@@ -6,7 +6,7 @@ from tests.integration.helpers.persons import insert_hr_record, insert_person
 
 
 def _create_person(conn, last, department=None, role=None):
-    """Personne, avec sa fiche RH quand un département ou un rôle est donné."""
+    """Insère une personne, avec sa fiche RH quand un département ou un rôle est donné."""
     person_id = insert_person(conn, last)
     if department or role:
         insert_hr_record(

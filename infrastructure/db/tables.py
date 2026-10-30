@@ -2,7 +2,7 @@
 
 Il sert à composer les requêtes de SQLAlchemy Core (`select(config.c.key)…`), et de référence à `alembic revision --autogenerate`.
 
-Les migrations Alembic (`alembic/versions/`, écrites à la main) font foi sur le schéma ; `infrastructure/db/schema.sql` en est un instantané, régénéré par `python -m interfaces.cli.dev.dump_schema`. Ce fichier suit la base à la main ; `alembic check`, joué par `tests/integration/infrastructure/db/test_sqlalchemy_smoke.py` sur une base montée par les migrations, contrôle l'accord.
+Les migrations Alembic (`alembic/versions/`, écrites à la main) font foi sur le schéma. `infrastructure/db/schema.sql` est un instantané du schéma, régénéré par `python -m interfaces.cli.dev.dump_schema`. Ce fichier suit la base à la main. `tests/integration/infrastructure/db/test_sqlalchemy_smoke.py` contrôle l'accord par `alembic check`, sur une base construite par les migrations.
 
 Le modèle couvre les tables et leurs colonnes. Index, clés étrangères et vues matérialisées (`contribution_structures`, `publication_author_alignment`, `publication_rors`, `publication_structures`, `source_contribution_structures`, `subject_cooccurrences`) relèvent des seules migrations : le filtre `include_object` d'`alembic/env.py` les écarte de la comparaison. Le code lit les vues matérialisées en SQL par leur nom, et les rafraîchit (`REFRESH`).
 """
@@ -91,15 +91,15 @@ audit_log = Table(
         ),
     ),
     Column(
-        "aggregate_type",
+        "entity_type",
         Text,
         nullable=False,
         comment=(
-            "Type de l'entité affectée : address, journal, perimeter, person, publication, structure."
+            "Type de l'entité affectée : address, config, perimeter, person, publication, publisher, serial, structure."
         ),
     ),
     Column(
-        "aggregate_id",
+        "entity_id",
         Integer,
         comment=(
             "ID de l'entité affectée, NULL si l'entité a été supprimée et "
@@ -140,7 +140,7 @@ config = Table(
     Column("value", Jsonb, nullable=False),
     Column("description", Text),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    # `value` est jsonb : la forme attendue dépend de la clé, que le domaine énumère.
+    # `value` est jsonb : la forme attendue dépend de la clé. Le domaine énumère les clés.
     CheckConstraint(
         f"key NOT IN ({', '.join(repr(key) for key in sorted(CAP_KEYS))}) "
         "OR (jsonb_typeof(value) = 'number' AND (value)::numeric >= 0 "
@@ -257,7 +257,7 @@ perimeters = Table(
 )
 
 
-# Structures de chaque périmètre : ses racines et toutes les structures dont elles sont tutelles, recalculées par `refresh_perimeter_structures`.
+# Structures de chaque périmètre : ses racines et toutes les structures sous leur tutelle, recalculées par `refresh_perimeter_structures`.
 perimeter_structures = Table(
     "perimeter_structures",
     metadata,
@@ -342,7 +342,7 @@ structure_name_forms = Table(
     Column("requires_context_of", ARRAY(Integer)),
     Column("is_excluding", Boolean, nullable=False, server_default="false"),
     UniqueConstraint("structure_id", "form_text", name="uq_snf_structure_form"),
-    # Une forme courte s'apparie seulement aux frontières de mot : un acronyme de quelques lettres se trouverait sinon au milieu de n'importe quel mot d'une adresse.
+    # Une forme courte se reconnaît seulement aux frontières de mot. Sinon, un acronyme de quelques lettres se trouverait au milieu de n'importe quel mot d'une adresse.
     CheckConstraint(
         "char_length(form_text) > 6 OR is_word_boundary",
         name="ck_structure_name_forms_short_word_boundary",
@@ -457,7 +457,7 @@ serials = Table(
     Column("is_academic", Boolean, server_default="true"),
     Column("doaj_payload", Jsonb),
     Column("doaj_imported_at", DateTime(timezone=True)),
-    # Nombre de publications du périmètre de la revue, que le pipeline et les fusions de l'administration tiennent à jour. Filtres, tris et affichage se passent ainsi de parcourir les publications.
+    # Nombre de publications du périmètre de la revue, tenu à jour par le pipeline et les fusions de l'administration. Filtres, tris et affichage se passent ainsi de parcourir les publications.
     Column("publication_count", Integer, nullable=False, server_default="0"),
     # Champs saisis à la main (`domain.serials.serial.ManualField`) : le pipeline les laisse en l'état.
     Column("manual_fields", ARRAY(Text), nullable=False, server_default="{}"),
@@ -591,7 +591,7 @@ publishers = Table(
         nullable=False,
         server_default="unknown",
     ),
-    # Nombre de publications du périmètre de l'éditeur, somme de celles de ses revues, que le pipeline et les fusions de l'administration tiennent à jour (comme `serials.publication_count`).
+    # Nombre de publications du périmètre de l'éditeur, somme des nombres de ses revues, tenu à jour par le pipeline et les fusions de l'administration (comme `serials.publication_count`).
     Column("publication_count", Integer, nullable=False, server_default="0"),
     UniqueConstraint("openalex_id", name="publishers_openalex_id_key"),
     schema="publishing",
@@ -638,7 +638,7 @@ identifier_status_enum = PgEnum(
     create_type=False,
 )
 
-# Provenance d'un identifiant : posé par une utilisatrice, ou promu depuis les contributions sources. Le vocabulaire est déclaré ici : le domaine en est dépourvu.
+# Provenance d'un identifiant : posé par une utilisatrice, ou promu depuis les contributions sources. Seul ce module déclare le vocabulaire.
 identifier_origin_enum = PgEnum(
     "manual",
     "auto",
@@ -879,7 +879,7 @@ contributor_information = Table(
 )
 
 
-# Arbitrages de l'administration au grain de la contribution source : la paire (contribution source, personne), que la phase `persons` lit comme une donnée fixe.
+# Arbitrages de l'administration au grain de la contribution source : la paire (contribution source, personne), lue comme une donnée fixe par la phase `persons`.
 confirmed_source_contributions = Table(
     "confirmed_source_contributions",
     metadata,
@@ -944,7 +944,7 @@ source_contributions = Table(
     Column("raw_author_name", Text),
     Column("raw_last_name", Text),
     Column("raw_first_name", Text),
-    # Informations du contributeur de la contribution source. La clé étrangère vit en base, comme les autres.
+    # Informations du contributeur de la contribution source. Comme les autres, la clé étrangère est déclarée seulement dans les migrations.
     Column("contributor_information_id", Integer, nullable=False),
     Column(
         "neutralized_identifiers",
@@ -1151,7 +1151,7 @@ publications = Table(
         server_default=text("'{}'::jsonb"),
     ),
     Column("is_retracted", Boolean, nullable=False, server_default="false"),
-    # Résumé, mots-clés, topics et numérotation sont dans `publications_detail` (1:1), que lit seulement la page de détail : `publications` reste étroite pour les listes et les facettes.
+    # Résumé, mots-clés, topics et numérotation sont dans `publications_detail` (1:1), lu seulement par la page de détail. `publications` reste étroite pour les listes et les facettes.
     # Indices des contributions de personnes non exclues, maintenus par la phase `finalize` et à l'exclusion d'une personne. `in_perimeter` en découle ; le filtre de périmètre des listes le lit.
     Column(
         "perimeter_evidence",
@@ -1637,7 +1637,7 @@ relation_type_enum = PgEnum(
 )
 
 
-# Relations sémantiques entre publications distinctes, du sujet vers l'objet. La cible est une publication du corpus (`target_publication_id`) ou un DOI hors corpus (`target_doi`) : l'unicité `NULLS NOT DISTINCT` dédoublonne sur celle des deux qui est renseignée.
+# Relations sémantiques entre publications distinctes, du sujet vers l'objet. La cible est une publication du corpus (`target_publication_id`) ou un DOI hors corpus (`target_doi`) : l'unicité `NULLS NOT DISTINCT` dédoublonne sur la colonne renseignée.
 publication_relations = Table(
     "publication_relations",
     metadata,
@@ -1687,7 +1687,7 @@ pipeline_phase_executions = Table(
 
 
 # ── Files d'attente de recalcul ───────────────────────────────────
-# Identifiants des lignes qu'une tâche du pipeline doit traiter (`infrastructure.db.queues`).
+# Identifiants des lignes à traiter par une tâche du pipeline (`infrastructure.db.queues`).
 
 
 def _queue(name: str) -> Table:

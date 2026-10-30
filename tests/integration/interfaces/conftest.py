@@ -10,7 +10,7 @@ from tests.integration.helpers.db import database_url
 
 
 def _build_test_sync_engine(identity: str = "pipeline") -> Engine:
-    """Engine SQLAlchemy synchrone sur bibliometrie_test, avec les garde-fous de l'engine de production.
+    """Construit un engine SQLAlchemy synchrone sur bibliometrie_test, avec les garde-fous de l'engine de production.
 
     `identity` choisit le rôle de connexion : celui de l'API pour l'application, celui du pipeline ou du propriétaire du schéma pour les jeux de données. Les tests exercent donc les droits de production.
     """
@@ -47,7 +47,7 @@ _settings.cookie_secure = False
 
 @pytest.fixture(scope="session")
 def _config_defaults() -> list[ConfigRow]:
-    """Réglages de `ops.config` posés par les migrations, lus avant le premier module de tests d'API."""
+    """Renvoie les réglages de `ops.config` posés par les migrations, lus avant le premier module de tests d'API."""
     return config_rows()
 
 
@@ -73,14 +73,14 @@ def _reset_rate_limiters():
 
 @pytest.fixture(scope="module")
 def client() -> Iterator[TestClient]:
-    """Client de l'application, sans session."""
+    """Fournit un client de l'application, sans session."""
     with TestClient(app, raise_server_exceptions=False) as c:
         yield c
 
 
 @pytest.fixture(scope="module")
 def auth_client() -> Iterator[TestClient]:
-    """Client de l'application, avec un cookie de session valide."""
+    """Fournit un client de l'application, avec un cookie de session valide."""
     from interfaces.api.session import issue_token
 
     with TestClient(app, raise_server_exceptions=False) as c:

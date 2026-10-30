@@ -1,6 +1,6 @@
 """Moissonnage ScanR : tâche `harvest.scanr`.
 
-Interroge l'index Elasticsearch de ScanR sur les affiliations du périmètre, année par année, avec une pagination `search_after`.
+La requête à l'index Elasticsearch de ScanR cible les affiliations du périmètre, année par année. La pagination suit `search_after`.
 """
 
 from __future__ import annotations
@@ -31,8 +31,8 @@ _COMMIT_EVERY = 500
 class ScanrHarvestConfig:
     """Configuration du moissonnage ScanR, lue en base."""
 
-    # Identifiants ScanR des structures du périmètre d'extraction.
     affiliation_ids: list[str]
+    """Identifiants ScanR des structures du périmètre de moissonnage."""
 
 
 def build_query(
@@ -42,11 +42,11 @@ def build_query(
     *,
     track_total: bool = False,
 ) -> Mapping[str, JsonValue]:
-    """Requête Elasticsearch d'une page.
+    """Construit la requête Elasticsearch d'une page.
 
-    Les clauses sont en contexte `filter` : un `term` sur l'année et un `terms` sur les affiliations. Ce contexte se passe de `_score`, et le cluster le met en cache : il répond neuf fois plus vite que l'équivalent `must`/`should` (1 s contre 9,5 s pour une page de 200), pour le même résultat. Le tri sur `id.keyword` sert la pagination `search_after`.
+    Les clauses sont en contexte `filter` : un `term` sur l'année et un `terms` sur les affiliations. Ce contexte se passe de `_score`, et le cluster le met en cache : il répond neuf fois plus vite que l'équivalent `must`/`should` (1 s contre 9,5 s pour une page de 200). Le tri sur `id.keyword` sert la pagination `search_after`.
 
-    `track_total` demande le comptage exact (`track_total_hits`), que seul `count` consomme. Les pages le coupent : Elasticsearch recompterait sinon tous les résultats à chaque page.
+    `track_total` demande le comptage exact (`track_total_hits`), consommé seulement par `count`. Les pages le coupent : Elasticsearch recompterait sinon tous les résultats à chaque page.
     """
     query: dict[str, JsonValue] = {
         "size": SCANR_PER_PAGE,
@@ -100,7 +100,7 @@ def harvest_year(
 
 
 class ScanrHarvester(SourceHarvester[ScanrHarvestConfig, ScanrClient]):
-    """Moissonnage ScanR : les documents des structures du périmètre, année par année."""
+    """Moissonnage ScanR des documents des structures du périmètre, année par année."""
 
     SOURCE = "scanr"
 

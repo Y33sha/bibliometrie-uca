@@ -18,7 +18,7 @@ _SNAPSHOT = "address_candidates_marks"
 
 
 def resolve_queued_addresses(conn: Connection) -> int:
-    """Compose `addresses.countries` pour les adresses en file, puis supprime les marquages traités. Retourne le nombre d'adresses dont le pays change."""
+    """Compose `addresses.countries` pour les adresses en file, puis supprime les marquages traités. Renvoie le nombre d'adresses au pays changé."""
     snapshot(conn, Queue.ADDRESS_CANDIDATES, _SNAPSHOT)
     address_ids = list(
         conn.execute(
@@ -37,7 +37,7 @@ def resolve_queued_addresses(conn: Connection) -> int:
 def resolve_address_countries(conn: Connection, address_ids: list[int]) -> int:
     """Compose `addresses.countries` pour `address_ids`.
 
-    Une adresse sans candidat perd son pays. Marque pour le recalcul des pays de leurs contributions sources les adresses dont le pays change. Retourne le nombre d'adresses dont le pays change.
+    Une adresse sans candidat perd son pays. Une adresse au pays changé est marquée pour le recalcul des pays de ses contributions sources. Renvoie le nombre d'adresses au pays changé.
     """
     changed = 0
     for start in range(0, len(address_ids), _RESOLVE_BATCH):

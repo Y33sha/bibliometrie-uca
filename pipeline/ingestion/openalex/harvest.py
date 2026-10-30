@@ -1,6 +1,6 @@
 """Moissonnage OpenAlex : tâche `harvest.openalex`.
 
-Interroge `/works` sur la lignée des institutions du périmètre (`authorships.institutions.lineage`), année par année ou depuis une date de modification, avec une pagination par curseur.
+La requête `/works` cible la lignée des institutions du périmètre (`authorships.institutions.lineage`), année par année ou depuis une date de modification. La pagination suit un curseur.
 """
 
 from __future__ import annotations
@@ -27,8 +27,8 @@ from pipeline.runtime.observability.progress import Progress
 class OpenalexHarvestConfig:
     """Configuration du moissonnage OpenAlex, lue en base."""
 
-    # Identifiants OpenAlex des institutions du périmètre d'extraction.
     institution_ids: list[str]
+    """Identifiants OpenAlex des institutions du périmètre de moissonnage."""
 
 
 def harvest_period(
@@ -73,7 +73,7 @@ def harvest_period(
 
 
 class OpenalexHarvester(SourceHarvester[OpenalexHarvestConfig, OpenalexClient]):
-    """Moissonnage OpenAlex : les works des institutions du périmètre, année par année ou depuis une date."""
+    """Moissonnage OpenAlex des works des institutions du périmètre, année par année ou depuis une date."""
 
     SOURCE = "openalex"
 
@@ -90,7 +90,10 @@ class OpenalexHarvester(SourceHarvester[OpenalexHarvestConfig, OpenalexClient]):
             self.logger.info("Mode incrémental : documents modifiés depuis %s", window.since)
 
     def harvest_all(self, window: HarvestWindow, config: OpenalexHarvestConfig) -> PhaseMetrics:
-        """Moissonne les works du périmètre. En mode incrémental, un seul périmètre : les works modifiés depuis la date, dans la plage d'années du mode complet. Sinon une passe par année."""
+        """Moissonne les works du périmètre.
+
+        En mode incrémental, un seul périmètre : les works modifiés depuis la date, dans la plage d'années du mode complet. Sinon une passe par année.
+        """
         ids = config.institution_ids
         client = self._client
         years = self._years(window)

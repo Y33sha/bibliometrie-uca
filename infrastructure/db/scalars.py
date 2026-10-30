@@ -1,8 +1,8 @@
 """Lecture d'un relevé SQL à une seule valeur.
 
-Une requête écrite en texte ignore le type de ses colonnes : `scalar_one` renvoie une valeur dont le vérificateur de types ne sait rien, et la déclaration de retour de l'appelant l'affirme sans que rien ne l'établisse. Ces fonctions font le contrôle, une fois, à l'endroit où la valeur passe du SQL au Python.
+Une requête écrite en texte ignore le type de ses colonnes. La valeur renvoyée par `scalar_one` est donc inconnue du vérificateur de types. Ces fonctions contrôlent le type au passage du SQL au Python.
 
-Elles s'appliquent aux relevés d'une ligne et d'une colonne — un `COUNT`, un identifiant rendu par `RETURNING`, un agrégat. Une valeur d'une autre nature que celle attendue signale une requête qui ne dit pas ce que son appelant croit, et lève.
+Elles s'appliquent aux relevés d'une ligne et d'une colonne : un `COUNT`, un identifiant renvoyé par `RETURNING`, un agrégat. Une valeur d'un autre type que le type attendu lève `TypeError`.
 """
 
 from datetime import datetime
@@ -10,15 +10,15 @@ from typing import Protocol
 
 
 class ScalarResult(Protocol):
-    """Un relevé rendant une valeur unique."""
+    """Relevé à valeur unique."""
 
     def scalar_one(self) -> object: ...
 
 
 def row_int(value: object) -> int:
-    """Une valeur lue en base, contrôlée comme entier.
+    """Renvoie une valeur lue en base, après contrôle de son type entier.
 
-    Un booléen est écarté : Python le tient pour un entier, mais `true` reçu là où un compte ou un identifiant est attendu ne vaut pas 1.
+    Un booléen est refusé. Python le tient pour un entier, mais `true` à la place d'un compte ou d'un identifiant est une erreur.
     """
     if isinstance(value, bool) or not isinstance(value, int):
         raise TypeError(f"entier attendu du relevé, {type(value).__name__} reçu")
@@ -26,12 +26,12 @@ def row_int(value: object) -> int:
 
 
 def scalar_int(result: ScalarResult) -> int:
-    """L'entier unique du relevé."""
+    """Renvoie l'entier unique du relevé."""
     return row_int(result.scalar_one())
 
 
 def scalar_datetime_or_none(result: ScalarResult) -> datetime | None:
-    """L'instant unique du relevé, ou `None` : le cas d'un agrégat sur un ensemble vide."""
+    """Renvoie l'instant unique du relevé, ou `None` pour un agrégat sur un ensemble vide."""
     value = result.scalar_one()
     if value is None or isinstance(value, datetime):
         return value

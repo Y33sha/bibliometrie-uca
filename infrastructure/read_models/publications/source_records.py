@@ -26,7 +26,7 @@ def _text(mapping: Mapping[str, object], key: str) -> str | None:
 
 
 def _pages(biblio: Mapping[str, object]) -> str | None:
-    """Plage de pages composée de `first_page` et `last_page`."""
+    """Renvoie la plage de pages composée de `first_page` et `last_page`."""
     first, last = _text(biblio, BiblioKey.FIRST_PAGE), _text(biblio, BiblioKey.LAST_PAGE)
     if first and last and first != last:
         return f"{first}-{last}"
@@ -71,12 +71,12 @@ def _record(r: Row[tuple[object, ...]]) -> SourceRecordMetadataOut:
 
 
 def _source_contributions(conn: Connection, publication_id: int) -> list[SourceContributionOut]:
-    """Contributions sources des enregistrements sources de la publication, avec leur contribution et leur entrée dans la contribution."""
+    """Renvoie les contributions sources des enregistrements sources de la publication, hors doublons d'auteur et collectifs (exclus de l'alignement), avec leur contribution et leur entrée dans la contribution."""
     rows = conn.execute(
         text(f"""
             SELECT sc.id, sc.source_record_id, sc.author_position AS position,
                    {contributor_display_name()} AS full_name, sc.roles, g.person_id,
-                   sc.in_perimeter, sc.collective, sc.countries,
+                   sc.in_perimeter, sc.countries,
                    (SELECT array_agg(structure_id ORDER BY structure_id)
                     FROM ({source_contribution_structure_ids("sc")}) ids) AS structure_ids,
                    (SELECT string_agg(addr.raw_text, ' | ' ORDER BY addr.id)
@@ -89,7 +89,7 @@ def _source_contributions(conn: Connection, publication_id: int) -> list[SourceC
             JOIN source_contributions sc ON sc.source_record_id = sr.id
             LEFT JOIN aligned_source_contributions gs ON gs.source_contribution_id = sc.id
             LEFT JOIN contributions g ON g.id = gs.contribution_id
-            WHERE sr.publication_id = :pid
+            WHERE sr.publication_id = :pid AND sc.duplicate_of IS NULL AND NOT sc.collective
             ORDER BY sc.source_record_id, sc.author_position NULLS LAST, sc.id
         """),  # noqa: S608
         {"pid": publication_id},
@@ -103,7 +103,6 @@ def _source_contributions(conn: Connection, publication_id: int) -> list[SourceC
             roles=r.roles,
             person_id=r.person_id,
             in_perimeter=r.in_perimeter,
-            collective=r.collective,
             structure_ids=r.structure_ids,
             raw_affiliation=r.raw_affiliation,
             countries=r.countries,
@@ -121,7 +120,7 @@ class PublicationSourceRecordQueries:
     _conn: Connection
 
     def get_publication_sources(self, publication_id: int) -> PublicationSourcesResponse | None:
-        """Métadonnées et contributions sources de chaque enregistrement source de la publication `publication_id`, ou `None` si la publication n'existe pas."""
+        """Renvoie les métadonnées et contributions sources de chaque enregistrement source de la publication `publication_id`, ou `None` si la publication n'existe pas."""
         title = self._conn.execute(
             text("SELECT title FROM publications WHERE id = :pid"), {"pid": publication_id}
         ).scalar_one_or_none()

@@ -5,22 +5,22 @@ Opération inverse de `StagingStore.mark_done` (`pipeline/ingestion/common/stagi
 
 Pour chaque source demandée, le script parcourt les clés du raw store (`data/raw_store/{source}/{source_id}.json.gz`), lit chaque payload et réhydrate la ligne `(source, source_id)` : `raw_data` reçoit le payload, `raw_hash` son empreinte (`change_detection_hash`, celle du moissonnage), et la ligne repasse à normaliser.
 
-Deux modes :
+Modes :
 
 - par défaut, seules les lignes `staging` présentes sont mises à jour ; une clé du store sans ligne est comptée comme orpheline et signalée ;
-- `--full` réinsère aussi les orphelines, par exemple après un `TRUNCATE staging`. Le `source_id` est la clé du store, et le DOI se relit dans le payload par l'adaptateur de la source. La provenance (`entry_mode`) et le marqueur de troncature (`authors_truncated`), que le payload seul ne donne pas, reprennent leur défaut et se recalculent au moissonnage suivant.
+- `--full` réinsère aussi les orphelines, par exemple après un `TRUNCATE staging`. Le `source_id` est la clé du store, et le DOI se relit dans le payload par l'adaptateur de la source. La provenance (`entry_mode`) et le marqueur de troncature (`authors_truncated`), absents du payload, reprennent leur défaut et se recalculent au moissonnage suivant.
 
 La normalisation se lance ensuite, avec les phases qui la suivent :
     run_pipeline --from normalize --sources <sources>
 
-`--doi-prefix` limite une source dont l'identifiant natif est le DOI (crossref, datacite) aux DOI d'un préfixe. `--id-prefix` limite toute source aux identifiants d'un préfixe. La normalisation traite ensuite ces seuls documents.
+`--doi-prefix` limite une source à identifiant natif DOI (crossref, datacite) aux DOI d'un préfixe. `--id-prefix` limite toute source aux identifiants d'un préfixe. La normalisation traite ensuite seulement ces lignes.
 
 Usage :
-    python -m interfaces.cli.maintenance.rehydrate_staging_from_raw_store \
+    uv run python -m interfaces.cli.maintenance.rehydrate_staging_from_raw_store \
         --sources hal,openalex [--full] [--dry-run]
-    python -m interfaces.cli.maintenance.rehydrate_staging_from_raw_store \
+    uv run python -m interfaces.cli.maintenance.rehydrate_staging_from_raw_store \
         --sources crossref --doi-prefix 10.70675
-    python -m interfaces.cli.maintenance.rehydrate_staging_from_raw_store \
+    uv run python -m interfaces.cli.maintenance.rehydrate_staging_from_raw_store \
         --sources scanr --id-prefix nnt
 """
 
@@ -112,7 +112,7 @@ def rehydrate_or_create_staging_row(
 
 
 def _doi_for(source: str, raw_data: Mapping[str, JsonValue]) -> str | None:
-    """DOI à poser en staging pour un payload réhydraté, lu par l'adaptateur de la source."""
+    """Renvoie le DOI à poser en staging pour un payload réhydraté, lu par l'adaptateur de la source."""
     identity = ADAPTERS[Source(source)].identify(raw_data)
     return identity.doi if identity else None
 

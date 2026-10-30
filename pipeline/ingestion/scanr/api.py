@@ -35,7 +35,7 @@ class ScanrClient:
         )
 
     def count(self, query: Mapping[str, JsonValue]) -> int:
-        """Nombre de documents de `query`, lu sur un comptage exact sans document (`size=0`)."""
+        """Renvoie le nombre de documents de `query`, lu sur un comptage exact sans document (`size=0`)."""
         counting = {**query, "track_total_hits": True, "size": 0}
         return as_int(at_path(self.fetch_page(counting), "hits", "total").get("value")) or 0
 
@@ -43,7 +43,7 @@ class ScanrClient:
 async def search(
     client: httpx2.AsyncClient, query: Mapping[str, JsonValue], *, label: str
 ) -> LookupOutcome[list[Mapping[str, JsonValue]]]:
-    """Documents (`_source`) de la requête Elasticsearch `query`. Une réponse valide sans hit renvoie une liste vide."""
+    """Renvoie les documents (`_source`) de la requête Elasticsearch `query`. Une réponse valide sans hit renvoie une liste vide."""
     outcome = await lookup_json_async(
         client,
         "POST",

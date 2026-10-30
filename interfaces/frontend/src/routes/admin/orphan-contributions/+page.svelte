@@ -22,6 +22,9 @@
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
 	import Modal from '#lib/components/Modal.svelte';
 	import FacetDropdown from '#lib/components/FacetDropdown.svelte';
+	import IconButton from '#lib/components/IconButton.svelte';
+	import PublicationDrawer from '#lib/components/publications/PublicationDrawer.svelte';
+	import { useDrawerParam } from '#lib/composables/useDrawerParam.svelte.js';
 	import { columnLabels, filterLabels } from '#lib/labels.js';
 	import type { FacetOption } from '#lib/components/FacetDropdown.svelte';
 	import type { components } from '#lib/api/schema.js';
@@ -37,6 +40,8 @@
 	): Promise<PersonResult[]> {
 		return request<PersonResult[]>(`/api/persons/search?search=${encodeURIComponent(q)}`);
 	}
+
+	const drawer = useDrawerParam('publication');
 
 	let search = $state('');
 	let selectedLabs: string[] = $state([]);
@@ -196,13 +201,13 @@
 		};
 	}
 
-	/** Signale les contributions qu'un lot écarte : déjà rattachées, ou dans une publication où la personne a déjà une contribution rattachée par une décision humaine. */
+	/** Signale les contributions écartées d'un lot. */
 	function reportSkipped(requested: number, assigned: number) {
 		const skipped = requested - assigned;
 		if (skipped <= 0) return;
 		const plural = skipped > 1 ? 's' : '';
 		toast(
-			`${skipped} contribution${plural} écartée${plural} : déjà rattachée${plural}, ou dans une publication où la personne a déjà une contribution rattachée manuellement.`,
+			`${skipped} contribution${plural} écartée${plural} : personne déjà rattachée à la publication.`,
 			'warning',
 			8000,
 		);
@@ -239,6 +244,7 @@
 		if (list.page > 1) p.set('page', String(list.page));
 		if (search.trim()) p.set('search', search.trim());
 		if (selectedLabs.length) p.set('lab', selectedLabs.join(','));
+		if (drawer.id !== null) p.set('publication', String(drawer.id));
 		void replaceQuery(resolve('admin/orphan-contributions'), p);
 	}
 
@@ -304,65 +310,73 @@
 		<table class="data-table">
 			<thead>
 				<tr>
-					<th style="width:30px"><input type="checkbox" aria-label="Tout sélectionner" checked={allSelected} onchange={toggleAll} /></th>
-					<th>{columnLabels.sources}</th>
-					<th>Nom</th>
-					<th>Publication</th>
-					<th>{columnLabels.labs}</th>
-					<th>Action</th>
+					<th class="fit"><input type="checkbox" aria-label="Tout sélectionner" checked={allSelected} onchange={toggleAll} /></th>
+					<th class="fit">{columnLabels.sources}</th>
+					<th class="fit">Nom</th>
+					<th class="publication-cell">Publication</th>
+					<th class="fit">{columnLabels.labs}</th>
+					<th class="fit">Action</th>
 				</tr>
 			</thead>
 			<tbody>
 				{#each orphans as o, i (o.contribution_id)}
-					<tr>
+					<tr class:active-row={o.publication_id === drawer.id}>
 						<td><input type="checkbox" aria-label="Sélectionner la contribution de {o.full_name}" checked={selectedIds.has(o.contribution_id)} onchange={() => toggleSelect(o)} /></td>
 						<td class="links-cell">
 							{#each o.sources as source (source)}
 								<SourceTag {source} />
 							{/each}
 						</td>
-						<td>{o.full_name}</td>
-						<td>
-							<a href={resolve(`publications/${o.publication_id}`)} class="publication-link">
-								{o.publication_year ?? '?'} — <span class="publication-title"><PublicationTitle titre={o.publication_title} /></span>
-							</a>
+						<td class="fit">{o.full_name}</td>
+						<td class="publication-cell">
+							<div class="publication-row row-actions">
+								<IconButton icon="panel" label="Ouvrir le volet" onclick={() => drawer.open(o.publication_id)} />
+								<a href={resolve(`publications/${o.publication_id}`)} class="publication-link">
+									<span class="publication-year">{o.publication_year ?? '?'} —</span>
+									<span class="publication-title"><PublicationTitle titre={o.publication_title} /></span>
+								</a>
+							</div>
 						</td>
 						<td>
-							{#each o.labs as lab (lab.id)}
-								<a href={resolve(`structures/${lab.id}`)} class="lab-tag">{lab.label}</a>
-							{/each}
+							<div class="labs">
+								{#each o.labs as lab (lab.id)}
+									<a href={resolve(`structures/${lab.id}`)} class="lab-tag">{lab.label}</a>
+								{/each}
+							</div>
 						</td>
 						<td>
-							{#if activeAssignIdx === i}
-								<div class="assign-panel">
-									<div class="assign-row">
-										<input type="search" placeholder="Nom de la personne" value={assignSearch.query}
-												use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { closeAssign(); } }}
-											oninput={(e) => assignSearch.setQuery((e.target as HTMLInputElement).value)} />
-										<button class="btn btn-sm" onclick={closeAssign}>&times;</button>
+							<div class="action-box">
+								{#if activeAssignIdx === i}
+									<div class="assign-panel">
+										<div class="assign-row">
+											<input type="search" placeholder="Nom de la personne" value={assignSearch.query}
+													use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { closeAssign(); } }}
+												oninput={(e) => assignSearch.setQuery((e.target as HTMLInputElement).value)} />
+											<button class="btn btn-sm" onclick={closeAssign}>&times;</button>
+										</div>
+										{#if assignSearch.loading}
+											<span class="loading-text">…</span>
+										{:else if assignSearch.results.length}
+											<div class="assign-results" use:anchored>
+												{#each assignSearch.results as r (r.id)}
+													<button class="result-btn" onclick={() => assign(o, r.id)}>
+														<strong>{titleCase(r.last_name)}</strong> {titleCase(r.first_name)}
+														{#if r.has_rh}<RhCheck />{/if}
+														<span class="result-hint">{r.department_name || `#${r.id}`}</span>
+													</button>
+												{/each}
+											</div>
+										{:else if assignSearch.query.length >= 2}
+											<div class="assign-results" use:anchored>
+												<span class="loading-text">Aucun résultat</span>
+												<button class="btn btn-sm btn-create" onclick={() => createAndAssign(o)}>Créer « {o.full_name} »</button>
+											</div>
+										{/if}
 									</div>
-									{#if assignSearch.loading}
-										<span class="loading-text">…</span>
-									{:else if assignSearch.results.length}
-										<div class="assign-results" use:anchored>
-											{#each assignSearch.results as r (r.id)}
-												<button class="result-btn" onclick={() => assign(o, r.id)}>
-													<strong>{titleCase(r.last_name)}</strong> {titleCase(r.first_name)}
-													{#if r.has_rh}<RhCheck />{/if}
-													<span class="result-hint">{r.department_name || `#${r.id}`}</span>
-												</button>
-											{/each}
-										</div>
-									{:else if assignSearch.query.length >= 2}
-										<div class="assign-results" use:anchored>
-											<span class="loading-text">Aucun résultat</span>
-											<button class="btn btn-sm btn-create" onclick={() => createAndAssign(o)}>Créer « {o.full_name} »</button>
-										</div>
-									{/if}
-								</div>
-							{:else}
-								<button class="btn btn-sm" onclick={() => openAssign(i)}>Attribuer…</button>
-							{/if}
+								{:else}
+									<button class="btn btn-sm" onclick={() => openAssign(i)}>Attribuer…</button>
+								{/if}
+							</div>
 						</td>
 					</tr>
 				{/each}
@@ -372,6 +386,10 @@
 
 	<Pagination page={list.page} pages={list.pages} onchange={(p) => { list.goToPage(p); syncUrl(); }} />
 </ListStatus>
+
+{#if drawer.id !== null}
+	<PublicationDrawer publicationId={drawer.id} onclose={() => drawer.open(null)} onopen={drawer.open} />
+{/if}
 
 {#if createModal}
 	<Modal
@@ -422,13 +440,21 @@
 {/if}
 
 <style>
-	.publication-link { color: var(--accent); text-decoration: none; font-size: var(--fs-sm); }
+	/* Colonnes à la largeur de leur contenu. La colonne Publication prend le reste : `max-width: 0` l'empêche de s'élargir à la longueur du titre, qui est tronqué là où il déborde. */
+	.fit { width: 1%; white-space: nowrap; }
+	.publication-cell { width: 100%; max-width: 0; }
+	/* Laboratoires à la largeur de leur contenu, passés à la ligne au-delà de 15em. */
+	.labs { width: max-content; max-width: 15em; }
+	/* Largeur fixe, portée par le contenu : la colonne Publication réduit les autres colonnes à la largeur minimale de leur contenu. */
+	.action-box { width: 11rem; }
+	.publication-row { display: flex; align-items: center; gap: 4px; }
+	.publication-link { display: flex; gap: 0.3em; min-width: 0; color: var(--accent); text-decoration: none; font-size: var(--fs-sm); }
 	.publication-link:hover { text-decoration: underline; }
-	/* Titre coupé à la largeur de 50 caractères, sur une ligne. */
-	.publication-title { display: inline-block; max-width: 50ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+	.publication-year { flex: none; }
+	.publication-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 	.assign-panel { position: relative; }
 	.assign-row { display: flex; gap: 4px; align-items: center; }
-	.assign-row input { padding: 4px 8px; border: 1px solid var(--border); border-radius: var(--radius); font-size: var(--fs-sm); width: 200px; }
+	.assign-row input { flex: 1; min-width: 0; padding: 4px 8px; border: 1px solid var(--border); border-radius: var(--radius); font-size: var(--fs-sm); }
 	.assign-results {
 		display: flex; flex-direction: column; gap: 2px;
 		background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);

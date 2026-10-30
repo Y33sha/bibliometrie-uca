@@ -1,6 +1,6 @@
 """Exécution des tâches d'une phase, dans l'ordre du graphe (`pipeline.graph`).
 
-Une phase fournit un `TaskStep` par tâche. L'exécuteur ouvre la section de la tâche, l'exécute, par l'accès à sa source si elle sort sur le réseau, écrit sa ligne de bilan, puis lance sa maintenance.
+Une phase fournit un `TaskStep` par tâche. L'exécuteur ouvre la section de la tâche, puis l'exécute. Une tâche réseau passe par l'accès à sa source. L'exécuteur écrit ensuite la ligne de bilan de la tâche et lance sa maintenance.
 """
 
 from __future__ import annotations
@@ -23,21 +23,21 @@ type TaskRun = Callable[[PhaseContext], PhaseMetrics]
 
 @dataclass(frozen=True)
 class TaskStep:
-    """Ce que l'exécuteur sait d'une tâche en plus du graphe."""
+    """Description d'une tâche pour l'exécuteur, en complément du graphe."""
 
     run: TaskRun
-    # Titre de la sous-étape que la tâche ouvre. `None` : la tâche écrit sous le titre courant.
     section: str | None = None
-    # Libellé de la ligne de bilan. `None` : la tâche écrit elle-même ses lignes.
+    """Titre de la sous-étape ouverte par la tâche. `None` : la tâche écrit sous le titre courant."""
     label: str | None = None
-    # La tâche affiche une barre d'avancement en terminal : sa ligne de bilan va au seul journal.
+    """Libellé de la ligne de bilan. `None` : la tâche écrit elle-même ses lignes."""
     progress_bar: bool = False
-    # Échecs consécutifs avant que le circuit-breaker de la source coupe. `None` : seuil par défaut.
+    """La tâche affiche une barre d'avancement en terminal, donc sa ligne de bilan va seulement au journal."""
     threshold: int | None = None
-    # Condition d'exécution, évaluée avant l'accès à la source. Une tâche écartée renvoie des métriques vides et n'écrit rien.
+    """Échecs consécutifs avant la coupure du circuit-breaker de la source. `None` : seuil par défaut."""
     when: Callable[[PhaseContext], bool] | None = None
-    # La tâche n'écrit rien quand elle n'a rien traité : `total` nul, sans signal.
+    """Condition d'exécution, évaluée avant l'accès à la source. Une tâche écartée renvoie des métriques vides et n'écrit rien."""
     silent_when_empty: bool = False
+    """La tâche n'écrit rien sans élément traité : `total` nul, sans signal."""
 
 
 def run_tasks(
@@ -49,7 +49,10 @@ def run_tasks(
 ) -> dict[str, PhaseMetrics]:
     """Exécute les tâches de `phase` dans l'ordre du graphe et renvoie leurs métriques, par nom de tâche.
 
-    Les tâches consécutives d'un même groupe parallèle s'exécutent ensemble par `parallel` ; leurs lignes de bilan suivent, dans l'ordre du graphe. Lève `ValueError` si `steps` ne couvre pas exactement les tâches de la phase.
+    Les tâches consécutives d'un même groupe parallèle s'exécutent ensemble par `parallel`. Leurs lignes de bilan suivent, dans l'ordre du graphe.
+
+    Raises:
+        ValueError: `steps` diffère des tâches de la phase.
     """
     tasks = [task for task in TASKS if task.phase == phase]
     if set(steps) != {task.name for task in tasks}:
@@ -106,7 +109,7 @@ def _close_if_silent(
     results: Mapping[str, PhaseMetrics],
     ctx: PhaseContext,
 ) -> None:
-    """Ferme sur « Rien à faire » la section des tâches `names` quand toutes se sont tues : sans cela, le titre resterait seul."""
+    """Ferme sur « Rien à faire » la section des tâches `names` quand toutes sont silencieuses : le titre a ainsi une ligne sous lui."""
     if all(
         steps[name].silent_when_empty and results[name].total == 0 and not results[name].signals
         for name in names
@@ -134,7 +137,7 @@ def _write_lines(
 
 
 def _maintain(task: Task, ctx: PhaseContext) -> list[tuple[str, str]]:
-    """Lance la maintenance de la tâche et renvoie une ligne de journal par opération. `VACUUM FULL` dans un mode qui le demande."""
+    """Lance la maintenance de la tâche et renvoie une ligne de journal par opération. `VACUUM` devient `VACUUM FULL` dans un mode qui le demande."""
     lines = []
     for operation in task.maintenance:
         if operation.startswith("VACUUM ") and ctx.options.policy.vacuum_full:
@@ -169,7 +172,7 @@ def _execute(task: Task, step: TaskStep, phase: str, ctx: PhaseContext) -> Phase
 
 
 def _outcome(metrics: PhaseMetrics) -> str:
-    """Bilan d'une tâche : sa ligne de bilan, ce qui l'a empêchée de travailler, ou ses compteurs."""
+    """Renvoie le bilan d'une tâche : sa ligne de bilan, l'obstacle à son exécution, ou ses compteurs."""
     if metrics.report is not None:
         return metrics.report
     if any(s["code"] == "source_unconfigured" for s in metrics.signals):
@@ -181,11 +184,12 @@ def _outcome(metrics: PhaseMetrics) -> str:
 
 @dataclass(frozen=True)
 class SingleTaskPhase:
-    """Phase d'une seule tâche, `task`, dont `phase` fait le travail. `label` donne à la tâche une ligne de bilan, écrite au seul journal."""
+    """Phase d'une seule tâche, `task`, exécutée par `phase`."""
 
     task: str
     phase: Phase
     label: str | None = None
+    """Libellé de la ligne de bilan de la tâche, écrite seulement au journal."""
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
         step = TaskStep(self.phase.run, label=self.label)

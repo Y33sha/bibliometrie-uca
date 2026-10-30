@@ -28,11 +28,11 @@ from infrastructure.read_models.sql_fragments import (
     contributor_display_name,
 )
 from infrastructure.read_models.subjects.models import SubjectOut
-from infrastructure.sql_fragments import active_issns
+from infrastructure.sql_fragments import active_issns, is_laboratory
 
 
 def get_publication_relations(conn: Connection, publication_id: int) -> list[RelatedPublicationOut]:
-    """Publications apparentées, dans les deux sens, vues depuis la publication.
+    """Renvoie les publications apparentées, dans les deux sens, vues depuis la publication.
 
     Les relations sortantes gardent leur type ; les entrantes sont inversées pour se lire depuis la publication. Une cible du corpus vient avec ses métadonnées, une cible hors corpus avec son seul DOI. Une paire déclarée des deux côtés s'affiche une fois.
     """
@@ -85,20 +85,27 @@ def get_publication_relations(conn: Connection, publication_id: int) -> list[Rel
 
 
 def structures_by_id(conn: Connection, ids: set[int]) -> dict[str, StructureInfo]:
-    """Acronyme, nom et type des structures données, par identifiant en texte."""
+    """Renvoie l'acronyme, le nom et le type des structures données, par identifiant en texte, et si chacune est un laboratoire."""
     if not ids:
         return {}
     rows = conn.execute(
-        text("""
-            SELECT id, acronym, name, structure_type::text AS type FROM structures
-            WHERE id = ANY(:ids)
+        text(f"""
+            SELECT s.id, s.acronym, s.name, s.structure_type::text AS type,
+                   {is_laboratory("s")} AS is_laboratory
+            FROM structures s
+            WHERE s.id = ANY(:ids)
         """),
         {"ids": list(ids)},
     ).all()
-    return {str(s.id): StructureInfo(acronym=s.acronym, name=s.name, type=s.type) for s in rows}
+    return {
+        str(s.id): StructureInfo(
+            acronym=s.acronym, name=s.name, type=s.type, is_laboratory=s.is_laboratory
+        )
+        for s in rows
+    }
 
 
-# Identifiants de bases qui référencent la publication, affichés dans la colonne latérale, dans l'ordre d'affichage. Le lien source HAL couvre le `hal_id`, le DOI de la publication ses DOI. arXiv et PMCID désignent des copies, qui sont des localisations.
+# Identifiants de bases référençant la publication, affichés dans la colonne latérale, dans l'ordre d'affichage. Le lien source HAL couvre le `hal_id`, le DOI de la publication ses DOI. arXiv et PMCID désignent des copies, donc des localisations.
 _EXTERNAL_IDENTIFIER_TYPES = (SourceIdentifierType.PMID, SourceIdentifierType.NNT)
 
 # Sources dont l'enregistrement est la page du DOI, déjà affiché.
@@ -109,7 +116,7 @@ _SOURCE_PLATFORMS: dict[str, str] = {Source.HAL: HAL.name}
 
 
 def _referenced_by(sources: list[SourceRecordOut], access: Access) -> list[SourceRecordOut]:
-    """Sources qui référencent la publication sans en donner de copie : une source dont la plateforme figure parmi les liens d'accès en est retirée."""
+    """Renvoie les sources référençant la publication sans en donner de copie : une source dont la plateforme figure parmi les liens d'accès est retirée."""
     platforms = {link.label for link in access.links}
     return [
         s
@@ -121,7 +128,7 @@ def _referenced_by(sources: list[SourceRecordOut], access: Access) -> list[Sourc
 def get_publication_external_identifiers(
     conn: Connection, publication_id: int
 ) -> list[ExternalIdentifierOut]:
-    """PMID et NNT actifs des enregistrements sources de la publication, sans doublon, par type (`_EXTERNAL_IDENTIFIER_TYPES`) puis par valeur.
+    """Renvoie les PMID et NNT actifs des enregistrements sources de la publication, sans doublon, par type (`_EXTERNAL_IDENTIFIER_TYPES`) puis par valeur.
 
     Un NNT déjà présent dans une source `theses` est omis : l'identifiant natif de cette source est le NNT, et son lien theses.fr le couvre, comme le lien HAL couvre le `hal_id`.
     """
@@ -148,7 +155,7 @@ def get_publication_external_identifiers(
 
 
 def get_publication_subjects(conn: Connection, publication_id: int) -> list[SubjectOut]:
-    """Sujets d'une publication, sans doublon, avec les sources qui les donnent, triés par libellé sans égard à la casse."""
+    """Renvoie les sujets d'une publication, sans doublon, avec leurs sources, triés par libellé sans égard à la casse."""
     rows = conn.execute(
         text("""
             SELECT s.id, s.label, s.language,
@@ -170,7 +177,7 @@ class PublicationDetailQueries:
     _conn: Connection
 
     def get_publication_detail(self, publication_id: int) -> PublicationDetailResponse | None:
-        """Détail complet d'une publication : métadonnées, sources, contributions. `None` si la publication n'existe pas."""
+        """Renvoie le détail complet d'une publication : métadonnées, sources, contributions. `None` si la publication n'existe pas."""
         publication_row = self._conn.execute(
             text(f"""
                 SELECT p.id, p.title, p.publication_year, p.doi, p.doc_type::text AS doc_type,
@@ -196,7 +203,7 @@ class PublicationDetailQueries:
         ).one_or_none()
         if not publication_row:
             return None
-        # Mots-clés libres (agrégat des sources) : hors référentiel `subjects`, rendus à part.
+        # Mots-clés libres réunis depuis les sources : hors référentiel `subjects`, renvoyés à part.
         keywords = publication_row.keywords or []
 
         sources_rows = self._conn.execute(

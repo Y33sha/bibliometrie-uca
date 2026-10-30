@@ -1,7 +1,6 @@
 """Modèles Pydantic du router des adresses : corps des requêtes entrantes et réponses composées après mutation."""
 
-from pydantic import BaseModel
-
+from application.ports.model import Model
 from infrastructure.read_models.addresses.models import (
     AddressPublicationItem,
     AddressStructureSummary,
@@ -12,22 +11,22 @@ from infrastructure.read_models.addresses.models import (
 # `is_confirmed` : vrai pour confirmé, faux pour rejeté, `None` pour revenir en attente.
 
 
-class ReviewAction(BaseModel):
+class ReviewAction(Model):
     structure_id: int
     is_confirmed: bool | None
 
 
-class BatchReviewAction(BaseModel):
+class BatchReviewAction(Model):
     address_ids: list[int]
     structure_id: int
     is_confirmed: bool | None
 
 
-class SetCountry(BaseModel):
+class SetCountry(Model):
     countries: list[str] | None = None
 
 
-class BatchSetCountry(BaseModel):
+class BatchSetCountry(Model):
     country_code: str
     address_ids: list[int] | None = None
     search: str = ""
@@ -38,7 +37,7 @@ class BatchSetCountry(BaseModel):
 # ----- Réponses composées par le router -----
 
 
-class AddressPublicationsResponse(BaseModel):
+class AddressPublicationsResponse(Model):
     """Publications rattachées à une adresse, avec le texte brut de celle-ci."""
 
     address_id: int
@@ -46,7 +45,7 @@ class AddressPublicationsResponse(BaseModel):
     publications: list[AddressPublicationItem]
 
 
-class AddressReviewResponse(BaseModel):
+class AddressReviewResponse(Model):
     """Réponse de POST /api/addresses/{addr_id}/review."""
 
     id: int
@@ -55,7 +54,7 @@ class AddressReviewResponse(BaseModel):
     structures: list[AddressStructureSummary]
 
 
-class BatchCountryResponse(BaseModel):
+class BatchCountryResponse(Model):
     """POST /api/addresses/batch-country : nombre d'adresses modifiées."""
 
     updated: int

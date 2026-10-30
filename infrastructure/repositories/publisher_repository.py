@@ -1,6 +1,6 @@
-"""Repository PostgreSQL de l'agrégat Publisher : édition, pays et fusion.
+"""Repository PostgreSQL de l'entité Publisher : édition et fusion.
 
-Le trouve-ou-crée du pipeline vit dans `pipeline/transformation/publishing/find_or_create.py`. Les erreurs sont celles du domaine ; l'orchestration est dans `application/services/`.
+Le trouve-ou-crée du pipeline est dans `pipeline/transformation/publishing/find_or_create.py`. Les erreurs sont celles du domaine ; l'orchestration est dans `application/services/`.
 
 La fusion applique la règle de chaque donnée d'un éditeur (`publisher_merge`). Le service de fusion trouve d'abord les revues homonymes (`SerialRepository.find_shared_title_serial_pairs`).
 """
@@ -29,7 +29,7 @@ class _PublisherRow(NamedTuple):
 
 
 def _publisher_from_row(row: _PublisherRow) -> Publisher:
-    """Éditeur de domaine d'une ligne de `publishers`."""
+    """Renvoie l'éditeur de domaine d'une ligne de `publishers`."""
     return Publisher(
         id=row.id,
         name=row.name,
@@ -40,7 +40,7 @@ def _publisher_from_row(row: _PublisherRow) -> Publisher:
 
 
 class PgPublisherRepository(PublisherRepository):
-    """Accès PostgreSQL à l'agrégat Publisher via une `Connection` SQLAlchemy."""
+    """Accès PostgreSQL à l'entité Publisher via une `Connection` SQLAlchemy."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
@@ -61,12 +61,10 @@ class PgPublisherRepository(PublisherRepository):
             return None
         return _publisher_from_row(row_as(_PublisherRow, row))
 
-    # ── Enrichissement pays (maintenance) ──────────────────────────
-
     # ── Écriture ───────────────────────────────────────────────────
 
     def save(self, publisher: Publisher) -> None:
-        """Écrit les champs modifiables par l'API d'un éditeur chargé. Le nom normalisé se recalcule ; `openalex_id`, que tient le pipeline, reste. Lève `NotFoundError` si l'id est absent."""
+        """Écrit les champs modifiables par l'API d'un éditeur chargé. Le nom normalisé se recalcule ; `openalex_id`, tenu par le pipeline, reste. Lève `NotFoundError` si l'id est absent."""
         result = self._conn.execute(
             update(publishers)
             .where(publishers.c.id == publisher.id)

@@ -1,6 +1,6 @@
-"""Plafond du décalage qu'une lecture paginée peut demander.
+"""Plafond du décalage demandé par une lecture paginée.
 
-Le coût d'une lecture profonde dépend du produit du rang de page par la taille de page : un rang arbitrairement grand fait trier tout le résultat par la base, pour aucune ligne rendue. Le plafond s'applique donc au décalage, et non au rang seul.
+Le coût d'une lecture profonde dépend du produit du rang de page par la taille de page : un rang arbitrairement grand fait trier tout le résultat par la base, pour aucune ligne renvoyée. Le plafond s'applique donc au décalage.
 """
 
 import pytest

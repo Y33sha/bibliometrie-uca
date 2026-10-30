@@ -1,6 +1,6 @@
 """Moissonnage d'une source par l'identifiant des personnes RH, identifiant confirmé ou authentifié : socle commun des tâches `harvest_by_person`.
 
-Chaque source interroge des lots de personnes, page après page, sur la plage d'années de l'extraction. Une requête réunit tous les identifiants des personnes du lot, dans les types que la source accepte (`PERSON_SEARCH_IDENTIFIERS`). Un document que plusieurs lots ramènent est écrit une fois par run. Une erreur sur un lot est journalisée, et le moissonnage passe au suivant.
+Chaque source est interrogée par lots de personnes, page après page, sur la plage d'années du moissonnage. Une requête réunit tous les identifiants des personnes du lot, dans les types acceptés par la source (`PERSON_SEARCH_IDENTIFIERS`). Un document ramené par plusieurs lots est écrit une fois par run. Une erreur sur un lot est journalisée, et le moissonnage passe au suivant.
 """
 
 from __future__ import annotations
@@ -35,7 +35,7 @@ type Identifiers = Mapping[PersonIdentifierType, list[str]]
 def searched_persons(
     conn: Connection, id_types: Collection[PersonIdentifierType]
 ) -> list[Identifiers]:
-    """Identifiants des personnes RH dans les types `id_types`, aux statuts `SEARCHED_IDENTIFIER_STATUSES`, par personne. Une personne sans identifiant de ces types est absente."""
+    """Renvoie, par personne RH, ses identifiants des types `id_types` aux statuts `SEARCHED_IDENTIFIER_STATUSES`. Une personne sans identifiant de ces types est absente."""
     rows = conn.execute(
         text("""
             SELECT pi.person_id, pi.id_type::text AS id_type, pi.id_value
@@ -56,7 +56,7 @@ def searched_persons(
 
 
 def merge_identifiers(persons: list[Identifiers]) -> dict[PersonIdentifierType, list[str]]:
-    """Identifiants d'un lot de personnes, par type, sans doublon."""
+    """Fusionne les identifiants d'un lot de personnes, par type, sans doublon."""
     merged: dict[PersonIdentifierType, list[str]] = {}
     for person in persons:
         for id_type, values in person.items():
@@ -75,21 +75,22 @@ class PersonSearchConfig:
 
 @dataclass(frozen=True)
 class PersonSearchPage:
-    """Une page de résultats : ses documents, et le jeton de la page suivante (`None` en fin de résultats)."""
+    """Une page de résultats."""
 
     records: list[Mapping[str, JsonValue]]
     next_token: str | None
+    """Jeton de la page suivante, `None` en fin de résultats."""
 
 
 class PersonSearchHarvester[ClientT](SourceHarvester[PersonSearchConfig, ClientT]):
     """Documents des personnes RH, cherchés par lots de personnes."""
 
-    # Personnes par requête.
     BATCH_SIZE: ClassVar[int] = 10
+    """Personnes par requête."""
 
     @property
     def id_types(self) -> frozenset[PersonIdentifierType]:
-        """Types d'identifiant que la source accepte."""
+        """Types d'identifiant acceptés par la source."""
         return PROFILES[Source(self.SOURCE)].person_identifiers
 
     @abstractmethod
@@ -100,7 +101,7 @@ class PersonSearchHarvester[ClientT](SourceHarvester[PersonSearchConfig, ClientT
         next_token: str | None,
         label: str,
     ) -> PersonSearchPage:
-        """Une page des documents d'un des `identifiers`, parus entre les deux années de `years` : la première quand `next_token` est `None`."""
+        """Renvoie une page des documents d'un des `identifiers`, parus entre les deux années de `years`. Renvoie la première page quand `next_token` est `None`."""
 
     def load_config(self, conn: Connection) -> PersonSearchConfig:
         persons = searched_persons(conn, self.id_types)

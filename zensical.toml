@@ -49,6 +49,7 @@ nav = [
     "sources/08-theses.md",
     "sources/09-sources-supplementaires.md",
     "sources/10-imports-manuels.md",
+    "sources/11-exemple-de-publication.md",
   ] },
   { "Pipeline" = [
     "pipeline/01-vue-d-ensemble.md",
@@ -69,8 +70,9 @@ nav = [
     "architecture/03-application.md",
     "architecture/04-infrastructure.md",
     "architecture/05-interfaces.md",
-    "architecture/06-composition-roots.md",
-    "architecture/07-tests.md",
+    "architecture/06-pipeline.md",
+    "architecture/07-composition-roots.md",
+    "architecture/08-tests.md",
   ] },
   { "Exploitation" = [
     "exploitation/01-developpement-local.md",

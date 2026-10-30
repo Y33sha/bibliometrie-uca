@@ -1,6 +1,6 @@
 """Moissonnage HAL : tâche `harvest.hal`.
 
-Interroge l'union des collections du périmètre en une seule requête Solr (`fq=collCode_s:(C1 OR … OR Cn)`), paginée par `cursorMark`. Solr dédoublonne l'union : chaque document arrive une fois, quel que soit le nombre de collections du périmètre auxquelles il appartient.
+Une seule requête Solr couvre l'union des collections du périmètre (`fq=collCode_s:(C1 OR … OR Cn)`), paginée par `cursorMark`. Solr dédoublonne l'union : chaque document arrive une fois, quel que soit son nombre de collections du périmètre.
 """
 
 from __future__ import annotations
@@ -27,15 +27,15 @@ from pipeline.runtime.observability.progress import Progress
 class HalHarvestConfig:
     """Configuration du moissonnage HAL, lue en base."""
 
-    # {code → libellé} des collections HAL des structures du périmètre d'extraction.
     all_collections: Mapping[str, str]
+    """{code → libellé} des collections HAL des structures du périmètre de moissonnage."""
 
 
 def build_query(years: list[int] | None, since: str | None = None) -> str:
-    """Requête Solr (`q`) : années de publication et/ou date de dernière modification.
+    """Construit la requête Solr (`q`) : années de publication et/ou date de dernière modification.
 
     - `years` borne `producedDateY_i:[min TO max]`.
-    - `since` (`YYYY-MM-DD`) borne `modifiedDate_tdate:[since TO *]`, date de dernière modification du dépôt, qui vaut la date de dépôt pour un dépôt jamais modifié.
+    - `since` (`YYYY-MM-DD`) borne `modifiedDate_tdate:[since TO *]`, date de dernière modification du dépôt. Pour un dépôt jamais modifié, cette date est la date de dépôt.
 
     Les deux filtres se combinent en AND. Au moins un des deux est requis.
     """
@@ -50,7 +50,10 @@ def build_query(years: list[int] | None, since: str | None = None) -> str:
 
 
 def build_collections_fq(collection_codes: list[str]) -> str:
-    """Filtre Solr `collCode_s:("C1" OR "C2" …)` sur toutes les collections. Les codes sont entre guillemets : certains contiennent un tiret (`CHU-CLERMONTFERRAND`), que Solr lirait comme un opérateur."""
+    """Construit le filtre Solr `collCode_s:("C1" OR "C2" …)` sur toutes les collections.
+
+    Les codes sont entre guillemets : certains contiennent un tiret (`CHU-CLERMONTFERRAND`), lu sinon par Solr comme un opérateur.
+    """
     terms = " OR ".join(f'"{code}"' for code in collection_codes)
     return f"collCode_s:({terms})"
 
@@ -93,7 +96,7 @@ def harvest_union(
 
 
 class HalHarvester(SourceHarvester[HalHarvestConfig, HalClient]):
-    """Moissonnage HAL : l'union des collections du périmètre, année par année ou depuis une date."""
+    """Moissonnage HAL de l'union des collections du périmètre, année par année ou depuis une date."""
 
     SOURCE = "hal"
 
@@ -108,7 +111,7 @@ class HalHarvester(SourceHarvester[HalHarvestConfig, HalClient]):
     def harvest_all(self, window: HarvestWindow, config: HalHarvestConfig) -> PhaseMetrics:
         """Moissonne l'union des collections, périmètre temporel par périmètre.
 
-        En mode incrémental, un seul périmètre : les dépôts modifiés depuis la date, dans la plage d'années du mode complet. Sinon une passe par année, qui permet une reprise ciblée par `--year` : un document a une seule année de publication.
+        En mode incrémental, un seul périmètre : les dépôts modifiés depuis la date, dans la plage d'années du mode complet. Sinon une passe par année, pour une reprise ciblée par `--year` : un document a une seule année de publication.
         """
         client = self._client
         fq = build_collections_fq(list(config.all_collections))

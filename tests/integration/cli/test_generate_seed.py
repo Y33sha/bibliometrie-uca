@@ -3,10 +3,12 @@
 pyrefly et ruff ignorent les identifiants SQL des chaînes `text()` : ce test détecte un renommage de schéma qui casse le script.
 """
 
+import json
 from pathlib import Path
 
 from sqlalchemy import text
 
+from domain.config import INITIAL_CONFIG_VALUES, LABORATORY_TYPES_KEY
 from infrastructure.db import tables
 from interfaces.cli.dev.generate_seed import (
     COMMON_SEED,
@@ -41,7 +43,7 @@ def test_generate_seed_walks_every_table(sa_sync_conn, tmp_path):
 
 
 def test_generate_seed_exports_structure_api_ids(sa_sync_conn, tmp_path):
-    # Les extractions OpenAlex, WoS, ScanR et theses.fr lisent l'institution dans `api_ids` : une base montée depuis le seed doit les contenir.
+    # Les moissonnages OpenAlex, WoS, ScanR et theses.fr lisent l'institution dans `api_ids` : une base montée depuis le seed doit les contenir.
     insert_structure(
         sa_sync_conn,
         "smoke",
@@ -74,15 +76,52 @@ def test_generate_seed_splits_config_keys(sa_sync_conn, tmp_path):
     assert "VALUES ('perimeter_persons'" not in common_sql
     assert "VALUES ('unpaywall_max_per_run'" in common_sql
     assert "VALUES ('unpaywall_max_per_run'" not in institution_sql
-    # Les délais de réinterrogation, que la migration pose, suivent le seed commun.
+    # Les délais de réinterrogation, posés par la migration, suivent le seed commun.
     assert "VALUES ('fetch_stale_after_days'" in common_sql
-    # Chaque seed supprime seulement ses propres clés : l'ordre de chargement est indifférent.
-    assert "DELETE FROM config WHERE (key NOT IN (" in common_sql
-    assert "DELETE FROM config WHERE (key IN (" in institution_sql
+    # Le chargement d'un seed garde la configuration en base.
+    assert "DELETE FROM config" not in common_sql + institution_sql
+
+
+def test_common_seed_writes_initial_config_values(sa_sync_conn, tmp_path):
+    """Le seed commun contient la valeur initiale de chaque clé commune, quelle que soit la valeur en base."""
+    set_config(sa_sync_conn, "unpaywall_max_per_run", 5)
+    set_config(sa_sync_conn, LABORATORY_TYPES_KEY, ["labo", "chu"])
+    common = tmp_path / "common.sql"
+
+    generate_seed(sa_sync_conn, COMMON_SEED, common)
+
+    common_sql = common.read_text(encoding="utf-8")
+    for key, value in INITIAL_CONFIG_VALUES.items():
+        assert f"VALUES ('{key}', '{json.dumps(value)}'" in common_sql
+    assert '\'["labo", "chu"]\'' not in common_sql
+
+
+def test_seed_keeps_the_config_in_base(sa_sync_conn):
+    """Le chargement du seed ajoute une clé absente et garde la valeur d'une clé présente."""
+    set_config(sa_sync_conn, "unpaywall_max_per_run", 5)
+    sa_sync_conn.execute(text("DELETE FROM config WHERE key = 'sudoc_max_per_run'"))
+    section = SeedSection(
+        tables.config,
+        [("unpaywall_max_per_run", 10_000, "d"), ("sudoc_max_per_run", 10_000, "d")],
+        keep_existing=True,
+    )
+    sql = render_seed(COMMON_SEED.description, Path("seed.sql"), [section])
+
+    sa_sync_conn.exec_driver_sql(sql.replace("BEGIN;", "").replace("COMMIT;", ""))
+
+    values = dict(
+        sa_sync_conn.execute(
+            text(
+                "SELECT key, value FROM config"
+                " WHERE key IN ('unpaywall_max_per_run', 'sudoc_max_per_run')"
+            )
+        ).all()
+    )
+    assert values == {"unpaywall_max_per_run": 5, "sudoc_max_per_run": 10_000}
 
 
 def test_seed_se_recharge_sur_une_base_remplie(sa_sync_conn):
-    """Régression : le seed se recharge sur une base où un candidat d'adresse référence un pays."""
+    """Le seed se recharge sur une base où un candidat d'adresse référence un pays."""
     ensure_country(sa_sync_conn, "fr", "Ancien nom")
     ensure_country(sa_sync_conn, "zz", "Absent du seed")
     address_id = insert_address(sa_sync_conn, "Clermont-Ferrand")

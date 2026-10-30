@@ -4,8 +4,9 @@ from functools import partial
 
 from sqlalchemy import text
 
+from infrastructure.read_models.addresses.queries import AddressesQueries
 from infrastructure.read_models.persons.queries import PersonsQueries
-from tests.integration.helpers.addresses import insert_address
+from tests.integration.helpers.addresses import insert_address, insert_address_structure
 from tests.integration.helpers.contributions import insert_contribution
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
@@ -14,13 +15,14 @@ from tests.integration.helpers.sources import (
     insert_source_contribution_address,
     insert_source_record,
 )
+from tests.integration.helpers.structures import insert_structure
 
 # Contribution du périmètre.
 _in_perimeter_contribution = partial(insert_contribution, in_perimeter=True)
 
 
 def _source_contribution(conn, publication_id, *, source="hal", roles=None):
-    """Contribution source sur un enregistrement source de la publication, d'identifiant source unique."""
+    """Insère une contribution source sur un enregistrement source de la publication, d'identifiant source unique."""
     source_record_id = insert_source_record(
         conn, publication_id, source=source, source_id=f"detail-{publication_id}-{source}"
     )
@@ -120,6 +122,80 @@ class TestMemberReads:
             sa_sync_conn, outsider, address_id=insert_address(sa_sync_conn, "Hors contribution")
         )
 
-        response = PersonsQueries(sa_sync_conn).person_addresses(person, page=1, per_page=50)
+        response = PersonsQueries(sa_sync_conn).person_addresses(
+            person, year=None, page=1, per_page=50
+        )
 
         assert [address.id for address in response.addresses] == [member_address]
+
+
+class TestAddressesByYear:
+    """Adresses de la personne sur les publications d'une année : CHU sur deux publications de 2024 et une de 2023, UCA sur une de 2024, une publication de 2024 sans adresse."""
+
+    def _setup(self, conn):
+        person = insert_person(conn, "Adressee")
+        chu = insert_structure(conn, "TEST-CHU", acronym="CHU")
+        uca = insert_structure(conn, "TEST-UCA", acronym="UCA")
+        rejected = insert_structure(conn, "TEST-REJ", acronym="REJ")
+        chu_address = insert_address(conn, "CHU Clermont-Ferrand")
+        uca_address = insert_address(conn, "Université Clermont Auvergne, CHU")
+        insert_address_structure(conn, chu_address, structure_id=chu)
+        insert_address_structure(conn, uca_address, structure_id=uca)
+        insert_address_structure(conn, uca_address, structure_id=chu, is_confirmed=True)
+        insert_address_structure(conn, uca_address, structure_id=rejected, is_confirmed=False)
+        publications = {}
+        for key, year, addresses in (
+            ("a", 2024, [chu_address, uca_address]),
+            ("b", 2024, [chu_address]),
+            ("c", 2024, []),
+            ("old", 2023, [chu_address]),
+        ):
+            publication = insert_publication(conn, publication_year=year)
+            publications[key] = publication
+            insert_contribution(conn, publication, person_id=person, roles=["author"])
+            member = _source_contribution(conn, publication)
+            _join_contribution(conn, member, publication_id=publication, person_id=person)
+            for address in addresses:
+                insert_source_contribution_address(conn, member[0], address_id=address)
+        # Un coauteur d'une autre publication de 2024 porte aussi l'adresse du CHU.
+        other_person = insert_person(conn, "Coauteur")
+        other_publication = insert_publication(conn, publication_year=2024)
+        insert_contribution(conn, other_publication, person_id=other_person, roles=["author"])
+        other = _source_contribution(conn, other_publication)
+        _join_contribution(conn, other, publication_id=other_publication, person_id=other_person)
+        insert_source_contribution_address(conn, other[0], address_id=chu_address)
+        return person, publications, {"chu": chu, "uca": uca}, chu_address, uca_address
+
+    def test_addresses_sorted_by_publication_count(self, sa_sync_conn):
+        person, _, _, chu_address, uca_address = self._setup(sa_sync_conn)
+
+        response = PersonsQueries(sa_sync_conn).person_addresses(
+            person, year=2024, page=1, per_page=50
+        )
+
+        assert [(a.id, a.publication_count) for a in response.addresses] == [
+            (chu_address, 2),
+            (uca_address, 1),
+        ]
+
+    def test_summary_counts_publications_per_structure(self, sa_sync_conn):
+        """Le dénominateur compte les publications ; le lien rejeté n'est pas compté ; le CHU, présent dans les deux adresses de la publication a, compte une fois pour elle."""
+        person, _, structures, _, _ = self._setup(sa_sync_conn)
+
+        summary = PersonsQueries(sa_sync_conn).person_address_summary(person, year=2024)
+
+        assert (summary.first_year, summary.last_year) == (2023, 2024)
+        assert (summary.publications, summary.publications_with_address) == (3, 2)
+        assert [(s.id, s.publications) for s in summary.structures] == [
+            (structures["chu"], 2),
+            (structures["uca"], 1),
+        ]
+
+    def test_address_publications_restricted_to_person_and_year(self, sa_sync_conn):
+        person, publications, _, chu_address, _ = self._setup(sa_sync_conn)
+
+        items = AddressesQueries(sa_sync_conn).get_address_publications(
+            chu_address, 20, person_id=person, year=2024
+        )
+
+        assert {p.id for p in items} == {publications["a"], publications["b"]}

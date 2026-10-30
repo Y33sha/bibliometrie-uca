@@ -50,7 +50,7 @@ def _count(conn: Connection) -> int:
 def _last_event(conn: Connection):
     return conn.execute(
         text(
-            "SELECT event_type, aggregate_type, aggregate_id, payload, user_id "
+            "SELECT event_type, entity_type, entity_id, payload, user_id "
             "FROM audit_log ORDER BY id DESC LIMIT 1"
         )
     ).one()
@@ -58,7 +58,7 @@ def _last_event(conn: Connection):
 
 @pytest.fixture
 def sa_sync_conn(sa_sync_conn_app):
-    """Connexion sous le rôle de l'API, seul rôle autorisé à écrire la trace d'audit."""
+    """Fournit une connexion sous le rôle de l'API, seul rôle autorisé à écrire la trace d'audit."""
     return sa_sync_conn_app
 
 
@@ -101,8 +101,8 @@ class TestEmitEvent:
 
         row = _last_event(sa_sync_conn)
         assert row.event_type == "person.merged"
-        assert row.aggregate_type == "person"
-        assert row.aggregate_id == 1
+        assert row.entity_type == "person"
+        assert row.entity_id == 1
         assert row.payload == {"source_id": 2}
         assert row.user_id == "admin"
 
@@ -115,11 +115,11 @@ class TestEmitEvent:
         finally:
             reset_current_user(token)
 
-    def test_accepts_null_aggregate_id(self, sa_sync_conn):
-        """Un événement sans identifiant d'agrégat, comme la suppression d'une entité sans successeur, est consigné."""
+    def test_accepts_null_entity_id(self, sa_sync_conn):
+        """Un événement sans identifiant d'entité (`entity_id`), comme la suppression d'une entité sans successeur, est consigné."""
         with _requete_admin(sa_sync_conn):
             emit_event("structure.deleted", "structure", None, {"name": "X"})
-        assert _last_event(sa_sync_conn).aggregate_id is None
+        assert _last_event(sa_sync_conn).entity_id is None
 
     def test_default_payload_is_empty_object(self, sa_sync_conn):
         with _requete_admin(sa_sync_conn):
@@ -147,7 +147,7 @@ class TestEndToEndServiceIntegration:
 
     @pytest.fixture
     def sa_sync_conn(self, sa_sync_conn_owner):
-        """Connexion sous le propriétaire du schéma : ces tests posent des publications, que crée le pipeline, puis exercent des opérations de l'API, dans une même transaction.
+        """Fournit une connexion sous le propriétaire du schéma : ces tests posent des publications, créées d'ordinaire par le pipeline, puis exercent des opérations de l'API, dans une même transaction.
 
         Ils vérifient l'émission de la trace ; les droits se vérifient dans les tests de l'API et du pipeline.
         """
@@ -162,7 +162,7 @@ class TestEndToEndServiceIntegration:
 
         row = _last_event(sa_sync_conn)
         assert row.event_type == "person.exclusion"
-        assert row.aggregate_id == person_id
+        assert row.entity_id == person_id
         assert row.payload == {"exclusion": "out_of_perimeter"}
         assert row.user_id == "admin"
 
@@ -198,7 +198,7 @@ class TestEndToEndServiceIntegration:
 
         row = _last_event(sa_sync_conn)
         assert row.event_type == "person.merged"
-        assert row.aggregate_id == target
+        assert row.entity_id == target
         assert row.payload == {"source_id": source}
         assert row.user_id == "admin"
 
@@ -214,7 +214,7 @@ class TestEndToEndServiceIntegration:
 
         row = _last_event(sa_sync_conn)
         assert row.event_type == "person_name_form.status_changed"
-        assert row.aggregate_id == person_id
+        assert row.entity_id == person_id
         assert row.payload == {"name_form": "x x", "status": status}
 
     def test_reject_pair_emits_event(self, sa_sync_conn):
@@ -234,8 +234,8 @@ class TestEndToEndServiceIntegration:
 
         row = _last_event(sa_sync_conn)
         assert row.event_type == "contribution.rejected"
-        assert row.aggregate_type == "publication"
-        assert row.aggregate_id == publication_id
+        assert row.entity_type == "publication"
+        assert row.entity_id == publication_id
         assert row.payload == {"person_id": person_id}
 
     def test_serial_type_preview_emits_nothing(self, sa_sync_conn):

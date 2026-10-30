@@ -1,8 +1,8 @@
 """Client DataCite des préfixes DOI : provider et client (repository) d'un préfixe.
 
-`GET /prefixes/<prefix>?include=clients,providers` donne le provider DataCite, organisation mère tenue pour l'éditeur, et le client : un entrepôt comme Zenodo, NAKALA ou INRAE. La phase `publishing` l'interroge pour un préfixe dont l'agence est DataCite.
+`GET /prefixes/<prefix>?include=clients,providers` donne le provider DataCite, organisation mère tenue pour l'éditeur, et le client : un entrepôt comme Zenodo, NAKALA ou INRAE. La phase `publishing` interroge ce point d'accès pour un préfixe d'agence DataCite.
 
-DataCite hiérarchise `provider → client → préfixe → DOI` ; un préfixe appartient à un seul client. Le symbole du client (`cern.zenodo`, `inist.inra`) est son identifiant stable, distinct du nom, qui survit aux renommages.
+DataCite hiérarchise `provider → client → préfixe → DOI` ; un préfixe appartient à un seul client. Le symbole du client (`cern.zenodo`, `inist.inra`) est son identifiant stable, distinct du nom ; il survit aux renommages.
 """
 
 from __future__ import annotations
@@ -20,9 +20,9 @@ from pipeline.ingestion.datacite.api import fetch_prefix
 async def fetch_datacite_prefix(
     client: httpx2.AsyncClient, prefix: str
 ) -> LookupOutcome[tuple[str, str, str]]:
-    """Nom du provider, nom et symbole du client d'un préfixe.
+    """Renvoie le nom du provider, le nom et le symbole du client d'un préfixe.
 
-    `NOT_FOUND` couvre un préfixe malformé, inconnu de DataCite (404 ou 400), ou une réponse à laquelle manque le provider ou le client.
+    `NOT_FOUND` couvre un préfixe malformé, inconnu de DataCite (404 ou 400), ou une réponse sans provider ou sans client.
     """
     parsed = DoiPrefix.try_parse(prefix)
     cleaned = str(parsed) if parsed else None
@@ -36,7 +36,7 @@ async def fetch_datacite_prefix(
 
 
 def _parse_datacite_prefix_payload(data: JsonValue) -> tuple[str, str, str] | None:
-    """Nom du provider, nom et symbole du client, lus dans la réponse JSON:API ; `None` s'il en manque un."""
+    """Lit le nom du provider, le nom et le symbole du client dans la réponse JSON:API. `None` si l'une des trois valeurs manque."""
     if not isinstance(data, dict):
         return None
     relationships = at_path(data, "data", "relationships")

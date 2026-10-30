@@ -14,7 +14,7 @@ _ROR_CANONICAL = re.compile(r"^0[0-9a-hjkmnp-z]{8}$")
 
 
 def normalize_ror_id(raw: str | None) -> str | None:
-    """Forme courte d'un ROR, écrit seul ou dans une URL `ror.org` ; `None` si le format est invalide."""
+    """Renvoie la forme courte d'un ROR, écrit seul ou dans une URL `ror.org` ; `None` si le format est invalide."""
     if not raw:
         return None
     s = raw.strip().lower()
@@ -36,7 +36,7 @@ class RorId(NormalizedIdentifier):
 
 
 def parse_ror_ids(raws: Iterable[str | None]) -> frozenset[RorId]:
-    """Ensemble des `RorId` valides de `raws`, URL ou identifiants courts. Les valeurs vides ou invalides sont écartées."""
+    """Renvoie l'ensemble des `RorId` valides de `raws`, URL ou identifiants courts. Les valeurs vides ou invalides sont écartées."""
     return frozenset(ror for raw in raws if (ror := RorId.try_parse(raw)) is not None)
 
 
@@ -45,7 +45,7 @@ _HAL_COLLECTION_CANONICAL = re.compile(r"^[A-Z0-9][A-Z0-9_-]*$")
 
 
 def normalize_hal_collection(raw: str | None) -> str | None:
-    """Code de collection HAL en majuscules ; `None` s'il contient d'autres caractères."""
+    """Renvoie le code de collection HAL en majuscules ; `None` s'il contient d'autres caractères."""
     if not raw:
         return None
     s = raw.strip().upper()

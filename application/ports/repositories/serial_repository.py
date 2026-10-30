@@ -1,16 +1,15 @@
-"""Port SerialRepository : édition de l'agrégat Serial dans l'administration."""
+"""Port SerialRepository : édition de l'entité Serial dans l'administration."""
 
 from typing import Protocol
 
-from pydantic import BaseModel
-
+from application.ports.model import Model
 from domain.publishers.merge import SharedTitlePair
 from domain.serials.issns import IssnStatus, IssnSupport
 from domain.serials.serial import OaModel, Serial, SerialType
 
 
-class SerialIssnInput(BaseModel):
-    """Un ISSN d'une revue, saisi dans l'administration."""
+class SerialIssnInput(Model):
+    """ISSN d'une revue, saisi dans l'administration."""
 
     issn: str
     support: IssnSupport | None = None
@@ -18,8 +17,8 @@ class SerialIssnInput(BaseModel):
     status: IssnStatus = IssnStatus.ACTIVE
 
 
-class SerialUpdate(BaseModel):
-    """Champs modifiables d'une revue ; seuls les champs fournis sont écrits."""
+class SerialUpdate(Model):
+    """Champs modifiables d'une revue. Seuls les champs fournis sont écrits."""
 
     title: str | None = None
     issns: list[SerialIssnInput] | None = None
@@ -29,10 +28,10 @@ class SerialUpdate(BaseModel):
 
 
 class SerialRepository(Protocol):
-    """Contrat d'édition de l'agrégat Serial dans l'administration."""
+    """Contrat d'édition de l'entité Serial dans l'administration."""
 
     def find_by_id(self, serial_id: int) -> Serial | None:
-        """Charge l'agrégat `Serial`, ou `None` si la revue n'existe pas. Ses formes de nom sont hors de l'agrégat."""
+        """Charge l'entité `Serial`, ou `None` si la revue n'existe pas. Ses formes de nom sont hors de l'entité."""
         ...
 
     def save(self, serial: Serial) -> None:
@@ -44,5 +43,5 @@ class SerialRepository(Protocol):
         target_publisher_id: int,
         source_publisher_id: int,
     ) -> list[SharedTitlePair]:
-        """Paires de revues de même titre normalisé, l'une de l'éditeur cible, l'autre de l'éditeur absorbé, avec leurs titres et leurs ISSN."""
+        """Renvoie les paires de revues de même titre normalisé, l'une de l'éditeur cible, l'autre de l'éditeur absorbé, avec leurs titres et leurs ISSN."""
         ...

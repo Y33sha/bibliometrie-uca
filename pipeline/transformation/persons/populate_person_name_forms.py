@@ -14,7 +14,7 @@ from infrastructure.sql_fragments import CONTRIBUTIONS_AND_SOURCES
 
 
 class PersonNameRow(NamedTuple):
-    """Nom et prénom d'une personne, sans les espaces qui les entourent."""
+    """Nom et prénom d'une personne, espaces de début et de fin retirés."""
 
     id: int
     first_name: str | None
@@ -38,7 +38,7 @@ class SyncCounts(NamedTuple):
 
 
 def fetch_persons_names(conn: Connection) -> list[PersonNameRow]:
-    """Nom de chaque personne, exclues comprises : leurs formes de nom servent au matching, qui ne recrée donc pas ces personnes."""
+    """Renvoie le nom de chaque personne, exclues comprises : leurs formes de nom servent au matching, qui ne recrée donc pas ces personnes."""
     rows = conn.execute(
         text("""
             SELECT id,
@@ -52,7 +52,7 @@ def fetch_persons_names(conn: Connection) -> list[PersonNameRow]:
 
 
 def create_temp_raw_forms_table(conn: Connection) -> None:
-    """Crée la table temporaire `_raw_forms`, qui reçoit les formes du nom des personnes."""
+    """Crée la table temporaire `_raw_forms` des formes du nom des personnes."""
     conn.execute(text("CREATE TEMP TABLE _raw_forms (name_form TEXT, person_id INT, source TEXT)"))
 
 
@@ -76,7 +76,10 @@ def drop_temp_raw_forms_table(conn: Connection) -> None:
 
 
 def sync_from_raw_forms(conn: Connection) -> SyncCounts:
-    """Synchronise `person_name_forms` avec l'état attendu, agrégé par `(name_form, person_id)` : suppression des couples absents, insertion des nouveaux en `pending`, mise à jour des `sources`. Le statut reste inchangé. Une forme `confirmed` ou `rejected` reste en base, sauf une forme du nom de la personne (source `persons`) qu'une modification du nom retire."""
+    """Synchronise `person_name_forms` avec l'état attendu, agrégé par `(name_form, person_id)`.
+
+    Les couples absents de l'état attendu sont supprimés, les couples manquants insérés en `pending`, et les `sources` mises à jour. Le statut reste inchangé. Une forme `confirmed` ou `rejected` reste en base, sauf une forme du nom de la personne (source `persons`) retirée par une modification du nom.
+    """
     conn.execute(
         text(f"""
             CREATE TEMP TABLE _expected_pnf AS

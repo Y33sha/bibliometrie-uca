@@ -23,23 +23,24 @@ from infrastructure.read_models.addresses.models import (
 from infrastructure.read_models.sql_fragments import contributor_display_name
 from infrastructure.sql_fragments import address_country_conditions
 
-# « Reconnue » comme une structure : lien en attente ou confirmé ; un lien rejeté ou absent l'exclut. Sert les prédicats de structure de `list_addresses`.
+# Adresse « reconnue » comme une structure : lien en attente ou confirmé. Sert aux prédicats de structure de `list_addresses`.
 _RECOGNIZED_LINK = (
     "((asx.matched_form_id IS NOT NULL AND asx.is_confirmed IS NULL) OR asx.is_confirmed = TRUE)"
 )
 
 
 def _countries_where(filters: AddressCountryFilter) -> tuple[str, dict[str, object]]:
-    """Clause WHERE de la liste des adresses à attribuer et de ses facettes. Une facette retire de `filters` sa propre dimension : ses comptes sont exclusifs."""
+    """Renvoie la clause WHERE de la liste des adresses à attribuer et de ses facettes. Une facette retire sa propre dimension de `filters`, pour des comptes exclusifs."""
     conditions, binds = address_country_conditions(filters)
     where = "WHERE " + " AND ".join(conditions) if conditions else ""
     return where, binds
 
 
 def address_structures_json(addr_ref: str) -> str:
-    """Projection JSON des structures liées à une adresse, au format `AddressStructureSummary`.
+    """Renvoie la projection JSON des structures liées à une adresse, au format `AddressStructureSummary`.
 
-    `addr_ref` est l'expression SQL désignant l'id d'adresse : `a.id` en sous-requête corrélée d'une liste, `:id` en requête autonome.
+    Args:
+        addr_ref: expression SQL de l'id d'adresse ; `a.id` en sous-requête corrélée d'une liste, `:id` en requête autonome.
     """
     return f"""
         SELECT json_agg(json_build_object(
@@ -67,7 +68,7 @@ class AddressesQueries:
         page: int,
         per_page: int,
     ) -> AddressListResponse:
-        """Liste paginée des adresses, filtrée par état de détection et de validation."""
+        """Renvoie la liste paginée des adresses, filtrée par état de détection et de validation."""
         offset = (page - 1) * per_page
         use_inner_join = filters.detected == "yes"
 
@@ -164,14 +165,27 @@ class AddressesQueries:
         return row is not None
 
     def get_address_raw_text(self, addr_id: int) -> str | None:
-        """Texte brut de l'adresse, ou `None` pour une adresse absente : la colonne est obligatoire."""
+        """Renvoie le texte brut de l'adresse, ou `None` si l'adresse est absente."""
         row = self._conn.execute(
             text("SELECT raw_text FROM addresses WHERE id = :id"),
             {"id": addr_id},
         ).one_or_none()
         return row.raw_text if row else None
 
-    def get_address_publications(self, addr_id: int, limit: int) -> list[AddressPublicationItem]:
+    def get_address_publications(
+        self, addr_id: int, limit: int, *, person_id: int | None = None, year: int | None = None
+    ) -> list[AddressPublicationItem]:
+        """Renvoie les publications dont une contribution source porte l'adresse. `person_id` restreint aux contributions sources de la personne, `year` aux publications de l'année."""
+        conditions = []
+        if person_id is not None:
+            conditions.append("""sca.source_contribution_id IN (
+                SELECT m.source_contribution_id FROM aligned_source_contributions m
+                JOIN contributions g ON g.id = m.contribution_id
+                WHERE g.person_id = :person_id
+            )""")
+        if year is not None:
+            conditions.append("p.publication_year = :year")
+        extra_where = "".join(f" AND {c}" for c in conditions)
         rows = self._conn.execute(
             text(f"""
                 SELECT DISTINCT ON (p.id)
@@ -185,11 +199,11 @@ class AddressesQueries:
                 JOIN source_records sr ON sr.id = sc.source_record_id
                 JOIN publications p ON p.id = sr.publication_id
                 LEFT JOIN serials j ON j.id = p.serial_id
-                WHERE sca.address_id = :id AND sr.publication_id IS NOT NULL
+                WHERE sca.address_id = :id AND sr.publication_id IS NOT NULL{extra_where}
                 ORDER BY p.id, p.publication_year DESC
                 LIMIT :lim
             """),
-            {"id": addr_id, "lim": limit},
+            {"id": addr_id, "lim": limit, "person_id": person_id, "year": year},
         ).all()
         return [
             AddressPublicationItem(
@@ -263,7 +277,7 @@ class AddressesQueries:
             for r in rows
         ]
 
-        # La facette pays couvre la présence d'un pays et le pays retenu : elle écarte ces deux critères.
+        # La facette pays porte sur la présence d'un pays et sur le pays retenu : ces deux critères sont retirés de ses filtres.
         # L'absence de pays vient en tête, comme dans `CountriesQueries.list_countries`.
         facet_filters = replace(filters, country_code=None, has_country=None)
         cf_where, cf_binds = _countries_where(facet_filters)

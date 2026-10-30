@@ -18,7 +18,7 @@
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
 	import PublicationsListView from '#lib/components/PublicationsListView.svelte';
 	import PartnersTab from './PartnersTab.svelte';
-	import StructureDrawer from '../StructureDrawer.svelte';
+	import StructureDrawer from '#lib/components/structures/StructureDrawer.svelte';
 	import TitleRow from '#lib/components/TitleRow.svelte';
 	import { useDrawerParam } from '#lib/composables/useDrawerParam.svelte.js';
 	import { goto } from '$app/navigation';

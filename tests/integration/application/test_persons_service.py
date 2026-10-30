@@ -77,7 +77,7 @@ def _contribution_person(conn, contribution_id):
 
 
 def _perimeter_contribution(conn, person_id, mode, *, source_id, **source_contribution):
-    """Publication du périmètre dont la seule contribution d'auteur, rattachée à la personne par `mode`, réunit une contribution source décrite par `source_contribution`. Renvoie (publication, contribution)."""
+    """Insère une publication du périmètre dont la seule contribution d'auteur, rattachée à la personne par `mode`, réunit une contribution source décrite par `source_contribution`. Renvoie (publication, contribution)."""
     publication = insert_publication(conn, in_perimeter=True)
     source_record = _source_record(conn, publication, source_id=source_id)
     source_contribution_id = insert_source_contribution(conn, source_record, **source_contribution)
@@ -89,7 +89,7 @@ def _perimeter_contribution(conn, person_id, mode, *, source_id, **source_contri
 
 
 def _orphan(conn, publication_id, *, source_id="hal-1", source="hal", **source_contribution):
-    """Contribution orpheline : contribution d'auteur du périmètre sans personne, d'une contribution source « jean dupont » décrite par `source_contribution`. Renvoie (contribution, contribution source)."""
+    """Insère une contribution orpheline : contribution d'auteur du périmètre sans personne, d'une contribution source « jean dupont » décrite par `source_contribution`. Renvoie (contribution, contribution source)."""
     source_record = _source_record(conn, publication_id, source=source, source_id=source_id)
     source_contribution_id = _jean_dupont_source_contribution(
         conn, source_record, source=source, **source_contribution
@@ -102,7 +102,7 @@ def _orphan(conn, publication_id, *, source_id="hal-1", source="hal", **source_c
 
 
 def _pinned_to(conn, source_contribution_ids):
-    """Personne à laquelle chaque contribution source est épinglée, `None` sans épinglage."""
+    """Renvoie la personne épinglée sur chaque contribution source, `None` sans épinglage."""
     rows = dict(
         conn.execute(
             text(
@@ -259,7 +259,7 @@ class TestIdentifierStatusPropagation:
         )
 
     def _source_contribution(self, conn, person_id, source, source_id, identifiers, **kw):
-        """Contribution source seule dans une contribution rattachée à la personne `person_id`."""
+        """Insère une contribution source, seule dans une contribution rattachée à la personne `person_id`."""
         source_record = _source_record(
             conn, insert_publication(conn), source=source, source_id=source_id
         )
@@ -347,7 +347,7 @@ class TestIdentifierStatusPropagation:
 
 
 class TestIdentifierRejectionOnContributions:
-    """Le rejet d'un identifiant met en file de résolution les contributions que cet identifiant rattache à la personne."""
+    """Le rejet d'un identifiant met en file de résolution les contributions rattachées à la personne par cet identifiant."""
 
     ORCID = "0000-0002-1825-0097"
 

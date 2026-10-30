@@ -1,8 +1,8 @@
-"""Phase `oa_status` : verdicts d'Unpaywall sur les DOI des publications (`sources.unpaywall`), et statut open access qui en découle (`publications.oa_status`).
+"""Phase `oa_status` : verdicts d'Unpaywall sur les DOI des publications (`sources.unpaywall`), et statut open access dérivé (`publications.oa_status`).
 
-La phase interroge Unpaywall pour les DOI jamais vérifiés ou périmés, hors DOI DataCite, et écrit chaque verdict. Un DOI absent d'Unpaywall reçoit un verdict nul. Quand Unpaywall est indisponible, le DOI attend le run suivant. Le statut des publications de ces DOI se recalcule ensuite par `publication_oa_status`, à partir de leurs enregistrements sources et du verdict.
+Unpaywall est interrogé pour les DOI jamais vérifiés ou périmés, hors DOI DataCite, et chaque verdict est écrit. Un DOI absent d'Unpaywall reçoit un verdict nul. Quand Unpaywall est indisponible, le DOI est reporté au run suivant. Le statut des publications de ces DOI est ensuite recalculé par `publication_oa_status`, à partir de leurs enregistrements sources et du verdict.
 
-Le délai de péremption et le plafond par run bornent la phase : le retard des DOI jamais vérifiés s'écoule d'un run à l'autre. La phase passe par l'accès à Unpaywall, qui exige l'adresse du polite pool.
+Le délai de péremption et le plafond par run bornent la phase. Les DOI jamais vérifiés au-delà du plafond sont traités aux runs suivants. L'accès à Unpaywall exige l'adresse du polite pool.
 """
 
 from __future__ import annotations
@@ -39,10 +39,10 @@ from pipeline.runtime.observability.progress import track_progress
 from pipeline.task_runner import SingleTaskPhase
 
 type OaStatusFetcher = Callable[[httpx2.AsyncClient, str], Awaitable[LookupOutcome[str]]]
-"""Signature : `(client, doi) → statut OA mappé, NOT_FOUND ou UNAVAILABLE`."""
+"""Interrogation d'Unpaywall : `(client, doi) → statut OA, NotFound ou Unavailable`."""
 
 BATCH_SIZE = 50
-# Requêtes simultanées, sous le débit que recommande Unpaywall (10 par seconde).
+# Requêtes simultanées, sous le débit recommandé par Unpaywall (10 par seconde).
 MAX_CONCURRENT = 5
 
 
@@ -54,7 +54,7 @@ class OaSignal(NamedTuple):
 
 
 class PublicationOaInputs(NamedTuple):
-    """Ce dont dépend le statut OA d'une publication : son DOI, son statut courant, les statuts de ses enregistrements sources."""
+    """Données du calcul du statut OA d'une publication : son DOI, son statut courant, les statuts de ses enregistrements sources."""
 
     id: int
     doi: str
@@ -62,7 +62,7 @@ class PublicationOaInputs(NamedTuple):
     signals: list[OaSignal]
 
 
-# DOI des publications sans verdict d'Unpaywall, ou dont le verdict date de plus de `:stale` jours. Unpaywall ignore les DOI DataCite : ils sont écartés.
+# DOI des publications sans verdict d'Unpaywall, ou à verdict de plus de `:stale` jours. Les DOI DataCite sont absents d'Unpaywall, donc écartés.
 _STALE_DOIS = """
     SELECT d.doi, u.checked_at
     FROM (SELECT DISTINCT lower(doi) AS doi FROM publications WHERE doi IS NOT NULL) d
@@ -80,7 +80,11 @@ class OaStatusStore:
         self._conn = conn
 
     def fetch_dois_to_check(self, *, limit: int | None = None, staleness_days: int) -> list[str]:
-        """DOI à vérifier sur Unpaywall : jamais vérifiés d'abord, puis les plus périmés. `limit` plafonne le run."""
+        """Renvoie les DOI à vérifier sur Unpaywall : jamais vérifiés d'abord, puis les plus périmés.
+
+        Args:
+            limit: plafond du run.
+        """
         rows = self._conn.execute(
             text(f"{_STALE_DOIS} ORDER BY checked_at ASC NULLS FIRST, doi LIMIT :lim"),
             {"stale": staleness_days, "lim": limit},
@@ -88,7 +92,7 @@ class OaStatusStore:
         return [r.doi for r in rows]
 
     def count_dois_to_check(self, *, staleness_days: int) -> int:
-        """Nombre de DOI à vérifier, sans plafond."""
+        """Compte les DOI à vérifier, sans plafond."""
         return scalar_int(
             self._conn.execute(
                 text(f"SELECT count(*) FROM ({_STALE_DOIS}) s"), {"stale": staleness_days}
@@ -96,7 +100,7 @@ class OaStatusStore:
         )
 
     def fetch_verdicts(self, dois: Sequence[str]) -> dict[str, str | None]:
-        """Verdict en table de chacun de ces DOI, quand il en a un."""
+        """Renvoie le verdict en table de chacun de ces DOI, quand il en a un."""
         rows = self._conn.execute(
             text("SELECT doi, oa_status::text AS oa_status FROM unpaywall WHERE doi = ANY(:dois)"),
             {"dois": list(dois)},
@@ -119,7 +123,7 @@ class OaStatusStore:
         )
 
     def fetch_oa_inputs(self, dois: Sequence[str]) -> list[PublicationOaInputs]:
-        """Publications de ces DOI, avec les statuts OA de leurs enregistrements sources."""
+        """Renvoie les publications de ces DOI, avec les statuts OA de leurs enregistrements sources."""
         rows = self._conn.execute(
             text("""
                 SELECT p.id, lower(p.doi) AS doi, p.oa_status::text AS oa_status,
@@ -153,7 +157,7 @@ class OaStatusStore:
         )
 
     def count_publications_by_oa_status(self) -> dict[str, int]:
-        """Répartition des publications par statut OA (`oa_status` → nombre)."""
+        """Compte les publications par statut OA (`oa_status` → nombre)."""
         rows = self._conn.execute(
             text(
                 f"SELECT COALESCE(oa_status::text, '{OaStatus.UNKNOWN.value}') AS status, count(*) AS n "
@@ -165,14 +169,13 @@ class OaStatusStore:
 
 @dataclass(frozen=True)
 class OaStatusPhase:
-    """Vérifie sur Unpaywall le statut OA des publications à DOI.
-
-    `staleness_days` lit le délai, en jours, au-delà duquel un DOI vérifié l'est de nouveau. `max_per_run` lit le plafond de DOI vérifiés par run, `None` valant illimité.
-    """
+    """Vérification sur Unpaywall du statut OA des publications à DOI."""
 
     fetcher: OaStatusFetcher
     staleness_days: Callable[[Connection], int]
+    """Lit le délai, en jours, au-delà duquel un DOI vérifié l'est de nouveau."""
     max_per_run: Callable[[Connection], int | None]
+    """Lit le plafond de DOI vérifiés par run ; `None` vaut illimité."""
     max_concurrent: int = MAX_CONCURRENT
     store_factory: Callable[[Connection], OaStatusStore] = OaStatusStore
 
@@ -318,7 +321,7 @@ def _apply_verdicts(
     verdicts: list[tuple[str, str | None]],
     progress: dict[str, int],
 ) -> None:
-    """Classe les verdicts face à ceux en table, les écrit, puis recalcule le statut OA des publications de ces DOI (`publication_oa_status`)."""
+    """Classe les verdicts par rapport à ceux en table, les écrit, puis recalcule le statut OA des publications de ces DOI (`publication_oa_status`)."""
     by_doi = dict(verdicts)
     stored = store.fetch_verdicts(list(by_doi))
     for doi, status in verdicts:

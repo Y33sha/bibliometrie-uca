@@ -1,4 +1,4 @@
-"""Tests unitaires du VO `StructureNameForm`."""
+"""Tests de l'objet valeur `StructureNameForm`."""
 
 import dataclasses
 

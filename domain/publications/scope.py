@@ -57,24 +57,24 @@ PARATEXT_TITLES = frozenset(
 
 
 class MatchabilityFacts(NamedTuple):
-    """Faits d'un enregistrement source que lit `is_matchable`.
-
-    `urls` : URL de copie, privées des dépôts HAL introuvables. `identifiers` : identifiants de l'enregistrement source, avec leur statut. `primary_doi_has_target` : son DOI `primary` est celui d'une forme secondaire, qui a une cible dans `doi_targets`.
-    """
+    """Faits d'un enregistrement source lus par `is_matchable`."""
 
     source: str
     source_id: str
     title_normalized: str | None
     urls: Sequence[str]
+    """URL de copie, privées des dépôts HAL introuvables."""
     identifiers: Sequence[SourceIdentifier]
-    primary_doi_has_target: bool = False
+    """Identifiants de l'enregistrement source, avec leur statut."""
+    primary_doi_target_recorded: bool = False
+    """Le DOI `primary` a une cible dans `doi_targets`, et cette cible est le DOI `primary` d'un autre enregistrement source."""
 
 
 def is_matchable(facts: MatchabilityFacts, missing_hal_ids: Set[str]) -> bool:
     """Vrai si l'enregistrement source entre dans la réconciliation. Il en est écarté si :
 
     - tous ses DOI propres (`own_dois`), quel que soit leur statut, ont un préfixe de `EXCLUDED_DOI_PREFIXES` ;
-    - il vient de DataCite et son DOI `primary` a une cible : l'enregistrement source est une forme secondaire d'une œuvre présente en base ;
+    - il vient de DataCite et la cible de son DOI `primary` est le DOI `primary` d'un autre enregistrement source : il est une forme secondaire d'une œuvre représentée par cet enregistrement source ;
     - son titre normalisé est dans `PARATEXT_TITLES` ;
     - il vient de ScanR et il est issu d'un dépôt HAL de `missing_hal_ids` ;
     - il vient d'une source de `AGGREGATOR_SOURCES` et il n'a aucun DOI actif de rôle autre que `related`, aucune URL de copie et aucune clé de confirmation active.
@@ -82,7 +82,7 @@ def is_matchable(facts: MatchabilityFacts, missing_hal_ids: Set[str]) -> bool:
     own = own_dois(facts.identifiers)
     if own and all(doi.split("/", 1)[0] in EXCLUDED_DOI_PREFIXES for doi in own):
         return False
-    if facts.source == Source.DATACITE and facts.primary_doi_has_target:
+    if facts.source == Source.DATACITE and facts.primary_doi_target_recorded:
         return False
     if facts.title_normalized in PARATEXT_TITLES:
         return False

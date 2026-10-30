@@ -1,4 +1,4 @@
-"""Empreinte et hash de détection des changements de l'extraction, sélection des DOI à chercher et des documents à relire."""
+"""Empreinte et hash de détection des changements du moissonnage, sélection des DOI à chercher et des documents à relire."""
 
 from functools import partial
 
@@ -62,7 +62,7 @@ class TestComputeHash:
 
 
 def _tei(*, when, not_before="2025-01-01"):
-    """Fragment TEI HAL minimal : horodatage de génération (`@when`, variable d'un moissonnage à l'autre) et date d'embargo (`@notBefore`, donnée bibliographique)."""
+    """Construit un fragment TEI HAL minimal : horodatage de génération (`@when`, variable d'un moissonnage à l'autre) et date d'embargo (`@notBefore`, donnée bibliographique)."""
     return (
         '<TEI xmlns="http://www.tei-c.org/ns/1.0"><teiHeader><fileDesc>'
         f'<publicationStmt><date when="{when}"/></publicationStmt></fileDesc></teiHeader>'
@@ -139,7 +139,7 @@ class TestCleanDoi:
 
 
 def _add_inperim_source_record(conn, source, sid, *, doi=None, identifiers=None):
-    """Publication du périmètre et son enregistrement source `source`, de DOI `doi` et d'identifiants secondaires `identifiers`. La recherche par DOI part seulement des enregistrements sources du périmètre."""
+    """Insère une publication du périmètre et son enregistrement source `source`, de DOI `doi` et d'identifiants secondaires `identifiers`. La recherche par DOI part seulement des enregistrements sources du périmètre."""
     publication_id = _publication(conn, "T", in_perimeter=True)
     _source_record(
         conn,
@@ -157,7 +157,7 @@ class TestGetMissingDois:
             get_missing_dois(None, "unknown", retry_after_days=30)
 
     def test_exclut_un_doi_que_la_cible_porte_deja(self, sa_sync_conn):
-        """Interroger la cible sur ce DOI rendrait un document déjà présent."""
+        """Interroger la cible sur ce DOI renverrait un document déjà présent."""
         _add_inperim_source_record(sa_sync_conn, "openalex", "W1", doi="10.1234/partage")
         _add_inperim_source_record(sa_sync_conn, "hal", "hal-1", doi="10.1234/partage")
 
@@ -213,7 +213,7 @@ class TestGetMissingDois:
         assert "10.9999/preprint" in result
 
     def test_reads_the_dois_of_the_identifier_table(self, sa_sync_conn):
-        """Régression : la colonne `doi` d'un work OpenAlex gardait un DOI mal formé, absent de ses identifiants."""
+        """Les DOI viennent de la table des identifiants, sans la valeur mal formée de la colonne `doi` d'un work OpenAlex."""
         _add_inperim_source_record(
             sa_sync_conn,
             "openalex",
@@ -258,6 +258,18 @@ class TestGetMissingDois:
         )
         result = get_missing_dois(sa_sync_conn, "hal", retry_after_days=30)
         assert "10.48550/arxiv.2605.02321" not in result
+
+    def test_includes_the_unversioned_form_of_a_versioned_doi(self, sa_sync_conn):
+        """La forme sans version, sans source, est cherchée même dans la source qui a la version."""
+        insert_doi_prefix(sa_sync_conn, "10.6084", ra="DataCite")
+        _add_inperim_source_record(
+            sa_sync_conn,
+            "datacite",
+            "10.6084/m9.figshare.1.v1",
+            identifiers={"doi": ["10.6084/m9.figshare.1.v1"]},
+        )
+        result = get_missing_dois(sa_sync_conn, "datacite", retry_after_days=30)
+        assert result == ["10.6084/m9.figshare.1"]
 
     def test_includes_relation_targets(self, sa_sync_conn):
         """Le DOI cible d'une relation depuis une publication du périmètre est retenu."""
@@ -443,7 +455,7 @@ class TestDisappearedMarking:
 
 
 class TestGetPrefixesToResolve:
-    """Régression : les préfixes des DOI cibles de relations et des DOI dérivés d'arXiv restaient sans agence d'enregistrement. Les préfixes à résoudre viennent de la vue `candidate_dois`, comme les DOI de la recherche par DOI."""
+    """Les préfixes à résoudre viennent de la vue `candidate_dois`, comme les DOI de la recherche par DOI : ils couvrent les DOI cibles de relations et les DOI dérivés d'arXiv."""
 
     def test_pool_covers_relation_and_arxiv_prefixes(self, sa_sync_conn):
         from pipeline.transformation.publishing.doi_prefixes import DoiPrefixStore

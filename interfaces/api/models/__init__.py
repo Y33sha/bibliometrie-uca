@@ -1,4 +1,4 @@
-"""Modèles Pydantic des routers : corps des requêtes entrantes, réponses que le router compose lui-même, et corps d'erreur structurés (`errors.py`) que les handlers d'`app.py` produisent et que les routes déclarent.
+"""Modèles Pydantic des routers : corps des requêtes entrantes, réponses composées par le router, et corps d'erreur structurés (`errors.py`) produits par les handlers d'`app.py` et déclarés par les routes.
 
 Le découpage des modules suit celui des routers (`interfaces/api/routers/*`). Le package réexpose les classes : `from interfaces.api.models import X`.
 

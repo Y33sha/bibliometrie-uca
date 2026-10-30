@@ -221,7 +221,7 @@ _SOURCE_MAPS: dict[str, dict[str, str]] = {
 
 
 def _translate(part: str, source_map: dict[str, str]) -> str | None:
-    """Traduction d'un type brut : sa valeur dans la table, sinon le type lui-même s'il est du référentiel. Un type suivi d'un sous-type absent de la table (`MEM_14`) prend la traduction du type."""
+    """Traduit un type brut : sa valeur dans la table, sinon le type lui-même s'il est du référentiel. Un type suivi d'un sous-type absent de la table (`MEM_14`) prend la traduction du type."""
     if translated := source_map.get(part) or (part if part in DOC_TYPES_SET else None):
         return translated
     base, _, subtype = part.partition("_")
@@ -229,7 +229,7 @@ def _translate(part: str, source_map: dict[str, str]) -> str | None:
 
 
 def map_doc_type(raw: str, source: str) -> str | None:
-    """Type du référentiel pour le type `raw` donné par `source` (`_translate`). `None` pour une valeur inconnue ; `other` pour une valeur vide.
+    """Renvoie le type du référentiel pour le type `raw` donné par `source` (`_translate`). `None` pour une valeur inconnue ; `other` pour une valeur vide.
 
     Un type composite (WoS « Article; Proceedings Paper ») prend la traduction de sa première partie traduite autrement qu'en `other`.
     """

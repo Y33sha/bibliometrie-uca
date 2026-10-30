@@ -8,6 +8,7 @@ import pytest
 from domain.config import (
     BRAND_HUE_KEY,
     INSTITUTION_COUNTRY_KEY,
+    LABORATORY_TYPES_KEY,
     MAX_YEAR,
     MIN_YEAR,
     SITE_TITLE_KEY,
@@ -109,6 +110,22 @@ class TestPaysEtablissement:
             normalize_config_value(INSTITUTION_COUNTRY_KEY, valeur)
 
 
+class TestTypesDeLaboratoire:
+    def test_les_types_sont_dedoublonnes_dans_l_ordre_de_l_enum(self):
+        assert normalize_config_value(LABORATORY_TYPES_KEY, ["admin", "labo", "admin"]) == [
+            "labo",
+            "admin",
+        ]
+
+    @pytest.mark.parametrize("valeur", [None, [], "labo"])
+    def test_une_valeur_autre_qu_une_liste_non_vide_est_refusee(self, valeur):
+        with pytest.raises(ValidationError, match="liste non vide"):
+            normalize_config_value(LABORATORY_TYPES_KEY, valeur)
+
+    def test_un_type_inconnu_est_refuse(self):
+        with pytest.raises(ValidationError, match="inconnus"):
+            normalize_config_value(LABORATORY_TYPES_KEY, ["labo", "institut"])
+
+
 def test_une_cle_sans_forme_imposee_passe_telle_quelle():
     assert normalize_config_value("perimeter_extraction", "alliance_uca") == "alliance_uca"
-    assert normalize_config_value("laboratories_display_types", ["labo"]) == ["labo"]

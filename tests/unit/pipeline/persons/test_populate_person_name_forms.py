@@ -95,7 +95,7 @@ def test_single_person_single_batch(queries):
     assert len(queries.batches) == 1
     rows = queries.batches[0]
     assert rows, "Au moins une forme calculée par personne"
-    # Chaque ligne a les clés que lit sync_from_raw_forms.
+    # Chaque ligne a les clés lues par sync_from_raw_forms.
     assert all(set(r.keys()) == {"name_form", "person_id", "source"} for r in rows)
     assert all(r["source"] == "persons" for r in rows)
     assert {r["person_id"] for r in rows} == {1, 2}
@@ -108,7 +108,6 @@ def test_strips_whitespace_in_names(queries):
     populate(_FakeConn())
 
     rows = queries.batches[0]
-    # Aucune forme ne commence ni ne finit par une espace.
     for r in rows:
         assert not r["name_form"].startswith(" ")
         assert not r["name_form"].endswith(" ")
@@ -136,16 +135,14 @@ def test_batches_flush_at_batch_size(queries, monkeypatch):
 
     populate(_FakeConn())
 
-    # Au moins deux lots.
     assert len(queries.batches) >= 2
-    # Aucun lot vide.
     assert all(len(b) > 0 for b in queries.batches)
     # Chaque lot sauf le dernier compte au plus trois formes.
     assert all(len(b) <= 3 for b in queries.batches[:-1])
 
 
 def test_la_table_temporaire_ne_survit_pas_a_la_synchronisation(queries, caplog):
-    """Les formes calculées transitent par une table que la synchronisation consomme."""
+    """Les formes calculées transitent par une table temporaire, consommée par la synchronisation."""
     queries.sync_return = SyncCounts(42, 7, 3)
 
     with caplog.at_level(logging.INFO):

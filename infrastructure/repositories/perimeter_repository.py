@@ -1,4 +1,4 @@
-"""Repository PostgreSQL de l'agrégat Perimeter."""
+"""Repository PostgreSQL de l'entité Perimeter."""
 
 from typing import NamedTuple
 
@@ -22,7 +22,7 @@ class _PerimeterRow(NamedTuple):
 
 
 def _perimeter_from_row(row: _PerimeterRow) -> Perimeter:
-    """Périmètre de domaine d'une ligne de `perimeters`."""
+    """Renvoie le périmètre de domaine d'une ligne de `perimeters`."""
     return Perimeter(
         id=row.id,
         code=row.code,
@@ -52,7 +52,7 @@ class PgPerimeterRepository(PerimeterRepository):
             return None
         return _perimeter_from_row(row_as(_PerimeterRow, row))
 
-    # ── Liens structure ↔ perimeter ────────────────────────────────
+    # ── Liens structure ↔ périmètre ────────────────────────────────
 
     def remove_structure_from_all_perimeters(self, structure_id: int) -> None:
         self._conn.execute(

@@ -21,7 +21,7 @@ log = setup_logger("pipeline", str(PROJECT_ROOT / "logs"))
 
 
 def open_tx() -> AbstractContextManager[Connection]:
-    """Fabrique de transaction gérée (port `OpenTransaction`) : commit sur succès, rollback sur erreur, fermeture, et tolérance aux commits par lots."""
+    """Ouvre une transaction gérée (port `OpenTransaction`) : commit sur succès, rollback sur erreur, tolérance aux commits par lots."""
 
     return managed_transaction(get_sync_engine())
 
@@ -39,7 +39,7 @@ def phase_context(
     credentials_missing: CredentialsMissing,
     request_budget: RequestBudget,
 ) -> PhaseContext:
-    """Contexte d'exécution remis aux phases : transaction gérée, journal du pipeline, options du run, maintenance des tables, contrôle des identifiants d'accès et débit des sources."""
+    """Renvoie le contexte d'exécution des phases."""
     return PhaseContext(
         open_tx=open_tx,
         logger=log,

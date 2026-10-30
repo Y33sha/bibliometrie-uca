@@ -1,6 +1,6 @@
 """Téléchargement et lecture du dump du Research Organization Registry (ROR).
 
-Le ROR publie son dump sur Zenodo, dans la communauté `ror-data` : une archive zip par version, qui contient le registre en JSON et en CSV. La lecture parcourt le CSV ligne à ligne. Le JSON demande plus d'un gigaoctet de mémoire.
+Le ROR publie son dump sur Zenodo, dans la communauté `ror-data` : une archive zip par version, avec le registre en JSON et en CSV. La lecture parcourt le CSV ligne à ligne. Le JSON demande plus d'un gigaoctet de mémoire.
 """
 
 from __future__ import annotations
@@ -43,12 +43,12 @@ ROR_DATA_CONCEPT_DOI = "10.5281/zenodo.6347574"
 
 
 def dump_version(archive_name: str) -> str:
-    """Version d'une archive du dump : `v2.14` pour `v2.14-2026-10-06-ror-data.zip`."""
+    """Renvoie la version d'une archive du dump : `v2.14` pour `v2.14-2026-10-06-ror-data.zip`."""
     return archive_name.split("-", 1)[0]
 
 
 def published_ror_version(*, user_agent: str) -> str | None:
-    """Version la plus récente du dump, d'après les métadonnées DataCite de son DOI conceptuel. `None` si DataCite ne répond pas."""
+    """Renvoie la version la plus récente du dump, d'après les métadonnées DataCite de son DOI conceptuel. `None` si DataCite ne répond pas."""
     try:
         response = httpx2.get(
             f"{API_BASE_URLS['datacite']}/dois/{ROR_DATA_CONCEPT_DOI}",
@@ -65,14 +65,16 @@ def published_ror_version(*, user_agent: str) -> str | None:
 
 @dataclass(frozen=True, slots=True)
 class RorDumpFile:
-    """Archive d'une version du dump : son nom (`v2.14-2026-10-06-ror-data.zip`…) et son URL de téléchargement."""
+    """Archive d'une version du dump."""
 
     name: str
+    """Nom de l'archive : `v2.14-2026-10-06-ror-data.zip`…"""
     url: str
+    """URL de téléchargement."""
 
 
 def find_latest_ror_dump(*, user_agent: str) -> RorDumpFile:
-    """Archive de la version la plus récente du dump, d'après l'API Zenodo.
+    """Renvoie l'archive de la version la plus récente du dump, d'après l'API Zenodo.
 
     Lève `DumpDownloadError` si la réponse ne désigne pas d'archive sur `zenodo.org`.
     """
@@ -136,7 +138,7 @@ def read_ror_dump(archive_path: str) -> Iterator[RorOrganization]:
 
 
 def parse_ror_row(row: Mapping[str, str]) -> RorOrganization:
-    """Organisation d'une ligne du CSV du dump (schéma v2)."""
+    """Lit l'organisation d'une ligne du CSV du dump (schéma v2)."""
     relations = _parse_relationships(row["relationships"])
     return RorOrganization(
         ror_id=RorId(row["id"]),
@@ -150,7 +152,7 @@ def parse_ror_row(row: Mapping[str, str]) -> RorOrganization:
 
 
 def _parse_relationships(cell: str) -> dict[str, frozenset[RorId]]:
-    """Relations d'une ligne par type : `child: <url>, <url>; parent: <url>` → `{type: identifiants}`."""
+    """Lit les relations d'une ligne, par type : `child: <url>, <url>; parent: <url>` → `{type: identifiants}`."""
     relations: dict[str, frozenset[RorId]] = {}
     for segment in cell.split(";"):
         kind, _, urls = segment.partition(":")
@@ -169,11 +171,11 @@ class ZenodoRorDumpSource:
         self._latest: RorDumpFile | None = None
 
     def published_version(self) -> str | None:
-        """Version la plus récente du dump selon DataCite (`v2.14`), `None` si DataCite ne répond pas."""
+        """Renvoie la version la plus récente du dump selon DataCite (`v2.14`), ou `None` si DataCite ne répond pas."""
         return published_ror_version(user_agent=self._user_agent)
 
     def latest_version(self) -> str:
-        """Nom de l'archive de la version la plus récente. Lève `DumpUnavailableError`."""
+        """Renvoie le nom de l'archive de la version la plus récente. Lève `DumpUnavailableError`."""
         try:
             self._latest = find_latest_ror_dump(user_agent=self._user_agent)
         except _UNAVAILABLE as e:
@@ -181,7 +183,7 @@ class ZenodoRorDumpSource:
         return self._latest.name
 
     def organizations(self, version: str) -> Iterator[RorOrganization]:
-        """Organisations de l'archive `version`, téléchargée le temps de la lecture. Lève `DumpUnavailableError`."""
+        """Itère les organisations de l'archive `version`, téléchargée le temps de la lecture. Lève `DumpUnavailableError`."""
         if self._latest is None or self._latest.name != version:
             raise DumpUnavailableError(f"Version {version} absente de la dernière liste lue.")
         with downloaded_dump(
@@ -206,4 +208,4 @@ _UNAVAILABLE = (
     ValidationError,
     zipfile.BadZipFile,
 )
-"""Échecs qui rendent le dump inaccessible : réseau, serveur, archive ou ligne inexploitable."""
+"""Échecs d'accès au dump : réseau, serveur, archive ou ligne inexploitable."""

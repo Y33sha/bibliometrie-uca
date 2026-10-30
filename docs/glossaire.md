@@ -1,167 +1,148 @@
 # Glossaire métier
 
-*A compléter*
-
 ## ABES
-*Agence bibliographique de l'Enseignement supérieur*
+*Agence bibliographique de l'enseignement supérieur*. Gère le Sudoc, IdRef et theses.fr.
 
 ## Adresse
-Chaîne de caractères associée à une publication et signalant l'[affiliation](glossaire.md#affiliation) institutionnelle de chaque auteur. Fournie par chaque auteur à l'éditeur.
-Généralement appelée *address* ou *affiliation string* dans les métadonnées des publications, et *signature* dans le langage courant (côté auteur).
-
-https://www.uca.fr/recherche/science-ouverte-et-publication/politique-de-signature-des-publications
+Chaîne de caractères qui donne l'[affiliation](#affiliation) d'un auteur dans une publication, fournie par l'auteur à l'éditeur. Appelée *address* ou *affiliation string* dans les métadonnées, et *signature* dans le langage courant.
 
 ## Affiliation
-Information sur la ou les structure(s) de rattachement de chaque auteur d'une publication.
-
-Elle est liée à un couple personne-publication, et non à une personne en tant que telle.
+Structure ou structures de rattachement d'un auteur dans une publication. Elle est liée au couple personne-publication, et non à la personne.
 
 ## APC
-*Article Processing Charges*. Frais de publication facturés par l'éditeur pour publier un article en open access. Peuvent aller de quelques centaines à plusieurs milliers d'euros selon la revue.
+*Article Processing Charges*. Frais facturés par l'éditeur pour publier un article en open access, de quelques centaines à plusieurs milliers d'euros selon la revue. Dans une revue entièrement open access, on parle d'open access gold ; dans une revue sous abonnement, de modèle hybride. Voir [voies *open access*](#voies-open-access).
 
-Si la revue est *full open access*, on parle d'*open access gold*. Si la revue est sous abonnement, on parle de modèle hybride. Voir [voies *open access*](glossaire.md#voies-open-access).
+## Article
+Publication dans une revue à comité de lecture.
 
 ## AuréHAL
-Référentiel d'entités HAL (auteurs, structures, revues).
+Référentiel d'entités de HAL : auteurs, structures, revues.
 
 ## Auteur correspondant
-
-Auteur désigné comme contact principal de l'éditeur pour une publication à plusieurs auteurs. Il y en a parfois deux ou trois sur une même publication.
-
-Les [APC](glossaire.md#apc) (si présents) sont payés par la structure de rattachement de l'auteur correspondant.
-
-L'information "auteur correspondant" est inégalement renseignée dans les métadonnées des sources.
-
-## Contribution
-Participation d'un auteur à une publication, avec ses [affiliations](glossaire.md#affiliation). Elle réunit les mentions de cet auteur dans les différentes sources, et désigne sa personne quand elle est identifiée. Voir le [modèle de données](donnees/04-contributions.md).
+Auteur désigné comme contact principal de l'éditeur. Une publication en a parfois deux ou trois. Les [APC](#apc) sont en général payés par la structure de rattachement de l'auteur correspondant. Les sources renseignent inégalement cette information.
 
 ## Collection HAL
-Sous-portail HAL agrégeant les publications d'une structure (i.e. les publications déposées dans HAL et dont au moins un auteur a une affiliation à cette structure). Chaque collection a un code, correspondant souvent à l'acronyme du laboratoire.
+Sous-portail HAL qui réunit les publications d'une structure : les dépôts avec au moins un auteur affilié à cette structure. Chaque collection a un code, souvent l'acronyme du laboratoire (exemple : https://hal.science/PIAF). La collection d'une tutelle réunit les publications de ses sous-structures, d'après l'arborescence d'[AuréHAL](#auréhal).
 
-Exemple: https://hal.science/PIAF
+## Communication
+Contribution à un colloque ou une conférence (*conference paper*). Certaines sources y rangent les posters.
 
-La collection d'une structure tutelle agrège les publications de ses sous-structures. L'arborescence des structures est fournie par le référentiel [AuréHAL](glossaire.md#auréhal).
+## Contribution
+Participation d'une personne à une publication, avec ses [affiliations](#affiliation). Elle réunit les mentions de cette personne dans les différentes sources, et désigne la personne quand elle est identifiée. Voir le [modèle de données](donnees/04-contributions.md).
 
 ## Crossref
-Agence d'enregistrement de DOI, principalement pour les publications.
+Agence d'enregistrement de DOI, surtout pour les publications d'éditeurs. Voir [détails](sources/06-crossref.md).
 
-## Datacite
-Agence d'enregistrement de DOI, principalement pour les autres types de documents (jeux de données, etc.)
+## DataCite
+Agence d'enregistrement de DOI, surtout pour les jeux de données, logiciels et dépôts d'entrepôts. Voir [détails](sources/07-datacite.md).
 
 ## DOAJ
-*Directory of Open Access Journals*. Répertoire des revues en open access.
-
-https://doaj.org/
+*Directory of Open Access Journals*. Répertoire des revues en open access : https://doaj.org/
 
 ## DOI
-*Digital Object Identifier*. Identifiant unique et pérenne d'une publication (ex: `10.1234/article.5678`).
+*Digital Object Identifier*. Identifiant unique et pérenne d'un document (ex. : `10.1234/article.5678`).
 
-## Dumas
+## DUMAS
+*Dépôt universitaire de mémoires après soutenance*. Portail de HAL pour les mémoires d'étudiants. Les mémoires restent hors des publications.
+
+## Éditeur
+Maison d'édition scientifique (Elsevier, Springer Nature, EDP Sciences…), qui publie les documents et reçoit les frais de publication.
 
 ## HAL
-Archive ouverte nationale française.
-
-Voir [détails](sources/02-hal.md) sur l'API et les données récupérées.
+Archive ouverte nationale française. Voir [détails](sources/02-hal.md).
 
 ## idHAL
-Identifiant auteur dans HAL. Créé par le chercheur dans son profil HAL.
+Identifiant d'auteur dans HAL, créé par le chercheur dans son profil HAL.
 
 ## IdRef
-**Id**entifiants et **Réf**érentiels pour l'Enseignement supérieur et la Recherche. Référentiel d'autorités (personnes, collectivités, etc.) développé et maintenu par l'ABES. https://documentation.abes.fr/aideidref/accueil/fr/index.html
-
-Par raccourci de langage on parle d'*identifiants IdRef* pour désigner les identifiant de ce référentiel. Officiellement on parle de *n° PPN*. Il est composé de 9 caractères (8 chiffres + 1 clé pouvant être un chiffre ou un 'X').
+*Identifiants et référentiels pour l'enseignement supérieur et la recherche*. Référentiel d'autorités (personnes, collectivités…) de l'ABES : https://www.idref.fr/. Un identifiant IdRef, ou PPN, compte 9 caractères : 8 chiffres et une clé, chiffre ou `X`.
 
 ## ISSN
-*International Standard Serial Number*. Identifiant d'une publication périodique (= revue). Il peut exister un ISSN *print* (pour la version imprimée), un eISSN (pour la version électronique) et un ISSN-L (de liaison: identifiant unique pour une publication multi-supports).
-
-Doc: https://www.issn.org/fr/comprendre-lissn/
+*International Standard Serial Number*. Identifiant d'une publication en série. Une revue peut avoir un ISSN imprimé, un eISSN (version électronique) et un ISSN-L, qui relie les supports d'une même revue : https://www.issn.org/fr/comprendre-lissn/
 
 ## Licences
+Conditions de réutilisation d'une publication, le plus souvent une licence Creative Commons (CC BY, CC BY-NC…).
 
 ## NNT
-Numéro national de thèse. Identifiant unique pour les thèses.
+Numéro national de thèse. Identifiant unique d'une thèse soutenue.
 
 ## OpenAlex
-Base bibliographique ouverte (fondation OurResearch): https://openalex.org/
-
-Voir [détails](sources/03-openalex.md) sur l'API et les données récupérées.
+Base bibliographique ouverte (fondation OurResearch) : https://openalex.org/. Voir [détails](sources/03-openalex.md).
 
 ## OpenAPC
+Jeu de données ouvert des frais de publication payés par les établissements participants. Voir [données APC](sources/10-imports-manuels.md#données-apc).
 
 ## ORCID
-Identifiant unique d'un chercheur (ex: `0000-0001-2345-6789`). Créé par le chercheur.
+Identifiant unique d'un chercheur (ex. : `0000-0001-2345-6789`), créé par le chercheur lui-même.
 
 ## Organisation partenaire
-Organisation [ROR](glossaire.md#ror) d'un auteur d'une publication, ou ancêtre ROR de cette organisation. Les organisations partenaires excluent les structures étudiées, leurs tutelles et leurs ancêtres ROR. Les structures étudiées sont le laboratoire de la page, les laboratoires sélectionnés, ou à défaut tout le périmètre.
+Organisation [ROR](#ror) d'un auteur d'une publication, ou ancêtre ROR de cette organisation. Les organisations partenaires excluent les structures étudiées, leurs tutelles et leurs ancêtres ROR. Les structures étudiées sont le laboratoire de la page, les laboratoires sélectionnés, ou à défaut tout le périmètre.
 
 ## PID
+*Persistent identifier*. Identifiant unique et pérenne d'une entité.
 
-*Persistent identifier*. Identifiant unique pour une entité donnée.
-|Entité|Exemples d'identifiants|
-|---|------|
-|Personne|[ORCID](glossaire.md#orcid), [IdRef](glossaire.md#idref)|
-|Structure|[ROR](glossaire.md#ror)|
-|Publication|[DOI](glossaire.md#doi)|
-|Revue|[ISSN](glossaire.md#issn)|
+| Entité | Exemples d'identifiants |
+|---|---|
+| Personne | [ORCID](#orcid), [IdRef](#idref) |
+| Structure | [ROR](#ror) |
+| Publication | [DOI](#doi) |
+| Revue | [ISSN](#issn) |
 
-## Pmid
-
-
+## PMID
+Identifiant d'un article dans [PubMed](#pubmed).
 
 ## Postprint
+Version d'un article acceptée pour publication, après évaluation par les pairs.
 
-Version d'un article acceptée pour publication (après *peer reviewing*).
+## Premier auteur, dernier auteur
+Conventions de signature : le premier auteur a en général fait le travail principal, le dernier dirige souvent l'équipe. Elles valent surtout en sciences, techniques et médecine.
 
 ## Preprint
+Version d'un article avant évaluation par les pairs.
 
-Version d'un article avant *peer reviewing*.
+## Publication en série
+Support qui réunit des documents sous un même titre : revue, collection d'ouvrages, recueil d'actes, serveur de preprints, archive ouverte, média. Elle est rattachée à un éditeur.
 
-## Pubmed
+## PubMed
+Base bibliographique biomédicale de la bibliothèque nationale de médecine des États-Unis.
 
-## Pubmed Central (PMC)
+## PubMed Central (PMC)
+Archive en texte intégral de la bibliothèque nationale de médecine des États-Unis. Un article de PMC a un identifiant PMCID.
+
+## RAMEAU
+*Répertoire d'autorité-matière encyclopédique et alphabétique unifié*. Vocabulaire d'indexation des bibliothèques françaises, géré par la BnF, employé par le Sudoc et theses.fr.
+
+## Revue
+Publication en série périodique, identifiée par un ou plusieurs [ISSN](#issn).
 
 ## ROR
-*Research Organization Registry*. Registre international des structures de recherche, responsable de l'attribution d'identifiants uniques à chaque structure. (ex: [01a8ajp46](https://ror.org/01a8ajp46) pour l'UCA).
+*Research Organization Registry*. Registre international des organisations de recherche, qui attribue un identifiant unique à chacune (ex. : [02feahw73](https://ror.org/02feahw73) pour le CNRS).
 
 ## ScanR
-Portail ministériel de la recherche française.
+Portail du ministère de l'Enseignement supérieur et de la Recherche sur la recherche française. Voir [détails](sources/05-scanr.md).
 
-## Theses.fr
+## Synthèse
+Article de synthèse, ou revue de la littérature (*review*). Dans WoS, *book review* désigne un compte rendu d'ouvrage.
+
+## theses.fr
+Portail de l'ABES des thèses françaises, soutenues et en préparation. Voir [détails](sources/08-theses.md).
 
 ## Thèses en ligne (TEL)
+Portail de HAL pour les thèses de doctorat et les habilitations à diriger des recherches.
 
 ## Unpaywall
-Service permettant de trouver des versions *open access* de publications académiques identifiées par un DOI. API utilisée pour enrichir et corriger le champ `oa_status` des publications. Voir [détails](sources/09-sources-supplementaires.md#unpaywall).
+Service qui trouve les versions open access d'un document identifié par un DOI. Voir [détails](sources/09-sources-supplementaires.md#unpaywall).
 
 ## Voies *open access*
+Les voies d'open access se nomment par des couleurs, selon le régime de diffusion. Les deux principales sont le *green* (dépôt de l'auteur dans une archive ouverte) et le *gold* (revue entièrement open access).
 
-On distingue plusieurs "voies" d'*open access* par des noms de couleur, selon le régime juridique. Les deux principales sont le *green open access* (côté auteur: dépôt du *postprint* dans une archive ouverte) et le *gold open access* (côté éditeur: revue nativement OA), mais d'autres sous-catégories ont été distinguées par la suite:
-
-
-| Voie OA | Définition |
-|-------|-----------|
-| **Green** | Publication déposée en archive ouverte (HAL, arXiv...), en général par l'auteur, parallèlement à sa publication dans une revue. La version déposée peut être un *preprint* ou un *postprint*. |
-| **Gold** | Publication en open access dans une revue entièrement OA. Généralement payant (APC). |
-| **Diamond** | Sous-catégorie du *gold* : publication dans une revue diamant, c'est-à-dire une revue OA sans APC ni autres frais. Une revue est diamant quand elle est marquée comme telle dans le référentiel, ou quand le DOAJ la donne sans frais. Attention: [Unpaywall](sources/09-sources-supplementaires.md#unpaywall) ne distingue pas *diamond* de *gold*. |
-| **Hybrid** | Publication en open access dans une revue sous abonnement payant. L'auteur paie un APC pour rendre son article accessible en OA. Généralement déconseillé (l'institution paye les APC + l'abonnement à la revue). |
-| **Bronze** | Publication accessible gratuitement sur le site de l'éditeur, sans licence OA explicite. *Open access* côté éditeur *de facto*, accès sans garantie de pérennité. |
+| Voie | Définition |
+|---|---|
+| **Green** | Publication déposée en archive ouverte (HAL, arXiv…), en général par l'auteur, en plus de sa publication dans une revue. La version déposée peut être un *preprint* ou un *postprint*. |
+| **Gold** | Publication en open access dans une revue entièrement open access, souvent contre des APC. |
+| **Diamond** | Sous-catégorie du *gold* : publication dans une revue sans APC ni autres frais. Une revue est diamant quand elle est marquée comme telle dans le référentiel, ou quand le DOAJ la donne sans frais. [Unpaywall](sources/09-sources-supplementaires.md#unpaywall) ne distingue pas *diamond* de *gold*. |
+| **Hybrid** | Publication en open access dans une revue sous abonnement, contre des APC. |
+| **Bronze** | Publication lisible gratuitement sur le site de l'éditeur, sans licence open access explicite ni garantie de pérennité. |
 
 ## Web of Science (WoS)
-Base bibliographique commerciale (*Clarivate*). Une des sources de données bibliographiques moissonnées (tant que l'UCA est abonnée).
-Voir [détails](sources/04-wos.md) sur l'API et les données récupérées.
-
-
-## Autres, à déplacer ou supprimer
-
-| Terme | Définition |
-|-------|-----------|
-| **Éditeur** (publisher) | Maison d'édition scientifique (Elsevier, Springer Nature, EDP Sciences...). |
-| **Publication en série** (serial) | Support de publication qui réunit des documents sous un même titre : revue, collection d'ouvrages, recueil d'actes, serveur de preprints, dépôt, média. Rattachée à un éditeur. |
-| **Revue** (journal) | Publication en série périodique, identifiée par un ou plusieurs ISSN. |
-| **Premier auteur / dernier auteur** | Conventions de signature scientifique : le premier auteur a généralement fait le travail principal ; le dernier auteur est souvent le directeur de l'équipe. Notion pertinente dans les disciplines STEM. |
-
-| Terme | Définition |
-|-------|-----------|
-| **Article** | Publication dans une revue à comité de lecture. Type le plus courant. |
-| **Review** | Article de synthèse (revue de la littérature). Attention : dans WoS, "book review" désigne un compte-rendu d'ouvrage, pas une revue de la littérature. |
-| **Conference paper** | Communication dans un colloque ou une conférence. Inclut les posters dans certaines sources. |
+Base bibliographique commerciale de Clarivate. Voir [détails](sources/04-wos.md).

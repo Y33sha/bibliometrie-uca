@@ -43,8 +43,8 @@ class OaModel(StrEnum):
 
     SUBSCRIPTION = "subscription"
     FULL_OA = "full_oa"
-    # Revue en open access sans frais de publication, marquée à la main. Une revue du DOAJ sans APC ni autres frais est diamant sans ce marquage.
     DIAMOND = "diamond"
+    """Revue en open access sans frais de publication : présente dans le DOAJ sans APC ni autres frais, ou marquée à la main."""
     REPOSITORY = "repository"
 
 
@@ -53,20 +53,20 @@ OA_MODELS: tuple[OaModel, ...] = tuple(OaModel)
 # Libellés français des modèles, servis à l'interface par `/api/serials/oa-models`.
 OA_MODEL_LABELS_FR: dict[OaModel, str] = {
     OaModel.SUBSCRIPTION: "Abonnement",
-    OaModel.FULL_OA: "Full OA (gold/diamond)",
+    OaModel.FULL_OA: "Full OA (gold)",
     OaModel.DIAMOND: "Diamant",
     OaModel.REPOSITORY: "Archive / dépôt",
 }
 
 
 class ManualField(StrEnum):
-    """Champ d'une revue que l'administration peut saisir et que le pipeline écrit aussi. Le pipeline laisse inchangé un champ saisi à la main."""
+    """Champ d'une revue saisissable par l'administration et écrit aussi par le pipeline. Le pipeline laisse inchangé un champ saisi à la main."""
 
     TITLE = "title"
     SERIAL_TYPE = "serial_type"
     OA_MODEL = "oa_model"
-    # La liste des ISSN, avec leur support, leur statut et l'ISSN de liaison.
     ISSNS = "issns"
+    """Liste des ISSN, avec leur support, leur statut et l'ISSN de liaison."""
 
 
 class SerialEdit(TypedDict, total=False):
@@ -114,7 +114,7 @@ class Serial:
         return changed
 
     def _manual_values(self) -> dict[ManualField, object]:
-        """Valeur de chaque champ que l'administration peut saisir."""
+        """Renvoie la valeur de chaque champ saisissable par l'administration."""
         return {
             ManualField.TITLE: self.title,
             ManualField.ISSNS: list(self.issns),

@@ -14,7 +14,7 @@ from tests.integration.helpers.seeds import (
 
 @pytest.fixture(scope="module", autouse=True)
 def _seed_addresses_api(client):
-    """Pays FR et périmètre des personnes, que demandent certaines routes.
+    """Sème le pays FR et le périmètre des personnes, demandés par certaines routes.
 
     Le conftest racine recrée la base au démarrage et coupe les connexions ouvertes. Quelques appels à l'API purgent les connexions mortes du pool.
     """
@@ -239,7 +239,7 @@ class TestSetAddressCountry:
         assert r.status_code == 200
 
     def test_set_country_visible_immediately(self, auth_client):
-        # Régression : la donnée écrite par le POST est lisible dès le GET suivant. Une route d'écriture sans `commit()` fait échouer ce test.
+        # La donnée écrite par le POST est lisible dès le GET suivant. Une route d'écriture sans `commit()` fait échouer ce test.
         addr = seed_address("Readback marker QWXZ")
         r = auth_client.post(f"/api/addresses/{addr}/country", json={"countries": ["FR"]})
         assert r.status_code == 200
@@ -308,10 +308,10 @@ class TestAddressStats:
 
 
 def _evenements(event_type: str) -> list[dict]:
-    """Lignes d'audit d'un type donné, dans l'ordre d'émission."""
+    """Renvoie les lignes d'audit d'un type donné, dans l'ordre d'émission."""
     with owner_pool() as cur:
         cur.execute(
-            "SELECT aggregate_type, aggregate_id, payload, user_id "
+            "SELECT entity_type, entity_id, payload, user_id "
             "FROM audit_log WHERE event_type = %s ORDER BY id",
             (event_type,),
         )
@@ -338,8 +338,8 @@ class TestTracabilite:
         evenements = _evenements("address.link_reviewed")
         assert len(evenements) == avant + 1
         dernier = evenements[-1]
-        assert dernier["aggregate_type"] == "address"
-        assert dernier["aggregate_id"] == addr
+        assert dernier["entity_type"] == "address"
+        assert dernier["entity_id"] == addr
         assert dernier["payload"]["structure_id"] == struct
         assert dernier["payload"]["is_confirmed"] is True
         assert dernier["user_id"]
@@ -359,7 +359,7 @@ class TestTracabilite:
         evenements = _evenements("address.batch_link_reviewed")
         assert len(evenements) == avant + 1
         dernier = evenements[-1]
-        assert dernier["aggregate_id"] is None
+        assert dernier["entity_id"] is None
         assert sorted(dernier["payload"]["address_ids"]) == sorted([a1, a2])
         assert dernier["payload"]["structure_id"] == struct
         assert dernier["payload"]["updated"] == 2
@@ -374,7 +374,7 @@ class TestTracabilite:
         evenements = _evenements("address.country_set")
         assert len(evenements) == avant + 1
         dernier = evenements[-1]
-        assert dernier["aggregate_id"] == addr
+        assert dernier["entity_id"] == addr
         assert dernier["payload"]["countries"] == ["FR"]
 
     def test_un_lot_de_pays_par_identifiants_porte_les_identifiants(self, auth_client):
@@ -390,7 +390,7 @@ class TestTracabilite:
         evenements = _evenements("address.batch_country_set")
         assert len(evenements) == avant + 1
         dernier = evenements[-1]
-        assert dernier["aggregate_id"] is None
+        assert dernier["entity_id"] is None
         assert dernier["payload"]["country_code"] == "FR"
         assert dernier["payload"]["address_ids"] == [addr]
 

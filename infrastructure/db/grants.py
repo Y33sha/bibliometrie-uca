@@ -6,12 +6,12 @@ from sqlalchemy import Connection, text
 
 GRANTS_FILE = Path(__file__).with_name("grants.sql")
 
-# Rôles que `grants.sql` désigne, créés par `roles.sql`.
+# Rôles désignés par `grants.sql`, créés par `roles.sql`.
 GRANTED_ROLES = ("bibliometrie_app", "bibliometrie_pipeline")
 
 
 def grant_statements() -> list[str]:
-    """Ordres de `grants.sql`, commentaires retirés, un par élément. Un `;` entre deux `$$` appartient au corps d'un bloc `DO`."""
+    """Renvoie les ordres de `grants.sql`, sans commentaires, un par élément. Un `;` entre deux `$$` appartient au corps d'un bloc `DO`."""
     lines = [
         line
         for line in GRANTS_FILE.read_text(encoding="utf-8").splitlines()

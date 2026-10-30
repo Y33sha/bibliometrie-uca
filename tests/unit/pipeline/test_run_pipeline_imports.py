@@ -2,7 +2,7 @@
 
 Les adaptateurs des sources importent le code de leur source au moment où une phase s'en sert. Le code d'une source écartée (`wos` sans `--include-wos`) reste non chargé : un défaut de ce code laisse le run se dérouler.
 
-Le test passe par un sous-processus : `sys.modules` du processus de test contient ce que les autres tests ont importé.
+Le test passe par un sous-processus : `sys.modules` du processus de test contient les modules importés par les autres tests.
 """
 
 from __future__ import annotations

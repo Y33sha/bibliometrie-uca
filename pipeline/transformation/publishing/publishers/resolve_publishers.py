@@ -1,8 +1,8 @@
 """Éditeur de chaque préfixe DOI, une étape par agence d'enregistrement (phase `publishing`).
 
-L'étape Crossref interroge `api.crossref.org/prefixes` pour les préfixes d'agence Crossref ou inconnue. L'étape DataCite interroge `api.datacite.org/prefixes` pour les préfixes d'agence DataCite, et pour ceux d'agence inconnue que Crossref ne connaît pas. Chaque étape renseigne les métadonnées (`publisher_*`, `crossref_member_id`, `client_*`, `datacite_client_symbol`), corrige l'agence d'un préfixe inconnu qu'elle trouve, puis reconnaît ou crée l'éditeur contre `publisher_name_forms` et l'attache. Un préfixe dont l'API a répondu est marqué vu par l'agence (`crossref_checked_at`, `datacite_checked_at`). Un préfixe dont l'API est indisponible reste en attente du run suivant.
+L'étape Crossref interroge `api.crossref.org/prefixes` pour les préfixes d'agence Crossref ou inconnue. L'étape DataCite interroge `api.datacite.org/prefixes` pour les préfixes d'agence DataCite, et pour ceux d'agence inconnue absents de Crossref. Chaque étape renseigne les métadonnées (`publisher_*`, `crossref_member_id`, `client_*`, `datacite_client_symbol`) et corrige l'agence d'un préfixe inconnu trouvé. Elle trouve ou crée ensuite l'éditeur parmi les formes de nom (`publisher_name_forms`), et l'attache au préfixe. Après réponse de l'API, le préfixe est marqué vu par l'agence (`crossref_checked_at`, `datacite_checked_at`). Si l'API est indisponible, le préfixe attend le run suivant.
 
-Les requêtes `/prefixes` partent en concurrence via `run_fetch_pool` ; les écritures, dont la création d'éditeurs, restent sérialisées. Les clients HTTP sont injectés en callables.
+Les requêtes `/prefixes` sont concurrentes (`run_fetch_pool`). Les écritures, création d'éditeurs comprise, sont sérialisées. Les clients HTTP sont injectés en callables.
 """
 
 from __future__ import annotations
@@ -58,11 +58,14 @@ type _Ask = Callable[
 
 @dataclass(frozen=True)
 class _PrefixAnswer:
-    """Réponse de `/prefixes` pour un préfixe : RA retenue, et les informations de l'agence qui le connaît (aucune si elle ne le connaît pas)."""
+    """Réponse de `/prefixes` pour un préfixe."""
 
     ra: str
+    """Agence retenue."""
     crossref: tuple[str, int | None] | None = None
+    """Informations de Crossref, si le préfixe est présent chez Crossref."""
     datacite: tuple[str, str, str] | None = None
+    """Informations de DataCite, si le préfixe est présent chez DataCite."""
 
 
 def run_resolve_crossref_publishers(
@@ -73,7 +76,7 @@ def run_resolve_crossref_publishers(
     publisher_store: PublisherStore,
     fetch_prefix_fn: FetchCrossrefPrefixFn,
 ) -> PhaseMetrics:
-    """Attache l'éditeur Crossref des préfixes en attente. Un DOI du préfixe, lu avant l'appel, retrouve le membre déposant d'un compte sans dépôt."""
+    """Attache l'éditeur Crossref des préfixes en attente. Un DOI du préfixe, lu avant l'appel, sert à retrouver le membre déposant d'un compte sans dépôt."""
 
     async def ask(
         client: httpx2.AsyncClient, row: PendingPublisherPrefix
@@ -99,7 +102,7 @@ def run_resolve_datacite_publishers(
     publisher_store: PublisherStore,
     fetch_prefix_fn: FetchDataCitePrefixFn,
 ) -> PhaseMetrics:
-    """Attache le provider DataCite des préfixes en attente, et retient le repository qui a déposé les DOI."""
+    """Attache le provider DataCite des préfixes en attente, et retient le repository déposant des DOI."""
 
     async def ask(
         client: httpx2.AsyncClient, row: PendingPublisherPrefix
@@ -123,9 +126,10 @@ def _resolve(
     prefix_store: DoiPrefixStore,
     publisher_store: PublisherStore,
 ) -> PhaseMetrics:
-    """Traite les préfixes en attente auprès de l'agence.
+    """Traite les préfixes en attente auprès de l'agence. S'arrête quand le circuit-breaker de la source coupe.
 
-    `total` = préfixes traités ; `errors` = préfixes laissés en attente faute de réponse ; `extras` = `publisher_matched` / `publisher_created` / `no_publisher` (préfixe inconnu de l'agence). S'arrête quand le circuit-breaker de la source coupe.
+    Returns:
+        Métriques : `total`, préfixes traités ; `errors`, préfixes laissés en attente faute de réponse ; `extras`, `publisher_matched` / `publisher_created` / `no_publisher` (préfixe inconnu de l'agence).
     """
     metrics = PhaseMetrics()
     rows = prefix_store.get_prefixes_pending_publisher(agency)
@@ -202,7 +206,7 @@ def _resolve(
 def _store_publisher_metadata(
     row: PendingPublisherPrefix, answer: _PrefixAnswer, prefix_store: DoiPrefixStore
 ) -> tuple[str | None, str | None]:
-    """Persiste les métadonnées de la réponse `/prefixes` et la RA retenue. Retourne `(name_raw, name_normalized)`."""
+    """Persiste les métadonnées de la réponse `/prefixes` et l'agence retenue. Renvoie `(name_raw, name_normalized)`."""
     publisher_name_raw: str | None = None
     publisher_name_normalized: str | None = None
     crossref_member_id: int | None = None

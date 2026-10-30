@@ -1,4 +1,4 @@
-"""Tests de la clé de rapprochement des noms d'éditeurs (`domain.publishers.names`)."""
+"""Tests de la clé de nom des éditeurs (`domain.publishers.names`)."""
 
 import pytest
 

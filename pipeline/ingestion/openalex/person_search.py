@@ -1,6 +1,6 @@
 """Moissonnage d'OpenAlex par ORCID : tâche `harvest_by_person.openalex`.
 
-Interroge `/works` avec le filtre `authorships.author.orcid`, qui réunit par OU les ORCID d'un lot, borné par `publication_year`. La pagination suit le curseur (`next_cursor`).
+La requête `/works` reçoit le filtre `authorships.author.orcid`, avec les ORCID d'un lot réunis par OU, borné par `publication_year`. La pagination suit le curseur (`next_cursor`).
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ from pipeline.ingestion.openalex.api import OpenalexClient
 
 
 def build_orcid_filter(orcids: list[str], first_year: int, last_year: int) -> str:
-    """Valeur du paramètre `filter` : works d'un des ORCID, parus de `first_year` à `last_year`."""
+    """Construit la valeur du paramètre `filter` : works d'un des ORCID, parus de `first_year` à `last_year`."""
     return f"authorships.author.orcid:{'|'.join(orcids)},publication_year:{first_year}-{last_year}"
 
 

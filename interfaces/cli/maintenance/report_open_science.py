@@ -4,7 +4,7 @@
 Une publication appartient au laboratoire quand au moins un de ses auteurs du périmètre signe avec lui. Les évolutions portent sur les cinq années qui finissent à l'année du bilan, les thèses sur dix années.
 
 Usage :
-    python -m interfaces.cli.maintenance.report_open_science --structure m2ish --year 2025 [--output data/reports/science-ouverte/m2ish-2025.md]
+    uv run python -m interfaces.cli.maintenance.report_open_science --structure m2ish --year 2025 [--output data/reports/science-ouverte/m2ish-2025.md]
 """
 
 import argparse
@@ -111,7 +111,7 @@ def _values(members: Sequence[str]) -> list[str]:
 
 
 def _num(n: float) -> str:
-    """Nombre à la française : espace insécable pour les milliers."""
+    """Formate un nombre à la française : espace insécable pour les milliers."""
     return f"{n:,.0f}".replace(",", " ")
 
 
@@ -619,14 +619,14 @@ class OpenScienceReport:
 
 
 def _with_identifier(id_type: str) -> str:
-    """Sous-requête : nombre d'auteurs de `lab_authors` qui ont un identifiant de ce type, non rejeté."""
+    """Renvoie la sous-requête comptant les auteurs de `lab_authors` pourvus d'un identifiant de ce type, non rejeté."""
     return f"""(SELECT COUNT(DISTINCT pi.person_id) FROM person_identifiers pi
                 JOIN lab_authors la ON la.person_id = pi.person_id
                 WHERE pi.id_type = '{id_type}' AND pi.status <> 'rejected')"""
 
 
 def preprint_server(prefixes: Sequence[str], copies: Sequence[Sequence[str]]) -> str | None:
-    """Serveur de preprints d'une publication, d'après ses copies (URL et source OpenAlex, vide à défaut), à défaut d'après les préfixes de ses DOI."""
+    """Renvoie le serveur de preprints d'une publication, d'après ses copies (URL et source OpenAlex, vide à défaut), à défaut d'après les préfixes de ses DOI."""
     for url, source in sorted((url, source) for url, source in copies):
         known = known_platform_of_copy(url, source or None)
         if known and known.platform_type is PlatformType.PREPRINT_SERVER:

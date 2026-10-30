@@ -20,7 +20,7 @@ MANUAL_MERGE_KEY = "manual_merge"
 
 
 def manual_merge_tokens(manual_merge_ids: Iterable[int]) -> frozenset[tuple[str, str]]:
-    """Jetons des fusions manuelles d'un enregistrement source. Le clustering les traite comme des clés de confirmation."""
+    """Renvoie les jetons des fusions manuelles d'un enregistrement source. Le clustering les traite comme des clés de confirmation."""
     return frozenset(
         (MANUAL_MERGE_KEY, str(manual_merge_id)) for manual_merge_id in manual_merge_ids
     )
@@ -30,23 +30,24 @@ def manual_merge_tokens(manual_merge_ids: Iterable[int]) -> frozenset[tuple[str,
 class ReconcileMember:
     """Enregistrement source du voisinage de réconciliation.
 
-    - `tokens` : clés de confirmation et jetons de fusion manuelle.
-    - `matchable` : l'enregistrement source entre dans la réconciliation (`is_matchable`).
-    - `doi_keys` : DOI actifs de rôle autre que `related`, qui déterminent la partition.
-    - `publication_id`, `publication_doi` : publication de l'enregistrement source et son DOI, `None` s'il est orphelin.
-    - `in_perimeter`, `title_normalized`, `publication_year`, `doc_type` : servent seulement à décider la création d'une publication.
+    `in_perimeter`, `title_normalized`, `publication_year` et `doc_type` servent seulement à décider la création d'une publication.
     """
 
     source_record_id: int
     publication_id: int | None
+    """Publication de l'enregistrement source, `None` s'il est orphelin."""
     publication_doi: str | None
+    """DOI de la publication, `None` pour un enregistrement source orphelin."""
     doi_keys: DoiKeys
+    """DOI actifs de rôle autre que `related`, qui déterminent la partition."""
     tokens: frozenset[tuple[str, str]]
+    """Clés de confirmation et jetons de fusion manuelle."""
     in_perimeter: bool = False
     title_normalized: str | None = None
     publication_year: int | None = None
     doc_type: str | None = None
     matchable: bool = True
+    """L'enregistrement source entre dans la réconciliation (`is_matchable`)."""
 
     @property
     def can_found_publication(self) -> bool:
@@ -61,19 +62,22 @@ class ReconcileMember:
 
 @dataclass(frozen=True, slots=True)
 class WorkGroup:
-    """Œuvre : enregistrements sources à rattacher à une seule publication. `target_publication_id` : ancre conservée, ou `None` pour créer une publication. `doi` : ancre DOI de la partition."""
+    """Œuvre : enregistrements sources à rattacher à une seule publication."""
 
     target_publication_id: int | None
+    """Ancre conservée, ou `None` pour créer une publication."""
     source_record_ids: tuple[int, ...]
     doi: str | None = None
+    """Ancre DOI de la partition."""
 
 
 @dataclass(frozen=True, slots=True)
 class DissolvedPublication:
-    """Publication vidée de ses enregistrements sources par une fusion. `successor_publication_id` : publication qui reçoit son plus petit enregistrement source, et ses paiements APC."""
+    """Publication vidée de ses enregistrements sources par une fusion."""
 
     publication_id: int
     successor_publication_id: int
+    """Publication qui reçoit son plus petit enregistrement source, et ses paiements APC."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,7 +92,7 @@ class ReconcilePlan:
 def _partitions(
     members: list[ReconcileMember],
 ) -> list[tuple[str | None, list[ReconcileMember]]]:
-    """Partitions du voisinage, avec leur ancre DOI : composantes connexes, coupées par leurs ancres. Dans une composante à plusieurs ancres, un enregistrement source sans ancre unique reste hors partition."""
+    """Renvoie les partitions du voisinage, avec leur ancre DOI : composantes connexes, coupées par leurs ancres. Dans une composante à plusieurs ancres, un enregistrement source sans ancre unique reste hors partition."""
     by_id = {m.source_record_id: m for m in members}
     components = connected_components([(m.source_record_id, m.tokens) for m in members])
 
@@ -108,19 +112,22 @@ def _partitions(
 
 
 class _Claim(NamedTuple):
-    """Revendication d'une partition. `preferred` est la publication revendiquée, `None` pour une création ; `strong` vaut pour le porteur du DOI ; `doi` est l'ancre DOI de la partition."""
+    """Revendication d'une partition."""
 
     preferred: int | None
+    """Publication revendiquée, `None` pour une création."""
     strong: bool
+    """Vrai pour la publication qui a le DOI de la partition."""
     min_source_record: int
     source_record_ids: tuple[int, ...]
     doi: str | None = None
+    """Ancre DOI de la partition."""
 
 
 def _claim(
     doi: str | None, part: list[ReconcileMember], existing_publication_by_doi: dict[str, int]
 ) -> _Claim | None:
-    """Revendication d'ancre d'une partition d'ancre DOI `doi`, ou `None` si la partition reste orpheline.
+    """Renvoie la revendication d'ancre d'une partition d'ancre DOI `doi`, ou `None` si la partition reste orpheline.
 
     - Partition avec des enregistrements sources rattachés : la publication qui a son DOI (revendication forte), sinon celle du plus petit enregistrement source rattaché (faible).
     - Partition d'orphelins : création, si un membre peut fonder une publication et un membre a un titre et une année.
@@ -158,11 +165,13 @@ def plan_reconciliation(
     existing_publication_by_doi: dict[str, int] | None = None,
     publication_sizes: Mapping[int, int] | None = None,
 ) -> ReconcilePlan:
-    """Plan de réconciliation du voisinage `members`.
+    """Planifie la réconciliation du voisinage `members`.
 
     Une publication existante est l'ancre d'une seule partition : la revendication forte l'emporte, puis le plus petit enregistrement source. Les autres partitions créent une publication. Une publication vidée de ses enregistrements sources est dissoute.
 
-    `existing_publication_by_doi` : publication par DOI en minuscules, pour les publications qui ont un DOI sans membre dans le voisinage. `publication_sizes` : nombre total d'enregistrements sources par publication ; une publication qui en garde hors du voisinage survit.
+    Args:
+        existing_publication_by_doi: publication par DOI en minuscules, pour les publications qui ont un DOI sans membre dans le voisinage.
+        publication_sizes: nombre total d'enregistrements sources par publication ; une publication qui en garde hors du voisinage survit.
     """
     members = list(members)
     by_doi = existing_publication_by_doi or {}
@@ -187,7 +196,9 @@ def plan_reconciliation(
             awarded.add(claim.preferred)
             target: int | None = claim.preferred
         else:
-            target = None  # création, ou publication existante déjà prise → nouvelle publication
+            target = (
+                None  # création, ou publication existante déjà prise → création d'une publication
+            )
             if not any(by_id[i].publication_year for i in claim.source_record_ids):
                 detached.extend(claim.source_record_ids)
                 continue

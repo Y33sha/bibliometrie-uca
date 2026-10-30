@@ -10,8 +10,8 @@ Le script recalcule chaque valeur avec la fonction du pipeline et écrit celles 
 La phase `persons` suivante resynchronise les formes de noms des personnes. Idempotent.
 
 Usage :
-    python -m interfaces.cli.oneshot.recompute_normalized_texts            # exécution
-    python -m interfaces.cli.oneshot.recompute_normalized_texts --dry-run  # rapport seul
+    uv run python -m interfaces.cli.oneshot.recompute_normalized_texts            # exécution
+    uv run python -m interfaces.cli.oneshot.recompute_normalized_texts --dry-run  # rapport seul
 """
 
 from __future__ import annotations
@@ -89,7 +89,7 @@ _COLUMNS = (
 
 
 def _recompute_column(conn: Connection, column: _Column, *, apply: bool) -> int:
-    """Écrit les valeurs de `column` qui changent. Retourne leur nombre."""
+    """Écrit les valeurs modifiées de `column`. Renvoie leur nombre."""
     rows = conn.execute(
         text(
             f"SELECT {column.key} AS key, {column.source} AS source, {column.target} AS target"
@@ -118,7 +118,7 @@ def _recompute_column(conn: Connection, column: _Column, *, apply: bool) -> int:
 
 
 def _add_name_forms(conn: Connection, *, apply: bool) -> tuple[int, int, int]:
-    """Supprime les formes de noms de revues vides, ajoute les formes recalculées des titres de revues et des noms d'éditeurs. Retourne (formes vides, formes de revues, formes d'éditeurs) candidates."""
+    """Supprime les formes de noms de revues vides, ajoute les formes recalculées des titres de revues et des noms d'éditeurs. Renvoie (formes vides, formes de revues, formes d'éditeurs) candidates."""
     empty = conn.execute(
         text("SELECT count(*) FROM serial_name_forms WHERE form_normalized = ''")
     ).scalar_one()
@@ -180,7 +180,7 @@ _REPOINT_SQL = text(
 
 
 def _repoint_source_contributions(conn: Connection, *, apply: bool) -> int:
-    """Rattache chaque contribution source dont le nom normalisé change aux informations du contributeur de ce nom. Retourne leur nombre."""
+    """Rattache chaque contribution source dont le nom normalisé change aux informations du contributeur de ce nom. Renvoie leur nombre."""
     payload = []
     # Curseur serveur pour cette seule lecture : posé sur la connexion, il s'étendrait aux écritures qui suivent.
     result = conn.execute(

@@ -47,7 +47,7 @@ def _row(
     has_target=False,
     doi_removed_by=None,
 ) -> DoiClusterRow:
-    """Membre d'un groupe. `doi` s'écrit en tête de ses identifiants, retiré par `doi_removed_by`, quand `identifiers` ne contient aucun DOI."""
+    """Renvoie un membre d'un groupe. `doi` s'écrit en tête de ses identifiants, retiré par `doi_removed_by`, quand `identifiers` ne contient aucun DOI."""
     ids = tuple(identifiers)
     if doi and not any(i.id_type is SourceIdentifierType.DOI for i in ids):
         ids = (_doi(doi, doi_removed_by), *ids)
@@ -72,7 +72,7 @@ _PMID_99 = SourceIdentifier(SourceIdentifierType.PMID, "99", SourceIdentifierRol
 
 
 def _active(identifiers):
-    """Valeurs des identifiants actifs, par type."""
+    """Renvoie les valeurs des identifiants actifs, par type."""
     values: dict[str, list[str]] = {}
     for i in identifiers:
         if i.removed_by is None:
@@ -84,14 +84,14 @@ _OWN_TITLE = object()
 
 
 def _m(member_id, doc_type, title=_OWN_TITLE) -> DoiClusterMember:
-    """Membre de groupe ; sans titre donné, chaque membre a le sien."""
+    """Renvoie un membre de groupe ; sans titre donné, chaque membre a le sien."""
     if title is _OWN_TITLE:
         title = f"titre {'abcdefghij'[member_id % 10]}"
     return DoiClusterMember(member_id, doc_type, title)
 
 
 def _resoudre(group, shared_doi="10.1/x"):
-    """Décision pour un groupe dont le DOI partagé importe peu au cas testé."""
+    """Renvoie la décision pour un groupe ; le DOI partagé importe peu au cas testé."""
     return resolve_cluster_doi_corrections(group, shared_doi=shared_doi)
 
 
@@ -367,7 +367,7 @@ def test_retrait_par_la_correction_unaire_garde():
 
 
 def test_identifiant_propre_d_un_enregistrement_source_qui_garde_le_doi_reste_en_place():
-    """Le chapitre OpenAlex recopie le dépôt HAL de l'enregistrement source qui garde le DOI : ce dépôt reste à lui."""
+    """Le chapitre OpenAlex recopie le dépôt HAL de l'enregistrement source qui garde le DOI : ce dépôt reste à cet enregistrement source."""
     book = _row(1, "book", "10.1/x", identifiers=_hal("hal-01234567"))
     hal = _row(
         2,

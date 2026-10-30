@@ -4,16 +4,18 @@ from functools import partial
 
 from sqlalchemy import text
 
+from domain.config import LABORATORY_TYPES_KEY
 from infrastructure.read_models.publications.facets import _PublicationFacetsBuilder
 from infrastructure.read_models.publications.filtering import FilterContext, filter_context
 from infrastructure.read_models.publications.models import PublicationFilters
 from infrastructure.read_models.stats.queries import StatsQueries
 from tests.integration.helpers.alignment import align_source_contributions
+from tests.integration.helpers.config import set_config
 from tests.integration.helpers.contributions import contribution_id_of, insert_contribution
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.read_models import publications_queries
-from tests.integration.helpers.serials import insert_publisher, insert_serial
+from tests.integration.helpers.serials import insert_doi_prefix, insert_publisher, insert_serial
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 from tests.integration.helpers.structures import add_contribution_structure, insert_structure
 from tests.integration.helpers.subjects import insert_publication_subject, insert_subject
@@ -26,7 +28,7 @@ _source_record = partial(insert_source_record, title="T")
 
 
 def _attach(conn, publication_id, lab_id):
-    """Contribution du périmètre, d'une personne créée, qui relie la publication au laboratoire `lab_id`."""
+    """Insère une contribution du périmètre, d'une personne créée, qui relie la publication au laboratoire `lab_id`."""
     aid = insert_contribution(
         conn, publication_id, person_id=insert_person(conn), in_perimeter=True, roles=["author"]
     )
@@ -109,7 +111,7 @@ class TestSearch:
         assert publication in ids
 
     def test_facets_respect_search(self, sa_sync_conn):
-        """Régression : les comptes de facettes suivent la recherche sur le titre, comme le tableau."""
+        """Les comptes de facettes suivent la recherche sur le titre, comme le tableau."""
         lab = _lab(sa_sync_conn)
         for title in ("quantum gravity", "classical mechanics"):
             pid = insert_publication(sa_sync_conn, title=title)
@@ -132,7 +134,7 @@ class TestSearch:
 
 
 class TestHalStatusMultipleHalEntries:
-    """Une publication à plusieurs dépôts HAL est en collection dès qu'un de ses dépôts contient la collection du laboratoire. Le statut rendu avec chaque publication suit la même règle que le filtre."""
+    """Une publication à plusieurs dépôts HAL est en collection dès qu'un de ses dépôts contient la collection du laboratoire. Le statut renvoyé avec chaque publication suit la même règle que le filtre."""
 
     def test_publication_in_collection_via_one_hal_entry_is_not_hors_collection(self, sa_sync_conn):
         """Deux dépôts HAL, dont un dans la collection du laboratoire : la publication est absente du filtre `hors_collection`."""
@@ -159,7 +161,7 @@ class TestHalStatusMultipleHalEntries:
         assert publication not in [p.id for p in res.publications]
 
     def test_listed_status_follows_the_filter_rule(self, sa_sync_conn):
-        """Le statut rendu avec la publication est celui du filtre : en collection par l'un de ses dépôts, en open access, elle vaut `ok`."""
+        """Le statut renvoyé avec la publication est celui du filtre : en collection par l'un de ses dépôts, en open access, elle vaut `ok`."""
         lab = _lab(sa_sync_conn, hal_collection="CMH")
         publication = insert_publication(sa_sync_conn, "Two HAL deposits")
         _attach(sa_sync_conn, publication, lab)
@@ -451,6 +453,41 @@ class TestLabScope:
         assert [(o.value, o.count) for o in labs] == [(str(lab), 1)]
 
 
+class TestLaboratoryTypes:
+    """La clé `laboratory_types` définit les types de structure traités comme laboratoires : facette, décompte « Sans laboratoire » et colonne de la liste."""
+
+    def _seed(self, conn):
+        institute = insert_structure(conn, "INST", structure_type="admin")
+        _attach(conn, insert_publication(conn, in_perimeter=True), institute)
+        return institute
+
+    def _facet(self, conn):
+        filters = PublicationFilters()
+        return _PublicationFacetsBuilder(conn, filters, filter_context(conn, filters))._facet_labs()
+
+    def _labs_column(self, conn):
+        res = publications_queries(conn).list_publications(
+            filters=PublicationFilters(), page=1, per_page=50, sort="year_desc"
+        )
+        return [[lab.label for lab in p.lab_items or []] for p in res.publications]
+
+    def test_structure_outside_the_types_is_not_a_laboratory(self, sa_sync_conn):
+        self._seed(sa_sync_conn)
+        set_config(sa_sync_conn, LABORATORY_TYPES_KEY, ["labo"])
+
+        assert self._facet(sa_sync_conn) == ([], 1)
+        assert self._labs_column(sa_sync_conn) == [[]]
+
+    def test_structure_of_a_listed_type_is_a_laboratory(self, sa_sync_conn):
+        institute = self._seed(sa_sync_conn)
+        set_config(sa_sync_conn, LABORATORY_TYPES_KEY, ["labo", "admin"])
+
+        labs, no_lab_count = self._facet(sa_sync_conn)
+        assert [(o.value, o.count) for o in labs] == [(str(institute), 1)]
+        assert no_lab_count == 0
+        assert self._labs_column(sa_sync_conn) == [["INST"]]
+
+
 class TestHalStatusNeedsASingleLab:
     def test_facets_ignore_hal_status_with_two_labs(self, sa_sync_conn):
         labs = [insert_structure(sa_sync_conn, code) for code in ("LAB-A", "LAB-B")]
@@ -651,6 +688,65 @@ class TestLicense:
         )
         facet = {(o.value, o.label, o.count) for o in builder._facet_licenses()}
         assert facet == {("cc-by", "CC BY", 1), ("none", "Aucune licence", 1)}
+
+
+class TestDoiAgency:
+    """Filtre et facette de l'agence d'enregistrement du DOI, lue par le préfixe dans `doi_prefixes`."""
+
+    def _seed(self, conn):
+        lab = _lab(conn)
+        insert_doi_prefix(conn, "10.1", ra="Crossref")
+        insert_doi_prefix(conn, "10.2", ra="DataCite")
+        insert_doi_prefix(conn, "10.3", ra="mEDRA")
+        publications = {
+            "crossref": insert_publication(conn, "Crossref", doi="10.1/a"),
+            "datacite": insert_publication(conn, "DataCite", doi="10.2/a"),
+            "medra": insert_publication(conn, "mEDRA", doi="10.3/a"),
+            "unresolved": insert_publication(conn, "Préfixe inconnu", doi="10.4/a"),
+            "none": insert_publication(conn, "Sans DOI"),
+        }
+        for publication in publications.values():
+            _attach(conn, publication, lab)
+        return lab, publications
+
+    def _ids(self, conn, lab, doi_agency):
+        res = publications_queries(conn).list_publications(
+            filters=PublicationFilters(lab_ids=[lab], doi_agency=doi_agency),
+            page=1,
+            per_page=50,
+            sort="year_desc",
+        )
+        return {p.id for p in res.publications}
+
+    def test_filter(self, sa_sync_conn):
+        lab, publications = self._seed(sa_sync_conn)
+
+        assert self._ids(sa_sync_conn, lab, ["crossref"]) == {publications["crossref"]}
+        assert self._ids(sa_sync_conn, lab, ["datacite"]) == {publications["datacite"]}
+        assert self._ids(sa_sync_conn, lab, ["other"]) == {
+            publications["medra"],
+            publications["unresolved"],
+        }
+        assert self._ids(sa_sync_conn, lab, ["none"]) == {publications["none"]}
+        assert self._ids(sa_sync_conn, lab, ["crossref", "none"]) == {
+            publications["crossref"],
+            publications["none"],
+        }
+
+    def test_facet_counts_and_labels(self, sa_sync_conn):
+        lab, _ = self._seed(sa_sync_conn)
+
+        builder = _PublicationFacetsBuilder(
+            sa_sync_conn,
+            PublicationFilters(lab_ids=[lab], doi_agency=["crossref"]),
+            FilterContext([], None),
+        )
+        assert [(o.value, o.label, o.count) for o in builder._facet_doi_agencies()] == [
+            ("crossref", "Crossref", 1),
+            ("datacite", "DataCite", 1),
+            ("other", "Autre", 2),
+            ("none", "Pas de DOI", 1),
+        ]
 
 
 def test_le_lien_d_acces_suit_la_meilleure_copie_et_le_statut(sa_sync_conn):

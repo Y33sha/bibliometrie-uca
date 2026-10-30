@@ -12,7 +12,7 @@ class MergeRedirectQueries:
         self._conn = conn
 
     def kept_id(self, entity: MergedEntity, absorbed_id: int) -> int | None:
-        """Identifiant de l'entité conservée vers laquelle mène `absorbed_id`, ou `None` sans redirection."""
+        """Renvoie l'identifiant de l'entité conservée, cible de la redirection de `absorbed_id`, ou `None` sans redirection."""
         return self._conn.execute(
             text("""
                 SELECT kept_id FROM merge_redirects

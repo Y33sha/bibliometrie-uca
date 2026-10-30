@@ -22,7 +22,46 @@ AVANT :
 
 APRÈS :
     def normaliser_doi(doi: str) -> str:
-        """Forme canonique : minuscules, préfixe https://doi.org/ retiré."""
+        """Renvoie la forme canonique du DOI : minuscules, préfixe https://doi.org/ retiré."""
+
+## Docstring de classe qui résume ses champs
+
+« Ce que X fait à Y » personnifie le code et reste vague. La liste en prose de tous les champs redit leurs noms. Le résumé dit ce qu'est la classe ; un champ non évident reçoit sa propre docstring.
+
+AVANT :
+    class PhaseContext:
+        """Ce que le run remet à chaque phase : ses transactions, son journal, ses options, l'exécution de la maintenance des tables (`VACUUM`, `ANALYZE`) hors transaction, le contrôle des identifiants d'accès aux sources et leur débit."""
+
+        open_tx: OpenTransaction
+        logger: logging.Logger
+        options: RunOptions
+        maintain: Callable[[str], None]
+
+APRÈS :
+    class PhaseContext:
+        """Dépendances d'exécution d'une phase."""
+
+        open_tx: OpenTransaction
+        logger: logging.Logger
+        options: RunOptions
+        maintain: Callable[[str], None]
+        """Lance `VACUUM` et `ANALYZE` sur une table, hors transaction."""
+
+## Paramètres non évidents
+
+Seuls les paramètres non évidents ont une ligne, dans une section `Args:`.
+
+AVANT :
+    def find_or_create_serial(title, *, issns=(), publisher_id=None, repo):
+        """Trouve ou crée un journal. `publisher_id`, l'éditeur du document, restreint la recherche par titre et s'enregistre avec la forme de nom."""
+
+APRÈS :
+    def find_or_create_serial(title, *, issns=(), publisher_id=None, repo):
+        """Trouve ou crée une revue. Renvoie son id, ou `None` si le titre est vide.
+
+        Args:
+            publisher_id: éditeur du document ; restreint la recherche par titre.
+        """
 
 
 ## Commentaires redondants
@@ -217,6 +256,16 @@ AVANT :
 
 APRÈS :
     | structure | `structures` | Établissement, laboratoire, équipe, site ou service |
+
+## Relatives et pronoms en série
+
+« que », « dont », « y » et « en » alourdissent la phrase. Une tournure participiale, un adjectif ou un complément de nom dit la même chose plus court.
+
+AVANT :
+    le bidule que schtroumpfe le truc
+
+APRÈS :
+    le bidule schtroumpfé par le truc
 
 ## Étapes numérotées
 

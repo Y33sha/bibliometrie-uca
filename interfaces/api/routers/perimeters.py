@@ -1,4 +1,4 @@
-"""Router des ensembles de structures que les phases du pipeline consomment. Sert `/api/perimeters/*`.
+"""Router des ensembles de structures consommés par les phases du pipeline. Sert `/api/perimeters/*`.
 
 Un périmètre (table `perimeters`) nomme des structures racines (`root_structure_ids`). Ses structures sont ces racines et leurs descendantes dans `structure_parents`, matérialisées dans `perimeter_structures` par `PerimeterStructures.refresh` ; les lectures les lisent sans les recalculer.
 """
@@ -37,7 +37,7 @@ def list_perimeters(
 def list_perimeter_countries(
     queries: PerimetersQueries = Depends(perimeters_queries),
 ) -> list[PerimeterCountryOut]:
-    """Pays des organisations ROR des structures du périmètre des personnes, du plus fréquent au moins fréquent. Sert à choisir le pays de l'établissement."""
+    """Liste les pays des organisations ROR des structures du périmètre des personnes, du plus fréquent au moins fréquent. Sert à choisir le pays de l'établissement."""
     return queries.persons_perimeter_countries()
 
 
@@ -48,7 +48,7 @@ def create_perimeter(
 ) -> CreatedIdResponse:
     """Crée un périmètre avec ses structures racines, la liste pouvant être vide.
 
-    Le code est un identifiant naturel : la configuration du pipeline désigne un périmètre par sa valeur. C'est un jeton unique, sans espace ; un code vide ou espacé renvoie 422. Renvoie 409 sur un code déjà pris.
+    Le code est un jeton unique, sans espace : la configuration du pipeline désigne un périmètre par sa valeur. Renvoie 422 sur un code vide ou espacé, 409 sur un code déjà pris.
     """
     pid = perimeters.create_perimeter(
         code=body.code, name=body.name, root_structure_ids=body.root_structure_ids
@@ -77,7 +77,7 @@ def delete_perimeter(
 ) -> OkResponse:
     """Supprime un périmètre.
 
-    Renvoie 409 si une clé de configuration le désigne : le pipeline le chercherait en vain. Ses lignes de `perimeter_structures` partent en cascade.
+    Renvoie 409 si une clé de configuration le désigne. Ses lignes de `perimeter_structures` sont supprimées en cascade.
     """
     perimeters.delete_perimeter(perimeter_id)
     return OkResponse()

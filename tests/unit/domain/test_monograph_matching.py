@@ -1,4 +1,4 @@
-"""Tests du rapprochement des monographies de même titre (`domain.monographs.matching`)."""
+"""Tests du choix entre monographies de même titre (`domain.monographs.matching`)."""
 
 from domain.monographs.matching import (
     MonographCandidate,

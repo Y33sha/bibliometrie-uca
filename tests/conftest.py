@@ -51,16 +51,16 @@ def _adresse_polite_pool(monkeypatch):
 
 @pytest.fixture
 def breaker() -> Iterator[SourceCircuitBreaker]:
-    """Circuit-breaker d'une source de test, posé comme le pose l'accès à une source."""
+    """Pose le circuit-breaker d'une source de test, comme l'accès à une source."""
     with source_circuit_breaker("test") as source_breaker:
         yield source_breaker
 
 
 @pytest.fixture
 def http_mock(breaker: SourceCircuitBreaker) -> Iterator[HttpMock]:  # noqa: ARG001
-    """Sert les requêtes HTTP sortantes du test depuis les routes qu'il déclare, sous le circuit-breaker `breaker`.
+    """Sert les requêtes HTTP sortantes du test depuis les routes déclarées par le test, sous le circuit-breaker `breaker`.
 
-    Le transport simulé est posé par défaut sur les clients httpx2 construits pendant le test : celui que le test crée pour appeler un adaptateur comme celui que le code appelé ouvre pour son compte. Un client qui reçoit un transport explicite garde le sien. Les fonctions de module (`httpx2.request`, `httpx2.get`, `httpx2.stream`…) construisent leur client dans `httpx2._api`, qui garde sa propre référence à `Client` : cette référence est simulée aussi.
+    Le transport simulé est posé par défaut sur tous les clients httpx2 construits pendant le test, par le test comme par le code appelé. Un client qui reçoit un transport explicite garde le sien. Les fonctions de module (`httpx2.request`, `httpx2.get`, `httpx2.stream`…) construisent leur client dans `httpx2._api`, qui garde sa propre référence à `Client` : cette référence est simulée aussi.
     """
     router = HttpMock()
     real_client, real_async_client = httpx2.Client, httpx2.AsyncClient

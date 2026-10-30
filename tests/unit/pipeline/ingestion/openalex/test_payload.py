@@ -91,7 +91,7 @@ class TestUrlIdentifiers:
 
 
 def _loc(**kwargs) -> OpenalexLocation:
-    """OpenalexLocation dont les champs valent None par défaut."""
+    """Construit une OpenalexLocation aux champs None par défaut."""
     defaults = {
         "location_id": None,
         "landing_page_url": None,

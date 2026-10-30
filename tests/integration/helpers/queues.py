@@ -13,7 +13,7 @@ def mark(conn: Connection, queue: Queue, row_ids: Iterable[int]) -> None:
 
 
 def queued(conn: Connection, queue: Queue) -> set[int]:
-    """Identifiants présents dans `queue`."""
+    """Renvoie les identifiants présents dans `queue`."""
     return set(conn.execute(text(f"SELECT id FROM {queue}")).scalars())
 
 

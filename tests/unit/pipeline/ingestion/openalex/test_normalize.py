@@ -66,7 +66,7 @@ class TestExtractLocationsData:
         assert urls == ["https://b.com"]
 
     def test_collects_all_location_dois(self):
-        """DOI collectés depuis les URLs doi.org et les location.id `doi:`."""
+        """Les DOI sont collectés dans les URL doi.org et les location.id `doi:`."""
         work = {
             "locations": [
                 {"landing_page_url": "https://doi.org/10.1/a", "id": "doi:10.1/a"},
@@ -77,7 +77,7 @@ class TestExtractLocationsData:
         assert _location_ids(work, "doi") == ["10.1/a", "10.2/b", "10.3/c"]
 
     def test_collects_hal_ids_from_urls_and_location_id(self):
-        """hal_id collectés depuis les URLs et les location.id OAI-PMH, y compris un dépôt dont seule la location.id contient le hal_id."""
+        """Les hal_id sont collectés dans les URL et les location.id OAI-PMH, y compris quand seule la location.id contient le hal_id."""
         work = {
             "locations": [
                 {"landing_page_url": "https://doi.org/10.1/x", "id": "doi:10.1/x"},
@@ -248,7 +248,7 @@ class TestReconstructAbstract:
         assert reconstruct_abstract(inverted) == "the cat the dog"
 
     def test_inverted_index_with_no_positions(self):
-        """Inverted index présent mais positions vides → None."""
+        """Un inverted index aux positions vides donne None."""
         assert reconstruct_abstract({"word": []}) is None
 
 
@@ -289,7 +289,7 @@ class TestExtractTopics:
         assert "score" not in topics[0]
 
     def test_topic_with_no_displayable_fields(self):
-        """Si un topic n'a aucun champ exploitable, il n'est pas inclus."""
+        """Un topic sans champ exploitable est écarté."""
         work = {"topics": [{"foo": "bar"}]}  # ni domain, ni field, ni subfield, ni display_name
         assert extract_topics(work) is None
 
@@ -627,7 +627,7 @@ class TestBuildOpenalexAuthorRecords:
         assert build_openalex_author_records({"authorships": []}) == []
 
     def test_shared_orcid_kept_on_each_record(self):
-        """La lecture renvoie l'ORCID de chaque contribution source tel que la source le donne ; l'écriture des contributions sources neutralise ceux que partagent plusieurs contributions sources."""
+        """La lecture renvoie l'ORCID de chaque contribution source tel que la source le donne. L'écriture des contributions sources neutralise les ORCID partagés par plusieurs contributions sources."""
         work = {
             "authorships": [
                 {
@@ -689,7 +689,7 @@ class TestBuildOpenalexAuthorRecords:
         assert build_openalex_author_records(work)[0].addresses == []
 
     def test_country_code_des_institutions_de_l_affiliation(self):
-        """`country_code` des institutions de l'affiliation → pays de son adresse. Union dédupliquée et en minuscules, comme `countries.code`."""
+        """Les `country_code` des institutions de l'affiliation donnent les pays de son adresse, dédupliqués et en minuscules comme `countries.code`."""
         work = {
             "authorships": [
                 {
@@ -789,7 +789,7 @@ def _make_normalizer():
 
 class TestOpenalexNormalizerClass:
     def test_metadonnees_minimales_d_un_work_sans_annee(self):
-        """Régression : OpenAlex renvoie W3131333980 sans DOI ni année ; les métadonnées minimales donnent son titre et une année vide."""
+        """OpenAlex renvoie W3131333980 sans DOI ni année ; les métadonnées minimales donnent son titre et une année vide."""
         work = {"title": "Inequality of Opportunity, Inequality of Income and Economic Growth"}
         assert _make_normalizer().minimal_metadata(staging_row(raw=work)) == (work["title"], None)
 

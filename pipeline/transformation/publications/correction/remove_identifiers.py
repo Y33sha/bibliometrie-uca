@@ -1,10 +1,10 @@
-"""Sous-étape `remove_identifiers` de la phase `metadata_correction` : retrait d'identifiants par groupe d'enregistrements sources de même DOI. Un groupe réunit les enregistrements sources qui ont son DOI dans `source_record_identifiers`, de rôle autre que `related` ; un enregistrement source appartient à un groupe par DOI.
+"""Sous-étape `remove_identifiers` de la phase `metadata_correction` : retrait d'identifiants par groupe d'enregistrements sources de même DOI. Un groupe réunit les enregistrements sources ayant son DOI dans `source_record_identifiers`, de rôle autre que `related`. Un enregistrement source appartient à un groupe par DOI.
 
-Un DOI que partagent des œuvres distinctes (ouvrage et chapitre, chapitres de titres différents, volume d'actes et communication, dépôt HAL d'une autre œuvre) est retiré du ou des mauvais côtés : la réconciliation fusionnerait sinon ces œuvres. Un DOI qui a une cible dans `doi_targets` est celui d'une forme secondaire : aucun membre de son groupe ne le perd. Un DOI inconnu de doi.org est retiré de tous les enregistrements sources qui le citent.
+Un DOI partagé par des œuvres distinctes (ouvrage et chapitre, chapitres de titres différents, volume d'actes et communication, dépôt HAL d'une autre œuvre) est retiré du ou des mauvais côtés. Sinon, la réconciliation fusionnerait ces œuvres. Un DOI à cible dans `doi_targets` est celui d'une forme secondaire : aucun membre de son groupe ne le perd. Un DOI inconnu de doi.org est retiré de tous les enregistrements sources qui le citent.
 
-Après une divergence, les enregistrements sources qui gardent le DOI perdent les clés de confirmation qu'ils partagent avec ceux qui le perdent : par exemple le dépôt HAL d'une communication, recopié par l'enregistrement source OpenAlex du volume d'actes. Le cas de chaque identifiant retiré, DOI compris, est inscrit dans `source_record_identifiers.removed_by`.
+Quand une partie du groupe perd le DOI, les enregistrements sources qui le gardent perdent les clés de confirmation partagées avec ceux qui le perdent. Exemple : le dépôt HAL d'une communication, recopié par l'enregistrement source OpenAlex du volume d'actes. Le cas de chaque identifiant retiré, DOI compris, est inscrit dans `source_record_identifiers.removed_by`.
 
-Les types lus sont ceux que la sous-étape unaire a corrigés. Chaque passage repart de tous les identifiants : un enregistrement source dont le conflit disparaît retrouve ses identifiants au run suivant.
+Les types lus sont ceux corrigés par la sous-étape unaire. Chaque passage repart de tous les identifiants : un enregistrement source à conflit disparu retrouve ses identifiants au run suivant.
 """
 
 import logging
@@ -38,12 +38,12 @@ from pipeline.transformation.publications.correction.correction_store import (
     SourceRecordCorrectionStore,
 )
 
-# Règles de retrait d'identifiants de la sous-étape : ses cas.
+# Règles de retrait d'identifiants de la sous-étape : les cas de `DoiClusterCase`.
 CLUSTER_IDENTIFIER_RULES = frozenset(case.value for case in DoiClusterCase)
 
 
 def _base_identifiers(row: DoiClusterRow) -> list[SourceIdentifier]:
-    """Identifiants actifs de l'enregistrement source avant cette sous-étape : ceux que l'étape unaire laisse actifs."""
+    """Renvoie les identifiants de l'enregistrement source laissés actifs par l'étape unaire, avant cette sous-étape."""
     return active(with_removals(row.identifiers, CLUSTER_IDENTIFIER_RULES, {}))
 
 
@@ -52,9 +52,11 @@ def _compute_update(
     removed_dois: Mapping[str, str],
     confirmation_removals: Iterable[ConfirmationIdRemoval] = (),
 ) -> DoiCorrectionUpdate | None:
-    """Identifiants d'un enregistrement source aux statuts recalculés, ou `None` si rien ne change.
+    """Renvoie les identifiants d'un enregistrement source aux statuts recalculés, ou `None` si rien ne change. Les retraits du passage précédent sont recalculés.
 
-    `removed_dois` : cas de retrait de chaque DOI que l'enregistrement source perd, par DOI. Chacun est retiré des identifiants sous son cas. Un retrait de clés de confirmation retire des identifiants sous son cas. Les retraits du passage précédent sont recalculés.
+    Args:
+        removed_dois: cas de retrait de chaque DOI perdu par l'enregistrement source.
+        confirmation_removals: retraits de clés de confirmation, chacun sous son cas.
     """
     removals: dict[tuple[SourceIdentifierType, str], str] = {
         (SourceIdentifierType.DOI, doi): case for doi, case in removed_dois.items()
@@ -71,7 +73,7 @@ def _compute_update(
 
 
 def compute_updates(rows: list[DoiClusterRow]) -> list[DoiCorrectionUpdate]:
-    """Mises à jour des enregistrements sources des groupes de même DOI. Un enregistrement source appartient à un groupe par DOI ; ses retraits se cumulent. La règle de retrait vit dans `resolve_cluster_doi_corrections`."""
+    """Calcule les mises à jour des enregistrements sources des groupes de même DOI. Les retraits d'un enregistrement source membre de plusieurs groupes se cumulent. La règle de retrait est définie dans `resolve_cluster_doi_corrections`."""
     groups: dict[str, list[DoiClusterRow]] = defaultdict(list)
     for row in rows:
         groups[row.shared_doi].append(row)
@@ -118,15 +120,18 @@ def compute_updates(rows: list[DoiClusterRow]) -> list[DoiCorrectionUpdate]:
 
 @dataclass
 class IdentifierRemovalStats:
-    """Bilan de la sous-étape : enregistrements sources examinés, DOI corrigés, corrections par cas (`DoiClusterCase`)."""
+    """Bilan de la sous-étape."""
 
     examined: int
+    """Enregistrements sources examinés."""
     corrected: int
+    """Enregistrements sources mis à jour."""
     case_counts: dict[str, int]
+    """DOI retirés par cas (`DoiClusterCase`)."""
 
 
 def tally_doi_corrections(updates: list[DoiCorrectionUpdate]) -> dict[str, int]:
-    """DOI retirés par cas, dans les identifiants des enregistrements sources mis à jour."""
+    """Compte les DOI retirés par cas, dans les identifiants des enregistrements sources mis à jour."""
     case_counts: dict[str, int] = {}
     for update in updates:
         for i in update.identifiers:

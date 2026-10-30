@@ -7,7 +7,7 @@ from tests.integration.helpers.staging import insert_failed_lookup, insert_stagi
 
 
 def _carry(conn, source, source_id, nnt):
-    """Enregistrement source `source` qui contient le NNT `nnt`, avec sa ligne de staging."""
+    """Insère un enregistrement source `source` qui contient le NNT `nnt`, avec sa ligne de staging."""
     staging_id = insert_staging(conn, source, source_id=source_id)
     insert_source_record(
         conn,

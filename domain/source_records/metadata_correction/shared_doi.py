@@ -1,16 +1,17 @@
-"""Correction du DOI que partagent plusieurs enregistrements sources.
+"""Correction du DOI partagé par plusieurs enregistrements sources.
 
-Une forme secondaire DataCite (version, variante, pièce d'un jeu de données) qui déclare son œuvre principale, présente en base, donne au DOI partagé une cible : le DOI de cette œuvre (`doi_target`). Un DOI partagé par des œuvres distinctes est retiré des membres qui l'ont à tort (`resolve_cluster_doi_corrections`). Les membres qui gardent le DOI perdent les clés de confirmation qu'ils partagent avec ceux qui le perdent (`confirmation_id_removals`).
+Une forme secondaire DataCite (version, variante, pièce d'un jeu de données) qui déclare son œuvre principale, présente en base, donne au DOI partagé une cible : le DOI de cette œuvre (`doi_target`). Un DOI à suffixe de version a pour cible sa forme sans version ou sa version la plus récente (`version_targets`). Un DOI partagé par des œuvres distinctes est retiré des membres qui l'ont à tort (`resolve_cluster_doi_corrections`). Les membres qui gardent le DOI perdent les clés de confirmation qu'ils partagent avec ceux qui le perdent (`confirmation_id_removals`).
 """
 
 import re
-from collections.abc import Iterable, Mapping
+from collections import defaultdict
+from collections.abc import Iterable, Mapping, Set
 from enum import StrEnum
 from itertools import combinations
 from typing import NamedTuple
 
 from domain.publications.doc_types import DocType
-from domain.publications.identifiers import NNT, HALId, meme_registrant
+from domain.publications.identifiers import NNT, HALId, doi_version, meme_registrant
 from domain.source_records.identifiers import SourceIdentifier, SourceIdentifierType
 from domain.source_records.keys import CONFIRMATION_ID_TYPES
 from domain.sources.registry import Source
@@ -18,13 +19,17 @@ from domain.sources.scanr import extract_hal_id_from_scanr_id
 
 
 class DoiTargetRule(StrEnum):
-    """Règle qui donne une cible au DOI d'une forme secondaire DataCite. Inscrite dans `doi_targets.rule`."""
+    """Règle qui donne une cible au DOI d'une forme secondaire. Inscrite dans `doi_targets.rule`."""
 
     DATACITE_VERSION_TO_CONCEPT = "DATACITE_VERSION_TO_CONCEPT"  # version → concept (IsVersionOf)
     DATACITE_VARIANT_TO_PRIMARY = (
         "DATACITE_VARIANT_TO_PRIMARY"  # copie repository → version publiée (IsVariantFormOf)
     )
     DATACITE_PACKAGE_PIECE = "DATACITE_PACKAGE_PIECE"  # pièce d'un dataset → dataset parent présent (IsPartOf, ou fichier complémentaire figshare)
+    DOI_VERSION_TO_UNVERSIONED = "DOI_VERSION_TO_UNVERSIONED"  # DOI à suffixe de version → sa forme sans version, DOI `primary` ou `derived` d'un enregistrement source
+    DOI_VERSION_TO_LATEST = (
+        "DOI_VERSION_TO_LATEST"  # DOI à suffixe de version → version de plus grand numéro en base
+    )
 
 
 class DoiClusterCase(StrEnum):
@@ -42,7 +47,7 @@ class DoiClusterCase(StrEnum):
     # Dépôt HAL dont le DOI est celui d'une autre œuvre (`_depots_hal_d_une_autre_oeuvre`) → le dépôt le perd.
     HAL_DOI_D_UNE_AUTRE_OEUVRE = "HAL_DOI_D_UNE_AUTRE_OEUVRE"
 
-    # DOI que doi.org ne connaît pas (`failed_lookups`, source `doi_org`) → tous les membres le perdent.
+    # DOI inconnu de doi.org (`failed_lookups`, source `doi_org`) → tous les membres le perdent.
     UNRESOLVED_DOI_TO_NULL = "UNRESOLVED_DOI_TO_NULL"
 
 
@@ -74,27 +79,29 @@ def meme_oeuvre_declaree(
 
 
 class SecondaryFormDeclaration(NamedTuple):
-    """Enregistrement source qui déclare son DOI forme secondaire de l'œuvre principale `target_doi`, présente en base, sous la règle `rule`. `doc_type` : type après la correction unaire."""
+    """Enregistrement source qui déclare son DOI forme secondaire de l'œuvre principale `target_doi`, présente en base, sous la règle `rule`."""
 
     id: int
     doc_type: str | None
+    """Type après la correction unaire."""
     target_doi: str
     rule: DoiTargetRule
 
 
 class DoiClusterMember(NamedTuple):
-    """Membre d'un groupe d'enregistrements sources qui partagent un DOI. `doc_type` : type après la correction unaire."""
+    """Membre d'un groupe d'enregistrements sources qui partagent un DOI."""
 
     id: int
     doc_type: str | None
+    """Type après la correction unaire."""
     title_normalized: str | None
-    # Valeurs des clés de confirmation (`CONFIRMATION_ID_TYPES`) de ses identifiants, par type.
     confirmation_ids: Mapping[str, tuple[str, ...]] = {}
-    # Identifiants propres de l'enregistrement source, par type : le `hal_id` d'un enregistrement source HAL, le NNT d'un enregistrement source theses.fr.
+    """Valeurs des clés de confirmation (`CONFIRMATION_ID_TYPES`) de ses identifiants, par type."""
     own_ids: Mapping[str, tuple[str, ...]] = {}
+    """Identifiants propres de l'enregistrement source, par type : le `hal_id` d'un enregistrement source HAL, le NNT d'un enregistrement source theses.fr."""
     source: str = ""
-    # Noms de famille normalisés de ses contributions sources individuelles.
     author_names: frozenset[str] = frozenset()
+    """Noms de famille normalisés de ses contributions sources individuelles."""
 
 
 class DoiClusterDecision(NamedTuple):
@@ -113,10 +120,11 @@ class DoiTarget(NamedTuple):
 
 
 class ConfirmationIdRemoval(NamedTuple):
-    """Identifiants retirés d'un membre qui garde le DOI partagé : par type, les valeurs qu'il partage avec un membre qui perd le DOI."""
+    """Identifiants retirés d'un membre qui garde le DOI partagé."""
 
     id: int
     removed: dict[str, list[str]]
+    """Valeurs partagées avec un membre qui perd le DOI, par type."""
     case: DoiClusterCase
 
 
@@ -132,7 +140,7 @@ DIVERGENCE_CASES: frozenset[DoiClusterCase] = frozenset(
 
 
 def confirmation_ids(identifiers: Iterable[SourceIdentifier]) -> dict[str, tuple[str, ...]]:
-    """Valeurs des clés de confirmation (`CONFIRMATION_ID_TYPES`) parmi `identifiers`, par type."""
+    """Renvoie les valeurs des clés de confirmation (`CONFIRMATION_ID_TYPES`) parmi `identifiers`, par type."""
     out: dict[str, list[str]] = {}
     for identifier in identifiers:
         if identifier.id_type in CONFIRMATION_ID_TYPES:
@@ -141,7 +149,7 @@ def confirmation_ids(identifiers: Iterable[SourceIdentifier]) -> dict[str, tuple
 
 
 def source_record_own_ids(source: str, source_id: str) -> dict[str, tuple[str, ...]]:
-    """Identifiants propres d'un enregistrement source, par type : le dépôt HAL d'un enregistrement source HAL ou d'un enregistrement source ScanR issu de HAL, le NNT d'un enregistrement source theses.fr."""
+    """Renvoie les identifiants propres d'un enregistrement source, par type : le dépôt HAL d'un enregistrement source HAL ou d'un enregistrement source ScanR issu de HAL, le NNT d'un enregistrement source theses.fr."""
     if source == Source.HAL:
         hal_id = HALId.try_parse(source_id)
     elif source == Source.SCANR:
@@ -157,9 +165,9 @@ def source_record_own_ids(source: str, source_id: str) -> dict[str, tuple[str, .
 def confirmation_id_removals(
     group: list[DoiClusterMember], decisions: list[DoiClusterDecision]
 ) -> list[ConfirmationIdRemoval]:
-    """Retraits d'identifiants après une divergence (`DIVERGENCE_CASES`).
+    """Calcule les retraits d'identifiants après une divergence (`DIVERGENCE_CASES`).
 
-    Une clé de confirmation partagée avec un membre qui perd le DOI appartient à cette autre œuvre : le membre qui garde le DOI la perd. Sans quoi la clé réunirait encore les deux œuvres, par exemple le dépôt HAL d'une communication que l'enregistrement source OpenAlex du volume d'actes recopie. Une valeur propre à un membre qui garde le DOI (`own_ids`) reste en place.
+    Une clé de confirmation partagée avec un membre qui perd le DOI appartient à cette autre œuvre : le membre qui garde le DOI la perd. Sans quoi la clé réunirait encore les deux œuvres, par exemple le dépôt HAL d'une communication recopié par l'enregistrement source OpenAlex du volume d'actes. Une valeur propre à un membre qui garde le DOI (`own_ids`) reste en place.
     """
     losers = {d.id: d.case for d in decisions if d.case in DIVERGENCE_CASES}
     if not losers:
@@ -198,7 +206,7 @@ _CHAPTER_TITLE_MARKERS = re.compile(
 
 
 def _clean_title(title_normalized: str | None) -> str:
-    """Titre normalisé sans chiffres ni marqueurs de chapitre, pour comparer des titres."""
+    """Retire d'un titre normalisé les chiffres et les marqueurs de chapitre, pour comparer des titres."""
     cleaned = re.sub(r"\d+", " ", title_normalized or "")
     cleaned = _CHAPTER_TITLE_MARKERS.sub(" ", cleaned)
     return re.sub(r"\s+", " ", cleaned).strip()
@@ -216,7 +224,7 @@ def _group_has_distinct_chapters(titles: list[str | None]) -> bool:
 
 
 def _volume_communications(group: list[DoiClusterMember]) -> list[DoiClusterMember]:
-    """Membres titrés d'un groupe à volume d'actes (`proceedings`) dont le titre diffère de celui de chaque volume. Vide sans volume titré."""
+    """Renvoie les membres titrés d'un groupe à volume d'actes (`proceedings`) dont le titre diffère de celui de chaque volume. Vide sans volume titré."""
     volumes = [
         t
         for m in group
@@ -238,7 +246,7 @@ _TITLE_WORD_MIN_LENGTH = 3
 
 
 def _shared_title_words(a: str | None, b: str | None) -> float | None:
-    """Part des mots du plus court des deux titres présents dans l'autre, mots de 3 lettres ou plus. `None` si l'un des titres n'a aucun mot retenu."""
+    """Calcule la part des mots du plus court des deux titres présents dans l'autre, mots de 3 lettres ou plus. `None` si l'un des titres n'a aucun mot retenu."""
     words_a = {w for w in (a or "").split() if len(w) >= _TITLE_WORD_MIN_LENGTH}
     words_b = {w for w in (b or "").split() if len(w) >= _TITLE_WORD_MIN_LENGTH}
     if not words_a or not words_b:
@@ -247,7 +255,7 @@ def _shared_title_words(a: str | None, b: str | None) -> float | None:
 
 
 def _depots_hal_d_une_autre_oeuvre(group: list[DoiClusterMember]) -> list[DoiClusterMember]:
-    """Dépôts HAL dont le DOI est celui d'une autre œuvre.
+    """Renvoie les dépôts HAL dont le DOI est celui d'une autre œuvre.
 
     Un dépôt HAL du groupe est retenu quand deux conditions sont réunies face à l'enregistrement source Crossref du DOI :
     - aucun nom de famille d'auteur commun ;
@@ -272,7 +280,7 @@ def _depots_hal_d_une_autre_oeuvre(group: list[DoiClusterMember]) -> list[DoiClu
 
 
 def doi_target(declarations: Iterable[SecondaryFormDeclaration], *, doi: str) -> DoiTarget | None:
-    """Cible de `doi` quand un enregistrement source le déclare forme secondaire d'une autre forme de la même œuvre (cf. `meme_oeuvre_declaree`) : version → concept, variante → version publiée, fichier → dépôt parent."""
+    """Renvoie la cible de `doi` quand un enregistrement source le déclare forme secondaire d'une autre forme de la même œuvre (cf. `meme_oeuvre_declaree`) : version → concept, variante → version publiée, fichier → dépôt parent."""
     declaration = next(
         (
             d
@@ -284,6 +292,29 @@ def doi_target(declarations: Iterable[SecondaryFormDeclaration], *, doi: str) ->
     return DoiTarget(doi, declaration.target_doi, declaration.rule) if declaration else None
 
 
+def version_targets(dois: Iterable[str], anchor_dois: Set[str]) -> list[DoiTarget]:
+    """Renvoie la cible de chaque DOI à suffixe de version de `dois` (`doi_version`) : sa forme sans version quand c'est un DOI de `anchor_dois`, sinon la version de plus grand numéro parmi `dois`. La version la plus récente reste alors sans cible."""
+    families: dict[str, list[tuple[int, str]]] = defaultdict(list)
+    for doi in set(dois):
+        if (version := doi_version(doi)) is not None:
+            families[version.unversioned].append((version.number, doi))
+    targets: list[DoiTarget] = []
+    for unversioned, versions in families.items():
+        if unversioned in anchor_dois:
+            targets.extend(
+                DoiTarget(doi, unversioned, DoiTargetRule.DOI_VERSION_TO_UNVERSIONED)
+                for _, doi in versions
+            )
+            continue
+        latest = max(versions)[1]
+        targets.extend(
+            DoiTarget(doi, latest, DoiTargetRule.DOI_VERSION_TO_LATEST)
+            for _, doi in versions
+            if doi != latest
+        )
+    return sorted(targets)
+
+
 def resolve_cluster_doi_corrections(
     group: list[DoiClusterMember],
     *,
@@ -291,7 +322,7 @@ def resolve_cluster_doi_corrections(
     unresolved: bool = False,
     has_target: bool = False,
 ) -> list[DoiClusterDecision]:
-    """Membres d'un groupe qui partagent `shared_doi` et le perdent, avec le cas qui le décide.
+    """Renvoie les membres d'un groupe qui partagent `shared_doi` et le perdent, avec le cas qui le décide.
 
     - **DOI inconnu de doi.org** (`unresolved`) : tous les membres perdent le DOI. Prime sur les cas ci-dessous.
     - **DOI d'une forme secondaire** (`has_target`, cf. `doi_target`) : aucun membre ne perd le DOI. Prime sur les cas ci-dessous, réservés à la famille ouvrage/chapitre.
@@ -315,7 +346,7 @@ def resolve_cluster_doi_corrections(
 
 
 def _divergence_decisions(group: list[DoiClusterMember]) -> list[DoiClusterDecision]:
-    """Décisions des familles ouvrage/chapitre et volume d'actes/communication."""
+    """Décide les retraits des familles ouvrage/chapitre et volume d'actes/communication."""
     book_family = [m for m in group if m.doc_type in (DocType.BOOK, DocType.BOOK_CHAPTER)]
     chapters = [m for m in book_family if m.doc_type == DocType.BOOK_CHAPTER]
     has_book = any(m.doc_type == DocType.BOOK for m in book_family)

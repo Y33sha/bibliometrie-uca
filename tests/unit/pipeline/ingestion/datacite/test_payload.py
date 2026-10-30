@@ -408,7 +408,7 @@ class TestMeta:
 class TestEntreesAEcarterAvantLaBonne:
     """Chaque fonction de lecture passe les entrées inexploitables et lit la suivante.
 
-    Une source place ce qu'elle veut dans ses listes : une entrée d'une autre forme, ou au texte vide, précède parfois celle qui contient la valeur.
+    Dans une liste de la source, une entrée d'une autre forme, ou au texte vide, précède parfois l'entrée contenant la valeur.
     """
 
     def test_le_titre_vient_de_la_premiere_entree_exploitable(self):

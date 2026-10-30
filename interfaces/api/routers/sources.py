@@ -10,5 +10,5 @@ router = APIRouter(prefix="/api/sources", tags=["sources"])
 
 @router.get("", response_model=list[EnumOption])
 def list_sources() -> list[EnumOption]:
-    """Sources et leur libellé, dans l'ordre d'affichage."""
+    """Liste les sources et leur libellé, dans l'ordre d'affichage."""
     return [EnumOption(value=source, label_fr=source_label(source)) for source in ALL_SOURCES]

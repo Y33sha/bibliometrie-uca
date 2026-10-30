@@ -1,29 +1,28 @@
-"""Port PerimeterRepository : accès à l'agrégat Perimeter."""
+"""Port PerimeterRepository : accès à l'entité Perimeter."""
 
 from typing import Annotated, Protocol
 
-from pydantic import BaseModel, StringConstraints
+from pydantic import StringConstraints
 
+from application.ports.model import Model
 from domain.perimeters.perimeter import Perimeter
 
 
-class PerimeterUpdate(BaseModel):
-    """Champs modifiables d'un périmètre ; seuls les champs fournis sont écrits.
-
-    `root_structure_ids` liste les structures racines ; le recalcul de leurs sous-structures (`perimeter_structures`) revient à l'appelant.
-    """
+class PerimeterUpdate(Model):
+    """Champs modifiables d'un périmètre. Seuls les champs fournis sont écrits."""
 
     name: Annotated[str, StringConstraints(strip_whitespace=True)] | None = None
     root_structure_ids: list[int] | None = None
+    """Structures racines. L'appelant recalcule leurs sous-structures (`perimeter_structures`)."""
 
 
 class PerimeterRepository(Protocol):
-    """Contrat d'accès à l'agrégat Perimeter."""
+    """Contrat d'accès à l'entité Perimeter."""
 
-    # ── Agrégat : chargement et écriture ───────────────────────────
+    # ── Entité : chargement et écriture ───────────────────────────
 
     def find_by_id(self, perimeter_id: int) -> Perimeter | None:
-        """Charge l'agrégat `Perimeter`, ou `None` si le périmètre n'existe pas. Ses racines sont des ids de structures."""
+        """Charge l'entité `Perimeter`, ou `None` si le périmètre est introuvable."""
         ...
 
     def add(self, perimeter: Perimeter) -> int:
@@ -31,7 +30,11 @@ class PerimeterRepository(Protocol):
         ...
 
     def save(self, perimeter: Perimeter) -> None:
-        """Enregistre les champs éditables d'un périmètre chargé ; le code est immuable. Lève `NotFoundError` si le périmètre n'existe pas."""
+        """Enregistre les champs éditables d'un périmètre chargé. Le code est immuable.
+
+        Raises:
+            NotFoundError: périmètre introuvable.
+        """
         ...
 
     # ── Liens aux structures ───────────────────────────────────────

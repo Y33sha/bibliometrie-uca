@@ -53,13 +53,13 @@ router = APIRouter(prefix="/api/publications", tags=["publications"])
 
 @router.get("/licenses", response_model=list[EnumOption])
 def list_licenses() -> list[EnumOption]:
-    """Licences d'une publication avec leur libellé français, dans l'ordre de `domain.publications.licenses.License`."""
+    """Liste les licences d'une publication avec leur libellé français, dans l'ordre de `domain.publications.licenses.License`."""
     return [EnumOption(value=v, label_fr=LICENSE_LABELS[v]) for v in License]
 
 
 @router.get("/doc-types", response_model=list[DocTypeFamilyOut])
 def list_doc_types() -> list[DocTypeFamilyOut]:
-    """Familles des types de document et leurs types, avec leurs libellés français, dans l'ordre d'affichage."""
+    """Liste les familles des types de document et leurs types, avec leurs libellés français, dans l'ordre d'affichage."""
     return [
         DocTypeFamilyOut(
             key=key,
@@ -82,7 +82,7 @@ def publications_facets(
     filters: ListFilters,
     queries: PublicationsQueries = Depends(publications_queries),
 ) -> PublicationsFacetsResponse:
-    """Décomptes par option des facettes de la liste des publications.
+    """Renvoie les décomptes par option des facettes de la liste des publications.
 
     Chaque facette écarte sa propre dimension de la clause WHERE : son décompte annonce le nombre de publications atteignables si l'option était cochée ou décochée.
     """
@@ -96,7 +96,7 @@ def publications_entity_facet(
     entity_search: SearchTerm = "",
     queries: PublicationsQueries = Depends(publications_queries),
 ) -> EntityFacetResponse:
-    """Facette contextuelle des éditeurs, des revues, des auteurs ou des sujets : les premières entités sous les filtres actifs, avec leur décompte.
+    """Renvoie la facette contextuelle des éditeurs, des revues, des auteurs ou des sujets : les premières entités sous les filtres actifs, avec leur décompte.
 
     Les entités sont corrélées entre elles. `entity_search` cherche dans leurs noms, là où `search` filtre les publications sur leur titre et leurs sujets.
     """
@@ -116,9 +116,9 @@ def export_publications_csv(
     _rate_limit: None = Depends(export_rate_limit),
     slot: ExportSlot = Depends(export_slot),
 ) -> StreamingResponse:
-    """Export CSV des publications, fidèle au tableau affiché : mêmes filtres, et mêmes colonnes que celles listées dans `columns`.
+    """Exporte en CSV les publications, fidèlement au tableau affiché : mêmes filtres, colonnes listées dans `columns`.
 
-    Le nombre de lignes est plafonné, et la fréquence des demandes aussi (429 au-delà) : l'export parcourt la table sous les seuls filtres reçus."""
+    Le nombre de lignes et la fréquence des demandes sont plafonnés (429 au-delà)."""
     return csv_response(
         queries.export_publications_csv(
             filters=filters.to_filters(),
@@ -144,7 +144,7 @@ def export_theses_csv(
     _rate_limit: None = Depends(export_rate_limit),
     slot: ExportSlot = Depends(export_slot),
 ) -> StreamingResponse:
-    """Export CSV de la page thèses, fidèle au tableau affiché : mêmes filtres, même tri, et mêmes colonnes que celles listées dans `columns`.
+    """Exporte en CSV la page thèses, fidèlement au tableau affiché : mêmes filtres, même tri, colonnes listées dans `columns`.
 
     Plafonné en nombre de lignes et en fréquence, comme l'export des publications.
 
@@ -178,7 +178,7 @@ def export_theses_csv(
 def suspect_merges_count(
     queries: PublicationsQueries = Depends(publications_queries),
 ) -> TotalCountResponse:
-    """Compteur de l'onglet « Fusions suspectes » (badge)."""
+    """Renvoie le compteur de l'onglet « Fusions suspectes » (badge)."""
     return TotalCountResponse(total=queries.suspect_merges_count())
 
 
@@ -188,7 +188,7 @@ def suspect_merges(
     per_page: int = Query(50, ge=1, le=200),
     queries: PublicationsQueries = Depends(publications_queries),
 ) -> SuspectMergesResponse:
-    """Publications dont moins de la moitié des contributions sources d'auteur ont un correspondant dans un autre enregistrement source, paginées."""
+    """Liste par page les publications dont moins de la moitié des contributions sources d'auteur ont un correspondant dans un autre enregistrement source."""
     return queries.suspect_merges(page=page, per_page=per_page)
 
 
@@ -198,7 +198,7 @@ def get_publication(
     queries: PublicationsQueries = Depends(publications_queries),
     detail: EntityDetail = Depends(entity_detail(MergedEntity.PUBLICATION)),
 ) -> PublicationDetailResponse:
-    """Détail complet d'une publication."""
+    """Renvoie le détail complet d'une publication."""
     return detail.found(queries.get_publication_detail(publication_id))
 
 
@@ -207,7 +207,7 @@ def get_publication_sources(
     publication_id: int,
     queries: PublicationsQueries = Depends(publications_queries),
 ) -> PublicationSourcesResponse:
-    """Métadonnées de chaque enregistrement source de la publication, toutes sources confondues."""
+    """Renvoie les métadonnées de chaque enregistrement source de la publication, toutes sources confondues."""
     sources = queries.get_publication_sources(publication_id)
     if sources is None:
         raise HTTPException(status_code=404, detail="Publication introuvable")
@@ -220,7 +220,7 @@ def get_merge_candidates(
     q: SearchTerm = "",
     queries: PublicationsQueries = Depends(publications_queries),
 ) -> list[MergeCandidateOut]:
-    """Publications fusionnables avec la publication, dix au plus. Sans `q` : les titres proches du sien. Avec `q` : la publication de cet identifiant, de ce DOI, ou les titres proches de `q`. Les publications à DOI distinct sont écartées."""
+    """Liste les publications fusionnables avec la publication, dix au plus. Sans `q` : les titres proches du sien. Avec `q` : la publication de cet identifiant, de ce DOI, ou les titres proches de `q`. Les publications à DOI distinct sont écartées."""
     return queries.merge_candidates(publication_id, q)
 
 
@@ -230,9 +230,9 @@ def preview_merge(
     body: PublicationMergeRequest,
     merges: PublicationMergeService = Depends(publication_merge_service),
 ) -> PublicationMergeResult:
-    """Résultat qu'aurait la fusion manuelle des deux publications : publication conservée, conflits d'auteurs.
+    """Renvoie le résultat de la fusion manuelle des deux publications, sans l'enregistrer : publication conservée, conflits d'auteurs.
 
-    L'aperçu applique réellement la fusion dans un `SAVEPOINT` annulé ensuite : aucune écriture ne survit. Il est en POST, pour passer par la garde d'authentification des méthodes d'écriture. Renvoie 422 sur deux identifiants égaux ou deux DOI distincts, 404 sur une publication introuvable.
+    L'aperçu applique la fusion dans un `SAVEPOINT` annulé ensuite. Il est en POST, pour passer par la garde d'authentification des méthodes d'écriture. Renvoie 422 sur deux identifiants égaux ou deux DOI distincts, 404 sur une publication introuvable.
     """
     outcome = merges.preview_merge(publication_id, body.other_id)
     return PublicationMergeResult(
@@ -246,7 +246,7 @@ def merge(
     body: PublicationMergeRequest,
     merges: PublicationMergeService = Depends(publication_merge_service),
 ) -> PublicationMergeResult:
-    """Fusionne manuellement les deux publications. La réconciliation relit ce verdict à chaque passage du pipeline.
+    """Fusionne manuellement les deux publications. La réconciliation relit cette décision à chaque exécution du pipeline.
 
     Renvoie la publication conservée, et le nombre de contributions laissées sans personne parce que leurs contributions sources désignaient deux personnes. Renvoie 422 sur deux identifiants égaux ou deux DOI distincts, 404 sur une publication introuvable.
     """
@@ -264,7 +264,7 @@ def list_publications(
     sort: PublicationSort = Query("year_desc"),
     queries: PublicationsQueries = Depends(publications_queries),
 ) -> PublicationListResponse:
-    """Liste paginée des publications, avec leurs sources, leurs laboratoires et leur revue.
+    """Liste les publications par page, avec leurs sources, leurs laboratoires et leur revue.
 
     Les filtres se cumulent. `sort` combine un champ — année, titre, APC, date de soutenance ou d'inscription, auteur de thèse (par nom puis prénom), laboratoires (par premier libellé), revue, éditeur — et un sens (`_asc` / `_desc`). Les valeurs absentes passent en dernier.
     """

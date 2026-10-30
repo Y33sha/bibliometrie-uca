@@ -1,6 +1,6 @@
 """Moissonnage de ScanR par identifiant de personne : tâche `harvest_by_person.scanr`.
 
-Interroge l'index Elasticsearch avec une clause `should` qui réunit l'IdRef des auteurs (`authors.person`, sous la forme `idref<IdRef>`) et leur ORCID (`authors.denormalized.orcid`), bornée par l'année. La pagination suit `search_after`, sur le tri par identifiant.
+La requête à l'index Elasticsearch contient une clause `should` réunissant l'IdRef des auteurs (`authors.person`, sous la forme `idref<IdRef>`) et leur ORCID (`authors.denormalized.orcid`), bornée par l'année. La pagination suit `search_after`, sur le tri par identifiant.
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ from pipeline.ingestion.scanr.api import ScanrClient
 def build_identifiers_query(
     identifiers: Identifiers, first_year: int, last_year: int, search_after: list[JsonValue] | None
 ) -> Mapping[str, JsonValue]:
-    """Requête Elasticsearch d'une page : documents parus de `first_year` à `last_year` dont un auteur a l'un des identifiants."""
+    """Construit la requête Elasticsearch d'une page : documents parus de `first_year` à `last_year`, avec un auteur identifié par l'un des identifiants."""
     should: list[JsonValue] = []
     if idrefs := identifiers.get(PersonIdentifierType.IDREF):
         should.append({"terms": {"authors.person.keyword": [f"idref{v}" for v in idrefs]}})

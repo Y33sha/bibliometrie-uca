@@ -16,7 +16,7 @@ class NormalizedIdentifier:
 
     @staticmethod
     def normalize(raw: str | None) -> str | None:
-        """Forme normalisée de `raw`, ou `None` si `raw` est invalide."""
+        """Renvoie la forme normalisée de `raw`, ou `None` si `raw` est invalide."""
         raise NotImplementedError
 
     def __post_init__(self) -> None:
@@ -27,7 +27,7 @@ class NormalizedIdentifier:
 
     @classmethod
     def try_parse(cls, raw: str | None) -> Self | None:
-        """L'identifiant, ou `None` si `raw` est vide ou invalide."""
+        """Construit l'identifiant, ou renvoie `None` si `raw` est vide ou invalide."""
         if not raw:
             return None
         try:

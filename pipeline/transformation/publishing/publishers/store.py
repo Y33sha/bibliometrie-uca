@@ -11,13 +11,13 @@ from infrastructure.db.tables import publisher_name_forms, publishers
 
 
 class PublisherStore:
-    """Éditeurs, sur la connexion `conn`."""
+    """Requêtes sur les éditeurs, sur la connexion `conn`."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
 
     def add_publisher_name_form(self, publisher_id: int, form_normalized: str) -> None:
-        """Ajoute une forme de nom normalisée pour un éditeur, si absente (idempotent)."""
+        """Ajoute une forme de nom normalisée à un éditeur, si elle est absente."""
         stmt = (
             pg_insert(publisher_name_forms)
             .values(publisher_id=publisher_id, form_normalized=form_normalized)
@@ -47,7 +47,7 @@ class PublisherStore:
     def match_or_create_by_name_form(
         self, name_raw: str, name_normalized: str, name_key: str
     ) -> tuple[int, bool]:
-        """`(id, created)` : l'éditeur qui a déjà la forme de nom `name_key`, sinon un éditeur créé sous `name_raw` et `name_normalized`, avec sa forme `name_key`."""
+        """Trouve l'éditeur de forme de nom `name_key`, ou le crée avec cette forme. Renvoie `(id, created)`."""
         existing = self.find_publisher_by_name_form(name_key)
         if existing is not None:
             return existing, False

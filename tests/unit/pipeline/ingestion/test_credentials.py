@@ -43,7 +43,7 @@ class TestSecretsDAcces:
         ("utilisateur", "secret"), [("utilisateur", ""), ("", "secret"), ("", "")]
     )
     def test_identifiants_scanr_incomplets(self, monkeypatch, utilisateur, secret):
-        """Un identifiant sans son mot de passe ne vaut rien : le couple entier est tenu pour absent."""
+        """Un couple d'identifiants incomplet est tenu pour absent."""
         monkeypatch.setattr(settings, "scanr_username", utilisateur)
         monkeypatch.setattr(settings, "scanr_password", SecretStr(secret))
         assert get_scanr_credentials() == ("", "")
@@ -56,7 +56,7 @@ def test_public_apis_never_missing(source):
 
 @pytest.mark.parametrize("source", ["doi.org", "doaj"])
 def test_sources_sans_credential_connu(source):
-    """Les API publiques que la fonction ne nomme pas ne réclament rien non plus."""
+    """Une API publique absente de la liste de la fonction ne réclame aucun identifiant."""
     assert _detect(source) is None
 
 

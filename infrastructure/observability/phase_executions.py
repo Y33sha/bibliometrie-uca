@@ -33,12 +33,12 @@ class PhaseExecution:
     status: PhaseStatus
     metrics: PhaseMetricsPayload
     signals: list[Signal] = field(default_factory=list)
-    # Indicateurs sur-mesure remontés par la phase (conventions `summary`, `table`, `lines`, `matrix` ; cf. `interfaces/frontend/.../phase-views.ts`).
     details: dict[str, object] = field(default_factory=dict)
+    """Indicateurs sur-mesure remontés par la phase (conventions `summary`, `table`, `lines`, `matrix` ; cf. `interfaces/frontend/.../phase-views.ts`)."""
 
 
 def next_run_id(conn: Connection) -> int:
-    """Identifiant de run, issu de la séquence dédiée."""
+    """Renvoie un identifiant de run, issu de la séquence dédiée."""
     return int(conn.execute(text("SELECT nextval('pipeline_run_id_seq')")).scalar_one())
 
 
@@ -72,9 +72,9 @@ def persist_phase_execution(conn: Connection, execution: PhaseExecution) -> None
 
 
 def last_daily_extract_date(conn: Connection) -> datetime.date | None:
-    """Jour (UTC) de début de la dernière phase `harvest` du mode `daily` terminée sans signal.
+    """Renvoie le jour (UTC) de début de la dernière phase `harvest` du mode `daily` terminée sans signal.
 
-    Ce jour borne le moissonnage incrémental suivant. Un moissonnage par années laisse la borne en place. Le mode `daily` moissonne HAL seul : le statut `ok` garantit que HAL a abouti. Partir du jour de début ménage un léger recouvrement, sans dommage : l'écriture dans `staging` est idempotente.
+    Ce jour borne le moissonnage incrémental suivant. Un moissonnage par années laisse la borne en place. Le mode `daily` moissonne HAL seul : le statut `ok` garantit que HAL a abouti. Partir du jour de début crée un léger recouvrement, sans dommage : l'écriture dans `staging` est idempotente.
     """
     last = conn.execute(
         text(
@@ -89,7 +89,7 @@ def last_daily_extract_date(conn: Connection) -> datetime.date | None:
 
 
 def get_last_daily_harvest_date() -> datetime.date | None:
-    """Même lecture sur sa propre connexion ; `None` si elle échoue (table absente, connexion impossible), et l'appelant prend sa valeur par défaut."""
+    """Renvoie `last_daily_extract_date`, lu sur une connexion dédiée, ou `None` si la lecture échoue (table absente, connexion impossible)."""
     try:
         with get_sync_engine().connect() as conn:
             return last_daily_extract_date(conn)
@@ -128,7 +128,7 @@ class PhaseExecutionRecorder:
         signals: list[Signal],
         details: dict[str, object],
     ) -> None:
-        """Écrit l'exécution de la phase, avec les indicateurs que la phase remonte (`details`)."""
+        """Écrit l'exécution de la phase, avec les indicateurs remontés par la phase (`details`)."""
         if self._conn is None or self._run_id is None:
             return
         try:

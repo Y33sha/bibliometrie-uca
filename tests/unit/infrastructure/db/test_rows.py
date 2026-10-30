@@ -1,6 +1,6 @@
-"""Appariement d'une ligne de relevé avec le type qu'elle alimente.
+"""Appariement des colonnes d'une ligne de relevé avec les champs d'un type.
 
-Les vérificateurs de types ignorent le désaccord entre les colonnes d'un relevé et les champs d'un type : la requête SQL est une chaîne de caractères. Ces tests vérifient le contrôle qui détecte ce désaccord à l'exécution, et ce que son message nomme.
+Les vérificateurs de types ignorent le désaccord entre les colonnes d'un relevé et les champs d'un type : la requête SQL est une chaîne de caractères. Un contrôle détecte ce désaccord à l'exécution ; son message nomme le type, les champs sans colonne et les colonnes en trop.
 """
 
 from typing import NamedTuple
@@ -23,7 +23,7 @@ class _Modele(BaseModel):
 
 
 class _FausseLigne:
-    """Ligne de relevé aux colonnes données, sous la forme que SQLAlchemy expose."""
+    """Ligne de relevé aux colonnes données, sous la forme exposée par SQLAlchemy."""
 
     def __init__(self, **colonnes: object) -> None:
         self._colonnes = colonnes
@@ -73,7 +73,7 @@ def test_un_modele_pydantic_s_apparie_comme_un_tuple_nomme():
 
 
 class _FauxReleve:
-    """Relevé aux colonnes données, sous la forme que SQLAlchemy expose."""
+    """Relevé aux colonnes données, sous la forme exposée par SQLAlchemy."""
 
     def __init__(self, colonnes: tuple[str, ...], lignes: list[_FausseLigne]) -> None:
         self._colonnes = colonnes

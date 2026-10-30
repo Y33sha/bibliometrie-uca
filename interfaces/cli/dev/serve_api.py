@@ -2,7 +2,7 @@
 """Lance l'API en développement, avec rechargement à chaud, sur `API_PORT` (8000 par défaut).
 
 Usage :
-    python -m interfaces.cli.dev.serve_api
+    uv run python -m interfaces.cli.dev.serve_api
 """
 
 import uvicorn

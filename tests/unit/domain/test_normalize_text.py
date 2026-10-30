@@ -22,7 +22,7 @@ class TestNormalizeText:
             ("l’histoire", "l histoire"),
             # Tirets Unicode → ASCII
             ("Abeywickrama‐Samarakoon", "abeywickrama samarakoon"),
-            # Ligatures œ et æ, que NFKD laisse entières : développées explicitement.
+            # Ligatures œ et æ, laissées entières par NFKD : développées explicitement.
             ("œuvres", "oeuvres"),
             ("Œuvres", "oeuvres"),
             ("Lire les œuvres littéraires", "lire les oeuvres litteraires"),
@@ -87,13 +87,13 @@ class TestNormalizeText:
         assert normalize_text(normalize_text(raw)) == normalize_text(raw)
 
     def test_textes_non_latins_distincts_restent_distincts(self) -> None:
-        """Régression : deux adresses russes différentes se réduisaient à leurs seuls chiffres, et devenaient égales."""
+        """Deux adresses russes différentes, aux mêmes chiffres, restent distinctes."""
         assert normalize_text("Лаборатория математики, BP 401") != normalize_text(
             "Университет, BP 401"
         )
 
     def test_oeuvres_oe_ligature_match_oe(self) -> None:
-        """Régression : deux graphies équivalentes du même titre sont égales après normalisation."""
+        """Les graphies « œ » et « oe » d'un même titre sont égales après normalisation."""
         assert normalize_text("œuvres littéraires") == normalize_text("oeuvres littéraires")
 
 
@@ -162,14 +162,14 @@ class TestSanitizeRawText:
         assert sanitize_raw_text(raw) == expected
 
     def test_nbsp_collapses_to_searchable_form(self) -> None:
-        """Régression : un texte avec NBSP converge sur la forme tapée au clavier."""
+        """Un texte à espace insécable donne la forme tapée au clavier."""
         with_nbsp = "Université Clermont Auvergne"
         typed = "Université Clermont Auvergne"
         assert sanitize_raw_text(with_nbsp) == sanitize_raw_text(typed) == typed
 
 
 class TestSanitizeOptionalText:
-    """Variante des imports de fichiers : même mise à plat, absence rendue par `None`."""
+    """Variante des imports de fichiers : même mise à plat, absence notée `None`."""
 
     def test_met_a_plat_comme_sanitize_raw_text(self) -> None:
         assert sanitize_optional_text("<i>Journal of Physics</i>") == "Journal of Physics"

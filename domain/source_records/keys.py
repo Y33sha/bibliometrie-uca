@@ -29,7 +29,7 @@ CONFIRMATION_ID_TYPES = (
 )
 
 
-# Longueur de titre normalisé, en caractères, en deçà de laquelle un titre est trop générique pour apparier deux publications.
+# Longueur de titre normalisé, en caractères, en deçà de laquelle un titre est trop générique pour servir de clé.
 # Sert aux clés de confirmation, aux relations et au dédoublonnage HAL ; les requêtes SQL l'interpolent.
 DISCRIMINANT_TITLE_MIN_LENGTH = 30
 
@@ -38,10 +38,12 @@ _STRONG_ROLES = frozenset({SourceIdentifierRole.PRIMARY, SourceIdentifierRole.DE
 
 @dataclass(frozen=True, slots=True)
 class DoiKeys:
-    """DOI actifs d'un enregistrement source, cible appliquée : `strong`, de rôle `primary` ou `derived` ; `weak`, de rôle `secondary` et absents de `strong`."""
+    """DOI actifs d'un enregistrement source, cible appliquée."""
 
     strong: frozenset[str] = frozenset()
+    """DOI de rôle `primary` ou `derived`."""
     weak: frozenset[str] = frozenset()
+    """DOI de rôle `secondary`, absents de `strong`."""
 
     @property
     def all(self) -> frozenset[str]:
@@ -51,7 +53,7 @@ class DoiKeys:
 def doi_keys(
     identifiers: Iterable[SourceIdentifier], doi_targets: Mapping[str, str] | None = None
 ) -> DoiKeys:
-    """DOI actifs de `identifiers` de rôle autre que `related`, chacun remplacé par sa cible dans `doi_targets`."""
+    """Renvoie les DOI actifs de `identifiers` de rôle autre que `related`, chacun ramené à sa cible dans `doi_targets`."""
     targets = doi_targets or {}
     strong: set[str] = set()
     weak: set[str] = set()
@@ -63,7 +65,7 @@ def doi_keys(
 
 
 def doi_anchors(keys: Iterable[DoiKeys]) -> frozenset[str]:
-    """Ancres d'un ensemble d'enregistrements sources : leurs DOI `primary` ou `derived` ; à défaut, le DOI de ceux qui ont un seul DOI."""
+    """Renvoie les ancres d'un ensemble d'enregistrements sources : leurs DOI `primary` ou `derived` ; à défaut, le DOI de ceux qui ont un seul DOI."""
     keys = list(keys)
     strong = frozenset().union(*(k.strong for k in keys))
     if strong:
@@ -72,7 +74,7 @@ def doi_anchors(keys: Iterable[DoiKeys]) -> frozenset[str]:
 
 
 def anchor_of(keys: DoiKeys, anchors: frozenset[str]) -> str | None:
-    """Ancre que rejoint un enregistrement source : celle de son DOI `primary` ou `derived`, à défaut l'unique ancre parmi ses DOI `secondary`. `None` sans ancre unique."""
+    """Renvoie l'ancre rejointe par un enregistrement source : celle de son DOI `primary` ou `derived`, à défaut l'unique ancre parmi ses DOI `secondary`. `None` sans ancre unique."""
     own = keys.strong & anchors or keys.weak & anchors
     return next(iter(own)) if len(own) == 1 else None
 
@@ -89,7 +91,7 @@ class ConfirmationKeys:
     metadata_block: str | None
 
     def tokens(self) -> frozenset[tuple[str, str]]:
-        """Clés présentes, en jetons `(nom de la clé, valeur)` : un DOI `x` et un NNT `x` restent distincts. Deux enregistrements sources qui partagent un jeton sont reliés dans le graphe des composantes."""
+        """Renvoie les clés présentes, en jetons `(nom de la clé, valeur)` : un DOI `x` et un NNT `x` restent distincts. Deux enregistrements sources qui partagent un jeton sont reliés dans le graphe des composantes."""
         singles = {
             (name, value)
             for name in _KEY_NAMES
@@ -105,7 +107,7 @@ assert set(_KEY_NAMES) == {"doi", "metadata_block", *CONFIRMATION_ID_TYPES}, (
 
 
 def confirmation_identifiers(identifiers: Iterable[SourceIdentifier]) -> dict[str, str | None]:
-    """Clé de chaque type de `CONFIRMATION_ID_TYPES` : l'identifiant actif de rôle le plus fort, puis de plus petite valeur (`by_role`). Un type sans identifiant actif vaut `None`."""
+    """Renvoie la clé de chaque type de `CONFIRMATION_ID_TYPES` : l'identifiant actif de rôle le plus fort, puis de plus petite valeur (`by_role`). Un type sans identifiant actif vaut `None`."""
     keys: dict[str, str | None] = dict.fromkeys(map(str, CONFIRMATION_ID_TYPES))
     for identifier in by_role(active(identifiers)):
         if keys.get(identifier.id_type.value, "") is None:
@@ -120,7 +122,12 @@ def project_confirmation_keys(
     publication_year: int | None,
     doi_targets: Mapping[str, str] | None = None,
 ) -> ConfirmationKeys:
-    """Clés de confirmation d'un enregistrement source. `identifiers` : ses identifiants, avec leur rôle et leur statut. `doi_targets` : cible du DOI de chaque forme secondaire. Le bloc de métadonnées demande un type de document, une année et un titre normalisé plus long que `DISCRIMINANT_TITLE_MIN_LENGTH`."""
+    """Calcule les clés de confirmation d'un enregistrement source. Le bloc de métadonnées demande un type de document, une année et un titre normalisé plus long que `DISCRIMINANT_TITLE_MIN_LENGTH`.
+
+    Args:
+        identifiers: identifiants de l'enregistrement source, avec leur rôle et leur statut.
+        doi_targets: cible du DOI de chaque forme secondaire.
+    """
     identifiers = list(identifiers)
     metadata_block = (
         f"{doc_type}|{title_normalized}|{publication_year}"

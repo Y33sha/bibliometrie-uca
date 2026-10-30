@@ -504,13 +504,16 @@
 </section>
 {:else}
 <!-- Histogramme du pivot -->
-{#if legendItems.length > 1}
-	<div class="legend">
-		{#each legendItems as item (item.label)}
-			<span><span class="legend-dot" style="background:{item.color}"></span>{item.label}</span>
-		{/each}
-	</div>
-{/if}
+<div class="chart-header">
+	{#if legendItems.length > 1}
+		<div class="legend">
+			{#each legendItems as item (item.label)}
+				<span><span class="legend-dot" style="background:{item.color}"></span>{item.label}</span>
+			{/each}
+		</div>
+	{/if}
+	<button type="button" class="export-btn chart-export" onclick={exportChartPng}>Export PNG</button>
+</div>
 <div class="chart-area">
 	<!-- Le graphique est dessiné dans un canvas : les lecteurs d'écran lisent le tableau des données. -->
 	<canvas bind:this={chartCanvas} aria-hidden="true"></canvas>
@@ -528,7 +531,6 @@
 			</table>
 		</div>
 	{/if}
-	<button type="button" class="export-btn chart-export" onclick={exportChartPng}>Export PNG</button>
 </div>
 {#if chartCatTotal > CHART_PAGE_SIZE}
 	<Pagination
@@ -589,13 +591,18 @@
 	.sort-dir:hover {
 		background: var(--hover);
 	}
-	/* Légende au-dessus du graphique, alignée à gauche ; la place à droite revient à l'export. */
+	/* Ligne au-dessus du graphique : légende à gauche, export à droite. */
+	.chart-header {
+		display: flex;
+		align-items: center;
+		gap: 16px;
+		margin-bottom: 8px;
+	}
 	.legend {
+		flex: 1 1 auto;
 		display: flex;
 		flex-wrap: wrap;
 		gap: 6px 18px;
-		margin-bottom: 8px;
-		padding-right: 120px;
 		font-size: var(--fs-sm);
 		color: var(--text-secondary);
 	}
@@ -616,16 +623,14 @@
 	}
 
 	.chart-area {
-		padding-top: 40px;
 		margin-bottom: 16px;
 		position: relative;
 		flex: 1 1 auto;
 		min-height: 360px;
 	}
 	.chart-export {
-		position: absolute;
-		top: 0;
-		right: 0;
+		flex: none;
+		margin-left: auto;
 	}
 
 </style>

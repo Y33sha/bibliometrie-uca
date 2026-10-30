@@ -42,7 +42,7 @@ from pipeline.transformation.publishing.find_or_create import (
 from pipeline.transformation.publishing.publishers.store import PublisherStore
 
 type Document = Mapping[str, JsonValue]
-"""Document que la source décrit, lu dans une ligne de `staging`."""
+"""Document décrit par la source, lu dans une ligne de `staging`."""
 
 
 class PublisherFacts(NamedTuple):
@@ -53,11 +53,14 @@ class PublisherFacts(NamedTuple):
 
 
 class NormalizeStats(NamedTuple):
-    """Bilan d'une normalisation de source : enregistrements normalisés, lignes vides sautées, enregistrements en erreur ou refusés."""
+    """Bilan d'une normalisation de source."""
 
     processed: int
+    """Documents normalisés."""
     skipped: int
+    """Lignes vides sautées."""
     errors: int
+    """Documents en erreur ou refusés."""
 
 
 class SourceNormalizer(ABC):
@@ -68,8 +71,8 @@ class SourceNormalizer(ABC):
 
     SOURCE: ClassVar[str] = ""
     DEFAULT_BATCH_SIZE: ClassVar[int] = 500
-    # Lignes de `staging` chargées par sous-lot : en mémoire, un payload JSONB désérialisé occupe 3 à 5 fois sa taille brute.
     FETCH_SUB_BATCH: ClassVar[int] = 50
+    """Lignes de `staging` chargées par sous-lot. En mémoire, un payload JSONB désérialisé occupe 3 à 5 fois sa taille brute."""
 
     def __init__(
         self,
@@ -93,40 +96,40 @@ class SourceNormalizer(ABC):
 
     @abstractmethod
     def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
-        """Titre et année de l'enregistrement source, lus dans son payload."""
+        """Renvoie le titre et l'année du document, lus dans son payload."""
 
     def parse(self, row: StagingRow) -> Document | None:
-        """Document que décrit la ligne, ou `None` pour un enregistrement refusé, sans rien écrire."""
+        """Renvoie le document décrit par la ligne, ou `None` pour un document refusé. N'écrit rien."""
         return row.raw_data
 
     def publisher(self, doc: Document) -> PublisherFacts | None:  # noqa: ARG002
-        """Éditeur du document, ou `None` sans éditeur."""
+        """Renvoie l'éditeur du document, ou `None`."""
         return None
 
     def container_facts(self, doc: Document) -> ContainerDescription | None:  # noqa: ARG002
-        """Revue, ou monographie et collection, qui contiennent le document. `None` : sans conteneur."""
+        """Renvoie la revue, ou la monographie et la collection, contenant le document. `None` : sans conteneur."""
         return None
 
     def locations(self, doc: Document) -> list[LocationFacts]:  # noqa: ARG002
-        """Localisations du document."""
+        """Renvoie les localisations du document."""
         return []
 
     @abstractmethod
     def source_record(
         self, row: StagingRow, doc: Document, containers: Containers
     ) -> SourceRecordUpsert:
-        """Enregistrement source du document, rattaché à ses conteneurs."""
+        """Construit l'enregistrement source du document, rattaché à ses conteneurs."""
 
     @abstractmethod
     def author_block(self, doc: Document) -> AuthorBlock:
-        """Partie du document qui contient ses auteurs : son empreinte décide de la synchronisation des contributions sources."""
+        """Renvoie la partie du document contenant ses auteurs. Son empreinte décide de la synchronisation des contributions sources."""
 
     @abstractmethod
     def author_records(self, block: AuthorBlock) -> list[AuthorRecord]:
-        """Contributions sources que donne le bloc auteurs."""
+        """Renvoie les contributions sources lues dans le bloc auteurs."""
 
     def normalize_record(self, row: StagingRow) -> bool:
-        """Normalise un enregistrement source qui a les métadonnées minimales et marque sa ligne traitée. Renvoie vrai, ou faux pour un enregistrement refusé, sans rien écrire.
+        """Normalise un document à métadonnées minimales et marque sa ligne traitée. Renvoie vrai, ou faux sans rien écrire pour un document refusé.
 
         Écrit dans l'ordre l'éditeur, les conteneurs, l'enregistrement source rattaché à son éditeur, ses localisations et ses contributions sources.
         """
@@ -165,9 +168,9 @@ class SourceNormalizer(ABC):
         return True
 
     def process_work(self, row: StagingRow) -> bool | None:
-        """Traite une ligne de `staging`. Renvoie vrai pour un enregistrement normalisé, `None` pour une ligne vide, sautée, et faux pour un enregistrement refusé.
+        """Traite une ligne de `staging`. Renvoie vrai pour un document normalisé, `None` pour une ligne vide, sautée, et faux pour un document refusé.
 
-        Un enregistrement sans titre, sans année, au titre trop long (`is_overlong_title`) ou refusé par la source ne fonde aucune publication (`_reject`).
+        Un document sans titre, sans année, au titre trop long (`is_overlong_title`) ou refusé par la source ne fonde aucune publication (`_reject`).
         """
         if not row.raw_data:
             self._staging.mark_done(row.id)
@@ -183,7 +186,7 @@ class SourceNormalizer(ABC):
         return result
 
     def _reject(self, row: StagingRow) -> bool:
-        """Écarte un enregistrement refusé : l'enregistrement source qu'il avait produit est supprimé, sa ligne marquée traitée. Renvoie faux, compté comme enregistrement incomplet."""
+        """Écarte un document refusé : son enregistrement source est supprimé, sa ligne marquée traitée. Renvoie faux, compté comme document incomplet."""
         self._staging.discard_source_record(row.id)
         self._staging.mark_done(row.id)
         return False
@@ -210,7 +213,7 @@ class SourceNormalizer(ABC):
             return self.process_work(row)
 
     def _summarize_incomplete(self, identifiers: list[str]) -> None:
-        """Récapitule sous la barre de la source les documents qu'elle a laissés de côté.
+        """Récapitule sous la barre de la source les documents laissés de côté.
 
         Le trait vertical se prolonge d'une ligne à l'autre : le récapitulatif appartient à la branche de sa source. Ces lignes passent par le journal nu ; le préfixe de la source romprait l'alignement.
         """
@@ -241,7 +244,7 @@ class SourceNormalizer(ABC):
             processed = 0
             skipped = 0
             errors = 0
-            # Documents que `process_work` laisse de côté faute de métadonnées exploitables : récapitulés sous la barre en fin de boucle.
+            # Documents laissés de côté par `process_work` faute de métadonnées exploitables : récapitulés sous la barre en fin de boucle.
             incomplete: list[str] = []
 
             with track_progress(total, source_branch(self.SOURCE), slog) as progress:

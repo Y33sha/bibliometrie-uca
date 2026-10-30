@@ -14,7 +14,7 @@ from domain.countries import NO_COUNTRY_CODE
 from domain.publications.licenses import license_label
 from domain.publications.metadata import OaStatus
 from domain.sources.hal import HAL_DEPOSIT_STATUS_LABELS, HAL_DEPOSIT_STATUSES
-from domain.structures.structure import StructureType
+from domain.sources.registry import source_label
 from infrastructure.db.rows import rows_as
 from infrastructure.read_models._common import (
     EntityFacetResponse,
@@ -24,10 +24,12 @@ from infrastructure.read_models._common import (
 )
 from infrastructure.read_models.entity_facet import entity_facet_rows
 from infrastructure.read_models.filters import (
+    DOI_AGENCY_SQL,
     OA_CLOSED_SQL,
     OA_OPEN_SQL,
     hal_status_expression,
     institution_apc_payment_sql,
+    no_lab_clause,
     own_structure_ids,
 )
 from infrastructure.read_models.perimeters.queries import get_persons_perimeter_name
@@ -38,10 +40,15 @@ from infrastructure.read_models.publications.filtering import (
     publication_filter_where,
 )
 from infrastructure.read_models.publications.models import (
+    DOI_AGENCY_FILTER_VALUES,
+    DOI_AGENCY_SOURCES,
+    NO_DOI,
     NO_LICENSE,
+    OTHER_DOI_AGENCY,
     PublicationFilters,
     PublicationsFacetsResponse,
 )
+from infrastructure.sql_fragments import is_laboratory
 
 
 class _PublicationFacetsBuilder:
@@ -55,7 +62,7 @@ class _PublicationFacetsBuilder:
         self.context = context
 
     def _clauses_skipping(self, skip: FilterDimension) -> tuple[str, dict[str, object]]:
-        """WHERE sous tous les filtres sauf celui de `skip`."""
+        """Renvoie le WHERE sous tous les filtres sauf celui de `skip`."""
         return publication_filter_where(self.filters, self.context, skip)
 
     # ── Facettes ────────────────────────────────────────────────
@@ -84,7 +91,7 @@ class _PublicationFacetsBuilder:
                 JOIN publications p ON p.id = ps.publication_id
                 JOIN structures s ON s.id = ps.structure_id
                 WHERE {where_sql}
-                  AND s.structure_type = '{StructureType.LABO.value}'
+                  AND {is_laboratory("s")}
                 GROUP BY s.id, s.acronym, s.name
                 ORDER BY count DESC
             """),
@@ -95,13 +102,7 @@ class _PublicationFacetsBuilder:
         no_lab_row = self.conn.execute(
             text(f"""
                 SELECT COUNT(*) AS total FROM publications p
-                WHERE {where_sql}
-                  AND NOT EXISTS (
-                      SELECT 1 FROM publication_structures ps
-                      JOIN structures s ON s.id = ps.structure_id
-                      WHERE ps.publication_id = p.id
-                        AND s.structure_type = '{StructureType.LABO.value}'
-                  )
+                WHERE {where_sql} AND {no_lab_clause().sql}
             """),
             binds,
         ).one()
@@ -121,7 +122,7 @@ class _PublicationFacetsBuilder:
         return rows_as(FacetOption, rows)
 
     def _facet_licenses(self) -> list[FacetOption]:
-        """Licence de la version éditeur, `NO_LICENSE` pour les publications sans licence connue."""
+        """Renvoie la facette des licences de la version éditeur, `NO_LICENSE` pour les publications sans licence connue."""
         where_sql, binds = self._clauses_skipping("license")
         rows = self.conn.execute(
             text(f"""
@@ -139,6 +140,28 @@ class _PublicationFacetsBuilder:
                 count=r.n,
             )
             for r in rows
+        ]
+
+    def _facet_doi_agencies(self) -> list[FacetOption]:
+        """Renvoie la facette des agences d'enregistrement du DOI. Une option sans publication compte zéro."""
+        where_sql, binds = self._clauses_skipping("doi_agency")
+        rows = self.conn.execute(
+            text(f"""
+                SELECT value, COUNT(*) AS n
+                FROM (SELECT {DOI_AGENCY_SQL} AS value FROM publications p WHERE {where_sql}) s
+                GROUP BY value
+            """),
+            binds,
+        ).all()
+        counts = {r.value: r.n for r in rows}
+        labels = {
+            **{source.value: source_label(source) for source in DOI_AGENCY_SOURCES},
+            OTHER_DOI_AGENCY: "Autre",
+            NO_DOI: "Pas de DOI",
+        }
+        return [
+            FacetOption(value=v, label=labels[v], count=counts.get(v, 0))
+            for v in DOI_AGENCY_FILTER_VALUES
         ]
 
     def _facet_access(self) -> list[FacetOption]:
@@ -204,7 +227,7 @@ class _PublicationFacetsBuilder:
         ]
 
     def _facet_source_counts(self) -> dict[str, YesNoCount]:
-        """Décomptes oui et non de chaque source, sans aucun filtre de source."""
+        """Renvoie les décomptes oui et non de chaque source, sans aucun filtre de source."""
         where_sql, binds = self._clauses_skipping("source")
         row = self.conn.execute(
             text(f"""
@@ -233,7 +256,7 @@ class _PublicationFacetsBuilder:
         }
 
     def _facet_apc(self) -> list[FacetOption]:
-        """APC payées par le périmètre : oui ou non."""
+        """Renvoie la facette des APC payées par le périmètre : oui ou non."""
         where, binds = self._clauses_skipping("apc")
         paid = institution_apc_payment_sql("apc_facet_root_ids")
         r = self.conn.execute(
@@ -293,7 +316,7 @@ class _PublicationFacetsBuilder:
         return [FacetOption(value=r.code, label=r.name, count=r.n) for r in rows]
 
     def _facet_hal_status(self) -> list[FacetOption]:
-        """Statut HAL, quand un seul laboratoire est sélectionné."""
+        """Renvoie la facette du statut HAL, quand un seul laboratoire est sélectionné."""
         if len(self.filters.lab_ids) != 1:
             return []
         where_sql, binds = self._clauses_skipping("hal_status")
@@ -348,7 +371,7 @@ class PublicationFacetQueries:
     _open_connection: Callable[[], Connection]
 
     def publications_facets(self, *, filters: PublicationFilters) -> PublicationsFacetsResponse:
-        """Facettes de la liste : chacune exclut son propre filtre et applique tous les autres.
+        """Renvoie les facettes de la liste : chacune exclut son propre filtre et applique tous les autres.
 
         Les facettes, une dizaine, sont indépendantes ; chacune agrège l'ensemble filtré en une demi-seconde environ. Elles s'exécutent en parallèle, chacune dans un thread avec sa connexion (`_open_connection`) : psycopg libère le GIL pendant la requête. Le contexte de filtrage se lit une fois.
         """
@@ -367,6 +390,7 @@ class PublicationFacetQueries:
             "access": "_facet_access",
             "oa_statuses": "_facet_oa_statuses",
             "licenses": "_facet_licenses",
+            "doi_agencies": "_facet_doi_agencies",
             "corresponding": "_facet_corresponding",
             "source_counts": "_facet_source_counts",
             "apc": "_facet_apc",
@@ -392,6 +416,7 @@ class PublicationFacetQueries:
             access=results["access"],
             oa_statuses=results["oa_statuses"],
             licenses=results["licenses"],
+            doi_agencies=results["doi_agencies"],
             corresponding=results["corresponding"],
             source_counts=results["source_counts"],
             apc=results["apc"],
@@ -408,7 +433,7 @@ class PublicationFacetQueries:
         search: str,
         filters: PublicationFilters,
     ) -> EntityFacetResponse:
-        """Facette d'entité de la liste (éditeur, revue, auteur, sujet) : les premières entités sous les filtres actifs, hors filtre de la dimension demandée. Les autres filtres, dont celui de l'autre entité, s'appliquent. La recherche par nom se fait côté serveur."""
+        """Renvoie la facette d'entité de la liste (éditeur, revue, auteur, sujet) : les premières entités sous les filtres actifs, hors filtre de la dimension demandée. Les autres filtres, dont celui de l'autre entité, s'appliquent. La recherche par nom se fait côté serveur."""
         context = filter_context(self._conn, filters)
         where_sql, binds = publication_filter_where(filters, context, kind)
         return EntityFacetResponse(

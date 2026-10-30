@@ -26,7 +26,7 @@
 		urlState,
 	} from '#lib/filterRegistry.js';
 	import Pagination from '#lib/components/Pagination.svelte';
-	import { licenseLabels } from '#lib/licenses.js';
+	import LicenseBadge from '#lib/components/LicenseBadge.svelte';
 	import { columnLabels, oaStatusLabel } from '#lib/labels.js';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
 	import TableStatusRow from '#lib/components/TableStatusRow.svelte';
@@ -102,8 +102,6 @@
 		{ key: 'access',     label: columnLabels.access, fixed: true },
 	];
 	const initialHidden = ['apc', 'oa_status', 'license', 'publisher', 'sources'];
-	// Libellés de la colonne Licence, servis par l'API.
-	let licenseNames = $state<Record<string, string>>({});
 	if (isLab) initialHidden.push('hal_status');
 	const cv = useColumnVisibility('publication-table-columns', columnDefs, initialHidden);
 	const col = cv.col;
@@ -232,9 +230,6 @@
 	}
 
 	onMount(async () => {
-		licenseLabels()
-			.then((labels) => (licenseNames = labels))
-			.catch(() => {});
 		if (urlSync) {
 			const restored = url.restoreFromUrl(page.url.searchParams);
 			restoreValues(FILTERS, restored, values);
@@ -366,7 +361,7 @@
 							<span class="oa-tag oa-{p.oa_status}">{oaStatusLabel(p.oa_status)}</span>
 						{/if}
 					</td>{/if}
-					{#if col('license')}<td class="license-cell">{p.license ? (licenseNames[p.license] ?? p.license) : ''}</td>{/if}
+					{#if col('license')}<td class="license-cell">{#if p.license}<LicenseBadge license={p.license} />{/if}</td>{/if}
 					{#if isLab && col('hal_status')}
 						<td>{#if p.hal_status}<span class="hal-badge hal-{p.hal_status}">{halStatusLabel(p.hal_status)}</span>{/if}</td>
 					{/if}

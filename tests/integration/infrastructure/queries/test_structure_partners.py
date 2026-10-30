@@ -13,7 +13,7 @@ from tests.integration.helpers.structures import add_source_contribution_structu
 
 
 def _copublication(conn) -> tuple[int, int]:
-    """Une publication d'un laboratoire du périmètre (ROR `0lab00001`) avec un laboratoire allemand. Renvoie la structure et la publication."""
+    """Insère une publication d'un laboratoire du périmètre (ROR `0lab00001`) avec un laboratoire allemand. Renvoie la structure et la publication."""
     insert_ror_tree(conn)
     structure = insert_structure(conn, "LAB", name="Laboratoire")
     conn.execute(

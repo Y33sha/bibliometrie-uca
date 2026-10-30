@@ -13,6 +13,7 @@ from domain.publications.metadata import ACCESS_LEVELS, OA_STATUSES
 from domain.sources.hal import HAL_DEPOSIT_STATUSES
 from domain.sources.registry import SOURCE_FILTER_VALUES
 from infrastructure.read_models.publications.models import (
+    DOI_AGENCY_FILTER_VALUES,
     LICENSE_FILTER_VALUES,
     PublicationFilters,
 )
@@ -46,6 +47,7 @@ class PublicationFilterParams:
     access: Annotated[str, Query()] = ""
     oa_status: Annotated[str, Query()] = ""
     license: Annotated[str, Query()] = ""
+    doi_agency: Annotated[str, Query()] = ""
     source_filter: Annotated[str, Query()] = ""
     doc_type: Annotated[str, Query()] = ""
     excluded_doc_type: Annotated[str, Query()] = ""
@@ -72,6 +74,9 @@ class PublicationFilterParams:
             oa_status=parse_vocabulary_csv(self.oa_status, allowed=OA_STATUSES, param="oa_status"),
             license=parse_vocabulary_csv(
                 self.license, allowed=LICENSE_FILTER_VALUES, param="license"
+            ),
+            doi_agency=parse_vocabulary_csv(
+                self.doi_agency, allowed=DOI_AGENCY_FILTER_VALUES, param="doi_agency"
             ),
             source_values=parse_vocabulary_csv(
                 self.source_filter, allowed=SOURCE_FILTER_VALUES, param="source_filter"

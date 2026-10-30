@@ -5,7 +5,7 @@ Une exception levée pendant le nettoyage d'une autre la masque : l'annulation d
 
 
 def exception_chain(exc: BaseException) -> list[BaseException]:
-    """L'exception, puis celles qu'elle masque, de la plus récente à celle d'origine."""
+    """Renvoie l'exception, puis les exceptions masquées par elle, de la plus récente à l'exception d'origine."""
     chain: list[BaseException] = []
     current: BaseException | None = exc
     while current is not None and current not in chain:
@@ -15,12 +15,12 @@ def exception_chain(exc: BaseException) -> list[BaseException]:
 
 
 def is_user_interruption(exc: BaseException) -> bool:
-    """Vrai si l'échec part d'une interruption clavier."""
+    """Indique si l'échec part d'une interruption clavier."""
     return any(isinstance(e, KeyboardInterrupt) for e in exception_chain(exc))
 
 
 def failure_message(exc: BaseException) -> str:
-    """Message d'un échec : l'erreur d'origine d'abord, puis celle qui la masque."""
+    """Renvoie le message d'un échec : l'erreur d'origine d'abord, puis l'erreur qui la masque."""
     origin = exception_chain(exc)[-1]
     if origin is exc or str(origin) in str(exc):
         return str(exc)

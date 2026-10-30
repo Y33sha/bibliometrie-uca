@@ -15,9 +15,9 @@ class CountriesQueries:
         self._conn = conn
 
     def list_countries(self) -> list[CountryOut]:
-        """Référentiel trié par libellé, l'absence de pays en tête.
+        """Renvoie le référentiel trié par libellé, l'absence de pays en tête.
 
-        Les listes de choix la proposent d'abord : c'est l'arbitrage que l'édition manuelle pose le plus souvent, et le seul qui ne se cherche pas par son nom.
+        L'absence de pays est l'arbitrage manuel le plus fréquent, et le seul introuvable par son nom.
         """
         rows = self._conn.execute(
             text("SELECT code, name FROM countries ORDER BY (code = :no_country) DESC, name"),

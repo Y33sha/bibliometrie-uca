@@ -1,6 +1,6 @@
 """Lecture des périmètres : structures de chaque périmètre (table `perimeter_structures`) et projection de la page d'administration.
 
-`config` désigne deux périmètres : `perimeter_extraction`, structures interrogées au moissonnage et reconnues dans les affiliations ; `perimeter_persons`, périmètre de création des personnes, à défaut celui d'extraction. Une clé absente vaut périmètre vide. `refresh_perimeter_structures` (pipeline) calcule les structures de chaque périmètre ; ce module les lit.
+`config` désigne deux périmètres. Le périmètre de moissonnage (`perimeter_extraction`) contient les structures interrogées au moissonnage et reconnues dans les affiliations. Le périmètre des personnes (`perimeter_persons`) est le périmètre de création des personnes, à défaut celui de moissonnage. Une clé absente vaut périmètre vide. `refresh_perimeter_structures` (pipeline) calcule les structures de chaque périmètre ; ce module les lit.
 
 Le moissonnage, le pipeline et les adaptateurs lisent tous le périmètre par ces fonctions.
 """
@@ -27,7 +27,7 @@ from infrastructure.read_models.perimeters.models import (
 
 
 def get_perimeter_structure_ids(conn: Connection, perimeter_code: str) -> set[int]:
-    """Structures d'un périmètre, racines et descendantes, lues dans `perimeter_structures`."""
+    """Renvoie les structures d'un périmètre, racines et descendantes, lues dans `perimeter_structures`."""
     result = conn.execute(
         text("""
             SELECT ps.structure_id
@@ -41,7 +41,7 @@ def get_perimeter_structure_ids(conn: Connection, perimeter_code: str) -> set[in
 
 
 def _config_perimeter_code(conn: Connection, config_key: str) -> str | None:
-    """Code de périmètre lu dans `config`, ou `None` si la clé est absente ou vide."""
+    """Renvoie le code de périmètre lu dans `config`, ou `None` si la clé est absente ou vide."""
     value = conn.execute(
         text("SELECT value FROM config WHERE key = :key"),
         {"key": config_key},
@@ -50,23 +50,23 @@ def _config_perimeter_code(conn: Connection, config_key: str) -> str | None:
 
 
 def extraction_perimeter_code(conn: Connection) -> str | None:
-    """Code du périmètre d'extraction, ou `None` s'il n'est pas configuré."""
+    """Renvoie le code du périmètre de moissonnage, ou `None` sans configuration."""
     return _config_perimeter_code(conn, PERIMETER_EXTRACTION_KEY)
 
 
 def persons_perimeter_code(conn: Connection) -> str | None:
-    """Code du périmètre des personnes, à défaut celui du périmètre d'extraction."""
+    """Renvoie le code du périmètre des personnes, à défaut celui du périmètre de moissonnage."""
     return _config_perimeter_code(conn, PERIMETER_PERSONS_KEY) or extraction_perimeter_code(conn)
 
 
 def get_extraction_structure_ids(conn: Connection) -> set[int]:
-    """Structures du périmètre d'extraction, vide s'il n'est pas configuré."""
+    """Renvoie les structures du périmètre de moissonnage, vide sans configuration."""
     code = extraction_perimeter_code(conn)
     return get_perimeter_structure_ids(conn, code) if code else set()
 
 
 def get_hal_collections(conn: Connection) -> dict[str, str]:
-    """Collections HAL des structures du périmètre d'extraction qui en ont une : libellé par code."""
+    """Renvoie les collections HAL des structures du périmètre de moissonnage : libellé par code."""
     structure_ids = get_extraction_structure_ids(conn)
     if not structure_ids:
         return {}
@@ -83,7 +83,7 @@ def get_hal_collections(conn: Connection) -> dict[str, str]:
 
 
 def get_extraction_api_ids(conn: Connection, source: str) -> list[str]:
-    """Identifiants d'API d'une source pour les structures du périmètre d'extraction (`structures.api_ids[source]`), sans doublon, dans l'ordre."""
+    """Renvoie les identifiants d'API d'une source pour les structures du périmètre de moissonnage (`structures.api_ids[source]`), sans doublon, dans l'ordre."""
     struct_ids = get_extraction_structure_ids(conn)
     if not struct_ids:
         return []
@@ -103,18 +103,18 @@ def get_extraction_api_ids(conn: Connection, source: str) -> list[str]:
 
 
 def get_persons_structure_ids(conn: Connection) -> set[int]:
-    """Structures du périmètre des personnes, vide s'il n'est pas configuré."""
+    """Renvoie les structures du périmètre des personnes, vide sans configuration."""
     code = persons_perimeter_code(conn)
     return get_perimeter_structure_ids(conn, code) if code else set()
 
 
 def get_persons_structure_ids_list(conn: Connection) -> list[int]:
-    """Mêmes structures que `get_persons_structure_ids`, en liste : `ANY(:ids)` refuse un `set`."""
+    """Renvoie les structures de `get_persons_structure_ids` en liste : `ANY(:ids)` refuse un `set`."""
     return list(get_persons_structure_ids(conn))
 
 
 def get_persons_perimeter_root_ids(conn: Connection) -> list[int]:
-    """Racines du périmètre des personnes, sans leurs sous-structures (que renvoie `get_persons_structure_ids`). Sert à filtrer les racines, par exemple pour retirer l'établissement des tutelles affichées pour un laboratoire."""
+    """Renvoie les racines du périmètre des personnes, sans leurs sous-structures. Sert par exemple à retirer l'établissement des tutelles affichées pour un laboratoire."""
     code = persons_perimeter_code(conn)
     if not code:
         return []
@@ -128,7 +128,7 @@ def get_persons_perimeter_root_ids(conn: Connection) -> list[int]:
 
 
 def get_institution_country(conn: Connection) -> str:
-    """Pays de l'établissement lu dans `config`, `DEFAULT_INSTITUTION_COUNTRY` si la clé est absente."""
+    """Renvoie le pays de l'établissement lu dans `config`, `DEFAULT_INSTITUTION_COUNTRY` si la clé est absente."""
     value = conn.execute(
         text("SELECT value FROM config WHERE key = :key"), {"key": INSTITUTION_COUNTRY_KEY}
     ).scalar_one_or_none()
@@ -136,7 +136,10 @@ def get_institution_country(conn: Connection) -> str:
 
 
 def get_persons_perimeter_name(conn: Connection) -> str:
-    """Nom du périmètre des personnes, qui désigne l'établissement dans l'interface, ou son code s'il manque. Vide sans périmètre configuré."""
+    """Renvoie le nom du périmètre des personnes, ou son code à défaut de nom. Vide sans périmètre configuré.
+
+    Ce nom désigne l'établissement dans l'interface.
+    """
     code = persons_perimeter_code(conn)
     if not code:
         return ""
@@ -171,7 +174,7 @@ class PerimetersQueries:
         )
 
     def persons_perimeter_countries(self) -> list[PerimeterCountryOut]:
-        """Pays des organisations ROR des structures du périmètre des personnes, du plus fréquent au moins fréquent."""
+        """Renvoie les pays des organisations ROR des structures du périmètre des personnes, du plus fréquent au moins fréquent."""
         rows = self._conn.execute(
             text(
                 "SELECT lower(r.country_code) AS code, c.name "
@@ -186,7 +189,7 @@ class PerimetersQueries:
         return [PerimeterCountryOut(code=r.code, name=r.name) for r in rows]
 
     def list_perimeters_with_structures(self) -> list[PerimeterOut]:
-        """Tous les périmètres, avec leurs structures racines et leur nombre de structures, lu dans `perimeter_structures`."""
+        """Renvoie tous les périmètres, avec leurs structures racines et leur nombre de structures, lu dans `perimeter_structures`."""
         perim_rows = self._conn.execute(
             text("SELECT id, code, name, root_structure_ids FROM perimeters ORDER BY id")
         ).all()

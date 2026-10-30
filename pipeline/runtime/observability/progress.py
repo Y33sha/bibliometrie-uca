@@ -1,6 +1,6 @@
 """Avancement d'une boucle de traitement, affiché ou journalisé.
 
-En terminal, une barre montre l'avancement. Sans terminal, ou sans `tqdm` installé, des jalons partent au journal à intervalle fixe, avec le débit. Un `logger` absent laisse la barre seule.
+En terminal, une barre montre l'avancement. Sans terminal, ou sans `tqdm` installé, des jalons s'écrivent au journal à intervalle fixe, avec le débit. Sans `logger`, seule la barre s'affiche.
 
 Usage :
     with track_progress(total=len(dois), label="crossref", logger=log) as progress:
@@ -22,9 +22,7 @@ try:
     from tqdm import tqdm
     from tqdm.utils import disp_len
 
-    # `tqdm` se verrouille par défaut sur un `multiprocessing.RLock`, soit un sémaphore du
-    # système, qu'un processus interrompu laisse derrière lui. Seul le processus principal du
-    # pipeline affiche une barre : un verrou de threads suffit et ne laisse rien.
+    # `tqdm` se verrouille par défaut sur un `multiprocessing.RLock`, soit un sémaphore du système, laissé en place par un processus interrompu. Seul le processus principal du pipeline affiche une barre : un verrou de threads suffit et ne laisse rien.
     tqdm.set_lock(threading.RLock())
 except ImportError:  # `tqdm` est une dépendance de développement.
     tqdm = None
@@ -36,7 +34,7 @@ LINE_WIDTH = 80
 """Largeur maximale d'une barre, en colonnes. Une fenêtre plus étroite l'emporte : une ligne plus longue que la fenêtre s'y replierait, décalant les barres voisines."""
 
 COUNTER_WIDTH = 13
-"""Colonne du compteur, à la largeur de `435758/435758`. Fixe, comme le nom de la source à gauche : ce qui reste pour le remplissage l'est aussi, et les barres d'une même phase ont la même longueur."""
+"""Colonne du compteur, à la largeur de `435758/435758`. Largeur fixe, comme le nom de la source à gauche : le remplissage a donc aussi une largeur fixe, et les barres d'une même phase ont la même longueur."""
 
 BAR_FORMAT = "{desc} {percentage:3.0f}% |{bar}| {counter} {elapsed}"
 """Barre réduite à l'avancement et au temps écoulé."""
@@ -46,7 +44,7 @@ KEPT_BAR_FORMAT = BAR_FORMAT
 
 
 class TextStream(Protocol):
-    """Ce qu'une barre et une ligne de journal écrivent en commun."""
+    """Flux d'écriture commun aux barres et aux lignes de journal."""
 
     def write(self, s: str, /) -> int: ...
 
@@ -54,7 +52,7 @@ class TextStream(Protocol):
 
 
 class WritableStream(Protocol):
-    """Flux que `tqdm` confie au redessin d'une barre : seule l'écriture y est garantie."""
+    """Flux confié par `tqdm` au redessin d'une barre. Seule l'écriture est garantie."""
 
     def write(self, s: str, /) -> object: ...
 
@@ -86,9 +84,9 @@ if tqdm is not None:
         def format_dict(self) -> dict[str, object]:
             """Champs du format, avec le compteur complété et la largeur bornée.
 
-            `{counter}` occupe une colonne fixe, de sorte que le remplissage qui la précède en occupe une aussi : deux sources aux volumes différents tracent des barres de même longueur.
+            `{counter}` occupe une colonne fixe, donc le remplissage aussi : deux sources aux volumes différents tracent des barres de même longueur.
 
-            Une source peut rendre plus d'éléments que le total qu'elle annonce. Le total affiché suit alors le compteur : `tqdm` traiterait un compteur supérieur au total comme un total inconnu, à 0 %.
+            Une source peut renvoyer plus d'éléments que le total qu'elle annonce. Le total affiché suit alors le compteur : `tqdm` traiterait un compteur supérieur au total comme un total inconnu, à 0 %.
             """
             fields: dict[str, object] = dict(super().format_dict)
             n, total = fields.get("n"), fields.get("total")
@@ -103,13 +101,13 @@ if tqdm is not None:
             return fields
 
         def _counter(self, fields: dict[str, object]) -> str:
-            """Éléments parcourus sur le total, complétés à la largeur de la colonne."""
+            """Renvoie les éléments parcourus sur le total, complétés à la largeur de la colonne."""
             return _counter_column(fields["n"], fields["total"])
 
         def status_printer(self, file: WritableStream) -> Callable[[str], None]:
-            """Réécrit la ligne en place : retour chariot, barre, effacement de ce qui suit.
+            """Renvoie la fonction de redessin, qui réécrit la ligne en place : retour chariot, barre, effacement de la suite.
 
-            L'effacement passe par une séquence, qui occupe une colonne quelle que soit la largeur. Des espaces jusqu'à la longueur du redessin précédent déborderaient d'un terminal rétréci entre-temps, et le redessin d'après s'installerait sur ce débordement, laissant la barre précédente affichée au-dessus.
+            L'effacement passe par une séquence, qui occupe une colonne quelle que soit la largeur. Des espaces jusqu'à la longueur du redessin précédent déborderaient d'un terminal rétréci entre-temps. Le redessin suivant s'écrirait sous ce débordement, et la barre précédente resterait affichée au-dessus.
 
             Le curseur revient en début de ligne. Un terminal qui replie une ligne garde le curseur à la place qu'il occupe dans le texte : laissé en fin de barre, il passerait sur la dernière ligne du repli, hors de portée du redessin suivant.
             """
@@ -143,25 +141,25 @@ WAITING_REFRESH_S = 0.4
 """Délai entre deux points d'une attente : assez lent pour se suivre à l'œil."""
 
 type LoggerLike = logging.Logger | logging.LoggerAdapter[logging.Logger]
-"""Ce qui accepte une ligne de journal : un logger, ou l'adaptateur qui le préfixe."""
+"""Destination d'une ligne de journal : un logger, ou l'adaptateur qui le préfixe."""
 
 
 _bar_stream: TextStream | None = None
 
 
 def set_bar_stream(stream: TextStream | None) -> None:
-    """Flux sur lequel les barres s'affichent, celui-là même qui reçoit les lignes de journal.
+    """Désigne le flux des barres, le même que celui des lignes de journal.
 
-    Un flux commun permet à chacune d'effacer l'autre : sur deux flux distincts, les barres et les lignes se recouvrent.
+    Sur un flux commun, les barres et les lignes s'effacent mutuellement. Sur deux flux distincts, elles se recouvrent.
     """
     global _bar_stream
     _bar_stream = stream
 
 
 def write_above_bars(line: str, stream: TextStream) -> None:
-    """Écrit `line` au-dessus des barres en cours, qui se redessinent ensuite.
+    """Écrit `line` au-dessus des barres en cours, puis les barres se redessinent.
 
-    La ligne emporte de quoi effacer ce qui la suit : plus courte que la barre dont elle prend la place, elle en laisserait la fin derrière elle.
+    En terminal, la ligne se termine par un effacement de la fin de ligne : plus courte que la barre précédente, elle laisserait la fin de la barre affichée.
     """
     if tqdm is None:
         print(line, file=stream)
@@ -172,7 +170,7 @@ def write_above_bars(line: str, stream: TextStream) -> None:
 
 
 def _interactive_terminal() -> bool:
-    """Vrai quand la sortie standard est un terminal."""
+    """Indique si la sortie standard est un terminal."""
     try:
         return sys.stdout.isatty()
     except AttributeError, ValueError:
@@ -180,7 +178,7 @@ def _interactive_terminal() -> bool:
 
 
 class Progress:
-    """Avancement d'une boucle, rendu selon ce que la sortie permet."""
+    """Avancement d'une boucle, affiché selon les capacités de la sortie."""
 
     def __init__(
         self,
@@ -209,8 +207,7 @@ class Progress:
                 total=total,
                 desc=label,
                 bar_format=KEPT_BAR_FORMAT if count_kept else BAR_FORMAT,
-                # `close` écrit elle-même la dernière image de la barre : `tqdm` la laisserait en
-                # tête du bloc des barres concurrentes, sur la ligne d'une autre.
+                # `close` écrit elle-même la dernière image de la barre : `tqdm` la laisserait en tête du bloc des barres concurrentes, sur la ligne d'une autre barre.
                 leave=False,
                 file=_bar_stream,
                 dynamic_ncols=True,
@@ -222,7 +219,7 @@ class Progress:
             threading.Thread(target=self._tick, daemon=True).start()
 
     def keep(self, n: int = 1) -> None:
-        """Compte `n` éléments retenus de plus — trouvés, récupérés, corrigés selon la phase."""
+        """Compte `n` éléments retenus de plus : trouvés, récupérés ou corrigés selon la phase."""
         self._kept += n
         if self._bar is not None and self._count_kept:
             self._bar.kept = self._kept
@@ -232,7 +229,7 @@ class Progress:
 
         Une barre `tqdm` se redessine seulement quand elle avance. Une source qui répond lentement la figerait, sans distinguer l'attente de l'arrêt.
 
-        Le redessin prend le verrou dont `tqdm.write` se sert : une ligne de journal efface les barres, s'écrit, puis les redessine, et un redessin qui s'y glisserait laisserait la fin de la barre derrière la ligne.
+        Le redessin prend le verrou de `tqdm.write` : une ligne de journal efface les barres, s'écrit, puis les redessine. Un redessin intercalé laisserait la fin de la barre derrière la ligne.
         """
         while not self._finished.wait(REFRESH_S):
             bar = self._bar
@@ -242,7 +239,7 @@ class Progress:
                 bar.refresh()
 
     def set_total(self, total: int) -> None:
-        """Fixe le total qu'une première réponse révèle."""
+        """Fixe le total, connu dès une première réponse."""
         self._total = total
         if self._bar is not None:
             self._bar.total = total
@@ -284,9 +281,9 @@ class Progress:
         )
 
     def close(self) -> None:
-        """Retire la barre en laissant sa dernière image au-dessus de celles qui tournent encore, ou sans rien laisser si elle s'efface.
+        """Retire la barre. Sa dernière image reste au-dessus des barres encore actives, sauf avec `erase`.
 
-        La ligne passe par le chemin des lignes de journal, qui efface les barres, écrit, puis les redessine. `tqdm` la poserait, lui, en tête du bloc des barres, sur la ligne d'une autre, et ferait glisser tout le reste d'un cran.
+        La dernière image s'écrit comme une ligne de journal : effacement des barres, écriture, redessin. `tqdm` l'écrirait en tête du bloc des barres, sur la ligne d'une autre barre, et décalerait les suivantes d'une ligne.
         """
         self._finished.set()
         bar = self._bar
@@ -323,7 +320,9 @@ def track_progress(
 ) -> Iterator[Progress]:
     """Ouvre un suivi d'avancement et le referme à la sortie du bloc.
 
-    `count_kept` fait donner au compteur les éléments retenus, posés par `keep()`, quand la barre elle-même suit les éléments parcourus. `erase` retire la barre sans trace à la fermeture, quand une ligne de bilan prend sa place.
+    Args:
+        count_kept: le compteur donne les éléments retenus (`keep()`), le remplissage suit les éléments parcourus.
+        erase: retire la barre sans trace à la fermeture, quand une ligne de bilan prend sa place.
     """
     progress = Progress(
         total,
@@ -340,15 +339,15 @@ def track_progress(
 
 
 WAITING_DOTS = ("", ".", "..", "...")
-"""Points qui se suivent, pour montrer qu'un travail sans avancement mesurable se poursuit."""
+"""Points successifs, signe de la poursuite d'un travail sans avancement mesurable."""
 
 
 class Waiting:
-    """Travail en cours dont l'avancement ne se mesure pas.
+    """Travail en cours à avancement non mesurable.
 
-    En terminal, des points courent après le libellé tant que le travail dure, sur une ligne réécrite en place. Ailleurs, une ligne de journal annonce le travail.
+    En terminal, des points défilent après le libellé tant que le travail dure, sur une ligne réécrite en place. Ailleurs, une ligne de journal annonce le travail.
 
-    L'écriture va droit au flux : `tqdm` mesure un avancement, et il n'y en a pas ici. Aucune barre ne tourne pendant ce temps, la maintenance venant après les boucles de la phase.
+    L'écriture va directement au flux, sans `tqdm` : il n'y a aucun avancement à mesurer. Aucune barre n'est active pendant l'attente : la maintenance suit les boucles de la phase.
     """
 
     def __init__(self, label: str, logger: LoggerLike | None) -> None:
@@ -366,9 +365,9 @@ class Waiting:
         threading.Thread(target=self._tick, daemon=True).start()
 
     def _write(self, dots: str) -> None:
-        """Réécrit la ligne en place, le retour chariot ramenant le curseur à son début.
+        """Réécrit la ligne en place, après un retour chariot.
 
-        La ligne emporte de quoi effacer ce qui la suit : plus courte que celle dont elle prend la place, elle en laisserait la fin derrière elle.
+        La ligne se termine par un effacement de la fin de ligne : plus courte que la précédente, elle laisserait la fin de la précédente affichée.
         """
         stream = self._stream
         if stream is not None:
@@ -376,22 +375,25 @@ class Waiting:
             stream.flush()
 
     def _tick(self) -> None:
-        """Fait courir les points tant que le travail dure."""
+        """Fait défiler les points tant que le travail dure."""
         index = 0
         while not self._finished.wait(WAITING_REFRESH_S):
             index = (index + 1) % len(WAITING_DOTS)
             self._write(WAITING_DOTS[index])
 
     def conclude(self, text: str) -> None:
-        """Donne à la ligne le texte qu'elle gardera une fois le travail fini."""
+        """Fixe le texte final de la ligne."""
         self._conclusion = text
 
     def erase(self) -> None:
-        """Retire la ligne une fois le travail fini, quand il n'y a rien à en dire."""
+        """Marque la ligne à effacer à la fin du travail."""
         self._erase = True
 
     def close(self) -> None:
-        """Arrête les points en laissant sur la ligne le libellé ou la conclusion posée, ou en effaçant la ligne. En terminal, la ligne laissée va aussi au journal, masquée au terminal (`detail`)."""
+        """Arrête les points, puis laisse sur la ligne le libellé ou la conclusion, ou efface la ligne.
+
+        En terminal, la ligne laissée va aussi au journal, masquée au terminal (`detail`).
+        """
         self._finished.set()
         if self._stream is not None:
             if self._erase:
@@ -410,7 +412,7 @@ class Waiting:
 
 @contextmanager
 def waiting(label: str, logger: LoggerLike | None) -> Iterator[Waiting]:
-    """Signale pendant tout le bloc qu'un travail se poursuit, sans en mesurer l'avancement."""
+    """Signale un travail en cours pendant tout le bloc, sans mesure d'avancement."""
     w = Waiting(label, logger)
     try:
         yield w

@@ -30,7 +30,7 @@ def auth_login(
 ) -> OkResponse:
     """Authentifie l'admin et pose un cookie de session signé.
 
-    Renvoie 401 si les identifiants ne correspondent pas à ceux configurés côté serveur (`ADMIN_USER` et `ADMIN_HASH`) ou si `ADMIN_USER` est absent de `ops.users`, 429 au-delà du plafond de tentatives par IP (`login_rate_limit`). Sur succès, un cookie `session` (httponly, samesite=strict, durée `SESSION_MAX_AGE`) est posé et autorise les écritures, que le middleware garde.
+    Renvoie 401 si les identifiants ne correspondent pas à ceux configurés côté serveur (`ADMIN_USER` et `ADMIN_HASH`) ou si `ADMIN_USER` est absent de `ops.users`, 429 au-delà du plafond de tentatives par IP (`login_rate_limit`). Sur succès, pose un cookie `session` (httponly, samesite=strict, durée `SESSION_MAX_AGE`), qui autorise les écritures gardées par le middleware.
     """
     # Les deux confrontations s'évaluent quel que soit le sort de la première : la vérification du mot de passe coûte quelques centaines de millisecondes, la comparaison du nom une fraction de microseconde, et un refus immédiat désignerait un nom inconnu.
     nom_correspond = check_username(data.username)
@@ -53,7 +53,7 @@ def auth_login(
 
 @router.get("/check", response_model=AuthCheckResponse)
 def auth_check(user: SessionUser | None = Depends(session_user)) -> AuthCheckResponse:
-    """État de la session en cours : validité, utilisateur et rôles.
+    """Renvoie l'état de la session en cours : validité, utilisateur et rôles.
 
     Répond toujours 200 : le frontend s'en sert pour choisir entre le bouton de connexion et celui de déconnexion.
     """

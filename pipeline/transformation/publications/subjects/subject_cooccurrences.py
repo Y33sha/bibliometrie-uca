@@ -1,9 +1,9 @@
-"""Seconde sous-étape de la phase `subjects`, après l'ingestion qui peuple `publication_subjects`. Recalcule deux caches dérivés :
+"""Seconde sous-étape de la phase `subjects`, après l'ingestion des liens `publication_subjects` : recalcul des données dérivées de ces liens.
 
-1. `subjects.usage_count` — nombre de publications distinctes par sujet (colonne maintenue par UPDATE).
-2. `subject_cooccurrences` — matview des paires de sujets co-présents sur une même publication, avec leur effectif. Seuil `count >= 2` figé dans la définition de la matview, pour borner la cardinalité.
+- `subjects.usage_count` : nombre de publications distinctes par sujet.
+- `subject_cooccurrences` : vue matérialisée des paires de sujets présents sur une même publication, avec leur effectif. Le seuil `count >= 2`, figé dans la définition de la vue, borne la cardinalité.
 
-Idempotent : le résultat ne dépend que de l'état courant de `publication_subjects`.
+Idempotent : le résultat dépend seulement de l'état courant de `publication_subjects`.
 """
 
 import logging
@@ -17,9 +17,9 @@ def run(
     store: SubjectStore,
     logger: logging.Logger,
 ) -> dict[str, int]:
-    """Recalcule usage_counts + rafraîchit la matview cooccurrences. Retourne un dict de stats.
+    """Recalcule `subjects.usage_count` et rafraîchit `subject_cooccurrences`. Renvoie les compteurs du recalcul.
 
-    Les deux recalculs balaient tous les liens publication-sujet : chaque ligne dit le travail en cours, puis cède la place à son résultat.
+    Les deux recalculs parcourent tous les liens publication-sujet. Chaque ligne du journal affiche le travail en cours, puis son résultat.
     """
     step(logger, "Rafraîchissement des décomptes")
     with waiting(f"{BRANCH}publications par sujet", logger) as line:

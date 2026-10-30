@@ -53,7 +53,7 @@ _PURGE_BATCH_SIZE = 5000
 
 
 def count_contributions_in_perimeter(conn: Connection) -> int:
-    """Nombre de contributions du périmètre rattachées à une personne."""
+    """Renvoie le nombre de contributions du périmètre rattachées à une personne."""
     return scalar_int(
         conn.execute(
             text("SELECT COUNT(*) FROM contributions WHERE person_id IS NOT NULL AND in_perimeter")
@@ -70,17 +70,17 @@ def refresh_publication_structures(conn: Connection) -> None:
 
 
 def refresh_publication_rors(conn: Connection) -> None:
-    """ROR des auteurs de chaque publication, ancêtres compris : lit `publication_structures`, rafraîchie avant."""
+    """Rafraîchit les ROR des auteurs de chaque publication, ancêtres compris. Lit `publication_structures`, rafraîchie avant."""
     conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY publication_rors"))
 
 
 @dataclass(frozen=True)
 class FinalizePhase:
-    # Suppressions des référentiels vides, dans l'ordre : (libellé, runner). Le câblage les fournit.
     empty_containers: tuple[tuple[str, Callable[[PhaseContext], PhaseMetrics]], ...] = ()
+    """Suppressions des référentiels vides, dans l'ordre : (libellé, runner), fournies par le câblage."""
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Exécute les tâches de la phase et retourne ses métriques : celles des référentiels vides, et un résumé."""
+        """Exécute les tâches de la phase et renvoie ses métriques : celles des référentiels vides, et un résumé."""
 
         def publications_in_perimeter(ctx: PhaseContext) -> PhaseMetrics:
             t0 = time.perf_counter()
@@ -154,14 +154,14 @@ class FinalizePhase:
 
 
 def _timed(t0: float) -> PhaseMetrics:
-    """Métriques d'une tâche de synchronisation, dont le bilan est sa durée."""
+    """Renvoie les métriques d'une tâche de synchronisation, avec sa durée pour bilan."""
     metrics = PhaseMetrics()
     metrics.report = f"{time.perf_counter() - t0:.1f}s"
     return metrics
 
 
 def _purge_publications(open_tx: OpenTransaction) -> int:
-    """Purge par lots, un commit par lot. Renvoie le nombre de publications supprimées."""
+    """Purge les publications par lots, un commit par lot. Renvoie le nombre de publications supprimées."""
     n = 0
     with open_tx() as conn:
         while True:
@@ -178,7 +178,7 @@ def _delete_empty_containers(
     metrics: PhaseMetrics,
     ctx: PhaseContext,
 ) -> None:
-    """Supprime les référentiels vides ; chaque suppression écrit sa ligne et reporte ses compteurs à la phase."""
+    """Supprime les référentiels vides. Chaque suppression écrit sa ligne et reporte ses compteurs à la phase."""
     if not steps:
         return
     step(ctx.logger, "Référentiels vides")
@@ -192,9 +192,9 @@ def _delete_empty_containers(
 def _refresh_publication_counts(open_tx: OpenTransaction, logger: logging.Logger) -> None:
     """Recalcule le nombre de publications de chaque adresse, revue et éditeur.
 
-    Les trois se lisent des mêmes publications et contributions sources, stabilisées à ce point du pipeline.
+    Les trois décomptes lisent les mêmes publications et contributions sources, stables à ce point du pipeline.
 
-    Chaque décompte dure : sa ligne annonce le travail en cours, puis cède la place à son résultat.
+    Chaque décompte est long : sa ligne annonce le travail en cours, puis affiche son résultat.
     """
     step(logger, "Recalcul des décomptes de publications")
 

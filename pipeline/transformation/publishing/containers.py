@@ -1,4 +1,4 @@
-"""Stores des conteneurs d'un document : revues et monographies."""
+"""Stores des conteneurs d'un enregistrement source : revues et monographies."""
 
 from typing import NamedTuple, Self
 
@@ -9,7 +9,7 @@ from pipeline.transformation.publishing.serials.store import SerialStore
 
 
 class ContainerStores(NamedTuple):
-    """Revues et monographies, sur une même connexion."""
+    """Stores des revues et des monographies, sur une même connexion."""
 
     serials: SerialStore
     monographs: MonographStore

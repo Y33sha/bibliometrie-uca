@@ -24,7 +24,7 @@ theses.fr est le portail [ABES](../glossaire.md#abes) qui agrège les thèses fr
 
 ## Données récupérées
 
-- **Thèse** : identifiant ([NNT](../glossaire.md#nnt) pour les soutenues, id `sXXXXXX` pour les en cours), titres et résumés multilingues, langues, DOI éventuel (DOI ABES `10.70675/...` pour les thèses récentes), discipline, dates (soutenance, première inscription), école doctorale, partenaires de recherche (laboratoires), sujets auteur (multilingues), sujets RAMEAU (vocabulaire contrôlé de la BnF), statut (`soutenue` / `enCours`), cas de diffusion et accessibilité
+- **Thèse** : identifiant ([NNT](../glossaire.md#nnt) pour les soutenues, id `sXXXXXX` pour les en cours), titres et résumés multilingues, langues, DOI éventuel (DOI ABES `10.70675/...` pour les thèses récentes), discipline, dates (soutenance, première inscription), école doctorale, partenaires de recherche (laboratoires), sujets auteur (multilingues), sujets [RAMEAU](../glossaire.md#rameau) (vocabulaire contrôlé de la BnF), statut (`soutenue` / `enCours`), cas de diffusion et accessibilité
 - **Personnes** : auteur(s), directeur(s), rapporteur(s), membres et président du jury — chacun avec nom, prénom et PPN IdRef si présent.
 
 ## Exemple de payload
@@ -112,7 +112,7 @@ Les cinq champs de personnes (`auteurs`, `directeurs`, `rapporteurs`, `membresJu
 
 Le PPN [IdRef](../glossaire.md#idref) d'une personne, identifiant de l'ABES partagé avec d'autres sources, sert de clé forte à la [résolution des personnes](../pipeline/09-persons.md).
 
-Le NNT (ex. `2017CLFAC001`) est l'identifiant primaire de l'enregistrement source. HAL, OpenAlex et ScanR le donnent aussi, ce qui rapproche leurs enregistrements sources.
+Le NNT (ex. `2017CLFAC001`) est l'identifiant primaire de l'enregistrement source. HAL, OpenAlex et ScanR le donnent aussi : leurs enregistrements sources sont rattachés à la même publication.
 
 ### Affiliations partagées au document
 
@@ -130,4 +130,4 @@ Le statut open access vient de la diffusion de la thèse. `cas` est le cas de di
 
 ### Langue et résumé
 
-La langue est la première de `langues`. Le résumé est celui de la première langue qui en a un.
+La langue est la première de `langues`. Le résumé est le premier disponible, dans l'ordre des langues.

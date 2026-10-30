@@ -15,5 +15,5 @@ def stable_json_bytes(value: JsonValue) -> bytes:
 
 
 def fingerprint(value: JsonValue) -> str:
-    """Empreinte de la sérialisation stable d'une valeur : deux valeurs égales ont la même empreinte."""
+    """Renvoie l'empreinte de la sérialisation stable d'une valeur."""
     return xxhash.xxh3_128_hexdigest(stable_json_bytes(value))

@@ -6,7 +6,7 @@ Le raw store grossit seulement : `mark_done` y écrit sans jamais supprimer. Au 
 Le store élagué est celui de la configuration (`BIBLIO_RAW_STORE_DIR`). `--root` en désigne un autre, par exemple une copie hors ligne.
 
 Usage :
-    python -m interfaces.cli.maintenance.delete_raw_store_orphans [--root CHEMIN] [--source SRC] [--dry-run]
+    uv run python -m interfaces.cli.maintenance.delete_raw_store_orphans [--root CHEMIN] [--source SRC] [--dry-run]
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ log = setup_logger("delete_raw_store_orphans", os.path.dirname(__file__))
 
 
 def fetch_existing_source_ids(conn: Connection, source: str) -> set[str]:
-    """`source_id` présents dans `staging` pour une source."""
+    """Renvoie les `source_id` présents dans `staging` pour une source."""
     rows: ScalarResult[str] = conn.execute(
         text("SELECT source_id FROM staging WHERE source = :source"),
         {"source": source},

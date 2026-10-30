@@ -11,7 +11,7 @@ from infrastructure.db.transaction import managed_transaction
 
 @pytest.fixture
 def engine():
-    """Base SQLite en mémoire, neuve à chaque test et fermée en sortie.
+    """Fournit une base SQLite en mémoire, neuve à chaque test et fermée en sortie.
 
     Sans la fermeture, la connexion du pool survit au test et le ramasse-miettes signale une ressource laissée ouverte.
     """

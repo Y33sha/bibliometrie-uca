@@ -1,4 +1,4 @@
-"""`migrate_all` migre la base par défaut puis chaque instance dont la base existe, et s'arrête au premier échec."""
+"""`migrate_all` migre la base par défaut puis chaque instance à base existante, et s'arrête au premier échec."""
 
 import subprocess
 

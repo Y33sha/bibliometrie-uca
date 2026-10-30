@@ -20,7 +20,7 @@ https://developer.clarivate.com/apis/wos
 
 ## Exemple de payload
 
-Document `WOS:001759398100001` (2 auteurs, article de mathématiques discrètes). Réduit aux champs que le pipeline lit ; résumé tronqué.
+Document `WOS:001759398100001` (2 auteurs, article de mathématiques discrètes). Réduit aux champs lus par le pipeline ; résumé tronqué.
 
 ```json
 {

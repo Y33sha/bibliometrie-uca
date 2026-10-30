@@ -131,7 +131,7 @@ class TestBestOAStatus:
         assert best_oa_status(["mystery"]) is None
 
     def test_unknown_kept_only_if_nothing_better(self):
-        # `unknown` a un rang positif : seul, il est rendu.
+        # `unknown` a un rang positif : seul, il est renvoyé.
         assert best_oa_status(["unknown"]) == "unknown"
 
     def test_embargoed_wins_over_closed_and_unknown(self):

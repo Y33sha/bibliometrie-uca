@@ -1,6 +1,6 @@
 """Éditeur d'une revue, calculé d'après ses publications.
 
-L'éditeur d'une revue est le plus fréquent parmi ses publications de la dernière année qui en a un ; à égalité, le plus fréquent sur toutes les années ; à égalité encore, le plus petit identifiant. Une revue dont aucune publication n'a d'éditeur n'en a pas.
+L'éditeur d'une revue est le plus fréquent parmi ses publications de la dernière année qui en a un ; à égalité, le plus fréquent sur toutes les années ; à égalité encore, le plus petit identifiant. Une revue sans publication à éditeur reste sans éditeur.
 """
 
 from sqlalchemy import Connection, text

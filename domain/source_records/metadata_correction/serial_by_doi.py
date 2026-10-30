@@ -1,6 +1,6 @@
 """Rattachement d'une revue à un enregistrement source via l'espace de noms de ses DOI.
 
-Un enregistrement source à DOI mais sans revue reçoit la revue que désignent les espaces de noms de ses DOI (`domain/serials/doi_namespaces.py`). Si ses DOI désignent plusieurs revues, il reste sans revue. Un livre ou un chapitre n'en reçoit pas : un éditeur publie sous un même espace de noms une revue et des livres (EAC, `10.17184/eac.`), ou une revue et les livres de sa collection (Hermès chez CAIRN, `10.3917/herm.`).
+Un enregistrement source à DOI mais sans revue reçoit la revue désignée par les espaces de noms de ses DOI (`domain/serials/doi_namespaces.py`). Si ses DOI désignent plusieurs revues, il reste sans revue. Un livre ou un chapitre reste sans revue : un éditeur publie sous un même espace de noms une revue et des livres (EAC, `10.17184/eac.`), ou une revue et les livres de sa collection (Hermès chez CAIRN, `10.3917/herm.`).
 """
 
 from collections.abc import Collection, Mapping
@@ -36,9 +36,9 @@ def attach_serial_by_doi(
     corrections: Mapping[str, JsonValue],
     namespaces: Mapping[str, DoiNamespace],
 ) -> SerialAttachment:
-    """Revue d'un enregistrement source après le rattachement par l'espace de noms de ses DOI.
+    """Rattache une revue à un enregistrement source par l'espace de noms de ses DOI.
 
-    Repart du `serial_id` d'avant correction et agit seulement s'il est nul. Quand les espaces de noms désignent une autre revue, ou plus aucune, la revue suit.
+    Repart du `serial_id` d'avant correction et agit seulement s'il est nul. Quand les espaces de noms désignent une autre revue, ou aucune, la revue suit.
     """
     raw_serial_id = raw_value(corrections, CorrectionKey.SERIAL_ID, serial_id)
     new_corrections = other_entries(corrections, SERIAL_BY_DOI_KEYS)

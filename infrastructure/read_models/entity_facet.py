@@ -1,6 +1,6 @@
 """Facette d'entité à forte cardinalité (éditeur, revue, auteur, sujet).
 
-`entity_facet_rows` renvoie les entités les plus représentées parmi les publications qui satisfont une clause fournie par l'appelant, avec leur décompte : la liste des publications et le tableau de bord s'en servent. `entity_name_clause` borne les options au terme cherché, quelle que soit la population décomptée.
+`entity_facet_rows` renvoie les entités les plus représentées parmi les publications satisfaisant une clause de l'appelant, avec leur décompte. La liste des publications et le tableau de bord l'utilisent. `entity_name_clause` borne les options au terme cherché, quelle que soit la population décomptée.
 """
 
 from collections.abc import Mapping
@@ -16,19 +16,21 @@ from infrastructure.sql_fragments import has_author_role
 class EntitySql(NamedTuple):
     """Fragments SQL d'un type d'entité (valeurs figées, aucune injection)."""
 
-    # Table de l'entité avec son alias, pour lire un libellé par identifiant.
     table: str
+    """Table de l'entité avec son alias, pour lire un libellé par identifiant."""
     id: str
     label: str
-    # Jointure depuis `publications p` vers l'entité.
     join: str
-    # Type SQL de l'identifiant, pour lire un libellé à partir de l'identifiant reçu en texte.
+    """Jointure depuis `publications p` vers l'entité."""
     id_type: str = "integer"
-    # Décompte des publications par entité. `COUNT(*)` suffit quand la jointure renvoie une ligne par couple publication–entité.
+    """Type SQL de l'identifiant, pour lire un libellé à partir de l'identifiant reçu en texte."""
     publication_count: str = "COUNT(*)"
+    """Décompte des publications par entité. `COUNT(*)` suffit quand la jointure renvoie une ligne par couple publication–entité."""
 
 
-# La revue sort de `publications.serial_id`, l'éditeur de `publications.publisher_id`. L'organisation partenaire est un ROR des auteurs, ancêtres compris (`publication_rors`), hors les ROR propres aux structures `:own_structure_ids`, nommé par le référentiel ROR. L'auteur passe par les contributions rattachées à une personne ; une personne rejetée n'est pas proposée. Le sujet passe par `publication_subjects`, qui a une ligne par source pour un même couple publication–sujet.
+# Organisation partenaire : ROR des auteurs, ancêtres compris (`publication_rors`), hors ROR propres aux structures `:own_structure_ids`.
+# Auteur : personne non exclue, rattachée à une contribution.
+# Sujet : `publication_subjects` a une ligne par source pour un même couple publication–sujet.
 ENTITY_SQL: dict[EntityKind, EntitySql] = {
     "serial": EntitySql(
         table="serials j",
@@ -76,9 +78,9 @@ ENTITY_SQL: dict[EntityKind, EntitySql] = {
 
 
 def entity_name_clause(label_sql: str, search: str) -> tuple[str, dict[str, object]]:
-    """Condition qui restreint une facette d'entité aux noms qui contiennent le terme cherché, à ajouter au WHERE.
+    """Renvoie la condition à ajouter au WHERE pour restreindre une facette d'entité aux noms contenant le terme cherché.
 
-    Le fragment rendu est vide en deçà de deux caractères : le terme ne discrimine alors rien.
+    Le fragment est vide pour un terme de moins de deux caractères.
     """
     term = search.strip()
     if len(term) < 2:
@@ -96,7 +98,7 @@ def entity_facet_rows(
     limit: int,
     own_structure_ids: list[int],
 ) -> list[EntityFacetItem]:
-    """Entités `kind` les plus représentées parmi les publications `p` qui satisfont `where_sql`.
+    """Renvoie les entités `kind` les plus représentées parmi les publications `p` satisfaisant `where_sql`.
 
     Le décompte porte sur les publications distinctes. Un terme de recherche d'au moins deux caractères filtre les entités par nom. Les organisations partenaires excluent les ROR propres aux structures `own_structure_ids`.
     """

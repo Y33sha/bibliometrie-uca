@@ -7,9 +7,9 @@ Propriétés d'une dimension :
 - **ordinal** : axe ordonné (l'année) ou catégoriel, qui change le tri et l'éligibilité au filtrage par plage.
 - **comparable** : la dimension sert aussi d'axe de comparaison (abscisse). Toute dimension sert de ventilation.
 
-Une mesure s'agrège sur les publications distinctes de chaque groupe : leur nombre, ou le montant des APC que l'établissement a payées pour elles. Le taux d'open access relève de la présentation.
+Une mesure s'agrège sur les publications distinctes de chaque groupe : leur nombre, ou le montant des APC payées pour elles par l'établissement. Le taux d'open access relève de la présentation.
 
-Un **indicateur** est ce que l'interface propose d'afficher : une mesure, ventilée par une dimension empilée dans chaque barre. L'indicateur impose sa mesure. Un axe de comparaison facultatif s'ajoute à la ventilation (`indicator_pivot`).
+Un **indicateur** est une mesure proposée par l'interface, ventilée par une dimension empilée dans chaque barre. L'indicateur impose sa mesure. Un axe de comparaison facultatif s'ajoute à la ventilation (`indicator_pivot`).
 
 La requête est composée sur **liste blanche** : `SELECT <dimensions>, <mesure> … GROUP BY <dimensions>` utilise seulement les expressions du registre, indexées par des clés validées (`validate_pivot`). Le grain est tenu par une sous-requête qui renvoie chaque publication une fois par groupe (`SELECT DISTINCT <dimensions>, p.id`). Une dimension qui multiplie les lignes (`lab`) compte et somme ainsi chaque publication une fois.
 """
@@ -23,7 +23,6 @@ from sqlalchemy import Connection, text
 from domain.errors import ValidationError
 from domain.publications.doc_types import DOC_TYPE_FAMILIES
 from domain.publications.metadata import OaStatus
-from domain.structures.structure import StructureType
 from infrastructure.read_models.filters import (
     OA_OPEN_SQL,
     OWN_RORS_SQL,
@@ -40,39 +39,45 @@ from infrastructure.read_models.stats.models import (
     PivotResponse,
     PivotSchemaResponse,
 )
+from infrastructure.sql_fragments import is_laboratory
 
 Cardinality = Literal["low", "high"]
 
 
 @dataclass(frozen=True, slots=True)
 class Dimension:
-    """Un attribut d'une publication, par lequel le pivot ventile.
-
-    `comparable` en fait aussi un axe de comparaison (l'abscisse : l'année, les laboratoires, les éditeurs, les revues). `group_sql` est l'expression de groupement sur la publication `p` et la revue `j`. `join_sql` est la jointure qu'elle demande.
-    """
+    """Attribut d'une publication, axe de ventilation du pivot."""
 
     key: str
     label: str
     cardinality: Cardinality
     ordinal: bool
     comparable: bool
+    """Vrai si la dimension sert aussi d'axe de comparaison (abscisse) : l'année, les laboratoires, les éditeurs, les revues."""
     group_sql: str
+    """Expression de groupement sur la publication `p` et la revue `j`."""
     join_sql: str = ""
+    """Jointure demandée par `group_sql`."""
 
 
 @dataclass(frozen=True, slots=True)
 class Measure:
-    """Une grandeur agrégée sur les publications distinctes `g` d'un groupe. `unit` est l'unité affichée, vide pour un nombre de publications. `agg_sql` est l'agrégat, `join_sql` la jointure qu'il demande."""
+    """Grandeur agrégée sur les publications distinctes `g` d'un groupe."""
 
     key: str
     label: str
     agg_sql: str
     join_sql: str = ""
+    """Jointure demandée par `agg_sql`."""
     unit: str = ""
+    """Unité affichée, vide pour un nombre de publications."""
 
 
 def doc_type_grouped_sql(column: str = "p.doc_type") -> str:
-    """Expression `CASE` qui projette une colonne `doc_type` sur la clé de groupement du pivot : les types de la famille « publications » (article, communication, chapitre…) gardent leur grain fin, les autres familles se regroupent sous leur clé de famille. Le détail sert là où il informe le plus : la répartition des publications au sens strict varie fortement d'un laboratoire à l'autre. L'expression couvre toute l'enum ; un type non listé tombe dans `misc`."""
+    """Renvoie l'expression `CASE` projetant une colonne `doc_type` sur la clé de groupement du pivot.
+
+    Les types de la famille « publications » (article, communication, chapitre…) gardent leur grain fin. Les autres familles se regroupent sous leur clé de famille. Un type non listé tombe dans `misc`.
+    """
     expanded = DOC_TYPE_FAMILIES["publications"].types
     whens = [
         f"WHEN {column}::text IN ({', '.join(f'{t.value!r}' for t in expanded)}) THEN {column}::text"
@@ -135,7 +140,7 @@ DIMENSIONS: dict[str, Dimension] = {
             group_sql="COALESCE(ls.acronym, ls.name)",
             join_sql=(
                 "JOIN publication_structures lps ON lps.publication_id = p.id "
-                f"JOIN structures ls ON ls.id = lps.structure_id AND ls.structure_type = '{StructureType.LABO.value}'"
+                f"JOIN structures ls ON ls.id = lps.structure_id AND {is_laboratory('ls')}"
             ),
         ),
         # Forte cardinalité : comparaison et facette (filtre par éditeur, recherche serveur). Jointure interne : exclut les publications sans éditeur.
@@ -271,7 +276,7 @@ def validate_indicator(indicator: str, compare: str) -> tuple[str, list[str]]:
 
 
 def _order_by(dims: list[Dimension]) -> str:
-    """Dimensions ordinales d'abord (ASC, lecture chronologique), puis par la mesure décroissante."""
+    """Renvoie la clause de tri : dimensions ordinales d'abord (ordre croissant), puis mesure décroissante."""
     parts = [d.key for d in dims if d.ordinal]
     parts.append("value DESC NULLS LAST")
     return ", ".join(parts)
@@ -313,7 +318,7 @@ class StatsPivotQueries:
     def pivot(
         self, *, measure: str, groups: list[str], filters: PublicationFilters
     ) -> PivotResponse:
-        """Exécute une agrégation : `mesure` ventilée selon `groups`, sous les filtres. Les clés sont validées contre le registre (`validate_pivot`) avant toute composition SQL."""
+        """Exécute l'agrégation de `measure` ventilée selon `groups`, sous les filtres. Les clés sont validées contre le registre (`validate_pivot`) avant toute composition SQL."""
         m, dims = validate_pivot(measure, groups)
         context = filter_context(self._conn, filters)
         perimeter_structure_ids = context.perimeter_structure_ids

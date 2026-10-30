@@ -10,7 +10,7 @@ https://unpaywall.org/
 
 Documentation API : https://unpaywall.org/products/api
 
-Source d'enrichissement consultée par DOI pour le statut open access des publications. Les DOI DataCite, qu'Unpaywall ignore, sont écartés.
+Consultée par DOI pour le statut open access des publications. Les DOI DataCite, absents d'Unpaywall, sont écartés.
 
 ### API utilisée
 
@@ -48,7 +48,7 @@ Une notice décrit une revue sur un support : le papier, l'en ligne et le CD-ROM
 
 https://doaj.org/ — Directory of Open Access Journals
 
-Source d'enrichissement des revues : « cette revue est-elle un journal open access certifié DOAJ, et à quelles conditions ? ». Consommée par `enrich_serials_from_doaj`, dans la phase [`publishing`](../pipeline/05-publishing.md).
+Indique si une revue est certifiée open access par le DOAJ, et à quelles conditions. Consommée par `enrich_serials_from_doaj`, dans la phase [`publishing`](../pipeline/05-publishing.md).
 
 ### Dump utilisé
 
@@ -65,5 +65,5 @@ Le payload garde les colonnes du CSV pour clés.
 Un dump téléchargé à la main s'importe par le même chemin d'écriture :
 
 ```bash
-python -m interfaces.cli.imports.import_doaj_csv data/doaj_journalcsv_*.csv
+uv run python -m interfaces.cli.imports.import_doaj_csv data/doaj_journalcsv_*.csv
 ```

@@ -1,14 +1,14 @@
-"""Sous-étape de la phase `publishing` — fusionne les revues en double.
+"""Sous-étape de la phase `publishing` : fusion des revues en double.
 
-Cinq règles désignent la même publication :
+Deux revues désignent la même publication quand :
 
-1. deux revues vérifiées dans le Sudoc partagent leur ISSN-L ;
+1. vérifiées dans le Sudoc, elles partagent leur ISSN-L ;
 2. le même ISSN est actif dans les deux, et les mots d'un titre sont tous dans l'autre (« BMJ » et « BMJ-BRITISH MEDICAL JOURNAL ») ;
-3. vérifiées dans le Sudoc, l'une a, inactif, un ISSN actif dans l'autre : titre précédent ou suivant de la même revue, supplément. La revue dont le premier document est le plus tardif absorbe l'autre : un titre suivant n'a pas de document antérieur à son changement de titre ;
-4. elles sont seules à avoir leur titre normalisé, au moins une est sans ISSN, et leurs enregistrements partagent un préfixe DOI ;
-5. des enregistrements d'une même publication y sont rattachés, leurs titres sont compatibles (« Phys.Rev.Lett. » et « Physical Review Letters », voir `compatible_titles`), et elles n'ont pas chacune des ISSN sans aucun en commun.
+3. vérifiées dans le Sudoc, l'une a, inactif, un ISSN actif dans l'autre : titre précédent ou suivant de la même revue, supplément. La revue à première année de publication la plus tardive absorbe l'autre : un titre suivant n'a pas de publication antérieure à son changement de titre ;
+4. elles sont seules à avoir leur titre normalisé, au moins une est sans ISSN, et leurs enregistrements sources partagent un préfixe DOI ;
+5. des enregistrements sources d'une même publication sont rattachés à chacune, leurs titres sont compatibles (« Phys.Rev.Lett. » et « Physical Review Letters », voir `compatible_titles`), et elles ont un ISSN en commun si chacune a des ISSN.
 
-L'éditeur ne sert pas de contrôle : deux fiches d'éditeur désignent souvent la même maison. La fusion est celle de l'administration des revues : publications, métadonnées et ISSN passent à la cible, qui requalifie les publications absorbées, puis la source est supprimée. Le journal garde le titre, l'éditeur et les ISSN des deux revues.
+L'éditeur ne sert pas de contrôle : deux fiches d'éditeur désignent souvent la même maison. La fusion est celle de l'administration des revues : publications, métadonnées et ISSN passent à la cible, les publications absorbées sont requalifiées, puis la source est supprimée. Le journal garde le titre, l'éditeur et les ISSN des deux revues.
 """
 
 import logging
@@ -33,9 +33,9 @@ MergeSerials = Callable[[int, int], None]
 """`(cible, source)` : fusionne la revue source dans la cible et valide la transaction."""
 
 MergeGroup = tuple[str, tuple[int, ...]]
-"""`(libellé, revues)` : ce que les revues partagent, puis les revues, la cible en tête."""
+"""`(libellé, revues)` : point commun des revues, puis les revues, la cible en tête."""
 
-# Ce que les revues d'un groupe partagent : la ligne qui annonce chaque règle, au-dessus de sa barre d'avancement.
+# Libellé de chaque règle, affiché au-dessus de sa barre d'avancement.
 _RULES = (
     "même ISSN-L",
     "même ISSN et titre emboîté",
@@ -49,7 +49,7 @@ class SerialMergeGroup(NamedTuple):
     """Revues en double. La cible de la fusion vient en premier."""
 
     key: str
-    """Ce que les revues partagent : ISSN-L ou titre normalisé."""
+    """Point commun des revues : ISSN-L ou titre normalisé."""
     serial_ids: tuple[int, ...]
 
 
@@ -68,7 +68,7 @@ class SerialIssnGroup(NamedTuple):
 
 
 class SerialMergeCandidate(NamedTuple):
-    """Une revue candidate à une fusion, avec ce qui départage la cible."""
+    """Revue candidate à une fusion, avec les critères de choix de la cible."""
 
     id: int
     title: str
@@ -127,7 +127,7 @@ _SERIALS_SHARING_ACTIVE_ISSN = text(f"""
 
 
 # Paires de revues vérifiées dont l'une a, inactif, un ISSN actif dans l'autre.
-# La cible de la fusion en tête : la revue dont le premier document est le plus tardif, puis celle qui a le plus de publications.
+# La cible de la fusion en tête : la revue à première année de publication la plus tardive, puis celle qui a le plus de publications.
 _SERIALS_SHARING_AN_INACTIVE_ISSN = text(f"""
     WITH {_VERIFIED}, paires AS (
         SELECT DISTINCT a.issn, least(a.serial_id, b.serial_id) AS x_id,
@@ -152,7 +152,7 @@ _SERIALS_SHARING_AN_INACTIVE_ISSN = text(f"""
 """)
 
 # Paires de revues seules à avoir leur titre, dont au moins une sans ISSN, et dont les enregistrements sources partagent un préfixe DOI. La cible de la fusion en tête.
-# Un titre normalisé vide (alphabet non latin, symboles) ne rapproche aucune revue.
+# Un titre normalisé vide (alphabet non latin, symboles) ne sert à aucune fusion.
 _SAME_TITLE_DUPLICATES = text(f"""
     WITH prefixes AS (
         SELECT s.serial_id AS id, array_agg(DISTINCT split_part(d.id_value, '/', 1)) AS pfx
@@ -207,14 +207,14 @@ _SERIALS_SHARING_A_PUBLICATION = text(f"""
 
 
 def find_serials_sharing_issnl(conn: Connection) -> list[SerialMergeGroup]:
-    """Groupes de revues vérifiées dans le Sudoc qui partagent leur ISSN-L. La revue qui a le plus de publications vient en premier, puis la plus petite par identifiant."""
+    """Renvoie les groupes de revues vérifiées dans le Sudoc qui partagent leur ISSN-L. La revue qui a le plus de publications vient en premier, puis la plus petite par identifiant."""
     return [
         SerialMergeGroup(r.issnl, tuple(r.ids)) for r in conn.execute(_SERIALS_SHARING_ISSNL).all()
     ]
 
 
 def find_serials_sharing_active_issn(conn: Connection) -> list[SerialIssnGroup]:
-    """Groupes de revues vérifiées dans le Sudoc où le même ISSN est actif, dans le même ordre."""
+    """Renvoie les groupes de revues vérifiées dans le Sudoc où le même ISSN est actif, dans l'ordre de `find_serials_sharing_issnl`."""
     return [
         SerialIssnGroup(
             r.issn, tuple(SerialTitleRow(i, t) for i, t in zip(r.ids, r.titles, strict=True))
@@ -224,7 +224,7 @@ def find_serials_sharing_active_issn(conn: Connection) -> list[SerialIssnGroup]:
 
 
 def find_serials_sharing_an_inactive_issn(conn: Connection) -> list[SerialMergeGroup]:
-    """Paires de revues vérifiées dans le Sudoc dont l'une a, inactif, un ISSN actif dans l'autre. La revue dont le premier document est le plus tardif vient en premier, puis celle qui a le plus de publications."""
+    """Renvoie les paires de revues vérifiées dans le Sudoc dont l'une a, inactif, un ISSN actif dans l'autre. La revue à première année de publication la plus tardive vient en premier, puis celle qui a le plus de publications."""
     return [
         SerialMergeGroup(r.issn, tuple(r.ids))
         for r in conn.execute(_SERIALS_SHARING_AN_INACTIVE_ISSN).all()
@@ -232,7 +232,7 @@ def find_serials_sharing_an_inactive_issn(conn: Connection) -> list[SerialMergeG
 
 
 def find_same_title_duplicates(conn: Connection) -> list[SerialMergeGroup]:
-    """Paires de revues seules à avoir leur titre normalisé, dont au moins une sans ISSN, et dont les enregistrements partagent un préfixe DOI. La revue qui a le plus de publications vient en premier, puis celle qui a un ISSN."""
+    """Renvoie les paires de revues seules à avoir leur titre normalisé, dont au moins une sans ISSN, et dont les enregistrements sources partagent un préfixe DOI. La revue qui a le plus de publications vient en premier, puis celle qui a un ISSN."""
     return [
         SerialMergeGroup(r.title_normalized, tuple(r.ids))
         for r in conn.execute(_SAME_TITLE_DUPLICATES).all()
@@ -240,7 +240,7 @@ def find_same_title_duplicates(conn: Connection) -> list[SerialMergeGroup]:
 
 
 def find_serials_sharing_a_publication(conn: Connection) -> list[SerialPublicationPair]:
-    """Paires de revues auxquelles sont rattachés les enregistrements d'une même publication. Les paires qui partagent le plus de publications viennent en premier."""
+    """Renvoie les paires de revues auxquelles sont rattachés les enregistrements sources d'une même publication. Les paires qui partagent le plus de publications viennent en premier."""
     return [
         SerialPublicationPair(
             SerialMergeCandidate(
@@ -261,7 +261,7 @@ def run_merge_duplicate_serials(
     *,
     merge: MergeSerials,
 ) -> PhaseMetrics:
-    """Applique les cinq règles dans l'ordre. Chaque règle lit ses groupes après les fusions des précédentes."""
+    """Fusionne les revues en double selon les cinq règles, dans l'ordre. Chaque règle lit ses groupes après les fusions des précédentes."""
     metrics = PhaseMetrics()
     # Revue absorbée → revue qui l'a absorbée. Une revue qui partage ses deux ISSN avec son double figure dans deux groupes.
     absorbed: dict[int, int] = {}
@@ -304,12 +304,12 @@ def run_merge_duplicate_serials(
 
 
 def _nested(target: SerialTitleRow, other: SerialTitleRow) -> bool:
-    """La cible et la revue candidate ont le même titre, aux mots près."""
+    """Vrai si la cible et la revue candidate ont le même titre, aux mots près."""
     return other.id == target.id or nested_titles(target.title, other.title)
 
 
 def _compatible_pairs(pairs: Sequence[SerialPublicationPair]) -> list[MergeGroup]:
-    """Paires de revues aux titres compatibles, la cible en tête.
+    """Renvoie les paires de revues aux titres compatibles, la cible en tête.
 
     Deux revues qui ont chacune des ISSN, sans aucun en commun, sont deux publications distinctes : « Geosciences » (2076-3263) et « Geosciences » (1023-7429).
     """
@@ -327,7 +327,7 @@ def _compatible_pairs(pairs: Sequence[SerialPublicationPair]) -> list[MergeGroup
 
 
 def _merge_priority(serial: SerialMergeCandidate) -> tuple[bool, int, int]:
-    """Rang de cible : la revue qui a un ISSN, puis celle qui a le plus de publications, puis la plus ancienne."""
+    """Renvoie le rang de cible : la revue qui a un ISSN, puis celle qui a le plus de publications, puis la plus ancienne."""
     return (bool(serial.issns), serial.publication_count, -serial.id)
 
 
@@ -340,7 +340,7 @@ def _merge_groups(
     groups: Sequence[MergeGroup],
     rule: str,
 ) -> None:
-    """Fusionne chaque groupe dans sa première revue. Une revue déjà absorbée est passée ; une cible déjà absorbée cède la place à celle qui l'a absorbée."""
+    """Fusionne chaque groupe dans sa première revue. Une revue déjà absorbée est ignorée. Une cible déjà absorbée est remplacée par sa revue absorbante."""
     metrics.add(seen=len(groups))
     with track_progress(len(groups), f"{BRANCH}{LABEL} ({rule})", logger, erase=True) as progress:
         for label, serial_ids in groups:
@@ -364,7 +364,7 @@ def _merge_groups(
 
 
 def _survivor(serial_id: int, absorbed: dict[int, int]) -> int:
-    """Revue qui subsiste de `serial_id` après les fusions déjà faites."""
+    """Renvoie la revue qui subsiste de `serial_id` après les fusions déjà faites."""
     while serial_id in absorbed:
         serial_id = absorbed[serial_id]
     return serial_id

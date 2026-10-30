@@ -2,7 +2,7 @@
 
 La recherche liste en une seule requête les thèses de l'ensemble des PPN d'établissement du périmètre, avec une pagination par `debut`. La requête ramène tout l'historique theses.fr de ces établissements. Le moissonnage retient les thèses soutenues dans la fenêtre d'années du run, et toutes les thèses en cours.
 
-Le détail d'une thèse retenue est lu seulement si elle est absente de `staging`, ou disparue de theses.fr : une lecture par thèse, à chaque moissonnage, multiplierait les appels. La tâche `fetch_stale.theses` relit le détail des autres thèses.
+Le détail d'une thèse retenue est lu seulement si elle est absente de `staging`, ou disparue de theses.fr. La tâche `fetch_stale.theses` relit le détail des autres thèses.
 """
 
 from __future__ import annotations
@@ -31,21 +31,21 @@ _STAGED_IDS_SQL = text(
 class ThesesHarvestConfig:
     """Configuration du moissonnage theses.fr, lue en base."""
 
-    # PPN des établissements de soutenance du périmètre d'extraction.
     ppns: list[str]
+    """PPN des établissements de soutenance du périmètre de moissonnage."""
 
 
 def build_query(ppns: list[str]) -> str:
-    """Recherche theses.fr sur l'un des PPN d'établissement de soutenance."""
+    """Construit la recherche theses.fr sur l'un des PPN d'établissement de soutenance."""
     return f"etabSoutenancePpn:({' OR '.join(ppns)})"
 
 
 def list_theses(
     client: ThesesClient, ppns: list[str], progress: Progress, *, years: list[int]
 ) -> tuple[int, list[str]]:
-    """Nombre de thèses parcourues et identifiants retenus des établissements, page après page.
+    """Parcourt les thèses des établissements, page après page. Renvoie le nombre de thèses parcourues et les identifiants retenus.
 
-    Retient les thèses soutenues l'une des années `years` (NNT commençant par l'année), et toutes les thèses en cours. `progress` compte les thèses parcourues, et retient celles que le filtre garde.
+    Sont retenues les thèses soutenues l'une des années `years` (NNT commençant par l'année), et toutes les thèses en cours. `progress` compte les thèses parcourues et les thèses retenues par le filtre.
     """
     prefixes = tuple(str(year) for year in years)
     query = build_query(ppns)
@@ -76,12 +76,12 @@ def list_theses(
 
 
 def staged_theses_ids(conn: Connection) -> set[str]:
-    """Identifiants des thèses présentes dans `staging`, hors thèses disparues de theses.fr."""
+    """Renvoie les identifiants des thèses présentes dans `staging`, hors thèses disparues de theses.fr."""
     return set(conn.execute(_STAGED_IDS_SQL).scalars())
 
 
 def stage_details(conn: Connection, log: logging.Logger, theses_ids: list[str]) -> PhaseMetrics:
-    """Lit le détail des thèses données et l'écrit dans `staging`. Une thèse que la recherche liste et dont le détail est introuvable reste hors de `staging`."""
+    """Lit le détail des thèses données et l'écrit dans `staging`. Une thèse listée par la recherche, au détail introuvable, reste hors de `staging`."""
     return asyncio.run(
         look_up(
             conn,
@@ -98,7 +98,7 @@ def stage_details(conn: Connection, log: logging.Logger, theses_ids: list[str]) 
 
 
 class ThesesHarvester(SourceHarvester[ThesesHarvestConfig, ThesesClient]):
-    """Moissonnage theses.fr : les thèses des établissements du périmètre."""
+    """Moissonnage theses.fr des thèses des établissements du périmètre."""
 
     SOURCE = "theses"
     DOCUMENT = "thèse"
@@ -123,6 +123,6 @@ class ThesesHarvester(SourceHarvester[ThesesHarvestConfig, ThesesClient]):
         )
         metrics.seen = seen
         metrics.add(unchanged=sum(1 for theses_id in kept if theses_id in staged))
-        # Le filtre par année retient une partie des thèses parcourues ; le bilan porte sur celles-là.
+        # Le filtre par année retient une partie des thèses parcourues ; le bilan compte seulement les thèses retenues.
         self._write_summary(metrics, found=metrics.new + metrics.updated + metrics.unchanged)
         return metrics

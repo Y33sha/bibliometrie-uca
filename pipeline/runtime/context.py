@@ -1,6 +1,6 @@
 """Contrat commun aux phases du pipeline.
 
-Une phase est un objet construit avec ses ports, qui s'exécute sur le contexte du run : `phase.run(ctx)`. Le contexte regroupe ce que toutes les phases partagent ; chaque phase reçoit à sa construction ce qui lui est propre.
+Une phase est un objet construit avec ses ports, exécuté sur le contexte du run : `phase.run(ctx)`. Le contexte regroupe les dépendances communes à toutes les phases. Chaque phase reçoit ses dépendances propres à sa construction.
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from domain.sources.registry import ALL_SOURCES_SET
 from pipeline.runtime.modes import MODES, ModePolicy
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
-# Ouvreur de transaction : un appelable qui renvoie une transaction gérée en context-manager — commit en sortie de bloc si succès, rollback sur exception. Une phase ouvre une transaction par sous-étape.
+# Fabrique de transaction gérée en context-manager : commit en sortie de bloc si succès, rollback sur exception. Une phase ouvre une transaction par sous-étape.
 OpenTransaction = Callable[[], AbstractContextManager[Connection]]
 
 # Contrôle des identifiants d'accès : motif d'absence des identifiants d'une source, ou `None` s'ils sont utilisables.
@@ -29,13 +29,14 @@ RequestBudget = Callable[[str], float | None]
 
 @dataclass(frozen=True, slots=True)
 class RunOptions:
-    """Options d'un run, telles que la ligne de commande les pose.
+    """Options d'un run, posées par la ligne de commande.
 
-    Toutes les phases reçoivent les mêmes options et lisent celles qui les concernent. `sources` contient les sources du run, toutes par défaut.
+    Toutes les phases reçoivent les mêmes options et lisent celles qui les concernent.
     """
 
     mode: str = "full"
     sources: frozenset[str] = ALL_SOURCES_SET
+    """Sources du run, toutes par défaut."""
     year: int | None = None
     start_year: int | None = None
     include_wos: bool = False
@@ -53,17 +54,18 @@ class RunOptions:
 
 @dataclass(frozen=True, slots=True)
 class PhaseContext:
-    """Ce que le run remet à chaque phase : ses transactions, son journal, ses options, l'exécution de la maintenance des tables (`VACUUM`, `ANALYZE`) hors transaction, le contrôle des identifiants d'accès aux sources et leur débit."""
+    """Dépendances d'exécution d'une phase."""
 
     open_tx: OpenTransaction
     logger: logging.Logger
     options: RunOptions
     maintain: Callable[[str], None]
+    """Lance `VACUUM` et `ANALYZE` sur une table, hors transaction."""
     credentials_missing: CredentialsMissing
     request_budget: RequestBudget
 
 
 class Phase(Protocol):
-    """Une phase du pipeline, prête à s'exécuter."""
+    """Phase du pipeline, prête à s'exécuter."""
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics: ...

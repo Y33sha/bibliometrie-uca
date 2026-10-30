@@ -22,24 +22,24 @@ class Source(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class SourceProfile:
-    """Ce que le pipeline fait d'une source."""
+    """Traitement d'une source par le pipeline."""
 
-    # Nom sous lequel la source se donne à lire, dans le journal comme à l'écran (servi par `/api/sources`).
     label: str
-    # Moissonnée par la phase `harvest`, sur les critères d'affiliation du périmètre.
+    """Nom affiché de la source, dans le journal comme à l'écran (servi par `/api/sources`)."""
     harvested: bool = False
-    # Interrogée par DOI à la phase `fetch_missing`.
+    """Moissonnée par la phase `harvest`, sur les critères d'affiliation du périmètre."""
     doi_searchable: bool = False
-    # Identifiants de personne que la phase `harvest_by_person` cherche dans la source. Vide : la phase ne l'interroge pas.
+    """Interrogée par DOI à la phase `fetch_missing`."""
     person_identifiers: frozenset[PersonIdentifierType] = frozenset()
-    # Agence d'enregistrement que la source représente, sous son nom dans `doi_prefixes.ra`. Seuls les DOI de cette agence y sont cherchés.
+    """Identifiants de personne cherchés dans la source par la phase `harvest_by_person`. Vide : la phase ignore la source."""
     registration_agency: str | None = None
-    # Interrogée sur option (`--include-wos`) : son crédit d'API est limité.
+    """Agence d'enregistrement représentée par la source, sous son nom dans `doi_prefixes.ra`. Seuls les DOI de cette agence sont cherchés dans la source."""
     opt_in: bool = False
-    # Moissonnée par le mode quotidien, depuis le dernier moissonnage quotidien réussi.
+    """Interrogée sur option (`--include-wos`) : son crédit d'API est limité."""
     incremental: bool = False
-    # Compile les enregistrements d'autres sources (dépôts HAL, Crossref, PubMed). Un enregistrement source de cette source vaut par les liens et les identifiants qu'il cite.
+    """Moissonnée par le mode quotidien, depuis le dernier moissonnage quotidien réussi."""
     aggregator: bool = False
+    """Compile les enregistrements d'autres sources (dépôts HAL, Crossref, PubMed). Un enregistrement source de cette source vaut par les liens et les identifiants cités."""
 
 
 PROFILES: dict[Source, SourceProfile] = {
@@ -94,14 +94,17 @@ SEARCHED_IDENTIFIER_STATUSES: frozenset[AttributionStatus] = frozenset(
 
 
 def source_label(source: str) -> str:
-    """Nom lisible d'une source. Une clé inconnue est renvoyée telle quelle."""
+    """Renvoie le nom lisible d'une source. Une clé inconnue est renvoyée telle quelle."""
     return SOURCE_LABELS.get(source, source)
 
 
 def source_record_url(source: str, source_id: str, oa_status: str | None = None) -> str:
-    """Lien vers l'enregistrement source sur le portail de sa source. Lève `ValueError` pour une source inconnue.
+    """Renvoie le lien vers l'enregistrement source sur le portail de sa source.
 
     L'hôte est écrit ici, et l'identifiant est encodé : il ne peut ni changer d'hôte ni ajouter de paramètre. Un dépôt HAL `dumas-` est servi par DUMAS. Une thèse HAL `tel-` est servie par theses.hal.science, sauf en accès fermé (`oa_status`).
+
+    Raises:
+        ValueError: source inconnue.
     """
     path = quote(source_id, safe=":")
     match Source(source):
@@ -185,7 +188,11 @@ STRUCTURE_API_SOURCES: tuple[Source, ...] = (
 
 
 def require_known_source(source: str) -> None:
-    """Lève `ValidationError` pour une source hors du registre. Le message nomme la source, que l'erreur PostgreSQL sur `source_type` tait."""
+    """Vérifie que la source figure au registre.
+
+    Raises:
+        ValidationError: source hors du registre. Le message nomme la source, absente de l'erreur PostgreSQL sur `source_type`.
+    """
     if source not in ALL_SOURCES_SET:
         raise ValidationError(
             f"Source inconnue : {source!r}. Sources valides : {', '.join(sorted(ALL_SOURCES))}."

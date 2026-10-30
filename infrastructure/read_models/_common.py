@@ -3,20 +3,21 @@
 import math
 from typing import Literal
 
-from pydantic import BaseModel, Field, computed_field
+from pydantic import Field, computed_field
 
+from application.ports.model import Model
 from domain.sources.registry import Source, source_record_url
 
 
 def page_count(total: int, per_page: int) -> int:
-    """Nombre de pages couvrant `total` résultats, zéro sur un résultat vide."""
+    """Renvoie le nombre de pages couvrant `total` résultats, zéro sur un résultat vide."""
     return math.ceil(total / per_page)
 
 
-class PaginatedResponse(BaseModel):
-    """Socle des lectures paginées : la tranche demandée et de quoi situer le reste.
+class PaginatedResponse(Model):
+    """Base des lectures paginées : la tranche demandée et sa position dans l'ensemble.
 
-    `pages` se déduit de `total` et `per_page`. Les réponses qui en héritent ajoutent leur liste de résultats et les champs propres à leur lecture.
+    `pages` se déduit de `total` et `per_page`. Les réponses héritées ajoutent leur liste de résultats et leurs champs propres.
     """
 
     total: int
@@ -29,7 +30,7 @@ class PaginatedResponse(BaseModel):
         return page_count(self.total, self.per_page)
 
 
-class SourceLink(BaseModel):
+class SourceLink(Model):
     """Identifiant d'un enregistrement source et son lien vers le portail de la source."""
 
     source_id: str
@@ -37,48 +38,46 @@ class SourceLink(BaseModel):
 
 
 def hal_links(halids: list[str] | None) -> list[SourceLink]:
-    """Liens des dépôts HAL donnés."""
+    """Renvoie les liens des dépôts HAL donnés."""
     return [
         SourceLink(source_id=h, record_url=source_record_url(Source.HAL, h)) for h in halids or []
     ]
 
 
-class FacetOption(BaseModel):
-    """Option d'une facette de liste : la valeur filtrable, son libellé d'affichage, le décompte.
-
-    `label` vaut `None` quand la valeur s'affiche telle quelle (année, statut) ou que le libellé est résolu côté client ; il contient le texte présentable quand seule la requête le connaît (nom de laboratoire, intitulé traduit).
-    """
+class FacetOption(Model):
+    """Option d'une facette de liste : la valeur filtrable, son libellé d'affichage, le décompte."""
 
     value: str
     label: str | None = None
+    """Texte affiché, quand seule la requête le connaît (nom de laboratoire, intitulé traduit). `None` pour une valeur affichée telle quelle (année, statut) ou un libellé résolu côté client."""
     count: int
 
 
 EntityKind = Literal["publisher", "serial", "person", "subject", "partner"]
 
 
-class EntityFacetItem(BaseModel):
+class EntityFacetItem(Model):
     id: int | str
     """Identifiant de l'entité : un entier, ou un ROR pour une organisation partenaire."""
     label: str
     count: int
 
 
-class EntityFacetResponse(BaseModel):
+class EntityFacetResponse(Model):
     """Facette d'entité à forte cardinalité (éditeur, revue, auteur, sujet).
 
-    Les options sont calculées côté serveur sous les filtres actifs du contexte (tableau de bord ou liste de publications), d'où des décomptes contextuels et une corrélation entre entités (une revue sélectionnée restreint les éditeurs proposés). La recherche par nom borne la requête.
+    Les options sont calculées côté serveur sous les filtres actifs du contexte (tableau de bord ou liste de publications). Les décomptes dépendent donc du contexte, et les entités se restreignent mutuellement : une revue sélectionnée restreint les éditeurs proposés. La recherche par nom borne la requête.
     """
 
     entities: list[EntityFacetItem]
 
 
-class YesNoCount(BaseModel):
+class YesNoCount(Model):
     yes: int
     no: int
 
 
-class StructureRef(BaseModel):
+class StructureRef(Model):
     """Référence courte à une structure (acronyme + nom)."""
 
     acronym: str | None

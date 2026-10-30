@@ -10,7 +10,7 @@ from tests.integration.helpers.sources import insert_source_contribution, insert
 def test_une_contribution_source_en_ecriture_non_latine_rejoint_les_informations_du_contributeur_de_son_nom(
     sa_sync_conn,
 ):
-    """Régression : les écritures qui suivent la lecture en curseur serveur aboutissent."""
+    """Les écritures qui suivent la lecture en curseur serveur aboutissent."""
     source_record = insert_source_record(sa_sync_conn, insert_publication(sa_sync_conn, "P"))
     sa = insert_source_contribution(
         sa_sync_conn,

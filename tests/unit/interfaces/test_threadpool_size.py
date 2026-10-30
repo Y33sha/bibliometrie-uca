@@ -7,7 +7,7 @@ from interfaces.api import app as app_module
 
 
 class _EngineFactice:
-    """Engine SQLAlchemy factice, que le lifespan construit et libère."""
+    """Engine SQLAlchemy factice, construit et libéré par le lifespan."""
 
     def dispose(self) -> None:
         pass

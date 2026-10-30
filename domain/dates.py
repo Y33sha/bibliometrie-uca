@@ -4,17 +4,17 @@ from datetime import UTC, date, datetime
 
 
 def today() -> date:
-    """Jour civil courant, en UTC."""
+    """Renvoie le jour civil courant, en UTC."""
     return datetime.now(UTC).date()
 
 
 def date_to_french(d: date) -> str:
-    """Date au format `JJ/MM/AAAA`."""
+    """Renvoie la date au format `JJ/MM/AAAA`."""
     return d.strftime("%d/%m/%Y")
 
 
 def french_date_to_iso(s: str | None) -> str | None:
-    """Date `JJ/MM/AAAA` au format ISO `AAAA-MM-JJ` ; `None` pour une entrée vide ou une date invalide."""
+    """Convertit une date `JJ/MM/AAAA` au format ISO `AAAA-MM-JJ` ; `None` pour une entrée vide ou une date invalide."""
     if not s:
         return None
     try:

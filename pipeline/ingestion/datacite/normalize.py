@@ -1,8 +1,8 @@
 """Normalisation des enregistrements sources DataCite.
 
 - `staging` garde la ressource JSON:API `data` ; les métadonnées sont dans ses `attributes`.
-- Les `relatedIdentifiers` de type DOI donnent des identifiants liés, que la phase `fetch_missing` cherche, et `source_extras.related_identifiers`, qui garde leur `relationType` pour les relations entre publications.
-- Le statut open access reste vide : les autres sources en décident.
+- Les `relatedIdentifiers` de type DOI donnent des identifiants liés, cherchés par la phase `fetch_missing`. `source_extras.related_identifiers` garde leur `relationType` pour les relations entre publications.
+- Le statut open access reste vide ; il vient des autres sources.
 """
 
 from __future__ import annotations
@@ -62,9 +62,9 @@ from pipeline.transformation.publishing.find_or_create import (
 
 
 def get_container_facts(attributes: Mapping[str, JsonValue]) -> ContainerDescription:
-    """Ce que DataCite dit du conteneur d'un document.
+    """Décrit le conteneur d'un document d'après DataCite.
 
-    Le `container` compte seulement quand il désigne celui qui publie le document (`container_names_a_journal`) : son titre est alors la revue d'un article, la collection quand un ISSN l'identifie, le livre ou le volume d'actes sinon. Un livre garde son propre titre et ses ISBN, et un chapitre l'ISBN de son livre, même sans conteneur.
+    Le `container` compte seulement s'il désigne le support de publication du document (`container_names_a_journal`) : son titre est alors la revue d'un article, la collection quand un ISSN l'identifie, le livre ou le volume d'actes sinon. Un livre garde son propre titre et ses ISBN, et un chapitre l'ISBN de son livre, même sans conteneur.
     """
     title, issn = get_container(attributes)
     doc_type = extract_datacite_doc_type_token(attributes)
@@ -84,7 +84,7 @@ def get_container_facts(attributes: Mapping[str, JsonValue]) -> ContainerDescrip
 
 
 def get_biblio(attributes: Mapping[str, JsonValue]) -> dict[str, JsonValue] | None:
-    """Volume, numéro et pages du conteneur, avec l'éditeur et la revue tels que DataCite les nomme."""
+    """Renvoie volume, numéro et pages du conteneur, avec l'éditeur et la revue nommés par DataCite."""
     container = as_mapping(attributes.get("container"))
     title, issn = get_container(attributes)
     return compact_biblio(
@@ -99,7 +99,10 @@ def get_biblio(attributes: Mapping[str, JsonValue]) -> dict[str, JsonValue] | No
 
 
 def _creator_name(creator: Mapping[str, JsonValue]) -> ContributorName | None:
-    """Nom et prénom séparés quand `familyName` et `givenName` sont tous deux renseignés. Sinon la chaîne brute : `familyName` seul contient souvent le nom complet."""
+    """Lit le nom d'un créateur : nom et prénom séparés quand `familyName` et `givenName` sont tous deux renseignés, sinon la chaîne brute.
+
+    `familyName` seul contient souvent le nom complet.
+    """
     given = (as_str(creator.get("givenName")) or "").strip()
     family = (as_str(creator.get("familyName")) or "").strip()
     if given and family:
@@ -108,7 +111,7 @@ def _creator_name(creator: Mapping[str, JsonValue]) -> ContributorName | None:
 
 
 def _creator_orcid(creator: Mapping[str, JsonValue]) -> str | None:
-    """ORCID depuis `nameIdentifiers` (scheme ORCID ou schemeUri orcid.org)."""
+    """Lit l'ORCID d'un créateur dans `nameIdentifiers` (scheme ORCID ou schemeUri orcid.org)."""
     for identifier in as_sequence(creator.get("nameIdentifiers")):
         fields = as_mapping(identifier)
         if not fields:
@@ -124,7 +127,10 @@ def _creator_orcid(creator: Mapping[str, JsonValue]) -> str | None:
 def _creator_affiliations(
     creator: Mapping[str, JsonValue],
 ) -> tuple[list[AddressRecord], frozenset[RorId]]:
-    """Adresses des affiliations à texte, chacune avec son ROR (`affiliationIdentifier` de schéma `ROR`), et ROR des affiliations sans texte. `affiliation` est une liste de chaînes ou d'objets `{name, affiliationIdentifier, ...}`."""
+    """Renvoie les adresses des affiliations à texte, chacune avec son ROR (`affiliationIdentifier` de schéma `ROR`), et les ROR des affiliations sans texte.
+
+    `affiliation` est une liste de chaînes ou d'objets `{name, affiliationIdentifier, ...}`.
+    """
     addresses: list[AddressRecord] = []
     without_text: set[RorId] = set()
     for aff in as_sequence(creator.get("affiliation")):
@@ -145,7 +151,7 @@ def _creator_affiliations(
 
 
 def build_datacite_author_records(attributes: Mapping[str, JsonValue]) -> list[AuthorRecord]:
-    """Contributions sources des `creators` DataCite.
+    """Lit les contributions sources des `creators` DataCite.
 
     Un créateur `Organizational` donne une contribution source collective. L'ORCID vient de `nameIdentifiers`. Les affiliations deviennent des adresses, sans pays ; le ROR d'une affiliation va sur son adresse, ou sur la contribution source pour une affiliation sans texte. Le rôle est toujours `author`.
     """
@@ -182,19 +188,22 @@ def build_datacite_author_records(attributes: Mapping[str, JsonValue]) -> list[A
 
 
 def extract_datacite_author_block(attributes: Mapping[str, JsonValue]) -> AuthorBlock:
-    """Bloc auteurs des attributs DataCite : `creators`."""
+    """Renvoie le bloc auteurs des attributs DataCite : `creators`."""
     return {"creators": attributes.get("creators")}
 
 
 def datacite_doi(attributes: Mapping[str, JsonValue], staging_doi: str | None) -> str | None:
-    """DOI de la ressource : `attributes.doi`, à défaut celui de sa ligne de `staging`."""
+    """Renvoie le DOI de la ressource : `attributes.doi`, à défaut celui de sa ligne de `staging`."""
     return clean_doi(as_str(attributes.get("doi"))) or staging_doi
 
 
 def datacite_identifiers(
     attributes: Mapping[str, JsonValue], doi: str
 ) -> tuple[SourceIdentifier, ...]:
-    """Identifiants d'un enregistrement source DataCite. Le DOI est primaire, les ISBN du document secondaires (`own_isbns`). Les DOI apparentés (`extract_related_dois`) et les ISBN de l'ouvrage qui contient le document (`host_isbns`) sont liés."""
+    """Renvoie les identifiants d'un document DataCite.
+
+    Le DOI est primaire, les ISBN du document secondaires (`own_isbns`). Les DOI apparentés (`extract_related_dois`) et les ISBN de l'ouvrage contenant le document (`host_isbns`) sont liés.
+    """
     secondary, related = SourceIdentifierRole.SECONDARY, SourceIdentifierRole.RELATED
     return (
         SourceIdentifier(SourceIdentifierType.DOI, doi, SourceIdentifierRole.PRIMARY),
@@ -210,10 +219,10 @@ def datacite_identifiers(
 def datacite_source_record(
     attributes: Mapping[str, JsonValue], staging_id: int, doi: str, containers: Containers
 ) -> SourceRecordUpsert:
-    """Enregistrement source DataCite d'une ressource, identifié par son DOI."""
+    """Construit l'enregistrement source DataCite d'une ressource, identifié par son DOI."""
     title = get_title(attributes)
     publication_year = extract_datacite_publication_year(attributes, max_year=today().year + 1)
-    # Garanti par `SourceNormalizer`, qui filtre les enregistrements sources sans titre ou sans année.
+    # Garanti par `SourceNormalizer`, qui écarte les documents sans titre ou sans année.
     assert isinstance(title, str) and isinstance(publication_year, int)
     container_title, _ = get_container(attributes)
     return SourceRecordUpsert(
@@ -251,7 +260,7 @@ class DataciteNormalizer(SourceNormalizer):
         )
 
     def parse(self, row: StagingRow) -> Document | None:
-        """Les `attributes` de la ressource JSON:API, refusés sans DOI."""
+        """Renvoie les `attributes` de la ressource JSON:API, ou `None` sans DOI."""
         attributes = row.raw_data.get("attributes")
         # Garanti par `SourceNormalizer` : `minimal_metadata` renvoie (None, None) sinon.
         assert isinstance(attributes, dict)

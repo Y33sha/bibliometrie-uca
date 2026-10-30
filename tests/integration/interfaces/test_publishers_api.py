@@ -240,7 +240,7 @@ class TestGetPublisher:
         assert all(p["crossref_member_id"] == 42 for p in publication["doi_prefixes"])
 
     def test_doi_prefixes_in_list(self, client):
-        """Régression : la liste renvoie les préfixes DOI de chaque éditeur, qu'affiche le tableau des éditeurs."""
+        """La liste renvoie les préfixes DOI de chaque éditeur, affichés par le tableau des éditeurs."""
         name = uniq("ListedPrefixedPub")
         pid = seed_publisher(name)
         seed_doi_prefix("10.9010", ra="Crossref", publisher_id=pid)
@@ -396,7 +396,7 @@ class TestTracabilite:
         with owner_pool() as cur:
             cur.execute(
                 "SELECT payload, user_id FROM audit_log "
-                "WHERE event_type = 'publisher.updated' AND aggregate_id = %s ORDER BY id",
+                "WHERE event_type = 'publisher.updated' AND entity_id = %s ORDER BY id",
                 (pid,),
             )
             evenements = cur.fetchall()

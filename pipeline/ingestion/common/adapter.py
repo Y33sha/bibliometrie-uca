@@ -1,8 +1,8 @@
-"""Adaptateur d'une source : les implémentations que les phases câblent pour elle.
+"""Adaptateur d'une source : implémentations câblées par les phases.
 
 Chaque source expose le sien dans son paquet (`pipeline/ingestion/<source>/__init__.py`), et `pipeline.ingestion.adapters` les réunit. L'adaptateur implémente le profil de la source (`domain.sources.registry.SourceProfile`) : un moissonneur si elle est moissonnée, une recherche par DOI si elle s'interroge par DOI, un moissonneur par personne si elle cherche des identifiants de personne.
 
-Chaque fabrique importe le code de la source au moment où elle s'exécute. Une source écartée du run ne charge donc pas son code, et `common.staging`, que les modules des sources importent, lit l'empreinte dans l'adaptateur sans les importer.
+Chaque fabrique importe le code de la source à son exécution. Une source écartée du run ne charge donc pas son code. `common.staging`, importé par les modules des sources, lit l'empreinte dans l'adaptateur sans importer ces modules.
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ class RecordIdentity:
 
     @classmethod
     def of(cls, source_id: str, *dois: str | None) -> RecordIdentity:
-        """Identifiant natif et DOI non vides du document, sans doublon."""
+        """Construit l'identifiant natif et les DOI non vides du document, sans doublon."""
         return cls(source_id, tuple(dict.fromkeys(d for d in dois if d)))
 
     @property
@@ -44,20 +44,22 @@ class RecordIdentity:
 
 @dataclass(frozen=True, slots=True)
 class SourceAdapter:
+    """Implémentations d'une source, câblées par les phases."""
+
     source: Source
-    # Identifiant natif et DOI d'un document reçu de la source, ou `None` pour un document sans identifiant.
     identify: Callable[[Mapping[str, JsonValue]], RecordIdentity | None]
-    # Nouvelle lecture des documents par identifiant natif (phase `fetch_stale`).
+    """Renvoie l'identifiant natif et les DOI d'un document reçu de la source, ou `None` pour un document sans identifiant."""
     stale_refetch: Callable[[], StaleRefetch]
-    # Classe du normaliseur, que la phase `normalize` construit sur ses stores.
+    """Nouvelle lecture des documents par identifiant natif (phase `fetch_stale`)."""
     normalizer: Callable[[], type[SourceNormalizer]]
-    # Moissonnage sur les critères d'affiliation du périmètre (phase `harvest`). Le client de l'API se construit avec le moissonneur.
+    """Classe du normaliseur, construite par la phase `normalize` sur ses stores."""
     harvester: HarvesterFactory | None = None
-    # Moissonnage par identifiant de personne (phase `harvest_by_person`).
+    """Moissonnage sur les critères d'affiliation du périmètre (phase `harvest`). Le client de l'API se construit avec le moissonneur."""
     person_harvester: HarvesterFactory | None = None
-    # Recherche par DOI (phase `fetch_missing`).
+    """Moissonnage par identifiant de personne (phase `harvest_by_person`)."""
     doi_search: Callable[[], DoiSearch] | None = None
-    # Neutralisation du bruit volatil avant l'empreinte. `None` : l'empreinte se calcule sur le payload tel quel.
+    """Recherche par DOI (phase `fetch_missing`)."""
     strip_volatile: StripVolatile | None = None
-    # Vrai quand un document reçu d'une réponse de liste atteint le plafond d'auteurs de la source : sa liste est peut-être tronquée. `None` : la source ne plafonne pas.
+    """Neutralisation du bruit volatil avant l'empreinte. `None` : l'empreinte se calcule sur le payload tel quel."""
     authors_truncated: Callable[[Mapping[str, JsonValue]], bool] | None = None
+    """Renvoie vrai quand un document reçu d'une réponse de liste atteint le plafond d'auteurs de la source : sa liste est peut-être tronquée. `None` : la source ne plafonne pas."""

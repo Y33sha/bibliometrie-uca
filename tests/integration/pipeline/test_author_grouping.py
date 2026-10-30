@@ -26,7 +26,7 @@ def conn(sa_sync_conn, monkeypatch):
 
 
 def _source_record(conn, publication_id, source, source_id, names, roles=None, positions=True):
-    """Enregistrement source et ses contributions sources, à partir de couples (nom de famille, prénom). Renvoie les identifiants des contributions sources."""
+    """Insère un enregistrement source et ses contributions sources, à partir de couples (nom de famille, prénom). Renvoie les identifiants des contributions sources."""
     source_record = insert_source_record(conn, publication_id, source=source, source_id=source_id)
     return [
         insert_source_contribution(
@@ -42,7 +42,7 @@ def _source_record(conn, publication_id, source, source_id, names, roles=None, p
 
 
 def _contributions(conn, publication_id):
-    """Contributions sources de chaque contribution de la publication : identifiant de contribution → ensemble de contributions sources."""
+    """Renvoie les contributions sources de chaque contribution de la publication : identifiant de contribution → ensemble de contributions sources."""
     rows = conn.execute(
         text("""
             SELECT g.id, gs.source_contribution_id FROM contributions g
@@ -179,7 +179,7 @@ def test_la_reconstruction_realigne_les_publications_non_marquees(conn):
 def test_un_enregistrement_source_deplace_quitte_les_contributions_de_sa_publication(
     conn, monkeypatch
 ):
-    """Régression : la publication d'arrivée est traitée dans un lot antérieur à celle de départ, dont une contribution contient encore la contribution source."""
+    """La contribution source passe aux contributions de la publication d'arrivée, même traitée dans un lot antérieur à la publication de départ."""
     monkeypatch.setattr(author_grouping, "BATCH_SIZE", 1)
     arrival = insert_publication(conn)
     departure = insert_publication(conn)
@@ -325,7 +325,7 @@ def test_une_contribution_source_qui_n_est_plus_copiee_perd_son_duplicate_of(con
 
 
 def test_les_roles_s_alignent_ensemble(conn):
-    """Régression : un conseiller scientifique HAL (`sad`) reste à part de la même personne, auteur chez OpenAlex."""
+    """Un conseiller scientifique HAL (`sad`) s'aligne avec la même personne, auteur chez OpenAlex."""
     publication = insert_publication(conn)
     names = [("bahier porte", "christelle"), ("schweitzer", "zoe")]
     hal = _source_record(conn, publication, "hal", "ujm-1", names, roles=["contributor"])
@@ -361,7 +361,7 @@ _ORCID = "0000-0002-1825-0097"
 
 
 def _homonyms_with_orcid(conn, status):
-    """Deux homonymes de même initiale dans l'enregistrement source HAL. L'enregistrement source OpenAlex a une contribution source réduite à l'initiale, dont l'ORCID est rattaché avec `status` à une personne du prénom du second."""
+    """Insère deux homonymes de même initiale dans l'enregistrement source HAL. L'enregistrement source OpenAlex a une contribution source réduite à l'initiale. Son ORCID est rattaché avec `status` à une personne du prénom du second."""
     publication = insert_publication(conn)
     hal = _source_record(conn, publication, "hal", "hal-1", [("xu", "zhihao"), ("xu", "zehua")])
     source_record = insert_source_record(conn, publication, source="openalex", source_id="W1")
@@ -417,7 +417,7 @@ def test_le_marquage_d_une_publication_supprimee_est_ignore_puis_supprime(conn):
 
 
 def test_un_marquage_fait_pendant_l_alignement_reste_en_file(conn):
-    """Régression : l'alignement effaçait le marquage d'une publication remarquée après son relevé."""
+    """Le marquage d'une publication marquée de nouveau après le relevé de la file survit à l'effacement des marquages traités."""
     publication = insert_publication(conn)
     store = AuthorGroupingStore(conn)
     store.snapshot_queued_publications()

@@ -72,7 +72,7 @@ def has_open_archive_deposit(sources: Iterable[_OaSignalSource]) -> bool:
 
 
 def best_oa_status(statuses: Iterable[str | None]) -> str | None:
-    """Statut le plus ouvert selon `OA_RANK`, ou `None`. Les valeurs vides ou inconnues sont ignorées."""
+    """Renvoie le statut le plus ouvert selon `OA_RANK`, ou `None`. Les valeurs vides ou inconnues sont ignorées."""
     best: str | None = None
     best_rank = 0
     for s in statuses:
@@ -85,9 +85,12 @@ def best_oa_status(statuses: Iterable[str | None]) -> str | None:
 
 
 def publication_oa_status(sources: Iterable[_OaSignalSource], unpaywall: str | None) -> str:
-    """Statut OA d'une publication, à partir de ses sources et du verdict d'Unpaywall sur son DOI (`None` : DOI non vérifié ou absent d'Unpaywall).
+    """Renvoie le statut open access d'une publication, à partir de ses sources et du verdict d'Unpaywall sur son DOI.
 
     Sans verdict, le statut le plus ouvert des sources. Le verdict l'emporte, sauf dans trois cas où le statut des sources tient : diamond face à gold, qu'Unpaywall ne distingue pas ; embargoed face à closed ou unknown ; un dépôt en archive ouverte face à closed ou unknown, Unpaywall ne voyant pas ce fichier sous le DOI.
+
+    Args:
+        unpaywall: verdict d'Unpaywall ; `None` pour un DOI non vérifié ou absent d'Unpaywall.
     """
     sources = list(sources)
     from_sources = best_oa_status(s.oa_status for s in sources) or OA_STATUS_UNKNOWN_DEFAULT
@@ -137,7 +140,7 @@ _WHITESPACE_RE = re.compile(r"\s+")
 
 
 def clean_publication_title(title: str | None) -> str | None:
-    """Titre pour l'enregistrement et l'affichage : entités HTML décodées jusqu'à stabilité (`&amp;lt;` d'OpenAlex et de ScanR), espacement réduit à un espace simple. Les balises HTML restent. L'affichage ré-échappe un `&` décodé (« Smith & Jones »)."""
+    """Nettoie un titre pour l'enregistrement et l'affichage : entités HTML décodées jusqu'à stabilité (`&amp;lt;` d'OpenAlex et de ScanR), espacement réduit à un espace simple. Les balises HTML restent. L'affichage ré-échappe un `&` décodé (« Smith & Jones »)."""
     if not title:
         return title
     for _ in range(4):
@@ -149,5 +152,5 @@ def clean_publication_title(title: str | None) -> str | None:
 
 
 def normalized_title(title: str | None) -> str:
-    """Forme de comparaison d'un titre, valeur de `source_records.title_normalized`."""
+    """Renvoie la forme de comparaison d'un titre, valeur de `source_records.title_normalized`."""
     return normalize_text(clean_publication_title(title) or "")

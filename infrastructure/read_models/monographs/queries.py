@@ -54,7 +54,7 @@ type _Dimension = Literal["kind", "year", "publisher", "serial"]
 def _where(
     filters: MonographFilters, *, skip: _Dimension | None = None
 ) -> tuple[str, dict[str, object]]:
-    """Clause WHERE de la liste : titre normalisé, ou début d'ISBN, éditeur, collection, type et année de la monographie. `skip` écarte le filtre d'une dimension, pour le décompte de sa facette."""
+    """Renvoie la clause WHERE de la liste : titre normalisé, ou début d'ISBN, éditeur, collection, type et année de la monographie. `skip` écarte le filtre d'une dimension, pour le décompte de sa facette."""
     parts: list[str] = []
     binds: dict[str, object] = {}
     if len(filters.search) >= 2:
@@ -80,7 +80,7 @@ def _where(
 
 
 def _list_sql(where: str, sort: MonographSort) -> str:
-    """Requête triée de la liste des monographies, sans pagination."""
+    """Renvoie la requête triée de la liste des monographies, sans pagination."""
     return f"SELECT {_COLUMNS} {_FROM} WHERE {where} ORDER BY {_SORT_MAP[sort]}"  # noqa: S608
 
 
@@ -115,7 +115,7 @@ class MonographQueries:
     def export_monographs_csv(
         self, *, filters: MonographFilters, sort: MonographSort
     ) -> Iterator[str]:
-        """Export CSV de la liste des monographies, aux filtres et au tri de la liste.
+        """Renvoie l'export CSV de la liste des monographies, aux filtres et au tri de la liste.
 
         La requête s'exécute à l'appel. Le parcours qui suit lit des lignes en mémoire.
         """

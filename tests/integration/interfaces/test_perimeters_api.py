@@ -177,12 +177,12 @@ class TestMaterializedPerimeterStructures:
 # ── Traçabilité des écritures sur les périmètres ─────────────
 
 
-def _audit(event_type: str, aggregate_id: int) -> list[dict]:
+def _audit(event_type: str, entity_id: int) -> list[dict]:
     with owner_pool() as cur:
         cur.execute(
             "SELECT payload, user_id FROM audit_log "
-            "WHERE event_type = %s AND aggregate_id = %s ORDER BY id",
-            (event_type, aggregate_id),
+            "WHERE event_type = %s AND entity_id = %s ORDER BY id",
+            (event_type, entity_id),
         )
         return cur.fetchall()
 

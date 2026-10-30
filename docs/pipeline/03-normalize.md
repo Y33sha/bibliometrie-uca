@@ -6,7 +6,7 @@ La phase `normalize` transforme les données moissonnées (`staging`) en [enregi
 
 L'enregistrement source reçoit l'éditeur que nomme sa source, sauf pour un document hébergé sans être publié (preprint, jeu de données, rapport, thèse). Les localisations et leurs plateformes sont décrites avec l'[édition](../donnees/07-publishing.md#plateformes).
 
-Chaque normaliseur reporte dans `source_contributions` ce que sa source fournit pour chaque contribution source : identifiants de l'auteur (ORCID, IdRef…) et affiliations. Chaque identifiant prend sa forme canonique ; une valeur mal formée est écartée et journalisée.
+Chaque normaliseur reporte dans `source_contributions` les données de chaque contribution source : identifiants de l'auteur (ORCID, IdRef…) et affiliations. Chaque identifiant prend sa forme canonique ; une valeur mal formée est écartée et journalisée.
 
 Une contribution source collective (collaboration, consortium, groupe d'étude…) reste à sa position, marquée `collective`. La marque vient de la source quand elle distingue les collectifs : entrée Crossref à `name` seul, créateur DataCite `Organizational`. Sinon, une règle sur le nom décide (`domain/persons/collective_names.py`).
 
@@ -20,9 +20,9 @@ En fin de phase, le `raw_data` de `staging` est vidé.
 
 ## Synchronisation des contributions sources
 
-Chaque contribution source entrante est rapprochée d'une contribution source en base aux mêmes informations du contributeur (nom, prénom et identifiants normalisés, marque collective), puis de même position si ces informations sont répétées. Une contribution source rapprochée garde son identifiant, donc son épinglage. Les autres sont insérées ou supprimées.
+Chaque contribution source entrante retrouve en base la contribution source de mêmes informations du contributeur (nom, prénom et identifiants normalisés, marque collective), puis de même position si ces informations sont répétées. Une contribution source retrouvée garde son identifiant, donc son épinglage. Les autres sont insérées ou supprimées.
 
-Un enregistrement source dont la partie auteurs du payload est inchangée depuis la dernière normalisation garde ses contributions sources en l'état. L'option `--normalize-full` vide l'empreinte de cette partie pour tous les enregistrements sources des sources normalisées : leurs contributions sources se resynchronisent à leur prochaine normalisation.
+Un enregistrement source garde ses contributions sources en l'état si la partie auteurs de son payload est inchangée depuis la dernière normalisation. L'option `--normalize-full` vide l'empreinte de cette partie pour tous les enregistrements sources des sources normalisées : leurs contributions sources se resynchronisent à leur prochaine normalisation.
 
 ## Archivage du payload brut
 

@@ -1,6 +1,6 @@
 """Moissonnage DataCite : tâche `harvest.datacite`.
 
-Interroge `GET /dois`, année par année, sur les affiliations des créateurs (`creators.affiliation.name`) qui contiennent l'un des mots-clés du périmètre de moissonnage, avec une pagination par curseur. La phase `affiliations` tranche ensuite quelles contributions sources relèvent du périmètre.
+La requête `GET /dois` cible, année par année, les affiliations de créateurs (`creators.affiliation.name`) contenant l'un des mots-clés du périmètre de moissonnage. La pagination suit un curseur. La phase `affiliations` détermine ensuite les contributions sources du périmètre.
 
 Les paramètres de requête comprennent `RECORD_PARAMS` (`api.py`), comme ceux des phases `fetch_missing` et `fetch_stale`. Le lien `next` de la pagination les reprend.
 """
@@ -29,12 +29,12 @@ from pipeline.runtime.observability.progress import Progress
 class DataciteHarvestConfig:
     """Configuration du moissonnage DataCite, lue en base."""
 
-    # Mots-clés cherchés dans les affiliations des créateurs.
     keywords: list[str]
+    """Mots-clés cherchés dans les affiliations des créateurs."""
 
 
 def build_query(year: int, keywords: list[str]) -> str:
-    """Requête `query` DataCite : DOI publiés l'année `year` dont une affiliation de créateur contient l'un des mots-clés, chacun cherché comme expression exacte."""
+    """Construit la requête `query` DataCite : DOI publiés l'année `year`, à affiliation de créateur contenant l'un des mots-clés, chacun cherché comme expression exacte."""
     clauses = " OR ".join(
         'creators.affiliation.name:"{}"'.format(k.replace("\\", "\\\\").replace('"', '\\"'))
         for k in keywords
@@ -65,9 +65,9 @@ def harvest_year(
 
 
 class DataciteHarvester(SourceHarvester[DataciteHarvestConfig, DataciteClient]):
-    """Moissonnage DataCite : les DOI dont une affiliation de créateur contient un mot-clé du périmètre, année par année.
+    """Moissonnage DataCite, année par année, des DOI à affiliation de créateur contenant un mot-clé du périmètre.
 
-    Une erreur sur une année est journalisée, et l'extraction passe à la suivante.
+    Une erreur sur une année est journalisée, et le moissonnage passe à la suivante.
     """
 
     SOURCE = "datacite"
@@ -91,7 +91,7 @@ class DataciteHarvester(SourceHarvester[DataciteHarvestConfig, DataciteClient]):
             except SourceUnavailableError:
                 raise
             except Exception:
-                # L'extraction de l'année rencontre la même erreur et la signale.
+                # Le moissonnage de l'année rencontre la même erreur et la signale.
                 return 0
 
         def harvest_step(year: int, progress: Progress) -> PhaseMetrics:

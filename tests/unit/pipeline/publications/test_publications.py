@@ -1,6 +1,6 @@
 """Orchestrateur de la phase `publications` : réconciliation, puis décompte des publications.
 
-Le propos testé ici est l'enchaînement. La réconciliation a ses propres tests.
+La réconciliation a ses propres tests.
 """
 
 from unittest.mock import patch

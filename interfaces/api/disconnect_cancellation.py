@@ -1,6 +1,6 @@
 """Middleware ASGI : une lecture abandonnée par le client interrompt ses requêtes SQL.
 
-Le frontend abandonne la requête précédente quand il en lance une de même nature (une frappe dans un champ de recherche, par exemple). Sans annulation, la requête SQL de la requête abandonnée poursuit son exécution jusqu'à son terme, ou jusqu'au plafond `api_read_statement_timeout_s`, et occupe un thread et une connexion pour un résultat que personne ne reçoit.
+Le frontend abandonne la requête précédente quand il en lance une de même nature (une frappe dans un champ de recherche, par exemple). Sans annulation, la requête SQL de la requête abandonnée poursuit son exécution jusqu'à son terme, ou jusqu'au plafond `api_read_statement_timeout_s`, et occupe un thread et une connexion pour un résultat perdu.
 
 Seules les lectures sont annulées : `deps._open_connection` recense seulement leurs connexions, et une écriture va à son terme, son commit compris.
 """
@@ -17,14 +17,14 @@ _STATE_KEY = "query_cancellation"
 
 
 def request_cancellation(request: Request) -> QueryCancellation | None:
-    """Recensement des connexions de `request`, posé par `CancelOnDisconnect`."""
+    """Renvoie le recensement des connexions de `request`, posé par `CancelOnDisconnect`."""
     return getattr(request.state, _STATE_KEY, None)
 
 
 class CancelOnDisconnect:
     """Interrompt les requêtes SQL recensées d'une requête HTTP dont le client se déconnecte avant la réponse.
 
-    Le middleware lit lui-même les messages du client, pour y voir la déconnexion, et les relaie à l'application dans le même ordre.
+    Le middleware lit lui-même les messages du client, pour détecter la déconnexion, et les relaie à l'application dans le même ordre.
     """
 
     def __init__(self, app: ASGIApp) -> None:

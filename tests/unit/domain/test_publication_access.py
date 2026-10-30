@@ -33,7 +33,7 @@ def test_version_puis_ordre_d_arrivee():
             _copy("https://doi.org/10.1/x", version="publishedVersion", arrival=2),
         ]
     )
-    # La copie que désigne le DOI est l'adresse d'accès, sans figurer parmi les liens.
+    # La copie désignée par le DOI est l'adresse d'accès, sans figurer parmi les liens.
     assert result == Access(
         url="https://doi.org/10.1/x",
         links=[
@@ -60,7 +60,7 @@ def test_les_copies_fermees_sont_ecartees():
 
 
 def test_hal_decide_de_l_ouverture_de_ses_copies():
-    """OpenAlex dit ouverte une copie HAL sans fichier : la copie que donne HAL l'emporte."""
+    """OpenAlex dit ouverte une copie HAL sans fichier : la copie donnée par HAL l'emporte."""
     copies = [
         _copy("https://hal.science/hal-1", platform="HAL", described=True, is_oa=False),
         _copy("https://hal.science/hal-1", version="submittedVersion", platform="HAL", arrival=2),

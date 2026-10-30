@@ -33,16 +33,16 @@ def list_config(
     user: SessionUser | None = Depends(session_user),
     queries: ConfigQueries = Depends(config_queries),
 ) -> list[ConfigItem]:
-    """Paramètres applicatifs (clé, valeur JSON, description), triés par clé.
+    """Liste les paramètres applicatifs (clé, valeur JSON, description), triés par clé.
 
-    Sans le rôle admin, la lecture se restreint à la liste blanche `PUBLIC_CONFIG_KEYS` ; une clé absente de cette liste reste réservée.
+    Sans le rôle admin, la lecture se restreint à la liste blanche `PUBLIC_CONFIG_KEYS`.
     """
     return queries.list_config(public_only=user is None or not user.is_admin)
 
 
 @router.get("/institution", response_model=InstitutionOut)
 def institution(queries: PerimetersQueries = Depends(perimeters_queries)) -> InstitutionOut:
-    """Établissement servi par l'instance : nom et structures racines du périmètre des personnes, titre de l'application."""
+    """Renvoie l'établissement servi par l'instance : nom et structures racines du périmètre des personnes, titre de l'application."""
     return queries.institution()
 
 

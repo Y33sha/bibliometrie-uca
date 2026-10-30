@@ -1,6 +1,6 @@
 """Limiteurs de débit en mémoire, sur la connexion et sur les exports.
 
-Fenêtre fixe par client : au plus `max_attempts` appels par `window_seconds`, puis 429. L'état vit dans le processus, un compteur par client, en défense en profondeur du plafond réseau du reverse-proxy.
+Fenêtre fixe par client : au plus `max_attempts` appels par `window_seconds`, puis 429. L'état est en mémoire du processus, un compteur par client, en défense en profondeur du plafond réseau du reverse-proxy.
 
 Deux compteurs indépendants : un export refusé laisse la connexion possible. Sur la connexion, le plafond ralentit la recherche du mot de passe par essais. Sur les exports, il borne le coût d'une rafale ; le plafond de lignes borne celui d'un appel.
 """
@@ -30,7 +30,7 @@ _READ_MAX_REQUESTS = 1200
 _READ_WINDOW_SECONDS = 300
 # Plafond du nombre de compteurs suivis : borne la mémoire même sous un flot d'adresses variées.
 _MAX_KEYS = 4096
-# Instant du dernier signalement, par pair de proxy non déclaré. Un déploiement qui oublie le réglage garde longtemps le symptôme : le signalement se répète, à intervalle espacé, et se trouve au journal le jour où la cause se cherche.
+# Instant du dernier signalement, par pair de proxy non déclaré. Le signalement se répète à intervalle espacé : un réglage oublié reste visible au journal.
 # La table est bornée comme celle des compteurs : sous un flot d'adresses variées, la plus anciennement signalée cède sa place.
 _WARN_INTERVAL_SECONDS = 3600.0
 _MAX_WARNED_PEERS = 64
@@ -40,7 +40,7 @@ _warned_peers: OrderedDict[str, float] = OrderedDict()
 class FixedWindowRateLimiter:
     """Compteur à fenêtre fixe par clé, sans dépendance externe.
 
-    Les compteurs sont rangés par ouverture de fenêtre, du plus ancien au plus récent ; une fenêtre qui repart passe en queue. La purge des fenêtres écoulées s'arrête ainsi au premier compteur vivant, et la place se fait en retirant le premier, dont la fenêtre expire avant les autres.
+    Les compteurs sont rangés par ouverture de fenêtre, du plus ancien au plus récent ; une fenêtre qui repart passe en queue. La purge des fenêtres écoulées s'arrête ainsi au premier compteur non expiré, et la place se fait en retirant le premier, dont la fenêtre expire avant les autres.
 
     Sous un flot d'adresses distinctes, le compteur d'un client peut partir avant la fin de sa fenêtre, et lui rendre ses tentatives : le plafond de mémoire prime sur l'exactitude. Le plafond du reverse-proxy reste la première défense.
     """
@@ -62,7 +62,7 @@ class FixedWindowRateLimiter:
     def _discard_expired(self, now: float) -> None:
         """Retire les compteurs dont la fenêtre est écoulée.
 
-        S'arrête au premier compteur encore vivant : l'ordre garantit que les suivants le sont aussi.
+        S'arrête au premier compteur non expiré : l'ordre garantit que les suivants le sont aussi.
         """
         while self._hits:
             key, (start, _) = next(iter(self._hits.items()))
@@ -151,9 +151,9 @@ def _warn_if_proxy_header_ignored(request: Request) -> None:
 
 
 def _client_key(request: Request) -> str:
-    """Client identifié par l'adresse de connexion de la requête.
+    """Renvoie la clé du client : l'adresse de connexion de la requête.
 
-    Le serveur ASGI lit `X-Forwarded-For` en amont (`ProxyHeadersMiddleware` d'uvicorn) : seulement si le pair figure dans `FORWARDED_ALLOW_IPS`, de droite à gauche en écartant les proxys déclarés, et il réécrit l'adresse du client. Relire l'en-tête ici croirait une valeur que tout appelant compose : une valeur différente à chaque tentative ouvrirait un compteur neuf.
+    Le serveur ASGI lit `X-Forwarded-For` en amont (`ProxyHeadersMiddleware` d'uvicorn) : seulement si le pair figure dans `FORWARDED_ALLOW_IPS`, de droite à gauche en écartant les proxys déclarés, et il réécrit l'adresse du client. Relire l'en-tête ici ferait confiance à une valeur composée par l'appelant : une valeur différente à chaque tentative ouvrirait un compteur neuf.
 
     Un réglage absent ou trop étroit se signale au journal (`_warn_if_proxy_header_ignored`). Sans proxy déclaré, l'adresse est celle du dernier maillon réseau : les clients derrière un même proxy partagent un compteur.
     """
@@ -162,7 +162,7 @@ def _client_key(request: Request) -> str:
 
 
 def _rate_limited(limiter: FixedWindowRateLimiter, detail: str) -> Callable[[Request], None]:
-    """Dépendance FastAPI qui rejette en 429 les appels qui dépassent le plafond du limiteur, par adresse IP."""
+    """Renvoie une dépendance FastAPI qui rejette en 429 les appels au-delà du plafond du limiteur, par adresse IP."""
 
     def dependency(request: Request) -> None:
         if not limiter.allow(_client_key(request)):
@@ -172,7 +172,7 @@ def _rate_limited(limiter: FixedWindowRateLimiter, detail: str) -> Callable[[Req
 
 
 def read_allowed(request: Request) -> bool:
-    """Vrai tant que l'adresse du client reste sous le plafond de lectures.
+    """Enregistre une lecture du client, et renvoie vrai tant que son adresse reste sous le plafond de lectures.
 
     Sert le middleware qui couvre toutes les lectures ; les dépendances de route couvrent seulement les routes qui les déclarent.
     """
@@ -195,9 +195,9 @@ _export_slots = threading.BoundedSemaphore(settings.max_concurrent_exports)
 
 
 class ExportSlot:
-    """Droit de mener un export, rendu quand son envoi s'achève.
+    """Droit de mener un export, libéré quand son envoi s'achève.
 
-    La restitution suit l'envoi, après la fin du traitement : la mémoire reste prise tant que le corps de la réponse part, et le cycle de vie des dépendances s'achève avant. `stream_owns` marque le passage de ce droit au flux, qui le rend alors lui-même.
+    La libération suit l'envoi, après la fin du traitement : la mémoire reste prise tant que le corps de la réponse part, et le cycle de vie des dépendances s'achève avant. `stream_owns` marque le passage de ce droit au flux, qui le libère alors lui-même.
     """
 
     def __init__(self) -> None:
@@ -211,18 +211,18 @@ class ExportSlot:
         return self._held_from is not None
 
     def release(self) -> None:
-        """Rend le droit au jeu dont il a été pris, une fois. Un second appel ne fait rien."""
+        """Libère le droit dans son jeu d'origine, une fois. Un second appel est sans effet."""
         if self._held_from is not None:
             self._held_from.release()
             self._held_from = None
 
 
 def export_slot() -> Iterator[ExportSlot]:
-    """Dépendance FastAPI : réserve un droit d'export, ou renvoie 503.
+    """Réserve un droit d'export, ou renvoie 503.
 
     Le refus signale une indisponibilité passagère, d'où un statut distinct de celui du plafond de fréquence.
 
-    À la sortie, le droit est rendu si le flux ne l'a pas repris : une erreur avant la construction de la réponse libère le droit, et un envoi en cours garde le sien.
+    À la sortie, le droit est libéré si le flux ne l'a pas repris : une erreur avant la construction de la réponse libère le droit, et un envoi en cours garde le sien.
     """
     slot = ExportSlot()
     if not slot.acquire():
@@ -239,7 +239,7 @@ def export_slot() -> Iterator[ExportSlot]:
 
 
 def releasing(chunks: Iterator[str], slot: ExportSlot) -> Iterator[str]:
-    """Parcourt les blocs d'un export et rend le droit quand le parcours s'achève, abandon compris."""
+    """Parcourt les blocs d'un export et libère le droit quand le parcours s'achève, abandon compris."""
     slot.stream_owns = True
     try:
         yield from chunks
@@ -248,6 +248,6 @@ def releasing(chunks: Iterator[str], slot: ExportSlot) -> Iterator[str]:
 
 
 def reset_export_slots() -> None:
-    """Rétablit un jeu de droits neuf, au nombre que la configuration fixe (isolation entre tests)."""
+    """Rétablit un jeu de droits neuf, au nombre fixé par la configuration (isolation entre tests)."""
     global _export_slots
     _export_slots = threading.BoundedSemaphore(settings.max_concurrent_exports)

@@ -11,7 +11,7 @@ from infrastructure.read_models.feedback.models import (
     FeedbackStats,
 )
 
-# Classent chaque lien address_structures (aliasé `ast`) en croisant ce que la détection a proposé (`matched_form_id`, vide si aucun rapprochement) et le verdict de l'édition manuelle (`is_confirmed`) ; partagés par le décompte et les listes.
+# Classement d'un lien `address_structures` (alias `ast`) : proposition de la détection (`matched_form_id`, vide sans forme détectée) croisée avec le verdict de l'édition manuelle (`is_confirmed`).
 _CONCORDANT_VALID = "ast.is_confirmed = TRUE AND ast.matched_form_id IS NOT NULL"
 _CONCORDANT_REJECTED = "ast.is_confirmed = FALSE AND ast.matched_form_id IS NULL"
 _FALSE_NEGATIVE = "ast.is_confirmed = TRUE AND ast.matched_form_id IS NULL"

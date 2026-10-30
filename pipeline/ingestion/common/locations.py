@@ -1,6 +1,6 @@
-"""Localisations d'un enregistrement source et plateformes qui les hébergent. L'écriture est commune aux normaliseurs.
+"""Localisations d'un enregistrement source et plateformes d'hébergement. L'écriture est commune aux normaliseurs.
 
-Les localisations d'un enregistrement source se réécrivent à chaque normalisation, comme l'enregistrement lui-même : le dernier import fait autorité. Un identifiant arXiv ou un PMCID de l'enregistrement donne aussi une localisation, quelle que soit la source. La plateforme d'une localisation est celle que nomme OpenAlex, et se reconnaît par son identifiant OpenAlex. La lecture des copies rattache en plus chaque localisation à une plateforme de la liste des plateformes connues, d'après son URL (`domain.platforms.registry`).
+Les localisations d'un enregistrement source se réécrivent à chaque normalisation, comme l'enregistrement source lui-même : le dernier import fait autorité. Un identifiant arXiv ou un PMCID de l'enregistrement source donne aussi une localisation, quelle que soit la source. La plateforme d'une localisation est celle nommée par OpenAlex, reconnue par son identifiant OpenAlex. La lecture des copies rattache en plus chaque localisation à une plateforme de la liste des plateformes connues, d'après son URL (`domain.platforms.registry`).
 """
 
 import json
@@ -38,7 +38,7 @@ class LocationFacts(NamedTuple):
 
 
 def identifier_locations(identifiers: Iterable[SourceIdentifier]) -> list[LocationFacts]:
-    """Copies ouvertes que désignent les identifiants arXiv et les PMCID d'un enregistrement source, sans version connue."""
+    """Renvoie les copies ouvertes désignées par les identifiants arXiv et les PMCID d'un enregistrement source, sans version connue."""
     identifiers, _ = normalize_identifiers(identifiers)
     return [
         LocationFacts(url=IDENTIFIER_COPIES[i.id_type].format(i.value), is_oa=True)
@@ -79,7 +79,7 @@ class LocationStore:
         self._platforms: dict[str, int] = {}
 
     def platform_id(self, platform: PlatformFacts) -> int:
-        """Identifiant de la plateforme, trouvée ou créée par son identifiant OpenAlex."""
+        """Renvoie l'identifiant de la plateforme, trouvée ou créée par son identifiant OpenAlex."""
         if platform.openalex_id not in self._platforms:
             self._platforms[platform.openalex_id] = scalar_int(
                 self._conn.execute(
@@ -95,7 +95,7 @@ class LocationStore:
         return self._platforms[platform.openalex_id]
 
     def replace_locations(self, source_record_id: int, locations: Sequence[LocationFacts]) -> None:
-        """Remplace les localisations de l'enregistrement source par `locations`, une par URL."""
+        """Réécrit les localisations de l'enregistrement source avec `locations`, une par URL."""
         self._conn.execute(_DELETE_LOCATIONS, {"id": source_record_id})
         # Parcours à rebours : une URL en double garde sa première localisation.
         rows = {

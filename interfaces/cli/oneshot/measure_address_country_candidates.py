@@ -7,13 +7,13 @@ Chaque moyen s'exécute sur toutes les adresses, indépendamment des autres moye
 - `institution`, `city` : nom de lieu de cette nature, cherché dans tout le texte (`PlaceNameDetector`) ;
 - `similarity` : pays le plus fréquent parmi les adresses à pays qui contiennent celle-ci, ses jumelles (même `normalized_text`) exclues ;
 - `ror` : pays des organisations ROR rattachées à l'adresse ;
-- `source_scanr`, `source_openalex` : pays que la source rattache à l'auteur, lus dans les payloads du raw store, pour chaque adresse de l'auteur. Seuls les documents présents dans `staging` comptent.
+- `source_scanr`, `source_openalex` : pays rattachés à l'auteur par la source, lus dans les payloads du raw store, pour chaque adresse de l'auteur. Seuls les enregistrements présents dans `staging` comptent.
 
 Le script lit la base et le raw store, et n'écrit ni dans l'une ni dans l'autre. Il écrit un fichier CSV compressé, une ligne par candidat : `address_id,country_code,method`. Le journal donne, par moyen, le nombre de candidats et d'adresses couvertes.
 
 Usage :
-    python -m interfaces.cli.oneshot.measure_address_country_candidates
-    python -m interfaces.cli.oneshot.measure_address_country_candidates --methods ror,city
+    uv run python -m interfaces.cli.oneshot.measure_address_country_candidates
+    uv run python -m interfaces.cli.oneshot.measure_address_country_candidates --methods ror,city
 """
 
 from __future__ import annotations
@@ -98,7 +98,7 @@ def place_candidates(
 
 
 def similarity_candidates(addresses: list[Address]) -> Iterator[Candidate]:
-    """Pour chaque texte normalisé, le ou les pays les plus fréquents parmi les adresses à pays dont le texte le contient au mot près, ce texte lui-même exclu."""
+    """Renvoie, pour chaque texte normalisé, le ou les pays les plus fréquents parmi les adresses à pays dont le texte le contient au mot près, ce texte lui-même exclu."""
     pool = [
         (a.normalized_text, a.countries) for a in addresses if a.countries and a.normalized_text
     ]
@@ -147,7 +147,7 @@ def source_candidates(
     source: str,
     build_records: Callable[[dict], list[AuthorRecord]],
 ) -> Iterator[Candidate]:
-    """Pays que la source rattache à chaque affiliation, posés sur l'adresse de son texte."""
+    """Renvoie les pays rattachés par la source à chaque affiliation, posés sur l'adresse de son texte."""
     id_by_raw_text = {a.raw_text: a.id for a in addresses}
     staged = set(
         conn.execute(

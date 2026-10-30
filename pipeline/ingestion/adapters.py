@@ -1,4 +1,4 @@
-"""Adaptateurs des sources, par source : les phases y trouvent les implémentations qu'elles câblent."""
+"""Adaptateurs des sources, indexés par source."""
 
 from domain.sources.registry import Source
 from pipeline.ingestion import crossref, datacite, hal, openalex, scanr, theses, wos

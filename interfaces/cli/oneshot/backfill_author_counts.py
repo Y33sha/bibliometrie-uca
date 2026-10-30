@@ -4,7 +4,7 @@
 Les enregistrements sources se traitent par lots d'identifiants, un commit par lot. Seules les valeurs qui changent s'écrivent. Idempotent.
 
 Usage :
-    python -m interfaces.cli.oneshot.backfill_author_counts [--dry-run] [--batch 50000]
+    uv run python -m interfaces.cli.oneshot.backfill_author_counts [--dry-run] [--batch 50000]
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ _AUTHOR = f"NOT sc.collective AND '{ContributionRole.AUTHOR.value}' = ANY(sc.rol
 
 
 def _update_counts(conn: Connection, source_records: str, params: dict[str, object]) -> int:
-    """Écrit les décomptes des enregistrements sources filtrés par la condition SQL `source_records` (sur `sr`) qui changent. Renvoie le nombre d'enregistrements sources modifiés."""
+    """Écrit les décomptes modifiés des enregistrements sources retenus par la condition SQL `source_records` (alias `sr`). Renvoie le nombre d'enregistrements sources modifiés."""
     return conn.execute(
         text(f"""
             UPDATE source_records sr
@@ -48,12 +48,12 @@ def _update_counts(conn: Connection, source_records: str, params: dict[str, obje
 
 
 def backfill_batch(conn: Connection, lo: int, hi: int) -> int:
-    """Écrit les décomptes des enregistrements sources `[lo, hi]` qui changent. Renvoie le nombre d'enregistrements sources modifiés."""
+    """Écrit les décomptes modifiés des enregistrements sources `[lo, hi]`. Renvoie le nombre d'enregistrements sources modifiés."""
     return _update_counts(conn, "sr.id BETWEEN :lo AND :hi", {"lo": lo, "hi": hi})
 
 
 def backfill_source_records(conn: Connection, source_record_ids: list[int]) -> int:
-    """Écrit les décomptes des enregistrements sources `source_record_ids` qui changent. Renvoie le nombre d'enregistrements sources modifiés."""
+    """Écrit les décomptes modifiés des enregistrements sources `source_record_ids`. Renvoie le nombre d'enregistrements sources modifiés."""
     return _update_counts(conn, "sr.id = ANY(:ids)", {"ids": source_record_ids})
 
 

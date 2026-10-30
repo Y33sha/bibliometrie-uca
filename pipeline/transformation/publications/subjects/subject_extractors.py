@@ -1,6 +1,6 @@
-"""Extraction des libellés de concept par source, depuis le champ `topics` d'une `source_record`.
+"""Extraction des libellés de concept par source, depuis le champ `topics` d'un enregistrement source.
 
-Chaque source expose ses concepts dans un format `topics` distinct ; ces fonctions pures le réduisent à une liste de libellés. L'upsert et la liaison sont communs (orchestrateur `ingestion`). Le registre `SUBJECT_EXTRACTORS` associe chaque source à son extracteur et à la langue de ses libellés ; une source absente (CrossRef : mots-clés libres seuls) ne produit aucun concept.
+Chaque source a son format de `topics`. Ces fonctions pures le réduisent à une liste de libellés. L'écriture des sujets et des liens est commune (`subject_ingestion`). Le registre `SUBJECT_EXTRACTORS` associe chaque source à sa fonction de lecture et à la langue de ses libellés. Une source absente du registre (Crossref : mots-clés libres seuls) produit zéro concept.
 """
 
 from collections.abc import Callable
@@ -14,9 +14,9 @@ _OPENALEX_LEVELS = ("domain", "field", "subfield", "topic")
 
 
 def hal_labels(topics: JsonValue) -> list[str]:
-    """Domaines HAL (`{"hal_domains": [...]}`), chaque niveau du chemin à plat.
+    """Renvoie les domaines HAL (`{"hal_domains": [...]}`), chaque niveau du chemin à plat.
 
-    Chaque entrée porte le code du domaine et le chemin de ses libellés, que `hal_domain_labels` découpe. Les niveaux sont liés à plat, comme les quatre niveaux OpenAlex.
+    Chaque entrée contient le code du domaine et le chemin de ses libellés, découpé par `hal_domain_labels`. Les niveaux sont liés à plat, comme les quatre niveaux OpenAlex.
     """
     if not isinstance(topics, dict):
         return []
@@ -27,7 +27,7 @@ def hal_labels(topics: JsonValue) -> list[str]:
 
 
 def openalex_labels(topics: JsonValue) -> list[str]:
-    """Topics OpenAlex (`[{domain, field, subfield, topic}, ...]`), les 4 niveaux à plat."""
+    """Renvoie les topics OpenAlex (`[{domain, field, subfield, topic}, ...]`), les quatre niveaux à plat."""
     if not isinstance(topics, list):
         return []
     labels: list[str] = []
@@ -42,14 +42,14 @@ def openalex_labels(topics: JsonValue) -> list[str]:
 
 
 def wos_labels(topics: JsonValue) -> list[str]:
-    """Sujets et vedettes WoS (`{"subjects": [...], "headings": [...]}`)."""
+    """Renvoie les sujets et vedettes WoS (`{"subjects": [...], "headings": [...]}`)."""
     if not isinstance(topics, dict):
         return []
     return dedup_strs(topics.get("subjects")) + dedup_strs(topics.get("headings"))
 
 
 def scanr_labels(topics: JsonValue) -> list[str]:
-    """Vedettes sudoc (RAMEAU) de ScanR (`[{"type": "sudoc", "code": …, "label": {"default": …}}, ...]`), par leur libellé."""
+    """Renvoie le libellé des vedettes Sudoc (RAMEAU) de ScanR (`[{"type": "sudoc", "code": …, "label": {"default": …}}, ...]`)."""
     if not isinstance(topics, list):
         return []
     return dedup_strs(
@@ -58,7 +58,7 @@ def scanr_labels(topics: JsonValue) -> list[str]:
 
 
 def theses_labels(topics: JsonValue) -> list[str]:
-    """Discipline + vedettes RAMEAU theses.fr (`{"discipline": str, "rameau": [...]}`)."""
+    """Renvoie la discipline et les vedettes RAMEAU de theses.fr (`{"discipline": str, "rameau": [...]}`)."""
     if not isinstance(topics, dict):
         return []
     labels: list[str] = []

@@ -33,7 +33,7 @@ TEST_EMAIL = "test@example.com"
 
 
 def _make_fetcher():
-    """Requête Unpaywall réelle, sur l'URL et l'adresse de test."""
+    """Renvoie la requête Unpaywall réelle, sur l'URL et l'adresse de test."""
 
     async def fetcher(client: httpx2.AsyncClient, doi: str) -> LookupOutcome[str]:
         return await fetch_oa_status(client, doi, base_url=UNPAYWALL_BASE, email=TEST_EMAIL)
@@ -52,7 +52,7 @@ def _route(http_mock, doi: str, *, status: str | None = None, http_status: int =
 def _publication(
     publication_id: int, doi: str, current: str | None, *signals: tuple[str, str | None]
 ):
-    """Publication d'un DOI, de statut `current`, dont les enregistrements sources donnent `signals` (par défaut, un enregistrement source OpenAlex au statut `current`)."""
+    """Construit la publication d'un DOI, de statut `current`, dont les enregistrements sources donnent `signals` (par défaut, un enregistrement source OpenAlex au statut `current`)."""
     return PublicationOaInputs(
         publication_id,
         doi,

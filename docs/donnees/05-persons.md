@@ -40,6 +40,6 @@ Deux tables contiennent les décisions de l'administration sur le rattachement d
 - **Fusion.** La personne absorbée est supprimée, et son identifiant redirige vers la personne conservée. La personne qui a une fiche RH est toujours conservée. Deux personnes qui ont chacune une fiche RH ne fusionnent pas.
 - **Exclusion**, pour le motif `not_a_person` ou `out_of_perimeter`. L'appartenance de ses publications au périmètre est recalculée.
 - **Renommage.** Les formes de nom de la personne sont régénérées.
-- **Statut d'un identifiant ou d'une forme de nom.** Un rejet renvoie en redécision les contributions que l'identifiant ou la forme rattachait.
+- **Statut d'un identifiant ou d'une forme de nom.** Un rejet renvoie en redécision les contributions rattachées par l'identifiant ou la forme.
 - **Détachement.** La personne est écartée des publications choisies (`rejected_contributions`).
 - **Déclaration de deux personnes distinctes.** La paire sort des files de doublons.

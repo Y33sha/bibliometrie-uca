@@ -1,6 +1,6 @@
 """Port ConfigRepository : écritures sur la table `config` (paramètres applicatifs), et lectures qui les conditionnent, pour l'administration.
 
-Les lectures par clé du pipeline vivent dans `pipeline/runtime/config.py`.
+Les lectures par clé du pipeline sont définies dans `pipeline/runtime/config.py`.
 """
 
 from typing import Protocol
@@ -12,7 +12,7 @@ class ConfigRepository(Protocol):
     """Mise à jour d'un paramètre applicatif."""
 
     def config_keys_referencing_perimeter(self, perimeter_code: str) -> list[str]:
-        """Clés dont la valeur désigne ce périmètre."""
+        """Renvoie les clés de configuration désignant ce périmètre."""
         ...
 
     def update_config_value(self, key: str, value: JsonValue) -> dict[str, JsonValue] | None:

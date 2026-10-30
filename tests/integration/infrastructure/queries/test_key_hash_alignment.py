@@ -1,4 +1,4 @@
-"""Colonnes générées de `contributor_information` : `key_hash` concorde avec l'expression que calcule `key_hash_sql`, `author_name_normalized` réunit prénom et nom.
+"""Colonnes générées de `contributor_information` : `key_hash` concorde avec l'expression calculée par `key_hash_sql`, `author_name_normalized` réunit prénom et nom.
 
 Un écart sur `key_hash` ferait échouer sans erreur la recherche des informations du contributeur par `key_hash`.
 """

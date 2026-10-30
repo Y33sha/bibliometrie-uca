@@ -20,7 +20,7 @@ from pipeline.transformation.publications.correction.correction_store import (
 def _compute_update(
     row: SerialCorrectionRow, namespaces: Mapping[str, DoiNamespace]
 ) -> SerialCorrectionUpdate | None:
-    """Mise à jour d'un enregistrement source, ou `None` si rien ne change."""
+    """Calcule la mise à jour d'un enregistrement source, ou `None` si rien ne change."""
     attached = attach_serial_by_doi(
         row.serial_id, row.dois, row.raw_doc_type, row.source, row.corrections, namespaces
     )
@@ -32,23 +32,24 @@ def _compute_update(
 def compute_updates(
     rows: Sequence[SerialCorrectionRow], namespaces: Sequence[DoiNamespace]
 ) -> list[SerialCorrectionUpdate]:
-    """Rattachements à écrire."""
+    """Calcule les rattachements à écrire."""
     by_namespace = {ns.namespace: ns for ns in namespaces}
     return [u for row in rows if (u := _compute_update(row, by_namespace)) is not None]
 
 
 @dataclass
 class SerialByDoiStats:
-    """Bilan de la sous-étape : enregistrements sources examinés, enregistrements sources qui reçoivent une revue."""
+    """Bilan de la sous-étape, en nombre d'enregistrements sources."""
 
     examined: int
     attached: int
+    """Enregistrements sources rattachés à une revue."""
 
 
 def run(
     conn: Connection, store: SourceRecordCorrectionStore, logger: logging.Logger
 ) -> SerialByDoiStats:
-    """Rattache leur revue aux enregistrements sources sans revue dont les DOI relèvent d'un espace de noms, et réévalue les rattachements existants."""
+    """Rattache à leur revue les enregistrements sources sans revue à DOI relevant d'un espace de noms, et réévalue les rattachements existants."""
     step(logger, "Revues non renseignées, identifiables par le DOI du document")
     namespaces = store.fetch_serial_doi_namespaces()
     rows = store.fetch_serial_by_doi_candidates()

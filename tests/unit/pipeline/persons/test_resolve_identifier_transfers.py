@@ -14,7 +14,7 @@ _OWNER, _OTHER, _THIRD = 1, 2, 3
 
 
 def _resolve(monkeypatch, votes: dict[int, int], status: str = "pending"):
-    """Arbitre un conflit : ORCID attribué à `_OWNER` avec le statut `status`, voix des groupes `votes`. Renvoie les compteurs, le dépôt simulé et les accès SQL simulés."""
+    """Arbitre un conflit : ORCID attribué à `_OWNER` avec le statut `status`, voix des groupes `votes`. Renvoie les compteurs, le repository simulé et les accès SQL simulés."""
     queries = MagicMock()
     queries.mark_identifier_contributions.return_value = 0
     monkeypatch.setattr(

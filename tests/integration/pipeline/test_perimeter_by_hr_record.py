@@ -21,7 +21,7 @@ _ORCID = "0000-0001-2345-6789"
 
 @pytest.fixture
 def rh_person(sa_sync_conn) -> int:
-    """Personne RH sous contrat de 2020 à 2023, ORCID confirmé."""
+    """Insère une personne RH sous contrat de 2020 à 2023, à ORCID confirmé."""
     person = insert_person(sa_sync_conn, "Rh")
     insert_hr_record(
         sa_sync_conn,

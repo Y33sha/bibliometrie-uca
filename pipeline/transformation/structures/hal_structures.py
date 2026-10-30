@@ -1,6 +1,6 @@
 """Référentiel des structures HAL (`hal_structures`, `hal_structure_relations`, `hal_structure_aliases`) : chargement en tête de la phase `affiliations`.
 
-La tâche charge les structures citées par les contributions sources (`source_contribution_hal_structures`) ou comme parent (`hal_structures.parent_ids`), et absentes du référentiel. Un identifiant absent de `ref/structure` se cherche parmi les alias. Chaque lot lu est enregistré aussitôt : un run interrompu reprend au lot suivant. Les relations parent/enfant se reconstruisent ensuite depuis `parent_ids`. Quand une structure change de pays, les contributions sources qui la citent sont marquées pour la phase `countries`. En mode `full`, la tâche relit aussi les structures chargées depuis plus de `STALE_AFTER_DAYS` jours.
+La tâche charge les structures citées par les contributions sources (`source_contribution_hal_structures`) ou comme parent (`hal_structures.parent_ids`), et absentes du référentiel. Un identifiant absent de `ref/structure` se cherche parmi les alias. Chaque lot lu est enregistré aussitôt : un run interrompu reprend au lot suivant. Les relations parent/enfant se reconstruisent ensuite depuis `parent_ids`. Quand une structure change de pays, les contributions sources citant la structure sont marquées pour la phase `countries`. En mode `full`, la tâche relit aussi les structures chargées depuis plus de `STALE_AFTER_DAYS` jours.
 """
 
 import logging
@@ -37,7 +37,7 @@ class HalStructureStore:
         self._conn = conn
 
     def ids_to_fetch(self, *, refresh_stale: bool) -> set[int]:
-        """Structures citées et absentes du référentiel. Avec `refresh_stale`, s'y ajoutent les structures chargées il y a plus de `STALE_AFTER_DAYS` jours."""
+        """Renvoie les structures citées et absentes du référentiel. Avec `refresh_stale`, les structures chargées il y a plus de `STALE_AFTER_DAYS` jours s'ajoutent."""
         ids = set(
             self._conn.execute(
                 text("""
@@ -64,7 +64,7 @@ class HalStructureStore:
         return ids
 
     def known_ids(self, ids: Iterable[int]) -> set[int]:
-        """Identifiants déjà présents dans le référentiel, comme structure ou comme alias."""
+        """Renvoie, parmi `ids`, les identifiants présents dans le référentiel, comme structure ou comme alias."""
         return set(
             self._conn.execute(
                 text("""
@@ -77,7 +77,7 @@ class HalStructureStore:
         )
 
     def save(self, structures: Collection[HalStructure], aliases: Mapping[int, int]) -> None:
-        """Écrit les structures et les alias. Un alias qui est lui-même une structure du référentiel est écarté. Marque pour le recalcul des pays les contributions sources qui citent une structure dont le pays change, ou un alias qui change de structure."""
+        """Écrit les structures et les alias. Un alias présent comme structure du référentiel est écarté. Les contributions sources citant une structure au pays changé, ou un alias changé de structure, sont marquées pour le recalcul des pays."""
         previous_countries: dict[int, str | None] = dict(
             self._conn.execute(
                 text(
@@ -147,7 +147,7 @@ class HalStructureStore:
         )
 
     def _mark_source_contributions(self, structure_ids: list[int], alias_ids: list[int]) -> None:
-        """Marque pour le recalcul des pays les contributions sources qui citent une structure de `structure_ids`, directement ou par un alias, ou qui citent un alias de `alias_ids`."""
+        """Marque pour le recalcul des pays les contributions sources citant une structure de `structure_ids`, directement ou par un alias, ou citant un alias de `alias_ids`."""
         if not structure_ids and not alias_ids:
             return
         enqueue(
@@ -183,11 +183,14 @@ class HalStructureStore:
 
 @dataclass
 class HalStructuresLoad:
-    """Identifiants cherchés dans `ref/structure`, parents compris, structures lues et identifiants introuvables."""
+    """Bilan du chargement des structures HAL."""
 
     requested: int = 0
+    """Identifiants cherchés dans `ref/structure`, parents compris."""
     structures: int = 0
+    """Structures lues."""
     not_found: set[int] = field(default_factory=set)
+    """Identifiants introuvables."""
 
 
 SaveBatch = Callable[[list[HalStructure], dict[int, int]], None]
@@ -206,7 +209,11 @@ def fetch_hal_structures(
     save_batch: SaveBatch,
     progress: Progress | None = None,
 ) -> HalStructuresLoad:
-    """Lit les structures dans `ref/structure` par lots, résout les alias, puis lit les parents absents du référentiel, jusqu'à la racine. Chaque lot passe à `save_batch` dès sa lecture. `progress` compte les identifiants lus ; son total croît avec les parents à lire."""
+    """Lit les structures dans `ref/structure` par lots, résout les alias, puis lit les parents absents du référentiel, jusqu'à la racine. Chaque lot passe à `save_batch` dès sa lecture.
+
+    Args:
+        progress: compte les identifiants lus ; son total croît avec les parents à lire.
+    """
     load = HalStructuresLoad()
     pending = set(ids)
     requested: set[int] = set()

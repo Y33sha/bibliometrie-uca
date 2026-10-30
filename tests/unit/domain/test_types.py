@@ -1,6 +1,6 @@
-"""Lecture d'une valeur JSON : ce que chaque accesseur accepte, et ce qu'il écarte.
+"""Lecture d'une valeur JSON : valeurs acceptées et écartées par chaque accesseur.
 
-Ces tests fixent ce qui est reconnu, ce qui vaut « absent », et deux cas particuliers de Python : le booléen est un entier, la chaîne est une suite de caractères.
+Deux cas particuliers de Python : le booléen est un entier, la chaîne est une suite de caractères.
 """
 
 import pytest
@@ -13,7 +13,7 @@ class TestAsStr:
         assert as_str("un titre") == "un titre"
 
     def test_chaine_vide_conservee(self):
-        """La chaîne vide est une valeur, que l'appelant traite comme il l'entend."""
+        """La chaîne vide est une valeur ; l'appelant décide de son traitement."""
         assert as_str("") == ""
 
     @pytest.mark.parametrize("valeur", [None, 2024, 3.5, True, ["un titre"], {"fr": "un titre"}])

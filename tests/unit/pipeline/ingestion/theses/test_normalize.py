@@ -226,7 +226,7 @@ class TestThesesSourceRecord:
         ],
     )
     def test_statut_open_access_selon_la_diffusion(self, diffusion, expected):
-        """Régression : le statut open access suit la diffusion de la thèse ; une thèse accessible sur theses.fr est `green`."""
+        """Le statut open access suit la diffusion de la thèse ; une thèse accessible sur theses.fr est `green`."""
         assert self._call(diffusion).oa_status == expected
 
     def test_langue_et_resume_de_la_premiere_langue(self):

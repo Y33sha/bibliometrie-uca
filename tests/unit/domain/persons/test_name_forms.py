@@ -1,4 +1,4 @@
-"""Tests unitaires du VO `PersonNameForm` et du calcul des formes de nom d'une personne."""
+"""Tests de l'objet valeur `PersonNameForm` et du calcul des formes de nom d'une personne."""
 
 import dataclasses
 

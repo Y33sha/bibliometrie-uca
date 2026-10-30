@@ -14,16 +14,18 @@ YearSelection = Literal["since_last", "full"]
 
 @dataclass(frozen=True)
 class ModePolicy:
-    # Sources que le mode moissonne. Une source sur option s'y ajoute seulement avec `--include-wos`.
+    """Politique d'un mode d'exécution."""
+
     harvest_sources: frozenset[str]
+    """Sources moissonnées par le mode. Une source sur option s'ajoute seulement avec `--include-wos`."""
     year_selection: YearSelection
     vacuum_full: bool
-    # La phase `fetch_stale` réinterroge un à un les documents que le moissonnage n'a pas revus.
     fetch_stale: bool
-    # La phase `harvest_by_person` moissonne les sources par l'identifiant des personnes RH.
+    """La phase `fetch_stale` réinterroge un à un les enregistrements sources non revus par le moissonnage."""
     harvest_by_person: bool
-    # Le référentiel des structures HAL recharge aussi les structures connues ; sinon, seulement les absentes.
+    """La phase `harvest_by_person` moissonne les sources par l'identifiant des personnes RH."""
     refresh_hal_structures: bool
+    """Le référentiel des structures HAL recharge aussi les structures connues, sinon seulement les absentes."""
 
 
 MODES: dict[str, ModePolicy] = {

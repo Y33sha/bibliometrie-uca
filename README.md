@@ -39,7 +39,7 @@ bibliometrie-uca/
 │   └── ports/           Interfaces que l'infrastructure implémente
 ├── infrastructure/      Adaptateurs sortants
 │   ├── db/              Schéma SQL, MetaData SA, engine
-│   ├── repositories/    Lecture et écriture des agrégats du domaine
+│   ├── repositories/    Lecture et écriture des entités du domaine
 │   ├── read_models/     Projections de lecture pour l'API
 │   └── raw_store/       Archivage des réponses brutes des sources
 ├── interfaces/          Adaptateurs entrants

@@ -19,7 +19,7 @@ _STASH = stash_entry(None, "SERIAL_BY_DOI_NAMESPACE")
 
 
 def _row(doi: str | None = None, **overrides: object) -> SerialCorrectionRow:
-    """Ligne candidate ; `doi` : son seul DOI propre actif."""
+    """Renvoie une ligne candidate ; `doi` est son seul DOI propre actif."""
     base: dict[str, object] = {
         "id": 1,
         "source": "crossref",
@@ -48,7 +48,7 @@ def test_enregistrement_sans_doi_intact():
 
 
 def test_un_seul_des_doi_designe_une_revue():
-    """Cas réel : un work OpenAlex a le DOI arXiv et le DOI des actes, que désigne un espace de noms."""
+    """Cas réel : un enregistrement source OpenAlex a le DOI arXiv et le DOI des actes, désigné par un espace de noms."""
     row = _row(dois=frozenset({"10.48550/arxiv.2310.05120", "10.64628/aak.335cx4kw5"}))
     assert compute_updates([row], _NAMESPACES) == [
         SerialCorrectionUpdate(1, 7, {"serial_id": _STASH})
@@ -96,7 +96,7 @@ def test_article_de_congres_rattache_a_sa_serie():
 
 
 def test_chapitre_sans_revue_par_espace_de_noms():
-    """Régression : l'espace `10.17184/eac.` de l'éditeur EAC rattachait ses chapitres de livres à sa revue."""
+    """Un chapitre de livre reste sans revue, même à DOI dans l'espace de noms d'une revue."""
     row = _row(doi="10.64628/aak.335cx4kw5", raw_doc_type="book-chapter")
     assert compute_updates([row], _NAMESPACES) == []
 
@@ -130,7 +130,7 @@ class _Conn:
 
 
 def test_le_bilan_compte_les_revues_distinctes(caplog):
-    """Régression : le bilan annonçait autant de revues que d'enregistrements sources rattachés."""
+    """Deux enregistrements sources rattachés à la même revue comptent pour une revue."""
     rows = [
         _row(id=1, doi="10.64628/aak.1"),
         _row(id=2, doi="10.64628/aak.2"),

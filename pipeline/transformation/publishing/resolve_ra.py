@@ -1,8 +1,8 @@
 """Phase `resolve_ra` : résolution préfixe DOI → Registration Agency, après `affiliations` et avant `publishing`.
 
-Soumet à `doi.org/ra` les préfixes valides (`DoiPrefix`) de tous les DOI connus absents de `doi_prefixes`, et insère `(prefix, ra)`. Un préfixe que doi.org ne connaît pas est inséré avec `ra='unknown'`. Un préfixe sans réponse, faute de requête aboutie, reste à résoudre.
+Soumet à `doi.org/ra` les préfixes valides (`DoiPrefix`) de tous les DOI connus absents de `doi_prefixes`, et insère `(prefix, ra)`. Un préfixe inconnu de doi.org est inséré avec `ra='unknown'`. Un préfixe sans réponse, faute de requête aboutie, reste à résoudre.
 
-La Registration Agency dit laquelle des deux API connaît un DOI, Crossref ou DataCite. La phase `publishing` rattache ensuite les préfixes à leur éditeur via les API `/prefixes`. Au run suivant, `fetch_missing` adresse chaque DOI à la bonne API et laisse attendre ceux dont le préfixe reste à résoudre.
+La Registration Agency désigne l'API où chercher un DOI, Crossref ou DataCite. La phase `publishing` rattache ensuite les préfixes à leur éditeur via les API `/prefixes`. Au run suivant, `fetch_missing` adresse chaque DOI à la bonne API et met en attente les DOI à préfixe non résolu.
 
 La requête à `doi.org/ra` est injectée par le câblage de la phase.
 """
@@ -33,14 +33,15 @@ from pipeline.task_runner import SingleTaskPhase
 from pipeline.transformation.publishing.doi_prefixes import DoiPrefixStore
 
 ResolveRasFn = Callable[[Sequence[str]], Iterable[tuple[str, str | None]]]
-"""Signature : `(préfixes) -> (préfixe, agence)` pour chaque préfixe auquel doi.org a répondu. Agence `None` : doi.org ne connaît pas le préfixe."""
+"""Signature : `(préfixes) -> (préfixe, agence)` pour chaque préfixe auquel doi.org a répondu. Agence `None` : préfixe inconnu de doi.org."""
 
 
 @dataclass(frozen=True)
 class ResolveRaPhase:
-    """`prefix_store_factory` construit les requêtes sur les préfixes sur la connexion de la phase."""
+    """Phase `resolve_ra`."""
 
     prefix_store_factory: Callable[[Connection], DoiPrefixStore]
+    """Construit les requêtes sur les préfixes, sur la connexion de la phase."""
     resolve_ras_fn: ResolveRasFn
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
@@ -64,10 +65,11 @@ def _resolve(
 ) -> PhaseMetrics:
     """Résout l'agence des préfixes absents de `doi_prefixes` (`doi.org/ra`) et l'insère.
 
-    `total` = préfixes auxquels doi.org a répondu ; `new` = rows insérées ; `extras` = `resolved` / `unresolved`.
+    Returns:
+        Métriques : `total`, préfixes auxquels doi.org a répondu ; `new`, lignes insérées ; `extras`, `resolved` / `unresolved`.
     """
     metrics = PhaseMetrics()
-    # Un préfixe hors de la forme `10.<chiffres>` vient d'une valeur qui n'est pas un DOI : il n'est pas enregistré.
+    # Seuls les préfixes de forme `10.<chiffres>` sont soumis. Les autres proviennent de valeurs autres que des DOI.
     prefixes = [
         prefix
         for prefix in prefix_store.get_prefixes_to_resolve()
@@ -95,7 +97,7 @@ def _resolve(
             new_by_ra[ra] = new_by_ra.get(ra, 0) + 1
         log.info("     %s → %s", prefix, ra)
 
-    # Indicateurs sur-mesure : synthèse du run + tableau par Registration Agency (Crossref / DataCite / unknown) avec DOI candidats et préfixes. La part `unknown` inclut les préfixes que doi.org ne connaît pas et les préfixes malformés (DOI à scheme « doi: » non nettoyé).
+    # Synthèse du run et tableau des DOI candidats et des préfixes par Registration Agency (Crossref, DataCite, unknown). La part `unknown` inclut les préfixes inconnus de doi.org et les préfixes malformés (DOI à scheme « doi: » non nettoyé).
     metrics.details["summary"] = {
         "new_prefixes": metrics.new,
         "resolved": metrics.extras.get("resolved", 0),

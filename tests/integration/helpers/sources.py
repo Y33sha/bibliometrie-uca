@@ -23,7 +23,7 @@ def _jsonb(value: object) -> str | None:
 
 
 def secondary_identifiers(values: Mapping[str, str | list[str]]) -> list[SourceIdentifier]:
-    """Identifiants secondaires de chaque type de `values` (valeur de `SourceIdentifierType`)."""
+    """Construit les identifiants secondaires de chaque type de `values` (valeur de `SourceIdentifierType`)."""
     return [
         SourceIdentifier(SourceIdentifierType(id_type), value, SourceIdentifierRole.SECONDARY)
         for id_type, raw in values.items()
@@ -137,7 +137,7 @@ def insert_source_record(
 
 
 def _own_doi(source: str, source_id: str, doi: str) -> SourceIdentifier:
-    """DOI d'un enregistrement source, avec le rôle que lui donne la normalisation de sa source : primaire chez Crossref et DataCite, dérivé chez ScanR quand l'identifiant ScanR le contient, secondaire ailleurs."""
+    """Construit le DOI d'un enregistrement source, avec le rôle donné par la normalisation de sa source : primaire chez Crossref et DataCite, dérivé chez ScanR quand l'identifiant ScanR le contient, secondaire ailleurs."""
     value = str(vo) if (vo := DOI.try_parse(doi)) else doi.lower()
     if source in ("crossref", "datacite"):
         role = SourceIdentifierRole.PRIMARY

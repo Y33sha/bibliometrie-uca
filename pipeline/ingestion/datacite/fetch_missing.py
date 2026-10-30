@@ -1,8 +1,8 @@
 """Recherche par DOI dans DataCite : tâche `fetch_missing.doi.datacite`.
 
-Les DOI vus dans une autre source et absents de DataCite s'interrogent par lots : `GET /dois?query=doi:"a" OR doi:"b" …`. Chaque ressource JSON:API reçue s'écrit dans `staging`. Au-delà d'une dizaine de clauses `OR`, la latence de DataCite s'envole (0,3 s à 10 DOI, 2,6 s à 20) : un lot compte 10 DOI, et le débit plafonne alors le coût.
+Les DOI vus dans une autre source et absents de DataCite sont cherchés par lots : `GET /dois?query=doi:"a" OR doi:"b" …`. Chaque ressource JSON:API reçue s'écrit dans `staging`. Au-delà d'une dizaine de clauses `OR`, la latence de DataCite s'envole (0,3 s à 10 DOI, 2,6 s à 20) : un lot compte donc 10 DOI, et le débit plafonne le coût.
 
-`get_missing_dois` soumet seulement les DOI dont le préfixe relève de DataCite. Un DOI absent de la réponse de son lot est inscrit dans `failed_lookups`, et `fetch_missing_doi` le soumet à doi.org.
+`get_missing_dois` soumet seulement les DOI à préfixe DataCite. Un DOI absent de la réponse de son lot est inscrit dans `failed_lookups`, et `fetch_missing_doi` le soumet à doi.org.
 """
 
 from __future__ import annotations

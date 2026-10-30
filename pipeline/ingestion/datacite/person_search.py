@@ -1,6 +1,6 @@
 """Moissonnage de DataCite par ORCID : tâche `harvest_by_person.datacite`.
 
-Interroge `GET /dois` sur les ORCID des créateurs (`creators.nameIdentifiers.nameIdentifier`).
+La requête `GET /dois` cible les ORCID des créateurs (`creators.nameIdentifiers.nameIdentifier`).
 """
 
 from __future__ import annotations
@@ -13,12 +13,12 @@ from pipeline.ingestion.common.person_search import (
 )
 from pipeline.ingestion.datacite.api import DataciteClient
 
-# Documents par page. Un enregistrement de grande collaboration compte un millier de créateurs (environ 200 Kio).
+# Documents par page. Un document de grande collaboration compte un millier de créateurs (environ 200 Kio).
 _PAGE_SIZE = 25
 
 
 def build_orcid_query(orcids: list[str], first_year: int, last_year: int) -> str:
-    """Requête `query` DataCite : DOI publiés de `first_year` à `last_year` dont un créateur a l'un des ORCID."""
+    """Construit la requête `query` DataCite : DOI publiés de `first_year` à `last_year`, avec un créateur identifié par l'un des ORCID."""
     clauses = " OR ".join(f'"{orcid_uri(orcid)}"' for orcid in orcids)
     return (
         f"publicationYear:[{first_year} TO {last_year}] "

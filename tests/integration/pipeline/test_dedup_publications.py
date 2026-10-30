@@ -58,7 +58,7 @@ class TestRefreshFromSources:
         assert lang == "en"
 
     def test_editeur_titulaire_du_prefixe_crossref(self, sa_sync_conn):
-        """Le titulaire du préfixe l'emporte sur l'éditeur actuel que nomme Crossref."""
+        """Le titulaire du préfixe l'emporte sur l'éditeur actuel nommé par Crossref."""
         origin = insert_publisher(sa_sync_conn, "Cambridge")
         current = insert_publisher(sa_sync_conn, "Elsevier")
         insert_doi_prefix(sa_sync_conn, "10.1017", ra="Crossref", publisher_id=origin)

@@ -6,7 +6,7 @@ from domain.merge import MergedEntity
 
 
 def redirect_of(conn: Connection, entity: MergedEntity, absorbed_id: int) -> int | None:
-    """Identifiant conservé vers lequel mène `absorbed_id`, ou `None` sans redirection."""
+    """Renvoie l'identifiant conservé vers lequel mène `absorbed_id`, ou `None` sans redirection."""
     return conn.execute(
         text("""
             SELECT kept_id FROM merge_redirects

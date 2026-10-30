@@ -18,7 +18,7 @@ from infrastructure.read_models.stats.pivot import StatsPivotQueries
 class StatsQueries(StatsPivotQueries, StatsCollaborationQueries):
     """Agrégats des tableaux de bord.
 
-    Le filtre `has_apc` classe un paiement d'APC en « interne » quand sa structure de budget appartient au périmètre `persons`. La lecture résout ce périmètre elle-même : ses appelants se passent de le connaître.
+    Le filtre `has_apc` classe un paiement d'APC en « interne » quand sa structure de budget appartient au périmètre `persons`. Ce périmètre est résolu par la lecture, sans paramètre de l'appelant.
     """
 
     def __init__(self, conn: Connection) -> None:

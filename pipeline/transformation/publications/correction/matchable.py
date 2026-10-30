@@ -1,4 +1,4 @@
-"""Sous-étape `matchable` de la phase `metadata_correction` : calcul de `source_records.is_matchable` (`is_matchable`), après les sous-étapes qui corrigent le DOI, les identifiants et les liens. Un changement de valeur marque l'enregistrement source pour la réconciliation."""
+"""Sous-étape `matchable` de la phase `metadata_correction` : calcul de `source_records.is_matchable` (`is_matchable`), après les sous-étapes de correction du DOI, des identifiants et des liens. Un changement de valeur marque l'enregistrement source pour la réconciliation."""
 
 import logging
 import time
@@ -20,7 +20,11 @@ from pipeline.transformation.publications.correction.correction_store import (
 def compute_updates(
     rows: list[MatchabilityRow], missing_hal_ids: Set[str]
 ) -> list[MatchabilityUpdate]:
-    """Mises à jour des enregistrements sources dont `is_matchable` change. `missing_hal_ids` : dépôts introuvables dans HAL."""
+    """Calcule les mises à jour des enregistrements sources à valeur de `is_matchable` changée.
+
+    Args:
+        missing_hal_ids: dépôts introuvables dans HAL.
+    """
     return [
         MatchabilityUpdate(row.id, matchable)
         for row in rows
@@ -30,11 +34,13 @@ def compute_updates(
 
 @dataclass
 class MatchabilityStats:
-    """Bilan de la sous-étape : enregistrements sources examinés, dont `is_matchable` change, et écartés de la réconciliation."""
+    """Bilan de la sous-étape, en nombre d'enregistrements sources."""
 
     examined: int
     changed: int
+    """Enregistrements sources à valeur de `is_matchable` changée."""
     excluded: int
+    """Enregistrements sources écartés de la réconciliation."""
 
 
 def run(

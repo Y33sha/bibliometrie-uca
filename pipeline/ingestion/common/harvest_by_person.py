@@ -1,8 +1,8 @@
-"""Phase `harvest_by_person` : moissonnage des sources par les identifiants des personnes qui ont une fiche RH, vers `staging`.
+"""Phase `harvest_by_person` : moissonnage des sources par les identifiants des personnes à fiche RH, vers `staging`.
 
-Une tâche par source, en parallèle, sur la plage d'années de l'extraction ou la seule année `--year`. Un mode dont la policy exclut la phase la saute (`daily`). `--sources` restreint les sources.
+Une tâche par source, en parallèle, sur la plage d'années du moissonnage ou la seule année `--year`. La phase est sautée dans un mode dont la policy l'exclut (`daily`). `--sources` restreint les sources.
 
-Le profil de chaque source dit quels identifiants de personne elle accepte (`domain/sources/registry.py`).
+Le profil de chaque source liste les types d'identifiant de personne acceptés (`domain/sources/registry.py`).
 """
 
 from __future__ import annotations

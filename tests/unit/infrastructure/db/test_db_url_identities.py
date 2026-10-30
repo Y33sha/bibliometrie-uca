@@ -82,6 +82,6 @@ class TestRefusDUneIdentiteAbsente:
         assert db_url("app").username == "bibliometrie_app"
 
     def test_le_pipeline_n_a_pas_besoin_du_proprietaire(self, db_settings):
-        """Le conteneur qui exécute le pipeline se passe du mot de passe qui permet de modifier le schéma."""
+        """Le conteneur qui exécute le pipeline se passe du mot de passe du propriétaire du schéma."""
         db_settings(db_owner_user="", db_owner_password="")
         assert db_url("pipeline").username == "bibliometrie_pipeline"

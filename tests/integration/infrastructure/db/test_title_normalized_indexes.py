@@ -19,7 +19,6 @@ _INSERTS = {
 
 @pytest.mark.parametrize("table", _INSERTS)
 def test_un_titre_long_s_ecrit_et_se_retrouve(sa_sync_conn, table):
-    """Régression : le titre de W7223893444 dépassait la taille maximale d'une entrée d'index btree."""
     sa_sync_conn.execute(text(_INSERTS[table]), {"t": _LONG_TITLE})
     found = sa_sync_conn.execute(
         text(f"SELECT count(*) FROM {table} WHERE title_normalized = :t"), {"t": _LONG_TITLE}

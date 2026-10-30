@@ -28,7 +28,7 @@ _PATH_PARAM = re.compile(r"\{[^}]+\}")
 
 
 def _write_endpoints() -> list[tuple[str, str]]:
-    """Couples (méthode, chemin) de toutes les écritures du contrat d'API, triés."""
+    """Renvoie les couples (méthode, chemin) de toutes les écritures du contrat d'API, triés."""
     chemins = app.openapi()["paths"]
     return sorted(
         {
@@ -41,7 +41,7 @@ def _write_endpoints() -> list[tuple[str, str]]:
 
 
 def _concrete(path: str) -> str:
-    """Chemin dont chaque paramètre vaut `1` : les identifiants du projet sont des entiers, et la garde refuse avant la validation."""
+    """Renvoie le chemin avec `1` pour chaque paramètre : les identifiants du projet sont des entiers, et la garde refuse avant la validation."""
     return _PATH_PARAM.sub("1", path)
 
 

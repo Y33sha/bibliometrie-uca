@@ -1,6 +1,6 @@
 """Chaîne MetaData → SQLAlchemy Core → psycopg3, et accord de la MetaData avec les migrations.
 
-Les tests de round-trip vérifient que les types Postgres non triviaux (JSONB, ARRAY) traversent la chaîne. `TestMetaDataMatchesMigrations` détecte tout écart entre `infrastructure/db/tables.py` et le schéma qu'écrivent les migrations.
+Les tests de round-trip vérifient que les types Postgres non triviaux (JSONB, ARRAY) traversent la chaîne. `TestMetaDataMatchesMigrations` détecte tout écart entre `infrastructure/db/tables.py` et le schéma écrit par les migrations.
 """
 
 from alembic.config import Config

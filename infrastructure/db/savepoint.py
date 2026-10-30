@@ -14,7 +14,10 @@ def savepoint(
 ) -> Iterator[None]:
     """Encadre un traitement dans un SAVEPOINT (`Connection.begin_nested()`).
 
-    Si l'annulation du SAVEPOINT échoue (transaction cassée), `on_rollback_failure`, en général `conn.rollback`, rend la connexion utilisable. L'exception d'origine remonte, même si cette seconde annulation échoue aussi (connexion perdue).
+    L'exception d'origine remonte toujours, même si la seconde annulation échoue aussi (connexion perdue).
+
+    Args:
+        on_rollback_failure: appelé si l'annulation du SAVEPOINT échoue (transaction cassée) ; en général `conn.rollback`, pour remettre la connexion en état.
     """
     nested: NestedTransaction = conn.begin_nested()
     try:
@@ -32,6 +35,9 @@ def savepoint(
 
 
 def rollback_unless_invalidated(conn: Connection) -> None:
-    """Annule la transaction en cours. Une connexion invalidée (interruption clavier ou coupure en pleine requête) a déjà perdu sa transaction côté serveur : son `rollback()` lèverait `PendingRollbackError`."""
+    """Annule la transaction en cours, sauf sur une connexion invalidée.
+
+    Une connexion invalidée (interruption clavier, coupure en pleine requête) a déjà perdu sa transaction côté serveur. Son `rollback()` lèverait `PendingRollbackError`.
+    """
     if not conn.invalidated:
         conn.rollback()

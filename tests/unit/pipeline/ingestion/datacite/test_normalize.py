@@ -1,6 +1,6 @@
 """Normaliseur DataCite : parsing des auteurs, données bibliographiques, conteneurs et enregistrement source.
 
-Le format DataCite loge ses métadonnées sous `attributes` et nomme ses auteurs `creators`. Un enregistrement sans DOI est refusé. L'enregistrement source est construit sans entrée-sortie.
+Le format DataCite loge ses métadonnées sous `attributes` et nomme ses auteurs `creators`. Une ressource sans DOI est refusée. L'enregistrement source est construit sans entrée-sortie.
 """
 
 from unittest.mock import MagicMock
@@ -102,7 +102,7 @@ class TestAuthorRecords:
         assert build_datacite_author_records(attrs)[0].identifiers is None
 
     def test_shared_orcid_kept_on_each_record(self):
-        """La lecture renvoie l'ORCID de chaque creator tel que la source le donne ; l'écriture des contributions sources neutralise ceux que partagent plusieurs contributions sources."""
+        """La lecture renvoie l'ORCID de chaque creator tel que la source le donne. L'écriture des contributions sources neutralise les ORCID partagés par plusieurs contributions sources."""
         attrs = {
             "creators": [
                 {
@@ -218,7 +218,7 @@ class TestCreatorsIllisibles:
 
 class TestChampsIgnores:
     def test_donnee_bibliographique_qui_n_est_pas_du_texte(self):
-        """Un volume numérique plutôt que textuel n'est pas repris : le champ attend une chaîne."""
+        """Un volume numérique est écarté : le champ attend une chaîne."""
         biblio = get_biblio({"container": {"title": "J. Things", "volume": 12, "issue": "3"}})
         assert "volume" not in biblio
         assert biblio["issue"] == "3"
@@ -282,7 +282,7 @@ class TestChampsIgnores:
 
 class TestAuthorBlock:
     def test_creators_deviennent_les_contributions_sources(self):
-        """Le bloc auteurs du normaliseur contient les `creators`, que lit `author_records`."""
+        """Le bloc auteurs du normaliseur contient les `creators`, lus par `author_records`."""
         normalizer = _normalizer()
         attrs = {
             "creators": [
@@ -371,7 +371,7 @@ class TestContainers:
 
 
 def _attributs(**surcharges) -> dict:
-    """Métadonnées DataCite minimales et acceptables, que chaque test dégrade à sa guise."""
+    """Renvoie des métadonnées DataCite minimales et acceptables, dégradées par chaque test selon ses besoins."""
     return {
         "doi": "10.5281/zenodo.1",
         "titles": [{"title": "Un jeu de données"}],

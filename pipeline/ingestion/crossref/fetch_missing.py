@@ -1,6 +1,6 @@
 """Recherche par DOI dans Crossref : tâche `fetch_missing.doi.crossref`.
 
-Chaque DOI vu dans une autre source et absent de Crossref s'interroge par `GET /works/{doi}` ; le `message` reçu s'écrit dans `staging`. Le polite pool de Crossref admet 10 requêtes par seconde, dont 3 simultanées.
+Chaque DOI vu dans une autre source et absent de Crossref est cherché par `GET /works/{doi}` ; le `message` reçu s'écrit dans `staging`. Le polite pool de Crossref admet 10 requêtes par seconde, dont 3 simultanées.
 
 Un 404 inscrit le DOI dans `failed_lookups`, et `fetch_missing_doi` le soumet à doi.org. Crossref redirige un DOI alias vers son DOI principal : le document principal s'écrit, et l'alias est inscrit comme introuvable.
 """

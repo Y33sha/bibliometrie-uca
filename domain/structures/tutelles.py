@@ -9,7 +9,14 @@ def check_can_create_tutelle(
     child_id: int,
     ancestors_of_parent: frozenset[int],
 ) -> None:
-    """Lève `ValidationError` si la tutelle `parent_id → child_id` relie une structure à elle-même ou ferme un cycle. `ancestors_of_parent` : ancêtres stricts de `parent_id`."""
+    """Vérifie que la tutelle `parent_id → child_id` peut être créée.
+
+    Args:
+        ancestors_of_parent: ancêtres stricts de `parent_id`.
+
+    Raises:
+        ValidationError: la tutelle relie une structure à elle-même ou ferme un cycle.
+    """
     if parent_id == child_id:
         raise ValidationError(
             f"Auto-référence interdite dans structure_parents : parent_id == child_id ({parent_id})"

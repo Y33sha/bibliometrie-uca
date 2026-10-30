@@ -1,4 +1,4 @@
-"""`StagingStore.upsert` efface le marqueur de disparition : un document retrouvé dans un harvest bulk est présent dans sa source."""
+"""`StagingStore.upsert` efface le marqueur de disparition : un document retrouvé par un moissonnage en masse est présent dans sa source."""
 
 from sqlalchemy import text
 

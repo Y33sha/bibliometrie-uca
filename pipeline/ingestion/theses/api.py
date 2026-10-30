@@ -20,7 +20,7 @@ class ThesesClient:
         self._url = base_url
 
     def fetch_page(self, query: str, *, start: int) -> Mapping[str, JsonValue]:
-        """Une page de `THESES_PER_PAGE` thèses, à partir du rang `start`."""
+        """Renvoie une page de `THESES_PER_PAGE` thèses, à partir du rang `start`."""
         params: dict[str, str | int | float | bool | None] = {
             "q": query,
             "debut": start,
@@ -36,7 +36,7 @@ class ThesesClient:
 async def fetch_thesis(
     client: httpx2.AsyncClient, thesis_id: str
 ) -> LookupOutcome[Mapping[str, JsonValue]]:
-    """Détail de la thèse d'identifiant `thesis_id` (NNT d'une thèse soutenue, identifiant theses.fr d'une thèse en cours), ou `NOT_FOUND`.
+    """Renvoie le détail de la thèse d'identifiant `thesis_id` (NNT d'une thèse soutenue, identifiant theses.fr d'une thèse en cours), ou `NOT_FOUND`.
 
     theses.fr répond 400 pour un identifiant inconnu.
     """

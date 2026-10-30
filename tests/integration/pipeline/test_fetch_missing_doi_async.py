@@ -30,7 +30,7 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 
 
 def _sans_config[S](cls: type[S], **attributs: object) -> S:
-    """Recherche `cls` construite sans lire la configuration, avec les attributs donnés."""
+    """Construit la recherche `cls` sans lire la configuration, avec les attributs donnés."""
     search = cls.__new__(cls)
     for nom, valeur in attributs.items():
         setattr(search, nom, valeur)
@@ -67,7 +67,7 @@ class _FakeAdapter:
 
 
 async def _run(adapter, dois: list[str], *, recorded: list | None = None, **kw) -> PhaseMetrics:
-    """`fetch_missing_doi` sur une connexion simulée et la sélection `dois` ; les DOI inscrits absents s'ajoutent à `recorded`."""
+    """Exécute `fetch_missing_doi` sur une connexion simulée et la sélection `dois` ; les DOI inscrits absents s'ajoutent à `recorded`."""
 
     def _record(conn, source, id_type, doi):  # noqa: ARG001
         if recorded is not None:
@@ -111,7 +111,7 @@ class TestRunAsyncOrchestrator:
 
     @pytest.mark.asyncio
     async def test_l_agence_d_enregistrement_soumet_ses_absents_a_doi_org(self):
-        """Un DOI absent de son agence d'enregistrement est soumis à doi.org, sous la barre de l'agence ; seul celui que doi.org ne connaît pas est inscrit sous `doi_org`."""
+        """Un DOI absent de son agence d'enregistrement est soumis à doi.org, sous la barre de l'agence ; seul un DOI inconnu de doi.org est inscrit sous `doi_org`."""
         recorded: list = []
         barres: list[str] = []
         track_progress = lookup.track_progress

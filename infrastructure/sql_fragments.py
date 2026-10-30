@@ -1,9 +1,12 @@
 """Fragments SQL partagés entre plusieurs adaptateurs de l'API ou du pipeline.
 
-Trois formes : des fragments rendus depuis des constantes du domaine (`in_clause`, `case_priority`), valeurs d'enums ou ordres de priorité, sans entrée utilisateur, donc sûrs à interpoler ; des expressions rendues depuis les alias de la requête hôte ; des expressions SQL figées.
+Le module contient des fragments construits depuis des constantes du domaine (`in_clause`, `case_priority`), des expressions construites depuis les alias de la requête hôte, et des expressions SQL figées. Les constantes du domaine (valeurs d'enums, ordres de priorité) sont sans entrée utilisateur, donc sûres à interpoler.
 """
 
+import json
+
 from application.ports.repositories.address_repository import AddressCountryFilter
+from domain.config import DEFAULT_LABORATORY_TYPES, LABORATORY_TYPES_KEY
 from domain.persons.identifiers import AttributionStatus, PersonIdentifierType
 from domain.persons.matching import ORCID_MATCH_SOURCES, STRONG_PERSON_IDENTIFIER_TYPES
 from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
@@ -16,18 +19,21 @@ from domain.structures.perimeter_evidence import PerimeterEvidence
 
 
 def in_clause(values: tuple[str, ...]) -> str:
-    """Contenu d'une clause SQL `IN` : `('a', 'b', …)`, prêt à interpoler dans `col IN {...}`."""
+    """Renvoie le contenu d'une clause SQL `IN` : `('a', 'b', …)`, prêt à interpoler dans `col IN {...}`."""
     return "(" + ", ".join(f"'{v}'" for v in values) + ")"
 
 
 def case_priority(values: tuple[str, ...], col: str) -> str:
-    """Fragment `CASE <col> WHEN 'v1' THEN 1 … END` classant `col` par l'ordre de `values`, pour un `ORDER BY` ou un `array_agg(… ORDER BY …)`."""
+    """Renvoie le fragment `CASE <col> WHEN 'v1' THEN 1 … END` classant `col` par l'ordre de `values`, pour un `ORDER BY` ou un `array_agg(… ORDER BY …)`."""
     whens = " ".join(f"WHEN '{v}' THEN {i + 1}" for i, v in enumerate(values))
     return f"CASE {col} {whens} END"
 
 
 def person_source_contribution(source_contribution: str = "sc") -> str:
-    """Condition vraie quand la contribution source aliasée `source_contribution` désigne une personne : elle appartient à une contribution (`aligned_source_contributions`). Les contributions sources collectives, les doublons d'auteur et celles des enregistrements sources écartés de l'alignement restent hors contribution."""
+    """Renvoie la condition vraie quand la contribution source aliasée `source_contribution` désigne une personne, donc appartient à une contribution (`aligned_source_contributions`).
+
+    Les contributions sources collectives, les doublons d'auteur et les contributions sources des enregistrements sources écartés de l'alignement restent hors contribution.
+    """
     return (
         "EXISTS (SELECT 1 FROM aligned_source_contributions gm"
         f" WHERE gm.source_contribution_id = {source_contribution}.id)"
@@ -44,12 +50,12 @@ CONTRIBUTIONS_AND_SOURCES = """
 
 
 def pinned(source_contribution_id: str) -> str:
-    """Condition vraie quand l'administration a épinglé la contribution source d'identifiant `source_contribution_id` à une personne (`confirmed_source_contributions`)."""
+    """Renvoie la condition vraie quand l'administration a épinglé la contribution source d'identifiant `source_contribution_id` à une personne (`confirmed_source_contributions`)."""
     return f"EXISTS (SELECT 1 FROM confirmed_source_contributions ca WHERE ca.source_contribution_id = {source_contribution_id})"
 
 
 def active_name_form(form: str) -> str:
-    """Condition vraie quand la forme de nom `form` (ligne de `person_name_forms`, ou son alias) désigne sa personne au matching : une forme dérivée du nom de la personne, ou une forme non rejetée."""
+    """Renvoie la condition vraie quand la forme de nom `form` (ligne de `person_name_forms`, ou son alias) désigne sa personne au matching : une forme dérivée du nom de la personne, ou une forme non rejetée."""
     return (
         f"({form}.status <> '{AttributionStatus.REJECTED.value}'"
         f" OR '{CANONICAL_NAME_FORM_SOURCE}' = ANY({form}.sources))"
@@ -57,7 +63,7 @@ def active_name_form(form: str) -> str:
 
 
 def pending_name_form(form: str) -> str:
-    """Condition vraie quand la forme de nom `form` (ligne de `person_name_forms`, ou son alias) est à confirmer : en attente, hors forme dérivée du nom de la personne, qui se confirme d'office."""
+    """Renvoie la condition vraie quand la forme de nom `form` (ligne de `person_name_forms`, ou son alias) est à confirmer : en attente, hors forme dérivée du nom de la personne, confirmée d'office."""
     return (
         f"({form}.status = '{AttributionStatus.PENDING.value}'"
         f" AND NOT ('{CANONICAL_NAME_FORM_SOURCE}' = ANY({form}.sources)))"
@@ -65,27 +71,33 @@ def pending_name_form(form: str) -> str:
 
 
 DETACHED_CONTRIBUTION = "person_id = NULL, resolution_mode = NULL"
-"""Affectations d'un `UPDATE contributions` qui retire sa personne à une contribution."""
+"""Affectations d'un `UPDATE contributions` détachant une contribution de sa personne."""
 
 
 def diamond_journal_sql(serial: str = "j") -> str:
-    """Condition vraie quand la revue aliasée `journal` est diamant : marquée `diamond`, ou présente dans le DOAJ sans APC ni autres frais. NULL quand la revue est absente d'une jointure externe."""
+    """Renvoie la condition vraie quand la revue aliasée `serial` est diamant. NULL quand la revue est absente d'une jointure externe."""
+    return f"({serial}.oa_model = '{OaModel.DIAMOND.value}')"
+
+
+def is_laboratory(structure: str = "s") -> str:
+    """Renvoie la condition vraie quand la structure aliasée `structure` est d'un type traité comme laboratoire (clé de config `LABORATORY_TYPES_KEY`, `DEFAULT_LABORATORY_TYPES` en son absence). La liste des types se calcule une fois par requête."""
+    default = json.dumps([t.value for t in DEFAULT_LABORATORY_TYPES])
     return (
-        f"({serial}.oa_model = '{OaModel.DIAMOND.value}' OR ({serial}.is_in_doaj"
-        f" AND {serial}.doaj_payload->>'APC' = 'No'"
-        f" AND {serial}.doaj_payload->>'Has other fees' = 'No'))"
+        f"{structure}.structure_type = ANY(ARRAY(SELECT jsonb_array_elements_text(COALESCE("
+        f"(SELECT value FROM config WHERE key = '{LABORATORY_TYPES_KEY}'), '{default}'::jsonb)"
+        "))::structure_type[])"
     )
 
 
 def has_author_role(source_contribution: str = "sc") -> str:
-    """Condition vraie quand la contribution source ou la contribution aliasée `source_contribution` tient le rôle d'auteur."""
+    """Renvoie la condition vraie quand la contribution source ou la contribution aliasée `source_contribution` tient le rôle d'auteur."""
     return f"{source_contribution}.roles && ARRAY['{ContributionRole.AUTHOR.value}']::text[]"
 
 
 def identifier_neutralized(
     id_type: str, source_contribution: str = "sc", *, reason: str | None = None
 ) -> str:
-    """Condition vraie quand la contribution source aliasée `source_contribution` neutralise l'identifiant `id_type`, pour le motif `reason` s'il est donné.
+    """Renvoie la condition vraie quand la contribution source aliasée `source_contribution` neutralise l'identifiant `id_type`, pour le motif `reason` s'il est donné.
 
     `id_type` est une expression SQL : littéral (`'orcid'`), paramètre (`:id_type`) ou colonne.
     """
@@ -99,7 +111,7 @@ def identifier_neutralized(
 def usable_identifier(
     id_type: str, *, source_contribution: str = "sc", contributor_information: str = "ci"
 ) -> str:
-    """Valeur de l'identifiant `id_type` dans les informations du contributeur d'une contribution source, NULL quand la contribution source le neutralise."""
+    """Renvoie la valeur de l'identifiant `id_type` dans les informations du contributeur d'une contribution source, NULL quand la contribution source le neutralise."""
     return (
         f"CASE WHEN {identifier_neutralized(id_type, source_contribution)} THEN NULL"
         f" ELSE {contributor_information}.identifiers ->> {id_type} END"
@@ -107,7 +119,7 @@ def usable_identifier(
 
 
 def trusted_identifier_sql(id_type: str, source_contribution: str = "sc") -> str:
-    """Condition SQL de `trusted_identifier` pour l'identifiant `id_type` de la contribution source aliasée `source_contribution`."""
+    """Renvoie la condition SQL de `trusted_identifier` pour l'identifiant `id_type` de la contribution source aliasée `source_contribution`."""
     if id_type != PersonIdentifierType.ORCID:
         return "TRUE"
     return f"{source_contribution}.source::text IN {in_clause(tuple(sorted(ORCID_MATCH_SOURCES)))}"
@@ -121,9 +133,12 @@ def strong_identifier_source_contributions(
     joins: str = "",
     where: str = "",
 ) -> str:
-    """Requête des contributions sources `sc_auth` dont les informations du contributeur contiennent l'identifiant `id_type` d'une ligne de `identifiers`.
+    """Renvoie la requête des contributions sources `sc_auth` dont les informations du contributeur contiennent l'identifiant `id_type` d'une ligne de `identifiers`.
 
-    `identifiers` : table ou sous-requête, aliasée `pi`, de colonnes `person_id`, `id_type`, `id_value`. L'identifiant que la contribution source neutralise est écarté, et celui que sa source rend non fiable (`trusted_identifier_sql`). La requête rejoint les contributions sources par `contributor_information_id` après un rapprochement sur `contributor_information`.
+    Un identifiant neutralisé par la contribution source est écarté, comme un identifiant non fiable pour sa source (`trusted_identifier_sql`). La jointure passe par `contributor_information`, puis par `contributor_information_id`.
+
+    Args:
+        identifiers: table ou sous-requête, aliasée `pi`, de colonnes `person_id`, `id_type`, `id_value`.
     """
     return f"""
         SELECT {select}
@@ -139,7 +154,7 @@ def strong_identifier_source_contributions(
     """
 
 
-# Identifiants des personnes RH, aux statuts qui les font interroger, avec les années de présence : de l'année qui suit l'arrivée à l'année de fin de contrat. Sans date : 0, 9999.
+# Identifiants des personnes RH, aux statuts interrogés, avec les années de présence : de l'année qui suit l'arrivée à l'année de fin de contrat. Sans date : 0, 9999.
 _RH_IDENTIFIERS = f"""(
     SELECT pi.person_id, pi.id_type::text AS id_type, pi.id_value,
            coalesce(extract(year FROM r.start_date)::int + 1, 0) AS first_year,
@@ -151,9 +166,12 @@ _RH_IDENTIFIERS = f"""(
 
 
 def hr_record_source_contributions(source_contribution_filter: str = "") -> str:
-    """Requête des ids des contributions sources qui entrent dans le périmètre par l'identifiant fort d'une personne qui a une fiche RH. La publication paraît entre l'année qui suit son arrivée et l'année de fin de son contrat, sans rejet de la personne pour l'enregistrement source.
+    """Renvoie la requête des ids des contributions sources entrées dans le périmètre par l'identifiant fort d'une personne à fiche RH.
 
-    `source_contribution_filter` : condition supplémentaire sur la contribution source `sc_auth`.
+    La publication paraît entre l'année suivant l'arrivée de la personne et l'année de fin de son contrat. La personne est sans rejet pour l'enregistrement source.
+
+    Args:
+        source_contribution_filter: condition supplémentaire sur la contribution source `sc_auth`.
     """
     conditions = [
         "sr_rh.publication_year BETWEEN pi.first_year AND pi.last_year",
@@ -185,7 +203,7 @@ REJECTED_PAIRS = (
 
 
 def publication_rejected_for(publication_id: str, person_id: str) -> str:
-    """Condition vraie quand la publication `publication_id` est rejetée pour la personne `person_id` (expressions SQL) : un de ses enregistrements sources l'est."""
+    """Renvoie la condition vraie quand la publication `publication_id` est rejetée pour la personne `person_id` (expressions SQL) : un de ses enregistrements sources l'est."""
     return (
         "EXISTS (SELECT 1 FROM rejected_contributions rej"
         " JOIN source_records sr_rej ON sr_rej.id = rej.source_record_id"
@@ -198,9 +216,12 @@ NO_PERIMETER_EVIDENCE = "'{}'::perimeter_evidence[]"
 
 
 def source_contribution_perimeter_evidence(source_contribution_ids: str | None = None) -> str:
-    """Requête des indices de l'entrée dans le périmètre de chaque contribution source qui en a : colonnes `id` et `evidence`, tableau trié.
+    """Renvoie la requête des indices de l'entrée dans le périmètre, par contribution source : colonnes `id` et `evidence`, tableau trié.
 
-    `:perimeter_ids` : structures du périmètre, atteintes par la vue matérialisée `source_contribution_structures`. `source_contribution_ids` : nom d'un paramètre lié, tableau d'ids, qui restreint les contributions sources.
+    Le paramètre lié `:perimeter_ids` désigne les structures du périmètre, atteintes par la vue matérialisée `source_contribution_structures`.
+
+    Args:
+        source_contribution_ids: nom d'un paramètre lié, tableau d'ids restreignant les contributions sources.
     """
     by_structure = "scs.structure_id = ANY(:perimeter_ids)"
     by_contributor_information = ""
@@ -222,47 +243,50 @@ def source_contribution_perimeter_evidence(source_contribution_ids: str | None =
 
 
 def corrected(field: str, source_record: str = "sr") -> str:
-    """Condition vraie quand la phase `metadata_correction` a corrigé le champ `field` de l'enregistrement source aliasé `source_record` (`domain.source_records.corrections`)."""
+    """Renvoie la condition vraie quand la phase `metadata_correction` a corrigé le champ `field` de l'enregistrement source aliasé `source_record` (`domain.source_records.corrections`)."""
     return f"{source_record}.corrections ? '{field}'"
 
 
 def corrected_by(field: str, source_record: str = "sr") -> str:
-    """Règle qui a corrigé le champ `field` de l'enregistrement source aliasé `source_record`. NULL quand le champ est intact."""
+    """Renvoie la règle de correction du champ `field` de l'enregistrement source aliasé `source_record`. NULL quand le champ est intact."""
     return f"{source_record}.corrections -> '{field}' ->> '{CORRECTED_BY}'"
 
 
 def stashed_raw(field: str, source_record: str = "sr") -> str:
-    """Valeur que la source donne pour le champ `field` de l'enregistrement source aliasé `source_record`, quand une correction l'a changée. NULL quand le champ est intact."""
+    """Renvoie la valeur donnée par la source pour le champ `field` de l'enregistrement source aliasé `source_record`, avant correction. NULL quand le champ est intact."""
     return f"{source_record}.corrections -> '{field}' ->> '{RAW}'"
 
 
 def source_extra(key: SourceExtra, alias: str = "sr") -> str:
-    """Valeur texte de la clé `key` des champs propres à la source de la ligne aliasée `alias`, enregistrement source ou publication."""
+    """Renvoie la valeur texte de la clé `key` des champs propres à la source de la ligne aliasée `alias`, enregistrement source ou publication."""
     return f"{alias}.source_extras ->> '{key}'"
 
 
 def source_extra_json(key: SourceExtra, alias: str = "sr") -> str:
-    """Valeur JSON de la clé `key` des champs propres à la source de la ligne aliasée `alias`."""
+    """Renvoie la valeur JSON de la clé `key` des champs propres à la source de la ligne aliasée `alias`."""
     return f"{alias}.source_extras -> '{key}'"
 
 
 def has_source_extra(key: SourceExtra, alias: str = "sr") -> str:
-    """Condition vraie quand les champs propres à la source de la ligne aliasée `alias` contiennent la clé `key`."""
+    """Renvoie la condition vraie quand les champs propres à la source de la ligne aliasée `alias` contiennent la clé `key`."""
     return f"{alias}.source_extras ? '{key}'"
 
 
 def declares_conference_sql(alias: str = "sr") -> str:
-    """Condition vraie quand l'enregistrement source aliasé `alias` nomme son congrès (`declares_conference`)."""
+    """Renvoie la condition vraie quand l'enregistrement source aliasé `alias` nomme son congrès (`declares_conference`)."""
     return f"COALESCE({has_source_extra(SourceExtra.CONFERENCE, alias)}, false)"
 
 
 def self_declared_preprint_sql(alias: str = "sr") -> str:
-    """Condition vraie quand l'enregistrement source aliasé `alias` déclare être le preprint d'une autre œuvre."""
+    """Renvoie la condition vraie quand l'enregistrement source aliasé `alias` déclare être le preprint d'une autre œuvre."""
     return f"COALESCE(jsonb_exists({source_extra_json(SourceExtra.RELATION, alias)}, '{CROSSREF_PREPRINT_OF}'), false)"
 
 
 def propagate_contribution_attributes_sql(contribution_ids: str) -> str:
-    """Recompose les attributs des contributions de la requête `group_ids` depuis leurs contributions sources : correspondant si une contribution source le dit, union des rôles et des indices de périmètre. Seules les contributions dont un attribut change sont écrites."""
+    """Renvoie l'instruction recomposant les attributs des contributions de la requête `contribution_ids` depuis leurs contributions sources.
+
+    Une contribution est correspondante si une de ses contributions sources l'est. Ses rôles et ses indices de périmètre sont l'union de ceux de ses contributions sources. Seules les contributions à attribut changé sont écrites.
+    """
     return f"""
         WITH members AS (
             SELECT gm.contribution_id, sc.is_corresponding, sc.perimeter_evidence, sc.roles
@@ -295,9 +319,9 @@ def propagate_contribution_attributes_sql(contribution_ids: str) -> str:
 
 
 def pinned_contributions_sql(contribution_ids: str) -> tuple[str, str]:
-    """Deux requêtes, à jouer dans l'ordre, qui rattachent à la personne épinglée les contributions de la requête `group_ids` dont une contribution source est épinglée.
+    """Renvoie deux requêtes, à jouer dans l'ordre, rattachant à la personne épinglée les contributions de la requête `contribution_ids` à contribution source épinglée.
 
-    Une contribution dont les contributions sources sont épinglées à plusieurs personnes reste en l'état. Dans une publication, une contribution par personne au plus : une contribution épinglée cède devant une autre contribution manuelle de la même personne, et prend sa personne à une autre contribution non manuelle. La première requête libère ces autres contributions, la seconde rattache les contributions épinglées en mode `manual`.
+    Une contribution aux contributions sources épinglées à plusieurs personnes reste en l'état. Dans une publication, une personne a au plus une contribution. Une contribution épinglée cède devant une autre contribution manuelle de la même personne. Elle prend sa personne à une autre contribution non manuelle. La première requête libère ces autres contributions, la seconde rattache les contributions épinglées en mode `manual`.
     """
     target = f"""
         WITH pinned AS (
@@ -338,7 +362,7 @@ def pinned_contributions_sql(contribution_ids: str) -> tuple[str, str]:
 
 
 def active_issns(serial: str) -> str:
-    """Tableau des ISSN actifs de la revue `journal` (expression SQL), dans l'ordre d'enregistrement ; tableau vide sans ISSN."""
+    """Renvoie le tableau des ISSN actifs de la revue `serial` (expression SQL), dans l'ordre d'enregistrement ; tableau vide sans ISSN."""
     return f"""coalesce((
         SELECT array_agg(i.issn ORDER BY i.id) FROM serial_issns i
         WHERE i.serial_id = {serial} AND i.status = 'active'
@@ -348,7 +372,7 @@ def active_issns(serial: str) -> str:
 def address_country_conditions(
     criteria: AddressCountryFilter,
 ) -> tuple[list[str], dict[str, object]]:
-    """Conditions SQL de `criteria` sur l'adresse aliasée `a`, et leurs paramètres."""
+    """Renvoie les conditions SQL de `criteria` sur l'adresse aliasée `a`, et leurs paramètres."""
     conditions: list[str] = []
     params: dict[str, object] = {}
     if criteria.search:
@@ -365,5 +389,5 @@ def address_country_conditions(
 
 
 def has_active_issn(serial: str) -> str:
-    """Condition vraie quand la revue `journal` a un ISSN actif."""
+    """Renvoie la condition vraie quand la revue `serial` a un ISSN actif."""
     return f"EXISTS (SELECT 1 FROM serial_issns i WHERE i.serial_id = {serial} AND i.status = 'active')"

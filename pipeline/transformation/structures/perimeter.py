@@ -1,6 +1,6 @@
 """Périmètres : structures de chaque périmètre, matérialisées dans `perimeter_structures`, et erreur du périmètre d'extraction vide.
 
-La table se recalcule en tête de pipeline, avant toute phase, et après chaque édition d'un périmètre, d'une structure ou d'une tutelle par l'administration (`PerimeterStructures`)."""
+La table se recalcule avant toute phase du pipeline, et après chaque édition d'un périmètre, d'une structure ou d'une tutelle par l'administration (`PerimeterStructures`)."""
 
 from sqlalchemy import Connection, text
 
@@ -8,7 +8,7 @@ from infrastructure.read_models.perimeters.queries import get_persons_structure_
 
 
 class EmptyExtractionPerimeterError(RuntimeError):
-    """Le périmètre d'extraction ne contient aucune structure. Les phases qui en dépendent s'arrêtent en échec."""
+    """Erreur du périmètre d'extraction sans structure. Les phases dépendantes de ce périmètre s'arrêtent en échec."""
 
     def __init__(self) -> None:
         super().__init__(
@@ -18,7 +18,7 @@ class EmptyExtractionPerimeterError(RuntimeError):
 
 
 def refresh_perimeter_structures(conn: Connection) -> None:
-    """Recalcule `perimeter_structures` : pour chaque périmètre, ses structures racines et les structures dont elles sont tutelles, directement ou non. Seules comptent les structures existantes. L'appelant commite."""
+    """Recalcule `perimeter_structures` : pour chaque périmètre, ses structures racines et les structures sous leur tutelle, directement ou non. Seules comptent les structures existantes. L'appelant commite."""
     conn.execute(text("DELETE FROM perimeter_structures"))
     conn.execute(
         text("""

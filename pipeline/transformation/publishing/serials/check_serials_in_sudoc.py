@@ -1,8 +1,8 @@
-"""Sous-étape de la phase `publishing` — vérifie les ISSN des revues dans le Sudoc.
+"""Sous-étape de la phase `publishing` : vérification des ISSN des revues dans le Sudoc.
 
-Sont reprises les revues dont un ISSN n'est pas vérifié, les revues dont un enregistrement source a un ISSN absent de leurs ISSN, et les séries d'actes ou collections de livres à ISSN dont le titre a la forme d'un volume. Celles-ci reçoivent leur titre de série (`reference_series_title`) : le titre de la notice Sudoc, à défaut le titre sans ses marques d'édition. Le Sudoc donne la notice de chacun de leurs ISSN, des corrections possibles de leurs valeurs mal formées, et des ISSN d'autre support que ces notices désignent. `domain.serials.issn_check` en tire le support et le statut de chaque ISSN, les ISSN à écarter et les corrections. Chaque ISSN reçoit la date de la vérification.
+Sont reprises les revues dont un ISSN n'est pas vérifié, les revues dont un enregistrement source a un ISSN absent de leurs ISSN, et les séries d'actes ou collections de livres à ISSN dont le titre a la forme d'un volume. Celles-ci reçoivent leur titre de série (`reference_series_title`) : le titre de la notice Sudoc, à défaut le titre sans ses marques d'édition. Le Sudoc donne la notice de chacun de leurs ISSN, des corrections possibles de leurs valeurs mal formées, et les ISSN d'autre support désignés par ces notices. `domain.serials.issn_check` déduit des notices le support et le statut de chaque ISSN, les ISSN à écarter et les corrections. Chaque ISSN reçoit la date de la vérification.
 
-Les revues passent par `run_fetch_pool` : téléchargements concurrents sur un client HTTP partagé, écritures sérialisées, commit par paquets. Le rythme de la source, posé par l'accès au Sudoc, plafonne le débit, toutes requêtes simultanées confondues. Une revue dont une requête échoue garde ses ISSN non vérifiés : le run suivant la reprend. Les requêtes au Sudoc sont injectées (`pipeline/ingestion/complements/sudoc.py`).
+Les revues passent par `run_fetch_pool` : téléchargements concurrents sur un client HTTP partagé, écritures sérialisées, commit par paquets. Le rythme de la source, posé par l'accès au Sudoc, plafonne le débit, toutes requêtes simultanées confondues. Si une requête échoue, la revue garde ses ISSN non vérifiés et le run suivant la reprend. Les requêtes au Sudoc sont injectées (`pipeline/ingestion/complements/sudoc.py`).
 """
 
 import logging
@@ -47,17 +47,18 @@ FetchPpns = Callable[[httpx2.AsyncClient, Sequence[str]], Awaitable[dict[str, tu
 FetchRecord = Callable[[httpx2.AsyncClient, str], Awaitable[SudocSerialRecord | None]]
 """`(client, ppn) -> notice`, ou `None` si la notice est introuvable ou illisible."""
 
-# Le sort des ISSN d'une revue tient du détail : le terminal le masque, le journal le garde.
+# Lignes de détail sur les ISSN d'une revue : le terminal les masque, le journal les garde.
 _DETAIL = {"detail": True}
 
 
 class SerialSudocRow(NamedTuple):
-    """Une revue à vérifier dans le Sudoc : son titre, ses ISSN et les ISSN de ses enregistrements sans figurer parmi les siens."""
+    """Revue à vérifier dans le Sudoc."""
 
     id: int
     title: str
     issns: tuple[SerialIssn, ...]
     document_issns: tuple[str, ...] = ()
+    """ISSN des enregistrements sources de la revue, absents des ISSN de la revue."""
     serial_type: SerialType = SerialType.UNKNOWN
 
 
@@ -69,7 +70,7 @@ class SerialTitleTypeRow(NamedTuple):
     serial_type: SerialType
 
 
-# ISSN des enregistrements de chaque revue, toutes sources, tels que reçus : `find_serials_to_check_in_sudoc` les normalise.
+# ISSN des enregistrements sources de chaque revue, toutes sources, tels que reçus : `find_serials_to_check_in_sudoc` les normalise.
 _DOCUMENT_ISSNS = text(f"""
     SELECT DISTINCT s.serial_id, trim(v.issn) AS issn
     FROM source_records s
@@ -88,7 +89,7 @@ _SERIALS_WITH_UNCHECKED_ISSNS = text("""
 
 
 def find_titles_of_serials_with_issn(conn: Connection) -> list[SerialTitleTypeRow]:
-    """Les revues qui ont un ISSN actif, avec leur titre et leur type."""
+    """Renvoie les revues à ISSN actif, avec leur titre et leur type."""
     rows = conn.execute(
         select(serials.c.id, serials.c.title, serials.c.serial_type)
         .where(
@@ -105,7 +106,7 @@ def find_titles_of_serials_with_issn(conn: Connection) -> list[SerialTitleTypeRo
 def find_serials_to_check_in_sudoc(
     conn: Connection, also: Sequence[int] = ()
 ) -> list[SerialSudocRow]:
-    """Revues dont un ISSN n'est pas vérifié dans le Sudoc, revues dont un enregistrement a un ISSN valide absent de leurs ISSN et encore jamais vérifié, et revues `also`."""
+    """Renvoie les revues dont un ISSN n'est pas vérifié dans le Sudoc, celles dont un enregistrement source a un ISSN valide absent de leurs ISSN et jamais vérifié, et les revues `also`."""
     issns_of = issns_by_serial(conn)
     released: set[str] = set(
         conn.execute(
@@ -125,7 +126,7 @@ def find_serials_to_check_in_sudoc(
         if str(issn) not in values:
             values.append(str(issn))
     ids = set(conn.execute(_SERIALS_WITH_UNCHECKED_ISSNS).scalars()) | set(documents) | set(also)
-    # Des ISSN saisis à la main font autorité : la vérification Sudoc passe à côté.
+    # Des ISSN saisis à la main font autorité : leur revue est exclue de la vérification Sudoc.
     rows = conn.execute(
         select(serials.c.id, serials.c.title, serials.c.serial_type)
         .where(
@@ -155,7 +156,12 @@ def record_sudoc_check(
     checked_at: datetime,
     title: str | None = None,
 ) -> None:
-    """Écrit les ISSN vérifiés d'une revue, datés de `checked_at`. `released` : ISSN d'une autre publication, retirés de la revue et gardés sans revue. Un `title` devient le titre de la revue, et une de ses formes de nom."""
+    """Écrit les ISSN vérifiés d'une revue, datés de `checked_at`.
+
+    Args:
+        released: ISSN d'une autre publication, retirés de la revue et gardés sans revue.
+        title: titre de la revue, ajouté aussi à ses formes de nom.
+    """
     store = SerialStore(conn)
     if store.issns_are_manual(serial_id):
         issns, released = [], []
@@ -200,7 +206,7 @@ def _serial_issns(row: SerialSudocRow) -> SerialIssns:
 
 
 def _adopted(row: SerialSudocRow, check: SudocCheck) -> tuple[str, ...]:
-    """ISSN venus des enregistrements de la revue que la vérification rend actifs."""
+    """Renvoie les ISSN des enregistrements sources de la revue, rendus actifs par la vérification."""
     active = {r.issn for r in check.issns if r.status is IssnStatus.ACTIVE}
     return tuple(i for i in row.document_issns if i in active)
 
@@ -234,7 +240,11 @@ async def run_check_serials_in_sudoc(
     max_concurrent: int,
     max_per_run: int | None,
 ) -> PhaseMetrics:
-    """Vérifie les revues à vérifier, `max_concurrent` à la fois. `max_per_run` plafonne le nombre de revues vérifiées, `None` valant illimité : les suivantes attendent le run suivant."""
+    """Vérifie les revues dans le Sudoc, `max_concurrent` à la fois.
+
+    Args:
+        max_per_run: plafond de revues vérifiées, `None` pour illimité ; les suivantes attendent le run suivant.
+    """
     titled_as_volumes = [
         j.id
         for j in find_titles_of_serials_with_issn(conn)
@@ -275,13 +285,13 @@ async def run_check_serials_in_sudoc(
     async def _fetch(
         client: httpx2.AsyncClient, row: SerialSudocRow
     ) -> dict[str, SudocSerialRecord] | None:
-        """Notices utiles à la vérification de la revue, ou `None` si une requête a échoué."""
+        """Renvoie les notices utiles à la vérification de la revue, ou `None` si une requête a échoué."""
         serial = _serial_issns(row)
         issns = (*serial.examined(), *correction_candidates(serial.malformed()))
         records: dict[str, SudocSerialRecord] = {}
         try:
             await _read(client, issns, records)
-            # L'ISSN d'autre support qu'une notice désigne complète une colonne vide : sa propre notice donne son support.
+            # L'ISSN d'autre support désigné par une notice complète une colonne vide. Sa propre notice donne son support.
             others = list(
                 dict.fromkeys(
                     x for r in records.values() for x in r.other_support_issns if x not in issns

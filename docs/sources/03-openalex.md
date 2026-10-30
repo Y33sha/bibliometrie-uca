@@ -14,16 +14,16 @@ https://developers.openalex.org/
 - [Moissonnage par personne](../pipeline/02-harvest.md#moissonnage-par-personne-harvest_by_person) : filtre `authorships.author.orcid` sur un lot de 50 personnes RH
 - Pagination par cursor, 200 résultats/page, à 8 req/s (`MAX_PER_SECOND`, `pipeline/ingestion/api_params.py`)
 
-**Sources API** (https://api.openalex.org/sources) — enrichissement par `openalex_id` de la revue. `enrich_serials_from_openalex`, dans la phase [`publishing`](../pipeline/05-publishing.md). Met à jour `serials.serial_type`.
+**Sources API** (https://api.openalex.org/sources) — interrogée par `openalex_id` de la revue. `enrich_serials_from_openalex`, dans la phase [`publishing`](../pipeline/05-publishing.md). Met à jour `serials.serial_type`.
 
-**Publishers API** (https://api.openalex.org/publishers) — enrichissement par `openalex_id` de l'éditeur, lancé à la demande par `interfaces/cli/maintenance/enrich_publishers.py`, hors pipeline. Écrit le pays des éditeurs qui n'en ont pas. Les éditeurs sans identifiant OpenAlex, la plupart, reçoivent leur pays et leur type à la main.
+**Publishers API** (https://api.openalex.org/publishers) — interrogée par `openalex_id` de l'éditeur, à la demande, par `interfaces/cli/maintenance/enrich_publishers.py`, hors pipeline. Écrit le pays des éditeurs sans pays. Les éditeurs sans identifiant OpenAlex, la plupart, reçoivent leur pays et leur type à la main.
 
 ## Données récupérées
 
 - **Publications** : identifiant OpenAlex, titre, DOI, année et date de publication, type, langue, statut open access, nombre de citations, indication de rétractation, résumé (reconstruit depuis l'inverted index), mots-clés, topics (hiérarchie domain/field/subfield/topic + score), biblio (volume/numéro/pages), URLs des copies de l'article
 - **Licence** : licence de la localisation principale (`primary_location`)
 - **Localisations** (`source_record_locations`) : chaque copie du document, avec son URL, son PDF, son identifiant OAI-PMH, sa version, sa licence et son accès. La source d'une copie de type `repository` donne sa plateforme (`platforms`), sous le nom qu'OpenAlex lui donne. Les fiches du DOAJ, sans copie du texte, sont écartées.
-- **Auteurs** : nom tel qu'il apparaît dans la contribution source, auteur correspondant, ORCID si présent.
+- **Auteurs** : nom brut, auteur correspondant, ORCID si présent.
 - **Affiliations** : adresse textuelle + identifiants OpenAlex des institutions
 - **Revues et éditeurs** : titre, ISSN, eISSN, ISSN-L, type, modèle OA, identifiants OpenAlex du journal et de l'éditeur
 
@@ -177,4 +177,4 @@ Document `W4395704497` (2 auteurs, article de mathématiques). `abstract_inverte
 ## Particularités
 
 - Les requêtes paginées tronquent les `authorships` à **100 auteurs** par publication. Ces works sont marqués `staging.authors_truncated` au moissonnage, et [fetch_truncated](https://github.com/Y33sha/bibliometrie-uca/blob/master/pipeline/ingestion/openalex/fetch_truncated.py) les retélécharge un par un pour lire la liste complète.
-- OpenAlex rattache chaque auteur à une entité auteur qu'il construit par algorithme, souvent fautive (`author.display_name`, `author.orcid`). Le pipeline lit le nom (`raw_author_name`) et l'ORCID (`raw_orcid`) que donne la source amont d'OpenAlex. Cet ORCID sert au rattachement des personnes, comme ceux de Crossref, DataCite et HAL (`ORCID_MATCH_SOURCES`).
+- OpenAlex rattache chaque auteur à une entité auteur construite par algorithme, souvent fautive (`author.display_name`, `author.orcid`). Le pipeline lit le nom (`raw_author_name`) et l'ORCID (`raw_orcid`) donnés par la source amont d'OpenAlex. Cet ORCID sert au rattachement des personnes, comme ceux de Crossref, DataCite et HAL (`ORCID_MATCH_SOURCES`).

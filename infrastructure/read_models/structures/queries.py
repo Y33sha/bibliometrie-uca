@@ -58,7 +58,7 @@ _PARTNER_TYPE = (
     "(CAST(:types AS text[]) = '{}' OR CAST(ro.types AS text[]) && CAST(:types AS text[]))"
 )
 
-# Contribution de la structure `:structure_id` : dans le périmètre, rattachée à elle par `contribution_structures`, et qui tient le rôle d'auteur. S'applique à un alias `a` sur `contributions`.
+# Contribution de la structure `:structure_id` : dans le périmètre, rattachée à la structure par `contribution_structures`, au rôle d'auteur. S'applique à l'alias `a` de `contributions`.
 AUTHOR_SOURCE_CONTRIBUTION = f"""
     a.in_perimeter = TRUE
     AND {has_author_role("a")}
@@ -68,7 +68,7 @@ AUTHOR_SOURCE_CONTRIBUTION = f"""
     )
 """
 
-# Publication `p` que la structure signe. La forme `EXISTS` compte chaque publication une fois, là où une jointure la dupliquerait par auteur de la structure.
+# Publication `p` signée par la structure. La forme `EXISTS` compte chaque publication une fois, là où une jointure la dupliquerait par auteur de la structure.
 AUTHORED_PUBLICATION = f"""
     EXISTS (
         SELECT 1 FROM contributions a
@@ -83,7 +83,7 @@ StructureFacet = Literal["types", "tutelles", "perimeters"]
 def _structure_where(
     filters: StructureFilters, *, skip: StructureFacet | None = None
 ) -> tuple[str, dict[str, object]]:
-    """Clause WHERE sur l'alias `s` de `structures`, sans le filtre de la facette `skip`."""
+    """Renvoie la clause WHERE sur l'alias `s` de `structures`, sans le filtre de la facette `skip`."""
     parts: list[str] = []
     binds: dict[str, object] = {}
     if filters.search:
@@ -146,7 +146,7 @@ _STRUCTURE_LIST_COLUMNS = """
     (SELECT json_agg(json_build_object(
          'id', sp.id, 'code', sp.code, 'name', sp.name, 'acronym', sp.acronym,
          'type', sp.structure_type::text,
-         'relation_id', sr.id
+         'tutelle_id', sr.id
      ) ORDER BY sp.name)
      FROM structure_parents sr
      JOIN structures sp ON sp.id = sr.parent_id
@@ -176,7 +176,7 @@ def _related_from_row(row: Row[tuple[object, ...]]) -> RelatedStructureOut:
         name=row.name,
         acronym=row.acronym,
         type=row.type,
-        relation_id=row.relation_id,
+        tutelle_id=row.tutelle_id,
     )
 
 
@@ -199,7 +199,7 @@ class StructuresQueries:
         self._conn = conn
 
     def list_all_structures(self) -> list[StructureListItem]:
-        """Toutes les structures, triées par nom, pour les sélecteurs de structure."""
+        """Renvoie toutes les structures, triées par nom, pour les sélecteurs de structure."""
         rows = self._conn.execute(
             text(f"SELECT {_STRUCTURE_LIST_COLUMNS} FROM structures s ORDER BY lower(s.name), s.id")
         ).all()
@@ -208,7 +208,7 @@ class StructuresQueries:
     def list_structures(
         self, *, filters: StructureFilters, sort: StructureSort, page: int, per_page: int
     ) -> StructureListResponse:
-        """Page de la liste des structures sous les filtres, au tri demandé."""
+        """Renvoie une page de la liste des structures sous les filtres, au tri demandé."""
         where, binds = _structure_where(filters)
         total = self._conn.execute(
             text(f"SELECT COUNT(*) FROM structures s WHERE {where}"), binds
@@ -231,7 +231,7 @@ class StructuresQueries:
         )
 
     def structures_facets(self, *, filters: StructureFilters) -> StructuresFacetsResponse:
-        """Décomptes par option des facettes de la liste des structures."""
+        """Renvoie les décomptes par option des facettes de la liste des structures."""
         where, binds = _structure_where(filters, skip="types")
         type_rows = self._conn.execute(
             text(f"""
@@ -293,7 +293,7 @@ class StructuresQueries:
     def export_structures_csv(
         self, *, filters: StructureFilters, sort: StructureSort
     ) -> Iterator[str]:
-        """Export CSV de la liste des structures, aux filtres et au tri de la liste.
+        """Renvoie l'export CSV de la liste des structures, aux filtres et au tri de la liste.
 
         La requête s'exécute à l'appel. Le parcours qui suit lit des lignes en mémoire.
         """
@@ -327,7 +327,7 @@ class StructuresQueries:
         )
 
     def get_structure_detail(self, structure_id: int) -> StructureDetailResponse | None:
-        """Détail complet : structure, tutelles, sous-structures et formes de nom ; `None` si la structure n'existe pas."""
+        """Renvoie la structure, ses tutelles, ses sous-structures et ses formes de nom, ou `None` si la structure est absente."""
         struct_row = self._conn.execute(
             text("""
                 SELECT id, code, name, acronym, structure_type::text AS type,
@@ -341,7 +341,7 @@ class StructuresQueries:
 
         parent_rows = self._conn.execute(
             text("""
-                SELECT sr.id AS relation_id,
+                SELECT sr.id AS tutelle_id,
                        sp.id, sp.code, sp.name, sp.acronym, sp.structure_type::text AS type
                 FROM structure_parents sr
                 JOIN structures sp ON sp.id = sr.parent_id
@@ -353,7 +353,7 @@ class StructuresQueries:
 
         child_rows = self._conn.execute(
             text("""
-                SELECT sr.id AS relation_id,
+                SELECT sr.id AS tutelle_id,
                        sc.id, sc.code, sc.name, sc.acronym, sc.structure_type::text AS type
                 FROM structure_parents sr
                 JOIN structures sc ON sc.id = sr.child_id
@@ -406,7 +406,7 @@ class StructuresQueries:
     def get_structure_addresses(
         self, structure_id: int, *, page: int, per_page: int
     ) -> StructureAddressesResponse:
-        """Adresses rattachées à une structure, le rattachement rejeté écarté."""
+        """Renvoie les adresses rattachées à une structure, hors rattachements rejetés."""
         from_where = """
             FROM addresses a
             JOIN address_structures ast ON ast.address_id = a.id
@@ -439,9 +439,9 @@ class StructuresQueries:
         )
 
     def get_structure_subjects(self, structure_id: int, *, limit: int) -> list[SubjectFrequency]:
-        """Sujets des publications d'une structure, les plus fréquents d'abord.
+        """Renvoie les sujets des publications d'une structure, les plus fréquents d'abord.
 
-        Le `COUNT(DISTINCT p.id)` tient au grain de `publication_subjects`, qui a une ligne par source pour une même paire (publication, sujet).
+        `publication_subjects` a une ligne par source pour une même paire (publication, sujet), d'où le `COUNT(DISTINCT p.id)`.
         """
         rows = self._conn.execute(
             text(
@@ -466,7 +466,7 @@ class StructuresQueries:
         page: int,
         per_page: int,
     ) -> StructurePartnersResponse:
-        """Organisations partenaires de la structure, les plus fréquentes en tête. Le décompte des options de pays et de types suit les autres filtres."""
+        """Renvoie les organisations partenaires de la structure, les plus fréquentes en tête. Le décompte des options de pays et de types suit les autres filtres."""
         binds = {
             "structure_id": structure_id,
             "own_structure_ids": [structure_id],
@@ -554,7 +554,7 @@ class StructuresQueries:
         )
 
     def get_name_form(self, form_id: int) -> NameFormOut | None:
-        """Forme de nom par id. None si absente."""
+        """Renvoie la forme de nom d'identifiant `form_id`, ou `None` si elle est absente."""
         row = self._conn.execute(
             text("SELECT * FROM structure_name_forms WHERE id = :id"),
             {"id": form_id},
@@ -562,7 +562,10 @@ class StructuresQueries:
         return _name_form_from_row(row) if row else None
 
     def get_deletion_impact(self, structure_id: int) -> StructureDeletionImpact | None:
-        """Formes de nom, tutelles, liens adresse-structure confirmés ou rejetés, et périmètres dont la structure est une racine. `None` si la structure n'existe pas."""
+        """Renvoie les données supprimées avec la structure, ou `None` si la structure est absente.
+
+        Ces données sont ses formes de nom, ses tutelles, ses liens adresse-structure confirmés ou rejetés, et les périmètres dont la structure est une racine.
+        """
         row = self._conn.execute(
             text("""
                 SELECT

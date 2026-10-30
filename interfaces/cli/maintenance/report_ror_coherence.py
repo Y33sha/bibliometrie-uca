@@ -4,7 +4,7 @@
 Liste les tutelles absentes du ROR, les parents ROR absents des tutelles, les parents et enfants ROR des structures du périmètre absents de `structures`, et les ROR attribués à plusieurs structures. Chaque écart se corrige dans l'interface d'administration ou se signale au ROR.
 
 Usage :
-    python -m interfaces.cli.maintenance.report_ror_coherence
+    uv run python -m interfaces.cli.maintenance.report_ror_coherence
 """
 
 import sys
@@ -29,7 +29,7 @@ class RorCoherenceReport:
 
 
 def ror_relations(conn: Connection) -> list[tuple[RorId, RorId]]:
-    """Couples `(parent, enfant)` de `ror_relations`."""
+    """Renvoie les couples `(parent, enfant)` de `ror_relations`."""
     rows = conn.execute(text("SELECT parent_ror_id, child_ror_id FROM ror_relations"))
     return [(RorId(r.parent_ror_id), RorId(r.child_ror_id)) for r in rows]
 
@@ -43,7 +43,7 @@ def ror_names(conn: Connection, ror_ids: Iterable[RorId]) -> dict[RorId, str]:
 
 
 def ror_coherence_report(conn: Connection) -> RorCoherenceReport:
-    """Compare `structure_parents` aux relations du ROR, pour toutes les structures qui ont un ROR."""
+    """Compare `structure_parents` aux relations du ROR, pour toutes les structures pourvues d'un ROR."""
     structures = conn.execute(text("SELECT id, code, ror_id FROM structures ORDER BY code")).all()
     structure_rors = {
         s.id: ror_id for s in structures if (ror_id := RorId.try_parse(s.ror_id)) is not None
@@ -106,7 +106,7 @@ def main() -> int:
     with get_sync_engine().connect() as conn:
         if not ror_relations(conn):
             print(
-                "Référentiel ROR vide : lancer python -m interfaces.cli.imports.import_ror_dump",
+                "Référentiel ROR vide : lancer uv run python -m interfaces.cli.imports.import_ror_dump",
                 file=sys.stderr,
             )
             return 1

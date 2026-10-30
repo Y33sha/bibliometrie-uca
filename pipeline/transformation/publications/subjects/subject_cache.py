@@ -7,7 +7,7 @@ from pipeline.transformation.publications.subjects.subject_store import (
 
 
 def dedup_strs(values: object) -> list[str]:
-    """Filtre les non-str et chaînes vides, déduplique sur `lower(s)` en préservant l'ordre et la casse du premier insert."""
+    """Filtre les valeurs autres que des chaînes et les chaînes vides, puis dédoublonne sur `lower(s)`. Garde l'ordre et la casse de la première occurrence."""
     if not isinstance(values, list):
         return []
     seen: set[str] = set()
@@ -27,17 +27,14 @@ def dedup_strs(values: object) -> list[str]:
 
 
 class SubjectCache:
-    """Cache mémoire des `subject_id` déjà upsertés sur la connexion courante.
-
-    Clé = `lower(label)`. Sur des dizaines de milliers de publications, un même libellé revient des centaines de fois ; le cache élimine les UPSERTs SQL redondants.
-    """
+    """Cache mémoire des `subject_id` déjà écrits sur la connexion courante, par `lower(label)`. Il évite les UPSERT redondants d'un libellé fréquent."""
 
     def __init__(self, store: SubjectStore) -> None:
         self._store = store
         self._cache: dict[str, int] = {}
 
     def get_or_upsert(self, *, label: str, language: str | None = None) -> int:
-        """Retourne l'id du sujet pour ce label (UPSERT au premier passage)."""
+        """Renvoie l'id du sujet de ce libellé, écrit par UPSERT au premier passage."""
         key = label.strip().lower()
         cached = self._cache.get(key)
         if cached is not None:

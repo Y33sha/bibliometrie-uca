@@ -29,7 +29,11 @@ def _publication(**overrides: object) -> MetadataForCorrection:
 
 
 def _view(doi: str | None = None, **overrides: object) -> MetadataForCorrection:
-    """Faits d'un enregistrement source ; `doi` : son seul DOI propre."""
+    """Construit les faits d'un enregistrement source.
+
+    Args:
+        doi: seul DOI propre de l'enregistrement source.
+    """
     defaults: dict[str, object] = {
         "title": "Some title",
         "doc_type": None,
@@ -379,7 +383,7 @@ class TestTitleSupplementaryContentRule:
 
 class TestDoiRegistrantMediaRule:
     def test_doi_depose_par_un_editeur_de_presse_devient_media(self):
-        """Cas réel : article de The Conversation, que Crossref type `posted-content`, sans revue."""
+        """Cas réel : article de The Conversation, typé `posted-content` par Crossref, sans revue."""
         corrected = effective_metadata(
             _view(doc_type="preprint", registrant_publisher_types=frozenset({"media"}))
         ).doc_type
@@ -1138,7 +1142,7 @@ class TestEffectiveMetadataScope:
         assert corrected.doc_type is None and corrected.oa_status is None
 
     def test_only_doc_type_is_touched(self):
-        # oa_status n'a que la règle embargo, ici non déclenchée (gold non expiré).
+        # La seule règle d'oa_status est la règle embargo, ici non déclenchée (gold non expiré).
         # Seul doc_type pourrait être corrigé sur cette vue.
         view = _view(
             doc_type="article",

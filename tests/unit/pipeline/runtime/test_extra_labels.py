@@ -1,6 +1,6 @@
 """Couverture des compteurs sur-mesure par leur libellé français.
 
-La ligne de bilan d'une tâche passe par `PhaseMetrics.as_summary()`, qui affiche la clé brute d'un compteur dont le libellé manque. Ce test relève dans le code les clés que les phases produisent et les confronte à la table des libellés.
+La ligne de bilan d'une tâche passe par `PhaseMetrics.as_summary()`, qui affiche la clé brute d'un compteur sans libellé. Le test relève dans le code les clés produites par les phases et les confronte à la table des libellés.
 """
 
 from __future__ import annotations
@@ -14,11 +14,11 @@ from pipeline.runtime.observability.metrics import EXTRA_LABELS
 COUCHES = ("application", "domain", "infrastructure", "interfaces", "pipeline")
 
 COMPTEURS_NOMMES = {"new", "updated", "unchanged", "seen", "errors"}
-"""Paramètres déclarés de `PhaseMetrics.add`, que `as_summary` traduit lui-même."""
+"""Paramètres déclarés de `PhaseMetrics.add`, traduits par `as_summary` lui-même."""
 
 
 def _cles_extras() -> dict[str, set[str]]:
-    """Clés de compteurs sur-mesure produites par le code, et les fichiers qui les posent."""
+    """Renvoie les clés de compteurs sur-mesure produites par le code, et leurs fichiers."""
     cles: dict[str, set[str]] = {}
     for couche in COUCHES:
         for fichier in (PROJECT_ROOT / couche).rglob("*.py"):

@@ -1,6 +1,6 @@
-"""Repository PostgreSQL de l'agrégat Serial, pour l'édition dans l'administration.
+"""Repository PostgreSQL de l'entité Serial, pour l'édition dans l'administration.
 
-L'agrégat Publisher est dans `publisher_repository.py`. La fusion de deux revues relève du pipeline (`pipeline/transformation/publishing/serials/serial_merge.py`). Les erreurs sont celles du domaine ; l'orchestration est dans `application/services/serials/`.
+L'entité Publisher est dans `publisher_repository.py`. La fusion de deux revues relève du pipeline (`pipeline/transformation/publishing/serials/serial_merge.py`). Les erreurs sont celles du domaine ; l'orchestration est dans `application/services/serials/`.
 """
 
 from collections.abc import Sequence
@@ -34,7 +34,7 @@ class _SerialRow(NamedTuple):
 
 
 def _serial_from_row(row: _SerialRow, issns: Sequence[SerialIssn]) -> Serial:
-    """Revue de domaine d'une ligne de `serials`.
+    """Renvoie la revue de domaine d'une ligne de `serials`.
 
     `serial_type` et `is_academic`, nullables, prennent leur défaut (`unknown`, vrai). Les enums SQL `serial_type` et `oa_model` reprennent le vocabulaire du domaine : une assertion de type suffit.
     """
@@ -55,7 +55,7 @@ def _serial_from_row(row: _SerialRow, issns: Sequence[SerialIssn]) -> Serial:
 
 
 class PgSerialRepository(SerialRepository):
-    """Accès PostgreSQL à l'agrégat Serial via une `Connection` SQLAlchemy."""
+    """Accès PostgreSQL à l'entité Serial via une `Connection` SQLAlchemy."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
@@ -84,7 +84,10 @@ class PgSerialRepository(SerialRepository):
     # ── Écriture ───────────────────────────────────────────────────
 
     def save(self, serial: Serial) -> None:
-        """Écrit les champs modifiables par l'API d'une revue chargée, et ses ISSN. Le titre normalisé se recalcule ; les colonnes que tient le pipeline (`publisher_id`, `openalex_id`, `is_in_doaj`) restent. Un ISSN gardé garde sa date de vérification Sudoc, un ISSN ajouté attend la sienne. Lève `NotFoundError` si l'id est absent."""
+        """Écrit les champs modifiables par l'API d'une revue chargée, et ses ISSN. Lève `NotFoundError` si l'id est absent.
+
+        Le titre normalisé se recalcule. Les colonnes tenues par le pipeline (`publisher_id`, `openalex_id`, `is_in_doaj`) restent. Un ISSN gardé garde sa date de vérification Sudoc, un ISSN ajouté attend la sienne.
+        """
         result = self._conn.execute(
             update(serials)
             .where(serials.c.id == serial.id)

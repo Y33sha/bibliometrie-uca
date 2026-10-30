@@ -65,7 +65,7 @@ def _ids(value: JsonValue) -> tuple[int, ...]:
 
 
 def parse_hal_structure(doc: Mapping[str, JsonValue]) -> HalStructure | None:
-    """Structure d'un document de `ref/structure`, `None` sans identifiant, nom, type ou statut reconnu. Le premier ROR valide est retenu."""
+    """Lit la structure d'un document de `ref/structure`, `None` sans identifiant, nom, type ou statut reconnu. Le premier ROR valide est retenu."""
     docid, name, structure_type = (
         as_str(doc.get("docid")),
         as_str(doc.get("name_s")),

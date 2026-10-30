@@ -1,6 +1,6 @@
-"""Sélection de l'implémentation `RawStore` selon `BIBLIO_RAW_STORE_DIR`.
+"""Construction du `RawStore` configuré par `BIBLIO_RAW_STORE_DIR`.
 
-Vide, le réglage laisse le stockage sous `data/raw_store` à la racine du dépôt ; renseigné, il désigne le répertoire à employer.
+Le réglage désigne le répertoire de stockage. Vide, il laisse le répertoire par défaut : `data/raw_store` à la racine du dépôt.
 """
 
 from __future__ import annotations
@@ -16,6 +16,6 @@ _DEFAULT_LOCAL_DIR = PROJECT_ROOT / "data" / "raw_store"
 
 
 def get_raw_store(directory: str | Path | None = None) -> RawStore:
-    """`RawStore` configuré : sur le répertoire reçu, celui du réglage, ou celui par défaut."""
+    """Renvoie le `RawStore` sur le répertoire reçu, à défaut celui du réglage, à défaut celui par défaut."""
     racine = directory if directory is not None else settings.biblio_raw_store_dir
     return LocalFileRawStore(Path(racine) if racine else _DEFAULT_LOCAL_DIR)

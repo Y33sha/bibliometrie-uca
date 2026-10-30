@@ -14,7 +14,7 @@ def test_le_singulier_couvre_zero_et_un(n: int, attendu: str) -> None:
 
 
 def test_un_groupe_nominal_porte_son_pluriel() -> None:
-    """Le `s` final se pose sur le nom, que le groupe ne place pas toujours en dernier."""
+    """Le `s` final se pose sur le nom, parfois placé ailleurs qu'en dernier dans le groupe."""
     assert quantity(5, "préfixe DOI", "préfixes DOI") == "5 préfixes DOI"
 
 

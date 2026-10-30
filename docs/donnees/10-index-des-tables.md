@@ -13,7 +13,6 @@
 | `aligned_source_contributions` | `publications` | [Contributions](04-contributions.md) |
 | `apc_payments` | `publishing` | [Édition](07-publishing.md#frais-de-publication) |
 | `audit_log` | `ops` | [Exploitation](08-ref-et-ops.md#exploitation) |
-| `candidate_dois` (vue) | `sources` | [Enregistrements sources](02-sources.md) |
 | `candidate_dois` (vue) | `sources` | [Enregistrements sources](02-sources.md#tables) |
 | `config` | `ops` | [Exploitation](08-ref-et-ops.md#exploitation) |
 | `confirmed_source_contributions` | `persons` | [Personnes](05-persons.md#décisions-humaines) |

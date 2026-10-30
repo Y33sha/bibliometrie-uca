@@ -1,4 +1,4 @@
-"""Ordre des phases : ce que chacune exige d'une autre avant de tourner."""
+"""Ordre des phases : prérequis de chaque phase."""
 
 import logging
 from contextlib import contextmanager

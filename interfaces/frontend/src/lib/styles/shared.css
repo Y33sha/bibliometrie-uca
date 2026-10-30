@@ -68,6 +68,7 @@
 	--closed: #4b5260;
 	--unknown: #c9ced6;
 	--diamond: #d0d4fb;
+	--diamond-text: #0288a8; /* lisible en texte sur fond clair */
 	--gold: #ffd700;
 	--hybrid: #b366f2;
 	--bronze: #cd7f32;
@@ -1167,17 +1168,18 @@ a.structure-tag:hover {
 .badge-doaj {
 	font-size: var(--fs-sm);
 	padding: 1px 6px;
-	background: var(--success);
-	color: white;
+	background: color-mix(in srgb, var(--success) 10%, white);
+	color: color-mix(in srgb, var(--success) 70%, white);
 	border-radius: var(--radius);
 	margin-left: 6px;
 	vertical-align: middle;
-	font-weight: 600;
+	font-weight: 500;
 	letter-spacing: 0.3px;
 	text-decoration: none;
 }
 a.badge-doaj:hover {
-	background: color-mix(in srgb, var(--success), black 20%);
+	background: color-mix(in srgb, var(--success) 20%, white);
+	color: var(--success);
 }
 
 /* ── Titre de carte et libellé de métadonnée : petites capitales en couleur d'accent ── */
@@ -1230,7 +1232,7 @@ a.badge-doaj:hover {
 
 .oa-diamond {
 	background: #e0f2f7;
-	color: #0288a8;
+	color: var(--diamond-text);
 }
 
 .oa-hybrid {

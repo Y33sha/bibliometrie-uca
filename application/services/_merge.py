@@ -14,7 +14,8 @@ def check_merge_pair(
 ) -> None:
     """Refuse une cible et une source identiques (`ValidationError`), ou absentes (`NotFoundError`).
 
-    `label` nomme l'agrégat dans les messages (« Éditeur #12 introuvable »).
+    Args:
+        label: nom de l'entité dans les messages (« Éditeur #12 introuvable »).
     """
     if target_id == source_id:
         raise ValidationError(

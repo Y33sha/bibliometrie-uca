@@ -1,4 +1,4 @@
-"""Le rattachement des contributions ignore les identifiants qu'une contribution source neutralise, et la requalification réécrit les neutralisations `misplaced`."""
+"""Le rattachement des contributions ignore les identifiants neutralisés par une contribution source, et la requalification réécrit les neutralisations `misplaced`."""
 
 from sqlalchemy import text
 
@@ -18,7 +18,7 @@ _ORCID = "0000-0001-2345-6789"
 
 
 def _source_contribution(conn, neutralized, *, name="dupont jean", source_id="c-neutralisation"):
-    """Contribution source crossref du périmètre avec un ORCID et les neutralisations `neutralized`. Renvoie `(contribution source, informations du contributeur)`."""
+    """Insère une contribution source crossref du périmètre avec un ORCID et les neutralisations `neutralized`. Renvoie `(contribution source, informations du contributeur)`."""
     source_record = insert_source_record(
         conn, insert_publication(conn), source="crossref", source_id=source_id
     )
@@ -66,7 +66,7 @@ def test_orcid_non_neutralise_present_dans_la_projection(sa_sync_conn):
 
 
 def test_vote_sans_les_contributions_sources_neutralisees_pour_partage(sa_sync_conn):
-    """Une contribution source qui partage la valeur dans son document ne vote pas ; une contribution source qui la contient par erreur vote."""
+    """Une contribution source qui partage la valeur dans son enregistrement source ne vote pas ; une contribution source qui la contient par erreur vote."""
     _source_contribution(sa_sync_conn, None, name="dupont jean", source_id="c-vote-1")
     _source_contribution(
         sa_sync_conn, {"orcid": "shared"}, name="martin pierre", source_id="c-vote-2"

@@ -5,7 +5,11 @@ from domain.serials.issns import IssnStatus, IssnSupport, SerialIssn, source_iss
 
 
 def _describe(**fields) -> ContainerDescription:
-    """Description de test ; `issn` et `eissn` donnent un ISSN papier et un ISSN en ligne."""
+    """Construit une description de conteneur de test.
+
+    Args:
+        fields: `issn` donne un ISSN papier, `eissn` un ISSN en ligne.
+    """
     fields.setdefault("source", "crossref")
     fields.setdefault("raw_doc_type", "book-chapter")
     issns = source_issns(
@@ -120,7 +124,7 @@ def test_communication_parue_dans_une_revue_sans_volume():
 
 
 def test_chapitre_sans_titre_de_livre_retrouve_par_son_isbn():
-    """Cas réel : chapitre Classiques Garnier, dont seul l'ISBN du livre est connu."""
+    """Cas réel : chapitre Classiques Garnier ; seul l'ISBN du livre est connu."""
     _, volume = determine_container_type(
         _describe(source="datacite", raw_doc_type="BookChapter", isbns=("9782406142003",))
     )

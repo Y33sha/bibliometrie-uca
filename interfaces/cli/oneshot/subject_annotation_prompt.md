@@ -5,7 +5,7 @@ Lis-le en entier avec l'outil Read. C'est une liste de publications : `title`, `
 
 Verdicts :
 - `pertinent` : la publication relève de ce domain ou de ce field, ou traite ce subfield ou ce topic ;
-- `aberrant` : le libellé est sans rapport avec le contenu (mauvaise discipline, rapprochement lexical trompeur) ;
+- `aberrant` : le libellé est sans rapport avec le contenu (mauvaise discipline, ressemblance lexicale trompeuse) ;
 - `limite` : rapport secondaire ou tangentiel, ou information insuffisante pour trancher (titre seul et ambigu).
 
 Règles :

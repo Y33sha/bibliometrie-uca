@@ -19,7 +19,7 @@ _EVE_ORCID = "0000-0001-9999-0001"
 
 
 def _setup(conn) -> dict[str, int]:
-    """Deux publications HAL du périmètre. Eve Leroy (compte HAL 900001, ORCID) signe les deux, Frank Moreau (compte HAL 900002) la première, Grace Petit (sans identifiant) la seconde. Les trois personnes existent, Eve et Frank avec leur compte HAL. Renvoie les personnes par prénom."""
+    """Insère deux publications HAL du périmètre. Eve Leroy (compte HAL 900001, ORCID) signe les deux, Frank Moreau (compte HAL 900002) la première, Grace Petit (sans identifiant) la seconde. Les trois personnes existent, Eve et Frank avec leur compte HAL. Renvoie les personnes par prénom."""
     repo = person_repository(conn)
     persons = {
         "eve": repo.create("Leroy", "Eve"),

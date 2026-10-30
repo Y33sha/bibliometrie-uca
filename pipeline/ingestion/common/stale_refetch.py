@@ -30,7 +30,8 @@ class StaleRefetch(ABC):
     """
 
     source_key: str
-    max_concurrent: int  # plafond de requêtes simultanées, sous le rate-limit de l'API
+    max_concurrent: int
+    """Plafond de requêtes simultanées, sous le rate-limit de l'API."""
 
     @abstractmethod
     async def fetch_by_native_id(
@@ -63,7 +64,7 @@ _SET_DISAPPEARED_SQL = text(
 def get_stale_source_ids(
     conn: Connection, source: str, years: list[int] | None = None, *, after_days: int
 ) -> list[str]:
-    """Identifiants natifs des documents de la source que le moissonnage n'a pas revus depuis `after_days` jours, hors documents disparus.
+    """Renvoie les identifiants natifs des documents de la source non revus par le moissonnage depuis `after_days` jours, hors documents disparus.
 
     `years` borne la sélection aux documents de ces années, et aux thèses en cours.
     """
@@ -83,7 +84,7 @@ def get_stale_source_ids(
 
 
 def set_disappeared(conn: Connection, source: str, source_id: str) -> None:
-    """Marque disparu un document que la source dit absent. L'appelant commite."""
+    """Marque disparu un document absent de la source. L'appelant commite."""
     conn.execute(_SET_DISAPPEARED_SQL, {"source": source, "source_id": source_id})
 
 
@@ -95,7 +96,9 @@ async def refresh(
     after_days: int,
     years: list[int] | None = None,
 ) -> PhaseMetrics:
-    """Relit par identifiant natif les documents de la source que le moissonnage n'a pas revus depuis `after_days` jours. Un document que la source dit absent est marqué disparu. `years` borne la sélection (`get_stale_source_ids`).
+    """Relit par identifiant natif les documents de la source non revus par le moissonnage depuis `after_days` jours.
+
+    Un document absent de la source est marqué disparu. `years` borne la sélection (`get_stale_source_ids`).
 
     Renvoie les compteurs de `look_up` : documents réécrits (`updated`), identiques (`unchanged`), lots non servis (`errors`), absences confirmées (`disappeared`).
     """

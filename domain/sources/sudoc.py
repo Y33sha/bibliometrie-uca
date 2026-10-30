@@ -32,7 +32,7 @@ class MarcField:
     subfields: tuple[tuple[str, str], ...]
 
     def values(self, code: str) -> list[str]:
-        """Valeurs des sous-zones de code `code`."""
+        """Renvoie les valeurs des sous-zones de code `code`."""
         return [value for c, value in self.subfields if c == code]
 
 
@@ -102,7 +102,7 @@ def _names_other_support(text: str) -> bool:
 
 
 def support_mentioned(title: str) -> IssnSupport | None:
-    """Support qu'indique la mention entre parenthèses d'un titre (« Nature (Print) »), ou `None`."""
+    """Renvoie le support indiqué par la mention entre parenthèses d'un titre (« Nature (Print) »), ou `None`."""
     mentions = " ".join(re.findall(r"\(([^)]*)\)", title)).lower()
     if _names_other_support(mentions):
         return IssnSupport.OTHER

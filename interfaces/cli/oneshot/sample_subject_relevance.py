@@ -11,11 +11,11 @@ Tire des publications sans remise : d'abord `--random` publications au hasard, p
 
 Le domain d'une publication, pour la répartition d'une revue, est celui de son premier topic OpenAlex. `--scale` multiplie l'effectif de chaque strate. `--exclude` écarte les publications d'un échantillon déjà tiré.
 
-Écrit un fichier JSON : une entrée par publication, avec titre, résumé, revue et l'arbre des libellés OpenAlex (domain, field, subfield, topic), chaque libellé avec un identifiant, son parent et le score maximal des topics qui le portent. Les sujets des autres sources sont exclus : la qualification se fait sur le titre, le résumé et la revue.
+Écrit un fichier JSON : une entrée par publication, avec titre, résumé, revue et l'arbre des libellés OpenAlex (domain, field, subfield, topic), chaque libellé avec un identifiant, son parent et le score maximal de ses topics descendants. Les sujets des autres sources sont exclus : la qualification se fait sur le titre, le résumé et la revue.
 
 Usage :
-    python -m interfaces.cli.oneshot.sample_subject_relevance --output sample.json
-    python -m interfaces.cli.oneshot.sample_subject_relevance --output annotation.json         --random 175 --scale 1.75 --exclude sample.json --seed 20261027
+    uv run python -m interfaces.cli.oneshot.sample_subject_relevance --output sample.json
+    uv run python -m interfaces.cli.oneshot.sample_subject_relevance --output annotation.json         --random 175 --scale 1.75 --exclude sample.json --seed 20261027
 """
 
 from __future__ import annotations
@@ -70,7 +70,7 @@ _DETAILS_SQL = """
 
 
 def _label_tree(topic_lists: list[list[dict]]) -> list[dict]:
-    """Libellés distincts par niveau, avec leur parent et le score maximal des topics qui les portent."""
+    """Renvoie les libellés distincts par niveau, avec leur parent et le score maximal de leurs topics descendants."""
     nodes: dict[tuple[str, str], dict] = {}
     for topics in topic_lists:
         for entry in topics:

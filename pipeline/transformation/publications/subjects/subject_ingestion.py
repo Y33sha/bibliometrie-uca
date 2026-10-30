@@ -1,6 +1,6 @@
 """Sujets des publications, première tâche de la phase `subjects`.
 
-Une publication s'ingère quand `publications.subjects_ingested_at` est vide : le recalcul d'une publication depuis ses enregistrements sources vide cette date. Ses liens non rejetés sont supprimés, puis reconstruits depuis le champ `topics` de chacun de ses enregistrements sources, lu selon sa source (`SUBJECT_EXTRACTORS`). `publication_subjects.source` garde ainsi la source de chaque sujet. Les sujets sans lien sont ensuite supprimés.
+Une publication est ingérée quand `publications.subjects_ingested_at` est vide. Le recalcul d'une publication depuis ses enregistrements sources vide cette date. Ses liens non rejetés sont supprimés, puis reconstruits depuis le champ `topics` de chacun de ses enregistrements sources, lu selon sa source (`SUBJECT_EXTRACTORS`). `publication_subjects.source` garde ainsi la source de chaque sujet. Les sujets sans lien sont ensuite supprimés.
 
 Les mots-clés libres (`keywords`) restent hors de `subjects`.
 """
@@ -35,7 +35,8 @@ def run(
 
     `metrics.new` compte les liens publication-sujet créés. Le résumé donne l'évolution nette du nombre de sujets, leur total et le nombre de publications ingérées.
 
-    `rebuild` marque d'abord toutes les publications : une évolution des règles d'ingestion s'applique alors à tout le stock.
+    Args:
+        rebuild: marque d'abord toutes les publications, pour appliquer une évolution des règles d'ingestion à tout le stock.
     """
     subjects_before = store.count_all_subjects()
     step(logger, "Liens publications-sujets")

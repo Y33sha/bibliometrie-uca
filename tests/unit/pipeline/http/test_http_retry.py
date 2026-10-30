@@ -1,6 +1,6 @@
 """Tests du helper HTTP `http_retry`, versions synchrone et asynchrone.
 
-Vérifie la politique de retry commune aux deux variantes : 429, 5xx, erreurs réseau et corps vide retentés jusqu'à `max_retries`, puis `SourceUnavailableError` ; autres 4xx (404…) en échec immédiat sans retry. Les requêtes s'exécutent sous le circuit-breaker de la fixture `breaker`.
+Politique de retry commune aux deux variantes : 429, 5xx, erreurs réseau et corps vide retentés jusqu'à `max_retries`, puis `SourceUnavailableError` ; autres 4xx (404…) en échec immédiat sans retry. Les requêtes s'exécutent sous le circuit-breaker de la fixture `breaker`.
 """
 
 import contextvars
@@ -27,7 +27,7 @@ pytestmark = pytest.mark.usefixtures("breaker")
 
 
 def _resp(status: int) -> MagicMock:
-    """Réponse simulée, avec les attributs que lit `raise_for_status` pour composer le message d'erreur."""
+    """Renvoie une réponse simulée, avec les attributs lus par `raise_for_status` pour composer le message d'erreur."""
     r = MagicMock()
     r.status_code = status
     r.is_success = 200 <= status < 300
@@ -49,7 +49,7 @@ def test_4xx_fails_fast_without_retry():
         with pytest.raises(httpx2.HTTPStatusError) as excinfo:
             http_retry.http_request_with_retry("GET", "http://x", label="t", max_retries=3)
     assert req.call_count == 1  # aucun retry sur 4xx
-    # Non-régression : l'erreur journalisée par les appelants omet la requête, dont les paramètres contiennent la clé d'API.
+    # L'erreur journalisée par les appelants omet la requête : ses paramètres contiennent la clé d'API.
     assert _API_KEY not in str(excinfo.value)
 
 
@@ -82,7 +82,7 @@ def test_5xx_exhausted_raises_source_unavailable():
 def test_une_requete_hors_de_l_acces_a_une_source_est_refusee():
     """Hors de l'accès à une source, aucun breaker n'est posé : la requête n'est pas émise."""
     with patch.object(http_retry.httpx2, "request") as req, pytest.raises(RuntimeError):
-        # Un contexte vide : la ContextVar y a sa valeur par défaut, sans breaker.
+        # Dans un contexte vide, la ContextVar a sa valeur par défaut, sans breaker.
         contextvars.Context().run(http_retry.http_request_with_retry, "GET", "http://x")
     req.assert_not_called()
 
@@ -256,7 +256,7 @@ class TestAsync:
 
     @pytest.mark.asyncio
     async def test_le_parametre_secret_ne_sort_pas_dans_l_erreur(self, http_mock):
-        """Non-régression : une clé d'API passée en paramètre de requête n'apparaît pas dans l'erreur levée, que les appelants journalisent."""
+        """Une clé d'API passée en paramètre de requête est absente de l'erreur levée, journalisée par les appelants."""
         http_mock.get("https://api.example/foo").mock(return_value=httpx2.Response(403))
         async with httpx2.AsyncClient() as client:
             with pytest.raises(httpx2.HTTPStatusError) as excinfo:
@@ -275,7 +275,7 @@ class TestAsync:
 class TestRedirections:
     """Le helper suit seulement une redirection vers le même hôte, pour une requête GET, et une seule fois.
 
-    Les en-têtes d'authentification propres à un fournisseur, que le client HTTP garde lors d'une redirection, restent donc chez leur destinataire.
+    Les en-têtes d'authentification propres à un fournisseur, gardés par le client HTTP lors d'une redirection, restent donc chez leur destinataire.
     """
 
     @pytest.mark.asyncio

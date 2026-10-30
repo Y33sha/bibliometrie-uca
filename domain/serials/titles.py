@@ -37,7 +37,7 @@ def names_proceedings(title: str) -> bool:
 
 
 def names_ebook_platform(title: str) -> bool:
-    """Vrai si le titre est celui qu'OpenAlex donne à la plateforme d'ebooks d'un éditeur : « ENS Éditions eBooks ». Une plateforme d'ebooks n'est le conteneur d'aucun document."""
+    """Vrai si le titre est celui donné par OpenAlex à la plateforme d'ebooks d'un éditeur : « ENS Éditions eBooks ». Une plateforme d'ebooks n'est le conteneur d'aucun document."""
     return bool(_EBOOK_PLATFORM.search(title))
 
 
@@ -79,10 +79,11 @@ _SUBTITLE = re.compile(r"\s[-–—]\s|[:(\[]")
 
 
 class _Word(NamedTuple):
-    """Mot significatif d'un titre, normalisé, et s'il s'écrit comme un acronyme."""
+    """Mot significatif d'un titre, normalisé."""
 
     text: str
     acronym: bool
+    """Le mot s'écrit comme un acronyme."""
 
 
 def compatible_titles(a: str, b: str) -> bool:
@@ -98,7 +99,7 @@ def compatible_titles(a: str, b: str) -> bool:
 
 
 def _variants(title: str) -> list[tuple[_Word, ...]]:
-    """Le titre, ses titres parallèles, et chacun d'eux privé de son sous-titre."""
+    """Renvoie le titre, ses titres parallèles, et chacun d'eux privé de son sous-titre."""
     parts = [title, *_PARALLEL_TITLES.split(title)]
     candidates = [*parts, *(_SUBTITLE.split(part, maxsplit=1)[0] for part in parts)]
     return [words for words in dict.fromkeys(_words(c) for c in candidates) if words]
@@ -120,7 +121,7 @@ def _abbreviates(short: Sequence[_Word], full: Sequence[_Word]) -> bool:
 
     @cache
     def matches_from(i: int, start: int, j: int, shortened: bool) -> bool:
-        """Le mot `i` du titre court, lu depuis sa lettre `start`, face au mot `j` du titre long."""
+        """Vrai si la suite du titre court abrège la suite du titre long : le mot `i`, lu depuis sa lettre `start`, face au mot `j`."""
         if i == len(short):
             return shortened and j == len(targets)
         if j == len(targets):
@@ -149,7 +150,7 @@ def _abbreviates(short: Sequence[_Word], full: Sequence[_Word]) -> bool:
 
 
 def _abbreviates_word(short: str, full: str) -> bool:
-    """Début du mot (« phys », « physical ») ou contraction : même initiale, lettres dans l'ordre (« rept », « reports »)."""
+    """Vrai si `short` est le début de `full` (« phys », « physical ») ou sa contraction : même initiale, lettres dans l'ordre (« rept », « reports »)."""
     if full.startswith(short):
         return True
     letters = iter(full)

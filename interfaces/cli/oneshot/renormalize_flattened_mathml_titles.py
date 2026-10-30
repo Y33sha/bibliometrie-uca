@@ -1,11 +1,11 @@
 # STATUS: oneshot (2026-10-25)
-"""Remet en file de normalisation les enregistrements sources Crossref et ScanR dont le titre porte la version MathML aplatie d'une formule.
+"""Remet en file de normalisation les enregistrements sources Crossref et ScanR dont le titre contient la version MathML aplatie d'une formule.
 
 Ces titres contiennent une formule LaTeX `$$…$$` et des retours à la ligne. Leur payload est réinjecté en `staging` depuis le raw store (`rehydrate_staging_row`) ; la normalisation les réécrit ensuite avec `drop_flattened_mathml`, puis la phase `publications` recalcule le titre de leurs publications :
     run_pipeline --from normalize --sources crossref,scanr
 
 Usage :
-    python -m interfaces.cli.oneshot.renormalize_flattened_mathml_titles [--dry-run]
+    uv run python -m interfaces.cli.oneshot.renormalize_flattened_mathml_titles [--dry-run]
 """
 
 from __future__ import annotations

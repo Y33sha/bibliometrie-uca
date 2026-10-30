@@ -13,7 +13,7 @@ from tests.integration.helpers.db import owner_pool
 
 
 def _roles_of(login: str) -> list[str] | None:
-    """Rôles de `login` lus en base, ou `None` s'il est absent de `ops.users`."""
+    """Renvoie les rôles de `login` lus en base, ou `None` s'il est absent de `ops.users`."""
     with owner_pool() as cur:
         cur.execute(
             "SELECT array_remove(array_agg(ur.role_code ORDER BY ur.role_code), NULL) AS roles "

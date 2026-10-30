@@ -1,8 +1,8 @@
-"""Service des contributions : écritures sur l'agrégat Contribution.
+"""Service des contributions : écritures sur les contributions (`contributions`) et les contributions sources (`source_contributions`).
 
-Couvre les contributions (`contributions`) et les contributions sources (`source_contributions`) : rejet d'une contribution, et attribution à une personne des contributions orphelines, contributions du périmètre rattachées à aucune personne.
+Opérations : rejet d'une contribution, et attribution à une personne des contributions orphelines, contributions du périmètre sans personne.
 
-La construction du stock relève du pipeline, qui écrit en SQL ensembliste : les phases `normalize`, `affiliations`, `countries` et `persons` alimentent les contributions sources, la phase `author_grouping` forme les contributions et la phase `persons` les rattache aux personnes.
+Le pipeline construit le stock en SQL ensembliste. Les phases `normalize`, `affiliations`, `countries` et `persons` alimentent les contributions sources. La phase `author_grouping` forme les contributions, et la phase `persons` les rattache aux personnes.
 """
 
 import logging
@@ -33,11 +33,11 @@ def reject_pair(
 ) -> int:
     """Rejette durablement une paire (publication, personne) : la personne n'est pas l'auteur de la publication.
 
-    Les deux façons de rejeter une contribution, depuis la fiche d'une personne ou d'une publication, passent par là. Trois effets :
+    Le rejet depuis la fiche d'une personne et le rejet depuis la fiche d'une publication passent par cette fonction. Effets :
 
-    1. La paire s'inscrit dans `rejected_contributions`, que le rattachement des personnes consulte pour écarter les paires rejetées : le rejet survit aux runs suivants.
-    2. La personne quitte sa contribution dans la publication, et les épinglages des contributions sources de la publication à elle sont retirés (`detach_rejected_pair`).
-    3. L'appartenance de la publication au périmètre se recalcule.
+    1. La paire s'inscrit dans `rejected_contributions`. Le rattachement des personnes écarte ces paires, donc le rejet survit aux exécutions suivantes.
+    2. La personne est détachée de sa contribution à la publication, et ses épinglages sur les contributions sources de la publication sont retirés (`detach_rejected_pair`).
+    3. L'appartenance de la publication au périmètre est recalculée.
 
     Renvoie le nombre de contributions détachées.
     """
@@ -55,10 +55,7 @@ def reject_pair(
 
 
 class ContributionService:
-    """Écritures sur les contributions : rejet, et attribution des contributions orphelines.
-
-    L'attribution vérifie l'existence de la personne cible : elle écrit des lignes qui la référencent, et sans cette garde une cible absente se traduirait en violation de clé étrangère.
-    """
+    """Écritures sur les contributions : rejet, et attribution des contributions orphelines."""
 
     def __init__(
         self,
@@ -76,9 +73,10 @@ class ContributionService:
     def exclude_contribution(self, contribution_id: int) -> None:
         """Rejette une contribution désignée par son identifiant.
 
-        Retrouve la paire (publication, personne) de la contribution, puis applique `reject_pair`. Supprime ensuite les formes de nom de la personne qu'aucune source restante ne contient.
+        Applique `reject_pair` à la paire (publication, personne) de la contribution. Supprime ensuite les formes de nom de la personne absentes de ses contributions sources restantes.
 
-        Lève `NotFoundError` si la contribution est absente ou sans personne.
+        Raises:
+            NotFoundError: contribution absente ou sans personne.
         """
         contribution = next(iter(self._contributions.find_contributions([contribution_id])), None)
         person_id = contribution["person_id"] if contribution else None
@@ -98,11 +96,15 @@ class ContributionService:
     def assign_orphan_contribution(
         self, person_id: int, contribution_id: int, *, force: bool = False
     ) -> None:
-        """Attribue une contribution orpheline, sans personne, à une personne.
+        """Attribue une contribution orpheline (sans personne) à une personne.
 
-        Si la paire (publication, personne) est rejetée : sans `force`, lève `RejectedPairError` ; avec `force`, retire d'abord le rejet (`_resolve_rejection`). Rattache ensuite la contribution à la personne (`_attach_contributions`).
+        Si la paire (publication, personne) est rejetée, `force` retire d'abord le rejet (`_resolve_rejection`). La contribution est ensuite rattachée à la personne (`_attach_contributions`).
 
-        Lève `NotFoundError` si la personne ou la contribution est absente, `ContributionAlreadyAssignedError` si la contribution est déjà rattachée à une personne, `PersonAlreadyInPublicationError` si la personne a déjà une contribution manuelle dans la publication.
+        Raises:
+            RejectedPairError: paire rejetée, sans `force`.
+            NotFoundError: personne ou contribution absente.
+            ContributionAlreadyAssignedError: contribution déjà rattachée à une personne.
+            PersonAlreadyInPublicationError: la personne a déjà une contribution manuelle dans la publication.
         """
         self._require_person(person_id)
 
@@ -134,7 +136,10 @@ class ContributionService:
     ) -> int:
         """Crée une personne (`PersonRepository.create`), puis lui attribue la contribution orpheline (`assign_orphan_contribution`). Renvoie l'id de la personne créée.
 
-        Lève `ValidationError` sans nom de famille, et les erreurs d'`assign_orphan_contribution`.
+        Lève aussi les erreurs d'`assign_orphan_contribution`.
+
+        Raises:
+            ValidationError: nom de famille vide.
         """
         person_id = self._persons.create(last_name, first_name)
         self.assign_orphan_contribution(person_id, contribution_id, force=force)
@@ -143,11 +148,15 @@ class ContributionService:
     def batch_assign_orphan_contributions(
         self, person_id: int, contribution_ids: list[int], *, force: bool = False
     ) -> int:
-        """Attribue en lot plusieurs contributions orphelines, contributions sans personne, à une personne.
+        """Attribue en lot des contributions orphelines à une personne. Renvoie le nombre de contributions rattachées.
 
-        Une contribution absente, déjà rattachée, ou d'une publication où la personne a déjà une contribution manuelle est une anomalie : elle est écartée du lot et journalisée, le reste du lot est rattaché (`_attach_contributions`). Les rejets se contrôlent sur toutes les publications du lot (`_resolve_rejection`) : sans `force`, une seule paire rejetée bloque le lot (`RejectedPairError`) ; avec `force`, les rejets sont d'abord retirés.
+        Une contribution absente, déjà rattachée, ou dans une publication où la personne a déjà une contribution manuelle est écartée du lot et journalisée. Le reste du lot est rattaché (`_attach_contributions`).
 
-        Renvoie le nombre de contributions rattachées. Lève `NotFoundError` si la personne n'existe pas.
+        Les rejets se contrôlent sur toutes les publications du lot (`_resolve_rejection`). Sans `force`, une seule paire rejetée bloque le lot. Avec `force`, les rejets sont d'abord retirés.
+
+        Raises:
+            NotFoundError: personne introuvable.
+            RejectedPairError: paire rejetée, sans `force`.
         """
         if not contribution_ids:
             return 0
@@ -185,16 +194,16 @@ class ContributionService:
         return len(contributions)
 
     def _require_person(self, person_id: int) -> None:
-        """Refuse une personne cible absente, que les écritures suivantes référencent."""
+        """Refuse une personne cible absente (`NotFoundError`)."""
         if self._persons.find_by_id(person_id) is None:
             raise NotFoundError(f"Personne {person_id} introuvable")
 
     def _resolve_rejection(
         self, person_id: int, publication_ids: list[int], *, force: bool
     ) -> None:
-        """Contrôle des paires rejetées avant une réattribution, quand la personne est rejetée pour au moins une des publications.
+        """Contrôle les paires rejetées avant une réattribution de la personne aux publications.
 
-        Sans `force`, lève `RejectedPairError` (409), avec les paires et leur date de rejet, pour que l'interface demande confirmation. Avec `force`, retire le rejet de chaque paire, et la réattribution recrée le lien.
+        Sans `force`, une paire rejetée lève `RejectedPairError` (409), avec les paires et leur date de rejet. L'interface demande alors confirmation. Avec `force`, le rejet de chaque paire est retiré, et la réattribution recrée le lien.
         """
         rejected = [
             (publication_id, at)
@@ -217,7 +226,7 @@ class ContributionService:
             )
         for publication_id, _ in rejected:
             self._contributions.delete_rejected_contribution(publication_id, person_id)
-        # Le retrait procède d'une confirmation unique : un seul événement, avec les publications dont le rejet tombe.
+        # Une confirmation unique donne un seul événement, avec les publications à rejet retiré.
         emit_event(
             "contribution.unrejected",
             "person",
@@ -226,12 +235,12 @@ class ContributionService:
         )
 
     def _attach_contributions(self, person_id: int, contributions: list[ContributionRow]) -> None:
-        """Rattache les contributions à la personne : épingle toutes leurs contributions sources, ce qui rattache les contributions (`pin_contributions`), ajoute leurs formes de nom sous leur source, puis recalcule l'appartenance au périmètre de leurs publications."""
+        """Rattache les contributions à la personne par l'épinglage de leurs contributions sources (`pin_contributions`). Ajoute ensuite leurs formes de nom avec leur source, puis recalcule l'appartenance au périmètre de leurs publications."""
         members = self._contributions.find_aligned_source_contributions(
             [g["id"] for g in contributions]
         )
         member_ids = [m["source_contribution_id"] for m in members]
-        # Épinglage de la décision de l'administration au grain de la contribution source : le pipeline la relit comme une donnée fixe.
+        # La décision de l'administration est épinglée sur chaque contribution source. Le pipeline la relit comme une donnée fixe.
         self._contributions.pin_contributions(member_ids, person_id)
         for name_form, source in sorted(
             {

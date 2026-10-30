@@ -11,7 +11,7 @@ Vérifie :
 Mesure le temps des retéléchargements.
 
 Usage :
-    python -m interfaces.cli.oneshot.audit_openalex_inline_truncation --year 2023
+    uv run python -m interfaces.cli.oneshot.audit_openalex_inline_truncation --year 2023
 """
 
 from __future__ import annotations

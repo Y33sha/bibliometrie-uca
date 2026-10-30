@@ -226,7 +226,7 @@ class TestUpdateStructure:
         )
 
     def test_ror_id_full_url_normalized_to_short(self, sa_sync_conn, service):
-        """Régression : éditer une structure avec un ROR en URL complète stocke l'identifiant court (`RorId`)."""
+        """Éditer une structure avec un ROR en URL complète stocke l'identifiant court (`RorId`)."""
         row = _create_structure(
             code="X", name="X", structure_type="labo", ror_id="026tc4g97", service=service
         )

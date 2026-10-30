@@ -11,8 +11,8 @@ L'instantané garde, à chaque niveau, les indices d'entrée dans le périmètre
 L'instantané s'écrit en JSON compressé sous `data/snapshots/`. `--compare` confronte deux instantanés : entrées et sorties du périmètre, structures gagnées et perdues, pays gagnés, perdus et changés. Une contribution source absente du second instantané est cherchée en base, pour distinguer une contribution source supprimée d'une contribution source sortie du périmètre : la comparaison se lance donc sur la base dans l'état du second instantané.
 
 Usage :
-    python -m interfaces.cli.oneshot.snapshot_perimeter
-    python -m interfaces.cli.oneshot.snapshot_perimeter --compare AVANT.json.gz APRES.json.gz
+    uv run python -m interfaces.cli.oneshot.snapshot_perimeter
+    uv run python -m interfaces.cli.oneshot.snapshot_perimeter --compare AVANT.json.gz APRES.json.gz
 """
 
 from __future__ import annotations

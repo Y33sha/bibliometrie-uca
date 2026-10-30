@@ -126,7 +126,7 @@ def test_shared_issn_spares_another_title():
 
 
 def test_serial_in_two_groups_is_merged_once():
-    """Cas réel : Raison publique partage ses deux ISSN avec son double ; le second groupe désignait une revue déjà absorbée."""
+    """Cas réel : Raison publique partage ses deux ISSN avec son double ; le second groupe désigne une revue déjà absorbée."""
     pair = (
         SerialTitleRow(20340, "Raison-publique.fr : arts, politique, société"),
         SerialTitleRow(100276, "Raison publique"),
@@ -147,7 +147,7 @@ def test_absorbed_target_gives_way_to_its_absorber():
 
 
 def test_same_title_pair_is_merged_after_the_issn_rules():
-    """Une paire de même titre déjà réunie par une règle d'ISSN n'est pas fusionnée deux fois."""
+    """Une paire de même titre déjà réunie par une règle d'ISSN est fusionnée une seule fois."""
     repo = _Repo(
         issnl_groups=[SerialMergeGroup("0028-0836", (7, 9))],
         title_groups=[

@@ -1,6 +1,6 @@
 """Import du personnel depuis un export des ressources humaines.
 
-Le fichier vient d'un tableur : son séparateur, ses intitulés de colonnes et le format de ses dates varient, y compris la sérialisation numérique d'Excel. Ces tests fixent ce que la lecture accepte, et ce qu'elle refuse : un fichier sans colonne de nom de famille ou de prénom.
+Le fichier vient d'un tableur : son séparateur, ses intitulés de colonnes et le format de ses dates varient, y compris la sérialisation numérique d'Excel. La lecture refuse seulement un fichier sans colonne de nom de famille ou de prénom.
 """
 
 import sys
@@ -83,9 +83,9 @@ class TestReadCsvTsv:
         assert len(read_csv_tsv(chemin)) == 2
 
     def test_cellule_manquante_en_fin_de_ligne(self, tmp_path):
-        """Une ligne plus courte que l'en-tête est lue ; ses cellules manquantes sont vides.
+        """Une ligne courte, à moins de cellules que l'en-tête, est lue ; ses cellules manquantes sont vides.
 
-        Le séparateur se devine sur les premiers milliers d'octets : une ligne courte au-delà de cette fenêtre échappe à la détection.
+        Le séparateur est détecté sur les premiers milliers d'octets : une ligne courte au-delà de cette fenêtre échappe à la détection.
         """
         completes = "".join(f"Nom{i},Prenom{i},p{i}@uca.fr\n" for i in range(300))
         chemin = self._fichier(tmp_path, f"nom,prenom,email\n{completes}Dupont,Marie\n")
@@ -199,7 +199,7 @@ class TestMain:
 
     @pytest.fixture
     def script(self, tmp_path, monkeypatch):
-        """Prépare un fichier lisible et enregistre ce que le script en fait."""
+        """Prépare un fichier lisible et enregistre les personnes transmises à l'import."""
         chemin = tmp_path / "rh.csv"
         chemin.write_text(
             "nom,prenom,departement\nDupont,Marie,LMBP\nDurand,Jean,LPC\n", encoding="utf-8"

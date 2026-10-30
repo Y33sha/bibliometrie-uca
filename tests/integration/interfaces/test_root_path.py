@@ -22,7 +22,7 @@ PREFIXE = "/bibliometrie"
 
 @pytest.fixture
 def client_prefixe() -> Iterator[TestClient]:
-    """Client visant l'application montée sous un préfixe, comme derrière un reverse-proxy qui le retire.
+    """Fournit un client visant l'application montée sous un préfixe, comme derrière un reverse-proxy qui le retire.
 
     `TestClient` compose le même `scope` qu'uvicorn lancé avec `--root-path` : chemin complet, préfixe signalé à part.
     """
@@ -62,12 +62,12 @@ class TestConnexionSousPrefixe:
 class TestProxyQuiNeRetirePasLePrefixe:
     """Le proxy transmet le chemin préfixé tel quel : l'application le reconnaît aussi.
 
-    Régression : un chemin sans route retombe sur le frontend, monté en dernier. Sans cette reconnaissance, un appel d'API reçoit la page d'accueil en HTML sous un code 200, sans signal d'erreur.
+    Un chemin sans route retombe sur le frontend, monté en dernier. Sans cette reconnaissance, un appel d'API reçoit la page d'accueil en HTML sous un code 200, sans signal d'erreur.
     """
 
     @pytest.fixture
     def client_nu(self) -> Iterator[TestClient]:
-        """Client sans `root_path` déclaré au transport : le chemin préfixé arrive tel quel, comme d'un proxy qui le transmet."""
+        """Fournit un client sans `root_path` déclaré au transport : le chemin préfixé arrive tel quel, comme d'un proxy qui le transmet."""
         with TestClient(app, raise_server_exceptions=False) as c:
             yield c
 

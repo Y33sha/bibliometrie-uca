@@ -35,7 +35,7 @@ class TestGetYears:
 
 
 class TestFormeImposeeEnBase:
-    """La table refuse une valeur hors de la forme que sa clé impose, quelle que soit la voie d'écriture.
+    """La table refuse une valeur hors de la forme imposée par sa clé, quelle que soit la voie d'écriture.
 
     Le domaine applique la même règle à l'écriture (`normalize_config_value`). Ces contraintes couvrent les écritures qui contournent le domaine : psql, migration, script.
     """

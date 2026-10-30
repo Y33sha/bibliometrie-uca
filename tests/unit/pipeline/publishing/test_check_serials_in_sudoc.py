@@ -46,7 +46,7 @@ def _row(
 
 
 def _written(repo: MagicMock) -> dict[str, tuple[IssnSupport | None, bool]]:
-    """ISSN actifs écrits par la vérification : support et drapeau ISSN-L."""
+    """Renvoie les ISSN actifs écrits par la vérification : support et drapeau ISSN-L."""
     issns: list[SerialIssn] = repo.record_sudoc_check.call_args.kwargs["issns"]
     return {r.issn: (r.support, r.linking) for r in issns if r.status is IssnStatus.ACTIVE}
 

@@ -1,7 +1,7 @@
 # STATUS: recurring (dev)
 """Réestime avec Splink les poids du modèle du résidu de l'alignement des auteurs, et réécrit `residual_weights.py`.
 
-Deux étapes, chacune rejouable seule :
+Chaque étape est rejouable seule :
 
 1. Export. Chaque publication à plusieurs enregistrements sources s'aligne par la seule règle de noms (`align_publication`). Les contributions sources et les groupes restés sans lien, enregistrement source par enregistrement source, vont dans `residual.parquet`. Les contributions sources d'auteur des publications de `FULL_MODEL_MAX_AUTHORS` auteurs au plus vont dans `source_contributions.parquet`. Les deux fichiers sont dans `data/residual_weights/`.
 2. Estimation. Splink estime par EM les poids du résidu. Sur le résidu, l'EM n'identifie pas les poids d'ORCID et d'IdRef : ils viennent d'un modèle estimé sur toutes les paires de contributions sources d'un échantillon de `source_contributions.parquet`. Le script affiche l'écart aux poids en place, puis réécrit le fichier.
@@ -116,7 +116,7 @@ def _residual_records(
     contributions: Sequence[Author],
     groups: Sequence[Author],
 ) -> list[dict[str, object]]:
-    """Lignes de `residual.parquet` pour un enregistrement source : `slot` réunit l'enregistrement source et les groupes qu'il affronte."""
+    """Renvoie les lignes de `residual.parquet` pour un enregistrement source : `slot` réunit l'enregistrement source et les groupes affrontés."""
     slot = f"{publication_id}:{source_record_id}"
     return [
         {
@@ -135,7 +135,7 @@ def _residual_records(
 
 
 def _collector(records: list[dict[str, object]], publication_id: int) -> ResidualSink:
-    """Ajoute à `records` le résidu de chaque enregistrement source de la publication."""
+    """Renvoie un collecteur qui ajoute à `records` le résidu de chaque enregistrement source de la publication."""
 
     def collect(
         source_record_id: int, contributions: Sequence[Author], groups: Sequence[Author]
@@ -212,7 +212,7 @@ def _only_initials(col: str) -> str:
 
 
 def _name_comparisons() -> list[cl.CustomComparison]:
-    """Nom de famille et prénom, niveaux de `comparison_levels`."""
+    """Renvoie les comparaisons du nom de famille et du prénom, aux niveaux de `comparison_levels`."""
     last_name = cl.CustomComparison(
         output_column_name=Comparison.LAST_NAME,
         comparison_levels=[
@@ -320,7 +320,10 @@ _SAME_PUBLICATION_RULE: BlockingRuleCreator = CustomRule(_SAME_PUBLICATION)
 
 
 def _full_settings() -> SettingsCreator:
-    """Noms, identifiants, et écart de position décliné par longueur de liste : la fiabilité de la position dépend de la longueur des listes."""
+    """Renvoie les réglages du modèle complet : noms, identifiants, et écart de position décliné par longueur de liste.
+
+    La fiabilité de la position dépend de la longueur des listes.
+    """
     gaps = (
         ("pos_l = pos_r", "même position"),
         ("abs(pos_l - pos_r) = 1", "écart de 1"),
@@ -355,7 +358,7 @@ def _full_settings() -> SettingsCreator:
 
 
 def _level_weights(linker: Linker) -> dict[str, dict[str, float]]:
-    """Poids en bits, log2(m/u), de chaque niveau non nul du modèle."""
+    """Renvoie le poids en bits, log2(m/u), de chaque niveau non nul du modèle."""
     weights: dict[str, dict[str, float]] = {}
     for comparison in linker.misc.save_model_to_json()["comparisons"]:
         levels = weights.setdefault(comparison["output_column_name"], {})
@@ -394,7 +397,7 @@ def _estimate_residual() -> dict[str, dict[str, float]]:
 
 
 def _estimate_identifiers() -> dict[str, dict[str, float]]:
-    """Poids d'ORCID et d'IdRef du modèle complet, estimé sur un échantillon de publications tirées au hasard."""
+    """Estime les poids d'ORCID et d'IdRef du modèle complet sur un échantillon de publications tirées au hasard."""
     con = _connect()
     sizes = con.execute(
         f"SELECT publication_id, count(*) FROM read_parquet('{SOURCE_CONTRIBUTIONS}') GROUP BY 1 ORDER BY 1"
@@ -427,7 +430,7 @@ def _estimate_identifiers() -> dict[str, dict[str, float]]:
 
 
 def _render(weights: Mapping[str, Mapping[str, float]]) -> str:
-    """Contenu de `residual_weights.py`."""
+    """Renvoie le contenu de `residual_weights.py`."""
     lines = [
         '"""Poids en bits du modèle du résidu, par comparaison et par niveau (`domain.publications.author_grouping.comparison_levels`).',
         "",

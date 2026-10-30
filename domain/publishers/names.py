@@ -25,7 +25,7 @@ def _strip_legal_forms(words: list[str]) -> list[str]:
 
 
 def publisher_name_key(name: str) -> str:
-    """Clé de comparaison d'un nom d'éditeur : le nom normalisé, débarrassé du bruit que les sources y ajoutent.
+    """Renvoie la clé de comparaison d'un nom d'éditeur : le nom normalisé, débarrassé du bruit ajouté par les sources.
 
     Sont retirés : les crochets (« Elsevier [1977-....] »), les années et périodes (« Nature Publishing Group, 2009- »), la mention « on behalf of » et sa suite, puis les formes juridiques finales. Les parenthèses (« Taylor & Francis (Routledge) », « Oxford University Press (UK) ») sont retirées, sauf si le nom se réduit alors à un seul mot court : « AIMS (Association internationale de management stratégique) » garde sa précision.
     """

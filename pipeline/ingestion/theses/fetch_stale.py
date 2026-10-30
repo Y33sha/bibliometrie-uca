@@ -1,6 +1,6 @@
 """Nouvelle lecture d'un document theses.fr par son identifiant natif : tâche `fetch_stale.theses`.
 
-Lit le détail d'une thèse par son identifiant natif (`staging.source_id` : NNT pour une thèse soutenue, identifiant theses.fr pour une thèse en cours). Le moissonnage écrit seulement les thèses absentes de `staging` : cette tâche met à jour les autres.
+Le détail d'une thèse se lit par son identifiant natif (`staging.source_id` : NNT pour une thèse soutenue, identifiant theses.fr pour une thèse en cours). Le moissonnage écrit seulement les thèses absentes de `staging` ; la tâche met à jour les autres.
 """
 
 from __future__ import annotations

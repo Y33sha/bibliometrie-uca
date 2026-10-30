@@ -5,7 +5,7 @@ from domain.publications.list_copies import copied_source_contributions
 
 
 def _source_record(names: list[str]) -> list[SourceContribution]:
-    """Contributions sources d'un enregistrement source, dans l'ordre : identifiant = position + 1, prénom = initiale du nom."""
+    """Construit les contributions sources d'un enregistrement source, dans l'ordre : identifiant = position + 1, prénom = initiale du nom."""
     return [SourceContribution(i + 1, 1, i, name, name[0]) for i, name in enumerate(names)]
 
 

@@ -10,5 +10,5 @@ def _no_extra_connection() -> Connection:
 
 
 def publications_queries(conn: Connection) -> PublicationsQueries:
-    """Lecture des publications sur `conn`. Le calcul parallèle des facettes, qui ouvre d'autres connexions, lève `AssertionError`."""
+    """Renvoie les lectures des publications sur `conn`. Le calcul parallèle des facettes, qui ouvre d'autres connexions, lève `AssertionError`."""
     return PublicationsQueries(conn, open_connection=_no_extra_connection)

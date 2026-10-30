@@ -1,14 +1,14 @@
 """Modèles Pydantic du router des structures : corps des requêtes entrantes et réponses composées après mutation.
 
-Les contrats de création et d'édition des structures et de leurs formes de nom vivent dans le port `application/ports/repositories/structure_repository.py`.
+Les contrats de création et d'édition des structures et de leurs formes de nom sont déclarés dans le port `application/ports/repositories/structure_repository.py`.
 """
 
-from pydantic import BaseModel
+from application.ports.model import Model
 
 # ----- Corps des requêtes -----
 
 
-class TutelleCreate(BaseModel):
+class TutelleCreate(Model):
     parent_id: int
     child_id: int
 
@@ -16,7 +16,7 @@ class TutelleCreate(BaseModel):
 # ----- Réponses composées par le router -----
 
 
-class StructureTutelleCreateResponse(BaseModel):
+class StructureTutelleCreateResponse(Model):
     """Réponse de POST /api/structures/tutelles : la tutelle créée, ou `{status: "already_exists"}`."""
 
     id: int | None = None

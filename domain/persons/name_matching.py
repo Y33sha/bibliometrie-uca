@@ -27,14 +27,14 @@ def is_initials(text: str) -> bool:
 
 
 def orient_initials(last_name: str, first_name: str) -> tuple[str, str]:
-    """(nom, prénom), inversés quand le nom se réduit à des initiales et que le prénom n'en est pas : « M. » / « Brigante » donne « Brigante » / « M. »."""
+    """Renvoie (nom, prénom), inversés quand le nom se réduit à des initiales et que le prénom n'en est pas : « M. » / « Brigante » donne « Brigante » / « M. »."""
     if is_initials(last_name) and first_name.strip() and not is_initials(first_name):
         return first_name, last_name
     return last_name, first_name
 
 
 def _trailing_initials_start(words: list[str]) -> int | None:
-    """Indice du premier mot d'une suite finale d'initiales précédée d'un mot plein (« Del Buono L. » donne 2), `None` sinon."""
+    """Renvoie l'indice du premier mot d'une suite finale d'initiales précédée d'un mot plein (« Del Buono L. » donne 2), `None` sinon."""
     if is_initials(words[0]) or not is_initials(words[-1]):
         return None
     start = len(words) - 1
@@ -44,7 +44,7 @@ def _trailing_initials_start(words: list[str]) -> int | None:
 
 
 def parse_raw_author_name(raw_name: str | None) -> tuple[str, str]:
-    """Nom de famille et prénom d'un nom brut.
+    """Découpe un nom brut en nom de famille et prénom.
 
     - « Nom, Prénom » : des initiales avant la virgule passent en prénom (« C., Küll »).
     - « Nom I. » : des initiales finales forment le prénom (« Del Buono L. »).
@@ -70,7 +70,7 @@ def parse_raw_author_name(raw_name: str | None) -> tuple[str, str]:
 
 
 def family_name_splits(raw_name: str | None) -> list[tuple[str, str]]:
-    """Découpages possibles d'un nom brut en nom de famille et prénom.
+    """Renvoie les découpages possibles d'un nom brut en nom de famille et prénom.
 
     Au format « Nom, Prénom » ou « Nom I. », le seul découpage de `parse_raw_author_name`. Sinon, chaque groupe de mots final après le premier mot, du plus long au plus court : « Florence Caldefie Chezet » donne (« Caldefie Chezet », « Florence ») puis (« Chezet », « Florence Caldefie »).
     """
@@ -84,7 +84,7 @@ def family_name_splits(raw_name: str | None) -> list[tuple[str, str]]:
 
 
 def first_name_initials(first_name: str) -> tuple[str, ...] | None:
-    """Initiales d'un prénom réduit à des initiales, `None` pour un prénom plein ou vide.
+    """Renvoie les initiales d'un prénom réduit à des initiales, `None` pour un prénom plein ou vide.
 
     Un prénom est réduit quand chacun de ses mots normalisés tient en une lettre (« A. », « J.-P. »), ou quand il s'écrit en deux ou trois capitales accolées (« JP »).
     """
@@ -100,7 +100,7 @@ def first_name_initials(first_name: str) -> tuple[str, ...] | None:
 
 
 def normalize_first_name(first_name: str) -> str:
-    """Prénom normalisé. Un prénom réduit à des initiales (`first_name_initials`) donne ses initiales séparées : « JP » et « J.-P. » donnent « j p »."""
+    """Normalise un prénom. Un prénom réduit à des initiales (`first_name_initials`) donne ses initiales séparées : « JP » et « J.-P. » donnent « j p »."""
     initials = first_name_initials(first_name)
     return " ".join(initials) if initials is not None else normalize_text(first_name)
 
@@ -114,12 +114,12 @@ def initials_extend(initials: tuple[str, ...], first_name: str) -> bool:
 
 
 def full_first_name_extends(initials: tuple[str, ...], first_name: str) -> bool:
-    """Vrai si `first_name` est un prénom plein que `initials` commencent (`initials_extend`) : (« a »,) et « Abdellah », mais ni « A. B. » ni un prénom vide."""
+    """Vrai si `first_name` est un prénom plein commencé par `initials` (`initials_extend`) : (« a »,) et « Abdellah », mais ni « A. B. » ni un prénom vide."""
     return first_name_initials(first_name) is None and initials_extend(initials, first_name)
 
 
 def _name_words(*parts: str) -> list[str]:
-    """Mots normalisés d'un nom, sans les chiffres, qui sont souvent une année de naissance (« Chiari, Sophie 1977- »)."""
+    """Renvoie les mots normalisés d'un nom, sans les chiffres, souvent une année de naissance (« Chiari, Sophie 1977- »)."""
     text = re.sub(r"\d+", " ", normalize_text(" ".join(part for part in parts if part)))
     return text.split()
 
@@ -133,7 +133,7 @@ def names_compatible(ln1: str, fn1: str, ln2: str, fn2: str) -> bool:
 
 
 def _edit_distance(a: str, b: str) -> int:
-    """Distance d'édition où insertion, suppression, substitution et échange de deux lettres voisines (« doit », « diot ») coûtent 1 (optimal string alignment)."""
+    """Calcule la distance d'édition où insertion, suppression, substitution et échange de deux lettres voisines (« doit », « diot ») coûtent 1 (optimal string alignment)."""
     if a == b:
         return 0
     la, lb = len(a), len(b)
@@ -163,7 +163,7 @@ class _Pairing(Enum):
 
 
 def _pairing(word: str, other: str, *, typo: bool) -> _Pairing | None:
-    """Nature de l'appariement de deux mots, `None` s'ils ne s'apparient pas. Un mot d'une lettre est une initiale. Une faute est admise seulement entre deux mots entiers, et si `typo`."""
+    """Renvoie la nature de l'appariement de deux mots, `None` s'ils ne s'apparient pas. Un mot d'une lettre est une initiale. Une faute est admise seulement entre deux mots entiers, et si `typo`."""
     if len(word) == 1 or len(other) == 1:
         if word == other:
             return _Pairing.INITIALS
@@ -191,7 +191,12 @@ def _pair_up(
     initial: bool = False,
     whole: bool = False,
 ) -> bool:
-    """Vrai si chaque mot de `words` s'apparie à un mot distinct de `others`, et si un appariement par initiale s'accompagne d'au moins un appariement entre deux mots entiers. `initial` et `whole` disent si les appariements déjà faits en contiennent un."""
+    """Vrai si chaque mot de `words` s'apparie à un mot distinct de `others`, et si un appariement par initiale s'accompagne d'au moins un appariement entre deux mots entiers.
+
+    Args:
+        initial: les appariements déjà faits en comptent un par initiale.
+        whole: les appariements déjà faits en comptent un entre deux mots entiers.
+    """
     if not words:
         return whole or not initial
     word, rest = words[0], words[1:]

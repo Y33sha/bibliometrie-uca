@@ -6,7 +6,7 @@ La phase s'arrête en échec si le périmètre d'extraction ne contient aucune s
 2. **Référentiel des structures HAL** (`affiliations.refresh_hal_structures`) : charge les structures HAL citées et absentes du référentiel.
 3. **Résolution des adresses** (`affiliations.resolve_addresses`) : rattache les adresses aux structures connues.
 4. **Partenaires de thèse** (`affiliations.resolve_thesis_partners`) : rattache aux structures les PPN des laboratoires partenaires de thèse.
-5. **Contributions sources du périmètre** (`affiliations.populate`) : pose sur chaque contribution source les indices de son entrée dans le périmètre, d'après les structures qu'elle atteint et les identifiants des personnes qui ont une fiche RH.
+5. **Contributions sources du périmètre** (`affiliations.populate`) : pose sur chaque contribution source les indices de son entrée dans le périmètre, d'après les structures atteintes et les identifiants des personnes à fiche RH.
 """
 
 from __future__ import annotations
@@ -126,7 +126,7 @@ def build() -> Phase:
 
 
 def _run_refresh_hal_structures(ctx: PhaseContext, refresh_stale: bool) -> PhaseMetrics:
-    """Chargement du référentiel des structures HAL, sur sa propre connexion."""
+    """Charge le référentiel des structures HAL, sur sa propre connexion."""
 
     with ctx.open_tx() as conn:
         return run_refresh_hal_structures(
@@ -139,9 +139,9 @@ def _run_refresh_hal_structures(ctx: PhaseContext, refresh_stale: bool) -> Phase
 
 
 def _run_refresh_ror(ctx: PhaseContext) -> PhaseMetrics:
-    """Rafraîchissement du référentiel ROR depuis le dump publié sur Zenodo, sur sa propre connexion."""
+    """Rafraîchit le référentiel ROR depuis le dump publié sur Zenodo, sur sa propre connexion."""
 
-    # Le dump est public : l'adresse du polite pool y est facultative.
+    # Le dump est public : l'adresse du polite pool est facultative.
     source = ZenodoRorDumpSource(user_agent=default_user_agent(), logger=ctx.logger)
     with ctx.open_tx() as conn:
         return run_refresh_ror(conn, source=source, store=RorStore(conn), logger=ctx.logger)

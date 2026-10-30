@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { compareStructureLabels, structsTooltip, structureLabel, type Affiliation, type StructInfo } from "./structureLabels";
 
 const struct = (over: Partial<StructInfo>): StructInfo =>
-  ({ id: 1, name: "Laboratoire", acronym: "LAB", type: "labo", ...over }) as StructInfo;
+  ({ id: 1, name: "Laboratoire", acronym: "LAB", type: "labo", is_laboratory: true, ...over }) as StructInfo;
 
 const contribution = (over: Partial<Affiliation>): Affiliation => ({
   raw_affiliation: null,

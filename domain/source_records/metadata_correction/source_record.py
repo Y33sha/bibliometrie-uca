@@ -27,12 +27,13 @@ from domain.types import JsonValue
 
 
 class CorrectedSourceRecord(NamedTuple):
-    """Valeurs corrigées d'un enregistrement source, et `corrections` complète : les entrées de la correction unaire recalculées, celles des autres sous-étapes gardées. Chaque champ a le nom de sa colonne de `source_records`."""
+    """Valeurs corrigées d'un enregistrement source. Chaque champ a le nom de sa colonne de `source_records`."""
 
     doc_type: str | None
     oa_status: str | None
     urls: list[str] | None
     corrections: dict[str, JsonValue]
+    """Colonne `corrections` complète : entrées de la correction unaire recalculées, entrées des autres sous-étapes gardées."""
 
 
 class UnaryCorrection(NamedTuple):
@@ -54,7 +55,7 @@ UNARY_IDENTIFIER_RULES = frozenset(
 def corrected_doc_type(
     facts: MetadataForCorrection, corrections: Mapping[str, JsonValue]
 ) -> str | None:
-    """Type d'un enregistrement source après les règles de correction."""
+    """Renvoie le type d'un enregistrement source après les règles de correction."""
     before = hydrate_raw_view(facts, corrections)
     corrected = effective_metadata(before).doc_type
     return corrected.value if corrected is not None else before.doc_type
@@ -68,11 +69,16 @@ def correct_source_record(
     origin_doc_type: str | None = None,
     missing_hal_ids: Set[str] = frozenset(),
 ) -> UnaryCorrection | None:
-    """Corrige un enregistrement source depuis ses valeurs d'avant correction, que `corrections` et ses `identifiers` permettent de reconstruire. Renvoie `None` si les valeurs courantes sont déjà les valeurs corrigées.
-
-    `facts` et `corrections` sont les valeurs courantes, éventuellement corrigées par un passage précédent. `identifiers` sont tous les identifiants de l'enregistrement source, avec leur statut courant. `origin_doc_type` est le type corrigé du dépôt HAL dont l'enregistrement source ScanR est issu ; il prime sur son type. `missing_hal_ids` : dépôts HAL introuvables dans HAL.
+    """Corrige un enregistrement source depuis ses valeurs d'avant correction, reconstruites à partir de `corrections` et de ses `identifiers`. Renvoie `None` si les valeurs courantes sont déjà les valeurs corrigées.
 
     Une conflation thèse-article corrigée en article perd ses identifiants de thèse (`is_dissertation_identifier`). Les identifiants et les liens des dépôts de `missing_hal_ids` sont retirés.
+
+    Args:
+        facts: valeurs courantes, éventuellement corrigées par un passage précédent.
+        identifiers: tous les identifiants de l'enregistrement source, avec leur statut courant.
+        corrections: colonne `corrections` courante.
+        origin_doc_type: type corrigé du dépôt HAL dont l'enregistrement source ScanR est issu ; il prime sur son type.
+        missing_hal_ids: dépôts HAL introuvables dans HAL.
     """
     before = hydrate_raw_view(facts, corrections)
     corrected = effective_metadata(before)

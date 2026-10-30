@@ -1,5 +1,5 @@
 # STATUS: oneshot (2026-10-15)
-"""Alignement des listes d'auteurs d'une même publication entre sources : mesure, phase 1 du chantier `DATA_alignement-auteurs.md`.
+"""Alignement des listes d'auteurs d'une même publication entre sources : mesure.
 
 Pour chaque publication dont les enregistrements sources viennent d'au moins deux sources, et pour chaque paire d'enregistrements sources de sources différentes :
 
@@ -15,7 +15,7 @@ Les enregistrements sources theses.fr, sans position d'auteur, sont écartés, a
 Écrit un rapport Markdown et un échantillon de désaccords à relire à la main. Lecture seule sur la base.
 
 Usage :
-    python -m interfaces.cli.oneshot.measure_author_alignment
+    uv run python -m interfaces.cli.oneshot.measure_author_alignment
 """
 
 from __future__ import annotations
@@ -63,12 +63,12 @@ class SourceContribution:
 
 
 def bucket(size: int) -> str:
-    """Tranche de taille d'une liste d'auteurs."""
+    """Renvoie la tranche de taille d'une liste d'auteurs."""
     return next((label for limit, label in _BUCKETS if size <= limit), _LARGE)
 
 
 def _publication_ids(conn: Connection, full_max: int, sample_large: int, seed: int) -> list[int]:
-    """Publications aux enregistrements sources d'au moins deux sources, hors theses.fr : toutes jusqu'à `full_max` auteurs, un échantillon au-delà."""
+    """Renvoie les publications aux enregistrements sources d'au moins deux sources, hors theses.fr : toutes jusqu'à `full_max` auteurs, un échantillon au-delà."""
     rows = conn.execute(
         text("""
             WITH multi AS (
@@ -106,9 +106,9 @@ type SourceRecordKey = tuple[int, str, bool]
 def _source_records(
     conn: Connection, publication_ids: Sequence[int]
 ) -> Iterator[tuple[int, dict[SourceRecordKey, list[SourceContribution]]]]:
-    """Enregistrements sources de chaque publication : `(id d'enregistrement source, source, issu de HAL)` → contributions sources d'auteur individuelles triées par position.
+    """Lit les enregistrements sources de chaque publication : `(id d'enregistrement source, source, issu de HAL)` → contributions sources d'auteur individuelles triées par position.
 
-    Un enregistrement source est issu de HAL quand il recopie un dépôt HAL : enregistrement scanR à identifiant `hal…`, enregistrement OpenAlex dont la première URL, celle de la location principale, est une page HAL.
+    Un enregistrement source est issu de HAL quand il recopie un dépôt HAL : enregistrement ScanR à identifiant `hal…`, enregistrement OpenAlex dont la première URL, celle de la localisation principale, est une page HAL.
     """
     for start in range(0, len(publication_ids), _BATCH):
         ids = list(publication_ids[start : start + _BATCH])
@@ -236,7 +236,7 @@ def _compare(
 
 
 def _dependent(ka: SourceRecordKey, kb: SourceRecordKey) -> bool:
-    """Vrai quand un enregistrement source recopie l'autre, ou quand les deux recopient le même dépôt HAL."""
+    """Renvoie vrai quand un enregistrement source recopie l'autre, ou quand les deux recopient le même dépôt HAL."""
     return (ka[1] == "hal" and kb[2]) or (kb[1] == "hal" and ka[2]) or (ka[2] and kb[2])
 
 
@@ -252,7 +252,7 @@ class Outliers:
 def _first_name_outliers(
     source_records: dict[SourceRecordKey, list[SourceContribution]], outliers: Outliers
 ) -> None:
-    """Pour chaque position commune à trois sources ou plus, au même nom de famille et aux noms pas tous compatibles : la source dont le nom s'écarte de tous les autres, eux compatibles entre eux.
+    """Compte dans `outliers`, pour chaque position commune à trois sources ou plus, au même nom de famille et aux noms pas tous compatibles, la source au nom écarté de tous les autres, eux compatibles entre eux.
 
     Un enregistrement source par source, le plus long. Les enregistrements sources recopiés d'un dépôt HAL sont écartés, pour que le vote compte des sources indépendantes.
     """
@@ -298,7 +298,7 @@ def measure(
     Outliers,
     list[dict[str, object]],
 ]:
-    """Accords par tranche de taille (toutes paires, paires indépendantes) et par paire de sources, écarts de longueur, sources qui s'écartent, échantillon de désaccords."""
+    """Mesure les accords par tranche de taille (toutes paires, paires indépendantes) et par paire de sources, les écarts de longueur, les sources écartées et un échantillon de désaccords."""
     by_bucket: dict[str, Tally] = defaultdict(Tally)
     by_bucket_independent: dict[str, Tally] = defaultdict(Tally)
     by_sources: dict[str, Tally] = defaultdict(Tally)

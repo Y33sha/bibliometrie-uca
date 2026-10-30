@@ -1,13 +1,15 @@
 """Identifiants de publication : DOI et son préfixe, identifiant HAL, NNT, PMID, PMCID, identifiant arXiv, ISSN, ISBN."""
 
 import re
+from typing import NamedTuple
 from urllib.parse import unquote, urlparse
 
 from domain.identifiers import NormalizedIdentifier
 from domain.urls import is_host
 
-# Suffixe de version des DOI d'entrepôts de données (Figshare, Zenodo…). Le DOI sans version désigne l'œuvre.
-_DOI_VERSION_SUFFIX = re.compile(r"\.v\d+$", re.IGNORECASE)
+DOI_VERSION_SUFFIX_PATTERN = r"[./]v(\d{1,3})$"
+"""Suffixe de version d'un DOI normalisé : `.v` ou `/v` suivi de trois chiffres au plus (`10.6084/m9.figshare.123.v2`, `10.21203/rs.3.rs-123/v1`). Un numéro plus long est un code d'article (`10.1681/asn.v12102060`). Le motif vaut aussi en SQL."""
+_DOI_VERSION_SUFFIX = re.compile(DOI_VERSION_SUFFIX_PATTERN)
 # Suffixe d'URL de page d'éditeur (`/pdf`, `/full`, `/abstract`) collé au DOI. Le DOI suffixé est inconnu de doi.org.
 _DOI_URL_PAGE_SUFFIX = re.compile(r"/(?:pdf|full|abstract)$", re.IGNORECASE)
 _DOI_URL_PREFIXES = (
@@ -29,11 +31,11 @@ _SEPARATORS_RE = re.compile(r"[\s-]")
 
 
 def clean_doi(raw: str | None) -> str | None:
-    """Forme normalisée d'un DOI brut : en minuscules, sans préfixe d'URL ni schéma, sans artefact de copier-coller ni suffixe de version. `None` si la valeur n'a pas la forme d'un DOI. Les DOI sont insensibles à la casse."""
+    """Renvoie la forme normalisée d'un DOI brut : en minuscules, sans préfixe d'URL ni schéma, sans artefact de copier-coller. `None` si la valeur n'a pas la forme d'un DOI. Les DOI sont insensibles à la casse."""
     if not raw:
         return None
     s = raw.strip().lower()
-    # Une étape de fin (suffixe `.vN`) peut laisser un résidu pour une étape de début : la passe se répète jusqu'à stabilité.
+    # Une étape de fin (suffixe de page d'éditeur) peut laisser un résidu pour une étape de début : la passe se répète jusqu'à stabilité.
     while s:
         reduced = _normalize_doi_step(s)
         if reduced == s:
@@ -44,7 +46,7 @@ def clean_doi(raw: str | None) -> str | None:
 
 
 def _normalize_doi_step(s: str) -> str:
-    """Une passe de nettoyage d'un DOI en minuscules."""
+    """Applique une passe de nettoyage à un DOI en minuscules."""
     if s.startswith("doi:"):
         # Préfixe de schéma (DataCite, identifiant OAI-PMH d'OpenAlex).
         s = s[len("doi:") :]
@@ -69,8 +71,22 @@ def _normalize_doi_step(s: str) -> str:
         s = s[:-1]
     if s.endswith("(") and s.count("(") > s.count(")"):
         s = s[:-1]
-    s = _DOI_URL_PAGE_SUFFIX.sub("", s)
-    return _DOI_VERSION_SUFFIX.sub("", s)
+    return _DOI_URL_PAGE_SUFFIX.sub("", s)
+
+
+class DoiVersion(NamedTuple):
+    """Forme sans version d'un DOI à suffixe de version, et numéro de la version."""
+
+    unversioned: str
+    number: int
+
+
+def doi_version(doi: str) -> DoiVersion | None:
+    """Renvoie la forme sans version et le numéro de version d'un DOI normalisé, ou `None` sans suffixe de version."""
+    match = _DOI_VERSION_SUFFIX.search(doi)
+    if match is None:
+        return None
+    return DoiVersion(doi[: match.start()], int(match.group(1)))
 
 
 class DOI(NormalizedIdentifier):
@@ -86,7 +102,7 @@ class DOI(NormalizedIdentifier):
 
 
 def _doi_prefix(raw: str | None) -> str | None:
-    """Préfixe en tête de `raw`, ou `None`."""
+    """Renvoie le préfixe en tête de `raw`, ou `None`."""
     match = _DOI_PREFIX_RE.match((raw or "").strip())
     return match.group(1) if match else None
 
@@ -116,7 +132,7 @@ def is_hal_host(host: str) -> bool:
 
 
 def extract_hal_id_from_url(raw: str | None) -> str | None:
-    """Identifiant HAL sans version, tiré d'une URL de portail HAL, d'un identifiant OAI-PMH HAL (`oai:HAL:hal-04123456v1`) ou d'un identifiant nu.
+    """Renvoie l'identifiant HAL sans version, tiré d'une URL de portail HAL, d'un identifiant OAI-PMH HAL (`oai:HAL:hal-04123456v1`) ou d'un identifiant nu.
 
     `None` pour une URL d'un autre hôte, ou un identifiant OAI-PMH d'une autre autorité : leurs fragments `mot-chiffres` ressemblent à un identifiant HAL (`oai:pure.rug.nl:openaire/1b9c53c2-4cfa-49c4-b454-3339841149ee`).
     """
@@ -144,7 +160,7 @@ _NNT_RE = re.compile(r"[0-9A-Z]+")
 
 
 def normalize_nnt(raw: str | None) -> str | None:
-    """NNT en majuscules. `None` s'il contient autre chose que des chiffres et des lettres ASCII, comme les identifiants OAI-PMH qu'OpenAlex donne à sa place (`oai:HAL:…`, `ark:/…`)."""
+    """Renvoie le NNT en majuscules. `None` s'il contient autre chose que des chiffres et des lettres ASCII, comme les identifiants OAI-PMH donnés à sa place par OpenAlex (`oai:HAL:…`, `ark:/…`)."""
     if not raw:
         return None
     s = raw.strip().upper()
@@ -168,7 +184,7 @@ _PMCID_BARE_RE = re.compile(r"^(?:PMC)?(\d+)$", re.IGNORECASE)
 
 
 def normalize_pmid(raw: str | None) -> str | None:
-    """PMID depuis une URL PubMed ou un identifiant brut (suite de chiffres)."""
+    """Extrait le PMID d'une URL PubMed ou d'un identifiant brut (suite de chiffres)."""
     if not raw:
         return None
     s = raw.strip()
@@ -179,7 +195,7 @@ def normalize_pmid(raw: str | None) -> str | None:
 
 
 def normalize_pmcid(raw: str | None) -> str | None:
-    """PMCID (`PMC<chiffres>`) depuis une URL PubMed Central ou un identifiant brut."""
+    """Extrait le PMCID (`PMC<chiffres>`) d'une URL PubMed Central ou d'un identifiant brut."""
     if not raw:
         return None
     s = raw.strip()
@@ -212,7 +228,7 @@ _ARXIV_BARE_RE = re.compile(r"^(\d{4}\.\d{4,5}|[a-z.\-]+/\d{7})(?:v\d+)?$", re.I
 
 
 def normalize_arxiv_id(raw: str | None) -> str | None:
-    """Identifiant arXiv, `AAAA.NNNNN` (`2103.00001`) ou `catégorie/NNNNNNN` (`math/0211159`), depuis une URL `arxiv.org/abs|pdf/<id>` ou un identifiant brut. Suffixe de version (`v2`) et extension `.pdf` sont ignorés."""
+    """Extrait l'identifiant arXiv, `AAAA.NNNNN` (`2103.00001`) ou `catégorie/NNNNNNN` (`math/0211159`), d'une URL `arxiv.org/abs|pdf/<id>` ou d'un identifiant brut. Suffixe de version (`v2`) et extension `.pdf` sont ignorés."""
     if not raw:
         return None
     s = raw.strip()
@@ -234,14 +250,14 @@ _ISSN_RE = re.compile(r"(?:ISSN[:\s]*)?(\d{4})-?(\d{3})([\dX])", re.IGNORECASE |
 
 
 def _mod11_check_digit(digits: str) -> str:
-    """Clé de contrôle modulo 11 (ISSN, ISBN-10) : poids décroissants jusqu'à 2, `X` pour 10."""
+    """Calcule la clé de contrôle modulo 11 (ISSN, ISBN-10) : poids décroissants jusqu'à 2, `X` pour 10."""
     total = sum(int(c) * w for c, w in zip(digits, range(len(digits) + 1, 1, -1), strict=True))
     check = (11 - total % 11) % 11
     return "X" if check == 10 else str(check)
 
 
 def _normalize_issn(raw: str | None) -> str | None:
-    """ISSN sous la forme `NNNN-NNNC`, `X` en majuscule. Tolère l'absence de tiret et le préfixe `ISSN`. `None` si la clé de contrôle est fausse."""
+    """Renvoie l'ISSN sous la forme `NNNN-NNNC`, `X` en majuscule. Tolère l'absence de tiret et le préfixe `ISSN`. `None` si la clé de contrôle est fausse."""
     if not raw:
         return None
     m = _ISSN_RE.fullmatch(raw.strip().translate(_DASH_TRANSLATION))
@@ -254,7 +270,7 @@ def _normalize_issn(raw: str | None) -> str | None:
 
 
 def issn_rejection_reason(raw: str) -> str:
-    """Motif du rejet d'une valeur d'ISSN : clé de contrôle fausse si la forme `NNNN-NNNC` est respectée, forme invalide sinon."""
+    """Renvoie le motif du rejet d'une valeur d'ISSN : clé de contrôle fausse si la forme `NNNN-NNNC` est respectée, forme invalide sinon."""
     if _ISSN_RE.fullmatch(raw.strip().translate(_DASH_TRANSLATION)):
         return "clé de contrôle fausse"
     return "forme invalide"
@@ -271,7 +287,7 @@ _ISSN_SEARCH_RE = re.compile(r"\d{1,8}|\d{7}X", re.ASCII)
 
 
 def issn_search_prefix(raw: str) -> str | None:
-    """Début d'ISSN d'un terme de recherche, sans séparateur, `X` en majuscule ; `None` si le terme n'a pas cette forme. Le terme peut être tronqué à droite. La clé de contrôle n'est pas vérifiée : les ISSN mal formés d'une revue restent cherchables."""
+    """Renvoie le début d'ISSN d'un terme de recherche, sans séparateur, `X` en majuscule ; `None` si le terme n'a pas cette forme. Le terme peut être tronqué à droite. La clé de contrôle n'est pas vérifiée : les ISSN mal formés d'une revue restent cherchables."""
     cleaned = _SEPARATORS_RE.sub("", raw.strip().translate(_DASH_TRANSLATION)).upper()
     return cleaned if _ISSN_SEARCH_RE.fullmatch(cleaned) else None
 
@@ -280,13 +296,13 @@ _ISBN_SEARCH_RE = re.compile(r"97[89]\d{0,10}", re.ASCII)
 
 
 def isbn_search_prefix(raw: str) -> str | None:
-    """Début d'ISBN-13 d'un terme de recherche, sans séparateur ; `None` si le terme n'a pas cette forme. Un ISBN-13 commence par 978 ou 979."""
+    """Renvoie le début d'ISBN-13 d'un terme de recherche, sans séparateur ; `None` si le terme n'a pas cette forme. Un ISBN-13 commence par 978 ou 979."""
     cleaned = _SEPARATORS_RE.sub("", raw.strip().translate(_DASH_TRANSLATION))
     return cleaned if _ISBN_SEARCH_RE.fullmatch(cleaned) else None
 
 
 def issn_typo_candidates(raw: str) -> frozenset[str]:
-    """ISSN valides à une faute de frappe près d'une valeur : un caractère remplacé, ou deux caractères voisins inversés. Vide si la valeur n'a pas huit caractères hors tiret."""
+    """Renvoie les ISSN valides à une faute de frappe près d'une valeur : un caractère remplacé, ou deux caractères voisins inversés. Vide si la valeur n'a pas huit caractères hors tiret."""
     s = raw.replace("-", "").strip().upper()
     if len(s) != 8:
         return frozenset()
@@ -301,13 +317,13 @@ _ISBN10_RE = re.compile(r"\d{9}[\dX]", re.ASCII)
 
 
 def _isbn13_check_digit(digits: str) -> str:
-    """Clé de contrôle modulo 10 d'un ISBN-13 : poids alternés 1 et 3."""
+    """Calcule la clé de contrôle modulo 10 d'un ISBN-13 : poids alternés 1 et 3."""
     total = sum(int(c) * (3 if i % 2 else 1) for i, c in enumerate(digits))
     return str((10 - total % 10) % 10)
 
 
 def _normalize_isbn(raw: str | None) -> str | None:
-    """ISBN-13 sans séparateur. Un ISBN-10 est converti en ISBN-13 (préfixe 978). Tolère tirets, espaces et préfixe `ISBN`. `None` si la clé de contrôle est fausse."""
+    """Renvoie l'ISBN-13 sans séparateur. Un ISBN-10 est converti en ISBN-13 (préfixe 978). Tolère tirets, espaces et préfixe `ISBN`. `None` si la clé de contrôle est fausse."""
     if not raw:
         return None
     s = _ISBN_PREFIX_RE.sub("", raw.strip().translate(_DASH_TRANSLATION), count=1)
@@ -332,7 +348,7 @@ _ISBN_CANDIDATE_RE = re.compile(r"(?<![\dXx])(?:97[89][-\s]?)?(?:\d[-\s]?){9}[\d
 
 
 def find_isbns(text: str | None) -> list[str]:
-    """ISBN-13 contenus dans `text`, dans l'ordre, sans doublon.
+    """Renvoie les ISBN-13 contenus dans `text`, dans l'ordre, sans doublon.
 
     Une zone donne parfois plusieurs ISBN (`978-2-84867-659-3 ; 978-2-84867-660-9`), un EAN qui répète l'ISBN, ou un ISBN suivi d'un numéro de chapitre (`978-3-319-77273-8_16`). Une suite de chiffres dont la clé de contrôle est fausse est écartée, de même qu'un ISSN, plus court.
     """
@@ -351,7 +367,7 @@ def meme_registrant(doi_a: str | None, doi_b: str | None) -> bool:
 
 
 def extract_doi_from_url(url: str | None) -> str | None:
-    """DOI d'une URL `doi.org` ou d'un identifiant OAI-PMH `doi:<doi>`, ou `None`.
+    """Renvoie le DOI d'une URL `doi.org` ou d'un identifiant OAI-PMH `doi:<doi>`, ou `None`.
 
     >>> extract_doi_from_url("https://doi.org/10.1234/x")
     '10.1234/x'

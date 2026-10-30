@@ -160,7 +160,7 @@ def run_normalize_scanr(conn):
 
 
 class TestNormalizeScanrIdempotence:
-    """La normalisation ScanR produit le même résultat si lancée deux fois."""
+    """Lancée deux fois, la normalisation ScanR produit le même résultat."""
 
     def test_double_run_same_counts(self, sa_sync_conn):
 

@@ -64,7 +64,7 @@ def _strip_volatile(raw_data: Mapping[str, JsonValue]) -> Mapping[str, JsonValue
 
 
 def _identify(record: Mapping[str, JsonValue]) -> RecordIdentity | None:
-    """Le DOI d'une ressource DataCite est son identifiant."""
+    """Renvoie l'identifiant natif d'une ressource DataCite : son DOI."""
     from pipeline.ingestion.datacite.fields import record_doi
 
     doi = record_doi(record)

@@ -8,7 +8,7 @@
 
 Le moissonnage nécessite des **structures** :
 
-* Créer les structures dont on veut moissonner les publications.
+* Créer les structures à moissonner.
 * Renseigner les relations de tutelle entre structures.
 * Pour le moissonnage, renseigner les identifiants de structure (au moins pour l'établissement de tutelle) :
     * identifiant [OpenAlex](../../glossaire.md#openalex), de forme `I198244214` ;

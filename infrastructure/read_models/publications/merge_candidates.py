@@ -10,7 +10,14 @@ _LIMIT = 10
 
 
 def _candidates_sql(similarity: str, condition: str, *, ranked: bool = False) -> str:
-    """Publications fusionnables avec `:publication` qui satisfont `condition`. Une publication dont le DOI diffère de celui de `:publication` est écartée : la fusion la refuserait. `similarity` : expression de la similarité rendue. `ranked` : tri par similarité décroissante, puis par écart d'année."""
+    """Renvoie la requête des publications fusionnables avec `:publication` et satisfaisant `condition`.
+
+    Une publication de DOI différent de celui de `:publication` est écartée : la fusion la refuserait.
+
+    Args:
+        similarity: expression de la similarité renvoyée.
+        ranked: tri par similarité décroissante, puis par écart d'année.
+    """
     order = (
         f"ORDER BY similarity DESC, abs(c.publication_year - p.publication_year), c.id LIMIT {_LIMIT}"
         if ranked
@@ -54,7 +61,7 @@ class MergeCandidateQueries:
     _conn: Connection
 
     def merge_candidates(self, publication_id: int, query: str = "") -> list[MergeCandidateOut]:
-        """Publications fusionnables avec `publication_id`. Sans `query` : titres proches du sien. Avec `query` : la publication de cet identifiant, de ce DOI, ou les titres proches de `query`."""
+        """Renvoie les publications fusionnables avec `publication_id`. Sans `query` : titres proches du sien. Avec `query` : la publication de cet identifiant, de ce DOI, ou les titres proches de `query`."""
         query = query.strip()
         own_title = self._conn.execute(_OWN_TITLE_SQL, {"publication": publication_id}).scalar()
         params: dict[str, object] = {"publication": publication_id, "title": own_title or ""}

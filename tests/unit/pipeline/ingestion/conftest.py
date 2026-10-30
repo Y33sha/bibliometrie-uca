@@ -105,5 +105,5 @@ def identifiants_rh(monkeypatch, configuration):
 
 @pytest.fixture
 def logger() -> logging.Logger:
-    """Logger neutre pour les normaliseurs sous test (aucune sortie disque)."""
+    """Renvoie un logger neutre, sans sortie disque, pour les normaliseurs sous test."""
     return logging.getLogger("test_normalize")

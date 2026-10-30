@@ -23,7 +23,7 @@ _SNAPSHOT = "publication_contributions_marks"
 # Relevé de la file `contribution_attributes_queue`.
 _ATTRIBUTES_SNAPSHOT = "contribution_attributes_marks"
 
-# Marque pour la recomposition de leurs attributs les contributions des publications `:publications`.
+# Marque les contributions des publications `:publications` pour la recomposition de leurs attributs.
 _MARK_CONTRIBUTIONS_OF_PUBLICATIONS_SQL = text(
     enqueue_sql(
         Queue.CONTRIBUTION_ATTRIBUTES,
@@ -33,7 +33,7 @@ _MARK_CONTRIBUTIONS_OF_PUBLICATIONS_SQL = text(
 
 
 def _known_first_name(id_type: str) -> str:
-    """Prénom normalisé de la personne à laquelle un humain a rattaché l'identifiant `id_type` de la contribution source `sa`, s'il n'est pas neutralisé."""
+    """Renvoie l'expression SQL du prénom normalisé de la personne rattachée par un humain à l'identifiant `id_type` de la contribution source, s'il n'est pas neutralisé."""
     return f"""(
         SELECT p.first_name_normalized FROM person_identifiers pi JOIN persons p ON p.id = pi.person_id
         WHERE pi.id_type = '{id_type}' AND pi.id_value = {usable_identifier(f"'{id_type}'")}
@@ -70,7 +70,7 @@ _DELETE_MEMBERSHIPS_SQL = text(
 
 _DELETE_CONTRIBUTIONS_SQL = text("DELETE FROM contributions WHERE id = ANY(:ids)")
 
-# Marque pour la redécision de leur personne les contributions recomposées `:ids` qui en ont une.
+# Marque les contributions recomposées `:ids` rattachées à une personne, pour la redécision de leur personne.
 _MARK_RECOMPOSED_SQL = text(
     enqueue_sql(
         Queue.CONTRIBUTION_RESOLUTION,
@@ -135,12 +135,13 @@ class SourceContributionRow:
 
 @dataclass(frozen=True, slots=True)
 class ContributionRow:
-    """Contribution à écrire. `existing` : l'identifiant est celui d'une contribution déjà en base."""
+    """Contribution à écrire."""
 
     id: int
     publication_id: int
     reference_position: int | None
     existing: bool
+    """Vrai si l'identifiant est celui d'une contribution déjà en base."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -162,13 +163,13 @@ class BatchPlan:
     publication_ids: Sequence[int]
     contributions: list[ContributionRow]
     removed: list[int]
-    """Contributions sources dont l'appartenance en base est supprimée."""
+    """Contributions sources à appartenance en base supprimée."""
     memberships: list[MembershipRow]
     """Appartenances à insérer."""
     unmatched: list[int]
     """Contributions en base sans correspondant, à supprimer."""
     recomposed: list[int]
-    """Contributions en base dont les contributions sources changent : elles perdent leur personne, que la phase `persons` redécide."""
+    """Contributions en base à contributions sources changées, marquées pour la redécision de leur personne par la phase `persons`."""
     copies: dict[int, int]
     """Doublon d'auteur → première occurrence de son nom (`duplicate_of`)."""
 
@@ -236,7 +237,7 @@ class AuthorGroupingStore:
     def fetch_source_contributions(
         self, publication_ids: Sequence[int]
     ) -> list[SourceContributionRow]:
-        """Contributions sources à aligner de ces publications."""
+        """Renvoie les contributions sources à aligner de ces publications."""
         rows = self._conn.execute(
             _SOURCE_CONTRIBUTIONS_SQL,
             {"publications": list(publication_ids)},
@@ -246,7 +247,7 @@ class AuthorGroupingStore:
     def fetch_contributions(
         self, publication_ids: Sequence[int]
     ) -> tuple[dict[int, dict[int, set[int]]], dict[int, MembershipRow]]:
-        """Contributions en base de ces publications : publication → contribution → contributions sources, et appartenance de chaque contribution source alignée."""
+        """Renvoie les contributions en base de ces publications (publication → contribution → contributions sources) et l'appartenance de chaque contribution source alignée."""
         contributions: dict[int, dict[int, set[int]]] = {}
         memberships: dict[int, MembershipRow] = {}
         for row in self._conn.execute(_CONTRIBUTIONS_SQL, {"publications": list(publication_ids)}):
@@ -264,7 +265,7 @@ class AuthorGroupingStore:
         return contributions, memberships
 
     def new_contribution_ids(self, n: int) -> list[int]:
-        """`n` identifiants tirés de la séquence des contributions."""
+        """Tire `n` identifiants de la séquence des contributions."""
         if not n:
             return []
         return list(self._conn.execute(_NEW_CONTRIBUTION_IDS_SQL, {"n": n}).scalars())
@@ -272,7 +273,7 @@ class AuthorGroupingStore:
     def write(self, plan: BatchPlan) -> None:
         """Écrit les contributions et les doublons d'auteur des publications du lot, et marque leurs contributions pour la recomposition de leurs attributs.
 
-        Une contribution déjà en base garde son identifiant, sa personne et son mode de résolution. Une contribution dont les contributions sources changent est marquée pour la redécision de sa personne (`Queue.CONTRIBUTION_RESOLUTION`). Les autres contributions sources des publications du lot perdent leur `duplicate_of`.
+        Une contribution déjà en base garde son identifiant, sa personne et son mode de résolution. Une contribution à contributions sources changées est marquée pour la redécision de sa personne (`Queue.CONTRIBUTION_RESOLUTION`). Les autres contributions sources des publications du lot perdent leur `duplicate_of`.
         """
         publication_ids, contributions, removed = (
             plan.publication_ids,

@@ -33,8 +33,7 @@ def _setup_perimeter(conn, lab_ids, code="uca"):
     # tutelle de la racine sur chaque descendant
     for lab in lab_ids:
         insert_tutelle(conn, root, child_id=lab)
-    # Matérialise la clôture du périmètre : `get_perimeter_structure_ids` lit la table
-    # `perimeter_structures`, peuplée par `refresh_perimeter_structures`.
+    # Matérialise la clôture du périmètre : `get_perimeter_structure_ids` lit la table `perimeter_structures`, peuplée par `refresh_perimeter_structures`.
     refresh_perimeter_structures(conn)
     return root
 
@@ -197,7 +196,7 @@ class TestGetLaboratorySubjects:
 
         pid = insert_person(sa_sync_conn)
 
-        # 3 publications du labo avec sujets variables.
+        # 3 publications du laboratoire, aux sujets variables.
         def _attach(publication_id):
             aid = _lab_author(sa_sync_conn, publication_id, person_id=pid)
             add_contribution_structure(sa_sync_conn, aid, lab)

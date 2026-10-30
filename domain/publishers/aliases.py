@@ -1,4 +1,4 @@
-"""Autres noms d'un éditeur : un éditeur que nomment les sources, rapproché du titulaire des préfixes DOI de ses publications.
+"""Autres noms d'un éditeur : un éditeur nommé par les sources, rattaché au titulaire des préfixes DOI de ses publications.
 
 Deux signaux doivent concorder. Les enregistrements sources qui nomment l'éditeur ont presque tous un DOI Crossref d'un même titulaire de préfixe. Les deux noms sont compatibles : l'un abrège l'autre, l'emboîte ou en est l'acronyme, aux mots génériques près. Une marque ou un éditeur racheté (« BioMed Central » et Springer, « Mary Ann Liebert » et SAGE) partage le titulaire, sans nom compatible : il reste distinct.
 """
@@ -21,7 +21,11 @@ _GENERIC_WORDS = frozenset(
 
 
 def prefix_holder(holders: Mapping[int, int]) -> int | None:
-    """Titulaire de préfixe qui réunit au moins `MIN_SHARE` des enregistrements sources d'un éditeur, eux-mêmes au moins `MIN_RECORDS`. `holders` : nombre d'enregistrements par titulaire."""
+    """Renvoie le titulaire de préfixe qui réunit au moins `MIN_SHARE` des enregistrements sources d'un éditeur, eux-mêmes au moins `MIN_RECORDS`.
+
+    Args:
+        holders: nombre d'enregistrements sources par titulaire.
+    """
     total = sum(holders.values())
     if total < MIN_RECORDS:
         return None

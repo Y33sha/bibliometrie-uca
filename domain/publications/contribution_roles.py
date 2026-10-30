@@ -174,7 +174,7 @@ _SOURCE_MAPS: dict[str, dict[str, tuple[list[ContributionRole], bool]]] = {
 
 
 def map_role(source: str, raw_role: str | None) -> tuple[list[ContributionRole], bool]:
-    """Rôles d'une contribution source d'après son rôle brut, et si elle est l'auteur correspondant. Un rôle absent, ou une source sans table, donne `AUTHOR`. Un rôle inconnu donne `OTHER`. La casse est ignorée."""
+    """Renvoie les rôles d'une contribution source d'après son rôle brut, et si elle est l'auteur correspondant. Un rôle absent, ou une source sans table, donne `AUTHOR`. Un rôle inconnu donne `OTHER`. La casse est ignorée."""
     if not raw_role:
         return [ContributionRole.AUTHOR], False
 
@@ -195,7 +195,7 @@ def map_role(source: str, raw_role: str | None) -> tuple[list[ContributionRole],
 
 
 def merge_roles(role_lists: list[list[ContributionRole]]) -> list[ContributionRole]:
-    """Union de listes de rôles, sans `JURY_MEMBER` si un autre rôle de thèse l'implique."""
+    """Renvoie l'union de listes de rôles, sans `JURY_MEMBER` si un autre rôle de thèse l'implique."""
     all_roles: set[ContributionRole] = set()
     for roles in role_lists:
         all_roles.update(roles)

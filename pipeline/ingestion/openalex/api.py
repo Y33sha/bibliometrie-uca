@@ -43,7 +43,7 @@ SELECT_FIELDS = ",".join(
 
 
 def credential_params() -> dict[str, str]:
-    """Identifiants d'une requête OpenAlex : la clé d'API, sinon l'adresse du polite pool, l'une et l'autre facultatives."""
+    """Renvoie les identifiants d'une requête OpenAlex : la clé d'API, sinon l'adresse du polite pool, l'une et l'autre facultatives."""
     if api_key := get_openalex_api_key():
         return {"api_key": api_key}
     if email := get_polite_pool_email_optional():
@@ -52,14 +52,14 @@ def credential_params() -> dict[str, str]:
 
 
 def auth_params() -> dict[str, str]:
-    """Paramètres d'une requête OpenAlex sur les works : identifiants, et inclusion des works hors corpus principal (`include_xpac`)."""
+    """Renvoie les paramètres d'une requête OpenAlex sur les works : identifiants, et inclusion des works hors corpus principal (`include_xpac`)."""
     return {"include_xpac": "true", **credential_params()}
 
 
 async def fetch_work(
     client: httpx2.AsyncClient, openalex_id: str
 ) -> LookupOutcome[Mapping[str, JsonValue]]:
-    """Un work par son identifiant (`GET /works/{id}`), avec tous ses auteurs. `NOT_FOUND` : work supprimé ou fusionné dans OpenAlex."""
+    """Renvoie un work par son identifiant (`GET /works/{id}`), avec tous ses auteurs. `NOT_FOUND` : work supprimé ou fusionné dans OpenAlex."""
     outcome = await lookup_json_async(
         client,
         "GET",
@@ -81,7 +81,7 @@ def build_params(
     cursor: str = "*",
     since: str | None = None,
 ) -> QueryParams:
-    """Paramètres d'une requête `/works`.
+    """Construit les paramètres d'une requête `/works`.
 
     `years` borne `publication_year` (une année, ou la plage de la plus petite à la plus grande). `since` (`YYYY-MM-DD`) ajoute `from_updated_date`. Le `lineage:` agrège les institutions par `|` (OR).
     """
@@ -97,7 +97,7 @@ def build_params(
 
 
 def filter_params(filter_str: str, *, cursor: str = "*") -> QueryParams:
-    """Paramètres d'une page de `/works` que désigne le filtre `filter_str`."""
+    """Construit les paramètres d'une page de `/works` désignée par le filtre `filter_str`."""
     return {
         "filter": filter_str,
         "select": SELECT_FIELDS,
@@ -121,7 +121,7 @@ class OpenalexClient:
     def count(
         self, institution_ids: list[str], *, years: list[int], since: str | None = None
     ) -> int:
-        """Nombre de works des années `years`, modifiés depuis `since` s'il est donné, lu sur une page d'un seul work réduit à son identifiant."""
+        """Renvoie le nombre de works des années `years`, modifiés depuis `since` s'il est donné, lu sur une page d'un seul work réduit à son identifiant."""
         params = {
             **build_params(institution_ids, years=years, since=since),
             "per_page": 1,
@@ -138,21 +138,21 @@ class OpenalexClient:
         cursor: str = "*",
         since: str | None = None,
     ) -> Mapping[str, JsonValue]:
-        """Une page de works ; `cursor` vaut `"*"` au premier appel, puis le `next_cursor` de la page précédente."""
+        """Renvoie une page de works ; `cursor` vaut `"*"` au premier appel, puis le `next_cursor` de la page précédente."""
         params = build_params(institution_ids, years=years, cursor=cursor, since=since)
         return self._get(params, f"OpenAlex {since or years[0]}")
 
     def fetch_filtered_page(
         self, filter_str: str, cursor: str, label: str
     ) -> Mapping[str, JsonValue]:
-        """Une page des works que désigne `filter_str` ; `cursor` vaut `"*"` au premier appel."""
+        """Renvoie une page des works désignés par `filter_str` ; `cursor` vaut `"*"` au premier appel."""
         return self._get(filter_params(filter_str, cursor=cursor), label)
 
 
 async def search_doi(
     client: httpx2.AsyncClient, doi: str
 ) -> LookupOutcome[Mapping[str, JsonValue]]:
-    """Premier work de `GET /works?filter=doi:{doi}`. `NOT_FOUND` : réponse valide sans résultat, DOI absent d'OpenAlex.
+    """Renvoie le premier work de `GET /works?filter=doi:{doi}`. `NOT_FOUND` : réponse valide sans résultat, DOI absent d'OpenAlex.
 
     L'endpoint de liste plafonne les auteurs d'un work, comme le moissonnage.
     """

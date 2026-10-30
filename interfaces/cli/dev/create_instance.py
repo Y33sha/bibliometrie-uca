@@ -2,9 +2,9 @@
 """Crée la base de l'instance désignée par `BIBLIO_INSTANCE` : base, migrations, rôles de connexion, seed commun, seed d'établissement.
 
 Usage :
-    BIBLIO_INSTANCE=lorraine python -m interfaces.cli.dev.create_instance [--reseed]
+    BIBLIO_INSTANCE=lorraine uv run python -m interfaces.cli.dev.create_instance [--reseed]
 
-Le seed d'établissement est `instances/<nom>/seed.sql`, à côté de `instance.env`. Le script s'arrête si la base existe déjà. `--reseed` vise une base existante encore vide de documents : il applique les migrations, recharge le seed d'établissement et recalcule les structures des périmètres.
+Le seed d'établissement est `instances/<nom>/seed.sql`, à côté de `instance.env`. Le script s'arrête si la base existe déjà. `--reseed` vise une base existante sans enregistrement moissonné : il applique les migrations, recharge le seed d'établissement et recalcule les structures des périmètres.
 """
 
 import argparse
@@ -29,9 +29,9 @@ _DB_DIR = PROJECT_ROOT / "infrastructure" / "db"
 
 
 def instance_seed(instance_env_file: Path | None) -> Path:
-    """Seed d'établissement de l'instance, rangé à côté de son `instance.env`.
+    """Renvoie le seed d'établissement de l'instance, rangé à côté de son `instance.env`.
 
-    Lève `SystemExit` sans instance désignée ou sans seed : la base créée n'aurait sinon aucune structure.
+    Lève `SystemExit` sans instance désignée ou sans seed.
     """
     if instance_env_file is None:
         raise SystemExit("BIBLIO_INSTANCE doit désigner l'instance à créer.")
@@ -42,14 +42,14 @@ def instance_seed(instance_env_file: Path | None) -> Path:
 
 
 def instance_scripts(seed: Path, *, reseed: bool) -> list[Path]:
-    """Scripts SQL joués après les migrations : rôles, seed commun et seed d'établissement, ou le seul seed d'établissement au rechargement."""
+    """Renvoie les scripts SQL joués après les migrations : rôles, seed commun et seed d'établissement, ou le seul seed d'établissement au rechargement."""
     if reseed:
         return [seed]
     return [_DB_DIR / "roles.sql", _DB_DIR / "seed.sql", seed]
 
 
 def _ensure_not_harvested() -> None:
-    """Lève `SystemExit` quand `staging` contient des documents : le seed vide `structures`, et la suppression en cascade emporterait les rattachements calculés par le pipeline."""
+    """Lève `SystemExit` quand `staging` contient des enregistrements moissonnés : le seed vide `structures`, et la suppression en cascade emporterait les rattachements calculés par le pipeline."""
     with get_sync_engine().connect() as conn:
         if conn.execute(text("SELECT EXISTS (SELECT 1 FROM staging)")).scalar():
             raise SystemExit(

@@ -26,7 +26,7 @@ class TestLastDailyHarvestDate:
         assert last_daily_extract_date(sa_sync_conn) == datetime.date(2099, 6, 15)
 
     def test_extraction_par_annees_ignoree(self, sa_sync_conn):
-        """Une extraction hors mode quotidien est ignorée : bornée par années, elle ne ramène pas les dépôts récents."""
+        """Un moissonnage hors mode quotidien est ignoré : borné par années, il omet les dépôts récents."""
         _phase(sa_sync_conn, 1, phase="harvest", started_at=_at(10))
         _phase(sa_sync_conn, 2, phase="harvest", started_at=_at(20), mode="full")
         assert last_daily_extract_date(sa_sync_conn) == datetime.date(2099, 6, 10)
@@ -37,7 +37,7 @@ class TestLastDailyHarvestDate:
         assert last_daily_extract_date(sa_sync_conn) == datetime.date(2099, 6, 10)
 
     def test_extraction_avec_signal_ignoree(self, sa_sync_conn):
-        """Une extraction en avertissement ou en erreur est ignorée (HAL indisponible, run interrompu) : les enregistrements sources non récupérés restent dans la fenêtre suivante."""
+        """Un moissonnage en avertissement ou en erreur est ignoré (HAL indisponible, run interrompu) : les enregistrements sources non récupérés restent dans la fenêtre suivante."""
         _phase(sa_sync_conn, 1, phase="harvest", started_at=_at(10))
         _phase(sa_sync_conn, 2, phase="harvest", started_at=_at(20), status="warning")
         _phase(sa_sync_conn, 3, phase="harvest", started_at=_at(25), status="error")

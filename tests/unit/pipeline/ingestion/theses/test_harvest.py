@@ -100,7 +100,7 @@ def test_these_sans_identifiant_ignoree():
 
 
 def test_page_vide_interrompt_la_boucle():
-    """`totalHits` annonce plus que ce que la source sert : la boucle s'arrête sans tourner à vide."""
+    """`totalHits` dépasse le nombre de thèses servies : la boucle s'arrête à la première page vide."""
     assert _lister(_client([[]], total=10)) == (10, [])
 
 

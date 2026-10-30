@@ -2,7 +2,7 @@
 
 La connexion s'ouvre en lecture seule sur `GET`, `HEAD` et `OPTIONS` : la base refuse une écriture émise depuis une route de lecture (SQLSTATE `25006`), qu'elle soit committée ou non.
 
-La règle vaut pour les deux façons dont une connexion naît pendant une requête : celle que `db_conn` sert aux dépendances, et celles que `connection_factory` remet à une lecture répartie sur plusieurs connexions. Un garde-fou d'exécution refuse une connexion ouverte par un troisième chemin.
+La règle vaut pour les deux chemins d'ouverture d'une connexion pendant une requête : la connexion servie aux dépendances par `db_conn`, et celles remises par `connection_factory` à une lecture répartie sur plusieurs connexions. Un garde-fou d'exécution refuse une connexion ouverte par un troisième chemin.
 
 L'écriture d'épreuve vise `config`, où le rôle de l'API a le droit `UPDATE` : le refus vient donc de la transaction en lecture seule. Sa clause `WHERE false` ne touche aucune ligne ; PostgreSQL contrôle la commande, quel que soit le nombre de lignes touchées.
 """
@@ -91,7 +91,7 @@ class TestDureeMaximaleDesLectures:
 class TestConnectionFactory:
     """Connexions supplémentaires d'une lecture parallélisée (les facettes des publications).
 
-    Elles naissent hors de `db_conn` et suivent la même règle. L'adaptateur reçoit la fabrique de la composition root : un contrat d'import lui interdit d'atteindre l'engine.
+    Elles s'ouvrent hors de `db_conn` et suivent la même règle. L'adaptateur reçoit la fabrique de la composition root : un contrat d'import lui interdit d'atteindre l'engine.
     """
 
     @pytest.fixture
@@ -122,7 +122,7 @@ class TestGardeFouDExecution:
 
     @pytest.fixture
     def probe_client(self, monkeypatch, sa_engine_app):
-        """Application d'épreuve avec le vrai middleware et trois routes de lecture."""
+        """Fournit un client de l'application d'épreuve, avec le vrai middleware et trois routes de lecture."""
         from fastapi import FastAPI
         from starlette.testclient import TestClient
 

@@ -1,4 +1,4 @@
-"""Sources bibliographiques : registre des sources et lecture des données de source dont plusieurs couches ont besoin.
+"""Sources bibliographiques : registre des sources et lecture des données de source utiles à plusieurs couches.
 
-La lecture du payload qui sert seulement à l'ingestion d'une source vit dans `pipeline/ingestion/<source>/payload.py`.
+La lecture du payload réservée à l'ingestion d'une source est définie dans `pipeline/ingestion/<source>/payload.py`.
 """

@@ -22,7 +22,7 @@ _LOGGER = logging.getLogger("test")
 
 
 def _auth(monkeypatch, *, api_key=None, email=None):
-    """Pose la clé d'API et l'adresse polite pool que lit `auth_params()`."""
+    """Pose la clé d'API et l'adresse polite pool lues par `auth_params()`."""
     monkeypatch.setattr(api, "get_openalex_api_key", lambda: api_key)
     monkeypatch.setattr(api, "get_polite_pool_email_optional", lambda: email)
 

@@ -64,7 +64,7 @@ _ORCID_CANONICAL = re.compile(r"^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$")
 
 
 def normalize_orcid(raw: str | None) -> str | None:
-    """Forme normalisée d'un ORCID (`0000-0002-1825-0097`), écrit avec ou sans URL, avec ou sans tirets ; `None` si le format est invalide."""
+    """Renvoie la forme normalisée d'un ORCID (`0000-0002-1825-0097`), écrit avec ou sans URL, avec ou sans tirets ; `None` si le format est invalide."""
     if not raw:
         return None
     s = raw.strip()
@@ -82,7 +82,7 @@ def normalize_orcid(raw: str | None) -> str | None:
 
 
 def orcid_uri(orcid: str) -> str:
-    """Forme URI d'un ORCID normalisé : `https://orcid.org/XXXX-XXXX-XXXX-XXXX`."""
+    """Renvoie la forme URI d'un ORCID normalisé : `https://orcid.org/XXXX-XXXX-XXXX-XXXX`."""
     return f"{_ORCID_URL_PREFIXES[0]}{orcid}"
 
 
@@ -98,7 +98,7 @@ _IDHAL_CANONICAL = re.compile(r"^\S+$")
 
 
 def _normalize_idhal(raw: str | None) -> str | None:
-    """IdHAL en minuscules (HAL ignore la casse) ; `None` s'il contient un espace."""
+    """Renvoie l'IdHAL en minuscules (HAL ignore la casse) ; `None` s'il contient un espace."""
     if not raw:
         return None
     s = raw.strip().lower()
@@ -120,7 +120,7 @@ _IDREF_CANONICAL = re.compile(r"^\d{8}[\dX]$")
 
 
 def _normalize_idref(raw: str | None) -> str | None:
-    """Forme normalisée d'un IdRef, écrit seul ou dans une URL idref.fr ; `None` si le format est invalide."""
+    """Renvoie la forme normalisée d'un IdRef, écrit seul ou dans une URL idref.fr ; `None` si le format est invalide."""
     if not raw:
         return None
     s = "".join(raw.split())
@@ -144,7 +144,7 @@ _HAL_PERSON_ID_CANONICAL = re.compile(r"^[1-9][0-9]*$")
 
 
 def _normalize_hal_person_id(raw: str | None) -> str | None:
-    """Identifiant de compte HAL ; `None` s'il n'est pas un entier positif."""
+    """Renvoie l'identifiant de compte HAL ; `None` s'il n'est pas un entier positif."""
     if not raw:
         return None
     s = str(raw).strip()
@@ -169,7 +169,11 @@ _IDENTIFIER_VALUE_OBJECTS: dict[str, type[ORCID | IdHAL | IdRef | HalPersonId]] 
 
 
 def normalized_identifier_value(id_type: str, raw: str) -> str:
-    """Forme normalisée de la valeur d'un identifiant de personne. Lève `ValidationError` pour un type inconnu ou une valeur mal formée."""
+    """Renvoie la forme normalisée de la valeur d'un identifiant de personne.
+
+    Raises:
+        ValidationError: type inconnu ou valeur mal formée.
+    """
     value_object = _IDENTIFIER_VALUE_OBJECTS.get(id_type)
     if value_object is None:
         raise ValidationError(f"Type d'identifiant inconnu : {id_type!r}")
@@ -177,14 +181,16 @@ def normalized_identifier_value(id_type: str, raw: str) -> str:
 
 
 class ContributorIdentifiers(NamedTuple):
-    """Identifiants d'une contribution source : `values` pour `contributor_information.identifiers`, `malformed` pour les couples `(type, valeur brute)` écartés."""
+    """Identifiants d'une contribution source."""
 
     values: dict[str, JsonValue] | None
+    """Valeurs pour `contributor_information.identifiers`."""
     malformed: tuple[tuple[str, str], ...]
+    """Couples `(type, valeur brute)` écartés."""
 
 
 def compact_identifiers(**ids: str | int | None) -> ContributorIdentifiers:
-    """Identifiants d'une contribution source, d'après les valeurs brutes de la source. Une valeur vide ou nulle est ignorée. Un identifiant de personne prend sa forme normalisée, ou va dans `malformed`. Les autres identifiants restent tels quels."""
+    """Renvoie les identifiants d'une contribution source, d'après les valeurs brutes de la source. Une valeur vide ou nulle est ignorée. Un identifiant de personne prend sa forme normalisée, ou va dans `malformed`. Les autres identifiants restent tels quels."""
     values: dict[str, JsonValue] = {}
     malformed: list[tuple[str, str]] = []
     for id_type, raw in ids.items():
@@ -212,7 +218,7 @@ class IdentifierNeutralization(StrEnum):
 def shared_identifier_neutralizations(
     ids_by_source_contribution: Sequence[Mapping[str, JsonValue] | None],
 ) -> list[dict[str, IdentifierNeutralization] | None]:
-    """Identifiants neutralisés de chaque contribution source d'un enregistrement source, pour partage d'une valeur. `None` pour une contribution source sans identifiant neutralisé.
+    """Renvoie les identifiants neutralisés de chaque contribution source d'un enregistrement source, pour partage d'une valeur. `None` pour une contribution source sans identifiant neutralisé.
 
     Un identifiant désigne un seul auteur d'un enregistrement source : une valeur partagée est une corruption. Toute contribution source qui la contient voit tous ses identifiants neutralisés, vrai propriétaire compris, faute de le distinguer.
     """

@@ -110,7 +110,7 @@ class TestListLabScope:
         assert unscoped.rh.yes + unscoped.rh.no >= 2
 
     def test_facets_respect_search(self, sa_sync_conn):
-        """Régression : les comptes de facettes suivent la recherche par nom."""
+        """Les comptes de facettes suivent la recherche par nom."""
         lab = insert_structure(sa_sync_conn, "LAB-SRCH")
         p1 = insert_person(sa_sync_conn, "Dupont")
         _contribution_in_lab(sa_sync_conn, p1, lab_id=lab)
@@ -209,7 +209,7 @@ class TestPendingFacets:
         assert q.persons_facets(filters=PersonFilters()).pending_forms.yes >= 1
 
     def test_form_derived_from_the_name_is_not_to_confirm(self, sa_sync_conn):
-        """Régression : une forme dérivée du nom de la personne, confirmée d'office, comptait comme à confirmer."""
+        """Une forme dérivée du nom de la personne est confirmée d'office : elle laisse la personne hors du filtre « À confirmer »."""
         p_canonical = insert_person(sa_sync_conn, "Canonicalform")
         insert_person_name_form(
             sa_sync_conn,

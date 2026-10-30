@@ -92,7 +92,7 @@ def queries(sa_sync_conn):
 
 
 def _subjects_of(conn, publication_id):
-    """Sujets liés à une publication, triés par libellé."""
+    """Renvoie les sujets liés à une publication, triés par libellé."""
     return conn.execute(
         text(
             """
@@ -108,7 +108,7 @@ def _subjects_of(conn, publication_id):
 
 
 def _publications_updated(metrics):
-    """Nombre de publications traitées par un passage."""
+    """Renvoie le nombre de publications traitées par un passage."""
     return metrics.details["summary"]["publications_updated"]
 
 

@@ -24,7 +24,7 @@ from tests.integration.helpers.sources import insert_source_contribution, insert
 
 
 def _orphan_source_contribution(conn):
-    """Contribution source seule dans une contribution d'auteur du périmètre sans personne. Renvoie (contribution source, contribution, publication)."""
+    """Insère une contribution source, seule dans une contribution d'auteur du périmètre sans personne. Renvoie (contribution source, contribution, publication)."""
     publication = insert_publication(conn, "t", normalize_title=False, doc_type=None)
     source_record = insert_source_record(
         conn, publication, source_id=f"hal-{publication}", title="t"
@@ -111,3 +111,4 @@ def test_attach_refuse_quand_la_personne_a_une_contribution_manuelle_dans_la_pub
     with pytest.raises(PersonAlreadyInPublicationError) as error:
         contribution_service(sa_sync_conn).assign_orphan_contribution(pid, contribution)
     assert error.value.contribution_id == manual
+    assert str(error.value) == "Cette personne est déjà rattachée à cette publication."

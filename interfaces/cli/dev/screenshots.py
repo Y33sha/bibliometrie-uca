@@ -2,7 +2,7 @@
 """Captures d'écran du guide utilisateur, prises dans l'application en cours d'exécution.
 
 Usage :
-    python -m interfaces.cli.dev.screenshots [--base-url URL] [--only NOM ...]
+    uv run python -m interfaces.cli.dev.screenshots [--base-url URL] [--only NOM ...]
 
 L'application doit tourner (`bash start.sh`). Les captures des pages d'administration demandent une session : le script se connecte avec `SCREENSHOT_LOGIN` et `SCREENSHOT_PASSWORD`, lus dans l'environnement. Sans eux, il saute ces captures.
 
@@ -34,11 +34,14 @@ SAMPLES = {
 
 @dataclass(frozen=True)
 class Shot:
-    """Une capture : le fichier produit, la page (avec `{structure}`, `{institution}`, `{serial}`, `{publisher}`, `{subject}` remplacés par l'identifiant de l'exemple) et la session demandée."""
+    """Capture d'écran du guide utilisateur."""
 
     name: str
+    """Nom du fichier produit, sans extension."""
     path: str
+    """Page, avec `{structure}`, `{institution}`, `{serial}`, `{publisher}`, `{subject}` remplacés par l'identifiant de l'exemple."""
     admin: bool = False
+    """Vrai si la capture demande une session d'administration."""
     full_page: bool = False
 
 
@@ -55,7 +58,7 @@ SHOTS = [
     Shot("subjects", "subjects"),
     Shot("subject_graph", "subjects/{subject}"),
     Shot("hal_problems", "hal-problems/affiliation-conflicts"),
-    # Le volet de l'établissement montre les identifiants de structure des sources, que les laboratoires n'ont pas.
+    # Le volet de l'établissement montre les identifiants de structure des sources, absents des laboratoires.
     Shot("admin_structure_management", "structures?structure={institution}", admin=True),
     Shot("admin_config", "admin/config", admin=True, full_page=True),
     Shot("admin_addresses", "admin/addresses?structure_id={institution}", admin=True),
@@ -67,7 +70,7 @@ SHOTS = [
 
 
 def sample_ids(api: APIRequestContext, base_url: str) -> dict[str, int]:
-    """Identifiant de chaque entité de `SAMPLES`, trouvé par la recherche de l'API."""
+    """Renvoie l'identifiant de chaque entité de `SAMPLES`, trouvé par la recherche de l'API."""
     ids: dict[str, int] = {}
     for key, (endpoint, items, field, value) in SAMPLES.items():
         response = api.get(f"{base_url}/api/{endpoint}", params={"search": value, "per_page": 20})
@@ -81,7 +84,7 @@ def sample_ids(api: APIRequestContext, base_url: str) -> dict[str, int]:
 
 
 def login(page: Page, base_url: str) -> bool:
-    """Ouvre une session d'administration avec les identifiants de l'environnement. Faux sans identifiants."""
+    """Ouvre une session d'administration avec les identifiants de l'environnement. Renvoie faux sans identifiants."""
     username = os.environ.get("SCREENSHOT_LOGIN")
     password = os.environ.get("SCREENSHOT_PASSWORD")
     if not username or not password:

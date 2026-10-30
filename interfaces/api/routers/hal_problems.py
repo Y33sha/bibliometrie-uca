@@ -29,7 +29,7 @@ def hal_duplicate_accounts(
     per_page: int = Query(50, ge=1, le=200),
     queries: HalProblemsQueries = Depends(hal_problems_queries),
 ) -> HalDuplicateAccountsResponse:
-    """Personnes liées à au moins deux comptes HAL distincts."""
+    """Liste les personnes liées à au moins deux comptes HAL distincts."""
     return queries.hal_duplicate_accounts(page=page, per_page=per_page)
 
 
@@ -39,7 +39,7 @@ def hal_duplicate_publications_by_doi(
     per_page: int = Query(50, ge=1, le=200),
     queries: HalProblemsQueries = Depends(hal_problems_queries),
 ) -> HalDoiDuplicatesResponse:
-    """Dépôts HAL avec DOI identique rattachés à la même publication."""
+    """Liste les dépôts HAL avec DOI identique rattachés à la même publication."""
     return queries.hal_duplicate_publications_by_doi(page=page, per_page=per_page)
 
 
@@ -49,7 +49,7 @@ def hal_duplicate_publications_by_metadata(
     per_page: int = Query(50, ge=1, le=200),
     queries: HalProblemsQueries = Depends(hal_problems_queries),
 ) -> HalMetaDuplicatesResponse:
-    """Doublons possibles : dépôts HAL avec métadonnées identiques."""
+    """Liste les doublons possibles : dépôts HAL avec métadonnées identiques."""
     return queries.hal_duplicate_publications_by_metadata(page=page, per_page=per_page)
 
 
@@ -60,9 +60,9 @@ def hal_missing_collections(
     per_page: int = Query(50, ge=1, le=200),
     queries: HalProblemsQueries = Depends(hal_problems_queries),
 ) -> HalMissingCollectionsResponse:
-    """Publications affiliées à un laboratoire dans HAL mais absentes de sa collection.
+    """Liste les publications affiliées à un laboratoire dans HAL mais absentes de sa collection.
 
-    Renvoie 404 sur un laboratoire introuvable, 422 sur un laboratoire sans collection HAL configurée : la question est alors sans objet.
+    Renvoie 404 sur un laboratoire introuvable, 422 sur un laboratoire sans collection HAL configurée.
     """
     result = queries.hal_missing_collections(lab_id=lab_id, page=page, per_page=per_page)
     if result is NoMissingCollections.UNKNOWN_LAB:
@@ -76,7 +76,7 @@ def hal_missing_collections(
 def hal_missing_collections_labs(
     queries: HalProblemsQueries = Depends(hal_problems_queries),
 ) -> list[HalCollectionLab]:
-    """Laboratoires dotés d'une collection HAL."""
+    """Liste les laboratoires dotés d'une collection HAL."""
     return queries.hal_missing_collections_labs()
 
 
@@ -86,7 +86,7 @@ def hal_affiliation_conflicts(
     per_page: int = Query(50, ge=1, le=200),
     queries: HalProblemsQueries = Depends(hal_problems_queries),
 ) -> HalAffiliationConflictsResponse:
-    """Publications que HAL met dans le périmètre, et que WoS et OpenAlex, seules sources à donner des adresses, laissent hors du périmètre."""
+    """Liste les publications dans le périmètre selon HAL, et hors du périmètre selon WoS et OpenAlex, seules sources à donner des adresses."""
     return queries.hal_affiliation_conflicts(page=page, per_page=per_page)
 
 
@@ -99,7 +99,7 @@ def export_duplicate_accounts_csv(
     _rate_limit: None = Depends(export_rate_limit),
     slot: ExportSlot = Depends(export_slot),
 ) -> StreamingResponse:
-    """Export CSV des comptes auteur HAL en double."""
+    """Exporte en CSV les comptes auteur HAL en double."""
     return csv_response(
         queries.export_duplicate_accounts_csv(),
         filename="comptes-hal-en-double.csv",
@@ -113,7 +113,7 @@ def export_duplicate_publications_by_doi_csv(
     _rate_limit: None = Depends(export_rate_limit),
     slot: ExportSlot = Depends(export_slot),
 ) -> StreamingResponse:
-    """Export CSV des dépôts HAL en double par DOI."""
+    """Exporte en CSV les dépôts HAL en double par DOI."""
     return csv_response(
         queries.export_duplicate_publications_by_doi_csv(),
         filename="depots-hal-en-double-doi.csv",
@@ -127,7 +127,7 @@ def export_duplicate_publications_by_metadata_csv(
     _rate_limit: None = Depends(export_rate_limit),
     slot: ExportSlot = Depends(export_slot),
 ) -> StreamingResponse:
-    """Export CSV des doublons possibles de dépôts HAL par métadonnées."""
+    """Exporte en CSV les doublons possibles de dépôts HAL par métadonnées."""
     return csv_response(
         queries.export_duplicate_publications_by_metadata_csv(),
         filename="depots-hal-en-double-metadonnees.csv",
@@ -142,7 +142,7 @@ def export_missing_collections_csv(
     _rate_limit: None = Depends(export_rate_limit),
     slot: ExportSlot = Depends(export_slot),
 ) -> StreamingResponse:
-    """Export CSV des publications d'un laboratoire absentes de sa collection HAL.
+    """Exporte en CSV les publications d'un laboratoire absentes de sa collection HAL.
 
     Renvoie 404 et 422 dans les mêmes cas que la liste.
     """
@@ -160,7 +160,7 @@ def export_affiliation_conflicts_csv(
     _rate_limit: None = Depends(export_rate_limit),
     slot: ExportSlot = Depends(export_slot),
 ) -> StreamingResponse:
-    """Export CSV des publications aux affiliations HAL divergentes."""
+    """Exporte en CSV les publications aux affiliations HAL divergentes."""
     return csv_response(
         queries.export_affiliation_conflicts_csv(),
         filename="affiliations-hal-divergentes.csv",

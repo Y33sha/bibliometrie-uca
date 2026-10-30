@@ -18,8 +18,8 @@ def resolve_entity_label(
     entity_id: str = Query(...),
     queries: EntityLabelQueries = Depends(entity_label_queries),
 ) -> EntityLabelResponse:
-    """Libellé d'une entité de facette par son identifiant : un entier, ou un ROR pour une organisation partenaire.
+    """Renvoie le libellé d'une entité de facette par son identifiant : un entier, ou un ROR pour une organisation partenaire.
 
-    Sert à réafficher une pastille de facette restaurée depuis l'URL, qui contient l'identifiant seul, état de référence de la sélection. Le libellé est le même sous tous les filtres : une seule lecture sert tous les contextes.
+    Sert à réafficher une pastille de facette restaurée depuis l'URL, qui contient seulement l'identifiant. Le libellé est le même sous tous les filtres : une seule lecture sert tous les contextes.
     """
     return queries.resolve_entity_label(kind=kind, entity_id=entity_id)

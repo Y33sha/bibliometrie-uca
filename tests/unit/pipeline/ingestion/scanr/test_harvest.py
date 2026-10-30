@@ -62,7 +62,7 @@ class TestFields:
 
 
 def _hit(identifiant: str, route: UpsertOutcome = UpsertOutcome.NEW) -> dict:
-    """Document Elasticsearch minimal : la source, et la clé de tri qui sert de curseur."""
+    """Renvoie un document Elasticsearch minimal : la source, et la clé de tri servant de curseur."""
     return {"_source": {"id": identifiant, "_route": route}, "sort": [identifiant]}
 
 

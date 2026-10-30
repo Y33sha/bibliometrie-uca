@@ -1,6 +1,6 @@
 """Router du référentiel des entités organisationnelles et de leurs liens. Sert `/api/structures/*`.
 
-Une structure est un laboratoire, une composante, une université, un centre hospitalier, une école ou un site. La table `structure_parents` décrit leurs tutelles, qui décident des structures d'un périmètre. Les formes de nom, qui servent à reconnaître les structures dans les adresses, s'éditent sous `/name-forms` ; celles des personnes, sans rapport, vivent sous `/api/persons`.
+Une structure est un laboratoire, une composante, une université, un centre hospitalier, une école ou un site. La table `structure_parents` décrit leurs tutelles, qui décident des structures d'un périmètre. Les formes de nom, qui servent à reconnaître les structures dans les adresses, s'éditent sous `/name-forms` ; celles des personnes sont servies par `/api/persons`.
 
 Les chemins littéraux se déclarent avant `/{structure_id}` : un segment fixe placé après serait capté par le paramètre.
 """
@@ -59,7 +59,7 @@ def structure_filters(
     tutelle_id: str = Query(""),
     perimeter_id: str = Query(""),
 ) -> StructureFilters:
-    """Filtres communs à la liste des structures, à ses facettes et à son export.
+    """Lit les filtres communs à la liste des structures, à ses facettes et à son export.
 
     Les valeurs multiples se séparent par des virgules. `search` cherche dans le nom, l'acronyme et le code, sans tenir compte des accents. `perimeter_id` accepte la sentinelle `none`, qui retient les structures hors de tout périmètre.
     """
@@ -86,7 +86,7 @@ def list_structures(
     sort: StructureSort = "acronym_asc",
     queries: StructuresQueries = Depends(structures_queries),
 ) -> StructureListResponse:
-    """Liste paginée des structures."""
+    """Liste les structures par page."""
     return queries.list_structures(filters=filters, sort=sort, page=page, per_page=per_page)
 
 
@@ -94,7 +94,7 @@ def list_structures(
 def list_all_structures(
     queries: StructuresQueries = Depends(structures_queries),
 ) -> list[StructureListItem]:
-    """Toutes les structures, triées par nom, pour les sélecteurs de structure."""
+    """Liste toutes les structures, triées par nom, pour les sélecteurs de structure."""
     return queries.list_all_structures()
 
 
@@ -103,7 +103,7 @@ def structures_facets(
     filters: Filters,
     queries: StructuresQueries = Depends(structures_queries),
 ) -> StructuresFacetsResponse:
-    """Décomptes par option des facettes de la liste des structures.
+    """Renvoie les décomptes par option des facettes de la liste des structures.
 
     Chaque facette écarte sa propre dimension de la clause WHERE.
     """
@@ -118,7 +118,7 @@ def export_structures_csv(
     _rate_limit: None = Depends(export_rate_limit),
     slot: ExportSlot = Depends(export_slot),
 ) -> StreamingResponse:
-    """Export CSV de la liste des structures, aux filtres et au tri de la liste."""
+    """Exporte en CSV la liste des structures, aux filtres et au tri de la liste."""
     return csv_response(
         queries.export_structures_csv(filters=filters, sort=sort),
         filename="structures.csv",
@@ -164,7 +164,7 @@ def delete_tutelle(
 
 
 # ── Formes de nom ────────────────────────────────────────────────
-# Une forme de nom est une écriture sous laquelle une structure se reconnaît dans le texte brut d'une adresse. La phase `affiliations` les charge toutes et les apparie ; ces routes les éditent.
+# Une forme de nom est une écriture sous laquelle une structure se reconnaît dans le texte brut d'une adresse. La phase `affiliations` les charge toutes et les cherche dans les adresses ; ces routes les éditent.
 
 
 @router.post("/name-forms", response_model=NameFormOut)
@@ -184,7 +184,7 @@ def get_name_form(
     form_id: int,
     queries: StructuresQueries = Depends(structures_queries),
 ) -> NameFormOut:
-    """Forme de nom, par son identifiant. Renvoie 404 si elle est inconnue."""
+    """Renvoie une forme de nom, par son identifiant. Renvoie 404 si elle est inconnue."""
     row = queries.get_name_form(form_id)
     if not row:
         raise HTTPException(status_code=404, detail="Forme de nom introuvable")
@@ -219,7 +219,7 @@ def get_structure(
     structure_id: int,
     queries: StructuresQueries = Depends(structures_queries),
 ) -> StructureDetailResponse:
-    """Détail complet d'une structure : `{structure, parents, children, forms}`, soit la structure, ses tutelles, ses sous-structures et ses formes de nom. Renvoie 404 si la structure n'existe pas."""
+    """Renvoie le détail complet d'une structure : la structure, ses tutelles, ses sous-structures et ses formes de nom (`{structure, parents, children, forms}`). Renvoie 404 si la structure n'existe pas."""
     detail = queries.get_structure_detail(structure_id)
     if detail is None:
         raise HTTPException(status_code=404, detail="Structure introuvable")
@@ -233,7 +233,7 @@ def get_structure_addresses(
     per_page: int = Query(50, ge=1, le=200),
     queries: StructuresQueries = Depends(structures_queries),
 ) -> StructureAddressesResponse:
-    """Adresses rattachées à la structure, le rattachement rejeté écarté."""
+    """Liste les adresses rattachées à la structure, hors rattachements rejetés."""
     return queries.get_structure_addresses(structure_id, page=page, per_page=per_page)
 
 
@@ -247,7 +247,10 @@ def get_structure_partners(
     per_page: int = Query(50, ge=1, le=200),
     queries: StructuresQueries = Depends(structures_queries),
 ) -> StructurePartnersResponse:
-    """Organisations partenaires de la structure, classées par nombre de copublications : les ROR des auteurs de ses publications, ancêtres compris, hors ceux de la structure et de ses tutelles. Filtres par année de publication, pays et type d'organisation ROR, valeurs séparées par des virgules."""
+    """Liste les organisations partenaires de la structure, classées par nombre de copublications.
+
+    Ce sont les ROR des auteurs de ses publications, ancêtres compris, hors ceux de la structure et de ses tutelles. Filtres par année de publication, pays et type d'organisation ROR, valeurs séparées par des virgules.
+    """
     return queries.get_structure_partners(
         structure_id,
         years=parse_int_csv(year, param="year"),
@@ -264,7 +267,7 @@ def get_structure_subjects(
     limit: TopSubjectsLimit = TOP_SUBJECTS_LIMIT,
     queries: StructuresQueries = Depends(structures_queries),
 ) -> list[SubjectFrequency]:
-    """Sujets les plus fréquents des publications de la structure (nuage de mots)."""
+    """Renvoie les sujets les plus fréquents des publications de la structure (nuage de mots)."""
     return queries.get_structure_subjects(structure_id, limit=limit)
 
 
@@ -273,7 +276,7 @@ def get_structure_deletion_impact(
     structure_id: int,
     queries: StructuresQueries = Depends(structures_queries),
 ) -> StructureDeletionImpact:
-    """Ce que la suppression de la structure emporte, pour la confirmation : formes de nom, tutelles, liens adresse-structure confirmés ou rejetés, périmètres dont elle est une racine. Renvoie 404 si la structure n'existe pas."""
+    """Renvoie l'effet de la suppression de la structure, pour la confirmation : formes de nom, tutelles, liens adresse-structure confirmés ou rejetés, périmètres ayant la structure pour racine. Renvoie 404 si la structure n'existe pas."""
     impact = queries.get_deletion_impact(structure_id)
     if impact is None:
         raise HTTPException(status_code=404, detail="Structure introuvable")

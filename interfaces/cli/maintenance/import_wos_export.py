@@ -1,7 +1,7 @@
 # STATUS: maintenance
 """Importe dans `staging` des exports tabulés de l'interface Web of Science.
 
-Chaque ligne d'export devient une ligne `staging` de la source `wos`, identifiée par son UT, avec le mode d'entrée `manual_export`. Le payload est la ligne elle-même : un objet dont les clés sont les balises WoS non vides (`UT`, `TI`, `AF`, `C1`, `RP`…). L'écriture passe par l'écriture commune au moissonnage : une ligne inchangée reste en l'état. Un UT présent dans plusieurs fichiers est importé une fois.
+Chaque ligne d'export devient une ligne `staging` de la source `wos`, identifiée par son UT, avec le mode d'entrée `manual_export`. Le payload est la ligne elle-même : un objet indexé par les balises WoS non vides (`UT`, `TI`, `AF`, `C1`, `RP`…). L'écriture passe par l'écriture commune au moissonnage : une ligne inchangée reste en l'état. Un UT présent dans plusieurs fichiers est importé une fois.
 
 L'export attendu est « Tab delimited file », contenu « Full Record ». Sans les balises `RP` (auteur correspondant) et `C1` (adresses), les contributions sources perdent l'auteur correspondant et les affiliations.
 
@@ -9,8 +9,8 @@ La normalisation se lance à part :
     run_pipeline --from normalize --sources wos
 
 Usage :
-    python -m interfaces.cli.maintenance.import_wos_export data/imports/wos/2026-10-07 [--dry-run]
-    python -m interfaces.cli.maintenance.import_wos_export export1.txt export2.txt
+    uv run python -m interfaces.cli.maintenance.import_wos_export data/imports/wos/2026-10-07 [--dry-run]
+    uv run python -m interfaces.cli.maintenance.import_wos_export export1.txt export2.txt
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ _COMMIT_BATCH = 500
 
 
 def export_files(paths: list[Path]) -> list[Path]:
-    """Fichiers désignés : les fichiers tels quels, et les fichiers `.txt` des répertoires, triés par nom."""
+    """Renvoie les fichiers désignés : les fichiers tels quels, et les fichiers `.txt` des répertoires, triés par nom."""
     files: list[Path] = []
     for path in paths:
         files += sorted(path.glob("*.txt")) if path.is_dir() else [path]
@@ -42,7 +42,7 @@ def export_files(paths: list[Path]) -> list[Path]:
 
 
 def read_export(path: Path) -> Iterator[dict[str, str]]:
-    """Lignes d'un export tabulé WoS, réduites à leurs balises non vides."""
+    """Lit les lignes d'un export tabulé WoS, réduites à leurs balises non vides."""
     csv.field_size_limit(sys.maxsize)
     with path.open(encoding="utf-8-sig", newline="") as f:
         for row in csv.DictReader(f, delimiter="\t", quoting=csv.QUOTE_NONE):

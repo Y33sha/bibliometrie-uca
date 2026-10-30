@@ -4,6 +4,7 @@ Sur une base vide, chaque test exerce une branche des filtres, des tris, des fac
 """
 
 import pytest
+from sqlalchemy import text
 
 from domain.publications.doc_types import DOC_TYPE_FAMILIES
 from domain.publications.licenses import LICENSE_LABELS
@@ -14,7 +15,7 @@ from domain.source_records.identifiers import (
 )
 from tests.integration.helpers.db import owner_connection
 from tests.integration.helpers.seeds import seed_publication, uniq
-from tests.integration.helpers.sources import insert_source_record
+from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 
 
 def test_licenses_follow_the_domain_enum(client):
@@ -40,6 +41,23 @@ def test_sources_are_readable_without_session(client):
     r = client.get("/api/publications/999999/sources")
     assert r.status_code == 404
     assert r.json()["detail"] == "Publication introuvable"
+
+
+def test_sources_exclude_author_duplicates_and_collectives(client):
+    """Les contributions sources de la publication excluent les doublons d'auteur et les collectifs, exclus de l'alignement."""
+    publication_id = seed_publication()
+    with owner_connection() as conn:
+        source_record_id = insert_source_record(conn, publication_id, source_id=uniq("h"))
+        first = insert_source_contribution(conn, source_record_id, author_position=0)
+        copy = insert_source_contribution(conn, source_record_id, author_position=1)
+        insert_source_contribution(conn, source_record_id, author_position=2, collective=True)
+        conn.execute(
+            text("UPDATE source_contributions SET duplicate_of = :first WHERE id = :copy"),
+            {"first": first, "copy": copy},
+        )
+    r = client.get(f"/api/publications/{publication_id}/sources")
+    assert r.status_code == 200
+    assert [s["id"] for s in r.json()["source_contributions"]] == [first]
 
 
 class TestSuspectMerges:
@@ -100,7 +118,7 @@ class TestPublicationsList:
         assert r.status_code == 200
 
     def test_filter_lab_none(self, client):
-        """Publications sans laboratoire."""
+        """Le filtre des publications sans laboratoire répond."""
         r = client.get("/api/publications", params={"lab_none": "true"})
         assert r.status_code == 200
 
@@ -364,7 +382,7 @@ class TestPublicationSources:
         assert r.status_code == 404
 
     def test_doi_affiche_par_role_et_autres_doi_parmi_les_identifiants(self, client):
-        """Régression : le DOI affiché d'un enregistrement ScanR était son DOI `secondary` (preprint), et non son DOI `derived`."""
+        """Le DOI affiché d'un enregistrement source ScanR est son DOI `derived` ; son DOI `secondary` actif (preprint) figure parmi les identifiants."""
         publication_id = seed_publication("Article")
         with owner_connection() as conn:
             insert_source_record(

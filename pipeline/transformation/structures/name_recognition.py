@@ -12,18 +12,19 @@ from domain.structures.structure import StructureType
 
 
 class MatchableNameForm(NamedTuple):
-    """Forme normalisée d'une structure, avec ses options de reconnaissance.
-
-    Une forme qui demande un contexte vaut seulement si l'une des structures de ce contexte est aussi reconnue dans le texte : un code de laboratoire ambigu vaut seulement avec son université de tutelle. Une forme d'exclusion présente retire sa structure du résultat, quelles que soient ses autres formes. Le type de la structure dit si sa reconnaissance vaut affiliation ou seulement contexte (`StructureType.is_affiliation`).
-    """
+    """Forme normalisée d'une structure, avec ses options de reconnaissance."""
 
     id: int
     structure_id: int
     form_text: str
     is_word_boundary: bool
+    """La forme vaut seulement comme mot entier."""
     requires_context_of: list[int] | None
+    """Contexte : la forme vaut seulement si l'une de ces structures est aussi reconnue dans le texte. Un code de laboratoire ambigu vaut ainsi seulement avec son université de tutelle."""
     is_excluding: bool
+    """Forme d'exclusion : sa présence retire sa structure du résultat, quelles que soient ses autres formes."""
     structure_type: StructureType
+    """Type de la structure : sa reconnaissance vaut affiliation ou seulement contexte (`StructureType.is_affiliation`)."""
 
 
 class StructureMatch(NamedTuple):
@@ -34,7 +35,7 @@ class StructureMatch(NamedTuple):
 
 
 def load_name_forms(conn: Connection) -> list[MatchableNameForm]:
-    """Formes de nom de toutes les structures, par `id` croissant."""
+    """Renvoie les formes de nom de toutes les structures, par `id` croissant."""
     rows = conn.execute(
         text("""
             SELECT nf.id, nf.structure_id, nf.form_text,
@@ -67,7 +68,7 @@ def _is_whole_word(text: str, start: int, end: int) -> bool:
 
 
 class StructureNameMatcher:
-    """Reconnaît les structures dans un texte par leurs formes de nom.
+    """Reconnaissance des structures dans un texte, par leurs formes de nom.
 
     Un automate Aho-Corasick détecte toutes les formes en un seul passage par texte, quel que soit leur nombre.
     """
@@ -87,11 +88,11 @@ class StructureNameMatcher:
 
     @classmethod
     def load(cls, conn: Connection) -> Self:
-        """Reconnaissance sur les formes de nom de toutes les structures."""
+        """Construit la reconnaissance sur les formes de nom de toutes les structures en base."""
         return cls(load_name_forms(conn))
 
     def _matched_form_ids(self, text_normalized: str) -> set[int]:
-        """Formes présentes dans le texte, comme mot entier pour celles qui l'exigent."""
+        """Renvoie les formes présentes dans le texte, comme mot entier pour celles qui l'exigent."""
         matched: set[int] = set()
         if self._empty:
             return matched
@@ -106,9 +107,9 @@ class StructureNameMatcher:
         return matched
 
     def resolve(self, text_normalized: str) -> list[StructureMatch]:
-        """Structures reconnues dans un texte normalisé, avec la forme de nom à l'origine de chacune.
+        """Renvoie les structures reconnues dans un texte normalisé, avec la forme de nom à l'origine de chacune.
 
-        Une structure est reconnue par une forme présente, hors exclusion, dont le contexte est une structure reconnue. Les contextes s'enchaînent : le calcul se répète tant qu'une structure s'ajoute. Pour chaque structure, la première forme valide par `id` l'emporte.
+        Une structure est reconnue par une forme présente, hors exclusion, sans contexte ou de contexte reconnu. Les contextes s'enchaînent : le calcul se répète tant qu'une structure s'ajoute. Pour chaque structure, la première forme valide par `id` l'emporte.
 
         Les structures sans valeur d'affiliation (sites) servent de contexte sans figurer au résultat.
         """

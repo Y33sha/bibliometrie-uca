@@ -2,7 +2,7 @@
 
 `doi.org/ra/<p1>,<p2>,…` renvoie l'agence d'enregistrement de chaque préfixe (`Crossref`, `DataCite`, `mEDRA`…), ou le statut `DOI does not exist` pour un préfixe inconnu. Une agence vaut pour tous les DOI d'un préfixe. Interrogé par la phase `resolve_ra`.
 
-`doi.org/api/handles/<doi>` répond 404 pour un DOI que le registre ne connaît pas. Interrogé par la phase `fetch_missing` pour un DOI que son agence d'enregistrement ne renvoie pas. Les requêtes s'identifient par l'adresse polite pool, dans le `User-Agent`.
+`doi.org/api/handles/<doi>` répond 404 pour un DOI inconnu du registre. Interrogé par la phase `fetch_missing` pour un DOI absent de son agence d'enregistrement. Les requêtes s'identifient par l'adresse polite pool, dans le `User-Agent`.
 """
 
 from __future__ import annotations
@@ -24,9 +24,9 @@ logger = logging.getLogger(__name__)
 def fetch_registration_agencies(
     prefixes: Sequence[str], *, user_agent: str
 ) -> Iterator[tuple[str, str | None]]:
-    """Agence d'enregistrement de chaque préfixe DOI, par lots de `DOI_ORG_RA_BATCH` préfixes.
+    """Renvoie l'agence d'enregistrement de chaque préfixe DOI, interrogée par lots de `DOI_ORG_RA_BATCH` préfixes.
 
-    Renvoie `(préfixe, agence)`, avec l'agence `None` quand doi.org ne connaît pas le préfixe. Les préfixes d'un lot refusé par doi.org (4xx) sont absents du résultat. L'indisponibilité de doi.org lève `SourceUnavailableError`.
+    Renvoie des couples `(préfixe, agence)`, avec l'agence `None` pour un préfixe inconnu de doi.org. Les préfixes d'un lot refusé par doi.org (4xx) sont absents du résultat. L'indisponibilité de doi.org lève `SourceUnavailableError`.
     """
     headers = {"User-Agent": user_agent, "Accept": "application/json"}
     for i in range(0, len(prefixes), DOI_ORG_RA_BATCH):
@@ -50,7 +50,7 @@ def fetch_registration_agencies(
 async def doi_existence(
     client: httpx2.AsyncClient, dois: Sequence[str], *, user_agent: str
 ) -> tuple[list[str], list[str]]:
-    """Partage des DOI entre DOI connus et inconnus de doi.org. Un DOI sans réponse concluante reste hors des deux listes."""
+    """Répartit des DOI entre DOI connus et inconnus de doi.org. Un DOI sans réponse concluante reste hors des deux listes."""
     headers = {"User-Agent": user_agent, "Accept": "application/json"}
     known: list[str] = []
     unknown: list[str] = []

@@ -24,9 +24,12 @@ from infrastructure.sql_fragments import (
 def detach_rejected_contributions(
     conn: Connection, person_id: int, publication_id: int | None = None
 ) -> int:
-    """Retire la personne à ses contributions des publications où elle est rejetée, et retire les épinglages de leurs contributions sources à elle. Avec `publication_id`, sur cette publication seulement. Renvoie le nombre de contributions détachées.
+    """Détache la personne de ses contributions aux publications rejetées pour elle, et retire ses épinglages de leurs contributions sources. Renvoie le nombre de contributions détachées.
 
-    Partagé par le rejet d'une paire et par la fusion de personnes, qui peut réunir sur une même personne une contribution et un rejet.
+    Sert au rejet d'une paire et à la fusion de personnes : une fusion peut réunir sur une même personne une contribution et un rejet.
+
+    Args:
+        publication_id: restreint le détachement à cette publication.
     """
     scope = "AND r.publication_id = :publication" if publication_id is not None else ""
     params = {"pid": person_id, "publication": publication_id}

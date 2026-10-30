@@ -213,7 +213,7 @@ class TestHalMissingCollections:
 
 
 def _create_contribution_uca(conn, publication_id, lab_id, position=0):
-    """Contribution du périmètre, de rôle auteur, rattachée au laboratoire `lab_id` et à une personne créée. Renvoie la personne."""
+    """Insère une contribution du périmètre, de rôle auteur, rattachée au laboratoire `lab_id` et à une personne créée. Renvoie la personne."""
     person_id = insert_person(conn)
     contribution_id = insert_contribution(
         conn,

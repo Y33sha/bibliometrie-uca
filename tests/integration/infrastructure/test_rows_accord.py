@@ -124,7 +124,7 @@ _COUCHES = ("application", "infrastructure", "pipeline")
 
 
 def _types_apparies() -> set[str]:
-    """Types que le code construit par appariement de noms, trouvés dans l'arbre syntaxique."""
+    """Renvoie les types construits par appariement de noms dans le code, trouvés dans l'arbre syntaxique."""
     racine = Path(__file__).resolve().parents[3]
     trouves: set[str] = set()
     for couche in _COUCHES:

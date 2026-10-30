@@ -1,6 +1,6 @@
 """Modèles de réponse : lectures sur les exécutions de phase du pipeline (/api/pipeline/runs/*).
 
-La liste regroupe les exécutions par `run_id` ; le statut d'un run est le pire de ses phases. Le détail d'un run renvoie ses phases dans l'ordre d'exécution, chacune avec son écart de durée au médian historique, recalculé à la lecture.
+La liste regroupe les exécutions par `run_id` ; le statut d'un run est le pire de ses phases. Le détail d'un run renvoie ses phases dans l'ordre d'exécution, chacune avec son écart de durée à la médiane historique, recalculé à la lecture.
 """
 
 from __future__ import annotations
@@ -8,20 +8,19 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel
-
+from application.ports.model import Model
 from domain.pipeline_runs import PhaseMetricsPayload, PhaseStatus, Signal
 
 
-class PhaseBrief(BaseModel):
+class PhaseBrief(Model):
     """Statut d'une phase au sein d'un run, pour le ruban de la liste."""
 
     phase: str
     status: PhaseStatus
 
 
-class RunSummary(BaseModel):
-    """Une ligne dans la liste des runs (agrégat des exécutions d'un même `run_id`)."""
+class RunSummary(Model):
+    """Ligne de la liste des runs : exécutions d'un même `run_id` regroupées."""
 
     run_id: int
     started_at: datetime
@@ -34,8 +33,8 @@ class RunSummary(BaseModel):
     phases: list[PhaseBrief]
 
 
-class PhaseExecutionDetail(BaseModel):
-    """Une exécution de phase, enrichie des valeurs recalculées à la lecture."""
+class PhaseExecutionDetail(Model):
+    """Exécution de phase, avec les valeurs recalculées à la lecture."""
 
     phase: str
     started_at: datetime
@@ -49,8 +48,8 @@ class PhaseExecutionDetail(BaseModel):
     signals: list[Signal]
 
 
-class RunDetail(BaseModel):
-    """Détail d'un run : ses phases et les agrégats de run."""
+class RunDetail(Model):
+    """Détail d'un run : ses phases et ses totaux."""
 
     run_id: int
     started_at: datetime

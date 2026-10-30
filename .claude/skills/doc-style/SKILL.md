@@ -24,7 +24,10 @@ allowed-tools: Read, Edit, Bash, Grep, Glob
 
 ## Contraintes de forme
 
-- Docstring de fonction simple : une phrase de résumé à l'indicatif présent, puis les seuls paramètres non évidents. 250 caractères au plus.
+- Docstrings au format PEP 257, sections du style Google. Ligne de résumé : verbe à l'indicatif présent pour une fonction (« Renvoie », « Fusionne »), groupe nominal pour une classe, un type ou un module. Jamais « Ce que… ».
+- Docstring de fonction simple : la ligne de résumé suffit. 250 caractères au plus.
+- Sections `Args:`, `Returns:`, `Raises:` : seulement pour les éléments non évidents, une ligne par élément. Jamais de liste en prose des paramètres.
+- Champ non évident d'une dataclass, d'un NamedTuple ou d'un modèle : une docstring sous le champ, plutôt qu'une mention dans la docstring de la classe.
 - Une idée par phrase. 28 mots maximum.
 - Aucun adjectif d'éloge, aucun titre décoratif en commentaire.
 
@@ -41,12 +44,16 @@ allowed-tools: Read, Edit, Bash, Grep, Glob
 - **Jargon.** Le jargon technique usuel est normal. Eviter le jargon interne au projet et les abréviations maison qu'un nouveau venu ne peut pas comprendre sans traduction (`sp` pour source_record, `pub` pour publication...).
 - **Anglicismes.** Toujours utiliser les termes les plus usuels, anglais ou français. Ne pas sur-franciser par purisme (on dit *repository* et non "dépôt" quand on parle des classes d'accès aux données).
 - **Pronoms « y » et « en ».** Ne les employer que si l'antécédent est le groupe nominal qui précède immédiatement, dans la même phrase. Sinon, répéter le nom.
+- **Relatives.** Remplacer les relatives en « que » (COD) et « dont » par un participe, un adjectif ou un complément de nom : « le bidule que schtroumpfe le truc » → « le bidule schtroumpfé par le truc ».
 - **Phrases négatives.** Les remplacer chaque fois que possible par des phrases positives. Si une phrase décrit ce que le code ne fait pas ou plus, la supprimer. Eviter les négations multiples.
 - **Un mot par notion.** Ne pas chercher l'élégance littéraire. Ne pas varier le vocabulaire pour éviter une répétition : en documentation technique, répéter le même mot est un service rendu au lecteur, pas une faiblesse de style.
-- **Vocabulaire du code.** Employer les mots de la documentation des données (`docs/donnees/`) et du pipeline (`docs/pipeline/01-vue-d-ensemble.md`). « Notice » désigne seulement une notice du Sudoc. `styles/Maison/Lexique.yml` signale les mots écartés hors contexte. Trois mots dépendent du contexte et restent au contrôle manuel :
+- **Vocabulaire du code.** Employer les mots de la documentation des données (`docs/donnees/`) et du pipeline (`docs/pipeline/01-vue-d-ensemble.md`). « Notice » désigne seulement une notice du Sudoc. `styles/Maison/Lexique.yml` signale les mots écartés hors contexte. Six mots dépendent du contexte et restent au contrôle manuel :
   - « document », « enregistrement » seul, pour une ligne de `source_records` → « enregistrement source » ;
   - « signature » désigne seulement la chaîne d'adresse ; pour une ligne de `source_contributions` → « contribution source » ;
-  - « extraction » pour la collecte des sources → « moissonnage ».
+  - « extraction » pour la collecte des sources → « moissonnage » ;
+  - « agrégat » au sens du DDD → « entité ». Au sens SQL (`COUNT`, `SUM`), le mot reste ;
+  - « rapprocher », « rapprochement », « apparier » → « rattacher » (enregistrement source à une publication, à une revue, à un éditeur ; contribution à une personne), « fusionner » (deux entités en une) ;
+  - « enrichissement » désigne seulement les phases qui suivent la résolution des entités, dans une description du pipeline.
 - **Simplicité et précision.** Remplacer les mots vagues par des équivalents précis ("la source atteste d'un document" => "le document est présent dans la source"; "la source ignore le document" => "le document est absent de la source").
 
 ## Alimentation

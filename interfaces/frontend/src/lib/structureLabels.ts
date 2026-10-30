@@ -30,7 +30,7 @@ export function compareStructureLabels(a: Labelled, b: Labelled): number {
 }
 
 export function structIsLabo(structures: Record<string, StructInfo>, id: number): boolean {
-	return structures[String(id)]?.type === 'labo';
+	return structures[String(id)]?.is_laboratory ?? false;
 }
 
 /**

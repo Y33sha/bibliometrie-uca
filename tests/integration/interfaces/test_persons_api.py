@@ -30,7 +30,7 @@ _persons_name_form = partial(seed_person_name_form, sources=["persons"])
 def _seed_perimeter_contribution(
     person_id: int, mode: str, *, raw_author_name: str, identifiers=None
 ) -> tuple[int, int]:
-    """Publication du périmètre dont la seule contribution d'auteur, rattachée à la personne par `mode`, réunit une contribution source de nom brut `raw_author_name` et d'identifiants `identifiers`. Renvoie (publication, contribution)."""
+    """Sème une publication du périmètre dont la seule contribution d'auteur, rattachée à la personne par `mode`, réunit une contribution source de nom brut `raw_author_name` et d'identifiants `identifiers`. Renvoie (publication, contribution)."""
     publication = seed_publication(uniq("Pub"), in_perimeter=True)
     source_record = seed_source_record(publication_id=publication)
     source_contribution = seed_source_contribution(
@@ -106,7 +106,7 @@ class TestPersonsList:
 
 class TestPersonProfileIdentifiers:
     def test_rejected_identifier_never_leaves_the_api(self, client):
-        """Un identifiant rejeté est absent de la fiche que renvoie l'API, pour tout client."""
+        """Un identifiant rejeté est absent de la fiche renvoyée par l'API, pour tout client."""
         person = seed_person(last="REJECTEDID")
         seed_person_identifier(
             person, id_type="orcid", id_value="0000-0002-0000-0001", status="rejected"
@@ -610,12 +610,12 @@ class TestMarkPersonsDistinct:
 # ── Traçabilité des écritures sur les personnes ──────────────
 
 
-def _audit_personne(event_type: str, aggregate_id: int) -> list[dict]:
+def _audit_personne(event_type: str, entity_id: int) -> list[dict]:
     with owner_pool() as cur:
         cur.execute(
             "SELECT payload, user_id FROM audit_log "
-            "WHERE event_type = %s AND aggregate_id = %s ORDER BY id",
-            (event_type, aggregate_id),
+            "WHERE event_type = %s AND entity_id = %s ORDER BY id",
+            (event_type, entity_id),
         )
         return cur.fetchall()
 

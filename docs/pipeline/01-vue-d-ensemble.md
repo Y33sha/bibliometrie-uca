@@ -2,7 +2,7 @@
 
 *À jour le 2026-10-26.*
 
-Le pipeline moissonne les sources, normalise ce qu'elles donnent, puis en déduit les publications, les contributions et les personnes du référentiel. Le [guide d'exploitation](../exploitation/03-pipeline.md) décrit son lancement et ses options.
+Le pipeline moissonne les sources, normalise leurs données, puis déduit les publications, les contributions et les personnes du référentiel. Le [guide d'exploitation](../exploitation/03-pipeline.md) décrit son lancement et ses options.
 
 | Notion | Code | Définition |
 |---|---|---|
@@ -21,7 +21,7 @@ Les phases s'exécutent dans cet ordre.
 - `harvest_by_person` interroge les sources sur les identifiants des personnes du référentiel RH.
 - `fetch_missing` cherche dans chaque source les documents trouvés dans les autres.
 - `fetch_stale` rafraîchit les documents non revus depuis un délai, et repère ceux qui ont disparu de leur source.
-- `fetch_truncated` retélécharge les documents OpenAlex dont la liste d'auteurs est tronquée.
+- `fetch_truncated` retélécharge les documents OpenAlex à liste d'auteurs tronquée.
 
 **Enregistrements sources**
 

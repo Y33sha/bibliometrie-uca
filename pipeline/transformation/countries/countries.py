@@ -23,14 +23,14 @@ from pipeline.transformation.countries.resolution import resolve_queued_addresse
 
 
 class AddressCountryStatus(NamedTuple):
-    """Bilan de l'état pays des adresses (restreint à `publication_count > 0`)."""
+    """Bilan pays des adresses citées par au moins une publication."""
 
     total: int
     with_country: int
 
 
 def count_address_country_status(conn: Connection) -> AddressCountryStatus:
-    """Bilan de la résolution des pays sur les adresses utiles (`publication_count > 0`)."""
+    """Renvoie le bilan pays des adresses citées par au moins une publication (`publication_count > 0`)."""
     row = conn.execute(
         text("""
             SELECT
@@ -52,7 +52,7 @@ def _address_status(open_tx: OpenTransaction) -> AddressCountryStatus:
 @dataclass(frozen=True)
 class CountriesPhase:
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Exécute les tâches, borne l'entonnoir par les deux relevés et assemble les métriques."""
+        """Exécute les tâches, relève l'état pays des adresses avant et après, puis assemble les métriques."""
         initial = _address_status(ctx.open_tx)
 
         def detect(ctx: PhaseContext) -> PhaseMetrics:

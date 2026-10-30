@@ -55,7 +55,7 @@ def _seed_phase(
 
 @pytest.fixture(scope="module")
 def seeded_runs() -> dict[str, int]:
-    """Deux runs : A sans warning ; B avec une phase en warning et une phase `publications` plus lente."""
+    """Sème deux runs : A sans warning ; B avec une phase en warning et une phase `publications` plus lente."""
     publications_details = {"tables": {"source_records": {"before": 1000, "after": 800}}}
 
     run_a = _next_run_id()
@@ -126,7 +126,7 @@ def test_get_run_detail(client, seeded_runs):
     assert [p["phase"] for p in detail["phases"]] == ["normalize", "publications", "persons"]
 
     publications = next(p for p in detail["phases"] if p["phase"] == "publications")
-    # Volumes avant et après rendus tels quels dans `details`.
+    # Volumes avant et après renvoyés tels quels dans `details`.
     assert publications["details"]["tables"]["source_records"] == {
         "before": 1000,
         "after": 800,
@@ -135,7 +135,7 @@ def test_get_run_detail(client, seeded_runs):
     assert publications["historical_median_duration_s"] == 10.0
     assert publications["duration_ratio"] == 2.0
 
-    # Indicateurs par source rendus tels quels.
+    # Indicateurs par source renvoyés tels quels.
     normalize = next(p for p in detail["phases"] if p["phase"] == "normalize")
     assert normalize["details"]["by_source"]["openalex"]["found"] == 7658
 

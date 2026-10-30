@@ -2,7 +2,7 @@
 
 *À jour le 2026-10-13.*
 
-Le système intègre 7 sources bibliographiques principales, complétées par des sources d'enrichissement et des imports manuels.
+Le système intègre 7 sources bibliographiques, des sources complémentaires et des imports manuels.
 
 ## Sources bibliographiques
 
@@ -16,6 +16,7 @@ Le système intègre 7 sources bibliographiques principales, complétées par de
 | [Crossref](06-crossref.md) | Agence d'enregistrement de DOI | Publications dotées d'un [DOI](../glossaire.md#doi) Crossref. Sert aussi à trouver l'éditeur d'un préfixe DOI. | REST (works, prefixes, members) | adresse électronique de contact |
 | [DataCite](07-datacite.md) | Agence d'enregistrement de DOI | Publications dotées d'un [DOI](../glossaire.md#doi) DataCite : jeux de données, logiciels, *preprints*, dépôts d'entrepôts (Zenodo, figshare, recherche-data-gouv…). Sert aussi à trouver l'entrepôt d'un préfixe DOI. | REST (dois, prefixes) | adresse électronique de contact |
 
+Un [exemple de publication](11-exemple-de-publication.md) compare les métadonnées de cinq sources.
 
 ### Modes d'interrogation
 
@@ -29,104 +30,13 @@ Le système intègre 7 sources bibliographiques principales, complétées par de
 | Crossref | — | ORCID | DOI |
 | DataCite | mot-clé d'affiliation + année | ORCID | DOI |
 
-Crossref donne l'affiliation en chaîne libre, sans identifiant d'établissement : il est interrogé seulement par personne et par DOI. Le moissonnage par personne interroge les identifiants des personnes RH, confirmés ou authentifiés.
-
-### Une même publication vue par chaque source
-
-Titre : *Mixed data k-Anonymization by Consistent Maximal Association and Microaggregation*. DOI : [10.1145/3746252.3761293](https://doi.org/10.1145/3746252.3761293). Les proportions citées portent sur les 58 608 publications du périmètre présentes dans au moins deux sources.
-
-#### Publication
-
-| Source | Titre |
-|---|---|
-| Crossref | `Mixed data <i>k</i> -Anonymization by Consistent Maximal Association and Microaggregation` |
-| ScanR | `Mixed data <i>k</i> -Anonymization by Consistent Maximal Association and Microaggregation` |
-| HAL | `Mixed data k -Anonymization by Consistent Maximal Association and Microaggregation` |
-| OpenAlex | `Mixed data k -Anonymization by Consistent Maximal Association and Microaggregation` |
-| Web of Science | `Mixed data k-Anonymization by Consistent Maximal Association and Microaggregation` |
-
-Les sources donnent le même titre dans 89,7 % des cas. Ici, l'éditeur a mis le *k* en italique. Crossref transmet la balise, ainsi que les retours à la ligne et l'indentation du fichier source ; ScanR reprend Crossref à l'identique. HAL et OpenAlex donnent le titre sans balise, avec l'espace que son retrait laisse devant le tiret. Web of Science donne la seule chaîne propre.
-
-| Source | Année | Type | Langue | DOI | Résumé |
-|---|---|---|---|---|---|
-| Crossref | 2025 | `conference_paper` | absente | présent | absent |
-| HAL | 2025 | `conference_paper` | `en` | présent | absent |
-| OpenAlex | 2025 | `conference_paper` | `en` | présent | 1 083 caractères |
-| ScanR | 2025 | `conference_paper` | absente | présent | absent |
-| Web of Science | 2025 | `conference_paper` | `English` | présent | 1 084 caractères |
-
-**Année.** Les sources s'accordent dans 88,6 % des cas. Quand elles divergent, l'écart est d'une seule année quatre fois sur cinq. Les deux dates en cause sont la mise en ligne et la parution.
-
-**Type de document.** Le champ le plus divergent : 60,7 % d'accord. Chaque source a sa nomenclature — `proceedings-article` pour Crossref, `COMM` pour HAL, `conference-paper` pour OpenAlex, `proceedings` pour ScanR, `Proceedings Paper` pour Web of Science. La phase `normalize` les ramène toutes à un vocabulaire commun, ici `conference_paper`.
-
-**Langue.** Trois sources sur cinq la renseignent, dans deux formats.
-
-#### Revue
-
-| Source | Valeur |
-|---|---|
-| HAL | `CIKM '25: The 34th ACM International Conference on Information and Knowledge Management`, sans rattachement à une entrée de revue |
-| Crossref | `Proceedings of the 34th ACM International Conference on Information and Knowledge Management` |
-| ScanR | même entrée que Crossref |
-| Web of Science | `PROCEEDINGS OF THE 34TH ACM INTERNATIONAL CONFERENCE ON INFORMATION AND KNOWLEDGE MANAGEMENT, CIKM 2025` |
-| OpenAlex | absente |
-
-Ces actes n'ont pas d'ISSN. Le rapprochement se fait alors sur le titre normalisé. Web of Science ajoute au titre du volume le sigle de la conférence et son année, ce qui suffit à produire une clé différente. Deux entrées coexistent donc pour un même volume, l'une typée `proceedings`, l'autre `journal`. 5,4 % des publications sont rattachées à plus d'une revue.
-
-#### Éditeur
-
-| Source | Valeur |
-|---|---|
-| Crossref, ScanR | `Association for Computing Machinery (ACM)`, typé `learned_society` |
-| Web of Science | `ASSOC COMPUTING MACHINERY`, typé `unknown` |
-
-Les éditeurs se rapprochent par identifiant OpenAlex, puis par nom normalisé. Web of Science abrège `Association` en `Assoc` et omet le sigle : le nom normalisé diffère, et un second éditeur naît, sans le type du premier.
-
-#### Sujets
-
-| Source | Valeur |
-|---|---|
-| Crossref | aucun |
-| HAL | domaine `Statistiques [stat]/Machine Learning [stat.ML]` |
-| OpenAlex | `Privacy-Preserving Technologies in Data` (0,993), `Cryptography and Data Security` (0,001), `Privacy, Security, and Data Protection` (0,001) |
-| ScanR | `Privacy-Preserving Technologies in Data` (0,916), `Data Quality and Management` (0,037), `Machine Learning and Data Classification` (0,005) |
-| Web of Science | mots-clés d'auteur `Data privacy`, `Mixed-type data`, `k-anonymization`, `Microaggregation` ; catégories `Computer Science, Artificial Intelligence`, `Computer Science, Information Systems`, `Computer Science, Theory & Methods` |
-
-Chaque source procède différemment. HAL donne les domaines choisis par le déposant, qui n'a saisi aucun mot-clé libre ici. Web of Science donne les mots-clés fournis par les auteurs, plus ses propres catégories disciplinaires. OpenAlex calcule des topics et leur attribue un score. ScanR redistribue les topics d'OpenAlex : les identifiants sont ceux d'OpenAlex, la liste et les scores viennent d'un instantané différent.
-
-#### Auteurs
-
-| Source | Forme du nom | Identifiants du premier auteur | Identifiants du second auteur |
-|---|---|---|---|
-| Crossref | `Julien Ah-Pine` | ORCID `0000-0001-6898-3961` | ORCID `0009-0004-4535-8644` |
-| HAL | `Julien Ah-Pine` | idHAL `julien-ah-pine`, ORCID `0000-0001-6898-3961`, compte HAL `15506` | ORCID `0009-0004-4535-8644`, compte HAL `1623465` |
-| OpenAlex | `Julien Ah-Pine` | ORCID `0000-0001-6898-3961` | ORCID `0009-0004-4535-8644` |
-| ScanR | `Julien Ah-Pine` | IdRef `139791140`, ORCID `0000-0001-6898-3961` | IdRef `253123445`, ORCID `0000-0002-4302-1878` |
-| Web of Science | `Ah-Pine, Julien` | ResearcherID `PQT-5225-2026` | ResearcherID `DUU-4326-2022` |
-
-Web of Science inverse le nom et le prénom ; les autres sources donnent la forme directe. La [phase `persons`](../pipeline/09-persons.md) se sert de ces formes et de ces identifiants pour rattacher chaque contribution à une personne.
-
-Le second auteur a deux ORCID différents. Une seule des deux valeurs peut être exacte : ScanR ou les trois autres sources rattachent le mauvais identifiant.
-
-Part des mentions d'auteur qui ont au moins un identifiant : Web of Science 100 %, theses.fr 87,2 %, ScanR 43,8 %, Crossref 43,7 %, OpenAlex 33,2 %, DataCite 11,9 %, HAL 5,1 %. Le décompte porte sur toutes les mentions, co-auteurs extérieurs compris. Les publications à plusieurs centaines d'auteurs pèsent donc fortement sur ces proportions.
-
-#### Adresses et structures
-
-| Source | Adresses du premier auteur |
-|---|---|
-| Crossref | `Université Clermont Auvergne, Clermont Auvergne INP, CNRS, Mines Saint-Etienne, SIGMA Clermont, LIMOS, Clermont-Ferrand, France` |
-| OpenAlex | même chaîne que Crossref |
-| Web of Science | `Univ Clermont Auvergne, Clermont Auvergne INP, CNRS, Mines St Etienne,SIGMA Clermont,LIMOS, Clermont Ferrand, France` |
-| HAL | `Centre d'Études et de Recherches sur le Développement International`, `Centre National de la Recherche Scientifique`, `École des Mines de Saint-Étienne`, `Institut de Recherche pour le Développement`, `Institut Mines-Télécom [Paris]`, `Institut national polytechnique Clermont Auvergne`, `Laboratoire d'Informatique, de Modélisation et d'Optimisation des Systèmes`, `Université Clermont Auvergne` |
-| ScanR | aucune |
-
-Crossref, OpenAlex et Web of Science donnent l'adresse imprimée dans l'article, entière ou abrégée. Les trois donnent les mêmes cinq structures : l'université, l'école d'ingénieurs, le CNRS, l'école des mines et le laboratoire. HAL donne des structures de son référentiel, sans adresse : deux d'entre elles, le centre de recherche sur le développement international et l'institut de recherche pour le développement, sont sans rapport avec cet article. ScanR donne les auteurs sans adresse pour cette publication.
+Le moissonnage par personne interroge les identifiants des personnes RH, confirmés ou authentifiés.
 
 ## Sources complémentaires
 
 | Source | Type | Couverture | API | Identifiants d'accès |
 |--------|------|-----------|-----|-----|
-| [Unpaywall](09-sources-supplementaires.md#unpaywall) | Enrichissement OA | Statut Open Access par DOI | REST (gratuit, 100k req/jour) | adresse électronique de contact |
-| [DOAJ](09-sources-supplementaires.md#doaj) | Annuaire des revues OA certifiées | Métadonnées qualifiées par revue (licence, APC, sujets…), appariées par ISSN | dump CSV | adresse électronique de contact |
+| [Unpaywall](09-sources-supplementaires.md#unpaywall) | Base de statuts open access | Statut open access par DOI | REST (gratuit, 100k req/jour) | adresse électronique de contact |
+| [DOAJ](09-sources-supplementaires.md#doaj) | Annuaire des revues open access certifiées | Métadonnées qualifiées par revue (licence, APC, sujets…), rattachées aux revues par ISSN | dump CSV | adresse électronique de contact |
 | [Extraction RH](10-imports-manuels.md#extraction-rh) | Import manuel | Personnel de l'établissement (noms, départements, rôles) | Fichier CSV | |
 | [Données APC](10-imports-manuels.md#données-apc) | Import manuel | Paiements APC (montants, éditeurs) | Fichier CSV | |

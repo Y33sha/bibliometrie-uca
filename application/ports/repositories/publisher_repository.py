@@ -1,14 +1,15 @@
-"""Port PublisherRepository : édition et fusion de l'agrégat Publisher."""
+"""Port PublisherRepository : édition et fusion de l'entité Publisher."""
 
 from typing import Protocol
 
-from pydantic import BaseModel, field_validator
+from pydantic import field_validator
 
+from application.ports.model import Model
 from domain.publishers.publisher import Publisher, PublisherType
 
 
-class PublisherUpdate(BaseModel):
-    """Champs modifiables d'un éditeur ; seuls les champs fournis sont écrits."""
+class PublisherUpdate(Model):
+    """Champs modifiables d'un éditeur. Seuls les champs fournis sont écrits."""
 
     name: str | None = None
     country: str | None = None
@@ -22,10 +23,10 @@ class PublisherUpdate(BaseModel):
 
 
 class PublisherRepository(Protocol):
-    """Contrat d'édition et de fusion de l'agrégat Publisher."""
+    """Contrat d'édition et de fusion de l'entité Publisher."""
 
     def find_by_id(self, publisher_id: int) -> Publisher | None:
-        """Charge l'agrégat `Publisher`, ou `None` si l'éditeur n'existe pas. Ses formes de nom sont hors de l'agrégat."""
+        """Charge l'entité `Publisher`, ou `None` si l'éditeur n'existe pas. Ses formes de nom sont hors de l'entité."""
         ...
 
     def save(self, publisher: Publisher) -> None:
@@ -35,7 +36,7 @@ class PublisherRepository(Protocol):
     # ── Fusion ─────────────────────────────────────────────────────
 
     def crossref_member_ids(self, publisher_id: int) -> tuple[int, ...]:
-        """Membres Crossref de l'éditeur, tirés de ses préfixes DOI."""
+        """Renvoie les membres Crossref de l'éditeur, tirés de ses préfixes DOI."""
         ...
 
     def merge_publisher_into(self, target_id: int, source_id: int) -> None:

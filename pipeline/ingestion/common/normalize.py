@@ -1,12 +1,12 @@
 """Phase `normalize` : normalisation de `staging` vers les enregistrements sources, les contributions sources et les adresses.
 
-Les enregistrements sources sortent sans publication : la phase `publications` les y rattache. Pour HAL, les ORCID et IdRef sont lus dans le TEI.
+Les enregistrements sources sont écrits sans publication. La phase `publications` les rattache à une publication. Pour HAL, les ORCID et IdRef sont lus dans le TEI.
 
-La phase enchaîne ses tâches (`pipeline.graph`) :
+Tâches de la phase, dans l'ordre (`pipeline.graph`) :
 
 1. la normalisation de chaque source retenue, dans l'ordre de `SOURCE_PRIORITY` ;
 2. la suppression des enregistrements sources des documents disparus de leur source ;
-3. la suppression des informations du contributeur qu'aucune contribution source ne référence : la normalisation réassigne des contributions sources, et la suppression précédente en retire ;
+3. la suppression des informations du contributeur sans contribution source : la normalisation réassigne des contributions sources, et l'étape précédente supprime des contributions sources ;
 4. la suppression des adresses orphelines, pour la même raison.
 
 L'exécuteur lance ensuite le `VACUUM` de `staging`, vidé de ses payloads : `VACUUM FULL` en mode full, simple dans les autres modes.
@@ -56,13 +56,13 @@ NormalizeOne = Callable[[PhaseContext, str], NormalizeStats]
 
 
 def _selected(source: str) -> Callable[[PhaseContext], bool]:
-    """Condition d'exécution de la tâche de `source` : la source fait partie des sources du run."""
+    """Renvoie la condition d'exécution de la tâche de `source` : la source fait partie des sources du run."""
     return lambda ctx: source in ctx.options.sources
 
 
 @dataclass(frozen=True)
 class NormalizePhase:
-    """Normalisation des sources du run, toutes quand il n'en restreint aucune, dans l'ordre de `SOURCE_PRIORITY`."""
+    """Normalisation des sources du run (toutes par défaut), dans l'ordre de `SOURCE_PRIORITY`."""
 
     normalize_one: NormalizeOne
     prune_disappeared: Callable[[PhaseContext], int]
@@ -110,7 +110,7 @@ class NormalizePhase:
         return metrics
 
     def _normalize_task(self, source: str) -> TaskRun:
-        """Tâche `normalize.<source>` : normalise la source et garde sa ligne de la table d'observabilité."""
+        """Renvoie la tâche `normalize.<source>`, qui normalise la source et garde sa ligne de la table d'observabilité."""
 
         def run(ctx: PhaseContext) -> PhaseMetrics:
             stats = self.normalize_one(ctx, source)
@@ -126,7 +126,7 @@ class NormalizePhase:
         return run
 
     def _prune(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Supprime les documents disparus de leur source, et ferme la section de normalisation."""
+        """Supprime les enregistrements sources des documents disparus de leur source, et ferme la section de normalisation."""
         disappeared = self.prune_disappeared(ctx)
         if disappeared:
             ctx.logger.info(
@@ -204,7 +204,7 @@ def _run_cleanup_orphan_addresses(ctx: PhaseContext) -> int:
 
 
 def normalizer_builders(*, archive: bool = True) -> dict[str, NormalizerFactory]:
-    """Constructeur du normaliseur de chaque source, sur les stores de la phase."""
+    """Renvoie le constructeur du normaliseur de chaque source, sur les stores de la phase."""
 
     raw_store = get_raw_store() if archive else NullRawStore()
 

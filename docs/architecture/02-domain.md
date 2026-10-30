@@ -6,7 +6,7 @@ Le noyau contient les règles métier. Il n'ouvre aucune connexion, ignore la ba
 
 Les tables de chaque entité et leurs écritures sont décrites dans le [modèle de données](../donnees/01-vue-d-ensemble.md). Les docstrings de chaque module, publiées dans la référence du code, décrivent ses règles.
 
-## Agrégats
+## Entités
 
 | Classe | Module | Entité |
 |---|---|---|
@@ -27,10 +27,10 @@ Les value objects sont immuables, et égaux quand leur contenu est égal.
 - Identifiants de structure : `RorId`, `HalCollection`
 - Formes de nom : `PersonNameForm`, `StructureNameForm`
 
-## Hydratation des agrégats
+## Chargement des entités
 
-Un agrégat se charge en objet là où le traitement porte sur une entité à la fois. Les éditions de l'administration chargent, modifient et enregistrent l'entité éditée, par le `find_by_id` de son repository. `refresh_from_sources` recalcule une `Publication` depuis ses enregistrements sources.
+Une entité se charge en objet là où le traitement porte sur une entité à la fois. Les éditions de l'administration chargent, modifient et enregistrent l'entité éditée, par le `find_by_id` de son repository. `refresh_from_sources` recalcule une `Publication` depuis ses enregistrements sources.
 
 Les traitements en masse du pipeline opèrent en SQL sur tout le corpus : résolution des affiliations, des publications et des personnes.
 
-Un agrégat référence un autre agrégat par son identifiant : `Serial.publisher_id`, `Perimeter.root_structure_ids`. Le chargement d'un agrégat s'arrête donc à ses propres value objects.
+Une entité en référence une autre par son identifiant : `Serial.publisher_id`, `Perimeter.root_structure_ids`. Le chargement d'une entité s'arrête donc à ses propres value objects.

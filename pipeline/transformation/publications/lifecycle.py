@@ -20,7 +20,7 @@ def create(
     publication_year: int,
     doi: str | None,
 ) -> int:
-    """Crée une publication avec les seules valeurs que la table exige, et renvoie son id.
+    """Crée une publication avec les seules valeurs exigées par la table, et renvoie son id.
 
     Ces valeurs tiennent jusqu'au premier `refresh` : le titre est le titre normalisé, le type vaut `other` quand la source n'en donne aucun, le statut open access vaut la valeur par défaut.
     """
@@ -45,7 +45,8 @@ def refresh(conn: Connection, publication_id: int) -> RefreshVerdict:
 def dissolve(conn: Connection, publication_id: int, successor_id: int) -> None:
     """Supprime une publication dont tous les enregistrements sources ont rejoint le successeur. Ses paiements APC passent au successeur, et son identifiant redirige vers lui.
 
-    Lève `ValueError` si un enregistrement source reste rattaché à la publication.
+    Raises:
+        ValueError: un enregistrement source reste rattaché à la publication.
     """
     store = PublicationStore(conn)
     if store.has_source_records(publication_id):
@@ -59,7 +60,7 @@ def dissolve(conn: Connection, publication_id: int, successor_id: int) -> None:
 def purge_publications(conn: Connection, *, limit: int | None = None) -> int:
     """Supprime les publications sans enregistrement source ou sans contribution rattachée à une personne, `limit` au plus. Renvoie le nombre de publications supprimées.
 
-    Une publication perd son dernier enregistrement source quand la phase `normalize` retire un document disparu de sa source. Elle perd sa dernière contribution rattachée à une personne par un rejet, une forme de nom rejetée ou une personne supprimée. Ses sujets partent avec elle (`ON DELETE CASCADE`).
+    Une publication perd son dernier enregistrement source quand la phase `normalize` retire un enregistrement source disparu de sa source. Elle perd sa dernière contribution rattachée à une personne par un rejet, une forme de nom rejetée ou une personne supprimée. Ses sujets sont supprimés avec elle (`ON DELETE CASCADE`).
     """
     limit_clause = "LIMIT :lim" if limit is not None else ""
     return conn.execute(

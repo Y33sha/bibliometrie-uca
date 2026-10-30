@@ -1,14 +1,14 @@
 # STATUS: maintenance
 """Importe les ORCID authentifiés par les chercheurs (fichier `data/authenticated_orcids.csv`).
 
-Le fichier, sans en-tête, a une ligne `email,orcid` par chercheur : les ORCID que leur titulaire a authentifiés en se connectant à son compte ORCID. Chaque ligne rejoint la personne par son email (`hr_records.email`, sans égard à la casse) et reçoit le statut `authenticated`.
+Le fichier, sans en-tête, a une ligne `email,orcid` par chercheur : les ORCID authentifiés par leur titulaire en se connectant à son compte ORCID. Chaque ligne est rattachée à la personne par son email (`hr_records.email`, sans égard à la casse) et reçoit le statut `authenticated`.
 
 Cet import est le seul contexte autorisé à écrire ce statut : un trigger PostgreSQL (`protect_authenticated_identifier`) rejette toute autre écriture de `authenticated`, et interdit d'en dégrader un. L'authentification fait autorité sur l'attribution : un ORCID rattaché à une autre personne est déplacé vers celle de l'email. Chaque déplacement est signalé ; il révèle en général un doublon de personne à fusionner.
 
 Réappliqué sur un fichier inchangé, l'import n'écrit rien.
 
 Usage :
-    python -m interfaces.cli.maintenance.import_authenticated_orcids [--file CHEMIN] [--dry-run]
+    uv run python -m interfaces.cli.maintenance.import_authenticated_orcids [--file CHEMIN] [--dry-run]
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ from infrastructure.observability.log import setup_logger
 
 log = setup_logger("import_authenticated_orcids", os.path.dirname(__file__))
 
-# `parents[3]` remonte interfaces/cli/maintenance/ → racine du dépôt ; le fichier vit sous data/.
+# `parents[3]` remonte interfaces/cli/maintenance/ → racine du dépôt ; le fichier est sous data/.
 _DEFAULT_FILE = Path(__file__).resolve().parents[3] / "data" / "authenticated_orcids.csv"
 
 
@@ -41,7 +41,7 @@ def _load_rows(path: str | Path) -> list[tuple[str, str]]:
         for record in csv.reader(f):
             if len(record) < 2:
                 continue
-            # Mise à plat des deux cellules : un fichier composé dans un tableur y glisse des espaces insécables et des caractères invisibles, qui feraient échouer en silence le rapprochement par email et la reconnaissance de l'ORCID.
+            # Mise à plat des deux cellules : un fichier composé dans un tableur y glisse des espaces insécables et des caractères invisibles.
             email = sanitize_optional_text(record[0])
             if not email:
                 continue
@@ -51,24 +51,25 @@ def _load_rows(path: str | Path) -> list[tuple[str, str]]:
 
 @dataclass(frozen=True, slots=True)
 class AuthenticationPlan:
-    """Ce que le fichier prescrit, une fois confronté aux personnes connues.
+    """Lignes du fichier, confrontées aux personnes connues.
 
-    `entries` contient les couples à authentifier ; les trois autres listes contiennent les lignes écartées, décrites pour le journal. Une ligne écartée n'est jamais une erreur du fichier seul : un email inconnu peut signaler un export RH en retard, et un email partagé par deux personnes, un doublon à fusionner.
+    Les lignes écartées sont décrites pour le journal. Une ligne écartée n'est jamais une erreur du fichier seul : un email inconnu peut signaler un export RH en retard, et un email partagé, un doublon à fusionner.
     """
 
     entries: list[tuple[int, str]]
+    """Couples (personne, ORCID) à authentifier."""
     malformed: list[str]
+    """Lignes écartées : ORCID de forme inexploitable."""
     unmatched: list[str]
+    """Lignes écartées : email absent des fiches du personnel."""
     ambiguous: list[str]
+    """Lignes écartées : email partagé par plusieurs personnes."""
 
 
 def plan_authentications(
     rows: list[tuple[str, str]], email_to_persons: dict[str, list[int]]
 ) -> AuthenticationPlan:
-    """Confronte les lignes du fichier aux personnes connues, et trie ce qui peut être authentifié.
-
-    Trois raisons d'écarter une ligne : un ORCID que sa forme rend inexploitable, un email absent des fiches du personnel, un email partagé par plusieurs personnes, dont la personne visée est alors indécidable.
-    """
+    """Confronte les lignes du fichier aux personnes connues, et trie les lignes authentifiables."""
     entries: list[tuple[int, str]] = []
     malformed: list[str] = []
     unmatched: list[str] = []
@@ -92,9 +93,10 @@ def plan_authentications(
 def find_reassignments(
     entries: list[tuple[int, str]], current: dict[str, tuple[int, str]]
 ) -> list[tuple[str, int, int]]:
-    """ORCID détenus par une autre personne que celle qui l'a authentifié, et vers qui les déplacer.
+    """Renvoie les ORCID détenus par une autre personne que celle qui l'a authentifié, avec la personne de destination.
 
-    `current` associe chaque ORCID à son détenteur actuel (personne et statut), tel que le référentiel le renvoie. L'authentification fait autorité sur l'attribution : le déplacement a lieu. Chacun révèle en général un doublon de personne à fusionner, d'où leur signalement.
+    Args:
+        current: détenteur actuel (personne et statut) de chaque ORCID, tel que le référentiel le renvoie.
     """
     return [
         (orcid, current[orcid][0], person_id)
@@ -113,7 +115,7 @@ class AuthenticateOrcidOutcome(StrEnum):
 
 
 def rh_emails_to_person_ids(conn: Connection) -> dict[str, list[int]]:
-    """`{email en minuscules: [person_id, ...]}` des fiches `hr_records` qui ont un email."""
+    """Renvoie `{email en minuscules: [person_id, ...]}` des fiches `hr_records` pourvues d'un email."""
     rows = conn.execute(
         text(
             "SELECT lower(email) AS email, array_agg(DISTINCT person_id) AS pids "
@@ -124,7 +126,7 @@ def rh_emails_to_person_ids(conn: Connection) -> dict[str, list[int]]:
 
 
 def orcid_holders(conn: Connection, orcids: list[str]) -> dict[str, tuple[int, str]]:
-    """`{orcid: (person_id, statut)}` des ORCID donnés déjà présents en base."""
+    """Renvoie `{orcid: (person_id, statut)}` des ORCID donnés déjà présents en base."""
     rows = conn.execute(
         text(
             "SELECT id_value, person_id, CAST(status AS text) AS status "
@@ -176,7 +178,7 @@ def authenticate_orcids(
 ) -> Counter[AuthenticateOrcidOutcome]:
     """Authentifie les paires `(person_id, orcid)` et renvoie le décompte des issues.
 
-    Le paramètre de session `app.orcid_authenticated_import` autorise l'écriture du statut, que le trigger `protect_authenticated_identifier` refuse ailleurs. `SET LOCAL` le borne à la transaction.
+    Le paramètre de session `app.orcid_authenticated_import` autorise l'écriture du statut, refusée ailleurs par le trigger `protect_authenticated_identifier`. `SET LOCAL` le borne à la transaction.
     """
     conn.execute(text("SET LOCAL app.orcid_authenticated_import = 'on'"))
     return Counter(authenticate_orcid(conn, person_id, orcid) for person_id, orcid in entries)

@@ -7,8 +7,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Literal, cast
 
-from pydantic import BaseModel
-
+from application.ports.model import Model
 from domain.structures.structure import Structure
 from infrastructure.read_models._common import (
     FacetOption,
@@ -29,17 +28,19 @@ StructureSort = Literal[
 class StructureFilters:
     """Filtres de la liste des structures, de ses facettes et de son export.
 
-    `perimeter_ids` retient les structures de ces périmètres, sous-structures comprises. `perimeter_none` retient les structures hors de tout périmètre. Les deux se combinent en OU.
+    `perimeter_ids` et `perimeter_none` se combinent en OU.
     """
 
     search: str = ""
     types: list[str] = field(default_factory=list)
     tutelle_ids: list[int] = field(default_factory=list)
     perimeter_ids: list[int] = field(default_factory=list)
+    """Périmètres des structures retenues, sous-structures comprises."""
     perimeter_none: bool = False
+    """Retient les structures hors de tout périmètre."""
 
 
-class StructureListItem(BaseModel):
+class StructureListItem(Model):
     """Ligne résumée d'une structure, dans la liste paginée et dans le référentiel complet."""
 
     id: int
@@ -52,26 +53,25 @@ class StructureListItem(BaseModel):
     perimeter_ids: list[int]
     """Périmètres qui contiennent la structure, directement ou par une tutelle ; vide hors de tout périmètre."""
     tutelles: list[RelatedStructureOut] | None
-    """Structures qui exercent une tutelle sur celle-ci."""
+    """Tutelles de la structure."""
 
 
 class StructureListResponse(PaginatedResponse):
     structures: list[StructureListItem]
 
 
-class StructuresFacetsResponse(BaseModel):
-    """Facettes de la liste des structures.
-
-    `types` laisse le libellé au client. `tutelles` et `perimeters` donnent le libellé de la structure ou du périmètre ; `perimeters` se termine par l'option `none`, hors de tout périmètre. Chaque décompte écarte le filtre de sa propre facette.
-    """
+class StructuresFacetsResponse(Model):
+    """Facettes de la liste des structures. Chaque décompte écarte le filtre de sa propre facette."""
 
     types: list[FacetOption]
+    """Options sans libellé, résolu par le client."""
     tutelles: list[FacetOption]
     perimeters: list[FacetOption]
+    """Options terminées par l'option `none`, hors de tout périmètre."""
 
 
-class StructureOut(BaseModel):
-    """Structure complète, rendue par GET, POST et PUT sur `/api/structures`."""
+class StructureOut(Model):
+    """Structure complète, renvoyée par GET, POST et PUT sur `/api/structures`."""
 
     id: int
     code: str
@@ -85,7 +85,7 @@ class StructureOut(BaseModel):
 
     @classmethod
     def from_structure(cls, structure: Structure) -> StructureOut:
-        """Réponse d'une structure enregistrée : son type sous le nom `type`, ses identifiants ROR et HAL en chaînes."""
+        """Renvoie la réponse d'une structure enregistrée : son type sous le nom `type`, ses identifiants ROR et HAL en chaînes."""
         return cls(
             id=cast(int, structure.id),
             code=structure.code,
@@ -99,7 +99,7 @@ class StructureOut(BaseModel):
         )
 
 
-class RelatedStructureOut(BaseModel):
+class RelatedStructureOut(Model):
     """Structure voisine (tutelle ou sous-structure) dans le détail d'une structure."""
 
     id: int
@@ -107,10 +107,10 @@ class RelatedStructureOut(BaseModel):
     name: str
     acronym: str | None
     type: str
-    relation_id: int
+    tutelle_id: int
 
 
-class NameFormOut(BaseModel):
+class NameFormOut(Model):
     """Forme de nom d'une structure."""
 
     id: int
@@ -122,7 +122,7 @@ class NameFormOut(BaseModel):
     created_at: datetime | None = None
 
 
-class StructureDetailResponse(BaseModel):
+class StructureDetailResponse(Model):
     """Détail complet renvoyé par GET /api/structures/{id}."""
 
     structure: StructureOut
@@ -132,7 +132,7 @@ class StructureDetailResponse(BaseModel):
     theses_count: int
 
 
-class StructureAddressOut(BaseModel):
+class StructureAddressOut(Model):
     id: int
     raw_text: str
     is_confirmed: bool | None
@@ -142,8 +142,8 @@ class StructureAddressesResponse(PaginatedResponse):
     addresses: list[StructureAddressOut]
 
 
-class StructurePartner(BaseModel):
-    """Organisation partenaire d'une structure : un ROR des auteurs de ses publications, avec le nombre de copublications."""
+class StructurePartner(Model):
+    """Organisation partenaire d'une structure : un ROR des auteurs de ses publications."""
 
     ror_id: str
     name: str | None
@@ -152,9 +152,10 @@ class StructurePartner(BaseModel):
     country_name: str | None
     types: list[str]
     publications: int
+    """Nombre de copublications."""
 
 
-class PartnerFacetOption(BaseModel):
+class PartnerFacetOption(Model):
     value: str
     label: str
     count: int
@@ -170,8 +171,8 @@ class StructurePartnersResponse(PaginatedResponse):
     types: list[PartnerFacetOption]
 
 
-class StructureDeletionImpact(BaseModel):
-    """Ce que la suppression d'une structure emporte."""
+class StructureDeletionImpact(Model):
+    """Données supprimées avec une structure."""
 
     name_forms: int
     tutelles: int

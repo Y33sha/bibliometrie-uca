@@ -47,7 +47,7 @@ def test_aucun_lancement_ne_demande_plusieurs_processus(chemin):
 
 
 def _descriptions_de_deploiement() -> set[Path]:
-    """Descriptions de construction, de composition et de lancement du dépôt."""
+    """Renvoie les descriptions de construction, de composition et de lancement du dépôt."""
     fichiers = {
         chemin
         for motif in ("Dockerfile", "docker-compose*.yml", "*.sh", "interfaces/*/Dockerfile")

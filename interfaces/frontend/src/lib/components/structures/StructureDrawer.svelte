@@ -34,7 +34,7 @@
   }: {
     id: number;
     onclose: () => void;
-    /** Appelé après une modification ou une suppression de la structure, pour que la page hôte recharge sa liste. */
+    /** Appelé après une modification de la structure, de ses tutelles ou de ses formes de nom, ou après sa suppression, pour que la page hôte recharge ses données. */
     onchange: () => void;
     /** Ouvre le volet d'une autre structure. */
     onopenStructure: (id: number) => void;
@@ -196,6 +196,11 @@
 
   /* ── Forms ── */
 
+  async function reloadAfterFormChange() {
+    await loadDetail();
+    onchange();
+  }
+
   async function addForm(structId: number) {
     const text = addFormText.trim();
     if (!text) return;
@@ -217,7 +222,7 @@
     addFormWordBoundary = false;
     addFormExcluding = false;
     newFormCtx = [];
-    await loadDetail();
+    await reloadAfterFormChange();
   }
 
   async function deleteForm(formId: number) {
@@ -228,7 +233,7 @@
       toast("Erreur suppression: " + errorMessage(e), "error");
       return;
     }
-    await loadDetail();
+    await reloadAfterFormChange();
   }
 
   function openEditFormModal(f: NameForm) {
@@ -249,7 +254,7 @@
       is_excluding: editFormModal.is_excluding,
     });
     editFormModal = null;
-    await loadDetail();
+    await reloadAfterFormChange();
   }
 
   /* ── Context picker ── */
@@ -275,7 +280,7 @@
       await nameForms.update(ctxPickerFormId, {
         requires_context_of: ctxPickerCurrentCtx,
       });
-      await loadDetail();
+      await reloadAfterFormChange();
     }
   }
 
@@ -286,7 +291,7 @@
       newFormCtx = [];
     } else {
       await nameForms.update(ctxPickerFormId, { requires_context_of: [] });
-      await loadDetail();
+      await reloadAfterFormChange();
     }
   }
 
@@ -298,7 +303,7 @@
     const currentCtx = formsData[formId] || [];
     const newCtx = currentCtx.filter((x) => x !== itemToRemove);
     await nameForms.update(formId, { requires_context_of: newCtx });
-    await loadDetail();
+    await reloadAfterFormChange();
   }
 
   function removeNewCtx(item: number | string) {

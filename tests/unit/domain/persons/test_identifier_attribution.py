@@ -1,4 +1,4 @@
-"""Tests de l'aggregate `IdentifierAttribution`."""
+"""Tests de l'entité `IdentifierAttribution`."""
 
 import pytest
 

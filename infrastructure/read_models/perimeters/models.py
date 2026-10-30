@@ -1,35 +1,38 @@
 """Modèles de réponse : lectures sur les périmètres et l'établissement servi par l'instance."""
 
-from pydantic import BaseModel
+from application.ports.model import Model
 
 
-class PerimeterStructureItem(BaseModel):
+class PerimeterStructureItem(Model):
     id: int
     name: str
     acronym: str | None
     code: str
 
 
-class PerimeterOut(BaseModel):
-    """Un périmètre : ses structures racines, en identifiants et résolues, et `structure_count`, le nombre de structures des racines et de leurs sous-structures. `is_persons` désigne le périmètre des personnes, celui de la liste publique des structures."""
+class PerimeterOut(Model):
+    """Périmètre et ses structures racines."""
 
     id: int
     code: str
     name: str
     root_structure_ids: list[int]
     structures: list[PerimeterStructureItem]
+    """Structures racines."""
     structure_count: int
+    """Nombre de structures des racines et de leurs sous-structures."""
     is_persons: bool
+    """Vrai pour le périmètre des personnes, celui de la liste publique des structures."""
 
 
-class PerimeterCountryOut(BaseModel):
+class PerimeterCountryOut(Model):
     """Pays d'organisations ROR des structures du périmètre des personnes."""
 
     code: str
     name: str | None
 
 
-class InstitutionOut(BaseModel):
+class InstitutionOut(Model):
     """Établissement servi par l'instance : nom et structures racines du périmètre des personnes, titre et teinte de l'application."""
 
     name: str

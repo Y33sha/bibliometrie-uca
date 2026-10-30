@@ -7,7 +7,7 @@ from collections.abc import Sequence
 
 
 def crossref_member_conflict(first: Sequence[int], second: Sequence[int]) -> str | None:
-    """Contradiction entre les membres Crossref de deux éditeurs, ou `None`.
+    """Renvoie la contradiction entre les membres Crossref de deux éditeurs, ou `None`.
 
     Deux éditeurs se contredisent quand chacun a au moins un membre et qu'ils n'en partagent aucun : ce sont deux éditeurs distincts.
     """

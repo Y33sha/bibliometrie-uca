@@ -4,8 +4,8 @@
 Une contribution source hors groupe est un doublon d'auteur (`duplicate_of`) ou appartient à un enregistrement source écarté de l'alignement. Ses doubles sont l'original pour un doublon d'auteur, et sinon les contributions sources groupées de la même publication au même nom normalisé. Chaque double reçoit l'épinglage, puis l'épinglage de la contribution source hors groupe est supprimé. Un épinglage reste en place quand il n'a aucun double, ou quand un double est épinglé à une autre personne.
 
 Usage :
-    python -m interfaces.cli.oneshot.transfer_ungrouped_pins            # exécution
-    python -m interfaces.cli.oneshot.transfer_ungrouped_pins --dry-run  # rapport seul
+    uv run python -m interfaces.cli.oneshot.transfer_ungrouped_pins            # exécution
+    uv run python -m interfaces.cli.oneshot.transfer_ungrouped_pins --dry-run  # rapport seul
 """
 
 from __future__ import annotations
@@ -59,7 +59,7 @@ _UNPIN = text("DELETE FROM confirmed_source_contributions WHERE source_contribut
 
 
 def transfer_pins(conn: Connection) -> Counter[str]:
-    """Transfère les épinglages, dans la transaction du caller, et renvoie le décompte des issues."""
+    """Transfère les épinglages, dans la transaction de l'appelant, et renvoie le décompte des issues."""
     outcomes: Counter[str] = Counter()
     for pin in conn.execute(_PINS).all():
         if not pin.doubles:

@@ -8,9 +8,9 @@ Des agents Claude Code annotent les lots, un agent par lot, avec le prompt `subj
 - `compare` mesure l'accord par niveau entre deux échantillons annotés, sur les libellés communs.
 
 Usage :
-    python -m interfaces.cli.oneshot.annotate_subjects split --sample annotation.json --out lots/ --size 20
-    python -m interfaces.cli.oneshot.annotate_subjects merge --sample annotation.json --verdicts lots/ --output annotated.json
-    python -m interfaces.cli.oneshot.annotate_subjects compare --reference reference.json --field claude --candidate annotated.json
+    uv run python -m interfaces.cli.oneshot.annotate_subjects split --sample annotation.json --out lots/ --size 20
+    uv run python -m interfaces.cli.oneshot.annotate_subjects merge --sample annotation.json --verdicts lots/ --output annotated.json
+    uv run python -m interfaces.cli.oneshot.annotate_subjects compare --reference reference.json --field claude --candidate annotated.json
 """
 
 from __future__ import annotations

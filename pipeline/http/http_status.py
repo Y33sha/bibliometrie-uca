@@ -1,4 +1,7 @@
-"""Erreur de statut d'une réponse de source. Son message donne seulement le statut, sans l'URL, et se journalise tel quel : plusieurs API attendent un identifiant en paramètre de requête (clé OpenAlex, adresse annoncée à Unpaywall)."""
+"""Erreur de statut d'une réponse de source.
+
+Le message donne seulement le statut, sans l'URL, et se journalise tel quel : plusieurs API attendent un identifiant en paramètre de requête (clé OpenAlex, adresse annoncée à Unpaywall).
+"""
 
 from __future__ import annotations
 

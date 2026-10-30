@@ -328,7 +328,7 @@ class TestRejectionAnchoredOnSourceRecords:
 
 
 class TestHumanDecisionsOnContributions:
-    """Les décisions humaines écrivent aussi la contribution, que les lecteurs affichent sans attendre le run suivant."""
+    """Les décisions humaines écrivent aussi la contribution : les lectures l'affichent sans attendre le run suivant."""
 
     def test_le_rejet_detache_la_contribution(self, sa_sync_conn, repo):
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
@@ -406,7 +406,7 @@ class TestHumanDecisionsOnPublicationPerimeter:
         assert _publication_evidence(sa_sync_conn, publication_id) == []
 
     def _orphan(self, conn, source_id):
-        """Publication hors périmètre dont la seule contribution, sans personne, est une contribution d'auteur du périmètre. Renvoie (publication, contribution)."""
+        """Insère une publication hors périmètre dont la seule contribution, sans personne, est une contribution d'auteur du périmètre. Renvoie (publication, contribution)."""
         publication_id = insert_publication(conn)
         source_record_id = _source_record(conn, publication_id, source_id=source_id)
         source_contribution_id = insert_source_contribution(

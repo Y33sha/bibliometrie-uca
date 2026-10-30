@@ -1,8 +1,8 @@
 """Les gestionnaires d'erreur de l'API renvoient le code attendu, et rien d'autre.
 
-Ils décident de ce qu'un appelant apprend d'un échec : un conflit donne 409, et une erreur imprévue donne seulement un message générique ; la trace part au journal.
+Un conflit donne 409. Une erreur imprévue donne seulement un message générique, et sa trace part au journal.
 
-Les gestionnaires sont testés directement : ils reçoivent une exception et une requête, et leur comportement est indépendant de la route qui a levé l'exception.
+Les gestionnaires sont testés directement, sur une exception et une requête : leur comportement est indépendant de la route qui a levé l'exception.
 """
 
 import json

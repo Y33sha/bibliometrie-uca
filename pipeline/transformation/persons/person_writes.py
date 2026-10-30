@@ -1,6 +1,6 @@
-"""Identifiants que la phase `persons` attribue à une personne d'après ses contributions sources.
+"""Attribution à une personne des identifiants de ses contributions sources, en phase `persons`.
 
-L'attribution passe par le repository des personnes (`PgPersonRepository.attribute_identifier`), que l'API utilise aussi.
+L'attribution passe par le repository des personnes (`PgPersonRepository.attribute_identifier`), partagé avec l'API.
 """
 
 import logging
@@ -19,9 +19,12 @@ def add_identifiers_from_contributions(
     *,
     repo: PgPersonRepository,
 ) -> None:
-    """Attribue en `pending` à la personne les identifiants observés dans ses contributions sources, donnés par `{id_type: valeur}`.
+    """Attribue en `pending` à la personne les identifiants observés dans ses contributions sources.
 
-    Une valeur mal formée est journalisée et écartée. Une valeur déjà attribuée à une autre personne en `pending` ou `confirmed` est laissée : l'arbitrage des conflits d'attribution du run suivant la tranche.
+    Une valeur mal formée est journalisée et écartée. Une valeur déjà attribuée à une autre personne en `pending` ou `confirmed` reste à cette personne. L'arbitrage des conflits d'attribution du run suivant tranche le conflit.
+
+    Args:
+        contributions: identifiants de chaque contribution source, `{id_type: valeur}`.
     """
     seen: set[tuple[str, str]] = set()
     for a in contributions:

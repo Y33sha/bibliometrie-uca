@@ -1,4 +1,4 @@
-"""Rafraîchissement du référentiel DOAJ (`run_enrich_serials_from_doaj`) : le dump est téléchargé seulement quand le dernier import date de plus que le délai."""
+"""Rafraîchissement du référentiel DOAJ (`run_enrich_serials_from_doaj`) : le dump est téléchargé seulement quand l'âge du dernier import dépasse le délai."""
 
 import contextlib
 import logging
@@ -54,6 +54,7 @@ def _bound(repo):
         mp.setattr(
             step, "type_doaj_serials_as_journals", lambda conn: repo.type_doaj_serials_as_journals()
         )
+        mp.setattr(step, "model_doaj_serials_as_diamond", lambda conn: 0)
         yield
 
 

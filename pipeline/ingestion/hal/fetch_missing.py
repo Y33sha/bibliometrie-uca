@@ -83,9 +83,9 @@ _MISSING_NNTS_SQL = text(
 
 
 def get_missing_hal_ids(conn: Connection, *, retry_after_days: int) -> list[str]:
-    """hal-id actifs des enregistrements sources OpenAlex ou ScanR, absents du staging HAL.
+    """Renvoie les hal-id actifs des enregistrements sources OpenAlex ou ScanR, absents du staging HAL.
 
-    Seules comptent les publications du périmètre. La sélection lit les enregistrements sources du run précédent : les documents extraits pendant le run y entrent au run suivant.
+    Seules comptent les publications du périmètre. La sélection lit les enregistrements sources du run précédent : les documents moissonnés pendant le run entrent dans la sélection au run suivant.
 
     Un hal-id déjà cherché en vain est écarté : HAL attribue les hal-id, l'échec est définitif.
     """
@@ -95,9 +95,9 @@ def get_missing_hal_ids(conn: Connection, *, retry_after_days: int) -> list[str]
 
 
 def get_missing_nnts(conn: Connection, *, retry_after_days: int) -> list[str]:
-    """NNT des enregistrements sources theses.fr des publications du périmètre, hors thèses en cours, dont la publication est sans enregistrement source HAL. Le NNT d'un enregistrement source est son NNT actif de rôle le plus fort, puis de plus petite valeur.
+    """Renvoie les NNT des enregistrements sources theses.fr des publications du périmètre sans enregistrement source HAL, hors thèses en cours.
 
-    Écarte les NNT qu'un document HAL contient déjà, et ceux cherchés en vain il y a moins de `retry_after_days` jours.
+    Le NNT d'un enregistrement source est son NNT actif de rôle le plus fort, puis de plus petite valeur. Sont écartés les NNT déjà présents dans un enregistrement source HAL, et ceux cherchés en vain il y a moins de `retry_after_days` jours.
     """
     return list(conn.execute(_MISSING_NNTS_SQL, {"retry_after_days": retry_after_days}).scalars())
 
@@ -140,7 +140,7 @@ async def _fetch_ids(
 async def fetch_missing_hal_by_id(
     conn: Connection, log: logging.Logger, *, retry_after_days: int
 ) -> PhaseMetrics:
-    """Cherche dans HAL les documents repérés par hal-id (OpenAlex, ScanR) et absents du staging. Un hal-id introuvable est cherché de nouveau après `retry_after_days` jours."""
+    """Cherche dans HAL les documents repérés par hal-id (OpenAlex, ScanR) et absents du staging. Un hal-id introuvable est écarté définitivement."""
     return await _fetch_ids(
         conn,
         log,
@@ -155,7 +155,7 @@ async def fetch_missing_hal_by_id(
 async def fetch_missing_hal_by_nnt(
     conn: Connection, log: logging.Logger, *, retry_after_days: int
 ) -> PhaseMetrics:
-    """Cherche dans HAL les thèses soutenues repérées par NNT (theses.fr) et sans document HAL. Un NNT introuvable est cherché de nouveau après `retry_after_days` jours."""
+    """Cherche dans HAL les thèses soutenues repérées par NNT (theses.fr) et sans enregistrement source HAL. Un NNT introuvable est cherché de nouveau après `retry_after_days` jours."""
     return await _fetch_ids(
         conn,
         log,

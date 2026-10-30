@@ -31,7 +31,7 @@ def _author(last="dupont", first="jean", orcid="", idref="", gap=0):
 
 
 def _source_record(source_record, names, start=0):
-    """Contributions sources d'un enregistrement source, numérotées `source_record * 100 + position`, à partir de couples (nom de famille, prénom)."""
+    """Construit les contributions sources d'un enregistrement source, numérotées `source_record * 100 + position`, à partir de couples (nom de famille, prénom)."""
     return [
         SourceContribution(source_record * 100 + pos, source_record, pos, last, first)
         for pos, (last, first) in enumerate(names, start)
@@ -39,7 +39,7 @@ def _source_record(source_record, names, start=0):
 
 
 def _greedy(matrix):
-    """Affectation gloutonne, suffisante pour des matrices sans conflit."""
+    """Calcule une affectation gloutonne, suffisante pour des matrices sans conflit."""
     taken_rows, taken_cols, out = set(), set(), []
     cells = sorted(
         ((v, i, j) for i, row in enumerate(matrix) for j, v in enumerate(row)), reverse=True
@@ -53,7 +53,7 @@ def _greedy(matrix):
 
 
 def _aligned(contributions):
-    """Contributions sources de chaque contribution qui en a plusieurs, avec la méthode de chacune."""
+    """Renvoie les contributions sources de chaque contribution qui en a plusieurs, avec la méthode de chacune."""
     return sorted(
         sorted((m.source_contribution, m.method) for m in g.members)
         for g in contributions
@@ -205,6 +205,77 @@ class TestAlignPublication:
             [(100, GroupingMethod.REFERENCE), (200, GroupingMethod.NAME)],
             [(101, GroupingMethod.REFERENCE), (201, GroupingMethod.NAME)],
             [(102, GroupingMethod.REFERENCE), (202, GroupingMethod.NAME)],
+        ]
+
+    def test_une_reference_qui_intervertit_nom_et_prenom_de_quelques_auteurs_s_aligne(self):
+        """La référence intervertit nom de famille et prénom de deux auteurs sur neuf : ils se lient par l'initiale puis par le nom, et la référence prend l'ordre des autres enregistrements sources."""
+        authors = [
+            ("trefond", "jeromine"),
+            ("vorilhon", "philippe"),
+            ("coudeyre", "emmanuel"),
+            ("richard", "amelie"),
+            ("pereira", "bruno"),
+            ("cambon", "benoit"),
+            ("roche", "marie claude"),
+            ("gocko", "xavier"),
+            ("vaillant roussel", "helene"),
+        ]
+        reference = [
+            (first, last) if pos in (0, 7) else (last, first)
+            for pos, (last, first) in enumerate(authors)
+        ]
+        initials = [(last, first[:1]) for last, first in authors]
+        contributions = align_publication(
+            {
+                1: _source_record(1, reference),
+                2: _source_record(2, initials),
+                3: _source_record(3, authors),
+            }
+        )
+        assert _aligned(contributions) == [
+            [
+                (100 + pos, GroupingMethod.REFERENCE),
+                (200 + pos, GroupingMethod.NAME),
+                (300 + pos, GroupingMethod.NAME),
+            ]
+            for pos in range(9)
+        ]
+        assert [(g.reference.last_name, g.reference.first_name) for g in contributions] == authors
+
+    def test_un_auteur_interverti_dans_le_deuxieme_enregistrement_source_s_aligne(self):
+        """Le deuxième enregistrement source intervertit un auteur aux prénoms complets : la référence prend son ordre, et le troisième la remet dans l'ordre."""
+        authors = [("martin", "anne"), ("gocko", "xavier"), ("durand", "claire")]
+        swapped = [("martin", "anne"), ("xavier", "gocko"), ("durand", "claire")]
+        initials = [(last, first[:1]) for last, first in authors]
+        contributions = align_publication(
+            {
+                1: _source_record(1, authors),
+                2: _source_record(2, swapped),
+                3: _source_record(3, initials),
+            }
+        )
+        assert _aligned(contributions) == [
+            [
+                (100 + pos, GroupingMethod.REFERENCE),
+                (200 + pos, GroupingMethod.NAME),
+                (300 + pos, GroupingMethod.NAME),
+            ]
+            for pos in range(3)
+        ]
+        assert contributions[1].reference.last_name == "gocko"
+
+    def test_un_nom_de_famille_present_tel_quel_ne_se_lie_pas_a_une_reference_intervertie(self):
+        """Une référence sans lien a le nom de famille cheng : « Cheng C L » se lie par le nom à « Cheng Alkaid », hors de la contribution de « Chen Cheng »."""
+        reference = [("chen", "cheng"), ("chen", "chunhui"), ("cheng", "bo"), ("cheng", "alkaid")]
+        other = [("chen", "c"), ("chen", "c h"), ("cheng", "b"), ("cheng", "c l")]
+        contributions = align_publication(
+            {1: _source_record(1, reference), 2: _source_record(2, other)}
+        )
+        assert _aligned(contributions) == [
+            [(100, GroupingMethod.REFERENCE), (200, GroupingMethod.ORDER)],
+            [(101, GroupingMethod.REFERENCE), (201, GroupingMethod.ORDER)],
+            [(102, GroupingMethod.REFERENCE), (202, GroupingMethod.NAME)],
+            [(103, GroupingMethod.REFERENCE), (203, GroupingMethod.NAME)],
         ]
 
     def test_a_longueur_egale_un_enregistrement_source_reporte_ne_fonde_pas_les_contributions(self):
@@ -402,7 +473,7 @@ class TestJaroWinkler:
         ],
     )
     def test_valeurs_de_duckdb(self, a, b, expected):
-        """Régression : les demi-transpositions s'arrondissent à l'entier inférieur, comme dans DuckDB."""
+        """Les demi-transpositions s'arrondissent à l'entier inférieur, comme dans DuckDB."""
         assert jaro_winkler(a, b) == pytest.approx(expected)
 
 

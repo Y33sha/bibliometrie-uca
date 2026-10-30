@@ -38,9 +38,9 @@ def _same_publisher(first: int | None, second: int | None) -> bool:
 def choose_monograph(
     candidates: Sequence[MonographCandidate], *, publisher_id: int | None, has_isbn: bool
 ) -> MonographChoice:
-    """Monographie d'un enregistrement source parmi celles de même titre, à défaut de monographie de même ISBN.
+    """Choisit la monographie d'un enregistrement source parmi celles de même titre, à défaut de monographie de même ISBN.
 
-    Les monographies du même éditeur passent avant celles sans éditeur. Avec ISBN, l'enregistrement rejoint une monographie sans ISBN, sinon il en crée une. Sans ISBN, il rejoint la seule monographie compatible, ou la seule sans ISBN. Entre plusieurs volumes, il reste sans monographie. Sans monographie compatible, il en crée une.
+    Les monographies du même éditeur passent avant celles sans éditeur. Avec ISBN, l'enregistrement source rejoint une monographie sans ISBN, sinon il en crée une. Sans ISBN, il rejoint la seule monographie compatible, ou la seule sans ISBN. Entre plusieurs volumes, il reste sans monographie. Sans monographie compatible, il en crée une.
     """
     compatible = [c for c in candidates if _same_publisher(c.publisher_id, publisher_id)]
     same = [c for c in compatible if publisher_id is not None and c.publisher_id == publisher_id]
@@ -68,7 +68,7 @@ def _strength(candidate: MonographCandidate) -> tuple[bool, bool, int]:
 def duplicate_monographs(
     same_title: Sequence[MonographCandidate],
 ) -> list[tuple[int, int]]:
-    """Fusions `(cible, source)` parmi des monographies de même titre.
+    """Renvoie les fusions `(cible, source)` parmi des monographies de même titre.
 
     Une monographie fusionne dans la seule monographie compatible, si celle-ci prime : par la présence d'ISBN, puis d'éditeur, puis par l'antériorité. Une monographie compatible avec plusieurs autres reste en place, faute de savoir laquelle elle double.
     """

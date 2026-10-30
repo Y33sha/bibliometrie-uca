@@ -1,4 +1,4 @@
-"""Colonnes que les corrections de métadonnées posent sur `source_records`."""
+"""Colonnes de `source_records` écrites par les corrections de métadonnées."""
 
 import pytest
 from sqlalchemy.dialects import postgresql
@@ -31,7 +31,7 @@ def test_champs_des_mises_a_jour_sont_des_colonnes():
 
 
 def test_colonne_inconnue_refusee_avant_tout_acces_a_la_base():
-    # `conn` vaut None : le refus tombe avant qu'on s'en serve.
+    # `conn` vaut None : le refus précède tout usage de la connexion.
     with pytest.raises(ValueError, match="colonne_inconnue"):
         _persist_updates(None, [{"id": 1, "doc_type": "article", "colonne_inconnue": 1}])  # type: ignore[arg-type]
 

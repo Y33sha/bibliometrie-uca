@@ -47,7 +47,7 @@ from pipeline.transformation.publishing.find_or_create import (
 
 
 def get_title(doc: Mapping[str, JsonValue]) -> str | None:
-    """Titre par défaut du document, nettoyé par `drop_flattened_mathml`."""
+    """Renvoie le titre par défaut du document, nettoyé par `drop_flattened_mathml`."""
     title = doc.get("title")
     text = as_str(title.get("default")) if isinstance(title, Mapping) else as_str(title)
     if not text:
@@ -56,13 +56,16 @@ def get_title(doc: Mapping[str, JsonValue]) -> str | None:
 
 
 def get_publisher(doc: Mapping[str, JsonValue]) -> PublisherFacts | None:
-    """Éditeur du document : celui de sa source (`source.publisher`)."""
+    """Renvoie l'éditeur du document : celui de sa source (`source.publisher`)."""
     publisher_name = as_str(as_mapping(doc.get("source")).get("publisher"))
     return PublisherFacts(publisher_name) if publisher_name else None
 
 
 def _extract_serial_issns(source: Mapping[str, JsonValue]) -> tuple[str | None, str | None]:
-    """ISSN papier et électronique de `source.journalIssns` : le premier, puis le second. Les entrées suivantes (alias, ISSN-L, variantes historiques) sont écartées."""
+    """Renvoie les ISSN papier et électronique de `source.journalIssns` : le premier, puis le second.
+
+    Les entrées suivantes (alias, ISSN-L, variantes historiques) sont écartées.
+    """
     issns = as_sequence(source.get("journalIssns"))
     issn = as_str(issns[0]) if len(issns) >= 1 else None
     eissn = as_str(issns[1]) if len(issns) >= 2 else None
@@ -70,12 +73,15 @@ def _extract_serial_issns(source: Mapping[str, JsonValue]) -> tuple[str | None, 
 
 
 def is_thesis(doc: Mapping[str, JsonValue]) -> bool:
-    """Vrai si le document est une thèse ou une habilitation : `source.title` nomme alors l'université de soutenance, hors conteneur."""
+    """Renvoie vrai si le document est une thèse ou une habilitation : `source.title` nomme alors l'université de soutenance, hors conteneur."""
     return map_doc_type(as_str(doc.get("type")) or "", "scanr") in DOC_TYPE_FAMILIES["theses"].types
 
 
 def get_container_facts(doc: Mapping[str, JsonValue]) -> ContainerDescription:
-    """Ce que ScanR dit du conteneur d'un document. `source.title` est la revue d'un article, le congrès d'une communication (type `proceedings`), et la plateforme de l'éditeur d'un chapitre : un chapitre reçoit sa seule collection, quand un ISSN la désigne. ScanR ne donne pas d'ISBN."""
+    """Décrit le conteneur d'un document d'après ScanR.
+
+    `source.title` est la revue d'un article, le congrès d'une communication (type `proceedings`), et la plateforme de l'éditeur d'un chapitre : un chapitre reçoit sa seule collection, quand un ISSN la désigne. ScanR omet les ISBN.
+    """
     source = as_mapping(doc.get("source"))
     title = as_str(source.get("title"))
     raw_type = as_str(doc.get("type"))
@@ -93,13 +99,13 @@ def get_container_facts(doc: Mapping[str, JsonValue]) -> ContainerDescription:
 
 
 def _address(url: str) -> str:
-    """Adresse comparable : sans schéma, sans `www.`, sans barre finale, en minuscules."""
+    """Renvoie une adresse comparable : sans schéma, sans `www.`, sans barre finale, en minuscules."""
     parts = urlsplit(url.strip().lower())
     return f"{parts.netloc.removeprefix('www.')}{parts.path.rstrip('/')}"
 
 
 def get_locations(doc: Mapping[str, JsonValue]) -> list[LocationFacts]:
-    """La copie ouverte (`oaEvidence`), puis la page du document (`landingPage`) quand elle désigne une autre adresse.
+    """Renvoie la copie ouverte (`oaEvidence`), puis la page du document (`landingPage`) quand elle désigne une autre adresse.
 
     La page de la copie ouverte est `oaEvidence.landingPageUrl`, à défaut la page du document quand elle désigne le même dépôt HAL, à défaut `oaEvidence.url`. L'ouverture de la page du document est inconnue. Seule la licence d'une copie chez l'éditeur est normalisée, comme celle de l'enregistrement source.
     """
@@ -149,7 +155,10 @@ _EXTERNAL_ID_TYPES = {
 
 
 def scanr_identifiers(doc: Mapping[str, JsonValue], scanr_id: str) -> tuple[SourceIdentifier, ...]:
-    """Identifiants d'un document ScanR. Ceux de ses `externalIds` sont secondaires. L'identifiant que contient l'identifiant ScanR est dérivé (`scanr_derived_identifier`)."""
+    """Renvoie les identifiants d'un document ScanR.
+
+    Ceux de ses `externalIds` sont secondaires. L'identifiant contenu dans l'identifiant ScanR est dérivé (`scanr_derived_identifier`).
+    """
     identifiers: list[SourceIdentifier] = []
     for entry in as_sequence(doc.get("externalIds")):
         eid = as_mapping(entry)
@@ -167,9 +176,9 @@ def scanr_source_record(  # noqa: C901
     scanr_id: str,
     containers: Containers,
 ) -> SourceRecordUpsert:
-    """Enregistrement source ScanR d'un document.
+    """Construit l'enregistrement source ScanR d'un document.
 
-    Le titre du conteneur (`source.title`) est gardé seulement sans revue. L'API ScanR est sans langue.
+    Le titre du conteneur (`source.title`) est gardé seulement sans revue, hors thèses. L'API ScanR est sans langue.
     """
     abstract = as_str(as_mapping(doc.get("summary")).get("default"))
 
@@ -181,7 +190,7 @@ def scanr_source_record(  # noqa: C901
     else:
         keywords = None
 
-    # `domains` contient les concepts ScanR : wikidata et mots-clés rejoignent les mots-clés, les vedettes sudoc forment les sujets. `topics` reprend les topics OpenAlex, que la source OpenAlex fournit : il n'est pas lu.
+    # `domains` contient les concepts ScanR : wikidata et mots-clés rejoignent les mots-clés, les vedettes sudoc forment les sujets. `topics`, copie des topics OpenAlex déjà fournis par la source OpenAlex, reste ignoré.
     concept_keywords, subjects = split_scanr_concepts(doc.get("domains"))
     known = {k.lower() for k in keywords or ()}
     keywords = [*(keywords or ()), *(k for k in concept_keywords if k.lower() not in known)] or None
@@ -205,7 +214,7 @@ def scanr_source_record(  # noqa: C901
             seen.add(u)
             urls.append(u)
 
-    # Éditeur et revue tels que ScanR les nomme.
+    # Éditeur et revue nommés par ScanR.
     source = as_mapping(doc.get("source"))
     jissn, jeissn = _extract_serial_issns(source)
     biblio_json = compact_biblio(
@@ -242,10 +251,10 @@ def scanr_source_record(  # noqa: C901
 
 
 def build_scanr_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecord]:
-    """Contributions sources d'un document ScanR.
+    """Lit les contributions sources d'un document ScanR.
 
     - Les identifiants `orcid` et `idref` viennent de `denormalized`, les rôles de `map_role`.
-    - Une affiliation feuille sans `structId` devient une adresse, avec les pays que ScanR détecte dans son texte (`detected_countries`).
+    - Une affiliation feuille sans `structId` devient une adresse, avec les pays détectés par ScanR dans son texte (`detected_countries`).
     - Une affiliation feuille avec `structId` est une structure HAL de la contribution source : son nom est celui d'une fiche du référentiel HAL, et reste hors des adresses.
     - Le ROR d'une affiliation va sur son adresse, ou sur la contribution source pour une affiliation sans adresse.
     """
@@ -307,7 +316,10 @@ def build_scanr_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecor
 
 
 def merge_person_roles(records: list[AuthorRecord]) -> list[AuthorRecord]:
-    """Une contribution source par personne, comme chez theses.fr. scanR liste une personne une fois par rôle (membre du jury et rapporteur). Une entrée de même nom et de mêmes identifiants qu'une précédente, avec un autre rôle, se fond dans celle-ci : rôles (`merge_roles`), adresses et structures réunis. Une entrée qui répète les mêmes rôles reste à part. Les positions se renumérotent dans l'ordre."""
+    """Fusionne les entrées d'une même personne en une contribution source, comme chez theses.fr.
+
+    ScanR liste une personne une fois par rôle (membre du jury et rapporteur). Une entrée de même nom et de mêmes identifiants qu'une précédente, avec un autre rôle, se fond dans celle-ci : rôles (`merge_roles`), adresses et structures réunis. Une entrée sans rôle nouveau reste à part. Les positions se renumérotent dans l'ordre.
+    """
     kept: list[AuthorRecord] = []
     by_person: dict[tuple[object, ...], AuthorRecord] = {}
     for record in records:
@@ -331,7 +343,7 @@ def merge_person_roles(records: list[AuthorRecord]) -> list[AuthorRecord]:
 
 
 def extract_scanr_author_block(doc: Mapping[str, JsonValue]) -> AuthorBlock:
-    """Bloc auteurs d'un document ScanR : `authors`."""
+    """Renvoie le bloc auteurs d'un document ScanR : `authors`."""
     return {"authors": doc.get("authors")}
 
 

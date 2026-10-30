@@ -19,17 +19,17 @@ from infrastructure.db.engine import get_sync_engine
 
 
 def instance_names() -> list[str]:
-    """Instances de `instances/` qui ont un `instance.env`, par ordre alphabétique."""
+    """Renvoie les instances de `instances/` pourvues d'un `instance.env`, par ordre alphabétique."""
     return sorted(p.parent.name for p in (PROJECT_ROOT / "instances").glob("*/instance.env"))
 
 
 def _database(instance: str) -> str | None:
-    """Base de l'instance, d'après son `instance.env`."""
+    """Renvoie la base de l'instance, d'après son `instance.env`."""
     return dotenv_values(PROJECT_ROOT / "instances" / instance / "instance.env").get("DB_NAME")
 
 
 def _exists(database: str | None) -> bool:
-    """Vrai quand la base `database` existe sur le serveur."""
+    """Renvoie vrai quand la base `database` existe sur le serveur."""
     with get_sync_engine().connect() as conn:
         return bool(
             conn.execute(
@@ -40,7 +40,7 @@ def _exists(database: str | None) -> bool:
 
 
 def _upgrade(instance: str | None) -> int:
-    """`alembic upgrade head` sur la base de `instance`, ou sur la base par défaut quand `instance` est vide. Renvoie le code de sortie."""
+    """Lance `alembic upgrade head` sur la base de `instance`, ou sur la base par défaut quand `instance` est vide. Renvoie le code de sortie."""
     env = {key: value for key, value in os.environ.items() if key != "BIBLIO_INSTANCE"}
     if instance:
         env["BIBLIO_INSTANCE"] = instance

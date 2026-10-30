@@ -6,7 +6,7 @@ Hors pipeline, lancé à la demande. Seuls les éditeurs sans pays reçoivent ce
 Le circuit-breaker de source arrête la boucle quand OpenAlex est à bout de budget (429). Le reste est repris à l'exécution suivante.
 
 Usage :
-    python -m interfaces.cli.maintenance.enrich_publishers [--limit N] [--dry-run]
+    uv run python -m interfaces.cli.maintenance.enrich_publishers [--limit N] [--dry-run]
 """
 
 from __future__ import annotations
@@ -52,7 +52,7 @@ FetchPublishersBatch = Callable[[list[str]], dict[str, str | None]]
 
 
 def find_countryless(conn: Connection, limit: int | None = None) -> list[tuple[int, str]]:
-    """Éditeurs sans pays qui ont un `openalex_id`, par id ; tous sans `limit`."""
+    """Renvoie les éditeurs sans pays pourvus d'un `openalex_id`, par id ; tous sans `limit`."""
     return [(r.id, r.openalex_id) for r in conn.execute(_COUNTRYLESS, {"limit": limit}).all()]
 
 
@@ -64,7 +64,7 @@ class _OpenAlexPublisher(TypedDict):
 
 
 def extract_country(source: _OpenAlexPublisher) -> str | None:
-    """Pays d'un éditeur dans le payload d'OpenAlex Publishers : le premier code de `country_codes`, en minuscules, en général celui du siège ; `None` sans code."""
+    """Renvoie le pays d'un éditeur dans le payload d'OpenAlex Publishers : le premier code de `country_codes`, en minuscules, en général celui du siège ; `None` sans code."""
     country_codes = source.get("country_codes") or []
     return country_codes[0].lower() if country_codes else None
 
@@ -110,7 +110,11 @@ def _enrich_batch(
     *,
     dry_run: bool,
 ) -> _BatchOutcome:
-    """Écrit le pays OpenAlex des éditeurs d'un lot. `id_map` associe `openalex_id` et id de l'éditeur."""
+    """Écrit le pays OpenAlex des éditeurs d'un lot.
+
+    Args:
+        id_map: id de l'éditeur, par `openalex_id`.
+    """
     updated = no_response = 0
     countries: Counter[str] = Counter()
     for oa_id, publisher_id in id_map.items():
@@ -138,7 +142,7 @@ def run_enrich_publishers_from_openalex(
     limit: int = 0,
     dry_run: bool = False,
 ) -> None:
-    """Pose le pays OpenAlex des éditeurs qui n'en ont pas, par lots de `BATCH_SIZE`, avec un commit par lot."""
+    """Pose le pays OpenAlex des éditeurs sans pays, par lots de `BATCH_SIZE`, avec un commit par lot."""
     try:
         publishers = find_countryless(conn, limit or None)
         total = len(publishers)

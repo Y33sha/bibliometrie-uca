@@ -92,14 +92,16 @@ MATCH_REASON_PRIORITY: tuple[ContributionMatchReason, ...] = (
 
 @dataclass(frozen=True)
 class AlignedSourceContribution:
-    """Contribution source alignée dans une contribution. `identifiers` : identifiants non neutralisés. `pinned_person_id` : personne à laquelle l'administration l'a épinglée."""
+    """Contribution source alignée dans une contribution."""
 
     source: str
     name: ContributorName
     identifiers: Mapping[str, str]
+    """Identifiants non neutralisés."""
     in_perimeter: bool
     roles: Sequence[str] = ()
     pinned_person_id: int | None = None
+    """Personne sur laquelle l'administration a épinglé la contribution source."""
 
     @property
     def name_forms(self) -> tuple[str, ...]:
@@ -118,18 +120,16 @@ class AlignedSourceContribution:
 
 @dataclass(frozen=True)
 class PersonIndex:
-    """Personnes connues, indexées pour la décision.
-
-    - `identifiers` : par type d'identifiant, la personne de chaque valeur (attributions non rejetées).
-    - `name_forms` : personnes de chaque forme de nom active.
-    - `name_form_status` : verdict d'un couple (forme de nom, personne), qui corrobore ou refuse un identifiant.
-    - `namesakes` : personnes par nom de famille normalisé, pour le rattachement par initiales compatibles.
-    """
+    """Personnes connues, indexées pour la décision."""
 
     identifiers: Mapping[str, MutableMapping[str, IdentifiedPerson]]
+    """Par type d'identifiant, la personne de chaque valeur (attributions non rejetées)."""
     name_forms: MutableMapping[str, list[int]]
+    """Personnes de chaque forme de nom active."""
     name_form_status: Mapping[tuple[str, int], str]
+    """Verdict d'un couple (forme de nom, personne), qui corrobore ou refuse un identifiant."""
     namesakes: MutableMapping[str, list[Namesake]]
+    """Personnes par nom de famille normalisé, pour le rattachement par initiales compatibles."""
 
     def register(
         self, person_id: int, last_name: str, first_name: str, identifiers: Mapping[str, str]
@@ -151,13 +151,15 @@ class PersonIndex:
 
 @dataclass(frozen=True)
 class ContributionDecision:
-    """Décision sur une contribution. `evidence` : signaux qui désignent une personne, `(signal, source de la contribution source, personne)`. `refused` : identifiants refusés faute de nom compatible, `(type, valeur, personne)`."""
+    """Décision sur une contribution."""
 
     outcome: ContributionOutcome
     person_id: int | None = None
     reason: ContributionMatchReason | ContributionSkipReason | None = None
     evidence: tuple[tuple[str, str, int], ...] = field(default=())
+    """Signaux qui désignent une personne : `(signal, source de la contribution source, personne)`."""
     refused: tuple[tuple[str, str, int], ...] = field(default=())
+    """Identifiants refusés faute de nom compatible : `(type, valeur, personne)`."""
 
 
 def _single(candidates: set[int]) -> int | None:
@@ -169,9 +171,10 @@ def decide_contribution(
     index: PersonIndex,
     rejected_person_ids: frozenset[int] = frozenset(),
 ) -> ContributionDecision:
-    """Rattache la contribution formée des contributions sources `members` à une personne, en crée une, ou la laisse sans personne.
+    """Rattache la contribution formée des contributions sources `members` à une personne, crée une personne, ou laisse la contribution sans personne.
 
-    `rejected_person_ids` : personnes rejetées pour la publication de la contribution.
+    Args:
+        rejected_person_ids: personnes rejetées pour la publication de la contribution.
     """
     pinned = {m.pinned_person_id for m in members if m.pinned_person_id is not None}
     if pinned:
@@ -231,7 +234,7 @@ def _decide_by_name(
     rejected_person_ids: frozenset[int],
     refused: tuple[tuple[str, str, int], ...],
 ) -> ContributionDecision:
-    """Décision par le nom des contributions sources. Une contribution source dont la forme désigne une seule personne l'emporte sur une contribution source au nom ambigu. Deux contributions sources qui désignent deux personnes laissent la contribution sans personne."""
+    """Décide par le nom des contributions sources. Une contribution source dont la forme désigne une seule personne l'emporte sur une contribution source au nom ambigu. Deux contributions sources qui désignent deux personnes laissent la contribution sans personne."""
     allow_create = any(allow_person_creation(list(m.roles)) for m in members)
     matched: dict[int, ContributionMatchReason] = {}
     evidence: list[tuple[str, str, int]] = []
@@ -298,9 +301,13 @@ _STRENGTH: dict[ContributionMatchReason, int] = {
 def settle_publication(
     decisions: Mapping[int, tuple[ContributionDecision, int]], taken: frozenset[int] = frozenset()
 ) -> dict[int, ContributionDecision]:
-    """Décisions des contributions d'une publication, une contribution au plus par personne.
+    """Arbitre les décisions des contributions d'une publication : une contribution au plus par personne.
 
-    `decisions` : décision et nombre de contributions sources de chaque contribution, par identifiant de contribution. `taken` : personnes déjà rattachées à une autre contribution de la publication ; une contribution qui en désigne une reste sans personne. Quand plusieurs contributions désignent la même personne, elle revient à la contribution la mieux appuyée (épinglage, puis identifiant, puis nom), à égalité à celle qui a le plus de contributions sources, puis au plus petit identifiant. Les autres contributions restent sans personne.
+    Quand plusieurs contributions désignent la même personne, elle revient à la contribution la mieux appuyée (épinglage, puis identifiant, puis nom). À égalité, elle revient à celle qui a le plus de contributions sources, puis au plus petit identifiant. Les autres contributions restent sans personne.
+
+    Args:
+        decisions: décision et nombre de contributions sources de chaque contribution, par identifiant de contribution.
+        taken: personnes déjà rattachées à une autre contribution de la publication ; une contribution qui en désigne une reste sans personne.
     """
 
     def rank(contribution_id: int) -> tuple[int, int, int]:
@@ -340,7 +347,7 @@ _NAME_SOURCE_RANK = {source.value: rank for rank, source in enumerate(NAME_SOURC
 
 
 def founding_name(members: Sequence[AlignedSourceContribution]) -> tuple[str, str]:
-    """Nom de famille et prénom d'une personne créée depuis une contribution. Ils viennent de préférence d'une source qui sépare nom et prénom, puis d'un prénom complet, puis de la source la mieux placée dans `NAME_SOURCE_PRIORITY`."""
+    """Renvoie le nom de famille et le prénom d'une personne créée depuis une contribution. Ils viennent de préférence d'une source qui sépare nom et prénom, puis d'un prénom complet, puis de la source la mieux placée dans `NAME_SOURCE_PRIORITY`."""
 
     def rank(member: AlignedSourceContribution) -> tuple[bool, bool, int, tuple[str, str]]:
         last_name, first_name = member.name.split()
@@ -358,7 +365,7 @@ def founding_name(members: Sequence[AlignedSourceContribution]) -> tuple[str, st
 def identifiers_to_attribute(
     members: Sequence[AlignedSourceContribution], decision: ContributionDecision
 ) -> list[dict[str, str]]:
-    """Identifiants fiables des contributions sources d'une contribution rattachée, à attribuer à sa personne. Les valeurs refusées faute de nom compatible sont écartées."""
+    """Renvoie les identifiants fiables des contributions sources d'une contribution rattachée, à attribuer à sa personne. Les valeurs refusées faute de nom compatible sont écartées."""
     refused = {(id_type, value) for id_type, value, _ in decision.refused}
     return [
         {

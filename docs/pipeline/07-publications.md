@@ -1,6 +1,6 @@
 # Création et résolution des publications
 
-*À jour le 2026-10-26.*
+*À jour le 2026-10-30.*
 
 La phase `publications` maintient les [publications](../donnees/03-publications.md) à partir des enregistrements sources. Une publication regroupe tous les enregistrements sources qui décrivent le même document, quelles que soient leurs sources. La phase rattache chaque enregistrement source à sa publication, en crée une au besoin, et fusionne ou scinde les publications existantes quand le regroupement le commande.
 
@@ -8,20 +8,20 @@ La phase `publications` maintient les [publications](../donnees/03-publications.
 
 Deux enregistrements sources désignent la même publication s'ils partagent une **clé de confirmation**.
 
-- **Identifiants** : DOI, NNT (numéro national de thèse), identifiant HAL, PMID (PubMed), identifiant arXiv. Égalité directe.
+- **Identifiants** : DOI, NNT (numéro national de thèse), identifiant HAL, PMID (PubMed), identifiant arXiv. Égalité directe. Seuls comptent les identifiants actifs ; un DOI `related` désigne une autre œuvre et reste hors des clés. Le DOI d'une forme secondaire (version, variante) cède la place à sa cible (`doi_targets`).
 - **Bloc de métadonnées** : le triplet `type de document | titre normalisé | année`. Deux documents de même type, même titre et même année sont tenus pour identiques. Une longueur minimale de titre écarte les collisions de titres trop génériques.
 
-`domain/source_records/keys.py` calcule ces clés, à partir des colonnes normalisées (phase `normalize`) puis corrigées (phase `metadata_correction`).
+`domain/source_records/keys.py` calcule ces clés, à partir des métadonnées et des identifiants laissés actifs par la phase `metadata_correction`.
 
 ## Regrouper, puis rattacher
 
 Les enregistrements sources reliés par au moins une clé partagée forment les **composantes connexes** d'un graphe.
 
-Une règle prime sur le regroupement : **deux DOI distincts désignent toujours deux documents distincts**. Une composante qui contient plusieurs DOI est donc découpée en une partition par DOI.
+Une règle prime sur le regroupement : **deux ancres distinctes désignent deux documents distincts**. Les ancres d'une composante sont ses DOI `primary` ou `derived`, à défaut le DOI des enregistrements sources à DOI unique. Une composante à plusieurs ancres est découpée en une partition par ancre. Un enregistrement source rejoint l'ancre de son DOI `primary` ou `derived`, sinon l'unique ancre parmi ses autres DOI. À défaut, il reste sur sa publication.
 
 Chaque partition aboutit à une seule publication :
 
-- **Rattachement** : la partition contient une publication existante. Tous ses enregistrements sources y sont rattachés.
+- **Rattachement** : la partition contient une publication existante. Tous ses enregistrements sources sont rattachés à cette publication.
 - **Fusion** : la partition réunit plusieurs publications existantes. Une seule est conservée, les autres sont absorbées.
 - **Scission** : une publication existante est à cheval sur plusieurs partitions. Elle reste sur l'une d'elles, et une publication est créée pour chacune des autres.
 - **Création** : la partition ne contient aucune publication. Une publication est créée si au moins un enregistrement source de la partition est dans le périmètre.
@@ -41,4 +41,4 @@ Après une modification de la logique de résolution, l'option `--rebuild-public
 
 ## Recalcul des métadonnées
 
-Les métadonnées de chaque publication touchée sont recalculées depuis ses enregistrements sources. La licence de la version éditeur (`license`) suit un ordre de sources propre, et la licence du fichier déposé (`deposit_license`) vient de HAL. L'éditeur est celui de la date de publication : le titulaire du préfixe du DOI Crossref, à défaut le premier éditeur des enregistrements sources selon le classement des sources. Le préfixe d'une plateforme d'éditeurs est écarté, et une production hébergée sans être publiée est sans éditeur (`domain/publishers/attribution.py`). Une publication sans enregistrement source est supprimée.
+Les métadonnées de chaque publication touchée sont recalculées depuis ses enregistrements sources. L'éditeur est celui de la date de publication : le titulaire du préfixe du DOI Crossref, à défaut le premier éditeur des enregistrements sources selon le classement des sources. Une publication sans enregistrement source est supprimée.

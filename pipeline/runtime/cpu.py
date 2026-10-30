@@ -1,4 +1,4 @@
-"""Processeurs dont dispose le pipeline."""
+"""Processeurs disponibles pour le pipeline."""
 
 import math
 import os
@@ -9,7 +9,7 @@ CGROUP_CPU_MAX = Path("/sys/fs/cgroup/cpu.max")
 
 
 def available_cpus(cpu_max: Path = CGROUP_CPU_MAX) -> int:
-    """Processeurs utilisables : ceux du processus, plafonnés par le quota du conteneur (`cpus` de docker compose) s'il y en a un."""
+    """Renvoie le nombre de processeurs du processus, plafonné par l'éventuel quota du conteneur (`cpus` de docker compose)."""
     cpus = os.process_cpu_count() or 1
     try:
         quota, period = cpu_max.read_text().split()

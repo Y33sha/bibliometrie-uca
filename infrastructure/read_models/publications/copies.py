@@ -11,7 +11,7 @@ from domain.sources.registry import Source
 
 
 def publication_copies(conn: Connection, publication_ids: Sequence[int]) -> dict[int, list[Copy]]:
-    """Localisations des enregistrements sources de chaque publication. Une publication sans localisation manque de la réponse. La copie qu'un enregistrement HAL donne de HAL est décrite par sa plateforme."""
+    """Renvoie les localisations des enregistrements sources de chaque publication. Une publication sans localisation est absente de la réponse. La copie HAL d'un enregistrement HAL est décrite par sa plateforme."""
     rows = conn.execute(
         text("""
             SELECT sr.publication_id, sr.source::text AS source, l.url, l.version, l.is_oa,

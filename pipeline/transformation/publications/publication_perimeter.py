@@ -12,7 +12,11 @@ from infrastructure.sql_fragments import NO_PERIMETER_EVIDENCE, has_author_role,
 
 
 def _refresh_sql(scope: str) -> str:
-    """Indices de chaque publication de `scope`. `scope` : condition sur l'id de publication. `:thesis_ppns` : PPN des établissements de soutenance du périmètre."""
+    """Renvoie la requête de recalcul des indices de chaque publication de `scope`. Le paramètre `:thesis_ppns` reçoit les PPN des établissements de soutenance du périmètre.
+
+    Args:
+        scope: condition sur l'id de publication.
+    """
     return f"""
         WITH computed AS (
             SELECT id, array_agg(DISTINCT e ORDER BY e) AS evidence
@@ -51,7 +55,7 @@ _OF_PUBLICATIONS = text(_refresh_sql("= ANY(:publication_ids)"))
 
 
 def _thesis_ppns(conn: Connection) -> list[str]:
-    """PPN des établissements de soutenance du périmètre des personnes (`api_ids.theses`)."""
+    """Renvoie les PPN des établissements de soutenance du périmètre des personnes (`api_ids.theses`)."""
     return list(
         conn.execute(
             text("""

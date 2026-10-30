@@ -2,12 +2,12 @@
 
 *À jour le 2026-10-26.*
 
-Le modèle sépare ce que disent les sources du référentiel que le pipeline en déduit.
+Le modèle sépare les données des sources et le référentiel déduit par le pipeline.
 
 | Niveau | Notion | Table | Définition |
 |---|---|---|---|
 | source | enregistrement source | `source_records` | Description d'un document par une source (HAL, OpenAlex, Crossref…) |
-| source | contribution source | `source_contributions` | Personne telle que la source la nomme dans un enregistrement source, avec son rôle (auteur, direction de thèse, jury…) |
+| source | contribution source | `source_contributions` | Personne nommée par la source dans un enregistrement source, avec son rôle (auteur, direction de thèse, jury…) |
 | référentiel | publication | `publications` | Document unique, qui réunit les enregistrements sources qui le décrivent |
 | référentiel | contribution | `contributions` | Participation d'une personne à une publication, qui réunit ses contributions sources |
 | référentiel | personne | `persons` | Personne réelle, identifiée à travers les sources |

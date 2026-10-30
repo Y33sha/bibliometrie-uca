@@ -17,7 +17,7 @@ NORMALIZERS: dict[str, Callable[[str], str]] = {
 def _normalized(
     value: str | None, imposed: str | None, normalize: Callable[[str], str]
 ) -> str | None:
-    """`imposed` s'il est fourni, sinon `value` normalisée ; `None` pour une valeur absente."""
+    """Renvoie `imposed` s'il est fourni, sinon `value` normalisée ; `None` pour une valeur absente."""
     if imposed is not None:
         return imposed
     return None if value is None else normalize(value)

@@ -3,8 +3,7 @@
 from dataclasses import dataclass
 from typing import Literal
 
-from pydantic import BaseModel
-
+from application.ports.model import Model
 from domain.country_detection import CountryDetectionMethod
 from infrastructure.read_models._common import FacetOption, PaginatedResponse
 
@@ -29,7 +28,7 @@ class TextPredicate:
 class StructurePredicate:
     """Filtre « structure reconnue » multi-structures.
 
-    `recognized` retient les adresses reconnues comme au moins une des `structure_ids`, `not_recognized` celles qui ne le sont comme aucune d'elles. Une adresse est reconnue comme une structure dès que le lien existe, qu'il soit en attente de validation ou confirmé.
+    `recognized` retient les adresses reconnues comme au moins une des `structure_ids`, `not_recognized` les adresses reconnues comme aucune. Une adresse est reconnue comme une structure dès que le lien existe, en attente de validation ou confirmé.
     """
 
     operator: StructurePredicateOperator
@@ -47,7 +46,7 @@ class AddressListFilters:
 # ----- Réponses -----
 
 
-class AddressStructureSummary(BaseModel):
+class AddressStructureSummary(Model):
     """Lien entre une adresse et une structure, dans la liste des adresses."""
 
     id: int
@@ -57,14 +56,15 @@ class AddressStructureSummary(BaseModel):
     is_detected: bool
 
 
-class StructureLinkState(BaseModel):
-    """État d'un lien entre adresse et structure : détection automatique et arbitrage manuel. `is_confirmed` : `None` en attente, vrai si confirmé, faux si rejeté."""
+class StructureLinkState(Model):
+    """État d'un lien entre adresse et structure : détection automatique et arbitrage manuel."""
 
     is_confirmed: bool | None
+    """`None` en attente, vrai si confirmé, faux si rejeté."""
     is_detected: bool
 
 
-class AddressOut(BaseModel):
+class AddressOut(Model):
     """Ligne de `/api/addresses` (liste paginée pour validation)."""
 
     id: int
@@ -76,16 +76,14 @@ class AddressOut(BaseModel):
 
 
 class AddressListResponse(PaginatedResponse):
-    """Réponse paginée de `/api/addresses`.
-
-    `requires_search` vrai signale une liste vide rendue sans lecture : sans prédicat de texte ou de structure, les filtres demandés couvriraient toute la base.
-    """
+    """Réponse paginée de `/api/addresses`."""
 
     addresses: list[AddressOut]
     requires_search: bool = False
+    """Vrai pour une liste vide renvoyée sans lecture : sans prédicat de texte ou de structure, les filtres demandés couvriraient toute la base."""
 
 
-class AddressPublicationItem(BaseModel):
+class AddressPublicationItem(Model):
     id: int
     title: str
     publication_year: int | None
@@ -96,32 +94,35 @@ class AddressPublicationItem(BaseModel):
     source_id: str | None
 
 
-class FoundCountry(BaseModel):
-    """Pays trouvé pour une adresse, et les moyens de détection qui le trouvent."""
+class FoundCountry(Model):
+    """Pays trouvé pour une adresse, avec ses moyens de détection."""
 
     country_code: str
     methods: list[CountryDetectionMethod]
 
 
-class AddressForCountryAttribution(BaseModel):
-    """Ligne de `/api/addresses/countries`. `countries` : pays retenus. `found_countries` : tous les pays trouvés, retenus ou non."""
+class AddressForCountryAttribution(Model):
+    """Ligne de `/api/addresses/countries`."""
 
     id: int
     raw_text: str
     countries: list[str] | None
+    """Pays retenus."""
     found_countries: list[FoundCountry]
+    """Tous les pays trouvés, retenus ou non."""
     publication_count: int
 
 
 class AddressesCountriesResponse(PaginatedResponse):
-    """`without_country` : nombre d'adresses sans pays retenu, sous les mêmes filtres que `country_facets`."""
+    """Réponse paginée de `/api/addresses/countries`."""
 
     addresses: list[AddressForCountryAttribution]
     country_facets: list[FacetOption]
     without_country: int
+    """Nombre d'adresses sans pays retenu, sous les mêmes filtres que `country_facets`."""
 
 
-class AddressStatsResponse(BaseModel):
+class AddressStatsResponse(Model):
     """Compteurs d'adresses d'une structure, par état de détection et de validation."""
 
     total: int
@@ -129,6 +130,3 @@ class AddressStatsResponse(BaseModel):
     pending: int
     rejected: int
     confirmed: int
-
-
-# ----- Port -----

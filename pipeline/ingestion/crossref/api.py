@@ -1,6 +1,6 @@
 """Accès à l'API Crossref : en-têtes, moissonnage de `/works`, lecture d'une ressource par son chemin.
 
-Crossref reconnaît le polite pool au `User-Agent` porteur d'un mailto.
+Crossref reconnaît le polite pool à un `User-Agent` avec mailto.
 """
 
 from __future__ import annotations
@@ -20,12 +20,12 @@ from pipeline.ingestion.common.person_search import PersonSearchPage
 
 logger = logging.getLogger(__name__)
 
-# Documents par page. Un enregistrement de grande collaboration pèse environ 500 Kio, et Crossref refuse une réponse de plus de 100 Mio.
+# Documents par page. Un document de grande collaboration pèse environ 500 Kio, et Crossref refuse une réponse de plus de 100 Mio.
 _ROWS = 50
 
 
 def headers() -> dict[str, str]:
-    """En-têtes d'une requête Crossref : `User-Agent` du polite pool, réponse JSON."""
+    """Renvoie les en-têtes d'une requête Crossref : `User-Agent` du polite pool, réponse JSON."""
     return {"User-Agent": polite_user_agent(), "Accept": "application/json"}
 
 
@@ -37,7 +37,7 @@ class CrossrefClient:
         self._headers = headers()
 
     def fetch_page(self, filters: str, cursor: str | None, label: str) -> PersonSearchPage:
-        """Une page des œuvres que désigne `filters` : la première quand `cursor` est `None`. Une page vide clôt la pagination."""
+        """Renvoie une page des œuvres désignées par `filters`, la première quand `cursor` est `None`. Une page vide clôt la pagination."""
         data = as_mapping(
             http_request_with_retry(
                 "GET",
@@ -62,7 +62,7 @@ async def get_message(
     timeout: float = 30.0,  # noqa: ASYNC109 — transmis au client httpx2
     max_retries: int = 3,
 ) -> LookupOutcome[Mapping[str, JsonValue]]:
-    """Corps `message` de `GET <racine>/<path>`. Une réponse sans `message` compte pour une source indisponible."""
+    """Renvoie le corps `message` de `GET <racine>/<path>`. Une réponse sans `message` compte pour une source indisponible."""
     url = f"{API_BASE_URLS['crossref']}/{path}"
     outcome = await lookup_json_async(
         client,
@@ -85,7 +85,7 @@ async def get_message(
 async def fetch_work(
     client: httpx2.AsyncClient, doi: str
 ) -> LookupOutcome[Mapping[str, JsonValue]]:
-    """Enregistrement de `GET /works/{doi}`. Crossref accepte le DOI tel quel dans le chemin, barres obliques comprises."""
+    """Renvoie le document de `GET /works/{doi}`. Crossref accepte le DOI tel quel dans le chemin, barres obliques comprises."""
     return await get_message(
         client, f"works/{urllib.parse.quote(doi, safe='/()')}", label=f"DOI {doi}"
     )

@@ -49,11 +49,12 @@ ROR_TYPE_LABELS_FR: dict[RorType, str] = {
 
 @dataclass(frozen=True, slots=True)
 class RorOrganization:
-    """Organisation du ROR. `country_code` est le code ISO 3166-1 en minuscules de la première localisation."""
+    """Organisation du ROR."""
 
     ror_id: RorId
     name: str
     country_code: str
+    """Code ISO 3166-1 en minuscules de la première localisation."""
     types: frozenset[RorType]
     status: RorStatus
     parent_ids: frozenset[RorId]
@@ -69,7 +70,7 @@ class RorOrganization:
 
 
 def ror_relations(organizations: list[RorOrganization]) -> frozenset[tuple[RorId, RorId]]:
-    """Couples `(parent, enfant)` déclarés par l'une ou l'autre des deux organisations, limités aux organisations de la liste.
+    """Renvoie les couples `(parent, enfant)` déclarés par l'une ou l'autre des deux organisations, limités aux organisations de la liste.
 
     Le ROR déclare chaque relation des deux côtés, à quelques exceptions près : l'union les couvre.
     """

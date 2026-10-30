@@ -19,7 +19,7 @@ from pipeline.transformation.countries.store import CountryCandidatesStore
 class ContributorNameFields(TypedDict):
     """Colonnes de nom d'une contribution source (`contributor_name_fields`).
 
-    Sur `source_contributions`, le nom tel que la source le donne : `raw_last_name` et `raw_first_name`, ou `raw_author_name`. Sur les informations du contributeur (`contributor_information`), le découpage retenu normalisé.
+    Sur `source_contributions`, le nom donné par la source : `raw_last_name` et `raw_first_name`, ou `raw_author_name`. Sur les informations du contributeur (`contributor_information`), le découpage retenu normalisé.
     """
 
     raw_author_name: str | None
@@ -30,33 +30,31 @@ class ContributorNameFields(TypedDict):
 
 
 class SourceContributionItem(ContributorNameFields):
-    """Une contribution source à écrire.
-
-    Une contribution source sans rang d'auteur (direction, rapport, jury ou présidence d'une thèse) a une position nulle. La contrainte d'unicité de la position la tolère : deux `NULL` sont distincts.
-    """
+    """Une contribution source à écrire."""
 
     source: str
     source_record_id: int
     author_position: int | None
+    """Position nulle pour une contribution source sans rang d'auteur (direction, rapport, jury ou présidence d'une thèse). La contrainte d'unicité de la position la tolère : deux `NULL` sont distincts."""
     is_corresponding: bool
     collective: bool
     roles: Sequence[str] | None
     identifiers: Mapping[str, JsonValue] | None
-    """Lu seulement (sérialisé en JSONB) : `Mapping` accepte les dictionnaires plus étroits que les sources produisent, tel le `dict[str, str]` des identifiants de thèse."""
+    """Lu seulement (sérialisé en JSONB) : `Mapping` accepte les dictionnaires plus étroits produits par les sources, tel le `dict[str, str]` des identifiants de thèse."""
     neutralized_identifiers: Mapping[str, str] | None
-    """Identifiants de `identifiers` que la résolution des personnes ignore pour cette contribution source, avec leur motif (`IdentifierNeutralization`)."""
+    """Identifiants de `identifiers` ignorés par la résolution des personnes pour cette contribution source, avec leur motif (`IdentifierNeutralization`)."""
     content_hash: str | None
-    """Empreinte des champs écrits (`signature_content_hash`), adresses comprises."""
+    """Empreinte des champs écrits (`source_contribution_content`), adresses comprises."""
 
 
 class SourceContributionUpdate(SourceContributionItem):
-    """Une contribution source en base, réécrite en place : son identifiant, puis les champs de la contribution source entrante qui lui est rapprochée."""
+    """Une contribution source en base, réécrite en place avec les champs de la contribution source entrante correspondante."""
 
     id: int
 
 
 class StoredSourceContributionRow(NamedTuple):
-    """Une contribution source en base d'un enregistrement source : identifiant, position, informations du contributeur, empreinte, marque collective et rôles."""
+    """Une contribution source en base d'un enregistrement source, avec ses informations du contributeur."""
 
     id: int
     author_position: int | None
@@ -69,10 +67,12 @@ class StoredSourceContributionRow(NamedTuple):
 
 
 class AddressBatchItem(TypedDict):
-    """Adresse d'un lot à écrire : forme normalisée, et texte brut d'une adresse nouvelle."""
+    """Adresse d'un lot à écrire."""
 
     raw: str
+    """Texte brut, écrit seulement pour une adresse absente de la base."""
     norm: str
+    """Forme normalisée."""
 
 
 class ContributionAddressItem(TypedDict):
@@ -83,11 +83,12 @@ class ContributionAddressItem(TypedDict):
 
 
 class ContributionRorItem(TypedDict):
-    """ROR d'un lot, attribué par la source à une contribution source, avec l'adresse de son affiliation (`None` pour une affiliation sans texte)."""
+    """ROR d'un lot, attribué par la source à une contribution source."""
 
     source_contribution_id: int
     ror_id: str
     addr_id: int | None
+    """Adresse de l'affiliation, `None` pour une affiliation sans texte."""
 
 
 # Sentinelles du `key_hash`, alignées sur la colonne générée `contributor_information.key_hash` : `E'\x01'` tient lieu de NULL, `E'\x1f'` sépare les champs. Ces octets de contrôle sont absents des vraies valeurs.
@@ -114,7 +115,7 @@ def key_hash_sql(exprs: Sequence[str]) -> str:
 
 _KEY_COLUMNS_SQL = ", ".join(CONTRIBUTOR_INFORMATION_KEY_COLUMNS)
 
-# Marque les contributions des contributions sources de la CTE `updated(id, attributes_changed)` dont les rôles ou le statut de correspondant changent.
+# Marque les contributions liées aux contributions sources de la CTE `updated(id, attributes_changed)` à rôles ou statut de correspondant changés.
 _MARK_CONTRIBUTIONS_OF_UPDATED = enqueue_sql(
     Queue.CONTRIBUTION_ATTRIBUTES,
     """
@@ -126,7 +127,10 @@ _MARK_CONTRIBUTIONS_OF_UPDATED = enqueue_sql(
 
 
 def mark_source_contributions_to_resync(conn: Connection, source: str) -> int:
-    """Vide l'empreinte du bloc auteurs des enregistrements sources de `source` : leur prochaine normalisation synchronise leurs contributions sources. Renvoie le nombre d'enregistrements sources marqués."""
+    """Vide l'empreinte du bloc auteurs des enregistrements sources de `source`. Renvoie le nombre d'enregistrements sources marqués.
+
+    La prochaine normalisation de ces enregistrements sources synchronise leurs contributions sources.
+    """
     return conn.execute(
         text("""
             UPDATE source_records SET authors_hash = NULL
@@ -137,7 +141,7 @@ def mark_source_contributions_to_resync(conn: Connection, source: str) -> int:
 
 
 def delete_orphan_contributor_information(conn: Connection) -> int:
-    """Supprime les lignes de `contributor_information` qu'aucune contribution source ne référence.
+    """Supprime les lignes de `contributor_information` sans contribution source.
 
     Une ligne devient orpheline quand la dernière contribution source qui la référençait change de clé (nom ou identifiants corrigés) et passe à une autre ligne. Renvoie le nombre de lignes supprimées.
     """
@@ -152,7 +156,7 @@ def delete_orphan_contributor_information(conn: Connection) -> int:
 
 
 def delete_orphan_addresses(conn: Connection) -> int:
-    """Supprime les adresses qu'aucune contribution source ne référence, avec leurs liens aux structures.
+    """Supprime les adresses sans contribution source, avec leurs liens aux structures.
 
     Une adresse devient orpheline quand la dernière contribution source qui la référençait est réécrite sans elle ou supprimée avec son enregistrement source. Renvoie le nombre d'adresses supprimées.
     """
@@ -173,9 +177,9 @@ class SourceContributionStore:
         self._conn = conn
 
     def upsert_source_contributions_batch(self, values: list[SourceContributionItem]) -> None:
-        """Insère les contributions sources d'un enregistrement source, et les informations du contributeur qui leur manquent.
+        """Insère les contributions sources d'un enregistrement source, et leurs informations du contributeur absentes de la base.
 
-        Les informations du contributeur sont dans `contributor_information`, sans doublon ; la contribution source y renvoie. Une première requête insère celles du lot qui manquent. La seconde insère les contributions sources, rattachées par `key_hash`. Les deux requêtes restent distinctes : une CTE qui écrit dans `contributor_information` laisse ses lignes invisibles au JOIN de la même requête.
+        Les informations du contributeur sont dans `contributor_information`, sans doublon ; chaque contribution source référence sa ligne. Une première requête insère les lignes absentes. La seconde insère les contributions sources, rattachées par `key_hash`. Les deux requêtes restent distinctes : une CTE qui écrit dans `contributor_information` laisse ses lignes invisibles au JOIN de la même requête.
         """
         if not values:
             return
@@ -196,7 +200,7 @@ class SourceContributionStore:
             }
             for v in values
         ]
-        # Informations du contributeur du lot qui manquent. Un `DO UPDATE` réécrirait à chaque enregistrement source les lignes qui reviennent.
+        # Informations du contributeur du lot absentes de la base. Un `DO UPDATE` réécrirait à chaque enregistrement source les lignes déjà présentes.
         self._conn.execute(
             text(f"""
                 INSERT INTO contributor_information ({_KEY_COLUMNS_SQL})
@@ -272,8 +276,8 @@ class SourceContributionStore:
             )
 
     def update_source_contributions_batch(self, values: list[SourceContributionUpdate]) -> None:
-        """Réécrit en place des contributions sources. Les marque pour le recalcul des pays, et marque les contributions de celles dont les rôles ou le statut de correspondant changent."""
-        # Une seule instruction : la contrainte `(source_record_id, author_position)`, différable, se vérifie en fin d'instruction, ce qui admet les permutations de positions.
+        """Réécrit en place des contributions sources et les marque pour le recalcul des pays. Marque aussi leurs contributions, si les rôles ou le statut de correspondant changent."""
+        # Une seule instruction : la contrainte `(source_record_id, author_position)`, différable, se vérifie en fin d'instruction. Les permutations de positions passent donc.
         if not values:
             return
         payload = [
@@ -392,7 +396,10 @@ class SourceContributionStore:
         self._conn.execute(stmt, {"payload": list(values)})
 
     def fetch_address_ids_by_normalized_text(self, normalized_texts: list[str]) -> dict[str, int]:
-        """Identifiant de l'adresse de chaque forme normalisée. La recherche passe par `md5(normalized_text)`, clé de l'index unique des adresses ; le `md5` de PostgreSQL et celui de `hashlib` coïncident sur l'UTF-8."""
+        """Renvoie l'identifiant de l'adresse de chaque forme normalisée.
+
+        La recherche passe par `md5(normalized_text)`, clé de l'index unique des adresses. Le `md5` de PostgreSQL et celui de `hashlib` coïncident sur l'UTF-8.
+        """
         if not normalized_texts:
             return {}
         md5s = [

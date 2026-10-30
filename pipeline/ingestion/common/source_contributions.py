@@ -1,6 +1,6 @@
 """Écriture des contributions sources, commune à toutes les sources.
 
-Seule l'analyse du payload diffère d'une source à l'autre : chaque normaliseur isole le bloc auteurs de son payload et en construit les `AuthorRecord` (`sync_source_contributions`). L'écriture d'un document fait un nombre constant d'allers-retours avec la base.
+Seule l'analyse du payload diffère d'une source à l'autre : chaque normaliseur isole le bloc auteurs de son payload et en construit les `AuthorRecord` (`sync_source_contributions`). L'écriture des contributions sources d'un enregistrement source fait un nombre constant d'allers-retours avec la base.
 """
 
 from __future__ import annotations
@@ -40,14 +40,14 @@ logger = logging.getLogger(__name__)
 
 @dataclass(slots=True)
 class AddressRecord:
-    """Une affiliation textuelle d'un auteur.
-
-    Le texte est assaini à la construction (`sanitize_raw_text`) : une affiliation réduite à du bruit invisible a un texte vide, et ne s'écrit pas. Les codes pays que la source donne deviennent des candidats du moyen de la source (`SOURCE_COUNTRY_METHODS`). Les ROR sont ceux que la source attribue à l'affiliation.
-    """
+    """Une affiliation textuelle d'un auteur."""
 
     text: str
+    """Texte assaini à la construction (`sanitize_raw_text`). Une affiliation réduite à du bruit invisible a un texte vide et ne s'écrit pas."""
     countries: list[str] | None = None
+    """Codes pays donnés par la source, candidats du moyen de détection de la source (`SOURCE_COUNTRY_METHODS`)."""
     ror_ids: frozenset[RorId] = frozenset()
+    """ROR attribués par la source à l'affiliation."""
 
     def __post_init__(self) -> None:
         self.text = sanitize_raw_text(self.text)
@@ -55,20 +55,22 @@ class AddressRecord:
 
 @dataclass(slots=True)
 class AuthorRecord:
-    """Auteur d'un document, tel que le normaliseur de la source le lit.
-
-    Une contribution source sans rôle d'auteur (direction, jury de thèse) a une position nulle. Des rôles nuls restent `NULL` en base : une source qui veut le rôle `author` le pose. Les ROR sont ceux que la source attribue à la contribution source sans texte d'affiliation ; ceux d'une affiliation à texte sont sur son `AddressRecord`. Les structures HAL sont les structures directes de la contribution source (`structId`). Une contribution source est collective si la source le déclare, ou si son nom désigne un collectif (`is_collective_name`).
-    """
+    """Auteur d'un document, tel que lu par le normaliseur de la source."""
 
     position: int | None
+    """Position nulle pour une contribution source sans rôle d'auteur (direction, jury de thèse)."""
     name: ContributorName
     is_corresponding: bool = False
     collective: bool = False
+    """Vrai si la source déclare la contribution source collective. Un nom de collectif la rend aussi collective (`is_collective_name`)."""
     roles: list[ContributionRole] | None = None
+    """`None` reste `NULL` en base. Une source pose elle-même le rôle `author`."""
     identifiers: dict[str, JsonValue] | None = None
     addresses: list[AddressRecord] = field(default_factory=list)
     ror_ids: frozenset[RorId] = frozenset()
+    """ROR attribués par la source à la contribution source sans texte d'affiliation. Ceux d'une affiliation à texte sont sur son `AddressRecord`."""
     hal_structure_ids: frozenset[int] = frozenset()
+    """Structures HAL directes de la contribution source (`structId`)."""
 
 
 AuthorBlock = Mapping[str, JsonValue]
@@ -76,7 +78,7 @@ AuthorBlock = Mapping[str, JsonValue]
 
 
 def contributor_identifiers(**ids: str | int | None) -> dict[str, JsonValue] | None:
-    """Identifiants d'une contribution source, depuis les valeurs brutes de la source (`compact_identifiers`). Une valeur mal formée est journalisée et écartée."""
+    """Renvoie les identifiants d'une contribution source, depuis les valeurs brutes de la source (`compact_identifiers`). Une valeur mal formée est journalisée et écartée."""
     identifiers = compact_identifiers(**ids)
     for id_type, raw in identifiers.malformed:
         logger.warning("Identifiant mal formé écarté : %s=%r", id_type, raw)
@@ -109,7 +111,7 @@ def write_source_contributions(
 ) -> None:
     """Synchronise les contributions sources d'un enregistrement source avec les auteurs lus (`plan_source_contribution_sync`).
 
-    Une contribution source rapprochée garde son identifiant, donc sa personne et sa confirmation. Elle est réécrite, adresses et ROR compris, seulement si son empreinte change. Les contributions sources sans correspondant sont insérées ou supprimées. Une insertion, une suppression, ou un changement de position ou de rôles marque la publication de l'enregistrement source pour le groupement des auteurs. L'enregistrement source reçoit son nombre de contributions sources d'auteur individuelles et de noms complets distincts parmi elles (`is_individual_author`).
+    Une contribution source retrouvée en base garde son identifiant, donc sa personne et sa confirmation. Elle est réécrite, adresses et ROR compris, seulement si son empreinte change. Les contributions sources sans correspondant sont insérées ou supprimées. Une insertion, une suppression, ou un changement de position ou de rôles marque la publication de l'enregistrement source pour le groupement des auteurs. L'enregistrement source reçoit son nombre de contributions sources d'auteur individuelles et de noms complets distincts parmi elles (`is_individual_author`).
 
     Une contribution source entrante est identifiée par son rang dans la liste des auteurs. Les positions non nulles de cette liste sont uniques ; chaque normaliseur le garantit.
     """
@@ -245,7 +247,10 @@ def _inserted_ids(
     known_ids: set[int],
     inserted: Mapping[int, SourceContributionItem],
 ) -> dict[int, int]:
-    """Identifiants des contributions sources insérées, par clé entrante : chaque ligne nouvelle est rapprochée d'une contribution source insérée de même position et de mêmes informations du contributeur. Deux contributions sources de même position et de mêmes informations du contributeur sont indiscernables : l'ordre de leur rapprochement est indifférent."""
+    """Renvoie les identifiants des contributions sources insérées, par clé entrante.
+
+    Chaque ligne absente de `known_ids` correspond à une contribution source insérée de même position et de mêmes informations du contributeur. Deux contributions sources de même position et de mêmes informations du contributeur sont indiscernables : l'ordre de correspondance est indifférent.
+    """
     new_ids: dict[Hashable, list[int]] = defaultdict(list)
     for row in sorted(rows, key=lambda r: r.id):
         if row.id not in known_ids:
@@ -257,7 +262,7 @@ def _inserted_ids(
 
 
 def contributor_name_fields(name: ContributorName) -> ContributorNameFields:
-    """Colonnes de nom d'une contribution source : nom fourni par la source, et découpage retenu normalisé."""
+    """Renvoie les colonnes de nom d'une contribution source : nom fourni par la source, et découpage retenu normalisé."""
     last, first = name.normalized()
     return {
         "raw_author_name": name.raw,
@@ -274,7 +279,10 @@ def _contributor_information(
     identifiers: object,
     collective: bool,
 ) -> Hashable:
-    """Clé d'appariement d'une contribution source : nom et prénom normalisés, identifiants, comme `contributor_information`, et marque collective. Une contribution source qui devient collective est donc réinsérée sans personne."""
+    """Renvoie la clé de synchronisation d'une contribution source : nom et prénom normalisés et identifiants, comme `contributor_information`, plus la marque collective.
+
+    Une contribution source devenue collective est donc réinsérée sans personne.
+    """
     ids = json.dumps(identifiers, sort_keys=True) if identifiers is not None else None
     return (last_name_normalized, first_name_normalized, ids, collective)
 
@@ -305,7 +313,7 @@ def write_addresses(
 ) -> dict[str, int]:
     """Écrit les adresses d'un document, leurs pays candidats et leurs liens aux contributions sources, et renvoie l'identifiant de chaque adresse par son texte.
 
-    Une adresse est unique par forme normalisée : un texte rejoint l'adresse de même forme, et un texte de forme vide est écarté. Les pays que la source donne deviennent des candidats du moyen de la source. Une adresse sans contribution source s'écrit sans lien.
+    Une adresse est unique par forme normalisée : un texte rejoint l'adresse de même forme, et un texte de forme vide est écarté. Les pays donnés par la source deviennent des candidats du moyen de la source. Une adresse sans contribution source s'écrit sans lien.
     """
     norm_by_text: dict[str, str] = {}
     addr_countries: dict[str, set[str]] = {}

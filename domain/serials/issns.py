@@ -29,7 +29,7 @@ class IssnStatus(StrEnum):
     """ISSN d'un titre précédent ou suivant."""
     SUPPLEMENT = "supplement"
     UNVERIFIED = "unverified"
-    """ISSN valide que donnent les enregistrements sources de la revue, sans notice Sudoc qui le confirme."""
+    """ISSN valide donné par les enregistrements sources de la revue, sans notice Sudoc qui le confirme."""
 
 
 ISSN_SUPPORTS = tuple(IssnSupport)
@@ -47,7 +47,7 @@ class SerialIssn:
 
 
 def received_issns(issns: Iterable[SerialIssn]) -> tuple[SerialIssn, ...]:
-    """ISSN reçus d'une source, normalisés, sans doublon.
+    """Normalise les ISSN reçus d'une source, et retire les doublons.
 
     Une valeur invalide garde sa forme reçue, au statut `malformed`. Deux mentions d'une même valeur n'en font qu'une : le premier support connu, le drapeau ISSN-L de l'une ou l'autre.
     """
@@ -84,7 +84,11 @@ def source_issns(
     unknown: Iterable[str | None] = (),
     linking: str | None = None,
 ) -> tuple[SerialIssn, ...]:
-    """ISSN tels qu'une source les donne : papier, en ligne, ou de support inconnu. `linking` est l'ISSN-L."""
+    """Construit les ISSN donnés par une source : papier, en ligne, ou de support inconnu.
+
+    Args:
+        linking: ISSN-L.
+    """
     return received_issns(
         [
             *(
@@ -102,7 +106,11 @@ def source_issns(
 
 
 def validate_serial_issns(issns: Iterable[SerialIssn]) -> list[SerialIssn]:
-    """ISSN d'une revue saisis à la main, normalisés. Lève `ValidationError` sur une valeur invalide hors statut `malformed`, sur un ISSN en double et sur plusieurs ISSN-L."""
+    """Normalise les ISSN d'une revue saisis à la main.
+
+    Raises:
+        ValidationError: valeur invalide hors statut `malformed`, ISSN en double ou plusieurs ISSN-L.
+    """
     rows: list[SerialIssn] = []
     for row in issns:
         value = row.issn.strip()
@@ -119,7 +127,7 @@ def validate_serial_issns(issns: Iterable[SerialIssn]) -> list[SerialIssn]:
 
 
 def issn_conflict(first: Sequence[SerialIssn], second: Sequence[SerialIssn]) -> str | None:
-    """Contradiction entre les ISSN de deux revues de même titre, ou `None`.
+    """Renvoie la contradiction entre les ISSN de deux revues de même titre, ou `None`.
 
     Deux revues se contredisent quand elles ont chacune un ISSN actif d'un même support sans en partager aucun, ou deux ISSN-L différents.
     """

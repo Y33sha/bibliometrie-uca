@@ -43,17 +43,17 @@ _ENRICH = text("""
 
 
 class MonographStore:
-    """Monographies, sur la connexion `conn`."""
+    """Requêtes sur les monographies, sur la connexion `conn`."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
 
     def find_monograph_by_isbn(self, isbn: str) -> int | None:
-        """Monographie qui a cet ISBN, papier ou électronique."""
+        """Renvoie la monographie qui a cet ISBN, papier ou électronique."""
         return self._conn.execute(_FIND_BY_ISBN, {"isbn": isbn}).scalar_one_or_none()
 
     def find_monographs_by_title(self, title_normalized: str) -> list[MonographCandidate]:
-        """Monographies de ce titre normalisé, de la plus ancienne à la plus récente."""
+        """Renvoie les monographies de ce titre normalisé, de la plus ancienne à la plus récente."""
         rows = self._conn.execute(_FIND_BY_TITLE, {"title_normalized": title_normalized})
         return [MonographCandidate(r.id, r.isbn, r.eisbn, r.publisher_id) for r in rows]
 
@@ -97,7 +97,7 @@ class MonographStore:
         publisher_id: int | None,
         serial_id: int | None,
     ) -> None:
-        """Complète les champs vides d'une monographie. Un ISBN déjà attribué à une autre monographie reste à celle-ci. Un livre devient volume d'actes si `proceedings` est vrai ; l'inverse est exclu."""
+        """Complète les champs vides d'une monographie. Un ISBN déjà attribué à une autre monographie reste à celle-ci. Un livre devient volume d'actes si `proceedings` est vrai ; un volume d'actes reste volume d'actes."""
         self._conn.execute(
             _ENRICH,
             {

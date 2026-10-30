@@ -1,6 +1,6 @@
 """Tests des deux passes de résolution des préfixes DOI : `ResolveRaPhase` (agence d'enregistrement, par doi.org) et les étapes Crossref et DataCite de `resolve_publishers` (éditeur, par les API /prefixes).
 
-Faux dépôts pour les ports, fonctions locales pour les clients HTTP, sans réseau ni base de données.
+Faux repositories pour les ports, fonctions locales pour les clients HTTP, sans réseau ni base de données.
 """
 
 from __future__ import annotations
@@ -36,7 +36,7 @@ class _Row:
 
 @dataclass
 class FakeDoiPrefixRepo:
-    """Faux dépôt : `candidates` (préfixes des DOI candidats) alimente `resolve_ra` ; `rows` simule la table `doi_prefixes`, indexée par préfixe."""
+    """Faux repository : `candidates` (préfixes des DOI candidats) alimente `resolve_ra` ; `rows` simule la table `doi_prefixes`, indexée par préfixe."""
 
     candidates: list[str] = field(default_factory=list)
     rows: dict[str, _Row] = field(default_factory=dict)
@@ -106,7 +106,7 @@ class FakeDoiPrefixRepo:
 
 @dataclass
 class FakePublisherRepo:
-    """Faux dépôt des éditeurs : `name_to_id` associe une forme de nom à un éditeur, enrichi par chaque création pour dédoublonner au sein du run."""
+    """Faux repository des éditeurs : `name_to_id` associe une forme de nom à un éditeur, enrichi par chaque création pour dédoublonner au sein du run."""
 
     name_to_id: dict[str, int] = field(default_factory=dict)
     created: list[dict] = field(default_factory=list)
@@ -219,7 +219,7 @@ def test_resolve_ra_inserts_ra_only(contexte):
 
 
 def test_resolve_ra_ecarte_les_prefixes_malformes(contexte):
-    """Régression : les préfixes malformés « doi:10.5194 » et « https: » restent hors de doi_prefixes."""
+    """Les préfixes malformés « doi:10.5194 » et « https: » restent hors de doi_prefixes."""
     repo = FakeDoiPrefixRepo(candidates=["doi:10.5194", "https:", "10.5194"])
     ras = StubResolveRas(answers={"10.5194": "Crossref"})
 
@@ -430,7 +430,7 @@ def test_publishers_dedup_same_name_one_creation():
 
 
 def test_publishers_crossref_sample_doi_read_before_call():
-    """Le DOI témoin d'un préfixe Crossref est lu juste avant de l'interroger ; un préfixe DataCite n'en a pas besoin."""
+    """Le DOI témoin d'un préfixe Crossref est lu juste avant de l'interroger ; un préfixe DataCite se passe de DOI témoin."""
     repo = FakeDoiPrefixRepo(
         rows={"10.1038": _Row("10.1038", "Crossref"), "10.5281": _Row("10.5281", "DataCite")}
     )

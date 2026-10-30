@@ -16,7 +16,7 @@ class CountryDetectionMethod(StrEnum):
     SOURCE_SCANR = "source_scanr"
 
 
-# Moyen des pays qu'une source donne pour une affiliation, par nom de source.
+# Moyen des pays donnés par une source pour une affiliation, par nom de source.
 SOURCE_COUNTRY_METHODS: dict[str, CountryDetectionMethod] = {
     "scanr": CountryDetectionMethod.SOURCE_SCANR,
     "openalex": CountryDetectionMethod.SOURCE_OPENALEX,
@@ -39,7 +39,7 @@ _CONTRARY_QUORUM = 2
 def retained_countries(
     candidates: Mapping[CountryDetectionMethod, Iterable[str]],
 ) -> frozenset[str]:
-    """Pays retenus d'une adresse, d'après les candidats de chaque moyen.
+    """Renvoie les pays retenus d'une adresse, d'après les candidats de chaque moyen.
 
     Le premier moyen qui propose un pays l'emporte. `manual` l'emporte toujours. Un autre premier moyen cède quand deux autres moyens proposent un même autre pays et qu'aucun ne soutient le sien.
     """

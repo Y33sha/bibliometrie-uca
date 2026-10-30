@@ -39,7 +39,7 @@ def _fetch_one(conn, sql_text: str, **params):
 
 
 def _find_or_create(title, *, issn=None, eissn=None, issnl=None, **kwargs):
-    """`find_or_create_serial` avec un ISSN papier, un ISSN en ligne et un ISSN-L."""
+    """Appelle `find_or_create_serial` avec un ISSN papier, un ISSN en ligne et un ISSN-L."""
     issns = source_issns(print_issn=issn, electronic_issn=eissn, linking=issnl)
     return find_or_create_serial(title, issns=issns, **kwargs)
 
@@ -67,7 +67,7 @@ class TestFindOrCreatePublisher:
     def test_un_nom_encode_rejoint_le_meme_editeur_que_le_nom_en_clair(
         self, sa_sync_conn, publisher_store
     ):
-        """Régression : un nom avec entités HTML (`&amp;`) créait un deuxième éditeur."""
+        """Un nom avec entités HTML (`&amp;`) rejoint l'éditeur du nom en clair."""
         premier = find_or_create_publisher("Taylor & Francis", repo=publisher_store)
         second = find_or_create_publisher("TAYLOR &amp; FRANCIS", repo=publisher_store)
         assert second == premier
@@ -78,7 +78,7 @@ class TestFindOrCreatePublisher:
         assert found == existing
 
     def test_variantes_de_nom_rejoignent_le_meme_editeur(self, sa_sync_conn, publisher_store):
-        """Cas réels : formes juridiques, dates et « on behalf of » ajoutés par les sources."""
+        """Les formes juridiques, dates et « on behalf of » ajoutés par les sources n'empêchent pas de retrouver l'éditeur."""
         elsevier = find_or_create_publisher("Elsevier BV", repo=publisher_store)
         for variant in (
             "Elsevier [1977-....]",
@@ -113,7 +113,7 @@ class TestFindOrCreateSerial:
     def test_un_titre_encode_rejoint_le_meme_serial_que_le_titre_en_clair(
         self, sa_sync_conn, gateway
     ):
-        """Régression : un titre avec entités HTML (`&amp;`) créait une deuxième revue. Le titre affiché et la clé de matching dérivent du même titre décodé."""
+        """Un titre avec entités HTML (`&amp;`) rejoint la revue du titre en clair. Le titre affiché et la clé de matching dérivent du même titre décodé."""
         premier = _find_or_create("Wood & Fire Safety", repo=gateway)
         second = _find_or_create("Wood &amp; Fire Safety", repo=gateway)
         assert second == premier
@@ -155,7 +155,7 @@ class TestFindOrCreateSerial:
         assert found is not None
 
     def test_forme_sans_editeur_enregistree_une_fois(self, sa_sync_conn, gateway):
-        """Régression : la contrainte d'unicité comptait deux éditeurs nuls comme différents, et chaque rattachement par ISSN ajoutait la forme."""
+        """Une forme sans éditeur s'enregistre une seule fois, quel que soit le nombre de rattachements par ISSN."""
         serial_id = _find_or_create("Viatica", issn="0028-0836", repo=gateway)
         for _ in range(3):
             assert _find_or_create("Viatica", issn="0028-0836", repo=gateway) == serial_id
@@ -169,7 +169,7 @@ class TestFindOrCreateSerial:
         )
 
     def test_enriches_metadata_on_match(self, sa_sync_conn, gateway, publisher_store):
-        """Une revue trouvée par ISSN reçoit l'ISSN qu'elle n'a pas. L'éditeur du document s'enregistre avec la forme de nom, la revue n'en reçoit pas."""
+        """Une revue trouvée par ISSN reçoit l'ISSN qu'elle n'a pas. L'éditeur de l'enregistrement source s'enregistre avec la forme de nom ; la revue reste sans éditeur."""
         existing = _serial(sa_sync_conn, issn="0028-0836")
         publisher_id = find_or_create_publisher("Springer", repo=publisher_store)
         _find_or_create(
@@ -208,7 +208,7 @@ class TestFindOrCreateSerial:
         assert found == existing
 
     def test_titles_emptied_by_normalization_do_not_match(self, sa_sync_conn, gateway):
-        """Cas réel : un titre grec et un titre cyrillique se normalisent tous deux en chaîne vide."""
+        """Un titre grec et un titre cyrillique, tous deux normalisés en chaîne vide, donnent deux revues."""
         greek = _find_or_create("Παιδαγωγικά ρεύματα στο Αιγαίο", repo=gateway)
         cyrillic = _find_or_create("Теория вероятностей и ее применения", repo=gateway)
         assert greek != cyrillic
@@ -240,7 +240,7 @@ class TestFindOrCreateSerial:
         assert row.sudoc_checked_at is not None
 
     def test_issnl_value_can_fill_the_issn_column(self, sa_sync_conn, gateway):
-        """Régression : l'ISSN-L est l'ISSN de l'un des supports, il peut donc aussi figurer dans `issn`."""
+        """L'ISSN-L est l'ISSN de l'un des supports, il peut donc aussi figurer dans `issn`."""
         j_id = _serial(sa_sync_conn, issnl="0028-0836")
         _find_or_create("Nature", issn="0028-0836", repo=gateway)
         row = issn_columns(sa_sync_conn, j_id)

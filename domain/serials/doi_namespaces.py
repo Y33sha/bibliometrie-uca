@@ -31,7 +31,7 @@ def _kind(char: str) -> str:
 
 
 def namespace_candidates(doi: str) -> list[str]:
-    """Préfixes de `doi` coupés à une frontière de segment, du plus court au plus long.
+    """Renvoie les préfixes de `doi` coupés à une frontière de segment, du plus court au plus long.
 
     Une frontière suit un séparateur, qui reste dans le préfixe (`10.1016/j.ins.` écarte `j.insmatheco`), ou sépare des lettres de chiffres (`10.3390/nu`, puis un chiffre). Un ISSN n'est pas coupé à son tiret (`10.1088/1748-0221/`). Le préfixe du déposant seul (`10.1016/`) n'en est pas un : un éditeur publie plusieurs revues. Un DOI construit sur un ISBN n'a aucun candidat.
     """
@@ -53,12 +53,15 @@ def namespace_candidates(doi: str) -> list[str]:
 
 
 class DoiNamespace(NamedTuple):
-    """Espace de noms retenu : la revue qu'il désigne, le nombre de DOI qu'il couvre, et la part de leurs voix qui va à cette revue."""
+    """Espace de noms retenu."""
 
     namespace: str
     serial_id: int
+    """Revue désignée."""
     dois: int
+    """Nombre de DOI couverts."""
     share: float
+    """Part des voix de ces DOI qui va à la revue."""
 
 
 def designated_by_namespace(serial_type: SerialType) -> bool:
@@ -73,9 +76,9 @@ def learn_namespaces(
     min_dois: int = 5,
     min_share: float = 0.9,
 ) -> dict[str, DoiNamespace]:
-    """Espaces de noms que désignent les couples `(DOI, revue)` des enregistrements sources, un couple par enregistrement source.
+    """Apprend les espaces de noms désignés par les couples `(DOI, revue)` des enregistrements sources, un couple par enregistrement source.
 
-    Chaque DOI donne une voix, répartie entre ses revues au prorata de ses enregistrements. Un espace est retenu s'il couvre au moins `min_dois` DOI distincts et qu'une revue hors de `platforms` y recueille au moins `min_share` des voix. Les DOI des revues de `platforms` comptent dans le total. Un espace est écarté quand un espace plus court, retenu, désigne déjà la même revue.
+    Chaque DOI donne une voix, répartie entre ses revues au prorata de ses enregistrements sources. Un espace est retenu s'il couvre au moins `min_dois` DOI distincts et qu'une revue hors de `platforms` y recueille au moins `min_share` des voix. Les DOI des revues de `platforms` comptent dans le total. Un espace est écarté quand un espace plus court, retenu, désigne déjà la même revue.
     """
     records_by_doi: dict[str, Counter[int]] = defaultdict(Counter)
     for doi, serial_id in evidence:
@@ -104,7 +107,7 @@ def learn_namespaces(
 
 
 def _longest_retained(namespace: str, retained: Mapping[str, DoiNamespace]) -> DoiNamespace | None:
-    """L'espace retenu le plus long parmi les préfixes plus courts de `namespace`."""
+    """Renvoie l'espace retenu le plus long parmi les préfixes plus courts de `namespace`."""
     for shorter in reversed(namespace_candidates(namespace)):
         if shorter != namespace and shorter in retained:
             return retained[shorter]
@@ -112,7 +115,7 @@ def _longest_retained(namespace: str, retained: Mapping[str, DoiNamespace]) -> D
 
 
 def resolve_serial(doi: str, namespaces: Mapping[str, DoiNamespace]) -> DoiNamespace | None:
-    """L'espace de noms retenu le plus long parmi les préfixes de `doi`, ou `None`."""
+    """Renvoie l'espace de noms retenu le plus long parmi les préfixes de `doi`, ou `None`."""
     for candidate in reversed(namespace_candidates(doi)):
         if candidate in namespaces:
             return namespaces[candidate]

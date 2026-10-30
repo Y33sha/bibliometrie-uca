@@ -1,6 +1,6 @@
 """Moissonnage de Crossref par ORCID : tâche `harvest_by_person.crossref`.
 
-Interroge `GET /works` avec le filtre `orcid`, une fois par ORCID du lot : Crossref réunit par OU les filtres de même nom. Les dates de publication bornent la recherche (`from-pub-date`, `until-pub-date`). La pagination suit le curseur (`next-cursor`). Polite pool par le `User-Agent`.
+La requête `GET /works` reçoit le filtre `orcid` une fois par ORCID du lot : Crossref réunit par OU les filtres de même nom. Les dates de publication bornent la recherche (`from-pub-date`, `until-pub-date`). La pagination suit le curseur (`next-cursor`). Polite pool par le `User-Agent`.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from pipeline.ingestion.crossref.api import CrossrefClient
 
 
 def build_orcid_filter(orcids: list[str], first_year: int, last_year: int) -> str:
-    """Valeur du paramètre `filter` : œuvres d'un des ORCID, parues de `first_year` à `last_year`."""
+    """Construit la valeur du paramètre `filter` : œuvres d'un des ORCID, parues de `first_year` à `last_year`."""
     return ",".join(
         [
             *(f"orcid:{orcid}" for orcid in orcids),

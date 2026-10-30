@@ -2,7 +2,7 @@
 
 Règle : **toute écriture de l'API d'administration est consignée**, sauf l'ouverture et la fermeture de session (plafonnées à part, et admises par le middleware avant toute garde). Une route d'écriture ajoutée sans décision sur son cas fait échouer ce test.
 
-Trois vérifications complémentaires :
+Le test vérifie que :
 
 1. le registre ci-dessous couvre exactement les routes d'écriture du contrat OpenAPI : aucune route oubliée, aucune entrée sans route ;
 2. chaque type d'événement du registre est émis dans la couche applicative ;
@@ -56,10 +56,10 @@ AUDITE: dict[tuple[str, str], str] = {
     ("POST", "/api/structures/name-forms"): "structure_name_form.created",
     ("PUT", "/api/structures/name-forms/{form_id}"): "structure_name_form.updated",
     ("DELETE", "/api/structures/name-forms/{form_id}"): "structure_name_form.deleted",
-    ("POST", "/api/structures/tutelles"): "structure_relation.created",
-    ("DELETE", "/api/structures/tutelles/{tutelle_id}"): "structure_relation.deleted",
+    ("POST", "/api/structures/tutelles"): "structure_tutelle.created",
+    ("DELETE", "/api/structures/tutelles/{tutelle_id}"): "structure_tutelle.deleted",
 }
-"""Route d'écriture → type d'événement qu'elle émet."""
+"""Route d'écriture → type d'événement émis."""
 
 EXEMPTES: dict[tuple[str, str], str] = {
     ("POST", "/api/auth/login"): "Ouverture de session : plafonnée par adresse, hors garde.",
@@ -79,7 +79,7 @@ _EMISSION = re.compile(r'emit_event\(\s*[^)]*?"([a-z_]+\.[a-z_]+)"', re.S)
 
 
 def _surface_d_ecriture() -> set[tuple[str, str]]:
-    """Routes d'écriture du contrat OpenAPI publié."""
+    """Renvoie les routes d'écriture du contrat OpenAPI publié."""
     return {
         (methode.upper(), chemin)
         for chemin, operations in app.openapi()["paths"].items()
@@ -89,7 +89,7 @@ def _surface_d_ecriture() -> set[tuple[str, str]]:
 
 
 def _evenements_emis() -> set[str]:
-    """Types d'événements émis dans la couche applicative (appels à `emit_event`)."""
+    """Renvoie les types d'événements émis dans la couche applicative (appels à `emit_event`)."""
     emis: set[str] = set()
     for source in (PROJECT_ROOT / "application").rglob("*.py"):
         emis.update(_EMISSION.findall(source.read_text(encoding="utf-8")))
@@ -138,11 +138,11 @@ CONSEQUENCES: dict[str, str] = {
         "et l'attribution porte déjà sa propre trace."
     ),
 }
-"""Types d'événements qui décrivent la conséquence d'une décision, et non la décision."""
+"""Types d'événements décrivant la conséquence d'une décision."""
 
 
 def test_aucun_evenement_emis_ne_reste_sans_point_d_entree() -> None:
-    """Un type d'événement qu'aucune route ne nomme, et qui ne suit aucune décision, est un vocabulaire mort."""
+    """Chaque type d'événement émis est nommé par une route, ou décrit la conséquence d'une décision."""
     orphelins = _evenements_emis() - set(AUDITE.values()) - set(CONSEQUENCES)
     assert not orphelins, (
         f"Types d'événements émis sans point d'entrée déclaré : {sorted(orphelins)}. "

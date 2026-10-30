@@ -16,7 +16,7 @@ class ValidationError(DomainError):
 
 
 class ConflictError(DomainError):
-    """Opération refusée, car elle violerait un invariant métier."""
+    """Opération refusée : elle violerait un invariant métier."""
 
 
 class IdentifierAttributionConflictError(ConflictError):
@@ -45,7 +45,8 @@ class BlockingSerial(TypedDict):
     target_title: str
     source_serial_id: int
     source_title: str
-    reason: str  # explication lisible, p. ex. « ISSN différents : 0028-0836 vs 9999-9999 »
+    reason: str
+    """Explication lisible : « ISSN différents : 0028-0836 vs 9999-9999 »."""
 
 
 class PublisherMergeBlockedError(ConflictError):
@@ -77,10 +78,7 @@ class PersonAlreadyInPublicationError(ConflictError):
     def __init__(self, publication_id: int, contribution_id: int) -> None:
         self.publication_id = publication_id
         self.contribution_id = contribution_id
-        super().__init__(
-            f"La personne a déjà la contribution #{contribution_id} dans la publication "
-            f"#{publication_id}, rattachée par une décision humaine."
-        )
+        super().__init__("Cette personne est déjà rattachée à cette publication.")
 
 
 class RejectedPair(TypedDict):

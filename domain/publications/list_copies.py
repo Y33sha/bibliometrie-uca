@@ -21,7 +21,7 @@ type Placed = tuple[int, SourceContribution]
 def copied_source_contributions(
     source_contributions: Sequence[SourceContribution],
 ) -> dict[int, int]:
-    """Doublons d'auteur d'un enregistrement source, chacun vers la première occurrence de son nom complet. Seules les contributions sources qui ont une position et un nom de famille comptent."""
+    """Renvoie les doublons d'auteur d'un enregistrement source, chacun vers la première occurrence de son nom complet. Seules les contributions sources qui ont une position et un nom de famille comptent."""
     ordered = sorted(
         ((s.position, s) for s in source_contributions if s.last_name and s.position is not None),
         key=lambda p: (p[0], p[1].id),
@@ -38,7 +38,7 @@ def copied_source_contributions(
 
 
 def _block_copies(by_name: dict[Name, list[Placed]]) -> set[int]:
-    """Occurrences qui suivent la précédente du même nom d'un décalage de répétition.
+    """Renvoie les occurrences qui suivent la précédente du même nom d'un décalage de répétition.
 
     Le décalage de répétition est supérieur à 1 et commun à au moins `MIN_COPIED_NAMES` noms. Les homonymes d'une liste alphabétique sont côte à côte, au décalage 1.
     """
@@ -57,7 +57,7 @@ def _block_copies(by_name: dict[Name, list[Placed]]) -> set[int]:
 
 
 def _member_list_copies(by_name: dict[Name, list[Placed]], list_size: int) -> set[int]:
-    """Occurrences qui suivent la précédente du même nom à distance (décalage supérieur à 1), quand au moins `MIN_COPIED_NAMES` noms et `MIN_MEMBER_LIST_SHARE` des `list_size` auteurs se répètent à distance.
+    """Renvoie les occurrences qui suivent la précédente du même nom à distance (décalage supérieur à 1), quand au moins `MIN_COPIED_NAMES` noms et `MIN_MEMBER_LIST_SHARE` des `list_size` auteurs se répètent à distance.
 
     La liste des membres d'un collectif reprend des auteurs dans un autre ordre : chaque nom repris a son propre décalage. Les homonymes sont côte à côte, ou moins nombreux.
     """
@@ -72,7 +72,7 @@ def _member_list_copies(by_name: dict[Name, list[Placed]], list_size: int) -> se
 
 
 def _doubled_in_place(ordered: Sequence[Placed]) -> set[int]:
-    """Secondes occurrences des suites d'au moins `MIN_DOUBLED_PAIRS` paires côte à côte (A A B B…), de noms différents."""
+    """Renvoie les secondes occurrences des suites d'au moins `MIN_DOUBLED_PAIRS` paires côte à côte (A A B B…), de noms différents."""
     copies: set[int] = set()
     run: list[Placed] = []
 

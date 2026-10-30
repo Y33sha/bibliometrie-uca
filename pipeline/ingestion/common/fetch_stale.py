@@ -1,6 +1,6 @@
-"""Phase `fetch_stale` : nouvelle lecture des documents de `staging` que le moissonnage n'a pas revus depuis `fetch_stale_after_days` jours. Une tâche par source, en parallèle.
+"""Phase `fetch_stale` : nouvelle lecture des documents de `staging` non revus par le moissonnage depuis `fetch_stale_after_days` jours. Une tâche par source, en parallèle.
 
-Chaque document est relu par son identifiant natif. Trois issues :
+Chaque document est relu par son identifiant natif :
 
 - document trouvé → écriture dans `staging` ;
 - absence confirmée (réponse valide, aucun document) → document marqué disparu (`disappeared_at`) ;
@@ -8,7 +8,7 @@ Chaque document est relu par son identifiant natif. Trois issues :
 
 Le délai étale la charge : chaque passe reprend seulement les documents qui viennent de le franchir.
 
-La relecture se borne aux années que le run moissonne ; une thèse en cours est relue quelle que soit la fenêtre. Un mode dont la policy exclut la phase la saute (`daily`). WoS est opt-in (`--include-wos`).
+La relecture se borne aux années moissonnées par le run ; une thèse en cours est relue quelle que soit la fenêtre. La phase est sautée dans un mode dont la policy l'exclut (`daily`). WoS est opt-in (`--include-wos`).
 """
 
 from __future__ import annotations
@@ -101,13 +101,13 @@ def build() -> Phase:
 def _get_years_for_window(
     ctx: PhaseContext, start_year: int | None, year: int | None
 ) -> list[int] | None:
-    """Années de la fenêtre du run (`window_years`)."""
+    """Renvoie les années de la fenêtre du run (`window_years`)."""
     with ctx.open_tx() as conn:
         return window_years(conn, start_year=start_year, year=year)
 
 
 def _run_fetch_stale(ctx: PhaseContext, target: str, years: list[int] | None) -> PhaseMetrics:
-    """Nouvelle lecture des documents anciens d'une source, sur sa propre connexion."""
+    """Relit les documents anciens d'une source, sur sa propre connexion."""
     refetch = ADAPTERS[Source(target)].stale_refetch()
     with ctx.open_tx() as conn:
         after_days = delay(conn, ConfigKey.FETCH_STALE_AFTER_DAYS)

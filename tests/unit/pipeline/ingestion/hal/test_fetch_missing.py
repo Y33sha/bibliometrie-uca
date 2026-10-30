@@ -28,7 +28,7 @@ class _FakeConnection:
 class _HalSimule:
     """HAL et la base, simulés.
 
-    `docs` contient les documents rendus, indexés par identifiant cherché ; un identifiant absent vaut « introuvable ». `en_echec` désigne les identifiants pour lesquels HAL est indisponible. `deja_en_staging` désigne les hal-ids des documents déjà présents.
+    `docs` contient les documents renvoyés, indexés par identifiant cherché ; un identifiant absent vaut « introuvable ». `en_echec` désigne les identifiants pour lesquels HAL est indisponible. `deja_en_staging` désigne les hal-ids des documents déjà présents.
     """
 
     def __init__(self, monkeypatch, *, ids=(), docs=None, en_echec=(), deja_en_staging=()):
@@ -78,7 +78,7 @@ class TestParHalId:
 
         assert (metrics.seen, metrics.new, metrics.extras["not_found"]) == (2, 1, 1)
         assert hal.echecs == [("hal_id", "hal-2")]
-        # Le dépôt rendu efface l'échec éventuel de sa recherche.
+        # Le dépôt renvoyé efface l'échec éventuel de sa recherche.
         assert hal.oublies == ["hal-1"]
 
     async def test_hal_indisponible_ni_ecrit_ni_compte(self, monkeypatch):

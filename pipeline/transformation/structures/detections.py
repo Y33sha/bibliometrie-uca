@@ -11,11 +11,13 @@ from sqlalchemy import Connection, text
 
 @dataclass(frozen=True, slots=True)
 class DetectionTable:
-    """Table de liens : son nom, sa colonne clé et le type SQL de la clé."""
+    """Table de liens clé → structure."""
 
     name: str
     key: str
+    """Colonne clé."""
     key_type: str
+    """Type SQL de la clé."""
 
 
 ADDRESS_STRUCTURES = DetectionTable("address_structures", "address_id", "int")
@@ -39,7 +41,10 @@ def sync_detections(
 ) -> None:
     """Aligne les liens de la table sur les détections.
 
-    Un lien automatique absent des détections est supprimé. Un lien confirmé ou infirmé par l'administration reste en place et perd sa forme d'origine. Les liens détectés sont insérés ou mis à jour, seulement s'ils changent. `scope` restreint la synchronisation aux liens de ces clés ; `None` couvre toute la table.
+    Un lien automatique absent des détections est supprimé. Un lien confirmé ou infirmé par l'administration reste en place et perd sa forme d'origine. Les liens détectés sont insérés ou mis à jour, seulement s'ils changent.
+
+    Args:
+        scope: clés des liens à synchroniser ; `None` couvre toute la table.
     """
     if scope is not None and not scope:
         return

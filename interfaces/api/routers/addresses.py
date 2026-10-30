@@ -1,6 +1,6 @@
 """Router des adresses brutes des sources : leur rattachement aux structures et l'attribution de leurs pays. Sert `/api/addresses/*`.
 
-Les lectures passent par `AddressesQueries`, les écritures par le service `AddressService`. Le référentiel des pays vit dans `countries.py`.
+Les lectures passent par `AddressesQueries`, les écritures par le service `AddressService`. Le référentiel des pays est servi par `countries.py`.
 
 Les routes sont groupées par sujet. Dans chaque groupe, les chemins littéraux précèdent ceux à identifiant : déclaré après `/{addr_id}`, un chemin littéral s'y ferait absorber.
 """
@@ -51,7 +51,7 @@ StructurePredicateParam = Annotated[str, Query(pattern=r"^(recognized|not_recogn
 
 
 def _parse_text_predicates(raw: list[str]) -> tuple[TextPredicate, ...]:
-    """Découpe les paramètres répétés `text=<mode>:<terme>`, dont la forme est déjà validée."""
+    """Découpe les paramètres répétés `text=<mode>:<terme>`, à forme déjà validée."""
     out: list[TextPredicate] = []
     for item in raw:
         mode, _, term = item.partition(":")
@@ -60,7 +60,7 @@ def _parse_text_predicates(raw: list[str]) -> tuple[TextPredicate, ...]:
 
 
 def _parse_structure_predicates(raw: list[str]) -> tuple[StructurePredicate, ...]:
-    """Découpe les paramètres répétés `struct=<operateur>:<id>[,<id>…]`, dont la forme est déjà validée."""
+    """Découpe les paramètres répétés `struct=<operateur>:<id>[,<id>…]`, à forme déjà validée."""
     out: list[StructurePredicate] = []
     for item in raw:
         operator, _, ids_csv = item.partition(":")
@@ -120,7 +120,7 @@ def address_stats(
     structure_id: int = Query(...),
     queries: AddressesQueries = Depends(addresses_queries),
 ) -> AddressStatsResponse:
-    """Compteurs d'adresses par état de détection et de validation, pour une structure."""
+    """Renvoie les compteurs d'adresses par état de détection et de validation, pour une structure."""
     return queries.address_stats(structure_id)
 
 
@@ -142,14 +142,16 @@ def batch_review(
 @router.get("/{addr_id}/publications", response_model=AddressPublicationsResponse)
 def get_address_publications(
     addr_id: int,
-    limit: int = Query(20, ge=1, le=100),
+    limit: int = Query(20, ge=1, le=500),
+    person_id: int | None = Query(None),
+    year: int | None = Query(None),
     queries: AddressesQueries = Depends(addresses_queries),
 ) -> AddressPublicationsResponse:
-    """Échantillon de publications liées à une adresse."""
+    """Renvoie un échantillon de publications liées à une adresse. `person_id` restreint aux contributions sources de la personne, `year` aux publications de l'année."""
     raw_text = queries.get_address_raw_text(addr_id)
     if raw_text is None:
         raise HTTPException(status_code=404, detail="Adresse introuvable")
-    publications = queries.get_address_publications(addr_id, limit)
+    publications = queries.get_address_publications(addr_id, limit, person_id=person_id, year=year)
     return AddressPublicationsResponse(
         address_id=addr_id, raw_text=raw_text, publications=publications
     )
@@ -165,7 +167,7 @@ def review_address(
 ) -> AddressReviewResponse:
     """Confirme, rejette ou réinitialise le lien entre une adresse et une structure.
 
-    Renvoie 404 sur une adresse introuvable, que l'écriture traiterait sinon en silence.
+    Renvoie 404 sur une adresse introuvable.
     """
     if not queries.address_exists(addr_id):
         raise HTTPException(status_code=404, detail="Adresse introuvable")
@@ -194,7 +196,7 @@ def list_addresses_countries(
     per_page: int = Query(50, ge=1, le=200),
     queries: AddressesQueries = Depends(addresses_queries),
 ) -> AddressesCountriesResponse:
-    """Liste des adresses pour l'attribution de pays."""
+    """Liste les adresses pour l'attribution de pays."""
     filters = AddressCountryFilter(
         search=search,
         has_country=has_country,
@@ -231,7 +233,7 @@ def set_address_country(
     bg: BackgroundTasks,
     addresses: AddressService = Depends(address_service),
 ) -> OkResponse:
-    """Saisit à la main les pays d'une adresse ; une liste vide rend l'adresse aux moyens automatiques.
+    """Saisit à la main les pays d'une adresse ; une liste vide remet l'adresse aux moyens automatiques.
 
     Renvoie 422 sur un code pays absent du référentiel, 404 sur une adresse introuvable (`set_country`).
     """

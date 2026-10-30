@@ -34,7 +34,7 @@ class PgUserRepository(UserRepository):
             )
 
     def list_users(self) -> list[tuple[str, frozenset[str]]]:
-        """Utilisateurs triés par login, avec leurs rôles."""
+        """Renvoie les utilisateurs triés par login, avec leurs rôles."""
         rows = self._conn.execute(
             select(users.c.login, user_roles.c.role_code)
             .select_from(users.outerjoin(user_roles, user_roles.c.user_id == users.c.id))

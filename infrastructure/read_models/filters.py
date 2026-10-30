@@ -15,21 +15,25 @@ from domain.publications.metadata import (
     OA_OPEN_STATUSES,
     OaStatus,
 )
-from domain.sources.registry import SOURCE_FILTER_PREFIXES, Source
-from domain.structures.structure import StructureType
-from infrastructure.read_models.publications.models import NO_LICENSE
-from infrastructure.sql_fragments import has_author_role, pending_name_form
+from domain.sources.registry import PROFILES, SOURCE_FILTER_PREFIXES, Source
+from infrastructure.read_models.publications.models import (
+    DOI_AGENCY_SOURCES,
+    NO_DOI,
+    NO_LICENSE,
+    OTHER_DOI_AGENCY,
+)
+from infrastructure.sql_fragments import has_author_role, is_laboratory, pending_name_form
 
 
 def _sql_list(values: Iterable[str]) -> str:
-    """Liste SQL littérale `('a','b',…)` de constantes du domaine, interpolée telle quelle : jamais de valeur saisie."""
+    """Renvoie la liste SQL littérale `('a','b',…)` de constantes du domaine. Les valeurs sont interpolées telles quelles : jamais de valeur saisie."""
     return "(" + ",".join(f"'{v}'" for v in sorted(values)) + ")"
 
 
 OA_OPEN_SQL = _sql_list(OA_OPEN_STATUSES)
 OA_CLOSED_SQL = _sql_list(OA_CLOSED_STATUSES)
 
-# Colonnes de ventilation open access par statut (alias `p` des publications), partagées par les statistiques des éditeurs, revues, laboratoires et années : une colonne par statut de `OaStatus`, nommée par sa valeur, dans l'ordre de l'enum.
+# Colonnes de ventilation open access (alias `p` des publications) : une colonne par statut de `OaStatus`, nommée par sa valeur, dans l'ordre de l'enum. Partagées par les statistiques des éditeurs, revues, laboratoires et années.
 OA_BREAKDOWN_COLS_SQL = ",\n            ".join(
     f"COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = '{status.value}') AS {status.value}"
     for status in OaStatus
@@ -37,7 +41,7 @@ OA_BREAKDOWN_COLS_SQL = ",\n            ".join(
 
 
 def publication_in_perimeter(alias: str = "p") -> str:
-    """Filtre SQL : la publication aliasée `alias` est dans le périmètre (`in_perimeter`, colonne générée vraie quand la publication a des indices de l'entrée dans le périmètre).
+    """Renvoie la condition SQL : la publication aliasée `alias` est dans le périmètre (`in_perimeter`).
 
     Seules les listes du périmètre l'appliquent ; les vues par personne montrent tout. `alias` sert quand `p` est déjà pris.
     """
@@ -55,7 +59,7 @@ SUBJECT_IS_NOT_GENERIC = f"(s.usage_count <= {GENERIC_SUBJECT_MAX_USAGE})"
 
 
 def entity_subjects_sql(entity_predicate: str) -> str:
-    """SQL des sujets les plus fréquents des publications retenues par `entity_predicate` (sur l'alias `p`), au grain de `publication_subjects`. Chaque page d'entité (revue, éditeur, laboratoire, personne) passe son propre prédicat ; `:lim` plafonne le nombre de sujets."""
+    """Renvoie la requête des sujets les plus fréquents des publications retenues par `entity_predicate` (alias `p`). Chaque page d'entité (revue, éditeur, laboratoire, personne) passe son propre prédicat ; `:lim` plafonne le nombre de sujets."""
     return f"""
         SELECT s.id, s.label, COUNT(DISTINCT p.id) AS n
         FROM publication_subjects ps
@@ -78,7 +82,7 @@ class WhereClause:
 
 
 def assemble_where(clauses: list[WhereClause | None]) -> tuple[str, dict[str, object]]:
-    """Condition SQL et paramètres des fragments assemblés. Sans clause, renvoie `("TRUE", {})` : l'appelant écrit `f"WHERE {where_sql}"` sans cas particulier."""
+    """Assemble les fragments en une condition SQL et ses paramètres. Sans clause, renvoie `("TRUE", {})` : l'appelant écrit `f"WHERE {where_sql}"` sans cas particulier."""
     valid = [c for c in clauses if c is not None]
     if not valid:
         return "TRUE", {}
@@ -126,12 +130,12 @@ OWN_RORS_SQL = """
 
 
 def own_structure_ids(lab_ids: list[int], perimeter_structure_ids: list[int]) -> list[int]:
-    """Structures dont les ROR sont exclus des organisations partenaires : les laboratoires sélectionnés, sinon tout le périmètre."""
+    """Renvoie les structures à ROR exclus des organisations partenaires : les laboratoires sélectionnés, sinon tout le périmètre."""
     return lab_ids or perimeter_structure_ids
 
 
 def partner_clause(ror_ids: list[str]) -> WhereClause | None:
-    """Filtre par organisation partenaire : un ROR des auteurs de la publication, ancêtres compris (`publication_rors`). Les valeurs se combinent en OR."""
+    """Renvoie le filtre par organisation partenaire : un ROR des auteurs de la publication, ancêtres compris (`publication_rors`). Les valeurs se combinent en OR."""
     if not ror_ids:
         return None
     return WhereClause(
@@ -144,7 +148,7 @@ def partner_clause(ror_ids: list[str]) -> WhereClause | None:
 
 
 def license_clause(values: list[str]) -> WhereClause | None:
-    """Filtre par licence de la version éditeur. `NO_LICENSE` retient les publications sans licence connue ; les valeurs se combinent en OR."""
+    """Renvoie le filtre par licence de la version éditeur. `NO_LICENSE` retient les publications sans licence connue ; les valeurs se combinent en OR."""
     if not values:
         return None
     named = [v for v in values if v != NO_LICENSE]
@@ -153,6 +157,30 @@ def license_clause(values: list[str]) -> WhereClause | None:
         parts.append("p.license IS NULL")
     sql = parts[0] if len(parts) == 1 else "(" + " OR ".join(parts) + ")"
     return WhereClause(sql, {"flt_license": named} if named else {})
+
+
+# Agence d'enregistrement du DOI de la publication `p`, au vocabulaire `DOI_AGENCY_FILTER_VALUES`, lue dans `doi_prefixes.ra` par le préfixe du DOI. Le filtre et la facette lisent cette expression, donc classent de la même façon.
+_DOI_AGENCY_CASES = " ".join(
+    f"WHEN '{PROFILES[source].registration_agency}' THEN '{source.value}'"
+    for source in DOI_AGENCY_SOURCES
+)
+DOI_AGENCY_SQL = f"""(CASE
+    WHEN p.doi IS NULL THEN '{NO_DOI}'
+    ELSE COALESCE(
+        (SELECT CASE dp.ra {_DOI_AGENCY_CASES} END
+         FROM doi_prefixes dp WHERE dp.prefix = p.doi_prefix),
+        '{OTHER_DOI_AGENCY}'
+    )
+END)"""
+
+
+def doi_agency_clause(values: list[str]) -> WhereClause | None:
+    """Renvoie le filtre par agence d'enregistrement du DOI (`DOI_AGENCY_SQL`), les valeurs combinées en OR."""
+    if not values:
+        return None
+    return WhereClause(
+        f"{DOI_AGENCY_SQL} = ANY(CAST(:flt_doi_agency AS text[]))", {"flt_doi_agency": values}
+    )
 
 
 def oa_clause(oa_status: list[str]) -> WhereClause | None:
@@ -164,9 +192,9 @@ def oa_clause(oa_status: list[str]) -> WhereClause | None:
 
 
 def access_clause(access: list[str]) -> WhereClause | None:
-    """Filtre par niveau d'accès, les niveaux demandés combinés en OR.
+    """Renvoie le filtre par niveau d'accès, les niveaux demandés combinés en OR.
 
-    Les niveaux ventilent les statuts OA (`ACCESS_LEVELS`) : filtrer sur un niveau revient à filtrer sur les statuts qu'il recouvre. Un `oa_status` nul compte comme fermé.
+    Un niveau regroupe des statuts OA (`ACCESS_LEVELS`). Un `oa_status` nul compte comme fermé.
     """
     if not access:
         return None
@@ -200,7 +228,7 @@ def excluded_doc_type_clause(excluded_types: list[str]) -> WhereClause | None:
 
 
 def search_clause(search: str) -> WhereClause | None:
-    """Recherche plein texte : titre normalisé ou libellé de sujet. La liste, l'export et les facettes la partagent : les trois comptent le même ensemble. Paramètre `:flt_search_pat`."""
+    """Renvoie le filtre de recherche plein texte : titre normalisé ou libellé de sujet. La liste, l'export et les facettes le partagent, donc comptent le même ensemble. Paramètre `:flt_search_pat`."""
     if not search:
         return None
     pattern = f"%{normalize_text(search)}%"
@@ -214,9 +242,9 @@ def search_clause(search: str) -> WhereClause | None:
 
 
 def person_search_clause(search: str) -> WhereClause | None:
-    """Recherche par nom : chaque mot saisi figure dans le nom ou le prénom (accent-insensible).
+    """Renvoie le filtre de recherche par nom : chaque mot saisi figure dans le nom ou le prénom (accent-insensible).
 
-    L'ordre des mots est indifférent : « Valérie Legué » et « Legué Valérie » trouvent la même personne. Partagée par l'annuaire des personnes, ses facettes et l'autocomplétion. Alias `p` : la personne. Paramètres `:flt_person_search_<rang du mot>`.
+    L'ordre des mots est indifférent : « Valérie Legué » et « Legué Valérie » trouvent la même personne. Partagé par l'annuaire des personnes, ses facettes et l'autocomplétion. Alias `p` : la personne. Paramètres `:flt_person_search_<rang du mot>`.
     """
     words = search.split()
     if not words:
@@ -234,7 +262,7 @@ def person_search_clause(search: str) -> WhereClause | None:
 
 
 def source_clause(source_values: list[str]) -> WhereClause | None:
-    """Filtre par source, sur `publications.sources`. Les valeurs sont des `{prefix}_{yes|no}`, constantes de l'interface, interpolées sans paramètre."""
+    """Renvoie le filtre par source, sur `publications.sources`. Les valeurs sont des `{prefix}_{yes|no}`, constantes de l'interface, interpolées sans paramètre."""
     parts: list[str] = []
     for sv in source_values:
         bits = sv.rsplit("_", 1)
@@ -254,7 +282,7 @@ def source_clause(source_values: list[str]) -> WhereClause | None:
 
 
 def _authored_by(person_id: int, bind: str) -> WhereClause:
-    """La personne est auteur (rôle 'author') de la publication ; son id est lié sous `:bind`."""
+    """Renvoie le filtre : la personne est auteur (rôle 'author') de la publication. Son id est lié sous `:bind`."""
     return WhereClause(
         f"""EXISTS (SELECT 1 FROM contributions a
                 WHERE a.publication_id = p.id AND a.person_id = :{bind}
@@ -264,12 +292,12 @@ def _authored_by(person_id: int, bind: str) -> WhereClause:
 
 
 def person_clause(person_id: int) -> WhereClause:
-    """Filtre : la personne donnée est auteur (rôle 'author') de la publication."""
+    """Renvoie le filtre : la personne donnée est auteur (rôle 'author') de la publication."""
     return _authored_by(person_id, "flt_person_id")
 
 
 def author_clause(author_id: int | None) -> WhereClause | None:
-    """Filtre : la personne choisie en facette est auteur de la publication.
+    """Renvoie le filtre : la personne choisie en facette est auteur de la publication.
 
     Se combine à `person_clause` sur une page personne (publications cosignées), d'où un paramètre lié distinct.
     """
@@ -281,7 +309,7 @@ def author_clause(author_id: int | None) -> WhereClause | None:
 def _toggle_clause(
     values: list[str], exists_sql: str, binds: dict[str, object]
 ) -> WhereClause | None:
-    """Facette binaire `yes`/`no` sur un prédicat EXISTS. `yes` retient les publications qui vérifient `exists_sql`, `no` les autres, combinés en OR : cocher les deux laisse tout passer. Une valeur inconnue est ignorée."""
+    """Renvoie le filtre d'une facette binaire `yes`/`no` sur un prédicat EXISTS. `yes` retient les publications vérifiant `exists_sql`, `no` les autres, combinés en OR. Une valeur inconnue est ignorée."""
     parts: list[str] = []
     if "yes" in values:
         parts.append(exists_sql)
@@ -317,7 +345,7 @@ _SQL_IN_COLLECTION_SOURCE_CONTRIBUTION = (
 
 
 def hal_status_expression(lab_hal_col: str | None) -> WhereClause:
-    """Statut de dépôt HAL de la publication `p` (`HAL_DEPOSIT_STATUSES`), au regard de la collection du laboratoire.
+    """Renvoie l'expression SQL du statut de dépôt HAL de la publication `p` (`HAL_DEPOSIT_STATUSES`), au regard de la collection du laboratoire.
 
     Sans collection déclarée, aucune publication n'est en collection : un dépôt HAL vaut `hors_collection`. Le filtre, la facette et l'export lisent tous cette expression, donc classent de la même façon.
     """
@@ -338,7 +366,7 @@ def hal_status_expression(lab_hal_col: str | None) -> WhereClause:
 
 
 def hal_status_clause(values: list[str], lab_hal_col: str | None) -> WhereClause | None:
-    """Filtre : le statut de dépôt HAL de la publication est l'un de `values`."""
+    """Renvoie le filtre : le statut de dépôt HAL de la publication est l'un de `values`."""
     if not values:
         return None
     status = hal_status_expression(lab_hal_col)
@@ -349,7 +377,7 @@ def hal_status_clause(values: list[str], lab_hal_col: str | None) -> WhereClause
 
 
 def institution_apc_payment_sql(root_ids_param: str) -> str:
-    """Condition SQL vraie quand la publication `p` a un paiement d'APC imputé au budget d'une structure du périmètre. Le paramètre nommé `root_ids_param` contient les identifiants de ces structures."""
+    """Renvoie la condition SQL : la publication `p` a un paiement d'APC imputé au budget d'une structure du périmètre. Le paramètre nommé `root_ids_param` contient les identifiants de ces structures."""
     return (
         "EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id "
         f"AND ap.budget_structure_id = ANY(CAST(:{root_ids_param} AS int[])))"
@@ -357,7 +385,7 @@ def institution_apc_payment_sql(root_ids_param: str) -> str:
 
 
 def apc_clause(has_apc: list[str], perimeter_structure_ids: list[int]) -> WhereClause | None:
-    """Filtre `yes` / `no` des publications dont un paiement d'APC est imputé au budget d'une structure du périmètre `persons` (`perimeter_structure_ids`, que les adaptateurs résolvent)."""
+    """Renvoie le filtre `yes` / `no` des publications à paiement d'APC imputé au budget d'une structure du périmètre des personnes (`perimeter_structure_ids`, résolu par les adaptateurs)."""
     return _toggle_clause(
         has_apc,
         institution_apc_payment_sql("flt_apc_root_ids"),
@@ -385,7 +413,7 @@ def no_lab_clause() -> WhereClause:
             SELECT 1 FROM publication_structures ps
             JOIN structures s ON s.id = ps.structure_id
             WHERE ps.publication_id = p.id
-              AND s.structure_type = '{StructureType.LABO.value}'
+              AND {is_laboratory("s")}
         )""",
         {},
     )
@@ -400,7 +428,7 @@ def country_clause(country_values: list[str]) -> WhereClause | None:
 
 
 def language_clause(language_codes: list[str]) -> WhereClause | None:
-    """Filtre : la langue de la publication est l'une des langues choisies."""
+    """Renvoie le filtre : la langue de la publication est l'une des langues choisies."""
     if not language_codes:
         return None
     return WhereClause(
@@ -409,7 +437,7 @@ def language_clause(language_codes: list[str]) -> WhereClause | None:
 
 
 def subject_clause(subject_ids: list[int]) -> WhereClause | None:
-    """Filtre : la publication a au moins un des sujets."""
+    """Renvoie le filtre : la publication a au moins un des sujets."""
     if not subject_ids:
         return None
     return WhereClause(
@@ -438,7 +466,7 @@ def monograph_id_clause(monograph_id: int | None) -> WhereClause | None:
 
 
 def person_has_identifier_sql(id_type: str) -> str:
-    """Prédicat : la personne `p` a un identifiant de ce type, non rejeté. Le type est une constante d'appel (orcid, idhal, idref), interpolée en SQL."""
+    """Renvoie la condition SQL : la personne `p` a un identifiant de ce type, non rejeté. Le type, constante d'appel (orcid, idhal, idref), est interpolé en SQL."""
     return f"""EXISTS (
             SELECT 1 FROM person_identifiers pi
             WHERE pi.person_id = p.id
@@ -448,7 +476,7 @@ def person_has_identifier_sql(id_type: str) -> str:
 
 
 def person_has_identifier_clause(id_type: str, value: bool | None) -> WhereClause | None:
-    """Filtre : la personne a (`value` vrai) ou non un identifiant de ce type (`person_has_identifier_sql`)."""
+    """Renvoie le filtre : la personne a (`value` vrai) ou non un identifiant de ce type (`person_has_identifier_sql`)."""
     if value is None:
         return None
     negate = "" if value else "NOT "
@@ -469,7 +497,7 @@ PERSON_HAS_PENDING_IDENTIFIERS_SQL = f"""EXISTS (
 
 
 def person_has_pending_name_forms_clause(value: bool | None) -> WhereClause | None:
-    """Filtre : la personne a (`value` vrai) ou non une forme de nom à confirmer (`PERSON_HAS_PENDING_NAME_FORMS_SQL`)."""
+    """Renvoie le filtre : la personne a (`value` vrai) ou non une forme de nom à confirmer (`PERSON_HAS_PENDING_NAME_FORMS_SQL`)."""
     if value is None:
         return None
     negate = "" if value else "NOT "
@@ -477,7 +505,7 @@ def person_has_pending_name_forms_clause(value: bool | None) -> WhereClause | No
 
 
 def person_has_pending_identifiers_clause(value: bool | None) -> WhereClause | None:
-    """Filtre : la personne a (`value` vrai) ou non un identifiant à confirmer (`PERSON_HAS_PENDING_IDENTIFIERS_SQL`)."""
+    """Renvoie le filtre : la personne a (`value` vrai) ou non un identifiant à confirmer (`PERSON_HAS_PENDING_IDENTIFIERS_SQL`)."""
     if value is None:
         return None
     negate = "" if value else "NOT "
@@ -485,7 +513,7 @@ def person_has_pending_identifiers_clause(value: bool | None) -> WhereClause | N
 
 
 def person_department_clause(departments: list[str]) -> WhereClause | None:
-    """Filtre : la personne est affectée à l'un des départements RH donnés (alias `prh`)."""
+    """Renvoie le filtre : la personne est affectée à l'un des départements RH donnés (alias `prh`)."""
     if not departments:
         return None
     return WhereClause(
@@ -494,21 +522,21 @@ def person_department_clause(departments: list[str]) -> WhereClause | None:
 
 
 def person_role_clause(roles: list[str]) -> WhereClause | None:
-    """Filtre : la personne a l'un des intitulés de poste donnés (alias `prh`)."""
+    """Renvoie le filtre : la personne a l'un des intitulés de poste donnés (alias `prh`)."""
     if not roles:
         return None
     return WhereClause("prh.role_title = ANY(:flt_roles)", {"flt_roles": roles})
 
 
 def person_has_rh_clause(value: bool | None) -> WhereClause | None:
-    """Filtre : la personne a (ou n'a pas) une fiche dans la base RH."""
+    """Renvoie le filtre : la personne a (ou n'a pas) une fiche dans la base RH."""
     if value is None:
         return None
     return WhereClause("prh.id IS NOT NULL" if value else "prh.id IS NULL", {})
 
 
 def person_active_clause(value: bool | None) -> WhereClause | None:
-    """Filtre : la personne a (ou n'a pas) une contribution ou une fiche RH."""
+    """Renvoie le filtre : la personne a (ou n'a pas) une contribution ou une fiche RH."""
     if value is None:
         return None
     active = (
@@ -518,7 +546,7 @@ def person_active_clause(value: bool | None) -> WhereClause | None:
 
 
 def person_exclusion_clause(exclusions: list[PersonExclusion | None]) -> WhereClause | None:
-    """Filtre : le motif d'exclusion de la personne figure dans `exclusions`, `None` désignant une personne retenue."""
+    """Renvoie le filtre : le motif d'exclusion de la personne figure dans `exclusions`, `None` désignant une personne retenue."""
     if not exclusions:
         return None
     reasons = [e.value for e in exclusions if e is not None]
@@ -529,7 +557,7 @@ def person_exclusion_clause(exclusions: list[PersonExclusion | None]) -> WhereCl
 
 
 def person_in_lab_clause(lab_id: int | None) -> WhereClause | None:
-    """Filtre : la personne (alias `p`) a une contribution d'auteur rattachée au laboratoire. Restreint l'annuaire et ses facettes à un laboratoire, comme `lab_clause` pour les publications."""
+    """Renvoie le filtre : la personne (alias `p`) a une contribution d'auteur rattachée au laboratoire. Restreint l'annuaire et ses facettes à un laboratoire, comme `lab_clause` pour les publications."""
     if not lab_id:
         return None
     return WhereClause(
@@ -559,5 +587,5 @@ _PERSONS_SORT_MAP = {
 
 
 def persons_sort_clause(sort: str) -> str:
-    """Clause ORDER BY de la liste des personnes. Le nom est celui du contrat, validé en amont."""
+    """Renvoie la clause ORDER BY de la liste des personnes. `sort` est une valeur du contrat, validée en amont."""
     return _PERSONS_SORT_MAP[sort]

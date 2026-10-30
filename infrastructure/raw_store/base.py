@@ -1,6 +1,6 @@
 """Archive des payloads bruts des sources (raw store).
 
-Un `RawStore` garde hors base les payloads JSON bruts que renvoient les API des sources, pour normaliser de nouveau, auditer ou reconstruire. Implémentations : `LocalFileRawStore`, `NullRawStore`.
+Un `RawStore` garde hors base les payloads JSON bruts renvoyés par les API des sources, pour normaliser de nouveau, auditer ou reconstruire. Implémentations : `LocalFileRawStore`, `NullRawStore`.
 
 La clé est `(source, source_id)` ; son encodage en chemin relève de l'implémentation.
 """
@@ -12,7 +12,7 @@ from typing import Protocol
 
 
 class UnreadablePayloadError(Exception):
-    """Le payload stocké pour une clé est illisible : fichier tronqué ou corrompu."""
+    """Payload illisible pour une clé : fichier tronqué ou corrompu."""
 
 
 class RawStore(Protocol):
@@ -22,13 +22,18 @@ class RawStore(Protocol):
         """Écrit, ou écrase, le payload brut de la clé."""
 
     def get(self, source: str, source_id: str) -> bytes:
-        """Payload brut de la clé. Lève `KeyError` s'il manque, `UnreadablePayloadError` s'il est illisible."""
+        """Renvoie le payload brut de la clé.
+
+        Raises:
+            KeyError: le payload manque.
+            UnreadablePayloadError: le payload est illisible.
+        """
 
     def exists(self, source: str, source_id: str) -> bool:
         """Vrai si un payload est stocké pour la clé."""
 
     def delete(self, source: str, source_id: str) -> bool:
-        """Supprime le payload de la clé, et renvoie vrai s'il existait. Une clé absente renvoie faux."""
+        """Supprime le payload de la clé. Renvoie vrai s'il existait."""
 
     def iter_keys(self, source: str) -> Iterator[str]:
         """Itère les `source_id` stockés pour la source."""

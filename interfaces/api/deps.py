@@ -76,7 +76,7 @@ logger = logging.getLogger(__name__)
 
 
 def get_admin_user() -> str:
-    """Login de l'administrateur, lu dans les réglages. Exposé en dépendance : les routers n'importent pas `infrastructure`."""
+    """Renvoie le login de l'administrateur, lu dans les réglages. Exposé en dépendance : les routers n'importent pas `infrastructure`."""
     return settings.admin_user
 
 
@@ -89,7 +89,7 @@ def _session_user(token: str | None, conn: Connection) -> SessionUser | None:
 
 
 def load_session_user(token: str | None) -> SessionUser | None:
-    """Utilisateur de la session du jeton `token`, avec ses rôles. `None` sans jeton valide, ou pour un login absent de `ops.users`.
+    """Renvoie l'utilisateur de la session du jeton `token`, avec ses rôles. `None` sans jeton valide, ou pour un login absent de `ops.users`.
 
     Ouvre sa propre connexion, en lecture seule : le middleware d'authentification l'appelle avant l'ouverture de la connexion de la requête.
     """
@@ -112,7 +112,7 @@ READ_ONLY_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
 
 def _open_connection(request: Request) -> Connection:
-    """Connexion pour la requête en cours. Toute connexion ouverte pendant une requête passe par cette fonction (`db_conn`, `connection_factory`).
+    """Ouvre une connexion pour la requête en cours. Toute connexion ouverte pendant une requête passe par cette fonction (`db_conn`, `connection_factory`).
 
     Sur une méthode de lecture, la transaction est en lecture seule (PostgreSQL refuse toute écriture), a une durée maximale par requête SQL (`api_read_statement_timeout_s`), et s'annule à la déconnexion du client (`CancelOnDisconnect`).
     """
@@ -129,7 +129,7 @@ def _open_connection(request: Request) -> Connection:
 
 
 def connection_factory(request: Request) -> Callable[[], Connection]:
-    """Fabrique de connexions supplémentaires, avec les caractéristiques de la connexion de la requête.
+    """Renvoie une fabrique de connexions supplémentaires, avec les caractéristiques de la connexion de la requête.
 
     Sert les lectures parallélisées (facettes de publications). L'appelant ferme chaque connexion qu'il ouvre.
     """
@@ -137,7 +137,7 @@ def connection_factory(request: Request) -> Callable[[], Connection]:
 
 
 def db_conn(request: Request) -> Iterator[Connection]:
-    """Connexion de la requête, servie aux routes par `DbConn`. Toutes les dépendances de la requête la partagent.
+    """Fournit la connexion de la requête, servie aux routes par `DbConn`. Toutes les dépendances de la requête la partagent.
 
     Une requête d'écriture qui aboutit est commitée avec ses événements d'audit (`record_pending_events`) ; une exception l'annule. Le commit précède l'envoi de la réponse (`scope="function"`) : une requête ou une tâche de fond lancée ensuite lit l'état commité. Les services ne commitent pas.
     """
@@ -160,7 +160,7 @@ DbConn = Annotated[Connection, Depends(db_conn, scope="function")]
 
 
 def session_user(request: Request, conn: DbConn) -> SessionUser | None:
-    """Utilisateur de la session en cours, ou `None`. Sert les lectures dont le contenu dépend de l'appelant (configuration, état de la session)."""
+    """Renvoie l'utilisateur de la session en cours, ou `None`. Sert les lectures propres à l'appelant (configuration, état de la session)."""
     return _session_user(request.cookies.get("session"), conn)
 
 
@@ -192,7 +192,7 @@ def entity_label_queries(conn: DbConn) -> EntityLabelQueries:
 
 
 def entity_detail(entity: MergedEntity) -> Callable[[Request, Connection], EntityDetail]:
-    """Dépendance d'une route de détail de `entity` (`interfaces.api.entity_detail`)."""
+    """Renvoie la dépendance d'une route de détail de `entity` (`interfaces.api.entity_detail`)."""
 
     def dependency(request: Request, conn: DbConn) -> EntityDetail:
         return EntityDetail(entity, request, MergeRedirectQueries(conn))
@@ -252,7 +252,7 @@ def subjects_queries(conn: DbConn) -> SubjectsQueries:
 
 
 # ----- Écritures -----
-# Un service par agrégat, construit sur la connexion reçue (requête, tâche de fond ou script).
+# Un service par entité ou par traitement, construit sur la connexion reçue (requête, tâche de fond ou script).
 
 
 def address_service(conn: DbConn) -> AddressService:
@@ -341,7 +341,7 @@ def _run_detached(label: str, work: Callable[[Connection], None]) -> None:
 
 
 def bg_propagate_countries(address_ids: list[int]) -> None:
-    """Tâche de fond : propage les pays des adresses vers les publications."""
+    """Propage en tâche de fond les pays des adresses vers les publications."""
     _run_detached(
         "propagation des pays",
         lambda conn: address_service(conn).propagate_countries_to_publications(address_ids),
@@ -349,7 +349,7 @@ def bg_propagate_countries(address_ids: list[int]) -> None:
 
 
 def bg_propagate_in_perimeter(address_ids: list[int]) -> None:
-    """Tâche de fond : propage `in_perimeter` après une décision sur le lien d'une adresse à une structure. Le recalcul peut toucher des dizaines de milliers de contributions sources."""
+    """Propage en tâche de fond `in_perimeter` après une décision sur le lien d'une adresse à une structure. Le recalcul peut toucher des dizaines de milliers de contributions sources."""
     _run_detached(
         "propagation d'in_perimeter",
         lambda conn: address_service(conn).propagate_in_perimeter_for_addresses(address_ids),

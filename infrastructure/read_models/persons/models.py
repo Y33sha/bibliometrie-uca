@@ -4,8 +4,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Literal
 
-from pydantic import BaseModel
-
+from application.ports.model import Model
 from domain.persons.identifiers import AttributionStatus
 from domain.persons.person import PersonExclusion
 from infrastructure.read_models._common import (
@@ -32,27 +31,30 @@ PersonSort = Literal[
 
 @dataclass(frozen=True, slots=True)
 class PersonFilters:
-    """Filtres des lectures de personnes — liste et facettes.
+    """Filtres des lectures de personnes : liste et facettes.
 
-    `departments` et `roles` sont multi-valués : une option cochée s'ajoute aux autres. Les `has_*` filtrent sur la présence ou l'absence, et `None` ne filtre pas. `exclusions` retient les personnes dont le motif d'exclusion figure dans la liste, `None` désignant les personnes retenues ; vide, il laisse tout passer.
-
-    `lab_id` restreint la liste aux personnes du laboratoire, et leurs dénombrements à ce laboratoire.
+    Les `has_*` filtrent sur la présence ou l'absence, et `None` ne filtre pas.
     """
 
     search: str = ""
     departments: list[str] = field(default_factory=list)
+    """Multi-valué : une option cochée s'ajoute aux autres."""
     roles: list[str] = field(default_factory=list)
+    """Multi-valué : une option cochée s'ajoute aux autres."""
     has_orcid: bool | None = None
     has_idhal: bool | None = None
     has_idref: bool | None = None
     has_rh: bool | None = None
-    # « À confirmer » : personnes qui ont au moins une forme de nom ou un identifiant `pending`.
     has_pending_forms: bool | None = None
+    """Au moins une forme de nom `pending`."""
     has_pending_identifiers: bool | None = None
+    """Au moins un identifiant `pending`."""
     exclusions: list[PersonExclusion | None] = field(default_factory=list)
-    # Personne qui a au moins une contribution ou une fiche RH. Une personne conservée pour ses seules décisions ne l'est pas.
+    """Motifs d'exclusion retenus, `None` désignant les personnes retenues ; vide, tout passe."""
     active: bool | None = None
+    """Au moins une contribution ou une fiche RH. Une personne conservée pour ses seules décisions est inactive."""
     lab_id: int | None = None
+    """Restreint la liste aux personnes du laboratoire, et leurs dénombrements à ce laboratoire."""
 
 
 # ---------------------------------------------------------------------------
@@ -60,7 +62,7 @@ class PersonFilters:
 # ---------------------------------------------------------------------------
 
 
-class PersonIdentifierOut(BaseModel):
+class PersonIdentifierOut(Model):
     """Identifiant (ORCID, idHAL, idRef) attaché à une personne."""
 
     id: int
@@ -70,8 +72,8 @@ class PersonIdentifierOut(BaseModel):
     status: AttributionStatus
 
 
-class NameFormSummaryOut(BaseModel):
-    """Forme de nom observée pour une personne, avec son état d'arbitrage. Seule la fiche d'une personne l'affiche."""
+class NameFormSummaryOut(Model):
+    """Forme de nom observée pour une personne, avec son état d'arbitrage."""
 
     name_form: str
     sources: list[str]
@@ -87,7 +89,7 @@ class NameFormSummaryOut(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class PersonSearchResult(BaseModel):
+class PersonSearchResult(Model):
     """Résultat d'autocomplétion de `/api/persons/search`."""
 
     id: int
@@ -97,11 +99,8 @@ class PersonSearchResult(BaseModel):
     has_rh: bool
 
 
-class PersonOut(BaseModel):
-    """Ligne de `/api/persons`.
-
-    Les trois dénombrements comptent la même chose sous des conditions de plus en plus étroites, et se restreignent tous au laboratoire avec `lab_id`.
-    """
+class PersonOut(Model):
+    """Ligne de `/api/persons`. Les dénombrements se restreignent au laboratoire avec `lab_id`."""
 
     id: int
     last_name: str
@@ -115,7 +114,7 @@ class PersonOut(BaseModel):
     contribution_count: int
     """Contributions où la personne tient le rôle d'auteur."""
     in_perimeter_contribution_count: int
-    """Celles de ces contributions que le périmètre retient."""
+    """Contributions d'auteur retenues dans le périmètre."""
     identifiers: list[PersonIdentifierOut]
 
 
@@ -128,7 +127,7 @@ class PersonListResponse(PaginatedResponse):
 # ---------------------------------------------------------------------------
 
 
-class PersonsFacetsResponse(BaseModel):
+class PersonsFacetsResponse(Model):
     """Réponse de `/api/persons/facets`."""
 
     departments: list[FacetOption]
@@ -146,7 +145,7 @@ class PersonsFacetsResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class PersonProfileCore(BaseModel):
+class PersonProfileCore(Model):
     """Bloc `person` de `/api/persons/{id}`."""
 
     id: int
@@ -158,13 +157,13 @@ class PersonProfileCore(BaseModel):
     end_date: date | None
 
 
-class PersonProfileResponse(BaseModel):
+class PersonProfileResponse(Model):
     person: PersonProfileCore
     identifiers: list[PersonIdentifierOut]
     theses_count: int
 
 
-class PersonThesis(BaseModel):
+class PersonThesis(Model):
     id: int
     title: str
     publication_year: int | None
@@ -174,27 +173,29 @@ class PersonThesis(BaseModel):
     structure_ids: list[int]
 
 
-class PersonThesesSection(BaseModel):
+class PersonThesesSection(Model):
     role: str
     label: str
     theses: list[PersonThesis]
 
 
-class PersonThesesResponse(BaseModel):
+class PersonThesesResponse(Model):
     sections: list[PersonThesesSection]
     total: int
     structures: dict[int, StructureRef]
 
 
-class PersonAddressStruct(BaseModel):
+class PersonAddressStruct(Model):
     id: int
     acronym: str | None
     name: str
 
 
-class PersonAddressOut(BaseModel):
+class PersonAddressOut(Model):
     id: int
     raw_text: str
+    publication_count: int
+    """Nombre de publications de la personne dont une contribution source porte l'adresse."""
     structures: list[PersonAddressStruct] | None
 
 
@@ -202,12 +203,31 @@ class PersonAddressesResponse(PaginatedResponse):
     addresses: list[PersonAddressOut]
 
 
+class PersonAddressStructureCount(PersonAddressStruct):
+    publications: int
+    """Nombre de publications de la personne dont une adresse est rattachée à la structure."""
+
+
+class PersonAddressSummary(Model):
+    """Structures reconnues dans les adresses de la personne, comptées en publications."""
+
+    first_year: int | None
+    """Année de la plus ancienne publication de la personne."""
+    last_year: int | None
+    """Année de la plus récente publication de la personne."""
+    publications: int
+    """Nombre de publications de la personne."""
+    publications_with_address: int
+    """Nombre de publications de la personne dont une contribution source porte une adresse."""
+    structures: list[PersonAddressStructureCount]
+
+
 # ---------------------------------------------------------------------------
 # Administration : formes de nom (`name_form_contributions`)
 # ---------------------------------------------------------------------------
 
 
-class NameFormContributionRef(BaseModel):
+class NameFormContributionRef(Model):
     source: str
     source_contribution_id: int
     publication_id: int
@@ -216,7 +236,7 @@ class NameFormContributionRef(BaseModel):
     doi: str | None
 
 
-class OtherPersonOut(BaseModel):
+class OtherPersonOut(Model):
     person_id: int
     first_name: str
     last_name: str
@@ -224,7 +244,7 @@ class OtherPersonOut(BaseModel):
     has_rh: bool
 
 
-class NameFormContributionsResponse(BaseModel):
+class NameFormContributionsResponse(Model):
     contributions: list[NameFormContributionRef]
     other_persons: list[OtherPersonOut]
 
@@ -234,21 +254,21 @@ class NameFormContributionsResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class AmbiguousFormPersonOut(BaseModel):
+class AmbiguousFormPersonOut(Model):
     person_id: int
     first_name: str
     last_name: str
     status: Literal[
         AttributionStatus.PENDING, AttributionStatus.CONFIRMED, AttributionStatus.REJECTED
     ]
-    # Forme dérivée du nom de la personne : confirmée d'office, statut non modifiable.
     canonical: bool
+    """Forme dérivée du nom de la personne : confirmée d'office, statut non modifiable."""
     has_rh: bool
-    # Nom de la personne compatible avec la forme (mêmes mots) : homonyme ou doublon si vrai, erreur d'attribution probable si faux.
     compatible: bool
+    """Nom de la personne compatible avec la forme (mêmes mots) : homonyme ou doublon si vrai, erreur d'attribution probable si faux."""
 
 
-class AmbiguousNameFormOut(BaseModel):
+class AmbiguousNameFormOut(Model):
     name_form: str
     persons: list[AmbiguousFormPersonOut]
 
@@ -257,8 +277,8 @@ class AmbiguousNameFormsResponse(PaginatedResponse):
     forms: list[AmbiguousNameFormOut]
 
 
-class CurationPersonOut(BaseModel):
-    """Fiche personne allégée, commune aux files de triage (conflits d'identifiant, doublons par nom) ; le détail complet est dans le panneau latéral."""
+class CurationPersonOut(Model):
+    """Fiche personne allégée, commune aux files de triage (conflits d'identifiant, doublons par nom)."""
 
     person_id: int
     first_name: str
@@ -269,13 +289,13 @@ class CurationPersonOut(BaseModel):
     labs: list[str]
 
 
-class IdentifierRef(BaseModel):
+class IdentifierRef(Model):
     id_type: str
     id_value: str
 
 
-class IdentifierConflictPairOut(BaseModel):
-    """Deux personnes distinctes qui ont la même valeur brute d'identifiant (ORCID / IdRef / hal_person_id / idHAL) : doublon probable (mêmes nom/réseau) ou erreur d'attribution."""
+class IdentifierConflictPairOut(Model):
+    """Deux personnes distinctes à même valeur brute d'identifiant (ORCID, IdRef, hal_person_id, idHAL) : doublon probable ou erreur d'attribution."""
 
     person_a: CurationPersonOut
     person_b: CurationPersonOut
@@ -286,7 +306,7 @@ class IdentifierConflictsResponse(PaginatedResponse):
     pairs: list[IdentifierConflictPairOut]
 
 
-class OverlapCountsOut(BaseModel):
+class OverlapCountsOut(Model):
     """Recouvrements de réseau entre deux personnes d'une paire candidate par nom."""
 
     coauthors: int
@@ -295,8 +315,8 @@ class OverlapCountsOut(BaseModel):
     serials: int
 
 
-class NameDuplicatePairOut(BaseModel):
-    """Deux personnes aux noms compatibles, avec leurs recouvrements de réseau. Un réseau commun (co-auteurs, publications co-signées) signe un doublon ; des réseaux disjoints, un homonyme."""
+class NameDuplicatePairOut(Model):
+    """Deux personnes aux noms compatibles, avec leurs recouvrements de réseau. Un réseau commun (co-auteurs, publications co-signées) indique un doublon ; des réseaux disjoints, un homonyme."""
 
     person_a: CurationPersonOut
     person_b: CurationPersonOut
@@ -307,7 +327,7 @@ class NameDuplicatesResponse(PaginatedResponse):
     pairs: list[NameDuplicatePairOut]
 
 
-class DistinctPersonOut(BaseModel):
+class DistinctPersonOut(Model):
     """Personne déclarée distincte d'une autre."""
 
     person_id: int
@@ -316,8 +336,8 @@ class DistinctPersonOut(BaseModel):
     has_rh: bool
 
 
-class SharingPersonOut(BaseModel):
-    """Personne qui partage au moins une forme de nom avec une autre, candidate à l'absorption."""
+class SharingPersonOut(Model):
+    """Personne partageant au moins une forme de nom avec une autre, candidate à l'absorption."""
 
     person_id: int
     first_name: str

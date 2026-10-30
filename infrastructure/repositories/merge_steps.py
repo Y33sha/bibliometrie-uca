@@ -19,14 +19,14 @@ type MergeApply = Callable[[Connection, int, int], None]
 
 @dataclass(frozen=True, slots=True)
 class MergeStep:
-    # (table, colonne) qui rattachent la donnée à l'entité.
     columns: tuple[tuple[str, str], ...]
-    # Applique la règle de fusion : (connexion, id conservé, id absorbé).
+    """Paires (table, colonne) rattachant la donnée à l'entité."""
     apply: MergeApply
+    """Applique la règle de fusion. Arguments : connexion, id conservé, id absorbé."""
     nature: DataNature = DataNature.DERIVED
 
     def of_nature(self, nature: DataNature) -> MergeStep:
-        """La même étape, pour une donnée de nature `nature`."""
+        """Renvoie la même étape, pour une donnée de nature `nature`."""
         return replace(self, nature=nature)
 
 
@@ -35,7 +35,7 @@ def _noop(conn: Connection, target_id: int, source_id: int) -> None:
 
 
 def untouched(table: str, *columns: str) -> MergeStep:
-    """Donnée que la fusion laisse en l'état : celle de l'entité conservée reste, celle de l'absorbée disparaît avec elle."""
+    """Renvoie l'étape d'une donnée laissée en l'état : celle de l'entité conservée reste, celle de l'absorbée disparaît avec elle."""
     return MergeStep(tuple((table, c) for c in columns), _noop)
 
 
@@ -50,7 +50,10 @@ def transfer(table: str, column: str) -> MergeStep:
 
 
 def transfer_unique(table: str, column: str, *key: str) -> MergeStep:
-    """Les lignes de l'absorbée dont l'entité conservée a déjà les valeurs des colonnes `key` sont supprimées, les autres transférées. Deux valeurs nulles sont égales."""
+    """Renvoie l'étape de transfert des lignes de l'absorbée, hors doublons sur les colonnes `key`.
+
+    Une ligne de l'absorbée est supprimée si l'entité conservée a déjà ses valeurs de `key`. Deux valeurs nulles sont égales.
+    """
     same_key = " AND ".join(f"t.{k} IS NOT DISTINCT FROM s.{k}" for k in key)
 
     def apply(conn: Connection, target_id: int, source_id: int) -> None:
@@ -71,7 +74,10 @@ def transfer_unique(table: str, column: str, *key: str) -> MergeStep:
 
 
 def fill_empty(table: str, *columns: str, empty: str | None = None) -> MergeStep:
-    """Colonnes de l'entité prises ensemble : si la première est vide chez l'entité conservée, toutes prennent la valeur de l'absorbée. Vide : nulle, ou égale à `empty`."""
+    """Renvoie l'étape de remplissage des colonnes de l'entité, prises ensemble.
+
+    Si la première colonne est vide chez l'entité conservée, toutes prennent la valeur de l'absorbée. Vide : nulle, ou égale à `empty`.
+    """
     assignments = ", ".join(f"{c} = s.{c}" for c in columns)
     is_empty = f"t.{columns[0]} IS NULL" + (f" OR t.{columns[0]}::text = :empty" if empty else "")
 
@@ -89,7 +95,7 @@ def fill_empty(table: str, *columns: str, empty: str | None = None) -> MergeStep
 
 
 def fill_empty_unique(table: str, column: str) -> MergeStep:
-    """Remplir si vide, pour une colonne unique : la valeur de l'absorbée lui est d'abord retirée."""
+    """Renvoie l'étape de remplissage d'une colonne unique, vide chez l'entité conservée. La valeur de l'absorbée lui est d'abord retirée."""
 
     def apply(conn: Connection, target_id: int, source_id: int) -> None:
         value = conn.execute(
@@ -105,7 +111,10 @@ def fill_empty_unique(table: str, column: str) -> MergeStep:
 
 
 def without_decision_sql(table: str, alias: str, steps: dict[str, MergeStep]) -> str:
-    """Condition SQL vraie quand l'entité `alias` (ligne de `table`) n'a aucune donnée de nature décision. Une colonne de `table` est nulle, une clé étrangère n'a aucune ligne."""
+    """Renvoie la condition SQL vraie quand l'entité `alias` (ligne de `table`) est sans donnée de nature décision.
+
+    Chaque colonne de `table` est nulle, chaque clé étrangère est sans ligne.
+    """
     clauses = []
     for step in steps.values():
         if step.nature != DataNature.DECISION:

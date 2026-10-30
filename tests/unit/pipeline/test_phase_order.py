@@ -8,7 +8,7 @@ def test_phases_uniques():
 
 
 def test_ordre_colonne_vertebrale():
-    # L'extraction ouvre le pipeline, la normalisation précède les phases aval.
+    # Le moissonnage ouvre le pipeline, la normalisation précède les phases aval.
     assert PHASE_ORDER[0] == "harvest"
     assert PHASE_ORDER.index("normalize") < PHASE_ORDER.index("publications")
 

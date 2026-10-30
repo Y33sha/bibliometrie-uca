@@ -19,8 +19,8 @@ class StructureType(StrEnum):
     EQUIPE = "equipe"
     SITE = "site"
     ONR = "onr"
-    # Service (direction des systèmes d'information, bibliothèque universitaire) ou structure fédérative (institut, sous tutelle de l'université et tutelle de laboratoires).
     ADMIN = "admin"
+    """Service (direction des systèmes d'information, bibliothèque universitaire) ou structure fédérative (institut, sous tutelle de l'université et tutelle de laboratoires)."""
     AUTRE = "autre"
 
     @property
@@ -30,7 +30,11 @@ class StructureType(StrEnum):
 
 
 def _parse_type(raw: str) -> StructureType:
-    """`StructureType` depuis sa valeur textuelle ; `ValidationError` hors énumération."""
+    """Lit un `StructureType` depuis sa valeur textuelle.
+
+    Raises:
+        ValidationError: valeur hors énumération.
+    """
     try:
         return StructureType(raw)
     except ValueError as exc:
@@ -38,7 +42,11 @@ def _parse_type(raw: str) -> StructureType:
 
 
 def _parse_ror(raw: str | None) -> RorId | None:
-    """`RorId` d'une valeur saisie, URL comprise ; `None` si elle est vide. Lève `ValidationError` si elle est invalide."""
+    """Lit le `RorId` d'une valeur saisie, URL comprise ; `None` si elle est vide.
+
+    Raises:
+        ValidationError: valeur invalide.
+    """
     if not raw or not raw.strip():
         return None
     parsed = RorId.try_parse(raw)
@@ -48,7 +56,11 @@ def _parse_ror(raw: str | None) -> RorId | None:
 
 
 def _parse_hal(raw: str | None) -> HalCollection | None:
-    """`HalCollection` d'une valeur saisie ; `None` si elle est vide. Lève `ValidationError` si elle est invalide."""
+    """Lit la `HalCollection` d'une valeur saisie ; `None` si elle est vide.
+
+    Raises:
+        ValidationError: valeur invalide.
+    """
     if not raw or not raw.strip():
         return None
     parsed = HalCollection.try_parse(raw)
@@ -97,7 +109,7 @@ class Structure:
         hal_collection: str | None = None,
         api_ids: dict[str, str | list[str]] | None = None,
     ) -> Structure:
-        """Structure à enregistrer, sans `id`."""
+        """Construit une structure à enregistrer, sans `id`."""
         return cls(
             id=None,
             code=code,

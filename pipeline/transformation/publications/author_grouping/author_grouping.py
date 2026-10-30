@@ -1,8 +1,6 @@
-"""Phase `author_grouping` : contributions des contributions sources d'un même auteur dans chaque publication (`contributions`, `aligned_source_contributions`).
+"""Phase `author_grouping` : regroupement, dans chaque publication, des contributions sources d'un même auteur en contributions (`contributions`, `aligned_source_contributions`).
 
-Les publications de la file `publication_contributions_queue` se recalculent entièrement, par lots ; `--rebuild-author-grouping` les marque toutes. Les publications d'un lot se répartissent entre des processus, un par processeur disponible (`available_cpus`). Les doublons d'auteur d'un enregistrement source (`domain.publications.list_copies`) reçoivent `duplicate_of` et restent hors des contributions. Les autres contributions sources, tous rôles réunis, s'alignent selon `domain.publications.author_grouping`. Chaque contribution reprend l'identifiant de la contribution en base avec laquelle elle partage le plus de contributions sources.
-
-Tâche `author_grouping.build`.
+Les publications de la file `publication_contributions_queue` se recalculent entièrement, par lots. `--rebuild-author-grouping` marque toutes les publications. Les publications d'un lot se répartissent entre des processus, un par processeur disponible (`available_cpus`). Les doublons d'auteur d'un enregistrement source (`domain.publications.list_copies`) reçoivent `duplicate_of` et restent hors des contributions. Les autres contributions sources, tous rôles réunis, s'alignent selon `domain.publications.author_grouping`. Chaque contribution reprend l'identifiant de la contribution en base avec laquelle elle partage le plus de contributions sources.
 """
 
 import logging
@@ -48,12 +46,16 @@ from pipeline.transformation.publications.author_grouping.store import (
 BATCH_SIZE = 1000
 BATCH_SOURCE_CONTRIBUTIONS = 200_000
 _MODEL = ResidualModel(RESIDUAL_WEIGHTS)
-# Source dont l'enregistrement source passe après les autres à longueur de liste égale : elle fonde une contribution seulement à défaut d'une autre.
+# Source classée après les autres à longueur de liste égale : elle fonde une contribution seulement à défaut d'une autre source.
 DEFERRED_SOURCE = "scanr"
 
 
 def publication_batches(publications: Sequence[tuple[int, int]]) -> list[list[int]]:
-    """Lots de publications, dans l'ordre : un lot se ferme à `BATCH_SIZE` publications ou dès qu'il atteint `BATCH_SOURCE_CONTRIBUTIONS` contributions sources. `publications` : (publication, nombre de contributions sources)."""
+    """Découpe les publications en lots, dans l'ordre. Un lot se ferme à `BATCH_SIZE` publications ou à `BATCH_SOURCE_CONTRIBUTIONS` contributions sources.
+
+    Args:
+        publications: paires (publication, nombre de contributions sources).
+    """
     batches: list[list[int]] = []
     batch: list[int] = []
     source_contributions = 0
@@ -69,7 +71,7 @@ def publication_batches(publications: Sequence[tuple[int, int]]) -> list[list[in
 
 
 def assign(matrix: Sequence[Sequence[float]]) -> Iterable[tuple[int, int]]:
-    """Affectation de gain maximal (algorithme hongrois)."""
+    """Renvoie l'affectation de gain maximal (algorithme hongrois)."""
     rows, cols = linear_sum_assignment([[-value for value in row] for row in matrix])
     return zip(rows.tolist(), cols.tolist(), strict=True)
 
@@ -77,7 +79,7 @@ def assign(matrix: Sequence[Sequence[float]]) -> Iterable[tuple[int, int]]:
 def contributions_by_source_record(
     rows: Sequence[SourceContributionRow],
 ) -> dict[int, list[SourceContribution]]:
-    """Contributions sources d'une publication par enregistrement source, tous rôles réunis. Une contribution source réduite à des initiales prend le prénom de la personne à laquelle un humain a rattaché son identifiant (`with_known_first_name`)."""
+    """Regroupe les contributions sources d'une publication par enregistrement source, tous rôles réunis. Une contribution source réduite à des initiales prend le prénom de la personne rattachée par un humain à son identifiant (`with_known_first_name`)."""
     source_records: dict[int, list[SourceContribution]] = {}
     for row in rows:
         first_name = with_known_first_name(row.first_name, row.known_first_name)
@@ -96,14 +98,14 @@ def contributions_by_source_record(
 
 
 def deferred_source_records(rows: Sequence[SourceContributionRow]) -> set[int]:
-    """Enregistrements sources de `DEFERRED_SOURCE` parmi les contributions sources d'une publication."""
+    """Renvoie les enregistrements sources de `DEFERRED_SOURCE` parmi les contributions sources d'une publication."""
     return {row.source_record for row in rows if row.source == DEFERRED_SOURCE}
 
 
 def align_publication_contributions(
     rows: Sequence[SourceContributionRow],
 ) -> tuple[list[Contribution], dict[int, int]]:
-    """Contributions des contributions sources d'une publication et doublons d'auteur (doublon → première occurrence de son nom), parmi les contributions sources qui ont une position. Les doublons restent hors des contributions."""
+    """Renvoie les contributions d'une publication et ses doublons d'auteur (doublon → première occurrence de son nom), parmi les contributions sources à position. Les doublons restent hors des contributions."""
     source_records = contributions_by_source_record(rows)
     copies: dict[int, int] = {}
     for source_contributions in source_records.values():
@@ -119,7 +121,7 @@ def align_publication_contributions(
 
 
 def _same_membership(stored: MembershipRow | None, planned: MembershipRow) -> bool:
-    """L'appartenance en base vaut l'appartenance calculée. Le score et la marge sont comparés à la précision de leur colonne (`real`)."""
+    """Vrai si l'appartenance en base vaut l'appartenance calculée. Le score et la marge sont comparés à la précision de leur colonne (`real`)."""
     if stored is None:
         return False
 
@@ -137,7 +139,7 @@ def _same_membership(stored: MembershipRow | None, planned: MembershipRow) -> bo
 def membership_changes(
     stored: Mapping[int, MembershipRow], planned: Sequence[MembershipRow]
 ) -> tuple[list[int], list[MembershipRow]]:
-    """Contributions sources dont l'appartenance en base disparaît ou change, et appartenances à insérer. Une appartenance inchangée reste en place."""
+    """Renvoie les contributions sources à appartenance disparue ou changée, et les appartenances à insérer. Une appartenance inchangée reste en place."""
     inserted = [m for m in planned if not _same_membership(stored.get(m.source_contribution), m)]
     kept = {m.source_contribution for m in planned}
     removed = [s for s in stored if s not in kept] + [m.source_contribution for m in inserted]
@@ -154,7 +156,7 @@ _SOURCE_CONTRIBUTION_FIELDS = attrgetter(*(f.name for f in fields(SourceContribu
 
 
 def align_rows(rows: Sequence[SourceContributionTuple]) -> Aligned:
-    """`align_publication_contributions` sur les contributions sources d'une publication en tuples, résultat en tuples."""
+    """Applique `align_publication_contributions` aux contributions sources d'une publication, en tuples à l'entrée comme à la sortie."""
     contributions, copies = align_publication_contributions(
         [SourceContributionRow(*row) for row in rows]
     )
@@ -177,11 +179,11 @@ type Mapper = Callable[
     ],
     Iterator[Aligned],
 ]
-"""Applique `align_rows` aux contributions sources de chaque publication et renvoie les résultats dans l'ordre : `map`, ou un pool de processus."""
+"""Application de `align_rows` aux contributions sources de chaque publication, résultats dans l'ordre : `map`, ou un pool de processus."""
 
 
 def pool_mapper(pool: ProcessPoolExecutor, workers: int) -> Mapper:
-    """`Mapper` qui répartit les publications d'un lot entre les `workers` processus de `pool`, par paquets de taille adaptée au lot."""
+    """Renvoie un `Mapper` qui répartit les publications d'un lot entre les `workers` processus de `pool`, par paquets de taille adaptée au lot."""
 
     def mapper(
         fn: Callable[[Sequence[SourceContributionTuple]], Aligned],
@@ -199,7 +201,11 @@ def _plan_batch(
     on_publication: Callable[[], None],
     mapper: Mapper,
 ) -> BatchPlan:
-    """Plan d'écriture d'un lot de publications. `on_publication` est appelé après chaque publication calculée."""
+    """Calcule le plan d'écriture d'un lot de publications.
+
+    Args:
+        on_publication: appelé après chaque publication calculée.
+    """
     rows_by_publication: dict[int, list[SourceContributionTuple]] = {}
     positions: dict[int, int | None] = {}
     for row in store.fetch_source_contributions(publication_ids):
@@ -257,7 +263,11 @@ def realign(
     on_publication: Callable[[], None] = lambda: None,
     mapper: Mapper = map,
 ) -> int:
-    """Recalcule et écrit les contributions et les doublons d'auteur de ces publications, sans commit. Renvoie le nombre de contributions écrites ; `methods` compte les appartenances par origine."""
+    """Recalcule et écrit les contributions et les doublons d'auteur de ces publications, sans commit. Renvoie le nombre de contributions écrites.
+
+    Args:
+        methods: compteur des appartenances par origine, incrémenté au passage.
+    """
     plan = _plan_batch(
         store,
         publication_ids,
@@ -276,9 +286,10 @@ def build_contributions(
     *,
     rebuild: bool = False,
 ) -> PhaseMetrics:
-    """Recalcule les contributions des publications en file, lot par lot, avec un commit par lot. Chaque lot supprime ses marquages traités avant son commit. Rafraîchit ensuite le recouvrement des listes d'auteurs. Les contributions d'une publication supprimée disparaissent avec elle (`ON DELETE CASCADE`).
+    """Recalcule les contributions des publications en file, avec un commit par lot. Chaque lot supprime ses marquages traités avant son commit. Rafraîchit ensuite le recouvrement des listes d'auteurs. Les contributions d'une publication supprimée disparaissent avec elle (`ON DELETE CASCADE`).
 
-    `rebuild` marque d'abord toutes les publications, pour appliquer une évolution des règles d'alignement sur tout le stock. Le marquage est commité aussitôt : un run interrompu reprend les publications restantes.
+    Args:
+        rebuild: marque d'abord toutes les publications et commite le marquage ; un run interrompu reprend les publications restantes.
     """
     if rebuild:
         marked = store.mark_all()
@@ -327,7 +338,7 @@ def build_contributions(
 @dataclass(frozen=True)
 class AuthorGroupingPhase:
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Recalcule les contributions des publications en file, puis les attributs des contributions en file : l'affiliation d'une contribution source change sans que sa contribution change."""
+        """Recalcule les contributions des publications en file, puis les attributs des contributions en file. Les attributs ont leur propre file : l'affiliation d'une contribution source change sans changer sa contribution."""
 
         def build_task(ctx: PhaseContext) -> PhaseMetrics:
             with ctx.open_tx() as conn:

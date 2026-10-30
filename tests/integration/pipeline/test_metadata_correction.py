@@ -1,6 +1,6 @@
 """Phase `metadata_correction` : la valeur corrigée est écrite en place, la valeur d'origine est gardée dans `corrections`."""
 
-import json
+import logging
 from datetime import timedelta
 from functools import partial
 
@@ -19,7 +19,10 @@ from pipeline.transformation.publications.correction.correct_unary import comput
 from pipeline.transformation.publications.correction.correction_store import (
     SourceRecordCorrectionStore,
 )
-from pipeline.transformation.publications.correction.doi_targets import compute_doi_targets
+from pipeline.transformation.publications.correction.doi_targets import (
+    compute_doi_targets,
+    run as run_doi_targets,
+)
 from pipeline.transformation.publications.correction.remove_identifiers import compute_updates
 from tests.integration.helpers.queues import clear, queued
 from tests.integration.helpers.serials import (
@@ -343,15 +346,9 @@ def _oa_status(conn, source_record_id: int) -> str:
 
 def test_diamond_follows_the_journal(sa_sync_conn):
     conn = sa_sync_conn
-    doaj_free = insert_serial(conn, "Sans frais", oa_model="full_oa", is_in_doaj=True)
-    conn.execute(
-        text("UPDATE serials SET doaj_payload = CAST(:p AS jsonb) WHERE id = :id"),
-        {"p": json.dumps({"APC": "No", "Has other fees": "No"}), "id": doaj_free},
-    )
-    marked = insert_serial(conn, "Marquée", oa_model="diamond")
+    diamond = insert_serial(conn, "Diamant", oa_model="diamond")
     paying = insert_serial(conn, "Payante", oa_model="full_oa")
-    gold_in_doaj = _source_record(conn, source_id="W-d1", oa_status="gold", serial_id=doaj_free)
-    gold_in_marked = _source_record(conn, source_id="W-d2", oa_status="gold", serial_id=marked)
+    gold_in_diamond = _source_record(conn, source_id="W-d2", oa_status="gold", serial_id=diamond)
     diamond_in_paying = _source_record(
         conn, source_id="W-d3", oa_status="diamond", serial_id=paying
     )
@@ -359,8 +356,7 @@ def test_diamond_follows_the_journal(sa_sync_conn):
 
     _apply(conn)
 
-    assert _oa_status(conn, gold_in_doaj) == "diamond"
-    assert _oa_status(conn, gold_in_marked) == "diamond"
+    assert _oa_status(conn, gold_in_diamond) == "diamond"
     assert _oa_status(conn, diamond_in_paying) == "gold"
     assert _oa_status(conn, diamond_without_journal) == "gold"
 
@@ -388,14 +384,14 @@ def test_active_embargo_not_promoted(sa_sync_conn):
 
 
 def _apply_cluster(conn) -> int:
-    """Sous-étapes `doi_targets` puis `remove_identifiers`. Renvoie le nombre d'enregistrements sources corrigés."""
+    """Joue les sous-étapes `doi_targets` puis `remove_identifiers`. Renvoie le nombre d'enregistrements sources corrigés."""
     store = SourceRecordCorrectionStore(conn)
-    store.replace_doi_targets(compute_doi_targets(store.fetch_secondary_form_declarations()))
+    run_doi_targets(conn, store, logging.getLogger("test"))
     return store.persist_doi_corrections(compute_updates(store.fetch_doi_cluster_candidates()))
 
 
 def _doi_statuses(conn, source_record: int) -> dict[str, str | None]:
-    """Règle qui retire chaque DOI de l'enregistrement source, `None` pour un DOI actif."""
+    """Renvoie la règle qui retire chaque DOI de l'enregistrement source, `None` pour un DOI actif."""
     return dict(
         conn.execute(
             text("""
@@ -408,7 +404,7 @@ def _doi_statuses(conn, source_record: int) -> dict[str, str | None]:
 
 
 def _targets(conn) -> dict[str, str]:
-    """Cible de chaque DOI de `doi_targets`."""
+    """Renvoie la cible de chaque DOI de `doi_targets`."""
     return dict(conn.execute(text("SELECT doi, target_doi FROM doi_targets")).all())
 
 
@@ -530,7 +526,7 @@ def test_chapters_number_prefix_same_chapter_untouched(sa_sync_conn):
 
 
 def test_un_doi_inconnu_de_doi_org_est_nulle_puis_restaure(sa_sync_conn):
-    """Régression : un DOI factice (`10.1364/ao.xx.xxxxxx`) réunissait des enregistrements sources sans rapport."""
+    """Un DOI inconnu de doi.org, comme le DOI factice `10.1364/ao.xx.xxxxxx`, est retiré de ses enregistrements sources, puis restauré quand doi.org le connaît."""
     conn = sa_sync_conn
     first = _typed_source_record(
         conn, source_id="h1", doi="10.1364/ao.xx.xxxxxx", doc_type="article"
@@ -559,7 +555,7 @@ def test_un_doi_inconnu_de_doi_org_est_nulle_puis_restaure(sa_sync_conn):
 
 
 def _seed_datacite(conn, *, source_id, doi, doc_type, relations, corrections=None):
-    """Enregistrement source DataCite dont les `related_identifiers` mentionnent `relations`, couples (type, DOI cible)."""
+    """Insère un enregistrement source DataCite dont les `related_identifiers` mentionnent `relations`, couples (type, DOI cible)."""
     source_extras = {"related_identifiers": [{"relation_type": t, "doi": d} for t, d in relations]}
     return _typed_source_record(
         conn,
@@ -573,7 +569,7 @@ def _seed_datacite(conn, *, source_id, doi, doc_type, relations, corrections=Non
 
 
 def _seed_work(conn, *, source_id, doi):
-    """Enregistrement source Crossref d'une œuvre principale, dont le DOI est dans `source_record_identifiers`."""
+    """Insère un enregistrement source Crossref d'une œuvre principale, avec son DOI dans `source_record_identifiers`."""
     return _typed_source_record(
         conn,
         source="crossref",
@@ -585,10 +581,7 @@ def _seed_work(conn, *, source_id, doi):
 
 
 def test_la_regle_lit_le_type_de_l_enregistrement_source_qui_mentionne_la_cible(sa_sync_conn):
-    """Un enregistrement source OpenAlex `article` au DOI d'un working paper DataCite laisse ce DOI sans cible.
-
-    Régression : la cible était attachée à tous les enregistrements sources du DOI, et le type de l'enregistrement source OpenAlex, que la revue déduite du DOI fait changer d'un run à l'autre, décidait pour le groupe.
-    """
+    """Un enregistrement source OpenAlex `article` au DOI d'un working paper DataCite laisse ce DOI sans cible."""
     conn = sa_sync_conn
     _seed_work(conn, source_id="arxiv", doi="10.48550/arxiv.1")
     wp = _seed_datacite(
@@ -634,7 +627,7 @@ def test_le_doi_d_une_copie_de_l_article_absent_de_la_base_n_a_pas_de_cible(sa_s
 
 
 def test_une_cible_inconnue_de_doi_org_n_est_pas_une_cible(sa_sync_conn):
-    """Régression : une copie de repository avait pour cible l'article qu'elle déclare, inconnu de doi.org."""
+    """L'article déclaré par une copie de repository, inconnu de doi.org, reste hors des cibles."""
     conn = sa_sync_conn
     _seed_work(conn, source_id="article", doi="10.1103/inconnu")
     _seed_datacite(
@@ -692,6 +685,71 @@ def test_la_version_prime_sur_la_variante(sa_sync_conn):
     ]
 
 
+def test_les_versions_d_un_preprint_ont_pour_cible_la_plus_recente(sa_sync_conn):
+    """Chaque version d'un preprint Research Square a pour cible la version la plus récente."""
+    conn = sa_sync_conn
+    _typed_source_record(conn, source_id="W1", doi="10.21203/rs.3.rs-1/v1")
+    _typed_source_record(conn, source_id="W2", doi="10.21203/rs.3.rs-1/v2")
+
+    _apply_cluster(conn)
+
+    assert _targets(conn) == {"10.21203/rs.3.rs-1/v1": "10.21203/rs.3.rs-1/v2"}
+
+
+def test_les_versions_ont_pour_cible_le_doi_concept_moissonne(sa_sync_conn):
+    conn = sa_sync_conn
+    _seed_work(conn, source_id="concept", doi="10.6084/m9.figshare.1")
+    _typed_source_record(conn, source_id="W1", doi="10.6084/m9.figshare.1.v1")
+
+    _apply_cluster(conn)
+
+    assert _targets(conn) == {"10.6084/m9.figshare.1.v1": "10.6084/m9.figshare.1"}
+
+
+def test_les_versions_ont_pour_cible_le_doi_concept_derive_d_openalex(sa_sync_conn):
+    """Le DOI de la v1 a pour cible le DOI concept Figshare, présent seulement comme DOI `derived` d'un work OpenAlex."""
+    conn = sa_sync_conn
+    _typed_source_record(
+        conn,
+        source_id="W1",
+        identifiers=[
+            SourceIdentifier(
+                SourceIdentifierType.DOI, "10.6084/m9.figshare.c.1", SourceIdentifierRole.DERIVED
+            )
+        ],
+    )
+    _seed_work(conn, source_id="v1", doi="10.6084/m9.figshare.c.1.v1")
+
+    _apply_cluster(conn)
+
+    assert _targets(conn) == {"10.6084/m9.figshare.c.1.v1": "10.6084/m9.figshare.c.1"}
+
+
+def test_la_version_datacite_reste_en_jeu_tant_que_sa_cible_est_sans_enregistrement_source(
+    sa_sync_conn,
+):
+    """Un dépôt Figshare en v1 a pour cible son DOI concept. Il est écarté de la réconciliation seulement quand le concept est le DOI `primary` d'un autre enregistrement source."""
+    conn = sa_sync_conn
+    version = _seed_work(conn, source_id="v1", doi="10.6084/m9.figshare.1.v1")
+    conn.execute(
+        text("UPDATE source_records SET source = 'datacite' WHERE id = :id"), {"id": version}
+    )
+    conn.execute(
+        text(
+            "INSERT INTO doi_targets (doi, target_doi, rule)"
+            " VALUES ('10.6084/m9.figshare.1.v1', '10.6084/m9.figshare.1', 'DOI_VERSION_TO_UNVERSIONED')"
+        )
+    )
+
+    def target_recorded() -> bool:
+        rows = SourceRecordCorrectionStore(conn).fetch_matchability_rows()
+        return next(r for r in rows if r.id == version).facts.primary_doi_target_recorded
+
+    assert not target_recorded()
+    _seed_work(conn, source_id="concept", doi="10.6084/m9.figshare.1")
+    assert target_recorded()
+
+
 def test_un_changement_de_cible_marque_les_enregistrements_sources_du_doi(sa_sync_conn):
     conn = sa_sync_conn
     _seed_work(conn, source_id="concept", doi="10.5281/zenodo.9")
@@ -738,7 +796,7 @@ def test_le_concept_present_comme_doi_lie_ne_compte_pas(sa_sync_conn):
 
 
 def _seed_datacite_piece(conn, *, source_id, doi, parent_doi, doc_type="dataset", title="Piece"):
-    """Enregistrement source DataCite déclarant une relation `IsPartOf` vers `parent_doi` dans son `source_extras`."""
+    """Insère un enregistrement source DataCite déclarant une relation `IsPartOf` vers `parent_doi` dans son `source_extras`."""
     return insert_source_record(
         conn,
         source="datacite",
@@ -790,7 +848,7 @@ def test_dataset_piece_without_target_when_parent_absent(sa_sync_conn):
 def _seed_figshare(
     conn, *, source_id, doi, title_normalized, source="datacite", year=2023, doc_type="dataset"
 ):
-    """Enregistrement source figshare, sans relation déclarée."""
+    """Insère un enregistrement source figshare, sans relation déclarée."""
     return insert_source_record(
         conn,
         source=source,
@@ -834,7 +892,7 @@ def test_figshare_additional_file_targets_the_collection_of_same_title(sa_sync_c
 def test_figshare_additional_file_targets_the_collection_whatever_its_source_and_type(
     sa_sync_conn,
 ):
-    """Une pièce que seul OpenAlex donne, et une pièce que DataCite type `media`, ont pour cible la collection."""
+    """Une pièce présente seulement dans OpenAlex et une pièce typée `media` par DataCite ont pour cible la collection."""
     conn = sa_sync_conn
     _seed_figshare(
         conn, source_id="c", doi="10.6084/m9.figshare.c.6702115", title_normalized=_ARTICLE
@@ -859,7 +917,7 @@ def test_figshare_additional_file_targets_the_collection_whatever_its_source_and
 
 
 def test_figshare_additional_file_without_number_targets_the_collection(sa_sync_conn):
-    """« Additional file of T », sans numéro."""
+    """Une pièce de titre « Additional file of T », sans numéro, a pour cible la collection."""
     conn = sa_sync_conn
     _seed_figshare(
         conn, source_id="c", doi="10.6084/m9.figshare.c.6702115", title_normalized=_ARTICLE

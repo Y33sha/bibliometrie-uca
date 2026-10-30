@@ -67,7 +67,7 @@ class _FakeStaging:
 
 
 def _stores(staging) -> dict[str, Any]:
-    """Arguments du constructeur commun, `staging` compris, les autres stores étant des MagicMock."""
+    """Renvoie les arguments du constructeur commun : `staging`, et des MagicMock pour les autres stores."""
     return {
         "conn": MagicMock(invalidated=False),
         "logger": logging.getLogger("test"),
@@ -139,7 +139,7 @@ class _Norm(_StubNorm):
 
 class TestRunNoWork:
     def test_nothing_to_do(self, caplog):
-        """Une source sans document en attente se tait : la barre des autres reste lisible."""
+        """Une source sans document en attente laisse le journal vide : la barre des autres sources reste lisible."""
         staging = _FakeStaging()
         staging.count_returns = 0
         norm = _Norm(staging)
@@ -311,7 +311,7 @@ class TestProcessWorkMinimalMetadata:
         staging.discard_source_record.assert_not_called()
 
     def test_enregistrement_source_sans_annee_ecarte_et_supprime(self):
-        """Régression : un enregistrement qu'OpenAlex renvoie sans année ne fonde aucune publication, et l'enregistrement source qu'il avait produit disparaît."""
+        """Un work OpenAlex sans année ne fonde aucune publication. Son enregistrement source existant est supprimé."""
         staging = MagicMock()
         norm = _MinimalNorm(staging)
         row = StagingRow(id=7, source_id="W3131333980", doi=None, raw_data={"title": "T"})
@@ -331,7 +331,7 @@ class TestProcessWorkMinimalMetadata:
         staging.mark_done.assert_called_once_with(3)
 
     def test_enregistrement_source_au_titre_trop_long_ecarte(self):
-        """Régression : OpenAlex donne pour titre de W7223893444 le programme d'un congrès, d'environ 5 000 caractères."""
+        """OpenAlex donne pour titre de W7223893444 le programme d'un congrès, d'environ 5 000 caractères."""
         staging = MagicMock()
         norm = _MinimalNorm(staging)
         title = "Outcomes of minimally invasive spine surgery. " * 100

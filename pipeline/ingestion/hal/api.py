@@ -14,7 +14,7 @@ from pipeline.ingestion.api_params import API_BASE_URLS, HAL_PER_PAGE
 
 type SolrParams = dict[str, str | int | float | bool | None]
 
-# Champs Solr demandés : un champ absent de la liste manque aux enregistrements reçus.
+# Champs Solr demandés : un champ absent de la liste manque aux documents reçus.
 HAL_FIELDS = [
     "halId_s",
     "doiId_s",
@@ -75,12 +75,12 @@ class HalClient:
         )
 
     def count(self, query: str, fq: str) -> int:
-        """Nombre de documents d'une requête, lu sur une réponse sans document (`rows=0`)."""
+        """Renvoie le nombre de documents d'une requête, lu sur une réponse sans document (`rows=0`)."""
         params: SolrParams = {"q": query, "fq": fq, "rows": 0, "wt": "json"}
         return as_int(at_path(self._get(params, "HAL comptage"), "response").get("numFound")) or 0
 
     def fetch_page_cursor(self, query: str, fq: str, cursor_mark: str) -> Mapping[str, JsonValue]:
-        """Une page en pagination `cursorMark`, avec tous les champs de `HAL_FIELDS`.
+        """Renvoie une page en pagination `cursorMark`, avec tous les champs de `HAL_FIELDS`.
 
         `cursor_mark` vaut `"*"` au premier appel, puis le `nextCursorMark` de la réponse précédente. `sort=docid asc`, clé unique, est requis par `cursorMark`.
         """
@@ -99,7 +99,7 @@ class HalClient:
 async def search_one(
     client: httpx2.AsyncClient, query: str, *, label: str
 ) -> LookupOutcome[Mapping[str, JsonValue]]:
-    """Premier document de la recherche Solr `query`, ou `NOT_FOUND` quand la réponse est vide."""
+    """Renvoie le premier document de la recherche Solr `query`, ou `NOT_FOUND` quand la réponse est vide."""
     outcome = await lookup_json_async(
         client,
         "GET",
@@ -140,9 +140,9 @@ class HalStructuresClient:
         ]
 
     def by_ids(self, ids: Collection[int]) -> Sequence[Mapping[str, JsonValue]]:
-        """Structures de ces identifiants. Un alias est absent de la réponse."""
+        """Renvoie les structures de ces identifiants. Un alias est absent de la réponse."""
         return self._docs("docid", ids)
 
     def by_aliases(self, ids: Collection[int]) -> Sequence[Mapping[str, JsonValue]]:
-        """Structures conservées qui listent un des `ids` dans leurs alias."""
+        """Renvoie les structures conservées avec l'un des `ids` parmi leurs alias."""
         return self._docs("aliasDocid_i", ids)

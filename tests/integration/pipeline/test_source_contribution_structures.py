@@ -43,7 +43,7 @@ def _hal(docid: int, *, parents=(), aliases=(), ror=None):
 
 
 def _perimeter(conn) -> tuple[int, int]:
-    """Université et laboratoire du périmètre, avec leur ROR ; référentiel HAL : équipe 3 → laboratoire 2 (alias 9) → université 1."""
+    """Insère l'université et le laboratoire du périmètre, avec leur ROR ; référentiel HAL : équipe 3 → laboratoire 2 (alias 9) → université 1."""
     univ = insert_persons_perimeter(conn)
     lab = insert_structure(conn, "LAB")
     insert_tutelle(conn, univ, child_id=lab)

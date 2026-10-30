@@ -18,6 +18,7 @@ from infrastructure.read_models.filters import (
     corresponding_clause,
     country_clause,
     doc_type_clause,
+    doi_agency_clause,
     excluded_doc_type_clause,
     hal_status_clause,
     in_perimeter_person_clause,
@@ -47,6 +48,7 @@ FilterDimension = Literal[
     "access",
     "oa_status",
     "license",
+    "doi_agency",
     "source",
     "apc",
     "publisher",
@@ -64,17 +66,16 @@ FilterDimension = Literal[
 
 @dataclass(frozen=True, slots=True)
 class FilterContext:
-    """Valeurs lues en base dont dépendent certaines conditions.
-
-    `perimeter_structure_ids` sert au filtre APC. `lab_hal_collection` est la collection HAL du laboratoire quand un seul est sélectionné ; le statut HAL se lit au regard de cette collection.
-    """
+    """Valeurs lues en base, nécessaires à certaines conditions."""
 
     perimeter_structure_ids: list[int]
+    """Structures du périmètre des personnes, pour le filtre APC."""
     lab_hal_collection: str | None
+    """Collection HAL du laboratoire quand un seul est sélectionné ; le statut HAL se lit au regard de cette collection."""
 
 
 def lab_hal_collection(conn: Connection, lab_ids: list[int]) -> str | None:
-    """Collection HAL du laboratoire quand un seul est sélectionné."""
+    """Renvoie la collection HAL du laboratoire quand un seul est sélectionné."""
     if len(lab_ids) != 1:
         return None
     row = conn.execute(
@@ -84,7 +85,7 @@ def lab_hal_collection(conn: Connection, lab_ids: list[int]) -> str | None:
 
 
 def filter_context(conn: Connection, filters: PublicationFilters) -> FilterContext:
-    """Lit une fois par requête les valeurs dont dépendent les conditions."""
+    """Lit une fois par requête les valeurs nécessaires aux conditions."""
     return FilterContext(
         perimeter_structure_ids=get_persons_structure_ids_list(conn),
         lab_hal_collection=lab_hal_collection(conn, filters.lab_ids),
@@ -92,7 +93,7 @@ def filter_context(conn: Connection, filters: PublicationFilters) -> FilterConte
 
 
 def _scope_clause(filters: PublicationFilters, skip: FilterDimension | None) -> WhereClause | None:
-    """Ensemble de départ : les publications de la personne, sinon celles des laboratoires sélectionnés, sinon celles du périmètre.
+    """Renvoie la condition de l'ensemble de départ : les publications de la personne, sinon celles des laboratoires sélectionnés, sinon celles du périmètre.
 
     Les laboratoires sélectionnés délimitent l'ensemble par le filtre laboratoire. Une facette qui écarte ce filtre part donc du périmètre.
     """
@@ -116,7 +117,7 @@ def publication_filter_where(
     context: FilterContext,
     skip: FilterDimension | None = None,
 ) -> tuple[str, dict[str, object]]:
-    """WHERE des publications `p` sous les filtres, et ses paramètres liés.
+    """Renvoie le WHERE des publications `p` sous les filtres, et ses paramètres liés.
 
     `skip` écarte le filtre d'une dimension, pour la facette de cette dimension. Le statut HAL s'applique seulement avec un seul laboratoire sélectionné.
     """
@@ -128,6 +129,7 @@ def publication_filter_where(
         "access": access_clause(f.access),
         "oa_status": oa_clause(f.oa_status),
         "license": license_clause(f.license),
+        "doi_agency": doi_agency_clause(f.doi_agency),
         "source": source_clause(f.source_values),
         "apc": apc_clause(f.has_apc, context.perimeter_structure_ids),
         "publisher": publisher_id_clause(f.publisher_id),

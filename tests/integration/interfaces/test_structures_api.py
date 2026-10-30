@@ -226,7 +226,7 @@ class TestDeleteStructure:
         with owner_pool() as cur:
             cur.execute(
                 "SELECT payload::text AS payload FROM audit_log"
-                " WHERE event_type = 'structure.deleted' AND aggregate_id = %s",
+                " WHERE event_type = 'structure.deleted' AND entity_id = %s",
                 (sid,),
             )
             payload = json.loads(cur.fetchone()["payload"])
@@ -282,8 +282,7 @@ class TestCreateRelation:
         )
         assert r.status_code == 200
         body = r.json()
-        # La route renvoie la relation créée, ou {"status": "already_exists"}.
-        assert "status" in body or "id" in body or "relation_id" in body
+        assert "id" in body
 
     def test_duplicate_already_exists(self, auth_client):
         parent = seed_structure(type_="universite")

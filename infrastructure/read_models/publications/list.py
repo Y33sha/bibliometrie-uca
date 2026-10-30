@@ -12,7 +12,6 @@ from domain.publications.licenses import license_label
 from domain.source_records.source_extras import SourceExtra
 from domain.sources.hal import HAL_DEPOSIT_STATUS_LABELS
 from domain.sources.registry import Source, source_record_url
-from domain.structures.structure import StructureType
 from infrastructure.read_models.csv_export import (
     MAX_EXPORT_ROWS,
     CsvWriter,
@@ -29,14 +28,14 @@ from infrastructure.read_models.publications.models import (
     PublicationListItem,
     PublicationListResponse,
 )
-from infrastructure.sql_fragments import has_author_role, source_extra
+from infrastructure.sql_fragments import has_author_role, is_laboratory, source_extra
 
 logger = logging.getLogger(__name__)
 
 # Libellés des statuts thèse pour l'export CSV.
 _THESES_STATUS_LABELS = {"thesis": "Soutenue", "ongoing_thesis": "En cours"}
 
-# Pivot des identifiants sources (alias `sd` sur `source_records`) : une colonne `<source>_id` par source moissonnée. Les deux listes qui donnent cinq identifiants le partagent ; l'export des thèses en donne quatre (sans `wos`) et garde son propre pivot.
+# Pivot des identifiants sources (alias `sd` sur `source_records`) : une colonne `<source>_id` par source moissonnée. Partagé par les deux listes à cinq identifiants ; l'export des thèses en donne quatre (sans `wos`) et garde son propre pivot.
 _SOURCE_ID_COLUMNS = ",\n                    ".join(
     f"max(CASE WHEN sr.source = '{source.value}' THEN sr.source_id END) AS {source.value}_id"
     for source in (Source.HAL, Source.OPENALEX, Source.SCANR, Source.WOS, Source.THESES)
@@ -44,7 +43,7 @@ _SOURCE_ID_COLUMNS = ",\n                    ".join(
 
 
 def _source_links(ids: dict[str, str | None], oa_status: str | None) -> dict[str, str]:
-    """URL publique de chaque source présente (identifiant non nul), pour la colonne « Sources »."""
+    """Renvoie l'URL publique de chaque source présente (identifiant non nul), pour la colonne « Sources »."""
     return {
         source: source_record_url(source, value, oa_status)
         for source, value in ids.items()
@@ -59,9 +58,10 @@ _APC_SORT = (
 
 
 def _thesis_author(column: str) -> str:
-    """Sous-requête scalaire : la colonne demandée de l'auteur de la thèse `p` (personne aliasée `pe`, contribution aliasée `ath`). NULL hors thèse, ou sans contribution d'auteur rattachée à une personne.
+    """Renvoie la sous-requête scalaire de la colonne demandée de l'auteur de la thèse `p` (personne aliasée `pe`, contribution aliasée `ath`). NULL hors thèse, ou sans contribution d'auteur rattachée à une personne.
 
-    L'ordre sur `person_id` désigne la même personne à chaque appel. La contribution se lit dans l'index unique `(publication_id, person_id)`, puis la personne par sa clé primaire : une jointure laisse le planificateur parcourir un index entier à chaque ligne."""
+    L'ordre sur `person_id` désigne la même personne à chaque appel. La contribution se lit dans l'index unique `(publication_id, person_id)`, puis la personne par sa clé primaire : une jointure laisse le planificateur parcourir un index entier à chaque ligne.
+    """
     return f"""(SELECT {column}
                  FROM persons pe
                  WHERE p.doc_type IN ('thesis', 'ongoing_thesis')
@@ -76,12 +76,12 @@ def _thesis_author(column: str) -> str:
 
 
 def _perimeter_labs(*, person_filter: bool = False, correlated: bool = True) -> str:
-    """Clauses FROM et WHERE des laboratoires des auteurs dans le périmètre (contribution aliasée `lc`, structure aliasée `s`). `correlated` les restreint à la publication `p`. `person_filter` les restreint aux contributions de la personne liée à `:lab_person`."""
+    """Renvoie les clauses FROM et WHERE des laboratoires des auteurs dans le périmètre (contribution aliasée `lc`, structure aliasée `s`). `correlated` les restreint à la publication `p`. `person_filter` les restreint aux contributions de la personne liée à `:lab_person`."""
     publication_clause = "lc.publication_id = p.id AND" if correlated else ""
     person_clause = "AND lc.person_id = :lab_person" if person_filter else ""
     return f"""FROM contributions lc
                  JOIN contribution_structures lcs ON lcs.contribution_id = lc.id
-                 JOIN structures s ON s.id = lcs.structure_id AND s.structure_type = '{StructureType.LABO.value}'
+                 JOIN structures s ON s.id = lcs.structure_id AND {is_laboratory("s")}
                  WHERE {publication_clause} lc.in_perimeter = TRUE
                    AND {has_author_role("lc")}
                    {person_clause}"""
@@ -113,9 +113,10 @@ _SORT_DIRECTIONS = {"asc": "ASC", "desc": "DESC"}
 
 
 def _sort_clauses(sort: str, *, person_filter: bool = False) -> tuple[str, str]:
-    """Jointure à ajouter à la requête et clause ORDER BY de la clé `sort` (`<champ>_<sens>`). Valeurs absentes en dernier, titre en départage.
+    """Renvoie la jointure à ajouter à la requête et la clause ORDER BY de la clé `sort` (`<champ>_<sens>`). Valeurs absentes en dernier, titre en départage.
 
-    Les laboratoires se trient par le premier libellé affiché. `person_filter` les restreint à ceux de la personne liée à `:lab_person`, comme la colonne. Leur clé se calcule en une agrégation sur toutes les publications : une sous-requête par ligne coûte plusieurs secondes sur la liste complète."""
+    Les laboratoires se trient par le premier libellé affiché. `person_filter` les restreint à ceux de la personne liée à `:lab_person`, comme la colonne. Leur clé se calcule en une agrégation sur toutes les publications : une sous-requête par ligne coûte plusieurs secondes sur la liste complète.
+    """
     field, direction = sort.rsplit("_", 1)
     join = ""
     if field in _SORT_JOINS:
@@ -133,12 +134,12 @@ def _sort_clauses(sort: str, *, person_filter: bool = False) -> tuple[str, str]:
 
 
 def _plain_text(s: str | None) -> str:
-    """Texte brut pour le CSV : mise à plat du titre par `to_plain_text`. Un tableur afficherait le balisage tel quel dans la cellule."""
+    """Renvoie le titre en texte brut pour le CSV (`to_plain_text`) : un tableur afficherait le balisage tel quel dans la cellule."""
     return to_plain_text(s)
 
 
 def _emitted_columns(spec: list[tuple[str, str]], columns: list[str]) -> list[tuple[str, str]]:
-    """Colonnes `(clé, en-tête)` de `spec` à émettre, dans l'ordre d'affichage : celles listées dans `columns`, toutes si `columns` est vide. Titre et accès toujours présents."""
+    """Renvoie les colonnes `(clé, en-tête)` de `spec` à émettre, dans l'ordre d'affichage : celles listées dans `columns`, toutes si `columns` est vide. Titre et accès toujours présents."""
     if not columns:
         return spec
     requested = {*columns, "title", "access"}
@@ -148,7 +149,7 @@ def _emitted_columns(spec: list[tuple[str, str]], columns: list[str]) -> list[tu
 def _publication_lines(
     rows: Sequence[Row[tuple[object, ...]]], emitted: list[tuple[str, str]], *, truncated: bool
 ) -> Iterator[str]:
-    """Lignes CSV de l'export des publications, en-tête comprise."""
+    """Renvoie les lignes CSV de l'export des publications, en-tête comprise."""
     writer = CsvWriter()
     yield writer.header([header for _, header in emitted])
     for row in rows:
@@ -188,7 +189,7 @@ def _publication_lines(
 def _these_lines(
     rows: Sequence[Row[tuple[object, ...]]], emitted: list[tuple[str, str]], *, truncated: bool
 ) -> Iterator[str]:
-    """Lignes CSV de l'export des thèses, en-tête comprise."""
+    """Renvoie les lignes CSV de l'export des thèses, en-tête comprise."""
     writer = CsvWriter()
     yield writer.header([header for _, header in emitted])
     for row in rows:
@@ -230,21 +231,21 @@ class PublicationListQueries:
         per_page: int,
         sort: str,
     ) -> PublicationListResponse:
-        """Liste paginée des publications, avec leurs sources, laboratoires et revue."""
+        """Renvoie la liste paginée des publications, avec leurs sources, laboratoires et revue."""
         context = filter_context(self._conn, filters)
         perimeter_structure_ids = context.perimeter_structure_ids
         self._conn.execute(text("SET LOCAL jit = off"))
         offset = (page - 1) * per_page
         where_clause, binds = publication_filter_where(filters, context)
         sort_join, order = _sort_clauses(sort, person_filter=bool(filters.person_id))
-        # Le statut HAL se lit au regard d'un laboratoire : il est calculé quand la liste porte sur un seul.
+        # Le statut HAL se lit au regard d'un laboratoire : il est calculé pour une liste restreinte à un seul laboratoire.
         hal_status = (
             hal_status_expression(context.lab_hal_collection)
             if len(filters.lab_ids) == 1
             else WhereClause("NULL", {})
         )
 
-        # Quand la recherche trouve un sujet (`search_clause`), les publications dont le titre répond passent en premier ; celles trouvées par leurs seuls sujets suivent.
+        # Quand la recherche trouve un sujet (`search_clause`), les publications trouvées par leur titre passent en premier ; celles trouvées par leurs seuls sujets suivent.
         if filters.search:
             order = (
                 "(CASE WHEN p.title_normalized ILIKE :sort_search_pat THEN 0 ELSE 1 END), " + order
@@ -366,11 +367,11 @@ class PublicationListQueries:
         sort: str,
         columns: list[str],
     ) -> Iterator[str]:
-        """Export CSV du tableau affiché : mêmes filtres que la liste (`publication_filter_where`), mêmes colonnes (clés des colonnes visibles, toutes si `columns` est vide). Titre et accès sont toujours présents.
+        """Renvoie l'export CSV du tableau affiché : mêmes filtres que la liste (`publication_filter_where`), mêmes colonnes (clés des colonnes visibles, toutes si `columns` est vide). Titre et accès sont toujours présents.
 
-        Le CSV sort par blocs, pour une réponse en flux : composer le fichier entier en mémoire coûterait une quinzaine de fois son poids (tampon qui double en croissant, copie à la relecture, marque d'ordre des octets en tête).
+        Le CSV est renvoyé par blocs, en flux : le fichier entier en mémoire coûterait une quinzaine de fois son poids (tampon qui double en croissant, copie à la relecture, marque d'ordre des octets en tête).
 
-        La méthode doit rester hors générateur : la requête s'exécute à l'appel, sur la connexion que la dépendance FastAPI tient ouverte le temps du traitement. Cette connexion se ferme avant l'envoi du corps de la réponse ; un générateur qui lirait la base pendant l'envoi la trouverait fermée. Seules les lignes déjà en mémoire se parcourent ensuite.
+        La méthode doit rester hors générateur : la requête s'exécute à l'appel, sur la connexion ouverte par la dépendance FastAPI le temps du traitement. Cette connexion se ferme avant l'envoi du corps de la réponse ; un générateur lisant la base pendant l'envoi la trouverait fermée. Seules les lignes déjà en mémoire se parcourent ensuite.
         """
         self._conn.execute(text("SET LOCAL jit = off"))
         context = filter_context(self._conn, filters)
@@ -456,9 +457,9 @@ class PublicationListQueries:
     def export_theses_csv(
         self, *, filters: PublicationFilters, sort: str, columns: list[str]
     ) -> Iterator[str]:
-        """Export CSV du tableau affiché par la page des thèses : mêmes filtres, même tri, mêmes colonnes (clés des colonnes visibles, toutes si `columns` est vide). Titre et accès sont toujours présents.
+        """Renvoie l'export CSV du tableau affiché par la page des thèses : mêmes filtres, même tri, mêmes colonnes (clés des colonnes visibles, toutes si `columns` est vide). Titre et accès sont toujours présents.
 
-        Rendu par blocs, aux mêmes conditions que l'export des publications : la requête s'exécute à l'appel, le parcours qui suit lit des lignes en mémoire.
+        Renvoyé par blocs, aux mêmes conditions que l'export des publications : la requête s'exécute à l'appel, le parcours qui suit lit des lignes en mémoire.
         """
         self._conn.execute(text("SET LOCAL jit = off"))
         where_clause, binds = publication_filter_where(filters, filter_context(self._conn, filters))

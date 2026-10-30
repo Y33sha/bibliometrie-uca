@@ -1,9 +1,9 @@
 """Modèles de réponse : résolution du libellé d'une entité de facette."""
 
-from pydantic import BaseModel
+from application.ports.model import Model
 
 
-class EntityLabelResponse(BaseModel):
-    """Libellé d'une entité résolu par id (None si l'id est inconnu). Réaffiche une pastille de facette restaurée depuis l'URL, où seul l'id est transporté."""
+class EntityLabelResponse(Model):
+    """Libellé d'une entité, ou `None` si l'id est inconnu."""
 
     label: str | None

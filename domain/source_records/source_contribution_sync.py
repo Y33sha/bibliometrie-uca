@@ -1,6 +1,6 @@
 """Synchronisation des contributions sources d'un enregistrement source renormalisé avec celles en base.
 
-La renormalisation d'un enregistrement source rapproche ses contributions sources entrantes de ses contributions sources en base. Une contribution source rapprochée garde son identifiant, et donc sa personne et son épinglage ; elle est réécrite seulement si son empreinte change. Les contributions sources sans correspondant sont insérées ou supprimées.
+La renormalisation d'un enregistrement source retrouve en base ses contributions sources entrantes. Une contribution source retrouvée garde son identifiant, et donc sa personne et son épinglage ; elle est réécrite seulement si son empreinte change. Les contributions sources sans correspondant sont insérées ou supprimées.
 """
 
 from collections import defaultdict
@@ -12,20 +12,24 @@ from domain.types import JsonValue
 
 
 class StoredSourceContribution(NamedTuple):
-    """Contribution source en base. `contributor_key` : nom normalisé et identifiants du contributeur. `content_hash` : empreinte de son contenu."""
+    """Contribution source en base."""
 
     id: int
     position: int | None
     contributor_key: Hashable
+    """Nom normalisé et identifiants du contributeur."""
     content_hash: str | None
+    """Empreinte du contenu de la contribution source."""
     roles: tuple[str, ...] | None = None
 
 
 class IncomingSourceContribution(NamedTuple):
-    """Contribution source de l'enregistrement source renormalisé. `key` : rang dans l'enregistrement source. Une contribution source sans rôle d'auteur est sans position."""
+    """Contribution source de l'enregistrement source renormalisé."""
 
     key: int
+    """Rang dans l'enregistrement source."""
     position: int | None
+    """`None` pour une contribution source sans rôle d'auteur."""
     contributor_key: Hashable
     content_hash: str
     roles: tuple[str, ...] | None = None
@@ -33,24 +37,26 @@ class IncomingSourceContribution(NamedTuple):
 
 @dataclass(frozen=True, slots=True)
 class SourceContributionSyncPlan:
-    """Ce que la renormalisation fait des contributions sources d'un enregistrement source.
-
-    `updates` : couples (identifiant en base, clé entrante) dont l'empreinte change. `kept` : identifiants en base rapprochés et inchangés. `inserts` : clés entrantes sans correspondant. `deletes` : identifiants en base sans correspondant. `regroup` : une contribution source est insérée ou supprimée, ou change de position ou de rôles. Les contributions sources de la publication sont alors à regrouper.
-    """
+    """Plan de synchronisation des contributions sources d'un enregistrement source renormalisé."""
 
     updates: tuple[tuple[int, int], ...]
+    """Couples (identifiant en base, clé entrante) dont l'empreinte change."""
     kept: tuple[int, ...]
+    """Identifiants en base retrouvés et inchangés."""
     inserts: tuple[int, ...]
+    """Clés entrantes sans correspondant."""
     deletes: tuple[int, ...]
+    """Identifiants en base sans correspondant."""
     regroup: bool
+    """Une contribution source est insérée ou supprimée, ou change de position ou de rôles. Les contributions sources de la publication sont alors à regrouper."""
 
 
 def plan_source_contribution_sync(
     stored: Sequence[StoredSourceContribution], incoming: Sequence[IncomingSourceContribution]
 ) -> SourceContributionSyncPlan:
-    """Rapproche les contributions sources entrantes de celles en base.
+    """Retrouve en base les contributions sources entrantes.
 
-    Des informations du contributeur présentes dans une seule contribution source de chaque côté rapprochent les deux. Répétées, elles rapprochent les contributions sources de même position d'auteur.
+    Des informations du contributeur présentes dans une seule contribution source de chaque côté suffisent à la correspondance. Répétées, elles valent seulement entre contributions sources de même position d'auteur.
     """
     stored_by_contributor_information: dict[Hashable, list[StoredSourceContribution]] = defaultdict(
         list
@@ -102,7 +108,14 @@ def source_contribution_content(
     hal_structure_ids: Iterable[int] = (),
     collective: bool = False,
 ) -> JsonValue:
-    """Champs qu'écrit la normalisation d'une contribution source, dont l'empreinte détecte un changement. `name` : chaîne brute, nom et prénom de la source. `addresses` : (texte, pays, ROR) de chaque adresse, dans l'ordre de la source. `ror_ids` : ROR attribués à la contribution source sans texte d'affiliation. `hal_structure_ids` : structures HAL directes de la contribution source. Les ROR, les structures HAL et la marque collective sont présents dans le contenu seulement s'il y en a."""
+    """Renvoie les champs écrits par la normalisation d'une contribution source, dont l'empreinte détecte un changement. Les ROR, les structures HAL et la marque collective figurent dans le contenu seulement s'ils sont présents.
+
+    Args:
+        name: chaîne brute, nom et prénom de la source.
+        addresses: (texte, pays, ROR) de chaque adresse, dans l'ordre de la source.
+        ror_ids: ROR attribués à la contribution source sans texte d'affiliation.
+        hal_structure_ids: structures HAL directes de la contribution source.
+    """
     content: dict[str, JsonValue] = {
         "position": position,
         "name": list(name),
