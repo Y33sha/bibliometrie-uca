@@ -8,12 +8,15 @@ _DOI = "10.1/x"
 
 
 def _copy(url, *, version=None, is_oa=True, platform=None, described=False, arrival=1) -> Copy:
+    known = _KNOWN.get(platform or "")
     return Copy(
         url=url,
         version=version,
         is_oa=is_oa,
         platform=platform,
-        known_platform=_KNOWN.get(platform or ""),
+        known_platform=known,
+        platform_type=known.platform_type if known else None,
+        license=None,
         described_by_platform=described,
         arrival=arrival,
     )
@@ -103,6 +106,8 @@ def test_une_plateforme_du_registre_porte_le_nom_du_registre():
         is_oa=True,
         platform="Zenodo (CERN European Organization for Nuclear Research)",
         known_platform=ZENODO,
+        platform_type=ZENODO.platform_type,
+        license=None,
         described_by_platform=False,
         arrival=1,
     )

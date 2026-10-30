@@ -5,8 +5,10 @@ from collections.abc import Sequence
 
 from sqlalchemy import Connection, text
 
-from domain.platforms.registry import HAL, known_platform_of_copy
+from domain.platforms.platform import PlatformType
+from domain.platforms.registry import HAL, known_platform_of_copy, platform_type_of_copy
 from domain.publications.access import Copy
+from domain.publications.licenses import License
 from domain.sources.registry import Source
 
 
@@ -15,7 +17,8 @@ def publication_copies(conn: Connection, publication_ids: Sequence[int]) -> dict
     rows = conn.execute(
         text("""
             SELECT sr.publication_id, sr.source::text AS source, l.url, l.version, l.is_oa,
-                   pl.name AS platform, pl.openalex_id AS platform_openalex_id,
+                   l.license::text AS license, pl.name AS platform,
+                   pl.openalex_id AS platform_openalex_id, pl.platform_type::text AS platform_type,
                    sr.id AS arrival
             FROM source_record_locations l
             JOIN source_records sr ON sr.id = l.source_record_id
@@ -34,6 +37,9 @@ def publication_copies(conn: Connection, publication_ids: Sequence[int]) -> dict
                 is_oa=r.is_oa,
                 platform=known.name if known else r.platform,
                 known_platform=known,
+                platform_type=platform_type_of_copy(r.url, r.platform_openalex_id)
+                or (PlatformType(r.platform_type) if r.platform_type else None),
+                license=License(r.license) if r.license else None,
                 described_by_platform=r.source == Source.HAL and known is HAL,
                 arrival=r.arrival,
             )

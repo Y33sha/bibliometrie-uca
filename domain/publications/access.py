@@ -1,15 +1,17 @@
 """Liens d'accès d'une publication : ses copies ouvertes, une par plateforme.
 
-Une copie se classe par sa version (éditeur, acceptée, soumise, inconnue), puis par l'ordre d'arrivée de son enregistrement source. Chaque plateforme donne sa meilleure copie ; une copie sans plateforme se range sous l'hôte de son URL. Quand une plateforme décrit elle-même la publication (HAL pour HAL), seule sa description décide de l'ouverture de ses copies.
+Seules les copies ouvertes comptent (`open_copies`). Une copie se classe par sa version (éditeur, acceptée, soumise, inconnue), puis par l'ordre d'arrivée de son enregistrement source. Chaque plateforme donne sa meilleure copie ; une copie sans plateforme se range sous l'hôte de son URL.
 
-Seule une copie à adresse `http` ou `https` compte. La meilleure copie donne l'adresse d'accès. Une copie désignée par le DOI de la publication est absente des liens : le DOI s'affiche à part. Une copie désignée par un autre DOI figure parmi les liens seulement si une plateforme l'héberge.
+La meilleure copie donne l'adresse d'accès. Une copie désignée par le DOI de la publication est absente des liens : le DOI s'affiche à part. Une copie désignée par un autre DOI figure parmi les liens seulement si une plateforme l'héberge.
 """
 
 from collections.abc import Iterable
 from dataclasses import dataclass
 from urllib.parse import unquote, urlsplit
 
+from domain.platforms.platform import PlatformType
 from domain.platforms.registry import KnownPlatform
+from domain.publications.licenses import License
 from domain.publications.metadata import OA_OPEN_STATUSES, OaStatus
 
 _DOI_HOSTS = frozenset({"doi.org", "dx.doi.org"})
@@ -29,6 +31,9 @@ class Copy:
     """Nom de la plateforme qui héberge la copie : celui de la liste pour une plateforme connue, sinon celui donné par la source."""
     known_platform: KnownPlatform | None
     """Plateforme de la liste qui héberge la copie (`known_platform_of_copy`)."""
+    platform_type: PlatformType | None
+    """Type de la plateforme : celui de la liste (`platform_type_of_copy`), à défaut celui donné par la source."""
+    license: License | None
     described_by_platform: bool
     """La copie vient de l'enregistrement source donné par la plateforme elle-même."""
     arrival: int
@@ -73,18 +78,22 @@ def _rank(copy: Copy) -> tuple[int, int]:
     return _VERSION_RANK.get(copy.version or "", _UNKNOWN_VERSION_RANK), copy.arrival
 
 
-def access(copies: Iterable[Copy], *, doi: str | None) -> Access:
-    """Calcule l'adresse d'accès et les liens d'accès d'une publication de DOI `doi`."""
+def open_copies(copies: Iterable[Copy]) -> list[Copy]:
+    """Renvoie les copies ouvertes, à adresse `http` ou `https`. Quand une plateforme décrit elle-même la publication, seule sa description décide de l'ouverture de ses copies."""
     copies = list(copies)
     self_described = {c.platform for c in copies if c.described_by_platform}
-    open_copies = [
+    return [
         c
         for c in copies
         if c.is_oa
         and urlsplit(c.url).scheme in _WEB_SCHEMES
         and (c.described_by_platform or c.platform not in self_described)
     ]
-    ranked = sorted(open_copies, key=_rank)
+
+
+def access(copies: Iterable[Copy], *, doi: str | None) -> Access:
+    """Calcule l'adresse d'accès et les liens d'accès d'une publication de DOI `doi`."""
+    ranked = sorted(open_copies(copies), key=_rank)
     best: dict[str, Copy] = {}
     for copy in ranked:
         if _listed(copy, doi):
