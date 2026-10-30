@@ -23,9 +23,9 @@
 	import FacetDropdown from '#lib/components/FacetDropdown.svelte';
 	import IconButton from '#lib/components/IconButton.svelte';
 	import { useDrawerParam } from '#lib/composables/useDrawerParam.svelte.js';
-	import StructureDrawer from './StructureDrawer.svelte';
-	import StructureFormModal from './StructureFormModal.svelte';
-	import { API_SOURCES, ROR_FORMAT_ERROR, buildApiIds, normalizeRorId } from './types';
+	import StructureDrawer from '#lib/components/structures/StructureDrawer.svelte';
+	import StructureFormModal from '#lib/components/structures/StructureFormModal.svelte';
+	import { API_SOURCES, ROR_FORMAT_ERROR, buildApiIds, normalizeRorId } from '#lib/components/structures/types.js';
 
 	import type { components } from '#lib/api/schema.js';
 	type Structure = components['schemas']['StructureListItem'];
