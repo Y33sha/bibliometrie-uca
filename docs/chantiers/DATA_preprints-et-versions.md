@@ -56,7 +56,6 @@ Le titre change souvent entre preprint et article : les titres différents d'une
 - [ ] Signaux qui autorisent la fusion : relation déclarée, clé partagée, titre, selon leur fiabilité mesurée.
 - [ ] Garde sur les auteurs : la quasi-totalité des auteurs du preprint se retrouve dans la version publiée, comparés par personnes alignées plutôt que par noms bruts.
 - [ ] Cible ambiguë : un preprint relié à plusieurs versions publiées.
-- [ ] Fusion par une règle de `doi_targets` : le DOI du preprint a pour cible le DOI de sa version publiée.
 
 ### Phase 2 — Type des preprints arXiv
 
@@ -79,4 +78,6 @@ Le titre change souvent entre preprint et article : les titres différents d'une
 - **Fiabilité de la version déclarée.** La version des localisations d'entrepôt est peu fiable chez OpenAlex comme chez Unpaywall : 200 949 localisations d'entrepôt sur 258 875 sont en `submittedVersion`, y compris dans Cairn, qui héberge des versions publiées.
 - **Cible antérieure au preprint** (29 paires) : repost tardif ou fausse paire ?
 - **Année de l'œuvre fusionnée** : celle de la version publiée. L'année change pour 839 paires.
-- **Preprint fusionné visible comme version** : `is_matchable` écarte l'enregistrement source DataCite d'une forme secondaire dont la cible est le DOI `primary` d'un autre enregistrement source. Avec une règle preprint → version publiée, l'enregistrement source DataCite arXiv serait écarté, et la fiche publication ne pourrait plus le montrer.
+- **Fusion ou masquage.** Deux options :
+  - Fusion à la réconciliation. La coupe par ancres cesse d'imposer un DOI par publication, pour toutes les publications ou pour les seuls preprints. Levée pour toutes, elle fusionne aussi des œuvres hors preprints, parfois à juste titre : l'ampleur est à mesurer. Restent à arbitrer le DOI, le type et l'année de la publication fusionnée, et la défusion d'une fausse paire.
+  - Masquage. Le preprint relié à une version publiée reste une publication, absente des listes, des statistiques et des bibliographies. La fiche de la version publiée le montre parmi ses copies. Le modèle reste inchangé, et une fausse paire se corrige sans défusion. L'état « preprint d'une version publiée » est calculé une fois par le pipeline, pour que toutes les vues filtrent de la même façon.
