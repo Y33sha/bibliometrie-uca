@@ -1,13 +1,14 @@
 """Identifiants de publication : DOI et son préfixe, identifiant HAL, NNT, PMID, PMCID, identifiant arXiv, ISSN, ISBN."""
 
 import re
+from typing import NamedTuple
 from urllib.parse import unquote, urlparse
 
 from domain.identifiers import NormalizedIdentifier
 from domain.urls import is_host
 
-# Suffixe de version des DOI d'entrepôts de données (Figshare, Zenodo…). Le DOI sans version désigne l'œuvre.
-_DOI_VERSION_SUFFIX = re.compile(r"\.v\d+$", re.IGNORECASE)
+# Suffixe de version d'un DOI normalisé : `.v` ou `/v` suivi de trois chiffres au plus (`10.6084/m9.figshare.123.v2`, `10.21203/rs.3.rs-123/v1`). Un numéro plus long est un code d'article (`10.1681/asn.v12102060`).
+_DOI_VERSION_SUFFIX = re.compile(r"[./]v(\d{1,3})$")
 # Suffixe d'URL de page d'éditeur (`/pdf`, `/full`, `/abstract`) collé au DOI. Le DOI suffixé est inconnu de doi.org.
 _DOI_URL_PAGE_SUFFIX = re.compile(r"/(?:pdf|full|abstract)$", re.IGNORECASE)
 _DOI_URL_PREFIXES = (
@@ -29,11 +30,11 @@ _SEPARATORS_RE = re.compile(r"[\s-]")
 
 
 def clean_doi(raw: str | None) -> str | None:
-    """Forme normalisée d'un DOI brut : en minuscules, sans préfixe d'URL ni schéma, sans artefact de copier-coller ni suffixe de version. `None` si la valeur n'a pas la forme d'un DOI. Les DOI sont insensibles à la casse."""
+    """Forme normalisée d'un DOI brut : en minuscules, sans préfixe d'URL ni schéma, sans artefact de copier-coller. `None` si la valeur n'a pas la forme d'un DOI. Les DOI sont insensibles à la casse."""
     if not raw:
         return None
     s = raw.strip().lower()
-    # Une étape de fin (suffixe `.vN`) peut laisser un résidu pour une étape de début : la passe se répète jusqu'à stabilité.
+    # Une étape de fin (suffixe de page d'éditeur) peut laisser un résidu pour une étape de début : la passe se répète jusqu'à stabilité.
     while s:
         reduced = _normalize_doi_step(s)
         if reduced == s:
@@ -69,8 +70,22 @@ def _normalize_doi_step(s: str) -> str:
         s = s[:-1]
     if s.endswith("(") and s.count("(") > s.count(")"):
         s = s[:-1]
-    s = _DOI_URL_PAGE_SUFFIX.sub("", s)
-    return _DOI_VERSION_SUFFIX.sub("", s)
+    return _DOI_URL_PAGE_SUFFIX.sub("", s)
+
+
+class DoiVersion(NamedTuple):
+    """Forme sans version d'un DOI à suffixe de version, et numéro de la version."""
+
+    unversioned: str
+    number: int
+
+
+def doi_version(doi: str) -> DoiVersion | None:
+    """Forme sans version et numéro de version d'un DOI normalisé, ou `None` sans suffixe de version."""
+    match = _DOI_VERSION_SUFFIX.search(doi)
+    if match is None:
+        return None
+    return DoiVersion(doi[: match.start()], int(match.group(1)))
 
 
 class DOI(NormalizedIdentifier):

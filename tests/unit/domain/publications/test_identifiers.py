@@ -14,7 +14,9 @@ from domain.publications.identifiers import (
     PMID,
     ArxivId,
     DoiPrefix,
+    DoiVersion,
     HALId,
+    doi_version,
     extract_doi_from_url,
     find_isbns,
     is_hal_host,
@@ -41,19 +43,15 @@ class TestDOIConstruction:
             ("DOI:10.1234/TEST", "10.1234/test"),  # schéma doi: et minuscules
             (
                 "doi:10.6084/m9.figshare.31023197.v1",
-                "10.6084/m9.figshare.31023197",
-            ),  # schéma et suffixe .vN
+                "10.6084/m9.figshare.31023197.v1",
+            ),  # schéma retiré, suffixe de version gardé
             ("  10.1234/test  ", "10.1234/test"),  # espaces retirés
-            ("10.6084/m9.figshare.31023197.v1", "10.6084/m9.figshare.31023197"),  # suffixe .vN
-            ("10.36227/techrxiv.19754971.v2", "10.36227/techrxiv.19754971"),  # suffixe .v2
+            ("10.20944/preprints202504.2026.V1", "10.20944/preprints202504.2026.v1"),  # version
+            ("10.21203/rs.3.rs-123/v2", "10.21203/rs.3.rs-123/v2"),  # version en /vN
             ("10.1234/test/pdf", "10.1234/test"),  # suffixe /pdf
             ("https://doi.org/10.1234/test/PDF", "10.1234/test"),  # /PDF et URL retirés
             ("10.3389/fnut.2026.1714437/full", "10.3389/fnut.2026.1714437"),  # suffixe /full
             ("10.3389/feart.2020.00279/abstract", "10.3389/feart.2020.00279"),  # suffixe /abstract
-            (
-                "10.1234/test/pdf.v1",
-                "10.1234/test",
-            ),  # le retrait de .vN fait apparaître /pdf, retiré à son tour
             ("10.24072/pcjournal.308/", "10.24072/pcjournal.308"),  # barre oblique finale parasite
             (
                 "https://doi.org/10.1234/test/",
@@ -61,8 +59,8 @@ class TestDOIConstruction:
             ),  # barre oblique finale et URL retirées
             (
                 "10.36227/techrxiv.19754971.v2/",
-                "10.36227/techrxiv.19754971",
-            ),  # barre oblique et suffixe .vN
+                "10.36227/techrxiv.19754971.v2",
+            ),  # barre oblique finale retirée, suffixe de version gardé
             ("10.18145/ivia)", "10.18145/ivia"),  # parenthèse finale non appariée
             ("10.1234/test.", "10.1234/test"),  # point final parasite
             ("10.1234/test).", "10.1234/test"),  # ponctuations finales cumulées
@@ -130,6 +128,31 @@ class TestDOIConstruction:
             DOI(raw)
 
 
+class TestDoiVersion:
+    @pytest.mark.parametrize(
+        ("doi", "expected"),
+        [
+            ("10.6084/m9.figshare.123.v2", DoiVersion("10.6084/m9.figshare.123", 2)),
+            ("10.21203/rs.3.rs-123/v1", DoiVersion("10.21203/rs.3.rs-123", 1)),
+            ("10.48580/dv5t.v89", DoiVersion("10.48580/dv5t", 89)),
+        ],
+    )
+    def test_version_suffix(self, doi, expected):
+        assert doi_version(doi) == expected
+
+    @pytest.mark.parametrize(
+        "doi",
+        [
+            "10.1681/asn.v12102060",  # code d'article de plus de trois chiffres
+            "10.3390/v10050256",  # revue Viruses : `v` collé au préfixe
+            "10.1234/journal.v12.issue3",
+            "10.1234/test",
+        ],
+    )
+    def test_without_version_suffix(self, doi):
+        assert doi_version(doi) is None
+
+
 class TestDOITryParse:
     @pytest.mark.parametrize("raw", [None, "", "   "])
     def test_returns_none_on_blank(self, raw):
@@ -142,7 +165,7 @@ class TestDOITryParse:
 
     def test_normalizes_on_parse(self):
         d = DOI.try_parse("https://doi.org/10.1234/TEST.v3")
-        assert d.value == "10.1234/test"
+        assert d.value == "10.1234/test.v3"
 
     # Cas réels des related_dois d'OpenAlex et des DOI WoS.
     @pytest.mark.parametrize(
@@ -174,7 +197,11 @@ class TestDOIImmutable:
 
     def test_equality_by_normalized_value(self):
         """Deux graphies du même DOI normalisé sont égales."""
-        assert DOI("10.1234/test") == DOI("  10.1234/test.v2  ")
+        assert DOI("10.1234/test") == DOI("  https://doi.org/10.1234/TEST  ")
+
+    def test_versions_are_distinct_dois(self):
+        """Régression : le suffixe retiré donnait `10.20944/preprints202504.2026`, inconnu de doi.org."""
+        assert DOI("10.20944/preprints202504.2026.v1") != DOI("10.20944/preprints202504.2026")
 
 
 class TestHALIdConstruction:
@@ -332,7 +359,7 @@ class TestExtractDoiFromUrl:
             ("https://doi.org/10.1234/x", "10.1234/x"),  # URL doi.org
             ("http://dx.doi.org/10.1234/x", "10.1234/x"),  # URL dx.doi.org
             ("doi:10.1234/x", "10.1234/x"),  # forme OAI-PMH location.id
-            ("doi:10.1234/X.v2", "10.1234/x"),  # normalisé (minuscules, version retirée)
+            ("doi:10.1234/X.v2", "10.1234/x.v2"),  # normalisé (minuscules)
             ("https://hal.science/hal-04123456", None),  # autre identifiant
             ("https://arxiv.org/abs/2401.00123", None),
             ("https://exemple.fr/?ref=doi.org/10.1234/x", None),  # doi.org hors de l'hôte
