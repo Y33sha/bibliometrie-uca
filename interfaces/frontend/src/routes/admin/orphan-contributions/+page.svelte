@@ -452,7 +452,8 @@
 	.publication-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 	.assign-panel { position: relative; }
 	.assign-row { display: flex; gap: 4px; align-items: center; }
-	.assign-row input { flex: 1; min-width: 0; padding: 4px 8px; border: 1px solid var(--border); border-radius: var(--radius); font-size: var(--fs-sm); }
+	/* Largeur nulle avant `flex: 1` : sinon la largeur par défaut du champ élargit la colonne. */
+	.assign-row input { flex: 1; width: 0; min-width: 0; padding: 4px 8px; border: 1px solid var(--border); border-radius: var(--radius); font-size: var(--fs-sm); }
 	.assign-results {
 		display: flex; flex-direction: column; gap: 2px;
 		background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
