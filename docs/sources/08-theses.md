@@ -24,7 +24,7 @@ theses.fr est le portail [ABES](../glossaire.md#abes) qui agrège les thèses fr
 
 ## Données récupérées
 
-- **Thèse** : identifiant ([NNT](../glossaire.md#nnt) pour les soutenues, id `sXXXXXX` pour les en cours), titres et résumés multilingues, langues, DOI éventuel (DOI ABES `10.70675/...` pour les thèses récentes), discipline, dates (soutenance, première inscription), école doctorale, partenaires de recherche (laboratoires), sujets auteur (multilingues), sujets RAMEAU (vocabulaire contrôlé de la BnF), statut (`soutenue` / `enCours`), cas de diffusion et accessibilité
+- **Thèse** : identifiant ([NNT](../glossaire.md#nnt) pour les soutenues, id `sXXXXXX` pour les en cours), titres et résumés multilingues, langues, DOI éventuel (DOI ABES `10.70675/...` pour les thèses récentes), discipline, dates (soutenance, première inscription), école doctorale, partenaires de recherche (laboratoires), sujets auteur (multilingues), sujets [RAMEAU](../glossaire.md#rameau) (vocabulaire contrôlé de la BnF), statut (`soutenue` / `enCours`), cas de diffusion et accessibilité
 - **Personnes** : auteur(s), directeur(s), rapporteur(s), membres et président du jury — chacun avec nom, prénom et PPN IdRef si présent.
 
 ## Exemple de payload
