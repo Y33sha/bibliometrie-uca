@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict NcDVQE2ZLpJHEZdnpkeMYdjdOBWqoB3aYHOgNhDFNsHQO4wb6hKHwz6qAUfFsCn
+\restrict Yq3MJxplGT5ncEWL8nvV6sL0BOj29TTOCuduvMAzYIDhfGDrskoeNWvsbnHeWxQ
 
--- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
--- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
+-- Dumped from database version 18.4
+-- Dumped by pg_dump version 18.4
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -1250,7 +1250,6 @@ CREATE TABLE sources.source_records (
     updated_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
     corrections jsonb DEFAULT '{}'::jsonb CONSTRAINT source_records_raw_metadata_not_null NOT NULL,
     title_normalized text,
-    embargo_until date,
     monograph_id integer,
     authors_hash text,
     impact jsonb,
@@ -2833,7 +2832,8 @@ CREATE TABLE sources.source_record_locations (
     version text,
     license public.license_type,
     is_oa boolean,
-    platform_id integer
+    platform_id integer,
+    embargo_until date
 );
 
 
@@ -2856,6 +2856,13 @@ COMMENT ON COLUMN sources.source_record_locations.oai_id IS 'Identifiant OAI-PMH
 --
 
 COMMENT ON COLUMN sources.source_record_locations.version IS 'Version de la copie dans le vocabulaire de la source (submittedVersion, acceptedVersion, publishedVersion).';
+
+
+--
+-- Name: COLUMN source_record_locations.embargo_until; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON COLUMN sources.source_record_locations.embargo_until IS 'Date de fin d''embargo. La copie est fermée jusqu''à cette date.';
 
 
 --
@@ -5617,5 +5624,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict NcDVQE2ZLpJHEZdnpkeMYdjdOBWqoB3aYHOgNhDFNsHQO4wb6hKHwz6qAUfFsCn
+\unrestrict Yq3MJxplGT5ncEWL8nvV6sL0BOj29TTOCuduvMAzYIDhfGDrskoeNWvsbnHeWxQ
 
