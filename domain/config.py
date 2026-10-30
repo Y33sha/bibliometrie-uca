@@ -127,6 +127,16 @@ INSTITUTION_CONFIG_KEYS: frozenset[str] = frozenset(
 )
 """Clés propres à l'établissement."""
 
+INITIAL_START_YEAR = 2017
+"""Première année moissonnée d'une installation."""
+
+INITIAL_CONFIG_VALUES: dict[str, JsonValue] = {
+    **{key.value: s.default for key, s in SETTINGS.items() if s.default is not None},
+    ConfigKey.PIPELINE_START_YEAR_FULL.value: INITIAL_START_YEAR,
+    LABORATORY_TYPES_KEY: [t.value for t in DEFAULT_LABORATORY_TYPES],
+}
+"""Valeur initiale de chaque clé commune à tous les établissements : sa valeur par défaut, et `INITIAL_START_YEAR` pour la première année moissonnée."""
+
 MIN_YEAR = 1970
 MAX_YEAR = 2100
 
