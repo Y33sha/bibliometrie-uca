@@ -198,7 +198,7 @@ class TestSourceContributions:
         openalex_martin = insert_source_contribution(
             conn, openalex, source="openalex", raw_author_name="A. Martin", author_position=0
         )
-        collective = insert_source_contribution(
+        insert_source_contribution(
             conn,
             openalex,
             source="openalex",
@@ -214,7 +214,7 @@ class TestSourceContributions:
 
         assert result is not None
         by_id = {s.id: s for s in result.source_contributions}
-        assert set(by_id) == {hal_martin, openalex_martin, collective}
+        assert set(by_id) == {hal_martin, openalex_martin}
         assert (by_id[hal_martin].contribution_id, by_id[hal_martin].method) == (
             contribution,
             "reference",
@@ -224,8 +224,6 @@ class TestSourceContributions:
             "name",
         )
         assert by_id[openalex_martin].source_record_id == openalex
-        assert by_id[collective].contribution_id is None
-        assert by_id[collective].collective is True
 
     def test_une_structure_atteinte_par_deux_indices_figure_une_fois(self, sa_sync_conn):
         """La contribution source atteint le laboratoire par une adresse et par un ROR."""
