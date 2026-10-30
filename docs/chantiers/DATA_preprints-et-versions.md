@@ -41,6 +41,19 @@ Le titre change souvent entre preprint et article : les titres différents d'une
 
 **Publications à DOI arXiv.** 169 publications à DOI arXiv (`10.48550`) ont un autre type que `preprint`, dont 160 typées `article`. 143 sont reliées à une autre publication par `is_related_to` (DataCite, clé partagée) : ce sont des preprints mal typés, comptés dans la famille « Publications » en plus de leur article.
 
+### Levée de la règle « un DOI par publication » (simulation du 2026-10-30)
+
+Deux publications se réunissent quand leurs enregistrements sources réconciliables partagent une clé de confirmation : DOI (cible appliquée), `hal_id`, identifiant arXiv, PMID, NNT, bloc de métadonnées. 5 265 publications se réuniraient en 2 498 composantes, dont 2 334 de deux publications.
+
+| Catégorie | Composantes | Échantillon de 15 |
+|---|---|---|
+| Preprint et version publiée reliés par `is_preprint_of` | 1 362 | Fusion visée |
+| Avec un preprint, sans relation | 140 | Surtout des paires légitimes : preprints DESY (`10.3204`) ou JMIR et leur article, doublons SSRN et arXiv |
+| Hors preprint, même registrant | 451 | Légitimes : versions Figshare, article à deux DOI. Œuvres distinctes : résumé de congrès et article, deux corrigenda, éditorial publié dans deux revues, chapitre réédition d'un article |
+| Hors preprint, registrants différents | 545 | Légitimes : copie arXiv typée `article`, copie Apollo (`10.17863`), double DOI Cairn, revue qui change de préfixe. Œuvres distinctes : communication et version longue en revue, poster EGU et article, data paper et jeu de données |
+
+Les composantes de trois publications ou plus enchaînent souvent communication, article de revue et copie arXiv. Une fusion générale demande une garde : type de document, auteurs, année.
+
 ## Décisions
 
 - **Le preprint fusionne avec sa version publiée.** Le chercheur consulte une seule œuvre dans sa bibliographie. Un preprint est une version d'une publication. OpenAlex et ScanR réunissent déjà l'article et son preprint.
@@ -78,6 +91,7 @@ Le titre change souvent entre preprint et article : les titres différents d'une
 - **Fiabilité de la version déclarée.** La version des localisations d'entrepôt est peu fiable chez OpenAlex comme chez Unpaywall : 200 949 localisations d'entrepôt sur 258 875 sont en `submittedVersion`, y compris dans Cairn, qui héberge des versions publiées.
 - **Cible antérieure au preprint** (29 paires) : repost tardif ou fausse paire ?
 - **Année de l'œuvre fusionnée** : celle de la version publiée. L'année change pour 839 paires.
+- **Hors périmètre : doublons hors preprints.** La simulation de la levée de la règle « un DOI par publication » montre des doublons légitimes hors preprints : copies arXiv typées `article`, copies de repository (Apollo), articles à deux DOI, revues qui changent de préfixe DOI. Ces copies et ces doubles DOI forment chacun une publication de plus.
 - **Fusion ou masquage.** Deux options :
   - Fusion à la réconciliation. La coupe par ancres cesse d'imposer un DOI par publication, pour toutes les publications ou pour les seuls preprints. Levée pour toutes, elle fusionne aussi des œuvres hors preprints, parfois à juste titre : l'ampleur est à mesurer. Restent à arbitrer le DOI, le type et l'année de la publication fusionnée, et la défusion d'une fausse paire.
   - Masquage. Le preprint relié à une version publiée reste une publication, absente des listes, des statistiques et des bibliographies. La fiche de la version publiée le montre parmi ses copies. Le modèle reste inchangé, et une fausse paire se corrige sans défusion. L'état « preprint d'une version publiée » est calculé une fois par le pipeline, pour que toutes les vues filtrent de la même façon.
