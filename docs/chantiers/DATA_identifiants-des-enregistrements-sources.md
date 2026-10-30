@@ -78,7 +78,9 @@ Les autres usages acceptent plusieurs DOI : `fetch_missing`, `known_dois`, `reso
 - La correction par DOI partagé garde ou retire chaque DOI.
 - Le DOI d'une version, d'une variante ou d'une pièce de dataset a une cible quand l'œuvre principale est présente en base : DOI concept, forme principale ou dataset parent. La table `doi_targets` relie les deux DOI.
 - La cible tient lieu du DOI pour tous les enregistrements sources qui ont ce DOI, dans la réconciliation et la consolidation.
-- L'enregistrement source DataCite de la forme secondaire est écarté de la réconciliation (`is_matchable`).
+- L'enregistrement source DataCite de la forme secondaire est écarté de la réconciliation (`is_matchable`) quand la cible est le DOI `primary` d'un autre enregistrement source en base.
+- Un DOI garde sa forme, suffixe de version compris. Un suffixe de version est `.v` ou `/v` suivi de trois chiffres au plus.
+- Le DOI d'une version a pour cible sa forme sans version quand doi.org la connaît, sinon la version la plus récente présente en base, par numéro de version.
 - Clés de la réconciliation : tous les DOI actifs de rôle autre que `related`, `hal_id`, NNT, PMID et identifiant arXiv. Pour les quatre derniers, la clé est l'identifiant actif de rôle le plus fort, puis de plus petite valeur.
 - Coupe d'une composante de la réconciliation par DOI : ses ancres sont ses DOI `primary` et `derived` ; à défaut, les DOI des membres qui ont un seul DOI. Une composante à une ancre au plus reste entière. Sinon, un membre rejoint l'ancre de son DOI `primary` ou `derived`, à défaut l'unique ancre parmi ses DOI `secondary` ; un membre sans ancre unique reste sur sa publication.
 - Un identifiant absent de son registre est invalide. L'invalidité se calcule par jointure sur `failed_lookups`.
@@ -139,13 +141,21 @@ Les autres usages acceptent plusieurs DOI : `fetch_missing`, `known_dois`, `reso
 - [x] Écritures de la colonne retirées : normalisation, `remove_identifiers` (colonne et `corrections.doi`), déclarations de `pipeline/graph.py`.
 - [x] Suppression de la colonne et de l'entrée `doi` de `corrections` (b6d1f9a3c8e2).
 
-### Phase 7 — Documentation
+### Phase 7 — Suffixes de version des DOI
+
+La normalisation retire le suffixe `.vN`. Chez Figshare et les repositories sur Figshare, la forme sans version existe chez doi.org. Chez preprints.org, ChemRxiv, TechRxiv, F1000 ou Code Ocean, elle est inconnue : `remove_identifiers` retire alors un DOI vrai. Research Square, Authorea et protocols.io versionnent en `/vN`, et chaque version forme une publication. Le retrait tronque aussi des DOI d'article (`10.1681/asn.v12102060` devient `10.1681/asn`).
+
+- [ ] Normalisation : DOI gardé avec son suffixe de version.
+- [ ] Tâche de résolution de la forme sans version chez doi.org, qui écrit les cibles de version dans `doi_targets`. Une forme connue garde sa cible sans nouvelle requête ; une forme inconnue passe par `failed_lookups`.
+- [ ] Cibles de version dans `known_dois`, pour que `fetch_missing` moissonne la forme sans version.
+- [ ] `is_matchable` : enregistrement source DataCite écarté seulement quand sa cible est le DOI `primary` d'un autre enregistrement source.
+- [ ] Stock : identifiants DOI réécrits depuis le raw store (oneshot).
+
+### Phase 8 — Documentation
 
 - [x] Mise à jour de la documentation.
+- [ ] Suffixes de version et cibles de version.
 
 ## Questions ouvertes
 
-- Règles de `remove_identifiers` à revoir. La sous-étape retire les DOI manifestement faux : inconnus de doi.org, ou attribués à tort, surtout le DOI d'un ouvrage donné à un chapitre et celui d'un volume d'actes donné à une communication. Un chapitre perd le DOI d'un ouvrage quel que soit son titre ; le type que Crossref donne au DOI suffit à le trancher. L'absence de nom d'auteur commun entre un dépôt HAL et l'enregistrement source Crossref est un indice trop approximatif : beaucoup d'ouvrages Crossref n'ont aucun auteur.
-- DOI preprints.org (`10.20944/preprints…`) inscrits dans `failed_lookups` comme inconnus de doi.org, à vérifier.
-
-- Hors périmètre : retrait des identifiants secondaires trop éloignés de l'enregistrement source qui les cite, par comparaison deux à deux des titres par exemple. Ce serait une généralisation de `remove_identifiers` à tous les identifiants.
+- Règles de `remove_identifiers` à revoir. La sous-étape retire les DOI manifestement faux : inconnus de doi.org, ou attribués à tort, surtout le DOI d'un ouvrage donné à un chapitre et celui d'un volume d'actes donné à une communication. Un chapitre perd le DOI d'un ouvrage quel que soit son titre ; le type que Crossref donne au DOI suffit à le trancher. L'absence de nom d'auteur commun entre un dépôt HAL et l'enregistrement source Crossref est un indice trop approximatif : beaucoup d'ouvrages Crossref n'ont aucun auteur. Une généralisation retirerait les identifiants secondaires trop éloignés de l'enregistrement source qui les cite, par comparaison deux à deux des titres par exemple.
