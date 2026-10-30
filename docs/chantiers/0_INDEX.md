@@ -12,7 +12,6 @@
 
 - [Date de publication](DATA_date-de-publication.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
-- [Payloads des sources hors de la base](CODE_payloads-hors-base.md)
 - [Pertinence des sujets](DATA_pertinence-des-sujets.md)
 - [Résolution probabiliste des personnes](DATA_resolution-personnes-probabiliste.md)
 - [Signatures institutionnelles](METIER_signatures-institutionnelles.md)

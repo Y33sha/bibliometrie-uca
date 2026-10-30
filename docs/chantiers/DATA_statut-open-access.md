@@ -51,7 +51,9 @@ Simulation sur les 76 591 publications du périmètre (`interfaces/cli/oneshot/m
 ### Phase 3 — Statut tiré des copies
 
 - [ ] Consolidation du statut : plancher des copies, verdict d'Unpaywall, `diamond` par le DOAJ.
-- [ ] Remesure avec `measure_oa_floor`, revue des écarts restants.
+- [ ] Remesure avec `measure_oa_floor`, revue des écarts restants. Cas à vérifier :
+  - publication 9705 : ouverte « via l'éditeur » pour un DOI Zenodo, avec une autre copie Zenodo ;
+  - publication 78490 : fermée, alors que le DOI mène au PDF. Le DOI est enregistré chez KISTI, agence mal couverte par Unpaywall.
 
 ### Phase 4 — Documentation
 

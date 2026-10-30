@@ -51,6 +51,8 @@ Le chantier [alignement des auteurs](archived/2026-10-24_DATA_alignement-auteurs
   - HAL seul : surtout des publications antérieures à 2017, d'auteurs partis depuis longtemps.
   - WoS se trompe sur la ville d'une adresse de l'université Côte d'Azur, dont le sigle est aussi UCA.
   - Cas limites de périmètre : CHU, laboratoire homonyme d'une autre ville.
+- [ ] Enregistrements sources OpenAlex dont toutes les contributions sources ont les mêmes affiliations, confrontés aux autres sources de la publication.
+- [ ] Adresses issues d'une erreur de parsing (publication 106296).
 
 ### Phase 2 — INSPIRE-HEP
 
