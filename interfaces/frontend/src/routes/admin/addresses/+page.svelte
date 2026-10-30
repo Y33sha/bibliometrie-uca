@@ -570,22 +570,21 @@
 							checked={selectedIds.has(addr.id)}
 							onchange={() => toggleSelect(addr.id)}
 						/>
-						<button
-							type="button"
-							class="addr-toggle"
-							aria-expanded={expandedId === addr.id}
-							onclick={() => toggleDetail(addr.id)}
-						>
+						<div>
 							<div class="addr-text">{addr.raw_text}</div>
 							<div class="addr-meta">
-								<span class="publication-count-tag"
-									>{addr.publication_count} publication{addr.publication_count > 1 ? 's' : ''}</span
+								<button
+									type="button"
+									class="publication-count-tag"
+									aria-expanded={expandedId === addr.id}
+									onclick={() => toggleDetail(addr.id)}
+									>{addr.publication_count} publication{addr.publication_count > 1 ? 's' : ''}</button
 								>
 								{#each addr.structures || [] as s}
 									<span class={structTagClass(s)}>{structureLabel(s)}</span>
 								{/each}
 							</div>
-						</button>
+						</div>
 						<div class="addr-actions" role="group" aria-label="Lien de l'adresse à la structure">
 							{#if addr.is_confirmed !== false}
 								<IconButton icon="reject" label="Rejeter le lien" onclick={() => reviewAddr(addr.id, false)} />
@@ -823,17 +822,6 @@
 	.addr-header:hover {
 		background: var(--surface-hover);
 	}
-	/* Texte de l'adresse : bouton qui déplie ses publications, sans apparence de bouton. */
-	.addr-toggle {
-		padding: 0;
-		border: none;
-		background: none;
-		font: inherit;
-		color: inherit;
-		text-align: left;
-		cursor: pointer;
-	}
-
 	.addr-text {
 		font-size: var(--fs-md);
 		word-break: break-word;
@@ -846,14 +834,22 @@
 		color: var(--muted);
 		flex-wrap: wrap;
 	}
+	/* Badge du nombre de publications : bouton qui déplie la liste des publications. */
 	.publication-count-tag {
 		display: inline-block;
+		font-family: inherit;
 		font-size: var(--fs-sm);
 		padding: 1px 7px;
+		border: none;
 		border-radius: var(--radius-pill);
 		background: var(--accent-light);
 		color: var(--accent);
 		font-weight: 500;
+		cursor: pointer;
+	}
+	.publication-count-tag:hover,
+	.publication-count-tag[aria-expanded='true'] {
+		background: color-mix(in srgb, var(--accent) 20%, var(--accent-light));
 	}
 	.struct-tag {
 		display: inline-block;
