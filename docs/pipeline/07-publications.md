@@ -41,4 +41,4 @@ Après une modification de la logique de résolution, l'option `--rebuild-public
 
 ## Recalcul des métadonnées
 
-Les métadonnées de chaque publication touchée sont recalculées depuis ses enregistrements sources. La licence de la version éditeur (`license`) suit un ordre de sources propre, et la licence du fichier déposé (`deposit_license`) vient de HAL. L'éditeur est celui de la date de publication : le titulaire du préfixe du DOI Crossref, à défaut le premier éditeur des enregistrements sources selon le classement des sources. Le préfixe d'une plateforme d'éditeurs est écarté, et une production hébergée sans être publiée est sans éditeur (`domain/publishers/attribution.py`). Une publication sans enregistrement source est supprimée.
+Les métadonnées de chaque publication touchée sont recalculées depuis ses enregistrements sources. L'éditeur est celui de la date de publication : le titulaire du préfixe du DOI Crossref, à défaut le premier éditeur des enregistrements sources selon le classement des sources. Une publication sans enregistrement source est supprimée.
