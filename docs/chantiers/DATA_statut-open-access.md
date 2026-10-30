@@ -45,8 +45,8 @@ Simulation sur les 76 591 publications du périmètre (`interfaces/cli/oneshot/m
 
 ### Phase 2 — Embargo sur les copies
 
-- [ ] Colonne `embargo_until` sur `source_record_locations`, retirée de `source_records`. La migration reporte la date sur les copies HAL et remet leur `is_oa` à vrai.
-- [ ] Ouverture d'une copie calculée à la lecture (lien texte intégral, statut). La règle de correction lit la date sur la copie.
+- [x] Colonne `embargo_until` sur `source_record_locations`, retirée de `source_records`. La migration reporte la date sur les copies HAL et remet leur `is_oa` à vrai. 711dbf64a
+- [x] Ouverture d'une copie calculée à la lecture (lien texte intégral, statut). La règle de correction lit la date sur la copie. 711dbf64a
 
 ### Phase 3 — Statut tiré des copies
 
