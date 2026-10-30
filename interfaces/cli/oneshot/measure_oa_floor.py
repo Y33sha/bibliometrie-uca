@@ -26,13 +26,13 @@ from sqlalchemy import Connection, text
 
 from domain.platforms.platform import PlatformType, is_catalog_record
 from domain.publications.access import Copy, open_copies
+from domain.publications.licenses import OPEN_LICENSES
 from domain.publications.metadata import OA_RANK
 from infrastructure.db.engine import build_sync_engine
 from infrastructure.read_models.publications.copies import publication_copies
 
 _DEFAULT_OUTPUT = Path("data/measures/oa_floor.tsv")
 _ARCHIVE_TYPES = frozenset({PlatformType.REPOSITORY, PlatformType.PREPRINT_SERVER})
-_OPEN_LICENSE_PREFIXES = ("cc", "public_domain", "pd")
 
 _PUBLICATIONS = text("""
     SELECT p.id, p.oa_status::text AS cur, p.doc_type::text AS doc_type, u.oa_status::text AS upw,
@@ -92,10 +92,7 @@ def simulate(conn: Connection, output: Path) -> None:
     """Écrit le statut actuel et le statut simulé de chaque publication, puis affiche la matrice des passages."""
     publications = conn.execute(_PUBLICATIONS).all()
     copies = {
-        pid: [
-            (_is_archive(c), bool(c.license) and c.license.startswith(_OPEN_LICENSE_PREFIXES))
-            for c in open_
-        ]
+        pid: [(_is_archive(c), c.license in OPEN_LICENSES) for c in open_]
         for pid, open_ in _open_copies(conn, [p.id for p in publications]).items()
     }
     matrix: Counter[tuple[str, str]] = Counter()

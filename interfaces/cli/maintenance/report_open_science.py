@@ -20,7 +20,7 @@ from domain.dates import today
 from domain.platforms.platform import PlatformType
 from domain.platforms.registry import known_platform_of_copy, preprint_servers_of_prefix
 from domain.publications.doc_types import DocType
-from domain.publications.licenses import License, license_label
+from domain.publications.licenses import OPEN_LICENSES, license_label
 from domain.publications.metadata import OaStatus
 from domain.sources.registry import source_label
 from infrastructure.db.engine import get_sync_engine
@@ -74,18 +74,6 @@ MODEL_LABELS = {"full_oa": "Open access", "diamond": "Open access", "subscriptio
 
 # Modèles des revues entièrement en open access.
 OPEN_ACCESS_MODELS = "('full_oa', 'diamond')"
-
-# Licences qui ouvrent la réutilisation.
-OPEN_LICENSES = frozenset(
-    {
-        *(lic.value for lic in License if lic.value.startswith("cc-")),
-        License.PUBLIC_DOMAIN,
-        License.LICENCE_OUVERTE,
-        License.OPEN_SOURCE,
-        License.PUBLISHER_OPEN,
-        License.OTHER_OA,
-    }
-)
 
 # Publications `p` du laboratoire.
 LAB_PUBLICATIONS = f"SELECT p.* FROM publications p WHERE {AUTHORED_PUBLICATION}"

@@ -52,6 +52,23 @@ LICENSE_LABELS: dict[License, str] = {
 }
 """Libellé français de chaque licence, dans l'ordre de l'enum."""
 
+OPEN_LICENSES: frozenset[License] = frozenset(
+    {
+        License.CC_BY,
+        License.CC_BY_SA,
+        License.CC_BY_ND,
+        License.CC_BY_NC,
+        License.CC_BY_NC_SA,
+        License.CC_BY_NC_ND,
+        License.PUBLIC_DOMAIN,
+        License.LICENCE_OUVERTE,
+        License.OPEN_SOURCE,
+        License.PUBLISHER_OPEN,
+        License.OTHER_OA,
+    }
+)
+"""Licences qui ouvrent la réutilisation."""
+
 NO_LICENSE_LABEL = "Aucune licence"
 
 
