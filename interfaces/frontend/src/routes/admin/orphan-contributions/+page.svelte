@@ -201,13 +201,13 @@
 		};
 	}
 
-	/** Signale les contributions qu'un lot écarte : déjà rattachées, ou dans une publication où la personne a déjà une contribution rattachée par une décision humaine. */
+	/** Signale les contributions qu'un lot écarte : déjà rattachées, ou dans une publication à laquelle la personne est déjà rattachée. */
 	function reportSkipped(requested: number, assigned: number) {
 		const skipped = requested - assigned;
 		if (skipped <= 0) return;
 		const plural = skipped > 1 ? 's' : '';
 		toast(
-			`${skipped} contribution${plural} écartée${plural} : déjà rattachée${plural}, ou dans une publication où la personne a déjà une contribution rattachée manuellement.`,
+			`${skipped} contribution${plural} écartée${plural} : contribution déjà rattachée, ou personne déjà rattachée à la publication.`,
 			'warning',
 			8000,
 		);
