@@ -25,7 +25,7 @@ Les enregistrements sources se traitent de la liste d'auteurs la plus longue à 
 - `contributions` : une ligne par auteur, avec `reference_position`, la position dans la liste la plus longue.
 - `aligned_source_contributions` : une ligne par contribution source alignée, avec l'origine du lien (`method` : `reference`, `name`, `identifier`, `order`, `model`).
 
-Chaque contribution reprend l'identifiant de la contribution en base avec laquelle elle partage le plus de contributions sources. La personne suit l'identifiant. Une contribution en base sans correspondant est supprimée. Une contribution rattachée dont les contributions sources changent entre dans la file de redécision de sa personne (`contribution_resolution_queue`).
+Chaque contribution reprend l'identifiant de la contribution en base avec laquelle elle partage le plus de contributions sources. La personne suit l'identifiant. Une contribution en base sans correspondant est supprimée. Une contribution rattachée entre dans la file de redécision de sa personne (`contribution_resolution_queue`) quand ses contributions sources changent.
 
 La tâche `author_grouping.attributes` recompose les attributs des contributions de la file `contribution_attributes_queue` : `roles`, `is_corresponding` et `perimeter_evidence` sont l'union de ceux des contributions sources alignées.
 

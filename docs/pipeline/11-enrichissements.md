@@ -8,7 +8,7 @@ Peuple la table `publication_relations`. Une relation rattache deux publications
 
 La table est reconstruite à chaque exécution, à partir de signaux indépendants appliqués dans l'ordre ci-dessous.
 
-**Relations déclarées par les sources.** DataCite et Crossref publient des relations typées entre DOI, que la phase traduit vers un vocabulaire unifié.
+**Relations déclarées par les sources.** DataCite et Crossref publient des relations typées entre DOI, traduites vers un vocabulaire unifié.
 
 **Clés de confirmation partagées.** Deux publications aux DOI distincts qui partagent un identifiant (HAL, arXiv, PMID, NNT) sont apparentées, par exemple un preprint et sa version publiée. La relation se déduit de leurs types de document.
 
@@ -17,9 +17,9 @@ La table est reconstruite à chaque exécution, à partir de signaux indépendan
 ## Sujets (`subjects`)
 
 **Ingestion.**
-Les sujets que les sources déclarent sur chaque `source_record` sont rattachés à la publication, dans les tables `subjects` et `publication_subjects`. Le lien garde la source qui a fourni le sujet. Seuls les termes d'un vocabulaire contrôlé entrent dans `subjects`. Les mots-clés libres restent dans les enregistrements sources.
+Les sujets déclarés par les sources sur chaque `source_record` sont rattachés à la publication, dans les tables `subjects` et `publication_subjects`. Le lien garde la source qui a fourni le sujet. Seuls les termes d'un vocabulaire contrôlé entrent dans `subjects`. Les mots-clés libres restent dans les enregistrements sources.
 
-Les publications dont les sources ont changé depuis la dernière ingestion de leurs sujets sont retraitées : leurs liens sont reconstruits, sauf ceux marqués `rejected`. L'option `--rebuild-subjects` retraite toutes les publications.
+Les publications aux sources modifiées depuis la dernière ingestion de leurs sujets sont retraitées : leurs liens sont reconstruits, sauf ceux marqués `rejected`. L'option `--rebuild-subjects` retraite toutes les publications.
 
 Les sujets sans lien sont supprimés.
 
@@ -42,4 +42,4 @@ Seules les adresses et les contributions sources marquées sont retraitées.
 
 Interroge [Unpaywall](../glossaire.md#unpaywall) par DOI et conserve son verdict dans `sources.unpaywall`. Le statut d'une publication se calcule à partir de ses sources et de ce verdict, ici et à chaque recalcul de la publication.
 
-Incrémentale : chaque exécution est plafonnée (`unpaywall_max_per_run`, 10 000 DOI par défaut) et vérifie seulement les DOI sans verdict, ou dont le verdict date de plus de `unpaywall_recheck_after_days` (15 jours par défaut, réglable dans `admin/config`). Les DOI DataCite, absents d'Unpaywall, sont écartés. Quand Unpaywall est indisponible, le DOI est repris au run suivant.
+Incrémentale : chaque exécution est plafonnée (`unpaywall_max_per_run`, 10 000 DOI par défaut) et vérifie seulement les DOI sans verdict, ou au verdict plus ancien que `unpaywall_recheck_after_days` (15 jours par défaut, réglable dans `admin/config`). Les DOI DataCite, absents d'Unpaywall, sont écartés. Quand Unpaywall est indisponible, le DOI est repris au run suivant.
