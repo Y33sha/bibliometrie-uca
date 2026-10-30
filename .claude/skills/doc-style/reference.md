@@ -218,6 +218,16 @@ AVANT :
 APRÈS :
     | structure | `structures` | Établissement, laboratoire, équipe, site ou service |
 
+## Relatives et pronoms en série
+
+« que », « dont », « y » et « en » alourdissent la phrase. Une tournure participiale, un adjectif ou un complément de nom dit la même chose plus court.
+
+AVANT :
+    le bidule que schtroumpfe le truc
+
+APRÈS :
+    le bidule schtroumpfé par le truc
+
 ## Étapes numérotées
 
 Le titre d'une étape la nomme ; un numéro n'apporte rien quand l'ordre se lit déjà dans la suite des paragraphes.
