@@ -719,15 +719,18 @@ class TestDoiAgency:
         return {p.id for p in res.publications}
 
     def test_filter(self, sa_sync_conn):
-        lab, pubs = self._seed(sa_sync_conn)
+        lab, publications = self._seed(sa_sync_conn)
 
-        assert self._ids(sa_sync_conn, lab, ["crossref"]) == {pubs["crossref"]}
-        assert self._ids(sa_sync_conn, lab, ["datacite"]) == {pubs["datacite"]}
-        assert self._ids(sa_sync_conn, lab, ["other"]) == {pubs["medra"], pubs["unresolved"]}
-        assert self._ids(sa_sync_conn, lab, ["none"]) == {pubs["none"]}
+        assert self._ids(sa_sync_conn, lab, ["crossref"]) == {publications["crossref"]}
+        assert self._ids(sa_sync_conn, lab, ["datacite"]) == {publications["datacite"]}
+        assert self._ids(sa_sync_conn, lab, ["other"]) == {
+            publications["medra"],
+            publications["unresolved"],
+        }
+        assert self._ids(sa_sync_conn, lab, ["none"]) == {publications["none"]}
         assert self._ids(sa_sync_conn, lab, ["crossref", "none"]) == {
-            pubs["crossref"],
-            pubs["none"],
+            publications["crossref"],
+            publications["none"],
         }
 
     def test_facet_counts_and_labels(self, sa_sync_conn):
