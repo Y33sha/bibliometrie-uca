@@ -14,9 +14,9 @@ https://developers.openalex.org/
 - [Moissonnage par personne](../pipeline/02-harvest.md#moissonnage-par-personne-harvest_by_person) : filtre `authorships.author.orcid` sur un lot de 50 personnes RH
 - Pagination par cursor, 200 résultats/page, à 8 req/s (`MAX_PER_SECOND`, `pipeline/ingestion/api_params.py`)
 
-**Sources API** (https://api.openalex.org/sources) — enrichissement par `openalex_id` de la revue. `enrich_serials_from_openalex`, dans la phase [`publishing`](../pipeline/05-publishing.md). Met à jour `serials.serial_type`.
+**Sources API** (https://api.openalex.org/sources) — interrogée par `openalex_id` de la revue. `enrich_serials_from_openalex`, dans la phase [`publishing`](../pipeline/05-publishing.md). Met à jour `serials.serial_type`.
 
-**Publishers API** (https://api.openalex.org/publishers) — enrichissement par `openalex_id` de l'éditeur, lancé à la demande par `interfaces/cli/maintenance/enrich_publishers.py`, hors pipeline. Écrit le pays des éditeurs qui n'en ont pas. Les éditeurs sans identifiant OpenAlex, la plupart, reçoivent leur pays et leur type à la main.
+**Publishers API** (https://api.openalex.org/publishers) — interrogée par `openalex_id` de l'éditeur, à la demande, par `interfaces/cli/maintenance/enrich_publishers.py`, hors pipeline. Écrit le pays des éditeurs sans pays. Les éditeurs sans identifiant OpenAlex, la plupart, reçoivent leur pays et leur type à la main.
 
 ## Données récupérées
 

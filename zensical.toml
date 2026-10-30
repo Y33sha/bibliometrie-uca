@@ -49,6 +49,7 @@ nav = [
     "sources/08-theses.md",
     "sources/09-sources-supplementaires.md",
     "sources/10-imports-manuels.md",
+    "sources/11-exemple-de-publication.md",
   ] },
   { "Pipeline" = [
     "pipeline/01-vue-d-ensemble.md",
