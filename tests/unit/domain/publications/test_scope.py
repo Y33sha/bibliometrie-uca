@@ -34,7 +34,7 @@ def _facts(
     title="observation of",
     urls=(),
     identifiers=(),
-    has_target=False,
+    target_recorded=False,
 ):
     """Faits d'un enregistrement source. `doi` : son DOI actif ; `removed_doi` : son DOI retiré par la correction. Le rôle du DOI est `primary` chez Crossref et DataCite, `secondary` ailleurs."""
     role = (
@@ -48,7 +48,7 @@ def _facts(
             SourceIdentifier(SourceIdentifierType.DOI, removed_doi, role, "UNRESOLVED_DOI_TO_NULL")
         )
     return MatchabilityFacts(
-        source, source_id, title, list(urls), [*dois, *identifiers], has_target
+        source, source_id, title, list(urls), [*dois, *identifiers], target_recorded
     )
 
 
@@ -85,12 +85,12 @@ class TestIsMatchable:
     def test_datacite_record_of_a_secondary_form_is_excluded(self):
         """L'enregistrement DataCite d'une version Zenodo dont le concept est en base."""
         version = "10.5281/zenodo.10"
-        record = _facts("datacite", version, doi=version, has_target=True)
+        record = _facts("datacite", version, doi=version, target_recorded=True)
         assert not is_matchable(record, set())
 
     def test_other_record_with_the_doi_of_a_secondary_form_is_kept(self):
         """Régression : un dépôt HAL au DOI d'une version Zenodo était écarté avec la version."""
-        record = _facts(doi="10.5281/zenodo.10", has_target=True)
+        record = _facts(doi="10.5281/zenodo.10", target_recorded=True)
         assert is_matchable(record, set())
 
     def test_paratext_title_is_excluded(self):

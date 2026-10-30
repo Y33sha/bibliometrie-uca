@@ -717,6 +717,31 @@ def test_les_versions_ont_pour_cible_le_doi_concept_moissonne(sa_sync_conn):
     assert _targets(conn) == {"10.6084/m9.figshare.1.v1": "10.6084/m9.figshare.1"}
 
 
+def test_la_version_datacite_reste_en_jeu_tant_que_sa_cible_est_sans_enregistrement_source(
+    sa_sync_conn,
+):
+    """Un dépôt Figshare en v1 a pour cible son DOI concept. Il est écarté de la réconciliation seulement quand le concept est le DOI `primary` d'un autre enregistrement source."""
+    conn = sa_sync_conn
+    version = _seed_work(conn, source_id="v1", doi="10.6084/m9.figshare.1.v1")
+    conn.execute(
+        text("UPDATE source_records SET source = 'datacite' WHERE id = :id"), {"id": version}
+    )
+    conn.execute(
+        text(
+            "INSERT INTO doi_targets (doi, target_doi, rule)"
+            " VALUES ('10.6084/m9.figshare.1.v1', '10.6084/m9.figshare.1', 'DOI_VERSION_TO_UNVERSIONED')"
+        )
+    )
+
+    def target_recorded() -> bool:
+        rows = SourceRecordCorrectionStore(conn).fetch_matchability_rows()
+        return next(r for r in rows if r.id == version).facts.primary_doi_target_recorded
+
+    assert not target_recorded()
+    _seed_work(conn, source_id="concept", doi="10.6084/m9.figshare.1")
+    assert target_recorded()
+
+
 def test_un_changement_de_cible_marque_les_enregistrements_sources_du_doi(sa_sync_conn):
     conn = sa_sync_conn
     _seed_work(conn, source_id="concept", doi="10.5281/zenodo.9")

@@ -351,10 +351,15 @@ class SourceRecordCorrectionStore:
                        EXISTS (
                            SELECT 1 FROM source_record_identifiers p
                            JOIN doi_targets t ON t.doi = p.id_value
+                           JOIN source_record_identifiers o
+                             ON o.id_value = t.target_doi
+                            AND o.id_type = '{SourceIdentifierType.DOI.value}'
+                            AND o.role = '{SourceIdentifierRole.PRIMARY.value}'
+                            AND o.source_record_id <> source_records.id
                            WHERE p.source_record_id = source_records.id
                              AND p.id_type = '{SourceIdentifierType.DOI.value}'
                              AND p.role = '{SourceIdentifierRole.PRIMARY.value}'
-                       ) AS primary_doi_has_target
+                       ) AS primary_doi_target_recorded
                 FROM source_records
             """)
         )
@@ -368,7 +373,7 @@ class SourceRecordCorrectionStore:
                     r.title_normalized,
                     r.urls,
                     parse_identifiers(r.identifiers),
-                    r.primary_doi_has_target,
+                    r.primary_doi_target_recorded,
                 ),
             )
             for r in rows
