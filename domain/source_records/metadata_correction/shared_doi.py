@@ -26,7 +26,7 @@ class DoiTargetRule(StrEnum):
         "DATACITE_VARIANT_TO_PRIMARY"  # copie repository → version publiée (IsVariantFormOf)
     )
     DATACITE_PACKAGE_PIECE = "DATACITE_PACKAGE_PIECE"  # pièce d'un dataset → dataset parent présent (IsPartOf, ou fichier complémentaire figshare)
-    DOI_VERSION_TO_UNVERSIONED = "DOI_VERSION_TO_UNVERSIONED"  # DOI à suffixe de version → sa forme sans version, DOI `primary` d'un enregistrement source
+    DOI_VERSION_TO_UNVERSIONED = "DOI_VERSION_TO_UNVERSIONED"  # DOI à suffixe de version → sa forme sans version, DOI `primary` ou `derived` d'un enregistrement source
     DOI_VERSION_TO_LATEST = (
         "DOI_VERSION_TO_LATEST"  # DOI à suffixe de version → version de plus grand numéro en base
     )
@@ -289,15 +289,15 @@ def doi_target(declarations: Iterable[SecondaryFormDeclaration], *, doi: str) ->
     return DoiTarget(doi, declaration.target_doi, declaration.rule) if declaration else None
 
 
-def version_targets(dois: Iterable[str], primary_dois: Set[str]) -> list[DoiTarget]:
-    """Cible de chaque DOI à suffixe de version de `dois` (`doi_version`) : sa forme sans version quand c'est un DOI de `primary_dois`, sinon la version de plus grand numéro parmi `dois`. La version la plus récente reste alors sans cible."""
+def version_targets(dois: Iterable[str], anchor_dois: Set[str]) -> list[DoiTarget]:
+    """Cible de chaque DOI à suffixe de version de `dois` (`doi_version`) : sa forme sans version quand c'est un DOI de `anchor_dois`, sinon la version de plus grand numéro parmi `dois`. La version la plus récente reste alors sans cible."""
     families: dict[str, list[tuple[int, str]]] = defaultdict(list)
     for doi in set(dois):
         if (version := doi_version(doi)) is not None:
             families[version.unversioned].append((version.number, doi))
     targets: list[DoiTarget] = []
     for unversioned, versions in families.items():
-        if unversioned in primary_dois:
+        if unversioned in anchor_dois:
             targets.extend(
                 DoiTarget(doi, unversioned, DoiTargetRule.DOI_VERSION_TO_UNVERSIONED)
                 for _, doi in versions

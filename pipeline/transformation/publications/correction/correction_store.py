@@ -435,13 +435,14 @@ class SourceRecordCorrectionStore:
         )
         return list(rows.scalars())
 
-    def fetch_primary_dois(self, dois: Iterable[str]) -> frozenset[str]:
-        """Ceux de `dois` qui sont le DOI `primary` d'un enregistrement source."""
+    def fetch_anchor_dois(self, dois: Iterable[str]) -> frozenset[str]:
+        """Ceux de `dois` qui sont le DOI actif `primary` ou `derived` d'un enregistrement source, ancre de la réconciliation."""
         rows = self._conn.execute(
             text(f"""
                 SELECT DISTINCT id_value FROM source_record_identifiers
                 WHERE id_type = '{SourceIdentifierType.DOI.value}'
-                  AND role = '{SourceIdentifierRole.PRIMARY.value}'
+                  AND role IN ('{SourceIdentifierRole.PRIMARY.value}', '{SourceIdentifierRole.DERIVED.value}')
+                  AND removed_by IS NULL
                   AND id_value = ANY(:dois)
             """),
             {"dois": sorted(set(dois))},

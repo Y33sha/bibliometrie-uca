@@ -717,6 +717,25 @@ def test_les_versions_ont_pour_cible_le_doi_concept_moissonne(sa_sync_conn):
     assert _targets(conn) == {"10.6084/m9.figshare.1.v1": "10.6084/m9.figshare.1"}
 
 
+def test_les_versions_ont_pour_cible_le_doi_concept_derive_d_openalex(sa_sync_conn):
+    """Régression : un work OpenAlex au DOI concept Figshare `derived` et l'enregistrement source DataCite de la v1 formaient deux publications."""
+    conn = sa_sync_conn
+    _typed_source_record(
+        conn,
+        source_id="W1",
+        identifiers=[
+            SourceIdentifier(
+                SourceIdentifierType.DOI, "10.6084/m9.figshare.c.1", SourceIdentifierRole.DERIVED
+            )
+        ],
+    )
+    _seed_work(conn, source_id="v1", doi="10.6084/m9.figshare.c.1.v1")
+
+    _apply_cluster(conn)
+
+    assert _targets(conn) == {"10.6084/m9.figshare.c.1.v1": "10.6084/m9.figshare.c.1"}
+
+
 def test_la_version_datacite_reste_en_jeu_tant_que_sa_cible_est_sans_enregistrement_source(
     sa_sync_conn,
 ):
