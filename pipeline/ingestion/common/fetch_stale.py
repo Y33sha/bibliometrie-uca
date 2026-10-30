@@ -1,4 +1,4 @@
-"""Phase `fetch_stale` : nouvelle lecture des documents de `staging` que le moissonnage n'a pas revus depuis `fetch_stale_after_days` jours. Une tâche par source.
+"""Phase `fetch_stale` : nouvelle lecture des documents de `staging` que le moissonnage n'a pas revus depuis `fetch_stale_after_days` jours. Une tâche par source, en parallèle.
 
 Chaque document est relu par son identifiant natif. Trois issues :
 
@@ -40,7 +40,7 @@ class FetchStalePhase:
     get_years_for_window: GetYearsForWindow
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Relit les documents anciens de chaque source retenue, et assemble les métriques."""
+        """Relit en parallèle les documents anciens de chaque source retenue, et assemble les métriques."""
         options, logger = ctx.options, ctx.logger
         metrics = PhaseMetrics()
         if not options.policy.fetch_stale:

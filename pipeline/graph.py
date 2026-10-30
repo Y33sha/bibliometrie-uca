@@ -250,6 +250,7 @@ TASKS: tuple[Task, ...] = (
             writes=("staging",),
             previous_run=("staging", "source_records"),
             network=source,
+            parallel_group="fetch_stale",
         )
         for source in ALL_SOURCES
     ),
