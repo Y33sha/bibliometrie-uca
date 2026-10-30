@@ -20,7 +20,7 @@ En fin de phase, le `raw_data` de `staging` est vidé.
 
 ## Synchronisation des contributions sources
 
-Chaque contribution source entrante est rapprochée d'une contribution source en base aux mêmes informations du contributeur (nom, prénom et identifiants normalisés, marque collective), puis de même position si ces informations sont répétées. Une contribution source rapprochée garde son identifiant, donc son épinglage. Les autres sont insérées ou supprimées.
+Chaque contribution source entrante retrouve en base la contribution source de mêmes informations du contributeur (nom, prénom et identifiants normalisés, marque collective), puis de même position si ces informations sont répétées. Une contribution source retrouvée garde son identifiant, donc son épinglage. Les autres sont insérées ou supprimées.
 
 Un enregistrement source dont la partie auteurs du payload est inchangée depuis la dernière normalisation garde ses contributions sources en l'état. L'option `--normalize-full` vide l'empreinte de cette partie pour tous les enregistrements sources des sources normalisées : leurs contributions sources se resynchronisent à leur prochaine normalisation.
 

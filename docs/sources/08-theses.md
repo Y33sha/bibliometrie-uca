@@ -112,7 +112,7 @@ Les cinq champs de personnes (`auteurs`, `directeurs`, `rapporteurs`, `membresJu
 
 Le PPN [IdRef](../glossaire.md#idref) d'une personne, identifiant de l'ABES partagé avec d'autres sources, sert de clé forte à la [résolution des personnes](../pipeline/09-persons.md).
 
-Le NNT (ex. `2017CLFAC001`) est l'identifiant primaire de l'enregistrement source. HAL, OpenAlex et ScanR le donnent aussi, ce qui rapproche leurs enregistrements sources.
+Le NNT (ex. `2017CLFAC001`) est l'identifiant primaire de l'enregistrement source. HAL, OpenAlex et ScanR le donnent aussi : leurs enregistrements sources sont rattachés à la même publication.
 
 ### Affiliations partagées au document
 

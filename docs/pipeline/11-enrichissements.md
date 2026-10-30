@@ -12,7 +12,7 @@ La table est reconstruite à chaque exécution, à partir de signaux indépendan
 
 **Clés de confirmation partagées.** Deux publications aux DOI distincts qui partagent un identifiant (HAL, arXiv, PMID, NNT) sont apparentées, par exemple un preprint et sa version publiée. La relation se déduit de leurs types de document.
 
-**Rapprochement par titre.** Un erratum rejoint l'article dont il reprend le titre, un preprint sa version publiée au titre identique, à condition qu'une seule publication ait ce titre.
+**Titre.** Un erratum est relié à l'article cité dans son titre, un preprint à sa version publiée de même titre. Ce titre doit désigner une seule publication.
 
 ## Sujets (`subjects`)
 

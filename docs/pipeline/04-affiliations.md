@@ -8,7 +8,7 @@ La phase `affiliations` rattache les contributions sources aux structures du pé
 
 - **`refresh_hal_structures`** — charge depuis l'API HAL les structures citées par les contributions sources et absentes du référentiel `ref.hal_structures`, puis leurs parents.
 
-- **`resolve_addresses`** — rapproche chaque adresse normalisée des structures connues, en cherchant leurs formes de nom (`structure_name_forms`) dans le texte de l'adresse. Le résultat est écrit dans `address_structures`, avec la forme de nom détectée. Les rattachements confirmés ou saisis à la main restent en place.
+- **`resolve_addresses`** — cherche dans le texte de chaque adresse normalisée les formes de nom des structures (`structure_name_forms`). Le résultat est écrit dans `address_structures`, avec la forme de nom détectée. Les rattachements confirmés ou saisis à la main restent en place.
 
    Trois options des formes de nom limitent les faux positifs :
    - une forme courte ou marquée « mot entier » compte seulement entre deux caractères qui ne sont pas des lettres ;

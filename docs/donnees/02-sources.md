@@ -17,11 +17,11 @@ Schéma PostgreSQL `sources`.
 | `staging` | Document moissonné : identifiant dans la source, payload brut, empreinte (`raw_hash`), date de disparition de la source (`disappeared_at`). Le payload est vidé après la normalisation | Un document par source et identifiant |
 | `failed_lookups` | Identifiant (DOI, identifiant HAL, NNT) cherché en vain dans une source ou auprès de doi.org, avec la date de l'échec | |
 
-**Enrichissement**
+**Statut open access**
 
 | Table | Contenu | Contrainte |
 |---|---|---|
-| `unpaywall` | Statut d'accès que donne Unpaywall pour un DOI, avec la date de l'interrogation | Un statut par DOI |
+| `unpaywall` | Statut d'accès donné par Unpaywall pour un DOI, avec la date de l'interrogation | Un statut par DOI |
 
 **Enregistrements sources**
 
