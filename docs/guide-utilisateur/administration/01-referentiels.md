@@ -16,7 +16,7 @@ Le volet de gestion d'une personne permet :
 
 - **Exclusion** : écarter une fausse personne (nom mal découpé, nom d'équipe de recherche) ou une personne rattachée à l'établissement par erreur.
 - **Identifiants** : chaque identifiant attribué par le pipeline est en attente, confirmé ou rejeté.
-- **Formes de nom** : une forme partagée avec une autre personne est ambiguë. Une forme ouvre la liste des contributions qu'elle rattache, que l'on peut détacher.
+- **Formes de nom** : une forme partagée avec une autre personne est ambiguë. Une forme ouvre la liste de ses contributions rattachées ; chacune peut être détachée.
 - **Fusion** : réunir deux personnes en double. La fusion exige qu'au plus une des deux ait une fiche RH.
 
 ### Contributions orphelines `/admin/orphan-contributions`
@@ -29,7 +29,7 @@ Le volet de gestion d'une personne permet :
 
 `/publications`, en session d'administration
 
-L'onglet « Fusions suspectes » liste les publications dont les sources donnent des listes d'auteurs très différentes : deux documents distincts ont peut-être été fusionnés à tort.
+L'onglet « Fusions suspectes » liste les publications aux listes d'auteurs très différentes selon les sources : deux documents distincts ont peut-être été fusionnés à tort.
 
 Le volet d'une publication compare les métadonnées de chaque source, une colonne par source. Une ligne surlignée signale des valeurs différentes selon les sources.
 

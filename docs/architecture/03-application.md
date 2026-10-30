@@ -5,7 +5,7 @@
 La couche applicative détermine le déroulé des écritures : dans quel ordre appeler les règles du domaine et les adaptateurs. Elle n'écrit elle-même ni SQL ni appel réseau.
 
 - **Services** (`application/services/`), un module et une classe par entité ou par traitement (`PersonService`, `SerialService`, `PublicationMergeService`…). Ils appliquent la règle métier ; leur appelant commite la transaction (cf. [transactions](04-infrastructure.md#transactions)).
-- **Journal d'audit** (`application/audit_log.py`) : les services y déposent leurs événements, que la requête d'administration écrit avec son commit.
+- **Journal d'audit** (`application/audit_log.py`) : les services y déposent leurs événements, écrits par la requête d'administration avec son commit.
 - **Ports** (`application/ports/`) : les interfaces `Protocol` par lesquelles les services atteignent l'extérieur.
 
 ## Injection
@@ -16,7 +16,7 @@ Un service reçoit ses repositories et ses recalculs à la construction. Une fab
 
 Un port est un `Protocol` déclaré par `application/` et implémenté par un adaptateur d'`infrastructure/` ou par le pipeline. Deux familles :
 
-- **Repositories** (`ports/repositories/`) — chargent et persistent une entité du domaine, ou lisent et écrivent directement leurs tables quand il n'y en a pas (adresses, configuration, journal d'audit…).
-- **Recalculs du pipeline** (`ports/pipeline/`) — recalculs ciblés que les services déclenchent après une édition. `interfaces/api/deps.py` les remplit depuis `pipeline/public.py`.
+- **Repositories** (`ports/repositories/`) — chargent et persistent une entité du domaine, ou lisent et écrivent directement les tables sans entité (adresses, configuration, journal d'audit…).
+- **Recalculs du pipeline** (`ports/pipeline/`) — recalculs ciblés déclenchés par les services après une édition. `interfaces/api/deps.py` les remplit depuis `pipeline/public.py`.
 
 Les lectures de l'API ne passent pas par `application/` : chaque lecture est un adaptateur de `infrastructure/read_models/`, qui déclare ses modèles de réponse.

@@ -2,7 +2,7 @@
 
 ## Liste `/subjects`
 
-Thématiques que les sources attribuent aux publications.
+Thématiques attribuées aux publications par les sources.
 
 ![Sujets](../../img/screenshots/subjects.png)
 

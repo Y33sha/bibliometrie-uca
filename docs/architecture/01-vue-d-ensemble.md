@@ -20,7 +20,7 @@ Le code contient deux programmes qui communiquent seulement par la base PostgreS
   └──────────────┘                └──────────────┘               └───────────────┘
 ```
 
-Les données saisies dans l'administration (structures, périmètres, configuration, décisions humaines) sont des entrées que le pipeline relit et conserve à chaque exécution.
+Les données saisies dans l'administration (structures, périmètres, configuration, décisions humaines) sont des entrées relues et conservées par le pipeline à chaque exécution.
 
 ## Couches
 

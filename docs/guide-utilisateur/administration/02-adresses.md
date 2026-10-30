@@ -2,7 +2,7 @@
 
 ## Affiliations `/admin/addresses`
 
-La [phase `affiliations`](../../pipeline/04-affiliations.md) du pipeline rattache chaque adresse aux structures qu'elle y reconnaît par leurs formes de nom. La page permet de confirmer ou de rejeter chaque rattachement.
+La [phase `affiliations`](../../pipeline/04-affiliations.md) du pipeline rattache chaque adresse aux structures reconnues par leurs formes de nom. La page permet de confirmer ou de rejeter chaque rattachement.
 
 Le bouton « Qualité de la détection » liste les rattachements créés ou rejetés à la main. Un rattachement créé à la main signale une forme de nom manquante, un rattachement rejeté une forme trop large. Les formes de nom modifiées prennent effet à la prochaine exécution de la phase `affiliations`.
 

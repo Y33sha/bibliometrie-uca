@@ -9,7 +9,7 @@
 - **`api/`** — l'application FastAPI.
   - `app.py` assemble les routers, la traduction des erreurs métier en codes HTTP, et les middlewares (authentification des écritures, plafonds de lecture, en-têtes de sécurité, journalisation des requêtes) ;
   - `routers/` contient un module par ressource, `models/` les corps des requêtes d'écriture ;
-  - `deps.py` contient les fabriques que les routes reçoivent par `Depends`.
+  - `deps.py` contient les fabriques reçues par les routes via `Depends`.
   - S'y ajoutent la session d'administration (`session.py`), les limiteurs de débit (`rate_limit.py`) et le service du frontend buildé (`spa.py`).
 - **`frontend/`** — l'application SvelteKit (Svelte 5), servie par l'API une fois buildée.
 - **`cli/`** — les programmes lancés en ligne de commande :

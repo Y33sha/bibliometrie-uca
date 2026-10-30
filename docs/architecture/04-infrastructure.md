@@ -23,6 +23,6 @@ Les adaptateurs de `repositories/` construisent des objets du domaine : ils char
 
 Une unité de travail tient dans une transaction, que seul son appelant commite : la requête pour l'API, le script ou la phase du pipeline pour le reste.
 
-Pour l'API, `db_conn` (`interfaces/api/deps.py`) ouvre la connexion de la requête, que les repositories partagent. Une requête d'écriture qui aboutit est commitée avant l'envoi de la réponse, avec les événements d'audit qu'elle a émis ; une exception l'annule. Une requête de lecture s'ouvre en lecture seule.
+Pour l'API, `db_conn` (`interfaces/api/deps.py`) ouvre la connexion de la requête, partagée par les repositories. Une requête d'écriture aboutie est commitée avant l'envoi de la réponse, avec ses événements d'audit ; une exception l'annule. Une requête de lecture s'ouvre en lecture seule.
 
-Les phases du pipeline qui traitent de grands ensembles commitent par lots, toutes les N opérations, si bien qu'un plantage perd seulement le dernier lot. À l'intérieur d'un lot, chaque item est isolé dans un savepoint : une erreur annule l'item fautif seul, sans emporter les autres.
+Les phases du pipeline qui traitent de grands ensembles commitent par lots, toutes les N opérations : un plantage perd seulement le dernier lot. À l'intérieur d'un lot, chaque item est isolé dans un savepoint : une erreur annule l'item fautif seul, sans emporter les autres.

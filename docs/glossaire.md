@@ -4,7 +4,7 @@
 *Agence bibliographique de l'enseignement supérieur*. Gère le Sudoc, IdRef et theses.fr.
 
 ## Adresse
-Chaîne de caractères qui donne l'[affiliation](#affiliation) d'un auteur dans une publication, telle que l'auteur l'a fournie à l'éditeur. Appelée *address* ou *affiliation string* dans les métadonnées, et *signature* dans le langage courant.
+Chaîne de caractères qui donne l'[affiliation](#affiliation) d'un auteur dans une publication, fournie par l'auteur à l'éditeur. Appelée *address* ou *affiliation string* dans les métadonnées, et *signature* dans le langage courant.
 
 ## Affiliation
 Structure ou structures de rattachement d'un auteur dans une publication. Elle est liée au couple personne-publication, et non à la personne.
@@ -22,7 +22,7 @@ Référentiel d'entités de HAL : auteurs, structures, revues.
 Auteur désigné comme contact principal de l'éditeur. Une publication en a parfois deux ou trois. Les [APC](#apc) sont en général payés par la structure de rattachement de l'auteur correspondant. Les sources renseignent inégalement cette information.
 
 ## Collection HAL
-Sous-portail HAL qui réunit les publications d'une structure : les dépôts dont au moins un auteur est affilié à cette structure. Chaque collection a un code, souvent l'acronyme du laboratoire (exemple : https://hal.science/PIAF). La collection d'une tutelle réunit les publications de ses sous-structures, d'après l'arborescence d'[AuréHAL](#auréhal).
+Sous-portail HAL qui réunit les publications d'une structure : les dépôts avec au moins un auteur affilié à cette structure. Chaque collection a un code, souvent l'acronyme du laboratoire (exemple : https://hal.science/PIAF). La collection d'une tutelle réunit les publications de ses sous-structures, d'après l'arborescence d'[AuréHAL](#auréhal).
 
 ## Communication
 Contribution à un colloque ou une conférence (*conference paper*). Certaines sources y rangent les posters.
@@ -52,7 +52,7 @@ Maison d'édition scientifique (Elsevier, Springer Nature, EDP Sciences…), qui
 Archive ouverte nationale française. Voir [détails](sources/02-hal.md).
 
 ## idHAL
-Identifiant d'auteur dans HAL, que le chercheur crée dans son profil HAL.
+Identifiant d'auteur dans HAL, créé par le chercheur dans son profil HAL.
 
 ## IdRef
 *Identifiants et référentiels pour l'enseignement supérieur et la recherche*. Référentiel d'autorités (personnes, collectivités…) de l'ABES : https://www.idref.fr/. Un identifiant IdRef, ou PPN, compte 9 caractères : 8 chiffres et une clé, chiffre ou `X`.
@@ -73,7 +73,7 @@ Base bibliographique ouverte (fondation OurResearch) : https://openalex.org/. Vo
 Jeu de données ouvert des frais de publication payés par les établissements participants. Voir [données APC](sources/10-imports-manuels.md#données-apc).
 
 ## ORCID
-Identifiant unique d'un chercheur (ex. : `0000-0001-2345-6789`), qu'il crée lui-même.
+Identifiant unique d'un chercheur (ex. : `0000-0001-2345-6789`), créé par le chercheur lui-même.
 
 ## Organisation partenaire
 Organisation [ROR](#ror) d'un auteur d'une publication, ou ancêtre ROR de cette organisation. Les organisations partenaires excluent les structures étudiées, leurs tutelles et leurs ancêtres ROR. Les structures étudiées sont le laboratoire de la page, les laboratoires sélectionnés, ou à défaut tout le périmètre.
@@ -107,10 +107,10 @@ Support qui réunit des documents sous un même titre : revue, collection d'ouvr
 Base bibliographique biomédicale de la bibliothèque nationale de médecine des États-Unis.
 
 ## PubMed Central (PMC)
-Archive en texte intégral de la bibliothèque nationale de médecine des États-Unis. Un article y a un identifiant PMCID.
+Archive en texte intégral de la bibliothèque nationale de médecine des États-Unis. Un article de PMC a un identifiant PMCID.
 
 ## RAMEAU
-*Répertoire d'autorité-matière encyclopédique et alphabétique unifié*. Vocabulaire d'indexation des bibliothèques françaises, géré par la BnF, que le Sudoc et theses.fr emploient.
+*Répertoire d'autorité-matière encyclopédique et alphabétique unifié*. Vocabulaire d'indexation des bibliothèques françaises, géré par la BnF, employé par le Sudoc et theses.fr.
 
 ## Revue
 Publication en série périodique, identifiée par un ou plusieurs [ISSN](#issn).
