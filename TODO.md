@@ -20,7 +20,6 @@
 * [ ] fusionner structures
 * [ ] bloquer les opérations destructrices côté admin lorsque le pipeline est actif (recenser les actions qui peuvent poser problème)
 ## Publique
-* [ ] icônes des licences
 * [ ] page "affiliations suspectes hal": requête incorrecte, capture trop de publis
 * [ ] mettre en place des slugs pour les URL? (personnes, labos, éditeurs, revues)
 * [ ] auteur premier, dernier, correspondant: sur les facettes et les stats
