@@ -9,7 +9,7 @@
   import { auth } from "#lib/api/index.js";
   import DialogHost from "#lib/components/DialogHost.svelte";
   import { loadInstitution, siteTitle } from "#lib/institution.svelte.js";
-  import { isAdmin, loadSession, loginUrl, session } from "#lib/session.svelte.js";
+  import { adminLook, isAdmin, loadSession, loginUrl, session } from "#lib/session.svelte.js";
   import { loadSources } from "#lib/sources.svelte.js";
   import { docTypesLoaded, loadDocTypes } from "#lib/docTypes.svelte.js";
 
@@ -132,9 +132,9 @@
 
 <a class="skip-link" href="#contenu">Aller au contenu</a>
 
-<header class="site-header" class:admin={isAdmin()}>
+<header class="site-header" class:admin={adminLook()}>
   <div class="site-brand">
-    <img src={asset(isAdmin() ? "connectome.svg" : "favicon-menu.svg")} alt="" class="site-icon" />
+    <img src={asset(adminLook() ?"connectome.svg" : "favicon-menu.svg")} alt="" class="site-icon" />
     <span class="site-title">{siteTitle()}</span>
   </div>
   <nav id="site-nav" class="site-nav" class:open={mobileNavOpen} aria-label="Navigation principale">
