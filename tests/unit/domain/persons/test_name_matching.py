@@ -1,6 +1,6 @@
 """Tests de `names_compatible` : deux noms désignent la même personne, à la graphie près.
 
-Les cas viennent des données réelles : noms des contributions sources qui ont un identifiant de personne, comparés au nom de la personne à qui il est attribué ; listes de collaboration.
+Les cas viennent des données réelles : noms des contributions sources à identifiant de personne, comparés au nom de la personne titulaire de cet identifiant ; listes de collaboration.
 """
 
 import pytest

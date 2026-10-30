@@ -43,6 +43,6 @@ def test_formule_en_debut_de_ligne_garde_le_texte_moins_indente():
 
 
 def test_titre_sur_une_ligne_garde_ses_symboles():
-    # OpenAlex : plus aucun repère d'indentation.
+    # OpenAlex : aucun repère d'indentation.
     title = "Study of charmonium production in $${b} $$ b -hadron decays"
     assert drop_flattened_mathml(title) == title

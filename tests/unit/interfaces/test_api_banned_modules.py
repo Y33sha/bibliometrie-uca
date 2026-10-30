@@ -1,8 +1,8 @@
-"""Modules que la couche API ne peut pas atteindre.
+"""Modules interdits à la couche API.
 
 Le code qui sert les requêtes HTTP n'émet aucun appel sortant et ne lance aucun programme externe. Deux mécanismes appliquent cette règle : les contrats d'architecture (import-linter) et la règle `banned-api` de ruff.
 
-Les contrats d'architecture suivent les chaînes d'imports : un module atteignable depuis la couche, même indirectement, y est refusé. Ils nomment seulement des modules de premier rang, donc `urllib.request` leur échappe. L'outil ne sait pas désigner le sous-module d'un paquet qu'il tient pour externe, et interdire `urllib` entier écarterait `urllib.parse`, dont le domaine se sert pour manipuler des URL.
+Les contrats d'architecture suivent les chaînes d'imports : ils refusent tout module atteignable depuis la couche, même indirectement. Pour un paquet externe, ils nomment seulement des modules de premier rang, donc `urllib.request` leur échappe. Interdire `urllib` entier écarterait `urllib.parse`, utilisé par le domaine pour manipuler des URL.
 
 La règle `banned-api` de ruff nomme un module de tout rang, mais voit seulement le fichier où l'import est écrit. Elle couvre donc ce seul cas.
 """
@@ -40,7 +40,7 @@ MODULES_FERMES = [
 
 
 def _modules_des_contrats() -> set[str]:
-    """Modules que les contrats d'architecture ferment à `interfaces.api`."""
+    """Renvoie les modules interdits à `interfaces.api` par les contrats d'architecture."""
     config = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     fermes: set[str] = set()
     for contrat in config["tool"]["importlinter"]["contracts"]:
@@ -52,7 +52,7 @@ def _modules_des_contrats() -> set[str]:
 
 
 def _analyser(source: str, chemin: str) -> str:
-    """Sortie de ruff sur `source`, présentée comme le fichier `chemin`."""
+    """Renvoie la sortie de ruff sur `source`, présentée comme le fichier `chemin`."""
     resultat = subprocess.run(  # noqa: S603 — commande écrite ici, sans valeur extérieure
         [sys.executable, "-m", "ruff", "check", "--stdin-filename", chemin, "-"],
         input=source,
@@ -66,7 +66,7 @@ def _analyser(source: str, chemin: str) -> str:
 
 @pytest.mark.parametrize("module", MODULES_FERMES)
 def test_la_couche_api_ne_peut_pas_atteindre_le_module(module: str) -> None:
-    """Chaque module est fermé par un contrat d'architecture, ou interdit par la règle `banned-api` de ruff."""
+    """Chaque module est interdit par un contrat d'architecture ou par la règle `banned-api` de ruff."""
     par_contrat = module in _modules_des_contrats()
     par_analyse = f"`{module}` is banned" in _analyser(
         f"import {module}\n", "interfaces/api/sonde.py"
@@ -104,7 +104,7 @@ def test_le_pipeline_garde_son_client_reseau() -> None:
 def test_le_second_chemin_sortant_est_refuse_partout() -> None:
     """`urllib.request` ouvrirait un chemin sortant hors des garde-fous du client HTTP du projet.
 
-    Les contrats d'architecture ne savent pas désigner ce sous-module : l'interdire dans tout le dépôt donne la transitivité qu'ils fourniraient.
+    Les contrats d'architecture ne savent pas désigner ce sous-module : son interdiction dans tout le dépôt couvre les imports indirects.
     """
     for chemin in ("interfaces/api/sonde.py", "application/sonde.py", "infrastructure/sonde.py"):
         sortie = _analyser("import urllib.request\n", chemin)

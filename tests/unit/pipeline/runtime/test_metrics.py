@@ -4,7 +4,7 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 
 
 def test_total_derives_from_breakdown_without_explicit_denominator():
-    # Régression : sans dénominateur renseigné, `total` vaut la somme de new, updated et unchanged.
+    # Sans dénominateur renseigné, `total` vaut la somme de new, updated et unchanged.
     m = PhaseMetrics()
     m.add(new=204)
     m.add(updated=3891)
@@ -13,7 +13,7 @@ def test_total_derives_from_breakdown_without_explicit_denominator():
 
 
 def test_total_uses_explicit_denominator_when_larger():
-    # Cas de fetch_missing : les DOI cherchés (`seen`) dépassent les documents insérés.
+    # Cas de fetch_missing : les DOI cherchés (`seen`) dépassent les enregistrements sources insérés.
     m = PhaseMetrics()
     m.add(new=10, seen=100)
     assert m.total == 100

@@ -36,7 +36,12 @@ def _facts(
     identifiers=(),
     target_recorded=False,
 ):
-    """Faits d'un enregistrement source. `doi` : son DOI actif ; `removed_doi` : son DOI retiré par la correction. Le rôle du DOI est `primary` chez Crossref et DataCite, `secondary` ailleurs."""
+    """Construit les faits d'un enregistrement source. Le rôle du DOI est `primary` chez Crossref et DataCite, `secondary` ailleurs.
+
+    Args:
+        doi: DOI actif.
+        removed_doi: DOI retiré par la correction.
+    """
     role = (
         SourceIdentifierRole.PRIMARY
         if source in ("crossref", "datacite")
@@ -58,7 +63,7 @@ def _id(id_type, value, removed_by=None, role=SourceIdentifierRole.SECONDARY):
 
 class TestIsMatchable:
     def test_gresis_doi_is_excluded(self):
-        """Régression : les copies GRESIS d'enregistrements OpenAlex (DOI 10.60692) dédoublaient les publications de revue."""
+        """Une copie GRESIS d'un enregistrement source OpenAlex (DOI 10.60692) dédoublerait la publication de revue."""
         gresis = "10.60692/m2raz-tjw54"
         assert not is_matchable(_facts("datacite", gresis, doi=gresis), set())
 
@@ -83,13 +88,13 @@ class TestIsMatchable:
         assert not is_matchable(_facts("openalex", "W1", identifiers=identifiers), set())
 
     def test_datacite_record_of_a_secondary_form_is_excluded(self):
-        """L'enregistrement DataCite d'une version Zenodo dont le concept est en base."""
+        """L'enregistrement source DataCite d'une version Zenodo, avec son concept en base."""
         version = "10.5281/zenodo.10"
         record = _facts("datacite", version, doi=version, target_recorded=True)
         assert not is_matchable(record, set())
 
     def test_other_record_with_the_doi_of_a_secondary_form_is_kept(self):
-        """Régression : un dépôt HAL au DOI d'une version Zenodo était écarté avec la version."""
+        """Un dépôt HAL au DOI d'une version Zenodo est gardé, même quand la version est écartée."""
         record = _facts(doi="10.5281/zenodo.10", target_recorded=True)
         assert is_matchable(record, set())
 
@@ -107,7 +112,7 @@ class TestIsMatchable:
         assert is_matchable(_facts(title=None), set())
 
     def test_aggregator_record_without_doi_link_or_key_is_excluded(self):
-        """Régression : un enregistrement OpenAlex fait du seul dépôt HAL introuvable hal-03178520 formait une publication à part."""
+        """Un enregistrement source OpenAlex fait du seul dépôt HAL introuvable hal-03178520 formerait une publication à part."""
         assert not is_matchable(_facts("openalex", "W4287257393"), {"hal-03178520"})
 
     def test_aggregator_record_with_link_or_key_is_kept(self):

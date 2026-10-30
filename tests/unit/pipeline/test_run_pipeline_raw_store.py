@@ -1,6 +1,6 @@
 """Trajet de `--raw-store` jusqu'au choix du store de payloads bruts.
 
-Le drapeau descend du composition root à la phase de normalisation, seule à écrire dans le store. Sans archivage, le store sur disque n'est pas même construit.
+Le drapeau descend du composition root à la phase de normalisation, seule à écrire dans le store. Le store sur disque est construit seulement avec l'archivage.
 """
 
 import pytest

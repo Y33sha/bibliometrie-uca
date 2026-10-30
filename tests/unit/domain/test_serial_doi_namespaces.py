@@ -79,7 +79,7 @@ def test_espace_partage_non_retenu():
 
 
 def test_le_deposant_seul_ne_designe_pas_une_revue():
-    """Cas réel : sous `10.1056/`, le *NEJM* domine nos données, mais *NEJM Evidence* y publie aussi."""
+    """Cas réel : sous `10.1056/`, le *NEJM* domine les enregistrements sources, mais *NEJM Evidence* publie aussi sous ce préfixe."""
     namespaces = learn_namespaces(_evidence("10.1056/nejmoa", 1, 20))
     assert "10.1056/" not in namespaces
     assert resolve_serial("10.1056/evidoa2200001", namespaces) is None
@@ -97,7 +97,7 @@ def test_sous_le_seuil_non_retenu():
 
 
 def test_une_plateforme_n_est_designee_par_aucun_espace():
-    """Cas réel : SSRN, dont le préfixe désigne la plateforme. Ses DOI comptent dans le total : une revue qui en a quelques-uns ne capte pas l'espace."""
+    """Cas réel : le préfixe de SSRN désigne la plateforme. Ses DOI comptent dans le total : une revue qui en a quelques-uns ne capte pas l'espace."""
     evidence = _evidence("10.2139/ssrn.", 1, 20) + [("10.2139/ssrn.00003", 2)]
     namespaces = learn_namespaces(evidence, platforms={1})
     assert resolve_serial("10.2139/ssrn.99999", namespaces) is None

@@ -97,7 +97,7 @@ class TestSudocCheck:
         assert checked not in rows
 
     def test_queue_holds_serials_whose_records_carry_an_unknown_issn(self, sa_sync_conn, repo):
-        """Une revue vérifiée revient dans la file quand un de ses enregistrements, quelle que soit sa source, contient un ISSN absent de ses ISSN. La valeur reçue est normalisée ; une valeur invalide est ignorée."""
+        """Une revue vérifiée revient dans la file quand un de ses enregistrements sources, quelle que soit sa source, contient un ISSN absent de ses ISSN. La valeur reçue est normalisée ; une valeur invalide est ignorée."""
         serial_id = _serial(sa_sync_conn, issn="0149-5992", sudoc_checked=True)
         _article(
             sa_sync_conn,
@@ -175,7 +175,7 @@ class TestSudocCheck:
         assert [j.title for j in groups["2999-0002"]] == ["BMJ", "BMJ British Medical Journal"]
 
     def test_same_title_duplicates(self, sa_sync_conn, repo):
-        """Seules les paires dont les enregistrements partagent un préfixe DOI sont retenues ; une revue vide ou deux revues à ISSN restent hors de la règle."""
+        """Seules les paires dont les enregistrements sources partagent un préfixe DOI sont retenues ; une revue vide ou deux revues à ISSN restent hors de la règle."""
         with_issn = _serial(sa_sync_conn, title="Revue test même préfixe", issn="2999-0003")
         without_issn = _serial(sa_sync_conn, title="Revue test même préfixe")
         _article(
@@ -222,7 +222,7 @@ class TestSudocCheck:
         assert "" not in {g.key for g in find_same_title_duplicates(sa_sync_conn)}
 
     def test_serials_sharing_an_inactive_issn(self, sa_sync_conn, repo):
-        """L'ISSN inactif de l'une est actif dans l'autre ; la revue dont le premier document est le plus tardif vient en tête, même quand l'ancien titre reçoit encore des documents récents. Une revue non vérifiée reste hors de la règle."""
+        """L'ISSN inactif de l'une est actif dans l'autre ; la revue au premier enregistrement source le plus tardif vient en tête, même quand l'ancien titre reçoit encore des enregistrements sources récents. Une revue non vérifiée reste hors de la règle."""
         earlier = _serial(
             sa_sync_conn, title="Revue test ancien titre", issn="2999-0012", sudoc_checked=True
         )
@@ -257,7 +257,7 @@ class TestSudocCheck:
         assert unchecked not in {i for ids in groups.values() for i in ids}
 
     def test_serials_sharing_a_publication(self, sa_sync_conn, repo):
-        """Deux revues désignées par les enregistrements d'une même publication forment une paire."""
+        """Deux revues désignées par les enregistrements sources d'une même publication forment une paire."""
         full = _serial(sa_sync_conn, title="Journal test complet", issn="2999-0009")
         abbreviated = _serial(sa_sync_conn, title="J.Test Compl.")
         publication_id = insert_publication(
@@ -447,7 +447,7 @@ class TestTitlesOfNonProceedingsSerials:
 
 class TestRecordTypesOfUnknownSerials:
     def test_type_brut_avant_correction(self, sa_sync_conn, repo):
-        """Un document retypé par la correction est compté avec son type de source."""
+        """Un enregistrement source retypé par la correction est compté avec son type de source."""
         jid = _serial(sa_sync_conn)
         insert_source_record(
             sa_sync_conn,
@@ -514,7 +514,7 @@ class TestDoiNamespaces:
         assert [(p.doi, p.serial_type) for p in pairs] == [("10.9001/abc.1", SerialType.UNKNOWN)]
 
     def test_doi_secondaire_d_agregateur_exclu_des_temoins(self, sa_sync_conn, repo):
-        """Régression : des works OpenAlex sans DOI `derived`, rattachés à tort à une revue, faisaient voter leurs copies de repository Apollo (`10.17863/cam.`) pour elle."""
+        """Seuls le DOI `derived` d'un work OpenAlex et les DOI des autres sources votent pour la revue ; un DOI `secondary` d'OpenAlex (copie de repository Apollo, `10.17863/cam.`) est exclu."""
         serial_id = _serial(sa_sync_conn)
         secondary = SourceIdentifierRole.SECONDARY
         _article(

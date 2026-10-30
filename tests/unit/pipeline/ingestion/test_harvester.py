@@ -67,7 +67,7 @@ def conn():
 
 
 class _ParAnnee(SourceHarvester):
-    """Moissonneur dont chaque année rapporte un document inséré et des documents inchangés, selon `volumes`. La source est indisponible à partir de l'année `unavailable_from`."""
+    """Moissonneur rapportant, pour chaque année, un document inséré et des documents inchangés selon `volumes`. La source est indisponible à partir de l'année `unavailable_from`."""
 
     SOURCE = "hal"
 
@@ -101,7 +101,7 @@ def _args() -> argparse.Namespace:
 
 
 class TestExtractionParAnnee:
-    """Une barre par source, dont le libellé suit l'année en cours, puis un bilan."""
+    """Une barre par source, libellée par l'année en cours, puis un bilan."""
 
     def test_le_libelle_suit_l_annee_en_cours(self, logger):
         ext = _ParAnnee(logger, {2023: 2, 2024: 3})

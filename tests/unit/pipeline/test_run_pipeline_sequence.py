@@ -22,13 +22,13 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 
 
 def _args(**surcharges) -> argparse.Namespace:
-    """Arguments par défaut de la CLI, sources réduites à HAL, OpenAlex et WoS, puis `surcharges`."""
+    """Renvoie les arguments par défaut de la CLI, sources réduites à HAL, OpenAlex et WoS, puis `surcharges`."""
     base = vars(run_pipeline._build_arg_parser().parse_args([]))
     return argparse.Namespace(**{**base, "sources": "hal,openalex,wos", **surcharges})
 
 
 def _phase(run):
-    """Fonction `build` d'une phase dont `run(ctx)` est `run`."""
+    """Renvoie la fonction `build` d'une phase de méthode `run(ctx)` égale à `run`."""
     return lambda: SimpleNamespace(run=run)
 
 
@@ -109,7 +109,7 @@ def test_chaque_option_booleenne_arrive_aux_phases():
 
 
 def _masquant(origine: BaseException) -> PendingRollbackError:
-    """L'erreur que lève l'annulation d'une transaction sur une connexion perdue, `origine` étant l'exception en cours de traitement."""
+    """Renvoie l'erreur levée par l'annulation d'une transaction sur une connexion perdue ; `origine` est l'exception en cours de traitement."""
     erreur = PendingRollbackError("Can't reconnect until invalid transaction is rolled back")
     erreur.__context__ = origine
     return erreur
@@ -159,13 +159,13 @@ class TestRunOnePhase:
         assert not any(m.startswith("Total") for m in caplog.messages)
 
     def test_phase_sans_metriques(self):
-        """Une phase qui ne renvoie rien est consignée avec des compteurs vides, non ignorée."""
+        """Une phase sans valeur de retour est consignée avec des compteurs vides."""
         _, recorder = self._executer(lambda ctx: None)
 
         assert recorder.records[0]["status"] == "ok"
 
     def test_interruption_utilisateur(self, caplog):
-        """L'arrêt demandé est un avertissement, non une erreur, et dit par où reprendre."""
+        """L'arrêt demandé est consigné comme un avertissement et dit par où reprendre."""
 
         def _interrompue(ctx):
             raise KeyboardInterrupt

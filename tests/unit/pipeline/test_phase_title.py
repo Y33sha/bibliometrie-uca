@@ -93,7 +93,7 @@ def test_une_phase_sans_libelle_garde_son_cadre(terminal) -> None:
 
 
 def _args(**modifications) -> argparse.Namespace:
-    """Arguments par défaut de la CLI, modifiés par `modifications`."""
+    """Renvoie les arguments par défaut de la CLI, modifiés par `modifications`."""
     return argparse.Namespace(**{**vars(_build_arg_parser().parse_args([])), **modifications})
 
 

@@ -200,7 +200,7 @@ class TestDOIImmutable:
         assert DOI("10.1234/test") == DOI("  https://doi.org/10.1234/TEST  ")
 
     def test_versions_are_distinct_dois(self):
-        """Régression : le suffixe retiré donnait `10.20944/preprints202504.2026`, inconnu de doi.org."""
+        """Le suffixe de version fait partie du DOI : sans lui, `10.20944/preprints202504.2026` est inconnu de doi.org."""
         assert DOI("10.20944/preprints202504.2026.v1") != DOI("10.20944/preprints202504.2026")
 
 

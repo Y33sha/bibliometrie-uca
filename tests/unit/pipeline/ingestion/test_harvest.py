@@ -1,6 +1,6 @@
 """Orchestrateur de la phase `harvest` : sélection des sources par mode, sources non configurées sautées.
 
-Les dépendances techniques (extraction d'une source, parallélisme, dernière date) sont injectées. L'orchestrateur se teste donc sans I/O ni threads : `run_parallel` est simulé par une exécution synchrone déterministe.
+Les dépendances techniques (moissonnage d'une source, parallélisme, dernière date) sont injectées. L'orchestrateur se teste donc sans I/O ni threads : `run_parallel` est simulé par une exécution synchrone déterministe.
 """
 
 import logging
@@ -61,7 +61,7 @@ def test_since_last_extracts_hal_from_last_date(contexte):
 
     assert calls == [
         ("hal", "2026-01-01")
-    ]  # HAL seul, en incrémental depuis la dernière extraction
+    ]  # HAL seul, en incrémental depuis le dernier moissonnage
     assert metrics.details["table"]["rows"][0]["key"] == "hal"
 
 
@@ -79,7 +79,7 @@ def test_toutes_les_sources_suivent_la_fenetre_d_annees(contexte):
 
 
 def _indisponible(source: str) -> PhaseMetrics:
-    """Métriques que renvoie l'accès à une source indisponible."""
+    """Renvoie les métriques de l'accès à une source indisponible."""
     metrics = PhaseMetrics()
     signal_source_unavailable(metrics, source, logger=logging.getLogger("test"), phase="harvest")
     return metrics
@@ -113,7 +113,7 @@ def test_since_last_marks_hal_unavailable(contexte):
 
 
 def test_empty_extraction_perimeter_stops_the_phase(contexte):
-    """Un périmètre d'extraction sans structure arrête la phase avant toute extraction."""
+    """Un périmètre d'extraction sans structure arrête la phase avant tout moissonnage."""
     calls: list[str] = []
 
     def harvest_one(_ctx, source, _args):

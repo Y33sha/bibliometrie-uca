@@ -58,7 +58,7 @@ def _last_event(conn: Connection):
 
 @pytest.fixture
 def sa_sync_conn(sa_sync_conn_app):
-    """Connexion sous le rôle de l'API, seul rôle autorisé à écrire la trace d'audit."""
+    """Fournit une connexion sous le rôle de l'API, seul rôle autorisé à écrire la trace d'audit."""
     return sa_sync_conn_app
 
 
@@ -147,7 +147,7 @@ class TestEndToEndServiceIntegration:
 
     @pytest.fixture
     def sa_sync_conn(self, sa_sync_conn_owner):
-        """Connexion sous le propriétaire du schéma : ces tests posent des publications, que crée le pipeline, puis exercent des opérations de l'API, dans une même transaction.
+        """Fournit une connexion sous le propriétaire du schéma : ces tests posent des publications, créées d'ordinaire par le pipeline, puis exercent des opérations de l'API, dans une même transaction.
 
         Ils vérifient l'émission de la trace ; les droits se vérifient dans les tests de l'API et du pipeline.
         """

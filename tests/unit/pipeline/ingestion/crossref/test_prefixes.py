@@ -72,7 +72,7 @@ async def test_fetch_crossref_prefix_no_member(http_mock):
 async def test_fetch_crossref_prefix_takes_depositing_member_when_registered_one_is_idle(
     http_mock,
 ):
-    """Le préfixe reste enregistré au nom d'un compte sans dépôt : l'enregistrement source donne le compte vivant, dont le nom déclaré l'emporte sur l'imprint de l'enregistrement source."""
+    """Le préfixe est enregistré au nom d'un compte sans dépôt. L'enregistrement source donne le compte actif. Le nom déclaré de ce compte l'emporte sur l'imprint de l'enregistrement source."""
     _message(
         http_mock,
         "/prefixes/10.70898",
@@ -145,7 +145,7 @@ async def test_fetch_crossref_prefix_network_error_is_unavailable(http_mock):
 
 @pytest.mark.asyncio
 async def test_fetch_crossref_prefix_unavailable_member_check_is_unavailable(http_mock):
-    """La vérification du membre échoue : le préfixe entier attend le run suivant, au lieu d'être enregistré au nom du compte peut-être dormant."""
+    """Après un échec de la vérification du membre, le préfixe entier attend le run suivant."""
     _message(http_mock, "/prefixes/10.1007", {"name": "Springer", "member": 297})
     http_mock.get(f"{_BASE}/members/297").mock(return_value=httpx2.Response(403))
     assert await _fetch("10.1007", "10.1007/abc") is UNAVAILABLE

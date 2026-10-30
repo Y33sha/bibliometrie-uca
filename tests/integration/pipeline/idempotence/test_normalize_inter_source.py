@@ -11,7 +11,7 @@ from tests.integration.pipeline.idempotence.test_normalize_openalex import (
 )
 
 SHARED_DOI = "10.9999/shared-article-001"
-# L'article propre à OpenAlex a un DOI : sans DOI, lien ni clé de confirmation, un enregistrement OpenAlex est écarté de la réconciliation.
+# L'article propre à OpenAlex a un DOI : sans DOI, lien ni clé de confirmation, un enregistrement source OpenAlex est écarté de la réconciliation.
 OA_ONLY_DOI = "10.9999/oa-only-article-002"
 
 INTER_HAL_DOCS = [

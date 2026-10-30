@@ -18,7 +18,7 @@ _ORCID = "0000-0002-1825-0097"
 
 
 def _contribution(conn, person, mode, *, name="jean martin", source="crossref", orcid=_ORCID):
-    """Contribution formée d'une seule contribution source, seul auteur d'une publication, rattachée à `person` par `mode`. La contribution source contient l'ORCID `orcid`."""
+    """Insère une contribution formée d'une seule contribution source, seul auteur d'une publication, rattachée à `person` par `mode`. La contribution source contient l'ORCID `orcid`."""
     publication = insert_publication(conn)
     source_record = insert_source_record(
         conn, publication, source=source, source_id=f"{source}-{publication}"
@@ -69,7 +69,7 @@ def _person_of(conn, contribution):
 
 
 def _persons(conn, owner_name=("Martin", "Jean"), other_name=("Martin", "Jeanne")):
-    """Titulaire de l'ORCID en `pending`, et une autre personne."""
+    """Insère le titulaire de l'ORCID en `pending`, et une autre personne."""
     owner = insert_person(conn, owner_name[0], first_name=owner_name[1])
     other = insert_person(conn, other_name[0], first_name=other_name[1])
     insert_person_identifier(conn, owner, id_type="orcid", id_value=_ORCID, status="pending")

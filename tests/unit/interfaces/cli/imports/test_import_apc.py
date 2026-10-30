@@ -1,6 +1,6 @@
 """Import des frais de publication : lecture des fichiers Open APC, des frais hors OA et des réponses à l'enquête APC.
 
-Ces tests vérifient ce que la lecture extrait de chaque format (montants, années, payeur, type de frais) et ce qu'elle refuse comme DOI. L'écriture en base a son test d'intégration.
+La lecture extrait de chaque format les montants, l'année, le payeur et le type de frais. Une mention d'absence (« pas de doi ») est refusée comme DOI. L'écriture en base est testée en intégration.
 """
 
 import pytest

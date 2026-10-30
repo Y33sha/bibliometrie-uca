@@ -40,7 +40,7 @@ def _write(conn, source_record: int, records: list[AuthorRecord]) -> None:
 
 
 def _source_contributions(conn, source_record: int) -> dict[int, tuple[int, str]]:
-    """Position → (identifiant, nom brut) des contributions sources de l'enregistrement source."""
+    """Renvoie position → (identifiant, nom brut) des contributions sources de l'enregistrement source."""
     rows = conn.execute(
         text(
             "SELECT author_position, id, raw_author_name FROM source_contributions "
@@ -429,7 +429,7 @@ def _build(block) -> list[AuthorRecord]:
 
 
 def _build_upper(block) -> list[AuthorRecord]:
-    """Construction selon une règle de normalisation modifiée : noms en majuscules."""
+    """Construit les auteurs selon une règle de normalisation modifiée : noms en majuscules."""
     return [_rec(i, name.upper()) for i, name in enumerate(block["names"])]
 
 

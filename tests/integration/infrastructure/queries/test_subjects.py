@@ -109,7 +109,7 @@ class TestLinkAndClear:
         assert sent == 1
 
     def test_bulk_counts_only_new_links(self, sa_sync_conn):
-        """La valeur rendue compte les liens insérés, pas ceux déjà présents."""
+        """La valeur renvoyée compte seulement les liens insérés."""
         publication = insert_publication(sa_sync_conn)
         sid = SubjectStore(sa_sync_conn).upsert_subject(label="x")
         sid2 = SubjectStore(sa_sync_conn).upsert_subject(label="y")

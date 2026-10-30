@@ -1,6 +1,6 @@
 """Statut `authenticated` : garde du trigger et écritures de l'import des ORCID authentifiés.
 
-Le statut `authenticated` indique qu'un chercheur a lui-même authentifié son ORCID. Le trigger `protect_authenticated_identifier` en fait un statut réservé (seul l'import dédié le pose) et définitif (aucun changement de statut, même par l'administration).
+Le statut `authenticated` indique qu'un chercheur a lui-même authentifié son ORCID. Le trigger `protect_authenticated_identifier` réserve ce statut à l'import dédié et le rend définitif, même pour l'administration.
 """
 
 from collections import Counter

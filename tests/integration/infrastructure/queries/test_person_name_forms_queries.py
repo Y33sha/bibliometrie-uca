@@ -27,7 +27,7 @@ def _fetch_pnf_for(conn, person_id):
 
 
 def _source_contribution(conn, name_form, source):
-    """Contribution source de forme `name_form` venue de `source`."""
+    """Insère une contribution source de forme `name_form` venue de `source`."""
     source_record = insert_source_record(
         conn, insert_publication(conn, "t"), source=source, source_id=f"{source}-1"
     )

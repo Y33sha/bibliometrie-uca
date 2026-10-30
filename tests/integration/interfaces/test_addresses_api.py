@@ -14,7 +14,7 @@ from tests.integration.helpers.seeds import (
 
 @pytest.fixture(scope="module", autouse=True)
 def _seed_addresses_api(client):
-    """Pays FR et périmètre des personnes, que demandent certaines routes.
+    """Sème le pays FR et le périmètre des personnes, demandés par certaines routes.
 
     Le conftest racine recrée la base au démarrage et coupe les connexions ouvertes. Quelques appels à l'API purgent les connexions mortes du pool.
     """
@@ -239,7 +239,7 @@ class TestSetAddressCountry:
         assert r.status_code == 200
 
     def test_set_country_visible_immediately(self, auth_client):
-        # Régression : la donnée écrite par le POST est lisible dès le GET suivant. Une route d'écriture sans `commit()` fait échouer ce test.
+        # La donnée écrite par le POST est lisible dès le GET suivant. Une route d'écriture sans `commit()` fait échouer ce test.
         addr = seed_address("Readback marker QWXZ")
         r = auth_client.post(f"/api/addresses/{addr}/country", json={"countries": ["FR"]})
         assert r.status_code == 200
@@ -308,7 +308,7 @@ class TestAddressStats:
 
 
 def _evenements(event_type: str) -> list[dict]:
-    """Lignes d'audit d'un type donné, dans l'ordre d'émission."""
+    """Renvoie les lignes d'audit d'un type donné, dans l'ordre d'émission."""
     with owner_pool() as cur:
         cur.execute(
             "SELECT entity_type, entity_id, payload, user_id "

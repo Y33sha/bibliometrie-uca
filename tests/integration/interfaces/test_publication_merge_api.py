@@ -12,7 +12,7 @@ from tests.integration.helpers.sources import insert_source_contribution
 
 
 def _authored_publication(*, doi: str | None, person_id: int | None) -> int:
-    """Publication d'un enregistrement source et d'une contribution du périmètre « Martin, Anne », rattachée par le nom à `person_id` quand il est fourni."""
+    """Sème une publication d'un enregistrement source et d'une contribution du périmètre « Martin, Anne », rattachée par le nom à `person_id` quand il est fourni."""
     publication = seed_publication(uniq("Titre"), doc_type="article")
     source = "crossref" if doi else "hal"
     source_record = seed_source_record(source, publication_id=publication, doi=doi)

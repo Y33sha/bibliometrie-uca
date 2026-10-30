@@ -1,8 +1,8 @@
 """Réinjection des payloads archivés dans `staging`, pour rejouer une normalisation.
 
-La normalisation archive le payload d'un document puis vide la colonne qui le contient : le payload subsiste alors seulement dans l'archive. Le script l'y reprend, le réinjecte et remet la ligne en attente de traitement.
+La normalisation archive chaque payload puis vide sa colonne dans `staging` : le payload subsiste alors seulement dans l'archive. Le script le lit dans l'archive, le réinjecte et remet la ligne en attente de traitement.
 
-Par défaut, seules les lignes présentes sont mises à jour ; une clé sans ligne correspondante est signalée. En mode complet (`--full`), ces clés orphelines sont recréées, par exemple après une table vidée. Le document est alors reconstruit depuis le payload seul, et l'adaptateur de la source en extrait le DOI.
+Par défaut, seules les lignes présentes sont mises à jour ; une clé sans ligne correspondante est signalée. En mode complet (`--full`), ces clés orphelines sont recréées, par exemple après une table vidée. La ligne est alors reconstruite depuis le payload seul, et l'adaptateur de la source extrait le DOI du payload.
 """
 
 import json
@@ -135,7 +135,7 @@ def test_cle_sans_ligne_signalee_et_ignoree(lancer, caplog):
 
 
 def test_mode_complet_recree_les_orphelines(lancer):
-    """Après une table vidée, toutes les clés sont orphelines : le document est reconstruit depuis le payload."""
+    """Après une table vidée, toutes les clés sont orphelines : la ligne est reconstruite depuis le payload."""
     resultat = lancer(
         {"hal": {"hal-1": {"halId_s": "hal-1", "doiId_s": "10.1/a"}}},
         "--sources",
@@ -149,7 +149,7 @@ def test_mode_complet_recree_les_orphelines(lancer):
 
 
 def test_mode_complet_met_a_jour_ce_qui_existe_deja(lancer, caplog):
-    """Une clé dont la ligne existe est mise à jour, sans nouvelle insertion."""
+    """En mode complet, la ligne existante d'une clé est mise à jour, sans insertion."""
     import logging
 
     with caplog.at_level(logging.INFO):

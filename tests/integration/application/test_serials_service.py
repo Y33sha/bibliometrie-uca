@@ -361,7 +361,7 @@ class TestMergePublishers:
         assert row.publisher_id == target
 
     def test_transfers_doi_prefixes(self, sa_sync_conn, publisher_service):
-        """Régression : le préfixe DOI de l'éditeur absorbé passe à l'éditeur conservé."""
+        """Le préfixe DOI de l'éditeur absorbé passe à l'éditeur conservé."""
         target = insert_publisher(sa_sync_conn, "Elsevier BV")
         source = insert_publisher(sa_sync_conn, "Elsevier [1977-....]")
         insert_doi_prefix(
@@ -668,7 +668,7 @@ class TestMergeSerials:
 
 class TestRequalifyPublicationsForSerial:
     def _seed(self, conn):
-        """Revue de type `journal` et publication de type `article`, présente dans un enregistrement source de type `article`."""
+        """Insère une revue de type `journal` et une publication de type `article`, présente dans un enregistrement source de type `article`."""
         serial = _serial(conn, title="Revue X")
         conn.execute(
             text("UPDATE serials SET serial_type = 'journal' WHERE id = :id"), {"id": serial}

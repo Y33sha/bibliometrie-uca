@@ -105,7 +105,7 @@ class TestGetTitle:
         assert get_title({}) is None
 
     def test_none_when_first_non_string(self):
-        # Un premier élément qui n'est pas une chaîne donne None, sans conversion.
+        # Un premier élément autre qu'une chaîne donne None, sans conversion.
         assert get_title({"title": [12345]}) is None
 
 
@@ -436,7 +436,7 @@ class TestBuildCrossrefAuthorRecords:
         ]
 
     def test_shared_orcid_kept_on_each_record(self):
-        """La lecture renvoie l'ORCID de chaque auteur tel que la source le donne ; l'écriture des contributions sources neutralise ceux que partagent plusieurs contributions sources."""
+        """La lecture renvoie l'ORCID de chaque auteur tel que la source le donne. L'écriture des contributions sources neutralise les ORCID partagés par plusieurs contributions sources."""
         msg = {
             "author": [
                 {"family": "Acharya", "ORCID": "https://orcid.org/0000-0001-2345-6789"},
@@ -570,7 +570,7 @@ class TestAuteursIllisibles:
 
 
 def _message(**surcharges) -> dict:
-    """Payload Crossref minimal et acceptable, que chaque test dégrade à sa guise."""
+    """Renvoie un payload Crossref minimal et acceptable, dégradé par chaque test selon ses besoins."""
     return {
         "DOI": "10.1000/abc",
         "title": ["Un article"],

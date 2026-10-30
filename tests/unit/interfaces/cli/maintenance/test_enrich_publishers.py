@@ -132,14 +132,14 @@ class TestFetchPublishersBatch:
         assert out == {"P1": "nl", "P2": None}
 
     def test_un_editeur_absent_de_la_reponse_reste_absent(self, monkeypatch):
-        """`None` dit « la source ne connaît pas de pays » ; l'absence de clé dit « la source n'a rien répondu »."""
+        """`None` signale un pays inconnu de la source ; une clé absente signale une réponse vide de la source."""
         payload = self._payload({"id": "https://openalex.org/P1", "country_codes": ["FR"]})
         monkeypatch.setattr(module, "http_request_with_retry", lambda *a, **k: payload)
         out = module.fetch_publishers_batch(["P1", "P2"], openalex_publishers_api="x")
         assert out == {"P1": "fr"}
 
     def test_dictionnaire_vide_sur_echec(self, monkeypatch):
-        """La fonction de requête HTTP compte déjà l'échec au circuit-breaker : le lot rendu est vide."""
+        """La fonction de requête HTTP compte déjà l'échec au circuit-breaker : le dictionnaire renvoyé est vide."""
 
         def boom(*_a, **_k):
             raise SourceUnavailableError("openalex")

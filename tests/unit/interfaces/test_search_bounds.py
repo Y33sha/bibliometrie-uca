@@ -15,7 +15,7 @@ _PLANCHER = 20
 
 
 def _parametres_de_recherche() -> list[tuple[str, str, dict[str, Any]]]:
-    """Paramètres de recherche du contrat publié : chemin, nom et schéma déclaré."""
+    """Renvoie les paramètres de recherche du contrat publié : chemin, nom et schéma déclaré."""
     return [
         (chemin, parametre["name"], parametre["schema"])
         for chemin, operations in app.openapi()["paths"].items()
@@ -26,7 +26,7 @@ def _parametres_de_recherche() -> list[tuple[str, str, dict[str, Any]]]:
 
 
 def _bornes_declarees(schema: dict[str, Any]) -> set[int | None]:
-    """Bornes de longueur d'un schéma, y compris dans une union avec le type nul."""
+    """Renvoie les bornes de longueur d'un schéma, y compris dans une union avec le type nul."""
     variantes = schema.get("anyOf", [schema])
     return {
         variante.get("maxLength")

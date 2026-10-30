@@ -57,7 +57,7 @@ def add_aligned_source_contribution(
 
 
 def align_unaligned(conn: Connection) -> None:
-    """Place dans sa propre contribution chaque contribution source non alignée d'un enregistrement source rattaché à une publication, hors collectifs et doublons d'auteur, comme la phase `author_grouping` pour un auteur sans correspondant dans les autres enregistrements sources. Marque les contributions créées pour la recomposition de leurs attributs."""
+    """Place dans sa propre contribution chaque contribution source non alignée d'un enregistrement source rattaché à une publication, hors collectifs et doublons d'auteur. La phase `author_grouping` traite ainsi un auteur sans correspondant dans les autres enregistrements sources. Marque les contributions créées pour la recomposition de leurs attributs."""
     conn.execute(
         text(f"""
             WITH ungrouped AS (
@@ -86,7 +86,7 @@ def recompose_contribution_attributes(conn: Connection) -> None:
 
 
 def contribution_of(conn: Connection, source_contribution_id: int) -> int:
-    """L'`id` de la contribution qui contient la contribution source `source_contribution_id`."""
+    """Renvoie l'`id` de la contribution qui contient la contribution source `source_contribution_id`."""
     return conn.execute(
         text(
             "SELECT contribution_id FROM aligned_source_contributions"
@@ -152,7 +152,7 @@ def insert_person_contribution(
 
 
 def contribution_person(conn: Connection, contribution_id: int) -> tuple[int | None, str | None]:
-    """Personne et mode de résolution de la contribution `contribution_id`."""
+    """Renvoie la personne et le mode de résolution de la contribution `contribution_id`."""
     row = conn.execute(
         text("SELECT person_id, resolution_mode FROM contributions WHERE id = :g"),
         {"g": contribution_id},

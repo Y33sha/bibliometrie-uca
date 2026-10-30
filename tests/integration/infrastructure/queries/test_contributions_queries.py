@@ -92,7 +92,7 @@ class TestOrphanContributionsCount:
 
 
 def _list(conn, **filters):
-    """File des contributions orphelines, après alignement des contributions sources sans contribution."""
+    """Renvoie la file des contributions orphelines, après alignement des contributions sources sans contribution."""
     _contribution(conn)
     return ContributionsQueries(conn).list_orphan_contributions(
         filters=OrphanFilters(**filters), page=1, per_page=50
@@ -100,7 +100,7 @@ def _list(conn, **filters):
 
 
 def _hal_and_openalex_contribution(conn, hal_name: str, openalex_name: str) -> int:
-    """Contribution orpheline à deux contributions sources, HAL (source prioritaire, nom affiché) et OpenAlex. Renvoie son identifiant."""
+    """Insère une contribution orpheline à deux contributions sources, HAL (source prioritaire, nom affiché) et OpenAlex. Renvoie son identifiant."""
     publication = insert_publication(conn)
     hal = insert_source_contribution(
         conn, insert_source_record(conn, publication), raw_author_name=hal_name, in_perimeter=True
@@ -209,7 +209,7 @@ class TestListOrphanContributions:
         ]
 
     def _labs_setup(self, conn):
-        """Contributions sources « Zzorph Avec » au laboratoire LAB et à une équipe, « Zzorph Autre » au laboratoire AUTRE, « Zzorph Sans » sans structure."""
+        """Insère les contributions sources « Zzorph Avec » au laboratoire LAB et à une équipe, « Zzorph Autre » au laboratoire AUTRE, « Zzorph Sans » sans structure."""
         lab, other_lab, team = (
             insert_structure(conn, code, acronym=acronym, structure_type=stype)
             for code, acronym, stype in (

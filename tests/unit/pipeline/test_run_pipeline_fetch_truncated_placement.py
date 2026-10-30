@@ -1,6 +1,6 @@
 """`fetch_truncated` est une phase distincte, entre `fetch_stale` et `normalize` ; les phases `harvest` et `normalize` l'excluent.
 
-Elle recharge les enregistrements OpenAlex en staging, non traités, dont la liste d'auteurs est tronquée à 100, juste avant leur normalisation. Elle couvre donc aussi ceux qu'apportent `fetch_missing` et `fetch_stale`.
+La phase recharge les enregistrements OpenAlex non traités du staging à liste d'auteurs tronquée à 100, juste avant leur normalisation. Elle couvre donc aussi ceux apportés par `fetch_missing` et `fetch_stale`.
 """
 
 from unittest.mock import AsyncMock, patch

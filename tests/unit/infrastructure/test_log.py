@@ -110,7 +110,7 @@ class TestRebaseLogDir:
 
 
 def _nom_de_logger_inedit(prefixe: str) -> str:
-    """Nom de logger encore inutilisé dans le processus.
+    """Renvoie un nom de logger encore inutilisé dans le processus.
 
     Le registre de `logging` dure autant que le processus, et pytest attache sa capture aux loggers existants qui ne propagent pas. Un logger de nom inédit arrive donc sans handler dans `setup_logger`, même d'une session pytest à l'autre.
     """
@@ -188,7 +188,7 @@ class TestMakeFormatter:
 
         from infrastructure.observability.log import _make_formatter
 
-        # Sans `LOG_FORMAT` (que le `.env` du projet définit), le format est JSON.
+        # Sans `LOG_FORMAT` (défini par le `.env` du projet), le format est JSON.
         monkeypatch.delenv("LOG_FORMAT", raising=False)
         fmt = _make_formatter()
         record = _logging.LogRecord(
@@ -391,7 +391,7 @@ class TestConfigureRootLogging:
     def test_un_logger_nomme_ne_propage_pas_au_root(self, tmp_path):
         """Un logger configuré par `setup_logger` a ses propres handlers et garde ses records : un seul jeu de handlers les traite.
 
-        Le module est rechargé pour exercer le vrai `setup_logger`, que `conftest.py` neutralise pour la session de tests.
+        Le module est rechargé pour exercer le vrai `setup_logger`, neutralisé par `conftest.py` pour la session de tests.
         """
         import importlib.util
 

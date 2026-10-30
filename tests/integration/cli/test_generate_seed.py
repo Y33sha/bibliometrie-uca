@@ -43,7 +43,7 @@ def test_generate_seed_walks_every_table(sa_sync_conn, tmp_path):
 
 
 def test_generate_seed_exports_structure_api_ids(sa_sync_conn, tmp_path):
-    # Les extractions OpenAlex, WoS, ScanR et theses.fr lisent l'institution dans `api_ids` : une base montée depuis le seed doit les contenir.
+    # Les moissonnages OpenAlex, WoS, ScanR et theses.fr lisent l'institution dans `api_ids` : une base montée depuis le seed doit les contenir.
     insert_structure(
         sa_sync_conn,
         "smoke",
@@ -76,7 +76,7 @@ def test_generate_seed_splits_config_keys(sa_sync_conn, tmp_path):
     assert "VALUES ('perimeter_persons'" not in common_sql
     assert "VALUES ('unpaywall_max_per_run'" in common_sql
     assert "VALUES ('unpaywall_max_per_run'" not in institution_sql
-    # Les délais de réinterrogation, que la migration pose, suivent le seed commun.
+    # Les délais de réinterrogation, posés par la migration, suivent le seed commun.
     assert "VALUES ('fetch_stale_after_days'" in common_sql
     # Le chargement d'un seed garde la configuration en base.
     assert "DELETE FROM config" not in common_sql + institution_sql
@@ -121,7 +121,7 @@ def test_seed_keeps_the_config_in_base(sa_sync_conn):
 
 
 def test_seed_se_recharge_sur_une_base_remplie(sa_sync_conn):
-    """Régression : le seed se recharge sur une base où un candidat d'adresse référence un pays."""
+    """Le seed se recharge sur une base où un candidat d'adresse référence un pays."""
     ensure_country(sa_sync_conn, "fr", "Ancien nom")
     ensure_country(sa_sync_conn, "zz", "Absent du seed")
     address_id = insert_address(sa_sync_conn, "Clermont-Ferrand")

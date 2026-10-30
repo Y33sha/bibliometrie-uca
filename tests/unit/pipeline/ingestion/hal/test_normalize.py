@@ -156,7 +156,7 @@ class TestContainerDescription:
         assert facts.isbns == ("9782410013221",)
 
     def test_le_congres_d_une_communication_ne_designe_pas_un_volume(self):
-        """Régression : HAL donne le congrès d'une communication avec ou sans actes publiés ; ce titre ne désigne aucun volume."""
+        """HAL donne le congrès d'une communication avec ou sans actes publiés ; ce titre ne désigne aucun volume."""
         facts = get_container_facts({"docType_s": "COMM", "conferenceTitle_s": "NuFACT 2022"})
         assert facts.book_title is None
 
@@ -229,7 +229,7 @@ def _embargo_tei(refs: str) -> str:
 
 
 def test_un_enregistrement_source_est_analyse_une_seule_fois(monkeypatch):
-    """Régression : les lecteurs du TEI (conteneur, identifiants, embargo, auteurs) partagent une seule analyse."""
+    """Les lecteurs du TEI (conteneur, identifiants, embargo, auteurs) partagent une seule analyse."""
     calls = []
     real = normalize_hal.ET.fromstring
     monkeypatch.setattr(normalize_hal.ET, "fromstring", lambda x: calls.append(x) or real(x))
@@ -276,7 +276,7 @@ class TestGetLocations:
 
 
 class TestParseTeiIsbns:
-    """HAL ne donne l'ISBN que dans le TEI, et la zone contient parfois autre chose."""
+    """HAL donne l'ISBN seulement dans le TEI. La zone contient parfois autre chose."""
 
     def test_reads_the_isbn_zone(self):
         xml = _embargo_tei('<idno type="isbn">978-3-031-33210-4</idno>')
@@ -388,7 +388,7 @@ class TestHalSourceRecord:
         assert captured.keywords is None
 
     def test_topics_from_domain(self):
-        """Les domaines sont stockés tels que la source les expose ; la découpe en libellés vit dans la phase `subjects`."""
+        """Les domaines sont stockés tels que la source les expose ; la phase `subjects` les découpe en libellés."""
         entries = [
             "sdv.bibs_FacetSep_Sciences du Vivant [q-bio]/Biostatistiques",
             "info.algo_FacetSep_Informatique [cs]/Algorithme et structure de données",
@@ -546,7 +546,7 @@ class TestBuildHalAuthorRecords:
         }
 
     def test_composite_numeric_idhal_not_promoted(self):
-        # Régression : pour un auteur sans idHAL, HAL recopie le person_id numérique dans le troisième segment du composite. Sans idHAL dans le TEI, seul le hal_person_id est retenu.
+        # Pour un auteur sans idHAL, HAL recopie le person_id numérique dans le troisième segment du composite. Sans idHAL dans le TEI, seul le hal_person_id est retenu.
         doc = {
             "authFullNameFormIDPersonIDIDHal_fs": [
                 "Christian Duale_FacetSep_106-921527_FacetSep_921527"
@@ -565,7 +565,7 @@ class TestBuildHalAuthorRecords:
         assert build_hal_author_records(doc)[0].identifiers is None
 
     def test_duplicate_hal_person_id_kept_on_each_record(self):
-        """La lecture renvoie les identifiants de chaque auteur tels que le dépôt les donne, compte HAL et IdRef alignés par position ; l'écriture des contributions sources neutralise ceux que partagent plusieurs contributions sources."""
+        """La lecture renvoie les identifiants de chaque auteur tels que le dépôt les donne, compte HAL et IdRef alignés par position. L'écriture des contributions sources neutralise les identifiants partagés par plusieurs contributions sources."""
         label_xml = (
             '<TEI xmlns="http://www.tei-c.org/ns/1.0"><biblFull><titleStmt>'
             '<author><idno type="IDREF">111111111</idno></author>'

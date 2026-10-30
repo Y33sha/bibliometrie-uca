@@ -310,5 +310,5 @@ class TestGetPublicationSubjects:
         assert len(detail.subjects) == 1
         assert detail.subjects[0].label == "genomics"
         assert detail.subjects[0].sources == ["wos"]
-        # Les mots-clés libres, hors du référentiel `subjects`, sont rendus à part.
+        # Les mots-clés libres, hors du référentiel `subjects`, sont renvoyés à part.
         assert detail.keywords == []

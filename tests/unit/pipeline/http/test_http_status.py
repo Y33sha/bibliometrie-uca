@@ -1,6 +1,6 @@
 """Tests de la levée d'erreur de statut sur les requêtes vers les sources.
 
-Non-régression : la clé d'API OpenAlex est un paramètre de requête, et le message que compose `httpx2.Response.raise_for_status` contient l'URL entière. Un 401 ou un 403 (clé invalide ou révoquée) écrirait la clé en clair dans le journal de l'appelant.
+La clé d'API OpenAlex est un paramètre de requête, et le message composé par `httpx2.Response.raise_for_status` contient l'URL entière. Un 401 ou un 403 (clé invalide ou révoquée) écrirait la clé en clair dans le journal de l'appelant.
 """
 
 import httpx2

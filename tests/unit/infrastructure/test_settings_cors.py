@@ -10,7 +10,7 @@ from infrastructure.settings import Settings
 
 
 def _settings(cors_origins: str) -> Settings:
-    """Settings construits sur une valeur de `CORS_ORIGINS` donnée, le reste venant de l'environnement."""
+    """Construit les settings sur une valeur de `CORS_ORIGINS` donnée, le reste venant de l'environnement."""
     return Settings(cors_origins=cors_origins)  # type: ignore[call-arg]
 
 

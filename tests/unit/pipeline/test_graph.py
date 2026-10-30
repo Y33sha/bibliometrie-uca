@@ -51,7 +51,7 @@ def test_normalisation_dans_l_ordre_de_priorite_des_sources():
 
 
 def test_aucune_tache_ne_lit_une_donnee_ecrite_apres_elle():
-    """Toute lecture d'une donnée qu'une tâche placée après écrit est déclarée lue au run précédent."""
+    """Toute lecture d'une donnée écrite par une tâche placée après est déclarée lue au run précédent."""
     assert order_violations(TASKS) == []
 
 
@@ -73,13 +73,13 @@ def test_creation_de_lignes_change_toute_lecture_de_la_table():
 
 
 def test_la_fusion_des_revues_suit_le_typage_openalex():
-    """La fusion lit le type, l'APC et le modèle open access des revues, que l'enrichissement OpenAlex écrit."""
+    """La fusion lit le type, l'APC et le modèle open access des revues, écrits par l'enrichissement OpenAlex."""
     deps = dependencies(TASKS)["publishing.merge_duplicate_serials"]
     assert "publishing.enrich_serials_from_openalex" in deps
 
 
 def test_le_nettoyage_des_informations_du_contributeur_suit_la_suppression_des_enregistrements_sources_disparus():
-    """Supprimer un enregistrement source emporte ses contributions sources, et donc des informations du contributeur deviennent orphelines."""
+    """La suppression d'un enregistrement source supprime ses contributions sources et rend orphelines des informations du contributeur."""
     deps = dependencies(TASKS)["normalize.cleanup_orphan_contributor_information"]
     assert "normalize.prune_disappeared" in deps
 

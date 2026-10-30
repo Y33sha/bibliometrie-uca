@@ -81,7 +81,7 @@ class TestCandidatesAndResolution:
         assert queued(sa_sync_conn, Queue.ADDRESS_CANDIDATES) == {addr}
 
     def test_la_detection_efface_les_pays_que_le_moyen_ne_trouve_pas(self, sa_sync_conn):
-        """Régression : un candidat issu d'une forme retirée de `place_name_forms` restait en place."""
+        """La détection efface un candidat de sa méthode absent de son résultat, par exemple issu d'une forme retirée de `place_name_forms`."""
         for code in ("fr", "us"):
             ensure_country(sa_sync_conn, code)
         dirty = insert_address(sa_sync_conn, "Gilead Sciences, La Défense")
@@ -171,7 +171,7 @@ class TestRefreshAddressSourceCountries:
         assert result == ["FR"]
 
     def test_le_journal_accorde_les_enregistrements_sources_mis_a_jour(self, sa_sync_conn, caplog):
-        """Régression : le journal écrivait « enregistrements sources mises à jour »."""
+        """Le journal accorde le participe au masculin : « enregistrement source mis à jour »."""
         ensure_country(sa_sync_conn, "FR")
         source_record = insert_source_record(
             sa_sync_conn, insert_publication(sa_sync_conn), source="openalex", source_id="oa-j"
@@ -335,7 +335,7 @@ class TestDirtyDrivenSourceCountries:
     def test_le_pays_d_une_contribution_source_sans_adresse_vient_de_sa_structure_hal(
         self, sa_sync_conn
     ):
-        """Régression : une contribution source HAL sans adresse donnait un enregistrement source sans pays."""
+        """Une contribution source HAL sans adresse donne à son enregistrement source le pays de sa structure HAL."""
         publication = insert_publication(sa_sync_conn)
         source_record = insert_source_record(
             sa_sync_conn, publication, source="hal", source_id="hal-s"
@@ -397,7 +397,7 @@ class TestDirtyDrivenSourceCountries:
         assert queued(sa_sync_conn, Queue.ADDRESS_COUNTRIES) == set()
 
     def test_un_marquage_fait_pendant_la_phase_reste_en_file(self, sa_sync_conn):
-        """Régression : l'effacement de fin de phase emportait les marquages faits pendant la phase, même ceux d'une ligne déjà marquée."""
+        """L'effacement de fin de phase garde les marquages faits pendant la phase, même ceux d'une ligne déjà marquée."""
         publication = insert_publication(sa_sync_conn)
         source_record = insert_source_record(
             sa_sync_conn, publication, source="openalex", source_id="oa-p"

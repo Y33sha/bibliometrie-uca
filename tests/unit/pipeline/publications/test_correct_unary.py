@@ -28,7 +28,7 @@ from pipeline.transformation.publications.correction.correction_store import (
 
 
 def _active(identifiers):
-    """Valeurs des identifiants actifs, par type."""
+    """Renvoie les valeurs des identifiants actifs, par type."""
     values: dict[str, list[str]] = {}
     for i in identifiers:
         if i.removed_by is None:
@@ -96,7 +96,7 @@ def _hal(*values, removed_by=None):
 
 
 def _source_record(**overrides: object) -> UnaryCorrectionRow:
-    """Ligne de correction unaire ; une clé hors des champs de la ligne est un fait des règles, et `doi` donne le seul DOI propre."""
+    """Renvoie une ligne de correction unaire ; une clé hors des champs de la ligne est un fait des règles, et `doi` donne le seul DOI propre."""
     row: dict[str, object] = {
         "id": 1,
         "source_id": "W1",
@@ -338,7 +338,7 @@ def test_le_journal_compte_seulement_les_documents_corriges_par_une_regle(caplog
 
 
 def test_depot_hal_introuvable_retire_des_identifiants_et_des_liens():
-    """Cas réel : l'enregistrement OpenAlex W4287257393 cite le dépôt hal-03178520, introuvable dans HAL."""
+    """Cas réel : l'enregistrement source OpenAlex W4287257393 cite le dépôt hal-03178520, introuvable dans HAL."""
     row = _source_record(
         identifiers=(
             *_hal("hal-03178520", "hal-03263588"),

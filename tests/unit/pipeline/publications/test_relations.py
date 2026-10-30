@@ -35,7 +35,7 @@ class TestBuildSharedKeyEdges:
         assert edges[0].target_publication_id == 10
 
     def test_pair_without_doi_related_by_publication_id(self):
-        """Deux publications sans DOI qui partagent une clé sont reliées : la cible est désignée par son identifiant."""
+        """Deux publications sans DOI à clé partagée sont reliées : la cible est désignée par son identifiant."""
         edges = _build_shared_key_edges(
             [SharedKeyPair(30, "conference_paper", None, 40, "poster", None)], declared_pairs=set()
         )

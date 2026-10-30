@@ -28,7 +28,7 @@ _source_record = partial(insert_source_record, title="T")
 
 
 def _attach(conn, publication_id, lab_id):
-    """Contribution du périmètre, d'une personne créée, qui relie la publication au laboratoire `lab_id`."""
+    """Insère une contribution du périmètre, d'une personne créée, qui relie la publication au laboratoire `lab_id`."""
     aid = insert_contribution(
         conn, publication_id, person_id=insert_person(conn), in_perimeter=True, roles=["author"]
     )
@@ -111,7 +111,7 @@ class TestSearch:
         assert publication in ids
 
     def test_facets_respect_search(self, sa_sync_conn):
-        """Régression : les comptes de facettes suivent la recherche sur le titre, comme le tableau."""
+        """Les comptes de facettes suivent la recherche sur le titre, comme le tableau."""
         lab = _lab(sa_sync_conn)
         for title in ("quantum gravity", "classical mechanics"):
             pid = insert_publication(sa_sync_conn, title=title)
@@ -134,7 +134,7 @@ class TestSearch:
 
 
 class TestHalStatusMultipleHalEntries:
-    """Une publication à plusieurs dépôts HAL est en collection dès qu'un de ses dépôts contient la collection du laboratoire. Le statut rendu avec chaque publication suit la même règle que le filtre."""
+    """Une publication à plusieurs dépôts HAL est en collection dès qu'un de ses dépôts contient la collection du laboratoire. Le statut renvoyé avec chaque publication suit la même règle que le filtre."""
 
     def test_publication_in_collection_via_one_hal_entry_is_not_hors_collection(self, sa_sync_conn):
         """Deux dépôts HAL, dont un dans la collection du laboratoire : la publication est absente du filtre `hors_collection`."""
@@ -161,7 +161,7 @@ class TestHalStatusMultipleHalEntries:
         assert publication not in [p.id for p in res.publications]
 
     def test_listed_status_follows_the_filter_rule(self, sa_sync_conn):
-        """Le statut rendu avec la publication est celui du filtre : en collection par l'un de ses dépôts, en open access, elle vaut `ok`."""
+        """Le statut renvoyé avec la publication est celui du filtre : en collection par l'un de ses dépôts, en open access, elle vaut `ok`."""
         lab = _lab(sa_sync_conn, hal_collection="CMH")
         publication = insert_publication(sa_sync_conn, "Two HAL deposits")
         _attach(sa_sync_conn, publication, lab)

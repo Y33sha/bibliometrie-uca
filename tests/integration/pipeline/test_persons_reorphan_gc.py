@@ -36,7 +36,7 @@ def _source_contribution(conn, *, form):
 
 
 def _contribution(conn, *, form, person_id, mode="name", in_perimeter=True):
-    """Contribution source de forme `form`, seule dans sa contribution rattachée à la personne `person_id` par le mode `mode`. Renvoie l'`id` de la contribution."""
+    """Insère une contribution source de forme `form`, seule dans sa contribution rattachée à la personne `person_id` par le mode `mode`. Renvoie l'`id` de la contribution."""
     source_contribution = _source_contribution(conn, form=form)
     return insert_person_contribution(
         conn, source_contribution, person_id=person_id, mode=mode, in_perimeter=in_perimeter
@@ -92,7 +92,7 @@ def test_une_forme_rejetee_ne_designe_pas_sa_personne(sa_sync_conn):
 def test_un_rejet_pour_la_publication_leve_l_ambiguite(sa_sync_conn):
     """Comme la résolution, la purge écarte la personne rejetée pour la publication de la contribution.
 
-    Régression : la purge comptait toutes les personnes de la forme, et retirait à chaque run une personne que la résolution rattachait de nouveau.
+    Sans cet accord, la purge retirerait à chaque run une personne rattachée de nouveau par la résolution.
     """
     conn = sa_sync_conn
     rejetee = insert_person(conn, "Tixier", first_name="Laurent")

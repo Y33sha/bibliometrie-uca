@@ -78,7 +78,7 @@ class TestGetApiTitle:
         assert _get_api_title(static, "item") is None
 
     def test_handles_single_title_as_dict(self):
-        """L'API renvoie parfois un dict directement (pas une liste)."""
+        """L'API renvoie parfois un dict seul à la place d'une liste."""
         static = {"summary": {"titles": {"title": {"type": "item", "content": "Solo"}}}}
         assert _get_api_title(static, "item") == "Solo"
 
@@ -275,7 +275,7 @@ class TestParseApiAuthors:
         assert authors[0]["full_name"] == "Doe, J."
 
     def test_orcid_not_harvested_from_data_item_ids(self):
-        """L'ORCID WoS (`PreferredORCID`), attribué par le matching interne de Web of Science, reste hors de la moisson."""
+        """L'ORCID WoS (`PreferredORCID`), attribué par le matching interne de Web of Science, reste hors du moissonnage."""
         static = {
             "summary": {"names": {"name": [_make_author_name(orcid="0000-0001-2345-6789")]}},
             "fullrecord_metadata": {"addresses": {}},

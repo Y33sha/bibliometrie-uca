@@ -28,7 +28,7 @@ _author = partial(insert_contribution, roles=["author"])
 
 
 def _person_source_contribution(conn, source_record, *, person_id, **source_contribution):
-    """Contribution source décrite par `source_contribution`, seule contribution source d'une contribution rattachée à la personne `person_id`. Renvoie l'`id` de la contribution source."""
+    """Insère une contribution source décrite par `source_contribution`, seule contribution source d'une contribution rattachée à la personne `person_id`. Renvoie l'`id` de la contribution source."""
     source_contribution_id = insert_source_contribution(conn, source_record, **source_contribution)
     publication = conn.execute(
         text("SELECT publication_id FROM source_records WHERE id = :s"), {"s": source_record}
@@ -163,7 +163,7 @@ class TestIdentifierConflicts:
         ]
 
     def test_neutralized_identifier_excluded(self, sa_sync_conn):
-        """Une valeur que chaque contribution source neutralise ne fait pas de conflit, même en attente de validation."""
+        """Une valeur neutralisée par chaque contribution source ne fait pas de conflit, même en attente de validation."""
         p1 = insert_person(sa_sync_conn, "Brown", first_name="Anne")
         p2 = insert_person(sa_sync_conn, "Brown", first_name="A")
         source_record = insert_source_record(sa_sync_conn, insert_publication(sa_sync_conn))

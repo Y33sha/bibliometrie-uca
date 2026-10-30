@@ -21,7 +21,7 @@ def insert_batch(conn, works):
 
 
 def _make_work(openalex_id, n_authors, title="Test Publication", cited_by_count=10):
-    """Document OpenAlex synthétique à `n_authors` auteurs."""
+    """Construit un document OpenAlex synthétique à `n_authors` auteurs."""
     authorships = [
         {
             "author_position": "first" if i == 0 else "middle",
@@ -56,7 +56,7 @@ def _make_work(openalex_id, n_authors, title="Test Publication", cited_by_count=
 
 
 def _seed_refetched(conn, *, source_id, full_work, bulk_payload, processed):
-    """Ligne de staging relue par `fetch_truncated` : `raw_data` contient la version complète `full_work`, `raw_hash` l'empreinte de la version tronquée `bulk_payload`."""
+    """Insère une ligne de staging relue par `fetch_truncated` : `raw_data` contient la version complète `full_work`, `raw_hash` l'empreinte de la version tronquée `bulk_payload`."""
     insert_staging(
         conn,
         "openalex",

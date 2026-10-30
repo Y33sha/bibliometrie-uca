@@ -168,7 +168,7 @@ class TestCompatibleNamesakes:
         assert compatible_namesakes("Bo-Hyung", [Namesake(1, "Lee", "H.")]) == []
 
     def test_reduced_person_claimed_by_a_full_namesake_is_not_a_candidate(self):
-        """« Martin J. » a déjà son prénom plein possible, « Martin Jean » : « Julien » ne s'y rattache pas."""
+        """« Martin Jean » est le prénom plein possible de « Martin J. » : « Julien » ne se rattache pas à « Martin J. »."""
         namesakes = [Namesake(1, "Martin", "J."), Namesake(2, "Martin", "Jean")]
         assert compatible_namesakes("Julien", namesakes) == []
 
@@ -254,7 +254,7 @@ class TestDecideMatchByIdentifier:
         assert result.rejection is None
 
     def test_incompatible_name_rejected(self):
-        """Sans verdict sur la forme de nom, un nom incompatible fait refuser le rattachement, et le rejet est rendu."""
+        """Sans verdict sur la forme de nom, un nom incompatible fait refuser le rattachement, et le rejet est renvoyé."""
         idref_map = {"252404955": IdentifiedPerson(42, "dupont", "jean")}
         result = decide_match_by_identifier(
             "252404955", idref_map, _contribution("Paul Martin"), ("paul martin",), {}

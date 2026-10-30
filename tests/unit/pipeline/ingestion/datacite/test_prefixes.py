@@ -110,7 +110,7 @@ async def test_fetch_datacite_prefix_404_is_not_found(http_mock):
 
 @pytest.mark.asyncio
 async def test_fetch_datacite_prefix_400_is_not_found(http_mock):
-    """DataCite répond 400 à chaque appel pour un préfixe dont il n'a qu'un enregistrement Handle (10.1713)."""
+    """DataCite répond 400 à chaque appel pour un préfixe connu de DataCite seulement par un enregistrement Handle (10.1713)."""
     http_mock.get("https://api.datacite.org/prefixes/10.1713").mock(
         return_value=httpx2.Response(
             400, json={"errors": [{"status": "400", "title": "undefined method 'uid'"}]}

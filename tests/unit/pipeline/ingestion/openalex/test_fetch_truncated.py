@@ -1,6 +1,10 @@
 """Relecture des works OpenAlex tronqués (`pipeline.ingestion.openalex.fetch_truncated`).
 
-Pas de réseau ni de base : la lecture d'un work est simulée, et une connexion simulée renvoie les works marqués et retient les écritures. Les tests vérifient le triage : le work qui dépasse cent auteurs est réécrit ; celui qui en compte exactement cent perd son marqueur sans réécriture ; celui qui est absent d'OpenAlex perd son marqueur ; celui dont OpenAlex est indisponible garde son marqueur pour le run suivant.
+Pas de réseau ni de base : la lecture d'un work est simulée, et une connexion simulée renvoie les works marqués et retient les écritures. Les tests vérifient le triage :
+- un work à plus de cent auteurs est réécrit ;
+- un work à cent auteurs exactement perd son marqueur sans réécriture ;
+- un work absent d'OpenAlex perd son marqueur ;
+- un work lu pendant une indisponibilité d'OpenAlex garde son marqueur pour le run suivant.
 """
 
 from __future__ import annotations

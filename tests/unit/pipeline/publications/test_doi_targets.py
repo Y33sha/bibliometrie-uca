@@ -101,7 +101,7 @@ def test_les_versions_ont_pour_cible_la_forme_sans_version_en_base():
 
 
 def test_sans_forme_sans_version_la_cible_est_la_version_la_plus_recente():
-    """Régression : chaque version d'un preprint Research Square formait une publication."""
+    """Les versions d'un preprint Research Square ont pour cible la plus récente : elles forment une seule publication."""
     dois = ["10.21203/rs.3.rs-1/v1", "10.21203/rs.3.rs-1/v2", "10.21203/rs.3.rs-1/v10"]
     assert version_targets(dois, frozenset()) == [
         DoiTarget("10.21203/rs.3.rs-1/v1", "10.21203/rs.3.rs-1/v10", _LATEST),

@@ -17,12 +17,12 @@ _Outcome = httpx2.Response | Exception
 
 
 def _target(url: httpx2.URL) -> tuple[str, str, int | None, str]:
-    """Partie de l'URL qui identifie une route."""
+    """Renvoie la partie de l'URL qui identifie une route."""
     return (url.scheme, url.host, url.port, url.path)
 
 
 def _replay(response: httpx2.Response) -> httpx2.Response:
-    """Copie d'une réponse, servie à la place de l'originale : une route peut ainsi servir la même réponse à plusieurs appels, chacun avec un flux non lu."""
+    """Renvoie une copie de la réponse, servie à la place de l'originale : une route peut ainsi servir la même réponse à plusieurs appels, chacun avec un flux non lu."""
     return httpx2.Response(response.status_code, headers=response.headers, content=response.content)
 
 
@@ -42,7 +42,7 @@ class Route:
         return_value: httpx2.Response | None = None,
         side_effect: Exception | Sequence[_Outcome] | None = None,
     ) -> Route:
-        """Pose ce que la route sert : `return_value` à chaque appel, `side_effect` levée à chaque appel si c'est une exception, ou consommée dans l'ordre si c'est une suite."""
+        """Pose les réponses de la route : `return_value` à chaque appel, `side_effect` levée à chaque appel si c'est une exception, ou consommée dans l'ordre si c'est une suite."""
         if side_effect is None:
             self._repeated = return_value
         elif isinstance(side_effect, Exception):

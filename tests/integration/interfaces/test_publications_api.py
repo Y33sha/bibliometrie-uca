@@ -118,7 +118,7 @@ class TestPublicationsList:
         assert r.status_code == 200
 
     def test_filter_lab_none(self, client):
-        """Publications sans laboratoire."""
+        """Le filtre des publications sans laboratoire répond."""
         r = client.get("/api/publications", params={"lab_none": "true"})
         assert r.status_code == 200
 
@@ -382,7 +382,7 @@ class TestPublicationSources:
         assert r.status_code == 404
 
     def test_doi_affiche_par_role_et_autres_doi_parmi_les_identifiants(self, client):
-        """Régression : le DOI affiché d'un enregistrement ScanR était son DOI `secondary` (preprint), et non son DOI `derived`."""
+        """Le DOI affiché d'un enregistrement source ScanR est son DOI `derived` ; son DOI `secondary` actif (preprint) figure parmi les identifiants."""
         publication_id = seed_publication("Article")
         with owner_connection() as conn:
             insert_source_record(

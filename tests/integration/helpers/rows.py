@@ -9,7 +9,7 @@ PERIMETER_EVIDENCE_CAST = "perimeter_evidence[]"
 
 
 def perimeter_evidence(in_perimeter: bool | None) -> list[str] | None:
-    """Indices d'une ligne semée : l'adresse quand `in_perimeter` est vrai, sinon la valeur par défaut du schéma (aucun indice)."""
+    """Renvoie les indices d'une ligne semée : l'adresse quand `in_perimeter` est vrai, sinon la valeur par défaut du schéma (aucun indice)."""
     return [PerimeterEvidence.ADDRESS.value] if in_perimeter else None
 
 

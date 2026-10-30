@@ -10,7 +10,11 @@ from domain.source_records.source_contribution_sync import (
 
 
 def _plan(stored, incoming) -> SourceContributionSyncPlan:
-    """`incoming` : (position, informations du contributeur, empreinte) ; la clé entrante vaut la position."""
+    """Planifie la synchronisation ; la clé entrante vaut la position.
+
+    Args:
+        incoming: triplets (position, informations du contributeur, empreinte).
+    """
     return plan_source_contribution_sync(
         [StoredSourceContribution(*s) for s in stored],
         [IncomingSourceContribution(i[0], *i) for i in incoming],
@@ -125,7 +129,7 @@ class TestPlanSourceContributionSync:
         assert plan.regroup
 
     def test_empreinte_absente_en_base(self):
-        """Une contribution source écrite avant l'empreinte est réécrite à sa première synchronisation."""
+        """Une contribution source sans empreinte en base est réécrite à sa première synchronisation."""
         plan = _plan([(10, 0, "dupont", None)], [(0, "dupont", "h1")])
         assert plan.updates == ((10, 0),)
 

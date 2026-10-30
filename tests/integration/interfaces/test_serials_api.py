@@ -47,7 +47,7 @@ _seed_record = partial(seed_source_record, title="Doc", publication_year=None)
 
 
 def _derived_doi(doi: str) -> list[SourceIdentifier]:
-    """DOI `derived` d'un agrégateur : celui de la localisation principale chez OpenAlex, de l'identifiant chez ScanR."""
+    """Construit le DOI `derived` d'un agrégateur : celui de la localisation principale chez OpenAlex, de l'identifiant chez ScanR."""
     return [SourceIdentifier(SourceIdentifierType.DOI, doi, SourceIdentifierRole.DERIVED)]
 
 
@@ -108,7 +108,7 @@ class TestListSerials:
             assert ids == [serial_id], term
 
     def test_search_keeps_matching_titles(self, client):
-        # Un terme qui n'a pas la forme d'un ISSN ne cherche que dans les titres.
+        # Un terme sans la forme d'un ISSN cherche seulement dans les titres.
         title = uniq("TitleOnlySerial")
         serial_id = seed_serial(title)
         r = client.get("/api/serials", params={"search": title, "per_page": 200})
@@ -238,7 +238,7 @@ class TestSerialsWithSameTitle:
         assert not ({a, b} & ids)
 
     def test_titles_emptied_by_normalization_form_no_group(self, client):
-        """Cas réel : un titre grec et un titre cyrillique se normalisent tous deux en chaîne vide."""
+        """Un titre grec et un titre cyrillique, tous deux normalisés en chaîne vide, ne forment pas de groupe."""
         a = seed_serial("Παιδαγωγικά ρεύματα στο Αιγαίο")
         b = seed_serial("Теория вероятностей и ее применения")
         r = client.get("/api/serials/same-titles")
@@ -266,7 +266,7 @@ class TestSerialsSharingIssn:
 
 
 def _seed_typed_serial_with_records(raw_types: list[tuple[str, str]]) -> int:
-    """Revue typée `journal`, avec un enregistrement source par couple `(source, type brut)`."""
+    """Sème une revue typée `journal`, avec un enregistrement source par couple `(source, type brut)`."""
     jid = seed_serial(serial_type="journal")
     for source, raw_type in raw_types:
         _seed_record(source, serial_id=jid, raw_doc_type=raw_type)
@@ -275,7 +275,7 @@ def _seed_typed_serial_with_records(raw_types: list[tuple[str, str]]) -> int:
 
 class TestDoiNamespaceConflicts:
     def test_enregistrement_contredit_par_l_espace_de_noms(self, client):
-        """Cas réel : *Physical review. C* et son titre parasite chez OpenAlex."""
+        """Les enregistrements sources OpenAlex d'une revue parasite, aux DOI de l'espace de noms d'une autre revue, forment un conflit (cas de *Physical review. C*)."""
         namespace = f"10.9001/{uuid.uuid4().hex[:8]}."
         serial = seed_serial()
         parasite = seed_serial()
@@ -300,7 +300,7 @@ class TestDoiNamespaceConflicts:
         assert (conflict["records"], conflict["sources"]) == (2, {"openalex": 2})
 
     def test_doi_documents_et_part_de_l_espace(self, client):
-        """DOI distincts et documents de l'espace de noms ; la part des DOI est celle de l'apprentissage."""
+        """Le conflit compte les DOI distincts et les enregistrements sources de l'espace de noms (`documents`) ; la part des DOI est celle de l'apprentissage."""
         namespace = f"10.9001/{uuid.uuid4().hex[:8]}."
         serial = seed_serial()
         other = seed_serial()
@@ -324,7 +324,7 @@ class TestDoiNamespaceConflicts:
 
 class TestLikelyProceedings:
     def test_revue_d_articles_de_congres_dans_la_file(self, client):
-        """Cas réel : « 2020 Winter Simulation Conference (WSC) », typée journal."""
+        """Une revue typée `journal` aux enregistrements sources de congrès entre dans la file, comme « 2020 Winter Simulation Conference (WSC) »."""
         proceedings = _seed_typed_serial_with_records(
             [("crossref", "proceedings-article"), ("hal", "COMM"), ("hal", "ART")]
         )
@@ -414,7 +414,7 @@ class TestGetSerial:
         assert r.json()["doaj_url"] == "https://doaj.org/toc/deadbeef1234"
 
     def test_doaj_url_from_csv_url_in_doaj(self, client):
-        """Cas le plus fréquent : payload d'un import CSV, avec `URL in DOAJ` (URL complète) et sans `DOAJ id`."""
+        """`doaj_url` reprend l'URL complète `URL in DOAJ` d'un payload d'import CSV sans `DOAJ id`, le cas le plus fréquent."""
         jid = seed_serial()
         payload = {"URL in DOAJ": "https://doaj.org/toc/csvurl42"}
         with owner_pool() as cur:
@@ -519,7 +519,7 @@ class TestTypeChangeImpact:
             assert cur.fetchone()["serial_type"] == "journal"
 
     def test_corrections_with_identifiers_are_counted(self, auth_client):
-        """Régression : la correction unaire rejouée écrit les statuts des identifiants, et le rôle de l'API n'en avait pas le droit (erreur 500)."""
+        """La correction unaire rejouée par l'aperçu écrit les statuts des identifiants, sous le rôle de l'API."""
         jid = seed_serial(serial_type="journal")
         publication_id = _publication(doc_type="article", serial_id=jid)
         _seed_record(

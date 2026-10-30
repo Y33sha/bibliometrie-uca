@@ -12,7 +12,7 @@ def test_a_defaut_le_volume():
 
 
 def test_sans_entree_aucune():
-    """Régression : un chapitre détaché de la revue que lui prêtait l'espace de noms de son DOI laissait la revue à sa monographie."""
+    """Sans collection ni volume, aucune revue n'est choisie."""
     assert choose_monograph_serial((), ()) == MonographSerialChoice(None)
 
 

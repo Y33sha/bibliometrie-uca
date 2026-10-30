@@ -2,11 +2,11 @@
 
 Une étiquette (`python:3.12-slim`) peut désigner un autre contenu d'une construction à l'autre ; l'empreinte désigne l'image examinée.
 
-Chaque répertoire qui contient une description de construction figure dans la configuration du robot de mise à jour, qui propose la montée des empreintes qu'il y trouve.
+Chaque répertoire contenant une description de construction figure dans la configuration du robot de mise à jour. Le robot propose la montée des empreintes trouvées dans ces répertoires.
 
-Toutes les déclarations de version de langage du dépôt s'accordent : les descriptions de construction, que l'intégration continue lit, et `.nvmrc`, qui donne le Node du poste de développement. La version de uv suit la même règle.
+Toutes les déclarations de version de langage du dépôt s'accordent : les descriptions de construction, lues par l'intégration continue, et `.nvmrc`, qui fixe le Node du poste de développement. La version de uv suit la même règle.
 
-Les conteneurs de service des workflows reprennent les images des compositions, que le robot suit.
+Les conteneurs de service des workflows reprennent les images des compositions, suivies par le robot.
 """
 
 import re
@@ -27,7 +27,7 @@ _EMPREINTE = re.compile(r"@sha256:[0-9a-f]{64}$")
 
 
 def _descriptions_de_construction() -> list[tuple[str, str]]:
-    """Chemins des descriptions de construction du dépôt, et leur contenu."""
+    """Renvoie les chemins des descriptions de construction du dépôt, et leur contenu."""
     chemins = [PROJECT_ROOT / "Dockerfile", *PROJECT_ROOT.glob("interfaces/*/Dockerfile")]
     return [
         (chemin.relative_to(PROJECT_ROOT).as_posix(), chemin.read_text(encoding="utf-8"))
@@ -56,7 +56,7 @@ def test_chaque_image_de_base_porte_son_empreinte():
 
 
 def test_chaque_description_de_construction_est_suivie_par_le_robot():
-    """Un répertoire qui contient une description de construction figure dans la configuration du robot de mise à jour."""
+    """Un répertoire contenant une description de construction figure dans la configuration du robot de mise à jour."""
     config = yaml.safe_load(_DEPENDABOT.read_text(encoding="utf-8"))
     suivis = {
         chemin.rstrip("/") or "/"
@@ -78,7 +78,7 @@ def test_chaque_description_de_construction_est_suivie_par_le_robot():
 
 
 def _versions_des_images() -> dict[str, set[str]]:
-    """Version de chaque langage telle que les images de base la figent."""
+    """Renvoie la version de chaque langage figée par les images de base."""
     versions: dict[str, set[str]] = {langage: set() for langage in _LANGAGES}
     for _, contenu in _descriptions_de_construction():
         for image in _FROM.findall(contenu):
@@ -89,7 +89,7 @@ def _versions_des_images() -> dict[str, set[str]]:
 
 
 def _versions_declarees_par_l_integration() -> dict[str, list[str]]:
-    """Versions de langage écrites en clair dans les workflows, par langage.
+    """Renvoie les versions de langage écrites en clair dans les workflows, par langage.
 
     Une valeur lue depuis les images est une expression `${{ … }}` ; toute autre est une version recopiée.
     """
@@ -107,7 +107,7 @@ def _versions_declarees_par_l_integration() -> dict[str, list[str]]:
 
 
 def _versions_declarees() -> dict[str, set[str]]:
-    """Version de chaque langage selon chaque déclaration du dépôt : images de base et `.nvmrc`.
+    """Renvoie la version de chaque langage selon chaque déclaration du dépôt : images de base et `.nvmrc`.
 
     `nvm use` lit `.nvmrc` sans argument : les contrôles du frontend lancés avant un push s'exécutent sous ce Node.
     """
@@ -152,7 +152,7 @@ def test_l_integration_ne_redeclare_aucune_version():
 
 
 def _images_des_services() -> list[tuple[str, str]]:
-    """Images des conteneurs de service des workflows, avec le nom du workflow."""
+    """Renvoie les images des conteneurs de service des workflows, avec le nom du workflow."""
     return [
         (workflow.name, service["image"])
         for workflow in _WORKFLOWS

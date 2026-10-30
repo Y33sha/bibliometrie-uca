@@ -1,8 +1,8 @@
-"""Hôtes que le trafic sortant peut joindre.
+"""Hôtes joignables par le trafic sortant.
 
 La liste d'hôtes déclarée est celle des destinations joignables. Trois mécanismes la garantissent : un contrat d'architecture interdit au code qui sert les requêtes HTTP d'importer un client réseau ; le helper HTTP partagé suit seulement les redirections vers le même hôte (`test_http_retry`) ; ce module confronte les URL écrites dans le code à la liste.
 
-La confrontation vise `pipeline/ingestion/`, d'où partent les requêtes. Les espaces de noms XML que les normaliseurs y lisent sont des identifiants, jamais appelés. Les URL des autres couches désignent des pages à afficher (une fiche HAL, un profil ORCID), jamais appelées non plus.
+La confrontation vise `pipeline/ingestion/`, d'où partent les requêtes. Les espaces de noms XML lus par les normaliseurs sont des identifiants, jamais appelés. Les URL des autres couches désignent des pages à afficher (une fiche HAL, un profil ORCID), jamais appelées non plus.
 """
 
 import re
@@ -28,11 +28,11 @@ HOTES_DECLARES = frozenset(
         "cluster-production.elasticsearch.dataesr.ovh",
         "www.sudoc.fr",
         "zenodo.org",
-        # `doaj.org` redirige le téléchargement du dump DOAJ vers un lien signé sur son stockage objet : seule redirection vers un autre hôte que le code suive (`ALLOWED_DUMP_HOSTS`).
+        # `doaj.org` redirige le téléchargement du dump DOAJ vers un lien signé sur son stockage objet : seule redirection vers un autre hôte suivie par le code (`ALLOWED_DUMP_HOSTS`).
         "doaj-live-journal-csv.s3.amazonaws.com",
     }
 )
-"""Destinations joignables depuis la couche sortante. Y ajouter un hôte est un geste délibéré."""
+"""Destinations joignables depuis la couche sortante."""
 
 _COUCHE_SORTANTE = PROJECT_ROOT / "pipeline" / "ingestion"
 _URL = re.compile(r"https?://([A-Za-z0-9._-]+)")
@@ -41,7 +41,7 @@ _ESPACES_DE_NOMS_XML = frozenset({"www.tei-c.org", "www.w3.org"})
 """Hôtes des espaces de noms XML du TEI de HAL : des identifiants, jamais appelés."""
 
 _IDENTIFIANTS = frozenset({"openalex.org"})
-"""Hôtes des identifiants en forme d'URL (`https://openalex.org/W…`) que lit la normalisation : jamais appelés."""
+"""Hôtes des identifiants en forme d'URL (`https://openalex.org/W…`) lus par la normalisation : jamais appelés."""
 
 
 def _hotes_ecrits_dans(racine: Path) -> set[str]:

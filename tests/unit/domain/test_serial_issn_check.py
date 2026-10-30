@@ -28,7 +28,11 @@ def _record(
     cancelled: tuple[str, ...] = (),
     hints: tuple[tuple[str, IssnSupport], ...] = (),
 ) -> SudocSerialRecord:
-    """Notice de test. Les titres précédents et suivants sont par défaut une continuation (`430`, `440`) ; `continuation=False` en fait une scission, une fusion ou une absorption."""
+    """Construit une notice Sudoc de test.
+
+    Args:
+        continuation: vrai par défaut, les titres précédents et suivants sont une continuation (`430`, `440`) ; faux, une scission, une fusion ou une absorption.
+    """
     return SudocSerialRecord(
         ppn=f"ppn-{issn}",
         issn=issn,
@@ -53,7 +57,7 @@ def _serial(
     title: str = "Revue",
     candidates: tuple[str, ...] = (),
 ) -> SerialIssns:
-    """Revue de test, décrite par les ISSN papier, électronique, ISSN-L et les valeurs mises de côté."""
+    """Construit une revue de test, décrite par ses ISSN papier, électronique, ISSN-L et ses valeurs mises de côté."""
     return SerialIssns(title, tuple(issns_from_columns(issn, eissn, issnl, rejected)), candidates)
 
 
@@ -65,7 +69,7 @@ def _label(row: SerialIssn) -> str:
 
 
 def _rows(check: SudocCheck) -> dict[str, str]:
-    """ISSN de la revue après vérification : « support:statut », « +L » pour l'ISSN-L, « >successeur »."""
+    """Renvoie les ISSN de la revue vérifiée : « support:statut », « +L » pour l'ISSN-L, « >successeur »."""
     return {r.issn: _label(r) for r in check.issns}
 
 
@@ -125,7 +129,7 @@ class TestSupport:
         assert check.set_aside == ()
 
     def test_issn_goes_to_the_column_its_mention_names(self):
-        """Cas réel (Lithosphere) : l'ISSN rangé comme électronique, sans notice, prend le support papier que lui donne la mention."""
+        """Cas réel (Lithosphere) : l'ISSN rangé comme électronique, sans notice, prend le support papier donné par la mention."""
         check = check_serial_issns(
             _serial(issn="1947-4253", eissn="1941-8264"),
             {
@@ -424,7 +428,7 @@ class TestSetAside:
         assert check.released == (SerialIssn(issn="0031-899X", support=PRINT),)
 
     def test_supplement_is_set_aside(self):
-        """Cas réel : des enregistrements d'Acta Cardiologica ont l'ISSN de son supplément, dont la notice désigne la revue (`422`)."""
+        """Cas réel : des enregistrements sources d'Acta Cardiologica ont l'ISSN de son supplément ; la notice du supplément désigne la revue (`422`)."""
         check = check_serial_issns(
             _serial(issn="0001-5385", title="Acta Cardiologica", candidates=("0373-7934",)),
             {
@@ -640,7 +644,7 @@ class TestSetAsideReexamined:
         assert _rows(check) == {"2179-9164": "electronic:active+L", "1807-975X": "print:active"}
 
     def test_set_aside_issn_of_the_serial_becomes_active(self):
-        """Cas réel : un passage antérieur a mis de côté l'ISSN en ligne de European Archives of Oto-Rhino-Laryngology ; il redevient actif."""
+        """Cas réel : l'ISSN en ligne de European Archives of Oto-Rhino-Laryngology, mis de côté, redevient actif."""
         check = check_serial_issns(
             _serial(
                 issn="0937-4477",
@@ -665,7 +669,7 @@ class TestSetAsideReexamined:
         assert _rows(check) == {"0937-4477": "print:active+L", "1434-4726": "electronic:active"}
 
     def test_rejected_issn_of_another_publication_is_discarded(self):
-        """Un ISSN d'une autre publication, mis de côté par un passage antérieur, est écarté de la revue."""
+        """Un ISSN mis de côté, d'une autre publication, est écarté de la revue."""
         check = check_serial_issns(
             _serial(
                 issn="1740-634X",
@@ -727,7 +731,7 @@ class TestSetAsideReexamined:
 
 class TestDocumentIssns:
     def test_document_issn_of_the_serial_completes_a_column(self):
-        """Cas réel (Diabetes Care) : les enregistrements ont l'ISSN en ligne, absent de la revue."""
+        """Cas réel (Diabetes Care) : les enregistrements sources ont l'ISSN en ligne, absent de la revue."""
         check = check_serial_issns(
             _serial(issn="0149-5992", issnl="0149-5992", candidates=("1935-5548",)),
             {
@@ -738,7 +742,7 @@ class TestDocumentIssns:
         assert _rows(check) == {"0149-5992": "print:active+L", "1935-5548": "electronic:active"}
 
     def test_document_issn_of_another_publication_is_discarded(self):
-        """Cas réel : des enregistrements de Technè ont l'ISSN de la revue « Spotlight »."""
+        """Cas réel : des enregistrements sources de Technè ont l'ISSN de la revue « Spotlight »."""
         check = check_serial_issns(
             _serial(
                 issn="1254-7867",
@@ -757,7 +761,7 @@ class TestDocumentIssns:
         assert check.discarded == (("2750-6185", SetAsideReason.OTHER_PUBLICATION),)
 
     def test_document_issns_do_not_take_over_the_serial(self):
-        """Cas réel (INRAE productions animales) : les enregistrements ont les deux ISSN de l'ancien titre, qui forment le groupe le plus nombreux."""
+        """Cas réel (INRAE productions animales) : les enregistrements sources ont les deux ISSN de l'ancien titre, qui forment le groupe le plus nombreux."""
         check = check_serial_issns(
             _serial(
                 eissn="2824-3633",
@@ -800,7 +804,7 @@ class TestDocumentIssns:
 
 class TestCorrection:
     def test_rejected_issn_is_corrected(self):
-        """Cas réel : `1950-2051` pour la revue Constructif, dont l'ISSN est `1950-5051`. La valeur mal formée désigne sa correction."""
+        """Cas réel : `1950-2051` pour la revue Constructif, d'ISSN `1950-5051`. La valeur mal formée désigne sa correction."""
         check = check_serial_issns(
             _serial(rejected=("1950-2051",), title="Constructif"),
             {"1950-5051": _record("1950-5051", "1950-5051", PRINT, title="Constructif")},

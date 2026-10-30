@@ -69,7 +69,7 @@ def test_les_compteurs_des_taches_remontent_a_la_phase(contexte):
 
 
 def test_acces_non_configure_saute_les_taches_a_source(contexte, caplog):
-    """Sans identifiants, l'accès à la source saute la tâche avant sa fonction, et sa ligne le dit."""
+    """Sans identifiants, une tâche à source est sautée avant l'appel de sa fonction, et sa ligne le signale."""
     appels: list[str] = []
     with caplog.at_level(logging.INFO, logger="test"):
         metrics = _run(contexte, appels, credentials_missing="clé absente")

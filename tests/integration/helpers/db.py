@@ -1,6 +1,6 @@
 """Connexions à la base de test.
 
-`database_url` donne l'URL de la base de test sous un rôle de connexion. Les tests d'intégration de l'API sèment leur jeu de données sous le propriétaire du schéma, en validation immédiate : ce qu'un module sème est visible du serveur d'API que le test interroge. `owner_connection` ouvre cette connexion SQLAlchemy, `owner_pool` un curseur psycopg sur elle. `reset_database` remet la base dans son état d'après les migrations.
+`database_url` donne l'URL de la base de test sous un rôle de connexion. Les tests d'intégration de l'API sèment leur jeu de données sous le propriétaire du schéma, en validation immédiate : les données semées par un module sont visibles du serveur d'API interrogé par le test. `owner_connection` ouvre cette connexion SQLAlchemy, `owner_pool` un curseur psycopg sur elle. `reset_database` remet la base dans son état d'après les migrations.
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ DB_PORT = int(os.environ.get("DB_PORT", "5432"))
 
 
 def database_url(*, identity: str = "pipeline") -> URL:
-    """URL SQLAlchemy de la base de test, sous le rôle `identity` (`pipeline`, `app` ou `owner`).
+    """Renvoie l'URL SQLAlchemy de la base de test, sous le rôle `identity` (`pipeline`, `app` ou `owner`).
 
     Le propriétaire du schéma sert aux migrations et au semis des tests d'API. Les fixtures de données passent par le rôle du pipeline, celles qui exercent une opération de l'API par le rôle de l'API.
     """
@@ -51,20 +51,20 @@ def database_url(*, identity: str = "pipeline") -> URL:
 
 @cache
 def _owner_engine() -> Engine:
-    """Engine du propriétaire du schéma en `AUTOCOMMIT`, créé au premier appel."""
+    """Renvoie l'engine du propriétaire du schéma en `AUTOCOMMIT`, créé au premier appel."""
     return create_engine(database_url(identity="owner"), isolation_level="AUTOCOMMIT")
 
 
 @contextmanager
 def owner_connection() -> Iterator[Connection]:
-    """Connexion SQLAlchemy sous le propriétaire du schéma, en validation immédiate, rendue au pool à la sortie."""
+    """Ouvre une connexion SQLAlchemy sous le propriétaire du schéma, en validation immédiate, rendue au pool à la sortie."""
     with _owner_engine().connect() as conn:
         yield conn
 
 
 @contextmanager
 def owner_pool() -> Iterator[psycopg.Cursor[dict[str, Any]]]:
-    """Curseur psycopg à lignes en dictionnaire sur une connexion `owner_connection`, fermé à la sortie."""
+    """Ouvre un curseur psycopg à lignes en dictionnaire sur une connexion `owner_connection`, fermé à la sortie."""
     with owner_connection() as conn:
         with conn.connection.driver_connection.cursor(row_factory=dict_row) as cur:
             yield cur
@@ -79,7 +79,7 @@ type ConfigRow = tuple[str, str, str | None]
 
 
 def config_rows() -> list[ConfigRow]:
-    """Réglages de `ops.config`."""
+    """Renvoie les réglages de `ops.config`."""
     with owner_pool() as cur:
         cur.execute("SELECT key, value::text AS value, description FROM ops.config")
         return [(r["key"], r["value"], r["description"]) for r in cur.fetchall()]

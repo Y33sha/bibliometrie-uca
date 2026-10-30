@@ -1,4 +1,4 @@
-"""Phase `harvest` : une source sans configuration d'extraction est sautée.
+"""Phase `harvest` : une source non configurée est sautée.
 
 La source reçoit un signal `source_unconfigured` (avertissement posé par `run_harvest`) et le run continue. Seules les sources configurées aboutissent et figurent dans la table par source. La règle vaut pour la branche parallèle (full, weekly) et pour la branche HAL incrémentale (daily).
 """

@@ -21,12 +21,12 @@ from tests.integration.helpers.seeds import (
 
 
 def _uniq_name(prefix: str) -> str:
-    """Nom de personne unique, en lettres seules : le nettoyage des noms bruts retire les chiffres."""
+    """Renvoie un nom de personne unique, en lettres seules : le nettoyage des noms bruts retire les chiffres."""
     return prefix + uuid.uuid4().hex[:8].translate(str.maketrans("0123456789", "ghijklmnop"))
 
 
 def _seed_orphan_with_publication(raw_author_name: str = "Reject Me") -> tuple[int, int]:
-    """Contribution orpheline (contribution d'auteur du périmètre, sans personne) d'une contribution source de nom brut `raw_author_name`. Renvoie (contribution, publication)."""
+    """Sème une contribution orpheline (contribution d'auteur du périmètre, sans personne) d'une contribution source de nom brut `raw_author_name`. Renvoie (contribution, publication)."""
     publication_id = seed_publication(title=uniq("Pub"))
     source_record_id = seed_source_record(publication_id=publication_id)
     source_contribution_id = seed_source_contribution(
@@ -38,7 +38,7 @@ def _seed_orphan_with_publication(raw_author_name: str = "Reject Me") -> tuple[i
 
 
 def _seed_orphan() -> int:
-    """Identifiant d'une contribution orpheline."""
+    """Sème une contribution orpheline et renvoie son identifiant."""
     return _seed_orphan_with_publication()[0]
 
 
@@ -46,7 +46,7 @@ def _seed_orphan() -> int:
 
 
 def _contribution_id(publication_id: int, person_id: int | None) -> int:
-    """Identifiant de la contribution de la personne dans la publication, ou de la contribution sans personne si `person_id` vaut `None`."""
+    """Renvoie l'identifiant de la contribution de la personne dans la publication, ou de la contribution sans personne si `person_id` vaut `None`."""
     with owner_pool() as cur:
         cur.execute(
             "SELECT id FROM contributions"

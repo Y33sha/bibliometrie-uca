@@ -43,7 +43,7 @@ def _identifier(
 
 
 def _identifiers(conn, source_record_id: int) -> list[tuple[str, str, str]]:
-    """Identifiants écrits de l'enregistrement source : type, valeur, rôle."""
+    """Renvoie les identifiants écrits de l'enregistrement source : type, valeur, rôle."""
     rows = conn.execute(
         text("""
             SELECT id_type::text, id_value, role::text FROM source_record_identifiers
@@ -177,7 +177,7 @@ class TestUpsertSourceRecord:
         assert queued(sa_sync_conn, Queue.SOURCE_RECORD_KEYS) == {source_record_id}
 
     def test_reimport_clears_the_original_values_of_corrections(self, sa_sync_conn):
-        """Régression : une valeur d'origine gardée d'un import précédent l'emportait sur la valeur fraîche à la correction suivante."""
+        """Le réimport efface les valeurs d'origine des corrections : la correction suivante part de la valeur fraîche."""
         staging_id = _thesis_staging(sa_sync_conn)
         source_record_id = SourceRecordStore(sa_sync_conn).upsert_source_record(_row(staging_id))
         sa_sync_conn.execute(
@@ -266,7 +266,7 @@ class TestUpsertSourceRecord:
 
 
 class TestPublisher:
-    """L'éditeur que nomme la source s'écrit, sauf pour une production hébergée sans être publiée."""
+    """L'éditeur nommé par la source s'écrit, sauf pour une production hébergée sans être publiée."""
 
     def _publisher_of(self, conn, **overrides) -> int | None:
         publisher_id = insert_publisher(conn, "Éditeur")

@@ -25,7 +25,7 @@ _ORCID = "0000-0002-1825-0097"
 
 
 def _contribution(conn, publication, members):
-    """Contribution qui aligne les contributions sources `(source, nom, identifiants, du périmètre)` de la publication, aux attributs recomposés comme par la phase `author_grouping`."""
+    """Insère une contribution qui aligne les contributions sources `(source, nom, identifiants, du périmètre)` de la publication, aux attributs recomposés comme par la phase `author_grouping`."""
     pairs = []
     for index, (source, name, identifiers, in_perimeter) in enumerate(members):
         source_record = insert_source_record(
@@ -513,7 +513,7 @@ class TestResolutionQueue:
     ):
         """La contribution en file perd sa personne avant que la contribution rattachée par ORCID la reçoive.
 
-        Régression : l'écriture du nouveau rattachement précédait le retrait de l'ancien et violait l'unicité de la personne dans la publication.
+        L'ordre inverse violerait l'unicité de la personne dans la publication.
         """
         conn = sa_sync_conn
         person = person_repository(conn).create("Martin", "Jean")

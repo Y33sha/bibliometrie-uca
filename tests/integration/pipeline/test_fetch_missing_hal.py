@@ -57,7 +57,7 @@ class TestFindMissingHalIds:
         assert self._missing(sa_sync_conn) == []
 
     def test_skips_hal_id_searched_in_vain_beyond_the_delay(self, sa_sync_conn):
-        """Régression : un hal-id absent de HAL était cherché de nouveau après le délai."""
+        """Un hal-id absent de HAL reste écarté après le délai : HAL attribue les hal-id."""
         self._carry(sa_sync_conn, "scanr", "scanr-1", ["hal-hhh"])
         insert_failed_lookup(
             sa_sync_conn, id_type="hal_id", id_value="hal-hhh", not_found_days_ago=365
@@ -80,7 +80,7 @@ class TestFindMissingHalIds:
 
 
 class TestFindMissingNnts:
-    """NNT à chercher : ceux des thèses soutenues du périmètre sans document HAL."""
+    """NNT à chercher : ceux des thèses soutenues du périmètre sans enregistrement source HAL."""
 
     @staticmethod
     def _thesis(conn, nnt) -> int:
@@ -102,7 +102,7 @@ class TestFindMissingNnts:
         assert self._missing(sa_sync_conn) == []
 
     def test_excludes_nnt_carried_by_a_hal_record(self, sa_sync_conn):
-        """Un document HAL contient le NNT sans être rattaché à la thèse : HAL connaît déjà la thèse."""
+        """Un enregistrement source HAL contient le NNT sans être rattaché à la thèse : HAL connaît déjà la thèse."""
         self._thesis(sa_sync_conn, "2024UCA0001")
         autre = insert_publication(sa_sync_conn, doc_type="thesis", in_perimeter=True)
         _insert_source_record(

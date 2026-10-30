@@ -15,7 +15,7 @@ from tests.integration.helpers.sources import insert_source_record
 
 
 def _records(conn, prefix: str, publisher_id: int, count: int, *, start: int = 0) -> None:
-    """`count` publications à DOI de `prefix`, chacune avec un enregistrement source HAL qui nomme `publisher_id`."""
+    """Insère `count` publications à DOI de `prefix`, chacune avec un enregistrement source HAL qui nomme `publisher_id`."""
     for i in range(start, start + count):
         publication = insert_publication(conn, doi=f"{prefix}/x{i}")
         insert_source_record(

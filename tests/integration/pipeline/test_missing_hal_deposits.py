@@ -70,7 +70,7 @@ def _seed_openalex(conn, publication_id=None, *, hal_ids=(_MISSING,), urls=(_MIS
 
 
 def test_enregistrement_openalex_du_seul_depot_introuvable_est_ecarte(sa_sync_conn):
-    """Régression : l'enregistrement OpenAlex W4287257393 citait le seul dépôt hal-03178520, introuvable dans HAL, et formait une publication à part."""
+    """Un enregistrement source OpenAlex dont le seul dépôt HAL cité est introuvable dans HAL perd ce dépôt et sort de la réconciliation : sa publication disparaît."""
     conn = sa_sync_conn
     publication = insert_publication(conn)
     record = _seed_openalex(conn, publication)

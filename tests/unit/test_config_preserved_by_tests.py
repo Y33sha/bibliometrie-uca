@@ -1,6 +1,6 @@
 """Aucun test ne vide la table `config`.
 
-La migration y pose des clés que des tests lisent ensuite, dans la même session. Un test retire seulement les clés qu'il a posées.
+La migration pose dans cette table des clés lues ensuite par des tests, dans la même session. Un test retire seulement les clés qu'il a posées.
 """
 
 import re

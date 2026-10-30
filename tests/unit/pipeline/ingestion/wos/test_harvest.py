@@ -103,14 +103,14 @@ def test_run_parcourt_les_annees_de_la_configuration(configuration, ecritures):
 
 
 def test_run_isole_l_echec_d_une_annee(configuration, ecritures):
-    """Une année qui lève laisse la suivante s'exécuter."""
+    """Une année en erreur laisse la suivante s'exécuter."""
     configuration(harvest, annees=[2023, 2024])
     client = _client([RuntimeError("API en panne"), _reponse(_records("W1"), total=1)])
     assert moissonneur(WosHarvester, client).run(arguments_du_run()).new == 1
 
 
 def test_run_survit_a_un_comptage_impossible(configuration, ecritures):
-    """Un comptage qui lève compte l'année pour zéro : son extraction s'exécute quand même."""
+    """Un comptage en erreur vaut zéro pour l'année. Le moissonnage de l'année s'exécute quand même."""
     configuration(harvest)
     client = _client([_reponse(_records("W1"), total=1)])
     client.count.side_effect = RuntimeError("API en panne")

@@ -27,7 +27,7 @@ class TestSecurityHeaders:
     def test_les_en_tetes_couvrent_aussi_l_interface(self, client):
         """Le middleware pose les en-têtes sur toute réponse, pages du frontend comprises.
 
-        L'attendu est lu dans le middleware : le test suit tout en-tête qu'on y ajoute ou qu'on en retire.
+        L'attendu est lu dans le middleware : le test suit tout ajout ou retrait d'en-tête.
         """
         from interfaces.api.app import _SECURITY_HEADERS
 
@@ -37,7 +37,7 @@ class TestSecurityHeaders:
 
 
 class TestPolitiqueDeSecuriteDeContenu:
-    """Politique de sécurité de contenu en en-tête, à côté de celle que les pages du frontend déclarent en balise.
+    """Politique de sécurité de contenu en en-tête, à côté de celle déclarée en balise par les pages du frontend.
 
     La directive `frame-ancestors` agit seulement en en-tête. Les réponses de l'API, en JSON, ont en plus une politique qui n'autorise aucune ressource.
     """
@@ -66,7 +66,7 @@ class TestPolitiqueDeSecuriteDeContenu:
 class TestMiseEnCache:
     """Aucun cache intermédiaire ne garde une réponse de l'API.
 
-    Une même adresse renvoie des corps différents selon la session : sans session, la configuration se limite à une liste blanche de clés. Un cache partagé rendrait à un appelant anonyme la variante servie à une session.
+    Une même adresse renvoie des corps différents selon la session : sans session, la configuration se limite à une liste blanche de clés. Un cache partagé servirait à un appelant anonyme la variante servie à une session.
     """
 
     def test_une_lecture_d_api_interdit_la_mise_en_cache(self, client):

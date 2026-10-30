@@ -27,7 +27,7 @@ ALEMBIC_INI = PROJECT_ROOT / "alembic.ini"
 
 
 def _admin_connect_args() -> dict:
-    """Paramètres de connexion à la base `postgres`, pour créer et supprimer des bases."""
+    """Renvoie les paramètres de connexion à la base `postgres`, pour créer et supprimer des bases."""
     args = {"dbname": "postgres", "user": DB_OWNER_USER, "host": DB_HOST, "port": DB_PORT}
     if DB_OWNER_PASSWORD:
         args["password"] = DB_OWNER_PASSWORD
@@ -35,7 +35,7 @@ def _admin_connect_args() -> dict:
 
 
 def _db_connect_args() -> dict:
-    """Paramètres de connexion à la base de test sous le rôle du pipeline.
+    """Renvoie les paramètres de connexion à la base de test sous le rôle du pipeline.
 
     Les fixtures qui posent et lisent des données passent par ce rôle, comme le pipeline en production : une écriture hors de ses droits échoue dans les tests, avant le déploiement. La création de la base et les migrations passent par le propriétaire du schéma.
     """
@@ -118,11 +118,11 @@ def _apply_role_grants() -> None:
 
 
 def _alembic_config() -> Config:
-    """Configuration Alembic pointée sur la base de test.
+    """Renvoie la configuration Alembic pointée sur la base de test.
 
     L'URL passe par `set_main_option`, qui la range dans un `configparser` où `%` ouvre une interpolation. Le rendu d'une URL encode en `%XX` les caractères non alphanumériques d'un mot de passe : doubler `%` le rend littéral.
 
-    `configure_logger` à faux empêche `env.py` d'appeler `fileConfig`, pour tout usage d'Alembic dans une session de test. `fileConfig` désactive les loggers déjà créés que `alembic.ini` omet, donc ceux de l'application : un test qui observe le journal le trouverait vide.
+    `configure_logger` à faux empêche `env.py` d'appeler `fileConfig`, pour tout usage d'Alembic dans une session de test. `fileConfig` désactive les loggers déjà créés et absents d'`alembic.ini`, donc ceux de l'application : un test qui observe le journal le trouverait vide.
     """
     cfg = Config(str(ALEMBIC_INI))
     url = database_url(identity="owner").render_as_string(hide_password=False)
@@ -138,7 +138,7 @@ def pytest_configure(config):
 
 @pytest.fixture
 def db():
-    """Curseur psycopg sur la base de test, sous le rôle du pipeline ; la transaction est annulée à la fin du test."""
+    """Fournit un curseur psycopg sur la base de test, sous le rôle du pipeline ; la transaction est annulée à la fin du test."""
     conn = psycopg.connect(**_db_connect_args(), row_factory=dict_row)
     conn.autocommit = False
     cur = conn.cursor()
@@ -149,15 +149,15 @@ def db():
 
 @pytest.fixture(scope="session")
 def alembic_config() -> Config:
-    """Configuration Alembic pointée sur la base de test, que `pytest_configure` monte à `head`."""
+    """Renvoie la configuration Alembic pointée sur la base de test, montée à `head` par `pytest_configure`."""
     return _alembic_config()
 
 
 @pytest.fixture
 def sa_sync_conn_owner():
-    """Connexion SQLAlchemy sous le propriétaire du schéma ; la transaction est annulée à la fin du test.
+    """Fournit une connexion SQLAlchemy sous le propriétaire du schéma ; la transaction est annulée à la fin du test.
 
-    Pour les rares tests qui, dans une même transaction, posent des données créées par un processus et exercent une opération conduite par un autre. Les droits se vérifient dans les tests qui se connectent sous le rôle qui exerce l'opération.
+    Sert aux rares tests qui, dans une même transaction, posent des données créées par un processus et exercent une opération conduite par un autre. Les droits se vérifient dans les tests connectés sous le rôle de l'opération.
     """
     from sqlalchemy import create_engine
 
@@ -173,9 +173,9 @@ def sa_sync_conn_owner():
 
 @pytest.fixture
 def sa_sync_conn_app():
-    """Connexion SQLAlchemy sous le rôle de l'API ; la transaction est annulée à la fin du test.
+    """Fournit une connexion SQLAlchemy sous le rôle de l'API ; la transaction est annulée à la fin du test.
 
-    Pour les tests d'une opération réservée à l'API, comme l'écriture de la trace d'audit.
+    Sert aux tests d'une opération réservée à l'API, comme l'écriture de la trace d'audit.
     """
     from sqlalchemy import create_engine
 
@@ -191,9 +191,9 @@ def sa_sync_conn_app():
 
 @pytest.fixture
 def sa_engine_app():
-    """Engine SQLAlchemy sous le rôle de l'API, avec les garde-fous de production.
+    """Fournit un engine SQLAlchemy sous le rôle de l'API, avec les garde-fous de production.
 
-    Pour les tests d'une dépendance qui ouvre elle-même sa connexion, comme `db_conn`.
+    Sert aux tests d'une dépendance qui ouvre elle-même sa connexion, comme `db_conn`.
     """
     from sqlalchemy import create_engine
 
@@ -207,9 +207,9 @@ def sa_engine_app():
 
 @pytest.fixture
 def sa_engine_pipeline():
-    """Engine du pipeline sur la base de test, installé comme engine global le temps du test.
+    """Fournit l'engine du pipeline sur la base de test, installé comme engine global le temps du test.
 
-    Pour les tests qui exercent un composant ouvrant lui-même sa connexion par `get_sync_engine`.
+    Sert aux tests qui exercent un composant ouvrant lui-même sa connexion par `get_sync_engine`.
     """
     from sqlalchemy import create_engine
 
@@ -224,7 +224,7 @@ def sa_engine_pipeline():
 
 @pytest.fixture
 def sa_sync_conn():
-    """Connexion SQLAlchemy sous le rôle du pipeline ; la transaction est annulée à la fin du test."""
+    """Fournit une connexion SQLAlchemy sous le rôle du pipeline ; la transaction est annulée à la fin du test."""
     from sqlalchemy import create_engine
 
     engine = create_engine(database_url())

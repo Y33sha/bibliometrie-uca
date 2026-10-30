@@ -40,14 +40,14 @@ def test_sans_prefixe_declare():
 def test_accorde_avec_le_routage_de_starlette(root_path: str, path: str, _attendu: str):
     """Les deux implémentations s'accordent sur chaque cas.
 
-    Starlette range ce calcul dans un module privé, que le code de l'application n'importe pas. Une divergence ferait décider le middleware sur un autre chemin que celui du routage ; ce test la signale.
+    Starlette range ce calcul dans un module privé, non importé par l'application. Une divergence ferait décider le middleware sur un autre chemin que celui du routage ; ce test la signale.
     """
     scope = _scope(root_path, path)
     assert route_path(scope) == _starlette_route_path(scope)
 
 
 async def _traverser(scope: dict, prefixe: str) -> dict:
-    """Fait traverser `RootPath` à `scope` et renvoie le `scope` que reçoit l'application enveloppée."""
+    """Fait traverser `RootPath` à `scope` et renvoie le `scope` reçu par l'application enveloppée."""
     recu: dict = {}
 
     async def application(scope, receive, send):

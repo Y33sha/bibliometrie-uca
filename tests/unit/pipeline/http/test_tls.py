@@ -22,7 +22,7 @@ def test_le_contexte_verifie_les_certificats_et_est_partage():
 
 
 def test_chaque_appel_httpx2_du_pipeline_recoit_le_contexte():
-    """Sans `verify=`, httpx2 crée un contexte truststore, que des connexions asynchrones simultanées modifient ensemble jusqu'au segfault."""
+    """Sans `verify=`, httpx2 crée un contexte truststore, modifié en même temps par des connexions asynchrones simultanées jusqu'au segfault."""
     modules = list(_PIPELINE.rglob("*.py"))
     assert modules
     missing = [

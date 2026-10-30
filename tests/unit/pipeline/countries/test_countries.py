@@ -1,4 +1,4 @@
-"""Orchestrateur de la phase `countries` : enchaînement des sous-étapes et entonnoir du bilan.
+"""Orchestrateur de la phase `countries` : enchaînement des sous-étapes et bilan.
 
 La phase encadre ses sous-étapes de deux bilans et en tire un résumé : adresses sans pays au départ, adresses dotées d'un pays par la passe, adresses restantes. Les sous-étapes ont leurs propres tests.
 """
@@ -13,7 +13,7 @@ from pipeline.transformation.countries.countries import AddressCountryStatus
 
 
 class _FakeCountryQueries:
-    """Renvoie les bilans successifs posés à la construction : l'initial, puis le final."""
+    """Faux accès SQL renvoyant les bilans successifs donnés à la construction : l'initial, puis le final."""
 
     def __init__(self, bilans: list[AddressCountryStatus]) -> None:
         self._bilans = list(bilans)
@@ -69,7 +69,7 @@ def test_cumule_les_metriques_des_sous_etapes(contexte, sous_etapes, monkeypatch
     metrics = phase.CountriesPhase().run(contexte(mode="daily"))
 
     assert metrics.new == 10  # 4 (nom de pays) + 6 (nom de lieu)
-    assert metrics.updated == 3  # adresses dont la résolution change le pays
+    assert metrics.updated == 3  # adresses au pays changé par la résolution
     assert sous_etapes["refresh"] is True
 
 

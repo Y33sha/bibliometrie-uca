@@ -131,7 +131,7 @@ class TestBarresConcurrentes:
 
 
 class TestRedessinDeLaBarre:
-    """La ligne réécrite en place emporte de quoi effacer le redessin précédent."""
+    """La ligne réécrite en place contient de quoi effacer le redessin précédent."""
 
     @staticmethod
     def _bar(stream: io.StringIO, largeur: int):
@@ -144,7 +144,7 @@ class TestRedessinDeLaBarre:
 
     @staticmethod
     def _redessine(barre: module._Bar, stream: io.StringIO) -> str:
-        """Vide le flux, redessine la barre, renvoie ce que le redessin a écrit."""
+        """Vide le flux, redessine la barre, renvoie le texte écrit par le redessin."""
         stream.seek(0)
         stream.truncate(0)
         barre.refresh()
@@ -160,7 +160,7 @@ class TestRedessinDeLaBarre:
         assert module.disp_len(ecrit.strip("\r")) <= 40
 
     def test_le_curseur_revient_en_debut_de_ligne(self):
-        """Un terminal replie la barre trop longue en gardant le curseur à sa place dans le texte : ramené au début, il reste sur la première ligne du repli, que le redessin suivant remplace."""
+        """Un terminal replie la barre trop longue en gardant le curseur à sa place dans le texte : ramené au début, il reste sur la première ligne du repli, remplacée par le redessin suivant."""
         stream = io.StringIO()
         with self._bar(stream, 80) as barre:
             ecrit = self._redessine(barre, stream)
@@ -187,7 +187,7 @@ class TestRedessinDeLaBarre:
             assert module.disp_len(str(barre)) == module.LINE_WIDTH
 
     def test_un_compteur_au_dela_du_total_annonce_affiche_100_pourcent(self):
-        """Une source renvoie plus de documents qu'elle n'en annonçait : le total affiché suit le compteur."""
+        """Une source renvoie plus d'enregistrements que le total annoncé : le total affiché suit le compteur."""
         stream = io.StringIO()
         with self._bar(stream, 80) as barre:
             barre.update(103)
@@ -195,7 +195,7 @@ class TestRedessinDeLaBarre:
             assert "103/103" in str(barre)
 
     def test_deux_volumes_differents_donnent_la_meme_longueur(self):
-        """Le compteur occupe une colonne fixe : ce qui reste au remplissage l'est aussi."""
+        """Le compteur occupe une colonne fixe : la largeur du remplissage est donc fixe aussi."""
         stream = io.StringIO()
         with self._bar(stream, 80) as petite, self._bar(stream, 80) as grande:
             petite.total = 19
@@ -203,7 +203,7 @@ class TestRedessinDeLaBarre:
             assert module.disp_len(str(petite)) == module.disp_len(str(grande))
 
     def test_un_terminal_retreci_efface_jusqu_au_bas_de_l_ecran(self):
-        """La barre trop longue s'y replie sur plusieurs lignes, toutes à effacer."""
+        """Dans un terminal rétréci, la barre trop longue se replie sur plusieurs lignes, toutes à effacer."""
         stream = io.StringIO()
         with self._bar(stream, 80) as barre:
             self._redessine(barre, stream)
@@ -227,7 +227,7 @@ class TestEcritureHorsBarre:
         assert "erreur sur hal-05614798" in stream.getvalue()
 
     def test_le_terminal_recoit_de_quoi_effacer_la_fin_de_ligne(self, avec_terminal):
-        """La ligne emporte de quoi effacer la fin de la barre dont elle prend la place."""
+        """La ligne contient de quoi effacer la fin de la barre remplacée."""
         stream = io.StringIO()
         module.write_above_bars("[HAL · 2018] 13 nouveaux", stream)
         assert module.CLEAR_TO_END_OF_LINE in stream.getvalue()
@@ -276,7 +276,7 @@ class TestCompteurDeRetenus:
 
 
 class TestAttente:
-    """Un travail dont l'avancement ne se mesure pas : maintenance des tables, VACUUM."""
+    """Travail à l'avancement non mesurable : maintenance des tables, VACUUM."""
 
     def test_le_terminal_recoit_le_libelle_sur_une_ligne_reecrite(self, avec_terminal, monkeypatch):
         stream = io.StringIO()
@@ -296,7 +296,7 @@ class TestAttente:
         assert "maintenance des tables..." in stream.getvalue()
 
     def test_la_conclusion_efface_la_fin_du_libelle(self, avec_terminal, monkeypatch):
-        """Plus courte que le libellé dont elle prend la place, elle en laisserait la fin derrière elle."""
+        """La conclusion efface la fin du libellé remplacé, même quand elle est plus courte."""
         stream = io.StringIO()
         monkeypatch.setattr(module, "_bar_stream", stream)
         with module.waiting("mise à jour en cours", None) as ligne:
@@ -306,7 +306,7 @@ class TestAttente:
     def test_en_terminal_la_conclusion_va_aussi_au_journal(
         self, avec_terminal, monkeypatch, caplog
     ):
-        """Régression : en terminal, la conclusion restait au terminal, et le fichier de journal perdait la durée de l'étape."""
+        """En terminal, la conclusion va aussi au fichier de journal, qui garde ainsi la durée de l'étape."""
         monkeypatch.setattr(module, "_bar_stream", io.StringIO())
         with caplog.at_level(logging.INFO), module.waiting("en cours", _log()) as ligne:
             ligne.conclude("Terminé en 12.3s")

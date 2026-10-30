@@ -1,6 +1,6 @@
 """Tests unitaires de `domain.source_records.keys` : clés de confirmation et ancres DOI.
 
-Garde le contrat de la projection partagée : DOI actifs de rôle autre que `related`, clé de chaque type d'identifiant (rôle le plus fort, puis plus petite valeur, parmi les identifiants actifs), token métadonnée `metadata_block`.
+Contrat de la projection partagée : DOI actifs de rôle autre que `related`, clé de chaque type d'identifiant (rôle le plus fort, puis plus petite valeur, parmi les identifiants actifs), token métadonnée `metadata_block`.
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ T, R = SourceIdentifierType, SourceIdentifierRole
 
 
 def _keys(identifiers=(), doc_type=None, title_normalized=None, publication_year=None, **kw):
-    """Appel avec valeurs par défaut neutres (sans titre/année)."""
+    """Appelle `project_confirmation_keys`, sans titre ni année par défaut."""
     return project_confirmation_keys(
         identifiers, doc_type, title_normalized, publication_year, **kw
     )
@@ -105,21 +105,19 @@ class TestMetadataBlock:
     LONG = "une communication scientifique au titre assez long"  # > 30 caractères
 
     def test_token_for_any_doc_type(self):
-        """Tout doc_type + titre long + année → `<doc_type>|<title>|<year>` (doc_type dans la clé).
-
-        La thèse passe par ce même token (pas de `thesis_meta` séparé)."""
+        """Un titre long et une année donnent le token `<doc_type>|<title>|<year>`, quel que soit le type de document, thèse comprise."""
         for dt in ("conference_paper", "book_chapter", "article", "thesis", "report"):
             keys = _keys(doc_type=dt, title_normalized=self.LONG, publication_year=2020)
             assert keys.metadata_block == f"{dt}|{self.LONG}|2020"
 
     def test_doc_type_in_key_separates_types(self):
-        """Même titre+année mais doc_type différents → clés différentes (pas de fusion cross-type)."""
+        """Un même titre et une même année donnent deux clés différentes pour deux types de document."""
         article = _keys(doc_type="article", title_normalized=self.LONG, publication_year=2020)
         chapter = _keys(doc_type="book_chapter", title_normalized=self.LONG, publication_year=2020)
         assert article.metadata_block != chapter.metadata_block
 
     def test_short_title_no_token(self):
-        """Titre ≤ seuil → pas de token (garde de longueur, écarte les titres génériques)."""
+        """Un titre court ne donne aucun token : les titres génériques sont écartés."""
         keys = _keys(
             doc_type="conference_paper", title_normalized="court titre", publication_year=2020
         )

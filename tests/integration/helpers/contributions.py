@@ -1,6 +1,6 @@
 """Semis des contributions et des informations du contributeur, sur une connexion SQLAlchemy.
 
-Le nom normalisé et les identifiants d'une contribution source sont dans la table dédupliquée `contributor_information`. `source_contributions` a seulement la clé étrangère `contributor_information_id`, que donne `upsert_contributor_information`.
+Le nom normalisé et les identifiants d'une contribution source sont dans la table dédupliquée `contributor_information`. `source_contributions` a seulement la clé étrangère `contributor_information_id`, renvoyée par `upsert_contributor_information`.
 """
 
 import json
@@ -9,7 +9,7 @@ from sqlalchemy import Connection, text
 
 from tests.integration.helpers.rows import PERIMETER_EVIDENCE_CAST, insert_row, perimeter_evidence
 
-# Paramètres au format psycopg (`%(nom)s`), que SQLAlchemy accepte via `exec_driver_sql`.
+# Paramètres au format psycopg (`%(nom)s`), acceptés par SQLAlchemy via `exec_driver_sql`.
 _INSERT_SQL = (
     "INSERT INTO contributor_information"
     " (last_name_normalized, first_name_normalized, identifiers)"
@@ -29,7 +29,7 @@ def _params(last: str, first: str | None, identifiers: dict | None) -> dict:
 
 
 def _form_params(author_name_normalized: str | None, identifiers: dict | None) -> dict:
-    """Forme « prénom nom » découpée au dernier espace : nom de famille à droite, prénom à gauche. La colonne calculée `author_name_normalized` redonne ainsi la forme reçue. `None` donne un nom vide."""
+    """Découpe la forme « prénom nom » au dernier espace : nom de famille à droite, prénom à gauche. La colonne calculée `author_name_normalized` redonne ainsi la forme reçue. `None` donne un nom vide."""
     first, _, last = (author_name_normalized or "").rpartition(" ")
     return _params(last, first, identifiers)
 
@@ -47,7 +47,7 @@ def upsert_contributor_information(conn, author_name_normalized=None, identifier
 def upsert_split_contributor_information(
     conn, last: str, first: str | None, identifiers=None
 ) -> int:
-    """`upsert_contributor_information` d'après un nom et un prénom normalisés explicites."""
+    """Upsert les informations du contributeur d'après un nom et un prénom normalisés explicites, et renvoie leur `id`."""
     return _upsert(conn, _params(last, first, identifiers))
 
 
@@ -77,7 +77,7 @@ def insert_contribution(
 
 
 def contribution_id_of(conn: Connection, publication_id: int, person_id: int) -> int:
-    """L'`id` de la contribution de la personne `person_id` dans la publication `publication_id`."""
+    """Renvoie l'`id` de la contribution de la personne `person_id` dans la publication `publication_id`."""
     return conn.execute(
         text(
             "SELECT id FROM contributions"

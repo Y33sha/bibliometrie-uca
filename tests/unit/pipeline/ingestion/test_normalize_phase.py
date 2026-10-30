@@ -1,6 +1,6 @@
 """Séquence de la phase `normalize`, exécutée tâche par tâche.
 
-Le retrait des enregistrements sources disparus précède le nettoyage des informations du contributeur et des adresses : il rend orphelines des lignes que le nettoyage supprime ensuite. L'exécuteur lance enfin le `VACUUM` du staging, maintenance de la tâche de nettoyage.
+Le retrait des enregistrements sources disparus précède le nettoyage des informations du contributeur et des adresses : les lignes ainsi orphelines sont supprimées par le nettoyage. L'exécuteur lance enfin le `VACUUM` du staging, maintenance de la tâche de nettoyage.
 """
 
 import dataclasses

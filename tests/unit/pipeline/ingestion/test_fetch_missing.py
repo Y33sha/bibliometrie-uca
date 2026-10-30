@@ -16,7 +16,7 @@ def _sync_run_parallel(thunks):
 
 
 def _non_configuree(source: str) -> PhaseMetrics:
-    """Métriques que renvoie l'accès à une source sans identifiants."""
+    """Renvoie les métriques de l'accès à une source sans identifiants."""
     metrics = PhaseMetrics()
     signal_source_unconfigured(
         metrics, source, "pas de credentials", logger=logging.getLogger("test"), phase="test"

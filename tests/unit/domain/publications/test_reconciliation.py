@@ -26,7 +26,12 @@ def _m(
     doc_type=None,
     matchable=True,
 ):
-    """Membre du voisinage. `doi` : DOI primaire ; `weak` : DOI secondaires."""
+    """Construit un membre du voisinage.
+
+    Args:
+        doi: DOI primaire.
+        weak: DOI secondaires.
+    """
     return ReconcileMember(
         source_record_id=source_record_id,
         publication_id=publication_id,
@@ -47,7 +52,7 @@ def _groups(plan):
 
 class TestMerge:
     def test_two_publications_same_doi_merge_to_carrier(self):
-        """Deux publications ont le même DOI, que leurs enregistrements sources partagent : elles fusionnent dans celle de plus petit identifiant."""
+        """Les enregistrements sources de deux publications partagent un DOI : elles fusionnent dans celle de plus petit identifiant."""
         plan = plan_reconciliation(
             [
                 _m(1, 10, publication_doi="10.1/x", doi="10.1/x", tokens=[("doi", "10.1/x")]),
@@ -232,7 +237,7 @@ class TestDoiAnchors:
 
 class TestDetachment:
     def test_enregistrement_source_sans_cle_ni_annee_est_detache(self):
-        """Régression : un enregistrement source OpenAlex renvoyé sans DOI ni année perd toutes ses clés ; il ne peut fonder aucune publication et devient orphelin."""
+        """Un enregistrement source OpenAlex renvoyé sans DOI ni année perd toutes ses clés ; il ne peut fonder aucune publication et devient orphelin."""
         plan = plan_reconciliation(
             [
                 _m(1, 10, publication_doi="10.1/x", doi="10.1/x", tokens=[("doi", "10.1/x")]),
@@ -269,7 +274,7 @@ class TestExclusion:
         assert plan.dissolved == ()
 
     def test_publication_of_excluded_records_only_is_not_dissolved(self):
-        """Régression : une publication faite de copies GRESIS perd tous ses enregistrements sources, sans successeur. Le recalcul la supprime."""
+        """Une publication faite de copies GRESIS perd tous ses enregistrements sources, sans successeur. Le recalcul la supprime."""
         gresis = "10.60692/m2raz-tjw54"
         plan = plan_reconciliation(
             [

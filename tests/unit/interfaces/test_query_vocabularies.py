@@ -47,7 +47,7 @@ Clé : le module et l'expression passée à l'appel. Une entrée répond « non 
 
 
 def _appels_dans_les_routes() -> set[tuple[str, str]]:
-    """Appels à `parse_str_csv` écrits dans les modules de l'API, par fichier et argument."""
+    """Renvoie les appels à `parse_str_csv` écrits dans les modules de l'API, par fichier et argument."""
     appels: set[tuple[str, str]] = set()
     for fichier in _API.rglob("*.py"):
         if fichier == _DEFINITION:
@@ -78,7 +78,7 @@ class TestListesLibres:
 
 
 class TestVocabulairesFermes:
-    """Les vocabulaires que les routes opposent aux paramètres, et d'où ils viennent."""
+    """Vocabulaires opposés aux paramètres par les routes, et leur origine."""
 
     def test_les_valeurs_du_filtre_par_source_derivent_du_registre(self):
         """Le vocabulaire se calcule depuis les préfixes : une source ajoutée au registre entre dans le filtre sans autre modification."""

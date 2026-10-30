@@ -77,7 +77,7 @@ def _publication_exists(conn, publication_id) -> bool:
 
 
 def _source_record_state(conn, source_record_id) -> tuple:
-    """`publication_id` de l'enregistrement source, et sa présence dans la file de la réconciliation."""
+    """Renvoie le `publication_id` de l'enregistrement source, et sa présence dans la file de la réconciliation."""
     publication_id = conn.execute(
         text("SELECT publication_id FROM source_records WHERE id = :id"), {"id": source_record_id}
     ).scalar_one()
@@ -304,9 +304,7 @@ class TestEndToEnd:
         assert redirect_of(conn, MergedEntity.PUBLICATION, publication_b) is None
 
     def test_scanr_record_joins_the_article_of_its_derived_doi(self, sa_sync_conn):
-        """L'identifiant ScanR désigne l'article ; le premier DOI de ses `externalIds` est celui du preprint.
-
-        Régression : l'enregistrement source ScanR rejoignait la publication du preprint par le DOI de la colonne."""
+        """L'identifiant ScanR désigne l'article ; le premier DOI de ses `externalIds` est celui du preprint. L'enregistrement source ScanR rejoint l'article par son DOI `derived`."""
         conn = sa_sync_conn
         article = _seed_publication(conn, doi="10.1/article")
         preprint = _seed_publication(conn, doi="10.1101/preprint")
@@ -329,9 +327,7 @@ class TestEndToEnd:
         assert _source_record_state(conn, scanr)[0] == article
 
     def test_deposit_with_a_version_doi_joins_the_concept_publication(self, sa_sync_conn):
-        """Régression : un dépôt HAL au DOI d'une version Zenodo était écarté de la réconciliation avec la version.
-
-        Le DOI de la version a pour cible le concept : le dépôt HAL rejoint la publication du concept, qui garde le DOI du concept. L'enregistrement DataCite de la version, écarté, reste orphelin."""
+        """Le DOI de la version a pour cible le concept : le dépôt HAL rejoint la publication du concept, qui garde le DOI du concept. L'enregistrement source DataCite de la version, écarté, reste orphelin."""
         conn = sa_sync_conn
         _add_doi_target(conn, "10.5281/zenodo.101", "10.5281/zenodo.100")
         publication = _seed_publication(conn, doi="10.5281/zenodo.100")
@@ -356,7 +352,7 @@ class TestEndToEnd:
         )
 
     def test_publication_of_excluded_records_only_is_deleted(self, sa_sync_conn):
-        """Régression : une publication faite de copies GRESIS (DOI 10.60692) est supprimée, ses enregistrements sources restent orphelins."""
+        """Une publication faite de copies GRESIS (DOI 10.60692) est supprimée, ses enregistrements sources restent orphelins."""
         conn = sa_sync_conn
         publication = _seed_publication(conn)
         gresis = partial(_source_record, doi="10.60692/m2raz-tjw54", is_matchable=False)
@@ -538,7 +534,7 @@ class TestEndToEnd:
         assert _source_record_state(conn, source_record_b)[1] is False
 
     def test_publication_of_a_residual_source_record_is_refreshed(self, sa_sync_conn):
-        """Régression : l'enregistrement source sans DOI d'une composante à deux DOI reste sur sa publication, qui gardait le DOI qu'il avait perdu."""
+        """L'enregistrement source sans DOI d'une composante à deux DOI reste sur sa publication, recalculée sans le DOI perdu."""
         conn = sa_sync_conn
         hal_id = _hal(_SECONDARY, "hal-01234567")
         stale = _seed_publication(conn, doi="10.9/retire")
@@ -910,7 +906,7 @@ class TestUniverseMatchesPythonTokens:
 
 
 class TestExternalDoiCarrier:
-    """Régression : une publication sans enregistrement source, avec un DOI, faisait échouer la réconciliation. Les enregistrements sources de ce DOI s'y rattachent ; une publication créée aurait le même DOI."""
+    """Les enregistrements sources d'un DOI se rattachent à la publication sans enregistrement source qui a ce DOI. Une publication créée aurait le même DOI."""
 
     def test_orphan_publication_with_doi_is_reused_not_duplicated(self, sa_sync_conn):
         conn = sa_sync_conn
@@ -948,16 +944,16 @@ def _distinct_dois(conn, publication_id) -> set[str]:
 
 
 class TestStaleMembership:
-    """Régression : un enregistrement source restait sur une publication après la disparition de la clé qui l'y rattachait.
+    """Un enregistrement source quitte sa publication après la disparition de la clé qui l'y rattachait.
 
-    Exemple : une préversion arXiv rejoint la publication tant que l'enregistrement OpenAlex a le DOI de la préversion, puis OpenAlex donne le DOI de la version publiée. Le voisinage se calcule sur les clés à jour, sans la préversion. Seul le marquage des autres enregistrements sources de la publication la fait entrer dans la passe ; sans lui, la publication garde deux DOI distincts.
+    Exemple : une préversion arXiv rejoint la publication tant que l'enregistrement source OpenAlex a le DOI de la préversion, puis OpenAlex donne le DOI de la version publiée. Le voisinage se calcule sur les clés à jour, sans la préversion. Seul le marquage des autres enregistrements sources de la publication la fait entrer dans la passe ; sans lui, la publication garde deux DOI distincts.
     """
 
     PREPRINT_DOI = "10.48550/arxiv.2409.20505"
     PUBLISHED_DOI = "10.1016/j.tcs.2026.116186"
 
     def _seed_drifted_pair(self, conn) -> tuple[int, int, int]:
-        """Une publication au DOI de la préversion, et ses deux enregistrements sources sans clé commune : DOI distincts, aucun identifiant commun, titres absents."""
+        """Insère une publication au DOI de la préversion, et ses deux enregistrements sources sans clé commune : DOI distincts, aucun identifiant commun, titres absents."""
         publication = _seed_publication(conn, doi=self.PREPRINT_DOI)
         preprint = _source_record(
             conn,

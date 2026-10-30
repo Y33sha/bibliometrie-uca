@@ -1,6 +1,6 @@
 """Détournement de l'écriture des lignes de console.
 
-Le pipeline y branche un écrivain qui affiche les lignes au-dessus des barres de progression.
+Le pipeline branche sur cette écriture un écrivain qui affiche les lignes au-dessus des barres de progression.
 """
 
 import io

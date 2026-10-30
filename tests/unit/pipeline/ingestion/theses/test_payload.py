@@ -45,7 +45,7 @@ class TestAggregateThesisPersons:
         assert director.is_author is False
 
     def test_dedup_by_ppn_across_fields(self):
-        """Une personne (même PPN) qui apparaît rapporteur ET président : 1 entrée, 2 rôles."""
+        """Une personne (même PPN) à la fois rapporteur et président donne une entrée à deux rôles."""
         person = {"nom": "X", "prenom": "Xavier", "ppn": "999"}
         thesis = {
             "rapporteurs": [person],

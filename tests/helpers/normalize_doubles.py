@@ -1,6 +1,6 @@
 """Doublures des requêtes d'écriture, communes aux tests des normaliseurs.
 
-Quelle que soit sa source, un normaliseur verse ses documents dans `source_records`, écrit leurs contributions sources et marque sa ligne de staging traitée. Ces doublures valent donc pour toutes les sources.
+Quelle que soit sa source, un normaliseur verse ses enregistrements sources dans `source_records`, écrit leurs contributions sources et marque sa ligne de staging traitée. Ces doublures valent donc pour toutes les sources.
 """
 
 from domain.source_records.identifiers import normalize_identifiers
@@ -10,7 +10,7 @@ from pipeline.ingestion.common.staging import StagingRow
 
 
 def identifier_values(record: SourceRecordUpsert) -> dict[str, list[str]]:
-    """Valeurs des identifiants normalisés de `record`, par type, triées."""
+    """Renvoie les valeurs des identifiants normalisés de `record`, par type, triées."""
     identifiers, _ = normalize_identifiers(record.identifiers)
     values: dict[str, list[str]] = {}
     for i in identifiers:
@@ -24,12 +24,12 @@ def staging_row(
     doi: str | None = None,
     raw: dict | None = None,
 ) -> StagingRow:
-    """Ligne de staging à traiter, identifiée par `staging_id` chez la source."""
+    """Construit une ligne de staging à traiter, identifiée par `staging_id` chez la source."""
     return StagingRow(id=staging_id, source_id=source_id, doi=doi, raw_data=raw or {})
 
 
 class FakeSourceRecordStore:
-    """`SourceRecordStore` : retient les documents versés."""
+    """`SourceRecordStore` : retient les enregistrements sources versés."""
 
     def __init__(self) -> None:
         self.upserted_documents: list[SourceRecordUpsert] = []
@@ -52,7 +52,7 @@ class FakeStagingStore:
 class FakeSourceContributionStore:
     """`SourceContributionStore` : retient les contributions sources insérées, et les renvoie comme contributions sources en base.
 
-    `synced_for` retient les documents dont les contributions sources sont synchronisées. Les adresses sont ignorées : leurs lectures renvoient des tables vides.
+    `synced_for` retient les enregistrements sources aux contributions sources synchronisées. Les adresses sont ignorées : leurs lectures renvoient des tables vides.
     """
 
     def __init__(self) -> None:

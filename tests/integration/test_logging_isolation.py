@@ -1,6 +1,6 @@
 """Une session de test laisse le journal de l'application observable.
 
-`alembic/env.py` appelle `fileConfig` sauf dispense. `fileConfig` désactive les loggers déjà créés que `alembic.ini` omet, donc ceux de l'application. Un logger désactivé jette ses enregistrements : un test qui observe le journal le trouve vide.
+`alembic/env.py` appelle `fileConfig` sauf dispense. `fileConfig` désactive les loggers déjà créés et absents d'`alembic.ini`, donc ceux de l'application. Un logger désactivé jette ses enregistrements : un test qui observe le journal le trouve vide.
 
 Le moment où les loggers sont créés dépend de la manière d'appeler pytest. Les fichiers de configuration des répertoires nommés en argument se chargent avant `pytest_configure`, ceux des répertoires atteints par exploration après. Nommer `tests/integration/interfaces` en argument crée donc les loggers de l'application avant les migrations ; nommer `tests/` les crée après.
 """

@@ -1,4 +1,4 @@
-"""Primitif `run_parallel` : résultats par étiquette, propagation d'erreur, cas vide."""
+"""Primitive `run_parallel` : résultats par étiquette, propagation d'erreur, cas vide."""
 
 import pytest
 

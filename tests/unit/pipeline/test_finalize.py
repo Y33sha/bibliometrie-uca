@@ -12,7 +12,7 @@ from pipeline.transformation import finalize as phase
 
 
 class _FakePurgeQueries:
-    """Renvoie les tailles de lots successives, puis zéro, qui arrête la boucle."""
+    """Faux accès SQL de purge renvoyant les tailles de lots successives, puis zéro, qui arrête la boucle."""
 
     def __init__(self, lots: list[int]) -> None:
         self._lots = [*lots, 0]

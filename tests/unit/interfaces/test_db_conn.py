@@ -69,7 +69,7 @@ def test_une_lecture_ne_committe_rien(connexion):
 
 
 def _routes(routes: Iterable[BaseRoute]) -> Iterator[APIRoute]:
-    """Routes de l'application, y compris celles des routeurs inclus."""
+    """Parcourt les routes de l'application, y compris celles des routeurs inclus."""
     for route in routes:
         if isinstance(route, APIRoute):
             yield route

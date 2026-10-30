@@ -57,7 +57,7 @@ def _link(
 
 
 def _linked(conn: Connection, links: _Table, key: int | str) -> dict[int, int | None]:
-    """`{structure_id: matched_form_id}` des liens de `key`."""
+    """Renvoie `{structure_id: matched_form_id}` des liens de `key`."""
     t = links.table
     rows = conn.execute(
         text(f"SELECT structure_id, matched_form_id FROM {t.name} WHERE {t.key} = :key"),

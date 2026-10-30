@@ -31,7 +31,7 @@ def _author(last="dupont", first="jean", orcid="", idref="", gap=0):
 
 
 def _source_record(source_record, names, start=0):
-    """Contributions sources d'un enregistrement source, numérotées `source_record * 100 + position`, à partir de couples (nom de famille, prénom)."""
+    """Construit les contributions sources d'un enregistrement source, numérotées `source_record * 100 + position`, à partir de couples (nom de famille, prénom)."""
     return [
         SourceContribution(source_record * 100 + pos, source_record, pos, last, first)
         for pos, (last, first) in enumerate(names, start)
@@ -39,7 +39,7 @@ def _source_record(source_record, names, start=0):
 
 
 def _greedy(matrix):
-    """Affectation gloutonne, suffisante pour des matrices sans conflit."""
+    """Calcule une affectation gloutonne, suffisante pour des matrices sans conflit."""
     taken_rows, taken_cols, out = set(), set(), []
     cells = sorted(
         ((v, i, j) for i, row in enumerate(matrix) for j, v in enumerate(row)), reverse=True
@@ -53,7 +53,7 @@ def _greedy(matrix):
 
 
 def _aligned(contributions):
-    """Contributions sources de chaque contribution qui en a plusieurs, avec la méthode de chacune."""
+    """Renvoie les contributions sources de chaque contribution qui en a plusieurs, avec la méthode de chacune."""
     return sorted(
         sorted((m.source_contribution, m.method) for m in g.members)
         for g in contributions
@@ -473,7 +473,7 @@ class TestJaroWinkler:
         ],
     )
     def test_valeurs_de_duckdb(self, a, b, expected):
-        """Régression : les demi-transpositions s'arrondissent à l'entier inférieur, comme dans DuckDB."""
+        """Les demi-transpositions s'arrondissent à l'entier inférieur, comme dans DuckDB."""
         assert jaro_winkler(a, b) == pytest.approx(expected)
 
 

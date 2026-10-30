@@ -13,7 +13,7 @@ from interfaces.api.rate_limit import (
 
 
 def _request(client_host: str | None, port: int = 51234, **headers: str) -> Request:
-    """Requête minimale avec une adresse de connexion, un port et des en-têtes.
+    """Construit une requête minimale avec une adresse de connexion, un port et des en-têtes.
 
     Le port vaut 0 quand le serveur ASGI a réécrit l'adresse depuis `X-Forwarded-For`. Un port nul signale donc un en-tête pris en compte.
     """

@@ -15,7 +15,7 @@ _CLE = "test_audit_config_key"
 
 @pytest.fixture
 def cle_posee(client):
-    """Paramètre existant : la route refuse une clé inconnue."""
+    """Pose un paramètre de test, puis le retire : la route refuse une clé inconnue."""
     seed_config(_CLE, "avant")
     yield _CLE
     with owner_pool() as cur:

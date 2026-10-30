@@ -1,4 +1,4 @@
-"""Semis des tables d'extraction, sur la connexion SQLAlchemy (`sa_sync_conn`) : lignes de staging et recherches infructueuses (`failed_lookups`)."""
+"""Semis des tables du moissonnage, sur la connexion SQLAlchemy (`sa_sync_conn`) : lignes de staging et recherches infructueuses (`failed_lookups`)."""
 
 import json
 import logging

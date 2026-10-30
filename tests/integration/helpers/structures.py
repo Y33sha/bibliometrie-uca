@@ -1,6 +1,6 @@
 """Semis de structures et de périmètres, et liens contribution ↔ structure, sur la connexion SQLAlchemy (`sa_sync_conn`).
 
-Les liens contribution ↔ structure sont des vues matérialisées. Pour en créer un, ce module sème la chaîne contribution source → adresse → structure, puis rafraîchit les vues.
+Les liens contribution ↔ structure sont des vues matérialisées. Pour créer un lien, ce module sème la chaîne contribution source → adresse → structure, puis rafraîchit les vues.
 """
 
 import itertools

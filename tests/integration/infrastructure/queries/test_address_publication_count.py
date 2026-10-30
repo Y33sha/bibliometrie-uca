@@ -15,7 +15,7 @@ from tests.integration.helpers.sources import (
 
 
 def _source_contribution_for_publication(conn, publication_id, source_id):
-    """Contribution source d'un enregistrement source de la publication `publication_id`."""
+    """Insère une contribution source d'un enregistrement source de la publication `publication_id`."""
     source_record_id = insert_source_record(
         conn, publication_id, source_id=source_id, publication_year=2024
     )

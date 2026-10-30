@@ -1,6 +1,6 @@
 """Service du frontend buildé : reprises sur fichier absent, et frontière de l'API.
 
-Trois comportements distinguent ce service d'un service de fichiers statiques ordinaire. Un chemin introuvable est retenté avec l'extension `.html` (pages prérendues). Une route inconnue retombe sur `index.html` (routage côté client). Un chemin d'API inconnu reçoit un 404 : la page d'accueil, servie sous un code 200, ferait passer une panne d'API pour un succès.
+Un chemin introuvable est retenté avec l'extension `.html` (pages prérendues). Une route inconnue retombe sur `index.html` (routage côté client). Un chemin d'API inconnu reçoit un 404 : la page d'accueil, servie sous un code 200, ferait passer une panne d'API pour un succès.
 
 Une erreur autre qu'un fichier absent remonte telle quelle : les reprises valent seulement pour le 404.
 """

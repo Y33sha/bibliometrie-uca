@@ -207,7 +207,7 @@ class TestFetchPreprintTitleMatches:
 
 
 class TestRelationTargetDeletionCascades:
-    """Régression : la suppression de la cible sans DOI d'une relation trouvée par titre laissait la relation sans cible, ce qui violait la contrainte `target_present` et faisait échouer la suppression des publications et la fusion. La relation est supprimée en cascade."""
+    """La suppression de la cible sans DOI d'une relation trouvée par titre supprime la relation en cascade. Une relation sans cible violerait la contrainte `target_present`."""
 
     def test_repo_delete_of_target_removes_relation(self, sa_sync_conn):
         parent = _publication(
@@ -235,7 +235,7 @@ class TestRelationTargetDeletionCascades:
 
 
 def _source_record_datacite(conn, publication_id, *, doi, cible, doc_type=None, removed_by=None):
-    """Enregistrement source DataCite de DOI `primary` `doi`, retiré par la règle `removed_by`."""
+    """Insère un enregistrement source DataCite de DOI `primary` `doi`, retiré par la règle `removed_by`."""
     insert_source_record(
         conn,
         publication_id,
@@ -256,7 +256,7 @@ class TestRelationsDeMemeOeuvre:
     def test_l_enregistrement_source_expose_son_doi_d_origine_et_le_type_de_sa_publication(
         self, sa_sync_conn
     ):
-        """Le préfixe se juge sur le DOI que l'enregistrement source déclare, même retiré par une correction."""
+        """Le préfixe se juge sur le DOI déclaré par l'enregistrement source, même retiré par une correction."""
         publication = _publication(
             sa_sync_conn, doc_type="preprint", title_normalized="preprint", doi="10.48550/arxiv.1"
         )
@@ -320,7 +320,7 @@ class TestRelationsDeMemeOeuvre:
 class TestCountByRelationType:
     """Nombre de relations par type, affiché dans les `details` de la phase `relations`.
 
-    Régression : l'alias SQL `t` masquait l'attribut `Row.t` de SQLAlchemy, et `r.t` renvoyait la ligne entière. Les `details` devenaient non sérialisables en JSON, et l'enregistrement de l'exécution de la phase échouait sans erreur visible.
+    Des `details` non sérialisables en JSON font échouer sans erreur visible l'enregistrement de l'exécution de la phase.
     """
 
     def test_returns_json_serializable_str_int_pairs(self, sa_sync_conn):

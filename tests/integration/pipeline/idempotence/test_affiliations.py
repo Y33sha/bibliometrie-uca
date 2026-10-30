@@ -15,7 +15,7 @@ from tests.integration.helpers.structures import insert_perimeter, insert_struct
 
 
 def _setup_affiliations_test_data(conn):
-    """Un laboratoire (80001) sous la tutelle de l'université (80000), racine des périmètres. Une publication et ses enregistrements sources HAL et OpenAlex, chacun avec une contribution source. Seule la contribution source OpenAlex a une adresse, rattachée au laboratoire."""
+    """Insère un laboratoire (80001) sous la tutelle de l'université (80000), racine des périmètres. Une publication et ses enregistrements sources HAL et OpenAlex, chacun avec une contribution source. Seule la contribution source OpenAlex a une adresse, rattachée au laboratoire."""
 
     set_config(conn, "perimeter_extraction", "alliance_uca")
     set_config(conn, "perimeter_persons", "uca")
@@ -135,7 +135,7 @@ class TestPopulateAffiliationsIdempotence:
         )
 
     def test_populate_is_source_agnostic(self, sa_sync_conn):
-        """Régression : un run limité à certaines sources laissait sans structure les contributions sources OpenAlex dont l'adresse était résolue entre deux runs. `populate` traite toutes les sources."""
+        """`populate` traite toutes les sources : une contribution source OpenAlex reçoit sa structure, même hors d'un run limité à OpenAlex."""
         import logging
 
         from sqlalchemy import text
@@ -165,7 +165,7 @@ class TestPopulateAffiliationsIdempotence:
 
 
 class TestPopulateAffiliationsTheses:
-    """Régression : les contributions sources de theses.fr (jury, directeurs, rapporteurs, auteurs) restaient hors périmètre, donc ignorées par la phase `persons`. Elles reçoivent leurs indices de périmètre comme celles des autres sources."""
+    """Les contributions sources de theses.fr (jury, directeurs, rapporteurs, auteurs) reçoivent leurs indices de périmètre comme celles des autres sources, donc entrent dans la phase `persons`."""
 
     def test_theses_contribution_in_perimeter_via_address(self, sa_sync_conn):
         from sqlalchemy import text
@@ -215,7 +215,7 @@ def _marked_for_reconciliation(conn, source_record_id: int) -> bool:
 
 
 class TestEntreeDansLePerimetre:
-    """Régression : un enregistrement source sans publication qui entre dans le périmètre après sa normalisation restait sans publication, faute d'être marqué pour la réconciliation."""
+    """Un enregistrement source sans publication, entré dans le périmètre après sa normalisation, est marqué pour la réconciliation."""
 
     def _orpheline(self, conn) -> None:
         from sqlalchemy import text

@@ -4,7 +4,7 @@ import copy
 
 from pipeline.ingestion.common.change_detection import change_detection_hash
 
-# Forme rendue par la route de liste (`/dois?query=…`).
+# Forme renvoyée par la route de liste (`/dois?query=…`).
 _LISTED = {
     "id": "10.57745/jg7xsq",
     "type": "dois",
@@ -24,7 +24,7 @@ _LISTED = {
 
 
 def _single() -> dict:
-    """Le même DOI tel que le renvoie la route unitaire (`/dois/{doi}`), un mois plus tard."""
+    """Renvoie le même DOI, lu par la route unitaire (`/dois/{doi}`) un mois plus tard."""
     node = copy.deepcopy(_LISTED)
     node["attributes"].update(
         {
@@ -67,7 +67,7 @@ def test_une_citation_nouvelle_change_l_empreinte():
 
 
 def test_un_isbn_ajoute_change_l_empreinte():
-    """`alternateIdentifiers` vide est ignoré ; renseigné, il compte (la normalisation y cherche les ISBN)."""
+    """`alternateIdentifiers` vide est ignoré. Renseigné, il compte : la normalisation lit les ISBN dans ce champ."""
     with_isbn = copy.deepcopy(_LISTED)
     with_isbn["attributes"]["alternateIdentifiers"] = [
         {"alternateIdentifier": "978-2-07-036822-8", "alternateIdentifierType": "ISBN"}

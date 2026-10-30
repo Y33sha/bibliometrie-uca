@@ -205,7 +205,7 @@ class TestSetCountry:
         assert _get_countries(sa_sync_conn, addr) is None
 
     def test_raises_on_unknown_address(self, sa_sync_conn, service):
-        """Une adresse inconnue lève `NotFoundError` au lieu d'une mise à jour sans effet."""
+        """Une adresse inconnue lève `NotFoundError`."""
         ensure_country(sa_sync_conn, "FR")
         with pytest.raises(NotFoundError):
             service.set_country(999999, ["FR"])
@@ -377,9 +377,9 @@ class TestPropagateCountriesToPublications:
 
 
 class TestPropagationSkipsNoOp:
-    """La revue d'un lien renvoie seulement les adresses dont la contribution au périmètre change : seules celles-ci sont à propager.
+    """La revue d'un lien renvoie seulement les adresses dont la contribution au périmètre change, donc à propager.
 
-    Une adresse contribue au périmètre si le lien existe et que sa confirmation diffère de FALSE (NULL ou TRUE). Seuls les passages par FALSE changent donc la contribution.
+    Une adresse contribue au périmètre si le lien existe avec une confirmation NULL ou TRUE. Seuls les passages par FALSE changent donc la contribution.
     """
 
     def test_confirm_auto_detected_skips_propagation(self, sa_sync_conn, service):

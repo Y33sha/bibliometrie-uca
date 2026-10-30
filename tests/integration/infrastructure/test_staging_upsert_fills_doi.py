@@ -1,6 +1,6 @@
 """`StagingStore.upsert` renseigne le `doi` vide d'une ligne existante, sans écraser un `doi` présent.
 
-Une ligne moissonnée avant que la source ait le DOI reçoit celui que trouve la phase `fetch_missing`. Sans cela, le même lot serait recherché à chaque run.
+Une ligne moissonnée avant que la source ait le DOI reçoit celui trouvé par la phase `fetch_missing`. Sans cela, le même lot serait recherché à chaque run.
 """
 
 from sqlalchemy import text

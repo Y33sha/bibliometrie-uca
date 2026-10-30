@@ -1,4 +1,4 @@
-"""Tests des règles de rattachement d'un document à une revue et de typage d'une revue selon ses documents."""
+"""Tests des règles de rattachement d'un enregistrement source à une revue, et du typage d'une revue selon ses enregistrements sources."""
 
 import pytest
 

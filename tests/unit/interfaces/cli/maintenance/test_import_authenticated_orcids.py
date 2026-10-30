@@ -1,6 +1,6 @@
 """Import des ORCID authentifiés par leur titulaire.
 
-Le fichier associe un email à un ORCID que le chercheur a authentifié en se connectant à son compte. L'import rattache chaque ligne à une personne par son email, et authentifie seulement les lignes dont la personne est certaine : un email inconnu ou partagé par plusieurs personnes écarte la ligne.
+Le fichier associe un email à un ORCID authentifié par le chercheur sur son compte. L'import rattache chaque ligne à une personne par son email. Un email inconnu ou partagé par plusieurs personnes écarte la ligne.
 
 L'authentification fait autorité sur l'attribution : un ORCID rattaché à une autre personne est déplacé vers le titulaire. Chaque déplacement est signalé ; il révèle en général un doublon de personne à fusionner.
 """

@@ -33,7 +33,7 @@ def _member(raw, source="hal", identifiers=None, in_perimeter=True, roles=(), pi
 
 
 def _index(persons=(), orcid=None, idref=None):
-    """Index des personnes `(person_id, nom, prénom)`, avec des attributions d'identifiants `{valeur: person_id}`."""
+    """Construit l'index des personnes `(person_id, nom, prénom)`, avec des attributions d'identifiants `{valeur: person_id}`."""
     by_id = {p[0]: p for p in persons}
     name_forms: dict[str, list[int]] = {}
     namesakes: dict[str, list[Namesake]] = {}

@@ -28,7 +28,7 @@ def _form(
     is_excluding=False,
     structure_type=StructureType.LABO,
 ):
-    """MatchableNameForm de test. Comme en base, une forme courte a toujours `is_word_boundary`."""
+    """Renvoie une MatchableNameForm de test. Comme en base, une forme courte a toujours `is_word_boundary`."""
     normalized = form_normalized or form_text.lower()
     return MatchableNameForm(
         id=form_id or structure_id * 100,
@@ -43,7 +43,7 @@ def _form(
 
 @pytest.fixture
 def addresses(monkeypatch: pytest.MonkeyPatch) -> list[tuple[int, str]]:
-    """Adresses que lisent `count_addresses` et `fetch_addresses_chunk`, sans base."""
+    """Adresses lues par `count_addresses` et `fetch_addresses_chunk`, sans base."""
     rows: list[tuple[int, str]] = []
 
     def chunk(conn, *, after_id: int, limit: int) -> list[tuple[int, str]]:
@@ -82,7 +82,7 @@ def logger() -> logging.Logger:
 
 @pytest.fixture
 def name_forms(monkeypatch: pytest.MonkeyPatch) -> list[MatchableNameForm]:
-    """Formes que `StructureNameMatcher.load` lit, à la place de `structure_name_forms`."""
+    """Formes lues par `StructureNameMatcher.load` à la place de `structure_name_forms`."""
     forms: list[MatchableNameForm] = []
     monkeypatch.setattr(name_recognition, "load_name_forms", lambda conn: forms)
     return forms

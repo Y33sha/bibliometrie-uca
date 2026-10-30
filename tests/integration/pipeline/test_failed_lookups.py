@@ -30,7 +30,7 @@ class TestRecordFailedLookup:
         assert _pending(sa_sync_conn, "hal", "doi", "10.1234/x", 30) is True
 
     def test_un_doi_absent_de_crossref_est_repris_apres_le_delai(self, sa_sync_conn):
-        """Régression : un échec chez l'agence d'enregistrement du DOI restait définitif, alors que Crossref peut renvoyer le DOI plus tard."""
+        """Un échec chez Crossref, agence d'enregistrement du DOI, est repris après le délai : Crossref peut renvoyer le DOI plus tard."""
         record_failed_lookup(sa_sync_conn, "crossref", "doi", "10.1234/x")
         sa_sync_conn.execute(
             text("UPDATE failed_lookups SET not_found_at = now() - interval '31 days'")
@@ -52,7 +52,7 @@ class TestRecordFailedLookup:
     def test_un_identifiant_absent_de_son_registre_n_est_plus_cherche(
         self, sa_sync_conn, source, id_type, id_value
     ):
-        """Régression : un hal-id introuvable dans HAL était cherché de nouveau après le délai."""
+        """Un identifiant absent de son registre (hal-id dans HAL, NNT dans theses.fr, DOI dans doi.org) reste écarté, quel que soit l'âge de l'échec."""
         record_failed_lookup(sa_sync_conn, source, id_type, id_value)
         sa_sync_conn.execute(
             text("UPDATE failed_lookups SET not_found_at = now() - interval '365 days'")
@@ -83,7 +83,7 @@ class TestForgetFailedDoiLookups:
         assert _count(sa_sync_conn) == 0
 
     def test_les_autres_sources_gardent_la_leur(self, sa_sync_conn):
-        """Une source qui livre le document ne dit rien de ce que les autres connaissent."""
+        """Le document livré par une source laisse en place l'échec des autres sources sur le même DOI."""
         record_failed_lookup(sa_sync_conn, "hal", "doi", "10.1234/x")
         forget_failed_doi_lookups(sa_sync_conn, "scanr", ["10.1234/x"])
         restant = sa_sync_conn.execute(text("SELECT source::text FROM failed_lookups")).scalar_one()

@@ -22,7 +22,7 @@ LAYERS = {"application", "domain", "infrastructure", "interfaces", "pipeline"}
 
 
 def _declared(chemin: tuple[str, ...]) -> set[str]:
-    """Valeurs déclarées sous `chemin`, la forme `paquet*` de setuptools ramenée au paquet."""
+    """Renvoie les valeurs déclarées sous `chemin`, la forme `paquet*` de setuptools ramenée au paquet."""
     with (PROJECT_ROOT / "pyproject.toml").open("rb") as f:
         noeud = tomllib.load(f)
     for cle in chemin:

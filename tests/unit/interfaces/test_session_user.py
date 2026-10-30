@@ -51,11 +51,11 @@ class TestSessionUser:
         assert deps.session_user(_request(), conn=None) is None
 
     def test_rend_none_sur_un_jeton_invalide(self, monkeypatch):
-        """Un cookie dont la signature est invalide équivaut à un cookie absent."""
+        """Un cookie à signature invalide équivaut à un cookie absent."""
         self._simuler(monkeypatch)
         assert deps.session_user(_request("forge"), conn=None) is None
 
     def test_rend_none_pour_un_login_absent_des_utilisateurs(self, monkeypatch):
-        """Un jeton valide dont le login est absent de `ops.users` équivaut à un cookie absent."""
+        """Un jeton valide pour un login absent de `ops.users` équivaut à un cookie absent."""
         self._simuler(monkeypatch)
         assert deps.session_user(_request("jeton-parti"), conn=None) is None

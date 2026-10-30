@@ -54,7 +54,7 @@ class TestReadSession:
         assert read_session(f"{payload}.{session_module._sign(payload)}") is None
 
     def test_reads_a_user_bearing_the_payload_separator(self):
-        """Le séparateur est cherché en partant de la fin : l'horodatage est le dernier champ, non le second."""
+        """Le séparateur est cherché à partir de la fin : l'horodatage est le dernier champ, et le nom peut contenir le séparateur."""
         assert read_session(issue_token("admin|prod")) == "admin|prod"
 
 

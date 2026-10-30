@@ -11,8 +11,8 @@ from tests.integration.helpers.config import set_config
 from tests.integration.interfaces.conftest import _build_test_sync_engine
 
 
-def _owner_engine():
-    """Engine sous le rôle du pipeline, pour poser les jeux de données."""
+def _pipeline_engine():
+    """Construit un engine sous le rôle du pipeline, pour poser les jeux de données."""
     return _build_test_sync_engine()
 
 
@@ -23,17 +23,17 @@ CREDENTIAL_CONFIG_KEYS = frozenset(
 
 @pytest.fixture
 def config_keys_seeded():
-    """Pose dans `config` chaque clé publique et chaque identifiant d'accès, puis retire les clés qu'elle a ajoutées.
+    """Pose dans `config` chaque clé publique et chaque identifiant d'accès, puis retire les clés ajoutées.
 
-    La base de test ne contient aucun identifiant : sans cette pose, une lecture qui n'en renvoie aucun ne prouve rien. L'API lit par sa propre connexion, donc la pose est committée.
+    La base de test ne contient aucun identifiant : sans cette pose, une lecture sans identifiant ne prouve rien. L'API lit par sa propre connexion, donc la pose est committée.
     """
     keys = [*PUBLIC_CONFIG_KEYS, *CREDENTIAL_CONFIG_KEYS]
     # Pose sous le rôle du pipeline : le rôle de l'API met à jour la configuration sans y ajouter de clé.
-    with _owner_engine().begin() as conn:
+    with _pipeline_engine().begin() as conn:
         added = [k for k in keys if set_config(conn, k, "x", replace=False)]
     yield
     if added:
-        with _owner_engine().begin() as conn:
+        with _pipeline_engine().begin() as conn:
             conn.execute(text("DELETE FROM config WHERE key = ANY(:ks)"), {"ks": added})
 
 
@@ -42,10 +42,10 @@ def reserved_config_key():
     """Pose une clé de configuration absente de la liste blanche, et la retire ensuite."""
     key = "reglage_hors_liste_blanche"
     assert key not in PUBLIC_CONFIG_KEYS
-    with _owner_engine().begin() as conn:
+    with _pipeline_engine().begin() as conn:
         set_config(conn, key, "x")
     yield key
-    with _owner_engine().begin() as conn:
+    with _pipeline_engine().begin() as conn:
         conn.execute(text("DELETE FROM config WHERE key = :k"), {"k": key})
 
 

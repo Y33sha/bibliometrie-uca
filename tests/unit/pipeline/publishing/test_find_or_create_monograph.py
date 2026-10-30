@@ -63,7 +63,7 @@ def test_meme_titre_chez_deux_editeurs_donne_deux_monographies():
 
 
 def test_editeur_absent_ne_separe_pas():
-    """Cas réel : HAL ne donne pas l'éditeur d'un livre de Classiques Garnier, Crossref le donne."""
+    """Cas réel : HAL omet l'éditeur d'un livre de Classiques Garnier, donné par Crossref."""
     repo = _Repo()
     from_hal = _find(repo, "Pascal intempestif", publisher_id=None)
     assert _find(repo, "Pascal intempestif", publisher_id=14001) == from_hal

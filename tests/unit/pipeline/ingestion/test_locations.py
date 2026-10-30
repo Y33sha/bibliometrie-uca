@@ -1,4 +1,4 @@
-"""Localisations que désignent les identifiants d'un enregistrement source (`identifier_locations`)."""
+"""Localisations désignées par les identifiants d'un enregistrement source (`identifier_locations`)."""
 
 from domain.source_records.identifiers import (
     SourceIdentifier,

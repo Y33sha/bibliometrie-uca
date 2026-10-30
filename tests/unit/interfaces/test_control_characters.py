@@ -30,7 +30,7 @@ def test_les_separateurs_passent(caractere):
 
 
 def _client_levant(exception: Exception) -> TestClient:
-    """Application minimale dont la route lève l'exception donnée, avec les handlers d'erreur de l'API."""
+    """Renvoie un client d'une application minimale dont la route lève l'exception donnée, avec les handlers d'erreur de l'API."""
     app = FastAPI()
     app.add_exception_handler(DataError, data_error_handler)
     app.add_exception_handler(Exception, unhandled_exception_handler)

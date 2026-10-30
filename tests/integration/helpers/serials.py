@@ -204,7 +204,7 @@ def mark_checked_in_sudoc(conn, serial_id: int) -> None:
 
 
 def issn_columns(conn, serial_id: int) -> SimpleNamespace:
-    """Premier ISSN papier et électronique actifs, ISSN-L, autres valeurs, et date de vérification si tous les ISSN sont vérifiés."""
+    """Renvoie les premiers ISSN papier et électronique actifs, ISSN-L, autres valeurs, et date de vérification si tous les ISSN sont vérifiés."""
     rows = conn.execute(
         text(
             "SELECT issn, support::text AS support, linking, status::text AS status, "

@@ -152,7 +152,7 @@ def test_paiements_de_l_etablissement_hors_de_la_base(sa_sync_conn):
 
 
 def test_reponse_de_l_etablissement_l_emporte_sur_open_apc(sa_sync_conn):
-    """Un frais d'open access Open APC d'un article que la réponse de son payeur décrit déjà est retiré, quel que soit l'ordre des imports. Un autre payeur garde le sien."""
+    """Un frais d'open access Open APC d'un article déjà décrit par la réponse de son payeur est retiré, quel que soit l'ordre des imports. Un autre payeur garde le sien."""
     _publication(sa_sync_conn, "10.9/apc-prio")
     university = insert_structure(
         sa_sync_conn, "TEST_APC_PRIO", name="Université prio APC", structure_type="universite"

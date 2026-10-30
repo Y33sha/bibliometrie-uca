@@ -240,7 +240,7 @@ class TestGetPublisher:
         assert all(p["crossref_member_id"] == 42 for p in publication["doi_prefixes"])
 
     def test_doi_prefixes_in_list(self, client):
-        """Régression : la liste renvoie les préfixes DOI de chaque éditeur, qu'affiche le tableau des éditeurs."""
+        """La liste renvoie les préfixes DOI de chaque éditeur, affichés par le tableau des éditeurs."""
         name = uniq("ListedPrefixedPub")
         pid = seed_publisher(name)
         seed_doi_prefix("10.9010", ra="Crossref", publisher_id=pid)

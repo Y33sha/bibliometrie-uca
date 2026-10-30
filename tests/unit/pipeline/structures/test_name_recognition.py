@@ -18,7 +18,7 @@ def _form(
     is_excluding=False,
     structure_type=StructureType.LABO,
 ):
-    """MatchableNameForm de test. Comme en base, une forme courte a toujours `is_word_boundary`."""
+    """Renvoie une MatchableNameForm de test. Comme en base, une forme courte a toujours `is_word_boundary`."""
     normalized = form_normalized or form_text.lower()
     return MatchableNameForm(
         id=form_id or structure_id * 100,
@@ -32,7 +32,7 @@ def _form(
 
 
 def _matches(form: MatchableNameForm, text: str) -> bool:
-    """Vrai si `form`, seule, est reconnue dans `text`."""
+    """Renvoie vrai si `form`, seule, est reconnue dans `text`."""
     return bool(StructureNameMatcher([form]).resolve(text))
 
 
@@ -124,7 +124,7 @@ class TestResolve:
         assert 1 not in structure_ids
 
     def test_u999_paris_no_match_lrl(self):
-        """Régression : « u999 », forme de LRL qui exige le contexte de l'UCA, reste sans effet dans une adresse parisienne sans l'UCA."""
+        """« u999 », forme de LRL qui exige le contexte de l'UCA, reste sans effet dans une adresse parisienne sans l'UCA."""
         forms = [
             _form(
                 217, "u999", "u999", form_id=1566, is_word_boundary=True, requires_context_of=[169]
@@ -167,12 +167,12 @@ class TestResolve:
         assert 170 not in structure_ids
 
     def test_site_alone_yields_nothing(self):
-        """Un texte dont la seule forme reconnue est celle d'un site produit un résultat vide."""
+        """Un texte où seule une forme de site est reconnue produit un résultat vide."""
         forms = [_form(170, "aubiere", form_id=20, structure_type=StructureType.SITE)]
         assert StructureNameMatcher(forms).resolve("2 rue des cezeaux aubiere") == []
 
     def test_context_must_itself_be_recognized(self):
-        """Régression : une forme de la structure de contexte, présente mais invalide faute de son propre contexte, ne satisfait pas le contexte.
+        """Une forme de la structure de contexte, présente mais invalide faute de son propre contexte, ne satisfait pas le contexte.
 
         « territoires » (UMR Territoires) exige l'UCA ; « faculte » (UCA) exige le site de Clermont. Une faculté de Lyon ne fait pas reconnaître l'UMR Territoires.
         """
