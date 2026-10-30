@@ -168,7 +168,6 @@ function contribution(overrides: Partial<SourceContribution>): SourceContributio
 		roles: ['author'],
 		person_id: null,
 		in_perimeter: false,
-		collective: false,
 		structure_ids: null,
 		raw_affiliation: null,
 		countries: null,
@@ -200,7 +199,7 @@ describe('authorRows', () => {
 	it('place une contribution source hors des groupes à sa position, et les contributions sources sans position en dernier', () => {
 		const rows = authorRows(records, [
 			contribution({ id: 30, source_record_id: 1, position: null, roles: ['jury_member'] }),
-			contribution({ id: 12, source_record_id: 1, position: 2, collective: true }),
+			contribution({ id: 12, source_record_id: 1, position: 2 }),
 			contribution({ id: 10, source_record_id: 1, position: 0, contribution_id: 6, reference_position: 0 }),
 		]);
 		expect(rows.map((r) => r.cells[0]?.id)).toEqual([10, 12, 30]);

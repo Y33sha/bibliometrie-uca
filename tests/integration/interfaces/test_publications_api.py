@@ -43,13 +43,14 @@ def test_sources_are_readable_without_session(client):
     assert r.json()["detail"] == "Publication introuvable"
 
 
-def test_sources_exclude_author_duplicates(client):
-    """Les contributions sources de la publication excluent les doublons d'auteur, hors de l'alignement."""
+def test_sources_exclude_author_duplicates_and_collectives(client):
+    """Les contributions sources de la publication excluent les doublons d'auteur et les collectifs, exclus de l'alignement."""
     publication_id = seed_publication()
     with owner_connection() as conn:
         source_record_id = insert_source_record(conn, publication_id, source_id=uniq("h"))
         first = insert_source_contribution(conn, source_record_id, author_position=0)
         copy = insert_source_contribution(conn, source_record_id, author_position=1)
+        insert_source_contribution(conn, source_record_id, author_position=2, collective=True)
         conn.execute(
             text("UPDATE source_contributions SET duplicate_of = :first WHERE id = :copy"),
             {"first": first, "copy": copy},
