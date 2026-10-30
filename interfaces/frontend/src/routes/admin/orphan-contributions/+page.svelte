@@ -310,12 +310,12 @@
 		<table class="data-table">
 			<thead>
 				<tr>
-					<th style="width:30px"><input type="checkbox" aria-label="Tout sélectionner" checked={allSelected} onchange={toggleAll} /></th>
-					<th>{columnLabels.sources}</th>
-					<th>Nom</th>
-					<th>Publication</th>
-					<th>{columnLabels.labs}</th>
-					<th>Action</th>
+					<th class="fit"><input type="checkbox" aria-label="Tout sélectionner" checked={allSelected} onchange={toggleAll} /></th>
+					<th class="fit">{columnLabels.sources}</th>
+					<th class="fit">Nom</th>
+					<th class="publication-cell">Publication</th>
+					<th class="fit">{columnLabels.labs}</th>
+					<th class="fit">Action</th>
 				</tr>
 			</thead>
 			<tbody>
@@ -327,14 +327,17 @@
 								<SourceTag {source} />
 							{/each}
 						</td>
-						<td>{o.full_name}</td>
-						<td class="row-actions">
-							<IconButton icon="panel" label="Ouvrir le volet" onclick={() => drawer.open(o.publication_id)} />
-							<a href={resolve(`publications/${o.publication_id}`)} class="publication-link">
-								{o.publication_year ?? '?'} — <span class="publication-title"><PublicationTitle titre={o.publication_title} /></span>
-							</a>
+						<td class="fit">{o.full_name}</td>
+						<td class="publication-cell">
+							<div class="publication-row row-actions">
+								<IconButton icon="panel" label="Ouvrir le volet" onclick={() => drawer.open(o.publication_id)} />
+								<a href={resolve(`publications/${o.publication_id}`)} class="publication-link">
+									<span class="publication-year">{o.publication_year ?? '?'} —</span>
+									<span class="publication-title"><PublicationTitle titre={o.publication_title} /></span>
+								</a>
+							</div>
 						</td>
-						<td>
+						<td class="fit">
 							{#each o.labs as lab (lab.id)}
 								<a href={resolve(`structures/${lab.id}`)} class="lab-tag">{lab.label}</a>
 							{/each}
@@ -433,10 +436,14 @@
 {/if}
 
 <style>
-	.publication-link { color: var(--accent); text-decoration: none; font-size: var(--fs-sm); }
+	/* Colonnes à la largeur de leur contenu. La colonne Publication prend le reste : `max-width: 0` l'empêche de s'élargir à la longueur du titre, qui est tronqué là où il déborde. */
+	.fit { width: 1%; white-space: nowrap; }
+	.publication-cell { width: 100%; max-width: 0; }
+	.publication-row { display: flex; align-items: center; gap: 4px; }
+	.publication-link { display: flex; gap: 0.3em; min-width: 0; color: var(--accent); text-decoration: none; font-size: var(--fs-sm); }
 	.publication-link:hover { text-decoration: underline; }
-	/* Titre coupé à la largeur de 50 caractères, sur une ligne. */
-	.publication-title { display: inline-block; max-width: 50ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+	.publication-year { flex: none; }
+	.publication-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 	.assign-panel { position: relative; }
 	.assign-row { display: flex; gap: 4px; align-items: center; }
 	.assign-row input { padding: 4px 8px; border: 1px solid var(--border); border-radius: var(--radius); font-size: var(--fs-sm); width: 200px; }
