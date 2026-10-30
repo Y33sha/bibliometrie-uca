@@ -3,7 +3,7 @@
   import AccessButton from "#lib/components/AccessButton.svelte";
   import SourceTag from "#lib/components/SourceTag.svelte";
   import { accessTag } from "#lib/labels.js";
-  import { licenseLabels } from "#lib/licenses.js";
+  import LicenseBadge from "#lib/components/LicenseBadge.svelte";
   import { sourceLabel, sourceOrder } from "#lib/sources.svelte.js";
   import type { AccessLink, ExternalId, PubDetail, Source } from "./types";
 
@@ -56,11 +56,6 @@
 
   const accessState = $derived(accessTag(pub.oa_status));
 
-  let labels = $state<Record<string, string>>({});
-  $effect(() => {
-    if (accessLicense) licenseLabels().then((l) => (labels = l)).catch(() => {});
-  });
-
   // Plateforme de la copie donnée par le bouton : une copie listée, ou l'éditeur quand le bouton mène au DOI.
   const accessCopy = $derived(access.find((a) => a.url === accessUrl) ?? null);
   const viaPublisher = $derived(accessUrl != null && accessCopy == null);
@@ -79,7 +74,7 @@
   {#if accessUrl && accessState}
     <div class="access-line">
       <span class="access-state" data-access={accessState.cls}><span class="access-dot"></span>Accès ouvert</span>
-      {#if accessLicense}<span class="access-license">· {labels[accessLicense] ?? accessLicense}</span>{/if}
+      {#if accessLicense}<span class="access-license">· <LicenseBadge license={accessLicense} /></span>{/if}
       {#if accessCopy || viaPublisher}
         <div class="access-via">via {viaPublisher ? "l'éditeur" : accessCopy?.label}</div>
       {/if}
