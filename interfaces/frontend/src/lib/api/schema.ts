@@ -479,7 +479,7 @@ export interface paths {
         };
         /**
          * Address Stats
-         * @description Compteurs d'adresses par état de détection et de validation, pour une structure.
+         * @description Renvoie les compteurs d'adresses par état de détection et de validation, pour une structure.
          */
         get: operations["address_stats_api_addresses_stats_get"];
         put?: never;
@@ -519,7 +519,7 @@ export interface paths {
         };
         /**
          * Get Address Publications
-         * @description Échantillon de publications liées à une adresse.
+         * @description Renvoie un échantillon de publications liées à une adresse. `person_id` restreint aux contributions sources de la personne, `year` aux publications de l'année.
          */
         get: operations["get_address_publications_api_addresses__addr_id__publications_get"];
         put?: never;
@@ -543,7 +543,7 @@ export interface paths {
          * Review Address
          * @description Confirme, rejette ou réinitialise le lien entre une adresse et une structure.
          *
-         *     Renvoie 404 sur une adresse introuvable, que l'écriture traiterait sinon en silence.
+         *     Renvoie 404 sur une adresse introuvable.
          */
         post: operations["review_address_api_addresses__addr_id__review_post"];
         delete?: never;
@@ -561,7 +561,7 @@ export interface paths {
         };
         /**
          * List Addresses Countries
-         * @description Liste des adresses pour l'attribution de pays.
+         * @description Liste les adresses pour l'attribution de pays.
          */
         get: operations["list_addresses_countries_api_addresses_countries_get"];
         put?: never;
@@ -605,7 +605,7 @@ export interface paths {
         put?: never;
         /**
          * Set Address Country
-         * @description Saisit à la main les pays d'une adresse ; une liste vide rend l'adresse aux moyens automatiques.
+         * @description Saisit à la main les pays d'une adresse ; une liste vide remet l'adresse aux moyens automatiques.
          *
          *     Renvoie 422 sur un code pays absent du référentiel, 404 sur une adresse introuvable (`set_country`).
          */
@@ -993,7 +993,7 @@ export interface paths {
         };
         /**
          * Search Persons
-         * @description Recherche rapide de personnes (autocomplétion).
+         * @description Recherche des personnes pour l'autocomplétion.
          */
         get: operations["search_persons_api_persons_search_get"];
         put?: never;
@@ -1013,7 +1013,7 @@ export interface paths {
         };
         /**
          * List Persons
-         * @description Liste paginée des personnes.
+         * @description Liste les personnes par page.
          *
          *     L'annuaire public et la liste de l'administration appellent tous deux cette lecture, avec des filtres différents.
          */
@@ -1035,7 +1035,7 @@ export interface paths {
         };
         /**
          * Export Persons Csv
-         * @description Export CSV de la liste des personnes, aux filtres et au tri de la liste.
+         * @description Exporte en CSV la liste des personnes, aux filtres et au tri de la liste.
          */
         get: operations["export_persons_csv_api_persons_export_csv_get"];
         put?: never;
@@ -1055,7 +1055,7 @@ export interface paths {
         };
         /**
          * Persons Facets
-         * @description Facettes dynamiques de la liste des personnes : chaque facette décompte sous les autres filtres.
+         * @description Renvoie les facettes dynamiques de la liste des personnes : chaque facette décompte sous les autres filtres.
          */
         get: operations["persons_facets_api_persons_facets_get"];
         put?: never;
@@ -1075,7 +1075,7 @@ export interface paths {
         };
         /**
          * Ambiguous Name Forms Count
-         * @description Compteur de l'onglet « Formes ambiguës » (badge).
+         * @description Renvoie le compteur de l'onglet « Formes ambiguës » (badge).
          */
         get: operations["ambiguous_name_forms_count_api_persons_ambiguous_name_forms_count_get"];
         put?: never;
@@ -1095,7 +1095,7 @@ export interface paths {
         };
         /**
          * Ambiguous Name Forms
-         * @description Formes de nom d'au moins deux personnes, dont au moins un lien en attente, paginées.
+         * @description Liste par page les formes de nom d'au moins deux personnes, avec au moins un lien en attente.
          */
         get: operations["ambiguous_name_forms_api_persons_ambiguous_name_forms_get"];
         put?: never;
@@ -1115,7 +1115,7 @@ export interface paths {
         };
         /**
          * Identifier Conflicts Count
-         * @description Compteur de l'onglet « Conflits d'identifiant » (badge).
+         * @description Renvoie le compteur de l'onglet « Conflits d'identifiant » (badge).
          */
         get: operations["identifier_conflicts_count_api_persons_identifier_conflicts_count_get"];
         put?: never;
@@ -1135,9 +1135,9 @@ export interface paths {
         };
         /**
          * Identifier Conflicts
-         * @description Paires de personnes partageant un identifiant brut (ORCID, IdRef, hal_person_id ou idHAL), paginées.
+         * @description Liste par page les paires de personnes partageant un identifiant brut (ORCID, IdRef, hal_person_id ou idHAL).
          *
-         *     Ce sont des doublons probables ou des erreurs d'attribution, que l'administration tranche.
+         *     Ce sont des doublons probables ou des erreurs d'attribution, tranchés par l'administration.
          */
         get: operations["identifier_conflicts_api_persons_identifier_conflicts_get"];
         put?: never;
@@ -1157,7 +1157,7 @@ export interface paths {
         };
         /**
          * Name Duplicates Count
-         * @description Compteur de l'onglet « Doublons par nom » (badge).
+         * @description Renvoie le compteur de l'onglet « Doublons par nom » (badge).
          */
         get: operations["name_duplicates_count_api_persons_name_duplicates_count_get"];
         put?: never;
@@ -1177,7 +1177,7 @@ export interface paths {
         };
         /**
          * Name Duplicates
-         * @description Paires de personnes aux noms compatibles, paginées, triées par force de réseau : co-auteurs, publications co-signées, laboratoires et revues en commun.
+         * @description Liste par page les paires de personnes aux noms compatibles, triées par force de réseau : co-auteurs, publications co-signées, laboratoires et revues en commun.
          *
          *     Les doublons probables viennent en tête, les homonymes en fin.
          */
@@ -1227,7 +1227,9 @@ export interface paths {
         head?: never;
         /**
          * Update Identifier Status
-         * @description Met à jour le statut d'un identifiant (pending/confirmed/rejected). Une confirmation ou un rejet s'étend aux identifiants `pending` de la même personne que contiennent les mêmes comptes HAL ; `propagated` les compte. Un rejet marque pour la redécision de leur personne les contributions que ses identifiants rejetés lui rattachent : le run suivant les redécide.
+         * @description Met à jour le statut d'un identifiant (pending/confirmed/rejected).
+         *
+         *     Une confirmation ou un rejet s'étend aux identifiants `pending` de la même personne présents dans les mêmes comptes HAL ; `propagated` les compte. Un rejet marque les contributions rattachées à la personne par ses identifiants rejetés : leur personne est redécidée à l'exécution suivante du pipeline.
          *
          *     Renvoie 404 sur un identifiant introuvable (`update_identifier_status`).
          */
@@ -1243,7 +1245,7 @@ export interface paths {
         };
         /**
          * Person Profile
-         * @description Profil public complet d'une personne.
+         * @description Renvoie le profil public complet d'une personne.
          */
         get: operations["person_profile_api_persons__person_id__get"];
         put?: never;
@@ -1263,7 +1265,7 @@ export interface paths {
         };
         /**
          * Person Curation
-         * @description Une personne sous la projection de la liste de l'administration : drapeau de rejet, identifiants avec leur statut et leur source, formes de nom avec leur état d'arbitrage.
+         * @description Renvoie une personne sous la projection de la liste de l'administration : drapeau de rejet, identifiants avec leur statut et leur source, formes de nom avec leur état d'arbitrage.
          *
          *     Alimente le panneau latéral ouvert directement par son URL, hors de la liste qui contient d'ordinaire ces données.
          */
@@ -1285,7 +1287,7 @@ export interface paths {
         };
         /**
          * Person Theses
-         * @description Thèses liées à cette personne par un rôle autre qu'auteur.
+         * @description Liste les thèses liées à cette personne par un rôle autre qu'auteur.
          */
         get: operations["person_theses_api_persons__person_id__theses_get"];
         put?: never;
@@ -1305,9 +1307,29 @@ export interface paths {
         };
         /**
          * Person Addresses
-         * @description Adresses distinctes utilisées dans les contributions sources de cette personne.
+         * @description Liste les adresses des contributions sources de cette personne, les plus fréquentes d'abord. `year` restreint aux publications de l'année.
          */
         get: operations["person_addresses_api_persons__person_id__addresses_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/persons/{person_id}/address-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Person Address Summary
+         * @description Compte les publications de cette personne, puis, par structure, celles dont une adresse est rattachée à la structure. `year` restreint aux publications de l'année.
+         */
+        get: operations["person_address_summary_api_persons__person_id__address_summary_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1325,7 +1347,7 @@ export interface paths {
         };
         /**
          * Person Subjects
-         * @description Sujets les plus fréquents des publications de cette personne (nuage de mots).
+         * @description Renvoie les sujets les plus fréquents des publications de cette personne (nuage de mots).
          */
         get: operations["person_subjects_api_persons__person_id__subjects_get"];
         put?: never;
@@ -1345,7 +1367,7 @@ export interface paths {
         };
         /**
          * Persons Sharing Name Form
-         * @description Personnes qui partagent au moins une forme de nom avec celle-ci, candidates à l'absorption.
+         * @description Liste les personnes partageant au moins une forme de nom avec celle-ci, candidates à la fusion.
          */
         get: operations["persons_sharing_name_form_api_persons__person_id__sharing_name_forms_get"];
         put?: never;
@@ -1365,7 +1387,7 @@ export interface paths {
         };
         /**
          * Distinct Persons
-         * @description Personnes déclarées distinctes de celle-ci.
+         * @description Liste les personnes déclarées distinctes de celle-ci.
          */
         get: operations["distinct_persons_api_persons__person_id__distinct_persons_get"];
         put?: never;
@@ -1385,9 +1407,9 @@ export interface paths {
         };
         /**
          * Person Name Forms
-         * @description Formes de nom de la personne, avec leur état d'arbitrage.
+         * @description Liste les formes de nom de la personne, avec leur état d'arbitrage.
          *
-         *     Servies à part de la liste : seule la fiche d'une personne les affiche, et les inclure dans chaque ligne pèserait les deux tiers de la réponse.
+         *     Servies à part de la liste : seule la fiche d'une personne les affiche.
          */
         get: operations["person_name_forms_api_persons__person_id__name_forms_get"];
         put?: never;
@@ -1407,7 +1429,7 @@ export interface paths {
         };
         /**
          * Name Form Contributions
-         * @description Contributions sources d'une forme de nom, et autres personnes qui la partagent.
+         * @description Renvoie les contributions sources d'une forme de nom, et les autres personnes qui la partagent.
          */
         get: operations["name_form_contributions_api_persons__person_id__name_form_contributions_get"];
         put?: never;
@@ -1431,7 +1453,9 @@ export interface paths {
          * Add Person Identifier
          * @description Ajoute à la main un identifiant (ORCID, idHAL ou IdRef) à une personne.
          *
-         *     La décision (insertion, idempotence, réattribution, conflit) appartient à `add_identifier`, dont l'origine par défaut est manuelle (`IdentifierOrigin.MANUAL`) : il refuse alors les types qu'aucun humain n'attribue, et vérifie l'existence de la personne. Le router traduit l'issue en réponse. Les handlers globaux traduisent la personne absente (`NotFoundError`) en 404, le conflit (`IdentifierAttributionConflictError`) en 409, le type ou la valeur refusés (`ValidationError`) en 422.
+         *     La décision (insertion, idempotence, réattribution, conflit) appartient à `add_identifier`, avec l'origine manuelle par défaut (`IdentifierOrigin.MANUAL`). Le service refuse alors les types non attribuables à la main, et vérifie l'existence de la personne.
+         *
+         *     Renvoie 404 sur une personne absente (`NotFoundError`), 409 sur un conflit (`IdentifierAttributionConflictError`), 422 sur un type ou une valeur refusés (`ValidationError`).
          */
         post: operations["add_person_identifier_api_persons__person_id__identifiers_post"];
         delete?: never;
@@ -1563,7 +1587,7 @@ export interface paths {
          * Update Name Form Status
          * @description Met à jour le statut d'une forme de nom : `pending`, `confirmed` ou `rejected`.
          *
-         *     Une forme rejetée sort durablement du rattachement par nom ; les contributions de la personne rattachées par le nom sous cette forme sont marquées pour la redécision de leur personne, au run suivant. Une forme confirmée valide le lien, et corrobore les rattachements par identifiant, faits sans test du nom.
+         *     Une forme rejetée sort durablement du rattachement par nom. Les contributions de la personne rattachées par cette forme sont marquées : leur personne est redécidée à l'exécution suivante du pipeline. Une forme confirmée valide le lien, et corrobore les rattachements par identifiant, faits sans test du nom.
          */
         patch: operations["update_name_form_status_api_persons__person_id__name_forms_status_patch"];
         trace?: never;
@@ -3312,7 +3336,7 @@ export interface components {
         };
         /**
          * CurationPersonOut
-         * @description Fiche personne allégée, commune aux files de triage (conflits d'identifiant, doublons par nom) ; le détail complet est dans le panneau latéral.
+         * @description Fiche personne allégée, commune aux files de triage (conflits d'identifiant, doublons par nom).
          */
         CurationPersonOut: {
             /** Person Id */
@@ -3791,7 +3815,7 @@ export interface components {
         };
         /**
          * IdentifierConflictPairOut
-         * @description Deux personnes distinctes qui ont la même valeur brute d'identifiant (ORCID / IdRef / hal_person_id / idHAL) : doublon probable (mêmes nom/réseau) ou erreur d'attribution.
+         * @description Deux personnes distinctes à même valeur brute d'identifiant (ORCID, IdRef, hal_person_id, idHAL) : doublon probable ou erreur d'attribution.
          */
         IdentifierConflictPairOut: {
             person_a: components["schemas"]["CurationPersonOut"];
@@ -3983,7 +4007,7 @@ export interface components {
         };
         /**
          * NameDuplicatePairOut
-         * @description Deux personnes aux noms compatibles, avec leurs recouvrements de réseau. Un réseau commun (co-auteurs, publications co-signées) signe un doublon ; des réseaux disjoints, un homonyme.
+         * @description Deux personnes aux noms compatibles, avec leurs recouvrements de réseau. Un réseau commun (co-auteurs, publications co-signées) indique un doublon ; des réseaux disjoints, un homonyme.
          */
         NameDuplicatePairOut: {
             person_a: components["schemas"]["CurationPersonOut"];
@@ -4081,7 +4105,7 @@ export interface components {
         };
         /**
          * NameFormSummaryOut
-         * @description Forme de nom observée pour une personne, avec son état d'arbitrage. Seule la fiche d'une personne l'affiche.
+         * @description Forme de nom observée pour une personne, avec son état d'arbitrage.
          */
         NameFormSummaryOut: {
             /** Name Form */
@@ -4323,6 +4347,8 @@ export interface components {
             id: number;
             /** Raw Text */
             raw_text: string;
+            /** Publication Count */
+            publication_count: number;
             /** Structures */
             structures: components["schemas"]["PersonAddressStruct"][] | null;
         };
@@ -4334,6 +4360,33 @@ export interface components {
             acronym: string | null;
             /** Name */
             name: string;
+        };
+        /** PersonAddressStructureCount */
+        PersonAddressStructureCount: {
+            /** Id */
+            id: number;
+            /** Acronym */
+            acronym: string | null;
+            /** Name */
+            name: string;
+            /** Publications */
+            publications: number;
+        };
+        /**
+         * PersonAddressSummary
+         * @description Structures reconnues dans les adresses de la personne, comptées en publications.
+         */
+        PersonAddressSummary: {
+            /** First Year */
+            first_year: number | null;
+            /** Last Year */
+            last_year: number | null;
+            /** Publications */
+            publications: number;
+            /** Publications With Address */
+            publications_with_address: number;
+            /** Structures */
+            structures: components["schemas"]["PersonAddressStructureCount"][];
         };
         /** PersonAddressesResponse */
         PersonAddressesResponse: {
@@ -4390,9 +4443,7 @@ export interface components {
         };
         /**
          * PersonOut
-         * @description Ligne de `/api/persons`.
-         *
-         *     Les trois dénombrements comptent la même chose sous des conditions de plus en plus étroites, et se restreignent tous au laboratoire avec `lab_id`.
+         * @description Ligne de `/api/persons`. Les dénombrements se restreignent au laboratoire avec `lab_id`.
          */
         PersonOut: {
             /** Id */
@@ -5304,7 +5355,7 @@ export interface components {
         };
         /**
          * SharingPersonOut
-         * @description Personne qui partage au moins une forme de nom avec une autre, candidate à l'absorption.
+         * @description Personne partageant au moins une forme de nom avec une autre, candidate à l'absorption.
          */
         SharingPersonOut: {
             /** Person Id */
@@ -6818,6 +6869,8 @@ export interface operations {
         parameters: {
             query?: {
                 limit?: number;
+                person_id?: number | null;
+                year?: number | null;
             };
             header?: never;
             path: {
@@ -8171,6 +8224,7 @@ export interface operations {
     person_addresses_api_persons__person_id__addresses_get: {
         parameters: {
             query?: {
+                year?: number | null;
                 page?: number;
                 per_page?: number;
             };
@@ -8189,6 +8243,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PersonAddressesResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    person_address_summary_api_persons__person_id__address_summary_get: {
+        parameters: {
+            query?: {
+                year?: number | null;
+            };
+            header?: never;
+            path: {
+                person_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonAddressSummary"];
                 };
             };
             /** @description Validation Error */

@@ -8,11 +8,11 @@
 	import { page } from '$app/state';
 	import { replaceQuery } from '#lib/url.js';
 	import { addresses as addressesApi, api, errorMessage, structures as structuresApi } from '#lib/api/index.js';
-	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
+	import AddressPublications from '#lib/components/AddressPublications.svelte';
+	import PublicationCountButton from '#lib/components/PublicationCountButton.svelte';
 	import { toast } from '#lib/dialogs.svelte.js';
 	import ListStatus from '#lib/components/ListStatus.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
-	import { docTypeLabel } from '#lib/docTypes.svelte.js';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
 	import { structureLabel } from '#lib/structureLabels.js';
 	import { groupStructuresByType, structureGroupLabel } from '#lib/structureTypes.js';
@@ -573,13 +573,11 @@
 						<div>
 							<div class="addr-text">{addr.raw_text}</div>
 							<div class="addr-meta">
-								<button
-									type="button"
-									class="publication-count-tag"
-									aria-expanded={expandedId === addr.id}
+								<PublicationCountButton
+									count={addr.publication_count}
+									expanded={expandedId === addr.id}
 									onclick={() => toggleDetail(addr.id)}
-									>{addr.publication_count} publication{addr.publication_count > 1 ? 's' : ''}</button
-								>
+								/>
 								{#each addr.structures || [] as s}
 									<span class={structTagClass(s)}>{structureLabel(s)}</span>
 								{/each}
@@ -600,35 +598,7 @@
 
 					{#if expandedId === addr.id}
 						<div class="addr-detail">
-							{#if pubsLoading}
-								<div class="detail-loading">Chargement…</div>
-							{:else if publications.length === 0}
-								<div class="detail-loading">Aucune publication liée.</div>
-							{:else}
-								<div class="detail-title">
-									Publications ({publications.length})
-								</div>
-								{#each publications as p}
-									<div class="publication-row">
-										<div class="publication-title-link">
-											<PublicationTitle titre={p.title || '(sans titre)'} />
-										</div>
-										<div class="publication-meta-inline">
-											{p.publication_year}
-											{#if p.doc_type}&middot; {docTypeLabel(p.doc_type)}{/if}
-											{#if p.author_name}&middot; {p.author_name}{/if}
-											{#if p.journal_title}&middot; {p.journal_title}{/if}
-											{#if p.doi}
-												<a
-													href="https://doi.org/{encodeURIComponent(p.doi)}"
-													target="_blank"
-													rel="noopener noreferrer">DOI</a
-												>
-											{/if}
-										</div>
-									</div>
-								{/each}
-							{/if}
+							<AddressPublications {publications} loading={pubsLoading} />
 						</div>
 					{/if}
 				</div>
@@ -834,23 +804,6 @@
 		color: var(--muted);
 		flex-wrap: wrap;
 	}
-	/* Badge du nombre de publications : bouton qui déplie la liste des publications. */
-	.publication-count-tag {
-		display: inline-block;
-		font-family: inherit;
-		font-size: var(--fs-sm);
-		padding: 1px 7px;
-		border: none;
-		border-radius: var(--radius-pill);
-		background: var(--accent-light);
-		color: var(--accent);
-		font-weight: 500;
-		cursor: pointer;
-	}
-	.publication-count-tag:hover,
-	.publication-count-tag[aria-expanded='true'] {
-		background: color-mix(in srgb, var(--accent) 20%, var(--accent-light));
-	}
 	.struct-tag {
 		display: inline-block;
 		font-size: var(--fs-sm);
@@ -882,39 +835,6 @@
 	.addr-detail {
 		padding: 0 12px 12px 50px;
 		border-top: 1px solid var(--border);
-	}
-	.detail-loading {
-		padding: 8px;
-		color: var(--muted);
-	}
-	.detail-title {
-		font-size: var(--fs-sm);
-		font-weight: 600;
-		color: var(--muted);
-		margin: 8px 0 4px 0;
-		text-transform: uppercase;
-		letter-spacing: 0.5px;
-	}
-
-	.publication-row {
-		padding: 5px 0;
-		border-bottom: 1px solid var(--border-subtle);
-		font-size: var(--fs-sm);
-	}
-	.publication-row:last-child {
-		border-bottom: none;
-	}
-	.publication-title-link {
-		font-weight: 500;
-		color: var(--text);
-	}
-	.publication-meta-inline {
-		font-size: var(--fs-sm);
-		color: var(--muted);
-		margin-top: 2px;
-	}
-	.publication-meta-inline a {
-		margin-left: 6px;
 	}
 
 	/* Batch bar */

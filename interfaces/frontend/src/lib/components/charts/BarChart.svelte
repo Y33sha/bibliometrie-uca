@@ -8,7 +8,10 @@
 		datasetLabel = '',
 		color,
 		horizontal = false,
-		height = 280
+		height = 280,
+		max,
+		barLabel,
+		tooltipLabel
 	}: {
 		labels: string[];
 		values: number[];
@@ -18,6 +21,12 @@
 		/** Barres horizontales (axe des valeurs en X). */
 		horizontal?: boolean;
 		height?: number;
+		/** Borne haute de l'axe des valeurs ; défaut = ajustée aux valeurs. */
+		max?: number;
+		/** Texte au bout de la barre `index` ; défaut = la valeur. */
+		barLabel?: (value: number, index: number) => string;
+		/** Texte de l'infobulle de la barre `index` ; défaut = « libellé du jeu de données : valeur ». */
+		tooltipLabel?: (value: number, index: number) => string;
 	} = $props();
 
 	let canvas = $state<HTMLCanvasElement | undefined>();
@@ -30,7 +39,11 @@
 		}
 		if (!canvas || values.length === 0) return;
 		const barColor = color ?? cssColor('accent-mid');
-		const valueScale = { beginAtZero: true, ticks: { precision: 0 } };
+		const valueScale = {
+			beginAtZero: true,
+			max,
+			ticks: { precision: 0 }
+		};
 		const categoryScale = { grid: { display: false } };
 
 		chart = new Chart(canvas, {
@@ -44,10 +57,24 @@
 				responsive: true,
 				maintainAspectRatio: false,
 				// Place pour les valeurs affichées au bout des barres.
-				layout: { padding: horizontal ? { right: 32 } : { top: 20 } },
+				layout: { padding: horizontal ? { right: 48 } : { top: 20 } },
 				plugins: {
 					legend: { display: false },
-					datalabels: { anchor: 'end', align: 'end', font: { weight: 600 } }
+					datalabels: {
+						anchor: 'end',
+						align: 'end',
+						font: { weight: 600 },
+						...(barLabel && {
+							formatter: (v: number, ctx: { dataIndex: number }) => barLabel(v, ctx.dataIndex)
+						})
+					},
+					...(tooltipLabel && {
+						tooltip: {
+							callbacks: {
+								label: (item: { dataIndex: number }) => tooltipLabel(values[item.dataIndex], item.dataIndex)
+							}
+						}
+					})
 				},
 				scales: horizontal
 					? { x: valueScale, y: categoryScale }
@@ -61,6 +88,9 @@
 		void values;
 		void color;
 		void horizontal;
+		void max;
+		void barLabel;
+		void tooltipLabel;
 		void canvas;
 		render();
 		return () => {
@@ -83,7 +113,7 @@
 		</thead>
 		<tbody>
 			{#each labels as label, i (i)}
-				<tr><th scope="row">{label}</th><td>{values[i]}</td></tr>
+				<tr><th scope="row">{label}</th><td>{tooltipLabel ? tooltipLabel(values[i], i) : values[i]}{#if barLabel} ({barLabel(values[i], i)}){/if}</td></tr>
 			{/each}
 		</tbody>
 	</table>
