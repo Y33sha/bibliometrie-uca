@@ -1,6 +1,7 @@
 """Phase `metadata_correction` : la valeur corrigée est écrite en place, la valeur d'origine est gardée dans `corrections`."""
 
 import json
+import logging
 from datetime import timedelta
 from functools import partial
 
@@ -19,7 +20,10 @@ from pipeline.transformation.publications.correction.correct_unary import comput
 from pipeline.transformation.publications.correction.correction_store import (
     SourceRecordCorrectionStore,
 )
-from pipeline.transformation.publications.correction.doi_targets import compute_doi_targets
+from pipeline.transformation.publications.correction.doi_targets import (
+    compute_doi_targets,
+    run as run_doi_targets,
+)
 from pipeline.transformation.publications.correction.remove_identifiers import compute_updates
 from tests.integration.helpers.queues import clear, queued
 from tests.integration.helpers.serials import (
@@ -390,7 +394,7 @@ def test_active_embargo_not_promoted(sa_sync_conn):
 def _apply_cluster(conn) -> int:
     """Sous-étapes `doi_targets` puis `remove_identifiers`. Renvoie le nombre d'enregistrements sources corrigés."""
     store = SourceRecordCorrectionStore(conn)
-    store.replace_doi_targets(compute_doi_targets(store.fetch_secondary_form_declarations()))
+    run_doi_targets(conn, store, logging.getLogger("test"))
     return store.persist_doi_corrections(compute_updates(store.fetch_doi_cluster_candidates()))
 
 
@@ -690,6 +694,27 @@ def test_la_version_prime_sur_la_variante(sa_sync_conn):
     assert conn.execute(text("SELECT doi, target_doi, rule FROM doi_targets")).all() == [
         ("10.5281/zenodo.20", "10.5281/zenodo.9", "DATACITE_VERSION_TO_CONCEPT")
     ]
+
+
+def test_les_versions_d_un_preprint_ont_pour_cible_la_plus_recente(sa_sync_conn):
+    """Régression : chaque version d'un preprint Research Square formait une publication."""
+    conn = sa_sync_conn
+    _typed_source_record(conn, source_id="W1", doi="10.21203/rs.3.rs-1/v1")
+    _typed_source_record(conn, source_id="W2", doi="10.21203/rs.3.rs-1/v2")
+
+    _apply_cluster(conn)
+
+    assert _targets(conn) == {"10.21203/rs.3.rs-1/v1": "10.21203/rs.3.rs-1/v2"}
+
+
+def test_les_versions_ont_pour_cible_le_doi_concept_moissonne(sa_sync_conn):
+    conn = sa_sync_conn
+    _seed_work(conn, source_id="concept", doi="10.6084/m9.figshare.1")
+    _typed_source_record(conn, source_id="W1", doi="10.6084/m9.figshare.1.v1")
+
+    _apply_cluster(conn)
+
+    assert _targets(conn) == {"10.6084/m9.figshare.1.v1": "10.6084/m9.figshare.1"}
 
 
 def test_un_changement_de_cible_marque_les_enregistrements_sources_du_doi(sa_sync_conn):

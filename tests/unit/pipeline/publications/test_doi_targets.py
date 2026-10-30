@@ -1,10 +1,11 @@
-"""Tests purs : cible du DOI d'une forme secondaire (`doi_target`, `compute_doi_targets`)."""
+"""Tests purs : cible du DOI d'une forme secondaire (`doi_target`, `version_targets`, `compute_doi_targets`)."""
 
 from domain.source_records.metadata_correction.shared_doi import (
     DoiTarget,
     DoiTargetRule,
     SecondaryFormDeclaration,
     doi_target,
+    version_targets,
 )
 from pipeline.transformation.publications.correction.correction_store import SecondaryFormRow
 from pipeline.transformation.publications.correction.doi_targets import compute_doi_targets
@@ -81,4 +82,50 @@ def test_compute_doi_targets_regroupe_les_declarations_par_doi():
     ]
     assert compute_doi_targets(rows) == [
         DoiTarget("10.5281/zenodo.10", "10.5281/zenodo.1", _VERSION)
+    ]
+
+
+# DOI à suffixe de version
+
+_UNVERSIONED = DoiTargetRule.DOI_VERSION_TO_UNVERSIONED
+_LATEST = DoiTargetRule.DOI_VERSION_TO_LATEST
+
+
+def test_les_versions_ont_pour_cible_la_forme_sans_version_en_base():
+    """Le DOI concept Figshare est le DOI `primary` d'un enregistrement source DataCite."""
+    dois = ["10.6084/m9.figshare.1.v1", "10.6084/m9.figshare.1.v2"]
+    assert version_targets(dois, {"10.6084/m9.figshare.1"}) == [
+        DoiTarget("10.6084/m9.figshare.1.v1", "10.6084/m9.figshare.1", _UNVERSIONED),
+        DoiTarget("10.6084/m9.figshare.1.v2", "10.6084/m9.figshare.1", _UNVERSIONED),
+    ]
+
+
+def test_sans_forme_sans_version_la_cible_est_la_version_la_plus_recente():
+    """Régression : chaque version d'un preprint Research Square formait une publication."""
+    dois = ["10.21203/rs.3.rs-1/v1", "10.21203/rs.3.rs-1/v2", "10.21203/rs.3.rs-1/v10"]
+    assert version_targets(dois, frozenset()) == [
+        DoiTarget("10.21203/rs.3.rs-1/v1", "10.21203/rs.3.rs-1/v10", _LATEST),
+        DoiTarget("10.21203/rs.3.rs-1/v2", "10.21203/rs.3.rs-1/v10", _LATEST),
+    ]
+
+
+def test_une_version_seule_sans_forme_sans_version_reste_sans_cible():
+    assert version_targets(["10.20944/preprints202305.0120.v1"], frozenset()) == []
+
+
+def test_la_cible_declaree_prime_sur_la_cible_de_version():
+    rows = [
+        SecondaryFormRow(
+            "10.6084/m9.figshare.1.v1",
+            SecondaryFormDeclaration(1, "dataset", "10.1594/pangaea.1", _PIECE),
+        )
+    ]
+    targets = compute_doi_targets(
+        rows,
+        ["10.6084/m9.figshare.1.v1", "10.6084/m9.figshare.1.v2"],
+        frozenset({"10.6084/m9.figshare.1"}),
+    )
+    assert targets == [
+        DoiTarget("10.6084/m9.figshare.1.v1", "10.1594/pangaea.1", _PIECE),
+        DoiTarget("10.6084/m9.figshare.1.v2", "10.6084/m9.figshare.1", _UNVERSIONED),
     ]

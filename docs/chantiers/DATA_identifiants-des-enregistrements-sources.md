@@ -146,7 +146,7 @@ Les autres usages acceptent plusieurs DOI : `fetch_missing`, `known_dois`, `reso
 La normalisation retire le suffixe `.vN`. Chez Figshare et les repositories sur Figshare, la forme sans version existe chez doi.org. Chez preprints.org, ChemRxiv, TechRxiv, F1000 ou Code Ocean, elle est inconnue : `remove_identifiers` retire alors un DOI vrai. Research Square, Authorea et protocols.io versionnent en `/vN`, et chaque version forme une publication. Le retrait tronque aussi des DOI d'article (`10.1681/asn.v12102060` devient `10.1681/asn`).
 
 - [x] Normalisation : DOI gardé avec son suffixe de version ; `doi_version` donne sa forme sans version et son numéro.
-- [ ] Formes sans version parmi les DOI candidats de `fetch_missing`. `doi_targets` en déduit la cible : la forme sans version quand c'est le DOI d'un enregistrement source en base, sinon la version la plus récente.
+- [x] Formes sans version parmi les DOI candidats de `fetch_missing`. `doi_targets` en déduit la cible : la forme sans version quand c'est le DOI `primary` d'un enregistrement source, sinon la version la plus récente. Une cible déclarée prime.
 - [ ] `is_matchable` : enregistrement source DataCite écarté seulement quand sa cible est le DOI `primary` d'un autre enregistrement source.
 - [ ] Stock : identifiants DOI réécrits depuis le raw store (oneshot).
 

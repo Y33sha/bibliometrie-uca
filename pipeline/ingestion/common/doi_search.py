@@ -21,6 +21,7 @@ from domain.sources.registry import (
     Source,
 )
 from domain.sources.staging import StagingEntryMode
+from infrastructure.db.doi_targets import unversioned_doi_sql
 from pipeline.http.lookup import UNAVAILABLE, Unavailable
 from pipeline.http.polite_pool import polite_user_agent
 from pipeline.ingestion.common.failed_lookups import (
@@ -54,7 +55,7 @@ def get_missing_dois(
 ) -> list[str]:
     """DOI à chercher dans la cible : DOI des publications du périmètre absents de la cible, nettoyés et sans doublon.
 
-    Les candidats viennent de la vue `candidate_dois` : DOI des enregistrements sources, cibles des relations entre publications, DOI DataCite déduits des identifiants arXiv. Le périmètre est celui du run précédent ; les DOI des enregistrements sources nouveaux attendent le run suivant.
+    Les candidats viennent de la vue `candidate_dois` : DOI des enregistrements sources, cibles des relations entre publications, DOI DataCite déduits des identifiants arXiv. S'y ajoute la forme sans version de chaque DOI à suffixe de version : quand elle existe, elle devient la cible des versions (sous-étape `doi_targets`). Le périmètre est celui du run précédent ; les DOI des enregistrements sources nouveaux attendent le run suivant.
 
     Un DOI est absent de la cible s'il manque à son `staging` et à tous les DOI de ses enregistrements sources : une source renvoie un même document pour chacun de ses DOI.
 
@@ -86,7 +87,7 @@ def get_missing_dois(
         if years is not None
         else ""
     )
-    # `IS DISTINCT FROM` : un DOI de relation, sans source, est candidat pour toutes les cibles.
+    # `IS DISTINCT FROM` : un DOI de relation ou une forme sans version, sans source, est candidat pour toutes les cibles.
     # `NOT EXISTS` : avec `NOT IN`, un NULL dans la sous-requête viderait la sélection.
     query = f"""
         WITH deja_connus AS (
@@ -97,7 +98,12 @@ def get_missing_dois(
               AND d.id_type = '{SourceIdentifierType.DOI.value}' AND d.removed_by IS NULL
         )
         SELECT DISTINCT c.doi
-        FROM candidate_dois c
+        FROM (
+            SELECT doi, source, publication_id FROM candidate_dois
+            UNION
+            SELECT {unversioned_doi_sql("doi")}, NULL, publication_id FROM candidate_dois
+            WHERE {unversioned_doi_sql("doi")} IS NOT NULL
+        ) c
         {join_clause}
         WHERE c.source IS DISTINCT FROM :target
           AND NOT EXISTS (

@@ -40,6 +40,7 @@ from domain.source_records.metadata_correction.source_record import UnaryCorrect
 from domain.source_records.source_extras import SourceExtra
 from domain.sources.registry import DOI_ORG, Source
 from domain.types import JsonValue
+from infrastructure.db.doi_targets import unversioned_doi_sql
 from infrastructure.db.queues import Queue, enqueue
 from infrastructure.db.rows import rows_as
 from infrastructure.db.source_record_identifiers import identifiers_json_sql, parse_identifiers
@@ -416,6 +417,31 @@ class SourceRecordCorrectionStore:
     def persist_serial_corrections(self, updates: list[SerialCorrectionUpdate]) -> int:
         """Écrit en lot `serial_id` et `corrections`, et marque les enregistrements sources pour la réconciliation, qui recalcule la revue de la publication. Renvoie le nombre de lignes."""
         return _persist_updates(self._conn, [u._asdict() for u in updates])
+
+    def fetch_versioned_dois(self) -> list[str]:
+        """DOI à suffixe de version des enregistrements sources, de rôle autre que `related`, quel que soit leur statut."""
+        rows = self._conn.execute(
+            text(f"""
+                SELECT DISTINCT id_value FROM source_record_identifiers
+                WHERE id_type = '{SourceIdentifierType.DOI.value}'
+                  AND role <> '{SourceIdentifierRole.RELATED.value}'
+                  AND {unversioned_doi_sql("id_value")} IS NOT NULL
+            """)
+        )
+        return list(rows.scalars())
+
+    def fetch_primary_dois(self, dois: Iterable[str]) -> frozenset[str]:
+        """Ceux de `dois` qui sont le DOI `primary` d'un enregistrement source."""
+        rows = self._conn.execute(
+            text(f"""
+                SELECT DISTINCT id_value FROM source_record_identifiers
+                WHERE id_type = '{SourceIdentifierType.DOI.value}'
+                  AND role = '{SourceIdentifierRole.PRIMARY.value}'
+                  AND id_value = ANY(:dois)
+            """),
+            {"dois": sorted(set(dois))},
+        )
+        return frozenset(rows.scalars())
 
     def fetch_secondary_form_declarations(self) -> list[SecondaryFormRow]:
         """Les enregistrements sources qui déclarent leur DOI forme secondaire d'une œuvre principale présente en base et connue de doi.org, un par enregistrement source. Un DOI inconnu de doi.org est écarté."""

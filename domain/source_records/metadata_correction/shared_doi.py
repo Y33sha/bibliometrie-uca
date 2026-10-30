@@ -1,16 +1,17 @@
 """Correction du DOI que partagent plusieurs enregistrements sources.
 
-Une forme secondaire DataCite (version, variante, pièce d'un jeu de données) qui déclare son œuvre principale, présente en base, donne au DOI partagé une cible : le DOI de cette œuvre (`doi_target`). Un DOI partagé par des œuvres distinctes est retiré des membres qui l'ont à tort (`resolve_cluster_doi_corrections`). Les membres qui gardent le DOI perdent les clés de confirmation qu'ils partagent avec ceux qui le perdent (`confirmation_id_removals`).
+Une forme secondaire DataCite (version, variante, pièce d'un jeu de données) qui déclare son œuvre principale, présente en base, donne au DOI partagé une cible : le DOI de cette œuvre (`doi_target`). Un DOI à suffixe de version a pour cible sa forme sans version ou sa version la plus récente (`version_targets`). Un DOI partagé par des œuvres distinctes est retiré des membres qui l'ont à tort (`resolve_cluster_doi_corrections`). Les membres qui gardent le DOI perdent les clés de confirmation qu'ils partagent avec ceux qui le perdent (`confirmation_id_removals`).
 """
 
 import re
-from collections.abc import Iterable, Mapping
+from collections import defaultdict
+from collections.abc import Iterable, Mapping, Set
 from enum import StrEnum
 from itertools import combinations
 from typing import NamedTuple
 
 from domain.publications.doc_types import DocType
-from domain.publications.identifiers import NNT, HALId, meme_registrant
+from domain.publications.identifiers import NNT, HALId, doi_version, meme_registrant
 from domain.source_records.identifiers import SourceIdentifier, SourceIdentifierType
 from domain.source_records.keys import CONFIRMATION_ID_TYPES
 from domain.sources.registry import Source
@@ -18,13 +19,17 @@ from domain.sources.scanr import extract_hal_id_from_scanr_id
 
 
 class DoiTargetRule(StrEnum):
-    """Règle qui donne une cible au DOI d'une forme secondaire DataCite. Inscrite dans `doi_targets.rule`."""
+    """Règle qui donne une cible au DOI d'une forme secondaire. Inscrite dans `doi_targets.rule`."""
 
     DATACITE_VERSION_TO_CONCEPT = "DATACITE_VERSION_TO_CONCEPT"  # version → concept (IsVersionOf)
     DATACITE_VARIANT_TO_PRIMARY = (
         "DATACITE_VARIANT_TO_PRIMARY"  # copie repository → version publiée (IsVariantFormOf)
     )
     DATACITE_PACKAGE_PIECE = "DATACITE_PACKAGE_PIECE"  # pièce d'un dataset → dataset parent présent (IsPartOf, ou fichier complémentaire figshare)
+    DOI_VERSION_TO_UNVERSIONED = "DOI_VERSION_TO_UNVERSIONED"  # DOI à suffixe de version → sa forme sans version, DOI `primary` d'un enregistrement source
+    DOI_VERSION_TO_LATEST = (
+        "DOI_VERSION_TO_LATEST"  # DOI à suffixe de version → version de plus grand numéro en base
+    )
 
 
 class DoiClusterCase(StrEnum):
@@ -282,6 +287,29 @@ def doi_target(declarations: Iterable[SecondaryFormDeclaration], *, doi: str) ->
         None,
     )
     return DoiTarget(doi, declaration.target_doi, declaration.rule) if declaration else None
+
+
+def version_targets(dois: Iterable[str], primary_dois: Set[str]) -> list[DoiTarget]:
+    """Cible de chaque DOI à suffixe de version de `dois` (`doi_version`) : sa forme sans version quand c'est un DOI de `primary_dois`, sinon la version de plus grand numéro parmi `dois`. La version la plus récente reste alors sans cible."""
+    families: dict[str, list[tuple[int, str]]] = defaultdict(list)
+    for doi in set(dois):
+        if (version := doi_version(doi)) is not None:
+            families[version.unversioned].append((version.number, doi))
+    targets: list[DoiTarget] = []
+    for unversioned, versions in families.items():
+        if unversioned in primary_dois:
+            targets.extend(
+                DoiTarget(doi, unversioned, DoiTargetRule.DOI_VERSION_TO_UNVERSIONED)
+                for _, doi in versions
+            )
+            continue
+        latest = max(versions)[1]
+        targets.extend(
+            DoiTarget(doi, latest, DoiTargetRule.DOI_VERSION_TO_LATEST)
+            for _, doi in versions
+            if doi != latest
+        )
+    return sorted(targets)
 
 
 def resolve_cluster_doi_corrections(

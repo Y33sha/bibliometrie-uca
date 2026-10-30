@@ -259,6 +259,18 @@ class TestGetMissingDois:
         result = get_missing_dois(sa_sync_conn, "hal", retry_after_days=30)
         assert "10.48550/arxiv.2605.02321" not in result
 
+    def test_includes_the_unversioned_form_of_a_versioned_doi(self, sa_sync_conn):
+        """La forme sans version, sans source, est cherchée même dans la source qui a la version."""
+        insert_doi_prefix(sa_sync_conn, "10.6084", ra="DataCite")
+        _add_inperim_source_record(
+            sa_sync_conn,
+            "datacite",
+            "10.6084/m9.figshare.1.v1",
+            identifiers={"doi": ["10.6084/m9.figshare.1.v1"]},
+        )
+        result = get_missing_dois(sa_sync_conn, "datacite", retry_after_days=30)
+        assert result == ["10.6084/m9.figshare.1"]
+
     def test_includes_relation_targets(self, sa_sync_conn):
         """Le DOI cible d'une relation depuis une publication du périmètre est retenu."""
         _publication(sa_sync_conn, "Parent", row_id=1, in_perimeter=True)

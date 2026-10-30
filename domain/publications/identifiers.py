@@ -7,8 +7,9 @@ from urllib.parse import unquote, urlparse
 from domain.identifiers import NormalizedIdentifier
 from domain.urls import is_host
 
-# Suffixe de version d'un DOI normalisé : `.v` ou `/v` suivi de trois chiffres au plus (`10.6084/m9.figshare.123.v2`, `10.21203/rs.3.rs-123/v1`). Un numéro plus long est un code d'article (`10.1681/asn.v12102060`).
-_DOI_VERSION_SUFFIX = re.compile(r"[./]v(\d{1,3})$")
+DOI_VERSION_SUFFIX_PATTERN = r"[./]v(\d{1,3})$"
+"""Suffixe de version d'un DOI normalisé : `.v` ou `/v` suivi de trois chiffres au plus (`10.6084/m9.figshare.123.v2`, `10.21203/rs.3.rs-123/v1`). Un numéro plus long est un code d'article (`10.1681/asn.v12102060`). Le motif vaut aussi en SQL."""
+_DOI_VERSION_SUFFIX = re.compile(DOI_VERSION_SUFFIX_PATTERN)
 # Suffixe d'URL de page d'éditeur (`/pdf`, `/full`, `/abstract`) collé au DOI. Le DOI suffixé est inconnu de doi.org.
 _DOI_URL_PAGE_SUFFIX = re.compile(r"/(?:pdf|full|abstract)$", re.IGNORECASE)
 _DOI_URL_PREFIXES = (
