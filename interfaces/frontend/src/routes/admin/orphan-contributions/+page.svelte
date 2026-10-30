@@ -315,7 +315,7 @@
 					<th class="fit">Nom</th>
 					<th class="publication-cell">Publication</th>
 					<th class="fit">{columnLabels.labs}</th>
-					<th class="fit">Action</th>
+					<th class="action-col">Action</th>
 				</tr>
 			</thead>
 			<tbody>
@@ -337,10 +337,12 @@
 								</a>
 							</div>
 						</td>
-						<td class="fit">
-							{#each o.labs as lab (lab.id)}
-								<a href={resolve(`structures/${lab.id}`)} class="lab-tag">{lab.label}</a>
-							{/each}
+						<td>
+							<div class="labs">
+								{#each o.labs as lab (lab.id)}
+									<a href={resolve(`structures/${lab.id}`)} class="lab-tag">{lab.label}</a>
+								{/each}
+							</div>
 						</td>
 						<td>
 							{#if activeAssignIdx === i}
@@ -439,6 +441,10 @@
 	/* Colonnes à la largeur de leur contenu. La colonne Publication prend le reste : `max-width: 0` l'empêche de s'élargir à la longueur du titre, qui est tronqué là où il déborde. */
 	.fit { width: 1%; white-space: nowrap; }
 	.publication-cell { width: 100%; max-width: 0; }
+	/* Laboratoires à la largeur de leur contenu, passés à la ligne au-delà de 15em. */
+	.labs { width: max-content; max-width: 15em; }
+	/* Largeur fixe : le champ de recherche de l'attribution occupe la colonne sans l'élargir. */
+	.action-col { width: 11rem; }
 	.publication-row { display: flex; align-items: center; gap: 4px; }
 	.publication-link { display: flex; gap: 0.3em; min-width: 0; color: var(--accent); text-decoration: none; font-size: var(--fs-sm); }
 	.publication-link:hover { text-decoration: underline; }
@@ -446,7 +452,7 @@
 	.publication-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 	.assign-panel { position: relative; }
 	.assign-row { display: flex; gap: 4px; align-items: center; }
-	.assign-row input { padding: 4px 8px; border: 1px solid var(--border); border-radius: var(--radius); font-size: var(--fs-sm); width: 200px; }
+	.assign-row input { flex: 1; min-width: 0; padding: 4px 8px; border: 1px solid var(--border); border-radius: var(--radius); font-size: var(--fs-sm); }
 	.assign-results {
 		display: flex; flex-direction: column; gap: 2px;
 		background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
