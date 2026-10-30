@@ -25,7 +25,7 @@ _MARK_TARGET = enqueue_sql(Queue.ADDRESS_CANDIDATES, "SELECT id FROM target")
 
 
 class PgAddressRepository(AddressRepository):
-    """Accès PostgreSQL sync à l'agrégat Address."""
+    """Accès PostgreSQL sync aux adresses."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn

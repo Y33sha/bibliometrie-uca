@@ -1,4 +1,4 @@
-"""Repository PostgreSQL de l'agrégat Structure : structures, tutelles et formes de nom."""
+"""Repository PostgreSQL de l'entité Structure : structures, tutelles et formes de nom."""
 
 from typing import NamedTuple, cast
 
@@ -106,7 +106,7 @@ def _normalize_api_ids(raw: dict[str, list[str]] | None) -> dict[str, list[str]]
 
 
 class PgStructureRepository(StructureRepository):
-    """Accès PostgreSQL sync à l'agrégat Structure."""
+    """Accès PostgreSQL sync à l'entité Structure."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn

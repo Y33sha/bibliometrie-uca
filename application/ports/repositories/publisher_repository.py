@@ -1,4 +1,4 @@
-"""Port PublisherRepository : édition et fusion de l'agrégat Publisher."""
+"""Port PublisherRepository : édition et fusion de l'entité Publisher."""
 
 from typing import Protocol
 
@@ -22,10 +22,10 @@ class PublisherUpdate(BaseModel):
 
 
 class PublisherRepository(Protocol):
-    """Contrat d'édition et de fusion de l'agrégat Publisher."""
+    """Contrat d'édition et de fusion de l'entité Publisher."""
 
     def find_by_id(self, publisher_id: int) -> Publisher | None:
-        """Charge l'agrégat `Publisher`, ou `None` si l'éditeur n'existe pas. Ses formes de nom sont hors de l'agrégat."""
+        """Charge l'entité `Publisher`, ou `None` si l'éditeur n'existe pas. Ses formes de nom sont hors de l'entité."""
         ...
 
     def save(self, publisher: Publisher) -> None:

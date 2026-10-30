@@ -1,4 +1,4 @@
-"""L'agrégat `Publication` enregistre et relit sa licence et celle de son dépôt."""
+"""L'entité `Publication` enregistre et relit sa licence et celle de son dépôt."""
 
 from pipeline.transformation.publications.store import PublicationStore
 

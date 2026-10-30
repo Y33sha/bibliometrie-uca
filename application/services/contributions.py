@@ -1,4 +1,4 @@
-"""Service des contributions : écritures sur l'agrégat Contribution.
+"""Service des contributions : écritures sur les contributions.
 
 Couvre les contributions (`contributions`) et les contributions sources (`source_contributions`) : rejet d'une contribution, et attribution à une personne des contributions orphelines, contributions du périmètre rattachées à aucune personne.
 

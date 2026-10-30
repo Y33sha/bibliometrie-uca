@@ -1,4 +1,4 @@
-"""Repository PostgreSQL de l'agrégat Perimeter."""
+"""Repository PostgreSQL de l'entité Perimeter."""
 
 from typing import NamedTuple
 

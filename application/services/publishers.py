@@ -1,4 +1,4 @@
-"""Service des éditeurs : écritures sur l'agrégat Publisher : mise à jour, fusion."""
+"""Service des éditeurs : écritures sur l'entité Publisher : mise à jour, fusion."""
 
 from application.audit_log import emit_event
 from application.ports.pipeline.publication_count import PublicationCountRecompute
@@ -49,7 +49,7 @@ class PublisherService:
         if publisher is None:
             raise NotFoundError(f"Éditeur {publisher_id} introuvable")
 
-        # Les champs de `PublisherUpdate` ont les noms des attributs de l'agrégat.
+        # Les champs de `PublisherUpdate` ont les noms des attributs de l'entité.
         champs = update.model_dump(exclude_unset=True, mode="json")
         for field_name, value in update.model_dump(exclude_unset=True).items():
             setattr(publisher, field_name, value)

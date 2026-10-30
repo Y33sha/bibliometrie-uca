@@ -1,4 +1,4 @@
-"""Service des personnes : écritures sur l'agrégat Person.
+"""Service des personnes : écritures sur l'entité Person.
 
 Couvre les tables `persons`, `person_identifiers` et `person_name_forms`, et le détachement des contributions (`contributions`). Le renommage et l'attribution d'un identifiant passent par le repository des personnes, que la phase `persons` du pipeline utilise aussi.
 """

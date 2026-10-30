@@ -1,4 +1,4 @@
-"""Port PersonRepository : accès à l'agrégat Person."""
+"""Port PersonRepository : accès à l'entité Person."""
 
 from typing import Protocol, TypedDict
 
@@ -24,12 +24,12 @@ class NameFormStatusRow(TypedDict):
 
 
 class PersonRepository(Protocol):
-    """Contrat d'accès à l'agrégat Person (tables persons, person_identifiers, person_name_forms, distinct_persons, et certaines opérations sur source_contributions)."""
+    """Contrat d'accès à l'entité Person (tables persons, person_identifiers, person_name_forms, distinct_persons, et certaines opérations sur source_contributions)."""
 
     # ── persons ────────────────────────────────────────────────────
 
     def find_by_id(self, person_id: int) -> Person | None:
-        """Charge l'agrégat `Person` complet (avec `identifiers` et `name_forms`), ou `None` si la personne n'existe pas. Identifiants et formes de nom l'accompagnent en lecture ; leurs modifications passent par les méthodes dédiées."""
+        """Charge l'entité `Person` complète (avec `identifiers` et `name_forms`), ou `None` si la personne n'existe pas. Identifiants et formes de nom l'accompagnent en lecture ; leurs modifications passent par les méthodes dédiées."""
         ...
 
     def create(self, last_name: str, first_name: str = "") -> int:

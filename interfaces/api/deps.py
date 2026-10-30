@@ -252,7 +252,7 @@ def subjects_queries(conn: DbConn) -> SubjectsQueries:
 
 
 # ----- Écritures -----
-# Un service par agrégat, construit sur la connexion reçue (requête, tâche de fond ou script).
+# Un service par entité ou par traitement, construit sur la connexion reçue (requête, tâche de fond ou script).
 
 
 def address_service(conn: DbConn) -> AddressService:

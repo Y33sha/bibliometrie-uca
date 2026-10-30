@@ -1,4 +1,4 @@
-"""Repository PostgreSQL de l'agrégat Publisher : édition, pays et fusion.
+"""Repository PostgreSQL de l'entité Publisher : édition, pays et fusion.
 
 Le trouve-ou-crée du pipeline vit dans `pipeline/transformation/publishing/find_or_create.py`. Les erreurs sont celles du domaine ; l'orchestration est dans `application/services/`.
 
@@ -40,7 +40,7 @@ def _publisher_from_row(row: _PublisherRow) -> Publisher:
 
 
 class PgPublisherRepository(PublisherRepository):
-    """Accès PostgreSQL à l'agrégat Publisher via une `Connection` SQLAlchemy."""
+    """Accès PostgreSQL à l'entité Publisher via une `Connection` SQLAlchemy."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn

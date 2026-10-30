@@ -1,4 +1,4 @@
-"""Port StructureRepository : accès à l'agrégat Structure."""
+"""Port StructureRepository : accès à l'entité Structure."""
 
 from datetime import datetime
 from typing import Protocol, TypedDict
@@ -100,10 +100,10 @@ class StructureNameFormDeletedRow(TypedDict):
 class StructureRepository(Protocol):
     """Accès aux structures, à leurs tutelles et à leurs formes de nom."""
 
-    # ── Agrégat : chargement et écriture ───────────────────────────
+    # ── Entité : chargement et écriture ───────────────────────────
 
     def find_by_id(self, structure_id: int) -> Structure | None:
-        """Charge l'agrégat `Structure` avec ses formes de nom, ou `None` si la structure n'existe pas. Les tutelles sont hors de l'agrégat (`get_ancestor_ids`)."""
+        """Charge l'entité `Structure` avec ses formes de nom, ou `None` si la structure n'existe pas. Les tutelles sont hors de l'entité (`get_ancestor_ids`)."""
         ...
 
     def add(self, structure: Structure) -> int:
@@ -138,7 +138,7 @@ class StructureRepository(Protocol):
     # ── structure_name_forms ───────────────────────────────────────
 
     def find_name_form(self, form_id: int) -> StructureNameFormRow | None:
-        """Charge la ligne d'agrégat d'une forme de nom de structure, pour édition. La lecture pour l'API vit dans `StructuresQueries.get_name_form`."""
+        """Charge une forme de nom de structure, pour édition. La lecture pour l'API vit dans `StructuresQueries.get_name_form`."""
         ...
 
     def create_name_form(

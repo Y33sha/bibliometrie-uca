@@ -1,4 +1,4 @@
-"""Service des structures : écritures sur l'agrégat Structure, ses tutelles et ses formes de nom.
+"""Service des structures : écritures sur l'entité Structure, ses tutelles et ses formes de nom.
 
 Le repository valide `api_ids` : toute écriture y passe.
 """
@@ -24,7 +24,7 @@ from domain.structures.tutelles import check_can_create_tutelle
 
 
 def _structure_edit(update: StructureUpdate) -> StructureEdit:
-    """Champs fournis de `update`, sous la forme que l'agrégat reçoit."""
+    """Champs fournis de `update`, sous la forme que l'entité reçoit."""
     provided = update.model_fields_set
     changes = StructureEdit()
     if "name" in provided and update.name is not None:
@@ -85,7 +85,7 @@ class StructureService:
         return structure
 
     def update_structure(self, structure_id: int, update: StructureUpdate) -> Structure:
-        """Met à jour une structure. Charge l'agrégat, applique les champs fournis, validés, et l'écrit. `null` efface un champ facultatif ; sur le nom ou le type, il vaut champ non fourni.
+        """Met à jour une structure. Charge l'entité, applique les champs fournis, validés, et l'écrit. `null` efface un champ facultatif ; sur le nom ou le type, il vaut champ non fourni.
 
         Lève `NotFoundError` si la structure n'existe pas, `ValidationError` si aucun champ n'est fourni ou si une valeur est invalide.
         """

@@ -1,4 +1,4 @@
-"""Service des publications en série : écritures sur l'agrégat Serial.
+"""Service des publications en série : écritures sur l'entité Serial.
 
 Le `serial_type` d'une revue alimente des règles de correction du `doc_type` de ses publications. Après une édition ou une fusion, le pipeline rejoue ces corrections (`SerialRecompute`).
 """
@@ -15,7 +15,7 @@ from domain.serials.serial import ManualField, SerialEdit, SerialType
 
 
 def _serial_edit(update: SerialUpdate) -> SerialEdit:
-    """Champs fournis de `update`, sous la forme que l'agrégat reçoit."""
+    """Champs fournis de `update`, sous la forme que l'entité reçoit."""
     provided = update.model_fields_set
     changes = SerialEdit()
     if "title" in provided and update.title is not None:

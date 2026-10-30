@@ -1,4 +1,4 @@
-"""Port PerimeterRepository : accès à l'agrégat Perimeter."""
+"""Port PerimeterRepository : accès à l'entité Perimeter."""
 
 from typing import Annotated, Protocol
 
@@ -18,12 +18,12 @@ class PerimeterUpdate(BaseModel):
 
 
 class PerimeterRepository(Protocol):
-    """Contrat d'accès à l'agrégat Perimeter."""
+    """Contrat d'accès à l'entité Perimeter."""
 
-    # ── Agrégat : chargement et écriture ───────────────────────────
+    # ── Entité : chargement et écriture ───────────────────────────
 
     def find_by_id(self, perimeter_id: int) -> Perimeter | None:
-        """Charge l'agrégat `Perimeter`, ou `None` si le périmètre n'existe pas. Ses racines sont des ids de structures."""
+        """Charge l'entité `Perimeter`, ou `None` si le périmètre n'existe pas. Ses racines sont des ids de structures."""
         ...
 
     def add(self, perimeter: Perimeter) -> int:

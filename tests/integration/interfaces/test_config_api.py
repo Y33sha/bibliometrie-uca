@@ -38,7 +38,7 @@ class TestTracabilite:
         assert len(evenements) == 1
         evenement = evenements[0]
         assert evenement["aggregate_type"] == "config"
-        # La clé est un texte et l'identifiant d'agrégat un entier : la clé est dans la charge utile.
+        # La clé est un texte et l'identifiant d'entité (`aggregate_id`) un entier : la clé est dans la charge utile.
         assert evenement["aggregate_id"] is None
         assert evenement["payload"] == {"key": cle_posee, "value": "apres"}
         assert evenement["user_id"]

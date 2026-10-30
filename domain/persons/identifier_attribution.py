@@ -1,6 +1,6 @@
 """Attribution d'un identifiant externe à une personne, et ses changements de statut.
 
-Le statut (`pending`, `confirmed`, `rejected`) qualifie l'attribution. Elle forme donc un agrégat distinct de `Person`, et une réattribution modifie seulement l'attribution. `Person.identifiers` en donne une copie en lecture.
+Le statut (`pending`, `confirmed`, `rejected`) qualifie l'attribution. Elle forme donc une entité distincte de `Person`, et une réattribution modifie seulement l'attribution. `Person.identifiers` en donne une copie en lecture.
 """
 
 from dataclasses import dataclass

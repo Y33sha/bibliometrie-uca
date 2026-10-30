@@ -1,4 +1,4 @@
-"""Port SerialRepository : édition de l'agrégat Serial dans l'administration."""
+"""Port SerialRepository : édition de l'entité Serial dans l'administration."""
 
 from typing import Protocol
 
@@ -29,10 +29,10 @@ class SerialUpdate(BaseModel):
 
 
 class SerialRepository(Protocol):
-    """Contrat d'édition de l'agrégat Serial dans l'administration."""
+    """Contrat d'édition de l'entité Serial dans l'administration."""
 
     def find_by_id(self, serial_id: int) -> Serial | None:
-        """Charge l'agrégat `Serial`, ou `None` si la revue n'existe pas. Ses formes de nom sont hors de l'agrégat."""
+        """Charge l'entité `Serial`, ou `None` si la revue n'existe pas. Ses formes de nom sont hors de l'entité."""
         ...
 
     def save(self, serial: Serial) -> None:

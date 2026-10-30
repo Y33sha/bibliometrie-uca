@@ -116,7 +116,7 @@ class TestEmitEvent:
             reset_current_user(token)
 
     def test_accepts_null_aggregate_id(self, sa_sync_conn):
-        """Un événement sans identifiant d'agrégat, comme la suppression d'une entité sans successeur, est consigné."""
+        """Un événement sans identifiant d'entité (`aggregate_id`), comme la suppression d'une entité sans successeur, est consigné."""
         with _requete_admin(sa_sync_conn):
             emit_event("structure.deleted", "structure", None, {"name": "X"})
         assert _last_event(sa_sync_conn).aggregate_id is None

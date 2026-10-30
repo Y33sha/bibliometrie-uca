@@ -1,4 +1,4 @@
-"""Service des périmètres : écritures sur l'agrégat Perimeter.
+"""Service des périmètres : écritures sur l'entité Perimeter.
 
 Un périmètre a des structures racines (`perimeters.root_structure_ids`) ; leurs sous-structures sont dans `perimeter_structures`, que le pipeline recalcule. La création et la mise à jour d'un périmètre recalculent cette table.
 """
