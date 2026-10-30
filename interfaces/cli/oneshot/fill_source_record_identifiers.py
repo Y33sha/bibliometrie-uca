@@ -4,7 +4,7 @@
 Chaque enregistrement source relit son payload au raw store. Le normaliseur de sa source en tire ses identifiants, que le script écrit seuls : le reste de l'enregistrement source est inchangé. Un enregistrement source sans ligne de `staging` ou sans payload au raw store est ignoré.
 
 Usage :
-    python -m interfaces.cli.oneshot.fill_source_record_identifiers [--sources hal,openalex] [--dry-run]
+    uv run python -m interfaces.cli.oneshot.fill_source_record_identifiers [--sources hal,openalex] [--dry-run]
 """
 
 from __future__ import annotations

@@ -9,8 +9,8 @@ La normalisation se lance à part :
     run_pipeline --from normalize --sources wos
 
 Usage :
-    python -m interfaces.cli.maintenance.import_wos_export data/imports/wos/2026-10-07 [--dry-run]
-    python -m interfaces.cli.maintenance.import_wos_export export1.txt export2.txt
+    uv run python -m interfaces.cli.maintenance.import_wos_export data/imports/wos/2026-10-07 [--dry-run]
+    uv run python -m interfaces.cli.maintenance.import_wos_export export1.txt export2.txt
 """
 
 from __future__ import annotations

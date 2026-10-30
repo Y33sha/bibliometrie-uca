@@ -4,7 +4,7 @@
 Le nom d'éditeur se lit dans `biblio.publisher`. L'éditeur est trouvé ou créé par ses formes de nom (`find_or_create_publisher`). Une production hébergée sans être publiée reste sans éditeur (`source_record_has_publisher`). Les enregistrements sources dont l'éditeur change passent dans la file de réconciliation : la phase `publications` recalcule ensuite l'éditeur de leurs publications. Idempotent.
 
 Usage :
-    python -m interfaces.cli.oneshot.backfill_source_record_publishers [--dry-run]
+    uv run python -m interfaces.cli.oneshot.backfill_source_record_publishers [--dry-run]
 """
 
 from __future__ import annotations

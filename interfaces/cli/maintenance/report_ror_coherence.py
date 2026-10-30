@@ -4,7 +4,7 @@
 Liste les tutelles absentes du ROR, les parents ROR absents des tutelles, les parents et enfants ROR des structures du périmètre absents de `structures`, et les ROR attribués à plusieurs structures. Chaque écart se corrige dans l'interface d'administration ou se signale au ROR.
 
 Usage :
-    python -m interfaces.cli.maintenance.report_ror_coherence
+    uv run python -m interfaces.cli.maintenance.report_ror_coherence
 """
 
 import sys
@@ -106,7 +106,7 @@ def main() -> int:
     with get_sync_engine().connect() as conn:
         if not ror_relations(conn):
             print(
-                "Référentiel ROR vide : lancer python -m interfaces.cli.imports.import_ror_dump",
+                "Référentiel ROR vide : lancer uv run python -m interfaces.cli.imports.import_ror_dump",
                 file=sys.stderr,
             )
             return 1

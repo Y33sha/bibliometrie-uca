@@ -4,8 +4,8 @@
 Le seed commun (`infrastructure/db/seed.sql`) contient les référentiels partagés par tous les établissements. Le seed d'établissement (`infrastructure/db/seed_uca.sql` pour UCA) contient les structures, leurs tutelles, les périmètres, les formes de noms, les clés de configuration qui désignent les périmètres et le titre de l'application. Les deux seeds se chargent indépendamment l'un de l'autre.
 
 Usage :
-    python -m interfaces.cli.dev.generate_seed
-    python -m interfaces.cli.dev.generate_seed --common-output CHEMIN --institution-output CHEMIN
+    uv run python -m interfaces.cli.dev.generate_seed
+    uv run python -m interfaces.cli.dev.generate_seed --common-output CHEMIN --institution-output CHEMIN
 
 Chaque fichier produit est un SQL pur qui aligne les tables sur le seed (`render_seed`) et recale les séquences. Il suppose le schéma appliqué par les migrations.
 """

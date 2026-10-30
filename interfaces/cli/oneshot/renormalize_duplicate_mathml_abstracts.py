@@ -5,7 +5,7 @@ Ces résumés contiennent une formule MathML et soit une formule LaTeX `$$…$$`
     run_pipeline --from normalize --sources crossref,openalex
 
 Usage :
-    python -m interfaces.cli.oneshot.renormalize_duplicate_mathml_abstracts [--dry-run]
+    uv run python -m interfaces.cli.oneshot.renormalize_duplicate_mathml_abstracts [--dry-run]
 """
 
 from __future__ import annotations

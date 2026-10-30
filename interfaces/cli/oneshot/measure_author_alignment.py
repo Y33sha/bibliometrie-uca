@@ -15,7 +15,7 @@ Les enregistrements sources theses.fr, sans position d'auteur, sont écartés, a
 Écrit un rapport Markdown et un échantillon de désaccords à relire à la main. Lecture seule sur la base.
 
 Usage :
-    python -m interfaces.cli.oneshot.measure_author_alignment
+    uv run python -m interfaces.cli.oneshot.measure_author_alignment
 """
 
 from __future__ import annotations

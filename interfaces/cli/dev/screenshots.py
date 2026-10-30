@@ -2,7 +2,7 @@
 """Captures d'écran du guide utilisateur, prises dans l'application en cours d'exécution.
 
 Usage :
-    python -m interfaces.cli.dev.screenshots [--base-url URL] [--only NOM ...]
+    uv run python -m interfaces.cli.dev.screenshots [--base-url URL] [--only NOM ...]
 
 L'application doit tourner (`bash start.sh`). Les captures des pages d'administration demandent une session : le script se connecte avec `SCREENSHOT_LOGIN` et `SCREENSHOT_PASSWORD`, lus dans l'environnement. Sans eux, il saute ces captures.
 

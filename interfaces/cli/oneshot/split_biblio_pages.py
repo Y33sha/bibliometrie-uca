@@ -4,7 +4,7 @@
 Le script applique aux enregistrements sources existants le découpage de leur normaliseur (`page_range` de `pipeline.ingestion.hal.normalize` et de `pipeline.ingestion.crossref.normalize`). Il recalcule ensuite leurs publications (`lifecycle.refresh`), dont `biblio` est la fusion de celui des enregistrements sources.
 
 Usage :
-    python -m interfaces.cli.oneshot.split_biblio_pages [--dry-run]
+    uv run python -m interfaces.cli.oneshot.split_biblio_pages [--dry-run]
 """
 
 from __future__ import annotations

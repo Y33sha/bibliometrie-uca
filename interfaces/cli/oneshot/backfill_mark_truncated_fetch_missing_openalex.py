@@ -6,8 +6,8 @@ La recherche par DOI de `fetch_missing` interroge l'endpoint de liste d'OpenAlex
 Le nombre d'auteurs se lit dans `raw_data` pour un enregistrement pas encore normalisé, et dans ses contributions sources sinon.
 
 Usage :
-    python -m interfaces.cli.oneshot.backfill_mark_truncated_fetch_missing_openalex             # applique
-    python -m interfaces.cli.oneshot.backfill_mark_truncated_fetch_missing_openalex --dry-run   # rapport seul
+    uv run python -m interfaces.cli.oneshot.backfill_mark_truncated_fetch_missing_openalex             # applique
+    uv run python -m interfaces.cli.oneshot.backfill_mark_truncated_fetch_missing_openalex --dry-run   # rapport seul
 """
 
 from __future__ import annotations

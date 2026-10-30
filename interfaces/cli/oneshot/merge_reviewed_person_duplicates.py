@@ -4,8 +4,8 @@
 Le fichier CSV donne une fusion par ligne : colonnes `conservée` et `absorbée`, identifiants de personnes. Chaque identifiant suit sa redirection de fusion (`merge_redirects`) jusqu'à la personne qui l'a absorbé. Une ligne est ignorée quand ses deux personnes sont déjà fusionnées, quand une personne a disparu sans redirection, ou quand les deux ont une fiche RH. Chaque fusion est commitée seule.
 
 Usage :
-    python -m interfaces.cli.oneshot.merge_reviewed_person_duplicates <fichier.csv>            # exécution
-    python -m interfaces.cli.oneshot.merge_reviewed_person_duplicates <fichier.csv> --dry-run  # rapport seul
+    uv run python -m interfaces.cli.oneshot.merge_reviewed_person_duplicates <fichier.csv>            # exécution
+    uv run python -m interfaces.cli.oneshot.merge_reviewed_person_duplicates <fichier.csv> --dry-run  # rapport seul
 """
 
 from __future__ import annotations

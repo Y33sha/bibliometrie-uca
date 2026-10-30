@@ -4,7 +4,7 @@
 Les enregistrements sources rattachés à une revue sans ISSN au titre de plateforme d'ebooks perdent cette revue. Ceux dont le titre de conteneur est un titre de plateforme d'ebooks le perdent. Les uns et les autres passent dans la file de réconciliation : la phase `publications` recalcule ensuite la revue et le titre de conteneur de leurs publications, et la phase `finalize` supprime les revues devenues vides. Idempotent.
 
 Usage :
-    python -m interfaces.cli.oneshot.detach_ebook_platforms [--dry-run]
+    uv run python -m interfaces.cli.oneshot.detach_ebook_platforms [--dry-run]
 """
 
 from __future__ import annotations

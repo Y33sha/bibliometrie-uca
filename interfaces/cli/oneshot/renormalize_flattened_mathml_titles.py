@@ -5,7 +5,7 @@ Ces titres contiennent une formule LaTeX `$$…$$` et des retours à la ligne. L
     run_pipeline --from normalize --sources crossref,scanr
 
 Usage :
-    python -m interfaces.cli.oneshot.renormalize_flattened_mathml_titles [--dry-run]
+    uv run python -m interfaces.cli.oneshot.renormalize_flattened_mathml_titles [--dry-run]
 """
 
 from __future__ import annotations

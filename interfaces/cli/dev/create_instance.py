@@ -2,7 +2,7 @@
 """Crée la base de l'instance désignée par `BIBLIO_INSTANCE` : base, migrations, rôles de connexion, seed commun, seed d'établissement.
 
 Usage :
-    BIBLIO_INSTANCE=lorraine python -m interfaces.cli.dev.create_instance [--reseed]
+    BIBLIO_INSTANCE=lorraine uv run python -m interfaces.cli.dev.create_instance [--reseed]
 
 Le seed d'établissement est `instances/<nom>/seed.sql`, à côté de `instance.env`. Le script s'arrête si la base existe déjà. `--reseed` vise une base existante encore vide de documents : il applique les migrations, recharge le seed d'établissement et recalcule les structures des périmètres.
 """

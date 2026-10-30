@@ -65,5 +65,5 @@ Le payload garde les colonnes du CSV pour clés.
 Un dump téléchargé à la main s'importe par le même chemin d'écriture :
 
 ```bash
-python -m interfaces.cli.imports.import_doaj_csv data/doaj_journalcsv_*.csv
+uv run python -m interfaces.cli.imports.import_doaj_csv data/doaj_journalcsv_*.csv
 ```

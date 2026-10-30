@@ -16,7 +16,7 @@ Chaque combinaison d'arbitres est mesurée telle quelle, puis avec Health et Lif
 Règle : sur une publication à plusieurs domains, un domain sans soutien est rejeté si un autre domain a au moins un soutien. Le rejet s'étend aux fields, subfields et topics qui en descendent. Les rejets sont comparés aux verdicts de référence de l'échantillon (`claude.v`), par niveau.
 
 Usage :
-    python -m interfaces.cli.oneshot.prototype_subject_vote --sample sample.json
+    uv run python -m interfaces.cli.oneshot.prototype_subject_vote --sample sample.json
 """
 
 from __future__ import annotations

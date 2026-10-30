@@ -9,7 +9,7 @@ Une structure HAL est candidate quand une contribution source la cite, que son s
 Une structure HAL rattachée à plusieurs structures internes est signalée et laissée de côté. `--dry-run` écrit les candidates dans `data/measures/hal_structure_matches.csv` sans modifier la base.
 
 Usage :
-    python -m interfaces.cli.oneshot.match_hal_structures [--dry-run] [--exclude ID ...]
+    uv run python -m interfaces.cli.oneshot.match_hal_structures [--dry-run] [--exclude ID ...]
 """
 
 import argparse

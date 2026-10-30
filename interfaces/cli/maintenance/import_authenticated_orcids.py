@@ -8,7 +8,7 @@ Cet import est le seul contexte autorisé à écrire ce statut : un trigger Post
 Réappliqué sur un fichier inchangé, l'import n'écrit rien.
 
 Usage :
-    python -m interfaces.cli.maintenance.import_authenticated_orcids [--file CHEMIN] [--dry-run]
+    uv run python -m interfaces.cli.maintenance.import_authenticated_orcids [--file CHEMIN] [--dry-run]
 """
 
 from __future__ import annotations

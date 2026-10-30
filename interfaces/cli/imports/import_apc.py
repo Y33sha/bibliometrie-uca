@@ -14,9 +14,9 @@ Le laboratoire et le payeur sont rattachés à leur structure par les formes de 
 La réponse d'un établissement à l'enquête l'emporte sur OpenAPC : un frais d'open access OpenAPC d'un article que la réponse de son payeur décrit déjà est retiré (`drop_open_apc_superseded_by_institution`).
 
 Usage :
-    python -m interfaces.cli.imports.import_apc data/apc/apc_de.csv --institution "Université Clermont Auvergne"
-    python -m interfaces.cli.imports.import_apc "data/FPhorsOA … .csv" --institution 200 --dry-run
-    python -m interfaces.cli.imports.import_apc "data/apc/APC_2025_… .csv"
+    uv run python -m interfaces.cli.imports.import_apc data/apc/apc_de.csv --institution "Université Clermont Auvergne"
+    uv run python -m interfaces.cli.imports.import_apc "data/FPhorsOA … .csv" --institution 200 --dry-run
+    uv run python -m interfaces.cli.imports.import_apc "data/apc/APC_2025_… .csv"
 """
 
 import argparse

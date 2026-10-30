@@ -15,7 +15,7 @@ L'import crée la personne et sa fiche RH. La fiche enrichit la personne, et une
 
 ## Données APC
 
-`python -m interfaces.cli.imports.import_apc <fichier>` importe un fichier de frais de publication dans `apc_payments`. Le script reconnaît trois formats à leurs colonnes :
+`uv run python -m interfaces.cli.imports.import_apc <fichier>` importe un fichier de frais de publication dans `apc_payments`. Le script reconnaît trois formats à leurs colonnes :
 
 - le jeu de données [OpenAPC](../glossaire.md#openapc), fichier brut [`apc_de.csv`](https://github.com/OpenAPC/openapc-de/blob/master/data/apc_de.csv) : frais d'open access déclarés par les établissements participants ;
 - le fichier « frais hors OA » de l'enquête nationale : autres frais de publication ;

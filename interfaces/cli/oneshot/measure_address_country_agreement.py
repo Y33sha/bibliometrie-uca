@@ -15,7 +15,7 @@ Le code `xx` (adresse arbitrée sans pays) est retiré des ensembles comparés.
 Écrit un rapport Markdown et un échantillon de désaccords avec `addresses.countries`, à revoir à la main : par moyen, des adresses tirées au hasard, avec leur texte et les candidats de tous les moyens. Lecture seule sur la base.
 
 Usage :
-    python -m interfaces.cli.oneshot.measure_address_country_agreement
+    uv run python -m interfaces.cli.oneshot.measure_address_country_agreement
 """
 
 from __future__ import annotations

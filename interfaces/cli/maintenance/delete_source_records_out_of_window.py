@@ -4,7 +4,7 @@
 Les enregistrements sources de la même publication sont marqués à réconcilier (`delete_source_records_before`). Le pipeline supprime ensuite les publications vidées (phase `publications`), puis les personnes vidées (phase `persons`).
 
 Usage :
-    python -m interfaces.cli.maintenance.delete_source_records_out_of_window [--dry-run]
+    uv run python -m interfaces.cli.maintenance.delete_source_records_out_of_window [--dry-run]
 """
 
 from __future__ import annotations

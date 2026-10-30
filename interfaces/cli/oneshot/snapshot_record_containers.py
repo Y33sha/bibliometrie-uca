@@ -6,8 +6,8 @@ Sert à quantifier, par type de changement, l'effet d'une renormalisation du sto
 L'instantané s'écrit en JSON compressé sous `data/snapshots/`. `--compare` confronte deux instantanés : pour chaque enregistrement présent dans les deux, le changement de son entrée de `serials` et celui de sa monographie, par source et type de document.
 
 Usage :
-    python -m interfaces.cli.oneshot.snapshot_record_containers
-    python -m interfaces.cli.oneshot.snapshot_record_containers --compare AVANT.json.gz APRES.json.gz
+    uv run python -m interfaces.cli.oneshot.snapshot_record_containers
+    uv run python -m interfaces.cli.oneshot.snapshot_record_containers --compare AVANT.json.gz APRES.json.gz
 """
 
 from __future__ import annotations

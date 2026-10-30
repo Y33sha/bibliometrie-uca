@@ -2,8 +2,8 @@
 """Import des personnes depuis un fichier RH (CSV ou TSV).
 
 Usage :
-    python -m interfaces.cli.imports.import_persons fichier_rh.csv
-    python -m interfaces.cli.imports.import_persons fichier_rh.tsv --dry-run
+    uv run python -m interfaces.cli.imports.import_persons fichier_rh.csv
+    uv run python -m interfaces.cli.imports.import_persons fichier_rh.tsv --dry-run
 
 Colonnes attendues, aux noms reconnus automatiquement : nom, prenom, email, department-name, role-title, start-date, end-date.
 """

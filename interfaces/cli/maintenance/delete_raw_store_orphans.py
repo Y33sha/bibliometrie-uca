@@ -6,7 +6,7 @@ Le raw store grossit seulement : `mark_done` y écrit sans jamais supprimer. Au 
 Le store élagué est celui de la configuration (`BIBLIO_RAW_STORE_DIR`). `--root` en désigne un autre, par exemple une copie hors ligne.
 
 Usage :
-    python -m interfaces.cli.maintenance.delete_raw_store_orphans [--root CHEMIN] [--source SRC] [--dry-run]
+    uv run python -m interfaces.cli.maintenance.delete_raw_store_orphans [--root CHEMIN] [--source SRC] [--dry-run]
 """
 
 from __future__ import annotations

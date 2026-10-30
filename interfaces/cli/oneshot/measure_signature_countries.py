@@ -10,7 +10,7 @@ Le pays d'une contribution source réunit trois sources :
 Le rapport donne, par source d'enregistrement, la couverture de chacune, leurs relations deux à deux, et les pays des publications qu'en tire chaque règle — adresses seules, ou les trois sources — comparés à `publications.countries`. Un échantillon de contributions sources dont l'adresse contredit le ROR ou la structure HAL s'écrit à part, pour une revue à la main. Lecture seule sur la base.
 
 Usage :
-    python -m interfaces.cli.oneshot.measure_signature_countries
+    uv run python -m interfaces.cli.oneshot.measure_signature_countries
 """
 
 from __future__ import annotations

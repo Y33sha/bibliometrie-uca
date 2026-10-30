@@ -4,8 +4,8 @@
 Le pipeline importe chaque version publiée en tête de la phase `affiliations`. Cette commande force un import. Sans argument, elle télécharge la version la plus récente du dump depuis Zenodo. `--file` charge une archive déjà téléchargée, dont le nom sert de version. Le chargement vide les deux tables avant de les remplir.
 
 Usage :
-    python -m interfaces.cli.imports.import_ror_dump
-    python -m interfaces.cli.imports.import_ror_dump --file data/ror/v2.14-2026-10-06-ror-data.zip
+    uv run python -m interfaces.cli.imports.import_ror_dump
+    uv run python -m interfaces.cli.imports.import_ror_dump --file data/ror/v2.14-2026-10-06-ror-data.zip
 """
 
 import argparse

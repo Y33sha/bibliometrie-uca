@@ -16,11 +16,11 @@ La normalisation se lance ensuite, avec les phases qui la suivent :
 `--doi-prefix` limite une source dont l'identifiant natif est le DOI (crossref, datacite) aux DOI d'un préfixe. `--id-prefix` limite toute source aux identifiants d'un préfixe. La normalisation traite ensuite ces seuls documents.
 
 Usage :
-    python -m interfaces.cli.maintenance.rehydrate_staging_from_raw_store \
+    uv run python -m interfaces.cli.maintenance.rehydrate_staging_from_raw_store \
         --sources hal,openalex [--full] [--dry-run]
-    python -m interfaces.cli.maintenance.rehydrate_staging_from_raw_store \
+    uv run python -m interfaces.cli.maintenance.rehydrate_staging_from_raw_store \
         --sources crossref --doi-prefix 10.70675
-    python -m interfaces.cli.maintenance.rehydrate_staging_from_raw_store \
+    uv run python -m interfaces.cli.maintenance.rehydrate_staging_from_raw_store \
         --sources scanr --id-prefix nnt
 """
 

@@ -4,7 +4,7 @@
 Une publication appartient au laboratoire quand au moins un de ses auteurs du périmètre signe avec lui. Les évolutions portent sur les cinq années qui finissent à l'année du bilan, les thèses sur dix années.
 
 Usage :
-    python -m interfaces.cli.maintenance.report_open_science --structure m2ish --year 2025 [--output data/reports/science-ouverte/m2ish-2025.md]
+    uv run python -m interfaces.cli.maintenance.report_open_science --structure m2ish --year 2025 [--output data/reports/science-ouverte/m2ish-2025.md]
 """
 
 import argparse

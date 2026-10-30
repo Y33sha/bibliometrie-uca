@@ -12,8 +12,8 @@ Chaque moyen s'exécute sur toutes les adresses, indépendamment des autres moye
 Le script lit la base et le raw store, et n'écrit ni dans l'une ni dans l'autre. Il écrit un fichier CSV compressé, une ligne par candidat : `address_id,country_code,method`. Le journal donne, par moyen, le nombre de candidats et d'adresses couvertes.
 
 Usage :
-    python -m interfaces.cli.oneshot.measure_address_country_candidates
-    python -m interfaces.cli.oneshot.measure_address_country_candidates --methods ror,city
+    uv run python -m interfaces.cli.oneshot.measure_address_country_candidates
+    uv run python -m interfaces.cli.oneshot.measure_address_country_candidates --methods ror,city
 """
 
 from __future__ import annotations

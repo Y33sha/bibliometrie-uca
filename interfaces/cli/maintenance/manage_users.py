@@ -4,10 +4,10 @@
 Le script se connecte sous le propriétaire du schéma (`DB_OWNER_USER`) : le rôle du pipeline est sans droit d'écriture sur `ops.users` et `ops.user_roles`.
 
 Usage :
-    python -m interfaces.cli.maintenance.manage_users list
-    python -m interfaces.cli.maintenance.manage_users add LOGIN [--role admin ...]
-    python -m interfaces.cli.maintenance.manage_users revoke LOGIN --role admin [--role ...]
-    python -m interfaces.cli.maintenance.manage_users remove LOGIN
+    uv run python -m interfaces.cli.maintenance.manage_users list
+    uv run python -m interfaces.cli.maintenance.manage_users add LOGIN [--role admin ...]
+    uv run python -m interfaces.cli.maintenance.manage_users revoke LOGIN --role admin [--role ...]
+    uv run python -m interfaces.cli.maintenance.manage_users remove LOGIN
 """
 
 import argparse

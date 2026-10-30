@@ -4,7 +4,7 @@
 Les publications se traitent par lots d'identifiants, un commit par lot. Seules les valeurs qui changent s'écrivent. Idempotent.
 
 Usage :
-    python -m interfaces.cli.oneshot.backfill_best_copy_urls [--dry-run] [--batch 5000]
+    uv run python -m interfaces.cli.oneshot.backfill_best_copy_urls [--dry-run] [--batch 5000]
 """
 
 from __future__ import annotations

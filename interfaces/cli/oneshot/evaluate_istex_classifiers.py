@@ -12,7 +12,7 @@ Mesure, pour chaque classifieur :
 Un domaine HAL de premier niveau couvre un ou plusieurs domains OpenAlex (`_HAL_TO_OPENALEX`).
 
 Usage :
-    python -m interfaces.cli.oneshot.evaluate_istex_classifiers --sample sample.json --output istex.json
+    uv run python -m interfaces.cli.oneshot.evaluate_istex_classifiers --sample sample.json --output istex.json
 """
 
 from __future__ import annotations

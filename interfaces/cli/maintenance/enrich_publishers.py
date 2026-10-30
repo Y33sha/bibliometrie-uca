@@ -6,7 +6,7 @@ Hors pipeline, lancé à la demande. Seuls les éditeurs sans pays reçoivent ce
 Le circuit-breaker de source arrête la boucle quand OpenAlex est à bout de budget (429). Le reste est repris à l'exécution suivante.
 
 Usage :
-    python -m interfaces.cli.maintenance.enrich_publishers [--limit N] [--dry-run]
+    uv run python -m interfaces.cli.maintenance.enrich_publishers [--limit N] [--dry-run]
 """
 
 from __future__ import annotations

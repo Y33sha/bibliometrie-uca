@@ -10,8 +10,8 @@ Le script recalcule chaque valeur avec la fonction du pipeline et écrit celles 
 La phase `persons` suivante resynchronise les formes de noms des personnes. Idempotent.
 
 Usage :
-    python -m interfaces.cli.oneshot.recompute_normalized_texts            # exécution
-    python -m interfaces.cli.oneshot.recompute_normalized_texts --dry-run  # rapport seul
+    uv run python -m interfaces.cli.oneshot.recompute_normalized_texts            # exécution
+    uv run python -m interfaces.cli.oneshot.recompute_normalized_texts --dry-run  # rapport seul
 """
 
 from __future__ import annotations

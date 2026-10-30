@@ -4,7 +4,7 @@
 Le fichier alimente `openapi-typescript`, qui génère les types du frontend, sans API lancée. Le script npm `types:gen` (`interfaces/frontend/package.json`) l'appelle.
 
 Usage :
-    python -m interfaces.cli.dev.dump_openapi [output_path]
+    uv run python -m interfaces.cli.dev.dump_openapi [output_path]
 
 Défaut de `output_path` : interfaces/frontend/openapi.json
 """

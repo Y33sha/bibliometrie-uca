@@ -48,7 +48,7 @@
 - Pose tes questions en **texte libre**. Pas de QCM à choix limités.
 - Gère les **commits** git. Fais un commit à chaque changement cohérent (au minimum une fois par phase de chantier, voire à chaque item d'une phase).
 - Commite **par chemin** pour éviter que ton travail soit commité par une autre instance parallèle. Si un hook pre-commit est en cours, attends 5 secondes et réessaie.
-- Laura applique les migrations Alembic. Dès qu'une migration est appliquée, **régénère le snapshot du schéma** (`python -m interfaces.cli.dev.dump_schema`) et commite `infrastructure/db/schema.sql` avec la migration.
+- Laura applique les migrations Alembic. Dès qu'une migration est appliquée, **régénère le snapshot du schéma** (`uv run python -m interfaces.cli.dev.dump_schema`) et commite `infrastructure/db/schema.sql` avec la migration.
 - **Ne fais PAS tourner toute la suite de tests** avant chaque commit (sauf les tests directement concernés par tes modifs). Les hooks et la CI sont là pour ça.
 
 ## Phases du pipeline
@@ -87,8 +87,8 @@ Les quatre dernières sont des enrichissements, hors résolution d'entités : `-
 - Architecture en couches DDD : `domain/` (règles et value objects, zéro I/O), `application/` (services dans `application/services/`), `infrastructure/` (adaptateurs SQL, settings), `interfaces/` (adaptateurs entrants : `interfaces/api/` pour FastAPI, `interfaces/frontend/` pour SvelteKit, `interfaces/cli/` pour les scripts). Le pipeline est un paquet racine, hors des couches : `pipeline/`.
 - Frontend : SvelteKit (Svelte 5), routes dans `interfaces/frontend/src/routes/`
 - Pipeline : paquet racine `pipeline/`, `ingestion/` par source, `transformation/` par domaine (`structures/`, `publishing/`, `publications/`, `persons/`), modules du run dans `runtime/` ; chaque phase expose `build()` dans son module ; orchestrateur `pipeline/run.py`, installé comme commande `run_pipeline`
-- Migrations Alembic dans `alembic/versions/` (créer : `alembic revision --autogenerate -m "..."` ; appliquer : `alembic upgrade head`, ou `migrate_all` pour la base par défaut et chaque instance ; rollback : `alembic downgrade -1`). Snapshot `infrastructure/db/schema.sql` régénéré par `python -m interfaces.cli.dev.dump_schema`.
-- Tests backend : `python -m pytest tests/ -v` (nécessite `export DB_OWNER_PASSWORD=...`)
+- Migrations Alembic dans `alembic/versions/` (créer : `alembic revision --autogenerate -m "..."` ; appliquer : `alembic upgrade head`, ou `migrate_all` pour la base par défaut et chaque instance ; rollback : `alembic downgrade -1`). Snapshot `infrastructure/db/schema.sql` régénéré par `uv run python -m interfaces.cli.dev.dump_schema`.
+- Tests backend : `uv run python -m pytest tests/ -v` (nécessite `export DB_OWNER_PASSWORD=...`)
 - Tests frontend : `cd interfaces/frontend && npm run check` (svelte-check, échoue sur les erreurs de types)
 - Lancement dev : `bash start.sh [<instance>]` (uvicorn sur `API_PORT`, vite sur `FRONT_PORT`, réglés dans `.env`)
 - Envoi de la branche : `ship`, fonction shell du poste (`~/.bashrc`), pousse, ouvre la pull request et arme la fusion automatique par merge commit. Le push déclenche les contrôles pre-push.

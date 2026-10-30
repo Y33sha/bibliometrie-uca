@@ -4,8 +4,8 @@
 Ces fiches ont pris le découpage inversé de la contribution source qui les a créées. Leurs contributions sources ont le découpage corrigé : supprimées, les fiches laissent leurs contributions sources orphelines (`ON DELETE SET NULL`), et le run suivant les rattache ou recrée la personne d'après ce découpage. Sont épargnées les personnes du référentiel RH et celles qui portent une curation : épinglage, identifiant confirmé, verdict sur une forme de nom.
 
 Usage :
-    python -m interfaces.cli.oneshot.delete_initials_last_name_persons            # exécution
-    python -m interfaces.cli.oneshot.delete_initials_last_name_persons --dry-run  # rapport seul
+    uv run python -m interfaces.cli.oneshot.delete_initials_last_name_persons            # exécution
+    uv run python -m interfaces.cli.oneshot.delete_initials_last_name_persons --dry-run  # rapport seul
 """
 
 from __future__ import annotations

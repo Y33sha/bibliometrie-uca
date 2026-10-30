@@ -2,7 +2,7 @@
 """Génère le seed d'un établissement à partir de ROR : l'établissement, ses structures filles, leurs formes de noms et le périmètre qui les réunit.
 
 Usage :
-    python -m interfaces.cli.dev.seed_from_ror 04vfs2w97 --code lorraine --output instances/lorraine/seed.sql
+    uv run python -m interfaces.cli.dev.seed_from_ror 04vfs2w97 --code lorraine --output instances/lorraine/seed.sql
 
 La racine est une université. Une fille ROR devient un laboratoire (`facility`), une école (`education`) ou un CHU (`healthcare`). Les filles d'un autre type sont écartées et listées. Le nom d'une structure est le nom affiché par ROR, ou son premier libellé de plusieurs mots quand le nom affiché tient en un mot. Les formes de noms viennent des libellés, alias et acronymes ROR. Une forme d'un seul mot exige une frontière de mot et, pour une fille, la présence de la racine dans l'adresse. L'identifiant OpenAlex de la racine est lu dans OpenAlex d'après son ROR. La collection HAL de chaque structure est déduite des dépôts HAL (`fetch_hal_collection`). Les RNSR et les identifiants WoS, ScanR et theses.fr restent à renseigner.
 """

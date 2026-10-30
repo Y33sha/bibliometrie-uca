@@ -4,7 +4,7 @@
 Une telle redirection, auto-redirection comprise, fait échouer la dissolution suivante de la même publication par la réconciliation.
 
 Usage :
-    python -m interfaces.cli.oneshot.repair_live_publication_redirects [--dry-run]
+    uv run python -m interfaces.cli.oneshot.repair_live_publication_redirects [--dry-run]
 """
 
 import argparse

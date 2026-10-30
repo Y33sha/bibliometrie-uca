@@ -2,7 +2,7 @@
 """Régénère `infrastructure/db/schema.sql` depuis la base courante.
 
 Usage :
-    python -m interfaces.cli.dev.dump_schema
+    uv run python -m interfaces.cli.dev.dump_schema
 
 `schema.sql` est un instantané du schéma, pour la relecture et pour monter vite la base des tests d'intégration (`tests/integration/conftest.py`). Les migrations Alembic (`alembic/versions/`) font foi.
 
