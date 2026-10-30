@@ -30,7 +30,7 @@ class SerialSummary(NamedTuple):
 # Type modifiable par le pipeline : absent des champs saisis à la main.
 TYPE_NOT_MANUAL = ~(literal(ManualField.SERIAL_TYPE.value) == any_(serials.c.manual_fields))
 # Modèle OA modifiable par le pipeline : absent des champs saisis à la main.
-_OA_MODEL_NOT_MANUAL = ~(literal(ManualField.OA_MODEL.value) == any_(serials.c.manual_fields))
+OA_MODEL_NOT_MANUAL = ~(literal(ManualField.OA_MODEL.value) == any_(serials.c.manual_fields))
 
 _SERIAL_SUMMARIES = text(f"""
     SELECT j.id, j.title, p.name AS publisher, {active_issns("j.id")} AS issns
@@ -163,7 +163,7 @@ class SerialStore:
                 # Un modèle OA saisi à la main reste, même vide.
                 oa_model=case(
                     (
-                        _OA_MODEL_NOT_MANUAL,
+                        OA_MODEL_NOT_MANUAL,
                         func.coalesce(
                             serials.c.oa_model, literal(oa_model, serials.c.oa_model.type)
                         ),

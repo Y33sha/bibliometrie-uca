@@ -1,4 +1,4 @@
-"""Import du dump CSV du DOAJ, qui fait autorité sur `is_in_doaj`, et typage en revue des entrées présentes dans le DOAJ.
+"""Import du dump CSV du DOAJ, qui fait autorité sur `is_in_doaj`, typage en revue des entrées présentes dans le DOAJ, et classement des revues diamant.
 
 Chaque ligne du dump est rattachée à sa revue par ISSN. La revue reçoit la ligne nettoyée (`doaj_payload`), la date de l'import et `is_in_doaj`, effacé d'abord sur toutes les revues.
 
@@ -12,14 +12,14 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import NamedTuple
 
-from sqlalchemy import Connection, func, select, update
+from sqlalchemy import Connection, and_, func, not_, select, update
 
 from domain.dates import date_to_french
 from domain.normalize import sanitize_optional_text
 from domain.pipeline_runs import PhaseStatus
 from domain.publications.identifiers import ISSN
 from domain.serials.issns import IssnStatus
-from domain.serials.serial import SerialType
+from domain.serials.serial import OaModel, SerialType
 from domain.types import JsonValue
 from infrastructure.db.scalars import scalar_datetime_or_none
 from infrastructure.db.tables import serial_issns, serials
@@ -28,7 +28,7 @@ from pipeline.runtime.observability.log_format import BRANCH, quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import waiting
 from pipeline.runtime.observability.signals import signal_source_unavailable
-from pipeline.transformation.publishing.serials.store import TYPE_NOT_MANUAL
+from pipeline.transformation.publishing.serials.store import OA_MODEL_NOT_MANUAL, TYPE_NOT_MANUAL
 
 LABEL = "Import du DOAJ"
 """Libellé de la sous-étape dans le journal de la phase."""
@@ -105,6 +105,37 @@ def type_doaj_serials_as_journals(conn: Connection) -> int:
         .where(serials.c.is_in_doaj, serials.c.serial_type == SerialType.UNKNOWN, TYPE_NOT_MANUAL)
         .values(serial_type=SerialType.JOURNAL)
     ).rowcount
+
+
+_NO_FEE_IN_DOAJ = and_(
+    serials.c.is_in_doaj,
+    serials.c.doaj_payload["APC"].astext == "No",
+    serials.c.doaj_payload["Has other fees"].astext == "No",
+)
+"""Revue présente dans le DOAJ, sans APC ni autres frais."""
+
+
+def model_doaj_serials_as_diamond(conn: Connection) -> int:
+    """Classe `diamond` les revues du DOAJ sans APC ni autres frais, et `full_oa` les revues `diamond` hors de ce cas. Un modèle saisi à la main reste en l'état. Renvoie le nombre de revues modifiées."""
+    to_diamond = conn.execute(
+        update(serials)
+        .where(
+            _NO_FEE_IN_DOAJ,
+            serials.c.oa_model.is_distinct_from(OaModel.DIAMOND),
+            OA_MODEL_NOT_MANUAL,
+        )
+        .values(oa_model=OaModel.DIAMOND)
+    ).rowcount
+    to_full_oa = conn.execute(
+        update(serials)
+        .where(
+            serials.c.oa_model == OaModel.DIAMOND,
+            not_(_NO_FEE_IN_DOAJ),
+            OA_MODEL_NOT_MANUAL,
+        )
+        .values(oa_model=OaModel.FULL_OA)
+    ).rowcount
+    return to_diamond + to_full_oa
 
 
 def doaj_last_import_at(conn: Connection) -> datetime | None:
@@ -194,7 +225,7 @@ def run_enrich_serials_from_doaj(
     refresh_after_days: int,
     download_dump: DownloadDump,
 ) -> PhaseMetrics:
-    """Télécharge et importe le dump DOAJ quand le dernier import date de plus de `refresh_after_days` jours, puis type en revue les entrées présentes dans le DOAJ (`type_doaj_serials_as_journals`).
+    """Télécharge et importe le dump DOAJ quand le dernier import date de plus de `refresh_after_days` jours. Type ensuite en revue les entrées présentes dans le DOAJ (`type_doaj_serials_as_journals`) et classe les revues diamant (`model_doaj_serials_as_diamond`).
 
     Un dump inaccessible laisse le référentiel inchangé et signale la source indisponible : la phase continue, l'import est repris au run suivant.
     """
@@ -202,6 +233,7 @@ def run_enrich_serials_from_doaj(
         conn, logger, refresh_after_days=refresh_after_days, download_dump=download_dump
     )
     type_doaj_serials_as_journals(conn)
+    model_doaj_serials_as_diamond(conn)
     return metrics
 
 

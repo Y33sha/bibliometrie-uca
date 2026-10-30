@@ -1,7 +1,7 @@
 # STATUS: oneshot (2026-10-30)
 """Simulation du statut open access des publications du périmètre, tiré des copies ouvertes et relevé par le verdict d'Unpaywall.
 
-Le plancher d'une publication vient de sa meilleure copie ouverte. Une copie d'archive ou de serveur de preprints donne `green`. Une autre copie ouverte est comptée côté éditeur : le modèle de la revue décide. Une revue `full_oa` donne `gold`, ou `diamond` si le DOAJ indique ni APC ni autres frais. Une revue `subscription` donne `hybrid` avec une licence ouverte, `bronze` sans. Le verdict d'Unpaywall relève ce plancher, jamais ne l'abaisse. Un `gold` d'Unpaywall devient `diamond` aux mêmes conditions DOAJ.
+Le plancher d'une publication vient de sa meilleure copie ouverte. Une copie d'archive ou de serveur de preprints donne `green`. Une autre copie ouverte est comptée côté éditeur : le modèle de la revue décide. Une revue `full_oa` donne `gold`, une revue `diamond` donne `diamond`. Une revue `subscription` donne `hybrid` avec une licence ouverte, `bronze` sans. Le verdict d'Unpaywall relève ce plancher, jamais ne l'abaisse. Un `gold` d'Unpaywall dans une revue `diamond` devient `diamond`.
 
 Chaque étape est rejouable séparément :
 
@@ -35,8 +35,7 @@ _OPEN_LICENSE_PREFIXES = ("cc", "public_domain", "pd")
 
 _PUBLICATIONS = text("""
     SELECT p.id, p.oa_status::text AS cur, p.doc_type::text AS doc_type, u.oa_status::text AS upw,
-           s.oa_model::text AS oa_model,
-           s.doaj_payload ->> 'APC' AS apc, s.doaj_payload ->> 'Has other fees' AS fees
+           s.oa_model::text AS oa_model
     FROM publications p
     LEFT JOIN sources.unpaywall u ON u.doi = p.doi::text
     LEFT JOIN serials s ON s.id = p.serial_id
@@ -65,10 +64,6 @@ def _rank_max(*statuses: str) -> str:
     return max(statuses, key=lambda s: OA_RANK[s])
 
 
-def _no_fee_doaj(apc: str | None, fees: str | None) -> bool:
-    return apc == "No" and fees == "No"
-
-
 def _floor(p, copies: Sequence[tuple[bool, bool]]) -> str:
     """Renvoie le statut tiré des copies ouvertes `(archive, licence ouverte)` et du modèle de la revue."""
     best = "closed"
@@ -76,8 +71,10 @@ def _floor(p, copies: Sequence[tuple[bool, bool]]) -> str:
         best = "green"
     publisher_side = [licensed for archive, licensed in copies if not archive]
     if publisher_side:
-        if p.oa_model == "full_oa":
-            best = "diamond" if _no_fee_doaj(p.apc, p.fees) else "gold"
+        if p.oa_model == "diamond":
+            best = "diamond"
+        elif p.oa_model == "full_oa":
+            best = "gold"
         elif p.oa_model == "subscription":
             best = "hybrid" if any(publisher_side) else "bronze"
         else:
@@ -90,7 +87,7 @@ def _simulated(p, copies: Sequence[tuple[bool, bool]]) -> str:
     if not copies and p.upw is None:
         return "unknown" if p.cur == "unknown" else "closed"
     verdict = p.upw or "closed"
-    if verdict == "gold" and _no_fee_doaj(p.apc, p.fees):
+    if verdict == "gold" and p.oa_model == "diamond":
         verdict = "diamond"
     return _rank_max(_floor(p, copies), verdict)
 

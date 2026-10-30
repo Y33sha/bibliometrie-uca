@@ -1,6 +1,5 @@
 """Phase `metadata_correction` : la valeur corrigée est écrite en place, la valeur d'origine est gardée dans `corrections`."""
 
-import json
 import logging
 from datetime import timedelta
 from functools import partial
@@ -347,15 +346,9 @@ def _oa_status(conn, source_record_id: int) -> str:
 
 def test_diamond_follows_the_journal(sa_sync_conn):
     conn = sa_sync_conn
-    doaj_free = insert_serial(conn, "Sans frais", oa_model="full_oa", is_in_doaj=True)
-    conn.execute(
-        text("UPDATE serials SET doaj_payload = CAST(:p AS jsonb) WHERE id = :id"),
-        {"p": json.dumps({"APC": "No", "Has other fees": "No"}), "id": doaj_free},
-    )
-    marked = insert_serial(conn, "Marquée", oa_model="diamond")
+    diamond = insert_serial(conn, "Diamant", oa_model="diamond")
     paying = insert_serial(conn, "Payante", oa_model="full_oa")
-    gold_in_doaj = _source_record(conn, source_id="W-d1", oa_status="gold", serial_id=doaj_free)
-    gold_in_marked = _source_record(conn, source_id="W-d2", oa_status="gold", serial_id=marked)
+    gold_in_diamond = _source_record(conn, source_id="W-d2", oa_status="gold", serial_id=diamond)
     diamond_in_paying = _source_record(
         conn, source_id="W-d3", oa_status="diamond", serial_id=paying
     )
@@ -363,8 +356,7 @@ def test_diamond_follows_the_journal(sa_sync_conn):
 
     _apply(conn)
 
-    assert _oa_status(conn, gold_in_doaj) == "diamond"
-    assert _oa_status(conn, gold_in_marked) == "diamond"
+    assert _oa_status(conn, gold_in_diamond) == "diamond"
     assert _oa_status(conn, diamond_in_paying) == "gold"
     assert _oa_status(conn, diamond_without_journal) == "gold"
 

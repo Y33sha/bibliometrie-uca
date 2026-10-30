@@ -460,9 +460,8 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
         "applies_to": {"oa_status": "embargoed", "embargo_expired": True},
         "applies_correction": {"oa_status": "green"},
     },
-    # Le diamant est une propriété de la revue : marquée `diamond`, ou dans le DOAJ sans APC ni autres frais.
+    # Le diamant est une propriété de la revue (`oa_model = diamond`).
     # Un article `gold` ou `hybrid` d'une revue diamant est `diamond`. Un `diamond` d'OpenAlex hors revue diamant est `gold`.
-    # Ces règles précèdent `HYBRID_FULL_OA_TO_GOLD` : une revue diamant classée full OA reste diamant.
     MetadataCorrectionRule.GOLD_DIAMOND_JOURNAL_TO_DIAMOND: {
         "applies_to": {"oa_status": "gold", "journal_diamond": True},
         "applies_correction": {"oa_status": "diamond"},

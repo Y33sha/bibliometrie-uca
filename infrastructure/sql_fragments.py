@@ -75,12 +75,8 @@ DETACHED_CONTRIBUTION = "person_id = NULL, resolution_mode = NULL"
 
 
 def diamond_journal_sql(serial: str = "j") -> str:
-    """Renvoie la condition vraie quand la revue aliasée `serial` est diamant : marquée `diamond`, ou présente dans le DOAJ sans APC ni autres frais. NULL quand la revue est absente d'une jointure externe."""
-    return (
-        f"({serial}.oa_model = '{OaModel.DIAMOND.value}' OR ({serial}.is_in_doaj"
-        f" AND {serial}.doaj_payload->>'APC' = 'No'"
-        f" AND {serial}.doaj_payload->>'Has other fees' = 'No'))"
-    )
+    """Renvoie la condition vraie quand la revue aliasée `serial` est diamant. NULL quand la revue est absente d'une jointure externe."""
+    return f"({serial}.oa_model = '{OaModel.DIAMOND.value}')"
 
 
 def is_laboratory(structure: str = "s") -> str:

@@ -43,8 +43,8 @@ class OaModel(StrEnum):
 
     SUBSCRIPTION = "subscription"
     FULL_OA = "full_oa"
-    # Revue en open access sans frais de publication, marquée à la main. Une revue du DOAJ sans APC ni autres frais est diamant sans ce marquage.
     DIAMOND = "diamond"
+    """Revue en open access sans frais de publication : présente dans le DOAJ sans APC ni autres frais, ou marquée à la main."""
     REPOSITORY = "repository"
 
 
@@ -53,7 +53,7 @@ OA_MODELS: tuple[OaModel, ...] = tuple(OaModel)
 # Libellés français des modèles, servis à l'interface par `/api/serials/oa-models`.
 OA_MODEL_LABELS_FR: dict[OaModel, str] = {
     OaModel.SUBSCRIPTION: "Abonnement",
-    OaModel.FULL_OA: "Full OA (gold/diamond)",
+    OaModel.FULL_OA: "Full OA (gold)",
     OaModel.DIAMOND: "Diamant",
     OaModel.REPOSITORY: "Archive / dépôt",
 }
