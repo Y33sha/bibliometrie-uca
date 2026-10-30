@@ -105,7 +105,7 @@ Les affiliations des créateurs sont du texte, parfois avec un ROR. Elles devien
 
 ### DOI liés et concept/version
 
-Un entrepôt comme Zenodo attribue un DOI distinct à chaque version d'un dépôt, plus un **DOI concept** stable couvrant toutes les versions. Le champ `relatedIdentifiers` expose ces liens, et la relation `IsVersionOf` pointe d'une version vers son concept. La phase [`metadata_correction`](../pipeline/06-metadata-correction.md) s'en sert pour faire converger versions et concept vers une seule publication.
+Un entrepôt comme Zenodo attribue un DOI distinct à chaque version d'un dépôt, plus un **DOI concept** stable couvrant toutes les versions. Le champ `relatedIdentifiers` expose ces liens, et la relation `IsVersionOf` pointe d'une version vers son concept. La phase [`metadata_correction`](../pipeline/06-metadata-correction.md) s'en sert pour réunir les versions et le concept dans une seule publication.
 
 Les DOI apparentés (versions, formes, parties, suppléments) deviennent des identifiants liés, que la phase `fetch_missing` cherche.
 

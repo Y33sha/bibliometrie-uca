@@ -55,9 +55,9 @@ Les sources donnent le même titre dans 89,7 % des cas. Ici, l'éditeur a mis le
 | ScanR | 2025 | `conference_paper` | absente | présent | absent |
 | Web of Science | 2025 | `conference_paper` | `English` | présent | 1 084 caractères |
 
-**Année.** Les sources s'accordent dans 88,6 % des cas. Quand elles divergent, l'écart est d'une seule année quatre fois sur cinq. Les deux dates en cause sont la mise en ligne et la parution.
+**Année.** Les sources s'accordent dans 88,6 % des cas. Quand elles diffèrent, l'écart est d'une seule année quatre fois sur cinq. Les deux dates en cause sont la mise en ligne et la parution.
 
-**Type de document.** Le champ le plus divergent : 60,7 % d'accord. Chaque source a sa nomenclature — `proceedings-article` pour Crossref, `COMM` pour HAL, `conference-paper` pour OpenAlex, `proceedings` pour ScanR, `Proceedings Paper` pour Web of Science. La phase `normalize` les ramène toutes à un vocabulaire commun, ici `conference_paper`.
+**Type de document.** Le champ où les sources s'accordent le moins : 60,7 % d'accord. Chaque source a sa nomenclature — `proceedings-article` pour Crossref, `COMM` pour HAL, `conference-paper` pour OpenAlex, `proceedings` pour ScanR, `Proceedings Paper` pour Web of Science. La phase `normalize` les ramène toutes à un vocabulaire commun, ici `conference_paper`.
 
 **Langue.** Trois sources sur cinq la renseignent, dans deux formats.
 
