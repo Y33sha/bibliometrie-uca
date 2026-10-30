@@ -16,7 +16,7 @@ Un service reçoit ses repositories et ses recalculs à la construction. Une fab
 
 Un port est un `Protocol` déclaré par `application/` et implémenté par un adaptateur d'`infrastructure/` ou par le pipeline. Deux familles :
 
-- **Repositories** (`ports/repositories/`) — chargent et persistent un agrégat du domaine, ou lisent et écrivent directement leurs tables quand il n'y en a pas (adresses, configuration, journal d'audit…).
+- **Repositories** (`ports/repositories/`) — chargent et persistent une entité du domaine, ou lisent et écrivent directement leurs tables quand il n'y en a pas (adresses, configuration, journal d'audit…).
 - **Recalculs du pipeline** (`ports/pipeline/`) — recalculs ciblés que les services déclenchent après une édition. `interfaces/api/deps.py` les remplit depuis `pipeline/public.py`.
 
 Les lectures de l'API ne passent pas par `application/` : chaque lecture est un adaptateur de `infrastructure/read_models/`, qui déclare ses modèles de réponse.

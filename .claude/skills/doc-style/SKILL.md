@@ -43,10 +43,11 @@ allowed-tools: Read, Edit, Bash, Grep, Glob
 - **Pronoms « y » et « en ».** Ne les employer que si l'antécédent est le groupe nominal qui précède immédiatement, dans la même phrase. Sinon, répéter le nom.
 - **Phrases négatives.** Les remplacer chaque fois que possible par des phrases positives. Si une phrase décrit ce que le code ne fait pas ou plus, la supprimer. Eviter les négations multiples.
 - **Un mot par notion.** Ne pas chercher l'élégance littéraire. Ne pas varier le vocabulaire pour éviter une répétition : en documentation technique, répéter le même mot est un service rendu au lecteur, pas une faiblesse de style.
-- **Vocabulaire du code.** Employer les mots de la documentation des données (`docs/donnees/`) et du pipeline (`docs/pipeline/01-vue-d-ensemble.md`). « Notice » désigne seulement une notice du Sudoc. `styles/Maison/Lexique.yml` signale les mots écartés hors contexte. Trois mots dépendent du contexte et restent au contrôle manuel :
+- **Vocabulaire du code.** Employer les mots de la documentation des données (`docs/donnees/`) et du pipeline (`docs/pipeline/01-vue-d-ensemble.md`). « Notice » désigne seulement une notice du Sudoc. `styles/Maison/Lexique.yml` signale les mots écartés hors contexte. Quatre mots dépendent du contexte et restent au contrôle manuel :
   - « document », « enregistrement » seul, pour une ligne de `source_records` → « enregistrement source » ;
   - « signature » désigne seulement la chaîne d'adresse ; pour une ligne de `source_contributions` → « contribution source » ;
-  - « extraction » pour la collecte des sources → « moissonnage ».
+  - « extraction » pour la collecte des sources → « moissonnage » ;
+  - « agrégat » au sens du DDD → « entité ». Au sens SQL (`COUNT`, `SUM`), le mot reste.
 - **Simplicité et précision.** Remplacer les mots vagues par des équivalents précis ("la source atteste d'un document" => "le document est présent dans la source"; "la source ignore le document" => "le document est absent de la source").
 
 ## Alimentation

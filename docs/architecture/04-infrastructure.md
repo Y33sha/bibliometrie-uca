@@ -15,7 +15,7 @@
 
 ## Familles d'adaptateurs
 
-Les adaptateurs de `repositories/` construisent des objets du domaine : ils hydratent un agrégat, garantissent ses invariants à l'écriture, et exposent des méthodes métier (`find_by_id`, `merge_into`, `save`). Le passage d'une ligne SQL à l'entité se fait dans une fonction libre `_<entité>_from_row`, au sein du module du repository.
+Les adaptateurs de `repositories/` construisent des objets du domaine : ils chargent une entité, garantissent ses invariants à l'écriture, et exposent des méthodes métier (`find_by_id`, `merge_into`, `save`). Le passage d'une ligne SQL à l'entité se fait dans une fonction libre `_<entité>_from_row`, au sein du module du repository.
 
 `read_models/` contient les lectures de l'API, sans hydratation : un paquet par lecture, avec sa classe (`queries.py`) et ses modèles de réponse (`models.py`). Chaque méthode de la classe contient sa requête. Un paquet découpé par thème déclare une classe par module, que `queries.py` réunit par héritage. Les routers reçoivent la classe directement, sans port.
 
