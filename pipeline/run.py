@@ -125,13 +125,20 @@ def _install_sigterm_handler() -> None:
     signal.signal(signal.SIGTERM, _sigterm_raises_keyboard_interrupt)
 
 
+class _NamedFields(dict[str, str]):
+    """Champs de libellé sans valeur : chacun s'affiche sous la forme `<nom>`."""
+
+    def __missing__(self, key: str) -> str:
+        return f"<{key}>"
+
+
 def _catalogue_des_phases() -> str:
-    """Renvoie les phases dans l'ordre d'exécution, chacune résumée par la première ligne de la docstring de sa fonction `build`."""
-    width = max(len(name) for name, _ in PHASES)
+    """Renvoie les phases dans l'ordre d'exécution, chacune avec son libellé (`PHASE_LABELS`)."""
+    width = max(len(name) for name in PHASE_NAMES)
     lines = ["Phases, dans l'ordre :"]
-    for i, (name, build) in enumerate(PHASES, 1):
-        doc = build.__doc__.strip().split("\n")[0] if build.__doc__ else ""
-        lines.append(f"  {i:2d}. {name:{width}s}  {doc}")
+    for i, name in enumerate(PHASE_NAMES, 1):
+        label = PHASE_LABELS[name].format_map(_NamedFields())
+        lines.append(f"  {i:2d}. {name:{width}s}  {label}")
     return "\n".join(lines)
 
 

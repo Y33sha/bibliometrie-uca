@@ -335,11 +335,13 @@ class TestMain:
         assert executees == ["persons"]
 
     def test_l_aide_porte_le_catalogue_des_phases(self):
-        """L'aide de `--help` nomme chaque phase et la résume."""
+        """L'aide de `--help` nomme chaque phase, suivie de son libellé."""
         catalogue = run_pipeline._catalogue_des_phases()
 
         for nom in run_pipeline.PHASE_NAMES:
-            assert nom in catalogue
+            ligne = next(line for line in catalogue.splitlines() if f" {nom} " in line)
+            assert ligne.split(nom, 1)[1].strip()
+        assert "Recherche des documents non revus depuis <delai>" in catalogue
 
     def test_pipeline_deja_en_cours(self, monkeypatch, capsys):
         """Deux pipelines simultanés se bloqueraient en base : le second refuse de démarrer."""

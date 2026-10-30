@@ -176,7 +176,7 @@ def find_or_create_monograph(
     serial_id: int | None = None,
     repo: MonographStore,
 ) -> int | None:
-    """Trouve ou crée une monographie. Renvoie son id, ou `None` sans ISBN connu ni titre.
+    """Trouve ou crée une monographie. Renvoie son id, ou `None` sans ISBN connu ni titre, ou si plusieurs volumes de ce titre sont candidats.
 
     Recherche par ISBN, papier ou électronique, puis par titre normalisé. `choose_monograph` choisit parmi les monographies de ce titre, selon l'éditeur et les ISBN. La monographie trouvée reçoit les champs qui lui manquent.
 
