@@ -1,6 +1,6 @@
 """Synchronisation des contributions sources d'un enregistrement source renormalisé avec celles en base.
 
-La renormalisation d'un enregistrement source rapproche ses contributions sources entrantes de ses contributions sources en base. Une contribution source rapprochée garde son identifiant, et donc sa personne et son épinglage ; elle est réécrite seulement si son empreinte change. Les contributions sources sans correspondant sont insérées ou supprimées.
+La renormalisation d'un enregistrement source retrouve en base ses contributions sources entrantes. Une contribution source retrouvée garde son identifiant, et donc sa personne et son épinglage ; elle est réécrite seulement si son empreinte change. Les contributions sources sans correspondant sont insérées ou supprimées.
 """
 
 from collections import defaultdict
@@ -35,7 +35,7 @@ class IncomingSourceContribution(NamedTuple):
 class SourceContributionSyncPlan:
     """Ce que la renormalisation fait des contributions sources d'un enregistrement source.
 
-    `updates` : couples (identifiant en base, clé entrante) dont l'empreinte change. `kept` : identifiants en base rapprochés et inchangés. `inserts` : clés entrantes sans correspondant. `deletes` : identifiants en base sans correspondant. `regroup` : une contribution source est insérée ou supprimée, ou change de position ou de rôles. Les contributions sources de la publication sont alors à regrouper.
+    `updates` : couples (identifiant en base, clé entrante) dont l'empreinte change. `kept` : identifiants en base retrouvés et inchangés. `inserts` : clés entrantes sans correspondant. `deletes` : identifiants en base sans correspondant. `regroup` : une contribution source est insérée ou supprimée, ou change de position ou de rôles. Les contributions sources de la publication sont alors à regrouper.
     """
 
     updates: tuple[tuple[int, int], ...]
@@ -48,9 +48,9 @@ class SourceContributionSyncPlan:
 def plan_source_contribution_sync(
     stored: Sequence[StoredSourceContribution], incoming: Sequence[IncomingSourceContribution]
 ) -> SourceContributionSyncPlan:
-    """Rapproche les contributions sources entrantes de celles en base.
+    """Retrouve en base les contributions sources entrantes.
 
-    Des informations du contributeur présentes dans une seule contribution source de chaque côté rapprochent les deux. Répétées, elles rapprochent les contributions sources de même position d'auteur.
+    Des informations du contributeur présentes dans une seule contribution source de chaque côté suffisent à la correspondance. Répétées, elles valent seulement entre contributions sources de même position d'auteur.
     """
     stored_by_contributor_information: dict[Hashable, list[StoredSourceContribution]] = defaultdict(
         list

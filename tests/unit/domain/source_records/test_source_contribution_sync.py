@@ -42,8 +42,8 @@ class TestPlanSourceContributionSync:
             updates=((11, 0),), kept=(), inserts=(), deletes=(10,), regroup=True
         )
 
-    def test_identite_repetee_departagee_par_position(self):
-        """Deux « Z. Xu » sur la même publication : rapprochés par leur position."""
+    def test_informations_repetees_departagees_par_position(self):
+        """Deux « Z. Xu » sur la même publication : retrouvés par leur position."""
         plan = _plan(
             [(10, 2, "xu z", "h2"), (11, 5, "xu z", "h5")],
             [(2, "xu z", "h2"), (5, "xu z", "h5"), (7, "dupont", "h7")],
@@ -52,7 +52,7 @@ class TestPlanSourceContributionSync:
             updates=(), kept=(10, 11), inserts=(7,), deletes=(), regroup=True
         )
 
-    def test_identite_repetee_sans_position_commune(self):
+    def test_informations_repetees_sans_position_commune(self):
         plan = _plan(
             [(10, 2, "xu z", "h2"), (11, 5, "xu z", "h5")], [(3, "xu z", "h3"), (6, "xu z", "h6")]
         )
@@ -60,20 +60,20 @@ class TestPlanSourceContributionSync:
             updates=(), kept=(), inserts=(3, 6), deletes=(10, 11), regroup=True
         )
 
-    def test_identite_unique_en_base_repetee_a_l_arrivee(self):
+    def test_informations_uniques_en_base_repetees_a_l_arrivee(self):
         plan = _plan([(10, 2, "xu z", "h2")], [(2, "xu z", "h2"), (4, "xu z", "h4")])
         assert plan == SourceContributionSyncPlan(
             updates=(), kept=(10,), inserts=(4,), deletes=(), regroup=True
         )
 
-    def test_identite_differente_ne_rapproche_rien(self):
+    def test_informations_differentes_sans_correspondance(self):
         """Le nom normalisé fait partie des informations du contributeur : un nom corrigé donne une autre contribution source."""
         plan = _plan([(10, 0, "bartoli adrien 1977", "h1")], [(0, "bartoli adrien", "h1")])
         assert plan == SourceContributionSyncPlan(
             updates=(), kept=(), inserts=(0,), deletes=(10,), regroup=True
         )
 
-    def test_contribution_source_sans_position_rapprochee_par_identifiant(self):
+    def test_contribution_source_sans_position_retrouvee_par_identifiant(self):
         """Un directeur de thèse est sans position d'auteur : ses informations du contributeur suffisent."""
         plan = plan_source_contribution_sync(
             [
@@ -89,7 +89,7 @@ class TestPlanSourceContributionSync:
             updates=(), kept=(10, 11), inserts=(), deletes=(), regroup=False
         )
 
-    def test_identite_repetee_sans_position_ne_rapproche_rien(self):
+    def test_informations_repetees_sans_position_sans_correspondance(self):
         plan = plan_source_contribution_sync(
             [
                 StoredSourceContribution(10, None, "dupont", "h1"),

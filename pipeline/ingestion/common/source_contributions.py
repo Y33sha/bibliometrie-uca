@@ -109,7 +109,7 @@ def write_source_contributions(
 ) -> None:
     """Synchronise les contributions sources d'un enregistrement source avec les auteurs lus (`plan_source_contribution_sync`).
 
-    Une contribution source rapprochée garde son identifiant, donc sa personne et sa confirmation. Elle est réécrite, adresses et ROR compris, seulement si son empreinte change. Les contributions sources sans correspondant sont insérées ou supprimées. Une insertion, une suppression, ou un changement de position ou de rôles marque la publication de l'enregistrement source pour le groupement des auteurs. L'enregistrement source reçoit son nombre de contributions sources d'auteur individuelles et de noms complets distincts parmi elles (`is_individual_author`).
+    Une contribution source retrouvée en base garde son identifiant, donc sa personne et sa confirmation. Elle est réécrite, adresses et ROR compris, seulement si son empreinte change. Les contributions sources sans correspondant sont insérées ou supprimées. Une insertion, une suppression, ou un changement de position ou de rôles marque la publication de l'enregistrement source pour le groupement des auteurs. L'enregistrement source reçoit son nombre de contributions sources d'auteur individuelles et de noms complets distincts parmi elles (`is_individual_author`).
 
     Une contribution source entrante est identifiée par son rang dans la liste des auteurs. Les positions non nulles de cette liste sont uniques ; chaque normaliseur le garantit.
     """
@@ -245,7 +245,7 @@ def _inserted_ids(
     known_ids: set[int],
     inserted: Mapping[int, SourceContributionItem],
 ) -> dict[int, int]:
-    """Identifiants des contributions sources insérées, par clé entrante : chaque ligne nouvelle est rapprochée d'une contribution source insérée de même position et de mêmes informations du contributeur. Deux contributions sources de même position et de mêmes informations du contributeur sont indiscernables : l'ordre de leur rapprochement est indifférent."""
+    """Identifiants des contributions sources insérées, par clé entrante : chaque ligne nouvelle correspond à une contribution source insérée de même position et de mêmes informations du contributeur. Deux contributions sources de même position et de mêmes informations du contributeur sont indiscernables : l'ordre de correspondance est indifférent."""
     new_ids: dict[Hashable, list[int]] = defaultdict(list)
     for row in sorted(rows, key=lambda r: r.id):
         if row.id not in known_ids:
@@ -274,7 +274,7 @@ def _contributor_information(
     identifiers: object,
     collective: bool,
 ) -> Hashable:
-    """Clé d'appariement d'une contribution source : nom et prénom normalisés, identifiants, comme `contributor_information`, et marque collective. Une contribution source qui devient collective est donc réinsérée sans personne."""
+    """Clé de synchronisation d'une contribution source : nom et prénom normalisés, identifiants, comme `contributor_information`, et marque collective. Une contribution source devenue collective est donc réinsérée sans personne."""
     ids = json.dumps(identifiers, sort_keys=True) if identifiers is not None else None
     return (last_name_normalized, first_name_normalized, ids, collective)
 

@@ -152,7 +152,7 @@ _SERIALS_SHARING_AN_INACTIVE_ISSN = text(f"""
 """)
 
 # Paires de revues seules à avoir leur titre, dont au moins une sans ISSN, et dont les enregistrements sources partagent un préfixe DOI. La cible de la fusion en tête.
-# Un titre normalisé vide (alphabet non latin, symboles) ne rapproche aucune revue.
+# Un titre normalisé vide (alphabet non latin, symboles) ne sert à aucune fusion.
 _SAME_TITLE_DUPLICATES = text(f"""
     WITH prefixes AS (
         SELECT s.serial_id AS id, array_agg(DISTINCT split_part(d.id_value, '/', 1)) AS pfx

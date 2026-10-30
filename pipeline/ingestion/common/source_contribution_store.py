@@ -50,7 +50,7 @@ class SourceContributionItem(ContributorNameFields):
 
 
 class SourceContributionUpdate(SourceContributionItem):
-    """Une contribution source en base, réécrite en place : son identifiant, puis les champs de la contribution source entrante qui lui est rapprochée."""
+    """Une contribution source en base, réécrite en place : son identifiant, puis les champs de la contribution source entrante correspondante."""
 
     id: int
 

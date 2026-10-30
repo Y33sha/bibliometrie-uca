@@ -96,7 +96,7 @@ class SharedKeyPair(NamedTuple):
 
 
 class TitleMatch(NamedTuple):
-    """Une publication rapprochée par titre de l'œuvre dont elle dépend (signal #3) : un erratum de l'article qu'il corrige, un preprint de sa version publiée. Le parent est au corpus, désigné par son `publication_id` (et son DOI quand il en a un). La relation dirigée part de `child` vers `parent` (`is_correction_of`, `is_preprint_of`)."""
+    """Une publication reliée par titre à l'œuvre dont elle dépend (signal #3) : un erratum de l'article qu'il corrige, un preprint de sa version publiée. Le parent est au corpus, désigné par son `publication_id` (et son DOI quand il en a un). La relation dirigée part de `child` vers `parent` (`is_correction_of`, `is_preprint_of`)."""
 
     child_id: int
     parent_id: int
@@ -143,7 +143,7 @@ _SHARED_KEY_PAIRS_SQL = text(f"""
     JOIN publications p2 ON p2.id = k2.pid
 """)
 
-# Signal #3 — rapprochement par titre de l'œuvre dépendante (erratum, preprint) à son parent. Erratum : titre parent = suffixe du titre erratum. Preprint : titre identique. Garde d'ambiguïté : un seul candidat substantiel, sinon abstention.
+# Signal #3 — relation par titre de l'œuvre dépendante (erratum, preprint) à son parent. Erratum : titre parent = suffixe du titre erratum. Preprint : titre identique. Garde d'ambiguïté : un seul candidat substantiel, sinon abstention.
 _ERRATUM_TITLE_MATCHES_SQL = text(f"""
     WITH child AS (
         SELECT id, title_normalized AS t, publication_year AS y
@@ -256,15 +256,15 @@ def fetch_shared_key_pairs(conn: Connection) -> list[SharedKeyPair]:
 
 
 def fetch_erratum_title_matches(conn: Connection) -> list[TitleMatch]:
-    """Les erratums rapprochés par titre de l'œuvre qu'ils corrigent (signal #3).
+    """Les erratums reliés par titre à l'œuvre corrigée (signal #3).
 
-    Pour chaque erratum, candidats = publications non-erratum, titre assez long, publiées dans la fenêtre `[année − 2 … année]`, dont le `title_normalized` est un suffixe de celui de l'erratum (le titre de l'article suit « Erratum: »). Le rapprochement exige un seul candidat de ce titre, hors `preprint` et `dataset`, autres formes de la même œuvre."""
+    Pour chaque erratum, candidats = publications non-erratum, titre assez long, publiées dans la fenêtre `[année − 2 … année]`, dont le `title_normalized` est un suffixe de celui de l'erratum (le titre de l'article suit « Erratum: »). La relation exige un seul candidat de ce titre, hors `preprint` et `dataset`, autres formes de la même œuvre."""
     rows = conn.execute(_ERRATUM_TITLE_MATCHES_SQL).all()
     return [TitleMatch(r.child_id, r.parent_id, r.parent_doi) for r in rows]
 
 
 def fetch_preprint_title_matches(conn: Connection) -> list[TitleMatch]:
-    """Les preprints rapprochés par titre de leur version publiée (signal #3).
+    """Les preprints reliés par titre à leur version publiée (signal #3).
 
     Pour chaque preprint, candidats = publications non-preprint au `title_normalized` **identique** (le preprint et sa version publiée ont le même titre), titre assez long, publiées dans la fenêtre `[année … année + 2]`. Même garde d'ambiguïté : un seul candidat substantiel (hors `dataset`) au même titre."""
     rows = conn.execute(_PREPRINT_TITLE_MATCHES_SQL).all()
@@ -483,7 +483,7 @@ def _build_shared_key_edges(
 def _build_title_match_edges(
     matches: list[TitleMatch], relation_type: RelationType
 ) -> list[RelationEdge]:
-    """Une arête `enfant relation_type parent` par rapprochement de titre. La cible est désignée par le `publication_id` du parent (au corpus), avec son DOI quand il en a un — l'unicité dédoublonne alors contre une éventuelle relation déjà posée vers ce même parent par un autre signal."""
+    """Une arête `enfant relation_type parent` par relation de titre. La cible est désignée par le `publication_id` du parent (au corpus), avec son DOI quand il en a un — l'unicité dédoublonne alors contre une éventuelle relation déjà posée vers ce même parent par un autre signal."""
     return [
         RelationEdge(
             match.child_id,

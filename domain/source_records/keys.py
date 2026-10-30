@@ -29,7 +29,7 @@ CONFIRMATION_ID_TYPES = (
 )
 
 
-# Longueur de titre normalisé, en caractères, en deçà de laquelle un titre est trop générique pour apparier deux publications.
+# Longueur de titre normalisé, en caractères, en deçà de laquelle un titre est trop générique pour servir de clé.
 # Sert aux clés de confirmation, aux relations et au dédoublonnage HAL ; les requêtes SQL l'interpolent.
 DISCRIMINANT_TITLE_MIN_LENGTH = 30
 

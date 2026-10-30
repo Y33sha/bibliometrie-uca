@@ -59,7 +59,7 @@ class TestPlanAuthentications:
         assert plan.entries == [(7, _ORCID)]
         assert (plan.malformed, plan.unmatched, plan.ambiguous) == ([], [], [])
 
-    def test_rapprochement_insensible_a_la_casse(self):
+    def test_rattachement_insensible_a_la_casse(self):
         plan = plan_authentications([("Marie@UCA.fr", _ORCID)], {"marie@uca.fr": [7]})
 
         assert plan.entries == [(7, _ORCID)]

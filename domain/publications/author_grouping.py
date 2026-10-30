@@ -227,7 +227,7 @@ def comparison_levels(x: Author, y: Author) -> dict[Comparison, ComparisonLevel 
 
 
 def position_only(x: Author, y: Author) -> bool:
-    """Seule la position rapproche les deux auteurs : noms de famille sans ressemblance, prénoms sans ressemblance ou absents, aucun identifiant commun."""
+    """Seule la position relie les deux auteurs : noms de famille sans ressemblance, prénoms sans ressemblance ou absents, aucun identifiant commun."""
     return _position_only(comparison_levels(x, y))
 
 
@@ -652,7 +652,7 @@ def _residual_links(
 ) -> dict[int, tuple[int, float, float]]:
     """Liens du résidu : contribution source → (indice de contribution, score, marge).
 
-    Une paire candidate partage un trou ou un trou voisin, les deux premières lettres du nom de famille, ou un identifiant. Son score est le meilleur face aux contributions sources retenues de la contribution : celles que la position seule ne rapproche pas (`position_only`), et dont les initiales ne contredisent pas un nom de famille seulement proche (`conflicting_initials`). Un lien est retenu si le score dépasse `link_threshold` du nombre de contributions restantes.
+    Une paire candidate partage un trou ou un trou voisin, les deux premières lettres du nom de famille, ou un identifiant. Son score est le meilleur face aux contributions sources retenues de la contribution : celles reliées par plus que leur position (`position_only`), sans initiales contredisant un nom de famille seulement proche (`conflicting_initials`). Un lien est retenu si le score dépasse `link_threshold` du nombre de contributions restantes.
     """
     source_contribution_gaps, contribution_gaps = record_links.gaps()
     rest_source_contributions = [

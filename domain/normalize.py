@@ -344,7 +344,7 @@ def _is_word_character(ch: str) -> bool:
 
 
 def normalize_text(text: str) -> str:
-    """Forme de comparaison d'un texte, pour le dédoublonnage et le rapprochement : sans balises ni commandes LaTeX, en minuscules, ligatures et exposants décomposés (ﬁ → fi, ² → 2), sans diacritiques sur les lettres latines et grecques. Tout caractère autre qu'une lettre ou un chiffre devient un espace."""
+    """Forme de comparaison d'un texte, pour le dédoublonnage et le rattachement : sans balises ni commandes LaTeX, en minuscules, ligatures et exposants décomposés (ﬁ → fi, ² → 2), sans diacritiques sur les lettres latines et grecques. Tout caractère autre qu'une lettre ou un chiffre devient un espace."""
     if not text:
         return ""
     text = strip_latex(strip_markup(text)).lower()

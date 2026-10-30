@@ -41,7 +41,7 @@ def _load_rows(path: str | Path) -> list[tuple[str, str]]:
         for record in csv.reader(f):
             if len(record) < 2:
                 continue
-            # Mise à plat des deux cellules : un fichier composé dans un tableur y glisse des espaces insécables et des caractères invisibles, qui feraient échouer en silence le rapprochement par email et la reconnaissance de l'ORCID.
+            # Mise à plat des deux cellules : un fichier composé dans un tableur y glisse des espaces insécables et des caractères invisibles, qui feraient échouer en silence le rattachement par email et la reconnaissance de l'ORCID.
             email = sanitize_optional_text(record[0])
             if not email:
                 continue

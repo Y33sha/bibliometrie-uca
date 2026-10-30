@@ -28,7 +28,7 @@ EXTRA_LABELS: dict[str, str | tuple[str, str]] = {
         "revue typée recueil d'actes",
         "revues typées recueils d'actes",
     ),
-    "matched": "rapproché",
+    "matched": "retrouvé",
     "monograph_collection_conflicts": (
         "monographie à plusieurs collections possibles",
         "monographies à plusieurs collections possibles",
@@ -48,7 +48,7 @@ EXTRA_LABELS: dict[str, str | tuple[str, str]] = {
     "no_publisher": ("sans éditeur", "sans éditeur"),
     "not_found": "introuvable",
     "publisher_created": ("éditeur créé", "éditeurs créés"),
-    "publisher_matched": ("éditeur rapproché", "éditeurs rapprochés"),
+    "publisher_matched": ("éditeur retrouvé", "éditeurs retrouvés"),
     "publishers_deleted": ("éditeur vide supprimé", "éditeurs vides supprimés"),
     "publishers_merged": ("éditeur fusionné", "éditeurs fusionnés"),
     "resolved": "résolu",
@@ -59,7 +59,7 @@ EXTRA_LABELS: dict[str, str | tuple[str, str]] = {
     "skipped": "sauté",
     "sudoc_found": ("présente dans le Sudoc", "présentes dans le Sudoc"),
     "unknown_to_doi_org": ("DOI inconnu de doi.org", "DOI inconnus de doi.org"),
-    "unmatched": "non rapproché",
+    "unmatched": "non retrouvé",
     "unresolved": "non résolu",
 }
 """Libellés des compteurs propres à une phase, au singulier. Un couple donne les formes que le `s` final ne donne pas."""

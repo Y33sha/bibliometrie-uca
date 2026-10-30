@@ -4,9 +4,9 @@ Contraintes d'ordre :
 
 - La fusion des autres noms des éditeurs suit la résolution des préfixes, qui pose leurs titulaires.
 - OpenAlex type les revues `unknown` avant le typage en recueil d'actes, qui vise aussi les revues `unknown`.
-- La vérification Sudoc précède la fusion des revues, qui lit l'ISSN-L, et l'import DOAJ, qui apparie les revues par ISSN.
+- La vérification Sudoc précède la fusion des revues, qui lit l'ISSN-L, et l'import DOAJ, rattaché aux revues par ISSN.
 - Les espaces de noms DOI suivent la fusion et le typage des revues.
-- Le rattachement des monographies suit la fusion des revues. La nature des monographies lit le type de la collection que pose le rattachement.
+- Le rattachement des monographies suit la fusion des revues. La nature des monographies lit le type de la collection posé par le rattachement.
 
 `enrich_serials_from_doaj` importe le dump CSV du DOAJ, qui fait autorité sur `is_in_doaj`, quand le dernier import date de plus que le délai `doaj_refresh_after_days`. L'enrichissement des éditeurs (pays, ROR, type) se lance à la demande, par `interfaces/cli/maintenance/enrich_publishers.py`.
 """

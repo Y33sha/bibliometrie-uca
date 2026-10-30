@@ -136,7 +136,7 @@ def strong_identifier_source_contributions(
 ) -> str:
     """Requête des contributions sources `sc_auth` dont les informations du contributeur contiennent l'identifiant `id_type` d'une ligne de `identifiers`.
 
-    `identifiers` : table ou sous-requête, aliasée `pi`, de colonnes `person_id`, `id_type`, `id_value`. L'identifiant que la contribution source neutralise est écarté, et celui que sa source rend non fiable (`trusted_identifier_sql`). La requête rejoint les contributions sources par `contributor_information_id` après un rapprochement sur `contributor_information`.
+    `identifiers` : table ou sous-requête, aliasée `pi`, de colonnes `person_id`, `id_type`, `id_value`. L'identifiant que la contribution source neutralise est écarté, et celui que sa source rend non fiable (`trusted_identifier_sql`). La requête rejoint les contributions sources par `contributor_information_id` après une jointure sur `contributor_information`.
     """
     return f"""
         SELECT {select}
