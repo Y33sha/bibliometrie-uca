@@ -37,12 +37,14 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 class DoiSearch(Protocol):
     """Recherche par DOI dans une source : requête d'un lot de DOI.
 
-    Les attributs règlent la boucle : taille de lot, nombre de requêtes simultanées. Le débit suit le budget de la source (`api_params.MAX_PER_SECOND`).
+    Le débit suit le budget de la source (`api_params.MAX_PER_SECOND`).
     """
 
     source_key: str
-    batch_size: int  # 1 pour un appel par DOI, >1 pour un appel groupé
-    max_concurrent: int  # plafond de requêtes simultanées, sous le rate-limit de l'API
+    batch_size: int
+    """Taille de lot : 1 pour un appel par DOI, plus de 1 pour un appel groupé."""
+    max_concurrent: int
+    """Plafond de requêtes simultanées, sous le rate-limit de l'API."""
 
     def fetch_async(
         self, client: httpx2.AsyncClient, dois: list[str]
@@ -53,15 +55,15 @@ class DoiSearch(Protocol):
 def get_missing_dois(
     conn: Connection, target: str, *, retry_after_days: int, years: list[int] | None = None
 ) -> list[str]:
-    """DOI à chercher dans la cible : DOI des publications du périmètre absents de la cible, nettoyés et sans doublon.
+    """Renvoie les DOI à chercher dans la cible : DOI des publications du périmètre absents de la cible, nettoyés et sans doublon.
 
-    Les candidats viennent de la vue `candidate_dois` : DOI des enregistrements sources, cibles des relations entre publications, DOI DataCite déduits des identifiants arXiv. S'y ajoute la forme sans version de chaque DOI à suffixe de version : quand elle existe, elle devient la cible des versions (sous-étape `doi_targets`). Le périmètre est celui du run précédent ; les DOI des enregistrements sources nouveaux attendent le run suivant.
+    Les candidats viennent de la vue `candidate_dois` : DOI des enregistrements sources, cibles des relations entre publications, DOI DataCite déduits des identifiants arXiv. La forme sans version de chaque DOI à suffixe de version s'ajoute aux candidats. Quand elle existe, elle devient la cible des versions (sous-étape `doi_targets`). Le périmètre est celui du run précédent ; les DOI des enregistrements sources créés pendant le run attendent le run suivant.
 
     Un DOI est absent de la cible s'il manque à son `staging` et à tous les DOI de ses enregistrements sources : une source renvoie un même document pour chacun de ses DOI.
 
     Un DOI sort de la sélection pendant `retry_after_days` jours après une recherche vaine dans la cible, et définitivement s'il est inconnu de doi.org (`failed_lookups`).
 
-    Pour une cible agence d'enregistrement, seuls comptent les DOI dont le préfixe est résolu vers cette agence. Un préfixe encore sans agence attend la phase `resolve_ra`, plus loin dans le run : son DOI est cherché au run suivant, auprès d'une seule des deux agences.
+    Pour une cible agence d'enregistrement, seuls comptent les DOI à préfixe résolu vers cette agence. Un préfixe encore sans agence attend la phase `resolve_ra`, plus loin dans le run : son DOI est cherché au run suivant, auprès d'une seule des deux agences.
 
     `years` borne les candidats à la fenêtre d'années du run : un DOI est retenu quand l'un des enregistrements sources de sa publication a son année dans la fenêtre. Les sources d'une même publication diffèrent souvent d'un an.
     """
@@ -133,7 +135,7 @@ async def fetch_missing_doi(
     limit: int | None = None,
     years: list[int] | None = None,
 ) -> PhaseMetrics:
-    """Cherche dans la source les DOI qu'elle n'a pas rendus, et écrit dans `staging` les enregistrements sources trouvés.
+    """Cherche dans la source les DOI absents de son `staging`, et écrit dans `staging` les documents trouvés.
 
     Un DOI absent de la source est inscrit dans `failed_lookups`. Quand la source est une agence d'enregistrement, ses DOI absents passent ensuite à doi.org : un DOI inconnu de doi.org est inscrit sous `DOI_ORG`. `limit` plafonne le nombre de DOI d'une exécution.
 
@@ -175,7 +177,7 @@ async def fetch_missing_doi(
 
 
 def _doi_org_channel() -> LookupChannel:
-    """Vérification auprès de doi.org des DOI absents d'une agence d'enregistrement."""
+    """Renvoie le canal de vérification auprès de doi.org des DOI absents d'une agence d'enregistrement."""
     user_agent = polite_user_agent()
 
     async def _fetch(client: httpx2.AsyncClient, dois: list[str]) -> LookupBatch | Unavailable:

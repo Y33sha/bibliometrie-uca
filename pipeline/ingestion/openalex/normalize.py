@@ -68,7 +68,7 @@ from pipeline.transformation.publishing.find_or_create import (
 def extract_locations_data(
     work: Mapping[str, JsonValue],
 ) -> tuple[list[str], list[SourceIdentifier]]:
-    """URLs dédoublonnées des localisations d'un work (`landing_page_url` et `pdf_url`), et identifiants secondaires de ces localisations.
+    """Renvoie les URLs dédoublonnées des localisations d'un work (`landing_page_url` et `pdf_url`), et identifiants secondaires de ces localisations.
 
     Les identifiants viennent des URLs (`url_identifiers`), puis des `hal_id` et DOI des URLs et des `location.id` (formes OAI-PMH `pmh:oai:HAL:<halid>` et `doi:<doi>`). `location.id` donne ces identifiants même quand la page de la localisation est une page éditeur.
     """
@@ -103,7 +103,7 @@ def extract_locations_data(
 def openalex_identifiers(
     identifiers: list[SourceIdentifier], doi: str | None, primary: OpenalexLocation | None
 ) -> tuple[SourceIdentifier, ...]:
-    """Identifiants d'un work : son DOI et les identifiants secondaires de ses localisations (`extract_locations_data`), plus l'identifiant de sa localisation principale, qui est dérivé (`openalex_derived_identifier`)."""
+    """Renvoie les identifiants d'un work : son DOI, les identifiants secondaires de ses localisations (`extract_locations_data`), et l'identifiant dérivé de sa localisation principale (`openalex_derived_identifier`)."""
     work_doi = (
         [SourceIdentifier(SourceIdentifierType.DOI, doi, SourceIdentifierRole.SECONDARY)]
         if doi
@@ -114,7 +114,7 @@ def openalex_identifiers(
 
 
 def get_locations(work: Mapping[str, JsonValue]) -> list[LocationFacts]:
-    """Localisations du work, hors fiches de catalogue. Une source de type `repository` donne la plateforme de la localisation."""
+    """Renvoie les localisations du work, hors fiches de catalogue. Une source de type `repository` donne la plateforme de la localisation."""
     locations: list[LocationFacts] = []
     for entry in as_sequence(work.get("locations")):
         loc = as_mapping(entry)
@@ -143,7 +143,10 @@ def get_locations(work: Mapping[str, JsonValue]) -> list[LocationFacts]:
 def _pmc_copy(
     url: str, pdf_url: str | None, platform: PlatformFacts
 ) -> tuple[str, PlatformFacts | None]:
-    """Adresse et plateforme d'une copie que OpenAlex range sous PubMed Central. Une page PubMed n'est pas une copie sur PMC : l'adresse devient la page de l'article sur PMC, d'après le PMCID de son PDF, à défaut la copie perd sa plateforme."""
+    """Renvoie l'adresse et la plateforme d'une copie rangée par OpenAlex sous PubMed Central.
+
+    Une page PubMed n'est pas une copie sur PMC : l'adresse devient la page de l'article sur PMC, d'après le PMCID de son PDF. À défaut, la copie perd sa plateforme.
+    """
     if urlsplit(url).hostname != "pubmed.ncbi.nlm.nih.gov":
         return url, platform
     if pmcid := normalize_pmcid(pdf_url):
@@ -152,7 +155,10 @@ def _pmc_copy(
 
 
 def _repository(source: Mapping[str, JsonValue]) -> PlatformFacts | None:
-    """Plateforme d'une source OpenAlex de type `repository`. Une plateforme de la liste des plateformes connues en prend le nom et le type ; une autre est un entrepôt, nommé comme OpenAlex le nomme."""
+    """Renvoie la plateforme d'une source OpenAlex de type `repository`.
+
+    Une plateforme de la liste des plateformes connues prend le nom et le type de cette liste. Une autre est un entrepôt, au nom donné par OpenAlex.
+    """
     if as_str(source.get("type")) != "repository":
         return None
     openalex_id = short_openalex_id(as_str(source.get("id")) or "")
@@ -165,7 +171,7 @@ def _repository(source: Mapping[str, JsonValue]) -> PlatformFacts | None:
 
 
 def reconstruct_abstract(inverted_index: Mapping[str, JsonValue] | None) -> str | None:
-    """Résumé reconstitué depuis l'index inversé d'OpenAlex (`{mot: [positions]}`)."""
+    """Reconstitue le résumé depuis l'index inversé d'OpenAlex (`{mot: [positions]}`)."""
     if not inverted_index:
         return None
     positions: dict[int, str] = {}
@@ -179,7 +185,7 @@ def reconstruct_abstract(inverted_index: Mapping[str, JsonValue] | None) -> str 
 
 
 def extract_topics(work: Mapping[str, JsonValue]) -> list[dict[str, JsonValue]] | None:
-    """Topics OpenAlex, en liste simplifiée."""
+    """Renvoie les topics OpenAlex, en liste simplifiée."""
     topics: list[dict[str, JsonValue]] = []
     for entry in as_sequence(work.get("topics")):
         t = as_mapping(entry)
@@ -196,7 +202,7 @@ def extract_topics(work: Mapping[str, JsonValue]) -> list[dict[str, JsonValue]] 
 
 
 def extract_impact(work: Mapping[str, JsonValue]) -> Impact:
-    """Indicateurs de citation OpenAlex : nombre de citations, FWCI et percentile de citations normalisé."""
+    """Renvoie les indicateurs de citation OpenAlex : nombre de citations, FWCI et percentile de citations normalisé."""
     percentile = as_mapping(work.get("citation_normalized_percentile"))
     return Impact(
         cited_by_count=as_int(work.get("cited_by_count")),
@@ -208,7 +214,7 @@ def extract_impact(work: Mapping[str, JsonValue]) -> Impact:
 
 
 def get_publisher(work: Mapping[str, JsonValue]) -> PublisherFacts | None:
-    """Éditeur du work : l'organisation hôte de la source de sa localisation principale."""
+    """Renvoie l'éditeur du work : l'organisation hôte de la source de sa localisation principale."""
     source = as_mapping(as_mapping(work.get("primary_location")).get("source"))
     publisher_name = as_str(source.get("host_organization_name"))
     if not publisher_name:
@@ -218,9 +224,9 @@ def get_publisher(work: Mapping[str, JsonValue]) -> PublisherFacts | None:
 
 
 def get_container_facts(work: Mapping[str, JsonValue]) -> ContainerDescription:
-    """Ce qu'OpenAlex dit du conteneur d'un document : la source de sa localisation principale.
+    """Décrit le conteneur d'un document d'après OpenAlex : la source de sa localisation principale.
 
-    Une source `book series` ou `journal` est la collection d'un livre, d'un chapitre ou d'un article de congrès ; une source `conference` est son volume d'actes. OpenAlex ne donne ni le titre du livre qui contient un chapitre, ni ISBN.
+    Une source `book series` ou `journal` est la collection d'un livre, d'un chapitre ou d'un article de congrès ; une source `conference` est son volume d'actes. OpenAlex omet le titre du livre d'un chapitre et les ISBN.
     """
     source = as_mapping(as_mapping(work.get("primary_location")).get("source"))
     title = as_str(source.get("display_name"))
@@ -251,7 +257,7 @@ def get_container_facts(work: Mapping[str, JsonValue]) -> ContainerDescription:
 
 
 def get_title(work: Mapping[str, JsonValue]) -> str | None:
-    """Titre du work, ou à défaut son `display_name`."""
+    """Renvoie le titre du work, à défaut son `display_name`."""
     return as_str(work.get("title")) or as_str(work.get("display_name"))
 
 
@@ -265,9 +271,9 @@ def openalex_source_record(  # noqa: C901
     containers: Containers,
     primary: OpenalexLocation | None = None,
 ) -> SourceRecordUpsert:
-    """Enregistrement source OpenAlex d'un work.
+    """Construit l'enregistrement source OpenAlex d'un work.
 
-    `primary` est la localisation principale déjà analysée ; la fonction l'analyse en son absence. Sans revue identifiée, le titre du conteneur est le nom de la source de la localisation principale, quand cette source peut être une revue (`names_serial`).
+    `primary` est la localisation principale déjà analysée ; à défaut, la fonction l'analyse. Sans revue identifiée, le titre du conteneur est le nom de la source de la localisation principale, quand cette source peut être une revue (`names_serial`).
     """
     openalex_id = short_openalex_id(as_str(work.get("id")) or "")
     if primary is None:
@@ -279,7 +285,8 @@ def openalex_source_record(  # noqa: C901
 
     is_retracted = bool(work.get("is_retracted"))
 
-    # Numérotation, éditeur et revue tels qu'OpenAlex les nomme. Comme à la création, l'éditeur et la revue sont écartés pour une localisation principale qui héberge le work sans le publier (HAL, theses.fr, Zenodo…), la revue pour une plateforme d'ebooks.
+    # Numérotation, éditeur et revue nommés par OpenAlex.
+    # Éditeur et revue écartés pour une localisation principale hébergeant le work sans le publier (HAL, theses.fr, Zenodo…), revue écartée pour une plateforme d'ebooks.
     raw_biblio = as_mapping(work.get("biblio"))
     primary_source = as_mapping(as_mapping(work.get("primary_location")).get("source"))
     publisher_source = primary_source if names_publisher(primary) else {}
@@ -299,7 +306,6 @@ def openalex_source_record(  # noqa: C901
         journal_openalex_id=short_openalex_id(as_str(source.get("id")) or ""),
     )
 
-    # Abstract, keywords, topics
     abstract = reconstruct_abstract(as_mapping(work.get("abstract_inverted_index")))
     words = [
         as_str(as_mapping(k).get("keyword")) or as_str(k) for k in as_sequence(work.get("keywords"))
@@ -348,12 +354,12 @@ def openalex_source_record(  # noqa: C901
 
 
 def _extract_openalex_orcid(authorship: Mapping[str, JsonValue]) -> str | None:
-    """ORCID que l'auteur a déposé sur son `authorship` (`raw_orcid`).
+    """Renvoie l'ORCID déposé par l'auteur sur son `authorship` (`raw_orcid`).
 
     OpenAlex donne deux ORCID par `authorship` :
 
-    - `raw_orcid` recopie la métadonnée du work que donne la source amont d'OpenAlex, Crossref pour la plupart des articles d'éditeur. C'est l'ORCID déposé à la soumission, aussi fiable qu'un ORCID Crossref.
-    - `author.orcid` est l'ORCID de l'entité auteur qu'OpenAlex désambiguïse par nom et affiliation, souvent fautive.
+    - `raw_orcid` recopie la métadonnée du work donnée par la source amont d'OpenAlex, Crossref pour la plupart des articles d'éditeur. C'est l'ORCID déposé à la soumission, aussi fiable qu'un ORCID Crossref.
+    - `author.orcid` est l'ORCID de l'entité auteur désambiguïsée par OpenAlex par nom et affiliation, souvent fautive.
 
     Seul `raw_orcid` est retenu.
     """
@@ -361,7 +367,7 @@ def _extract_openalex_orcid(authorship: Mapping[str, JsonValue]) -> str | None:
 
 
 def _countries(institutions: Iterable[Mapping[str, JsonValue]]) -> list[str] | None:
-    """Codes pays des institutions, triés, ou `None` sans pays."""
+    """Renvoie les codes pays des institutions, triés, ou `None` sans pays."""
     return (
         sorted(
             {
@@ -379,13 +385,13 @@ def _rors(institutions: Iterable[Mapping[str, JsonValue]]) -> frozenset[RorId]:
 
 
 def build_openalex_author_records(work: Mapping[str, JsonValue]) -> list[AuthorRecord]:
-    """Contributions sources des `authorships` d'un work OpenAlex.
+    """Lit les contributions sources des `authorships` d'un work OpenAlex.
 
-    - nom brut : `raw_author_name`, le nom tel qu'imprimé, `author.display_name` étant celui de l'auteur désambiguïsé ;
+    - nom brut : `raw_author_name`, le nom imprimé ; `author.display_name` est le nom de l'auteur désambiguïsé ;
     - ORCID déposé (`raw_orcid`) sur `identifiers` ;
     - adresses : les `raw_affiliation_strings` ;
-    - pays d'une adresse : `country_code` des institutions que `affiliations` relie à son texte ;
-    - ROR des institutions : sur l'adresse dont le texte les désigne, sur la contribution source pour les autres ;
+    - pays d'une adresse : `country_code` des institutions reliées à son texte par `affiliations` ;
+    - ROR des institutions : sur l'adresse désignant l'institution par son texte, sur la contribution source pour les autres ;
     - rôle toujours `author` : OpenAlex ne distingue pas les rôles.
     """
     authorships = [as_mapping(a) for a in as_sequence(work.get("authorships"))]
@@ -446,7 +452,7 @@ def build_openalex_author_records(work: Mapping[str, JsonValue]) -> list[AuthorR
 
 
 def extract_openalex_author_block(work: Mapping[str, JsonValue]) -> AuthorBlock:
-    """Bloc auteurs d'un work OpenAlex : `authorships`."""
+    """Renvoie le bloc auteurs d'un work OpenAlex : `authorships`."""
     return {"authorships": work.get("authorships")}
 
 

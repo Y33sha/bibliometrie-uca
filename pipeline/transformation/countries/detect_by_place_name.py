@@ -1,6 +1,6 @@
 """Détection du pays d'une adresse par **nom de lieu** : candidats `institution` et `city`.
 
-Cherche dans tout le texte normalisé des adresses en file (`address_candidates_queue`) les noms d'institutions et de villes connus (`place_name_forms`), chacun rattaché à un pays, via un automate Aho-Corasick (`PlaceNameDetector`) par nature de lieu. Chaque pays trouvé devient un candidat du moyen de même nature : des lieux de pays différents donnent plusieurs candidats. Les candidats de ces deux moyens sont recalculés en entier pour chaque adresse traitée. L'appelant commite.
+Les noms d'institutions et de villes connus (`place_name_forms`), associés chacun à un pays, sont cherchés dans tout le texte normalisé des adresses en file (`address_candidates_queue`). Chaque pays trouvé devient un candidat du moyen de même nature : des lieux de pays différents donnent plusieurs candidats. Les candidats de ces deux moyens sont recalculés en entier pour chaque adresse traitée. L'appelant commite.
 """
 
 import logging
@@ -22,7 +22,7 @@ _LABELS = {PlaceNameKind.INSTITUTION: "institutions", PlaceNameKind.CITY: "ville
 
 
 def load_place_forms(conn: Connection, kind: PlaceNameKind) -> dict[str, str]:
-    """Formes normalisées des noms de lieux de nature `kind` (institution ou ville), chacune avec le code ISO du pays où le lieu se situe : `{forme: code ISO}`."""
+    """Renvoie les formes normalisées des noms de lieux de nature `kind`, avec le code ISO de leur pays : `{forme: code ISO}`."""
     rows = conn.execute(
         text("SELECT form_normalized, iso_code FROM place_name_forms WHERE kind = :kind"),
         {"kind": kind.value},

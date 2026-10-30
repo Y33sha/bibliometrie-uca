@@ -1,6 +1,6 @@
 """Complétion des prénoms réduits à des initiales, d'après les contributions sources des contributions rattachées aux personnes.
 
-Une personne créée depuis une contribution source « Tnourji, A. » a le prénom « A. ». Quand les contributions sources de ses contributions lui donnent un seul prénom plein compatible (« Abdellah »), elle prend ce prénom : le rattachement par initiales compatibles lui envoie ensuite seulement les contributions sources de ce prénom. Quand elles lui en donnent plusieurs, elle garde ses initiales (`Namesake.conflicting`).
+Une personne créée depuis une contribution source « Tnourji, A. » a le prénom « A. ». Quand les contributions sources de ses contributions lui donnent un seul prénom plein compatible (« Abdellah »), elle prend ce prénom. Le rattachement par initiales compatibles lui attribue ensuite seulement les contributions sources de ce prénom. Avec plusieurs prénoms pleins compatibles, elle garde ses initiales (`Namesake.conflicting`).
 """
 
 from typing import NamedTuple
@@ -18,7 +18,7 @@ from pipeline.transformation.persons.store import fetch_namesakes
 def fetch_linked_contributor_names(
     conn: Connection, person_ids: list[int]
 ) -> dict[int, list[ContributorName]]:
-    """`{person_id: [nom, ...]}` — les noms des contributions sources des contributions rattachées à chacune des personnes, tels que les sources les donnent."""
+    """Renvoie `{person_id: [nom, ...]}` : les noms bruts des contributions sources des contributions rattachées à chaque personne."""
     if not person_ids:
         return {}
     rows = conn.execute(
@@ -38,16 +38,18 @@ def fetch_linked_contributor_names(
 
 
 class FirstNameCompletion(NamedTuple):
-    """Issue de la complétion : personnes complétées, et personnes à prénoms pleins concurrents."""
+    """Issue de la complétion des prénoms."""
 
     completed: int
+    """Nombre de personnes complétées."""
     conflicting: frozenset[int]
+    """Personnes à plusieurs prénoms pleins concurrents."""
 
 
 def complete_reduced_first_names(
     conn: Connection, *, repo: PgPersonRepository
 ) -> FirstNameCompletion:
-    """Donne à chaque personne au prénom réduit le prénom plein que les contributions sources de ses contributions donnent seul."""
+    """Donne à chaque personne au prénom réduit le prénom plein, s'il est seul donné par les contributions sources de ses contributions."""
     reduced = {}
     for namesake in fetch_namesakes(conn):
         initials = first_name_initials(namesake.first_name)

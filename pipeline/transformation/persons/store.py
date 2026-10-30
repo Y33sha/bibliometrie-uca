@@ -1,4 +1,4 @@
-"""Accès aux personnes que plusieurs tâches de la phase `persons` partagent."""
+"""Accès aux personnes, partagés par plusieurs tâches de la phase `persons`."""
 
 from sqlalchemy import Connection, text
 
@@ -9,7 +9,7 @@ from infrastructure.sql_fragments import REJECTED_PAIRS, active_name_form
 
 
 def fetch_namesakes(conn: Connection) -> list[Namesake]:
-    """Personnes non exclues, avec leur nom et prénom saisis, pour le rattachement par initiales compatibles."""
+    """Renvoie les personnes non exclues, avec leur nom et prénom saisis, pour le rattachement par initiales compatibles."""
     rows = conn.execute(
         text("""
             SELECT id, last_name, COALESCE(first_name, '') AS first_name
@@ -22,7 +22,7 @@ def fetch_namesakes(conn: Connection) -> list[Namesake]:
 
 
 def fetch_identifier_to_person_map(conn: Connection, id_type: str) -> dict[str, IdentifiedPerson]:
-    """Personne de chaque valeur d'un type d'identifiant, attributions rejetées exclues, avec son nom normalisé : le rattachement par identifiant se corrobore par le nom (`decide_match_by_identifier`)."""
+    """Renvoie la personne de chaque valeur d'un type d'identifiant, avec son nom normalisé, attributions rejetées exclues. Le nom corrobore le rattachement par identifiant (`decide_match_by_identifier`)."""
     rows = conn.execute(
         text(f"""
             SELECT pi.id_value, pi.person_id,
@@ -38,7 +38,7 @@ def fetch_identifier_to_person_map(conn: Connection, id_type: str) -> dict[str, 
 
 
 def fetch_name_form_map(conn: Connection) -> dict[str, list[int]]:
-    """Personnes de chaque forme de nom active, par `person_id` croissant. Une forme rejetée pour une personne est écartée ; une forme tirée du nom de la personne reste active."""
+    """Renvoie les personnes de chaque forme de nom active, par `person_id` croissant. Une forme rejetée pour une personne est écartée ; une forme tirée du nom de la personne reste active."""
     rows = conn.execute(
         text(f"""
             SELECT name_form,
@@ -52,7 +52,7 @@ def fetch_name_form_map(conn: Connection) -> dict[str, list[int]]:
 
 
 def fetch_name_form_status_map(conn: Connection) -> dict[tuple[str, int], str]:
-    """Verdict de chaque couple (forme de nom, personne), qui corrobore (`confirmed`) ou refuse (`rejected`) un rattachement par identifiant sans comparer les noms. Une forme tirée du nom de la personne corrobore ; sinon, le statut de la forme décide. Les formes `pending` hors du nom de la personne sont omises."""
+    """Renvoie le verdict de chaque couple (forme de nom, personne). Le verdict corrobore (`confirmed`) ou refuse (`rejected`) un rattachement par identifiant sans comparer les noms. Une forme tirée du nom de la personne corrobore ; sinon, le statut de la forme décide. Les formes `pending` hors du nom de la personne sont omises."""
     rows = conn.execute(
         text(f"""
             SELECT name_form, person_id,
@@ -71,7 +71,7 @@ def fetch_name_form_status_map(conn: Connection) -> dict[tuple[str, int], str]:
 
 
 def fetch_rejected_person_ids_by_publication(conn: Connection) -> dict[int, frozenset[int]]:
-    """Personnes rejetées pour chaque publication, que la décision écarte des candidats (`decide_contribution`). Une publication est rejetée pour une personne dès qu'un de ses enregistrements sources l'est."""
+    """Renvoie les personnes rejetées pour chaque publication, écartées des candidats par la décision (`decide_contribution`). Une publication est rejetée pour une personne dès qu'un de ses enregistrements sources l'est."""
     rows = conn.execute(
         text(f"""
             SELECT publication_id, array_agg(DISTINCT person_id) AS person_ids

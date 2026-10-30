@@ -27,7 +27,7 @@ from pipeline.transformation.publishing.serials.serial_publishers import (
 
 
 def _merge_issns(conn: Connection, target_id: int, source_id: int) -> None:
-    """Un ISSN que la conservée a déjà reste le sien ; les autres passent à la conservée, à revérifier dans le Sudoc. L'ISSN de liaison de la conservée l'emporte. Des ISSN saisis à la main sur l'absorbée gardent leur marqueur."""
+    """Transfère à la revue conservée les ISSN de l'absorbée absents chez elle, à revérifier dans le Sudoc. L'ISSN de liaison de la conservée l'emporte. Des ISSN saisis à la main sur l'absorbée gardent leur marqueur."""
     conn.execute(
         text("""
             DELETE FROM serial_issns s
@@ -62,7 +62,11 @@ def _merge_issns(conn: Connection, target_id: int, source_id: int) -> None:
 def _fill_empty_with_marker(
     field: ManualField, columns: tuple[str, ...], is_empty: str
 ) -> MergeStep:
-    """Remplir si vide, les colonnes prises ensemble ; `is_empty` est la condition SQL de vide sur la revue conservée `t`. Une valeur reprise de l'absorbée garde son marqueur de saisie à la main."""
+    """Renvoie l'étape qui remplit les colonnes vides de la revue conservée, prises ensemble. Une valeur reprise de l'absorbée garde son marqueur de saisie à la main.
+
+    Args:
+        is_empty: condition SQL de vide sur la revue conservée `t`.
+    """
     assignments = ", ".join(f"{c} = s.{c}" for c in columns)
 
     def apply(conn: Connection, target_id: int, source_id: int) -> None:
@@ -85,7 +89,7 @@ def _fill_empty_with_marker(
 
 
 def _merge_is_in_doaj(conn: Connection, target_id: int, source_id: int) -> None:
-    """La revue conservée est au DOAJ si l'une des deux y est."""
+    """Marque la revue conservée présente au DOAJ si l'une des deux l'est."""
     conn.execute(
         text("""
             UPDATE serials t SET is_in_doaj = COALESCE(t.is_in_doaj OR s.is_in_doaj, false)
@@ -121,7 +125,7 @@ MERGE_STEPS: dict[str, MergeStep] = {
     "is_in_doaj": MergeStep((("serials", "is_in_doaj"),), _merge_is_in_doaj, DataNature.MIXED),
     "doaj_record": untouched("serials", "doaj_payload", "doaj_imported_at"),
     "publication_count": untouched("serials", "publication_count"),
-    # Un champ repris de l'absorbée y apporte son marqueur (`_fill_empty_with_marker`).
+    # Un champ repris de l'absorbée ajoute son marqueur à `manual_fields` (`_fill_empty_with_marker`).
     "manual_fields": untouched("serials", "manual_fields").of_nature(DataNature.DECISION),
 }
 
@@ -138,9 +142,9 @@ def merge_serial_into(conn: Connection, target_id: int, source_id: int) -> None:
 
 
 def merge_serials(conn: Connection, target_id: int, source_id: int) -> None:
-    """Fusionne la revue `source_id` dans `target_id`, puis requalifie les publications absorbées contre le `serial_type` de la cible.
+    """Fusionne la revue `source_id` dans `target_id`, puis requalifie les publications absorbées selon le `serial_type` de la cible.
 
-    Les corrections des `source_records` de la cible sont rejouées, absorbées comprises, puis les publications absorbées sont recalculées. Fusionner une revue dans un média donne à ses publications le type `media`.
+    Les corrections des enregistrements sources de la cible sont rejouées, absorbées comprises, puis les publications absorbées sont recalculées. Fusionner une revue dans un média donne à ses publications le type `media`.
     """
     store = PublicationStore(conn)
     absorbed_publication_ids = store.find_ids_by_serial_id(source_id)
@@ -157,7 +161,7 @@ class SerialRecompute:
         self._conn = conn
 
     def requalify_publications(self, serial_id: int) -> int:
-        """Requalifie les publications de la revue. Retourne le nombre de publications dont le `doc_type` change."""
+        """Requalifie les publications de la revue. Renvoie le nombre de publications dont le `doc_type` change."""
         return requalify_serial_publications(self._conn, serial_id)
 
     def merge_serials(self, target_id: int, source_id: int) -> None:

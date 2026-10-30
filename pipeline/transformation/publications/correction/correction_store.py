@@ -1,6 +1,6 @@
 """Requêtes de la phase `metadata_correction`, et du recalcul ciblé des corrections d'une revue.
 
-La phase écrit sur les enregistrements sources les valeurs que corrigent les règles de `domain.source_records.metadata_correction` : la réconciliation lit ainsi des colonnes déjà corrigées.
+La phase écrit sur les enregistrements sources les valeurs corrigées par les règles de `domain.source_records.metadata_correction`. La réconciliation lit donc des colonnes déjà corrigées.
 """
 
 import json
@@ -56,7 +56,7 @@ from infrastructure.sql_fragments import (
 
 
 class UnaryCorrectionRow(NamedTuple):
-    """Un enregistrement source candidat à la correction unaire : les faits que lisent les règles, ses identifiants avec leur statut, et ce que la phase réécrit."""
+    """Enregistrement source candidat à la correction unaire : faits lus par les règles, identifiants avec leur statut, et `corrections`, réécrit par la phase."""
 
     id: int
     source_id: str
@@ -66,14 +66,14 @@ class UnaryCorrectionRow(NamedTuple):
 
 
 class CorrectionUpdate(NamedTuple):
-    """Une mise à jour de la correction unaire : l'enregistrement source `id`, ses colonnes corrigées et ses identifiants."""
+    """Mise à jour de la correction unaire de l'enregistrement source `id` : colonnes corrigées et identifiants."""
 
     id: int
     corrected: UnaryCorrection
 
 
 class MatchabilityRow(NamedTuple):
-    """Un enregistrement source : sa valeur de `is_matchable` et les faits qui la décident."""
+    """Enregistrement source, avec sa valeur de `is_matchable` et les faits qui la décident."""
 
     id: int
     is_matchable: bool
@@ -88,59 +88,65 @@ class MatchabilityUpdate(NamedTuple):
 
 
 class SerialCorrectionRow(NamedTuple):
-    """Un enregistrement source candidat au rattachement de la revue par l'espace de noms de ses DOI propres actifs (`dois`). `corrections` garde le rattachement d'origine, et limite la correction à une revue manquante."""
+    """Enregistrement source candidat au rattachement de la revue par l'espace de noms de ses DOI."""
 
     id: int
     source: str
     raw_doc_type: str | None
     dois: frozenset[str]
+    """DOI propres actifs."""
     serial_id: int | None
     corrections: dict[str, JsonValue]
+    """Garde le rattachement d'origine, et limite la correction à une revue manquante."""
 
 
 class SerialCorrectionUpdate(NamedTuple):
-    """Une mise à jour de rattachement : `serial_id`, posé ou remis à vide, et `corrections`."""
+    """Mise à jour du rattachement de revue d'un enregistrement source."""
 
     id: int
     serial_id: int | None
+    """Revue rattachée, ou `None` pour retirer le rattachement."""
     corrections: dict[str, JsonValue]
 
 
 class SecondaryFormRow(NamedTuple):
-    """Déclaration de forme secondaire d'un enregistrement source, et son DOI d'avant correction, en minuscules."""
+    """Déclaration de forme secondaire d'un enregistrement source."""
 
     doi: str
+    """DOI d'avant correction, en minuscules."""
     declaration: SecondaryFormDeclaration
 
 
 class DoiClusterRow(NamedTuple):
-    """Un enregistrement source membre d'un groupe candidat au retrait de DOI : les enregistrements sources qui ont le DOI `shared_doi`, de rôle autre que `related`, quel que soit son statut. Un enregistrement source appartient à un groupe par DOI.
+    """Enregistrement source membre d'un groupe candidat au retrait de DOI.
 
-    Le titre normalisé sert à comparer deux chapitres."""
+    Le groupe réunit les enregistrements sources ayant le DOI `shared_doi`, de rôle autre que `related`, quel que soit son statut. Un enregistrement source appartient à un groupe par DOI.
+    """
 
     id: int
     doc_type: str | None
     title_normalized: str | None
+    """Sert à comparer deux chapitres."""
     shared_doi: str
-    # `shared_doi` est inconnu de doi.org (`failed_lookups`, source `doi_org`).
     unresolved: bool = False
-    # `shared_doi` a une cible dans `doi_targets`.
+    """Vrai si `shared_doi` est inconnu de doi.org (`failed_lookups`, source `doi_org`)."""
     has_target: bool = False
+    """Vrai si `shared_doi` a une cible dans `doi_targets`."""
     identifiers: tuple[SourceIdentifier, ...] = ()
     source: str = ""
     source_id: str = ""
-    # Noms de famille normalisés des contributions sources individuelles, renseignés pour les groupes où un dépôt HAL et l'enregistrement source Crossref n'ont aucun nom commun.
     author_names: tuple[str, ...] = ()
+    """Noms de famille normalisés des contributions sources individuelles, renseignés pour les groupes où un dépôt HAL et l'enregistrement source Crossref n'ont aucun nom commun."""
 
 
 class DoiCorrectionUpdate(NamedTuple):
-    """Une mise à jour du retrait de DOI par groupe : identifiants de l'enregistrement source aux statuts recalculés."""
+    """Mise à jour du retrait de DOI par groupe : identifiants de l'enregistrement source aux statuts recalculés."""
 
     id: int
     identifiers: tuple[SourceIdentifier, ...]
 
 
-# Branches du `CASE` et liste `IN` des relations DataCite à convergence directe, tirées de `DATACITE_DIRECT_CONVERGENCE`.
+# Branches du `CASE` et liste `IN` des relations DataCite de `DATACITE_DIRECT_CONVERGENCE`.
 _DATACITE_CASE_SQL = (
     "CASE rel->>'relation_type' "
     + " ".join(
@@ -243,9 +249,10 @@ _UPDATE = (
 
 
 def _persist_updates(conn: Connection, updates: Sequence[Mapping[str, object]]) -> int:
-    """Écrit en lot les colonnes de chaque mise à jour sur l'enregistrement source de sa clé `id`, avec `updated_at`, et marque ces enregistrements sources pour la réconciliation. Renvoie le nombre de lignes.
+    """Écrit en lot les colonnes de chaque mise à jour sur l'enregistrement source de clé `id`, avec `updated_at`, et marque ces enregistrements sources pour la réconciliation. Renvoie le nombre de lignes.
 
-    Lève `ValueError` sur une clé qui ne nomme aucune colonne de `source_records`.
+    Raises:
+        ValueError: une clé ne nomme aucune colonne de `source_records`.
     """
     if not updates:
         return 0
@@ -279,18 +286,18 @@ class SourceRecordCorrectionStore:
         self._conn = conn
 
     def fetch_for_unary_correction(self) -> list[UnaryCorrectionRow]:
-        """Tous les enregistrements sources, avec les faits que lisent les règles.
+        """Renvoie tous les enregistrements sources, avec les faits lus par les règles.
 
-        Aucun filtre par règle : certaines règles valent quel que soit le type (URL theses.fr ou DUMAS), et un enregistrement source sans type reste candidat.
+        Certaines règles valent quel que soit le type (URL theses.fr ou DUMAS), et un enregistrement source sans type reste candidat : aucun filtre par règle.
         """
         return self._unary_rows(_SELECT, {})
 
     def fetch_for_unary_correction_by_serial(self, serial_id: int) -> list[UnaryCorrectionRow]:
-        """Enregistrements sources d'une revue, pour le recalcul ciblé après un changement de son type dans l'administration."""
+        """Renvoie les enregistrements sources d'une revue, pour le recalcul ciblé après un changement de son type dans l'administration."""
         return self._unary_rows(_SELECT + " WHERE sr.serial_id = :jid", {"jid": serial_id})
 
     def fetch_for_unary_correction_by_hal_ids(self, hal_ids: list[str]) -> list[UnaryCorrectionRow]:
-        """Enregistrements sources HAL de ces identifiants : dépôts d'origine des enregistrements sources ScanR d'une correction ciblée."""
+        """Renvoie les enregistrements sources HAL de ces identifiants : dépôts d'origine des enregistrements sources ScanR d'une correction ciblée."""
         if not hal_ids:
             return []
         return self._unary_rows(
@@ -310,14 +317,14 @@ class SourceRecordCorrectionStore:
         return [_unary_row(r, registrant_types) for r in self._conn.execute(text(query), params)]
 
     def persist_corrections(self, updates: list[CorrectionUpdate]) -> int:
-        """Écrit en lot les colonnes corrigées, `corrections` et les statuts des identifiants, et marque les enregistrements sources pour la réconciliation, dont le type et les identifiants sont des clés. Renvoie le nombre de lignes."""
+        """Écrit en lot les colonnes corrigées, `corrections` et les statuts des identifiants. Marque les enregistrements sources pour la réconciliation : leur type et leurs identifiants sont des clés. Renvoie le nombre de lignes."""
         _persist_statuses(self._conn, {u.id: u.corrected.identifiers for u in updates})
         return _persist_updates(
             self._conn, [{"id": u.id, **u.corrected.columns._asdict()} for u in updates]
         )
 
     def fetch_missing_hal_ids(self) -> frozenset[str]:
-        """Identifiants des dépôts HAL introuvables dans HAL (`failed_lookups`). HAL attribue les identifiants HAL : l'échec est définitif."""
+        """Renvoie les identifiants des dépôts HAL introuvables dans HAL (`failed_lookups`). HAL attribue les identifiants HAL : l'échec est définitif."""
         rows = self._conn.execute(
             text(f"""
                 SELECT id_value FROM failed_lookups
@@ -327,7 +334,7 @@ class SourceRecordCorrectionStore:
         return frozenset(rows.scalars())
 
     def delete_missing_hal_locations(self) -> int:
-        """Supprime les localisations dont la correction unaire a retiré le lien des `urls` de leur enregistrement source (dépôt HAL introuvable). La normalisation réécrit les localisations : la suppression se rejoue à chaque passage. Renvoie le nombre de localisations supprimées."""
+        """Supprime les localisations à lien retiré des `urls` de leur enregistrement source par la correction unaire (dépôt HAL introuvable). La normalisation réécrit les localisations, donc la suppression se rejoue à chaque passage. Renvoie le nombre de localisations supprimées."""
         result = self._conn.execute(
             text(f"""
                 DELETE FROM source_record_locations l
@@ -342,7 +349,7 @@ class SourceRecordCorrectionStore:
         return result.rowcount
 
     def fetch_matchability_rows(self) -> list[MatchabilityRow]:
-        """Tous les enregistrements sources, avec les faits que lit `is_matchable` et sa valeur."""
+        """Renvoie tous les enregistrements sources, avec leur valeur de `is_matchable` et les faits qui la décident."""
         rows = self._conn.execute(
             text(f"""
                 SELECT id, is_matchable, source::text AS source, source_id, title_normalized,
@@ -384,14 +391,14 @@ class SourceRecordCorrectionStore:
         return _persist_updates(self._conn, [u._asdict() for u in updates])
 
     def fetch_serial_doi_namespaces(self) -> list[DoiNamespace]:
-        """Espaces de noms DOI des revues (`serial_doi_namespaces`)."""
+        """Renvoie les espaces de noms DOI des revues (`serial_doi_namespaces`)."""
         rows = self._conn.execute(
             text("SELECT namespace, serial_id, dois, share FROM serial_doi_namespaces")
         )
         return rows_as(DoiNamespace, rows)
 
     def fetch_serial_by_doi_candidates(self) -> list[SerialCorrectionRow]:
-        """Enregistrements sources candidats au rattachement : sans revue avec un DOI actif, ou déjà rattachés par espace de noms, dont le rattachement se réévalue."""
+        """Renvoie les enregistrements sources candidats au rattachement : sans revue avec un DOI actif, ou déjà rattachés par espace de noms, pour réévaluation."""
         rows = self._conn.execute(
             text(f"""
                 SELECT sr.id, sr.source::text AS source, sr.raw_doc_type,
@@ -424,7 +431,7 @@ class SourceRecordCorrectionStore:
         return _persist_updates(self._conn, [u._asdict() for u in updates])
 
     def fetch_versioned_dois(self) -> list[str]:
-        """DOI à suffixe de version des enregistrements sources, de rôle autre que `related`, quel que soit leur statut."""
+        """Renvoie les DOI à suffixe de version des enregistrements sources, de rôle autre que `related`, quel que soit leur statut."""
         rows = self._conn.execute(
             text(f"""
                 SELECT DISTINCT id_value FROM source_record_identifiers
@@ -436,7 +443,7 @@ class SourceRecordCorrectionStore:
         return list(rows.scalars())
 
     def fetch_anchor_dois(self, dois: Iterable[str]) -> frozenset[str]:
-        """Ceux de `dois` qui sont le DOI actif `primary` ou `derived` d'un enregistrement source, ancre de la réconciliation."""
+        """Renvoie les DOI de `dois` actifs en rôle `primary` ou `derived` d'un enregistrement source : ancres de la réconciliation."""
         rows = self._conn.execute(
             text(f"""
                 SELECT DISTINCT id_value FROM source_record_identifiers
@@ -450,7 +457,7 @@ class SourceRecordCorrectionStore:
         return frozenset(rows.scalars())
 
     def fetch_secondary_form_declarations(self) -> list[SecondaryFormRow]:
-        """Les enregistrements sources qui déclarent leur DOI forme secondaire d'une œuvre principale présente en base et connue de doi.org, un par enregistrement source. Un DOI inconnu de doi.org est écarté."""
+        """Renvoie les déclarations de forme secondaire, une par enregistrement source : DOI déclaré forme secondaire d'une œuvre principale présente en base. Un DOI inconnu de doi.org, déclaré ou cible, est écarté."""
         rows = self._conn.execute(
             text(f"""
                 WITH sr_eff AS (
@@ -579,7 +586,15 @@ class SourceRecordCorrectionStore:
         ]
 
     def fetch_doi_cluster_candidates(self) -> list[DoiClusterRow]:
-        """Membres des groupes de même DOI candidats au retrait du DOI : groupes qui contiennent un livre, un chapitre ou un volume d'actes ; groupes dont le DOI est inconnu de doi.org ; groupes où un dépôt HAL partage zéro nom d'auteur avec l'enregistrement source Crossref ; groupes d'un enregistrement source déjà corrigé, dont la correction se réévalue. Un groupe réunit les enregistrements sources qui ont son DOI, de rôle autre que `related`, quel que soit son statut."""
+        """Renvoie les membres des groupes de même DOI candidats au retrait du DOI.
+
+        Un groupe réunit les enregistrements sources ayant son DOI, de rôle autre que `related`, quel que soit son statut. Un groupe est candidat si :
+
+        - il contient un livre, un chapitre ou un volume d'actes ;
+        - son DOI est inconnu de doi.org ;
+        - un de ses dépôts HAL partage zéro nom d'auteur avec son enregistrement source Crossref ;
+        - il contient un enregistrement source déjà corrigé, à réévaluer.
+        """
         rows = self._conn.execute(
             text(f"""
                 WITH sr_eff AS (
@@ -672,7 +687,7 @@ class SourceRecordCorrectionStore:
         ]
 
     def replace_doi_targets(self, targets: list[DoiTarget]) -> int:
-        """Réécrit `doi_targets` avec les cibles données. Les enregistrements sources dont le DOI change de cible sont marqués pour la réconciliation. Renvoie le nombre de DOI dont la cible change."""
+        """Réécrit `doi_targets` avec les cibles données. Les enregistrements sources à DOI de cible changée sont marqués pour la réconciliation. Renvoie le nombre de DOI à cible changée."""
         current = {
             r.doi: (r.target_doi, r.rule)
             for r in self._conn.execute(text("SELECT doi, target_doi, rule FROM doi_targets"))
@@ -708,6 +723,6 @@ class SourceRecordCorrectionStore:
         return len(changed)
 
     def persist_doi_corrections(self, updates: list[DoiCorrectionUpdate]) -> int:
-        """Écrit en lot les statuts des identifiants, et marque les enregistrements sources pour la réconciliation, dont les identifiants sont des clés. Renvoie le nombre de lignes."""
+        """Écrit en lot les statuts des identifiants. Marque les enregistrements sources pour la réconciliation : leurs identifiants sont des clés. Renvoie le nombre de lignes."""
         _persist_statuses(self._conn, {u.id: u.identifiers for u in updates})
         return _persist_updates(self._conn, [{"id": u.id} for u in updates])

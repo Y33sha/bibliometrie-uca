@@ -25,9 +25,12 @@ async def run_fetch_pool[Item, Fetched](
     write: Callable[[Connection, Item, Fetched], None],
     prepare: Callable[[Connection, Item], Item] | None = None,
 ) -> None:
-    """Traite `items` avec `max_concurrent` workers : `fetch` asynchrone et concurrent, puis `write` synchrone et sérialisé, sans commit. Le pool commite tous les `commit_every` éléments, et à la fin. Il s'arrête quand le circuit-breaker de la source coupe.
+    """Traite `items` avec `max_concurrent` workers : `fetch` asynchrone et concurrent, puis `write` synchrone et sérialisé, sans commit.
 
-    `prepare`, facultatif, complète un élément par une lecture en base avant son fetch, sous le verrou des écritures.
+    Le pool commite tous les `commit_every` éléments, et à la fin. Il s'arrête quand le circuit-breaker de la source coupe.
+
+    Args:
+        prepare: complète un élément par une lecture en base avant son fetch, sous le verrou des écritures.
     """
     db_lock = asyncio.Lock()
     item_iter = iter(items)

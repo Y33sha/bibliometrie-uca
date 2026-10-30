@@ -1,6 +1,6 @@
 """Accès à une source : tout appel à une API tierce passe par `access_source`.
 
-L'accès contrôle les identifiants de la source et saute l'étape, avec un avertissement, s'ils manquent. Il pose le circuit-breaker de la source, que lisent les clients HTTP. Il signale une source coupée, par une exception ou par la boucle qui y renonce : la phase passe en avertissement, et le run suivant reprend les éléments non traités.
+L'accès contrôle les identifiants de la source. S'ils manquent, l'étape est sautée avec un avertissement. L'accès pose le circuit-breaker de la source, lu par les clients HTTP. Une source coupée, par une exception ou par `trip_source`, est signalée : la phase passe en avertissement, et le run suivant reprend les éléments non traités.
 """
 
 from __future__ import annotations
@@ -33,7 +33,8 @@ def access_source(
 ) -> PhaseMetrics:
     """Exécute `execute` sur `source` : identifiants contrôlés, circuit-breaker posé, indisponibilité signalée.
 
-    `phase` situe les avertissements dans le journal. `credentials_missing` contrôle les identifiants de la source, `request_budget` donne son débit.
+    Args:
+        phase: situe les avertissements dans le journal.
     """
     if reason := credentials_missing(source):
         metrics = PhaseMetrics()

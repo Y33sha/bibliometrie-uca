@@ -49,7 +49,7 @@ class CountryCandidatesStore:
         self._conn = conn
 
     def queued_addresses(self) -> list[tuple[int, str]]:
-        """`(id, normalized_text)` des adresses en file, pour la détection par le texte."""
+        """Renvoie `(id, normalized_text)` des adresses en file, pour la détection par le texte."""
         rows = self._conn.execute(
             text(
                 f"SELECT a.id, a.normalized_text FROM addresses a JOIN {Queue.ADDRESS_CANDIDATES} q ON q.id = a.id"  # noqa: S608
@@ -58,7 +58,7 @@ class CountryCandidatesStore:
         return [(r.id, r.normalized_text) for r in rows]
 
     def add(self, method: CountryDetectionMethod, rows: list[tuple[int, list[str]]]) -> int:
-        """Ajoute les candidats `(adresse, pays)` de `rows` pour le moyen `method`, et marque les adresses qui en reçoivent un. Un candidat déjà présent, ou un code absent du référentiel des pays, est ignoré. Retourne le nombre d'adresses qui reçoivent un candidat."""
+        """Ajoute les candidats `(adresse, pays)` de `rows` pour le moyen `method`, et marque les adresses pourvues d'un candidat. Un candidat déjà présent, ou un code absent du référentiel des pays, est ignoré. Renvoie le nombre d'adresses pourvues d'un candidat."""
         if not rows:
             return 0
         return int(
@@ -71,7 +71,7 @@ class CountryCandidatesStore:
     def replace_for_queued_addresses(
         self, method: CountryDetectionMethod, rows: list[tuple[int, list[str]]]
     ) -> int:
-        """Efface les candidats du moyen `method` des adresses en file, puis écrit ceux de `rows`, qui concernent ces seules adresses. Retourne le nombre d'adresses qui reçoivent un candidat."""
+        """Efface les candidats du moyen `method` des adresses en file, puis écrit ceux de `rows`, limités à ces adresses. Renvoie le nombre d'adresses pourvues d'un candidat."""
         self._conn.execute(
             text(f"""
                 DELETE FROM address_country_candidates
@@ -90,5 +90,5 @@ class CountryCandidatesStore:
         )
 
     def mark_all_for_detection(self) -> int:
-        """Marque toutes les adresses : le run suivant refait la détection par le texte et la résolution sur tout le stock. Retourne le nombre d'adresses marquées."""
+        """Marque toutes les adresses pour la détection par le texte et la résolution au run suivant. Renvoie le nombre d'adresses marquées."""
         return enqueue(self._conn, Queue.ADDRESS_CANDIDATES, "SELECT id FROM addresses", {})

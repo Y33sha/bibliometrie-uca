@@ -1,21 +1,21 @@
-"""Neutralisation, pour la détection de changement, de ce qui varie dans une ressource DataCite sans que l'enregistrement change.
+"""Neutralisation, pour la détection de changement, des champs variables d'une ressource DataCite à métadonnées inchangées.
 
-Un même DOI se lit par deux routes : la liste (`/dois?query=…`, moissonnage et phase `fetch_missing`) et la route unitaire (`/dois/{doi}`, phase `fetch_stale`). La route unitaire ajoute l'enregistrement XML encodé (`xml`), `prefix`, `suffix`, `published`, des `relationships` détaillées, renvoie `[]` là où la liste renvoie `None`, et donne les dates à la milliseconde. Les compteurs (`…Count`, `…OverTime`) bougent d'une lecture à l'autre ; seul le nombre de citations, que la normalisation lit, reste dans l'empreinte.
+Un même DOI se lit par deux routes : la liste (`/dois?query=…`, moissonnage et phase `fetch_missing`) et la route unitaire (`/dois/{doi}`, phase `fetch_stale`). La route unitaire ajoute la ressource XML encodée (`xml`), `prefix`, `suffix`, `published`, des `relationships` détaillées, renvoie `[]` à la place du `None` de la liste, et donne les dates à la milliseconde. Les compteurs (`…Count`, `…OverTime`) bougent d'une lecture à l'autre ; seul le nombre de citations, lu par la normalisation, reste dans l'empreinte.
 
-`strip_volatile_for_hash` renvoie une copie de la ressource sans ces champs, pour le seul calcul de l'empreinte. Les métadonnées que lit la normalisation restent dans l'empreinte : un vrai changement de l'enregistrement reste détecté. Le payload stocké reste fidèle à la source.
+`strip_volatile_for_hash` renvoie une copie de la ressource sans ces champs, pour le seul calcul de l'empreinte. Les métadonnées lues par la normalisation restent dans l'empreinte : un vrai changement de la ressource reste détecté. Le payload stocké reste fidèle à la source.
 """
 
 from collections.abc import Mapping
 
 from domain.types import JsonValue
 
-# Attributs absents d'une route ou propres à l'enregistrement du DOI, qu'aucune lecture n'utilise.
+# Attributs absents d'une route ou propres à l'enregistrement du DOI auprès de DataCite, inutilisés par la normalisation.
 _ROUTE_OR_REGISTRATION = frozenset(
     {"xml", "prefix", "suffix", "published", "created", "registered", "updated"}
 )
 # Suffixes des compteurs (consultations, téléchargements, références, versions…).
 _COUNTER_SUFFIXES = ("Count", "OverTime")
-# Compteur que la normalisation lit : il reste dans l'empreinte.
+# Compteur lu par la normalisation : il reste dans l'empreinte.
 _READ_COUNTERS = frozenset({"citationCount"})
 
 
@@ -28,7 +28,7 @@ def _kept(key: str, value: JsonValue) -> bool:
 
 
 def strip_volatile_for_hash(raw_data: Mapping[str, JsonValue]) -> Mapping[str, JsonValue]:
-    """Copie de la ressource DataCite réduite à `id`, `type` et aux attributs stables, sans `relationships`."""
+    """Renvoie une copie de la ressource DataCite réduite à `id`, `type` et aux attributs stables, sans `relationships`."""
     attributes = raw_data.get("attributes")
     stable: dict[str, JsonValue] = {"id": raw_data.get("id"), "type": raw_data.get("type")}
     if isinstance(attributes, Mapping):

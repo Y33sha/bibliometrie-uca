@@ -29,7 +29,7 @@ _SCOPE_WIDTH = len("2023-2026")
 
 
 def source_branch(source: str, scope: str | None = None) -> str:
-    """Libellé de la barre d'avancement d'une source : sa branche, son nom, et le remplissage qui aligne les barres d'une même phase les unes sous les autres.
+    """Renvoie le libellé de la barre d'avancement d'une source : sa branche, son nom, et le remplissage qui aligne les barres d'une même phase.
 
     `scope` ajoute une colonne pour le périmètre en cours, une année par exemple. Un périmètre vide garde la colonne, pour aligner une source sans périmètre sur les autres.
     """
@@ -46,7 +46,10 @@ def breakdown(
     *,
     last: bool = True,
 ) -> None:
-    """Ligne de branche `header`, puis une ligne par `(nombre, libellé)`, nombres alignés à droite. Sous une branche suivie d'autres lignes (`last` faux), le trait vertical longe le détail, et une ligne vide le sépare de la branche suivante."""
+    """Écrit la ligne de branche `header`, puis une ligne par `(nombre, libellé)`, nombres alignés à droite.
+
+    Sous une branche suivie d'autres lignes (`last` faux), le trait vertical longe le détail, et une ligne vide le sépare de la branche suivante.
+    """
     rows = list(rows)
     margin = " " * len(LAST_BRANCH) if last else BRANCH_CONTINUATION
     logger.info("%s%s", LAST_BRANCH if last else BRANCH, header)
@@ -58,9 +61,10 @@ def breakdown(
 
 
 def step(logger: ScopedOrPlainLogger, title: str, *args: object) -> None:
-    """Ouvre une sous-étape : une ligne vide la détache de ce qui précède, puis son titre.
+    """Ouvre une sous-étape : une ligne vide, puis son titre.
 
-    `args` complète les champs de `title`, comme pour tout message de journal.
+    Args:
+        args: champs de `title`, comme pour tout message de journal.
     """
     line = f"{STEP}{title}"
     logger.info("")
@@ -68,14 +72,19 @@ def step(logger: ScopedOrPlainLogger, title: str, *args: object) -> None:
 
 
 def nothing_to_do(logger: ScopedOrPlainLogger, subject: str | None = None) -> None:
-    """Ferme une sous-étape qui n'a rien à traiter. `subject` nomme la sous-étape quand l'étape en compte plusieurs."""
+    """Ferme une sous-étape sans rien à traiter.
+
+    Args:
+        subject: nomme la sous-étape quand l'étape compte plusieurs sous-étapes.
+    """
     logger.info("%s%s", LAST_BRANCH, f"{subject} : rien à faire" if subject else "Rien à faire")
 
 
 def inflect(n: int, singular: str, plural: str | None = None) -> str:
-    """Renvoie « préfixe » ou « préfixes » selon `n`. Zéro prend le singulier, comme le veut le français.
+    """Renvoie « préfixe » ou « préfixes » selon `n`. Zéro prend le singulier.
 
-    `plural` couvre les formes que le `s` final ne donne pas.
+    Args:
+        plural: pluriel, quand il ne se forme pas par un `s` final.
     """
     if plural is None:
         plural = f"{singular}s"

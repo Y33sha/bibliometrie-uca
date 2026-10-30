@@ -27,7 +27,7 @@ def count_addresses(conn: Connection) -> int:
 
 
 def fetch_addresses_chunk(conn: Connection, *, after_id: int, limit: int) -> list[tuple[int, str]]:
-    """Tranche des adresses qui suivent `after_id`, par identifiant croissant."""
+    """Renvoie la tranche des adresses d'identifiant supérieur à `after_id`, par identifiant croissant."""
     rows = conn.execute(
         text(
             "SELECT a.id, a.normalized_text FROM addresses a "
@@ -41,9 +41,11 @@ def fetch_addresses_chunk(conn: Connection, *, after_id: int, limit: int) -> lis
 class ResolutionStats(NamedTuple):
     """Bilan d'une passe de résolution d'adresses."""
 
-    processed: int  # adresses traitées
-    in_perimeter: int  # adresses rattachées à au moins une structure du périmètre
-    affiliations: int  # liens détectés entre adresse et structure
+    processed: int
+    in_perimeter: int
+    """Adresses rattachées à au moins une structure du périmètre."""
+    affiliations: int
+    """Liens détectés entre adresse et structure."""
 
 
 def run_resolution(

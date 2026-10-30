@@ -1,6 +1,6 @@
 """Lecture des réglages numériques du pipeline (`domain.config.ConfigKey`) : années couvertes, plafonds et délais d'interrogation.
 
-Ces réglages sont dans la table `config`, et se modifient dans l'interface d'administration.
+La table `config` contient ces réglages, modifiables dans l'interface d'administration.
 """
 
 import logging
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 def _stored_int(conn: Connection, key: ConfigKey) -> int | None:
-    """Valeur entière de `key` dans la table `config`, ou `None` si elle est absente ou illisible. Une valeur illisible est journalisée."""
+    """Renvoie la valeur entière de `key` dans la table `config`, ou `None` si elle est absente ou illisible. Une valeur illisible est journalisée."""
     row = conn.execute(
         text("SELECT value FROM config WHERE key = :key"), {"key": key.value}
     ).one_or_none()
@@ -30,17 +30,20 @@ def _stored_int(conn: Connection, key: ConfigKey) -> int | None:
 
 
 def cap(conn: Connection, key: ConfigKey) -> int | None:
-    """Plafond d'interrogations de `key`, `None` valant illimité (`cap_value`)."""
+    """Renvoie le plafond d'interrogations de `key`, ou `None` sans plafond (`cap_value`)."""
     return cap_value(key, _stored_int(conn, key))
 
 
 def delay(conn: Connection, key: ConfigKey) -> int:
-    """Délai de réinterrogation de `key`, en jours (`delay_value`)."""
+    """Renvoie le délai de réinterrogation de `key`, en jours (`delay_value`)."""
     return delay_value(key, _stored_int(conn, key))
 
 
 def get_years(conn: Connection, start_year: int | None = None) -> list[int]:
-    """Années à moissonner, de `start_year` à l'année courante. Sans `start_year`, la clé `pipeline_start_year_full` donne la première année. Seule l'année courante si la première année manque ou est future."""
+    """Renvoie les années à moissonner, de `start_year` à l'année courante.
+
+    Sans `start_year`, la clé `pipeline_start_year_full` donne la première année. Si la première année manque ou est future, seule l'année courante est renvoyée.
+    """
     current_year = today().year
     if start_year is None:
         start_year = _stored_int(conn, ConfigKey.PIPELINE_START_YEAR_FULL)
@@ -50,5 +53,5 @@ def get_years(conn: Connection, start_year: int | None = None) -> list[int]:
 
 
 def window_years(conn: Connection, *, start_year: int | None, year: int | None) -> list[int]:
-    """Années de la fenêtre du run : `year` (`--year`), sinon `[start_year … année courante]` (`get_years`)."""
+    """Renvoie les années de la fenêtre du run : `year` (`--year`), sinon de `start_year` à l'année courante (`get_years`)."""
     return [year] if year else get_years(conn, start_year)

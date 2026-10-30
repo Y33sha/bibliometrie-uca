@@ -15,7 +15,7 @@ from pipeline.transformation.countries.store import CountryCandidatesStore
 
 
 def load_country_forms(conn: Connection) -> dict[str, str]:
-    """Formes normalisées des noms de pays, chacune avec le code ISO du pays qu'elle désigne : `{forme: code ISO}`."""
+    """Renvoie les formes normalisées des noms de pays, avec le code ISO du pays désigné : `{forme: code ISO}`."""
     rows = conn.execute(
         text(
             "SELECT form_normalized, iso_code FROM place_name_forms "
@@ -28,9 +28,9 @@ def load_country_forms(conn: Connection) -> dict[str, str]:
 def _match_trailing_country(
     normalized_text: str, country_forms: dict[str, str], max_tokens: int
 ) -> str | None:
-    """Code ISO du plus long nom de pays qui termine `normalized_text`, ou None.
+    """Renvoie le code ISO du plus long nom de pays en fin de `normalized_text`, ou None.
 
-    Teste les suffixes de N tokens décroissants (N ≤ `max_tokens`) : le plus long l'emporte, de sorte qu'« united kingdom » prime sur « kingdom »."""
+    Les suffixes sont testés du plus long (`max_tokens` tokens) au plus court : « united kingdom » prime sur « kingdom »."""
     tokens = normalized_text.split()
     for n in range(min(max_tokens, len(tokens)), 0, -1):
         iso = country_forms.get(" ".join(tokens[-n:]))

@@ -84,35 +84,34 @@ def stage_document(
 
 
 class HarvestConfigError(Exception):
-    """Configuration d'extraction incomplète : il manque un paramètre indispensable à l'API (identifiants d'institution, affiliations, PPN).
+    """Configuration de moissonnage incomplète : un paramètre indispensable à l'API manque (identifiants d'institution, affiliations, PPN).
 
-    `load_config` la lève avant toute requête, et la source est sautée avec un message explicite.
+    `load_config` la lève avant toute requête. La source est alors sautée avec un message explicite.
     """
 
 
 @dataclass(frozen=True, slots=True)
 class HarvestWindow:
-    """Bornes d'un moissonnage : année de départ, année unique (`--year`), date de modification minimale (mode quotidien).
-
-    `year` prime sur `start_year`. `since`, au format `YYYY-MM-DD`, sert au moissonnage incrémental de HAL et d'OpenAlex.
-    """
+    """Bornes d'un moissonnage."""
 
     start_year: int | None = None
     year: int | None = None
+    """Année unique (`--year`). Prime sur `start_year`."""
     since: str | None = None
+    """Date de modification minimale du mode quotidien, au format `YYYY-MM-DD`. Sert au moissonnage incrémental de HAL et d'OpenAlex."""
 
 
 class SourceHarvester[ConfigT, ClientT](ABC):
     """Patron d'un moissonneur, de l'API de la source vers `staging`.
 
-    `ConfigT` est le type de la configuration propre à la source, que `load_config` renvoie et que `harvest_all` reçoit. `ClientT` est le type du client HTTP de la source, reçu à la construction.
+    `ConfigT` est le type de la configuration propre à la source, renvoyée par `load_config` et reçue par `harvest_all`. `ClientT` est le type du client HTTP de la source, reçu à la construction.
 
     Une sous-classe définit `SOURCE`, `load_config` et `harvest_all`, et peut définir `setup_logging`.
     """
 
     SOURCE: ClassVar[str] = ""
     DOCUMENT: ClassVar[str] = "document"
-    """Nom des éléments que rapporte la source, au singulier."""
+    """Nom des éléments rapportés par la source, au singulier."""
     FEMININE: ClassVar[bool] = False
     """Genre de `DOCUMENT`, auquel s'accordent les mots du bilan."""
 
@@ -127,11 +126,11 @@ class SourceHarvester[ConfigT, ClientT](ABC):
         self._client = client
 
     def _years(self, window: HarvestWindow) -> list[int]:
-        """Années de publication à moissonner : `--year`, sinon de `start_year` à l'année courante. Le mode incrémental garde cette plage."""
+        """Renvoie les années de publication à moissonner : `--year`, sinon de `start_year` à l'année courante. Le mode incrémental garde cette plage."""
         return window_years(self.conn, start_year=window.start_year, year=window.year)
 
     def _label(self, scope: str | None = None) -> str:
-        """Libellé de la barre de la source, avec la colonne du périmètre en cours."""
+        """Renvoie le libellé de la barre de la source, avec la colonne du périmètre en cours."""
         return source_branch(self.SOURCE, scope)
 
     def _harvest_by_year(
@@ -140,11 +139,11 @@ class SourceHarvester[ConfigT, ClientT](ABC):
         count_year: Callable[[int], int],
         harvest_step: Callable[[int, Progress], PhaseMetrics],
     ) -> PhaseMetrics:
-        """Extrait les années dans l'ordre sous une seule barre, dont le libellé suit l'année en cours.
+        """Moissonne les années dans l'ordre sous une seule barre, au libellé réglé sur l'année en cours.
 
         `count_year` donne le volume d'une année : la barre connaît son total dès le départ. Une coupure laisse sur la barre l'année interrompue, et les précédentes sont terminées.
 
-        Une source indisponible (`SourceUnavailableError`) arrête la boucle et coupe la source : les années restantes repartent au prochain run, les métriques des années extraites sont gardées.
+        Une source indisponible (`SourceUnavailableError`) arrête la boucle et coupe la source : les années restantes repartent au prochain run, les métriques des années moissonnées sont gardées.
         """
         metrics = PhaseMetrics()
         if not years:
@@ -171,7 +170,7 @@ class SourceHarvester[ConfigT, ClientT](ABC):
         *,
         by: str | None = None,
     ) -> PhaseMetrics:
-        """Extrait un périmètre d'un seul tenant sous la barre de la source, puis écrit le bilan."""
+        """Moissonne un périmètre d'un seul tenant sous la barre de la source, puis écrit le bilan."""
         with track_progress(total, self._label(), self.logger) as progress:
             metrics = harvest_step(progress)
         self._write_summary(metrics, by=by)
@@ -222,7 +221,7 @@ class SourceHarvester[ConfigT, ClientT](ABC):
 
 
 class Harvester(Protocol):
-    """Point d'entrée d'un `SourceHarvester`, seul que les orchestrateurs appellent.
+    """Point d'entrée d'un `SourceHarvester`, seul appelé par les orchestrateurs.
 
     Le protocole efface les paramètres de type de `SourceHarvester`, la configuration et le client propres à chaque source.
     """

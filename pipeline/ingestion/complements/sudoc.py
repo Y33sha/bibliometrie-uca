@@ -31,7 +31,7 @@ def _is_not_found(exc: httpx2.HTTPStatusError) -> bool:
 async def fetch_ppns(
     client: httpx2.AsyncClient, issns: Sequence[str], *, base_url: str
 ) -> dict[str, tuple[str, ...]]:
-    """PPN des notices Sudoc de chaque ISSN, par lots de `SUDOC_ISSN2PPN_BATCH`. Un ISSN sans notice est absent du résultat."""
+    """Renvoie les PPN des notices Sudoc de chaque ISSN, interrogés par lots de `SUDOC_ISSN2PPN_BATCH`. Un ISSN sans notice est absent du résultat."""
     result: dict[str, tuple[str, ...]] = {}
     for i in range(0, len(issns), SUDOC_ISSN2PPN_BATCH):
         batch = issns[i : i + SUDOC_ISSN2PPN_BATCH]
@@ -61,7 +61,7 @@ async def fetch_ppns(
 
 
 def marc_fields(xml: str) -> list[MarcField]:
-    """Zones de données d'une notice MARCXML, dans l'ordre de la notice."""
+    """Lit les zones de données d'une notice MARCXML, dans l'ordre de la notice."""
     root = ET.fromstring(xml)
     fields: list[MarcField] = []
     for element in root.iter():
@@ -86,7 +86,7 @@ def marc_fields(xml: str) -> list[MarcField]:
 async def fetch_serial_record(
     client: httpx2.AsyncClient, ppn: str, *, base_url: str
 ) -> SudocSerialRecord | None:
-    """Notice Sudoc d'une publication en série, ou `None` si le PPN est inconnu ou la notice illisible."""
+    """Renvoie la notice Sudoc d'une publication en série, ou `None` si le PPN est inconnu ou la notice illisible."""
     try:
         xml = await http_get_text_with_retry_async(
             client, f"{base_url}/{ppn}.xml", label=f"notice {ppn}"

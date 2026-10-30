@@ -1,6 +1,6 @@
 """Phase `subjects` : sujets des publications (`subject_ingestion`), puis usage des sujets et cooccurrences (`subject_cooccurrences`). Chaque tâche a sa transaction. La phase est idempotente.
 
-La phase `finalize` a supprimé les publications sans contribution rattachée à une personne : `publication_subjects` et les compteurs qui en dérivent couvrent donc le périmètre.
+La phase `finalize` supprime au préalable les publications sans contribution rattachée à une personne. `publication_subjects` et ses compteurs dérivés couvrent donc le périmètre.
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ from pipeline.transformation.publications.subjects.subject_store import SubjectS
 @dataclass(frozen=True)
 class SubjectsPhase:
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Ingestion des sujets puis recalcul des co-occurrences ; retourne les métriques d'ingestion. L'option `rebuild_subjects` force la ré-ingestion de toutes les publications."""
+        """Ingère les sujets, puis recalcule l'usage des sujets et les cooccurrences. Renvoie les métriques d'ingestion. L'option `rebuild_subjects` force la ré-ingestion de toutes les publications."""
 
         def ingest(ctx: PhaseContext) -> PhaseMetrics:
             with ctx.open_tx() as conn:

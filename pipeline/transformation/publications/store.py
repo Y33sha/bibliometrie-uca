@@ -23,7 +23,7 @@ class PublicationStore:
         self._conn = conn
 
     def find_ids_by_serial_id(self, serial_id: int) -> list[int]:
-        """Publications de cette revue, à recalculer quand un champ modifiable de la revue change (`serial_type`)."""
+        """Renvoie les publications de cette revue, à recalculer quand un champ modifiable de la revue change (`serial_type`)."""
         result = self._conn.execute(
             text("SELECT id FROM publications WHERE serial_id = :jid ORDER BY id"),
             {"jid": serial_id},
@@ -31,7 +31,7 @@ class PublicationStore:
         return [row.id for row in result]
 
     def find_doc_types_by_ids(self, publication_ids: list[int]) -> dict[int, str]:
-        """`doc_type` de chaque publication demandée. Une publication supprimée, par un recalcul par exemple, manque de la réponse."""
+        """Renvoie le `doc_type` de chaque publication demandée. Une publication supprimée, par un recalcul par exemple, est absente de la réponse."""
         if not publication_ids:
             return {}
         result = self._conn.execute(
@@ -43,7 +43,7 @@ class PublicationStore:
         return {row.id: row.doc_type for row in result}
 
     def find_by_id(self, publication_id: int) -> Publication | None:
-        """Publication de cet identifiant, sans ses contributions, ou `None`."""
+        """Renvoie la publication de cet identifiant, sans ses contributions, ou `None`."""
         row = self._conn.execute(
             text("""
                 SELECT p.id, p.title, p.title_normalized,
@@ -209,7 +209,7 @@ class PublicationStore:
         )
 
     def repoint_dependents(self, from_publication_id: int, to_publication_id: int) -> None:
-        """Re-pointe les paiements APC (`apc_payments`) de `from_publication_id` vers `to_publication_id`, et enregistre la redirection de son identifiant."""
+        """Rattache les paiements APC (`apc_payments`) de `from_publication_id` à `to_publication_id`, et enregistre la redirection de son identifiant."""
         self._conn.execute(
             text("UPDATE apc_payments SET publication_id = :t WHERE publication_id = :s"),
             {"s": from_publication_id, "t": to_publication_id},
@@ -227,7 +227,7 @@ class PublicationStore:
 
 
 def _json_dumps_or_none(value: Mapping[str, JsonValue] | None) -> str | None:
-    """Texte JSON de `value` pour `CAST(:p AS jsonb)`, ou `None`."""
+    """Renvoie le texte JSON de `value` pour `CAST(:p AS jsonb)`, ou `None`."""
     if value is None:
         return None
     return json.dumps(value)

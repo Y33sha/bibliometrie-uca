@@ -1,4 +1,4 @@
-"""Lecture des enregistrements sources Crossref par la normalisation : conventions des champs de l'API Works.
+"""Lecture des payloads Crossref par la normalisation : conventions des champs de l'API Works.
 
 Les payloads sont les objets JSON bruts de l'API, sans schéma typé.
 """
@@ -21,11 +21,11 @@ def strip_jats_tags(s: str) -> str:
 
 
 def extract_crossref_publication_year(msg: Mapping[str, JsonValue], *, max_year: int) -> int | None:
-    """Année de publication Crossref : la première année plausible parmi `published`, `issued`, `published-online`, `published-print` et `approved`.
+    """Renvoie l'année de publication Crossref : la première année plausible parmi `published`, `issued`, `published-online`, `published-print` et `approved`.
 
-    `published` est la plus ancienne des dates en ligne et papier. `issued` est la date que déclare l'éditeur ; elle peut viser un numéro futur, déposé avant parution. `approved` est la date de soutenance d'une thèse, seule date des thèses déposées par l'ABES.
+    `published` est la plus ancienne des dates en ligne et papier. `issued` est la date déclarée par l'éditeur ; elle peut viser un numéro futur, déposé avant parution. `approved` est la date de soutenance d'une thèse, seule date des thèses déposées par l'ABES.
 
-    Une année plausible tient entre 1500 et `max_year`, en général l'année suivante : un preprint peut être daté de l'année à venir. Sans année plausible, la normalisation refuse l'enregistrement, et les autres sources donnent l'année de la publication. `max_year` est un paramètre pour que les tests restent indépendants du calendrier.
+    Une année plausible tient entre 1500 et `max_year`, en général l'année suivante : un preprint peut être daté de l'année à venir. Sans année plausible, la normalisation refuse le document, et les autres sources donnent l'année de la publication. `max_year` est un paramètre pour que les tests restent indépendants du calendrier.
     """
     for field in ("published", "issued", "published-online", "published-print", "approved"):
         date_parts = as_sequence(as_mapping(msg.get(field)).get("date-parts"))
@@ -43,7 +43,7 @@ _ISSN_SUPPORTS = {"print": IssnSupport.PRINT, "electronic": IssnSupport.ELECTRON
 
 
 def crossref_issns(msg: Mapping[str, JsonValue]) -> tuple[SerialIssn, ...]:
-    """ISSN d'un enregistrement source Crossref. `issn-type` donne le support (papier ou en ligne) ; un ISSN de la liste `ISSN` absent de `issn-type` a un support inconnu."""
+    """Renvoie les ISSN d'un document Crossref. `issn-type` donne le support (papier ou en ligne) ; un ISSN de la liste `ISSN` absent de `issn-type` a un support inconnu."""
     typed = []
     for entry in as_sequence(msg.get("issn-type")):
         issn_obj = as_mapping(entry)
@@ -56,7 +56,7 @@ def crossref_issns(msg: Mapping[str, JsonValue]) -> tuple[SerialIssn, ...]:
 
 
 def parse_crossref_issns(msg: Mapping[str, JsonValue]) -> tuple[str | None, str | None]:
-    """ISSN papier et électronique : le premier de chaque support, à défaut le premier ISSN de support inconnu comme ISSN papier."""
+    """Renvoie les ISSN papier et électronique : le premier de chaque support, à défaut le premier ISSN de support inconnu comme ISSN papier."""
     issns = crossref_issns(msg)
 
     def first(support: IssnSupport | None) -> str | None:
@@ -69,14 +69,14 @@ def parse_crossref_issns(msg: Mapping[str, JsonValue]) -> tuple[str | None, str 
 
 
 def crossref_raw_doc_type(msg: Mapping[str, JsonValue]) -> str | None:
-    """Type brut d'un document Crossref, suivi de son sous-type quand Crossref en donne un (`posted-content_preprint`, `posted-content_other`)."""
+    """Renvoie le type brut d'un document Crossref, suivi de son sous-type quand Crossref en donne un (`posted-content_preprint`, `posted-content_other`)."""
     doc_type = as_str(msg.get("type"))
     subtype = as_str(msg.get("subtype"))
     return f"{doc_type}_{subtype}" if doc_type and subtype else doc_type
 
 
 def extract_crossref_conference(msg: Mapping[str, JsonValue]) -> dict[str, JsonValue] | None:
-    """Nom et acronyme du congrès dont le document est issu, ou `None`.
+    """Renvoie le nom et l'acronyme du congrès d'origine du document, ou `None`.
 
     Crossref décrit le congrès dans `event` pour un `proceedings-article`. Springer le décrit dans les `assertion` du groupe `ConferenceInfo` pour un `book-chapter`.
     """
@@ -104,7 +104,7 @@ def extract_crossref_conference(msg: Mapping[str, JsonValue]) -> dict[str, JsonV
 
 
 def extract_crossref_source_extras(msg: Mapping[str, JsonValue]) -> Mapping[str, JsonValue] | None:
-    """Champs propres à Crossref gardés dans `source_records.source_extras` : licence, financeurs, relations, congrès, titre de groupe d'un `posted-content`, nombre de références s'il est positif, date d'indexation. Le reste du payload est écarté.
+    """Renvoie les champs propres à Crossref gardés dans `source_records.source_extras` : licence, financeurs, relations, congrès, titre de groupe d'un `posted-content`, nombre de références s'il est positif, date d'indexation. Le reste du payload est écarté.
 
     Les relations servent à la phase `relations`.
     """

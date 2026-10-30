@@ -1,8 +1,8 @@
 """Écriture et suppression des enregistrements sources, communes aux normaliseurs de toutes les sources.
 
-Un enregistrement source est la vue normalisée du dernier import, qui fait autorité : l'écriture réécrit toutes les colonnes que l'import renseigne. La clé `(source, source_id)` garde l'`id` de la ligne d'un import à l'autre, pour les tables qui la référencent.
+Un enregistrement source est la vue normalisée du dernier import, qui fait autorité : l'écriture réécrit toutes les colonnes renseignées par l'import. La clé `(source, source_id)` garde l'`id` de la ligne d'un import à l'autre, pour les tables qui la référencent.
 
-Les colonnes qu'aucun import ne renseigne restent en l'état : le rattachement à la publication, que la phase `publications` recalcule pour chaque enregistrement source écrit, les pays, que calcule la phase `countries`, et la date de création.
+Les colonnes absentes de l'import restent en l'état : le rattachement à la publication, recalculé par la phase `publications` pour chaque enregistrement source écrit ; les pays, calculés par la phase `countries` ; la date de création.
 """
 
 import json
@@ -32,11 +32,11 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class SourceRecordUpsert:
-    """Un enregistrement source tel qu'une source le fournit, prêt à être écrit.
+    """Un enregistrement source fourni par une source, prêt à être écrit.
 
-    Le jeu de colonnes est commun à toutes les sources ; celles qu'une source ne renseigne pas restent à `None`. Cette absence reflète ce que la source expose : theses.fr est sans résumé, HAL et theses.fr sans indicateur de citation ; `hal_collections` et `embargo_until` existent seulement pour HAL, `is_retracted` seulement pour OpenAlex.
+    Le jeu de colonnes est commun à toutes les sources ; une colonne non renseignée par la source reste à `None`. Les absences suivent les données exposées par chaque source : theses.fr est sans résumé, HAL et theses.fr sans indicateur de citation ; `hal_collections` et `embargo_until` existent seulement pour HAL, `is_retracted` seulement pour OpenAlex.
 
-    Quatre colonnes de `source_records` n'y figurent pas. `title_normalized` se dérive de `title` au moment de l'écriture, `doc_type` de `raw_doc_type` (`map_doc_type`) et `language` de `raw_language` (`language_code`). `publication_id` est le rattachement à la publication, que la phase `publications` pose et que l'import ne connaît pas.
+    `title_normalized` se dérive de `title` à l'écriture, `doc_type` de `raw_doc_type` (`map_doc_type`) et `language` de `raw_language` (`language_code`). `publication_id`, rattachement à la publication, est posé par la phase `publications`.
     """
 
     # Clé de l'enregistrement source
@@ -57,7 +57,7 @@ class SourceRecordUpsert:
     serial_id: int | None = None
     monograph_id: int | None = None
     publisher_id: int | None = None
-    """Éditeur que nomme la source. L'écriture le retire d'une production hébergée sans être publiée (`source_record_has_publisher`)."""
+    """Éditeur nommé par la source. L'écriture le retire d'une production hébergée sans être publiée (`source_record_has_publisher`)."""
     container_title: str | None = None
     """Titre libre du conteneur. L'écriture retire un titre de plateforme d'ebooks (`names_ebook_platform`)."""
     raw_language: str | None = None
@@ -143,7 +143,7 @@ _INSERT_IDENTIFIERS = text("""
 def replace_identifiers(
     conn: Connection, identifiers_by_source_record: Mapping[int, Iterable[SourceIdentifier]]
 ) -> None:
-    """Remplace les identifiants des enregistrements sources donnés, en une suppression et une insertion. Chaque identifiant écrit est actif."""
+    """Réécrit les identifiants des enregistrements sources donnés, en une suppression et une insertion. Chaque identifiant écrit est actif."""
     conn.execute(_DELETE_IDENTIFIERS, {"source_record_ids": list(identifiers_by_source_record)})
     rows = [
         {
@@ -192,7 +192,7 @@ class SourceRecordStore:
 
 
 def _doc_type(row: SourceRecordUpsert) -> str | None:
-    """Type du référentiel qui correspond au type de la source (`map_doc_type`). Un type absent de la table de sa source donne `other` et est journalisé."""
+    """Renvoie le type du référentiel correspondant au type de la source (`map_doc_type`). Un type absent de la table de sa source donne `other` et est journalisé."""
     if row.raw_doc_type is None:
         return None
     doc_type = map_doc_type(row.raw_doc_type, row.source)
@@ -209,13 +209,13 @@ def _doc_type(row: SourceRecordUpsert) -> str | None:
 
 
 def fetch_language_forms(conn: Connection) -> dict[str, str]:
-    """Formes de `language_forms`, chacune associée au code de sa langue."""
+    """Renvoie les formes de `language_forms`, chacune associée au code de sa langue."""
     rows = conn.execute(text("SELECT form_normalized, language_code FROM language_forms"))
     return {r.form_normalized: r.language_code for r in rows}
 
 
 def normalized_identifiers(row: SourceRecordUpsert) -> tuple[SourceIdentifier, ...]:
-    """Identifiants normalisés de la ligne (`normalize_identifiers`). Chaque identifiant écarté est journalisé."""
+    """Renvoie les identifiants normalisés de la ligne (`normalize_identifiers`). Chaque identifiant écarté est journalisé."""
     identifiers, rejected = normalize_identifiers(row.identifiers)
     for identifier in rejected:
         # Lignes de détail : le terminal les masque, le journal les garde.
@@ -231,9 +231,9 @@ def normalized_identifiers(row: SourceRecordUpsert) -> tuple[SourceIdentifier, .
 
 
 def _delete_source_records(conn: Connection, staging_filter: str, params: dict[str, object]) -> int:
-    """Supprime les enregistrements sources dont la ligne de `staging` (alias `s`) satisfait le filtre, et renvoie leur nombre.
+    """Supprime les enregistrements sources à ligne de `staging` (alias `s`) conforme au filtre, et renvoie leur nombre.
 
-    Les autres enregistrements sources de leur publication sont d'abord marqués pour la réconciliation : la phase `publications` recalcule la publication sans les enregistrements supprimés. La publication est marquée pour le groupement des auteurs. Une publication vidée de tous ses enregistrements sources est supprimée en fin de phase `publications`. Les contributions sources suivent par cascade.
+    Les autres enregistrements sources de leur publication sont d'abord marqués pour la réconciliation : la phase `publications` recalcule la publication sans les enregistrements sources supprimés. La publication est marquée pour le groupement des auteurs. Une publication vidée de tous ses enregistrements sources est supprimée en fin de phase `publications`. Les contributions sources suivent par cascade.
     """
     enqueue(
         conn,

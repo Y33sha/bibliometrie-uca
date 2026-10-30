@@ -1,4 +1,4 @@
-"""Indices de l'entrée des contributions sources dans le périmètre (`source_contributions.perimeter_evidence`), d'après les structures qu'elles atteignent et les identifiants des personnes qui ont une fiche RH.
+"""Indices de l'entrée des contributions sources dans le périmètre (`source_contributions.perimeter_evidence`), d'après les structures atteintes et les identifiants des personnes à fiche RH.
 
 Le module sert la phase `affiliations` et le recalcul ciblé après une correction d'adresse (`SourceContributionPerimeterRecompute`)."""
 
@@ -18,16 +18,18 @@ from pipeline.transformation.publications.publication_perimeter import (
 
 
 class InPerimeterSyncCounts(NamedTuple):
-    """Nombre de contributions sources entrées dans le périmètre et sorties du périmètre lors d'une synchronisation."""
+    """Bilan d'une synchronisation des indices de périmètre."""
 
     added: int
+    """Contributions sources entrées dans le périmètre."""
     removed: int
+    """Contributions sources sorties du périmètre."""
 
 
 def _sync_sql(scoped: bool) -> str:
-    """Requête de synchronisation des indices, restreinte à une liste de contributions sources si `scoped` est vrai.
+    """Renvoie la requête de synchronisation des indices, restreinte à une liste de contributions sources si `scoped` est vrai.
 
-    Seules les contributions sources dont les indices changent sont écrites. Un enregistrement source sans publication dont une contribution source entre dans le périmètre est marqué pour la réconciliation : la phase `publications` le met alors en publication. Les contributions des contributions sources écrites sont marquées pour la recomposition de leurs attributs.
+    Seules les contributions sources aux indices changés sont écrites. Un enregistrement source sans publication, dont une contribution source entre dans le périmètre, est marqué pour la réconciliation. La phase `publications` lui donne alors une publication. Les contributions des contributions sources écrites sont marquées pour la recomposition de leurs attributs.
     """
     marked = enqueue_sql(
         Queue.SOURCE_RECORD_KEYS,
@@ -73,9 +75,9 @@ _SYNC_SCOPED = text(_sync_sql(scoped=True))
 
 
 def refresh_source_contribution_structures(conn: Connection) -> None:
-    """Rafraîchit la vue matérialisée `source_contribution_structures`, qui alimente `sync_perimeter_evidence`.
+    """Rafraîchit la vue matérialisée `source_contribution_structures`, lue par `sync_perimeter_evidence`.
 
-    À appeler après la matérialisation de `perimeter_structures` et la résolution des adresses, et avant le rafraîchissement de `contribution_structures`, qui en dérive.
+    À appeler après la matérialisation de `perimeter_structures` et la résolution des adresses. À appeler avant le rafraîchissement de `contribution_structures`, dérivée de cette vue.
     """
     conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY source_contribution_structures"))
 

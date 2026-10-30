@@ -95,7 +95,7 @@ class SubjectStore:
         ).rowcount
 
     def select_publications_to_reingest(self) -> list[int]:
-        """Publications dont `subjects_ingested_at` est vide : jamais ingérées, ou recalculées depuis leurs enregistrements sources après leur dernière ingestion."""
+        """Renvoie les publications à `subjects_ingested_at` vide : jamais ingérées, ou recalculées depuis leurs enregistrements sources après leur dernière ingestion."""
         return [
             r.id
             for r in self._conn.execute(
@@ -104,7 +104,7 @@ class SubjectStore:
         ]
 
     def mark_subjects_ingested(self, *, publication_ids: list[int]) -> None:
-        """Pose `subjects_ingested_at = now()` sur les publications données : elles sortent de la sélection jusqu'à leur prochain recalcul depuis leurs sources."""
+        """Pose `subjects_ingested_at = now()` sur les publications données : elles sortent de la sélection jusqu'à leur prochain recalcul depuis leurs enregistrements sources."""
         if not publication_ids:
             return
         self._conn.execute(
@@ -124,7 +124,7 @@ class SubjectStore:
     def select_source_records_for_publications(
         self, *, publication_ids: list[int]
     ) -> list[SourceRecordTopics]:
-        """Champ `topics` de chaque enregistrement source de ces publications, avec sa source."""
+        """Renvoie le champ `topics` de chaque enregistrement source de ces publications, avec sa source."""
         if not publication_ids:
             return []
         rows = self._conn.execute(
@@ -153,11 +153,11 @@ class SubjectStore:
         ).rowcount
 
     def count_all_subjects(self) -> int:
-        """Nombre de sujets du référentiel."""
+        """Compte les sujets du référentiel."""
         return scalar_int(self._conn.execute(text("SELECT COUNT(*) FROM subjects")))
 
     def recompute_usage_counts(self) -> int:
-        """Recalcule `subjects.usage_count` depuis `publication_subjects`."""
+        """Recalcule `subjects.usage_count` depuis les liens non rejetés de `publication_subjects`. Renvoie le nombre de lignes mises à jour."""
         n_reset = self._conn.execute(
             text("UPDATE subjects SET usage_count = 0 WHERE usage_count <> 0")
         ).rowcount
@@ -179,6 +179,6 @@ class SubjectStore:
         return n_reset + n_updated
 
     def refresh_cooccurrences(self) -> int:
-        """Rafraîchit la matview `subject_cooccurrences`. Retourne le nombre de paires après refresh (seuil `count >= 2` figé dans la matview)."""
+        """Rafraîchit la vue matérialisée `subject_cooccurrences`. Renvoie le nombre de paires, au seuil `count >= 2` figé dans la vue."""
         self._conn.execute(text("REFRESH MATERIALIZED VIEW subject_cooccurrences"))
         return scalar_int(self._conn.execute(text("SELECT COUNT(*) FROM subject_cooccurrences")))

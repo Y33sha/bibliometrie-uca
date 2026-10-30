@@ -18,7 +18,7 @@ from infrastructure.sql_fragments import active_issns
 
 
 class SerialSummary(NamedTuple):
-    """Ce que le journal du pipeline dit d'une revue."""
+    """Description d'une revue dans le journal du pipeline."""
 
     id: int
     title: str
@@ -27,9 +27,9 @@ class SerialSummary(NamedTuple):
     """ISSN actifs."""
 
 
-# Le type n'est pas saisi à la main : le pipeline peut l'écrire.
+# Type modifiable par le pipeline : absent des champs saisis à la main.
 TYPE_NOT_MANUAL = ~(literal(ManualField.SERIAL_TYPE.value) == any_(serials.c.manual_fields))
-# Le modèle OA n'est pas saisi à la main : le pipeline peut l'écrire.
+# Modèle OA modifiable par le pipeline : absent des champs saisis à la main.
 _OA_MODEL_NOT_MANUAL = ~(literal(ManualField.OA_MODEL.value) == any_(serials.c.manual_fields))
 
 _SERIAL_SUMMARIES = text(f"""
@@ -40,7 +40,7 @@ _SERIAL_SUMMARIES = text(f"""
 
 
 class SerialStore:
-    """Revues, sur la connexion `conn`."""
+    """Requêtes sur les revues, sur la connexion `conn`."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
@@ -70,7 +70,7 @@ class SerialStore:
         form_normalized: str,
         publisher_id: int | None,
     ) -> int | None:
-        """Revue d'une forme de nom normalisée. Une revue à ISSN électronique actif passe en premier. Avec un éditeur, seules comptent les formes de cet éditeur ou sans éditeur."""
+        """Renvoie la revue d'une forme de nom normalisée. Une revue à ISSN électronique actif passe en premier. Avec un éditeur, seules comptent les formes de cet éditeur ou sans éditeur."""
         stmt = (
             select(serial_name_forms.c.serial_id)
             .select_from(
@@ -104,7 +104,7 @@ class SerialStore:
         ).scalar_one_or_none()
 
     def find_serial_by_issn_any(self, issn_value: str) -> int | None:
-        """Revue qui a l'ISSN, quel que soit son statut, hors valeur mal formée. Une revue où l'ISSN est actif passe en premier."""
+        """Renvoie la revue qui a l'ISSN, quel que soit son statut, hors valeur mal formée. Une revue où l'ISSN est actif passe en premier."""
         return self._conn.execute(
             select(serial_issns.c.serial_id)
             .where(
@@ -146,7 +146,7 @@ class SerialStore:
         openalex_id: str | None = None,
         oa_model: OaModel | None = None,
     ) -> None:
-        """Complète les champs vides d'une revue avec les valeurs fournies ; une valeur déjà en place reste."""
+        """Complète les champs vides d'une revue avec les valeurs fournies."""
         fillable = (
             (serials.c.openalex_id, openalex_id),
             (serials.c.oa_model, oa_model),
@@ -174,7 +174,7 @@ class SerialStore:
         )
 
     def issns_are_manual(self, serial_id: int) -> bool:
-        """Vrai si les ISSN de la revue sont saisis à la main : ils font autorité, et le pipeline les laisse."""
+        """Vrai si les ISSN de la revue sont saisis à la main. Ils font alors autorité et le pipeline les garde en l'état."""
         return bool(
             self._conn.execute(
                 select(literal(ManualField.ISSNS.value) == any_(serials.c.manual_fields)).where(
@@ -184,7 +184,7 @@ class SerialStore:
         )
 
     def add_serial_issns(self, serial_id: int, issns: Sequence[SerialIssn]) -> None:
-        """Ajoute à la revue les ISSN qu'elle n'a pas, sans date de vérification : ils attendent la vérification Sudoc. Une ligne sans revue de même ISSN est rattachée à la revue. Un ISSN déjà présent garde ses données ; il reçoit seulement le support qui lui manque."""
+        """Ajoute à la revue ses ISSN manquants, sans date de vérification, en attente de la vérification Sudoc. Une ligne sans revue de même ISSN est rattachée à la revue. Un ISSN déjà présent garde ses données et reçoit seulement le support manquant."""
         if self.issns_are_manual(serial_id):
             return
         has_linking = self._conn.execute(
@@ -244,6 +244,6 @@ class SerialStore:
         )
 
     def describe_serials(self, serial_ids: Sequence[int]) -> dict[int, SerialSummary]:
-        """Titre, éditeur et ISSN de chaque revue, pour la journalisation."""
+        """Renvoie le titre, l'éditeur et les ISSN de chaque revue, pour la journalisation."""
         rows = self._conn.execute(_SERIAL_SUMMARIES, {"ids": list(serial_ids)}).all()
         return {r.id: SerialSummary(r.id, r.title, r.publisher, tuple(r.issns)) for r in rows}

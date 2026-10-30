@@ -15,7 +15,7 @@ def persist_in_batches[U](
     updates: list[U],
     persist: Callable[[list[U]], int | None],
 ) -> int:
-    """Écrit les mises à jour par lots de `PERSIST_BATCH`, un commit par lot. Renvoie la somme des comptes de `persist`, 0 si elle ne compte pas."""
+    """Écrit les mises à jour par lots de `PERSIST_BATCH`, un commit par lot. Renvoie la somme des comptes de `persist`, où `None` vaut 0."""
     total = 0
     for start in range(0, len(updates), PERSIST_BATCH):
         total += persist(updates[start : start + PERSIST_BATCH]) or 0

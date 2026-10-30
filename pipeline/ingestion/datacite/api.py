@@ -1,6 +1,6 @@
-"""Accès à l'API DataCite : en-têtes, moissonnage de `/dois`, lecture des enregistrements par DOI, préfixes.
+"""Accès à l'API DataCite : en-têtes, moissonnage de `/dois`, lecture des documents par DOI, préfixes.
 
-DataCite reconnaît le polite pool au `User-Agent` porteur d'un mailto. Ses réponses suivent JSON:API.
+DataCite reconnaît le polite pool à un `User-Agent` avec mailto. Ses réponses suivent JSON:API.
 """
 
 from __future__ import annotations
@@ -21,11 +21,14 @@ from pipeline.ingestion.api_params import API_BASE_URLS
 _PAGE_SIZE = 1000
 
 RECORD_PARAMS: dict[str, str] = {"affiliation": "true"}
-"""Paramètres de toute requête qui rapatrie des enregistrements. `affiliation=true` rend les affiliations des créateurs en objets `{name, affiliationIdentifier, affiliationIdentifierScheme}`. Un même DOI garde ainsi la même forme, quel que soit le chemin qui le ramène."""
+"""Paramètres de toute requête de rapatriement de documents.
+
+`affiliation=true` renvoie les affiliations des créateurs en objets `{name, affiliationIdentifier, affiliationIdentifierScheme}`. Un même DOI garde ainsi la même forme, quelle que soit la route de lecture.
+"""
 
 
 def headers() -> dict[str, str]:
-    """En-têtes d'une requête DataCite : `User-Agent` du polite pool, réponse JSON:API."""
+    """Renvoie les en-têtes d'une requête DataCite : `User-Agent` du polite pool, réponse JSON:API."""
     return {
         "User-Agent": polite_user_agent(),
         "Accept": "application/vnd.api+json",
@@ -34,10 +37,11 @@ def headers() -> dict[str, str]:
 
 @dataclass(frozen=True)
 class DatacitePage:
-    """Une page de résultats : ses ressources, et l'URL de la page suivante (`None` en fin de résultats)."""
+    """Une page de résultats."""
 
     records: list[Mapping[str, JsonValue]]
     next_url: str | None
+    """URL de la page suivante, `None` en fin de résultats."""
 
 
 class DataciteClient:
@@ -57,7 +61,11 @@ class DataciteClient:
         )
 
     def count(self, query: str, label: str) -> int:
-        """Nombre de DOI que désigne `query`, lu sur une page vide (`page[size]=0`). `label` nomme la requête dans le journal."""
+        """Renvoie le nombre de DOI désignés par `query`, lu sur une page vide (`page[size]=0`).
+
+        Args:
+            label: nom de la requête dans le journal.
+        """
         data = self._get(
             self._url,
             {"query": query, "page[size]": 0, **RECORD_PARAMS},
@@ -69,7 +77,7 @@ class DataciteClient:
     def fetch_page(
         self, query: str, next_url: str | None, label: str, *, page_size: int = _PAGE_SIZE
     ) -> DatacitePage:
-        """Une page des DOI que désigne `query` : la première quand `next_url` est `None`, sinon celle que désigne `next_url`."""
+        """Renvoie une page des DOI désignés par `query` : la première quand `next_url` est `None`, sinon la page désignée par `next_url`."""
         if next_url is None:
             data = self._get(
                 self._url,
@@ -87,7 +95,7 @@ class DataciteClient:
 async def search_dois(
     client: httpx2.AsyncClient, dois: list[str]
 ) -> LookupOutcome[list[Mapping[str, JsonValue]]]:
-    """Enregistrements des DOI d'un lot, par `GET /dois?query=doi:"a" OR doi:"b" …`. Un DOI absent de DataCite manque à la liste.
+    """Renvoie les documents des DOI d'un lot, par `GET /dois?query=doi:"a" OR doi:"b" …`. Un DOI absent de DataCite manque à la liste.
 
     Le champ `doi` est requêté en phrase exacte. La liste suit un ordre quelconque.
     """
@@ -111,7 +119,7 @@ async def search_dois(
 
 
 async def fetch_doi(client: httpx2.AsyncClient, doi: str) -> LookupOutcome[Mapping[str, JsonValue]]:
-    """Enregistrement JSON:API `data` de `GET /dois/{doi}`. Un 404 vaut DOI absent de DataCite."""
+    """Renvoie la ressource JSON:API `data` de `GET /dois/{doi}`. Un 404 vaut DOI absent de DataCite."""
     outcome = await lookup_json_async(
         client,
         "GET",
@@ -130,7 +138,7 @@ async def fetch_doi(client: httpx2.AsyncClient, doi: str) -> LookupOutcome[Mappi
 
 
 async def fetch_prefix(client: httpx2.AsyncClient, prefix: str) -> LookupOutcome[JsonValue]:
-    """Réponse JSON:API de `GET /prefixes/{prefix}?include=clients,providers`. Un 400 ou un 404 vaut préfixe inconnu."""
+    """Renvoie la réponse JSON:API de `GET /prefixes/{prefix}?include=clients,providers`. Un 400 ou un 404 vaut préfixe inconnu."""
     return await lookup_json_async(
         client,
         "GET",

@@ -1,4 +1,4 @@
-"""Lecture des enregistrements sources HAL par la normalisation : statut open access, champs texte, métadonnées propres à HAL."""
+"""Lecture des payloads HAL par la normalisation : statut open access, champs texte, métadonnées propres à HAL."""
 
 from collections.abc import Mapping, Sequence
 from datetime import date
@@ -6,7 +6,7 @@ from datetime import date
 from domain.source_records.source_extras import SourceExtra
 from domain.types import JsonValue, as_strs
 
-# Archives ouvertes que HAL reconnaît dans `linkExtId_s`, tenues pour du green open access :
+# Archives ouvertes reconnues par HAL dans `linkExtId_s`, tenues pour du green open access :
 # - `arxiv` : serveur de preprints, entièrement en open access ;
 # - `pubmedcentral` : archive biomédicale ; ses articles sont tous en lecture libre, sans être tous sous licence ouverte.
 # `openaccess`, lien vers le DOI de l'éditeur, reste hors de la liste : HAL seul ne dit pas si l'accès est gold, hybrid ou bronze.
@@ -20,16 +20,16 @@ def derive_hal_oa_status(
     link_ext_id: str | None,
     embargo_until: date | None = None,
 ) -> str | None:
-    """Statut open access d'un dépôt HAL.
+    """Renvoie le statut open access d'un dépôt HAL.
 
-    `openAccess_bool` vrai recouvre plusieurs cas, que départagent le fichier déposé, `linkExtId_s` et l'embargo :
+    `openAccess_bool` vrai recouvre plusieurs cas, départagés par le fichier déposé, `linkExtId_s` et l'embargo :
 
     - fichier déposé sous embargo actif → `embargoed` ; une règle de correction de `oa_status` lève l'embargo à son échéance ;
     - fichier déposé → `green` ;
     - lien vers arXiv ou PubMed Central (`GREEN_LINK_EXT_IDS`) → `green` ;
-    - lien `openaccess` vers le DOI de l'éditeur → `hybrid`, que `best_oa_status` remplace par `gold` si une autre source le dit ;
+    - lien `openaccess` vers le DOI de l'éditeur → `hybrid`, changé en `gold` par `best_oa_status` si une autre source donne `gold` ;
     - `openAccess_bool` faux → `closed` ;
-    - `openAccess_bool` vrai sans autre signal, ou absent → `None` : OpenAlex et Unpaywall en décident.
+    - `openAccess_bool` vrai sans autre signal, ou absent → `None` : le statut vient d'OpenAlex et d'Unpaywall.
     """
     if file_main and embargo_until is not None:
         return "embargoed"
@@ -47,7 +47,7 @@ def derive_hal_oa_status(
 
 
 def hal_text_field(value: JsonValue) -> str | None:
-    """Chaîne d'un champ HAL, qui arrive en texte ou en liste de textes (convention Solr).
+    """Renvoie la chaîne d'un champ HAL, reçu en texte ou en liste de textes (convention Solr).
 
     Les champs de l'index HAL sont multivalués par construction : un titre unique y arrive tout de même en liste. La première valeur fait foi.
     """
@@ -64,7 +64,7 @@ def hal_text_field(value: JsonValue) -> str | None:
 
 
 def extract_hal_source_extras(doc: Mapping[str, JsonValue]) -> dict[str, JsonValue] | None:
-    """Ce que HAL dit de la publication d'une communication et de la licence du fichier déposé, ou `None` si le dépôt n'en dit rien.
+    """Renvoie les informations HAL sur la publication d'une communication et sur la licence du fichier déposé, ou `None` à défaut.
 
     `proceedings` reprend l'indicateur « avec actes » (`proceedings_s`, saisi par le déposant), `series` les collections (`serie_s`), `source_title` le titre de la source (`source_s`), souvent celui des actes. `licence` reprend l'URL de la licence du fichier déposé (`licence_s`).
     """

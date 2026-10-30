@@ -1,4 +1,4 @@
-"""Table `staging` : écriture des documents rendus par les sources, lecture et marquage par la normalisation.
+"""Table `staging` : écriture des documents renvoyés par les sources, lecture et marquage par la normalisation.
 
 `StagingStore` écrit un document pour toutes les voies d'entrée (moissonnages, phases `fetch_missing`, `fetch_stale` et `fetch_truncated`, imports), lit les lignes à normaliser et marque les lignes traitées, en archivant leur payload au raw store.
 
@@ -75,7 +75,7 @@ class UpsertOutcome(StrEnum):
 
     - `NEW` : ligne insérée ;
     - `UPDATED` : ligne existante au contenu changé, réécrite ;
-    - `UNCHANGED` : ligne revue au contenu identique, dont seule la date de dernière lecture change.
+    - `UNCHANGED` : ligne revue au contenu identique ; seule sa date de dernière lecture change.
     """
 
     NEW = "new"
@@ -117,7 +117,7 @@ _MARK_DONE_SQL = text(
 )
 
 
-# Réécrit `raw_data` sans recalculer `raw_hash` : la ligne garde l'empreinte du document tronqué, que le moissonnage suivant retrouve. Lève le marqueur et repasse `processed = FALSE` : la normalisation réécrit les contributions sources complètes.
+# Réécrit `raw_data` sans recalculer `raw_hash` : la ligne garde l'empreinte du document tronqué, retrouvée par le moissonnage suivant. Lève le marqueur et repasse `processed = FALSE` : la normalisation réécrit les contributions sources complètes.
 _COMPLETE_AUTHORS_SQL = text(
     """
     UPDATE staging
@@ -132,9 +132,9 @@ _CLEAR_TRUNCATED_SQL = text(
 
 
 class StagingStore:
-    """Écritures des documents rendus par les sources, lectures et marquages de `staging` par la normalisation.
+    """Écritures des documents renvoyés par les sources, lectures et marquages de `staging` par la normalisation.
 
-    Le raw store reçoit chaque payload juste avant que `mark_done` le vide de la base. Par défaut, c'est celui de `get_raw_store()`, lu au premier `mark_done`.
+    Le raw store reçoit chaque payload juste avant son effacement de la base par `mark_done`. Par défaut, le raw store est celui de `get_raw_store()`, lu au premier `mark_done`.
     """
 
     def __init__(self, conn: Connection, raw_store: RawStore | None = None) -> None:
@@ -149,9 +149,12 @@ class StagingStore:
         entry_mode: StagingEntryMode = StagingEntryMode.BULK,
         listed: bool = True,
     ) -> UpsertOutcome | None:
-        """Écrit un document de `source`, identifié par l'adaptateur de la source, et efface les recherches infructueuses que le document dément.
+        """Écrit un document de `source`, identifié par l'adaptateur de la source, et efface les échecs de recherche démentis par le document.
 
-        Les DOI d'un document démentent l'échec de leur recherche dans sa source, et, pour une agence d'enregistrement, auprès de doi.org. Un dépôt HAL dément l'échec de la recherche de son identifiant. `listed` : le document vient d'une réponse de liste, où la source peut plafonner les auteurs. Renvoie `None`, sans rien écrire, pour un document sans identifiant.
+        Les DOI d'un document démentent l'échec de leur recherche dans sa source, et, pour une agence d'enregistrement, auprès de doi.org. Un dépôt HAL dément l'échec de la recherche de son identifiant. Renvoie `None`, sans rien écrire, pour un document sans identifiant.
+
+        Args:
+            listed: le document vient d'une réponse de liste, où la source peut plafonner les auteurs.
         """
         adapter = ADAPTERS[Source(source)]
         identity = adapter.identify(record)

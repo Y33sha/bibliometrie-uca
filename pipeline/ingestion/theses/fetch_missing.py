@@ -1,6 +1,6 @@
 """Recherche dans theses.fr de la phase `fetch_missing` : tâche `fetch_missing.theses_by_nnt`.
 
-NNT de thèses soutenues que d'autres sources contiennent (ScanR, OpenAlex, HAL), absents du staging theses.fr : thèses soutenues dans un autre établissement, liées au périmètre par un auteur, un directeur ou un membre du jury. Une requête à la fois, par la boucle commune (`pipeline.ingestion.common.lookup`).
+Les NNT cherchés sont ceux de thèses soutenues présentes dans d'autres sources (ScanR, OpenAlex, HAL) et absentes du staging theses.fr : thèses soutenues dans un autre établissement, liées au périmètre par un auteur, un directeur ou un membre du jury. Une requête à la fois, par la boucle commune (`pipeline.ingestion.common.lookup`).
 """
 
 from __future__ import annotations
@@ -40,7 +40,10 @@ _MISSING_NNTS_SQL = text(
 
 
 def get_missing_nnts(conn: Connection, *, retry_after_days: int) -> list[str]:
-    """NNT que des documents d'autres sources contiennent, absents du staging theses.fr. Écarte ceux déjà cherchés en vain : theses.fr attribue les NNT, l'échec est définitif."""
+    """Renvoie les NNT présents dans des enregistrements sources d'autres sources et absents du staging theses.fr.
+
+    Les NNT déjà cherchés en vain sont écartés : theses.fr attribue les NNT, l'échec est définitif.
+    """
     return list(conn.execute(_MISSING_NNTS_SQL, {"retry_after_days": retry_after_days}).scalars())
 
 

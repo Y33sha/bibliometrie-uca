@@ -1,8 +1,8 @@
-"""Sous-étape de la phase `publishing` — type en recueil d'actes les revues qui en sont.
+"""Sous-étape de la phase `publishing` : typage des recueils d'actes.
 
-Trois règles de `domain/serials/containers.py` désignent un recueil d'actes :
+Une revue est un recueil d'actes dans les cas suivants (`domain/serials/containers.py`) :
 
-- une revue de type `unknown` dont la majorité stricte des documents sont des articles de congrès, d'après le type brut de chaque document, toutes sources confondues ;
+- une revue de type `unknown` dont la majorité stricte des enregistrements sources sont des articles de congrès, d'après leur type brut, toutes sources confondues ;
 - une revue sans ISSN, de n'importe quel type, dont le titre nomme une édition datée (« NuFACT 2022 », « 2024 IEEE SENSORS ») ;
 - une revue sans ISSN, de n'importe quel type, dont le titre annonce des actes, hors société savante, académie et institution.
 """
@@ -34,7 +34,7 @@ _BY_PROCEEDINGS_TITLE = "titre d'actes"
 
 
 class SerialRecordTypes(NamedTuple):
-    """Les documents d'une revue : `(source, type brut)` de chacun."""
+    """Enregistrements sources d'une revue : `(source, type brut)` de chacun."""
 
     serial_id: int
     records: tuple[tuple[str, str | None], ...]
@@ -48,7 +48,7 @@ class SerialTitleIssnRow(NamedTuple):
     has_issn: bool
 
 
-# Type brut de chaque document des revues de type inconnu : celui de la source, avant correction.
+# Type brut de chaque enregistrement source des revues de type inconnu : celui de la source, avant correction.
 _RECORD_TYPES_OF_UNKNOWN_SERIALS = text("""
     SELECT j.id,
            array_agg(s.source::text ORDER BY s.id) AS sources,
@@ -62,7 +62,7 @@ _RECORD_TYPES_OF_UNKNOWN_SERIALS = text("""
 
 
 def find_record_types_of_unknown_serials(conn: Connection) -> list[SerialRecordTypes]:
-    """Les revues de type `unknown` qui ont au moins un document, avec le type brut de chaque document."""
+    """Renvoie les revues de type `unknown` à enregistrement source, avec le type brut de chaque enregistrement source."""
     return [
         SerialRecordTypes(r.id, tuple(zip(r.sources, r.raw_types, strict=True)))
         for r in conn.execute(_RECORD_TYPES_OF_UNKNOWN_SERIALS)
@@ -70,7 +70,7 @@ def find_record_types_of_unknown_serials(conn: Connection) -> list[SerialRecordT
 
 
 def find_titles_of_non_proceedings_serials(conn: Connection) -> list[SerialTitleIssnRow]:
-    """Les revues d'un autre type que `proceedings`, avec leur titre et la présence d'un ISSN."""
+    """Renvoie les revues d'un autre type que `proceedings`, avec leur titre et la présence d'un ISSN."""
     rows = conn.execute(
         select(
             serials.c.id,
@@ -89,7 +89,7 @@ def find_titles_of_non_proceedings_serials(conn: Connection) -> list[SerialTitle
 
 
 def run_type_proceedings_serials(conn: Connection, logger: logging.Logger) -> PhaseMetrics:
-    """Type en recueil d'actes les revues que désigne l'une des trois règles, et journalise chacune avec la règle qui la désigne."""
+    """Type en recueil d'actes les revues désignées par l'une des trois règles, et journalise chacune avec sa règle."""
     metrics = PhaseMetrics()
     reasons: dict[int, str] = {
         serial.serial_id: _BY_RECORDS

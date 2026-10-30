@@ -1,6 +1,6 @@
 """Client Unpaywall : statut open access d'un DOI.
 
-L'API (`https://api.unpaywall.org/v2/{doi}?email=…`) accepte 100 000 requêtes par jour, et recommande une dizaine par seconde. Les requêtes passent par `lookup_json_async`, avec nouvelles tentatives et backoff, sur un client que toute la boucle d'enrichissement partage.
+L'API (`https://api.unpaywall.org/v2/{doi}?email=…`) accepte 100 000 requêtes par jour, et recommande une dizaine par seconde. Les requêtes passent par `lookup_json_async`, avec nouvelles tentatives et backoff, sur un client partagé par toute la boucle d'enrichissement.
 """
 
 from __future__ import annotations
@@ -29,11 +29,11 @@ async def fetch_oa_status(
     base_url: str,
     email: str,
 ) -> LookupOutcome[str]:
-    """Statut open access d'un DOI selon Unpaywall, ramené au vocabulaire `oa_type`.
+    """Renvoie le statut open access d'un DOI selon Unpaywall, ramené au vocabulaire `oa_type`.
 
     `NOT_FOUND` couvre un DOI inexploitable, un DOI absent d'Unpaywall et un statut hors vocabulaire.
     """
-    # La colonne d'origine peut contenir un DOI non normalisé : `clean_doi` repasse avant l'appel. Un DOI inexploitable évite l'appel.
+    # La colonne d'origine peut contenir un DOI non normalisé : `clean_doi` repasse avant l'appel. Un DOI inexploitable renvoie `NOT_FOUND` sans appel.
     cleaned = clean_doi(doi)
     if not cleaned:
         return NOT_FOUND

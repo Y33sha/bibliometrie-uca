@@ -19,14 +19,14 @@ from pipeline.transformation.publications.reconciliation import reconcile
 
 
 def count_publications(conn: Connection) -> int:
-    """Total des publications, toutes dans le périmètre : la réconciliation crée une publication seulement pour une partition du périmètre."""
+    """Compte les publications, toutes dans le périmètre : la réconciliation crée une publication seulement pour une partition du périmètre."""
     return int(conn.execute(text("SELECT count(*) FROM publications")).scalar_one())
 
 
 @dataclass(frozen=True)
 class PublicationsPhase:
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Réconciliation des `source_records` avec les publications."""
+        """Réconcilie les enregistrements sources avec les publications, puis ajoute le total des publications aux métriques."""
 
         def reconcile_task(ctx: PhaseContext) -> PhaseMetrics:
             return _reconcile(ctx.open_tx, ctx.logger, rebuild=ctx.options.rebuild_publications)
@@ -53,7 +53,7 @@ def _reconcile(open_tx: OpenTransaction, logger: logging.Logger, *, rebuild: boo
 
     metrics = PhaseMetrics()
     metrics.add(seen=stats.processed, new=stats.created)
-    # Chiffres du run ; `run` y ajoute `publication_total`, compté après la suppression des publications sans source.
+    # Chiffres du run. `run` ajoute `publication_total`, compté après la suppression des publications sans enregistrement source.
     metrics.details["summary"] = {
         "processed": stats.processed,
         "publications": stats.publications,

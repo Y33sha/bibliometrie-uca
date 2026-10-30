@@ -11,9 +11,10 @@ import ahocorasick
 
 
 class PlaceNameDetector:
-    """Détecte les pays des lieux (institutions, villes) présents dans une adresse.
+    """Détecteur des pays des lieux (institutions, villes) présents dans une adresse.
 
-    `forms` : `{form_normalized: iso_code}` (codes pays ISO en minuscules). `detect` renvoie l'ensemble des pays des lieux matchés, vide si aucun.
+    Args:
+        forms: `{form_normalized: iso_code}`, codes pays ISO en minuscules.
     """
 
     def __init__(self, forms: Mapping[str, str]) -> None:
@@ -26,6 +27,7 @@ class PlaceNameDetector:
             self._automaton.make_automaton()
 
     def detect(self, normalized_text: str) -> set[str]:
+        """Renvoie les pays des lieux présents dans le texte, vide si aucun."""
         if self._empty or not normalized_text:
             return set()
         return {iso for _end, iso in self._automaton.iter(f" {normalized_text} ")}

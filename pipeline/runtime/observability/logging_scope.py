@@ -22,7 +22,7 @@ class _ScopedLogger(logging.LoggerAdapter[logging.Logger]):
 
 
 def scoped_logger(logger: logging.Logger, source: str, scope: str | None = None) -> _ScopedLogger:
-    """Adaptateur préfixant les logs d'un `[source · scope]`, ou `[source]` sans scope.
+    """Renvoie un adaptateur préfixant les lignes de journal d'un `[source · scope]`, ou `[source]` sans scope.
 
     La source paraît sous son libellé (`theses.fr`).
     """

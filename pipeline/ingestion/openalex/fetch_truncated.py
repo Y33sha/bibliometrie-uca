@@ -1,8 +1,8 @@
-"""Phase `fetch_truncated` : nouvelle lecture des works OpenAlex dont la liste d'auteurs est peut-être tronquée. Tâche `fetch_truncated.refetch_openalex`.
+"""Phase `fetch_truncated` : nouvelle lecture des works OpenAlex à liste d'auteurs peut-être tronquée. Tâche `fetch_truncated.refetch_openalex`.
 
-Une réponse de liste d'OpenAlex plafonne les auteurs d'un work à `BULK_AUTHORSHIPS_CAP`. Le moissonnage marque `staging.authors_truncated` les works qui atteignent ce plafond ; cette phase les relit un par un par `/works/{id}`, qui renvoie tous les auteurs.
+Une réponse de liste d'OpenAlex plafonne les auteurs d'un work à `BULK_AUTHORSHIPS_CAP`. Le moissonnage marque `staging.authors_truncated` les works au plafond. La phase les relit un par un par `/works/{id}`, avec tous les auteurs.
 
-La nouvelle lecture garde l'empreinte du work moissonné (`StagingStore.complete_authors`). Tant que le moissonnage renvoie le même work tronqué, son empreinte égale celle en base, et l'écriture laisse les auteurs complets en place. Un work modifié dans OpenAlex écrase le contenu par sa version tronquée, de nouveau marquée : cette phase la relit au même run.
+La nouvelle lecture garde l'empreinte du work moissonné (`StagingStore.complete_authors`). Tant que le moissonnage renvoie le même work tronqué, son empreinte égale celle en base, et l'écriture laisse les auteurs complets en place. Un work modifié dans OpenAlex écrase le contenu par sa version tronquée, de nouveau marquée : la phase la relit au même run.
 """
 
 from __future__ import annotations
@@ -42,7 +42,7 @@ _SELECT_TRUNCATED_SQL = text(
 @dataclass(frozen=True)
 class FetchTruncatedPhase:
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Relit les works tronqués dans une transaction, dès qu'OpenAlex fait partie des sources du run. La phase tourne dans tous les modes."""
+        """Relit les works tronqués dans une transaction, si OpenAlex fait partie des sources du run. La phase tourne dans tous les modes."""
         if "openalex" not in ctx.options.sources:
             return PhaseMetrics()
         with ctx.open_tx() as conn:
@@ -50,7 +50,7 @@ class FetchTruncatedPhase:
 
 
 def _complete(staging: StagingStore, work: Mapping[str, JsonValue]) -> UpsertOutcome | None:
-    """Écrit le work complet. Un work qui compte au plus le plafond d'auteurs était complet : son marqueur est levé, sans réécrire `raw_data` ni relancer la normalisation."""
+    """Écrit le work complet. Un work au plus au plafond d'auteurs était complet : son marqueur est levé, sans réécrire `raw_data` ni relancer la normalisation."""
     if len(as_sequence(work.get("authorships"))) > BULK_AUTHORSHIPS_CAP:
         return staging.complete_authors("openalex", work)
     staging.clear_truncated("openalex", extract_openalex_id(work))
@@ -60,7 +60,7 @@ def _complete(staging: StagingStore, work: Mapping[str, JsonValue]) -> UpsertOut
 async def refetch_openalex(conn: Connection, log: logging.Logger) -> PhaseMetrics:
     """Relit les works OpenAlex marqués tronqués (`staging.authors_truncated`).
 
-    Renvoie les compteurs de `look_up` : works réécrits (`updated`), works qui avaient exactement le plafond d'auteurs (`unchanged`), works inconnus d'OpenAlex (`not_found`), lots non servis (`errors`). Le marqueur est levé, sauf pour les lots non servis.
+    Renvoie les compteurs de `look_up` : works réécrits (`updated`), works à exactement le plafond d'auteurs (`unchanged`), works inconnus d'OpenAlex (`not_found`), lots non servis (`errors`). Le marqueur est levé, sauf pour les lots non servis.
     """
     truncated = list(conn.execute(_SELECT_TRUNCATED_SQL).scalars())
     if not truncated:

@@ -1,10 +1,10 @@
 """Verrou consultatif PostgreSQL : une seule exécution du pipeline à la fois sur une base.
 
-Deux `run_pipeline` en parallèle sur la même base déclenchent des interblocages Postgres et laissent des états incohérents — deux phases personnes qui fusionnent différemment, par exemple. Le verrou est pris dans la base, que toutes les exécutions atteignent, quel que soit le poste ou le conteneur d'où elles partent.
+Deux `run_pipeline` en parallèle sur la même base déclenchent des interblocages Postgres et laissent des états incohérents. Le verrou est pris dans la base, donc il vaut quel que soit le poste ou le conteneur de l'exécution.
 
-Le verrou tient à une session : la fermeture de sa connexion le libère, y compris quand le processus est tué ou son conteneur arrêté. La connexion qui le détient sert à cela seul, et reste ouverte pendant toute l'exécution.
+Le verrou tient à une session : la fermeture de sa connexion le libère, y compris quand le processus est tué ou son conteneur arrêté. La connexion détentrice sert seulement au verrou et reste ouverte pendant toute l'exécution.
 
-`application_name` contient le nom de machine et l'identifiant de processus : une exécution refusée nomme celle qui détient le verrou.
+`application_name` contient le nom de machine et l'identifiant de processus : une exécution refusée nomme l'exécution détentrice du verrou.
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ log = logging.getLogger(__name__)
 # Clé du verrou, tirée au hasard, propre à ce verrou parmi les verrous consultatifs du projet.
 PIPELINE_LOCK_KEY = 8_014_552_301_774_233_001
 
-# `pg_locks` couvre tout le cluster, un verrou consultatif une seule base : le filtre sur `database` écarte les autres bases.
+# `pg_locks` couvre tout le cluster, un verrou consultatif une seule base : le filtre sur `database` retient la base courante.
 _HOLDER_SQL = text("""
     SELECT a.application_name AS holder,
            to_char(a.backend_start, 'DD/MM/YYYY HH24:MI:SS') AS started_at
@@ -43,7 +43,7 @@ class PipelineAlreadyRunningError(RuntimeError):
 
 
 def _identity() -> str:
-    """Nom de machine et identifiant de processus, pour `application_name`."""
+    """Renvoie le nom de machine et l'identifiant de processus, pour `application_name`."""
     return f"run_pipeline@{socket.gethostname()} (processus {os.getpid()})"
 
 
@@ -59,7 +59,7 @@ def _holder(conn: Connection) -> str:
 def pipeline_lock() -> Iterator[None]:
     """Prend le verrou pour la durée du bloc, ou lève `PipelineAlreadyRunningError`.
 
-    La sortie du bloc rend le verrou, comme la fin de la session qui le détient : processus tué, conteneur arrêté.
+    La sortie du bloc libère le verrou, comme la fin de la session détentrice : processus tué, conteneur arrêté.
     """
     with get_sync_engine().connect() as conn:
         conn.execute(

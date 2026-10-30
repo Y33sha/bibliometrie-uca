@@ -1,6 +1,6 @@
 """Moissonnage Web of Science : tâche `harvest.wos`.
 
-Interroge l'API WoS Expanded sur les affiliations du périmètre (`OG=`), année par année. La pagination refait la recherche avec `firstRecord` à chaque page : celle par `queryId` renvoie des pages vides.
+La requête à l'API WoS Expanded cible les affiliations du périmètre (`OG=`), année par année. La pagination refait la recherche avec `firstRecord` à chaque page : la pagination par `queryId` renvoie des pages vides.
 """
 
 from __future__ import annotations
@@ -36,8 +36,8 @@ _WOS_FIRST_RECORD_LIMIT = 100_000
 class WosHarvestConfig:
     """Configuration du moissonnage WoS, lue en base."""
 
-    # Variantes d'affiliation (Organization-Enhanced) du périmètre d'extraction.
     affiliations: list[str]
+    """Variantes d'affiliation (Organization-Enhanced) du périmètre de moissonnage."""
 
 
 def harvest_year(
@@ -101,9 +101,9 @@ def harvest_year(
 
 
 class WosHarvester(SourceHarvester[WosHarvestConfig, WosClient]):
-    """Moissonnage WoS : les records des affiliations du périmètre, année par année.
+    """Moissonnage WoS des records des affiliations du périmètre, année par année.
 
-    Une erreur sur une année est journalisée, et l'extraction passe à la suivante.
+    Une erreur sur une année est journalisée, et le moissonnage passe à la suivante.
     """
 
     SOURCE = "wos"
@@ -136,7 +136,7 @@ class WosHarvester(SourceHarvester[WosHarvestConfig, WosClient]):
             except SourceUnavailableError:
                 raise
             except Exception:
-                # L'extraction de l'année rencontre la même erreur et la signale.
+                # Le moissonnage de l'année rencontre la même erreur et la signale.
                 return 0
 
         def harvest_step(year: int, progress: Progress) -> PhaseMetrics:

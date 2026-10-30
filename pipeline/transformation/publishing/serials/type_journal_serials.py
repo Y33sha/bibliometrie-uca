@@ -1,6 +1,6 @@
-"""Sous-étape de la phase `publishing` — type en revue les entrées de type inconnu qui contiennent surtout des articles.
+"""Sous-étape de la phase `publishing` : typage en revue des entrées de type inconnu contenant surtout des articles.
 
-Une entrée de type `unknown` dont la majorité stricte des documents sont des articles, d'après le type brut de chaque document, toutes sources confondues, est une revue (`domain/serials/containers.py`). Le typage en recueil d'actes passe avant.
+Une entrée de type `unknown` est une revue quand la majorité stricte de ses enregistrements sources sont des articles, d'après leur type brut, toutes sources confondues (`domain/serials/containers.py`). Le typage en recueil d'actes passe avant.
 """
 
 import logging
@@ -22,7 +22,7 @@ LABEL = "Typage des revues"
 
 
 def run_type_journal_serials(conn: Connection, logger: logging.Logger) -> PhaseMetrics:
-    """Type en revue les entrées de type inconnu qui contiennent surtout des articles, et journalise chacune."""
+    """Type en revue les entrées de type inconnu contenant surtout des articles, et journalise chacune."""
     metrics = PhaseMetrics()
     serial_ids = [
         serial.serial_id

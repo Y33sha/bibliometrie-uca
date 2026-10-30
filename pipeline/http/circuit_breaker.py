@@ -1,6 +1,6 @@
 """Circuit-breaker par source : coupe les requêtes d'une source à bout de budget (429) ou en panne (5xx, réseau).
 
-`source_circuit_breaker` pose dans une `ContextVar` le compteur des échecs consécutifs de la source, que partagent les requêtes de la tâche. Une requête en échec après ses nouvelles tentatives l'incrémente, un succès le remet à zéro. Au seuil, le breaker coupe : les clients HTTP lèvent `SourceUnavailableError` pour les requêtes suivantes, et le run suivant reprend les éléments non traités.
+`source_circuit_breaker` pose dans une `ContextVar` le compteur des échecs consécutifs de la source, partagé par les requêtes de la tâche. Une requête en échec après ses nouvelles tentatives l'incrémente, un succès le remet à zéro. Au seuil, le breaker coupe : les clients HTTP lèvent `SourceUnavailableError` pour les requêtes suivantes, et le run suivant reprend les éléments non traités.
 
 Le seuil de 10 absorbe une série ponctuelle d'échecs de requêtes concurrentes. `record_success` et `record_failure` sont sans `await`, donc atomiques entre les coroutines qui partagent le compteur.
 """
@@ -27,7 +27,10 @@ __all__ = [
 
 
 class SourceUnavailableError(Exception):
-    """Source indisponible pour le run, levée par le client HTTP après ses nouvelles tentatives, ou par le breaker coupé. L'accès à la source l'attrape pour sauter la source sans interrompre le run."""
+    """Source indisponible pour le run.
+
+    Levée par le client HTTP après ses nouvelles tentatives, ou par le breaker coupé. L'accès à la source l'attrape pour sauter la source sans interrompre le run.
+    """
 
     def __init__(self, source: str) -> None:
         super().__init__(
@@ -37,7 +40,7 @@ class SourceUnavailableError(Exception):
 
 
 class SourceCircuitBreaker:
-    """Compteur d'échecs consécutifs d'une source, `tripped` à `threshold`, et rythme de ses requêtes (`pace`, `None` sans plafond)."""
+    """Compteur d'échecs consécutifs d'une source, et rythme de ses requêtes."""
 
     def __init__(
         self, source: str, *, threshold: int = DEFAULT_THRESHOLD, pace: Pace | None = None
@@ -45,8 +48,10 @@ class SourceCircuitBreaker:
         self.source = source
         self.threshold = threshold
         self.pace = pace
+        """Rythme des requêtes, ou `None` sans plafond."""
         self._consecutive = 0
         self.tripped = False
+        """Vrai dès `threshold` échecs consécutifs, ou après `trip()`."""
 
     def record_success(self) -> None:
         self._consecutive = 0
@@ -57,7 +62,7 @@ class SourceCircuitBreaker:
             self.tripped = True
 
     def trip(self) -> None:
-        """Coupe la source : une boucle y renonce après une requête en échec."""
+        """Coupe la source. Sert à une boucle qui abandonne la source après une requête en échec."""
         self.tripped = True
 
     def check(self) -> None:
@@ -72,19 +77,19 @@ _current_breaker: ContextVar[SourceCircuitBreaker | None] = ContextVar(
 
 
 def get_current_breaker() -> SourceCircuitBreaker | None:
-    """Breaker de la tâche courante, ou `None`."""
+    """Renvoie le breaker de la tâche courante, ou `None`."""
     return _current_breaker.get()
 
 
 def trip_source() -> None:
-    """Coupe la source de la tâche courante, si un breaker est posé : une boucle y renonce sur `SourceUnavailableError`."""
+    """Coupe la source de la tâche courante, si un breaker est posé. Sert à une boucle qui abandonne la source sur `SourceUnavailableError`."""
     breaker = _current_breaker.get()
     if breaker is not None:
         breaker.trip()
 
 
 def source_tripped() -> bool:
-    """Vrai si le breaker de la tâche courante a coupé. Une boucle qui range les échecs en résultats le consulte pour s'arrêter."""
+    """Indique si le breaker de la tâche courante a coupé. Sert à l'arrêt d'une boucle qui range les échecs en résultats."""
     breaker = _current_breaker.get()
     return breaker is not None and breaker.tripped
 
@@ -93,7 +98,11 @@ def source_tripped() -> bool:
 def source_circuit_breaker(
     source: str, *, threshold: int = DEFAULT_THRESHOLD, max_per_second: float | None = None
 ) -> Iterator[SourceCircuitBreaker]:
-    """Pose le breaker de `source` dans la ContextVar le temps du bloc. Les requêtes suivent le rythme de `max_per_second`, sans plafond à `None`."""
+    """Pose le breaker de `source` dans la `ContextVar` le temps du bloc.
+
+    Args:
+        max_per_second: débit des requêtes, sans plafond à `None`.
+    """
     pace = Pace(max_per_second) if max_per_second else None
     breaker = SourceCircuitBreaker(source, threshold=threshold, pace=pace)
     token = _current_breaker.set(breaker)

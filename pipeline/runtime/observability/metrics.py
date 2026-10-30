@@ -1,4 +1,4 @@
-"""Compteurs que renvoie chaque phase du pipeline. L'orchestrateur en mesure la durée et les enregistre (`to_payload`)."""
+"""Compteurs renvoyés par chaque phase du pipeline. L'orchestrateur mesure la durée de la phase et enregistre ses compteurs (`to_payload`)."""
 
 from __future__ import annotations
 
@@ -62,35 +62,37 @@ EXTRA_LABELS: dict[str, str | tuple[str, str]] = {
     "unmatched": "non retrouvé",
     "unresolved": "non résolu",
 }
-"""Libellés des compteurs propres à une phase, au singulier. Un couple donne les formes que le `s` final ne donne pas."""
+"""Libellés des compteurs propres à une phase, au singulier. Un couple (singulier, pluriel) sert quand le pluriel ne se forme pas par un `s` final."""
 
 
 @dataclass
 class PhaseMetrics:
-    """Compteurs d'une exécution de phase.
-
-    `updated` : contenu réécrit ; `unchanged` : revu à contenu identique. `extras` : compteurs propres à la phase (`EXTRA_LABELS`). `details` : indicateurs que l'interface affiche (`summary`, `table`). `signals` : motifs d'un statut dégradé, comme une source coupée.
-    """
+    """Compteurs d'une exécution de phase."""
 
     new: int = 0
     updated: int = 0
+    """Éléments au contenu réécrit."""
     unchanged: int = 0
+    """Éléments revus à contenu identique."""
     seen: int = 0
     errors: int = 0
     extras: dict[str, int] = field(default_factory=dict)
+    """Compteurs propres à la phase (`EXTRA_LABELS`)."""
     details: dict[str, object] = field(default_factory=dict)
+    """Indicateurs affichés par l'interface (`summary`, `table`)."""
     signals: list[Signal] = field(default_factory=list)
+    """Motifs d'un statut dégradé, comme une source coupée."""
     report: str | None = field(default=None, compare=False)
-    """Ligne de bilan de la tâche, dans les mots de la tâche. `as_summary()` prend le relais à défaut.
+    """Ligne de bilan de la tâche, dans les mots de la tâche. À défaut, le bilan est `as_summary()`.
 
-    Hors comparaison : deux relevés portant les mêmes compteurs sont égaux, quels que soient les mots qui les présentent.
+    Hors comparaison : deux relevés aux mêmes compteurs sont égaux, quels que soient leurs libellés.
     """
     duration_s: float | None = field(default=None, compare=False)
     """Durée d'une tâche en secondes, mesurée par l'exécuteur ; `merge` l'ignore."""
 
     @property
     def total(self) -> int:
-        """Éléments traités : `seen`, ou la somme de `new`, `updated` et `unchanged` si elle est plus grande."""
+        """Nombre d'éléments traités : `seen`, ou la somme de `new`, `updated` et `unchanged` si elle est plus grande."""
         return max(self.seen, self.new + self.updated + self.unchanged)
 
     def add(
@@ -125,7 +127,7 @@ class PhaseMetrics:
         self.signals.extend(other.signals)
 
     def to_payload(self, duration_s: float) -> PhaseMetricsPayload:
-        """Forme JSON des compteurs, durée comprise (`domain.pipeline_runs.PhaseMetricsPayload`)."""
+        """Renvoie la forme JSON des compteurs, durée comprise (`domain.pipeline_runs.PhaseMetricsPayload`)."""
         return {
             "new": self.new,
             "updated": self.updated,
@@ -137,8 +139,8 @@ class PhaseMetrics:
         }
 
     def as_summary(self) -> str:
-        """Ligne de journal des compteurs (« 10 nouveaux, 5 mis à jour »)."""
-        # Les clés d'`extras` sont celles des runs enregistrés, que lit l'interface : la traduction se fait à l'affichage.
+        """Renvoie la ligne de journal des compteurs (« 10 nouveaux, 5 mis à jour »)."""
+        # Les runs enregistrés gardent les clés d'`extras`, lues par l'interface : la traduction se fait à l'affichage.
         parts: list[str] = []
         if self.new:
             parts.append(f"{self.new} {inflect(self.new, 'nouveau', 'nouveaux')}")

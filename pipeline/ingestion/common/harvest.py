@@ -1,6 +1,6 @@
 """Phase `harvest` : moissonnage des sources vers `staging`, une tâche par source, en parallèle.
 
-La phase s'arrête en échec si le périmètre d'extraction ne contient aucune structure. La policy du mode (`modes.py`) choisit les sources et la fenêtre :
+La phase s'arrête en échec si le périmètre de moissonnage (`perimeter_extraction`) est vide. La policy du mode (`modes.py`) fixe les sources et la fenêtre :
 
 - mode quotidien (`since_last`) : les documents modifiés depuis le dernier moissonnage quotidien réussi, à défaut depuis 30 jours ;
 - autres modes : les années de `start_year` à l'année courante, ou la seule année `--year`.
@@ -36,7 +36,7 @@ GetLastDailyHarvestDate = Callable[[], date | None]
 
 
 def _source_summary(metrics: PhaseMetrics) -> dict[str, float | None]:
-    """Ligne « par source » de la table d'observabilité de la phase."""
+    """Renvoie la ligne « par source » de la table d'observabilité de la phase."""
     return {
         "found": metrics.total,
         "new": metrics.new,
@@ -119,7 +119,10 @@ class HarvestPhase:
         return metrics
 
     def _since_last_daily(self) -> tuple[date, str]:
-        """Mode quotidien : date depuis laquelle le moissonnage reprend les documents modifiés, avec son origine. C'est la date du dernier moissonnage quotidien réussi, à défaut celle d'il y a 30 jours."""
+        """Renvoie, pour le mode quotidien, la date de départ des modifications à moissonner, avec son origine.
+
+        Cette date est celle du dernier moissonnage quotidien réussi, à défaut celle d'il y a 30 jours.
+        """
         last = self.get_last_daily_harvest_date()
         if last is not None:
             return last, "dernier moissonnage quotidien réussi"
@@ -143,6 +146,6 @@ def build() -> Phase:
 
 
 def _extraction_structure_count(ctx: PhaseContext) -> int:
-    """Nombre de structures du périmètre d'extraction, lu dans `perimeter_structures`."""
+    """Renvoie le nombre de structures du périmètre de moissonnage, lu dans `perimeter_structures`."""
     with ctx.open_tx() as conn:
         return len(get_extraction_structure_ids(conn))

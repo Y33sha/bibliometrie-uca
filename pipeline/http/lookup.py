@@ -1,6 +1,6 @@
 """Issue d'une requête à une source pour un élément : valeur trouvée, absence confirmée, ou source indisponible.
 
-Seule une absence confirmée autorise à enregistrer l'élément comme vérifié. Une source indisponible (réseau, 429 ou 5xx après les nouvelles tentatives, réponse illisible, disjoncteur déclenché) laisse l'élément en attente du run suivant.
+Seule une absence confirmée autorise l'enregistrement de l'élément comme vérifié. Une source indisponible (réseau, 429 ou 5xx après les nouvelles tentatives, réponse illisible, circuit-breaker déclenché) laisse l'élément en attente du run suivant.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ class NotFound:
 
 
 class Unavailable:
-    """Source indisponible : l'absence de l'élément n'est pas établie."""
+    """Source indisponible : l'absence de l'élément reste incertaine."""
 
     __slots__ = ()
 

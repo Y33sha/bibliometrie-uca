@@ -5,17 +5,17 @@ from pipeline.http.polite_pool import get_polite_pool_email_optional
 
 
 def get_openalex_api_key() -> str | None:
-    """Clé d'API OpenAlex, ou `None` si elle n'est pas configurée."""
+    """Renvoie la clé d'API OpenAlex, ou `None` si elle est absente de la configuration."""
     return settings.openalex_api_key.get_secret_value() or None
 
 
 def get_wos_api_key() -> str:
-    """Clé d'API Web of Science, chaîne vide si elle n'est pas configurée."""
+    """Renvoie la clé d'API Web of Science, ou une chaîne vide si elle est absente de la configuration."""
     return settings.wos_api_key.get_secret_value()
 
 
 def get_scanr_credentials() -> tuple[str, str]:
-    """Identifiants de l'API ScanR, `("", "")` si l'un des deux manque."""
+    """Renvoie l'utilisateur et le mot de passe de l'API ScanR, ou `("", "")` si l'un des deux manque."""
     user, password = settings.scanr_username, settings.scanr_password.get_secret_value()
     if user and password:
         return user, password
@@ -23,9 +23,9 @@ def get_scanr_credentials() -> tuple[str, str]:
 
 
 def source_credentials_missing(source: str) -> str | None:
-    """Motif de l'absence des identifiants d'API d'une source, ou `None` si la source est utilisable.
+    """Renvoie le motif de l'absence des identifiants d'API d'une source, ou `None` si la source est utilisable.
 
-    `access_source` la consulte avant tout appel à une API tierce, et saute avec un avertissement un accès qui a un motif. HAL, theses.fr, doi.org et DOAJ sont des API publiques. L'adresse polite pool compte comme un identifiant : Crossref, DataCite et Unpaywall l'exigent, et OpenAlex l'accepte à défaut de clé d'API.
+    `access_source` appelle cette fonction avant tout appel à une API tierce. Un accès avec motif est sauté, avec un avertissement. HAL, theses.fr, doi.org et DOAJ sont des API publiques. L'adresse polite pool compte comme un identifiant : Crossref, DataCite et Unpaywall l'exigent, OpenAlex l'accepte à défaut de clé d'API.
     """
     if source in ("hal", "theses"):
         return None

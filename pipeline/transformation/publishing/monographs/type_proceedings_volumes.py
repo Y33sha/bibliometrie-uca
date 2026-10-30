@@ -1,6 +1,6 @@
-"""Sous-étape de la phase `publishing` — recalcule la nature des monographies, volume d'actes ou livre.
+"""Sous-étape de la phase `publishing` : nature des monographies, volume d'actes ou livre.
 
-La nature se recalcule à chaque run d'après les enregistrements, la collection et le titre de la monographie (`is_proceedings_volume`) : elle suit les enregistrements quand ils changent, dans un sens comme dans l'autre. La sous-étape s'exécute après le typage des collections, dont elle lit le type.
+La nature se recalcule à chaque run d'après les enregistrements sources, la collection et le titre de la monographie (`is_proceedings_volume`). Elle suit les enregistrements sources quand ils changent, dans un sens comme dans l'autre. La sous-étape suit le typage des collections et lit leur type.
 """
 
 import logging
@@ -18,7 +18,7 @@ LABEL = "Nature des monographies"
 
 
 class MonographProceedingsFacts(NamedTuple):
-    """Une monographie, sa nature en base, le type de sa collection et ses enregistrements."""
+    """Une monographie, sa nature en base, le type de sa collection et ses enregistrements sources."""
 
     monograph_id: int
     title: str
@@ -55,7 +55,7 @@ _SET_PROCEEDINGS = text(
 
 
 def find_monograph_proceedings_facts(conn: Connection) -> list[MonographProceedingsFacts]:
-    """Chaque monographie, avec le type de sa collection et ses enregistrements."""
+    """Renvoie chaque monographie, avec le type de sa collection et ses enregistrements sources."""
     return [
         MonographProceedingsFacts(
             r.id,
@@ -80,7 +80,7 @@ def set_monographs_proceedings(
 
 
 def run_type_proceedings_volumes(conn: Connection, logger: logging.Logger) -> PhaseMetrics:
-    """Pose la nature recalculée des monographies qui en changent, et journalise chacune."""
+    """Met à jour la nature des monographies quand elle change, et journalise chacune."""
     to_proceedings: list[int] = []
     to_books: list[int] = []
     titles: dict[int, str] = {}

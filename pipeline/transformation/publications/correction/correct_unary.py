@@ -1,6 +1,6 @@
-"""Sous-étape unaire de la phase `metadata_correction` : chaque enregistrement source corrigé par `correct_source_record`, et la mise à jour écrite quand elle change quelque chose.
+"""Sous-étape unaire de la phase `metadata_correction` : correction de chaque enregistrement source par `correct_source_record`, et écriture des seules mises à jour effectives.
 
-Les revues sont typées à ce stade : la phase suit `publishing`. La correction repart des valeurs d'avant correction : un changement de type de revue qui déclenche ou retire une règle s'applique au run suivant.
+Les revues sont typées à ce stade : la phase suit `publishing`. La correction repart des valeurs d'avant correction. Un changement de type de revue qui déclenche ou retire une règle s'applique au run suivant.
 """
 
 import logging
@@ -31,7 +31,12 @@ def compute_updates(
     hal_rows: Mapping[str, UnaryCorrectionRow],
     missing_hal_ids: Set[str],
 ) -> list[CorrectionUpdate]:
-    """Mises à jour à écrire. `hal_rows` donne les enregistrements sources HAL par identifiant, où se trouvent les dépôts d'origine des enregistrements sources ScanR. `missing_hal_ids` : dépôts introuvables dans HAL."""
+    """Calcule les mises à jour à écrire.
+
+    Args:
+        hal_rows: enregistrements sources HAL par identifiant, parmi lesquels les dépôts d'origine des enregistrements sources ScanR.
+        missing_hal_ids: dépôts introuvables dans HAL.
+    """
     updates: list[CorrectionUpdate] = []
     for row in rows:
         origin = (
@@ -47,7 +52,7 @@ def compute_updates(
 
 
 def hal_origin_ids(rows: list[UnaryCorrectionRow]) -> list[str]:
-    """Identifiants des dépôts HAL dont sont issus les enregistrements sources ScanR."""
+    """Renvoie les identifiants des dépôts HAL d'origine des enregistrements sources ScanR."""
     return sorted(
         {
             hal_id
@@ -63,7 +68,11 @@ def compute_update(
     origin_doc_type: str | None = None,
     missing_hal_ids: Set[str] = frozenset(),
 ) -> CorrectionUpdate | None:
-    """Mise à jour de la correction unaire d'un enregistrement source (`correct_source_record`), ou `None` si rien ne change. `origin_doc_type` : type corrigé du dépôt HAL dont l'enregistrement source ScanR est issu."""
+    """Calcule la mise à jour de la correction unaire d'un enregistrement source (`correct_source_record`), ou `None` si rien ne change.
+
+    Args:
+        origin_doc_type: type corrigé du dépôt HAL d'origine d'un enregistrement source ScanR.
+    """
     corrected = correct_source_record(
         row.facts,
         row.identifiers,
@@ -76,15 +85,18 @@ def compute_update(
 
 @dataclass
 class UnaryCorrectionStats:
-    """Bilan de la passe unaire : enregistrements sources examinés, enregistrements sources corrigés par au moins une règle, déclenchements par règle."""
+    """Bilan de la passe unaire."""
 
     examined: int
+    """Enregistrements sources examinés."""
     corrected: int
+    """Enregistrements sources corrigés par au moins une règle."""
     rule_counts: dict[str, int]
+    """Déclenchements par règle."""
 
 
 def tally_corrections(updates: list[CorrectionUpdate]) -> tuple[int, dict[str, int]]:
-    """Nombre d'enregistrements sources corrigés et déclenchements par règle, d'après les champs unaires corrigés et les règles qui retirent des identifiants. Une règle qui corrige plusieurs champs d'un enregistrement source compte une fois."""
+    """Compte les enregistrements sources corrigés et les déclenchements par règle, d'après les champs unaires corrigés et les règles de retrait d'identifiants. Une règle qui corrige plusieurs champs d'un enregistrement source compte une fois."""
     rule_counts: dict[str, int] = {}
     corrected = 0
     for update in updates:

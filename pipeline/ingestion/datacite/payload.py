@@ -1,4 +1,4 @@
-"""Lecture des enregistrements sources DataCite par la normalisation : conventions des `attributes` d'une ressource JSON:API.
+"""Lecture des payloads DataCite par la normalisation : conventions des `attributes` d'une ressource JSON:API.
 
 Les payloads sont les objets JSON bruts de l'API, sans schéma typé.
 """
@@ -14,7 +14,10 @@ from domain.types import JsonValue, as_mapping, as_sequence, as_str
 
 
 def get_title(attributes: Mapping[str, JsonValue]) -> str | None:
-    """Titre principal : le premier titre sans `titleType`, à défaut le premier titre. Un `titleType` qualifie un sous-titre, un titre alternatif ou traduit."""
+    """Renvoie le titre principal : le premier titre sans `titleType`, à défaut le premier titre.
+
+    Un `titleType` qualifie un sous-titre, un titre alternatif ou traduit.
+    """
     titles = attributes.get("titles") or []
     if not isinstance(titles, list):
         return None
@@ -35,9 +38,9 @@ def get_title(attributes: Mapping[str, JsonValue]) -> str | None:
 def extract_datacite_publication_year(
     attributes: Mapping[str, JsonValue], *, max_year: int
 ) -> int | None:
-    """Année de publication (`publicationYear`), si elle tient entre 1500 et `max_year`. Sans elle, la normalisation refuse l'enregistrement."""
+    """Renvoie l'année de publication (`publicationYear`), si elle tient entre 1500 et `max_year`. Sans elle, la normalisation refuse le document."""
     raw = attributes.get("publicationYear")
-    # L'année arrive en nombre ou en texte selon le dépôt ; toute autre forme ne dit rien.
+    # L'année arrive en nombre ou en texte selon le dépôt ; toute autre forme est ignorée.
     if not isinstance(raw, str | int) or isinstance(raw, bool):
         return None
     try:
@@ -50,7 +53,7 @@ def extract_datacite_publication_year(
 
 
 def get_publisher_name(attributes: Mapping[str, JsonValue]) -> str | None:
-    """Nom de l'éditeur ou de l'entrepôt (`publisher`), donné en chaîne ou, depuis le schéma 4.5, en objet `{name, publisherIdentifier, …}`."""
+    """Renvoie le nom de l'éditeur ou de l'entrepôt (`publisher`), donné en chaîne ou, depuis le schéma 4.5, en objet `{name, publisherIdentifier, …}`."""
     publisher = attributes.get("publisher")
     if isinstance(publisher, str) and publisher.strip():
         return publisher.strip()
@@ -62,7 +65,7 @@ def get_publisher_name(attributes: Mapping[str, JsonValue]) -> str | None:
 
 
 def get_container(attributes: Mapping[str, JsonValue]) -> tuple[str | None, str | None]:
-    """Titre et ISSN du `container`, que donnent les documents publiés dans une revue ou une série. L'ISSN vient seulement d'un identifiant de type `ISSN`."""
+    """Renvoie le titre et l'ISSN du `container`, donné par les documents publiés dans une revue ou une série. L'ISSN vient seulement d'un identifiant de type `ISSN`."""
     container = attributes.get("container")
     if not isinstance(container, dict) or not container:
         return None, None
@@ -77,12 +80,15 @@ def get_container(attributes: Mapping[str, JsonValue]) -> tuple[str | None, str 
 
 
 def get_isbns(attributes: Mapping[str, JsonValue]) -> list[str]:
-    """ISBN du document (`own_isbns`), puis ceux de l'ouvrage qui le contient (`host_isbns`), dédoublonnés."""
+    """Renvoie les ISBN du document (`own_isbns`), puis ceux de l'ouvrage contenant le document (`host_isbns`), dédoublonnés."""
     return list(dict.fromkeys([*own_isbns(attributes), *host_isbns(attributes)]))
 
 
 def own_isbns(attributes: Mapping[str, JsonValue]) -> list[str]:
-    """ISBN des identifiants du document (`identifiers`, `alternateIdentifiers`). L'ISBN d'un livre figure parmi ses identifiants. DataCite ne dit pas le support."""
+    """Renvoie les ISBN des identifiants du document (`identifiers`, `alternateIdentifiers`).
+
+    L'ISBN d'un livre figure parmi ses identifiants. DataCite omet le support.
+    """
     isbns: list[str] = []
     for key, value_key, type_key in (
         ("identifiers", "identifier", "identifierType"),
@@ -96,7 +102,10 @@ def own_isbns(attributes: Mapping[str, JsonValue]) -> list[str]:
 
 
 def host_isbns(attributes: Mapping[str, JsonValue]) -> list[str]:
-    """ISBN des `relatedIdentifiers` de type ISBN et du conteneur quand son identifiant en est un. L'ISBN du livre d'un chapitre figure en `IsPartOf`."""
+    """Renvoie les ISBN des `relatedIdentifiers` de type ISBN, et celui du conteneur identifié par un ISBN.
+
+    L'ISBN du livre d'un chapitre figure en `IsPartOf`.
+    """
     isbns: list[str] = []
     for related in as_sequence(attributes.get("relatedIdentifiers")):
         entry = as_mapping(related)
@@ -109,7 +118,7 @@ def host_isbns(attributes: Mapping[str, JsonValue]) -> list[str]:
 
 
 def get_container_pages(attributes: Mapping[str, JsonValue]) -> tuple[str | None, str | None]:
-    """Première et dernière pages du `container`."""
+    """Renvoie la première et la dernière page du `container`."""
     container = attributes.get("container")
     if not isinstance(container, dict):
         return None, None
@@ -117,7 +126,7 @@ def get_container_pages(attributes: Mapping[str, JsonValue]) -> tuple[str | None
 
 
 def get_abstract(attributes: Mapping[str, JsonValue]) -> str | None:
-    """Résumé : `descriptions` de `descriptionType == 'Abstract'` en priorité, sinon la première description disponible."""
+    """Renvoie le résumé : `descriptions` de `descriptionType == 'Abstract'` en priorité, sinon la première description disponible."""
     descriptions = attributes.get("descriptions") or []
     if not isinstance(descriptions, list):
         return None
@@ -136,7 +145,7 @@ def get_abstract(attributes: Mapping[str, JsonValue]) -> str | None:
 
 
 def get_keywords(attributes: Mapping[str, JsonValue]) -> list[str] | None:
-    """Mots-clés : `subjects[*].subject`, dédupliqués en préservant l'ordre."""
+    """Renvoie les mots-clés : `subjects[*].subject`, dédupliqués en préservant l'ordre."""
     subjects = attributes.get("subjects") or []
     if not isinstance(subjects, list):
         return None
@@ -156,7 +165,7 @@ def get_keywords(attributes: Mapping[str, JsonValue]) -> list[str] | None:
 
 
 def get_language(attributes: Mapping[str, JsonValue]) -> str | None:
-    """Code langue (`language`), normalisé en minuscules. Souvent absent."""
+    """Renvoie le code langue (`language`), normalisé en minuscules. Souvent absent."""
     lang = attributes.get("language")
     if isinstance(lang, str) and lang.strip():
         return lang.strip().lower()
@@ -164,13 +173,13 @@ def get_language(attributes: Mapping[str, JsonValue]) -> str | None:
 
 
 def get_cited_by_count(attributes: Mapping[str, JsonValue]) -> int | None:
-    """Nombre de citations (`citationCount`)."""
+    """Renvoie le nombre de citations (`citationCount`)."""
     val = attributes.get("citationCount")
     return val if isinstance(val, int) else None
 
 
 def extract_datacite_doc_type_token(attributes: Mapping[str, JsonValue]) -> str | None:
-    """Type brut du document (`raw_doc_type`), que traduit la table des types de DataCite (`map_doc_type`).
+    """Renvoie le type brut du document (`raw_doc_type`), traduit par la table des types de DataCite (`map_doc_type`).
 
     DataCite donne deux niveaux dans `types` : `resourceTypeGeneral`, au vocabulaire contrôlé (JournalArticle, Preprint, Dataset, Text…), et `resourceType`, en texte libre. Le type brut est `resourceTypeGeneral` s'il est spécifique (hors Text et Other), à défaut `resourceType`, à défaut le `resourceTypeGeneral` générique, traduit en `other`.
     """
@@ -186,7 +195,7 @@ def extract_datacite_doc_type_token(attributes: Mapping[str, JsonValue]) -> str 
     return general or None
 
 
-# Types d'un document que publie une revue, une collection ou un recueil d'actes. La valeur contrôlée `JournalArticle` date du schéma 4.4 (2021) ; avant, un article se déclarait `Text`, avec « Journal article » ou « Article » en texte libre.
+# Types d'un document publié par une revue, une collection ou un recueil d'actes. La valeur contrôlée `JournalArticle` date du schéma 4.4 (2021) ; avant, un article se déclarait `Text`, avec « Journal article » ou « Article » en texte libre.
 _PUBLISHED_TYPES = frozenset(
     {
         "Book",
@@ -206,9 +215,9 @@ _CITATION_IN_PAGES = re.compile(r"doi:|\((?:1[89]|20)\d\d\)", re.IGNORECASE)
 def container_names_a_journal(
     doc_type_token: str | None, title: str, pages: Iterable[str | None]
 ) -> bool:
-    """Le conteneur d'un enregistrement source DataCite désigne la revue, la collection ou le recueil d'actes qui publie le document.
+    """Renvoie vrai si le conteneur d'un document DataCite désigne la revue, la collection ou le recueil d'actes du document.
 
-    Le type brut (`extract_datacite_doc_type_token`) est celui d'un article, d'une communication, d'un recueil d'actes, d'un livre, d'un chapitre ou d'un data paper. Un préprint, un rapport, un logiciel ou un jeu de données n'a pas de revue. Le conteneur ne vient pas d'une citation en texte libre : les copies d'articles déposées par les entrepôts (GSI, DESY, RWTH) citent ainsi l'article publié, et DataCite en découpe mal le titre et les pages.
+    Le type brut (`extract_datacite_doc_type_token`) doit être celui d'un article, d'une communication, d'un recueil d'actes, d'un livre, d'un chapitre ou d'un data paper. Un préprint, un rapport, un logiciel ou un jeu de données est sans revue. Un conteneur découpé dans une citation en texte libre est écarté : les copies d'articles déposées par les entrepôts (GSI, DESY, RWTH) citent ainsi l'article publié, et DataCite découpe mal le titre et les pages de la citation.
     """
     published_type = (
         doc_type_token in _PUBLISHED_TYPES
@@ -222,7 +231,7 @@ def container_names_a_journal(
 
 
 def _doi_related_identifiers(attributes: Mapping[str, JsonValue]) -> list[dict[str, str]]:
-    """`relatedIdentifiers` de type DOI, normalisés en `{"doi": <doi minuscule>, "relation_type": <relationType>}`.
+    """Renvoie les `relatedIdentifiers` de type DOI, normalisés en `{"doi": <doi minuscule>, "relation_type": <relationType>}`.
 
     Le `relationType` (`IsVersionOf`, `HasVersion`, `IsSupplementTo`, `IsPartOf`, `Cites`…) fonde les relations entre publications ; `IsVersionOf` désigne le DOI de concept d'une version.
     """
@@ -262,7 +271,10 @@ _CORPUS_RELATION_TYPES = frozenset(
 
 
 def extract_related_dois(attributes: Mapping[str, JsonValue], self_doi: str) -> list[str]:
-    """DOI apparentés à rapatrier, hors DOI primaire et sans doublon : versions, formes, parties et suppléments (`_CORPUS_RELATION_TYPES`). Ils deviennent des identifiants liés, que la phase `fetch_missing` cherche dans chaque source."""
+    """Renvoie les DOI apparentés à rapatrier, hors DOI primaire et sans doublon : versions, formes, parties et suppléments (`_CORPUS_RELATION_TYPES`).
+
+    Ces DOI deviennent des identifiants liés, cherchés dans chaque source par la phase `fetch_missing`.
+    """
     self_doi_clean = clean_doi(self_doi)
     out: list[str] = []
     seen: set[str] = set()
@@ -280,7 +292,7 @@ def extract_related_dois(attributes: Mapping[str, JsonValue], self_doi: str) -> 
 def extract_datacite_source_extras(
     attributes: Mapping[str, JsonValue],
 ) -> Mapping[str, JsonValue] | None:
-    """Champs propres à DataCite gardés dans `source_records.source_extras` : DOI apparentés avec leur `relationType`, licences (`rights`) et financeurs (`funding`)."""
+    """Renvoie les champs propres à DataCite gardés dans `source_records.source_extras` : DOI apparentés avec leur `relationType`, licences (`rights`) et financeurs (`funding`)."""
     source_extras: dict[str, JsonValue] = {}
     related = _doi_related_identifiers(attributes)
     if related:

@@ -1,8 +1,8 @@
 """Client Crossref des préfixes DOI : éditeur et membre Crossref d'un préfixe.
 
-`GET /prefixes/<prefix>` donne le nom de l'éditeur et le numéro de membre Crossref d'un préfixe. La phase `publishing` l'interroge pour un préfixe dont l'agence est Crossref.
+`GET /prefixes/<prefix>` donne le nom de l'éditeur et le numéro de membre Crossref d'un préfixe. La phase `publishing` interroge ce point d'accès pour un préfixe d'agence Crossref.
 
-Un préfixe reste parfois enregistré au nom d'un compte sans dépôt, pendant qu'un autre compte dépose sous ce préfixe : un second compte de la même maison, ou celui du groupe qui l'a rachetée. `GET /members/<id>` donne le nom déclaré d'un membre et son nombre de dépôts. À zéro, `GET /works/<doi>` sur un DOI du préfixe nomme le membre déposant, dont le nom déclaré fait alors foi.
+Un préfixe reste parfois enregistré au nom d'un compte sans dépôt, pendant qu'un autre compte dépose sous ce préfixe : un second compte de la même maison, ou celui du groupe qui l'a rachetée. `GET /members/<id>` donne le nom déclaré d'un membre et son nombre de dépôts. À zéro, `GET /works/<doi>` sur un DOI du préfixe nomme le membre déposant. Le nom déclaré de ce membre fait alors foi.
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ _MEMBER_URL_RE = re.compile(r"/member/(\d+)\b")
 
 
 def parse_member_id(member: JsonValue) -> int | None:
-    """Numéro de membre Crossref, sous les trois formes que prennent les réponses : l'URL `…/member/10` des préfixes, la chaîne `"10"` des enregistrements, ou un entier."""
+    """Lit un numéro de membre Crossref, sous les trois formes des réponses : l'URL `…/member/10` des préfixes, la chaîne `"10"` des œuvres, ou un entier."""
     if isinstance(member, bool) or member is None:
         return None
     if isinstance(member, int):
@@ -44,7 +44,7 @@ def parse_member_id(member: JsonValue) -> int | None:
 async def member_profile(
     client: httpx2.AsyncClient, member_id: int
 ) -> LookupOutcome[tuple[str, int]]:
-    """Nom déclaré et nombre de DOI déposés d'un membre Crossref."""
+    """Renvoie le nom déclaré et le nombre de DOI déposés d'un membre Crossref."""
     msg = await get_message(client, f"members/{member_id}", label=f"membre {member_id}", timeout=15)
     if isinstance(msg, NotFound | Unavailable):
         return msg
@@ -54,7 +54,7 @@ async def member_profile(
 
 
 async def depositing_member(client: httpx2.AsyncClient, doi: str) -> LookupOutcome[int]:
-    """Membre Crossref qui a déposé ce DOI, d'après son enregistrement."""
+    """Renvoie le membre Crossref déposant de ce DOI, d'après `GET /works/<doi>`."""
     msg = await get_message(client, f"works/{doi}", label=f"enregistrement {doi}", timeout=15)
     if isinstance(msg, NotFound | Unavailable):
         return msg
@@ -65,7 +65,7 @@ async def depositing_member(client: httpx2.AsyncClient, doi: str) -> LookupOutco
 async def fetch_crossref_prefix(
     client: httpx2.AsyncClient, prefix: str, sample_doi: str | None = None
 ) -> LookupOutcome[tuple[str, int | None]]:
-    """Nom de l'éditeur et numéro de membre Crossref d'un préfixe.
+    """Renvoie le nom de l'éditeur et le numéro de membre Crossref d'un préfixe.
 
     `NOT_FOUND` couvre un préfixe malformé, inconnu de Crossref ou sans nom. Le numéro de membre est `None` quand l'API l'omet.
 
@@ -95,7 +95,7 @@ async def fetch_crossref_prefix(
         return depositing
     if isinstance(depositing, NotFound) or depositing == member:
         return registered
-    # Le nom vient du profil du membre déposant : l'enregistrement donne l'imprint, qui varie d'un dépôt à l'autre sous un même compte.
+    # Le nom vient du profil du membre déposant : l'œuvre donne l'imprint, variable d'un dépôt à l'autre sous un même compte.
     deposited_by = await member_profile(client, depositing)
     if isinstance(deposited_by, Unavailable):
         return deposited_by

@@ -11,7 +11,7 @@ _VOLATILE_EXPORT_TAGS = frozenset({"DA", "U1", "U2"})
 
 
 def strip_volatile_for_hash(raw_data: Mapping[str, JsonValue]) -> Mapping[str, JsonValue]:
-    """Copie du payload sans les balises volatiles d'une ligne d'export ; le payload lui-même pour un payload de l'API."""
+    """Renvoie une copie du payload sans les balises volatiles d'une ligne d'export. Un payload de l'API est renvoyé tel quel."""
     if "UT" not in raw_data:
         return raw_data
     return {k: v for k, v in raw_data.items() if k not in _VOLATILE_EXPORT_TAGS}

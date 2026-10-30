@@ -1,6 +1,6 @@
-"""Sous-étape de la phase `publishing` — fusionne dans le titulaire de préfixe un autre nom du même éditeur.
+"""Sous-étape de la phase `publishing` : fusion des autres noms d'un éditeur dans le titulaire de ses préfixes.
 
-Un éditeur que nomment les sources, sans préfixe DOI, rejoint le titulaire des préfixes Crossref de ses enregistrements sources quand leurs noms sont compatibles (`domain.publishers.aliases`). Les préfixes des plateformes d'éditeurs sont écartés : ils désignent la plateforme. La fusion est celle de l'administration des éditeurs, sans les revues homonymes : les formes de nom passent au titulaire, qui reconnaît ensuite ce nom. Le journal garde les deux noms.
+Un éditeur nommé par les sources, sans préfixe DOI, rejoint le titulaire des préfixes Crossref de ses enregistrements sources quand leurs noms sont compatibles (`domain.publishers.aliases`). Les préfixes des plateformes d'éditeurs sont écartés : ils désignent la plateforme. La fusion est celle de l'administration des éditeurs, sans les revues homonymes : les formes de nom passent au titulaire, retrouvé ensuite par ce nom. Le journal garde les deux noms.
 """
 
 import logging
@@ -47,7 +47,7 @@ class PublisherAlias(NamedTuple):
 
 
 def find_publisher_aliases(conn: Connection) -> list[PublisherAlias]:
-    """Éditeurs nommés par les sources qui sont un autre nom du titulaire de leurs préfixes."""
+    """Renvoie les éditeurs nommés par les sources qui sont un autre nom du titulaire de leurs préfixes."""
     holders: dict[int, dict[int, int]] = defaultdict(lambda: defaultdict(int))
     for r in conn.execute(_EVIDENCE):
         if not is_publisher_platform_prefix(r.prefix):

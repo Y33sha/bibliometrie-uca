@@ -1,6 +1,6 @@
 """Recherches vaines de la phase `fetch_missing` (table `failed_lookups`) : une ligne par identifiant cherché en vain dans une source, ou inconnu de doi.org (`DOI_ORG`).
 
-Un identifiant inscrit sort des sélections le temps du délai de nouvelle tentative, et définitivement s'il est absent de son registre. Un document que la source renvoie efface l'échec. L'appelant commite.
+Un identifiant inscrit sort des sélections le temps du délai de nouvelle tentative, et définitivement s'il est absent de son registre. Un document renvoyé par la source efface l'échec. L'appelant commite.
 """
 
 from collections.abc import Sequence
@@ -28,7 +28,7 @@ def record_failed_lookup(
 ) -> None:
     """Inscrit, ou date de nouveau, l'échec de la recherche d'un identifiant dans une source.
 
-    L'identifiant garde la forme que la sélection a fournie : la sélection le compare ensuite à cette forme.
+    L'identifiant garde la forme fournie par la sélection. La sélection le compare ensuite sous cette forme.
     """
     conn.execute(_RECORD_SQL, {"source": source, "id_type": id_type, "id_value": id_value})
 
@@ -43,7 +43,7 @@ _FORGET_SQL = text(
 
 
 def forget_failed_doi_lookups(conn: Connection, source: str, dois: Sequence[str | None]) -> None:
-    """Efface les échecs inscrits dans la source pour ces DOI : DOI d'un document que la source renvoie, ou DOI que doi.org connaît (`DOI_ORG`).
+    """Efface les échecs inscrits dans la source pour ces DOI : DOI d'un document renvoyé par la source, ou DOI connus de doi.org (`DOI_ORG`).
 
     Les DOI passent par `clean_doi` : un document peut les donner sous toute forme.
     """
@@ -53,12 +53,12 @@ def forget_failed_doi_lookups(conn: Connection, source: str, dois: Sequence[str 
 
 
 def forget_failed_hal_id_lookup(conn: Connection, hal_id: str) -> None:
-    """Efface l'échec de la recherche d'un dépôt dans HAL, que HAL renvoie."""
+    """Efface l'échec de la recherche dans HAL d'un dépôt renvoyé par HAL."""
     conn.execute(_FORGET_SQL, {"source": Source.HAL.value, "id_type": "hal_id", "values": [hal_id]})
 
 
 def pending_failed_lookup_sql(*, source_sql: str, id_type: LookupIdType, value_sql: str) -> str:
-    """Condition SQL vraie quand la recherche de l'identifiant dans la source a échoué il y a moins de `:retry_after_days` jours, ou à n'importe quelle date quand la source est le registre de ce type d'identifiant (`REGISTRY_LOOKUPS`).
+    """Renvoie la condition SQL vraie quand la recherche de l'identifiant dans la source a échoué il y a moins de `:retry_after_days` jours, ou à n'importe quelle date quand la source est le registre de ce type d'identifiant (`REGISTRY_LOOKUPS`).
 
     Source et identifiant sont des expressions SQL : paramètre lié, littéral ou colonne. Les sélections de la phase `fetch_missing` l'emploient sous `NOT`.
     """

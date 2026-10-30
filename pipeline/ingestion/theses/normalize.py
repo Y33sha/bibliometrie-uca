@@ -33,28 +33,28 @@ from pipeline.transformation.publishing.find_or_create import Containers
 
 
 def _defense_date(thesis: Mapping[str, JsonValue]) -> str | None:
-    """Date de soutenance ISO."""
+    """Renvoie la date de soutenance ISO."""
     return french_date_to_iso(as_str(thesis.get("dateSoutenance")))
 
 
 def _enrollment_date(thesis: Mapping[str, JsonValue]) -> str | None:
-    """Date de première inscription en doctorat ISO."""
+    """Renvoie la date ISO de première inscription en doctorat."""
     return french_date_to_iso(as_str(thesis.get("datePremiereInscriptionDoctorat")))
 
 
 def get_title(thesis: Mapping[str, JsonValue]) -> str | None:
-    """Titre principal de la thèse."""
+    """Renvoie le titre principal de la thèse."""
     return as_str(thesis.get("titrePrincipal"))
 
 
 def get_publication_year(thesis: Mapping[str, JsonValue]) -> int | None:
-    """Année de soutenance, à défaut année de première inscription."""
+    """Renvoie l'année de soutenance, à défaut l'année de première inscription."""
     year_source = _defense_date(thesis) or _enrollment_date(thesis)
     return int(year_source[:4]) if year_source else None
 
 
 def _build_source_extras(thesis: Mapping[str, JsonValue]) -> dict[str, JsonValue] | None:
-    """Champs propres à theses.fr, pour `source_records.source_extras`."""
+    """Renvoie les champs propres à theses.fr, pour `source_records.source_extras`."""
     source_extras: dict[str, JsonValue] = {}
     ds = _defense_date(thesis)
     di = _enrollment_date(thesis)
@@ -91,7 +91,7 @@ def _build_source_extras(thesis: Mapping[str, JsonValue]) -> dict[str, JsonValue
 
 
 def _subject_labels(subjects: list[Mapping[str, JsonValue]], subject_type: str) -> list[str]:
-    """Libellés distincts des sujets de type `subject_type`, dans l'ordre."""
+    """Renvoie les libellés distincts des sujets de type `subject_type`, dans l'ordre."""
     labels = (as_str(s.get("keyword")) for s in subjects if as_str(s.get("type")) == subject_type)
     return list(dict.fromkeys(label for label in labels if label))
 
@@ -101,9 +101,9 @@ def theses_source_record(
     staging_id: int,
     theses_id: str,
 ) -> SourceRecordUpsert:
-    """Enregistrement source theses.fr d'une thèse, d'après son détail.
+    """Construit l'enregistrement source theses.fr d'une thèse, d'après son détail.
 
-    Sans conteneur. Le type dépend de la présence d'une date de soutenance, le statut open access de la diffusion de la thèse (`thesis_oa_status`). La langue est la première de `langues`, le résumé celui de la première langue qui en a un.
+    Sans conteneur. Le type dépend de la présence d'une date de soutenance, le statut open access de la diffusion de la thèse (`thesis_oa_status`). La langue est la première de `langues`, le résumé celui de la première langue pourvue d'un résumé.
     """
     doi = clean_doi(as_str(thesis.get("doi")))
     identifiers: list[SourceIdentifier] = []
@@ -162,12 +162,12 @@ def theses_source_record(
 
 
 def extract_theses_author_block(thesis: Mapping[str, JsonValue]) -> AuthorBlock:
-    """Bloc auteurs d'une thèse : les personnes de chaque rôle."""
+    """Renvoie le bloc auteurs d'une thèse : les personnes de chaque rôle."""
     return {field: thesis.get(field) for field in THESES_FIELD_ROLES}
 
 
 def build_theses_author_records(block: AuthorBlock) -> list[AuthorRecord]:
-    """Une contribution source par personne de la thèse, rôles fusionnés (`aggregate_thesis_persons`) ; seuls les auteurs ont une position.
+    """Lit une contribution source par personne de la thèse, rôles fusionnés (`aggregate_thesis_persons`) ; seuls les auteurs ont une position.
 
     theses.fr est sans adresse par personne. L'établissement de soutenance et les laboratoires partenaires, gardés dans `source_extras` avec leur PPN, rattachent les contributions sources à leurs structures (vue `source_contribution_structures`).
     """
@@ -192,7 +192,7 @@ class ThesesNormalizer(SourceNormalizer):
     def source_record(
         self, row: StagingRow, doc: Document, containers: Containers
     ) -> SourceRecordUpsert:
-        """Une thèse est sans éditeur ni conteneur."""
+        """Construit l'enregistrement source de la thèse, sans éditeur ni conteneur."""
         return theses_source_record(doc, row.id, row.source_id)
 
     def author_block(self, doc: Document) -> AuthorBlock:

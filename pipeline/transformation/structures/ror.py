@@ -2,7 +2,7 @@
 
 Le dump est importé seulement si sa version diffère de celle du dernier import. La version publiée se lit d'abord chez DataCite : Zenodo est interrogé seulement quand elle diffère, ou quand DataCite ne répond pas. Un dump inaccessible laisse le référentiel en l'état.
 
-Quand une organisation change de pays, l'import marque les contributions sources qui la citent sans adresse, pour la phase `countries`.
+Quand une organisation change de pays, les contributions sources citant l'organisation sans adresse sont marquées pour la phase `countries`.
 """
 
 import logging
@@ -43,7 +43,7 @@ class RorStore:
         *,
         version: str,
     ) -> None:
-        """Remplace les organisations et leurs relations par celles du dump, inscrit sa version, et marque pour la phase `countries` les dépendants des organisations dont le pays change."""
+        """Substitue au référentiel les organisations et relations du dump, et inscrit sa version. Les contributions sources des organisations au pays changé sont marquées pour la phase `countries`."""
         previous = dict(
             self._conn.execute(
                 select(ror_organizations.c.ror_id, ror_organizations.c.country_code)
@@ -90,7 +90,7 @@ class RorStore:
         )
 
     def _mark_country_changes(self, ror_ids: list[str]) -> None:
-        """Marque pour le recalcul des pays les contributions sources qui citent ces organisations sans adresse."""
+        """Marque pour le recalcul des pays les contributions sources citant ces organisations sans adresse."""
         if not ror_ids:
             return
         self._conn.execute(
@@ -107,7 +107,7 @@ class RorStore:
         )
 
     def last_imported_version(self) -> str | None:
-        """Version du dernier import, `None` sans import."""
+        """Renvoie la version du dernier import, `None` sans import."""
         return self._conn.execute(
             select(ror_dump_imports.c.version)
             .order_by(ror_dump_imports.c.imported_at.desc())

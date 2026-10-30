@@ -1,6 +1,6 @@
-"""Sous-étape de la phase `finalize` — supprime les éditeurs vides.
+"""Sous-étape de la phase `finalize` : suppression des éditeurs vides.
 
-Un éditeur vide n'a ni revue, ni monographie, ni enregistrement source, ni publication, ni préfixe DOI, ni paiement APC, ni forme de nom de revue. Une forme de nom de revue rattachée à un éditeur retrouve une revue par son titre chez cet éditeur : l'éditeur de la forme reste. Ses propres formes de nom partent avec lui. Le journal garde le nom de chaque éditeur supprimé.
+Un éditeur vide n'a ni revue, ni monographie, ni enregistrement source, ni publication, ni préfixe DOI, ni paiement APC, ni forme de nom de revue. Une forme de nom de revue sert à retrouver une revue par son titre chez son éditeur, donc cet éditeur est conservé. Les formes de nom de l'éditeur supprimé sont supprimées avec lui. Le journal garde le nom de chaque éditeur supprimé.
 """
 
 import logging
@@ -13,7 +13,7 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 LABEL = "Éditeurs vides"
 """Libellé de la sous-étape dans le journal de la phase."""
 
-# Leurs propres formes de nom partent avec eux (`ON DELETE CASCADE`).
+# Les formes de nom des éditeurs supprimés sont supprimées avec eux (`ON DELETE CASCADE`).
 _DELETE_EMPTY_PUBLISHERS = text("""
     DELETE FROM publishers p
     WHERE NOT EXISTS (SELECT 1 FROM serials j WHERE j.publisher_id = p.id)

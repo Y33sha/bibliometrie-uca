@@ -2,7 +2,7 @@
 
 Le dump liste toutes les revues du DOAJ (https://doaj.org/csv) et fait autorité sur `serials.doaj_payload` et `is_in_doaj`. La phase `publishing` l'importe (`enrich_serials_from_doaj`), comme la commande `import_doaj_csv` sur fichier local.
 
-`doaj_payload` garde les clés du dump CSV : des requêtes SQL, l'interface (`READABLE_DOAJ_FIELDS`) et l'audit des APC (`doaj_payload->>'APC amount'`) les lisent.
+`doaj_payload` garde les clés du dump CSV. Ces clés sont lues par des requêtes SQL, l'interface (`READABLE_DOAJ_FIELDS`) et l'audit des APC (`doaj_payload->>'APC amount'`).
 """
 
 from __future__ import annotations
@@ -18,15 +18,15 @@ DOAJ_CSV_DUMP_URL = "https://doaj.org/csv"
 """Dump CSV public de toutes les revues DOAJ (généré à la volée par DOAJ)."""
 
 ALLOWED_DUMP_HOSTS = frozenset({"doaj.org", "doaj-live-journal-csv.s3.amazonaws.com"})
-"""Hôtes que le téléchargement du dump accepte de joindre.
+"""Hôtes joignables par le téléchargement du dump.
 
-C'est la seule requête sortante du projet qui suit une redirection : `doaj.org` renvoie vers un lien signé, à durée limitée, sur son stockage objet. Ailleurs, une redirection est une erreur, si bien que les URL écrites dans le code sont la liste des hôtes joignables. La liste garde cette propriété ici : une redirection vers un autre hôte échoue en le nommant.
+Ce téléchargement est la seule requête sortante du projet à suivre une redirection : `doaj.org` renvoie vers un lien signé, à durée limitée, sur son stockage objet. Ailleurs, une redirection est une erreur : les URL écrites dans le code sont donc la liste des hôtes joignables. Cette liste garde la propriété : une redirection vers un autre hôte échoue en le nommant.
 """
 
 MAX_DUMP_BYTES = 256 * 1024 * 1024
 """Plafond d'octets acceptés pour le dump.
 
-Le dump pèse une trentaine de mégaoctets ; le plafond laisse un ordre de grandeur de marge et reste loin de ce dont dispose le conteneur.
+Le dump pèse une trentaine de mégaoctets ; le plafond laisse un ordre de grandeur de marge et reste loin des ressources du conteneur.
 """
 
 
@@ -44,7 +44,7 @@ def downloaded_doaj_dump(
 ) -> Iterator[Iterator[dict[str, str]]]:
     """Télécharge le dump CSV du DOAJ et renvoie ses lignes, le temps du bloc.
 
-    Le dump transite par un fichier temporaire, que le module CSV relit : un enregistrement peut contenir des sauts de ligne dans ses champs. Lève `DumpUnavailableError` quand le téléchargement échoue, avant que le bloc ne commence.
+    Le dump transite par un fichier temporaire, relu par le module CSV : une entrée du CSV peut contenir des sauts de ligne dans ses champs. Lève `DumpUnavailableError` quand le téléchargement échoue, avant le début du bloc.
     """
     with downloaded_dump(
         DOAJ_CSV_DUMP_URL,

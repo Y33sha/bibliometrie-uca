@@ -7,7 +7,7 @@ from sqlalchemy import Connection, text
 
 
 def refresh_serial_publication_count(conn: Connection, serial_id: int) -> None:
-    """Recalcule le `publication_count` d'une seule revue (fusion admin)."""
+    """Recalcule le `publication_count` d'une seule revue (fusion depuis l'administration)."""
     conn.execute(
         text("""
             UPDATE serials j SET publication_count = COALESCE((
@@ -21,7 +21,7 @@ def refresh_serial_publication_count(conn: Connection, serial_id: int) -> None:
 
 
 def refresh_publisher_publication_count(conn: Connection, publisher_id: int) -> None:
-    """Recalcule le `publication_count` d'un seul éditeur (fusion admin)."""
+    """Recalcule le `publication_count` d'un seul éditeur (fusion depuis l'administration)."""
     conn.execute(
         text("""
             UPDATE publishers p SET publication_count = COALESCE((
@@ -35,10 +35,7 @@ def refresh_publisher_publication_count(conn: Connection, publisher_id: int) -> 
 
 
 def refresh_serial_publication_counts(conn: Connection) -> int:
-    """Recalcule le `publication_count` de chaque revue.
-
-    Renvoie le nombre de lignes changées (garde `IS DISTINCT FROM` : les lignes inchangées ne comptent pas).
-    """
+    """Recalcule le `publication_count` de chaque revue. Renvoie le nombre de lignes changées."""
     return conn.execute(
         text("""
             WITH counts AS (

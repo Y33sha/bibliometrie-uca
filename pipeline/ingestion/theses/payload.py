@@ -1,4 +1,4 @@
-"""Lecture des enregistrements sources theses.fr par la normalisation : conventions des champs de theses.fr.
+"""Lecture des payloads theses.fr par la normalisation : conventions des champs de theses.fr.
 
 Les payloads sont les objets JSON bruts de l'API, sans schéma typé.
 """
@@ -12,12 +12,12 @@ from domain.publications.metadata import OaStatus
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
 from pipeline.ingestion.common.source_contributions import contributor_identifiers
 
-# Cas de diffusion STAR où une version de la thèse est destinée à Internet. Les cas 5 et 6 réservent la thèse à l'intranet de l'établissement.
+# Cas de diffusion STAR avec une version de la thèse destinée à Internet. Les cas 5 et 6 réservent la thèse à l'intranet de l'établissement.
 _INTERNET_CASES = frozenset({"cas1", "cas2", "cas3", "cas4"})
 
 
 def thesis_oa_status(thesis: Mapping[str, JsonValue]) -> OaStatus:
-    """Statut open access d'une thèse, d'après sa diffusion (`accessible`, `cas`).
+    """Renvoie le statut open access d'une thèse, d'après sa diffusion (`accessible`, `cas`).
 
     Une thèse accessible est `green`. Une thèse inaccessible destinée à Internet (cas 1 à 4) attend la fin d'un embargo ou d'une confidentialité : elle est `embargoed`. Les autres sont `closed` : intranet seulement, ou thèse en cours sans fichier.
     """
@@ -29,15 +29,19 @@ def thesis_oa_status(thesis: Mapping[str, JsonValue]) -> OaStatus:
 
 
 def derive_theses_doc_type(defense_date: str | None) -> str:
-    """Type d'une thèse theses.fr : `thesis` avec une date de soutenance, `ongoing_thesis` sans. La date de soutenance est le seul signal fiable qui distingue thèse soutenue et thèse en préparation."""
+    """Renvoie le type d'une thèse theses.fr : `thesis` avec une date de soutenance, `ongoing_thesis` sans.
+
+    La date de soutenance est le seul signal fiable pour distinguer thèse soutenue et thèse en préparation.
+    """
     return "thesis" if defense_date else "ongoing_thesis"
 
 
 @dataclass(frozen=True)
 class ThesisContribution:
-    """Une personne d'une thèse, avec ses rôles fusionnés (`aggregate_thesis_persons`). `person` est l'objet brut de l'API."""
+    """Une personne d'une thèse, avec ses rôles fusionnés (`aggregate_thesis_persons`)."""
 
     person: Mapping[str, JsonValue]
+    """Objet brut de l'API."""
     roles: list[ContributionRole]
     name: ContributorName
     author_position: int | None
@@ -46,7 +50,7 @@ class ThesisContribution:
 
 
 def aggregate_thesis_persons(thesis: Mapping[str, JsonValue]) -> list[ThesisContribution]:
-    """Personnes d'une thèse, une fois chacune, avec leurs rôles fusionnés.
+    """Renvoie les personnes d'une thèse, une fois chacune, avec leurs rôles fusionnés.
 
     Les personnes viennent des champs `auteurs`, `directeurs`, `rapporteurs`, `membresJury` et `presidentJury` (`THESES_FIELD_ROLES`). Une personne présente dans plusieurs champs est identifiée par son PPN, à défaut par son nom et son prénom ; ses rôles se fusionnent (`merge_roles`). C'est presque toujours le président du jury qui est aussi rapporteur.
 

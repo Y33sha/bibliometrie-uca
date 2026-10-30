@@ -8,9 +8,9 @@ import time
 
 
 class Pace:
-    """Plafond de débit : les départs sont réservés l'un après l'autre, espacés de `1 / max_per_second` seconde.
+    """Plafond de débit : départs réservés l'un après l'autre, espacés de `1 / max_per_second` seconde.
 
-    Le plafond vaut pour toutes les requêtes, quel que soit le nombre de requêtes simultanées et leur temps de réponse. Une requête que l'ordonnancement retarde part après sa réservation, jamais avant : le nombre de départs sur une durée reste borné.
+    Le plafond vaut pour toutes les requêtes, quel que soit le nombre de requêtes simultanées et leur temps de réponse. Une requête retardée par l'ordonnancement part après sa réservation, jamais avant : le nombre de départs sur une durée reste borné.
     """
 
     def __init__(self, max_per_second: float) -> None:
@@ -19,7 +19,7 @@ class Pace:
         self._lock = threading.Lock()
 
     def _reserve(self) -> float:
-        """Réserve le prochain départ et renvoie l'attente qui le sépare de maintenant."""
+        """Réserve le prochain départ et renvoie l'attente jusqu'à ce départ."""
         with self._lock:
             now = time.monotonic()
             start = max(now, self._next_start)

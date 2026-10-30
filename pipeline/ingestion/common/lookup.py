@@ -1,6 +1,6 @@
 """Recherche de documents dans une source par identifiant : boucle commune des phases `fetch_missing`, `fetch_stale` et `fetch_truncated`.
 
-Un canal (`LookupChannel`) dit comment interroger la source pour un lot d'identifiants, comment écrire un document trouvé, et ce que devient un identifiant dont la source confirme l'absence. `look_up` interroge les lots en parallèle (`run_fetch_pool`), écrit les documents trouvés, range les absents et compte les issues. Un lot que la source ne sert pas attend le run suivant. Le pool s'arrête quand le circuit-breaker de la source coupe ; l'accès à la source le signale.
+Un canal (`LookupChannel`) définit la requête d'un lot d'identifiants, l'écriture d'un document trouvé et le traitement d'un identifiant absent de la source. `look_up` interroge les lots en parallèle (`run_fetch_pool`), écrit les documents trouvés, range les absents et compte les issues. Un lot non servi par la source attend le run suivant. Le pool s'arrête quand le circuit-breaker de la source coupe ; l'accès à la source le signale.
 """
 
 from __future__ import annotations
@@ -29,17 +29,22 @@ COMMIT_EVERY = 50
 
 @dataclass(frozen=True, slots=True)
 class LookupBatch:
-    """Réponse de la source à un lot d'identifiants : documents trouvés, identifiants dont la source confirme l'absence. Un identifiant du lot présent dans aucune des deux listes attend le run suivant."""
+    """Réponse de la source à un lot d'identifiants.
+
+    Un identifiant du lot présent dans aucune des deux listes attend le run suivant.
+    """
 
     records: list[Mapping[str, JsonValue]] = field(default_factory=list)
+    """Documents trouvés."""
     absent: list[str] = field(default_factory=list)
+    """Identifiants à l'absence confirmée par la source."""
 
 
 type Fetch = Callable[[httpx2.AsyncClient, list[str]], Awaitable[LookupBatch | Unavailable]]
 """Interroge la source pour un lot d'identifiants."""
 
 type Stage = Callable[[StagingStore, Mapping[str, JsonValue]], UpsertOutcome | None]
-"""Écrit un document trouvé dans `staging`. Renvoie `None` pour un document sans identifiant, qui n'est pas écrit."""
+"""Écrit un document trouvé dans `staging`. Renvoie `None` pour un document sans identifiant, laissé de côté."""
 
 
 def one_at_a_time(
@@ -47,7 +52,7 @@ def one_at_a_time(
         [httpx2.AsyncClient, str], Awaitable[LookupOutcome[Mapping[str, JsonValue]]]
     ],
 ) -> Fetch:
-    """Requête d'un lot d'un seul identifiant, par `fetch_one` : document trouvé, absence confirmée, ou source indisponible."""
+    """Adapte `fetch_one` en requête d'un lot d'un seul identifiant : document trouvé, absence confirmée ou source indisponible."""
 
     async def fetch(client: httpx2.AsyncClient, keys: list[str]) -> LookupBatch | Unavailable:
         (key,) = keys
@@ -68,7 +73,7 @@ class LookupChannel:
     source: str
     fetch: Fetch
     on_absent: Callable[[Connection, str], None]
-    """Ce que devient un identifiant dont la source confirme l'absence. Ne commite pas."""
+    """Traite un identifiant à l'absence confirmée par la source. Ne commite pas."""
     stage: Stage | None = None
     """`None` : la source renvoie seulement la présence des identifiants, sans document à écrire."""
     absent_metric: str = "not_found"
@@ -76,7 +81,7 @@ class LookupChannel:
     batch_size: int = 1
     max_concurrent: int = 1
     shown: bool = True
-    """La recherche a sa barre de progression. `False` : une vérification qui prolonge une autre recherche, sous la barre de celle-ci."""
+    """Vrai si la recherche a sa barre de progression. `False` : vérification prolongeant une autre recherche, sous la barre de celle-ci."""
 
 
 async def look_up(
@@ -84,7 +89,7 @@ async def look_up(
 ) -> PhaseMetrics:
     """Cherche les identifiants dans la source du canal, écrit les documents trouvés et range les absents.
 
-    Les compteurs rendus : identifiants cherchés (`total`), documents écrits (`new`, `updated`, `unchanged`), identifiants des lots que la source n'a pas servis (`errors`), identifiants absents (compteur du canal). La barre compte les documents trouvés.
+    Renvoie les compteurs : identifiants cherchés (`total`), documents écrits (`new`, `updated`, `unchanged`), identifiants des lots non servis par la source (`errors`), identifiants absents (compteur du canal). La barre compte les documents trouvés.
     """
     metrics = PhaseMetrics(seen=len(keys))
     if not keys:

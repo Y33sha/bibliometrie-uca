@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Orchestrateur du pipeline bibliométrique : sélection et séquence d'exécution des phases.
 
-Le module de chaque phase expose `build`, qui câble ses dépendances et rend la phase prête à s'exécuter. `PHASE_ORDER` fixe l'ordre d'exécution et `_PHASE_BUILDERS` associe chaque nom à sa fonction `build`.
+Le module de chaque phase expose `build`, qui câble ses dépendances et renvoie la phase prête à s'exécuter. `PHASE_ORDER` fixe l'ordre d'exécution et `_PHASE_BUILDERS` associe chaque nom à sa fonction `build`.
 
 `run_pipeline --help` donne les options et la liste des phases.
 """
@@ -73,8 +73,7 @@ from pipeline.transformation.structures.perimeter import refresh_perimeter_struc
 set_console_writer(write_above_bars)
 set_bar_stream(console_stream())
 
-# Seuil du root logger, où émettent les modules qui appellent `logging.getLogger(__name__)` :
-# les bibliothèques tierces y écrivent trop d'information pour la laisser passer.
+# Seuil du root logger, destinataire des modules qui appellent `logging.getLogger(__name__)` : les bibliothèques tierces y écrivent trop d'informations pour les laisser passer.
 configure_root_logging(logging.WARNING)
 
 
@@ -127,7 +126,7 @@ def _install_sigterm_handler() -> None:
 
 
 def _catalogue_des_phases() -> str:
-    """Phases dans l'ordre d'exécution, chacune résumée par la première ligne de la docstring de sa fonction `build`."""
+    """Renvoie les phases dans l'ordre d'exécution, chacune résumée par la première ligne de la docstring de sa fonction `build`."""
     width = max(len(name) for name, _ in PHASES)
     lines = ["Phases, dans l'ordre :"]
     for i, (name, build) in enumerate(PHASES, 1):
@@ -153,7 +152,7 @@ class _RunFlag:
     option: str
     help: str
     banner: str | None = None
-    """Libellé de l'option dans la bannière du run ; sans libellé, l'option n'y paraît pas."""
+    """Libellé de l'option dans la bannière du run, ou `None` pour l'omettre."""
 
     @property
     def dest(self) -> str:
@@ -202,7 +201,7 @@ _RUN_FLAGS = (
 
 
 def _build_arg_parser() -> argparse.ArgumentParser:
-    """Parseur des arguments de `run_pipeline`. L'aide liste les phases, que `--from` et `--only` nomment."""
+    """Renvoie le parseur des arguments de `run_pipeline`. L'aide liste les phases, nommées par `--from` et `--only`."""
     parser = argparse.ArgumentParser(
         description="Orchestrateur pipeline bibliométrique",
         epilog=_catalogue_des_phases(),
@@ -248,7 +247,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
 
 
 def _run_options(args: argparse.Namespace, sources: set[str]) -> RunOptions:
-    """Options du run transmises aux phases."""
+    """Renvoie les options du run transmises aux phases."""
     return RunOptions(
         mode=args.mode,
         sources=frozenset(sources),
@@ -261,9 +260,9 @@ def _run_options(args: argparse.Namespace, sources: set[str]) -> RunOptions:
 def _select_phases_to_run(
     args: argparse.Namespace,
 ) -> list[tuple[str, PhaseBuilder]]:
-    """Phases à exécuter selon `--only` / `--from` (sinon toutes), moins les enrichissements si `--no-extras`.
+    """Renvoie les phases à exécuter selon `--only` ou `--from` (sinon toutes), moins les enrichissements avec `--no-extras`.
 
-    `--only` nomme une phase explicitement : elle est rendue même si c'est un enrichissement.
+    Une phase nommée par `--only` est renvoyée même si c'est un enrichissement.
     """
     if args.only:
         return [(n, build) for n, build in PHASES if n == args.only]
@@ -310,8 +309,8 @@ _LABEL_FIELDS: dict[str, Callable[[Connection], dict[str, str]]] = {
 
 
 def _phase_label(name: str) -> str | None:
-    """Ce que la phase produit, ses champs remplis par la configuration."""
-    # `PHASE_LABELS` couvre les phases du pipeline ; les tests en nomment d'autres.
+    """Renvoie le libellé de la phase, ses champs remplis par la configuration."""
+    # `PHASE_LABELS` couvre les phases du pipeline. Les tests nomment aussi d'autres phases.
     label = PHASE_LABELS.get(name)
     fields = _LABEL_FIELDS.get(name)
     if label is None or fields is None:
@@ -321,7 +320,7 @@ def _phase_label(name: str) -> str | None:
 
 
 def _phase_title(name: str, label: str | None) -> list[str]:
-    """Lignes ouvrant une phase : son nom, et ce qu'elle produit."""
+    """Renvoie les lignes d'ouverture d'une phase : son nom et son libellé."""
     return _framed([f"{PHASE_MARKER}{name}", *([label] if label else [])])
 
 
@@ -337,7 +336,7 @@ _SETTING_KEY_WIDTH = 9
 
 
 def _setting(key: str, value: str) -> list[str]:
-    """Lignes « clé ···· valeur » de la bannière, la valeur repliée sous elle-même."""
+    """Renvoie les lignes « clé ···· valeur » de la bannière, la valeur repliée sous elle-même."""
     head = f"{key} {'·' * (_SETTING_KEY_WIDTH - len(key))} "
     wrapped = textwrap.wrap(value, PHASE_TITLE_WIDTH - len(head)) or [""]
     return [head + wrapped[0], *(" " * len(head) + continuation for continuation in wrapped[1:])]
@@ -346,7 +345,7 @@ def _setting(key: str, value: str) -> list[str]:
 def _banner(settings: list[str]) -> list[str]:
     """Encadre le titre et les réglages d'une exécution, avec une ombre.
 
-    Un terminal reçoit le cadre, au moins aussi large que celui d'une phase ; une sortie capturée reçoit deux filets et le titre en texte.
+    Un terminal reçoit le cadre, au moins aussi large que celui d'une phase. Une sortie capturée reçoit deux filets et le titre en texte.
     """
     if not sys.stdout.isatty():
         return ["─" * 40, "PIPELINE BIBLIOMÉTRIQUE", *settings, "─" * 40]
@@ -369,7 +368,7 @@ def _banner(settings: list[str]) -> list[str]:
 
 
 def _run_title(args: argparse.Namespace, phases: list[tuple[str, PhaseBuilder]]) -> list[str]:
-    """Lignes ouvrant une exécution : son mode, puis ce qui écarte le lancement du courant."""
+    """Renvoie les lignes d'ouverture d'une exécution : son mode, puis ses réglages distincts du lancement par défaut."""
     settings = _setting("mode", args.mode)
 
     if args.year:
@@ -399,11 +398,12 @@ def _run_one_phase(
 ) -> tuple[str, float]:
     """Construit et exécute une phase, et enregistre son observabilité. Renvoie son nom et sa durée.
 
-    Une interruption clavier ou une exception est enregistrée, puis termine le processus ; `--from <phase>` reprend la séquence où elle s'est arrêtée."""
+    Une interruption clavier ou une exception est enregistrée, puis termine le processus. `--from <phase>` reprend la séquence à la phase interrompue.
+    """
     # Le nom de la phase préfixe les records émis pendant la phase, y compris par les moissonneurs en threads, qui héritent du contexte.
     phase_token = set_log_phase(name)
     try:
-        # Ligne vide devant le cadre : elle le détache de ce que la phase précédente a écrit.
+        # Ligne vide devant le cadre, pour le séparer de la sortie de la phase précédente.
         log.info("")
         for line in _phase_title(name, _phase_label(name)):
             log.info("%s", line)
@@ -418,7 +418,7 @@ def _run_one_phase(
                 )
             )
         except (KeyboardInterrupt, Exception) as e:
-            # Une interruption en pleine requête invalide la connexion : le nettoyage qui suit lève une erreur SQLAlchemy à la place du `KeyboardInterrupt`, que la chaîne des exceptions garde.
+            # Une interruption en pleine requête invalide la connexion : le nettoyage suivant lève une erreur SQLAlchemy, et le `KeyboardInterrupt` reste dans la chaîne des exceptions.
             interrupted = is_user_interruption(e)
             if interrupted:
                 message = "Interrompu par l'utilisateur (action contrôlée)"

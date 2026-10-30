@@ -2,7 +2,7 @@
 
 WoS accepte une requête groupée par DOI (`DO=("doi1" OR "doi2" OR …)`). Un lot compte 20 DOI, pour que l'URL reste courte ; ses résultats se lisent par pages de `WOS_PER_PAGE` records.
 
-Les DOI de preprints que WoS n'indexe pas (Zenodo, arXiv, SSRN, Research Square…) restent hors des requêtes (`filter_doi_for_wos`).
+Les DOI de preprints absents de l'index WoS (Zenodo, arXiv, SSRN, Research Square…) restent hors des requêtes (`filter_doi_for_wos`).
 """
 
 from __future__ import annotations

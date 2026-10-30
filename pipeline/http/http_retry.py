@@ -5,7 +5,7 @@
 
 Une redirection est suivie seulement pour une requête GET, vers le même hôte, et une fois : Crossref redirige ainsi un DOI alias vers son DOI principal. Toute autre redirection est une erreur : l'hôte joint reste celui qu'`api_params` désigne, et les en-têtes d'authentification ne quittent pas leur destinataire.
 
-Chaque tentative attend son tour au rythme de la source, et compte au circuit-breaker que pose l'accès à la source (`access_source`). Hors de cet accès, une requête lève `RuntimeError`.
+Chaque tentative attend son tour au rythme de la source, et compte au circuit-breaker posé par l'accès à la source (`access_source`). Hors de cet accès, une requête lève `RuntimeError`.
 """
 
 from __future__ import annotations
@@ -41,7 +41,7 @@ class _Success[T]:
 
 
 def _describe(error: Exception) -> str:
-    """Type de l'erreur, suivi de son message quand elle en a un : un délai dépassé de httpx a un message vide."""
+    """Renvoie le type de l'erreur, suivi de son message s'il existe : un délai dépassé de httpx a un message vide."""
     message = str(error)
     return f"{type(error).__name__}: {message}" if message else type(error).__name__
 
@@ -51,7 +51,10 @@ def _backoff_delay(initial_backoff: float, attempt: int) -> float:
 
 
 def _same_host_redirect(resp: httpx2.Response) -> httpx2.URL | None:
-    """Destination d'une redirection à suivre, ou `None` : seule une requête GET redirigée vers le même hôte, sous le même schéma et le même port, est suivie."""
+    """Renvoie la destination d'une redirection à suivre, ou `None`.
+
+    Seule une requête GET redirigée vers le même hôte, sous le même schéma et le même port, est suivie.
+    """
     if not resp.is_redirect or resp.request.method != "GET":
         return None
     origin = resp.request.url
@@ -62,9 +65,11 @@ def _same_host_redirect(resp: httpx2.Response) -> httpx2.URL | None:
 
 
 def _source_breaker(label: str) -> tuple[SourceCircuitBreaker, str]:
-    """Breaker de la source et label préfixé de son nom.
+    """Renvoie le breaker de la source, et le label préfixé du nom de la source.
 
-    Lève `SourceUnavailableError` si le breaker a déjà coupé, et `RuntimeError` hors de l'accès à une source.
+    Raises:
+        SourceUnavailableError: breaker déjà coupé.
+        RuntimeError: requête hors de l'accès à une source.
     """
     breaker = get_current_breaker()
     if breaker is None:
@@ -79,9 +84,9 @@ def _classify[T](
     *,
     retry_on_empty_body: bool,
 ) -> _Success[T] | str:
-    """Issue d'une tentative : la valeur décodée, ou le motif d'un retry.
+    """Renvoie l'issue d'une tentative : la valeur décodée, ou le motif d'une nouvelle tentative.
 
-    Lève `httpx2.HTTPStatusError` sur un statut d'erreur non retryable : la réponse est définitive.
+    Lève `httpx2.HTTPStatusError` sur un statut d'erreur définitif.
     """
     if isinstance(result, httpx2.RequestError):
         return f"erreur réseau ({_describe(result)})"
@@ -125,9 +130,13 @@ def http_request_with_retry(
     retry_on_empty_body: bool = False,
     label: str = "",
 ) -> JsonValue:
-    """Requête HTTP synchrone, selon la politique du module.
+    """Envoie une requête HTTP synchrone, selon la politique du module.
 
-    `max_retries=3` avec le backoff par défaut donne des pauses de 1 et 2 s. `label` : chaîne courte (ex. "year 2024, rec 100") insérée dans les logs. Le corps est rendu tel que la source l'a écrit : la plupart répondent par un objet, `doi.org/ra` par un tableau — l'appelant en tire la forme qu'il attend (`as_mapping`, `as_sequence`).
+    Le corps est renvoyé tel quel : la plupart des sources répondent par un objet, `doi.org/ra` par un tableau. L'appelant convertit le corps dans la forme attendue (`as_mapping`, `as_sequence`).
+
+    Args:
+        max_retries: à 3, avec le backoff par défaut, donne des pauses de 1 et 2 s.
+        label: chaîne courte insérée dans le journal (ex. "year 2024, rec 100").
     """
     breaker, label = _source_breaker(label)
     reason = ""
@@ -179,9 +188,12 @@ async def http_request_with_retry_async(
     retry_on_empty_body: bool = False,
     label: str = "",
 ) -> JsonValue:
-    """Requête HTTP asynchrone, selon la politique du module.
+    """Envoie une requête HTTP asynchrone, selon la politique du module.
 
-    Les coroutines d'un même run partagent le `httpx2.AsyncClient` et ses connexions. `label` : chaîne courte (ex. "DOI 10.xxx") pour distinguer les requêtes concurrentes dans les logs. Le corps est rendu tel que la source l'a écrit, comme pour la variante synchrone.
+    Les coroutines d'un même run partagent le `httpx2.AsyncClient` et ses connexions. Le corps est renvoyé tel quel, comme pour la variante synchrone.
+
+    Args:
+        label: chaîne courte pour distinguer les requêtes concurrentes dans le journal (ex. "DOI 10.xxx").
     """
     return await _request_with_retry_async(
         client,
@@ -216,11 +228,12 @@ async def lookup_json_async(
     not_found_statuses: frozenset[int] = frozenset({404}),
     label: str = "",
 ) -> LookupOutcome[JsonValue]:
-    """Requête d'un élément par `http_request_with_retry_async`, classée en issue (cf. `pipeline.http.lookup`).
+    """Interroge une source sur un élément par `http_request_with_retry_async`, et classe la réponse en issue (cf. `pipeline.http.lookup`).
 
-    Un statut de `not_found_statuses` donne `NOT_FOUND`. Un autre statut d'erreur, des retries épuisés ou un circuit-breaker déclenché donnent `UNAVAILABLE`.
+    Un statut de `not_found_statuses` donne `NOT_FOUND`. Un autre statut d'erreur, des nouvelles tentatives épuisées ou un circuit-breaker déclenché donnent `UNAVAILABLE`.
 
-    `not_found_statuses` vaut 404 pour une ressource adressée par son identifiant. Il est vide pour un endpoint de recherche, où un 404 désigne l'endpoint et non l'élément : l'absence s'y lit dans une réponse sans résultat.
+    Args:
+        not_found_statuses: 404 pour une ressource adressée par son identifiant. Vide pour un endpoint de recherche : un 404 désigne alors l'endpoint, et l'absence de l'élément se lit dans une réponse sans résultat.
     """
     try:
         return await http_request_with_retry_async(
@@ -257,7 +270,10 @@ async def http_get_text_with_retry_async(
     initial_backoff: float = 1.0,
     label: str = "",
 ) -> str:
-    """Requête GET asynchrone qui renvoie le corps de la réponse en texte (XML, par exemple), avec la politique de `http_request_with_retry_async`. Un corps vide est retenté."""
+    """Envoie une requête GET asynchrone et renvoie le corps de la réponse en texte (XML, par exemple).
+
+    La politique est celle de `http_request_with_retry_async`. Un corps vide est retenté.
+    """
     return await _request_with_retry_async(
         client,
         "GET",
@@ -276,7 +292,7 @@ async def http_get_text_with_retry_async(
 
 
 def _json_body(resp: httpx2.Response) -> JsonValue:
-    """Corps JSON de la réponse. Lève `json.JSONDecodeError` sur un corps illisible, qui est retenté."""
+    """Renvoie le corps JSON de la réponse. Lève `json.JSONDecodeError` sur un corps illisible, ensuite retenté."""
     return cast("JsonValue", resp.json())
 
 
@@ -300,7 +316,11 @@ async def _request_with_retry_async[T](
     retry_on_empty_body: bool,
     label: str,
 ) -> T:
-    """Boucle de retry asynchrone commune. `decode` lit le corps d'une réponse aboutie."""
+    """Exécute la boucle commune des nouvelles tentatives asynchrones.
+
+    Args:
+        decode: lit le corps d'une réponse aboutie.
+    """
     breaker, label = _source_breaker(label)
     reason = ""
     for attempt in range(max_retries):

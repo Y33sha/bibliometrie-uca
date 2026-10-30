@@ -7,9 +7,9 @@ from typing import Protocol
 
 
 class RunParallel(Protocol):
-    """Lance des thunks étiquetés en parallèle et renvoie leurs résultats par étiquette.
+    """Exécution parallèle de thunks étiquetés, avec leurs résultats par étiquette.
 
-    Chaque thunk s'exécute dans une copie du contexte courant, qui garde l'estampille de phase des journaux. L'exception d'un thunk se propage : la phase échoue.
+    Chaque thunk s'exécute dans une copie du contexte courant, donc garde l'estampille de phase des journaux. L'exception d'un thunk se propage et fait échouer la phase.
     """
 
     def __call__[T](self, thunks: dict[str, Callable[[], T]]) -> dict[str, T]: ...

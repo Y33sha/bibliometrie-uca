@@ -1,4 +1,4 @@
-"""Source HAL : moissonnage, client de l'API Solr, champs des enregistrements sources."""
+"""Source HAL : moissonnage, client de l'API Solr, champs des documents."""
 
 from __future__ import annotations
 

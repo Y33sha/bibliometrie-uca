@@ -1,16 +1,16 @@
-"""Recalcule les pays des contributions sources, des enregistrements sources et des publications à partir de `addresses.countries`.
+"""Recalcul des pays des contributions sources, des enregistrements sources et des publications à partir de `addresses.countries`.
 
 Trois caches dénormalisés, en cascade :
   1. `source_contributions.countries` — pays retenus des adresses de la contribution source, pays de ses organisations ROR sans adresse et de ses structures HAL.
-  2. `source_records.countries` — union des `source_contributions.countries` du document.
+  2. `source_records.countries` — union des `source_contributions.countries` de l'enregistrement source.
   3. `publications.countries` — union des `source_records.countries` de même publication_id.
 
 Deux portées partagent l'agrégation : les contributions sources à recalculer (`refresh`, tâche `countries.refresh_publication_countries`), ou les contributions sources d'un lot d'adresses (`CountryRecompute`, appelé par l'API après une saisie manuelle).
 
-Une contribution source est à recalculer quand elle est dans la file `source_contribution_countries_queue`, ou liée à une adresse de la file `address_countries_queue`. `create_dirty_scope` relève les deux files, puis ces contributions sources, dans des tables temporaires que lisent les trois étapes :
+Une contribution source est à recalculer quand elle est dans la file `source_contribution_countries_queue`, ou liée à une adresse de la file `address_countries_queue`. `create_dirty_scope` relève les deux files, puis ces contributions sources, dans des tables temporaires lues par les trois étapes :
 
 - `countries_dirty_scope` : toutes ces contributions sources, avec leur enregistrement source ;
-- `countries_recompute_scope` : parmi elles, celles dont les pays peuvent changer, numérotées pour le traitement par tranches. Une contribution source sans adresse, sans ROR sans adresse, sans structure HAL et sans pays garde des pays vides : elle en est absente.
+- `countries_recompute_scope` : parmi elles, celles dont les pays peuvent changer, numérotées pour le traitement par tranches. Une contribution source sans pays, sans adresse, sans ROR sans adresse et sans structure HAL est absente de cette table : ses pays restent vides.
 """
 
 import logging
@@ -26,7 +26,7 @@ from pipeline.transformation.countries.resolution import resolve_address_countri
 BATCH_SIZE = 50_000
 """Nombre de contributions sources recalculées par requête."""
 
-# Relevés des deux files, que `delete_processed_marks` supprime des files.
+# Files et tables de leur relevé. `delete_processed_marks` supprime des files les marquages relevés.
 _SNAPSHOTS = (
     (Queue.SOURCE_CONTRIBUTION_COUNTRIES, "source_contribution_countries_marks"),
     (Queue.ADDRESS_COUNTRIES, "address_countries_marks"),
@@ -131,7 +131,7 @@ _PUBLICATION_COUNTRIES_FROM_SCOPE = """,
 
 
 def create_dirty_scope(conn: Connection) -> int:
-    """Relève les deux files, puis crée `countries_dirty_scope` et `countries_recompute_scope`. Retourne le nombre de contributions sources à recalculer."""
+    """Relève les deux files, puis crée `countries_dirty_scope` et `countries_recompute_scope`. Renvoie le nombre de contributions sources à recalculer."""
     for queue, table in _SNAPSHOTS:
         snapshot(conn, queue, table)
     conn.execute(text(_CREATE_DIRTY_SCOPE))
@@ -157,9 +157,10 @@ def drop_dirty_scope(conn: Connection) -> None:
 def refresh_source_contribution_countries(
     conn: Connection, *, ranks: tuple[int, int] | None = None
 ) -> int:
-    """Recalcule `source_contributions.countries` des contributions sources de `countries_recompute_scope`. Retourne le nombre de contributions sources modifiées.
+    """Recalcule `source_contributions.countries` des contributions sources de `countries_recompute_scope`. Renvoie le nombre de contributions sources modifiées.
 
-    `ranks` (bornes incluses) limite le recalcul à une tranche de la numérotation.
+    Args:
+        ranks: tranche de la numérotation à recalculer, bornes incluses.
     """
     if ranks is None:
         scope = "WITH scoped_sa AS (SELECT id FROM countries_recompute_scope)"
@@ -174,7 +175,7 @@ def refresh_source_contribution_countries(
 
 
 def refresh_source_record_countries(conn: Connection) -> int:
-    """Recalcule `source_records.countries` des documents de `countries_dirty_scope`. Retourne le nombre de lignes modifiées."""
+    """Recalcule `source_records.countries` des enregistrements sources de `countries_dirty_scope`. Renvoie le nombre de lignes modifiées."""
     return conn.execute(
         text(
             """
@@ -189,7 +190,7 @@ def refresh_source_record_countries(conn: Connection) -> int:
 
 
 def refresh_publication_countries(conn: Connection) -> int:
-    """Recalcule `publications.countries` des publications des documents de `countries_dirty_scope`. Retourne le nombre de lignes modifiées."""
+    """Recalcule `publications.countries` des publications des enregistrements sources de `countries_dirty_scope`. Renvoie le nombre de lignes modifiées."""
     return conn.execute(
         text(
             """
@@ -208,7 +209,7 @@ def refresh_publication_countries(conn: Connection) -> int:
 def _refresh_source_contributions_in_batches(
     conn: Connection, total: int, logger: logging.Logger
 ) -> int:
-    """Recalcule les `total` contributions sources de `countries_recompute_scope` par tranches de `BATCH_SIZE`, avec une barre de progression. Retourne le nombre de contributions sources modifiées."""
+    """Recalcule les `total` contributions sources de `countries_recompute_scope` par tranches de `BATCH_SIZE`, avec une barre de progression. Renvoie le nombre de contributions sources modifiées."""
     updated = 0
     with track_progress(total, f"{BRANCH}contributions sources", logger, erase=True) as progress:
         for lo in range(1, total + 1, BATCH_SIZE):
@@ -219,7 +220,7 @@ def _refresh_source_contributions_in_batches(
 
 
 def refresh(conn: Connection, logger: logging.Logger) -> int:
-    """Recalcule les caches pays (source_contributions → source_records → publications) des contributions sources à recalculer, puis supprime les marquages traités. Retourne le nombre de publications mises à jour. Chaque recalcul a sa ligne de journal, avec son nombre de lignes et sa durée."""
+    """Recalcule les caches pays (source_contributions → source_records → publications) des contributions sources à recalculer, puis supprime les marquages traités. Renvoie le nombre de publications mises à jour. Chaque recalcul a sa ligne de journal, avec son nombre de lignes et sa durée."""
     step(logger, "Rafraîchissement des pays associés aux publications")
     with waiting(f"{BRANCH}contributions sources à recalculer : en cours", logger) as line:
         total = create_dirty_scope(conn)
@@ -271,7 +272,7 @@ class CountryRecompute:
         return resolve_address_countries(self._conn, address_ids)
 
     def refresh_source_records_countries_for_addresses(self, address_ids: list[int]) -> int:
-        """Recalcule `source_contributions.countries` des contributions sources liées à l'une des `address_ids`, puis `source_records.countries` de leurs documents. Idempotent. Retourne le nombre de documents mis à jour."""
+        """Recalcule `source_contributions.countries` des contributions sources liées à l'une des `address_ids`, puis `source_records.countries` de leurs enregistrements sources. Idempotent. Renvoie le nombre d'enregistrements sources mis à jour."""
         if not address_ids:
             return 0
         self._conn.execute(
@@ -303,7 +304,7 @@ class CountryRecompute:
         ).rowcount
 
     def refresh_publications_countries_for_addresses(self, address_ids: list[int]) -> int:
-        """Recalcule `publications.countries` (union des `source_records.countries`) pour les publications rattachées à l'une des `address_ids`. Idempotent. Retourne le nombre de publications mises à jour."""
+        """Recalcule `publications.countries` (union des `source_records.countries`) pour les publications rattachées à l'une des `address_ids`. Idempotent. Renvoie le nombre de publications mises à jour."""
         if not address_ids:
             return 0
         return self._conn.execute(

@@ -14,7 +14,7 @@ from pipeline.transformation.publishing.monographs.store import MonographStore
 
 
 def _merge_proceedings(conn: Connection, target_id: int, source_id: int) -> None:
-    """La monographie conservée est un volume d'actes si l'une des deux l'est."""
+    """Fait de la monographie conservée un volume d'actes si l'une des deux l'est."""
     conn.execute(
         text("""
             UPDATE monographs t SET proceedings = t.proceedings OR s.proceedings
@@ -26,7 +26,7 @@ def _merge_proceedings(conn: Connection, target_id: int, source_id: int) -> None
 
 
 def _merge_isbns(conn: Connection, target_id: int, source_id: int) -> None:
-    """La conservée reçoit les ISBN de l'absorbée qui lui manquent, sauf ceux qu'une autre monographie a déjà. L'absorbée les libère d'abord : la contrainte d'unicité le demande."""
+    """Donne à la monographie conservée les ISBN manquants de l'absorbée, sauf ceux déjà attribués à une autre monographie. L'absorbée libère d'abord ses ISBN, pour la contrainte d'unicité."""
     source = conn.execute(
         text("SELECT isbn, eisbn FROM monographs WHERE id = :s"), {"s": source_id}
     ).one()

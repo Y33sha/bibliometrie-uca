@@ -1,7 +1,7 @@
 """Normalisation des enregistrements sources Crossref.
 
 - Le type brut est le `type` Crossref, suivi du sous-type quand Crossref en donne un (`crossref_raw_doc_type`). `arbitrate_doc_type_with_article_subtype` arbitre ensuite un `journal-article` contre les sous-types plus précis des autres sources (`ARTICLE_SUBTYPES`).
-- Le statut open access de Crossref est peu fiable : il reste vide, et les autres sources en décident (`refresh_from_sources`).
+- Le statut open access de Crossref est peu fiable : il reste vide, et le statut vient des autres sources (`refresh_from_sources`).
 """
 
 from __future__ import annotations
@@ -53,12 +53,12 @@ from pipeline.transformation.publishing.find_or_create import (
 
 
 def get_doi(msg: Mapping[str, JsonValue]) -> str | None:
-    """DOI normalisé ; Crossref le donne tel que déposé."""
+    """Renvoie le DOI normalisé ; Crossref le donne tel que déposé."""
     return clean_doi(as_str(msg.get("DOI")))
 
 
 def get_title(msg: Mapping[str, JsonValue]) -> str | None:
-    """Premier titre du payload, nettoyé par `drop_flattened_mathml`."""
+    """Renvoie le premier titre du payload, nettoyé par `drop_flattened_mathml`."""
     titles = msg.get("title") or []
     first = titles[0] if isinstance(titles, list) and titles else titles
     if isinstance(first, str) and (title := drop_flattened_mathml(first)):
@@ -121,7 +121,7 @@ def get_language(msg: Mapping[str, JsonValue]) -> str | None:
 
 
 def get_isbns(msg: Mapping[str, JsonValue]) -> tuple[list[str], list[str]]:
-    """ISBN imprimés ou sans support déclaré, puis ISBN électroniques. `isbn-type` donne le support de chaque ISBN."""
+    """Renvoie les ISBN imprimés ou sans support déclaré, puis les ISBN électroniques. `isbn-type` donne le support de chaque ISBN."""
     electronic = {
         value
         for entry in as_sequence(msg.get("isbn-type"))
@@ -133,7 +133,7 @@ def get_isbns(msg: Mapping[str, JsonValue]) -> tuple[list[str], list[str]]:
 
 
 def crossref_identifiers(msg: Mapping[str, JsonValue], doi: str) -> tuple[SourceIdentifier, ...]:
-    """Identifiants d'une œuvre Crossref. Le DOI est primaire, le rôle des ISBN suit le type de l'œuvre (`isbn_role`)."""
+    """Renvoie les identifiants d'une œuvre Crossref. Le DOI est primaire, le rôle des ISBN suit le type de l'œuvre (`isbn_role`)."""
     role = isbn_role(
         crossref_raw_doc_type(msg),
         "crossref",
@@ -148,7 +148,7 @@ def crossref_identifiers(msg: Mapping[str, JsonValue], doi: str) -> tuple[Source
 
 
 def page_range(page: str | None, article_number: str | None) -> PageRange:
-    """Pagination Crossref (`page`). Une page seule égale au numéro d'article est écartée."""
+    """Renvoie la pagination Crossref (`page`). Une page seule égale au numéro d'article est écartée."""
     pages = parse_pages(page)
     if pages.last_page is None and pages.first_page == article_number:
         return PageRange()
@@ -156,7 +156,7 @@ def page_range(page: str | None, article_number: str | None) -> PageRange:
 
 
 def get_biblio(msg: Mapping[str, JsonValue]) -> dict[str, JsonValue] | None:
-    """Volume, numéro, pages et numéro d'article, avec l'éditeur et la revue tels que Crossref les nomme."""
+    """Renvoie volume, numéro, pages et numéro d'article, avec l'éditeur et la revue nommés par Crossref."""
     issn_val, eissn_val = get_issns(msg)
     article_number = as_text(msg.get("article-number"))
     return compact_biblio(
@@ -178,9 +178,9 @@ def _container_titles(msg: Mapping[str, JsonValue]) -> list[str]:
 
 
 def get_container_facts(msg: Mapping[str, JsonValue]) -> ContainerDescription:
-    """Ce que Crossref dit du conteneur d'un document.
+    """Décrit le conteneur d'un document d'après Crossref.
 
-    Un livre donne sa collection dans `container-title`. Un chapitre ou un article de congrès y donne la collection et le livre ou le volume d'actes (`split_collection_and_volume`), ou le seul livre, ou la seule collection quand un ISSN la désigne. Sous une collection seule, le volume d'actes prend le nom du congrès.
+    Un livre donne sa collection dans `container-title`. Pour un chapitre ou un article de congrès, `container-title` donne la collection et le livre ou le volume d'actes (`split_collection_and_volume`), ou le seul livre, ou la seule collection quand un ISSN la désigne. Sous une collection seule, le volume d'actes prend le nom du congrès.
     """
     raw_type = crossref_raw_doc_type(msg)
     conference = extract_crossref_conference(msg)
@@ -221,7 +221,7 @@ def _author_name(author: Mapping[str, JsonValue]) -> ContributorName | None:
 def _author_affiliations(
     author: Mapping[str, JsonValue],
 ) -> tuple[list[AddressRecord], frozenset[RorId]]:
-    """Adresses des affiliations à nom, chacune avec ses ROR (`id` de type `ROR`), et ROR des affiliations sans nom."""
+    """Renvoie les adresses des affiliations à nom, chacune avec ses ROR (`id` de type `ROR`), et ROR des affiliations sans nom."""
     addresses: list[AddressRecord] = []
     without_name: set[RorId] = set()
     for aff in (as_mapping(a) for a in as_sequence(author.get("affiliation"))):
@@ -238,11 +238,11 @@ def _author_affiliations(
 
 
 def build_crossref_author_records(msg: Mapping[str, JsonValue]) -> list[AuthorRecord]:
-    """Contributions sources d'un message Crossref.
+    """Lit les contributions sources d'un message Crossref.
 
     - Le nom et le prénom sont séparés (`family`, `given`) ; une entrée au seul `name` est collective.
     - L'ORCID est le seul identifiant exploitable.
-    - Les affiliations deviennent des adresses, sans pays, que la phase `affiliations` rattache aux structures.
+    - Les affiliations deviennent des adresses sans pays, rattachées aux structures par la phase `affiliations`.
     - Les ROR d'une affiliation vont sur son adresse, ou sur la contribution source pour une affiliation sans nom.
     - Le rôle est toujours `author` : Crossref ne distingue pas les rôles.
     """
@@ -284,12 +284,15 @@ def build_crossref_author_records(msg: Mapping[str, JsonValue]) -> list[AuthorRe
 
 
 def extract_crossref_author_block(msg: Mapping[str, JsonValue]) -> AuthorBlock:
-    """Bloc auteurs d'un message Crossref : `author`."""
+    """Renvoie le bloc auteurs d'un message Crossref : `author`."""
     return {"author": msg.get("author")}
 
 
 def get_locations(msg: Mapping[str, JsonValue]) -> list[LocationFacts]:
-    """Page vers laquelle résout le DOI (`resource.primary.URL`), avec la licence de la version éditeur. Les URL de `link` mènent à des points d'accès pour la fouille de texte : elles restent hors des localisations."""
+    """Renvoie la page de résolution du DOI (`resource.primary.URL`), avec la licence de la version éditeur.
+
+    Les URL de `link` mènent à des points d'accès pour la fouille de texte : elles restent hors des localisations.
+    """
     url = as_str(as_mapping(as_mapping(msg.get("resource")).get("primary")).get("URL"))
     return [LocationFacts(url=url, license=crossref_license(msg.get("license")))] if url else []
 
@@ -297,7 +300,7 @@ def get_locations(msg: Mapping[str, JsonValue]) -> list[LocationFacts]:
 def crossref_source_record(
     msg: Mapping[str, JsonValue], staging_id: int, containers: Containers
 ) -> SourceRecordUpsert:
-    """Enregistrement source Crossref d'une œuvre, identifiée par son DOI."""
+    """Construit l'enregistrement source Crossref d'une œuvre, identifiée par son DOI."""
     doi = get_doi(msg)
     title = get_title(msg)
     publication_year = get_publication_year(msg)
@@ -333,7 +336,7 @@ class CrossrefNormalizer(SourceNormalizer):
         return get_title(row.raw_data), get_publication_year(row.raw_data)
 
     def parse(self, row: StagingRow) -> Document | None:
-        """Le `message` de l'œuvre, refusé sans DOI."""
+        """Renvoie le `message` de l'œuvre, ou `None` sans DOI."""
         return row.raw_data if get_doi(row.raw_data) else None
 
     def publisher(self, doc: Document) -> PublisherFacts | None:

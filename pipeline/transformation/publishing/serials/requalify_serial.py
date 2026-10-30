@@ -14,7 +14,7 @@ from pipeline.transformation.publications.store import PublicationStore
 
 
 def correct_serial_records(conn: Connection, serial_id: int) -> int:
-    """Recalcule et persiste les corrections unaires des `source_records` d'une revue. Retourne le nombre de `source_records` corrigées."""
+    """Recalcule et enregistre les corrections unaires des enregistrements sources d'une revue. Renvoie le nombre d'enregistrements sources corrigés."""
     store = SourceRecordCorrectionStore(conn)
     rows = store.fetch_for_unary_correction_by_serial(serial_id)
     hal_rows = {
@@ -26,9 +26,9 @@ def correct_serial_records(conn: Connection, serial_id: int) -> int:
 
 
 def requalify_serial_publications(conn: Connection, serial_id: int) -> int:
-    """Rejoue les corrections des `source_records` de la revue, puis recalcule chacune de ses publications.
+    """Rejoue les corrections des enregistrements sources de la revue, puis recalcule chacune de ses publications.
 
-    Retourne le nombre de publications dont le `doc_type` change. Une publication supprimée par le recalcul n'est pas comptée.
+    Renvoie le nombre de publications dont le `doc_type` change. Seules comptent les publications conservées par le recalcul.
     """
     store = PublicationStore(conn)
     publication_ids = store.find_ids_by_serial_id(serial_id)

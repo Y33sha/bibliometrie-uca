@@ -1,6 +1,6 @@
-"""Sous-étape de la phase `publishing` — rattache chaque monographie à sa collection.
+"""Sous-étape de la phase `publishing` : rattachement de chaque monographie à sa collection.
 
-Les monographies sans collection à ISSN se regroupent en séries (`group_series`, `domain/serials/series.py`) : même clé de série, même éditeur, au moins deux volumes. Chaque série a son entrée dans `serials`, sans ISSN, typée série d'actes ou collection de livres selon ses volumes. `choose_monograph_serial` (`domain/monographs/collection.py`) choisit ensuite l'entrée de chaque monographie : sa collection à ISSN, à défaut sa série sans ISSN, à défaut le volume lui-même, à défaut aucune. Une monographie en conflit reste en l'état, signalée. Le calcul se refait à chaque run, d'après les enregistrements.
+Les monographies sans collection à ISSN se regroupent en séries (`group_series`, `domain/serials/series.py`) : même clé de série, même éditeur, au moins deux volumes. Chaque série a son entrée dans `serials`, sans ISSN, typée série d'actes ou collection de livres selon ses volumes. `choose_monograph_serial` (`domain/monographs/collection.py`) choisit ensuite l'entrée de chaque monographie : sa collection à ISSN, à défaut sa série sans ISSN, à défaut le volume lui-même, à défaut aucune. Une monographie en conflit reste en l'état, signalée. Le calcul se refait à chaque run, d'après les enregistrements sources.
 """
 
 import logging
@@ -22,7 +22,7 @@ LABEL = "Rattachement aux collections"
 
 
 class MonographSerialCandidates(NamedTuple):
-    """Une monographie et les entrées de `serials` de ses enregistrements, avec ou sans ISSN actif."""
+    """Une monographie et les entrées de `serials` de ses enregistrements sources, avec ou sans ISSN actif."""
 
     monograph_id: int
     title: str
@@ -57,7 +57,7 @@ _SET_SERIAL = text("UPDATE monographs SET serial_id = :serial_id WHERE id = :id"
 
 
 def find_monograph_serial_candidates(conn: Connection) -> list[MonographSerialCandidates]:
-    """Chaque monographie qui a au moins un enregistrement source, avec les entrées de `serials` de ses enregistrements."""
+    """Renvoie les monographies à enregistrement source, avec les entrées de `serials` de leurs enregistrements sources."""
     return [
         MonographSerialCandidates(
             r.id,
@@ -80,7 +80,7 @@ def set_monograph_serial(conn: Connection, monograph_id: int, serial_id: int | N
 def _series_by_monograph(
     candidates: list[MonographSerialCandidates], repo: SerialStore
 ) -> dict[int, int]:
-    """Série sans ISSN de chaque monographie qui en a une, trouvée ou créée dans `serials`."""
+    """Renvoie la série sans ISSN de chaque monographie qui en a une, trouvée ou créée dans `serials`."""
     proceedings = {m.monograph_id: m.proceedings for m in candidates}
     series: dict[int, int] = {}
     for group in group_series(

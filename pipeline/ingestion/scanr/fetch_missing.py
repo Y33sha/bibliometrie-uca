@@ -38,7 +38,7 @@ async def search_by_external_ids(
     id_type: str,
     normalize: Callable[[str | None], str | None] = lambda value: value,
 ) -> LookupBatch | Unavailable:
-    """Documents ScanR dont les `externalIds` contiennent l'un des identifiants, de ce type.
+    """Cherche les documents ScanR avec l'un des identifiants de type `id_type` parmi leurs `externalIds`.
 
     Un identifiant sans document est confirmé absent. `normalize` ramène les identifiants de la réponse à la forme des identifiants demandés.
     """
@@ -114,9 +114,9 @@ _MISSING_HAL_IDS_SQL = text(
 
 
 def get_missing_hal_ids(conn: Connection, *, retry_after_days: int) -> list[str]:
-    """hal-id des documents HAL et OpenAlex des publications du périmètre, absents de ScanR.
+    """Renvoie les hal-id des documents HAL et OpenAlex des publications du périmètre, absents de ScanR.
 
-    Un hal-id est présent dans ScanR quand un enregistrement source ScanR le contient, ou quand le staging ScanR a le document `hal<hal-id>`. Un hal-id cherché en vain l'est de nouveau après `retry_after_days` jours.
+    Un hal-id est présent dans ScanR quand un enregistrement source ScanR le contient, ou quand le staging ScanR a le document `hal<hal-id>`. Un hal-id cherché en vain est cherché de nouveau après `retry_after_days` jours.
     """
     return list(
         conn.execute(_MISSING_HAL_IDS_SQL, {"retry_after_days": retry_after_days}).scalars()

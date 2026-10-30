@@ -1,4 +1,4 @@
-"""Phase `fetch_missing` : rattrapage des documents repérés dans une source mais absents d'une autre. Trois mécanismes, dans cet ordre :
+"""Phase `fetch_missing` : rattrapage des documents repérés dans une source mais absents d'une autre.
 
 1. **Recherche par hal-id** : dans HAL, les hal-id repérés dans OpenAlex et ScanR (`pipeline.ingestion.hal.fetch_missing`) ; dans ScanR, les hal-id repérés dans HAL et OpenAlex (`pipeline.ingestion.scanr.fetch_missing`). Les deux tâches forment un groupe parallèle.
 2. **Recherche par NNT** : dans HAL, en mode `full`, les thèses de theses.fr sans document HAL (`pipeline.ingestion.hal.fetch_missing`) ; dans theses.fr, les NNT repérés dans une autre source (`pipeline.ingestion.theses.fetch_missing`). Les deux tâches forment un groupe parallèle.
@@ -44,7 +44,7 @@ def _doi_task(target: str) -> str:
 
 
 def _summary(metrics: PhaseMetrics) -> dict[str, float | None]:
-    """Ligne « par canal » de la table d'observabilité de la phase."""
+    """Renvoie la ligne « par canal » de la table d'observabilité de la phase."""
     return {
         "interrogated": metrics.total,
         "new": metrics.new,
@@ -159,7 +159,7 @@ def build() -> Phase:
 
 
 def _run_fetch_missing_hal_by_id(ctx: PhaseContext) -> PhaseMetrics:
-    """Recherche dans HAL par hal-id (OpenAlex/ScanR) : documents absents du staging."""
+    """Cherche dans HAL, par hal-id, les documents repérés dans OpenAlex ou ScanR et absents du staging."""
     from pipeline.ingestion.hal.fetch_missing import fetch_missing_hal_by_id
 
     with ctx.open_tx() as conn:
@@ -170,7 +170,7 @@ def _run_fetch_missing_hal_by_id(ctx: PhaseContext) -> PhaseMetrics:
 
 
 def _run_fetch_missing_scanr_by_hal_id(ctx: PhaseContext) -> PhaseMetrics:
-    """Recherche dans ScanR par hal-id (HAL/OpenAlex) : documents absents de ScanR."""
+    """Cherche dans ScanR, par hal-id, les documents repérés dans HAL ou OpenAlex et absents de ScanR."""
     from pipeline.ingestion.scanr.fetch_missing import fetch_missing_scanr_by_hal_id
 
     with ctx.open_tx() as conn:
@@ -181,7 +181,7 @@ def _run_fetch_missing_scanr_by_hal_id(ctx: PhaseContext) -> PhaseMetrics:
 
 
 def _run_fetch_missing_hal_by_nnt(ctx: PhaseContext) -> PhaseMetrics:
-    """Recherche dans HAL par NNT (theses.fr) : thèses soutenues sans document HAL."""
+    """Cherche dans HAL, par NNT, les thèses soutenues de theses.fr sans document HAL."""
     from pipeline.ingestion.hal.fetch_missing import fetch_missing_hal_by_nnt
 
     with ctx.open_tx() as conn:
@@ -192,7 +192,7 @@ def _run_fetch_missing_hal_by_nnt(ctx: PhaseContext) -> PhaseMetrics:
 
 
 def _run_fetch_missing_theses_by_nnt(ctx: PhaseContext) -> PhaseMetrics:
-    """Recherche dans theses.fr par NNT : thèses trouvées dans d'autres sources, absentes du staging theses.fr."""
+    """Cherche dans theses.fr, par NNT, les thèses trouvées dans d'autres sources et absentes du staging theses.fr."""
     from pipeline.ingestion.theses.fetch_missing import fetch_missing_theses_by_nnt
 
     with ctx.open_tx() as conn:

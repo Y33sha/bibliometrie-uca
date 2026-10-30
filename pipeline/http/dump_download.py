@@ -1,6 +1,6 @@
 """Téléchargement d'un dump de référentiel (ROR, DOAJ), borné en octets et en destinations.
 
-Le fichier transite par le répertoire temporaire, monté en mémoire et compté sur celle du conteneur : une réponse sans fin y épuiserait la mémoire du processus.
+Le fichier transite par le répertoire temporaire, monté en mémoire et compté sur la mémoire du conteneur : une réponse sans fin épuiserait la mémoire du processus.
 """
 
 from __future__ import annotations
@@ -17,21 +17,24 @@ from pipeline.http.http_status import raise_for_status
 from pipeline.http.tls import tls_context
 
 _MAX_REDIRECTS = 3
-"""Nombre maximal de redirections, contre une redirection circulaire. La liste des hôtes autorisés fait la sécurité."""
+"""Nombre maximal de redirections, contre une redirection circulaire. La sécurité repose sur la liste des hôtes autorisés."""
 
 
 class DumpUnavailableError(Exception):
-    """Un dump de référentiel (ROR, DOAJ) est inaccessible : échec du réseau, du serveur, ou réponse inattendue."""
+    """Dump de référentiel (ROR, DOAJ) inaccessible : échec du réseau, du serveur, ou réponse inattendue."""
 
 
 class DumpDownloadError(Exception):
-    """Le téléchargement d'un dump sort de ce qu'on en attend : destination imprévue ou réponse qui dépasse le plafond d'octets."""
+    """Téléchargement d'un dump hors des bornes attendues : destination imprévue ou réponse au-delà du plafond d'octets."""
 
 
 def write_capped(resp: httpx2.Response, dest_path: str, max_bytes: int, *, label: str) -> int:
     """Écrit le corps de la réponse dans `dest_path` et renvoie le nombre d'octets écrits.
 
-    Lève `DumpDownloadError` au franchissement du plafond, sans lire la suite. Le fichier partiel reste sur le disque : son effacement appartient à l'appelant, qui l'a créé. `label` nomme le dump dans le message d'erreur.
+    Lève `DumpDownloadError` au franchissement du plafond, sans lire la suite. Le fichier partiel reste sur le disque : l'appelant, créateur du fichier, l'efface.
+
+    Args:
+        label: nomme le dump dans le message d'erreur.
     """
     written = 0
     with open(dest_path, "wb") as f:
@@ -49,7 +52,7 @@ def write_capped(resp: httpx2.Response, dest_path: str, max_bytes: int, *, label
 def _redirect_target(
     resp: httpx2.Response, current: httpx2.URL, allowed_hosts: frozenset[str], *, label: str
 ) -> httpx2.URL:
-    """Destination d'une redirection, si elle est prévue.
+    """Renvoie la destination d'une redirection prévue.
 
     Lève `DumpDownloadError` quand l'en-tête manque ou quand l'hôte visé est absent de `allowed_hosts`. Le contrôle précède la requête : aucune connexion n'est ouverte vers un hôte non prévu.
     """
@@ -79,7 +82,11 @@ def download_dump(
 ) -> None:
     """Télécharge le dump `label` de `url` vers `dest_path`, en streaming, borné à `max_bytes`.
 
-    Une redirection est suivie seulement vers `allowed_redirect_hosts`. Sans hôte autorisé, elle reste un statut d'erreur. Lève `httpx2.HTTPError` sur un échec de transport ou un statut d'erreur, `DumpDownloadError` quand le téléchargement sort de ce qu'on en attend.
+    Une redirection est suivie seulement vers `allowed_redirect_hosts`. Sans hôte autorisé, elle reste un statut d'erreur.
+
+    Raises:
+        httpx2.HTTPError: échec de transport ou statut d'erreur.
+        DumpDownloadError: téléchargement hors des bornes attendues.
     """
     logger.info("Téléchargement du dump %s depuis %s", label, url, extra={"detail": True})
     target = httpx2.URL(url)
@@ -118,7 +125,7 @@ def downloaded_dump(
 ) -> Iterator[str]:
     """Télécharge le dump dans un fichier temporaire `file_name` et renvoie son chemin, le temps du bloc.
 
-    Le répertoire temporaire est le seul emplacement en écriture du conteneur (`tmpfs` sur `/tmp`). Le fichier est supprimé à la sortie du bloc. Lève `DumpUnavailableError` quand le téléchargement échoue, avant que le bloc ne commence.
+    Le répertoire temporaire est le seul emplacement en écriture du conteneur (`tmpfs` sur `/tmp`). Le fichier est supprimé à la sortie du bloc. Lève `DumpUnavailableError` quand le téléchargement échoue, avant le début du bloc.
     """
     with tempfile.TemporaryDirectory() as tmp:
         path = str(Path(tmp) / file_name)

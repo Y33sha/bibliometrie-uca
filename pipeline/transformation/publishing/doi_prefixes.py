@@ -12,7 +12,7 @@ from domain.source_records.identifiers import SourceIdentifierType
 type Agency = Literal["Crossref", "DataCite"]
 """Agence dont l'API `/prefixes` donne l'éditeur d'un préfixe."""
 
-# Préfixes qu'une agence n'a pas encore vus. Un préfixe d'agence inconnue passe chez DataCite après que Crossref l'a interrogé sans le trouver.
+# Préfixes encore jamais vus par l'agence. Un préfixe d'agence inconnue passe chez DataCite après sa vérification par Crossref.
 _PENDING: dict[Agency, str] = {
     "Crossref": "crossref_checked_at IS NULL AND ra IN ('Crossref', 'unknown')",
     "DataCite": (
@@ -28,11 +28,12 @@ _CHECKED_COLUMN: dict[Agency, str] = {
 
 
 class PendingPublisherPrefix(NamedTuple):
-    """Préfixe dont l'éditeur reste à déterminer. Son nom d'éditeur est en général vide : `resolve_ra` crée la ligne avec l'agence seule. Un nom présent dispense de la requête à l'agence."""
+    """Préfixe en attente de son éditeur."""
 
     prefix: str
     ra: str
     publisher_name_raw: str | None
+    """En général vide : `resolve_ra` crée la ligne avec l'agence seule. Un nom présent dispense de la requête à l'agence."""
     publisher_name_normalized: str | None
     sample_doi: str | None = None
     """DOI d'un enregistrement source de ce préfixe, lu juste avant d'interroger Crossref."""
@@ -45,7 +46,7 @@ class DoiPrefixStore:
         self._conn = conn
 
     def get_prefixes_to_resolve(self) -> list[str]:
-        """Préfixes absents de la table parmi les DOI connus (vue `known_dois`), tous périmètres confondus. Ils couvrent les DOI que cherche la phase `fetch_missing`."""
+        """Renvoie les préfixes absents de la table parmi les DOI connus (vue `known_dois`), tous périmètres confondus. Ils couvrent les DOI cherchés par la phase `fetch_missing`."""
         result = self._conn.execute(
             text(
                 """
@@ -71,7 +72,7 @@ class DoiPrefixStore:
         return result.rowcount > 0
 
     def breakdown_by_registration_agency(self) -> list[tuple[str, int, int]]:
-        """Nombre de DOI et de préfixes de chaque agence parmi les DOI connus, de l'agence qui a le plus de DOI à celle qui en a le moins. Un préfixe absent de la table compte comme `unknown`. Sert le journal de la phase `resolve_ra`."""
+        """Renvoie le nombre de DOI et de préfixes de chaque agence parmi les DOI connus, par nombre de DOI décroissant. Un préfixe absent de la table compte comme `unknown`. Sert au journal de la phase `resolve_ra`."""
         result = self._conn.execute(
             text(
                 """
@@ -89,7 +90,7 @@ class DoiPrefixStore:
         return [(row.ra, int(row.dois), int(row.prefixes)) for row in result]
 
     def get_prefixes_pending_publisher(self, agency: Agency) -> list[PendingPublisherPrefix]:
-        """Préfixes sans éditeur que l'agence n'a pas encore vus, par ordre de préfixe."""
+        """Renvoie les préfixes sans éditeur encore jamais vus par l'agence, par ordre de préfixe."""
         result = self._conn.execute(
             text(
                 f"""
@@ -122,7 +123,7 @@ class DoiPrefixStore:
         client_name_normalized: str | None,
         datacite_client_symbol: str | None,
     ) -> None:
-        """Pose l'agence et les métadonnées d'éditeur que donne l'API `/prefixes`. L'éditeur s'attache par `update_publisher_id`, la réponse de l'agence se retient par `mark_checked`."""
+        """Pose l'agence et les métadonnées d'éditeur données par l'API `/prefixes`. `update_publisher_id` attache l'éditeur, `mark_checked` retient la réponse de l'agence."""
         self._conn.execute(
             text(
                 """
@@ -150,7 +151,7 @@ class DoiPrefixStore:
         )
 
     def find_doi_with_prefix(self, prefix: str) -> str | None:
-        """Un DOI actif d'enregistrement source de ce préfixe. Il sert à retrouver le membre Crossref déposant."""
+        """Renvoie un DOI actif d'enregistrement source de ce préfixe. Il sert à retrouver le membre Crossref déposant."""
         return self._conn.execute(
             text(f"""
                 SELECT id_value FROM source_record_identifiers

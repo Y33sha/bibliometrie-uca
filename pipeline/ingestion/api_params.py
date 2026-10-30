@@ -1,6 +1,6 @@
 """Paramètres invariants des API des sources : URL de base, tailles de page et débits.
 
-Chaque valeur vaut pour tous les modules qui interrogent l'API. La reprise après erreur et les pauses après un dépassement de quota relèvent de chaque module.
+Chaque valeur vaut pour tous les modules clients de l'API. La reprise après erreur et les pauses après un dépassement de quota relèvent de chaque module.
 """
 
 API_BASE_URLS: dict[str, str] = {
@@ -79,7 +79,7 @@ MAX_PER_SECOND: dict[str, float] = {
 
 
 def request_budget(source: str) -> float | None:
-    """Débit consenti à `source`, en requêtes par seconde, ou `None` sans plafond."""
+    """Renvoie le débit consenti à `source`, en requêtes par seconde, ou `None` sans plafond."""
     return MAX_PER_SECOND.get(source)
 
 

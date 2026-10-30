@@ -1,6 +1,6 @@
 """Moissonnage de HAL par identifiant de personne : tâche `harvest_by_person.hal`.
 
-Interroge l'API de recherche avec un filtre Solr qui réunit les ORCID (`authORCIDIdExt_s`), idHAL (`authIdHal_s`) et IdRef (`authIdRefIdExt_s`) des personnes du lot, borné par l'année de production. La pagination suit `cursorMark`.
+L'API de recherche reçoit un filtre Solr réunissant les ORCID (`authORCIDIdExt_s`), idHAL (`authIdHal_s`) et IdRef (`authIdRefIdExt_s`) des personnes du lot, borné par l'année de production. La pagination suit `cursorMark`.
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ _FIELDS = {
 
 
 def build_identifiers_fq(identifiers: Identifiers) -> str:
-    """Filtre Solr : un auteur a l'un des identifiants, tous types réunis par OU."""
+    """Construit le filtre Solr « un auteur a l'un des identifiants », tous types réunis par OU."""
     clauses = [
         f"{_FIELDS[id_type]}:({' OR '.join(f'"{v}"' for v in values)})"
         for id_type, values in identifiers.items()
@@ -36,7 +36,7 @@ def build_identifiers_fq(identifiers: Identifiers) -> str:
 
 
 class HalPersonHarvester(PersonSearchHarvester[HalClient]):
-    """Enregistrements HAL des personnes qui ont une fiche RH, cherchées par ORCID, idHAL et IdRef."""
+    """Documents HAL des personnes à fiche RH, cherchés par ORCID, idHAL et IdRef."""
 
     SOURCE = "hal"
     BATCH_SIZE: ClassVar[int] = 30

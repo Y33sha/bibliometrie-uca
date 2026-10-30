@@ -1,4 +1,4 @@
-"""Sous-étape de la phase `publishing` — calcule les espaces de noms DOI des revues.
+"""Sous-étape de la phase `publishing` : calcul des espaces de noms DOI des revues.
 
 Les couples (DOI, revue) des enregistrements sources de toutes les sources désignent les espaces de noms (`domain/serials/doi_namespaces.py`). La table `serial_doi_namespaces` est recalculée en entier à chaque passage.
 """
@@ -22,14 +22,14 @@ LABEL = "Espaces de noms DOI"
 
 
 class DoiSerialRow(NamedTuple):
-    """Un DOI et la revue que lui donne sa source, avec le type de cette revue."""
+    """Un DOI et la revue attribuée par sa source, avec le type de cette revue."""
 
     doi: str
     serial_id: int
     serial_type: SerialType
 
 
-# Une revue posée par son espace de noms laisse sa trace dans `corrections.serial_id`.
+# Une revue attribuée par son espace de noms est notée dans `corrections.serial_id`.
 _DOI_SERIAL_PAIRS = text(f"""
     SELECT d.id_value AS doi, s.serial_id, j.serial_type
     FROM source_records s
@@ -40,7 +40,7 @@ _DOI_SERIAL_PAIRS = text(f"""
 
 
 def find_doi_serial_pairs(conn: Connection) -> list[DoiSerialRow]:
-    """Les couples (DOI, revue) des enregistrements sources, un par DOI que l'enregistrement source donne avec sa revue (`serial_doi_sql`). Une revue posée par son espace de noms est exclue : elle ne témoigne pas pour lui."""
+    """Renvoie les couples (DOI, revue) des enregistrements sources, un par DOI donné avec sa revue (`serial_doi_sql`). Une revue attribuée par son espace de noms est exclue du calcul de cet espace."""
     return [
         DoiSerialRow(r.doi, r.serial_id, SerialType(r.serial_type))
         for r in conn.execute(_DOI_SERIAL_PAIRS)

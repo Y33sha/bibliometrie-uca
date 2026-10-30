@@ -1,6 +1,6 @@
-"""Sous-étape de la phase `publishing` — fusionne les monographies en double.
+"""Sous-étape de la phase `publishing` : fusion des monographies en double.
 
-Deux monographies de même titre naissent quand l'éditeur ou l'ISBN manque à l'une des sources, puis arrive par une autre. `duplicate_monographs` (`domain/monographs/matching.py`) désigne les fusions : une monographie rejoint la seule monographie compatible de son titre, quand celle-ci en dit davantage. Le journal garde le titre et les identifiants de chaque fusion.
+Deux monographies de même titre sont créées quand l'éditeur ou l'ISBN manque à une source, puis arrive par une autre. `duplicate_monographs` (`domain/monographs/matching.py`) désigne les fusions : une monographie rejoint la seule monographie compatible de son titre, quand celle-ci prime. Le journal garde le titre et les identifiants de chaque fusion.
 """
 
 import logging
@@ -38,7 +38,7 @@ _TITLE_GROUPS = text("""
 
 
 def find_monographs_sharing_a_title(conn: Connection) -> list[MonographTitleGroup]:
-    """Groupes d'au moins deux monographies de même titre normalisé."""
+    """Renvoie les groupes d'au moins deux monographies de même titre normalisé."""
     return [
         MonographTitleGroup(
             r.title,

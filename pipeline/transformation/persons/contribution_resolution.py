@@ -1,6 +1,13 @@
-"""Tâche `persons.resolve_contributions` : rattache à une personne les contributions qui n'en ont pas (`domain.persons.contribution_matching`).
+"""Tâche `persons.resolve_contributions` : rattachement des contributions sans personne à une personne (`domain.persons.contribution_matching`).
 
-Les épinglages s'appliquent d'abord : une contribution dont une contribution source est épinglée prend la personne épinglée (`pinned_contributions_sql`). Une contribution déjà rattachée garde sinon sa personne, jusqu'à sa redécision quand elle entre dans la file `Queue.CONTRIBUTION_RESOLUTION` : ses contributions sources changent, ou l'identifiant ou la forme de nom qui la rattachait est invalidé. Sont décidées les contributions sans personne qui ont une contribution source du périmètre, une contribution source épinglée, ou une contribution source dont un identifiant fiable est attribué à une personne, et les contributions non manuelles de la file. Une contribution de la file qui désigne encore sa personne la garde ; une contribution que sa décision ne rattache plus la perd. Les contributions du périmètre au nom inconnu sont traitées ensuite, une à une, contre l'index tenu à jour : une contribution rejoint une personne créée plus tôt dans le passage, ou fonde la sienne (`create_persons`).
+Les épinglages s'appliquent d'abord : une contribution à contribution source épinglée prend la personne épinglée (`pinned_contributions_sql`). Sinon, une contribution rattachée garde sa personne jusqu'à son entrée dans la file `Queue.CONTRIBUTION_RESOLUTION`. Une contribution entre dans cette file quand ses contributions sources changent, ou quand l'identifiant ou la forme de nom à l'origine du rattachement est invalidé.
+
+Sont décidées :
+
+- les contributions sans personne ayant une contribution source du périmètre, une contribution source épinglée, ou une contribution source à identifiant fiable attribué à une personne ;
+- les contributions non manuelles de la file.
+
+Une contribution de la file garde sa personne si sa décision la désigne encore, et la perd sinon. Les contributions du périmètre au nom inconnu sont traitées ensuite, une à une, contre l'index tenu à jour. Chacune rejoint une personne créée dans le même passage, ou fonde la sienne (`create_persons`).
 """
 
 from collections import Counter, defaultdict
@@ -132,7 +139,7 @@ _WRITE_SQL = text("""
       AND (g.person_id, g.resolution_mode::text) IS DISTINCT FROM (u.person_id, u.mode)
 """)
 
-# Contributions décidées dont la personne diffère de celle que désigne leur décision : elles la perdent.
+# Contributions décidées rattachées à une autre personne que celle désignée par leur décision : elles perdent leur personne.
 _RELEASE_SQL = text(f"""
     UPDATE contributions g SET {DETACHED_CONTRIBUTION}
     FROM unnest(CAST(:ids AS integer[]), CAST(:persons AS integer[])) AS u(id, person_id)
@@ -141,7 +148,11 @@ _RELEASE_SQL = text(f"""
 
 
 def load_index(conn: Connection, conflicting: frozenset[int] = frozenset()) -> PersonIndex:
-    """Index complet des personnes : identifiants attribués, formes de nom, verdicts des formes, homonymes par nom de famille. `conflicting` : personnes au prénom réduit à qui les contributions donnent plusieurs prénoms pleins (`Namesake.conflicting`)."""
+    """Renvoie l'index complet des personnes : identifiants attribués, formes de nom, verdicts des formes, homonymes par nom de famille.
+
+    Args:
+        conflicting: personnes au prénom réduit, auxquelles les contributions donnent plusieurs prénoms pleins (`Namesake.conflicting`).
+    """
     namesakes: dict[str, list[Namesake]] = defaultdict(list)
     for namesake in fetch_namesakes(conn):
         namesakes[normalize_text(namesake.last_name)].append(
@@ -158,7 +169,9 @@ def load_index(conn: Connection, conflicting: frozenset[int] = frozenset()) -> P
 def load_candidate_contributions(
     conn: Connection,
 ) -> dict[int, dict[int, list[AlignedSourceContribution]]]:
-    """Contributions sources des contributions à décider, par publication puis par contribution : contributions sans personne, et contributions non manuelles de la file à redécider. Relève la file (`snapshot`) : `resolve_contributions` en retire ensuite les marquages relevés.
+    """Renvoie les contributions sources des contributions à décider, par publication puis par contribution.
+
+    Les contributions à décider sont les contributions sans personne et les contributions non manuelles de la file. La file est relevée (`snapshot`). `resolve_contributions` supprime ensuite de la file les marquages relevés.
 
     Les contributions à décider sont matérialisées dans une table temporaire analysée : l'estimation de leur nombre guide la jointure avec leurs contributions sources.
     """
@@ -189,7 +202,7 @@ def load_candidate_contributions(
 def taken_persons(
     conn: Connection, candidates: dict[int, dict[int, list[AlignedSourceContribution]]]
 ) -> dict[int, frozenset[int]]:
-    """Personnes rattachées à une autre contribution de chaque publication des contributions à décider."""
+    """Renvoie, pour chaque publication des contributions à décider, les personnes rattachées à une autre contribution."""
     rows = conn.execute(
         text(_TAKEN_SQL),
         {
@@ -211,7 +224,11 @@ def decide_contributions(
     taken: dict[int, frozenset[int]],
     progress: Progress | None = None,
 ) -> dict[int, ContributionDecision]:
-    """Décision de chaque contribution, une personne au plus par publication. `progress` avance d'une contribution décidée et retient les contributions rattachées."""
+    """Renvoie la décision de chaque contribution, avec au maximum une personne par publication.
+
+    Args:
+        progress: avance d'une contribution décidée ; retient les contributions rattachées.
+    """
     decisions: dict[int, ContributionDecision] = {}
     for publication_id, by_contribution in candidates.items():
         rejected_here = rejected.get(publication_id, frozenset())
@@ -230,7 +247,7 @@ def decide_contributions(
 
 
 def release_contributions(conn: Connection, decisions: dict[int, ContributionDecision]) -> int:
-    """Retire leur personne aux contributions que leur décision rattache à une autre personne, à une personne à créer ou à aucune. Précède toute écriture : une publication compte une personne au plus, et la personne retirée peut revenir à une autre contribution de la publication. Renvoie le nombre de contributions concernées."""
+    """Retire leur personne aux contributions rattachées par leur décision à une autre personne, à une personne à créer ou à aucune. Précède toute écriture : une publication compte au maximum une personne, et la personne retirée peut revenir à une autre contribution de la publication. Renvoie le nombre de contributions concernées."""
     if not decisions:
         return 0
     return conn.execute(
@@ -291,7 +308,13 @@ def create_persons(
     taken: dict[int, frozenset[int]],
     progress: Progress | None = None,
 ) -> int:
-    """Traite une à une les contributions dont la décision est une création, contre l'index tenu à jour : une contribution que désigne une personne créée dans le même passage la rejoint ; sinon une personne naît de son nom (`founding_name`), et l'index l'enregistre. Une personne déjà rattachée à une autre contribution de la publication reste à celle-ci. Met `decisions` à jour et renvoie le nombre de personnes créées. `progress` avance d'une contribution traitée et retient les personnes créées."""
+    """Traite une à une les contributions à décision de création, contre l'index tenu à jour. Met `decisions` à jour et renvoie le nombre de personnes créées.
+
+    Une contribution désignée par une personne créée dans le même passage rejoint cette personne. Sinon, une personne est créée depuis son nom (`founding_name`) et enregistrée dans l'index. Une personne déjà rattachée à une autre contribution de la publication reste à cette autre contribution.
+
+    Args:
+        progress: avance d'une contribution traitée ; retient les personnes créées.
+    """
     repo = PgPersonRepository(conn)
     created = 0
     for publication_id in sorted(candidates):
@@ -359,7 +382,7 @@ def create_persons(
 
 
 def apply_pins(conn: Connection) -> int:
-    """Rattache à la personne épinglée les contributions dont une contribution source est épinglée (`pinned_contributions_sql`). Renvoie le nombre de contributions rattachées."""
+    """Rattache à la personne épinglée les contributions à contribution source épinglée (`pinned_contributions_sql`). Renvoie le nombre de contributions rattachées."""
     release, attach = pinned_contributions_sql("SELECT id FROM contributions")
     conn.execute(text(release))
     return conn.execute(text(attach)).rowcount
@@ -379,7 +402,7 @@ _MODE_LABELS: dict[ContributionMatchReason, str] = {
 def _log_identified(
     logger: ScopedOrPlainLogger, decisions: dict[int, ContributionDecision], pinned: int
 ) -> None:
-    """Contributions identifiées, mode de rattachement par mode de rattachement, nombres alignés à droite. Les épinglages appliqués avant la décision comptent avec le mode `manual`."""
+    """Journalise les contributions identifiées par mode de rattachement, nombres alignés à droite. Les épinglages appliqués avant la décision comptent dans le mode `manual`."""
     by_mode: Counter[ContributionMatchReason] = Counter(
         d.reason
         for d in decisions.values()
@@ -395,7 +418,17 @@ def _log_identified(
 
 
 def resolve_contributions(conn: Connection, logger: ScopedOrPlainLogger) -> dict[str, int]:
-    """Applique les épinglages, complète les prénoms réduits (`complete_reduced_first_names`), décide la personne des contributions sans personne et des contributions en file, retire leur personne aux contributions que leur décision ne rattache plus à elle (`release_contributions`), écrit les rattachements, puis crée les personnes des contributions du périmètre au nom inconnu (`create_persons`). Renvoie les compteurs par issue et par motif."""
+    """Rattache les contributions aux personnes et crée les personnes manquantes. Renvoie les compteurs par issue et par motif.
+
+    Étapes, dans l'ordre :
+
+    - application des épinglages ;
+    - complétion des prénoms réduits (`complete_reduced_first_names`) ;
+    - décision des contributions sans personne et des contributions en file ;
+    - retrait des personnes non désignées par la décision (`release_contributions`) ;
+    - écriture des rattachements ;
+    - création des personnes des contributions du périmètre au nom inconnu (`create_persons`).
+    """
     pinned = apply_pins(conn)
     completion = complete_reduced_first_names(conn, repo=PgPersonRepository(conn))
     logger.info(
@@ -403,7 +436,7 @@ def resolve_contributions(conn: Connection, logger: ScopedOrPlainLogger) -> dict
         BRANCH,
         quantity(completion.completed, "prénom complété", "prénoms complétés"),
     )
-    # Le chargement dure : la ligne d'attente évite que l'étape reste muette.
+    # Le chargement est long : une ligne d'attente le signale.
     with waiting(f"{BRANCH}chargement des contributions", logger) as line:
         candidates = load_candidate_contributions(conn)
         index = load_index(conn, completion.conflicting)
@@ -419,7 +452,7 @@ def resolve_contributions(conn: Connection, logger: ScopedOrPlainLogger) -> dict
     _log_identified(logger, decisions, pinned)
 
     step(logger, "Création de nouvelles personnes")
-    # Contributions du périmètre sans personne, hors rôles qui n'autorisent pas la création.
+    # Contributions du périmètre sans personne, hors rôles interdisant la création.
     unidentified = [
         d
         for d in decisions.values()
