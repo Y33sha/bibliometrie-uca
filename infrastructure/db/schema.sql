@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict urkNBcCi95t8aetsLK4IIsXbTvja3MzuJYsc58vr87rszoufSeJ9gCwcAeDPcfQ
+\restrict db6bSAAG9CmkaHKNYfY0eDds7TXz0oQjWNq3OfrRfsXwK59US5qL2WI1EVJJ4dI
 
 -- Dumped from database version 18.4
 -- Dumped by pg_dump version 18.4
@@ -290,8 +290,7 @@ CREATE TYPE public.merged_entity AS ENUM (
 CREATE TYPE public.oa_model AS ENUM (
     'subscription',
     'full_oa',
-    'diamond',
-    'repository'
+    'diamond'
 );
 
 
@@ -437,9 +436,7 @@ CREATE TYPE public.serial_type AS ENUM (
     'journal',
     'data_journal',
     'proceedings',
-    'repository',
     'book_series',
-    'preprint_server',
     'media',
     'unknown'
 );
@@ -5711,5 +5708,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict urkNBcCi95t8aetsLK4IIsXbTvja3MzuJYsc58vr87rszoufSeJ9gCwcAeDPcfQ
+\unrestrict db6bSAAG9CmkaHKNYfY0eDds7TXz0oQjWNq3OfrRfsXwK59US5qL2WI1EVJJ4dI
 
