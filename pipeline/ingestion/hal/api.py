@@ -42,6 +42,8 @@ HAL_FIELDS = [
     "source_s",
     "openAccess_bool",
     "fileMain_s",
+    # Annexes déposées (URL) : diaporama, poster, matériel supplémentaire. Un dépôt peut avoir des annexes sans fichier principal.
+    "fileAnnexes_s",
     # Licence du fichier déposé (URL), présente quand un fichier est déposé.
     "licence_s",
     "linkExtId_s",
