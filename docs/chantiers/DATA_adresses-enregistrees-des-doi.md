@@ -14,7 +14,9 @@
 
 - Une table `sources.dois` remplace `unpaywall`. Elle a une ligne par DOI de publication, avec les réponses des services externes : verdict d'Unpaywall et sa date, adresse enregistrée chez doi.org et sa date.
 - La phase `oa_status` lit l'adresse enregistrée de chaque DOI dans l'API des handles de doi.org, toutes agences comprises. Aucun site d'éditeur n'est interrogé. Un DOI inconnu de doi.org reçoit une adresse nulle et datée, comme un DOI absent d'Unpaywall.
-- Une adresse enregistrée donne une copie ouverte de la publication, sans licence, dans deux cas. Elle mène à une plateforme en accès libre intégral d'après sa propre déclaration : arXiv, bioRxiv, medRxiv, PubMed Central ; version inconnue. Ou son chemin finit par `.pdf` ; version de l'éditeur. Les autres adresses enregistrées donnent seulement une ligne de `sources.dois`.
+- Une adresse enregistrée donne une copie ouverte de la publication, sans licence :
+  - quand elle mène à arXiv, bioRxiv, medRxiv ou PubMed Central. Ces plateformes déclarent donner librement accès à tout leur contenu. La version de la copie est inconnue.
+  - quand son chemin finit par `.pdf`. La copie est en version de l'éditeur.
 - Seule une copie déclarée fermée compte comme information pour le statut : une copie d'ouverture inconnue laisse la publication `unknown`.
 - Le normaliseur DataCite écrit seulement l'enregistrement source, sans localisation : `rightsList` déclare un niveau d'accès pour trop peu d'enregistrements.
 
