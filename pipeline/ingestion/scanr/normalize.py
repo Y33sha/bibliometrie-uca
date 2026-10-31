@@ -36,7 +36,6 @@ from pipeline.ingestion.common.source_records import (
 )
 from pipeline.ingestion.common.staging import StagingRow
 from pipeline.ingestion.scanr.payload import (
-    derive_scanr_oa_status,
     scanr_derived_identifier,
     select_leaf_affiliations,
     split_scanr_concepts,
@@ -139,13 +138,6 @@ def get_locations(doc: Mapping[str, JsonValue]) -> list[LocationFacts]:
     return locations
 
 
-def get_oa_status(doc: Mapping[str, JsonValue]) -> str | None:
-    is_open = doc.get("isOa")
-    return derive_scanr_oa_status(
-        is_open if isinstance(is_open, bool) else None, as_mapping(doc.get("oaEvidence"))
-    )
-
-
 # Type d'identifiant de chaque type d'`externalIds` lu.
 _EXTERNAL_ID_TYPES = {
     "doi": SourceIdentifierType.DOI,
@@ -242,7 +234,6 @@ def scanr_source_record(  # noqa: C901
         abstract=abstract,
         keywords=keywords,
         topics=topics,
-        oa_status=get_oa_status(doc),
         license=normalize_license(publisher_license),
         urls=urls or None,
         impact=Impact(cited_by_count=cited_by_count).to_json(),

@@ -78,12 +78,12 @@ OPEN_ACCESS_MODELS = "('full_oa', 'diamond')"
 # Publications `p` du laboratoire.
 LAB_PUBLICATIONS = f"SELECT p.* FROM publications p WHERE {AUTHORED_PUBLICATION}"
 
-# Texte intégral déposé dans HAL, ou lien HAL vers une archive ouverte, pour la publication `p`.
-HAL_FULL_TEXT = f"""
+# Fichier déposé dans HAL pour la publication `p`, sous embargo ou non.
+HAL_FULL_TEXT = """
     EXISTS (
         SELECT 1 FROM source_records sr
-        WHERE sr.publication_id = p.id AND sr.source = 'hal'
-          AND sr.oa_status IN ('{OaStatus.GREEN.value}', '{OaStatus.EMBARGOED.value}')
+        JOIN source_record_locations l ON l.source_record_id = sr.id
+        WHERE sr.publication_id = p.id AND sr.source = 'hal' AND l.pdf_url IS NOT NULL
     )
 """
 

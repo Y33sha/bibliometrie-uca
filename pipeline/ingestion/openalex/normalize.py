@@ -52,7 +52,6 @@ from pipeline.ingestion.common.source_records import (
 from pipeline.ingestion.common.staging import StagingRow
 from pipeline.ingestion.openalex.payload import (
     OpenalexLocation,
-    map_openalex_oa_status,
     names_publisher,
     names_serial,
     openalex_derived_identifier,
@@ -332,9 +331,6 @@ def openalex_source_record(  # noqa: C901
         abstract=abstract,
         keywords=keywords,
         topics=topics_json,
-        oa_status=map_openalex_oa_status(
-            as_str(as_mapping(work.get("open_access")).get("oa_status"))
-        ),
         license=normalize_license(publisher_license),
         urls=urls or None,
         impact=extract_impact(work).to_json(),

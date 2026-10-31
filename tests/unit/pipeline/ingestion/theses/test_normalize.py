@@ -8,8 +8,6 @@ from __future__ import annotations
 import logging
 from unittest.mock import MagicMock
 
-import pytest
-
 from pipeline.ingestion.common.embargoes import Embargo
 from pipeline.ingestion.common.source_records import SourceRecordUpsert
 from pipeline.ingestion.theses.normalize import (
@@ -139,7 +137,6 @@ class TestThesesSourceRecord:
         assert record.title == "T"
         assert record.publication_year is None
         assert identifier_values(record) == {}
-        assert record.oa_status == "closed"
         assert record.serial_id is None
 
     def test_defended_thesis(self):
@@ -214,21 +211,6 @@ class TestThesesSourceRecord:
     def test_title_empty_string_when_none(self):
         record = self._call({})
         assert record.title == ""
-
-    @pytest.mark.parametrize(
-        ("diffusion", "expected"),
-        [
-            ({"cas": "cas1", "accessible": "oui"}, "green"),
-            ({"cas": "cas3", "accessible": "oui"}, "green"),
-            ({"cas": "cas1", "accessible": "non"}, "embargoed"),
-            ({"cas": "cas4", "accessible": "non"}, "embargoed"),
-            ({"cas": "cas5", "accessible": "non"}, "closed"),
-            ({"cas": None, "accessible": "non"}, "closed"),  # thèse en cours
-        ],
-    )
-    def test_statut_open_access_selon_la_diffusion(self, diffusion, expected):
-        """Le statut open access suit la diffusion de la thèse ; une thèse accessible sur theses.fr est `green`."""
-        assert self._call(diffusion).oa_status == expected
 
     def test_langue_et_resume_de_la_premiere_langue(self):
         thesis = {"langues": ["en", "fr"], "resumes": {"fr": "Résumé.", "en": "Summary."}}

@@ -50,9 +50,7 @@ class TestRefreshFromSources:
             publication_year=2024,
             doc_type="article",
         )
-        _source_record(
-            sa_sync_conn, id1, source_id=f"hal-{id1}-closed", language="en", oa_status="closed"
-        )
+        _source_record(sa_sync_conn, id1, source_id=f"hal-{id1}-closed", language="en")
         refresh_from_sources(sa_sync_conn, id1)
 
         lang = _scalar(sa_sync_conn, "SELECT language FROM publications WHERE id = :id", id=id1)
@@ -94,9 +92,9 @@ class TestRefreshFromSources:
         )
 
     def test_oa_status_tire_des_copies(self, sa_sync_conn):
-        """Une copie d'archive ouverte donne green, malgré le statut closed déclaré par une source."""
+        """Une copie d'archive ouverte donne green."""
         id1 = _insert_publication(sa_sync_conn, doi="10.1234/oa", oa_status="closed")
-        hal = _source_record(sa_sync_conn, id1, source_id=f"hal-{id1}", oa_status="closed")
+        hal = _source_record(sa_sync_conn, id1, source_id=f"hal-{id1}")
         LocationStore(sa_sync_conn).replace_locations(
             hal, [LocationFacts("https://hal.science/hal-01607327", is_oa=True)]
         )
@@ -120,7 +118,7 @@ class TestRefreshFromSources:
         oa = _scalar(sa_sync_conn, "SELECT oa_status FROM publications WHERE id = :id", id=id1)
         assert oa == "diamond"
 
-    def test_le_verdict_d_unpaywall_sur_le_doi_l_emporte_sur_les_sources(self, sa_sync_conn):
+    def test_verdict_d_unpaywall_sans_copie(self, sa_sync_conn):
         id1 = _insert_publication(sa_sync_conn, doi="10.1234/upw", oa_status="unknown")
         sa_sync_conn.execute(
             text(
@@ -131,24 +129,22 @@ class TestRefreshFromSources:
             sa_sync_conn,
             id1,
             source="openalex",
-            source_id=f"openalex-{id1}-gold",
+            source_id=f"openalex-{id1}",
             doi="10.1234/upw",
-            oa_status="gold",
         )
         refresh_from_sources(sa_sync_conn, id1)
 
         oa = _scalar(sa_sync_conn, "SELECT oa_status FROM publications WHERE id = :id", id=id1)
         assert oa == "closed"
 
-    def test_un_statut_ouvert_declare_sans_copie_ne_compte_pas(self, sa_sync_conn):
+    def test_sans_copie_ni_verdict_inconnu(self, sa_sync_conn):
         id1 = _insert_publication(sa_sync_conn, doi="10.1234/agg", oa_status="closed")
         _source_record(
             sa_sync_conn,
             id1,
             source="openalex",
-            source_id=f"openalex-{id1}-gold",
+            source_id=f"openalex-{id1}",
             doi="10.1234/agg",
-            oa_status="gold",
         )
         refresh_from_sources(sa_sync_conn, id1)
 

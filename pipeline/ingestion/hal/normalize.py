@@ -48,7 +48,6 @@ from pipeline.ingestion.common.source_records import (
 from pipeline.ingestion.common.staging import StagingRow
 from pipeline.ingestion.hal.payload import (
     communication_annex,
-    derive_hal_oa_status,
     extract_hal_source_extras,
     hal_text_field,
 )
@@ -105,18 +104,6 @@ def get_container_title(doc: Mapping[str, JsonValue]) -> str | None:
         hal_text_field(doc.get("bookTitle_s"))
         or hal_text_field(doc.get("conferenceTitle_s"))
         or hal_text_field(doc.get("journalTitle_s"))
-    )
-
-
-def get_oa_status(doc: Mapping[str, JsonValue], embargo_until: date | None) -> str | None:
-    """Renvoie le statut open access, tiré de `openAccess_bool`, du fichier déposé ou de l'annexe d'une communication, du lien externe et de l'embargo actif."""
-    is_open = doc.get("openAccess_bool")
-    return derive_hal_oa_status(
-        is_open if isinstance(is_open, bool) else None,
-        hal_text_field(doc.get("fileMain_s")),
-        hal_text_field(doc.get("linkExtId_s")),
-        embargo_until,
-        communication_annex(doc),
     )
 
 
@@ -191,7 +178,6 @@ def hal_source_record(
     """
     doc_type = get_doc_type(doc)
     nnt = normalize_nnt(hal_text_field(doc.get("nntId_s")))
-    embargo_until = active_embargo_until(hal_text_field(doc.get("label_xml")), today())
 
     # Toutes les collections du dépôt.
     collections_array = sorted(set(as_strs(doc.get("collCode_s")))) or None
@@ -236,7 +222,6 @@ def hal_source_record(
         abstract=abstract,
         keywords=keywords,
         topics=topics,
-        oa_status=get_oa_status(doc, embargo_until),
         license=normalize_license(hal_text_field(doc.get("licence_s"))),
         urls=urls,
         hal_collections=collections_array,

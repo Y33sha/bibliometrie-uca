@@ -25,7 +25,6 @@ from pipeline.ingestion.hal.normalize import (
     extract_hal_author_block,
     get_container_facts,
     get_locations,
-    get_oa_status,
     get_title,
     hal_source_record,
     page_range,
@@ -272,7 +271,6 @@ class TestGetLocations:
             "https://hal.science/hal-04/file/slides.pdf",
             True,
         )
-        assert get_oa_status(doc, None) == "green"
 
     def test_annexe_d_un_article_fermee(self):
         doc = {
@@ -492,7 +490,6 @@ class TestHalSourceRecord:
         )
         assert captured.serial_id is None
         assert captured.monograph_id == 8
-        assert captured.oa_status == "embargoed"
         assert captured.raw_language == "fr"
         assert captured.container_title == "Book"
 

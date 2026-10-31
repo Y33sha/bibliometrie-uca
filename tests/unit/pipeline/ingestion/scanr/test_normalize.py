@@ -319,7 +319,6 @@ class TestScanrSourceRecordMetadonnees:
         assert record.publication_year == 2024
         assert record.raw_doc_type == "journal-article"
         assert identifier_values(record)["doi"] == ["10.1/a"]
-        assert record.oa_status == "closed"
         assert "nnt" not in identifier_values(record)
         assert (
             record.container_title is None

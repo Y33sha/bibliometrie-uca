@@ -1,17 +1,9 @@
-"""Lecture des payloads HAL par la normalisation : statut open access, champs texte, métadonnées propres à HAL."""
+"""Lecture des payloads HAL par la normalisation : annexes, champs texte, métadonnées propres à HAL."""
 
 from collections.abc import Mapping, Sequence
-from datetime import date
 
 from domain.source_records.source_extras import SourceExtra
 from domain.types import JsonValue, as_strs
-
-# Archives ouvertes reconnues par HAL dans `linkExtId_s`, tenues pour du green open access :
-# - `arxiv` : serveur de preprints, entièrement en open access ;
-# - `pubmedcentral` : archive biomédicale ; ses articles sont tous en lecture libre, sans être tous sous licence ouverte.
-# `openaccess`, lien vers le DOI de l'éditeur, reste hors de la liste : HAL seul ne dit pas si l'accès est gold, hybrid ou bronze.
-# `istex` aussi : la plateforme donne accès à des contenus payants. Ses documents ont en général un `fileMain_s`, tenu pour green.
-GREEN_LINK_EXT_IDS = frozenset({"arxiv", "pubmedcentral"})
 
 # Types HAL d'une communication orale ou affichée : son annexe (diaporama, poster, résumé) donne accès à son contenu.
 _COMMUNICATION_TYPES = frozenset({"COMM", "POSTER", "PRESCONF"})
@@ -30,39 +22,6 @@ def communication_annex(doc: Mapping[str, JsonValue]) -> str | None:
     if hal_text_field(doc.get("docType_s")) not in _COMMUNICATION_TYPES:
         return None
     return hal_annex(doc)
-
-
-def derive_hal_oa_status(
-    open_access_bool: bool | None,
-    file_main: str | None,
-    link_ext_id: str | None,
-    embargo_until: date | None = None,
-    annex: str | None = None,
-) -> str | None:
-    """Renvoie le statut open access d'un dépôt HAL.
-
-    `openAccess_bool` vrai recouvre plusieurs cas, départagés par le fichier déposé, `linkExtId_s` et l'embargo :
-
-    - fichier déposé sous embargo actif → `embargoed` ; une règle de correction de `oa_status` lève l'embargo à son échéance ;
-    - fichier déposé, ou annexe d'une communication (`annex`, `communication_annex`) → `green` ;
-    - lien vers arXiv ou PubMed Central (`GREEN_LINK_EXT_IDS`) → `green` ;
-    - lien `openaccess` vers le DOI de l'éditeur → `hybrid` ;
-    - `openAccess_bool` faux → `closed` ;
-    - `openAccess_bool` vrai sans autre signal, ou absent → `None`.
-    """
-    if file_main and embargo_until is not None:
-        return "embargoed"
-    if file_main or annex:
-        return "green"
-    if link_ext_id in GREEN_LINK_EXT_IDS:
-        return "green"
-    if link_ext_id == "openaccess":
-        return "hybrid"
-    if open_access_bool is None:
-        return None
-    if not open_access_bool:
-        return "closed"
-    return None
 
 
 def hal_text_field(value: JsonValue) -> str | None:

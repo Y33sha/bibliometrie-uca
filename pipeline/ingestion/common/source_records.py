@@ -70,7 +70,6 @@ class SourceRecordUpsert:
     topics: JsonValue = None
 
     # Open access
-    oa_status: str | None = None
     license: License | None = None
     urls: list[str] | None = None
 

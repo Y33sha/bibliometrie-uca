@@ -1,6 +1,6 @@
 """Correction des métadonnées par table de règles, pour un enregistrement source comme pour une publication.
 
-`effective_metadata` applique les règles aux faits de `MetadataForCorrection`. Elle corrige `doc_type` et `oa_status`.
+`effective_metadata` applique les règles aux faits de `MetadataForCorrection`. Elle corrige `doc_type`.
 
 Une règle est un membre de `MetadataCorrectionRule` et son entrée dans `_RULES`. `applies_to` liste ses prédicats, tous requis. `applies_correction` donne la valeur cible de chaque champ corrigé. Pour un champ, la première règle de `_RULES` qui s'applique l'emporte.
 
@@ -17,7 +17,7 @@ from typing import NamedTuple, TypedDict
 from domain.normalize import normalize_text
 from domain.publications.doc_types import DocType
 from domain.publishers.publisher import PublisherType
-from domain.serials.serial import OaModel, SerialType
+from domain.serials.serial import SerialType
 from domain.source_records.identifiers import SourceIdentifier, SourceIdentifierType
 
 
@@ -31,11 +31,7 @@ class MetadataForCorrection:
     dois: frozenset[str] = frozenset()
     """DOI propres actifs d'un enregistrement source (`own_dois`), DOI d'une publication."""
     serial_type: str | None = None
-    oa_status: str | None = None
-    oa_model: str | None = None
     urls: list[str] | None = None
-    embargo_expired: bool | None = None
-    """Une copie de l'enregistrement source a un embargo échu."""
     self_declared_preprint: bool | None = None
     """L'enregistrement source déclare la relation Crossref `is-preprint-of` : il est le preprint d'une autre œuvre."""
     declares_conference: bool | None = None
@@ -46,8 +42,6 @@ class MetadataForCorrection:
     """La monographie de l'enregistrement source est un volume d'actes (`monographs.proceedings`)."""
     group_title: str | None = None
     """Forme de présentation d'un `posted-content` Crossref (`oral`, `pico`, `display`)."""
-    journal_diamond: bool | None = None
-    """La revue rattachée est diamant (marquée `diamond`, ou dans le DOAJ sans APC ni autres frais)."""
     source: str | None = None
     author_count: int | None = None
     """`source_records.author_count` : contributions sources d'auteur non collectives."""
@@ -103,11 +97,6 @@ class MetadataCorrectionRule(StrEnum):
     TITLE_RECENSION_TO_BOOK_REVIEW = "TITLE_RECENSION_TO_BOOK_REVIEW"
     SERIAL_TYPE_DATA_JOURNAL_TO_DATA_PAPER = "SERIAL_TYPE_DATA_JOURNAL_TO_DATA_PAPER"
     DOI_FIGSHARE_COLLECTION_TO_DATASET = "DOI_FIGSHARE_COLLECTION_TO_DATASET"
-    EMBARGO_EXPIRED_TO_GREEN = "EMBARGO_EXPIRED_TO_GREEN"
-    GOLD_DIAMOND_JOURNAL_TO_DIAMOND = "GOLD_DIAMOND_JOURNAL_TO_DIAMOND"
-    HYBRID_DIAMOND_JOURNAL_TO_DIAMOND = "HYBRID_DIAMOND_JOURNAL_TO_DIAMOND"
-    DIAMOND_OUTSIDE_DIAMOND_JOURNAL_TO_GOLD = "DIAMOND_OUTSIDE_DIAMOND_JOURNAL_TO_GOLD"
-    HYBRID_FULL_OA_TO_GOLD = "HYBRID_FULL_OA_TO_GOLD"
     SCANR_FROM_HAL_TO_HAL_TYPE = "SCANR_FROM_HAL_TO_HAL_TYPE"
     HAL_DEPOSIT_MISSING_TO_REMOVED = "HAL_DEPOSIT_MISSING_TO_REMOVED"
 
@@ -123,7 +112,6 @@ class CorrectedFields(NamedTuple):
     """Correction de chaque champ, `None` sans correction."""
 
     doc_type: Correction[str] | None = None
-    oa_status: Correction[str] | None = None
 
 
 # Débuts de titre normalisé d'une intervention dans les médias.
@@ -199,7 +187,6 @@ class _AppliesTo(TypedDict, total=False):
     doc_type_not_in: frozenset[str]
     """Types laissés en l'état par la règle. Un type absent est hors de l'ensemble."""
     serial_type: str
-    oa_model: str
     url_contains: str
     """Sous-chaîne d'au moins une des `urls`."""
     doi_contains: str
@@ -212,8 +199,6 @@ class _AppliesTo(TypedDict, total=False):
     """Présence d'un `serial_id`."""
     doi_prefix_not_in: tuple[str, ...]
     """Au moins un des `dois` a un préfixe hors du tuple."""
-    oa_status: str
-    embargo_expired: bool
     self_declared_preprint: bool
     declares_conference: bool
     registrant_publisher_type: str
@@ -221,7 +206,6 @@ class _AppliesTo(TypedDict, total=False):
     in_proceedings_volume: bool
     group_title: frozenset[str]
     """Valeurs admises, comparées en minuscules."""
-    journal_diamond: bool
     source: str
     author_count_max: int
     """`author_count` connu et au plus égal à la valeur."""
@@ -231,7 +215,6 @@ class _AppliesCorrection(TypedDict, total=False):
     """Champ corrigé et sa valeur cible."""
 
     doc_type: str
-    oa_status: str
 
 
 class _RuleDefinition(TypedDict):
@@ -455,30 +438,6 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
         },
         "applies_correction": {"doc_type": DocType.DATA_PAPER},
     },
-    # Embargo HAL échu ⇒ `green`. `embargo_expired` se calcule à la lecture, en SQL.
-    MetadataCorrectionRule.EMBARGO_EXPIRED_TO_GREEN: {
-        "applies_to": {"oa_status": "embargoed", "embargo_expired": True},
-        "applies_correction": {"oa_status": "green"},
-    },
-    # Le diamant est une propriété de la revue (`oa_model = diamond`).
-    # Un article `gold` ou `hybrid` d'une revue diamant est `diamond`. Un `diamond` d'OpenAlex hors revue diamant est `gold`.
-    MetadataCorrectionRule.GOLD_DIAMOND_JOURNAL_TO_DIAMOND: {
-        "applies_to": {"oa_status": "gold", "journal_diamond": True},
-        "applies_correction": {"oa_status": "diamond"},
-    },
-    MetadataCorrectionRule.HYBRID_DIAMOND_JOURNAL_TO_DIAMOND: {
-        "applies_to": {"oa_status": "hybrid", "journal_diamond": True},
-        "applies_correction": {"oa_status": "diamond"},
-    },
-    MetadataCorrectionRule.DIAMOND_OUTSIDE_DIAMOND_JOURNAL_TO_GOLD: {
-        "applies_to": {"oa_status": "diamond", "journal_diamond": False},
-        "applies_correction": {"oa_status": "gold"},
-    },
-    # `hybrid` est le statut par défaut avant l'enrichissement des revues. Dans une revue full OA, c'est `gold`.
-    MetadataCorrectionRule.HYBRID_FULL_OA_TO_GOLD: {
-        "applies_to": {"oa_status": "hybrid", "oa_model": OaModel.FULL_OA},
-        "applies_correction": {"oa_status": "gold"},
-    },
 }
 
 _FIELDS = frozenset(f.name for f in fields(MetadataForCorrection))
@@ -544,10 +503,9 @@ def _correct_field(source_record: MetadataForCorrection, field: str) -> Correcti
 
 
 def effective_metadata(source_record: MetadataForCorrection) -> CorrectedFields:
-    """Calcule les corrections de `doc_type` et `oa_status`, indépendantes l'une de l'autre. Une correction qui dépend d'une autre, comme un type corrigé selon le type de la revue rattachée, passe par l'ordre des sous-étapes de la phase `metadata_correction`."""
+    """Calcule la correction de `doc_type`. Une correction qui dépend d'une autre, comme un type corrigé selon le type de la revue rattachée, passe par l'ordre des sous-étapes de la phase `metadata_correction`."""
     return CorrectedFields(
         doc_type=_correct_field(source_record, "doc_type"),
-        oa_status=_correct_field(source_record, "oa_status"),
     )
 
 

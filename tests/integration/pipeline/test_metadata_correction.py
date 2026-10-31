@@ -1,12 +1,10 @@
 """Phase `metadata_correction` : la valeur corrigée est écrite en place, la valeur d'origine est gardée dans `corrections`."""
 
 import logging
-from datetime import timedelta
 from functools import partial
 
 from sqlalchemy import text
 
-from domain.dates import today
 from domain.source_records.identifiers import (
     SourceIdentifier,
     SourceIdentifierRole,
@@ -312,79 +310,6 @@ def test_thesis_with_serial_corrected_and_deconflated(sa_sync_conn):
         ("hal-99", None),
         ("tel-01", "THESIS_WITH_SERIAL_TO_ARTICLE"),
     ]
-
-
-def _embargo(conn, source_record_id: int, until) -> None:
-    conn.execute(
-        text("INSERT INTO embargoes (source_record_id, until) VALUES (:id, :until)"),
-        {"id": source_record_id, "until": until},
-    )
-
-
-def test_expired_embargo_promoted_to_green(sa_sync_conn):
-    conn = sa_sync_conn
-    # `embargo_expired` est calculé à la lecture, sur la table des embargos. Date de levée passée : la règle, commune à toutes les sources, passe `embargoed` à `green`.
-    source_record = insert_source_record(
-        conn,
-        source="openalex",
-        source_id="W-emb-past",
-        title="T",
-        doc_type="article",
-        oa_status="embargoed",
-    )
-    _embargo(conn, source_record, today() - timedelta(days=1))
-    assert _apply(conn) == 1
-    row = conn.execute(
-        text("SELECT oa_status::text AS oa, corrections FROM source_records WHERE id = :id"),
-        {"id": source_record},
-    ).one()
-    assert row.oa == "green"
-    assert row.corrections["oa_status"] == {
-        "raw": "embargoed",
-        "corrected_by": "EMBARGO_EXPIRED_TO_GREEN",
-    }
-
-
-def _oa_status(conn, source_record_id: int) -> str:
-    return conn.execute(
-        text("SELECT oa_status::text FROM source_records WHERE id = :id"), {"id": source_record_id}
-    ).scalar_one()
-
-
-def test_diamond_follows_the_journal(sa_sync_conn):
-    conn = sa_sync_conn
-    diamond = insert_serial(conn, "Diamant", oa_model="diamond")
-    paying = insert_serial(conn, "Payante", oa_model="full_oa")
-    gold_in_diamond = _source_record(conn, source_id="W-d2", oa_status="gold", serial_id=diamond)
-    diamond_in_paying = _source_record(
-        conn, source_id="W-d3", oa_status="diamond", serial_id=paying
-    )
-    diamond_without_journal = _source_record(conn, source_id="W-d4", oa_status="diamond")
-
-    _apply(conn)
-
-    assert _oa_status(conn, gold_in_diamond) == "diamond"
-    assert _oa_status(conn, diamond_in_paying) == "gold"
-    assert _oa_status(conn, diamond_without_journal) == "gold"
-
-
-def test_active_embargo_not_promoted(sa_sync_conn):
-    conn = sa_sync_conn
-    # Date de levée future : `embargo_expired` est faux, le statut reste `embargoed`.
-    source_record = insert_source_record(
-        conn,
-        source="openalex",
-        source_id="W-emb-future",
-        title="T",
-        doc_type="article",
-        oa_status="embargoed",
-    )
-    _embargo(conn, source_record, today() + timedelta(days=365))
-    assert _apply(conn) == 0
-    oa = conn.execute(
-        text("SELECT oa_status::text FROM source_records WHERE id = :id"), {"id": source_record}
-    ).scalar_one()
-    assert oa == "embargoed"
 
 
 # ── Sous-étape cluster : ouvrage/chapitre au même DOI ──

@@ -26,7 +26,6 @@ def _source_record(**overrides) -> SourceRecord:
         "monograph_id": None,
         "container_title": None,
         "language": None,
-        "oa_status": None,
         "is_retracted": None,
         "abstract": None,
         "countries": (),

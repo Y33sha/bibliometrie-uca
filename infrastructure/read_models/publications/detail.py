@@ -208,7 +208,7 @@ class PublicationDetailQueries:
 
         sources_rows = self._conn.execute(
             text(f"""
-                SELECT sr.source, sr.source_id, sr.oa_status, {source_record_doi_sql("sr")} AS doi,
+                SELECT sr.source, sr.source_id, {source_record_doi_sql("sr")} AS doi,
                        sr.hal_collections, sr.countries
                 FROM source_records sr
                 WHERE sr.publication_id = :pid
@@ -220,7 +220,6 @@ class PublicationDetailQueries:
             SourceRecordOut(
                 source=r.source,
                 source_id=r.source_id,
-                oa_status=r.oa_status,
                 doi=r.doi,
                 hal_collections=r.hal_collections,
                 countries=r.countries,

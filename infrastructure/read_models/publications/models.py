@@ -272,7 +272,6 @@ class PublicationDetailCore(Model):
 class SourceRecordOut(Model):
     source: str
     source_id: str
-    oa_status: str | None
     doi: str | None
     hal_collections: list[str] | None
     countries: list[str] | None
@@ -426,7 +425,6 @@ class SourceRecordMetadataOut(Model):
     """Nom de la langue dans le référentiel."""
     language_raw: str | None
     """Valeur donnée par la source, quand la normalisation l'a changée."""
-    oa_status: str | None
     serial_id: int | None
     """Revue du référentiel rattachée à l'enregistrement source."""
     journal_title: str | None

@@ -79,7 +79,7 @@ Simulation sur les 76 591 publications du périmètre (`interfaces/cli/oneshot/m
 
 - [x] Table des embargos : embargo d'une copie HAL, avec sa date de fin ; embargo déclaré par theses.fr, sans date. Elle remplace `embargo_until` des localisations et le statut `embargoed` déclaré par theses.fr. 71ceed221
 - [x] Thèse réservée à l'intranet dans `source_extras`. Thèse en cours et thèse réservée à l'intranet `closed`, statuts déclarés ignorés.
-- [x] Adresse d'un dépôt HAL écrite par une seule fonction. Une thèse TEL va sur `hal.science` : theses.hal.science renvoie une erreur 404 sans fichier. Stock : `canonicalize_hal_location_urls`, puis `backfill_best_copy_urls`.
+- [x] Adresse d'un dépôt HAL écrite par une seule fonction. L'adresse d'une thèse TEL est sur `hal.science`, qui affiche toutes les thèses TEL. theses.hal.science affiche seulement les thèses TEL avec fichier déposé. Stock : `canonicalize_hal_location_urls`, puis `backfill_best_copy_urls`.
 - [ ] Colonne `source_records.oa_status` retirée, avec les dérivations des normaliseurs et les règles de correction associées.
 
 ## Questions ouvertes

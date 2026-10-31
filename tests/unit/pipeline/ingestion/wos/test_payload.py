@@ -1,5 +1,4 @@
 from pipeline.ingestion.wos.payload import (
-    derive_wos_api_oa_status,
     is_wos_author_usable,
     parse_export_addresses,
     parse_export_corresponding,
@@ -53,22 +52,3 @@ class TestIsWosAuthorExploitable:
 
     def test_empty_dict(self):
         assert not is_wos_author_usable({})
-
-
-class TestDeriveWosApiOaStatus:
-    def test_y_returns_gold(self):
-        assert derive_wos_api_oa_status("Y") == "gold"
-
-    def test_n_returns_none(self):
-        # « N » de WoS laisse le statut indéterminé : la décision revient aux autres sources.
-        assert derive_wos_api_oa_status("N") is None
-
-    def test_none_returns_none(self):
-        assert derive_wos_api_oa_status(None) is None
-
-    def test_empty_returns_none(self):
-        assert derive_wos_api_oa_status("") is None
-
-    def test_unknown_value_returns_none(self):
-        assert derive_wos_api_oa_status("yes") is None
-        assert derive_wos_api_oa_status("y") is None, "match strict casse"

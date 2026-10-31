@@ -29,7 +29,6 @@ function record(overrides: Partial<SourceRecord>): SourceRecord {
 		language: 'en',
 		language_name: 'Anglais',
 		language_raw: null,
-		oa_status: 'green',
 		serial_id: null,
 		journal_title: null,
 		journal_raw_title: null,

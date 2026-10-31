@@ -605,7 +605,6 @@ class TestCrossrefSourceRecord:
         assert "10.1000/abc" in identifier_values(document)["doi"]
         assert document.publication_year == 2024
         assert document.raw_doc_type == "journal-article"
-        assert document.oa_status is None  # Crossref ne renseigne pas le statut open access
 
     def test_titre_de_conteneur_garde_sans_revue(self):
         msg = _message(**{"container-title": ["J. Things"]})

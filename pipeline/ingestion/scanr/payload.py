@@ -1,4 +1,4 @@
-"""Lecture des payloads ScanR par la normalisation : affiliations feuilles, identifiants, concepts, statut open access.
+"""Lecture des payloads ScanR par la normalisation : affiliations feuilles, identifiants, concepts.
 
 Les payloads sont les objets JSON bruts de l'API, sans schéma typé."""
 
@@ -78,29 +78,3 @@ def split_scanr_concepts(domains: JsonValue) -> tuple[list[str], list[JsonValue]
                 seen.add(label.lower())
                 keywords.append(label)
     return keywords, subjects
-
-
-def derive_scanr_oa_status(
-    is_oa: bool | None, oa_evidence: Mapping[str, JsonValue] | None
-) -> str | None:
-    """Renvoie le statut open access d'un document ScanR, déduit de `isOa` et de `oaEvidence` (hôte et licence de la copie ouverte).
-
-    - `isOa` absent → `None` ;
-    - `isOa` faux → `closed` ;
-    - copie ouverte dans une archive (`repository`) → `green` ;
-    - copie ouverte chez l'éditeur, sous licence Creative Commons → `hybrid` ;
-    - copie ouverte chez l'éditeur, sans licence Creative Commons → `bronze` ;
-    - hôte absent ou inconnu → `None`.
-    """
-    if is_oa is None:
-        return None
-    if not is_oa:
-        return "closed"
-    ev = as_mapping(oa_evidence)
-    host_type = as_str(ev.get("hostType"))
-    license_ = (as_str(ev.get("license")) or "").lower()
-    if host_type == "repository":
-        return "green"
-    if host_type == "publisher":
-        return "hybrid" if license_.startswith("cc-") else "bronze"
-    return None

@@ -30,7 +30,6 @@ class CorrectedSourceRecord(NamedTuple):
     """Valeurs corrigées d'un enregistrement source. Chaque champ a le nom de sa colonne de `source_records`."""
 
     doc_type: str | None
-    oa_status: str | None
     urls: list[str] | None
     corrections: dict[str, JsonValue]
     """Colonne `corrections` complète : entrées de la correction unaire recalculées, entrées des autres sous-étapes gardées."""
@@ -93,13 +92,6 @@ def correct_source_record(
     if doc_type_rule is not None:
         new_corrections[CorrectionKey.DOC_TYPE] = stash_entry(before.doc_type, doc_type_rule)
 
-    oa_status = before.oa_status
-    if corrected.oa_status is not None and corrected.oa_status.value != before.oa_status:
-        oa_status = corrected.oa_status.value
-        new_corrections[CorrectionKey.OA_STATUS] = stash_entry(
-            before.oa_status, corrected.oa_status.rule.value
-        )
-
     removals: dict[tuple[SourceIdentifierType, str], str] = {}
     thesis_to_article = MetadataCorrectionRule.THESIS_WITH_SERIAL_TO_ARTICLE
     if corrected.doc_type is not None and corrected.doc_type.rule == thesis_to_article:
@@ -119,10 +111,9 @@ def correct_source_record(
             new_corrections[CorrectionKey.URLS] = stash_entry(before.urls, missing_rule)
 
     new_identifiers = with_removals(identifiers, UNARY_IDENTIFIER_RULES, removals)
-    columns = CorrectedSourceRecord(doc_type, oa_status, urls, new_corrections)
+    columns = CorrectedSourceRecord(doc_type, urls, new_corrections)
     if columns == (
         facts.doc_type,
-        facts.oa_status,
         facts.urls,
         dict(corrections),
     ) and new_identifiers == tuple(identifiers):

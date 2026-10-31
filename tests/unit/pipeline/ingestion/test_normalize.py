@@ -366,7 +366,6 @@ _RECORD = SourceRecordUpsert(
     biblio=None,
     abstract=None,
     keywords=None,
-    oa_status=None,
     license=None,
     impact=None,
     source_extras=None,

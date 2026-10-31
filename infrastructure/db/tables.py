@@ -1251,7 +1251,6 @@ source_records = Table(
         Integer,
         comment="Éditeur que nomme la source. Nul pour une production hébergée sans être publiée.",
     ),
-    Column("oa_status", Text),
     # Licence normalisée de l'enregistrement source ; la forme brute reste dans `source_extras`.
     Column("license", license_type_enum),
     Column("language", Text),

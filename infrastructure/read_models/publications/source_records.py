@@ -53,7 +53,6 @@ def _record(r: Row[tuple[object, ...]]) -> SourceRecordMetadataOut:
         language=r.language,
         language_name=r.language_name,
         language_raw=r.language_raw,
-        oa_status=r.oa_status,
         serial_id=r.serial_id,
         journal_title=r.journal_title,
         journal_raw_title=_text(raw_journal, JournalKey.TITLE),
@@ -146,7 +145,7 @@ class PublicationSourceRecordQueries:
                        lang.name AS language_name,
                        CASE WHEN sr.raw_language IS DISTINCT FROM sr.language
                             THEN sr.raw_language END AS language_raw,
-                       sr.oa_status, sr.container_title, sr.biblio,
+                       sr.container_title, sr.biblio,
                        j.id AS serial_id, j.title AS journal_title,
                        pub.id AS publisher_id, pub.name AS publisher_name
                 FROM source_records sr

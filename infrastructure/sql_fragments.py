@@ -280,14 +280,6 @@ def under_active_embargo(source_record: str = "sr") -> str:
     )
 
 
-def embargo_expired(source_record: str = "sr") -> str:
-    """Condition SQL : l'embargo de l'enregistrement source `source_record` a une date de fin échue (`embargoes`)."""
-    return (
-        f"EXISTS (SELECT 1 FROM embargoes e WHERE e.source_record_id = {source_record}.id"
-        " AND e.until <= current_date)"
-    )
-
-
 def declares_conference_sql(alias: str = "sr") -> str:
     """Renvoie la condition vraie quand l'enregistrement source aliasé `alias` nomme son congrès (`declares_conference`)."""
     return f"COALESCE({has_source_extra(SourceExtra.CONFERENCE, alias)}, false)"

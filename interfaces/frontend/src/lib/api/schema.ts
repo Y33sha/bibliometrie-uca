@@ -5776,8 +5776,6 @@ export interface components {
              * @description Valeur donnée par la source, quand la normalisation l'a changée.
              */
             language_raw: string | null;
-            /** Oa Status */
-            oa_status: string | null;
             /**
              * Serial Id
              * @description Revue du référentiel rattachée à l'enregistrement source.
@@ -5825,8 +5823,6 @@ export interface components {
             source: string;
             /** Source Id */
             source_id: string;
-            /** Oa Status */
-            oa_status: string | null;
             /** Doi */
             doi: string | null;
             /** Hal Collections */

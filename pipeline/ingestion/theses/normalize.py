@@ -30,7 +30,6 @@ from pipeline.ingestion.theses.payload import (
     awaits_diffusion,
     derive_theses_doc_type,
     intranet_only,
-    thesis_oa_status,
 )
 from pipeline.transformation.publishing.find_or_create import Containers
 
@@ -108,7 +107,7 @@ def theses_source_record(
 ) -> SourceRecordUpsert:
     """Construit l'enregistrement source theses.fr d'une thèse, d'après son détail.
 
-    Sans conteneur. Le type dépend de la présence d'une date de soutenance, le statut open access de la diffusion de la thèse (`thesis_oa_status`). La langue est la première de `langues`, le résumé celui de la première langue pourvue d'un résumé.
+    Sans conteneur. Le type dépend de la présence d'une date de soutenance. La langue est la première de `langues`, le résumé celui de la première langue pourvue d'un résumé.
     """
     doi = clean_doi(as_str(thesis.get("doi")))
     identifiers: list[SourceIdentifier] = []
@@ -161,7 +160,6 @@ def theses_source_record(
         abstract=abstract,
         keywords=keywords,
         topics=topics_json,
-        oa_status=thesis_oa_status(thesis),
         source_extras=_build_source_extras(thesis),
     )
 
