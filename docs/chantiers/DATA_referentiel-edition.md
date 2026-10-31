@@ -52,7 +52,7 @@ Les personnes et les publications ont un volet latéral (`PersonDrawer`, `Public
 
 ## Décisions
 
-- Les valeurs données par la source sur la série d'un enregistrement source deviennent des colonnes de `source_records` : titre brut et sa forme normalisée, ISSN, identifiant OpenAlex, nom brut de l'éditeur. Ce sont les valeurs qui servent au rattachement. `biblio` garde la numérotation.
+- `biblio.journal` décrit la série qui sert au rattachement : titre, identifiant OpenAlex, liste des ISSN avec leur support et l'indicateur ISSN-L.
 - La revue de chaque enregistrement source se calcule à chaque passage de `publishing`, comme sa publication : composantes connexes sur les ISSN et l'identifiant OpenAlex. Deux ISSN-L distincts restent toujours séparés. L'ISSN-L vient de la vérification Sudoc.
 - Un titre précédent, un titre suivant ou un supplément forme une revue distincte. Une table relie les revues par ces trois relations, lues dans le Sudoc.
 - Une série sans ISSN ni identifiant OpenAlex rejoint la seule revue à ISSN de même titre et d'éditeur compatible : le même éditeur, ou un éditeur absent d'un côté. Sinon, les séries de même titre et de même éditeur forment une revue sans ISSN.
@@ -64,7 +64,7 @@ Les personnes et les publications ont un volet latéral (`PersonDrawer`, `Public
 ### Phase 1 — Reconnaissance des revues
 
 - [x] Contrainte `NULLS NOT DISTINCT`, dédoublonnage des formes sans éditeur (7668391c6)
-- [ ] Colonnes de la série sur `source_records`, écrites par les normaliseurs, reprises de `biblio` pour le stock par un script ponctuel. Lecteurs basculés : vérification Sudoc, détection des actes de congrès, comparaison des sources.
+- [ ] `biblio.journal` écrit d'après la série qui sert au rattachement, ISSN en liste. Lecteurs adaptés : vérification Sudoc, comparaison des sources. Reprise du stock depuis le raw store par un script ponctuel.
 - [ ] Calcul des revues dans `publishing` : composantes connexes coupées par ISSN-L, rattachement par titre, identifiant conservé, redirection des revues absorbées
 - [ ] Éditeur déduit du préfixe DOI Crossref pour le rattachement par titre
 - [ ] Relations entre revues : titre précédent, titre suivant, supplément, lues dans le Sudoc. Liens sur la page d'une revue.
