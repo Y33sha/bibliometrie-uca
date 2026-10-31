@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 7TM2pvCQN19ITdSfKrbqj87onLMifw6lIMdUuFCbsPnQegtajNTTA5M4Z0IKviY
+\restrict S3g5501iNWm1LUqnDvEYQ7zmM9H5ixYWxHjLkBI8qpPECT0JF6fCbJzmwem9jku
 
 -- Dumped from database version 18.4
 -- Dumped by pg_dump version 18.4
@@ -1244,7 +1244,6 @@ CREATE TABLE sources.source_records (
     source public.source_type NOT NULL,
     source_id text NOT NULL,
     title text NOT NULL,
-    publication_year smallint,
     doc_type public.doc_type,
     publication_id integer,
     staging_id integer,
@@ -1276,6 +1275,7 @@ CREATE TABLE sources.source_records (
     is_matchable boolean DEFAULT true NOT NULL,
     publication_date date,
     publication_date_precision public.date_precision,
+    publication_year smallint GENERATED ALWAYS AS ((EXTRACT(year FROM publication_date))::smallint) STORED,
     CONSTRAINT source_records_corrections_is_object CHECK ((jsonb_typeof(corrections) = 'object'::text)),
     CONSTRAINT source_records_impact_is_object CHECK (((impact IS NULL) OR (jsonb_typeof(impact) = 'object'::text)))
 );
@@ -1342,6 +1342,13 @@ COMMENT ON COLUMN sources.source_records.publication_date IS 'Date de publicatio
 --
 
 COMMENT ON COLUMN sources.source_records.publication_date_precision IS 'Précision de publication_date : year, month ou day.';
+
+
+--
+-- Name: COLUMN source_records.publication_year; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON COLUMN sources.source_records.publication_year IS 'Année de publication_date.';
 
 
 --
@@ -1774,7 +1781,6 @@ CREATE TABLE publications.publications (
     title text NOT NULL,
     title_normalized text,
     doc_type public.doc_type DEFAULT 'other'::public.doc_type,
-    publication_year smallint NOT NULL,
     doi text,
     oa_status public.oa_type DEFAULT 'unknown'::public.oa_type,
     serial_id integer,
@@ -1796,8 +1802,9 @@ CREATE TABLE publications.publications (
     publisher_id integer,
     doi_prefix text GENERATED ALWAYS AS (split_part(doi, '/'::text, 1)) STORED,
     best_copy_url text,
-    publication_date date,
-    publication_date_precision public.date_precision,
+    publication_date date NOT NULL,
+    publication_date_precision public.date_precision NOT NULL,
+    publication_year smallint GENERATED ALWAYS AS ((EXTRACT(year FROM publication_date))::smallint) STORED,
     CONSTRAINT publications_corrections_is_object CHECK ((jsonb_typeof(corrections) = 'object'::text))
 );
 
@@ -1835,6 +1842,13 @@ COMMENT ON COLUMN publications.publications.publication_date IS 'Date de publica
 --
 
 COMMENT ON COLUMN publications.publications.publication_date_precision IS 'Précision de publication_date : year, month ou day.';
+
+
+--
+-- Name: COLUMN publications.publication_year; Type: COMMENT; Schema: publications; Owner: -
+--
+
+COMMENT ON COLUMN publications.publications.publication_year IS 'Année de publication_date.';
 
 
 --
@@ -5759,5 +5773,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 7TM2pvCQN19ITdSfKrbqj87onLMifw6lIMdUuFCbsPnQegtajNTTA5M4Z0IKviY
+\unrestrict S3g5501iNWm1LUqnDvEYQ7zmM9H5ixYWxHjLkBI8qpPECT0JF6fCbJzmwem9jku
 
