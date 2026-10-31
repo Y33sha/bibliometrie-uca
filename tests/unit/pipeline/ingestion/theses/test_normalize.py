@@ -137,7 +137,6 @@ class TestThesesSourceRecord:
         assert record.title == "T"
         assert record.publication_year is None
         assert identifier_values(record) == {}
-        assert record.serial_id is None
 
     def test_defended_thesis(self):
         assert self._call({"dateSoutenance": "15/03/2023"}).raw_doc_type == "thesis"
@@ -261,7 +260,7 @@ def _make_normalizer():
         logger=logging.getLogger("test"),
         staging_store=FakeStagingStore(),
         record_store=FakeSourceRecordStore(),
-        container_stores=MagicMock(),
+        monograph_store=MagicMock(),
         publisher_store=MagicMock(),
         contribution_store=FakeSourceContributionStore(),
         location_store=MagicMock(),
@@ -296,7 +295,7 @@ class TestThesesNormalizerClass:
         """L'enregistrement source reprend la ligne de staging et les métadonnées lues dans la thèse."""
         thesis = {"titrePrincipal": "T", "nnt": "2024clfac001", "dateSoutenance": "15/03/2024"}
         row = staging_row(staging_id=42, source_id="2024CLFAC001", raw=thesis)
-        record = _make_normalizer().source_record(row, thesis, Containers(None, None))
+        record = _make_normalizer().source_record(row, thesis, Containers(False, None))
         assert (record.source, record.source_id, record.staging_id) == (
             "theses",
             "2024CLFAC001",
@@ -304,7 +303,6 @@ class TestThesesNormalizerClass:
         )
         assert (record.title, record.publication_year) == ("T", 2024)
         assert identifier_values(record) == {"nnt": ["2024CLFAC001"]}
-        assert record.serial_id is None
 
     def test_contributions_sources_d_une_these(self):
         norm = _make_normalizer()

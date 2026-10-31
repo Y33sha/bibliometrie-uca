@@ -2,7 +2,7 @@
 
 *À jour le 2026-10-26.*
 
-La phase `normalize` transforme les données moissonnées (`staging`) en [enregistrements sources](../donnees/02-sources.md) et en contributions sources. Elle écrit aussi les localisations, les adresses, et crée ou reconnaît les publications en série, les monographies, les éditeurs et les plateformes.
+La phase `normalize` transforme les données moissonnées (`staging`) en [enregistrements sources](../donnees/02-sources.md) et en contributions sources. Elle écrit aussi les localisations, les adresses, et crée ou reconnaît les monographies, les éditeurs et les plateformes. L'enregistrement source décrit sa série (`biblio.journal`) ; la phase [`publishing`](05-publishing.md) le rattache à sa publication en série.
 
 L'enregistrement source reçoit l'éditeur que nomme sa source, sauf pour un document hébergé sans être publié (preprint, jeu de données, rapport, thèse). Les localisations et leurs plateformes sont décrites avec l'[édition](../donnees/07-publishing.md#plateformes).
 

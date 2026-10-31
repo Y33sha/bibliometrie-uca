@@ -96,11 +96,16 @@ GRANT INSERT, UPDATE ON
 TO bibliometrie_app;
 
 GRANT UPDATE, DELETE ON
-    publishing.serial_name_forms, publishing.serials, publications.publications, publishing.publisher_name_forms, publishing.publishers
+    publishing.serials, publications.publications, publishing.publisher_name_forms, publishing.publishers
 TO bibliometrie_app;
 
--- Les ISSN d'une revue s'éditent à l'administration, et rejoignent la revue qui en absorbe une autre.
+-- La fusion d'une revue sans ISSN dans une autre revue est gardée comme décision de l'administration.
 GRANT INSERT, UPDATE, DELETE ON
+    publishing.serial_title_decisions
+TO bibliometrie_app;
+
+-- Les ISSN d'une revue absorbée par une fusion rejoignent la revue conservée.
+GRANT UPDATE ON
     publishing.serial_issns
 TO bibliometrie_app;
 

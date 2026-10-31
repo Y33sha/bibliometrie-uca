@@ -1,25 +1,18 @@
-"""Recherche et création des conteneurs d'un enregistrement source et de son éditeur : revue, monographie, éditeur.
+"""Recherche et création de la monographie d'un enregistrement source et de son éditeur.
 
-Les normaliseurs des sources appellent ces fonctions pour chaque enregistrement source.
+Les normaliseurs des sources appellent ces fonctions pour chaque enregistrement source. La revue se rattache dans la phase `publishing` (`attach_serials`).
 """
 
-import logging
 from collections.abc import Sequence
 from typing import NamedTuple
 
 from domain.monographs.matching import choose_monograph
 from domain.normalize import normalize_text, to_plain_text
-from domain.publications.identifiers import ISBN, issn_rejection_reason
+from domain.publications.identifiers import ISBN
 from domain.publishers.names import publisher_name_key
 from domain.serials.containers import SeriesDescription, VolumeDescription
-from domain.serials.issns import IssnStatus, SerialIssn, received_issns
-from domain.serials.serial import OaModel
-from pipeline.transformation.publishing.containers import ContainerStores
 from pipeline.transformation.publishing.monographs.store import MonographStore
 from pipeline.transformation.publishing.publishers.store import PublisherStore
-from pipeline.transformation.publishing.serials.store import SerialStore
-
-logger = logging.getLogger(__name__)
 
 
 def find_or_create_publisher(
@@ -57,7 +50,7 @@ def find_or_create_publisher(
 def match_or_create_publisher(name: str, *, repo: PublisherStore) -> tuple[int, bool] | None:
     """Trouve par sa clé de nom, ou crée, l'éditeur désigné par `name`. Renvoie `(id, created)`, ou `None` si le nom est vide une fois normalisé.
 
-    Le nom affiché, le nom normalisé et la clé dérivent tous du nom mis à plat (cf. `find_or_create_serial`).
+    Le nom affiché, le nom normalisé et la clé dérivent tous du nom mis à plat : un nom reçu avec des entités (`Wood &amp; Fire`) retrouve le même éditeur que reçu en clair.
     """
     name = to_plain_text(name)
     name_normalized = normalize_text(name)
@@ -65,90 +58,6 @@ def match_or_create_publisher(name: str, *, repo: PublisherStore) -> tuple[int, 
     if not name_normalized or not name_key:
         return None
     return repo.match_or_create_by_name_form(name, name_normalized, name_key)
-
-
-def find_or_create_serial(
-    title: str | None,
-    *,
-    issns: Sequence[SerialIssn] = (),
-    publisher_id: int | None = None,
-    openalex_id: str | None = None,
-    oa_model: OaModel | None = None,
-    repo: SerialStore,
-) -> int | None:
-    """Trouve ou crée une revue. Renvoie son id, ou `None` si le titre est vide.
-
-    Recherche par `openalex_id`, puis par chacun des ISSN valides, puis par titre normalisé parmi les formes de nom. Sans correspondance, la revue est créée.
-
-    La revue trouvée reçoit les métadonnées et les ISSN qui lui manquent. Le titre reçu devient une forme de nom, pour les recherches par titre suivantes. Un ISSN invalide est journalisé et gardé au statut `malformed`. L'éditeur de la revue se calcule d'après ses publications.
-
-    Args:
-        publisher_id: éditeur de l'enregistrement source ; restreint la recherche par titre.
-    """
-    if not title:
-        return None
-
-    # La clé de comparaison et le titre affiché dérivent du texte brut : un titre reçu avec des entités (`Wood &amp; Fire Safety`) retrouve la même revue que reçu en clair.
-    title = to_plain_text(title)
-    title_normalized = normalize_text(title)
-    issns = received_issns(issns)
-    for row in issns:
-        if row.status is IssnStatus.MALFORMED:
-            # Ligne de détail : le terminal la masque, le journal la garde.
-            logger.warning(
-                "ISSN mal formé (revue %r) : %r — %s, valeur gardée telle que reçue",
-                title,
-                row.issn,
-                issn_rejection_reason(row.issn),
-                extra={"detail": True},
-            )
-
-    def _match_and_enrich(serial_id: int, *, with_openalex: bool = True) -> int:
-        """Enrichit la revue trouvée et enregistre son titre comme forme de nom, pour les recherches par titre suivantes. Renvoie son id."""
-        repo.enrich_serial(
-            serial_id,
-            openalex_id=openalex_id if with_openalex else None,
-            oa_model=oa_model if with_openalex else None,
-        )
-        repo.add_serial_issns(serial_id, issns)
-        repo.add_serial_name_form(serial_id, title_normalized, publisher_id)
-        return serial_id
-
-    def _find_or_create() -> int:
-        # 1. Par openalex_id
-        if openalex_id:
-            jid = repo.find_serial_by_openalex_id(openalex_id)
-            if jid:
-                # La revue trouvée a déjà cet `openalex_id` et son modèle open access.
-                return _match_and_enrich(jid, with_openalex=False)
-            # `openalex_id` inconnu : la recherche continue, pour le rattacher à une revue existante.
-
-        # 2. Par chacun des ISSN valides, parmi les ISSN des revues
-        for row in issns:
-            if row.status is IssnStatus.MALFORMED:
-                continue
-            jid = repo.find_serial_by_issn_any(row.issn)
-            if jid:
-                return _match_and_enrich(jid)
-
-        # 3. Par forme de nom, priorité aux revues à ISSN électronique actif. Un titre vide une fois normalisé (alphabet non latin, symboles) ne désigne aucune revue.
-        jid = (
-            repo.find_serial_by_name_form(title_normalized, publisher_id)
-            if title_normalized
-            else None
-        )
-        if jid:
-            repo.enrich_serial(jid, openalex_id=openalex_id, oa_model=oa_model)
-            repo.add_serial_issns(jid, issns)
-            return jid
-
-        # 4. Création, avec la forme de nom
-        created = repo.create_serial(title=title, openalex_id=openalex_id, oa_model=oa_model)
-        repo.add_serial_issns(created, issns)
-        repo.add_serial_name_form(created, title_normalized, publisher_id)
-        return created
-
-    return _find_or_create()
 
 
 def _isbns(values: Sequence[str]) -> list[str]:
@@ -169,15 +78,11 @@ def find_or_create_monograph(
     proceedings: bool,
     year: int | None = None,
     publisher_id: int | None = None,
-    serial_id: int | None = None,
     repo: MonographStore,
 ) -> int | None:
     """Trouve ou crée une monographie. Renvoie son id, ou `None` sans ISBN connu ni titre, ou si plusieurs volumes de ce titre sont candidats.
 
     Recherche par ISBN, papier ou électronique, puis par titre normalisé. `choose_monograph` choisit parmi les monographies de ce titre, selon l'éditeur et les ISBN. La monographie trouvée reçoit les champs qui lui manquent.
-
-    Args:
-        serial_id: collection, quand un ISSN la désigne.
     """
     paper = _isbns(isbns)
     electronic = [isbn for isbn in _isbns(eisbns) if isbn not in paper]
@@ -192,7 +97,6 @@ def find_or_create_monograph(
             isbn=isbn,
             eisbn=eisbn,
             publisher_id=publisher_id,
-            serial_id=serial_id,
         )
         return monograph_id
 
@@ -221,36 +125,15 @@ def find_or_create_monograph(
         isbn=isbn,
         eisbn=eisbn,
         publisher_id=publisher_id,
-        serial_id=serial_id,
     )
 
 
 class Containers(NamedTuple):
-    """Entrée de `serials` et monographie d'un enregistrement source."""
+    """Série et monographie d'un enregistrement source."""
 
-    serial_id: int | None
+    has_series: bool
+    """L'enregistrement source décrit une série (`biblio.journal`)."""
     monograph_id: int | None
-
-
-def _find_series(
-    series: SeriesDescription, publisher_id: int | None, stores: ContainerStores
-) -> int | None:
-    """Renvoie l'entrée de `serials` d'une série. Une série sans titre est seulement cherchée par ses ISSN valides."""
-    if series.title:
-        return find_or_create_serial(
-            series.title,
-            issns=series.issns,
-            publisher_id=publisher_id,
-            openalex_id=series.openalex_id,
-            oa_model=series.oa_model,
-            repo=stores.serials,
-        )
-    for row in series.issns:
-        if row.status is not IssnStatus.MALFORMED and (
-            serial_id := stores.serials.find_serial_by_issn_any(row.issn)
-        ):
-            return serial_id
-    return None
 
 
 def find_or_create_containers(
@@ -258,15 +141,11 @@ def find_or_create_containers(
     volume: VolumeDescription | None,
     *,
     publisher_id: int | None,
-    stores: ContainerStores,
+    monographs: MonographStore,
 ) -> Containers:
-    """Trouve ou crée les conteneurs d'un enregistrement source, séparés par `determine_container_type`.
-
-    L'enregistrement source reçoit sa série comme entrée de `serials`, et son volume comme monographie reliée à cette série. La série d'un volume a toujours un ISSN. L'étape de rattachement de `publishing` reconnaît les séries sans ISSN.
-    """
-    serial_id = _find_series(series, publisher_id, stores) if series else None
+    """Trouve ou crée la monographie d'un enregistrement source, d'après sa série et son volume séparés par `determine_container_type`. Le rattachement aux collections de `publishing` relie la monographie à sa collection."""
     if volume is None:
-        return Containers(serial_id, None)
+        return Containers(series is not None, None)
     monograph_id = find_or_create_monograph(
         volume.title,
         isbns=volume.isbns,
@@ -274,7 +153,6 @@ def find_or_create_containers(
         proceedings=volume.proceedings,
         year=volume.year,
         publisher_id=publisher_id,
-        serial_id=serial_id,
-        repo=stores.monographs,
+        repo=monographs,
     )
-    return Containers(serial_id, monograph_id)
+    return Containers(series is not None, monograph_id)

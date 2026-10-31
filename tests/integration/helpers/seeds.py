@@ -188,13 +188,13 @@ def seed_serial_issn(
     *,
     issn: str,
     support: str | None = None,
-    linking: bool = False,
+    issnl: str | None = None,
     status: str = "active",
 ) -> int:
     """Sème un ISSN de la revue `serial_id`. Les valeurs par défaut sont celles du schéma."""
     with owner_connection() as conn:
         return insert_serial_issn(
-            conn, serial_id, issn=issn, support=support, linking=linking, status=status
+            conn, serial_id, issn=issn, support=support, issnl=issnl, status=status
         )
 
 

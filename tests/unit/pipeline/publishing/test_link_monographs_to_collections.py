@@ -13,6 +13,7 @@ class _Repo:
     def __init__(self, candidates: list[MonographSerialCandidates]) -> None:
         self._candidates = candidates
         self.set: list[tuple[int, int | None]] = []
+        self.created: list[tuple[str, int | None]] = []
 
     def find_monograph_serial_candidates(self) -> list[MonographSerialCandidates]:
         return self._candidates
@@ -22,6 +23,10 @@ class _Repo:
 
     def set_serial_type_if_unknown(self, serial_id, serial_type) -> None:
         self.typed = (serial_id, serial_type)
+
+    def serial_for_title(self, title: str, publisher_id: int | None) -> int:
+        self.created.append((title, publisher_id))
+        return 500
 
 
 def _run(monkeypatch, logger, repo: _Repo):
@@ -60,13 +65,6 @@ def test_rattachements_et_conflits_journalises(caplog, monkeypatch):
 
 def test_volumes_d_une_serie_rattaches_a_la_serie(monkeypatch):
     """Cas réel : les volumes NuFACT 2022 et 2023, sans ISSN, forment la série NuFACT."""
-    created: list[tuple[str, int | None]] = []
-
-    def fake_find_or_create(title, *, publisher_id, repo):
-        created.append((title, publisher_id))
-        return 500
-
-    monkeypatch.setattr(mod, "find_or_create_serial", fake_find_or_create)
     repo = _Repo(
         [
             MonographSerialCandidates(1, "NuFACT 2022", 3, True, 91, (), (91,)),
@@ -74,7 +72,7 @@ def test_volumes_d_une_serie_rattaches_a_la_serie(monkeypatch):
         ]
     )
     metrics = _run(monkeypatch, logging.getLogger("t"), repo)
-    assert created == [("NuFACT", 3)]
+    assert repo.created == [("NuFACT", 3)]
     assert repo.typed == (500, SerialType.PROCEEDINGS)
     assert repo.set == [(1, 500), (2, 500)]
     assert metrics.extras["monograph_series"] == 1

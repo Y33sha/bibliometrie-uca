@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from sqlalchemy import text
+
 from pipeline.transformation.publishing.publishers.delete_empty_publishers import (
     delete_empty_publishers,
 )
@@ -10,7 +12,6 @@ from tests.integration.helpers.serials import (
     insert_monograph,
     insert_publisher,
     insert_serial,
-    insert_serial_name_form,
 )
 
 
@@ -25,11 +26,12 @@ class TestDeleteEmptyPublishers:
             sa_sync_conn, "Elsevier on behalf of the American College of Cardiology"
         )
         other_serial = insert_serial(sa_sync_conn, "Journal of the American College of Cardiology")
-        insert_serial_name_form(
-            sa_sync_conn,
-            other_serial,
-            form_normalized="journal of the american college of cardiology",
-            publisher_id=with_form,
+        sa_sync_conn.execute(
+            text(
+                "INSERT INTO serial_title_decisions (title_normalized, publisher_id, serial_id)"
+                " VALUES ('journal of the american college of cardiology', :p, :s)"
+            ),
+            {"p": with_form, "s": other_serial},
         )
 
         with_monograph = insert_publisher(sa_sync_conn, "Presses universitaires de Rennes")

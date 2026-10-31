@@ -310,12 +310,11 @@ def openalex_source_record(  # noqa: C901
         title=get_title(work) or "",
         publication_year=get_publication_year(work),
         raw_doc_type=as_str(work.get("type")),
-        serial_id=containers.serial_id,
         monograph_id=containers.monograph_id,
         # Une archive, un entrepôt ou une plateforme d'ebooks héberge le work sans le contenir.
         container_title=(
             primary.source_display_name
-            if primary and names_serial(primary) and not containers.serial_id
+            if primary and names_serial(primary) and not containers.has_series
             else None
         ),
         raw_language=as_str(work.get("language")),

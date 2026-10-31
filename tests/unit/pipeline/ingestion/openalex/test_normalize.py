@@ -102,7 +102,7 @@ class TestOpenalexIdentifiers:
             "primary_location": {"landing_page_url": "https://doi.org/10.1/x"},
             "locations": [{"landing_page_url": "https://doi.org/10.1/x"}],
         }
-        record = openalex_source_record(work, 1, Containers(None, None))
+        record = openalex_source_record(work, 1, Containers(False, None))
         kept, _ = normalize_identifiers(record.identifiers)
         assert [(str(i.id_type), i.value, str(i.role)) for i in kept] == [
             ("doi", "10.1/x", "derived")
@@ -117,7 +117,7 @@ class TestOpenalexIdentifiers:
                 {"landing_page_url": "https://doi.org/10.1/x"},
             ],
         }
-        record = openalex_source_record(work, 1, Containers(None, None))
+        record = openalex_source_record(work, 1, Containers(False, None))
         kept, _ = normalize_identifiers(record.identifiers)
         assert {(str(i.id_type), i.value, str(i.role)) for i in kept} == {
             ("doi", "10.1/x", "secondary"),
@@ -430,7 +430,7 @@ class TestContainerDescription:
 
 # ── openalex_source_record (métadonnées canoniques) ──────────────
 
-_NO_CONTAINERS = Containers(serial_id=None, monograph_id=None)
+_NO_CONTAINERS = Containers(has_series=False, monograph_id=None)
 
 
 class TestOpenalexSourceRecordMetadata:
@@ -442,7 +442,6 @@ class TestOpenalexSourceRecordMetadata:
         assert record.publication_year == 2024
         assert "doi" not in identifier_values(record)
         assert "nnt" not in identifier_values(record)
-        assert record.serial_id is None
 
     def test_display_name_fallback(self):
         record = openalex_source_record(
@@ -450,14 +449,14 @@ class TestOpenalexSourceRecordMetadata:
         )
         assert record.title == "DN"
 
-    def test_with_serial_id_no_container_title(self):
-        """Une revue identifiée laisse `container_title` à None."""
+    def test_with_series_no_container_title(self):
+        """Une série décrite laisse `container_title` à None."""
         work = {
             "title": "T",
             "primary_location": {"source": {"display_name": "Some Source"}},
         }
         record = openalex_source_record(
-            work, staging_id=1, containers=Containers(serial_id=42, monograph_id=None)
+            work, staging_id=1, containers=Containers(has_series=True, monograph_id=None)
         )
         assert record.container_title is None
 
@@ -766,7 +765,7 @@ def _make_normalizer():
         logger=logging.getLogger("test"),
         staging_store=FakeStagingStore(),
         record_store=FakeSourceRecordStore(),
-        container_stores=MagicMock(),
+        monograph_store=MagicMock(),
         publisher_store=MagicMock(),
         contribution_store=MagicMock(),
         location_store=MagicMock(),

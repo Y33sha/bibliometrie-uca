@@ -18,7 +18,6 @@ from domain.dates import date_to_french
 from domain.normalize import sanitize_optional_text
 from domain.pipeline_runs import PhaseStatus
 from domain.publications.identifiers import ISSN
-from domain.serials.issns import IssnStatus
 from domain.serials.serial import OaModel, SerialType
 from domain.types import JsonValue
 from infrastructure.db.scalars import scalar_datetime_or_none
@@ -61,15 +60,12 @@ class SerialIssnRow(NamedTuple):
 
 
 def find_serial_issn_index(conn: Connection) -> list[SerialIssnRow]:
-    """Renvoie les ISSN valides des revues, quel que soit leur statut, pour retrouver la revue d'une ligne du dump."""
+    """Renvoie les ISSN des revues, quel que soit leur statut, pour retrouver la revue d'une ligne du dump."""
     return [
         SerialIssnRow(r.serial_id, r.issn)
         for r in conn.execute(
             select(serial_issns.c.serial_id, serial_issns.c.issn)
-            .where(
-                serial_issns.c.serial_id.is_not(None),
-                serial_issns.c.status != IssnStatus.MALFORMED,
-            )
+            .where(serial_issns.c.serial_id.is_not(None))
             .order_by(serial_issns.c.id)
         ).all()
     ]

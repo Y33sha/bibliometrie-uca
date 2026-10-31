@@ -1,11 +1,8 @@
 """Publications en série : revue, collection d'ouvrages, série d'actes ou média."""
 
-from collections.abc import Iterable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import StrEnum
 from typing import TypedDict, Unpack
-
-from domain.serials.issns import SerialIssn, validate_serial_issns
 
 
 class SerialType(StrEnum):
@@ -65,15 +62,12 @@ class ManualField(StrEnum):
     TITLE = "title"
     SERIAL_TYPE = "serial_type"
     OA_MODEL = "oa_model"
-    ISSNS = "issns"
-    """Liste des ISSN, avec leur support, leur statut et l'ISSN de liaison."""
 
 
 class SerialEdit(TypedDict, total=False):
     """Saisie de l'administration sur une revue. Une clé absente désigne un champ non fourni ; `None` efface la valeur."""
 
     title: str
-    issns: Iterable[SerialIssn]
     serial_type: SerialType
     oa_model: OaModel | None
     is_academic: bool
@@ -83,7 +77,6 @@ class SerialEdit(TypedDict, total=False):
 class Serial:
     id: int | None
     title: str
-    issns: list[SerialIssn] = field(default_factory=list)
     publisher_id: int | None = None
     openalex_id: str | None = None
     is_in_doaj: bool = False
@@ -93,15 +86,10 @@ class Serial:
     manual_fields: frozenset[ManualField] = frozenset()
 
     def edit(self, **changes: Unpack[SerialEdit]) -> frozenset[ManualField]:
-        """Applique une saisie de l'administration. Renvoie les champs saisis à la main dont elle change la valeur ; ils rejoignent `manual_fields`.
-
-        Les ISSN sont normalisés et validés (`validate_serial_issns`).
-        """
+        """Applique une saisie de l'administration. Renvoie les champs saisis à la main dont elle change la valeur ; ils rejoignent `manual_fields`."""
         before = self._manual_values()
         if "title" in changes:
             self.title = changes["title"]
-        if "issns" in changes:
-            self.issns = validate_serial_issns(changes["issns"])
         if "serial_type" in changes:
             self.serial_type = changes["serial_type"]
         if "oa_model" in changes:
@@ -117,7 +105,6 @@ class Serial:
         """Renvoie la valeur de chaque champ saisissable par l'administration."""
         return {
             ManualField.TITLE: self.title,
-            ManualField.ISSNS: list(self.issns),
             ManualField.SERIAL_TYPE: self.serial_type,
             ManualField.OA_MODEL: self.oa_model,
         }

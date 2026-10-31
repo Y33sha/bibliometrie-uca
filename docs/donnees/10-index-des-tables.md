@@ -33,6 +33,7 @@
 | `hal_structures` | `ref` | [Référentiels externes](08-ref-et-ops.md) |
 | `hr_records` | `persons` | [Personnes](05-persons.md) |
 | `idref_structures` | `structures` | [Structures](06-structures.md) |
+| `issn_links` | `publishing` | [Édition](07-publishing.md#publications-en-série) |
 | `known_dois` (vue) | `sources` | [Enregistrements sources](02-sources.md) |
 | `known_dois` (vue) | `sources` | [Enregistrements sources](02-sources.md#tables) |
 | `language_forms` | `ref` | [Référentiels externes](08-ref-et-ops.md) |
@@ -68,7 +69,7 @@
 | `ror_relations` | `ref` | [Référentiels externes](08-ref-et-ops.md) |
 | `serial_doi_namespaces` | `publishing` | [Édition](07-publishing.md#publications-en-série) |
 | `serial_issns` | `publishing` | [Édition](07-publishing.md#publications-en-série) |
-| `serial_name_forms` | `publishing` | [Édition](07-publishing.md#publications-en-série) |
+| `serial_title_decisions` | `publishing` | [Édition](07-publishing.md#publications-en-série) |
 | `serials` | `publishing` | [Édition](07-publishing.md#publications-en-série) |
 | `source_contribution_addresses` | `sources` | [Enregistrements sources](02-sources.md) |
 | `source_contribution_countries_queue` | `queues` | [Données dérivées](09-donnees-derivees.md#incrémental-ou-recalcul-complet) |

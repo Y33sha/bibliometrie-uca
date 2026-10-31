@@ -1,29 +1,27 @@
 """Revues homonymes de deux éditeurs à fusionner : paires fusionnables et paires bloquantes."""
 
 from domain.publishers.merge import SharedTitlePair, split_shared_title_pairs
-from domain.serials.issns import IssnSupport, SerialIssn
 
 
-def _pair(target_id: int, source_id: int, target_issn: str = "", source_issn: str = ""):
-    def issns(value: str) -> tuple[SerialIssn, ...]:
-        return (SerialIssn(issn=value, support=IssnSupport.PRINT),) if value else ()
-
+def _pair(
+    target_id: int, source_id: int, target_issnl: str | None = None, source_issnl: str | None = None
+):
     return SharedTitlePair(
         target_serial_id=target_id,
         target_title=f"Revue {target_id}",
-        target_issns=issns(target_issn),
+        target_issnl=target_issnl,
         source_serial_id=source_id,
         source_title=f"Revue {source_id}",
-        source_issns=issns(source_issn),
+        source_issnl=source_issnl,
     )
 
 
 class TestSplitSharedTitlePairs:
-    def test_pair_with_same_issn_is_mergeable(self):
-        pair = _pair(1, 2, "0028-0836", "0028-0836")
+    def test_pair_with_one_issnl_is_mergeable(self):
+        pair = _pair(1, 2, "0028-0836", None)
         assert split_shared_title_pairs([pair]) == ([pair], [])
 
-    def test_conflicting_issns_block(self):
+    def test_two_issnls_block(self):
         mergeable, blockers = split_shared_title_pairs([_pair(1, 2, "0028-0836", "1476-4687")])
         assert mergeable == []
         assert [b["target_serial_id"] for b in blockers] == [1]

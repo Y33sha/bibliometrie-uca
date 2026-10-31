@@ -182,15 +182,6 @@ _RECORDS_WITH_DOI_AND_SERIAL = f"""
       AND NOT {corrected("serial_id", "s")}
 """
 
-# Revues où le même ISSN est actif.
-_SHARED_ISSN_GROUPS = """
-    SELECT issn AS value, array_agg(serial_id) AS ids
-    FROM serial_issns
-    WHERE serial_id IS NOT NULL AND status = 'active'
-    GROUP BY issn
-    HAVING count(*) > 1
-"""
-
 
 class SerialQueries:
     """Lectures sur les revues."""
@@ -280,10 +271,6 @@ class SerialQueries:
     def serials_with_same_title(self) -> SerialDuplicatesResponse:
         """Renvoie les revues de même titre normalisé. Deux revues de même titre ayant chacune un ISSN sont des homonymes probables, donc écartées."""
         return self._duplicate_groups(_SAME_TITLE_GROUPS)
-
-    def serials_sharing_issn(self) -> SerialDuplicatesResponse:
-        """Renvoie les groupes de revues où le même ISSN est actif."""
-        return self._duplicate_groups(_SHARED_ISSN_GROUPS)
 
     def _duplicate_groups(self, groups_sql: str) -> SerialDuplicatesResponse:
         """Renvoie les groupes `(value, ids)` avec la ligne de liste de chaque revue, les plus riches en publications en tête."""
@@ -482,7 +469,7 @@ class SerialQueries:
                 )
                 for i in self._conn.execute(
                     text(
-                        "SELECT issn, support, linking, status, sudoc_checked_at "
+                        "SELECT issn, support, issn = issnl AS linking, status, sudoc_checked_at "
                         "FROM serial_issns WHERE serial_id = :id ORDER BY id"
                     ),
                     {"id": serial_id},

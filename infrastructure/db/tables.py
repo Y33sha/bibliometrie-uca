@@ -55,6 +55,7 @@ from domain.publications.licenses import License
 from domain.publications.metadata import OA_RANK
 from domain.publications.relations import RelationType
 from domain.publishers.publisher import PUBLISHER_TYPES
+from domain.serials.issn_facts import ISSN_LINK_TYPES
 from domain.serials.issns import ISSN_STATUSES, ISSN_SUPPORTS
 from domain.serials.serial import OA_MODELS, SERIAL_TYPES
 from domain.source_records.identifiers import (
@@ -293,6 +294,7 @@ serial_type_enum = PgEnum(*SERIAL_TYPES, name="serial_type", create_type=False)
 oa_model_enum = PgEnum(*OA_MODELS, name="oa_model", create_type=False)
 issn_support_enum = PgEnum(*ISSN_SUPPORTS, name="issn_support", create_type=False)
 issn_status_enum = PgEnum(*ISSN_STATUSES, name="issn_status", create_type=False)
+issn_link_type_enum = PgEnum(*ISSN_LINK_TYPES, name="issn_link_type", create_type=False)
 
 
 structures = Table(
@@ -470,63 +472,67 @@ serial_issns = Table(
     "serial_issns",
     metadata,
     Column("id", Integer, primary_key=True),
+    Column("issn", Text, nullable=False, comment="ISSN, forme normalisée."),
     Column(
-        "issn",
+        "issnl",
         Text,
-        nullable=False,
-        comment="Forme normalisée si la valeur est valide, valeur reçue sinon (statut malformed).",
+        comment="ISSN-L de l'ISSN d'après sa notice Sudoc. NULL : inconnu.",
     ),
-    Column("serial_id", Integer),
-    Column("support", issn_support_enum, comment="Support de l'ISSN. NULL : inconnu."),
     Column(
-        "linking",
-        Boolean,
-        nullable=False,
-        server_default="false",
-        comment="Vrai pour l'ISSN-L de la revue.",
+        "serial_id",
+        Integer,
+        comment="Revue de l'ISSN-L de l'ISSN, calculée par la phase publishing.",
     ),
+    Column("support", issn_support_enum, comment="Support de l'ISSN. NULL : inconnu."),
     Column(
         "status",
         issn_status_enum,
         nullable=False,
         server_default="active",
-        comment=(
-            "active ; malformed (forme ou clé de contrôle fausse) ; cancelled ; related_title (titre "
-            "précédent ou suivant) ; supplement ; unverified (ISSN des enregistrements sources, sans "
-            "notice Sudoc)."
-        ),
+        comment="active ; cancelled (ISSN annulé) ; unverified (sans notice Sudoc).",
     ),
     Column(
         "sudoc_checked_at",
         DateTime(timezone=True),
         comment="Date de la vérification de l'ISSN au Sudoc. NULL : jamais vérifié.",
     ),
-    UniqueConstraint(
-        "issn",
-        "serial_id",
-        name="uq_serial_issns_issn_serial",
-        postgresql_nulls_not_distinct=True,
-    ),
+    UniqueConstraint("issn", name="uq_serial_issns_issn"),
+    comment="ISSN valides, une ligne par ISSN, et revue de leur ISSN-L.",
+    schema="publishing",
+)
+
+
+issn_links = Table(
+    "issn_links",
+    metadata,
+    Column("issn", Text, primary_key=True),
+    Column("linked_issn", Text, primary_key=True),
+    Column("link_type", issn_link_type_enum, primary_key=True),
     comment=(
-        "ISSN des revues. Sans revue : ISSN vérifié au Sudoc, dont la publication est absente de la base."
+        "Liens entre ISSN lus dans le Sudoc, une ligne par lien : continued_by, titre précédent "
+        "vers titre suivant ; supplement, revue principale vers supplément."
     ),
     schema="publishing",
 )
 
 
-serial_name_forms = Table(
-    "serial_name_forms",
+serial_title_decisions = Table(
+    "serial_title_decisions",
     metadata,
     Column("id", Integer, primary_key=True),
-    Column("serial_id", Integer, nullable=False),
-    Column("form_normalized", Text, nullable=False),
-    Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    Column("title_normalized", Text, nullable=False),
     Column("publisher_id", Integer),
+    Column("serial_id", Integer, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     UniqueConstraint(
-        "form_normalized",
+        "title_normalized",
         "publisher_id",
-        name="uq_serial_name_forms_form_publisher",
+        name="uq_serial_title_decisions",
         postgresql_nulls_not_distinct=True,
+    ),
+    comment=(
+        "Fusions décidées par l'administration : une série sans ISSN, de ce titre normalisé et de "
+        "cet éditeur, est rattachée à la revue."
     ),
     schema="publishing",
 )

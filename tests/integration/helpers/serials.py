@@ -1,4 +1,4 @@
-"""Semis des revues, de leurs ISSN et formes de nom, des éditeurs et des monographies, sur la connexion SQLAlchemy (`sa_sync_conn`)."""
+"""Semis des revues, de leurs ISSN, des éditeurs et des monographies, sur la connexion SQLAlchemy (`sa_sync_conn`)."""
 
 from collections.abc import Iterable
 from types import SimpleNamespace
@@ -67,7 +67,7 @@ def insert_serial_issn(
     *,
     issn: str,
     support: str | None = None,
-    linking: bool | None = None,
+    issnl: str | None = None,
     status: str | None = None,
     sudoc_checked: bool = False,
 ) -> int:
@@ -80,7 +80,7 @@ def insert_serial_issn(
             "issn": issn,
             "serial_id": serial_id,
             "support": support,
-            "linking": linking,
+            "issnl": issnl,
             "status": status,
             "sudoc_checked_at": checked_at,
         },
@@ -102,35 +102,20 @@ def insert_serial_with_issns(
 ) -> int:
     """Insère une revue avec ses ISSN et renvoie son `id`.
 
-    `issn` est papier, `eissn` électronique, `issnl` marque l'ISSN de liaison ; un `issnl` distinct des deux autres forme son propre ISSN. Chaque valeur de `rejected` forme un ISSN de statut `rejected_status`. `sudoc_checked` s'applique à tous les ISSN. Les autres mots-clés vont à `insert_serial`.
+    `issn` est papier, `eissn` électronique, `issnl` est l'ISSN-L de chacun ; un `issnl` distinct des deux autres forme son propre ISSN. Chaque valeur de `rejected` forme un ISSN de statut `rejected_status`. `sudoc_checked` s'applique à tous les ISSN. Les autres mots-clés vont à `insert_serial`.
     """
     serial_id = insert_serial(conn, title, **columns)
     rows = []
     if issn:
-        rows.append({"issn": issn, "support": "print", "linking": issn == issnl})
+        rows.append({"issn": issn, "support": "print", "issnl": issnl})
     if eissn and eissn != issn:
-        rows.append({"issn": eissn, "support": "electronic", "linking": eissn == issnl})
+        rows.append({"issn": eissn, "support": "electronic", "issnl": issnl})
     if issnl and issnl not in (issn, eissn):
-        rows.append({"issn": issnl, "linking": True})
+        rows.append({"issn": issnl, "issnl": issnl})
     rows += [{"issn": value, "status": rejected_status} for value in rejected]
     for row in rows:
         insert_serial_issn(conn, serial_id, sudoc_checked=sudoc_checked, **row)
     return serial_id
-
-
-def insert_serial_name_form(
-    conn: Connection, serial_id: int, *, form_normalized: str, publisher_id: int | None = None
-) -> int:
-    """Insère une forme de nom de la revue `serial_id` et renvoie son `id`."""
-    return insert_row(
-        conn,
-        "serial_name_forms",
-        {
-            "serial_id": serial_id,
-            "form_normalized": form_normalized,
-            "publisher_id": publisher_id,
-        },
-    )
 
 
 def insert_monograph(
@@ -207,7 +192,7 @@ def issn_columns(conn, serial_id: int) -> SimpleNamespace:
     """Renvoie les premiers ISSN papier et électronique actifs, ISSN-L, autres valeurs, et date de vérification si tous les ISSN sont vérifiés."""
     rows = conn.execute(
         text(
-            "SELECT issn, support::text AS support, linking, status::text AS status, "
+            "SELECT issn, support::text AS support, issn = issnl AS linking, status::text AS status, "
             "sudoc_checked_at FROM serial_issns WHERE serial_id = :id ORDER BY id"
         ),
         {"id": serial_id},

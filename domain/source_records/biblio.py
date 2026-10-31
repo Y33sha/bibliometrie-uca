@@ -6,7 +6,7 @@ from enum import StrEnum
 from typing import NamedTuple
 
 from domain.serials.containers import SeriesDescription
-from domain.serials.issns import IssnStatus, IssnSupport, SerialIssn
+from domain.serials.issns import IssnSupport, SerialIssn
 from domain.serials.serial import OaModel
 from domain.types import JsonValue
 
@@ -55,7 +55,7 @@ def journal_biblio(series: SeriesDescription) -> dict[str, JsonValue] | None:
                 (IssnKey.ISSN, row.issn),
                 (IssnKey.SUPPORT, row.support),
                 (IssnKey.LINKING, row.linking),
-                (IssnKey.MALFORMED, row.status is IssnStatus.MALFORMED),
+                (IssnKey.MALFORMED, row.malformed),
             )
             if value
         }
@@ -97,7 +97,7 @@ def journal_series(biblio: Mapping[str, object] | None) -> SeriesDescription | N
             issn=str(row[IssnKey.ISSN]),
             support=IssnSupport(row[IssnKey.SUPPORT]) if row.get(IssnKey.SUPPORT) else None,
             linking=bool(row.get(IssnKey.LINKING)),
-            status=IssnStatus.MALFORMED if row.get(IssnKey.MALFORMED) else IssnStatus.ACTIVE,
+            malformed=bool(row.get(IssnKey.MALFORMED)),
         )
         for row in (rows if isinstance(rows, list) else [])
         if isinstance(row, Mapping) and row.get(IssnKey.ISSN)

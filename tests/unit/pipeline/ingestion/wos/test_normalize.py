@@ -809,7 +809,7 @@ class TestWosSourceRecord:
         }
 
         row_arg = wos_source_record(
-            rec, staging_id=10, containers=Containers(serial_id=42, monograph_id=None)
+            rec, staging_id=10, containers=Containers(has_series=True, monograph_id=None)
         )
 
         assert row_arg.source_id == "WOS:1"
@@ -817,7 +817,6 @@ class TestWosSourceRecord:
         assert row_arg.title == "T"
         assert row_arg.publication_year == 2024
         assert row_arg.raw_doc_type == "article"
-        assert row_arg.serial_id == 42
         assert row_arg.raw_language == "en"
         assert row_arg.abstract == "abs"
         assert row_arg.impact == {"cited_by_count": 9}
@@ -826,13 +825,12 @@ class TestWosSourceRecord:
     def test_none_values_propagate(self):
         rec = {"ut": "WOS:1", "title": "T", "doc_type": "other"}
         row_arg = wos_source_record(
-            rec, staging_id=5, containers=Containers(serial_id=None, monograph_id=None)
+            rec, staging_id=5, containers=Containers(has_series=False, monograph_id=None)
         )
 
-        assert row_arg.serial_id is None
         assert "doi" not in identifier_values(row_arg)
 
-    def test_container_title_absent_with_serial_id(self):
+    def test_container_title_absent_with_series(self):
         rec = {
             "ut": "WOS:1",
             "title": "T",
@@ -843,13 +841,12 @@ class TestWosSourceRecord:
             "journal_title": "J Name",
         }
         row_arg = wos_source_record(
-            rec, staging_id=1, containers=Containers(serial_id=42, monograph_id=None)
+            rec, staging_id=1, containers=Containers(has_series=True, monograph_id=None)
         )
         assert row_arg.title == "T"
-        assert row_arg.serial_id == 42
         assert row_arg.container_title is None
 
-    def test_container_title_falls_back_when_no_serial_id(self):
+    def test_container_title_falls_back_without_series(self):
         """Sans revue identifiée, `journal_title` devient le `container_title`."""
         rec = {
             "ut": "WOS:1",
@@ -861,7 +858,7 @@ class TestWosSourceRecord:
             "journal_title": "Container Title",
         }
         row_arg = wos_source_record(
-            rec, staging_id=1, containers=Containers(serial_id=None, monograph_id=None)
+            rec, staging_id=1, containers=Containers(has_series=False, monograph_id=None)
         )
         assert row_arg.container_title == "Container Title"
 
@@ -961,7 +958,7 @@ def _normalizer(logger) -> WosNormalizer:
         logger,
         staging_store=MagicMock(),
         record_store=MagicMock(),
-        container_stores=MagicMock(),
+        monograph_store=MagicMock(),
         publisher_store=MagicMock(),
         contribution_store=MagicMock(),
         location_store=MagicMock(),
@@ -990,7 +987,7 @@ class TestWosNormalizer:
         norm = _normalizer(logger)
         row = staging_row(staging_id=7, source_id="WOS:001", raw=_export_row())
         doc = norm.parse(row)
-        upsert = norm.source_record(row, doc, Containers(serial_id=22, monograph_id=33))
+        upsert = norm.source_record(row, doc, Containers(has_series=True, monograph_id=33))
         assert (upsert.source_id, upsert.staging_id) == ("WOS:001", 7)
-        assert (upsert.serial_id, upsert.monograph_id) == (22, 33)
+        assert upsert.monograph_id == 33
         assert upsert.container_title is None

@@ -1,6 +1,6 @@
 """Agrégation des métriques de la phase `publishing`.
 
-La phase enchaîne ses sous-étapes : éditeurs des préfixes DOI (Crossref, DataCite), enrichissement des revues par OpenAlex, vérification des ISSN dans le Sudoc, import DOAJ. Leurs compteurs et signaux remontent à la phase.
+La phase enchaîne ses sous-étapes : éditeurs des préfixes DOI (Crossref, DataCite), vérification des ISSN dans le Sudoc, rattachement des enregistrements sources aux revues, enrichissement des revues par OpenAlex, import DOAJ. Leurs compteurs et signaux remontent à la phase.
 """
 
 from unittest.mock import patch
@@ -22,7 +22,7 @@ def test_phase_aggregates_substep_counters():
         patch.object(publishing, "_run_resolve_crossref_publishers", return_value=publishers),
         patch.object(publishing, "_run_resolve_datacite_publishers", return_value=PhaseMetrics()),
         patch.object(publishing, "_run_enrich_serials_from_openalex", return_value=openalex),
-        patch.object(publishing, "_run_check_serials_in_sudoc", return_value=PhaseMetrics()),
+        patch.object(publishing, "_run_check_issns_in_sudoc", return_value=PhaseMetrics()),
         patch.object(publishing, "_run_enrich_serials_from_doaj", return_value=doaj),
     ):
         metrics = publishing.build().run(
@@ -55,7 +55,7 @@ def test_phase_propagates_substep_signals():
             "_run_enrich_serials_from_openalex",
             return_value=PhaseMetrics(),
         ),
-        patch.object(publishing, "_run_check_serials_in_sudoc", return_value=PhaseMetrics()),
+        patch.object(publishing, "_run_check_issns_in_sudoc", return_value=PhaseMetrics()),
         patch.object(publishing, "_run_enrich_serials_from_doaj", return_value=PhaseMetrics()),
     ):
         metrics = publishing.build().run(

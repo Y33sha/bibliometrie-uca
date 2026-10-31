@@ -73,7 +73,7 @@ def _stores(staging) -> dict[str, Any]:
         "logger": logging.getLogger("test"),
         "staging_store": staging,
         "record_store": MagicMock(),
-        "container_stores": MagicMock(),
+        "monograph_store": MagicMock(),
         "publisher_store": MagicMock(),
         "contribution_store": MagicMock(),
         "location_store": MagicMock(),
@@ -359,7 +359,6 @@ _RECORD = SourceRecordUpsert(
     title="T",
     publication_year=2020,
     raw_doc_type=None,
-    serial_id=None,
     monograph_id=None,
     container_title=None,
     raw_language=None,
@@ -413,9 +412,9 @@ def writes(monkeypatch) -> list[tuple]:
         calls.append(("publisher", name, openalex_id))
         return 5
 
-    def containers(series, volume, *, publisher_id, stores):
+    def containers(series, volume, *, publisher_id, monographs):
         calls.append(("containers", publisher_id))
-        return Containers(7, None)
+        return Containers(series is not None, None)
 
     def sync(store, source, source_record_id, block, build):
         calls.append(("contributions", source, source_record_id))
@@ -449,9 +448,10 @@ class TestNormalizeRecord:
             ("containers", 5),
             ("contributions", "test", 42),
         ]
-        assert norm.containers_seen == [Containers(7, None)]
+        assert norm.containers_seen == [Containers(True, None)]
         norm._record_store.upsert_source_record.assert_called_once_with(
-            replace(_RECORD, publisher_id=5, biblio={"journal": {"title": "Revue"}})
+            replace(_RECORD, publisher_id=5, biblio={"journal": {"title": "Revue"}}),
+            has_series=True,
         )
         norm._location_store.replace_locations.assert_called_once_with(42, [])
         norm._embargo_store.replace_embargo.assert_called_once_with(42, None)
@@ -461,8 +461,8 @@ class TestNormalizeRecord:
         norm = _WritingNorm(doc={"title": "T"})
         norm._record_store.upsert_source_record.return_value = 42
         assert norm.normalize_record(self.ROW) is True
-        assert writes == [("contributions", "test", 42)]
-        assert norm.containers_seen == [Containers(None, None)]
+        assert writes == [("containers", None), ("contributions", "test", 42)]
+        assert norm.containers_seen == [Containers(False, None)]
 
     def test_conteneurs_sans_editeur(self, writes):
         norm = _WritingNorm(

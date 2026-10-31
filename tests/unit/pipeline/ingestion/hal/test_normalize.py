@@ -187,16 +187,15 @@ class TestContainerDescription:
 # ── métadonnées canoniques ───────────────────────────────────────────────
 
 
-def _record(doc, containers=Containers(None, None)):
+def _record(doc, containers=Containers(False, None)):
     return hal_source_record(doc, staging_id=1, hal_id="hal-01234567", containers=containers)
 
 
 class TestCanonicalMetadata:
     def test_minimal(self):
-        record = _record({"title_s": ["T"], "producedDateY_i": 2024}, Containers(42, None))
+        record = _record({"title_s": ["T"], "producedDateY_i": 2024}, Containers(True, None))
         assert record.title == "T"
         assert record.publication_year == 2024
-        assert record.serial_id == 42
         # Une revue identifiée laisse `container_title` vide.
         assert record.container_title is None
 
@@ -363,7 +362,7 @@ class TestActiveEmbargoUntil:
 
 
 class TestHalSourceRecord:
-    def _call(self, doc, containers=Containers(None, None)):
+    def _call(self, doc, containers=Containers(False, None)):
         return _record(doc, containers)
 
     def test_collections_from_coll_codes(self):
@@ -466,15 +465,11 @@ class TestHalSourceRecord:
                 "language_s": "fr",
                 "bookTitle_s": "Book",
             },
-            Containers(None, 8),
+            Containers(False, 8),
         )
-        assert captured.serial_id is None
         assert captured.monograph_id == 8
         assert captured.raw_language == "fr"
         assert captured.container_title == "Book"
-
-    def test_serial_id_from_containers(self):
-        assert self._call({}, Containers(7, None)).serial_id == 7
 
 
 # `parse_tei_author_identifiers` est testé dans `test_tei_author_identifiers.py`.
@@ -619,7 +614,7 @@ def _make_normalizer():
         logger=logging.getLogger("test"),
         staging_store=FakeStagingStore(),
         record_store=FakeSourceRecordStore(),
-        container_stores=MagicMock(),
+        monograph_store=MagicMock(),
         publisher_store=MagicMock(),
         contribution_store=FakeSourceContributionStore(),
         location_store=MagicMock(),
@@ -662,6 +657,6 @@ class TestHalNormalizerClass:
 
     def test_enregistrement_source_porte_ligne_et_conteneurs(self):
         row = staging_row(staging_id=7, source_id="hal-7", raw={"title_s": ["T"]})
-        record = _make_normalizer().source_record(row, row.raw_data, Containers(3, 4))
+        record = _make_normalizer().source_record(row, row.raw_data, Containers(True, 4))
         assert (record.staging_id, record.source_id) == (7, "hal-7")
-        assert (record.serial_id, record.monograph_id) == (3, 4)
+        assert record.monograph_id == 4

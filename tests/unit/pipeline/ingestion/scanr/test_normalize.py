@@ -26,7 +26,7 @@ from pipeline.ingestion.scanr.normalize import (
 from pipeline.transformation.publishing.find_or_create import Containers
 from tests.helpers.normalize_doubles import identifier_values, staging_row
 
-_NO_CONTAINERS = Containers(serial_id=None, monograph_id=None)
+_NO_CONTAINERS = Containers(has_series=False, monograph_id=None)
 
 
 class TestScanrSourceRecordLicense:
@@ -276,7 +276,7 @@ class TestScanrSourceRecordMetadonnees:
         }
 
         record = scanr_source_record(
-            doc, 1, "doi10.1/a", Containers(serial_id=3, monograph_id=None)
+            doc, 1, "doi10.1/a", Containers(has_series=True, monograph_id=None)
         )
 
         assert record.title == "Un titre"
@@ -407,7 +407,7 @@ def _normalizer() -> ScanrNormalizer:
         logger=MagicMock(),
         staging_store=MagicMock(),
         record_store=MagicMock(),
-        container_stores=MagicMock(),
+        monograph_store=MagicMock(),
         publisher_store=MagicMock(),
         contribution_store=MagicMock(),
         location_store=MagicMock(),
@@ -426,7 +426,9 @@ class TestScanrNormalizer:
             "source": {"title": "Revue"},
         }
 
-        document = _normalizer().source_record(row, doc, Containers(serial_id=3, monograph_id=5))
+        document = _normalizer().source_record(
+            row, doc, Containers(has_series=True, monograph_id=5)
+        )
 
         assert (document.source, document.source_id, document.staging_id) == (
             "scanr",
@@ -434,7 +436,7 @@ class TestScanrNormalizer:
             42,
         )
         assert document.title == "Un titre"
-        assert (document.serial_id, document.monograph_id) == (3, 5)
+        assert document.monograph_id == 5
         assert document.container_title is None
         assert identifier_values(document) == {"nnt": ["2021CLFAC030"]}
 

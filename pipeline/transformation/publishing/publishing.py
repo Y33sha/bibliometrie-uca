@@ -3,10 +3,10 @@
 Contraintes d'ordre :
 
 - La fusion des autres noms des éditeurs suit la résolution des préfixes, qui pose leurs titulaires.
-- Le typage OpenAlex des revues `unknown` précède le typage en recueil d'actes, qui vise aussi les revues `unknown`.
-- La vérification Sudoc précède la fusion des revues, qui lit l'ISSN-L, et l'import DOAJ, rattaché aux revues par ISSN.
-- Les espaces de noms DOI suivent la fusion et le typage des revues.
-- Le rattachement des monographies suit la fusion des revues. La nature des monographies lit le type de la collection posé par le rattachement.
+- Les ISSN des séries précèdent leur vérification Sudoc, qui précède le rattachement des enregistrements sources aux revues : le rattachement lit l'ISSN-L de chaque ISSN.
+- Le typage OpenAlex des revues `unknown` suit le rattachement, qui pose leur identifiant OpenAlex, et précède le typage en recueil d'actes, qui vise aussi les revues `unknown`.
+- Les espaces de noms DOI suivent le rattachement et le typage des revues.
+- Le rattachement des monographies à leur collection suit le rattachement des enregistrements sources. La nature des monographies lit le type de la collection posé par le rattachement.
 
 `enrich_serials_from_doaj` importe le dump CSV du DOAJ, qui fait autorité sur `is_in_doaj`, quand le dernier import date de plus de `doaj_refresh_after_days` jours. L'enrichissement des éditeurs (pays, ROR, type) se lance à la demande, par `interfaces/cli/maintenance/enrich_publishers.py`.
 """
@@ -61,16 +61,20 @@ from pipeline.transformation.publishing.publishers.resolve_publishers import (
 )
 from pipeline.transformation.publishing.publishers.store import PublisherStore
 from pipeline.transformation.publishing.serials import (
-    check_serials_in_sudoc,
+    attach_serials,
+    check_issns_in_sudoc,
     enrich_serials_from_doaj,
     enrich_serials_from_openalex,
     learn_serial_doi_namespaces,
-    merge_duplicate_serials,
     type_journal_serials,
     type_proceedings_serials,
 )
-from pipeline.transformation.publishing.serials.check_serials_in_sudoc import (
-    run_check_serials_in_sudoc,
+from pipeline.transformation.publishing.serials.attach_serials import (
+    run_attach_serials,
+    run_sync_issns,
+)
+from pipeline.transformation.publishing.serials.check_issns_in_sudoc import (
+    run_check_issns_in_sudoc,
 )
 from pipeline.transformation.publishing.serials.enrich_serials_from_doaj import (
     run_enrich_serials_from_doaj,
@@ -81,10 +85,6 @@ from pipeline.transformation.publishing.serials.enrich_serials_from_openalex imp
 from pipeline.transformation.publishing.serials.learn_serial_doi_namespaces import (
     run_learn_serial_doi_namespaces,
 )
-from pipeline.transformation.publishing.serials.merge_duplicate_serials import (
-    run_merge_duplicate_serials,
-)
-from pipeline.transformation.publishing.serials.serial_merge import merge_serials
 from pipeline.transformation.publishing.serials.type_journal_serials import (
     run_type_journal_serials,
 )
@@ -122,17 +122,14 @@ _TABLE: tuple[tuple[str, str, Callable[[PhaseMetrics], int]], ...] = (
         "préfixes DOI DataCite → éditeurs",
         lambda m: m.extras.get("publisher_matched", 0),
     ),
-    ("enrich_serials_from_openalex", "revues OpenAlex", lambda m: m.updated),
+    ("sync_issns", "ISSN des séries", lambda m: m.new),
     (
-        "check_serials_in_sudoc",
-        "revues vérifiées dans le Sudoc",
+        "check_issns_in_sudoc",
+        "ISSN vérifiés dans le Sudoc",
         lambda m: m.extras.get("sudoc_found", 0),
     ),
-    (
-        "merge_duplicate_serials",
-        "groupes de revues en double",
-        lambda m: m.extras.get("serials_merged", 0),
-    ),
+    ("attach_serials", "enregistrements sources rattachés aux revues", lambda m: m.updated),
+    ("enrich_serials_from_openalex", "revues OpenAlex", lambda m: m.updated),
     (
         "type_proceedings_serials",
         "revues typées recueils d'actes",
@@ -207,23 +204,24 @@ def build() -> Phase:
                 "merge_duplicate_publishers": TaskStep(
                     _run_merge_duplicate_publishers, "Éditeurs", merge_duplicate_publishers.LABEL
                 ),
+                "sync_issns": TaskStep(
+                    _run_sync_issns, "Publications en série", attach_serials.SYNC_LABEL
+                ),
+                "check_issns_in_sudoc": TaskStep(
+                    _run_check_issns_in_sudoc,
+                    "Publications en série",
+                    check_issns_in_sudoc.LABEL,
+                    threshold=3,
+                ),
+                "attach_serials": TaskStep(
+                    _run_attach_serials, "Publications en série", attach_serials.ATTACH_LABEL
+                ),
                 # Trois lots consécutifs en 429 signalent l'épuisement du quota OpenAlex du jour. Le reste attend le run suivant.
                 "enrich_serials_from_openalex": TaskStep(
                     _run_enrich_serials_from_openalex,
                     "Publications en série",
                     enrich_serials_from_openalex.LABEL,
                     threshold=3,
-                ),
-                "check_serials_in_sudoc": TaskStep(
-                    _run_check_serials_in_sudoc,
-                    "Publications en série",
-                    check_serials_in_sudoc.LABEL,
-                    threshold=3,
-                ),
-                "merge_duplicate_serials": TaskStep(
-                    _run_merge_duplicate_serials,
-                    "Publications en série",
-                    merge_duplicate_serials.LABEL,
                 ),
                 "type_proceedings_serials": TaskStep(
                     _run_type_proceedings_serials,
@@ -315,14 +313,24 @@ def _run_enrich_serials_from_openalex(
         )
 
 
-def _run_check_serials_in_sudoc(
+def _run_sync_issns(ctx: PhaseContext) -> PhaseMetrics:
+    with ctx.open_tx() as conn:
+        return run_sync_issns(conn, ctx.logger)
+
+
+def _run_attach_serials(ctx: PhaseContext) -> PhaseMetrics:
+    with ctx.open_tx() as conn:
+        return run_attach_serials(conn, ctx.logger)
+
+
+def _run_check_issns_in_sudoc(
     ctx: PhaseContext,
 ) -> PhaseMetrics:
     base_url = API_BASE_URLS["sudoc"]
     with ctx.open_tx() as conn:
         # `asyncio.run` transmet aux coroutines la ContextVar du circuit-breaker.
         return asyncio.run(
-            run_check_serials_in_sudoc(
+            run_check_issns_in_sudoc(
                 conn,
                 ctx.logger,
                 fetch_ppns=lambda client, issns: fetch_ppns(client, issns, base_url=base_url),
@@ -333,16 +341,6 @@ def _run_check_serials_in_sudoc(
                 max_per_run=cap(conn, ConfigKey.SUDOC_MAX_PER_RUN),
             )
         )
-
-
-def _run_merge_duplicate_serials(ctx: PhaseContext) -> PhaseMetrics:
-    with ctx.open_tx() as conn:
-
-        def merge(target_id: int, source_id: int) -> None:
-            merge_serials(conn, target_id, source_id)
-            conn.commit()
-
-        return run_merge_duplicate_serials(conn, ctx.logger, merge=merge)
 
 
 def _run_merge_duplicate_monographs(ctx: PhaseContext) -> PhaseMetrics:

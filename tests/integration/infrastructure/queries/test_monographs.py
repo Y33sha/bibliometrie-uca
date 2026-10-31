@@ -38,17 +38,23 @@ def repo(sa_sync_conn):
     return MonographStore(sa_sync_conn)
 
 
-def _create(repo, title="Livre", **fields):
+def _create(repo, title="Livre", *, serial_id: int | None = None, **fields):
     defaults = {
         "proceedings": False,
         "year": None,
         "isbn": None,
         "eisbn": None,
         "publisher_id": None,
-        "serial_id": None,
     }
     defaults.update(fields)
-    return repo.create_monograph(title=title, title_normalized=title.lower(), **defaults)
+    monograph_id = repo.create_monograph(title=title, title_normalized=title.lower(), **defaults)
+    if serial_id is not None:
+        # La collection d'une monographie est posée par le rattachement aux collections.
+        repo._conn.execute(
+            text("UPDATE monographs SET serial_id = :s WHERE id = :id"),
+            {"s": serial_id, "id": monograph_id},
+        )
+    return monograph_id
 
 
 def _row(conn, monograph_id):
@@ -83,7 +89,6 @@ def test_enrichissement_complete_les_champs_vides(repo, sa_sync_conn):
         isbn=_PAPER,
         eisbn=None,
         publisher_id=None,
-        serial_id=None,
     )
     assert tuple(_row(sa_sync_conn, mid)) == (_PAPER, None, 2020, True)
 
@@ -163,7 +168,6 @@ def test_isbn_d_une_autre_monographie_hors_des_colonnes(repo, sa_sync_conn):
         isbn=None,
         eisbn=_ELECTRONIC,
         publisher_id=None,
-        serial_id=None,
     )
     assert tuple(_row(sa_sync_conn, other))[:2] == (_PAPER, None)
     assert tuple(_row(sa_sync_conn, holder))[:2] == (None, _ELECTRONIC)

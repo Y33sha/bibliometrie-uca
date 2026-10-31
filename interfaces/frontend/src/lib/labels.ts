@@ -161,11 +161,8 @@ const issnPrefixes: Record<string, string> = {
 /** Libellés FR des statuts d'ISSN — enum PG `issn_status`. */
 export const issnStatusLabels: Record<string, string> = {
 	active: 'Actif',
-	malformed: 'Mal formé',
 	cancelled: 'Annulé',
-	related_title: 'Titre précédent ou suivant',
-	supplement: 'Supplément',
-	unverified: 'À vérifier'
+	unverified: 'Sans notice Sudoc'
 };
 
 /** Étiquette d'un ISSN : son support, et la mention ISSN-L. */

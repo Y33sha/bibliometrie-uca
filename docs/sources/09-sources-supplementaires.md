@@ -52,18 +52,18 @@ L'URL de résolution d'un DOI est aussi dans les payloads de Crossref (`resource
 
 https://www.sudoc.fr/ — catalogue collectif des bibliothèques de l'enseignement supérieur (ABES)
 
-Source de référence des ISSN des revues. Consommée par `check_serials_in_sudoc`, dans la phase [`publishing`](../pipeline/05-publishing.md).
+Source de référence des ISSN des revues. Consommée par `check_issns_in_sudoc`, dans la phase [`publishing`](../pipeline/05-publishing.md).
 
 ### Services utilisés
 
-- `https://www.sudoc.fr/services/issn2ppn/<ISSN>,<ISSN>&format=text/json` : PPN de la notice de chaque ISSN d'une revue, en une requête.
+- `https://www.sudoc.fr/services/issn2ppn/<ISSN>,<ISSN>&format=text/json` : PPN de la notice de chaque ISSN, par lots de 20 ISSN.
 - `https://www.sudoc.fr/<ppn>.xml` : notice MARCXML.
 
-Aucun identifiant d'accès n'est requis. Aucune limite de débit n'est documentée : le pipeline s'en tient à 5 requêtes par seconde, 4 revues à la fois (`MAX_PER_SECOND`, `SUDOC_MAX_CONCURRENT`, `pipeline/ingestion/api_params.py`). Licence ouverte Etalab.
+Aucun identifiant d'accès n'est requis. Aucune limite de débit n'est documentée : le pipeline s'en tient à 5 requêtes par seconde, 4 lots d'ISSN à la fois (`MAX_PER_SECOND`, `SUDOC_MAX_CONCURRENT`, `pipeline/ingestion/api_params.py`). Licence ouverte Etalab.
 
 ### Données récupérées
 
-Une notice décrit une revue sur un support : le papier, l'en ligne et le CD-ROM ont chacun leur ISSN et leur notice. Le pipeline lit dans la notice l'ISSN, l'ISSN-L, les ISSN annulés, le support et les ISSN des autres supports. Il écrit dans `serial_issns` le support, l'ISSN-L, le statut et la date de vérification de chaque ISSN.
+Une notice décrit une revue sur un support : le papier, l'en ligne et le CD-ROM ont chacun leur ISSN et leur notice. Le pipeline lit dans la notice l'ISSN, l'ISSN-L, les ISSN annulés, le support, les ISSN des autres supports, du titre précédent, du titre suivant et du supplément. Il écrit dans `serial_issns` le support, l'ISSN-L, le statut et la date de vérification de chaque ISSN, et dans `issn_links` ses liens.
 
 ## DOAJ
 

@@ -1,6 +1,6 @@
 """Sous-étape de la phase `finalize` : suppression des revues vides.
 
-Une revue vide n'a ni enregistrement source, ni publication, ni monographie, ni paiement APC. Ses formes de nom sont supprimées avec elle. Un enregistrement source de ce titre chez cet éditeur recrée la revue. Le journal garde le titre, l'éditeur et les ISSN de chaque revue supprimée.
+Une revue vide n'a ni enregistrement source, ni publication, ni monographie, ni paiement APC. Ses ISSN restent dans `serial_issns`, sans revue. Le journal garde le titre, l'éditeur et les ISSN de chaque revue supprimée.
 """
 
 import logging
@@ -26,13 +26,7 @@ _EMPTY_SERIALS = text(f"""
     ORDER BY j.id
 """)
 
-# Un ISSN déjà présent sans revue prévaut sur la ligne de même valeur d'une revue supprimée ; les autres ISSN restent sans revue (`ON DELETE SET NULL`).
-# Les formes de nom sont supprimées avec la revue (`ON DELETE CASCADE`).
-_DELETE_ISSNS_KNOWN_WITHOUT_SERIAL = text("""
-    DELETE FROM serial_issns i
-    WHERE i.serial_id = ANY(:ids)
-      AND EXISTS (SELECT 1 FROM serial_issns o WHERE o.issn = i.issn AND o.serial_id IS NULL)
-""")
+# Les ISSN de la revue supprimée restent sans revue (`ON DELETE SET NULL`).
 _DELETE_SERIALS = text("DELETE FROM serials WHERE id = ANY(:ids)")
 
 
@@ -42,9 +36,7 @@ def delete_empty_serials(conn: Connection) -> list[SerialSummary]:
         SerialSummary(r.id, r.title, r.publisher, tuple(r.issns))
         for r in conn.execute(_EMPTY_SERIALS).all()
     ]
-    ids = [j.id for j in empty]
-    conn.execute(_DELETE_ISSNS_KNOWN_WITHOUT_SERIAL, {"ids": ids})
-    conn.execute(_DELETE_SERIALS, {"ids": ids})
+    conn.execute(_DELETE_SERIALS, {"ids": [j.id for j in empty]})
     return empty
 
 

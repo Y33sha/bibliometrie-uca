@@ -557,7 +557,7 @@ def _normalizer() -> CrossrefNormalizer:
         logger=MagicMock(),
         staging_store=MagicMock(),
         record_store=MagicMock(),
-        container_stores=MagicMock(),
+        monograph_store=MagicMock(),
         publisher_store=MagicMock(),
         contribution_store=MagicMock(),
         location_store=MagicMock(),
@@ -567,7 +567,7 @@ def _normalizer() -> CrossrefNormalizer:
 
 class TestCrossrefSourceRecord:
     def test_champs_du_document(self):
-        document = crossref_source_record(_message(), 42, Containers(None, None))
+        document = crossref_source_record(_message(), 42, Containers(False, None))
 
         assert document.source == "crossref"
         assert document.source_id == "10.1000/abc"
@@ -579,17 +579,16 @@ class TestCrossrefSourceRecord:
     def test_titre_de_conteneur_garde_sans_revue(self):
         msg = _message(**{"container-title": ["J. Things"]})
 
-        document = crossref_source_record(msg, 42, Containers(None, 9))
+        document = crossref_source_record(msg, 42, Containers(False, 9))
 
-        assert (document.serial_id, document.monograph_id) == (None, 9)
+        assert document.monograph_id == 9
         assert document.container_title == "J. Things"
 
     def test_titre_de_conteneur_porte_par_la_revue(self):
         msg = _message(**{"container-title": ["J. Things"]})
 
-        document = crossref_source_record(msg, 42, Containers(7, None))
+        document = crossref_source_record(msg, 42, Containers(True, None))
 
-        assert document.serial_id == 7
         assert document.container_title is None
 
 

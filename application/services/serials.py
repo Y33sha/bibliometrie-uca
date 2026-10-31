@@ -10,7 +10,6 @@ from application.ports.pipeline.serial_recompute import SerialRecompute
 from application.ports.repositories.serial_repository import SerialRepository, SerialUpdate
 from application.services._merge import check_merge_pair
 from domain.errors import NotFoundError, ValidationError
-from domain.serials.issns import SerialIssn
 from domain.serials.serial import ManualField, SerialEdit, SerialType
 
 
@@ -20,8 +19,6 @@ def _serial_edit(update: SerialUpdate) -> SerialEdit:
     changes = SerialEdit()
     if "title" in provided and update.title is not None:
         changes["title"] = update.title
-    if "issns" in provided:
-        changes["issns"] = [SerialIssn(**row.model_dump()) for row in update.issns or []]
     if "serial_type" in provided and update.serial_type is not None:
         changes["serial_type"] = update.serial_type
     if "oa_model" in provided:
@@ -52,7 +49,7 @@ class SerialService:
         Un `null` sur un champ obligatoire (titre, type, caractère académique) vaut champ non fourni. L'événement d'audit contient seulement les champs soumis.
 
         Raises:
-            ValidationError: aucun champ fourni, ou ISSN invalides.
+            ValidationError: aucun champ fourni.
             NotFoundError: revue introuvable.
         """
         if not update.model_fields_set:
@@ -89,11 +86,18 @@ class SerialService:
     def merge_serials(self, target_id: int, source_id: int) -> None:
         """Fusionne la revue source dans la revue cible par le pipeline, qui requalifie les publications absorbées.
 
+        La revue source est sans ISSN : deux ISSN-L désignent deux revues. La fusion est gardée comme décision de rattachement par titre, relue par le rattachement des enregistrements sources.
+
         Raises:
-            ValidationError: deux identifiants égaux.
+            ValidationError: deux identifiants égaux, ou revue source à ISSN-L quand la cible en a un.
             NotFoundError: revue introuvable.
         """
         check_merge_pair(target_id, source_id, self._serials.find_by_id, label="Revue")
+        source_issnl = self._serials.issnl_of(source_id)
+        if source_issnl is not None and self._serials.issnl_of(target_id) is not None:
+            raise ValidationError("Deux revues à ISSN-L distincts ne fusionnent pas")
+        if source_issnl is None:
+            self._serials.record_title_decision(source_id, target_id)
         self._recompute.merge_serials(target_id, source_id)
         emit_event("serial.merged", "serial", target_id, {"source_id": source_id})
 

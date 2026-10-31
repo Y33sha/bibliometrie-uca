@@ -125,6 +125,20 @@ SCANR_STAGING_DOCS = [
 ]
 
 
+def attach_serials(conn) -> None:
+    """Rattache les enregistrements sources normalisés à leur revue, comme la phase `publishing`."""
+    import logging
+
+    from pipeline.transformation.publishing.serials.attach_serials import (
+        run_attach_serials,
+        run_sync_issns,
+    )
+
+    logger = logging.getLogger("test_attach_serials")
+    run_sync_issns(conn, logger)
+    run_attach_serials(conn, logger)
+
+
 def insert_scanr_staging(conn, docs):
     """Insère des documents ScanR dans le staging."""
     for doc in docs:
@@ -260,6 +274,7 @@ class TestNormalizeScanrIdempotence:
 
         insert_scanr_staging(sa_sync_conn, SCANR_STAGING_DOCS)
         run_normalize_scanr(sa_sync_conn)
+        attach_serials(sa_sync_conn)
 
         cnt = sa_sync_conn.execute(
             text("SELECT count(*) AS cnt FROM serials WHERE title_normalized LIKE '%volcanology%'")

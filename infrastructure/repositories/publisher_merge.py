@@ -25,7 +25,9 @@ MERGE_STEPS: dict[str, MergeStep] = {
     "doi_prefixes": transfer("doi_prefixes", "publisher_id"),
     "name_forms": transfer("publisher_name_forms", "publisher_id"),
     # Formes de nom des revues rattachées à l'éditeur, une par forme.
-    "serial_name_forms": transfer_unique("serial_name_forms", "publisher_id", "form_normalized"),
+    "serial_title_decisions": transfer_unique(
+        "serial_title_decisions", "publisher_id", "title_normalized"
+    ),
     "name": untouched("publishers", "name", "name_normalized").of_nature(DataNature.MIXED),
     "created_at": untouched("publishers", "created_at"),
     "openalex_id": fill_empty_unique("publishers", "openalex_id"),

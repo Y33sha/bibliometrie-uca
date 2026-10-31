@@ -53,7 +53,6 @@ class SourceRecordUpsert:
     publication_year: int | None = None
     raw_doc_type: str | None = None
     """Type de document dans le vocabulaire de la source."""
-    serial_id: int | None = None
     monograph_id: int | None = None
     publisher_id: int | None = None
     """Éditeur nommé par la source. L'écriture le retire d'une production hébergée sans être publiée (`source_record_has_publisher`)."""
@@ -168,7 +167,12 @@ class SourceRecordStore:
         self._conn = conn
         self._language_forms: dict[str, str] | None = None
 
-    def upsert_source_record(self, row: SourceRecordUpsert) -> int:
+    def upsert_source_record(self, row: SourceRecordUpsert, *, has_series: bool = False) -> int:
+        """Écrit l'enregistrement source et ses identifiants, et renvoie son id. La revue se rattache dans la phase `publishing`.
+
+        Args:
+            has_series: l'enregistrement source décrit une série ; avec sa monographie, cela décide de son éditeur (`source_record_has_publisher`).
+        """
         params: dict[str, object] = {name: getattr(row, name) for name in _ROW_FIELDS}
         params["title"] = clean_publication_title(row.title)
         params["title_normalized"] = normalized_title(row.title)
@@ -176,7 +180,7 @@ class SourceRecordStore:
         if not source_record_has_publisher(
             params["doc_type"],
             row.source,
-            has_container=row.serial_id is not None or row.monograph_id is not None,
+            has_container=has_series or row.monograph_id is not None,
         ):
             params["publisher_id"] = None
         if row.container_title and names_ebook_platform(row.container_title):

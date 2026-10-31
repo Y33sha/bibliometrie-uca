@@ -3,7 +3,7 @@
 import pytest
 
 from domain.serials.containers import SeriesDescription
-from domain.serials.issns import IssnStatus, IssnSupport, SerialIssn
+from domain.serials.issns import IssnSupport, SerialIssn
 from domain.serials.serial import OaModel
 from domain.source_records.biblio import (
     PageRange,
@@ -49,7 +49,7 @@ _SERIES = SeriesDescription(
     issns=(
         SerialIssn(issn="0022-3727", support=IssnSupport.PRINT, linking=True),
         SerialIssn(issn="1361-6463", support=IssnSupport.ELECTRONIC),
-        SerialIssn(issn="1234", status=IssnStatus.MALFORMED),
+        SerialIssn(issn="1234", malformed=True),
     ),
     openalex_id="S123",
     oa_model=OaModel.SUBSCRIPTION,

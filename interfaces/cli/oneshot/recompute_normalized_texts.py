@@ -4,7 +4,7 @@
 Le script recalcule chaque valeur avec la fonction du pipeline et écrit celles qui diffèrent :
 
 - colonnes calculées d'une autre colonne de la même ligne : titres, noms d'éditeurs et de préfixes DOI, noms des personnes, adresses, libellés de sujets. Toutes les lignes sont relues : une forme calculée d'un texte depuis assaini (`&amp;` devenu `&`) est périmée, même en ASCII ;
-- formes de noms des revues et des éditeurs : la forme recalculée d'un titre ou d'un nom non ASCII s'ajoute aux formes existantes, les formes vides sont supprimées ;
+- formes de noms des éditeurs : la forme recalculée d'un nom non ASCII s'ajoute aux formes existantes ;
 - informations du contributeur : chaque contribution source dont le nom contient un caractère non ASCII est rattachée aux informations du contributeur de son nom recalculé, puis les lignes orphelines sont purgées.
 
 La phase `persons` suivante resynchronise les formes de noms des personnes. Idempotent.
@@ -37,7 +37,6 @@ from pipeline.ingestion.common.source_contribution_store import (
 )
 from pipeline.ingestion.common.source_contributions import contributor_name_fields
 from pipeline.transformation.publishing.publishers.store import PublisherStore
-from pipeline.transformation.publishing.serials.store import SerialStore
 
 log = setup_logger("recompute_normalized_texts", os.path.dirname(__file__))
 
@@ -117,19 +116,8 @@ def _recompute_column(conn: Connection, column: _Column, *, apply: bool) -> int:
     return len(payload)
 
 
-def _add_name_forms(conn: Connection, *, apply: bool) -> tuple[int, int, int]:
-    """Supprime les formes de noms de revues vides, ajoute les formes recalculées des titres de revues et des noms d'éditeurs. Renvoie (formes vides, formes de revues, formes d'éditeurs) candidates."""
-    empty = conn.execute(
-        text("SELECT count(*) FROM serial_name_forms WHERE form_normalized = ''")
-    ).scalar_one()
-    serials = [
-        (r.id, form, r.publisher_id)
-        for r in conn.execute(
-            text("SELECT id, title, publisher_id FROM serials WHERE title ~ :pattern"),
-            {"pattern": _NON_ASCII},
-        )
-        if (form := normalize_text(r.title))
-    ]
+def _add_publisher_name_forms(conn: Connection, *, apply: bool) -> int:
+    """Ajoute les formes recalculées des noms d'éditeurs non ASCII. Renvoie le nombre de candidates."""
     publishers = [
         (r.id, key)
         for r in conn.execute(
@@ -138,14 +126,10 @@ def _add_name_forms(conn: Connection, *, apply: bool) -> tuple[int, int, int]:
         if (key := publisher_name_key(to_plain_text(r.name)))
     ]
     if apply:
-        conn.execute(text("DELETE FROM serial_name_forms WHERE form_normalized = ''"))
-        serial_gateway = SerialStore(conn)
-        for serial_id, form, publisher_id in serials:
-            serial_gateway.add_serial_name_form(serial_id, form, publisher_id)
         publisher_store = PublisherStore(conn)
         for publisher_id, key in publishers:
             publisher_store.add_publisher_name_form(publisher_id, key)
-    return empty, len(serials), len(publishers)
+    return len(publishers)
 
 
 _SOURCE_CONTRIBUTIONS_SQL = text("""
@@ -220,12 +204,9 @@ def main() -> int:
         for column in _COLUMNS:
             log.info("%s.%s…", column.table, column.target)
             log.info("  %d valeurs changées", _recompute_column(conn, column, apply=apply))
-        empty, serials, publishers = _add_name_forms(conn, apply=apply)
         log.info(
-            "formes de noms : %d formes de revues vides, %d titres de revues et %d noms d'éditeurs non ASCII",
-            empty,
-            serials,
-            publishers,
+            "formes de noms : %d noms d'éditeurs non ASCII",
+            _add_publisher_name_forms(conn, apply=apply),
         )
         log.info("contributions sources…")
         log.info(

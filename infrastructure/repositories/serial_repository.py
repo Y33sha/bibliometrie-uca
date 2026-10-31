@@ -3,20 +3,19 @@
 L'entité Publisher est dans `publisher_repository.py`. La fusion de deux revues relève du pipeline (`pipeline/transformation/publishing/serials/serial_merge.py`). Les erreurs sont celles du domaine ; l'orchestration est dans `application/services/serials/`.
 """
 
-from collections.abc import Sequence
 from typing import NamedTuple, cast
 
-from sqlalchemy import Connection, delete, select, update
+from sqlalchemy import Connection, select, text, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from application.ports.repositories.serial_repository import SerialRepository
 from domain.errors import NotFoundError
 from domain.normalize import normalize_text
 from domain.publishers.merge import SharedTitlePair
-from domain.serials.issns import SerialIssn
 from domain.serials.serial import ManualField, OaModel, Serial, SerialType
 from infrastructure.db.rows import row_as
-from infrastructure.db.tables import serial_issns, serials
-from infrastructure.repositories.serial_issns import issns_by_serial
+from infrastructure.db.tables import serial_title_decisions, serials
+from infrastructure.sql_fragments import serial_issnl
 
 
 class _SerialRow(NamedTuple):
@@ -33,7 +32,7 @@ class _SerialRow(NamedTuple):
     manual_fields: list[str]
 
 
-def _serial_from_row(row: _SerialRow, issns: Sequence[SerialIssn]) -> Serial:
+def _serial_from_row(row: _SerialRow) -> Serial:
     """Renvoie la revue de domaine d'une ligne de `serials`.
 
     `serial_type` et `is_academic`, nullables, prennent leur défaut (`unknown`, vrai). Les enums SQL `serial_type` et `oa_model` reprennent le vocabulaire du domaine : une assertion de type suffit.
@@ -41,7 +40,6 @@ def _serial_from_row(row: _SerialRow, issns: Sequence[SerialIssn]) -> Serial:
     return Serial(
         id=row.id,
         title=row.title,
-        issns=list(issns),
         publisher_id=row.publisher_id,
         openalex_id=row.openalex_id,
         is_in_doaj=row.is_in_doaj,
@@ -78,15 +76,43 @@ class PgSerialRepository(SerialRepository):
         ).first()
         if row is None:
             return None
-        issns = issns_by_serial(self._conn, [serial_id]).get(serial_id, ())
-        return _serial_from_row(row_as(_SerialRow, row), issns)
+        return _serial_from_row(row_as(_SerialRow, row))
+
+    def issnl_of(self, serial_id: int) -> str | None:
+        return self._conn.execute(
+            text(f"SELECT {serial_issnl(':id')}"), {"id": serial_id}
+        ).scalar_one_or_none()
+
+    def record_title_decision(self, source_id: int, target_id: int) -> None:
+        source = self._conn.execute(
+            select(serials.c.title_normalized, serials.c.publisher_id).where(
+                serials.c.id == source_id
+            )
+        ).one()
+        self._conn.execute(
+            pg_insert(serial_title_decisions)
+            .values(
+                title_normalized=source.title_normalized,
+                publisher_id=source.publisher_id,
+                serial_id=target_id,
+            )
+            .on_conflict_do_update(
+                constraint="uq_serial_title_decisions", set_={"serial_id": target_id}
+            )
+        )
+        # Une décision qui désignait la revue absorbée la suit.
+        self._conn.execute(
+            update(serial_title_decisions)
+            .where(serial_title_decisions.c.serial_id == source_id)
+            .values(serial_id=target_id)
+        )
 
     # ── Écriture ───────────────────────────────────────────────────
 
     def save(self, serial: Serial) -> None:
-        """Écrit les champs modifiables par l'API d'une revue chargée, et ses ISSN. Lève `NotFoundError` si l'id est absent.
+        """Écrit les champs modifiables par l'API d'une revue chargée. Lève `NotFoundError` si l'id est absent.
 
-        Le titre normalisé se recalcule. Les colonnes tenues par le pipeline (`publisher_id`, `openalex_id`, `is_in_doaj`) restent. Un ISSN gardé garde sa date de vérification Sudoc, un ISSN ajouté attend la sienne.
+        Le titre normalisé se recalcule. Les colonnes tenues par le pipeline (`publisher_id`, `openalex_id`, `is_in_doaj`) restent.
         """
         result = self._conn.execute(
             update(serials)
@@ -102,34 +128,6 @@ class PgSerialRepository(SerialRepository):
         )
         if result.rowcount == 0:
             raise NotFoundError(f"Revue {serial.id} introuvable")
-        self._save_issns(serial.id, serial.issns)
-
-    def _save_issns(self, serial_id: int | None, issns: Sequence[SerialIssn]) -> None:
-        values = [row.issn for row in issns]
-        self._conn.execute(
-            delete(serial_issns).where(
-                serial_issns.c.serial_id == serial_id, serial_issns.c.issn.not_in(values)
-            )
-        )
-        # Le drapeau ISSN-L se retire avant d'être reposé : une revue a au plus un ISSN-L.
-        self._conn.execute(
-            update(serial_issns).where(serial_issns.c.serial_id == serial_id).values(linking=False)
-        )
-        for row in issns:
-            fields = {
-                "support": row.support,
-                "linking": row.linking,
-                "status": row.status,
-            }
-            kept = self._conn.execute(
-                update(serial_issns)
-                .where(serial_issns.c.serial_id == serial_id, serial_issns.c.issn == row.issn)
-                .values(**fields)
-            ).rowcount
-            if not kept:
-                self._conn.execute(
-                    serial_issns.insert().values(issn=row.issn, serial_id=serial_id, **fields)
-                )
 
     # ── Revues homonymes de deux éditeurs ──────────────────────────
 
@@ -152,17 +150,14 @@ class PgSerialRepository(SerialRepository):
             .where(js.c.publisher_id == source_publisher_id)
         )
         rows = self._conn.execute(stmt).all()
-        issns = issns_by_serial(
-            self._conn, [r.target_serial_id for r in rows] + [r.source_serial_id for r in rows]
-        )
         return [
             SharedTitlePair(
                 target_serial_id=r.target_serial_id,
                 target_title=r.target_title,
-                target_issns=issns.get(r.target_serial_id, ()),
+                target_issnl=self.issnl_of(r.target_serial_id),
                 source_serial_id=r.source_serial_id,
                 source_title=r.source_title,
-                source_issns=issns.get(r.source_serial_id, ()),
+                source_issnl=self.issnl_of(r.source_serial_id),
             )
             for r in rows
         ]

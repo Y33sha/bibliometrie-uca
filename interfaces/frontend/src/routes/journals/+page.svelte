@@ -11,7 +11,6 @@
 	import DoiNamespaceConflictsList from './DoiNamespaceConflictsList.svelte';
 	import { mergeSerial } from './mergeSerial';
 	import Modal from '#lib/components/Modal.svelte';
-	import SerialIssnsEditor, { type EditedIssn } from './SerialIssnsEditor.svelte';
 	import Picker from '#lib/components/Picker.svelte';
 	import { confirmDialog, toast } from '#lib/dialogs.svelte.js';
 	import { isAdmin } from '#lib/session.svelte.js';
@@ -27,11 +26,10 @@
 	let oaModels: EnumOption[] = $state([]);
 
 	// Onglets de la session admin : la liste, une file par type de doublon potentiel, la file des recueils d'actes probables, puis celle des publications en série que contredit l'espace de noms DOI. L'onglet ouvert se garde dans l'URL (`?tab=`).
-	type TabKey = 'all' | 'same-titles' | 'shared-issns' | 'likely-proceedings' | 'doi-namespace-conflicts';
-	const QUEUES: TabKey[] = ['same-titles', 'shared-issns', 'likely-proceedings', 'doi-namespace-conflicts'];
+	type TabKey = 'all' | 'same-titles' | 'likely-proceedings' | 'doi-namespace-conflicts';
+	const QUEUES: TabKey[] = ['same-titles', 'likely-proceedings', 'doi-namespace-conflicts'];
 	const tab = useTabParam(QUEUES, isAdmin);
 	let sameTitleCount = $state(0);
-	let sharedIssnCount = $state(0);
 	let likelyProceedingsCount = $state(0);
 	let doiNamespaceConflictsCount = $state(0);
 
@@ -44,9 +42,8 @@
 	}
 
 	async function loadQueueCounts() {
-		[sameTitleCount, sharedIssnCount, likelyProceedingsCount, doiNamespaceConflictsCount] = await Promise.all([
+		[sameTitleCount, likelyProceedingsCount, doiNamespaceConflictsCount] = await Promise.all([
 			queueCount('same-titles'),
-			queueCount('shared-issns'),
 			queueCount('likely-proceedings'),
 			queueCount('doi-namespace-conflicts'),
 		]);
@@ -73,7 +70,7 @@
 
 	// Modal édition
 	let editModal: {
-		id: number; title: string; issns: EditedIssn[];
+		id: number; title: string;
 		oa_model: string;
 		serial_type: string; original_serial_type: string;
 		is_academic: boolean;
@@ -91,10 +88,6 @@
 		const jt = detail.serial_type || 'journal';
 		editModal = {
 			id: detail.id, title: detail.title,
-			issns: detail.issn_details.map((i) => ({
-				issn: i.issn, support: i.support ?? '', linking: i.linking,
-				status: i.status,
-			})),
 			oa_model: detail.oa_model || '',
 			serial_type: jt, original_serial_type: jt,
 			is_academic: detail.is_academic ?? true,
@@ -122,12 +115,6 @@
 
 		const body: Record<string, any> = {};
 		body.title = editModal.title.trim();
-		body.issns = editModal.issns
-			.filter((i) => i.issn.trim())
-			.map((i) => ({
-				issn: i.issn.trim(), support: i.support || null, linking: i.linking,
-				status: i.status,
-			}));
 		body.oa_model = editModal.oa_model || null;
 		body.serial_type = editModal.serial_type;
 		body.is_academic = editModal.is_academic;
@@ -135,7 +122,7 @@
 			await serialsApi.update(editModal.id, body);
 			editModal = null;
 			reload();
-			// Une modification d'ISSN, de titre ou de type fait entrer ou sortir la publication en série des files.
+			// Une modification de titre ou de type fait entrer ou sortir la publication en série des files.
 			loadQueueCounts();
 		} catch (e) {
 			toast('Erreur : ' + errorMessage(e), 'error');
@@ -180,7 +167,6 @@
 		tabs={[
 			{ key: 'all', label: 'Toutes les publications en série' },
 			{ key: 'same-titles', label: 'Titres identiques', count: sameTitleCount },
-			{ key: 'shared-issns', label: 'ISSN partagés', count: sharedIssnCount },
 			{ key: 'likely-proceedings', label: "Recueils d'actes probables", count: likelyProceedingsCount },
 			{ key: 'doi-namespace-conflicts', label: 'Contredites par le DOI', count: doiNamespaceConflictsCount },
 		]}
@@ -221,8 +207,6 @@
 		intro="Deux publications en série de même titre qui ont chacune un ISSN sont des homonymes probables : elles n'apparaissent pas ici."
 		onchange={loadQueueCounts}
 	/>
-{:else if tab.current === 'shared-issns'}
-	<SerialDuplicatesList url="/api/serials/shared-issns" valueLabel="ISSN" onchange={loadQueueCounts} />
 {:else if tab.current === 'likely-proceedings'}
 	<LikelyProceedingsList onchange={loadQueueCounts} />
 {:else if tab.current === 'doi-namespace-conflicts'}
@@ -234,7 +218,6 @@
 {#if editModal}
 <Modal title="Modifier la publication en série" maxWidth="720px" onclose={() => editModal = null} onsubmit={saveEdit}>
 		<label>Titre <input bind:value={editModal.title} /></label>
-		<SerialIssnsEditor bind:issns={editModal.issns} />
 		<div style="display:flex;gap:8px">
 			<div style="flex:1">
 				<label>Modèle OA <select bind:value={editModal.oa_model}>

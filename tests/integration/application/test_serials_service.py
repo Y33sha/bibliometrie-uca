@@ -7,24 +7,24 @@ import pytest
 from sqlalchemy import text
 
 from application.ports.repositories.publisher_repository import PublisherUpdate
-from application.ports.repositories.serial_repository import SerialIssnInput, SerialUpdate
+from application.ports.repositories.serial_repository import SerialUpdate
 from domain.errors import (
     NotFoundError,
     PublisherMergeBlockedError,
     ValidationError,
 )
 from domain.merge import MergedEntity
-from domain.serials.issns import IssnSupport, SerialIssn
-from domain.serials.serial import OaModel, SerialType
+from domain.serials.issn_facts import IssnFacts, SudocReading
+from domain.serials.issns import IssnStatus
+from domain.serials.serial import SerialType
 from infrastructure.repositories import (
     publisher_repository,
     serial_repository,
 )
 from interfaces.api import deps
 from pipeline.transformation.publishing.publishers.store import PublisherStore
-from pipeline.transformation.publishing.serials.check_serials_in_sudoc import (
-    find_serials_to_check_in_sudoc,
-    record_sudoc_check,
+from pipeline.transformation.publishing.serials.check_issns_in_sudoc import (
+    record_sudoc_reading,
 )
 from pipeline.transformation.publishing.serials.serial_merge import SerialRecompute
 from pipeline.transformation.publishing.serials.store import SerialStore
@@ -39,7 +39,6 @@ from tests.integration.helpers.serials import (
     insert_publisher,
     insert_serial_with_issns,
     issn_columns,
-    mark_checked_in_sudoc,
 )
 from tests.integration.helpers.sources import insert_source_record
 
@@ -140,9 +139,6 @@ class TestSerialFindById:
         assert j is not None
         assert j.title == "PLOS ONE"
         assert j.publisher_id == publication_id
-        assert j.issns == [
-            SerialIssn(issn="1932-6203", support=IssnSupport.PRINT, linking=True),
-        ]
         assert j.openalex_id == "S202381698"
         assert j.is_in_doaj is True
         assert j.oa_model == "full_oa"
@@ -166,42 +162,6 @@ class TestUpdateSerial:
         )
         assert row.title == "Nature Medicine"
         assert row.title_normalized == "nature medicine"
-
-    def test_partial_update(self, sa_sync_conn, serial_service):
-        """Les ISSN fournis remplacent ceux de la revue ; un ISSN gardé conserve sa date de vérification."""
-        j = _serial(sa_sync_conn, issn="0028-0836")
-        mark_checked_in_sudoc(sa_sync_conn, j)
-        serial_service.update_serial(
-            j,
-            update=SerialUpdate(
-                issns=[
-                    SerialIssnInput(issn="0028-0836", support=IssnSupport.PRINT),
-                    SerialIssnInput(issn="1476-4687", support=IssnSupport.ELECTRONIC),
-                ]
-            ),
-        )
-        assert (
-            _fetch_one(
-                sa_sync_conn,
-                "SELECT sudoc_checked_at FROM serial_issns WHERE serial_id = :id AND issn = '0028-0836'",
-                id=j,
-            ).sudoc_checked_at
-            is not None
-        )
-        row = issn_columns(sa_sync_conn, j)
-        assert row.issn == "0028-0836"
-        assert row.eissn == "1476-4687"
-
-    def test_normalizes_issn(self, sa_sync_conn, serial_service):
-        j = _serial(sa_sync_conn)
-        serial_service.update_serial(
-            j,
-            update=SerialUpdate(
-                issns=[SerialIssnInput(issn="14764687", support=IssnSupport.ELECTRONIC)]
-            ),
-        )
-        row = issn_columns(sa_sync_conn, j)
-        assert row.eissn == "1476-4687"
 
     def test_type_saisi_a_la_main_hors_de_portee_du_pipeline(
         self, sa_sync_conn, gateway, serial_service
@@ -232,49 +192,19 @@ class TestUpdateSerial:
             == []
         )
 
-    def test_titre_et_issn_saisis_hors_de_portee_du_sudoc(
-        self, sa_sync_conn, gateway, serial_service
-    ):
-        """Des ISSN saisis à la main sortent de la vérification Sudoc et des ajouts par les notices Sudoc ; un titre saisi reste."""
-        j = _serial(sa_sync_conn, title="Old", issn="0028-0836")
-        serial_service.update_serial(
-            j,
-            update=SerialUpdate(
-                title="New",
-                issns=[SerialIssnInput(issn="1476-4687", support=IssnSupport.ELECTRONIC)],
-            ),
+    def test_titre_saisi_hors_de_portee_du_sudoc(self, sa_sync_conn, serial_service):
+        """Un titre saisi à la main reste quand la vérification Sudoc donne un autre titre."""
+        j = _serial(sa_sync_conn, title="Old", issn="0028-0836", issnl="0028-0836")
+        serial_service.update_serial(j, update=SerialUpdate(title="New"))
+        reading = SudocReading(
+            (IssnFacts("0028-0836", "0028-0836", None, IssnStatus.ACTIVE),), title="Sudoc"
         )
-
-        assert j not in {r.id for r in find_serials_to_check_in_sudoc(sa_sync_conn, also=[j])}
-        gateway.add_serial_issns(j, [SerialIssn(issn="0028-0836", support=IssnSupport.PRINT)])
-        record_sudoc_check(sa_sync_conn, j, issns=[], released=[], checked_at=_NOW, title="Sudoc")
+        record_sudoc_reading(sa_sync_conn, "0028-0836", reading, _NOW)
 
         row = _fetch_one(
             sa_sync_conn, "SELECT title, manual_fields FROM serials WHERE id = :id", id=j
         )
-        assert (row.title, sorted(row.manual_fields)) == ("New", ["issns", "title"])
-        assert issn_columns(sa_sync_conn, j).eissn == "1476-4687"
-        assert issn_columns(sa_sync_conn, j).issn is None
-
-    def test_modele_oa_vide_a_la_main_reste_vide(self, sa_sync_conn, gateway, serial_service):
-        j = _serial(sa_sync_conn, oa_model="full_oa")
-        serial_service.update_serial(j, update=SerialUpdate(oa_model=None))
-
-        gateway.enrich_serial(j, oa_model=OaModel.SUBSCRIPTION)
-
-        row = _fetch_one(
-            sa_sync_conn, "SELECT oa_model, manual_fields FROM serials WHERE id = :id", id=j
-        )
-        assert (row.oa_model, row.manual_fields) == (None, ["oa_model"])
-
-    def test_rejects_invalid_issn(self, sa_sync_conn, serial_service):
-        j = _serial(sa_sync_conn, issn="0028-0836")
-        with pytest.raises(ValidationError):
-            serial_service.update_serial(
-                j, update=SerialUpdate(issns=[SerialIssnInput(issn="1234-5678")])
-            )
-        row = issn_columns(sa_sync_conn, j)
-        assert row.issn == "0028-0836"
+        assert (row.title, row.manual_fields) == ("New", ["title"])
 
 
 class TestUpdatePublisher:
@@ -376,19 +306,17 @@ class TestMergePublishers:
         assert row.publisher_id == target
 
     def test_merges_same_title_serials(self, sa_sync_conn, publisher_service):
-        """Deux revues de même titre, une chez chaque éditeur, sont fusionnées."""
+        """Deux revues de même titre, une chez chaque éditeur, sont fusionnées ; la revue absorbée est sans ISSN."""
         target = insert_publisher(sa_sync_conn, "Target")
         source = insert_publisher(sa_sync_conn, "Source")
         jt = _serial(sa_sync_conn, publisher_id=target, issn="0028-0836")
-        js = _serial(sa_sync_conn, publisher_id=source, eissn="1476-4687")
+        js = _serial(sa_sync_conn, publisher_id=source)
         insert_publication(sa_sync_conn, serial_id=js)
 
         publisher_service.merge_publishers(target, source)
 
         assert (_fetch_one(sa_sync_conn, "SELECT id FROM serials WHERE id = :id", id=js)) is None
-        row = issn_columns(sa_sync_conn, jt)
-        assert row.issn == "0028-0836"
-        assert row.eissn == "1476-4687"
+        assert issn_columns(sa_sync_conn, jt).issn == "0028-0836"
 
     def test_merges_same_title_serials_with_only_source_openalex_id(
         self, sa_sync_conn, publisher_service
@@ -566,41 +494,26 @@ class TestMergeSerials:
         )
         assert row.serial_type == expected
 
-    def test_unites_malformed_issns_and_resets_sudoc_check(self, sa_sync_conn, serial_service):
-        """La cible reçoit les valeurs mal formées de la source et redevient à vérifier dans le Sudoc."""
-        target = _serial(
-            sa_sync_conn, title="Target", rejected=("1234-5678",), rejected_status="malformed"
-        )
-        mark_checked_in_sudoc(sa_sync_conn, target)
-        source = _serial(
-            sa_sync_conn,
-            title="Source",
-            rejected=("1234-5678", "(Internet)"),
-            rejected_status="malformed",
-        )
-
-        serial_service.merge_serials(target, source)
-
-        row = issn_columns(sa_sync_conn, target)
-        assert row.rejected_issns == ["(Internet)", "1234-5678"]
-        assert row.sudoc_checked_at is None
-
-    def test_source_issns_join_the_target(self, sa_sync_conn, serial_service):
-        """Titre précédent absorbé par le titre suivant : l'ISSN du titre précédent rejoint les ISSN écartés de la cible, qui garde son propre ISSN."""
+    def test_refuse_deux_revues_a_issn_l(self, sa_sync_conn, serial_service):
+        """Cas réel : « BMC Family Practice » et son titre suivant « BMC Primary Care » sont deux revues."""
         target = _serial(sa_sync_conn, title="BMC Primary Care", eissn="2731-4553")
-        source = _serial(
-            sa_sync_conn,
-            title="BMC Family Practice",
-            eissn="1471-2296",
-            rejected=("2731-4553",),
-            rejected_status="related_title",
-        )
+        source = _serial(sa_sync_conn, title="BMC Family Practice", eissn="1471-2296")
+        with pytest.raises(ValidationError, match="ISSN-L"):
+            serial_service.merge_serials(target, source)
+
+    def test_revue_sans_issn_absorbee_garde_une_decision(self, sa_sync_conn, serial_service):
+        """La fusion d'une revue sans ISSN se garde comme décision de rattachement par son titre et son éditeur."""
+        publisher = insert_publisher(sa_sync_conn, "Elsevier")
+        target = _serial(sa_sync_conn, title="Nature", issn="0028-0836")
+        source = _serial(sa_sync_conn, title="Nature (London)", publisher_id=publisher)
 
         serial_service.merge_serials(target, source)
 
-        row = issn_columns(sa_sync_conn, target)
-        assert row.eissn == "2731-4553"
-        assert row.rejected_issns == ["1471-2296"]
+        row = _fetch_one(
+            sa_sync_conn,
+            "SELECT title_normalized, publisher_id, serial_id FROM serial_title_decisions",
+        )
+        assert tuple(row) == ("nature (london)", publisher, target)
 
     def test_enriches_target_metadata(self, sa_sync_conn, serial_service):
         target = _serial(sa_sync_conn, title="Target")
@@ -620,13 +533,13 @@ class TestMergeSerials:
 
     def test_does_not_overwrite_existing_fields(self, sa_sync_conn, serial_service):
         """Les champs renseignés de la cible gardent leur valeur."""
-        target = _serial(sa_sync_conn, title="Target", issn="0028-0836")
-        source = _serial(sa_sync_conn, title="Source", issn="1234-5678")
+        target = _serial(sa_sync_conn, title="Target", oa_model="full_oa")
+        source = _serial(sa_sync_conn, title="Source", oa_model="subscription")
 
         serial_service.merge_serials(target, source)
 
-        row = issn_columns(sa_sync_conn, target)
-        assert row.issn == "0028-0836"
+        row = _fetch_one(sa_sync_conn, "SELECT oa_model FROM serials WHERE id = :id", id=target)
+        assert row.oa_model == "full_oa"
 
     def test_requalifies_absorbed_publications_against_target_type(
         self, sa_sync_conn, serial_service

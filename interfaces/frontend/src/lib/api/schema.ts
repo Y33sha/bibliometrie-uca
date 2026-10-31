@@ -2422,46 +2422,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/serials/shared-issns/count": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Serials Sharing Issn Count
-         * @description Renvoie le compteur de l'onglet « ISSN partagés » (badge).
-         */
-        get: operations["serials_sharing_issn_count_api_serials_shared_issns_count_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/serials/shared-issns": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Serials Sharing Issn
-         * @description Liste les groupes de revues où le même ISSN est actif, à fusionner à la main.
-         */
-        get: operations["serials_sharing_issn_api_serials_shared_issns_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/serials/likely-proceedings/count": {
         parameters: {
             query?: never;
@@ -3953,10 +3913,10 @@ export interface components {
         };
         /**
          * IssnStatus
-         * @description Statut d'un ISSN dans sa revue.
+         * @description Statut d'un ISSN dans `serial_issns`.
          * @enum {string}
          */
-        IssnStatus: "active" | "malformed" | "cancelled" | "related_title" | "supplement" | "unverified";
+        IssnStatus: "active" | "cancelled" | "unverified";
         /**
          * IssnSupport
          * @description Support d'une publication en série.
@@ -5484,22 +5444,6 @@ export interface components {
             sudoc_checked_at: string | null;
         };
         /**
-         * SerialIssnInput
-         * @description ISSN d'une revue, saisi dans l'administration.
-         */
-        SerialIssnInput: {
-            /** Issn */
-            issn: string;
-            support?: components["schemas"]["IssnSupport"] | null;
-            /**
-             * Linking
-             * @default false
-             */
-            linking: boolean;
-            /** @default active */
-            status: components["schemas"]["IssnStatus"];
-        };
-        /**
          * SerialListItem
          * @description Ligne de la liste paginée `/api/serials`, résumé du profil complet (`SerialDetailResponse`).
          */
@@ -5567,8 +5511,6 @@ export interface components {
         SerialUpdate: {
             /** Title */
             title?: string | null;
-            /** Issns */
-            issns?: components["schemas"]["SerialIssnInput"][] | null;
             oa_model?: components["schemas"]["OaModel"] | null;
             serial_type?: components["schemas"]["SerialType"] | null;
             /** Is Academic */
@@ -10209,46 +10151,6 @@ export interface operations {
         };
     };
     serials_with_same_title_api_serials_same_titles_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SerialDuplicatesResponse"];
-                };
-            };
-        };
-    };
-    serials_sharing_issn_count_api_serials_shared_issns_count_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TotalCountResponse"];
-                };
-            };
-        };
-    };
-    serials_sharing_issn_api_serials_shared_issns_get: {
         parameters: {
             query?: never;
             header?: never;

@@ -170,22 +170,6 @@ def serials_with_same_title(
     return queries.serials_with_same_title()
 
 
-@router.get("/shared-issns/count", response_model=TotalCountResponse)
-def serials_sharing_issn_count(
-    queries: SerialQueries = Depends(serial_queries),
-) -> TotalCountResponse:
-    """Renvoie le compteur de l'onglet « ISSN partagés » (badge)."""
-    return TotalCountResponse(total=len(queries.serials_sharing_issn().groups))
-
-
-@router.get("/shared-issns", response_model=SerialDuplicatesResponse)
-def serials_sharing_issn(
-    queries: SerialQueries = Depends(serial_queries),
-) -> SerialDuplicatesResponse:
-    """Liste les groupes de revues où le même ISSN est actif, à fusionner à la main."""
-    return queries.serials_sharing_issn()
-
-
 @router.get("/likely-proceedings/count", response_model=TotalCountResponse)
 def likely_proceedings_count(
     queries: SerialQueries = Depends(serial_queries),

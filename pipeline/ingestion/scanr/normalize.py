@@ -207,10 +207,9 @@ def scanr_source_record(  # noqa: C901
         title=get_title(doc) or "",
         publication_year=as_int(doc.get("year")),
         raw_doc_type=as_str(doc.get("type")),
-        serial_id=containers.serial_id,
         monograph_id=containers.monograph_id,
         container_title=(
-            as_str(source.get("title")) if not (containers.serial_id or is_thesis(doc)) else None
+            as_str(source.get("title")) if not (containers.has_series or is_thesis(doc)) else None
         ),
         raw_language=None,
         biblio=biblio_json,

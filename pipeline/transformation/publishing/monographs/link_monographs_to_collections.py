@@ -1,6 +1,6 @@
 """Sous-étape de la phase `publishing` : rattachement de chaque monographie à sa collection.
 
-Les monographies sans collection à ISSN se regroupent en séries (`group_series`, `domain/serials/series.py`) : même clé de série, même éditeur, au moins deux volumes. Chaque série a son entrée dans `serials`, sans ISSN, typée série d'actes ou collection de livres selon ses volumes. `choose_monograph_serial` (`domain/monographs/collection.py`) choisit ensuite l'entrée de chaque monographie : sa collection à ISSN, à défaut sa série sans ISSN, à défaut le volume lui-même, à défaut aucune. Une monographie en conflit reste en l'état, signalée. Le calcul se refait à chaque run, d'après les enregistrements sources.
+Les monographies sans collection à ISSN se regroupent en séries (`group_series`, `domain/serials/series.py`) : même clé de série, même éditeur, au moins deux volumes. Chaque série a son entrée dans `serials`, la revue sans ISSN de son titre et de son éditeur (`serial_for_title`), typée série d'actes ou collection de livres selon ses volumes. `choose_monograph_serial` (`domain/monographs/collection.py`) choisit ensuite l'entrée de chaque monographie : sa collection à ISSN, à défaut sa série sans ISSN, à défaut le volume lui-même, à défaut aucune. Une monographie en conflit reste en l'état, signalée. Le calcul se refait à chaque run, d'après les enregistrements sources.
 """
 
 import logging
@@ -9,12 +9,12 @@ from typing import NamedTuple
 from sqlalchemy import Connection, text
 
 from domain.monographs.collection import MonographSerialChoice, choose_monograph_serial
+from domain.normalize import normalize_text
 from domain.serials.serial import SerialType
 from domain.serials.series import VolumeTitle, group_series
 from infrastructure.sql_fragments import has_active_issn
 from pipeline.runtime.observability.log_format import quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.transformation.publishing.find_or_create import find_or_create_serial
 from pipeline.transformation.publishing.serials.store import SerialStore
 
 LABEL = "Rattachement aux collections"
@@ -90,9 +90,9 @@ def _series_by_monograph(
             if not m.with_issn
         ]
     ):
-        series_id = find_or_create_serial(group.title, publisher_id=group.publisher_id, repo=repo)
-        if series_id is None:
+        if not normalize_text(group.title):
             continue
+        series_id = repo.serial_for_title(group.title, group.publisher_id)
         kind = (
             SerialType.PROCEEDINGS
             if all(proceedings[i] for i in group.volume_ids)

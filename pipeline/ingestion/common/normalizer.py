@@ -35,12 +35,12 @@ from pipeline.runtime.observability.log_format import (
 )
 from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.progress import track_progress
-from pipeline.transformation.publishing.containers import ContainerStores
 from pipeline.transformation.publishing.find_or_create import (
     Containers,
     find_or_create_containers,
     find_or_create_publisher,
 )
+from pipeline.transformation.publishing.monographs.store import MonographStore
 from pipeline.transformation.publishing.publishers.store import PublisherStore
 
 type Document = Mapping[str, JsonValue]
@@ -82,7 +82,7 @@ class SourceNormalizer(ABC):
         logger: logging.Logger,
         staging_store: StagingStore,
         record_store: SourceRecordStore,
-        container_stores: ContainerStores,
+        monograph_store: MonographStore,
         publisher_store: PublisherStore,
         contribution_store: SourceContributionStore,
         location_store: LocationStore,
@@ -92,7 +92,7 @@ class SourceNormalizer(ABC):
         self.logger = logger
         self._staging = staging_store
         self._record_store = record_store
-        self._container_stores = container_stores
+        self._monograph_store = monograph_store
         self._publisher_store = publisher_store
         self._contribution_store = contribution_store
         self._location_store = location_store
@@ -154,18 +154,16 @@ class SourceNormalizer(ABC):
         )
         facts = self.container_facts(doc)
         series, volume = determine_container_type(facts) if facts is not None else (None, None)
-        containers = (
-            find_or_create_containers(
-                series, volume, publisher_id=publisher_id, stores=self._container_stores
-            )
-            if series or volume
-            else Containers(None, None)
+        containers = find_or_create_containers(
+            series, volume, publisher_id=publisher_id, monographs=self._monograph_store
         )
         record = self.source_record(row, doc, containers)
         record = replace(
             record, publisher_id=publisher_id, biblio=with_journal(record.biblio, series)
         )
-        source_record_id = self._record_store.upsert_source_record(record)
+        source_record_id = self._record_store.upsert_source_record(
+            record, has_series=containers.has_series
+        )
         self._location_store.replace_locations(
             source_record_id, [*self.locations(doc), *identifier_locations(record.identifiers)]
         )
