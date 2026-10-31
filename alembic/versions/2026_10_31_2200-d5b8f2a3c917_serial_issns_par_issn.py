@@ -4,7 +4,7 @@ Revision ID: d5b8f2a3c917
 Revises: c4a7e19d2b56
 Create Date: 2026-10-31 22:00:00.000000
 
-`serial_issns` contient une ligne par ISSN valide, avec son ISSN-L (`issnl`). Sa colonne `serial_id` désigne la revue de cet ISSN-L. Les lignes sans revue en double et les valeurs mal formées sont supprimées. Un ISSN d'un titre précédent, d'un titre suivant ou d'un supplément quitte sa revue et repasse à la vérification Sudoc, qui écrit ses liens dans `issn_links`. L'énumération `issn_status` garde `active`, `cancelled` et `unverified`.
+`serial_issns` contient une ligne par ISSN valide, avec son ISSN-L (`issnl`). Sa colonne `serial_id` désigne la revue de cet ISSN-L. Les valeurs mal formées sont supprimées. Un ISSN présent dans plusieurs lignes en garde une seule. Un ISSN d'un titre précédent, d'un titre suivant ou d'un supplément quitte sa revue et repasse à la vérification Sudoc, qui écrit ses liens dans `issn_links`. L'énumération `issn_status` garde `active`, `cancelled` et `unverified`.
 
 `serial_title_decisions` garde les fusions décidées par l'administration d'une revue sans ISSN dans une autre revue. `issns` quitte les champs saisis à la main des revues. `serial_name_forms` est supprimée. `sudoc_max_per_run` compte des ISSN.
 """
@@ -33,11 +33,6 @@ def _recreate_status(values: str, old_name: str) -> str:
 
 def upgrade() -> None:
     op.execute("""
-        DELETE FROM publishing.serial_issns i
-        WHERE i.serial_id IS NULL
-          AND EXISTS (SELECT 1 FROM publishing.serial_issns o
-                      WHERE o.issn = i.issn AND o.serial_id IS NOT NULL);
-
         DELETE FROM publishing.serial_issns WHERE status = 'malformed';
 
         ALTER TABLE publishing.serial_issns ADD COLUMN issnl text;
@@ -50,6 +45,18 @@ def upgrade() -> None:
         UPDATE publishing.serial_issns
         SET serial_id = NULL, status = 'active', sudoc_checked_at = NULL
         WHERE status IN ('related_title', 'supplement');
+
+        -- Un ISSN présent dans plusieurs lignes garde la ligne rattachée à une revue, puis celle de l'ISSN-L, puis la ligne vérifiée, puis la plus ancienne.
+        DELETE FROM publishing.serial_issns i
+        USING (
+            SELECT id, row_number() OVER (
+                PARTITION BY issn
+                ORDER BY serial_id IS NOT NULL DESC, linking DESC,
+                         sudoc_checked_at IS NOT NULL DESC, id
+            ) AS rank
+            FROM publishing.serial_issns
+        ) ranked
+        WHERE i.id = ranked.id AND ranked.rank > 1;
 
         DROP INDEX publishing.uq_serial_issns_linking;
         ALTER TABLE publishing.serial_issns DROP COLUMN linking;
