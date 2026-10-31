@@ -1,6 +1,6 @@
 """Sous-étape de la phase `finalize` : suppression des éditeurs vides.
 
-Un éditeur vide n'a ni revue, ni monographie, ni enregistrement source, ni publication, ni préfixe DOI, ni paiement APC, ni décision de rattachement par titre (`serial_title_decisions`). Les formes de nom de l'éditeur supprimé sont supprimées avec lui. Le journal garde le nom de chaque éditeur supprimé.
+Un éditeur vide n'a ni revue, ni monographie, ni enregistrement source, ni publication, ni préfixe DOI, ni paiement APC. Les formes de nom de l'éditeur supprimé sont supprimées avec lui. Le journal garde le nom de chaque éditeur supprimé.
 """
 
 import logging
@@ -19,7 +19,6 @@ _DELETE_EMPTY_PUBLISHERS = text("""
     WHERE NOT EXISTS (SELECT 1 FROM serials j WHERE j.publisher_id = p.id)
       AND NOT EXISTS (SELECT 1 FROM doi_prefixes d WHERE d.publisher_id = p.id)
       AND NOT EXISTS (SELECT 1 FROM apc_payments a WHERE a.publisher_id = p.id)
-      AND NOT EXISTS (SELECT 1 FROM serial_title_decisions d WHERE d.publisher_id = p.id)
       AND NOT EXISTS (SELECT 1 FROM monographs m WHERE m.publisher_id = p.id)
       AND NOT EXISTS (SELECT 1 FROM source_records sr WHERE sr.publisher_id = p.id)
       AND NOT EXISTS (SELECT 1 FROM publications pu WHERE pu.publisher_id = p.id)

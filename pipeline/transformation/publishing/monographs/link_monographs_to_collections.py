@@ -1,6 +1,6 @@
 """Sous-étape de la phase `publishing` : rattachement de chaque monographie à sa collection.
 
-Les monographies sans collection à ISSN se regroupent en séries (`group_series`, `domain/serials/series.py`) : même clé de série, même éditeur, au moins deux volumes. Chaque série a son entrée dans `serials`, la revue sans ISSN de son titre et de son éditeur (`serial_for_title`), typée série d'actes ou collection de livres selon ses volumes. `choose_monograph_serial` (`domain/monographs/collection.py`) choisit ensuite l'entrée de chaque monographie : sa collection à ISSN, à défaut sa série sans ISSN, à défaut le volume lui-même, à défaut aucune. Une monographie en conflit reste en l'état, signalée. Le calcul se refait à chaque run, d'après les enregistrements sources.
+Les monographies sans collection à ISSN se regroupent en séries (`group_series`, `domain/serials/series.py`) : même clé de série, même éditeur, au moins deux volumes. Chaque série a son entrée dans `serials`, la revue sans ISSN de son titre et de son éditeur (`serial_for_title_and_publisher`), typée série d'actes ou collection de livres selon ses volumes. `choose_monograph_serial` (`domain/monographs/collection.py`) choisit ensuite l'entrée de chaque monographie : sa collection à ISSN, à défaut sa série sans ISSN, à défaut le volume lui-même, à défaut aucune. Une monographie en conflit reste en l'état, signalée. Le calcul se refait à chaque run, d'après les enregistrements sources.
 """
 
 import logging
@@ -92,7 +92,7 @@ def _series_by_monograph(
     ):
         if not normalize_text(group.title):
             continue
-        series_id = repo.serial_for_title(group.title, group.publisher_id)
+        series_id = repo.serial_for_title_and_publisher(group.title, group.publisher_id)
         kind = (
             SerialType.PROCEEDINGS
             if all(proceedings[i] for i in group.volume_ids)

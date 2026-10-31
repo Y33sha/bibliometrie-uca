@@ -1,4 +1,4 @@
-"""Store des revues : revue d'un ISSN-L, revue sans ISSN d'un titre et d'un éditeur, titre et type de la table `serials`, pour le pipeline.
+"""Store des revues : revue d'un ISSN-L, revue sans ISSN d'un titre ou d'un titre et d'un éditeur, titre et type de la table `serials`, pour le pipeline.
 
 L'édition dans l'administration passe par `infrastructure/repositories/serial_repository.py`, la fusion par `serial_merge`.
 """
@@ -6,7 +6,7 @@ L'édition dans l'administration passe par `infrastructure/repositories/serial_r
 from collections.abc import Sequence
 from typing import NamedTuple
 
-from sqlalchemy import Connection, any_, exists, literal, select, text, update
+from sqlalchemy import ColumnElement, Connection, any_, exists, literal, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from domain.normalize import normalize_text, to_plain_text
@@ -62,15 +62,27 @@ class SerialStore:
         )
         return created
 
-    def serial_for_title(self, title: str, publisher_id: int | None) -> int:
+    def serial_for_title(self, title: str) -> int:
+        """Renvoie la revue sans ISSN de ce titre normalisé, créée si elle manque. Le plus petit identifiant départage deux revues."""
+        return self._serial_without_issn(title, None)
+
+    def serial_for_title_and_publisher(self, title: str, publisher_id: int | None) -> int:
         """Renvoie la revue sans ISSN de ce titre normalisé et de cet éditeur, créée si elle manque. Le plus petit identifiant départage deux revues."""
+        return self._serial_without_issn(
+            title, publisher_id, serials.c.publisher_id.is_not_distinct_from(publisher_id)
+        )
+
+    def _serial_without_issn(
+        self, title: str, publisher_id: int | None, *conditions: ColumnElement[bool]
+    ) -> int:
+        """Renvoie la plus ancienne revue sans ISSN de ce titre normalisé qui remplit `conditions`, créée avec l'éditeur `publisher_id` si elle manque."""
         title = to_plain_text(title)
         found: int | None = self._conn.execute(
             select(serials.c.id)
             .where(
                 serials.c.title_normalized == normalize_text(title),
-                serials.c.publisher_id.is_not_distinct_from(publisher_id),
                 ~exists().where(serial_issns.c.serial_id == serials.c.id),
+                *conditions,
             )
             .order_by(serials.c.id)
             .limit(1)

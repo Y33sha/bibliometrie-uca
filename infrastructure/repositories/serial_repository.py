@@ -84,18 +84,12 @@ class PgSerialRepository(SerialRepository):
         ).scalar_one_or_none()
 
     def record_title_decision(self, source_id: int, target_id: int) -> None:
-        source = self._conn.execute(
-            select(serials.c.title_normalized, serials.c.publisher_id).where(
-                serials.c.id == source_id
-            )
-        ).one()
+        title_normalized = self._conn.execute(
+            select(serials.c.title_normalized).where(serials.c.id == source_id)
+        ).scalar_one()
         self._conn.execute(
             pg_insert(serial_title_decisions)
-            .values(
-                title_normalized=source.title_normalized,
-                publisher_id=source.publisher_id,
-                serial_id=target_id,
-            )
+            .values(title_normalized=title_normalized, serial_id=target_id)
             .on_conflict_do_update(
                 constraint="uq_serial_title_decisions", set_={"serial_id": target_id}
             )

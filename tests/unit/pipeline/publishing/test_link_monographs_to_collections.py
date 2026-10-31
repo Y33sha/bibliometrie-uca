@@ -24,7 +24,7 @@ class _Repo:
     def set_serial_type_if_unknown(self, serial_id, serial_type) -> None:
         self.typed = (serial_id, serial_type)
 
-    def serial_for_title(self, title: str, publisher_id: int | None) -> int:
+    def serial_for_title_and_publisher(self, title: str, publisher_id: int | None) -> int:
         self.created.append((title, publisher_id))
         return 500
 

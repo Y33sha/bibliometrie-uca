@@ -502,18 +502,16 @@ class TestMergeSerials:
             serial_service.merge_serials(target, source)
 
     def test_revue_sans_issn_absorbee_garde_une_decision(self, sa_sync_conn, serial_service):
-        """La fusion d'une revue sans ISSN se garde comme décision de rattachement par son titre et son éditeur."""
-        publisher = insert_publisher(sa_sync_conn, "Elsevier")
+        """La fusion d'une revue sans ISSN se garde comme décision de rattachement par son titre."""
         target = _serial(sa_sync_conn, title="Nature", issn="0028-0836")
-        source = _serial(sa_sync_conn, title="Nature (London)", publisher_id=publisher)
+        source = _serial(sa_sync_conn, title="Nature (London)")
 
         serial_service.merge_serials(target, source)
 
         row = _fetch_one(
-            sa_sync_conn,
-            "SELECT title_normalized, publisher_id, serial_id FROM serial_title_decisions",
+            sa_sync_conn, "SELECT title_normalized, serial_id FROM serial_title_decisions"
         )
-        assert tuple(row) == ("nature (london)", publisher, target)
+        assert tuple(row) == ("nature (london)", target)
 
     def test_enriches_target_metadata(self, sa_sync_conn, serial_service):
         target = _serial(sa_sync_conn, title="Target")

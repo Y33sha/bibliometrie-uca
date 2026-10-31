@@ -1,12 +1,13 @@
 """Règles de rattachement d'un enregistrement source à sa revue, d'après la série qu'il décrit (`biblio.journal`).
 
-Une revue correspond à un ISSN-L. L'ISSN-L d'un ISSN est celui du Sudoc, à défaut celui qu'OpenAlex donne avec cet ISSN, à défaut l'ISSN lui-même. Un enregistrement source rejoint la revue de l'ISSN-L de ses ISSN. Ses ISSN mènent parfois à plusieurs ISSN-L : il rejoint alors la seule revue de titre compatible avec le sien. À défaut, il rejoint la revue de son identifiant OpenAlex, puis la revue désignée par son titre.
+Une revue correspond à un ISSN-L. L'ISSN-L d'un ISSN est celui du Sudoc, à défaut celui qu'OpenAlex donne avec cet ISSN, à défaut l'ISSN lui-même. Un enregistrement source rejoint la revue de l'ISSN-L de ses ISSN. Ses ISSN mènent parfois à plusieurs ISSN-L : le titre départage alors les revues. À défaut, il rejoint la revue de son identifiant OpenAlex, puis la revue désignée par son titre.
 """
 
 from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 
+from domain.normalize import normalize_text, to_plain_text
 from domain.serials.titles import compatible_titles
 
 
@@ -34,10 +35,15 @@ def most_frequent[T: str | int](counter: Counter[T]) -> T:
     return min(value for value, n in counter.items() if n == best)
 
 
+def title_key(title: str | None) -> str:
+    """Renvoie la forme de comparaison d'un titre de série reçu d'une source."""
+    return normalize_text(to_plain_text(title)) if title else ""
+
+
 def choose_issnl(title: str | None, candidates: Mapping[str, str]) -> str | None:
     """Renvoie l'ISSN-L de l'enregistrement source parmi `candidates`, ou `None` s'ils restent indiscernables.
 
-    Un seul candidat l'emporte d'office. Parmi plusieurs, seul compte celui dont la revue a un titre compatible avec `title` (`compatible_titles`).
+    Un seul candidat l'emporte d'office. Parmi plusieurs, l'emporte la seule revue de même titre normalisé que `title`, à défaut la seule de titre compatible (`compatible_titles`) : « INRA productions animales » est compatible avec « INRAE Productions Animales », « INRAE productions animales » est identique.
 
     Args:
         candidates: titre de la revue de chaque ISSN-L candidat.
@@ -46,8 +52,11 @@ def choose_issnl(title: str | None, candidates: Mapping[str, str]) -> str | None
         return next(iter(candidates))
     if not title:
         return None
-    compatible = [issnl for issnl, name in candidates.items() if compatible_titles(title, name)]
-    return compatible[0] if len(compatible) == 1 else None
+    key = title_key(title)
+    matches = [issnl for issnl, name in candidates.items() if title_key(name) == key] or [
+        issnl for issnl, name in candidates.items() if compatible_titles(title, name)
+    ]
+    return matches[0] if len(matches) == 1 else None
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,14 +68,12 @@ class TitledSerial:
 
 
 def match_by_title(publisher_id: int | None, serials: Sequence[TitledSerial]) -> int | None:
-    """Renvoie la seule revue à ISSN de même titre et d'éditeur compatible, ou `None`. Deux éditeurs sont compatibles s'ils sont égaux, ou si l'un manque.
+    """Renvoie la seule revue à ISSN de même titre, quel que soit son éditeur. Parmi plusieurs, renvoie la seule de l'éditeur `publisher_id`, ou `None`.
 
     Args:
         serials: revues à ISSN de même titre normalisé que la série.
     """
-    matches = [
-        s.id
-        for s in serials
-        if s.publisher_id is None or publisher_id is None or s.publisher_id == publisher_id
-    ]
-    return matches[0] if len(matches) == 1 else None
+    if len(serials) == 1:
+        return serials[0].id
+    same = [s.id for s in serials if publisher_id is not None and s.publisher_id == publisher_id]
+    return same[0] if len(same) == 1 else None

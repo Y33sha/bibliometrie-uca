@@ -103,22 +103,31 @@ def test_issn_de_deux_issn_l_departages_par_le_titre(conn):
 
 
 def test_par_titre_la_seule_revue_a_issn_de_meme_titre(conn):
+    """Chaque source nomme l'éditeur à sa façon : « INRAE », « Université de Bordeaux »."""
     serial_id = insert_serial(conn, "Frictions")
     insert_serial_issn(conn, serial_id, issn="1298-5724", issnl="1298-5724", sudoc_checked=True)
-    issn = _record(conn, "a", title="Frictions", issns=_issns("1298-5724"))
-    title_only = _record(conn, "b", title="Frictions")
+    issn = _record(
+        conn,
+        "a",
+        title="Frictions",
+        issns=_issns("1298-5724"),
+        publisher_id=insert_publisher(conn, "INRAE"),
+    )
+    title_only = _record(
+        conn, "b", title="Frictions", publisher_id=insert_publisher(conn, "Université de Bordeaux")
+    )
     _attach(conn)
     assert _serial_of(conn, title_only) == _serial_of(conn, issn) == serial_id
 
 
 def test_titre_sans_revue_a_issn_forme_une_revue_sans_issn(conn):
-    publisher = insert_publisher(conn, "Éditions X")
-    first = _record(conn, "a", title="Revue locale", publisher_id=publisher)
-    second = _record(conn, "b", title="Revue Locale", publisher_id=publisher)
-    other_publisher = _record(conn, "c", title="Revue locale")
+    """Cas réel : « Edition CdP », « Editions CdP » ou aucun éditeur pour la même série."""
+    first = _record(conn, "a", title="Clinic", publisher_id=insert_publisher(conn, "Edition CdP"))
+    second = _record(conn, "b", title="CLINIC", publisher_id=insert_publisher(conn, "Editions CdP"))
+    no_publisher = _record(conn, "c", title="Clinic")
     _attach(conn)
-    assert _serial_of(conn, first) == _serial_of(conn, second) is not None
-    assert _serial_of(conn, other_publisher) not in (None, _serial_of(conn, first))
+    assert _serial_of(conn, first) == _serial_of(conn, second) == _serial_of(conn, no_publisher)
+    assert _serial_of(conn, first) is not None
 
 
 def test_decision_de_l_administration(conn):
@@ -126,8 +135,8 @@ def test_decision_de_l_administration(conn):
     insert_serial_issn(conn, target, issn="0028-0836", issnl="0028-0836", sudoc_checked=True)
     conn.execute(
         text(
-            "INSERT INTO serial_title_decisions (title_normalized, publisher_id, serial_id)"
-            " VALUES ('nature london', NULL, :s)"
+            "INSERT INTO serial_title_decisions (title_normalized, serial_id)"
+            " VALUES ('nature london', :s)"
         ),
         {"s": target},
     )

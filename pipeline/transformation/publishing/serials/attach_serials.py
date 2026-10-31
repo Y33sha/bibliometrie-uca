@@ -5,7 +5,7 @@
 `attach_serials` applique les règles de `domain.serials.attachment` :
 
 - chaque ISSN reçoit la revue de son ISSN-L. Cette revue est celle de la ligne de l'ISSN-L, à défaut la plus fréquente parmi les ISSN de cet ISSN-L, à défaut une revue créée. Une revue va à un seul ISSN-L ;
-- chaque enregistrement source rejoint la revue de l'ISSN-L de ses ISSN, à défaut la revue de son identifiant OpenAlex, à défaut la revue de son titre : décision de l'administration (`serial_title_decisions`), seule revue à ISSN de même titre et d'éditeur compatible, ou revue sans ISSN de son titre et de son éditeur ;
+- chaque enregistrement source rejoint la revue de l'ISSN-L de ses ISSN, à défaut la revue de son identifiant OpenAlex, à défaut la revue de son titre : décision de l'administration (`serial_title_decisions`), seule revue à ISSN de même titre, ou revue sans ISSN de même titre, créée au besoin. L'éditeur départage plusieurs revues à ISSN de même titre ;
 - le titre d'une revue sans notice Sudoc est le plus fréquent parmi ses enregistrements sources. Son identifiant OpenAlex et son modèle OA viennent des enregistrements sources OpenAlex dont l'ISSN-L, d'après OpenAlex, est celui de la revue. Un champ saisi à la main reste inchangé.
 
 Un enregistrement source qui change de revue est marqué pour la réconciliation. Pour un enregistrement source dont la revue est corrigée par la correction des métadonnées, la revue calculée devient la valeur d'avant correction (`corrections.serial_id.raw`). Une revue vidée de ses enregistrements sources, sans ISSN ni monographie, est absorbée par la revue qui en reçoit le plus, avec une redirection.
@@ -19,7 +19,6 @@ from dataclasses import dataclass, field
 
 from sqlalchemy import Connection, Row, text
 
-from domain.normalize import normalize_text, to_plain_text
 from domain.publications.identifiers import ISSN
 from domain.serials.attachment import (
     TitledSerial,
@@ -28,6 +27,7 @@ from domain.serials.attachment import (
     match_by_title,
     most_frequent,
     openalex_issnls,
+    title_key,
 )
 from domain.serials.containers import SeriesDescription
 from domain.serials.issns import IssnStatus
@@ -63,7 +63,7 @@ _SERIALS = text("""
     FROM serials s
 """)
 
-_DECISIONS = text("SELECT title_normalized, publisher_id, serial_id FROM serial_title_decisions")
+_DECISIONS = text("SELECT title_normalized, serial_id FROM serial_title_decisions")
 
 _SET_ISSN_SERIALS = text("""
     UPDATE serial_issns i SET serial_id = t.serial_id
@@ -284,11 +284,9 @@ def _attach(
     for s in serials.values():
         if s.has_issn or s.id in serial_of_issnl.values():
             by_title.setdefault(s.title_normalized, []).append(TitledSerial(s.id, s.publisher_id))
-    decisions = {
-        (r.title_normalized, r.publisher_id): r.serial_id for r in conn.execute(_DECISIONS)
-    }
+    decisions = {r.title_normalized: r.serial_id for r in conn.execute(_DECISIONS)}
     store = SerialStore(conn)
-    untitled: dict[tuple[str, int | None], int] = {}
+    untitled: dict[str, int] = {}
     result = _Attachment()
     for m in mentions:
         series = m.series
@@ -308,19 +306,18 @@ def _attach(
             result.serial_of[m.id] = by_openalex[series.openalex_id]
             result.by_way["openalex"] += 1
             continue
-        title_normalized = normalize_text(to_plain_text(series.title)) if series.title else ""
+        title_normalized = title_key(series.title)
         if not title_normalized:
             result.serial_of[m.id] = None
             result.by_way["unattached"] += 1
             continue
-        key = (title_normalized, m.publisher_id)
-        found = decisions.get(key) or match_by_title(
+        found = decisions.get(title_normalized) or match_by_title(
             m.publisher_id, by_title.get(title_normalized, [])
         )
         if found is None:
-            if key not in untitled:
-                untitled[key] = store.serial_for_title(str(series.title), m.publisher_id)
-            found = untitled[key]
+            if title_normalized not in untitled:
+                untitled[title_normalized] = store.serial_for_title(str(series.title))
+            found = untitled[title_normalized]
         result.serial_of[m.id] = found
         result.by_way["title"] += 1
     return result

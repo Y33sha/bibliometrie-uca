@@ -46,9 +46,21 @@ def test_plusieurs_issn_l_departages_par_le_titre():
     assert choose_issnl(None, candidates) is None
 
 
-def test_rattachement_par_titre_a_la_seule_revue_d_editeur_compatible():
-    serials = [TitledSerial(1, 10), TitledSerial(2, 20)]
+def test_titre_identique_avant_titre_compatible():
+    """Cas réel : un article donne l'ISSN d'« INRAE Productions Animales » et celui de son titre précédent."""
+    candidates = {
+        "2824-3633": "INRAE productions animales",
+        "2273-774X": "INRA productions animales",
+    }
+    assert choose_issnl("INRAE Productions Animales", candidates) == "2824-3633"
+
+
+def test_seule_revue_a_issn_d_un_titre_quel_que_soit_l_editeur():
+    assert match_by_title(30, [TitledSerial(3, 10)]) == 3
+
+
+def test_editeur_departage_les_revues_a_issn_d_un_titre():
+    serials = [TitledSerial(1, 10), TitledSerial(2, 20), TitledSerial(3, None)]
     assert match_by_title(10, serials) == 1
     assert match_by_title(None, serials) is None
-    assert match_by_title(30, [TitledSerial(3, None)]) == 3
     assert match_by_title(30, serials) is None

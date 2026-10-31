@@ -521,18 +521,12 @@ serial_title_decisions = Table(
     metadata,
     Column("id", Integer, primary_key=True),
     Column("title_normalized", Text, nullable=False),
-    Column("publisher_id", Integer),
     Column("serial_id", Integer, nullable=False),
     Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
-    UniqueConstraint(
-        "title_normalized",
-        "publisher_id",
-        name="uq_serial_title_decisions",
-        postgresql_nulls_not_distinct=True,
-    ),
+    UniqueConstraint("title_normalized", name="uq_serial_title_decisions"),
     comment=(
-        "Fusions décidées par l'administration : une série sans ISSN, de ce titre normalisé et de "
-        "cet éditeur, est rattachée à la revue."
+        "Fusions décidées par l'administration : une série sans ISSN de ce titre normalisé est "
+        "rattachée à la revue."
     ),
     schema="publishing",
 )

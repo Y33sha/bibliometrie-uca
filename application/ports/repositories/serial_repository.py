@@ -28,7 +28,7 @@ class SerialRepository(Protocol):
         ...
 
     def record_title_decision(self, source_id: int, target_id: int) -> None:
-        """Garde la fusion de la revue sans ISSN `source_id` dans `target_id` : une série de son titre normalisé et de son éditeur est rattachée à `target_id`."""
+        """Garde la fusion de la revue sans ISSN `source_id` dans `target_id` : une série de son titre normalisé est rattachée à `target_id`."""
         ...
 
     def save(self, serial: Serial) -> None:
