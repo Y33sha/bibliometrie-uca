@@ -2,6 +2,7 @@
 
 import calendar
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
 from enum import StrEnum
@@ -29,6 +30,13 @@ class PublicationDate:
         """Renvoie la date à l'année `year`."""
         return cls(date(year, 1, 1), DatePrecision.YEAR)
 
+    @classmethod
+    def stored(cls, value: date | None, precision: str | None) -> PublicationDate | None:
+        """Renvoie la date lue dans les colonnes `publication_date` et `publication_date_precision`, ou `None` sans date."""
+        if value is None or precision is None:
+            return None
+        return cls(value, DatePrecision(precision))
+
     @property
     def year(self) -> int:
         return self.value.year
@@ -40,6 +48,31 @@ class PublicationDate:
         if self.value.month == 1:
             return PublicationDate(self.value, DatePrecision.YEAR)
         return PublicationDate(self.value, DatePrecision.MONTH)
+
+
+_RANK = {DatePrecision.YEAR: 0, DatePrecision.MONTH: 1, DatePrecision.DAY: 2}
+
+
+def _agrees(coarse: PublicationDate, fine: PublicationDate) -> bool:
+    """Vrai si `fine` a l'année de `coarse`, et son mois quand `coarse` est au mois ou au jour."""
+    if fine.value.year != coarse.value.year:
+        return False
+    return coarse.precision is DatePrecision.YEAR or fine.value.month == coarse.value.month
+
+
+def arbitrate_publication_date(dates: Sequence[PublicationDate]) -> PublicationDate | None:
+    """Renvoie la date de la première source de `dates`, précisée par les suivantes quand elles concordent : « 2024 » puis « 15 octobre 2024 » donnent le 15 octobre 2024, « 2024 » puis « 15 octobre 2023 » donnent 2024.
+
+    Args:
+        dates: dates des enregistrements sources, de la source prioritaire à la moins prioritaire.
+    """
+    if not dates:
+        return None
+    best = dates[0]
+    for candidate in dates[1:]:
+        if _RANK[candidate.precision] > _RANK[best.precision] and _agrees(best, candidate):
+            best = candidate
+    return best
 
 
 _MIN_YEAR, _MAX_YEAR = 1000, 2100

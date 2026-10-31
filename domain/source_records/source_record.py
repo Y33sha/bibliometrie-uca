@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 
+from domain.publications.dates import PublicationDate
 from domain.source_records.keys import DoiKeys
 from domain.types import JsonValue
 
@@ -33,3 +34,4 @@ class SourceRecord:
     license: str | None = None
     """Licence normalisée (valeur de `License`)."""
     publisher_id: int | None = None
+    publication_date: PublicationDate | None = None

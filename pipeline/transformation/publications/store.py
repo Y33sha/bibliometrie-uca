@@ -6,6 +6,7 @@ from collections.abc import Mapping
 from sqlalchemy import Connection, text
 
 from domain.merge import MergedEntity
+from domain.publications.dates import PublicationDate
 from domain.publications.identifiers import DOI
 from domain.publications.publication import Publication
 from domain.types import JsonValue
@@ -48,7 +49,9 @@ class PublicationStore:
             text("""
                 SELECT p.id, p.title, p.title_normalized,
                        CAST(p.doc_type AS text) AS doc_type,
-                       p.publication_year, p.doi,
+                       p.publication_year, p.publication_date,
+                       CAST(p.publication_date_precision AS text) AS publication_date_precision,
+                       p.doi,
                        CAST(p.oa_status AS text) AS oa_status,
                        CAST(p.license AS text) AS license,
                        CAST(p.deposit_license AS text) AS deposit_license,
@@ -68,6 +71,9 @@ class PublicationStore:
             id=m["id"],
             title=m["title"],
             publication_year=m["publication_year"],
+            publication_date=PublicationDate.stored(
+                m["publication_date"], m["publication_date_precision"]
+            ),
             title_normalized=m["title_normalized"],
             doc_type=m["doc_type"],
             doi=DOI(m["doi"]) if m["doi"] else None,
@@ -91,7 +97,7 @@ class PublicationStore:
         )
 
     def save(self, publication: Publication) -> None:
-        """Enregistre les champs modifiables d'une publication déjà insérée ; `publication_year` reste celle de la création."""
+        """Enregistre les champs modifiables d'une publication déjà insérée."""
         if publication.id is None:
             raise ValueError(
                 "save(publication) : publication.id doit être posé (utiliser create pour insérer)"
@@ -102,6 +108,9 @@ class PublicationStore:
                     title = :title,
                     title_normalized = :tn,
                     doc_type = CAST(:dt AS doc_type),
+                    publication_year = :publication_year,
+                    publication_date = :publication_date,
+                    publication_date_precision = CAST(:publication_date_precision AS date_precision),
                     doi = :doi,
                     oa_status = CAST(:oa AS oa_type),
                     license = CAST(:license AS license_type),
@@ -126,6 +135,7 @@ class PublicationStore:
                 "title": publication.title,
                 "tn": publication.title_normalized,
                 "dt": publication.doc_type,
+                **_date_params(publication.publication_year, publication.publication_date),
                 "doi": str(publication.doi) if publication.doi else None,
                 "oa": publication.oa_status,
                 "license": publication.license,
@@ -174,14 +184,17 @@ class PublicationStore:
         doi: str | None,
         oa_status: str,
     ) -> int:
-        """Insère une publication, sans dédoublonnage, la marque pour l'alignement des auteurs et renvoie son `id`. Les colonnes autres que les colonnes NOT NULL et le DOI prennent leur valeur par défaut ; `save` les pose."""
+        """Insère une publication, sans dédoublonnage, la marque pour l'alignement des auteurs et renvoie son `id`. La date est à l'année `publication_year`. Les colonnes autres que les colonnes NOT NULL, la date et le DOI prennent leur valeur par défaut ; `save` les pose."""
         return scalar_int(
             self._conn.execute(
                 text(f"""
                 WITH inserted AS (
                     INSERT INTO publications
-                        (title, title_normalized, doc_type, publication_year, doi, oa_status)
-                    VALUES (:title, :tn, CAST(:doc_type AS doc_type), :py, :doi,
+                        (title, title_normalized, doc_type, publication_year, publication_date,
+                         publication_date_precision, doi, oa_status)
+                    VALUES (:title, :tn, CAST(:doc_type AS doc_type), :publication_year,
+                            :publication_date,
+                            CAST(:publication_date_precision AS date_precision), :doi,
                             CAST(:oa AS oa_type))
                     RETURNING id
                 ),
@@ -192,7 +205,7 @@ class PublicationStore:
                     "title": title,
                     "tn": title_normalized,
                     "doc_type": doc_type,
-                    "py": publication_year,
+                    **_date_params(publication_year, PublicationDate.of_year(publication_year)),
                     "doi": doi,
                     "oa": oa_status,
                 },
@@ -224,6 +237,21 @@ class PublicationStore:
             text("DELETE FROM publications WHERE id = :id"),
             {"id": publication_id},
         )
+
+
+def _date_params(year: int, publication_date: PublicationDate | None) -> dict[str, object]:
+    """Renvoie les paramètres de l'année et de la date de publication. L'année suit la date, à défaut `year`."""
+    if publication_date is None:
+        return {
+            "publication_year": year,
+            "publication_date": None,
+            "publication_date_precision": None,
+        }
+    return {
+        "publication_year": publication_date.year,
+        "publication_date": publication_date.value,
+        "publication_date_precision": publication_date.precision.value,
+    }
 
 
 def _json_dumps_or_none(value: Mapping[str, JsonValue] | None) -> str | None:

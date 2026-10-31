@@ -7,6 +7,7 @@ from domain.publications.aggregation import (
     assign_publisher,
     refresh_from_sources,
 )
+from domain.publications.dates import PublicationDate, date_from_parts
 from domain.publications.identifiers import DOI
 from domain.publications.publication import Publication
 from domain.source_records.keys import DoiKeys
@@ -20,6 +21,7 @@ def _source_record(**overrides) -> SourceRecord:
         "source_id": "s",
         "title": "Titre",
         "publication_year": 2020,
+        "publication_date": PublicationDate.of_year(2020),
         "doc_type": "dataset",
         "doi": "10.9001/set",
         "serial_id": None,
@@ -111,6 +113,7 @@ class TestChampsAgreges:
         source = _source_record(
             title="Blé <i>durum</i>",
             publication_year=2021,
+            publication_date=date_from_parts(2021, 3),
             doi="10.1234/ABC",
             serial_id=7,
             monograph_id=9,
@@ -127,6 +130,7 @@ class TestChampsAgreges:
         refresh_from_sources(publication, [source], source_priority=_PRIORITY)
         assert publication.title_normalized == "ble durum"
         assert publication.publication_year == 2021
+        assert publication.publication_date == date_from_parts(2021, 3)
         assert publication.doi == DOI("10.1234/abc")
         assert publication.serial_id == 7
         assert publication.monograph_id == 9

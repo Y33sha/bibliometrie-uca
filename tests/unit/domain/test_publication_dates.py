@@ -7,6 +7,7 @@ import pytest
 from domain.publications.dates import (
     DatePrecision,
     PublicationDate,
+    arbitrate_publication_date,
     date_from_parts,
     parse_date_parts,
     parse_iso_date,
@@ -53,6 +54,26 @@ def test_date_crossref():
 )
 def test_date_wos(raw, year, expected):
     assert parse_wos_date(raw, year) == expected
+
+
+def test_date_de_la_source_prioritaire_precisee_par_les_autres():
+    """HAL, prioritaire, donne l'année ; OpenAlex le mois ; Crossref le jour du même mois."""
+    dates = [
+        date_from_parts(2024),
+        date_from_parts(2024, 10),
+        date_from_parts(2024, 10, 15),
+    ]
+    assert arbitrate_publication_date(dates) == PublicationDate(date(2024, 10, 15), DAY)
+
+
+def test_date_discordante_ignoree():
+    assert arbitrate_publication_date(
+        [date_from_parts(2024), date_from_parts(2023, 10, 15)]
+    ) == PublicationDate.of_year(2024)
+    assert arbitrate_publication_date(
+        [date_from_parts(2024, 10), date_from_parts(2024, 11, 15)]
+    ) == PublicationDate(date(2024, 10, 1), MONTH)
+    assert arbitrate_publication_date([]) is None
 
 
 def test_jour_bouche_trou():

@@ -22,6 +22,7 @@ Les enregistrements sources et les publications ont seulement une année (`publi
 - La date d'un enregistrement source est celle du champ de date de sa source (tableau du contexte), et l'année en dérive. HAL : `publicationDate_s`, à défaut l'année `producedDateY_i`. Crossref : la première date plausible parmi `published`, `issued`, `published-online`, `published-print` et `approved`.
 - OpenAlex et ScanR : le 1er janvier est ramené à l'année, le 1er d'un autre mois au mois.
 - WoS garde sa date à l'année : la source n'est plus moissonnée.
+- La date d'une publication est celle de la source prioritaire, précisée par les autres sources quand elles concordent : même année, et même mois quand la date retenue est au mois.
 
 ## Phasage
 
@@ -60,5 +61,3 @@ Mesures du 2026-10-30 sur tout le stock : 354 711 enregistrements sources, 79 90
 - [ ] Mise à jour de la documentation.
 
 ## Questions ouvertes
-
-- Date d'une publication : la plus ancienne, la plus précise, celle de la source prioritaire ; date en ligne ou date papier.

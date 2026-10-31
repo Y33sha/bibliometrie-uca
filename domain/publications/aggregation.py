@@ -6,6 +6,7 @@ from typing import cast
 from domain.normalize import normalize_text
 from domain.platforms.registry import is_publisher_platform_prefix
 from domain.publications.conference import arbitrate_conference
+from domain.publications.dates import arbitrate_publication_date
 from domain.publications.doc_types import ARTICLE_SUBTYPES, DocType
 from domain.publications.identifiers import DOI
 from domain.publications.licenses import DEPOSIT_LICENSE_SOURCE, publisher_license_sources
@@ -28,6 +29,7 @@ def refresh_from_sources(
 
     - Champs simples : première valeur non nulle dans l'ordre de `source_priority`. Sans revue dans aucune source, la publication prend la collection de sa monographie (`monograph_serials`).
     - Type de document : `arbitrate_doc_type_with_article_subtype`, puis `arbitrate_conference`.
+    - Date de publication : `arbitrate_publication_date` ; l'année en dérive.
     - Licence : celle de la version éditeur (`publisher_license_sources`). Licence de dépôt : celle du fichier déposé dans HAL.
     - Rétractation : déclarée par une source au moins.
     - Mots-clés et pays : union sans doublon.
@@ -50,9 +52,14 @@ def refresh_from_sources(
     publication.doc_type = arbitrate_conference(
         arbitrate_doc_type_with_article_subtype(sorted_sources), sorted_sources
     )
-    publication.publication_year = (
-        as_int(first_non_null(sorted_sources, "publication_year")) or publication.publication_year
+    publication.publication_date = (
+        arbitrate_publication_date(
+            [s.publication_date for s in sorted_sources if s.publication_date]
+        )
+        or publication.publication_date
     )
+    if publication.publication_date is not None:
+        publication.publication_year = publication.publication_date.year
 
     new_doi_str = publication_doi(sorted_sources)
     publication.doi = DOI(new_doi_str) if new_doi_str else None
