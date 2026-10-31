@@ -53,12 +53,16 @@ def _hal_editorial_fields(source: SourceRecord) -> bool:
 
 
 def attests_publication(source: SourceRecord) -> bool:
-    """Vrai si l'enregistrement source décrit un texte publié : DOI, revue, monographie, congrès déclaré par Crossref, ou champs éditoriaux d'un enregistrement source HAL."""
+    """Vrai si l'enregistrement source décrit un texte publié : DOI, revue, monographie, congrès déclaré par Crossref, ou champs éditoriaux d'un enregistrement source HAL. Un dépôt HAL réduit à des annexes (diaporama, résumé) désigne une communication : ses champs éditoriaux comptent pour rien."""
     if source.dois.all or source.serial_id or source.monograph_id:
         return True
     if declares_conference(source.source_extras):
         return True
-    return source.source == "hal" and _hal_editorial_fields(source)
+    return (
+        source.source == "hal"
+        and not (source.source_extras or {}).get(SourceExtra.ANNEX_DEPOSIT)
+        and _hal_editorial_fields(source)
+    )
 
 
 def arbitrate_conference(doc_type: str, sources: list[SourceRecord]) -> str:

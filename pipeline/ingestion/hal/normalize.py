@@ -1,6 +1,5 @@
 """Normalisation des enregistrements sources HAL."""
 
-import re
 from collections.abc import Mapping
 from datetime import date
 from functools import lru_cache
@@ -47,6 +46,7 @@ from pipeline.ingestion.common.source_records import (
 )
 from pipeline.ingestion.common.staging import StagingRow
 from pipeline.ingestion.hal.payload import (
+    communication_annex,
     derive_hal_oa_status,
     extract_hal_source_extras,
     hal_text_field,
@@ -108,37 +108,29 @@ def get_container_title(doc: Mapping[str, JsonValue]) -> str | None:
 
 
 def get_oa_status(doc: Mapping[str, JsonValue], embargo_until: date | None) -> str | None:
-    """Renvoie le statut open access, tiré de `openAccess_bool`, du fichier déposé, du lien externe et de l'embargo actif."""
+    """Renvoie le statut open access, tiré de `openAccess_bool`, du fichier déposé ou de l'annexe d'une communication, du lien externe et de l'embargo actif."""
     is_open = doc.get("openAccess_bool")
     return derive_hal_oa_status(
         is_open if isinstance(is_open, bool) else None,
         hal_text_field(doc.get("fileMain_s")),
         hal_text_field(doc.get("linkExtId_s")),
         embargo_until,
+        communication_annex(doc),
     )
 
 
-_HAL_VERSION = re.compile(r"v\d+$")
-"""Numéro de version en fin d'adresse d'un dépôt HAL (`hal-01607327v1`)."""
-
-
-def unversioned_hal_url(uri: str) -> str:
-    """Renvoie l'adresse d'un dépôt HAL sans son numéro de version (`hal-01607327v1` → `hal-01607327`)."""
-    return _HAL_VERSION.sub("", uri)
-
-
 def get_locations(doc: Mapping[str, JsonValue], embargo_until: date | None) -> list[LocationFacts]:
-    """Renvoie la page du dépôt HAL (`uri_s`, sans numéro de version), avec le fichier déposé (`fileMain_s`), sa licence et la fin de son embargo. La copie est ouverte quand un fichier est déposé."""
+    """Renvoie la page du dépôt HAL (`uri_s`), avec le fichier déposé (`fileMain_s`, à défaut l'annexe d'une communication), sa licence et la fin de son embargo. La copie est ouverte quand elle a un fichier."""
     uri = hal_text_field(doc.get("uri_s"))
     if not uri:
         return []
-    file_main = hal_text_field(doc.get("fileMain_s"))
+    file = hal_text_field(doc.get("fileMain_s")) or communication_annex(doc)
     return [
         LocationFacts(
-            url=unversioned_hal_url(uri),
-            pdf_url=file_main,
+            url=uri,
+            pdf_url=file,
             license=normalize_license(hal_text_field(doc.get("licence_s"))),
-            is_oa=file_main is not None,
+            is_oa=file is not None,
             embargo_until=embargo_until,
         )
     ]

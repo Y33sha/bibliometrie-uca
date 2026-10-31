@@ -24,6 +24,7 @@ from pipeline.ingestion.hal.normalize import (
     extract_hal_author_block,
     get_container_facts,
     get_locations,
+    get_oa_status,
     get_title,
     hal_source_record,
     page_range,
@@ -259,9 +260,27 @@ class TestGetLocations:
             True,
         )
 
-    def test_adresse_du_depot_sans_numero_de_version(self):
-        [location] = get_locations({"uri_s": "https://hal.science/hal-01607327v2"}, None)
-        assert location.url == "https://hal.science/hal-01607327"
+    def test_annexe_d_une_communication_ouverte(self):
+        doc = {
+            "uri_s": "https://hal.science/hal-04",
+            "docType_s": "COMM",
+            "fileAnnexes_s": ["https://hal.science/hal-04/file/slides.pdf"],
+        }
+        [location] = get_locations(doc, None)
+        assert (location.pdf_url, location.is_oa) == (
+            "https://hal.science/hal-04/file/slides.pdf",
+            True,
+        )
+        assert get_oa_status(doc, None) == "green"
+
+    def test_annexe_d_un_article_fermee(self):
+        doc = {
+            "uri_s": "https://hal.science/hal-05",
+            "docType_s": "ART",
+            "fileAnnexes_s": ["https://hal.science/hal-05/file/supplement.pdf"],
+        }
+        [location] = get_locations(doc, None)
+        assert (location.pdf_url, location.is_oa) == (None, False)
 
     def test_depot_sans_fichier_ferme(self):
         [location] = get_locations({"uri_s": "https://hal.science/hal-02"}, None)

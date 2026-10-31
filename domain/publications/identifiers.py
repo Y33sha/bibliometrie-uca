@@ -149,6 +149,22 @@ def extract_hal_id_from_url(raw: str | None) -> str | None:
     return m.group(1) if m else None
 
 
+_SEPARATE_HAL_PORTALS = {"dumas": "dumas.ccsd.cnrs.fr", "tel": "theses.hal.science"}
+"""Portail des dépôts inaccessibles depuis `hal.science`, par préfixe d'identifiant : mémoires DUMAS, thèses TEL."""
+
+
+def hal_deposit_url(url: str) -> str | None:
+    """Renvoie l'adresse du dépôt HAL désigné par une URL de portail HAL : `https://hal.science/<identifiant sans version>`, ou le portail propre d'un dépôt DUMAS ou TEL. `None` pour une URL d'un autre hôte."""
+    host = urlparse(url.strip().lower()).hostname
+    if not host or not is_hal_host(host):
+        return None
+    hal_id = extract_hal_id_from_url(url)
+    if not hal_id:
+        return None
+    portal = _SEPARATE_HAL_PORTALS.get(hal_id.partition("-")[0], "hal.science")
+    return f"https://{portal}/{hal_id}"
+
+
 class HALId(NormalizedIdentifier):
     """Identifiant HAL d'un dépôt (`hal-…`, `tel-…`, `halshs-…`), en minuscules et sans version (`hal-04123456v2` → `hal-04123456`). Accepte une URL."""
 

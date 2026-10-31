@@ -20,7 +20,8 @@ Documentation API : https://api.archives-ouvertes.fr/docs
 ## Données récupérées
 
 - **Publications** : titre, DOI, année, type de document, langue, revue (titre, ISSN, eISSN, éditeur), ISBN (lu dans le TEI), OA, licence du fichier déposé (`licence_s`), URI, résumé, mots-clés, domaines HAL, biblio (volume/numéro/pages)
-- **Localisation** (`source_record_locations`) : la page du dépôt (`uri_s`) et le fichier déposé (`fileMain_s`), avec sa licence. La copie est ouverte quand un fichier est déposé ; un dépôt sans fichier, qui renvoie seulement vers un autre emplacement, est fermé. Un fichier sous embargo est fermé jusqu'à la fin de l'embargo, date portée par la copie.
+- **Localisation** (`source_record_locations`) : la page du dépôt (`uri_s`) et le fichier déposé (`fileMain_s`), avec sa licence. La copie est ouverte quand un fichier est déposé ; un dépôt sans fichier, qui renvoie seulement vers un autre emplacement, est fermé. Pour une communication ou un poster (`COMM`, `POSTER`, `PRESCONF`), une annexe (`fileAnnexes_s` : diaporama, poster, résumé) tient lieu de fichier déposé. Un fichier sous embargo est fermé jusqu'à la fin de l'embargo, date portée par la copie.
+- **Dépôt réduit à des annexes** : il désigne une communication. Ses champs éditoriaux (indicateur « avec actes », pages, éditeur, collection) n'attestent pas un texte publié.
 - **Auteurs** : nom complet, compte HAL, idHAL, ORCID et IdRef si présents
 - **Affiliations** : structures HAL directes de chaque auteur et leur ROR, lus dans le TEI. HAL donne des structures de son référentiel, sans texte d'affiliation : les contributions sources HAL sont sans adresse.
 

@@ -34,6 +34,8 @@ class SourceExtra(StrEnum):
     """Titre de la source (HAL)."""
     LICENCE = "licence"
     """Licence du dépôt (HAL)."""
+    ANNEX_DEPOSIT = "annex_deposit"
+    """Dépôt réduit à des annexes, sans fichier principal (HAL)."""
     RELATED_IDENTIFIERS = "related_identifiers"
     """Identifiants liés, avec leur type de relation (DataCite)."""
     RIGHTS = "rights"
