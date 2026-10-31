@@ -19,6 +19,9 @@ class PlatformType(StrEnum):
 
 PLATFORM_TYPES: tuple[PlatformType, ...] = tuple(PlatformType)
 
+ARCHIVE_TYPES = frozenset({PlatformType.REPOSITORY, PlatformType.PREPRINT_SERVER})
+"""Types des archives et des serveurs de preprints : une copie hébergée ailleurs est chez l'éditeur."""
+
 _DESCRIPTIVE_PAGE_SITES = (
     "doaj.org",
     "doabooks.org",

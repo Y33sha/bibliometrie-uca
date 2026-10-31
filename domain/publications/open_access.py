@@ -12,14 +12,12 @@ from collections.abc import Iterable
 from dataclasses import dataclass, replace
 from typing import Protocol
 
-from domain.platforms.platform import PlatformType
+from domain.platforms.platform import ARCHIVE_TYPES
 from domain.publications.access import Copy, open_copies
 from domain.publications.licenses import OPEN_LICENSES
 from domain.publications.metadata import OaStatus
 from domain.serials.serial import OaModel
 from domain.sources.registry import Source
-
-_ARCHIVE_TYPES = frozenset({PlatformType.REPOSITORY, PlatformType.PREPRINT_SERVER})
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -54,11 +52,11 @@ def copies_facts(copies: Iterable[Copy]) -> OpenAccessFacts:
     """Renvoie les accès constatés sur les copies d'une publication (`open_copies`). Une copie, même fermée, informe sur la publication."""
     copies = list(copies)
     opened = open_copies(copies)
-    publisher = [c for c in opened if c.platform_type not in _ARCHIVE_TYPES]
+    publisher = [c for c in opened if c.platform_type not in ARCHIVE_TYPES]
     return OpenAccessFacts(
         publisher_open=bool(publisher),
         publisher_licensed=any(c.license in OPEN_LICENSES for c in publisher),
-        archive_open=any(c.platform_type in _ARCHIVE_TYPES for c in opened),
+        archive_open=any(c.platform_type in ARCHIVE_TYPES for c in opened),
         embargoed=any(c.embargoed for c in copies),
         informed=bool(copies),
     )

@@ -1,5 +1,8 @@
 """Liens d'accès d'une publication (`domain.publications.access`)."""
 
+from dataclasses import replace
+
+from domain.platforms.platform import PlatformType
 from domain.platforms.registry import ARXIV, HAL, ZENODO
 from domain.publications.access import Access, AccessLink, Copy, access, access_url
 
@@ -129,6 +132,16 @@ def test_le_doi_de_la_publication_sur_une_plateforme_du_registre_figure_parmi_le
     assert result == Access(
         url="https://doi.org/10.5281/zenodo.8278818",
         links=[AccessLink("Zenodo", "https://doi.org/10.5281/zenodo.8278818", known=True)],
+    )
+
+
+def test_le_doi_de_la_publication_chez_un_editeur_reste_hors_des_liens():
+    copy = replace(
+        _copy("https://doi.org/10.48611/isbn.978-2", platform="Classiques Garnier"),
+        platform_type=PlatformType.PUBLISHER_PLATFORM,
+    )
+    assert access([copy], doi="10.48611/isbn.978-2") == Access(
+        url="https://doi.org/10.48611/isbn.978-2", links=[]
     )
 
 

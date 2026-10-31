@@ -163,6 +163,15 @@ KNOWN_PLATFORMS: tuple[KnownPlatform, ...] = (
     _publisher_platform("Centre Mersenne", {"10.5802"}, hosts=("centre-mersenne.org",)),
     _publisher_platform("Project MUSE", {"10.1353"}, hosts=("muse.jhu.edu",)),
     _publisher_platform("Université de Bordeaux", {"10.20870"}),
+    # Éditeurs déposant leurs DOI chez DataCite, qu'OpenAlex range parmi les entrepôts. Leurs préfixes désignent l'éditeur lui-même, pas une plateforme d'éditeurs.
+    _publisher_platform("Classiques Garnier", set(), ("S7407051766", "S7407051950")),
+    _publisher_platform("Éditions et presses universitaires de Reims", set(), ("S7407051763",)),
+    _publisher_platform("Underline Science", set(), ("S7407053148",)),
+    _publisher_platform("IUGG 2023", set(), ("S7407051559",)),
+    _publisher_platform("Association Universitaire de Génie Civil", set(), ("S7407051738",)),
+    _publisher_platform(
+        "Association Française d'Etudes et de Recherches sur les Aérosols", set(), ("S7407051736",)
+    ),
 )
 
 PMC_ARTICLE_URL = "https://www.ncbi.nlm.nih.gov/pmc/articles/{}/"

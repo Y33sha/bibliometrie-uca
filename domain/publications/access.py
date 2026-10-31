@@ -2,14 +2,14 @@
 
 Seules les copies ouvertes comptent (`open_copies`). Une copie se classe par sa version (éditeur, acceptée, soumise, inconnue), puis par l'ordre d'arrivée de son enregistrement source. Chaque plateforme donne sa meilleure copie ; une copie sans plateforme se range sous l'hôte de son URL.
 
-La meilleure copie donne l'adresse d'accès. Une copie désignée par un DOI figure parmi les liens quand une plateforme du registre l'héberge (Zenodo), ou quand une autre plateforme l'héberge sous un autre DOI que celui de la publication. Le DOI de la publication s'affiche à part.
+La meilleure copie donne l'adresse d'accès. Une copie désignée par un DOI figure parmi les liens quand une archive ou un serveur de preprints l'héberge (Zenodo), ou quand une autre plateforme l'héberge sous un autre DOI que celui de la publication. Le DOI de la publication chez son éditeur s'affiche à part.
 """
 
 from collections.abc import Iterable
 from dataclasses import dataclass
 from urllib.parse import unquote, urlsplit
 
-from domain.platforms.platform import PlatformType
+from domain.platforms.platform import ARCHIVE_TYPES, PlatformType
 from domain.platforms.registry import KnownPlatform
 from domain.publications.identifiers import extract_hal_id_from_url
 from domain.publications.licenses import License
@@ -71,7 +71,7 @@ def _label(copy: Copy) -> str:
 
 def _listed(copy: Copy, doi: str | None) -> bool:
     """Vrai si la copie figure parmi les liens."""
-    if _host(copy) not in _DOI_HOSTS or copy.known_platform is not None:
+    if _host(copy) not in _DOI_HOSTS or copy.platform_type in ARCHIVE_TYPES:
         return True
     target = unquote(urlsplit(copy.url).path).lstrip("/").lower()
     return copy.platform is not None and target != (doi or "").lower()
