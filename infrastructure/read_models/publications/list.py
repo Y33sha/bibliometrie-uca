@@ -8,6 +8,7 @@ from sqlalchemy import Connection, Row, text
 
 from domain.normalize import normalize_text, to_plain_text
 from domain.publications.access import access_url
+from domain.publications.dates import DatePrecision, PublicationDate
 from domain.publications.licenses import license_label
 from domain.source_records.source_extras import SourceExtra
 from domain.sources.hal import HAL_DEPOSIT_STATUS_LABELS
@@ -83,9 +84,9 @@ def _perimeter_labs(*, person_filter: bool = False, correlated: bool = True) -> 
                    {person_clause}"""
 
 
-# Expression triée par champ de `PublicationSort`, tris par jointure exceptés. Auteur de thèse trié par nom puis prénom.
+# Expression triée par champ de `PublicationSort`, tris par jointure exceptés. Année triée par la date de publication, auteur de thèse par nom puis prénom.
 _SORT_FIELDS = {
-    "year": "p.publication_year",
+    "year": "p.publication_date",
     "title": "p.title",
     "apc": _APC_SORT,
     "soutenance": source_extra(SourceExtra.DATE_SOUTENANCE, "p"),
@@ -162,6 +163,7 @@ def _publication_lines(
         cell = {
             "Type": row.doc_type or "",
             "Année": row.publication_year or "",
+            "Date": PublicationDate(row.publication_date, DatePrecision(row.precision)).isoformat(),
             "Titre": _plain_text(row.title),
             "Revue": row.journal_title or "",
             "Éditeur": row.publisher_name or "",
@@ -383,6 +385,7 @@ class PublicationListQueries:
             text(f"""
                 SELECT
                     p.id, p.title, p.publication_year, p.doi, p.doc_type::text AS doc_type,
+                    p.publication_date, p.publication_date_precision::text AS precision,
                     p.oa_status::text AS oa_status, p.best_copy_url,
                     p.license::text AS license,
                     j.title AS journal_title,
@@ -430,7 +433,9 @@ class PublicationListQueries:
 
         spec = [
             ("type", "Type"),
+            # La colonne de l'année donne aussi la date, réduite à sa précision.
             ("year", "Année"),
+            ("year", "Date"),
             ("doi", "DOI"),
             ("title", "Titre"),
             ("serial", "Revue"),

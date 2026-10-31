@@ -2,6 +2,7 @@
 
 from sqlalchemy import text
 
+from domain.publications.dates import PublicationDate
 from domain.publications.licenses import License
 from pipeline.ingestion.common.source_records import (
     SourceRecordStore,
@@ -20,7 +21,7 @@ def test_licence_ecrite_puis_reecrite(sa_sync_conn):
                 source_id="W_license",
                 staging_id=staging_id,
                 title="Titre",
-                publication_year=2024,
+                publication_date=PublicationDate.of_year(2024),
                 license=found,
             ),
         )

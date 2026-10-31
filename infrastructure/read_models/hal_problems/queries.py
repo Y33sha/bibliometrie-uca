@@ -347,12 +347,12 @@ class HalProblemsQueries:
 
         rows = self._conn.execute(
             text(f"""
-                SELECT DISTINCT p.id, p.title, p.publication_year, p.doc_type::text AS doc_type,
-                       p.doi,
+                SELECT DISTINCT p.id, p.title, p.publication_year, p.publication_date,
+                       p.doc_type::text AS doc_type, p.doi,
                        (SELECT array_agg(sr2.source_id) FROM source_records sr2
                         WHERE sr2.publication_id = p.id AND sr2.source = 'hal') AS halids
                 {base_where}
-                ORDER BY p.publication_year DESC NULLS LAST, p.id DESC
+                ORDER BY p.publication_date DESC, p.id DESC
                 LIMIT :pg_limit OFFSET :pg_offset
             """),
             binds,
@@ -436,7 +436,7 @@ class HalProblemsQueries:
                        ) AS laboratories
                 FROM conflict_pubs cp
                 JOIN publications p ON p.id = cp.publication_id
-                ORDER BY p.publication_year DESC NULLS LAST, p.id DESC
+                ORDER BY p.publication_date DESC, p.id DESC
                 LIMIT :pg_limit OFFSET :pg_offset
             """),
             {

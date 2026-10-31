@@ -4,6 +4,7 @@ from functools import partial
 
 from sqlalchemy import text
 
+from domain.publications.dates import PublicationDate
 from domain.source_records.identifiers import (
     SourceIdentifier,
     SourceIdentifierRole,
@@ -15,7 +16,7 @@ from pipeline.ingestion.common.source_records import (
     SourceRecordUpsert,
 )
 from tests.integration.helpers.queues import clear, queued
-from tests.integration.helpers.serials import insert_publisher, insert_serial
+from tests.integration.helpers.serials import insert_publisher
 from tests.integration.helpers.staging import insert_staging
 
 # Ligne de staging theses.fr « t-stg ».
@@ -28,7 +29,7 @@ def _row(staging_id: int, **overrides) -> SourceRecordUpsert:
         "source_id": "2023ABC001",
         "staging_id": staging_id,
         "title": "Ma thèse",
-        "publication_year": 2023,
+        "publication_date": PublicationDate.of_year(2023),
         "raw_doc_type": "thesis",
     }
     return SourceRecordUpsert(**{**defaults, **overrides})
@@ -268,12 +269,12 @@ class TestUpsertSourceRecord:
 class TestPublisher:
     """L'éditeur nommé par la source s'écrit, sauf pour une production hébergée sans être publiée."""
 
-    def _publisher_of(self, conn, **overrides) -> int | None:
+    def _publisher_of(self, conn, *, has_series: bool = False, **overrides) -> int | None:
         publisher_id = insert_publisher(conn, "Éditeur")
         staging_id = insert_staging(conn, source="datacite", source_id="dc-stg")
         defaults = {"source": "datacite", "source_id": "10.9/x", "publisher_id": publisher_id}
         source_record_id = SourceRecordStore(conn).upsert_source_record(
-            _row(staging_id, **{**defaults, **overrides})
+            _row(staging_id, **{**defaults, **overrides}), has_series=has_series
         )
         return conn.execute(
             text("SELECT publisher_id FROM source_records WHERE id = :id"),
@@ -281,9 +282,8 @@ class TestPublisher:
         ).scalar_one()
 
     def test_article_datacite_dans_une_revue(self, sa_sync_conn):
-        serial_id = insert_serial(sa_sync_conn, "Revue")
         assert (
-            self._publisher_of(sa_sync_conn, raw_doc_type="JournalArticle", serial_id=serial_id)
+            self._publisher_of(sa_sync_conn, raw_doc_type="JournalArticle", has_series=True)
             is not None
         )
 
@@ -291,5 +291,4 @@ class TestPublisher:
         assert self._publisher_of(sa_sync_conn, raw_doc_type="JournalArticle") is None
 
     def test_jeu_de_donnees(self, sa_sync_conn):
-        serial_id = insert_serial(sa_sync_conn, "Revue")
-        assert self._publisher_of(sa_sync_conn, raw_doc_type="Dataset", serial_id=serial_id) is None
+        assert self._publisher_of(sa_sync_conn, raw_doc_type="Dataset", has_series=True) is None

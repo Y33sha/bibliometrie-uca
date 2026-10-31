@@ -116,6 +116,20 @@ INTER_OA_DOCS = [
 ]
 
 
+def attach_serials(conn) -> None:
+    """Rattache les enregistrements sources normalisés à leur revue, comme la phase `publishing`."""
+    import logging
+
+    from pipeline.transformation.publishing.serials.attach_serials import (
+        run_attach_serials,
+        run_sync_issns,
+    )
+
+    logger = logging.getLogger("test_attach_serials")
+    run_sync_issns(conn, logger)
+    run_attach_serials(conn, logger)
+
+
 class TestNormalizeInterSourceIdempotence:
     """Normaliser HAL, puis OpenAlex, puis HAL de nouveau crée chaque publication une seule fois."""
 
@@ -172,6 +186,7 @@ class TestNormalizeInterSourceIdempotence:
 
         run_normalize_hal(sa_sync_conn)
         run_normalize_oa(sa_sync_conn)
+        attach_serials(sa_sync_conn)
 
         cnt = sa_sync_conn.execute(
             text("""

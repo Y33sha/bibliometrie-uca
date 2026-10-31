@@ -1,26 +1,12 @@
-"""Recherche ou création des éditeurs et des revues (`pipeline/transformation/publishing/find_or_create.py`)."""
-
-from functools import partial
-from types import SimpleNamespace
+"""Recherche ou création des éditeurs (`pipeline/transformation/publishing/find_or_create.py`) et des revues (`SerialStore`)."""
 
 import pytest
 from sqlalchemy import text
 
-from domain.serials.issns import source_issns
-from pipeline.transformation.publishing.find_or_create import (
-    find_or_create_publisher,
-    find_or_create_serial,
-)
+from pipeline.transformation.publishing.find_or_create import find_or_create_publisher
 from pipeline.transformation.publishing.publishers.store import PublisherStore
 from pipeline.transformation.publishing.serials.store import SerialStore
-from tests.integration.helpers.serials import (
-    insert_publisher,
-    insert_serial_with_issns,
-    issn_columns,
-    mark_checked_in_sudoc,
-)
-
-_serial = partial(insert_serial_with_issns, title="Nature")
+from tests.integration.helpers.serials import insert_publisher
 
 
 @pytest.fixture
@@ -36,12 +22,6 @@ def publisher_store(sa_sync_conn):
 def _fetch_one(conn, sql_text: str, **params):
     """Exécute un SELECT et renvoie sa première ligne, ou `None`."""
     return conn.execute(text(sql_text), params).first()
-
-
-def _find_or_create(title, *, issn=None, eissn=None, issnl=None, **kwargs):
-    """Appelle `find_or_create_serial` avec un ISSN papier, un ISSN en ligne et un ISSN-L."""
-    issns = source_issns(print_issn=issn, electronic_issn=eissn, linking=issnl)
-    return find_or_create_serial(title, issns=issns, **kwargs)
 
 
 class TestFindOrCreatePublisher:
@@ -98,176 +78,29 @@ class TestFindOrCreatePublisher:
         assert row.openalex_id == "P123"
 
 
-class TestFindOrCreateSerial:
-    def test_returns_none_on_empty_title(self, sa_sync_conn, gateway):
-        assert _find_or_create(None, repo=gateway) is None
-        assert _find_or_create("", repo=gateway) is None
-
-    def test_creates_new_serial(self, sa_sync_conn, gateway):
-        j_id = _find_or_create("Nature", issn="0028-0836", repo=gateway)
-        row = _fetch_one(sa_sync_conn, "SELECT title FROM serials WHERE id = :id", id=j_id)
-        row = SimpleNamespace(title=row.title, issn=issn_columns(sa_sync_conn, j_id).issn)
-        assert row.title == "Nature"
-        assert row.issn == "0028-0836"
-
-    def test_un_titre_encode_rejoint_le_meme_serial_que_le_titre_en_clair(
-        self, sa_sync_conn, gateway
-    ):
-        """Un titre avec entités HTML (`&amp;`) rejoint la revue du titre en clair. Le titre affiché et la clé de matching dérivent du même titre décodé."""
-        premier = _find_or_create("Wood & Fire Safety", repo=gateway)
-        second = _find_or_create("Wood &amp; Fire Safety", repo=gateway)
-        assert second == premier
+class TestSerialStore:
+    def test_revue_d_un_issn_l_creee_puis_retrouvee(self, sa_sync_conn, gateway):
+        serial_id = gateway.serial_for_issnl("0028-0836", "Nature")
+        assert gateway.serial_for_issnl("0028-0836", "Autre titre") == serial_id
         row = _fetch_one(
             sa_sync_conn,
-            "SELECT title, title_normalized FROM serials WHERE id = :id",
-            id=premier,
+            "SELECT s.title, i.serial_id FROM serials s JOIN serial_issns i ON i.serial_id = s.id "
+            "WHERE i.issn = '0028-0836'",
         )
-        assert row.title == "Wood & Fire Safety"
-        assert "amp" not in row.title_normalized
+        assert tuple(row) == ("Nature", serial_id)
 
-    def test_finds_by_openalex_id(self, sa_sync_conn, gateway):
-        existing = _serial(sa_sync_conn, openalex_id="S137773608")
-        found = _find_or_create("Nature Journal", openalex_id="S137773608", repo=gateway)
-        assert found == existing
+    def test_revue_sans_issn_d_un_titre(self, sa_sync_conn, gateway):
+        serial_id = gateway.serial_for_title("Revue &amp; Société")
+        assert gateway.serial_for_title("Revue & Société") == serial_id
 
-    def test_finds_by_issn(self, sa_sync_conn, gateway):
-        existing = _serial(sa_sync_conn, issn="0028-0836")
-        found = _find_or_create("Nature Variant", issn="0028-0836", repo=gateway)
-        assert found == existing
+    def test_revue_sans_issn_d_un_titre_et_d_un_editeur(self, sa_sync_conn, gateway):
+        elsevier = insert_publisher(sa_sync_conn, "Elsevier")
+        serial_id = gateway.serial_for_title_and_publisher("Revue &amp; Société", elsevier)
+        assert gateway.serial_for_title_and_publisher("Revue & Société", elsevier) == serial_id
+        assert gateway.serial_for_title_and_publisher("Revue & Société", None) != serial_id
 
-    def test_finds_by_eissn(self, sa_sync_conn, gateway):
-        existing = _serial(sa_sync_conn, eissn="1476-4687")
-        found = _find_or_create("Nature", eissn="1476-4687", repo=gateway)
-        assert found == existing
-
-    def test_finds_by_issnl(self, sa_sync_conn, gateway):
-        existing = _serial(sa_sync_conn, issnl="0028-0836")
-        found = _find_or_create("Other Title", issnl="0028-0836", repo=gateway)
-        assert found == existing
-
-    def test_finds_by_name_form(self, sa_sync_conn, gateway):
-        _find_or_create("Nature", repo=gateway)
-        found = _find_or_create("nature", repo=gateway)
-        n = sa_sync_conn.execute(
-            text("SELECT COUNT(*) AS n FROM serials WHERE title_normalized = 'nature'")
-        ).scalar_one()
-        assert n == 1
-        assert found is not None
-
-    def test_forme_sans_editeur_enregistree_une_fois(self, sa_sync_conn, gateway):
-        """Une forme sans éditeur s'enregistre une seule fois, quel que soit le nombre de rattachements par ISSN."""
-        serial_id = _find_or_create("Viatica", issn="0028-0836", repo=gateway)
-        for _ in range(3):
-            assert _find_or_create("Viatica", issn="0028-0836", repo=gateway) == serial_id
-        assert (
-            _fetch_one(
-                sa_sync_conn,
-                "SELECT count(*) AS n FROM serial_name_forms WHERE serial_id = :id",
-                id=serial_id,
-            ).n
-            == 1
-        )
-
-    def test_enriches_metadata_on_match(self, sa_sync_conn, gateway, publisher_store):
-        """Une revue trouvée par ISSN reçoit l'ISSN qu'elle n'a pas. L'éditeur de l'enregistrement source s'enregistre avec la forme de nom ; la revue reste sans éditeur."""
-        existing = _serial(sa_sync_conn, issn="0028-0836")
-        publisher_id = find_or_create_publisher("Springer", repo=publisher_store)
-        _find_or_create(
-            "Nature",
-            issn="0028-0836",
-            eissn="1476-4687",
-            publisher_id=publisher_id,
-            repo=gateway,
-        )
-        assert issn_columns(sa_sync_conn, existing).eissn == "1476-4687"
-        assert (
-            _fetch_one(
-                sa_sync_conn, "SELECT publisher_id FROM serials WHERE id = :id", id=existing
-            ).publisher_id
-            is None
-        )
-        assert (
-            _fetch_one(
-                sa_sync_conn,
-                "SELECT count(*) AS n FROM serial_name_forms WHERE serial_id = :id AND publisher_id = :p",
-                id=existing,
-                p=publisher_id,
-            ).n
-            == 1
-        )
-
-    def test_normalizes_issn_on_create(self, sa_sync_conn, gateway):
-        j_id = _find_or_create("Nature", issn="00280836", eissn="1476-4687", repo=gateway)
-        row = issn_columns(sa_sync_conn, j_id)
-        assert row.issn == "0028-0836"
-        assert row.eissn == "1476-4687"
-
-    def test_finds_by_issn_under_another_form(self, sa_sync_conn, gateway):
-        existing = _find_or_create("Nature", issn="0028-0836", repo=gateway)
-        found = _find_or_create("Nature Variant", issn="ISSN 00280836", repo=gateway)
-        assert found == existing
-
-    def test_titles_emptied_by_normalization_do_not_match(self, sa_sync_conn, gateway):
-        """Un titre grec et un titre cyrillique, tous deux normalisés en chaîne vide, donnent deux revues."""
-        greek = _find_or_create("Παιδαγωγικά ρεύματα στο Αιγαίο", repo=gateway)
-        cyrillic = _find_or_create("Теория вероятностей и ее применения", repo=gateway)
-        assert greek != cyrillic
-
-    def test_invalid_issn_is_kept_aside_and_logged(self, sa_sync_conn, gateway, caplog):
-        j_id = _find_or_create("Nature", issn="(Internet)", eissn="1476-4687", repo=gateway)
-        row = issn_columns(sa_sync_conn, j_id)
-        assert row.issn is None
-        assert row.eissn == "1476-4687"
-        assert row.rejected_issns == ["(Internet)"]
-        assert "ISSN mal formé (revue 'Nature') : '(Internet)'" in caplog.text
-
-    def test_rejected_issns_accumulate_without_duplicates(self, sa_sync_conn, gateway):
-        """Les ISSN invalides s'ajoutent à ceux de la revue trouvée, sans doublon."""
-        j_id = _find_or_create("Nature", issn="0028-0836", eissn="1476-4688", repo=gateway)
-        _find_or_create("Nature", issn="0028-0836", eissn="1476-4688", repo=gateway)
-        _find_or_create("Nature", issn="0028-0836", issnl="1234-5678", repo=gateway)
-        row = issn_columns(sa_sync_conn, j_id)
-        assert row.rejected_issns == ["1234-5678", "1476-4688"]
-
-    def test_known_issn_is_not_copied_into_a_free_column(self, sa_sync_conn, gateway):
-        """Une source qui donne comme ISSN papier l'ISSN électronique d'une revue vérifiée ne défait pas son rangement."""
-        j_id = _serial(sa_sync_conn, eissn="1476-4687")
-        mark_checked_in_sudoc(sa_sync_conn, j_id)
-        _find_or_create("Nature", issn="1476-4687", repo=gateway)
-        row = issn_columns(sa_sync_conn, j_id)
-        assert row.issn is None
-        assert row.eissn == "1476-4687"
-        assert row.sudoc_checked_at is not None
-
-    def test_issnl_value_can_fill_the_issn_column(self, sa_sync_conn, gateway):
-        """L'ISSN-L est l'ISSN de l'un des supports, il peut donc aussi figurer dans `issn`."""
-        j_id = _serial(sa_sync_conn, issnl="0028-0836")
-        _find_or_create("Nature", issn="0028-0836", repo=gateway)
-        row = issn_columns(sa_sync_conn, j_id)
-        assert (row.issn, row.issnl) == ("0028-0836", "0028-0836")
-
-    def test_rejected_issn_is_not_copied_into_a_column(self, sa_sync_conn, gateway):
-        """Un ISSN rejeté (ici un CD-ROM) retrouve la revue sans revenir dans une colonne."""
-        j_id = _serial(sa_sync_conn, issn="0305-1048", rejected=("1362-4954",))
-        mark_checked_in_sudoc(sa_sync_conn, j_id)
-        found = _find_or_create("Other title", eissn="1362-4954", repo=gateway)
-        row = issn_columns(sa_sync_conn, j_id)
-        assert found == j_id
-        assert row.eissn is None
-        assert row.sudoc_checked_at is not None
-
-    def test_new_issn_makes_the_serial_to_check_again(self, sa_sync_conn, gateway):
-        j_id = _serial(sa_sync_conn, eissn="1476-4687")
-        mark_checked_in_sudoc(sa_sync_conn, j_id)
-        _find_or_create("Nature", issn="0028-0836", eissn="1476-4687", repo=gateway)
-        row = issn_columns(sa_sync_conn, j_id)
-        assert row.issn == "0028-0836"
-        assert row.sudoc_checked_at is None
-
-    def test_new_rejected_issn_makes_the_serial_to_check_again(self, sa_sync_conn, gateway):
-        j_id = _serial(sa_sync_conn, issn="0028-0836")
-        mark_checked_in_sudoc(sa_sync_conn, j_id)
-        _find_or_create("Nature", issn="0028-0836", eissn="1476-4688", repo=gateway)
-        row = issn_columns(sa_sync_conn, j_id)
-        assert row.rejected_issns == ["1476-4688"]
-        assert row.sudoc_checked_at is None
+    def test_une_revue_a_issn_n_est_pas_la_revue_sans_issn_de_son_titre(
+        self, sa_sync_conn, gateway
+    ):
+        with_issn = gateway.serial_for_issnl("0028-0836", "Nature")
+        assert gateway.serial_for_title("Nature") != with_issn

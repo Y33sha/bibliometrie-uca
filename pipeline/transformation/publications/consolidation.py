@@ -1,6 +1,7 @@
 """Recalcul de l'état consolidé d'une publication depuis ses `source_records`."""
 
 from collections.abc import Sequence
+from datetime import date
 from enum import StrEnum
 from typing import NamedTuple
 
@@ -11,6 +12,7 @@ from domain.publications.aggregation import (
     assign_publisher,
     refresh_from_sources as _refresh_aggregate,
 )
+from domain.publications.dates import PublicationDate
 from domain.publications.open_access import is_restricted, publication_oa_status
 from domain.publications.publication import Publication
 from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES
@@ -56,6 +58,8 @@ class _SourceRecordRow(NamedTuple):
     source_extras: dict[str, JsonValue] | None
     license: str | None
     publisher_id: int | None
+    publication_date: date | None
+    publication_date_precision: str | None
 
 
 def _source_record_from_row(
@@ -88,6 +92,9 @@ def _source_record_from_row(
         source_extras=row.source_extras,
         license=row.license,
         publisher_id=row.publisher_id,
+        publication_date=PublicationDate.stored(
+            row.publication_date, row.publication_date_precision
+        ),
     )
 
 
@@ -102,7 +109,8 @@ def source_records_of(conn: Connection, publication_id: int) -> list[SourceRecor
                    sr.is_retracted, sr.abstract,
                    sr.countries, sr.urls, sr.keywords,
                    sr.topics, sr.biblio, sr.source_extras, sr.license::text AS license,
-                   sr.publisher_id
+                   sr.publisher_id, sr.publication_date,
+                   sr.publication_date_precision::text AS publication_date_precision
             FROM source_records sr
             WHERE sr.publication_id = :id
         """),

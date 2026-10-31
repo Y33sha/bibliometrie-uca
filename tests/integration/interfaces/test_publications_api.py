@@ -293,11 +293,11 @@ class TestPublicationsExports:
         assert r.status_code == 200
 
     def test_csv_export_respects_columns(self, client):
-        """Le CSV contient les colonnes demandées, puis Titre et Accès, toujours présents."""
+        """Le CSV contient les colonnes demandées, puis Titre et Accès, toujours présents. La colonne de l'année donne aussi la date."""
         r = client.get("/api/publications/export.csv", params={"columns": "type,year"})
         assert r.status_code == 200
         header = r.text.splitlines()[0].lstrip("﻿").split(",")
-        assert header == ["Type", "Année", "Titre", "Accès"]
+        assert header == ["Type", "Année", "Date", "Titre", "Accès"]
 
     def test_csv_export_publisher_is_its_own_column(self, client):
         """La colonne de l'éditeur est distincte de celle de la revue."""

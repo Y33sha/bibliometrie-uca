@@ -7,6 +7,7 @@ from domain.countries import normalize_country_code
 from domain.normalize import drop_flattened_mathml
 from domain.persons.contributor_name import ContributorName
 from domain.publications.contribution_roles import map_role, merge_roles
+from domain.publications.dates import PublicationDate, date_from_parts, parse_iso_date
 from domain.publications.doc_types import DOC_TYPE_FAMILIES
 from domain.publications.identifiers import extract_hal_id_from_url
 from domain.publications.licenses import normalize_license
@@ -54,21 +55,17 @@ def get_title(doc: Mapping[str, JsonValue]) -> str | None:
     return drop_flattened_mathml(text) or None
 
 
+def get_publication_date(doc: Mapping[str, JsonValue]) -> PublicationDate | None:
+    """Renvoie la date de publication (`publicationDate`), au 1er janvier ramenée à l'année et au 1er d'un autre mois ramenée au mois (`without_placeholder_day`). À défaut, renvoie l'année (`year`)."""
+    if parsed := parse_iso_date(as_str(doc.get("publicationDate"))):
+        return parsed.without_placeholder_day()
+    return date_from_parts(as_int(doc.get("year")))
+
+
 def get_publisher(doc: Mapping[str, JsonValue]) -> PublisherFacts | None:
     """Renvoie l'éditeur du document : celui de sa source (`source.publisher`)."""
     publisher_name = as_str(as_mapping(doc.get("source")).get("publisher"))
     return PublisherFacts(publisher_name) if publisher_name else None
-
-
-def _extract_serial_issns(source: Mapping[str, JsonValue]) -> tuple[str | None, str | None]:
-    """Renvoie les ISSN papier et électronique de `source.journalIssns` : le premier, puis le second.
-
-    Les entrées suivantes (alias, ISSN-L, variantes historiques) sont écartées.
-    """
-    issns = as_sequence(source.get("journalIssns"))
-    issn = as_str(issns[0]) if len(issns) >= 1 else None
-    eissn = as_str(issns[1]) if len(issns) >= 2 else None
-    return issn, eissn
 
 
 def is_thesis(doc: Mapping[str, JsonValue]) -> bool:
@@ -206,15 +203,9 @@ def scanr_source_record(  # noqa: C901
             seen.add(u)
             urls.append(u)
 
-    # Éditeur et revue nommés par ScanR.
+    # Éditeur nommé par ScanR.
     source = as_mapping(doc.get("source"))
-    jissn, jeissn = _extract_serial_issns(source)
-    biblio_json = compact_biblio(
-        publisher=as_str(source.get("publisher")),
-        journal_title=None if is_thesis(doc) else as_str(source.get("title")),
-        journal_issn=jissn,
-        journal_eissn=jeissn,
-    )
+    biblio_json = compact_biblio(publisher=as_str(source.get("publisher")))
 
     return SourceRecordUpsert(
         source="scanr",
@@ -222,12 +213,10 @@ def scanr_source_record(  # noqa: C901
         staging_id=staging_id,
         identifiers=scanr_identifiers(doc, scanr_id),
         title=get_title(doc) or "",
-        publication_year=as_int(doc.get("year")),
         raw_doc_type=as_str(doc.get("type")),
-        serial_id=containers.serial_id,
         monograph_id=containers.monograph_id,
         container_title=(
-            as_str(source.get("title")) if not (containers.serial_id or is_thesis(doc)) else None
+            as_str(source.get("title")) if not (containers.has_series or is_thesis(doc)) else None
         ),
         raw_language=None,
         biblio=biblio_json,
@@ -353,6 +342,9 @@ class ScanrNormalizer(SourceNormalizer):
 
     def locations(self, doc: Document) -> list[LocationFacts]:
         return get_locations(doc)
+
+    def publication_date(self, doc: Document) -> PublicationDate | None:
+        return get_publication_date(doc)
 
     def source_record(
         self, row: StagingRow, doc: Document, containers: Containers

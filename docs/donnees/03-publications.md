@@ -12,7 +12,7 @@ Schéma PostgreSQL `publications`.
 
 | Table | Contenu | Contrainte |
 |---|---|---|
-| `publications` | Métadonnées consolidées : titre, type de document, année, DOI, statut d'accès, licences, langue, pays, publication en série, monographie, éditeur. `sources` : sources qui décrivent la publication. `publisher_id` : éditeur à la date de publication. `best_copy_url` : lien vers le texte intégral. `in_perimeter` : vrai pour au moins un indice de périmètre | Un DOI par publication, sans distinction de casse |
+| `publications` | Métadonnées consolidées : titre, type de document, date de publication avec sa précision, DOI, statut d'accès, licences, langue, pays, publication en série, monographie, éditeur. `publication_year` : année de la date de publication (colonne générée). `sources` : sources qui décrivent la publication. `publisher_id` : éditeur à la date de publication. `best_copy_url` : lien vers le texte intégral. `in_perimeter` : vrai pour au moins un indice de périmètre | Un DOI par publication, sans distinction de casse |
 | `publications_detail` | Résumé, mots-clés, thématiques et données bibliographiques | Une ligne par publication |
 | `publication_relations` | Lien orienté d'une publication vers une publication apparentée ou vers un DOI, avec le type de relation et sa source | La cible est une publication ou un DOI |
 | `manual_merges`, `manual_merge_source_records` | Fusions de publications décidées par l'administration, avec leurs enregistrements sources : la réconciliation les réunit dans une même publication | |

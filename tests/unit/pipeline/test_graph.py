@@ -72,10 +72,18 @@ def test_creation_de_lignes_change_toute_lecture_de_la_table():
     assert order_violations([id_reader, column_writer]) == []
 
 
-def test_la_fusion_des_revues_suit_le_typage_openalex():
-    """La fusion lit le type, l'APC et le modèle open access des revues, écrits par l'enrichissement OpenAlex."""
-    deps = dependencies(TASKS)["publishing.merge_duplicate_serials"]
-    assert "publishing.enrich_serials_from_openalex" in deps
+def test_le_rattachement_des_revues_suit_la_verification_sudoc():
+    """Le rattachement lit l'ISSN-L de chaque ISSN, écrit par la vérification Sudoc."""
+    deps = dependencies(TASKS)["publishing.attach_serials"]
+    assert {"publishing.sync_issns", "publishing.check_issns_in_sudoc"} <= deps
+
+
+def test_le_typage_openalex_suit_le_rattachement_des_revues():
+    """Le typage OpenAlex lit l'identifiant OpenAlex des revues, écrit par le rattachement."""
+    assert (
+        "publishing.attach_serials"
+        in dependencies(TASKS)["publishing.enrich_serials_from_openalex"]
+    )
 
 
 def test_le_nettoyage_des_informations_du_contributeur_suit_la_suppression_des_enregistrements_sources_disparus():

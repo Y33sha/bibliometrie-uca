@@ -7,6 +7,8 @@ Les migrations Alembic (`alembic/versions/`, écrites à la main) font foi sur l
 Le modèle couvre les tables et leurs colonnes. Index, clés étrangères et vues matérialisées (`contribution_structures`, `publication_author_alignment`, `publication_rors`, `publication_structures`, `source_contribution_structures`, `subject_cooccurrences`) relèvent des seules migrations : le filtre `include_object` d'`alembic/env.py` les écarte de la comparaison. Le code lit les vues matérialisées en SQL par leur nom, et les rafraîchit (`REFRESH`).
 """
 
+from datetime import date
+
 from sqlalchemy import (
     CHAR,
     REAL,
@@ -50,11 +52,13 @@ from domain.persons.identifiers import AttributionStatus
 from domain.persons.person import PersonExclusion
 from domain.platforms.platform import PLATFORM_TYPES
 from domain.publications.author_grouping import GroupingMethod
+from domain.publications.dates import DatePrecision
 from domain.publications.doc_types import DOC_TYPES
 from domain.publications.licenses import License
 from domain.publications.metadata import OA_RANK
 from domain.publications.relations import RelationType
 from domain.publishers.publisher import PUBLISHER_TYPES
+from domain.serials.issn_facts import ISSN_LINK_TYPES
 from domain.serials.issns import ISSN_STATUSES, ISSN_SUPPORTS
 from domain.serials.serial import OA_MODELS, SERIAL_TYPES
 from domain.source_records.identifiers import (
@@ -293,6 +297,7 @@ serial_type_enum = PgEnum(*SERIAL_TYPES, name="serial_type", create_type=False)
 oa_model_enum = PgEnum(*OA_MODELS, name="oa_model", create_type=False)
 issn_support_enum = PgEnum(*ISSN_SUPPORTS, name="issn_support", create_type=False)
 issn_status_enum = PgEnum(*ISSN_STATUSES, name="issn_status", create_type=False)
+issn_link_type_enum = PgEnum(*ISSN_LINK_TYPES, name="issn_link_type", create_type=False)
 
 
 structures = Table(
@@ -470,63 +475,66 @@ serial_issns = Table(
     "serial_issns",
     metadata,
     Column("id", Integer, primary_key=True),
+    Column("issn", Text, nullable=False, comment="ISSN, forme normalisée."),
     Column(
-        "issn",
+        "issnl",
         Text,
-        nullable=False,
-        comment="Forme normalisée si la valeur est valide, valeur reçue sinon (statut malformed).",
+        comment="ISSN-L de l'ISSN d'après sa notice Sudoc. NULL : inconnu.",
     ),
-    Column("serial_id", Integer),
-    Column("support", issn_support_enum, comment="Support de l'ISSN. NULL : inconnu."),
     Column(
-        "linking",
-        Boolean,
-        nullable=False,
-        server_default="false",
-        comment="Vrai pour l'ISSN-L de la revue.",
+        "serial_id",
+        Integer,
+        comment="Revue de l'ISSN-L de l'ISSN, calculée par la phase publishing.",
     ),
+    Column("support", issn_support_enum, comment="Support de l'ISSN. NULL : inconnu."),
     Column(
         "status",
         issn_status_enum,
         nullable=False,
         server_default="active",
-        comment=(
-            "active ; malformed (forme ou clé de contrôle fausse) ; cancelled ; related_title (titre "
-            "précédent ou suivant) ; supplement ; unverified (ISSN des enregistrements sources, sans "
-            "notice Sudoc)."
-        ),
+        comment="active ; cancelled (ISSN annulé) ; unverified (sans notice Sudoc).",
+    ),
+    Column(
+        "sudoc_title",
+        Text,
+        comment="Titre de la notice Sudoc de l'ISSN. NULL : sans notice, ou ISSN jamais vérifié.",
     ),
     Column(
         "sudoc_checked_at",
         DateTime(timezone=True),
         comment="Date de la vérification de l'ISSN au Sudoc. NULL : jamais vérifié.",
     ),
-    UniqueConstraint(
-        "issn",
-        "serial_id",
-        name="uq_serial_issns_issn_serial",
-        postgresql_nulls_not_distinct=True,
-    ),
+    UniqueConstraint("issn", name="uq_serial_issns_issn"),
+    comment="ISSN valides, une ligne par ISSN, et revue de leur ISSN-L.",
+    schema="publishing",
+)
+
+
+issn_links = Table(
+    "issn_links",
+    metadata,
+    Column("issn", Text, primary_key=True),
+    Column("linked_issn", Text, primary_key=True),
+    Column("link_type", issn_link_type_enum, primary_key=True),
     comment=(
-        "ISSN des revues. Sans revue : ISSN vérifié au Sudoc, dont la publication est absente de la base."
+        "Liens entre ISSN lus dans le Sudoc, une ligne par lien : continued_by, titre précédent "
+        "vers titre suivant ; supplement, revue principale vers supplément."
     ),
     schema="publishing",
 )
 
 
-serial_name_forms = Table(
-    "serial_name_forms",
+serial_title_decisions = Table(
+    "serial_title_decisions",
     metadata,
     Column("id", Integer, primary_key=True),
+    Column("title_normalized", Text, nullable=False),
     Column("serial_id", Integer, nullable=False),
-    Column("form_normalized", Text, nullable=False),
-    Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    Column("publisher_id", Integer),
-    UniqueConstraint(
-        "form_normalized",
-        "publisher_id",
-        name="uq_serial_name_forms_form_publisher",
-        postgresql_nulls_not_distinct=True,
+    Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    UniqueConstraint("title_normalized", name="uq_serial_title_decisions"),
+    comment=(
+        "Fusions décidées par l'administration : une série sans ISSN de ce titre normalisé est "
+        "rattachée à la revue."
     ),
     schema="publishing",
 )
@@ -659,6 +667,31 @@ platform_type_enum = PgEnum(*PLATFORM_TYPES, name="platform_type", create_type=F
 perimeter_evidence_enum = PgEnum(*PerimeterEvidence, name="perimeter_evidence", create_type=False)
 
 doc_type_enum = PgEnum(*DOC_TYPES, name="doc_type", create_type=False)
+date_precision_enum = PgEnum(*DatePrecision, name="date_precision", create_type=False)
+
+
+def publication_date_columns(*, nullable: bool) -> tuple[Column[date], Column[str], Column[int]]:
+    """Renvoie les colonnes de la date de publication, de sa précision et de son année, communes aux enregistrements sources et aux publications."""
+    return (
+        Column(
+            "publication_date",
+            Date,
+            nullable=nullable,
+            comment="Date de publication. À l'année : 1er janvier ; au mois : 1er du mois.",
+        ),
+        Column(
+            "publication_date_precision",
+            date_precision_enum,
+            nullable=nullable,
+            comment="Précision de publication_date : year, month ou day.",
+        ),
+        Column(
+            "publication_year",
+            SmallInteger,
+            Computed("EXTRACT(YEAR FROM publication_date)::smallint", persisted=True),
+            comment="Année de publication_date.",
+        ),
+    )
 
 
 # ── Adresses ──────────────────────────────────────────────────────
@@ -1113,7 +1146,7 @@ publications = Table(
     Column("title", Text, nullable=False),
     Column("title_normalized", Text),
     Column("doc_type", doc_type_enum, server_default="other"),
-    Column("publication_year", SmallInteger, nullable=False),
+    *publication_date_columns(nullable=False),
     Column("doi", Text),
     Column(
         "doi_prefix",
@@ -1224,7 +1257,7 @@ source_records = Table(
     Column("source_id", Text, nullable=False),
     Column("title", Text, nullable=False),
     Column("title_normalized", Text),
-    Column("publication_year", SmallInteger),
+    *publication_date_columns(nullable=True),
     Column("doc_type", doc_type_enum),
     Column(
         "raw_doc_type",

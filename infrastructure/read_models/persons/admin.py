@@ -318,7 +318,7 @@ class PersonAdminQueries:
                 FROM {CONTRIBUTIONS_AND_SOURCES}
                 JOIN source_records sr ON sr.id = sc.source_record_id
                 WHERE g.person_id = :pid AND ci.author_name_normalized = :nf
-                ORDER BY sr.publication_year DESC, sr.title
+                ORDER BY sr.publication_date DESC, sr.title
             """),
             {"pid": person_id, "nf": name_form},
         ).all()

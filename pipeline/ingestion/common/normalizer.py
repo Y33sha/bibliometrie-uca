@@ -13,8 +13,16 @@ from typing import ClassVar, NamedTuple
 
 from sqlalchemy import Connection
 
+from domain.platforms.registry import names_platform
+from domain.publications.dates import PublicationDate
 from domain.publications.metadata import has_minimal_publication_metadata, is_overlong_title
-from domain.serials.containers import ContainerDescription
+from domain.serials.containers import (
+    ContainerDescription,
+    SeriesDescription,
+    VolumeDescription,
+    determine_container_type,
+)
+from domain.source_records.biblio import with_journal
 from domain.types import JsonValue
 from infrastructure.db.savepoint import rollback_unless_invalidated, savepoint
 from pipeline.ingestion.common.embargoes import Embargo, EmbargoStore
@@ -34,12 +42,12 @@ from pipeline.runtime.observability.log_format import (
 )
 from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.progress import track_progress
-from pipeline.transformation.publishing.containers import ContainerStores
 from pipeline.transformation.publishing.find_or_create import (
     Containers,
     find_or_create_containers,
     find_or_create_publisher,
 )
+from pipeline.transformation.publishing.monographs.store import MonographStore
 from pipeline.transformation.publishing.publishers.store import PublisherStore
 
 type Document = Mapping[str, JsonValue]
@@ -81,7 +89,7 @@ class SourceNormalizer(ABC):
         logger: logging.Logger,
         staging_store: StagingStore,
         record_store: SourceRecordStore,
-        container_stores: ContainerStores,
+        monograph_store: MonographStore,
         publisher_store: PublisherStore,
         contribution_store: SourceContributionStore,
         location_store: LocationStore,
@@ -91,7 +99,7 @@ class SourceNormalizer(ABC):
         self.logger = logger
         self._staging = staging_store
         self._record_store = record_store
-        self._container_stores = container_stores
+        self._monograph_store = monograph_store
         self._publisher_store = publisher_store
         self._contribution_store = contribution_store
         self._location_store = location_store
@@ -122,6 +130,10 @@ class SourceNormalizer(ABC):
         return None
 
     @abstractmethod
+    def publication_date(self, doc: Document) -> PublicationDate | None:
+        """Renvoie la date de publication du document, avec sa précision, ou `None` sans année."""
+
+    @abstractmethod
     def source_record(
         self, row: StagingRow, doc: Document, containers: Containers
     ) -> SourceRecordUpsert:
@@ -134,6 +146,21 @@ class SourceNormalizer(ABC):
     @abstractmethod
     def author_records(self, block: AuthorBlock) -> list[AuthorRecord]:
         """Renvoie les contributions sources lues dans le bloc auteurs."""
+
+    def series_and_volume(
+        self, row: StagingRow, doc: Document
+    ) -> tuple[SeriesDescription | None, VolumeDescription | None]:
+        """Renvoie la série et le volume du document (`determine_container_type`). Une série qui désigne une plateforme est retirée (`names_platform`), d'après le DOI de la ligne de `staging`."""
+        facts = self.container_facts(doc)
+        if facts is None:
+            return None, None
+        if names_platform(
+            (facts.journal_title, facts.collection_title),
+            openalex_id=facts.openalex_id,
+            doi=row.doi,
+        ):
+            facts = facts.without_series()
+        return determine_container_type(facts)
 
     def normalize_record(self, row: StagingRow) -> bool:
         """Normalise un document à métadonnées minimales et marque sa ligne traitée. Renvoie vrai, ou faux sans rien écrire pour un document refusé.
@@ -151,16 +178,20 @@ class SourceNormalizer(ABC):
             if publisher
             else None
         )
-        facts = self.container_facts(doc)
-        containers = (
-            find_or_create_containers(
-                facts, publisher_id=publisher_id, stores=self._container_stores
-            )
-            if facts is not None
-            else Containers(None, None)
+        series, volume = self.series_and_volume(row, doc)
+        containers = find_or_create_containers(
+            series, volume, publisher_id=publisher_id, monographs=self._monograph_store
         )
-        record = replace(self.source_record(row, doc, containers), publisher_id=publisher_id)
-        source_record_id = self._record_store.upsert_source_record(record)
+        record = self.source_record(row, doc, containers)
+        record = replace(
+            record,
+            publication_date=self.publication_date(doc),
+            publisher_id=publisher_id,
+            biblio=with_journal(record.biblio, series),
+        )
+        source_record_id = self._record_store.upsert_source_record(
+            record, has_series=containers.has_series
+        )
         self._location_store.replace_locations(
             source_record_id, [*self.locations(doc), *identifier_locations(record.identifiers)]
         )

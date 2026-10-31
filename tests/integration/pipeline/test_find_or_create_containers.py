@@ -1,37 +1,42 @@
-"""Entrée de `serials` et monographie d'un document (`find_or_create_containers`)."""
+"""Monographie d'un enregistrement source (`find_or_create_containers`). La normalisation crée aucune revue."""
 
 import pytest
 from sqlalchemy import text
 
-from domain.serials.containers import ContainerDescription
+from domain.serials.containers import ContainerDescription, determine_container_type
 from domain.serials.issns import source_issns
-from pipeline.transformation.publishing.containers import ContainerStores
 from pipeline.transformation.publishing.find_or_create import (
     Containers,
     find_or_create_containers,
-    find_or_create_serial,
 )
+from pipeline.transformation.publishing.monographs.store import MonographStore
 
 
 @pytest.fixture
-def stores(sa_sync_conn):
-    return ContainerStores.of(sa_sync_conn)
+def monographs(sa_sync_conn):
+    return MonographStore(sa_sync_conn)
+
+
+def _containers(facts: ContainerDescription, monographs: MonographStore) -> Containers:
+    return find_or_create_containers(
+        *determine_container_type(facts), publisher_id=None, monographs=monographs
+    )
 
 
 def _count(conn, table: str) -> int:
     return conn.execute(text(f"SELECT count(*) FROM {table}")).scalar_one()  # noqa: S608
 
 
-def test_article_revue_sans_monographie(sa_sync_conn, stores):
+def test_article_revue_sans_monographie(sa_sync_conn, monographs):
+    before = _count(sa_sync_conn, "serials")
     facts = ContainerDescription(
         source="crossref", raw_doc_type="journal-article", journal_title="J. Things"
     )
-    containers = find_or_create_containers(facts, publisher_id=None, stores=stores)
-    assert containers.serial_id is not None
-    assert containers.monograph_id is None
+    assert _containers(facts, monographs) == Containers(True, None)
+    assert _count(sa_sync_conn, "serials") == before
 
 
-def test_chapitre_monographie_et_son_entree_de_journals(sa_sync_conn, stores):
+def test_chapitre_d_une_collection_a_issn(sa_sync_conn, monographs):
     facts = ContainerDescription(
         source="crossref",
         raw_doc_type="book-chapter",
@@ -42,7 +47,8 @@ def test_chapitre_monographie_et_son_entree_de_journals(sa_sync_conn, stores):
         isbns=("9783030580803",),
         year=2020,
     )
-    containers = find_or_create_containers(facts, publisher_id=None, stores=stores)
+    containers = _containers(facts, monographs)
+    assert containers.has_series
     row = sa_sync_conn.execute(
         text("SELECT title, isbn, serial_id, proceedings, year FROM monographs WHERE id = :id"),
         {"id": containers.monograph_id},
@@ -50,98 +56,58 @@ def test_chapitre_monographie_et_son_entree_de_journals(sa_sync_conn, stores):
     assert tuple(row) == (
         "Advances in Production Management Systems",
         "9783030580803",
-        containers.serial_id,
+        None,
         False,
         2020,
     )
 
 
-def test_chapitre_sans_issn_aucune_revue(sa_sync_conn, stores):
-    before = _count(sa_sync_conn, "serials")
+def test_chapitre_sans_issn_sans_serie(sa_sync_conn, monographs):
     facts = ContainerDescription(
         source="crossref", raw_doc_type="book-chapter", book_title="Le Paris du Moyen Âge"
     )
-    containers = find_or_create_containers(facts, publisher_id=None, stores=stores)
-    assert containers.serial_id is None
+    containers = _containers(facts, monographs)
+    assert not containers.has_series
     assert containers.monograph_id is not None
-    assert _count(sa_sync_conn, "serials") == before
 
 
-def test_article_de_congres_sans_issn_volume_seul(sa_sync_conn, stores):
-    """Le volume d'actes devient une monographie, sans entrée dans `serials`."""
-    before = _count(sa_sync_conn, "serials")
+def test_article_de_congres_sans_issn_volume_d_actes(sa_sync_conn, monographs):
     facts = ContainerDescription(
         source="crossref",
         raw_doc_type="proceedings-article",
         journal_title="NuFACT 2022",
         book_title="NuFACT 2022",
     )
-    containers = find_or_create_containers(facts, publisher_id=None, stores=stores)
-    row = sa_sync_conn.execute(
-        text("SELECT proceedings, serial_id FROM monographs WHERE id = :id"),
-        {"id": containers.monograph_id},
-    ).one()
-    assert containers.serial_id is None
-    assert tuple(row) == (True, None)
-    assert _count(sa_sync_conn, "serials") == before
+    containers = _containers(facts, monographs)
+    assert not containers.has_series
+    proceedings = sa_sync_conn.execute(
+        text("SELECT proceedings FROM monographs WHERE id = :id"), {"id": containers.monograph_id}
+    ).scalar_one()
+    assert proceedings is True
 
 
-def test_article_dans_un_conteneur_date_volume_seul(sa_sync_conn, stores):
+def test_article_dans_un_conteneur_date_volume_seul(sa_sync_conn, monographs):
     """Cas réel : OpenAlex classe en article une communication dont la source est le congrès daté."""
-    before = _count(sa_sync_conn, "serials")
     facts = ContainerDescription(
         source="openalex", raw_doc_type="article", journal_title="2021 21st ICCAS"
     )
-    containers = find_or_create_containers(facts, publisher_id=None, stores=stores)
-    assert containers.serial_id is None
+    containers = _containers(facts, monographs)
+    assert not containers.has_series
     assert containers.monograph_id is not None
-    assert _count(sa_sync_conn, "serials") == before
 
 
-def test_serie_sans_titre_retrouvee_par_issn(sa_sync_conn, stores):
-    collection = find_or_create_serial(
-        "Lecture Notes in Computer Science",
-        issns=source_issns(print_issn="0302-9743"),
-        repo=stores.serials,
-    )
-    facts = ContainerDescription(
-        source="openalex",
-        raw_doc_type="book-chapter",
-        journal_title="ICORES 2023",
-        book_title="ICORES 2023",
-        issns=source_issns(print_issn="0302-9743"),
-    )
-    containers = find_or_create_containers(facts, publisher_id=None, stores=stores)
-    assert containers.serial_id == collection
-    serial_id = sa_sync_conn.execute(
-        text("SELECT serial_id FROM monographs WHERE id = :id"), {"id": containers.monograph_id}
-    ).scalar_one()
-    assert serial_id == collection
-
-
-def test_chapitre_sans_issn_ignore_une_revue_de_meme_titre(sa_sync_conn, stores):
-    find_or_create_serial("Handbook of Things", repo=stores.serials)
-    facts = ContainerDescription(
-        source="crossref",
-        raw_doc_type="book-chapter",
-        journal_title="Handbook of Things",
-        book_title="Handbook of Things",
-    )
-    assert find_or_create_containers(facts, publisher_id=None, stores=stores).serial_id is None
-
-
-def test_livre_monographie_a_son_titre(sa_sync_conn, stores):
+def test_livre_monographie_a_son_titre(sa_sync_conn, monographs):
     facts = ContainerDescription(
         source="openalex", raw_doc_type="book", document_title="Global Handbook of Health"
     )
-    containers = find_or_create_containers(facts, publisher_id=None, stores=stores)
+    containers = _containers(facts, monographs)
     title = sa_sync_conn.execute(
         text("SELECT title FROM monographs WHERE id = :id"), {"id": containers.monograph_id}
     ).scalar_one()
     assert title == "Global Handbook of Health"
 
 
-def test_communication_parue_dans_une_revue_sans_monographie(sa_sync_conn, stores):
+def test_communication_parue_dans_une_revue_sans_monographie(sa_sync_conn, monographs):
     """Cas réel : WoS type « Article; Proceedings Paper » un article de revue issu d'un congrès ; la source nomme la revue."""
     facts = ContainerDescription(
         source="wos",
@@ -151,33 +117,14 @@ def test_communication_parue_dans_une_revue_sans_monographie(sa_sync_conn, store
         book_title="Physical Review D",
         issns=source_issns(print_issn="2470-0010"),
     )
-    containers = find_or_create_containers(facts, publisher_id=None, stores=stores)
-    assert containers.serial_id is not None
-    assert containers.monograph_id is None
+    assert _containers(facts, monographs) == Containers(True, None)
 
 
-def test_idempotent(sa_sync_conn, stores):
+def test_idempotent(sa_sync_conn, monographs):
     facts = ContainerDescription(
         source="hal",
         raw_doc_type="COUV",
         book_title="Le Paris du Moyen Âge",
         isbns=("9782410013221",),
     )
-    first = find_or_create_containers(facts, publisher_id=None, stores=stores)
-    assert find_or_create_containers(facts, publisher_id=None, stores=stores) == first
-    assert isinstance(first, Containers)
-
-
-def test_issn_mal_forme_garde_dans_la_revue(sa_sync_conn, stores):
-    facts = ContainerDescription(
-        source="crossref",
-        raw_doc_type="journal-article",
-        journal_title="J. Rejects",
-        issns=source_issns(print_issn="1234-5670"),
-    )
-    serial_id = find_or_create_containers(facts, publisher_id=None, stores=stores).serial_id
-    rows = sa_sync_conn.execute(
-        text("SELECT issn, status::text FROM serial_issns WHERE serial_id = :id"),
-        {"id": serial_id},
-    ).all()
-    assert [tuple(r) for r in rows] == [("1234-5670", "malformed")]
+    assert _containers(facts, monographs) == _containers(facts, monographs)

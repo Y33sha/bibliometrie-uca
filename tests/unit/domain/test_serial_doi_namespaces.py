@@ -106,4 +106,4 @@ def test_une_plateforme_n_est_designee_par_aucun_espace():
 def test_types_designes_par_un_espace():
     assert designated_by_namespace(SerialType.JOURNAL)
     assert designated_by_namespace(SerialType.MEDIA)
-    assert not designated_by_namespace(SerialType.PREPRINT_SERVER)
+    assert not designated_by_namespace(SerialType.BOOK_SERIES)

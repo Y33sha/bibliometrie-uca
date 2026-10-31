@@ -27,7 +27,7 @@ class ConfigKey(StrEnum):
     FETCH_MISSING_MAX_PER_SOURCE = "fetch_missing_max_per_source"
     """Nombre de DOI interrogés par source cible à la recherche par DOI (phase `fetch_missing`)."""
     SUDOC_MAX_PER_RUN = "sudoc_max_per_run"
-    """Nombre de revues vérifiées dans le Sudoc par run."""
+    """Nombre d'ISSN vérifiés dans le Sudoc par run."""
     DOI_RESOLUTION_MAX_PER_RUN = "doi_resolution_max_per_run"
     """Nombre de DOI dont l'URL de résolution est lue chez doi.org par run."""
     FETCH_STALE_AFTER_DAYS = "fetch_stale_after_days"

@@ -102,7 +102,7 @@ class TestOpenalexIdentifiers:
             "primary_location": {"landing_page_url": "https://doi.org/10.1/x"},
             "locations": [{"landing_page_url": "https://doi.org/10.1/x"}],
         }
-        record = openalex_source_record(work, 1, Containers(None, None))
+        record = openalex_source_record(work, 1, Containers(False, None))
         kept, _ = normalize_identifiers(record.identifiers)
         assert [(str(i.id_type), i.value, str(i.role)) for i in kept] == [
             ("doi", "10.1/x", "derived")
@@ -117,7 +117,7 @@ class TestOpenalexIdentifiers:
                 {"landing_page_url": "https://doi.org/10.1/x"},
             ],
         }
-        record = openalex_source_record(work, 1, Containers(None, None))
+        record = openalex_source_record(work, 1, Containers(False, None))
         kept, _ = normalize_identifiers(record.identifiers)
         assert {(str(i.id_type), i.value, str(i.role)) for i in kept} == {
             ("doi", "10.1/x", "secondary"),
@@ -363,7 +363,7 @@ class TestGetPublisher:
 
 
 class TestContainerDescription:
-    def test_repository_source_oa_model(self):
+    def test_repository_source_sans_modele_oa(self):
         work = {
             "primary_location": {
                 "source": {
@@ -374,7 +374,7 @@ class TestContainerDescription:
             }
         }
         facts = get_container_facts(work)
-        assert facts.oa_model == "repository"
+        assert facts.oa_model is None
         assert facts.openalex_id == "S1"
 
     def test_serial_full_oa(self):
@@ -430,7 +430,7 @@ class TestContainerDescription:
 
 # ── openalex_source_record (métadonnées canoniques) ──────────────
 
-_NO_CONTAINERS = Containers(serial_id=None, monograph_id=None)
+_NO_CONTAINERS = Containers(has_series=False, monograph_id=None)
 
 
 class TestOpenalexSourceRecordMetadata:
@@ -439,10 +439,8 @@ class TestOpenalexSourceRecordMetadata:
             {"title": "T", "publication_year": 2024}, staging_id=1, containers=_NO_CONTAINERS
         )
         assert record.title == "T"
-        assert record.publication_year == 2024
         assert "doi" not in identifier_values(record)
         assert "nnt" not in identifier_values(record)
-        assert record.serial_id is None
 
     def test_display_name_fallback(self):
         record = openalex_source_record(
@@ -450,14 +448,14 @@ class TestOpenalexSourceRecordMetadata:
         )
         assert record.title == "DN"
 
-    def test_with_serial_id_no_container_title(self):
-        """Une revue identifiée laisse `container_title` à None."""
+    def test_with_series_no_container_title(self):
+        """Une série décrite laisse `container_title` à None."""
         work = {
             "title": "T",
             "primary_location": {"source": {"display_name": "Some Source"}},
         }
         record = openalex_source_record(
-            work, staging_id=1, containers=Containers(serial_id=42, monograph_id=None)
+            work, staging_id=1, containers=Containers(has_series=True, monograph_id=None)
         )
         assert record.container_title is None
 
@@ -547,7 +545,7 @@ class TestOpenalexSourceRecord:
         captured = self._call(work)
         assert identifier_values(captured)["doi"] == ["10.1/primary"]
 
-    def test_biblio_publisher_and_journal_from_primary_location(self):
+    def test_biblio_publisher_from_primary_location(self):
         work = {
             "id": "https://openalex.org/W1",
             "primary_location": {
@@ -561,16 +559,7 @@ class TestOpenalexSourceRecord:
             },
         }
         captured = self._call(work)
-        # `issn_l` va dans `issnl` ; le premier autre ISSN de la liste va dans `issn`, sans support.
-        assert captured.biblio == {
-            "publisher": "Elsevier",
-            "journal": {
-                "title": "Journal of Physics",
-                "issn": "1361-6463",
-                "issnl": "0022-3727",
-                "openalex_id": "S123",
-            },
-        }
+        assert captured.biblio == {"publisher": "Elsevier"}
 
     def test_biblio_skipped_when_primary_is_repository(self):
         """Un entrepôt héberge le work sans le publier : ni éditeur ni revue dans biblio."""
@@ -775,7 +764,7 @@ def _make_normalizer():
         logger=logging.getLogger("test"),
         staging_store=FakeStagingStore(),
         record_store=FakeSourceRecordStore(),
-        container_stores=MagicMock(),
+        monograph_store=MagicMock(),
         publisher_store=MagicMock(),
         contribution_store=MagicMock(),
         location_store=MagicMock(),

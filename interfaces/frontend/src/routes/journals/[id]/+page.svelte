@@ -6,7 +6,8 @@
 	import { resolve } from '$app/paths';
 	import { onMount, tick } from 'svelte';
 	import { api, apiDetail } from '#lib/api/index.js';
-	import { issnLabel } from '#lib/labels.js';
+	import { issnLabel, serialRelationLabels } from '#lib/labels.js';
+	import { issnPortalUrl } from '#lib/utils.js';
 	import TabNav from '#lib/components/TabNav.svelte';
 	import PublicationsListView from '#lib/components/PublicationsListView.svelte';
 	import MonographsListView from '#lib/components/MonographsListView.svelte';
@@ -120,6 +121,19 @@
 				<EntityMetaItem label={issnLabel(issn)}><span class="id-badge">{issn.issn}</span></EntityMetaItem>
 			{/each}
 		</div>
+		{#if journal.relations.length}
+			<div class="entity-meta">
+				{#each journal.relations as relation (`${relation.kind}-${relation.serial_id ?? relation.issn}`)}
+					<EntityMetaItem label={serialRelationLabels[relation.kind]}>
+						{#if relation.serial_id}
+							<a href={resolve(`journals/${relation.serial_id}`)}>{relation.title}</a>
+						{:else if relation.issn}
+							<a class="id-badge" href={issnPortalUrl(relation.issn)} target="_blank" rel="noopener" title="Portail ISSN (nouvel onglet)">{relation.issn}</a>
+						{/if}
+					</EntityMetaItem>
+				{/each}
+			</div>
+		{/if}
 		<div class="entity-meta">
 			{#if journal.publisher_name}
 				<EntityMetaItem label="Éditeur">

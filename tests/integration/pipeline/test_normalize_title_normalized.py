@@ -2,6 +2,7 @@
 
 from sqlalchemy import text
 
+from domain.publications.dates import PublicationDate
 from domain.publications.metadata import normalized_title
 from pipeline.ingestion.common.source_records import (
     SourceRecordStore,
@@ -20,7 +21,7 @@ def test_upsert_writes_cleaned_title_and_title_normalized(sa_sync_conn):
             source_id="W_title_norm",
             staging_id=staging_id,
             title=raw_title,
-            publication_year=2020,
+            publication_date=PublicationDate.of_year(2020),
             raw_doc_type="article",
         ),
     )

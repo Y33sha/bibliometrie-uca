@@ -12,6 +12,7 @@ from domain.dates import today
 from domain.normalize import drop_flattened_mathml
 from domain.persons.contributor_name import ContributorName
 from domain.publications.contribution_roles import ContributionRole
+from domain.publications.dates import PublicationDate
 from domain.publications.identifiers import clean_doi
 from domain.publications.licenses import crossref_license
 from domain.serials.containers import ContainerDescription, ContainerRole, container_role
@@ -42,9 +43,9 @@ from pipeline.ingestion.crossref.payload import (
     crossref_issns,
     crossref_raw_doc_type,
     extract_crossref_conference,
+    extract_crossref_publication_date,
     extract_crossref_publication_year,
     extract_crossref_source_extras,
-    parse_crossref_issns,
     strip_jats_tags,
 )
 from pipeline.transformation.publishing.find_or_create import (
@@ -79,10 +80,6 @@ def get_container_title(msg: Mapping[str, JsonValue]) -> str | None:
     if isinstance(cts, str) and cts.strip():
         return cts.strip()
     return None
-
-
-def get_issns(msg: Mapping[str, JsonValue]) -> tuple[str | None, str | None]:
-    return parse_crossref_issns(msg)
 
 
 def get_publisher_name(msg: Mapping[str, JsonValue]) -> str | None:
@@ -156,8 +153,7 @@ def page_range(page: str | None, article_number: str | None) -> PageRange:
 
 
 def get_biblio(msg: Mapping[str, JsonValue]) -> dict[str, JsonValue] | None:
-    """Renvoie volume, numéro, pages et numéro d'article, avec l'éditeur et la revue nommés par Crossref."""
-    issn_val, eissn_val = get_issns(msg)
+    """Renvoie volume, numéro, pages et numéro d'article, avec l'éditeur nommé par Crossref."""
     article_number = as_text(msg.get("article-number"))
     return compact_biblio(
         volume=as_text(msg.get("volume")),
@@ -165,9 +161,6 @@ def get_biblio(msg: Mapping[str, JsonValue]) -> dict[str, JsonValue] | None:
         **page_range(as_text(msg.get("page")), article_number)._asdict(),
         article_number=article_number,
         publisher=get_publisher_name(msg),
-        journal_title=get_container_title(msg),
-        journal_issn=issn_val,
-        journal_eissn=eissn_val,
     )
 
 
@@ -303,20 +296,17 @@ def crossref_source_record(
     """Construit l'enregistrement source Crossref d'une œuvre, identifiée par son DOI."""
     doi = get_doi(msg)
     title = get_title(msg)
-    publication_year = get_publication_year(msg)
-    # Garanti par `SourceNormalizer` : l'œuvre a un DOI, un titre et une année.
-    assert doi and isinstance(title, str) and isinstance(publication_year, int)
+    # Garanti par `SourceNormalizer` : l'œuvre a un DOI et un titre.
+    assert doi and isinstance(title, str)
     return SourceRecordUpsert(
         source="crossref",
         source_id=doi,
         staging_id=staging_id,
         identifiers=crossref_identifiers(msg, doi),
         title=title,
-        publication_year=publication_year,
         raw_doc_type=crossref_raw_doc_type(msg),
-        serial_id=containers.serial_id,
         monograph_id=containers.monograph_id,
-        container_title=get_container_title(msg) if not containers.serial_id else None,
+        container_title=get_container_title(msg) if not containers.has_series else None,
         raw_language=get_language(msg),
         biblio=get_biblio(msg),
         abstract=get_abstract(msg),
@@ -347,6 +337,9 @@ class CrossrefNormalizer(SourceNormalizer):
 
     def locations(self, doc: Document) -> list[LocationFacts]:
         return get_locations(doc)
+
+    def publication_date(self, doc: Document) -> PublicationDate | None:
+        return extract_crossref_publication_date(doc, max_year=today().year + 1)
 
     def source_record(
         self, row: StagingRow, doc: Document, containers: Containers

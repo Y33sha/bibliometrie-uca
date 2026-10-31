@@ -33,7 +33,6 @@ from pipeline.ingestion.crossref.normalize import (
     get_container_title,
     get_doi,
     get_isbns,
-    get_issns,
     get_keywords,
     get_language,
     get_locations,
@@ -137,13 +136,6 @@ class TestGetContainerTitle:
 
     def test_strips_whitespace(self):
         assert get_container_title({"container-title": ["  J Phys  "]}) == "J Phys"
-
-
-class TestGetIssns:
-    def test_delegates_to_domain(self):
-        # Le détail de `parse_crossref_issns` est testé dans `test_payload.py`.
-        issn, eissn = get_issns({"ISSN": ["1234-5679"], "issn-type": []})
-        assert issn == "1234-5679" or eissn == "1234-5679"
 
 
 class TestGetPublisherName:
@@ -317,28 +309,6 @@ class TestGetBiblio:
 
     def test_publisher_extracted(self):
         assert get_biblio({"publisher": "Elsevier"}) == {"publisher": "Elsevier"}
-
-    def test_serial_built_from_container_title_and_issns(self):
-        # `issn-type` donne le support de chaque ISSN ; la liste `ISSN` seule alimente `issn`.
-        msg = {
-            "container-title": ["Journal of Physics"],
-            "issn-type": [
-                {"type": "print", "value": "0022-3727"},
-                {"type": "electronic", "value": "1361-6463"},
-            ],
-        }
-        biblio = get_biblio(msg)
-        assert biblio is not None
-        assert biblio["journal"] == {
-            "title": "Journal of Physics",
-            "issn": "0022-3727",
-            "eissn": "1361-6463",
-        }
-
-    def test_serial_title_only_when_no_issns(self):
-        assert get_biblio({"container-title": ["J. Phys."]}) == {
-            "journal": {"title": "J. Phys."},
-        }
 
 
 class TestAuthorName:
@@ -587,7 +557,7 @@ def _normalizer() -> CrossrefNormalizer:
         logger=MagicMock(),
         staging_store=MagicMock(),
         record_store=MagicMock(),
-        container_stores=MagicMock(),
+        monograph_store=MagicMock(),
         publisher_store=MagicMock(),
         contribution_store=MagicMock(),
         location_store=MagicMock(),
@@ -597,29 +567,27 @@ def _normalizer() -> CrossrefNormalizer:
 
 class TestCrossrefSourceRecord:
     def test_champs_du_document(self):
-        document = crossref_source_record(_message(), 42, Containers(None, None))
+        document = crossref_source_record(_message(), 42, Containers(False, None))
 
         assert document.source == "crossref"
         assert document.source_id == "10.1000/abc"
         assert document.staging_id == 42
         assert "10.1000/abc" in identifier_values(document)["doi"]
-        assert document.publication_year == 2024
         assert document.raw_doc_type == "journal-article"
 
     def test_titre_de_conteneur_garde_sans_revue(self):
         msg = _message(**{"container-title": ["J. Things"]})
 
-        document = crossref_source_record(msg, 42, Containers(None, 9))
+        document = crossref_source_record(msg, 42, Containers(False, 9))
 
-        assert (document.serial_id, document.monograph_id) == (None, 9)
+        assert document.monograph_id == 9
         assert document.container_title == "J. Things"
 
     def test_titre_de_conteneur_porte_par_la_revue(self):
         msg = _message(**{"container-title": ["J. Things"]})
 
-        document = crossref_source_record(msg, 42, Containers(7, None))
+        document = crossref_source_record(msg, 42, Containers(True, None))
 
-        assert document.serial_id == 7
         assert document.container_title is None
 
 

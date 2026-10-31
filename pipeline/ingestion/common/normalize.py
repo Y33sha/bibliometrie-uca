@@ -49,7 +49,7 @@ from pipeline.runtime.observability.log_format import (
 )
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.task_runner import TaskRun, TaskStep, run_tasks
-from pipeline.transformation.publishing.containers import ContainerStores
+from pipeline.transformation.publishing.monographs.store import MonographStore
 from pipeline.transformation.publishing.publishers.store import PublisherStore
 
 NormalizeOne = Callable[[PhaseContext, str], NormalizeStats]
@@ -216,7 +216,7 @@ def normalizer_builders(*, archive: bool = True) -> dict[str, NormalizerFactory]
                 logger,
                 StagingStore(conn, raw_store),
                 SourceRecordStore(conn),
-                container_stores=ContainerStores.of(conn),
+                monograph_store=MonographStore(conn),
                 publisher_store=PublisherStore(conn),
                 contribution_store=SourceContributionStore(conn),
                 location_store=LocationStore(conn),

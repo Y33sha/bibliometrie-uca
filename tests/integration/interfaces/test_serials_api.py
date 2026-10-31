@@ -90,8 +90,8 @@ class TestListSerials:
         serial_id = seed_serial()
         seed_serial_issn(serial_id, issn="9990-0018", support="print")
         seed_serial_issn(serial_id, issn="9990-0026", support="electronic")
-        seed_serial_issn(serial_id, issn="9990-0034", linking=True)
-        seed_serial_issn(serial_id, issn="9990-0042", status="related_title")
+        seed_serial_issn(serial_id, issn="9990-0034", issnl="9990-0034")
+        seed_serial_issn(serial_id, issn="9990-0042", status="cancelled")
         for term in ("9990-0018", "9990-0026", "9990-0034", "9990-0042"):
             r = client.get("/api/serials", params={"search": term, "per_page": 200})
             assert r.status_code == 200
@@ -250,21 +250,6 @@ class TestSerialsWithSameTitle:
         assert client.get("/api/serials/same-titles/count").json() == {"total": len(groups)}
 
 
-class TestSerialsSharingIssn:
-    def test_groups_serials_sharing_an_issn_across_supports(self, client):
-        a, b = seed_serial(), seed_serial()
-        _set_issns(a, "2999-1111")
-        _set_issns(b, None, "2999-1111")
-        r = client.get("/api/serials/shared-issns")
-        assert r.status_code == 200
-        groups = {g["value"]: g for g in r.json()["groups"]}
-        assert {j["id"] for j in groups["2999-1111"]["serials"]} == {a, b}
-
-    def test_count_matches_the_groups(self, client):
-        groups = client.get("/api/serials/shared-issns").json()["groups"]
-        assert client.get("/api/serials/shared-issns/count").json() == {"total": len(groups)}
-
-
 def _seed_typed_serial_with_records(raw_types: list[tuple[str, str]]) -> int:
     """Sème une revue typée `journal`, avec un enregistrement source par couple `(source, type brut)`."""
     jid = seed_serial(serial_type="journal")
@@ -339,7 +324,7 @@ class TestLikelyProceedings:
 
     def test_revues_sans_issn_en_tete(self, client):
         with_issn = _seed_typed_serial_with_records([("hal", "COMM")] * 5)
-        _set_issns(with_issn, "2999-2222")
+        _set_issns(with_issn, "2999-6665")
         without_issn = _seed_typed_serial_with_records([("hal", "COMM")])
 
         ids = [
@@ -373,6 +358,45 @@ class TestGetSerial:
         assert "publication_count" in body
         assert body["doaj_payload"] is None
         assert body["publication_count"] == 0
+
+    def test_issn_sans_issn_l(self, client):
+        jid = seed_serial()
+        issn = uniq("I")
+        seed_serial_issn(jid, issn=issn)
+        r = client.get(f"/api/serials/{jid}")
+        assert r.status_code == 200
+        assert [(i["issn"], i["linking"]) for i in r.json()["issn_details"]] == [(issn, False)]
+
+    def test_relations_lues_dans_les_liens_entre_issn(self, client):
+        """Cas réel : la Revue internationale des études du développement continue la Revue Tiers Monde."""
+        previous = seed_serial("Revue Tiers Monde")
+        current = seed_serial("Revue internationale des études du développement")
+        old, new, orphan = uniq("I"), uniq("I"), uniq("I")
+        seed_serial_issn(previous, issn=old)
+        seed_serial_issn(current, issn=new)
+        with owner_pool() as cur:
+            cur.execute(
+                "INSERT INTO issn_links (issn, linked_issn, link_type)"
+                " VALUES (%s, %s, 'continued_by'), (%s, %s, 'supplement')",
+                (old, new, new, orphan),
+            )
+        assert client.get(f"/api/serials/{current}").json()["relations"] == [
+            {
+                "kind": "previous_title",
+                "serial_id": previous,
+                "title": "Revue Tiers Monde",
+                "issn": None,
+            },
+            {"kind": "supplement", "serial_id": None, "title": None, "issn": orphan},
+        ]
+        assert client.get(f"/api/serials/{previous}").json()["relations"] == [
+            {
+                "kind": "next_title",
+                "serial_id": current,
+                "title": "Revue internationale des études du développement",
+                "issn": None,
+            }
+        ]
 
     def test_doaj_payload_exposed_when_present(self, client):
         jid = seed_serial()
@@ -580,7 +604,7 @@ class TestOaModels:
         models = r.json()
         # Référence : `OA_MODELS` et `OA_MODEL_LABELS_FR` de `domain.serials.journal`.
         values = [m["value"] for m in models]
-        assert values == ["subscription", "full_oa", "diamond", "repository"]
+        assert values == ["subscription", "full_oa", "diamond"]
         assert all("label_fr" in m and m["label_fr"] for m in models)
 
 
@@ -597,9 +621,7 @@ class TestSerialTypes:
             "journal",
             "data_journal",
             "proceedings",
-            "repository",
             "book_series",
-            "preprint_server",
             "media",
             "unknown",
         ]
@@ -700,13 +722,12 @@ class TestSerialsPublisherFacet:
 
 
 class TestTracabiliteEdition:
-    """L'édition d'une revue est consignée, y compris un changement d'ISSN ou de titre : il commande le rattachement des publications à leur revue."""
+    """L'édition d'une revue est consignée, y compris un changement de titre : il commande le rattachement des publications à leur revue."""
 
     def test_la_modification_ne_consigne_que_les_champs_fournis(self, auth_client):
         jid = seed_serial(uniq("Audit revue"))
 
-        issns = [{"issn": "1234-5679", "support": "print"}]
-        r = auth_client.put(f"/api/serials/{jid}", json={"issns": issns})
+        r = auth_client.put(f"/api/serials/{jid}", json={"title": "Audit revue renommée"})
         assert r.status_code == 200, r.text
 
         with owner_pool() as cur:
@@ -718,5 +739,5 @@ class TestTracabiliteEdition:
             evenements = cur.fetchall()
 
         assert len(evenements) == 1
-        assert evenements[0]["payload"] == {"issns": issns}
+        assert evenements[0]["payload"] == {"title": "Audit revue renommée"}
         assert evenements[0]["user_id"]

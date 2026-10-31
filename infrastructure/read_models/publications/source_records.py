@@ -4,7 +4,7 @@ from collections.abc import Mapping
 
 from sqlalchemy import Connection, Row, text
 
-from domain.source_records.biblio import BiblioKey, JournalKey
+from domain.source_records.biblio import BiblioKey, journal_series
 from domain.source_records.corrections import CORRECTED_BY, RAW, CorrectionKey
 from infrastructure.db.source_record_identifiers import source_record_doi_sql
 from infrastructure.read_models.publications.detail import structures_by_id
@@ -35,8 +35,7 @@ def _pages(biblio: Mapping[str, object]) -> str | None:
 
 def _record(r: Row[tuple[object, ...]]) -> SourceRecordMetadataOut:
     biblio: Mapping[str, object] = r.biblio or {}
-    journal = biblio.get(BiblioKey.JOURNAL)
-    raw_journal: Mapping[str, object] = journal if isinstance(journal, Mapping) else {}
+    series = journal_series(biblio)
     return SourceRecordMetadataOut(
         id=r.id,
         source=r.source,
@@ -49,15 +48,15 @@ def _record(r: Row[tuple[object, ...]]) -> SourceRecordMetadataOut:
         raw_doc_type=r.raw_doc_type,
         doc_type_uncorrected=r.doc_type_uncorrected,
         doc_type_corrected_by=r.doc_type_corrected_by,
-        publication_year=r.publication_year,
+        publication_date=r.publication_date,
+        publication_date_precision=r.publication_date_precision,
         language=r.language,
         language_name=r.language_name,
         language_raw=r.language_raw,
         serial_id=r.serial_id,
         journal_title=r.journal_title,
-        journal_raw_title=_text(raw_journal, JournalKey.TITLE),
-        journal_raw_issn=_text(raw_journal, JournalKey.ISSN),
-        journal_raw_eissn=_text(raw_journal, JournalKey.EISSN),
+        journal_raw_title=series.title if series else None,
+        journal_raw_issns=[row.issn for row in series.issns] if series else [],
         publisher_id=r.publisher_id,
         publisher_name=r.publisher_name,
         publisher_raw_name=_text(biblio, BiblioKey.PUBLISHER),
@@ -141,7 +140,9 @@ class PublicationSourceRecordQueries:
                        sr.corrections -> '{CorrectionKey.DOC_TYPE}' ->> '{RAW}' AS doc_type_uncorrected,
                        sr.corrections -> '{CorrectionKey.DOC_TYPE}' ->> '{CORRECTED_BY}'
                            AS doc_type_corrected_by,
-                       sr.publication_year, sr.language,
+                       sr.publication_date,
+                       sr.publication_date_precision::text AS publication_date_precision,
+                       sr.language,
                        lang.name AS language_name,
                        CASE WHEN sr.raw_language IS DISTINCT FROM sr.language
                             THEN sr.raw_language END AS language_raw,

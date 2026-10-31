@@ -13,6 +13,7 @@ from domain.dates import today
 from domain.persons.contributor_name import ContributorName
 from domain.persons.identifiers import normalize_orcid
 from domain.publications.contribution_roles import ContributionRole
+from domain.publications.dates import PublicationDate
 from domain.publications.identifiers import clean_doi
 from domain.publications.licenses import datacite_license
 from domain.serials.containers import ContainerDescription
@@ -41,6 +42,7 @@ from pipeline.ingestion.common.staging import StagingRow
 from pipeline.ingestion.datacite.payload import (
     container_names_a_journal,
     extract_datacite_doc_type_token,
+    extract_datacite_publication_date,
     extract_datacite_publication_year,
     extract_datacite_source_extras,
     extract_related_dois,
@@ -84,17 +86,14 @@ def get_container_facts(attributes: Mapping[str, JsonValue]) -> ContainerDescrip
 
 
 def get_biblio(attributes: Mapping[str, JsonValue]) -> dict[str, JsonValue] | None:
-    """Renvoie volume, numéro et pages du conteneur, avec l'éditeur et la revue nommés par DataCite."""
+    """Renvoie volume, numéro et pages du conteneur, avec l'éditeur nommé par DataCite."""
     container = as_mapping(attributes.get("container"))
-    title, issn = get_container(attributes)
     return compact_biblio(
         volume=as_text(container.get("volume")),
         issue=as_text(container.get("issue")),
         first_page=as_text(container.get("firstPage")),
         last_page=as_text(container.get("lastPage")),
         publisher=get_publisher_name(attributes),
-        journal_title=title,
-        journal_issn=issn,
     )
 
 
@@ -221,9 +220,8 @@ def datacite_source_record(
 ) -> SourceRecordUpsert:
     """Construit l'enregistrement source DataCite d'une ressource, identifié par son DOI."""
     title = get_title(attributes)
-    publication_year = extract_datacite_publication_year(attributes, max_year=today().year + 1)
-    # Garanti par `SourceNormalizer`, qui écarte les documents sans titre ou sans année.
-    assert isinstance(title, str) and isinstance(publication_year, int)
+    # Garanti par `SourceNormalizer`, qui écarte les documents sans titre.
+    assert isinstance(title, str)
     container_title, _ = get_container(attributes)
     return SourceRecordUpsert(
         source="datacite",
@@ -231,11 +229,9 @@ def datacite_source_record(
         staging_id=staging_id,
         identifiers=datacite_identifiers(attributes, doi),
         title=title,
-        publication_year=publication_year,
         raw_doc_type=extract_datacite_doc_type_token(attributes),
-        serial_id=containers.serial_id,
         monograph_id=containers.monograph_id,
-        container_title=container_title if not containers.serial_id else None,
+        container_title=container_title if not containers.has_series else None,
         raw_language=get_language(attributes),
         biblio=get_biblio(attributes),
         abstract=get_abstract(attributes),
@@ -271,6 +267,9 @@ class DataciteNormalizer(SourceNormalizer):
 
     def container_facts(self, doc: Document) -> ContainerDescription:
         return get_container_facts(doc)
+
+    def publication_date(self, doc: Document) -> PublicationDate | None:
+        return extract_datacite_publication_date(doc, max_year=today().year + 1)
 
     def source_record(
         self, row: StagingRow, doc: Document, containers: Containers

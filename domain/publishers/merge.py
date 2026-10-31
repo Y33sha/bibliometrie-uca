@@ -8,7 +8,6 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from domain.errors import BlockingSerial
-from domain.serials.issns import SerialIssn, issn_conflict
 
 
 @dataclass(frozen=True, slots=True)
@@ -17,10 +16,10 @@ class SharedTitlePair:
 
     target_serial_id: int
     target_title: str
-    target_issns: tuple[SerialIssn, ...]
+    target_issnl: str | None
     source_serial_id: int
     source_title: str
-    source_issns: tuple[SerialIssn, ...]
+    source_issnl: str | None
 
 
 def split_shared_title_pairs(
@@ -28,7 +27,7 @@ def split_shared_title_pairs(
 ) -> tuple[list[SharedTitlePair], list[BlockingSerial]]:
     """Sépare les paires fusionnables des paires qui bloquent la fusion des éditeurs.
 
-    Une paire bloque dans deux cas. Ses ISSN se contredisent (`issn_conflict`). Ou l'une de ses revues figure dans une autre paire : l'autre éditeur contient alors deux revues de même titre normalisé, doublon à résoudre avant la fusion.
+    Une paire bloque dans deux cas. Ses deux revues ont chacune un ISSN-L : deux ISSN-L désignent deux revues. Ou l'une de ses revues figure dans une autre paire : l'autre éditeur contient alors deux revues de même titre normalisé, doublon à résoudre avant la fusion.
     """
     target_seen = Counter(pair.target_serial_id for pair in pairs)
     source_seen = Counter(pair.source_serial_id for pair in pairs)
@@ -40,8 +39,10 @@ def split_shared_title_pairs(
             reasons.append("doublon interne dans l'éditeur source (titre dédupliqué)")
         if source_seen[pair.source_serial_id] > 1:
             reasons.append("doublon interne dans l'éditeur cible (titre dédupliqué)")
-        if conflict := issn_conflict(pair.target_issns, pair.source_issns):
-            reasons.append(f"{conflict} (cible / source)")
+        if pair.target_issnl and pair.source_issnl:
+            reasons.append(
+                f"ISSN-L différents : {pair.target_issnl} / {pair.source_issnl} (cible / source)"
+            )
         if reasons:
             blockers.append(
                 BlockingSerial(

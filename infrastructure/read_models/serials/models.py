@@ -51,6 +51,18 @@ class SerialIssnDetail(Model):
     sudoc_checked_at: datetime | None
 
 
+class SerialRelation(Model):
+    """Revue liée par un lien Sudoc entre ISSN (`issn_links`)."""
+
+    kind: Literal["previous_title", "next_title", "supplement", "main_serial"]
+    """Titre précédent, titre suivant, supplément de la revue, ou revue dont elle est le supplément."""
+    serial_id: int | None
+    """Revue de l'ISSN lié, `None` pour un ISSN sans revue."""
+    title: str | None
+    issn: str | None
+    """ISSN lié, quand il est sans revue."""
+
+
 class SerialListItem(Model):
     """Ligne de la liste paginée `/api/serials`, résumé du profil complet (`SerialDetailResponse`)."""
 
@@ -75,6 +87,7 @@ class SerialDetailResponse(SerialListItem):
     """Profil complet de la revue (GET /api/serials/{id}), pour sa page publique et l'édition admin : la ligne de liste et les champs propres au détail."""
 
     issn_details: list[SerialIssnDetail]
+    relations: list[SerialRelation]
     openalex_id: str | None
     is_academic: bool | None
     doaj_payload: dict[str, str] | None

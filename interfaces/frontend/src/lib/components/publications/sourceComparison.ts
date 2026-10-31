@@ -2,6 +2,7 @@ import type { components } from '#lib/api/schema.js';
 import { docTypeLabel } from '#lib/docTypes.svelte.js';
 import { CONTRIBUTION_ROLE_ORDER } from '#lib/labels.js';
 import { sourceOrder } from '#lib/sources.svelte.js';
+import { formatPublicationDate } from '#lib/utils.js';
 
 export type SourceRecord = components['schemas']['SourceRecordMetadataOut'];
 export type SourceContribution = components['schemas']['SourceContributionOut'];
@@ -135,10 +136,16 @@ function fields(records: SourceRecord[]): Field[] {
 			compared: (r) => r.doc_type,
 		},
 		{
-			key: 'publication_year',
-			label: 'Année',
-			cell: (r) => ({ text: r.publication_year?.toString() ?? null }),
-			compared: (r) => r.publication_year,
+			key: 'publication_date',
+			label: 'Date',
+			cell: (r) => ({
+				text:
+					r.publication_date && r.publication_date_precision
+						? formatPublicationDate(r.publication_date, r.publication_date_precision)
+						: null,
+			}),
+			// Seule l'année est comparée : deux dates de précisions différentes ne créent pas d'écart.
+			compared: (r) => r.publication_date?.slice(0, 4),
 		},
 		{
 			key: 'serial',
@@ -146,8 +153,7 @@ function fields(records: SourceRecord[]): Field[] {
 			cell: (r) => referentialCell(r.serial_id, r.journal_title, r.journal_raw_title, 'serials'),
 			compared: (r) => (r.serial_id != null ? `#${r.serial_id}` : r.journal_raw_title),
 		},
-		textField('issn', 'ISSN', (r) => r.journal_raw_issn),
-		textField('eissn', 'e-ISSN', (r) => r.journal_raw_eissn),
+		textField('issn', 'ISSN', (r) => r.journal_raw_issns.join(', ') || null),
 		{
 			key: 'publisher',
 			label: 'Éditeur',

@@ -6,6 +6,7 @@ from collections.abc import Mapping, Sequence
 from domain.normalize import normalize_text
 from domain.persons.contributor_name import ContributorName
 from domain.publications.contribution_roles import ContributionRole, map_role
+from domain.publications.dates import PublicationDate, date_from_parts
 from domain.publications.identifiers import clean_doi, find_isbns
 from domain.serials.containers import ContainerDescription
 from domain.serials.issns import source_issns
@@ -235,19 +236,14 @@ def extract_from_api(raw: Mapping[str, JsonValue], staging_doi: str | None) -> d
     if lang_list:
         language = as_str(as_mapping(lang_list[0]).get("content")) or as_str(lang_list[0])
 
-    # Numérotation, éditeur et revue nommés par WoS.
+    # Numérotation et éditeur nommés par WoS.
     page = at_path(publication_info, "page")
-    issn_val = _get_api_issn(dynamic, "issn")
-    eissn_val = _get_api_issn(dynamic, "eissn")
     biblio = compact_biblio(
         volume=_text_of(publication_info.get("vol")),
         issue=_text_of(publication_info.get("issue")),
         first_page=_text_of(page.get("begin")),
         last_page=_text_of(page.get("end")),
         publisher=publisher_name,
-        journal_title=journal_title,
-        journal_issn=issn_val,
-        journal_eissn=eissn_val,
     )
 
     frm = at_path(static, "fullrecord_metadata")
@@ -298,8 +294,8 @@ def extract_from_api(raw: Mapping[str, JsonValue], staging_doi: str | None) -> d
         "doc_type": raw_doc_type or "other",
         "language": language,
         "journal_title": journal_title,
-        "issn": issn_val,
-        "eissn": eissn_val,
+        "issn": _get_api_issn(dynamic, "issn"),
+        "eissn": _get_api_issn(dynamic, "eissn"),
         "publisher_name": publisher_name,
         "authors": [a for a in authors if is_wos_author_usable(a)],
         "authors_found": len(authors),
@@ -358,9 +354,6 @@ def extract_from_export(
         first_page=field("BP"),
         last_page=field("EP"),
         publisher=field("PU"),
-        journal_title=field("SO"),
-        journal_issn=field("SN"),
-        journal_eissn=field("EI"),
     )
     subjects = list(dict.fromkeys(split_export_list(field("WC")) + split_export_list(field("SC"))))
     doc_types = split_export_list(field("DT"))
@@ -448,11 +441,9 @@ def wos_source_record(
         staging_id=staging_id,
         identifiers=wos_identifiers(rec),
         title=as_str(rec.get("title")) or "",
-        publication_year=as_int(rec.get("publication_year")),
         raw_doc_type=as_str(rec.get("doc_type")),
-        serial_id=containers.serial_id,
         monograph_id=containers.monograph_id,
-        container_title=as_str(rec.get("journal_title")) if not containers.serial_id else None,
+        container_title=as_str(rec.get("journal_title")) if not containers.has_series else None,
         raw_language=as_str(rec.get("language")),
         biblio=dict(as_mapping(rec.get("biblio"))) or None,
         abstract=as_str(rec.get("abstract")),
@@ -558,6 +549,10 @@ class WosNormalizer(SourceNormalizer):
 
     def container_facts(self, doc: Document) -> ContainerDescription:
         return get_container_facts(doc)
+
+    def publication_date(self, doc: Document) -> PublicationDate | None:
+        """Renvoie l'année de publication (`PY` ou `pubyear`), en date à l'année."""
+        return date_from_parts(as_int(doc.get("publication_year")))
 
     def source_record(
         self, row: StagingRow, doc: Document, containers: Containers

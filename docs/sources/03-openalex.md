@@ -20,7 +20,8 @@ https://developers.openalex.org/
 
 ## Données récupérées
 
-- **Publications** : identifiant OpenAlex, titre, DOI, année et date de publication, type, langue, nombre de citations, indication de rétractation, résumé (reconstruit depuis l'inverted index), mots-clés, topics (hiérarchie domain/field/subfield/topic + score), biblio (volume/numéro/pages), URLs des copies de l'article
+- **Publications** : identifiant OpenAlex, titre, DOI, date de publication, type, langue, nombre de citations, indication de rétractation, résumé (reconstruit depuis l'inverted index), mots-clés, topics (hiérarchie domain/field/subfield/topic + score), biblio (volume/numéro/pages), URLs des copies de l'article
+- **Date de publication** : un 1er janvier vaut l'année, le 1er d'un autre mois vaut le mois.
 - **Licence** : licence de la localisation principale (`primary_location`)
 - **Localisations** (`source_record_locations`) : chaque copie du document, avec son URL, son PDF, son identifiant OAI-PMH, sa version, sa licence et son accès. La source d'une copie de type `repository` donne sa plateforme (`platforms`), sous le nom qu'OpenAlex lui donne.
 - **Auteurs** : nom brut, auteur correspondant, ORCID si présent.

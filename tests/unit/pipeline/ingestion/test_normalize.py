@@ -18,7 +18,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from domain.publications.dates import PublicationDate
 from domain.serials.containers import ContainerDescription
+from domain.serials.issns import SerialIssn
 from pipeline.ingestion.common import normalizer as normalizer_module
 from pipeline.ingestion.common.normalizer import (
     Document,
@@ -73,7 +75,7 @@ def _stores(staging) -> dict[str, Any]:
         "logger": logging.getLogger("test"),
         "staging_store": staging,
         "record_store": MagicMock(),
-        "container_stores": MagicMock(),
+        "monograph_store": MagicMock(),
         "publisher_store": MagicMock(),
         "contribution_store": MagicMock(),
         "location_store": MagicMock(),
@@ -88,6 +90,9 @@ class _StubNorm(SourceNormalizer):
 
     def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
         return "Titre", 2024
+
+    def publication_date(self, doc: Document) -> PublicationDate | None:
+        return PublicationDate.of_year(2020)
 
     def source_record(
         self, row: StagingRow, doc: Document, containers: Containers
@@ -357,9 +362,8 @@ _RECORD = SourceRecordUpsert(
     source_id="a",
     staging_id=1,
     title="T",
-    publication_year=2020,
+    publication_date=PublicationDate.of_year(2020),
     raw_doc_type=None,
-    serial_id=None,
     monograph_id=None,
     container_title=None,
     raw_language=None,
@@ -413,9 +417,9 @@ def writes(monkeypatch) -> list[tuple]:
         calls.append(("publisher", name, openalex_id))
         return 5
 
-    def containers(facts, *, publisher_id, stores):
+    def containers(series, volume, *, publisher_id, monographs):
         calls.append(("containers", publisher_id))
-        return Containers(7, None)
+        return Containers(series is not None, None)
 
     def sync(store, source, source_record_id, block, build):
         calls.append(("contributions", source, source_record_id))
@@ -449,9 +453,10 @@ class TestNormalizeRecord:
             ("containers", 5),
             ("contributions", "test", 42),
         ]
-        assert norm.containers_seen == [Containers(7, None)]
+        assert norm.containers_seen == [Containers(True, None)]
         norm._record_store.upsert_source_record.assert_called_once_with(
-            replace(_RECORD, publisher_id=5)
+            replace(_RECORD, publisher_id=5, biblio={"journal": {"title": "Revue"}}),
+            has_series=True,
         )
         norm._location_store.replace_locations.assert_called_once_with(42, [])
         norm._embargo_store.replace_embargo.assert_called_once_with(42, None)
@@ -461,8 +466,8 @@ class TestNormalizeRecord:
         norm = _WritingNorm(doc={"title": "T"})
         norm._record_store.upsert_source_record.return_value = 42
         assert norm.normalize_record(self.ROW) is True
-        assert writes == [("contributions", "test", 42)]
-        assert norm.containers_seen == [Containers(None, None)]
+        assert writes == [("containers", None), ("contributions", "test", 42)]
+        assert norm.containers_seen == [Containers(False, None)]
 
     def test_conteneurs_sans_editeur(self, writes):
         norm = _WritingNorm(
@@ -471,3 +476,30 @@ class TestNormalizeRecord:
         )
         norm.normalize_record(self.ROW)
         assert writes[0] == ("containers", None)
+
+
+class TestSeriesAndVolume:
+    def _series(self, doi: str | None, title: str):
+        norm = _WritingNorm(
+            doc={"title": "T"},
+            facts=ContainerDescription(
+                source="scanr",
+                raw_doc_type="article",
+                journal_title=title,
+                issns=(SerialIssn(issn="2692-8205"),),
+            ),
+        )
+        row = StagingRow(id=1, source_id="a", doi=doi, raw_data={})
+        series, _ = norm.series_and_volume(row, {"title": "T"})
+        return series
+
+    def test_serveur_de_preprints_du_doi_sans_serie(self):
+        """Cas réel : ScanR donne pour série d'un preprint bioRxiv « bioRxiv (Cold Spring Harbor Laboratory) »."""
+        assert (
+            self._series("10.1101/2020.01.01.123456", "bioRxiv (Cold Spring Harbor Laboratory)")
+            is None
+        )
+
+    def test_revue_d_un_article_publie_gardee(self):
+        series = self._series("10.1101/2020.01.01.123456", "Science")
+        assert series is not None and series.title == "Science"

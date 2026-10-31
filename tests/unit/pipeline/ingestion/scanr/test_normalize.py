@@ -26,7 +26,7 @@ from pipeline.ingestion.scanr.normalize import (
 from pipeline.transformation.publishing.find_or_create import Containers
 from tests.helpers.normalize_doubles import identifier_values, staging_row
 
-_NO_CONTAINERS = Containers(serial_id=None, monograph_id=None)
+_NO_CONTAINERS = Containers(has_series=False, monograph_id=None)
 
 
 class TestScanrSourceRecordLicense:
@@ -58,42 +58,6 @@ class TestScanrSourceRecordBiblio:
     def test_biblio_publisher_only(self):
         captured = self._call({"source": {"publisher": "Elsevier"}})
         assert captured.biblio == {"publisher": "Elsevier"}
-
-    def test_biblio_journal_built_from_title_and_journal_issns(self):
-        captured = self._call(
-            {
-                "source": {
-                    "title": "Journal of Physics",
-                    "journalIssns": ["0022-3727", "1361-6463"],
-                }
-            },
-        )
-        assert captured.biblio == {
-            "journal": {
-                "title": "Journal of Physics",
-                "issn": "0022-3727",
-                "eissn": "1361-6463",
-            }
-        }
-
-    def test_biblio_publisher_and_journal_together(self):
-        captured = self._call(
-            {
-                "source": {
-                    "publisher": "Elsevier",
-                    "title": "Journal of Physics",
-                    "journalIssns": ["0022-3727"],
-                }
-            },
-        )
-        assert captured.biblio == {
-            "publisher": "Elsevier",
-            "journal": {"title": "Journal of Physics", "issn": "0022-3727"},
-        }
-
-    def test_biblio_journal_title_only(self):
-        captured = self._call({"source": {"title": "J. Phys."}})
-        assert captured.biblio == {"journal": {"title": "J. Phys."}}
 
 
 class TestScanrSourceRecordExternalIds:
@@ -312,11 +276,10 @@ class TestScanrSourceRecordMetadonnees:
         }
 
         record = scanr_source_record(
-            doc, 1, "doi10.1/a", Containers(serial_id=3, monograph_id=None)
+            doc, 1, "doi10.1/a", Containers(has_series=True, monograph_id=None)
         )
 
         assert record.title == "Un titre"
-        assert record.publication_year == 2024
         assert record.raw_doc_type == "journal-article"
         assert identifier_values(record)["doi"] == ["10.1/a"]
         assert "nnt" not in identifier_values(record)
@@ -443,7 +406,7 @@ def _normalizer() -> ScanrNormalizer:
         logger=MagicMock(),
         staging_store=MagicMock(),
         record_store=MagicMock(),
-        container_stores=MagicMock(),
+        monograph_store=MagicMock(),
         publisher_store=MagicMock(),
         contribution_store=MagicMock(),
         location_store=MagicMock(),
@@ -462,7 +425,9 @@ class TestScanrNormalizer:
             "source": {"title": "Revue"},
         }
 
-        document = _normalizer().source_record(row, doc, Containers(serial_id=3, monograph_id=5))
+        document = _normalizer().source_record(
+            row, doc, Containers(has_series=True, monograph_id=5)
+        )
 
         assert (document.source, document.source_id, document.staging_id) == (
             "scanr",
@@ -470,7 +435,7 @@ class TestScanrNormalizer:
             42,
         )
         assert document.title == "Un titre"
-        assert (document.serial_id, document.monograph_id) == (3, 5)
+        assert document.monograph_id == 5
         assert document.container_title is None
         assert identifier_values(document) == {"nnt": ["2021CLFAC030"]}
 

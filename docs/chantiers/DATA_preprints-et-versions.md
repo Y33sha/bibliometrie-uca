@@ -8,9 +8,13 @@ OpenAlex et ScanR suivent un autre modèle : un work réunit le preprint et l'ar
 
 La réconciliation coupe une composante par ancres, les DOI `primary` et `derived` : deux ancres distinctes désignent deux œuvres (`domain/publications/reconciliation.py`). Le DOI d'une forme secondaire (version Zenodo, pièce d'un jeu de données, DOI à suffixe de version) a une cible dans `doi_targets`, que la réconciliation lit à la place du DOI. Les formes d'une œuvre rejoignent ainsi sa publication. L'enregistrement source DataCite d'une forme secondaire est écarté de la réconciliation quand sa cible est le DOI `primary` d'un autre enregistrement source.
 
+La phase `relations` reconstruit `publication_relations` à chaque run. Elle suit `finalize`, qui calcule le périmètre et les compteurs. L'option `--no-extras` l'omet.
+
+La publication 165044 est typée `preprint`, avec la revue et le DOI Crossref de l'article. Elle réunit le preprint HAL, ses copies ScanR et DataCite arXiv, et deux works OpenAlex : le preprint, qui donne déjà le DOI de l'article, et l'article.
+
 ### Mesures du 2026-10-30
 
-- 2 298 des 3 935 enregistrements sources DataCite arXiv sont typés `article`, d'après leur type d'origine. Aucun n'est écarté de la réconciliation. Les espaces de noms DOI excluent les serveurs de preprints du rattachement de revue.
+- 2 298 des 3 935 enregistrements sources DataCite arXiv sont typés `article`, d'après leur type d'origine. Aucun n'est écarté de la réconciliation.
 - 2 802 couples publication–identifiant arXiv viennent d'une localisation arXiv en `submittedVersion` d'une publication autre qu'un preprint. Pour 2 350, le DOI arXiv est le DOI d'aucune publication.
 - 81 paires de publications autres que des preprints partagent un identifiant arXiv actif.
 
@@ -41,57 +45,52 @@ Le titre change souvent entre preprint et article : les titres différents d'une
 
 **Publications à DOI arXiv.** 169 publications à DOI arXiv (`10.48550`) ont un autre type que `preprint`, dont 160 typées `article`. 143 sont reliées à une autre publication par `is_related_to` (DataCite, clé partagée) : ce sont des preprints mal typés, comptés dans la famille « Publications » en plus de leur article.
 
-### Levée de la règle « un DOI par publication » (simulation du 2026-10-30)
-
-Deux publications se réunissent quand leurs enregistrements sources réconciliables partagent une clé de confirmation : DOI (cible appliquée), `hal_id`, identifiant arXiv, PMID, NNT, bloc de métadonnées. 5 265 publications se réuniraient en 2 498 composantes, dont 2 334 de deux publications.
-
-| Catégorie | Composantes | Échantillon de 15 |
-|---|---|---|
-| Preprint et version publiée reliés par `is_preprint_of` | 1 362 | Fusion visée |
-| Avec un preprint, sans relation | 140 | Surtout des paires légitimes : preprints DESY (`10.3204`) ou JMIR et leur article, doublons SSRN et arXiv |
-| Hors preprint, même registrant | 451 | Légitimes : versions Figshare, article à deux DOI. Œuvres distinctes : résumé de congrès et article, deux corrigenda, éditorial publié dans deux revues, chapitre réédition d'un article |
-| Hors preprint, registrants différents | 545 | Légitimes : copie arXiv typée `article`, copie Apollo (`10.17863`), double DOI Cairn, revue qui change de préfixe. Œuvres distinctes : communication et version longue en revue, poster EGU et article, data paper et jeu de données |
-
-Les composantes de trois publications ou plus enchaînent souvent communication, article de revue et copie arXiv. Une fusion générale demande une garde : type de document, auteurs, année.
-
 ## Décisions
 
-- **Le preprint fusionne avec sa version publiée.** Le chercheur consulte une seule œuvre dans sa bibliographie. Un preprint est une version d'une publication. OpenAlex et ScanR réunissent déjà l'article et son preprint.
-- **Le type `preprint` désigne un preprint dont aucune version publiée n'est en base.** Un preprint fusionné prend le type de sa version publiée.
-- **Le preprint reste visible comme version.** Sa diffusion (arXiv, HAL) a une valeur propre, surtout quand la version éditeur est fermée ; dans certaines disciplines, le preprint vaut presque l'article. La fiche le montre comme une version à part entière, distincte des formes secondaires repliées.
-- **Seule une version publiée reçoit le preprint.** Une communication orale, un poster, une thèse, un jeu de données, un logiciel ou un `other` reste une œuvre liée par une relation.
-- La question est distincte du modèle des conteneurs : les localisations se rangent par enregistrement source, et le type d'une plateforme vient d'une liste fermée, quel que soit le modèle retenu ici.
+- **Un preprint relié à sa version publiée est masqué.** Il reste une publication, avec son DOI, son type et sa date. Il est absent des listes, des statistiques, des compteurs et des bibliographies. La fiche de la version publiée le montre. La réconciliation garde un DOI par publication, et une fausse paire se corrige par le retrait du lien.
+- **Le masquage se lit dans le lien `is_preprint_of`.** Toutes les vues filtrent les preprints masqués par une même jointure sur `publication_relations`.
+- **Le lien est vérifié à sa création.** La phase `relations` relie un preprint à une seule version publiée, sous la garde des auteurs. Une communication orale, un poster, une thèse, un jeu de données, un logiciel ou un `other` reste une œuvre liée par une autre relation.
+- **`relations` précède `finalize`**, hors des enrichissements : le masquage pèse sur le périmètre et les compteurs.
+- **Le statut open access de la version publiée tient compte des copies de son preprint masqué.** Pour 73 paires, la version publiée est fermée et le preprint ouvert.
 
 ## Phasage
 
-### Phase 1 — Règle de fusion
+### Phase 1 — Mesures
 
-- [ ] Signaux qui autorisent la fusion : relation déclarée, clé partagée, titre, selon leur fiabilité mesurée.
-- [ ] Garde sur les auteurs : la quasi-totalité des auteurs du preprint se retrouve dans la version publiée, comparés par personnes alignées plutôt que par noms bruts.
-- [ ] Cible ambiguë : un preprint relié à plusieurs versions publiées.
+- [ ] Preprints du périmètre dont la version publiée est hors périmètre
+- [ ] Publications typées `preprint`, avec la revue et le DOI Crossref de leur article (165044), sur la base de prod
 
-### Phase 2 — Type des preprints arXiv
+### Phase 2 — Création du lien
 
-- [ ] Type `preprint` d'après le préfixe DOI du serveur (liste fermée du chantier [Modèle des conteneurs](archived/2026-10-25_DATA_modele-des-conteneurs.md)). 169 publications.
+- [ ] Signaux qui créent le lien : relation déclarée, clé partagée, titre, selon leur fiabilité mesurée
+- [ ] Garde sur les auteurs : la quasi-totalité des auteurs du preprint se retrouve dans la version publiée, comparés par personnes alignées
+- [ ] Cible unique, d'après les 27 preprints à plusieurs cibles
 
-### Phase 3 — Rapprochement des preprints sans cible
+### Phase 3 — Masquage
+
+- [ ] `relations` avant `finalize`
+- [ ] Preprints masqués filtrés dans toutes les vues : listes, facettes, statistiques, compteurs, bibliographies, exports
+- [ ] Statut open access de la version publiée d'après les copies de son preprint masqué
+
+### Phase 4 — Type des preprints arXiv
+
+- [x] Type `preprint` d'après le préfixe DOI du serveur de preprints, pour un enregistrement source sans revue (67c1b73ef)
+
+### Phase 5 — Rapprochement des preprints sans cible
 
 - [ ] Rapprochement par titre proche, au sein des publications d'une même personne, sous la garde des auteurs. 284 preprints candidats.
 
-### Phase 4 — Affichage
+### Phase 6 — Affichage
 
-- [ ] Bloc « Versions » de la fiche publication : version publiée, preprint, avec plateforme et DOI.
+- [ ] Fiche de la version publiée : ses preprints masqués, avec plateforme et DOI
 
-### Phase 5 — Statistiques
+### Phase 7 — Fin de chantier
 
-- [ ] Famille « Preprints » des statistiques réduite aux preprints sans version publiée.
+- [ ] Mise à jour de la documentation
 
 ## Questions ouvertes
 
 - **Fiabilité de la version déclarée.** La version des localisations d'entrepôt est peu fiable chez OpenAlex comme chez Unpaywall : 200 949 localisations d'entrepôt sur 258 875 sont en `submittedVersion`, y compris dans Cairn, qui héberge des versions publiées.
 - **Cible antérieure au preprint** (29 paires) : repost tardif ou fausse paire ?
-- **Année de l'œuvre fusionnée** : celle de la version publiée. L'année change pour 839 paires.
-- **Hors périmètre : doublons hors preprints.** La simulation de la levée de la règle « un DOI par publication » montre des doublons légitimes hors preprints : copies arXiv typées `article`, copies de repository (Apollo), articles à deux DOI, revues qui changent de préfixe DOI. Ces copies et ces doubles DOI forment chacun une publication de plus.
-- **Fusion ou masquage.** Deux options :
-  - Fusion à la réconciliation. La coupe par ancres cesse d'imposer un DOI par publication, pour toutes les publications ou pour les seuls preprints. Levée pour toutes, elle fusionne aussi des œuvres hors preprints, parfois à juste titre : l'ampleur est à mesurer. Restent à arbitrer le DOI, le type et l'année de la publication fusionnée, et la défusion d'une fausse paire.
-  - Masquage. Le preprint relié à une version publiée reste une publication, absente des listes, des statistiques et des bibliographies. La fiche de la version publiée le montre parmi ses copies. Le modèle reste inchangé, et une fausse paire se corrige sans défusion. L'état « preprint d'une version publiée » est calculé une fois par le pipeline, pour que toutes les vues filtrent de la même façon.
+- **Rejet d'un lien par l'administration**, pour une fausse paire passée à travers la garde des auteurs.
+- **Doublons hors preprints.** Copies de repository (Apollo), articles à deux DOI, revues qui changent de préfixe DOI : chaque copie ou double DOI forme une publication de plus.

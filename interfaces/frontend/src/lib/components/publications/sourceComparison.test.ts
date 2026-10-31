@@ -25,15 +25,15 @@ function record(overrides: Partial<SourceRecord>): SourceRecord {
 		raw_doc_type: null,
 		doc_type_uncorrected: null,
 		doc_type_corrected_by: null,
-		publication_year: 2024,
+		publication_date: '2024-01-01',
+		publication_date_precision: 'year',
 		language: 'en',
 		language_name: 'Anglais',
 		language_raw: null,
 		serial_id: null,
 		journal_title: null,
 		journal_raw_title: null,
-		journal_raw_issn: null,
-		journal_raw_eissn: null,
+		journal_raw_issns: [],
 		publisher_id: null,
 		publisher_name: null,
 		publisher_raw_name: null,
@@ -109,11 +109,10 @@ describe('comparisonRows', () => {
 
 	it('place les ISSN sous la revue et masque les lignes vides dans toutes les sources', () => {
 		const keys = comparisonRows([
-			record({ journal_raw_title: 'Revue', journal_raw_issn: '1234-5678' }),
+			record({ journal_raw_title: 'Revue', journal_raw_issns: ['1234-5678'] }),
 		]).map((r) => r.key);
 		const serial = keys.indexOf('serial');
 		expect(keys.slice(serial, serial + 2)).toEqual(['serial', 'issn']);
-		expect(keys).not.toContain('eissn');
 		expect(keys).not.toContain('volume');
 	});
 
@@ -150,6 +149,20 @@ describe('comparisonRows', () => {
 				corrected: { from: 'article', rule: 'SERIAL_TYPE_MEDIA_TO_MEDIA' },
 			},
 		]);
+	});
+
+	it("affiche la date de chaque source et signale seulement un écart d'année", () => {
+		const sameYear = comparisonRows([
+			record({}),
+			record({ id: 2, publication_date: '2024-10-15', publication_date_precision: 'day' }),
+		]);
+		expect(row(sameYear, 'publication_date').cells.map((c) => c.text)).toEqual(['2024', '15 oct. 2024']);
+		expect(row(sameYear, 'publication_date').divergent).toBe(false);
+		const otherYear = comparisonRows([
+			record({}),
+			record({ id: 2, publication_date: '2023-10-15', publication_date_precision: 'day' }),
+		]);
+		expect(row(otherYear, 'publication_date').divergent).toBe(true);
 	});
 
 	it('affiche le nom de la langue, avec en note la valeur que donnait la source', () => {

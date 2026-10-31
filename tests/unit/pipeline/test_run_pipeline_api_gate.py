@@ -101,10 +101,7 @@ def _run_oa_status(credentials_missing) -> tuple[PhaseMetrics, list[oa_status.Do
         services.append(task.service)
         return PhaseMetrics(new=4)
 
-    with (
-        patch("pipeline.runtime.execution.get_sync_engine"),
-        patch.object(oa_status.DoiLookupTask, "run", autospec=True, side_effect=run),
-    ):
+    with patch.object(oa_status.DoiLookupTask, "run", autospec=True, side_effect=run):
         metrics = oa_status.build().run(
             phase_context(
                 RunOptions(),

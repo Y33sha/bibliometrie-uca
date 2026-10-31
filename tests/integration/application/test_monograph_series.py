@@ -29,7 +29,6 @@ def _volume(conn, repo, title: str, source_id: str) -> int:
         isbn=None,
         eisbn=None,
         publisher_id=None,
-        serial_id=serial_id,
     )
     insert_source_record(
         conn,

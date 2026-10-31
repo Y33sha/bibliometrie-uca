@@ -40,7 +40,6 @@ def _merge_isbns(conn: Connection, target_id: int, source_id: int) -> None:
         isbn=source.isbn,
         eisbn=source.eisbn,
         publisher_id=None,
-        serial_id=None,
     )
 
 

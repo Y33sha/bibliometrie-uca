@@ -1,11 +1,11 @@
 """Règles de rattachement d'un document à son conteneur, revue ou monographie, et de typage d'une revue selon ses documents."""
 
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
 
 from domain.normalize import normalize_text, to_plain_text
-from domain.serials.issns import IssnStatus, SerialIssn, received_issns
+from domain.serials.issns import SerialIssn, received_issns
 from domain.serials.serial import OaModel
 from domain.serials.series import ContainerLevel, container_level, series_title
 from domain.serials.titles import names_a_dated_event, names_ebook_platform, names_proceedings
@@ -127,10 +127,21 @@ class ContainerDescription:
             if title and names_ebook_platform(title):
                 object.__setattr__(self, name, None)
 
+    def without_series(self) -> ContainerDescription:
+        """Renvoie la description privée de sa revue et de sa collection, avec leurs ISSN."""
+        return replace(
+            self,
+            journal_title=None,
+            collection_title=None,
+            issns=(),
+            openalex_id=None,
+            oa_model=None,
+        )
+
     @property
     def has_issn(self) -> bool:
         """Vrai si un ISSN au moins est valide."""
-        return any(r.status is not IssnStatus.MALFORMED for r in self.issns)
+        return any(not r.malformed for r in self.issns)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

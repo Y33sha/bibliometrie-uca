@@ -10,11 +10,12 @@ Un fait inconnu vaut `None`, et les prédicats qui le testent sont faux. Une pub
 """
 
 import re
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, field, fields
 from enum import StrEnum
 from typing import NamedTuple, TypedDict
 
 from domain.normalize import normalize_text
+from domain.platforms.registry import preprint_servers_of_doi
 from domain.publications.doc_types import DocType
 from domain.publishers.publisher import PublisherType
 from domain.serials.serial import SerialType
@@ -45,6 +46,12 @@ class MetadataForCorrection:
     source: str | None = None
     author_count: int | None = None
     """`source_records.author_count` : contributions sources d'auteur non collectives."""
+    preprint_server_dois: bool = field(init=False)
+    """Les `dois`, un au moins, sont tous des DOI de serveur de preprints (`preprint_servers_of_doi`)."""
+
+    def __post_init__(self) -> None:
+        on_server = bool(self.dois) and all(preprint_servers_of_doi(doi) for doi in self.dois)
+        object.__setattr__(self, "preprint_server_dois", on_server)
 
     @classmethod
     def for_publication(
@@ -83,7 +90,7 @@ class MetadataCorrectionRule(StrEnum):
         "CROSSREF_AUTHORLESS_VOLUME_TITLE_TO_PROCEEDINGS"
     )
     CROSSREF_VOLUME_TITLE_PREFIX_TO_PROCEEDINGS = "CROSSREF_VOLUME_TITLE_PREFIX_TO_PROCEEDINGS"
-    SERIAL_TYPE_PREPRINT_SERVER_TO_PREPRINT = "SERIAL_TYPE_PREPRINT_SERVER_TO_PREPRINT"
+    DOI_PREPRINT_SERVER_TO_PREPRINT = "DOI_PREPRINT_SERVER_TO_PREPRINT"
     PREPRINT_RELATION_TO_PREPRINT = "PREPRINT_RELATION_TO_PREPRINT"
     TITLE_MEDIA_PREFIX_TO_MEDIA = "TITLE_MEDIA_PREFIX_TO_MEDIA"
     TITLE_SUPPLEMENTARY_CONTENT_TO_DATASET = "TITLE_SUPPLEMENTARY_CONTENT_TO_DATASET"
@@ -199,6 +206,7 @@ class _AppliesTo(TypedDict, total=False):
     """Présence d'un `serial_id`."""
     doi_prefix_not_in: tuple[str, ...]
     """Au moins un des `dois` a un préfixe hors du tuple."""
+    preprint_server_dois: bool
     self_declared_preprint: bool
     declares_conference: bool
     registrant_publisher_type: str
@@ -317,10 +325,11 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
         },
         "applies_correction": {"doc_type": DocType.CONFERENCE_PAPER},
     },
-    # Serveur de preprints (arXiv, bioRxiv, ChemRxiv, EGUsphere, SSRN, …) + doc_type ∈ {article, other} ⇒ `preprint`.
-    MetadataCorrectionRule.SERIAL_TYPE_PREPRINT_SERVER_TO_PREPRINT: {
+    # DOI de serveur de preprints (arXiv, bioRxiv, SSRN, Research Square, …), sans revue + doc_type ∈ {article, other} ⇒ `preprint`. Une revue désigne l'article publié, déposé sous le DOI du preprint.
+    MetadataCorrectionRule.DOI_PREPRINT_SERVER_TO_PREPRINT: {
         "applies_to": {
-            "serial_type": SerialType.PREPRINT_SERVER,
+            "preprint_server_dois": True,
+            "serial_id_present": False,
             "doc_type": _ARTICLE_OR_OTHER,
         },
         "applies_correction": {"doc_type": DocType.PREPRINT},

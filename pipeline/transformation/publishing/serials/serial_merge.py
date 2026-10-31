@@ -9,7 +9,6 @@ from infrastructure.repositories.merge_steps import (
     fill_empty_unique,
     record_redirect,
     transfer,
-    transfer_unique,
     untouched,
 )
 from pipeline.transformation.publications import lifecycle
@@ -24,39 +23,6 @@ from pipeline.transformation.publishing.serials.requalify_serial import (
 from pipeline.transformation.publishing.serials.serial_publishers import (
     refresh_serial_publishers,
 )
-
-
-def _merge_issns(conn: Connection, target_id: int, source_id: int) -> None:
-    """Transfère à la revue conservée les ISSN de l'absorbée absents chez elle, à revérifier dans le Sudoc. L'ISSN de liaison de la conservée l'emporte. Des ISSN saisis à la main sur l'absorbée gardent leur marqueur."""
-    conn.execute(
-        text("""
-            DELETE FROM serial_issns s
-            WHERE s.serial_id = :s
-              AND EXISTS (SELECT 1 FROM serial_issns t WHERE t.serial_id = :t AND t.issn = s.issn)
-        """),
-        {"t": target_id, "s": source_id},
-    )
-    conn.execute(
-        text("""
-            UPDATE serial_issns
-            SET serial_id = :t, sudoc_checked_at = NULL,
-                linking = linking AND NOT EXISTS (
-                    SELECT 1 FROM serial_issns WHERE serial_id = :t AND linking
-                )
-            WHERE serial_id = :s
-        """),
-        {"t": target_id, "s": source_id},
-    )
-    # Des ISSN saisis à la main sur l'absorbée gardent leur autorité sur la liste réunie.
-    conn.execute(
-        text("""
-            UPDATE serials t SET manual_fields = t.manual_fields || CAST(:field AS text)
-            FROM serials s
-            WHERE t.id = :t AND s.id = :s
-              AND :field = ANY(s.manual_fields) AND NOT :field = ANY(t.manual_fields)
-        """),
-        {"t": target_id, "s": source_id, "field": ManualField.ISSNS.value},
-    )
 
 
 def _fill_empty_with_marker(
@@ -105,10 +71,10 @@ MERGE_STEPS: dict[str, MergeStep] = {
     "source_records": transfer("source_records", "serial_id"),
     "apc_payments": transfer("apc_payments", "serial_id"),
     "monographs": transfer("monographs", "serial_id"),
-    "issns": MergeStep((("serial_issns", "serial_id"),), _merge_issns, DataNature.MIXED),
-    "name_forms": transfer_unique(
-        "serial_name_forms", "serial_id", "form_normalized", "publisher_id"
-    ),
+    # Les ISSN de l'absorbée, et donc son ISSN-L, passent à la revue conservée.
+    "issns": transfer("serial_issns", "serial_id"),
+    # Une décision de rattachement par titre qui désignait l'absorbée la suit.
+    "title_decisions": transfer("serial_title_decisions", "serial_id"),
     "doi_namespaces": untouched("serial_doi_namespaces", "serial_id"),
     "title": untouched("serials", "title", "title_normalized").of_nature(DataNature.MIXED),
     "created_at": untouched("serials", "created_at"),

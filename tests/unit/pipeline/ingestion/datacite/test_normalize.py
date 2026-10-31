@@ -26,7 +26,7 @@ def _normalizer() -> DataciteNormalizer:
         logger=MagicMock(),
         staging_store=MagicMock(),
         record_store=MagicMock(),
-        container_stores=MagicMock(),
+        monograph_store=MagicMock(),
         publisher_store=MagicMock(),
         contribution_store=MagicMock(),
         location_store=MagicMock(),
@@ -194,7 +194,6 @@ class TestBiblio:
         assert biblio["first_page"] == "100"
         assert biblio["last_page"] == "110"
         assert biblio["publisher"] == "Some Press"
-        assert biblio["journal"] == {"title": "J. Things", "issn": "1234-5679"}
 
     def test_none_when_empty(self):
         assert get_biblio({}) is None
@@ -388,7 +387,7 @@ class TestSourceRecord:
         attributs = _attributs()
 
         document = datacite_source_record(
-            attributs, 42, datacite_doi(attributs, None), Containers(None, None)
+            attributs, 42, datacite_doi(attributs, None), Containers(False, None)
         )
 
         assert document.source == "datacite"
@@ -396,7 +395,6 @@ class TestSourceRecord:
         assert document.staging_id == 42
         assert identifier_values(document)["doi"] == ["10.5281/zenodo.1"]
         assert document.title == "Un jeu de données"
-        assert document.publication_year == 2024
 
     def test_dois_apparentes_rassembles(self):
         attributs = _attributs(
@@ -409,19 +407,23 @@ class TestSourceRecord:
             ]
         )
 
-        document = datacite_source_record(attributs, 42, "10.5281/zenodo.1", Containers(None, None))
+        document = datacite_source_record(
+            attributs, 42, "10.5281/zenodo.1", Containers(False, None)
+        )
 
         assert identifier_values(document) == {"doi": ["10.5281/zenodo.0", "10.5281/zenodo.1"]}
 
     def test_titre_du_conteneur_garde_sans_revue_resolue(self):
         attributs = _attributs(container={"title": "Une collection"})
 
-        sans_revue = datacite_source_record(attributs, 42, "10.5281/zenodo.1", Containers(None, 8))
-        avec_revue = datacite_source_record(attributs, 42, "10.5281/zenodo.1", Containers(3, None))
+        sans_revue = datacite_source_record(attributs, 42, "10.5281/zenodo.1", Containers(False, 8))
+        avec_revue = datacite_source_record(
+            attributs, 42, "10.5281/zenodo.1", Containers(True, None)
+        )
 
-        assert (sans_revue.serial_id, sans_revue.monograph_id) == (None, 8)
+        assert sans_revue.monograph_id == 8
         assert sans_revue.container_title == "Une collection"
-        assert (avec_revue.serial_id, avec_revue.container_title) == (3, None)
+        assert avec_revue.container_title is None
 
 
 class TestDoi:
@@ -434,7 +436,7 @@ class TestDoi:
         row = staging_row(staging_id=42, raw={"attributes": attributs}, doi="10.5281/zenodo.9")
         normalizer = _normalizer()
 
-        document = normalizer.source_record(row, normalizer.parse(row), Containers(None, None))
+        document = normalizer.source_record(row, normalizer.parse(row), Containers(False, None))
 
         assert identifier_values(document)["doi"] == ["10.5281/zenodo.9"]
 

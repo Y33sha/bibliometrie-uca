@@ -12,7 +12,6 @@ from infrastructure.repositories.merge_steps import (
     fill_empty_unique,
     record_redirect,
     transfer,
-    transfer_unique,
     untouched,
 )
 
@@ -24,8 +23,6 @@ MERGE_STEPS: dict[str, MergeStep] = {
     "apc_payments": transfer("apc_payments", "publisher_id"),
     "doi_prefixes": transfer("doi_prefixes", "publisher_id"),
     "name_forms": transfer("publisher_name_forms", "publisher_id"),
-    # Formes de nom des revues rattachées à l'éditeur, une par forme.
-    "serial_name_forms": transfer_unique("serial_name_forms", "publisher_id", "form_normalized"),
     "name": untouched("publishers", "name", "name_normalized").of_nature(DataNature.MIXED),
     "created_at": untouched("publishers", "created_at"),
     "openalex_id": fill_empty_unique("publishers", "openalex_id"),

@@ -6,8 +6,10 @@ Couvre le titre et l'année (soutenance, sinon inscription), les champs propres 
 from __future__ import annotations
 
 import logging
+from datetime import date
 from unittest.mock import MagicMock
 
+from domain.publications.dates import DatePrecision, PublicationDate
 from pipeline.ingestion.common.embargoes import Embargo
 from pipeline.ingestion.common.source_records import SourceRecordUpsert
 from pipeline.ingestion.theses.normalize import (
@@ -15,6 +17,7 @@ from pipeline.ingestion.theses.normalize import (
     _build_source_extras,
     build_theses_author_records,
     extract_theses_author_block,
+    get_publication_date,
     get_publication_year,
     get_title,
     theses_source_record,
@@ -135,20 +138,16 @@ class TestThesesSourceRecord:
     def test_minimal(self):
         record = self._call({"titrePrincipal": "T"})
         assert record.title == "T"
-        assert record.publication_year is None
         assert identifier_values(record) == {}
-        assert record.serial_id is None
 
     def test_defended_thesis(self):
         assert self._call({"dateSoutenance": "15/03/2023"}).raw_doc_type == "thesis"
 
     def test_ongoing_thesis(self):
-        record = self._call({"datePremiereInscriptionDoctorat": "01/09/2022"})
-        assert record.raw_doc_type == "ongoing_thesis"
-        assert record.publication_year == 2022
-
-    def test_malformed_date(self):
-        assert self._call({"dateSoutenance": "date-invalide"}).publication_year is None
+        assert (
+            self._call({"datePremiereInscriptionDoctorat": "01/09/2022"}).raw_doc_type
+            == "ongoing_thesis"
+        )
 
     def test_nnt_normalized(self):
         record = self._call({"titrePrincipal": "T", "nnt": "  2024clfac001  "})
@@ -222,6 +221,21 @@ class TestThesesSourceRecord:
         assert record.abstract == "Summary."
 
 
+class TestPublicationDate:
+    def test_date_de_soutenance(self):
+        assert get_publication_date({"dateSoutenance": "15/03/2023"}) == PublicationDate(
+            date(2023, 3, 15), DatePrecision.DAY
+        )
+
+    def test_these_en_cours_a_l_annee_de_premiere_inscription(self):
+        thesis = {"datePremiereInscriptionDoctorat": "01/09/2022"}
+        assert get_publication_date(thesis) == PublicationDate.of_year(2022)
+
+    def test_date_illisible_ou_absente(self):
+        assert get_publication_date({"dateSoutenance": "date-invalide"}) is None
+        assert get_publication_date({}) is None
+
+
 # ── build_theses_author_records ──────────────────────────────────
 
 
@@ -261,7 +275,7 @@ def _make_normalizer():
         logger=logging.getLogger("test"),
         staging_store=FakeStagingStore(),
         record_store=FakeSourceRecordStore(),
-        container_stores=MagicMock(),
+        monograph_store=MagicMock(),
         publisher_store=MagicMock(),
         contribution_store=FakeSourceContributionStore(),
         location_store=MagicMock(),
@@ -296,15 +310,14 @@ class TestThesesNormalizerClass:
         """L'enregistrement source reprend la ligne de staging et les métadonnées lues dans la thèse."""
         thesis = {"titrePrincipal": "T", "nnt": "2024clfac001", "dateSoutenance": "15/03/2024"}
         row = staging_row(staging_id=42, source_id="2024CLFAC001", raw=thesis)
-        record = _make_normalizer().source_record(row, thesis, Containers(None, None))
+        record = _make_normalizer().source_record(row, thesis, Containers(False, None))
         assert (record.source, record.source_id, record.staging_id) == (
             "theses",
             "2024CLFAC001",
             42,
         )
-        assert (record.title, record.publication_year) == ("T", 2024)
+        assert record.title == "T"
         assert identifier_values(record) == {"nnt": ["2024CLFAC001"]}
-        assert record.serial_id is None
 
     def test_contributions_sources_d_une_these(self):
         norm = _make_normalizer()

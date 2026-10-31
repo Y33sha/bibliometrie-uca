@@ -124,7 +124,7 @@ class ContributionsQueries:
                 {_ORPHANS_FROM}
                 {_DISPLAYED_MEMBER}
                 WHERE {where}
-                ORDER BY {contributor_display_name()}, p.publication_year DESC, g.id
+                ORDER BY {contributor_display_name()}, p.publication_date DESC, g.id
                 LIMIT :pg_limit OFFSET :pg_offset
             """),
             {**binds, "pg_limit": per_page, "pg_offset": offset},

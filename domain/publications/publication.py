@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass, field
 
+from domain.publications.dates import PublicationDate
 from domain.publications.identifiers import DOI
 from domain.types import JsonValue
 
@@ -14,6 +15,8 @@ class Publication:
     """`None` avant l'insertion en base."""
     title: str
     publication_year: int
+    publication_date: PublicationDate | None = None
+    """Date de publication, avec sa précision ; `publication_year` est son année."""
     title_normalized: str | None = None
     doc_type: str | None = None
     doi: DOI | None = None

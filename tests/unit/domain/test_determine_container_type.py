@@ -1,7 +1,7 @@
 """Tests de la séparation d'un conteneur en série et volume (`determine_container_type`)."""
 
 from domain.serials.containers import ContainerDescription, determine_container_type
-from domain.serials.issns import IssnStatus, IssnSupport, SerialIssn, source_issns
+from domain.serials.issns import IssnSupport, SerialIssn, source_issns
 
 
 def _describe(**fields) -> ContainerDescription:
@@ -141,7 +141,7 @@ def test_un_isbn_dans_le_champ_issn_est_rejete():
         raw_doc_type="journal-article", journal_title="Processing HRI 2017", issn="9781450348850"
     )
     assert description.issns == (
-        SerialIssn(issn="9781450348850", support=IssnSupport.PRINT, status=IssnStatus.MALFORMED),
+        SerialIssn(issn="9781450348850", support=IssnSupport.PRINT, malformed=True),
     )
     assert not description.has_issn
     series, volume = determine_container_type(description)

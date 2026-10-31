@@ -1,5 +1,8 @@
 import DOMPurify from 'dompurify';
 import katex from 'katex';
+import type { components } from '#lib/api/schema.js';
+
+type DatePrecision = components['schemas']['DatePrecision'];
 
 /** Sérialise des paramètres en query string en gardant les virgules littérales. `URLSearchParams.toString()` percent-encode la virgule en `%2C` ; or elle est licite dans une query (RFC 3986) et sépare nos listes de valeurs — on la restaure pour des URL lisibles. Retourne la chaîne sans le `?` initial (vide si aucun paramètre). */
 export function paramsToQuery(params: URLSearchParams): string {
@@ -252,6 +255,21 @@ export function formatDate(d: string | null | undefined): string {
 	return d;
 }
 
+const PUBLICATION_DATE_FORMATS: Record<DatePrecision, Intl.DateTimeFormatOptions> = {
+	year: { year: 'numeric' },
+	month: { month: 'short', year: 'numeric' },
+	day: { day: 'numeric', month: 'short', year: 'numeric' },
+};
+
+/** Date de publication à sa précision : « 2025 », « janv. 2025 », « 14 janv. 2025 ». */
+export function formatPublicationDate(value: string, precision: DatePrecision): string {
+	// `AAAA-MM-JJ` se lit à minuit UTC : formatée dans un autre fuseau, la date passerait parfois à la veille.
+	return new Date(value).toLocaleDateString('fr-FR', {
+		...PUBLICATION_DATE_FORMATS[precision],
+		timeZone: 'UTC',
+	});
+}
+
 /** Dépôts HAL d'un compte auteur. HAL indexe le `personId` du compte sous `authIdHal_i`. */
 export function halPersonUrl(halPersonId: string | number): string {
 	return `https://hal.science/search/index/?qa%5BauthIdHal_i%5D%5B%5D=${halPersonId}`;
@@ -266,6 +284,11 @@ export function rorShortId(rorId: string): string {
 export function rorFullUrl(rorId: string): string {
 	if (rorId.startsWith('http')) return rorId;
 	return `https://ror.org/${rorId}`;
+}
+
+/** Notice d'un ISSN sur le portail ISSN. */
+export function issnPortalUrl(issn: string): string {
+	return `https://portal.issn.org/resource/ISSN/${encodeURIComponent(issn)}`;
 }
 
 /** Dérive le statut de détection d'une structure à partir des flags `is_confirmed` (tri-state nullable) et `is_detected` (booléen).

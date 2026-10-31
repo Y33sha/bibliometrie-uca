@@ -43,10 +43,10 @@ def _pairs(prefix: str, serial_id: int, serial_type: SerialType) -> list[DoiSeri
     return [DoiSerialRow(f"{prefix}{i:05d}", serial_id, serial_type) for i in range(10)]
 
 
-def test_une_plateforme_n_obtient_aucun_espace():
+def test_une_collection_de_livres_n_obtient_aucun_espace():
     repo = _Repo(
         _pairs("10.64628/aak.", 1, SerialType.MEDIA)
-        + _pairs("10.2139/ssrn.", 2, SerialType.REPOSITORY)
+        + _pairs("10.1007/978-3-", 2, SerialType.BOOK_SERIES)
     )
     with _bound(repo):
         metrics = step.run_learn_serial_doi_namespaces(None, logging.getLogger("test"))

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 9rAfsetKf04IuDbF7gufyUxR592IDsCt1hakAM4dm4qGNQcTOEVYUXSdJZKfEE2
+\restrict S3g5501iNWm1LUqnDvEYQ7zmM9H5ixYWxHjLkBI8qpPECT0JF6fCbJzmwem9jku
 
 -- Dumped from database version 18.4
 -- Dumped by pg_dump version 18.4
@@ -118,6 +118,17 @@ CREATE TYPE public.country_detection_method AS ENUM (
 
 
 --
+-- Name: date_precision; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public.date_precision AS ENUM (
+    'year',
+    'month',
+    'day'
+);
+
+
+--
 -- Name: doc_type; Type: TYPE; Schema: public; Owner: -
 --
 
@@ -201,15 +212,22 @@ CREATE TYPE public.identifier_status AS ENUM (
 
 
 --
+-- Name: issn_link_type; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public.issn_link_type AS ENUM (
+    'continued_by',
+    'supplement'
+);
+
+
+--
 -- Name: issn_status; Type: TYPE; Schema: public; Owner: -
 --
 
 CREATE TYPE public.issn_status AS ENUM (
     'active',
-    'malformed',
     'cancelled',
-    'related_title',
-    'supplement',
     'unverified'
 );
 
@@ -283,8 +301,7 @@ CREATE TYPE public.merged_entity AS ENUM (
 CREATE TYPE public.oa_model AS ENUM (
     'subscription',
     'full_oa',
-    'diamond',
-    'repository'
+    'diamond'
 );
 
 
@@ -430,9 +447,7 @@ CREATE TYPE public.serial_type AS ENUM (
     'journal',
     'data_journal',
     'proceedings',
-    'repository',
     'book_series',
-    'preprint_server',
     'media',
     'unknown'
 );
@@ -1229,7 +1244,6 @@ CREATE TABLE sources.source_records (
     source public.source_type NOT NULL,
     source_id text NOT NULL,
     title text NOT NULL,
-    publication_year smallint,
     doc_type public.doc_type,
     publication_id integer,
     staging_id integer,
@@ -1259,6 +1273,9 @@ CREATE TABLE sources.source_records (
     raw_language text,
     publisher_id integer,
     is_matchable boolean DEFAULT true NOT NULL,
+    publication_date date,
+    publication_date_precision public.date_precision,
+    publication_year smallint GENERATED ALWAYS AS ((EXTRACT(year FROM publication_date))::smallint) STORED,
     CONSTRAINT source_records_corrections_is_object CHECK ((jsonb_typeof(corrections) = 'object'::text)),
     CONSTRAINT source_records_impact_is_object CHECK (((impact IS NULL) OR (jsonb_typeof(impact) = 'object'::text)))
 );
@@ -1311,6 +1328,27 @@ COMMENT ON COLUMN sources.source_records.publisher_id IS 'Éditeur que nomme la 
 --
 
 COMMENT ON COLUMN sources.source_records.is_matchable IS 'Faux pour un enregistrement source écarté de la réconciliation : préfixe DOI exclu, titre de paratexte, enregistrement ScanR issu d''un dépôt HAL introuvable, enregistrement d''agrégateur sans DOI, lien ni clé de confirmation.';
+
+
+--
+-- Name: COLUMN source_records.publication_date; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON COLUMN sources.source_records.publication_date IS 'Date de publication. À l''année : 1er janvier ; au mois : 1er du mois.';
+
+
+--
+-- Name: COLUMN source_records.publication_date_precision; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON COLUMN sources.source_records.publication_date_precision IS 'Précision de publication_date : year, month ou day.';
+
+
+--
+-- Name: COLUMN source_records.publication_year; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON COLUMN sources.source_records.publication_year IS 'Année de publication_date.';
 
 
 --
@@ -1743,7 +1781,6 @@ CREATE TABLE publications.publications (
     title text NOT NULL,
     title_normalized text,
     doc_type public.doc_type DEFAULT 'other'::public.doc_type,
-    publication_year smallint NOT NULL,
     doi text,
     oa_status public.oa_type DEFAULT 'unknown'::public.oa_type,
     serial_id integer,
@@ -1765,6 +1802,9 @@ CREATE TABLE publications.publications (
     publisher_id integer,
     doi_prefix text GENERATED ALWAYS AS (split_part(doi, '/'::text, 1)) STORED,
     best_copy_url text,
+    publication_date date NOT NULL,
+    publication_date_precision public.date_precision NOT NULL,
+    publication_year smallint GENERATED ALWAYS AS ((EXTRACT(year FROM publication_date))::smallint) STORED,
     CONSTRAINT publications_corrections_is_object CHECK ((jsonb_typeof(corrections) = 'object'::text))
 );
 
@@ -1788,6 +1828,27 @@ COMMENT ON COLUMN publications.publications.doi_prefix IS 'Préfixe du DOI, pour
 --
 
 COMMENT ON COLUMN publications.publications.best_copy_url IS 'Adresse de la meilleure copie ouverte, parmi les localisations des enregistrements sources.';
+
+
+--
+-- Name: COLUMN publications.publication_date; Type: COMMENT; Schema: publications; Owner: -
+--
+
+COMMENT ON COLUMN publications.publications.publication_date IS 'Date de publication. À l''année : 1er janvier ; au mois : 1er du mois.';
+
+
+--
+-- Name: COLUMN publications.publication_date_precision; Type: COMMENT; Schema: publications; Owner: -
+--
+
+COMMENT ON COLUMN publications.publications.publication_date_precision IS 'Précision de publication_date : year, month ou day.';
+
+
+--
+-- Name: COLUMN publications.publication_year; Type: COMMENT; Schema: publications; Owner: -
+--
+
+COMMENT ON COLUMN publications.publications.publication_year IS 'Année de publication_date.';
 
 
 --
@@ -1954,6 +2015,24 @@ CREATE TABLE publishing.doi_prefixes (
     crossref_checked_at timestamp with time zone,
     datacite_checked_at timestamp with time zone
 );
+
+
+--
+-- Name: issn_links; Type: TABLE; Schema: publishing; Owner: -
+--
+
+CREATE TABLE publishing.issn_links (
+    issn text NOT NULL,
+    linked_issn text NOT NULL,
+    link_type public.issn_link_type NOT NULL
+);
+
+
+--
+-- Name: TABLE issn_links; Type: COMMENT; Schema: publishing; Owner: -
+--
+
+COMMENT ON TABLE publishing.issn_links IS 'Liens entre ISSN lus dans le Sudoc, une ligne par lien : continued_by, titre précédent vers titre suivant ; supplement, revue principale vers supplément.';
 
 
 --
@@ -2152,9 +2231,10 @@ CREATE TABLE publishing.serial_issns (
     issn text NOT NULL,
     serial_id integer,
     support public.issn_support,
-    linking boolean DEFAULT false NOT NULL,
     status public.issn_status DEFAULT 'active'::public.issn_status NOT NULL,
-    sudoc_checked_at timestamp with time zone
+    sudoc_checked_at timestamp with time zone,
+    issnl text,
+    sudoc_title text
 );
 
 
@@ -2162,14 +2242,21 @@ CREATE TABLE publishing.serial_issns (
 -- Name: TABLE serial_issns; Type: COMMENT; Schema: publishing; Owner: -
 --
 
-COMMENT ON TABLE publishing.serial_issns IS 'ISSN des revues. Sans revue : ISSN vérifié au Sudoc, dont la publication est absente de la base.';
+COMMENT ON TABLE publishing.serial_issns IS 'ISSN valides, une ligne par ISSN, et revue de leur ISSN-L.';
 
 
 --
 -- Name: COLUMN serial_issns.issn; Type: COMMENT; Schema: publishing; Owner: -
 --
 
-COMMENT ON COLUMN publishing.serial_issns.issn IS 'Forme normalisée si la valeur est valide, valeur reçue sinon (statut malformed).';
+COMMENT ON COLUMN publishing.serial_issns.issn IS 'ISSN, forme normalisée.';
+
+
+--
+-- Name: COLUMN serial_issns.serial_id; Type: COMMENT; Schema: publishing; Owner: -
+--
+
+COMMENT ON COLUMN publishing.serial_issns.serial_id IS 'Revue de l''ISSN-L de l''ISSN, calculée par la phase publishing.';
 
 
 --
@@ -2180,17 +2267,10 @@ COMMENT ON COLUMN publishing.serial_issns.support IS 'Support de l''ISSN. NULL :
 
 
 --
--- Name: COLUMN serial_issns.linking; Type: COMMENT; Schema: publishing; Owner: -
---
-
-COMMENT ON COLUMN publishing.serial_issns.linking IS 'Vrai pour l''ISSN-L de la revue.';
-
-
---
 -- Name: COLUMN serial_issns.status; Type: COMMENT; Schema: publishing; Owner: -
 --
 
-COMMENT ON COLUMN publishing.serial_issns.status IS 'active ; malformed (forme ou clé de contrôle fausse) ; cancelled ; related_title (titre précédent ou suivant) ; supplement ; unverified (ISSN des enregistrements sources, sans notice Sudoc).';
+COMMENT ON COLUMN publishing.serial_issns.status IS 'active ; cancelled (ISSN annulé) ; unverified (sans notice Sudoc).';
 
 
 --
@@ -2198,6 +2278,20 @@ COMMENT ON COLUMN publishing.serial_issns.status IS 'active ; malformed (forme o
 --
 
 COMMENT ON COLUMN publishing.serial_issns.sudoc_checked_at IS 'Date de la vérification de l''ISSN au Sudoc. NULL : jamais vérifié.';
+
+
+--
+-- Name: COLUMN serial_issns.issnl; Type: COMMENT; Schema: publishing; Owner: -
+--
+
+COMMENT ON COLUMN publishing.serial_issns.issnl IS 'ISSN-L de l''ISSN d''après sa notice Sudoc. NULL : inconnu.';
+
+
+--
+-- Name: COLUMN serial_issns.sudoc_title; Type: COMMENT; Schema: publishing; Owner: -
+--
+
+COMMENT ON COLUMN publishing.serial_issns.sudoc_title IS 'Titre de la notice Sudoc de l''ISSN. NULL : sans notice, ou ISSN jamais vérifié.';
 
 
 --
@@ -2221,23 +2315,29 @@ ALTER SEQUENCE publishing.serial_issns_id_seq OWNED BY publishing.serial_issns.i
 
 
 --
--- Name: serial_name_forms; Type: TABLE; Schema: publishing; Owner: -
+-- Name: serial_title_decisions; Type: TABLE; Schema: publishing; Owner: -
 --
 
-CREATE TABLE publishing.serial_name_forms (
+CREATE TABLE publishing.serial_title_decisions (
     id integer NOT NULL,
+    title_normalized text NOT NULL,
     serial_id integer NOT NULL,
-    form_normalized text NOT NULL,
-    created_at timestamp with time zone DEFAULT now(),
-    publisher_id integer
+    created_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
 --
--- Name: serial_name_forms_id_seq; Type: SEQUENCE; Schema: publishing; Owner: -
+-- Name: TABLE serial_title_decisions; Type: COMMENT; Schema: publishing; Owner: -
 --
 
-CREATE SEQUENCE publishing.serial_name_forms_id_seq
+COMMENT ON TABLE publishing.serial_title_decisions IS 'Fusions décidées par l''administration : une série sans ISSN de ce titre normalisé est rattachée à la revue.';
+
+
+--
+-- Name: serial_title_decisions_id_seq; Type: SEQUENCE; Schema: publishing; Owner: -
+--
+
+CREATE SEQUENCE publishing.serial_title_decisions_id_seq
     AS integer
     START WITH 1
     INCREMENT BY 1
@@ -2247,10 +2347,10 @@ CREATE SEQUENCE publishing.serial_name_forms_id_seq
 
 
 --
--- Name: serial_name_forms_id_seq; Type: SEQUENCE OWNED BY; Schema: publishing; Owner: -
+-- Name: serial_title_decisions_id_seq; Type: SEQUENCE OWNED BY; Schema: publishing; Owner: -
 --
 
-ALTER SEQUENCE publishing.serial_name_forms_id_seq OWNED BY publishing.serial_name_forms.id;
+ALTER SEQUENCE publishing.serial_title_decisions_id_seq OWNED BY publishing.serial_title_decisions.id;
 
 
 --
@@ -3294,10 +3394,10 @@ ALTER TABLE ONLY publishing.serial_issns ALTER COLUMN id SET DEFAULT nextval('pu
 
 
 --
--- Name: serial_name_forms id; Type: DEFAULT; Schema: publishing; Owner: -
+-- Name: serial_title_decisions id; Type: DEFAULT; Schema: publishing; Owner: -
 --
 
-ALTER TABLE ONLY publishing.serial_name_forms ALTER COLUMN id SET DEFAULT nextval('publishing.serial_name_forms_id_seq'::regclass);
+ALTER TABLE ONLY publishing.serial_title_decisions ALTER COLUMN id SET DEFAULT nextval('publishing.serial_title_decisions_id_seq'::regclass);
 
 
 --
@@ -3664,6 +3764,14 @@ ALTER TABLE ONLY publishing.doi_prefixes
 
 
 --
+-- Name: issn_links issn_links_pkey; Type: CONSTRAINT; Schema: publishing; Owner: -
+--
+
+ALTER TABLE ONLY publishing.issn_links
+    ADD CONSTRAINT issn_links_pkey PRIMARY KEY (issn, linked_issn, link_type);
+
+
+--
 -- Name: monographs monographs_eisbn_key; Type: CONSTRAINT; Schema: publishing; Owner: -
 --
 
@@ -3752,11 +3860,11 @@ ALTER TABLE ONLY publishing.serial_issns
 
 
 --
--- Name: serial_name_forms serial_name_forms_pkey; Type: CONSTRAINT; Schema: publishing; Owner: -
+-- Name: serial_title_decisions serial_title_decisions_pkey; Type: CONSTRAINT; Schema: publishing; Owner: -
 --
 
-ALTER TABLE ONLY publishing.serial_name_forms
-    ADD CONSTRAINT serial_name_forms_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY publishing.serial_title_decisions
+    ADD CONSTRAINT serial_title_decisions_pkey PRIMARY KEY (id);
 
 
 --
@@ -3776,19 +3884,19 @@ ALTER TABLE ONLY publishing.serials
 
 
 --
--- Name: serial_issns uq_serial_issns_issn_serial; Type: CONSTRAINT; Schema: publishing; Owner: -
+-- Name: serial_issns uq_serial_issns_issn; Type: CONSTRAINT; Schema: publishing; Owner: -
 --
 
 ALTER TABLE ONLY publishing.serial_issns
-    ADD CONSTRAINT uq_serial_issns_issn_serial UNIQUE NULLS NOT DISTINCT (issn, serial_id);
+    ADD CONSTRAINT uq_serial_issns_issn UNIQUE (issn);
 
 
 --
--- Name: serial_name_forms uq_serial_name_forms_form_publisher; Type: CONSTRAINT; Schema: publishing; Owner: -
+-- Name: serial_title_decisions uq_serial_title_decisions; Type: CONSTRAINT; Schema: publishing; Owner: -
 --
 
-ALTER TABLE ONLY publishing.serial_name_forms
-    ADD CONSTRAINT uq_serial_name_forms_form_publisher UNIQUE NULLS NOT DISTINCT (form_normalized, publisher_id);
+ALTER TABLE ONLY publishing.serial_title_decisions
+    ADD CONSTRAINT uq_serial_title_decisions UNIQUE (title_normalized);
 
 
 --
@@ -4606,6 +4714,13 @@ CREATE INDEX idx_doi_prefixes_ra ON publishing.doi_prefixes USING btree (ra);
 
 
 --
+-- Name: idx_issn_links_linked; Type: INDEX; Schema: publishing; Owner: -
+--
+
+CREATE INDEX idx_issn_links_linked ON publishing.issn_links USING btree (linked_issn);
+
+
+--
 -- Name: idx_monographs_publisher; Type: INDEX; Schema: publishing; Owner: -
 --
 
@@ -4655,13 +4770,6 @@ CREATE INDEX idx_serial_issns_serial ON publishing.serial_issns USING btree (ser
 
 
 --
--- Name: idx_serial_name_forms_serial; Type: INDEX; Schema: publishing; Owner: -
---
-
-CREATE INDEX idx_serial_name_forms_serial ON publishing.serial_name_forms USING btree (serial_id);
-
-
---
 -- Name: idx_serials_publisher; Type: INDEX; Schema: publishing; Owner: -
 --
 
@@ -4680,13 +4788,6 @@ CREATE INDEX idx_serials_title_normalized ON publishing.serials USING hash (titl
 --
 
 CREATE INDEX ix_serial_doi_namespaces_serial_id ON publishing.serial_doi_namespaces USING btree (serial_id);
-
-
---
--- Name: uq_serial_issns_linking; Type: INDEX; Schema: publishing; Owner: -
---
-
-CREATE UNIQUE INDEX uq_serial_issns_linking ON publishing.serial_issns USING btree (serial_id) WHERE linking;
 
 
 --
@@ -5349,19 +5450,11 @@ ALTER TABLE ONLY publishing.serial_issns
 
 
 --
--- Name: serial_name_forms serial_name_forms_publisher_id_fkey; Type: FK CONSTRAINT; Schema: publishing; Owner: -
+-- Name: serial_title_decisions serial_title_decisions_serial_id_fkey; Type: FK CONSTRAINT; Schema: publishing; Owner: -
 --
 
-ALTER TABLE ONLY publishing.serial_name_forms
-    ADD CONSTRAINT serial_name_forms_publisher_id_fkey FOREIGN KEY (publisher_id) REFERENCES publishing.publishers(id);
-
-
---
--- Name: serial_name_forms serial_name_forms_serial_id_fkey; Type: FK CONSTRAINT; Schema: publishing; Owner: -
---
-
-ALTER TABLE ONLY publishing.serial_name_forms
-    ADD CONSTRAINT serial_name_forms_serial_id_fkey FOREIGN KEY (serial_id) REFERENCES publishing.serials(id) ON DELETE CASCADE;
+ALTER TABLE ONLY publishing.serial_title_decisions
+    ADD CONSTRAINT serial_title_decisions_serial_id_fkey FOREIGN KEY (serial_id) REFERENCES publishing.serials(id) ON DELETE CASCADE;
 
 
 --
@@ -5680,5 +5773,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 9rAfsetKf04IuDbF7gufyUxR592IDsCt1hakAM4dm4qGNQcTOEVYUXSdJZKfEE2
+\unrestrict S3g5501iNWm1LUqnDvEYQ7zmM9H5ixYWxHjLkBI8qpPECT0JF6fCbJzmwem9jku
 

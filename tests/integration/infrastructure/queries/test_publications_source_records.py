@@ -55,7 +55,10 @@ class TestGetPublicationSources:
             serial_id=journal,
             publisher_id=insert_publisher(sa_sync_conn, "Springer Nature"),
             biblio={
-                "journal": {"title": "Nature (London)", "issn": "0028-0836", "eissn": "1476-4687"},
+                "journal": {
+                    "title": "Nature (London)",
+                    "issns": [{"issn": "0028-0836"}, {"issn": "1476-4687"}],
+                },
                 "publisher": "Nature Publishing Group",
             },
         )
@@ -65,7 +68,7 @@ class TestGetPublicationSources:
             "Nature",
             "Nature (London)",
         )
-        assert (record.journal_raw_issn, record.journal_raw_eissn) == ("0028-0836", "1476-4687")
+        assert record.journal_raw_issns == ["0028-0836", "1476-4687"]
         assert (record.publisher_name, record.publisher_raw_name) == (
             "Springer Nature",
             "Nature Publishing Group",

@@ -16,7 +16,7 @@ INSERT INTO config (key, value, description) VALUES ('fetch_missing_retry_after_
 INSERT INTO config (key, value, description) VALUES ('fetch_stale_after_days', '90', 'Délai, en jours, au-delà duquel un document non revu est interrogé de nouveau à sa source.') ON CONFLICT (key) DO NOTHING;
 INSERT INTO config (key, value, description) VALUES ('laboratory_types', '["labo"]', 'Types de structure traités comme laboratoires.') ON CONFLICT (key) DO NOTHING;
 INSERT INTO config (key, value, description) VALUES ('pipeline_start_year_full', '2017', 'Mode full/monthly : extraire depuis cette année (incluse) jusqu''à l''année courante. Année absolue (ancre fixe), pas un offset — rétention cumulative.') ON CONFLICT (key) DO NOTHING;
-INSERT INTO config (key, value, description) VALUES ('sudoc_max_per_run', '10000', 'Nombre maximum de revues vérifiées dans le Sudoc par run. 0 = illimité.') ON CONFLICT (key) DO NOTHING;
+INSERT INTO config (key, value, description) VALUES ('sudoc_max_per_run', '10000', 'Nombre maximum d''ISSN vérifiés dans le Sudoc par run. 0 = illimité.') ON CONFLICT (key) DO NOTHING;
 INSERT INTO config (key, value, description) VALUES ('unpaywall_max_per_run', '10000', 'Nombre maximum de DOI vérifiés auprès d''Unpaywall par run. 0 = illimité.') ON CONFLICT (key) DO NOTHING;
 INSERT INTO config (key, value, description) VALUES ('unpaywall_recheck_after_days', '15', 'Délai, en jours, avant de vérifier de nouveau le statut open access d''une publication auprès d''Unpaywall.') ON CONFLICT (key) DO NOTHING;
 

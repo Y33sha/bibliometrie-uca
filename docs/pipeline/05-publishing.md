@@ -1,8 +1,8 @@
 # Référentiels de l'édition
 
-*À jour le 2026-10-26.*
+*À jour le 2026-10-31.*
 
-La phase `publishing` complète les [référentiels de l'édition](../donnees/07-publishing.md) alimentés par la phase [normalize](03-normalize.md). Elle rattache chaque préfixe DOI à son éditeur et vérifie les ISSN des publications en série. Elle cherche leur type auprès de sources externes. Elle fusionne les doublons et rattache les monographies à leur collection. La phase [finalize](10-finalize.md) supprime les entrées vides. La phase [metadata_correction](06-metadata-correction.md), qui suit, corrige le type de document des publications d'après le `serial_type`.
+La phase `publishing` complète les [référentiels de l'édition](../donnees/07-publishing.md) alimentés par la phase [normalize](03-normalize.md). Elle rattache chaque préfixe DOI à son éditeur. Elle vérifie les ISSN dans le Sudoc et rattache chaque enregistrement source à sa publication en série. Elle cherche le type des publications en série auprès de sources externes. Elle fusionne les monographies en double et les rattache à leur collection. La phase [finalize](10-finalize.md) supprime les entrées vides. La phase [metadata_correction](06-metadata-correction.md), qui suit, corrige le type de document des publications d'après le `serial_type`.
 
 ## Agences d'enregistrement DOI (`resolve_ra`)
 
@@ -16,9 +16,10 @@ Phase à part, juste avant `publishing`. Elle interroge doi.org sur les préfixe
 
 ## Publications en série
 
+- **`sync_issns`** — donne une ligne de `serial_issns` à chaque ISSN valide d'une série décrite par un enregistrement source (`biblio.journal`).
+- **`check_issns_in_sudoc`** — lit la notice Sudoc de chaque ISSN jamais vérifié ([Sudoc](../sources/09-sources-supplementaires.md#sudoc)) : ISSN-L, support, statut, titre, liens vers le titre précédent, le titre suivant ou le supplément (`domain/serials/issn_facts.py`). Le nombre d'ISSN vérifiés par run est plafonné (`sudoc_max_per_run`).
+- **`attach_serials`** — rattache chaque enregistrement source à sa publication en série (`domain/serials/attachment.py`). Une publication en série correspond à un ISSN-L : celui du Sudoc, à défaut celui d'OpenAlex, à défaut l'ISSN lui-même. Sans ISSN, l'enregistrement source rejoint la publication en série de son identifiant OpenAlex, à défaut celle de son titre. Une publication en série vidée est absorbée par celle qui reçoit ses enregistrements sources. Le titre d'une publication en série est celui de la notice Sudoc de son ISSN-L, sauf titre saisi à la main.
 - **`enrich_serials_from_openalex`** — renseigne d'après [OpenAlex](../sources/03-openalex.md) le type des revues de type inconnu.
-- **`check_serials_in_sudoc`** — vérifie les ISSN des revues dans le [Sudoc](../sources/09-sources-supplementaires.md#sudoc) : support, ISSN-L, ISSN annulés ou d'un titre précédent, ISSN d'une autre publication écartés (`domain/serials/issn_check.py`). Le nombre de revues vérifiées par run est plafonné (`sudoc_max_per_run`).
-- **`merge_duplicate_serials`** — fusionne les revues en double : ISSN-L ou ISSN partagés, titres emboîtés ou abrégés que désigne une même publication (`domain/serials/titles.py`). La revue qui a le plus de publications absorbe les autres.
 - **`type_proceedings_serials`** — type en recueil d'actes les revues composées surtout d'articles de congrès, et les revues sans ISSN au titre nommant une édition datée ou des actes (« proceedings »).
 - **`type_journal_serials`** — type en revue les entrées de type inconnu composées en majorité d'articles.
 - **`learn_serial_doi_namespaces`** — calcule les espaces de noms DOI qui désignent une revue (`10.1016/j.physletb.`), d'après les DOI de ses enregistrements sources (`domain/serials/doi_namespaces.py`).

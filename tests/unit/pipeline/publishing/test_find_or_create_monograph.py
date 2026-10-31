@@ -31,7 +31,7 @@ class _Repo:
     def enrich_monograph(self, monograph_id, **fields) -> None:
         row = self.rows[monograph_id]
         row["proceedings"] = row["proceedings"] or fields["proceedings"]
-        for key in ("year", "isbn", "eisbn", "publisher_id", "serial_id"):
+        for key in ("year", "isbn", "eisbn", "publisher_id"):
             row[key] = row[key] if row[key] is not None else fields[key]
 
 

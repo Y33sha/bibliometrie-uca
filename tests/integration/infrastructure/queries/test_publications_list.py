@@ -5,6 +5,7 @@ from functools import partial
 from sqlalchemy import text
 
 from domain.config import LABORATORY_TYPES_KEY
+from domain.publications.dates import date_from_parts
 from infrastructure.read_models.publications.facets import _PublicationFacetsBuilder
 from infrastructure.read_models.publications.filtering import FilterContext, filter_context
 from infrastructure.read_models.publications.models import PublicationFilters
@@ -351,7 +352,7 @@ class TestThesesSort:
 
 
 class TestPublicationsSort:
-    """Tri des publications par revue, éditeur et laboratoires, sans égard à la casse, publications sans valeur en dernier."""
+    """Tri des publications. Revue, éditeur et laboratoires se trient sans égard à la casse, publications sans valeur en dernier."""
 
     def _publication(self, conn, title, *, serial=None, publisher=None, labs=(), person=None):
         serial_id = insert_serial(conn, serial) if serial else None
@@ -395,6 +396,18 @@ class TestPublicationsSort:
         assert self._sorted(sa_sync_conn, "publisher_desc") == [p2, p1, p3]
         assert self._sorted(sa_sync_conn, "labs_asc") == [p2, p1, p3]
         assert self._sorted(sa_sync_conn, "labs_desc") == [p1, p2, p3]
+
+    def test_year_sort_reads_the_full_date(self, sa_sync_conn):
+        """Dans une même année, le tri par année suit la date de publication, avant le titre."""
+        october = insert_publication(
+            sa_sync_conn, "B", publication_date=date_from_parts(2024, 10, 15), in_perimeter=True
+        )
+        march = insert_publication(
+            sa_sync_conn, "A", publication_date=date_from_parts(2024, 3), in_perimeter=True
+        )
+
+        assert self._sorted(sa_sync_conn, "year_desc") == [october, march]
+        assert self._sorted(sa_sync_conn, "year_asc") == [march, october]
 
     def test_labs_sort_reads_the_labs_of_the_person(self, sa_sync_conn):
         """Sur la vue d'une personne, la colonne affiche seulement ses laboratoires : le tri lit les mêmes."""

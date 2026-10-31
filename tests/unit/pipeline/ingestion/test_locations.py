@@ -1,6 +1,41 @@
-"""Fusion des localisations d'un enregistrement source (`pipeline.ingestion.common.locations`)."""
+"""Localisations d'un enregistrement source (`pipeline.ingestion.common.locations`)."""
 
-from pipeline.ingestion.common.locations import LocationFacts, merge_locations
+from domain.source_records.identifiers import (
+    SourceIdentifier,
+    SourceIdentifierRole,
+    SourceIdentifierType,
+)
+from pipeline.ingestion.common.locations import (
+    LocationFacts,
+    identifier_locations,
+    merge_locations,
+)
+
+
+def _doi(value: str, role: SourceIdentifierRole = SourceIdentifierRole.PRIMARY) -> SourceIdentifier:
+    return SourceIdentifier(SourceIdentifierType.DOI, value, role)
+
+
+def test_doi_de_serveur_de_preprints_ouvert_donne_une_copie_ouverte():
+    """bioRxiv et medRxiv partagent le préfixe 10.1101, et donnent tous deux librement accès à leur contenu."""
+    assert identifier_locations([_doi("10.1101/2020.01.01.123456")]) == [
+        LocationFacts("https://doi.org/10.1101/2020.01.01.123456", is_oa=True)
+    ]
+
+
+def test_doi_d_un_autre_serveur_donne_une_copie_sans_acces_libre_declare():
+    assert identifier_locations([_doi("10.2139/ssrn.123")]) == [
+        LocationFacts("https://doi.org/10.2139/ssrn.123", is_oa=False)
+    ]
+
+
+def test_doi_de_revue_ou_doi_lie_sans_copie():
+    identifiers = [
+        _doi("10.1101/gad.1"),
+        _doi("10.1038/s41586-020-1"),
+        _doi("10.1101/2020.01.01.123456", SourceIdentifierRole.RELATED),
+    ]
+    assert identifier_locations(identifiers) == []
 
 
 def test_les_portails_hal_d_un_depot_forment_une_seule_copie():

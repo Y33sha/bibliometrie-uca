@@ -9,6 +9,7 @@ from domain.persons.contributor_name import ContributorName
 from domain.platforms.platform import PlatformType
 from domain.platforms.registry import PMC_ARTICLE_URL, PUBMED_CENTRAL, known_platform_of_source
 from domain.publications.contribution_roles import ContributionRole
+from domain.publications.dates import PublicationDate, date_from_parts, parse_iso_date
 from domain.publications.identifiers import (
     clean_doi,
     extract_doi_from_url,
@@ -231,8 +232,6 @@ def get_container_facts(work: Mapping[str, JsonValue]) -> ContainerDescription:
     oa_model: OaModel | None = None
     if source_type == "journal":
         oa_model = OaModel.FULL_OA if source.get("is_oa") else OaModel.SUBSCRIPTION
-    elif source_type == "repository":
-        oa_model = OaModel.REPOSITORY
 
     return ContainerDescription(
         source="openalex",
@@ -257,6 +256,13 @@ def get_publication_year(work: Mapping[str, JsonValue]) -> int | None:
     return as_int(work.get("publication_year"))
 
 
+def get_publication_date(work: Mapping[str, JsonValue]) -> PublicationDate | None:
+    """Renvoie la date de publication (`publication_date`), au 1er janvier ramenée à l'année et au 1er d'un autre mois ramenée au mois (`without_placeholder_day`). À défaut, renvoie l'année (`publication_year`)."""
+    if parsed := parse_iso_date(as_str(work.get("publication_date"))):
+        return parsed.without_placeholder_day()
+    return date_from_parts(get_publication_year(work))
+
+
 def openalex_source_record(  # noqa: C901
     work: Mapping[str, JsonValue],
     staging_id: int,
@@ -277,25 +283,17 @@ def openalex_source_record(  # noqa: C901
 
     is_retracted = bool(work.get("is_retracted"))
 
-    # Numérotation, éditeur et revue nommés par OpenAlex.
-    # Éditeur et revue écartés pour une localisation principale hébergeant le work sans le publier (HAL, theses.fr, Zenodo…), revue écartée pour une plateforme d'ebooks.
+    # Numérotation et éditeur nommés par OpenAlex.
+    # Éditeur écarté pour une localisation principale hébergeant le work sans le publier (HAL, theses.fr, Zenodo…).
     raw_biblio = as_mapping(work.get("biblio"))
     primary_source = as_mapping(as_mapping(work.get("primary_location")).get("source"))
     publisher_source = primary_source if names_publisher(primary) else {}
-    source = primary_source if names_serial(primary) else {}
-    issn_l = as_str(source.get("issn_l"))
-    issns = [i for e in as_sequence(source.get("issn")) if (i := as_str(e)) and i != issn_l]
     biblio_json = compact_biblio(
         volume=as_str(raw_biblio.get("volume")),
         issue=as_str(raw_biblio.get("issue")),
         first_page=as_str(raw_biblio.get("first_page")),
         last_page=as_str(raw_biblio.get("last_page")),
         publisher=as_str(publisher_source.get("host_organization_name")),
-        journal_title=as_str(source.get("display_name")),
-        journal_issn=issns[0] if issns else None,
-        journal_eissn=issns[1] if len(issns) > 1 else None,
-        journal_issnl=issn_l,
-        journal_openalex_id=short_openalex_id(as_str(source.get("id")) or ""),
     )
 
     abstract = reconstruct_abstract(as_mapping(work.get("abstract_inverted_index")))
@@ -316,14 +314,12 @@ def openalex_source_record(  # noqa: C901
         staging_id=staging_id,
         identifiers=openalex_identifiers(location_identifiers, doi, primary),
         title=get_title(work) or "",
-        publication_year=get_publication_year(work),
         raw_doc_type=as_str(work.get("type")),
-        serial_id=containers.serial_id,
         monograph_id=containers.monograph_id,
         # Une archive, un entrepôt ou une plateforme d'ebooks héberge le work sans le contenir.
         container_title=(
             primary.source_display_name
-            if primary and names_serial(primary) and not containers.serial_id
+            if primary and names_serial(primary) and not containers.has_series
             else None
         ),
         raw_language=as_str(work.get("language")),
@@ -464,6 +460,9 @@ class OpenalexNormalizer(SourceNormalizer):
 
     def locations(self, doc: Document) -> list[LocationFacts]:
         return get_locations(doc)
+
+    def publication_date(self, doc: Document) -> PublicationDate | None:
+        return get_publication_date(doc)
 
     def source_record(
         self, row: StagingRow, doc: Document, containers: Containers
