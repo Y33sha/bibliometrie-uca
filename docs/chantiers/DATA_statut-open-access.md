@@ -29,7 +29,7 @@ Simulation sur les 76 591 publications du périmètre (`interfaces/cli/oneshot/m
 ## Décisions
 
 - Le statut d'une publication est le plancher tiré de sa meilleure copie ouverte, relevé par le verdict d'Unpaywall, jamais abaissé.
-- Copie d'archive ou de serveur de preprints ouverte : `green`. Copie ouverte côté éditeur : le modèle de la revue décide, comme dans la simulation.
+- Copie d'archive ou de serveur de preprints ouverte : `green`. Copie ouverte côté éditeur : le modèle de la revue décide, comme dans la simulation. Sans copie ouverte côté éditeur, le modèle de la revue ne donne aucun statut.
 - `diamond` : revue au DOAJ sans APC ni autres frais. Un `gold` d'Unpaywall devient `diamond` aux mêmes conditions.
 - La date de fin d'embargo est une colonne de la copie. L'ouverture d'une copie se calcule à la lecture : `is_oa` et embargo absent ou échu. Une copie sous embargo actif donne `embargoed`.
 - L'embargo déclaré par theses.fr, sans copie ni date, reste un statut `embargoed`.
@@ -73,6 +73,5 @@ Simulation sur les 76 591 publications du périmètre (`interfaces/cli/oneshot/m
 
 - Le statut déclaré par chaque source (`source_records.oa_status`) sert-il encore, hors embargo de theses.fr ? Ignoré, il laisse 671 publications sans copie ni verdict passer en `unknown`, dont 272 présentes seulement dans le WoS.
 - Copie ouverte sur `doi.org`, à DOI vérifié par Unpaywall : le verdict décide-t-il de son ouverture ? Unpaywall décrit la page de l'éditeur, comme HAL décrit ses dépôts. Le plancher compte sinon environ 5 % de copies faussement ouvertes.
-- Revue `full_oa` ou `diamond` : la publication est-elle au moins `gold` ou `diamond`, même sans copie ouverte ? 1 568 publications changent de statut. Le modèle de la revue est son modèle actuel.
 - 128 communications : HAL décrit un dépôt sans fichier, OpenAlex dit la copie HAL ouverte.
 - Lien `openaccess` de HAL vers le texte chez l'éditeur (`linkExtUrl_s`) : absent des copies. 31 publications déclarées `hybrid` par HAL seul.
