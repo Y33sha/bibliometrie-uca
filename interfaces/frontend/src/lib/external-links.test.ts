@@ -35,13 +35,15 @@ const HOTES_AFFICHABLES = new Set([
 	// confronte à cet hôte avant de la servir (`infrastructure/read_models/doaj_links.py`).
 	'doaj.org',
 	// Rapport de participation d'un membre Crossref, depuis la liste des éditeurs.
-	'www.crossref.org'
+	'www.crossref.org',
+	// Notice d'un ISSN lié à une revue sans y être rattaché, depuis la fiche de la revue.
+	'portal.issn.org'
 ]);
 
 /* Expressions admises dans un attribut `href`. Les fonctions de composition écrivent l'hôte ;
  * les valeurs internes désignent une route de l'application. */
 const COMPOSITION =
-	/^(halPersonUrl|halUrl|halCollectionUrl|rorFullUrl|crossrefMemberUrl|exportCsvUrl|relHref)\(/;
+	/^(halPersonUrl|halUrl|halCollectionUrl|rorFullUrl|crossrefMemberUrl|issnPortalUrl|exportCsvUrl|relHref)\(/;
 const INTERNE = /^(pubsUrl|statsUrl)$/;
 /* `resolve` compose un chemin de l'application sous le préfixe de déploiement, `withBase` un
  * chemin de l'API ; `loginUrl` y ajoute la page de retour après connexion. */

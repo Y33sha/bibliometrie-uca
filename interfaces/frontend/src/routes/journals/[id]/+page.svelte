@@ -7,6 +7,7 @@
 	import { onMount, tick } from 'svelte';
 	import { api, apiDetail } from '#lib/api/index.js';
 	import { issnLabel, serialRelationLabels } from '#lib/labels.js';
+	import { issnPortalUrl } from '#lib/utils.js';
 	import TabNav from '#lib/components/TabNav.svelte';
 	import PublicationsListView from '#lib/components/PublicationsListView.svelte';
 	import MonographsListView from '#lib/components/MonographsListView.svelte';
@@ -126,8 +127,8 @@
 					<EntityMetaItem label={serialRelationLabels[relation.kind]}>
 						{#if relation.serial_id}
 							<a href={resolve(`journals/${relation.serial_id}`)}>{relation.title}</a>
-						{:else}
-							<a class="id-badge" href={`https://portal.issn.org/resource/ISSN/${relation.issn}`} target="_blank" rel="noopener" title="Portail ISSN (nouvel onglet)">{relation.issn}</a>
+						{:else if relation.issn}
+							<a class="id-badge" href={issnPortalUrl(relation.issn)} target="_blank" rel="noopener" title="Portail ISSN (nouvel onglet)">{relation.issn}</a>
 						{/if}
 					</EntityMetaItem>
 				{/each}

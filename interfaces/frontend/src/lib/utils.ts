@@ -286,6 +286,11 @@ export function rorFullUrl(rorId: string): string {
 	return `https://ror.org/${rorId}`;
 }
 
+/** Notice d'un ISSN sur le portail ISSN. */
+export function issnPortalUrl(issn: string): string {
+	return `https://portal.issn.org/resource/ISSN/${encodeURIComponent(issn)}`;
+}
+
 /** Dérive le statut de détection d'une structure à partir des flags `is_confirmed` (tri-state nullable) et `is_detected` (booléen).
  *
  * Règle : confirmed > rejected > detected > manual.
