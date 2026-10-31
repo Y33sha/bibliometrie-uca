@@ -10,6 +10,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from pipeline.ingestion.common.embargoes import Embargo
 from pipeline.ingestion.common.source_records import SourceRecordUpsert
 from pipeline.ingestion.theses.normalize import (
     ThesesNormalizer,
@@ -282,10 +283,17 @@ def _make_normalizer():
         publisher_store=MagicMock(),
         contribution_store=FakeSourceContributionStore(),
         location_store=MagicMock(),
+        embargo_store=MagicMock(),
     )
 
 
 class TestThesesNormalizerClass:
+    def test_embargo_sans_date_d_une_these_destinee_a_internet(self):
+        norm = _make_normalizer()
+        assert norm.embargo(_these(cas="cas1", accessible="non")) == Embargo(None)
+        assert norm.embargo(_these(cas="cas5", accessible="non")) is None
+        assert norm.embargo(_these(cas="cas1", accessible="oui")) is None
+
     def test_metadonnees_minimales(self):
         assert _make_normalizer().minimal_metadata(staging_row(raw={})) == (None, None)
 

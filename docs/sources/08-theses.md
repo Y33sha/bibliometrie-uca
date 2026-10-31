@@ -128,6 +128,8 @@ Le statut open access vient de la diffusion de la thèse. `cas` est le cas de di
 | cas 1 à 4, `accessible` = `non` | `embargoed` |
 | cas 5 ou 6, thèse en cours | `closed` |
 
+Une thèse `embargoed` reçoit un embargo sans date (`embargoes`).
+
 ### Langue et résumé
 
 La langue est la première de `langues`. Le résumé est le premier disponible, dans l'ordre des langues.

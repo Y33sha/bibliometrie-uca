@@ -5,7 +5,7 @@
 3. Sinon, copie ouverte chez l'éditeur sans licence ouverte : `bronze`.
 4. Sinon : `embargoed` sous embargo, `closed` avec une information sur la publication, `unknown` sans aucune.
 
-Le verdict d'Unpaywall relève les accès, jamais ne les abaisse. Des statuts déclarés par les sources, seuls comptent `closed` et l'embargo déclaré par theses.fr.
+Le verdict d'Unpaywall relève les accès, jamais ne les abaisse. Des statuts déclarés par les sources, seul compte `closed`.
 """
 
 from collections.abc import Iterable
@@ -17,7 +17,6 @@ from domain.publications.access import Copy, open_copies
 from domain.publications.licenses import OPEN_LICENSES
 from domain.publications.metadata import OaStatus
 from domain.serials.serial import OaModel
-from domain.sources.registry import Source
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -30,7 +29,7 @@ class OpenAccessFacts:
     """Une copie ouverte chez l'éditeur a une licence ouverte (`OPEN_LICENSES`)."""
     archive_open: bool = False
     embargoed: bool = False
-    """Une copie est sous embargo actif, ou theses.fr déclare un embargo."""
+    """Un enregistrement source de la publication est sous embargo actif."""
     informed: bool = False
     """La publication a une copie, un verdict d'Unpaywall ou un statut `closed` déclaré par une source."""
 
@@ -75,21 +74,21 @@ def publication_oa_status(
     copies: Iterable[Copy],
     declared: Iterable[DeclaredOaStatus],
     *,
+    embargoed: bool,
     unpaywall: str | None,
     has_serial: bool,
     serial_oa_model: str | None,
 ) -> OaStatus:
-    """Renvoie le statut open access d'une publication (`decide_oa_status`) : accès constatés sur ses copies, statut `closed` déclaré par une source, embargo déclaré par theses.fr, le tout relevé par le verdict d'Unpaywall.
+    """Renvoie le statut open access d'une publication (`decide_oa_status`) : accès constatés sur ses copies, embargo, statut `closed` déclaré par une source, le tout relevé par le verdict d'Unpaywall.
 
     Args:
+        embargoed: un enregistrement source de la publication est sous embargo actif (`embargoes`).
         unpaywall: verdict d'Unpaywall sur le DOI de la publication, `None` sans verdict.
     """
-    declared = list(declared)
     facts = copies_facts(copies)
     facts = replace(
         facts,
-        embargoed=facts.embargoed
-        or any(d.source == Source.THESES and d.oa_status == OaStatus.EMBARGOED for d in declared),
+        embargoed=facts.embargoed or embargoed,
         informed=facts.informed or any(d.oa_status == OaStatus.CLOSED for d in declared),
     )
     return decide_oa_status(

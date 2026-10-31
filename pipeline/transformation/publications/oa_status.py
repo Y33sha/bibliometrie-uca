@@ -22,6 +22,7 @@ from domain.publications.metadata import OaStatus
 from domain.publications.open_access import publication_oa_status
 from infrastructure.db.scalars import scalar_int
 from infrastructure.read_models.publications.copies import publication_copies
+from infrastructure.sql_fragments import under_active_embargo
 from pipeline.http.lookup import LookupOutcome, NotFound, Unavailable
 from pipeline.http.polite_pool import get_polite_pool_email_optional
 from pipeline.http.tls import tls_context
@@ -64,6 +65,8 @@ class PublicationOaInputs(NamedTuple):
     oa_status: str | None
     has_serial: bool
     serial_oa_model: str | None
+    embargoed: bool
+    """Un enregistrement source de la publication est sous embargo actif."""
     signals: list[OaSignal]
     copies: list[Copy]
 
@@ -143,6 +146,7 @@ class OaStatusStore:
             text(f"""
                 SELECT p.id, lower(p.doi) AS doi, p.oa_status::text AS oa_status,
                        p.serial_id IS NOT NULL AS has_serial, s.oa_model::text AS oa_model,
+                       bool_or({under_active_embargo("sr")}) AS embargoed,
                        array_agg(sr.source::text ORDER BY sr.id) AS sources,
                        array_agg(sr.oa_status::text ORDER BY sr.id) AS statuses
                 FROM publications p
@@ -161,6 +165,7 @@ class OaStatusStore:
                 r.oa_status,
                 r.has_serial,
                 r.oa_model,
+                r.embargoed,
                 [OaSignal(s, o) for s, o in zip(r.sources, r.statuses, strict=True)],
                 copies.get(r.id, []),
             )
@@ -359,6 +364,7 @@ def _apply_verdicts(
         status = publication_oa_status(
             publication.copies,
             publication.signals,
+            embargoed=publication.embargoed,
             unpaywall=by_doi.get(publication.doi) if publication.doi else None,
             has_serial=publication.has_serial,
             serial_oa_model=publication.serial_oa_model,

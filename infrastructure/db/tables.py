@@ -1412,13 +1412,22 @@ source_record_locations = Table(
     Column("license", license_type_enum),
     Column("is_oa", Boolean),
     Column("platform_id", Integer),
-    Column(
-        "embargo_until",
-        Date,
-        comment="Date de fin d'embargo. La copie est fermée jusqu'à cette date.",
-    ),
     schema="sources",
     comment="Localisations d'un enregistrement source, réécrites à chaque normalisation.",
+)
+
+
+embargoes = Table(
+    "embargoes",
+    metadata,
+    Column("source_record_id", Integer, primary_key=True),
+    Column(
+        "until",
+        Date,
+        comment="Date de fin d'embargo. Nulle quand la source déclare un embargo sans date.",
+    ),
+    schema="sources",
+    comment="Embargo déclaré par un enregistrement source : fichier déposé dans HAL, thèse de theses.fr.",
 )
 
 

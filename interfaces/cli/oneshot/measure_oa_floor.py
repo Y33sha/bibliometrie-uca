@@ -24,9 +24,9 @@ from domain.publications.access import Copy
 from domain.publications.identifiers import extract_hal_id_from_url
 from domain.publications.metadata import OA_OPEN_STATUSES, OA_RANK, OaStatus
 from domain.publications.open_access import OpenAccessFacts, copies_facts, decide_oa_status
-from domain.sources.registry import Source
 from infrastructure.db.engine import build_sync_engine
 from infrastructure.read_models.publications.copies import publication_copies
+from infrastructure.sql_fragments import under_active_embargo
 
 _DEFAULT_OUTPUT = Path("data/measures/oa_floor.tsv")
 _ANNEX_DOC_TYPES = frozenset({"conference", "poster"})
@@ -40,18 +40,16 @@ _PUBLICATIONS = text("""
     WHERE p.in_perimeter
 """)
 
-_DECLARED = text("""
-    SELECT sr.publication_id AS pid, sr.source::text AS source, sr.oa_status::text AS oa_status
+_DECLARED_CLOSED = text("""
+    SELECT DISTINCT sr.publication_id AS pid
     FROM source_records sr JOIN publications p ON p.id = sr.publication_id AND p.in_perimeter
-    WHERE sr.oa_status IN ('closed', 'embargoed')
+    WHERE sr.oa_status = 'closed'
 """)
 
-_EMBARGOED = text("""
+_EMBARGOED = text(f"""
     SELECT DISTINCT sr.publication_id AS pid
-    FROM source_record_locations l
-    JOIN source_records sr ON sr.id = l.source_record_id
-    JOIN publications p ON p.id = sr.publication_id AND p.in_perimeter
-    WHERE l.embargo_until > current_date
+    FROM source_records sr JOIN publications p ON p.id = sr.publication_id AND p.in_perimeter
+    WHERE {under_active_embargo("sr")}
 """)
 
 
@@ -66,8 +64,7 @@ class _Publication:
     copies: list[Copy] = field(default_factory=list)
     """Copies, ouvertes ou non, hors pages descriptives."""
     declared_closed: bool = False
-    theses_embargo: bool = False
-    embargoed_copy: bool = False
+    embargoed: bool = False
 
 
 @cache
@@ -100,7 +97,7 @@ def _facts(p: _Publication) -> OpenAccessFacts:
     facts = copies_facts(_copies(p))
     return replace(
         facts,
-        embargoed=p.embargoed_copy or p.theses_embargo,
+        embargoed=p.embargoed,
         informed=facts.informed or p.declared_closed,
     )
 
@@ -114,13 +111,10 @@ def _publications(conn: Connection) -> list[_Publication]:
         r.id: _Publication(r.id, r.cur or "unknown", r.upw, r.doc_type, r.has_serial, r.oa_model)
         for r in conn.execute(_PUBLICATIONS)
     }
-    for r in conn.execute(_DECLARED):
-        if r.oa_status == "closed":
-            publications[r.pid].declared_closed = True
-        elif r.source == Source.THESES:
-            publications[r.pid].theses_embargo = True
+    for r in conn.execute(_DECLARED_CLOSED):
+        publications[r.pid].declared_closed = True
     for r in conn.execute(_EMBARGOED):
-        publications[r.pid].embargoed_copy = True
+        publications[r.pid].embargoed = True
     for pid, copies in publication_copies(conn, list(publications)).items():
         publications[pid].copies = [c for c in copies if not is_descriptive_page(c.url)]
     return list(publications.values())

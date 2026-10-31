@@ -78,6 +78,7 @@ def _publication(
         current,
         True,
         "full_oa",
+        False,
         [OaSignal("openalex", None)],
         list(copies),
     )

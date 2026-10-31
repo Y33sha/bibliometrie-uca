@@ -49,6 +49,7 @@ from infrastructure.sql_fragments import (
     corrected,
     declares_conference_sql,
     diamond_journal_sql,
+    embargo_expired,
     self_declared_preprint_sql,
     source_extra,
     source_extra_json,
@@ -169,10 +170,7 @@ _FACTS: dict[str, str] = {
     "oa_status": "sr.oa_status",
     "oa_model": "j.oa_model",
     "urls": "sr.urls",
-    "embargo_expired": (
-        "EXISTS (SELECT 1 FROM source_record_locations l"
-        " WHERE l.source_record_id = sr.id AND l.embargo_until <= current_date)"
-    ),
+    "embargo_expired": embargo_expired(),
     "self_declared_preprint": self_declared_preprint_sql(),
     "declares_conference": declares_conference_sql(),
     "in_proceedings_volume": "COALESCE(m.proceedings, false)",

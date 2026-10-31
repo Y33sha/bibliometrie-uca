@@ -11,7 +11,6 @@ import argparse
 import json
 import os
 from collections import defaultdict
-from datetime import date
 
 from sqlalchemy import text
 
@@ -25,7 +24,7 @@ log = setup_logger("canonicalize_hal_location_urls", os.path.dirname(__file__))
 
 _ROWS = text("""
     SELECT source_record_id, url, pdf_url, oai_id, version, license::text AS license, is_oa,
-           platform_id, embargo_until
+           platform_id
     FROM source_record_locations
     WHERE source_record_id IN (
         SELECT source_record_id FROM source_record_locations
@@ -37,13 +36,12 @@ _DELETE = text("DELETE FROM source_record_locations WHERE source_record_id = ANY
 
 _INSERT = text("""
     INSERT INTO source_record_locations
-        (source_record_id, url, pdf_url, oai_id, version, license, is_oa, platform_id,
-         embargo_until)
+        (source_record_id, url, pdf_url, oai_id, version, license, is_oa, platform_id)
     SELECT l.source_record_id, l.url, l.pdf_url, l.oai_id, l.version,
-           CAST(l.license AS license_type), l.is_oa, l.platform_id, l.embargo_until
+           CAST(l.license AS license_type), l.is_oa, l.platform_id
     FROM jsonb_to_recordset(CAST(:rows AS jsonb)) AS l(
         source_record_id integer, url text, pdf_url text, oai_id text, version text,
-        license text, is_oa boolean, platform_id integer, embargo_until date
+        license text, is_oa boolean, platform_id integer
     )
 """)
 
@@ -74,7 +72,6 @@ def main() -> int:
                     version=r.version,
                     license=License(r.license) if r.license else None,
                     is_oa=r.is_oa,
-                    embargo_until=r.embargo_until,
                 )
                 for r in locations
             )
@@ -89,9 +86,6 @@ def main() -> int:
                     "license": loc.license.value if loc.license else None,
                     "is_oa": loc.is_oa,
                     "platform_id": platforms.get(loc.url),
-                    "embargo_until": loc.embargo_until.isoformat()
-                    if isinstance(loc.embargo_until, date)
-                    else None,
                 }
                 for loc in merged
             ]

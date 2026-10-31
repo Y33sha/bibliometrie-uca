@@ -79,6 +79,7 @@
 | `source_record_identifiers` | `sources` | [Enregistrements sources](02-sources.md#tables) |
 | `source_record_keys_queue` | `queues` | [Données dérivées](09-donnees-derivees.md#incrémental-ou-recalcul-complet) |
 | `source_record_locations` | `sources` | [Enregistrements sources](02-sources.md) |
+| `embargoes` | `sources` | [Enregistrements sources](02-sources.md) |
 | `source_records` | `sources` | [Enregistrements sources](02-sources.md) |
 | `staging` | `sources` | [Enregistrements sources](02-sources.md) |
 | `structure_name_forms` | `structures` | [Structures](06-structures.md) |

@@ -77,7 +77,7 @@ Simulation sur les 76 591 publications du périmètre (`interfaces/cli/oneshot/m
 
 ### Phase 5 — Embargos
 
-- [ ] Table des embargos : embargo d'une copie HAL, avec sa date de fin ; embargo déclaré par theses.fr, sans date. Elle remplace `embargo_until` des localisations et le statut `embargoed` déclaré par theses.fr.
+- [x] Table des embargos : embargo d'une copie HAL, avec sa date de fin ; embargo déclaré par theses.fr, sans date. Elle remplace `embargo_until` des localisations et le statut `embargoed` déclaré par theses.fr.
 
 ## Questions ouvertes
 

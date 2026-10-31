@@ -8,6 +8,7 @@ from collections.abc import Mapping
 from domain.dates import french_date_to_iso
 from domain.publications.contribution_roles import THESES_FIELD_ROLES
 from domain.publications.identifiers import clean_doi, normalize_nnt
+from domain.publications.metadata import OaStatus
 from domain.source_records.identifiers import (
     SourceIdentifier,
     SourceIdentifierRole,
@@ -15,6 +16,7 @@ from domain.source_records.identifiers import (
 )
 from domain.source_records.source_extras import SourceExtra
 from domain.types import JsonValue, as_mapping, as_sequence, as_str, as_strs
+from pipeline.ingestion.common.embargoes import Embargo
 from pipeline.ingestion.common.normalizer import Document, SourceNormalizer
 from pipeline.ingestion.common.source_contributions import (
     AuthorBlock,
@@ -194,6 +196,10 @@ class ThesesNormalizer(SourceNormalizer):
     ) -> SourceRecordUpsert:
         """Construit l'enregistrement source de la thèse, sans éditeur ni conteneur."""
         return theses_source_record(doc, row.id, row.source_id)
+
+    def embargo(self, doc: Document) -> Embargo | None:
+        """Renvoie un embargo sans date pour une thèse inaccessible destinée à Internet (`thesis_oa_status`)."""
+        return Embargo(None) if thesis_oa_status(doc) == OaStatus.EMBARGOED else None
 
     def author_block(self, doc: Document) -> AuthorBlock:
         return extract_theses_author_block(doc)

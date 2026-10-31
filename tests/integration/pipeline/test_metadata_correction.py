@@ -314,19 +314,16 @@ def test_thesis_with_serial_corrected_and_deconflated(sa_sync_conn):
     ]
 
 
-def _embargoed_copy(conn, source_record_id: int, embargo_until) -> None:
+def _embargo(conn, source_record_id: int, until) -> None:
     conn.execute(
-        text(
-            "INSERT INTO source_record_locations (source_record_id, url, is_oa, embargo_until)"
-            " VALUES (:id, 'https://hal.science/hal-1', true, :until)"
-        ),
-        {"id": source_record_id, "until": embargo_until},
+        text("INSERT INTO embargoes (source_record_id, until) VALUES (:id, :until)"),
+        {"id": source_record_id, "until": until},
     )
 
 
 def test_expired_embargo_promoted_to_green(sa_sync_conn):
     conn = sa_sync_conn
-    # `embargo_expired` est calculé à la lecture, sur les copies. Date de levée passée : la règle, commune à toutes les sources, passe `embargoed` à `green`.
+    # `embargo_expired` est calculé à la lecture, sur la table des embargos. Date de levée passée : la règle, commune à toutes les sources, passe `embargoed` à `green`.
     source_record = insert_source_record(
         conn,
         source="openalex",
@@ -335,7 +332,7 @@ def test_expired_embargo_promoted_to_green(sa_sync_conn):
         doc_type="article",
         oa_status="embargoed",
     )
-    _embargoed_copy(conn, source_record, today() - timedelta(days=1))
+    _embargo(conn, source_record, today() - timedelta(days=1))
     assert _apply(conn) == 1
     row = conn.execute(
         text("SELECT oa_status::text AS oa, corrections FROM source_records WHERE id = :id"),
@@ -382,7 +379,7 @@ def test_active_embargo_not_promoted(sa_sync_conn):
         doc_type="article",
         oa_status="embargoed",
     )
-    _embargoed_copy(conn, source_record, today() + timedelta(days=365))
+    _embargo(conn, source_record, today() + timedelta(days=365))
     assert _apply(conn) == 0
     oa = conn.execute(
         text("SELECT oa_status::text FROM source_records WHERE id = :id"), {"id": source_record}

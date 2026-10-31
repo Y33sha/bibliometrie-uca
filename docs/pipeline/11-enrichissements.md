@@ -45,7 +45,7 @@ Interroge [Unpaywall](../glossaire.md#unpaywall) par DOI et conserve son verdict
 1. Copie ouverte chez l'éditeur, sous licence ouverte : `hybrid` dans une revue sur abonnement ou de modèle inconnu, `gold` dans une revue entièrement en open access ou hors revue, `diamond` dans une revue diamant.
 2. Sinon, copie ouverte dans une archive ou sur un serveur de preprints : `green`.
 3. Sinon, copie ouverte chez l'éditeur sans licence ouverte : `bronze`.
-4. Sinon : `embargoed` sous embargo (copie, ou embargo déclaré par theses.fr), `closed` avec une copie, un verdict ou un statut `closed` déclaré par une source, `unknown` sans aucune information.
+4. Sinon : `embargoed` avec un enregistrement source sous embargo actif (`embargoes`), `closed` avec une copie, un verdict ou un statut `closed` déclaré par une source, `unknown` sans aucune information.
 
 Le verdict d'Unpaywall relève ces accès, sans les abaisser : `gold`, `hybrid` ou `diamond` vaut une copie ouverte chez l'éditeur sous licence, `bronze` sans licence, `green` une copie d'archive ouverte.
 

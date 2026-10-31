@@ -10,16 +10,16 @@ from domain.platforms.registry import HAL, known_platform_of_copy, platform_type
 from domain.publications.access import Copy
 from domain.publications.licenses import License
 from domain.sources.registry import Source
+from infrastructure.sql_fragments import under_active_embargo
 
 
 def publication_copies(conn: Connection, publication_ids: Sequence[int]) -> dict[int, list[Copy]]:
-    """Renvoie les localisations des enregistrements sources de chaque publication. Une publication sans localisation est absente de la réponse. Une copie sous embargo est fermée jusqu'à sa date de fin. La copie HAL d'un enregistrement HAL est décrite par sa plateforme."""
+    """Renvoie les localisations des enregistrements sources de chaque publication. Une publication sans localisation est absente de la réponse. Le fichier déposé d'un enregistrement source sous embargo, sa copie à PDF, est fermé jusqu'à la fin de l'embargo. La copie HAL d'un enregistrement HAL est décrite par sa plateforme."""
     rows = conn.execute(
-        text("""
+        text(f"""
             SELECT sr.publication_id, sr.source::text AS source, l.url, l.version,
-                   l.is_oa AND (l.embargo_until IS NULL OR l.embargo_until <= current_date)
-                       AS is_oa,
-                   coalesce(l.embargo_until > current_date, false) AS embargoed,
+                   l.is_oa AS declared_oa,
+                   l.pdf_url IS NOT NULL AND {under_active_embargo("sr")} AS embargoed,
                    l.license::text AS license, pl.name AS platform,
                    pl.openalex_id AS platform_openalex_id, pl.platform_type::text AS platform_type,
                    sr.id AS arrival
@@ -37,7 +37,7 @@ def publication_copies(conn: Connection, publication_ids: Sequence[int]) -> dict
             Copy(
                 url=r.url,
                 version=r.version,
-                is_oa=r.is_oa,
+                is_oa=r.declared_oa and not r.embargoed,
                 platform=known.name if known else r.platform,
                 known_platform=known,
                 platform_type=platform_type_of_copy(r.url, r.platform_openalex_id)

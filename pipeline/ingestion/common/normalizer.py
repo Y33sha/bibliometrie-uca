@@ -17,6 +17,7 @@ from domain.publications.metadata import has_minimal_publication_metadata, is_ov
 from domain.serials.containers import ContainerDescription
 from domain.types import JsonValue
 from infrastructure.db.savepoint import rollback_unless_invalidated, savepoint
+from pipeline.ingestion.common.embargoes import Embargo, EmbargoStore
 from pipeline.ingestion.common.locations import LocationFacts, LocationStore, identifier_locations
 from pipeline.ingestion.common.source_contribution_store import SourceContributionStore
 from pipeline.ingestion.common.source_contributions import (
@@ -66,7 +67,7 @@ class NormalizeStats(NamedTuple):
 class SourceNormalizer(ABC):
     """Normalisation d'une source : la sous-classe analyse une ligne de `staging`, le patron écrit.
 
-    Une sous-classe définit `SOURCE`, `minimal_metadata`, `source_record`, `author_block` et `author_records`. `parse`, `publisher`, `container_facts`, `locations`, `preload_caches` et `cleanup` ont un comportement par défaut.
+    Une sous-classe définit `SOURCE`, `minimal_metadata`, `source_record`, `author_block` et `author_records`. `parse`, `publisher`, `container_facts`, `locations`, `embargo`, `preload_caches` et `cleanup` ont un comportement par défaut.
     """
 
     SOURCE: ClassVar[str] = ""
@@ -84,6 +85,7 @@ class SourceNormalizer(ABC):
         publisher_store: PublisherStore,
         contribution_store: SourceContributionStore,
         location_store: LocationStore,
+        embargo_store: EmbargoStore,
     ) -> None:
         self.conn = conn
         self.logger = logger
@@ -93,6 +95,7 @@ class SourceNormalizer(ABC):
         self._publisher_store = publisher_store
         self._contribution_store = contribution_store
         self._location_store = location_store
+        self._embargo_store = embargo_store
 
     @abstractmethod
     def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
@@ -114,6 +117,10 @@ class SourceNormalizer(ABC):
         """Renvoie les localisations du document."""
         return []
 
+    def embargo(self, doc: Document) -> Embargo | None:  # noqa: ARG002
+        """Renvoie l'embargo déclaré par la source, ou `None`."""
+        return None
+
     @abstractmethod
     def source_record(
         self, row: StagingRow, doc: Document, containers: Containers
@@ -131,7 +138,7 @@ class SourceNormalizer(ABC):
     def normalize_record(self, row: StagingRow) -> bool:
         """Normalise un document à métadonnées minimales et marque sa ligne traitée. Renvoie vrai, ou faux sans rien écrire pour un document refusé.
 
-        Écrit dans l'ordre l'éditeur, les conteneurs, l'enregistrement source rattaché à son éditeur, ses localisations et ses contributions sources.
+        Écrit dans l'ordre l'éditeur, les conteneurs, l'enregistrement source rattaché à son éditeur, ses localisations, son embargo et ses contributions sources.
         """
         doc = self.parse(row)
         if doc is None:
@@ -157,6 +164,7 @@ class SourceNormalizer(ABC):
         self._location_store.replace_locations(
             source_record_id, [*self.locations(doc), *identifier_locations(record.identifiers)]
         )
+        self._embargo_store.replace_embargo(source_record_id, self.embargo(doc))
         sync_source_contributions(
             self._contribution_store,
             self.SOURCE,

@@ -448,6 +448,7 @@ def _normalizer() -> ScanrNormalizer:
         publisher_store=MagicMock(),
         contribution_store=MagicMock(),
         location_store=MagicMock(),
+        embargo_store=MagicMock(),
     )
 
 

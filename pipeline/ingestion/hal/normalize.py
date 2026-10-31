@@ -34,6 +34,7 @@ from domain.source_records.identifiers import (
 )
 from domain.structures.identifiers import parse_ror_ids
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs
+from pipeline.ingestion.common.embargoes import Embargo
 from pipeline.ingestion.common.locations import LocationFacts
 from pipeline.ingestion.common.normalizer import Document, PublisherFacts, SourceNormalizer
 from pipeline.ingestion.common.source_contributions import (
@@ -119,8 +120,8 @@ def get_oa_status(doc: Mapping[str, JsonValue], embargo_until: date | None) -> s
     )
 
 
-def get_locations(doc: Mapping[str, JsonValue], embargo_until: date | None) -> list[LocationFacts]:
-    """Renvoie la page du dépôt HAL (`uri_s`), avec le fichier déposé (`fileMain_s`, à défaut l'annexe d'une communication), sa licence et la fin de son embargo. La copie est ouverte quand elle a un fichier."""
+def get_locations(doc: Mapping[str, JsonValue]) -> list[LocationFacts]:
+    """Renvoie la page du dépôt HAL (`uri_s`), avec le fichier déposé (`fileMain_s`, à défaut l'annexe d'une communication) et sa licence. La copie est ouverte quand elle a un fichier."""
     uri = hal_text_field(doc.get("uri_s"))
     if not uri:
         return []
@@ -131,7 +132,6 @@ def get_locations(doc: Mapping[str, JsonValue], embargo_until: date | None) -> l
             pdf_url=file,
             license=normalize_license(hal_text_field(doc.get("licence_s"))),
             is_oa=file is not None,
-            embargo_until=embargo_until,
         )
     ]
 
@@ -260,7 +260,7 @@ def _parse_tei(label_xml: str) -> Element:
 def active_embargo_until(label_xml: str | None, today: date) -> date | None:
     """Renvoie la date de fin d'un embargo HAL encore actif, sinon `None`.
 
-    Lit `ref[@type='file']/date/@notBefore` du TEI : la date d'accès au fichier déposé. Parmi plusieurs `ref` de type `file` (page et document), la plus tardive l'emporte. Une date échue renvoie `None`. À l'échéance d'un embargo stocké, la copie s'ouvre à la lecture, et une règle de correction lève le statut `embargoed`, sans nouvel import HAL.
+    Lit `ref[@type='file']/date/@notBefore` du TEI : la date d'accès au fichier déposé. Parmi plusieurs `ref` de type `file` (page et document), la plus tardive l'emporte. Une date échue renvoie `None`. À l'échéance d'un embargo stocké (`embargoes`), la copie s'ouvre à la lecture, et une règle de correction lève le statut `embargoed`, sans nouvel import HAL.
     """
     if not label_xml:
         return None
@@ -561,9 +561,12 @@ class HalNormalizer(SourceNormalizer):
         return get_container_facts(doc)
 
     def locations(self, doc: Document) -> list[LocationFacts]:
-        return get_locations(
-            doc, active_embargo_until(hal_text_field(doc.get("label_xml")), today())
-        )
+        return get_locations(doc)
+
+    def embargo(self, doc: Document) -> Embargo | None:
+        """Renvoie l'embargo actif du fichier déposé (`active_embargo_until`)."""
+        until = active_embargo_until(hal_text_field(doc.get("label_xml")), today())
+        return Embargo(until) if until else None
 
     def source_record(
         self, row: StagingRow, doc: Document, containers: Containers

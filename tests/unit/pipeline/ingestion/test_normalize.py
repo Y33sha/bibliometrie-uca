@@ -77,6 +77,7 @@ def _stores(staging) -> dict[str, Any]:
         "publisher_store": MagicMock(),
         "contribution_store": MagicMock(),
         "location_store": MagicMock(),
+        "embargo_store": MagicMock(),
     }
 
 
@@ -454,6 +455,7 @@ class TestNormalizeRecord:
             replace(_RECORD, publisher_id=5)
         )
         norm._location_store.replace_locations.assert_called_once_with(42, [])
+        norm._embargo_store.replace_embargo.assert_called_once_with(42, None)
         norm._staging.mark_done.assert_called_once_with(1)
 
     def test_sans_editeur_ni_conteneur(self, writes):

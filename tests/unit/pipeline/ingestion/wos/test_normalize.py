@@ -995,6 +995,7 @@ def _normalizer(logger) -> WosNormalizer:
         publisher_store=MagicMock(),
         contribution_store=MagicMock(),
         location_store=MagicMock(),
+        embargo_store=MagicMock(),
     )
 
 

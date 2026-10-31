@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict Yq3MJxplGT5ncEWL8nvV6sL0BOj29TTOCuduvMAzYIDhfGDrskoeNWvsbnHeWxQ
+\restrict yKRoQ4xRwMlFKmCuNK0VyCOB22rAq50lUPtDieznvGzDA6wbuxFgy4ZMh94mVfo
 
 -- Dumped from database version 18.4
 -- Dumped by pg_dump version 18.4
@@ -2761,6 +2761,30 @@ COMMENT ON COLUMN sources.doi_targets.rule IS 'Règle de correction qui relie le
 
 
 --
+-- Name: embargoes; Type: TABLE; Schema: sources; Owner: -
+--
+
+CREATE TABLE sources.embargoes (
+    source_record_id integer NOT NULL,
+    until date
+);
+
+
+--
+-- Name: TABLE embargoes; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON TABLE sources.embargoes IS 'Embargo déclaré par un enregistrement source : fichier déposé dans HAL, thèse de theses.fr.';
+
+
+--
+-- Name: COLUMN embargoes.until; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON COLUMN sources.embargoes.until IS 'Date de fin d''embargo. Nulle quand la source déclare un embargo sans date.';
+
+
+--
 -- Name: failed_lookups; Type: TABLE; Schema: sources; Owner: -
 --
 
@@ -2832,8 +2856,7 @@ CREATE TABLE sources.source_record_locations (
     version text,
     license public.license_type,
     is_oa boolean,
-    platform_id integer,
-    embargo_until date
+    platform_id integer
 );
 
 
@@ -2856,13 +2879,6 @@ COMMENT ON COLUMN sources.source_record_locations.oai_id IS 'Identifiant OAI-PMH
 --
 
 COMMENT ON COLUMN sources.source_record_locations.version IS 'Version de la copie dans le vocabulaire de la source (submittedVersion, acceptedVersion, publishedVersion).';
-
-
---
--- Name: COLUMN source_record_locations.embargo_until; Type: COMMENT; Schema: sources; Owner: -
---
-
-COMMENT ON COLUMN sources.source_record_locations.embargo_until IS 'Date de fin d''embargo. La copie est fermée jusqu''à cette date.';
 
 
 --
@@ -3917,6 +3933,14 @@ ALTER TABLE ONLY sources.contributor_information
 
 ALTER TABLE ONLY sources.doi_targets
     ADD CONSTRAINT doi_targets_pkey PRIMARY KEY (doi);
+
+
+--
+-- Name: embargoes embargoes_pkey; Type: CONSTRAINT; Schema: sources; Owner: -
+--
+
+ALTER TABLE ONLY sources.embargoes
+    ADD CONSTRAINT embargoes_pkey PRIMARY KEY (source_record_id);
 
 
 --
@@ -5397,6 +5421,14 @@ ALTER TABLE ONLY ref.ror_relations
 
 
 --
+-- Name: embargoes embargoes_source_record_id_fkey; Type: FK CONSTRAINT; Schema: sources; Owner: -
+--
+
+ALTER TABLE ONLY sources.embargoes
+    ADD CONSTRAINT embargoes_source_record_id_fkey FOREIGN KEY (source_record_id) REFERENCES sources.source_records(id) ON DELETE CASCADE;
+
+
+--
 -- Name: source_contribution_addresses source_contribution_addresses_address_id_fkey; Type: FK CONSTRAINT; Schema: sources; Owner: -
 --
 
@@ -5624,5 +5656,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Yq3MJxplGT5ncEWL8nvV6sL0BOj29TTOCuduvMAzYIDhfGDrskoeNWvsbnHeWxQ
+\unrestrict yKRoQ4xRwMlFKmCuNK0VyCOB22rAq50lUPtDieznvGzDA6wbuxFgy4ZMh94mVfo
 

@@ -28,6 +28,7 @@ from infrastructure.db.doi_targets import fetch_doi_targets
 from infrastructure.db.rows import rows_as
 from infrastructure.db.source_record_identifiers import identifiers_json_sql, parse_identifiers
 from infrastructure.read_models.publications.copies import publication_copies
+from infrastructure.sql_fragments import under_active_embargo
 from pipeline.transformation.publications.store import PublicationStore
 
 
@@ -142,6 +143,19 @@ def crossref_prefix_publishers(conn: Connection, prefixes: Sequence[str]) -> dic
     return {r.prefix: r.publisher_id for r in rows}
 
 
+def under_embargo(conn: Connection, publication_id: int) -> bool:
+    """Vrai si un enregistrement source de la publication est sous embargo actif."""
+    return bool(
+        conn.execute(
+            text(
+                "SELECT EXISTS (SELECT 1 FROM source_records sr"
+                f" WHERE sr.publication_id = :id AND {under_active_embargo('sr')})"
+            ),
+            {"id": publication_id},
+        ).scalar()
+    )
+
+
 def serial_oa_model_of(conn: Connection, serial_id: int) -> str | None:
     """Renvoie le modèle open access d'une revue, ou `None`, pour le statut open access de ses publications."""
     return conn.execute(
@@ -226,6 +240,7 @@ def refresh_from_sources(conn: Connection, publication_id: int) -> RefreshVerdic
     publication.oa_status = publication_oa_status(
         copies,
         sources,
+        embargoed=under_embargo(conn, publication_id),
         unpaywall=unpaywall_verdict(conn, publication.doi.value) if publication.doi else None,
         has_serial=publication.serial_id is not None,
         serial_oa_model=serial_oa_model_of(conn, publication.serial_id)

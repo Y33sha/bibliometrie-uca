@@ -102,9 +102,14 @@ def _declared(source, oa_status):
     return SimpleNamespace(source=source, oa_status=oa_status)
 
 
-def _status(copies, declared, unpaywall=None):
+def _status(copies, declared, unpaywall=None, *, embargoed=False):
     return publication_oa_status(
-        copies, declared, unpaywall=unpaywall, has_serial=True, serial_oa_model="subscription"
+        copies,
+        declared,
+        embargoed=embargoed,
+        unpaywall=unpaywall,
+        has_serial=True,
+        serial_oa_model="subscription",
     )
 
 
@@ -117,9 +122,9 @@ def test_un_statut_ouvert_declare_sans_copie_ne_compte_pas():
     assert _status([], [_declared("wos", "gold"), _declared("openalex", "green")]) == "unknown"
 
 
-def test_l_embargo_declare_par_theses_fr():
-    assert _status([], [_declared("theses", "embargoed")]) == "embargoed"
-    assert _status([], [_declared("hal", "embargoed")]) == "unknown"
+def test_un_embargo_sans_copie_ouverte():
+    assert _status([], [], embargoed=True) == "embargoed"
+    assert _status([], [_declared("theses", "embargoed")]) == "unknown"
 
 
 def test_une_copie_sous_embargo():

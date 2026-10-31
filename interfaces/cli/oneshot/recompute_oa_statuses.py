@@ -46,6 +46,7 @@ def main() -> int:
                 status = publication_oa_status(
                     p.copies,
                     p.signals,
+                    embargoed=p.embargoed,
                     unpaywall=verdicts.get(p.doi) if p.doi else None,
                     has_serial=p.has_serial,
                     serial_oa_model=p.serial_oa_model,
