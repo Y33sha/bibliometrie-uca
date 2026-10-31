@@ -8,9 +8,10 @@ Chaque étape ajoute une décision à l'étape précédente :
 3. `verdict_releve` : le verdict d'Unpaywall relève le statut, sans l'abaisser.
 4. `embargo_copies` : l'embargo actif d'une copie donne `embargoed` ; le statut `embargoed` déclaré par HAL est ignoré.
 
-Trois options se mesurent sur l'étape 4 :
+Quatre options se mesurent sur l'étape 4 :
 
 - `annexes_hal` : un dépôt HAL sans fichier principal, dit ouvert par HAL, compte comme copie d'archive ouverte. Son enregistrement source HAL est sans statut.
+- `annexes_communications` : une communication ou un poster dont le dépôt HAL a un fichier, même seulement une annexe, compte comme copie d'archive ouverte. Le type de dépôt vient de l'API HAL (`data/measures/hal_annexes.tsv`, écrit par `data/measures/fetch_hal_annexes.py`).
 - `verdict_doi` : un verdict `green` ou `closed` d'Unpaywall ferme les copies `doi.org` du DOI de la publication.
 - `revue_ouverte` : une publication d'une revue `full_oa` est au moins `gold`, d'une revue `diamond` au moins `diamond`, même sans copie ouverte.
 
@@ -31,6 +32,7 @@ import csv
 from collections import Counter, defaultdict
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field, replace
+from functools import cache
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
@@ -38,6 +40,7 @@ from sqlalchemy import Connection, text
 
 from domain.platforms.platform import PlatformType, is_descriptive_page
 from domain.publications.access import Copy, open_copies
+from domain.publications.identifiers import extract_hal_id_from_url
 from domain.publications.licenses import OPEN_LICENSES
 from domain.publications.metadata import (
     OA_OPEN_STATUSES,
@@ -55,7 +58,7 @@ _DOI_HOSTS = frozenset({"doi.org", "dx.doi.org"})
 
 _PUBLICATIONS = text("""
     SELECT p.id, p.oa_status::text AS cur, lower(p.doi::text) AS doi, u.oa_status::text AS upw,
-           s.oa_model::text AS oa_model
+           s.oa_model::text AS oa_model, p.doc_type::text AS doc_type
     FROM publications p
     LEFT JOIN sources.unpaywall u ON u.doi = lower(p.doi::text)
     LEFT JOIN serials s ON s.id = p.serial_id
@@ -89,6 +92,7 @@ class _Facts:
     doi: str | None
     upw: str | None
     oa_model: str | None
+    doc_type: str | None
     signals: list[_Signal] = field(default_factory=list)
     copies: list[Copy] = field(default_factory=list)
     """Copies, ouvertes ou non, hors pages descriptives."""
@@ -136,12 +140,22 @@ class _Rules:
     verdict_raises: bool = False
     embargo_on_copies: bool = False
     hal_annexes: bool = False
+    hal_deposits_with_file: frozenset[str] | None = None
+    """Dépôts HAL à fichier ou à annexe, d'après l'API HAL : leur copie compte comme ouverte pour une communication ou un poster."""
     verdict_closes_doi_copies: bool = False
     open_journal: bool = False
 
 
 def _open(f: _Facts, rules: _Rules) -> list[Copy]:
     copies = open_copies(f.copies)
+    if rules.hal_deposits_with_file is not None and f.doc_type in ("conference", "poster"):
+        copies += [
+            replace(c, is_oa=True)
+            for c in f.copies
+            if c.described_by_platform
+            and not c.is_oa
+            and extract_hal_id_from_url(c.url) in rules.hal_deposits_with_file
+        ]
     if rules.hal_annexes and any(s.source == Source.HAL and s.oa_status is None for s in f.signals):
         copies += [
             replace(c, is_oa=True) for c in f.copies if c.described_by_platform and not c.is_oa
@@ -191,6 +205,14 @@ _OPTIONS: dict[str, Callable[[_Facts], str]] = {
     "annexes_hal": lambda f: _status(
         f, _Rules(verdict_raises=True, embargo_on_copies=True, hal_annexes=True)
     ),
+    "annexes_communications": lambda f: _status(
+        f,
+        _Rules(
+            verdict_raises=True,
+            embargo_on_copies=True,
+            hal_deposits_with_file=_hal_deposits_with_file(),
+        ),
+    ),
     "verdict_doi": lambda f: _status(
         f, _Rules(verdict_raises=True, embargo_on_copies=True, verdict_closes_doi_copies=True)
     ),
@@ -201,9 +223,22 @@ _OPTIONS: dict[str, Callable[[_Facts], str]] = {
 _LAST_STEP = list(_STEPS)[-1]
 
 
+@cache
+def _hal_deposits_with_file() -> frozenset[str]:
+    path = Path("data/measures/hal_annexes.tsv")
+    if not path.exists():
+        return frozenset()
+    with path.open(encoding="utf-8") as fh:
+        return frozenset(
+            r["hal_id"].lower()
+            for r in csv.DictReader(fh, delimiter="	")
+            if r["submit_type"] in ("file", "annex")
+        )
+
+
 def _facts(conn: Connection) -> list[_Facts]:
     facts = {
-        r.id: _Facts(r.id, r.cur or "unknown", r.doi, r.upw, r.oa_model)
+        r.id: _Facts(r.id, r.cur or "unknown", r.doi, r.upw, r.oa_model, r.doc_type)
         for r in conn.execute(_PUBLICATIONS)
     }
     for r in conn.execute(_SOURCE_STATUSES):
@@ -231,9 +266,11 @@ def simulate(conn: Connection, output: Path) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     with output.open("w", newline="", encoding="utf-8") as fh:
         writer = csv.writer(fh, delimiter="\t")
-        writer.writerow(["id", "unpaywall", "oa_model", *columns])
+        writer.writerow(["id", "unpaywall", "oa_model", "doc_type", *columns])
         for i, f in enumerate(facts):
-            writer.writerow([f.id, f.upw, f.oa_model, *(col[i] for col in columns.values())])
+            writer.writerow(
+                [f.id, f.upw, f.oa_model, f.doc_type, *(col[i] for col in columns.values())]
+            )
     print(f"{len(facts)} publications")
     previous = "actuel"
     for name in _STEPS:
