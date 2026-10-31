@@ -253,9 +253,17 @@ def preprint_servers_of_doi(doi: str) -> tuple[KnownPlatform, ...]:
 
 
 def is_fully_open(url: str) -> bool:
-    """Vrai si `url` désigne une plateforme de la liste donnant librement accès à tout son contenu."""
-    known = known_platform_of_url(url)
-    return known is not None and known.fully_open
+    """Vrai si `url` désigne une plateforme de la liste donnant librement accès à tout son contenu. Le DOI de plusieurs plateformes toutes ouvertes compte aussi (bioRxiv et medRxiv)."""
+    if (known := known_platform_of_url(url)) is not None:
+        return known.fully_open
+    platforms = _platforms_of_doi_url(url)
+    return bool(platforms) and all(p.fully_open for p in platforms)
+
+
+def preprint_copy_url(doi: str) -> str | None:
+    """Renvoie l'adresse de la copie désignée par le DOI d'un serveur de preprints de la liste, ou `None` pour un autre DOI."""
+    cleaned = clean_doi(doi)
+    return f"https://doi.org/{cleaned}" if cleaned and preprint_servers_of_doi(cleaned) else None
 
 
 def known_platform_of_url(url: str) -> KnownPlatform | None:

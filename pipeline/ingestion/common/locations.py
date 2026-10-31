@@ -1,6 +1,6 @@
 """Localisations d'un enregistrement source et plateformes d'hébergement. L'écriture est commune aux normaliseurs.
 
-Les localisations d'un enregistrement source se réécrivent à chaque normalisation, comme l'enregistrement source lui-même : le dernier import fait autorité. Un identifiant arXiv ou un PMCID de l'enregistrement source donne aussi une localisation, quelle que soit la source. La plateforme d'une localisation est celle nommée par OpenAlex, reconnue par son identifiant OpenAlex. La lecture des copies rattache en plus chaque localisation à une plateforme de la liste des plateformes connues, d'après son URL (`domain.platforms.registry`).
+Les localisations d'un enregistrement source se réécrivent à chaque normalisation, comme l'enregistrement source lui-même : le dernier import fait autorité. Un identifiant arXiv, un PMCID ou un DOI de serveur de preprints de l'enregistrement source donne aussi une localisation, quelle que soit la source. La plateforme d'une localisation est celle nommée par OpenAlex, reconnue par son identifiant OpenAlex. La lecture des copies rattache en plus chaque localisation à une plateforme de la liste des plateformes connues, d'après son URL (`domain.platforms.registry`).
 """
 
 import json
@@ -12,10 +12,15 @@ from sqlalchemy import Connection, text
 
 from domain.normalize import normalize_text
 from domain.platforms.platform import PlatformType, is_descriptive_page
-from domain.platforms.registry import IDENTIFIER_COPIES, is_fully_open
+from domain.platforms.registry import IDENTIFIER_COPIES, is_fully_open, preprint_copy_url
 from domain.publications.identifiers import hal_deposit_url
 from domain.publications.licenses import License
-from domain.source_records.identifiers import SourceIdentifier, normalize_identifiers
+from domain.source_records.identifiers import (
+    SourceIdentifier,
+    SourceIdentifierRole,
+    SourceIdentifierType,
+    normalize_identifiers,
+)
 from infrastructure.db.scalars import scalar_int
 
 
@@ -41,12 +46,21 @@ class LocationFacts(NamedTuple):
 
 
 def identifier_locations(identifiers: Iterable[SourceIdentifier]) -> list[LocationFacts]:
-    """Renvoie les copies désignées par les identifiants arXiv et les PMCID d'un enregistrement source, sans version connue. Leur plateforme donne librement accès à tout son contenu, donc les copies sont ouvertes."""
+    """Renvoie les copies désignées par les identifiants arXiv, les PMCID et les DOI de serveur de preprints d'un enregistrement source, sans version connue. Une copie est ouverte si sa plateforme donne librement accès à tout son contenu.
+
+    Un DOI lié désigne un autre document : il ne donne aucune copie.
+    """
     identifiers, _ = normalize_identifiers(identifiers)
     urls = [
         IDENTIFIER_COPIES[i.id_type].format(i.value)
         for i in identifiers
         if i.id_type in IDENTIFIER_COPIES
+    ] + [
+        url
+        for i in identifiers
+        if i.id_type is SourceIdentifierType.DOI
+        and i.role is not SourceIdentifierRole.RELATED
+        and (url := preprint_copy_url(i.value))
     ]
     return [LocationFacts(url=url, is_oa=is_fully_open(url)) for url in urls]
 
