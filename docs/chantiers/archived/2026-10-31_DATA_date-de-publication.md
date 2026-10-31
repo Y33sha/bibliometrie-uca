@@ -59,6 +59,6 @@ Mesures du 2026-10-30 sur tout le stock : 354 711 enregistrements sources, 79 90
 
 ### Phase 6 — Documentation
 
-- [ ] Mise à jour de la documentation.
+- [x] Mise à jour de la documentation (9877e18b4)
 
 ## Questions ouvertes

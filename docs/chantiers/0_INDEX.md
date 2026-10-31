@@ -10,7 +10,6 @@
 
 ### Non commencé
 
-- [Date de publication](DATA_date-de-publication.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
 - [Pertinence des sujets](DATA_pertinence-des-sujets.md)
 - [Résolution probabiliste des personnes](DATA_resolution-personnes-probabiliste.md)
@@ -20,6 +19,7 @@
 
 ## Chantiers archivés
 
+- 2026-10-31 — [Date de publication](archived/2026-10-31_DATA_date-de-publication.md)
 - 2026-10-31 — [URL de résolution des DOI](archived/2026-10-31_DATA_url-de-resolution-des-doi.md)
 - 2026-10-31 — [Statut open access tiré des copies](archived/2026-10-31_DATA_statut-open-access.md)
 - 2026-10-30 — [Identifiants des enregistrements sources](archived/2026-10-30_DATA_identifiants-des-enregistrements-sources.md)
