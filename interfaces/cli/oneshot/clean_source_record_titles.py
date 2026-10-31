@@ -30,8 +30,9 @@ _BATCH = 5_000
 
 def _changed_titles(conn: Connection) -> list[dict[str, object]]:
     """Renvoie les enregistrements sources dont le titre nettoyé diffère du titre stocké, avec leur titre nettoyé et normalisé."""
-    rows = conn.execution_options(stream_results=True, yield_per=_STREAM).execute(
-        text("SELECT id, title FROM source_records")
+    rows = conn.execute(
+        text("SELECT id, title FROM source_records"),
+        execution_options={"stream_results": True, "yield_per": _STREAM},
     )
     changed: list[dict[str, object]] = []
     for row in rows:
