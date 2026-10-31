@@ -64,6 +64,7 @@ Les personnes et les publications ont un volet latéral (`PersonDrawer`, `Public
 - Titre d'une revue : celui saisi à la main, sinon celui du Sudoc, sinon le plus fréquent parmi ses enregistrements sources. La vérification Sudoc l'écrit dans `serials.title`.
 - Identifiant OpenAlex d'une revue : celui des enregistrements sources OpenAlex dont l'ISSN-L, d'après OpenAlex, est celui de la revue. Modèle OA : celui d'OpenAlex pour cette source, sauf saisie à la main.
 - Une série sans ISSN ni identifiant OpenAlex rejoint la seule revue à ISSN de même titre et d'éditeur compatible : le même éditeur, ou un éditeur absent d'un côté. Sinon, les séries de même titre et de même éditeur forment une revue sans ISSN.
+- Une revue sans ISSN est identifiée par son titre normalisé et son éditeur. Une seule fonction la renvoie, créée au besoin. Le rattachement par titre et le rattachement des monographies à leur collection l'appellent.
 - Pour ce rattachement par titre, un enregistrement source sans éditeur reçoit le titulaire de son préfixe DOI Crossref. Le titulaire d'un préfixe DataCite est souvent un repository ou un établissement : il est exclu. `source_records.publisher_id` garde l'éditeur donné par la source.
 - Deux revues de même ISSN-L fusionnent : la revue vide est absorbée, avec une redirection.
 - L'administration modifie le titre, le type et le modèle OA d'une revue. Les ISSN sont en lecture seule.
@@ -81,7 +82,7 @@ Les personnes et les publications ont un volet latéral (`PersonDrawer`, `Public
 - [ ] Éditeur déduit du préfixe DOI Crossref pour le rattachement par titre
 - [ ] Relations entre revues déduites des liens entre ISSN. Liens sur la page d'une revue.
 - [ ] Administration : ISSN en lecture seule, fusion limitée aux revues sans ISSN et gardée dans la table des titres
-- [ ] Normalisation sans recherche ni création de revue ; collection des monographies posée par `publishing`
+- [ ] Normalisation sans recherche ni création de revue. Collection sans ISSN des monographies : revue sans ISSN de son titre et de son éditeur.
 - [ ] Retrait de `serial_name_forms`, de `find_or_create_serial` et des règles de fusion remplacées par le calcul et les relations
 - [ ] Comparaison des revues avant et après sur le stock, dont les quatre titres partagés par deux revues
 
