@@ -9,9 +9,11 @@ from sqlalchemy import text
 _LONG_TITLE = secrets.token_hex(4000)
 
 _INSERTS = {
-    "source_records": "INSERT INTO source_records (source, source_id, title, title_normalized, publication_year)"
-    " VALUES ('openalex', 'W7223893444', :t, :t, 2026)",
-    "publications": "INSERT INTO publications (title, title_normalized, publication_year) VALUES (:t, :t, 2026)",
+    "source_records": "INSERT INTO source_records (source, source_id, title, title_normalized)"
+    " VALUES ('openalex', 'W7223893444', :t, :t)",
+    "publications": "INSERT INTO publications"
+    " (title, title_normalized, publication_date, publication_date_precision)"
+    " VALUES (:t, :t, '2026-01-01', 'year')",
     "serials": "INSERT INTO serials (title, title_normalized) VALUES (:t, :t)",
     "monographs": "INSERT INTO monographs (title, title_normalized) VALUES (:t, :t)",
 }

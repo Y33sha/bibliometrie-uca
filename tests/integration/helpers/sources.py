@@ -2,9 +2,11 @@
 
 import json
 from collections.abc import Mapping, Sequence
+from datetime import date
 
 from sqlalchemy import Connection, text
 
+from domain.publications.dates import DatePrecision
 from domain.publications.identifiers import DOI
 from domain.source_records.identifiers import (
     SourceIdentifier,
@@ -98,7 +100,8 @@ def insert_source_record(
             "title": title,
             "title_normalized": title_normalized,
             "publication_id": publication_id,
-            "publication_year": publication_year,
+            "publication_date": date(publication_year, 1, 1) if publication_year else None,
+            "publication_date_precision": DatePrecision.YEAR.value if publication_year else None,
             "doc_type": doc_type,
             "raw_doc_type": doc_type if raw_doc_type is None else raw_doc_type,
             "serial_id": serial_id,
@@ -119,7 +122,10 @@ def insert_source_record(
             "corrections": _jsonb(corrections),
             "is_matchable": is_matchable,
         },
-        dict.fromkeys(("biblio", "source_extras", "topics", "corrections"), "jsonb"),
+        {
+            **dict.fromkeys(("biblio", "source_extras", "topics", "corrections"), "jsonb"),
+            "publication_date_precision": "date_precision",
+        },
     )
     identifiers = list(identifiers)
     if doi and not any(i.id_type is SourceIdentifierType.DOI for i in identifiers):

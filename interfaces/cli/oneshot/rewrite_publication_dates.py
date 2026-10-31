@@ -44,12 +44,10 @@ _BATCH_ROWS = text("""
 
 _WRITE = text("""
     UPDATE source_records sr
-    SET publication_year = t.publication_year,
-        publication_date = t.publication_date,
+    SET publication_date = t.publication_date,
         publication_date_precision = CAST(t.publication_date_precision AS date_precision)
     FROM jsonb_to_recordset(CAST(:rows AS jsonb)) AS t(
-        id integer, publication_year smallint, publication_date date,
-        publication_date_precision text
+        id integer, publication_date date, publication_date_precision text
     )
     WHERE sr.id = t.id
 """)

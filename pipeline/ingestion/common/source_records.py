@@ -52,7 +52,7 @@ class SourceRecordUpsert:
     # Métadonnées bibliographiques
     title: str
     publication_date: PublicationDate | None = None
-    """Date de publication, avec sa précision. L'écriture en tire `publication_year`."""
+    """Date de publication, avec sa précision. La base en tire `publication_year`."""
     raw_doc_type: str | None = None
     """Type de document dans le vocabulaire de la source."""
     monograph_id: int | None = None
@@ -92,7 +92,7 @@ _FIELDS = tuple(
 
 # Les colonnes écrites se dérivent des champs de la ligne, plus les colonnes calculées à l'écriture : un champ ajouté à `SourceRecordUpsert` s'écrit sans autre geste.
 _ROW_FIELDS = tuple(f.name for f in _FIELDS)
-_DATE_COLUMNS = ("publication_year", "publication_date", "publication_date_precision")
+_DATE_COLUMNS = ("publication_date", "publication_date_precision")
 _COLUMNS = (*_ROW_FIELDS, "title_normalized", "doc_type", "language", *_DATE_COLUMNS)
 
 # Tout est réécrit, sauf la clé de conflit. `corrections` se vide : ses valeurs d'origine viennent de l'import précédent, et la phase `metadata_correction` refait ses corrections sur les valeurs fraîches.
@@ -165,11 +165,10 @@ def replace_identifiers(
 
 
 def date_columns(publication_date: PublicationDate | None) -> dict[str, object]:
-    """Renvoie les colonnes de la date de publication : année, date et précision."""
+    """Renvoie les colonnes de la date de publication et de sa précision."""
     if publication_date is None:
         return dict.fromkeys(_DATE_COLUMNS)
     return {
-        "publication_year": publication_date.year,
         "publication_date": publication_date.value,
         "publication_date_precision": publication_date.precision.value,
     }

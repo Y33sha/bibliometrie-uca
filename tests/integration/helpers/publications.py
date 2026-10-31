@@ -1,8 +1,11 @@
 """Semis de publications pour les tests de requêtes et de services, sur la connexion SQLAlchemy (`sa_sync_conn`)."""
 
+from datetime import date
+
 from sqlalchemy import Connection
 
 from domain.normalize import normalize_text
+from domain.publications.dates import DatePrecision
 from infrastructure.db.queues import Queue
 from tests.integration.helpers.queues import mark
 from tests.integration.helpers.rows import PERIMETER_EVIDENCE_CAST, insert_row, perimeter_evidence
@@ -40,7 +43,8 @@ def insert_publication(
             "id": row_id,
             "title": title,
             "title_normalized": title_normalized,
-            "publication_year": publication_year,
+            "publication_date": date(publication_year, 1, 1),
+            "publication_date_precision": DatePrecision.YEAR.value,
             "doc_type": doc_type,
             "doi": doi,
             "oa_status": oa_status,
@@ -53,6 +57,7 @@ def insert_publication(
         },
         {
             "doc_type": "doc_type",
+            "publication_date_precision": "date_precision",
             "oa_status": "oa_type",
             "sources": "source_type[]",
             "perimeter_evidence": PERIMETER_EVIDENCE_CAST,

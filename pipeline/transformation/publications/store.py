@@ -108,9 +108,11 @@ class PublicationStore:
                     title = :title,
                     title_normalized = :tn,
                     doc_type = CAST(:dt AS doc_type),
-                    publication_year = :publication_year,
-                    publication_date = :publication_date,
-                    publication_date_precision = CAST(:publication_date_precision AS date_precision),
+                    publication_date = coalesce(:publication_date, publication_date),
+                    publication_date_precision = coalesce(
+                        CAST(:publication_date_precision AS date_precision),
+                        publication_date_precision
+                    ),
                     doi = :doi,
                     oa_status = CAST(:oa AS oa_type),
                     license = CAST(:license AS license_type),
@@ -135,7 +137,7 @@ class PublicationStore:
                 "title": publication.title,
                 "tn": publication.title_normalized,
                 "dt": publication.doc_type,
-                **_date_params(publication.publication_year, publication.publication_date),
+                **_date_params(publication.publication_date),
                 "doi": str(publication.doi) if publication.doi else None,
                 "oa": publication.oa_status,
                 "license": publication.license,
@@ -190,10 +192,9 @@ class PublicationStore:
                 text(f"""
                 WITH inserted AS (
                     INSERT INTO publications
-                        (title, title_normalized, doc_type, publication_year, publication_date,
+                        (title, title_normalized, doc_type, publication_date,
                          publication_date_precision, doi, oa_status)
-                    VALUES (:title, :tn, CAST(:doc_type AS doc_type), :publication_year,
-                            :publication_date,
+                    VALUES (:title, :tn, CAST(:doc_type AS doc_type), :publication_date,
                             CAST(:publication_date_precision AS date_precision), :doi,
                             CAST(:oa AS oa_type))
                     RETURNING id
@@ -205,7 +206,7 @@ class PublicationStore:
                     "title": title,
                     "tn": title_normalized,
                     "doc_type": doc_type,
-                    **_date_params(publication_year, PublicationDate.of_year(publication_year)),
+                    **_date_params(PublicationDate.of_year(publication_year)),
                     "doi": doi,
                     "oa": oa_status,
                 },
@@ -239,16 +240,11 @@ class PublicationStore:
         )
 
 
-def _date_params(year: int, publication_date: PublicationDate | None) -> dict[str, object]:
-    """Renvoie les paramètres de l'année et de la date de publication. L'année suit la date, à défaut `year`."""
+def _date_params(publication_date: PublicationDate | None) -> dict[str, object]:
+    """Renvoie les paramètres de la date de publication et de sa précision. La base en tire `publication_year`."""
     if publication_date is None:
-        return {
-            "publication_year": year,
-            "publication_date": None,
-            "publication_date_precision": None,
-        }
+        return {"publication_date": None, "publication_date_precision": None}
     return {
-        "publication_year": publication_date.year,
         "publication_date": publication_date.value,
         "publication_date_precision": publication_date.precision.value,
     }

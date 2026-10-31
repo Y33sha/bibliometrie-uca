@@ -670,18 +670,26 @@ doc_type_enum = PgEnum(*DOC_TYPES, name="doc_type", create_type=False)
 date_precision_enum = PgEnum(*DatePrecision, name="date_precision", create_type=False)
 
 
-def publication_date_columns() -> tuple[Column[date], Column[str]]:
-    """Renvoie les colonnes de la date de publication et de sa précision, communes aux enregistrements sources et aux publications."""
+def publication_date_columns(*, nullable: bool) -> tuple[Column[date], Column[str], Column[int]]:
+    """Renvoie les colonnes de la date de publication, de sa précision et de son année, communes aux enregistrements sources et aux publications."""
     return (
         Column(
             "publication_date",
             Date,
+            nullable=nullable,
             comment="Date de publication. À l'année : 1er janvier ; au mois : 1er du mois.",
         ),
         Column(
             "publication_date_precision",
             date_precision_enum,
+            nullable=nullable,
             comment="Précision de publication_date : year, month ou day.",
+        ),
+        Column(
+            "publication_year",
+            SmallInteger,
+            Computed("EXTRACT(YEAR FROM publication_date)::smallint", persisted=True),
+            comment="Année de publication_date.",
         ),
     )
 
@@ -1138,8 +1146,7 @@ publications = Table(
     Column("title", Text, nullable=False),
     Column("title_normalized", Text),
     Column("doc_type", doc_type_enum, server_default="other"),
-    Column("publication_year", SmallInteger, nullable=False),
-    *publication_date_columns(),
+    *publication_date_columns(nullable=False),
     Column("doi", Text),
     Column(
         "doi_prefix",
@@ -1250,8 +1257,7 @@ source_records = Table(
     Column("source_id", Text, nullable=False),
     Column("title", Text, nullable=False),
     Column("title_normalized", Text),
-    Column("publication_year", SmallInteger),
-    *publication_date_columns(),
+    *publication_date_columns(nullable=True),
     Column("doc_type", doc_type_enum),
     Column(
         "raw_doc_type",
