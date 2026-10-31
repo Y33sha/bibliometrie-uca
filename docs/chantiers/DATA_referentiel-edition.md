@@ -63,7 +63,7 @@ Les personnes et les publications ont un volet latéral (`PersonDrawer`, `Public
 - Une seule fonction renvoie la revue d'un ISSN-L, créée au besoin. Le rattachement et la vérification Sudoc l'appellent tous deux.
 - Titre d'une revue : celui saisi à la main, sinon celui du Sudoc, sinon le plus fréquent parmi ses enregistrements sources. La vérification Sudoc l'écrit dans `serials.title`. Une revue à ISSN reste donc, même vide.
 - Identifiant OpenAlex d'une revue : celui des enregistrements sources OpenAlex dont l'ISSN-L, d'après OpenAlex, est celui de la revue. Modèle OA : celui d'OpenAlex pour cette source, sauf saisie à la main.
-- Une série sans ISSN ni identifiant OpenAlex rejoint la seule revue à ISSN de même titre, quel que soit son éditeur. L'éditeur départage plusieurs revues à ISSN de même titre. Sinon, les séries de même titre forment une revue sans ISSN.
+- Une série sans ISSN ni identifiant OpenAlex rejoint la seule revue à ISSN de même titre, quel que soit son éditeur. L'éditeur départage plusieurs revues à ISSN de même titre. À défaut, elle rejoint la seule revue à ISSN de titre compatible parmi celles des autres enregistrements sources de sa publication (« JHEP »). La publication est celle du run précédent. Sinon, les séries de même titre forment une revue sans ISSN.
 - Une revue sans ISSN est identifiée par son titre normalisé : chaque source nomme l'éditeur à sa façon (« Edition CdP », « Editions CdP »). Une collection de monographies sans ISSN est identifiée par son titre et son éditeur : les noms de collection génériques (« Essais ») sont fréquents.
 - Pour ce rattachement par titre, un enregistrement source sans éditeur reçoit le titulaire de son préfixe DOI Crossref. Le titulaire d'un préfixe DataCite est souvent un repository ou un établissement : il est exclu. `source_records.publisher_id` garde l'éditeur donné par la source.
 - Deux revues de même ISSN-L fusionnent : la revue vide est absorbée, avec une redirection.
@@ -109,8 +109,8 @@ Les personnes et les publications ont un volet latéral (`PersonDrawer`, `Public
 ### Phase 6 — Listes de revues
 
 - [ ] Modélisation : table des listes, table de liaison entre revues et listes
-- [ ] Source de chaque liste (question 2)
-- [ ] Mise à jour de chaque liste (question 3)
+- [ ] Source de chaque liste (question 1)
+- [ ] Mise à jour de chaque liste (question 2)
 
 ### Phase 7 — Plateformes typées comme revues
 
@@ -125,6 +125,5 @@ Les personnes et les publications ont un volet latéral (`PersonDrawer`, `Public
 
 ## Questions ouvertes
 
-1. Règle 5 de `merge_duplicate_serials` : deux revues rattachées à des enregistrements sources d'une même publication, aux titres compatibles (« Phys.Rev.Lett. » et « Physical Review Letters »). Utile une fois la revue de chaque publication arbitrée entre ses enregistrements sources ?
-2. Source de chaque liste : fichier publié par l'organisme, API ou saisie dans l'administration. Accès à la liste des revues indexées dans le WoS après la résiliation de l'abonnement.
-3. Mise à jour d'une liste : import complet qui la remplace, ajouts et retraits datés, ou liste posée une fois. Rattachement d'une entrée à une revue : par ISSN, par titre à défaut. Sort des entrées sans revue dans le référentiel.
+1. Source de chaque liste : fichier publié par l'organisme, API ou saisie dans l'administration. Accès à la liste des revues indexées dans le WoS après la résiliation de l'abonnement.
+2. Mise à jour d'une liste : import complet qui la remplace, ajouts et retraits datés, ou liste posée une fois. Rattachement d'une entrée à une revue : par ISSN, par titre à défaut. Sort des entrées sans revue dans le référentiel.

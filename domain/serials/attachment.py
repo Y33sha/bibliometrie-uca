@@ -1,6 +1,6 @@
 """Règles de rattachement d'un enregistrement source à sa revue, d'après la série qu'il décrit (`biblio.journal`).
 
-Une revue correspond à un ISSN-L. L'ISSN-L d'un ISSN est celui du Sudoc, à défaut celui qu'OpenAlex donne avec cet ISSN, à défaut l'ISSN lui-même. Un enregistrement source rejoint la revue de l'ISSN-L de ses ISSN. Ses ISSN mènent parfois à plusieurs ISSN-L : le titre départage alors les revues. À défaut, il rejoint la revue de son identifiant OpenAlex, puis la revue désignée par son titre.
+Une revue correspond à un ISSN-L. L'ISSN-L d'un ISSN est celui du Sudoc, à défaut celui qu'OpenAlex donne avec cet ISSN, à défaut l'ISSN lui-même. Un enregistrement source rejoint la revue de l'ISSN-L de ses ISSN. Ses ISSN mènent parfois à plusieurs ISSN-L : le titre départage alors les revues. À défaut, il rejoint la revue de son identifiant OpenAlex, puis la revue désignée par son titre. Sans revue à ISSN de même titre, une série désignée par son titre rejoint la revue à ISSN de titre compatible d'un autre enregistrement source de la même publication.
 """
 
 from collections import Counter
@@ -77,3 +77,15 @@ def match_by_title(publisher_id: int | None, serials: Sequence[TitledSerial]) ->
         return serials[0].id
     same = [s.id for s in serials if publisher_id is not None and s.publisher_id == publisher_id]
     return same[0] if len(same) == 1 else None
+
+
+def match_in_publication(title: str | None, publication_serials: Mapping[int, str]) -> int | None:
+    """Renvoie la seule revue à ISSN de titre compatible avec `title` (`compatible_titles`) parmi celles de la publication, ou `None` : « JHEP » rejoint « Journal of High Energy Physics ».
+
+    Args:
+        publication_serials: titre de chaque revue à ISSN des autres enregistrements sources de la publication.
+    """
+    if not title:
+        return None
+    matches = [s for s, name in publication_serials.items() if compatible_titles(title, name)]
+    return matches[0] if len(matches) == 1 else None

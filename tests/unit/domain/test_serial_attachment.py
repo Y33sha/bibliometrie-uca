@@ -7,6 +7,7 @@ from domain.serials.attachment import (
     choose_issnl,
     effective_issnl,
     match_by_title,
+    match_in_publication,
     most_frequent,
     openalex_issnls,
 )
@@ -57,6 +58,14 @@ def test_titre_identique_avant_titre_compatible():
 
 def test_seule_revue_a_issn_d_un_titre_quel_que_soit_l_editeur():
     assert match_by_title(30, [TitledSerial(3, 10)]) == 3
+
+
+def test_seule_revue_a_issn_de_titre_compatible_dans_la_publication():
+    serials = {41: "Journal of High Energy Physics", 489: "Physics Letters B"}
+    assert match_in_publication("JHEP", serials) == 41
+    assert match_in_publication("Phys.Lett.B", serials) == 489
+    assert match_in_publication("Nature", serials) is None
+    assert match_in_publication(None, serials) is None
 
 
 def test_editeur_departage_les_revues_a_issn_d_un_titre():

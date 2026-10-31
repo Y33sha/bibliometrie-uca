@@ -5,7 +5,7 @@
 `attach_serials` applique les règles de `domain.serials.attachment` :
 
 - chaque ISSN reçoit la revue de son ISSN-L. Cette revue est celle de la ligne de l'ISSN-L, à défaut la plus fréquente parmi les ISSN de cet ISSN-L, à défaut une revue créée. Une revue va à un seul ISSN-L ;
-- chaque enregistrement source rejoint la revue de l'ISSN-L de ses ISSN, à défaut la revue de son identifiant OpenAlex, à défaut la revue de son titre : décision de l'administration (`serial_title_decisions`), seule revue à ISSN de même titre, ou revue sans ISSN de même titre, créée au besoin. L'éditeur départage plusieurs revues à ISSN de même titre ;
+- chaque enregistrement source rejoint la revue de l'ISSN-L de ses ISSN, à défaut la revue de son identifiant OpenAlex, à défaut la revue de son titre : décision de l'administration (`serial_title_decisions`), seule revue à ISSN de même titre, revue à ISSN de titre compatible d'un autre enregistrement source de sa publication au run précédent, ou revue sans ISSN de même titre, créée au besoin. L'éditeur départage plusieurs revues à ISSN de même titre ;
 - le titre d'une revue sans notice Sudoc est le plus fréquent parmi ses enregistrements sources. Son identifiant OpenAlex et son modèle OA viennent des enregistrements sources OpenAlex dont l'ISSN-L, d'après OpenAlex, est celui de la revue. Un champ saisi à la main reste inchangé.
 
 Un enregistrement source qui change de revue est marqué pour la réconciliation. Pour un enregistrement source dont la revue est corrigée par la correction des métadonnées, la revue calculée devient la valeur d'avant correction (`corrections.serial_id.raw`). Une revue vidée de ses enregistrements sources, sans ISSN ni monographie, est absorbée par la revue qui en reçoit le plus, avec une redirection.
@@ -14,7 +14,6 @@ Un enregistrement source qui change de revue est marqué pour la réconciliation
 import json
 import logging
 from collections import Counter
-from collections.abc import Iterable
 from dataclasses import dataclass, field
 
 from sqlalchemy import Connection, Row, text
@@ -25,6 +24,7 @@ from domain.serials.attachment import (
     choose_issnl,
     effective_issnl,
     match_by_title,
+    match_in_publication,
     most_frequent,
     openalex_issnls,
     title_key,
@@ -47,7 +47,7 @@ ATTACH_LABEL = "Rattachement des enregistrements sources aux publications en sé
 """Libellé de la sous-étape `attach_serials` dans le journal de la phase."""
 
 _SERIES = text(f"""
-    SELECT id, source, publisher_id, biblio->'journal' AS journal,
+    SELECT id, source, publication_id, publisher_id, biblio->'journal' AS journal,
            CASE WHEN corrections ? '{CorrectionKey.SERIAL_ID}'
                 THEN CAST(corrections->'{CorrectionKey.SERIAL_ID}'->>'{RAW}' AS integer)
                 ELSE serial_id END AS serial_id
@@ -130,6 +130,8 @@ class _Mention:
 
     id: int
     source: str
+    publication_id: int | None
+    """Publication de l'enregistrement source au run précédent."""
     serial_id: int | None
     """Revue d'avant correction."""
     publisher_id: int | None
@@ -177,6 +179,7 @@ def _mention(row: Row[tuple[object, ...]]) -> _Mention:
     return _Mention(
         id=int(row.id),
         source=str(row.source),
+        publication_id=row.publication_id,
         serial_id=row.serial_id,
         publisher_id=row.publisher_id,
         series=series,
@@ -263,7 +266,7 @@ def _issn_serials(
 
 def _attach(
     conn: Connection,
-    mentions: Iterable[_Mention],
+    mentions: list[_Mention],
     issnl_of: dict[str, str],
     serial_of_issnl: dict[str, int],
 ) -> _Attachment:
@@ -279,15 +282,16 @@ def _attach(
         )
         for r in conn.execute(_SERIALS)
     }
+    with_issn = {s.id for s in serials.values() if s.has_issn} | set(serial_of_issnl.values())
     by_openalex = {s.openalex_id: s.id for s in serials.values() if s.openalex_id}
     by_title: dict[str, list[TitledSerial]] = {}
     for s in serials.values():
-        if s.has_issn or s.id in serial_of_issnl.values():
+        if s.id in with_issn:
             by_title.setdefault(s.title_normalized, []).append(TitledSerial(s.id, s.publisher_id))
     decisions = {r.title_normalized: r.serial_id for r in conn.execute(_DECISIONS)}
-    store = SerialStore(conn)
-    untitled: dict[str, int] = {}
     result = _Attachment()
+    # Séries désignées par leur seul titre, sans revue à ISSN de ce titre : titre et titre normalisé.
+    untitled_mentions: list[tuple[_Mention, str, str]] = []
     for m in mentions:
         series = m.series
         if series is None:
@@ -315,8 +319,27 @@ def _attach(
             m.publisher_id, by_title.get(title_normalized, [])
         )
         if found is None:
+            untitled_mentions.append((m, str(series.title), title_normalized))
+            continue
+        result.serial_of[m.id] = found
+        result.by_way["title"] += 1
+    publication_serials: dict[int, dict[int, str]] = {}
+    for m in mentions:
+        serial_id = result.serial_of.get(m.id)
+        if m.publication_id is not None and serial_id in with_issn:
+            publication_serials.setdefault(m.publication_id, {})[serial_id] = serials[
+                serial_id
+            ].title
+    store = SerialStore(conn)
+    untitled: dict[str, int] = {}
+    for m, title, title_normalized in untitled_mentions:
+        in_publication = (
+            publication_serials.get(m.publication_id, {}) if m.publication_id is not None else {}
+        )
+        found = match_in_publication(title, in_publication)
+        if found is None:
             if title_normalized not in untitled:
-                untitled[title_normalized] = store.serial_for_title(str(series.title))
+                untitled[title_normalized] = store.serial_for_title(title)
             found = untitled[title_normalized]
         result.serial_of[m.id] = found
         result.by_way["title"] += 1

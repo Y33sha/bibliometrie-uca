@@ -10,6 +10,7 @@ from pipeline.transformation.publishing.serials.attach_serials import (
     run_attach_serials,
     run_sync_issns,
 )
+from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.redirects import redirect_of
 from tests.integration.helpers.serials import (
     insert_publisher,
@@ -26,10 +27,12 @@ def _record(conn, source_id: str, *, source: str = "hal", **journal) -> int:
     publisher_id = journal.pop("publisher_id", None)
     corrections = journal.pop("corrections", None)
     serial_id = journal.pop("serial_id", None)
+    publication_id = journal.pop("publication_id", None)
     return insert_source_record(
         conn,
         source=source,
         source_id=source_id,
+        publication_id=publication_id,
         publisher_id=publisher_id,
         serial_id=serial_id,
         corrections=corrections,
@@ -128,6 +131,27 @@ def test_titre_sans_revue_a_issn_forme_une_revue_sans_issn(conn):
     _attach(conn)
     assert _serial_of(conn, first) == _serial_of(conn, second) == _serial_of(conn, no_publisher)
     assert _serial_of(conn, first) is not None
+
+
+def test_titre_abrege_rejoint_la_revue_a_issn_de_sa_publication(conn):
+    """Cas réel : HAL abrège « Journal of High Energy Physics » en « JHEP » ; OpenAlex donne l'ISSN."""
+    jhep = insert_serial(conn, "Journal of High Energy Physics")
+    insert_serial_issn(conn, jhep, issn="1029-8479", issnl="1029-8479", sudoc_checked=True)
+    publication = insert_publication(conn, "Article")
+    other = insert_publication(conn, "Autre article")
+    _record(
+        conn,
+        "W1",
+        source="openalex",
+        title="J. High Energ. Phys.",
+        issns=_issns("1029-8479"),
+        publication_id=publication,
+    )
+    hal = _record(conn, "h1", title="JHEP", publication_id=publication)
+    alone = _record(conn, "h2", title="JHEP", publication_id=other)
+    _attach(conn)
+    assert _serial_of(conn, hal) == jhep
+    assert _serial_of(conn, alone) not in (None, jhep)
 
 
 def test_decision_de_l_administration(conn):
