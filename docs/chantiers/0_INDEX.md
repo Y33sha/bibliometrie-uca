@@ -7,12 +7,12 @@
 - [Preprints et versions d'une publication](DATA_preprints-et-versions.md)
 - [Audit de la qualité de la résolution des personnes](DATA_audit-qualite-resolution-personnes.md)
 - [Qualité du référentiel de l'édition](DATA_referentiel-edition.md)
+- [Adresses enregistrées des DOI](DATA_adresses-enregistrees-des-doi.md)
 
 ### Non commencé
 
 - [Date de publication](DATA_date-de-publication.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
-- [Localisations](DATA_localisations.md)
 - [Pertinence des sujets](DATA_pertinence-des-sujets.md)
 - [Résolution probabiliste des personnes](DATA_resolution-personnes-probabiliste.md)
 - [Signatures institutionnelles](METIER_signatures-institutionnelles.md)
