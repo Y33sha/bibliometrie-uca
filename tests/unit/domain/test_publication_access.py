@@ -2,7 +2,9 @@
 
 from dataclasses import replace
 
-from domain.platforms.platform import PlatformType
+import pytest
+
+from domain.platforms.platform import ARCHIVE_TYPES, PlatformType
 from domain.platforms.registry import ARXIV, HAL, ZENODO
 from domain.publications.access import (
     Access,
@@ -182,6 +184,24 @@ def test_l_adresse_enregistree_d_un_pdf_donne_une_copie_ouverte_de_l_editeur():
 def test_l_adresse_enregistree_d_une_page_ne_donne_aucune_copie():
     assert registered_url_copy("https://www.techno-press.org/content/?page=article") is None
     assert registered_url_copy("https://e.org/pdf/12") is None
+    assert registered_url_copy("https://www.researchsquare.com/article/rs-1/v1") is None
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://arxiv.org/abs/2011.12961",
+        "https://www.biorxiv.org/content/10.1101/2022.08.29.505639v1",
+        "https://www.medrxiv.org/content/10.1101/2021.01.01.21249117v2",
+        "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC123/",
+    ],
+)
+def test_l_adresse_enregistree_d_une_plateforme_en_acces_libre_integral_donne_une_copie_ouverte(
+    url,
+):
+    copy = registered_url_copy(url)
+    assert copy is not None
+    assert (copy.is_oa, copy.version, copy.platform_type in ARCHIVE_TYPES) == (True, None, True)
 
 
 def test_la_copie_de_l_adresse_enregistree_passe_devant_une_copie_d_archive():

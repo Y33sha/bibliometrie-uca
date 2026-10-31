@@ -2,19 +2,21 @@
 
 ## Contexte
 
-`source_record_locations` range les copies par enregistrement source. `publication_copies` rend les copies d'une publication aux règles d'accès et de statut. Une copie d'ouverture inconnue compte comme une information : elle classe `closed` une publication sans copie ouverte.
+`source_record_locations` range les copies par enregistrement source. `publication_copies` rend les copies d'une publication aux règles d'accès et de statut.
 
 **Adresse enregistrée d'un DOI.** Crossref la donne dans `resource.primary.URL`, DataCite dans `attributes.url`. Sur un échantillon de 15 DOI, elle est identique à celle de l'API des handles de doi.org. Crossref l'écrit comme localisation, d'ouverture inconnue. Les DOI des autres agences (mEDRA, KISTI, JaLC, Office des publications…) sont sans localisation éditeur.
 
 **Adresse enregistrée qui désigne un PDF.** 136 adresses Crossref finissent par `.pdf`. Parmi les DOI du périmètre des autres agences, 11 aussi, dont 6 de publications `closed` ou `unknown`. Exemple : la publication 78490, DOI KISTI, est `closed` alors que son DOI mène à un PDF (`http://isyou.info/jowua/papers/jowua-v12n1-6.pdf`). 9 DOI du périmètre sont inconnus de doi.org.
 
-**Publications du périmètre à DOI en `unknown`** : DataCite 317 sur 4 909, mEDRA 7, KISTI 3, Public 1. Les DOI DataCite sont absents d'Unpaywall.
+**Publications du périmètre à DOI en `unknown`** : DataCite 317 sur 4 909, mEDRA 7, KISTI 3, Public 1. Les DOI DataCite sont absents d'Unpaywall. Leurs 358 enregistrements DataCite ont une `rightsList` vide pour 165, une licence arXiv pour 67, une licence CC ou de logiciel libre sans niveau d'accès pour 45, un accès open access déclaré pour 6 ; 72 sont absents du raw store. 110 publications du périmètre en `unknown` ont un enregistrement DataCite d'arXiv (DOI `10.48550/arxiv.*`), sans identifiant arXiv, donc sans copie.
 
 ## Décisions
 
 - Une table `sources.dois` remplace `unpaywall`. Elle a une ligne par DOI de publication, avec les réponses des services externes : verdict d'Unpaywall et sa date, adresse enregistrée chez doi.org et sa date.
 - La phase `oa_status` lit l'adresse enregistrée de chaque DOI dans l'API des handles de doi.org, toutes agences comprises. Aucun site d'éditeur n'est interrogé. Un DOI inconnu de doi.org reçoit une adresse nulle et datée, comme un DOI absent d'Unpaywall.
-- Une adresse enregistrée dont le chemin finit par `.pdf` donne une copie ouverte de la publication, en version de l'éditeur, sans licence. Les autres adresses enregistrées donnent seulement une ligne de `sources.dois`.
+- Une adresse enregistrée donne une copie ouverte de la publication, sans licence, dans deux cas. Elle mène à une plateforme en accès libre intégral d'après sa propre déclaration : arXiv, bioRxiv, medRxiv, PubMed Central ; version inconnue. Ou son chemin finit par `.pdf` ; version de l'éditeur. Les autres adresses enregistrées donnent seulement une ligne de `sources.dois`.
+- Seule une copie déclarée fermée compte comme information pour le statut : une copie d'ouverture inconnue laisse la publication `unknown`.
+- Le normaliseur DataCite écrit seulement l'enregistrement source, sans localisation : `rightsList` déclare un niveau d'accès pour trop peu d'enregistrements.
 
 ## Phasage
 
@@ -30,12 +32,10 @@
 
 ### Phase 3 — Copies
 
-- [x] `publication_copies` : copie ouverte tirée d'une adresse enregistrée qui désigne un PDF.
+- [x] `publication_copies` : copie ouverte tirée d'une adresse enregistrée qui désigne un PDF (994767e00).
+- [x] Plateformes en accès libre intégral dans la liste des plateformes connues, lues par la copie tirée d'une adresse enregistrée et par celle tirée d'un identifiant arXiv ou d'un PMCID.
+- [x] Statut : seule une copie déclarée fermée informe.
 
 ### Phase 4 — Documentation
 
-- [x] `docs/donnees/02-sources.md`, index des tables, fiches des sources, documentation de la phase `oa_status`.
-
-## Questions ouvertes
-
-- DOI DataCite en `unknown` : les enregistrements sources DataCite sont sans localisation. Le normaliseur DataCite pourrait écrire l'adresse enregistrée, avec l'ouverture tirée de `rightsList`, déjà lu pour la licence.
+- [x] `docs/donnees/02-sources.md`, index des tables, fiches des sources, documentation de la phase `oa_status` (994767e00).

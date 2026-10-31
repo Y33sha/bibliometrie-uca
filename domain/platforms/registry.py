@@ -22,6 +22,8 @@ class KnownPlatform:
     """Hôtes de la plateforme. Un hôte vaut pour ses sous-domaines. Il peut se compléter d'un début de chemin (`ncbi.nlm.nih.gov/pmc`)."""
     doi_suffix: re.Pattern[str] | None = None
     """Début du suffixe des DOI de la plateforme, quand ses préfixes couvrent aussi d'autres publications."""
+    fully_open: bool = False
+    """La plateforme donne librement accès à tout son contenu, d'après sa propre déclaration."""
 
 
 def _preprint_server(
@@ -30,9 +32,17 @@ def _preprint_server(
     openalex_ids: tuple[str, ...],
     hosts: tuple[str, ...] = (),
     doi_suffix: re.Pattern[str] | None = None,
+    *,
+    fully_open: bool = False,
 ) -> KnownPlatform:
     return KnownPlatform(
-        name, PlatformType.PREPRINT_SERVER, frozenset(prefixes), openalex_ids, hosts, doi_suffix
+        name,
+        PlatformType.PREPRINT_SERVER,
+        frozenset(prefixes),
+        openalex_ids,
+        hosts,
+        doi_suffix,
+        fully_open,
     )
 
 
@@ -49,9 +59,16 @@ def _repository(
     openalex_ids: tuple[str, ...] = (),
     hosts: tuple[str, ...] = (),
     prefixes: set[str] | None = None,
+    *,
+    fully_open: bool = False,
 ) -> KnownPlatform:
     return KnownPlatform(
-        name, PlatformType.REPOSITORY, frozenset(prefixes or ()), openalex_ids, hosts
+        name,
+        PlatformType.REPOSITORY,
+        frozenset(prefixes or ()),
+        openalex_ids,
+        hosts,
+        fully_open=fully_open,
     )
 
 
@@ -64,13 +81,16 @@ PUBMED_CENTRAL = _repository(
     "PubMed Central",
     ("S2764455111", "S4306400806"),
     ("ncbi.nlm.nih.gov/pmc", "pmc.ncbi.nlm.nih.gov", "europepmc.org"),
+    fully_open=True,
 )
 """L'archive de PubMed Central, que désigne aussi l'identifiant PMCID d'un document. La source OpenAlex de son miroir Europe PMC donne surtout des adresses de PubMed Central."""
 
 ZENODO = _repository("Zenodo", ("S4306400562",), ("zenodo.org",))
 """L'archive ouverte Zenodo, du CERN."""
 
-ARXIV = _preprint_server("arXiv", {"10.48550"}, ("S4306400194", "S4393918464"), ("arxiv.org",))
+ARXIV = _preprint_server(
+    "arXiv", {"10.48550"}, ("S4306400194", "S4393918464"), ("arxiv.org",), fully_open=True
+)
 """Le serveur de preprints arXiv, que désigne aussi l'identifiant arXiv d'un document."""
 
 KNOWN_PLATFORMS: tuple[KnownPlatform, ...] = (
@@ -114,6 +134,7 @@ KNOWN_PLATFORMS: tuple[KnownPlatform, ...] = (
         ("S4306402567",),
         ("biorxiv.org",),
         re.compile(r"\d"),
+        fully_open=True,
     ),
     _preprint_server(
         "medRxiv",
@@ -121,6 +142,7 @@ KNOWN_PLATFORMS: tuple[KnownPlatform, ...] = (
         ("S3005729997",),
         ("medrxiv.org",),
         re.compile(r"\d"),
+        fully_open=True,
     ),
     _preprint_server("SSRN", {"10.2139"}, ("S4210172589",), ("ssrn.com",)),
     _preprint_server(
@@ -181,7 +203,7 @@ IDENTIFIER_COPIES: dict[SourceIdentifierType, str] = {
     SourceIdentifierType.ARXIV_ID: "https://arxiv.org/abs/{}",
     SourceIdentifierType.PMCID: PMC_ARTICLE_URL,
 }
-"""Copie ouverte que désigne un identifiant de document : URL à compléter par sa valeur, par type d'identifiant."""
+"""Copie que désigne un identifiant de document : URL à compléter par sa valeur, par type d'identifiant."""
 
 _BY_OPENALEX_ID = {i: p for p in KNOWN_PLATFORMS for i in p.openalex_ids}
 _PUBLISHER_PLATFORM_PREFIXES = frozenset(
@@ -211,6 +233,12 @@ def _platforms_of_doi_url(url: str) -> list[KnownPlatform]:
         for p in _PLATFORMS_OF_PREFIX.get(prefix, ())
         if p.doi_suffix is None or p.doi_suffix.match(suffix)
     ]
+
+
+def is_fully_open(url: str) -> bool:
+    """Vrai si `url` désigne une plateforme de la liste donnant librement accès à tout son contenu."""
+    known = known_platform_of_url(url)
+    return known is not None and known.fully_open
 
 
 def known_platform_of_url(url: str) -> KnownPlatform | None:

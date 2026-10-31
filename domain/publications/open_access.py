@@ -3,7 +3,7 @@
 1. Copie ouverte chez l'éditeur, sous licence ouverte : le modèle de la revue décide. `subscription` ou inconnu donne `hybrid`, `full_oa` donne `gold`, `diamond` donne `diamond`. Sans revue, `gold`.
 2. Sinon, copie d'archive ou de serveur de preprints ouverte : `green`.
 3. Sinon, copie ouverte chez l'éditeur sans licence ouverte : `bronze`.
-4. Sinon : `embargoed` sous embargo ; `closed` avec une copie, un verdict, ou pour une publication fermée par nature (`is_restricted`) ; `unknown` sans aucune information.
+4. Sinon : `embargoed` sous embargo ; `closed` avec une copie déclarée fermée, un verdict, ou pour une publication fermée par nature (`is_restricted`) ; `unknown` sans aucune information.
 
 Le verdict d'Unpaywall relève les accès, jamais ne les abaisse.
 """
@@ -33,7 +33,7 @@ class OpenAccessFacts:
     embargoed: bool = False
     """Un enregistrement source de la publication est sous embargo actif."""
     informed: bool = False
-    """La publication a une copie, un verdict d'Unpaywall, ou elle est fermée par nature (`is_restricted`)."""
+    """La publication a une copie déclarée fermée, un verdict d'Unpaywall, ou elle est fermée par nature (`is_restricted`)."""
 
     def raised_by(self, unpaywall: str | None) -> OpenAccessFacts:
         """Renvoie les accès relevés par le verdict d'Unpaywall : `gold`, `hybrid` ou `diamond` valent une copie ouverte chez l'éditeur sous licence, `bronze` sans licence, `green` une copie d'archive ouverte."""
@@ -50,7 +50,7 @@ class OpenAccessFacts:
 
 
 def copies_facts(copies: Iterable[Copy]) -> OpenAccessFacts:
-    """Renvoie les accès constatés sur les copies d'une publication (`open_copies`). Une copie, même fermée, informe sur la publication."""
+    """Renvoie les accès constatés sur les copies d'une publication (`open_copies`). Seule une copie déclarée fermée informe sur la publication."""
     copies = list(copies)
     opened = open_copies(copies)
     publisher = [c for c in opened if c.platform_type not in ARCHIVE_TYPES]
@@ -59,7 +59,7 @@ def copies_facts(copies: Iterable[Copy]) -> OpenAccessFacts:
         publisher_licensed=any(c.license in OPEN_LICENSES for c in publisher),
         archive_open=any(c.platform_type in ARCHIVE_TYPES for c in opened),
         embargoed=any(c.embargoed for c in copies),
-        informed=bool(copies),
+        informed=any(c.is_oa is False for c in copies),
     )
 
 

@@ -10,7 +10,12 @@ from dataclasses import dataclass
 from urllib.parse import unquote, urlsplit
 
 from domain.platforms.platform import ARCHIVE_TYPES, PlatformType
-from domain.platforms.registry import KnownPlatform, known_platform_of_copy, platform_type_of_copy
+from domain.platforms.registry import (
+    KnownPlatform,
+    is_fully_open,
+    known_platform_of_copy,
+    platform_type_of_copy,
+)
 from domain.publications.identifiers import extract_hal_id_from_url
 from domain.publications.licenses import License
 from domain.publications.metadata import OA_OPEN_STATUSES, OaStatus
@@ -82,13 +87,20 @@ def _rank(copy: Copy) -> tuple[int, int]:
 
 
 def registered_url_copy(url: str) -> Copy | None:
-    """Renvoie la copie ouverte, en version de l'éditeur, désignée par l'adresse enregistrée d'un DOI dont le chemin finit par `.pdf`. Sinon `None`."""
-    if not urlsplit(url).path.lower().endswith(".pdf"):
+    """Renvoie la copie ouverte désignée par l'adresse enregistrée d'un DOI, ou `None`.
+
+    L'adresse d'une plateforme en accès libre intégral (`is_fully_open`) donne une copie de version inconnue. À défaut, une adresse dont le chemin finit par `.pdf` donne une copie en version de l'éditeur.
+    """
+    if is_fully_open(url):
+        version = None
+    elif urlsplit(url).path.lower().endswith(".pdf"):
+        version = "publishedVersion"
+    else:
         return None
     known = known_platform_of_copy(url, None)
     return Copy(
         url=url,
-        version="publishedVersion",
+        version=version,
         is_oa=True,
         platform=known.name if known else None,
         known_platform=known,

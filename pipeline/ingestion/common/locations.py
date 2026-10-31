@@ -12,7 +12,7 @@ from sqlalchemy import Connection, text
 
 from domain.normalize import normalize_text
 from domain.platforms.platform import PlatformType, is_descriptive_page
-from domain.platforms.registry import IDENTIFIER_COPIES
+from domain.platforms.registry import IDENTIFIER_COPIES, is_fully_open
 from domain.publications.identifiers import hal_deposit_url
 from domain.publications.licenses import License
 from domain.source_records.identifiers import SourceIdentifier, normalize_identifiers
@@ -41,13 +41,14 @@ class LocationFacts(NamedTuple):
 
 
 def identifier_locations(identifiers: Iterable[SourceIdentifier]) -> list[LocationFacts]:
-    """Renvoie les copies ouvertes désignées par les identifiants arXiv et les PMCID d'un enregistrement source, sans version connue."""
+    """Renvoie les copies désignées par les identifiants arXiv et les PMCID d'un enregistrement source, sans version connue. Leur plateforme donne librement accès à tout son contenu, donc les copies sont ouvertes."""
     identifiers, _ = normalize_identifiers(identifiers)
-    return [
-        LocationFacts(url=IDENTIFIER_COPIES[i.id_type].format(i.value), is_oa=True)
+    urls = [
+        IDENTIFIER_COPIES[i.id_type].format(i.value)
         for i in identifiers
         if i.id_type in IDENTIFIER_COPIES
     ]
+    return [LocationFacts(url=url, is_oa=is_fully_open(url)) for url in urls]
 
 
 def _on_hal_deposit_url(loc: LocationFacts) -> LocationFacts:

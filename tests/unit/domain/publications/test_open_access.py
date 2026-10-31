@@ -114,6 +114,11 @@ def test_sans_copie_ni_verdict_le_statut_est_inconnu():
     assert _status([], "closed") == "closed"
 
 
+def test_seule_une_copie_declaree_fermee_ferme_la_publication():
+    assert _status([_copy("https://e.org/page", is_oa=None)]) == "unknown"
+    assert _status([_copy("https://e.org/page", is_oa=False)]) == "closed"
+
+
 def test_une_publication_fermee_par_nature():
     assert _status([], restricted=True) == "closed"
 
