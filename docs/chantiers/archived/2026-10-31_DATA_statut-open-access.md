@@ -70,7 +70,7 @@ Simulation sur les 76 591 publications du périmètre (`interfaces/cli/oneshot/m
 - [x] Statut calculé dans la consolidation et dans la phase `oa_status`. 0466fb7ba
 - [x] Recalcul du stock (`recompute_oa_statuses`) : 6 675 publications changent de statut à blanc en local. Écart restant avec la mesure : 389 publications, dont 374 à annexes HAL absentes des payloads.
 - [x] Publication 9705, déposée sur Zenodo : son DOI mène à Zenodo, le bouton d'accès affichait « via l'éditeur ». 303d519f6
-- [x] Publication 78490, fermée alors que son DOI KISTI mène au PDF : aucune localisation éditeur, ni verdict d'Unpaywall. Pris en charge par le chantier [Adresses enregistrées des DOI](../DATA_adresses-enregistrees-des-doi.md).
+- [x] Publication 78490, fermée alors que son DOI KISTI mène au PDF : aucune localisation éditeur, ni verdict d'Unpaywall. Pris en charge par le chantier [Adresses enregistrées des DOI](2026-10-31_DATA_adresses-enregistrees-des-doi.md).
 
 ### Phase 4 — Documentation
 

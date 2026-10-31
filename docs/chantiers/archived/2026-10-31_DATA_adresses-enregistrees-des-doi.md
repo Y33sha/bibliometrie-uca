@@ -35,8 +35,8 @@
 ### Phase 3 — Copies
 
 - [x] `publication_copies` : copie ouverte tirée d'une adresse enregistrée qui désigne un PDF (994767e00).
-- [x] Plateformes en accès libre intégral dans la liste des plateformes connues, lues par la copie tirée d'une adresse enregistrée et par celle tirée d'un identifiant arXiv ou d'un PMCID.
-- [x] Statut : seule une copie déclarée fermée informe.
+- [x] Plateformes en accès libre intégral dans la liste des plateformes connues, lues par la copie tirée d'une adresse enregistrée et par celle tirée d'un identifiant arXiv ou d'un PMCID (3ea277a5a).
+- [x] Statut : seule une copie déclarée fermée informe (3ea277a5a).
 
 ### Phase 4 — Documentation
 
