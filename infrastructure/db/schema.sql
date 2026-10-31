@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict a0TMke1lntYingaMjNRJqWIy3J5KFnXYg81bUsEZVGtFSfmDvnAD275QFC0xCI4
+\restrict urkNBcCi95t8aetsLK4IIsXbTvja3MzuJYsc58vr87rszoufSeJ9gCwcAeDPcfQ
 
 -- Dumped from database version 18.4
 -- Dumped by pg_dump version 18.4
@@ -2259,7 +2259,6 @@ ALTER SEQUENCE publishing.serial_issns_id_seq OWNED BY publishing.serial_issns.i
 CREATE TABLE publishing.serial_title_decisions (
     id integer NOT NULL,
     title_normalized text NOT NULL,
-    publisher_id integer,
     serial_id integer NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL
 );
@@ -2269,7 +2268,7 @@ CREATE TABLE publishing.serial_title_decisions (
 -- Name: TABLE serial_title_decisions; Type: COMMENT; Schema: publishing; Owner: -
 --
 
-COMMENT ON TABLE publishing.serial_title_decisions IS 'Fusions décidées par l''administration : une série sans ISSN, de ce titre normalisé et de cet éditeur, est rattachée à la revue.';
+COMMENT ON TABLE publishing.serial_title_decisions IS 'Fusions décidées par l''administration : une série sans ISSN de ce titre normalisé est rattachée à la revue.';
 
 
 --
@@ -3835,7 +3834,7 @@ ALTER TABLE ONLY publishing.serial_issns
 --
 
 ALTER TABLE ONLY publishing.serial_title_decisions
-    ADD CONSTRAINT uq_serial_title_decisions UNIQUE NULLS NOT DISTINCT (title_normalized, publisher_id);
+    ADD CONSTRAINT uq_serial_title_decisions UNIQUE (title_normalized);
 
 
 --
@@ -5389,14 +5388,6 @@ ALTER TABLE ONLY publishing.serial_issns
 
 
 --
--- Name: serial_title_decisions serial_title_decisions_publisher_id_fkey; Type: FK CONSTRAINT; Schema: publishing; Owner: -
---
-
-ALTER TABLE ONLY publishing.serial_title_decisions
-    ADD CONSTRAINT serial_title_decisions_publisher_id_fkey FOREIGN KEY (publisher_id) REFERENCES publishing.publishers(id) ON DELETE CASCADE;
-
-
---
 -- Name: serial_title_decisions serial_title_decisions_serial_id_fkey; Type: FK CONSTRAINT; Schema: publishing; Owner: -
 --
 
@@ -5720,5 +5711,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict a0TMke1lntYingaMjNRJqWIy3J5KFnXYg81bUsEZVGtFSfmDvnAD275QFC0xCI4
+\unrestrict urkNBcCi95t8aetsLK4IIsXbTvja3MzuJYsc58vr87rszoufSeJ9gCwcAeDPcfQ
 
