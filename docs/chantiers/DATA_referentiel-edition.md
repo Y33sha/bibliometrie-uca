@@ -76,14 +76,14 @@ Les personnes et les publications ont un volet latéral (`PersonDrawer`, `Public
 
 - [x] Contrainte `NULLS NOT DISTINCT`, dédoublonnage des formes sans éditeur (7668391c6)
 - [x] `biblio.journal` écrit d'après la série qui sert au rattachement, ISSN en liste. Lecteurs adaptés : vérification Sudoc, comparaison des sources. Migration du format sur toutes les bases (773670312, a3be1805f)
-- [ ] Reprise du contenu des séries depuis le raw store (`rewrite_biblio_journal`)
-- [ ] `serial_issns` : une ligne par ISSN, colonne `issnl`, table des liens entre ISSN. Vérification Sudoc ISSN par ISSN.
-- [ ] Rattachement des enregistrements sources dans `publishing` : ISSN-L, identifiant OpenAlex, titre. Fusion des revues de même ISSN-L. Titre, identifiant OpenAlex et modèle OA de chaque revue.
+- [x] Reprise du contenu des séries depuis le raw store (`rewrite_biblio_journal`)
+- [x] `serial_issns` : une ligne par ISSN, colonne `issnl`, table des liens entre ISSN. Vérification Sudoc ISSN par ISSN (27f9ef446)
+- [x] Rattachement des enregistrements sources dans `publishing` : ISSN-L, identifiant OpenAlex, titre. Fusion des revues de même ISSN-L. Titre, identifiant OpenAlex et modèle OA de chaque revue (27f9ef446)
 - [ ] Éditeur déduit du préfixe DOI Crossref pour le rattachement par titre
 - [ ] Relations entre revues déduites des liens entre ISSN. Liens sur la page d'une revue.
-- [ ] Administration : ISSN en lecture seule, fusion limitée aux revues sans ISSN et gardée dans la table des titres
-- [ ] Normalisation sans recherche ni création de revue. Collection sans ISSN des monographies : revue sans ISSN de son titre et de son éditeur.
-- [ ] Retrait de `serial_name_forms`, de `find_or_create_serial` et des règles de fusion remplacées par le calcul et les relations
+- [x] Administration : ISSN en lecture seule, fusion limitée aux revues sans ISSN et gardée dans la table des titres (27f9ef446)
+- [x] Normalisation sans recherche ni création de revue. Collection sans ISSN des monographies : revue sans ISSN de son titre et de son éditeur (27f9ef446)
+- [x] Retrait de `serial_name_forms`, de `find_or_create_serial` et des règles de fusion remplacées par le calcul et les relations (27f9ef446)
 - [ ] Comparaison des revues avant et après sur le stock, dont les quatre titres partagés par deux revues
 
 ### Phase 2 — Éditeurs
