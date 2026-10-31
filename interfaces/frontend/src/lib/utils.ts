@@ -209,43 +209,11 @@ function sanitizeMarkup(s: string, allowedTags: Set<string>): string {
 
 const HAS_MATHML = /<\/?mml:/;
 
-const ENTITY_MAP: Record<string, string> = {
-	amp: '&', lt: '<', gt: '>', quot: '"', apos: "'"
-};
-
-/* Décode une couche d'entités HTML (nommées + numériques). */
-function decodeEntitiesOnce(s: string): string {
-	return s.replace(
-		/&(amp|lt|gt|quot|apos|#\d+|#x[0-9a-f]+);/gi,
-		(full, entity: string) => {
-			if (entity[0] === '#') {
-				const code = entity[1] === 'x' || entity[1] === 'X'
-					? parseInt(entity.slice(2), 16)
-					: parseInt(entity.slice(1), 10);
-				return Number.isFinite(code) ? String.fromCodePoint(code) : full;
-			}
-			return ENTITY_MAP[entity.toLowerCase()] ?? full;
-		}
-	);
-}
-
-/* Décode les entités HTML d'un titre jusqu'à stabilisation (`&lt;sub&gt;` → `<sub>`, `&amp;` → `&`, `&#233;` → `é`). La boucle (bornée) absorbe le double-encodage (`&amp;lt;`). Le markup brut obtenu est ensuite sanitizé ; un `&` de contenu est ré-échappé par `escapeHtml`. */
-function decodeHtmlEntities(s: string): string {
-	let out = s;
-	for (let i = 0; i < 4; i++) {
-		const decoded = decodeEntitiesOnce(out);
-		if (decoded === out) break;
-		out = decoded;
-	}
-	return out;
-}
-
-/* Rend une chaîne reçue d'une source, sûre vis-à-vis du XSS, selon les règles de son type de texte. */
+/* Rend une chaîne reçue d'une source, sûre vis-à-vis du XSS, selon les règles de son type de texte. La normalisation a déjà décodé ses entités HTML : un `&` du texte est échappé ici. */
 function render(s: string | null | undefined, rules: RenderRules): string {
 	if (!s) return '';
 
-	let input = decodeHtmlEntities(s);
-	if (!rules.keepsBold) input = unboldMathml(input);
+	const input = rules.keepsBold ? s : unboldMathml(s);
 
 	if (hasLatex(input)) return renderLatex(input, rules);
 	if (HAS_MATHML.test(input) || /<\/?[a-z]/i.test(input)) return sanitizeMarkup(input, rules.allowedTags);

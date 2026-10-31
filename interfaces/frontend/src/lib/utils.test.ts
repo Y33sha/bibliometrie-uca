@@ -105,30 +105,8 @@ describe('sanitizeTitle', () => {
 		expect(sanitizeTitle(undefined)).toBe('');
 	});
 
-	it('décode les titres double-encodés (&amp;lt;i&amp;gt; → <i>)', () => {
-		const result = sanitizeTitle(
-			'Detection of &amp;lt;i&amp;gt;Candida&amp;lt;/i&amp;gt; species'
-		);
-		expect(result).toContain('<i>Candida</i>');
-		expect(result).not.toContain('&amp;');
-	});
-
-	it('décode les entités numériques double-encodées (&amp;#233; → é)', () => {
-		const result = sanitizeTitle('Gagn&amp;#233; et al.');
-		expect(result).toContain('Gagné');
-	});
-
-	it('décode le markup simple-encodé (&lt;sub&gt; → <sub>)', () => {
-		const result = sanitizeTitle('Fe&lt;sub&gt;3&lt;/sub&gt;O&lt;sub&gt;4&lt;/sub&gt;');
-		expect(result).toContain('<sub>3</sub>');
-		expect(result).not.toContain('&lt;');
-		expect(result).not.toContain('&amp;');
-	});
-
-	it('décode un &amp; de contenu isolé (&amp; → &)', () => {
-		// "Smith &amp; Jones" → "Smith & Jones", ré-échappé une fois à l'affichage.
-		const result = sanitizeTitle('Smith &amp; Jones');
-		expect(result).toBe('Smith &amp; Jones');
+	it('échappe un & du texte', () => {
+		expect(sanitizeTitle('Smith & Jones')).toBe('Smith &amp; Jones');
 	});
 });
 
@@ -197,8 +175,8 @@ describe('titleText', () => {
 		expect(text).toBe('Σ± production in pp collisions');
 	});
 
-	it('décode les entités et retire le formatage HTML', () => {
-		expect(titleText('H&lt;sub&gt;2&lt;/sub&gt;O &amp; CO<sub>2</sub>')).toBe('H2O & CO2');
+	it('retire le formatage HTML', () => {
+		expect(titleText('H<sub>2</sub>O & CO<sub>2</sub>')).toBe('H2O & CO2');
 	});
 
 	it('renvoie une chaîne vide pour un titre absent', () => {
