@@ -17,11 +17,11 @@ Schéma PostgreSQL `sources`.
 | `staging` | Document moissonné : identifiant dans la source, payload brut, empreinte (`raw_hash`), date de disparition de la source (`disappeared_at`). Le payload est vidé après la normalisation | Un document par source et identifiant |
 | `failed_lookups` | Identifiant (DOI, identifiant HAL, NNT) cherché en vain dans une source ou auprès de doi.org, avec la date de l'échec | |
 
-**Statut open access**
+**DOI**
 
 | Table | Contenu | Contrainte |
 |---|---|---|
-| `unpaywall` | Statut d'accès donné par Unpaywall pour un DOI, avec la date de l'interrogation | Un statut par DOI |
+| `dois` | Statut d'accès donné par Unpaywall, adresse enregistrée chez doi.org, chacun avec la date de l'interrogation | Une ligne par DOI de publication |
 
 **Enregistrements sources**
 
@@ -60,4 +60,4 @@ Schéma PostgreSQL `sources`.
 - La phase [`publications`](../pipeline/07-publications.md) rattache chaque enregistrement source à sa publication.
 - La phase [`author_grouping`](../pipeline/08-author-grouping.md) marque les doublons d'auteur.
 - Les phases `normalize` et [`persons`](../pipeline/09-persons.md) neutralisent des identifiants.
-- Les [enrichissements](../pipeline/11-enrichissements.md) écrivent les pays et `unpaywall`.
+- Les [enrichissements](../pipeline/11-enrichissements.md) écrivent les pays et `dois`.

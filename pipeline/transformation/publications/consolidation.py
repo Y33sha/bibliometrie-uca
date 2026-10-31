@@ -125,7 +125,7 @@ def monograph_serial_ids(conn: Connection, monograph_ids: Sequence[int]) -> dict
 def unpaywall_verdict(conn: Connection, doi: str) -> str | None:
     """Renvoie le verdict d'Unpaywall sur un DOI, `None` sans verdict."""
     return conn.execute(
-        text("SELECT oa_status::text FROM unpaywall WHERE doi = :doi"), {"doi": doi}
+        text("SELECT unpaywall_oa_status::text FROM dois WHERE doi = :doi"), {"doi": doi}
     ).scalar_one_or_none()
 
 

@@ -1593,19 +1593,42 @@ failed_lookups = Table(
 )
 
 
-unpaywall = Table(
-    "unpaywall",
+dois = Table(
+    "dois",
     metadata,
     Column("doi", Text, primary_key=True),
     Column(
-        "oa_status",
+        "unpaywall_oa_status",
         oa_type_enum,
-        comment="Statut open access donné par Unpaywall. NULL : DOI absent d'Unpaywall.",
+        comment="Statut open access donné par Unpaywall. NULL avec une date : DOI absent d'Unpaywall.",
     ),
-    Column("checked_at", DateTime(timezone=True), nullable=False),
+    Column(
+        "unpaywall_checked_at",
+        DateTime(timezone=True),
+        comment=(
+            "Date du verdict d'Unpaywall. Le DOI est réinterrogé au-delà du délai "
+            "unpaywall_recheck_after_days."
+        ),
+    ),
+    Column(
+        "registered_url",
+        Text,
+        comment=(
+            "Adresse enregistrée du DOI, lue dans l'API des handles de doi.org. NULL avec une "
+            "date : DOI inconnu de doi.org."
+        ),
+    ),
+    Column("resolved_at", DateTime(timezone=True), comment="Date de la lecture chez doi.org."),
+    CheckConstraint(
+        "unpaywall_oa_status IS NULL OR unpaywall_checked_at IS NOT NULL",
+        name="dois_unpaywall_dated",
+    ),
+    CheckConstraint(
+        "registered_url IS NULL OR resolved_at IS NOT NULL", name="dois_registered_url_dated"
+    ),
     comment=(
-        "Verdict d'Unpaywall pour chaque DOI interrogé par la phase oa_status. Le DOI est "
-        "réinterrogé quand checked_at date de plus que le délai unpaywall_recheck_after_days."
+        "Réponses des services externes sur chaque DOI de publication : verdict d'Unpaywall, "
+        "adresse enregistrée chez doi.org."
     ),
     schema="sources",
 )

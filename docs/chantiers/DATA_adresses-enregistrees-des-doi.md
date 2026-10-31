@@ -8,9 +8,7 @@
 
 **Adresse enregistrée qui désigne un PDF.** 136 adresses Crossref finissent par `.pdf`. Parmi les DOI du périmètre des autres agences, 11 aussi, dont 6 de publications `closed` ou `unknown`. Exemple : la publication 78490, DOI KISTI, est `closed` alors que son DOI mène à un PDF (`http://isyou.info/jowua/papers/jowua-v12n1-6.pdf`). 9 DOI du périmètre sont inconnus de doi.org.
 
-**Verdicts d'Unpaywall.** `sources.unpaywall` garde un verdict par DOI de publication interrogé, soit 54 564 DOI. Les DOI DataCite sont absents d'Unpaywall.
-
-**Publications du périmètre à DOI en `unknown`** : DataCite 317 sur 4 909, mEDRA 7, KISTI 3, Public 1.
+**Publications du périmètre à DOI en `unknown`** : DataCite 317 sur 4 909, mEDRA 7, KISTI 3, Public 1. Les DOI DataCite sont absents d'Unpaywall.
 
 ## Décisions
 
@@ -22,9 +20,9 @@
 
 ### Phase 1 — Schéma
 
-- [ ] Migration : `sources.dois`, reprise des verdicts de `unpaywall`, suppression de `unpaywall`.
-- [ ] `tables.py`, snapshot du schéma, lectures et écritures déclarées du graphe.
-- [ ] Lecteurs de `unpaywall` basculés : phase `oa_status`, consolidation, scripts.
+- [x] Migration : `sources.dois`, reprise des verdicts de `unpaywall`, suppression de `unpaywall`.
+- [x] `tables.py`, snapshot du schéma, lectures et écritures déclarées du graphe.
+- [x] Lecteurs de `unpaywall` basculés : phase `oa_status`, consolidation, scripts.
 
 ### Phase 2 — Résolution
 

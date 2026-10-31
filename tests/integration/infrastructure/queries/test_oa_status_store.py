@@ -13,10 +13,19 @@ STALENESS = 30  # seuil de péremption arbitraire pour ces tests
 def _verdict(conn, doi, oa_status, *, days_ago):
     conn.execute(
         text(
-            "INSERT INTO unpaywall (doi, oa_status, checked_at)"
+            "INSERT INTO dois (doi, unpaywall_oa_status, unpaywall_checked_at)"
             " VALUES (:doi, CAST(:os AS oa_type), now() - make_interval(days => :d))"
         ),
         {"doi": doi, "os": oa_status, "d": days_ago},
+    )
+
+
+def _resolved_only(conn, doi):
+    conn.execute(
+        text(
+            "INSERT INTO dois (doi, registered_url, resolved_at) VALUES (:doi, 'https://x', now())"
+        ),
+        {"doi": doi},
     )
 
 
@@ -51,6 +60,12 @@ class TestDoisToCheck:
 
         assert dois == ["10.1/b", "10.1/a"]
 
+    def test_doi_resolu_sans_verdict_a_verifier(self, sa_sync_conn):
+        insert_publication(sa_sync_conn, doi="10.1/r")
+        _resolved_only(sa_sync_conn, "10.1/r")
+
+        assert "10.1/r" in OaStatusStore(sa_sync_conn).fetch_dois_to_check(staleness_days=STALENESS)
+
     def test_doi_datacite_ecartes(self, sa_sync_conn):
         """Un préfixe DataCite écarte le DOI ; un préfixe d'une autre agence ou pas encore résolu le garde."""
         insert_doi_prefix(sa_sync_conn, "10.9001", ra="DataCite")
@@ -76,7 +91,10 @@ class TestVerdicts:
     def test_verdicts_en_table_nul_compris(self, sa_sync_conn):
         _verdict(sa_sync_conn, "10.1/t", "gold", days_ago=1)
         _verdict(sa_sync_conn, "10.1/u", None, days_ago=1)
-        assert OaStatusStore(sa_sync_conn).fetch_verdicts(["10.1/t", "10.1/u", "10.1/z"]) == {
+        _resolved_only(sa_sync_conn, "10.1/r")
+        assert OaStatusStore(sa_sync_conn).fetch_verdicts(
+            ["10.1/t", "10.1/u", "10.1/r", "10.1/z"]
+        ) == {
             "10.1/t": "gold",
             "10.1/u": None,
         }
@@ -86,8 +104,9 @@ class TestVerdicts:
         OaStatusStore(sa_sync_conn).record_verdicts([("10.1/v", "gold"), ("10.1/w", None)])
         rows = sa_sync_conn.execute(
             text(
-                "SELECT doi, oa_status::text, checked_at > now() - interval '1 minute'"
-                " FROM unpaywall WHERE doi IN ('10.1/v', '10.1/w') ORDER BY doi"
+                "SELECT doi, unpaywall_oa_status::text,"
+                " unpaywall_checked_at > now() - interval '1 minute'"
+                " FROM dois WHERE doi IN ('10.1/v', '10.1/w') ORDER BY doi"
             )
         ).all()
         assert [tuple(r) for r in rows] == [("10.1/v", "gold", True), ("10.1/w", None, True)]

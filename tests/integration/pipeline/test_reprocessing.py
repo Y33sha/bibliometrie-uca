@@ -121,7 +121,7 @@ class TestHalReprocessingUpdatesOaStatus:
         # Unpaywall ne voit pas le dépôt HAL sous le DOI.
         sa_sync_conn.execute(
             text("""
-                INSERT INTO unpaywall (doi, oa_status, checked_at)
+                INSERT INTO dois (doi, unpaywall_oa_status, unpaywall_checked_at)
                 SELECT lower(doi), 'closed', now() FROM publications
                 WHERE id = (
                     SELECT publication_id FROM source_records

@@ -1,4 +1,4 @@
-"""Phase `oa_status` : verdicts d'Unpaywall sur les DOI des publications (`sources.unpaywall`), et statut open access dérivé (`publications.oa_status`).
+"""Phase `oa_status` : verdicts d'Unpaywall sur les DOI des publications (`sources.dois`), et statut open access dérivé (`publications.oa_status`).
 
 Unpaywall est interrogé pour les DOI jamais vérifiés ou périmés, hors DOI DataCite, et chaque verdict est écrit. Un DOI absent d'Unpaywall reçoit un verdict nul. Quand Unpaywall est indisponible, le DOI est reporté au run suivant. Le statut des publications de ces DOI est ensuite recalculé par `publication_oa_status`, à partir de leurs copies, de leurs embargos, de leur type, de leur revue et du verdict.
 
@@ -67,11 +67,12 @@ class PublicationOaInputs(NamedTuple):
 
 # DOI des publications sans verdict d'Unpaywall, ou à verdict de plus de `:stale` jours. Les DOI DataCite sont absents d'Unpaywall, donc écartés.
 _STALE_DOIS = """
-    SELECT d.doi, u.checked_at
+    SELECT d.doi, u.unpaywall_checked_at
     FROM (SELECT DISTINCT lower(doi) AS doi FROM publications WHERE doi IS NOT NULL) d
-    LEFT JOIN unpaywall u ON u.doi = d.doi
+    LEFT JOIN dois u ON u.doi = d.doi
     LEFT JOIN doi_prefixes dp ON dp.prefix = split_part(d.doi, '/', 1)
-    WHERE (u.doi IS NULL OR u.checked_at < now() - make_interval(days => :stale))
+    WHERE (u.unpaywall_checked_at IS NULL
+           OR u.unpaywall_checked_at < now() - make_interval(days => :stale))
       AND dp.ra IS DISTINCT FROM 'DataCite'
 """
 
@@ -89,7 +90,7 @@ class OaStatusStore:
             limit: plafond du run.
         """
         rows = self._conn.execute(
-            text(f"{_STALE_DOIS} ORDER BY checked_at ASC NULLS FIRST, doi LIMIT :lim"),
+            text(f"{_STALE_DOIS} ORDER BY unpaywall_checked_at ASC NULLS FIRST, doi LIMIT :lim"),
             {"stale": staleness_days, "lim": limit},
         )
         return [r.doi for r in rows]
@@ -105,7 +106,10 @@ class OaStatusStore:
     def fetch_verdicts(self, dois: Sequence[str]) -> dict[str, str | None]:
         """Renvoie le verdict en table de chacun de ces DOI, quand il en a un."""
         rows = self._conn.execute(
-            text("SELECT doi, oa_status::text AS oa_status FROM unpaywall WHERE doi = ANY(:dois)"),
+            text("""
+                SELECT doi, unpaywall_oa_status::text AS oa_status FROM dois
+                WHERE doi = ANY(:dois) AND unpaywall_checked_at IS NOT NULL
+            """),
             {"dois": list(dois)},
         )
         return {r.doi: r.oa_status for r in rows}
@@ -116,11 +120,12 @@ class OaStatusStore:
             return
         self._conn.execute(
             text("""
-                INSERT INTO unpaywall (doi, oa_status, checked_at)
+                INSERT INTO dois (doi, unpaywall_oa_status, unpaywall_checked_at)
                 SELECT v.doi, CAST(v.oa_status AS oa_type), now()
                 FROM unnest(CAST(:dois AS text[]), CAST(:statuses AS text[])) AS v(doi, oa_status)
                 ON CONFLICT (doi) DO UPDATE
-                SET oa_status = EXCLUDED.oa_status, checked_at = EXCLUDED.checked_at
+                SET unpaywall_oa_status = EXCLUDED.unpaywall_oa_status,
+                    unpaywall_checked_at = EXCLUDED.unpaywall_checked_at
             """),
             {"dois": [d for d, _ in verdicts], "statuses": [s for _, s in verdicts]},
         )

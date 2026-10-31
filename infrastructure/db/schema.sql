@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict Xfuqeta8mss965x33boqjb0sIesIAgUmcM27xZxJv7GZ8ZUPYCApXB6ra6NvUtQ
+\restrict hhmeSHiFihnSQaYAdcMh1d2sun5YROa8jFgAD7dgyVccpKvgV7bCsbSEhNrsnW5
 
 -- Dumped from database version 18.4
 -- Dumped by pg_dump version 18.4
@@ -2760,6 +2760,56 @@ COMMENT ON COLUMN sources.doi_targets.rule IS 'Règle de correction qui relie le
 
 
 --
+-- Name: dois; Type: TABLE; Schema: sources; Owner: -
+--
+
+CREATE TABLE sources.dois (
+    doi text NOT NULL,
+    unpaywall_oa_status public.oa_type,
+    unpaywall_checked_at timestamp with time zone,
+    registered_url text,
+    resolved_at timestamp with time zone,
+    CONSTRAINT dois_registered_url_dated CHECK (((registered_url IS NULL) OR (resolved_at IS NOT NULL))),
+    CONSTRAINT dois_unpaywall_dated CHECK (((unpaywall_oa_status IS NULL) OR (unpaywall_checked_at IS NOT NULL)))
+);
+
+
+--
+-- Name: TABLE dois; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON TABLE sources.dois IS 'Réponses des services externes sur chaque DOI de publication : verdict d''Unpaywall, adresse enregistrée chez doi.org.';
+
+
+--
+-- Name: COLUMN dois.unpaywall_oa_status; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON COLUMN sources.dois.unpaywall_oa_status IS 'Statut open access donné par Unpaywall. NULL avec une date : DOI absent d''Unpaywall.';
+
+
+--
+-- Name: COLUMN dois.unpaywall_checked_at; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON COLUMN sources.dois.unpaywall_checked_at IS 'Date du verdict d''Unpaywall. Le DOI est réinterrogé au-delà du délai unpaywall_recheck_after_days.';
+
+
+--
+-- Name: COLUMN dois.registered_url; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON COLUMN sources.dois.registered_url IS 'Adresse enregistrée du DOI, lue dans l''API des handles de doi.org. NULL avec une date : DOI inconnu de doi.org.';
+
+
+--
+-- Name: COLUMN dois.resolved_at; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON COLUMN sources.dois.resolved_at IS 'Date de la lecture chez doi.org.';
+
+
+--
 -- Name: embargoes; Type: TABLE; Schema: sources; Owner: -
 --
 
@@ -2953,31 +3003,6 @@ CREATE SEQUENCE sources.staging_id_seq
 --
 
 ALTER SEQUENCE sources.staging_id_seq OWNED BY sources.staging.id;
-
-
---
--- Name: unpaywall; Type: TABLE; Schema: sources; Owner: -
---
-
-CREATE TABLE sources.unpaywall (
-    doi text NOT NULL,
-    oa_status public.oa_type,
-    checked_at timestamp with time zone NOT NULL
-);
-
-
---
--- Name: TABLE unpaywall; Type: COMMENT; Schema: sources; Owner: -
---
-
-COMMENT ON TABLE sources.unpaywall IS 'Verdict d''Unpaywall pour chaque DOI interrogé par la phase oa_status. Le DOI est réinterrogé quand checked_at date de plus que le délai unpaywall_recheck_after_days.';
-
-
---
--- Name: COLUMN unpaywall.oa_status; Type: COMMENT; Schema: sources; Owner: -
---
-
-COMMENT ON COLUMN sources.unpaywall.oa_status IS 'Statut open access donné par Unpaywall. NULL : DOI absent d''Unpaywall.';
 
 
 --
@@ -3935,6 +3960,14 @@ ALTER TABLE ONLY sources.doi_targets
 
 
 --
+-- Name: dois dois_pkey; Type: CONSTRAINT; Schema: sources; Owner: -
+--
+
+ALTER TABLE ONLY sources.dois
+    ADD CONSTRAINT dois_pkey PRIMARY KEY (doi);
+
+
+--
 -- Name: embargoes embargoes_pkey; Type: CONSTRAINT; Schema: sources; Owner: -
 --
 
@@ -4044,14 +4077,6 @@ ALTER TABLE ONLY sources.staging
 
 ALTER TABLE ONLY sources.staging
     ADD CONSTRAINT staging_source_source_id_key UNIQUE (source, source_id);
-
-
---
--- Name: unpaywall unpaywall_pkey; Type: CONSTRAINT; Schema: sources; Owner: -
---
-
-ALTER TABLE ONLY sources.unpaywall
-    ADD CONSTRAINT unpaywall_pkey PRIMARY KEY (doi);
 
 
 --
@@ -5655,5 +5680,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Xfuqeta8mss965x33boqjb0sIesIAgUmcM27xZxJv7GZ8ZUPYCApXB6ra6NvUtQ
+\unrestrict hhmeSHiFihnSQaYAdcMh1d2sun5YROa8jFgAD7dgyVccpKvgV7bCsbSEhNrsnW5
 

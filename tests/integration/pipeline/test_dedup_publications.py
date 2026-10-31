@@ -122,7 +122,8 @@ class TestRefreshFromSources:
         id1 = _insert_publication(sa_sync_conn, doi="10.1234/upw", oa_status="unknown")
         sa_sync_conn.execute(
             text(
-                "INSERT INTO unpaywall (doi, oa_status, checked_at) VALUES ('10.1234/upw', 'closed', now())"
+                "INSERT INTO dois (doi, unpaywall_oa_status, unpaywall_checked_at)"
+                " VALUES ('10.1234/upw', 'closed', now())"
             )
         )
         _source_record(

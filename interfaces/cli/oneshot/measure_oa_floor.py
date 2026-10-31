@@ -37,10 +37,11 @@ _DEFAULT_OUTPUT = Path("data/measures/oa_floor.tsv")
 _ANNEX_DOC_TYPES = frozenset({"conference", "poster"})
 
 _PUBLICATIONS = text("""
-    SELECT p.id, p.oa_status::text AS cur, u.oa_status::text AS upw, p.doc_type::text AS doc_type,
-           p.serial_id IS NOT NULL AS has_serial, s.oa_model::text AS oa_model, p.source_extras
+    SELECT p.id, p.oa_status::text AS cur, u.unpaywall_oa_status::text AS upw,
+           p.doc_type::text AS doc_type, p.serial_id IS NOT NULL AS has_serial,
+           s.oa_model::text AS oa_model, p.source_extras
     FROM publications p
-    LEFT JOIN sources.unpaywall u ON u.doi = lower(p.doi::text)
+    LEFT JOIN sources.dois u ON u.doi = lower(p.doi::text)
     LEFT JOIN serials s ON s.id = p.serial_id
     WHERE p.in_perimeter
 """)

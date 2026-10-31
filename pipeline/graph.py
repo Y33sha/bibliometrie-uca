@@ -613,7 +613,7 @@ TASKS: tuple[Task, ...] = (
             "source_records.publication_id",
             "source_record_identifiers",
             # Verdicts d'Unpaywall, lus par le recalcul des publications des revues fusionnées.
-            "unpaywall",
+            "dois.unpaywall_oa_status",
         ),
         writes=(
             "serials",
@@ -637,7 +637,7 @@ TASKS: tuple[Task, ...] = (
             "source_records.publication_id",
             "source_records.serial_id",
             "source_record_identifiers",
-            "unpaywall",
+            "dois.unpaywall_oa_status",
         ),
     ),
     _task(
@@ -916,7 +916,7 @@ TASKS: tuple[Task, ...] = (
             "serials.serial_type",
             "serials.oa_model",
             "monographs.serial_id",
-            "unpaywall",
+            "dois.unpaywall_oa_status",
             # Titulaire du préfixe DOI Crossref, éditeur de la publication.
             "doi_prefixes.ra",
             "doi_prefixes.publisher_id",
@@ -934,7 +934,7 @@ TASKS: tuple[Task, ...] = (
             "source_records.countries",
             "publications.id",
             "publications.oa_status",
-            "unpaywall",
+            "dois.unpaywall_oa_status",
             "serials",
             "monographs",
         ),
@@ -1335,7 +1335,7 @@ TASKS: tuple[Task, ...] = (
             "publications.oa_status",
             "publications.serial_id",
             "serials.oa_model",
-            "unpaywall",
+            "dois",
             "doi_prefixes.ra",
             "source_records.publication_id",
             "source_records.source",
@@ -1347,7 +1347,7 @@ TASKS: tuple[Task, ...] = (
             "embargoes",
             "config",
         ),
-        writes=("publications.oa_status", "unpaywall"),
+        writes=("publications.oa_status", "dois"),
         network="unpaywall",
     ),
 )

@@ -26,6 +26,7 @@
 | `distinct_persons` | `persons` | [Personnes](05-persons.md) |
 | `doi_prefixes` | `publishing` | [Édition](07-publishing.md#éditeurs) |
 | `doi_targets` | `sources` | [Enregistrements sources](02-sources.md#tables) |
+| `dois` | `sources` | [Enregistrements sources](02-sources.md) |
 | `failed_lookups` | `sources` | [Enregistrements sources](02-sources.md) |
 | `hal_structure_aliases` | `ref` | [Référentiels externes](08-ref-et-ops.md) |
 | `hal_structure_relations` | `ref` | [Référentiels externes](08-ref-et-ops.md) |
@@ -88,6 +89,5 @@
 | `subject_cooccurrences` (vue matérialisée) | `publications` | [Publications](03-publications.md#sujets) |
 | `subject_cooccurrences` (vue matérialisée) | `publications` | [Publications](03-publications.md#sujets) |
 | `subjects` | `publications` | [Publications](03-publications.md#sujets) |
-| `unpaywall` | `sources` | [Enregistrements sources](02-sources.md) |
 | `user_roles` | `ops` | [Exploitation](08-ref-et-ops.md#exploitation) |
 | `users` | `ops` | [Exploitation](08-ref-et-ops.md#exploitation) |
