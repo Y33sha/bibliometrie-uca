@@ -18,6 +18,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from domain.publications.dates import PublicationDate
 from domain.serials.containers import ContainerDescription
 from domain.serials.issns import SerialIssn
 from pipeline.ingestion.common import normalizer as normalizer_module
@@ -89,6 +90,9 @@ class _StubNorm(SourceNormalizer):
 
     def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
         return "Titre", 2024
+
+    def publication_date(self, doc: Document) -> PublicationDate | None:
+        return PublicationDate.of_year(2020)
 
     def source_record(
         self, row: StagingRow, doc: Document, containers: Containers
@@ -358,7 +362,7 @@ _RECORD = SourceRecordUpsert(
     source_id="a",
     staging_id=1,
     title="T",
-    publication_year=2020,
+    publication_date=PublicationDate.of_year(2020),
     raw_doc_type=None,
     monograph_id=None,
     container_title=None,

@@ -8,6 +8,7 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable, Mapping
 
+from domain.publications.dates import PublicationDate, parse_iso_date
 from domain.publications.identifiers import clean_doi, find_isbns
 from domain.source_records.source_extras import SourceExtra
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
@@ -50,6 +51,21 @@ def extract_datacite_publication_year(
     if 1500 <= year <= max_year:
         return year
     return None
+
+
+def extract_datacite_publication_date(
+    attributes: Mapping[str, JsonValue], *, max_year: int
+) -> PublicationDate | None:
+    """Renvoie la date de publication : la date `Issued` d'année comprise entre 1500 et `max_year`, à défaut l'année `publicationYear`."""
+    for entry in as_sequence(attributes.get("dates")):
+        date = as_mapping(entry)
+        if as_str(date.get("dateType")) != "Issued":
+            continue
+        parsed = parse_iso_date(as_str(date.get("date")))
+        if parsed is not None and 1500 <= parsed.year <= max_year:
+            return parsed
+    year = extract_datacite_publication_year(attributes, max_year=max_year)
+    return PublicationDate.of_year(year) if year else None
 
 
 def get_publisher_name(attributes: Mapping[str, JsonValue]) -> str | None:

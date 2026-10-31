@@ -102,7 +102,7 @@ Le détail d'une thèse en cours a la même structure, avec `status: "enCours"`,
 
 ### Thèses soutenues et en cours
 
-Une thèse avec `dateSoutenance` est soutenue (`thesis`), sans elle en cours (`ongoing_thesis`). Une thèse en cours n'a ni NNT ni DOI : son identifiant theses.fr (`sXXXXXX`) sert de clé. L'année est celle de la soutenance, à défaut celle de la première inscription.
+Une thèse avec `dateSoutenance` est soutenue (`thesis`), sans elle en cours (`ongoing_thesis`). Une thèse en cours n'a ni NNT ni DOI : son identifiant theses.fr (`sXXXXXX`) sert de clé. La date de publication est celle de la soutenance, à défaut l'année de la première inscription.
 
 ### Rôles
 

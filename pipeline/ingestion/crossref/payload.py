@@ -8,9 +8,10 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping
 
+from domain.publications.dates import PublicationDate, parse_date_parts
 from domain.serials.issns import IssnSupport, SerialIssn, received_issns
 from domain.source_records.source_extras import SourceExtra
-from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs
+from domain.types import JsonValue, as_mapping, as_sequence, as_str, as_strs
 
 _JATS_TAG_RE = re.compile(r"</?jats:[A-Za-z][^<>]*>")
 
@@ -20,23 +21,26 @@ def strip_jats_tags(s: str) -> str:
     return _JATS_TAG_RE.sub("", s)
 
 
-def extract_crossref_publication_year(msg: Mapping[str, JsonValue], *, max_year: int) -> int | None:
-    """Renvoie l'année de publication Crossref : la première année plausible parmi `published`, `issued`, `published-online`, `published-print` et `approved`.
+def extract_crossref_publication_date(
+    msg: Mapping[str, JsonValue], *, max_year: int
+) -> PublicationDate | None:
+    """Renvoie la date de publication Crossref, avec sa précision : la première date d'année plausible parmi `published`, `issued`, `published-online`, `published-print` et `approved`.
 
     `published` est la plus ancienne des dates en ligne et papier. `issued` est la date déclarée par l'éditeur ; elle peut viser un numéro futur, déposé avant parution. `approved` est la date de soutenance d'une thèse, seule date des thèses déposées par l'ABES.
 
     Une année plausible tient entre 1500 et `max_year`, en général l'année suivante : un preprint peut être daté de l'année à venir. Sans année plausible, la normalisation refuse le document, et les autres sources donnent l'année de la publication. `max_year` est un paramètre pour que les tests restent indépendants du calendrier.
     """
     for field in ("published", "issued", "published-online", "published-print", "approved"):
-        date_parts = as_sequence(as_mapping(msg.get(field)).get("date-parts"))
-        if not date_parts:
-            continue
-        # `date-parts` contient une liste de dates, chacune décomposée en [année, mois, jour].
-        first = as_sequence(date_parts[0])
-        year = as_int(first[0]) if first else None
-        if year is not None and 1500 <= year <= max_year:
-            return year
+        parsed = parse_date_parts(msg.get(field))
+        if parsed is not None and 1500 <= parsed.year <= max_year:
+            return parsed
     return None
+
+
+def extract_crossref_publication_year(msg: Mapping[str, JsonValue], *, max_year: int) -> int | None:
+    """Renvoie l'année de la date de publication Crossref (`extract_crossref_publication_date`)."""
+    parsed = extract_crossref_publication_date(msg, max_year=max_year)
+    return parsed.year if parsed else None
 
 
 _ISSN_SUPPORTS = {"print": IssnSupport.PRINT, "electronic": IssnSupport.ELECTRONIC}

@@ -15,12 +15,13 @@ Les enregistrements sources et les publications ont seulement une année (`publi
 | WoS, export tabulé | `PY` (année), `PD` (« OCT 15 », sans année), `EA` (« OCT 2024 ») | année, mois ou jour |
 | theses.fr | `dateSoutenance` | jour |
 
-L'année des enregistrements sources HAL vient de `producedDateY_i`.
-
 ## Décisions
 
 - La date de publication (`publication_date`) a une précision (`publication_date_precision`) : année, mois ou jour. Une date à l'année tombe le 1er janvier, une date au mois le 1er du mois.
 - `publication_year` reste, calculée depuis la date par PostgreSQL (colonne générée).
+- La date d'un enregistrement source est celle du champ de date de sa source (tableau du contexte), et l'année en dérive. HAL : `publicationDate_s`, à défaut l'année `producedDateY_i`. Crossref : la première date plausible parmi `published`, `issued`, `published-online`, `published-print` et `approved`.
+- OpenAlex et ScanR : le 1er janvier est ramené à l'année, le 1er d'un autre mois au mois.
+- WoS garde sa date à l'année : la source n'est plus moissonnée.
 
 ## Phasage
 
@@ -61,5 +62,3 @@ Mesures du 2026-10-30 sur tout le stock : 354 711 enregistrements sources, 79 90
 ## Questions ouvertes
 
 - Date d'une publication : la plus ancienne, la plus précise, celle de la source prioritaire ; date en ligne ou date papier.
-- Date d'une thèse : date de soutenance.
-- 1er d'un autre mois chez OpenAlex et ScanR : jour gardé, ou ramené au mois.

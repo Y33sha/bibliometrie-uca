@@ -14,6 +14,7 @@ from typing import ClassVar, NamedTuple
 from sqlalchemy import Connection
 
 from domain.platforms.registry import names_platform
+from domain.publications.dates import PublicationDate
 from domain.publications.metadata import has_minimal_publication_metadata, is_overlong_title
 from domain.serials.containers import (
     ContainerDescription,
@@ -129,6 +130,10 @@ class SourceNormalizer(ABC):
         return None
 
     @abstractmethod
+    def publication_date(self, doc: Document) -> PublicationDate | None:
+        """Renvoie la date de publication du document, avec sa précision, ou `None` sans année."""
+
+    @abstractmethod
     def source_record(
         self, row: StagingRow, doc: Document, containers: Containers
     ) -> SourceRecordUpsert:
@@ -179,7 +184,10 @@ class SourceNormalizer(ABC):
         )
         record = self.source_record(row, doc, containers)
         record = replace(
-            record, publisher_id=publisher_id, biblio=with_journal(record.biblio, series)
+            record,
+            publication_date=self.publication_date(doc),
+            publisher_id=publisher_id,
+            biblio=with_journal(record.biblio, series),
         )
         source_record_id = self._record_store.upsert_source_record(
             record, has_series=containers.has_series

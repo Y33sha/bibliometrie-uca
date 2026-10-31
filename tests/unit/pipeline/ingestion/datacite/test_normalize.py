@@ -395,7 +395,6 @@ class TestSourceRecord:
         assert document.staging_id == 42
         assert identifier_values(document)["doi"] == ["10.5281/zenodo.1"]
         assert document.title == "Un jeu de données"
-        assert document.publication_year == 2024
 
     def test_dois_apparentes_rassembles(self):
         attributs = _attributs(

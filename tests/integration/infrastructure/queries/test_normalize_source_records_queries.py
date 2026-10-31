@@ -4,6 +4,7 @@ from functools import partial
 
 from sqlalchemy import text
 
+from domain.publications.dates import PublicationDate
 from domain.source_records.identifiers import (
     SourceIdentifier,
     SourceIdentifierRole,
@@ -28,7 +29,7 @@ def _row(staging_id: int, **overrides) -> SourceRecordUpsert:
         "source_id": "2023ABC001",
         "staging_id": staging_id,
         "title": "Ma thèse",
-        "publication_year": 2023,
+        "publication_date": PublicationDate.of_year(2023),
         "raw_doc_type": "thesis",
     }
     return SourceRecordUpsert(**{**defaults, **overrides})

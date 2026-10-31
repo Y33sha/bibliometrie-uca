@@ -439,7 +439,6 @@ class TestOpenalexSourceRecordMetadata:
             {"title": "T", "publication_year": 2024}, staging_id=1, containers=_NO_CONTAINERS
         )
         assert record.title == "T"
-        assert record.publication_year == 2024
         assert "doi" not in identifier_values(record)
         assert "nnt" not in identifier_values(record)
 

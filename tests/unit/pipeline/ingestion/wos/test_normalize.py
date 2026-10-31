@@ -815,7 +815,6 @@ class TestWosSourceRecord:
         assert row_arg.source_id == "WOS:1"
         assert identifier_values(row_arg)["doi"] == ["10.1/x"]
         assert row_arg.title == "T"
-        assert row_arg.publication_year == 2024
         assert row_arg.raw_doc_type == "article"
         assert row_arg.raw_language == "en"
         assert row_arg.abstract == "abs"

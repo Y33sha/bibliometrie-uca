@@ -195,7 +195,6 @@ class TestCanonicalMetadata:
     def test_minimal(self):
         record = _record({"title_s": ["T"], "producedDateY_i": 2024}, Containers(True, None))
         assert record.title == "T"
-        assert record.publication_year == 2024
         # Une revue identifiée laisse `container_title` vide.
         assert record.container_title is None
 

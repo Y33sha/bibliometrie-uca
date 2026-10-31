@@ -12,6 +12,7 @@ from defusedxml.common import DefusedXmlException
 from domain.dates import today
 from domain.persons.contributor_name import ContributorName
 from domain.publications.contribution_roles import map_role
+from domain.publications.dates import PublicationDate, date_from_parts, parse_iso_date
 from domain.publications.doc_types import DocType
 from domain.publications.identifiers import (
     clean_doi,
@@ -54,6 +55,13 @@ from pipeline.ingestion.hal.payload import (
 from pipeline.transformation.publishing.find_or_create import (
     Containers,
 )
+
+
+def get_publication_date(doc: Mapping[str, JsonValue]) -> PublicationDate | None:
+    """Renvoie la date de parution (`publicationDate_s`), à défaut l'année de production (`producedDateY_i`)."""
+    return parse_iso_date(as_str(doc.get("publicationDate_s"))) or date_from_parts(
+        as_int(doc.get("producedDateY_i"))
+    )
 
 
 def get_title(doc: Mapping[str, JsonValue]) -> str:
@@ -208,7 +216,6 @@ def hal_source_record(
         staging_id=staging_id,
         identifiers=build_hal_identifiers(doc, hal_id, nnt),
         title=get_title(doc),
-        publication_year=as_int(doc.get("producedDateY_i")),
         raw_doc_type=doc_type,
         monograph_id=containers.monograph_id,
         container_title=get_container_title(doc) if not containers.has_series else None,
@@ -548,6 +555,9 @@ class HalNormalizer(SourceNormalizer):
         """Renvoie l'embargo actif du fichier déposé (`active_embargo_until`)."""
         until = active_embargo_until(hal_text_field(doc.get("label_xml")), today())
         return Embargo(until) if until else None
+
+    def publication_date(self, doc: Document) -> PublicationDate | None:
+        return get_publication_date(doc)
 
     def source_record(
         self, row: StagingRow, doc: Document, containers: Containers

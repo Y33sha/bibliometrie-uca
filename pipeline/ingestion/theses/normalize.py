@@ -7,6 +7,7 @@ from collections.abc import Mapping
 
 from domain.dates import french_date_to_iso
 from domain.publications.contribution_roles import THESES_FIELD_ROLES
+from domain.publications.dates import PublicationDate, parse_iso_date
 from domain.publications.identifiers import clean_doi, normalize_nnt
 from domain.source_records.identifiers import (
     SourceIdentifier,
@@ -49,10 +50,18 @@ def get_title(thesis: Mapping[str, JsonValue]) -> str | None:
     return as_str(thesis.get("titrePrincipal"))
 
 
+def get_publication_date(thesis: Mapping[str, JsonValue]) -> PublicationDate | None:
+    """Renvoie la date de soutenance, à défaut l'année de première inscription."""
+    if defense := parse_iso_date(_defense_date(thesis)):
+        return defense
+    enrollment = parse_iso_date(_enrollment_date(thesis))
+    return PublicationDate.of_year(enrollment.year) if enrollment else None
+
+
 def get_publication_year(thesis: Mapping[str, JsonValue]) -> int | None:
-    """Renvoie l'année de soutenance, à défaut l'année de première inscription."""
-    year_source = _defense_date(thesis) or _enrollment_date(thesis)
-    return int(year_source[:4]) if year_source else None
+    """Renvoie l'année de la date de publication (`get_publication_date`)."""
+    publication_date = get_publication_date(thesis)
+    return publication_date.year if publication_date else None
 
 
 def _build_source_extras(thesis: Mapping[str, JsonValue]) -> dict[str, JsonValue] | None:
@@ -151,7 +160,6 @@ def theses_source_record(
         staging_id=staging_id,
         identifiers=tuple(identifiers),
         title=get_title(thesis) or "",
-        publication_year=get_publication_year(thesis),
         raw_doc_type=derive_theses_doc_type(_defense_date(thesis)),
         monograph_id=None,
         container_title=None,
@@ -200,6 +208,9 @@ class ThesesNormalizer(SourceNormalizer):
     def embargo(self, doc: Document) -> Embargo | None:
         """Renvoie un embargo sans date pour une thèse en attente de diffusion sur Internet (`awaits_diffusion`)."""
         return Embargo(None) if awaits_diffusion(doc) else None
+
+    def publication_date(self, doc: Document) -> PublicationDate | None:
+        return get_publication_date(doc)
 
     def author_block(self, doc: Document) -> AuthorBlock:
         return extract_theses_author_block(doc)

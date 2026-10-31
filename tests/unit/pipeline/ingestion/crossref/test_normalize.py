@@ -573,7 +573,6 @@ class TestCrossrefSourceRecord:
         assert document.source_id == "10.1000/abc"
         assert document.staging_id == 42
         assert "10.1000/abc" in identifier_values(document)["doi"]
-        assert document.publication_year == 2024
         assert document.raw_doc_type == "journal-article"
 
     def test_titre_de_conteneur_garde_sans_revue(self):

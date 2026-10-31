@@ -7,6 +7,7 @@ from domain.countries import normalize_country_code
 from domain.normalize import drop_flattened_mathml
 from domain.persons.contributor_name import ContributorName
 from domain.publications.contribution_roles import map_role, merge_roles
+from domain.publications.dates import PublicationDate, date_from_parts, parse_iso_date
 from domain.publications.doc_types import DOC_TYPE_FAMILIES
 from domain.publications.identifiers import extract_hal_id_from_url
 from domain.publications.licenses import normalize_license
@@ -52,6 +53,13 @@ def get_title(doc: Mapping[str, JsonValue]) -> str | None:
     if not text:
         return None
     return drop_flattened_mathml(text) or None
+
+
+def get_publication_date(doc: Mapping[str, JsonValue]) -> PublicationDate | None:
+    """Renvoie la date de publication (`publicationDate`), au 1er janvier ramenée à l'année et au 1er d'un autre mois ramenée au mois (`without_placeholder_day`). À défaut, renvoie l'année (`year`)."""
+    if parsed := parse_iso_date(as_str(doc.get("publicationDate"))):
+        return parsed.without_placeholder_day()
+    return date_from_parts(as_int(doc.get("year")))
 
 
 def get_publisher(doc: Mapping[str, JsonValue]) -> PublisherFacts | None:
@@ -205,7 +213,6 @@ def scanr_source_record(  # noqa: C901
         staging_id=staging_id,
         identifiers=scanr_identifiers(doc, scanr_id),
         title=get_title(doc) or "",
-        publication_year=as_int(doc.get("year")),
         raw_doc_type=as_str(doc.get("type")),
         monograph_id=containers.monograph_id,
         container_title=(
@@ -335,6 +342,9 @@ class ScanrNormalizer(SourceNormalizer):
 
     def locations(self, doc: Document) -> list[LocationFacts]:
         return get_locations(doc)
+
+    def publication_date(self, doc: Document) -> PublicationDate | None:
+        return get_publication_date(doc)
 
     def source_record(
         self, row: StagingRow, doc: Document, containers: Containers

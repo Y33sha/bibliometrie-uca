@@ -13,6 +13,7 @@ from dataclasses import dataclass, fields
 from sqlalchemy import Connection, bindparam, text
 
 from domain.normalize import clean_abstract, drop_duplicate_mathml, strip_abstract_label
+from domain.publications.dates import PublicationDate
 from domain.publications.doc_types import DocType
 from domain.publications.licenses import License
 from domain.publications.metadata import clean_publication_title, normalized_title
@@ -50,7 +51,8 @@ class SourceRecordUpsert:
 
     # Métadonnées bibliographiques
     title: str
-    publication_year: int | None = None
+    publication_date: PublicationDate | None = None
+    """Date de publication, avec sa précision. L'écriture en tire `publication_year`."""
     raw_doc_type: str | None = None
     """Type de document dans le vocabulaire de la source."""
     monograph_id: int | None = None
@@ -84,11 +86,14 @@ class SourceRecordUpsert:
     source_extras: JsonValue = None
 
 
-_FIELDS = tuple(f for f in fields(SourceRecordUpsert) if f.name != "identifiers")
+_FIELDS = tuple(
+    f for f in fields(SourceRecordUpsert) if f.name not in ("identifiers", "publication_date")
+)
 
 # Les colonnes écrites se dérivent des champs de la ligne, plus les colonnes calculées à l'écriture : un champ ajouté à `SourceRecordUpsert` s'écrit sans autre geste.
 _ROW_FIELDS = tuple(f.name for f in _FIELDS)
-_COLUMNS = (*_ROW_FIELDS, "title_normalized", "doc_type", "language")
+_DATE_COLUMNS = ("publication_year", "publication_date", "publication_date_precision")
+_COLUMNS = (*_ROW_FIELDS, "title_normalized", "doc_type", "language", *_DATE_COLUMNS)
 
 # Tout est réécrit, sauf la clé de conflit. `corrections` se vide : ses valeurs d'origine viennent de l'import précédent, et la phase `metadata_correction` refait ses corrections sur les valeurs fraîches.
 _UPDATED_COLUMNS = tuple(c for c in _COLUMNS if c not in ("source", "source_id"))
@@ -97,7 +102,11 @@ _UPDATED_COLUMNS = tuple(c for c in _COLUMNS if c not in ("source", "source_id")
 _JSONB_COLUMNS = tuple(f.name for f in _FIELDS if f.type is JsonValue)
 
 # Colonnes à type énuméré PostgreSQL : le paramètre est converti vers ce type.
-_ENUM_CASTS = {"doc_type": "doc_type", "license": "license_type"}
+_ENUM_CASTS = {
+    "doc_type": "doc_type",
+    "license": "license_type",
+    "publication_date_precision": "date_precision",
+}
 
 
 def _value(column: str) -> str:
@@ -155,6 +164,17 @@ def replace_identifiers(
         conn.execute(_INSERT_IDENTIFIERS, {"identifiers": json.dumps(rows)})
 
 
+def date_columns(publication_date: PublicationDate | None) -> dict[str, object]:
+    """Renvoie les colonnes de la date de publication : année, date et précision."""
+    if publication_date is None:
+        return dict.fromkeys(_DATE_COLUMNS)
+    return {
+        "publication_year": publication_date.year,
+        "publication_date": publication_date.value,
+        "publication_date_precision": publication_date.precision.value,
+    }
+
+
 def stored_abstract(abstract: str | None) -> str | None:
     """Renvoie le résumé tel qu'il est écrit : nettoyé, sans copie MathML d'une formule TeX ni intitulé de tête (« Abstract »)."""
     return strip_abstract_label(drop_duplicate_mathml(clean_abstract(abstract)))
@@ -187,6 +207,7 @@ class SourceRecordStore:
             params["container_title"] = None
         params["abstract"] = stored_abstract(row.abstract)
         params["language"] = language_code(row.raw_language, self._forms())
+        params |= date_columns(row.publication_date)
         identifiers = normalized_identifiers(row)
         source_record_id = scalar_int(self._conn.execute(_UPSERT_SQL, params))
         replace_identifiers(self._conn, {source_record_id: identifiers})
