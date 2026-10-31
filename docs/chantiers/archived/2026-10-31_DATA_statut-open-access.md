@@ -54,7 +54,8 @@ Simulation sur les 76 591 publications du périmètre (`interfaces/cli/oneshot/m
 - [x] HAL décide pour ses seuls dépôts : OpenAlex réunit parfois deux dépôts HAL sous un work. 22104f7d2
 - [x] Adresse unique d'un dépôt HAL, toutes sources confondues ; script `canonicalize_hal_location_urls` pour le stock. bff127b5c
 - [x] Annexes HAL (`fileAnnexes_s`) moissonnées ; annexe d'une communication ou d'un poster tenue pour fichier déposé ; dépôt réduit à des annexes typé communication. Mesure sur l'API HAL : 540 publications passent de `closed` à `green`. 62e867b50, bff127b5c
-- [ ] Stock : annexes absentes des payloads HAL moissonnés avant 62e867b50.
+- [x] Stock : annexes absentes des payloads HAL moissonnés avant 62e867b50. Le retrait de champs inutiles du moissonnage HAL change tous les payloads. Chaque dépôt repasse donc en normalisation à sa prochaine lecture, annexes comprises. 27a98a5dd
+- [x] 806 enregistrements sources HAL sans localisation en local (701 publications, dont 310 sans aucune copie). Leurs payloads sont absents du raw store, donc de la relecture du stock qui a créé les localisations. Même remède. 27a98a5dd
 - [x] Registre : OSF, posters et diaporamas de F1000Research, preprints JMIR. fcd982c57
 
 ### Phase 2 — Embargo sur les copies
@@ -67,9 +68,9 @@ Simulation sur les 76 591 publications du périmètre (`interfaces/cli/oneshot/m
 - [x] Mesure (`measure_oa_floor`) : accord avec Unpaywall de 97 % sur ouvert ou fermé, de 96 % sur la copie côté éditeur. f6a93aab6
 - [x] Fonction de décision du domaine (`domain/publications/open_access.py`). fcd982c57
 - [x] Statut calculé dans la consolidation et dans la phase `oa_status`. 0466fb7ba
-- [ ] Recalcul du stock (`recompute_oa_statuses`) : 6 675 publications changent de statut à blanc en local. Comparaison avec la mesure.
+- [x] Recalcul du stock (`recompute_oa_statuses`) : 6 675 publications changent de statut à blanc en local. Écart restant avec la mesure : 389 publications, dont 374 à annexes HAL absentes des payloads.
 - [x] Publication 9705, déposée sur Zenodo : son DOI mène à Zenodo, le bouton d'accès affichait « via l'éditeur ». 303d519f6
-- [x] Publication 78490, fermée alors que son DOI KISTI mène au PDF : aucune localisation éditeur, ni verdict d'Unpaywall. Pris en charge par le chantier [Localisations](DATA_localisations.md).
+- [x] Publication 78490, fermée alors que son DOI KISTI mène au PDF : aucune localisation éditeur, ni verdict d'Unpaywall. Pris en charge par le chantier [Localisations](../DATA_localisations.md).
 
 ### Phase 4 — Documentation
 
@@ -78,8 +79,6 @@ Simulation sur les 76 591 publications du périmètre (`interfaces/cli/oneshot/m
 ### Phase 5 — Embargos
 
 - [x] Table des embargos : embargo d'une copie HAL, avec sa date de fin ; embargo déclaré par theses.fr, sans date. Elle remplace `embargo_until` des localisations et le statut `embargoed` déclaré par theses.fr. 71ceed221
-- [x] Thèse réservée à l'intranet dans `source_extras`. Thèse en cours et thèse réservée à l'intranet `closed`, statuts déclarés ignorés.
+- [x] Thèse réservée à l'intranet dans `source_extras`. Thèse en cours et thèse réservée à l'intranet `closed`, statuts déclarés ignorés. 168568f69
 - [x] Adresse d'un dépôt HAL écrite par une seule fonction. L'adresse d'une thèse TEL est sur `hal.science`, qui affiche toutes les thèses TEL. theses.hal.science affiche seulement les thèses TEL avec fichier déposé. Stock : `canonicalize_hal_location_urls`. 27fa9b584
 - [x] Colonne `source_records.oa_status` retirée, avec les dérivations des normaliseurs et les règles de correction associées. a3bdf2ae2
-
-## Questions ouvertes
