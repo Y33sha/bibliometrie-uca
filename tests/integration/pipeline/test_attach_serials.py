@@ -238,6 +238,48 @@ def test_identifiant_openalex_et_modele_oa_d_openalex(conn):
     assert tuple(row) == ("S202381698", "full_oa")
 
 
+def _title(conn, serial_id: int) -> str:
+    return conn.execute(
+        text("SELECT title FROM serials WHERE id = :id"), {"id": serial_id}
+    ).scalar_one()
+
+
+def test_titre_de_la_notice_de_l_issn_l_apres_eclatement(conn):
+    """Cas réel : une revue réunissait « Materials in engineering » et son titre suivant, « Materials & design »."""
+    merged = insert_serial(conn, "Materials & design")
+    for issn, issnl, title in (
+        ("0261-3069", "0261-3069", "Materials in engineering"),
+        ("0264-1275", "0264-1275", "Materials & design"),
+        ("1873-4197", "0264-1275", "Materials & design"),
+    ):
+        insert_serial_issn(
+            conn, merged, issn=issn, issnl=issnl, sudoc_checked=True, sudoc_title=title
+        )
+    old = _record(conn, "a", title="Materials & Design", issns=_issns("0261-3069"))
+    current = _record(conn, "b", title="Materials & Design", issns=_issns("1873-4197"))
+    _attach(conn)
+    assert _title(conn, _serial_of(conn, old)) == "Materials in engineering"
+    assert _title(conn, _serial_of(conn, current)) == "Materials & design"
+
+
+def test_titre_saisi_a_la_main_garde(conn):
+    serial_id = insert_serial(conn, "Nature (London)")
+    conn.execute(
+        text("UPDATE serials SET manual_fields = ARRAY['title'] WHERE id = :id"), {"id": serial_id}
+    )
+    insert_serial_issn(
+        conn,
+        serial_id,
+        issn="0028-0836",
+        issnl="0028-0836",
+        sudoc_checked=True,
+        sudoc_title="Nature",
+    )
+    _record(conn, "a", title="Nature", issns=_issns("0028-0836"))
+    _attach(conn)
+    assert _title(conn, serial_id) == "Nature (London)"
+
+
 def test_modele_oa_saisi_a_la_main_garde(conn):
     serial_id = insert_serial(conn, "PLOS ONE", oa_model="subscription")
     conn.execute(

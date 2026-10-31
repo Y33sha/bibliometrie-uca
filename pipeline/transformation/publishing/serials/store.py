@@ -1,4 +1,4 @@
-"""Store des revues : revue d'un ISSN-L, revue sans ISSN d'un titre ou d'un titre et d'un éditeur, titre et type de la table `serials`, pour le pipeline.
+"""Store des revues : revue d'un ISSN-L, revue sans ISSN d'un titre ou d'un titre et d'un éditeur, type de la table `serials`, pour le pipeline.
 
 L'édition dans l'administration passe par `infrastructure/repositories/serial_repository.py`, la fusion par `serial_merge`.
 """
@@ -103,19 +103,6 @@ class SerialStore:
                 )
                 .returning(serials.c.id)
             )
-        )
-
-    def set_title(self, serial_id: int, title: str) -> None:
-        """Écrit le titre de la revue, sauf s'il est saisi à la main."""
-        title = to_plain_text(title)
-        self._conn.execute(
-            update(serials)
-            .where(
-                serials.c.id == serial_id,
-                ~(literal(ManualField.TITLE.value) == any_(serials.c.manual_fields)),
-                serials.c.title != title,
-            )
-            .values(title=title, title_normalized=normalize_text(title))
         )
 
     def set_serial_type_if_unknown(self, serial_id: int, serial_type: SerialType) -> None:

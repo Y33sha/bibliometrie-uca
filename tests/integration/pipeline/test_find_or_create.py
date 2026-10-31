@@ -104,15 +104,3 @@ class TestSerialStore:
     ):
         with_issn = gateway.serial_for_issnl("0028-0836", "Nature")
         assert gateway.serial_for_title("Nature") != with_issn
-
-    def test_titre_saisi_a_la_main_garde(self, sa_sync_conn, gateway):
-        serial_id = gateway.serial_for_issnl("0028-0836", "Nature")
-        gateway.set_title(serial_id, "Nature (London)")
-        title = "SELECT title FROM serials WHERE id = :id"
-        assert _fetch_one(sa_sync_conn, title, id=serial_id).title == "Nature (London)"
-        sa_sync_conn.execute(
-            text("UPDATE serials SET manual_fields = ARRAY['title'] WHERE id = :id"),
-            {"id": serial_id},
-        )
-        gateway.set_title(serial_id, "Nature")
-        assert _fetch_one(sa_sync_conn, title, id=serial_id).title == "Nature (London)"

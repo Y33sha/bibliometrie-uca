@@ -70,6 +70,7 @@ def insert_serial_issn(
     issnl: str | None = None,
     status: str | None = None,
     sudoc_checked: bool = False,
+    sudoc_title: str | None = None,
 ) -> int:
     """Insère un ISSN de la revue `serial_id` et renvoie son `id`. `sudoc_checked` date la vérification Sudoc de l'instant de la transaction."""
     checked_at = conn.execute(text("SELECT now()")).scalar_one() if sudoc_checked else None
@@ -82,6 +83,7 @@ def insert_serial_issn(
             "support": support,
             "issnl": issnl,
             "status": status,
+            "sudoc_title": sudoc_title,
             "sudoc_checked_at": checked_at,
         },
         {"support": "issn_support", "status": "issn_status"},

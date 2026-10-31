@@ -1,6 +1,6 @@
 """Sous-étape de la phase `publishing` : vérification des ISSN dans le Sudoc.
 
-Sont vérifiés les ISSN de `serial_issns` jamais vérifiés. La notice Sudoc de chaque ISSN donne son ISSN-L, son support et son statut, ceux de ses ISSN annulés, et ses liens vers d'autres ISSN (`read_sudoc_record`). Les ISSN de la même publication sur un autre support reçoivent leur ligne, vérifiée au run suivant. La revue de l'ISSN-L reçoit le titre de la notice Sudoc, sauf titre saisi à la main : elle est créée si elle manque (`serial_for_issnl`).
+Sont vérifiés les ISSN de `serial_issns` jamais vérifiés. La notice Sudoc de chaque ISSN donne son ISSN-L, son support, son statut et son titre, ceux de ses ISSN annulés, et ses liens vers d'autres ISSN (`read_sudoc_record`). Les ISSN de la même publication sur un autre support reçoivent leur ligne, vérifiée au run suivant. `attach_serials` en dérive le titre de chaque revue.
 
 Les ISSN passent par lots de `SUDOC_ISSN2PPN_BATCH` dans `run_fetch_pool` : téléchargements concurrents sur un client HTTP partagé, écritures sérialisées, commit par paquets. Si une requête échoue, les ISSN du lot restent non vérifiés et le run suivant les reprend. Les requêtes au Sudoc sont injectées (`pipeline/ingestion/complements/sudoc.py`).
 """
@@ -22,7 +22,6 @@ from pipeline.ingestion.api_params import SUDOC_ISSN2PPN_BATCH
 from pipeline.runtime.observability.log_format import BRANCH, inflect, quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import track_progress
-from pipeline.transformation.publishing.serials.store import SerialStore
 
 LABEL = "Vérification des ISSN dans le Sudoc"
 """Libellé de la sous-étape dans le journal de la phase."""
@@ -36,15 +35,16 @@ FetchRecord = Callable[[httpx2.AsyncClient, str], Awaitable[SudocSerialRecord | 
 """`(client, ppn) -> notice Sudoc`, ou `None` si la notice Sudoc est introuvable ou illisible."""
 
 _WRITE_FACTS = text("""
-    INSERT INTO serial_issns (issn, issnl, support, status, sudoc_checked_at)
+    INSERT INTO serial_issns (issn, issnl, support, status, sudoc_title, sudoc_checked_at)
     SELECT f.issn, f.issnl, CAST(f.support AS issn_support), CAST(f.status AS issn_status),
-           CAST(:checked_at AS timestamptz)
+           CAST(:title AS text), CAST(:checked_at AS timestamptz)
     FROM jsonb_to_recordset(CAST(:facts AS jsonb))
         AS f(issn text, issnl text, support text, status text)
     ON CONFLICT (issn) DO UPDATE SET
         issnl = EXCLUDED.issnl,
         support = coalesce(EXCLUDED.support, serial_issns.support),
         status = EXCLUDED.status,
+        sudoc_title = EXCLUDED.sudoc_title,
         sudoc_checked_at = EXCLUDED.sudoc_checked_at
 """)
 
@@ -76,10 +76,11 @@ def find_issns_to_check(conn: Connection) -> list[str]:
 def record_sudoc_reading(
     conn: Connection, issn: str, reading: SudocReading, checked_at: datetime
 ) -> None:
-    """Écrit les faits et les liens tirés de la notice Sudoc de `issn`, et le titre de la revue de son ISSN-L."""
+    """Écrit les faits, le titre et les liens tirés de la notice Sudoc de `issn`."""
     conn.execute(
         _WRITE_FACTS,
         {
+            "title": reading.title,
             "checked_at": checked_at,
             "facts": json.dumps(
                 [
@@ -103,10 +104,6 @@ def record_sudoc_reading(
         )
     if reading.other_support_issns:
         conn.execute(_ADD_ISSNS, {"issns": list(reading.other_support_issns)})
-    if reading.title:
-        store = SerialStore(conn)
-        serial_id = store.serial_for_issnl(reading.issnl or issn, reading.title)
-        store.set_title(serial_id, reading.title)
 
 
 async def run_check_issns_in_sudoc(

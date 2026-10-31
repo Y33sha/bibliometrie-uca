@@ -492,6 +492,11 @@ serial_issns = Table(
         comment="active ; cancelled (ISSN annulé) ; unverified (sans notice Sudoc).",
     ),
     Column(
+        "sudoc_title",
+        Text,
+        comment="Titre de la notice Sudoc de l'ISSN. NULL : sans notice, ou ISSN jamais vérifié.",
+    ),
+    Column(
         "sudoc_checked_at",
         DateTime(timezone=True),
         comment="Date de la vérification de l'ISSN au Sudoc. NULL : jamais vérifié.",

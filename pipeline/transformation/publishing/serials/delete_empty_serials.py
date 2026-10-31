@@ -1,6 +1,6 @@
 """Sous-étape de la phase `finalize` : suppression des revues vides.
 
-Une revue vide n'a ni ISSN, ni enregistrement source, ni publication, ni monographie, ni paiement APC. Une revue à ISSN reste : son titre est le titre Sudoc de son ISSN-L. Le journal garde le titre et l'éditeur de chaque revue supprimée.
+Une revue vide n'a ni ISSN, ni enregistrement source, ni publication, ni monographie, ni paiement APC. Une revue à ISSN reste : supprimée, elle serait recréée au passage suivant pour les séries qui citent ses ISSN. Le journal garde le titre et l'éditeur de chaque revue supprimée.
 """
 
 import logging

@@ -95,7 +95,8 @@ class TestSudocCheck:
             r.issn: r
             for r in sa_sync_conn.execute(
                 text(
-                    "SELECT issn, issnl, support::text, status::text, sudoc_checked_at, serial_id"
+                    "SELECT issn, issnl, support::text, status::text, sudoc_title,"
+                    " sudoc_checked_at, serial_id"
                     " FROM serial_issns WHERE issn IN ('0028-0836', '0302-2889', '1754-6656')"
                 )
             )
@@ -103,20 +104,15 @@ class TestSudocCheck:
         assert (rows["0028-0836"].issnl, rows["0028-0836"].support) == ("0028-0836", "print")
         assert rows["0028-0836"].sudoc_checked_at is not None
         assert (rows["0302-2889"].issnl, rows["0302-2889"].status) == ("0028-0836", "cancelled")
+        assert rows["0028-0836"].sudoc_title == rows["0302-2889"].sudoc_title == "Nature"
+        assert rows["0028-0836"].serial_id is None
         assert rows["1754-6656"].sudoc_checked_at is None
-        serial_id = rows["0028-0836"].serial_id
-        assert (
-            sa_sync_conn.execute(
-                text("SELECT title FROM serials WHERE id = :id"), {"id": serial_id}
-            ).scalar_one()
-            == "Nature"
-        )
         assert sa_sync_conn.execute(
             text("SELECT issn, linked_issn, link_type::text FROM issn_links")
         ).all() == [("0028-0836", "1476-4687", "continued_by")]
 
     def test_delete_empty_serials_spares_issns_records_and_apc_payments(self, sa_sync_conn, repo):
-        """Une revue à ISSN reste, même sans enregistrement source : son titre est le titre Sudoc de son ISSN-L."""
+        """Une revue à ISSN reste, même sans enregistrement source."""
         empty = _serial(sa_sync_conn, title="Revue test vide")
         with_issn = _serial(sa_sync_conn, title="Revue test à ISSN", issn="2999-0007")
         with_record = _serial(sa_sync_conn, title="Revue test avec enregistrement")
