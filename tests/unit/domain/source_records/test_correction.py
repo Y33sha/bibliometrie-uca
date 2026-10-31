@@ -558,46 +558,43 @@ class TestSerialTypeProceedingsRule:
         assert corrected is not None and corrected.value == "thesis"
 
 
-class TestSerialTypePreprintServerRule:
-    def test_serial_type_preprint_server_article_corrects(self):
-        view = _view(doc_type="article", serial_type="preprint_server")
+class TestDoiPreprintServerRule:
+    BIORXIV = "10.1101/2020.01.01.123456"
+
+    def test_article_au_doi_de_serveur_de_preprints_corrige(self):
+        view = _view(doc_type="article", doi=self.BIORXIV)
         corrected = effective_metadata(view).doc_type
         assert corrected is not None
         assert corrected.value == "preprint"
-        assert corrected.rule == MetadataCorrectionRule.SERIAL_TYPE_PREPRINT_SERVER_TO_PREPRINT
+        assert corrected.rule == MetadataCorrectionRule.DOI_PREPRINT_SERVER_TO_PREPRINT
 
-    def test_serial_type_preprint_server_other_corrects(self):
-        view = _view(doc_type="other", serial_type="preprint_server")
+    def test_other_corrige(self):
+        view = _view(doc_type="other", doi="10.21203/rs.3.rs-123/v1")
         corrected = effective_metadata(view).doc_type
         assert corrected is not None and corrected.value == "preprint"
 
-    def test_serial_type_preprint_server_already_preprint_is_noop(self):
-        view = _view(doc_type="preprint", serial_type="preprint_server")
+    def test_deja_preprint_inchange(self):
+        assert effective_metadata(_view(doc_type="preprint", doi=self.BIORXIV)).doc_type is None
+
+    def test_dataset_epargne(self):
+        # `dataset` est hors des types corrigés : un jeu de données déposé sur arXiv reste `dataset`.
+        view = _view(doc_type="dataset", doi="10.48550/arxiv.2001.00001")
         assert effective_metadata(view).doc_type is None
 
-    def test_serial_type_preprint_server_dataset_is_spared(self):
-        # `dataset` est hors des types corrigés : un jeu de données déposé sur arXiv ou Zenodo reste `dataset`.
-        view = _view(doc_type="dataset", serial_type="preprint_server")
+    def test_avec_revue_inchange(self):
+        """Cas réel : un dépôt HAL de l'article publié dans « Astronomy & Astrophysics », sous le DOI arXiv."""
+        view = _view(doc_type="article", doi="10.48550/arxiv.2001.00001", serial_id=42)
         assert effective_metadata(view).doc_type is None
 
-    def test_serial_type_preprint_server_software_is_spared(self):
-        view = _view(doc_type="software", serial_type="preprint_server")
+    def test_doi_d_une_revue_de_cold_spring_harbor_inchange(self):
+        assert effective_metadata(_view(doc_type="article", doi="10.1101/gad.1")).doc_type is None
+
+    def test_doi_de_revue_en_plus_inchange(self):
+        view = _view(doc_type="article", dois=frozenset({self.BIORXIV, "10.1038/s41586-020-1"}))
         assert effective_metadata(view).doc_type is None
 
-    def test_serial_type_non_preprint_server_no_correction(self):
-        view = _view(doc_type="article", serial_type="journal")
-        assert effective_metadata(view).doc_type is None
-
-    def test_serial_type_none_no_correction(self):
-        view = _view(doc_type="article", serial_type=None)
-        assert effective_metadata(view).doc_type is None
-
-    def test_theses_fr_wins_over_serial_type_preprint_server(self):
-        view = _view(
-            doc_type="article",
-            urls=("https://theses.fr/s1",),
-            serial_type="preprint_server",
-        )
+    def test_theses_fr_l_emporte(self):
+        view = _view(doc_type="article", urls=("https://theses.fr/s1",), doi=self.BIORXIV)
         corrected = effective_metadata(view).doc_type
         assert corrected is not None and corrected.value == "thesis"
 

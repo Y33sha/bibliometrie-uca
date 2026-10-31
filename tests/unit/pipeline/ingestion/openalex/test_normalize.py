@@ -363,7 +363,7 @@ class TestGetPublisher:
 
 
 class TestContainerDescription:
-    def test_repository_source_oa_model(self):
+    def test_repository_source_sans_modele_oa(self):
         work = {
             "primary_location": {
                 "source": {
@@ -374,7 +374,7 @@ class TestContainerDescription:
             }
         }
         facts = get_container_facts(work)
-        assert facts.oa_model == "repository"
+        assert facts.oa_model is None
         assert facts.openalex_id == "S1"
 
     def test_serial_full_oa(self):

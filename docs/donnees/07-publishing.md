@@ -2,7 +2,7 @@
 
 *À jour le 2026-10-31.*
 
-Les référentiels de l'édition décrivent où paraissent les publications. Une publication en série réunit des documents sous un même titre : revue, collection d'ouvrages, recueil d'actes, serveur de preprints, archive ouverte, média. Une monographie est un livre ou un volume d'actes. Un éditeur publie les documents et reçoit les frais de publication. Une plateforme héberge des copies sans les publier : entrepôt, serveur de preprints, plateforme d'éditeurs.
+Les référentiels de l'édition décrivent où paraissent les publications. Une publication en série réunit des documents sous un même titre : revue, collection d'ouvrages, recueil d'actes, média. Une monographie est un livre ou un volume d'actes. Un éditeur publie les documents et reçoit les frais de publication. Une plateforme héberge des copies sans les publier : entrepôt, serveur de preprints, plateforme d'éditeurs.
 
 Schéma PostgreSQL `publishing`.
 

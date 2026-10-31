@@ -68,6 +68,9 @@ Les personnes et les publications ont un volet latéral (`PersonDrawer`, `Public
 - Pour ce rattachement par titre, un enregistrement source sans éditeur reçoit le titulaire de son préfixe DOI Crossref. Le titulaire d'un préfixe DataCite est souvent un repository ou un établissement : il est exclu. `source_records.publisher_id` garde l'éditeur donné par la source.
 - Deux revues de même ISSN-L fusionnent : la revue vide est absorbée, avec une redirection.
 - L'administration modifie le titre, le type et le modèle OA d'une revue. Les ISSN sont en lecture seule.
+- Une série qui désigne une plateforme est écartée à la normalisation : source OpenAlex de la liste des plateformes connues (Cairn.info), ou titre qui nomme le serveur de preprints du DOI du document (« SSRN Electronic Journal »). La série d'une vraie revue reste, même sous un DOI de serveur de preprints.
+- Un enregistrement source sans revue, dont les DOI sont tous ceux d'un serveur de preprints, passe de « article » ou « autre » à « preprint ».
+- `serial_type` perd `repository` et `preprint_server`, `oa_model` perd `repository`. Les revues de ces types passent au type inconnu.
 - L'administration fusionne une revue sans ISSN dans une autre revue. Une table titre normalisé → revue garde la décision, et le rattachement par titre la consulte. La fusion de deux revues à ISSN-L est refusée.
 
 ## Phasage

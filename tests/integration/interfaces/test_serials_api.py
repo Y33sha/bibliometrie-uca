@@ -604,7 +604,7 @@ class TestOaModels:
         models = r.json()
         # Référence : `OA_MODELS` et `OA_MODEL_LABELS_FR` de `domain.serials.journal`.
         values = [m["value"] for m in models]
-        assert values == ["subscription", "full_oa", "diamond", "repository"]
+        assert values == ["subscription", "full_oa", "diamond"]
         assert all("label_fr" in m and m["label_fr"] for m in models)
 
 
@@ -621,9 +621,7 @@ class TestSerialTypes:
             "journal",
             "data_journal",
             "proceedings",
-            "repository",
             "book_series",
-            "preprint_server",
             "media",
             "unknown",
         ]

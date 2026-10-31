@@ -4201,7 +4201,7 @@ export interface components {
          * @description Modèle open access d'une revue. Reflet du type PostgreSQL `oa_model`.
          * @enum {string}
          */
-        OaModel: "subscription" | "full_oa" | "diamond" | "repository";
+        OaModel: "subscription" | "full_oa" | "diamond";
         /**
          * OkResponse
          * @description Acquittement sans données.
@@ -5514,7 +5514,7 @@ export interface components {
          * @description Type de publication en série. Reflet du type PostgreSQL `serial_type`.
          * @enum {string}
          */
-        SerialType: "journal" | "data_journal" | "proceedings" | "repository" | "book_series" | "preprint_server" | "media" | "unknown";
+        SerialType: "journal" | "data_journal" | "proceedings" | "book_series" | "media" | "unknown";
         /**
          * SerialTypeChange
          * @description Type de revue prévu, soumis par la fenêtre d'édition pour connaître son effet avant confirmation.

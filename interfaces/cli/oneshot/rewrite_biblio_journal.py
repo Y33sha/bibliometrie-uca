@@ -1,7 +1,7 @@
 # STATUS: oneshot (2026-10-31)
 """Réécrit `biblio.journal` des enregistrements sources déjà normalisés : la série qui sert au rattachement, ISSN en liste avec leur support.
 
-Le payload de chaque enregistrement source est relu au raw store. Le normaliseur de sa source en tire la description du conteneur, puis la série (`determine_container_type`). Seul `biblio.journal` est réécrit. Un enregistrement source sans payload au raw store garde sa série.
+Le payload de chaque enregistrement source est relu au raw store. Le normaliseur de sa source en tire la série (`series_and_volume`). Seul `biblio.journal` est réécrit. Un enregistrement source sans payload au raw store garde sa série.
 
 Usage :
     uv run python -m interfaces.cli.oneshot.rewrite_biblio_journal [--sources hal,openalex] [--dry-run]
@@ -15,7 +15,6 @@ import os
 
 from sqlalchemy import Connection, text
 
-from domain.serials.containers import determine_container_type
 from domain.source_records.biblio import with_journal
 from domain.sources.registry import SOURCE_PRIORITY
 from infrastructure.db.engine import get_sync_engine
@@ -68,8 +67,7 @@ def _rewrite_source(conn: Connection, source: str) -> None:
             if doc is None:
                 refused += 1
                 continue
-            facts = normalizer.container_facts(doc)
-            series, _ = determine_container_type(facts) if facts is not None else (None, None)
+            series, _ = normalizer.series_and_volume(row, doc)
             batch.append({"id": r.id, "biblio": with_journal(r.biblio, series)})
         if batch:
             written += conn.execute(_WRITE, {"rows": json.dumps(batch)}).rowcount

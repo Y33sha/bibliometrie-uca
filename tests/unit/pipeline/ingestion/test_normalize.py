@@ -19,6 +19,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from domain.serials.containers import ContainerDescription
+from domain.serials.issns import SerialIssn
 from pipeline.ingestion.common import normalizer as normalizer_module
 from pipeline.ingestion.common.normalizer import (
     Document,
@@ -471,3 +472,30 @@ class TestNormalizeRecord:
         )
         norm.normalize_record(self.ROW)
         assert writes[0] == ("containers", None)
+
+
+class TestSeriesAndVolume:
+    def _series(self, doi: str | None, title: str):
+        norm = _WritingNorm(
+            doc={"title": "T"},
+            facts=ContainerDescription(
+                source="scanr",
+                raw_doc_type="article",
+                journal_title=title,
+                issns=(SerialIssn(issn="2692-8205"),),
+            ),
+        )
+        row = StagingRow(id=1, source_id="a", doi=doi, raw_data={})
+        series, _ = norm.series_and_volume(row, {"title": "T"})
+        return series
+
+    def test_serveur_de_preprints_du_doi_sans_serie(self):
+        """Cas réel : ScanR donne pour série d'un preprint bioRxiv « bioRxiv (Cold Spring Harbor Laboratory) »."""
+        assert (
+            self._series("10.1101/2020.01.01.123456", "bioRxiv (Cold Spring Harbor Laboratory)")
+            is None
+        )
+
+    def test_revue_d_un_article_publie_gardee(self):
+        series = self._series("10.1101/2020.01.01.123456", "Science")
+        assert series is not None and series.title == "Science"

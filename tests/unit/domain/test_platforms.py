@@ -12,7 +12,9 @@ from domain.platforms.registry import (
     known_platform_of_copy,
     known_platform_of_source,
     known_platform_of_url,
+    names_platform,
     platform_type_of_copy,
+    preprint_servers_of_doi,
     preprint_servers_of_prefix,
 )
 
@@ -51,6 +53,44 @@ class TestKnownPlatforms:
 
     def test_prefixe_commun_a_deux_serveurs(self):
         assert [p.name for p in preprint_servers_of_prefix("10.1101")] == ["bioRxiv", "medRxiv"]
+
+    def test_serveurs_de_preprints_d_un_doi(self):
+        """Le préfixe 10.1101 couvre aussi les revues de Cold Spring Harbor (`10.1101/gad.…`)."""
+        biorxiv = "https://doi.org/10.1101/2020.01.01.123456"
+        assert [p.name for p in preprint_servers_of_doi(biorxiv)] == ["bioRxiv", "medRxiv"]
+        assert preprint_servers_of_doi("10.1101/gad.1") == ()
+        assert preprint_servers_of_doi("10.3917/rfg.1") == ()
+
+
+class TestNamesPlatform:
+    @pytest.mark.parametrize(
+        ("title", "doi"),
+        [
+            ("bioRxiv (Cold Spring Harbor Laboratory)", "10.1101/2020.01.01.123456"),
+            ("SSRN Electronic Journal", "10.2139/ssrn.123"),
+            ("Research Square (Research Square)", "10.21203/rs.3.rs-1/v1"),
+            ("ArXiv.org", "10.48550/arxiv.2001.00001"),
+        ],
+    )
+    def test_titre_du_serveur_de_preprints_du_doi(self, title, doi):
+        assert names_platform([title], openalex_id=None, doi=doi)
+
+    @pytest.mark.parametrize(
+        ("title", "doi"),
+        [
+            # Article publié, déposé sous le DOI du preprint.
+            ("Science", "10.1101/2020.01.01.123456"),
+            ("Genes & Development", "10.1101/gad.1"),
+            ("Revue française de gestion", "10.3917/rfg.1"),
+            ("bioRxiv (Cold Spring Harbor Laboratory)", None),
+        ],
+    )
+    def test_revue(self, title, doi):
+        assert not names_platform([title], openalex_id=None, doi=doi)
+
+    def test_source_openalex_du_registre(self):
+        assert names_platform(["Cairn.info"], openalex_id="S4406923042", doi=None)
+        assert not names_platform(["Revue"], openalex_id="S137773608", doi=None)
 
     def test_une_source_openalex_designe_une_seule_plateforme(self):
         counts = Counter(i for p in KNOWN_PLATFORMS for i in p.openalex_ids)

@@ -231,8 +231,6 @@ def get_container_facts(work: Mapping[str, JsonValue]) -> ContainerDescription:
     oa_model: OaModel | None = None
     if source_type == "journal":
         oa_model = OaModel.FULL_OA if source.get("is_oa") else OaModel.SUBSCRIPTION
-    elif source_type == "repository":
-        oa_model = OaModel.REPOSITORY
 
     return ContainerDescription(
         source="openalex",

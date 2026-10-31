@@ -1,10 +1,12 @@
 """Liste fermée des plateformes connues : archives ouvertes, serveurs de preprints et plateformes d'éditeurs. Une plateforme reconnue prend le nom de la liste."""
 
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 from domain.platforms.platform import PlatformType
 from domain.publications.identifiers import clean_doi, is_hal_host
+from domain.serials.titles import compatible_titles, nested_titles
 from domain.source_records.identifiers import SourceIdentifierType
 from domain.urls import is_host, is_on_site, url_host
 
@@ -168,7 +170,7 @@ KNOWN_PLATFORMS: tuple[KnownPlatform, ...] = (
     _preprint_server("Arabixiv", set(), ("S4306400047",)),
     _preprint_server("EdArXiv", set(), ("S4306402530",)),
     _preprint_server("EcoEvoRxiv", set(), ("S4306402488",)),
-    _publisher_platform("Cairn", {"10.3917"}, hosts=("cairn.info",)),
+    _publisher_platform("Cairn", {"10.3917"}, ("S4406923042",), ("cairn.info",)),
     _publisher_platform(
         "OpenEdition",
         {"10.4000"},
@@ -223,16 +225,31 @@ def known_platform_of_source(openalex_id: str) -> KnownPlatform | None:
     return _BY_OPENALEX_ID.get(openalex_id)
 
 
-def _platforms_of_doi_url(url: str) -> list[KnownPlatform]:
-    """Renvoie les plateformes de la liste dont le DOI d'une URL doi.org a la forme."""
-    if not is_host(url, "doi.org") or not (doi := clean_doi(url)):
-        return []
+def _platforms_of_doi(doi: str) -> list[KnownPlatform]:
+    """Renvoie les plateformes de la liste dont `doi`, nettoyé, a la forme : préfixe, et début de suffixe s'il est fixé."""
     prefix, _, suffix = doi.partition("/")
     return [
         p
         for p in _PLATFORMS_OF_PREFIX.get(prefix, ())
         if p.doi_suffix is None or p.doi_suffix.match(suffix)
     ]
+
+
+def _platforms_of_doi_url(url: str) -> list[KnownPlatform]:
+    """Renvoie les plateformes de la liste dont le DOI d'une URL doi.org a la forme."""
+    if not is_host(url, "doi.org") or not (doi := clean_doi(url)):
+        return []
+    return _platforms_of_doi(doi)
+
+
+def preprint_servers_of_doi(doi: str) -> tuple[KnownPlatform, ...]:
+    """Renvoie les serveurs de preprints de la liste qui ont la forme du DOI : bioRxiv et medRxiv pour `10.1101/2020.…`, aucun pour `10.1101/gad.…`."""
+    cleaned = clean_doi(doi)
+    if not cleaned:
+        return ()
+    return tuple(
+        p for p in _platforms_of_doi(cleaned) if p.platform_type is PlatformType.PREPRINT_SERVER
+    )
 
 
 def is_fully_open(url: str) -> bool:
@@ -279,6 +296,26 @@ def platform_type_of_copy(url: str, openalex_id: str | None) -> PlatformType | N
 def is_publisher_platform_prefix(prefix: str) -> bool:
     """Vrai si `prefix` est le préfixe DOI d'une plateforme d'éditeurs. Une telle plateforme enregistre sous son préfixe les articles des revues diffusées : le titulaire du préfixe est la plateforme."""
     return prefix in _PUBLISHER_PLATFORM_PREFIXES
+
+
+def names_platform(
+    titles: Iterable[str | None], *, openalex_id: str | None, doi: str | None
+) -> bool:
+    """Vrai si la série décrite par une source désigne une plateforme : source OpenAlex de la liste (Cairn.info), ou titre qui nomme le serveur de preprints du DOI du document (« SSRN Electronic Journal » pour un DOI `10.2139`).
+
+    Args:
+        titles: titres de la série.
+        doi: DOI du document.
+    """
+    if openalex_id and known_platform_of_source(openalex_id):
+        return True
+    servers = preprint_servers_of_doi(doi) if doi else ()
+    return any(
+        nested_titles(title, server.name) or compatible_titles(title, server.name)
+        for server in servers
+        for title in titles
+        if title
+    )
 
 
 def preprint_servers_of_prefix(prefix: str) -> tuple[KnownPlatform, ...]:

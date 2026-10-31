@@ -101,7 +101,7 @@ Conventions de signature : le premier auteur a en général fait le travail prin
 Version d'un article avant évaluation par les pairs.
 
 ## Publication en série
-Support qui réunit des documents sous un même titre : revue, collection d'ouvrages, recueil d'actes, serveur de preprints, archive ouverte, média. Elle est rattachée à un éditeur.
+Support qui réunit des documents sous un même titre : revue, collection d'ouvrages, recueil d'actes, média. Elle est rattachée à un éditeur.
 
 ## PubMed
 Base bibliographique biomédicale de la bibliothèque nationale de médecine des États-Unis.

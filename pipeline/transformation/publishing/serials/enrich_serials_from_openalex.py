@@ -38,14 +38,13 @@ def find_serials_of_unknown_type(
 
 _OPENALEX_SOURCE_TYPE_MAP: dict[str, SerialType] = {
     "journal": SerialType.JOURNAL,
-    "repository": SerialType.REPOSITORY,
     "conference": SerialType.PROCEEDINGS,
     "book series": SerialType.BOOK_SERIES,
 }
 
 
 def map_openalex_source_type(raw: str | None) -> SerialType | None:
-    """Renvoie le `serial_type` du `type` d'une source OpenAlex, ou `None` pour un type sans équivalent : `metadata`, `other`, `ebook platform`, type inconnu. `preprint_server` et `media` se posent à la main."""
+    """Renvoie le `serial_type` du `type` d'une source OpenAlex, ou `None` pour un type sans équivalent : `repository`, `metadata`, `other`, `ebook platform`, type inconnu. `media` se pose à la main."""
     if not raw:
         return None
     return _OPENALEX_SOURCE_TYPE_MAP.get(raw.lower())

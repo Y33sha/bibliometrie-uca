@@ -2,7 +2,7 @@
 
 Un espace de noms est un préfixe de DOI coupé à une frontière de segment : `10.1016/j.physletb.`, `10.1038/s41598-`, `10.3390/nu`. Une revue en a souvent plusieurs, au fil des changements de convention, de plateforme ou d'éditeur.
 
-Un dépôt, un serveur de preprints, une plateforme de livres ou une collection de livres n'est désigné par aucun espace de noms : leur préfixe désigne la plateforme, et la suite du DOI désigne le document.
+Une collection de livres n'est désignée par aucun espace de noms : la suite du DOI désigne le livre.
 """
 
 import re
@@ -13,13 +13,6 @@ from typing import NamedTuple
 from domain.serials.serial import SerialType
 
 _SEPARATORS = frozenset("./-_(")
-_PLATFORM_TYPES = frozenset(
-    {
-        SerialType.REPOSITORY,
-        SerialType.PREPRINT_SERVER,
-        SerialType.BOOK_SERIES,
-    }
-)
 # DOI construit sur un ISBN : il désigne une monographie, pas une revue.
 _ISBN_SUFFIX = re.compile(r"97[89][-\d]")
 # Tiret interne d'un ISSN (`1748-0221`, `s0273-0979`) : l'ISSN reste d'un seul tenant.
@@ -66,7 +59,7 @@ class DoiNamespace(NamedTuple):
 
 def designated_by_namespace(serial_type: SerialType) -> bool:
     """Vrai si un espace de noms DOI peut désigner une revue de ce type."""
-    return serial_type not in _PLATFORM_TYPES
+    return serial_type is not SerialType.BOOK_SERIES
 
 
 def learn_namespaces(

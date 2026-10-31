@@ -12,9 +12,7 @@ class SerialType(StrEnum):
     # Revue dont les articles décrivent des jeux de données (data papers).
     DATA_JOURNAL = "data_journal"
     PROCEEDINGS = "proceedings"
-    REPOSITORY = "repository"
     BOOK_SERIES = "book_series"
-    PREPRINT_SERVER = "preprint_server"
     MEDIA = "media"
     UNKNOWN = "unknown"
 
@@ -27,9 +25,7 @@ SERIAL_TYPE_LABELS_FR: dict[SerialType, str] = {
     SerialType.JOURNAL: "Revue",
     SerialType.DATA_JOURNAL: "Revue de données",
     SerialType.PROCEEDINGS: "Proceedings",
-    SerialType.REPOSITORY: "Archive / dépôt",
     SerialType.BOOK_SERIES: "Série d'ouvrages",
-    SerialType.PREPRINT_SERVER: "Serveur de preprints",
     SerialType.MEDIA: "Média",
     SerialType.UNKNOWN: "Inconnu",
 }
@@ -42,7 +38,6 @@ class OaModel(StrEnum):
     FULL_OA = "full_oa"
     DIAMOND = "diamond"
     """Revue en open access sans frais de publication : présente dans le DOAJ sans APC ni autres frais, ou marquée à la main."""
-    REPOSITORY = "repository"
 
 
 OA_MODELS: tuple[OaModel, ...] = tuple(OaModel)
@@ -52,7 +47,6 @@ OA_MODEL_LABELS_FR: dict[OaModel, str] = {
     OaModel.SUBSCRIPTION: "Abonnement",
     OaModel.FULL_OA: "Full OA (gold)",
     OaModel.DIAMOND: "Diamant",
-    OaModel.REPOSITORY: "Archive / dépôt",
 }
 
 

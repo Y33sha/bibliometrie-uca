@@ -1,7 +1,7 @@
 """Règles de rattachement d'un document à son conteneur, revue ou monographie, et de typage d'une revue selon ses documents."""
 
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
 
 from domain.normalize import normalize_text, to_plain_text
@@ -126,6 +126,17 @@ class ContainerDescription:
             title = getattr(self, name)
             if title and names_ebook_platform(title):
                 object.__setattr__(self, name, None)
+
+    def without_series(self) -> ContainerDescription:
+        """Renvoie la description privée de sa revue et de sa collection, avec leurs ISSN."""
+        return replace(
+            self,
+            journal_title=None,
+            collection_title=None,
+            issns=(),
+            openalex_id=None,
+            oa_model=None,
+        )
 
     @property
     def has_issn(self) -> bool:

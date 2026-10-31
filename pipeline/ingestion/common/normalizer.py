@@ -13,8 +13,14 @@ from typing import ClassVar, NamedTuple
 
 from sqlalchemy import Connection
 
+from domain.platforms.registry import names_platform
 from domain.publications.metadata import has_minimal_publication_metadata, is_overlong_title
-from domain.serials.containers import ContainerDescription, determine_container_type
+from domain.serials.containers import (
+    ContainerDescription,
+    SeriesDescription,
+    VolumeDescription,
+    determine_container_type,
+)
 from domain.source_records.biblio import with_journal
 from domain.types import JsonValue
 from infrastructure.db.savepoint import rollback_unless_invalidated, savepoint
@@ -136,6 +142,21 @@ class SourceNormalizer(ABC):
     def author_records(self, block: AuthorBlock) -> list[AuthorRecord]:
         """Renvoie les contributions sources lues dans le bloc auteurs."""
 
+    def series_and_volume(
+        self, row: StagingRow, doc: Document
+    ) -> tuple[SeriesDescription | None, VolumeDescription | None]:
+        """Renvoie la série et le volume du document (`determine_container_type`). Une série qui désigne une plateforme est retirée (`names_platform`), d'après le DOI de la ligne de `staging`."""
+        facts = self.container_facts(doc)
+        if facts is None:
+            return None, None
+        if names_platform(
+            (facts.journal_title, facts.collection_title),
+            openalex_id=facts.openalex_id,
+            doi=row.doi,
+        ):
+            facts = facts.without_series()
+        return determine_container_type(facts)
+
     def normalize_record(self, row: StagingRow) -> bool:
         """Normalise un document à métadonnées minimales et marque sa ligne traitée. Renvoie vrai, ou faux sans rien écrire pour un document refusé.
 
@@ -152,8 +173,7 @@ class SourceNormalizer(ABC):
             if publisher
             else None
         )
-        facts = self.container_facts(doc)
-        series, volume = determine_container_type(facts) if facts is not None else (None, None)
+        series, volume = self.series_and_volume(row, doc)
         containers = find_or_create_containers(
             series, volume, publisher_id=publisher_id, monographs=self._monograph_store
         )
