@@ -4,7 +4,7 @@ Sans identifiants, l'étape est sautée avec un signal `source_unconfigured`, av
 """
 
 import logging
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 from pipeline.http.circuit_breaker import SourceUnavailableError, get_current_breaker
 from pipeline.runtime.access_source import access_source
@@ -13,7 +13,6 @@ from pipeline.runtime.execution import phase_context
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publications import oa_status
 
-_RUN_ENRICH = "pipeline.transformation.publications.oa_status._check"
 _LOG = logging.getLogger("test")
 
 
@@ -94,37 +93,40 @@ def test_circuit_coupe_signale():
     assert [s["code"] for s in metrics.signals] == ["source_unavailable"]
 
 
-def test_phase_oa_status_skips_without_email():
+def _run_oa_status(credentials_missing) -> tuple[PhaseMetrics, list[oa_status.DoiService]]:
+    """Exécute la phase `oa_status` sans réseau ni base, et renvoie ses métriques et les services interrogés."""
+    services = []
+
+    def run(task, _ctx):
+        services.append(task.service)
+        return PhaseMetrics(new=4)
+
     with (
         patch("pipeline.runtime.execution.get_sync_engine"),
-        patch(_RUN_ENRICH, new_callable=AsyncMock) as run_step,
+        patch.object(oa_status.DoiLookupTask, "run", autospec=True, side_effect=run),
     ):
         metrics = oa_status.build().run(
             phase_context(
                 RunOptions(),
-                credentials_missing=lambda _source: "adresse absente",
+                credentials_missing=credentials_missing,
                 request_budget=lambda _source: None,
             )
         )
+    return metrics, services
 
-    run_step.assert_not_called()
+
+def test_phase_oa_status_skips_unpaywall_without_email():
+    metrics, services = _run_oa_status(
+        lambda source: "adresse absente" if source == "unpaywall" else None
+    )
+
+    assert services == [oa_status.DOI_ORG]
     assert [s["code"] for s in metrics.signals] == ["source_unconfigured"]
 
 
 def test_phase_oa_status_runs_with_email():
-    with (
-        patch("pipeline.runtime.execution.get_sync_engine"),
-        patch("pipeline.http.polite_pool.get_polite_pool_email_optional", return_value="e@x"),
-        patch(_RUN_ENRICH, new_callable=AsyncMock, return_value=PhaseMetrics(new=4)) as run_step,
-    ):
-        metrics = oa_status.build().run(
-            phase_context(
-                RunOptions(),
-                credentials_missing=lambda _source: None,
-                request_budget=lambda _source: None,
-            )
-        )
+    metrics, services = _run_oa_status(lambda _source: None)
 
-    run_step.assert_called_once()
+    assert services == [oa_status.DOI_ORG, oa_status.UNPAYWALL]
     assert metrics.new == 4
     assert metrics.signals == []
