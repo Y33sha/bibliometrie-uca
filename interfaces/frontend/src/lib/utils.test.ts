@@ -220,6 +220,7 @@ describe('sanitizeAbstract', () => {
 
 	it('garde les intertitres en gras', () => {
 		expect(sanitizeAbstract('<b>Background:</b> Texte')).toContain('<b>Background:</b>');
+		expect(sanitizeAbstract('<strong>Methods:</strong> Texte')).toContain('<strong>Methods:</strong>');
 	});
 
 	it('retire les balises hors liste blanche en gardant leur texte', () => {

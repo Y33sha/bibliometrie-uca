@@ -24,7 +24,7 @@ const TITLE_ALLOWED_TAGS = new Set([
 ]);
 
 /* Le résumé porte en plus la structure que les sources y déposent (JATS, Crossref) : paragraphes et intertitres en gras (« Background: »). */
-const ABSTRACT_ALLOWED_TAGS = new Set([...TITLE_ALLOWED_TAGS, 'p', 'br', 'b']);
+const ABSTRACT_ALLOWED_TAGS = new Set([...TITLE_ALLOWED_TAGS, 'p', 'br', 'b', 'strong']);
 
 const TITLE_ALLOWED_ATTRS = new Set(['mathvariant', 'display']);
 
