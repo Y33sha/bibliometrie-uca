@@ -116,13 +116,13 @@ _SOURCE_PLATFORMS: dict[str, str] = {Source.HAL: HAL.name}
 
 
 def _referenced_by(sources: list[SourceRecordOut], access: Access) -> list[SourceRecordOut]:
-    """Renvoie les sources référençant la publication sans en donner de copie : une source dont la plateforme figure parmi les liens d'accès est retirée."""
+    """Renvoie les sources référençant la publication sans en donner de copie, un enregistrement source par source, le premier de `sources`. Une source dont la plateforme figure parmi les liens d'accès est retirée."""
     platforms = {link.label for link in access.links}
-    return [
-        s
-        for s in sources
-        if s.source not in _DOI_SOURCES and _SOURCE_PLATFORMS.get(s.source) not in platforms
-    ]
+    first_by_source: dict[str, SourceRecordOut] = {}
+    for s in sources:
+        if s.source not in _DOI_SOURCES and _SOURCE_PLATFORMS.get(s.source) not in platforms:
+            first_by_source.setdefault(s.source, s)
+    return list(first_by_source.values())
 
 
 def get_publication_external_identifiers(
