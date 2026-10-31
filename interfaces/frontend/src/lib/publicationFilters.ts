@@ -91,7 +91,7 @@ export function publicationFilters(
 		{
 			key: 'authorPosition',
 			control: 'checkbox',
-			label: 'Positions auteur',
+			label: 'Position auteur',
 			param: 'author_position',
 			facet: {
 				type: 'label_map',
