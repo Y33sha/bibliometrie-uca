@@ -34,14 +34,22 @@ Simulation sur les 76 591 publications du périmètre (`interfaces/cli/oneshot/m
 - La date de fin d'embargo est une colonne de la copie. L'ouverture d'une copie se calcule à la lecture : `is_oa` et embargo absent ou échu. Une copie sous embargo actif donne `embargoed`.
 - L'embargo déclaré par theses.fr, sans copie ni date, reste un statut `embargoed`.
 - Sans copie ouverte ni verdict : `closed`, ou `unknown` sans aucune information.
+- HAL décide de l'ouverture des copies de ses propres dépôts : quand l'enregistrement source HAL d'un dépôt est dans la publication, sa description l'emporte sur celle des autres sources.
+- L'identifiant HAL désigne un dépôt, quel que soit le portail. Une copie HAL a l'adresse de son dépôt sur `hal.science`, quel que soit le portail ; DUMAS et TEL gardent leur portail propre.
+- Pour une communication ou un poster, une annexe HAL (diaporama, poster, résumé) tient lieu de fichier déposé.
+- Un dépôt HAL réduit à des annexes désigne une communication (`conference`), sauf DOI, revue ou volume d'actes donnés par une source.
 
 ## Phasage
 
 ### Phase 1 — Copies fiables
 
-- [x] Registre des plateformes : theses.fr, `hdl.handle.net`, archives institutionnelles, serveurs de preprints reconnus par préfixe DOI. Fiches du DOAJ, du DOAB et de PubMed écartées des copies. Reste `green` → `bronze` : 789 publications, à copie sur une plateforme d'éditeurs (OpenEdition, Cairn) ou à lien `doi.org` de ScanR. 2d9d97af7
+- [x] Registre des plateformes : theses.fr, `hdl.handle.net`, archives institutionnelles, serveurs de preprints reconnus par préfixe DOI. Pages du DOAJ, du DOAB et de PubMed écartées des copies. Reste `green` → `bronze` : 789 publications, à copie sur une plateforme d'éditeurs (OpenEdition, Cairn) ou à lien `doi.org` de ScanR. 2d9d97af7
 - [x] La description d'une copie par sa propre plateforme prime : une copie HAL suit l'enregistrement HAL. `green` → `closed` : 1 019 publications. Parmi elles, 270 enregistrements sources HAL sans fichier, 224 dépôts HAL sans fichier principal, environ 300 publications dont la seule copie ouverte était une page du DOAJ, de PubMed ou une liste de Glasgow. ef34b5ae0
 - [x] `is_oa` de ScanR sur les liens `doi.org` : mesurer contre Unpaywall, l'écarter s'il est peu fiable. Copies ouvertes à DOI vérifié par Unpaywall, hors DOI d'archive : verdict `closed` ou `green` pour 5,6 % des copies ScanR, 4,6 % des copies OpenAlex. ScanR est aussi fiable qu'OpenAlex.
+- [x] HAL décide pour ses seuls dépôts : OpenAlex réunit parfois deux dépôts HAL sous un work. 22104f7d2
+- [x] Adresse unique d'un dépôt HAL, toutes sources confondues ; script `canonicalize_hal_location_urls` pour le stock. bff127b5c
+- [x] Annexes HAL (`fileAnnexes_s`) moissonnées ; annexe d'une communication ou d'un poster tenue pour fichier déposé ; dépôt réduit à des annexes typé communication. Mesure sur l'API HAL : 540 publications passent de `closed` à `green`. 62e867b50, bff127b5c
+- [ ] Stock : annexes absentes des payloads HAL moissonnés avant 62e867b50.
 
 ### Phase 2 — Embargo sur les copies
 
@@ -50,6 +58,8 @@ Simulation sur les 76 591 publications du périmètre (`interfaces/cli/oneshot/m
 
 ### Phase 3 — Statut tiré des copies
 
+- [x] Mesure décision par décision (`measure_oa_floor`) et page de revue des exemples. fb123f7a7
+- [ ] Revue des exemples, décisions sur les options.
 - [ ] Consolidation du statut : plancher des copies, verdict d'Unpaywall, `diamond` par le DOAJ.
 - [ ] Remesure avec `measure_oa_floor`, revue des écarts restants. Cas à vérifier :
   - publication 9705 : ouverte « via l'éditeur » pour un DOI Zenodo, avec une autre copie Zenodo ;
@@ -61,6 +71,8 @@ Simulation sur les 76 591 publications du périmètre (`interfaces/cli/oneshot/m
 
 ## Questions ouvertes
 
-- Le statut déclaré par chaque source (`source_records.oa_status`) sert-il encore, hors embargo de theses.fr ?
-- Dépôt HAL sans fichier principal, dit ouvert par HAL (`openAccess_bool`, annexe seule) : copie ouverte ou fermée ? La normalisation HAL la tient pour fermée. 224 publications.
+- Le statut déclaré par chaque source (`source_records.oa_status`) sert-il encore, hors embargo de theses.fr ? Ignoré, il laisse 671 publications sans copie ni verdict passer en `unknown`, dont 272 présentes seulement dans le WoS.
 - Copie ouverte sur `doi.org`, à DOI vérifié par Unpaywall : le verdict décide-t-il de son ouverture ? Unpaywall décrit la page de l'éditeur, comme HAL décrit ses dépôts. Le plancher compte sinon environ 5 % de copies faussement ouvertes.
+- Revue `full_oa` ou `diamond` : la publication est-elle au moins `gold` ou `diamond`, même sans copie ouverte ? 1 568 publications changent de statut. Le modèle de la revue est son modèle actuel.
+- 128 communications : HAL décrit un dépôt sans fichier, OpenAlex dit la copie HAL ouverte.
+- Lien `openaccess` de HAL vers le texte chez l'éditeur (`linkExtUrl_s`) : absent des copies. 31 publications déclarées `hybrid` par HAL seul.
