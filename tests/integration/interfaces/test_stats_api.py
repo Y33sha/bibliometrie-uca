@@ -59,7 +59,7 @@ class TestStatsAcceptListFilters:
         params = {"search": "quantum", "country": "de", "author_id": "1", "lab_id": "none"}
         assert client.get("/api/stats/pivot", params=params).status_code == 200
 
-    @pytest.mark.parametrize("param", ["hal_status", "is_corresponding", "in_perimeter"])
+    @pytest.mark.parametrize("param", ["hal_status", "author_position", "in_perimeter"])
     def test_ignores_context_filters(self, client, param):
         r = client.get("/api/stats/pivot", params={param: "inconnu"})
         assert r.status_code == 200

@@ -108,7 +108,3 @@ Les affiliations des créateurs sont du texte, parfois avec un ROR. Elles devien
 Un entrepôt comme Zenodo attribue un DOI distinct à chaque version d'un dépôt, plus un **DOI concept** stable couvrant toutes les versions. Le champ `relatedIdentifiers` expose ces liens, et la relation `IsVersionOf` pointe d'une version vers son concept. La phase [`metadata_correction`](../pipeline/06-metadata-correction.md) s'en sert pour réunir les versions et le concept dans une seule publication.
 
 Les DOI apparentés (versions, formes, parties, suppléments) deviennent des identifiants liés, cherchés par la phase `fetch_missing`.
-
-### Statut open access
-
-DataCite ne donne pas de statut open access : celui de la publication vient des autres sources.

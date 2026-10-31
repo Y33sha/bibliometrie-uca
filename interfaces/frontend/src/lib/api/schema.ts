@@ -5142,10 +5142,10 @@ export interface components {
             /** Doi Agencies */
             doi_agencies: components["schemas"]["FacetOption"][];
             /**
-             * Corresponding
-             * @description Rempli seulement avec `person_id`.
+             * Author Positions
+             * @description Rempli seulement avec `person_id` ou des laboratoires. Une publication compte dans chaque position occupée.
              */
-            corresponding: components["schemas"]["FacetOption"][];
+            author_positions: components["schemas"]["FacetOption"][];
             /** Source Counts */
             source_counts: {
                 [key: string]: components["schemas"]["YesNoCount"];
@@ -5776,8 +5776,6 @@ export interface components {
              * @description Valeur donnée par la source, quand la normalisation l'a changée.
              */
             language_raw: string | null;
-            /** Oa Status */
-            oa_status: string | null;
             /**
              * Serial Id
              * @description Revue du référentiel rattachée à l'enregistrement source.
@@ -5825,8 +5823,6 @@ export interface components {
             source: string;
             /** Source Id */
             source_id: string;
-            /** Oa Status */
-            oa_status: string | null;
             /** Doi */
             doi: string | null;
             /** Hal Collections */
@@ -6619,7 +6615,7 @@ export interface operations {
                 country?: string;
                 language?: string;
                 partner_ror?: string;
-                is_corresponding?: string;
+                author_position?: string;
                 hal_status?: string;
                 in_perimeter?: string;
             };
@@ -6674,7 +6670,7 @@ export interface operations {
                 country?: string;
                 language?: string;
                 partner_ror?: string;
-                is_corresponding?: string;
+                author_position?: string;
                 hal_status?: string;
                 in_perimeter?: string;
             };
@@ -6729,7 +6725,7 @@ export interface operations {
                 country?: string;
                 language?: string;
                 partner_ror?: string;
-                is_corresponding?: string;
+                author_position?: string;
                 hal_status?: string;
                 in_perimeter?: string;
             };
@@ -7040,7 +7036,7 @@ export interface operations {
                 country?: string;
                 language?: string;
                 partner_ror?: string;
-                is_corresponding?: string;
+                author_position?: string;
                 hal_status?: string;
                 in_perimeter?: string;
             };

@@ -34,6 +34,8 @@ class SourceExtra(StrEnum):
     """Titre de la source (HAL)."""
     LICENCE = "licence"
     """Licence du dépôt (HAL)."""
+    ANNEX_DEPOSIT = "annex_deposit"
+    """Dépôt réduit à des annexes, sans fichier principal (HAL)."""
     RELATED_IDENTIFIERS = "related_identifiers"
     """Identifiants liés, avec leur type de relation (DataCite)."""
     RIGHTS = "rights"
@@ -52,6 +54,8 @@ class SourceExtra(StrEnum):
     """Écoles doctorales (theses.fr)."""
     PARTENAIRES = "partenaires"
     """Partenaires de recherche (theses.fr)."""
+    INTRANET_ONLY = "intranet_only"
+    """Thèse réservée à l'intranet de son établissement, cas de diffusion STAR 5 et 6 (theses.fr)."""
 
 
 CROSSREF_PREPRINT_OF = "is-preprint-of"

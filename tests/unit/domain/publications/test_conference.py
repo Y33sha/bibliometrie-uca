@@ -18,7 +18,6 @@ def _source_record(**overrides) -> SourceRecord:
         "monograph_id": None,
         "container_title": "Colloque de 2020",
         "language": None,
-        "oa_status": None,
         "is_retracted": None,
         "abstract": None,
         "countries": (),
@@ -60,6 +59,15 @@ class TestAttestsPublication:
         )
         assert not attests_publication(
             _source_record(source_extras={"source_title": "Colloque de 2020"})
+        )
+
+    def test_depot_hal_reduit_a_des_annexes(self):
+        """Le déposant coche « avec actes » mais dépose seulement son diaporama : c'est une communication."""
+        assert not attests_publication(
+            _source_record(source_extras={"proceedings": True, "annex_deposit": True})
+        )
+        assert attests_publication(
+            _source_record(doi="10.1/x", source_extras={"annex_deposit": True})
         )
 
     def test_champs_editoriaux_ignores_hors_hal(self):

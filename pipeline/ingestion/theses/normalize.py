@@ -15,6 +15,7 @@ from domain.source_records.identifiers import (
 )
 from domain.source_records.source_extras import SourceExtra
 from domain.types import JsonValue, as_mapping, as_sequence, as_str, as_strs
+from pipeline.ingestion.common.embargoes import Embargo
 from pipeline.ingestion.common.normalizer import Document, SourceNormalizer
 from pipeline.ingestion.common.source_contributions import (
     AuthorBlock,
@@ -26,8 +27,9 @@ from pipeline.ingestion.common.source_records import (
 from pipeline.ingestion.common.staging import StagingRow
 from pipeline.ingestion.theses.payload import (
     aggregate_thesis_persons,
+    awaits_diffusion,
     derive_theses_doc_type,
-    thesis_oa_status,
+    intranet_only,
 )
 from pipeline.transformation.publishing.find_or_create import Containers
 
@@ -64,6 +66,8 @@ def _build_source_extras(thesis: Mapping[str, JsonValue]) -> dict[str, JsonValue
         source_extras[SourceExtra.DATE_INSCRIPTION] = di
 
     institution = as_mapping(thesis.get("etabSoutenance"))
+    if intranet_only(thesis):
+        source_extras[SourceExtra.INTRANET_ONLY] = True
     if institution_name := as_str(institution.get("nom")):
         source_extras[SourceExtra.ETABLISSEMENT] = institution_name
     if institution_ppn := as_str(institution.get("ppn")):
@@ -103,7 +107,7 @@ def theses_source_record(
 ) -> SourceRecordUpsert:
     """Construit l'enregistrement source theses.fr d'une thèse, d'après son détail.
 
-    Sans conteneur. Le type dépend de la présence d'une date de soutenance, le statut open access de la diffusion de la thèse (`thesis_oa_status`). La langue est la première de `langues`, le résumé celui de la première langue pourvue d'un résumé.
+    Sans conteneur. Le type dépend de la présence d'une date de soutenance. La langue est la première de `langues`, le résumé celui de la première langue pourvue d'un résumé.
     """
     doi = clean_doi(as_str(thesis.get("doi")))
     identifiers: list[SourceIdentifier] = []
@@ -156,7 +160,6 @@ def theses_source_record(
         abstract=abstract,
         keywords=keywords,
         topics=topics_json,
-        oa_status=thesis_oa_status(thesis),
         source_extras=_build_source_extras(thesis),
     )
 
@@ -194,6 +197,10 @@ class ThesesNormalizer(SourceNormalizer):
     ) -> SourceRecordUpsert:
         """Construit l'enregistrement source de la thèse, sans éditeur ni conteneur."""
         return theses_source_record(doc, row.id, row.source_id)
+
+    def embargo(self, doc: Document) -> Embargo | None:
+        """Renvoie un embargo sans date pour une thèse en attente de diffusion sur Internet (`awaits_diffusion`)."""
+        return Embargo(None) if awaits_diffusion(doc) else None
 
     def author_block(self, doc: Document) -> AuthorBlock:
         return extract_theses_author_block(doc)

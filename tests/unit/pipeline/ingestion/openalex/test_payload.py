@@ -13,7 +13,6 @@ from pipeline.ingestion.openalex.payload import (
     is_hal_location,
     is_repository_location,
     is_theses_fr_location,
-    map_openalex_oa_status,
     names_publisher,
     names_serial,
     openalex_derived_identifier,
@@ -102,25 +101,6 @@ def _loc(**kwargs) -> OpenalexLocation:
     }
     defaults.update(kwargs)
     return OpenalexLocation(**defaults)
-
-
-class TestMapOpenalexOaStatus:
-    def test_known_statuses_passthrough(self):
-        for raw in ("gold", "diamond", "hybrid", "bronze", "green", "closed"):
-            assert map_openalex_oa_status(raw) == raw
-
-    def test_none_returns_none(self):
-        # Sans statut OpenAlex, la décision revient aux autres sources.
-        assert map_openalex_oa_status(None) is None
-
-    def test_empty_string_returns_none(self):
-        assert map_openalex_oa_status("") is None
-
-    def test_unknown_value_returns_unknown(self):
-        assert map_openalex_oa_status("some_new_label") == "unknown"
-        assert map_openalex_oa_status("Gold") == "unknown", (
-            "matching strict casse — OpenAlex utilise lowercase"
-        )
 
 
 class TestParsePrimaryLocation:

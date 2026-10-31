@@ -4,7 +4,12 @@ from __future__ import annotations
 
 import pytest
 
-from domain.normalize import normalize_text, sanitize_optional_text, sanitize_raw_text
+from domain.normalize import (
+    clean_abstract,
+    normalize_text,
+    sanitize_optional_text,
+    sanitize_raw_text,
+)
 
 
 class TestNormalizeText:
@@ -180,3 +185,58 @@ class TestSanitizeOptionalText:
     @pytest.mark.parametrize("raw", [None, "", "   ", "\u200b", "<br/>", "<!-- vide -->"])
     def test_rend_none_quand_la_valeur_ne_porte_rien(self, raw: str | None) -> None:
         assert sanitize_optional_text(raw) is None
+
+
+class TestCleanAbstract:
+    def test_garde_balises_et_formules(self) -> None:
+        abstract = "<p>Soit $\\mathcal{B}(x) &lt; 1$ et</p> <b>H<sub>2</sub>O</b>"
+        assert (
+            clean_abstract(abstract) == "<p>Soit $\\mathcal{B}(x) < 1$ et</p> <b>H<sub>2</sub>O</b>"
+        )
+
+    def test_decode_les_accents_latex_hors_formule(self) -> None:
+        assert (
+            clean_abstract("Schr\\\"odinger, Mat\\'ern $\\'x$")
+            == "Schr\u00f6dinger, Mat\u00e9rn $\\'x$"
+        )
+
+    def test_laisse_les_tournures_de_prose_qui_ressemblent_a_un_accent(self) -> None:
+        """Cas réels : quotient Γ\\H, notation `\\c mu`, apostrophe échappée."""
+        assert clean_abstract("Let M = Γ\\H be finite") == "Let M = Γ\\H be finite"
+        assert clean_abstract("/\\b-->/\\c mu nu") == "/\\b-->/\\c mu nu"
+        assert clean_abstract("Allan\\\\\\'s L coefficient") == "Allan\\'s L coefficient"
+        assert (
+            clean_abstract("Besan{\\c c}on, Fran\\c{c}ois, Ku{\\'s}") == "Besançon, François, Kuś"
+        )
+        assert clean_abstract("doesn\\'t, (\\O), 5n+2\\l") == "doesn\\'t, (\\O), 5n+2\\l"
+        assert clean_abstract("\\L{}ukasiewicz, Maa{\\ss}, Mart\\'{\\i}nez") == (
+            "Łukasiewicz, Maaß, Martínez"
+        )
+
+    def test_lit_les_guillemets_echappes_comme_des_guillemets(self) -> None:
+        assert clean_abstract('the \\"cold\\" case of Schr\\"odinger') == (
+            'the "cold" case of Schr"odinger'
+        )
+        assert clean_abstract('Schr\\"odinger and H\\" older') == "Schrödinger and Hölder"
+
+    def test_convertit_un_accent_sous_une_barre_doublee(self) -> None:
+        """La commande `\\n` à barre simple empêche de diviser les barres du texte."""
+        assert clean_abstract("L\\\\'evy and Hubi\\\\v{c}ka\\n") == "Lévy and Hubička\\n"
+
+    def test_garde_les_accolades_d_un_argument_de_commande(self) -> None:
+        assert clean_abstract("\\overline{Ω} and Poincar{é}") == "\\overline{Ω} and Poincaré"
+        assert clean_abstract("W^{±}W^{∓} and p_{T}^{γ}") == "W^{±}W^{∓} and p_{T}^{γ}"
+        assert clean_abstract("N ∪ {∞}, g({α}), {\\`a} la Leray") == "N ∪ {∞}, g({α}), à la Leray"
+
+    def test_ramene_les_barres_obliques_doublees(self) -> None:
+        assert clean_abstract("decay $B^-\\\\to D_s^-$") == "decay $B^-\\to D_s^-$"
+
+    def test_garde_les_paragraphes_et_reduit_les_espaces(self) -> None:
+        abstract = (
+            "  Dataset summary:\r\n\r\n\r\nThis  data\tset\n                    . Next\xa0: end  "
+        )
+        assert clean_abstract(abstract) == "Dataset summary:\n\nThis data set\n. Next\xa0: end"
+
+    @pytest.mark.parametrize("raw", [None, ""])
+    def test_rend_la_valeur_vide_telle_quelle(self, raw: str | None) -> None:
+        assert clean_abstract(raw) == raw

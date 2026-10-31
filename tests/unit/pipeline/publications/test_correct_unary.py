@@ -48,7 +48,6 @@ def test_tally_corrections_compte_les_regles():
                 CorrectedSourceRecord(
                     "thesis",
                     None,
-                    None,
                     {"doc_type": stash_entry("article", "THESIS_WITH_SERIAL_TO_ARTICLE")},
                 ),
                 (),
@@ -60,25 +59,26 @@ def test_tally_corrections_compte_les_regles():
             UnaryCorrection(
                 CorrectedSourceRecord(
                     "media",
-                    "green",
                     None,
                     {
                         "doc_type": stash_entry("article", "SERIAL_TYPE_MEDIA_TO_MEDIA"),
-                        "oa_status": stash_entry("closed", "EMBARGO_EXPIRED_TO_GREEN"),
+                        "urls": stash_entry(
+                            ["https://hal.science/hal-1"], "HAL_DEPOSIT_MISSING_TO_REMOVED"
+                        ),
                     },
                 ),
                 (),
             ),
         ),
         # correction défaite : mise à jour sans règle
-        CorrectionUpdate(4, UnaryCorrection(CorrectedSourceRecord("article", None, None, {}), ())),
+        CorrectionUpdate(4, UnaryCorrection(CorrectedSourceRecord("article", None, {}), ())),
     ]
     corrected, rule_counts = tally_corrections(updates)
     assert corrected == 2
     assert rule_counts == {
         "THESIS_WITH_SERIAL_TO_ARTICLE": 1,
         "SERIAL_TYPE_MEDIA_TO_MEDIA": 1,
-        "EMBARGO_EXPIRED_TO_GREEN": 1,
+        "HAL_DEPOSIT_MISSING_TO_REMOVED": 1,
     }
 
 
@@ -108,11 +108,9 @@ def _source_record(**overrides: object) -> UnaryCorrectionRow:
         "title": "Un titre quelconque",
         "doc_type": "article",
         "serial_id": None,
-        "embargo_expired": False,
         "self_declared_preprint": False,
         "declares_conference": False,
         "in_proceedings_volume": False,
-        "journal_diamond": False,
         "author_count": 1,
     }
     if doi := overrides.pop("doi", None):
@@ -277,22 +275,6 @@ def test_self_heals_when_rule_no_longer_applies():
     assert upd is not None
     assert upd.corrected.columns.doc_type == "article"
     assert upd.corrected.columns.corrections == {}
-
-
-def test_expired_embargo_promotes_oa_status_to_green():
-    # oa_status `embargoed` et embargo échu (constaté à la lecture de la source) : `green`, la valeur brute est conservée dans `corrections`.
-    upd = _update(_source_record(oa_status="embargoed", embargo_expired=True))
-    assert upd is not None
-    assert upd.corrected.columns.oa_status == "green"
-    assert upd.corrected.columns.corrections["oa_status"] == {
-        "raw": "embargoed",
-        "corrected_by": "EMBARGO_EXPIRED_TO_GREEN",
-    }
-
-
-def test_active_embargo_oa_status_untouched():
-    # Embargo en cours : aucune mise à jour.
-    assert _update(_source_record(oa_status="embargoed", embargo_expired=False)) is None
 
 
 def test_null_doc_type_left_null_when_no_rule():

@@ -155,6 +155,28 @@ _CONTAINERS = (
 )
 
 
+# Lectures d'une tâche de la phase `oa_status` : DOI à interroger, données du statut des publications.
+_OA_STATUS_INPUTS = (
+    "publications.id",
+    "publications.doi",
+    "publications.oa_status",
+    "publications.serial_id",
+    "publications.doc_type",
+    "publications.source_extras",
+    "serials.oa_model",
+    "dois",
+    "source_records.publication_id",
+    "source_records.source",
+    # Copies des publications, dont le statut se déduit.
+    "source_record_locations",
+    "platforms.name",
+    "platforms.openalex_id",
+    "platforms.platform_type",
+    "embargoes",
+    "config",
+)
+
+
 def _containers(source: Source) -> tuple[str, ...]:
     """Renvoie les référentiels de publication lus et écrits par la normalisation de `source` : aucun pour theses.fr."""
     return () if source == Source.THESES else _CONTAINERS
@@ -291,6 +313,7 @@ TASKS: tuple[Task, ...] = (
                 "source_records",
                 "source_record_identifiers",
                 "source_record_locations",
+                "embargoes",
                 "platforms",
                 "source_contributions",
                 "source_contribution_addresses",
@@ -311,6 +334,7 @@ TASKS: tuple[Task, ...] = (
                 "staging",
                 "source_records",
                 "source_record_locations",
+                "embargoes",
                 "platforms",
                 "source_contributions",
                 "contributor_information",
@@ -335,6 +359,7 @@ TASKS: tuple[Task, ...] = (
             "source_records.id",
             "source_record_identifiers",
             "source_record_locations",
+            "embargoes",
             "source_record_keys_queue",
             "publication_contributions_queue",
             "source_contributions.id",
@@ -609,8 +634,14 @@ TASKS: tuple[Task, ...] = (
             "source_records.publication_year",
             "source_records.publication_id",
             "source_record_identifiers",
-            # Verdicts d'Unpaywall, lus par le recalcul des publications des revues fusionnées.
-            "unpaywall",
+            # Copies, embargos et réponses d'Unpaywall et de doi.org, lus par le recalcul des publications des revues fusionnées.
+            "source_record_locations",
+            "platforms.name",
+            "platforms.openalex_id",
+            "platforms.platform_type",
+            "embargoes",
+            "dois.unpaywall_oa_status",
+            "dois.registered_url",
         ),
         writes=(
             "serials",
@@ -621,7 +652,6 @@ TASKS: tuple[Task, ...] = (
             "apc_payments.serial_id",
             "source_records.serial_id",
             "source_records.doc_type",
-            "source_records.oa_status",
             "source_records.language",
             "source_records.corrections",
             "source_record_identifiers.removed_by",
@@ -635,7 +665,10 @@ TASKS: tuple[Task, ...] = (
             "source_records.publication_id",
             "source_records.serial_id",
             "source_record_identifiers",
-            "unpaywall",
+            # Localisations des dépôts HAL introuvables, retirées par `metadata_correction.unary`.
+            "source_record_locations",
+            "dois.unpaywall_oa_status",
+            "dois.registered_url",
         ),
     ),
     _task(
@@ -777,18 +810,13 @@ TASKS: tuple[Task, ...] = (
                     "doi",
                     "serial_id",
                     "monograph_id",
-                    "oa_status",
                     "language",
                     "urls",
                     "corrections",
-                    "embargo_until",
                     "source_extras",
                 )
             ),
             "serials.serial_type",
-            "serials.oa_model",
-            "serials.is_in_doaj",
-            "serials.doaj_payload",
             "monographs.proceedings",
             "doi_prefixes.publisher_id",
             "publishers.publisher_type",
@@ -800,7 +828,6 @@ TASKS: tuple[Task, ...] = (
         ),
         writes=(
             "source_records.doc_type",
-            "source_records.oa_status",
             "source_records.language",
             "source_records.urls",
             "source_records.corrections",
@@ -913,11 +940,15 @@ TASKS: tuple[Task, ...] = (
             "source_record_locations",
             "platforms.name",
             "platforms.openalex_id",
+            "platforms.platform_type",
+            "embargoes",
+            "dois.registered_url",
             "publications",
             "apc_payments",
             "serials.serial_type",
+            "serials.oa_model",
             "monographs.serial_id",
-            "unpaywall",
+            "dois.unpaywall_oa_status",
             # Titulaire du préfixe DOI Crossref, éditeur de la publication.
             "doi_prefixes.ra",
             "doi_prefixes.publisher_id",
@@ -930,12 +961,13 @@ TASKS: tuple[Task, ...] = (
             "apc_payments.publication_id",
             "publication_contributions_queue",
         ),
-        # Verdicts d'Unpaywall ; publications supprimées par `finalize.purge_publications` ; revues et monographies vides supprimées par `finalize.delete_empty_containers`.
+        # Réponses d'Unpaywall et de doi.org ; publications supprimées par `finalize.purge_publications` ; revues et monographies vides supprimées par `finalize.delete_empty_containers`.
         previous_run=(
             "source_records.countries",
             "publications.id",
             "publications.oa_status",
-            "unpaywall",
+            "dois.unpaywall_oa_status",
+            "dois.registered_url",
             "serials",
             "monographs",
         ),
@@ -1328,20 +1360,29 @@ TASKS: tuple[Task, ...] = (
         ),
     ),
     _task(
+        "oa_status.resolve_dois",
+        "oa_status",
+        reads=_OA_STATUS_INPUTS,
+        writes=(
+            "publications.oa_status",
+            "dois.doi",
+            "dois.registered_url",
+            "dois.resolved_at",
+        ),
+        # Verdicts d'Unpaywall et statut des publications, lus par le recalcul de ce statut.
+        previous_run=("dois.unpaywall_oa_status", "publications.oa_status"),
+        network="doi.org",
+    ),
+    _task(
         "oa_status.verify_unpaywall",
         "oa_status",
-        reads=(
-            "publications.id",
-            "publications.doi",
+        reads=(*_OA_STATUS_INPUTS, "doi_prefixes.ra"),
+        writes=(
             "publications.oa_status",
-            "unpaywall",
-            "doi_prefixes.ra",
-            "source_records.publication_id",
-            "source_records.source",
-            "source_records.oa_status",
-            "config",
+            "dois.doi",
+            "dois.unpaywall_oa_status",
+            "dois.unpaywall_checked_at",
         ),
-        writes=("publications.oa_status", "unpaywall"),
         network="unpaywall",
     ),
 )

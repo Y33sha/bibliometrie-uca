@@ -1,6 +1,6 @@
 import type { components } from '#lib/api/schema.js';
 import { docTypeLabel } from '#lib/docTypes.svelte.js';
-import { CONTRIBUTION_ROLE_ORDER, oaStatusLabel } from '#lib/labels.js';
+import { CONTRIBUTION_ROLE_ORDER } from '#lib/labels.js';
 import { sourceOrder } from '#lib/sources.svelte.js';
 
 export type SourceRecord = components['schemas']['SourceRecordMetadataOut'];
@@ -166,12 +166,6 @@ function fields(records: SourceRecord[]): Field[] {
 			// Nom du référentiel, avec en note la valeur que donnait la source quand la normalisation l'a changée.
 			cell: (r) => ({ text: r.language_name ?? r.language, note: r.language_raw ?? undefined }),
 			compared: (r) => r.language,
-		},
-		{
-			key: 'oa_status',
-			label: 'Statut OA',
-			cell: (r) => ({ text: r.oa_status ? oaStatusLabel(r.oa_status) : null }),
-			compared: (r) => r.oa_status,
 		},
 	];
 }

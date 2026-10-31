@@ -1317,15 +1317,25 @@ a.badge-doaj:hover {
 	white-space: nowrap;
 }
 
-/* ── Coche : personne présente dans l'extraction du SI RH ── */
-.rh-check {
+/* ── Marques accolées au nom d'une personne : icône SVG en masque, teinte d'accent ── */
+.rh-check,
+.corresponding-mark {
 	display: inline-block;
 	width: 14px;
 	height: 14px;
 	margin-left: 5px;
 	vertical-align: -2px;
 	background: var(--accent-mid);
+}
+
+/* Coche : personne présente dans l'extraction du SI RH */
+.rh-check {
 	mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='m8.5 12 2.5 2.5 4.5-5'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+/* Enveloppe : auteur correspondant */
+.corresponding-mark {
+	mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='2' y='4' width='20' height='16' rx='2'/%3E%3Cpath d='m22 7-10 6L2 7'/%3E%3C/svg%3E") center / contain no-repeat;
 }
 
 /* ── Buttons ── */

@@ -13,10 +13,12 @@ from dataclasses import dataclass, field
 import httpx2
 from sqlalchemy import Connection
 
+from domain.sources.registry import Source
 from domain.types import JsonValue
 from pipeline.http.circuit_breaker import source_tripped
 from pipeline.http.fetch_pool import run_fetch_pool
 from pipeline.http.lookup import UNAVAILABLE, LookupOutcome, NotFound, Unavailable
+from pipeline.ingestion.adapters import ADAPTERS
 from pipeline.ingestion.common.staging import StagingStore, UpsertOutcome
 from pipeline.runtime.observability.log_format import source_branch
 from pipeline.runtime.observability.logging_scope import scoped_logger
@@ -62,6 +64,31 @@ def one_at_a_time(
         if isinstance(outcome, NotFound):
             return LookupBatch(absent=[key])
         return LookupBatch(records=[outcome])
+
+    return fetch
+
+
+def by_native_id(
+    source: str,
+    fetch_one: Callable[
+        [httpx2.AsyncClient, str], Awaitable[LookupOutcome[Mapping[str, JsonValue]]]
+    ],
+) -> Fetch:
+    """Adapte `fetch_one`, requête par identifiant natif, comme `one_at_a_time`.
+
+    Un document renvoyé sous un autre identifiant natif (work fusionné, DOI alias) est écrit, et l'identifiant cherché rejoint les absents.
+    """
+    fetch_single = one_at_a_time(fetch_one)
+
+    async def fetch(client: httpx2.AsyncClient, keys: list[str]) -> LookupBatch | Unavailable:
+        result = await fetch_single(client, keys)
+        if isinstance(result, Unavailable) or not result.records:
+            return result
+        (source_id,), (record,) = keys, result.records
+        identity = ADAPTERS[Source(source)].identify(record)
+        if identity is None or identity.source_id == source_id:
+            return result
+        return LookupBatch(records=result.records, absent=[source_id])
 
     return fetch
 

@@ -1251,10 +1251,8 @@ source_records = Table(
         Integer,
         comment="Éditeur que nomme la source. Nul pour une production hébergée sans être publiée.",
     ),
-    Column("oa_status", Text),
     # Licence normalisée de l'enregistrement source ; la forme brute reste dans `source_extras`.
     Column("license", license_type_enum),
-    Column("embargo_until", Date),
     Column("language", Text),
     Column(
         "raw_language",
@@ -1415,6 +1413,20 @@ source_record_locations = Table(
     Column("platform_id", Integer),
     schema="sources",
     comment="Localisations d'un enregistrement source, réécrites à chaque normalisation.",
+)
+
+
+embargoes = Table(
+    "embargoes",
+    metadata,
+    Column("source_record_id", Integer, primary_key=True),
+    Column(
+        "until",
+        Date,
+        comment="Date de fin d'embargo. Nulle quand la source déclare un embargo sans date.",
+    ),
+    schema="sources",
+    comment="Embargo déclaré par un enregistrement source : fichier déposé dans HAL, thèse de theses.fr.",
 )
 
 
@@ -1581,19 +1593,42 @@ failed_lookups = Table(
 )
 
 
-unpaywall = Table(
-    "unpaywall",
+dois = Table(
+    "dois",
     metadata,
     Column("doi", Text, primary_key=True),
     Column(
-        "oa_status",
+        "unpaywall_oa_status",
         oa_type_enum,
-        comment="Statut open access donné par Unpaywall. NULL : DOI absent d'Unpaywall.",
+        comment="Statut open access donné par Unpaywall. NULL avec une date : DOI absent d'Unpaywall.",
     ),
-    Column("checked_at", DateTime(timezone=True), nullable=False),
+    Column(
+        "unpaywall_checked_at",
+        DateTime(timezone=True),
+        comment=(
+            "Date du verdict d'Unpaywall. Le DOI est réinterrogé au-delà du délai "
+            "unpaywall_recheck_after_days."
+        ),
+    ),
+    Column(
+        "registered_url",
+        Text,
+        comment=(
+            "URL de résolution du DOI, lue dans l'API des handles de doi.org. NULL avec une "
+            "date : DOI inconnu de doi.org."
+        ),
+    ),
+    Column("resolved_at", DateTime(timezone=True), comment="Date de la lecture chez doi.org."),
+    CheckConstraint(
+        "unpaywall_oa_status IS NULL OR unpaywall_checked_at IS NOT NULL",
+        name="dois_unpaywall_dated",
+    ),
+    CheckConstraint(
+        "registered_url IS NULL OR resolved_at IS NOT NULL", name="dois_registered_url_dated"
+    ),
     comment=(
-        "Verdict d'Unpaywall pour chaque DOI interrogé par la phase oa_status. Le DOI est "
-        "réinterrogé quand checked_at date de plus que le délai unpaywall_recheck_after_days."
+        "Réponses des services externes sur chaque DOI de publication : verdict d'Unpaywall, "
+        "URL de résolution chez doi.org."
     ),
     schema="sources",
 )

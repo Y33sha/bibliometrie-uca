@@ -66,6 +66,33 @@ describe('sanitizeTitle', () => {
 		expect(sanitizeTitle('Mesure de $$ D^+ \\to \\eta \\pi^+ $$ et suite')).not.toContain('katex-display');
 	});
 
+	it('retire le gras des formules LaTeX', () => {
+		for (const tex of ['\\mathbf{\\sqrt{s}=13}', '\\varvec{pp}', '\\pmb{x}', '\\boldsymbol{x}', '\\textbf{892}', '{\\bf x}']) {
+			const result = sanitizeTitle(`Mesure à $$${tex}$$ TeV`);
+			expect(result).toContain('katex');
+			expect(result.replace(/<annotation[\s\S]*?<\/annotation>/g, '')).not.toMatch(/mathbf|boldsymbol|bold"/);
+		}
+	});
+
+	it('rend en lettre ajourée un ensemble de nombres en gras', () => {
+		expect(sanitizeTitle('Sous-groupes de $$SL_2(\\mathbf {Z})$$')).toContain('<span class="mord mathbb">Z</span>');
+	});
+
+	it('rend les macros inconnues de KaTeX sans erreur', () => {
+		for (const tex of ['\\varvec{p}', '\\uppi^+', '\\Upgamma', '\\C_p']) {
+			expect(sanitizeTitle(`$${tex}$`)).not.toContain('katex-error');
+		}
+		expect(titleText('Désintégration $J/\\uppsi$')).toBe('Désintégration J/ψ');
+	});
+
+	it('retire le gras du MathML', () => {
+		const result = sanitizeTitle(
+			'<mml:math><mml:mi mathvariant="bold">x</mml:mi><mml:mtext mathvariant="bold-italic">s</mml:mtext></mml:math>'
+		);
+		expect(result).toContain('<mi>x</mi>');
+		expect(result).toContain('<mtext mathvariant="italic">s</mtext>');
+	});
+
 	it('gère le MathML avec préfixe mml:', () => {
 		const result = sanitizeTitle('Test <mml:math><mml:mi>x</mml:mi></mml:math>');
 		// Le préfixe mml: doit être supprimé pour le rendu natif
@@ -78,30 +105,8 @@ describe('sanitizeTitle', () => {
 		expect(sanitizeTitle(undefined)).toBe('');
 	});
 
-	it('décode les titres double-encodés (&amp;lt;i&amp;gt; → <i>)', () => {
-		const result = sanitizeTitle(
-			'Detection of &amp;lt;i&amp;gt;Candida&amp;lt;/i&amp;gt; species'
-		);
-		expect(result).toContain('<i>Candida</i>');
-		expect(result).not.toContain('&amp;');
-	});
-
-	it('décode les entités numériques double-encodées (&amp;#233; → é)', () => {
-		const result = sanitizeTitle('Gagn&amp;#233; et al.');
-		expect(result).toContain('Gagné');
-	});
-
-	it('décode le markup simple-encodé (&lt;sub&gt; → <sub>)', () => {
-		const result = sanitizeTitle('Fe&lt;sub&gt;3&lt;/sub&gt;O&lt;sub&gt;4&lt;/sub&gt;');
-		expect(result).toContain('<sub>3</sub>');
-		expect(result).not.toContain('&lt;');
-		expect(result).not.toContain('&amp;');
-	});
-
-	it('décode un &amp; de contenu isolé (&amp; → &)', () => {
-		// "Smith &amp; Jones" → "Smith & Jones", ré-échappé une fois à l'affichage.
-		const result = sanitizeTitle('Smith &amp; Jones');
-		expect(result).toBe('Smith &amp; Jones');
+	it('échappe un & du texte', () => {
+		expect(sanitizeTitle('Smith & Jones')).toBe('Smith &amp; Jones');
 	});
 });
 
@@ -170,8 +175,8 @@ describe('titleText', () => {
 		expect(text).toBe('Σ± production in pp collisions');
 	});
 
-	it('décode les entités et retire le formatage HTML', () => {
-		expect(titleText('H&lt;sub&gt;2&lt;/sub&gt;O &amp; CO<sub>2</sub>')).toBe('H2O & CO2');
+	it('retire le formatage HTML', () => {
+		expect(titleText('H<sub>2</sub>O & CO<sub>2</sub>')).toBe('H2O & CO2');
 	});
 
 	it('renvoie une chaîne vide pour un titre absent', () => {
@@ -193,6 +198,7 @@ describe('sanitizeAbstract', () => {
 
 	it('garde les intertitres en gras', () => {
 		expect(sanitizeAbstract('<b>Background:</b> Texte')).toContain('<b>Background:</b>');
+		expect(sanitizeAbstract('<strong>Methods:</strong> Texte')).toContain('<strong>Methods:</strong>');
 	});
 
 	it('retire les balises hors liste blanche en gardant leur texte', () => {
@@ -200,6 +206,43 @@ describe('sanitizeAbstract', () => {
 		expect(result).toContain('Texte');
 		expect(result).not.toContain('onclick');
 		expect(result).not.toContain('<div');
+	});
+
+	it('rend les commandes LaTeX et MathJax inconnues de KaTeX', () => {
+		for (const tex of [
+			'\\mbox{ in } \\Omega',
+			'L^p(\\ensuremath{\\mathbb{R}}^d)',
+			'a \\hfill b',
+			'1 \\textless{} p \\textgreater{} 0',
+			'\\left\\arrowvert x \\right\\arrowvert',
+			'{H \\mathord{\\left/ {\\vphantom {H B}} \\right. \\kern-\\nulldelimiterspace} B}',
+			'\\begin{equation*} x^7 = z^n \\end{equation*}',
+			'u = 0. \\tag{1}',
+			'\\begin{eqnarray} a &=& b \\end{eqnarray}',
+			'y^\\eps + \\pa \\Omega + (\\Cal T) + \\cE + \\dsp{f\\over g} + \\re s + \\Log r + \\conv(S) + \\diam'
+		]) {
+			expect(sanitizeAbstract(`Soit $${tex}$.`)).not.toMatch(/katex-error|cc0000/);
+		}
+	});
+
+	it('remplace un caractère désigné par son code par sa lettre de base', () => {
+		const text = titleText('Somme $S_{n,\\unicode[STIX]{x1D6FC}}$');
+		expect(text).toContain('Sn,α');
+		expect(text).not.toContain('unicode');
+	});
+
+	it('garde la branche mathématique d\'une condition TeX', () => {
+		expect(titleText('Charge $\\ifmmode\\pm\\else\\textpm\\fi{}2$')).toBe('Charge ±2');
+	});
+
+	it('retire une étiquette d\'équation', () => {
+		expect(titleText('Équation $\\label{1}x=1$')).toBe('Équation x=1');
+	});
+
+	it('garde le gras des formules', () => {
+		expect(sanitizeAbstract('Le vecteur $\\mathbf{v}$')).toContain('mathbf');
+		expect(sanitizeAbstract('Le vecteur $\\varvec{v}$')).not.toContain('katex-error');
+		expect(sanitizeAbstract('<math><mi mathvariant="bold">v</mi></math>')).toContain('mathvariant="bold"');
 	});
 
 	it('rend le MathML comme un titre', () => {

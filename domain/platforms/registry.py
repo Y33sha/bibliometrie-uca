@@ -1,12 +1,12 @@
 """Liste fermée des plateformes connues : archives ouvertes, serveurs de preprints et plateformes d'éditeurs. Une plateforme reconnue prend le nom de la liste."""
 
+import re
 from dataclasses import dataclass
-from urllib.parse import urlsplit
 
 from domain.platforms.platform import PlatformType
 from domain.publications.identifiers import clean_doi, is_hal_host
 from domain.source_records.identifiers import SourceIdentifierType
-from domain.urls import is_host, url_host
+from domain.urls import is_host, is_on_site, url_host
 
 
 @dataclass(frozen=True, slots=True)
@@ -20,13 +20,29 @@ class KnownPlatform:
     """Sources OpenAlex, la principale en tête."""
     hosts: tuple[str, ...] = ()
     """Hôtes de la plateforme. Un hôte vaut pour ses sous-domaines. Il peut se compléter d'un début de chemin (`ncbi.nlm.nih.gov/pmc`)."""
+    doi_suffix: re.Pattern[str] | None = None
+    """Début du suffixe des DOI de la plateforme, quand ses préfixes couvrent aussi d'autres publications."""
+    fully_open: bool = False
+    """La plateforme donne librement accès à tout son contenu, d'après sa propre déclaration."""
 
 
 def _preprint_server(
-    name: str, prefixes: set[str], openalex_ids: tuple[str, ...], hosts: tuple[str, ...] = ()
+    name: str,
+    prefixes: set[str],
+    openalex_ids: tuple[str, ...],
+    hosts: tuple[str, ...] = (),
+    doi_suffix: re.Pattern[str] | None = None,
+    *,
+    fully_open: bool = False,
 ) -> KnownPlatform:
     return KnownPlatform(
-        name, PlatformType.PREPRINT_SERVER, frozenset(prefixes), openalex_ids, hosts
+        name,
+        PlatformType.PREPRINT_SERVER,
+        frozenset(prefixes),
+        openalex_ids,
+        hosts,
+        doi_suffix,
+        fully_open,
     )
 
 
@@ -39,9 +55,21 @@ def _publisher_platform(
 
 
 def _repository(
-    name: str, openalex_ids: tuple[str, ...], hosts: tuple[str, ...] = ()
+    name: str,
+    openalex_ids: tuple[str, ...] = (),
+    hosts: tuple[str, ...] = (),
+    prefixes: set[str] | None = None,
+    *,
+    fully_open: bool = False,
 ) -> KnownPlatform:
-    return KnownPlatform(name, PlatformType.REPOSITORY, openalex_ids=openalex_ids, hosts=hosts)
+    return KnownPlatform(
+        name,
+        PlatformType.REPOSITORY,
+        frozenset(prefixes or ()),
+        openalex_ids,
+        hosts,
+        fully_open=fully_open,
+    )
 
 
 HAL = _repository(
@@ -53,13 +81,16 @@ PUBMED_CENTRAL = _repository(
     "PubMed Central",
     ("S2764455111", "S4306400806"),
     ("ncbi.nlm.nih.gov/pmc", "pmc.ncbi.nlm.nih.gov", "europepmc.org"),
+    fully_open=True,
 )
 """L'archive de PubMed Central, que désigne aussi l'identifiant PMCID d'un document. La source OpenAlex de son miroir Europe PMC donne surtout des adresses de PubMed Central."""
 
 ZENODO = _repository("Zenodo", ("S4306400562",), ("zenodo.org",))
 """L'archive ouverte Zenodo, du CERN."""
 
-ARXIV = _preprint_server("arXiv", {"10.48550"}, ("S4306400194", "S4393918464"), ("arxiv.org",))
+ARXIV = _preprint_server(
+    "arXiv", {"10.48550"}, ("S4306400194", "S4393918464"), ("arxiv.org",), fully_open=True
+)
 """Le serveur de preprints arXiv, que désigne aussi l'identifiant arXiv d'un document."""
 
 KNOWN_PLATFORMS: tuple[KnownPlatform, ...] = (
@@ -68,10 +99,51 @@ KNOWN_PLATFORMS: tuple[KnownPlatform, ...] = (
     ZENODO,
     _repository("Figshare", ("S4377196282",), ("figshare.com",)),
     _repository("CERN Document Server", ("S4306402195",), ("cds.cern.ch",)),
+    _repository("theses.fr", ("S4406923047",), ("theses.fr",)),
+    _repository(
+        "DESY Publication Database",
+        ("S4306400383", "S4306401365", "S4377196278"),
+        ("bib-pubdb1.desy.de",),
+        {"10.3204"},
+    ),
+    _repository(
+        "RWTH Publications",
+        ("S4306401033", "S4306401362"),
+        ("publications.rwth-aachen.de",),
+        {"10.18154"},
+    ),
+    _repository(
+        "GSI Repository", ("S4306400339", "S4306401977"), ("repository.gsi.de",), {"10.15120"}
+    ),
+    _repository("Infoscience", ("S4306400487", "S4306400488"), ("infoscience.epfl.ch",)),
+    _repository("ORBi", ("S4306401300",), ("orbi.uliege.be",)),
+    _repository("OSTI", ("S4306402487",), ("osti.gov",)),
+    _repository("Enlighten", hosts=("eprints.gla.ac.uk",)),
+    _repository("Wageningen University & Research", hosts=("research.wur.nl",)),
+    _repository("Aarhus University", hosts=("pure.au.dk",)),
+    _repository("ResearchGate", hosts=("researchgate.net",), prefixes={"10.13140"}),
+    # Résolveur des identifiants Handle, surtout ceux des archives institutionnelles.
+    _repository("Handle", hosts=("hdl.handle.net",)),
+    # Posters et diaporamas déposés sur F1000Research, hors de sa revue.
+    _repository("F1000Research (posters et diaporamas)", prefixes={"10.7490"}),
     ARXIV,
-    # Le préfixe 10.1101 couvre aussi les revues de Cold Spring Harbor (*Genome Research*).
-    _preprint_server("bioRxiv", {"10.1101", "10.64898"}, ("S4306402567",), ("biorxiv.org",)),
-    _preprint_server("medRxiv", {"10.1101", "10.64898"}, ("S3005729997",), ("medrxiv.org",)),
+    # Le préfixe 10.1101 couvre aussi les revues de Cold Spring Harbor (`10.1101/gad.…`).
+    _preprint_server(
+        "bioRxiv",
+        {"10.1101", "10.64898"},
+        ("S4306402567",),
+        ("biorxiv.org",),
+        re.compile(r"\d"),
+        fully_open=True,
+    ),
+    _preprint_server(
+        "medRxiv",
+        {"10.1101", "10.64898"},
+        ("S3005729997",),
+        ("medrxiv.org",),
+        re.compile(r"\d"),
+        fully_open=True,
+    ),
     _preprint_server("SSRN", {"10.2139"}, ("S4210172589",), ("ssrn.com",)),
     _preprint_server(
         "Research Square", {"10.21203"}, ("S4306525896", "S4306402450"), ("researchsquare.com",)
@@ -79,6 +151,8 @@ KNOWN_PLATFORMS: tuple[KnownPlatform, ...] = (
     _preprint_server("Preprints.org", {"10.20944"}, ("S6309402219",), ("preprints.org",)),
     _preprint_server("ChemRxiv", {"10.26434"}, ("S4393918830",), ("chemrxiv.org",)),
     _preprint_server("Authorea", {"10.22541"}, ("S4363604296",), ("authorea.com",)),
+    # Le préfixe 10.2196 couvre aussi les revues de JMIR.
+    _preprint_server("JMIR Preprints", {"10.2196"}, (), (), re.compile(r"preprints\.")),
     # Les URL d'osf.io désignent plusieurs serveurs de preprints sans les distinguer : seule la source OpenAlex les départage.
     _preprint_server("OSF Preprints", {"10.31219"}, ("S4306401127",)),
     _preprint_server("PsyArXiv", {"10.31234"}, ("S4306401687",)),
@@ -111,6 +185,15 @@ KNOWN_PLATFORMS: tuple[KnownPlatform, ...] = (
     _publisher_platform("Centre Mersenne", {"10.5802"}, hosts=("centre-mersenne.org",)),
     _publisher_platform("Project MUSE", {"10.1353"}, hosts=("muse.jhu.edu",)),
     _publisher_platform("Université de Bordeaux", {"10.20870"}),
+    # Éditeurs déposant leurs DOI chez DataCite, qu'OpenAlex range parmi les entrepôts. Leurs préfixes désignent l'éditeur lui-même, pas une plateforme d'éditeurs.
+    _publisher_platform("Classiques Garnier", set(), ("S7407051766", "S7407051950")),
+    _publisher_platform("Éditions et presses universitaires de Reims", set(), ("S7407051763",)),
+    _publisher_platform("Underline Science", set(), ("S7407053148",)),
+    _publisher_platform("IUGG 2023", set(), ("S7407051559",)),
+    _publisher_platform("Association Universitaire de Génie Civil", set(), ("S7407051738",)),
+    _publisher_platform(
+        "Association Française d'Etudes et de Recherches sur les Aérosols", set(), ("S7407051736",)
+    ),
 )
 
 PMC_ARTICLE_URL = "https://www.ncbi.nlm.nih.gov/pmc/articles/{}/"
@@ -120,7 +203,7 @@ IDENTIFIER_COPIES: dict[SourceIdentifierType, str] = {
     SourceIdentifierType.ARXIV_ID: "https://arxiv.org/abs/{}",
     SourceIdentifierType.PMCID: PMC_ARTICLE_URL,
 }
-"""Copie ouverte que désigne un identifiant de document : URL à compléter par sa valeur, par type d'identifiant."""
+"""Copie que désigne un identifiant de document : URL à compléter par sa valeur, par type d'identifiant."""
 
 _BY_OPENALEX_ID = {i: p for p in KNOWN_PLATFORMS for i in p.openalex_ids}
 _PUBLISHER_PLATFORM_PREFIXES = frozenset(
@@ -133,8 +216,6 @@ _PLATFORMS_OF_PREFIX: dict[str, list[KnownPlatform]] = {}
 for _platform in KNOWN_PLATFORMS:
     for _prefix in _platform.doi_prefixes:
         _PLATFORMS_OF_PREFIX.setdefault(_prefix, []).append(_platform)
-# Préfixe DOI d'une seule plateforme.
-_BY_PREFIX = {prefix: ps[0] for prefix, ps in _PLATFORMS_OF_PREFIX.items() if len(ps) == 1}
 
 
 def known_platform_of_source(openalex_id: str) -> KnownPlatform | None:
@@ -142,24 +223,36 @@ def known_platform_of_source(openalex_id: str) -> KnownPlatform | None:
     return _BY_OPENALEX_ID.get(openalex_id)
 
 
-def _matches(url: str, host: str) -> bool:
-    domain, _, path = host.partition("/")
-    return is_host(url, domain) and (not path or urlsplit(url).path.lower().startswith(f"/{path}"))
+def _platforms_of_doi_url(url: str) -> list[KnownPlatform]:
+    """Renvoie les plateformes de la liste dont le DOI d'une URL doi.org a la forme."""
+    if not is_host(url, "doi.org") or not (doi := clean_doi(url)):
+        return []
+    prefix, _, suffix = doi.partition("/")
+    return [
+        p
+        for p in _PLATFORMS_OF_PREFIX.get(prefix, ())
+        if p.doi_suffix is None or p.doi_suffix.match(suffix)
+    ]
+
+
+def is_fully_open(url: str) -> bool:
+    """Vrai si `url` désigne une plateforme de la liste donnant librement accès à tout son contenu."""
+    known = known_platform_of_url(url)
+    return known is not None and known.fully_open
 
 
 def known_platform_of_url(url: str) -> KnownPlatform | None:
-    """Renvoie la plateforme de la liste désignée par `url` : par son hôte, à défaut par le préfixe d'une URL doi.org propre à une seule plateforme."""
+    """Renvoie la plateforme de la liste désignée par `url` : par son hôte, à défaut par le DOI d'une URL doi.org propre à une seule plateforme."""
     host = url_host(url)
     if not host:
         return None
     if is_hal_host(host):
         return HAL
     for platform in KNOWN_PLATFORMS:
-        if any(_matches(url, h) for h in platform.hosts):
+        if any(is_on_site(url, h) for h in platform.hosts):
             return platform
-    if is_host(url, "doi.org") and (doi := clean_doi(url)):
-        return _BY_PREFIX.get(doi.partition("/")[0])
-    return None
+    platforms = _platforms_of_doi_url(url)
+    return platforms[0] if len(platforms) == 1 else None
 
 
 def known_platform_of_copy(url: str, openalex_id: str | None) -> KnownPlatform | None:
@@ -167,6 +260,20 @@ def known_platform_of_copy(url: str, openalex_id: str | None) -> KnownPlatform |
     if known := known_platform_of_url(url):
         return known
     return known_platform_of_source(openalex_id) if openalex_id else None
+
+
+_SHARED_HOST_TYPES = {"osf.io": PlatformType.REPOSITORY}
+"""Type des hôtes de plusieurs plateformes : `osf.io` sert les serveurs de preprints d'OSF et ses projets."""
+
+
+def platform_type_of_copy(url: str, openalex_id: str | None) -> PlatformType | None:
+    """Renvoie le type de la plateforme de la liste d'une copie. Quand le DOI d'une URL doi.org désigne plusieurs plateformes de même type (bioRxiv et medRxiv), il donne ce type. Un hôte de plusieurs plateformes donne le type de `_SHARED_HOST_TYPES`."""
+    if known := known_platform_of_copy(url, openalex_id):
+        return known.platform_type
+    types = {p.platform_type for p in _platforms_of_doi_url(url)}
+    if len(types) == 1:
+        return types.pop()
+    return next((t for host, t in _SHARED_HOST_TYPES.items() if is_host(url, host)), None)
 
 
 def is_publisher_platform_prefix(prefix: str) -> bool:

@@ -6,12 +6,14 @@ Les localisations d'un enregistrement source se réécrivent à chaque normalisa
 import json
 from collections.abc import Iterable, Sequence
 from typing import NamedTuple
+from urllib.parse import urlsplit
 
 from sqlalchemy import Connection, text
 
 from domain.normalize import normalize_text
-from domain.platforms.platform import PlatformType
-from domain.platforms.registry import IDENTIFIER_COPIES
+from domain.platforms.platform import PlatformType, is_descriptive_page
+from domain.platforms.registry import IDENTIFIER_COPIES, is_fully_open
+from domain.publications.identifiers import hal_deposit_url
 from domain.publications.licenses import License
 from domain.source_records.identifiers import SourceIdentifier, normalize_identifiers
 from infrastructure.db.scalars import scalar_int
@@ -34,17 +36,50 @@ class LocationFacts(NamedTuple):
     version: str | None = None
     license: License | None = None
     is_oa: bool | None = None
+    """Copie ouverte, à la fin de l'embargo de son enregistrement source s'il y en a un."""
     platform: PlatformFacts | None = None
 
 
 def identifier_locations(identifiers: Iterable[SourceIdentifier]) -> list[LocationFacts]:
-    """Renvoie les copies ouvertes désignées par les identifiants arXiv et les PMCID d'un enregistrement source, sans version connue."""
+    """Renvoie les copies désignées par les identifiants arXiv et les PMCID d'un enregistrement source, sans version connue. Leur plateforme donne librement accès à tout son contenu, donc les copies sont ouvertes."""
     identifiers, _ = normalize_identifiers(identifiers)
-    return [
-        LocationFacts(url=IDENTIFIER_COPIES[i.id_type].format(i.value), is_oa=True)
+    urls = [
+        IDENTIFIER_COPIES[i.id_type].format(i.value)
         for i in identifiers
         if i.id_type in IDENTIFIER_COPIES
     ]
+    return [LocationFacts(url=url, is_oa=is_fully_open(url)) for url in urls]
+
+
+def _on_hal_deposit_url(loc: LocationFacts) -> LocationFacts:
+    """Renvoie la localisation sur l'adresse de son dépôt HAL (`hal_deposit_url`). Une URL de fichier du dépôt devient l'URL du PDF."""
+    page = hal_deposit_url(loc.url)
+    if page is None or page == loc.url:
+        return loc
+    path = urlsplit(loc.url).path
+    is_file = "/document" in path or "/file/" in path
+    return loc._replace(url=page, pdf_url=loc.pdf_url or (loc.url if is_file else None))
+
+
+def merge_locations(locations: Iterable[LocationFacts]) -> list[LocationFacts]:
+    """Renvoie les localisations hors pages descriptives, une par URL, une copie HAL sur l'adresse de son dépôt. Deux localisations de même URL se fusionnent : la première donne ses valeurs, l'autre complète le PDF, et la copie est ouverte si l'une l'est."""
+    merged: dict[str, LocationFacts] = {}
+    for loc in map(_on_hal_deposit_url, locations):
+        if is_descriptive_page(loc.url):
+            continue
+        if (first := merged.get(loc.url)) is None:
+            merged[loc.url] = loc
+            continue
+        merged[loc.url] = first._replace(
+            pdf_url=first.pdf_url or loc.pdf_url, is_oa=_either_open(first.is_oa, loc.is_oa)
+        )
+    return list(merged.values())
+
+
+def _either_open(a: bool | None, b: bool | None) -> bool | None:
+    if a or b:
+        return True
+    return False if False in (a, b) else None
 
 
 # Le nom et le type suivent la source à chaque écriture.
@@ -95,11 +130,10 @@ class LocationStore:
         return self._platforms[platform.openalex_id]
 
     def replace_locations(self, source_record_id: int, locations: Sequence[LocationFacts]) -> None:
-        """Réécrit les localisations de l'enregistrement source avec `locations`, une par URL."""
+        """Réécrit les localisations de l'enregistrement source avec `locations` (`merge_locations`)."""
         self._conn.execute(_DELETE_LOCATIONS, {"id": source_record_id})
-        # Parcours à rebours : une URL en double garde sa première localisation.
-        rows = {
-            loc.url: {
+        rows = [
+            {
                 "url": loc.url,
                 "pdf_url": loc.pdf_url,
                 "oai_id": loc.oai_id,
@@ -108,10 +142,9 @@ class LocationStore:
                 "is_oa": loc.is_oa,
                 "platform_id": self.platform_id(loc.platform) if loc.platform else None,
             }
-            for loc in reversed(locations)
-        }
+            for loc in merge_locations(locations)
+        ]
         if rows:
             self._conn.execute(
-                _INSERT_LOCATIONS,
-                {"id": source_record_id, "locations": json.dumps(list(rows.values()))},
+                _INSERT_LOCATIONS, {"id": source_record_id, "locations": json.dumps(rows)}
             )

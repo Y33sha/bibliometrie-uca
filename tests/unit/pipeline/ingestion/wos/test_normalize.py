@@ -370,7 +370,6 @@ def _make_api_record(  # noqa: C901
     publisher_name: str | None = "Test Publisher",
     issn: str | None = "0123-4567",
     eissn: str | None = "1234-5678",
-    journal_oas_gold: str | None = None,
     language: str | None = "English",
     vol: str | None = "10",
     issue: str | None = "2",
@@ -419,8 +418,6 @@ def _make_api_record(  # noqa: C901
         publication_info["issue"] = issue
     if page_obj:
         publication_info["page"] = page_obj
-    if journal_oas_gold is not None:
-        publication_info["journal_oas_gold"] = journal_oas_gold
 
     abstracts_value: dict[str, Any] = {}
     if abstract:
@@ -559,16 +556,6 @@ class TestExtractFromApi:
         raw["static_data"]["summary"]["publishers"] = {"publisher": {"names": {"name": []}}}
         rec = extract_from_api(raw, None)
         assert rec["publisher_name"] is None
-
-    def test_oa_status_from_serial_oas_gold(self):
-        raw = _make_api_record(journal_oas_gold="Y")
-        rec = extract_from_api(raw, None)
-        assert rec["oa_status"] == "gold"
-
-    def test_oa_status_none_when_signal_absent(self):
-        raw = _make_api_record(journal_oas_gold=None)
-        rec = extract_from_api(raw, None)
-        assert rec["oa_status"] is None
 
     def test_language_as_dict(self):
         raw = _make_api_record()
@@ -824,7 +811,6 @@ class TestWosSourceRecord:
             "title": "T",
             "publication_year": 2024,
             "doc_type": "article",
-            "oa_status": "gold",
             "language": "en",
             "abstract": "abs",
             "cited_by_count": 9,
@@ -844,7 +830,6 @@ class TestWosSourceRecord:
         assert row_arg.publication_year == 2024
         assert row_arg.raw_doc_type == "article"
         assert row_arg.serial_id == 42
-        assert row_arg.oa_status == "gold"
         assert row_arg.raw_language == "en"
         assert row_arg.abstract == "abs"
         assert row_arg.impact == {"cited_by_count": 9}
@@ -857,7 +842,6 @@ class TestWosSourceRecord:
         )
 
         assert row_arg.serial_id is None
-        assert row_arg.oa_status is None
         assert "doi" not in identifier_values(row_arg)
 
     def test_container_title_absent_with_serial_id(self):
@@ -867,7 +851,6 @@ class TestWosSourceRecord:
             "publication_year": 2024,
             "doc_type": "article",
             "doi": "10.1/x",
-            "oa_status": "gold",
             "language": "en",
             "journal_title": "J Name",
         }
@@ -886,7 +869,6 @@ class TestWosSourceRecord:
             "publication_year": 2024,
             "doc_type": "article",
             "doi": None,
-            "oa_status": None,
             "language": None,
             "journal_title": "Container Title",
         }
@@ -995,6 +977,7 @@ def _normalizer(logger) -> WosNormalizer:
         publisher_store=MagicMock(),
         contribution_store=MagicMock(),
         location_store=MagicMock(),
+        embargo_store=MagicMock(),
     )
 
 

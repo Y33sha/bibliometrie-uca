@@ -8,7 +8,6 @@ from domain.publications.aggregation import (
     refresh_from_sources,
 )
 from domain.publications.identifiers import DOI
-from domain.publications.metadata import OA_STATUS_UNKNOWN_DEFAULT
 from domain.publications.publication import Publication
 from domain.source_records.keys import DoiKeys
 from domain.source_records.source_record import SourceRecord
@@ -27,7 +26,6 @@ def _source_record(**overrides) -> SourceRecord:
         "monograph_id": None,
         "container_title": None,
         "language": None,
-        "oa_status": None,
         "is_retracted": None,
         "abstract": None,
         "countries": (),
@@ -155,55 +153,6 @@ class TestChampsAgreges:
         publication = _publication()
         refresh_from_sources(publication, [premiere, seconde], source_priority=_PRIORITY)
         assert publication.biblio == {"volume": "3", "issue": "1", "pages": "5-9"}
-
-
-class TestStatutOa:
-    """Statut open access tiré des sources et du verdict d'Unpaywall sur le DOI de la publication."""
-
-    def test_le_statut_le_plus_ouvert_l_emporte(self):
-        verte = _source_record(id=1, source="hal", oa_status="green")
-        doree = _source_record(id=2, source="openalex", oa_status="gold")
-
-        publication = _publication()
-        refresh_from_sources(publication, [verte, doree], source_priority=("hal", "openalex"))
-        assert publication.oa_status == "gold"
-
-    def test_des_sources_muettes_donnent_un_statut_inconnu(self):
-        publication = _publication()
-        refresh_from_sources(
-            publication, [_source_record(oa_status=None)], source_priority=_PRIORITY
-        )
-        assert publication.oa_status == OA_STATUS_UNKNOWN_DEFAULT
-
-    def test_un_depot_en_archive_ouverte_tient_face_a_un_verdict_ferme(self):
-        publication = _publication()
-        refresh_from_sources(
-            publication,
-            [_source_record(source="hal", oa_status="green")],
-            source_priority=("hal",),
-            unpaywall={"10.9001/set": "closed"},
-        )
-        assert publication.oa_status == "green"
-
-    def test_sans_depot_le_verdict_ferme_tient(self):
-        publication = _publication()
-        refresh_from_sources(
-            publication,
-            [_source_record(source="openalex", oa_status="gold")],
-            source_priority=_PRIORITY,
-            unpaywall={"10.9001/set": "closed"},
-        )
-        assert publication.oa_status == "closed"
-
-    def test_le_verdict_vise_le_doi_de_la_publication(self):
-        publication = _publication()
-        refresh_from_sources(
-            publication,
-            [_source_record(source="openalex", oa_status="gold")],
-            source_priority=_PRIORITY,
-            unpaywall={"10.9001/autre": "closed"},
-        )
-        assert publication.oa_status == "gold"
 
 
 class TestLicences:

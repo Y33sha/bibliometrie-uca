@@ -15,12 +15,13 @@
 - [Pertinence des sujets](DATA_pertinence-des-sujets.md)
 - [Résolution probabiliste des personnes](DATA_resolution-personnes-probabiliste.md)
 - [Signatures institutionnelles](METIER_signatures-institutionnelles.md)
-- [Statut open access tiré des copies](DATA_statut-open-access.md)
 - [Types de document](DATA_types-document.md)
 - [Vérification des affiliations des sources](DATA_verification-affiliations.md)
 
 ## Chantiers archivés
 
+- 2026-10-31 — [URL de résolution des DOI](archived/2026-10-31_DATA_url-de-resolution-des-doi.md)
+- 2026-10-31 — [Statut open access tiré des copies](archived/2026-10-31_DATA_statut-open-access.md)
 - 2026-10-30 — [Identifiants des enregistrements sources](archived/2026-10-30_DATA_identifiants-des-enregistrements-sources.md)
 - 2026-10-27 — [Administration intégrée au site, navigation entre entités liées](archived/2026-10-27_UI_administration-et-navigation.md)
 - 2026-10-27 — [Cohérence graphique, responsivité et accessibilité du frontend](archived/2026-10-27_UI_coherence-et-accessibilite.md)

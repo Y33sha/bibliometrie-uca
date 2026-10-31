@@ -4,7 +4,7 @@ from collections import Counter
 
 import pytest
 
-from domain.platforms.platform import PlatformType, is_catalog_record
+from domain.platforms.platform import PlatformType, is_descriptive_page
 from domain.platforms.registry import (
     HAL,
     KNOWN_PLATFORMS,
@@ -12,6 +12,7 @@ from domain.platforms.registry import (
     known_platform_of_copy,
     known_platform_of_source,
     known_platform_of_url,
+    platform_type_of_copy,
     preprint_servers_of_prefix,
 )
 
@@ -21,11 +22,14 @@ from domain.platforms.registry import (
     [
         ("https://doaj.org/article/abc", True),
         ("https://www.doaj.org/article/abc", True),
+        ("https://pubmed.ncbi.nlm.nih.gov/1/", True),
+        ("https://eprints.gla.ac.uk/view/journal_volume/Physics_Letters_B.html>,", True),
+        ("https://eprints.gla.ac.uk/153180/1/153180.pdf", False),
         ("https://hal.science/hal-1", False),
     ],
 )
-def test_fiche_de_catalogue(url, expected):
-    assert is_catalog_record(url) is expected
+def test_page_descriptive(url, expected):
+    assert is_descriptive_page(url) is expected
 
 
 class TestKnownPlatforms:
@@ -76,6 +80,10 @@ class TestKnownPlatformOfUrl:
             ("https://shs.cairn.info/revue-x", "Cairn"),
             ("https://doi.org/10.48550/arxiv.2108.03135", "arXiv"),
             ("https://dx.doi.org/10.2139/ssrn.1", "SSRN"),
+            ("http://www.theses.fr/2018CLFAC093/document", "theses.fr"),
+            ("http://hdl.handle.net/10138/345747", "Handle"),
+            ("https://doi.org/10.3204/pubdb-2026-02456", "DESY Publication Database"),
+            ("https://doi.org/10.13140/rg.2.2.35033.38245", "ResearchGate"),
         ],
     )
     def test_plateforme_reconnue(self, url, expected):
@@ -86,7 +94,7 @@ class TestKnownPlatformOfUrl:
     @pytest.mark.parametrize(
         "url",
         [
-            "https://pubmed.ncbi.nlm.nih.gov/1",  # fiche de catalogue
+            "https://pubmed.ncbi.nlm.nih.gov/1",  # page descriptive
             "https://doi.org/10.1101/2020.01.01.1",  # préfixe commun à bioRxiv et medRxiv
             "https://osf.io/esfm6",  # hôte de plusieurs serveurs
             "https://doi.org/10.1016/j.x.2020.1",
@@ -109,3 +117,28 @@ class TestKnownPlatformOfUrl:
         assert known is not None
         assert known.name == "PsyArXiv"
         assert known_platform_of_copy("https://osf.io/esfm6", None) is None
+
+
+class TestPlatformTypeOfCopy:
+    def test_le_doi_commun_a_bioRxiv_et_medRxiv_donne_un_serveur_de_preprints(self):
+        url = "https://doi.org/10.1101/2025.06.28.662115"
+        assert platform_type_of_copy(url, None) is PlatformType.PREPRINT_SERVER
+
+    def test_une_revue_de_cold_spring_harbor_n_est_pas_un_serveur_de_preprints(self):
+        assert platform_type_of_copy("https://doi.org/10.1101/gad.353948.126", None) is None
+
+    @pytest.mark.parametrize(
+        ("url", "expected"),
+        [
+            ("https://doi.org/10.2196/preprints.12345", PlatformType.PREPRINT_SERVER),
+            ("https://doi.org/10.2196/jmir.12345", None),
+            ("https://doi.org/10.7490/f1000research.1115.1", PlatformType.REPOSITORY),
+            ("https://osf.io/hmd34", PlatformType.REPOSITORY),
+        ],
+    )
+    def test_preprints_jmir_posters_f1000_et_osf(self, url, expected):
+        assert platform_type_of_copy(url, None) is expected
+
+    def test_plateforme_de_la_liste(self):
+        url = "https://research.wur.nl/en/publications/x"
+        assert platform_type_of_copy(url, None) is PlatformType.REPOSITORY

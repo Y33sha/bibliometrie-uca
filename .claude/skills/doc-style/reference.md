@@ -267,6 +267,18 @@ AVANT :
 APRÈS :
     le bidule schtroumpfé par le truc
 
+## Énumération de cas tassée en prose
+
+Des cas parallèles enchaînés par des points-virgules et des fragments sans verbe (« ; version inconnue. Ou son chemin… ») ne se lisent plus. Une liste, une phrase complète par cas.
+
+AVANT :
+    - Une adresse enregistrée donne une copie ouverte de la publication, sans licence, dans deux cas. Elle mène à une plateforme en accès libre intégral d'après sa propre déclaration : arXiv, bioRxiv, medRxiv, PubMed Central ; version inconnue. Ou son chemin finit par `.pdf` ; version de l'éditeur. Les autres adresses enregistrées donnent seulement une ligne de `sources.dois`.
+
+APRÈS :
+    - Une adresse enregistrée donne une copie ouverte de la publication, sans licence :
+      - quand elle mène à arXiv, bioRxiv, medRxiv ou PubMed Central. Ces plateformes déclarent donner librement accès à tout leur contenu. La version de la copie est inconnue.
+      - quand son chemin finit par `.pdf`. La copie est en version de l'éditeur.
+
 ## Étapes numérotées
 
 Le titre d'une étape la nomme ; un numéro n'apporte rien quand l'ordre se lit déjà dans la suite des paragraphes.

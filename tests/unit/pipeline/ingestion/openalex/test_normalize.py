@@ -197,11 +197,7 @@ class TestGetLocations:
         }
         with_pdf, without_pdf = get_locations(work)
         assert with_pdf.url == "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC12988236/"
-        assert with_pdf.platform is not None
-        assert (without_pdf.url, without_pdf.platform) == (
-            "https://pubmed.ncbi.nlm.nih.gov/1/",
-            None,
-        )
+        assert without_pdf.url == "https://pubmed.ncbi.nlm.nih.gov/1/"
 
     def test_une_revue_ne_donne_pas_de_plateforme(self):
         work = {
@@ -216,10 +212,9 @@ class TestGetLocations:
         [location] = get_locations(work)
         assert (location.platform, location.oai_id) == (None, None)
 
-    def test_fiche_du_doaj_et_localisation_sans_url_ecartees(self):
+    def test_localisation_sans_url_ecartee(self):
         work = {
             "locations": [
-                {"landing_page_url": "https://doaj.org/article/abc"},
                 {"landing_page_url": None, "pdf_url": None},
                 {"landing_page_url": None, "pdf_url": "https://arxiv.org/pdf/2103.11769"},
             ]
@@ -784,6 +779,7 @@ def _make_normalizer():
         publisher_store=MagicMock(),
         contribution_store=MagicMock(),
         location_store=MagicMock(),
+        embargo_store=MagicMock(),
     )
 
 

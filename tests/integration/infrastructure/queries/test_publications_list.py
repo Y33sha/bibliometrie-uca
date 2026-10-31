@@ -576,13 +576,18 @@ class TestPersonView:
         assert item.is_corresponding is True
         assert [i.id for i in item.lab_items or []] == [lab]
 
-    def test_corresponding_and_perimeter_filters_read_the_contribution(self, sa_sync_conn):
+    def test_author_position_and_perimeter_filters_read_the_contribution(self, sa_sync_conn):
         person, _, publication = self._seed(sa_sync_conn)
 
-        assert [
-            p.id for p in self._list(sa_sync_conn, person_id=person, is_corresponding=["yes"])
-        ] == [publication]
-        assert self._list(sa_sync_conn, person_id=person, is_corresponding=["no"]) == []
+        def by_position(*positions):
+            return [
+                p.id
+                for p in self._list(sa_sync_conn, person_id=person, author_position=list(positions))
+            ]
+
+        assert by_position("corresponding") == [publication]
+        assert by_position("other") == []
+        assert by_position("corresponding", "other") == [publication]
         assert [p.id for p in self._list(sa_sync_conn, person_id=person, in_perimeter=["yes"])] == [
             publication
         ]
@@ -590,13 +595,38 @@ class TestPersonView:
         builder = _PublicationFacetsBuilder(
             sa_sync_conn, PublicationFilters(person_id=person), FilterContext([], None)
         )
-        assert {(o.value, o.count) for o in builder._facet_corresponding()} == {
-            ("yes", 1),
-            ("no", 0),
+        assert {(o.value, o.count) for o in builder._facet_author_positions()} == {
+            ("corresponding", 1),
+            ("other", 0),
         }
         assert {(o.value, o.count) for o in builder._facet_in_perimeter()} == {
             ("yes", 1),
             ("no", 0),
+        }
+
+    def test_author_position_of_a_lab_reads_its_contributions(self, sa_sync_conn):
+        """Le correspondant est affilié au laboratoire de la personne, pas à celui du coauteur."""
+        _, lab, publication = self._seed(sa_sync_conn)
+        coauthor_lab = sa_sync_conn.execute(
+            text("SELECT id FROM structures WHERE code = 'LAB-C'")
+        ).scalar_one()
+
+        def by_position(lab_id, position):
+            return [
+                p.id for p in self._list(sa_sync_conn, lab_ids=[lab_id], author_position=[position])
+            ]
+
+        assert by_position(lab, "corresponding") == [publication]
+        assert by_position(lab, "other") == []
+        assert by_position(coauthor_lab, "corresponding") == []
+        assert by_position(coauthor_lab, "other") == [publication]
+
+        builder = _PublicationFacetsBuilder(
+            sa_sync_conn, PublicationFilters(lab_ids=[coauthor_lab]), FilterContext([], None)
+        )
+        assert {(o.value, o.count) for o in builder._facet_author_positions()} == {
+            ("corresponding", 0),
+            ("other", 1),
         }
 
     def test_thesis_author_is_a_contribution_with_person(self, sa_sync_conn):

@@ -31,6 +31,7 @@ La table des paires est du dérivé recalculable. C'est la sortie d'un modèle p
 ### Phase 2 — Choix de la méthode
 
 - [ ] Cascade seule, ou cascade puis modèle probabiliste sur le résidu.
+- [ ] Résolution indépendante de l'ordre d'arrivée des enregistrements sources. Les rattachements non épinglés sont remis en jeu à chaque passage.
 
 ## Questions ouvertes
 

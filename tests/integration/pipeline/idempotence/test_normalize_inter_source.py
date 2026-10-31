@@ -30,7 +30,6 @@ INTER_HAL_DOCS = [
                 "Alice Dupont_FacetSep_0-0_FacetSep_",
                 "Bob Martin_FacetSep_0-0_FacetSep_",
             ],
-            "openAccess_bool": True,
         },
     },
     {

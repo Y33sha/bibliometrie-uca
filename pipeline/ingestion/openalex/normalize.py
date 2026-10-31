@@ -6,7 +6,7 @@ from urllib.parse import urlsplit
 
 from domain.countries import normalize_country_code
 from domain.persons.contributor_name import ContributorName
-from domain.platforms.platform import PlatformType, is_catalog_record
+from domain.platforms.platform import PlatformType
 from domain.platforms.registry import PMC_ARTICLE_URL, PUBMED_CENTRAL, known_platform_of_source
 from domain.publications.contribution_roles import ContributionRole
 from domain.publications.identifiers import (
@@ -52,7 +52,6 @@ from pipeline.ingestion.common.source_records import (
 from pipeline.ingestion.common.staging import StagingRow
 from pipeline.ingestion.openalex.payload import (
     OpenalexLocation,
-    map_openalex_oa_status,
     names_publisher,
     names_serial,
     openalex_derived_identifier,
@@ -114,18 +113,18 @@ def openalex_identifiers(
 
 
 def get_locations(work: Mapping[str, JsonValue]) -> list[LocationFacts]:
-    """Renvoie les localisations du work, hors fiches de catalogue. Une source de type `repository` donne la plateforme de la localisation."""
+    """Renvoie les localisations du work. Une source de type `repository` donne la plateforme de la localisation."""
     locations: list[LocationFacts] = []
     for entry in as_sequence(work.get("locations")):
         loc = as_mapping(entry)
         pdf_url = as_str(loc.get("pdf_url"))
         url = as_str(loc.get("landing_page_url")) or pdf_url
-        if not url or is_catalog_record(url):
+        if not url:
             continue
         location_id = as_str(loc.get("id")) or ""
         platform = _repository(as_mapping(loc.get("source")))
         if platform and platform.openalex_id in PUBMED_CENTRAL.openalex_ids:
-            url, platform = _pmc_copy(url, pdf_url, platform)
+            url = _pmc_url(url, pdf_url)
         locations.append(
             LocationFacts(
                 url=url,
@@ -140,18 +139,11 @@ def get_locations(work: Mapping[str, JsonValue]) -> list[LocationFacts]:
     return locations
 
 
-def _pmc_copy(
-    url: str, pdf_url: str | None, platform: PlatformFacts
-) -> tuple[str, PlatformFacts | None]:
-    """Renvoie l'adresse et la plateforme d'une copie rangée par OpenAlex sous PubMed Central.
-
-    Une page PubMed n'est pas une copie sur PMC : l'adresse devient la page de l'article sur PMC, d'après le PMCID de son PDF. À défaut, la copie perd sa plateforme.
-    """
-    if urlsplit(url).hostname != "pubmed.ncbi.nlm.nih.gov":
-        return url, platform
-    if pmcid := normalize_pmcid(pdf_url):
-        return PMC_ARTICLE_URL.format(pmcid), platform
-    return url, None
+def _pmc_url(url: str, pdf_url: str | None) -> str:
+    """Renvoie l'adresse d'une copie rangée par OpenAlex sous PubMed Central. Une page PubMed, page descriptive, devient la page de l'article sur PMC, d'après le PMCID de son PDF."""
+    if urlsplit(url).hostname == "pubmed.ncbi.nlm.nih.gov" and (pmcid := normalize_pmcid(pdf_url)):
+        return PMC_ARTICLE_URL.format(pmcid)
+    return url
 
 
 def _repository(source: Mapping[str, JsonValue]) -> PlatformFacts | None:
@@ -339,9 +331,6 @@ def openalex_source_record(  # noqa: C901
         abstract=abstract,
         keywords=keywords,
         topics=topics_json,
-        oa_status=map_openalex_oa_status(
-            as_str(as_mapping(work.get("open_access")).get("oa_status"))
-        ),
         license=normalize_license(publisher_license),
         urls=urls or None,
         impact=extract_impact(work).to_json(),

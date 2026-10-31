@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict NcDVQE2ZLpJHEZdnpkeMYdjdOBWqoB3aYHOgNhDFNsHQO4wb6hKHwz6qAUfFsCn
+\restrict 9rAfsetKf04IuDbF7gufyUxR592IDsCt1hakAM4dm4qGNQcTOEVYUXSdJZKfEE2
 
--- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
--- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
+-- Dumped from database version 18.4
+-- Dumped by pg_dump version 18.4
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -670,8 +670,8 @@ CREATE TABLE ops.config (
     description text,
     created_at timestamp with time zone DEFAULT now(),
     CONSTRAINT config_brand_hue_is_angle CHECK (((key <> 'brand_hue'::text) OR ((jsonb_typeof(value) = 'number'::text) AND (((value)::numeric >= (0)::numeric) AND ((value)::numeric <= (359)::numeric)) AND ((value)::numeric = trunc((value)::numeric))))),
-    CONSTRAINT config_cap_is_non_negative_integer CHECK (((key <> ALL (ARRAY['fetch_missing_max_per_source'::text, 'sudoc_max_per_run'::text, 'unpaywall_max_per_run'::text])) OR ((jsonb_typeof(value) = 'number'::text) AND ((value)::numeric >= (0)::numeric) AND ((value)::numeric = trunc((value)::numeric))))),
-    CONSTRAINT config_delay_is_positive_integer CHECK (((key <> ALL (ARRAY['doaj_refresh_after_days'::text, 'fetch_missing_retry_after_days'::text, 'fetch_stale_after_days'::text, 'unpaywall_recheck_after_days'::text])) OR ((jsonb_typeof(value) = 'number'::text) AND ((value)::numeric >= (1)::numeric) AND ((value)::numeric = trunc((value)::numeric))))),
+    CONSTRAINT config_cap_is_non_negative_integer CHECK (((key <> ALL (ARRAY['doi_resolution_max_per_run'::text, 'fetch_missing_max_per_source'::text, 'sudoc_max_per_run'::text, 'unpaywall_max_per_run'::text])) OR ((jsonb_typeof(value) = 'number'::text) AND ((value)::numeric >= (0)::numeric) AND ((value)::numeric = trunc((value)::numeric))))),
+    CONSTRAINT config_delay_is_positive_integer CHECK (((key <> ALL (ARRAY['doaj_refresh_after_days'::text, 'doi_resolution_recheck_after_days'::text, 'fetch_missing_retry_after_days'::text, 'fetch_stale_after_days'::text, 'unpaywall_recheck_after_days'::text])) OR ((jsonb_typeof(value) = 'number'::text) AND ((value)::numeric >= (1)::numeric) AND ((value)::numeric = trunc((value)::numeric))))),
     CONSTRAINT config_institution_country_is_code CHECK (((key <> 'institution_country'::text) OR ((jsonb_typeof(value) = 'string'::text) AND ((value #>> '{}'::text[]) ~ '^[a-z]{2}$'::text) AND ((value #>> '{}'::text[]) <> 'xx'::text)))),
     CONSTRAINT config_site_title_is_text CHECK (((key <> 'site_title'::text) OR (jsonb_typeof(value) = 'string'::text))),
     CONSTRAINT config_year_is_in_range CHECK (((key <> 'pipeline_start_year_full'::text) OR ((jsonb_typeof(value) = 'number'::text) AND (((value)::numeric >= (1970)::numeric) AND ((value)::numeric <= (2100)::numeric)) AND ((value)::numeric = trunc((value)::numeric)))))
@@ -1238,7 +1238,6 @@ CREATE TABLE sources.source_records (
     hal_collections text[],
     urls text[],
     serial_id integer,
-    oa_status text,
     language text,
     container_title text,
     is_retracted boolean,
@@ -1250,7 +1249,6 @@ CREATE TABLE sources.source_records (
     updated_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
     corrections jsonb DEFAULT '{}'::jsonb CONSTRAINT source_records_raw_metadata_not_null NOT NULL,
     title_normalized text,
-    embargo_until date,
     monograph_id integer,
     authors_hash text,
     impact jsonb,
@@ -2762,6 +2760,80 @@ COMMENT ON COLUMN sources.doi_targets.rule IS 'Règle de correction qui relie le
 
 
 --
+-- Name: dois; Type: TABLE; Schema: sources; Owner: -
+--
+
+CREATE TABLE sources.dois (
+    doi text NOT NULL,
+    unpaywall_oa_status public.oa_type,
+    unpaywall_checked_at timestamp with time zone,
+    registered_url text,
+    resolved_at timestamp with time zone,
+    CONSTRAINT dois_registered_url_dated CHECK (((registered_url IS NULL) OR (resolved_at IS NOT NULL))),
+    CONSTRAINT dois_unpaywall_dated CHECK (((unpaywall_oa_status IS NULL) OR (unpaywall_checked_at IS NOT NULL)))
+);
+
+
+--
+-- Name: TABLE dois; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON TABLE sources.dois IS 'Réponses des services externes sur chaque DOI de publication : verdict d''Unpaywall, URL de résolution chez doi.org.';
+
+
+--
+-- Name: COLUMN dois.unpaywall_oa_status; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON COLUMN sources.dois.unpaywall_oa_status IS 'Statut open access donné par Unpaywall. NULL avec une date : DOI absent d''Unpaywall.';
+
+
+--
+-- Name: COLUMN dois.unpaywall_checked_at; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON COLUMN sources.dois.unpaywall_checked_at IS 'Date du verdict d''Unpaywall. Le DOI est réinterrogé au-delà du délai unpaywall_recheck_after_days.';
+
+
+--
+-- Name: COLUMN dois.registered_url; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON COLUMN sources.dois.registered_url IS 'URL de résolution du DOI, lue dans l''API des handles de doi.org. NULL avec une date : DOI inconnu de doi.org.';
+
+
+--
+-- Name: COLUMN dois.resolved_at; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON COLUMN sources.dois.resolved_at IS 'Date de la lecture chez doi.org.';
+
+
+--
+-- Name: embargoes; Type: TABLE; Schema: sources; Owner: -
+--
+
+CREATE TABLE sources.embargoes (
+    source_record_id integer NOT NULL,
+    until date
+);
+
+
+--
+-- Name: TABLE embargoes; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON TABLE sources.embargoes IS 'Embargo déclaré par un enregistrement source : fichier déposé dans HAL, thèse de theses.fr.';
+
+
+--
+-- Name: COLUMN embargoes.until; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON COLUMN sources.embargoes.until IS 'Date de fin d''embargo. Nulle quand la source déclare un embargo sans date.';
+
+
+--
 -- Name: failed_lookups; Type: TABLE; Schema: sources; Owner: -
 --
 
@@ -2931,31 +3003,6 @@ CREATE SEQUENCE sources.staging_id_seq
 --
 
 ALTER SEQUENCE sources.staging_id_seq OWNED BY sources.staging.id;
-
-
---
--- Name: unpaywall; Type: TABLE; Schema: sources; Owner: -
---
-
-CREATE TABLE sources.unpaywall (
-    doi text NOT NULL,
-    oa_status public.oa_type,
-    checked_at timestamp with time zone NOT NULL
-);
-
-
---
--- Name: TABLE unpaywall; Type: COMMENT; Schema: sources; Owner: -
---
-
-COMMENT ON TABLE sources.unpaywall IS 'Verdict d''Unpaywall pour chaque DOI interrogé par la phase oa_status. Le DOI est réinterrogé quand checked_at date de plus que le délai unpaywall_recheck_after_days.';
-
-
---
--- Name: COLUMN unpaywall.oa_status; Type: COMMENT; Schema: sources; Owner: -
---
-
-COMMENT ON COLUMN sources.unpaywall.oa_status IS 'Statut open access donné par Unpaywall. NULL : DOI absent d''Unpaywall.';
 
 
 --
@@ -3913,6 +3960,22 @@ ALTER TABLE ONLY sources.doi_targets
 
 
 --
+-- Name: dois dois_pkey; Type: CONSTRAINT; Schema: sources; Owner: -
+--
+
+ALTER TABLE ONLY sources.dois
+    ADD CONSTRAINT dois_pkey PRIMARY KEY (doi);
+
+
+--
+-- Name: embargoes embargoes_pkey; Type: CONSTRAINT; Schema: sources; Owner: -
+--
+
+ALTER TABLE ONLY sources.embargoes
+    ADD CONSTRAINT embargoes_pkey PRIMARY KEY (source_record_id);
+
+
+--
 -- Name: failed_lookups failed_lookups_pkey; Type: CONSTRAINT; Schema: sources; Owner: -
 --
 
@@ -4014,14 +4077,6 @@ ALTER TABLE ONLY sources.staging
 
 ALTER TABLE ONLY sources.staging
     ADD CONSTRAINT staging_source_source_id_key UNIQUE (source, source_id);
-
-
---
--- Name: unpaywall unpaywall_pkey; Type: CONSTRAINT; Schema: sources; Owner: -
---
-
-ALTER TABLE ONLY sources.unpaywall
-    ADD CONSTRAINT unpaywall_pkey PRIMARY KEY (doi);
 
 
 --
@@ -5390,6 +5445,14 @@ ALTER TABLE ONLY ref.ror_relations
 
 
 --
+-- Name: embargoes embargoes_source_record_id_fkey; Type: FK CONSTRAINT; Schema: sources; Owner: -
+--
+
+ALTER TABLE ONLY sources.embargoes
+    ADD CONSTRAINT embargoes_source_record_id_fkey FOREIGN KEY (source_record_id) REFERENCES sources.source_records(id) ON DELETE CASCADE;
+
+
+--
 -- Name: source_contribution_addresses source_contribution_addresses_address_id_fkey; Type: FK CONSTRAINT; Schema: sources; Owner: -
 --
 
@@ -5617,5 +5680,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict NcDVQE2ZLpJHEZdnpkeMYdjdOBWqoB3aYHOgNhDFNsHQO4wb6hKHwz6qAUfFsCn
+\unrestrict 9rAfsetKf04IuDbF7gufyUxR592IDsCt1hakAM4dm4qGNQcTOEVYUXSdJZKfEE2
 

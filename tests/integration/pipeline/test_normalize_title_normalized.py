@@ -1,4 +1,4 @@
-"""La normalisation écrit `title_normalized` en même temps que `title`."""
+"""La normalisation écrit le titre nettoyé et `title_normalized`, qui s'en dérive."""
 
 from sqlalchemy import text
 
@@ -10,10 +10,10 @@ from pipeline.ingestion.common.source_records import (
 from tests.integration.helpers.staging import insert_staging
 
 
-def test_upsert_writes_title_normalized(sa_sync_conn):
+def test_upsert_writes_cleaned_title_and_title_normalized(sa_sync_conn):
     conn = sa_sync_conn
     staging_id = insert_staging(conn, "openalex", source_id="W_title_norm")
-    raw_title = "Les Cœurs <b>simples</b> &amp;amp; complexes"
+    raw_title = "Les  Cœurs <b>simples</b> &amp;amp; complexes"
     source_record_id = SourceRecordStore(sa_sync_conn).upsert_source_record(
         SourceRecordUpsert(
             source="openalex",
@@ -28,6 +28,6 @@ def test_upsert_writes_title_normalized(sa_sync_conn):
         text("SELECT title, title_normalized FROM source_records WHERE id = :id"),
         {"id": source_record_id},
     ).one()
-    assert stored.title == raw_title  # le titre brut est conservé tel quel
+    assert stored.title == "Les Cœurs <b>simples</b> & complexes"
     assert stored.title_normalized == normalized_title(raw_title)
-    assert stored.title_normalized  # non vide / non NULL
+    assert stored.title_normalized

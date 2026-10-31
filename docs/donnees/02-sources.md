@@ -17,19 +17,20 @@ Schéma PostgreSQL `sources`.
 | `staging` | Document moissonné : identifiant dans la source, payload brut, empreinte (`raw_hash`), date de disparition de la source (`disappeared_at`). Le payload est vidé après la normalisation | Un document par source et identifiant |
 | `failed_lookups` | Identifiant (DOI, identifiant HAL, NNT) cherché en vain dans une source ou auprès de doi.org, avec la date de l'échec | |
 
-**Statut open access**
+**DOI**
 
 | Table | Contenu | Contrainte |
 |---|---|---|
-| `unpaywall` | Statut d'accès donné par Unpaywall pour un DOI, avec la date de l'interrogation | Un statut par DOI |
+| `dois` | Statut d'accès donné par Unpaywall, URL de résolution chez doi.org, chacun avec la date de l'interrogation | Une ligne par DOI de publication |
 
 **Enregistrements sources**
 
 | Table | Contenu | Contrainte |
 |---|---|---|
-| `source_records` | Métadonnées typées : titre, type de document, année, revue, éditeur, statut d'accès, langue. Champs propres à certaines sources : résumé, mots-clés, thématiques, données bibliographiques, collections HAL, embargo, rétractation. `raw_doc_type` et `raw_language` : valeurs dans le vocabulaire de la source. `corrections` : valeurs d'origine des métadonnées corrigées. `is_matchable` : faux pour un enregistrement source écarté de la réconciliation. `publication_id` : publication de rattachement | Un enregistrement source par source et identifiant |
+| `source_records` | Métadonnées typées : titre, type de document, année, revue, éditeur, langue. Champs propres à certaines sources : résumé, mots-clés, thématiques, données bibliographiques, collections HAL, rétractation. `raw_doc_type` et `raw_language` : valeurs dans le vocabulaire de la source. `corrections` : valeurs d'origine des métadonnées corrigées. `is_matchable` : faux pour un enregistrement source écarté de la réconciliation. `publication_id` : publication de rattachement | Un enregistrement source par source et identifiant |
 | `source_record_identifiers` | Identifiants d'un enregistrement source, DOI compris : type, valeur, rôle (primaire, dérivé, secondaire ou lié). `removed_by` : règle de correction qui retire l'identifiant | Un identifiant par type et valeur, au plus un identifiant dérivé |
-| `source_record_locations` | Copies du document : URL de la page et du PDF, identifiant OAI-PMH, version, licence, open access, [plateforme](07-publishing.md) | Une copie par URL |
+| `source_record_locations` | Copies du document : URL de la page et du PDF, identifiant OAI-PMH, version, licence, open access, [plateforme](07-publishing.md). Les pages qui décrivent le document sans en donner le texte (DOAJ, DOAB, PubMed) sont écartées. L'URL d'une copie HAL est l'adresse de son dépôt, `https://hal.science/<identifiant sans version>` (portail DUMAS pour un mémoire DUMAS), quel que soit le portail donné par la source | Une copie par URL |
+| `embargoes` | Embargo déclaré par un enregistrement source : date de fin du fichier déposé dans HAL, ou embargo sans date d'une thèse de theses.fr. Sous embargo actif, le fichier déposé est fermé | Un embargo par enregistrement source |
 | `doi_targets` | Cible du DOI d'une forme secondaire de la même œuvre (version, variante), qui tient lieu du DOI pour la réconciliation | Une cible par DOI |
 
 **Contributions sources**
@@ -59,4 +60,4 @@ Schéma PostgreSQL `sources`.
 - La phase [`publications`](../pipeline/07-publications.md) rattache chaque enregistrement source à sa publication.
 - La phase [`author_grouping`](../pipeline/08-author-grouping.md) marque les doublons d'auteur.
 - Les phases `normalize` et [`persons`](../pipeline/09-persons.md) neutralisent des identifiants.
-- Les [enrichissements](../pipeline/11-enrichissements.md) écrivent les pays et `unpaywall`.
+- Les [enrichissements](../pipeline/11-enrichissements.md) écrivent les pays et `dois`.

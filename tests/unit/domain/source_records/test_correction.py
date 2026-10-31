@@ -39,11 +39,8 @@ def _view(doi: str | None = None, **overrides: object) -> MetadataForCorrection:
         "doc_type": None,
         "dois": frozenset({doi} if doi else ()),
         "serial_id": None,
-        "oa_status": None,
         "urls": (),
         "serial_type": None,
-        "oa_model": None,
-        "embargo_expired": False,
         "self_declared_preprint": False,
         "declares_conference": False,
     }
@@ -1039,81 +1036,6 @@ class TestDoiFigshareCollectionRule:
         assert corrected.rule == MetadataCorrectionRule.DOI_FIGSHARE_COLLECTION_TO_DATASET
 
 
-class TestEmbargoExpiredRule:
-    def test_expired_embargo_promoted_to_green(self):
-        view = _view(oa_status="embargoed", embargo_expired=True)
-        corrected = effective_metadata(view).oa_status
-        assert corrected is not None
-        assert corrected.value == "green"
-        assert corrected.rule == MetadataCorrectionRule.EMBARGO_EXPIRED_TO_GREEN
-
-    def test_active_embargo_not_promoted(self):
-        # Embargo encore en cours (non expiré) → reste `embargoed`.
-        assert (
-            effective_metadata(_view(oa_status="embargoed", embargo_expired=False)).oa_status
-            is None
-        )
-
-    def test_non_embargoed_status_untouched(self):
-        # Un statut non-`embargoed` n'est pas concerné, même si `embargo_expired` est vrai.
-        assert effective_metadata(_view(oa_status="green", embargo_expired=True)).oa_status is None
-        assert effective_metadata(_view(oa_status="closed", embargo_expired=True)).oa_status is None
-
-
-class TestHybridFullOaRule:
-    def test_hybrid_in_full_oa_serial_promoted_to_gold(self):
-        view = _view(oa_status="hybrid", oa_model="full_oa")
-        corrected = effective_metadata(view).oa_status
-        assert corrected is not None
-        assert corrected.value == "gold"
-        assert corrected.rule == MetadataCorrectionRule.HYBRID_FULL_OA_TO_GOLD
-
-    def test_hybrid_outside_full_oa_untouched(self):
-        # Revue par abonnement : `hybrid` est un statut légitime, aucune promotion.
-        assert (
-            effective_metadata(_view(oa_status="hybrid", oa_model="subscription")).oa_status is None
-        )
-        # oa_model inconnu (revue non enrichie) : abstention.
-        assert effective_metadata(_view(oa_status="hybrid", oa_model=None)).oa_status is None
-
-    def test_non_hybrid_status_untouched(self):
-        # Un statut déjà `gold`/`green` dans une revue full-OA reste inchangé.
-        assert effective_metadata(_view(oa_status="gold", oa_model="full_oa")).oa_status is None
-        assert effective_metadata(_view(oa_status="green", oa_model="full_oa")).oa_status is None
-
-
-class TestDiamondJournalRules:
-    """Le diamant suit la revue : un article ouvert d'une revue diamant est diamant, un diamant hors revue diamant est gold."""
-
-    def _corrected(self, **overrides: object):
-        return effective_metadata(_view(**overrides)).oa_status
-
-    def test_gold_in_diamond_journal_becomes_diamond(self):
-        corrected = self._corrected(oa_status="gold", journal_diamond=True)
-        assert corrected is not None
-        assert corrected.value == "diamond"
-        assert corrected.rule == MetadataCorrectionRule.GOLD_DIAMOND_JOURNAL_TO_DIAMOND
-
-    def test_hybrid_in_diamond_full_oa_journal_becomes_diamond(self):
-        # La règle diamant précède `HYBRID_FULL_OA_TO_GOLD`.
-        corrected = self._corrected(oa_status="hybrid", oa_model="full_oa", journal_diamond=True)
-        assert corrected is not None
-        assert corrected.value == "diamond"
-        assert corrected.rule == MetadataCorrectionRule.HYBRID_DIAMOND_JOURNAL_TO_DIAMOND
-
-    def test_diamond_outside_diamond_journal_becomes_gold(self):
-        corrected = self._corrected(oa_status="diamond", oa_model="full_oa", journal_diamond=False)
-        assert corrected is not None
-        assert corrected.value == "gold"
-        assert corrected.rule == MetadataCorrectionRule.DIAMOND_OUTSIDE_DIAMOND_JOURNAL_TO_GOLD
-
-    def test_diamond_in_diamond_journal_untouched(self):
-        assert self._corrected(oa_status="diamond", journal_diamond=True) is None
-
-    def test_green_in_diamond_journal_untouched(self):
-        assert self._corrected(oa_status="green", journal_diamond=True) is None
-
-
 class TestPreprintRelationRule:
     def test_declared_preprint_retyped_even_without_doc_type(self):
         # Crossref donne un `doc_type` nul, mais déclare `is-preprint-of`.
@@ -1139,19 +1061,7 @@ class TestPreprintRelationRule:
 class TestEffectiveMetadataScope:
     def test_no_signals_no_correction(self):
         corrected = effective_metadata(_view())
-        assert corrected.doc_type is None and corrected.oa_status is None
-
-    def test_only_doc_type_is_touched(self):
-        # La seule règle d'oa_status est la règle embargo, ici non déclenchée (gold non expiré).
-        # Seul doc_type pourrait être corrigé sur cette vue.
-        view = _view(
-            doc_type="article",
-            urls=("https://theses.fr/s1",),
-            serial_id=42,
-            oa_status="gold",
-        )
-        fields = effective_metadata(view)
-        assert fields.oa_status is None
+        assert corrected.doc_type is None
 
 
 class TestPublication:
@@ -1175,7 +1085,9 @@ class TestPublication:
 class TestFaitInconnu:
     @pytest.mark.parametrize("expected", [True, False])
     def test_predicat_sur_un_fait_inconnu_faux(self, expected):
-        assert not _check_predicate(_view(journal_diamond=None), "journal_diamond", expected)
+        assert not _check_predicate(
+            _view(in_proceedings_volume=None), "in_proceedings_volume", expected
+        )
 
 
 class TestPresentationRules:

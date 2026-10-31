@@ -2,6 +2,7 @@
 
 Chaque issue d'une lecture par identifiant natif a son traitement :
 - document trouvé (empreinte changée / inchangée) → écriture dans `staging` (updated / unchanged) ;
+- document renvoyé sous un autre identifiant natif → écriture du document renvoyé, `disappeared_at` sur le document cherché ;
 - absence confirmée (`NOT_FOUND`) → `disappeared_at` ;
 - source indisponible (`UNAVAILABLE`) → rien, compté en `errors`, ni écrit ni marqué disparu.
 """
@@ -85,6 +86,14 @@ def test_routes_each_outcome(lancer):
     assert set(base.ecrits) == {"A", "B"}
     assert base.disparus == ["C"]
     assert (metrics.updated, metrics.unchanged, metrics.errors, metrics.total) == (1, 1, 1, 4)
+    assert metrics.extras.get("disappeared") == 1
+
+
+def test_document_returned_under_another_id_replaces_the_requested_one(lancer):
+    # Work fusionné : OpenAlex renvoie le work absorbant sous l'identifiant demandé.
+    metrics, base = lancer({"A": {"id": "https://openalex.org/B", "changed": True}})
+
+    assert (base.ecrits, base.disparus) == (["B"], ["A"])
     assert metrics.extras.get("disappeared") == 1
 
 

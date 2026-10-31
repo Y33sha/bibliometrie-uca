@@ -34,6 +34,7 @@ from domain.source_records.identifiers import (
 )
 from domain.structures.identifiers import parse_ror_ids
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs
+from pipeline.ingestion.common.embargoes import Embargo
 from pipeline.ingestion.common.locations import LocationFacts
 from pipeline.ingestion.common.normalizer import Document, PublisherFacts, SourceNormalizer
 from pipeline.ingestion.common.source_contributions import (
@@ -46,7 +47,7 @@ from pipeline.ingestion.common.source_records import (
 )
 from pipeline.ingestion.common.staging import StagingRow
 from pipeline.ingestion.hal.payload import (
-    derive_hal_oa_status,
+    communication_annex,
     extract_hal_source_extras,
     hal_text_field,
 )
@@ -106,31 +107,18 @@ def get_container_title(doc: Mapping[str, JsonValue]) -> str | None:
     )
 
 
-def get_oa_status(doc: Mapping[str, JsonValue], embargo_until: date | None) -> str | None:
-    """Renvoie le statut open access, tiré de `openAccess_bool`, du fichier déposé, du lien externe et de l'embargo actif."""
-    is_open = doc.get("openAccess_bool")
-    return derive_hal_oa_status(
-        is_open if isinstance(is_open, bool) else None,
-        hal_text_field(doc.get("fileMain_s")),
-        hal_text_field(doc.get("linkExtId_s")),
-        embargo_until,
-    )
-
-
-def get_locations(doc: Mapping[str, JsonValue], embargo_until: date | None) -> list[LocationFacts]:
-    """Renvoie la page du dépôt HAL (`uri_s`), avec le fichier déposé (`fileMain_s`) et sa licence.
-
-    La copie est ouverte quand un fichier est déposé, hors embargo actif (`embargo_until`)."""
+def get_locations(doc: Mapping[str, JsonValue]) -> list[LocationFacts]:
+    """Renvoie la page du dépôt HAL (`uri_s`), avec le fichier déposé (`fileMain_s`, à défaut l'annexe d'une communication) et sa licence. La copie est ouverte quand elle a un fichier."""
     uri = hal_text_field(doc.get("uri_s"))
     if not uri:
         return []
-    file_main = hal_text_field(doc.get("fileMain_s"))
+    file = hal_text_field(doc.get("fileMain_s")) or communication_annex(doc)
     return [
         LocationFacts(
             url=uri,
-            pdf_url=file_main,
+            pdf_url=file,
             license=normalize_license(hal_text_field(doc.get("licence_s"))),
-            is_oa=file_main is not None and embargo_until is None,
+            is_oa=file is not None,
         )
     ]
 
@@ -190,7 +178,6 @@ def hal_source_record(
     """
     doc_type = get_doc_type(doc)
     nnt = normalize_nnt(hal_text_field(doc.get("nntId_s")))
-    embargo_until = active_embargo_until(hal_text_field(doc.get("label_xml")), today())
 
     # Toutes les collections du dépôt.
     collections_array = sorted(set(as_strs(doc.get("collCode_s")))) or None
@@ -235,10 +222,8 @@ def hal_source_record(
         abstract=abstract,
         keywords=keywords,
         topics=topics,
-        oa_status=get_oa_status(doc, embargo_until),
         license=normalize_license(hal_text_field(doc.get("licence_s"))),
         urls=urls,
-        embargo_until=embargo_until,
         hal_collections=collections_array,
     )
 
@@ -260,7 +245,7 @@ def _parse_tei(label_xml: str) -> Element:
 def active_embargo_until(label_xml: str | None, today: date) -> date | None:
     """Renvoie la date de fin d'un embargo HAL encore actif, sinon `None`.
 
-    Lit `ref[@type='file']/date/@notBefore` du TEI : la date d'accès au fichier déposé. Parmi plusieurs `ref` de type `file` (page et document), la plus tardive l'emporte. Une date échue renvoie `None` : un embargo levé reste hors de la base. À l'échéance d'un embargo stocké, une règle de correction de `oa_status` le lève, sans nouvel import HAL.
+    Lit `ref[@type='file']/date/@notBefore` du TEI : la date d'accès au fichier déposé. Parmi plusieurs `ref` de type `file` (page et document), la plus tardive l'emporte. Une date échue renvoie `None`. À l'échéance d'un embargo stocké (`embargoes`), la copie s'ouvre à la lecture, et une règle de correction lève le statut `embargoed`, sans nouvel import HAL.
     """
     if not label_xml:
         return None
@@ -561,9 +546,12 @@ class HalNormalizer(SourceNormalizer):
         return get_container_facts(doc)
 
     def locations(self, doc: Document) -> list[LocationFacts]:
-        return get_locations(
-            doc, active_embargo_until(hal_text_field(doc.get("label_xml")), today())
-        )
+        return get_locations(doc)
+
+    def embargo(self, doc: Document) -> Embargo | None:
+        """Renvoie l'embargo actif du fichier déposé (`active_embargo_until`)."""
+        until = active_embargo_until(hal_text_field(doc.get("label_xml")), today())
+        return Embargo(until) if until else None
 
     def source_record(
         self, row: StagingRow, doc: Document, containers: Containers

@@ -3,7 +3,8 @@
 Chaque document est relu par son identifiant natif :
 
 - document trouvé → écriture dans `staging` ;
-- absence confirmée (réponse valide, aucun document) → document marqué disparu (`disappeared_at`) ;
+- document renvoyé sous un autre identifiant natif (work fusionné, DOI alias) → écriture dans `staging` du document renvoyé, document cherché marqué disparu (`disappeared_at`) ;
+- absence confirmée (réponse valide, aucun document) → document marqué disparu ;
 - source indisponible (réseau, 429, réponse illisible) → nouvelle tentative au run suivant.
 
 Le délai étale la charge : chaque passe reprend seulement les documents qui viennent de le franchir.

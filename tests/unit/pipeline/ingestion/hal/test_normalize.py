@@ -13,6 +13,7 @@ from domain.persons.contributor_name import ContributorName
 from domain.serials.issns import IssnSupport, SerialIssn
 from domain.source_records.biblio import PageRange
 from domain.structures.identifiers import RorId
+from pipeline.ingestion.common.embargoes import Embargo
 from pipeline.ingestion.common.normalizer import PublisherFacts
 from pipeline.ingestion.hal import normalize as normalize_hal
 from pipeline.ingestion.hal.api import HAL_FIELDS
@@ -252,27 +253,48 @@ class TestGetLocations:
             "fileMain_s": "https://hal.science/hal-01/document",
             "licence_s": "http://creativecommons.org/licenses/by/",
         }
-        [location] = get_locations(doc, None)
+        [location] = get_locations(doc)
         assert (location.url, location.pdf_url, location.is_oa) == (
             "https://hal.science/hal-01",
             "https://hal.science/hal-01/document",
             True,
         )
 
-    def test_depot_sans_fichier_ferme(self):
-        [location] = get_locations({"uri_s": "https://hal.science/hal-02"}, None)
+    def test_annexe_d_une_communication_ouverte(self):
+        doc = {
+            "uri_s": "https://hal.science/hal-04",
+            "docType_s": "COMM",
+            "fileAnnexes_s": ["https://hal.science/hal-04/file/slides.pdf"],
+        }
+        [location] = get_locations(doc)
+        assert (location.pdf_url, location.is_oa) == (
+            "https://hal.science/hal-04/file/slides.pdf",
+            True,
+        )
+
+    def test_annexe_d_un_article_fermee(self):
+        doc = {
+            "uri_s": "https://hal.science/hal-05",
+            "docType_s": "ART",
+            "fileAnnexes_s": ["https://hal.science/hal-05/file/supplement.pdf"],
+        }
+        [location] = get_locations(doc)
         assert (location.pdf_url, location.is_oa) == (None, False)
 
-    def test_fichier_sous_embargo_ferme(self):
+    def test_depot_sans_fichier_ferme(self):
+        [location] = get_locations({"uri_s": "https://hal.science/hal-02"})
+        assert (location.pdf_url, location.is_oa) == (None, False)
+
+    def test_fichier_sous_embargo_ouvert_a_l_ecriture(self):
         doc = {
             "uri_s": "https://hal.science/hal-03",
             "fileMain_s": "https://hal.science/hal-03/document",
         }
-        [location] = get_locations(doc, date(2099, 1, 1))
-        assert location.is_oa is False
+        [location] = get_locations(doc)
+        assert location.is_oa is True
 
     def test_sans_page_de_depot(self):
-        assert get_locations({}, None) == []
+        assert get_locations({}) == []
 
 
 class TestParseTeiIsbns:
@@ -468,8 +490,6 @@ class TestHalSourceRecord:
         )
         assert captured.serial_id is None
         assert captured.monograph_id == 8
-        assert captured.oa_status == "embargoed"
-        assert captured.embargo_until == date(2999, 1, 1)
         assert captured.raw_language == "fr"
         assert captured.container_title == "Book"
 
@@ -623,10 +643,17 @@ def _make_normalizer():
         publisher_store=MagicMock(),
         contribution_store=FakeSourceContributionStore(),
         location_store=MagicMock(),
+        embargo_store=MagicMock(),
     )
 
 
 class TestHalNormalizerClass:
+    def test_embargo_actif_du_fichier_depose(self):
+        future = _embargo_tei('<ref type="file" target="x"><date notBefore="2999-01-01"/></ref>')
+        past = _embargo_tei('<ref type="file" target="x"><date notBefore="2001-01-01"/></ref>')
+        assert _make_normalizer().embargo({"label_xml": future}) == Embargo(date(2999, 1, 1))
+        assert _make_normalizer().embargo({"label_xml": past}) is None
+
     def test_metadonnees_minimales(self):
         norm = _make_normalizer()
         assert norm.minimal_metadata(staging_row(raw={"title_s": []})) == ("", None)

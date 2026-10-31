@@ -240,7 +240,6 @@ def datacite_source_record(
         biblio=get_biblio(attributes),
         abstract=get_abstract(attributes),
         keywords=get_keywords(attributes),
-        oa_status=None,
         license=datacite_license(attributes.get("rightsList")),
         impact=Impact(cited_by_count=get_cited_by_count(attributes)).to_json(),
         source_extras=extract_datacite_source_extras(attributes),

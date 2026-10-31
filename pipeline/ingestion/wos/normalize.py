@@ -31,7 +31,6 @@ from pipeline.ingestion.common.source_records import (
 )
 from pipeline.ingestion.common.staging import StagingRow
 from pipeline.ingestion.wos.payload import (
-    derive_wos_api_oa_status,
     is_wos_author_usable,
     parse_export_addresses,
     parse_export_corresponding,
@@ -230,8 +229,6 @@ def extract_from_api(raw: Mapping[str, JsonValue], staging_doi: str | None) -> d
 
     journal_title = _get_api_title(static, "source")
 
-    oa_status = derive_wos_api_oa_status(as_str(publication_info.get("journal_oas_gold")))
-
     lang_data = at_path(static, "fullrecord_metadata", "languages")
     lang_list = _safe_list(lang_data.get("language"))
     language = None
@@ -300,7 +297,6 @@ def extract_from_api(raw: Mapping[str, JsonValue], staging_doi: str | None) -> d
         "publication_year": publication_year,
         "doc_type": raw_doc_type or "other",
         "language": language,
-        "oa_status": oa_status,
         "journal_title": journal_title,
         "issn": issn_val,
         "eissn": eissn_val,
@@ -378,7 +374,6 @@ def extract_from_export(
         "publication_year": int(py) if (py := field("PY")) and py.isdigit() else None,
         "doc_type": doc_types[0] if doc_types else "other",
         "language": languages[0] if languages else None,
-        "oa_status": None,
         "journal_title": field("SO"),
         "issn": field("SN"),
         "eissn": field("EI"),
@@ -463,7 +458,6 @@ def wos_source_record(
         abstract=as_str(rec.get("abstract")),
         keywords=[k for e in as_sequence(rec.get("keywords")) if (k := as_str(e))] or None,
         topics=dict(as_mapping(rec.get("topics"))) or None,
-        oa_status=as_str(rec.get("oa_status")),
         urls=[u for e in as_sequence(rec.get("urls")) if (u := as_str(e))] or None,
         impact=Impact(cited_by_count=as_int(rec.get("cited_by_count"))).to_json(),
     )

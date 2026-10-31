@@ -8,7 +8,6 @@ from dataclasses import dataclass
 
 from domain.persons.contributor_name import ContributorName
 from domain.publications.contribution_roles import THESES_FIELD_ROLES, ContributionRole, merge_roles
-from domain.publications.metadata import OaStatus
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
 from pipeline.ingestion.common.source_contributions import contributor_identifiers
 
@@ -16,16 +15,16 @@ from pipeline.ingestion.common.source_contributions import contributor_identifie
 _INTERNET_CASES = frozenset({"cas1", "cas2", "cas3", "cas4"})
 
 
-def thesis_oa_status(thesis: Mapping[str, JsonValue]) -> OaStatus:
-    """Renvoie le statut open access d'une thèse, d'après sa diffusion (`accessible`, `cas`).
+def awaits_diffusion(thesis: Mapping[str, JsonValue]) -> bool:
+    """Vrai pour une thèse inaccessible destinée à Internet (cas 1 à 4) : elle attend la fin d'un embargo ou d'une confidentialité."""
+    return (
+        as_str(thesis.get("accessible")) != "oui" and as_str(thesis.get("cas")) in _INTERNET_CASES
+    )
 
-    Une thèse accessible est `green`. Une thèse inaccessible destinée à Internet (cas 1 à 4) attend la fin d'un embargo ou d'une confidentialité : elle est `embargoed`. Les autres sont `closed` : intranet seulement, ou thèse en cours sans fichier.
-    """
-    if as_str(thesis.get("accessible")) == "oui":
-        return OaStatus.GREEN
-    if as_str(thesis.get("cas")) in _INTERNET_CASES:
-        return OaStatus.EMBARGOED
-    return OaStatus.CLOSED
+
+def intranet_only(thesis: Mapping[str, JsonValue]) -> bool:
+    """Vrai pour une thèse réservée à l'intranet de son établissement (cas 5 et 6)."""
+    return as_str(thesis.get("cas")) in ("cas5", "cas6")
 
 
 def derive_theses_doc_type(defense_date: str | None) -> str:

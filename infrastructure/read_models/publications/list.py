@@ -42,13 +42,9 @@ _SOURCE_ID_COLUMNS = ",\n                    ".join(
 )
 
 
-def _source_links(ids: dict[str, str | None], oa_status: str | None) -> dict[str, str]:
+def _source_links(ids: dict[str, str | None]) -> dict[str, str]:
     """Renvoie l'URL publique de chaque source présente (identifiant non nul), pour la colonne « Sources »."""
-    return {
-        source: source_record_url(source, value, oa_status)
-        for source, value in ids.items()
-        if value
-    }
+    return {source: source_record_url(source, value) for source, value in ids.items() if value}
 
 
 _APC_SORT = (
@@ -161,8 +157,7 @@ def _publication_lines(
                 "wos": row.wos_id,
                 "scanr": row.scanr_id,
                 "theses": row.theses_id,
-            },
-            row.oa_status,
+            }
         )
         cell = {
             "Type": row.doc_type or "",
@@ -200,8 +195,7 @@ def _these_lines(
                 "openalex": row.openalex_id,
                 "scanr": row.scanr_id,
                 "theses": row.theses_id,
-            },
-            row.oa_status,
+            }
         )
         cell = {
             "Inscription": row.date_inscription or "",

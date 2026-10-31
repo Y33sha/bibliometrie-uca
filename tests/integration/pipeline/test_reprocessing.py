@@ -14,11 +14,11 @@ from tests.integration.helpers.staging import insert_staging, normalize_pending
 # Document HAL minimal, sans dépôt de fichier.
 HAL_DOC_CLOSED = {
     "halId_s": "tel-99990001",
+    "uri_s": "https://theses.hal.science/tel-99990001",
     "doiId_s": None,
     "title_s": "Approche hybride pour la modélisation sémantique",
     "producedDateY_i": 2024,
     "docType_s": "THESE",
-    "openAccess_bool": False,
     "language_s": ["fr"],
     "authFullNameFormIDPersonIDIDHal_fs": ["Alice Dupont_FacetSep_0-0_FacetSep_"],
 }
@@ -78,9 +78,8 @@ class TestHalReprocessingUpdatesOaStatus:
 
         assert _get_publication_oa_status(sa_sync_conn, hal_id) == "closed"
 
-        # Retraitement avec un fichier déposé dans HAL (`fileMain_s`) : green. `openAccess_bool` seul donne closed.
+        # Retraitement avec un fichier déposé dans HAL (`fileMain_s`) : green.
         updated_doc = copy.deepcopy(HAL_DOC_CLOSED)
-        updated_doc["openAccess_bool"] = True
         updated_doc["fileMain_s"] = "https://hal.science/tel-99990001/document"
         _insert_hal_staging(sa_sync_conn, updated_doc)  # remet la ligne à traiter
         _run_normalize_hal(sa_sync_conn)
@@ -94,7 +93,6 @@ class TestHalReprocessingUpdatesOaStatus:
 
         # Premier traitement, avec dépôt : green.
         open_doc = copy.deepcopy(HAL_DOC_CLOSED)
-        open_doc["openAccess_bool"] = True
         open_doc["fileMain_s"] = "https://hal.science/tel-99990001/document"
         _insert_hal_staging(sa_sync_conn, open_doc)
         _run_normalize_hal(sa_sync_conn)
@@ -102,7 +100,7 @@ class TestHalReprocessingUpdatesOaStatus:
 
         assert _get_publication_oa_status(sa_sync_conn, hal_id) == "green"
 
-        # Retraitement sans `fileMain_s`, avec `openAccess_bool` faux : closed.
+        # Retraitement sans `fileMain_s` : closed.
         _insert_hal_staging(sa_sync_conn, HAL_DOC_CLOSED)
         _run_normalize_hal(sa_sync_conn)
         _fetch_stale_publications(sa_sync_conn)
@@ -114,7 +112,6 @@ class TestHalReprocessingUpdatesOaStatus:
         hal_id = HAL_DOC_CLOSED["halId_s"]
         open_doc = copy.deepcopy(HAL_DOC_CLOSED)
         open_doc["doiId_s"] = "10.9999/tel-99990001"
-        open_doc["openAccess_bool"] = True
         open_doc["fileMain_s"] = "https://hal.science/tel-99990001/document"
         _insert_hal_staging(sa_sync_conn, open_doc)
         _run_normalize_hal(sa_sync_conn)
@@ -124,7 +121,7 @@ class TestHalReprocessingUpdatesOaStatus:
         # Unpaywall ne voit pas le dépôt HAL sous le DOI.
         sa_sync_conn.execute(
             text("""
-                INSERT INTO unpaywall (doi, oa_status, checked_at)
+                INSERT INTO dois (doi, unpaywall_oa_status, unpaywall_checked_at)
                 SELECT lower(doi), 'closed', now() FROM publications
                 WHERE id = (
                     SELECT publication_id FROM source_records

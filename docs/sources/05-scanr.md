@@ -17,7 +17,7 @@ https://scanr.enseignementsup-recherche.gouv.fr/docs/overview
 
 ## Données récupérées
 
-- **Publications** : identifiant ScanR, titre (multilingue), année, type, statut open access, résumé (multilingue), mots-clés (multilingue), concepts `domains` (concepts wikidata et mots-clés, ajoutés aux mots-clés ; vedettes sudoc, retenues comme sujets), citations (somme des comptages annuels), URLs (landing, PDF, DOI), identifiants externes (DOI, hal_id, NNT, PMID), licence (`oaEvidence.license`)
+- **Publications** : identifiant ScanR, titre (multilingue), année, type, résumé (multilingue), mots-clés (multilingue), concepts `domains` (concepts wikidata et mots-clés, ajoutés aux mots-clés ; vedettes sudoc, retenues comme sujets), citations (somme des comptages annuels), URLs (landing, PDF, DOI), identifiants externes (DOI, hal_id, NNT, PMID), licence (`oaEvidence.license`)
 - **Localisations** (`source_record_locations`) : la copie ouverte (`oaEvidence`), avec son PDF, sa version et son accès, puis la page du document (`landingPage`) quand elle désigne une autre adresse.
 - **Revue et éditeur** : titre, ISSN, eISSN, éditeur. Pour une thèse ou une habilitation, le titre de la source est l'université de soutenance : il ne donne ni publication en série ni titre de conteneur.
 - **Auteurs** : nom complet, rôle, affiliations rattachées à chaque auteur (arbre tutelle → laboratoire, seules les feuilles sont retenues), ORCID et IdRef si présents. Une affiliation avec `structId` est une fiche du référentiel HAL : elle donne une structure HAL à la contribution source. Une affiliation sans `structId` est un texte d'affiliation : elle donne une adresse.
@@ -118,7 +118,3 @@ L'`id` ScanR concatène le préfixe de source et l'identifiant natif de la publi
 | `hal`  | 42 % | `halhal-04244961` |
 | `nnt`  | 4 %  | `nnt2023clil0004` |
 | `pmid` | 0.2 %| `pmid36609465` |
-
-### Statut open access
-
-`isOa` est un booléen. Le statut open access (green, gold, hybrid, bronze, diamond, closed) se déduit de `isOa` et de la copie ouverte que décrit `oaEvidence` (`derive_scanr_oa_status`).

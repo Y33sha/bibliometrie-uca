@@ -1,6 +1,7 @@
 <script lang="ts">
   import { resolve } from "$app/paths";
   import RhCheck from "#lib/components/RhCheck.svelte";
+  import CorrespondingMark from "#lib/components/CorrespondingMark.svelte";
   import SectionLabel from "./SectionLabel.svelte";
   import { titleCase } from "#lib/utils.js";
   import type { Contribution } from "./types";
@@ -20,6 +21,11 @@
     return out;
   });
 
+  // Une personne est correspondante dès qu'une de ses contributions l'est.
+  const correspondingIds = $derived(
+    new Set(contributions.filter((a) => a.is_corresponding).map((a) => a.person_id)),
+  );
+
   function personName(a: Contribution): string {
     return `${titleCase(a.first_name)} ${titleCase(a.last_name)}`.trim();
   }
@@ -33,6 +39,7 @@
         <a href={resolve(`persons/${a.person_id}`)}>
           {personName(a)}
           {#if a.has_rh}<RhCheck />{/if}
+          {#if correspondingIds.has(a.person_id)}<CorrespondingMark />{/if}
         </a>
       {/each}
     </div>

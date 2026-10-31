@@ -25,7 +25,6 @@ class CorrectionKey(StrEnum):
     """Clé de `corrections`."""
 
     DOC_TYPE = "doc_type"
-    OA_STATUS = "oa_status"
     URLS = "urls"
     SERIAL_ID = "serial_id"
 
@@ -34,7 +33,6 @@ class CorrectionKey(StrEnum):
 UNARY_KEYS = frozenset(
     {
         CorrectionKey.DOC_TYPE,
-        CorrectionKey.OA_STATUS,
         CorrectionKey.URLS,
     }
 )

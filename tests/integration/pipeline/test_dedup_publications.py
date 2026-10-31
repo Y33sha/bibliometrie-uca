@@ -1,4 +1,4 @@
-"""Recalcul des métadonnées d'une publication depuis ses enregistrements sources (`refresh_from_sources`) : priorité par source, statut open access le plus ouvert, fusion des mots-clés et des topics.
+"""Recalcul des métadonnées d'une publication depuis ses enregistrements sources (`refresh_from_sources`) : priorité par source, statut open access tiré des copies, fusion des mots-clés et des topics.
 
 Les publications sont semées par `PublicationStore.create`, sans réconciliation. La réconciliation est testée dans `tests/unit/domain/publications/test_reconciliation.py` et `tests/integration/pipeline/test_reprocessing.py`.
 """
@@ -9,13 +9,14 @@ import pytest
 from sqlalchemy import text
 
 from domain.normalize import normalize_text
+from domain.publications.licenses import License
 from pipeline.ingestion.common.locations import LocationFacts, LocationStore
 from pipeline.transformation.publications.consolidation import RefreshVerdict, refresh_from_sources
 from pipeline.transformation.publications.lifecycle import refresh
 from pipeline.transformation.publications.store import PublicationStore
 from tests.integration.helpers.contributions import insert_contribution
 from tests.integration.helpers.persons import insert_person
-from tests.integration.helpers.serials import insert_doi_prefix, insert_publisher
+from tests.integration.helpers.serials import insert_doi_prefix, insert_publisher, insert_serial
 from tests.integration.helpers.sources import insert_source_record
 
 # Enregistrement source de 2024, de titre « Test ».
@@ -49,9 +50,7 @@ class TestRefreshFromSources:
             publication_year=2024,
             doc_type="article",
         )
-        _source_record(
-            sa_sync_conn, id1, source_id=f"hal-{id1}-closed", language="en", oa_status="closed"
-        )
+        _source_record(sa_sync_conn, id1, source_id=f"hal-{id1}-closed", language="en")
         refresh_from_sources(sa_sync_conn, id1)
 
         lang = _scalar(sa_sync_conn, "SELECT language FROM publications WHERE id = :id", id=id1)
@@ -92,72 +91,66 @@ class TestRefreshFromSources:
             == publisher
         )
 
-    def test_oa_status_upgrade(self, sa_sync_conn):
-        """Le statut open access le plus ouvert l'emporte (closed et green donnent green)."""
+    def test_oa_status_tire_des_copies(self, sa_sync_conn):
+        """Une copie d'archive ouverte donne green."""
         id1 = _insert_publication(sa_sync_conn, doi="10.1234/oa", oa_status="closed")
-        _source_record(sa_sync_conn, id1, source_id=f"hal-{id1}-closed", oa_status="closed")
-        _source_record(
-            sa_sync_conn,
-            id1,
-            source="openalex",
-            source_id=f"openalex-{id1}-green",
-            oa_status="green",
+        hal = _source_record(sa_sync_conn, id1, source_id=f"hal-{id1}")
+        LocationStore(sa_sync_conn).replace_locations(
+            hal, [LocationFacts("https://hal.science/hal-01607327", is_oa=True)]
         )
         refresh_from_sources(sa_sync_conn, id1)
 
         oa = _scalar(sa_sync_conn, "SELECT oa_status FROM publications WHERE id = :id", id=id1)
         assert oa == "green"
 
-    def test_diamond_wins_over_gold(self, sa_sync_conn):
-        """Le statut le plus ouvert des sources l'emporte : diamond sur gold."""
+    def test_copie_editeur_sous_licence_dans_une_revue_diamant(self, sa_sync_conn):
+        serial = insert_serial(sa_sync_conn, "Revue diamant", oa_model="diamond")
         id1 = _insert_publication(sa_sync_conn, doi="10.1234/dia", oa_status="gold")
-        _source_record(sa_sync_conn, id1, source_id=f"hal-{id1}-gold", oa_status="gold")
-        _source_record(
-            sa_sync_conn,
-            id1,
-            source="openalex",
-            source_id=f"openalex-{id1}-diamond",
-            oa_status="diamond",
+        record = _source_record(
+            sa_sync_conn, id1, source="crossref", source_id="10.1234/dia", serial_id=serial
+        )
+        LocationStore(sa_sync_conn).replace_locations(
+            record,
+            [LocationFacts("https://doi.org/10.1234/dia", license=License.CC_BY, is_oa=True)],
         )
         refresh_from_sources(sa_sync_conn, id1)
 
         oa = _scalar(sa_sync_conn, "SELECT oa_status FROM publications WHERE id = :id", id=id1)
         assert oa == "diamond"
 
-    def test_le_verdict_d_unpaywall_sur_le_doi_l_emporte_sur_les_sources(self, sa_sync_conn):
+    def test_verdict_d_unpaywall_sans_copie(self, sa_sync_conn):
         id1 = _insert_publication(sa_sync_conn, doi="10.1234/upw", oa_status="unknown")
         sa_sync_conn.execute(
             text(
-                "INSERT INTO unpaywall (doi, oa_status, checked_at) VALUES ('10.1234/upw', 'closed', now())"
+                "INSERT INTO dois (doi, unpaywall_oa_status, unpaywall_checked_at)"
+                " VALUES ('10.1234/upw', 'closed', now())"
             )
         )
         _source_record(
             sa_sync_conn,
             id1,
             source="openalex",
-            source_id=f"openalex-{id1}-gold",
+            source_id=f"openalex-{id1}",
             doi="10.1234/upw",
-            oa_status="gold",
         )
         refresh_from_sources(sa_sync_conn, id1)
 
         oa = _scalar(sa_sync_conn, "SELECT oa_status FROM publications WHERE id = :id", id=id1)
         assert oa == "closed"
 
-    def test_sans_verdict_l_oa_suit_les_sources(self, sa_sync_conn):
+    def test_sans_copie_ni_verdict_inconnu(self, sa_sync_conn):
         id1 = _insert_publication(sa_sync_conn, doi="10.1234/agg", oa_status="closed")
         _source_record(
             sa_sync_conn,
             id1,
             source="openalex",
-            source_id=f"openalex-{id1}-gold",
+            source_id=f"openalex-{id1}",
             doi="10.1234/agg",
-            oa_status="gold",
         )
         refresh_from_sources(sa_sync_conn, id1)
 
         oa = _scalar(sa_sync_conn, "SELECT oa_status FROM publications WHERE id = :id", id=id1)
-        assert oa == "gold"
+        assert oa == "unknown"
 
     def test_la_meilleure_copie_ouverte_des_sources(self, sa_sync_conn):
         """La copie de la version éditeur l'emporte sur un dépôt, quelle que soit sa source ; une copie fermée est écartée."""

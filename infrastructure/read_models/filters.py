@@ -17,9 +17,11 @@ from domain.publications.metadata import (
 )
 from domain.sources.registry import PROFILES, SOURCE_FILTER_PREFIXES, Source
 from infrastructure.read_models.publications.models import (
+    AUTHOR_POSITION_COLUMNS,
     DOI_AGENCY_SOURCES,
     NO_DOI,
     NO_LICENSE,
+    OTHER_AUTHOR_POSITION,
     OTHER_DOI_AGENCY,
 )
 from infrastructure.sql_fragments import has_author_role, is_laboratory, pending_name_form
@@ -321,16 +323,37 @@ def _toggle_clause(
     return WhereClause(sql, binds)
 
 
-def corresponding_clause(person_id: int | None, corr_filter: list[str]) -> WhereClause | None:
-    if not corr_filter or not person_id:
+def author_position_subject(person_id: int | None, lab_ids: list[int]) -> WhereClause | None:
+    """Renvoie la condition sur la contribution `a` dont la position d'auteur compte : celle de la personne, sinon une contribution liée à l'un des laboratoires."""
+    if person_id:
+        return WhereClause("a.person_id = :flt_position_person", {"flt_position_person": person_id})
+    if lab_ids:
+        return WhereClause(
+            """EXISTS (SELECT 1 FROM contribution_structures cs
+                WHERE cs.contribution_id = a.id AND cs.structure_id = ANY(:flt_position_labs))""",
+            {"flt_position_labs": lab_ids},
+        )
+    return None
+
+
+def author_position_predicate(position: str, subject: WhereClause) -> str:
+    """Renvoie le prédicat : une contribution de `subject` occupe la position d'auteur dans la publication `p`. `OTHER_AUTHOR_POSITION` : aucune n'occupe de position."""
+    if position == OTHER_AUTHOR_POSITION:
+        return f"NOT ({' OR '.join(author_position_predicate(p, subject) for p in AUTHOR_POSITION_COLUMNS)})"
+    return f"""EXISTS (SELECT 1 FROM contributions a
+                WHERE a.publication_id = p.id AND {subject.sql}
+                  AND a.{AUTHOR_POSITION_COLUMNS[position]})"""
+
+
+def author_position_clause(
+    person_id: int | None, lab_ids: list[int], values: list[str]
+) -> WhereClause | None:
+    """Renvoie le filtre par position d'auteur de la personne, sinon des laboratoires. Les valeurs de `AUTHOR_POSITION_FILTER_VALUES` se combinent en OR."""
+    subject = author_position_subject(person_id, lab_ids)
+    if subject is None or not values:
         return None
-    return _toggle_clause(
-        corr_filter,
-        """EXISTS (SELECT 1 FROM contributions a
-                WHERE a.publication_id = p.id AND a.person_id = :flt_corr_person
-                  AND a.is_corresponding = TRUE)""",
-        {"flt_corr_person": person_id},
-    )
+    parts = [author_position_predicate(v, subject) for v in values]
+    return WhereClause("(" + " OR ".join(parts) + ")", subject.binds)
 
 
 _SQL_HAS_HAL_SOURCE_CONTRIBUTION = (

@@ -220,7 +220,7 @@
 		<FacetDropdown label={filterLabels.types} options={facets.options.types} bind:selected={selectedTypes} onchange={onFilterChange} />
 		<FacetDropdown label="Tutelles" options={facets.options.tutelles} searchable bind:selected={selectedTutelles} onchange={onFilterChange} />
 		{#if isAdmin()}
-			<FacetDropdown label="Périmètre" options={facets.options.perimeters} bind:selected={selectedPerimeters} onchange={onFilterChange} />
+			<FacetDropdown label="Périmètres"options={facets.options.perimeters} bind:selected={selectedPerimeters} onchange={onFilterChange} />
 		{/if}
 	{/snippet}
 </ListToolbar>

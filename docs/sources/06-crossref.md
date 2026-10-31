@@ -86,7 +86,3 @@ Crossref donne une affiliation pour 29 % des auteurs (sondage sur 1 000 payloads
 ### Type de document
 
 Crossref donne `journal-article` pour tous les sous-types d'article (synthèse, data paper, éditorial…). L'agrégation retient le sous-type donné par une autre source ([`arbitrate_doc_type_with_article_subtype`](https://github.com/Y33sha/bibliometrie-uca/blob/master/domain/publications/aggregation.py)).
-
-### Statut open access
-
-Crossref ne donne pas de statut open access : celui de la publication vient des autres sources.

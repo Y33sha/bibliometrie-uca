@@ -8,8 +8,10 @@ from sqlalchemy.dialects.postgresql import ENUM as PgEnum
 from sqlalchemy.exc import IntegrityError
 
 from domain.errors import ConflictError
+from domain.publications.licenses import License
 from infrastructure.db.tables import metadata
 from interfaces.api.deps import person_service
+from pipeline.ingestion.common.locations import LocationFacts, LocationStore
 from pipeline.transformation.publications.consolidation import refresh_from_sources
 from pipeline.transformation.publications.store import PublicationStore
 from tests.integration.helpers.persons import (
@@ -86,10 +88,10 @@ def _seed_publication(
 
 class TestRefreshFromSources:
     def test_enrich_via_refresh(self, sa_sync_conn, publication_repo):
-        """`refresh_from_sources` reprend les métadonnées des enregistrements sources (revue, statut open access)."""
-        serial_id = insert_serial(sa_sync_conn, "Science")
+        """`refresh_from_sources` reprend les métadonnées des enregistrements sources (revue) et déduit le statut open access de leurs copies."""
+        serial_id = insert_serial(sa_sync_conn, "Science", oa_model="full_oa")
         publication_id = _seed_publication(publication_repo, "Pub", doi="10.5555/enrich-test")
-        insert_source_record(
+        record = insert_source_record(
             sa_sync_conn,
             publication_id,
             source="openalex",
@@ -97,7 +99,14 @@ class TestRefreshFromSources:
             title="Pub",
             publication_year=2024,
             serial_id=serial_id,
-            oa_status="gold",
+        )
+        LocationStore(sa_sync_conn).replace_locations(
+            record,
+            [
+                LocationFacts(
+                    "https://doi.org/10.5555/enrich-test", license=License.CC_BY, is_oa=True
+                )
+            ],
         )
         refresh_from_sources(sa_sync_conn, publication_id)
         row = sa_sync_conn.execute(

@@ -9,7 +9,6 @@ from domain.publications.conference import arbitrate_conference
 from domain.publications.doc_types import ARTICLE_SUBTYPES, DocType
 from domain.publications.identifiers import DOI
 from domain.publications.licenses import DEPOSIT_LICENSE_SOURCE, publisher_license_sources
-from domain.publications.metadata import publication_oa_status
 from domain.publications.publication import Publication
 from domain.publishers.attribution import publication_publisher
 from domain.source_records.keys import anchor_of, doi_anchors
@@ -24,13 +23,11 @@ def refresh_from_sources(
     *,
     source_priority: tuple[str, ...],
     monograph_serials: Mapping[int, int | None] | None = None,
-    unpaywall: Mapping[str, str] | None = None,
 ) -> None:
-    """Recalcule sur place les métadonnées de `publication` depuis ses enregistrements sources. L'éditeur se pose ensuite, par `assign_publisher`.
+    """Recalcule sur place les métadonnées de `publication` depuis ses enregistrements sources. L'éditeur se pose ensuite, par `assign_publisher`, et le statut open access d'après les copies (`domain.publications.open_access`).
 
     - Champs simples : première valeur non nulle dans l'ordre de `source_priority`. Sans revue dans aucune source, la publication prend la collection de sa monographie (`monograph_serials`).
     - Type de document : `arbitrate_doc_type_with_article_subtype`, puis `arbitrate_conference`.
-    - Statut open access : le plus ouvert des sources, ou le verdict d'Unpaywall sur le DOI (`unpaywall`, par DOI).
     - Licence : celle de la version éditeur (`publisher_license_sources`). Licence de dépôt : celle du fichier déposé dans HAL.
     - Rétractation : déclarée par une source au moins.
     - Mots-clés et pays : union sans doublon.
@@ -64,10 +61,6 @@ def refresh_from_sources(
     publication.monograph_id = as_int(first_non_null(sorted_sources, "monograph_id"))
     if publication.serial_id is None and publication.monograph_id is not None and monograph_serials:
         publication.serial_id = monograph_serials.get(publication.monograph_id)
-    publication.oa_status = publication_oa_status(
-        sorted_sources,
-        unpaywall.get(publication.doi.value) if publication.doi and unpaywall else None,
-    )
     publication.license = license_by_source(
         sorted_sources, publisher_license_sources(publication.doc_type)
     )

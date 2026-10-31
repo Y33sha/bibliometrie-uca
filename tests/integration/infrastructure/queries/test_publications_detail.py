@@ -229,6 +229,16 @@ class TestAccessAndReferences:
         # Crossref est couvert par le DOI, HAL donne une copie : seul OpenAlex référence.
         assert [s.source for s in detail.referenced_by] == ["openalex"]
 
+    def test_une_ligne_par_source_dans_referenced_by(self, sa_sync_conn):
+        publication = insert_publication(sa_sync_conn)
+        insert_source_record(sa_sync_conn, publication, source="openalex", source_id="W1")
+        insert_source_record(sa_sync_conn, publication, source="openalex", source_id="W2")
+        insert_source_record(sa_sync_conn, publication, source="wos", source_id="WOS:1")
+
+        detail = publications_queries(sa_sync_conn).get_publication_detail(publication)
+        assert detail is not None
+        assert sorted(s.source for s in detail.referenced_by) == ["openalex", "wos"]
+
 
 class TestGetPublicationExternalIdentifiers:
     def test_aggregates_and_dedups(self, sa_sync_conn):

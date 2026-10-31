@@ -17,7 +17,6 @@ HAL_STAGING_DOCS = [
                 "Eve Leroy_FacetSep_0-0_FacetSep_",
                 "Frank Moreau_FacetSep_0-0_FacetSep_",
             ],
-            "openAccess_bool": True,
         },
     },
     {

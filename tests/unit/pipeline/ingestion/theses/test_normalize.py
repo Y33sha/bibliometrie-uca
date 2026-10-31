@@ -8,8 +8,7 @@ from __future__ import annotations
 import logging
 from unittest.mock import MagicMock
 
-import pytest
-
+from pipeline.ingestion.common.embargoes import Embargo
 from pipeline.ingestion.common.source_records import SourceRecordUpsert
 from pipeline.ingestion.theses.normalize import (
     ThesesNormalizer,
@@ -138,7 +137,6 @@ class TestThesesSourceRecord:
         assert record.title == "T"
         assert record.publication_year is None
         assert identifier_values(record) == {}
-        assert record.oa_status == "closed"
         assert record.serial_id is None
 
     def test_defended_thesis(self):
@@ -214,21 +212,6 @@ class TestThesesSourceRecord:
         record = self._call({})
         assert record.title == ""
 
-    @pytest.mark.parametrize(
-        ("diffusion", "expected"),
-        [
-            ({"cas": "cas1", "accessible": "oui"}, "green"),
-            ({"cas": "cas3", "accessible": "oui"}, "green"),
-            ({"cas": "cas1", "accessible": "non"}, "embargoed"),
-            ({"cas": "cas4", "accessible": "non"}, "embargoed"),
-            ({"cas": "cas5", "accessible": "non"}, "closed"),
-            ({"cas": None, "accessible": "non"}, "closed"),  # thèse en cours
-        ],
-    )
-    def test_statut_open_access_selon_la_diffusion(self, diffusion, expected):
-        """Le statut open access suit la diffusion de la thèse ; une thèse accessible sur theses.fr est `green`."""
-        assert self._call(diffusion).oa_status == expected
-
     def test_langue_et_resume_de_la_premiere_langue(self):
         thesis = {"langues": ["en", "fr"], "resumes": {"fr": "Résumé.", "en": "Summary."}}
         record = self._call(thesis)
@@ -282,10 +265,24 @@ def _make_normalizer():
         publisher_store=MagicMock(),
         contribution_store=FakeSourceContributionStore(),
         location_store=MagicMock(),
+        embargo_store=MagicMock(),
     )
 
 
 class TestThesesNormalizerClass:
+    def test_embargo_sans_date_d_une_these_destinee_a_internet(self):
+        norm = _make_normalizer()
+        assert norm.embargo(_these(cas="cas1", accessible="non")) == Embargo(None)
+        assert norm.embargo(_these(cas="cas5", accessible="non")) is None
+        assert norm.embargo(_these(cas="cas1", accessible="oui")) is None
+
+    def test_these_reservee_a_l_intranet(self):
+        record = theses_source_record(_these(cas="cas5", accessible="non"), 1, "2020CLFAC001")
+        assert record.source_extras is not None
+        assert record.source_extras["intranet_only"] is True
+        other = theses_source_record(_these(cas="cas1", accessible="oui"), 1, "2020CLFAC002")
+        assert "intranet_only" not in (other.source_extras or {})
+
     def test_metadonnees_minimales(self):
         assert _make_normalizer().minimal_metadata(staging_row(raw={})) == (None, None)
 

@@ -26,6 +26,7 @@
 | `distinct_persons` | `persons` | [Personnes](05-persons.md) |
 | `doi_prefixes` | `publishing` | [Édition](07-publishing.md#éditeurs) |
 | `doi_targets` | `sources` | [Enregistrements sources](02-sources.md#tables) |
+| `dois` | `sources` | [Enregistrements sources](02-sources.md) |
 | `failed_lookups` | `sources` | [Enregistrements sources](02-sources.md) |
 | `hal_structure_aliases` | `ref` | [Référentiels externes](08-ref-et-ops.md) |
 | `hal_structure_relations` | `ref` | [Référentiels externes](08-ref-et-ops.md) |
@@ -79,6 +80,7 @@
 | `source_record_identifiers` | `sources` | [Enregistrements sources](02-sources.md#tables) |
 | `source_record_keys_queue` | `queues` | [Données dérivées](09-donnees-derivees.md#incrémental-ou-recalcul-complet) |
 | `source_record_locations` | `sources` | [Enregistrements sources](02-sources.md) |
+| `embargoes` | `sources` | [Enregistrements sources](02-sources.md) |
 | `source_records` | `sources` | [Enregistrements sources](02-sources.md) |
 | `staging` | `sources` | [Enregistrements sources](02-sources.md) |
 | `structure_name_forms` | `structures` | [Structures](06-structures.md) |
@@ -87,6 +89,5 @@
 | `subject_cooccurrences` (vue matérialisée) | `publications` | [Publications](03-publications.md#sujets) |
 | `subject_cooccurrences` (vue matérialisée) | `publications` | [Publications](03-publications.md#sujets) |
 | `subjects` | `publications` | [Publications](03-publications.md#sujets) |
-| `unpaywall` | `sources` | [Enregistrements sources](02-sources.md) |
 | `user_roles` | `ops` | [Exploitation](08-ref-et-ops.md#exploitation) |
 | `users` | `ops` | [Exploitation](08-ref-et-ops.md#exploitation) |

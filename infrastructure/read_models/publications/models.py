@@ -87,6 +87,13 @@ OTHER_DOI_AGENCY = "other"
 NO_DOI = "none"
 DOI_AGENCY_FILTER_VALUES: tuple[str, ...] = (*DOI_AGENCY_SOURCES, OTHER_DOI_AGENCY, NO_DOI)
 
+# Positions d'auteur d'une personne dans une publication, chacune avec sa colonne booléenne de `contributions`.
+AUTHOR_POSITION_COLUMNS: dict[str, str] = {"corresponding": "is_corresponding"}
+
+# Vocabulaire du filtre par position d'auteur, dans l'ordre de la facette : les positions, puis `other` pour une personne qui n'en occupe aucune.
+OTHER_AUTHOR_POSITION = "other"
+AUTHOR_POSITION_FILTER_VALUES: tuple[str, ...] = (*AUTHOR_POSITION_COLUMNS, OTHER_AUTHOR_POSITION)
+
 
 @dataclass(frozen=True, slots=True)
 class PublicationFilters:
@@ -114,8 +121,8 @@ class PublicationFilters:
     """Ensemble d'une page personne : toutes les publications de la personne, dans le périmètre ou hors de lui."""
     author_id: int | None = None
     """Restreint l'ensemble courant aux publications d'un auteur ; se combine avec `person_id`."""
-    is_corresponding: list[str] = field(default_factory=list)
-    """Valeurs `yes` et `no`, combinées en OR."""
+    author_position: list[str] = field(default_factory=list)
+    """Valeurs de `AUTHOR_POSITION_FILTER_VALUES`, combinées en OR."""
     has_apc: list[str] = field(default_factory=list)
     """Valeurs `yes` et `no`, combinées en OR. `yes` retient les publications à paiement d'APC imputé au budget d'une structure du périmètre."""
     country_values: list[str] = field(default_factory=list)
@@ -184,7 +191,7 @@ class PublicationListItem(Model):
             Source.THESES: self.theses_id,
         }
         return {
-            source: source_record_url(source, source_id, self.oa_status)
+            source: source_record_url(source, source_id)
             for source, source_id in ids.items()
             if source_id
         }
@@ -221,8 +228,8 @@ class PublicationsFacetsResponse(Model):
     oa_statuses: list[FacetOption]
     licenses: list[FacetOption]
     doi_agencies: list[FacetOption]
-    corresponding: list[FacetOption]
-    """Rempli seulement avec `person_id`."""
+    author_positions: list[FacetOption]
+    """Rempli seulement avec `person_id` ou des laboratoires. Une publication compte dans chaque position occupée."""
     source_counts: dict[str, YesNoCount]
     apc: list[FacetOption]
     countries: list[FacetOption]
@@ -272,7 +279,6 @@ class PublicationDetailCore(Model):
 class SourceRecordOut(Model):
     source: str
     source_id: str
-    oa_status: str | None
     doi: str | None
     hal_collections: list[str] | None
     countries: list[str] | None
@@ -281,7 +287,7 @@ class SourceRecordOut(Model):
     @property
     def record_url(self) -> str:
         """Lien vers l'enregistrement sur le portail de sa source."""
-        return source_record_url(self.source, self.source_id, self.oa_status)
+        return source_record_url(self.source, self.source_id)
 
 
 class ExternalIdentifierOut(Model):
@@ -426,7 +432,6 @@ class SourceRecordMetadataOut(Model):
     """Nom de la langue dans le référentiel."""
     language_raw: str | None
     """Valeur donnée par la source, quand la normalisation l'a changée."""
-    oa_status: str | None
     serial_id: int | None
     """Revue du référentiel rattachée à l'enregistrement source."""
     journal_title: str | None
@@ -448,7 +453,7 @@ class SourceRecordMetadataOut(Model):
     @property
     def record_url(self) -> str:
         """Lien vers l'enregistrement sur le portail de sa source."""
-        return source_record_url(self.source, self.source_id, self.oa_status)
+        return source_record_url(self.source, self.source_id)
 
 
 class SourceContributionOut(Model):

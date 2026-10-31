@@ -59,7 +59,7 @@ def auth_params() -> dict[str, str]:
 async def fetch_work(
     client: httpx2.AsyncClient, openalex_id: str
 ) -> LookupOutcome[Mapping[str, JsonValue]]:
-    """Renvoie un work par son identifiant (`GET /works/{id}`), avec tous ses auteurs. `NOT_FOUND` : work supprimé ou fusionné dans OpenAlex."""
+    """Renvoie un work par son identifiant (`GET /works/{id}`), avec tous ses auteurs. Un work fusionné renvoie le work qui l'absorbe, sous l'identifiant de celui-ci. `NOT_FOUND` : work supprimé dans OpenAlex."""
     outcome = await lookup_json_async(
         client,
         "GET",

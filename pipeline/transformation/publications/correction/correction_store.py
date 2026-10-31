@@ -48,7 +48,6 @@ from infrastructure.db.tables import source_records
 from infrastructure.sql_fragments import (
     corrected,
     declares_conference_sql,
-    diamond_journal_sql,
     self_declared_preprint_sql,
     source_extra,
     source_extra_json,
@@ -166,15 +165,11 @@ _FACTS: dict[str, str] = {
     "doc_type": "sr.doc_type",
     "serial_id": "sr.serial_id",
     "serial_type": "j.serial_type::text",
-    "oa_status": "sr.oa_status",
-    "oa_model": "j.oa_model",
     "urls": "sr.urls",
-    "embargo_expired": "(sr.embargo_until IS NOT NULL AND sr.embargo_until <= current_date)",
     "self_declared_preprint": self_declared_preprint_sql(),
     "declares_conference": declares_conference_sql(),
     "in_proceedings_volume": "COALESCE(m.proceedings, false)",
     "group_title": source_extra(SourceExtra.GROUP_TITLE),
-    "journal_diamond": f"COALESCE({diamond_journal_sql('j')}, false)",
     "source": "sr.source::text",
     "author_count": "sr.author_count",
 }

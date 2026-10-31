@@ -1,41 +1,49 @@
-"""Facettes oui/non liées à une personne (`corresponding`, `in_perimeter`).
+"""Facettes liées à une personne ou à un laboratoire : position d'auteur et périmètre.
 
-La clause reçoit la liste des valeurs cochées, découpée par le routeur. Cocher `yes` et `no` combine les deux branches par OR et retient toutes les publications.
+La clause reçoit la liste des valeurs cochées, découpée par le routeur. Les valeurs cochées se combinent par OR.
 """
 
 from infrastructure.read_models.filters import (
-    corresponding_clause,
+    author_position_clause,
     in_perimeter_person_clause,
 )
 
 
-def test_corresponding_none_without_person_or_filter():
-    assert corresponding_clause(0, ["yes"]) is None
-    assert corresponding_clause(42, []) is None
+def test_author_position_none_without_subject_or_filter():
+    assert author_position_clause(None, [], ["corresponding"]) is None
+    assert author_position_clause(42, [], []) is None
 
 
-def test_corresponding_yes_is_exists():
-    clause = corresponding_clause(42, ["yes"])
+def test_author_position_corresponding_is_exists():
+    clause = author_position_clause(42, [], ["corresponding"])
     assert clause is not None
-    assert clause.sql.startswith("EXISTS")
-    assert clause.binds == {"flt_corr_person": 42}
+    assert clause.sql.startswith("(EXISTS")
+    assert clause.binds == {"flt_position_person": 42}
 
 
-def test_corresponding_no_is_negated():
-    clause = corresponding_clause(42, ["no"])
+def test_author_position_of_labs_reads_contribution_structures():
+    clause = author_position_clause(None, [7], ["corresponding"])
     assert clause is not None
-    assert clause.sql.startswith("NOT EXISTS")
+    assert "contribution_structures" in clause.sql
+    assert clause.binds == {"flt_position_labs": [7]}
 
 
-def test_corresponding_both_is_no_constraint():
-    clause = corresponding_clause(42, ["yes", "no"])
+def test_author_position_prefers_the_person_over_labs():
+    clause = author_position_clause(42, [7], ["corresponding"])
     assert clause is not None
-    assert " OR " in clause.sql
-    assert "EXISTS" in clause.sql and "NOT EXISTS" in clause.sql
+    assert clause.binds == {"flt_position_person": 42}
 
 
-def test_corresponding_unknown_value_ignored():
-    assert corresponding_clause(42, ["bogus"]) is None
+def test_author_position_other_is_negated():
+    clause = author_position_clause(42, [], ["other"])
+    assert clause is not None
+    assert clause.sql.startswith("(NOT (EXISTS")
+
+
+def test_author_position_values_combine_with_or():
+    clause = author_position_clause(42, [], ["corresponding", "other"])
+    assert clause is not None
+    assert " OR NOT (" in clause.sql
 
 
 def test_in_perimeter_none_without_person_or_filter():

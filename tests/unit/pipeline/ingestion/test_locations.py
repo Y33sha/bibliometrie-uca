@@ -1,29 +1,59 @@
-"""Localisations désignées par les identifiants d'un enregistrement source (`identifier_locations`)."""
+"""Fusion des localisations d'un enregistrement source (`pipeline.ingestion.common.locations`)."""
 
-from domain.source_records.identifiers import (
-    SourceIdentifier,
-    SourceIdentifierRole,
-    SourceIdentifierType,
-)
-from pipeline.ingestion.common.locations import LocationFacts, identifier_locations
+from pipeline.ingestion.common.locations import LocationFacts, merge_locations
 
 
-def _id(id_type, value):
-    return SourceIdentifier(id_type, value, SourceIdentifierRole.SECONDARY)
-
-
-def test_arxiv_et_pmcid_donnent_une_copie_ouverte():
-    identifiers = [
-        _id(SourceIdentifierType.ARXIV_ID, "2103.11769"),
-        _id(SourceIdentifierType.PMCID, "PMC1234567"),
-        _id(SourceIdentifierType.PMID, "1"),
-    ]
-    assert identifier_locations(identifiers) == [
-        LocationFacts(url="https://arxiv.org/abs/2103.11769", is_oa=True),
-        LocationFacts(url="https://www.ncbi.nlm.nih.gov/pmc/articles/PMC1234567/", is_oa=True),
+def test_les_portails_hal_d_un_depot_forment_une_seule_copie():
+    merged = merge_locations(
+        [
+            LocationFacts("https://shs.hal.science/halshs-01497672", is_oa=False),
+            LocationFacts(
+                "https://halshs.archives-ouvertes.fr/halshs-01497672v2/document", is_oa=True
+            ),
+            LocationFacts("https://hal.science/halshs-01497672"),
+        ]
+    )
+    assert merged == [
+        LocationFacts(
+            "https://hal.science/halshs-01497672",
+            pdf_url="https://halshs.archives-ouvertes.fr/halshs-01497672v2/document",
+            is_oa=True,
+        )
     ]
 
 
-def test_identifiant_invalide_ou_absent():
-    assert identifier_locations([_id(SourceIdentifierType.ARXIV_ID, "pas un identifiant")]) == []
-    assert identifier_locations([]) == []
+def test_un_depot_dumas_garde_son_portail_une_these_tel_va_sur_hal_science():
+    merged = merge_locations(
+        [
+            LocationFacts("https://dumas.ccsd.cnrs.fr/dumas-01234567v1"),
+            LocationFacts("https://tel.archives-ouvertes.fr/tel-01234567"),
+        ]
+    )
+    assert [loc.url for loc in merged] == [
+        "https://dumas.ccsd.cnrs.fr/dumas-01234567",
+        "https://hal.science/tel-01234567",
+    ]
+
+
+def test_deux_depots_hal_restent_distincts():
+    merged = merge_locations(
+        [
+            LocationFacts("https://hal.science/hal-01607327v1"),
+            LocationFacts("https://hal.science/hal-01651302"),
+        ]
+    )
+    assert [loc.url for loc in merged] == [
+        "https://hal.science/hal-01607327",
+        "https://hal.science/hal-01651302",
+    ]
+
+
+def test_les_pages_descriptives_et_les_autres_adresses():
+    merged = merge_locations(
+        [
+            LocationFacts("https://doaj.org/article/abc"),
+            LocationFacts("https://doi.org/10.1/x", is_oa=False),
+            LocationFacts("https://doi.org/10.1/x", oai_id="doublon"),
+        ]
+    )
+    assert merged == [LocationFacts("https://doi.org/10.1/x", is_oa=False)]

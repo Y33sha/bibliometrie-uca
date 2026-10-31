@@ -28,12 +28,16 @@ class ConfigKey(StrEnum):
     """Nombre de DOI interrogés par source cible à la recherche par DOI (phase `fetch_missing`)."""
     SUDOC_MAX_PER_RUN = "sudoc_max_per_run"
     """Nombre de revues vérifiées dans le Sudoc par run."""
+    DOI_RESOLUTION_MAX_PER_RUN = "doi_resolution_max_per_run"
+    """Nombre de DOI dont l'URL de résolution est lue chez doi.org par run."""
     FETCH_STALE_AFTER_DAYS = "fetch_stale_after_days"
     """Âge au-delà duquel un enregistrement source est interrogé de nouveau à sa source."""
     FETCH_MISSING_RETRY_AFTER_DAYS = "fetch_missing_retry_after_days"
     """Délai avant de chercher de nouveau un identifiant resté introuvable dans une source."""
     UNPAYWALL_RECHECK_AFTER_DAYS = "unpaywall_recheck_after_days"
     """Délai avant de vérifier de nouveau le statut open access d'une publication auprès d'Unpaywall."""
+    DOI_RESOLUTION_RECHECK_AFTER_DAYS = "doi_resolution_recheck_after_days"
+    """Délai avant de relire chez doi.org l'URL de résolution d'un DOI."""
     DOAJ_REFRESH_AFTER_DAYS = "doaj_refresh_after_days"
     """Délai avant de télécharger de nouveau le fichier du DOAJ."""
     PIPELINE_START_YEAR_FULL = "pipeline_start_year_full"
@@ -62,9 +66,11 @@ SETTINGS: dict[ConfigKey, ConfigSetting] = {
     ConfigKey.UNPAYWALL_MAX_PER_RUN: ConfigSetting(ConfigKind.CAP, 10_000),
     ConfigKey.FETCH_MISSING_MAX_PER_SOURCE: ConfigSetting(ConfigKind.CAP, 0),
     ConfigKey.SUDOC_MAX_PER_RUN: ConfigSetting(ConfigKind.CAP, 10_000),
+    ConfigKey.DOI_RESOLUTION_MAX_PER_RUN: ConfigSetting(ConfigKind.CAP, 10_000),
     ConfigKey.FETCH_STALE_AFTER_DAYS: ConfigSetting(ConfigKind.DELAY, 90),
     ConfigKey.FETCH_MISSING_RETRY_AFTER_DAYS: ConfigSetting(ConfigKind.DELAY, 30),
     ConfigKey.UNPAYWALL_RECHECK_AFTER_DAYS: ConfigSetting(ConfigKind.DELAY, 15),
+    ConfigKey.DOI_RESOLUTION_RECHECK_AFTER_DAYS: ConfigSetting(ConfigKind.DELAY, 180),
     ConfigKey.DOAJ_REFRESH_AFTER_DAYS: ConfigSetting(ConfigKind.DELAY, 30),
     ConfigKey.PIPELINE_START_YEAR_FULL: ConfigSetting(ConfigKind.YEAR),
 }

@@ -173,7 +173,7 @@
 		{/if}
 		{#if !serialFixed}
 			<EntityFilter
-				label="Collection"
+				label="Collections"
 				endpoint="/api/monographs/facets"
 				kind="serial"
 				buildParams={buildFilterParams}

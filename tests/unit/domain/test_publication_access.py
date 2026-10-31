@@ -1,19 +1,35 @@
 """Liens d'accès d'une publication (`domain.publications.access`)."""
 
+from dataclasses import replace
+
+import pytest
+
+from domain.platforms.platform import ARCHIVE_TYPES, PlatformType
 from domain.platforms.registry import ARXIV, HAL, ZENODO
-from domain.publications.access import Access, AccessLink, Copy, access, access_url
+from domain.publications.access import (
+    Access,
+    AccessLink,
+    Copy,
+    access,
+    access_url,
+    registered_url_copy,
+)
 
 _KNOWN = {p.name: p for p in (ARXIV, HAL, ZENODO)}
 _DOI = "10.1/x"
 
 
 def _copy(url, *, version=None, is_oa=True, platform=None, described=False, arrival=1) -> Copy:
+    known = _KNOWN.get(platform or "")
     return Copy(
         url=url,
         version=version,
         is_oa=is_oa,
         platform=platform,
-        known_platform=_KNOWN.get(platform or ""),
+        known_platform=known,
+        platform_type=known.platform_type if known else None,
+        license=None,
+        embargoed=False,
         described_by_platform=described,
         arrival=arrival,
     )
@@ -62,10 +78,27 @@ def test_les_copies_fermees_sont_ecartees():
 def test_hal_decide_de_l_ouverture_de_ses_copies():
     """OpenAlex dit ouverte une copie HAL sans fichier : la copie donnée par HAL l'emporte."""
     copies = [
-        _copy("https://hal.science/hal-1", platform="HAL", described=True, is_oa=False),
-        _copy("https://hal.science/hal-1", version="submittedVersion", platform="HAL", arrival=2),
+        _copy("https://hal.science/hal-01607327", platform="HAL", described=True, is_oa=False),
+        _copy(
+            "https://hal.science/hal-01607327",
+            version="submittedVersion",
+            platform="HAL",
+            arrival=2,
+        ),
     ]
     assert _access(copies) == Access(None, [])
+
+
+def test_hal_decide_seulement_pour_ses_propres_depots():
+    """OpenAlex réunit deux dépôts HAL ; seul le premier a son enregistrement source HAL dans la publication."""
+    copies = [
+        _copy("https://hal.science/hal-01607327v1", platform="HAL", described=True, is_oa=False),
+        _copy("https://hal.science/hal-01607327", platform="HAL", arrival=2),
+        _copy("https://hal.science/hal-01651302", platform="HAL", arrival=2),
+    ]
+    assert _access(copies).links == [
+        AccessLink("HAL", "https://hal.science/hal-01651302", known=True)
+    ]
 
 
 def test_seule_une_adresse_web_compte():
@@ -96,6 +129,31 @@ def test_une_copie_designee_par_un_autre_doi_figure_sur_sa_plateforme():
     assert links == [AccessLink("Zenodo", "https://doi.org/10.5281/zenodo.1", known=True)]
 
 
+def test_le_doi_de_la_publication_sur_une_plateforme_du_registre_figure_parmi_les_liens():
+    """Publication déposée sur Zenodo : son DOI mène à Zenodo, pas à un éditeur."""
+    result = access(
+        [
+            _copy("https://doi.org/10.5281/zenodo.8278818", platform="Zenodo", arrival=1),
+            _copy("https://doi.org/10.5281/zenodo.8278819", platform="Zenodo", arrival=2),
+        ],
+        doi="10.5281/zenodo.8278818",
+    )
+    assert result == Access(
+        url="https://doi.org/10.5281/zenodo.8278818",
+        links=[AccessLink("Zenodo", "https://doi.org/10.5281/zenodo.8278818", known=True)],
+    )
+
+
+def test_le_doi_de_la_publication_chez_un_editeur_reste_hors_des_liens():
+    copy = replace(
+        _copy("https://doi.org/10.48611/isbn.978-2", platform="Classiques Garnier"),
+        platform_type=PlatformType.PUBLISHER_PLATFORM,
+    )
+    assert access([copy], doi="10.48611/isbn.978-2") == Access(
+        url="https://doi.org/10.48611/isbn.978-2", links=[]
+    )
+
+
 def test_une_plateforme_du_registre_porte_le_nom_du_registre():
     copy = Copy(
         url="https://zenodo.org/records/1",
@@ -103,10 +161,54 @@ def test_une_plateforme_du_registre_porte_le_nom_du_registre():
         is_oa=True,
         platform="Zenodo (CERN European Organization for Nuclear Research)",
         known_platform=ZENODO,
+        platform_type=ZENODO.platform_type,
+        license=None,
+        embargoed=False,
         described_by_platform=False,
         arrival=1,
     )
     assert _access([copy]).links == [AccessLink("Zenodo", copy.url, known=True)]
+
+
+def test_l_adresse_enregistree_d_un_pdf_donne_une_copie_ouverte_de_l_editeur():
+    copy = registered_url_copy("http://isyou.info/jowua/papers/jowua-v12n1-6.PDF?dl=1")
+    assert copy is not None
+    assert (copy.is_oa, copy.version, copy.platform_type, copy.license) == (
+        True,
+        "publishedVersion",
+        None,
+        None,
+    )
+
+
+def test_l_adresse_enregistree_d_une_page_ne_donne_aucune_copie():
+    assert registered_url_copy("https://www.techno-press.org/content/?page=article") is None
+    assert registered_url_copy("https://e.org/pdf/12") is None
+    assert registered_url_copy("https://www.researchsquare.com/article/rs-1/v1") is None
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://arxiv.org/abs/2011.12961",
+        "https://www.biorxiv.org/content/10.1101/2022.08.29.505639v1",
+        "https://www.medrxiv.org/content/10.1101/2021.01.01.21249117v2",
+        "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC123/",
+    ],
+)
+def test_l_adresse_enregistree_d_une_plateforme_en_acces_libre_integral_donne_une_copie_ouverte(
+    url,
+):
+    copy = registered_url_copy(url)
+    assert copy is not None
+    assert (copy.is_oa, copy.version, copy.platform_type in ARCHIVE_TYPES) == (True, None, True)
+
+
+def test_la_copie_de_l_adresse_enregistree_passe_devant_une_copie_d_archive():
+    pdf = registered_url_copy("https://www.cetjournal.it/cet/23/101/002.pdf")
+    assert pdf is not None
+    hal = _copy("https://hal.science/hal-1", platform="HAL", described=True, arrival=1)
+    assert _access([hal, pdf]).url == pdf.url
 
 
 def test_le_lien_d_acces_mene_a_la_meilleure_copie():

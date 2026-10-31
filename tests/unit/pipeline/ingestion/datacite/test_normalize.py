@@ -30,6 +30,7 @@ def _normalizer() -> DataciteNormalizer:
         publisher_store=MagicMock(),
         contribution_store=MagicMock(),
         location_store=MagicMock(),
+        embargo_store=MagicMock(),
     )
 
 
@@ -396,7 +397,6 @@ class TestSourceRecord:
         assert identifier_values(document)["doi"] == ["10.5281/zenodo.1"]
         assert document.title == "Un jeu de données"
         assert document.publication_year == 2024
-        assert document.oa_status is None  # DataCite ne renseigne pas le statut open access
 
     def test_dois_apparentes_rassembles(self):
         attributs = _attributs(

@@ -66,9 +66,10 @@ Les personnes et les publications ont un volet latéral (`PersonDrawer`, `Public
 - [ ] Lieu et directeur d'ouvrage dans les noms d'éditeur
 - [ ] Mesure des autres doublons d'éditeurs sous des noms différents
 
-### Phase 3 — Titres de revue
+### Phase 3 — Revues
 
-- [ ] Apostrophes retirées par OpenAlex
+- [ ] Apostrophes retirées du titre par OpenAlex (+ caractère @ à conserver)
+- [ ] Stocker la langue des revues?
 
 ### Phase 4 — Conteneur libre
 

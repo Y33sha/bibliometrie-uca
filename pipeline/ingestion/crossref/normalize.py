@@ -321,7 +321,6 @@ def crossref_source_record(
         biblio=get_biblio(msg),
         abstract=get_abstract(msg),
         keywords=get_keywords(msg),
-        oa_status=None,
         license=crossref_license(msg.get("license")),
         impact=Impact(cited_by_count=get_cited_by_count(msg)).to_json(),
         source_extras=extract_crossref_source_extras(msg),

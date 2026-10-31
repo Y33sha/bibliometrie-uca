@@ -118,15 +118,12 @@ Le NNT (ex. `2017CLFAC001`) est l'identifiant primaire de l'enregistrement sourc
 
 L'établissement de soutenance (`etabSoutenance`) et les laboratoires partenaires (`partenairesRecherche`) sont des propriétés du document. La normalisation les garde dans `source_extras` avec leur PPN IdRef, et les contributions sources de la thèse sont sans adresse. La vue `source_contribution_structures` rattache toutes les contributions sources à l'établissement de soutenance quand son PPN figure parmi les établissements du périmètre, et la contribution source du doctorant à chaque laboratoire partenaire reconnu par son PPN (`idref_structures`).
 
-### Statut open access
+### Diffusion
 
-Le statut open access vient de la diffusion de la thèse. `cas` est le cas de diffusion STAR : cas 1 à 4, une version de la thèse est destinée à Internet ; cas 5 et 6, l'intranet de l'établissement seulement. `accessible` dit si la thèse est consultable.
+`cas` est le cas de diffusion STAR : cas 1 à 4, une version de la thèse est destinée à Internet ; cas 5 et 6, l'intranet de l'établissement seulement. `accessible` dit si la thèse est consultable.
 
-| Diffusion | `oa_status` |
-|---|---|
-| `accessible` = `oui` | `green` |
-| cas 1 à 4, `accessible` = `non` | `embargoed` |
-| cas 5 ou 6, thèse en cours | `closed` |
+- Une thèse inaccessible des cas 1 à 4 reçoit un embargo sans date (`embargoes`).
+- Une thèse des cas 5 et 6 a `intranet_only` dans `source_extras`. Sa publication est `closed`, comme une thèse en cours.
 
 ### Langue et résumé
 

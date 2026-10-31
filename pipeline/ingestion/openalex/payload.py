@@ -16,7 +16,6 @@ from domain.publications.identifiers import (
     normalize_pmcid,
     normalize_pmid,
 )
-from domain.publications.metadata import OaStatus
 from domain.source_records.identifiers import (
     SourceIdentifier,
     SourceIdentifierRole,
@@ -159,31 +158,6 @@ def extract_nnt_from_location(loc: OpenalexLocation) -> str | None:
         if m:
             return normalize_nnt(m.group(1))
     return None
-
-
-# Statuts open access exposés par OpenAlex (`open_access.oa_status`), reconnus par `map_openalex_oa_status`.
-_KNOWN_OA_STATUSES = frozenset(
-    {
-        OaStatus.GOLD,
-        OaStatus.DIAMOND,
-        OaStatus.HYBRID,
-        OaStatus.BRONZE,
-        OaStatus.GREEN,
-        OaStatus.CLOSED,
-    }
-)
-
-
-def map_openalex_oa_status(raw: str | None) -> str | None:
-    """Renvoie le statut open access (`OaStatus`) d'un `open_access.oa_status` d'OpenAlex.
-
-    OpenAlex emploie les mêmes valeurs que `OaStatus` (gold, diamond, hybrid, bronze, green, closed). Une valeur vide donne `None` : le statut vient alors des autres sources (`best_oa_status`), et un champ vide reste distinct de `closed`. Une valeur inattendue donne `unknown`.
-    """
-    if not raw:
-        return None
-    if raw in _KNOWN_OA_STATUSES:
-        return raw
-    return "unknown"
 
 
 def url_identifiers(urls: list[str]) -> list[SourceIdentifier]:

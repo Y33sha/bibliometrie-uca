@@ -9,14 +9,13 @@ import json
 import logging
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, fields
-from datetime import date
 
 from sqlalchemy import Connection, bindparam, text
 
-from domain.normalize import drop_duplicate_mathml, strip_abstract_label
+from domain.normalize import clean_abstract, drop_duplicate_mathml, strip_abstract_label
 from domain.publications.doc_types import DocType
 from domain.publications.licenses import License
-from domain.publications.metadata import normalized_title
+from domain.publications.metadata import clean_publication_title, normalized_title
 from domain.publishers.attribution import source_record_has_publisher
 from domain.serials.titles import names_ebook_platform
 from domain.source_records.doc_types import map_doc_type
@@ -34,9 +33,9 @@ logger = logging.getLogger(__name__)
 class SourceRecordUpsert:
     """Un enregistrement source fourni par une source, prêt à être écrit.
 
-    Le jeu de colonnes est commun à toutes les sources ; une colonne non renseignée par la source reste à `None`. Les absences suivent les données exposées par chaque source : theses.fr est sans résumé, HAL et theses.fr sans indicateur de citation ; `hal_collections` et `embargo_until` existent seulement pour HAL, `is_retracted` seulement pour OpenAlex.
+    Le jeu de colonnes est commun à toutes les sources ; une colonne non renseignée par la source reste à `None`. Les absences suivent les données exposées par chaque source : theses.fr est sans résumé, HAL et theses.fr sans indicateur de citation ; `hal_collections` existe seulement pour HAL, `is_retracted` seulement pour OpenAlex.
 
-    `title_normalized` se dérive de `title` à l'écriture, `doc_type` de `raw_doc_type` (`map_doc_type`) et `language` de `raw_language` (`language_code`). `publication_id`, rattachement à la publication, est posé par la phase `publications`.
+    `title` et `abstract` sont nettoyés à l'écriture (`clean_publication_title`, `clean_abstract`), et `title_normalized` se dérive du titre. `doc_type` de `raw_doc_type` (`map_doc_type`) et `language` de `raw_language` (`language_code`). `publication_id`, rattachement à la publication, est posé par la phase `publications`.
     """
 
     # Clé de l'enregistrement source
@@ -71,10 +70,8 @@ class SourceRecordUpsert:
     topics: JsonValue = None
 
     # Open access
-    oa_status: str | None = None
     license: License | None = None
     urls: list[str] | None = None
-    embargo_until: date | None = None
 
     # Citations et drapeaux
     impact: JsonValue = None
@@ -159,6 +156,11 @@ def replace_identifiers(
         conn.execute(_INSERT_IDENTIFIERS, {"identifiers": json.dumps(rows)})
 
 
+def stored_abstract(abstract: str | None) -> str | None:
+    """Renvoie le résumé tel qu'il est écrit : nettoyé, sans copie MathML d'une formule TeX ni intitulé de tête (« Abstract »)."""
+    return strip_abstract_label(drop_duplicate_mathml(clean_abstract(abstract)))
+
+
 class SourceRecordStore:
     """Écriture des enregistrements sources et de leurs identifiants. Les formes de langue se chargent à la première écriture."""
 
@@ -168,6 +170,7 @@ class SourceRecordStore:
 
     def upsert_source_record(self, row: SourceRecordUpsert) -> int:
         params: dict[str, object] = {name: getattr(row, name) for name in _ROW_FIELDS}
+        params["title"] = clean_publication_title(row.title)
         params["title_normalized"] = normalized_title(row.title)
         params["doc_type"] = _doc_type(row)
         if not source_record_has_publisher(
@@ -178,7 +181,7 @@ class SourceRecordStore:
             params["publisher_id"] = None
         if row.container_title and names_ebook_platform(row.container_title):
             params["container_title"] = None
-        params["abstract"] = strip_abstract_label(drop_duplicate_mathml(row.abstract))
+        params["abstract"] = stored_abstract(row.abstract)
         params["language"] = language_code(row.raw_language, self._forms())
         identifiers = normalized_identifiers(row)
         source_record_id = scalar_int(self._conn.execute(_UPSERT_SQL, params))

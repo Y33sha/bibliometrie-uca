@@ -5,6 +5,7 @@
 	import DocTypePill from '#lib/components/DocTypePill.svelte';
 	import ListToolbar from '#lib/components/ListToolbar.svelte';
 	import DoiLink from '#lib/components/DoiLink.svelte';
+	import CorrespondingMark from '#lib/components/CorrespondingMark.svelte';
 	import SortChevron from '#lib/components/SortChevron.svelte';
 	import { institution } from '#lib/institution.svelte.js';
 	import { onMount } from 'svelte';
@@ -72,7 +73,7 @@
 	// Volet d'une publication : ouvert tant que `?publication=<id>` figure dans l'URL. Une icône en tête de ligne ouvre le volet ; le titre mène toujours à la fiche.
 	const drawer = useDrawerParam('publication');
 
-	// Le laboratoire a la colonne et le filtre « Statut HAL ». La personne a la colonne et le filtre « Auteur correspondant », le filtre du périmètre, et marque les APC des publications dont elle n'est pas l'auteur correspondant.
+	// Le laboratoire a la colonne et le filtre « Statut HAL ». La personne a la colonne « Auteur correspondant », le filtre du périmètre, et marque les APC des publications dont elle n'est pas l'auteur correspondant. Le filtre « Position auteur » vaut pour l'un et l'autre.
 	// svelte-ignore state_referenced_locally
 	const isLab = context.kind === 'lab';
 	// svelte-ignore state_referenced_locally
@@ -338,7 +339,7 @@
 						{/each}
 					</td>{/if}
 					{#if isPerson && col('corr')}<td class="corr-cell">
-						{#if p.is_corresponding}<span title="Auteur correspondant">&#10003;</span>{/if}
+						{#if p.is_corresponding}<CorrespondingMark />{/if}
 					</td>{/if}
 					{#if col('apc')}<td class="apc-cell">
 						{#if p.apc}
@@ -409,7 +410,8 @@
 	.hal-hors_hal        { background: var(--danger-light); color: var(--danger); }
 
 	/* Auteur correspondant (person) */
-	.corr-cell { text-align: center; color: var(--accent); font-size: var(--fs-sm); }
+	.corr-cell { text-align: center; }
+	.corr-cell :global(.corresponding-mark) { margin-left: 0; }
 
 	/* Bouton exclure (admin, person) */
 </style>

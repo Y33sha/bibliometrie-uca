@@ -40,6 +40,20 @@ Seules les adresses et les contributions sources marquées sont retraitées.
 
 ## Statut open access (`oa_status`)
 
-Interroge [Unpaywall](../glossaire.md#unpaywall) par DOI et conserve son verdict dans `sources.unpaywall`. Le statut d'une publication se calcule à partir de ses sources et de ce verdict, ici et à chaque recalcul de la publication.
+Lit chez doi.org l'URL de résolution de chaque DOI, interroge [Unpaywall](../glossaire.md#unpaywall) par DOI, et conserve les deux réponses dans `sources.dois`. Une URL de résolution donne une copie ouverte de la publication dans deux cas : elle mène à une plateforme en accès libre intégral (arXiv, bioRxiv, medRxiv, PubMed Central), ou son chemin finit par `.pdf`. Le statut d'une publication se déduit de ses copies, du modèle de sa revue et de ce verdict (`domain/publications/open_access.py`), ici et à chaque recalcul de la publication :
 
-Incrémentale : chaque exécution est plafonnée (`unpaywall_max_per_run`, 10 000 DOI par défaut) et vérifie seulement les DOI sans verdict, ou au verdict plus ancien que `unpaywall_recheck_after_days` (15 jours par défaut, réglable dans `admin/config`). Les DOI DataCite, absents d'Unpaywall, sont écartés. Quand Unpaywall est indisponible, le DOI est repris au run suivant.
+1. Copie ouverte chez l'éditeur, sous licence ouverte : `hybrid` dans une revue sur abonnement ou de modèle inconnu, `gold` dans une revue entièrement en open access ou hors revue, `diamond` dans une revue diamant.
+2. Sinon, copie ouverte dans une archive ou sur un serveur de preprints : `green`.
+3. Sinon, copie ouverte chez l'éditeur sans licence ouverte : `bronze`.
+4. Sinon : `embargoed` avec un enregistrement source sous embargo actif (`embargoes`), `closed` avec une copie déclarée fermée, un verdict, ou pour une thèse en cours ou réservée à l'intranet de son établissement, `unknown` sans aucune information.
+
+Le verdict d'Unpaywall relève ces accès, sans les abaisser : `gold`, `hybrid` ou `diamond` vaut une copie ouverte chez l'éditeur sous licence, `bronze` sans licence, `green` une copie d'archive ouverte.
+
+Incrémentale : chaque service reçoit seulement les DOI sans réponse de sa part, ou à réponse plus ancienne que son délai, dans la limite de son plafond par exécution. Ces réglages se modifient dans `admin/config`.
+
+| Service | Plafond | Délai | DOI écartés |
+|---|---|---|---|
+| doi.org | `doi_resolution_max_per_run`, 10 000 | `doi_resolution_recheck_after_days`, 180 jours | aucun |
+| Unpaywall | `unpaywall_max_per_run`, 10 000 | `unpaywall_recheck_after_days`, 15 jours | DOI DataCite, absents d'Unpaywall |
+
+Un DOI inconnu du service reçoit une réponse nulle. Quand le service est indisponible, le DOI est repris au run suivant.

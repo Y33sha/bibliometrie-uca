@@ -19,6 +19,7 @@ Un jeu d'évaluation tiré des verdicts humains existe depuis le 2026-10-19 (`bu
 - [ ] Identifiants attribués à tort. 226 personnes ont plusieurs ORCID non rejetés au 2026-10-24, dont Miriam Calvo Gomez, qui a l'ORCID de Marta Calvi sur 192 publications. Un ORCID en attente rattache parfois la contribution d'une autre personne que son titulaire (21 cas dans la relecture du 2026-10-19).
 - [ ] Contrôle des identifiants par le nom que déclarent les API d'IdRef et d'ORCID.
 - [ ] ORCID d'OpenAlex sans DOI : sur des enregistrements sources OpenAlex sans DOI, `raw_orcid` donne deux fois un ORCID faux (Yannick Chevalier, Bruno Pereira). Provenance de `raw_orcid` hors Crossref à vérifier.
+- [ ] Fiabilité des IdRef et des ORCID de ScanR, confrontés aux autres sources de la même contribution. L'IdRef de ScanR sert au rattachement, son ORCID est exclu (`ORCID_MATCH_SOURCES`). La mesure dit aussi si ScanR reste utile comme source.
 
 ### Phase 2 — Affiliations
 
