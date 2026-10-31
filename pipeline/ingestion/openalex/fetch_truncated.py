@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from sqlalchemy import Connection, text
 
 from domain.types import JsonValue, as_sequence
-from pipeline.ingestion.common.lookup import LookupChannel, look_up, one_at_a_time
+from pipeline.ingestion.common.lookup import LookupChannel, by_native_id, look_up
 from pipeline.ingestion.common.staging import StagingStore, UpsertOutcome
 from pipeline.ingestion.openalex.api import fetch_work
 from pipeline.ingestion.openalex.fields import extract_openalex_id
@@ -60,7 +60,7 @@ def _complete(staging: StagingStore, work: Mapping[str, JsonValue]) -> UpsertOut
 async def refetch_openalex(conn: Connection, log: logging.Logger) -> PhaseMetrics:
     """Relit les works OpenAlex marqués tronqués (`staging.authors_truncated`).
 
-    Renvoie les compteurs de `look_up` : works réécrits (`updated`), works à exactement le plafond d'auteurs (`unchanged`), works inconnus d'OpenAlex (`not_found`), lots non servis (`errors`). Le marqueur est levé, sauf pour les lots non servis.
+    Renvoie les compteurs de `look_up` : works réécrits (`updated`), works à exactement le plafond d'auteurs (`unchanged`), works inconnus d'OpenAlex ou fusionnés dans un autre work (`not_found`), lots non servis (`errors`). Le marqueur est levé, sauf pour les lots non servis.
     """
     truncated = list(conn.execute(_SELECT_TRUNCATED_SQL).scalars())
     if not truncated:
@@ -77,7 +77,7 @@ async def refetch_openalex(conn: Connection, log: logging.Logger) -> PhaseMetric
         log,
         LookupChannel(
             source="openalex",
-            fetch=one_at_a_time(fetch_work),
+            fetch=by_native_id("openalex", fetch_work),
             on_absent=lambda conn, openalex_id: StagingStore(conn).clear_truncated(
                 "openalex", openalex_id
             ),

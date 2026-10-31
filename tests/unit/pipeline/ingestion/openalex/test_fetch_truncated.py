@@ -3,7 +3,7 @@
 Pas de réseau ni de base : la lecture d'un work est simulée, et une connexion simulée renvoie les works marqués et retient les écritures. Les tests vérifient le triage :
 - un work à plus de cent auteurs est réécrit ;
 - un work à cent auteurs exactement perd son marqueur sans réécriture ;
-- un work absent d'OpenAlex perd son marqueur ;
+- un work absent d'OpenAlex, ou fusionné dans un autre work, perd son marqueur ;
 - un work lu pendant une indisponibilité d'OpenAlex garde son marqueur pour le run suivant.
 """
 
@@ -95,11 +95,19 @@ async def test_openalex_indisponible_garde_le_marqueur(openalex):
 
 
 async def test_work_inconnu_d_openalex_perd_son_marqueur(openalex):
-    """Work supprimé ou fusionné dans OpenAlex : le marqueur s'efface, donc le run suivant ignore le work."""
+    """Work supprimé dans OpenAlex : le marqueur s'efface, donc le run suivant ignore le work."""
     conn = openalex({"W1": NOT_FOUND})
     metrics = await refetch_openalex(conn, _LOGGER)
     assert metrics.extras.get("not_found") == 1
     assert (conn.reecrits, conn.leves) == ([], ["W1"])
+
+
+async def test_work_fusionne_perd_son_marqueur(openalex):
+    """Work fusionné : OpenAlex renvoie le work absorbant, écrit sous son identifiant ; le work demandé perd son marqueur."""
+    conn = openalex({"W1": {"id": "https://openalex.org/W9", **_work(150)}})
+    metrics = await refetch_openalex(conn, _LOGGER)
+    assert metrics.extras.get("not_found") == 1
+    assert (conn.reecrits, conn.leves) == (["W9"], ["W1"])
 
 
 @pytest.mark.parametrize(

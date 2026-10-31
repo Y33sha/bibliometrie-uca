@@ -16,7 +16,7 @@ from domain.publications.doc_types import DocType
 from domain.sources.registry import ALL_SOURCES_SET as VALID_SOURCES
 from domain.types import JsonValue
 from pipeline.http.lookup import LookupOutcome
-from pipeline.ingestion.common.lookup import LookupChannel, look_up, one_at_a_time
+from pipeline.ingestion.common.lookup import LookupChannel, by_native_id, look_up
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
 type FetchOutcome = LookupOutcome[Mapping[str, JsonValue]]
@@ -98,7 +98,7 @@ async def refresh(
 ) -> PhaseMetrics:
     """Relit par identifiant natif les documents de la source non revus par le moissonnage depuis `after_days` jours.
 
-    Un document absent de la source est marqué disparu. `years` borne la sélection (`get_stale_source_ids`).
+    Un document absent de la source, ou renvoyé sous un autre identifiant natif, est marqué disparu. `years` borne la sélection (`get_stale_source_ids`).
 
     Renvoie les compteurs de `look_up` : documents réécrits (`updated`), identiques (`unchanged`), lots non servis (`errors`), absences confirmées (`disappeared`).
     """
@@ -108,7 +108,7 @@ async def refresh(
         log,
         LookupChannel(
             source=source,
-            fetch=one_at_a_time(refetch.fetch_by_native_id),
+            fetch=by_native_id(source, refetch.fetch_by_native_id),
             on_absent=lambda conn, source_id: set_disappeared(conn, source, source_id),
             # La lecture par identifiant natif renvoie le document entier : aucun plafond d'auteurs.
             stage=lambda staging, record: staging.stage(source, record, listed=False),
