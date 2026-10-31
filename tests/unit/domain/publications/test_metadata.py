@@ -203,6 +203,20 @@ class TestCleanPublicationTitle:
         )
         assert clean_publication_title("  spaced \t title  ") == "spaced title"
 
+    def test_keeps_inner_non_breaking_spaces(self):
+        """Les espaces insécables de la typographie restent ; en bordure, ils sont retirés."""
+        assert clean_publication_title("Pratiques\xa0: soins ") == "Pratiques\xa0: soins"
+
+    def test_undoubles_repeatedly_escaped_backslashes(self):
+        """Dépôt Crossref réel : 64 barres obliques devant chaque commande."""
+        assert clean_publication_title("in " + "\\" * 64 + "mathbf{n}^+") == "in \\mathbf{n}^+"
+        assert clean_publication_title("low-$p_{\\\\rm T}$") == "low-$p_{\\rm T}$"
+
+    def test_keeps_line_breaks_beside_a_single_backslash_command(self):
+        """Un `\\\\` à côté d'une commande à barre simple est un saut de ligne."""
+        title = "$\\begin{array}{l}a=1,\\\\ b=2\\end{array}$"
+        assert clean_publication_title(title) == title
+
     def test_idempotent(self):
         """Une seconde application laisse le titre inchangé."""
         once = clean_publication_title("&amp;lt;i&amp;gt;Candida&amp;lt;/i&amp;gt;")

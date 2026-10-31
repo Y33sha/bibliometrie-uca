@@ -136,11 +136,20 @@ def is_overlong_title(title: str | None) -> bool:
     return bool(title) and len(normalize_text(title)) > TITLE_NORMALIZED_MAX_LENGTH
 
 
-_WHITESPACE_RE = re.compile(r"\s+")
+# Espaces ASCII seuls : les espaces insécables de la typographie (« pratiques : ») restent.
+_ASCII_WHITESPACE_RE = re.compile(r"[ \t\n\r\f\v]+")
+_SINGLE_BACKSLASH_COMMAND_RE = re.compile(r"(?<!\\)\\[a-zA-Z]")
+
+
+def _undouble_backslashes(title: str) -> str:
+    """Divise par deux les barres obliques tant qu'aucune commande LaTeX n'est précédée d'une seule barre. Une source qui échappe son titre plusieurs fois multiplie les barres (`\\\\mathbf` chez OpenAlex, 64 barres dans des dépôts Crossref)."""
+    while "\\\\" in title and not _SINGLE_BACKSLASH_COMMAND_RE.search(title):
+        title = title.replace("\\\\", "\\")
+    return title
 
 
 def clean_publication_title(title: str | None) -> str | None:
-    """Nettoie un titre pour l'enregistrement et l'affichage : entités HTML décodées jusqu'à stabilité (`&amp;lt;` d'OpenAlex et de ScanR), espacement réduit à un espace simple. Les balises HTML restent. L'affichage ré-échappe un `&` décodé (« Smith & Jones »)."""
+    """Nettoie un titre à son écriture : entités HTML décodées jusqu'à stabilité (`&amp;lt;` d'OpenAlex et de ScanR), barres obliques multipliées par un échappement répété ramenées à une, suites d'espaces ASCII réduites à un espace, espaces de bordure retirés. Les balises HTML restent."""
     if not title:
         return title
     for _ in range(4):
@@ -148,7 +157,7 @@ def clean_publication_title(title: str | None) -> str | None:
         if decoded == title:
             break
         title = decoded
-    return _WHITESPACE_RE.sub(" ", title).strip()
+    return _ASCII_WHITESPACE_RE.sub(" ", _undouble_backslashes(title)).strip()
 
 
 def normalized_title(title: str | None) -> str:
