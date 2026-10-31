@@ -37,6 +37,7 @@ Le moissonnage par personne interroge les identifiants des personnes RH, confirm
 | Source | Type | Couverture | API | Identifiants d'accès |
 |--------|------|-----------|-----|-----|
 | [Unpaywall](09-sources-supplementaires.md#unpaywall) | Base de statuts open access | Statut open access par DOI | REST (gratuit, 100k req/jour) | adresse électronique de contact |
+| [doi.org](09-sources-supplementaires.md#doiorg) | Résolveur des DOI | Agence d'enregistrement par préfixe, existence et adresse enregistrée par DOI | REST (gratuit) | |
 | [DOAJ](09-sources-supplementaires.md#doaj) | Annuaire des revues open access certifiées | Métadonnées qualifiées par revue (licence, APC, sujets…), rattachées aux revues par ISSN | dump CSV | adresse électronique de contact |
 | [Extraction RH](10-imports-manuels.md#extraction-rh) | Import manuel | Personnel de l'établissement (noms, départements, rôles) | Fichier CSV | |
 | [Données APC](10-imports-manuels.md#données-apc) | Import manuel | Paiements APC (montants, éditeurs) | Fichier CSV | |

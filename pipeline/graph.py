@@ -634,8 +634,14 @@ TASKS: tuple[Task, ...] = (
             "source_records.publication_year",
             "source_records.publication_id",
             "source_record_identifiers",
-            # Verdicts d'Unpaywall, lus par le recalcul des publications des revues fusionnées.
+            # Copies, embargos et réponses d'Unpaywall et de doi.org, lus par le recalcul des publications des revues fusionnées.
+            "source_record_locations",
+            "platforms.name",
+            "platforms.openalex_id",
+            "platforms.platform_type",
+            "embargoes",
             "dois.unpaywall_oa_status",
+            "dois.registered_url",
         ),
         writes=(
             "serials",
@@ -659,7 +665,10 @@ TASKS: tuple[Task, ...] = (
             "source_records.publication_id",
             "source_records.serial_id",
             "source_record_identifiers",
+            # Localisations des dépôts HAL introuvables, retirées par `metadata_correction.unary`.
+            "source_record_locations",
             "dois.unpaywall_oa_status",
+            "dois.registered_url",
         ),
     ),
     _task(
@@ -933,6 +942,7 @@ TASKS: tuple[Task, ...] = (
             "platforms.openalex_id",
             "platforms.platform_type",
             "embargoes",
+            "dois.registered_url",
             "publications",
             "apc_payments",
             "serials.serial_type",
@@ -951,12 +961,13 @@ TASKS: tuple[Task, ...] = (
             "apc_payments.publication_id",
             "publication_contributions_queue",
         ),
-        # Verdicts d'Unpaywall ; publications supprimées par `finalize.purge_publications` ; revues et monographies vides supprimées par `finalize.delete_empty_containers`.
+        # Réponses d'Unpaywall et de doi.org ; publications supprimées par `finalize.purge_publications` ; revues et monographies vides supprimées par `finalize.delete_empty_containers`.
         previous_run=(
             "source_records.countries",
             "publications.id",
             "publications.oa_status",
             "dois.unpaywall_oa_status",
+            "dois.registered_url",
             "serials",
             "monographs",
         ),

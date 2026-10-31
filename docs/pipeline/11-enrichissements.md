@@ -40,7 +40,7 @@ Seules les adresses et les contributions sources marquées sont retraitées.
 
 ## Statut open access (`oa_status`)
 
-Lit chez doi.org l'adresse enregistrée de chaque DOI, interroge [Unpaywall](../glossaire.md#unpaywall) par DOI, et conserve les deux réponses dans `sources.dois`. Le statut d'une publication se déduit de ses copies, du modèle de sa revue et de ce verdict (`domain/publications/open_access.py`), ici et à chaque recalcul de la publication :
+Lit chez doi.org l'adresse enregistrée de chaque DOI, interroge [Unpaywall](../glossaire.md#unpaywall) par DOI, et conserve les deux réponses dans `sources.dois`. Une adresse enregistrée dont le chemin finit par `.pdf` donne une copie ouverte de la publication, en version de l'éditeur. Le statut d'une publication se déduit de ses copies, du modèle de sa revue et de ce verdict (`domain/publications/open_access.py`), ici et à chaque recalcul de la publication :
 
 1. Copie ouverte chez l'éditeur, sous licence ouverte : `hybrid` dans une revue sur abonnement ou de modèle inconnu, `gold` dans une revue entièrement en open access ou hors revue, `diamond` dans une revue diamant.
 2. Sinon, copie ouverte dans une archive ou sur un serveur de preprints : `green`.

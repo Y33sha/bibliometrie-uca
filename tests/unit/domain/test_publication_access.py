@@ -4,7 +4,14 @@ from dataclasses import replace
 
 from domain.platforms.platform import PlatformType
 from domain.platforms.registry import ARXIV, HAL, ZENODO
-from domain.publications.access import Access, AccessLink, Copy, access, access_url
+from domain.publications.access import (
+    Access,
+    AccessLink,
+    Copy,
+    access,
+    access_url,
+    registered_url_copy,
+)
 
 _KNOWN = {p.name: p for p in (ARXIV, HAL, ZENODO)}
 _DOI = "10.1/x"
@@ -159,6 +166,29 @@ def test_une_plateforme_du_registre_porte_le_nom_du_registre():
         arrival=1,
     )
     assert _access([copy]).links == [AccessLink("Zenodo", copy.url, known=True)]
+
+
+def test_l_adresse_enregistree_d_un_pdf_donne_une_copie_ouverte_de_l_editeur():
+    copy = registered_url_copy("http://isyou.info/jowua/papers/jowua-v12n1-6.PDF?dl=1")
+    assert copy is not None
+    assert (copy.is_oa, copy.version, copy.platform_type, copy.license) == (
+        True,
+        "publishedVersion",
+        None,
+        None,
+    )
+
+
+def test_l_adresse_enregistree_d_une_page_ne_donne_aucune_copie():
+    assert registered_url_copy("https://www.techno-press.org/content/?page=article") is None
+    assert registered_url_copy("https://e.org/pdf/12") is None
+
+
+def test_la_copie_de_l_adresse_enregistree_passe_devant_une_copie_d_archive():
+    pdf = registered_url_copy("https://www.cetjournal.it/cet/23/101/002.pdf")
+    assert pdf is not None
+    hal = _copy("https://hal.science/hal-1", platform="HAL", described=True, arrival=1)
+    assert _access([hal, pdf]).url == pdf.url
 
 
 def test_le_lien_d_acces_mene_a_la_meilleure_copie():

@@ -3,6 +3,7 @@
 from datetime import timedelta
 
 import pytest
+from sqlalchemy import text
 
 from domain.dates import today
 from infrastructure.read_models.publications.copies import publication_copies
@@ -44,3 +45,26 @@ def test_le_fichier_depose_est_ferme_jusqu_a_la_fin_de_l_embargo(sa_sync_conn, e
         "https://hal.science/hal-01607327": file_open,
         "https://arxiv.org/abs/2401.00001": True,
     }
+
+
+@pytest.mark.parametrize(
+    ("registered_url", "copy_urls"),
+    [
+        ("https://e.org/a.pdf", ["https://e.org/a.pdf"]),
+        ("https://e.org/article/1", []),
+        (None, []),
+    ],
+)
+def test_l_adresse_enregistree_d_un_pdf_donne_une_copie(sa_sync_conn, registered_url, copy_urls):
+    """Une publication sans enregistrement source à localisation reçoit la copie de son DOI, en majuscules ou non."""
+    publication = insert_publication(sa_sync_conn, doi="10.9/ABC")
+    sa_sync_conn.execute(
+        text(
+            "INSERT INTO dois (doi, registered_url, resolved_at) VALUES ('10.9/abc', :url, now())"
+        ),
+        {"url": registered_url},
+    )
+
+    copies = publication_copies(sa_sync_conn, [publication]).get(publication, [])
+
+    assert [c.url for c in copies] == copy_urls

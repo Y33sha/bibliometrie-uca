@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from urllib.parse import unquote, urlsplit
 
 from domain.platforms.platform import ARCHIVE_TYPES, PlatformType
-from domain.platforms.registry import KnownPlatform
+from domain.platforms.registry import KnownPlatform, known_platform_of_copy, platform_type_of_copy
 from domain.publications.identifiers import extract_hal_id_from_url
 from domain.publications.licenses import License
 from domain.publications.metadata import OA_OPEN_STATUSES, OaStatus
@@ -40,7 +40,7 @@ class Copy:
     described_by_platform: bool
     """La copie vient de l'enregistrement source donné par la plateforme elle-même."""
     arrival: int
-    """Ordre d'arrivée de l'enregistrement source."""
+    """Ordre d'arrivée de l'enregistrement source ; zéro pour la copie de l'adresse enregistrée du DOI."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,6 +79,25 @@ def _listed(copy: Copy, doi: str | None) -> bool:
 
 def _rank(copy: Copy) -> tuple[int, int]:
     return _VERSION_RANK.get(copy.version or "", _UNKNOWN_VERSION_RANK), copy.arrival
+
+
+def registered_url_copy(url: str) -> Copy | None:
+    """Renvoie la copie ouverte, en version de l'éditeur, désignée par l'adresse enregistrée d'un DOI dont le chemin finit par `.pdf`. Sinon `None`."""
+    if not urlsplit(url).path.lower().endswith(".pdf"):
+        return None
+    known = known_platform_of_copy(url, None)
+    return Copy(
+        url=url,
+        version="publishedVersion",
+        is_oa=True,
+        platform=known.name if known else None,
+        known_platform=known,
+        platform_type=platform_type_of_copy(url, None),
+        license=None,
+        embargoed=False,
+        described_by_platform=False,
+        arrival=0,
+    )
 
 
 def open_copies(copies: Iterable[Copy]) -> list[Copy]:
