@@ -40,17 +40,17 @@ Mesures du 2026-10-30 sur tout le stock : 354 711 enregistrements sources, 79 90
 
 ### Phase 2 — Schéma
 
-- [ ] Date et précision (année, mois, jour) sur les enregistrements sources et sur les publications.
+- [x] Date et précision (année, mois, jour) sur les enregistrements sources et sur les publications (86bf8a5af)
 
 ### Phase 3 — Normalisation
 
-- [ ] Date de chaque source, avec sa précision. Jours fictifs ramenés à l'année.
-- [ ] Remise en conformité du stock depuis le raw store. Les enregistrements sources absents du raw store restent sans date.
+- [x] Date de chaque source, avec sa précision. Jours fictifs ramenés à l'année ou au mois (539503b89)
+- [x] Remise en conformité du stock depuis le raw store (`rewrite_publication_dates`, 539503b89). Les enregistrements sources absents du raw store et ceux de WoS gardent leur date à l'année.
 
 ### Phase 4 — Date de la publication
 
-- [ ] Arbitrage entre les dates des enregistrements sources.
-- [ ] `publication_year` en colonne générée depuis la date, une fois les écrivains passés à la date.
+- [x] Arbitrage entre les dates des enregistrements sources ; la sauvegarde d'une publication écrit sa date (2b884962f)
+- [x] `publication_year` en colonne générée depuis la date (bcf4d5710)
 
 ### Phase 5 — Usages
 
