@@ -35,10 +35,10 @@ Simulation sur les 76 591 publications du périmètre (`interfaces/cli/oneshot/m
   4. sinon `embargoed`, `closed` ou `unknown`.
 - Sans copie ouverte côté éditeur, le modèle de la revue ne donne aucun statut.
 - Le verdict d'Unpaywall relève les accès constatés, jamais ne les abaisse.
-- Des statuts déclarés par les sources, seuls comptent `closed` et l'embargo de theses.fr.
-- La date de fin d'embargo est une colonne de la copie. L'ouverture d'une copie se calcule à la lecture : `is_oa` et embargo absent ou échu. Une copie sous embargo actif donne `embargoed`.
-- L'embargo déclaré par theses.fr, sans copie ni date, reste un statut `embargoed`.
-- Sans copie ouverte ni verdict : `closed` avec une copie, un verdict ou un `closed` déclaré, `unknown` sans aucune information.
+- Le statut ignore les statuts déclarés par les sources. La colonne `source_records.oa_status` disparaît.
+- L'embargo d'un enregistrement source est dans la table des embargos. L'ouverture d'une copie se calcule à la lecture : `is_oa` et embargo absent ou échu. Un enregistrement source sous embargo actif donne `embargoed`.
+- L'embargo déclaré par theses.fr, sans copie ni date, donne `embargoed`.
+- Sans copie ouverte ni verdict : `closed` avec une copie, un verdict, pour une thèse en cours ou réservée à l'intranet de son établissement ; `unknown` sans aucune information.
 - HAL décide de l'ouverture des copies de ses propres dépôts : quand l'enregistrement source HAL d'un dépôt est dans la publication, sa description l'emporte sur celle des autres sources.
 - L'identifiant HAL désigne un dépôt, quel que soit le portail. Une copie HAL a l'adresse de son dépôt sur `hal.science`, quel que soit le portail ; DUMAS et TEL gardent leur portail propre.
 - Pour une communication ou un poster, une annexe HAL (diaporama, poster, résumé) tient lieu de fichier déposé.
@@ -77,8 +77,8 @@ Simulation sur les 76 591 publications du périmètre (`interfaces/cli/oneshot/m
 
 ### Phase 5 — Embargos
 
-- [x] Table des embargos : embargo d'une copie HAL, avec sa date de fin ; embargo déclaré par theses.fr, sans date. Elle remplace `embargo_until` des localisations et le statut `embargoed` déclaré par theses.fr.
+- [x] Table des embargos : embargo d'une copie HAL, avec sa date de fin ; embargo déclaré par theses.fr, sans date. Elle remplace `embargo_until` des localisations et le statut `embargoed` déclaré par theses.fr. 71ceed221
+- [x] Thèse réservée à l'intranet dans `source_extras`. Thèse en cours et thèse réservée à l'intranet `closed`, statuts déclarés ignorés.
+- [ ] Colonne `source_records.oa_status` retirée, avec les dérivations des normaliseurs et les règles de correction associées.
 
 ## Questions ouvertes
-
-- `source_records.oa_status`, une fois les embargos en table : seul le statut `closed` déclaré reste lu, et il distingue `closed` de `unknown`. Garder la colonne pour ce seul fait ?

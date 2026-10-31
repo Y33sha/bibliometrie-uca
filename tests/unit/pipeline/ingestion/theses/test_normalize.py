@@ -294,6 +294,13 @@ class TestThesesNormalizerClass:
         assert norm.embargo(_these(cas="cas5", accessible="non")) is None
         assert norm.embargo(_these(cas="cas1", accessible="oui")) is None
 
+    def test_these_reservee_a_l_intranet(self):
+        record = theses_source_record(_these(cas="cas5", accessible="non"), 1, "2020CLFAC001")
+        assert record.source_extras is not None
+        assert record.source_extras["intranet_only"] is True
+        other = theses_source_record(_these(cas="cas1", accessible="oui"), 1, "2020CLFAC002")
+        assert "intranet_only" not in (other.source_extras or {})
+
     def test_metadonnees_minimales(self):
         assert _make_normalizer().minimal_metadata(staging_row(raw={})) == (None, None)
 

@@ -8,7 +8,6 @@ from collections.abc import Mapping
 from domain.dates import french_date_to_iso
 from domain.publications.contribution_roles import THESES_FIELD_ROLES
 from domain.publications.identifiers import clean_doi, normalize_nnt
-from domain.publications.metadata import OaStatus
 from domain.source_records.identifiers import (
     SourceIdentifier,
     SourceIdentifierRole,
@@ -28,7 +27,9 @@ from pipeline.ingestion.common.source_records import (
 from pipeline.ingestion.common.staging import StagingRow
 from pipeline.ingestion.theses.payload import (
     aggregate_thesis_persons,
+    awaits_diffusion,
     derive_theses_doc_type,
+    intranet_only,
     thesis_oa_status,
 )
 from pipeline.transformation.publishing.find_or_create import Containers
@@ -66,6 +67,8 @@ def _build_source_extras(thesis: Mapping[str, JsonValue]) -> dict[str, JsonValue
         source_extras[SourceExtra.DATE_INSCRIPTION] = di
 
     institution = as_mapping(thesis.get("etabSoutenance"))
+    if intranet_only(thesis):
+        source_extras[SourceExtra.INTRANET_ONLY] = True
     if institution_name := as_str(institution.get("nom")):
         source_extras[SourceExtra.ETABLISSEMENT] = institution_name
     if institution_ppn := as_str(institution.get("ppn")):
@@ -198,8 +201,8 @@ class ThesesNormalizer(SourceNormalizer):
         return theses_source_record(doc, row.id, row.source_id)
 
     def embargo(self, doc: Document) -> Embargo | None:
-        """Renvoie un embargo sans date pour une thèse inaccessible destinée à Internet (`thesis_oa_status`)."""
-        return Embargo(None) if thesis_oa_status(doc) == OaStatus.EMBARGOED else None
+        """Renvoie un embargo sans date pour une thèse en attente de diffusion sur Internet (`awaits_diffusion`)."""
+        return Embargo(None) if awaits_diffusion(doc) else None
 
     def author_block(self, doc: Document) -> AuthorBlock:
         return extract_theses_author_block(doc)

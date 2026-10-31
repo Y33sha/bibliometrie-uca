@@ -1,6 +1,6 @@
 """Phase `oa_status` : verdicts d'Unpaywall sur les DOI des publications (`sources.unpaywall`), et statut open access dérivé (`publications.oa_status`).
 
-Unpaywall est interrogé pour les DOI jamais vérifiés ou périmés, hors DOI DataCite, et chaque verdict est écrit. Un DOI absent d'Unpaywall reçoit un verdict nul. Quand Unpaywall est indisponible, le DOI est reporté au run suivant. Le statut des publications de ces DOI est ensuite recalculé par `publication_oa_status`, à partir de leurs copies, des statuts déclarés par leurs enregistrements sources, de leur revue et du verdict.
+Unpaywall est interrogé pour les DOI jamais vérifiés ou périmés, hors DOI DataCite, et chaque verdict est écrit. Un DOI absent d'Unpaywall reçoit un verdict nul. Quand Unpaywall est indisponible, le DOI est reporté au run suivant. Le statut des publications de ces DOI est ensuite recalculé par `publication_oa_status`, à partir de leurs copies, de leurs embargos, de leur type, de leur revue et du verdict.
 
 Le délai de péremption et le plafond par run bornent la phase. Les DOI jamais vérifiés au-delà du plafond sont traités aux runs suivants. L'accès à Unpaywall exige l'adresse du polite pool.
 """
@@ -19,7 +19,7 @@ from sqlalchemy import Connection, text
 from domain.config import ConfigKey
 from domain.publications.access import Copy
 from domain.publications.metadata import OaStatus
-from domain.publications.open_access import publication_oa_status
+from domain.publications.open_access import is_restricted, publication_oa_status
 from infrastructure.db.scalars import scalar_int
 from infrastructure.read_models.publications.copies import publication_copies
 from infrastructure.sql_fragments import under_active_embargo
@@ -50,15 +50,8 @@ BATCH_SIZE = 50
 MAX_CONCURRENT = 5
 
 
-class OaSignal(NamedTuple):
-    """Source et statut OA d'un enregistrement source d'une publication."""
-
-    source: str
-    oa_status: str | None
-
-
 class PublicationOaInputs(NamedTuple):
-    """Données du calcul du statut OA d'une publication : son DOI, son statut courant, sa revue, les statuts déclarés par ses enregistrements sources, ses copies."""
+    """Données du calcul du statut OA d'une publication : son DOI, son statut courant, sa revue, son embargo, sa fermeture par nature, ses copies."""
 
     id: int
     doi: str | None
@@ -67,7 +60,8 @@ class PublicationOaInputs(NamedTuple):
     serial_oa_model: str | None
     embargoed: bool
     """Un enregistrement source de la publication est sous embargo actif."""
-    signals: list[OaSignal]
+    restricted: bool
+    """La publication est fermée par nature (`is_restricted`)."""
     copies: list[Copy]
 
 
@@ -132,11 +126,11 @@ class OaStatusStore:
         )
 
     def fetch_oa_inputs(self, dois: Sequence[str]) -> list[PublicationOaInputs]:
-        """Renvoie les publications de ces DOI, avec leur revue, les statuts OA de leurs enregistrements sources et leurs copies."""
+        """Renvoie les publications de ces DOI, avec les données du calcul de leur statut OA."""
         return self._fetch_oa_inputs("lower(p.doi) = ANY(:keys)", list(dois))
 
     def fetch_oa_inputs_of(self, publication_ids: Sequence[int]) -> list[PublicationOaInputs]:
-        """Renvoie ces publications, avec leur revue, les statuts OA de leurs enregistrements sources et leurs copies."""
+        """Renvoie ces publications, avec les données du calcul de leur statut OA."""
         return self._fetch_oa_inputs("p.id = ANY(:keys)", list(publication_ids))
 
     def _fetch_oa_inputs(
@@ -146,9 +140,8 @@ class OaStatusStore:
             text(f"""
                 SELECT p.id, lower(p.doi) AS doi, p.oa_status::text AS oa_status,
                        p.serial_id IS NOT NULL AS has_serial, s.oa_model::text AS oa_model,
-                       bool_or({under_active_embargo("sr")}) AS embargoed,
-                       array_agg(sr.source::text ORDER BY sr.id) AS sources,
-                       array_agg(sr.oa_status::text ORDER BY sr.id) AS statuses
+                       p.doc_type::text AS doc_type, p.source_extras,
+                       bool_or({under_active_embargo("sr")}) AS embargoed
                 FROM publications p
                 JOIN source_records sr ON sr.publication_id = p.id
                 LEFT JOIN serials s ON s.id = p.serial_id
@@ -166,7 +159,7 @@ class OaStatusStore:
                 r.has_serial,
                 r.oa_model,
                 r.embargoed,
-                [OaSignal(s, o) for s, o in zip(r.sources, r.statuses, strict=True)],
+                is_restricted(r.doc_type, r.source_extras),
                 copies.get(r.id, []),
             )
             for r in rows
@@ -363,8 +356,8 @@ def _apply_verdicts(
     for publication in store.fetch_oa_inputs(list(by_doi)):
         status = publication_oa_status(
             publication.copies,
-            publication.signals,
             embargoed=publication.embargoed,
+            restricted=publication.restricted,
             unpaywall=by_doi.get(publication.doi) if publication.doi else None,
             has_serial=publication.has_serial,
             serial_oa_model=publication.serial_oa_model,

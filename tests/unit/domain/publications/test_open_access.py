@@ -1,7 +1,6 @@
 """Statut open access déduit des accès constatés (`domain.publications.open_access`)."""
 
 from dataclasses import replace
-from types import SimpleNamespace
 
 import pytest
 
@@ -12,6 +11,7 @@ from domain.publications.open_access import (
     OpenAccessFacts,
     copies_facts,
     decide_oa_status,
+    is_restricted,
     publication_oa_status,
 )
 
@@ -98,36 +98,44 @@ def test_acces_constates_sur_les_copies():
     )
 
 
-def _declared(source, oa_status):
-    return SimpleNamespace(source=source, oa_status=oa_status)
-
-
-def _status(copies, declared, unpaywall=None, *, embargoed=False):
+def _status(copies, unpaywall=None, *, embargoed=False, restricted=False):
     return publication_oa_status(
         copies,
-        declared,
         embargoed=embargoed,
+        restricted=restricted,
         unpaywall=unpaywall,
         has_serial=True,
         serial_oa_model="subscription",
     )
 
 
-def test_le_statut_closed_declare_informe_sur_la_publication():
-    assert _status([], [_declared("openalex", "closed")]) == "closed"
-    assert _status([], [_declared("openalex", None)]) == "unknown"
+def test_sans_copie_ni_verdict_le_statut_est_inconnu():
+    assert _status([]) == "unknown"
+    assert _status([], "closed") == "closed"
 
 
-def test_un_statut_ouvert_declare_sans_copie_ne_compte_pas():
-    assert _status([], [_declared("wos", "gold"), _declared("openalex", "green")]) == "unknown"
+def test_une_publication_fermee_par_nature():
+    assert _status([], restricted=True) == "closed"
+
+
+@pytest.mark.parametrize(
+    ("doc_type", "source_extras", "expected"),
+    [
+        ("ongoing_thesis", None, True),
+        ("thesis", {"intranet_only": True}, True),
+        ("thesis", None, False),
+        ("article", {}, False),
+    ],
+)
+def test_fermeture_par_nature(doc_type, source_extras, expected):
+    assert is_restricted(doc_type, source_extras) is expected
 
 
 def test_un_embargo_sans_copie_ouverte():
-    assert _status([], [], embargoed=True) == "embargoed"
-    assert _status([], [_declared("theses", "embargoed")]) == "unknown"
+    assert _status([], embargoed=True) == "embargoed"
 
 
 def test_une_copie_sous_embargo():
     copy = _copy("https://hal.science/hal-01607327", is_oa=False)
-    assert _status([copy], []) == "closed"
-    assert _status([replace(copy, embargoed=True)], []) == "embargoed"
+    assert _status([copy]) == "closed"
+    assert _status([replace(copy, embargoed=True)]) == "embargoed"

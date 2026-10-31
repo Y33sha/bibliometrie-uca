@@ -2,7 +2,7 @@
 
 from sqlalchemy import text
 
-from pipeline.transformation.publications.oa_status import OaSignal, OaStatusStore
+from pipeline.transformation.publications.oa_status import OaStatusStore
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.serials import insert_doi_prefix
 from tests.integration.helpers.sources import insert_source_record
@@ -94,19 +94,20 @@ class TestVerdicts:
 
 
 class TestPublicationsOfDois:
-    def test_statuts_des_enregistrements_sources(self, sa_sync_conn):
-        publication = insert_publication(sa_sync_conn, doi="10.1/p", oa_status="closed")
-        insert_source_record(
-            sa_sync_conn, publication, source="hal", source_id="hal-oa", oa_status="green"
+    def test_donnees_du_statut(self, sa_sync_conn):
+        publication = insert_publication(
+            sa_sync_conn, doi="10.1/p", oa_status="closed", doc_type="ongoing_thesis"
         )
-        insert_source_record(
-            sa_sync_conn, publication, source="openalex", source_id="W-oa", oa_status=None
+        record = insert_source_record(sa_sync_conn, publication, source="hal", source_id="hal-oa")
+        sa_sync_conn.execute(
+            text("INSERT INTO embargoes (source_record_id, until) VALUES (:id, NULL)"),
+            {"id": record},
         )
 
         [inputs] = OaStatusStore(sa_sync_conn).fetch_oa_inputs(["10.1/p"])
 
         assert (inputs.id, inputs.doi, inputs.oa_status) == (publication, "10.1/p", "closed")
-        assert inputs.signals == [OaSignal("hal", "green"), OaSignal("openalex", None)]
+        assert (inputs.embargoed, inputs.restricted, inputs.copies) == (True, True, [])
 
 
 class TestCounters:

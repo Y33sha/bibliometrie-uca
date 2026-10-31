@@ -11,7 +11,7 @@ from domain.publications.aggregation import (
     assign_publisher,
     refresh_from_sources as _refresh_aggregate,
 )
-from domain.publications.open_access import publication_oa_status
+from domain.publications.open_access import is_restricted, publication_oa_status
 from domain.publications.publication import Publication
 from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES
 from domain.source_records.corrections import stash_entry
@@ -239,8 +239,8 @@ def refresh_from_sources(conn: Connection, publication_id: int) -> RefreshVerdic
     ).url
     publication.oa_status = publication_oa_status(
         copies,
-        sources,
         embargoed=under_embargo(conn, publication_id),
+        restricted=is_restricted(publication.doc_type, publication.source_extras),
         unpaywall=unpaywall_verdict(conn, publication.doi.value) if publication.doi else None,
         has_serial=publication.serial_id is not None,
         serial_oa_model=serial_oa_model_of(conn, publication.serial_id)

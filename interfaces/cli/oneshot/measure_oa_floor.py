@@ -23,7 +23,12 @@ from domain.platforms.platform import is_descriptive_page
 from domain.publications.access import Copy
 from domain.publications.identifiers import extract_hal_id_from_url
 from domain.publications.metadata import OA_OPEN_STATUSES, OA_RANK, OaStatus
-from domain.publications.open_access import OpenAccessFacts, copies_facts, decide_oa_status
+from domain.publications.open_access import (
+    OpenAccessFacts,
+    copies_facts,
+    decide_oa_status,
+    is_restricted,
+)
 from infrastructure.db.engine import build_sync_engine
 from infrastructure.read_models.publications.copies import publication_copies
 from infrastructure.sql_fragments import under_active_embargo
@@ -33,17 +38,11 @@ _ANNEX_DOC_TYPES = frozenset({"conference", "poster"})
 
 _PUBLICATIONS = text("""
     SELECT p.id, p.oa_status::text AS cur, u.oa_status::text AS upw, p.doc_type::text AS doc_type,
-           p.serial_id IS NOT NULL AS has_serial, s.oa_model::text AS oa_model
+           p.serial_id IS NOT NULL AS has_serial, s.oa_model::text AS oa_model, p.source_extras
     FROM publications p
     LEFT JOIN sources.unpaywall u ON u.doi = lower(p.doi::text)
     LEFT JOIN serials s ON s.id = p.serial_id
     WHERE p.in_perimeter
-""")
-
-_DECLARED_CLOSED = text("""
-    SELECT DISTINCT sr.publication_id AS pid
-    FROM source_records sr JOIN publications p ON p.id = sr.publication_id AND p.in_perimeter
-    WHERE sr.oa_status = 'closed'
 """)
 
 _EMBARGOED = text(f"""
@@ -61,9 +60,9 @@ class _Publication:
     doc_type: str | None
     has_serial: bool
     oa_model: str | None
+    restricted: bool
     copies: list[Copy] = field(default_factory=list)
     """Copies, ouvertes ou non, hors pages descriptives."""
-    declared_closed: bool = False
     embargoed: bool = False
 
 
@@ -98,7 +97,7 @@ def _facts(p: _Publication) -> OpenAccessFacts:
     return replace(
         facts,
         embargoed=p.embargoed,
-        informed=facts.informed or p.declared_closed,
+        informed=facts.informed or p.restricted,
     )
 
 
@@ -108,11 +107,17 @@ def _status(p: _Publication, facts: OpenAccessFacts) -> str:
 
 def _publications(conn: Connection) -> list[_Publication]:
     publications = {
-        r.id: _Publication(r.id, r.cur or "unknown", r.upw, r.doc_type, r.has_serial, r.oa_model)
+        r.id: _Publication(
+            r.id,
+            r.cur or "unknown",
+            r.upw,
+            r.doc_type,
+            r.has_serial,
+            r.oa_model,
+            is_restricted(r.doc_type, r.source_extras),
+        )
         for r in conn.execute(_PUBLICATIONS)
     }
-    for r in conn.execute(_DECLARED_CLOSED):
-        publications[r.pid].declared_closed = True
     for r in conn.execute(_EMBARGOED):
         publications[r.pid].embargoed = True
     for pid, copies in publication_copies(conn, list(publications)).items():

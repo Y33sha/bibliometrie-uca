@@ -1,5 +1,5 @@
 # STATUS: oneshot (2026-10-31)
-"""Recalcule le statut open access de toutes les publications (`domain.publications.open_access`), d'après leurs copies, leur revue, les statuts déclarés par leurs enregistrements sources et le verdict d'Unpaywall en table.
+"""Recalcule le statut open access de toutes les publications (`domain.publications.open_access`), d'après leurs copies, leurs embargos, leur type, leur revue et le verdict d'Unpaywall en table.
 
 Les publications se traitent par lots d'identifiants, un commit par lot. Seuls les statuts qui changent s'écrivent. Idempotent. Le bilan donne les passages d'un statut à l'autre.
 
@@ -45,8 +45,8 @@ def main() -> int:
             for p in publications:
                 status = publication_oa_status(
                     p.copies,
-                    p.signals,
                     embargoed=p.embargoed,
+                    restricted=p.restricted,
                     unpaywall=verdicts.get(p.doi) if p.doi else None,
                     has_serial=p.has_serial,
                     serial_oa_model=p.serial_oa_model,

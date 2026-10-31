@@ -3,20 +3,22 @@
 1. Copie ouverte chez l'éditeur, sous licence ouverte : le modèle de la revue décide. `subscription` ou inconnu donne `hybrid`, `full_oa` donne `gold`, `diamond` donne `diamond`. Sans revue, `gold`.
 2. Sinon, copie d'archive ou de serveur de preprints ouverte : `green`.
 3. Sinon, copie ouverte chez l'éditeur sans licence ouverte : `bronze`.
-4. Sinon : `embargoed` sous embargo, `closed` avec une information sur la publication, `unknown` sans aucune.
+4. Sinon : `embargoed` sous embargo ; `closed` avec une copie, un verdict, ou pour une publication fermée par nature (`is_restricted`) ; `unknown` sans aucune information.
 
-Le verdict d'Unpaywall relève les accès, jamais ne les abaisse. Des statuts déclarés par les sources, seul compte `closed`.
+Le verdict d'Unpaywall relève les accès, jamais ne les abaisse.
 """
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, replace
-from typing import Protocol
 
 from domain.platforms.platform import ARCHIVE_TYPES
 from domain.publications.access import Copy, open_copies
+from domain.publications.doc_types import DocType
 from domain.publications.licenses import OPEN_LICENSES
 from domain.publications.metadata import OaStatus
 from domain.serials.serial import OaModel
+from domain.source_records.source_extras import SourceExtra
+from domain.types import JsonValue
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -31,7 +33,7 @@ class OpenAccessFacts:
     embargoed: bool = False
     """Un enregistrement source de la publication est sous embargo actif."""
     informed: bool = False
-    """La publication a une copie, un verdict d'Unpaywall ou un statut `closed` déclaré par une source."""
+    """La publication a une copie, un verdict d'Unpaywall, ou elle est fermée par nature (`is_restricted`)."""
 
     def raised_by(self, unpaywall: str | None) -> OpenAccessFacts:
         """Renvoie les accès relevés par le verdict d'Unpaywall : `gold`, `hybrid` ou `diamond` valent une copie ouverte chez l'éditeur sous licence, `bronze` sans licence, `green` une copie d'archive ouverte."""
@@ -61,35 +63,32 @@ def copies_facts(copies: Iterable[Copy]) -> OpenAccessFacts:
     )
 
 
-class DeclaredOaStatus(Protocol):
-    """Statut open access déclaré par un enregistrement source."""
-
-    @property
-    def source(self) -> str: ...
-    @property
-    def oa_status(self) -> str | None: ...
+def is_restricted(doc_type: str | None, source_extras: Mapping[str, JsonValue] | None) -> bool:
+    """Vrai pour une publication fermée par nature : thèse en cours, thèse réservée à l'intranet de son établissement."""
+    return doc_type == DocType.ONGOING_THESIS or bool(
+        (source_extras or {}).get(SourceExtra.INTRANET_ONLY)
+    )
 
 
 def publication_oa_status(
     copies: Iterable[Copy],
-    declared: Iterable[DeclaredOaStatus],
     *,
     embargoed: bool,
+    restricted: bool,
     unpaywall: str | None,
     has_serial: bool,
     serial_oa_model: str | None,
 ) -> OaStatus:
-    """Renvoie le statut open access d'une publication (`decide_oa_status`) : accès constatés sur ses copies, embargo, statut `closed` déclaré par une source, le tout relevé par le verdict d'Unpaywall.
+    """Renvoie le statut open access d'une publication (`decide_oa_status`) : accès constatés sur ses copies, embargo, fermeture par nature, le tout relevé par le verdict d'Unpaywall.
 
     Args:
         embargoed: un enregistrement source de la publication est sous embargo actif (`embargoes`).
+        restricted: la publication est fermée par nature (`is_restricted`).
         unpaywall: verdict d'Unpaywall sur le DOI de la publication, `None` sans verdict.
     """
     facts = copies_facts(copies)
     facts = replace(
-        facts,
-        embargoed=facts.embargoed or embargoed,
-        informed=facts.informed or any(d.oa_status == OaStatus.CLOSED for d in declared),
+        facts, embargoed=facts.embargoed or embargoed, informed=facts.informed or restricted
     )
     return decide_oa_status(
         facts.raised_by(unpaywall), has_serial=has_serial, serial_oa_model=serial_oa_model

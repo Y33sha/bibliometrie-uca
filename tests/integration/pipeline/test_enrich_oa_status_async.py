@@ -25,7 +25,6 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.task_runner import SingleTaskPhase
 from pipeline.transformation.publications.oa_status import (
     MAX_CONCURRENT,
-    OaSignal,
     OaStatusFetcher,
     OaStatusPhase,
     PublicationOaInputs,
@@ -71,7 +70,7 @@ def _copy(url: str, *, platform_type: PlatformType | None = None) -> Copy:
 def _publication(
     publication_id: int, doi: str, current: str | None, *copies: Copy
 ) -> PublicationOaInputs:
-    """Construit la publication d'un DOI, de statut `current`, dans une revue `full_oa`, avec ses `copies` et un enregistrement source OpenAlex sans statut."""
+    """Construit la publication d'un DOI, de statut `current`, dans une revue `full_oa`, sans embargo, avec ses `copies`."""
     return PublicationOaInputs(
         publication_id,
         doi,
@@ -79,7 +78,7 @@ def _publication(
         True,
         "full_oa",
         False,
-        [OaSignal("openalex", None)],
+        False,
         list(copies),
     )
 
