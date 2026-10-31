@@ -169,13 +169,13 @@ async def run_check_issns_in_sudoc(
 
     # Le compteur de la barre compte les ISSN présents dans le Sudoc.
     with track_progress(
-        len(batches), f"{BRANCH}{LABEL}", logger, count_kept=True, erase=True
+        len(issns), f"{BRANCH}{LABEL}", logger, count_kept=True, erase=True
     ) as progress:
 
         def _write(
             conn: Connection, batch: tuple[str, ...], records: dict[str, SudocSerialRecord] | None
         ) -> None:
-            progress.advance()
+            progress.advance(len(batch))
             if records is None:
                 metrics.add(errors=len(batch))
                 return
