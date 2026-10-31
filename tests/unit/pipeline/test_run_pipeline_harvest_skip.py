@@ -3,6 +3,8 @@
 La source reçoit un signal `source_unconfigured` (avertissement posé par `run_harvest`) et le run continue. Seules les sources configurées aboutissent et figurent dans la table par source. La règle vaut pour la branche parallèle (full, weekly) et pour la branche HAL incrémentale (daily).
 """
 
+from dataclasses import replace
+from typing import cast
 from unittest.mock import patch
 
 from pipeline.ingestion.common import harvest
@@ -53,14 +55,13 @@ def test_phase_extract_daily_hal_unconfigured():
         return metrics
 
     with (
-        patch(
-            "infrastructure.observability.phase_executions.get_last_daily_harvest_date",
-            return_value=None,
-        ),
         patch.object(harvest, "_extraction_structure_count", return_value=1),
         patch.object(harvest, "run_harvest", side_effect=_extract),
     ):
-        metrics = harvest.build().run(
+        phase = replace(
+            cast(harvest.HarvestPhase, harvest.build()), get_last_daily_harvest_date=lambda: None
+        )
+        metrics = phase.run(
             phase_context(
                 RunOptions(mode="daily"),
                 credentials_missing=lambda _source: None,
