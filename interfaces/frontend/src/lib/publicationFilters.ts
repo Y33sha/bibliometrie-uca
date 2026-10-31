@@ -82,7 +82,7 @@ export function publicationFilters(
 		{
 			key: 'halStatus',
 			control: 'checkbox',
-			label: 'Statuts HAL',
+			label: 'Statut HAL',
 			param: 'hal_status',
 			facet: { type: 'labeled', apiKey: 'hal_status' },
 			enabled: () => context.kind === 'lab',
