@@ -86,12 +86,16 @@ Les personnes et les publications ont un volet latéral (`PersonDrawer`, `Public
 - [x] Titre seul rattaché à la revue à ISSN d'un autre enregistrement source de la publication (b2ecf4014)
 - [x] Revue à ISSN gardée même vide, revérification Sudoc de tous les ISSN (5474a9263)
 - [x] Titre de chaque revue d'après la notice Sudoc de son ISSN-L, gardée par ISSN (816a520de)
-- [ ] Éditeur déduit du préfixe DOI Crossref pour le rattachement par titre
+- [ ] Éditeur déduit du préfixe DOI Crossref pour le rattachement par titre. Mesure préalable de son utilité : départage de revues à ISSN de même titre, collections sans ISSN des monographies
 - [x] Relations entre revues déduites des liens entre ISSN. Liens sur la page d'une revue (035cdf8f6)
 - [x] Administration : ISSN en lecture seule, fusion limitée aux revues sans ISSN et gardée dans la table des titres (27f9ef446)
 - [x] Normalisation sans recherche ni création de revue. Collection sans ISSN des monographies : revue sans ISSN de son titre et de son éditeur (27f9ef446)
 - [x] Retrait de `serial_name_forms`, de `find_or_create_serial` et des règles de fusion remplacées par le calcul et les relations (27f9ef446)
-- [ ] Comparaison des revues avant et après sur le stock, dont les quatre titres partagés par deux revues
+- [ ] Comparaison des revues avant et après sur le stock, dont les quatre titres partagés par deux revues et les titres de Materials & Design (67208, 106232) et de Physical Review D (9, 106629)
+- [ ] Mesure des ISSN-L distincts de même titre Sudoc : « Perspectives médiévales », 0338-2338 et 2103-6527
+- [ ] Mesure des ISSN sans ISSN-L donnés ensemble par un même enregistrement source
+- [ ] Mesure des séries sans ISSN de titre compatible avec une revue à ISSN, sans autre enregistrement source de leur publication rattaché à cette revue
+- [ ] Mesure des collections sans ISSN des monographies réparties entre plusieurs éditeurs
 
 ### Phase 2 — Éditeurs
 
