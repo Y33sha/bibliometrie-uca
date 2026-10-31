@@ -66,6 +66,33 @@ describe('sanitizeTitle', () => {
 		expect(sanitizeTitle('Mesure de $$ D^+ \\to \\eta \\pi^+ $$ et suite')).not.toContain('katex-display');
 	});
 
+	it('retire le gras des formules LaTeX', () => {
+		for (const tex of ['\\mathbf{\\sqrt{s}=13}', '\\varvec{pp}', '\\pmb{x}', '\\boldsymbol{x}', '\\textbf{892}', '{\\bf x}']) {
+			const result = sanitizeTitle(`Mesure à $$${tex}$$ TeV`);
+			expect(result).toContain('katex');
+			expect(result.replace(/<annotation[\s\S]*?<\/annotation>/g, '')).not.toMatch(/mathbf|boldsymbol|bold"/);
+		}
+	});
+
+	it('rend en lettre ajourée un ensemble de nombres en gras', () => {
+		expect(sanitizeTitle('Sous-groupes de $$SL_2(\\mathbf {Z})$$')).toContain('<span class="mord mathbb">Z</span>');
+	});
+
+	it('rend les macros inconnues de KaTeX sans erreur', () => {
+		for (const tex of ['\\varvec{p}', '\\uppi^+', '\\Upgamma', '\\C_p']) {
+			expect(sanitizeTitle(`$${tex}$`)).not.toContain('katex-error');
+		}
+		expect(titleText('Désintégration $J/\\uppsi$')).toBe('Désintégration J/ψ');
+	});
+
+	it('retire le gras du MathML', () => {
+		const result = sanitizeTitle(
+			'<mml:math><mml:mi mathvariant="bold">x</mml:mi><mml:mtext mathvariant="bold-italic">s</mml:mtext></mml:math>'
+		);
+		expect(result).toContain('<mi>x</mi>');
+		expect(result).toContain('<mtext mathvariant="italic">s</mtext>');
+	});
+
 	it('gère le MathML avec préfixe mml:', () => {
 		const result = sanitizeTitle('Test <mml:math><mml:mi>x</mml:mi></mml:math>');
 		// Le préfixe mml: doit être supprimé pour le rendu natif
@@ -200,6 +227,12 @@ describe('sanitizeAbstract', () => {
 		expect(result).toContain('Texte');
 		expect(result).not.toContain('onclick');
 		expect(result).not.toContain('<div');
+	});
+
+	it('garde le gras des formules', () => {
+		expect(sanitizeAbstract('Le vecteur $\\mathbf{v}$')).toContain('mathbf');
+		expect(sanitizeAbstract('Le vecteur $\\varvec{v}$')).not.toContain('katex-error');
+		expect(sanitizeAbstract('<math><mi mathvariant="bold">v</mi></math>')).toContain('mathvariant="bold"');
 	});
 
 	it('rend le MathML comme un titre', () => {

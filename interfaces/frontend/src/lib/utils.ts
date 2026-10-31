@@ -23,10 +23,62 @@ const TITLE_ALLOWED_TAGS = new Set([
 	'menclose', 'mstyle', 'merror'
 ]);
 
-/* Le résumé porte en plus la structure que les sources y déposent (JATS, Crossref) : paragraphes et intertitres en gras (« Background: »). Dans un titre, le gras est un formatage d'éditeur sans valeur : DOMPurify retire la balise et garde son texte. */
+/* Le résumé porte en plus la structure que les sources y déposent (JATS, Crossref) : paragraphes et intertitres en gras (« Background: »). */
 const ABSTRACT_ALLOWED_TAGS = new Set([...TITLE_ALLOWED_TAGS, 'p', 'br', 'b']);
 
 const TITLE_ALLOWED_ATTRS = new Set(['mathvariant', 'display']);
+
+/* Lettres grecques du paquet upgreek, qui les compose droites (usage pour les noms de particules). KaTeX les rend en italique. */
+const GREEK_LETTERS = [
+	'alpha', 'beta', 'gamma', 'delta', 'epsilon', 'varepsilon', 'zeta', 'eta', 'theta', 'vartheta',
+	'iota', 'kappa', 'lambda', 'mu', 'nu', 'xi', 'pi', 'varpi', 'rho', 'varrho', 'sigma', 'varsigma',
+	'tau', 'upsilon', 'phi', 'varphi', 'chi', 'psi', 'omega',
+	'Gamma', 'Delta', 'Theta', 'Lambda', 'Xi', 'Pi', 'Sigma', 'Upsilon', 'Phi', 'Psi', 'Omega'
+];
+
+/* Macros présentes dans les formules des sources et absentes de KaTeX, qui les afficherait en rouge. */
+const KATEX_MACROS: Record<string, string> = {
+	// Classes LaTeX de Springer.
+	'\\varvec': '\\boldsymbol',
+	// Macro d'auteur pour l'ensemble des nombres complexes.
+	'\\C': '\\mathbb{C}',
+	...Object.fromEntries(
+		GREEK_LETTERS.map((name) => [
+			name[0] === name[0].toUpperCase() ? `\\Up${name.toLowerCase()}` : `\\up${name}`,
+			`\\${name}`
+		])
+	)
+};
+
+/* Commandes de gras des formules. Une revue qui compose ses titres en gras y met aussi leurs formules : ce gras est sans valeur. */
+const UNBOLD_MACROS: Record<string, string> = {
+	'\\mathbf': '#1',
+	'\\boldsymbol': '#1',
+	'\\bm': '#1',
+	'\\pmb': '#1',
+	'\\varvec': '#1',
+	'\\textbf': '\\text{#1}',
+	'\\bf': ''
+};
+
+/* Ensemble de nombres en gras (`\mathbf{Z}`) : seul gras de titre qui porte un sens. Il passe en lettre ajourée (ℤ), notation équivalente. */
+const BOLD_NUMBER_SET = /\\mathbf\s*\{\s*([NZQRC])\s*\}/g;
+
+/* Variantes grasses du MathML : `bold` donne la variante par défaut, `bold-italic` donne `italic`. */
+const MATHML_BOLD = /\smathvariant\s*=\s*(["'])bold\1|(mathvariant\s*=\s*["'])bold-/g;
+
+function unboldMathml(s: string): string {
+	return s.replace(MATHML_BOLD, (_full, _quote, prefix: string | undefined) => prefix ?? '');
+}
+
+/* Règles de rendu d'un type de texte. Un titre perd son gras, balises HTML comprises ; un résumé le garde. */
+interface RenderRules {
+	allowedTags: Set<string>;
+	keepsBold: boolean;
+}
+
+const TITLE_RULES: RenderRules = { allowedTags: TITLE_ALLOWED_TAGS, keepsBold: false };
+const ABSTRACT_RULES: RenderRules = { allowedTags: ABSTRACT_ALLOWED_TAGS, keepsBold: true };
 
 function escapeHtml(s: string): string {
 	return s
@@ -71,25 +123,28 @@ function undoubleBackslashes(tex: string): string {
  * que par un échappement en bloc : un résumé qui porte à la fois des paragraphes et une formule
  * garde les deux. Les segments de prose, eux, gardent leurs dollars — ce sont des caractères du
  * texte, non des délimiteurs. */
-function renderLatex(s: string, allowedTags: Set<string>): string {
+function renderLatex(s: string, rules: RenderRules): string {
 	const parts: string[] = [];
 	let lastIdx = 0;
 	LATEX_SEGMENT.lastIndex = 0;
 	let m;
 
 	while ((m = LATEX_SEGMENT.exec(s)) !== null) {
-		parts.push(sanitizeMarkup(s.slice(lastIdx, m.index), allowedTags));
+		parts.push(sanitizeMarkup(s.slice(lastIdx, m.index), rules.allowedTags));
 		const content = m[1] || m[2];
 		if (isProse(content)) {
 			parts.push(escapeHtml(m[0]));
 		} else {
-			const tex = undoubleBackslashes(content.trim());
+			let tex = undoubleBackslashes(content.trim());
+			if (!rules.keepsBold) tex = tex.replace(BOLD_NUMBER_SET, '\\mathbb{$1}');
 			// Une formule détachée (`$$`) de plusieurs lignes s'affiche en bloc ; les autres restent dans la phrase.
 			const displayMode = m[1] !== undefined && tex.includes('\\\\');
 			try {
 				parts.push(katex.renderToString(tex, {
 					displayMode,
-					throwOnError: false
+					throwOnError: false,
+					// Copie fraîche à chaque formule : KaTeX y enregistre les `\def` qu'il rencontre.
+					macros: rules.keepsBold ? { ...KATEX_MACROS } : { ...KATEX_MACROS, ...UNBOLD_MACROS }
 				}));
 			} catch {
 				parts.push(escapeHtml(tex));
@@ -98,7 +153,7 @@ function renderLatex(s: string, allowedTags: Set<string>): string {
 		lastIdx = m.index + m[0].length;
 	}
 
-	parts.push(sanitizeMarkup(s.slice(lastIdx), allowedTags));
+	parts.push(sanitizeMarkup(s.slice(lastIdx), rules.allowedTags));
 	return parts.join('');
 }
 
@@ -145,20 +200,21 @@ function decodeHtmlEntities(s: string): string {
 	return out;
 }
 
-/* Rend une chaîne reçue d'une source, sûre vis-à-vis du XSS, en n'autorisant que `allowedTags`. */
-function render(s: string | null | undefined, allowedTags: Set<string>): string {
+/* Rend une chaîne reçue d'une source, sûre vis-à-vis du XSS, selon les règles de son type de texte. */
+function render(s: string | null | undefined, rules: RenderRules): string {
 	if (!s) return '';
 
-	const input = decodeHtmlEntities(s);
+	let input = decodeHtmlEntities(s);
+	if (!rules.keepsBold) input = unboldMathml(input);
 
-	if (hasLatex(input)) return renderLatex(input, allowedTags);
-	if (HAS_MATHML.test(input) || /<\/?[a-z]/i.test(input)) return sanitizeMarkup(input, allowedTags);
+	if (hasLatex(input)) return renderLatex(input, rules);
+	if (HAS_MATHML.test(input) || /<\/?[a-z]/i.test(input)) return sanitizeMarkup(input, rules.allowedTags);
 
 	return escapeHtml(input);
 }
 
 export function sanitizeTitle(s: string | null | undefined): string {
-	return render(s, TITLE_ALLOWED_TAGS);
+	return render(s, TITLE_RULES);
 }
 
 /** Texte visible du rendu de `sanitizeTitle`, pour les emplacements qui n'acceptent pas de HTML (titre d'onglet, info-bulle). La copie MathML que KaTeX joint à son rendu est écartée. */
@@ -170,7 +226,7 @@ export function titleText(s: string | null | undefined): string {
 
 /* Comme `sanitizeTitle`, en gardant les paragraphes : un résumé en porte, un titre non. */
 export function sanitizeAbstract(s: string | null | undefined): string {
-	return render(s, ABSTRACT_ALLOWED_TAGS);
+	return render(s, ABSTRACT_RULES);
 }
 
 export function titleCase(s: string | null | undefined): string {
