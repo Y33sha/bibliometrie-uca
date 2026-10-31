@@ -18,6 +18,7 @@ from domain.normalize import strip_abstract_label
         ("Abstract $$ D^+ $$ decays", "$$ D^+ $$ decays"),
         ("<title>Abstract</title> <p>Background</p>", "<p>Background</p>"),
         ("<jats:title>SUMMARY</jats:title><jats:p>Text</jats:p>", "<jats:p>Text</jats:p>"),
+        ("Abstract Summary\nViral genes", "Viral genes"),
     ],
 )
 def test_retire_l_intitule(abstract: str, expected: str) -> None:

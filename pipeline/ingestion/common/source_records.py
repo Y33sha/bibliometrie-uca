@@ -12,7 +12,7 @@ from dataclasses import dataclass, fields
 
 from sqlalchemy import Connection, bindparam, text
 
-from domain.normalize import drop_duplicate_mathml, strip_abstract_label
+from domain.normalize import clean_abstract, drop_duplicate_mathml, strip_abstract_label
 from domain.publications.doc_types import DocType
 from domain.publications.licenses import License
 from domain.publications.metadata import clean_publication_title, normalized_title
@@ -35,7 +35,7 @@ class SourceRecordUpsert:
 
     Le jeu de colonnes est commun à toutes les sources ; une colonne non renseignée par la source reste à `None`. Les absences suivent les données exposées par chaque source : theses.fr est sans résumé, HAL et theses.fr sans indicateur de citation ; `hal_collections` existe seulement pour HAL, `is_retracted` seulement pour OpenAlex.
 
-    `title` est nettoyé à l'écriture (`clean_publication_title`), et `title_normalized` s'en dérive. `doc_type` de `raw_doc_type` (`map_doc_type`) et `language` de `raw_language` (`language_code`). `publication_id`, rattachement à la publication, est posé par la phase `publications`.
+    `title` et `abstract` sont nettoyés à l'écriture (`clean_publication_title`, `clean_abstract`), et `title_normalized` se dérive du titre. `doc_type` de `raw_doc_type` (`map_doc_type`) et `language` de `raw_language` (`language_code`). `publication_id`, rattachement à la publication, est posé par la phase `publications`.
     """
 
     # Clé de l'enregistrement source
@@ -157,6 +157,11 @@ def replace_identifiers(
         conn.execute(_INSERT_IDENTIFIERS, {"identifiers": json.dumps(rows)})
 
 
+def stored_abstract(abstract: str | None) -> str | None:
+    """Renvoie le résumé tel qu'il est écrit : nettoyé, sans copie MathML d'une formule TeX ni intitulé de tête (« Abstract »)."""
+    return strip_abstract_label(drop_duplicate_mathml(clean_abstract(abstract)))
+
+
 class SourceRecordStore:
     """Écriture des enregistrements sources et de leurs identifiants. Les formes de langue se chargent à la première écriture."""
 
@@ -177,7 +182,7 @@ class SourceRecordStore:
             params["publisher_id"] = None
         if row.container_title and names_ebook_platform(row.container_title):
             params["container_title"] = None
-        params["abstract"] = strip_abstract_label(drop_duplicate_mathml(row.abstract))
+        params["abstract"] = stored_abstract(row.abstract)
         params["language"] = language_code(row.raw_language, self._forms())
         identifiers = normalized_identifiers(row)
         source_record_id = scalar_int(self._conn.execute(_UPSERT_SQL, params))

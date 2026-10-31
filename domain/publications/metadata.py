@@ -5,7 +5,7 @@ from collections.abc import Iterable
 from enum import StrEnum
 from typing import Protocol
 
-from domain.normalize import normalize_text
+from domain.normalize import clean_source_text, normalize_text
 
 
 class OaStatus(StrEnum):
@@ -21,13 +21,13 @@ class OaStatus(StrEnum):
     UNKNOWN = "unknown"
 
 
-# Rang des statuts open access, du moins ouvert au plus ouvert.
+# Rang des statuts open access, du plus ouvert au moins ouvert. Un statut à licence connue passe avant `bronze`, sans licence : `green` d'abord.
 OA_RANK: dict[str, int] = {
     OaStatus.DIAMOND: 8,
     OaStatus.GOLD: 7,
     OaStatus.HYBRID: 6,
-    OaStatus.BRONZE: 5,
-    OaStatus.GREEN: 4,
+    OaStatus.GREEN: 5,
+    OaStatus.BRONZE: 4,
     OaStatus.EMBARGOED: 3,
     OaStatus.CLOSED: 2,
     OaStatus.UNKNOWN: 1,
@@ -105,24 +105,6 @@ def publication_oa_status(sources: Iterable[_OaSignalSource], unpaywall: str | N
     return unpaywall
 
 
-_HTML_ENTITY_NAMED = {"amp": "&", "lt": "<", "gt": ">", "quot": '"', "apos": "'"}
-_HTML_ENTITY_RE = re.compile(r"&(amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);")
-
-
-def _decode_html_entities_once(s: str) -> str:
-    def repl(m: re.Match[str]) -> str:
-        name = m.group(1)
-        if name.startswith("#"):
-            try:
-                code = int(name[2:], 16) if name[1] in "xX" else int(name[1:])
-                return chr(code)
-            except ValueError, OverflowError:
-                return m.group(0)
-        return _HTML_ENTITY_NAMED.get(name, m.group(0))
-
-    return _HTML_ENTITY_RE.sub(repl, s)
-
-
 def has_minimal_publication_metadata(title: str | None, publication_year: int | None) -> bool:
     """Vrai si une publication candidate a un titre et une année, condition de sa création. Une année à 0 compte comme absente."""
     return bool(title) and bool(publication_year)
@@ -138,26 +120,13 @@ def is_overlong_title(title: str | None) -> bool:
 
 # Espaces ASCII seuls : les espaces insécables de la typographie (« pratiques : ») restent.
 _ASCII_WHITESPACE_RE = re.compile(r"[ \t\n\r\f\v]+")
-_SINGLE_BACKSLASH_COMMAND_RE = re.compile(r"(?<!\\)\\[a-zA-Z]")
-
-
-def _undouble_backslashes(title: str) -> str:
-    """Divise par deux les barres obliques tant qu'aucune commande LaTeX n'est précédée d'une seule barre. Une source qui échappe son titre plusieurs fois multiplie les barres (`\\\\mathbf` chez OpenAlex, 64 barres dans des dépôts Crossref)."""
-    while "\\\\" in title and not _SINGLE_BACKSLASH_COMMAND_RE.search(title):
-        title = title.replace("\\\\", "\\")
-    return title
 
 
 def clean_publication_title(title: str | None) -> str | None:
-    """Nettoie un titre à son écriture : entités HTML décodées jusqu'à stabilité (`&amp;lt;` d'OpenAlex et de ScanR), barres obliques multipliées par un échappement répété ramenées à une, suites d'espaces ASCII réduites à un espace, espaces de bordure retirés. Les balises HTML restent."""
+    """Nettoie un titre à son écriture (`clean_source_text`). Les suites d'espaces ASCII se réduisent à un espace, les espaces de bordure sont retirés."""
     if not title:
         return title
-    for _ in range(4):
-        decoded = _decode_html_entities_once(title)
-        if decoded == title:
-            break
-        title = decoded
-    return _ASCII_WHITESPACE_RE.sub(" ", _undouble_backslashes(title)).strip()
+    return _ASCII_WHITESPACE_RE.sub(" ", clean_source_text(title)).strip()
 
 
 def normalized_title(title: str | None) -> str:

@@ -65,7 +65,7 @@ def _strip_comments(text: str) -> str:
 _MAX_UNESCAPE_PASSES = 4
 
 
-def _unescape_fully(text: str) -> str:
+def unescape_html(text: str) -> str:
     """Décode les entités HTML jusqu'à stabilisation."""
     for _ in range(_MAX_UNESCAPE_PASSES):
         decoded = html.unescape(text)
@@ -82,7 +82,7 @@ def to_plain_text(text: str | None) -> str:
     """
     if not text:
         return ""
-    without_comments = _strip_comments(_unescape_fully(text))
+    without_comments = _strip_comments(unescape_html(text))
     return " ".join(strip_markup(without_comments).split())
 
 
@@ -187,14 +187,23 @@ _ABSTRACT_LABEL_RE = re.compile(
 )
 
 
+# Intitulés empilés en tête d'un même résumé : « Abstract Summary ».
+_MAX_ABSTRACT_LABELS = 3
+
+
 def strip_abstract_label(abstract: str | None) -> str | None:
-    """Retire l'intitulé placé en tête du résumé par certaines sources (« Abstract », « Résumé : », `<title>Abstract</title>`).
+    """Retire les intitulés placés en tête du résumé par certaines sources (« Abstract », « Résumé : », `<title>Abstract</title>`, « Abstract Summary »).
 
     Un mot suivi d'une minuscule ouvre une phrase (« Summary statistics are… ») : il reste.
     """
     if not abstract:
         return abstract
-    return _ABSTRACT_LABEL_RE.sub("", abstract, count=1) or None
+    for _ in range(_MAX_ABSTRACT_LABELS):
+        stripped = _ABSTRACT_LABEL_RE.sub("", abstract, count=1)
+        if stripped == abstract:
+            break
+        abstract = stripped
+    return abstract or None
 
 
 _GREEK_LETTERS = (
@@ -242,18 +251,127 @@ def strip_latex(text: str) -> str:
     return _LATEX_COMMAND_RE.sub(lambda m: _GREEK_COMMANDS.get(m.group(1), " "), text)
 
 
+def _accented(m: re.Match[str]) -> str:
+    """Renvoie la lettre accentuée d'une correspondance de `_LATEX_ACCENT_RE`, précomposée si Unicode a le caractère."""
+    letter = m.group(2) or m.group(3)
+    return unicodedata.normalize(
+        "NFC", ("i" if letter == "ı" else letter) + _LATEX_ACCENTS[m.group(1)]
+    )
+
+
 def decode_latex_accents(text: str) -> str:
     """Convertit les accents et les lettres LaTeX en caractères, et retire les accolades de groupement : `Fr\\'ed\\'eric` → Frédéric, `Besan\\c{c}on` → Besançon, `J{\\o}rgensen` → Jørgensen."""
     if "\\" not in text:
         return text
     text = _LATEX_LETTER_RE.sub(lambda m: _LATEX_LETTERS[m.group(1)], text)
-
-    def accent(m: re.Match[str]) -> str:
-        letter = m.group(2) or m.group(3)
-        return ("i" if letter == "ı" else letter) + _LATEX_ACCENTS[m.group(1)]
-
-    text = _LATEX_ACCENT_RE.sub(accent, text)
+    text = _LATEX_ACCENT_RE.sub(_accented, text)
     return unicodedata.normalize("NFC", text.replace("{", "").replace("}", ""))
+
+
+# Formule délimitée par des dollars : $$...$$ ou $...$.
+_MATH_SEGMENT_RE = re.compile(r"\$\$[\s\S]+?\$\$|\$[^$]+?\$")
+# Barre oblique doublée devant une commande d'accent, laissée par un texte échappé deux fois dont une autre commande a gardé sa barre simple.
+_DOUBLED_ACCENT_BACKSLASH_RE = re.compile(r"\\\\(?=[`'^\"~=.]|[cvuHkrCVUKR]\{)")
+# Paire de guillemets échappés (`the \"cold\" case`) : les `\"` du texte sont des guillemets, non des trémas.
+_ESCAPED_QUOTE_PAIR_RE = re.compile(r'(?:^|(?<=[\s(]))\\"[A-Za-z][^"]*?[A-Za-z.,!?]\\"')
+# Caractère seul entre accolades : `S{é}ries`, `Poincar{é}`.
+_BRACED_NON_ASCII_RE = re.compile(r"\{([^\x00-\x7f])\}")
+_TRAILING_COMMAND_RE = re.compile(r"\\[A-Za-z]+$")
+# Accolades vides qui terminent une lettre LaTeX : `\L{}ukasiewicz`.
+_EMPTY_BRACES_AFTER_NON_ASCII_RE = re.compile(r"(?<=[^\x00-\x7f])\{\}")
+
+
+def _prose_accented(m: re.Match[str]) -> str:
+    """Comme `_accented`, en laissant les tournures de prose qui ressemblent à un accent : commande faite d'une lettre sans accolades (`Γ\\H b`, quotient par un groupe ; `\\c mu`), apostrophe échappée d'un possessif (`Allan\\'s`), accent sans caractère précomposé (`doesn\\'t`)."""
+    command, bare = m.group(1), m.group(3)
+    source, start, end = m.string, m.start(), m.end()
+    wrapped = source[start - 1 : start] == "{" and source[end : end + 1] == "}"
+    if bare and not wrapped:
+        if command.isalpha():
+            return m.group()
+        possessive = (
+            command == "'"
+            and bare == "s"
+            and source[start - 1 : start].isalpha()
+            and not source[end : end + 1].isalpha()
+        )
+        if possessive:
+            return m.group()
+    accented = _accented(m)
+    return accented if len(accented) == 1 else m.group()
+
+
+def _prose_letter(m: re.Match[str]) -> str:
+    """Convertit une lettre LaTeX de prose entre accolades (`{\\o}`), suivie d'accolades vides (`\\L{}`), ou `\\i` sous un accent (`\\'\\i`). Hors de ces formes, la commande reste (`(\\O)`, `2\\l`)."""
+    source, start, end = m.string, m.start(), m.end()
+    braced = source[start - 1 : start] == "{" and source[end : end + 1] == "}"
+    emptied = source[end : end + 2] == "{}"
+    under_accent = m.group(1) == "i" and re.search(r"\\[`'^\"~=.]\{?$", source[:start]) is not None
+    return _LATEX_LETTERS[m.group(1)] if braced or emptied or under_accent else m.group()
+
+
+def _unbraced(m: re.Match[str]) -> str:
+    """Retire les accolades d'une lettre latine seule (`{à} la`), ou d'une lettre accolée à un mot (`S{é}ries`). Les accolades restent autour d'un ensemble (`∪ {∞}`, `({α})`), de l'argument d'une commande (`\\overline{Ω}`), d'un exposant ou d'un indice (`W^{±}`)."""
+    character, before = m.group(1), m.string[: m.start()]
+    if before.endswith(("^", "_")) or _TRAILING_COMMAND_RE.search(before):
+        return m.group()
+    in_word = before[-1:].isalpha() or m.string[m.end() : m.end() + 1].isalpha()
+    latin = "LATIN" in unicodedata.name(character, "")
+    return character if character.isalpha() and (latin or in_word) else m.group()
+
+
+def _decode_prose_accents(segment: str) -> str:
+    """Convertit les accents et les lettres LaTeX d'un passage de prose, et retire les accolades qui entourent seulement le caractère obtenu."""
+    if "\\" in segment:
+        segment = _DOUBLED_ACCENT_BACKSLASH_RE.sub(r"\\", segment)
+        if _ESCAPED_QUOTE_PAIR_RE.search(segment):
+            segment = segment.replace('\\"', '"')
+        segment = _LATEX_LETTER_RE.sub(_prose_letter, segment)
+        segment = _LATEX_ACCENT_RE.sub(_prose_accented, segment)
+        segment = _EMPTY_BRACES_AFTER_NON_ASCII_RE.sub("", segment)
+    return _BRACED_NON_ASCII_RE.sub(_unbraced, segment)
+
+
+def _decode_prose_latex_accents(text: str) -> str:
+    """Convertit les accents et les lettres LaTeX hors des formules. Les formules restent intactes."""
+    if "\\" not in text and "{" not in text:
+        return text
+    parts: list[str] = []
+    position = 0
+    for formula in _MATH_SEGMENT_RE.finditer(text):
+        parts += [_decode_prose_accents(text[position : formula.start()]), formula.group()]
+        position = formula.end()
+    parts.append(_decode_prose_accents(text[position:]))
+    return "".join(parts)
+
+
+_SINGLE_BACKSLASH_COMMAND_RE = re.compile(r"(?<!\\)\\[a-zA-Z]")
+
+
+def _undouble_backslashes(text: str) -> str:
+    """Divise par deux les barres obliques tant qu'aucune commande LaTeX n'est précédée d'une seule barre. Une source qui échappe son texte plusieurs fois multiplie les barres (`\\\\mathbf` chez OpenAlex, 64 barres dans des dépôts Crossref)."""
+    while "\\\\" in text and not _SINGLE_BACKSLASH_COMMAND_RE.search(text):
+        text = text.replace("\\\\", "\\")
+    return text
+
+
+def clean_source_text(text: str) -> str:
+    """Nettoie un titre ou un résumé reçu d'une source, en gardant balises et formules : entités HTML décodées, barres obliques multipliées par un échappement répété ramenées à une, accents LaTeX hors formule convertis en caractères (`Th\\'eorie` → Théorie). L'espacement est laissé à l'appelant."""
+    return _decode_prose_latex_accents(_undouble_backslashes(unescape_html(text)))
+
+
+_ABSTRACT_SPACES_RE = re.compile(r"[ \t\r\f\v]+")
+_ABSTRACT_LINE_EDGES_RE = re.compile(r" ?\n ?")
+_ABSTRACT_BLANK_LINES_RE = re.compile(r"\n{3,}")
+
+
+def clean_abstract(abstract: str | None) -> str | None:
+    """Nettoie un résumé à son écriture (`clean_source_text`). Les suites d'espaces ASCII se réduisent à un espace. Les sauts de ligne restent, et une ligne vide au plus sépare deux paragraphes. Les espaces insécables restent."""
+    if not abstract:
+        return abstract
+    text = _ABSTRACT_SPACES_RE.sub(" ", clean_source_text(abstract))
+    text = _ABSTRACT_LINE_EDGES_RE.sub("\n", text)
+    return _ABSTRACT_BLANK_LINES_RE.sub("\n\n", text).strip()
 
 
 def _byte_readings(byte: int) -> str:

@@ -139,7 +139,7 @@ class TestBestOAStatus:
         assert best_oa_status(["closed", "embargoed", "unknown"]) == "embargoed"
 
     def test_open_status_wins_over_embargoed(self):
-        # Un statut ouvert (green ou mieux) l'emporte sur `embargoed`.
+        # Un statut ouvert l'emporte sur `embargoed`.
         assert best_oa_status(["embargoed", "green"]) == "green"
         assert best_oa_status(["embargoed", "gold"]) == "gold"
 
@@ -148,8 +148,12 @@ class TestBestOAStatus:
 
     def test_rank_order_is_strict(self):
         assert OA_RANK["diamond"] > OA_RANK["gold"] > OA_RANK["hybrid"]
-        assert OA_RANK["hybrid"] > OA_RANK["bronze"] > OA_RANK["green"]
-        assert OA_RANK["green"] > OA_RANK["embargoed"] > OA_RANK["closed"] > OA_RANK["unknown"]
+        assert OA_RANK["hybrid"] > OA_RANK["green"] > OA_RANK["bronze"]
+        assert OA_RANK["bronze"] > OA_RANK["embargoed"] > OA_RANK["closed"] > OA_RANK["unknown"]
+
+    def test_green_wins_over_bronze(self):
+        # Un dépôt en archive a en général une licence ; `bronze` n'en a pas.
+        assert best_oa_status(["bronze", "green"]) == "green"
 
 
 class TestCleanPublicationTitle:
@@ -168,8 +172,22 @@ class TestCleanPublicationTitle:
         """Entité hexadécimale doublement échappée : `&amp;#xE9;` donne « é »."""
         assert clean_publication_title("Gagn&amp;#xE9; et al.") == "Gagné et al."
 
-    def test_keeps_a_numeric_entity_outside_unicode(self):
-        assert clean_publication_title("a &#99999999999; b") == "a &#99999999999; b"
+    def test_replaces_a_numeric_entity_outside_unicode(self):
+        assert clean_publication_title("a &#99999999999; b") == "a � b"
+
+    def test_decodes_named_entities(self):
+        assert clean_publication_title("caf&eacute;&nbsp;!") == "café\xa0!"
+
+    def test_decodes_latex_accents_outside_formulas(self):
+        """Titres réels d'OpenAlex : accents LaTeX hors formule, parfois entre accolades."""
+        assert (
+            clean_publication_title("Th\\'eorie inverse de Galois") == "Théorie inverse de Galois"
+        )
+        assert (
+            clean_publication_title("Classification des S{\\'e}ries") == "Classification des Séries"
+        )
+        assert clean_publication_title("polyn\\^ome sur $\\hat{K}$") == "polynôme sur $\\hat{K}$"
+        assert clean_publication_title("Dualit\\\\'e de Koszul") == "Dualité de Koszul"
 
     def test_decodes_single_encoded_html_markup(self):
         """Cas le plus fréquent en base : balisage échappé une fois, `&lt;sub&gt;`."""
