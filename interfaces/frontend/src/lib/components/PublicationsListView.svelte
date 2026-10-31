@@ -5,6 +5,7 @@
 	import DocTypePill from '#lib/components/DocTypePill.svelte';
 	import ListToolbar from '#lib/components/ListToolbar.svelte';
 	import DoiLink from '#lib/components/DoiLink.svelte';
+	import CorrespondingMark from '#lib/components/CorrespondingMark.svelte';
 	import SortChevron from '#lib/components/SortChevron.svelte';
 	import { institution } from '#lib/institution.svelte.js';
 	import { onMount } from 'svelte';
@@ -338,7 +339,7 @@
 						{/each}
 					</td>{/if}
 					{#if isPerson && col('corr')}<td class="corr-cell">
-						{#if p.is_corresponding}<span title="Auteur correspondant">&#10003;</span>{/if}
+						{#if p.is_corresponding}<CorrespondingMark />{/if}
 					</td>{/if}
 					{#if col('apc')}<td class="apc-cell">
 						{#if p.apc}
@@ -409,7 +410,8 @@
 	.hal-hors_hal        { background: var(--danger-light); color: var(--danger); }
 
 	/* Auteur correspondant (person) */
-	.corr-cell { text-align: center; color: var(--accent); font-size: var(--fs-sm); }
+	.corr-cell { text-align: center; }
+	.corr-cell :global(.corresponding-mark) { margin-left: 0; }
 
 	/* Bouton exclure (admin, person) */
 </style>
