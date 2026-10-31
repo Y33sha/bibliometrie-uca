@@ -25,7 +25,7 @@ Une seule donnée consommée : le `oa_status` du payload Unpaywall, mappé sur l
 
 ### Particularités
 
-Le verdict d'Unpaywall l'emporte sur le statut des sources, sauf dans trois cas : diamond face à gold, qu'Unpaywall ne distingue pas ; embargoed face à closed ou unknown ; dépôt en archive ouverte face à closed ou unknown.
+Le verdict d'Unpaywall relève le statut déduit des copies, sans l'abaisser ([règle](../pipeline/11-enrichissements.md#statut-open-access-oa_status)).
 
 ## Sudoc
 

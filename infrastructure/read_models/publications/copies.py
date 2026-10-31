@@ -19,6 +19,7 @@ def publication_copies(conn: Connection, publication_ids: Sequence[int]) -> dict
             SELECT sr.publication_id, sr.source::text AS source, l.url, l.version,
                    l.is_oa AND (l.embargo_until IS NULL OR l.embargo_until <= current_date)
                        AS is_oa,
+                   coalesce(l.embargo_until > current_date, false) AS embargoed,
                    l.license::text AS license, pl.name AS platform,
                    pl.openalex_id AS platform_openalex_id, pl.platform_type::text AS platform_type,
                    sr.id AS arrival
@@ -42,6 +43,7 @@ def publication_copies(conn: Connection, publication_ids: Sequence[int]) -> dict
                 platform_type=platform_type_of_copy(r.url, r.platform_openalex_id)
                 or (PlatformType(r.platform_type) if r.platform_type else None),
                 license=License(r.license) if r.license else None,
+                embargoed=r.embargoed,
                 described_by_platform=r.source == Source.HAL and known is HAL,
                 arrival=r.arrival,
             )

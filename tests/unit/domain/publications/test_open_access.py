@@ -1,11 +1,19 @@
 """Statut open access déduit des accès constatés (`domain.publications.open_access`)."""
 
+from dataclasses import replace
+from types import SimpleNamespace
+
 import pytest
 
 from domain.platforms.platform import PlatformType
 from domain.publications.access import Copy
 from domain.publications.licenses import License
-from domain.publications.open_access import OpenAccessFacts, copies_facts, decide_oa_status
+from domain.publications.open_access import (
+    OpenAccessFacts,
+    copies_facts,
+    decide_oa_status,
+    publication_oa_status,
+)
 
 _LICENSED = OpenAccessFacts(publisher_open=True, publisher_licensed=True, informed=True)
 
@@ -19,6 +27,7 @@ def _copy(url, *, is_oa=True, platform_type=None, licence=None) -> Copy:
         known_platform=None,
         platform_type=platform_type,
         license=licence,
+        embargoed=False,
         described_by_platform=False,
         arrival=1,
     )
@@ -87,3 +96,33 @@ def test_acces_constates_sur_les_copies():
     assert facts == OpenAccessFacts(
         publisher_open=True, publisher_licensed=True, archive_open=True, informed=True
     )
+
+
+def _declared(source, oa_status):
+    return SimpleNamespace(source=source, oa_status=oa_status)
+
+
+def _status(copies, declared, unpaywall=None):
+    return publication_oa_status(
+        copies, declared, unpaywall=unpaywall, has_serial=True, serial_oa_model="subscription"
+    )
+
+
+def test_le_statut_closed_declare_informe_sur_la_publication():
+    assert _status([], [_declared("openalex", "closed")]) == "closed"
+    assert _status([], [_declared("openalex", None)]) == "unknown"
+
+
+def test_un_statut_ouvert_declare_sans_copie_ne_compte_pas():
+    assert _status([], [_declared("wos", "gold"), _declared("openalex", "green")]) == "unknown"
+
+
+def test_l_embargo_declare_par_theses_fr():
+    assert _status([], [_declared("theses", "embargoed")]) == "embargoed"
+    assert _status([], [_declared("hal", "embargoed")]) == "unknown"
+
+
+def test_une_copie_sous_embargo():
+    copy = _copy("https://hal.science/hal-01607327", is_oa=False)
+    assert _status([copy], []) == "closed"
+    assert _status([replace(copy, embargoed=True)], []) == "embargoed"

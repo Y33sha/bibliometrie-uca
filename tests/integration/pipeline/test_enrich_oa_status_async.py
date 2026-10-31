@@ -1,6 +1,6 @@
 """Phase asynchrone `OaStatusPhase` (`pipeline.transformation.publications.oa_status`), avec la requête Unpaywall de `pipeline.ingestion.complements.unpaywall`.
 
-Les règles du statut sont testées dans `tests/unit/domain/publications/test_metadata.py` (`publication_oa_status`). Ce module teste les verdicts écrits par DOI, le recalcul des publications de ces DOI, le DOI absent, Unpaywall indisponible, la réponse 429 et le plafond de concurrence.
+Les règles du statut sont testées dans `tests/unit/domain/publications/test_open_access.py` (`publication_oa_status`). Ce module teste les verdicts écrits par DOI, le recalcul des publications de ces DOI, le DOI absent, Unpaywall indisponible, la réponse 429 et le plafond de concurrence.
 
 Le store est simulé et capture les écritures. Les réponses HTTP viennent de la fixture `http_mock`.
 """
@@ -15,6 +15,9 @@ from unittest.mock import MagicMock
 import httpx2
 import pytest
 
+from domain.platforms.platform import PlatformType
+from domain.publications.access import Copy
+from domain.publications.licenses import License
 from pipeline.http.lookup import LookupOutcome
 from pipeline.ingestion.complements.unpaywall import fetch_oa_status
 from pipeline.runtime.context import PhaseContext, RunOptions
@@ -49,15 +52,34 @@ def _route(http_mock, doi: str, *, status: str | None = None, http_status: int =
     )
 
 
+def _copy(url: str, *, platform_type: PlatformType | None = None) -> Copy:
+    """Construit une copie ouverte sous licence CC BY."""
+    return Copy(
+        url=url,
+        version=None,
+        is_oa=True,
+        platform=None,
+        known_platform=None,
+        platform_type=platform_type,
+        license=License.CC_BY,
+        embargoed=False,
+        described_by_platform=False,
+        arrival=1,
+    )
+
+
 def _publication(
-    publication_id: int, doi: str, current: str | None, *signals: tuple[str, str | None]
-):
-    """Construit la publication d'un DOI, de statut `current`, dont les enregistrements sources donnent `signals` (par défaut, un enregistrement source OpenAlex au statut `current`)."""
+    publication_id: int, doi: str, current: str | None, *copies: Copy
+) -> PublicationOaInputs:
+    """Construit la publication d'un DOI, de statut `current`, dans une revue `full_oa`, avec ses `copies` et un enregistrement source OpenAlex sans statut."""
     return PublicationOaInputs(
         publication_id,
         doi,
         current,
-        [OaSignal(s, o) for s, o in signals] or [OaSignal("openalex", current)],
+        True,
+        "full_oa",
+        [OaSignal("openalex", None)],
+        list(copies),
     )
 
 
@@ -174,8 +196,8 @@ def test_happy_path_updates_each_publication(logger, http_mock):
     assert metrics.details["table"]["rows"][0] == {"key": "gold", "count": 7, "delta": 0}
 
 
-def test_404_ecrit_un_verdict_nul_et_le_statut_suit_les_sources(logger, http_mock):
-    publications = [_publication(1, "10.1/x", "closed", ("openalex", "gold"))]
+def test_404_ecrit_un_verdict_nul_et_le_statut_suit_les_copies(logger, http_mock):
+    publications = [_publication(1, "10.1/x", "closed", _copy("https://doi.org/10.1/x"))]
     _route(http_mock, "10.1/x", http_status=404)
 
     queries = _FakeStore(publications, stored={"10.1/x": "closed"})
@@ -198,10 +220,15 @@ def test_unavailable_leaves_doi_unchecked(logger, http_mock):
     assert metrics.extras["not_found"] == 0
 
 
-def test_le_statut_suit_les_enregistrements_sources_de_la_publication(logger, http_mock):
-    """Le dépôt HAL d'un enregistrement source l'emporte sur le statut `closed` d'Unpaywall : la publication reste `green`."""
+def test_le_verdict_n_abaisse_pas_le_statut_des_copies(logger, http_mock):
+    """Une copie d'archive ouverte l'emporte sur le statut `closed` d'Unpaywall : la publication reste `green`."""
     publications = [
-        _publication(1, "10.1/deposit", "green", ("hal", "green"), ("openalex", "closed"))
+        _publication(
+            1,
+            "10.1/deposit",
+            "green",
+            _copy("https://hal.science/hal-01607327", platform_type=PlatformType.REPOSITORY),
+        )
     ]
     _route(http_mock, "10.1/deposit", status="closed")
 

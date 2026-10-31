@@ -177,7 +177,7 @@ _KNOWN_OA_STATUSES = frozenset(
 def map_openalex_oa_status(raw: str | None) -> str | None:
     """Renvoie le statut open access (`OaStatus`) d'un `open_access.oa_status` d'OpenAlex.
 
-    OpenAlex emploie les mêmes valeurs que `OaStatus` (gold, diamond, hybrid, bronze, green, closed). Une valeur vide donne `None` : le statut vient alors des autres sources (`best_oa_status`), et un champ vide reste distinct de `closed`. Une valeur inattendue donne `unknown`.
+    OpenAlex emploie les mêmes valeurs que `OaStatus` (gold, diamond, hybrid, bronze, green, closed). Une valeur vide donne `None`, distinct de `closed`. Une valeur inattendue donne `unknown`.
     """
     if not raw:
         return None

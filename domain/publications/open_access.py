@@ -5,17 +5,19 @@
 3. Sinon, copie ouverte chez l'éditeur sans licence ouverte : `bronze`.
 4. Sinon : `embargoed` sous embargo, `closed` avec une information sur la publication, `unknown` sans aucune.
 
-Le verdict d'Unpaywall relève les accès, jamais ne les abaisse.
+Le verdict d'Unpaywall relève les accès, jamais ne les abaisse. Des statuts déclarés par les sources, seuls comptent `closed` et l'embargo déclaré par theses.fr.
 """
 
 from collections.abc import Iterable
 from dataclasses import dataclass, replace
+from typing import Protocol
 
 from domain.platforms.platform import PlatformType
 from domain.publications.access import Copy, open_copies
 from domain.publications.licenses import OPEN_LICENSES
 from domain.publications.metadata import OaStatus
 from domain.serials.serial import OaModel
+from domain.sources.registry import Source
 
 _ARCHIVE_TYPES = frozenset({PlatformType.REPOSITORY, PlatformType.PREPRINT_SERVER})
 
@@ -57,7 +59,43 @@ def copies_facts(copies: Iterable[Copy]) -> OpenAccessFacts:
         publisher_open=bool(publisher),
         publisher_licensed=any(c.license in OPEN_LICENSES for c in publisher),
         archive_open=any(c.platform_type in _ARCHIVE_TYPES for c in opened),
+        embargoed=any(c.embargoed for c in copies),
         informed=bool(copies),
+    )
+
+
+class DeclaredOaStatus(Protocol):
+    """Statut open access déclaré par un enregistrement source."""
+
+    @property
+    def source(self) -> str: ...
+    @property
+    def oa_status(self) -> str | None: ...
+
+
+def publication_oa_status(
+    copies: Iterable[Copy],
+    declared: Iterable[DeclaredOaStatus],
+    *,
+    unpaywall: str | None,
+    has_serial: bool,
+    serial_oa_model: str | None,
+) -> OaStatus:
+    """Renvoie le statut open access d'une publication (`decide_oa_status`) : accès constatés sur ses copies, statut `closed` déclaré par une source, embargo déclaré par theses.fr, le tout relevé par le verdict d'Unpaywall.
+
+    Args:
+        unpaywall: verdict d'Unpaywall sur le DOI de la publication, `None` sans verdict.
+    """
+    declared = list(declared)
+    facts = copies_facts(copies)
+    facts = replace(
+        facts,
+        embargoed=facts.embargoed
+        or any(d.source == Source.THESES and d.oa_status == OaStatus.EMBARGOED for d in declared),
+        informed=facts.informed or any(d.oa_status == OaStatus.CLOSED for d in declared),
+    )
+    return decide_oa_status(
+        facts.raised_by(unpaywall), has_serial=has_serial, serial_oa_model=serial_oa_model
     )
 
 

@@ -60,7 +60,7 @@ def is_wos_author_usable(author: Mapping[str, JsonValue]) -> bool:
 def derive_wos_api_oa_status(journal_oas_gold: str | None) -> str | None:
     """Renvoie le statut open access d'un record de l'API WoS, d'après `pub_info.journal_oas_gold`.
 
-    WoS donne seulement ce drapeau : revue entièrement en open access ou non. `Y` donne `gold`. Toute autre valeur donne `None`, et le statut vient des autres sources (`best_oa_status`) : un `N` reste distinct de `closed`.
+    WoS donne seulement ce drapeau : revue entièrement en open access ou non. `Y` donne `gold`. Toute autre valeur donne `None` : un `N` reste distinct de `closed`.
     """
     if journal_oas_gold == "Y":
         return "gold"

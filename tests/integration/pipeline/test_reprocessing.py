@@ -14,6 +14,7 @@ from tests.integration.helpers.staging import insert_staging, normalize_pending
 # Document HAL minimal, sans dépôt de fichier.
 HAL_DOC_CLOSED = {
     "halId_s": "tel-99990001",
+    "uri_s": "https://theses.hal.science/tel-99990001",
     "doiId_s": None,
     "title_s": "Approche hybride pour la modélisation sémantique",
     "producedDateY_i": 2024,

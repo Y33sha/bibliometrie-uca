@@ -56,7 +56,7 @@ class TestDeriveHalOaStatus:
         assert derive_hal_oa_status(True, None, "pubmedcentral") == "green"
 
     def test_openaccess_link_returns_hybrid(self):
-        # Lien éditeur sans licence connue : hybrid par défaut. `best_oa_status` choisit gold si une autre source le donne.
+        # Lien éditeur sans licence connue : hybrid par défaut.
         assert derive_hal_oa_status(True, None, "openaccess") == "hybrid"
 
     def test_istex_link_delegated(self):

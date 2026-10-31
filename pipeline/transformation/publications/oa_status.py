@@ -1,6 +1,6 @@
 """Phase `oa_status` : verdicts d'Unpaywall sur les DOI des publications (`sources.unpaywall`), et statut open access dérivé (`publications.oa_status`).
 
-Unpaywall est interrogé pour les DOI jamais vérifiés ou périmés, hors DOI DataCite, et chaque verdict est écrit. Un DOI absent d'Unpaywall reçoit un verdict nul. Quand Unpaywall est indisponible, le DOI est reporté au run suivant. Le statut des publications de ces DOI est ensuite recalculé par `publication_oa_status`, à partir de leurs enregistrements sources et du verdict.
+Unpaywall est interrogé pour les DOI jamais vérifiés ou périmés, hors DOI DataCite, et chaque verdict est écrit. Un DOI absent d'Unpaywall reçoit un verdict nul. Quand Unpaywall est indisponible, le DOI est reporté au run suivant. Le statut des publications de ces DOI est ensuite recalculé par `publication_oa_status`, à partir de leurs copies, des statuts déclarés par leurs enregistrements sources, de leur revue et du verdict.
 
 Le délai de péremption et le plafond par run bornent la phase. Les DOI jamais vérifiés au-delà du plafond sont traités aux runs suivants. L'accès à Unpaywall exige l'adresse du polite pool.
 """
@@ -17,8 +17,11 @@ import httpx2
 from sqlalchemy import Connection, text
 
 from domain.config import ConfigKey
-from domain.publications.metadata import OaStatus, publication_oa_status
+from domain.publications.access import Copy
+from domain.publications.metadata import OaStatus
+from domain.publications.open_access import publication_oa_status
 from infrastructure.db.scalars import scalar_int
+from infrastructure.read_models.publications.copies import publication_copies
 from pipeline.http.lookup import LookupOutcome, NotFound, Unavailable
 from pipeline.http.polite_pool import get_polite_pool_email_optional
 from pipeline.http.tls import tls_context
@@ -54,12 +57,15 @@ class OaSignal(NamedTuple):
 
 
 class PublicationOaInputs(NamedTuple):
-    """Données du calcul du statut OA d'une publication : son DOI, son statut courant, les statuts de ses enregistrements sources."""
+    """Données du calcul du statut OA d'une publication : son DOI, son statut courant, sa revue, les statuts déclarés par ses enregistrements sources, ses copies."""
 
     id: int
-    doi: str
+    doi: str | None
     oa_status: str | None
+    has_serial: bool
+    serial_oa_model: str | None
     signals: list[OaSignal]
+    copies: list[Copy]
 
 
 # DOI des publications sans verdict d'Unpaywall, ou à verdict de plus de `:stale` jours. Les DOI DataCite sont absents d'Unpaywall, donc écartés.
@@ -123,25 +129,40 @@ class OaStatusStore:
         )
 
     def fetch_oa_inputs(self, dois: Sequence[str]) -> list[PublicationOaInputs]:
-        """Renvoie les publications de ces DOI, avec les statuts OA de leurs enregistrements sources."""
+        """Renvoie les publications de ces DOI, avec leur revue, les statuts OA de leurs enregistrements sources et leurs copies."""
+        return self._fetch_oa_inputs("lower(p.doi) = ANY(:keys)", list(dois))
+
+    def fetch_oa_inputs_of(self, publication_ids: Sequence[int]) -> list[PublicationOaInputs]:
+        """Renvoie ces publications, avec leur revue, les statuts OA de leurs enregistrements sources et leurs copies."""
+        return self._fetch_oa_inputs("p.id = ANY(:keys)", list(publication_ids))
+
+    def _fetch_oa_inputs(
+        self, where: str, keys: list[str] | list[int]
+    ) -> list[PublicationOaInputs]:
         rows = self._conn.execute(
-            text("""
+            text(f"""
                 SELECT p.id, lower(p.doi) AS doi, p.oa_status::text AS oa_status,
+                       p.serial_id IS NOT NULL AS has_serial, s.oa_model::text AS oa_model,
                        array_agg(sr.source::text ORDER BY sr.id) AS sources,
                        array_agg(sr.oa_status::text ORDER BY sr.id) AS statuses
                 FROM publications p
                 JOIN source_records sr ON sr.publication_id = p.id
-                WHERE lower(p.doi) = ANY(:dois)
-                GROUP BY p.id
-            """),
-            {"dois": list(dois)},
-        )
+                LEFT JOIN serials s ON s.id = p.serial_id
+                WHERE {where}
+                GROUP BY p.id, s.oa_model
+            """),  # noqa: S608 — condition choisie par le code
+            {"keys": keys},
+        ).all()
+        copies = publication_copies(self._conn, [r.id for r in rows])
         return [
             PublicationOaInputs(
                 r.id,
                 r.doi,
                 r.oa_status,
+                r.has_serial,
+                r.oa_model,
                 [OaSignal(s, o) for s, o in zip(r.sources, r.statuses, strict=True)],
+                copies.get(r.id, []),
             )
             for r in rows
         ]
@@ -335,7 +356,13 @@ def _apply_verdicts(
             progress["unchanged"] += 1
     store.record_verdicts(verdicts)
     for publication in store.fetch_oa_inputs(list(by_doi)):
-        status = publication_oa_status(publication.signals, by_doi.get(publication.doi))
+        status = publication_oa_status(
+            publication.copies,
+            publication.signals,
+            unpaywall=by_doi.get(publication.doi) if publication.doi else None,
+            has_serial=publication.has_serial,
+            serial_oa_model=publication.serial_oa_model,
+        )
         if status != publication.oa_status:
             store.update_oa_status(publication.id, status)
 

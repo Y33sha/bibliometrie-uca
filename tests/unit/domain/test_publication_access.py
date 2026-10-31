@@ -17,6 +17,7 @@ def _copy(url, *, version=None, is_oa=True, platform=None, described=False, arri
         known_platform=known,
         platform_type=known.platform_type if known else None,
         license=None,
+        embargoed=False,
         described_by_platform=described,
         arrival=arrival,
     )
@@ -125,6 +126,7 @@ def test_une_plateforme_du_registre_porte_le_nom_du_registre():
         known_platform=ZENODO,
         platform_type=ZENODO.platform_type,
         license=None,
+        embargoed=False,
         described_by_platform=False,
         arrival=1,
     )

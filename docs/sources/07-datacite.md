@@ -111,4 +111,4 @@ Les DOI apparentés (versions, formes, parties, suppléments) deviennent des ide
 
 ### Statut open access
 
-DataCite ne donne pas de statut open access : celui de la publication vient des autres sources.
+DataCite ne donne pas de statut open access.

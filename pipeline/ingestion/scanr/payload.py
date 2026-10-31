@@ -85,10 +85,10 @@ def derive_scanr_oa_status(
 ) -> str | None:
     """Renvoie le statut open access d'un document ScanR, déduit de `isOa` et de `oaEvidence` (hôte et licence de la copie ouverte).
 
-    - `isOa` absent → `None` : le statut vient des autres sources (`best_oa_status`) ;
+    - `isOa` absent → `None` ;
     - `isOa` faux → `closed` ;
     - copie ouverte dans une archive (`repository`) → `green` ;
-    - copie ouverte chez l'éditeur, sous licence Creative Commons → `hybrid`, changé en `gold` par `best_oa_status` si une autre source donne `gold` ;
+    - copie ouverte chez l'éditeur, sous licence Creative Commons → `hybrid` ;
     - copie ouverte chez l'éditeur, sans licence Creative Commons → `bronze` ;
     - hôte absent ou inconnu → `None`.
     """

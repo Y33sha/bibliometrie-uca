@@ -40,6 +40,13 @@ Seules les adresses et les contributions sources marquées sont retraitées.
 
 ## Statut open access (`oa_status`)
 
-Interroge [Unpaywall](../glossaire.md#unpaywall) par DOI et conserve son verdict dans `sources.unpaywall`. Le statut d'une publication se calcule à partir de ses sources et de ce verdict, ici et à chaque recalcul de la publication.
+Interroge [Unpaywall](../glossaire.md#unpaywall) par DOI et conserve son verdict dans `sources.unpaywall`. Le statut d'une publication se déduit de ses copies, du modèle de sa revue et de ce verdict (`domain/publications/open_access.py`), ici et à chaque recalcul de la publication :
+
+1. Copie ouverte chez l'éditeur, sous licence ouverte : `hybrid` dans une revue sur abonnement ou de modèle inconnu, `gold` dans une revue entièrement en open access ou hors revue, `diamond` dans une revue diamant.
+2. Sinon, copie ouverte dans une archive ou sur un serveur de preprints : `green`.
+3. Sinon, copie ouverte chez l'éditeur sans licence ouverte : `bronze`.
+4. Sinon : `embargoed` sous embargo (copie, ou embargo déclaré par theses.fr), `closed` avec une copie, un verdict ou un statut `closed` déclaré par une source, `unknown` sans aucune information.
+
+Le verdict d'Unpaywall relève ces accès, sans les abaisser : `gold`, `hybrid` ou `diamond` vaut une copie ouverte chez l'éditeur sous licence, `bronze` sans licence, `green` une copie d'archive ouverte.
 
 Incrémentale : chaque exécution est plafonnée (`unpaywall_max_per_run`, 10 000 DOI par défaut) et vérifie seulement les DOI sans verdict, ou au verdict plus ancien que `unpaywall_recheck_after_days` (15 jours par défaut, réglable dans `admin/config`). Les DOI DataCite, absents d'Unpaywall, sont écartés. Quand Unpaywall est indisponible, le DOI est repris au run suivant.

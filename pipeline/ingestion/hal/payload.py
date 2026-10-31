@@ -46,9 +46,9 @@ def derive_hal_oa_status(
     - fichier déposé sous embargo actif → `embargoed` ; une règle de correction de `oa_status` lève l'embargo à son échéance ;
     - fichier déposé, ou annexe d'une communication (`annex`, `communication_annex`) → `green` ;
     - lien vers arXiv ou PubMed Central (`GREEN_LINK_EXT_IDS`) → `green` ;
-    - lien `openaccess` vers le DOI de l'éditeur → `hybrid`, changé en `gold` par `best_oa_status` si une autre source donne `gold` ;
+    - lien `openaccess` vers le DOI de l'éditeur → `hybrid` ;
     - `openAccess_bool` faux → `closed` ;
-    - `openAccess_bool` vrai sans autre signal, ou absent → `None` : le statut vient d'OpenAlex et d'Unpaywall.
+    - `openAccess_bool` vrai sans autre signal, ou absent → `None`.
     """
     if file_main and embargo_until is not None:
         return "embargoed"

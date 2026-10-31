@@ -1,23 +1,14 @@
-"""Règles sur les métadonnées d'une publication : statut open access, niveaux d'accès, titre (nettoyage, normalisation, longueur), métadonnées minimales."""
-
-from types import SimpleNamespace
+"""Règles sur les métadonnées d'une publication : rang des statuts open access, niveaux d'accès, titre (nettoyage, normalisation, longueur), métadonnées minimales."""
 
 from domain.publications.metadata import (
     ACCESS_LEVELS,
     OA_RANK,
     TITLE_NORMALIZED_MAX_LENGTH,
-    best_oa_status,
     clean_publication_title,
     has_minimal_publication_metadata,
-    has_open_archive_deposit,
     is_overlong_title,
     normalized_title,
-    publication_oa_status,
 )
-
-
-def _src(source: str, oa_status: str | None):
-    return SimpleNamespace(source=source, oa_status=oa_status)
 
 
 class TestAccessLevels:
@@ -35,27 +26,6 @@ class TestAccessLevels:
         """L'ordre des niveaux suit celui des statuts qu'ils recouvrent."""
         rank = {level: {OA_RANK[s] for s in statuses} for level, statuses in ACCESS_LEVELS.items()}
         assert min(rank["open"]) > max(rank["embargo"]) > max(rank["closed"])
-
-
-class TestHasOpenArchiveDeposit:
-    def test_hal_green_is_a_deposit(self):
-        # Statut green de HAL : un fichier est déposé.
-        assert has_open_archive_deposit([_src("hal", "green")]) is True
-
-    def test_hal_hybrid_is_not_a_deposit(self):
-        # Statut hybrid de HAL : lien vers la version de l'éditeur, sans fichier déposé.
-        assert has_open_archive_deposit([_src("hal", "hybrid")]) is False
-
-    def test_non_archive_green_is_not_a_deposit(self):
-        # Statut green d'une source autre qu'une archive ouverte (estimation d'OpenAlex).
-        assert has_open_archive_deposit([_src("openalex", "green")]) is False
-
-    def test_mix_detects_the_hal_green(self):
-        sources = [_src("openalex", "closed"), _src("scanr", "green"), _src("hal", "green")]
-        assert has_open_archive_deposit(sources) is True
-
-    def test_no_deposit(self):
-        assert has_open_archive_deposit([_src("hal", "closed"), _src("openalex", "gold")]) is False
 
 
 class TestNormalizedTitle:
@@ -109,51 +79,11 @@ class TestIsOverlongTitle:
         assert is_overlong_title("") is False
 
 
-class TestBestOAStatus:
-    def test_returns_most_open(self):
-        assert best_oa_status(["green", "gold", "closed"]) == "gold"
-
-    def test_diamond_wins_over_gold(self):
-        assert best_oa_status(["gold", "diamond"]) == "diamond"
-
-    def test_ignores_none_and_empty(self):
-        assert best_oa_status([None, "", "bronze"]) == "bronze"
-
-    def test_returns_none_if_no_known_status(self):
-        assert best_oa_status([None, None]) is None
-        assert best_oa_status([]) is None
-
-    def test_ignores_unknown_status_value(self):
-        # Un statut absent de `OA_RANK` est ignoré.
-        assert best_oa_status(["mystery", "green"]) == "green"
-
-    def test_unknown_status_value_alone_gives_none(self):
-        assert best_oa_status(["mystery"]) is None
-
-    def test_unknown_kept_only_if_nothing_better(self):
-        # `unknown` a un rang positif : seul, il est renvoyé.
-        assert best_oa_status(["unknown"]) == "unknown"
-
-    def test_embargoed_wins_over_closed_and_unknown(self):
-        # `embargoed` (dépôt sous embargo) est plus ouvert que `closed` et `unknown`.
-        assert best_oa_status(["closed", "embargoed", "unknown"]) == "embargoed"
-
-    def test_open_status_wins_over_embargoed(self):
-        # Un statut ouvert l'emporte sur `embargoed`.
-        assert best_oa_status(["embargoed", "green"]) == "green"
-        assert best_oa_status(["embargoed", "gold"]) == "gold"
-
-    def test_embargoed_alone(self):
-        assert best_oa_status(["embargoed"]) == "embargoed"
-
+class TestOaRank:
     def test_rank_order_is_strict(self):
         assert OA_RANK["diamond"] > OA_RANK["gold"] > OA_RANK["hybrid"]
         assert OA_RANK["hybrid"] > OA_RANK["green"] > OA_RANK["bronze"]
         assert OA_RANK["bronze"] > OA_RANK["embargoed"] > OA_RANK["closed"] > OA_RANK["unknown"]
-
-    def test_green_wins_over_bronze(self):
-        # Un dépôt en archive a en général une licence ; `bronze` n'en a pas.
-        assert best_oa_status(["bronze", "green"]) == "green"
 
 
 class TestCleanPublicationTitle:
@@ -246,40 +176,3 @@ class TestCleanPublicationTitle:
 
     def test_returns_empty_for_empty(self):
         assert clean_publication_title("") == ""
-
-
-class TestPublicationOaStatus:
-    def test_sans_verdict_le_statut_le_plus_ouvert_des_sources(self):
-        sources = [_src("hal", "green"), _src("openalex", "gold")]
-        assert publication_oa_status(sources, None) == "gold"
-
-    def test_sources_muettes_sans_verdict_donnent_unknown(self):
-        assert publication_oa_status([_src("openalex", None)], None) == "unknown"
-
-    def test_le_verdict_l_emporte(self):
-        assert publication_oa_status([_src("openalex", "closed")], "gold") == "gold"
-        assert publication_oa_status([_src("openalex", "gold")], "closed") == "closed"
-
-    def test_diamond_tient_face_a_gold(self):
-        assert publication_oa_status([_src("openalex", "diamond")], "gold") == "diamond"
-
-    def test_diamond_cede_a_un_autre_verdict(self):
-        # Seul gold est confondu avec diamond par Unpaywall.
-        assert publication_oa_status([_src("openalex", "diamond")], "green") == "green"
-
-    def test_embargoed_tient_face_a_un_statut_ferme(self):
-        assert publication_oa_status([_src("hal", "embargoed")], "closed") == "embargoed"
-        assert publication_oa_status([_src("hal", "embargoed")], "unknown") == "embargoed"
-
-    def test_embargoed_cede_a_un_statut_ouvert(self):
-        assert publication_oa_status([_src("hal", "embargoed")], "gold") == "gold"
-
-    def test_un_depot_en_archive_ouverte_tient_face_a_un_statut_ferme(self):
-        assert publication_oa_status([_src("hal", "green")], "closed") == "green"
-        assert publication_oa_status([_src("hal", "green")], "unknown") == "green"
-
-    def test_un_verdict_ouvert_l_emporte_sur_un_depot(self):
-        assert publication_oa_status([_src("hal", "green")], "hybrid") == "hybrid"
-
-    def test_sans_depot_le_statut_ferme_tient(self):
-        assert publication_oa_status([_src("openalex", "green")], "closed") == "closed"

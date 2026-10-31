@@ -35,6 +35,8 @@ class Copy:
     platform_type: PlatformType | None
     """Type de la plateforme : celui de la liste (`platform_type_of_copy`), à défaut celui donné par la source."""
     license: License | None
+    embargoed: bool
+    """La copie est sous embargo actif."""
     described_by_platform: bool
     """La copie vient de l'enregistrement source donné par la plateforme elle-même."""
     arrival: int

@@ -11,6 +11,7 @@ from domain.publications.aggregation import (
     assign_publisher,
     refresh_from_sources as _refresh_aggregate,
 )
+from domain.publications.open_access import publication_oa_status
 from domain.publications.publication import Publication
 from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES
 from domain.source_records.corrections import stash_entry
@@ -122,16 +123,11 @@ def monograph_serial_ids(conn: Connection, monograph_ids: Sequence[int]) -> dict
     return {r.id: r.serial_id for r in rows}
 
 
-def unpaywall_verdicts(conn: Connection, dois: Sequence[str]) -> dict[str, str]:
-    """Renvoie le verdict d'Unpaywall de chaque DOI connu d'Unpaywall, pour l'agrégation."""
-    rows = conn.execute(
-        text(
-            "SELECT doi, oa_status::text AS oa_status FROM unpaywall"
-            " WHERE doi = ANY(:dois) AND oa_status IS NOT NULL"
-        ),
-        {"dois": list(dois)},
-    )
-    return {r.doi: r.oa_status for r in rows}
+def unpaywall_verdict(conn: Connection, doi: str) -> str | None:
+    """Renvoie le verdict d'Unpaywall sur un DOI, `None` sans verdict."""
+    return conn.execute(
+        text("SELECT oa_status::text FROM unpaywall WHERE doi = :doi"), {"doi": doi}
+    ).scalar_one_or_none()
 
 
 def crossref_prefix_publishers(conn: Connection, prefixes: Sequence[str]) -> dict[str, int]:
@@ -144,6 +140,14 @@ def crossref_prefix_publishers(conn: Connection, prefixes: Sequence[str]) -> dic
         {"prefixes": list(prefixes)},
     )
     return {r.prefix: r.publisher_id for r in rows}
+
+
+def serial_oa_model_of(conn: Connection, serial_id: int) -> str | None:
+    """Renvoie le modèle open access d'une revue, ou `None`, pour le statut open access de ses publications."""
+    return conn.execute(
+        text("SELECT oa_model::text FROM serials WHERE id = :id"),
+        {"id": serial_id},
+    ).scalar_one_or_none()
 
 
 def serial_type_of(conn: Connection, serial_id: int) -> str | None:
@@ -186,7 +190,7 @@ class RefreshVerdict(StrEnum):
 def refresh_from_sources(conn: Connection, publication_id: int) -> RefreshVerdict:
     """Recalcule les métadonnées d'une publication depuis ses enregistrements sources.
 
-    Recalcul complet : lit tous les enregistrements sources rattachés, agrège (`domain.publications.aggregation`), rejoue les corrections nées de l'arbitrage, choisit l'URL du texte intégral (`domain.publications.access`), pose l'éditeur d'après le type corrigé, persiste. Rattrape les métadonnées périmées (`ongoing_thesis` → `thesis` après soutenance).
+    Recalcul complet : lit tous les enregistrements sources rattachés, agrège (`domain.publications.aggregation`), rejoue les corrections nées de l'arbitrage, choisit l'URL du texte intégral (`domain.publications.access`), déduit le statut open access des copies (`domain.publications.open_access`), pose l'éditeur d'après le type corrigé, persiste. Rattrape les métadonnées périmées (`ongoing_thesis` → `thesis` après soutenance).
 
     Une publication sans enregistrement source (`NO_SOURCE`), ou de `doc_type` résolu dans `OUT_OF_SCOPE_DOC_TYPES` (`INADMISSIBLE_TYPE`), reste en l'état. Le module du cycle de vie la supprime sur ce verdict.
 
@@ -203,13 +207,11 @@ def refresh_from_sources(conn: Connection, publication_id: int) -> RefreshVerdic
 
     # L'agrégation part des colonnes corrigées par la phase `metadata_correction`.
     monograph_ids = sorted({s.monograph_id for s in sources if s.monograph_id is not None})
-    dois = sorted({d for s in sources for d in s.dois.all})
     _refresh_aggregate(
         publication,
         sources,
         source_priority=SOURCE_PRIORITY,
         monograph_serials=monograph_serial_ids(conn, monograph_ids) if monograph_ids else {},
-        unpaywall=unpaywall_verdicts(conn, dois) if dois else {},
     )
     _apply_canonical_doc_type_correction(
         publication,
@@ -217,10 +219,19 @@ def refresh_from_sources(conn: Connection, publication_id: int) -> RefreshVerdic
         if publication.serial_id is not None
         else None,
     )
+    copies = publication_copies(conn, [publication_id]).get(publication_id, [])
     publication.best_copy_url = access(
-        publication_copies(conn, [publication_id]).get(publication_id, []),
-        doi=str(publication.doi) if publication.doi else None,
+        copies, doi=str(publication.doi) if publication.doi else None
     ).url
+    publication.oa_status = publication_oa_status(
+        copies,
+        sources,
+        unpaywall=unpaywall_verdict(conn, publication.doi.value) if publication.doi else None,
+        has_serial=publication.serial_id is not None,
+        serial_oa_model=serial_oa_model_of(conn, publication.serial_id)
+        if publication.serial_id is not None
+        else None,
+    )
     prefixes = [publication.doi.prefix.value] if publication.doi else []
     assign_publisher(
         publication,

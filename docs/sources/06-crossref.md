@@ -89,4 +89,4 @@ Crossref donne `journal-article` pour tous les sous-types d'article (synthèse, 
 
 ### Statut open access
 
-Crossref ne donne pas de statut open access : celui de la publication vient des autres sources.
+Crossref ne donne pas de statut open access.
