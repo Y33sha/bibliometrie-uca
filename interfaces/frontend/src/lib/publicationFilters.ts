@@ -5,7 +5,6 @@
  */
 import { ALL_TOKEN, explicitSelectionUrl, type ListFilter } from '#lib/filterRegistry.js';
 import { SOURCE_ITEMS } from '#lib/filterItems.js';
-import { institution } from '#lib/institution.svelte.js';
 import { docTypeFamilies, docTypePluralLabels } from '#lib/docTypes.svelte.js';
 import { filterLabels, oaLabelsMap } from '#lib/labels.js';
 import { contextEntityId, type PublicationListContext } from '#lib/publicationListContext.js';
@@ -90,6 +89,20 @@ export function publicationFilters(
 			showColumns: ['hal_status'],
 		},
 		{
+			key: 'authorPosition',
+			control: 'checkbox',
+			label: 'Positions auteur',
+			param: 'author_position',
+			facet: {
+				type: 'label_map',
+				apiKey: 'author_positions',
+				labels: { corresponding: 'Correspondant', other: 'Autre' },
+			},
+			enabled: () => context.kind === 'person',
+			hideWhenEmpty: true,
+			showColumns: ['corr'],
+		},
+		{
 			key: 'publisher',
 			control: 'entity',
 			label: filterLabels.publisher,
@@ -129,26 +142,9 @@ export function publicationFilters(
 			showColumns: ['license'],
 		},
 		{
-			key: 'authorPosition',
-			control: 'checkbox',
-			label: 'Position auteur',
-			param: 'author_position',
-			facet: {
-				type: 'label_map',
-				apiKey: 'author_positions',
-				labels: { corresponding: 'Correspondant', other: 'Autre' },
-			},
-			group: 'Auteurs',
-			enabled: () => context.kind === 'person',
-			hideWhenEmpty: true,
-			showColumns: ['corr'],
-		},
-		{
 			key: 'perimeter',
 			control: 'checkbox',
-			get label() {
-				return institution.name;
-			},
+			label: 'Affiliations',
 			param: 'in_perimeter',
 			facet: { type: 'labeled', apiKey: 'in_perimeter' },
 			group: 'Auteurs',

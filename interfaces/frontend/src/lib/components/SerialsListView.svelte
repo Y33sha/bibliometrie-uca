@@ -214,7 +214,7 @@
 			onchange={onFilterChange}
 		/>
 		<FacetDropdown
-			label="Modèle OA"
+			label="Modèles OA"
 			options={facets.options.oaModels}
 			bind:selected={selectedOaModels}
 			onchange={onFilterChange}

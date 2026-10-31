@@ -258,7 +258,7 @@
 				counts={pendingCounts}
 				onchange={onFilterChange}
 			/>
-			<FacetDropdown label="Exclusion" options={exclusionOptions} bind:selected={selectedExclusions} onchange={onFilterChange} />
+			<FacetDropdown label="Exclusions"options={exclusionOptions} bind:selected={selectedExclusions} onchange={onFilterChange} />
 		{/if}
 	{/snippet}
 </ListToolbar>
