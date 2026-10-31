@@ -33,7 +33,6 @@ from pipeline.ingestion.crossref.normalize import (
     get_container_title,
     get_doi,
     get_isbns,
-    get_issns,
     get_keywords,
     get_language,
     get_locations,
@@ -137,13 +136,6 @@ class TestGetContainerTitle:
 
     def test_strips_whitespace(self):
         assert get_container_title({"container-title": ["  J Phys  "]}) == "J Phys"
-
-
-class TestGetIssns:
-    def test_delegates_to_domain(self):
-        # Le détail de `parse_crossref_issns` est testé dans `test_payload.py`.
-        issn, eissn = get_issns({"ISSN": ["1234-5679"], "issn-type": []})
-        assert issn == "1234-5679" or eissn == "1234-5679"
 
 
 class TestGetPublisherName:
@@ -317,28 +309,6 @@ class TestGetBiblio:
 
     def test_publisher_extracted(self):
         assert get_biblio({"publisher": "Elsevier"}) == {"publisher": "Elsevier"}
-
-    def test_serial_built_from_container_title_and_issns(self):
-        # `issn-type` donne le support de chaque ISSN ; la liste `ISSN` seule alimente `issn`.
-        msg = {
-            "container-title": ["Journal of Physics"],
-            "issn-type": [
-                {"type": "print", "value": "0022-3727"},
-                {"type": "electronic", "value": "1361-6463"},
-            ],
-        }
-        biblio = get_biblio(msg)
-        assert biblio is not None
-        assert biblio["journal"] == {
-            "title": "Journal of Physics",
-            "issn": "0022-3727",
-            "eissn": "1361-6463",
-        }
-
-    def test_serial_title_only_when_no_issns(self):
-        assert get_biblio({"container-title": ["J. Phys."]}) == {
-            "journal": {"title": "J. Phys."},
-        }
 
 
 class TestAuthorName:

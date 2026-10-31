@@ -489,11 +489,6 @@ class TestExtractFromApi:
             "first_page": "100",
             "last_page": "120",
             "publisher": "Test Publisher",
-            "journal": {
-                "title": "Test Journal",
-                "issn": "0123-4567",
-                "eissn": "1234-5678",
-            },
         }
 
     def test_fallback_to_staging_doi_when_api_missing(self):
@@ -585,8 +580,8 @@ class TestExtractFromApi:
         rec = extract_from_api(raw, None)
         assert rec["biblio"] is None
 
-    def test_biblio_publisher_and_journal_extracted(self):
-        """Le nom de l'éditeur et la revue, tels que WoS les donne, figurent dans `biblio`."""
+    def test_biblio_publisher_extracted(self):
+        """Le nom de l'éditeur, tel que WoS le donne, figure dans `biblio`."""
         raw = _make_api_record(
             vol=None,
             issue=None,
@@ -598,14 +593,7 @@ class TestExtractFromApi:
             eissn="1361-6463",
         )
         rec = extract_from_api(raw, None)
-        assert rec["biblio"] == {
-            "publisher": "Elsevier",
-            "journal": {
-                "title": "Journal of Physics",
-                "issn": "0022-3727",
-                "eissn": "1361-6463",
-            },
-        }
+        assert rec["biblio"] == {"publisher": "Elsevier"}
 
     def test_page_as_string_ignored(self):
         """Une `page` en chaîne est ignorée : ni première ni dernière page."""

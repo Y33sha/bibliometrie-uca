@@ -44,7 +44,6 @@ from pipeline.ingestion.crossref.payload import (
     extract_crossref_conference,
     extract_crossref_publication_year,
     extract_crossref_source_extras,
-    parse_crossref_issns,
     strip_jats_tags,
 )
 from pipeline.transformation.publishing.find_or_create import (
@@ -79,10 +78,6 @@ def get_container_title(msg: Mapping[str, JsonValue]) -> str | None:
     if isinstance(cts, str) and cts.strip():
         return cts.strip()
     return None
-
-
-def get_issns(msg: Mapping[str, JsonValue]) -> tuple[str | None, str | None]:
-    return parse_crossref_issns(msg)
 
 
 def get_publisher_name(msg: Mapping[str, JsonValue]) -> str | None:
@@ -156,8 +151,7 @@ def page_range(page: str | None, article_number: str | None) -> PageRange:
 
 
 def get_biblio(msg: Mapping[str, JsonValue]) -> dict[str, JsonValue] | None:
-    """Renvoie volume, numéro, pages et numéro d'article, avec l'éditeur et la revue nommés par Crossref."""
-    issn_val, eissn_val = get_issns(msg)
+    """Renvoie volume, numéro, pages et numéro d'article, avec l'éditeur nommé par Crossref."""
     article_number = as_text(msg.get("article-number"))
     return compact_biblio(
         volume=as_text(msg.get("volume")),
@@ -165,9 +159,6 @@ def get_biblio(msg: Mapping[str, JsonValue]) -> dict[str, JsonValue] | None:
         **page_range(as_text(msg.get("page")), article_number)._asdict(),
         article_number=article_number,
         publisher=get_publisher_name(msg),
-        journal_title=get_container_title(msg),
-        journal_issn=issn_val,
-        journal_eissn=eissn_val,
     )
 
 

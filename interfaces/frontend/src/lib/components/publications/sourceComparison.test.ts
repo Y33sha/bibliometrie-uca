@@ -32,8 +32,7 @@ function record(overrides: Partial<SourceRecord>): SourceRecord {
 		serial_id: null,
 		journal_title: null,
 		journal_raw_title: null,
-		journal_raw_issn: null,
-		journal_raw_eissn: null,
+		journal_raw_issns: [],
 		publisher_id: null,
 		publisher_name: null,
 		publisher_raw_name: null,
@@ -109,11 +108,10 @@ describe('comparisonRows', () => {
 
 	it('place les ISSN sous la revue et masque les lignes vides dans toutes les sources', () => {
 		const keys = comparisonRows([
-			record({ journal_raw_title: 'Revue', journal_raw_issn: '1234-5678' }),
+			record({ journal_raw_title: 'Revue', journal_raw_issns: ['1234-5678'] }),
 		]).map((r) => r.key);
 		const serial = keys.indexOf('serial');
 		expect(keys.slice(serial, serial + 2)).toEqual(['serial', 'issn']);
-		expect(keys).not.toContain('eissn');
 		expect(keys).not.toContain('volume');
 	});
 

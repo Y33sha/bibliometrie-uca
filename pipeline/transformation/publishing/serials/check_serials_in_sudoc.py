@@ -25,7 +25,7 @@ from domain.serials.issn_check import (
 from domain.serials.issns import IssnStatus, SerialIssn
 from domain.serials.serial import ManualField, SerialType
 from domain.serials.series import ContainerLevel, container_level, holds_volumes
-from domain.source_records.biblio import BiblioKey, JournalKey
+from domain.source_records.biblio import BiblioKey, IssnKey, JournalKey
 from domain.sources.sudoc import SudocSerialRecord
 from infrastructure.db.tables import serial_issns, serials
 from infrastructure.repositories.serial_issns import issn_values, issns_by_serial
@@ -72,13 +72,12 @@ class SerialTitleTypeRow(NamedTuple):
 
 # ISSN des enregistrements sources de chaque revue, toutes sources, tels que reçus : `find_serials_to_check_in_sudoc` les normalise.
 _DOCUMENT_ISSNS = text(f"""
-    SELECT DISTINCT s.serial_id, trim(v.issn) AS issn
+    SELECT DISTINCT s.serial_id, trim(v.value->>'{IssnKey.ISSN}') AS issn
     FROM source_records s
-    CROSS JOIN LATERAL (
-        VALUES (s.biblio->'{BiblioKey.JOURNAL}'->>'{JournalKey.ISSN}'),
-               (s.biblio->'{BiblioKey.JOURNAL}'->>'{JournalKey.EISSN}')
-    ) AS v(issn)
-    WHERE s.serial_id IS NOT NULL AND v.issn IS NOT NULL
+    CROSS JOIN LATERAL jsonb_array_elements(
+        s.biblio->'{BiblioKey.JOURNAL}'->'{JournalKey.ISSNS}'
+    ) AS v(value)
+    WHERE s.serial_id IS NOT NULL AND v.value->>'{IssnKey.ISSN}' IS NOT NULL
 """)
 
 # Revues dont un ISSN n'est pas vérifié dans le Sudoc.

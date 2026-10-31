@@ -452,26 +452,6 @@ class TestHalSourceRecord:
         captured = self._call({"journalPublisher_s": "Elsevier", "publisher_s": "Springer"})
         assert captured.biblio == {"publisher": "Elsevier"}
 
-    def test_biblio_journal_built_from_title_issn_eissn(self):
-        captured = self._call(
-            {
-                "journalTitle_s": "J. Phys.",
-                "journalIssn_s": "0022-3727",
-                "journalEissn_s": "1361-6463",
-            },
-        )
-        assert captured.biblio == {
-            "journal": {
-                "title": "J. Phys.",
-                "issn": "0022-3727",
-                "eissn": "1361-6463",
-            }
-        }
-
-    def test_biblio_journal_partial(self):
-        captured = self._call({"journalTitle_s": "J. Phys."})
-        assert captured.biblio == {"journal": {"title": "J. Phys."}}
-
     def test_url_from_uri(self):
         captured = self._call({"uri_s": "https://hal.science/hal-123"})
         assert captured.urls == ["https://hal.science/hal-123"]

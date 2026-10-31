@@ -5785,10 +5785,8 @@ export interface components {
             journal_title: string | null;
             /** Journal Raw Title */
             journal_raw_title: string | null;
-            /** Journal Raw Issn */
-            journal_raw_issn: string | null;
-            /** Journal Raw Eissn */
-            journal_raw_eissn: string | null;
+            /** Journal Raw Issns */
+            journal_raw_issns: string[];
             /**
              * Publisher Id
              * @description Éditeur nommé par la source, rattaché au référentiel.

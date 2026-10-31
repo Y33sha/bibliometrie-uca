@@ -436,8 +436,7 @@ class SourceRecordMetadataOut(Model):
     """Revue du référentiel rattachée à l'enregistrement source."""
     journal_title: str | None
     journal_raw_title: str | None
-    journal_raw_issn: str | None
-    journal_raw_eissn: str | None
+    journal_raw_issns: list[str]
     publisher_id: int | None
     """Éditeur nommé par la source, rattaché au référentiel."""
     publisher_name: str | None

@@ -146,8 +146,7 @@ function fields(records: SourceRecord[]): Field[] {
 			cell: (r) => referentialCell(r.serial_id, r.journal_title, r.journal_raw_title, 'serials'),
 			compared: (r) => (r.serial_id != null ? `#${r.serial_id}` : r.journal_raw_title),
 		},
-		textField('issn', 'ISSN', (r) => r.journal_raw_issn),
-		textField('eissn', 'e-ISSN', (r) => r.journal_raw_eissn),
+		textField('issn', 'ISSN', (r) => r.journal_raw_issns.join(', ') || null),
 		{
 			key: 'publisher',
 			label: 'Éditeur',

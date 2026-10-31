@@ -1,9 +1,13 @@
-"""Données bibliographiques d'un enregistrement source (`source_records.biblio`) : numérotation, éditeur et revue, tels que la source les donne. La pagination est décomposée en première et dernière page."""
+"""Données bibliographiques d'un enregistrement source (`source_records.biblio`) : numérotation, éditeur et série, tels que la source les donne. La pagination est décomposée en première et dernière page."""
 
 import re
+from collections.abc import Mapping
 from enum import StrEnum
 from typing import NamedTuple
 
+from domain.serials.containers import SeriesDescription
+from domain.serials.issns import IssnStatus, IssnSupport, SerialIssn
+from domain.serials.serial import OaModel
 from domain.types import JsonValue
 
 
@@ -18,17 +22,95 @@ class BiblioKey(StrEnum):
     PUBLISHER = "publisher"
     """Nom de l'éditeur."""
     JOURNAL = "journal"
-    """Revue, clés `JournalKey`."""
+    """Série qui sert au rattachement de l'enregistrement source à sa revue, clés `JournalKey`."""
 
 
 class JournalKey(StrEnum):
     """Clé de `biblio.journal`."""
 
     TITLE = "title"
-    ISSN = "issn"
-    EISSN = "eissn"
-    ISSNL = "issnl"
+    ISSNS = "issns"
+    """Liste d'ISSN, clés `IssnKey`."""
     OPENALEX_ID = "openalex_id"
+    OA_MODEL = "oa_model"
+
+
+class IssnKey(StrEnum):
+    """Clé d'un ISSN de `biblio.journal`."""
+
+    ISSN = "issn"
+    SUPPORT = "support"
+    LINKING = "linking"
+    """Vrai pour l'ISSN-L."""
+    MALFORMED = "malformed"
+    """Vrai pour une valeur gardée telle que reçue, à forme ou clé de contrôle fausse."""
+
+
+def journal_biblio(series: SeriesDescription) -> dict[str, JsonValue] | None:
+    """Construit `biblio.journal` d'après une série, réduit aux valeurs non vides ; `None` sans aucune valeur."""
+    issns: list[JsonValue] = [
+        {
+            key: value
+            for key, value in (
+                (IssnKey.ISSN, row.issn),
+                (IssnKey.SUPPORT, row.support),
+                (IssnKey.LINKING, row.linking),
+                (IssnKey.MALFORMED, row.status is IssnStatus.MALFORMED),
+            )
+            if value
+        }
+        for row in series.issns
+    ]
+    journal: dict[str, JsonValue] = {
+        key: value
+        for key, value in (
+            (JournalKey.TITLE, series.title),
+            (JournalKey.ISSNS, issns),
+            (JournalKey.OPENALEX_ID, series.openalex_id),
+            (JournalKey.OA_MODEL, series.oa_model),
+        )
+        if value
+    }
+    return journal or None
+
+
+def with_journal(
+    biblio: JsonValue, series: SeriesDescription | None
+) -> dict[str, JsonValue] | None:
+    """Renvoie `biblio` dont la série est remplacée par `series` ; `None` sans aucune valeur."""
+    entries = biblio.items() if isinstance(biblio, Mapping) else ()
+    result = {key: value for key, value in entries if key != BiblioKey.JOURNAL}
+    journal = journal_biblio(series) if series else None
+    if journal:
+        result[BiblioKey.JOURNAL] = journal
+    return result or None
+
+
+def journal_series(biblio: Mapping[str, object] | None) -> SeriesDescription | None:
+    """Renvoie la série décrite par `biblio.journal`, ou `None` sans série."""
+    journal = (biblio or {}).get(BiblioKey.JOURNAL)
+    if not isinstance(journal, Mapping):
+        return None
+    rows = journal.get(JournalKey.ISSNS)
+    issns = tuple(
+        SerialIssn(
+            issn=str(row[IssnKey.ISSN]),
+            support=IssnSupport(row[IssnKey.SUPPORT]) if row.get(IssnKey.SUPPORT) else None,
+            linking=bool(row.get(IssnKey.LINKING)),
+            status=IssnStatus.MALFORMED if row.get(IssnKey.MALFORMED) else IssnStatus.ACTIVE,
+        )
+        for row in (rows if isinstance(rows, list) else [])
+        if isinstance(row, Mapping) and row.get(IssnKey.ISSN)
+    )
+    title = journal.get(JournalKey.TITLE)
+    openalex_id = journal.get(JournalKey.OPENALEX_ID)
+    oa_model = journal.get(JournalKey.OA_MODEL)
+    return SeriesDescription(
+        title=str(title) if title else None,
+        issns=issns,
+        openalex_id=str(openalex_id) if openalex_id else None,
+        oa_model=OaModel(oa_model) if oa_model else None,
+    )
 
 
 # Une page : un mot sans blanc ni tiret qui contient un chiffre (`45`, `e1234`, `S12`), ou un nombre en chiffres romains (`xiv`).
@@ -70,24 +152,8 @@ def compact_biblio(
     last_page: str | None = None,
     article_number: str | None = None,
     publisher: str | None = None,
-    journal_title: str | None = None,
-    journal_issn: str | None = None,
-    journal_eissn: str | None = None,
-    journal_issnl: str | None = None,
-    journal_openalex_id: str | None = None,
 ) -> dict[str, JsonValue] | None:
-    """Construit `biblio` réduit aux valeurs non vides ; `None` sans aucune valeur."""
-    journal: dict[str, JsonValue] = {
-        key: value
-        for key, value in (
-            (JournalKey.TITLE, journal_title),
-            (JournalKey.ISSN, journal_issn),
-            (JournalKey.EISSN, journal_eissn),
-            (JournalKey.ISSNL, journal_issnl),
-            (JournalKey.OPENALEX_ID, journal_openalex_id),
-        )
-        if value
-    }
+    """Construit `biblio` réduit aux valeurs non vides, sans série ; `None` sans aucune valeur. La normalisation y ajoute la série (`with_journal`)."""
     biblio: dict[str, JsonValue] = {
         key: value
         for key, value in (
@@ -100,6 +166,4 @@ def compact_biblio(
         )
         if value
     }
-    if journal:
-        biblio[BiblioKey.JOURNAL] = journal
     return biblio or None

@@ -14,7 +14,8 @@ from typing import ClassVar, NamedTuple
 from sqlalchemy import Connection
 
 from domain.publications.metadata import has_minimal_publication_metadata, is_overlong_title
-from domain.serials.containers import ContainerDescription
+from domain.serials.containers import ContainerDescription, determine_container_type
+from domain.source_records.biblio import with_journal
 from domain.types import JsonValue
 from infrastructure.db.savepoint import rollback_unless_invalidated, savepoint
 from pipeline.ingestion.common.embargoes import Embargo, EmbargoStore
@@ -152,14 +153,18 @@ class SourceNormalizer(ABC):
             else None
         )
         facts = self.container_facts(doc)
+        series, volume = determine_container_type(facts) if facts is not None else (None, None)
         containers = (
             find_or_create_containers(
-                facts, publisher_id=publisher_id, stores=self._container_stores
+                series, volume, publisher_id=publisher_id, stores=self._container_stores
             )
-            if facts is not None
+            if series or volume
             else Containers(None, None)
         )
-        record = replace(self.source_record(row, doc, containers), publisher_id=publisher_id)
+        record = self.source_record(row, doc, containers)
+        record = replace(
+            record, publisher_id=publisher_id, biblio=with_journal(record.biblio, series)
+        )
         source_record_id = self._record_store.upsert_source_record(record)
         self._location_store.replace_locations(
             source_record_id, [*self.locations(doc), *identifier_locations(record.identifiers)]

@@ -60,17 +60,6 @@ def get_publisher(doc: Mapping[str, JsonValue]) -> PublisherFacts | None:
     return PublisherFacts(publisher_name) if publisher_name else None
 
 
-def _extract_serial_issns(source: Mapping[str, JsonValue]) -> tuple[str | None, str | None]:
-    """Renvoie les ISSN papier et électronique de `source.journalIssns` : le premier, puis le second.
-
-    Les entrées suivantes (alias, ISSN-L, variantes historiques) sont écartées.
-    """
-    issns = as_sequence(source.get("journalIssns"))
-    issn = as_str(issns[0]) if len(issns) >= 1 else None
-    eissn = as_str(issns[1]) if len(issns) >= 2 else None
-    return issn, eissn
-
-
 def is_thesis(doc: Mapping[str, JsonValue]) -> bool:
     """Renvoie vrai si le document est une thèse ou une habilitation : `source.title` nomme alors l'université de soutenance, hors conteneur."""
     return map_doc_type(as_str(doc.get("type")) or "", "scanr") in DOC_TYPE_FAMILIES["theses"].types
@@ -206,15 +195,9 @@ def scanr_source_record(  # noqa: C901
             seen.add(u)
             urls.append(u)
 
-    # Éditeur et revue nommés par ScanR.
+    # Éditeur nommé par ScanR.
     source = as_mapping(doc.get("source"))
-    jissn, jeissn = _extract_serial_issns(source)
-    biblio_json = compact_biblio(
-        publisher=as_str(source.get("publisher")),
-        journal_title=None if is_thesis(doc) else as_str(source.get("title")),
-        journal_issn=jissn,
-        journal_eissn=jeissn,
-    )
+    biblio_json = compact_biblio(publisher=as_str(source.get("publisher")))
 
     return SourceRecordUpsert(
         source="scanr",

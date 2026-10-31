@@ -194,7 +194,6 @@ class TestBiblio:
         assert biblio["first_page"] == "100"
         assert biblio["last_page"] == "110"
         assert biblio["publisher"] == "Some Press"
-        assert biblio["journal"] == {"title": "J. Things", "issn": "1234-5679"}
 
     def test_none_when_empty(self):
         assert get_biblio({}) is None

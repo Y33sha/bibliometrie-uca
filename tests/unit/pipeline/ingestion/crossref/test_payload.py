@@ -6,7 +6,6 @@ from pipeline.ingestion.crossref.payload import (
     extract_crossref_conference,
     extract_crossref_publication_year,
     extract_crossref_source_extras,
-    parse_crossref_issns,
     strip_jats_tags,
 )
 
@@ -105,51 +104,6 @@ class TestExtractCrossrefPublicationYearMalformed:
             extract_crossref_publication_year({"published": _date_field(1500)}, max_year=_NEXT_YEAR)
             == 1500
         )
-
-
-class TestParseCrossrefIssns:
-    def test_separates_print_and_electronic(self):
-        msg = {
-            "issn-type": [
-                {"type": "print", "value": "1234-5678"},
-                {"type": "electronic", "value": "8765-4321"},
-            ]
-        }
-        assert parse_crossref_issns(msg) == ("1234-5678", "8765-4321")
-
-    def test_only_electronic(self):
-        msg = {"issn-type": [{"type": "electronic", "value": "8765-4321"}]}
-        assert parse_crossref_issns(msg) == (None, "8765-4321")
-
-    def test_falls_back_to_plain_issn(self):
-        msg = {"ISSN": ["1234-5678", "8765-4321"]}
-        assert parse_crossref_issns(msg) == ("1234-5678", None)
-
-    def test_empty(self):
-        assert parse_crossref_issns({}) == (None, None)
-
-    def test_ignores_malformed_entries(self):
-        msg = {
-            "issn-type": [
-                {"type": "print"},  # sans valeur
-                {"value": "1234-5678"},  # sans type : ignoré
-                {"type": "print", "value": "  "},  # vide
-                {"type": "print", "value": "1111-2222"},  # OK
-            ]
-        }
-        assert parse_crossref_issns(msg) == ("1111-2222", None)
-
-    def test_a_second_electronic_issn_is_not_taken_for_print(self):
-        msg = {
-            "issn-type": [
-                {"type": "electronic", "value": "8765-4321"},
-                {"type": "electronic", "value": "1111-2222"},
-            ]
-        }
-        assert parse_crossref_issns(msg) == (None, "8765-4321")
-
-    def test_non_textual_plain_issn_ignored(self):
-        assert parse_crossref_issns({"ISSN": [None]}) == (None, None)
 
 
 class TestStripJatsTags:

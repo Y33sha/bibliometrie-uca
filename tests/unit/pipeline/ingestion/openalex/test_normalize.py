@@ -547,7 +547,7 @@ class TestOpenalexSourceRecord:
         captured = self._call(work)
         assert identifier_values(captured)["doi"] == ["10.1/primary"]
 
-    def test_biblio_publisher_and_journal_from_primary_location(self):
+    def test_biblio_publisher_from_primary_location(self):
         work = {
             "id": "https://openalex.org/W1",
             "primary_location": {
@@ -561,16 +561,7 @@ class TestOpenalexSourceRecord:
             },
         }
         captured = self._call(work)
-        # `issn_l` va dans `issnl` ; le premier autre ISSN de la liste va dans `issn`, sans support.
-        assert captured.biblio == {
-            "publisher": "Elsevier",
-            "journal": {
-                "title": "Journal of Physics",
-                "issn": "1361-6463",
-                "issnl": "0022-3727",
-                "openalex_id": "S123",
-            },
-        }
+        assert captured.biblio == {"publisher": "Elsevier"}
 
     def test_biblio_skipped_when_primary_is_repository(self):
         """Un entrepôt héberge le work sans le publier : ni éditeur ni revue dans biblio."""

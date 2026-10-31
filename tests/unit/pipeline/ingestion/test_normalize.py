@@ -413,7 +413,7 @@ def writes(monkeypatch) -> list[tuple]:
         calls.append(("publisher", name, openalex_id))
         return 5
 
-    def containers(facts, *, publisher_id, stores):
+    def containers(series, volume, *, publisher_id, stores):
         calls.append(("containers", publisher_id))
         return Containers(7, None)
 
@@ -451,7 +451,7 @@ class TestNormalizeRecord:
         ]
         assert norm.containers_seen == [Containers(7, None)]
         norm._record_store.upsert_source_record.assert_called_once_with(
-            replace(_RECORD, publisher_id=5)
+            replace(_RECORD, publisher_id=5, biblio={"journal": {"title": "Revue"}})
         )
         norm._location_store.replace_locations.assert_called_once_with(42, [])
         norm._embargo_store.replace_embargo.assert_called_once_with(42, None)

@@ -190,16 +190,13 @@ def hal_source_record(
     domain_raw = doc.get("fr_domainAllCodeLabel_fs")
     topics = {"hal_domains": domain_raw} if isinstance(domain_raw, list) and domain_raw else None
 
-    # Éditeur et revue nommés par HAL.
+    # Éditeur nommé par HAL.
     biblio_json = compact_biblio(
         volume=hal_text_field(doc.get("volume_s")),
         issue=hal_text_field(doc.get("issue_s")),
         **page_range(hal_text_field(doc.get("page_s")), doc_type)._asdict(),
         publisher=hal_text_field(doc.get("journalPublisher_s"))
         or hal_text_field(doc.get("publisher_s")),
-        journal_title=hal_text_field(doc.get("journalTitle_s")),
-        journal_issn=hal_text_field(doc.get("journalIssn_s")),
-        journal_eissn=hal_text_field(doc.get("journalEissn_s")),
     )
 
     uri = hal_text_field(doc.get("uri_s"))

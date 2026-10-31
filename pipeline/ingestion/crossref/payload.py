@@ -55,19 +55,6 @@ def crossref_issns(msg: Mapping[str, JsonValue]) -> tuple[SerialIssn, ...]:
     return received_issns([*typed, *plain])
 
 
-def parse_crossref_issns(msg: Mapping[str, JsonValue]) -> tuple[str | None, str | None]:
-    """Renvoie les ISSN papier et électronique : le premier de chaque support, à défaut le premier ISSN de support inconnu comme ISSN papier."""
-    issns = crossref_issns(msg)
-
-    def first(support: IssnSupport | None) -> str | None:
-        return next((r.issn for r in issns if r.support is support), None)
-
-    issn_print, eissn = first(IssnSupport.PRINT), first(IssnSupport.ELECTRONIC)
-    if issn_print or eissn:
-        return issn_print, eissn
-    return first(None), None
-
-
 def crossref_raw_doc_type(msg: Mapping[str, JsonValue]) -> str | None:
     """Renvoie le type brut d'un document Crossref, suivi de son sous-type quand Crossref en donne un (`posted-content_preprint`, `posted-content_other`)."""
     doc_type = as_str(msg.get("type"))

@@ -11,11 +11,7 @@ from domain.monographs.matching import choose_monograph
 from domain.normalize import normalize_text, to_plain_text
 from domain.publications.identifiers import ISBN, issn_rejection_reason
 from domain.publishers.names import publisher_name_key
-from domain.serials.containers import (
-    ContainerDescription,
-    SeriesDescription,
-    determine_container_type,
-)
+from domain.serials.containers import SeriesDescription, VolumeDescription
 from domain.serials.issns import IssnStatus, SerialIssn, received_issns
 from domain.serials.serial import OaModel
 from pipeline.transformation.publishing.containers import ContainerStores
@@ -258,16 +254,16 @@ def _find_series(
 
 
 def find_or_create_containers(
-    description: ContainerDescription,
+    series: SeriesDescription | None,
+    volume: VolumeDescription | None,
     *,
     publisher_id: int | None,
     stores: ContainerStores,
 ) -> Containers:
-    """Trouve ou crée les conteneurs d'un enregistrement source, d'après `determine_container_type`.
+    """Trouve ou crée les conteneurs d'un enregistrement source, séparés par `determine_container_type`.
 
     L'enregistrement source reçoit sa série comme entrée de `serials`, et son volume comme monographie reliée à cette série. La série d'un volume a toujours un ISSN. L'étape de rattachement de `publishing` reconnaît les séries sans ISSN.
     """
-    series, volume = determine_container_type(description)
     serial_id = _find_series(series, publisher_id, stores) if series else None
     if volume is None:
         return Containers(serial_id, None)

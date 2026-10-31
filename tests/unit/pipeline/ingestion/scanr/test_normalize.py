@@ -59,42 +59,6 @@ class TestScanrSourceRecordBiblio:
         captured = self._call({"source": {"publisher": "Elsevier"}})
         assert captured.biblio == {"publisher": "Elsevier"}
 
-    def test_biblio_journal_built_from_title_and_journal_issns(self):
-        captured = self._call(
-            {
-                "source": {
-                    "title": "Journal of Physics",
-                    "journalIssns": ["0022-3727", "1361-6463"],
-                }
-            },
-        )
-        assert captured.biblio == {
-            "journal": {
-                "title": "Journal of Physics",
-                "issn": "0022-3727",
-                "eissn": "1361-6463",
-            }
-        }
-
-    def test_biblio_publisher_and_journal_together(self):
-        captured = self._call(
-            {
-                "source": {
-                    "publisher": "Elsevier",
-                    "title": "Journal of Physics",
-                    "journalIssns": ["0022-3727"],
-                }
-            },
-        )
-        assert captured.biblio == {
-            "publisher": "Elsevier",
-            "journal": {"title": "Journal of Physics", "issn": "0022-3727"},
-        }
-
-    def test_biblio_journal_title_only(self):
-        captured = self._call({"source": {"title": "J. Phys."}})
-        assert captured.biblio == {"journal": {"title": "J. Phys."}}
-
 
 class TestScanrSourceRecordExternalIds:
     def _call(self, doc) -> SourceRecordUpsert:

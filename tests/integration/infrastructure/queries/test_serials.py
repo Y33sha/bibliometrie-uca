@@ -103,14 +103,14 @@ class TestSudocCheck:
             sa_sync_conn,
             source_id=f"sp-issn-{serial_id}",
             serial_id=serial_id,
-            biblio={"journal": {"issn": "19355548", "eissn": "0149-5992"}},
+            biblio={"journal": {"issns": [{"issn": "19355548"}, {"issn": "0149-5992"}]}},
         )
         _article(
             sa_sync_conn,
             source="openalex",
             source_id=f"sp-issn-bad-{serial_id}",
             serial_id=serial_id,
-            biblio={"journal": {"issn": "1234-5678"}},
+            biblio={"journal": {"issns": [{"issn": "1234-5678"}]}},
         )
         rows = {r.id: r for r in find_serials_to_check_in_sudoc(sa_sync_conn)}
         assert rows[serial_id].document_issns == ("1935-5548",)
@@ -122,7 +122,7 @@ class TestSudocCheck:
             source="scanr",
             source_id=f"sp-own-{serial_id}",
             serial_id=serial_id,
-            biblio={"journal": {"issn": "01495992"}},
+            biblio={"journal": {"issns": [{"issn": "01495992"}]}},
         )
         assert serial_id not in {r.id for r in find_serials_to_check_in_sudoc(sa_sync_conn)}
 
@@ -136,7 +136,7 @@ class TestSudocCheck:
             sa_sync_conn,
             source_id=f"sp-other-{serial_id}",
             serial_id=serial_id,
-            biblio={"journal": {"issn": "2750-6185"}},
+            biblio={"journal": {"issns": [{"issn": "2750-6185"}]}},
         )
         assert serial_id not in {r.id for r in find_serials_to_check_in_sudoc(sa_sync_conn)}
 
