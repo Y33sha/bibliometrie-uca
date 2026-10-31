@@ -5142,10 +5142,10 @@ export interface components {
             /** Doi Agencies */
             doi_agencies: components["schemas"]["FacetOption"][];
             /**
-             * Corresponding
-             * @description Rempli seulement avec `person_id`.
+             * Author Positions
+             * @description Rempli seulement avec `person_id`. Une publication compte dans chaque position que la personne occupe.
              */
-            corresponding: components["schemas"]["FacetOption"][];
+            author_positions: components["schemas"]["FacetOption"][];
             /** Source Counts */
             source_counts: {
                 [key: string]: components["schemas"]["YesNoCount"];
@@ -6615,7 +6615,7 @@ export interface operations {
                 country?: string;
                 language?: string;
                 partner_ror?: string;
-                is_corresponding?: string;
+                author_position?: string;
                 hal_status?: string;
                 in_perimeter?: string;
             };
@@ -6670,7 +6670,7 @@ export interface operations {
                 country?: string;
                 language?: string;
                 partner_ror?: string;
-                is_corresponding?: string;
+                author_position?: string;
                 hal_status?: string;
                 in_perimeter?: string;
             };
@@ -6725,7 +6725,7 @@ export interface operations {
                 country?: string;
                 language?: string;
                 partner_ror?: string;
-                is_corresponding?: string;
+                author_position?: string;
                 hal_status?: string;
                 in_perimeter?: string;
             };
@@ -7036,7 +7036,7 @@ export interface operations {
                 country?: string;
                 language?: string;
                 partner_ror?: string;
-                is_corresponding?: string;
+                author_position?: string;
                 hal_status?: string;
                 in_perimeter?: string;
             };

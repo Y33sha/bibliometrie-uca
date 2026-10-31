@@ -17,9 +17,11 @@ from domain.publications.metadata import (
 )
 from domain.sources.registry import PROFILES, SOURCE_FILTER_PREFIXES, Source
 from infrastructure.read_models.publications.models import (
+    AUTHOR_POSITION_COLUMNS,
     DOI_AGENCY_SOURCES,
     NO_DOI,
     NO_LICENSE,
+    OTHER_AUTHOR_POSITION,
     OTHER_DOI_AGENCY,
 )
 from infrastructure.sql_fragments import has_author_role, is_laboratory, pending_name_form
@@ -321,16 +323,21 @@ def _toggle_clause(
     return WhereClause(sql, binds)
 
 
-def corresponding_clause(person_id: int | None, corr_filter: list[str]) -> WhereClause | None:
-    if not corr_filter or not person_id:
+def author_position_predicate(position: str, bind: str) -> str:
+    """Renvoie le prédicat : la personne liée sous `:bind` occupe la position d'auteur dans la publication `p`. `OTHER_AUTHOR_POSITION` : elle n'occupe aucune position."""
+    if position == OTHER_AUTHOR_POSITION:
+        return f"NOT ({' OR '.join(author_position_predicate(p, bind) for p in AUTHOR_POSITION_COLUMNS)})"
+    return f"""EXISTS (SELECT 1 FROM contributions a
+                WHERE a.publication_id = p.id AND a.person_id = :{bind}
+                  AND a.{AUTHOR_POSITION_COLUMNS[position]})"""
+
+
+def author_position_clause(person_id: int | None, values: list[str]) -> WhereClause | None:
+    """Renvoie le filtre par position d'auteur de la personne. Les valeurs de `AUTHOR_POSITION_FILTER_VALUES` se combinent en OR."""
+    if not person_id or not values:
         return None
-    return _toggle_clause(
-        corr_filter,
-        """EXISTS (SELECT 1 FROM contributions a
-                WHERE a.publication_id = p.id AND a.person_id = :flt_corr_person
-                  AND a.is_corresponding = TRUE)""",
-        {"flt_corr_person": person_id},
-    )
+    parts = [author_position_predicate(v, "flt_position_person") for v in values]
+    return WhereClause("(" + " OR ".join(parts) + ")", {"flt_position_person": person_id})
 
 
 _SQL_HAS_HAL_SOURCE_CONTRIBUTION = (

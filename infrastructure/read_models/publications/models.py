@@ -87,6 +87,13 @@ OTHER_DOI_AGENCY = "other"
 NO_DOI = "none"
 DOI_AGENCY_FILTER_VALUES: tuple[str, ...] = (*DOI_AGENCY_SOURCES, OTHER_DOI_AGENCY, NO_DOI)
 
+# Positions d'auteur d'une personne dans une publication, chacune avec sa colonne booléenne de `contributions`.
+AUTHOR_POSITION_COLUMNS: dict[str, str] = {"corresponding": "is_corresponding"}
+
+# Vocabulaire du filtre par position d'auteur, dans l'ordre de la facette : les positions, puis `other` pour une personne qui n'en occupe aucune.
+OTHER_AUTHOR_POSITION = "other"
+AUTHOR_POSITION_FILTER_VALUES: tuple[str, ...] = (*AUTHOR_POSITION_COLUMNS, OTHER_AUTHOR_POSITION)
+
 
 @dataclass(frozen=True, slots=True)
 class PublicationFilters:
@@ -114,8 +121,8 @@ class PublicationFilters:
     """Ensemble d'une page personne : toutes les publications de la personne, dans le périmètre ou hors de lui."""
     author_id: int | None = None
     """Restreint l'ensemble courant aux publications d'un auteur ; se combine avec `person_id`."""
-    is_corresponding: list[str] = field(default_factory=list)
-    """Valeurs `yes` et `no`, combinées en OR."""
+    author_position: list[str] = field(default_factory=list)
+    """Valeurs de `AUTHOR_POSITION_FILTER_VALUES`, combinées en OR."""
     has_apc: list[str] = field(default_factory=list)
     """Valeurs `yes` et `no`, combinées en OR. `yes` retient les publications à paiement d'APC imputé au budget d'une structure du périmètre."""
     country_values: list[str] = field(default_factory=list)
@@ -221,8 +228,8 @@ class PublicationsFacetsResponse(Model):
     oa_statuses: list[FacetOption]
     licenses: list[FacetOption]
     doi_agencies: list[FacetOption]
-    corresponding: list[FacetOption]
-    """Rempli seulement avec `person_id`."""
+    author_positions: list[FacetOption]
+    """Rempli seulement avec `person_id`. Une publication compte dans chaque position que la personne occupe."""
     source_counts: dict[str, YesNoCount]
     apc: list[FacetOption]
     countries: list[FacetOption]

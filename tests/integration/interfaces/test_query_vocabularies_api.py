@@ -15,7 +15,7 @@ class TestValeurIntruse:
 
     def test_une_intruse_glissee_parmi_des_valeurs_valides_est_refusee(self, client):
         """Une valeur fausse parmi des valeurs justes fait refuser la liste entière."""
-        r = client.get("/api/publications", params={"is_corresponding": "yes,peut-etre"})
+        r = client.get("/api/publications", params={"author_position": "corresponding,peut-etre"})
         assert r.status_code == 422
 
     def test_le_refus_vaut_pour_les_types_d_organisation_ror(self, client):
@@ -37,7 +37,7 @@ class TestValeursAdmises:
         ("chemin", "params"),
         [
             ("/api/publications", {"source_filter": "hal_yes,oa_no"}),
-            ("/api/publications", {"is_corresponding": "yes,no"}),
+            ("/api/publications", {"author_position": "corresponding,other"}),
             ("/api/publications", {"in_perimeter": "yes"}),
             ("/api/publications", {"has_apc": "yes,no"}),
             ("/api/publications", {"license": "cc-by,none"}),

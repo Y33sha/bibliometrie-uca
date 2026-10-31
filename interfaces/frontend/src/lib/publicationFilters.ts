@@ -1,7 +1,7 @@
 /**
  * Registre des filtres des publications, partagé par la liste des publications et la page Statistiques.
  *
- * Le contexte fixe le filtre de son entité. Il active les filtres propres à l'entité : le statut HAL pour un laboratoire, la correspondance et le périmètre pour une personne.
+ * Le contexte fixe le filtre de son entité. Il active les filtres propres à l'entité : le statut HAL pour un laboratoire, la position d'auteur et le périmètre pour une personne.
  */
 import { ALL_TOKEN, explicitSelectionUrl, type ListFilter } from '#lib/filterRegistry.js';
 import { SOURCE_ITEMS } from '#lib/filterItems.js';
@@ -129,11 +129,15 @@ export function publicationFilters(
 			showColumns: ['license'],
 		},
 		{
-			key: 'corresponding',
+			key: 'authorPosition',
 			control: 'checkbox',
-			label: 'Auteur correspondant',
-			param: 'is_corresponding',
-			facet: { type: 'label_map', apiKey: 'corresponding', labels: { yes: 'Oui', no: 'Non' } },
+			label: 'Position auteur',
+			param: 'author_position',
+			facet: {
+				type: 'label_map',
+				apiKey: 'author_positions',
+				labels: { corresponding: 'Correspondant', other: 'Autre' },
+			},
 			group: 'Auteurs',
 			enabled: () => context.kind === 'person',
 			hideWhenEmpty: true,

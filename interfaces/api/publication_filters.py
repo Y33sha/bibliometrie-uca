@@ -13,6 +13,7 @@ from domain.publications.metadata import ACCESS_LEVELS, OA_STATUSES
 from domain.sources.hal import HAL_DEPOSIT_STATUSES
 from domain.sources.registry import SOURCE_FILTER_VALUES
 from infrastructure.read_models.publications.models import (
+    AUTHOR_POSITION_FILTER_VALUES,
     DOI_AGENCY_FILTER_VALUES,
     LICENSE_FILTER_VALUES,
     PublicationFilters,
@@ -94,9 +95,9 @@ class PublicationFilterParams:
 
 @dataclass(frozen=True, slots=True)
 class PublicationListFilterParams(PublicationFilterParams):
-    """Filtres de la liste des publications : les filtres communs, plus ceux qui supposent un seul laboratoire (statut HAL) ou une personne (correspondance, périmètre)."""
+    """Filtres de la liste des publications : les filtres communs, plus ceux qui supposent un seul laboratoire (statut HAL) ou une personne (position d'auteur, périmètre)."""
 
-    is_corresponding: Annotated[str, Query()] = ""
+    author_position: Annotated[str, Query()] = ""
     hal_status: Annotated[str, Query()] = ""
     in_perimeter: Annotated[str, Query()] = ""
 
@@ -104,8 +105,8 @@ class PublicationListFilterParams(PublicationFilterParams):
         """Traduit la query string en filtres de la lecture."""
         return replace(
             PublicationFilterParams.to_filters(self),
-            is_corresponding=parse_vocabulary_csv(
-                self.is_corresponding, allowed=TOGGLE_VALUES, param="is_corresponding"
+            author_position=parse_vocabulary_csv(
+                self.author_position, allowed=AUTHOR_POSITION_FILTER_VALUES, param="author_position"
             ),
             hal_status_values=parse_vocabulary_csv(
                 self.hal_status, allowed=HAL_DEPOSIT_STATUSES, param="hal_status"

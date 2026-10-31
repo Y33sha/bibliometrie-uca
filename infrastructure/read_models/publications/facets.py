@@ -27,6 +27,7 @@ from infrastructure.read_models.filters import (
     DOI_AGENCY_SQL,
     OA_CLOSED_SQL,
     OA_OPEN_SQL,
+    author_position_predicate,
     hal_status_expression,
     institution_apc_payment_sql,
     no_lab_clause,
@@ -40,6 +41,7 @@ from infrastructure.read_models.publications.filtering import (
     publication_filter_where,
 )
 from infrastructure.read_models.publications.models import (
+    AUTHOR_POSITION_FILTER_VALUES,
     DOI_AGENCY_FILTER_VALUES,
     DOI_AGENCY_SOURCES,
     NO_DOI,
@@ -199,31 +201,22 @@ class _PublicationFacetsBuilder:
         )
         return rows_as(FacetOption, rows)
 
-    def _facet_corresponding(self) -> list[FacetOption]:
+    def _facet_author_positions(self) -> list[FacetOption]:
+        """Renvoie la facette des positions d'auteur de la personne. Une option sans publication compte zéro."""
         if not self.filters.person_id:
             return []
-        where_sql, binds = self._clauses_skipping("corresponding")
+        where_sql, binds = self._clauses_skipping("author_position")
+        columns = ",\n".join(
+            f"COUNT(*) FILTER (WHERE {author_position_predicate(position, 'position_pid')}) AS {position}"
+            for position in AUTHOR_POSITION_FILTER_VALUES
+        )
         row = self.conn.execute(
-            text(f"""
-                SELECT
-                    COUNT(*) FILTER (WHERE EXISTS (
-                        SELECT 1 FROM contributions a
-                        WHERE a.publication_id = p.id AND a.person_id = :corr_pid
-                          AND a.is_corresponding = TRUE
-                    )) AS yes_count,
-                    COUNT(*) FILTER (WHERE NOT EXISTS (
-                        SELECT 1 FROM contributions a
-                        WHERE a.publication_id = p.id AND a.person_id = :corr_pid
-                          AND a.is_corresponding = TRUE
-                    )) AS no_count
-                FROM publications p
-                WHERE {where_sql}
-            """),
-            {**binds, "corr_pid": self.filters.person_id},
+            text(f"SELECT {columns} FROM publications p WHERE {where_sql}"),
+            {**binds, "position_pid": self.filters.person_id},
         ).one()
         return [
-            FacetOption(value="yes", count=row.yes_count),
-            FacetOption(value="no", count=row.no_count),
+            FacetOption(value=position, count=getattr(row, position))
+            for position in AUTHOR_POSITION_FILTER_VALUES
         ]
 
     def _facet_source_counts(self) -> dict[str, YesNoCount]:
@@ -391,7 +384,7 @@ class PublicationFacetQueries:
             "oa_statuses": "_facet_oa_statuses",
             "licenses": "_facet_licenses",
             "doi_agencies": "_facet_doi_agencies",
-            "corresponding": "_facet_corresponding",
+            "author_positions": "_facet_author_positions",
             "source_counts": "_facet_source_counts",
             "apc": "_facet_apc",
             "countries": "_facet_countries",
@@ -417,7 +410,7 @@ class PublicationFacetQueries:
             oa_statuses=results["oa_statuses"],
             licenses=results["licenses"],
             doi_agencies=results["doi_agencies"],
-            corresponding=results["corresponding"],
+            author_positions=results["author_positions"],
             source_counts=results["source_counts"],
             apc=results["apc"],
             countries=results["countries"],
