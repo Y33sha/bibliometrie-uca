@@ -19,6 +19,8 @@ Base locale au 2026-10-31 :
 - `delete_empty_publishers` garde un éditeur désigné par une forme de nom de revue.
 - La règle 3 de `merge_duplicate_serials` fusionne dans la revue son titre précédent, son titre suivant ou son supplément. 21 revues ont des enregistrements sources rattachés seulement par l'ISSN d'un tel titre : 307 enregistrements sources, 166 publications. Tous les enregistrements sources de 20 de ces publications passent par ce seul ISSN.
 - La vérification Sudoc range le titre précédent (zone 430) et le titre suivant (zone 440) sous un même statut d'ISSN, `related_title`.
+- `serial_issns` compte 18 740 lignes pour 18 736 ISSN. Un ISSN retiré d'une revue par la vérification Sudoc reste dans une ligne sans revue.
+- D'après les ISSN-L des revues, 1 139 enregistrements sources donnent des ISSN de plusieurs ISSN-L, dans 449 publications : OpenAlex 542, ScanR 370, Crossref 116, HAL 90, WoS 21. Pour 1 011 d'entre eux, l'un des ISSN est celui d'un titre précédent, d'un titre suivant ou d'un supplément.
 
 CRISalid, Academic Observatory et OpenAIRE identifient la revue par ses seuls ISSN ou ISSN-L, et recalculent le rattachement des publications à chaque passage ([benchmark](archived/2026-10-12_benchmark-pipelines.md)).
 
@@ -53,22 +55,25 @@ Les personnes et les publications ont un volet latéral (`PersonDrawer`, `Public
 ## Décisions
 
 - `biblio.journal` décrit la série qui sert au rattachement : titre, identifiant OpenAlex, liste des ISSN avec leur support et l'indicateur ISSN-L.
-- La revue de chaque enregistrement source se calcule à chaque passage de `publishing`, comme sa publication : composantes connexes sur les ISSN et l'identifiant OpenAlex. Deux ISSN-L distincts restent toujours séparés. L'ISSN-L vient de la vérification Sudoc.
-- Un titre précédent, un titre suivant ou un supplément forme une revue distincte. Une table relie les revues par ces trois relations, lues dans le Sudoc.
+- Une revue correspond à un ISSN-L.
+- `serial_issns` contient une ligne par ISSN, avec son ISSN-L : celui du Sudoc, à défaut celui d'OpenAlex, à défaut l'ISSN lui-même. La vérification Sudoc la remplit ISSN par ISSN. Sa colonne `serial_id` est calculée.
+- Une table relie les ISSN, une ligne par lien : titre précédent vers titre suivant, revue principale vers supplément. Un titre précédent, un titre suivant ou un supplément forme une revue distincte.
+- À chaque passage de `publishing`, un enregistrement source est rattaché à la revue de l'ISSN-L de ses ISSN, à défaut à la revue de son identifiant OpenAlex.
 - Une série sans ISSN ni identifiant OpenAlex rejoint la seule revue à ISSN de même titre et d'éditeur compatible : le même éditeur, ou un éditeur absent d'un côté. Sinon, les séries de même titre et de même éditeur forment une revue sans ISSN.
 - Pour ce rattachement par titre, un enregistrement source sans éditeur reçoit le titulaire de son préfixe DOI Crossref. Le titulaire d'un préfixe DataCite est souvent un repository ou un établissement : il est exclu. `source_records.publisher_id` garde l'éditeur donné par la source.
-- Une revue garde son identifiant d'un passage à l'autre. Une fusion de revues décidée dans l'administration pose un jeton de fusion, lu par le calcul.
+- Deux revues de même ISSN-L fusionnent : la revue vide est absorbée, avec une redirection.
 
 ## Phasage
 
 ### Phase 1 — Reconnaissance des revues
 
 - [x] Contrainte `NULLS NOT DISTINCT`, dédoublonnage des formes sans éditeur (7668391c6)
-- [ ] `biblio.journal` écrit d'après la série qui sert au rattachement, ISSN en liste. Lecteurs adaptés : vérification Sudoc, comparaison des sources. Reprise du stock depuis le raw store par un script ponctuel.
-- [ ] Calcul des revues dans `publishing` : composantes connexes coupées par ISSN-L, rattachement par titre, identifiant conservé, redirection des revues absorbées
+- [x] `biblio.journal` écrit d'après la série qui sert au rattachement, ISSN en liste. Lecteurs adaptés : vérification Sudoc, comparaison des sources. Migration du format sur toutes les bases (773670312, a3be1805f)
+- [ ] Reprise du contenu des séries depuis le raw store (`rewrite_biblio_journal`)
+- [ ] `serial_issns` : une ligne par ISSN, colonne `issnl`, table des liens entre ISSN. Vérification Sudoc ISSN par ISSN.
+- [ ] Rattachement des enregistrements sources dans `publishing` : ISSN-L, identifiant OpenAlex, titre. Fusion des revues de même ISSN-L.
 - [ ] Éditeur déduit du préfixe DOI Crossref pour le rattachement par titre
-- [ ] Relations entre revues : titre précédent, titre suivant, supplément, lues dans le Sudoc. Liens sur la page d'une revue.
-- [ ] Fusion de revues dans l'administration par jeton de fusion
+- [ ] Relations entre revues déduites des liens entre ISSN. Liens sur la page d'une revue.
 - [ ] Normalisation sans recherche ni création de revue ; collection des monographies posée par `publishing`
 - [ ] Retrait de `serial_name_forms`, de `find_or_create_serial` et des règles de fusion remplacées par le calcul et les relations
 - [ ] Comparaison des revues avant et après sur le stock, dont les quatre titres partagés par deux revues
@@ -96,8 +101,8 @@ Les personnes et les publications ont un volet latéral (`PersonDrawer`, `Public
 ### Phase 6 — Listes de revues
 
 - [ ] Modélisation : table des listes, table de liaison entre revues et listes
-- [ ] Source de chaque liste (question 2)
-- [ ] Mise à jour de chaque liste (question 3)
+- [ ] Source de chaque liste (question 4)
+- [ ] Mise à jour de chaque liste (question 5)
 
 ### Phase 7 — Plateformes typées comme revues
 
@@ -113,5 +118,7 @@ Les personnes et les publications ont un volet latéral (`PersonDrawer`, `Public
 ## Questions ouvertes
 
 1. Règle 5 de `merge_duplicate_serials` : deux revues rattachées à des enregistrements sources d'une même publication, aux titres compatibles (« Phys.Rev.Lett. » et « Physical Review Letters »). Utile une fois la revue de chaque publication arbitrée entre ses enregistrements sources ?
-2. Source de chaque liste : fichier publié par l'organisme, API ou saisie dans l'administration. Accès à la liste des revues indexées dans le WoS après la résiliation de l'abonnement.
-3. Mise à jour d'une liste : import complet qui la remplace, ajouts et retraits datés, ou liste posée une fois. Rattachement d'une entrée à une revue : par ISSN, par titre à défaut. Sort des entrées sans revue dans le référentiel.
+2. Enregistrement source dont les ISSN mènent à plusieurs ISSN-L : règle de choix.
+3. Décisions de l'administration : fusion de deux revues, ISSN saisis à la main, champs saisis à la main.
+4. Source de chaque liste : fichier publié par l'organisme, API ou saisie dans l'administration. Accès à la liste des revues indexées dans le WoS après la résiliation de l'abonnement.
+5. Mise à jour d'une liste : import complet qui la remplace, ajouts et retraits datés, ou liste posée une fois. Rattachement d'une entrée à une revue : par ISSN, par titre à défaut. Sort des entrées sans revue dans le référentiel.
