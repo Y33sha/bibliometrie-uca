@@ -127,6 +127,18 @@ class TestPlatformTypeOfCopy:
     def test_une_revue_de_cold_spring_harbor_n_est_pas_un_serveur_de_preprints(self):
         assert platform_type_of_copy("https://doi.org/10.1101/gad.353948.126", None) is None
 
+    @pytest.mark.parametrize(
+        ("url", "expected"),
+        [
+            ("https://doi.org/10.2196/preprints.12345", PlatformType.PREPRINT_SERVER),
+            ("https://doi.org/10.2196/jmir.12345", None),
+            ("https://doi.org/10.7490/f1000research.1115.1", PlatformType.REPOSITORY),
+            ("https://osf.io/hmd34", PlatformType.REPOSITORY),
+        ],
+    )
+    def test_preprints_jmir_posters_f1000_et_osf(self, url, expected):
+        assert platform_type_of_copy(url, None) is expected
+
     def test_plateforme_de_la_liste(self):
         url = "https://research.wur.nl/en/publications/x"
         assert platform_type_of_copy(url, None) is PlatformType.REPOSITORY

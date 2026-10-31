@@ -1,16 +1,7 @@
 # STATUS: oneshot (2026-10-31)
-"""Mesure du statut open access des publications du périmètre déduit de leurs copies, de leur revue et du verdict d'Unpaywall.
+"""Mesure du statut open access des publications du périmètre déduit de leurs copies, de leur revue et du verdict d'Unpaywall (`domain.publications.open_access`).
 
-Arbre de décision :
-
-1. Copie ouverte chez l'éditeur, sous licence ouverte : `hybrid` pour une revue absente du DOAJ, `diamond` pour une revue du DOAJ sans APC, `gold` avec APC.
-2. Sinon, copie d'archive ou de serveur de preprints ouverte : `green`.
-3. Sinon, copie ouverte chez l'éditeur sans licence ouverte : `bronze`.
-4. Sinon : `embargoed` avec une copie sous embargo actif ou l'embargo déclaré par theses.fr ; `closed` avec une copie, un verdict ou un statut `closed` déclaré ; `unknown` sans rien.
-
-Le verdict d'Unpaywall relève les copies : `gold`, `hybrid` ou `diamond` valent une copie ouverte chez l'éditeur sous licence, `bronze` une copie ouverte chez l'éditeur sans licence, `green` une copie d'archive ouverte.
-
-Les copies ouvertes suivent `open_copies`. Les pages descriptives sont écartées. Pour une communication ou un poster, un dépôt HAL à annexe compte comme copie d'archive ouverte, d'après l'API HAL (`data/measures/hal_annexes.tsv`, écrit par `data/measures/fetch_hal_annexes.py`).
+Les pages descriptives sont écartées des copies. Pour une communication ou un poster, un dépôt HAL à annexe compte comme copie d'archive ouverte, d'après l'API HAL (`data/measures/hal_annexes.tsv`, écrit par `data/measures/fetch_hal_annexes.py`) : les payloads HAL du stock sont sans annexes.
 
 `simulate` écrit le statut actuel, le statut déduit des copies seules et le statut relevé par Unpaywall de chaque publication. Il affiche les passages, la répartition, et l'accord entre les copies seules et le verdict d'Unpaywall. Le script n'écrit pas dans la base.
 
@@ -28,22 +19,21 @@ from pathlib import Path
 
 from sqlalchemy import Connection, text
 
-from domain.platforms.platform import PlatformType, is_descriptive_page
-from domain.publications.access import Copy, open_copies
+from domain.platforms.platform import is_descriptive_page
+from domain.publications.access import Copy
 from domain.publications.identifiers import extract_hal_id_from_url
-from domain.publications.licenses import OPEN_LICENSES
-from domain.publications.metadata import OA_RANK
+from domain.publications.metadata import OA_OPEN_STATUSES, OA_RANK, OaStatus
+from domain.publications.open_access import OpenAccessFacts, copies_facts, decide_oa_status
 from domain.sources.registry import Source
 from infrastructure.db.engine import build_sync_engine
 from infrastructure.read_models.publications.copies import publication_copies
 
 _DEFAULT_OUTPUT = Path("data/measures/oa_floor.tsv")
-_ARCHIVE_TYPES = frozenset({PlatformType.REPOSITORY, PlatformType.PREPRINT_SERVER})
 _ANNEX_DOC_TYPES = frozenset({"conference", "poster"})
 
 _PUBLICATIONS = text("""
     SELECT p.id, p.oa_status::text AS cur, u.oa_status::text AS upw, p.doc_type::text AS doc_type,
-           coalesce(s.is_in_doaj, false) AS in_doaj, s.oa_model::text AS oa_model
+           p.serial_id IS NOT NULL AS has_serial, s.oa_model::text AS oa_model
     FROM publications p
     LEFT JOIN sources.unpaywall u ON u.doi = lower(p.doi::text)
     LEFT JOIN serials s ON s.id = p.serial_id
@@ -66,36 +56,18 @@ _EMBARGOED = text("""
 
 
 @dataclass(slots=True)
-class _Facts:
+class _Publication:
     id: int
     cur: str
     upw: str | None
     doc_type: str | None
-    in_doaj: bool
+    has_serial: bool
     oa_model: str | None
     copies: list[Copy] = field(default_factory=list)
     """Copies, ouvertes ou non, hors pages descriptives."""
     declared_closed: bool = False
     theses_embargo: bool = False
     embargoed_copy: bool = False
-
-
-@dataclass(frozen=True, slots=True)
-class _Access:
-    """Accès constatés : copie ouverte chez l'éditeur, sous licence ouverte ou non, copie d'archive ouverte."""
-
-    publisher: bool = False
-    licensed: bool = False
-    archive: bool = False
-
-    def raised_by(self, verdict: str | None) -> _Access:
-        if verdict in ("gold", "hybrid", "diamond"):
-            return replace(self, publisher=True, licensed=True)
-        if verdict == "bronze":
-            return replace(self, publisher=True)
-        if verdict == "green":
-            return replace(self, archive=True)
-        return self
 
 
 @cache
@@ -111,61 +83,47 @@ def _hal_deposits_with_file() -> frozenset[str]:
         )
 
 
-def _open(f: _Facts) -> list[Copy]:
-    copies = open_copies(f.copies)
-    if f.doc_type in _ANNEX_DOC_TYPES:
-        with_file = _hal_deposits_with_file()
-        copies += [
-            replace(c, is_oa=True)
-            for c in f.copies
-            if c.described_by_platform
-            and not c.is_oa
-            and extract_hal_id_from_url(c.url) in with_file
-        ]
-    return copies
+def _copies(p: _Publication) -> list[Copy]:
+    """Renvoie les copies de la publication ; pour une communication ou un poster, la copie d'un dépôt HAL à annexe est ouverte."""
+    if p.doc_type not in _ANNEX_DOC_TYPES:
+        return p.copies
+    with_file = _hal_deposits_with_file()
+    return [
+        replace(c, is_oa=True)
+        if c.described_by_platform and extract_hal_id_from_url(c.url) in with_file
+        else c
+        for c in p.copies
+    ]
 
 
-def _access(f: _Facts) -> _Access:
-    copies = _open(f)
-    publisher = [c for c in copies if c.platform_type not in _ARCHIVE_TYPES]
-    return _Access(
-        publisher=bool(publisher),
-        licensed=any(c.license in OPEN_LICENSES for c in publisher),
-        archive=any(c.platform_type in _ARCHIVE_TYPES for c in copies),
+def _facts(p: _Publication) -> OpenAccessFacts:
+    facts = copies_facts(_copies(p))
+    return replace(
+        facts,
+        embargoed=p.embargoed_copy or p.theses_embargo,
+        informed=facts.informed or p.declared_closed,
     )
 
 
-def _status(f: _Facts, access: _Access) -> str:
-    if access.publisher and access.licensed:
-        if not f.in_doaj:
-            return "hybrid"
-        return "diamond" if f.oa_model == "diamond" else "gold"
-    if access.archive:
-        return "green"
-    if access.publisher:
-        return "bronze"
-    if f.embargoed_copy or f.theses_embargo:
-        return "embargoed"
-    if f.copies or f.upw or f.declared_closed:
-        return "closed"
-    return "unknown"
+def _status(p: _Publication, facts: OpenAccessFacts) -> str:
+    return decide_oa_status(facts, has_serial=p.has_serial, serial_oa_model=p.oa_model)
 
 
-def _facts(conn: Connection) -> list[_Facts]:
-    facts = {
-        r.id: _Facts(r.id, r.cur or "unknown", r.upw, r.doc_type, r.in_doaj, r.oa_model)
+def _publications(conn: Connection) -> list[_Publication]:
+    publications = {
+        r.id: _Publication(r.id, r.cur or "unknown", r.upw, r.doc_type, r.has_serial, r.oa_model)
         for r in conn.execute(_PUBLICATIONS)
     }
     for r in conn.execute(_DECLARED):
         if r.oa_status == "closed":
-            facts[r.pid].declared_closed = True
+            publications[r.pid].declared_closed = True
         elif r.source == Source.THESES:
-            facts[r.pid].theses_embargo = True
+            publications[r.pid].theses_embargo = True
     for r in conn.execute(_EMBARGOED):
-        facts[r.pid].embargoed_copy = True
-    for pid, copies in publication_copies(conn, list(facts)).items():
-        facts[pid].copies = [c for c in copies if not is_descriptive_page(c.url)]
-    return list(facts.values())
+        publications[r.pid].embargoed_copy = True
+    for pid, copies in publication_copies(conn, list(publications)).items():
+        publications[pid].copies = [c for c in copies if not is_descriptive_page(c.url)]
+    return list(publications.values())
 
 
 def _print_transitions(title: str, before: Sequence[str], after: Sequence[str]) -> None:
@@ -175,47 +133,48 @@ def _print_transitions(title: str, before: Sequence[str], after: Sequence[str]) 
         print(f"  {b:10s} -> {a:10s} {n}")
 
 
-def _print_unpaywall_agreement(facts: Sequence[_Facts], accesses: Sequence[_Access]) -> None:
+def _print_unpaywall_agreement(
+    publications: Sequence[_Publication], facts: Sequence[OpenAccessFacts]
+) -> None:
     """Confronte les copies seules au verdict d'Unpaywall, sur les publications à verdict."""
-    open_level = Counter()
-    publisher_level = Counter()
-    for f, a in zip(facts, accesses, strict=True):
-        if f.upw is None:
+    open_level: Counter[tuple[bool, bool]] = Counter()
+    publisher_level: Counter[tuple[bool, bool]] = Counter()
+    for p, f in zip(publications, facts, strict=True):
+        if p.upw is None:
             continue
-        copies_open = a.publisher or a.archive
-        verdict_open = f.upw in ("gold", "hybrid", "diamond", "bronze", "green")
+        copies_open = f.publisher_open or f.archive_open
+        verdict_open = p.upw in OA_OPEN_STATUSES
         open_level[(copies_open, verdict_open)] += 1
         if copies_open and verdict_open:
-            verdict_publisher = f.upw != "green"
-            publisher_level[(a.publisher, verdict_publisher)] += 1
+            publisher_level[(f.publisher_open, p.upw != OaStatus.GREEN)] += 1
     label = {True: "ouvert", False: "fermé"}
     print("\nAccord avec Unpaywall, ouvert ou fermé (copies seules / verdict)")
-    for (c, v), n in sorted(open_level.items(), key=lambda x: -x[1]):
+    for (c, v), n in open_level.most_common():
         print(f"  copies {label[c]:7s} / verdict {label[v]:7s} {n}")
     side = {True: "éditeur ouvert", False: "archive seule"}
     print("\nAccord avec Unpaywall, publications ouvertes des deux côtés (copies / verdict)")
-    for (c, v), n in sorted(publisher_level.items(), key=lambda x: -x[1]):
+    for (c, v), n in publisher_level.most_common():
         print(f"  copies {side[c]:15s} / verdict {side[v]:15s} {n}")
 
 
 def simulate(conn: Connection, output: Path) -> None:
     """Écrit le statut actuel, le statut des copies seules et le statut relevé par Unpaywall de chaque publication, puis affiche les passages, la répartition et l'accord avec Unpaywall."""
-    facts = _facts(conn)
-    accesses = [_access(f) for f in facts]
+    publications = _publications(conn)
+    facts = [_facts(p) for p in publications]
     columns = {
-        "actuel": [f.cur for f in facts],
-        "copies": [_status(f, a) for f, a in zip(facts, accesses, strict=True)],
+        "actuel": [p.cur for p in publications],
+        "copies": [_status(p, f) for p, f in zip(publications, facts, strict=True)],
         "copies_unpaywall": [
-            _status(f, a.raised_by(f.upw)) for f, a in zip(facts, accesses, strict=True)
+            _status(p, f.raised_by(p.upw)) for p, f in zip(publications, facts, strict=True)
         ],
     }
     output.parent.mkdir(parents=True, exist_ok=True)
     with output.open("w", newline="", encoding="utf-8") as fh:
         writer = csv.writer(fh, delimiter="\t")
         writer.writerow(["id", "unpaywall", "doc_type", *columns])
-        for i, f in enumerate(facts):
-            writer.writerow([f.id, f.upw, f.doc_type, *(col[i] for col in columns.values())])
-    print(f"{len(facts)} publications")
+        for i, p in enumerate(publications):
+            writer.writerow([p.id, p.upw, p.doc_type, *(col[i] for col in columns.values())])
+    print(f"{len(publications)} publications")
     _print_transitions("actuel -> copies seules", columns["actuel"], columns["copies"])
     _print_transitions(
         "copies seules -> relevé par Unpaywall", columns["copies"], columns["copies_unpaywall"]
@@ -224,7 +183,7 @@ def simulate(conn: Connection, output: Path) -> None:
     for status in sorted(OA_RANK, key=OA_RANK.__getitem__, reverse=True):
         counts = [col.count(status) for col in columns.values()]
         print(f"  {status:10s} " + " ".join(f"{n:7d}" for n in counts))
-    _print_unpaywall_agreement(facts, accesses)
+    _print_unpaywall_agreement(publications, facts)
 
 
 def main() -> None:

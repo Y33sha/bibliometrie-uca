@@ -104,6 +104,8 @@ KNOWN_PLATFORMS: tuple[KnownPlatform, ...] = (
     _repository("ResearchGate", hosts=("researchgate.net",), prefixes={"10.13140"}),
     # Résolveur des identifiants Handle, surtout ceux des archives institutionnelles.
     _repository("Handle", hosts=("hdl.handle.net",)),
+    # Posters et diaporamas déposés sur F1000Research, hors de sa revue.
+    _repository("F1000Research (posters et diaporamas)", prefixes={"10.7490"}),
     ARXIV,
     # Le préfixe 10.1101 couvre aussi les revues de Cold Spring Harbor (`10.1101/gad.…`).
     _preprint_server(
@@ -127,6 +129,8 @@ KNOWN_PLATFORMS: tuple[KnownPlatform, ...] = (
     _preprint_server("Preprints.org", {"10.20944"}, ("S6309402219",), ("preprints.org",)),
     _preprint_server("ChemRxiv", {"10.26434"}, ("S4393918830",), ("chemrxiv.org",)),
     _preprint_server("Authorea", {"10.22541"}, ("S4363604296",), ("authorea.com",)),
+    # Le préfixe 10.2196 couvre aussi les revues de JMIR.
+    _preprint_server("JMIR Preprints", {"10.2196"}, (), (), re.compile(r"preprints\.")),
     # Les URL d'osf.io désignent plusieurs serveurs de preprints sans les distinguer : seule la source OpenAlex les départage.
     _preprint_server("OSF Preprints", {"10.31219"}, ("S4306401127",)),
     _preprint_server("PsyArXiv", {"10.31234"}, ("S4306401687",)),
@@ -221,12 +225,18 @@ def known_platform_of_copy(url: str, openalex_id: str | None) -> KnownPlatform |
     return known_platform_of_source(openalex_id) if openalex_id else None
 
 
+_SHARED_HOST_TYPES = {"osf.io": PlatformType.REPOSITORY}
+"""Type des hôtes de plusieurs plateformes : `osf.io` sert les serveurs de preprints d'OSF et ses projets."""
+
+
 def platform_type_of_copy(url: str, openalex_id: str | None) -> PlatformType | None:
-    """Renvoie le type de la plateforme de la liste d'une copie. Quand le DOI d'une URL doi.org désigne plusieurs plateformes de même type (bioRxiv et medRxiv), il donne ce type."""
+    """Renvoie le type de la plateforme de la liste d'une copie. Quand le DOI d'une URL doi.org désigne plusieurs plateformes de même type (bioRxiv et medRxiv), il donne ce type. Un hôte de plusieurs plateformes donne le type de `_SHARED_HOST_TYPES`."""
     if known := known_platform_of_copy(url, openalex_id):
         return known.platform_type
     types = {p.platform_type for p in _platforms_of_doi_url(url)}
-    return types.pop() if len(types) == 1 else None
+    if len(types) == 1:
+        return types.pop()
+    return next((t for host, t in _SHARED_HOST_TYPES.items() if is_host(url, host)), None)
 
 
 def is_publisher_platform_prefix(prefix: str) -> bool:
