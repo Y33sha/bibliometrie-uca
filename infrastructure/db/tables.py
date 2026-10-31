@@ -7,6 +7,8 @@ Les migrations Alembic (`alembic/versions/`, écrites à la main) font foi sur l
 Le modèle couvre les tables et leurs colonnes. Index, clés étrangères et vues matérialisées (`contribution_structures`, `publication_author_alignment`, `publication_rors`, `publication_structures`, `source_contribution_structures`, `subject_cooccurrences`) relèvent des seules migrations : le filtre `include_object` d'`alembic/env.py` les écarte de la comparaison. Le code lit les vues matérialisées en SQL par leur nom, et les rafraîchit (`REFRESH`).
 """
 
+from datetime import date
+
 from sqlalchemy import (
     CHAR,
     REAL,
@@ -50,6 +52,7 @@ from domain.persons.identifiers import AttributionStatus
 from domain.persons.person import PersonExclusion
 from domain.platforms.platform import PLATFORM_TYPES
 from domain.publications.author_grouping import GroupingMethod
+from domain.publications.dates import DatePrecision
 from domain.publications.doc_types import DOC_TYPES
 from domain.publications.licenses import License
 from domain.publications.metadata import OA_RANK
@@ -664,6 +667,23 @@ platform_type_enum = PgEnum(*PLATFORM_TYPES, name="platform_type", create_type=F
 perimeter_evidence_enum = PgEnum(*PerimeterEvidence, name="perimeter_evidence", create_type=False)
 
 doc_type_enum = PgEnum(*DOC_TYPES, name="doc_type", create_type=False)
+date_precision_enum = PgEnum(*DatePrecision, name="date_precision", create_type=False)
+
+
+def publication_date_columns() -> tuple[Column[date], Column[str]]:
+    """Renvoie les colonnes de la date de publication et de sa précision, communes aux enregistrements sources et aux publications."""
+    return (
+        Column(
+            "publication_date",
+            Date,
+            comment="Date de publication. À l'année : 1er janvier ; au mois : 1er du mois.",
+        ),
+        Column(
+            "publication_date_precision",
+            date_precision_enum,
+            comment="Précision de publication_date : year, month ou day.",
+        ),
+    )
 
 
 # ── Adresses ──────────────────────────────────────────────────────
@@ -1119,6 +1139,7 @@ publications = Table(
     Column("title_normalized", Text),
     Column("doc_type", doc_type_enum, server_default="other"),
     Column("publication_year", SmallInteger, nullable=False),
+    *publication_date_columns(),
     Column("doi", Text),
     Column(
         "doi_prefix",
@@ -1230,6 +1251,7 @@ source_records = Table(
     Column("title", Text, nullable=False),
     Column("title_normalized", Text),
     Column("publication_year", SmallInteger),
+    *publication_date_columns(),
     Column("doc_type", doc_type_enum),
     Column(
         "raw_doc_type",

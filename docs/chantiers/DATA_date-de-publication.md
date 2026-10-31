@@ -19,6 +19,9 @@ L'année des enregistrements sources HAL vient de `producedDateY_i`.
 
 ## Décisions
 
+- La date de publication (`publication_date`) a une précision (`publication_date_precision`) : année, mois ou jour. Une date à l'année tombe le 1er janvier, une date au mois le 1er du mois.
+- `publication_year` reste, calculée depuis la date par PostgreSQL (colonne générée).
+
 ## Phasage
 
 ### Phase 1 — Mesures
@@ -45,6 +48,7 @@ Mesures du 2026-10-30 sur tout le stock : 354 711 enregistrements sources, 79 90
 ### Phase 4 — Date de la publication
 
 - [ ] Arbitrage entre les dates des enregistrements sources.
+- [ ] `publication_year` en colonne générée depuis la date, une fois les écrivains passés à la date.
 
 ### Phase 5 — Usages
 
@@ -57,6 +61,5 @@ Mesures du 2026-10-30 sur tout le stock : 354 711 enregistrements sources, 79 90
 ## Questions ouvertes
 
 - Date d'une publication : la plus ancienne, la plus précise, celle de la source prioritaire ; date en ligne ou date papier.
-- `publication_year` : colonne gardée, ou déduite de la date.
 - Date d'une thèse : date de soutenance.
 - 1er d'un autre mois chez OpenAlex et ScanR : jour gardé, ou ramené au mois.
