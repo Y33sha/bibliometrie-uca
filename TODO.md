@@ -3,6 +3,12 @@ uv run python -m interfaces.cli.oneshot.canonicalize_hal_location_urls
 uv run python -m interfaces.cli.oneshot.clean_source_record_texts
 uv run python -m interfaces.cli.oneshot.backfill_best_copy_urls
 uv run python -m interfaces.cli.oneshot.recompute_oa_statuses
+uv run python -m interfaces.cli.oneshot.rewrite_biblio_journal
+uv run python -m interfaces.cli.oneshot.drop_platform_series
+uv run python -m interfaces.cli.oneshot.apply_platform_rules
+uv run python -m interfaces.cli.oneshot.drop_series_without_issn
+uv run python -m interfaces.cli.oneshot.rewrite_publication_dates
+uv run python -m interfaces.cli.oneshot.restore_primary_identifiers
 
 # Pipeline
 ## Extraction
@@ -28,7 +34,7 @@ uv run python -m interfaces.cli.oneshot.recompute_oa_statuses
 * [ ] auteur premier, dernier, correspondant: sur les facettes et les stats
 * [ ] mesures d'impact à intégrer dans les stats, les dashboards, et les facettes
 * [ ] stats en compte fractionnaire vs compte entier?
-* [ ] définir des groupes de pays (UE, continents) pour la facette "pays des co-auteurs"
+* [ ] embargo dans HAL: signaler dans la page publication (cf 165044)
 ### Visualisation
 * [ ] taux de collaboration
 * [ ] évolution des collaborations dans le temps (graphes de collaboration par labo, avec visualisation animée par année)
@@ -36,5 +42,5 @@ uv run python -m interfaces.cli.oneshot.recompute_oa_statuses
 * [ ] année en cours: diminuer l'opacité
 
 # Cas particuliers, bizarreries à élucider
-* 9705 accès ouvert "via l'éditeur" alors que c'est un DOI Zenodo (+ autre accès Zenodo en dessous)
 * 132757 collab Argentine? (il y en a bcp comme ça)
+* 165044 et 301756: pourquoi les records openalex fusionnent avec le preprint et pas l'article?
