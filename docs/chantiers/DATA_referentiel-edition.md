@@ -82,8 +82,12 @@ Les personnes et les publications ont un volet latéral (`PersonDrawer`, `Public
 - [x] Reprise du contenu des séries depuis le raw store (`rewrite_biblio_journal`)
 - [x] `serial_issns` : une ligne par ISSN, colonne `issnl`, table des liens entre ISSN. Vérification Sudoc ISSN par ISSN (27f9ef446)
 - [x] Rattachement des enregistrements sources dans `publishing` : ISSN-L, identifiant OpenAlex, titre. Fusion des revues de même ISSN-L. Titre, identifiant OpenAlex et modèle OA de chaque revue (27f9ef446)
+- [x] Rattachement par titre : titre identique avant titre compatible parmi plusieurs ISSN-L, revue sans ISSN identifiée par son titre seul, décisions de l'administration par titre (ba79befd1)
+- [x] Titre seul rattaché à la revue à ISSN d'un autre enregistrement source de la publication (b2ecf4014)
+- [x] Revue à ISSN gardée même vide, revérification Sudoc de tous les ISSN (5474a9263)
+- [x] Titre de chaque revue d'après la notice Sudoc de son ISSN-L, gardée par ISSN (816a520de)
 - [ ] Éditeur déduit du préfixe DOI Crossref pour le rattachement par titre
-- [ ] Relations entre revues déduites des liens entre ISSN. Liens sur la page d'une revue.
+- [x] Relations entre revues déduites des liens entre ISSN. Liens sur la page d'une revue (035cdf8f6)
 - [x] Administration : ISSN en lecture seule, fusion limitée aux revues sans ISSN et gardée dans la table des titres (27f9ef446)
 - [x] Normalisation sans recherche ni création de revue. Collection sans ISSN des monographies : revue sans ISSN de son titre et de son éditeur (27f9ef446)
 - [x] Retrait de `serial_name_forms`, de `find_or_create_serial` et des règles de fusion remplacées par le calcul et les relations (27f9ef446)
@@ -117,10 +121,10 @@ Les personnes et les publications ont un volet latéral (`PersonDrawer`, `Public
 
 ### Phase 7 — Plateformes typées comme revues
 
-- [ ] Normaliseurs ScanR, Crossref et HAL : un conteneur désignant une plateforme connue donne une localisation au lieu d'une revue
-- [ ] Lecteurs des types `repository` et `preprint_server` basculés sur les plateformes
-- [ ] Stock : entrées converties en plateformes, publications détachées
-- [ ] Migration : valeurs `repository` et `preprint_server` retirées de `serial_type`, valeur `repository` retirée de `oa_model`
+- [x] Normalisation : série qui désigne une plateforme écartée ; DOI d'un serveur de preprints donnant une copie sur ce serveur (67c1b73ef, e4898057b)
+- [x] Type « preprint » d'après le DOI de serveur de preprints ; types `repository` et `preprint_server` retirés des lecteurs (67c1b73ef)
+- [x] Stock : séries de plateforme retirées, copies déduites du DOI (`apply_platform_rules`, e4898057b)
+- [x] Migration : valeurs `repository` et `preprint_server` retirées de `serial_type`, valeur `repository` retirée de `oa_model` (67c1b73ef)
 
 ### Phase 8 — Fin de chantier
 
