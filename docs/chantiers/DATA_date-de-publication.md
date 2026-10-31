@@ -23,6 +23,7 @@ Les enregistrements sources et les publications ont seulement une année (`publi
 - OpenAlex et ScanR : le 1er janvier est ramené à l'année, le 1er d'un autre mois au mois.
 - WoS garde sa date à l'année : la source n'est plus moissonnée.
 - La date d'une publication est celle de la source prioritaire, précisée par les autres sources quand elles concordent : même année, et même mois quand la date retenue est au mois.
+- Les listes de publications affichent l'année et se trient par date. La fiche publication affiche la date à sa précision (« 14 janv. 2025 »). L'export CSV donne l'année et la date ISO 8601 réduite à sa précision (« 2025-01 »).
 
 ## Phasage
 
@@ -54,7 +55,7 @@ Mesures du 2026-10-30 sur tout le stock : 354 711 enregistrements sources, 79 90
 
 ### Phase 5 — Usages
 
-- [ ] Affichage de la date sur la fiche publication et dans les exports.
+- [x] Tri des listes par date ; date sur la fiche publication, dans le tableau comparatif des sources et dans l'export CSV (9345eb0ce)
 
 ### Phase 6 — Documentation
 
