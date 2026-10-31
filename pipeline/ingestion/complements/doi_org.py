@@ -2,7 +2,7 @@
 
 `doi.org/ra/<p1>,<p2>,…` renvoie l'agence d'enregistrement de chaque préfixe (`Crossref`, `DataCite`, `mEDRA`…), ou le statut `DOI does not exist` pour un préfixe inconnu. Une agence vaut pour tous les DOI d'un préfixe. Interrogé par la phase `resolve_ra`.
 
-`doi.org/api/handles/<doi>` répond 404 pour un DOI inconnu du registre. Interrogé par la phase `fetch_missing` pour un DOI absent de son agence d'enregistrement. Sa valeur de type `URL` est l'adresse enregistrée du DOI, lue par la phase `oa_status`. Les requêtes s'identifient par l'adresse polite pool, dans le `User-Agent`.
+`doi.org/api/handles/<doi>` répond 404 pour un DOI inconnu du registre. Interrogé par la phase `fetch_missing` pour un DOI absent de son agence d'enregistrement. Sa valeur de type `URL` est l'URL de résolution du DOI, lue par la phase `oa_status`. Les requêtes s'identifient par l'adresse polite pool, dans le `User-Agent`.
 """
 
 from __future__ import annotations
@@ -54,7 +54,7 @@ def _handle_url(doi: str) -> str:
 async def fetch_registered_url(
     client: httpx2.AsyncClient, doi: str, *, user_agent: str
 ) -> LookupOutcome[str]:
-    """Renvoie l'adresse enregistrée d'un DOI. `NOT_FOUND` couvre un DOI inconnu de doi.org et un handle sans adresse."""
+    """Renvoie l'URL de résolution d'un DOI. `NOT_FOUND` couvre un DOI inconnu de doi.org et un handle sans URL."""
     outcome = await lookup_json_async(
         client,
         "GET",

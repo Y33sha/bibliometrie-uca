@@ -1,4 +1,4 @@
-"""Copies des publications, lues sur les localisations de leurs enregistrements sources et sur l'adresse enregistrée de leur DOI."""
+"""Copies des publications, lues sur les localisations de leurs enregistrements sources et sur l'URL de résolution de leur DOI."""
 
 from collections import defaultdict
 from collections.abc import Sequence
@@ -14,7 +14,7 @@ from infrastructure.sql_fragments import under_active_embargo
 
 
 def publication_copies(conn: Connection, publication_ids: Sequence[int]) -> dict[int, list[Copy]]:
-    """Renvoie les localisations des enregistrements sources de chaque publication, et la copie de l'adresse enregistrée de son DOI (`registered_url_copy`). Une publication sans copie est absente de la réponse. Le fichier déposé d'un enregistrement source sous embargo, sa copie à PDF, est fermé jusqu'à la fin de l'embargo. La copie HAL d'un enregistrement HAL est décrite par sa plateforme."""
+    """Renvoie les localisations des enregistrements sources de chaque publication, et la copie de l'URL de résolution de son DOI (`registered_url_copy`). Une publication sans copie est absente de la réponse. Le fichier déposé d'un enregistrement source sous embargo, sa copie à PDF, est fermé jusqu'à la fin de l'embargo. La copie HAL d'un enregistrement HAL est décrite par sa plateforme."""
     rows = conn.execute(
         text(f"""
             SELECT sr.publication_id, sr.source::text AS source, l.url, l.version,

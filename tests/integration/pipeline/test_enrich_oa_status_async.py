@@ -372,7 +372,7 @@ def test_skips_without_unpaywall_configuration(logger):
 
 
 def test_adresse_enregistree_lue_chez_doi_org(logger, http_mock):
-    """La valeur `URL` du handle est écrite ; un DOI inconnu et un handle sans adresse reçoivent une adresse nulle."""
+    """La valeur `URL` du handle est écrite ; un DOI inconnu et un handle sans URL reçoivent une URL nulle."""
     publications = [
         _publication(1, "10.1/u", None),
         _publication(2, "10.1/x", None),

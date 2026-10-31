@@ -1614,7 +1614,7 @@ dois = Table(
         "registered_url",
         Text,
         comment=(
-            "Adresse enregistrée du DOI, lue dans l'API des handles de doi.org. NULL avec une "
+            "URL de résolution du DOI, lue dans l'API des handles de doi.org. NULL avec une "
             "date : DOI inconnu de doi.org."
         ),
     ),
@@ -1628,7 +1628,7 @@ dois = Table(
     ),
     comment=(
         "Réponses des services externes sur chaque DOI de publication : verdict d'Unpaywall, "
-        "adresse enregistrée chez doi.org."
+        "URL de résolution chez doi.org."
     ),
     schema="sources",
 )

@@ -9,8 +9,8 @@ BEGIN;
 
 -- config (11 lignes)
 INSERT INTO config (key, value, description) VALUES ('doaj_refresh_after_days', '30', 'Délai, en jours, avant de télécharger de nouveau le fichier du DOAJ.') ON CONFLICT (key) DO NOTHING;
-INSERT INTO config (key, value, description) VALUES ('doi_resolution_max_per_run', '10000', 'Nombre maximum de DOI dont l''adresse enregistrée est lue chez doi.org par run. 0 = illimité.') ON CONFLICT (key) DO NOTHING;
-INSERT INTO config (key, value, description) VALUES ('doi_resolution_recheck_after_days', '180', 'Délai, en jours, avant de relire chez doi.org l''adresse enregistrée d''un DOI.') ON CONFLICT (key) DO NOTHING;
+INSERT INTO config (key, value, description) VALUES ('doi_resolution_max_per_run', '10000', 'Nombre maximum de DOI dont l''URL de résolution est lue chez doi.org par run. 0 = illimité.') ON CONFLICT (key) DO NOTHING;
+INSERT INTO config (key, value, description) VALUES ('doi_resolution_recheck_after_days', '180', 'Délai, en jours, avant de relire chez doi.org l''URL de résolution d''un DOI.') ON CONFLICT (key) DO NOTHING;
 INSERT INTO config (key, value, description) VALUES ('fetch_missing_max_per_source', '0', 'Nombre maximum de DOI interrogés par source cible à la phase fetch_missing, par run. 0 = illimité.') ON CONFLICT (key) DO NOTHING;
 INSERT INTO config (key, value, description) VALUES ('fetch_missing_retry_after_days', '30', 'Délai, en jours, avant de chercher de nouveau un identifiant introuvable dans une source. L''échec est définitif pour un identifiant absent de son registre (hal-id dans HAL, NNT dans theses.fr, DOI auprès de doi.org).') ON CONFLICT (key) DO NOTHING;
 INSERT INTO config (key, value, description) VALUES ('fetch_stale_after_days', '90', 'Délai, en jours, au-delà duquel un document non revu est interrogé de nouveau à sa source.') ON CONFLICT (key) DO NOTHING;

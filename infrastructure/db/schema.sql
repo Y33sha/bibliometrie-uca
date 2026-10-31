@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict LNGmxWapVmESh8ebTbx0cceILgr2VcIfVAJP89bz6r42Mhkl0JeebssFITWR6nE
+\restrict 9rAfsetKf04IuDbF7gufyUxR592IDsCt1hakAM4dm4qGNQcTOEVYUXSdJZKfEE2
 
 -- Dumped from database version 18.4
 -- Dumped by pg_dump version 18.4
@@ -2778,7 +2778,7 @@ CREATE TABLE sources.dois (
 -- Name: TABLE dois; Type: COMMENT; Schema: sources; Owner: -
 --
 
-COMMENT ON TABLE sources.dois IS 'Réponses des services externes sur chaque DOI de publication : verdict d''Unpaywall, adresse enregistrée chez doi.org.';
+COMMENT ON TABLE sources.dois IS 'Réponses des services externes sur chaque DOI de publication : verdict d''Unpaywall, URL de résolution chez doi.org.';
 
 
 --
@@ -2799,7 +2799,7 @@ COMMENT ON COLUMN sources.dois.unpaywall_checked_at IS 'Date du verdict d''Unpay
 -- Name: COLUMN dois.registered_url; Type: COMMENT; Schema: sources; Owner: -
 --
 
-COMMENT ON COLUMN sources.dois.registered_url IS 'Adresse enregistrée du DOI, lue dans l''API des handles de doi.org. NULL avec une date : DOI inconnu de doi.org.';
+COMMENT ON COLUMN sources.dois.registered_url IS 'URL de résolution du DOI, lue dans l''API des handles de doi.org. NULL avec une date : DOI inconnu de doi.org.';
 
 
 --
@@ -5680,5 +5680,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict LNGmxWapVmESh8ebTbx0cceILgr2VcIfVAJP89bz6r42Mhkl0JeebssFITWR6nE
+\unrestrict 9rAfsetKf04IuDbF7gufyUxR592IDsCt1hakAM4dm4qGNQcTOEVYUXSdJZKfEE2
 

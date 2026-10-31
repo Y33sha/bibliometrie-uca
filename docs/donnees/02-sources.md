@@ -21,7 +21,7 @@ Schéma PostgreSQL `sources`.
 
 | Table | Contenu | Contrainte |
 |---|---|---|
-| `dois` | Statut d'accès donné par Unpaywall, adresse enregistrée chez doi.org, chacun avec la date de l'interrogation | Une ligne par DOI de publication |
+| `dois` | Statut d'accès donné par Unpaywall, URL de résolution chez doi.org, chacun avec la date de l'interrogation | Une ligne par DOI de publication |
 
 **Enregistrements sources**
 

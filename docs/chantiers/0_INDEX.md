@@ -20,7 +20,7 @@
 
 ## Chantiers archivés
 
-- 2026-10-31 — [Adresses enregistrées des DOI](archived/2026-10-31_DATA_adresses-enregistrees-des-doi.md)
+- 2026-10-31 — [URL de résolution des DOI](archived/2026-10-31_DATA_url-de-resolution-des-doi.md)
 - 2026-10-31 — [Statut open access tiré des copies](archived/2026-10-31_DATA_statut-open-access.md)
 - 2026-10-30 — [Identifiants des enregistrements sources](archived/2026-10-30_DATA_identifiants-des-enregistrements-sources.md)
 - 2026-10-27 — [Administration intégrée au site, navigation entre entités liées](archived/2026-10-27_UI_administration-et-navigation.md)

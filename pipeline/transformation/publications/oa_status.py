@@ -2,7 +2,7 @@
 
 Deux tâches interrogent chacune un service sur les DOI jamais interrogés ou périmés, et écrivent chaque réponse :
 
-- `oa_status.resolve_dois` lit chez doi.org l'adresse enregistrée de chaque DOI. Un DOI inconnu de doi.org reçoit une adresse nulle.
+- `oa_status.resolve_dois` lit chez doi.org l'URL de résolution de chaque DOI. Un DOI inconnu de doi.org reçoit une URL nulle.
 - `oa_status.verify_unpaywall` demande à Unpaywall le statut open access de chaque DOI, hors DOI DataCite. Un DOI absent d'Unpaywall reçoit un verdict nul.
 
 Quand le service est indisponible, le DOI est reporté au run suivant. Le statut des publications des DOI interrogés est ensuite recalculé par `publication_oa_status`, à partir de leurs copies, de leurs embargos, de leur type, de leur revue et du verdict d'Unpaywall.
@@ -418,7 +418,7 @@ def _apply_answers(
 
 @dataclass(frozen=True)
 class OaStatusPhase:
-    """Phase `oa_status` : lecture des adresses enregistrées, puis vérification sur Unpaywall."""
+    """Phase `oa_status` : lecture des URL de résolution, puis vérification sur Unpaywall."""
 
     resolution: DoiLookupTask
     unpaywall: DoiLookupTask
@@ -452,7 +452,7 @@ def build() -> Phase:
         resolution=DoiLookupTask(
             DOI_ORG,
             doi_org_fetcher,
-            title="Adresses enregistrées des DOI sur doi.org",
+            title="URL de résolution des DOI sur doi.org",
             participle="lu",
             not_found=("inconnu de doi.org", "inconnus de doi.org"),
             staleness_days=lambda conn: delay(conn, ConfigKey.DOI_RESOLUTION_RECHECK_AFTER_DAYS),

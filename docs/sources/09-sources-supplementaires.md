@@ -36,17 +36,17 @@ Aucun identifiant d'accès n'est requis. Les requêtes s'identifient par leur `U
 ### Services utilisés
 
 - `https://doi.org/ra/<préfixe>,<préfixe>` : agence d'enregistrement de chaque préfixe DOI. Phase [`resolve_ra`](../pipeline/05-publishing.md#agences-denregistrement-doi-resolve_ra).
-- `https://doi.org/api/handles/<doi>` : handle du DOI, 404 pour un DOI inconnu. Phase [`fetch_missing`](../pipeline/02-harvest.md#documents-absents-dune-source-fetch_missing), pour un DOI absent de son agence d'enregistrement. Phase [`oa_status`](../pipeline/11-enrichissements.md#statut-open-access-oa_status), pour l'adresse enregistrée du DOI, valeur de type `URL` du handle.
+- `https://doi.org/api/handles/<doi>` : handle du DOI, 404 pour un DOI inconnu. Phase [`fetch_missing`](../pipeline/02-harvest.md#documents-absents-dune-source-fetch_missing), pour un DOI absent de son agence d'enregistrement. Phase [`oa_status`](../pipeline/11-enrichissements.md#statut-open-access-oa_status), pour l'URL de résolution du DOI, valeur de type `URL` du handle.
 
 ### Données récupérées
 
 - `doi_prefixes.ra` : agence d'enregistrement de chaque préfixe.
 - `failed_lookups`, source `doi_org` : DOI inconnus de doi.org.
-- `sources.dois.registered_url` : adresse enregistrée de chaque DOI de publication, avec la date de lecture. Un DOI inconnu de doi.org, ou à handle sans adresse, y reçoit une adresse nulle.
+- `sources.dois.registered_url` : URL de résolution de chaque DOI de publication, avec la date de lecture. Un DOI inconnu de doi.org, ou à handle sans URL, y reçoit une URL nulle.
 
 ### Particularités
 
-L'adresse enregistrée d'un DOI est aussi dans les payloads de Crossref (`resource.primary.URL`) et de DataCite (`attributes.url`). Pour les DOI des autres agences (mEDRA, KISTI, JaLC, Office des publications…), doi.org est la seule source de cette adresse.
+L'URL de résolution d'un DOI est aussi dans les payloads de Crossref (`resource.primary.URL`) et de DataCite (`attributes.url`). Pour les DOI des autres agences (mEDRA, KISTI, JaLC, Office des publications…), doi.org est la seule source de cette URL.
 
 ## Sudoc
 

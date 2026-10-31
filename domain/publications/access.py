@@ -45,7 +45,7 @@ class Copy:
     described_by_platform: bool
     """La copie vient de l'enregistrement source donné par la plateforme elle-même."""
     arrival: int
-    """Ordre d'arrivée de l'enregistrement source ; zéro pour la copie de l'adresse enregistrée du DOI."""
+    """Ordre d'arrivée de l'enregistrement source ; zéro pour la copie de l'URL de résolution du DOI."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,9 +87,9 @@ def _rank(copy: Copy) -> tuple[int, int]:
 
 
 def registered_url_copy(url: str) -> Copy | None:
-    """Renvoie la copie ouverte désignée par l'adresse enregistrée d'un DOI, ou `None`.
+    """Renvoie la copie ouverte désignée par l'URL de résolution d'un DOI, ou `None`.
 
-    L'adresse d'une plateforme en accès libre intégral (`is_fully_open`) donne une copie de version inconnue. À défaut, une adresse dont le chemin finit par `.pdf` donne une copie en version de l'éditeur.
+    L'URL d'une plateforme en accès libre intégral (`is_fully_open`) donne une copie de version inconnue. À défaut, une URL dont le chemin finit par `.pdf` donne une copie en version de l'éditeur.
     """
     if is_fully_open(url):
         version = None
