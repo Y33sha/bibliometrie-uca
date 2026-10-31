@@ -229,7 +229,7 @@ class PublicationsFacetsResponse(Model):
     licenses: list[FacetOption]
     doi_agencies: list[FacetOption]
     author_positions: list[FacetOption]
-    """Rempli seulement avec `person_id`. Une publication compte dans chaque position que la personne occupe."""
+    """Rempli seulement avec `person_id` ou des laboratoires. Une publication compte dans chaque position occupée."""
     source_counts: dict[str, YesNoCount]
     apc: list[FacetOption]
     countries: list[FacetOption]

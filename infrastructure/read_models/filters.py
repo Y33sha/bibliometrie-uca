@@ -323,21 +323,37 @@ def _toggle_clause(
     return WhereClause(sql, binds)
 
 
-def author_position_predicate(position: str, bind: str) -> str:
-    """Renvoie le prédicat : la personne liée sous `:bind` occupe la position d'auteur dans la publication `p`. `OTHER_AUTHOR_POSITION` : elle n'occupe aucune position."""
+def author_position_subject(person_id: int | None, lab_ids: list[int]) -> WhereClause | None:
+    """Renvoie la condition sur la contribution `a` dont la position d'auteur compte : celle de la personne, sinon une contribution liée à l'un des laboratoires."""
+    if person_id:
+        return WhereClause("a.person_id = :flt_position_person", {"flt_position_person": person_id})
+    if lab_ids:
+        return WhereClause(
+            """EXISTS (SELECT 1 FROM contribution_structures cs
+                WHERE cs.contribution_id = a.id AND cs.structure_id = ANY(:flt_position_labs))""",
+            {"flt_position_labs": lab_ids},
+        )
+    return None
+
+
+def author_position_predicate(position: str, subject: WhereClause) -> str:
+    """Renvoie le prédicat : une contribution de `subject` occupe la position d'auteur dans la publication `p`. `OTHER_AUTHOR_POSITION` : aucune n'occupe de position."""
     if position == OTHER_AUTHOR_POSITION:
-        return f"NOT ({' OR '.join(author_position_predicate(p, bind) for p in AUTHOR_POSITION_COLUMNS)})"
+        return f"NOT ({' OR '.join(author_position_predicate(p, subject) for p in AUTHOR_POSITION_COLUMNS)})"
     return f"""EXISTS (SELECT 1 FROM contributions a
-                WHERE a.publication_id = p.id AND a.person_id = :{bind}
+                WHERE a.publication_id = p.id AND {subject.sql}
                   AND a.{AUTHOR_POSITION_COLUMNS[position]})"""
 
 
-def author_position_clause(person_id: int | None, values: list[str]) -> WhereClause | None:
-    """Renvoie le filtre par position d'auteur de la personne. Les valeurs de `AUTHOR_POSITION_FILTER_VALUES` se combinent en OR."""
-    if not person_id or not values:
+def author_position_clause(
+    person_id: int | None, lab_ids: list[int], values: list[str]
+) -> WhereClause | None:
+    """Renvoie le filtre par position d'auteur de la personne, sinon des laboratoires. Les valeurs de `AUTHOR_POSITION_FILTER_VALUES` se combinent en OR."""
+    subject = author_position_subject(person_id, lab_ids)
+    if subject is None or not values:
         return None
-    parts = [author_position_predicate(v, "flt_position_person") for v in values]
-    return WhereClause("(" + " OR ".join(parts) + ")", {"flt_position_person": person_id})
+    parts = [author_position_predicate(v, subject) for v in values]
+    return WhereClause("(" + " OR ".join(parts) + ")", subject.binds)
 
 
 _SQL_HAS_HAL_SOURCE_CONTRIBUTION = (

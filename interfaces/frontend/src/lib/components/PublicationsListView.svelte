@@ -73,7 +73,7 @@
 	// Volet d'une publication : ouvert tant que `?publication=<id>` figure dans l'URL. Une icône en tête de ligne ouvre le volet ; le titre mène toujours à la fiche.
 	const drawer = useDrawerParam('publication');
 
-	// Le laboratoire a la colonne et le filtre « Statut HAL ». La personne a la colonne et le filtre « Auteur correspondant », le filtre du périmètre, et marque les APC des publications dont elle n'est pas l'auteur correspondant.
+	// Le laboratoire a la colonne et le filtre « Statut HAL ». La personne a la colonne « Auteur correspondant », le filtre du périmètre, et marque les APC des publications dont elle n'est pas l'auteur correspondant. Le filtre « Position auteur » vaut pour l'un et l'autre.
 	// svelte-ignore state_referenced_locally
 	const isLab = context.kind === 'lab';
 	// svelte-ignore state_referenced_locally

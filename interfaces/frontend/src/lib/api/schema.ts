@@ -5143,7 +5143,7 @@ export interface components {
             doi_agencies: components["schemas"]["FacetOption"][];
             /**
              * Author Positions
-             * @description Rempli seulement avec `person_id`. Une publication compte dans chaque position que la personne occupe.
+             * @description Rempli seulement avec `person_id` ou des laboratoires. Une publication compte dans chaque position occupée.
              */
             author_positions: components["schemas"]["FacetOption"][];
             /** Source Counts */

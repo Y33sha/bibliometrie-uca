@@ -95,7 +95,7 @@ class PublicationFilterParams:
 
 @dataclass(frozen=True, slots=True)
 class PublicationListFilterParams(PublicationFilterParams):
-    """Filtres de la liste des publications : les filtres communs, plus ceux qui supposent un seul laboratoire (statut HAL) ou une personne (position d'auteur, périmètre)."""
+    """Filtres de la liste des publications : les filtres communs, plus ceux qui supposent un seul laboratoire (statut HAL), une personne (périmètre), ou l'un ou l'autre (position d'auteur)."""
 
     author_position: Annotated[str, Query()] = ""
     hal_status: Annotated[str, Query()] = ""

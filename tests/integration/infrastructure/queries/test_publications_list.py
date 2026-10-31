@@ -604,6 +604,31 @@ class TestPersonView:
             ("no", 0),
         }
 
+    def test_author_position_of_a_lab_reads_its_contributions(self, sa_sync_conn):
+        """Le correspondant est affilié au laboratoire de la personne, pas à celui du coauteur."""
+        _, lab, publication = self._seed(sa_sync_conn)
+        coauthor_lab = sa_sync_conn.execute(
+            text("SELECT id FROM structures WHERE code = 'LAB-C'")
+        ).scalar_one()
+
+        def by_position(lab_id, position):
+            return [
+                p.id for p in self._list(sa_sync_conn, lab_ids=[lab_id], author_position=[position])
+            ]
+
+        assert by_position(lab, "corresponding") == [publication]
+        assert by_position(lab, "other") == []
+        assert by_position(coauthor_lab, "corresponding") == []
+        assert by_position(coauthor_lab, "other") == [publication]
+
+        builder = _PublicationFacetsBuilder(
+            sa_sync_conn, PublicationFilters(lab_ids=[coauthor_lab]), FilterContext([], None)
+        )
+        assert {(o.value, o.count) for o in builder._facet_author_positions()} == {
+            ("corresponding", 0),
+            ("other", 1),
+        }
+
     def test_thesis_author_is_a_contribution_with_person(self, sa_sync_conn):
         """Une contribution d'auteur sans personne n'est pas l'auteur de la thèse."""
         author = insert_person(sa_sync_conn, "Doctorant", first_name="Y", normalizer="lower")

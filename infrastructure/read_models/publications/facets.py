@@ -28,6 +28,7 @@ from infrastructure.read_models.filters import (
     OA_CLOSED_SQL,
     OA_OPEN_SQL,
     author_position_predicate,
+    author_position_subject,
     hal_status_expression,
     institution_apc_payment_sql,
     no_lab_clause,
@@ -202,17 +203,18 @@ class _PublicationFacetsBuilder:
         return rows_as(FacetOption, rows)
 
     def _facet_author_positions(self) -> list[FacetOption]:
-        """Renvoie la facette des positions d'auteur de la personne. Une option sans publication compte zéro."""
-        if not self.filters.person_id:
+        """Renvoie la facette des positions d'auteur de la personne, sinon des laboratoires. Une option sans publication compte zéro."""
+        subject = author_position_subject(self.filters.person_id, self.filters.lab_ids)
+        if subject is None:
             return []
         where_sql, binds = self._clauses_skipping("author_position")
         columns = ",\n".join(
-            f"COUNT(*) FILTER (WHERE {author_position_predicate(position, 'position_pid')}) AS {position}"
+            f"COUNT(*) FILTER (WHERE {author_position_predicate(position, subject)}) AS {position}"
             for position in AUTHOR_POSITION_FILTER_VALUES
         )
         row = self.conn.execute(
             text(f"SELECT {columns} FROM publications p WHERE {where_sql}"),
-            {**binds, "position_pid": self.filters.person_id},
+            {**binds, **subject.binds},
         ).one()
         return [
             FacetOption(value=position, count=getattr(row, position))

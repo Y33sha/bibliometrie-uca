@@ -1,4 +1,4 @@
-"""Facettes liées à une personne : position d'auteur et périmètre.
+"""Facettes liées à une personne ou à un laboratoire : position d'auteur et périmètre.
 
 La clause reçoit la liste des valeurs cochées, découpée par le routeur. Les valeurs cochées se combinent par OR.
 """
@@ -9,26 +9,39 @@ from infrastructure.read_models.filters import (
 )
 
 
-def test_author_position_none_without_person_or_filter():
-    assert author_position_clause(0, ["corresponding"]) is None
-    assert author_position_clause(42, []) is None
+def test_author_position_none_without_subject_or_filter():
+    assert author_position_clause(None, [], ["corresponding"]) is None
+    assert author_position_clause(42, [], []) is None
 
 
 def test_author_position_corresponding_is_exists():
-    clause = author_position_clause(42, ["corresponding"])
+    clause = author_position_clause(42, [], ["corresponding"])
     assert clause is not None
     assert clause.sql.startswith("(EXISTS")
     assert clause.binds == {"flt_position_person": 42}
 
 
+def test_author_position_of_labs_reads_contribution_structures():
+    clause = author_position_clause(None, [7], ["corresponding"])
+    assert clause is not None
+    assert "contribution_structures" in clause.sql
+    assert clause.binds == {"flt_position_labs": [7]}
+
+
+def test_author_position_prefers_the_person_over_labs():
+    clause = author_position_clause(42, [7], ["corresponding"])
+    assert clause is not None
+    assert clause.binds == {"flt_position_person": 42}
+
+
 def test_author_position_other_is_negated():
-    clause = author_position_clause(42, ["other"])
+    clause = author_position_clause(42, [], ["other"])
     assert clause is not None
     assert clause.sql.startswith("(NOT (EXISTS")
 
 
 def test_author_position_values_combine_with_or():
-    clause = author_position_clause(42, ["corresponding", "other"])
+    clause = author_position_clause(42, [], ["corresponding", "other"])
     assert clause is not None
     assert " OR NOT (" in clause.sql
 
