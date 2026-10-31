@@ -37,11 +37,29 @@ const GREEK_LETTERS = [
 ];
 
 /* Macros présentes dans les formules des sources et absentes de KaTeX, qui les afficherait en rouge. */
-const KATEX_MACROS: Record<string, string> = {
+const KATEX_MACROS: Record<string, string | object> = {
+	// Commandes LaTeX standard.
+	'\\mbox': '\\text{#1}',
+	'\\ensuremath': '#1',
+	'\\hfill': '',
+	'\\textless': '<',
+	'\\textgreater': '>',
+	'\\arrowvert': '\\vert',
+	'\\nulldelimiterspace': '1.2pt',
+	'\\label': { tokens: [], numArgs: 1 },
 	// Classes LaTeX de Springer.
 	'\\varvec': '\\boldsymbol',
-	// Macro d'auteur pour l'ensemble des nombres complexes.
+	// Abréviations d'usage courant dans les macros d'auteurs.
 	'\\C': '\\mathbb{C}',
+	'\\eps': '\\varepsilon',
+	'\\pa': '\\partial',
+	'\\Cal': '\\mathcal',
+	'\\cE': '\\mathcal{E}',
+	'\\dsp': '\\displaystyle',
+	'\\re': '\\operatorname{Re}',
+	'\\Log': '\\operatorname{Log}',
+	'\\conv': '\\operatorname{conv}',
+	'\\diam': '\\operatorname{diam}',
 	...Object.fromEntries(
 		GREEK_LETTERS.map((name) => [
 			name[0] === name[0].toUpperCase() ? `\\Up${name.toLowerCase()}` : `\\up${name}`,
@@ -49,6 +67,28 @@ const KATEX_MACROS: Record<string, string> = {
 		])
 	)
 };
+
+/* Caractère désigné par son code (`\unicode[STIX]{x1D70E}`, extension MathJax), en hexadécimal ou en décimal. */
+const UNICODE_COMMAND = /\\unicode\s*(?:\[[^\]]*\])?\s*\{\s*(?:0?x([0-9a-fA-F]+)|(\d+))\s*\}/g;
+
+/* Condition TeX sur le mode mathématique : seule la branche mathématique concerne une formule. */
+const IFMMODE = /\\ifmmode\s*([\s\S]*?)\\else[\s\S]*?\\fi/g;
+
+const EQNARRAY = /\\(begin|end)\{eqnarray\*?\}/g;
+
+/* Environnements et numéros d'équation que KaTeX rend seulement en mode bloc. */
+const DISPLAY_ONLY = /\\begin\{(equation|align|alignat|gather)\*?\}|\\tag\*?\s*\{/;
+
+/* Réécrit les tournures des sources que KaTeX ne lit pas. Un caractère mathématique Unicode (𝛼, absent des polices de KaTeX) devient sa lettre de base (α). `eqnarray` devient un tableau aux mêmes colonnes. */
+function adaptTex(tex: string): string {
+	return tex
+		.replace(UNICODE_COMMAND, (full, hex: string | undefined, decimal: string | undefined) => {
+			const code = hex !== undefined ? parseInt(hex, 16) : parseInt(decimal!, 10);
+			return code <= 0x10ffff ? String.fromCodePoint(code).normalize('NFKC') : full;
+		})
+		.replace(IFMMODE, '$1')
+		.replace(EQNARRAY, (_full, side: string) => (side === 'begin' ? '\\begin{array}{rcl}' : '\\end{array}'));
+}
 
 /* Commandes de gras des formules. Une revue qui compose ses titres en gras y met aussi leurs formules : ce gras est sans valeur. */
 const UNBOLD_MACROS: Record<string, string> = {
@@ -135,10 +175,10 @@ function renderLatex(s: string, rules: RenderRules): string {
 		if (isProse(content)) {
 			parts.push(escapeHtml(m[0]));
 		} else {
-			let tex = undoubleBackslashes(content.trim());
+			let tex = adaptTex(undoubleBackslashes(content.trim()));
 			if (!rules.keepsBold) tex = tex.replace(BOLD_NUMBER_SET, '\\mathbb{$1}');
-			// Une formule détachée (`$$`) de plusieurs lignes s'affiche en bloc ; les autres restent dans la phrase.
-			const displayMode = m[1] !== undefined && tex.includes('\\\\');
+			// Une formule détachée (`$$`) de plusieurs lignes s'affiche en bloc, comme une formule réservée au bloc ; les autres restent dans la phrase.
+			const displayMode = DISPLAY_ONLY.test(tex) || (m[1] !== undefined && tex.includes('\\\\'));
 			try {
 				parts.push(katex.renderToString(tex, {
 					displayMode,

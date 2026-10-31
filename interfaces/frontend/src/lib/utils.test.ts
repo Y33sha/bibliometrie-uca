@@ -229,6 +229,37 @@ describe('sanitizeAbstract', () => {
 		expect(result).not.toContain('<div');
 	});
 
+	it('rend les commandes LaTeX et MathJax inconnues de KaTeX', () => {
+		for (const tex of [
+			'\\mbox{ in } \\Omega',
+			'L^p(\\ensuremath{\\mathbb{R}}^d)',
+			'a \\hfill b',
+			'1 \\textless{} p \\textgreater{} 0',
+			'\\left\\arrowvert x \\right\\arrowvert',
+			'{H \\mathord{\\left/ {\\vphantom {H B}} \\right. \\kern-\\nulldelimiterspace} B}',
+			'\\begin{equation*} x^7 = z^n \\end{equation*}',
+			'u = 0. \\tag{1}',
+			'\\begin{eqnarray} a &=& b \\end{eqnarray}',
+			'y^\\eps + \\pa \\Omega + (\\Cal T) + \\cE + \\dsp{f\\over g} + \\re s + \\Log r + \\conv(S) + \\diam'
+		]) {
+			expect(sanitizeAbstract(`Soit $${tex}$.`)).not.toMatch(/katex-error|cc0000/);
+		}
+	});
+
+	it('remplace un caractère désigné par son code par sa lettre de base', () => {
+		const text = titleText('Somme $S_{n,\\unicode[STIX]{x1D6FC}}$');
+		expect(text).toContain('Sn,α');
+		expect(text).not.toContain('unicode');
+	});
+
+	it('garde la branche mathématique d\'une condition TeX', () => {
+		expect(titleText('Charge $\\ifmmode\\pm\\else\\textpm\\fi{}2$')).toBe('Charge ±2');
+	});
+
+	it('retire une étiquette d\'équation', () => {
+		expect(titleText('Équation $\\label{1}x=1$')).toBe('Équation x=1');
+	});
+
 	it('garde le gras des formules', () => {
 		expect(sanitizeAbstract('Le vecteur $\\mathbf{v}$')).toContain('mathbf');
 		expect(sanitizeAbstract('Le vecteur $\\varvec{v}$')).not.toContain('katex-error');
