@@ -259,6 +259,10 @@ class TestGetLocations:
             True,
         )
 
+    def test_adresse_du_depot_sans_numero_de_version(self):
+        [location] = get_locations({"uri_s": "https://hal.science/hal-01607327v2"}, None)
+        assert location.url == "https://hal.science/hal-01607327"
+
     def test_depot_sans_fichier_ferme(self):
         [location] = get_locations({"uri_s": "https://hal.science/hal-02"}, None)
         assert (location.pdf_url, location.is_oa) == (None, False)

@@ -1,5 +1,6 @@
 """Normalisation des enregistrements sources HAL."""
 
+import re
 from collections.abc import Mapping
 from datetime import date
 from functools import lru_cache
@@ -117,15 +118,24 @@ def get_oa_status(doc: Mapping[str, JsonValue], embargo_until: date | None) -> s
     )
 
 
+_HAL_VERSION = re.compile(r"v\d+$")
+"""Numéro de version en fin d'adresse d'un dépôt HAL (`hal-01607327v1`)."""
+
+
+def unversioned_hal_url(uri: str) -> str:
+    """Renvoie l'adresse d'un dépôt HAL sans son numéro de version (`hal-01607327v1` → `hal-01607327`)."""
+    return _HAL_VERSION.sub("", uri)
+
+
 def get_locations(doc: Mapping[str, JsonValue], embargo_until: date | None) -> list[LocationFacts]:
-    """Renvoie la page du dépôt HAL (`uri_s`), avec le fichier déposé (`fileMain_s`), sa licence et la fin de son embargo. La copie est ouverte quand un fichier est déposé."""
+    """Renvoie la page du dépôt HAL (`uri_s`, sans numéro de version), avec le fichier déposé (`fileMain_s`), sa licence et la fin de son embargo. La copie est ouverte quand un fichier est déposé."""
     uri = hal_text_field(doc.get("uri_s"))
     if not uri:
         return []
     file_main = hal_text_field(doc.get("fileMain_s"))
     return [
         LocationFacts(
-            url=uri,
+            url=unversioned_hal_url(uri),
             pdf_url=file_main,
             license=normalize_license(hal_text_field(doc.get("licence_s"))),
             is_oa=file_main is not None,

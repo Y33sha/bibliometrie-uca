@@ -65,10 +65,27 @@ def test_les_copies_fermees_sont_ecartees():
 def test_hal_decide_de_l_ouverture_de_ses_copies():
     """OpenAlex dit ouverte une copie HAL sans fichier : la copie donnée par HAL l'emporte."""
     copies = [
-        _copy("https://hal.science/hal-1", platform="HAL", described=True, is_oa=False),
-        _copy("https://hal.science/hal-1", version="submittedVersion", platform="HAL", arrival=2),
+        _copy("https://hal.science/hal-01607327", platform="HAL", described=True, is_oa=False),
+        _copy(
+            "https://hal.science/hal-01607327",
+            version="submittedVersion",
+            platform="HAL",
+            arrival=2,
+        ),
     ]
     assert _access(copies) == Access(None, [])
+
+
+def test_hal_decide_seulement_pour_ses_propres_depots():
+    """OpenAlex réunit deux dépôts HAL ; seul le premier a son enregistrement source HAL dans la publication."""
+    copies = [
+        _copy("https://hal.science/hal-01607327v1", platform="HAL", described=True, is_oa=False),
+        _copy("https://hal.science/hal-01607327", platform="HAL", arrival=2),
+        _copy("https://hal.science/hal-01651302", platform="HAL", arrival=2),
+    ]
+    assert _access(copies).links == [
+        AccessLink("HAL", "https://hal.science/hal-01651302", known=True)
+    ]
 
 
 def test_seule_une_adresse_web_compte():

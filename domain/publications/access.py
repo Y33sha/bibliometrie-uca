@@ -11,6 +11,7 @@ from urllib.parse import unquote, urlsplit
 
 from domain.platforms.platform import PlatformType
 from domain.platforms.registry import KnownPlatform
+from domain.publications.identifiers import extract_hal_id_from_url
 from domain.publications.licenses import License
 from domain.publications.metadata import OA_OPEN_STATUSES, OaStatus
 
@@ -79,15 +80,19 @@ def _rank(copy: Copy) -> tuple[int, int]:
 
 
 def open_copies(copies: Iterable[Copy]) -> list[Copy]:
-    """Renvoie les copies ouvertes, à adresse `http` ou `https`. Quand une plateforme décrit elle-même la publication, seule sa description décide de l'ouverture de ses copies."""
+    """Renvoie les copies ouvertes, à adresse `http` ou `https`. Quand HAL décrit lui-même un dépôt, seule sa description décide de l'ouverture des copies de ce dépôt."""
     copies = list(copies)
-    self_described = {c.platform for c in copies if c.described_by_platform}
+    self_described = {
+        hal_id
+        for c in copies
+        if c.described_by_platform and (hal_id := extract_hal_id_from_url(c.url))
+    }
     return [
         c
         for c in copies
         if c.is_oa
         and urlsplit(c.url).scheme in _WEB_SCHEMES
-        and (c.described_by_platform or c.platform not in self_described)
+        and (c.described_by_platform or extract_hal_id_from_url(c.url) not in self_described)
     ]
 
 
