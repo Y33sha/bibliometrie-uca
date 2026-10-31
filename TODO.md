@@ -1,6 +1,7 @@
 uv run python -m interfaces.cli.oneshot.purge_descriptive_page_locations
 uv run python -m interfaces.cli.oneshot.canonicalize_hal_location_urls
 uv run python -m interfaces.cli.oneshot.clean_source_record_texts
+uv run python -m interfaces.cli.oneshot.backfill_best_copy_urls
 uv run python -m interfaces.cli.oneshot.recompute_oa_statuses
 
 # Pipeline
@@ -16,6 +17,7 @@ uv run python -m interfaces.cli.oneshot.recompute_oa_statuses
 * [ ] conserver l'historique des structures
 * [ ] financements (projets ANR, projets européens)
 * [ ] publications fermées, sans localisation éditeur, avec revue OA: chercher des moyens de retrouver les localisations éditeur (URL des revues)
+* [ ] OpenAlex: raw affiliation strings qui dérivent de noms de structures HAL: pas de vraies adresses
 # UI
 ## Admin
 * [ ] créer des catégories de personnes (personnel UCA, chercheurs associés, anciens doctorants, méga-collab de physique des particules) => et pouvoir configurer la visibilité des groupes dans l'UI publique (beaucoup d'adresses UCA dans les collaborations ALICE/ATLAS sont décalées dans les sources, ce qui pourrit la base avec des milliers de fausses "personnes UCA")
