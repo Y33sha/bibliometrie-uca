@@ -26,7 +26,7 @@
 	// Composant de liste de publications en série réutilisable. Utilisé par :
 	// - `/journals` (mode autonome avec sync URL ; la session admin y reçoit le snippet `actionCell` pour Modifier/Fusionner)
 	// - `/publishers/[id]?tab=journals` (filtre `publisherId` fixe)
-	// La session admin y gagne la facette « Publications ».
+	// Sur `/journals`, la session admin gagne la facette « Publications ».
 	interface ExternalFilters {
 		publisherId?: number;
 	}
@@ -61,7 +61,7 @@
 	let selectedSerialTypes: string[] = $state([]);
 	let selectedOaModels: string[] = $state([]);
 	let selectedDoaj: string[] = $state([]); // 'true' / 'false'
-	// Publications en série avec ou sans publication. Par défaut, celles qui en ont ; seule la session admin change ce réglage.
+	// Publications en série avec ou sans publication. Par défaut, celles qui en ont ; seule la session admin change ce réglage, sur `/journals`.
 	let selectedPublications: string[] = $state(['yes']);
 
 	// --- Params builder partagé entre la liste et ses facettes ---
@@ -219,7 +219,7 @@
 			bind:selected={selectedOaModels}
 			onchange={onFilterChange}
 		/>
-		{#if isAdmin()}
+		{#if isAdmin() && !publisherFixed}
 			<FacetDropdown
 				label="Publications"
 				options={facets.options.publications}
