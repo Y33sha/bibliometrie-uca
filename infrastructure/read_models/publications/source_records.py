@@ -48,7 +48,8 @@ def _record(r: Row[tuple[object, ...]]) -> SourceRecordMetadataOut:
         raw_doc_type=r.raw_doc_type,
         doc_type_uncorrected=r.doc_type_uncorrected,
         doc_type_corrected_by=r.doc_type_corrected_by,
-        publication_year=r.publication_year,
+        publication_date=r.publication_date,
+        publication_date_precision=r.publication_date_precision,
         language=r.language,
         language_name=r.language_name,
         language_raw=r.language_raw,
@@ -139,7 +140,9 @@ class PublicationSourceRecordQueries:
                        sr.corrections -> '{CorrectionKey.DOC_TYPE}' ->> '{RAW}' AS doc_type_uncorrected,
                        sr.corrections -> '{CorrectionKey.DOC_TYPE}' ->> '{CORRECTED_BY}'
                            AS doc_type_corrected_by,
-                       sr.publication_year, sr.language,
+                       sr.publication_date,
+                       sr.publication_date_precision::text AS publication_date_precision,
+                       sr.language,
                        lang.name AS language_name,
                        CASE WHEN sr.raw_language IS DISTINCT FROM sr.language
                             THEN sr.raw_language END AS language_raw,

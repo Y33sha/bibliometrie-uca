@@ -1,11 +1,9 @@
 """Semis de publications pour les tests de requêtes et de services, sur la connexion SQLAlchemy (`sa_sync_conn`)."""
 
-from datetime import date
-
 from sqlalchemy import Connection
 
 from domain.normalize import normalize_text
-from domain.publications.dates import DatePrecision
+from domain.publications.dates import PublicationDate
 from infrastructure.db.queues import Queue
 from tests.integration.helpers.queues import mark
 from tests.integration.helpers.rows import PERIMETER_EVIDENCE_CAST, insert_row, perimeter_evidence
@@ -19,6 +17,7 @@ def insert_publication(
     title_normalized: str | None = None,
     normalize_title: bool = True,
     publication_year: int = 2024,
+    publication_date: PublicationDate | None = None,
     doc_type: str | None = "article",
     doi: str | None = None,
     oa_status: str | None = None,
@@ -32,10 +31,12 @@ def insert_publication(
 ) -> int:
     """Insère une publication, la marque pour le groupement des auteurs comme la phase `publications`, et renvoie son `id`. `row_id` fixe l'`id`.
 
-    `title_normalized` vaut par défaut le titre normalisé, NULL si `normalize_title` est faux. Une colonne facultative laissée à `None` prend la valeur par défaut du schéma, `doc_type` compris, sauf une colonne de `nullable`, écrite NULL.
+    La date vaut par défaut l'année `publication_year`. `title_normalized` vaut par défaut le titre normalisé, NULL si `normalize_title` est faux. Une colonne facultative laissée à `None` prend la valeur par défaut du schéma, `doc_type` compris, sauf une colonne de `nullable`, écrite NULL.
     """
     if title_normalized is None and normalize_title:
         title_normalized = normalize_text(title)
+    if publication_date is None:
+        publication_date = PublicationDate.of_year(publication_year)
     publication_id = insert_row(
         conn,
         "publications",
@@ -43,8 +44,8 @@ def insert_publication(
             "id": row_id,
             "title": title,
             "title_normalized": title_normalized,
-            "publication_date": date(publication_year, 1, 1),
-            "publication_date_precision": DatePrecision.YEAR.value,
+            "publication_date": publication_date.value,
+            "publication_date_precision": publication_date.precision.value,
             "doc_type": doc_type,
             "doi": doi,
             "oa_status": oa_status,

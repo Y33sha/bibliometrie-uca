@@ -139,7 +139,7 @@ class PersonDetailQueries:
                 WHERE a.person_id = :pid
                   AND NOT ({has_author_role("a")})
                   AND p.doc_type::text IN {in_clause(DOC_TYPE_FAMILIES["theses"].types)}
-                ORDER BY p.publication_year DESC NULLS LAST, p.title
+                ORDER BY p.publication_date DESC, p.title
             """),
             {"pid": person_id},
         ).all()

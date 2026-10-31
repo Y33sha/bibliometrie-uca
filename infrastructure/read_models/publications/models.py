@@ -1,11 +1,13 @@
 """Modèles de réponse : lectures sur les publications."""
 
 from dataclasses import dataclass, field
+from datetime import date
 from typing import Literal
 
 from pydantic import ConfigDict, computed_field
 
 from application.ports.model import Model
+from domain.publications.dates import DatePrecision
 from domain.publications.licenses import License
 from domain.sources.registry import PROFILES, Source, source_record_url
 from infrastructure.read_models._common import (
@@ -250,7 +252,8 @@ class PublicationDetailCore(Model):
 
     id: int
     title: str
-    publication_year: int | None
+    publication_date: date
+    publication_date_precision: DatePrecision
     doi: str | None
     doi_ra: str | None
     """Agence d'enregistrement du préfixe DOI (Crossref, DataCite), d'après `doi_prefixes`."""
@@ -426,7 +429,8 @@ class SourceRecordMetadataOut(Model):
     """Type avant correction, pour un type corrigé."""
     doc_type_corrected_by: str | None
     """Règle de correction, pour un type corrigé."""
-    publication_year: int | None
+    publication_date: date | None
+    publication_date_precision: DatePrecision | None
     language: str | None
     language_name: str | None
     """Nom de la langue dans le référentiel."""

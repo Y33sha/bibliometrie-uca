@@ -3356,6 +3356,12 @@ export interface components {
             labs: string[];
         };
         /**
+         * DatePrecision
+         * @description Précision d'une date de publication. Reflet du type PostgreSQL `date_precision`.
+         * @enum {string}
+         */
+        DatePrecision: "year" | "month" | "day";
+        /**
          * DeletedResponse
          * @description Acquittement de suppression : `{deleted: true}`.
          */
@@ -4847,8 +4853,12 @@ export interface components {
             id: number;
             /** Title */
             title: string;
-            /** Publication Year */
-            publication_year: number | null;
+            /**
+             * Publication Date
+             * Format: date
+             */
+            publication_date: string;
+            publication_date_precision: components["schemas"]["DatePrecision"];
             /** Doi */
             doi: string | null;
             /**
@@ -5730,8 +5740,9 @@ export interface components {
              * @description Règle de correction, pour un type corrigé.
              */
             doc_type_corrected_by: string | null;
-            /** Publication Year */
-            publication_year: number | null;
+            /** Publication Date */
+            publication_date: string | null;
+            publication_date_precision: components["schemas"]["DatePrecision"] | null;
             /** Language */
             language: string | null;
             /**

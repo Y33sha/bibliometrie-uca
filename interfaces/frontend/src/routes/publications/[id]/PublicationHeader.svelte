@@ -4,6 +4,7 @@
   import PublicationTitle from "#lib/components/PublicationTitle.svelte";
   import TitleRow from "#lib/components/TitleRow.svelte";
   import { relationTypeLabel, relationTier, relationTierRank } from "#lib/labels.js";
+  import { formatPublicationDate } from "#lib/utils.js";
   import type { PubDetail, RelatedPublication } from "./types";
 
   const {
@@ -42,7 +43,7 @@
 <div class="publication-header">
   <div class="publication-meta">
     {#if pub.doc_type}<DocTypePill docType={pub.doc_type} />{/if}
-    {#if pub.publication_year}<span class="publication-year">{pub.publication_year}</span>{/if}
+    <span class="publication-date">{formatPublicationDate(pub.publication_date, pub.publication_date_precision)}</span>
     {#if pub.doi}<span class="publication-doi"><span class="doi-label">DOI</span> <a href="https://doi.org/{pub.doi}" target="_blank" rel="noopener">{pub.doi}</a></span>{/if}
   </div>
   <div class="publication-title-row">
@@ -139,7 +140,7 @@
     font-size: var(--fs-md);
     color: var(--text-secondary);
   }
-  .publication-year {
+  .publication-date {
     font-weight: 600;
   }
   .publication-doi {

@@ -82,3 +82,9 @@ def test_jour_bouche_trou():
     assert date_from_parts(2024, 10, 1).without_placeholder_day().precision is MONTH
     assert date_from_parts(2024, 10, 15).without_placeholder_day().precision is DAY
     assert date_from_parts(2024).without_placeholder_day().precision is YEAR
+
+
+def test_date_iso_reduite_a_sa_precision():
+    assert PublicationDate(date(2024, 1, 1), YEAR).isoformat() == "2024"
+    assert PublicationDate(date(2024, 10, 1), MONTH).isoformat() == "2024-10"
+    assert PublicationDate(date(2024, 10, 5), DAY).isoformat() == "2024-10-05"

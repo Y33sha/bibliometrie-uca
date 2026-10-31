@@ -54,7 +54,7 @@ def get_publication_relations(conn: Connection, publication_id: int) -> list[Rel
                    p.doc_type::text AS other_doc_type
             FROM rel
             LEFT JOIN publications p ON p.id = rel.other_id
-            ORDER BY rel.rtype, p.publication_year DESC NULLS LAST
+            ORDER BY rel.rtype, p.publication_date DESC NULLS LAST
         """),
         {"pid": publication_id},
     ).all()
@@ -180,7 +180,9 @@ class PublicationDetailQueries:
         """Renvoie le détail complet d'une publication : métadonnées, sources, contributions. `None` si la publication n'existe pas."""
         publication_row = self._conn.execute(
             text(f"""
-                SELECT p.id, p.title, p.publication_year, p.doi, p.doc_type::text AS doc_type,
+                SELECT p.id, p.title, p.publication_date,
+                       p.publication_date_precision::text AS publication_date_precision,
+                       p.doi, p.doc_type::text AS doc_type,
                        p.oa_status::text AS oa_status,
                        p.license::text AS license, p.deposit_license::text AS deposit_license,
                        p.best_copy_url,
@@ -336,7 +338,8 @@ class PublicationDetailQueries:
             publication=PublicationDetailCore(
                 id=publication_row.id,
                 title=publication_row.title,
-                publication_year=publication_row.publication_year,
+                publication_date=publication_row.publication_date,
+                publication_date_precision=publication_row.publication_date_precision,
                 doi=publication_row.doi,
                 doi_ra=publication_row.doi_ra,
                 doc_type=publication_row.doc_type,

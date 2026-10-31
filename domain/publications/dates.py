@@ -18,6 +18,9 @@ class DatePrecision(StrEnum):
     DAY = "day"
 
 
+_ISO_LENGTH = {DatePrecision.YEAR: 4, DatePrecision.MONTH: 7, DatePrecision.DAY: 10}
+
+
 @dataclass(frozen=True, slots=True)
 class PublicationDate:
     """Date de publication. Une date à l'année tombe le 1er janvier, une date au mois le 1er du mois."""
@@ -40,6 +43,10 @@ class PublicationDate:
     @property
     def year(self) -> int:
         return self.value.year
+
+    def isoformat(self) -> str:
+        """Renvoie la date ISO 8601 réduite à sa précision : « 2025 », « 2025-03 » ou « 2025-03-14 »."""
+        return self.value.isoformat()[: _ISO_LENGTH[self.precision]]
 
     def without_placeholder_day(self) -> PublicationDate:
         """Renvoie le 1er janvier à l'année, le 1er d'un autre mois au mois. OpenAlex et ScanR datent ainsi au jour une année ou un mois seuls."""

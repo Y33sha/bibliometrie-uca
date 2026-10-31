@@ -9,6 +9,7 @@ import {
 	titleCase,
 	titleText,
 	formatDate,
+	formatPublicationDate,
 	deriveStructDetectionStatus,
 	paramsToQuery
 } from './utils';
@@ -135,6 +136,16 @@ describe('formatDate', () => {
 
 	it('retourne une chaîne vide pour null', () => {
 		expect(formatDate(null)).toBe('');
+	});
+});
+
+// ── formatPublicationDate ──────────────────────────────────────
+
+describe('formatPublicationDate', () => {
+	it('écrit la date à sa précision', () => {
+		expect(formatPublicationDate('2025-01-01', 'year')).toBe('2025');
+		expect(formatPublicationDate('2025-01-01', 'month')).toBe('janv. 2025');
+		expect(formatPublicationDate('2025-01-14', 'day')).toBe('14 janv. 2025');
 	});
 });
 

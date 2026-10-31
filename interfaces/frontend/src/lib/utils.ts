@@ -1,5 +1,8 @@
 import DOMPurify from 'dompurify';
 import katex from 'katex';
+import type { components } from '#lib/api/schema.js';
+
+type DatePrecision = components['schemas']['DatePrecision'];
 
 /** Sérialise des paramètres en query string en gardant les virgules littérales. `URLSearchParams.toString()` percent-encode la virgule en `%2C` ; or elle est licite dans une query (RFC 3986) et sépare nos listes de valeurs — on la restaure pour des URL lisibles. Retourne la chaîne sans le `?` initial (vide si aucun paramètre). */
 export function paramsToQuery(params: URLSearchParams): string {
@@ -250,6 +253,21 @@ export function formatDate(d: string | null | undefined): string {
 	const parts = d.split('-');
 	if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
 	return d;
+}
+
+const PUBLICATION_DATE_FORMATS: Record<DatePrecision, Intl.DateTimeFormatOptions> = {
+	year: { year: 'numeric' },
+	month: { month: 'short', year: 'numeric' },
+	day: { day: 'numeric', month: 'short', year: 'numeric' },
+};
+
+/** Date de publication à sa précision : « 2025 », « janv. 2025 », « 14 janv. 2025 ». */
+export function formatPublicationDate(value: string, precision: DatePrecision): string {
+	// `AAAA-MM-JJ` se lit à minuit UTC : formatée dans un autre fuseau, la date passerait parfois à la veille.
+	return new Date(value).toLocaleDateString('fr-FR', {
+		...PUBLICATION_DATE_FORMATS[precision],
+		timeZone: 'UTC',
+	});
 }
 
 /** Dépôts HAL d'un compte auteur. HAL indexe le `personId` du compte sous `authIdHal_i`. */
