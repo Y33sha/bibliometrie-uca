@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict db6bSAAG9CmkaHKNYfY0eDds7TXz0oQjWNq3OfrRfsXwK59US5qL2WI1EVJJ4dI
+\restrict cJjHzAMmVk6OyFGW7StULvqRQqm6UhH1SGTUL5drkRKUrUgjEt2WCfauaWFQOfw
 
 -- Dumped from database version 18.4
 -- Dumped by pg_dump version 18.4
@@ -2176,7 +2176,8 @@ CREATE TABLE publishing.serial_issns (
     support public.issn_support,
     status public.issn_status DEFAULT 'active'::public.issn_status NOT NULL,
     sudoc_checked_at timestamp with time zone,
-    issnl text
+    issnl text,
+    sudoc_title text
 );
 
 
@@ -2227,6 +2228,13 @@ COMMENT ON COLUMN publishing.serial_issns.sudoc_checked_at IS 'Date de la vérif
 --
 
 COMMENT ON COLUMN publishing.serial_issns.issnl IS 'ISSN-L de l''ISSN d''après sa notice Sudoc. NULL : inconnu.';
+
+
+--
+-- Name: COLUMN serial_issns.sudoc_title; Type: COMMENT; Schema: publishing; Owner: -
+--
+
+COMMENT ON COLUMN publishing.serial_issns.sudoc_title IS 'Titre de la notice Sudoc de l''ISSN. NULL : sans notice, ou ISSN jamais vérifié.';
 
 
 --
@@ -5708,5 +5716,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict db6bSAAG9CmkaHKNYfY0eDds7TXz0oQjWNq3OfrRfsXwK59US5qL2WI1EVJJ4dI
+\unrestrict cJjHzAMmVk6OyFGW7StULvqRQqm6UhH1SGTUL5drkRKUrUgjEt2WCfauaWFQOfw
 
