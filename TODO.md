@@ -35,6 +35,7 @@ uv run python -m interfaces.cli.oneshot.restore_primary_identifiers
 * [ ] mesures d'impact à intégrer dans les stats, les dashboards, et les facettes
 * [ ] stats en compte fractionnaire vs compte entier?
 * [ ] embargo dans HAL: signaler dans la page publication (cf 165044)
+* [ ] liens ISSN: généraliser
 ### Visualisation
 * [ ] taux de collaboration
 * [ ] évolution des collaborations dans le temps (graphes de collaboration par labo, avec visualisation animée par année)
