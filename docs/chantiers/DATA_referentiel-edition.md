@@ -4,16 +4,21 @@
 
 Base locale au 2026-10-27 : 10 871 revues, 6 872 éditeurs.
 
-### Formes de nom des revues
+### Reconnaissance des revues
 
-`serial_name_forms` associe un titre normalisé et un éditeur à une revue. La recherche par titre de `find_or_create_serial` lit seulement cette table. Une forme s'ajoute à la création d'une revue et à chaque rattachement par identifiant OpenAlex ou par ISSN. Aucune étape ne purge la table.
+La normalisation cherche ou crée la revue de chaque enregistrement source (`find_or_create_serial`) : par identifiant OpenAlex, puis par ISSN, puis par titre parmi les formes de nom (`serial_name_forms`, 19 976 formes). Le résultat dépend de l'ordre d'arrivée des enregistrements sources. La phase `publishing` fusionne ensuite les revues en double par cinq règles (`merge_duplicate_serials`). Une fusion de revues est définitive.
 
-- **Doublons.** La contrainte `(form_normalized, publisher_id)` compte deux éditeurs nuls comme différents : 69 413 des 69 836 formes sans éditeur sont des doublons.
-- **Provenance.** `source_records.biblio` garde ce que la source donne : titre brut de la revue, ISSN et identifiant OpenAlex (`biblio.journal`), nom brut de l'éditeur (`biblio.publisher`). Rapprochées de ces titres, 441 des 2 534 formes sans éditeur et 2 719 des 17 438 formes avec éditeur sont sans enregistrement source producteur. 1 605 couples (titre, éditeur) des enregistrements sources sont sans forme : le rattachement par titre écrit seulement dans `source_records`.
-- **Titre du référentiel.** La correction d'un titre dans l'administration réécrit `serials.title` seulement. La vérification Sudoc écrit une forme quand elle donne son titre de série à une série d'actes ou à une collection.
-- **Forme sans éditeur.** Elle répond à tout éditeur. Quatre formes sans éditeur désignent deux revues : « regards » (11220, 70507), « reperes » (8063, 9778), « atem archiv fur textmusikforschung » (67294, 96761), « french journal of urology » (20878, 20893). Le préfixe DOI de leurs publications sépare les deux revues « Regards » et les deux revues « Repères ».
-- **Éditeur absent.** Les revues à forme sans éditeur comptent 10 123 enregistrements sources sans éditeur. 8 795 ont un DOI dont le préfixe a un titulaire connu (`doi_prefixes.publisher_id`). Pour 8 097, ce titulaire a déjà une forme pour la revue. `doi_prefixes` est rempli après `normalize`.
-- **Éditeurs retenus.** `delete_empty_publishers` garde un éditeur que désigne une forme de nom de revue.
+Base locale au 2026-10-31 :
+
+- 10 317 des 11 023 revues ont un ISSN actif. 176 882 des 185 262 enregistrements sources rattachés à une revue donnent un ISSN ou un identifiant OpenAlex.
+- Le titre seul fixe la revue de 2 222 publications, réparties sur 666 revues : `journal` 957, `proceedings` 417, `media` 304, `preprint_server` 243, `unknown` 236, `book_series` 63.
+- `biblio.journal` garde le premier conteneur nommé par la source. Le rattachement lit la série extraite du conteneur : collection séparée du livre, noms de plateforme d'ebooks écartés. Les deux diffèrent pour un chapitre.
+- 441 des 2 534 formes sans éditeur et 2 719 des 17 438 formes avec éditeur sont sans enregistrement source producteur (2026-10-27). Un rattachement par une forme sans éditeur écrit seulement dans `source_records` : 1 605 couples (titre, éditeur) des enregistrements sources sont sans forme.
+- Une forme sans éditeur répond à tout éditeur. Quatre formes sans éditeur désignent deux revues : « regards » (11220, 70507), « reperes » (8063, 9778), « atem archiv fur textmusikforschung » (67294, 96761), « french journal of urology » (20878, 20893). Le préfixe DOI de leurs publications sépare les deux revues « Regards » et les deux revues « Repères ».
+- Les revues à forme sans éditeur comptent 10 123 enregistrements sources sans éditeur. 8 795 ont un DOI dont le préfixe a un titulaire connu (`doi_prefixes.publisher_id`). `doi_prefixes` est rempli après `normalize`.
+- `delete_empty_publishers` garde un éditeur désigné par une forme de nom de revue.
+
+CRISalid, Academic Observatory et OpenAIRE identifient la revue par ses seuls ISSN ou ISSN-L, et recalculent le rattachement des publications à chaque passage ([benchmark](archived/2026-10-12_benchmark-pipelines.md)).
 
 ### Éditeurs
 
@@ -45,20 +50,24 @@ Les personnes et les publications ont un volet latéral (`PersonDrawer`, `Public
 
 ## Décisions
 
-- Une forme par couple (forme, éditeur), éditeur absent compris.
-- Les valeurs de la source qui servent au rattachement de la revue et de l'éditeur sortent de `biblio`. Elles deviennent des colonnes typées de `source_records` : titre brut de la revue et sa forme normalisée, nom brut de l'éditeur, ISSN et identifiant OpenAlex de la revue.
-- Une forme de nom sans éditeur et sans enregistrement source producteur est supprimée.
+- Les valeurs données par la source sur la série d'un enregistrement source deviennent des colonnes de `source_records` : titre brut et sa forme normalisée, ISSN, identifiant OpenAlex, nom brut de l'éditeur. Ce sont les valeurs qui servent au rattachement. `biblio` garde la numérotation.
+- La revue de chaque enregistrement source se calcule à chaque passage de `publishing`, comme sa publication : composantes connexes sur les ISSN et l'identifiant OpenAlex. Deux ISSN-L distincts restent toujours séparés. L'ISSN-L vient de la vérification Sudoc.
+- Une série sans ISSN ni identifiant OpenAlex rejoint la seule revue à ISSN de même titre et d'éditeur compatible : le même éditeur, ou un éditeur absent d'un côté. Sinon, les séries de même titre et de même éditeur forment une revue sans ISSN.
+- Pour ce rattachement par titre, un enregistrement source sans éditeur reçoit le titulaire de son préfixe DOI Crossref. Le titulaire d'un préfixe DataCite est souvent un repository ou un établissement : il est exclu. `source_records.publisher_id` garde l'éditeur donné par la source.
+- Une revue garde son identifiant d'un passage à l'autre. Une fusion de revues décidée dans l'administration pose un jeton de fusion, lu par le calcul.
 
 ## Phasage
 
-### Phase 1 — Formes de nom des revues
+### Phase 1 — Reconnaissance des revues
 
 - [x] Contrainte `NULLS NOT DISTINCT`, dédoublonnage des formes sans éditeur (7668391c6)
-- [ ] Colonnes de la source sur `source_records`, écrites par les normaliseurs et reprises de `biblio` pour le stock. Lecteurs à basculer : vérification Sudoc, détection des actes de congrès, comparaison des sources.
-- [ ] Régime de `serial_name_forms` (question 1), purge des formes sans producteur
-- [ ] Titre du référentiel comme forme de nom
-- [ ] Éditeur déduit du préfixe DOI pour un enregistrement source sans éditeur (question 2)
-- [ ] Les quatre formes sans éditeur partagées par deux revues
+- [ ] Colonnes de la série sur `source_records`, écrites par les normaliseurs, reprises de `biblio` pour le stock par un script ponctuel. Lecteurs basculés : vérification Sudoc, détection des actes de congrès, comparaison des sources.
+- [ ] Calcul des revues dans `publishing` : composantes connexes coupées par ISSN-L, rattachement par titre, identifiant conservé, redirection des revues absorbées
+- [ ] Éditeur déduit du préfixe DOI Crossref pour le rattachement par titre
+- [ ] Fusion de revues dans l'administration par jeton de fusion
+- [ ] Normalisation sans recherche ni création de revue ; collection des monographies posée par `publishing`
+- [ ] Retrait de `serial_name_forms`, de `find_or_create_serial` et des règles de fusion couvertes par le calcul
+- [ ] Comparaison des revues avant et après sur le stock, dont les quatre titres partagés par deux revues
 
 ### Phase 2 — Éditeurs
 
@@ -83,8 +92,8 @@ Les personnes et les publications ont un volet latéral (`PersonDrawer`, `Public
 ### Phase 6 — Listes de revues
 
 - [ ] Modélisation : table des listes, table de liaison entre revues et listes
-- [ ] Source de chaque liste (question 4)
-- [ ] Mise à jour de chaque liste (question 5)
+- [ ] Source de chaque liste (question 3)
+- [ ] Mise à jour de chaque liste (question 4)
 
 ### Phase 7 — Plateformes typées comme revues
 
@@ -99,8 +108,7 @@ Les personnes et les publications ont un volet latéral (`PersonDrawer`, `Public
 
 ## Questions ouvertes
 
-1. Régime de `serial_name_forms` : recalcul à chaque passage de `publishing` à partir des colonnes de `source_records` et du titre du référentiel, ou accumulation avec purge. Avec le recalcul, deux revues qui produisent le même couple (forme, éditeur) demandent un départage. Celui de la recherche donne la revue à ISSN électronique actif, puis le plus petit identifiant.
-2. Éditeur déduit du DOI : report dans `publishing` une fois les préfixes résolus, ou résolution du préfixe dès `normalize`. Destination : `source_records.publisher_id`, le nom brut restant dans sa colonne, ou la forme de nom seule.
-3. Migration `c8e3f1a6d924` : sa première étape supprime une forme sans éditeur quand aucun enregistrement source sans éditeur ne désigne sa revue. Le lien exact passe par `normalize_text`, hors de portée du SQL pur. Garder cette étape, ou la retirer au profit de la purge de la phase 1.
-4. Source de chaque liste : fichier publié par l'organisme, API ou saisie dans l'administration. Accès à la liste des revues indexées dans le WoS après la résiliation de l'abonnement.
-5. Mise à jour d'une liste : import complet qui la remplace, ajouts et retraits datés, ou liste posée une fois. Rattachement d'une entrée à une revue : par ISSN, par titre à défaut. Sort des entrées sans revue dans le référentiel.
+1. Titre précédent ou suivant d'une revue, supplément : deux ISSN-L, donc deux revues. La règle 3 de `merge_duplicate_serials` les fusionne. Garder cette fusion ?
+2. Règle 5 de `merge_duplicate_serials` : deux revues rattachées à des enregistrements sources d'une même publication, aux titres compatibles (« Phys.Rev.Lett. » et « Physical Review Letters »). Utile une fois la revue de chaque publication arbitrée entre ses enregistrements sources ?
+3. Source de chaque liste : fichier publié par l'organisme, API ou saisie dans l'administration. Accès à la liste des revues indexées dans le WoS après la résiliation de l'abonnement.
+4. Mise à jour d'une liste : import complet qui la remplace, ajouts et retraits datés, ou liste posée une fois. Rattachement d'une entrée à une revue : par ISSN, par titre à défaut. Sort des entrées sans revue dans le référentiel.
