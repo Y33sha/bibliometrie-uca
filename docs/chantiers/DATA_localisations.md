@@ -2,58 +2,43 @@
 
 ## Contexte
 
-`source_record_locations` range les copies par enregistrement source : clé `(source_record_id, url)`. Une même adresse donnée par trois sources forme trois lignes. Elles se fusionnent à la lecture (`publication_copies`), et l'adresse unique d'un dépôt HAL est calculée à l'écriture (`merge_locations`).
+`source_record_locations` range les copies par enregistrement source. `publication_copies` rend les copies d'une publication aux règles d'accès et de statut. Une copie d'ouverture inconnue compte comme une information : elle classe `closed` une publication sans copie ouverte.
 
-La normalisation efface toutes les localisations d'un enregistrement source, puis réécrit celles que donne sa source (`LocationStore.replace_locations`). Une information ajoutée hors normalisation sur une localisation disparaît au passage suivant.
+**Adresse enregistrée d'un DOI.** Crossref la donne dans `resource.primary.URL`, DataCite dans `attributes.url`. Sur un échantillon de 15 DOI, elle est identique à celle de l'API des handles de doi.org. Crossref l'écrit comme localisation, d'ouverture inconnue. Les DOI des autres agences (mEDRA, KISTI, JaLC, Office des publications…) sont sans localisation éditeur.
 
-Les identifiants arXiv et PMCID d'un enregistrement source donnent une localisation (`identifier_locations`). Le DOI de l'enregistrement source n'en donne pas : seul Crossref écrit la page du DOI comme localisation. Une publication à DOI d'une autre agence (mEDRA, KISTI, JaLC, Office des publications) est donc sans localisation éditeur, même quand son DOI mène à un PDF ouvert. Exemple : la publication 78490, DOI KISTI, fermée alors que son DOI donne le PDF. Le périmètre compte 95 publications à DOI hors Crossref et DataCite.
+**Adresse enregistrée qui désigne un PDF.** 136 adresses Crossref finissent par `.pdf`. Parmi les DOI du périmètre des autres agences, 11 aussi, dont 6 de publications `closed` ou `unknown`. Exemple : la publication 78490, DOI KISTI, est `closed` alors que son DOI mène à un PDF (`http://isyou.info/jowua/papers/jowua-v12n1-6.pdf`). 9 DOI du périmètre sont inconnus de doi.org.
 
-Lecteurs et écrivains des localisations :
+**Verdicts d'Unpaywall.** `sources.unpaywall` garde un verdict par DOI de publication interrogé, soit 54 564 DOI. Les DOI DataCite sont absents d'Unpaywall.
 
-| Rôle | Code |
-|---|---|
-| Écriture | `pipeline/ingestion/common/locations.py`, `normalizer.py`, `normalize.py` |
-| Écriture hors normalisation | `correction_store.py` (copies d'un dépôt HAL introuvable, embargo échu) |
-| Lecture | `infrastructure/read_models/publications/copies.py` (consolidation, phase `oa_status`, fiche publication, mesure), `report_open_science.py` |
-| Scripts ponctuels | `purge_descriptive_page_locations`, `canonicalize_hal_location_urls`, `backfill_best_copy_urls`, `measure_oa_floor` |
+**Publications du périmètre à DOI en `unknown`** : DataCite 317 sur 4 909, mEDRA 7, KISTI 3, Public 1.
 
 ## Décisions
 
-- `locations` : une ligne par adresse normalisée (adresse unique d'un dépôt HAL, page d'un DOI, URL d'une copie). Elle contient la plateforme et ce qui est constaté sur l'adresse : adresse du PDF et date de la vérification par doi.org.
-- `source_record_locations` devient la table de liaison entre `source_records` et `locations`. Elle contient ce que déclare chaque source : ouverture, version, licence, PDF, identifiant OAI-PMH.
-- La normalisation met à jour les liaisons d'un enregistrement source : ajout des nouvelles, retrait des disparues, mise à jour des autres. Une localisation sans liaison est supprimée.
-- Le DOI propre d'un enregistrement source donne une localisation, `https://doi.org/<DOI>`, comme les identifiants arXiv et PMCID.
-- La lecture des copies donne une copie par localisation et par publication, avec les déclarations de ses sources. Les règles d'accès et de statut lisent ces copies.
-- La phase `oa_status` vérifie par doi.org les DOI des agences autres que Crossref et DataCite. Un DOI qui mène directement à un PDF donne une copie ouverte : l'adresse du PDF et la date de vérification vont sur sa localisation. Un DOI inconnu de doi.org va dans `failed_lookups`, avec la source `doi_org`.
+- Une table `sources.dois` remplace `unpaywall`. Elle a une ligne par DOI de publication, avec les réponses des services externes : verdict d'Unpaywall et sa date, adresse enregistrée chez doi.org et sa date.
+- La phase `oa_status` lit l'adresse enregistrée de chaque DOI dans l'API des handles de doi.org, toutes agences comprises. Aucun site d'éditeur n'est interrogé. Un DOI inconnu de doi.org reçoit une adresse nulle et datée, comme un DOI absent d'Unpaywall.
+- Une adresse enregistrée dont le chemin finit par `.pdf` donne une copie ouverte de la publication. Les autres adresses enregistrées donnent seulement une ligne de `sources.dois`.
 
 ## Phasage
 
 ### Phase 1 — Schéma
 
-- [ ] Migration : `locations`, liaison `source_record_locations`, reprise des lignes en place. Adresse unique des dépôts HAL et retrait des pages descriptives dans la migration.
-- [ ] `tables.py`, snapshot du schéma.
+- [ ] Migration : `sources.dois`, reprise des verdicts de `unpaywall`, suppression de `unpaywall`.
+- [ ] `tables.py`, snapshot du schéma, lectures et écritures déclarées du graphe.
+- [ ] Lecteurs de `unpaywall` basculés : phase `oa_status`, consolidation, scripts.
 
-### Phase 2 — Écriture
+### Phase 2 — Résolution
 
-- [ ] `LocationStore` : mise à jour des liaisons, suppression des localisations sans liaison.
-- [ ] Localisation du DOI propre de chaque enregistrement source.
-- [ ] Écritures hors normalisation (`correction_store.py`), lectures et écritures déclarées du graphe.
+- [ ] Tâche de la phase `oa_status` : DOI jamais résolus ou périmés, délai et plafond par run réglables comme pour Unpaywall. Recalcul du statut des publications dont l'adresse enregistrée change.
 
-### Phase 3 — Lecture
+### Phase 3 — Copies
 
-- [ ] `publication_copies` : une copie par localisation et par publication.
-- [ ] `report_open_science.py`.
-- [ ] Scripts ponctuels devenus sans objet retirés.
+- [ ] `publication_copies` : copie ouverte tirée d'une adresse enregistrée qui désigne un PDF.
 
-### Phase 4 — Vérification par doi.org
+### Phase 4 — Documentation
 
-- [ ] Tâche de la phase `oa_status` : DOI hors Crossref et DataCite, PDF obtenu, date de vérification. Recalcul du statut des publications concernées.
-
-### Phase 5 — Documentation
-
-- [ ] `docs/donnees/02-sources.md`, index des tables, fiches des sources.
+- [ ] `docs/donnees/02-sources.md`, index des tables, fiches des sources, documentation de la phase `oa_status`.
 
 ## Questions ouvertes
 
-- Plateforme d'une localisation donnée par deux sources de plateformes différentes (OpenAlex nomme la source, le registre reconnaît l'adresse).
-- DOI de DataCite, ignorés par Unpaywall : les vérifier aussi par doi.org ?
+- DOI DataCite en `unknown` : les enregistrements sources DataCite sont sans localisation. Le normaliseur DataCite pourrait écrire l'adresse enregistrée, avec l'ouverture tirée de `rightsList`, déjà lu pour la licence.
+- Version et licence de la copie tirée d'une adresse enregistrée.
