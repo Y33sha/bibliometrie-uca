@@ -61,7 +61,7 @@ Les personnes et les publications ont un volet latéral (`PersonDrawer`, `Public
 - À chaque passage de `publishing`, un enregistrement source est rattaché à la revue de l'ISSN-L de ses ISSN, à défaut à la revue de son identifiant OpenAlex.
 - Un enregistrement source dont les ISSN mènent à plusieurs ISSN-L rejoint la seule revue de même titre normalisé, à défaut la seule revue de titre compatible (`compatible_titles`). Sinon, il reste sans revue par ISSN.
 - Une seule fonction renvoie la revue d'un ISSN-L, créée au besoin. Le rattachement et la vérification Sudoc l'appellent tous deux.
-- Titre d'une revue : celui saisi à la main, sinon celui du Sudoc, sinon le plus fréquent parmi ses enregistrements sources. La vérification Sudoc l'écrit dans `serials.title`.
+- Titre d'une revue : celui saisi à la main, sinon celui du Sudoc, sinon le plus fréquent parmi ses enregistrements sources. La vérification Sudoc l'écrit dans `serials.title`. Une revue à ISSN reste donc, même vide.
 - Identifiant OpenAlex d'une revue : celui des enregistrements sources OpenAlex dont l'ISSN-L, d'après OpenAlex, est celui de la revue. Modèle OA : celui d'OpenAlex pour cette source, sauf saisie à la main.
 - Une série sans ISSN ni identifiant OpenAlex rejoint la seule revue à ISSN de même titre, quel que soit son éditeur. L'éditeur départage plusieurs revues à ISSN de même titre. Sinon, les séries de même titre forment une revue sans ISSN.
 - Une revue sans ISSN est identifiée par son titre normalisé : chaque source nomme l'éditeur à sa façon (« Edition CdP », « Editions CdP »). Une collection de monographies sans ISSN est identifiée par son titre et son éditeur : les noms de collection génériques (« Essais ») sont fréquents.

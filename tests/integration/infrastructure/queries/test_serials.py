@@ -115,10 +115,10 @@ class TestSudocCheck:
             text("SELECT issn, linked_issn, link_type::text FROM issn_links")
         ).all() == [("0028-0836", "1476-4687", "continued_by")]
 
-    def test_delete_empty_serials_spares_records_and_apc_payments(self, sa_sync_conn, repo):
-        """Une revue vide est supprimée ; ses ISSN restent sans revue."""
-        empty = _serial(sa_sync_conn, title="Revue test vide", issn="2999-0007")
-        insert_serial_issn(sa_sync_conn, empty, issn="2999-0015", support="electronic")
+    def test_delete_empty_serials_spares_issns_records_and_apc_payments(self, sa_sync_conn, repo):
+        """Une revue à ISSN reste, même sans enregistrement source : son titre est le titre Sudoc de son ISSN-L."""
+        empty = _serial(sa_sync_conn, title="Revue test vide")
+        with_issn = _serial(sa_sync_conn, title="Revue test à ISSN", issn="2999-0007")
         with_record = _serial(sa_sync_conn, title="Revue test avec enregistrement")
         _article(
             sa_sync_conn,
@@ -130,10 +130,7 @@ class TestSudocCheck:
         insert_apc_payment(sa_sync_conn, serial_id=with_payment, open_access_fee=True)
         deleted = {j.id: j for j in delete_empty_serials(sa_sync_conn)}
         assert deleted[empty].title == "Revue test vide"
-        assert deleted[empty].issns == ("2999-0007", "2999-0015")
-        assert with_record not in deleted
-        assert with_payment not in deleted
-        assert set(_issns(sa_sync_conn, None)) >= {"2999-0007", "2999-0015"}
+        assert not deleted.keys() & {with_issn, with_record, with_payment}
 
     def test_describe_serials(self, sa_sync_conn, repo):
         serial_id = _serial(sa_sync_conn, title="Revue test décrite", eissn="2999-0008")
