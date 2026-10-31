@@ -117,6 +117,21 @@ def test_une_copie_designee_par_un_autre_doi_figure_sur_sa_plateforme():
     assert links == [AccessLink("Zenodo", "https://doi.org/10.5281/zenodo.1", known=True)]
 
 
+def test_le_doi_de_la_publication_sur_une_plateforme_du_registre_figure_parmi_les_liens():
+    """Publication déposée sur Zenodo : son DOI mène à Zenodo, pas à un éditeur."""
+    result = access(
+        [
+            _copy("https://doi.org/10.5281/zenodo.8278818", platform="Zenodo", arrival=1),
+            _copy("https://doi.org/10.5281/zenodo.8278819", platform="Zenodo", arrival=2),
+        ],
+        doi="10.5281/zenodo.8278818",
+    )
+    assert result == Access(
+        url="https://doi.org/10.5281/zenodo.8278818",
+        links=[AccessLink("Zenodo", "https://doi.org/10.5281/zenodo.8278818", known=True)],
+    )
+
+
 def test_une_plateforme_du_registre_porte_le_nom_du_registre():
     copy = Copy(
         url="https://zenodo.org/records/1",
