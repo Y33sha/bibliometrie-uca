@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict yKRoQ4xRwMlFKmCuNK0VyCOB22rAq50lUPtDieznvGzDA6wbuxFgy4ZMh94mVfo
+\restrict Xfuqeta8mss965x33boqjb0sIesIAgUmcM27xZxJv7GZ8ZUPYCApXB6ra6NvUtQ
 
 -- Dumped from database version 18.4
 -- Dumped by pg_dump version 18.4
@@ -1238,7 +1238,6 @@ CREATE TABLE sources.source_records (
     hal_collections text[],
     urls text[],
     serial_id integer,
-    oa_status text,
     language text,
     container_title text,
     is_retracted boolean,
@@ -5656,5 +5655,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict yKRoQ4xRwMlFKmCuNK0VyCOB22rAq50lUPtDieznvGzDA6wbuxFgy4ZMh94mVfo
+\unrestrict Xfuqeta8mss965x33boqjb0sIesIAgUmcM27xZxJv7GZ8ZUPYCApXB6ra6NvUtQ
 
