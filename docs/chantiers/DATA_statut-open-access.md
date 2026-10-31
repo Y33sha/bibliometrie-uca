@@ -69,13 +69,16 @@ Simulation sur les 76 591 publications du périmètre (`interfaces/cli/oneshot/m
 - [x] Statut calculé dans la consolidation et dans la phase `oa_status`. 0466fb7ba
 - [ ] Recalcul du stock (`recompute_oa_statuses`) : 6 675 publications changent de statut à blanc en local. Comparaison avec la mesure.
 - [x] Publication 9705, déposée sur Zenodo : son DOI mène à Zenodo, le bouton d'accès affichait « via l'éditeur ». 303d519f6
-- [ ] Revue des écarts restants. Cas à vérifier :
-  - publication 78490 : fermée, alors que le DOI mène au PDF. Le DOI est enregistré chez KISTI, agence mal couverte par Unpaywall.
+- [x] Publication 78490, fermée alors que son DOI KISTI mène au PDF : aucune localisation éditeur, ni verdict d'Unpaywall. Pris en charge par le chantier [Localisations](DATA_localisations.md).
 
 ### Phase 4 — Documentation
 
 - [x] Règle du statut dans `docs/pipeline/11-enrichissements.md`, Unpaywall dans `docs/sources/`. 0466fb7ba
 
+### Phase 5 — Embargos
+
+- [ ] Table des embargos : embargo d'une copie HAL, avec sa date de fin ; embargo déclaré par theses.fr, sans date. Elle remplace `embargo_until` des localisations et le statut `embargoed` déclaré par theses.fr.
+
 ## Questions ouvertes
 
-- `source_records.oa_status` et son calcul dans chaque normaliseur : seuls `closed` et l'embargo de theses.fr servent au statut de la publication. Garder la colonne, ou la réduire à ces deux faits ?
+- `source_records.oa_status`, une fois les embargos en table : seul le statut `closed` déclaré reste lu, et il distingue `closed` de `unknown`. Garder la colonne pour ce seul fait ?
