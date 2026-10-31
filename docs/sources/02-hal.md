@@ -27,7 +27,7 @@ Documentation API : https://api.archives-ouvertes.fr/docs
 
 ## Exemple de payload
 
-Document `hal-04836977` (3 auteurs, podcast Métaclassique). `abstract_s`, `subTitle_s` et `label_s` tronqués, `label_xml` élidé (extrait formaté plus bas).
+Document `hal-04836977` (3 auteurs, podcast Métaclassique). `abstract_s` et `label_s` tronqués, `label_xml` élidé (extrait formaté plus bas).
 
 ```json
 {
@@ -55,10 +55,8 @@ Document `hal-04836977` (3 auteurs, podcast Métaclassique). `abstract_s`, `subT
   "label_s": "Céline Frigau Manning, Hélène Tysman, David Christoffel. Podcast… (tronqué)",
   "label_xml": "<TEI…> … voir extrait formaté ci-dessous … </TEI>",
   "language_s": ["en"],
-  "openAccess_bool": false,
   "producedDateY_i": 2020,
   "publicationDate_s": "2020-03-18",
-  "subTitle_s": ["URL : https://metaclassique.com/… (tronqué)"],
   "title_s": [
     "Podcast : Métaclassique #59. Hypnotiser, entretien avec Céline Frigau Manning et Hélène Tysman, réalisé par David Christoffel"
   ],

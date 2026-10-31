@@ -19,7 +19,6 @@ HAL_FIELDS = [
     "halId_s",
     "doiId_s",
     "title_s",
-    "subTitle_s",
     "authFullNameFormIDPersonIDIDHal_fs",
     "authQuality_s",
     # `label_xml` (TEI) : seul champ qui rattache l'ORCID et l'IdRef à chaque auteur par sa position. `authORCIDIdExt_s` et `authIdRefIdExt_s` omettent les valeurs nulles et perdent l'alignement : ils restent hors de la liste.
@@ -40,13 +39,11 @@ HAL_FIELDS = [
     "proceedings_s",
     "serie_s",
     "source_s",
-    "openAccess_bool",
     "fileMain_s",
     # Annexes déposées (URL) : diaporama, poster, matériel supplémentaire. Un dépôt peut avoir des annexes sans fichier principal.
     "fileAnnexes_s",
     # Licence du fichier déposé (URL), présente quand un fichier est déposé.
     "licence_s",
-    "linkExtId_s",
     "linkExtUrl_s",
     "uri_s",
     "label_s",
