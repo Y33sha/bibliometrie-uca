@@ -1,7 +1,7 @@
 # STATUS: oneshot (2026-10-31)
 """Réécrit `biblio.journal` des enregistrements sources déjà normalisés : la série qui sert au rattachement, ISSN en liste avec leur support.
 
-Le payload de chaque enregistrement source est relu au raw store. Le normaliseur de sa source en tire la description du conteneur, puis la série (`determine_container_type`). Seul `biblio.journal` est réécrit. Un enregistrement source sans payload au raw store garde sa série, convertie en SQL : ISSN, ISSN électronique et ISSN-L passent dans la liste, sans support pour l'ISSN.
+Le payload de chaque enregistrement source est relu au raw store. Le normaliseur de sa source en tire la description du conteneur, puis la série (`determine_container_type`). Seul `biblio.journal` est réécrit. Un enregistrement source sans payload au raw store garde sa série.
 
 Usage :
     uv run python -m interfaces.cli.oneshot.rewrite_biblio_journal [--sources hal,openalex] [--dry-run]
@@ -45,31 +45,6 @@ _WRITE = text("""
     WHERE sr.id = t.id AND sr.biblio IS DISTINCT FROM t.biblio
 """)
 
-# Série à l'ancienne forme (`issn`, `eissn`, `issnl`) convertie en liste d'ISSN, pour les enregistrements sources sans payload.
-_CONVERT_LEGACY = text("""
-    UPDATE source_records sr
-    SET biblio = jsonb_set(
-        sr.biblio, '{journal}',
-        (sr.biblio->'journal') - 'issn' - 'eissn' - 'issnl'
-        || jsonb_build_object('issns', (
-            SELECT coalesce(jsonb_agg(v.item), '[]'::jsonb)
-            FROM (VALUES
-                (CASE WHEN sr.biblio->'journal' ? 'issn'
-                      THEN jsonb_build_object('issn', sr.biblio->'journal'->>'issn') END),
-                (CASE WHEN sr.biblio->'journal' ? 'eissn'
-                      THEN jsonb_build_object('issn', sr.biblio->'journal'->>'eissn',
-                                              'support', 'electronic') END),
-                (CASE WHEN sr.biblio->'journal' ? 'issnl'
-                      THEN jsonb_build_object('issn', sr.biblio->'journal'->>'issnl',
-                                              'linking', true) END)
-            ) AS v(item)
-            WHERE v.item IS NOT NULL
-        ))
-    )
-    WHERE sr.source = :source
-      AND sr.biblio->'journal' ?| array['issn', 'eissn', 'issnl']
-""")
-
 
 def _rewrite_source(conn: Connection, source: str) -> None:
     total = conn.execute(_COUNT, {"source": source}).scalar_one()
@@ -102,13 +77,10 @@ def _rewrite_source(conn: Connection, source: str) -> None:
         seen += len(rows)
         after = rows[-1].id
         log.info("%s : %d / %d traités", source, seen, total)
-    converted = conn.execute(_CONVERT_LEGACY, {"source": source}).rowcount
-    conn.commit()
     log.info(
-        "%s : %d séries réécrites, %d converties sans payload au raw store (%d sans payload), %d refusées par la normalisation",
+        "%s : %d séries réécrites, %d enregistrements sources sans payload au raw store, %d refusés par la normalisation",
         source,
         written,
-        converted,
         missing,
         refused,
     )
