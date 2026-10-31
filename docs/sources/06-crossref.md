@@ -24,6 +24,7 @@ Le pipeline interroge Crossref par DOI, pour les documents découverts par les a
 ## Données récupérées
 
 - **Publications** : DOI, titre, type, langue, revue (titre, ISSN, eISSN, éditeur), date de publication, résumé (nettoyé du JATS XML), mots-clés (depuis `subject`), citations (`is-referenced-by-count`), biblio (volume/numéro/pages/n° d'article), identifiants externes (ISBN et eISBN, `isbn-type` donnant le support), champs propres à Crossref gardés dans `source_extras` (licence, financeurs, relations, congrès)
+- **Date de publication** : la première date d'année plausible (de 1500 à l'année suivante) parmi `published`, `issued`, `published-online`, `published-print` et `approved`. `published` est la plus ancienne des dates en ligne et papier. `approved` est la date de soutenance d'une thèse.
 - **Auteurs** : nom complet, ORCID si présent, affiliation textuelle
 - **Localisation** (`source_record_locations`) : la page vers laquelle résout le DOI (`resource.primary.URL`), avec la licence de la version éditeur. Les URL de `link` mènent à des points d'accès pour la fouille de texte : elles sont ignorées.
 

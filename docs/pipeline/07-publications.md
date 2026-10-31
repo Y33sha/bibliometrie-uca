@@ -41,4 +41,4 @@ Après une modification de la logique de résolution, l'option `--rebuild-public
 
 ## Recalcul des métadonnées
 
-Les métadonnées de chaque publication touchée sont recalculées depuis ses enregistrements sources. L'éditeur est celui de la date de publication : le titulaire du préfixe du DOI Crossref, à défaut le premier éditeur des enregistrements sources selon le classement des sources. Une publication sans enregistrement source est supprimée.
+Les métadonnées de chaque publication touchée sont recalculées depuis ses enregistrements sources. La date de publication est celle du premier enregistrement source selon le classement des sources. Les enregistrements sources suivants la précisent quand ils concordent : même année, et même mois quand la date retenue est au mois. L'éditeur est celui de la date de publication : le titulaire du préfixe du DOI Crossref, à défaut le premier éditeur des enregistrements sources selon le classement des sources. Une publication sans enregistrement source est supprimée.
