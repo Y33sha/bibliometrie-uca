@@ -68,8 +68,8 @@ Simulation sur les 76 591 publications du périmètre (`interfaces/cli/oneshot/m
 - [x] Fonction de décision du domaine (`domain/publications/open_access.py`). fcd982c57
 - [x] Statut calculé dans la consolidation et dans la phase `oa_status`. 0466fb7ba
 - [ ] Recalcul du stock (`recompute_oa_statuses`) : 6 675 publications changent de statut à blanc en local. Comparaison avec la mesure.
+- [x] Publication 9705, déposée sur Zenodo : son DOI mène à Zenodo, le bouton d'accès affichait « via l'éditeur ». 303d519f6
 - [ ] Revue des écarts restants. Cas à vérifier :
-  - publication 9705 : ouverte « via l'éditeur » pour un DOI Zenodo, avec une autre copie Zenodo ;
   - publication 78490 : fermée, alors que le DOI mène au PDF. Le DOI est enregistré chez KISTI, agence mal couverte par Unpaywall.
 
 ### Phase 4 — Documentation
