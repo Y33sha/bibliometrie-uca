@@ -5391,6 +5391,8 @@ export interface components {
             doaj_url: string | null;
             /** Issn Details */
             issn_details: components["schemas"]["SerialIssnDetail"][];
+            /** Relations */
+            relations: components["schemas"]["SerialRelation"][];
             /** Openalex Id */
             openalex_id: string | null;
             /** Is Academic */
@@ -5482,6 +5484,30 @@ export interface components {
             serials: components["schemas"]["SerialListItem"][];
             /** Pages */
             readonly pages: number;
+        };
+        /**
+         * SerialRelation
+         * @description Revue liée par un lien Sudoc entre ISSN (`issn_links`).
+         */
+        SerialRelation: {
+            /**
+             * Kind
+             * @description Titre précédent, titre suivant, supplément de la revue, ou revue dont elle est le supplément.
+             * @enum {string}
+             */
+            kind: "previous_title" | "next_title" | "supplement" | "main_serial";
+            /**
+             * Serial Id
+             * @description Revue de l'ISSN lié, `None` pour un ISSN sans revue.
+             */
+            serial_id: number | null;
+            /** Title */
+            title: string | null;
+            /**
+             * Issn
+             * @description ISSN lié, quand il est sans revue.
+             */
+            issn: string | null;
         };
         /**
          * SerialType

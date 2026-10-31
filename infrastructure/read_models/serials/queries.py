@@ -38,6 +38,7 @@ from infrastructure.read_models.serials.models import (
     SerialIssnDetail,
     SerialListItem,
     SerialListResponse,
+    SerialRelation,
     SerialsFacetsResponse,
     SerialSort,
 )
@@ -58,6 +59,26 @@ _SERIAL_DETAIL_COLUMNS = f"""
     {_SERIAL_LIST_COLUMNS},
     j.openalex_id, j.is_academic
 """
+
+# Revues liées par les liens entre ISSN, lus dans les deux sens. Un ISSN lié sans revue reste nommé par lui-même.
+_RELATIONS = text("""
+    WITH own AS (SELECT issn FROM serial_issns WHERE serial_id = :id),
+    linked AS (
+        SELECT CASE l.link_type WHEN 'continued_by' THEN 'next_title' ELSE 'supplement' END AS kind,
+               l.linked_issn AS issn
+        FROM issn_links l JOIN own o ON o.issn = l.issn
+        UNION ALL
+        SELECT CASE l.link_type WHEN 'continued_by' THEN 'previous_title' ELSE 'main_serial' END,
+               l.issn
+        FROM issn_links l JOIN own o ON o.issn = l.linked_issn
+    )
+    SELECT DISTINCT k.kind, s.id AS serial_id, s.title, CASE WHEN s.id IS NULL THEN k.issn END AS issn
+    FROM linked k
+    LEFT JOIN serial_issns i ON i.issn = k.issn
+    LEFT JOIN serials s ON s.id = i.serial_id
+    WHERE s.id IS DISTINCT FROM :id
+    ORDER BY k.kind, s.title, issn
+""")
 
 
 def _list_sql(where: str, sort: SerialSort) -> str:
@@ -469,11 +490,16 @@ class SerialQueries:
                 )
                 for i in self._conn.execute(
                     text(
-                        "SELECT issn, support, issn = issnl AS linking, status, sudoc_checked_at "
+                        "SELECT issn, support, issn IS NOT DISTINCT FROM issnl AS linking, status, "
+                        "sudoc_checked_at "
                         "FROM serial_issns WHERE serial_id = :id ORDER BY id"
                     ),
                     {"id": serial_id},
                 )
+            ],
+            relations=[
+                SerialRelation(kind=r.kind, serial_id=r.serial_id, title=r.title, issn=r.issn)
+                for r in self._conn.execute(_RELATIONS, {"id": serial_id})
             ],
             openalex_id=row.openalex_id,
             is_academic=row.is_academic,

@@ -359,6 +359,45 @@ class TestGetSerial:
         assert body["doaj_payload"] is None
         assert body["publication_count"] == 0
 
+    def test_issn_sans_issn_l(self, client):
+        jid = seed_serial()
+        issn = uniq("I")
+        seed_serial_issn(jid, issn=issn)
+        r = client.get(f"/api/serials/{jid}")
+        assert r.status_code == 200
+        assert [(i["issn"], i["linking"]) for i in r.json()["issn_details"]] == [(issn, False)]
+
+    def test_relations_lues_dans_les_liens_entre_issn(self, client):
+        """Cas réel : la Revue internationale des études du développement continue la Revue Tiers Monde."""
+        previous = seed_serial("Revue Tiers Monde")
+        current = seed_serial("Revue internationale des études du développement")
+        old, new, orphan = uniq("I"), uniq("I"), uniq("I")
+        seed_serial_issn(previous, issn=old)
+        seed_serial_issn(current, issn=new)
+        with owner_pool() as cur:
+            cur.execute(
+                "INSERT INTO issn_links (issn, linked_issn, link_type)"
+                " VALUES (%s, %s, 'continued_by'), (%s, %s, 'supplement')",
+                (old, new, new, orphan),
+            )
+        assert client.get(f"/api/serials/{current}").json()["relations"] == [
+            {
+                "kind": "previous_title",
+                "serial_id": previous,
+                "title": "Revue Tiers Monde",
+                "issn": None,
+            },
+            {"kind": "supplement", "serial_id": None, "title": None, "issn": orphan},
+        ]
+        assert client.get(f"/api/serials/{previous}").json()["relations"] == [
+            {
+                "kind": "next_title",
+                "serial_id": current,
+                "title": "Revue internationale des études du développement",
+                "issn": None,
+            }
+        ]
+
     def test_doaj_payload_exposed_when_present(self, client):
         jid = seed_serial()
         payload = {"License": "CC BY", "Country of publisher": "France"}
