@@ -40,7 +40,7 @@ Simulation sur les 76 591 publications du périmètre (`interfaces/cli/oneshot/m
 - L'embargo déclaré par theses.fr, sans copie ni date, donne `embargoed`.
 - Sans copie ouverte ni verdict : `closed` avec une copie, un verdict, pour une thèse en cours ou réservée à l'intranet de son établissement ; `unknown` sans aucune information.
 - HAL décide de l'ouverture des copies de ses propres dépôts : quand l'enregistrement source HAL d'un dépôt est dans la publication, sa description l'emporte sur celle des autres sources.
-- L'identifiant HAL désigne un dépôt, quel que soit le portail. Une copie HAL a l'adresse de son dépôt sur `hal.science`, quel que soit le portail ; DUMAS et TEL gardent leur portail propre.
+- L'identifiant HAL désigne un dépôt, quel que soit le portail. Une copie HAL a l'adresse de son dépôt sur `hal.science`, quel que soit le portail. Seul DUMAS garde son portail : ses dépôts sont absents de `hal.science`.
 - Pour une communication ou un poster, une annexe HAL (diaporama, poster, résumé) tient lieu de fichier déposé.
 - Un dépôt HAL réduit à des annexes désigne une communication (`conference`), sauf DOI, revue ou volume d'actes donnés par une source.
 
@@ -79,6 +79,7 @@ Simulation sur les 76 591 publications du périmètre (`interfaces/cli/oneshot/m
 
 - [x] Table des embargos : embargo d'une copie HAL, avec sa date de fin ; embargo déclaré par theses.fr, sans date. Elle remplace `embargo_until` des localisations et le statut `embargoed` déclaré par theses.fr. 71ceed221
 - [x] Thèse réservée à l'intranet dans `source_extras`. Thèse en cours et thèse réservée à l'intranet `closed`, statuts déclarés ignorés.
+- [x] Adresse d'un dépôt HAL écrite par une seule fonction. Une thèse TEL va sur `hal.science` : theses.hal.science renvoie une erreur 404 sans fichier. Stock : `canonicalize_hal_location_urls`, puis `backfill_best_copy_urls`.
 - [ ] Colonne `source_records.oa_status` retirée, avec les dérivations des normaliseurs et les règles de correction associées.
 
 ## Questions ouvertes

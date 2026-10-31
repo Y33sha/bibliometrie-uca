@@ -149,20 +149,19 @@ def extract_hal_id_from_url(raw: str | None) -> str | None:
     return m.group(1) if m else None
 
 
-_SEPARATE_HAL_PORTALS = {"dumas": "dumas.ccsd.cnrs.fr", "tel": "theses.hal.science"}
-"""Portail des dépôts inaccessibles depuis `hal.science`, par préfixe d'identifiant : mémoires DUMAS, thèses TEL."""
+def hal_id_url(hal_id: str) -> str:
+    """Renvoie l'adresse d'un dépôt HAL : `https://hal.science/<identifiant>`, ou le portail DUMAS pour un mémoire `dumas-`, absent de `hal.science`."""
+    portal = "dumas.ccsd.cnrs.fr" if hal_id.startswith("dumas-") else "hal.science"
+    return f"https://{portal}/{hal_id}"
 
 
 def hal_deposit_url(url: str) -> str | None:
-    """Renvoie l'adresse du dépôt HAL désigné par une URL de portail HAL : `https://hal.science/<identifiant sans version>`, ou le portail propre d'un dépôt DUMAS ou TEL. `None` pour une URL d'un autre hôte."""
+    """Renvoie l'adresse (`hal_id_url`) du dépôt HAL désigné par une URL de portail HAL, sans version. `None` pour une URL d'un autre hôte."""
     host = urlparse(url.strip().lower()).hostname
     if not host or not is_hal_host(host):
         return None
     hal_id = extract_hal_id_from_url(url)
-    if not hal_id:
-        return None
-    portal = _SEPARATE_HAL_PORTALS.get(hal_id.partition("-")[0], "hal.science")
-    return f"https://{portal}/{hal_id}"
+    return hal_id_url(hal_id) if hal_id else None
 
 
 class HALId(NormalizedIdentifier):

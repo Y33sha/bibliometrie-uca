@@ -22,7 +22,7 @@ def test_les_portails_hal_d_un_depot_forment_une_seule_copie():
     ]
 
 
-def test_un_depot_dumas_ou_tel_garde_son_portail():
+def test_un_depot_dumas_garde_son_portail_une_these_tel_va_sur_hal_science():
     merged = merge_locations(
         [
             LocationFacts("https://dumas.ccsd.cnrs.fr/dumas-01234567v1"),
@@ -31,7 +31,7 @@ def test_un_depot_dumas_ou_tel_garde_son_portail():
     )
     assert [loc.url for loc in merged] == [
         "https://dumas.ccsd.cnrs.fr/dumas-01234567",
-        "https://theses.hal.science/tel-01234567",
+        "https://hal.science/tel-01234567",
     ]
 
 

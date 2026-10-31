@@ -6,6 +6,7 @@ from urllib.parse import quote
 
 from domain.errors import ValidationError
 from domain.persons.identifiers import AttributionStatus, PersonIdentifierType
+from domain.publications.identifiers import hal_id_url
 
 
 class Source(StrEnum):
@@ -98,10 +99,10 @@ def source_label(source: str) -> str:
     return SOURCE_LABELS.get(source, source)
 
 
-def source_record_url(source: str, source_id: str, oa_status: str | None = None) -> str:
+def source_record_url(source: str, source_id: str) -> str:
     """Renvoie le lien vers l'enregistrement source sur le portail de sa source.
 
-    L'hôte est écrit ici, et l'identifiant est encodé : il ne peut ni changer d'hôte ni ajouter de paramètre. Un dépôt HAL `dumas-` est servi par DUMAS. Une thèse HAL `tel-` est servie par theses.hal.science, sauf en accès fermé (`oa_status`).
+    L'hôte est écrit ici, et l'identifiant est encodé : il ne peut ni changer d'hôte ni ajouter de paramètre.
 
     Raises:
         ValueError: source inconnue.
@@ -109,11 +110,7 @@ def source_record_url(source: str, source_id: str, oa_status: str | None = None)
     path = quote(source_id, safe=":")
     match Source(source):
         case Source.HAL:
-            if source_id.startswith("dumas-"):
-                return f"https://dumas.ccsd.cnrs.fr/{path}"
-            if source_id.startswith("tel-") and oa_status != "closed":
-                return f"https://theses.hal.science/{path}"
-            return f"https://hal.science/{path}"
+            return hal_id_url(path)
         case Source.OPENALEX:
             return f"https://openalex.org/{path}"
         case Source.WOS:

@@ -184,7 +184,7 @@ class PublicationListItem(Model):
             Source.THESES: self.theses_id,
         }
         return {
-            source: source_record_url(source, source_id, self.oa_status)
+            source: source_record_url(source, source_id)
             for source, source_id in ids.items()
             if source_id
         }
@@ -281,7 +281,7 @@ class SourceRecordOut(Model):
     @property
     def record_url(self) -> str:
         """Lien vers l'enregistrement sur le portail de sa source."""
-        return source_record_url(self.source, self.source_id, self.oa_status)
+        return source_record_url(self.source, self.source_id)
 
 
 class ExternalIdentifierOut(Model):
@@ -448,7 +448,7 @@ class SourceRecordMetadataOut(Model):
     @property
     def record_url(self) -> str:
         """Lien vers l'enregistrement sur le portail de sa source."""
-        return source_record_url(self.source, self.source_id, self.oa_status)
+        return source_record_url(self.source, self.source_id)
 
 
 class SourceContributionOut(Model):

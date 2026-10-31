@@ -58,15 +58,8 @@ class TestSourceRecordUrl:
             == "https://dumas.ccsd.cnrs.fr/dumas-12345678"
         )
 
-    def test_these_hal_ouverte(self):
-        assert source_record_url("hal", "tel-04579115", "green") == (
-            "https://theses.hal.science/tel-04579115"
-        )
-
-    def test_these_hal_fermee(self):
-        assert source_record_url("hal", "tel-04579115", "closed") == (
-            "https://hal.science/tel-04579115"
-        )
+    def test_these_hal(self):
+        assert source_record_url("hal", "tel-04579115") == "https://hal.science/tel-04579115"
 
     def test_identifiant_scanr_encode_en_entier(self):
         assert source_record_url("scanr", "doi/10.1234/test") == (
