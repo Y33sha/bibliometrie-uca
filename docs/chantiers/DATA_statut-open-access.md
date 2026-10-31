@@ -28,12 +28,17 @@ Simulation sur les 76 591 publications du périmètre (`interfaces/cli/oneshot/m
 
 ## Décisions
 
-- Le statut d'une publication est le plancher tiré de sa meilleure copie ouverte, relevé par le verdict d'Unpaywall, jamais abaissé.
-- Copie d'archive ou de serveur de preprints ouverte : `green`. Copie ouverte côté éditeur : le modèle de la revue décide, comme dans la simulation. Sans copie ouverte côté éditeur, le modèle de la revue ne donne aucun statut.
-- `diamond` : revue au DOAJ sans APC ni autres frais. Un `gold` d'Unpaywall devient `diamond` aux mêmes conditions.
+- Le statut d'une publication se déduit de ses copies et du modèle de sa revue, dans cet ordre :
+  1. copie ouverte côté éditeur, sous licence ouverte : `hybrid` dans une revue `subscription` ou de modèle inconnu, `gold` dans une revue `full_oa` ou hors revue, `diamond` dans une revue `diamond` ;
+  2. sinon, copie d'archive ou de serveur de preprints ouverte : `green`, avant `bronze` ;
+  3. sinon, copie ouverte côté éditeur sans licence : `bronze` ;
+  4. sinon `embargoed`, `closed` ou `unknown`.
+- Sans copie ouverte côté éditeur, le modèle de la revue ne donne aucun statut.
+- Le verdict d'Unpaywall relève les accès constatés, jamais ne les abaisse.
+- Des statuts déclarés par les sources, seuls comptent `closed` et l'embargo de theses.fr.
 - La date de fin d'embargo est une colonne de la copie. L'ouverture d'une copie se calcule à la lecture : `is_oa` et embargo absent ou échu. Une copie sous embargo actif donne `embargoed`.
 - L'embargo déclaré par theses.fr, sans copie ni date, reste un statut `embargoed`.
-- Sans copie ouverte ni verdict : `closed`, ou `unknown` sans aucune information.
+- Sans copie ouverte ni verdict : `closed` avec une copie, un verdict ou un `closed` déclaré, `unknown` sans aucune information.
 - HAL décide de l'ouverture des copies de ses propres dépôts : quand l'enregistrement source HAL d'un dépôt est dans la publication, sa description l'emporte sur celle des autres sources.
 - L'identifiant HAL désigne un dépôt, quel que soit le portail. Une copie HAL a l'adresse de son dépôt sur `hal.science`, quel que soit le portail ; DUMAS et TEL gardent leur portail propre.
 - Pour une communication ou un poster, une annexe HAL (diaporama, poster, résumé) tient lieu de fichier déposé.
@@ -50,6 +55,7 @@ Simulation sur les 76 591 publications du périmètre (`interfaces/cli/oneshot/m
 - [x] Adresse unique d'un dépôt HAL, toutes sources confondues ; script `canonicalize_hal_location_urls` pour le stock. bff127b5c
 - [x] Annexes HAL (`fileAnnexes_s`) moissonnées ; annexe d'une communication ou d'un poster tenue pour fichier déposé ; dépôt réduit à des annexes typé communication. Mesure sur l'API HAL : 540 publications passent de `closed` à `green`. 62e867b50, bff127b5c
 - [ ] Stock : annexes absentes des payloads HAL moissonnés avant 62e867b50.
+- [x] Registre : OSF, posters et diaporamas de F1000Research, preprints JMIR. fcd982c57
 
 ### Phase 2 — Embargo sur les copies
 
@@ -58,20 +64,18 @@ Simulation sur les 76 591 publications du périmètre (`interfaces/cli/oneshot/m
 
 ### Phase 3 — Statut tiré des copies
 
-- [x] Mesure décision par décision (`measure_oa_floor`) et page de revue des exemples. fb123f7a7
-- [ ] Revue des exemples, décisions sur les options.
-- [ ] Consolidation du statut : plancher des copies, verdict d'Unpaywall, `diamond` par le DOAJ.
-- [ ] Remesure avec `measure_oa_floor`, revue des écarts restants. Cas à vérifier :
+- [x] Mesure (`measure_oa_floor`) : accord avec Unpaywall de 97 % sur ouvert ou fermé, de 96 % sur la copie côté éditeur. f6a93aab6
+- [x] Fonction de décision du domaine (`domain/publications/open_access.py`). fcd982c57
+- [x] Statut calculé dans la consolidation et dans la phase `oa_status`. 0466fb7ba
+- [ ] Recalcul du stock (`recompute_oa_statuses`) : 6 675 publications changent de statut à blanc en local. Comparaison avec la mesure.
+- [ ] Revue des écarts restants. Cas à vérifier :
   - publication 9705 : ouverte « via l'éditeur » pour un DOI Zenodo, avec une autre copie Zenodo ;
   - publication 78490 : fermée, alors que le DOI mène au PDF. Le DOI est enregistré chez KISTI, agence mal couverte par Unpaywall.
 
 ### Phase 4 — Documentation
 
-- [ ] Mise à jour de la doc : statut open access dans `docs/pipeline/`, `docs/donnees/` et `docs/sources/`.
+- [x] Règle du statut dans `docs/pipeline/11-enrichissements.md`, Unpaywall dans `docs/sources/`. 0466fb7ba
 
 ## Questions ouvertes
 
-- Le statut déclaré par chaque source (`source_records.oa_status`) sert-il encore, hors embargo de theses.fr ? Ignoré, il laisse 671 publications sans copie ni verdict passer en `unknown`, dont 272 présentes seulement dans le WoS.
-- Copie ouverte sur `doi.org`, à DOI vérifié par Unpaywall : le verdict décide-t-il de son ouverture ? Unpaywall décrit la page de l'éditeur, comme HAL décrit ses dépôts. Le plancher compte sinon environ 5 % de copies faussement ouvertes.
-- 128 communications : HAL décrit un dépôt sans fichier, OpenAlex dit la copie HAL ouverte.
-- Lien `openaccess` de HAL vers le texte chez l'éditeur (`linkExtUrl_s`) : absent des copies. 31 publications déclarées `hybrid` par HAL seul.
+- `source_records.oa_status` et son calcul dans chaque normaliseur : seuls `closed` et l'embargo de theses.fr servent au statut de la publication. Garder la colonne, ou la réduire à ces deux faits ?
