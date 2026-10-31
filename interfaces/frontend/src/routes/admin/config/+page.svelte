@@ -136,6 +136,7 @@
   const CAPS = [
     { key: "fetch_missing_max_per_source", label: "Imports par DOI : max par source" },
     { key: "unpaywall_max_per_run", label: "Unpaywall" },
+    { key: "doi_resolution_max_per_run", label: "doi.org (adresses enregistrées)" },
     { key: "sudoc_max_per_run", label: "Sudoc : revues vérifiées" },
   ];
   const CAP_KEYS = new Set(CAPS.map((cap) => cap.key));
@@ -145,6 +146,7 @@
     { key: "fetch_stale_after_days", label: "Documents non revus" },
     { key: "fetch_missing_retry_after_days", label: "Recherches infructueuses" },
     { key: "unpaywall_recheck_after_days", label: "Statut open access (Unpaywall)" },
+    { key: "doi_resolution_recheck_after_days", label: "Adresses enregistrées des DOI (doi.org)" },
     { key: "doaj_refresh_after_days", label: "Fichier du DOAJ" },
   ];
   const DELAY_KEYS = new Set(DELAYS.map((delay) => delay.key));

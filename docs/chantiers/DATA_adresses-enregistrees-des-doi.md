@@ -20,13 +20,13 @@
 
 ### Phase 1 — Schéma
 
-- [x] Migration : `sources.dois`, reprise des verdicts de `unpaywall`, suppression de `unpaywall`.
-- [x] `tables.py`, snapshot du schéma, lectures et écritures déclarées du graphe.
-- [x] Lecteurs de `unpaywall` basculés : phase `oa_status`, consolidation, scripts.
+- [x] Migration : `sources.dois`, reprise des verdicts de `unpaywall`, suppression de `unpaywall` (8d7c2c4c0).
+- [x] `tables.py`, snapshot du schéma, lectures et écritures déclarées du graphe (8d7c2c4c0).
+- [x] Lecteurs de `unpaywall` basculés : phase `oa_status`, consolidation, scripts (8d7c2c4c0).
 
 ### Phase 2 — Résolution
 
-- [ ] Tâche de la phase `oa_status` : DOI jamais résolus ou périmés, délai et plafond par run réglables comme pour Unpaywall. Recalcul du statut des publications dont l'adresse enregistrée change.
+- [x] Tâche de la phase `oa_status` : DOI jamais résolus ou périmés, délai et plafond par run réglables comme pour Unpaywall. Recalcul du statut des publications des DOI résolus.
 
 ### Phase 3 — Copies
 

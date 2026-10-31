@@ -1,6 +1,6 @@
-"""Phase asynchrone `OaStatusPhase` (`pipeline.transformation.publications.oa_status`), avec la requête Unpaywall de `pipeline.ingestion.complements.unpaywall`.
+"""Tâches asynchrones de la phase `oa_status` (`pipeline.transformation.publications.oa_status`), avec les requêtes d'Unpaywall et de doi.org (`pipeline.ingestion.complements`).
 
-Les règles du statut sont testées dans `tests/unit/domain/publications/test_open_access.py` (`publication_oa_status`). Ce module teste les verdicts écrits par DOI, le recalcul des publications de ces DOI, le DOI absent, Unpaywall indisponible, la réponse 429 et le plafond de concurrence.
+Les règles du statut sont testées dans `tests/unit/domain/publications/test_open_access.py` (`publication_oa_status`). Ce module teste les réponses écrites par DOI, le recalcul des publications de ces DOI, le DOI absent, le service indisponible, la réponse 429 et le plafond de concurrence.
 
 Le store est simulé et capture les écritures. Les réponses HTTP viennent de la fixture `http_mock`.
 """
@@ -19,18 +19,23 @@ from domain.platforms.platform import PlatformType
 from domain.publications.access import Copy
 from domain.publications.licenses import License
 from pipeline.http.lookup import LookupOutcome
+from pipeline.ingestion.complements.doi_org import fetch_registered_url
 from pipeline.ingestion.complements.unpaywall import fetch_oa_status
 from pipeline.runtime.context import PhaseContext, RunOptions
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.task_runner import SingleTaskPhase
 from pipeline.transformation.publications.oa_status import (
+    DOI_ORG,
     MAX_CONCURRENT,
-    OaStatusFetcher,
+    UNPAYWALL,
+    DoiFetcher,
+    DoiLookupTask,
+    DoiService,
     OaStatusPhase,
     PublicationOaInputs,
 )
 
 UNPAYWALL_BASE = "https://api.unpaywall.org/v2"
+HANDLES_BASE = "https://doi.org/api/handles"
 TEST_EMAIL = "test@example.com"
 
 
@@ -41,6 +46,17 @@ def _make_fetcher():
         return await fetch_oa_status(client, doi, base_url=UNPAYWALL_BASE, email=TEST_EMAIL)
 
     return fetcher
+
+
+async def _doi_org_fetcher(client: httpx2.AsyncClient, doi: str) -> LookupOutcome[str]:
+    return await fetch_registered_url(client, doi, user_agent="test")
+
+
+def _handle_route(http_mock, doi: str, *, values: list | None = None, http_status: int = 200):
+    """Déclare la réponse de l'API des handles pour un DOI : ses valeurs `values` sous le code `http_status`."""
+    return http_mock.get(f"{HANDLES_BASE}/{doi}").mock(
+        return_value=httpx2.Response(http_status, json={"responseCode": 1, "values": values or []})
+    )
 
 
 def _route(http_mock, doi: str, *, status: str | None = None, http_status: int = 200):
@@ -79,12 +95,13 @@ def _publication(
         "full_oa",
         False,
         False,
+        None,
         list(copies),
     )
 
 
 class _FakeStore:
-    """DOI à vérifier, publications de ces DOI, et capture des écritures (`record_verdicts`, `update_oa_status`)."""
+    """DOI à interroger, publications de ces DOI, et capture des écritures (`record_answers`, `update_oa_status`). Une publication lue après l'écriture d'un verdict d'Unpaywall contient ce verdict."""
 
     def __init__(
         self,
@@ -99,26 +116,33 @@ class _FakeStore:
         self._stale_total = stale_total if stale_total is not None else len(self._dois)
         self._oa_distribution = oa_distribution or {}
         self._stored = stored or {}
-        self.verdicts: list[tuple[str, str | None]] = []
+        self.answers: list[tuple[str, str | None]] = []
+        self.services: set[DoiService] = set()
         self.updates: list[tuple[int, str]] = []
 
-    def fetch_verdicts(self, dois) -> dict[str, str | None]:
+    def fetch_answers(self, service, dois) -> dict[str, str | None]:  # noqa: ARG002
         return {d: s for d, s in self._stored.items() if d in set(dois)}
 
-    def fetch_dois_to_check(self, *, limit=None, staleness_days):
+    def fetch_dois_to_query(self, service, *, limit=None, staleness_days):  # noqa: ARG002
         return self._dois[:limit] if limit else self._dois
 
-    def count_dois_to_check(self, *, staleness_days) -> int:
+    def count_dois_to_query(self, service, *, staleness_days) -> int:  # noqa: ARG002
         return self._stale_total
 
     def count_publications_by_oa_status(self) -> dict[str, int]:
         return dict(self._oa_distribution)
 
-    def record_verdicts(self, verdicts) -> None:
-        self.verdicts.extend(verdicts)
+    def record_answers(self, service, answers) -> None:
+        self.services.add(service)
+        self.answers.extend(answers)
 
     def fetch_oa_inputs(self, dois) -> list[PublicationOaInputs]:
-        return [p for p in self._publications if p.doi in set(dois)]
+        verdicts = dict(self.answers) if UNPAYWALL in self.services else {}
+        return [
+            p._replace(unpaywall=verdicts.get(p.doi, p.unpaywall))
+            for p in self._publications
+            if p.doi in set(dois)
+        ]
 
     def update_oa_status(self, publication_id: int, status: str) -> None:
         self.updates.append((publication_id, status))
@@ -134,30 +158,53 @@ def _open_tx():
     yield MagicMock()
 
 
-def _run(
+def _task(
     queries: _FakeStore,
-    fetcher: OaStatusFetcher,
-    logger: logging.Logger,
+    fetcher: DoiFetcher,
     *,
+    service: DoiService = UNPAYWALL,
     max_concurrent: int = MAX_CONCURRENT,
-) -> PhaseMetrics:
-    """Exécute la phase sur une transaction inerte, Unpaywall configuré, sans plafond par run."""
-    return OaStatusPhase(
+) -> DoiLookupTask:
+    """Construit une tâche sans plafond par run, sur le store simulé."""
+    return DoiLookupTask(
+        service,
         fetcher,
+        title="Vérification",
+        participle="vérifié",
+        not_found=("non trouvé", "non trouvés"),
         staleness_days=lambda conn: 15,  # noqa: ARG005
         max_per_run=lambda conn: None,  # noqa: ARG005
         max_concurrent=max_concurrent,
         store_factory=lambda conn: queries,  # noqa: ARG005
-    ).run(
-        PhaseContext(
-            open_tx=_open_tx,
-            logger=logger,
-            options=RunOptions(),
-            maintain=lambda op: None,
-            credentials_missing=lambda _source: None,
-            request_budget=lambda _source: None,
-        )
     )
+
+
+def _context(logger: logging.Logger, **overrides) -> PhaseContext:
+    """Contexte sur une transaction inerte, sources configurées."""
+    return PhaseContext(
+        **{
+            "open_tx": _open_tx,
+            "logger": logger,
+            "options": RunOptions(),
+            "maintain": lambda op: None,
+            "credentials_missing": lambda _source: None,
+            "request_budget": lambda _source: None,
+            **overrides,
+        }
+    )
+
+
+def _run(
+    queries: _FakeStore,
+    fetcher: DoiFetcher,
+    logger: logging.Logger,
+    *,
+    service: DoiService = UNPAYWALL,
+    max_concurrent: int = MAX_CONCURRENT,
+) -> PhaseMetrics:
+    """Exécute une tâche sur une transaction inerte."""
+    task = _task(queries, fetcher, service=service, max_concurrent=max_concurrent)
+    return task.run(_context(logger))
 
 
 def test_happy_path_updates_each_publication(logger, http_mock):
@@ -178,7 +225,7 @@ def test_happy_path_updates_each_publication(logger, http_mock):
     )
     metrics = _run(queries, _make_fetcher(), logger)
 
-    assert sorted(queries.verdicts) == [
+    assert sorted(queries.answers) == [
         ("10.1/a", "gold"),
         ("10.1/b", "green"),
         ("10.1/c", "bronze"),
@@ -202,7 +249,7 @@ def test_404_ecrit_un_verdict_nul_et_le_statut_suit_les_copies(logger, http_mock
 
     queries = _FakeStore(publications, stored={"10.1/x": "closed"})
     metrics = _run(queries, _make_fetcher(), logger)
-    assert queries.verdicts == [("10.1/x", None)]
+    assert queries.answers == [("10.1/x", None)]
     assert queries.updates == [(1, "gold")]
     assert (metrics.extras["not_found"], metrics.updated) == (1, 0)
 
@@ -214,7 +261,7 @@ def test_unavailable_leaves_doi_unchecked(logger, http_mock):
 
     queries = _FakeStore(publications)
     metrics = _run(queries, _make_fetcher(), logger)
-    assert queries.verdicts == []
+    assert queries.answers == []
     assert queries.updates == []
     assert metrics.errors == 1
     assert metrics.extras["not_found"] == 0
@@ -234,7 +281,7 @@ def test_le_verdict_n_abaisse_pas_le_statut_des_copies(logger, http_mock):
 
     queries = _FakeStore(publications)
     _run(queries, _make_fetcher(), logger)
-    assert queries.verdicts == [("10.1/deposit", "closed")]
+    assert queries.answers == [("10.1/deposit", "closed")]
     assert queries.updates == []
 
 
@@ -244,7 +291,7 @@ def test_un_verdict_identique_compte_inchange(logger, http_mock):
 
     queries = _FakeStore(publications, stored={"10.1/same": "gold"})
     metrics = _run(queries, _make_fetcher(), logger)
-    assert queries.verdicts == [("10.1/same", "gold")]
+    assert queries.answers == [("10.1/same", "gold")]
     assert queries.updates == []
     assert (metrics.new, metrics.unchanged) == (0, 1)
 
@@ -300,30 +347,58 @@ def test_semaphore_caps_concurrent_fetches(logger):
 
 
 def test_skips_without_unpaywall_configuration(logger):
-    """Sans configuration Unpaywall, l'accès à la source signale son absence et la phase s'arrête avant toute transaction."""
-    queries = _FakeStore([_publication(1, "10.1/a", "closed")])
-    open_tx = MagicMock()
-    phase = SingleTaskPhase(
-        "oa_status.verify_unpaywall",
-        OaStatusPhase(
-            _make_fetcher(),
-            staleness_days=lambda conn: 15,  # noqa: ARG005
-            max_per_run=lambda conn: None,  # noqa: ARG005
-            store_factory=lambda conn: queries,  # noqa: ARG005
-        ),
+    """Sans configuration Unpaywall, l'accès à la source signale son absence et la tâche s'arrête avant toute transaction."""
+    queries = _FakeStore([])
+    unconfigured = _FakeStore([_publication(1, "10.1/a", "closed")])
+    open_tx = MagicMock(side_effect=_open_tx)
+    phase = OaStatusPhase(
+        resolution=_task(queries, _doi_org_fetcher, service=DOI_ORG),
+        unpaywall=_task(unconfigured, _make_fetcher()),
     )
 
     metrics = phase.run(
-        PhaseContext(
+        _context(
+            logger,
             open_tx=open_tx,
-            logger=logger,
-            options=RunOptions(),
-            maintain=lambda op: None,
-            credentials_missing=lambda _source: "adresse polite pool absente",
-            request_budget=lambda _source: None,
+            credentials_missing=lambda source: (
+                "adresse polite pool absente" if source == "unpaywall" else None
+            ),
         )
     )
 
-    open_tx.assert_not_called()
+    open_tx.assert_called_once()
     assert [s["code"] for s in metrics.signals] == ["source_unconfigured"]
-    assert queries.verdicts == []
+    assert unconfigured.answers == []
+
+
+def test_adresse_enregistree_lue_chez_doi_org(logger, http_mock):
+    """La valeur `URL` du handle est écrite ; un DOI inconnu et un handle sans adresse reçoivent une adresse nulle."""
+    publications = [
+        _publication(1, "10.1/u", None),
+        _publication(2, "10.1/x", None),
+        _publication(3, "10.1/e", None),
+    ]
+    _handle_route(
+        http_mock,
+        "10.1/u",
+        values=[
+            {
+                "index": 1,
+                "type": "URL",
+                "data": {"format": "string", "value": "https://e.org/a.pdf"},
+            }
+        ],
+    )
+    _handle_route(http_mock, "10.1/x", http_status=404)
+    _handle_route(http_mock, "10.1/e", values=[])
+
+    queries = _FakeStore(publications)
+    metrics = _run(queries, _doi_org_fetcher, logger, service=DOI_ORG)
+
+    assert queries.services == {DOI_ORG}
+    assert sorted(queries.answers) == [
+        ("10.1/e", None),
+        ("10.1/u", "https://e.org/a.pdf"),
+        ("10.1/x", None),
+    ]
+    assert (metrics.new, metrics.extras["not_found"]) == (1, 2)

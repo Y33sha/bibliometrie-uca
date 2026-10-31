@@ -15,7 +15,6 @@ from collections import Counter
 
 from sqlalchemy import text
 
-from domain.publications.open_access import publication_oa_status
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from pipeline.transformation.publications.oa_status import OaStatusStore
@@ -40,17 +39,8 @@ def main() -> int:
         log.info("recalcul du statut open access des publications %d à %d…", min_id, max_id)
         store = OaStatusStore(conn)
         for lo in range(min_id, max_id + 1, args.batch):
-            publications = store.fetch_oa_inputs_of(list(range(lo, lo + args.batch)))
-            verdicts = store.fetch_verdicts([p.doi for p in publications if p.doi])
-            for p in publications:
-                status = publication_oa_status(
-                    p.copies,
-                    embargoed=p.embargoed,
-                    restricted=p.restricted,
-                    unpaywall=verdicts.get(p.doi) if p.doi else None,
-                    has_serial=p.has_serial,
-                    serial_oa_model=p.serial_oa_model,
-                )
+            for p in store.fetch_oa_inputs_of(list(range(lo, lo + args.batch))):
+                status = p.computed_status()
                 if status != p.oa_status:
                     transitions[(p.oa_status, status)] += 1
                     store.update_oa_status(p.id, status)
