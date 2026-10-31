@@ -17,6 +17,8 @@ Base locale au 2026-10-31 :
 - Une forme sans éditeur répond à tout éditeur. Quatre formes sans éditeur désignent deux revues : « regards » (11220, 70507), « reperes » (8063, 9778), « atem archiv fur textmusikforschung » (67294, 96761), « french journal of urology » (20878, 20893). Le préfixe DOI de leurs publications sépare les deux revues « Regards » et les deux revues « Repères ».
 - Les revues à forme sans éditeur comptent 10 123 enregistrements sources sans éditeur. 8 795 ont un DOI dont le préfixe a un titulaire connu (`doi_prefixes.publisher_id`). `doi_prefixes` est rempli après `normalize`.
 - `delete_empty_publishers` garde un éditeur désigné par une forme de nom de revue.
+- La règle 3 de `merge_duplicate_serials` fusionne dans la revue son titre précédent, son titre suivant ou son supplément. 21 revues ont des enregistrements sources rattachés seulement par l'ISSN d'un tel titre : 307 enregistrements sources, 166 publications. Tous les enregistrements sources de 20 de ces publications passent par ce seul ISSN.
+- La vérification Sudoc range le titre précédent (zone 430) et le titre suivant (zone 440) sous un même statut d'ISSN, `related_title`.
 
 CRISalid, Academic Observatory et OpenAIRE identifient la revue par ses seuls ISSN ou ISSN-L, et recalculent le rattachement des publications à chaque passage ([benchmark](archived/2026-10-12_benchmark-pipelines.md)).
 
@@ -52,6 +54,7 @@ Les personnes et les publications ont un volet latéral (`PersonDrawer`, `Public
 
 - Les valeurs données par la source sur la série d'un enregistrement source deviennent des colonnes de `source_records` : titre brut et sa forme normalisée, ISSN, identifiant OpenAlex, nom brut de l'éditeur. Ce sont les valeurs qui servent au rattachement. `biblio` garde la numérotation.
 - La revue de chaque enregistrement source se calcule à chaque passage de `publishing`, comme sa publication : composantes connexes sur les ISSN et l'identifiant OpenAlex. Deux ISSN-L distincts restent toujours séparés. L'ISSN-L vient de la vérification Sudoc.
+- Un titre précédent, un titre suivant ou un supplément forme une revue distincte. Une table relie les revues par ces trois relations, lues dans le Sudoc.
 - Une série sans ISSN ni identifiant OpenAlex rejoint la seule revue à ISSN de même titre et d'éditeur compatible : le même éditeur, ou un éditeur absent d'un côté. Sinon, les séries de même titre et de même éditeur forment une revue sans ISSN.
 - Pour ce rattachement par titre, un enregistrement source sans éditeur reçoit le titulaire de son préfixe DOI Crossref. Le titulaire d'un préfixe DataCite est souvent un repository ou un établissement : il est exclu. `source_records.publisher_id` garde l'éditeur donné par la source.
 - Une revue garde son identifiant d'un passage à l'autre. Une fusion de revues décidée dans l'administration pose un jeton de fusion, lu par le calcul.
@@ -64,9 +67,10 @@ Les personnes et les publications ont un volet latéral (`PersonDrawer`, `Public
 - [ ] Colonnes de la série sur `source_records`, écrites par les normaliseurs, reprises de `biblio` pour le stock par un script ponctuel. Lecteurs basculés : vérification Sudoc, détection des actes de congrès, comparaison des sources.
 - [ ] Calcul des revues dans `publishing` : composantes connexes coupées par ISSN-L, rattachement par titre, identifiant conservé, redirection des revues absorbées
 - [ ] Éditeur déduit du préfixe DOI Crossref pour le rattachement par titre
+- [ ] Relations entre revues : titre précédent, titre suivant, supplément, lues dans le Sudoc. Liens sur la page d'une revue.
 - [ ] Fusion de revues dans l'administration par jeton de fusion
 - [ ] Normalisation sans recherche ni création de revue ; collection des monographies posée par `publishing`
-- [ ] Retrait de `serial_name_forms`, de `find_or_create_serial` et des règles de fusion couvertes par le calcul
+- [ ] Retrait de `serial_name_forms`, de `find_or_create_serial` et des règles de fusion remplacées par le calcul et les relations
 - [ ] Comparaison des revues avant et après sur le stock, dont les quatre titres partagés par deux revues
 
 ### Phase 2 — Éditeurs
@@ -92,8 +96,8 @@ Les personnes et les publications ont un volet latéral (`PersonDrawer`, `Public
 ### Phase 6 — Listes de revues
 
 - [ ] Modélisation : table des listes, table de liaison entre revues et listes
-- [ ] Source de chaque liste (question 3)
-- [ ] Mise à jour de chaque liste (question 4)
+- [ ] Source de chaque liste (question 2)
+- [ ] Mise à jour de chaque liste (question 3)
 
 ### Phase 7 — Plateformes typées comme revues
 
@@ -108,7 +112,6 @@ Les personnes et les publications ont un volet latéral (`PersonDrawer`, `Public
 
 ## Questions ouvertes
 
-1. Titre précédent ou suivant d'une revue, supplément : deux ISSN-L, donc deux revues. La règle 3 de `merge_duplicate_serials` les fusionne. Garder cette fusion ?
-2. Règle 5 de `merge_duplicate_serials` : deux revues rattachées à des enregistrements sources d'une même publication, aux titres compatibles (« Phys.Rev.Lett. » et « Physical Review Letters »). Utile une fois la revue de chaque publication arbitrée entre ses enregistrements sources ?
-3. Source de chaque liste : fichier publié par l'organisme, API ou saisie dans l'administration. Accès à la liste des revues indexées dans le WoS après la résiliation de l'abonnement.
-4. Mise à jour d'une liste : import complet qui la remplace, ajouts et retraits datés, ou liste posée une fois. Rattachement d'une entrée à une revue : par ISSN, par titre à défaut. Sort des entrées sans revue dans le référentiel.
+1. Règle 5 de `merge_duplicate_serials` : deux revues rattachées à des enregistrements sources d'une même publication, aux titres compatibles (« Phys.Rev.Lett. » et « Physical Review Letters »). Utile une fois la revue de chaque publication arbitrée entre ses enregistrements sources ?
+2. Source de chaque liste : fichier publié par l'organisme, API ou saisie dans l'administration. Accès à la liste des revues indexées dans le WoS après la résiliation de l'abonnement.
+3. Mise à jour d'une liste : import complet qui la remplace, ajouts et retraits datés, ou liste posée une fois. Rattachement d'une entrée à une revue : par ISSN, par titre à défaut. Sort des entrées sans revue dans le référentiel.
