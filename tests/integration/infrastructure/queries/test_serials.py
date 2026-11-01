@@ -111,10 +111,25 @@ class TestSudocCheck:
             text("SELECT issn, linked_issn, link_type::text FROM issn_links")
         ).all() == [("0028-0836", "1476-4687", "continued_by")]
 
-    def test_delete_empty_serials_spares_issns_records_and_apc_payments(self, sa_sync_conn, repo):
-        """Une revue à ISSN reste, même sans enregistrement source."""
+    def test_delete_empty_serials_spares_cited_and_linked_issns_records_and_apc_payments(
+        self, sa_sync_conn, repo
+    ):
+        """Une revue vide à ISSN reste quand l'un de ses ISSN est cité par une série ou relié par un lien entre titres."""
         empty = _serial(sa_sync_conn, title="Revue test vide")
-        with_issn = _serial(sa_sync_conn, title="Revue test à ISSN", issn="2999-0007")
+        uncited = _serial(sa_sync_conn, title="Revue test à ISSN orphelin", issn="2999-0007")
+        cited = _serial(sa_sync_conn, title="Revue test à ISSN cité", issn="2999-0015")
+        insert_source_record(
+            sa_sync_conn,
+            source_id="cite-2999-0015",
+            biblio={"journal": {"title": "Revue citée", "issns": [{"issn": "2999-0015"}]}},
+        )
+        linked = _serial(sa_sync_conn, title="Revue test à titre suivant", issn="2999-0023")
+        sa_sync_conn.execute(
+            text(
+                "INSERT INTO issn_links (issn, linked_issn, link_type)"
+                " VALUES ('2999-0023', '2999-0031', 'continued_by')"
+            )
+        )
         with_record = _serial(sa_sync_conn, title="Revue test avec enregistrement")
         _article(
             sa_sync_conn,
@@ -126,7 +141,14 @@ class TestSudocCheck:
         insert_apc_payment(sa_sync_conn, serial_id=with_payment, open_access_fee=True)
         deleted = {j.id: j for j in delete_empty_serials(sa_sync_conn)}
         assert deleted[empty].title == "Revue test vide"
-        assert not deleted.keys() & {with_issn, with_record, with_payment}
+        assert uncited in deleted
+        assert not deleted.keys() & {cited, linked, with_record, with_payment}
+        assert (
+            sa_sync_conn.execute(
+                text("SELECT serial_id FROM serial_issns WHERE issn = '2999-0007'")
+            ).scalar_one()
+            is None
+        )
 
     def test_describe_serials(self, sa_sync_conn, repo):
         serial_id = _serial(sa_sync_conn, title="Revue test décrite", eissn="2999-0008")

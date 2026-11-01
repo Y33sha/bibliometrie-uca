@@ -1,6 +1,6 @@
 """Sous-étape de la phase `finalize` : suppression des revues vides.
 
-Une revue vide n'a ni ISSN, ni enregistrement source, ni publication, ni monographie, ni paiement APC. Une revue à ISSN reste : supprimée, elle serait recréée au passage suivant pour les séries qui citent ses ISSN. Le journal garde le titre et l'éditeur de chaque revue supprimée.
+Une revue vide n'a ni enregistrement source, ni publication, ni monographie, ni paiement APC. Une revue vide reste quand l'un de ses ISSN est cité par la série d'un enregistrement source : supprimée, elle serait recréée au passage suivant. Elle reste aussi quand l'un de ses ISSN est relié à un autre par un lien entre titres ou entre revue principale et supplément. Les lignes d'ISSN d'une revue supprimée restent, sans revue. Le journal garde le titre et l'éditeur de chaque revue supprimée.
 """
 
 import logging
@@ -16,9 +16,25 @@ LABEL = "Publications en série vides"
 """Libellé de la sous-étape dans le journal de la phase."""
 
 _EMPTY_SERIALS = text("""
+    WITH cited AS (
+        SELECT DISTINCT e->>'issn' AS issn
+        FROM source_records s
+        CROSS JOIN LATERAL jsonb_array_elements(s.biblio->'journal'->'issns') e
+        WHERE jsonb_typeof(s.biblio->'journal'->'issns') = 'array'
+    ),
+    linked AS (
+        SELECT issn FROM issn_links WHERE link_type IN ('continued_by', 'supplement')
+        UNION
+        SELECT linked_issn FROM issn_links WHERE link_type IN ('continued_by', 'supplement')
+    ),
+    kept AS (
+        SELECT i.serial_id FROM serial_issns i JOIN cited c ON c.issn = i.issn
+        UNION
+        SELECT i.serial_id FROM serial_issns i JOIN linked l ON l.issn = i.issn
+    )
     SELECT j.id, j.title, p.name AS publisher
     FROM serials j LEFT JOIN publishers p ON p.id = j.publisher_id
-    WHERE NOT EXISTS (SELECT 1 FROM serial_issns i WHERE i.serial_id = j.id)
+    WHERE NOT EXISTS (SELECT 1 FROM kept k WHERE k.serial_id = j.id)
       AND NOT EXISTS (SELECT 1 FROM source_records s WHERE s.serial_id = j.id)
       AND NOT EXISTS (SELECT 1 FROM publications p WHERE p.serial_id = j.id)
       AND NOT EXISTS (SELECT 1 FROM apc_payments a WHERE a.serial_id = j.id)

@@ -1239,6 +1239,10 @@ TASKS: tuple[Task, ...] = (
             "apc_payments",
             "doi_prefixes.publisher_id",
             "serial_title_decisions",
+            # ISSN cités par la série d'un enregistrement source, ou reliés à un autre titre.
+            "serial_issns",
+            "source_records.biblio",
+            "issn_links",
         ),
         writes=("monographs.id", "serials.id", "publishers.id", "serial_issns"),
     ),
