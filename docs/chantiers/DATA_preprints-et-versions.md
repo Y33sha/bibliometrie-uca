@@ -134,6 +134,14 @@ La reconstruction des publications fusionne 1 047 publications. 709 paires `is_p
 
 La seconde reconstruction, DOI de dépôt compris, fusionne 294 publications. Les publications DESY typées preprint passent de 173 à 19, celles de RWTH de 112 à 38. Les publications Zenodo typées preprint passent de 25 à 84 : des working papers, typés article par OpenAlex, que leur DOI Zenodo faisait passer pour publiés. L'article « Octagon Embeddings » quitte 15705 (319879).
 
+### Discussions Copernicus, simulation du 2026-11-01
+
+Règle simulée : les discussions Copernicus forment un serveur de preprints, au DOI de forme `10.5194/<revue>-<année>-<numéro>`, preprints EGUsphere compris. Le rattachement à une revue par l'espace de noms DOI ignore leurs DOI. Hors règle : anciennes discussions (`amtd-…`, 3 DOI), commentaires (`-ac1`, 416 DOI), suppléments, résumés de congrès.
+
+- 95 publications fusionnent, en 93 groupes : discussion paper et article final. Une fusion est fausse : un discussion paper rejoint une thèse par un work OpenAlex typé thèse (173176, 283259). Cinq autres réunissent des titres modifiés entre la discussion et l'article.
+- 110 discussion papers restent seuls, dont 100 du périmètre. Tous deviennent preprints : 52 le sont, 40 sont typés `other` et 18 article. Les 64 rattachés à une revue la perdent.
+- Le statut open access des discussion papers seuls passe de `gold` à `green` : copie sur un serveur de preprints.
+
 ## Décisions
 
 - **Un preprint et sa version publiée forment une seule publication quand une clé de confirmation les réunit.** Seuls les DOI extérieurs aux serveurs de preprints du registre coupent les regroupements. Une communication sans actes, une HDR ou un article sans localisation éditeur réunit ainsi ses copies de serveurs de preprints.
