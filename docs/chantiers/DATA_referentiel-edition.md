@@ -75,7 +75,6 @@ Les personnes et les publications ont un volet latéral (`PersonDrawer`, `Public
 - Identifiant OpenAlex d'une revue : celui des enregistrements sources OpenAlex dont l'ISSN-L, d'après OpenAlex, est celui de la revue. Modèle OA : celui d'OpenAlex pour cette source, sauf saisie à la main.
 - Une série sans ISSN ni identifiant OpenAlex rejoint la seule revue à ISSN de même titre, quel que soit son éditeur. L'éditeur départage plusieurs revues à ISSN de même titre. À défaut, elle rejoint la seule revue à ISSN de titre compatible parmi celles des autres enregistrements sources de sa publication (« JHEP »). La publication est celle du run précédent. Sinon, les séries de même titre forment une revue sans ISSN.
 - Une revue sans ISSN est identifiée par son titre normalisé : chaque source nomme l'éditeur à sa façon (« Edition CdP », « Editions CdP »). Une collection de monographies sans ISSN est identifiée par son titre et son éditeur : les noms de collection génériques (« Essais ») sont fréquents.
-- Pour ce rattachement par titre, un enregistrement source sans éditeur reçoit le titulaire de son préfixe DOI Crossref. Le titulaire d'un préfixe DataCite est souvent un repository ou un établissement : il est exclu. `source_records.publisher_id` garde l'éditeur donné par la source.
 - Deux revues de même ISSN-L fusionnent : la revue vide est absorbée, avec une redirection.
 - L'administration modifie le titre, le type et le modèle OA d'une revue. Les ISSN sont en lecture seule.
 - Une série qui désigne une plateforme est écartée à la normalisation : source OpenAlex de la liste des plateformes connues (Cairn.info), ou titre qui nomme le serveur de preprints du DOI du document (« SSRN Electronic Journal »). La série d'une vraie revue reste, même sous un DOI de serveur de preprints.
@@ -96,7 +95,6 @@ Les personnes et les publications ont un volet latéral (`PersonDrawer`, `Public
 - [x] Titre seul rattaché à la revue à ISSN d'un autre enregistrement source de la publication (b2ecf4014)
 - [x] Revue à ISSN gardée même vide, revérification Sudoc de tous les ISSN (5474a9263)
 - [x] Titre de chaque revue d'après la notice Sudoc de son ISSN-L, gardée par ISSN (816a520de)
-- [ ] Éditeur déduit du préfixe DOI Crossref pour le rattachement par titre. Mesure préalable de son utilité : départage de revues à ISSN de même titre, collections sans ISSN des monographies
 - [x] Relations entre revues déduites des liens entre ISSN. Liens sur la page d'une revue (035cdf8f6)
 - [x] Administration : ISSN en lecture seule, fusion limitée aux revues sans ISSN et gardée dans la table des titres (27f9ef446)
 - [x] Normalisation sans recherche ni création de revue. Collection sans ISSN des monographies : revue sans ISSN de son titre et de son éditeur (27f9ef446)
