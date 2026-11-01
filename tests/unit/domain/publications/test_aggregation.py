@@ -279,6 +279,49 @@ class TestLicences:
         assert publication.license == "public-domain"
 
 
+class TestIndicateursDeCitation:
+    """Indicateurs du premier enregistrement source OpenAlex dans l'ordre d'arbitrage."""
+
+    _ORDRE = ("crossref", "openalex")
+
+    def test_ceux_d_openalex_meme_apres_une_source_prioritaire(self):
+        sources = [
+            _source_record(id=1, source="crossref", impact={"cited_by_count": 50}),
+            _source_record(id=2, source="openalex", impact={"cited_by_count": 30, "fwci": 1.2}),
+        ]
+        publication = _publication()
+        refresh_from_sources(publication, sources, source_priority=self._ORDRE)
+        assert publication.impact == {"cited_by_count": 30, "fwci": 1.2}
+
+    def test_ceux_de_la_version_publiee_avant_le_preprint(self):
+        sources = [
+            _source_record(
+                id=1,
+                source="openalex",
+                doc_type="preprint",
+                doi="10.48550/arxiv.1",
+                impact={"cited_by_count": 3},
+            ),
+            _source_record(
+                id=2,
+                source="openalex",
+                doc_type="article",
+                doi="10.1016/article",
+                impact={"cited_by_count": 40, "fwci": 2.1},
+            ),
+        ]
+        publication = _publication()
+        refresh_from_sources(publication, sources, source_priority=self._ORDRE)
+        assert publication.impact == {"cited_by_count": 40, "fwci": 2.1}
+
+    def test_sans_enregistrement_openalex_aucun_indicateur(self):
+        sources = [_source_record(id=1, source="crossref", impact={"cited_by_count": 50})]
+        publication = _publication()
+        publication.impact = {"cited_by_count": 12}
+        refresh_from_sources(publication, sources, source_priority=self._ORDRE)
+        assert publication.impact is None
+
+
 class TestCollectionDeLaMonographie:
     def test_publication_sans_revue_prend_la_collection_de_sa_monographie(self):
         publication = _publication()

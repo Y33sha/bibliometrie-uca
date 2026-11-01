@@ -1194,6 +1194,11 @@ publications = Table(
         server_default=text("'{}'::jsonb"),
     ),
     Column("is_retracted", Boolean, nullable=False, server_default="false"),
+    Column(
+        "impact",
+        Jsonb,
+        comment="Indicateurs de citation de l'enregistrement source OpenAlex retenu par la consolidation.",
+    ),
     # Résumé, mots-clés et numérotation sont dans `publications_detail` (1:1), lu seulement par la page de détail. `publications` reste étroite pour les listes et les facettes.
     # Indices des contributions de personnes non exclues, maintenus par la phase `finalize` et à l'exclusion d'une personne. `in_perimeter` en découle ; le filtre de périmètre des listes le lit.
     Column(
@@ -1213,6 +1218,10 @@ publications = Table(
     CheckConstraint(
         "jsonb_typeof(corrections) = 'object'",
         name="publications_corrections_is_object",
+    ),
+    CheckConstraint(
+        "impact IS NULL OR jsonb_typeof(impact) = 'object'",
+        name="publications_impact_is_object",
     ),
     schema="publications",
 )

@@ -34,3 +34,5 @@ class SourceRecord:
     """Licence normalisée (valeur de `License`)."""
     publisher_id: int | None = None
     publication_date: PublicationDate | None = None
+    impact: dict[str, JsonValue] | None = None
+    """Indicateurs de citation (`domain.source_records.impact`)."""

@@ -33,6 +33,7 @@ def refresh_from_sources(
     - Date de publication : `arbitrate_publication_date` ; l'année en dérive.
     - Licence : celle de la version éditeur (`publisher_license_sources`). Licence de dépôt : celle du fichier déposé dans HAL.
     - Rétractation : déclarée par une source au moins.
+    - Indicateurs de citation : ceux du premier enregistrement source OpenAlex dans l'ordre d'arbitrage. Le nombre de citations et le FWCI décrivent ainsi la même œuvre, comptée dans la même base.
     - Mots-clés et pays : union sans doublon.
     - `biblio` et `source_extras` : fusion par clé, la source prioritaire l'emporte.
 
@@ -79,6 +80,9 @@ def refresh_from_sources(
     publication.biblio = shallow_merge_jsonb(sorted_sources, "biblio")
     publication.source_extras = shallow_merge_jsonb(sorted_sources, "source_extras")
     publication.is_retracted = any(s.is_retracted for s in sorted_sources if s.is_retracted)
+    publication.impact = next(
+        (s.impact for s in sorted_sources if s.source == Source.OPENALEX), None
+    )
 
 
 def assign_publisher(
