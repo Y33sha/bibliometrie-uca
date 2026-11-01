@@ -19,7 +19,7 @@
 	type CitationPoint = components['schemas']['CitationPoint'];
 	type CitationPointsResponse = components['schemas']['CitationPointsResponse'];
 	type Row = PivotResponse['rows'][number];
-	type Figure = { value: string; label: string; tone?: 'open'; title?: string };
+	type Figure = { value: string; label: string; tone?: 'open'; tooltip?: string };
 
 	// Dashboard des publications d'une entité, calculé par le moteur de la page Statistiques. Le corpus est celui de l'onglet Publications, restreint à la famille « Publications » et aux années récentes. La répartition par types de documents compte toutes les familles, sur les mêmes années.
 	let {
@@ -144,7 +144,7 @@
 					{
 						value: percent(topCited, withCitationClass),
 						label: 'dans le top 10 % des plus citées',
-						title: `D'après OpenAlex, sur les ${withCitationClass.toLocaleString('fr-FR')} publications pourvues de l'indicateur (${percent(withCitationClass, total)} du corpus)`,
+						tooltip: `D'après OpenAlex, sur les ${withCitationClass.toLocaleString('fr-FR')} publications pourvues de l'indicateur (${percent(withCitationClass, total)} du corpus)`,
 					},
 				]
 			: []),

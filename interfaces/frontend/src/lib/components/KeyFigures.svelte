@@ -3,14 +3,14 @@
 	let {
 		items
 	}: {
-		/** `open` colore le chiffre en vert open access. `title` s'affiche au survol. */
-		items: { value: string; label: string; tone?: 'open'; title?: string }[];
+		/** `open` colore le chiffre en vert open access. `tooltip` s'affiche au survol. */
+		items: { value: string; label: string; tone?: 'open'; tooltip?: string }[];
 	} = $props();
 </script>
 
 <div class="key-figures">
 	{#each items as item (item.label)}
-		<div title={item.title}>
+		<div title={item.tooltip}>
 			<div class="key-figure-value" class:open={item.tone === 'open'}>{item.value}</div>
 			<div class="key-figure-label">{item.label}</div>
 		</div>
