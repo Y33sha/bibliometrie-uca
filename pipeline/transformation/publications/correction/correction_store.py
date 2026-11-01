@@ -222,12 +222,13 @@ def _unary_row(
     identifiers = parse_identifiers(r.identifiers)
     dois = frozenset(own_dois(active(identifiers)))
     types = {registrant_types.get(doi.split("/", 1)[0]) for doi in dois}
+    columns = r._mapping
     return UnaryCorrectionRow(
         id=r.id,
         source_id=r.source_id,
         corrections=r.corrections,
         facts=MetadataForCorrection(
-            **{name: r._mapping[name] for name in _FACTS},
+            **{name: columns[name] for name in _FACTS},
             dois=dois,
             registrant_publisher_types=frozenset(t for t in types if t is not None),
         ),

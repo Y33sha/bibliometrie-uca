@@ -12,6 +12,7 @@ Un fait inconnu vaut `None`, et les prédicats qui le testent sont faux. Une pub
 import re
 from dataclasses import dataclass, field, fields
 from enum import StrEnum
+from functools import lru_cache
 from typing import NamedTuple, TypedDict
 
 from domain.normalize import normalize_text
@@ -451,6 +452,9 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
 
 _FIELDS = frozenset(f.name for f in fields(MetadataForCorrection))
 
+# Plusieurs règles testent le préfixe du titre normalisé d'un même enregistrement source, à la suite.
+_normalized_title = lru_cache(maxsize=16)(normalize_text)
+
 
 def _check_predicate(source_record: MetadataForCorrection, key: str, value: object) -> bool:
     """Vrai si les faits vérifient le prédicat `key` de valeur `value` (`_AppliesTo`)."""
@@ -478,7 +482,7 @@ def _check_predicate(source_record: MetadataForCorrection, key: str, value: obje
         assert isinstance(value, tuple)
         if not source_record.title:
             return False
-        normalized = normalize_text(source_record.title)
+        normalized = _normalized_title(source_record.title)
         return any(normalized.startswith(p) for p in value)
     if key == "title_regex":
         assert isinstance(value, re.Pattern)
