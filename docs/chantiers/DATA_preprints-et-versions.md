@@ -114,7 +114,7 @@ Le titre change souvent entre preprint et article : les titres différents d'une
 
 ### Remédiation du 2026-11-01
 
-La reconstruction des publications fusionne 1 047 publications. 709 paires `is_preprint_of` restent distinctes. 301756 rejoint 165044.
+La reconstruction des publications fusionne 1 047 publications. 709 paires `is_preprint_of` restent distinctes. 301756 rejoint 165044. 109 publications au DOI d'un serveur de preprints réunissent un enregistrement source d'un type publié et restent typées preprint, dont 43 avec revue (3059).
 
 ## Décisions
 
@@ -122,6 +122,7 @@ La reconstruction des publications fusionne 1 047 publications. 709 paires `is_p
 - **Le DOI d'une publication est son DOI extérieur aux serveurs de preprints**, à défaut le DOI d'un serveur de preprints.
 - **Dans une publication à DOI extérieur aux serveurs de preprints, les enregistrements sources preprint passent après les autres** pour arbitrer le type, la date, le titre et les autres champs.
 - **Un dépôt arXiv est un preprint**, même accepté pour publication : la plateforme impose le type.
+- **Une publication typée preprint prend le type de son conteneur** : article dans une revue, communication dans des actes, chapitre dans un ouvrage.
 - **Les copies d'un preprint passent après les autres copies ouvertes dans le volet Accès** : un preprint donne l'accès principal seulement s'il est la seule copie ouverte. Le nom de la plateforme suffit à reconnaître un preprint.
 - **Un preprint sans clé commune avec sa version publiée reste une publication distincte et visible**, reliée par `is_preprint_of`. L'administration fusionne la paire à la main. La fusion manuelle ignore les DOI des serveurs de preprints, comme la réconciliation.
 
@@ -146,6 +147,7 @@ La reconstruction des publications fusionne 1 047 publications. 709 paires `is_p
 - [x] Fusion manuelle : DOI des serveurs de preprints ignorés (7a291b64c)
 - [x] Arbitrage : enregistrements sources preprint après les autres (96b9bc228)
 - [x] Remédiation du stock : reconstruction des publications (`--rebuild-publications`), run du 2026-11-01
+- [ ] Type d'une publication preprint d'après son conteneur : revue, actes, ouvrage
 
 ### Phase 3 — Affichage
 
@@ -159,7 +161,6 @@ La reconstruction des publications fusionne 1 047 publications. 709 paires `is_p
 
 - **Fusion fausse.** Un DOI secondaire cité par un seul enregistrement source d'agrégateur suffit à réunir deux œuvres (165353, 27616). Recours : l'interdiction de fusion, prévue par le chantier de gestion admin des publications.
 - **Preprints restés distincts** (813 paires) : discussion papers Copernicus, dépôts institutionnels, paires reliées par le seul titre. Les fusions manuelles de l'administration diront si des critères de fusion automatique existent. Une fusion manuelle reste refusée entre deux DOI qui coupent : discussion papers Copernicus (189), dépôts DESY, RWTH et Zenodo typés preprint.
-- **Preprint avec revue.** 109 publications au DOI d'un serveur de preprints réunissent un enregistrement source d'un type publié : dépôt HAL, work OpenAlex, WoS. Elles restent typées preprint, dont 43 avec revue (3059). Le type publié l'emporte-t-il quand la publication a une revue ?
 - **Revue d'un preprint.** La revue de l'article, donnée par l'espace de noms DOI, compte 149 discussion papers parmi ses publications.
 - **Working papers typés `other`** (87) : le type `preprint` de HAL devant le type `other` de DataCite ?
 - **Fiabilité de la version déclarée.** La version des localisations d'entrepôt est peu fiable chez OpenAlex comme chez Unpaywall : 200 949 localisations d'entrepôt sur 258 875 sont en `submittedVersion`, y compris dans Cairn, qui héberge des versions publiées.
