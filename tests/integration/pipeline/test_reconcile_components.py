@@ -563,6 +563,34 @@ class TestEndToEnd:
             == "10.1/x"
         )
 
+    def test_the_zenodo_doi_of_a_text_deposit_does_not_keep_the_copy_apart(self, sa_sync_conn):
+        """La copie Zenodo d'un article le rejoint ; le jeu de données Zenodo d'un autre article, œuvre distincte, garde sa publication."""
+        conn = sa_sync_conn
+        article = _seed_publication(conn, doi="10.1/x")
+        copy = _seed_publication(conn, doi="10.5281/zenodo.1")
+        other_article = _seed_publication(conn, doi="10.1/y")
+        dataset = _seed_publication(conn, doi="10.5281/zenodo.2")
+        first_hal_id = _hal(_SECONDARY, "hal-01000001")
+        second_hal_id = _hal(_SECONDARY, "hal-01000002")
+        _source_record(conn, article, source_id="a", doi="10.1/x", identifiers=first_hal_id)
+        source_record_copy = _source_record(
+            conn, copy, source_id="c", doi="10.5281/zenodo.1", identifiers=first_hal_id
+        )
+        _source_record(conn, other_article, source_id="b", doi="10.1/y", identifiers=second_hal_id)
+        source_record_dataset = _source_record(
+            conn,
+            dataset,
+            source_id="d",
+            doi="10.5281/zenodo.2",
+            doc_type="dataset",
+            identifiers=second_hal_id,
+        )
+
+        reconcile(conn, logger)
+
+        assert _source_record_state(conn, source_record_copy) == (article, False)
+        assert _source_record_state(conn, source_record_dataset) == (dataset, False)
+
     def test_publication_of_a_residual_source_record_is_refreshed(self, sa_sync_conn):
         """L'enregistrement source sans DOI d'une composante à deux DOI reste sur sa publication, recalculée sans le DOI perdu."""
         conn = sa_sync_conn

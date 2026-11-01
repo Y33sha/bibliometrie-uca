@@ -8,9 +8,11 @@ from application.ports.repositories.publication_merge_repository import (
     PublicationMergeRepository,
 )
 from domain.persons.contribution_matching import ContributionMatchReason
-from domain.publications.manual_merge import Attribution
+from domain.publications.manual_merge import Attribution, PublicationDoi
 
-_DOIS_SQL = text("SELECT id, doi FROM publications WHERE id = ANY(:ids)")
+_DOIS_SQL = text(
+    "SELECT id, doi, doc_type::text AS doc_type FROM publications WHERE id = ANY(:ids)"
+)
 
 _SOURCE_RECORDS_SQL = text(
     "SELECT id FROM source_records WHERE publication_id = ANY(:ids) ORDER BY id"
@@ -64,9 +66,9 @@ class PgPublicationMergeRepository(PublicationMergeRepository):
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
 
-    def dois(self, publication_ids: Sequence[int]) -> dict[int, str | None]:
+    def dois(self, publication_ids: Sequence[int]) -> dict[int, PublicationDoi]:
         rows = self._conn.execute(_DOIS_SQL, {"ids": list(publication_ids)})
-        return {row.id: row.doi for row in rows}
+        return {row.id: PublicationDoi(row.doi, row.doc_type) for row in rows}
 
     def source_record_ids(self, publication_ids: Sequence[int]) -> list[int]:
         return list(

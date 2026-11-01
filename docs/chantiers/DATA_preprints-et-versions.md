@@ -135,12 +135,13 @@ La reconstruction des publications fusionne 1 047 publications. 709 paires `is_p
 ## Décisions
 
 - **Un preprint et sa version publiée forment une seule publication quand une clé de confirmation les réunit.** Seuls les DOI extérieurs aux serveurs de preprints du registre coupent les regroupements. Une communication sans actes, une HDR ou un article sans localisation éditeur réunit ainsi ses copies de serveurs de preprints.
-- **Le DOI d'une publication est son DOI extérieur aux serveurs de preprints**, à défaut le DOI d'un serveur de preprints.
-- **Dans une publication publiée, les enregistrements sources preprint passent après les autres** pour arbitrer le type, la date, le titre et les autres champs. Une publication est publiée quand son DOI est extérieur aux serveurs de preprints, ou quand un enregistrement source typé autrement que preprint a un conteneur.
+- **Une copie de dépôt rejoint sa version publiée comme un preprint.** Le DOI d'une archive de copies (DESY, RWTH, GSI, ResearchGate) et le DOI Zenodo d'un dépôt de texte restent hors des ancres. Le DOI Zenodo d'un jeu de données, d'un logiciel ou d'un poster reste une ancre.
+- **Le DOI d'une publication est son ancre**, à défaut un DOI de dépôt : serveur de preprints, archive de copies, dépôt de texte sur Zenodo.
+- **Dans une publication qui a une version publiée, les enregistrements sources preprint passent après les autres** pour arbitrer le type, la date, le titre et les autres champs. Une publication a une version publiée quand ses enregistrements sources ont une ancre, ou quand un enregistrement source typé autrement que preprint a un conteneur.
 - **Une publication publiée par son conteneur prend le type du conteneur** : article dans une revue, communication dans des actes, chapitre dans un ouvrage. La correction des métadonnées aligne déjà le type de l'enregistrement source sur son conteneur.
 - **Un dépôt arXiv est un preprint**, même accepté pour publication : la plateforme impose le type.
 - **Les copies d'un preprint passent après les autres copies ouvertes dans le volet Accès** : un preprint donne l'accès principal seulement s'il est la seule copie ouverte. Le nom de la plateforme suffit à reconnaître un preprint.
-- **Un preprint sans clé commune avec sa version publiée reste une publication distincte et visible**, reliée par `is_preprint_of`. L'administration fusionne la paire à la main. La fusion manuelle ignore les DOI des serveurs de preprints, comme la réconciliation.
+- **Un preprint sans clé commune avec sa version publiée reste une publication distincte et visible**, reliée par `is_preprint_of`. L'administration fusionne la paire à la main. La fusion manuelle ignore les DOI de dépôt, comme la réconciliation.
 
 ## Phasage
 
@@ -165,6 +166,8 @@ La reconstruction des publications fusionne 1 047 publications. 709 paires `is_p
 - [x] Remédiation du stock : reconstruction des publications (`--rebuild-publications`), run du 2026-11-01
 - [x] Retrait du DOI d'une autre œuvre étendu à toutes les sources, pour la fusion fausse de 15705 (1004d75d1)
 - [x] Publication publiée par le conteneur d'un enregistrement source typé autrement que preprint : revue, actes, ouvrage (6269b46ef)
+- [x] DOI de dépôt hors des ancres : archives de copies (DESY, RWTH, GSI, ResearchGate), dépôts de textes sur Zenodo ; fusion manuelle comprise
+- [ ] Remédiation du stock : reconstruction des publications pour les DOI de dépôt
 
 ### Phase 3 — Affichage
 
@@ -177,7 +180,7 @@ La reconstruction des publications fusionne 1 047 publications. 709 paires `is_p
 ## Questions ouvertes
 
 - **Fusion fausse.** Un DOI secondaire cité par un seul enregistrement source d'agrégateur suffit à réunir deux œuvres (165353, 27616). Recours : l'interdiction de fusion, prévue par le chantier de gestion admin des publications.
-- **Preprints restés distincts** (813 paires) : discussion papers Copernicus, dépôts institutionnels, paires reliées par le seul titre. Les fusions manuelles de l'administration diront si des critères de fusion automatique existent. Une fusion manuelle reste refusée entre deux DOI qui coupent : discussion papers Copernicus (189), dépôts DESY, RWTH et Zenodo typés preprint.
+- **Preprints restés distincts** (813 paires) : discussion papers Copernicus, paires reliées par le seul titre. Les fusions manuelles de l'administration diront si des critères de fusion automatique existent. Une fusion manuelle reste refusée entre deux DOI qui coupent : discussion papers Copernicus (189).
 - **Revue d'un preprint.** La revue de l'article, donnée par l'espace de noms DOI, compte 149 discussion papers parmi ses publications.
 - **Working papers typés `other`** (87) : le type `preprint` de HAL devant le type `other` de DataCite ?
 - **Fiabilité de la version déclarée.** La version des localisations d'entrepôt est peu fiable chez OpenAlex comme chez Unpaywall : 200 949 localisations d'entrepôt sur 258 875 sont en `submittedVersion`, y compris dans Cairn, qui héberge des versions publiées.

@@ -12,12 +12,7 @@ from domain.publications.identifiers import DOI
 from domain.publications.licenses import DEPOSIT_LICENSE_SOURCE, publisher_license_sources
 from domain.publications.publication import Publication
 from domain.publishers.attribution import publication_publisher
-from domain.source_records.keys import (
-    anchor_of,
-    doi_anchors,
-    is_preprint_server_doi,
-    preprint_server_anchors,
-)
+from domain.source_records.keys import anchor_of, deposit_anchors, doi_anchors
 from domain.source_records.source_record import SourceRecord
 from domain.sources.registry import Source
 from domain.types import JsonValue, as_int, as_str
@@ -51,7 +46,7 @@ def refresh_from_sources(
 
     new_doi_str = publication_doi(prioritized(sources, source_priority))
     publication.doi = DOI(new_doi_str) if new_doi_str else None
-    sorted_sources = arbitration_order(sources, source_priority, doi=new_doi_str)
+    sorted_sources = arbitration_order(sources, source_priority)
 
     new_title = as_str(first_non_null(sorted_sources, "title"))
     publication.title = new_title if new_title is not None else publication.title
@@ -102,21 +97,14 @@ def assign_publisher(
     publication.publisher_id = publication_publisher(
         publication.doc_type,
         (prefix_publishers or {}).get(prefix) if prefix else None,
-        (
-            s.publisher_id
-            for s in arbitration_order(
-                sources, source_priority, doi=str(publication.doi) if publication.doi else None
-            )
-        ),
+        (s.publisher_id for s in arbitration_order(sources, source_priority)),
         platform_prefix=prefix is not None and is_publisher_platform_prefix(prefix),
     )
 
 
 def publication_doi(sources: list[SourceRecord]) -> str | None:
-    """Renvoie le DOI d'une publication : l'ancre de ses enregistrements sources (`doi_anchors`), à défaut un DOI de serveur de preprints (`preprint_server_anchors`). Entre plusieurs candidats, celui du premier enregistrement source de `sources` qui en rejoint un."""
-    candidates = doi_anchors(s.dois for s in sources) or preprint_server_anchors(
-        s.dois for s in sources
-    )
+    """Renvoie le DOI d'une publication : l'ancre de ses enregistrements sources (`doi_anchors`), à défaut un DOI de dépôt (`deposit_anchors`). Entre plusieurs candidats, celui du premier enregistrement source de `sources` qui en rejoint un."""
+    candidates = doi_anchors(s.dois for s in sources) or deposit_anchors(s.dois for s in sources)
     if len(candidates) == 1:
         return next(iter(candidates))
     return next((a for s in sources if (a := anchor_of(s.dois, candidates)) is not None), None)
@@ -131,18 +119,18 @@ def prioritized(
 
 
 def arbitration_order(
-    sources: list[SourceRecord], source_priority: tuple[str, ...], *, doi: str | None
+    sources: list[SourceRecord], source_priority: tuple[str, ...]
 ) -> list[SourceRecord]:
-    """Trie `sources` dans l'ordre de `source_priority`. Dans une publication publiée (`is_published`), les enregistrements sources preprint passent après les autres."""
+    """Trie `sources` dans l'ordre de `source_priority`. Dans une publication qui a une version publiée (`has_published_version`), les enregistrements sources preprint passent après les autres."""
     ordered = prioritized(sources, source_priority)
-    if not is_published(sources, doi=doi):
+    if not has_published_version(sources):
         return ordered
     return sorted(ordered, key=lambda s: s.doc_type == DocType.PREPRINT)
 
 
-def is_published(sources: list[SourceRecord], *, doi: str | None) -> bool:
-    """Vrai si la publication de DOI `doi` est publiée : DOI extérieur aux serveurs de preprints, ou revue ou monographie d'un enregistrement source typé autrement que preprint."""
-    if doi is not None and not is_preprint_server_doi(doi):
+def has_published_version(sources: list[SourceRecord]) -> bool:
+    """Vrai si une publication a une version publiée : une ancre (`doi_anchors`), ou la revue ou la monographie d'un enregistrement source typé autrement que preprint."""
+    if doi_anchors(s.dois for s in sources):
         return True
     return any(
         s.doc_type not in (None, DocType.PREPRINT)

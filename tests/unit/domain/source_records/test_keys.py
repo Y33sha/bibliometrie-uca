@@ -16,9 +16,9 @@ from domain.source_records.keys import (
     Derivation,
     DoiKeys,
     anchor_of,
+    deposit_anchors,
     derivation,
     doi_anchors,
-    preprint_server_anchors,
     project_confirmation_keys,
 )
 
@@ -77,10 +77,22 @@ class TestAnchors:
             [DoiKeys(frozenset({arxiv})), DoiKeys(frozenset(), frozenset({article}))]
         ) == {article}
 
-    def test_preprint_server_anchors_are_chosen_like_anchors(self):
+    def test_deposit_anchors_are_chosen_like_anchors(self):
         arxiv, ssrn = "10.48550/arxiv.1", "10.2139/ssrn.1"
         keys = [DoiKeys(frozenset({arxiv})), DoiKeys(frozenset(), frozenset({ssrn}))]
-        assert preprint_server_anchors(keys) == {arxiv}
+        assert deposit_anchors(keys) == {arxiv}
+
+    def test_the_doi_of_a_copy_archive_is_not_an_anchor(self):
+        desy, article = "10.3204/pubdb-2024-00624", "10.1016/article"
+        keys = [DoiKeys(frozenset({desy}), doc_type="article"), DoiKeys(frozenset({article}))]
+        assert doi_anchors(keys) == {article}
+
+    def test_the_zenodo_doi_of_a_text_deposit_is_not_an_anchor(self):
+        zenodo, article = "10.5281/zenodo.1", "10.1016/article"
+        copy = DoiKeys(frozenset({zenodo}), doc_type="article")
+        dataset = DoiKeys(frozenset({zenodo}), doc_type="dataset")
+        assert doi_anchors([copy, DoiKeys(frozenset({article}))]) == {article}
+        assert doi_anchors([dataset, DoiKeys(frozenset({article}))]) == {zenodo, article}
 
     def test_anchor_of_a_member(self):
         anchors = frozenset({"a", "b"})

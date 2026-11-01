@@ -4,23 +4,39 @@ import pytest
 
 from domain.errors import ValidationError
 from domain.persons.contribution_matching import MATCH_REASON_PRIORITY, ContributionMatchReason
-from domain.publications.manual_merge import Attribution, check_mergeable, merge_attributions
+from domain.publications.manual_merge import (
+    Attribution,
+    PublicationDoi,
+    check_mergeable,
+    merge_attributions,
+)
 
 ORCID = ContributionMatchReason.ORCID
 NAME = ContributionMatchReason.NAME
 
 
+def _articles(*dois):
+    return [PublicationDoi(doi, "article") for doi in dois]
+
+
 def test_distinct_dois_are_not_mergeable():
     with pytest.raises(ValidationError, match="DOI distincts"):
-        check_mergeable(["10.1/x", "10.2/y"])
+        check_mergeable(_articles("10.1/x", "10.2/y"))
 
 
 def test_one_doi_and_a_publication_without_doi_are_mergeable():
-    check_mergeable(["10.1/X", None, "10.1/x"])
+    check_mergeable(_articles("10.1/X", None, "10.1/x"))
 
 
-def test_a_preprint_server_doi_stays_out_of_the_count():
-    check_mergeable(["10.1/x", "10.48550/arxiv.2401.00001"])
+def test_a_deposit_doi_stays_out_of_the_count():
+    check_mergeable(
+        [*_articles("10.1/x", "10.3204/pubdb-2024-00624"), PublicationDoi("10.48550/arxiv.1", None)]
+    )
+
+
+def test_the_doi_of_a_zenodo_dataset_counts():
+    with pytest.raises(ValidationError, match="DOI distincts"):
+        check_mergeable([*_articles("10.1/x"), PublicationDoi("10.5281/zenodo.1", "dataset")])
 
 
 def test_priority_follows_the_order_of_the_decision():

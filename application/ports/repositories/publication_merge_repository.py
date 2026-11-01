@@ -3,14 +3,14 @@
 from collections.abc import Mapping, Sequence
 from typing import Protocol
 
-from domain.publications.manual_merge import Attribution
+from domain.publications.manual_merge import Attribution, PublicationDoi
 
 
 class PublicationMergeRepository(Protocol):
     """Publications à fusionner, verdict de fusion et personnes de leurs contributions."""
 
-    def dois(self, publication_ids: Sequence[int]) -> dict[int, str | None]:
-        """Renvoie le DOI de chaque publication donnée existante."""
+    def dois(self, publication_ids: Sequence[int]) -> dict[int, PublicationDoi]:
+        """Renvoie le DOI de chaque publication donnée existante, avec son type de document."""
         ...
 
     def source_record_ids(self, publication_ids: Sequence[int]) -> list[int]:

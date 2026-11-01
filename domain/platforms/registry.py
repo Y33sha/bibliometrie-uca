@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from urllib.parse import urlsplit
 
 from domain.platforms.platform import PlatformType
+from domain.publications.doc_types import DocType
 from domain.publications.identifiers import clean_doi, is_hal_host
 from domain.serials.titles import compatible_titles, nested_titles
 from domain.source_records.identifiers import SourceIdentifierType
@@ -27,6 +28,8 @@ class KnownPlatform:
     """Début du suffixe des DOI de la plateforme, quand ses préfixes couvrent aussi d'autres publications."""
     fully_open: bool = False
     """La plateforme donne librement accès à tout son contenu, d'après sa propre déclaration."""
+    deposit_doc_types: frozenset[str] | None = frozenset()
+    """Types de document dont le DOI de la plateforme est un DOI de dépôt (`is_deposit_doi`). `None` pour tous les types, absent compris."""
 
 
 def _preprint_server(
@@ -46,6 +49,7 @@ def _preprint_server(
         hosts,
         doi_suffix,
         fully_open,
+        deposit_doc_types=None,
     )
 
 
@@ -64,6 +68,7 @@ def _repository(
     prefixes: set[str] | None = None,
     *,
     fully_open: bool = False,
+    deposit_doc_types: frozenset[str] | None = frozenset(),
 ) -> KnownPlatform:
     return KnownPlatform(
         name,
@@ -72,7 +77,28 @@ def _repository(
         openalex_ids,
         hosts,
         fully_open=fully_open,
+        deposit_doc_types=deposit_doc_types,
     )
+
+
+def _copy_archive(
+    name: str, openalex_ids: tuple[str, ...], prefixes: set[str], hosts: tuple[str, ...] = ()
+) -> KnownPlatform:
+    """Archive de copies de documents publiés ailleurs : tout DOI de l'archive est un DOI de dépôt."""
+    return _repository(name, openalex_ids, hosts, prefixes, deposit_doc_types=None)
+
+
+_TEXT_DOC_TYPES = frozenset(
+    {
+        DocType.PREPRINT,
+        DocType.ARTICLE,
+        DocType.REVIEW,
+        DocType.CONFERENCE_PAPER,
+        DocType.BOOK_CHAPTER,
+        DocType.REPORT,
+    }
+)
+"""Types d'un dépôt de texte : sur Zenodo, un preprint ou la copie d'un document publié ailleurs. Un jeu de données, un logiciel ou un poster y forme une œuvre distincte."""
 
 
 HAL = _repository(
@@ -88,7 +114,9 @@ PUBMED_CENTRAL = _repository(
 )
 """L'archive de PubMed Central, que désigne aussi l'identifiant PMCID d'un document. La source OpenAlex de son miroir Europe PMC donne surtout des adresses de PubMed Central."""
 
-ZENODO = _repository("Zenodo", ("S4306400562",), ("zenodo.org",))
+ZENODO = _repository(
+    "Zenodo", ("S4306400562",), ("zenodo.org",), {"10.5281"}, deposit_doc_types=_TEXT_DOC_TYPES
+)
 """L'archive ouverte Zenodo, du CERN."""
 
 ARXIV = _preprint_server(
@@ -103,20 +131,20 @@ KNOWN_PLATFORMS: tuple[KnownPlatform, ...] = (
     _repository("Figshare", ("S4377196282",), ("figshare.com",)),
     _repository("CERN Document Server", ("S4306402195",), ("cds.cern.ch",)),
     _repository("theses.fr", ("S4406923047",), ("theses.fr",)),
-    _repository(
+    _copy_archive(
         "DESY Publication Database",
         ("S4306400383", "S4306401365", "S4377196278"),
-        ("bib-pubdb1.desy.de",),
         {"10.3204"},
+        ("bib-pubdb1.desy.de",),
     ),
-    _repository(
+    _copy_archive(
         "RWTH Publications",
         ("S4306401033", "S4306401362"),
-        ("publications.rwth-aachen.de",),
         {"10.18154"},
+        ("publications.rwth-aachen.de",),
     ),
-    _repository(
-        "GSI Repository", ("S4306400339", "S4306401977"), ("repository.gsi.de",), {"10.15120"}
+    _copy_archive(
+        "GSI Repository", ("S4306400339", "S4306401977"), {"10.15120"}, ("repository.gsi.de",)
     ),
     _repository("Infoscience", ("S4306400487", "S4306400488"), ("infoscience.epfl.ch",)),
     _repository("ORBi", ("S4306401300",), ("orbi.uliege.be",)),
@@ -124,7 +152,7 @@ KNOWN_PLATFORMS: tuple[KnownPlatform, ...] = (
     _repository("Enlighten", hosts=("eprints.gla.ac.uk",)),
     _repository("Wageningen University & Research", hosts=("research.wur.nl",)),
     _repository("Aarhus University", hosts=("pure.au.dk",)),
-    _repository("ResearchGate", hosts=("researchgate.net",), prefixes={"10.13140"}),
+    _copy_archive("ResearchGate", (), {"10.13140"}, ("researchgate.net",)),
     # Résolveur des identifiants Handle, surtout ceux des archives institutionnelles.
     _repository("Handle", hosts=("hdl.handle.net",)),
     # Posters et diaporamas déposés sur F1000Research, hors de sa revue.
@@ -250,6 +278,17 @@ def preprint_servers_of_doi(doi: str) -> tuple[KnownPlatform, ...]:
         return ()
     return tuple(
         p for p in _platforms_of_doi(cleaned) if p.platform_type is PlatformType.PREPRINT_SERVER
+    )
+
+
+def is_deposit_doi(doi: str, doc_type: str | None) -> bool:
+    """Vrai pour un DOI de dépôt : DOI attribué par une plateforme de la liste à un document de type `doc_type`, dont l'œuvre peut avoir un autre DOI. Serveur de preprints, archive de copies (DESY), dépôt de texte sur Zenodo."""
+    cleaned = clean_doi(doi)
+    if not cleaned:
+        return False
+    return any(
+        p.deposit_doc_types is None or doc_type in p.deposit_doc_types
+        for p in _platforms_of_doi(cleaned)
     )
 
 

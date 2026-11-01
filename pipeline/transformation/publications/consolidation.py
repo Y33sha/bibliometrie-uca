@@ -77,7 +77,7 @@ def _source_record_from_row(
         title=row.title,
         publication_year=row.publication_year,
         doc_type=row.doc_type,
-        dois=doi_keys(identifiers, doi_targets),
+        dois=doi_keys(identifiers, doi_targets, row.doc_type),
         serial_id=row.serial_id,
         monograph_id=row.monograph_id,
         container_title=row.container_title,
