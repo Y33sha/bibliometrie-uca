@@ -8,6 +8,7 @@ from __future__ import annotations
 from datetime import date
 
 from domain.publications.dates import DatePrecision, PublicationDate
+from domain.subjects.subject import Subject, SubjectVocabulary
 from pipeline.ingestion.common.embargoes import Embargo
 from pipeline.ingestion.common.source_records import SourceRecordUpsert
 from pipeline.ingestion.theses.normalize import (
@@ -17,6 +18,7 @@ from pipeline.ingestion.theses.normalize import (
     extract_theses_author_block,
     get_publication_date,
     get_publication_year,
+    get_subjects,
     get_title,
     theses_source_record,
 )
@@ -184,23 +186,34 @@ class TestThesesSourceRecord:
     def test_no_keywords(self):
         assert self._call({}).keywords is None
 
-    def test_topics_discipline_only(self):
-        assert self._call({"discipline": "Informatique"}).topics == {"discipline": "Informatique"}
+    def test_subjects_discipline_only(self):
+        [link] = get_subjects({"discipline": "Informatique"})
+        assert link.subject == Subject(
+            SubjectVocabulary.THESES_DISCIPLINE, "informatique", "Informatique"
+        )
 
-    def test_topics_with_rameau(self):
+    def test_subjects_rameau_coded_by_the_ppn_of_their_query(self):
         thesis = {
             "discipline": "Informatique",
             "mapSujets": {
-                "fr": [{"keyword": "Apprentissage automatique", "type": "sujetsRameau"}, {}]
+                "fr": [
+                    {
+                        "keyword": "Littérature espagnole -- 20e siècle",
+                        "type": "sujetsRameau",
+                        "query": '"Littérature espagnole -- 20e siècle" ET 02897297x',
+                    },
+                    {"keyword": "Sans PPN", "type": "sujetsRameau", "query": '"Sans PPN"'},
+                    {},
+                ]
             },
         }
-        assert self._call(thesis).topics == {
-            "discipline": "Informatique",
-            "rameau": ["Apprentissage automatique"],
-        }
+        assert [(link.subject.vocabulary, link.subject.code) for link in get_subjects(thesis)] == [
+            (SubjectVocabulary.THESES_DISCIPLINE, "informatique"),
+            (SubjectVocabulary.RAMEAU, "02897297X"),
+        ]
 
-    def test_no_topics(self):
-        assert self._call({}).topics is None
+    def test_no_subjects(self):
+        assert get_subjects({}) == []
 
     def test_source_meta_passed(self):
         record = self._call({"dateSoutenance": "15/03/2024"})

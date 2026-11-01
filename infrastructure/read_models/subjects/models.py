@@ -6,6 +6,7 @@ Les écritures du référentiel appartiennent à la phase `subjects` (`pipeline/
 """
 
 from application.ports.model import Model
+from domain.subjects.subject import SubjectVocabulary
 from infrastructure.read_models._common import PaginatedResponse
 
 
@@ -14,7 +15,9 @@ class SubjectOut(Model):
 
     id: int
     label: str
-    language: str | None
+    vocabulary: SubjectVocabulary
+    level: int
+    """Profondeur dans le vocabulaire : 1 pour une racine."""
     sources: list[str]
     """Sources ayant fourni le sujet."""
 
@@ -24,7 +27,9 @@ class SubjectListItem(Model):
 
     id: int
     label: str
-    language: str | None
+    vocabulary: SubjectVocabulary
+    level: int
+    """Profondeur dans le vocabulaire : 1 pour une racine."""
     usage_count: int
 
 

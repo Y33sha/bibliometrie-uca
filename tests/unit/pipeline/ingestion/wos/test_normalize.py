@@ -376,8 +376,6 @@ def _make_api_record(  # noqa: C901
     page_end: str | None = "120",
     abstract: str | list | None = "Some abstract.",
     keywords: list[str] | None = None,
-    subjects: list[dict] | None = None,
-    headings: list[str] | None = None,
     tc_count: int | None = 42,
     authors: list[dict] | None = None,
 ) -> dict[str, Any]:
@@ -426,12 +424,6 @@ def _make_api_record(  # noqa: C901
     if keywords:
         keywords_value = {"keyword": keywords}
 
-    category_info: dict[str, Any] = {}
-    if subjects:
-        category_info["subjects"] = {"subject": subjects}
-    if headings:
-        category_info["headings"] = {"heading": headings}
-
     languages_value: dict[str, Any] = {}
     if language:
         languages_value = {"language": [language]}
@@ -453,7 +445,6 @@ def _make_api_record(  # noqa: C901
             "languages": languages_value,
             "abstracts": abstracts_value,
             "keywords": keywords_value,
-            "category_info": category_info,
         },
     }
     dynamic: dict[str, Any] = {
@@ -623,38 +614,6 @@ class TestExtractFromApi:
         rec = extract_from_api(raw, None)
         assert rec["keywords"] is None
 
-    def test_topics_subjects_and_headings(self):
-        raw = _make_api_record(
-            subjects=[{"content": "Chemistry"}, {"content": "Physics"}],
-            headings=["Materials Science"],
-        )
-        rec = extract_from_api(raw, None)
-        assert rec["topics"] == {
-            "subjects": ["Chemistry", "Physics"],
-            "headings": ["Materials Science"],
-        }
-
-    def test_topics_subjects_as_dict(self):
-        raw = _make_api_record()
-        raw["static_data"]["fullrecord_metadata"]["category_info"] = {
-            "subjects": {"subject": {"content": "Single"}}
-        }
-        rec = extract_from_api(raw, None)
-        assert rec["topics"] == {"subjects": ["Single"]}
-
-    def test_topics_headings_as_string(self):
-        raw = _make_api_record()
-        raw["static_data"]["fullrecord_metadata"]["category_info"] = {
-            "headings": {"heading": "Lone Heading"}
-        }
-        rec = extract_from_api(raw, None)
-        assert rec["topics"] == {"headings": ["Lone Heading"]}
-
-    def test_topics_none_when_empty(self):
-        raw = _make_api_record()
-        rec = extract_from_api(raw, None)
-        assert rec["topics"] is None
-
     def test_cited_by_count_invalid_value(self):
         """Un `local_count` non numérique donne None."""
         raw = _make_api_record()
@@ -732,7 +691,6 @@ class TestExtractFromExport:
         assert rec["publisher_name"] == "ELSEVIER"
         assert rec["cited_by_count"] == 7
         assert rec["keywords"] == ["alpha", "beta"]
-        assert rec["topics"] == {"subjects": ["Microbiology", "Immunology"]}
         assert rec["biblio"]["volume"] == "12"
         assert rec["biblio"]["first_page"] == "3"
 
@@ -803,7 +761,6 @@ class TestWosSourceRecord:
             "cited_by_count": 9,
             "biblio": {"volume": "1"},
             "keywords": ["k1"],
-            "topics": {"subjects": ["s"]},
             "urls": ["https://x"],
         }
 

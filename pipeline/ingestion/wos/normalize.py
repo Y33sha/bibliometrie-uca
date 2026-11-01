@@ -262,21 +262,6 @@ def extract_from_api(raw: Mapping[str, JsonValue], staging_doi: str | None) -> d
     single_word = as_str(kw_raw)
     keywords = ([single_word] if single_word else as_strs(kw_raw)) or None
 
-    # Topics : catégories WoS.
-    cat = at_path(frm, "category_info")
-    topics = {}
-    subj_names = [
-        name
-        for s in _safe_list(at_path(cat, "subjects").get("subject"))
-        if (name := as_str(as_mapping(s).get("content")))
-    ]
-    if subj_names:
-        topics["subjects"] = subj_names
-    if headings := [
-        h for e in _safe_list(at_path(cat, "headings").get("heading")) if (h := as_str(e))
-    ]:
-        topics["headings"] = headings
-
     cited_by_count = None
     for entry in _safe_list(at_path(dynamic, "citation_related", "tc_list").get("silo_tc")):
         tc = as_mapping(entry)
@@ -303,7 +288,6 @@ def extract_from_api(raw: Mapping[str, JsonValue], staging_doi: str | None) -> d
         "cited_by_count": cited_by_count,
         "biblio": biblio or None,
         "keywords": keywords,
-        "topics": topics or None,
         "urls": None,
         "isbns": _get_api_isbns(dynamic, "isbn"),
         "eisbns": _get_api_isbns(dynamic, "eisbn"),
@@ -355,7 +339,6 @@ def extract_from_export(
         last_page=field("EP"),
         publisher=field("PU"),
     )
-    subjects = list(dict.fromkeys(split_export_list(field("WC")) + split_export_list(field("SC"))))
     doc_types = split_export_list(field("DT"))
     languages = split_export_list(field("LA"))
     isbns = [isbn for value in split_export_list(field("BN")) for isbn in find_isbns(value)]
@@ -377,7 +360,6 @@ def extract_from_export(
         "cited_by_count": int(tc) if (tc := field("TC")) and tc.isdigit() else None,
         "biblio": biblio or None,
         "keywords": split_export_list(field("DE")) or None,
-        "topics": {"subjects": subjects} if subjects else None,
         "urls": None,
         "isbns": list(dict.fromkeys(isbns)),
         "eisbns": [],
@@ -448,7 +430,6 @@ def wos_source_record(
         biblio=dict(as_mapping(rec.get("biblio"))) or None,
         abstract=as_str(rec.get("abstract")),
         keywords=[k for e in as_sequence(rec.get("keywords")) if (k := as_str(e))] or None,
-        topics=dict(as_mapping(rec.get("topics"))) or None,
         urls=[u for e in as_sequence(rec.get("urls")) if (u := as_str(e))] or None,
         impact=Impact(cited_by_count=as_int(rec.get("cited_by_count"))).to_json(),
     )

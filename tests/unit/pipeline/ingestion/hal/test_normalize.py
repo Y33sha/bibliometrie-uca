@@ -23,6 +23,7 @@ from pipeline.ingestion.hal.normalize import (
     extract_hal_author_block,
     get_container_facts,
     get_locations,
+    get_subjects,
     get_title,
     hal_source_record,
     page_range,
@@ -420,14 +421,20 @@ class TestHalSourceRecord:
     def test_keywords_without_tei(self):
         assert self._call({}).keywords is None
 
-    def test_topics_from_domain(self):
-        """Les domaines sont stockés tels que la source les expose ; la phase `subjects` les découpe en libellés."""
+    def test_subjects_from_domains(self):
+        """Chaque domaine du dépôt est un sujet, avec ses ancêtres ; une entrée mal formée est écartée."""
         entries = [
             "sdv.bibs_FacetSep_Sciences du Vivant [q-bio]/Biostatistiques",
             "info.algo_FacetSep_Informatique [cs]/Algorithme et structure de données",
+            "sans séparateur",
         ]
-        captured = self._call({"fr_domainAllCodeLabel_fs": entries})
-        assert captured.topics == {"hal_domains": entries}
+        links = get_subjects({"fr_domainAllCodeLabel_fs": entries})
+        assert [
+            (link.subject.code, link.subject.parent and link.subject.parent.code) for link in links
+        ] == [
+            ("sdv.bibs", "sdv"),
+            ("info.algo", "info"),
+        ]
 
     def test_biblio_built_from_volume_issue_pages(self):
         captured = self._call({"volume_s": "10", "issue_s": "2", "page_s": "100-120"})

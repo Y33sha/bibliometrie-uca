@@ -17,11 +17,11 @@ La table est reconstruite à chaque exécution, à partir de signaux indépendan
 ## Sujets (`subjects`)
 
 **Ingestion.**
-Les sujets déclarés par les sources sur chaque `source_record` sont rattachés à la publication, dans les tables `subjects` et `publication_subjects`. Le lien garde la source qui a fourni le sujet. Seuls les termes d'un vocabulaire contrôlé entrent dans `subjects`. Les mots-clés libres restent dans les enregistrements sources.
+La normalisation lie chaque enregistrement source aux sujets donnés par sa source (`source_record_subjects`). La phase lie la publication à ces sujets et à leurs ancêtres, dans `publication_subjects`. Le lien garde la source qui a fourni le sujet.
 
 Les publications aux sources modifiées depuis la dernière ingestion de leurs sujets sont retraitées : leurs liens sont reconstruits, sauf ceux marqués `rejected`. L'option `--rebuild-subjects` retraite toutes les publications.
 
-Les sujets sans lien sont supprimés.
+Les sujets liés à aucun enregistrement source ni à aucune publication sont supprimés, sauf les ancêtres d'un sujet lié.
 
 **Co-occurrences.** Recalcule depuis `publication_subjects` :
 

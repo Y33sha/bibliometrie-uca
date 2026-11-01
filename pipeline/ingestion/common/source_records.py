@@ -68,7 +68,6 @@ class SourceRecordUpsert:
     abstract: str | None = None
     """Résumé. L'écriture retire la version MathML d'une formule déposée aussi en LaTeX (`drop_duplicate_mathml`) et l'intitulé « Abstract » ou « Résumé » en tête (`strip_abstract_label`)."""
     keywords: list[str] | None = None
-    topics: JsonValue = None
 
     # Open access
     license: License | None = None

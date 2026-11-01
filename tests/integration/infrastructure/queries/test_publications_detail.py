@@ -4,6 +4,7 @@ import json
 
 from sqlalchemy import text
 
+from domain.subjects.subject import Subject, SubjectLink, SubjectVocabulary
 from infrastructure.read_models.publications.detail import (
     get_publication_external_identifiers,
     get_publication_subjects,
@@ -122,7 +123,11 @@ class TestGetPublicationDetail:
             source="theses",
             source_id="t-1",
             title="Thèse",
-            topics={"discipline": "Informatique"},
+            subjects=[
+                SubjectLink(
+                    Subject(SubjectVocabulary.THESES_DISCIPLINE, "informatique", "Informatique")
+                )
+            ],
         )
 
         detail = publications_queries(sa_sync_conn).get_publication_detail(publication)

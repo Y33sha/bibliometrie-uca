@@ -4,7 +4,7 @@
 
 Base locale au 2026-11-01.
 
-- **Unicité des sujets.** `subjects` contient un libellé par sujet, unique à la casse près. Les fonctions de lecture des sujets (`subject_extractors.py`) rendent des libellés seuls. Un libellé présent dans plusieurs vocabulaires donne un seul sujet : 3 001 libellés au 2026-10-25. Les homonymes d'un même vocabulaire aussi : « Biochemistry », « Genetics », « Pharmacology » sont des subfields OpenAlex de deux fields différents ; « Social Sciences » est domain et field.
+- **Unicité des sujets.** Un sujet identifié par son seul libellé réunit les vocabulaires : 3 001 libellés communs à plusieurs vocabulaires au 2026-10-25. Les homonymes d'un même vocabulaire aussi : « Biochemistry », « Genetics », « Pharmacology » sont des subfields OpenAlex de deux fields différents ; « Social Sciences » est domain et field.
 - **Hiérarchie.** Tous les niveaux sont liés à plat à la publication. La chaîne domain → field → subfield → topic d'OpenAlex et le chemin des domaines HAL existent seulement dans `source_records.topics`.
 - **Codes des vocabulaires.**
   - OpenAlex : le payload donne l'identifiant de chaque niveau (`domains/2`, `fields/20`, `subfields/2002`, `T11257`). Le normalizer garde le libellé et le score seulement (`extract_topics`).
@@ -35,22 +35,21 @@ Base locale au 2026-11-01.
 
 ### Phase 2 — Sujets écrits à la normalisation
 
-- [ ] Schéma : `subjects` contient vocabulaire, code, niveau et parent ; unicité sur (vocabulaire, code) à la place de l'unicité sur le libellé ; `language` retirée. Table `source_record_subjects` : enregistrement source, sujet, score
-- [ ] Écriture commune aux normalizers : sujets et liens en une requête par lot
-- [ ] HAL : domaines par leur code, chaque niveau rattaché au niveau supérieur
-- [ ] OpenAlex : identifiant de chaque niveau, score du topic
-- [ ] ScanR et theses.fr : vedettes RAMEAU par leur PPN, lu dans le champ `query` chez theses.fr ; discipline de theses.fr par son libellé
-- [ ] WoS : sujets abandonnés
-- [ ] Phase `subjects` : `publication_subjects` dérivée en SQL de `source_record_subjects` ; fonctions de lecture des sujets (`subject_extractors.py`) retirées
-- [ ] Fiche d'une thèse : discipline lue dans les sujets
-- [ ] API des sujets : vocabulaire et niveau de chaque sujet
-- [ ] Documentation : `docs/agregats/subjects.md`, `docs/donnees/03-publications.md`, `docs/pipeline/03-normalize.md`
+- [x] Schéma : `subjects` contient vocabulaire, code, niveau et parent ; unicité sur (vocabulaire, code) à la place de l'unicité sur le libellé ; `language` retirée. Table `source_record_subjects` : enregistrement source, sujet, score
+- [x] Écriture commune aux normalizers : sujets et liens en une requête par lot
+- [x] HAL : domaines par leur code, chaque niveau rattaché au niveau supérieur
+- [x] OpenAlex : identifiant de chaque niveau, score du topic
+- [x] ScanR et theses.fr : vedettes RAMEAU par leur PPN, lu dans le champ `query` chez theses.fr ; discipline de theses.fr par son libellé
+- [x] WoS : sujets abandonnés
+- [x] Phase `subjects` : `publication_subjects` dérivée en SQL de `source_record_subjects` ; fonctions de lecture des sujets (`subject_extractors.py`) retirées
+- [x] Fiche d'une thèse : discipline lue dans les sujets
+- [x] API des sujets : vocabulaire et niveau de chaque sujet
+- [x] Documentation : `docs/donnees/03-publications.md`, `docs/pipeline/03-normalize.md`, `docs/pipeline/11-enrichissements.md`
 
 ### Phase 3 — Stock, entre la migration et le run suivant
 
-- [ ] HAL : `last_seen_at` vieilli pour tous les dépôts, puis run sur toutes les années. Le moissonnage relit les 59 720 dépôts des collections, `fetch_stale` les 7 352 autres. Leur normalisation écrit les sujets et les mots-clés du TEI
-- [ ] ScanR : script ponctuel qui écrit les sujets depuis `source_records.topics`, où les codes sont présents
-- [ ] OpenAlex : script ponctuel qui écrit les sujets depuis le raw store
+- [ ] Script ponctuel `write_source_record_subjects` : HAL et ScanR depuis `source_records.topics`, où les codes sont présents ; OpenAlex depuis le raw store
+- [ ] HAL : `last_seen_at` vieilli pour tous les dépôts, puis run sur toutes les années. Le moissonnage relit les 59 720 dépôts des collections, `fetch_stale` les 7 352 autres. Leur normalisation écrit les mots-clés du TEI
 - [ ] theses.fr : `raw_hash` vidé et `last_seen_at` vieilli pour toutes les thèses, puis `fetch_stale` sur toutes les années. La normalisation qui suit retire aussi `source_extras.discipline`
 - [ ] Retrait de `source_records.topics` ; scripts de la pertinence des sujets (`sample_subject_relevance`, `prototype_subject_vote`) adaptés
 

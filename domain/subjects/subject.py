@@ -22,6 +22,15 @@ class SubjectVocabulary(StrEnum):
     """Disciplines des thèses de theses.fr, libellés libres en français."""
 
 
+VOCABULARY_LABELS: dict[str, str] = {
+    SubjectVocabulary.OPENALEX: "OpenAlex",
+    SubjectVocabulary.HAL_DOMAIN: "Domaines HAL",
+    SubjectVocabulary.RAMEAU: "RAMEAU",
+    SubjectVocabulary.THESES_DISCIPLINE: "Disciplines de thèse",
+}
+"""Libellé d'affichage de chaque vocabulaire."""
+
+
 @dataclass(frozen=True, slots=True)
 class Subject:
     """Sujet d'un vocabulaire, avec la chaîne de ses ancêtres."""

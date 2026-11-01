@@ -6121,8 +6121,12 @@ export interface components {
             id: number;
             /** Label */
             label: string;
-            /** Language */
-            language: string | null;
+            vocabulary: components["schemas"]["SubjectVocabulary"];
+            /**
+             * Level
+             * @description Profondeur dans le vocabulaire : 1 pour une racine.
+             */
+            level: number;
             /** Usage Count */
             usage_count: number;
         };
@@ -6174,14 +6178,24 @@ export interface components {
             id: number;
             /** Label */
             label: string;
-            /** Language */
-            language: string | null;
+            vocabulary: components["schemas"]["SubjectVocabulary"];
+            /**
+             * Level
+             * @description Profondeur dans le vocabulaire : 1 pour une racine.
+             */
+            level: number;
             /**
              * Sources
              * @description Sources ayant fourni le sujet.
              */
             sources: string[];
         };
+        /**
+         * SubjectVocabulary
+         * @description Vocabulaire d'un sujet. Reflet du type PostgreSQL `subject_vocabulary`. La langue des libellés découle du vocabulaire.
+         * @enum {string}
+         */
+        SubjectVocabulary: "openalex" | "hal_domain" | "rameau" | "theses_discipline";
         /**
          * SuspectMergeOut
          * @description Publication de la file des fusions suspectes : moins de la moitié de ses contributions sources d'auteur ont un correspondant dans un autre enregistrement source.

@@ -42,6 +42,7 @@ from pipeline.ingestion.common.source_records import (
     delete_disappeared_source_records,
 )
 from pipeline.ingestion.common.staging import StagingStore
+from pipeline.ingestion.common.subjects import SourceRecordSubjectStore
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.log_format import (
     LAST_BRANCH,
@@ -221,6 +222,7 @@ def normalizer_builders(*, archive: bool = True) -> dict[str, NormalizerFactory]
                 contribution_store=SourceContributionStore(conn),
                 location_store=LocationStore(conn),
                 embargo_store=EmbargoStore(conn),
+                subject_store=SourceRecordSubjectStore(conn),
             )
 
         return build

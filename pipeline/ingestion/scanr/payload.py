@@ -11,10 +11,11 @@ from domain.source_records.identifiers import (
     SourceIdentifierRole,
     SourceIdentifierType,
 )
+from domain.subjects.subject import SubjectLink, rameau_subject
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
 
 # Types des concepts ScanR (`domains`). Les vedettes sudoc (RAMEAU) relèvent d'un vocabulaire contrôlé. Les concepts wikidata, détectés par ScanR dans le texte, et les mots-clés sont des mots-clés libres.
-_SUBJECT_CONCEPT_TYPES = frozenset({"sudoc"})
+_RAMEAU_CONCEPT_TYPE = "sudoc"
 
 _KEYWORD_CONCEPT_TYPES = frozenset({"wikidata", "keyword"})
 
@@ -59,22 +60,30 @@ def scanr_derived_identifier(scanr_id: str) -> SourceIdentifier | None:
     return None
 
 
-def split_scanr_concepts(domains: JsonValue) -> tuple[list[str], list[JsonValue]]:
-    """Répartit les concepts ScanR (`domains`) en mots-clés libres et en sujets.
-
-    Renvoie d'abord les libellés des concepts wikidata et des mots-clés, dédoublonnés sans tenir compte de la casse, puis les vedettes sudoc sous leur forme ScanR, avec leur code. Un concept d'un autre type est écarté.
-    """
+def scanr_concept_keywords(domains: JsonValue) -> list[str]:
+    """Renvoie les libellés des concepts wikidata et des mots-clés de ScanR (`domains`), dédoublonnés sans tenir compte de la casse."""
     keywords: list[str] = []
     seen: set[str] = set()
-    subjects: list[JsonValue] = []
     for entry in as_sequence(domains):
         concept = as_mapping(entry)
-        kind = as_str(concept.get("type"))
-        if kind in _SUBJECT_CONCEPT_TYPES:
-            subjects.append(entry)
-        elif kind in _KEYWORD_CONCEPT_TYPES:
-            label = (as_str(as_mapping(concept.get("label")).get("default")) or "").strip()
-            if label and label.lower() not in seen:
-                seen.add(label.lower())
-                keywords.append(label)
-    return keywords, subjects
+        if as_str(concept.get("type")) not in _KEYWORD_CONCEPT_TYPES:
+            continue
+        label = (as_str(as_mapping(concept.get("label")).get("default")) or "").strip()
+        if label and label.lower() not in seen:
+            seen.add(label.lower())
+            keywords.append(label)
+    return keywords
+
+
+def scanr_subjects(domains: JsonValue) -> list[SubjectLink]:
+    """Renvoie les vedettes RAMEAU de ScanR (`domains` de type `sudoc`), codées par leur PPN."""
+    return [
+        SubjectLink(subject)
+        for entry in as_sequence(domains)
+        if as_str((concept := as_mapping(entry)).get("type")) == _RAMEAU_CONCEPT_TYPE
+        and (
+            subject := rameau_subject(
+                as_str(concept.get("code")), as_str(as_mapping(concept.get("label")).get("default"))
+            )
+        )
+    ]

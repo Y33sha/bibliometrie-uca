@@ -72,6 +72,7 @@ from domain.structures.hal_structures import HalStructureStatus
 from domain.structures.perimeter_evidence import PerimeterEvidence
 from domain.structures.ror import RorStatus, RorType
 from domain.structures.structure import StructureType
+from domain.subjects.subject import SubjectVocabulary
 from infrastructure.db.jsonb import Jsonb
 
 metadata = MetaData()
@@ -1462,6 +1463,17 @@ embargoes = Table(
 )
 
 
+source_record_subjects = Table(
+    "source_record_subjects",
+    metadata,
+    Column("source_record_id", Integer, primary_key=True),
+    Column("subject_id", Integer, primary_key=True),
+    Column("score", REAL, comment="Score OpenAlex du topic. Nul pour les autres sources."),
+    schema="sources",
+    comment="Sujets donnés par un enregistrement source. Leurs ancêtres découlent de subjects.parent_id.",
+)
+
+
 distinct_persons = Table(
     "distinct_persons",
     metadata,
@@ -1666,6 +1678,8 @@ dois = Table(
 )
 
 
+subject_vocabulary_enum = PgEnum(*SubjectVocabulary, name="subject_vocabulary", create_type=False)
+
 subjects = Table(
     "subjects",
     metadata,
@@ -1677,9 +1691,26 @@ subjects = Table(
         nullable=False,
         comment="Forme de recherche du libellé (normalize_text), servie par un index trigram.",
     ),
-    Column("language", Text),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("usage_count", Integer, nullable=False, server_default="0"),
+    Column("vocabulary", subject_vocabulary_enum, nullable=False),
+    Column(
+        "code",
+        Text,
+        nullable=False,
+        comment=(
+            "Code du sujet dans son vocabulaire : identifiant OpenAlex sans préfixe d'URL, code de "
+            "domaine HAL, PPN RAMEAU, libellé normalisé d'une discipline de thèse."
+        ),
+    ),
+    Column(
+        "level",
+        SmallInteger,
+        nullable=False,
+        comment="Profondeur dans le vocabulaire : 1 pour une racine.",
+    ),
+    Column("parent_id", Integer, comment="Sujet du niveau supérieur, du même vocabulaire."),
+    UniqueConstraint("vocabulary", "code", name="subjects_vocabulary_code_key"),
     schema="publications",
 )
 

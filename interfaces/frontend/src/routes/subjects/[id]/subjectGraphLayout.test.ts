@@ -24,7 +24,13 @@ const LABELS = [
 	'Animal Behavior and Welfare Studies'
 ];
 
-const subject = { id: 1, label: 'Veterinary', language: null, usage_count: 900 };
+const subject = {
+	id: 1,
+	label: 'Veterinary',
+	vocabulary: 'openalex' as const,
+	level: 2,
+	usage_count: 900
+};
 const neighbors = LABELS.map((label, i) => ({
 	id: 100 + i,
 	label,

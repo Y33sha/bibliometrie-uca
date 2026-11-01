@@ -10,6 +10,7 @@ from domain.platforms.platform import PlatformType
 from domain.publications.licenses import License
 from domain.serials.issns import SerialIssn
 from domain.source_records.identifiers import normalize_identifiers
+from domain.subjects.subject import SubjectVocabulary
 from pipeline.ingestion.common.locations import LocationFacts, PlatformFacts
 from pipeline.ingestion.common.normalizer import PublisherFacts
 from pipeline.ingestion.common.source_records import SourceRecordUpsert
@@ -19,10 +20,10 @@ from pipeline.ingestion.openalex.normalize import (
     build_openalex_author_records,
     extract_impact,
     extract_locations_data,
-    extract_topics,
     get_container_facts,
     get_locations,
     get_publisher,
+    get_subjects,
     openalex_source_record,
     reconstruct_abstract,
 )
@@ -245,46 +246,46 @@ class TestReconstructAbstract:
         assert reconstruct_abstract({"word": []}) is None
 
 
-# ── extract_topics ───────────────────────────────────────────────
+# ── get_subjects ─────────────────────────────────────────────────
 
 
-class TestExtractTopics:
-    def test_none_topics(self):
-        assert extract_topics({}) is None
+def _topic(score: float | None = 0.8, **overrides) -> dict:
+    topic = {
+        "id": "https://openalex.org/T10001",
+        "display_name": "Theory of Computation",
+        "domain": {"id": "https://openalex.org/domains/3", "display_name": "Physical Sciences"},
+        "field": {"id": "https://openalex.org/fields/17", "display_name": "Computer Science"},
+        "subfield": {
+            "id": "https://openalex.org/subfields/1703",
+            "display_name": "Computational Theory",
+        },
+        "score": score,
+    }
+    return {**topic, **overrides}
 
-    def test_empty_topics(self):
-        assert extract_topics({"topics": []}) is None
 
-    def test_basic_topic(self):
-        work = {
-            "topics": [
-                {
-                    "display_name": "Theory of Computation",
-                    "domain": {"display_name": "Computer Science"},
-                    "field": {"display_name": "Algorithms"},
-                    "subfield": {"display_name": "Complexity"},
-                    "score": 0.8,
-                }
-            ]
-        }
-        topics = extract_topics(work)
-        assert topics is not None
-        assert topics[0]["domain"] == "Computer Science"
-        assert topics[0]["field"] == "Algorithms"
-        assert topics[0]["subfield"] == "Complexity"
-        assert topics[0]["topic"] == "Theory of Computation"
-        assert topics[0]["score"] == 0.8
+class TestGetSubjects:
+    def test_no_topics(self):
+        assert get_subjects({}) == []
 
-    def test_topic_no_score(self):
-        work = {"topics": [{"display_name": "Math"}]}
-        topics = extract_topics(work)
-        assert topics is not None
-        assert "score" not in topics[0]
+    def test_topic_with_its_ancestors_and_score(self):
+        [link] = get_subjects({"topics": [_topic()]})
+        assert link.score == 0.8
+        assert [(s.code, s.label, s.level) for s in link.subject.lineage()] == [
+            ("domains/3", "Physical Sciences", 1),
+            ("fields/17", "Computer Science", 2),
+            ("subfields/1703", "Computational Theory", 3),
+            ("T10001", "Theory of Computation", 4),
+        ]
+        assert link.subject.vocabulary == SubjectVocabulary.OPENALEX
 
-    def test_topic_with_no_displayable_fields(self):
-        """Un topic sans champ exploitable est écarté."""
-        work = {"topics": [{"foo": "bar"}]}  # ni domain, ni field, ni subfield, ni display_name
-        assert extract_topics(work) is None
+    def test_topic_without_score(self):
+        [link] = get_subjects({"topics": [_topic(score=None)]})
+        assert link.score is None
+
+    def test_topic_with_an_incomplete_chain(self):
+        """Un topic sans field est écarté : son niveau resterait faux."""
+        assert get_subjects({"topics": [_topic(field={})]}) == []
 
 
 # ── extract_impact ───────────────────────────────────────────────

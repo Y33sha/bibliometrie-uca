@@ -1,6 +1,6 @@
-"""Normalisation d'une source, du staging vers `source_records`, `source_contributions` et `addresses`.
+"""Normalisation d'une source, du staging vers `source_records`, `source_contributions`, `addresses` et `subjects`.
 
-Chaque source hérite de `SourceNormalizer` (`pipeline/ingestion/<source>/normalize.py`) et fournit l'analyse d'une ligne de `staging`, sans I/O : document lu, éditeur, conteneurs, enregistrement source, bloc auteurs et contributions sources. Le patron fait les écritures et la boucle : chargement des lignes à traiter, un SAVEPOINT par enregistrement source (une erreur isolée garde le lot en cours), commit périodique, progression et bilan. Les stores sont injectés à la construction.
+Chaque source hérite de `SourceNormalizer` (`pipeline/ingestion/<source>/normalize.py`) et fournit l'analyse d'une ligne de `staging`, sans I/O : document lu, éditeur, conteneurs, enregistrement source, sujets, bloc auteurs et contributions sources. Le patron fait les écritures et la boucle : chargement des lignes à traiter, un SAVEPOINT par enregistrement source (une erreur isolée garde le lot en cours), commit périodique, progression et bilan. Les stores sont injectés à la construction.
 """
 
 from __future__ import annotations
@@ -23,6 +23,7 @@ from domain.serials.containers import (
     determine_container_type,
 )
 from domain.source_records.biblio import with_journal
+from domain.subjects.subject import SubjectLink
 from domain.types import JsonValue
 from infrastructure.db.savepoint import rollback_unless_invalidated, savepoint
 from pipeline.ingestion.common.embargoes import Embargo, EmbargoStore
@@ -35,6 +36,7 @@ from pipeline.ingestion.common.source_contributions import (
 )
 from pipeline.ingestion.common.source_records import SourceRecordStore, SourceRecordUpsert
 from pipeline.ingestion.common.staging import StagingRow, StagingStore
+from pipeline.ingestion.common.subjects import SourceRecordSubjectStore
 from pipeline.runtime.observability.log_format import (
     BRANCH_CONTINUATION,
     quantity,
@@ -75,7 +77,7 @@ class NormalizeStats(NamedTuple):
 class SourceNormalizer(ABC):
     """Normalisation d'une source : la sous-classe analyse une ligne de `staging`, le patron écrit.
 
-    Une sous-classe définit `SOURCE`, `minimal_metadata`, `source_record`, `author_block` et `author_records`. `parse`, `publisher`, `container_facts`, `locations`, `embargo`, `preload_caches` et `cleanup` ont un comportement par défaut.
+    Une sous-classe définit `SOURCE`, `minimal_metadata`, `source_record`, `author_block` et `author_records`. `parse`, `publisher`, `container_facts`, `locations`, `embargo`, `subjects`, `preload_caches` et `cleanup` ont un comportement par défaut.
     """
 
     SOURCE: ClassVar[str] = ""
@@ -94,6 +96,7 @@ class SourceNormalizer(ABC):
         contribution_store: SourceContributionStore,
         location_store: LocationStore,
         embargo_store: EmbargoStore,
+        subject_store: SourceRecordSubjectStore,
     ) -> None:
         self.conn = conn
         self.logger = logger
@@ -104,6 +107,7 @@ class SourceNormalizer(ABC):
         self._contribution_store = contribution_store
         self._location_store = location_store
         self._embargo_store = embargo_store
+        self._subject_store = subject_store
 
     @abstractmethod
     def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
@@ -128,6 +132,10 @@ class SourceNormalizer(ABC):
     def embargo(self, doc: Document) -> Embargo | None:  # noqa: ARG002
         """Renvoie l'embargo déclaré par la source, ou `None`."""
         return None
+
+    def subjects(self, doc: Document) -> list[SubjectLink]:  # noqa: ARG002
+        """Renvoie les sujets donnés par la source."""
+        return []
 
     @abstractmethod
     def publication_date(self, doc: Document) -> PublicationDate | None:
@@ -165,7 +173,7 @@ class SourceNormalizer(ABC):
     def normalize_record(self, row: StagingRow) -> bool:
         """Normalise un document à métadonnées minimales et marque sa ligne traitée. Renvoie vrai, ou faux sans rien écrire pour un document refusé.
 
-        Écrit dans l'ordre l'éditeur, les conteneurs, l'enregistrement source rattaché à son éditeur, ses localisations, son embargo et ses contributions sources.
+        Écrit dans l'ordre l'éditeur, les conteneurs, l'enregistrement source rattaché à son éditeur, ses localisations, son embargo, ses sujets et ses contributions sources.
         """
         doc = self.parse(row)
         if doc is None:
@@ -196,6 +204,7 @@ class SourceNormalizer(ABC):
             source_record_id, [*self.locations(doc), *identifier_locations(record.identifiers)]
         )
         self._embargo_store.replace_embargo(source_record_id, self.embargo(doc))
+        self._subject_store.replace_subjects(source_record_id, self.subjects(doc))
         sync_source_contributions(
             self._contribution_store,
             self.SOURCE,

@@ -21,13 +21,16 @@ Les frais de publication (`apc_payments`) sont décrits avec l'[édition](07-pub
 
 ## Sujets
 
-Un sujet est un terme d'un vocabulaire contrôlé : domaine HAL, discipline de thèse, vedette RAMEAU, topic OpenAlex, catégorie du Web of Science. Les mots-clés libres restent sur l'enregistrement source.
+Un sujet est un terme d'un vocabulaire contrôlé : classement OpenAlex (domain, field, subfield, topic), domaine HAL, vedette RAMEAU, discipline de thèse. Il est identifié par son vocabulaire et son code. Les mots-clés libres restent sur l'enregistrement source.
 
 | Table | Contenu | Contrainte |
 |---|---|---|
-| `subjects` | Libellé, langue, nombre de publications (`usage_count`) | Un sujet par libellé, sans distinction de casse |
-| `publication_subjects` | Lien entre une publication et un sujet, avec la source qui le fournit | Un lien par publication, sujet et source |
+| `subjects` | Vocabulaire, code, libellé, niveau, parent, nombre de publications (`usage_count`) | Un sujet par vocabulaire et code |
+| `source_record_subjects` | Sujet donné par un enregistrement source, avec le score OpenAlex du topic | Un lien par enregistrement source et sujet |
+| `publication_subjects` | Lien entre une publication et un sujet, ancêtres compris, avec la source qui le fournit | Un lien par publication, sujet et source |
 | `subject_cooccurrences` | Vue matérialisée : paires de sujets présents ensemble sur au moins deux publications | |
+
+Le code est l'identifiant OpenAlex sans préfixe d'URL (`fields/17`, `T10001`), le code du domaine HAL (`sdv.bbm`), le PPN de la vedette RAMEAU, ou le libellé normalisé de la discipline. Le niveau vaut 1 pour une racine. La langue d'un libellé découle de son vocabulaire : anglais pour OpenAlex, français pour les autres.
 
 `publication_subjects.rejected` exclut un lien des décomptes et le conserve aux recalculs.
 

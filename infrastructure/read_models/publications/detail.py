@@ -9,6 +9,7 @@ from domain.publications.relations import RelationType, inverse_relation
 from domain.source_records.identifiers import SourceIdentifierType
 from domain.source_records.source_extras import SourceExtra
 from domain.sources.registry import Source
+from domain.subjects.subject import SubjectVocabulary
 from infrastructure.db.source_record_identifiers import source_record_doi_sql
 from infrastructure.read_models.publications.copies import publication_copies
 from infrastructure.read_models.publications.models import (
@@ -158,7 +159,7 @@ def get_publication_subjects(conn: Connection, publication_id: int) -> list[Subj
     """Renvoie les sujets d'une publication, sans doublon, avec leurs sources, triés par libellé sans égard à la casse."""
     rows = conn.execute(
         text("""
-            SELECT s.id, s.label, s.language,
+            SELECT s.id, s.label, s.vocabulary::text AS vocabulary, s.level,
                    array_agg(DISTINCT ps.source::text ORDER BY ps.source::text) AS sources
             FROM publication_subjects ps
             JOIN subjects s ON s.id = ps.subject_id
@@ -169,7 +170,10 @@ def get_publication_subjects(conn: Connection, publication_id: int) -> list[Subj
         {"pid": publication_id},
     ).all()
     return [
-        SubjectOut(id=r.id, label=r.label, language=r.language, sources=r.sources) for r in rows
+        SubjectOut(
+            id=r.id, label=r.label, vocabulary=r.vocabulary, level=r.level, sources=r.sources
+        )
+        for r in rows
     ]
 
 
@@ -299,7 +303,13 @@ class PublicationDetailQueries:
         if publication_row.doc_type in (DocType.THESIS, DocType.ONGOING_THESIS):
             extras_row = self._conn.execute(
                 text(f"""
-                    SELECT sr.source_extras AS source_record_extras, sr.topics->>'discipline' AS discipline,
+                    SELECT sr.source_extras AS source_record_extras,
+                           (SELECT s.label
+                            FROM source_record_subjects srs
+                            JOIN subjects s ON s.id = srs.subject_id
+                            WHERE srs.source_record_id = sr.id
+                              AND s.vocabulary = '{SubjectVocabulary.THESES_DISCIPLINE.value}'
+                            LIMIT 1) AS discipline,
                            p.source_extras AS publication_extras
                     FROM publications p
                     LEFT JOIN source_records sr

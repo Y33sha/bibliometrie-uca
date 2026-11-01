@@ -51,7 +51,7 @@ def _rows(text: str) -> list[list[str]]:
         (
             "/api/subjects/export.csv",
             {"min_count": "3"},
-            ["Libellé", "Langue", "Occurrences"],
+            ["Libellé", "Vocabulaire", "Occurrences"],
         ),
         (
             "/api/structures/export.csv",

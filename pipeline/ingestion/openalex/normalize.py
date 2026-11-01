@@ -29,6 +29,7 @@ from domain.source_records.identifiers import (
 from domain.source_records.impact import Impact
 from domain.source_records.source_extras import SourceExtra
 from domain.structures.identifiers import RorId, parse_ror_ids
+from domain.subjects.subject import Subject, SubjectLink, SubjectVocabulary
 from domain.types import (
     JsonValue,
     as_bool,
@@ -177,21 +178,30 @@ def reconstruct_abstract(inverted_index: Mapping[str, JsonValue] | None) -> str 
     return " ".join(positions[k] for k in sorted(positions))
 
 
-def extract_topics(work: Mapping[str, JsonValue]) -> list[dict[str, JsonValue]] | None:
-    """Renvoie les topics OpenAlex, en liste simplifiée."""
-    topics: list[dict[str, JsonValue]] = []
+_OPENALEX_URL = "https://openalex.org/"
+_TOPIC_ANCESTORS = ("domain", "field", "subfield")
+
+
+def _openalex_subject(entry: Mapping[str, JsonValue], parent: Subject | None) -> Subject | None:
+    """Renvoie le sujet d'un niveau du classement OpenAlex (`id`, `display_name`), codé par son identifiant sans le préfixe d'URL."""
+    code = (as_str(entry.get("id")) or "").removeprefix(_OPENALEX_URL)
+    label = as_str(entry.get("display_name"))
+    return Subject(SubjectVocabulary.OPENALEX, code, label, parent) if code and label else None
+
+
+def get_subjects(work: Mapping[str, JsonValue]) -> list[SubjectLink]:
+    """Renvoie les topics du work avec leur score. Un topic a pour ancêtres son subfield, son field et son domain ; un topic à la chaîne incomplète est écarté."""
+    links: list[SubjectLink] = []
     for entry in as_sequence(work.get("topics")):
-        t = as_mapping(entry)
-        topic: dict[str, JsonValue] = {}
-        for level in ("domain", "field", "subfield", "topic"):
-            obj = as_mapping(t.get(level)) or (t if level == "topic" else {})
-            if name := as_str(obj.get("display_name")):
-                topic[level] = name
-        if (score := t.get("score")) is not None:
-            topic["score"] = score
-        if topic:
-            topics.append(topic)
-    return topics or None
+        topic = as_mapping(entry)
+        subject: Subject | None = None
+        for level in (*(as_mapping(topic.get(name)) for name in _TOPIC_ANCESTORS), topic):
+            subject = _openalex_subject(level, subject)
+            if subject is None:
+                break
+        if subject is not None:
+            links.append(SubjectLink(subject, as_float(topic.get("score"))))
+    return links
 
 
 def extract_impact(work: Mapping[str, JsonValue]) -> Impact:
@@ -301,8 +311,6 @@ def openalex_source_record(  # noqa: C901
         as_str(as_mapping(k).get("keyword")) or as_str(k) for k in as_sequence(work.get("keywords"))
     ]
     keywords = [m for m in words if m] or None
-    topics = extract_topics(work)
-    topics_json = topics if topics else None
 
     # Licence de la localisation principale seule : HAL et Crossref donnent celles de leurs propres localisations. Une localisation sans éditeur (archive, entrepôt) garde sa forme brute dans `source_extras`, sans licence normalisée.
     raw_license = as_str(as_mapping(work.get("primary_location")).get("license"))
@@ -326,7 +334,6 @@ def openalex_source_record(  # noqa: C901
         biblio=biblio_json,
         abstract=abstract,
         keywords=keywords,
-        topics=topics_json,
         license=normalize_license(publisher_license),
         urls=urls or None,
         impact=extract_impact(work).to_json(),
@@ -463,6 +470,9 @@ class OpenalexNormalizer(SourceNormalizer):
 
     def publication_date(self, doc: Document) -> PublicationDate | None:
         return get_publication_date(doc)
+
+    def subjects(self, doc: Document) -> list[SubjectLink]:
+        return get_subjects(doc)
 
     def source_record(
         self, row: StagingRow, doc: Document, containers: Containers

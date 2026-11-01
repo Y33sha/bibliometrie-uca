@@ -7,6 +7,7 @@ from collections.abc import Iterator
 
 from sqlalchemy import Connection, Row, text
 
+from domain.subjects.subject import VOCABULARY_LABELS
 from infrastructure.read_models.csv_export import csv_chunks, fetch_export_rows
 from infrastructure.read_models.subjects.models import (
     SubjectDetailResponse,
@@ -30,7 +31,7 @@ def _search_clause(search: str | None, min_usage_count: int) -> tuple[str, dict[
 def _list_sql(where: str) -> str:
     """Renvoie la requête de la liste des sujets, sans pagination, les plus fréquents d'abord."""
     return f"""
-        SELECT id, label, language, usage_count
+        SELECT id, label, vocabulary::text AS vocabulary, level, usage_count
         FROM subjects
         WHERE {where}
         ORDER BY usage_count DESC, lower(label)
@@ -39,7 +40,11 @@ def _list_sql(where: str) -> str:
 
 def _subject_list_item(row: Row[tuple[object, ...]]) -> SubjectListItem:
     return SubjectListItem(
-        id=row.id, label=row.label, language=row.language, usage_count=row.usage_count
+        id=row.id,
+        label=row.label,
+        vocabulary=row.vocabulary,
+        level=row.level,
+        usage_count=row.usage_count,
     )
 
 
@@ -76,8 +81,8 @@ class SubjectsQueries:
         where, binds = _search_clause(search, min_usage_count)
         rows, truncated = fetch_export_rows(self._conn, _list_sql(where), binds, name="sujets")
         return csv_chunks(
-            ["Libellé", "Langue", "Occurrences"],
-            ([r.label, r.language or "", r.usage_count] for r in rows),
+            ["Libellé", "Vocabulaire", "Occurrences"],
+            ([r.label, VOCABULARY_LABELS[r.vocabulary], r.usage_count] for r in rows),
             truncated=truncated,
         )
 
@@ -86,7 +91,7 @@ class SubjectsQueries:
     ) -> SubjectDetailResponse | None:
         row = self._conn.execute(
             text("""
-                SELECT id, label, language, usage_count
+                SELECT id, label, vocabulary::text AS vocabulary, level, usage_count
                 FROM subjects
                 WHERE id = :id
             """),
