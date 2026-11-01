@@ -17,7 +17,7 @@ Deux enregistrements sources désignent la même publication s'ils partagent une
 
 Les enregistrements sources reliés par au moins une clé partagée forment les **composantes connexes** d'un graphe.
 
-Une règle prime sur le regroupement : **deux ancres distinctes désignent deux documents distincts**. Les ancres d'une composante sont ses DOI `primary` ou `derived`, à défaut le DOI des enregistrements sources à DOI unique. Une composante à plusieurs ancres est découpée en une partition par ancre. Un enregistrement source rejoint l'ancre de son DOI `primary` ou `derived`, sinon l'unique ancre parmi ses autres DOI. À défaut, il reste sur sa publication.
+Une règle prime sur le regroupement : **deux ancres distinctes désignent deux documents distincts**. Les ancres d'une composante sont ses DOI `primary` ou `derived`, à défaut le DOI des enregistrements sources à DOI unique. Une composante à plusieurs ancres est découpée en une partition par ancre. Un enregistrement source rejoint l'ancre de son DOI `primary` ou `derived`, sinon l'unique ancre parmi ses autres DOI. À défaut, il reste sur sa publication. Un enregistrement source dérivé suit l'ancre de son parent, l'enregistrement source dont l'identifiant primaire est son identifiant `derived`. Sans parent, les enregistrements sources de même identifiant `derived` suivent l'unique ancre parmi les leurs.
 
 Chaque partition aboutit à une seule publication :
 

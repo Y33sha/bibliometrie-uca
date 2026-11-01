@@ -35,6 +35,7 @@ from domain.source_records.identifiers import (
 from domain.source_records.keys import (
     CONFIRMATION_ID_TYPES,
     DISCRIMINANT_TITLE_MIN_LENGTH,
+    derivation,
     project_confirmation_keys,
 )
 from infrastructure.db.doi_targets import doi_or_target_sql, fetch_doi_targets
@@ -345,6 +346,7 @@ def _member(row: ReconcileRow, doi_targets: dict[str, str]) -> ReconcileMember:
         publication_doi=row.publication_doi,
         doi_keys=keys.doi,
         tokens=keys.tokens() | manual_merge_tokens(row.manual_merge_ids),
+        derivation=derivation(row.identifiers),
         in_perimeter=row.in_perimeter,
         title_normalized=row.title_normalized,
         publication_year=row.publication_year,

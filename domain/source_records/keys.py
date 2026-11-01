@@ -80,6 +80,30 @@ def anchor_of(keys: DoiKeys, anchors: frozenset[str]) -> str | None:
 
 
 @dataclass(frozen=True, slots=True)
+class Derivation:
+    """Identifiants qui relient un enregistrement source dérivé à son parent, l'enregistrement source dont l'identifiant primaire est son identifiant dérivé."""
+
+    primary: frozenset[tuple[str, str]] = frozenset()
+    """Identifiants actifs de rôle `primary`, en couples (type, valeur)."""
+    derived: tuple[str, str] | None = None
+    """Identifiant actif de rôle `derived`, en couple (type, valeur)."""
+
+
+def derivation(identifiers: Iterable[SourceIdentifier]) -> Derivation:
+    """Renvoie les identifiants primaires et l'identifiant dérivé actifs de `identifiers`."""
+    kept = active(identifiers)
+    return Derivation(
+        primary=frozenset(
+            (i.id_type.value, i.value) for i in kept if i.role is SourceIdentifierRole.PRIMARY
+        ),
+        derived=next(
+            ((i.id_type.value, i.value) for i in kept if i.role is SourceIdentifierRole.DERIVED),
+            None,
+        ),
+    )
+
+
+@dataclass(frozen=True, slots=True)
 class ConfirmationKeys:
     """Clés de confirmation d'un enregistrement source ; une clé absente vaut `None`."""
 

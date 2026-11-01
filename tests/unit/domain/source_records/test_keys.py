@@ -13,8 +13,10 @@ from domain.source_records.identifiers import (
 from domain.source_records.keys import (
     DISCRIMINANT_TITLE_MIN_LENGTH,
     ConfirmationKeys,
+    Derivation,
     DoiKeys,
     anchor_of,
+    derivation,
     doi_anchors,
     project_confirmation_keys,
 )
@@ -169,3 +171,16 @@ class TestTokens:
 
     def test_no_keys_empty_token_set(self):
         assert _none().tokens() == frozenset()
+
+
+def test_derivation_lit_les_identifiants_primaires_et_l_identifiant_derive_actifs():
+    hal, doi = SourceIdentifierType.HAL_ID, SourceIdentifierType.DOI
+    identifiers = [
+        SourceIdentifier(hal, "hal-1", SourceIdentifierRole.DERIVED),
+        SourceIdentifier(doi, "10.1/x", SourceIdentifierRole.PRIMARY),
+        SourceIdentifier(doi, "10.1/y", SourceIdentifierRole.PRIMARY, removed_by="RULE"),
+        SourceIdentifier(doi, "10.1/z", SourceIdentifierRole.SECONDARY),
+    ]
+    assert derivation(identifiers) == Derivation(
+        frozenset({("doi", "10.1/x")}), ("hal_id", "hal-1")
+    )

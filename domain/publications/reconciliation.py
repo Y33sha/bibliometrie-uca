@@ -1,6 +1,6 @@
 """Réconciliation des publications : rattachement, fusion et scission, en une seule décision.
 
-Les enregistrements sources du voisinage se répartissent en partitions : composantes connexes de clés de confirmation, coupées par leurs ancres DOI (`doi_anchors`). Une composante à une ancre au plus reste entière. Dans une composante à plusieurs ancres, un enregistrement source rejoint l'ancre de son DOI `primary` ou `derived`, à défaut l'unique ancre parmi ses DOI `secondary` ; sans ancre unique, il reste sur sa publication.
+Les enregistrements sources du voisinage se répartissent en partitions : composantes connexes de clés de confirmation, coupées par leurs ancres DOI (`doi_anchors`). Une composante à une ancre au plus reste entière. Dans une composante à plusieurs ancres, un enregistrement source rejoint l'ancre de son DOI `primary` ou `derived`, à défaut l'unique ancre parmi ses DOI `secondary` ; sans ancre unique, il reste sur sa publication. Un enregistrement source dérivé suit l'ancre de son parent, l'enregistrement source dont l'identifiant primaire est son identifiant dérivé.
 
 Chaque partition aboutit sur une seule publication, son ancre : celle qui a déjà son DOI, sinon celle du plus petit enregistrement source rattaché. L'ancre garde son identifiant, et donc les corrections faites à la main. Une partition d'enregistrements sources orphelins, sans publication, en crée une si l'un d'eux peut la fonder ; sinon, elle reste orpheline. Un enregistrement source écarté (`is_matchable`) quitte sa publication.
 """
@@ -13,7 +13,7 @@ from typing import NamedTuple
 from domain.entity_resolution import connected_components
 from domain.publications.metadata import has_minimal_publication_metadata
 from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES
-from domain.source_records.keys import DoiKeys, anchor_of, doi_anchors
+from domain.source_records.keys import Derivation, DoiKeys, anchor_of, doi_anchors
 
 # Nom de clé des jetons de fusion manuelle, valeur de clé = identifiant de la fusion manuelle.
 MANUAL_MERGE_KEY = "manual_merge"
@@ -42,6 +42,8 @@ class ReconcileMember:
     """DOI actifs de rôle autre que `related`, qui déterminent la partition."""
     tokens: frozenset[tuple[str, str]]
     """Clés de confirmation et jetons de fusion manuelle."""
+    derivation: Derivation = Derivation()
+    """Identifiants primaires et identifiant dérivé, qui relient un enregistrement source dérivé à son parent."""
     in_perimeter: bool = False
     title_normalized: str | None = None
     publication_year: int | None = None
@@ -89,10 +91,31 @@ class ReconcilePlan:
     detached: tuple[int, ...] = ()
 
 
+def _derived_anchors(
+    members: list[ReconcileMember], own_anchors: Mapping[int, str | None]
+) -> dict[int, str]:
+    """Renvoie l'ancre suivie par chaque enregistrement source dérivé : celle de son parent. Sans parent parmi `members`, les enregistrements sources de même identifiant dérivé suivent l'unique ancre parmi les leurs."""
+    parents = {key: m for m in members for key in m.derivation.primary}
+    families: dict[tuple[str, str], list[ReconcileMember]] = defaultdict(list)
+    for m in members:
+        if m.derivation.derived is not None:
+            families[m.derivation.derived].append(m)
+    followed: dict[int, str] = {}
+    for key, family in families.items():
+        if (parent := parents.get(key)) is not None:
+            anchor = own_anchors[parent.source_record_id]
+        else:
+            candidates = {a for m in family if (a := own_anchors[m.source_record_id]) is not None}
+            anchor = next(iter(candidates)) if len(candidates) == 1 else None
+        if anchor is not None:
+            followed.update(dict.fromkeys((m.source_record_id for m in family), anchor))
+    return followed
+
+
 def _partitions(
     members: list[ReconcileMember],
 ) -> list[tuple[str | None, list[ReconcileMember]]]:
-    """Renvoie les partitions du voisinage, avec leur ancre DOI : composantes connexes, coupées par leurs ancres. Dans une composante à plusieurs ancres, un enregistrement source sans ancre unique reste hors partition."""
+    """Renvoie les partitions du voisinage, avec leur ancre DOI : composantes connexes, coupées par leurs ancres. Dans une composante à plusieurs ancres, un enregistrement source dérivé suit l'ancre de son parent (`_derived_anchors`) ; un autre enregistrement source sans ancre unique reste hors partition."""
     by_id = {m.source_record_id: m for m in members}
     components = connected_components([(m.source_record_id, m.tokens) for m in members])
 
@@ -103,9 +126,12 @@ def _partitions(
         if len(anchors) <= 1:
             partitions.append((next(iter(anchors), None), comp))
             continue
+        own_anchors = {m.source_record_id: anchor_of(m.doi_keys, anchors) for m in comp}
+        followed = _derived_anchors(comp, own_anchors)
         by_anchor: dict[str, list[ReconcileMember]] = defaultdict(list)
         for m in comp:
-            if (anchor := anchor_of(m.doi_keys, anchors)) is not None:
+            anchor = followed.get(m.source_record_id, own_anchors[m.source_record_id])
+            if anchor is not None:
                 by_anchor[anchor].append(m)
         partitions.extend((anchor, by_anchor[anchor]) for anchor in sorted(by_anchor))
     return partitions

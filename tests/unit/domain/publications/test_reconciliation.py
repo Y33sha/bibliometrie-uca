@@ -9,7 +9,7 @@ from domain.publications.reconciliation import (
     WorkGroup,
     plan_reconciliation,
 )
-from domain.source_records.keys import DoiKeys
+from domain.source_records.keys import Derivation, DoiKeys
 
 
 def _m(
@@ -25,12 +25,16 @@ def _m(
     year=2024,
     doc_type=None,
     matchable=True,
+    primary=(),
+    derived=None,
 ):
     """Construit un membre du voisinage.
 
     Args:
         doi: DOI primaire.
         weak: DOI secondaires.
+        primary: identifiants primaires, en couples (type, valeur).
+        derived: identifiant dérivé, en couple (type, valeur).
     """
     return ReconcileMember(
         source_record_id=source_record_id,
@@ -38,6 +42,7 @@ def _m(
         publication_doi=publication_doi,
         doi_keys=DoiKeys(frozenset({doi} if doi else ()), frozenset(weak)),
         tokens=frozenset(tokens),
+        derivation=Derivation(frozenset(primary), derived),
         in_perimeter=in_perimeter,
         title_normalized=tn,
         publication_year=year,
@@ -233,6 +238,64 @@ class TestDoiAnchors:
         )
         assert _groups(plan) == {10: (1,), 20: (2,)}
         assert plan.dissolved == ()
+
+
+_HAL = ("hal_id", "hal-1")
+_ARTICLE = _m(1, 10, doi="10.1/article", tokens=[("doi", "10.1/article")])
+_PREPRINT = _m(
+    2, 20, doi="10.48550/arxiv.1", tokens=[("doi", "10.48550/arxiv.1"), ("arxiv_id", "1")]
+)
+
+
+class TestDerivedRecords:
+    """Composante à deux ancres, l'article et le preprint : un enregistrement source dérivé suit l'ancre de son parent."""
+
+    def test_un_enregistrement_derive_suit_son_parent(self):
+        """Le dépôt HAL cite le DOI de l'article ; l'enregistrement scanR dérivé du dépôt, sans DOI, le suit."""
+        hal = _m(
+            3,
+            30,
+            weak=("10.1/article",),
+            tokens=[_HAL, ("doi", "10.1/article")],
+            primary=[_HAL],
+        )
+        scanr = _m(4, 40, tokens=[_HAL, ("arxiv_id", "1")], derived=_HAL)
+
+        plan = plan_reconciliation([_ARTICLE, _PREPRINT, hal, scanr])
+
+        assert _groups(plan) == {10: (1, 3, 4), 20: (2,)}
+
+    def test_sans_parent_les_enregistrements_derives_suivent_l_ancre_de_l_un_d_eux(self):
+        """Le dépôt HAL est absent du voisinage : le work OpenAlex dérivé du dépôt cite l'article, l'enregistrement scanR dérivé du dépôt suit."""
+        openalex = _m(
+            3, 30, weak=("10.1/article",), tokens=[_HAL, ("doi", "10.1/article")], derived=_HAL
+        )
+        scanr = _m(4, 40, tokens=[_HAL, ("arxiv_id", "1")], derived=_HAL)
+
+        plan = plan_reconciliation([_ARTICLE, _PREPRINT, openalex, scanr])
+
+        assert _groups(plan) == {10: (1, 3, 4), 20: (2,)}
+
+    def test_l_ancre_du_parent_l_emporte_sur_celle_de_l_enregistrement_derive(self):
+        """Le work OpenAlex dérivé du dépôt HAL cite le DOI du preprint ; il suit le dépôt, qui cite l'article."""
+        hal = _m(
+            3,
+            30,
+            weak=("10.1/article",),
+            tokens=[_HAL, ("doi", "10.1/article")],
+            primary=[_HAL],
+        )
+        openalex = _m(
+            4,
+            40,
+            weak=("10.48550/arxiv.1",),
+            tokens=[_HAL, ("doi", "10.48550/arxiv.1")],
+            derived=_HAL,
+        )
+
+        plan = plan_reconciliation([_ARTICLE, _PREPRINT, hal, openalex])
+
+        assert _groups(plan) == {10: (1, 3, 4), 20: (2,)}
 
 
 class TestDetachment:
