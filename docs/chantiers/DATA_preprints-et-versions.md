@@ -45,6 +45,15 @@ Le titre change souvent entre preprint et article : les titres différents d'une
 
 **Publications à DOI arXiv.** 169 publications à DOI arXiv (`10.48550`) ont un autre type que `preprint`, dont 160 typées `article`. 143 sont reliées à une autre publication par `is_related_to` (DataCite, clé partagée) : ce sont des preprints mal typés, comptés dans la famille « Publications » en plus de leur article.
 
+### Mesure du 2026-11-01 : preprint du périmètre, version publiée hors périmètre
+
+49 paires `is_preprint_of` relient un preprint du périmètre à une version publiée hors périmètre. Classement d'après les adresses des personnes du périmètre du preprint :
+
+- 23 : le preprint entre dans le périmètre par un ROR donné par OpenAlex sans adresse, surtout celui du Laboratoire de Mathématiques Blaise Pascal. Les adresses de ces auteurs désignent d'autres laboratoires de mathématiques.
+- 11 : la cible est un enregistrement ScanR seul.
+- 8 : ces personnes ont une adresse du périmètre sur le preprint, une autre adresse sur la cible.
+- 7 : ces personnes ont une adresse du périmètre sur le preprint, aucune adresse sur la cible.
+
 ## Décisions
 
 - **Un preprint relié à sa version publiée est masqué.** Il reste une publication, avec son DOI, son type et sa date. Il est absent des listes, des statistiques, des compteurs et des bibliographies. La fiche de la version publiée le montre. La réconciliation garde un DOI par publication, et une fausse paire se corrige par le retrait du lien.
@@ -57,7 +66,7 @@ Le titre change souvent entre preprint et article : les titres différents d'une
 
 ### Phase 1 — Mesures
 
-- [ ] Preprints du périmètre dont la version publiée est hors périmètre
+- [x] Preprints du périmètre dont la version publiée est hors périmètre
 - [ ] Publications typées `preprint`, avec la revue et le DOI Crossref de leur article (165044), sur la base de prod
 
 ### Phase 2 — Création du lien
