@@ -109,7 +109,7 @@ Sept entrées de `serials` ont un type de plateforme, pour 560 publications : `r
 
 ### Phase 2 — Éditeurs
 
-- [ ] Doublons d'éditeurs que révèle le titulaire DataCite du préfixe
+- [x] Doublons d'éditeurs que révèle le titulaire DataCite du préfixe : la fusion des autres noms lit aussi les préfixes DataCite (603483936)
 - [ ] Lieu et directeur d'ouvrage dans les noms d'éditeur
 - [x] Mesure des autres doublons d'éditeurs sous des noms différents
 - [x] Fusion des éditeurs de même nom aux formes juridiques et mots génériques près (2a553667a)
