@@ -14,13 +14,13 @@ Base locale au 2026-11-01.
 - **Raw store.** Il est complet pour OpenAlex (116 813 payloads pour 116 331 enregistrements sources), presque complet pour HAL (66 523 pour 67 303).
 - **MeSH.** Aucun sujet MeSH. Le moissonnage OpenAlex omet le champ `mesh` des works (`pipeline/ingestion/openalex/api.py`). PubMed n'est pas moissonné.
 - **Besoins de l'interface.** Les nuages de sujets (`SubjectsCloud.svelte`) et le graphe des co-occurrences (`/subjects/[id]`) colorent par fréquence. Ils demandent une couleur par grand domaine, et de pouvoir écarter les niveaux hauts, qui encombrent sans informer.
-- **Mots-clés HAL.** Le normalizer HAL lit `keyword_s`, qui met une majuscule initiale et retire la ponctuation : « Industry 4.0 » devient « Industry 40 », « eau destinée à la consommation humaine (EDCH) » devient « Eau destinée à la consommation humaine EDCH ». Les `<term>` du TEI (`label_xml`) gardent la saisie de l'auteur. Ils sont présents dans chaque dépôt pourvu de `keyword_s`, sur un échantillon de 4 160 dépôts.
+- **Mots-clés HAL.** Le champ Solr `keyword_s` met une majuscule initiale et retire la ponctuation : « Industry 4.0 » devient « Industry 40 », « eau destinée à la consommation humaine (EDCH) » devient « Eau destinée à la consommation humaine EDCH ». Les `<term>` du TEI (`label_xml`) gardent la saisie de l'auteur. Ils sont présents dans chaque dépôt pourvu de `keyword_s`, sur un échantillon de 4 160 dépôts.
 
 ## Décisions
 
 - **Code et hiérarchie.** Un sujet est identifié par son vocabulaire et son code dans ce vocabulaire, à défaut son libellé. Il a un niveau et un parent.
-- **Une seule table de sujets.** `subjects` contient le vocabulaire, le code, le niveau et le parent ; `publication_subjects` relie les publications à ces sujets. Les vedettes RAMEAU, identifiées par leur PPN chez ScanR comme chez theses.fr, forment un seul sujet quelle que soit la source.
-- **Les codes précèdent le schéma.** Les normalizers écrivent les codes dans `source_records.topics`, et le stock est mis en conformité, avant que l'ingestion identifie les sujets par leur code. Chaque sujet OpenAlex ou RAMEAU est ainsi identifié par son code dès sa première ingestion.
+- **Une seule table de sujets.** `subjects` contient le vocabulaire, le code, le niveau et le parent. Les vedettes RAMEAU, identifiées par leur PPN chez ScanR comme chez theses.fr, forment un seul sujet quelle que soit la source.
+- **Sujets écrits à la normalisation.** La clé (vocabulaire, code) se passe de résolution entre sources, comme celle des adresses. Le normalizer de chaque source écrit donc les sujets de l'enregistrement source dans `subjects`, et leurs liens dans `source_record_subjects`, avec le score OpenAlex. La phase `subjects` dérive `publication_subjects` en SQL. `source_records.topics` disparaît.
 - **Sujets WoS abandonnés.** Ils sont les seuls sujets de 558 publications (0,7 %), presque toutes présentes seulement dans le WoS : résumés de congrès, articles sans enregistrement OpenAlex.
 - **Couleurs.** Les domaines de haut niveau de tous les vocabulaires partagent une palette commune.
 - **Les 4 domains OpenAlex sont écartés des graphiques.**
@@ -29,29 +29,35 @@ Base locale au 2026-11-01.
 
 ### Phase 1 — Correctifs indépendants
 
-- [ ] Normalizer HAL : mots-clés lus dans les `<term>` du TEI ; `keyword_s` retiré des champs demandés à l'API
-- [ ] Stock HAL : script ponctuel qui relit les mots-clés TEI dans le raw store
-- [x] Retrait de `publications_detail.topics` et de `Publication.topics`
+- [x] Normalizer HAL : mots-clés lus dans les `<term>` du TEI
+- [ ] `keyword_s` retiré des champs demandés à l'API. L'empreinte de chaque payload HAL change : chaque dépôt relu est normalisé une fois de plus
+- [ ] Stock HAL : script ponctuel `rewrite_hal_keywords`, qui relit les mots-clés TEI dans le raw store
+- [x] Retrait de `publications_detail.topics` et de `Publication.topics` (e227269d1)
 
-### Phase 2 — Codes dans les enregistrements sources
+### Phase 2 — Sujets écrits à la normalisation
 
-- [ ] Normalizer OpenAlex : `extract_topics` garde l'identifiant de chaque niveau
-- [ ] Normalizer theses.fr : chaque vedette RAMEAU garde son PPN ; fonction de lecture des sujets theses.fr adaptée au format de `topics`
-- [ ] Stock OpenAlex : script ponctuel qui réécrit `topics` depuis le raw store
-- [ ] Stock theses.fr : `raw_hash` vidé et `last_seen_at` vieilli pour toutes les thèses, puis `fetch_stale` sur toutes les années. La normalisation qui suit retire aussi `source_extras.discipline`
-
-### Phase 3 — Sujets identifiés par vocabulaire et code
-
-- [ ] Schéma : `subjects` contient vocabulaire, code, niveau et parent ; unicité sur (vocabulaire, code) à la place de l'unicité sur le libellé. Livré avec les fonctions de lecture et l'ingestion
-- [ ] Fonctions de lecture des sujets (`subject_extractors.py`) : chaque sujet rendu avec son vocabulaire, son code, son niveau et son parent. Codes : celui des domaines HAL, identifiants OpenAlex, PPN des vedettes RAMEAU, libellé de la discipline de theses.fr. Lecture des sujets WoS retirée
-- [ ] Ingestion de la phase `subjects` par (vocabulaire, code) ; reconstruction du stock
+- [ ] Schéma : `subjects` contient vocabulaire, code, niveau et parent ; unicité sur (vocabulaire, code) à la place de l'unicité sur le libellé. Table `source_record_subjects` : enregistrement source, sujet, score
+- [ ] Écriture commune aux normalizers : sujets et liens en une requête par lot
+- [ ] HAL : domaines par leur code, chaque niveau rattaché au niveau supérieur
+- [ ] OpenAlex : identifiant de chaque niveau, score du topic
+- [ ] ScanR et theses.fr : vedettes RAMEAU par leur PPN, lu dans le champ `query` chez theses.fr ; discipline de theses.fr par son libellé
+- [ ] WoS : sujets abandonnés
+- [ ] Phase `subjects` : `publication_subjects` dérivée en SQL de `source_record_subjects` ; fonctions de lecture des sujets (`subject_extractors.py`) retirées
+- [ ] Fiche d'une thèse : discipline lue dans les sujets
 - [ ] API des sujets : vocabulaire et niveau de chaque sujet
-- [ ] Documentation : `docs/agregats/subjects.md`, `docs/donnees/03-publications.md`
+- [ ] Documentation : `docs/agregats/subjects.md`, `docs/donnees/03-publications.md`, `docs/pipeline/03-normalize.md`
+
+### Phase 3 — Stock, entre la migration et le run suivant
+
+- [ ] HAL et ScanR : script ponctuel qui écrit les sujets depuis `source_records.topics`, où les codes sont présents
+- [ ] OpenAlex : script ponctuel qui écrit les sujets depuis le raw store
+- [ ] theses.fr : `raw_hash` vidé et `last_seen_at` vieilli pour toutes les thèses, puis `fetch_stale` sur toutes les années. La normalisation qui suit retire aussi `source_extras.discipline`
+- [ ] Retrait de `source_records.topics` ; scripts de la pertinence des sujets (`sample_subject_relevance`, `prototype_subject_vote`) adaptés
 
 ### Phase 4 — MeSH
 
 - [ ] Moissonnage selon la source retenue
-- [ ] Lecture des sujets MeSH : descripteur identifié par son code, avec son niveau et son parent
+- [ ] Normalizer : descripteurs MeSH identifiés par leur code, avec leur niveau et leur parent
 
 ### Phase 5 — Couleurs dans l'interface
 

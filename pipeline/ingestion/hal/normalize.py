@@ -192,7 +192,7 @@ def hal_source_record(
 
     abstract = hal_text_field(doc.get("abstract_s"))
 
-    keywords = list(dict.fromkeys(as_strs(doc.get("keyword_s")))) or None
+    keywords = parse_tei_keywords(hal_text_field(doc.get("label_xml"))) or None
 
     # Topics : domaines HAL, stockés sous la forme exposée par la source (code + chemin de libellés).
     domain_raw = doc.get("fr_domainAllCodeLabel_fs")
@@ -316,6 +316,19 @@ def _tei_root(label_xml: str | None) -> Element | None:
         return _parse_tei(label_xml)
     except ParseError, DefusedXmlException:
         return None
+
+
+def parse_tei_keywords(label_xml: str | None) -> list[str]:
+    """Renvoie les mots-clés saisis par l'auteur (`keywords[@scheme='author']/term`), sans doublon, espaces réduits. Le champ Solr `keyword_s` en retire la ponctuation."""
+    root = _tei_root(label_xml)
+    if root is None:
+        return []
+    terms = (
+        " ".join("".join(term.itertext()).split())
+        for keywords in root.iterfind(".//tei:keywords[@scheme='author']", _TEI_NS)
+        for term in keywords.findall("tei:term", _TEI_NS)
+    )
+    return list(dict.fromkeys(term for term in terms if term))
 
 
 def _title_authors(root: Element | None) -> list[Element]:

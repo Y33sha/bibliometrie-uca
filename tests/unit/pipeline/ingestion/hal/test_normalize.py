@@ -399,12 +399,27 @@ class TestHalSourceRecord:
         captured = self._call({})
         assert identifier_values(captured) == {"hal_id": ["hal-01234567"]}
 
-    def test_keywords_deduplicated(self):
-        captured = self._call({"keyword_s": ["a", "b", "a", "c"]})
-        assert captured.keywords == ["a", "b", "c"]
+    def test_keywords_from_tei(self):
+        """Les mots-clés de l'auteur gardent leur ponctuation ; les doublons et les espaces répétés disparaissent."""
+        tei = (
+            '<TEI xmlns="http://www.tei-c.org/ns/1.0"><text><profileDesc><textClass>'
+            '<keywords scheme="author">'
+            '<term xml:lang="fr">eau destinée à la consommation humaine (EDCH)</term>'
+            '<term xml:lang="en">Industry  4.0</term>'
+            '<term xml:lang="en">Industry 4.0</term>'
+            "<term/>"
+            "</keywords>"
+            '<keywords scheme="other"><term>hors auteur</term></keywords>'
+            "</textClass></profileDesc></text></TEI>"
+        )
+        captured = self._call({"label_xml": tei, "keyword_s": ["Industry 40"]})
+        assert captured.keywords == [
+            "eau destinée à la consommation humaine (EDCH)",
+            "Industry 4.0",
+        ]
 
-    def test_keywords_empty(self):
-        captured = self._call({"keyword_s": []})
+    def test_keywords_without_tei(self):
+        captured = self._call({"keyword_s": ["Industry 40"]})
         assert captured.keywords is None
 
     def test_topics_from_domain(self):
