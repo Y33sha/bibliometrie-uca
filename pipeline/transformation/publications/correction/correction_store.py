@@ -484,6 +484,10 @@ class SourceRecordCorrectionStore:
                     GROUP BY sr.title_normalized, sr.publication_year
                     HAVING count(DISTINCT d.doi) = 1
                 ),
+                -- DOI d'item figshare, filtrés une seule fois.
+                figshare_items AS MATERIALIZED (
+                    SELECT id, doi FROM record_dois WHERE doi ~ '{FIGSHARE_ITEM_DOI_PATTERN}'
+                ),
                 -- DOI présents en base : DOI de rôle autre que `related` des enregistrements sources, hors retraits de la correction unaire.
                 present_dois AS (
                     SELECT DISTINCT id_value AS d FROM source_record_identifiers
@@ -550,14 +554,13 @@ class SourceRecordCorrectionStore:
                             c.doi AS canonical_doi,
                             '{DoiTargetRule.DATACITE_PACKAGE_PIECE.value}' AS same_work_case
                         FROM sr_eff sr
-                        JOIN record_dois piece ON piece.id = sr.id
+                        JOIN figshare_items piece ON piece.id = sr.id
                         JOIN figshare_collections c
                           ON c.title_normalized = regexp_replace(
                                  sr.title_normalized, '{FIGSHARE_ADDITIONAL_FILE_TITLE_PATTERN}', ''
                              )
                          AND c.publication_year = sr.publication_year
-                        WHERE piece.doi ~ '{FIGSHARE_ITEM_DOI_PATTERN}'
-                          AND sr.title_normalized ~ '{FIGSHARE_ADDITIONAL_FILE_TITLE_PATTERN}'
+                        WHERE sr.title_normalized ~ '{FIGSHARE_ADDITIONAL_FILE_TITLE_PATTERN}'
                     ) s
                     WHERE s.canonical_doi NOT IN (SELECT d FROM unresolved_dois)
                       AND s.secondary_doi NOT IN (SELECT d FROM unresolved_dois)
