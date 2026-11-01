@@ -1,4 +1,4 @@
-"""Tests purs du retrait des DOI par groupe (ouvrage et chapitre, chapitres entre eux, volume d'actes et communication, dépôt HAL d'une autre œuvre) et de `compute_updates`."""
+"""Tests purs du retrait des DOI par groupe (ouvrage et chapitre, chapitres entre eux, volume d'actes et communication, enregistrement source d'une autre œuvre) et de `compute_updates`."""
 
 from domain.source_records.identifiers import (
     SourceIdentifier,
@@ -46,8 +46,9 @@ def _row(
     identifiers=(),
     has_target=False,
     doi_removed_by=None,
+    source="openalex",
 ) -> DoiClusterRow:
-    """Renvoie un membre d'un groupe. `doi` s'écrit en tête de ses identifiants, retiré par `doi_removed_by`, quand `identifiers` ne contient aucun DOI."""
+    """Renvoie un membre d'un groupe, OpenAlex par défaut. `doi` s'écrit en tête de ses identifiants, retiré par `doi_removed_by`, quand `identifiers` ne contient aucun DOI."""
     ids = tuple(identifiers)
     if doi and not any(i.id_type is SourceIdentifierType.DOI for i in ids):
         ids = (_doi(doi, doi_removed_by), *ids)
@@ -58,6 +59,7 @@ def _row(
         shared_doi,
         has_target=has_target,
         identifiers=ids,
+        source=source,
     )
 
 
@@ -380,13 +382,38 @@ def test_identifiant_propre_d_un_enregistrement_source_qui_garde_le_doi_reste_en
     assert set(updates) == {3}
 
 
+def test_cle_d_un_depot_hal_qui_garde_le_doi_reste_en_place():
+    """L'enregistrement source ScanR d'un congrès recopie le DOI et le PMID de l'article. Il perd le DOI ; le dépôt HAL de l'article, source de son propre document, garde le PMID."""
+    title = "nmr metabolomic signatures reveal predictive plasma metabolites"
+    crossref = _row(1, "article", "10.1/x", title=title, source="crossref")._replace(
+        author_names=("deschasaux", "fiolet")
+    )
+    article = _row(
+        2, "article", "10.1/x", title=title, identifiers=(_PMID_99,), source="hal"
+    )._replace(author_names=("deschasaux",))
+    work = _row(3, "article", "10.1/x", title=title, identifiers=(_PMID_99,))._replace(
+        author_names=("deschasaux",)
+    )
+    congress = _row(
+        4,
+        "article",
+        "10.1/x",
+        title="iuns international congress of nutrition buenos aires",
+        identifiers=(_PMID_99,),
+        source="scanr",
+    )._replace(author_names=("stuckle",))
+    updates = compute_updates([crossref, article, work, congress])
+    assert [u.id for u in updates] == [4]
+    assert _active(updates[0].identifiers) == {"pmid": ["99"]}
+
+
 def test_sans_divergence_aucun_retrait():
     a = _row(1, "article", "10.1/x", identifiers=_hal("hal-1"))
     b = _row(2, "article", "10.1/x", identifiers=_hal("hal-1"))
     assert compute_updates([a, b]) == []
 
 
-# Dépôt HAL au DOI d'une autre œuvre
+# Enregistrement source au DOI d'une autre œuvre
 
 
 def _source_record(member_id, source, title, authors, doc_type="article"):
@@ -405,7 +432,38 @@ def test_depot_hal_d_une_autre_oeuvre_perd_le_doi():
         ),
         _source_record(3, "openalex", "a brief history of oleds emitter development", {"zhang"}),
     ]
-    assert _resoudre(group) == [DoiClusterDecision(2, DoiClusterCase.HAL_DOI_D_UNE_AUTRE_OEUVRE)]
+    assert _resoudre(group) == [DoiClusterDecision(2, DoiClusterCase.DOI_D_UNE_AUTRE_OEUVRE)]
+
+
+def test_work_openalex_d_une_autre_oeuvre_perd_le_doi():
+    """Le work OpenAlex reprend le DOI erroné d'un dépôt HAL : il décrit l'article du dépôt, pas celui du DOI."""
+    group = [
+        _source_record(
+            1,
+            "crossref",
+            "multi scale temporal neural network for stock trend prediction",
+            {"song", "chen"},
+        ),
+        _source_record(
+            2,
+            "openalex",
+            "capturing knowledge graphs and rules with octagon embeddings",
+            {"charpenay", "schockaert"},
+        ),
+        _source_record(
+            3, "scanr", "multi scale temporal neural network for stock trend prediction", {"song"}
+        ),
+    ]
+    assert _resoudre(group) == [DoiClusterDecision(2, DoiClusterCase.DOI_D_UNE_AUTRE_OEUVRE)]
+
+
+def test_une_traduction_garde_le_doi():
+    """Titre français d'un article publié en anglais : les auteurs communs désignent la même œuvre."""
+    group = [
+        _source_record(1, "crossref", "awakening girls to science", {"rouquette"}),
+        _source_record(2, "openalex", "l eveil des filles aux sciences", {"rouquette"}),
+    ]
+    assert _resoudre(group) == []
 
 
 def test_depot_hal_au_titre_proche_garde_le_doi():

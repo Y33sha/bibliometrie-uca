@@ -16,6 +16,7 @@ from pipeline.transformation.publications.correction.matchable import (
 )
 from pipeline.transformation.publications.correction.remove_identifiers import (
     compute_updates as compute_removal_updates,
+    fetch_candidates,
 )
 from pipeline.transformation.publications.reconciliation import reconcile
 
@@ -38,7 +39,7 @@ def apply_metadata_corrections(conn: Connection) -> None:
     queries.delete_missing_hal_locations()
 
     queries.replace_doi_targets(compute_doi_targets(queries.fetch_secondary_form_declarations()))
-    queries.persist_doi_corrections(compute_removal_updates(queries.fetch_doi_cluster_candidates()))
+    queries.persist_doi_corrections(compute_removal_updates(fetch_candidates(queries)))
 
     matchable_updates = compute_matchable_updates(
         queries.fetch_matchability_rows(), missing_hal_ids

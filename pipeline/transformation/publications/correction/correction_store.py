@@ -4,7 +4,7 @@ La phase écrit sur les enregistrements sources les valeurs corrigées par les r
 """
 
 import json
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import fields
 from typing import NamedTuple
 
@@ -139,7 +139,15 @@ class DoiClusterRow(NamedTuple):
     source: str = ""
     source_id: str = ""
     author_names: tuple[str, ...] = ()
-    """Noms de famille normalisés des contributions sources individuelles, renseignés pour les groupes où un dépôt HAL et l'enregistrement source Crossref n'ont aucun nom commun."""
+    """Noms de famille normalisés des contributions sources individuelles, renseignés pour les groupes où un enregistrement source a un titre éloigné de celui de l'enregistrement source Crossref."""
+
+
+class CrossrefTitlePair(NamedTuple):
+    """Enregistrement source qui partage un DOI avec un enregistrement source Crossref."""
+
+    doi: str
+    title_normalized: str | None
+    crossref_title_normalized: str | None
 
 
 class DoiCorrectionUpdate(NamedTuple):
@@ -273,11 +281,13 @@ def _persist_updates(conn: Connection, updates: Sequence[Mapping[str, object]]) 
     return len(updates)
 
 
-# L'enregistrement source `{source_record}` a au moins une contribution source individuelle.
-_HAS_INDIVIDUAL_SOURCE_CONTRIBUTION = (
-    "EXISTS (SELECT 1 FROM source_contributions s"
-    " WHERE s.source_record_id = {source_record} AND NOT s.collective)"
-)
+# DOI de rôle autre que `related` de chaque enregistrement source, quel que soit leur statut.
+_RECORD_DOIS_SQL = f"""
+    SELECT source_record_id AS id, id_value AS doi, role
+    FROM source_record_identifiers
+    WHERE id_type = '{SourceIdentifierType.DOI.value}'
+      AND role <> '{SourceIdentifierRole.RELATED.value}'
+"""
 
 
 class SourceRecordCorrectionStore:
@@ -470,13 +480,7 @@ class SourceRecordCorrectionStore:
                     SELECT id, source, doc_type, title_normalized, publication_year, source_extras
                     FROM source_records
                 ),
-                -- DOI de rôle autre que `related` de chaque enregistrement source, quel que soit leur statut.
-                record_dois AS (
-                    SELECT source_record_id AS id, id_value AS doi, role
-                    FROM source_record_identifiers
-                    WHERE id_type = '{SourceIdentifierType.DOI.value}'
-                      AND role <> '{SourceIdentifierRole.RELATED.value}'
-                ),
+                record_dois AS ({_RECORD_DOIS_SQL}),
                 dataset_dois AS (
                     SELECT DISTINCT d.doi AS d
                     FROM sr_eff sr JOIN record_dois d ON d.id = sr.id
@@ -594,14 +598,34 @@ class SourceRecordCorrectionStore:
             for row in rows
         ]
 
-    def fetch_doi_cluster_candidates(self) -> list[DoiClusterRow]:
+    def fetch_crossref_title_pairs(self) -> list[CrossrefTitlePair]:
+        """Renvoie les paires d'enregistrements sources de même DOI, l'un Crossref, l'autre d'une autre source, avec leurs titres normalisés."""
+        return rows_as(
+            CrossrefTitlePair,
+            self._conn.execute(
+                text(f"""
+                    WITH record_dois AS ({_RECORD_DOIS_SQL})
+                    SELECT od.doi, o.title_normalized,
+                           c.title_normalized AS crossref_title_normalized
+                    FROM source_records c
+                    JOIN record_dois cd ON cd.id = c.id
+                    JOIN record_dois od ON od.doi = cd.doi AND od.id <> c.id
+                    JOIN source_records o ON o.id = od.id AND o.source <> '{Source.CROSSREF.value}'
+                    WHERE c.source = '{Source.CROSSREF.value}'
+                """)
+            ),
+        )
+
+    def fetch_doi_cluster_candidates(
+        self, distant_title_dois: Collection[str]
+    ) -> list[DoiClusterRow]:
         """Renvoie les membres des groupes de même DOI candidats au retrait du DOI.
 
         Un groupe réunit les enregistrements sources ayant son DOI, de rôle autre que `related`, quel que soit son statut. Un groupe est candidat si :
 
         - il contient un livre, un chapitre ou un volume d'actes ;
         - son DOI est inconnu de doi.org ;
-        - un de ses dépôts HAL partage zéro nom d'auteur avec son enregistrement source Crossref ;
+        - son DOI est dans `distant_title_dois`, avec les noms d'auteur de chaque membre ;
         - il contient un enregistrement source déjà corrigé, à réévaluer.
         """
         rows = self._conn.execute(
@@ -610,41 +634,10 @@ class SourceRecordCorrectionStore:
                     SELECT id, source, source_id, doc_type, title_normalized
                     FROM source_records
                 ),
-                record_dois AS (
-                    SELECT source_record_id AS id, id_value AS doi
-                    FROM source_record_identifiers
-                    WHERE id_type = '{SourceIdentifierType.DOI.value}'
-                      AND role <> '{SourceIdentifierRole.RELATED.value}'
-                ),
+                record_dois AS ({_RECORD_DOIS_SQL}),
                 unresolved_dois AS (
                     SELECT id_value AS d FROM failed_lookups
                     WHERE source = '{DOI_ORG}' AND id_type = 'doi'
-                ),
-                -- DOI dont un dépôt HAL n'a aucun nom d'auteur en commun avec l'enregistrement source Crossref,
-                -- les deux ayant des contributions sources individuelles.
-                hal_crossref AS MATERIALIZED (
-                    SELECT hd.doi AS d, h.id AS hal_id, c.id AS crossref_id
-                    FROM sr_eff h
-                    JOIN record_dois hd ON hd.id = h.id
-                    JOIN record_dois cd ON cd.doi = hd.doi
-                    JOIN sr_eff c ON c.id = cd.id AND c.source = '{Source.CROSSREF.value}'
-                    WHERE h.source = '{Source.HAL.value}'
-                ),
-                foreign_hal_dois AS (
-                    SELECT DISTINCT hc.d FROM hal_crossref hc
-                    WHERE {_HAS_INDIVIDUAL_SOURCE_CONTRIBUTION.format(source_record="hc.hal_id")}
-                      AND {_HAS_INDIVIDUAL_SOURCE_CONTRIBUTION.format(source_record="hc.crossref_id")}
-                      AND NOT EXISTS (
-                          SELECT 1
-                          FROM source_contributions a
-                          JOIN contributor_information ka ON ka.id = a.contributor_information_id
-                          JOIN contributor_information kb
-                            ON kb.last_name_normalized = ka.last_name_normalized
-                          JOIN source_contributions b
-                            ON b.contributor_information_id = kb.id AND b.source_record_id = hc.crossref_id
-                          WHERE a.source_record_id = hc.hal_id
-                            AND NOT a.collective AND NOT b.collective
-                      )
                 ),
                 candidate_dois AS (
                     SELECT d.doi AS d FROM record_dois d JOIN sr_eff sr ON sr.id = d.id
@@ -659,7 +652,7 @@ class SourceRecordCorrectionStore:
                     UNION
                     SELECT d FROM unresolved_dois
                     UNION
-                    SELECT d FROM foreign_hal_dois
+                    SELECT unnest(CAST(:distant_title_dois AS text[]))
                 )
                 SELECT sr.id, sr.doc_type, sr.title_normalized,
                        sr.source::text AS source, sr.source_id,
@@ -667,7 +660,7 @@ class SourceRecordCorrectionStore:
                        m.doi AS shared_doi,
                        m.doi IN (SELECT d FROM unresolved_dois) AS unresolved,
                        EXISTS (SELECT 1 FROM doi_targets t WHERE t.doi = m.doi) AS has_target,
-                       CASE WHEN m.doi IN (SELECT d FROM foreign_hal_dois) THEN ARRAY(
+                       CASE WHEN m.doi = ANY(CAST(:distant_title_dois AS text[])) THEN ARRAY(
                            SELECT DISTINCT ci.last_name_normalized
                            FROM source_contributions sc
                            JOIN contributor_information ci ON ci.id = sc.contributor_information_id
@@ -677,7 +670,8 @@ class SourceRecordCorrectionStore:
                 FROM candidate_dois c
                 JOIN record_dois m ON m.doi = c.d
                 JOIN sr_eff sr ON sr.id = m.id
-            """)
+            """),
+            {"distant_title_dois": sorted(distant_title_dois)},
         ).all()
         return [
             DoiClusterRow(

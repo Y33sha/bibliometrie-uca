@@ -1,6 +1,6 @@
 # Correction des métadonnées
 
-*À jour le 2026-10-30.*
+*À jour le 2026-11-01.*
 
 La phase `metadata_correction` prépare les `source_records` pour que le [rattachement des publications](07-publications.md) s'appuie sur des valeurs propres. Elle tourne après [`publishing`](05-publishing.md) : le typage des revues alimente les règles dépendantes de la revue.
 
@@ -15,7 +15,7 @@ Les corrections sont écrites sur les colonnes des `source_records` ; la valeur 
 
 - **`remove_identifiers`** — retire un DOI des enregistrements sources qui l'ont à tort. Un groupe réunit les enregistrements sources qui ont un même DOI.
 
-   - **Documents distincts** — des documents distincts ont le même DOI : un chapitre d'un autre titre a le DOI de son ouvrage, une communication celui de son volume d'actes, un dépôt HAL celui d'un autre article. Le DOI reste aux seuls documents désignés.
+   - **Documents distincts** — des documents distincts ont le même DOI : un chapitre d'un autre titre a le DOI de son ouvrage, une communication celui de son volume d'actes, un enregistrement source celui d'une autre œuvre. Le DOI reste aux seuls documents désignés. Un enregistrement source désigne une autre œuvre que l'enregistrement source Crossref du DOI s'il a un titre éloigné du sien et aucun nom d'auteur commun.
    - **DOI inexistant** — un DOI que doi.org ne connaît pas (`failed_lookups`, source `doi_org`) est retiré de tous les enregistrements sources qui le citent.
 
 - **`matchable`** — calcule `is_matchable` d'après les valeurs corrigées. Un enregistrement source écarté reste hors de la [réconciliation](07-publications.md) : préfixe DOI exclu, titre de paratexte, enregistrement DataCite d'une forme secondaire, enregistrement ScanR issu d'un dépôt HAL introuvable, enregistrement OpenAlex ou ScanR sans DOI, lien ni clé de confirmation.
