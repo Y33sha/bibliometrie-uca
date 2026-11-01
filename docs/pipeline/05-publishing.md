@@ -12,7 +12,7 @@ Phase à part, juste avant `publishing`. Elle interroge doi.org sur les préfixe
 
 - **`resolve_crossref_publishers`** — rattache chaque préfixe Crossref à son éditeur (membre Crossref), par l'API `/prefixes` de Crossref.
 - **`resolve_datacite_publishers`** — rattache chaque préfixe DataCite à l'organisation qui dépose et à l'entrepôt (Zenodo, NAKALA…), par l'API `/prefixes` de DataCite.
-- **`merge_duplicate_publishers`** — fusionne dans le titulaire d'un préfixe les autres noms du même éditeur, d'après les DOI de leurs enregistrements sources et la compatibilité des noms (`domain/publishers/aliases.py`).
+- **`merge_duplicate_publishers`** — fusionne dans le titulaire d'un préfixe les autres noms du même éditeur, d'après les DOI de leurs enregistrements sources et la compatibilité des noms. Fusionne ensuite les éditeurs de même nom aux mots génériques près : « Brepols Publ » et « Brepols Publishers » (`domain/publishers/aliases.py`).
 
 ## Publications en série
 
