@@ -42,10 +42,6 @@ CRISalid, Academic Observatory et OpenAIRE identifient la revue par ses seuls IS
   - « INRAE » (13895) et « National Research Institute for Agriculture, Food and Environment » (83482), titulaire « Institut National de Recherche pour l'Agriculture, l'Alimentation et l'Environnement » (76867).
 - Des noms d'éditeur contiennent un lieu ou un directeur d'ouvrage : « Paris: Classiques Garnier » (14077), « A. Hatzenberger dir., Classiques Garnier » (84199).
 
-### Titres de revue
-
-OpenAlex retire les apostrophes. 106 titres de revue ont la forme « Annales d Endocrinologie », « L Encéphale », « Journal Français d Ophtalmologie ». 441 titres ont une apostrophe.
-
 ### Conteneur libre
 
 `publications.container_title` est renseigné pour 39 690 publications, dont 10 202 à revue et 8 876 à monographie. OpenAlex y met le nom d'un repository : « HAL (Le Centre pour la Communication Scientifique Directe) » pour 28 846 de ses 52 116 enregistrements sources à conteneur, puis arXiv, theses.fr, Figshare, Zenodo.
@@ -104,17 +100,15 @@ Les personnes et les publications ont un volet latéral (`PersonDrawer`, `Public
 - [x] Mesure des ISSN sans ISSN-L donnés ensemble par un même enregistrement source
 - [x] Mesure des séries sans ISSN de titre compatible avec une revue à ISSN, sans autre enregistrement source de leur publication rattaché à cette revue
 - [x] Mesure des collections sans ISSN des monographies réparties entre plusieurs éditeurs
+- [x] ISSN-L lu dans la table de l'ISSN International Centre, importée chaque mois ; le Sudoc garde le titre, le support, le statut et les liens (f56521a60)
+- [x] ISSN annulé lié à l'ISSN qui l'annule, dont il prend l'ISSN-L (c71b4a7c7)
+- [x] Revue vide à ISSN supprimée quand aucun de ses ISSN n'est cité ni relié (c3b44143c)
 
 ### Phase 2 — Éditeurs
 
 - [ ] Doublons d'éditeurs que révèle le titulaire DataCite du préfixe
 - [ ] Lieu et directeur d'ouvrage dans les noms d'éditeur
 - [ ] Mesure des autres doublons d'éditeurs sous des noms différents
-
-### Phase 3 — Revues
-
-- [ ] Apostrophes retirées du titre par OpenAlex (+ caractère @ à conserver)
-- [ ] Stocker la langue des revues?
 
 ### Phase 4 — Conteneur libre
 
