@@ -114,13 +114,12 @@ Le titre change souvent entre preprint et article : les titres différents d'une
 
 ## Décisions
 
-- **Un preprint relié à sa version publiée est masqué.** Il reste une publication, avec son DOI, son type et sa date. Il est absent des listes, des statistiques, des compteurs et des bibliographies. Ses copies figurent dans le volet Accès de la version publiée. La réconciliation garde un DOI par publication, et une fausse paire se corrige par le retrait du lien.
-- **Le masquage se lit dans le lien `is_preprint_of`.** Toutes les vues filtrent les preprints masqués par une même jointure sur `publication_relations`.
-- **Le lien est vérifié à sa création.** La phase `relations` relie un preprint à une seule version publiée, sous la garde des auteurs. Une communication orale, un poster, une thèse, un jeu de données, un logiciel ou un `other` reste une œuvre liée par une autre relation.
-- **`relations` précède `finalize`**, hors des enrichissements : le masquage pèse sur le périmètre et les compteurs.
-- **Le statut open access de la version publiée tient compte des copies de son preprint masqué.** Pour 73 paires, la version publiée est fermée et le preprint ouvert.
+- **Un preprint et sa version publiée forment une seule publication quand une clé de confirmation les réunit.** Seuls les DOI extérieurs aux serveurs de preprints du registre coupent les regroupements. Une communication sans actes, une HDR ou un article sans localisation éditeur réunit ainsi ses copies de serveurs de preprints.
+- **Le DOI d'une publication est son DOI extérieur aux serveurs de preprints**, à défaut le DOI d'un serveur de preprints.
+- **Dans une publication à DOI extérieur aux serveurs de preprints, les enregistrements sources preprint passent après les autres** pour arbitrer le type, la date, le titre et les autres champs.
 - **Un dépôt arXiv est un preprint**, même accepté pour publication : la plateforme impose le type.
 - **Les copies d'un preprint passent après les autres copies ouvertes dans le volet Accès** : un preprint donne l'accès principal seulement s'il est la seule copie ouverte. Le nom de la plateforme suffit à reconnaître un preprint.
+- **Un preprint sans clé commune avec sa version publiée reste une publication distincte et visible**, reliée par `is_preprint_of`. L'administration fusionne la paire à la main. La fusion manuelle ignore les DOI des serveurs de preprints, comme la réconciliation.
 
 ## Phasage
 
@@ -132,47 +131,31 @@ Le titre change souvent entre preprint et article : les titres différents d'une
 - [x] Relecture d'un échantillon de 50 scissions V5
 - [x] Simulation de fusion : DOI des serveurs de preprints écartés des ancres
 - [x] Relecture d'un échantillon de 41 fusions
+- [ ] DOI des dépôts institutionnels typés preprint (DESY, RWTH, Zenodo), avant toute règle
 
-### Phase 2 — Réunion et type des preprints
+### Phase 2 — Fusion des preprints
 
 - [x] Type `preprint` d'après le préfixe DOI du serveur de preprints, pour un enregistrement source sans revue (67c1b73ef)
 - [x] Enregistrements sources lus dans l'ordre d'arrivée pour l'agrégation (c1b6d7615)
-- [ ] Dépôts HAL réunis à une œuvre d'une autre nature : preprint et version publiée
+- [ ] DOI des serveurs de preprints écartés des ancres de la réconciliation
+- [ ] DOI de la publication : DOI extérieur aux serveurs de preprints, à défaut DOI d'un serveur de preprints
+- [ ] Fusion manuelle : DOI des serveurs de preprints ignorés
+- [ ] Arbitrage : enregistrements sources preprint après les autres
+- [ ] Remédiation du stock : commande de remise en réconciliation des publications concernées
 
-### Phase 3 — Création du lien
-
-- [ ] Signaux qui créent le lien : relation déclarée, clé partagée, titre, selon leur fiabilité mesurée
-- [ ] Garde sur les auteurs : la quasi-totalité des auteurs du preprint se retrouve dans la version publiée, comparés par personnes alignées
-- [ ] Cible unique, d'après les 27 preprints à plusieurs cibles
-
-### Phase 4 — Masquage
-
-- [ ] `relations` avant `finalize`
-- [ ] Preprints masqués filtrés dans toutes les vues : listes, facettes, statistiques, compteurs, bibliographies, exports
-- [ ] Adresse d'accès et statut open access calculés après `relations`, sur les copies de la publication et de ses preprints masqués
-
-### Phase 5 — Lien des preprints sans cible
-
-- [ ] Lien par titre proche, au sein des publications d'une même personne, sous la garde des auteurs. 284 preprints candidats.
-
-### Phase 6 — Affichage
+### Phase 3 — Affichage
 
 - [ ] Volet Accès : copies des preprints après les autres copies
 
-### Phase 7 — Fin de chantier
+### Phase 4 — Fin de chantier
 
-- [ ] Mise à jour de la documentation
+- [ ] Mise à jour de la documentation : réconciliation, agrégation, fusion manuelle
 
 ## Questions ouvertes
 
-- **Preprint fusionné ou distinct.** Le masquage réunit d'une publication à l'autre les copies, le statut open access, le périmètre, les laboratoires, les sources affichées et leur comparaison. La distinction entre preprint et version publiée vaut mal hors édition (communication sans actes, HDR), et pour un article sans localisation éditeur. Piste : seuls les DOI extérieurs aux serveurs de preprints du registre coupent les regroupements (simulation de fusion).
-- **Dépôts HAL réunis à une œuvre d'une autre nature.** Les `hal_id` secondaires d'OpenAlex et de ScanR réunissent un dépôt HAL preprint sans DOI à l'article (209 publications), un dépôt HAL d'article ou de communication au preprint arXiv (142), une communication à l'article (620). Deux voies :
-  - scinder : le dépôt forme sa propre publication, reliée puis masquée. Un preprint sans DOI forme alors aussi une publication distincte. La règle V5 scinde 357 publications.
-  - typer : la publication prend le type de la version publiée, avec le DOI du preprint. Une communication sans revue ni recueil (57) garde un type incertain.
-- **Version publiée hors périmètre** (49 paires ; 15 en base locale) : le masquage sort l'œuvre du périmètre. Deux voies : le preprint reste visible ; ou la version publiée entre dans le périmètre par ses preprints masqués, comme par un enregistrement source preprint réuni (16 publications). La seconde voie pose la question des laboratoires des preprints masqués.
+- **Fusion fausse.** Un DOI secondaire cité par un seul enregistrement source d'agrégateur suffit à réunir deux œuvres (165353, 27616). Recours : l'interdiction de fusion, prévue par le chantier de gestion admin des publications.
+- **Preprints restés distincts** (813 paires) : discussion papers Copernicus, dépôts institutionnels, paires reliées par le seul titre. Les fusions manuelles de l'administration diront si des critères de fusion automatique existent. Une fusion manuelle reste refusée entre deux DOI qui coupent : discussion papers Copernicus (189), dépôts DESY, RWTH et Zenodo typés preprint.
 - **Revue d'un preprint.** La revue de l'article, donnée par l'espace de noms DOI, compte 149 discussion papers parmi ses publications.
 - **Working papers typés `other`** (87) : le type `preprint` de HAL devant le type `other` de DataCite ?
 - **Fiabilité de la version déclarée.** La version des localisations d'entrepôt est peu fiable chez OpenAlex comme chez Unpaywall : 200 949 localisations d'entrepôt sur 258 875 sont en `submittedVersion`, y compris dans Cairn, qui héberge des versions publiées.
-- **Cible antérieure au preprint** (29 paires) : repost tardif ou fausse paire ?
-- **Rejet d'un lien par l'administration**, pour une fausse paire passée à travers la garde des auteurs.
 - **Doublons hors preprints.** Copies de repository (Apollo), articles à deux DOI, revues qui changent de préfixe DOI, articles vus par le seul WoS sans DOI (301756) : chaque copie ou double DOI forme une publication de plus.
