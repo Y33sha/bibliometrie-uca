@@ -12,7 +12,7 @@ Base locale au 2026-11-01.
   - RAMEAU : chaque vedette a un PPN, vedettes construites comprises (« Béton armé -- Fissuration »). ScanR le garde dans `topics`. theses.fr le donne dans le champ `query` de `mapSujets`, et le normalizer l'écarte. Les PPN des deux sources concordent pour 2 557 des 2 558 libellés communs. Chez ScanR, 51 PPN ont deux formes d'une même vedette (« Poumon -- Cancer », « Cancer du poumon »).
   - Discipline de theses.fr : libellé libre, 644 distincts à la casse et aux accents près. La discipline de 1 090 thèses sur 3 912 coïncide avec une vedette RAMEAU (« Informatique », « Mathématiques »). Les autres disciplines sont composées (« Biologie santé », « Mécanique, génie mécanique, génie civil »).
 - **Raw store.** Il est complet pour OpenAlex : 116 813 payloads pour 116 331 enregistrements sources.
-- **MeSH.** Aucun sujet MeSH. Le moissonnage OpenAlex omet le champ `mesh` des works (`pipeline/ingestion/openalex/api.py`). PubMed n'est pas moissonné.
+- **MeSH.** Aucun sujet MeSH. Le moissonnage OpenAlex omet le champ `mesh` des works (`pipeline/ingestion/openalex/api.py`). PubMed n'est pas moissonné. Chaque entrée de `mesh` contient l'identifiant du descripteur (`D008175`), son libellé, un qualificatif facultatif (`Q000453`, « epidemiology ») et un indicateur de sujet majeur. Les numéros d'arborescence sont absents.
 - **Besoins de l'interface.** Les nuages de sujets (`SubjectsCloud.svelte`) et le graphe des co-occurrences (`/subjects/[id]`) colorent par fréquence. Ils demandent une couleur par grand domaine, et de pouvoir écarter les niveaux hauts, qui encombrent sans informer.
 - **Mots-clés HAL.** Le champ Solr `keyword_s` met une majuscule initiale et retire la ponctuation : « Industry 4.0 » devient « Industry 40 », « eau destinée à la consommation humaine (EDCH) » devient « Eau destinée à la consommation humaine EDCH ». Les `<term>` du TEI (`label_xml`) gardent la saisie de l'auteur. Ils sont présents dans chaque dépôt pourvu de `keyword_s`, sur un échantillon de 4 160 dépôts.
 
@@ -22,6 +22,7 @@ Base locale au 2026-11-01.
 - **Une seule table de sujets.** `subjects` contient le vocabulaire, le code, le libellé, le niveau et le parent. La langue du libellé découle du vocabulaire. Les vedettes RAMEAU, identifiées par leur PPN chez ScanR comme chez theses.fr, forment un seul sujet quelle que soit la source.
 - **Sujets écrits à la normalisation.** La clé (vocabulaire, code) se passe de résolution entre sources, comme celle des adresses. Le normalizer de chaque source écrit donc les sujets donnés par la source dans `subjects`, et leurs liens dans `source_record_subjects`, avec le score OpenAlex. La phase `subjects` dérive `publication_subjects` en SQL, ancêtres compris. `source_records.topics` disparaît.
 - **Sujets WoS abandonnés.** Ils sont les seuls sujets de 558 publications (0,7 %), presque toutes présentes seulement dans le WoS : résumés de congrès, articles sans enregistrement OpenAlex.
+- **MeSH lu dans OpenAlex.** Le champ `mesh` des works donne les descripteurs des publications indexées dans PubMed.
 - **Couleurs.** Les domaines de haut niveau de tous les vocabulaires partagent une palette commune.
 - **Les 4 domains OpenAlex sont écartés des graphiques.**
 
@@ -49,14 +50,14 @@ Base locale au 2026-11-01.
 ### Phase 3 — Stock, entre la migration et le run suivant
 
 - [x] Script ponctuel `write_source_record_subjects` : HAL et ScanR depuis `source_records.topics`, où les codes sont présents (b0b93124e)
-- [ ] Même script : OpenAlex et ScanR depuis le raw store, enregistrements sources sans sujet seulement
+- [x] Même script : OpenAlex et ScanR depuis le raw store, enregistrements sources sans sujet seulement (a6317415c)
 - [x] Retrait de `source_records.topics` ; scripts de la pertinence des sujets (`sample_subject_relevance`, `prototype_subject_vote`) adaptés (ac2de2b5d)
 - [x] theses.fr : `raw_hash` vidé et `last_seen_at` vieilli pour toutes les thèses, puis `fetch_stale`. La normalisation qui suit retire aussi `source_extras.discipline`
 - [x] HAL : `last_seen_at` vieilli pour tous les dépôts, puis run. Le moissonnage relit les dépôts des collections, `fetch_stale` les autres. Leur normalisation écrit les mots-clés du TEI
 
 ### Phase 4 — MeSH
 
-- [ ] Moissonnage selon la source retenue
+- [ ] `mesh` ajouté aux champs demandés à OpenAlex. L'empreinte de chaque payload OpenAlex change : chaque work relu est normalisé une fois de plus
 - [ ] Normalizer : descripteurs MeSH identifiés par leur code, avec leur niveau et leur parent
 
 ### Phase 5 — Couleurs dans l'interface
@@ -68,7 +69,10 @@ Base locale au 2026-11-01.
 
 ## Questions ouvertes
 
-- **Source du MeSH** : champ `mesh` d'OpenAlex, renseigné pour les publications indexées dans PubMed, ou moissonnage de PubMed. Un descripteur MeSH occupe plusieurs positions dans l'arborescence : `subjects` lui donne un seul parent.
+- **Parents des descripteurs MeSH** : arborescence publiée par la NLM, ou aucun parent. Un descripteur occupe plusieurs positions dans l'arborescence : `subjects` lui donne un seul parent.
+- **Qualificatifs MeSH** : écartés, ou sujets à part.
+- **Descripteurs démographiques MeSH** (« Humans », « Male », « Female », « Aged ») : présents sur la plupart des publications médicales.
+- **Indicateur de sujet majeur** : score du lien, ou écarté.
 - **Parents des vedettes RAMEAU** : termes génériques lus dans IdRef, ou aucun parent.
 - **Libellé d'un sujet différent selon les sources** : 51 PPN RAMEAU à deux libellés chez ScanR.
 - **Classes de la palette commune.** Les correspondances du prototype de vote rattachent des codes HAL et des disciplines à plusieurs domains OpenAlex (`sdv.neu` : Health et Life ; `scco` : Social Sciences, Life et Health). Une couleur par sujet demande une seule classe.
