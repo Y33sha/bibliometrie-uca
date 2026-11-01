@@ -9,6 +9,7 @@ from pipeline.runtime.observability.log_format import inflect
 
 EXTRA_LABELS: dict[str, str | tuple[str, str]] = {
     "already_complete": "déjà complet",
+    "changed": "modifié",
     "conflicts": "conflit",
     "disappeared": "disparu",
     "fetched": "récupéré",
