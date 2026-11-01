@@ -112,6 +112,22 @@ Le titre change souvent entre preprint et article : les titres différents d'une
 - 8 : ces personnes ont une adresse du périmètre sur le preprint, une autre adresse sur la cible.
 - 7 : ces personnes ont une adresse du périmètre sur le preprint, aucune adresse sur la cible.
 
+### Dépôts institutionnels typés preprint, 2026-11-01
+
+Le type DataCite « Working Paper » des dépôts DESY et RWTH donne le type preprint.
+
+| Dépôt | Publications preprint | Reliées à leur version publiée | dont par une clé partagée | Doublons dans le périmètre |
+|---|---|---|---|---|
+| DESY (`10.3204`) | 173 | 112 | 8 | 69 |
+| RWTH (`10.18154`) | 112 | 96 | 46 | 84 |
+| Zenodo (`10.5281`) | 25 | 6 | 4 | 5 |
+| ResearchGate (`10.13140`) | 4 | 2 | 1 | 0 |
+
+- DESY et RWTH : copies d'articles de collaborations (ATLAS, CMS, LHCb), de même titre et de même année que l'article ou de l'année précédente. Le DOI du dépôt est une ancre. 99 copies DESY et 46 copies RWTH sont reliées à l'article par le seul titre.
+- RWTH déclare la copie arXiv (`IsVariantFormOf`, 121 enregistrements sources), DESY la version publiée (27). La règle des formes secondaires écarte ces déclarations, faites par un enregistrement source preprint (`meme_oeuvre_declaree`).
+- Zenodo : working papers, publiés ensuite pour certains.
+- La version publiée des autres publications est absente de la base : aucun homonyme.
+
 ### Remédiation du 2026-11-01
 
 La reconstruction des publications fusionne 1 047 publications. 709 paires `is_preprint_of` restent distinctes. 301756 rejoint 165044. 109 publications au DOI d'un serveur de preprints réunissent un enregistrement source d'un type publié et restent typées preprint, dont 43 avec revue (3059).
@@ -136,7 +152,7 @@ La reconstruction des publications fusionne 1 047 publications. 709 paires `is_p
 - [x] Relecture d'un échantillon de 50 scissions V5
 - [x] Simulation de fusion : DOI des serveurs de preprints écartés des ancres
 - [x] Relecture d'un échantillon de 41 fusions
-- [ ] DOI des dépôts institutionnels typés preprint (DESY, RWTH, Zenodo), avant toute règle
+- [x] DOI des dépôts institutionnels typés preprint (DESY, RWTH, Zenodo), avant toute règle
 
 ### Phase 2 — Fusion des preprints
 
@@ -148,7 +164,7 @@ La reconstruction des publications fusionne 1 047 publications. 709 paires `is_p
 - [x] Arbitrage : enregistrements sources preprint après les autres (96b9bc228)
 - [x] Remédiation du stock : reconstruction des publications (`--rebuild-publications`), run du 2026-11-01
 - [x] Retrait du DOI d'une autre œuvre étendu à toutes les sources, pour la fusion fausse de 15705 (1004d75d1)
-- [x] Publication publiée par le conteneur d'un enregistrement source typé autrement que preprint : revue, actes, ouvrage
+- [x] Publication publiée par le conteneur d'un enregistrement source typé autrement que preprint : revue, actes, ouvrage (6269b46ef)
 
 ### Phase 3 — Affichage
 
