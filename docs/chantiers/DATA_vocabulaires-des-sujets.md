@@ -10,7 +10,7 @@ Base locale au 2026-11-01.
   - OpenAlex : le payload donne l'identifiant de chaque niveau (`domains/2`, `fields/20`, `subfields/2002`, `T11257`). Le normalizer garde le libellé et le score seulement (`extract_topics`).
   - Domaines HAL : `topics.hal_domains` garde le code de la feuille (`sdv.bbm.bm`). Le code de chaque ancêtre en est un préfixe.
   - RAMEAU : chaque vedette a un PPN, vedettes construites comprises (« Béton armé -- Fissuration »). ScanR le garde dans `topics`. theses.fr le donne dans le champ `query` de `mapSujets`, et le normalizer l'écarte. Les PPN des deux sources concordent pour 2 557 des 2 558 libellés communs. Chez ScanR, 51 PPN ont deux formes d'une même vedette (« Poumon -- Cancer », « Cancer du poumon »).
-  - Discipline de theses.fr : libellé libre, 471 distincts.
+  - Discipline de theses.fr : libellé libre, 644 distincts à la casse et aux accents près. La discipline de 1 090 thèses sur 3 912 coïncide avec une vedette RAMEAU (« Informatique », « Mathématiques »). Les autres disciplines sont composées (« Biologie santé », « Mécanique, génie mécanique, génie civil »).
 - **Raw store.** Il est complet pour OpenAlex : 116 813 payloads pour 116 331 enregistrements sources.
 - **MeSH.** Aucun sujet MeSH. Le moissonnage OpenAlex omet le champ `mesh` des works (`pipeline/ingestion/openalex/api.py`). PubMed n'est pas moissonné.
 - **Besoins de l'interface.** Les nuages de sujets (`SubjectsCloud.svelte`) et le graphe des co-occurrences (`/subjects/[id]`) colorent par fréquence. Ils demandent une couleur par grand domaine, et de pouvoir écarter les niveaux hauts, qui encombrent sans informer.
@@ -18,9 +18,9 @@ Base locale au 2026-11-01.
 
 ## Décisions
 
-- **Code et hiérarchie.** Un sujet est identifié par son vocabulaire et son code dans ce vocabulaire, à défaut son libellé. Il a un niveau et un parent.
-- **Une seule table de sujets.** `subjects` contient le vocabulaire, le code, le niveau et le parent. Les vedettes RAMEAU, identifiées par leur PPN chez ScanR comme chez theses.fr, forment un seul sujet quelle que soit la source.
-- **Sujets écrits à la normalisation.** La clé (vocabulaire, code) se passe de résolution entre sources, comme celle des adresses. Le normalizer de chaque source écrit donc les sujets de l'enregistrement source dans `subjects`, et leurs liens dans `source_record_subjects`, avec le score OpenAlex. La phase `subjects` dérive `publication_subjects` en SQL. `source_records.topics` disparaît.
+- **Code et hiérarchie.** Un sujet est identifié par son vocabulaire et son code dans ce vocabulaire. Le code d'une discipline de thèse est son libellé normalisé. Un sujet a un niveau et un parent.
+- **Une seule table de sujets.** `subjects` contient le vocabulaire, le code, le libellé, le niveau et le parent. La langue du libellé découle du vocabulaire. Les vedettes RAMEAU, identifiées par leur PPN chez ScanR comme chez theses.fr, forment un seul sujet quelle que soit la source.
+- **Sujets écrits à la normalisation.** La clé (vocabulaire, code) se passe de résolution entre sources, comme celle des adresses. Le normalizer de chaque source écrit donc les sujets donnés par la source dans `subjects`, et leurs liens dans `source_record_subjects`, avec le score OpenAlex. La phase `subjects` dérive `publication_subjects` en SQL, ancêtres compris. `source_records.topics` disparaît.
 - **Sujets WoS abandonnés.** Ils sont les seuls sujets de 558 publications (0,7 %), presque toutes présentes seulement dans le WoS : résumés de congrès, articles sans enregistrement OpenAlex.
 - **Couleurs.** Les domaines de haut niveau de tous les vocabulaires partagent une palette commune.
 - **Les 4 domains OpenAlex sont écartés des graphiques.**
@@ -35,7 +35,7 @@ Base locale au 2026-11-01.
 
 ### Phase 2 — Sujets écrits à la normalisation
 
-- [ ] Schéma : `subjects` contient vocabulaire, code, niveau et parent ; unicité sur (vocabulaire, code) à la place de l'unicité sur le libellé. Table `source_record_subjects` : enregistrement source, sujet, score
+- [ ] Schéma : `subjects` contient vocabulaire, code, niveau et parent ; unicité sur (vocabulaire, code) à la place de l'unicité sur le libellé ; `language` retirée. Table `source_record_subjects` : enregistrement source, sujet, score
 - [ ] Écriture commune aux normalizers : sujets et liens en une requête par lot
 - [ ] HAL : domaines par leur code, chaque niveau rattaché au niveau supérieur
 - [ ] OpenAlex : identifiant de chaque niveau, score du topic
