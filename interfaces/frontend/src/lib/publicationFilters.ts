@@ -176,7 +176,7 @@ export function publicationFilters(
 			key: 'subjects',
 			control: 'entity',
 			label: 'Sujets',
-			param: 'subject_id',
+			param: 'subject',
 			entity: 'subject',
 			multiple: true,
 			group: 'Détails',

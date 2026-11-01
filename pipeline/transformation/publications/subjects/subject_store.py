@@ -124,7 +124,12 @@ class SubjectStore:
         ).rowcount
         return n_reset + n_updated
 
+    def refresh_labels(self) -> int:
+        """Rafraîchit la vue matérialisée `subject_labels`. Renvoie le nombre de libellés normalisés."""
+        self._conn.execute(text("REFRESH MATERIALIZED VIEW subject_labels"))
+        return scalar_int(self._conn.execute(text("SELECT COUNT(*) FROM subject_labels")))
+
     def refresh_cooccurrences(self) -> int:
-        """Rafraîchit la vue matérialisée `subject_cooccurrences`. Renvoie le nombre de paires, au seuil `count >= 2` figé dans la vue."""
+        """Rafraîchit la vue matérialisée `subject_cooccurrences`. Renvoie le nombre de paires de libellés normalisés, au seuil `count >= 2` figé dans la vue."""
         self._conn.execute(text("REFRESH MATERIALIZED VIEW subject_cooccurrences"))
         return scalar_int(self._conn.execute(text("SELECT COUNT(*) FROM subject_cooccurrences")))

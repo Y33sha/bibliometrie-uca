@@ -51,7 +51,7 @@ def _rows(text: str) -> list[list[str]]:
         (
             "/api/subjects/export.csv",
             {"sort": "label_asc"},
-            ["Libellé", "Vocabulaire", "Occurrences"],
+            ["Libellé", "Vocabulaires", "Occurrences"],
         ),
         (
             "/api/structures/export.csv",

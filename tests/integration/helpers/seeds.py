@@ -11,6 +11,7 @@ from sqlalchemy import text
 
 from domain.normalize import normalize_text
 from domain.source_records.identifiers import SourceIdentifier
+from domain.subjects.subject import SubjectVocabulary
 from infrastructure.db.queues import Queue
 from tests.integration.helpers.addresses import (
     ensure_country,
@@ -50,7 +51,11 @@ from tests.integration.helpers.structures import (
     insert_structure_name_form,
     insert_tutelle,
 )
-from tests.integration.helpers.subjects import insert_publication_subject, insert_subject
+from tests.integration.helpers.subjects import (
+    insert_publication_subject,
+    insert_subject,
+    refresh_subject_usage,
+)
 
 
 def uniq(prefix: str, sep: str = "_") -> str:
@@ -430,16 +435,36 @@ def contribution_person(contribution_id: int) -> tuple[int | None, str | None]:
         return _contribution_person(conn, contribution_id)
 
 
-def seed_subject(label: str | None = None, *, usage_count: int = 0) -> int:
-    """Sème un sujet de libellé unique par défaut. Le compte d'usage par défaut est celui du schéma."""
+def seed_subject(
+    label: str | None = None,
+    *,
+    vocabulary: SubjectVocabulary = SubjectVocabulary.OPENALEX,
+    code: str | None = None,
+    level: int = 1,
+    parent_id: int | None = None,
+) -> int:
+    """Sème un sujet de libellé unique par défaut. Son code vaut par défaut son libellé."""
     with owner_connection() as conn:
-        return insert_subject(conn, label or uniq("Subject"), usage_count=usage_count)
+        return insert_subject(
+            conn,
+            label or uniq("Subject"),
+            vocabulary=vocabulary,
+            code=code,
+            level=level,
+            parent_id=parent_id,
+        )
 
 
 def seed_publication_subject(publication_id: int, *, subject_id: int, source: str = "hal") -> None:
     """Sème le lien de la publication `publication_id` au sujet `subject_id`."""
     with owner_connection() as conn:
         insert_publication_subject(conn, publication_id, subject_id=subject_id, source=source)
+
+
+def seed_subject_usage() -> None:
+    """Recalcule le nombre de publications des sujets et rafraîchit leurs vues, après le semis des liens aux publications."""
+    with owner_connection() as conn:
+        refresh_subject_usage(conn)
 
 
 def seed_doi_prefix(

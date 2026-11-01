@@ -9,7 +9,6 @@ from domain.publishers.names import publisher_name_key
 from domain.publishers.publisher import PUBLISHER_TYPE_LABELS_FR, PUBLISHER_TYPES, PublisherType
 from infrastructure.read_models._common import FacetOption, YesNoCount
 from infrastructure.read_models.csv_export import csv_chunks, fetch_export_rows
-from infrastructure.read_models.filters import entity_subjects_sql
 from infrastructure.read_models.publishers.models import (
     DoiPrefixInfo,
     Publisher,
@@ -21,6 +20,7 @@ from infrastructure.read_models.publishers.models import (
     PublisherSort,
 )
 from infrastructure.read_models.subjects.models import SubjectFrequency
+from infrastructure.read_models.subjects.queries import entity_subjects
 
 
 def _build_publisher_where(
@@ -263,12 +263,7 @@ class PublisherQueries:
         ]
 
     def get_publisher_subjects(self, publisher_id: int, *, limit: int) -> list[SubjectFrequency]:
-        """Renvoie les sujets des publications de l'éditeur, les plus fréquents d'abord.
-
-        `COUNT(DISTINCT p.id)` est nécessaire : `publication_subjects` a une ligne par source pour une même paire (publication, sujet).
-        """
-        rows = self._conn.execute(
-            text(entity_subjects_sql("p.publisher_id = :id")),
-            {"id": publisher_id, "lim": limit},
-        ).all()
-        return [SubjectFrequency(id=r.id, label=r.label, count=r.n) for r in rows]
+        """Renvoie les sujets des publications de l'éditeur, les plus fréquents d'abord."""
+        return entity_subjects(
+            self._conn, "p.publisher_id = :id", {"id": publisher_id}, limit=limit
+        )

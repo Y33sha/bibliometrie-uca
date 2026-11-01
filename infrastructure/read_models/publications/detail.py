@@ -159,7 +159,7 @@ def get_publication_subjects(conn: Connection, publication_id: int) -> list[Subj
     """Renvoie les sujets d'une publication, sans doublon, avec leurs sources, triés par libellé sans égard à la casse."""
     rows = conn.execute(
         text("""
-            SELECT s.id, s.label, s.vocabulary::text AS vocabulary, s.level,
+            SELECT s.id, s.label, s.label_normalized, s.vocabulary::text AS vocabulary, s.level,
                    array_agg(DISTINCT ps.source::text ORDER BY ps.source::text) AS sources
             FROM publication_subjects ps
             JOIN subjects s ON s.id = ps.subject_id
@@ -171,7 +171,12 @@ def get_publication_subjects(conn: Connection, publication_id: int) -> list[Subj
     ).all()
     return [
         SubjectOut(
-            id=r.id, label=r.label, vocabulary=r.vocabulary, level=r.level, sources=r.sources
+            id=r.id,
+            label=r.label,
+            label_normalized=r.label_normalized,
+            vocabulary=r.vocabulary,
+            level=r.level,
+            sources=r.sources,
         )
         for r in rows
     ]

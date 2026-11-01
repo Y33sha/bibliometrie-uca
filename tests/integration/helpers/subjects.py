@@ -4,6 +4,7 @@ from sqlalchemy import Connection
 
 from domain.normalize import normalize_text
 from domain.subjects.subject import SubjectVocabulary
+from pipeline.transformation.publications.subjects.subject_store import SubjectStore
 from tests.integration.helpers.rows import insert_row
 
 
@@ -45,3 +46,11 @@ def insert_publication_subject(
         {"source": "source_type"},
         returning=False,
     )
+
+
+def refresh_subject_usage(conn: Connection) -> None:
+    """Recalcule le nombre de publications de chaque sujet, puis rafraîchit les vues des sujets regroupés par libellé et de leurs co-occurrences, comme la phase `subjects`."""
+    store = SubjectStore(conn)
+    store.recompute_usage_counts()
+    store.refresh_labels()
+    store.refresh_cooccurrences()

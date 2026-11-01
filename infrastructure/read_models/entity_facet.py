@@ -30,7 +30,7 @@ class EntitySql(NamedTuple):
 
 # Organisation partenaire : ROR des auteurs, ancêtres compris (`publication_rors`), hors ROR propres aux structures `:own_structure_ids`.
 # Auteur : personne non exclue, rattachée à une contribution.
-# Sujet : `publication_subjects` a une ligne par source pour un même couple publication–sujet.
+# Sujet : regroupé par libellé normalisé, tous vocabulaires confondus. `publication_subjects` a une ligne par source pour un même couple publication–sujet.
 ENTITY_SQL: dict[EntityKind, EntitySql] = {
     "serial": EntitySql(
         table="serials j",
@@ -54,13 +54,15 @@ ENTITY_SQL: dict[EntityKind, EntitySql] = {
         ),
     ),
     "subject": EntitySql(
-        table="subjects s",
-        id="s.id",
-        label="s.label",
+        table="subject_labels sl",
+        id="sl.label_normalized",
+        label="sl.label",
         join=(
             "JOIN publication_subjects ps ON ps.publication_id = p.id "
-            "JOIN subjects s ON s.id = ps.subject_id"
+            "JOIN subjects s ON s.id = ps.subject_id "
+            "JOIN subject_labels sl ON sl.label_normalized = s.label_normalized"
         ),
+        id_type="text",
         publication_count="COUNT(DISTINCT p.id)",
     ),
     "partner": EntitySql(

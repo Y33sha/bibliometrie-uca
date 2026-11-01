@@ -9,7 +9,6 @@ from infrastructure.read_models._common import (
     StructureRef,
     page_count,
 )
-from infrastructure.read_models.filters import entity_subjects_sql
 from infrastructure.read_models.persons.identifiers import person_identifiers
 from infrastructure.read_models.persons.models import (
     PersonAddressesResponse,
@@ -24,6 +23,7 @@ from infrastructure.read_models.persons.models import (
     PersonThesis,
 )
 from infrastructure.read_models.subjects.models import SubjectFrequency
+from infrastructure.read_models.subjects.queries import entity_subjects
 from infrastructure.sql_fragments import has_author_role, in_clause, is_laboratory
 
 _THESIS_ROLES = (
@@ -287,14 +287,11 @@ class PersonDetailQueries:
 
     def person_subjects(self, person_id: int, *, limit: int) -> list[SubjectFrequency]:
         """Renvoie les sujets des publications signées par la personne, les plus fréquents d'abord."""
-        rows = self._conn.execute(
-            text(
-                entity_subjects_sql(
-                    "EXISTS (SELECT 1 FROM contributions a "
-                    "WHERE a.publication_id = p.id AND a.person_id = :pid "
-                    f"AND {has_author_role('a')})"
-                )
-            ),
-            {"pid": person_id, "lim": limit},
-        ).all()
-        return [SubjectFrequency(id=r.id, label=r.label, count=r.n) for r in rows]
+        return entity_subjects(
+            self._conn,
+            "EXISTS (SELECT 1 FROM contributions a "
+            "WHERE a.publication_id = p.id AND a.person_id = :pid "
+            f"AND {has_author_role('a')})",
+            {"pid": person_id},
+            limit=limit,
+        )

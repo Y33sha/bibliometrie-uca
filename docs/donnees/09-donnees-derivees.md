@@ -14,7 +14,8 @@ Le pipeline les rafraîchit. Aucune n'est écrite directement.
 | `contribution_structures` | `source_contribution_structures` ⋈ `aligned_source_contributions`, pour les contributions d'une personne non exclue | phase `finalize` |
 | `publication_structures` | `contributions` ⋈ `contribution_structures` | phase `finalize` |
 | `publication_rors` | ROR des contributions sources alignées des auteurs (`source_contribution_rors`) et des structures de `publication_structures`, avec leurs ancêtres de `ror_relations` ; `cited` distingue les ROR cités | phase `finalize` |
-| `subject_cooccurrences` | paires de sujets co-présents sur une même publication (`publication_subjects`) | phase `subjects` |
+| `subject_labels` | sujets regroupés par libellé normalisé (`subjects` ⋈ `publication_subjects`) | phase `subjects` |
+| `subject_cooccurrences` | paires de libellés normalisés de sujets co-présents sur une même publication (`publication_subjects`) | phase `subjects` |
 
 ## Tables dérivées
 

@@ -1,6 +1,7 @@
 import type { components } from './api/schema';
 
 type PersonExclusion = components['schemas']['PersonExclusion'];
+type SubjectVocabulary = components['schemas']['SubjectVocabulary'];
 
 /** Licences dans l'ordre d'affichage. Chacune a sa couleur dans la variable CSS `--license-<clé>` de `shared.css`. `none` désigne une publication sans licence connue. */
 export const licenseOrder = [
@@ -126,6 +127,14 @@ export const identifierStatusClasses: Record<string, string> = {
 export const personExclusionLabels: Record<PersonExclusion, string> = {
 	not_a_person: 'Fausse entité',
 	out_of_perimeter: 'Hors périmètre'
+};
+
+/** Libellés FR des vocabulaires de sujets — enum PG `subject_vocabulary`. */
+export const subjectVocabularyLabels: Record<SubjectVocabulary, string> = {
+	openalex: 'OpenAlex',
+	hal_domain: 'Domaines HAL',
+	rameau: 'RAMEAU',
+	theses_discipline: 'Disciplines de thèse'
 };
 
 /** Classes CSS associées aux statuts de détection d'une structure dans le tableau de bord feedback. Le statut est dérivé de `is_confirmed` + `is_detected` via `deriveStructDetectionStatus`. */

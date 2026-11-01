@@ -63,12 +63,12 @@ Base locale au 2026-11-01.
 
 ### Phase 5 — Sujets regroupés par libellé
 
-- [ ] Migration : vue matérialisée des libellés normalisés ; `subject_cooccurrences` entre libellés normalisés
-- [ ] Phase `subjects` : rafraîchissement des deux vues
-- [ ] API : liste et export par libellé, avec les vocabulaires de chaque libellé ; détail d'un libellé avec les sujets de chaque vocabulaire, leurs parents, leurs enfants et les voisins par co-occurrence
-- [ ] Filtre des publications par sujet, facette et nuages de sujets : par libellé normalisé
-- [ ] Frontend : liste, page d'un sujet, liens des fiches de publications et des nuages
-- [ ] Documentation : `docs/donnees/03-publications.md`, `docs/pipeline/11-enrichissements.md`, guide utilisateur
+- [x] Migration : vue matérialisée des libellés normalisés (`subject_labels`) ; `subject_cooccurrences` entre libellés normalisés (d6db5fc18)
+- [x] Phase `subjects` : rafraîchissement des deux vues
+- [x] API : liste et export par libellé, avec les vocabulaires de chaque libellé ; détail d'un libellé avec les sujets de chaque vocabulaire, leurs parents, leurs enfants et les voisins par co-occurrence
+- [x] Filtre des publications par sujet, facette et nuages de sujets : par libellé normalisé
+- [x] Frontend : liste, page d'un sujet, liens des fiches de publications et des nuages
+- [x] Documentation : `docs/donnees/03-publications.md`, `docs/pipeline/11-enrichissements.md`, guide utilisateur
 
 ## Questions ouvertes
 

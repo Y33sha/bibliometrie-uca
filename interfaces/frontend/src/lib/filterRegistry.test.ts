@@ -80,7 +80,7 @@ const subjects: EntityChoiceFilter = {
 	key: 'subjects',
 	control: 'entity',
 	label: 'Sujets',
-	param: 'subject_id',
+	param: 'subject',
 	entity: 'subject',
 	multiple: true,
 	group: 'Sujets',
@@ -109,14 +109,14 @@ describe('filterRegistry', () => {
 		const values = initialValues(FILTERS);
 		values.checkbox.years = ['2024', '2023'];
 		values.entity.serial = ['12'];
-		values.entity.subjects = ['3', '5'];
+		values.entity.subjects = ['chimie', 'physique'];
 		values.presence.sources = { hal: 'yes', wos: 'no', oa: 'all' };
 		const params = new URLSearchParams();
 		appendFilterParams(FILTERS, values, params);
 		expect(Object.fromEntries(params)).toEqual({
 			year: '2024,2023',
 			serial_id: '12',
-			subject_id: '3,5',
+			subject: 'chimie,physique',
 			source_filter: 'hal_yes,wos_no',
 		});
 	});

@@ -28,9 +28,12 @@ Un sujet est un terme d'un vocabulaire contrôlé : classement OpenAlex (domain,
 | `subjects` | Vocabulaire, code, libellé, niveau, parent, nombre de publications (`usage_count`) | Un sujet par vocabulaire et code |
 | `source_record_subjects` | Sujet donné par un enregistrement source, avec le score OpenAlex du topic | Un lien par enregistrement source et sujet |
 | `publication_subjects` | Lien entre une publication et un sujet, ancêtres compris, avec la source qui le fournit | Un lien par publication, sujet et source |
-| `subject_cooccurrences` | Vue matérialisée : paires de sujets présents ensemble sur au moins deux publications | |
+| `subject_labels` | Vue matérialisée : sujets regroupés par libellé normalisé, avec la forme la plus fréquente du libellé et le nombre de publications | Une ligne par libellé normalisé |
+| `subject_cooccurrences` | Vue matérialisée : paires de libellés normalisés présents ensemble sur au moins deux publications | |
 
 Le code est l'identifiant OpenAlex sans préfixe d'URL (`fields/17`, `T10001`), le code du domaine HAL (`sdv.bbm`), le PPN de la vedette RAMEAU, ou le libellé normalisé de la discipline. Le niveau vaut 1 pour une racine. La langue d'un libellé découle de son vocabulaire : anglais pour OpenAlex, français pour les autres.
+
+Les pages publiques regroupent les sujets de même libellé normalisé, tous vocabulaires confondus : « Chimie » réunit le domaine HAL, la vedette RAMEAU et la discipline de thèse. Le libellé normalisé identifie ce regroupement dans l'URL et dans le filtre des publications. Son nombre de publications est l'union de leurs publications.
 
 `publication_subjects.rejected` exclut un lien des décomptes et le conserve aux recalculs.
 

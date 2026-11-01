@@ -26,7 +26,8 @@ Les sujets liés à aucun enregistrement source ni à aucune publication sont su
 **Co-occurrences.** Recalcule depuis `publication_subjects` :
 
 - `subjects.usage_count` — nombre de publications distinctes par sujet ;
-- `subject_cooccurrences` — paires de sujets présents ensemble sur au moins deux publications, avec leur effectif.
+- `subject_labels` — sujets regroupés par libellé normalisé, tous vocabulaires confondus, avec leur nombre de publications ;
+- `subject_cooccurrences` — paires de libellés normalisés présents ensemble sur au moins deux publications, avec leur effectif.
 
 ## Pays des adresses (`countries`)
 

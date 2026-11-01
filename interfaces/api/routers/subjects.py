@@ -1,6 +1,6 @@
 """Router des sujets : liste paginée, export et détail avec les voisins par co-occurrence. Sert `/api/subjects/*`.
 
-Le chemin littéral `/export.csv` précède `/{subject_id}`, qui l'accepterait sinon comme identifiant.
+Un sujet regroupe les sujets de vocabulaire de même libellé normalisé : le libellé normalisé l'identifie. Le chemin littéral `/export.csv` précède `/{label_normalized}`, qui l'accepterait sinon comme identifiant.
 """
 
 from dataclasses import dataclass
@@ -67,16 +67,16 @@ def export_subjects_csv(
     )
 
 
-@router.get("/{subject_id}", response_model=SubjectDetailResponse)
+@router.get("/{label_normalized}", response_model=SubjectDetailResponse)
 def get_subject(
-    subject_id: int,
+    label_normalized: str,
     neighbors_limit: int = Query(20, ge=1, le=100),
     min_cooccurrence: int = Query(2, ge=1),
     queries: SubjectsQueries = Depends(subjects_queries),
 ) -> SubjectDetailResponse:
-    """Renvoie le détail d'un sujet, avec ses voisins par co-occurrence, les plus fréquents d'abord."""
+    """Renvoie le détail d'un sujet, identifié par son libellé normalisé, avec ses voisins par co-occurrence, les plus fréquents d'abord."""
     detail = queries.get_subject_detail(
-        subject_id, neighbors_limit=neighbors_limit, min_cooccurrence_count=min_cooccurrence
+        label_normalized, neighbors_limit=neighbors_limit, min_cooccurrence_count=min_cooccurrence
     )
     if detail is None:
         raise HTTPException(status_code=404, detail="Sujet introuvable")

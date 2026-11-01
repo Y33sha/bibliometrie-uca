@@ -58,7 +58,7 @@ EntityKind = Literal["publisher", "serial", "person", "subject", "partner"]
 
 class EntityFacetItem(Model):
     id: int | str
-    """Identifiant de l'entité : un entier, ou un ROR pour une organisation partenaire."""
+    """Identifiant de l'entité : un entier, un ROR pour une organisation partenaire, un libellé normalisé pour un sujet."""
     label: str
     count: int
 

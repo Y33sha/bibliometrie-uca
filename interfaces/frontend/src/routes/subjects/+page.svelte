@@ -5,6 +5,7 @@
   import { onMount } from "svelte";
   import { resolve } from "$app/paths";
   import { usePaginatedFetch } from "#lib/composables/usePaginatedFetch.svelte.js";
+  import { subjectVocabularyLabels } from "#lib/labels.js";
   import { withBase } from "#lib/paths.js";
   import { nextSort, sortDirection } from "#lib/sort.js";
   import { paramsToQuery } from "#lib/utils.js";
@@ -64,15 +65,17 @@
     <thead>
       <tr>
         <th class="sortable" onclick={() => setSort("label")}>Libellé <SortChevron direction={sortDirection(currentSort, "label")} /></th>
+        <th>Vocabulaires</th>
         <th class="num sortable" onclick={() => setSort("publications")}>Occurrences <SortChevron direction={sortDirection(currentSort, "publications")} /></th>
       </tr>
     </thead>
     <tbody>
-      {#each list.items as s (s.id)}
+      {#each list.items as s (s.label_normalized)}
         <tr>
           <td>
-            <a href={resolve(`subjects/${s.id}`)}>{s.label}</a>
+            <a href={resolve(`subjects/${s.label_normalized}`)}>{s.label}</a>
           </td>
+          <td class="muted">{s.vocabularies.map((v) => subjectVocabularyLabels[v]).join(", ")}</td>
           <td class="num">{s.usage_count.toLocaleString("fr-FR")}</td>
         </tr>
       {/each}
@@ -81,3 +84,9 @@
 
   <Pagination page={list.page} pages={list.pages} onchange={list.goToPage} />
 </ListStatus>
+
+<style>
+  .muted {
+    color: var(--muted);
+  }
+</style>

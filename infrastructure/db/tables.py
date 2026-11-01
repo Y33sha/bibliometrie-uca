@@ -4,7 +4,7 @@ Il sert à composer les requêtes de SQLAlchemy Core (`select(config.c.key)…`)
 
 Les migrations Alembic (`alembic/versions/`, écrites à la main) font foi sur le schéma. `infrastructure/db/schema.sql` est un instantané du schéma, régénéré par `python -m interfaces.cli.dev.dump_schema`. Ce fichier suit la base à la main. `tests/integration/infrastructure/db/test_sqlalchemy_smoke.py` contrôle l'accord par `alembic check`, sur une base construite par les migrations.
 
-Le modèle couvre les tables et leurs colonnes. Index, clés étrangères et vues matérialisées (`contribution_structures`, `publication_author_alignment`, `publication_rors`, `publication_structures`, `source_contribution_structures`, `subject_cooccurrences`) relèvent des seules migrations : le filtre `include_object` d'`alembic/env.py` les écarte de la comparaison. Le code lit les vues matérialisées en SQL par leur nom, et les rafraîchit (`REFRESH`).
+Le modèle couvre les tables et leurs colonnes. Index, clés étrangères et vues matérialisées (`contribution_structures`, `publication_author_alignment`, `publication_rors`, `publication_structures`, `source_contribution_structures`, `subject_cooccurrences`, `subject_labels`) relèvent des seules migrations : le filtre `include_object` d'`alembic/env.py` les écarte de la comparaison. Le code lit les vues matérialisées en SQL par leur nom, et les rafraîchit (`REFRESH`).
 """
 
 from datetime import date
@@ -1815,4 +1815,5 @@ contribution_attributes_queue = _queue("contribution_attributes_queue")
 contribution_resolution_queue = _queue("contribution_resolution_queue")
 
 
-# `subject_cooccurrences` (vue matérialisée) : paires de sujets présents sur une même publication, avec leur effectif, à partir de 2.
+# `subject_labels` (vue matérialisée) : sujets regroupés par libellé normalisé, tous vocabulaires confondus, avec leur nombre de publications.
+# `subject_cooccurrences` (vue matérialisée) : paires de libellés normalisés présents sur une même publication, avec leur effectif, à partir de 2.

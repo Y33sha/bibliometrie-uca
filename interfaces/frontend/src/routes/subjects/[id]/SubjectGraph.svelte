@@ -35,7 +35,7 @@
     role="group"
     aria-label="Graphe des sujets associés à {subject.label}"
   >
-    {#each layout.nodes as n (n.neighbor.id)}
+    {#each layout.nodes as n (n.neighbor.label_normalized)}
       <line
         x1={CX}
         y1={CY}
@@ -49,10 +49,10 @@
 
     <circle cx={CX} cy={CY} r={layout.centerR} class="center" />
 
-    {#each layout.nodes as n (n.neighbor.id)}
+    {#each layout.nodes as n (n.neighbor.label_normalized)}
       {@const right = n.x >= CX}
       <a
-        href={resolve(`subjects/${n.neighbor.id}`)}
+        href={resolve(`subjects/${n.neighbor.label_normalized}`)}
         class="node"
         class:active={hovered === n}
         onmouseenter={() => (hovered = n)}

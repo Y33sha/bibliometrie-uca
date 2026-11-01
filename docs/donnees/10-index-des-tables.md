@@ -84,6 +84,7 @@
 | `structure_parents` | `structures` | [Structures](06-structures.md) |
 | `structures` | `structures` | [Structures](06-structures.md) |
 | `subject_cooccurrences` (vue matérialisée) | `publications` | [Publications](03-publications.md#sujets) |
+| `subject_labels` (vue matérialisée) | `publications` | [Publications](03-publications.md#sujets) |
 | `subjects` | `publications` | [Publications](03-publications.md#sujets) |
 | `user_roles` | `ops` | [Exploitation](08-ref-et-ops.md#exploitation) |
 | `users` | `ops` | [Exploitation](08-ref-et-ops.md#exploitation) |

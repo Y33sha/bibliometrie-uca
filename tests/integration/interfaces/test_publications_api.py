@@ -143,11 +143,11 @@ class TestPublicationsList:
         assert r.status_code == 200
 
     def test_filter_by_subject(self, client):
-        r = client.get("/api/publications", params={"subject_id": 1})
+        r = client.get("/api/publications", params={"subject": "chimie"})
         assert r.status_code == 200
 
     def test_filter_by_several_subjects(self, client):
-        r = client.get("/api/publications", params={"subject_id": "1,2"})
+        r = client.get("/api/publications", params={"subject": "chimie,biologie vegetale"})
         assert r.status_code == 200
 
     def test_sort_by_year_desc(self, client):
@@ -263,7 +263,7 @@ class TestPublicationsFacets:
         # Facette des sujets sous sa propre sélection, qu'elle ignore, et sous une recherche de libellé.
         r = client.get(
             "/api/publications/facets/entities",
-            params={"kind": "subject", "entity_search": "chim", "subject_id": "1,2"},
+            params={"kind": "subject", "entity_search": "chim", "subject": "chimie,physique"},
         )
         assert r.status_code == 200
 

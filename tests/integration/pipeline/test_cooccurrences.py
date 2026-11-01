@@ -1,9 +1,10 @@
-"""Sous-étape des cooccurrences de la phase `subjects` : recalcul de `usage_count` et rafraîchissement de la vue `subject_cooccurrences`."""
+"""Sous-étape des cooccurrences de la phase `subjects` : recalcul de `usage_count` et rafraîchissement des vues `subject_labels` et `subject_cooccurrences`."""
 
 import logging
 
 from sqlalchemy import text
 
+from domain.subjects.subject import SubjectVocabulary
 from pipeline.transformation.publications.subjects.subject_cooccurrences import run
 from pipeline.transformation.publications.subjects.subject_store import SubjectStore
 from tests.integration.helpers.publications import insert_publication
@@ -39,6 +40,39 @@ class TestRecomputeUsageCounts:
         assert usage == 0
 
 
+class TestRefreshLabels:
+    def test_union_of_publications_across_vocabularies(self, sa_sync_conn):
+        hal = insert_subject(sa_sync_conn, "Chimie", vocabulary=SubjectVocabulary.HAL_DOMAIN)
+        rameau = insert_subject(
+            sa_sync_conn, "chimie", vocabulary=SubjectVocabulary.RAMEAU, code="027249808"
+        )
+        p1, p2, p3 = (insert_publication(sa_sync_conn, f"p{i}") for i in (1, 2, 3))
+        for p in (p1, p2):
+            insert_publication_subject(sa_sync_conn, p, subject_id=hal, source="hal")
+        # p2 a les deux sujets : elle compte une fois.
+        for p in (p2, p3):
+            insert_publication_subject(sa_sync_conn, p, subject_id=rameau, source="theses")
+
+        assert SubjectStore(sa_sync_conn).refresh_labels() == 1
+        row = sa_sync_conn.execute(
+            text("SELECT label_normalized, usage_count FROM subject_labels")
+        ).one()
+        assert (row.label_normalized, row.usage_count) == ("chimie", 3)
+
+    def test_most_frequent_form(self, sa_sync_conn):
+        rare = insert_subject(sa_sync_conn, "Sciences Economiques", code="a")
+        frequent = insert_subject(sa_sync_conn, "Sciences économiques", code="b")
+        p1 = insert_publication(sa_sync_conn, "p1")
+        p2 = insert_publication(sa_sync_conn, "p2")
+        insert_publication_subject(sa_sync_conn, p1, subject_id=rare)
+        for p in (p1, p2):
+            insert_publication_subject(sa_sync_conn, p, subject_id=frequent)
+
+        SubjectStore(sa_sync_conn).refresh_labels()
+        label = sa_sync_conn.execute(text("SELECT label FROM subject_labels")).scalar_one()
+        assert label == "Sciences économiques"
+
+
 class TestRefreshCooccurrences:
     def test_pairs_with_min_count(self, sa_sync_conn):
         a = insert_subject(sa_sync_conn, "a")
@@ -56,12 +90,19 @@ class TestRefreshCooccurrences:
         assert n == 1  # Seule la paire (a, b) atteint le seuil de la vue.
 
         row = sa_sync_conn.execute(
-            text("SELECT subject_a_id, subject_b_id, count FROM subject_cooccurrences")
+            text("SELECT label_a, label_b, count FROM subject_cooccurrences")
         ).one()
-        assert row.count == 2
-        # Convention a < b.
-        assert row.subject_a_id < row.subject_b_id
-        assert {row.subject_a_id, row.subject_b_id} == {a, b}
+        assert (row.label_a, row.label_b, row.count) == ("a", "b", 2)
+
+    def test_same_label_forms_no_pair(self, sa_sync_conn):
+        # Deux sujets de même libellé normalisé forment un seul libellé, sans paire entre eux.
+        hal = insert_subject(sa_sync_conn, "Chimie", vocabulary=SubjectVocabulary.HAL_DOMAIN)
+        rameau = insert_subject(sa_sync_conn, "Chimie", vocabulary=SubjectVocabulary.RAMEAU)
+        for p in (insert_publication(sa_sync_conn, "p1"), insert_publication(sa_sync_conn, "p2")):
+            insert_publication_subject(sa_sync_conn, p, subject_id=hal, source="hal")
+            insert_publication_subject(sa_sync_conn, p, subject_id=rameau, source="theses")
+
+        assert SubjectStore(sa_sync_conn).refresh_cooccurrences() == 0
 
     def test_self_pairs_excluded(self, sa_sync_conn):
         # Un sujet ne forme pas de paire avec lui-même. Deux publications le contiennent, donc le seuil de la vue laisserait passer cette paire.
@@ -101,6 +142,7 @@ class TestRunOrchestrator:
             insert_publication_subject(sa_sync_conn, p2, subject_id=s)
 
         stats = run(SubjectStore(sa_sync_conn), logging.getLogger("test"))
+        assert stats["labels"] == 2
         assert stats["cooccurrence_pairs"] == 1  # (a,b) count=2
         # Chacun des deux sujets est dans deux publications.
         rows = sa_sync_conn.execute(

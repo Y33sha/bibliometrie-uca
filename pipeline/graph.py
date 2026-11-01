@@ -1315,8 +1315,10 @@ TASKS: tuple[Task, ...] = (
         reads=(
             "publication_subjects",
             "subjects.id",
+            "subjects.label",
+            "subjects.label_normalized",
         ),
-        writes=("subjects.usage_count", "subject_cooccurrences"),
+        writes=("subjects.usage_count", "subject_labels", "subject_cooccurrences"),
         previous_run=("subjects",),
     ),
     _task(
