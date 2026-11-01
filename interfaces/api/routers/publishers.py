@@ -121,6 +121,15 @@ def get_publisher(
     return detail.found(queries.get_publisher_detail(publisher_id))
 
 
+@router.get("/{publisher_id}/name-forms", response_model=list[str])
+def get_publisher_name_forms(
+    publisher_id: int,
+    queries: PublisherQueries = Depends(publisher_queries),
+) -> list[str]:
+    """Liste les formes de nom normalisées de l'éditeur. La normalisation rattache à l'éditeur chaque enregistrement source qui le nomme par l'une d'elles."""
+    return queries.get_publisher_name_forms(publisher_id)
+
+
 @router.get("/{publisher_id}/subjects", response_model=list[SubjectFrequency])
 def get_publisher_subjects(
     publisher_id: int,
@@ -164,7 +173,7 @@ def merge(
 
     Deux éditeurs aux membres Crossref distincts sont deux maisons : la fusion est refusée par un 409.
 
-    La fusion des revues bloque sur des ISSN divergents pour un même titre, ou sur un doublon de titre chez l'un des éditeurs. La fusion entière est alors refusée par un 409 (`PublisherMergeBlockedResponse`). Son corps énumère toutes les paires bloquantes, à traiter dans les revues avant de relancer. Renvoie aussi 422 sur deux identifiants égaux, 404 si l'un des deux éditeurs est introuvable.
+    La fusion des revues bloque sur des ISSN différents pour un même titre, ou sur un doublon de titre chez l'un des éditeurs. La fusion entière est alors refusée par un 409 (`PublisherMergeBlockedResponse`). Son corps énumère toutes les paires bloquantes, à traiter dans les revues avant de relancer. Renvoie aussi 422 sur deux identifiants égaux, 404 si l'un des deux éditeurs est introuvable.
     """
     publishers.merge_publishers(publisher_id, body.source_id)
     return MergeResponse(merged=True, source_id=body.source_id, target_id=publisher_id)

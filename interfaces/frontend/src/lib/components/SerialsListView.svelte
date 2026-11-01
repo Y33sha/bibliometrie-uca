@@ -6,15 +6,17 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
-	import type { Snippet } from 'svelte';
 
 	import EntityFilter from '#lib/components/EntityFilter.svelte';
 	import FacetDropdown from '#lib/components/FacetDropdown.svelte';
+	import IconButton from '#lib/components/IconButton.svelte';
+	import SerialDrawer from '#lib/components/serials/SerialDrawer.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import TableStatusRow from '#lib/components/TableStatusRow.svelte';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
 	import { useFacets } from '#lib/composables/useFacets.svelte.js';
 	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
+	import { useDrawerParam } from '#lib/composables/useDrawerParam.svelte.js';
 	import { isAdmin } from '#lib/session.svelte.js';
 	import { nextSort, sortDirection } from '#lib/sort.js';
 	import { withBase } from '#lib/paths.js';
@@ -24,9 +26,9 @@
 	type Serial = components['schemas']['SerialListItem'];
 
 	// Composant de liste de publications en série réutilisable. Utilisé par :
-	// - `/journals` (mode autonome avec sync URL ; la session admin y reçoit le snippet `actionCell` pour Modifier/Fusionner)
+	// - `/journals` (mode autonome avec sync URL)
 	// - `/publishers/[id]?tab=journals` (filtre `publisherId` fixe)
-	// Sur `/journals`, la session admin gagne la facette « Publications ».
+	// La session admin gagne, en tête de ligne, l'icône du volet d'édition de la publication en série ; sur `/journals`, elle gagne aussi la facette « Publications ».
 	interface ExternalFilters {
 		publisherId?: number;
 	}
@@ -37,19 +39,19 @@
 		urlSync = false,
 		basePath = '/journals',
 		perPage = 50,
-		actionCell,
-		actionColumnHeader = '',
+		onchange,
 	}: {
 		apiKey?: string;
 		externalFilters?: ExternalFilters;
 		urlSync?: boolean;
 		basePath?: string;
 		perPage?: number;
-		/** Snippet rendu dans la colonne actions (1 row → 1 cell). Si fourni, une colonne Actions est ajoutée à droite du tableau. */
-		actionCell?: Snippet<[Serial]>;
-		/** En-tête de la colonne actions (vide par défaut, comme admin). */
-		actionColumnHeader?: string;
+		/** Appelé après chaque écriture du volet, après le rechargement de la liste. */
+		onchange?: () => void;
 	} = $props();
+
+	// Volet d'édition d'une publication en série, en session admin : ouvert tant que `?serial=<id>` figure dans l'URL.
+	const drawer = useDrawerParam('serial', isAdmin);
 
 	// Éditeur imposé par le contexte : la facette et la colonne Éditeur portent alors la même valeur sur toutes les lignes, et sont masquées.
 	const publisherFixed = $derived(externalFilters?.publisherId != null);
@@ -234,6 +236,7 @@
 <table class="data-table journals-table">
 	<thead>
 		<tr>
+			{#if isAdmin()}<th class="row-actions"></th>{/if}
 			<th class="diamond-col" aria-label="Revue diamant"></th>
 			<th class="sortable" onclick={() => setSort('title')}>
 				{columnLabels.title} <SortChevron direction={sortDirection(currentSort, 'title')} />
@@ -248,12 +251,16 @@
 			<th class="num sortable" onclick={() => setSort('publications')}>
 				{columnLabels.publications} <SortChevron direction={sortDirection(currentSort, 'publications')} />
 			</th>
-			{#if actionCell}<th>{actionColumnHeader}</th>{/if}
 		</tr>
 	</thead>
 	<tbody>
 		{#each serials.items as j (j.id)}
-			<tr>
+			<tr class:active-row={j.id === drawer.id}>
+				{#if isAdmin()}
+					<td class="row-actions">
+						<IconButton icon="panel" label="Ouvrir le volet" onclick={() => drawer.open(j.id)} />
+					</td>
+				{/if}
 				<td class="diamond-col">
 					{#if j.oa_model === 'diamond'}
 						<span class="diamond" title="Revue diamant&nbsp;: open access sans frais de publication" aria-label="Revue diamant">
@@ -288,11 +295,10 @@
 				{/if}
 				<td class="muted">{serialTypeLabel(j.serial_type)}</td>
 				<td class="num">{j.publication_count.toLocaleString('fr-FR')}</td>
-				{#if actionCell}<td class="actions row-actions">{@render actionCell(j)}</td>{/if}
 			</tr>
 		{/each}
 		{#if serials.items.length === 0}
-			<TableStatusRow loading={serials.loading} error={serials.error} colspan={(publisherFixed ? 5 : 6) + (actionCell ? 1 : 0)} emptyText="Aucune publication en série ne correspond aux filtres." />
+			<TableStatusRow loading={serials.loading} error={serials.error} colspan={(publisherFixed ? 5 : 6) + (isAdmin() ? 1 : 0)} emptyText="Aucune publication en série ne correspond aux filtres." />
 		{/if}
 	</tbody>
 </table>
@@ -308,13 +314,23 @@
 	}}
 />
 
+{#if drawer.id !== null}
+	<SerialDrawer
+		id={drawer.id}
+		onclose={() => drawer.open(null)}
+		onchange={() => {
+			serials.load();
+			facets.load();
+			onchange?.();
+		}}
+	/>
+{/if}
+
 <style>
 	.journals-table { min-width: 660px; }
 	.journals-table td.num { color: var(--muted); }
+	.row-actions { width: 1%; }
 	.diamond-col { width: 1.5rem; padding-right: 0; }
 	.diamond { display: inline-flex; color: var(--diamond-text); vertical-align: middle; }
 	.muted { color: var(--muted); }
-
-
-	.actions { white-space: nowrap; position: relative; }
 </style>

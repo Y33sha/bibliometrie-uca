@@ -4,6 +4,7 @@ Couvre :
 - GET /api/publishers (liste, recherche, tris, filtres)
 - GET /api/publishers/facets (trois dimensions, chacune décomptée hors de sa propre sélection)
 - GET /api/publishers/{id} (fiche, 404)
+- GET /api/publishers/{id}/name-forms (formes de nom, dans l'ordre alphabétique)
 - GET /api/publishers/{id}/subjects (sujets principaux, hors sujets génériques)
 - PUT /api/publishers/{id} (mise à jour, authentification requise)
 - POST /api/publishers/{id}/merge (fusion, authentification requise, 404 sur la cible ou la source)
@@ -248,6 +249,24 @@ class TestGetPublisher:
         assert r.status_code == 200
         mine = next(p for p in r.json()["publishers"] if p["id"] == pid)
         assert [p["prefix"] for p in mine["doi_prefixes"]] == ["10.9010"]
+
+
+# ── GET /api/publishers/{id}/name-forms ─────────────────────────
+
+
+class TestPublisherNameForms:
+    def test_returns_sorted_forms(self, client):
+        pid = seed_publisher()
+        forms = [uniq("zeta press"), uniq("alpha press")]
+        with owner_pool() as cur:
+            for form in forms:
+                cur.execute(
+                    "INSERT INTO publisher_name_forms (publisher_id, form_normalized) VALUES (%s, %s)",
+                    (pid, form),
+                )
+        r = client.get(f"/api/publishers/{pid}/name-forms")
+        assert r.status_code == 200
+        assert r.json() == sorted(forms)
 
 
 # ── GET /api/publishers/{id}/subjects ───────────────────────────

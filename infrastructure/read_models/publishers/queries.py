@@ -234,6 +234,18 @@ class PublisherQueries:
             return None
         return _row_to_publisher(row)
 
+    def get_publisher_name_forms(self, publisher_id: int) -> list[str]:
+        """Renvoie les formes de nom normalisées de l'éditeur, dans l'ordre alphabétique."""
+        return list(
+            self._conn.execute(
+                text(
+                    "SELECT form_normalized FROM publisher_name_forms"
+                    " WHERE publisher_id = :id ORDER BY form_normalized"
+                ),
+                {"id": publisher_id},
+            ).scalars()
+        )
+
     def get_publisher_subjects(self, publisher_id: int, *, limit: int) -> list[SubjectFrequency]:
         """Renvoie les sujets des publications de l'éditeur, les plus fréquents d'abord.
 

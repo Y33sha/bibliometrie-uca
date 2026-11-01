@@ -2200,6 +2200,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/publishers/{publisher_id}/name-forms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Publisher Name Forms
+         * @description Liste les formes de nom normalisées de l'éditeur. La normalisation rattache à l'éditeur chaque enregistrement source qui le nomme par l'une d'elles.
+         */
+        get: operations["get_publisher_name_forms_api_publishers__publisher_id__name_forms_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/publishers/{publisher_id}/subjects": {
         parameters: {
             query?: never;
@@ -2239,7 +2259,7 @@ export interface paths {
          *
          *     Deux éditeurs aux membres Crossref distincts sont deux maisons : la fusion est refusée par un 409.
          *
-         *     La fusion des revues bloque sur des ISSN divergents pour un même titre, ou sur un doublon de titre chez l'un des éditeurs. La fusion entière est alors refusée par un 409 (`PublisherMergeBlockedResponse`). Son corps énumère toutes les paires bloquantes, à traiter dans les revues avant de relancer. Renvoie aussi 422 sur deux identifiants égaux, 404 si l'un des deux éditeurs est introuvable.
+         *     La fusion des revues bloque sur des ISSN différents pour un même titre, ou sur un doublon de titre chez l'un des éditeurs. La fusion entière est alors refusée par un 409 (`PublisherMergeBlockedResponse`). Son corps énumère toutes les paires bloquantes, à traiter dans les revues avant de relancer. Renvoie aussi 422 sur deux identifiants égaux, 404 si l'un des deux éditeurs est introuvable.
          */
         post: operations["merge_api_publishers__publisher_id__merge_post"];
         delete?: never;
@@ -9901,6 +9921,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OkResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_publisher_name_forms_api_publishers__publisher_id__name_forms_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                publisher_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": string[];
                 };
             };
             /** @description Validation Error */

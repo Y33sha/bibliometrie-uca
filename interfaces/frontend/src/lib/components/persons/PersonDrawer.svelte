@@ -148,7 +148,7 @@
 
 <Drawer {onclose} {onescape}>
   {#snippet head()}
-  <div class="person-head">
+  <div class="drawer-head-row">
     {#if editing}
       <form class="drawer-edit" onsubmit={(e) => { e.preventDefault(); saveEdit(); }}>
         <input class="edit-input" bind:value={lastName} placeholder="Nom" aria-label="Nom" use:autofocus={{ select: true }} />
@@ -317,31 +317,10 @@
 </Drawer>
 
 <style>
-  .btn-merge-inline {
-    padding: 2px 8px;
-    border: 1px dashed var(--border);
-    border-radius: var(--radius);
-    background: none;
-    font-size: var(--fs-sm);
-    cursor: pointer;
-    color: var(--muted);
-    font-family: inherit;
-  }
-  .btn-merge-inline:hover {
-    background: var(--warning-light);
-    color: var(--warning);
-    border-color: var(--warning);
-  }
   .merge-dept {
     font-size: var(--fs-sm);
     color: var(--muted);
     margin-left: 6px;
-  }
-  .person-head {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 12px;
   }
   .drawer-title.excluded {
     text-decoration: line-through;
@@ -350,38 +329,11 @@
   .drawer-title {
     font-size: var(--fs-lg);
   }
-  .drawer-name-link {
-    color: inherit;
-    text-decoration: none;
-  }
-  .drawer-name-link:hover {
-    color: var(--accent);
-    text-decoration: underline;
-  }
   .drawer-last {
     font-weight: 600;
   }
-  .drawer-head-actions {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-shrink: 0;
-  }
-  .drawer-edit {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-wrap: wrap;
-  }
-  .drawer-edit .btn {
-    flex-shrink: 0;
-  }
   .edit-input {
     width: 128px;
-    padding: 4px 6px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    font-size: var(--fs-md);
   }
   .exclusion-select {
     height: 28px;
@@ -390,17 +342,6 @@
   }
   .exclusion-select.excluded {
     color: var(--danger);
-  }
-  .drawer-meta {
-    display: flex;
-    gap: 14px;
-    align-items: center;
-    color: var(--muted);
-    font-size: var(--fs-sm);
-    margin-bottom: 18px;
-  }
-  .drawer-section {
-    margin-bottom: 22px;
   }
   .rh-info {
     display: grid;
@@ -414,13 +355,6 @@
   }
   .rh-info dd {
     margin: 0;
-  }
-  .drawer-section h3 {
-    font-size: var(--fs-sm);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--muted);
-    margin: 0 0 8px;
   }
   .forms-loading {
     font-size: var(--fs-sm);

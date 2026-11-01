@@ -526,18 +526,93 @@
 	}
 }
 
-/* Bouton « Fusionner… » d'une ligne de liste. */
-.btn-merge {
-	font-size: var(--fs-sm);
+/* Contenu des volets latéraux (`Drawer`) : en-tête nom et actions, édition du nom, sections. */
+.drawer-head-row {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 12px;
+}
+.drawer-name-link {
+	font-size: var(--fs-lg);
+	color: inherit;
+	text-decoration: none;
+}
+.drawer-name-link:hover {
 	color: var(--accent);
-	background: none;
+	text-decoration: underline;
+}
+.drawer-head-actions {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	flex-shrink: 0;
+}
+.drawer-edit {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	flex-wrap: wrap;
+}
+.drawer-edit .btn {
+	flex-shrink: 0;
+}
+.drawer-edit input {
+	width: 280px;
+	padding: 4px 6px;
 	border: 1px solid var(--border);
 	border-radius: var(--radius);
-	cursor: pointer;
-	padding: 2px 8px;
+	font-size: var(--fs-md);
 }
-.btn-merge:hover {
-	background: var(--accent-light);
+/* Libellés et valeurs d'un volet, sur deux colonnes. */
+.drawer-fields {
+	display: grid;
+	grid-template-columns: auto 1fr;
+	gap: 6px 12px;
+	align-items: center;
+	margin: 0;
+	font-size: var(--fs-sm);
+}
+.drawer-fields dt {
+	color: var(--muted);
+}
+.drawer-fields dd {
+	margin: 0;
+}
+.drawer-meta {
+	display: flex;
+	gap: 14px;
+	align-items: center;
+	color: var(--muted);
+	font-size: var(--fs-sm);
+	margin-bottom: 18px;
+}
+.drawer-section {
+	margin-bottom: 22px;
+}
+.drawer-section h3 {
+	font-size: var(--fs-sm);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--muted);
+	margin: 0 0 8px;
+}
+
+/* Bouton « Fusionner… » d'un volet, qui ouvre la recherche de l'entité à absorber. */
+.btn-merge-inline {
+	padding: 2px 8px;
+	border: 1px dashed var(--border);
+	border-radius: var(--radius);
+	background: none;
+	font-size: var(--fs-sm);
+	cursor: pointer;
+	color: var(--muted);
+	font-family: inherit;
+}
+.btn-merge-inline:hover {
+	background: var(--warning-light);
+	color: var(--warning);
+	border-color: var(--warning);
 }
 
 /* Liens de structure dans un tableau : texte simple, les pastilles étant réservées aux valeurs codées par couleur. */
@@ -1417,9 +1492,14 @@ a.badge-doaj:hover {
 }
 
 .btn-merge {
-	border-color: var(--success);
+	font-size: var(--fs-sm);
 	color: var(--success);
 	font-weight: 500;
+	background: none;
+	border: 1px solid var(--success);
+	border-radius: var(--radius);
+	cursor: pointer;
+	padding: 2px 8px;
 }
 
 .btn-merge:hover:not(:disabled) {

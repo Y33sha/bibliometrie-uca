@@ -440,7 +440,7 @@
   {#snippet head()}
     {#if detail}
       {@const s = detail.structure}
-      <div class="structure-head">
+      <div class="drawer-head-row">
         <a class="drawer-name-link" href={resolve(`structures/${s.id}`)} target="_blank" rel="noopener" title="Voir la fiche publique">
           {#if s.acronym}<span class="drawer-acronym">{s.acronym}</span>{/if}
           {s.name}
@@ -457,7 +457,7 @@
     <p class="loading">Chargement…</p>
   {:else}
     {@const s = detail.structure}
-    <div class="drawer-meta">
+    <div class="structure-meta">
       <span class="structure-type structure-type-{s.type}">{s.type}</span>
       <span><span class="field-label">Code</span> {s.code}</span>
     </div>
@@ -544,32 +544,11 @@
   .loading {
     color: var(--muted);
   }
-  .structure-head {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 12px;
-  }
-  .drawer-name-link {
-    font-size: var(--fs-lg);
-    color: inherit;
-    text-decoration: none;
-  }
-  .drawer-name-link:hover {
-    color: var(--accent);
-    text-decoration: underline;
-  }
   .drawer-acronym {
     font-weight: 600;
     margin-right: 6px;
   }
-  .drawer-head-actions {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-shrink: 0;
-  }
-  .drawer-meta {
+  .structure-meta {
     display: flex;
     align-items: center;
     gap: 14px;

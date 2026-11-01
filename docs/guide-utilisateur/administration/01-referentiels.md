@@ -37,4 +37,10 @@ Le volet d'une publication compare les métadonnées de chaque source, une colon
 
 ## Éditeurs et publications en série
 
-En session d'administration, la fiche d'un éditeur ou d'une publication en série permet de les modifier et de les fusionner avec un doublon. Changer le type d'une publication en série change le type de ses publications.
+`/publishers` et `/journals`, en session d'administration
+
+Le volet de gestion d'un éditeur règle son nom, son type et son pays. Il montre ses formes de nom : elles rattachent à l'éditeur les enregistrements sources qui le nomment.
+
+Le volet de gestion d'une publication en série règle son titre, son type, son modèle OA et son caractère académique. Changer le type d'une publication en série change le type de ses publications.
+
+Chaque volet fusionne un doublon dans l'entité ouverte.

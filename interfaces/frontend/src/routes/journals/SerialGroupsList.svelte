@@ -4,7 +4,7 @@
 	import { errorMessage } from '#lib/api/index.js';
 	import { confirmDialog, toast } from '#lib/dialogs.svelte.js';
 	import type { components } from '#lib/api/schema.js';
-	import { mergeSerial } from './mergeSerial';
+	import { mergeSerial } from '#lib/components/serials/mergeSerial.js';
 
 	type Serial = components['schemas']['SerialListItem'];
 
