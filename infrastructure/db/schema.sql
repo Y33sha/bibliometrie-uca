@@ -5115,6 +5115,13 @@ CREATE INDEX source_contributions_duplicate_of_idx ON sources.source_contributio
 
 
 --
+-- Name: source_contributions_neutralized_idx; Type: INDEX; Schema: sources; Owner: -
+--
+
+CREATE INDEX source_contributions_neutralized_idx ON sources.source_contributions USING btree (id) INCLUDE (neutralized_identifiers) WHERE (neutralized_identifiers IS NOT NULL);
+
+
+--
 -- Name: source_record_subjects_subject_idx; Type: INDEX; Schema: sources; Owner: -
 --
 
