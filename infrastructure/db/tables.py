@@ -480,7 +480,15 @@ serial_issns = Table(
     Column(
         "issnl",
         Text,
-        comment="ISSN-L de l'ISSN d'après sa notice Sudoc. NULL : inconnu.",
+        comment=(
+            "ISSN-L de l'ISSN d'après la table de l'ISSN International Centre. "
+            "NULL : ISSN absent de la table au dernier import, ou ajouté depuis."
+        ),
+    ),
+    Column(
+        "issnl_checked_at",
+        DateTime(timezone=True),
+        comment="Date du dernier import de la table ISSN-L qui a lu l'ISSN. NULL : jamais lu.",
     ),
     Column(
         "serial_id",

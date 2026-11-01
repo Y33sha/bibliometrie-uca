@@ -28,7 +28,6 @@ class TestParseSudocSerialRecord:
         assert record == SudocSerialRecord(
             ppn="122563522",
             issn="1963-1006",
-            issnl="0767-9513",
             cancelled_issns=(),
             support=IssnSupport.ELECTRONIC,
             other_support_issns=("0767-9513",),
@@ -101,7 +100,6 @@ class TestParseSudocSerialRecord:
         assert record == SudocSerialRecord(
             ppn="1",
             issn=None,
-            issnl=None,
             cancelled_issns=(),
             support=None,
             other_support_issns=(),

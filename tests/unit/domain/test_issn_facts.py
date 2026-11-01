@@ -9,7 +9,6 @@ def _record(**fields) -> SudocSerialRecord:
     values = {
         "ppn": "1",
         "issn": "0028-0836",
-        "issnl": "0028-0836",
         "cancelled_issns": (),
         "support": IssnSupport.PRINT,
         "other_support_issns": (),
@@ -20,25 +19,23 @@ def _record(**fields) -> SudocSerialRecord:
 
 def test_sans_notice_sudoc_l_issn_est_non_verifie():
     reading = read_sudoc_record("1234-5679", None)
-    assert reading.facts == (IssnFacts("1234-5679", None, None, IssnStatus.UNVERIFIED),)
-    assert (reading.links, reading.title, reading.issnl) == ((), None, None)
+    assert reading.facts == (IssnFacts("1234-5679", None, IssnStatus.UNVERIFIED),)
+    assert (reading.links, reading.title) == ((), None)
 
 
 def test_notice_de_l_issn_lu():
     reading = read_sudoc_record("0028-0836", _record(other_support_issns=("1476-4687",)))
-    assert reading.facts == (
-        IssnFacts("0028-0836", "0028-0836", IssnSupport.PRINT, IssnStatus.ACTIVE),
-    )
-    assert (reading.title, reading.issnl) == ("Nature", "0028-0836")
+    assert reading.facts == (IssnFacts("0028-0836", IssnSupport.PRINT, IssnStatus.ACTIVE),)
+    assert reading.title == "Nature"
     assert reading.other_support_issns == ("1476-4687",)
 
 
-def test_issn_annule_rejoint_l_issn_l_de_la_notice():
+def test_issn_annule_de_la_notice():
     """Cas réel : la notice Sudoc de Nature annule l'ISSN 0302-2889."""
     reading = read_sudoc_record("0302-2889", _record(cancelled_issns=("0302-2889",)))
     assert reading.facts == (
-        IssnFacts("0302-2889", "0028-0836", None, IssnStatus.CANCELLED),
-        IssnFacts("0028-0836", "0028-0836", IssnSupport.PRINT, IssnStatus.ACTIVE),
+        IssnFacts("0302-2889", None, IssnStatus.CANCELLED),
+        IssnFacts("0028-0836", IssnSupport.PRINT, IssnStatus.ACTIVE),
     )
 
 

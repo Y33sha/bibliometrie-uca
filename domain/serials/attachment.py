@@ -11,9 +11,9 @@ from domain.normalize import normalize_text, to_plain_text
 from domain.serials.titles import compatible_titles
 
 
-def effective_issnl(issn: str, sudoc_issnl: str | None, openalex_issnls: Mapping[str, str]) -> str:
-    """Renvoie l'ISSN-L de `issn` : celui du Sudoc, à défaut celui d'OpenAlex, à défaut l'ISSN lui-même."""
-    return sudoc_issnl or openalex_issnls.get(issn) or issn
+def effective_issnl(issn: str, issnl: str | None, openalex_issnls: Mapping[str, str]) -> str:
+    """Renvoie l'ISSN-L de `issn` : `issnl`, lu dans la table de l'ISSN International Centre, à défaut celui d'OpenAlex, à défaut l'ISSN lui-même."""
+    return issnl or openalex_issnls.get(issn) or issn
 
 
 def openalex_issnls(series: Iterable[tuple[str, Sequence[str]]]) -> dict[str, str]:

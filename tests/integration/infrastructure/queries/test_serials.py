@@ -83,8 +83,8 @@ class TestSudocCheck:
         insert_serial_issn(sa_sync_conn, None, issn="0028-0836")
         reading = SudocReading(
             (
-                IssnFacts("0028-0836", "0028-0836", IssnSupport.PRINT, IssnStatus.ACTIVE),
-                IssnFacts("0302-2889", "0028-0836", None, IssnStatus.CANCELLED),
+                IssnFacts("0028-0836", IssnSupport.PRINT, IssnStatus.ACTIVE),
+                IssnFacts("0302-2889", None, IssnStatus.CANCELLED),
             ),
             (IssnLink("0028-0836", "1476-4687", IssnLinkType.CONTINUED_BY),),
             "Nature",
@@ -95,15 +95,15 @@ class TestSudocCheck:
             r.issn: r
             for r in sa_sync_conn.execute(
                 text(
-                    "SELECT issn, issnl, support::text, status::text, sudoc_title,"
+                    "SELECT issn, support::text, status::text, sudoc_title,"
                     " sudoc_checked_at, serial_id"
                     " FROM serial_issns WHERE issn IN ('0028-0836', '0302-2889', '1754-6656')"
                 )
             )
         }
-        assert (rows["0028-0836"].issnl, rows["0028-0836"].support) == ("0028-0836", "print")
+        assert rows["0028-0836"].support == "print"
         assert rows["0028-0836"].sudoc_checked_at is not None
-        assert (rows["0302-2889"].issnl, rows["0302-2889"].status) == ("0028-0836", "cancelled")
+        assert rows["0302-2889"].status == "cancelled"
         assert rows["0028-0836"].sudoc_title == rows["0302-2889"].sudoc_title == "Nature"
         assert rows["0028-0836"].serial_id is None
         assert rows["1754-6656"].sudoc_checked_at is None

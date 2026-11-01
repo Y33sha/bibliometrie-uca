@@ -108,7 +108,6 @@ class TestFetchSerialRecord:
         record = await client.fetch_serial_record(None, "068267983", base_url=_BASE)
         assert record is not None
         assert record.issn == "1476-4687"
-        assert record.issnl == "0028-0836"
         assert record.support is IssnSupport.ELECTRONIC
 
     @pytest.mark.asyncio

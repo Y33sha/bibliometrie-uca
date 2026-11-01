@@ -97,6 +97,7 @@ class TestDelais:
             ConfigKey.FETCH_MISSING_RETRY_AFTER_DAYS,
             ConfigKey.UNPAYWALL_RECHECK_AFTER_DAYS,
             ConfigKey.DOAJ_REFRESH_AFTER_DAYS,
+            ConfigKey.ISSNL_TABLE_REFRESH_AFTER_DAYS,
         ],
     )
     def test_le_delai_configure_est_lu(self, sa_sync_conn, key):

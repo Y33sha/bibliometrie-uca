@@ -196,9 +196,7 @@ class TestUpdateSerial:
         """Un titre saisi à la main reste quand la vérification Sudoc donne un autre titre."""
         j = _serial(sa_sync_conn, title="Old", issn="0028-0836", issnl="0028-0836")
         serial_service.update_serial(j, update=SerialUpdate(title="New"))
-        reading = SudocReading(
-            (IssnFacts("0028-0836", "0028-0836", None, IssnStatus.ACTIVE),), title="Sudoc"
-        )
+        reading = SudocReading((IssnFacts("0028-0836", None, IssnStatus.ACTIVE),), title="Sudoc")
         record_sudoc_reading(sa_sync_conn, "0028-0836", reading, _NOW)
 
         row = _fetch_one(

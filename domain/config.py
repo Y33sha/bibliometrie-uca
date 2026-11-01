@@ -40,6 +40,8 @@ class ConfigKey(StrEnum):
     """Délai avant de relire chez doi.org l'URL de résolution d'un DOI."""
     DOAJ_REFRESH_AFTER_DAYS = "doaj_refresh_after_days"
     """Délai avant de télécharger de nouveau le fichier du DOAJ."""
+    ISSNL_TABLE_REFRESH_AFTER_DAYS = "issnl_table_refresh_after_days"
+    """Délai avant de télécharger de nouveau la table ISSN-L de l'ISSN International Centre."""
     PIPELINE_START_YEAR_FULL = "pipeline_start_year_full"
     """Première année moissonnée."""
 
@@ -72,6 +74,7 @@ SETTINGS: dict[ConfigKey, ConfigSetting] = {
     ConfigKey.UNPAYWALL_RECHECK_AFTER_DAYS: ConfigSetting(ConfigKind.DELAY, 15),
     ConfigKey.DOI_RESOLUTION_RECHECK_AFTER_DAYS: ConfigSetting(ConfigKind.DELAY, 180),
     ConfigKey.DOAJ_REFRESH_AFTER_DAYS: ConfigSetting(ConfigKind.DELAY, 30),
+    ConfigKey.ISSNL_TABLE_REFRESH_AFTER_DAYS: ConfigSetting(ConfigKind.DELAY, 30),
     ConfigKey.PIPELINE_START_YEAR_FULL: ConfigSetting(ConfigKind.YEAR),
 }
 assert set(SETTINGS) == set(ConfigKey)
