@@ -11,7 +11,7 @@ Base locale au 2026-11-01.
   - Domaines HAL : `topics.hal_domains` garde le code de la feuille (`sdv.bbm.bm`). Le code de chaque ancêtre en est un préfixe.
   - RAMEAU : chaque vedette a un PPN, vedettes construites comprises (« Béton armé -- Fissuration »). ScanR le garde dans `topics`. theses.fr le donne dans le champ `query` de `mapSujets`, et le normalizer l'écarte. Les PPN des deux sources concordent pour 2 557 des 2 558 libellés communs. Chez ScanR, 51 PPN ont deux formes d'une même vedette (« Poumon -- Cancer », « Cancer du poumon »).
   - Discipline de theses.fr : libellé libre, 471 distincts.
-- **Raw store.** Il est complet pour OpenAlex (116 813 payloads pour 116 331 enregistrements sources), presque complet pour HAL (66 523 pour 67 303).
+- **Raw store.** Il est complet pour OpenAlex : 116 813 payloads pour 116 331 enregistrements sources.
 - **MeSH.** Aucun sujet MeSH. Le moissonnage OpenAlex omet le champ `mesh` des works (`pipeline/ingestion/openalex/api.py`). PubMed n'est pas moissonné.
 - **Besoins de l'interface.** Les nuages de sujets (`SubjectsCloud.svelte`) et le graphe des co-occurrences (`/subjects/[id]`) colorent par fréquence. Ils demandent une couleur par grand domaine, et de pouvoir écarter les niveaux hauts, qui encombrent sans informer.
 - **Mots-clés HAL.** Le champ Solr `keyword_s` met une majuscule initiale et retire la ponctuation : « Industry 4.0 » devient « Industry 40 », « eau destinée à la consommation humaine (EDCH) » devient « Eau destinée à la consommation humaine EDCH ». Les `<term>` du TEI (`label_xml`) gardent la saisie de l'auteur. Ils sont présents dans chaque dépôt pourvu de `keyword_s`, sur un échantillon de 4 160 dépôts.
@@ -31,7 +31,6 @@ Base locale au 2026-11-01.
 
 - [x] Normalizer HAL : mots-clés lus dans les `<term>` du TEI
 - [x] `keyword_s` retiré des champs demandés à l'API. L'empreinte de chaque payload HAL change : chaque dépôt relu est normalisé une fois de plus
-- [ ] Stock HAL : script ponctuel `rewrite_hal_keywords`, qui relit les mots-clés TEI dans le raw store
 - [x] Retrait de `publications_detail.topics` et de `Publication.topics` (e227269d1)
 
 ### Phase 2 — Sujets écrits à la normalisation
@@ -49,7 +48,8 @@ Base locale au 2026-11-01.
 
 ### Phase 3 — Stock, entre la migration et le run suivant
 
-- [ ] HAL et ScanR : script ponctuel qui écrit les sujets depuis `source_records.topics`, où les codes sont présents
+- [ ] HAL : `last_seen_at` vieilli pour tous les dépôts, puis run sur toutes les années. Le moissonnage relit les 59 720 dépôts des collections, `fetch_stale` les 7 352 autres. Leur normalisation écrit les sujets et les mots-clés du TEI
+- [ ] ScanR : script ponctuel qui écrit les sujets depuis `source_records.topics`, où les codes sont présents
 - [ ] OpenAlex : script ponctuel qui écrit les sujets depuis le raw store
 - [ ] theses.fr : `raw_hash` vidé et `last_seen_at` vieilli pour toutes les thèses, puis `fetch_stale` sur toutes les années. La normalisation qui suit retire aussi `source_extras.discipline`
 - [ ] Retrait de `source_records.topics` ; scripts de la pertinence des sujets (`sample_subject_relevance`, `prototype_subject_vote`) adaptés
