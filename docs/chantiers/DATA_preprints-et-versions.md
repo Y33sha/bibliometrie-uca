@@ -166,7 +166,7 @@ La reconstruction des publications fusionne 1 047 publications. 709 paires `is_p
 - [x] Remédiation du stock : reconstruction des publications (`--rebuild-publications`), run du 2026-11-01
 - [x] Retrait du DOI d'une autre œuvre étendu à toutes les sources, pour la fusion fausse de 15705 (1004d75d1)
 - [x] Publication publiée par le conteneur d'un enregistrement source typé autrement que preprint : revue, actes, ouvrage (6269b46ef)
-- [x] DOI de dépôt hors des ancres : archives de copies (DESY, RWTH, GSI, ResearchGate), dépôts de textes sur Zenodo ; fusion manuelle comprise
+- [x] DOI de dépôt hors des ancres : archives de copies (DESY, RWTH, GSI, ResearchGate), dépôts de textes sur Zenodo ; fusion manuelle comprise (4e4f0775f)
 - [ ] Remédiation du stock : reconstruction des publications pour les DOI de dépôt
 
 ### Phase 3 — Affichage
@@ -175,7 +175,7 @@ La reconstruction des publications fusionne 1 047 publications. 709 paires `is_p
 
 ### Phase 4 — Fin de chantier
 
-- [ ] Mise à jour de la documentation : réconciliation, agrégation, fusion manuelle
+- [x] Mise à jour de la documentation : réconciliation, agrégation, fusion manuelle
 
 ## Questions ouvertes
 

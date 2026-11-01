@@ -33,6 +33,8 @@ L'onglet « Fusions suspectes » liste les publications aux listes d'auteurs tr�
 
 Le volet d'une publication compare les métadonnées de chaque source, une colonne par source. Une ligne surlignée signale des valeurs différentes selon les sources.
 
+Le volet fusionne aussi la publication avec un doublon : une publication de titre proche, ou une publication cherchée par identifiant, DOI ou mots du titre. La publication à DOI est conservée. La fusion est refusée entre deux publications à DOI distincts. Un DOI de dépôt (serveur de preprints, archive de copies, dépôt de texte sur Zenodo) reste hors du compte. La fusion réunit ainsi un preprint et sa version publiée, quand aucun identifiant commun ne les relie.
+
 ![Fusions suspectes](../../img/screenshots/admin_publications.png)
 
 ## Éditeurs et publications en série
