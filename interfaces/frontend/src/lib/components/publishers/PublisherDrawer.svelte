@@ -13,6 +13,7 @@
 
   type Publisher = components["schemas"]["Publisher"];
   type PublisherListItem = components["schemas"]["PublisherListItem"];
+  type PublisherNameForm = components["schemas"]["PublisherNameForm"];
   type BlockingSerial = components["schemas"]["BlockingSerialItem"];
   type MergeBlocked = components["schemas"]["PublisherMergeBlockedResponse"];
   type EnumOption = components["schemas"]["EnumOption"];
@@ -30,7 +31,7 @@
   } = $props();
 
   let publisher = $state<Publisher | null>(null);
-  let nameForms = $state<string[] | null>(null);
+  let nameForms = $state<PublisherNameForm[] | null>(null);
   let publisherTypes: EnumOption[] = $state([]);
   let countries: Country[] = $state([]);
 
@@ -55,7 +56,7 @@
     const current = id;
     const [p, forms] = await Promise.all([
       api<Publisher>(`/api/publishers/${current}`),
-      api<string[]>(`/api/publishers/${current}/name-forms`),
+      api<PublisherNameForm[]>(`/api/publishers/${current}/name-forms`),
     ]);
     if (current !== id) return;
     publisher = p;
@@ -218,19 +219,6 @@
     {/if}
 
     <section class="drawer-section">
-      <h3>Formes de nom</h3>
-      {#if nameForms === null}
-        <span class="muted">Chargement…</span>
-      {:else if nameForms.length === 0}
-        <span class="muted">Aucune</span>
-      {:else}
-        <ul class="name-forms">
-          {#each nameForms as form (form)}<li>{form}</li>{/each}
-        </ul>
-      {/if}
-    </section>
-
-    <section class="drawer-section">
       <h3>Fusion</h3>
       {#if blocking}
         <div class="blocking" role="alert">
@@ -269,17 +257,32 @@
         <button class="btn-merge-inline" onclick={openMerge}>Fusionner…</button>
       {/if}
     </section>
+
+    <section class="drawer-section">
+      <h3>Formes de nom</h3>
+      {#if nameForms === null}
+        <span class="muted">Chargement…</span>
+      {:else if nameForms.length === 0}
+        <span class="muted">Aucune</span>
+      {:else}
+        <div class="chip-list">
+          {#each nameForms as nf (nf.form)}
+            <div class="chip-row">
+              <span class="status-chip">{nf.form}</span>
+              <span class="chip-count" class:zero={nf.source_record_count === 0}>
+                {nf.source_record_count.toLocaleString("fr-FR")} enregistrement{nf.source_record_count > 1 ? "s" : ""} source{nf.source_record_count > 1 ? "s" : ""}
+              </span>
+            </div>
+          {/each}
+        </div>
+      {/if}
+    </section>
   {/if}
 </Drawer>
 
 <style>
   .muted {
     color: var(--muted);
-  }
-  .name-forms {
-    margin: 0;
-    padding-left: 18px;
-    font-size: var(--fs-sm);
   }
   .blocking {
     background: var(--warning-light);

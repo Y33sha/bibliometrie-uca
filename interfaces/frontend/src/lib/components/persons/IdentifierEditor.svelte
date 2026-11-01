@@ -155,11 +155,6 @@
     align-items: flex-start;
     margin-bottom: 6px;
   }
-  .chip-row {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-  }
   .identifier-chip {
     font-family: var(--mono);
     font-size: var(--fs-sm);

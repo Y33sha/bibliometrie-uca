@@ -4,7 +4,7 @@ Couvre :
 - GET /api/publishers (liste, recherche, tris, filtres)
 - GET /api/publishers/facets (trois dimensions, chacune décomptée hors de sa propre sélection)
 - GET /api/publishers/{id} (fiche, 404)
-- GET /api/publishers/{id}/name-forms (formes de nom, dans l'ordre alphabétique)
+- GET /api/publishers/{id}/name-forms (formes de nom, décomptées sur les noms donnés par les enregistrements sources)
 - GET /api/publishers/{id}/subjects (sujets principaux, hors sujets génériques)
 - PUT /api/publishers/{id} (mise à jour, authentification requise)
 - POST /api/publishers/{id}/merge (fusion, authentification requise, 404 sur la cible ou la source)
@@ -15,7 +15,7 @@ Couvre :
 import uuid
 from functools import partial
 
-from tests.integration.helpers.db import owner_pool
+from tests.integration.helpers.db import owner_connection, owner_pool
 from tests.integration.helpers.seeds import (
     seed_country,
     seed_doi_prefix,
@@ -27,6 +27,7 @@ from tests.integration.helpers.seeds import (
     seed_subject,
     uniq,
 )
+from tests.integration.helpers.sources import insert_source_record
 
 # Publication sans titre normalisé.
 _publication = partial(seed_publication, normalize_title=False)
@@ -255,18 +256,29 @@ class TestGetPublisher:
 
 
 class TestPublisherNameForms:
-    def test_returns_sorted_forms(self, client):
+    def test_forms_counted_on_the_names_given_by_source_records(self, client):
         pid = seed_publisher()
-        forms = [uniq("zeta press"), uniq("alpha press")]
+        # Suffixe en lettres seules : la clé de nom retire les années.
+        suffix = uuid.uuid4().hex[:8].translate(str.maketrans("0123456789", "ghijklmnop"))
         with owner_pool() as cur:
-            for form in forms:
+            for form in (f"alpha press {suffix}", f"zeta press {suffix}"):
                 cur.execute(
                     "INSERT INTO publisher_name_forms (publisher_id, form_normalized) VALUES (%s, %s)",
                     (pid, form),
                 )
+        with owner_connection() as conn:
+            insert_source_record(
+                conn,
+                source_id=uniq("sid"),
+                biblio={"publisher": f"Zeta Press {suffix} Ltd"},
+                publisher_id=pid,
+            )
         r = client.get(f"/api/publishers/{pid}/name-forms")
         assert r.status_code == 200
-        assert r.json() == sorted(forms)
+        assert r.json() == [
+            {"form": f"zeta press {suffix}", "source_record_count": 1},
+            {"form": f"alpha press {suffix}", "source_record_count": 0},
+        ]
 
 
 # ── GET /api/publishers/{id}/subjects ───────────────────────────

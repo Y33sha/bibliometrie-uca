@@ -4,7 +4,8 @@ from collections.abc import Iterator
 
 from sqlalchemy import Connection, Row, text
 
-from domain.normalize import normalize_text
+from domain.normalize import normalize_text, to_plain_text
+from domain.publishers.names import publisher_name_key
 from domain.publishers.publisher import PUBLISHER_TYPE_LABELS_FR, PUBLISHER_TYPES, PublisherType
 from infrastructure.read_models._common import FacetOption, YesNoCount
 from infrastructure.read_models.csv_export import csv_chunks, fetch_export_rows
@@ -15,6 +16,7 @@ from infrastructure.read_models.publishers.models import (
     PublisherFilters,
     PublisherListItem,
     PublisherListResponse,
+    PublisherNameForm,
     PublishersFacetsResponse,
     PublisherSort,
 )
@@ -234,17 +236,31 @@ class PublisherQueries:
             return None
         return _row_to_publisher(row)
 
-    def get_publisher_name_forms(self, publisher_id: int) -> list[str]:
-        """Renvoie les formes de nom normalisées de l'éditeur, dans l'ordre alphabétique."""
-        return list(
-            self._conn.execute(
-                text(
-                    "SELECT form_normalized FROM publisher_name_forms"
-                    " WHERE publisher_id = :id ORDER BY form_normalized"
-                ),
-                {"id": publisher_id},
-            ).scalars()
-        )
+    def get_publisher_name_forms(self, publisher_id: int) -> list[PublisherNameForm]:
+        """Renvoie les formes de nom de l'éditeur, les plus fréquentes parmi ses enregistrements sources d'abord.
+
+        La forme d'un enregistrement source est la clé du nom d'éditeur qu'il donne (`publisher_name_key`), comme à la normalisation.
+        """
+        params = {"id": publisher_id}
+        forms = self._conn.execute(
+            text("SELECT form_normalized FROM publisher_name_forms WHERE publisher_id = :id"),
+            params,
+        ).scalars()
+        counts = dict.fromkeys(forms, 0)
+        for r in self._conn.execute(
+            text("""
+                SELECT biblio->>'publisher' AS name, count(*) AS n
+                FROM source_records WHERE publisher_id = :id GROUP BY 1
+            """),
+            params,
+        ):
+            form = publisher_name_key(to_plain_text(r.name or ""))
+            if form in counts:
+                counts[form] += r.n
+        return [
+            PublisherNameForm(form=form, source_record_count=n)
+            for form, n in sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+        ]
 
     def get_publisher_subjects(self, publisher_id: int, *, limit: int) -> list[SubjectFrequency]:
         """Renvoie les sujets des publications de l'éditeur, les plus fréquents d'abord.

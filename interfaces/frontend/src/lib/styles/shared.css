@@ -579,6 +579,10 @@
 .drawer-fields dd {
 	margin: 0;
 }
+/* Menus déroulants d'un volet, alignés sur une même largeur. */
+.drawer-fields .select {
+	width: 280px;
+}
 .drawer-meta {
 	display: flex;
 	gap: 14px;
@@ -1657,6 +1661,26 @@ button.entity-link {
 
 /* ── Puces de statut partagées (identifiants, formes de nom) ──
    Rectangulaire, colorée selon le statut ; boutons de bascule ✓/✗ unifiés. */
+/* Liste de puces, une par ligne, chacune suivie de son décompte. */
+.chip-list {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	align-items: flex-start;
+}
+.chip-row {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+}
+.chip-count {
+	font-size: var(--fs-sm);
+	color: var(--muted);
+	white-space: nowrap;
+}
+.chip-count.zero {
+	color: var(--text-faint);
+}
 .status-chip {
 	display: inline-flex;
 	align-items: center;

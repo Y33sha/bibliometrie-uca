@@ -2209,7 +2209,7 @@ export interface paths {
         };
         /**
          * Get Publisher Name Forms
-         * @description Liste les formes de nom normalisées de l'éditeur. La normalisation rattache à l'éditeur chaque enregistrement source qui le nomme par l'une d'elles.
+         * @description Liste les formes de nom normalisées de l'éditeur, avec leur nombre d'enregistrements sources. La normalisation rattache à l'éditeur chaque enregistrement source qui le nomme par l'une d'elles.
          */
         get: operations["get_publisher_name_forms_api_publishers__publisher_id__name_forms_get"];
         put?: never;
@@ -5229,6 +5229,19 @@ export interface components {
             detail: string;
             /** Blocking Serials */
             blocking_serials: components["schemas"]["BlockingSerialItem"][];
+        };
+        /**
+         * PublisherNameForm
+         * @description Forme de nom normalisée d'un éditeur (`publisher_name_forms`).
+         */
+        PublisherNameForm: {
+            /** Form */
+            form: string;
+            /**
+             * Source Record Count
+             * @description Enregistrements sources de l'éditeur qui le nomment par cette forme.
+             */
+            source_record_count: number;
         };
         /**
          * PublisherType
@@ -9951,7 +9964,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": string[];
+                    "application/json": components["schemas"]["PublisherNameForm"][];
                 };
             };
             /** @description Validation Error */

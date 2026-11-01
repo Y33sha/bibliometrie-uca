@@ -14,6 +14,7 @@ from infrastructure.read_models.publishers.models import (
     Publisher,
     PublisherFilters,
     PublisherListResponse,
+    PublisherNameForm,
     PublishersFacetsResponse,
     PublisherSort,
 )
@@ -121,12 +122,12 @@ def get_publisher(
     return detail.found(queries.get_publisher_detail(publisher_id))
 
 
-@router.get("/{publisher_id}/name-forms", response_model=list[str])
+@router.get("/{publisher_id}/name-forms", response_model=list[PublisherNameForm])
 def get_publisher_name_forms(
     publisher_id: int,
     queries: PublisherQueries = Depends(publisher_queries),
-) -> list[str]:
-    """Liste les formes de nom normalisées de l'éditeur. La normalisation rattache à l'éditeur chaque enregistrement source qui le nomme par l'une d'elles."""
+) -> list[PublisherNameForm]:
+    """Liste les formes de nom normalisées de l'éditeur, avec leur nombre d'enregistrements sources. La normalisation rattache à l'éditeur chaque enregistrement source qui le nomme par l'une d'elles."""
     return queries.get_publisher_name_forms(publisher_id)
 
 
