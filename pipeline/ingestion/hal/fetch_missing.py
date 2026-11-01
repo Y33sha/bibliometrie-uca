@@ -1,6 +1,6 @@
 """Recherches dans HAL de la phase `fetch_missing`.
 
-- `fetch_missing_hal_by_id` (tâche `fetch_missing.hal_by_id`) : hal-id des documents OpenAlex et ScanR, absents du staging HAL ; requête Solr `halId_s`.
+- `fetch_missing_hal_by_id` (tâche `fetch_missing.hal_by_id`) : hal-id des documents OpenAlex et ScanR, absents du staging HAL ; lecture par `find_deposit`. Un doublon absorbé donne le dépôt conservé, et rejoint les hal-id introuvables.
 - `fetch_missing_hal_by_nnt` (tâche `fetch_missing.hal_by_nnt`) : NNT de thèses soutenues sans document HAL ; requête Solr `nntId_s`. Réservé au mode `full`.
 - `HalDoiSearch` (tâche `fetch_missing.doi.hal`) : recherche par DOI, pilotée par `pipeline.ingestion.common.doi_search`.
 
@@ -10,23 +10,29 @@ Les deux premières passent par la boucle commune (`pipeline.ingestion.common.lo
 from __future__ import annotations
 
 import logging
-from collections.abc import Awaitable, Callable, Mapping, Sequence
+from collections.abc import Sequence
 
 import httpx2
 from sqlalchemy import Connection, text
 
 from domain.source_records.identifiers import SourceIdentifierType
 from domain.sources.staging import StagingEntryMode
-from domain.types import JsonValue
 from infrastructure.db.source_record_identifiers import first_of_its_type_sql
-from pipeline.http.lookup import UNAVAILABLE, LookupOutcome, NotFound, Unavailable
+from pipeline.http.lookup import UNAVAILABLE, NotFound, Unavailable
 from pipeline.ingestion.common.failed_lookups import (
     LookupIdType,
     pending_failed_lookup_sql,
     record_failed_lookup,
 )
-from pipeline.ingestion.common.lookup import LookupBatch, LookupChannel, look_up, one_at_a_time
-from pipeline.ingestion.hal.api import search_one
+from pipeline.ingestion.common.lookup import (
+    Fetch,
+    LookupBatch,
+    LookupChannel,
+    by_native_id,
+    look_up,
+    one_at_a_time,
+)
+from pipeline.ingestion.hal.api import find_deposit, search_one
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
 # Requêtes simultanées à HAL ; le débit suit le budget de la source (`api_params.MAX_PER_SECOND`).
@@ -107,9 +113,7 @@ async def _fetch_ids(
     log: logging.Logger,
     ids: Sequence[str],
     *,
-    fetch_one: Callable[
-        [httpx2.AsyncClient, str], Awaitable[LookupOutcome[Mapping[str, JsonValue]]]
-    ],
+    fetch: Fetch,
     id_type: LookupIdType,
 ) -> PhaseMetrics:
     """Cherche chaque identifiant dans HAL et écrit les documents trouvés dans `staging`. Un identifiant introuvable est inscrit dans `failed_lookups`.
@@ -126,7 +130,7 @@ async def _fetch_ids(
         log,
         LookupChannel(
             source="hal",
-            fetch=one_at_a_time(fetch_one),
+            fetch=fetch,
             on_absent=lambda conn, identifier: record_failed_lookup(
                 conn, "hal", id_type, identifier
             ),
@@ -145,9 +149,7 @@ async def fetch_missing_hal_by_id(
         conn,
         log,
         get_missing_hal_ids(conn, retry_after_days=retry_after_days),
-        fetch_one=lambda client, hal_id: search_one(
-            client, f"halId_s:{hal_id}", label=f"halId {hal_id}"
-        ),
+        fetch=by_native_id("hal", find_deposit),
         id_type="hal_id",
     )
 
@@ -160,7 +162,9 @@ async def fetch_missing_hal_by_nnt(
         conn,
         log,
         get_missing_nnts(conn, retry_after_days=retry_after_days),
-        fetch_one=lambda client, nnt: search_one(client, f"nntId_s:{nnt}", label=f"NNT {nnt}"),
+        fetch=one_at_a_time(
+            lambda client, nnt: search_one(client, f"nntId_s:{nnt}", label=f"NNT {nnt}")
+        ),
         id_type="nnt",
     )
 

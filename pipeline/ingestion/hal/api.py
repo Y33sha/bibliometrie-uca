@@ -6,10 +6,16 @@ from collections.abc import Collection, Mapping, Sequence
 
 import httpx2
 
+from domain.sources.registry import source_record_url
 from domain.structures.hal_structures import HAL_STRUCTURE_FIELDS
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, at_path
-from pipeline.http.http_retry import http_request_with_retry, lookup_json_async
-from pipeline.http.lookup import NOT_FOUND, LookupOutcome, NotFound, Unavailable
+from pipeline.http.circuit_breaker import SourceUnavailableError
+from pipeline.http.http_retry import (
+    http_get_text_with_retry_async,
+    http_request_with_retry,
+    lookup_json_async,
+)
+from pipeline.http.lookup import NOT_FOUND, UNAVAILABLE, LookupOutcome, NotFound, Unavailable
 from pipeline.ingestion.api_params import API_BASE_URLS, HAL_PER_PAGE
 
 type SolrParams = dict[str, str | int | float | bool | None]
@@ -112,6 +118,28 @@ async def search_one(
         return outcome
     docs = as_sequence(at_path(outcome, "response").get("docs"))
     return as_mapping(docs[0]) if docs else NOT_FOUND
+
+
+async def find_deposit(
+    client: httpx2.AsyncClient, hal_id: str
+) -> LookupOutcome[Mapping[str, JsonValue]]:
+    """Renvoie le dépôt HAL `hal_id`, ou le dépôt conservé qui l'a absorbé comme doublon (`halIdSameAs_s`).
+
+    Un dépôt supprimé sort de l'index de recherche. Une recherche vide se confirme donc sur la page du dépôt : `NOT_FOUND` pour une page absente (404). Une page présente donne `UNAVAILABLE` : le dépôt est relu plus tard.
+    """
+    label = f"halId {hal_id}"
+    doc = await search_one(client, f"halId_s:{hal_id} OR halIdSameAs_s:{hal_id}", label=label)
+    if not isinstance(doc, NotFound):
+        return doc
+    try:
+        await http_get_text_with_retry_async(
+            client, source_record_url("hal", hal_id), timeout=15, label=f"page {hal_id}"
+        )
+    except httpx2.HTTPStatusError as e:
+        return NOT_FOUND if e.response.status_code == 404 else UNAVAILABLE
+    except SourceUnavailableError:
+        return UNAVAILABLE
+    return UNAVAILABLE
 
 
 # Identifiants par requête : la requête Solr reste courte, et la réponse tient en une page.

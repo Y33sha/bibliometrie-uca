@@ -39,12 +39,17 @@ class _HalSimule:
         self.ecrits: list[str] = []
         self.echecs: list[tuple[str, str]] = []
 
-        async def search_one(client, query, *, label):
-            identifiant = query.split(":", 1)[1]
+        async def find(identifiant):
             self.cherches.append(identifiant)
             if identifiant in self.en_echec:
                 return UNAVAILABLE
             return self.docs.get(identifiant, NOT_FOUND)
+
+        async def search_one(client, query, *, label):
+            return await find(query.split(":", 1)[1])
+
+        async def find_deposit(client, hal_id):
+            return await find(hal_id)
 
         def upsert(_store, *, source, source_id, doi, raw_data, authors_truncated, entry_mode):
             self.ecrits.append(source_id)
@@ -66,6 +71,7 @@ class _HalSimule:
             fetch_missing, "get_missing_nnts", lambda conn, *, retry_after_days: list(ids)
         )
         monkeypatch.setattr(fetch_missing, "search_one", search_one)
+        monkeypatch.setattr(fetch_missing, "find_deposit", find_deposit)
         monkeypatch.setattr(StagingStore, "upsert", upsert)
         monkeypatch.setattr(fetch_missing, "record_failed_lookup", record_failed_lookup)
 
@@ -80,6 +86,16 @@ class TestParHalId:
         assert hal.echecs == [("hal_id", "hal-2")]
         # Le dépôt renvoyé efface l'échec éventuel de sa recherche.
         assert hal.oublies == ["hal-1"]
+
+    async def test_un_doublon_absorbe_donne_le_depot_conserve(self, monkeypatch):
+        """Le dépôt conservé est écrit ; le hal-id du doublon rejoint les introuvables."""
+        hal = _HalSimule(monkeypatch, ids=["hal-1"], docs={"hal-1": {"halId_s": "hal-2"}})
+
+        metrics = await fetch_missing_hal_by_id(_FakeConnection(), _LOG, retry_after_days=30)
+
+        assert hal.ecrits == ["hal-2"]
+        assert hal.echecs == [("hal_id", "hal-1")]
+        assert (metrics.new, metrics.extras["not_found"]) == (1, 1)
 
     async def test_hal_indisponible_ni_ecrit_ni_compte(self, monkeypatch):
         # Une source indisponible laisse l'absence non établie : l'identifiant attend le run suivant.
@@ -111,13 +127,13 @@ class TestParHalId:
         """La recherche s'arrête à l'identifiant qui fait couper le circuit-breaker."""
         hal_ids = [f"hal-{i}" for i in range(20)]
         hal = _HalSimule(monkeypatch, ids=hal_ids)
-        recherche = fetch_missing.search_one
+        recherche = fetch_missing.find_deposit
 
-        async def search_one_puis_coupure(client, query, *, label):
+        async def find_deposit_puis_coupure(client, hal_id):
             breaker.tripped = True
-            return await recherche(client, query, label=label)
+            return await recherche(client, hal_id)
 
-        monkeypatch.setattr(fetch_missing, "search_one", search_one_puis_coupure)
+        monkeypatch.setattr(fetch_missing, "find_deposit", find_deposit_puis_coupure)
         with source_circuit_breaker("hal") as breaker:
             await fetch_missing_hal_by_id(_FakeConnection(), _LOG, retry_after_days=30)
 
