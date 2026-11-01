@@ -412,15 +412,14 @@ class TestHalSourceRecord:
             '<keywords scheme="other"><term>hors auteur</term></keywords>'
             "</textClass></profileDesc></text></TEI>"
         )
-        captured = self._call({"label_xml": tei, "keyword_s": ["Industry 40"]})
+        captured = self._call({"label_xml": tei})
         assert captured.keywords == [
             "eau destinée à la consommation humaine (EDCH)",
             "Industry 4.0",
         ]
 
     def test_keywords_without_tei(self):
-        captured = self._call({"keyword_s": ["Industry 40"]})
-        assert captured.keywords is None
+        assert self._call({}).keywords is None
 
     def test_topics_from_domain(self):
         """Les domaines sont stockés tels que la source les expose ; la phase `subjects` les découpe en libellés."""

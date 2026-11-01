@@ -30,7 +30,7 @@ Base locale au 2026-11-01.
 ### Phase 1 — Correctifs indépendants
 
 - [x] Normalizer HAL : mots-clés lus dans les `<term>` du TEI
-- [ ] `keyword_s` retiré des champs demandés à l'API. L'empreinte de chaque payload HAL change : chaque dépôt relu est normalisé une fois de plus
+- [x] `keyword_s` retiré des champs demandés à l'API. L'empreinte de chaque payload HAL change : chaque dépôt relu est normalisé une fois de plus
 - [ ] Stock HAL : script ponctuel `rewrite_hal_keywords`, qui relit les mots-clés TEI dans le raw store
 - [x] Retrait de `publications_detail.topics` et de `Publication.topics` (e227269d1)
 
