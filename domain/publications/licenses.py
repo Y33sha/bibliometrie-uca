@@ -44,7 +44,7 @@ LICENSE_LABELS: dict[License, str] = {
     License.PUBLIC_DOMAIN: "Domaine public (CC0, Public Domain Mark)",
     License.LICENCE_OUVERTE: "Licence Ouverte Etalab",
     License.OPEN_SOURCE: "Licence de logiciel libre",
-    License.REPOSITORY_DISTRIBUTION: "Autorisation de diffusion (HAL, arXiv)",
+    License.REPOSITORY_DISTRIBUTION: "Autorisation de diffusion",
     License.PUBLISHER_OPEN: "Licence ouverte de l'éditeur",
     License.OTHER_OA: "Autre licence ouverte",
     License.ALL_RIGHTS_RESERVED: "Droits réservés",
