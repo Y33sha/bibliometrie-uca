@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict S3g5501iNWm1LUqnDvEYQ7zmM9H5ixYWxHjLkBI8qpPECT0JF6fCbJzmwem9jku
+\restrict 8VYH6AHlVedH9y4jEJzxoazbb2W0K0FjEQig1jm4bHoslTXs28bfdLaAUYJcSyE
 
 -- Dumped from database version 18.4
 -- Dumped by pg_dump version 18.4
@@ -1509,7 +1509,9 @@ UNION
    FROM (sources.source_contribution_rors sar
      JOIN structures.structures s ON ((s.ror_id = sar.ror_id)))
   WHERE ((s.id IN ( SELECT perimeter.structure_id
-           FROM perimeter)) AND (sar.address_id IS NULL))
+           FROM perimeter)) AND ((sar.address_id IS NULL) AND (NOT (EXISTS ( SELECT 1
+           FROM sources.source_contribution_addresses saa
+          WHERE (saa.source_contribution_id = sar.source_contribution_id))))))
 UNION
  SELECT l.source_contribution_id,
     r.structure_id,
@@ -5773,5 +5775,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict S3g5501iNWm1LUqnDvEYQ7zmM9H5ixYWxHjLkBI8qpPECT0JF6fCbJzmwem9jku
+\unrestrict 8VYH6AHlVedH9y4jEJzxoazbb2W0K0FjEQig1jm4bHoslTXs28bfdLaAUYJcSyE
 
