@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict FOzVqAkw0LSLpW2XqFpWYFbYpQ8wvaabm8J04JLN04WHHPmVnS49ZnfEnjecd0w
+\restrict TURmMYkTj8neUYGcTz3uDc0pRgkHprBjzdC1p3oewIlZbJXBtAmDysfauKnKW6V
 
 -- Dumped from database version 18.4
 -- Dumped by pg_dump version 18.4
@@ -514,6 +514,18 @@ CREATE TYPE public.structure_type AS ENUM (
 
 
 --
+-- Name: subject_vocabulary; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public.subject_vocabulary AS ENUM (
+    'openalex',
+    'hal_domain',
+    'rameau',
+    'theses_discipline'
+);
+
+
+--
 -- Name: protect_authenticated_identifier(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -686,7 +698,7 @@ CREATE TABLE ops.config (
     created_at timestamp with time zone DEFAULT now(),
     CONSTRAINT config_brand_hue_is_angle CHECK (((key <> 'brand_hue'::text) OR ((jsonb_typeof(value) = 'number'::text) AND (((value)::numeric >= (0)::numeric) AND ((value)::numeric <= (359)::numeric)) AND ((value)::numeric = trunc((value)::numeric))))),
     CONSTRAINT config_cap_is_non_negative_integer CHECK (((key <> ALL (ARRAY['doi_resolution_max_per_run'::text, 'fetch_missing_max_per_source'::text, 'sudoc_max_per_run'::text, 'unpaywall_max_per_run'::text])) OR ((jsonb_typeof(value) = 'number'::text) AND ((value)::numeric >= (0)::numeric) AND ((value)::numeric = trunc((value)::numeric))))),
-    CONSTRAINT config_delay_is_positive_integer CHECK (((key <> ALL (ARRAY['doaj_refresh_after_days'::text, 'doi_resolution_recheck_after_days'::text, 'fetch_missing_retry_after_days'::text, 'fetch_stale_after_days'::text, 'unpaywall_recheck_after_days'::text])) OR ((jsonb_typeof(value) = 'number'::text) AND ((value)::numeric >= (1)::numeric) AND ((value)::numeric = trunc((value)::numeric))))),
+    CONSTRAINT config_delay_is_positive_integer CHECK (((key <> ALL (ARRAY['doaj_refresh_after_days'::text, 'doi_resolution_recheck_after_days'::text, 'fetch_missing_retry_after_days'::text, 'fetch_stale_after_days'::text, 'issnl_table_refresh_after_days'::text, 'unpaywall_recheck_after_days'::text])) OR ((jsonb_typeof(value) = 'number'::text) AND ((value)::numeric >= (1)::numeric) AND ((value)::numeric = trunc((value)::numeric))))),
     CONSTRAINT config_institution_country_is_code CHECK (((key <> 'institution_country'::text) OR ((jsonb_typeof(value) = 'string'::text) AND ((value #>> '{}'::text[]) ~ '^[a-z]{2}$'::text) AND ((value #>> '{}'::text[]) <> 'xx'::text)))),
     CONSTRAINT config_site_title_is_text CHECK (((key <> 'site_title'::text) OR (jsonb_typeof(value) = 'string'::text))),
     CONSTRAINT config_year_is_in_range CHECK (((key <> 'pipeline_start_year_full'::text) OR ((jsonb_typeof(value) = 'number'::text) AND (((value)::numeric >= (1970)::numeric) AND ((value)::numeric <= (2100)::numeric)) AND ((value)::numeric = trunc((value)::numeric)))))
@@ -1908,10 +1920,13 @@ CREATE MATERIALIZED VIEW publications.subject_cooccurrences AS
 CREATE TABLE publications.subjects (
     id integer NOT NULL,
     label text NOT NULL,
-    language text,
     created_at timestamp with time zone DEFAULT now(),
     usage_count integer DEFAULT 0 NOT NULL,
-    label_normalized text NOT NULL
+    label_normalized text NOT NULL,
+    vocabulary public.subject_vocabulary NOT NULL,
+    code text NOT NULL,
+    level smallint NOT NULL,
+    parent_id integer
 );
 
 
@@ -1920,6 +1935,27 @@ CREATE TABLE publications.subjects (
 --
 
 COMMENT ON COLUMN publications.subjects.label_normalized IS 'Forme de recherche du libellé (normalize_text), servie par un index trigram.';
+
+
+--
+-- Name: COLUMN subjects.code; Type: COMMENT; Schema: publications; Owner: -
+--
+
+COMMENT ON COLUMN publications.subjects.code IS 'Code du sujet dans son vocabulaire : identifiant OpenAlex sans préfixe d''URL, code de domaine HAL, PPN RAMEAU, libellé normalisé d''une discipline de thèse.';
+
+
+--
+-- Name: COLUMN subjects.level; Type: COMMENT; Schema: publications; Owner: -
+--
+
+COMMENT ON COLUMN publications.subjects.level IS 'Profondeur dans le vocabulaire : 1 pour une racine.';
+
+
+--
+-- Name: COLUMN subjects.parent_id; Type: COMMENT; Schema: publications; Owner: -
+--
+
+COMMENT ON COLUMN publications.subjects.parent_id IS 'Sujet du niveau supérieur, du même vocabulaire.';
 
 
 --
@@ -2235,7 +2271,8 @@ CREATE TABLE publishing.serial_issns (
     status public.issn_status DEFAULT 'active'::public.issn_status NOT NULL,
     sudoc_checked_at timestamp with time zone,
     issnl text,
-    sudoc_title text
+    sudoc_title text,
+    issnl_checked_at timestamp with time zone
 );
 
 
@@ -2285,7 +2322,7 @@ COMMENT ON COLUMN publishing.serial_issns.sudoc_checked_at IS 'Date de la vérif
 -- Name: COLUMN serial_issns.issnl; Type: COMMENT; Schema: publishing; Owner: -
 --
 
-COMMENT ON COLUMN publishing.serial_issns.issnl IS 'ISSN-L de l''ISSN d''après sa notice Sudoc. NULL : inconnu.';
+COMMENT ON COLUMN publishing.serial_issns.issnl IS 'ISSN-L de l''ISSN d''après la table de l''ISSN International Centre. NULL : ISSN absent de la table au dernier import, ou ajouté depuis.';
 
 
 --
@@ -2293,6 +2330,13 @@ COMMENT ON COLUMN publishing.serial_issns.issnl IS 'ISSN-L de l''ISSN d''après 
 --
 
 COMMENT ON COLUMN publishing.serial_issns.sudoc_title IS 'Titre de la notice Sudoc de l''ISSN. NULL : sans notice, ou ISSN jamais vérifié.';
+
+
+--
+-- Name: COLUMN serial_issns.issnl_checked_at; Type: COMMENT; Schema: publishing; Owner: -
+--
+
+COMMENT ON COLUMN publishing.serial_issns.issnl_checked_at IS 'Date du dernier import de la table ISSN-L qui a lu l''ISSN. NULL : jamais lu.';
 
 
 --
@@ -3032,6 +3076,31 @@ COMMENT ON COLUMN sources.source_record_locations.version IS 'Version de la copi
 
 
 --
+-- Name: source_record_subjects; Type: TABLE; Schema: sources; Owner: -
+--
+
+CREATE TABLE sources.source_record_subjects (
+    source_record_id integer NOT NULL,
+    subject_id integer NOT NULL,
+    score real
+);
+
+
+--
+-- Name: TABLE source_record_subjects; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON TABLE sources.source_record_subjects IS 'Sujets donnés par un enregistrement source. Leurs ancêtres découlent de subjects.parent_id.';
+
+
+--
+-- Name: COLUMN source_record_subjects.score; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON COLUMN sources.source_record_subjects.score IS 'Score OpenAlex du topic. Nul pour les autres sources.';
+
+
+--
 -- Name: source_records_id_seq; Type: SEQUENCE; Schema: sources; Owner: -
 --
 
@@ -3741,6 +3810,14 @@ ALTER TABLE ONLY publications.subjects
 
 
 --
+-- Name: subjects subjects_vocabulary_code_key; Type: CONSTRAINT; Schema: publications; Owner: -
+--
+
+ALTER TABLE ONLY publications.subjects
+    ADD CONSTRAINT subjects_vocabulary_code_key UNIQUE (vocabulary, code);
+
+
+--
 -- Name: apc_payments apc_payments_payment_key; Type: CONSTRAINT; Schema: publishing; Owner: -
 --
 
@@ -4154,6 +4231,14 @@ ALTER TABLE ONLY sources.source_record_identifiers
 
 ALTER TABLE ONLY sources.source_record_locations
     ADD CONSTRAINT source_record_locations_pkey PRIMARY KEY (source_record_id, url);
+
+
+--
+-- Name: source_record_subjects source_record_subjects_pkey; Type: CONSTRAINT; Schema: sources; Owner: -
+--
+
+ALTER TABLE ONLY sources.source_record_subjects
+    ADD CONSTRAINT source_record_subjects_pkey PRIMARY KEY (source_record_id, subject_id);
 
 
 --
@@ -4631,17 +4716,17 @@ CREATE UNIQUE INDEX subject_cooccurrences_pkey ON publications.subject_cooccurre
 
 
 --
--- Name: subjects_label_key; Type: INDEX; Schema: publications; Owner: -
---
-
-CREATE UNIQUE INDEX subjects_label_key ON publications.subjects USING btree (lower(label));
-
-
---
 -- Name: subjects_label_normalized_trgm_idx; Type: INDEX; Schema: publications; Owner: -
 --
 
 CREATE INDEX subjects_label_normalized_trgm_idx ON publications.subjects USING gin (label_normalized public.gin_trgm_ops);
+
+
+--
+-- Name: subjects_parent_idx; Type: INDEX; Schema: publications; Owner: -
+--
+
+CREATE INDEX subjects_parent_idx ON publications.subjects USING btree (parent_id);
 
 
 --
@@ -5030,6 +5115,13 @@ CREATE INDEX source_contributions_duplicate_of_idx ON sources.source_contributio
 
 
 --
+-- Name: source_record_subjects_subject_idx; Type: INDEX; Schema: sources; Owner: -
+--
+
+CREATE INDEX source_record_subjects_subject_idx ON sources.source_record_subjects USING btree (subject_id);
+
+
+--
 -- Name: uq_source_record_identifiers_derived; Type: INDEX; Schema: sources; Owner: -
 --
 
@@ -5363,6 +5455,14 @@ ALTER TABLE ONLY publications.publications
 
 
 --
+-- Name: subjects subjects_parent_id_fkey; Type: FK CONSTRAINT; Schema: publications; Owner: -
+--
+
+ALTER TABLE ONLY publications.subjects
+    ADD CONSTRAINT subjects_parent_id_fkey FOREIGN KEY (parent_id) REFERENCES publications.subjects(id);
+
+
+--
 -- Name: apc_payments apc_payments_budget_structure_id_fkey; Type: FK CONSTRAINT; Schema: publishing; Owner: -
 --
 
@@ -5635,6 +5735,22 @@ ALTER TABLE ONLY sources.source_record_locations
 
 
 --
+-- Name: source_record_subjects source_record_subjects_source_record_id_fkey; Type: FK CONSTRAINT; Schema: sources; Owner: -
+--
+
+ALTER TABLE ONLY sources.source_record_subjects
+    ADD CONSTRAINT source_record_subjects_source_record_id_fkey FOREIGN KEY (source_record_id) REFERENCES sources.source_records(id) ON DELETE CASCADE;
+
+
+--
+-- Name: source_record_subjects source_record_subjects_subject_id_fkey; Type: FK CONSTRAINT; Schema: sources; Owner: -
+--
+
+ALTER TABLE ONLY sources.source_record_subjects
+    ADD CONSTRAINT source_record_subjects_subject_id_fkey FOREIGN KEY (subject_id) REFERENCES publications.subjects(id);
+
+
+--
 -- Name: source_records source_records_monograph_id_fkey; Type: FK CONSTRAINT; Schema: sources; Owner: -
 --
 
@@ -5774,5 +5890,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict FOzVqAkw0LSLpW2XqFpWYFbYpQ8wvaabm8J04JLN04WHHPmVnS49ZnfEnjecd0w
+\unrestrict TURmMYkTj8neUYGcTz3uDc0pRgkHprBjzdC1p3oewIlZbJXBtAmDysfauKnKW6V
 
