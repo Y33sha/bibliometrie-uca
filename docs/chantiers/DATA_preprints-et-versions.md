@@ -112,6 +112,10 @@ Le titre change souvent entre preprint et article : les titres différents d'une
 - 8 : ces personnes ont une adresse du périmètre sur le preprint, une autre adresse sur la cible.
 - 7 : ces personnes ont une adresse du périmètre sur le preprint, aucune adresse sur la cible.
 
+### Remédiation du 2026-11-01
+
+La reconstruction des publications fusionne 1 047 publications. 709 paires `is_preprint_of` restent distinctes. 301756 rejoint 165044.
+
 ## Décisions
 
 - **Un preprint et sa version publiée forment une seule publication quand une clé de confirmation les réunit.** Seuls les DOI extérieurs aux serveurs de preprints du registre coupent les regroupements. Une communication sans actes, une HDR ou un article sans localisation éditeur réunit ainsi ses copies de serveurs de preprints.
@@ -141,11 +145,11 @@ Le titre change souvent entre preprint et article : les titres différents d'une
 - [x] DOI de la publication : DOI extérieur aux serveurs de preprints, à défaut DOI d'un serveur de preprints (7a291b64c)
 - [x] Fusion manuelle : DOI des serveurs de preprints ignorés (7a291b64c)
 - [x] Arbitrage : enregistrements sources preprint après les autres (96b9bc228)
-- [ ] Remédiation du stock : commande de remise en réconciliation des publications concernées
+- [x] Remédiation du stock : reconstruction des publications (`--rebuild-publications`), run du 2026-11-01
 
 ### Phase 3 — Affichage
 
-- [ ] Volet Accès : copies des preprints après les autres copies
+- [x] Volet Accès : copies des preprints après les autres copies (b207d36fd)
 
 ### Phase 4 — Fin de chantier
 
@@ -155,6 +159,7 @@ Le titre change souvent entre preprint et article : les titres différents d'une
 
 - **Fusion fausse.** Un DOI secondaire cité par un seul enregistrement source d'agrégateur suffit à réunir deux œuvres (165353, 27616). Recours : l'interdiction de fusion, prévue par le chantier de gestion admin des publications.
 - **Preprints restés distincts** (813 paires) : discussion papers Copernicus, dépôts institutionnels, paires reliées par le seul titre. Les fusions manuelles de l'administration diront si des critères de fusion automatique existent. Une fusion manuelle reste refusée entre deux DOI qui coupent : discussion papers Copernicus (189), dépôts DESY, RWTH et Zenodo typés preprint.
+- **Preprint avec revue.** 109 publications au DOI d'un serveur de preprints réunissent un enregistrement source d'un type publié : dépôt HAL, work OpenAlex, WoS. Elles restent typées preprint, dont 43 avec revue (3059). Le type publié l'emporte-t-il quand la publication a une revue ?
 - **Revue d'un preprint.** La revue de l'article, donnée par l'espace de noms DOI, compte 149 discussion papers parmi ses publications.
 - **Working papers typés `other`** (87) : le type `preprint` de HAL devant le type `other` de DataCite ?
 - **Fiabilité de la version déclarée.** La version des localisations d'entrepôt est peu fiable chez OpenAlex comme chez Unpaywall : 200 949 localisations d'entrepôt sur 258 875 sont en `submittedVersion`, y compris dans Cairn, qui héberge des versions publiées.
