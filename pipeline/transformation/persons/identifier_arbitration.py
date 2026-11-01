@@ -1,8 +1,8 @@
-"""Arbitrage des identifiants de personne, avant le rattachement des contributions : identifiants mal placés et conflits d'attribution.
+"""Arbitrage des identifiants de personne, avant le rattachement des contributions : neutralisation des identifiants mal placés.
 
 Le consensus de nom d'une valeur d'identifiant est le nom contenu dans strictement plus de contributions sources que chacun des autres (`strict_majority`). Il est calculé une fois sur le snapshot (`compute_identifier_consensus`). Une valeur est mal placée dans des informations du contributeur au nom désignant une autre personne que le consensus. Les contributions sources de ces informations neutralisent la valeur avec le motif `misplaced` (`requalify_misplaced_identifiers`). Une contribution rattachée par ce type d'identifiant, et dont une contribution source gagne la marque, est marquée pour la redécision de sa personne (`Queue.CONTRIBUTION_RESOLUTION`).
 
-Un conflit (`IdentifierConflict`) est une valeur attribuée à une personne, le titulaire, et portée par une contribution d'une autre personne. Le vote des contributions le tranche (`resolve_identifier_transfers`). Chaque contribution portant la valeur donne une voix à sa personne. La valeur va à la personne qui a strictement plus de voix que chacune des autres. Seules les attributions `pending` sont transférables. Après un transfert, les contributions du titulaire initial rattachées par ce type d'identifiant et portant la valeur sont marquées pour la redécision de leur personne. Le rattachement des contributions (`persons.resolve_contributions`) les redécide.
+Une valeur neutralisée ne fait ni entrer une contribution source dans le périmètre par la fiche RH d'une personne, ni passer à la personne d'une contribution rattachée. Une valeur contenue dans les contributions de plusieurs personnes figure dans la file d'administration des conflits d'identifiants.
 
 L'arbitrage est indépendant de l'ordre de traitement : le calcul repart des données à chaque exécution.
 """
@@ -14,33 +14,16 @@ from typing import NamedTuple
 
 from sqlalchemy import Connection, bindparam, text
 
-from domain.persons.identifiers import (
-    PERSON_IDENTIFIER_TYPES,
-    AttributionStatus,
-    IdentifierNeutralization,
-    IdentifierOrigin,
-)
-from domain.persons.matching import (
-    STRONG_PERSON_IDENTIFIER_TYPES,
-    identifier_misplaced,
-    strict_majority,
-)
+from domain.persons.identifiers import PERSON_IDENTIFIER_TYPES, IdentifierNeutralization
+from domain.persons.matching import identifier_misplaced, strict_majority
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.db.queues import Queue, enqueue, enqueue_sql
-from infrastructure.repositories.person_repository import PgPersonRepository
 from infrastructure.sql_fragments import (
-    CONTRIBUTIONS_AND_SOURCES,
     identifier_neutralized,
     person_source_contribution,
     trusted_identifier_sql,
 )
-from pipeline.runtime.observability.log_format import (
-    BRANCH,
-    LAST_BRANCH,
-    inflect,
-    quantity,
-    step,
-)
+from pipeline.runtime.observability.log_format import LAST_BRANCH, inflect, quantity, step
 from pipeline.runtime.observability.progress import waiting
 
 # Marque pour le groupement des auteurs les publications des contributions sources de la CTE `modifiees`.
@@ -61,39 +44,51 @@ class ContributorInformationIdentifier(NamedTuple):
     value: str
 
 
-# Condition vraie quand la contribution source `sc` neutralise l'identifiant du paramètre `:id_type`.
-_ID_TYPE_NEUTRALIZED = identifier_neutralized(":id_type")
+IdentifierKey = tuple[str, str]
+"""`(id_type, id_value)`."""
 
-# Même condition, restreinte au partage de la valeur entre contributions sources d'un enregistrement source.
-_ID_TYPE_SHARED = identifier_neutralized(":id_type", reason=IdentifierNeutralization.SHARED.value)
+# Identifiants des informations du contributeur `ci`, une ligne par type : `k.id_type`, `k.id_value`. Une requête lit ainsi les tables une seule fois pour tous les types.
+_IDENTIFIERS = "CROSS JOIN LATERAL jsonb_each_text(ci.identifiers) AS k(id_type, id_value)"
+
+
+def _trusted_identifier_of_types(id_types: Sequence[str]) -> str:
+    """Renvoie la condition vraie quand l'identifiant `k` est d'un des types `id_types`, et fiable pour la source de la contribution source `sc` (`trusted_identifier_sql`)."""
+    return (
+        "("
+        + " OR ".join(
+            f"(k.id_type = '{t}' AND {trusted_identifier_sql(t, 'sc')})" for t in id_types
+        )
+        + ")"
+    )
+
 
 _MISPLACED = IdentifierNeutralization.MISPLACED.value
 
 
-def fetch_identifier_votes(conn: Connection, id_type: str) -> dict[str, dict[str, int]]:
-    """Renvoie, pour chaque valeur du type, le nombre de contributions sources contenant la valeur, par `author_name_normalized`.
+def fetch_identifier_votes(conn: Connection) -> dict[IdentifierKey, dict[str, int]]:
+    """Renvoie, pour chaque valeur d'identifiant, le nombre de contributions sources contenant la valeur, par `author_name_normalized`.
 
     Votent les contributions sources rattachées à une contribution, de source fiable pour l'identifiant (`trusted_identifier`), et sans neutralisation de la valeur pour partage. Une contribution source neutralisant la valeur comme mal placée vote : le consensus dépend seulement des données.
     """
+    shared = identifier_neutralized("k.id_type", reason=IdentifierNeutralization.SHARED.value)
     rows = conn.execute(
         text(f"""
-            SELECT ci.identifiers->>:id_type AS id_value,
+            SELECT k.id_type, k.id_value,
                    ci.author_name_normalized AS name,
                    count(*) AS votes
             FROM contributor_information ci
+            {_IDENTIFIERS}
             JOIN source_contributions sc ON sc.contributor_information_id = ci.id
-            WHERE ci.identifiers ? :id_type
-              AND ci.author_name_normalized IS NOT NULL
+            WHERE ci.author_name_normalized IS NOT NULL
+              AND {_trusted_identifier_of_types(PERSON_IDENTIFIER_TYPES)}
               AND {person_source_contribution("sc")}
-              AND NOT {_ID_TYPE_SHARED}
-              AND {trusted_identifier_sql(id_type, "sc")}
-            GROUP BY 1, 2
-        """),
-        {"id_type": id_type},
+              AND NOT {shared}
+            GROUP BY 1, 2, 3
+        """)
     ).all()
-    votes: dict[str, dict[str, int]] = {}
+    votes: dict[IdentifierKey, dict[str, int]] = {}
     for r in rows:
-        votes.setdefault(r.id_value, {})[r.name] = int(r.votes)
+        votes.setdefault((r.id_type, r.id_value), {})[r.name] = int(r.votes)
     return votes
 
 
@@ -135,6 +130,20 @@ def write_misplaced_neutralizations(
                 SELECT m.contributor_information_id, m.carte
                 FROM jsonb_to_recordset(:payload) AS m(contributor_information_id integer, carte jsonb)
             ),
+            -- Deux branches indexées : les contributions sources des informations marquées, et celles déjà neutralisées (`source_contributions_neutralized_idx`).
+            candidates AS (
+                SELECT sc.id
+                FROM marques m
+                JOIN source_contributions sc ON sc.contributor_information_id = m.contributor_information_id
+                UNION
+                SELECT sc.id
+                FROM source_contributions sc
+                WHERE sc.neutralized_identifiers IS NOT NULL
+                  AND EXISTS (
+                      SELECT 1 FROM jsonb_each_text(sc.neutralized_identifiers) AS e(k, v)
+                      WHERE e.v = '{_MISPLACED}'
+                  )
+            ),
             cibles AS (
                 SELECT sc.id,
                        sc.neutralized_identifiers AS avant,
@@ -147,14 +156,9 @@ def write_misplaced_neutralizations(
                                '{{}}'::jsonb),
                            '{{}}'::jsonb
                        ) AS apres
-                FROM source_contributions sc
+                FROM candidates c
+                JOIN source_contributions sc ON sc.id = c.id
                 LEFT JOIN marques m ON m.contributor_information_id = sc.contributor_information_id
-                WHERE m.contributor_information_id IS NOT NULL
-                   OR (sc.neutralized_identifiers IS NOT NULL
-                       AND EXISTS (
-                           SELECT 1 FROM jsonb_each_text(sc.neutralized_identifiers) AS e(k, v)
-                           WHERE e.v = '{_MISPLACED}'
-                       ))
             ),
             modifiees AS (
                 UPDATE source_contributions sc
@@ -212,81 +216,17 @@ def mark_misplaced_contributions(conn: Connection, gained: Mapping[int, Sequence
     )
 
 
-def fetch_identifier_owners(conn: Connection, id_type: str) -> dict[str, tuple[int, str]]:
-    """Renvoie le titulaire et le statut de chaque valeur attribuée du type, hors attributions rejetées."""
-    rows = conn.execute(
-        text(f"""
-            SELECT id_value, person_id, status
-            FROM person_identifiers
-            WHERE id_type = :t AND status <> '{AttributionStatus.REJECTED.value}'
-        """),
-        {"t": id_type},
-    ).all()
-    return {r.id_value: (r.person_id, r.status) for r in rows}
-
-
-def _bears_identifier(id_type: str) -> str:
-    """Renvoie la condition SQL vraie quand la contribution source `sc` (informations du contributeur `ci`) porte l'identifiant `id_type` : présent, non neutralisé et fiable selon sa source.
-
-    La requête lie aussi `id_type` au paramètre `:id_type`.
-    """
-    return (
-        f"ci.identifiers ? :id_type AND NOT {_ID_TYPE_NEUTRALIZED}"
-        f" AND {trusted_identifier_sql(id_type, 'sc')}"
-    )
-
-
-def fetch_identifier_contribution_votes(
-    conn: Connection, id_type: str
-) -> dict[str, dict[int, int]]:
-    """Renvoie, pour chaque valeur du type, les personnes des contributions portant la valeur, avec leurs voix. Une contribution porte la valeur quand une de ses contributions sources la porte (`_bears_identifier`), et donne une voix à sa personne."""
-    rows = conn.execute(
-        text(f"""
-            SELECT ci.identifiers->>:id_type AS id_value, g.person_id,
-                   count(DISTINCT g.id) AS votes
-            FROM {CONTRIBUTIONS_AND_SOURCES}
-            WHERE g.person_id IS NOT NULL AND {_bears_identifier(id_type)}
-            GROUP BY 1, 2
-        """),
-        {"id_type": id_type},
-    ).all()
-    votes: dict[str, dict[int, int]] = {}
-    for r in rows:
-        votes.setdefault(r.id_value, {})[r.person_id] = int(r.votes)
-    return votes
-
-
-def mark_identifier_contributions(
-    conn: Connection, id_type: str, id_value: str, person_id: int
-) -> int:
-    """Marque pour la redécision de leur personne (`Queue.CONTRIBUTION_RESOLUTION`) les contributions de `person_id` rattachées par le type d'identifiant et portant la valeur (`_bears_identifier`). Renvoie le nombre de contributions marquées."""
-    return enqueue(
-        conn,
-        Queue.CONTRIBUTION_RESOLUTION,
-        f"""
-            SELECT g.id
-            FROM {CONTRIBUTIONS_AND_SOURCES}
-            WHERE g.person_id = :person_id
-              AND g.resolution_mode::text = :id_type
-              AND ci.identifiers->>:id_type = :id_value
-              AND {_bears_identifier(id_type)}
-        """,
-        {"person_id": person_id, "id_type": id_type, "id_value": id_value},
-    )
-
-
-IdentifierConsensus = dict[tuple[str, str], str]
+IdentifierConsensus = dict[IdentifierKey, str]
 """`{(id_type, id_value): nom du consensus}` pour les valeurs pourvues d'un consensus."""
 
 
 def compute_identifier_consensus(conn: Connection) -> IdentifierConsensus:
     """Renvoie le consensus de nom de chaque valeur d'identifiant, tous types confondus."""
-    consensus: IdentifierConsensus = {}
-    for id_type in PERSON_IDENTIFIER_TYPES:
-        for value, votes in fetch_identifier_votes(conn, id_type).items():
-            if (name := strict_majority(votes)) is not None:
-                consensus[(id_type, value)] = name
-    return consensus
+    return {
+        key: name
+        for key, votes in fetch_identifier_votes(conn).items()
+        if (name := strict_majority(votes)) is not None
+    }
 
 
 def requalify_misplaced_identifiers(
@@ -310,107 +250,21 @@ def requalify_misplaced_identifiers(
     }
 
 
-class IdentifierConflict(NamedTuple):
-    """Valeur d'identifiant attribuée à une personne, le titulaire, et portée par une contribution d'une autre personne.
+def arbitrate_identifier_conflicts(conn: Connection, logger: logging.Logger) -> dict[str, int]:
+    """Neutralise les identifiants mal placés (`requalify_misplaced_identifiers`).
 
-    Le vote des contributions transfère la valeur à la personne qui a la majorité stricte des voix. Seule une attribution `pending` est transférable.
-    """
-
-    id_type: str
-    id_value: str
-    owner_person_id: int
-    owner_status: str
-    votes: Mapping[int, int]
-    """Voix de chaque personne dont une contribution porte la valeur (`fetch_identifier_contribution_votes`)."""
-
-
-def detect_identifier_conflicts(conn: Connection) -> list[IdentifierConflict]:
-    """Renvoie les conflits d'attribution des identifiants forts : valeurs attribuées et portées par une contribution d'une autre personne que le titulaire."""
-    conflicts: list[IdentifierConflict] = []
-    for id_type in STRONG_PERSON_IDENTIFIER_TYPES:
-        owners = fetch_identifier_owners(conn, id_type)
-        if not owners:
-            continue
-        for id_value, votes in fetch_identifier_contribution_votes(conn, id_type).items():
-            owner = owners.get(id_value)
-            if owner is None or votes.keys() <= {owner[0]}:
-                continue
-            conflicts.append(IdentifierConflict(id_type, id_value, owner[0], owner[1], votes))
-    return conflicts
-
-
-def resolve_identifier_transfers(
-    conn: Connection,
-    conflicts: list[IdentifierConflict],
-    *,
-    repo: PgPersonRepository,
-    logger: logging.Logger,
-) -> dict[str, int]:
-    """Tranche les conflits d'attribution par le vote des contributions. La valeur va à la personne qui a strictement plus de voix que chacune des autres (`strict_majority`), quand ce n'est pas le titulaire. Sans majorité, le conflit reste en l'état.
-
-    Renvoie les compteurs `{conflicts, pending, transferred}`.
-    """
-    # Seuls les conflits à attribution `pending` se tranchent par le vote.
-    pending = [c for c in conflicts if c.owner_status == AttributionStatus.PENDING]
-    transferred = 0
-    for conflict in pending:
-        id_type, id_value, owner = conflict.id_type, conflict.id_value, conflict.owner_person_id
-        target = strict_majority(conflict.votes)
-        if target is None or target == owner:
-            continue
-        ident = repo.find_identifier(id_type, id_value)
-        if ident is None:
-            continue
-        ident.transfer_to(target, source=IdentifierOrigin.AUTO)
-        repo.update_identifier(ident)
-        mark_identifier_contributions(conn, id_type, id_value, owner)
-        logger.debug(
-            "Transfert %s=%s : personne %d → %d (%s contre %d)",
-            id_type,
-            id_value,
-            owner,
-            target,
-            quantity(conflict.votes[target], "voix", "voix"),
-            conflict.votes.get(owner, 0),
-        )
-        transferred += 1
-    return {"conflicts": len(conflicts), "pending": len(pending), "transferred": transferred}
-
-
-def arbitrate_identifier_conflicts(
-    conn: Connection,
-    logger: logging.Logger,
-    *,
-    repo: PgPersonRepository,
-) -> dict[str, int]:
-    """Neutralise les identifiants mal placés, puis tranche les conflits d'attribution d'identifiant par transfert.
-
-    Renvoie `{neutralized, marked_contributions, transferred}`. L'appelant commite.
+    Renvoie `{neutralized, marked_contributions}`. L'appelant commite.
     """
     step(logger, "Conflits d'identifiants")
-    with waiting(BRANCH, logger) as line:
+    with waiting(LAST_BRANCH, logger) as line:
         requalified = requalify_misplaced_identifiers(conn, compute_identifier_consensus(conn))
         neutralized = requalified["neutralized"]
         line.conclude(
-            f"{BRANCH}Identifiants portés sous le nom d'une autre personne : "
+            f"{LAST_BRANCH}Identifiants portés sous le nom d'une autre personne : "
             + (
                 f"{quantity(neutralized, 'identifiant')} {inflect(neutralized, 'neutralisé')}"
                 if neutralized
                 else "rien à faire"
             )
         )
-    with waiting(LAST_BRANCH, logger) as line:
-        transferred = resolve_identifier_transfers(
-            conn, detect_identifier_conflicts(conn), repo=repo, logger=logger
-        )
-        line.conclude(
-            f"{LAST_BRANCH}Conflits d'attribution : "
-            + (
-                f"{quantity(transferred['transferred'], 'identifiant')} "
-                f"{inflect(transferred['transferred'], 'transféré')} à la personne majoritaire"
-                if transferred["pending"]
-                else "rien à faire"
-            )
-        )
-
-    return {**requalified, "transferred": transferred["transferred"]}
+    return requalified

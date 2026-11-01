@@ -1,4 +1,4 @@
-"""Fusion des éditeurs qui sont un autre nom du titulaire de leurs préfixes DOI (`merge_duplicate_publishers`)."""
+"""Fusion des autres noms d'un éditeur (`merge_duplicate_publishers`)."""
 
 import logging
 
@@ -59,6 +59,15 @@ def test_un_autre_nom_rejoint_le_titulaire_du_prefixe(sa_sync_conn):
     assert publishers == [holder]
 
 
+def test_le_titulaire_d_un_prefixe_datacite_compte(sa_sync_conn):
+    holder = insert_publisher(sa_sync_conn, "Librairie Classiques Garnier")
+    named = insert_publisher(sa_sync_conn, "Classiques Garnier")
+    insert_doi_prefix(sa_sync_conn, "10.15122", ra="DataCite", publisher_id=holder)
+    _records(sa_sync_conn, "10.15122", named, 5)
+    aliases = find_publisher_aliases(sa_sync_conn)
+    assert [(a.source_id, a.target_id) for a in aliases] == [(named, holder)]
+
+
 def test_une_marque_reste_distincte(sa_sync_conn):
     holder = insert_publisher(sa_sync_conn, "Springer")
     brand = insert_publisher(sa_sync_conn, "BioMed Central")
@@ -79,6 +88,28 @@ def test_trop_peu_d_enregistrements_ou_titulaires_partages(sa_sync_conn):
     _records(sa_sync_conn, "10.1515", named, 2, start=4)
     # 6 enregistrements sources sur 8 chez le même titulaire : moins de 90 %.
     assert find_publisher_aliases(sa_sync_conn) == []
+
+
+def test_les_editeurs_de_meme_nom_reduit_fusionnent(sa_sync_conn):
+    kept = insert_publisher(sa_sync_conn, "Brepols Publishers")
+    merged = insert_publisher(sa_sync_conn, "Brepols Publ")
+    _records(sa_sync_conn, "10.9999", kept, 2)
+    _records(sa_sync_conn, "10.9999", merged, 1, start=2)
+
+    run_merge_duplicate_publishers(
+        sa_sync_conn,
+        logging.getLogger("test"),
+        merge=lambda target, source: merge_publisher_into(sa_sync_conn, target, source),
+    )
+
+    remaining = (
+        sa_sync_conn.execute(
+            text("SELECT id FROM publishers WHERE id IN (:a, :b)"), {"a": kept, "b": merged}
+        )
+        .scalars()
+        .all()
+    )
+    assert remaining == [kept]
 
 
 def test_un_prefixe_de_plateforme_ne_compte_pas(sa_sync_conn):

@@ -148,6 +148,7 @@
     { key: "unpaywall_recheck_after_days", label: "Statut open access (Unpaywall)" },
     { key: "doi_resolution_recheck_after_days", label: "URL des DOI (doi.org)" },
     { key: "doaj_refresh_after_days", label: "Fichier du DOAJ" },
+    { key: "issnl_table_refresh_after_days", label: "Table ISSN-L (ISSN International Centre)" },
   ];
   const DELAY_KEYS = new Set(DELAYS.map((delay) => delay.key));
 

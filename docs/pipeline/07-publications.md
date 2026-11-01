@@ -1,6 +1,6 @@
 # Création et résolution des publications
 
-*À jour le 2026-10-30.*
+*À jour le 2026-11-01.*
 
 La phase `publications` maintient les [publications](../donnees/03-publications.md) à partir des enregistrements sources. Une publication regroupe tous les enregistrements sources qui décrivent le même document, quelles que soient leurs sources. La phase rattache chaque enregistrement source à sa publication, en crée une au besoin, et fusionne ou scinde les publications existantes quand le regroupement le commande.
 
@@ -17,7 +17,7 @@ Deux enregistrements sources désignent la même publication s'ils partagent une
 
 Les enregistrements sources reliés par au moins une clé partagée forment les **composantes connexes** d'un graphe.
 
-Une règle prime sur le regroupement : **deux ancres distinctes désignent deux documents distincts**. Les ancres d'une composante sont ses DOI `primary` ou `derived`, à défaut le DOI des enregistrements sources à DOI unique. Une composante à plusieurs ancres est découpée en une partition par ancre. Un enregistrement source rejoint l'ancre de son DOI `primary` ou `derived`, sinon l'unique ancre parmi ses autres DOI. À défaut, il reste sur sa publication.
+Une règle prime sur le regroupement : **deux ancres distinctes désignent deux documents distincts**. Les ancres d'une composante sont ses DOI `primary` ou `derived`, à défaut le DOI des enregistrements sources à DOI unique. Les DOI de dépôt restent hors des ancres : DOI d'un serveur de preprints ou d'une archive de copies (DESY, RWTH, GSI, ResearchGate) du registre des plateformes, DOI Zenodo d'un dépôt de texte. Un preprint ou une copie rejoint ainsi la publication de sa version publiée. Une composante à plusieurs ancres est découpée en une partition par ancre. Un enregistrement source rejoint l'ancre de son DOI `primary` ou `derived`, sinon l'unique ancre parmi ses autres DOI. À défaut, il reste sur sa publication. Un enregistrement source dérivé suit l'ancre de son parent, l'enregistrement source dont l'identifiant primaire est son identifiant `derived`. Sans parent, les enregistrements sources de même identifiant `derived` suivent l'unique ancre parmi les leurs.
 
 Chaque partition aboutit à une seule publication :
 
@@ -41,4 +41,4 @@ Après une modification de la logique de résolution, l'option `--rebuild-public
 
 ## Recalcul des métadonnées
 
-Les métadonnées de chaque publication touchée sont recalculées depuis ses enregistrements sources. La date de publication est celle du premier enregistrement source selon le classement des sources. Les enregistrements sources suivants la précisent quand ils concordent : même année, et même mois quand la date retenue est au mois. L'éditeur est celui de la date de publication : le titulaire du préfixe du DOI Crossref, à défaut le premier éditeur des enregistrements sources selon le classement des sources. Une publication sans enregistrement source est supprimée.
+Les métadonnées de chaque publication touchée sont recalculées depuis ses enregistrements sources. Le DOI de la publication est l'ancre de ses enregistrements sources, à défaut un DOI de dépôt. Dans une publication qui a une version publiée, les enregistrements sources preprint passent après les autres dans le classement des sources. Une publication a une version publiée quand ses enregistrements sources ont une ancre, ou quand un enregistrement source typé autrement que preprint a une revue ou une monographie. La date de publication est celle du premier enregistrement source selon le classement des sources. Les enregistrements sources suivants la précisent quand ils concordent : même année, et même mois quand la date retenue est au mois. L'éditeur est celui de la date de publication : le titulaire du préfixe du DOI Crossref, à défaut le premier éditeur des enregistrements sources selon le classement des sources. Une publication sans enregistrement source est supprimée.

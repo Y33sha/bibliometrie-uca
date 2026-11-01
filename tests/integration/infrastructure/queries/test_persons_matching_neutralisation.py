@@ -75,8 +75,8 @@ def test_vote_sans_les_contributions_sources_neutralisees_pour_partage(sa_sync_c
         sa_sync_conn, {"orcid": "misplaced"}, name="durand paul", source_id="c-vote-3"
     )
     align_unaligned(sa_sync_conn)
-    votes = fetch_identifier_votes(sa_sync_conn, "orcid")
-    assert votes[_ORCID] == {"dupont jean": 1, "durand paul": 1}
+    votes = fetch_identifier_votes(sa_sync_conn)
+    assert votes[("orcid", _ORCID)] == {"dupont jean": 1, "durand paul": 1}
 
 
 def test_requalification_pose_puis_efface_misplaced(sa_sync_conn):

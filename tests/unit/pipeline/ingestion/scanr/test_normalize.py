@@ -5,12 +5,11 @@ Couvre l'enregistrement source construit par `scanr_source_record`, l'éditeur, 
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
-
 import pytest
 
 from domain.persons.contributor_name import ContributorName
 from domain.serials.issns import SerialIssn
+from domain.subjects.subject import Subject, SubjectLink, SubjectVocabulary
 from pipeline.ingestion.common.locations import LocationFacts
 from pipeline.ingestion.common.normalizer import PublisherFacts
 from pipeline.ingestion.common.source_records import SourceRecordUpsert
@@ -24,7 +23,7 @@ from pipeline.ingestion.scanr.normalize import (
     scanr_source_record,
 )
 from pipeline.transformation.publishing.find_or_create import Containers
-from tests.helpers.normalize_doubles import identifier_values, staging_row
+from tests.helpers.normalize_doubles import identifier_values, normalizer_arguments, staging_row
 
 _NO_CONTAINERS = Containers(has_series=False, monograph_id=None)
 
@@ -356,21 +355,28 @@ class TestScanrSourceRecordChamps:
         )
 
         assert document.keywords == ["Cirrhose", "Liver Disease", "TIRF"]
-        assert document.topics is None
+        assert (
+            _normalizer().subjects({"domains": [{"type": "keyword", "label": {"default": "TIRF"}}]})
+            == []
+        )
 
     def test_vedettes_sudoc_en_sujets(self):
-        vedette = {"type": "sudoc", "code": "027219046", "label": {"default": "Analgésie"}}
+        vedette = {
+            "type": "sudoc",
+            "code": "02750607x",
+            "label": {"default": "Béton armé -- Fissuration"},
+        }
 
-        document = self._call({"domains": [vedette]})
-
-        assert document.topics == [vedette]
-        assert document.keywords is None
+        assert self._call({"domains": [vedette]}).keywords is None
+        assert _normalizer().subjects({"domains": [vedette]}) == [
+            SubjectLink(Subject(SubjectVocabulary.RAMEAU, "02750607X", "Béton armé -- Fissuration"))
+        ]
 
     def test_topics_openalex_ignores(self):
-        """Le champ `topics` de ScanR reprend les topics OpenAlex : il est ignoré, la source OpenAlex les fournit."""
-        document = self._call({"topics": [{"id": "T11207", "display_name": "Alcohol Consumption"}]})
+        """Le champ `topics` de ScanR reprend les topics OpenAlex : la source OpenAlex les donne."""
+        doc = {"topics": [{"id": "T11207", "display_name": "Alcohol Consumption"}]}
 
-        assert document.topics is None
+        assert _normalizer().subjects(doc) == []
 
     def test_citations_cumulees_sur_les_annees(self):
         document = self._call({"cited_by_counts_by_year": {"2023": 4, "2024": 6}})
@@ -401,17 +407,7 @@ class TestScanrSourceRecordChamps:
 
 
 def _normalizer() -> ScanrNormalizer:
-    return ScanrNormalizer(
-        conn=MagicMock(),
-        logger=MagicMock(),
-        staging_store=MagicMock(),
-        record_store=MagicMock(),
-        monograph_store=MagicMock(),
-        publisher_store=MagicMock(),
-        contribution_store=MagicMock(),
-        location_store=MagicMock(),
-        embargo_store=MagicMock(),
-    )
+    return ScanrNormalizer(**normalizer_arguments())
 
 
 class TestScanrNormalizer:

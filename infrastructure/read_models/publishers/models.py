@@ -36,6 +36,14 @@ class DoiPrefixInfo(Model):
     crossref_member_id: int | None = None
 
 
+class PublisherNameForm(Model):
+    """Forme de nom normalisée d'un éditeur (`publisher_name_forms`)."""
+
+    form: str
+    source_record_count: int
+    """Enregistrements sources de l'éditeur qui le nomment par cette forme."""
+
+
 class PublisherListItem(Model):
     """Ligne de la liste des éditeurs."""
 

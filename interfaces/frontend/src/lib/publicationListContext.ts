@@ -5,7 +5,7 @@
  */
 export type PublicationListContext =
 	| { kind: 'all' }
-	| { kind: 'subject'; id: number }
+	| { kind: 'subject'; id: string }
 	| { kind: 'lab'; id: number }
 	| { kind: 'person'; id: number }
 	| { kind: 'serial'; id: number }
@@ -14,7 +14,7 @@ export type PublicationListContext =
 
 // Paramètre de requête de l'entité de chaque contexte, dans l'API des publications et des statistiques.
 const CONTEXT_PARAM: Record<Exclude<PublicationListContext['kind'], 'all'>, string> = {
-	subject: 'subject_id',
+	subject: 'subject',
 	lab: 'lab_id',
 	person: 'person_id',
 	serial: 'serial_id',

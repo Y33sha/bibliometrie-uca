@@ -10,7 +10,7 @@ La même liste sert d'onglet aux fiches d'une structure, d'une personne, d'une r
 
 ## Détails `/publications/{id}`
 
-Le bouton « Accéder » mène au texte intégral, à défaut au DOI.
+Le bouton « Accéder » mène au texte intégral, à défaut au DOI. Une copie de preprint passe après les autres copies ouvertes.
 
 ## Thèses `/theses`
 

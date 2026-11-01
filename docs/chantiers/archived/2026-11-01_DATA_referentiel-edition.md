@@ -22,7 +22,17 @@ Base locale au 2026-10-31 :
 - `serial_issns` compte 18 740 lignes pour 18 736 ISSN. Un ISSN retiré d'une revue par la vérification Sudoc reste dans une ligne sans revue.
 - D'après les ISSN-L des revues, 1 139 enregistrements sources donnent des ISSN de plusieurs ISSN-L, dans 449 publications : OpenAlex 542, ScanR 370, Crossref 116, HAL 90, WoS 21. Pour 1 011 d'entre eux, l'un des ISSN est celui d'un titre précédent, d'un titre suivant ou d'un supplément.
 
-CRISalid, Academic Observatory et OpenAIRE identifient la revue par ses seuls ISSN ou ISSN-L, et recalculent le rattachement des publications à chaque passage ([benchmark](archived/2026-10-12_benchmark-pipelines.md)).
+Base locale au 2026-11-01, après le rattachement par ISSN-L :
+
+- 12 267 revues, contre 11 023 : 1 374 créées, dont 373 sans ISSN ; 130 disparues, dont 54 absorbées avec une redirection. Les quatre titres partagés par deux revues restent sur deux revues.
+- Un titre précédent garde sa revue : « Physical review D Particles and fields » (0556-2821) à côté de « Physical review D » (2470-0010), « Materials in engineering » à côté de « Materials & design ». Un enregistrement source DataCite de 2022 donne l'ISSN du titre précédent de Physical Review D.
+- 118 titres Sudoc sont partagés par plusieurs ISSN-L, et 60 d'entre eux ont des enregistrements sources sur deux revues. 54 opposent un ISSN papier et un ISSN électronique. Le Sudoc donne parfois un ISSN-L faux : 0093-4127, ISSN du titre précédent, pour l'ISSN papier de Journal of Comparative Psychology (0735-7036).
+- 3 839 ISSN sont sans notice Sudoc, donc sans ISSN-L Sudoc. 2 734 enregistrements sources donnent un tel ISSN à côté d'ISSN d'une autre revue. Les combinaisons les plus fréquentes réunissent des revues distinctes : titres successifs (Physical Review C, INRA et INRAE productions animales), éditions (The Conversation, Australie et France).
+- 812 revues sans ISSN ont des enregistrements sources. 62 ont un titre compatible avec une seule revue à ISSN : vraies variantes (« Geochim.Cosmochim.Acta ») et faux acronymes (« Act II » et « AI »). 132 ont un titre compatible avec plusieurs revues à ISSN, souvent deux revues de même titre Sudoc.
+- 55 titres sont partagés par plusieurs revues sans ISSN, dont 54 collections de monographies. Les actes SciTePress se répartissent entre deux éditeurs (79458, 15030).
+- Le titulaire du préfixe DOI Crossref départagerait 5 enregistrements sources rattachés par un titre de plusieurs revues à ISSN. 6 monographies ont une collection sans ISSN et aucun éditeur.
+
+CRISalid, Academic Observatory et OpenAIRE identifient la revue par ses seuls ISSN ou ISSN-L, et recalculent le rattachement des publications à chaque passage ([benchmark](2026-10-12_benchmark-pipelines.md)).
 
 ### Éditeurs
 
@@ -32,9 +42,14 @@ CRISalid, Academic Observatory et OpenAIRE identifient la revue par ses seuls IS
   - « INRAE » (13895) et « National Research Institute for Agriculture, Food and Environment » (83482), titulaire « Institut National de Recherche pour l'Agriculture, l'Alimentation et l'Environnement » (76867).
 - Des noms d'éditeur contiennent un lieu ou un directeur d'ouvrage : « Paris: Classiques Garnier » (14077), « A. Hatzenberger dir., Classiques Garnier » (84199).
 
-### Titres de revue
+Base locale au 2026-11-01 : 6 785 éditeurs, dont 5 698 nommés par au moins un enregistrement source. Doublons possibles, par signal :
 
-OpenAlex retire les apostrophes. 106 titres de revue ont la forme « Annales d Endocrinologie », « L Encéphale », « Journal Français d Ophtalmologie ». 441 titres ont une apostrophe.
+- Même nom, formes juridiques et mots génériques retirés : 51 groupes, 108 éditeurs. « Copernicus GmbH » et « Copernicus Publ », « Brepols Publ » et « Brepols Publishers », « ISTE Group » et « ISTE ».
+- Noms compatibles : 350 paires. Vrais doublons (« Presses Universitaires De France » et « Presses Univ France », « Académie des sciences (Paris) » et « ACAD SCIENCES ») et faux (« American Physiological Society » et « American Physical Society », « INRIA » et « INRA »).
+- Noms emboîtés : 1 735 paires. Souvent un nom composé de deux éditeurs : « Published by Elsevier (since 2021) / Cambridge University Press », « Juris éditions, Dalloz [2013-2017] ».
+- Même identifiant OpenAlex, même membre Crossref : aucun.
+- Éditeurs nommés par les enregistrements sources d'une même revue à ISSN : 206 paires dans au moins 3 revues. Surtout une marque et sa maison mère : « BioMed Central » et Springer (132 revues), Birkhäuser et Springer, Lippincott Williams & Wilkins et Ovid. Parfois un doublon : « BioMed Central » et « BMC » (80 revues).
+- « INSTICC » et « SCITEPRESS », éditeurs des 54 collections de monographies dédoublées, sont l'institut et sa marque d'édition.
 
 ### Conteneur libre
 
@@ -44,34 +59,27 @@ OpenAlex retire les apostrophes. 106 titres de revue ont la forme « Annales d E
 
 Sept entrées de `serials` ont un type de plateforme, pour 560 publications : `repository` (SSRN Electronic Journal, AEA Randomized Controlled Trials, Global Monitoring Laboratory) et `preprint_server` (bioRxiv, Research Square, Preprints.org, ArXiv.org). Leurs 702 enregistrements sources viennent de ScanR (598), Crossref (78) et HAL (26). Trois ont un type saisi à la main, trois ont `oa_model = repository`. SSRN, bioRxiv, Research Square, Preprints.org et arXiv figurent dans la liste des plateformes connues (`domain/platforms/registry.py`). Lecteurs des deux types : enrichissement OpenAlex (`enrich_serials_from_openalex`), correction du type de document (`preprint_server` donne `preprint`), espaces de noms DOI.
 
-### Listes de revues
-
-Aucune table ne rattache une revue à une liste de référence : revues indexées dans le WoS, revues de confiance recommandées par la conférence des doyens de médecine.
-
-### Administration
-
-Les personnes et les publications ont un volet latéral (`PersonDrawer`, `PublicationDrawer`). Les pages Éditeurs et Revues (`publishers/`, `journals/`) ouvrent une page par entité.
-
 ## Décisions
 
 - `biblio.journal` décrit la série qui sert au rattachement : titre, identifiant OpenAlex, liste des ISSN avec leur support et l'indicateur ISSN-L.
 - Une revue correspond à un ISSN-L.
-- `serial_issns` contient une ligne par ISSN, avec son ISSN-L : celui du Sudoc, à défaut celui d'OpenAlex, à défaut l'ISSN lui-même. La vérification Sudoc la remplit ISSN par ISSN. Sa colonne `serial_id` est calculée.
+- `serial_issns` contient une ligne par ISSN, avec son ISSN-L : celui de la table de l'ISSN International Centre, à défaut celui de l'ISSN qui l'annule d'après le Sudoc, à défaut celui d'OpenAlex, à défaut l'ISSN lui-même. La table est importée chaque mois et omet les ISSN annulés. Le Sudoc donne le titre, le support, le statut et les liens entre ISSN. La colonne `serial_id` est calculée.
 - Une table relie les ISSN, une ligne par lien : titre précédent vers titre suivant, revue principale vers supplément. Un titre précédent, un titre suivant ou un supplément forme une revue distincte.
 - À chaque passage de `publishing`, un enregistrement source est rattaché à la revue de l'ISSN-L de ses ISSN, à défaut à la revue de son identifiant OpenAlex.
 - Un enregistrement source dont les ISSN mènent à plusieurs ISSN-L rejoint la seule revue de même titre normalisé, à défaut la seule revue de titre compatible (`compatible_titles`). Sinon, il reste sans revue par ISSN.
 - Une seule fonction renvoie la revue d'un ISSN-L, créée au besoin. Le rattachement et la vérification Sudoc l'appellent tous deux.
-- Titre d'une revue : celui saisi à la main, sinon celui de la notice Sudoc de son ISSN-L, sinon le plus fréquent parmi ses enregistrements sources. `serial_issns.sudoc_title` garde le titre de la notice Sudoc de chaque ISSN. Une revue à ISSN reste, même vide.
+- Titre d'une revue : celui saisi à la main, sinon celui de la notice Sudoc de son ISSN-L, sinon le plus fréquent parmi ses enregistrements sources. `serial_issns.sudoc_title` garde le titre de la notice Sudoc de chaque ISSN. Une revue vide reste quand l'un de ses ISSN est cité par la série d'un enregistrement source, ou relié à un titre précédent, suivant ou à un supplément.
 - Identifiant OpenAlex d'une revue : celui des enregistrements sources OpenAlex dont l'ISSN-L, d'après OpenAlex, est celui de la revue. Modèle OA : celui d'OpenAlex pour cette source, sauf saisie à la main.
 - Une série sans ISSN ni identifiant OpenAlex rejoint la seule revue à ISSN de même titre, quel que soit son éditeur. L'éditeur départage plusieurs revues à ISSN de même titre. À défaut, elle rejoint la seule revue à ISSN de titre compatible parmi celles des autres enregistrements sources de sa publication (« JHEP »). La publication est celle du run précédent. Sinon, les séries de même titre forment une revue sans ISSN.
 - Une revue sans ISSN est identifiée par son titre normalisé : chaque source nomme l'éditeur à sa façon (« Edition CdP », « Editions CdP »). Une collection de monographies sans ISSN est identifiée par son titre et son éditeur : les noms de collection génériques (« Essais ») sont fréquents.
-- Pour ce rattachement par titre, un enregistrement source sans éditeur reçoit le titulaire de son préfixe DOI Crossref. Le titulaire d'un préfixe DataCite est souvent un repository ou un établissement : il est exclu. `source_records.publisher_id` garde l'éditeur donné par la source.
 - Deux revues de même ISSN-L fusionnent : la revue vide est absorbée, avec une redirection.
 - L'administration modifie le titre, le type et le modèle OA d'une revue. Les ISSN sont en lecture seule.
 - Une série qui désigne une plateforme est écartée à la normalisation : source OpenAlex de la liste des plateformes connues (Cairn.info), ou titre qui nomme le serveur de preprints du DOI du document (« SSRN Electronic Journal »). La série d'une vraie revue reste, même sous un DOI de serveur de preprints.
 - Un enregistrement source sans revue, dont les DOI sont tous ceux d'un serveur de preprints, passe de « article » ou « autre » à « preprint ».
 - `serial_type` perd `repository` et `preprint_server`, `oa_model` perd `repository`. Les revues de ces types passent au type inconnu.
 - L'administration fusionne une revue sans ISSN dans une autre revue. Une table titre normalisé → revue garde la décision, et le rattachement par titre la consulte. La fusion de deux revues à ISSN-L est refusée.
+- En session d'administration, une icône ouvre le volet de gestion d'un éditeur ou d'une revue, en tête de ligne des listes et à gauche du titre des fiches. Le volet de l'éditeur montre ses formes de nom. La fusion se fait depuis le volet.
+- Deux éditeurs de même nom, aux formes juridiques et aux mots génériques près, fusionnent. L'éditeur gardé est le seul titulaire de préfixe DOI du groupe, à défaut le plus nommé par les enregistrements sources. Un groupe à plusieurs titulaires de préfixe, ou de nom réduit à un mot courant (« Academic »), reste en l'état.
 
 ## Phasage
 
@@ -86,42 +94,35 @@ Les personnes et les publications ont un volet latéral (`PersonDrawer`, `Public
 - [x] Titre seul rattaché à la revue à ISSN d'un autre enregistrement source de la publication (b2ecf4014)
 - [x] Revue à ISSN gardée même vide, revérification Sudoc de tous les ISSN (5474a9263)
 - [x] Titre de chaque revue d'après la notice Sudoc de son ISSN-L, gardée par ISSN (816a520de)
-- [ ] Éditeur déduit du préfixe DOI Crossref pour le rattachement par titre. Mesure préalable de son utilité : départage de revues à ISSN de même titre, collections sans ISSN des monographies
 - [x] Relations entre revues déduites des liens entre ISSN. Liens sur la page d'une revue (035cdf8f6)
 - [x] Administration : ISSN en lecture seule, fusion limitée aux revues sans ISSN et gardée dans la table des titres (27f9ef446)
 - [x] Normalisation sans recherche ni création de revue. Collection sans ISSN des monographies : revue sans ISSN de son titre et de son éditeur (27f9ef446)
 - [x] Retrait de `serial_name_forms`, de `find_or_create_serial` et des règles de fusion remplacées par le calcul et les relations (27f9ef446)
-- [ ] Comparaison des revues avant et après sur le stock, dont les quatre titres partagés par deux revues et les titres de Materials & Design (67208, 106232) et de Physical Review D (9, 106629)
-- [ ] Mesure des ISSN-L distincts de même titre Sudoc : « Perspectives médiévales », 0338-2338 et 2103-6527
-- [ ] Mesure des ISSN sans ISSN-L donnés ensemble par un même enregistrement source
-- [ ] Mesure des séries sans ISSN de titre compatible avec une revue à ISSN, sans autre enregistrement source de leur publication rattaché à cette revue
-- [ ] Mesure des collections sans ISSN des monographies réparties entre plusieurs éditeurs
+- [x] Comparaison des revues avant et après sur le stock, dont les quatre titres partagés par deux revues et les titres de Materials & Design (67208, 106232) et de Physical Review D (9, 106629)
+- [x] Mesure des ISSN-L distincts de même titre Sudoc : « Perspectives médiévales », 0338-2338 et 2103-6527
+- [x] Mesure des ISSN sans ISSN-L donnés ensemble par un même enregistrement source
+- [x] Mesure des séries sans ISSN de titre compatible avec une revue à ISSN, sans autre enregistrement source de leur publication rattaché à cette revue
+- [x] Mesure des collections sans ISSN des monographies réparties entre plusieurs éditeurs
+- [x] ISSN-L lu dans la table de l'ISSN International Centre, importée chaque mois ; le Sudoc garde le titre, le support, le statut et les liens (f56521a60)
+- [x] ISSN annulé lié à l'ISSN qui l'annule, dont il prend l'ISSN-L (c71b4a7c7)
+- [x] Revue vide à ISSN supprimée quand aucun de ses ISSN n'est cité ni relié (c3b44143c)
 
 ### Phase 2 — Éditeurs
 
-- [ ] Doublons d'éditeurs que révèle le titulaire DataCite du préfixe
-- [ ] Lieu et directeur d'ouvrage dans les noms d'éditeur
-- [ ] Mesure des autres doublons d'éditeurs sous des noms différents
-
-### Phase 3 — Revues
-
-- [ ] Apostrophes retirées du titre par OpenAlex (+ caractère @ à conserver)
-- [ ] Stocker la langue des revues?
+- [x] Doublons d'éditeurs que révèle le titulaire DataCite du préfixe : la fusion des autres noms lit aussi les préfixes DataCite (603483936)
+- [x] Lieu et directeur d'ouvrage dans les noms d'éditeur : 156 noms à deux-points, 0,26 % des enregistrements sources ; fusion à la main depuis le volet
+- [x] Mesure des autres doublons d'éditeurs sous des noms différents
+- [x] Fusion des éditeurs de même nom aux formes juridiques et mots génériques près (2a553667a)
 
 ### Phase 4 — Conteneur libre
 
-- [ ] Usage de `container_title` à côté de `serial_id` et `monograph_id` : exploitation ou suppression de la colonne
-- [ ] Noms de repository dans le `container_title` d'OpenAlex
+- [x] Usage de `container_title` à côté de `serial_id` et `monograph_id` : colonne gardée, elle donne le nom du congrès ou du livre de 17 526 publications sans revue ni monographie
+- [x] Noms de repository dans le `container_title` d'OpenAlex : la normalisation les écarte ; restes de stock en base locale (2 525 publications)
+- [ ] Restes de stock en production
 
 ### Phase 5 — Administration
 
-- [ ] Volet latéral des pages Éditeurs et Revues
-
-### Phase 6 — Listes de revues
-
-- [ ] Modélisation : table des listes, table de liaison entre revues et listes
-- [ ] Source de chaque liste (question 1)
-- [ ] Mise à jour de chaque liste (question 2)
+- [x] Volet latéral des pages Éditeurs et Revues : édition, formes de nom de l'éditeur, fusion ; colonne d'actions retirée des listes (042ffbef5)
 
 ### Phase 7 — Plateformes typées comme revues
 
@@ -132,9 +133,8 @@ Les personnes et les publications ont un volet latéral (`PersonDrawer`, `Public
 
 ### Phase 8 — Fin de chantier
 
-- [ ] Mise à jour de la documentation
+- [x] Mise à jour de la documentation
 
 ## Questions ouvertes
 
-1. Source de chaque liste : fichier publié par l'organisme, API ou saisie dans l'administration. Accès à la liste des revues indexées dans le WoS après la résiliation de l'abonnement.
-2. Mise à jour d'une liste : import complet qui la remplace, ajouts et retraits datés, ou liste posée une fois. Rattachement d'une entrée à une revue : par ISSN, par titre à défaut. Sort des entrées sans revue dans le référentiel.
+1. Marques et maisons mères : « BioMed Central » et Springer, « SCITEPRESS » et INSTICC. Éditeurs distincts, éditeur unique, ou marque reliée à sa maison mère.

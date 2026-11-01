@@ -180,7 +180,7 @@ Usages du type dans le code :
 - [x] Entrées de type inconnu dont la majorité stricte des documents sont des articles, d'après le type donné par chaque source : typées revues (563 sur 773 entrées `unknown` de la base locale).
 - [x] Thèses ScanR : l'université de soutenance ne donne ni publication en série ni titre de conteneur. 1 452 enregistrements de thèses ScanR rattachés à 66 entrées, dont 60 n'ont pas d'autre usage.
 - [x] Stock : réhydratation et renormalisation de ScanR, puis phases `publications` et `finalize`.
-- Type des preprints arXiv et exclusion des preprints des statistiques : chantier [Preprints et versions d'une publication](../DATA_preprints-et-versions.md).
+- Type des preprints arXiv et exclusion des preprints des statistiques : chantier [Preprints et versions d'une publication](2026-11-01_DATA_preprints-et-versions.md).
 
 ## Questions ouvertes
 

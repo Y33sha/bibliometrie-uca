@@ -27,6 +27,12 @@ LISTES_LIBRES: dict[tuple[str, str], str] = {
         "valeur est liée à une comparaison `= ANY` : une valeur inconnue ne rend aucune ligne, "
         "au lieu d'annuler le filtre."
     ),
+    ("publication_filters.py", "self.subject"): (
+        "Libellés normalisés des sujets, présents dans les données, non énumérables dans le code. "
+        "La forme normalisée exclut la virgule : le découpage garde chaque libellé entier. La "
+        "valeur est liée à une comparaison `= ANY` : une valeur inconnue ne rend aucune ligne, "
+        "au lieu d'annuler le filtre."
+    ),
     ("publishers.py", "country"): (
         "Mêmes codes pays que la liste des publications, même liaison, même comportement."
     ),

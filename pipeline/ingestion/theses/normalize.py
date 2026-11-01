@@ -3,6 +3,7 @@
 Une thèse soutenue a pour identifiant son NNT ; une thèse en cours est sans NNT ni DOI. Les personnes d'une thèse ont un ou plusieurs rôles : auteur, direction, rapport, jury, présidence du jury.
 """
 
+import re
 from collections.abc import Mapping
 
 from domain.dates import french_date_to_iso
@@ -15,6 +16,7 @@ from domain.source_records.identifiers import (
     SourceIdentifierType,
 )
 from domain.source_records.source_extras import SourceExtra
+from domain.subjects.subject import SubjectLink, rameau_subject, theses_discipline_subject
 from domain.types import JsonValue, as_mapping, as_sequence, as_str, as_strs
 from pipeline.ingestion.common.embargoes import Embargo
 from pipeline.ingestion.common.normalizer import Document, SourceNormalizer
@@ -103,10 +105,35 @@ def _build_source_extras(thesis: Mapping[str, JsonValue]) -> dict[str, JsonValue
     return source_extras or None
 
 
-def _subject_labels(subjects: list[Mapping[str, JsonValue]], subject_type: str) -> list[str]:
-    """Renvoie les libellés distincts des sujets de type `subject_type`, dans l'ordre."""
-    labels = (as_str(s.get("keyword")) for s in subjects if as_str(s.get("type")) == subject_type)
-    return list(dict.fromkeys(label for label in labels if label))
+def _languages(thesis: Mapping[str, JsonValue]) -> list[str]:
+    """Renvoie les langues de la thèse (`langues`)."""
+    return [lang for lang in as_strs(thesis.get("langues")) if lang]
+
+
+def _subject_entries(
+    thesis: Mapping[str, JsonValue], subject_type: str
+) -> list[Mapping[str, JsonValue]]:
+    """Renvoie les entrées de `mapSujets` de type `subject_type` (`sujet` : mot-clé de l'auteur, `sujetsRameau` : vedette RAMEAU), par langue, dans l'ordre de `langues`."""
+    by_language = as_mapping(thesis.get("mapSujets"))
+    return [
+        entry
+        for lang in dict.fromkeys([*_languages(thesis), *by_language])
+        for s in as_sequence(by_language.get(lang))
+        if as_str((entry := as_mapping(s)).get("type")) == subject_type
+    ]
+
+
+# PPN d'une vedette RAMEAU, en fin du champ `query` : `"Analgésie" ET 027219046`.
+_RAMEAU_QUERY_PPN = re.compile(r"(\d{8}[\dX])\s*$", re.IGNORECASE)
+
+
+def get_subjects(thesis: Mapping[str, JsonValue]) -> list[SubjectLink]:
+    """Renvoie la discipline de la thèse et ses vedettes RAMEAU, codées par le PPN lu dans leur champ `query`."""
+    subjects = [theses_discipline_subject(as_str(thesis.get("discipline")))]
+    for entry in _subject_entries(thesis, "sujetsRameau"):
+        ppn = _RAMEAU_QUERY_PPN.search(as_str(entry.get("query")) or "")
+        subjects.append(rameau_subject(ppn.group(1) if ppn else None, as_str(entry.get("keyword"))))
+    return [SubjectLink(subject) for subject in subjects if subject]
 
 
 def theses_source_record(
@@ -129,24 +156,9 @@ def theses_source_record(
             SourceIdentifier(SourceIdentifierType.DOI, doi, SourceIdentifierRole.SECONDARY)
         )
 
-    languages = [lang for lang in as_strs(thesis.get("langues")) if lang]
-    # Mots-clés de l'auteur et vedettes RAMEAU, par langue, dans l'ordre de `langues`.
-    subjects_by_language = as_mapping(thesis.get("mapSujets"))
-    subjects = [
-        as_mapping(s)
-        for lang in dict.fromkeys([*languages, *subjects_by_language])
-        for s in as_sequence(subjects_by_language.get(lang))
-    ]
-    keywords = _subject_labels(subjects, "sujet") or None
-
-    # Topics : discipline et vedettes RAMEAU.
-    topics: dict[str, JsonValue] = {}
-    discipline = as_str(thesis.get("discipline"))
-    if discipline:
-        topics["discipline"] = discipline
-    if rameau_list := _subject_labels(subjects, "sujetsRameau"):
-        topics["rameau"] = rameau_list
-    topics_json = topics if topics else None
+    languages = _languages(thesis)
+    keyword_labels = (as_str(entry.get("keyword")) for entry in _subject_entries(thesis, "sujet"))
+    keywords = list(dict.fromkeys(label for label in keyword_labels if label)) or None
 
     abstracts = as_mapping(thesis.get("resumes"))
     abstract = next(
@@ -166,7 +178,6 @@ def theses_source_record(
         raw_language=languages[0] if languages else None,
         abstract=abstract,
         keywords=keywords,
-        topics=topics_json,
         source_extras=_build_source_extras(thesis),
     )
 
@@ -211,6 +222,9 @@ class ThesesNormalizer(SourceNormalizer):
 
     def publication_date(self, doc: Document) -> PublicationDate | None:
         return get_publication_date(doc)
+
+    def subjects(self, doc: Document) -> list[SubjectLink]:
+        return get_subjects(doc)
 
     def author_block(self, doc: Document) -> AuthorBlock:
         return extract_theses_author_block(doc)

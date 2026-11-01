@@ -11,6 +11,10 @@
 	import MonographsListView from '#lib/components/MonographsListView.svelte';
 	import PublicationsDashboard from '#lib/components/PublicationsDashboard.svelte';
 	import SubjectsCloud from '#lib/components/SubjectsCloud.svelte';
+	import TitleRow from '#lib/components/TitleRow.svelte';
+	import PublisherDrawer from '#lib/components/publishers/PublisherDrawer.svelte';
+	import { useDrawerParam } from '#lib/composables/useDrawerParam.svelte.js';
+	import { isAdmin } from '#lib/session.svelte.js';
 	import type { components } from '#lib/api/schema.js';
 
 	type PublisherDetail = components['schemas']['Publisher'];
@@ -18,6 +22,9 @@
 	type EnumOption = components['schemas']['EnumOption'];
 
 	const publisherId = $derived(Number(page.params.id));
+
+	// Volet d'édition de l'éditeur, en session admin : ouvert tant que `?publisher=<id>` figure dans l'URL.
+	const drawer = useDrawerParam('publisher', isAdmin);
 
 	const validTabs = ['dashboard', 'serials', 'monographs', 'publications'];
 	const activeTab = $derived(
@@ -81,9 +88,11 @@
 {:else}
 	<!-- Header -->
 	<div class="entity-header">
-		<h1 class="entity-title">
-			{publisher.name}
-		</h1>
+		<TitleRow onopen={isAdmin() ? () => drawer.open(publisherId) : undefined}>
+			<h1 class="entity-title">
+				{publisher.name}
+			</h1>
+		</TitleRow>
 		<div class="entity-meta">
 			<EntityMetaItem label="Type">
 				<span class="entity-tag">
@@ -172,6 +181,10 @@
 			/>
 		</div>
 	{/if}
+{/if}
+
+{#if drawer.id !== null}
+	<PublisherDrawer id={drawer.id} onclose={() => drawer.open(null)} onchange={loadPublisher} />
 {/if}
 
 <style>

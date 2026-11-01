@@ -8,16 +8,18 @@ from sqlalchemy import Connection, text
 from domain.platforms.platform import PlatformType
 from domain.platforms.registry import HAL, known_platform_of_copy, platform_type_of_copy
 from domain.publications.access import Copy, registered_url_copy
+from domain.publications.doc_types import DocType
 from domain.publications.licenses import License
 from domain.sources.registry import Source
 from infrastructure.sql_fragments import under_active_embargo
 
 
 def publication_copies(conn: Connection, publication_ids: Sequence[int]) -> dict[int, list[Copy]]:
-    """Renvoie les localisations des enregistrements sources de chaque publication, et la copie de l'URL de résolution de son DOI (`registered_url_copy`). Une publication sans copie est absente de la réponse. Le fichier déposé d'un enregistrement source sous embargo, sa copie à PDF, est fermé jusqu'à la fin de l'embargo. La copie HAL d'un enregistrement HAL est décrite par sa plateforme."""
+    """Renvoie les localisations des enregistrements sources de chaque publication, et la copie de l'URL de résolution de son DOI (`registered_url_copy`). Une publication sans copie est absente de la réponse. Le fichier déposé d'un enregistrement source sous embargo, sa copie à PDF, est fermé jusqu'à la fin de l'embargo. La copie HAL d'un enregistrement HAL est décrite par sa plateforme. Une copie garde le type preprint de son enregistrement source."""
     rows = conn.execute(
         text(f"""
-            SELECT sr.publication_id, sr.source::text AS source, l.url, l.version,
+            SELECT sr.publication_id, sr.source::text AS source, sr.doc_type::text AS doc_type,
+                   l.url, l.version,
                    l.is_oa AS declared_oa,
                    l.pdf_url IS NOT NULL AND {under_active_embargo("sr")} AS embargoed,
                    l.license::text AS license, pl.name AS platform,
@@ -46,6 +48,7 @@ def publication_copies(conn: Connection, publication_ids: Sequence[int]) -> dict
                 embargoed=r.embargoed,
                 described_by_platform=r.source == Source.HAL and known is HAL,
                 arrival=r.arrival,
+                preprint_record=r.doc_type == DocType.PREPRINT,
             )
         )
     registered = conn.execute(

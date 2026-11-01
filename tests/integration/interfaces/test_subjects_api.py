@@ -1,32 +1,44 @@
 """Tests d'intégration du router des sujets (`interfaces.api.routers.subjects`).
 
 Couvre :
-- GET /api/subjects (liste, pagination, recherche, min_count)
-- GET /api/subjects/{id} (fiche, voisins et liens entre voisins, 404)
+- GET /api/subjects (liste, pagination, recherche, tri, regroupement par libellé normalisé)
+- GET /api/subjects/{libellé normalisé} (fiche, sujets de vocabulaire, voisins et liens entre voisins, 404)
 """
 
 from __future__ import annotations
 
+from domain.normalize import normalize_text
+from domain.subjects.subject import SubjectVocabulary
 from tests.integration.helpers.db import owner_pool
 from tests.integration.helpers.seeds import (
     seed_publication,
     seed_publication_subject,
     seed_subject,
+    seed_subject_usage,
     uniq,
 )
 
 
-def _seed_cooccurrence(subject_a_id: int, subject_b_id: int, count: int) -> None:
-    """Crée `count` publications liées aux deux sujets, puis rafraîchit la vue matérialisée des cooccurrences. La vue retient seulement les paires d'au moins deux publications."""
-    a, b = sorted([subject_a_id, subject_b_id])
+def _key(subject_id: int) -> str:
+    """Renvoie le libellé normalisé du sujet semé `subject_id`."""
     with owner_pool() as cur:
-        for _ in range(count):
-            publication_id = seed_publication(
-                "cooc-seed", normalize_title=False, doc_type="article"
-            )
-            for s in (a, b):
-                seed_publication_subject(publication_id, subject_id=s)
-        cur.execute("REFRESH MATERIALIZED VIEW subject_cooccurrences")
+        cur.execute("SELECT label_normalized FROM subjects WHERE id = %s", (subject_id,))
+        return cur.fetchone()["label_normalized"]
+
+
+def _publications(*subject_ids: int, count: int = 1) -> None:
+    """Sème `count` publications liées aux sujets, puis recalcule le nombre de publications des sujets et leurs vues."""
+    for _ in range(count):
+        publication_id = seed_publication("subject-seed", normalize_title=False, doc_type="article")
+        for subject_id in subject_ids:
+            seed_publication_subject(publication_id, subject_id=subject_id)
+    seed_subject_usage()
+
+
+def _items(client, **params) -> list[dict]:
+    r = client.get("/api/subjects", params={"per_page": 200, **params})
+    assert r.status_code == 200
+    return r.json()["items"]
 
 
 class TestListSubjects:
@@ -45,86 +57,150 @@ class TestListSubjects:
         r = client.get("/api/subjects", params={"page": 0})
         assert r.status_code == 422
 
-    def test_min_count_below_one_rejected(self, client):
-        r = client.get("/api/subjects", params={"min_count": 0})
+    def test_unknown_sort_rejected(self, client):
+        r = client.get("/api/subjects", params={"sort": "usage_desc"})
         assert r.status_code == 422
 
     def test_search_by_label(self, client):
         label = uniq("FindMeSubject")
-        sid = seed_subject(label=label, usage_count=10)
-        r = client.get("/api/subjects", params={"search": label.lower()})
-        assert r.status_code == 200
-        ids = [item["id"] for item in r.json()["items"]]
-        assert sid in ids
+        _publications(seed_subject(label))
+        [item] = _items(client, search=label.lower())
+        assert (item["label"], item["usage_count"]) == (label, 1)
 
-    def test_min_count_filter(self, client):
-        low = seed_subject(uniq("LowCount"), usage_count=1)
-        high = seed_subject(uniq("HighCount"), usage_count=50)
-        # `min_count=10` écarte `low` et retient `high`.
-        r = client.get("/api/subjects", params={"min_count": 10, "per_page": 200})
+    def test_subject_without_publication_excluded(self, client):
+        label = uniq("UnusedSubject")
+        seed_subject(label)
+        seed_subject_usage()
+        assert _items(client, search=label) == []
+
+    def test_same_label_across_vocabularies_forms_one_subject(self, client):
+        label = uniq("Chimie")
+        hal = seed_subject(label, vocabulary=SubjectVocabulary.HAL_DOMAIN)
+        rameau = seed_subject(label.lower(), vocabulary=SubjectVocabulary.RAMEAU)
+        _publications(hal)
+        _publications(hal, rameau)
+        _publications(rameau)
+        [item] = _items(client, search=label)
+        assert item["label_normalized"] == normalize_text(label)
+        assert item["vocabularies"] == ["hal_domain", "rameau"]
+        # Union des publications : celle des deux sujets compte une fois.
+        assert item["usage_count"] == 3
+
+    def test_sort(self, client):
+        token = uniq("SortSubject")
+        alpha = seed_subject(f"{token} alpha")
+        beta = seed_subject(f"{token} beta")
+        _publications(alpha, count=2)
+        _publications(beta)
+        alpha_key, beta_key = normalize_text(f"{token} alpha"), normalize_text(f"{token} beta")
+        for sort, expected in (
+            ("label_asc", [alpha_key, beta_key]),
+            ("label_desc", [beta_key, alpha_key]),
+            ("publications_asc", [beta_key, alpha_key]),
+            ("publications_desc", [alpha_key, beta_key]),
+        ):
+            keys = [item["label_normalized"] for item in _items(client, search=token, sort=sort)]
+            assert keys == expected, sort
+
+
+class TestVocabularyFilter:
+    def _seed(self) -> tuple[str, str, str]:
+        """Sème un sujet HAL et RAMEAU, et un sujet OpenAlex, de même préfixe. Renvoie le préfixe et les deux libellés normalisés."""
+        token = uniq("VocabSubject")
+        shared = seed_subject(f"{token} chimie", vocabulary=SubjectVocabulary.HAL_DOMAIN)
+        shared_rameau = seed_subject(f"{token} chimie", vocabulary=SubjectVocabulary.RAMEAU)
+        english = seed_subject(f"{token} chemistry")
+        _publications(shared, shared_rameau, english)
+        return token, normalize_text(f"{token} chimie"), normalize_text(f"{token} chemistry")
+
+    def test_retains_subjects_of_one_of_the_vocabularies(self, client):
+        token, shared, english = self._seed()
+        keys = {i["label_normalized"] for i in _items(client, search=token, vocabulary="rameau")}
+        assert keys == {shared}
+        keys = {
+            i["label_normalized"]
+            for i in _items(client, search=token, vocabulary="rameau,openalex")
+        }
+        assert keys == {shared, english}
+
+    def test_unknown_vocabulary_rejected(self, client):
+        r = client.get("/api/subjects", params={"vocabulary": "mesh"})
+        assert r.status_code == 422
+
+    def test_facets_count_subjects_per_vocabulary_ignoring_their_own_filter(self, client):
+        token, _, _ = self._seed()
+        r = client.get("/api/subjects/facets", params={"search": token, "vocabulary": "rameau"})
         assert r.status_code == 200
-        ids = [item["id"] for item in r.json()["items"]]
-        assert high in ids
-        assert low not in ids
+        counts = {o["value"]: o["count"] for o in r.json()["vocabularies"]}
+        assert counts == {"openalex": 1, "hal_domain": 1, "rameau": 1, "theses_discipline": 0}
 
 
 class TestGetSubject:
     def test_404_when_unknown(self, client):
-        r = client.get("/api/subjects/999999999")
+        r = client.get(f"/api/subjects/{uniq('unknown')}")
         assert r.status_code == 404
 
-    def test_returns_subject_with_empty_neighbors(self, client):
-        label = uniq("DetailSubject")
-        sid = seed_subject(label=label, usage_count=5)
-        r = client.get(f"/api/subjects/{sid}")
+    def test_returns_vocabulary_subjects_with_ancestors_and_children(self, client):
+        root_label, label, child_label = uniq("Racine"), uniq("Domaine"), uniq("Feuille")
+        root = seed_subject(root_label, vocabulary=SubjectVocabulary.HAL_DOMAIN, code=uniq("r"))
+        subject = seed_subject(
+            label, vocabulary=SubjectVocabulary.HAL_DOMAIN, code=uniq("d"), level=2, parent_id=root
+        )
+        child = seed_subject(
+            child_label,
+            vocabulary=SubjectVocabulary.HAL_DOMAIN,
+            code=uniq("f"),
+            level=3,
+            parent_id=subject,
+        )
+        rameau = seed_subject(label, vocabulary=SubjectVocabulary.RAMEAU, code=uniq("ppn"))
+        _publications(root, subject, child, rameau)
+
+        r = client.get(f"/api/subjects/{normalize_text(label)}")
         assert r.status_code == 200
         body = r.json()
-        assert body["subject"]["id"] == sid
         assert body["subject"]["label"] == label
-        assert body["neighbors"] == []
+        hal, ppn = body["vocabulary_subjects"]
+        assert hal["vocabulary"] == "hal_domain"
+        assert [a["label"] for a in hal["ancestors"]] == [root_label]
+        assert [(c["label"], c["usage_count"]) for c in hal["children"]] == [(child_label, 1)]
+        assert ppn["vocabulary"] == "rameau"
+        assert (ppn["ancestors"], ppn["children"]) == ([], [])
 
-    def test_returns_neighbors_when_cooccurrences_exist(self, client):
-        s_main = seed_subject(uniq("Main"), usage_count=10)
-        s_n1 = seed_subject(uniq("Neighbor1"), usage_count=8)
-        s_n2 = seed_subject(uniq("Neighbor2"), usage_count=5)
-        _seed_cooccurrence(s_main, s_n1, count=10)
-        _seed_cooccurrence(s_main, s_n2, count=5)
+    def test_returns_neighbors_and_links_between_neighbors(self, client):
+        main, n1, n2 = (seed_subject(uniq(name)) for name in ("Main", "Neighbor1", "Neighbor2"))
+        _publications(main, n1, n2, count=2)
 
-        r = client.get(f"/api/subjects/{s_main}", params={"min_cooccurrence": 1})
+        r = client.get(f"/api/subjects/{_key(main)}", params={"min_cooccurrence": 1})
         assert r.status_code == 200
-        neighbors = r.json()["neighbors"]
-        ids = [n["id"] for n in neighbors]
-        assert s_n1 in ids
-        assert s_n2 in ids
+        body = r.json()
+        assert {n["label_normalized"] for n in body["neighbors"]} == {_key(n1), _key(n2)}
+        a, b = sorted([_key(n1), _key(n2)])
+        assert body["neighbor_links"] == [{"label_a": a, "label_b": b, "cooccurrence_count": 2}]
 
-    def test_returns_links_between_neighbors(self, client):
-        s_main = seed_subject(uniq("MainLinks"), usage_count=10)
-        s_n1 = seed_subject(uniq("LinkedNeighbor1"), usage_count=8)
-        s_n2 = seed_subject(uniq("LinkedNeighbor2"), usage_count=5)
-        _seed_cooccurrence(s_main, s_n1, count=4)
-        _seed_cooccurrence(s_main, s_n2, count=3)
-        _seed_cooccurrence(s_n1, s_n2, count=2)
+    def test_most_specific_neighbors_first(self, client):
+        main, big, small = (seed_subject(uniq(name)) for name in ("Main", "Big", "Small"))
+        # `big` : 3 publications en commun sur 9 ; `small` : 2 sur 2.
+        _publications(main, big, small, count=2)
+        _publications(main, big)
+        _publications(big, count=6)
 
-        r = client.get(f"/api/subjects/{s_main}", params={"min_cooccurrence": 1})
+        r = client.get(
+            f"/api/subjects/{_key(main)}", params={"min_cooccurrence": 1, "neighbors_limit": 1}
+        )
         assert r.status_code == 200
-        a, b = sorted([s_n1, s_n2])
-        assert r.json()["neighbor_links"] == [
-            {"subject_a_id": a, "subject_b_id": b, "cooccurrence_count": 2}
-        ]
+        assert [n["label_normalized"] for n in r.json()["neighbors"]] == [_key(small)]
 
     def test_min_cooccurrence_filters(self, client):
-        s_main = seed_subject(uniq("MainFilter"), usage_count=10)
-        s_weak = seed_subject(uniq("WeakNeighbor"), usage_count=8)
-        _seed_cooccurrence(s_main, s_weak, count=2)
+        main, weak = seed_subject(uniq("MainFilter")), seed_subject(uniq("WeakNeighbor"))
+        _publications(main, weak, count=2)
 
-        r = client.get(f"/api/subjects/{s_main}", params={"min_cooccurrence": 5})
+        r = client.get(f"/api/subjects/{_key(main)}", params={"min_cooccurrence": 5})
         assert r.status_code == 200
-        # Deux cooccurrences, sous le seuil de cinq : voisin écarté.
-        ids = [n["id"] for n in r.json()["neighbors"]]
-        assert s_weak not in ids
+        # Deux co-occurrences, sous le seuil de cinq : voisin écarté.
+        assert r.json()["neighbors"] == []
 
     def test_neighbors_limit_param_validation(self, client):
         # `neighbors_limit` au-delà de 100 : 422.
-        s = seed_subject()
-        r = client.get(f"/api/subjects/{s}", params={"neighbors_limit": 500})
+        r = client.get("/api/subjects/chimie", params={"neighbors_limit": 500})
         assert r.status_code == 422

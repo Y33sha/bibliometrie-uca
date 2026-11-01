@@ -4,14 +4,15 @@
 
 ### En cours
 
-- [Preprints et versions d'une publication](DATA_preprints-et-versions.md)
 - [Audit de la qualité de la résolution des personnes](DATA_audit-qualite-resolution-personnes.md)
-- [Qualité du référentiel de l'édition](DATA_referentiel-edition.md)
+- [Pertinence des sujets](DATA_pertinence-des-sujets.md)
+- [Vocabulaires des sujets](DATA_vocabulaires-des-sujets.md)
 
 ### Non commencé
 
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
-- [Pertinence des sujets](DATA_pertinence-des-sujets.md)
+- [Listes de revues](DATA_listes-de-revues.md)
+- [Mesures d'impact](METIER_mesures-impact.md)
 - [Résolution probabiliste des personnes](DATA_resolution-personnes-probabiliste.md)
 - [Signatures institutionnelles](METIER_signatures-institutionnelles.md)
 - [Types de document](DATA_types-document.md)
@@ -19,6 +20,8 @@
 
 ## Chantiers archivés
 
+- 2026-11-01 — [Preprints et versions d'une publication](archived/2026-11-01_DATA_preprints-et-versions.md)
+- 2026-11-01 — [Qualité du référentiel de l'édition](archived/2026-11-01_DATA_referentiel-edition.md)
 - 2026-10-31 — [Date de publication](archived/2026-10-31_DATA_date-de-publication.md)
 - 2026-10-31 — [URL de résolution des DOI](archived/2026-10-31_DATA_url-de-resolution-des-doi.md)
 - 2026-10-31 — [Statut open access tiré des copies](archived/2026-10-31_DATA_statut-open-access.md)

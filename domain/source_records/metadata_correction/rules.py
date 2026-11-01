@@ -12,9 +12,9 @@ Un fait inconnu vaut `None`, et les prédicats qui le testent sont faux. Une pub
 import re
 from dataclasses import dataclass, field, fields
 from enum import StrEnum
+from functools import cache
 from typing import NamedTuple, TypedDict
 
-from domain.normalize import normalize_text
 from domain.platforms.registry import preprint_servers_of_doi
 from domain.publications.doc_types import DocType
 from domain.publishers.publisher import PublisherType
@@ -27,6 +27,8 @@ class MetadataForCorrection:
     """Faits lus par les règles de correction, pour un enregistrement source ou une publication."""
 
     title: str
+    title_normalized: str
+    """Forme de comparaison du titre (`normalize_text`)."""
     doc_type: str | None
     serial_id: int | None
     dois: frozenset[str] = frozenset()
@@ -58,6 +60,7 @@ class MetadataForCorrection:
         cls,
         *,
         title: str,
+        title_normalized: str,
         doc_type: str | None,
         doi: str | None,
         serial_id: int | None,
@@ -66,6 +69,7 @@ class MetadataForCorrection:
         """Construit les faits d'une publication : les champs arbitrés par l'agrégation, et le type de sa revue."""
         return cls(
             title=title,
+            title_normalized=title_normalized,
             doc_type=doc_type,
             dois=frozenset({doi} if doi else ()),
             serial_id=serial_id,
@@ -199,7 +203,7 @@ class _AppliesTo(TypedDict, total=False):
     doi_contains: str
     """Sous-chaîne d'au moins un des `dois`."""
     title_prefix_normalized: tuple[str, ...]
-    """Préfixes de `normalize_text(title)`."""
+    """Préfixes de `title_normalized`."""
     title_regex: re.Pattern[str]
     """Motif cherché dans le titre."""
     serial_id_present: bool
@@ -451,17 +455,27 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
 
 _FIELDS = frozenset(f.name for f in fields(MetadataForCorrection))
 
+# Prédicats sur le type de document, évalués une fois par type pour toutes les règles (`_candidate_rules`).
+_DOC_TYPE_KEYS = frozenset({"doc_type", "doc_type_not_in"})
+
+
+def _doc_type_admitted(doc_type: str, key: str, value: object) -> bool:
+    """Vrai si le type de document `doc_type`, en minuscules, vérifie le prédicat de type `key` de valeur `value`."""
+    if key == "doc_type":
+        return doc_type in value if isinstance(value, frozenset) else doc_type == value
+    assert isinstance(value, frozenset)
+    return doc_type not in value
+
+
+def _lower_doc_type(source_record: MetadataForCorrection) -> str:
+    """Renvoie le type de document des faits, en minuscules, vide sans type."""
+    return (source_record.doc_type or "").lower()
+
 
 def _check_predicate(source_record: MetadataForCorrection, key: str, value: object) -> bool:
     """Vrai si les faits vérifient le prédicat `key` de valeur `value` (`_AppliesTo`)."""
-    if key == "doc_type":
-        doc_type = (source_record.doc_type or "").lower()
-        if isinstance(value, frozenset):
-            return doc_type in value
-        return doc_type == value
-    if key == "doc_type_not_in":
-        assert isinstance(value, frozenset)
-        return (source_record.doc_type or "").lower() not in value
+    if key in _DOC_TYPE_KEYS:
+        return _doc_type_admitted(_lower_doc_type(source_record), key, value)
     if key == "author_count_max":
         assert isinstance(value, int)
         return source_record.author_count is not None and source_record.author_count <= value
@@ -478,8 +492,7 @@ def _check_predicate(source_record: MetadataForCorrection, key: str, value: obje
         assert isinstance(value, tuple)
         if not source_record.title:
             return False
-        normalized = normalize_text(source_record.title)
-        return any(normalized.startswith(p) for p in value)
+        return any(source_record.title_normalized.startswith(p) for p in value)
     if key == "title_regex":
         assert isinstance(value, re.Pattern)
         return bool(source_record.title and value.search(source_record.title))
@@ -496,18 +509,40 @@ def _check_predicate(source_record: MetadataForCorrection, key: str, value: obje
     raise ValueError(f"Prédicat inconnu : {key!r}")
 
 
-def _rule_applies(source_record: MetadataForCorrection, rule_def: _RuleDefinition) -> bool:
-    """Vrai si les faits vérifient tous les prédicats de la règle."""
-    return all(_check_predicate(source_record, k, v) for k, v in rule_def["applies_to"].items())
+class _CandidateRule(NamedTuple):
+    """Règle qui corrige un champ et admet un type de document."""
+
+    rule_id: MetadataCorrectionRule
+    value: str
+    """Valeur cible du champ."""
+    predicates: tuple[tuple[str, object], ...]
+    """Prédicats de la règle autres que de type de document."""
+
+
+@cache
+def _candidate_rules(field: str, doc_type: str) -> tuple[_CandidateRule, ...]:
+    """Renvoie, dans l'ordre de `_RULES`, les règles qui corrigent `field` et dont les prédicats de type admettent `doc_type` (en minuscules)."""
+    candidates = []
+    for rule_id, rule_def in _RULES.items():
+        if field not in rule_def["applies_correction"]:
+            continue
+        applies_to = rule_def["applies_to"].items()
+        if all(_doc_type_admitted(doc_type, k, v) for k, v in applies_to if k in _DOC_TYPE_KEYS):
+            candidates.append(
+                _CandidateRule(
+                    rule_id,
+                    rule_def["applies_correction"][field],
+                    tuple((k, v) for k, v in applies_to if k not in _DOC_TYPE_KEYS),
+                )
+            )
+    return tuple(candidates)
 
 
 def _correct_field(source_record: MetadataForCorrection, field: str) -> Correction[str] | None:
     """Renvoie la correction de `field` par la première règle de `_RULES` qui le corrige et s'applique."""
-    for rule_id, rule_def in _RULES.items():
-        if field not in rule_def["applies_correction"]:
-            continue
-        if _rule_applies(source_record, rule_def):
-            return Correction(rule_def["applies_correction"][field], rule_id)
+    for rule in _candidate_rules(field, _lower_doc_type(source_record)):
+        if all(_check_predicate(source_record, k, v) for k, v in rule.predicates):
+            return Correction(rule.value, rule.rule_id)
     return None
 
 

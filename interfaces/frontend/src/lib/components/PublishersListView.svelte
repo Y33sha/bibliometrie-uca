@@ -6,14 +6,16 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { asset, resolve } from '$app/paths';
-	import type { Snippet } from 'svelte';
 
 	import FacetDropdown from '#lib/components/FacetDropdown.svelte';
+	import IconButton from '#lib/components/IconButton.svelte';
+	import PublisherDrawer from '#lib/components/publishers/PublisherDrawer.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import TableStatusRow from '#lib/components/TableStatusRow.svelte';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
 	import { useFacets } from '#lib/composables/useFacets.svelte.js';
 	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
+	import { useDrawerParam } from '#lib/composables/useDrawerParam.svelte.js';
 	import { crossrefMemberIds, crossrefMemberUrl } from '#lib/sources.svelte.js';
 	import { isAdmin } from '#lib/session.svelte.js';
 	import { nextSort, sortDirection } from '#lib/sort.js';
@@ -23,23 +25,21 @@
 
 	type Publisher = components['schemas']['PublisherListItem'];
 
-	// Liste des éditeurs de la page `/publishers`. La session admin y gagne la facette « Publications » et la colonne d'actions que lui passe la page.
+	// Liste des éditeurs de la page `/publishers`. La session admin y gagne la facette « Publications » et, en tête de ligne, l'icône du volet d'édition de l'éditeur.
 	let {
 		apiKey = 'publishers-list',
 		urlSync = false,
 		basePath = '/publishers',
 		perPage = 50,
-		actionCell,
-		actionColumnHeader = '',
 	}: {
 		apiKey?: string;
 		urlSync?: boolean;
 		basePath?: string;
 		perPage?: number;
-		/** Snippet rendu dans la colonne actions (1 row → 1 cell). */
-		actionCell?: Snippet<[Publisher]>;
-		actionColumnHeader?: string;
 	} = $props();
+
+	// Volet d'édition d'un éditeur, en session admin : ouvert tant que `?publisher=<id>` figure dans l'URL.
+	const drawer = useDrawerParam('publisher', isAdmin);
 
 	// --- Filter state ---
 	let search = $state('');
@@ -197,6 +197,7 @@
 <table class="data-table publishers-table">
 	<thead>
 		<tr>
+			{#if isAdmin()}<th class="row-actions"></th>{/if}
 			<th class="sortable" onclick={() => setSort('name')}>
 				Nom <SortChevron direction={sortDirection(currentSort, 'name')} />
 			</th>
@@ -209,12 +210,16 @@
 			<th class="num sortable" onclick={() => setSort('publications')}>
 				{columnLabels.publications} <SortChevron direction={sortDirection(currentSort, 'publications')} />
 			</th>
-			{#if actionCell}<th>{actionColumnHeader}</th>{/if}
 		</tr>
 	</thead>
 	<tbody>
 		{#each publishers.items as p (p.id)}
-			<tr>
+			<tr class:active-row={p.id === drawer.id}>
+				{#if isAdmin()}
+					<td class="row-actions">
+						<IconButton icon="panel" label="Ouvrir le volet" onclick={() => drawer.open(p.id)} />
+					</td>
+				{/if}
 				<td>
 					<a href={resolve(`publishers/${p.id}`)} class="entity-link">{p.name}</a>
 					{#each crossrefMemberIds(p.doi_prefixes) as member (member)}
@@ -240,11 +245,10 @@
 				</td>
 				<td class="num">{p.serial_count.toLocaleString('fr-FR')}</td>
 				<td class="num">{p.publication_count.toLocaleString('fr-FR')}</td>
-				{#if actionCell}<td class="actions row-actions">{@render actionCell(p)}</td>{/if}
 			</tr>
 		{/each}
 		{#if publishers.items.length === 0}
-			<TableStatusRow loading={publishers.loading} error={publishers.error} colspan={actionCell ? 7 : 6} emptyText="Aucun éditeur ne correspond aux filtres." />
+			<TableStatusRow loading={publishers.loading} error={publishers.error} colspan={isAdmin() ? 7 : 6} emptyText="Aucun éditeur ne correspond aux filtres." />
 		{/if}
 	</tbody>
 </table>
@@ -260,12 +264,22 @@
 	}}
 />
 
+{#if drawer.id !== null}
+	<PublisherDrawer
+		id={drawer.id}
+		onclose={() => drawer.open(null)}
+		onchange={() => {
+			publishers.load();
+			facets.load();
+		}}
+	/>
+{/if}
+
 <style>
 	.publishers-table { min-width: 620px; }
 	.publishers-table td.num { color: var(--muted); }
 	.muted { color: var(--muted); }
+	.row-actions { width: 1%; }
 
 	.crossref-link { text-decoration: none; margin-left: 5px; vertical-align: text-bottom; }
-
-	.actions { white-space: nowrap; position: relative; }
 </style>

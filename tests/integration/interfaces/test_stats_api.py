@@ -49,7 +49,7 @@ class TestStatsAcceptListFilters:
 
     @pytest.mark.parametrize(
         ("param", "value"),
-        [("access", "inconnu"), ("source_filter", "inconnu"), ("subject_id", "x")],
+        [("access", "inconnu"), ("source_filter", "inconnu"), ("year", "x")],
     )
     def test_reads_list_filters(self, client, param, value):
         r = client.get("/api/stats/pivot", params={param: value})

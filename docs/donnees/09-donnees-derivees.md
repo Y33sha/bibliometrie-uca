@@ -10,16 +10,17 @@ Le pipeline les rafraîchit. Aucune n'est écrite directement.
 
 | Vue matérialisée | Dérivée de | Rafraîchie par |
 |---|---|---|
-| `source_contribution_structures` | adresses (`address_structures` non rejetés), ROR sans adresse, structures HAL et structures de thèse des contributions sources ⋈ `perimeter_structures` | phase `affiliations` |
+| `source_contribution_structures` | adresses (`address_structures` non rejetés), ROR des contributions sources sans adresse, structures HAL et structures de thèse des contributions sources ⋈ `perimeter_structures` | phase `affiliations` |
 | `contribution_structures` | `source_contribution_structures` ⋈ `aligned_source_contributions`, pour les contributions d'une personne non exclue | phase `finalize` |
 | `publication_structures` | `contributions` ⋈ `contribution_structures` | phase `finalize` |
 | `publication_rors` | ROR des contributions sources alignées des auteurs (`source_contribution_rors`) et des structures de `publication_structures`, avec leurs ancêtres de `ror_relations` ; `cited` distingue les ROR cités | phase `finalize` |
-| `subject_cooccurrences` | paires de sujets co-présents sur une même publication (`publication_subjects`) | phase `subjects` |
+| `subject_labels` | sujets regroupés par libellé normalisé (`subjects` ⋈ `publication_subjects`) | phase `subjects` |
+| `subject_cooccurrences` | paires de libellés normalisés de sujets co-présents sur une même publication (`publication_subjects`) | phase `subjects` |
 
 ## Tables dérivées
 
 - **`perimeter_structures`** : appartenance au périmètre, matérialisée par clôture récursive de `structure_parents`. Rematérialisée avant la première phase du pipeline et à chaque modification depuis l'administration qui touche une tutelle ou un périmètre.
-- **`publications_detail`** : une ligne par publication (`abstract`, `keywords`, `topics`, `biblio`), recalculé depuis les `source_records` rattachées.
+- **`publications_detail`** : une ligne par publication (`abstract`, `keywords`, `biblio`), recalculé depuis les `source_records` rattachées.
 
 ## Colonnes dérivées
 

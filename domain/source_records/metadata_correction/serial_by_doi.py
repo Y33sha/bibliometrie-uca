@@ -1,11 +1,12 @@
 """Rattachement d'une revue à un enregistrement source via l'espace de noms de ses DOI.
 
-Un enregistrement source à DOI mais sans revue reçoit la revue désignée par les espaces de noms de ses DOI (`domain/serials/doi_namespaces.py`). Si ses DOI désignent plusieurs revues, il reste sans revue. Un livre ou un chapitre reste sans revue : un éditeur publie sous un même espace de noms une revue et des livres (EAC, `10.17184/eac.`), ou une revue et les livres de sa collection (Hermès chez CAIRN, `10.3917/herm.`).
+Un enregistrement source à DOI mais sans revue reçoit la revue désignée par les espaces de noms de ses DOI (`domain/serials/doi_namespaces.py`). Si ses DOI désignent plusieurs revues, il reste sans revue. Un livre ou un chapitre reste sans revue : un éditeur publie sous un même espace de noms une revue et des livres (EAC, `10.17184/eac.`), ou une revue et les livres de sa collection (Hermès chez CAIRN, `10.3917/herm.`). Les DOI de serveur de preprints restent hors du rattachement : la discussion d'un article Copernicus partage l'espace de noms de sa revue (`10.5194/acp-`).
 """
 
 from collections.abc import Collection, Mapping
 from typing import NamedTuple
 
+from domain.platforms.registry import preprint_servers_of_doi
 from domain.serials.containers import is_book_or_chapter
 from domain.serials.doi_namespaces import DoiNamespace, resolve_serial
 from domain.source_records.corrections import (
@@ -44,7 +45,11 @@ def attach_serial_by_doi(
     new_corrections = other_entries(corrections, SERIAL_BY_DOI_KEYS)
     if raw_serial_id is not None or not dois or is_book_or_chapter(raw_doc_type, source):
         return SerialAttachment(raw_serial_id, new_corrections)
-    serials = {ns.serial_id for doi in dois if (ns := resolve_serial(doi, namespaces))}
+    serials = {
+        ns.serial_id
+        for doi in dois
+        if not preprint_servers_of_doi(doi) and (ns := resolve_serial(doi, namespaces))
+    }
     if len(serials) != 1:
         return SerialAttachment(None, new_corrections)
     new_corrections[CorrectionKey.SERIAL_ID] = stash_entry(None, SERIAL_BY_DOI_NAMESPACE)

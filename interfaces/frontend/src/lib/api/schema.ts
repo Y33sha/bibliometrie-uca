@@ -2200,6 +2200,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/publishers/{publisher_id}/name-forms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Publisher Name Forms
+         * @description Liste les formes de nom normalisées de l'éditeur, avec leur nombre d'enregistrements sources. La normalisation rattache à l'éditeur chaque enregistrement source qui le nomme par l'une d'elles.
+         */
+        get: operations["get_publisher_name_forms_api_publishers__publisher_id__name_forms_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/publishers/{publisher_id}/subjects": {
         parameters: {
             query?: never;
@@ -2239,7 +2259,7 @@ export interface paths {
          *
          *     Deux éditeurs aux membres Crossref distincts sont deux maisons : la fusion est refusée par un 409.
          *
-         *     La fusion des revues bloque sur des ISSN divergents pour un même titre, ou sur un doublon de titre chez l'un des éditeurs. La fusion entière est alors refusée par un 409 (`PublisherMergeBlockedResponse`). Son corps énumère toutes les paires bloquantes, à traiter dans les revues avant de relancer. Renvoie aussi 422 sur deux identifiants égaux, 404 si l'un des deux éditeurs est introuvable.
+         *     La fusion des revues bloque sur des ISSN différents pour un même titre, ou sur un doublon de titre chez l'un des éditeurs. La fusion entière est alors refusée par un 409 (`PublisherMergeBlockedResponse`). Son corps énumère toutes les paires bloquantes, à traiter dans les revues avant de relancer. Renvoie aussi 422 sur deux identifiants égaux, 404 si l'un des deux éditeurs est introuvable.
          */
         post: operations["merge_api_publishers__publisher_id__merge_post"];
         delete?: never;
@@ -2771,9 +2791,29 @@ export interface paths {
         };
         /**
          * List Subjects
-         * @description Liste les sujets par page, les plus fréquents dans les publications d'abord.
+         * @description Liste les sujets par page, avec leur nombre de publications.
          */
         get: operations["list_subjects_api_subjects_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/subjects/facets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Subjects Facets
+         * @description Compte les sujets de chaque vocabulaire. Le décompte écarte le filtre des vocabulaires.
+         */
+        get: operations["subjects_facets_api_subjects_facets_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2802,7 +2842,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/subjects/{subject_id}": {
+    "/api/subjects/{label_normalized}": {
         parameters: {
             query?: never;
             header?: never;
@@ -2811,9 +2851,9 @@ export interface paths {
         };
         /**
          * Get Subject
-         * @description Renvoie le détail d'un sujet, avec ses voisins par co-occurrence, les plus fréquents d'abord.
+         * @description Renvoie le détail d'un sujet, identifié par son libellé normalisé, avec ses voisins par co-occurrence, les plus spécifiques d'abord. La spécificité d'un voisin est la part de ses publications qui ont aussi le sujet.
          */
-        get: operations["get_subject_api_subjects__subject_id__get"];
+        get: operations["get_subject_api_subjects__label_normalized__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3504,7 +3544,7 @@ export interface components {
         EntityFacetItem: {
             /**
              * Id
-             * @description Identifiant de l'entité : un entier, ou un ROR pour une organisation partenaire.
+             * @description Identifiant de l'entité : un entier, un ROR pour une organisation partenaire, un libellé normalisé pour un sujet.
              */
             id: number | string;
             /** Label */
@@ -5211,6 +5251,19 @@ export interface components {
             blocking_serials: components["schemas"]["BlockingSerialItem"][];
         };
         /**
+         * PublisherNameForm
+         * @description Forme de nom normalisée d'un éditeur (`publisher_name_forms`).
+         */
+        PublisherNameForm: {
+            /** Form */
+            form: string;
+            /**
+             * Source Record Count
+             * @description Enregistrements sources de l'éditeur qui le nomment par cette forme.
+             */
+            source_record_count: number;
+        };
+        /**
          * PublisherType
          * @description Type d'éditeur. Reflet du type PostgreSQL `publisher_type`.
          * @enum {string}
@@ -6090,11 +6143,25 @@ export interface components {
             perimeters: components["schemas"]["FacetOption"][];
         };
         /**
+         * SubjectChildOut
+         * @description Enfant d'un sujet de vocabulaire, avec son nombre de publications dans ce vocabulaire.
+         */
+        SubjectChildOut: {
+            /** Label Normalized */
+            label_normalized: string;
+            /** Label */
+            label: string;
+            /** Usage Count */
+            usage_count: number;
+        };
+        /**
          * SubjectDetailResponse
-         * @description Détail d'un sujet, ses voisins par co-occurrence et les co-occurrences entre ces voisins.
+         * @description Détail d'un sujet : ses sujets de vocabulaire, ses voisins par co-occurrence et les co-occurrences entre ces voisins.
          */
         SubjectDetailResponse: {
             subject: components["schemas"]["SubjectListItem"];
+            /** Vocabulary Subjects */
+            vocabulary_subjects: components["schemas"]["VocabularySubjectOut"][];
             /** Neighbors */
             neighbors: components["schemas"]["SubjectNeighborOut"][];
             /** Neighbor Links */
@@ -6105,24 +6172,34 @@ export interface components {
          * @description Sujet et son nombre de publications au sein d'une personne, d'un laboratoire, d'une revue ou d'un éditeur, pour les sujets principaux de son tableau de bord.
          */
         SubjectFrequency: {
-            /** Id */
-            id: number;
+            /** Label Normalized */
+            label_normalized: string;
             /** Label */
             label: string;
             /** Count */
             count: number;
         };
         /**
-         * SubjectListItem
-         * @description Sujet du référentiel et son nombre de publications, servi en liste comme en détail.
+         * SubjectLabelRef
+         * @description Lien vers la page d'un sujet.
          */
-        SubjectListItem: {
-            /** Id */
-            id: number;
+        SubjectLabelRef: {
+            /** Label Normalized */
+            label_normalized: string;
             /** Label */
             label: string;
-            /** Language */
-            language: string | null;
+        };
+        /**
+         * SubjectListItem
+         * @description Sujet regroupé par libellé, avec ses vocabulaires et son nombre de publications.
+         */
+        SubjectListItem: {
+            /** Label Normalized */
+            label_normalized: string;
+            /** Label */
+            label: string;
+            /** Vocabularies */
+            vocabularies: components["schemas"]["SubjectVocabulary"][];
             /** Usage Count */
             usage_count: number;
         };
@@ -6141,13 +6218,13 @@ export interface components {
         };
         /**
          * SubjectNeighborLink
-         * @description Co-occurrence entre deux voisins d'un sujet, `subject_a_id` < `subject_b_id`.
+         * @description Co-occurrence entre deux voisins d'un sujet, `label_a` < `label_b` (libellés normalisés).
          */
         SubjectNeighborLink: {
-            /** Subject A Id */
-            subject_a_id: number;
-            /** Subject B Id */
-            subject_b_id: number;
+            /** Label A */
+            label_a: string;
+            /** Label B */
+            label_b: string;
             /** Cooccurrence Count */
             cooccurrence_count: number;
         };
@@ -6156,8 +6233,8 @@ export interface components {
          * @description Voisin d'un sujet par co-occurrence.
          */
         SubjectNeighborOut: {
-            /** Id */
-            id: number;
+            /** Label Normalized */
+            label_normalized: string;
             /** Label */
             label: string;
             /** Usage Count */
@@ -6167,20 +6244,43 @@ export interface components {
         };
         /**
          * SubjectOut
-         * @description Sujet attaché à une publication, une ligne par sujet toutes sources réunies.
+         * @description Sujet de vocabulaire attaché à une publication, une ligne par sujet toutes sources réunies.
          */
         SubjectOut: {
             /** Id */
             id: number;
             /** Label */
             label: string;
-            /** Language */
-            language: string | null;
+            /**
+             * Label Normalized
+             * @description Identifiant de la page du sujet.
+             */
+            label_normalized: string;
+            vocabulary: components["schemas"]["SubjectVocabulary"];
+            /**
+             * Level
+             * @description Profondeur dans le vocabulaire : 1 pour une racine.
+             */
+            level: number;
             /**
              * Sources
              * @description Sources ayant fourni le sujet.
              */
             sources: string[];
+        };
+        /**
+         * SubjectVocabulary
+         * @description Vocabulaire d'un sujet. Reflet du type PostgreSQL `subject_vocabulary`. La langue des libellés découle du vocabulaire.
+         * @enum {string}
+         */
+        SubjectVocabulary: "openalex" | "hal_domain" | "rameau" | "theses_discipline";
+        /**
+         * SubjectsFacetsResponse
+         * @description Facettes de la liste des sujets. Le décompte d'un vocabulaire écarte le filtre des vocabulaires : il donne le nombre de sujets retenus si l'option est cochée.
+         */
+        SubjectsFacetsResponse: {
+            /** Vocabularies */
+            vocabularies: components["schemas"]["FacetOption"][];
         };
         /**
          * SuspectMergeOut
@@ -6318,6 +6418,29 @@ export interface components {
             /** Context */
             ctx?: Record<string, never>;
         };
+        /**
+         * VocabularySubjectOut
+         * @description Sujet de vocabulaire de même libellé normalisé, avec sa place dans l'arborescence.
+         */
+        VocabularySubjectOut: {
+            vocabulary: components["schemas"]["SubjectVocabulary"];
+            /** Code */
+            code: string;
+            /**
+             * Level
+             * @description Profondeur dans le vocabulaire : 1 pour une racine.
+             */
+            level: number;
+            /** Usage Count */
+            usage_count: number;
+            /**
+             * Ancestors
+             * @description De la racine au parent.
+             */
+            ancestors: components["schemas"]["SubjectLabelRef"][];
+            /** Children */
+            children: components["schemas"]["SubjectChildOut"][];
+        };
         /** YesNoCount */
         YesNoCount: {
             /** Yes */
@@ -6418,7 +6541,8 @@ export interface operations {
                 monograph_id?: number | null;
                 person_id?: number | null;
                 author_id?: number | null;
-                subject_id?: string;
+                /** @description Libellés normalisés des sujets */
+                subject?: string;
                 access?: string;
                 oa_status?: string;
                 license?: string;
@@ -6490,7 +6614,8 @@ export interface operations {
                 monograph_id?: number | null;
                 person_id?: number | null;
                 author_id?: number | null;
-                subject_id?: string;
+                /** @description Libellés normalisés des sujets */
+                subject?: string;
                 access?: string;
                 oa_status?: string;
                 license?: string;
@@ -6580,7 +6705,8 @@ export interface operations {
                 monograph_id?: number | null;
                 person_id?: number | null;
                 author_id?: number | null;
-                subject_id?: string;
+                /** @description Libellés normalisés des sujets */
+                subject?: string;
                 access?: string;
                 oa_status?: string;
                 license?: string;
@@ -6635,7 +6761,8 @@ export interface operations {
                 monograph_id?: number | null;
                 person_id?: number | null;
                 author_id?: number | null;
-                subject_id?: string;
+                /** @description Libellés normalisés des sujets */
+                subject?: string;
                 access?: string;
                 oa_status?: string;
                 license?: string;
@@ -6690,7 +6817,8 @@ export interface operations {
                 monograph_id?: number | null;
                 person_id?: number | null;
                 author_id?: number | null;
-                subject_id?: string;
+                /** @description Libellés normalisés des sujets */
+                subject?: string;
                 access?: string;
                 oa_status?: string;
                 license?: string;
@@ -7001,7 +7129,8 @@ export interface operations {
                 monograph_id?: number | null;
                 person_id?: number | null;
                 author_id?: number | null;
-                subject_id?: string;
+                /** @description Libellés normalisés des sujets */
+                subject?: string;
                 access?: string;
                 oa_status?: string;
                 license?: string;
@@ -9900,6 +10029,37 @@ export interface operations {
             };
         };
     };
+    get_publisher_name_forms_api_publishers__publisher_id__name_forms_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                publisher_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublisherNameForm"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_publisher_subjects_api_publishers__publisher_id__subjects_get: {
         parameters: {
             query?: {
@@ -10721,10 +10881,9 @@ export interface operations {
             query?: {
                 page?: number;
                 per_page?: number;
-                /** @description Recherche sur le libellé, insensible à la casse et aux accents */
-                search?: string | null;
-                /** @description Nombre minimal de publications portant le sujet */
-                min_count?: number;
+                sort?: "label_asc" | "label_desc" | "publications_asc" | "publications_desc";
+                search?: string;
+                vocabulary?: string;
             };
             header?: never;
             path?: never;
@@ -10752,13 +10911,44 @@ export interface operations {
             };
         };
     };
+    subjects_facets_api_subjects_facets_get: {
+        parameters: {
+            query?: {
+                search?: string;
+                vocabulary?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubjectsFacetsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     export_subjects_csv_api_subjects_export_csv_get: {
         parameters: {
             query?: {
-                /** @description Recherche sur le libellé, insensible à la casse et aux accents */
-                search?: string | null;
-                /** @description Nombre minimal de publications portant le sujet */
-                min_count?: number;
+                sort?: "label_asc" | "label_desc" | "publications_asc" | "publications_desc";
+                search?: string;
+                vocabulary?: string;
             };
             header?: never;
             path?: never;
@@ -10786,7 +10976,7 @@ export interface operations {
             };
         };
     };
-    get_subject_api_subjects__subject_id__get: {
+    get_subject_api_subjects__label_normalized__get: {
         parameters: {
             query?: {
                 neighbors_limit?: number;
@@ -10794,7 +10984,7 @@ export interface operations {
             };
             header?: never;
             path: {
-                subject_id: number;
+                label_normalized: string;
             };
             cookie?: never;
         };

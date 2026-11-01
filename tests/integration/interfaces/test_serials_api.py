@@ -25,6 +25,7 @@ from domain.source_records.identifiers import (
     SourceIdentifierRole,
     SourceIdentifierType,
 )
+from infrastructure.read_models.subjects import queries as subject_queries
 from tests.integration.helpers.db import owner_pool
 from tests.integration.helpers.seeds import (
     seed_in_perimeter_contributions,
@@ -36,6 +37,7 @@ from tests.integration.helpers.seeds import (
     seed_serial_issn,
     seed_source_record,
     seed_subject,
+    seed_subject_usage,
     uniq,
 )
 
@@ -470,21 +472,22 @@ class TestSerialSubjects:
         assert r.status_code == 200
         assert r.json() == []
 
-    def test_returns_top_subjects_excluding_generic(self, client):
+    def test_returns_top_subjects_excluding_generic(self, client, monkeypatch):
+        # Seuil de généricité abaissé à une publication : un sujet de deux publications est générique.
+        monkeypatch.setattr(subject_queries, "GENERIC_SUBJECT_MAX_USAGE", 1)
         jid = seed_serial()
         publication_ids = [_publication("p1", serial_id=jid), _publication("p2", serial_id=jid)]
-        # Sujet spécifique, sous le seuil de généricité (5000), attaché aux deux publications.
         specific_label = uniq("specific_subject")
-        spec_id = seed_subject(specific_label, usage_count=100)
-        # Sujet générique, au-dessus du seuil, attaché à une publication : exclu des sujets principaux.
+        spec_id = seed_subject(specific_label)
         generic_label = uniq("generic_subject")
-        gen_id = seed_subject(generic_label, usage_count=9999)
+        gen_id = seed_subject(generic_label)
         for publication_id, subject_id in (
             (publication_ids[0], spec_id),
-            (publication_ids[1], spec_id),
             (publication_ids[0], gen_id),
+            (publication_ids[1], gen_id),
         ):
             seed_publication_subject(publication_id, subject_id=subject_id)
+        seed_subject_usage()
         seed_in_perimeter_contributions(jid)
         r = client.get(f"/api/serials/{jid}/subjects")
         assert r.status_code == 200
@@ -493,7 +496,7 @@ class TestSerialSubjects:
         assert specific_label in labels
         assert generic_label not in labels
         spec_entry = next(s for s in body if s["label"] == specific_label)
-        assert spec_entry["count"] == 2
+        assert spec_entry["count"] == 1
 
     def test_respects_limit(self, client):
         jid = seed_serial()

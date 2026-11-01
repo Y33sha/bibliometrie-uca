@@ -4,6 +4,7 @@
   import { page } from "$app/state";
   import { apiDetail } from "#lib/api/index.js";
   import { titleText } from "#lib/utils.js";
+  import ClampedBlock from "#lib/components/ClampedBlock.svelte";
   import PublicationAbstract from "#lib/components/PublicationAbstract.svelte";
   import type { PubResponse } from "./types";
   import PublicationHeader from "./PublicationHeader.svelte";
@@ -43,19 +44,6 @@
   );
 
   const thesesSource = $derived(data?.sources.find((s) => s.source === "theses"));
-
-  // Résumé replié à quelques lignes ; « Lire la suite » n'apparaît que s'il dépasse.
-  let abstractEl = $state<HTMLDivElement | undefined>();
-  let abstractOpen = $state(false);
-  let abstractOverflows = $state(false);
-  $effect(() => {
-    void pub?.abstract;
-    abstractOpen = false;
-  });
-  $effect(() => {
-    if (!abstractEl || abstractOpen) return;
-    abstractOverflows = abstractEl.scrollHeight > abstractEl.clientHeight + 2;
-  });
 
   async function loadData(id: string) {
     data = await apiDetail<PubResponse>(`/api/publications/${id}`);
@@ -112,14 +100,14 @@
         {#if pub.abstract}
           <div class="detail-section">
             <SectionLabel icon="document" text="Résumé" />
-            <div class="abstract-text" class:clamped={!abstractOpen} class:overflows={abstractOverflows} bind:this={abstractEl}>
-              <PublicationAbstract resume={pub.abstract} />
+            <!-- Six lignes environ. -->
+            <div class="abstract-text">
+              {#key pub.id}
+                <ClampedBlock maxHeight="calc(1.65em * 6)" moreLabel="Lire la suite">
+                  <PublicationAbstract resume={pub.abstract} />
+                </ClampedBlock>
+              {/key}
             </div>
-            {#if abstractOverflows || abstractOpen}
-              <button type="button" class="read-more" onclick={() => (abstractOpen = !abstractOpen)}>
-                {abstractOpen ? "Réduire" : "Lire la suite"}
-              </button>
-            {/if}
           </div>
         {/if}
 
@@ -165,15 +153,6 @@
     color: var(--text);
     margin: 0;
   }
-  /* Six lignes environ ; fondu sur la dernière quand le résumé dépasse. */
-  .abstract-text.clamped {
-    max-height: calc(1.65em * 6);
-    overflow: hidden;
-  }
-  .abstract-text.clamped.overflows {
-    mask-image: linear-gradient(to bottom, black 70%, transparent);
-  }
-
   /* Le résumé garde les paragraphes que la source y dépose : conteneur en `div`, un `p` ne
      pouvant pas en contenir un autre. */
   .abstract-text :global(p) {
@@ -182,18 +161,5 @@
 
   .abstract-text :global(p:last-child) {
     margin-bottom: 0;
-  }
-  .read-more {
-    margin-top: 6px;
-    padding: 4px 0;
-    border: none;
-    background: none;
-    font: inherit;
-    font-weight: 600;
-    color: var(--accent);
-    cursor: pointer;
-  }
-  .read-more:hover {
-    text-decoration: underline;
   }
 </style>

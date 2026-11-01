@@ -2,12 +2,16 @@
 
 import uuid
 
+from domain.normalize import normalize_text
 from tests.integration.helpers.db import owner_pool
 from tests.integration.helpers.seeds import (
     seed_person,
+    seed_publication,
+    seed_publication_subject,
     seed_publisher,
     seed_serial,
     seed_subject,
+    seed_subject_usage,
 )
 
 
@@ -44,16 +48,15 @@ class TestEntityLabels:
                 cur.execute("DELETE FROM persons WHERE id = %s", (person_id,))
 
     def test_subject_reads_its_label(self, client):
+        """Un sujet est identifié par son libellé normalisé."""
         label = f"Sujet {uuid.uuid4().hex[:8]}"
-        subject_id = seed_subject(label)
-        try:
-            r = client.get(
-                "/api/entity-labels", params={"kind": "subject", "entity_id": subject_id}
-            )
-            assert r.json() == {"label": label}
-        finally:
-            with owner_pool() as cur:
-                cur.execute("DELETE FROM subjects WHERE id = %s", (subject_id,))
+        publication_id = seed_publication("subject-label", normalize_title=False)
+        seed_publication_subject(publication_id, subject_id=seed_subject(label))
+        seed_subject_usage()
+        r = client.get(
+            "/api/entity-labels", params={"kind": "subject", "entity_id": normalize_text(label)}
+        )
+        assert r.json() == {"label": label}
 
     def test_unknown_kind_rejected(self, client):
         r = client.get("/api/entity-labels", params={"kind": "structure", "entity_id": 1})

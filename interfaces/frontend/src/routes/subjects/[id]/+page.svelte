@@ -10,10 +10,13 @@
   import PublicationsListView from "#lib/components/PublicationsListView.svelte";
   import TabNav from "#lib/components/TabNav.svelte";
   import SortChevron from "#lib/components/SortChevron.svelte";
+  import ClampedBlock from "#lib/components/ClampedBlock.svelte";
+  import { subjectVocabularyLabels } from "#lib/labels.js";
 
   type SubjectDetailResponse = components["schemas"]["SubjectDetailResponse"];
 
-  const subjectId = $derived(Number(page.params.id));
+  // Libellé normalisé du sujet : il l'identifie, tous vocabulaires confondus.
+  const subjectKey = $derived(page.params.id ?? "");
 
   // Onglet actif synchronisé avec `?tab=...` (graphe par défaut). TabNav gère lui-même la lecture de l'URL et la navigation via goto.
   const activeTab = $derived(
@@ -29,14 +32,14 @@
   // Chaque changement de sujet relance la fiche : la requête précédente, encore en vol, est annulée.
   const request = latestRequest();
 
-  async function loadFor(id: number, limit: number, min: number) {
+  async function loadFor(key: string, limit: number, min: number) {
     loading = true;
     error = false;
     try {
       const qs = new URLSearchParams();
       qs.set("neighbors_limit", String(limit));
       qs.set("min_cooccurrence", String(min));
-      data = await request<SubjectDetailResponse>(`/api/subjects/${id}?${qs}`);
+      data = await request<SubjectDetailResponse>(`/api/subjects/${encodeURIComponent(key)}?${qs}`);
     } catch {
       error = true;
       data = null;
@@ -45,15 +48,14 @@
     }
   }
 
-  // Charge le sujet de l'identifiant de la page et ses voisins.
+  // Charge le sujet de la page et ses voisins.
   $effect(() => {
-    const id = subjectId;
-    loadFor(id, NEIGHBORS_LIMIT, MIN_COOCCURRENCE);
+    loadFor(subjectKey, NEIGHBORS_LIMIT, MIN_COOCCURRENCE);
   });
 
-  // Tableau des sujets associés, trié par publications en commun par défaut. Spécificité : part des publications du sujet associé qui portent aussi le sujet de la page.
+  // Tableau des sujets associés, trié par spécificité par défaut : part des publications du sujet associé qui portent aussi le sujet de la page.
   type NeighborSort = "common" | "specificity" | "total";
-  let neighborSort = $state<NeighborSort>("common");
+  let neighborSort = $state<NeighborSort>("specificity");
   const specificity = (n: { cooccurrence_count: number; usage_count: number }) =>
     Math.min(1, n.cooccurrence_count / Math.max(n.usage_count, 1));
   const sortedNeighbors = $derived(
@@ -86,6 +88,39 @@
         {data.subject.usage_count.toLocaleString("fr-FR")} publications
       </div>
     </div>
+
+    <!-- Place du sujet dans chaque vocabulaire : ancêtres, nombre de publications, sous-sujets. -->
+    <div class="vocabularies">
+      {#each data.vocabulary_subjects as v (`${v.vocabulary}:${v.code}`)}
+        <div class="vocabulary">
+          <div class="vocabulary-line">
+            <span class="entity-meta-label">{subjectVocabularyLabels[v.vocabulary]}</span>
+            <span class="lineage">
+              {#each v.ancestors as a (a.label_normalized)}
+                <a class="entity-link" href={resolve(`subjects/${a.label_normalized}`)}>{a.label}</a>
+                <span class="separator">›</span>
+              {/each}
+              <span class="current">{data.subject.label}</span>
+            </span>
+            <span class="muted-num">{v.usage_count.toLocaleString("fr-FR")} publications</span>
+          </div>
+          {#if v.children.length > 0}
+            <div class="detail-sublabel">Sous-sujets</div>
+            <!-- Deux lignes et demie de pastilles. -->
+            {#key `${data.subject.label_normalized}:${v.vocabulary}:${v.code}`}
+              <ClampedBlock maxHeight="4.5rem" moreLabel={`Voir les ${v.children.length} sous-sujets`}>
+                <div class="detail-tags">
+                  {#each v.children as c (c.label_normalized)}
+                    <a href={resolve(`subjects/${c.label_normalized}`)}>{c.label} <span class="muted-num">{c.usage_count.toLocaleString("fr-FR")}</span></a>
+                  {/each}
+                </div>
+              </ClampedBlock>
+            {/key}
+          {/if}
+        </div>
+      {/each}
+    </div>
+
     <TabNav
       tabs={[
         { id: "graph", label: "Sujets associés" },
@@ -103,7 +138,7 @@
             Taille du cercle : nombre de publications du sujet · Épaisseur du lien : publications en commun ·
             Distance au centre : spécificité de l'association. Un clic sur un sujet ouvre sa page.
           </p>
-          {#key data.subject.id}
+          {#key data.subject.label_normalized}
             <SubjectGraph
               subject={data.subject}
               neighbors={data.neighbors}
@@ -134,9 +169,9 @@
                 </tr>
               </thead>
               <tbody>
-                {#each sortedNeighbors as n (n.id)}
+                {#each sortedNeighbors as n (n.label_normalized)}
                   <tr>
-                    <td><a class="entity-link" href={resolve(`subjects/${n.id}`)}>{n.label}</a></td>
+                    <td><a class="entity-link" href={resolve(`subjects/${n.label_normalized}`)}>{n.label}</a></td>
                     <td class="num">{n.cooccurrence_count.toLocaleString("fr-FR")}</td>
                     <td class="num">
                       <span class="spec-cell">
@@ -153,10 +188,10 @@
         {/if}
       </div>
     {:else}
-      {#key data.subject.id}
+      {#key data.subject.label_normalized}
         <PublicationsListView
-          apiKey={`subject-${data.subject.id}-publications`}
-          context={{ kind: 'subject', id: data.subject.id }}
+          apiKey={`subject-${data.subject.label_normalized}-publications`}
+          context={{ kind: 'subject', id: data.subject.label_normalized }}
           urlSync={false}
         />
       {/key}
@@ -164,6 +199,35 @@
   {/if}
 
 <style>
+  .vocabularies {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .vocabulary {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .vocabulary-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 6px 12px;
+  }
+  .lineage {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 6px;
+  }
+  .separator {
+    color: var(--muted);
+  }
+  .current {
+    font-weight: 600;
+  }
   .graph-wrapper {
     width: 100%;
   }

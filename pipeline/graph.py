@@ -300,6 +300,7 @@ TASKS: tuple[Task, ...] = (
                 "contributor_information",
                 "addresses.id",
                 "countries",
+                "subjects",
                 # Contributions des contributions sources à rôles ou statut de correspondant modifiés.
                 "aligned_source_contributions",
                 *_containers(source),
@@ -311,6 +312,8 @@ TASKS: tuple[Task, ...] = (
                 "source_record_identifiers",
                 "source_record_locations",
                 "embargoes",
+                "subjects",
+                "source_record_subjects",
                 "platforms",
                 "source_contributions",
                 "source_contribution_addresses",
@@ -332,6 +335,8 @@ TASKS: tuple[Task, ...] = (
                 "source_records",
                 "source_record_locations",
                 "embargoes",
+                "subjects",
+                "source_record_subjects",
                 "platforms",
                 "source_contributions",
                 "contributor_information",
@@ -357,6 +362,7 @@ TASKS: tuple[Task, ...] = (
             "source_record_identifiers",
             "source_record_locations",
             "embargoes",
+            "source_record_subjects",
             "source_record_keys_queue",
             "publication_contributions_queue",
             "source_contributions.id",
@@ -562,7 +568,6 @@ TASKS: tuple[Task, ...] = (
             "source_records.publisher_id",
             "source_records.publication_id",
             "publications.doi_prefix",
-            "doi_prefixes.ra",
             "doi_prefixes.publisher_id",
             "publishers.id",
             "publishers.name",
@@ -609,6 +614,15 @@ TASKS: tuple[Task, ...] = (
         network="sudoc",
     ),
     _task(
+        "publishing.import_issnl_table",
+        "publishing",
+        reads=("serial_issns", "config"),
+        writes=("serial_issns.issnl", "serial_issns.issnl_checked_at"),
+        # Date du dernier import, posée par la tâche elle-même.
+        previous_run=("serial_issns",),
+        network="issn",
+    ),
+    _task(
         "publishing.attach_serials",
         "publishing",
         reads=(
@@ -618,6 +632,8 @@ TASKS: tuple[Task, ...] = (
             "source_records.publisher_id",
             "source_records.corrections",
             "serial_issns",
+            # ISSN qui annule chaque ISSN annulé.
+            "issn_links",
             "serials",
             "serial_title_decisions",
             "monographs.serial_id",
@@ -1222,6 +1238,10 @@ TASKS: tuple[Task, ...] = (
             "apc_payments",
             "doi_prefixes.publisher_id",
             "serial_title_decisions",
+            # ISSN cités par la série d'un enregistrement source, ou reliés à un autre titre.
+            "serial_issns",
+            "source_records.biblio",
+            "issn_links",
         ),
         writes=("monographs.id", "serials.id", "publishers.id", "serial_issns"),
     ),
@@ -1280,7 +1300,9 @@ TASKS: tuple[Task, ...] = (
         reads=(
             "publications.id",
             "publications.subjects_ingested_at",
-            "source_records.topics",
+            "source_records.publication_id",
+            "source_records.source",
+            "source_record_subjects",
             "subjects",
             "publication_subjects",
         ),
@@ -1293,8 +1315,10 @@ TASKS: tuple[Task, ...] = (
         reads=(
             "publication_subjects",
             "subjects.id",
+            "subjects.label",
+            "subjects.label_normalized",
         ),
-        writes=("subjects.usage_count", "subject_cooccurrences"),
+        writes=("subjects.usage_count", "subject_labels", "subject_cooccurrences"),
         previous_run=("subjects",),
     ),
     _task(

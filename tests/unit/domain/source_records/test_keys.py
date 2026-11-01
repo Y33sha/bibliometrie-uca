@@ -13,8 +13,11 @@ from domain.source_records.identifiers import (
 from domain.source_records.keys import (
     DISCRIMINANT_TITLE_MIN_LENGTH,
     ConfirmationKeys,
+    Derivation,
     DoiKeys,
     anchor_of,
+    deposit_anchors,
+    derivation,
     doi_anchors,
     project_confirmation_keys,
 )
@@ -63,6 +66,33 @@ class TestAnchors:
     def test_without_primary_or_derived_doi_single_dois_are_the_anchors(self):
         keys = [DoiKeys(frozenset(), frozenset({"a"})), DoiKeys(frozenset(), frozenset({"a", "b"}))]
         assert doi_anchors(keys) == {"a"}
+
+    def test_preprint_server_dois_are_not_anchors(self):
+        arxiv, article = "10.48550/arxiv.1", "10.1016/article"
+        assert doi_anchors([DoiKeys(frozenset({arxiv})), DoiKeys(frozenset({article}))]) == {
+            article
+        }
+        assert doi_anchors([DoiKeys(frozenset({arxiv}))]) == frozenset()
+        assert doi_anchors(
+            [DoiKeys(frozenset({arxiv})), DoiKeys(frozenset(), frozenset({article}))]
+        ) == {article}
+
+    def test_deposit_anchors_are_chosen_like_anchors(self):
+        arxiv, ssrn = "10.48550/arxiv.1", "10.2139/ssrn.1"
+        keys = [DoiKeys(frozenset({arxiv})), DoiKeys(frozenset(), frozenset({ssrn}))]
+        assert deposit_anchors(keys) == {arxiv}
+
+    def test_the_doi_of_a_copy_archive_is_not_an_anchor(self):
+        desy, article = "10.3204/pubdb-2024-00624", "10.1016/article"
+        keys = [DoiKeys(frozenset({desy}), doc_type="article"), DoiKeys(frozenset({article}))]
+        assert doi_anchors(keys) == {article}
+
+    def test_the_zenodo_doi_of_a_text_deposit_is_not_an_anchor(self):
+        zenodo, article = "10.5281/zenodo.1", "10.1016/article"
+        copy = DoiKeys(frozenset({zenodo}), doc_type="article")
+        dataset = DoiKeys(frozenset({zenodo}), doc_type="dataset")
+        assert doi_anchors([copy, DoiKeys(frozenset({article}))]) == {article}
+        assert doi_anchors([dataset, DoiKeys(frozenset({article}))]) == {zenodo, article}
 
     def test_anchor_of_a_member(self):
         anchors = frozenset({"a", "b"})
@@ -169,3 +199,16 @@ class TestTokens:
 
     def test_no_keys_empty_token_set(self):
         assert _none().tokens() == frozenset()
+
+
+def test_derivation_lit_les_identifiants_primaires_et_l_identifiant_derive_actifs():
+    hal, doi = SourceIdentifierType.HAL_ID, SourceIdentifierType.DOI
+    identifiers = [
+        SourceIdentifier(hal, "hal-1", SourceIdentifierRole.DERIVED),
+        SourceIdentifier(doi, "10.1/x", SourceIdentifierRole.PRIMARY),
+        SourceIdentifier(doi, "10.1/y", SourceIdentifierRole.PRIMARY, removed_by="RULE"),
+        SourceIdentifier(doi, "10.1/z", SourceIdentifierRole.SECONDARY),
+    ]
+    assert derivation(identifiers) == Derivation(
+        frozenset({("doi", "10.1/x")}), ("hal_id", "hal-1")
+    )

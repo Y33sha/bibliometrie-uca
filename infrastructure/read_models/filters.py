@@ -53,27 +53,6 @@ def publication_in_perimeter(alias: str = "p") -> str:
 # La plupart des requêtes aliasent les publications `p` : constante de commodité.
 PUBLICATION_IS_IN_PERIMETER = publication_in_perimeter()
 
-# Un sujet dont l'usage global dépasse ce seuil est trop générique pour un nuage de mots : « research article » ou « science » arrivent en tête partout, et masquent ce qui distingue le contexte affiché.
-GENERIC_SUBJECT_MAX_USAGE = 5000
-
-# Filtre SQL : le sujet (alias `s`) est hors des sujets génériques. Les quatre nuages de mots (éditeur, revue, laboratoire, personne) écartent le même ensemble.
-SUBJECT_IS_NOT_GENERIC = f"(s.usage_count <= {GENERIC_SUBJECT_MAX_USAGE})"
-
-
-def entity_subjects_sql(entity_predicate: str) -> str:
-    """Renvoie la requête des sujets les plus fréquents des publications retenues par `entity_predicate` (alias `p`). Chaque page d'entité (revue, éditeur, laboratoire, personne) passe son propre prédicat ; `:lim` plafonne le nombre de sujets."""
-    return f"""
-        SELECT s.id, s.label, COUNT(DISTINCT p.id) AS n
-        FROM publication_subjects ps
-        JOIN publications p ON p.id = ps.publication_id
-        JOIN subjects s ON s.id = ps.subject_id
-        WHERE {entity_predicate}
-          AND {SUBJECT_IS_NOT_GENERIC}
-        GROUP BY s.id, s.label
-        ORDER BY n DESC, lower(s.label)
-        LIMIT :lim
-    """
-
 
 @dataclass(frozen=True)
 class WhereClause:
@@ -459,14 +438,15 @@ def language_clause(language_codes: list[str]) -> WhereClause | None:
     )
 
 
-def subject_clause(subject_ids: list[int]) -> WhereClause | None:
-    """Renvoie le filtre : la publication a au moins un des sujets."""
-    if not subject_ids:
+def subject_clause(subject_labels: list[str]) -> WhereClause | None:
+    """Renvoie le filtre : la publication a un sujet d'au moins un des libellés normalisés, quel que soit son vocabulaire."""
+    if not subject_labels:
         return None
     return WhereClause(
-        "EXISTS (SELECT 1 FROM publication_subjects ps "
-        "WHERE ps.publication_id = p.id AND ps.subject_id = ANY(CAST(:flt_subject_ids AS int[])))",
-        {"flt_subject_ids": subject_ids},
+        "EXISTS (SELECT 1 FROM publication_subjects ps JOIN subjects s ON s.id = ps.subject_id "
+        "WHERE ps.publication_id = p.id "
+        "AND s.label_normalized = ANY(CAST(:flt_subject_labels AS text[])))",
+        {"flt_subject_labels": subject_labels},
     )
 
 

@@ -5,7 +5,6 @@ import logging
 from sqlalchemy import text
 
 from infrastructure.repositories import person_repository
-from infrastructure.repositories.person_repository import PgPersonRepository
 from pipeline.transformation.persons.contribution_resolution import resolve_contributions
 from pipeline.transformation.persons.identifier_arbitration import arbitrate_identifier_conflicts
 from pipeline.transformation.persons.populate_person_name_forms import populate
@@ -53,7 +52,7 @@ def _setup(conn) -> dict[str, int]:
 
 
 def _run(conn) -> None:
-    arbitrate_identifier_conflicts(conn, logging.getLogger("test"), repo=PgPersonRepository(conn))
+    arbitrate_identifier_conflicts(conn, logging.getLogger("test"))
     resolve_contributions(conn, logging.getLogger("test"))
     populate(conn)
     purge(conn)

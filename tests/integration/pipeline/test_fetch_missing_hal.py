@@ -2,8 +2,10 @@
 
 import httpx2
 
+from domain.sources.registry import source_record_url
 from pipeline.http.lookup import NOT_FOUND, UNAVAILABLE
 from pipeline.ingestion.api_params import API_BASE_URLS
+from pipeline.ingestion.hal.api import find_deposit
 from pipeline.ingestion.hal.fetch_missing import get_missing_hal_ids, get_missing_nnts, search_one
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_record, secondary_identifiers
@@ -138,3 +140,39 @@ class TestSearchOne:
         http_mock.get(API_BASE_URLS["hal"]).mock(return_value=httpx2.Response(404))
         async with httpx2.AsyncClient() as client:
             assert await search_one(client, "nntId_s:2024UCA0001", label="x") is UNAVAILABLE
+
+
+_EMPTY_SEARCH = httpx2.Response(200, json={"response": {"docs": []}})
+
+
+class TestFindDeposit:
+    """Dépôt lu par son hal-id, ou dépôt conservé qui l'a absorbé ; une recherche vide se confirme sur la page du dépôt."""
+
+    async def test_un_doublon_absorbe_renvoie_le_depot_conserve(self, http_mock):
+        search = http_mock.get(API_BASE_URLS["hal"]).mock(
+            return_value=httpx2.Response(
+                200, json={"response": {"docs": [{"halId_s": "hal-02305054"}]}}
+            )
+        )
+        async with httpx2.AsyncClient() as client:
+            assert await find_deposit(client, "hal-04395740") == {"halId_s": "hal-02305054"}
+        assert search.calls[0].url.params["q"] == (
+            "halId_s:hal-04395740 OR halIdSameAs_s:hal-04395740"
+        )
+
+    async def test_une_page_absente_confirme_l_absence(self, http_mock):
+        http_mock.get(API_BASE_URLS["hal"]).mock(return_value=_EMPTY_SEARCH)
+        http_mock.get(source_record_url("hal", "hal-01234567")).mock(
+            return_value=httpx2.Response(404)
+        )
+        async with httpx2.AsyncClient() as client:
+            assert await find_deposit(client, "hal-01234567") is NOT_FOUND
+
+    async def test_une_page_presente_reporte_la_lecture(self, http_mock):
+        """Le dépôt est en ligne mais absent de l'index : il est relu plus tard."""
+        http_mock.get(API_BASE_URLS["hal"]).mock(return_value=_EMPTY_SEARCH)
+        http_mock.get(source_record_url("hal", "hal-01234567")).mock(
+            return_value=httpx2.Response(200, text="<html></html>")
+        )
+        async with httpx2.AsyncClient() as client:
+            assert await find_deposit(client, "hal-01234567") is UNAVAILABLE

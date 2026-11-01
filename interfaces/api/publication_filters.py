@@ -44,7 +44,7 @@ class PublicationFilterParams:
     monograph_id: Annotated[int | None, Query()] = None
     person_id: Annotated[int | None, Query()] = None
     author_id: Annotated[int | None, Query()] = None
-    subject_id: Annotated[str, Query()] = ""
+    subject: Annotated[str, Query(description="Libellés normalisés des sujets")] = ""
     access: Annotated[str, Query()] = ""
     oa_status: Annotated[str, Query()] = ""
     license: Annotated[str, Query()] = ""
@@ -70,7 +70,7 @@ class PublicationFilterParams:
             monograph_id=self.monograph_id,
             person_id=self.person_id,
             author_id=self.author_id,
-            subject_ids=parse_int_csv(self.subject_id, param="subject_id"),
+            subject_labels=parse_str_csv(self.subject),
             access=parse_vocabulary_csv(self.access, allowed=ACCESS_LEVELS, param="access"),
             oa_status=parse_vocabulary_csv(self.oa_status, allowed=OA_STATUSES, param="oa_status"),
             license=parse_vocabulary_csv(

@@ -72,6 +72,18 @@ def test_les_retraits_sont_annonces(contexte, caplog):
     assert "2 documents supprimés (disparus de leur source)" in caplog.text
 
 
+def test_la_ligne_de_la_source_compte_les_documents_normalises_et_les_erreurs(contexte, caplog):
+    with caplog.at_level(logging.INFO, logger="test"):
+        _run(contexte, [], bilan=NormalizeStats(3525, 0, 1))
+    assert "HAL : 3525 documents normalisés, 1 erreur" in caplog.text
+
+
+def test_sans_document_la_ligne_de_la_source_dit_rien_a_faire(contexte, caplog):
+    with caplog.at_level(logging.INFO, logger="test"):
+        _run(contexte, [], bilan=NormalizeStats(0, 0, 0))
+    assert "HAL : rien à faire" in caplog.text
+
+
 def test_la_table_porte_une_ligne_par_source(contexte):
     metrics = _run(contexte, [], bilan=NormalizeStats(3, 1, 2))
     (ligne,) = metrics.details["table"]["rows"]

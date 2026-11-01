@@ -1,6 +1,6 @@
 """Sous-étape `remove_identifiers` de la phase `metadata_correction` : retrait d'identifiants par groupe d'enregistrements sources de même DOI. Un groupe réunit les enregistrements sources ayant son DOI dans `source_record_identifiers`, de rôle autre que `related`. Un enregistrement source appartient à un groupe par DOI.
 
-Un DOI partagé par des œuvres distinctes (ouvrage et chapitre, chapitres de titres différents, volume d'actes et communication, dépôt HAL d'une autre œuvre) est retiré du ou des mauvais côtés. Sinon, la réconciliation fusionnerait ces œuvres. Un DOI à cible dans `doi_targets` est celui d'une forme secondaire : aucun membre de son groupe ne le perd. Un DOI inconnu de doi.org est retiré de tous les enregistrements sources qui le citent.
+Un DOI partagé par des œuvres distinctes (ouvrage et chapitre, chapitres de titres différents, volume d'actes et communication, enregistrement source d'une autre œuvre) est retiré du ou des mauvais côtés. Sinon, la réconciliation fusionnerait ces œuvres. Un DOI à cible dans `doi_targets` est celui d'une forme secondaire : aucun membre de son groupe ne le perd. Un DOI inconnu de doi.org est retiré de tous les enregistrements sources qui le citent.
 
 Quand une partie du groupe perd le DOI, les enregistrements sources qui le gardent perdent les clés de confirmation partagées avec ceux qui le perdent. Exemple : le dépôt HAL d'une communication, recopié par l'enregistrement source OpenAlex du volume d'actes. Le cas de chaque identifiant retiré, DOI compris, est inscrit dans `source_record_identifiers.removed_by`.
 
@@ -27,6 +27,7 @@ from domain.source_records.metadata_correction.shared_doi import (
     DoiClusterMember,
     confirmation_id_removals,
     confirmation_ids,
+    distant_titles,
     resolve_cluster_doi_corrections,
     source_record_own_ids,
 )
@@ -70,6 +71,16 @@ def _compute_update(
     if identifiers == row.identifiers:
         return None
     return DoiCorrectionUpdate(row.id, identifiers)
+
+
+def fetch_candidates(store: SourceRecordCorrectionStore) -> list[DoiClusterRow]:
+    """Renvoie les membres des groupes candidats au retrait du DOI. Un groupe où un enregistrement source a un titre éloigné de celui de l'enregistrement source Crossref est candidat : seuls ces groupes reçoivent les noms d'auteur, plus coûteux à lire."""
+    distant = {
+        pair.doi
+        for pair in store.fetch_crossref_title_pairs()
+        if distant_titles(pair.title_normalized, pair.crossref_title_normalized)
+    }
+    return store.fetch_doi_cluster_candidates(distant)
 
 
 def compute_updates(rows: list[DoiClusterRow]) -> list[DoiCorrectionUpdate]:
@@ -143,10 +154,10 @@ def tally_doi_corrections(updates: list[DoiCorrectionUpdate]) -> dict[str, int]:
 def run(
     conn: Connection, store: SourceRecordCorrectionStore, logger: logging.Logger
 ) -> IdentifierRemovalStats:
-    """Retire le DOI des chapitres qui ont celui de l'ouvrage, des communications qui ont celui du volume d'actes, des dépôts HAL qui ont celui d'une autre œuvre, et le DOI inconnu de doi.org."""
+    """Retire le DOI des chapitres qui ont celui de l'ouvrage, des communications qui ont celui du volume d'actes, des enregistrements sources qui ont celui d'une autre œuvre, et le DOI inconnu de doi.org."""
     step(logger, "Retraits de DOI par confrontation de documents")
     t0 = time.perf_counter()
-    rows = store.fetch_doi_cluster_candidates()
+    rows = fetch_candidates(store)
     examined = len({row.id for row in rows})
     logger.info("%s%s %s", BRANCH, quantity(examined, "document"), inflect(examined, "examiné"))
 

@@ -3,12 +3,12 @@
 Contraintes d'ordre :
 
 - La fusion des autres noms des éditeurs suit la résolution des préfixes, qui pose leurs titulaires.
-- Les ISSN des séries précèdent leur vérification Sudoc, qui précède le rattachement des enregistrements sources aux revues : le rattachement lit l'ISSN-L de chaque ISSN.
+- Les ISSN des séries précèdent leur vérification Sudoc et l'import de la table ISSN-L, qui précèdent le rattachement des enregistrements sources aux revues : le rattachement lit l'ISSN-L et le titre Sudoc de chaque ISSN.
 - Le typage OpenAlex des revues `unknown` suit le rattachement, qui pose leur identifiant OpenAlex, et précède le typage en recueil d'actes, qui vise aussi les revues `unknown`.
 - Les espaces de noms DOI suivent le rattachement et le typage des revues.
 - Le rattachement des monographies à leur collection suit le rattachement des enregistrements sources. La nature des monographies lit le type de la collection posé par le rattachement.
 
-`enrich_serials_from_doaj` importe le dump CSV du DOAJ, qui fait autorité sur `is_in_doaj`, quand le dernier import date de plus de `doaj_refresh_after_days` jours. L'enrichissement des éditeurs (pays, ROR, type) se lance à la demande, par `interfaces/cli/maintenance/enrich_publishers.py`.
+`import_issnl_table` importe la table ISSN-L de l'ISSN International Centre, qui fait autorité sur `serial_issns.issnl`, quand le dernier import date de plus de `issnl_table_refresh_after_days` jours. `enrich_serials_from_doaj` importe le dump CSV du DOAJ, qui fait autorité sur `is_in_doaj`, quand le dernier import date de plus de `doaj_refresh_after_days` jours. L'enrichissement des éditeurs (pays, ROR, type) se lance à la demande, par `interfaces/cli/maintenance/enrich_publishers.py`.
 """
 
 from __future__ import annotations
@@ -25,6 +25,7 @@ from pipeline.ingestion.api_params import (
     SUDOC_MAX_CONCURRENT,
 )
 from pipeline.ingestion.complements.doaj import downloaded_doaj_dump
+from pipeline.ingestion.complements.issn_centre import downloaded_issnl_table
 from pipeline.ingestion.complements.sudoc import fetch_ppns, fetch_serial_record
 from pipeline.ingestion.crossref.prefixes import fetch_crossref_prefix
 from pipeline.ingestion.datacite.prefixes import fetch_datacite_prefix
@@ -65,6 +66,7 @@ from pipeline.transformation.publishing.serials import (
     check_issns_in_sudoc,
     enrich_serials_from_doaj,
     enrich_serials_from_openalex,
+    import_issnl_table,
     learn_serial_doi_namespaces,
     type_journal_serials,
     type_proceedings_serials,
@@ -82,6 +84,7 @@ from pipeline.transformation.publishing.serials.enrich_serials_from_doaj import 
 from pipeline.transformation.publishing.serials.enrich_serials_from_openalex import (
     run_enrich_serials_from_openalex,
 )
+from pipeline.transformation.publishing.serials.import_issnl_table import run_import_issnl_table
 from pipeline.transformation.publishing.serials.learn_serial_doi_namespaces import (
     run_learn_serial_doi_namespaces,
 )
@@ -212,6 +215,9 @@ def build() -> Phase:
                     "Publications en série",
                     check_issns_in_sudoc.LABEL,
                     threshold=3,
+                ),
+                "import_issnl_table": TaskStep(
+                    _run_import_issnl_table, "Publications en série", import_issnl_table.LABEL
                 ),
                 "attach_serials": TaskStep(
                     _run_attach_serials, "Publications en série", attach_serials.ATTACH_LABEL
@@ -371,6 +377,17 @@ def _run_type_journal_serials(ctx: PhaseContext) -> PhaseMetrics:
 def _run_learn_serial_doi_namespaces(ctx: PhaseContext) -> PhaseMetrics:
     with ctx.open_tx() as conn:
         return run_learn_serial_doi_namespaces(conn, ctx.logger)
+
+
+def _run_import_issnl_table(ctx: PhaseContext) -> PhaseMetrics:
+    user_agent = default_user_agent()
+    with ctx.open_tx() as conn:
+        return run_import_issnl_table(
+            conn,
+            ctx.logger,
+            refresh_after_days=delay(conn, ConfigKey.ISSNL_TABLE_REFRESH_AFTER_DAYS),
+            download_table=lambda: downloaded_issnl_table(user_agent=user_agent, logger=ctx.logger),
+        )
 
 
 def _run_enrich_serials_from_doaj(ctx: PhaseContext) -> PhaseMetrics:

@@ -12,7 +12,7 @@ from domain.publications.identifiers import DOI
 from domain.publications.licenses import DEPOSIT_LICENSE_SOURCE, publisher_license_sources
 from domain.publications.publication import Publication
 from domain.publishers.attribution import publication_publisher
-from domain.source_records.keys import anchor_of, doi_anchors
+from domain.source_records.keys import anchor_of, deposit_anchors, doi_anchors
 from domain.source_records.source_record import SourceRecord
 from domain.sources.registry import Source
 from domain.types import JsonValue, as_int, as_str
@@ -27,14 +27,14 @@ def refresh_from_sources(
 ) -> None:
     """Recalcule sur place les métadonnées de `publication` depuis ses enregistrements sources. L'éditeur se pose ensuite, par `assign_publisher`, et le statut open access d'après les copies (`domain.publications.open_access`).
 
-    - Champs simples : première valeur non nulle dans l'ordre de `source_priority`. Sans revue dans aucune source, la publication prend la collection de sa monographie (`monograph_serials`).
+    - DOI : `publication_doi`.
+    - Champs simples : première valeur non nulle dans l'ordre d'arbitrage (`arbitration_order`). Sans revue dans aucune source, la publication prend la collection de sa monographie (`monograph_serials`).
     - Type de document : `arbitrate_doc_type_with_article_subtype`, puis `arbitrate_conference`.
     - Date de publication : `arbitrate_publication_date` ; l'année en dérive.
     - Licence : celle de la version éditeur (`publisher_license_sources`). Licence de dépôt : celle du fichier déposé dans HAL.
     - Rétractation : déclarée par une source au moins.
     - Mots-clés et pays : union sans doublon.
     - `biblio` et `source_extras` : fusion par clé, la source prioritaire l'emporte.
-    - `topics` : sous la clé de chaque source.
 
     Raises:
         ValueError: `sources` vide ; une publication sans enregistrement source se supprime.
@@ -44,7 +44,9 @@ def refresh_from_sources(
             "refresh_from_sources requiert au moins une source ; le cas orphelin est à traiter côté caller (suppression de la publication)"
         )
 
-    sorted_sources = prioritized(sources, source_priority)
+    new_doi_str = publication_doi(prioritized(sources, source_priority))
+    publication.doi = DOI(new_doi_str) if new_doi_str else None
+    sorted_sources = arbitration_order(sources, source_priority)
 
     new_title = as_str(first_non_null(sorted_sources, "title"))
     publication.title = new_title if new_title is not None else publication.title
@@ -61,9 +63,6 @@ def refresh_from_sources(
     if publication.publication_date is not None:
         publication.publication_year = publication.publication_date.year
 
-    new_doi_str = publication_doi(sorted_sources)
-    publication.doi = DOI(new_doi_str) if new_doi_str else None
-
     publication.serial_id = as_int(first_non_null(sorted_sources, "serial_id"))
     publication.monograph_id = as_int(first_non_null(sorted_sources, "monograph_id"))
     if publication.serial_id is None and publication.monograph_id is not None and monograph_serials:
@@ -77,7 +76,6 @@ def refresh_from_sources(
     publication.abstract = as_str(first_non_null(sorted_sources, "abstract"))
     publication.keywords = _textes(merge_lists_dedup_ci(sorted_sources, "keywords"))
     publication.countries = _textes(merge_lists_dedup_ci(sorted_sources, "countries"))
-    publication.topics = topics_by_source(sorted_sources)
     publication.biblio = shallow_merge_jsonb(sorted_sources, "biblio")
     publication.source_extras = shallow_merge_jsonb(sorted_sources, "source_extras")
     publication.is_retracted = any(s.is_retracted for s in sorted_sources if s.is_retracted)
@@ -99,17 +97,17 @@ def assign_publisher(
     publication.publisher_id = publication_publisher(
         publication.doc_type,
         (prefix_publishers or {}).get(prefix) if prefix else None,
-        (s.publisher_id for s in prioritized(sources, source_priority)),
+        (s.publisher_id for s in arbitration_order(sources, source_priority)),
         platform_prefix=prefix is not None and is_publisher_platform_prefix(prefix),
     )
 
 
 def publication_doi(sources: list[SourceRecord]) -> str | None:
-    """Renvoie le DOI d'une publication : l'ancre de ses enregistrements sources (`doi_anchors`). Entre plusieurs ancres, celle du premier enregistrement source de `sources` qui en rejoint une."""
-    anchors = doi_anchors(s.dois for s in sources)
-    if len(anchors) == 1:
-        return next(iter(anchors))
-    return next((a for s in sources if (a := anchor_of(s.dois, anchors)) is not None), None)
+    """Renvoie le DOI d'une publication : l'ancre de ses enregistrements sources (`doi_anchors`), à défaut un DOI de dépôt (`deposit_anchors`). Entre plusieurs candidats, celui du premier enregistrement source de `sources` qui en rejoint un."""
+    candidates = doi_anchors(s.dois for s in sources) or deposit_anchors(s.dois for s in sources)
+    if len(candidates) == 1:
+        return next(iter(candidates))
+    return next((a for s in sources if (a := anchor_of(s.dois, candidates)) is not None), None)
 
 
 def prioritized(
@@ -118,6 +116,27 @@ def prioritized(
     """Trie `sources` dans l'ordre de `source_priority`."""
     rank = {s: i for i, s in enumerate(source_priority)}
     return sorted(sources, key=lambda s: rank.get(s.source, 99))
+
+
+def arbitration_order(
+    sources: list[SourceRecord], source_priority: tuple[str, ...]
+) -> list[SourceRecord]:
+    """Trie `sources` dans l'ordre de `source_priority`. Dans une publication qui a une version publiée (`has_published_version`), les enregistrements sources preprint passent après les autres."""
+    ordered = prioritized(sources, source_priority)
+    if not has_published_version(sources):
+        return ordered
+    return sorted(ordered, key=lambda s: s.doc_type == DocType.PREPRINT)
+
+
+def has_published_version(sources: list[SourceRecord]) -> bool:
+    """Vrai si une publication a une version publiée : une ancre (`doi_anchors`), ou la revue ou la monographie d'un enregistrement source typé autrement que preprint."""
+    if doi_anchors(s.dois for s in sources):
+        return True
+    return any(
+        s.doc_type not in (None, DocType.PREPRINT)
+        and (s.serial_id is not None or s.monograph_id is not None)
+        for s in sources
+    )
 
 
 def _textes(valeurs: list[JsonValue] | None) -> tuple[str, ...]:
@@ -167,17 +186,6 @@ def shallow_merge_jsonb(sources: list[SourceRecord], attr: str) -> dict[str, Jso
                 if k not in merged:
                     merged[k] = v
     return merged or None
-
-
-def topics_by_source(
-    sources: list[SourceRecord],
-) -> dict[str, JsonValue] | None:
-    """Renvoie les `topics` de chaque source, sous la clé de la source : leur forme diffère d'une source à l'autre."""
-    out: dict[str, JsonValue] = {}
-    for s in sources:
-        if s.topics:
-            out[s.source] = s.topics
-    return out or None
 
 
 def arbitrate_doc_type_with_article_subtype(sources: list[SourceRecord]) -> str:

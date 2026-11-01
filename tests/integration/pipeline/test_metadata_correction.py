@@ -21,7 +21,10 @@ from pipeline.transformation.publications.correction.doi_targets import (
     compute_doi_targets,
     run as run_doi_targets,
 )
-from pipeline.transformation.publications.correction.remove_identifiers import compute_updates
+from pipeline.transformation.publications.correction.remove_identifiers import (
+    compute_updates,
+    fetch_candidates,
+)
 from tests.integration.helpers.queues import clear, queued
 from tests.integration.helpers.serials import (
     insert_doi_prefix,
@@ -29,7 +32,7 @@ from tests.integration.helpers.serials import (
     insert_serial,
     insert_serial_doi_namespace,
 )
-from tests.integration.helpers.sources import insert_source_record
+from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 
 # Enregistrement source de titre « T », OpenAlex par défaut.
 _typed_source_record = partial(
@@ -319,7 +322,7 @@ def _apply_cluster(conn) -> int:
     """Joue les sous-étapes `doi_targets` puis `remove_identifiers`. Renvoie le nombre d'enregistrements sources corrigés."""
     store = SourceRecordCorrectionStore(conn)
     run_doi_targets(conn, store, logging.getLogger("test"))
-    return store.persist_doi_corrections(compute_updates(store.fetch_doi_cluster_candidates()))
+    return store.persist_doi_corrections(compute_updates(fetch_candidates(store)))
 
 
 def _doi_statuses(conn, source_record: int) -> dict[str, str | None]:
@@ -452,6 +455,71 @@ def test_chapters_number_prefix_same_chapter_untouched(sa_sync_conn):
         doc_type="book_chapter",
     )
     assert _apply_cluster(conn) == 0
+
+
+# ── Sous-étape cluster : enregistrement source au DOI d'une autre œuvre ──
+
+
+def _authored_source_record(conn, *, source, title_normalized, authors):
+    """Insère un enregistrement source au DOI `10.1/o`, avec une contribution source par auteur (« prénom nom »)."""
+    source_record = insert_source_record(
+        conn,
+        source=source,
+        source_id=f"{source}-o",
+        title="T",
+        title_normalized=title_normalized,
+        doi="10.1/o",
+        doc_type="article",
+    )
+    for position, name in enumerate(authors):
+        insert_source_contribution(
+            conn,
+            source_record,
+            source=source,
+            author_position=position,
+            author_name_normalized=name,
+        )
+    return source_record
+
+
+def test_un_work_au_doi_d_une_autre_oeuvre_le_perd(sa_sync_conn):
+    conn = sa_sync_conn
+    crossref = _authored_source_record(
+        conn,
+        source="crossref",
+        title_normalized="multi scale temporal neural network for stock trend prediction",
+        authors=["wei song", "li chen"],
+    )
+    work = _authored_source_record(
+        conn,
+        source="openalex",
+        title_normalized="capturing knowledge graphs and rules with octagon embeddings",
+        authors=["victor charpenay", "steven schockaert"],
+    )
+
+    assert _apply_cluster(conn) == 1
+    assert _doi_statuses(conn, crossref) == {"10.1/o": None}
+    assert _doi_statuses(conn, work) == {"10.1/o": "DOI_D_UNE_AUTRE_OEUVRE"}
+
+
+def test_un_work_au_titre_proche_garde_le_doi(sa_sync_conn):
+    """Noms découpés autrement chez Crossref : le titre proche désigne la même œuvre."""
+    conn = sa_sync_conn
+    _authored_source_record(
+        conn,
+        source="crossref",
+        title_normalized="production planning under demand uncertainty using monte carlo simulation",
+        authors=["belil sabah", "tchernev nikolay"],
+    )
+    work = _authored_source_record(
+        conn,
+        source="openalex",
+        title_normalized="production planning under demand uncertainty using monte carlo simulation",
+        authors=["sabah belil", "nikolay tchernev"],
+    )
+
+    assert _apply_cluster(conn) == 0
+    assert _doi_statuses(conn, work) == {"10.1/o": None}
 
 
 # ── Sous-étape cluster : DOI inconnu de doi.org ──

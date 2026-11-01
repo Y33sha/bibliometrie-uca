@@ -1,5 +1,6 @@
 """`correct_source_record` : valeurs corrigées d'un enregistrement source, statuts de ses identifiants et trace complète de ses corrections."""
 
+from domain.normalize import normalize_text
 from domain.source_records.corrections import CorrectionKey, stash_entry
 from domain.source_records.identifiers import (
     SourceIdentifier,
@@ -20,6 +21,7 @@ def _facts(**overrides: object) -> MetadataForCorrection:
         "serial_id": None,
     }
     defaults.update(overrides)
+    defaults.setdefault("title_normalized", normalize_text(str(defaults["title"])))
     return MetadataForCorrection(**defaults)  # type: ignore[arg-type]
 
 

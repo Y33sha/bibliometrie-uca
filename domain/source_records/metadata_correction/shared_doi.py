@@ -14,7 +14,7 @@ from domain.publications.doc_types import DocType
 from domain.publications.identifiers import NNT, HALId, doi_version, meme_registrant
 from domain.source_records.identifiers import SourceIdentifier, SourceIdentifierType
 from domain.source_records.keys import CONFIRMATION_ID_TYPES
-from domain.sources.registry import Source
+from domain.sources.registry import AGGREGATOR_SOURCES, Source
 from domain.sources.scanr import extract_hal_id_from_scanr_id
 
 
@@ -44,8 +44,8 @@ class DoiClusterCase(StrEnum):
     # Volume d'actes et documents d'autres titres partageant son DOI : ces communications perdent le DOI.
     ACTES_VS_COMMUNICATION = "ACTES_VS_COMMUNICATION"
 
-    # Dépôt HAL dont le DOI est celui d'une autre œuvre (`_depots_hal_d_une_autre_oeuvre`) → le dépôt le perd.
-    HAL_DOI_D_UNE_AUTRE_OEUVRE = "HAL_DOI_D_UNE_AUTRE_OEUVRE"
+    # Enregistrement source dont le DOI est celui d'une autre œuvre (`_records_of_another_work`) → il le perd.
+    DOI_D_UNE_AUTRE_OEUVRE = "DOI_D_UNE_AUTRE_OEUVRE"
 
     # DOI inconnu de doi.org (`failed_lookups`, source `doi_org`) → tous les membres le perdent.
     UNRESOLVED_DOI_TO_NULL = "UNRESOLVED_DOI_TO_NULL"
@@ -134,7 +134,7 @@ DIVERGENCE_CASES: frozenset[DoiClusterCase] = frozenset(
         DoiClusterCase.OUVRAGE_VS_CHAPITRE,
         DoiClusterCase.CHAPITRES_TITRES_DIFFERENTS,
         DoiClusterCase.ACTES_VS_COMMUNICATION,
-        DoiClusterCase.HAL_DOI_D_UNE_AUTRE_OEUVRE,
+        DoiClusterCase.DOI_D_UNE_AUTRE_OEUVRE,
     }
 )
 
@@ -167,22 +167,27 @@ def confirmation_id_removals(
 ) -> list[ConfirmationIdRemoval]:
     """Calcule les retraits d'identifiants après une divergence (`DIVERGENCE_CASES`).
 
-    Une clé de confirmation partagée avec un membre qui perd le DOI appartient à cette autre œuvre : le membre qui garde le DOI la perd. Sans quoi la clé réunirait encore les deux œuvres, par exemple le dépôt HAL d'une communication recopié par l'enregistrement source OpenAlex du volume d'actes. Une valeur propre à un membre qui garde le DOI (`own_ids`) reste en place.
+    Une clé de confirmation partagée avec un membre qui perd le DOI appartient à cette autre œuvre : le membre qui garde le DOI la perd. Sans quoi la clé réunirait encore les deux œuvres, par exemple le dépôt HAL d'une communication recopié par l'enregistrement source OpenAlex du volume d'actes.
+
+    Une clé reste en place quand un membre qui garde le DOI la tient en propre (`own_ids`), ou quand ce membre vient d'une source autre qu'un agrégateur (`AGGREGATOR_SOURCES`). Une telle source décrit son propre document : le PMID d'un dépôt HAL est celui de l'article, même recopié par l'enregistrement source ScanR d'un volume de résumés.
     """
     losers = {d.id: d.case for d in decisions if d.case in DIVERGENCE_CASES}
     if not losers:
         return []
-    kept_own: dict[str, set[str]] = {}
+    kept: dict[str, set[str]] = {}
     for m in group:
-        if m.id not in losers:
-            for id_type, values in m.own_ids.items():
-                kept_own.setdefault(id_type, set()).update(values)
+        if m.id in losers:
+            continue
+        held = [m.own_ids] if m.source in AGGREGATOR_SOURCES else [m.own_ids, m.confirmation_ids]
+        for ids in held:
+            for id_type, values in ids.items():
+                kept.setdefault(id_type, set()).update(values)
     lost: dict[str, set[str]] = {}
     for m in group:
         if m.id in losers:
             for id_type, values in m.confirmation_ids.items():
                 lost.setdefault(id_type, set()).update(
-                    v for v in values if v not in kept_own.get(id_type, ())
+                    v for v in values if v not in kept.get(id_type, ())
                 )
     case = next(iter(losers.values()))
     removals: list[ConfirmationIdRemoval] = []
@@ -254,14 +259,23 @@ def _shared_title_words(a: str | None, b: str | None) -> float | None:
     return len(words_a & words_b) / min(len(words_a), len(words_b))
 
 
-def _depots_hal_d_une_autre_oeuvre(group: list[DoiClusterMember]) -> list[DoiClusterMember]:
-    """Renvoie les dépôts HAL dont le DOI est celui d'une autre œuvre.
+def distant_titles(a: str | None, b: str | None) -> bool:
+    """Vrai si moins de 35 % des mots du plus court des deux titres normalisés sont présents dans l'autre (`SHARED_TITLE_WORDS_MIN`).
 
-    Un dépôt HAL du groupe est retenu quand deux conditions sont réunies face à l'enregistrement source Crossref du DOI :
+    Seuls comptent les mots de 3 lettres ou plus : les mots grammaticaux et les restes de formules mathématiques sont ignorés. Un titre sans mot retenu n'est éloigné d'aucun autre.
+    """
+    shared = _shared_title_words(a, b)
+    return shared is not None and shared < SHARED_TITLE_WORDS_MIN
+
+
+def _records_of_another_work(group: list[DoiClusterMember]) -> list[DoiClusterMember]:
+    """Renvoie les membres dont le DOI est celui d'une autre œuvre.
+
+    L'enregistrement source Crossref du DOI sert de référence. Un membre d'une autre source est retenu quand deux conditions sont réunies face à lui :
     - aucun nom de famille d'auteur commun ;
-    - moins de 35 % des mots du plus court des deux titres présents dans l'autre (`SHARED_TITLE_WORDS_MIN`).
+    - des titres éloignés (`distant_titles`).
 
-    Les titres sont les titres normalisés, réduits aux mots de 3 lettres ou plus : les mots grammaticaux et les restes de formules mathématiques ne comptent pas. Seules les contributions sources individuelles comptent. Un dépôt ou un enregistrement source Crossref sans contribution source individuelle reste hors de la comparaison.
+    Seules les contributions sources individuelles comptent. Un membre ou un enregistrement source Crossref sans contribution source individuelle reste hors de la comparaison.
     """
     crossref = [m for m in group if m.source == Source.CROSSREF and m.author_names]
     if len(crossref) != 1:
@@ -270,12 +284,10 @@ def _depots_hal_d_une_autre_oeuvre(group: list[DoiClusterMember]) -> list[DoiClu
     return [
         m
         for m in group
-        if m.source == Source.HAL
+        if m.source != Source.CROSSREF
         and m.author_names
         and not m.author_names & reference.author_names
-        and (shared := _shared_title_words(m.title_normalized, reference.title_normalized))
-        is not None
-        and shared < SHARED_TITLE_WORDS_MIN
+        and distant_titles(m.title_normalized, reference.title_normalized)
     ]
 
 
@@ -329,7 +341,7 @@ def resolve_cluster_doi_corrections(
     - **Ouvrage + chapitre** : les `book_chapter` d'un autre titre que l'ouvrage perdent le DOI, celui de l'ouvrage. Un chapitre au titre de l'ouvrage est la même œuvre, typée autrement par sa source : il garde le DOI.
     - **Chapitres seuls, de titres différents** : tous les `book_chapter` perdent le DOI, celui de l'ouvrage absent.
     - **Volume d'actes + communications** : les membres dont le titre diffère de celui du volume (`proceedings`) perdent le DOI, quel que soit leur type. Les membres au titre du volume le gardent.
-    - **Dépôt HAL d'une autre œuvre** (`_depots_hal_d_une_autre_oeuvre`) : un dépôt HAL sans nom d'auteur commun avec l'enregistrement source Crossref du DOI, et dont le titre partage peu de mots avec le sien, perd le DOI. S'ajoute aux cas précédents.
+    - **DOI d'une autre œuvre** (`_records_of_another_work`) : un enregistrement source sans nom d'auteur commun avec l'enregistrement source Crossref du DOI, et de titre éloigné du sien, perd le DOI. S'ajoute aux cas précédents.
     """
     if unresolved:
         return [DoiClusterDecision(m.id, DoiClusterCase.UNRESOLVED_DOI_TO_NULL) for m in group]
@@ -339,8 +351,8 @@ def resolve_cluster_doi_corrections(
     decisions = _divergence_decisions(group)
     decided = {d.id for d in decisions}
     return decisions + [
-        DoiClusterDecision(m.id, DoiClusterCase.HAL_DOI_D_UNE_AUTRE_OEUVRE)
-        for m in _depots_hal_d_une_autre_oeuvre(group)
+        DoiClusterDecision(m.id, DoiClusterCase.DOI_D_UNE_AUTRE_OEUVRE)
+        for m in _records_of_another_work(group)
         if m.id not in decided
     ]
 

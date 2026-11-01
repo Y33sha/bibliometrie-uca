@@ -37,14 +37,14 @@ class TestRefresh:
     def test_publication_sans_source_supprimee(self, sa_sync_conn):
         pid = insert_publication(sa_sync_conn)
 
-        assert refresh(sa_sync_conn, pid) == RefreshVerdict.NO_SOURCE
+        assert refresh(sa_sync_conn, [pid]) == {pid: RefreshVerdict.NO_SOURCE}
         assert not _publication_exists(sa_sync_conn, pid)
 
     def test_publication_avec_source_enregistree(self, sa_sync_conn):
         pid = insert_publication(sa_sync_conn)
         _source_record(sa_sync_conn, pid, source_id="w1")
 
-        assert refresh(sa_sync_conn, pid) == RefreshVerdict.SAVED
+        assert refresh(sa_sync_conn, [pid]) == {pid: RefreshVerdict.SAVED}
         assert _publication_exists(sa_sync_conn, pid)
 
 

@@ -36,8 +36,7 @@ def requalify_serial_publications(conn: Connection, serial_id: int) -> int:
         return 0
     before = store.find_doc_types_by_ids(publication_ids)
     correct_serial_records(conn, serial_id)
-    for publication_id in publication_ids:
-        lifecycle.refresh(conn, publication_id)
+    lifecycle.refresh(conn, publication_ids)
     after = store.find_doc_types_by_ids(publication_ids)
     return sum(
         1

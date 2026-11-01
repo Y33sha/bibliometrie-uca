@@ -17,8 +17,7 @@ def _page(works: list[dict], cursor: str | None) -> dict:
 
 def test_filtre_sur_les_orcid_et_la_plage_d_annees():
     assert build_orcid_filter(["0000-0001-2345-6789", "0000-0002-0000-000X"], 2017, 2026) == (
-        "authorships.author.orcid:0000-0001-2345-6789|0000-0002-0000-000X,"
-        "publication_year:2017-2026"
+        "authorships.raw_orcid:0000-0001-2345-6789|0000-0002-0000-000X,publication_year:2017-2026"
     )
 
 

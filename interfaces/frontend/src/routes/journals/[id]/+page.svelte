@@ -13,6 +13,10 @@
 	import MonographsListView from '#lib/components/MonographsListView.svelte';
 	import PublicationsDashboard from '#lib/components/PublicationsDashboard.svelte';
 	import SubjectsCloud from '#lib/components/SubjectsCloud.svelte';
+	import TitleRow from '#lib/components/TitleRow.svelte';
+	import SerialDrawer from '#lib/components/serials/SerialDrawer.svelte';
+	import { useDrawerParam } from '#lib/composables/useDrawerParam.svelte.js';
+	import { isAdmin } from '#lib/session.svelte.js';
 	import type { components } from '#lib/api/schema.js';
 
 	type SerialDetail = components['schemas']['SerialDetailResponse'];
@@ -20,6 +24,9 @@
 	type EnumOption = components['schemas']['EnumOption'];
 
 	const serialId = $derived(Number(page.params.id));
+
+	// Volet d'édition de la publication en série, en session admin : ouvert tant que `?serial=<id>` figure dans l'URL.
+	const drawer = useDrawerParam('serial', isAdmin);
 	const activeTab = $derived(
 		(() => {
 			const t = page.url.searchParams.get('tab');
@@ -106,16 +113,18 @@
 {:else}
 	<!-- Header -->
 	<div class="entity-header">
-		<h1 class="entity-title">
-			{journal.title}
-			{#if journal.is_in_doaj}
-				{#if journal.doaj_url}
-					<a class="badge-doaj" href={journal.doaj_url} target="_blank" rel="noopener" title="Fiche DOAJ (nouvel onglet)">DOAJ</a>
-				{:else}
-					<span class="badge-doaj" title="Indexée dans DOAJ">DOAJ</span>
+		<TitleRow onopen={isAdmin() ? () => drawer.open(serialId) : undefined}>
+			<h1 class="entity-title">
+				{journal.title}
+				{#if journal.is_in_doaj}
+					{#if journal.doaj_url}
+						<a class="badge-doaj" href={journal.doaj_url} target="_blank" rel="noopener" title="Fiche DOAJ (nouvel onglet)">DOAJ</a>
+					{:else}
+						<span class="badge-doaj" title="Indexée dans DOAJ">DOAJ</span>
+					{/if}
 				{/if}
-			{/if}
-		</h1>
+			</h1>
+		</TitleRow>
 		<div class="entity-meta">
 			{#each journal.issn_details.filter((i) => i.status === 'active' || i.linking) as issn (issn.issn)}
 				<EntityMetaItem label={issnLabel(issn)}><span class="id-badge">{issn.issn}</span></EntityMetaItem>
@@ -236,6 +245,10 @@
 			/>
 		</div>
 	{/if}
+{/if}
+
+{#if drawer.id !== null}
+	<SerialDrawer id={drawer.id} onclose={() => drawer.open(null)} onchange={loadSerial} />
 {/if}
 
 <style>

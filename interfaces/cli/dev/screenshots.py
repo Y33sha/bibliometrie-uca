@@ -21,14 +21,14 @@ from infrastructure import PROJECT_ROOT
 OUT_DIR = PROJECT_ROOT / "docs" / "img" / "screenshots"
 VIEWPORT = {"width": 1440, "height": 900}
 
-# Entités montrées en exemple : (route de recherche, clé de la liste, champ comparé, valeur cherchée).
+# Entités montrées en exemple : (route de recherche, clé de la liste, champ comparé, valeur cherchée, champ de l'identifiant).
 SAMPLES = {
-    "structure": ("structures", "structures", "acronym", "LMV"),
+    "structure": ("structures", "structures", "acronym", "LMV", "id"),
     # Les pages d'adresses montrent l'établissement : les adresses d'un laboratoire contiennent souvent des courriels personnels.
-    "institution": ("structures", "structures", "code", "uca"),
-    "serial": ("serials", "serials", "title", "Journal of High Energy Physics"),
-    "publisher": ("publishers", "publishers", "name", "Elsevier"),
-    "subject": ("subjects", "items", "label", "Volcanologie"),
+    "institution": ("structures", "structures", "code", "uca", "id"),
+    "serial": ("serials", "serials", "title", "Journal of High Energy Physics", "id"),
+    "publisher": ("publishers", "publishers", "name", "Elsevier", "id"),
+    "subject": ("subjects", "items", "label", "Volcanologie", "label_normalized"),
 }
 
 
@@ -69,17 +69,17 @@ SHOTS = [
 ]
 
 
-def sample_ids(api: APIRequestContext, base_url: str) -> dict[str, int]:
+def sample_ids(api: APIRequestContext, base_url: str) -> dict[str, int | str]:
     """Renvoie l'identifiant de chaque entité de `SAMPLES`, trouvé par la recherche de l'API."""
-    ids: dict[str, int] = {}
-    for key, (endpoint, items, field, value) in SAMPLES.items():
+    ids: dict[str, int | str] = {}
+    for key, (endpoint, items, field, value, id_field) in SAMPLES.items():
         response = api.get(f"{base_url}/api/{endpoint}", params={"search": value, "per_page": 20})
         if not response.ok:
             raise SystemExit(f"Recherche refusée ({response.status}) : {endpoint}")
         matches = [item for item in response.json()[items] if item.get(field) == value]
         if not matches:
             raise SystemExit(f"Exemple introuvable : {key} {field}={value!r}")
-        ids[key] = matches[0]["id"]
+        ids[key] = matches[0][id_field]
     return ids
 
 
@@ -97,7 +97,7 @@ def login(page: Page, base_url: str) -> bool:
     return True
 
 
-def capture(page: Page, base_url: str, shot: Shot, ids: dict[str, int]) -> Path:
+def capture(page: Page, base_url: str, shot: Shot, ids: dict[str, int | str]) -> Path:
     """Ouvre la page de `shot`, attend la fin de ses requêtes et de ses graphiques, et enregistre la capture."""
     page.goto(f"{base_url}/{shot.path.format(**ids)}", wait_until="networkidle")
     # Les graphiques s'animent après le chargement des données.

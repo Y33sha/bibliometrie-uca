@@ -47,8 +47,9 @@ Jouée en mode `full`, après `fetch_missing`, cette phase rafraîchit les docum
 
 Chaque ligne périmée est réinterrogée par son identifiant natif :
 - trouvée → `raw_data` rafraîchi et `last_seen_at` repoussé ;
-- absence confirmée → `disappeared_at` posé ;
-- erreur transitoire → laissée, retentée plus tard.
+- renvoyée sous un autre identifiant (work OpenAlex fusionné, doublon HAL absorbé par un autre dépôt) → document renvoyé écrit, `disappeared_at` posé sur la ligne cherchée ;
+- absence confirmée → `disappeared_at` posé. La source répond 404, ou la page du dépôt HAL répond 404, ou la recherche ScanR est vide ;
+- erreur transitoire → laissée, retentée plus tard. Un dépôt HAL absent de la recherche mais en ligne est aussi retenté.
 
 La sélection se borne aux années de la fenêtre courante, lues sur `source_records.publication_year`. Une thèse en cours, qui n'a pas d'année de soutenance, est relue quelle que soit la fenêtre.
 

@@ -4,7 +4,7 @@ Il sert à composer les requêtes de SQLAlchemy Core (`select(config.c.key)…`)
 
 Les migrations Alembic (`alembic/versions/`, écrites à la main) font foi sur le schéma. `infrastructure/db/schema.sql` est un instantané du schéma, régénéré par `python -m interfaces.cli.dev.dump_schema`. Ce fichier suit la base à la main. `tests/integration/infrastructure/db/test_sqlalchemy_smoke.py` contrôle l'accord par `alembic check`, sur une base construite par les migrations.
 
-Le modèle couvre les tables et leurs colonnes. Index, clés étrangères et vues matérialisées (`contribution_structures`, `publication_author_alignment`, `publication_rors`, `publication_structures`, `source_contribution_structures`, `subject_cooccurrences`) relèvent des seules migrations : le filtre `include_object` d'`alembic/env.py` les écarte de la comparaison. Le code lit les vues matérialisées en SQL par leur nom, et les rafraîchit (`REFRESH`).
+Le modèle couvre les tables et leurs colonnes. Index, clés étrangères et vues matérialisées (`contribution_structures`, `publication_author_alignment`, `publication_rors`, `publication_structures`, `source_contribution_structures`, `subject_cooccurrences`, `subject_labels`) relèvent des seules migrations : le filtre `include_object` d'`alembic/env.py` les écarte de la comparaison. Le code lit les vues matérialisées en SQL par leur nom, et les rafraîchit (`REFRESH`).
 """
 
 from datetime import date
@@ -72,6 +72,7 @@ from domain.structures.hal_structures import HalStructureStatus
 from domain.structures.perimeter_evidence import PerimeterEvidence
 from domain.structures.ror import RorStatus, RorType
 from domain.structures.structure import StructureType
+from domain.subjects.subject import SubjectVocabulary
 from infrastructure.db.jsonb import Jsonb
 
 metadata = MetaData()
@@ -479,7 +480,15 @@ serial_issns = Table(
     Column(
         "issnl",
         Text,
-        comment="ISSN-L de l'ISSN d'après sa notice Sudoc. NULL : inconnu.",
+        comment=(
+            "ISSN-L de l'ISSN d'après la table de l'ISSN International Centre. "
+            "NULL : ISSN absent de la table au dernier import, ou ajouté depuis."
+        ),
+    ),
+    Column(
+        "issnl_checked_at",
+        DateTime(timezone=True),
+        comment="Date du dernier import de la table ISSN-L qui a lu l'ISSN. NULL : jamais lu.",
     ),
     Column(
         "serial_id",
@@ -518,7 +527,8 @@ issn_links = Table(
     Column("link_type", issn_link_type_enum, primary_key=True),
     comment=(
         "Liens entre ISSN lus dans le Sudoc, une ligne par lien : continued_by, titre précédent "
-        "vers titre suivant ; supplement, revue principale vers supplément."
+        "vers titre suivant ; supplement, revue principale vers supplément ; replaced_by, ISSN "
+        "annulé vers l'ISSN de la notice Sudoc qui l'annule."
     ),
     schema="publishing",
 )
@@ -1184,7 +1194,7 @@ publications = Table(
         server_default=text("'{}'::jsonb"),
     ),
     Column("is_retracted", Boolean, nullable=False, server_default="false"),
-    # Résumé, mots-clés, topics et numérotation sont dans `publications_detail` (1:1), lu seulement par la page de détail. `publications` reste étroite pour les listes et les facettes.
+    # Résumé, mots-clés et numérotation sont dans `publications_detail` (1:1), lu seulement par la page de détail. `publications` reste étroite pour les listes et les facettes.
     # Indices des contributions de personnes non exclues, maintenus par la phase `finalize` et à l'exclusion d'une personne. `in_perimeter` en découle ; le filtre de périmètre des listes le lit.
     Column(
         "perimeter_evidence",
@@ -1215,7 +1225,6 @@ publications_detail = Table(
     Column("publication_id", Integer, primary_key=True),
     Column("abstract", Text),
     Column("keywords", ARRAY(Text)),
-    Column("topics", Jsonb),
     Column("biblio", Jsonb),
     schema="publications",
 )
@@ -1296,7 +1305,6 @@ source_records = Table(
     Column("is_retracted", Boolean),
     Column("abstract", Text),
     Column("keywords", ARRAY(Text)),
-    Column("topics", Jsonb),
     Column("biblio", Jsonb),
     Column("source_extras", Jsonb),
     Column(
@@ -1460,6 +1468,17 @@ embargoes = Table(
     ),
     schema="sources",
     comment="Embargo déclaré par un enregistrement source : fichier déposé dans HAL, thèse de theses.fr.",
+)
+
+
+source_record_subjects = Table(
+    "source_record_subjects",
+    metadata,
+    Column("source_record_id", Integer, primary_key=True),
+    Column("subject_id", Integer, primary_key=True),
+    Column("score", REAL, comment="Score OpenAlex du topic. Nul pour les autres sources."),
+    schema="sources",
+    comment="Sujets donnés par un enregistrement source. Leurs ancêtres découlent de subjects.parent_id.",
 )
 
 
@@ -1667,6 +1686,8 @@ dois = Table(
 )
 
 
+subject_vocabulary_enum = PgEnum(*SubjectVocabulary, name="subject_vocabulary", create_type=False)
+
 subjects = Table(
     "subjects",
     metadata,
@@ -1678,9 +1699,26 @@ subjects = Table(
         nullable=False,
         comment="Forme de recherche du libellé (normalize_text), servie par un index trigram.",
     ),
-    Column("language", Text),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("usage_count", Integer, nullable=False, server_default="0"),
+    Column("vocabulary", subject_vocabulary_enum, nullable=False),
+    Column(
+        "code",
+        Text,
+        nullable=False,
+        comment=(
+            "Code du sujet dans son vocabulaire : identifiant OpenAlex sans préfixe d'URL, code de "
+            "domaine HAL, PPN RAMEAU, libellé normalisé d'une discipline de thèse."
+        ),
+    ),
+    Column(
+        "level",
+        SmallInteger,
+        nullable=False,
+        comment="Profondeur dans le vocabulaire : 1 pour une racine.",
+    ),
+    Column("parent_id", Integer, comment="Sujet du niveau supérieur, du même vocabulaire."),
+    UniqueConstraint("vocabulary", "code", name="subjects_vocabulary_code_key"),
     schema="publications",
 )
 
@@ -1777,4 +1815,5 @@ contribution_attributes_queue = _queue("contribution_attributes_queue")
 contribution_resolution_queue = _queue("contribution_resolution_queue")
 
 
-# `subject_cooccurrences` (vue matérialisée) : paires de sujets présents sur une même publication, avec leur effectif, à partir de 2.
+# `subject_labels` (vue matérialisée) : sujets regroupés par libellé normalisé, tous vocabulaires confondus, avec leur nombre de publications.
+# `subject_cooccurrences` (vue matérialisée) : paires de libellés normalisés présents sur une même publication, avec leur effectif, à partir de 2.

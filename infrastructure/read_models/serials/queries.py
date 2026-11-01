@@ -25,7 +25,6 @@ from infrastructure.read_models._common import (
 from infrastructure.read_models.csv_export import csv_chunks, fetch_export_rows
 from infrastructure.read_models.doaj_links import resolve_doaj_url
 from infrastructure.read_models.entity_facet import entity_name_clause
-from infrastructure.read_models.filters import entity_subjects_sql
 from infrastructure.read_models.serials.models import (
     DoiNamespaceConflict,
     DoiNamespaceConflictsResponse,
@@ -43,6 +42,7 @@ from infrastructure.read_models.serials.models import (
     SerialSort,
 )
 from infrastructure.read_models.subjects.models import SubjectFrequency
+from infrastructure.read_models.subjects.queries import entity_subjects
 from infrastructure.sql_fragments import active_issns, corrected, has_active_issn
 
 # Colonnes de la ligne de liste d'une revue. `doaj_id` et `doaj_url_csv` sont les deux entrées de `resolve_doaj_url` ; `publisher_name` suppose la jointure `publishers p`.
@@ -60,17 +60,19 @@ _SERIAL_DETAIL_COLUMNS = f"""
     j.openalex_id, j.is_academic
 """
 
-# Revues liées par les liens entre ISSN, lus dans les deux sens. Un ISSN lié sans revue reste nommé par lui-même.
+# Revues liées par les liens entre titres et entre revue principale et supplément, lus dans les deux sens. Un ISSN lié sans revue reste nommé par lui-même.
 _RELATIONS = text("""
     WITH own AS (SELECT issn FROM serial_issns WHERE serial_id = :id),
     linked AS (
         SELECT CASE l.link_type WHEN 'continued_by' THEN 'next_title' ELSE 'supplement' END AS kind,
                l.linked_issn AS issn
         FROM issn_links l JOIN own o ON o.issn = l.issn
+        WHERE l.link_type IN ('continued_by', 'supplement')
         UNION ALL
         SELECT CASE l.link_type WHEN 'continued_by' THEN 'previous_title' ELSE 'main_serial' END,
                l.issn
         FROM issn_links l JOIN own o ON o.issn = l.linked_issn
+        WHERE l.link_type IN ('continued_by', 'supplement')
     )
     SELECT DISTINCT k.kind, s.id AS serial_id, s.title, CASE WHEN s.id IS NULL THEN k.issn END AS issn
     FROM linked k
@@ -508,12 +510,5 @@ class SerialQueries:
         )
 
     def get_serial_subjects(self, serial_id: int, *, limit: int) -> list[SubjectFrequency]:
-        """Renvoie les sujets des publications de la revue, les plus fréquents d'abord.
-
-        `COUNT(DISTINCT p.id)` est nécessaire : `publication_subjects` a une ligne par source pour une même paire (publication, sujet).
-        """
-        rows = self._conn.execute(
-            text(entity_subjects_sql("p.serial_id = :id")),
-            {"id": serial_id, "lim": limit},
-        ).all()
-        return [SubjectFrequency(id=r.id, label=r.label, count=r.n) for r in rows]
+        """Renvoie les sujets des publications de la revue, les plus fréquents d'abord."""
+        return entity_subjects(self._conn, "p.serial_id = :id", {"id": serial_id}, limit=limit)

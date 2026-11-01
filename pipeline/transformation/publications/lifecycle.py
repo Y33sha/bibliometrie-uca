@@ -1,15 +1,21 @@
 """Cycle de vie d'une publication : création, suppression après recalcul, dissolution, purge.
 
-Une publication existe si elle a au moins un enregistrement source, un type admissible et au moins une contribution rattachée à une personne. `refresh` vérifie les deux premières conditions après le recalcul d'une publication. `purge_publications` vérifie la première et la dernière sur toute la table, une fois les personnes résolues.
+Une publication existe si elle a au moins un enregistrement source, un type admissible et au moins une contribution rattachée à une personne. `refresh` vérifie les deux premières conditions après le recalcul des publications. `purge_publications` vérifie la première et la dernière sur toute la table, une fois les personnes résolues.
 """
+
+from collections.abc import Callable, Sequence
+from itertools import batched
 
 from sqlalchemy import Connection, text
 
 from domain.publications.metadata import OA_STATUS_UNKNOWN_DEFAULT
-from pipeline.transformation.publications.consolidation import RefreshVerdict, refresh_from_sources
+from pipeline.transformation.publications.consolidation import RefreshVerdict, consolidate
 from pipeline.transformation.publications.store import PublicationStore
 
 _DELETION_VERDICTS = frozenset({RefreshVerdict.NO_SOURCE, RefreshVerdict.INADMISSIBLE_TYPE})
+
+# Publications recalculées ensemble : chaque lecture du recalcul porte sur un lot.
+_REFRESH_BATCH_SIZE = 500
 
 
 def create(
@@ -34,12 +40,29 @@ def create(
     )
 
 
-def refresh(conn: Connection, publication_id: int) -> RefreshVerdict:
-    """Recalcule la publication depuis ses enregistrements sources. La supprime si elle est sans enregistrement source ou si son type est inadmissible. Renvoie le verdict du recalcul."""
-    verdict = refresh_from_sources(conn, publication_id)
-    if verdict in _DELETION_VERDICTS:
-        PublicationStore(conn).delete(publication_id)
-    return verdict
+def refresh(
+    conn: Connection,
+    publication_ids: Sequence[int],
+    *,
+    on_batch: Callable[[int], None] | None = None,
+) -> dict[int, RefreshVerdict]:
+    """Recalcule les publications depuis leurs enregistrements sources, par lots (`consolidate`). Supprime celles sans enregistrement source ou de type inadmissible. Renvoie le verdict de chaque publication.
+
+    Les suppressions d'un lot précèdent ses écritures : le DOI d'une publication supprimée passe ainsi à une publication du même lot.
+
+    Args:
+        on_batch: appelé après chaque lot, avec son nombre de publications.
+    """
+    store = PublicationStore(conn)
+    verdicts: dict[int, RefreshVerdict] = {}
+    for batch in batched(publication_ids, _REFRESH_BATCH_SIZE, strict=False):
+        consolidation = consolidate(conn, batch)
+        store.delete([p for p, v in consolidation.verdicts.items() if v in _DELETION_VERDICTS])
+        store.save(consolidation.saved)
+        verdicts.update(consolidation.verdicts)
+        if on_batch is not None:
+            on_batch(len(batch))
+    return verdicts
 
 
 def dissolve(conn: Connection, publication_id: int, successor_id: int) -> None:
@@ -54,7 +77,7 @@ def dissolve(conn: Connection, publication_id: int, successor_id: int) -> None:
             f"Publication {publication_id} dissoute avec des source_records rattachées"
         )
     store.repoint_dependents(publication_id, successor_id)
-    store.delete(publication_id)
+    store.delete([publication_id])
 
 
 def purge_publications(conn: Connection, *, limit: int | None = None) -> int:

@@ -143,7 +143,7 @@ def publication_filter_where(
         ),
         "in_perimeter": in_perimeter_person_clause(f.in_perimeter, f.person_id),
         "author_position": author_position_clause(f.person_id, f.lab_ids, f.author_position),
-        "subject": subject_clause(f.subject_ids),
+        "subject": subject_clause(f.subject_labels),
         "person": author_clause(f.author_id),
         "partner": partner_clause(f.partner_rors),
     }

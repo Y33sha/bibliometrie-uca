@@ -20,7 +20,7 @@
     <SectionLabel icon="tag" text="Sujets" />
     <div class="detail-tags">
       {#each subjects as s (s.id)}
-        <a href={resolve(`subjects/${s.id}`)} title={tooltip(s)}>{s.label}</a>
+        <a href={resolve(`subjects/${s.label_normalized}`)} title={tooltip(s)}>{s.label}</a>
       {/each}
     </div>
   </div>

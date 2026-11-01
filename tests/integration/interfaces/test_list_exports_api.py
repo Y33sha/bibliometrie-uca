@@ -50,8 +50,8 @@ def _rows(text: str) -> list[list[str]]:
         ),
         (
             "/api/subjects/export.csv",
-            {"min_count": "3"},
-            ["Libellé", "Langue", "Occurrences"],
+            {"sort": "label_asc"},
+            ["Libellé", "Vocabulaires", "Occurrences"],
         ),
         (
             "/api/structures/export.csv",

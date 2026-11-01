@@ -132,7 +132,8 @@ class PublicationFilters:
     hal_status_values: list[str] = field(default_factory=list)
     in_perimeter: list[str] = field(default_factory=list)
     """Valeurs `yes` et `no`, combinées en OR."""
-    subject_ids: list[int] = field(default_factory=list)
+    subject_labels: list[str] = field(default_factory=list)
+    """Libellés normalisés des sujets, tous vocabulaires confondus."""
     partner_rors: list[str] = field(default_factory=list)
 
 

@@ -23,6 +23,7 @@ from domain.source_records.identifiers import (
 from domain.source_records.impact import Impact
 from domain.source_records.source_extras import SourceExtra
 from domain.structures.identifiers import RorId, parse_ror_ids
+from domain.subjects.subject import SubjectLink
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs
 from pipeline.ingestion.common.locations import LocationFacts
 from pipeline.ingestion.common.normalizer import Document, PublisherFacts, SourceNormalizer
@@ -37,9 +38,10 @@ from pipeline.ingestion.common.source_records import (
 )
 from pipeline.ingestion.common.staging import StagingRow
 from pipeline.ingestion.scanr.payload import (
+    scanr_concept_keywords,
     scanr_derived_identifier,
+    scanr_subjects,
     select_leaf_affiliations,
-    split_scanr_concepts,
 )
 from pipeline.transformation.publishing.find_or_create import (
     Containers,
@@ -179,11 +181,12 @@ def scanr_source_record(  # noqa: C901
     else:
         keywords = None
 
-    # `domains` contient les concepts ScanR : wikidata et mots-clés rejoignent les mots-clés, les vedettes sudoc forment les sujets. `topics`, copie des topics OpenAlex déjà fournis par la source OpenAlex, reste ignoré.
-    concept_keywords, subjects = split_scanr_concepts(doc.get("domains"))
+    # Les concepts wikidata et les mots-clés de `domains` rejoignent les mots-clés.
     known = {k.lower() for k in keywords or ()}
-    keywords = [*(keywords or ()), *(k for k in concept_keywords if k.lower() not in known)] or None
-    topics = subjects or None
+    keywords = [
+        *(keywords or ()),
+        *(k for k in scanr_concept_keywords(doc.get("domains")) if k.lower() not in known),
+    ] or None
 
     cbc = as_mapping(doc.get("cited_by_counts_by_year"))
     years = [n for v in cbc.values() if (n := as_int(v)) is not None]
@@ -222,7 +225,6 @@ def scanr_source_record(  # noqa: C901
         biblio=biblio_json,
         abstract=abstract,
         keywords=keywords,
-        topics=topics,
         license=normalize_license(publisher_license),
         urls=urls or None,
         impact=Impact(cited_by_count=cited_by_count).to_json(),
@@ -345,6 +347,10 @@ class ScanrNormalizer(SourceNormalizer):
 
     def publication_date(self, doc: Document) -> PublicationDate | None:
         return get_publication_date(doc)
+
+    def subjects(self, doc: Document) -> list[SubjectLink]:
+        """Renvoie les vedettes RAMEAU de `domains`. Le champ `topics` de ScanR reprend les topics OpenAlex : la source OpenAlex les donne."""
+        return scanr_subjects(doc.get("domains"))
 
     def source_record(
         self, row: StagingRow, doc: Document, containers: Containers

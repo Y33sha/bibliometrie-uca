@@ -85,7 +85,9 @@ def apply(conn: Connection, updates: list[dict[str, JsonValue]]) -> Counter[str]
         """),
         {"ids": [u["id"] for u in updates]},
     ).scalars()
-    return Counter(lifecycle.refresh(conn, pid).value for pid in publication_ids)
+    return Counter(
+        verdict.value for verdict in lifecycle.refresh(conn, list(publication_ids)).values()
+    )
 
 
 def main() -> int:

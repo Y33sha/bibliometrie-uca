@@ -52,18 +52,34 @@ L'URL de résolution d'un DOI est aussi dans les payloads de Crossref (`resource
 
 https://www.sudoc.fr/ — catalogue collectif des bibliothèques de l'enseignement supérieur (ABES)
 
-Source de référence des ISSN des revues. Consommée par `check_issns_in_sudoc`, dans la phase [`publishing`](../pipeline/05-publishing.md).
+Source des titres des revues et des liens entre leurs ISSN. Consommée par `check_issns_in_sudoc`, dans la phase [`publishing`](../pipeline/05-publishing.md).
 
 ### Services utilisés
 
-- `https://www.sudoc.fr/services/issn2ppn/<ISSN>,<ISSN>&format=text/json` : PPN de la notice de chaque ISSN, par lots de 20 ISSN.
-- `https://www.sudoc.fr/<ppn>.xml` : notice MARCXML.
+- `https://www.sudoc.fr/services/issn2ppn/<ISSN>,<ISSN>&format=text/json` : PPN de la notice Sudoc de chaque ISSN, par lots de 20 ISSN.
+- `https://www.sudoc.fr/<ppn>.xml` : notice Sudoc en MARCXML.
 
 Aucun identifiant d'accès n'est requis. Aucune limite de débit n'est documentée : le pipeline s'en tient à 5 requêtes par seconde, 4 lots d'ISSN à la fois (`MAX_PER_SECOND`, `SUDOC_MAX_CONCURRENT`, `pipeline/ingestion/api_params.py`). Licence ouverte Etalab.
 
 ### Données récupérées
 
-Une notice décrit une revue sur un support : le papier, l'en ligne et le CD-ROM ont chacun leur ISSN et leur notice. Le pipeline lit dans la notice l'ISSN, l'ISSN-L, les ISSN annulés, le support, les ISSN des autres supports, du titre précédent, du titre suivant et du supplément. Il écrit dans `serial_issns` le support, l'ISSN-L, le statut et la date de vérification de chaque ISSN, et dans `issn_links` ses liens.
+Une notice Sudoc décrit une revue sur un support : le papier, l'en ligne et le CD-ROM ont chacun leur ISSN et leur notice Sudoc. Le pipeline lit dans la notice Sudoc l'ISSN, les ISSN annulés, le support, les ISSN des autres supports, du titre précédent, du titre suivant et du supplément. Il écrit dans `serial_issns` le support, le statut, le titre et la date de vérification de chaque ISSN, et dans `issn_links` ses liens.
+
+## ISSN International Centre
+
+https://www.issn.org/ — attribue les ISSN et les ISSN-L.
+
+Donne l'ISSN-L de chaque ISSN. Consommée par `import_issnl_table`, dans la phase [`publishing`](../pipeline/05-publishing.md).
+
+### Table utilisée
+
+La table ISSN-L publique, mise à jour chaque jour : https://portal.issn.org/public/issnltables.zip. Le zip contient deux fichiers tabulés, ISSN → ISSN-L et ISSN-L → ISSN, faits seulement de numéros. Le pipeline lit le premier.
+
+La table est retéléchargée quand le dernier import date de plus de trente jours, par défaut.
+
+### Données récupérées
+
+Stockage : `serial_issns.issnl`, `serial_issns.issnl_checked_at`. Un ISSN absent de la table reçoit un ISSN-L vide ; les ISSN annulés en sont absents.
 
 ## DOAJ
 

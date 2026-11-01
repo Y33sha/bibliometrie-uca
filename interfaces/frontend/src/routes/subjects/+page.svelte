@@ -1,10 +1,15 @@
 <script lang="ts">
   import PageHeader from "#lib/components/PageHeader.svelte";
   import ListToolbar from "#lib/components/ListToolbar.svelte";
+  import FacetDropdown from "#lib/components/FacetDropdown.svelte";
+  import SortChevron from "#lib/components/SortChevron.svelte";
   import { onMount } from "svelte";
   import { resolve } from "$app/paths";
+  import { useFacets } from "#lib/composables/useFacets.svelte.js";
   import { usePaginatedFetch } from "#lib/composables/usePaginatedFetch.svelte.js";
+  import { subjectVocabularyLabels } from "#lib/labels.js";
   import { withBase } from "#lib/paths.js";
+  import { nextSort, sortDirection } from "#lib/sort.js";
   import { paramsToQuery } from "#lib/utils.js";
   import ListStatus from "#lib/components/ListStatus.svelte";
   import Pagination from "#lib/components/Pagination.svelte";
@@ -13,14 +18,22 @@
   type SubjectListItem = components["schemas"]["SubjectListItem"];
 
   let search = $state("");
-  let minCount = $state(3);
+  let selectedVocabularies: string[] = $state([]);
+  let currentSort = $state("publications_desc");
   let searchTimer: ReturnType<typeof setTimeout> | undefined;
 
+  // Paramètres partagés par la liste, son export et ses facettes : les décomptes suivent la recherche.
   function buildFilterParams(): URLSearchParams {
     const params = new URLSearchParams();
     const q = search.trim();
     if (q) params.set("search", q);
-    params.set("min_count", String(minCount));
+    if (selectedVocabularies.length) params.set("vocabulary", selectedVocabularies.join(","));
+    return params;
+  }
+
+  function buildParams(): URLSearchParams {
+    const params = buildFilterParams();
+    params.set("sort", currentSort);
     return params;
   }
 
@@ -29,26 +42,40 @@
     itemsKey: "items",
     apiKey: "subjects",
     pageParam: null,
-    buildParams: buildFilterParams,
+    buildParams,
   });
 
-  const exportUrl = $derived(withBase(`/api/subjects/export.csv?${paramsToQuery(buildFilterParams())}`));
+  const facets = useFacets({
+    endpoint: "/api/subjects/facets",
+    apiKey: "subjects-facets",
+    buildParams: buildFilterParams,
+    facets: {
+      vocabularies: { type: "label_map", apiKey: "vocabularies", labels: subjectVocabularyLabels },
+    },
+  });
+
+  const exportUrl = $derived(withBase(`/api/subjects/export.csv?${paramsToQuery(buildParams())}`));
+
+  function onFilterChange() {
+    list.page = 1;
+    list.load();
+    facets.load();
+  }
 
   function onSearchInput() {
     if (searchTimer) clearTimeout(searchTimer);
-    searchTimer = setTimeout(() => {
-      list.page = 1;
-      list.load();
-    }, 300);
+    searchTimer = setTimeout(onFilterChange, 300);
   }
 
-  function onMinCountChange() {
+  function setSort(column: "label" | "publications") {
+    currentSort = nextSort(currentSort, column, column === "label" ? "asc" : "desc");
     list.page = 1;
     list.load();
   }
 
   onMount(() => {
     list.load();
+    facets.load();
   });
 </script>
 
@@ -56,10 +83,7 @@
 
 <ListToolbar bind:search placeholder="Rechercher dans les libellés" onsearch={onSearchInput} {list} one="sujet" many="sujets" {exportUrl}>
   {#snippet filters()}
-    <label class="min-count">
-      Occurrences minimales
-      <input type="number" min="1" bind:value={minCount} onchange={onMinCountChange} />
-    </label>
+    <FacetDropdown label="Vocabulaires" options={facets.options.vocabularies} bind:selected={selectedVocabularies} onchange={onFilterChange} />
   {/snippet}
 </ListToolbar>
 
@@ -67,16 +91,18 @@
   <table class="data-table">
     <thead>
       <tr>
-        <th>Libellé</th>
-        <th class="num">Occurrences</th>
+        <th class="sortable" onclick={() => setSort("label")}>Libellé <SortChevron direction={sortDirection(currentSort, "label")} /></th>
+        <th>Vocabulaires</th>
+        <th class="num sortable" onclick={() => setSort("publications")}>Occurrences <SortChevron direction={sortDirection(currentSort, "publications")} /></th>
       </tr>
     </thead>
     <tbody>
-      {#each list.items as s (s.id)}
+      {#each list.items as s (s.label_normalized)}
         <tr>
           <td>
-            <a href={resolve(`subjects/${s.id}`)}>{s.label}</a>
+            <a href={resolve(`subjects/${s.label_normalized}`)}>{s.label}</a>
           </td>
+          <td class="muted">{s.vocabularies.map((v) => subjectVocabularyLabels[v]).join(", ")}</td>
           <td class="num">{s.usage_count.toLocaleString("fr-FR")}</td>
         </tr>
       {/each}
@@ -87,15 +113,7 @@
 </ListStatus>
 
 <style>
-  .min-count {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding-left: 10px;
-    font-size: var(--fs-md);
-    white-space: nowrap;
-  }
-  .min-count input {
-    width: 70px;
+  .muted {
+    color: var(--muted);
   }
 </style>

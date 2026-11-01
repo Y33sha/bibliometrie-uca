@@ -23,7 +23,6 @@ def _source_record(**overrides) -> SourceRecord:
         "countries": (),
         "keywords": (),
         "urls": (),
-        "topics": None,
         "biblio": None,
         "source_extras": None,
     }

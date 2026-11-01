@@ -1,6 +1,6 @@
 """Sous-étape de la phase `publishing` : vérification des ISSN dans le Sudoc.
 
-Sont vérifiés les ISSN de `serial_issns` jamais vérifiés. La notice Sudoc de chaque ISSN donne son ISSN-L, son support, son statut et son titre, ceux de ses ISSN annulés, et ses liens vers d'autres ISSN (`read_sudoc_record`). Les ISSN de la même publication sur un autre support reçoivent leur ligne, vérifiée au run suivant. `attach_serials` en dérive le titre de chaque revue.
+Sont vérifiés les ISSN de `serial_issns` jamais vérifiés. La notice Sudoc de chaque ISSN donne son support, son statut et son titre, ceux de ses ISSN annulés, et ses liens vers d'autres ISSN (`read_sudoc_record`). Les ISSN de la même publication sur un autre support reçoivent leur ligne, vérifiée au run suivant. `attach_serials` en dérive le titre de chaque revue.
 
 Les ISSN passent par lots de `SUDOC_ISSN2PPN_BATCH` dans `run_fetch_pool` : téléchargements concurrents sur un client HTTP partagé, écritures sérialisées, commit par paquets. Si une requête échoue, les ISSN du lot restent non vérifiés et le run suivant les reprend. Les requêtes au Sudoc sont injectées (`pipeline/ingestion/complements/sudoc.py`).
 """
@@ -35,13 +35,12 @@ FetchRecord = Callable[[httpx2.AsyncClient, str], Awaitable[SudocSerialRecord | 
 """`(client, ppn) -> notice Sudoc`, ou `None` si la notice Sudoc est introuvable ou illisible."""
 
 _WRITE_FACTS = text("""
-    INSERT INTO serial_issns (issn, issnl, support, status, sudoc_title, sudoc_checked_at)
-    SELECT f.issn, f.issnl, CAST(f.support AS issn_support), CAST(f.status AS issn_status),
+    INSERT INTO serial_issns (issn, support, status, sudoc_title, sudoc_checked_at)
+    SELECT f.issn, CAST(f.support AS issn_support), CAST(f.status AS issn_status),
            CAST(:title AS text), CAST(:checked_at AS timestamptz)
     FROM jsonb_to_recordset(CAST(:facts AS jsonb))
-        AS f(issn text, issnl text, support text, status text)
+        AS f(issn text, support text, status text)
     ON CONFLICT (issn) DO UPDATE SET
-        issnl = EXCLUDED.issnl,
         support = coalesce(EXCLUDED.support, serial_issns.support),
         status = EXCLUDED.status,
         sudoc_title = EXCLUDED.sudoc_title,
@@ -83,10 +82,7 @@ def record_sudoc_reading(
             "title": reading.title,
             "checked_at": checked_at,
             "facts": json.dumps(
-                [
-                    {"issn": f.issn, "issnl": f.issnl, "support": f.support, "status": f.status}
-                    for f in reading.facts
-                ]
+                [{"issn": f.issn, "support": f.support, "status": f.status} for f in reading.facts]
             ),
         },
     )

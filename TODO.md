@@ -9,6 +9,18 @@ uv run python -m interfaces.cli.oneshot.apply_platform_rules
 uv run python -m interfaces.cli.oneshot.drop_series_without_issn
 uv run python -m interfaces.cli.oneshot.rewrite_publication_dates
 uv run python -m interfaces.cli.oneshot.restore_primary_identifiers
+uv run python -m interfaces.cli.oneshot.restore_identifiers_from_source_id
+uv run python -m interfaces.cli.oneshot.reset_hal_disappearances
+uv run python -m interfaces.cli.oneshot.write_source_record_subjects
+UPDATE sources.staging SET raw_hash = NULL, last_seen_at = '2000-01-01' WHERE source = 'theses';
+UPDATE sources.staging SET last_seen_at = '2000-01-01' WHERE source = 'hal';
+INSERT INTO queues.source_record_keys_queue (id)
+SELECT DISTINCT source_record_id FROM sources.source_record_identifiers
+WHERE id_type = 'doi' AND role <> 'related'
+  AND lower(id_value) ~ '^10\.5194/[a-z]+-[0-9]{4}-[0-9]+$'
+ON CONFLICT (id) DO UPDATE SET seq = DEFAULT;
+uv run python -m interfaces.cli.oneshot.delete_hal_ids_from_dois
+uv run python -m interfaces.cli.oneshot.delete_openalex_person_harvest_orphans
 
 # Pipeline
 ## Extraction
@@ -45,3 +57,4 @@ uv run python -m interfaces.cli.oneshot.restore_primary_identifiers
 # Cas particuliers, bizarreries à élucider
 * 132757 collab Argentine? (il y en a bcp comme ça)
 * 165044 et 301756: pourquoi les records openalex fusionnent avec le preprint et pas l'article?
+* "How Self-Location Predicts the Degree and Quality of the Felt Sense of Connection" => preprint de ... (DOI non résolu) + lien open access renvoie sur la v1

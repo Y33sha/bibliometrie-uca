@@ -45,7 +45,6 @@ class SudocSerialRecord:
 
     ppn: str
     issn: str | None
-    issnl: str | None
     cancelled_issns: tuple[str, ...]
     support: IssnSupport | None
     other_support_issns: tuple[str, ...]
@@ -101,12 +100,10 @@ def _title(fields: Sequence[MarcField]) -> str | None:
 def parse_sudoc_serial_record(ppn: str, fields: Sequence[MarcField]) -> SudocSerialRecord:
     """Lit une notice Sudoc de publication en série. Une zone absente donne `None` ou un tuple vide."""
     issns = _issns(_subfield_values(fields, "011", "a"))
-    issnls = _issns(_subfield_values(fields, "011", "f"))
     title = _title(fields)
     return SudocSerialRecord(
         ppn=ppn,
         issn=issns[0] if issns else None,
-        issnl=issnls[0] if issnls else None,
         cancelled_issns=_issns(_subfield_values(fields, "011", "y")),
         support=IssnSupport.OTHER if title and _names_other_support(title) else _support(fields),
         other_support_issns=_issns(_subfield_values(fields, "452", "x")),

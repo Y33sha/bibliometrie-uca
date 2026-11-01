@@ -37,7 +37,6 @@ class Publication:
     is_retracted: bool = False
     countries: tuple[str, ...] = field(default=())
     keywords: tuple[str, ...] = field(default=())
-    topics: dict[str, JsonValue] | None = None
     biblio: dict[str, JsonValue] | None = None
     source_extras: dict[str, JsonValue] | None = None
     corrections: dict[str, JsonValue] = field(default_factory=dict)

@@ -24,15 +24,21 @@ const LABELS = [
 	'Animal Behavior and Welfare Studies'
 ];
 
-const subject = { id: 1, label: 'Veterinary', language: null, usage_count: 900 };
+const subject = {
+	label_normalized: 'veterinary',
+	label: 'Veterinary',
+	vocabularies: ['openalex' as const],
+	usage_count: 900
+};
 const neighbors = LABELS.map((label, i) => ({
-	id: 100 + i,
+	label_normalized: label.toLowerCase(),
 	label,
 	usage_count: 200 + ((i * 397) % 2400),
 	cooccurrence_count: 10 + ((i * 53) % 140)
 }));
 // Deux sujets très liés entre eux, éloignés dans la liste d'origine.
-const links = [{ subject_a_id: 103, subject_b_id: 110, cooccurrence_count: 150 }];
+const [linkedA, linkedB] = [neighbors[3].label_normalized, neighbors[10].label_normalized];
+const links = [{ label_a: linkedA, label_b: linkedB, cooccurrence_count: 150 }];
 
 function overlaps(a: Box, b: Box): boolean {
 	return Math.min(a.x1, b.x1) > Math.max(a.x0, b.x0) && Math.min(a.y1, b.y1) > Math.max(a.y0, b.y0);
@@ -71,11 +77,11 @@ describe('subjectGraphLayout', () => {
 	});
 
 	it('place côte à côte deux sujets très liés', () => {
-		const angle = (id: number) => {
-			const n = layout.nodes.find((m) => m.neighbor.id === id)!;
+		const angle = (key: string) => {
+			const n = layout.nodes.find((m) => m.neighbor.label_normalized === key)!;
 			return Math.atan2(n.y - CY, n.x - CX);
 		};
-		const diff = Math.abs(angle(103) - angle(110));
+		const diff = Math.abs(angle(linkedA) - angle(linkedB));
 		expect(Math.min(diff, 2 * Math.PI - diff)).toBeLessThan((2 * Math.PI) / neighbors.length * 1.6);
 	});
 });

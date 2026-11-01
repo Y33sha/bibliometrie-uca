@@ -125,17 +125,18 @@ export function subjectGraphLayout(
     x: CX,
     y: CY,
   }));
-  const byId = new Map(nodes.map((n) => [n.neighbor.id, n]));
+  const byLabel = new Map(nodes.map((n) => [n.neighbor.label_normalized, n]));
 
   // Proximité de deux voisins : leurs publications en commun, rapportées à la moyenne géométrique de leurs tailles.
   const similarity = new Map<string, number>();
-  const pairKey = (a: number, b: number) => (a < b ? `${a}-${b}` : `${b}-${a}`);
+  const pairKey = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);
   for (const l of links) {
-    const a = byId.get(l.subject_a_id);
-    const b = byId.get(l.subject_b_id);
-    if (a && b) similarity.set(pairKey(a.neighbor.id, b.neighbor.id), l.cooccurrence_count / Math.sqrt(a.neighbor.usage_count * b.neighbor.usage_count));
+    const a = byLabel.get(l.label_a);
+    const b = byLabel.get(l.label_b);
+    if (a && b) similarity.set(pairKey(l.label_a, l.label_b), l.cooccurrence_count / Math.sqrt(a.neighbor.usage_count * b.neighbor.usage_count));
   }
-  const sim = (a: GraphNode, b: GraphNode) => similarity.get(pairKey(a.neighbor.id, b.neighbor.id)) ?? 0;
+  const sim = (a: GraphNode, b: GraphNode) =>
+    similarity.get(pairKey(a.neighbor.label_normalized, b.neighbor.label_normalized)) ?? 0;
 
   const order = circularOrder(nodes, sim);
   const baseDistance = new Map(nodes.map((n) => [n, n.distance]));

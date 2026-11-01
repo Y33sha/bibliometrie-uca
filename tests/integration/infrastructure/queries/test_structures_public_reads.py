@@ -22,7 +22,11 @@ from tests.integration.helpers.structures import (
     insert_structure,
     insert_tutelle,
 )
-from tests.integration.helpers.subjects import insert_publication_subject, insert_subject
+from tests.integration.helpers.subjects import (
+    insert_publication_subject,
+    insert_subject,
+    refresh_subject_usage,
+)
 
 # Contribution du périmètre, de rôle auteur.
 _lab_author = partial(insert_contribution, in_perimeter=True, roles=["author"])
@@ -213,6 +217,7 @@ class TestGetLaboratorySubjects:
         for p in (p1, p2, p3):
             insert_publication_subject(sa_sync_conn, p, subject_id=ai)
         insert_publication_subject(sa_sync_conn, p1, subject_id=bio)
+        refresh_subject_usage(sa_sync_conn)
 
         res = StructuresQueries(sa_sync_conn).get_structure_subjects(lab, limit=10)
         assert len(res) == 2

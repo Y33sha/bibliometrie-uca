@@ -53,8 +53,11 @@ class TestRelevesRendantUneListe:
         queries = SourceRecordCorrectionStore(sa_sync_conn_owner)
         assert queries.fetch_serial_by_doi_candidates() == []
 
+    def test_les_paires_de_meme_doi_avec_crossref_s_accordent(self, sa_sync_conn_owner):
+        assert SourceRecordCorrectionStore(sa_sync_conn_owner).fetch_crossref_title_pairs() == []
+
     def test_les_publications_sources_d_une_publication_s_accordent(self, sa_sync_conn_owner):
-        assert source_records_of(sa_sync_conn_owner, 1) == []
+        assert source_records_of(sa_sync_conn_owner, [1]) == {}
 
     def test_les_lignes_de_staging_s_accordent(self, sa_sync_conn_owner):
         store = StagingStore(sa_sync_conn_owner)
@@ -102,6 +105,7 @@ class TestRelevesRendantUneLigne:
 
 
 TYPES_EXERCES = {
+    "CrossrefTitlePair",
     "FacetOption",
     "DoiNamespace",
     "_SerialRow",

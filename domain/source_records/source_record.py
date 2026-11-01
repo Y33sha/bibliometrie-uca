@@ -28,7 +28,6 @@ class SourceRecord:
     countries: tuple[str, ...]
     keywords: tuple[str, ...]
     urls: tuple[str, ...]
-    topics: dict[str, JsonValue] | None
     biblio: dict[str, JsonValue] | None
     source_extras: dict[str, JsonValue] | None
     license: str | None = None

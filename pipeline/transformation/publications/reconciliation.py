@@ -15,10 +15,10 @@ Le voisinage direct suffit : l'invariant du marquage garantit que toute arête a
 
 import logging
 import time
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import NamedTuple
 
-from sqlalchemy import Connection, bindparam, text
+from sqlalchemy import Connection, text
 
 from domain.publications.reconciliation import (
     ReconcileMember,
@@ -35,11 +35,11 @@ from domain.source_records.identifiers import (
 from domain.source_records.keys import (
     CONFIRMATION_ID_TYPES,
     DISCRIMINANT_TITLE_MIN_LENGTH,
+    derivation,
     project_confirmation_keys,
 )
 from infrastructure.db.doi_targets import doi_or_target_sql, fetch_doi_targets
 from infrastructure.db.queues import Queue, delete_processed, enqueue, snapshot
-from infrastructure.db.savepoint import savepoint
 from infrastructure.db.scalars import scalar_int
 from infrastructure.db.source_record_identifiers import (
     first_of_its_type_sql,
@@ -110,69 +110,64 @@ _DOI_KEY_SQL = (
     f" AND {{a}}.role <> '{SourceIdentifierRole.RELATED.value}'"
 )
 
+# Le voisinage s'unit sur les seuls identifiants : une clé partagée par k enregistrements sources produit k² paires. Les colonnes se calculent ensuite une fois par enregistrement source.
 _UNIVERSE_SQL = text(f"""
     WITH dirty AS (
-        SELECT {_COLS.format(a="sr")}
+        SELECT sr.id, sr.source, sr.source_id, sr.doc_type, sr.title_normalized, sr.publication_year
         FROM {_SNAPSHOT} m
         JOIN source_records sr ON sr.id = m.id
-        LEFT JOIN publications p ON p.id = sr.publication_id
+    ), neighbours AS (
+        SELECT id FROM dirty
+        UNION
+        -- DOI : une clé DOI de l'autre enregistrement source égale à une clé DOI de `d`, cible
+        -- appliquée (`doi_targets`), par l'index `idx_source_record_identifiers_value`.
+        SELECT oi.source_record_id
+        FROM dirty d
+        JOIN source_record_identifiers di ON di.source_record_id = d.id AND {_DOI_KEY_SQL.format(a="di")}
+        JOIN source_record_identifiers oi
+          ON oi.id_type = di.id_type AND oi.id_value = {doi_or_target_sql("di.id_value")}
+             AND {_DOI_KEY_SQL.format(a="oi")}
+        UNION
+        -- DOI d'une forme secondaire dont la cible est une clé DOI de `d`.
+        SELECT oi.source_record_id
+        FROM dirty d
+        JOIN source_record_identifiers di ON di.source_record_id = d.id AND {_DOI_KEY_SQL.format(a="di")}
+        JOIN doi_targets t ON t.target_doi = {doi_or_target_sql("di.id_value")}
+        JOIN source_record_identifiers oi
+          ON oi.id_type = di.id_type AND oi.id_value = t.doi AND {_DOI_KEY_SQL.format(a="oi")}
+        UNION
+        -- Identifiants : même type et même valeur, clé de confirmation de part et d'autre (index
+        -- `idx_source_record_identifiers_value`).
+        SELECT oi.source_record_id
+        FROM dirty d
+        JOIN source_record_identifiers di
+          ON di.source_record_id = d.id AND {_CONFIRMATION_KEY_SQL.format(a="di")}
+        JOIN source_record_identifiers oi
+          ON oi.id_type = di.id_type AND oi.id_value = di.id_value
+             AND {_CONFIRMATION_KEY_SQL.format(a="oi")}
+        UNION
+        -- Token metadata_block : même doc_type + titre + année, pour tout doc_type, titre assez long.
+        SELECT o.id
+        FROM dirty d
+        JOIN source_records o
+          ON o.doc_type = d.doc_type
+             AND o.title_normalized = d.title_normalized
+             AND o.publication_year = d.publication_year
+        WHERE d.doc_type IS NOT NULL
+          AND length(d.title_normalized) > {DISCRIMINANT_TITLE_MIN_LENGTH}
+          AND d.publication_year IS NOT NULL
+        UNION
+        -- Fusion manuelle : les enregistrements sources désignés par une même fusion manuelle.
+        SELECT o.id
+        FROM dirty d
+        JOIN manual_merge_source_records dm ON dm.source = d.source AND dm.source_id = d.source_id
+        JOIN manual_merge_source_records m ON m.manual_merge_id = dm.manual_merge_id
+        JOIN source_records o ON o.source = m.source AND o.source_id = m.source_id
     )
-    SELECT id, identifiers, publication_id, doc_type, title_normalized, publication_year,
-           is_matchable, publication_doi, in_perimeter, manual_merge_ids
-    FROM dirty
-    UNION
-    -- DOI : une clé DOI de l'autre enregistrement source égale à une clé DOI de `d`, cible
-    -- appliquée (`doi_targets`), par l'index `idx_source_record_identifiers_value`.
     SELECT {_COLS.format(a="o")}
-    FROM dirty d
-    JOIN source_record_identifiers di ON di.source_record_id = d.id AND {_DOI_KEY_SQL.format(a="di")}
-    JOIN source_record_identifiers oi
-      ON oi.id_type = di.id_type AND oi.id_value = {doi_or_target_sql("di.id_value")}
-         AND {_DOI_KEY_SQL.format(a="oi")}
-    JOIN source_records o ON o.id = oi.source_record_id
+    FROM neighbours n
+    JOIN source_records o ON o.id = n.id
     LEFT JOIN publications p ON p.id = o.publication_id
-    UNION
-    -- DOI d'une forme secondaire dont la cible est une clé DOI de `d`.
-    SELECT {_COLS.format(a="o")}
-    FROM dirty d
-    JOIN source_record_identifiers di ON di.source_record_id = d.id AND {_DOI_KEY_SQL.format(a="di")}
-    JOIN doi_targets t ON t.target_doi = {doi_or_target_sql("di.id_value")}
-    JOIN source_record_identifiers oi
-      ON oi.id_type = di.id_type AND oi.id_value = t.doi AND {_DOI_KEY_SQL.format(a="oi")}
-    JOIN source_records o ON o.id = oi.source_record_id
-    LEFT JOIN publications p ON p.id = o.publication_id
-    UNION
-    -- Identifiants : même type et même valeur, clé de confirmation de part et d'autre (index
-    -- `idx_source_record_identifiers_value`).
-    SELECT {_COLS.format(a="o")}
-    FROM dirty d
-    JOIN source_record_identifiers di
-      ON di.source_record_id = d.id AND {_CONFIRMATION_KEY_SQL.format(a="di")}
-    JOIN source_record_identifiers oi
-      ON oi.id_type = di.id_type AND oi.id_value = di.id_value
-         AND {_CONFIRMATION_KEY_SQL.format(a="oi")}
-    JOIN source_records o ON o.id = oi.source_record_id
-    LEFT JOIN publications p ON p.id = o.publication_id
-    UNION
-    -- Token metadata_block : même doc_type + titre + année, pour tout doc_type, titre assez long.
-    SELECT {_COLS.format(a="o")}
-    FROM dirty d
-    JOIN source_records o
-      ON o.doc_type = d.doc_type
-         AND o.title_normalized = d.title_normalized
-         AND o.publication_year = d.publication_year
-    LEFT JOIN publications p ON p.id = o.publication_id
-    WHERE d.doc_type IS NOT NULL
-      AND length(d.title_normalized) > {DISCRIMINANT_TITLE_MIN_LENGTH}
-      AND d.publication_year IS NOT NULL
-    UNION
-    -- Fusion manuelle : les enregistrements sources désignés par une même fusion manuelle.
-    SELECT {_COLS.format(a="o")}
-    FROM dirty d
-    JOIN manual_merge_source_records m ON m.manual_merge_id = ANY(d.manual_merge_ids)
-    JOIN source_records o ON o.source = m.source AND o.source_id = m.source_id
-    LEFT JOIN publications p ON p.id = o.publication_id
-    WHERE cardinality(d.manual_merge_ids) > 0
 """)
 
 
@@ -301,26 +296,32 @@ def fetch_publication_sizes(conn: Connection, publication_ids: list[int]) -> dic
     return {row.publication_id: row.n for row in rows}
 
 
-def repoint_source_records(
-    conn: Connection, source_record_ids: list[int], publication_id: int
-) -> None:
-    """Rattache des enregistrements sources à `publication_id` (assignation d'un groupe)."""
-    if not source_record_ids:
+def repoint_source_records(conn: Connection, assignments: Mapping[int, int]) -> None:
+    """Rattache chaque enregistrement source à sa publication (`{source_record_id: publication_id}`), en une requête. Seules les lignes qui changent de publication sont réécrites."""
+    if not assignments:
         return
-    stmt = text("UPDATE source_records SET publication_id = :pid WHERE id = ANY(:ids)").bindparams(
-        bindparam("ids")
+    conn.execute(
+        text("""
+            UPDATE source_records sr SET publication_id = a.publication_id
+            FROM unnest(CAST(:ids AS integer[]), CAST(:publications AS integer[]))
+                AS a(id, publication_id)
+            WHERE sr.id = a.id AND sr.publication_id IS DISTINCT FROM a.publication_id
+        """),
+        {"ids": list(assignments), "publications": list(assignments.values())},
     )
-    conn.execute(stmt, {"pid": publication_id, "ids": source_record_ids})
 
 
 def detach_source_records(conn: Connection, source_record_ids: list[int]) -> None:
-    """Détache des enregistrements sources de leur publication : ils deviennent orphelins."""
+    """Détache des enregistrements sources de leur publication : ils deviennent orphelins. Seules les lignes rattachées sont réécrites."""
     if not source_record_ids:
         return
-    stmt = text("UPDATE source_records SET publication_id = NULL WHERE id = ANY(:ids)").bindparams(
-        bindparam("ids")
+    conn.execute(
+        text(
+            "UPDATE source_records SET publication_id = NULL"
+            " WHERE id = ANY(:ids) AND publication_id IS NOT NULL"
+        ),
+        {"ids": source_record_ids},
     )
-    conn.execute(stmt, {"ids": source_record_ids})
 
 
 def mark_publications_for_grouping(conn: Connection, publication_ids: list[int]) -> int:
@@ -345,6 +346,7 @@ def _member(row: ReconcileRow, doi_targets: dict[str, str]) -> ReconcileMember:
         publication_doi=row.publication_doi,
         doi_keys=keys.doi,
         tokens=keys.tokens() | manual_merge_tokens(row.manual_merge_ids),
+        derivation=derivation(row.identifiers),
         in_perimeter=row.in_perimeter,
         title_normalized=row.title_normalized,
         publication_year=row.publication_year,
@@ -433,6 +435,7 @@ def _apply(
     membership_changed: set[int] = set()
     created = 0
     splits = 0
+    assignments: dict[int, int] = {}
 
     # Groupes : chaque enregistrement source rejoint son ancre, ou une publication créée.
     # Une publication est créée pour des orphelins du périmètre, ou pour la partition perdante d'une scission.
@@ -447,11 +450,12 @@ def _apply(
             created += 1
             if from_existing:
                 splits += 1
-        repoint_source_records(conn, list(group.source_record_ids), target)
+        assignments.update(dict.fromkeys(group.source_record_ids, target))
         survivors.add(target)
         for source_record in group.source_record_ids:
             if (previous := rows_by_source_record[source_record].publication_id) != target:
                 membership_changed.update(p for p in (previous, target) if p is not None)
+    repoint_source_records(conn, assignments)
 
     # Détachements : les enregistrements sources écartés et les membres d'une partition incapable de fonder une publication deviennent orphelins.
     # Leur ancienne publication est recalculée, et supprimée si elle reste sans enregistrement source.
@@ -464,17 +468,18 @@ def _apply(
             for source_record in plan.detached
             if (p := rows_by_source_record[source_record].publication_id) is not None
         )
-        for publication_id in sorted(
-            {
-                p
-                for source_record in plan.detached
-                if (p := rows_by_source_record[source_record].publication_id) is not None
-            }
-            - survivors
-            - dissolved_ids
-        ):
-            with savepoint(conn):
-                lifecycle.refresh(conn, publication_id)
+        lifecycle.refresh(
+            conn,
+            sorted(
+                {
+                    p
+                    for source_record in plan.detached
+                    if (p := rows_by_source_record[source_record].publication_id) is not None
+                }
+                - survivors
+                - dissolved_ids
+            ),
+        )
 
     # Dissolutions, avant le recalcul des survivants : la suppression libère le DOI repris par un survivant, refusé sinon par la contrainte unique.
     for dissolved in plan.dissolved:
@@ -486,12 +491,6 @@ def _apply(
         created=created,
         splits=splits,
     )
-
-
-def _refresh(conn: Connection, publication_id: int) -> None:
-    """Recalcule les métadonnées consolidées d'une publication depuis ses enregistrements sources."""
-    with savepoint(conn):
-        lifecycle.refresh(conn, publication_id)
 
 
 def _snapshot_publications(conn: Connection) -> set[int]:
@@ -557,9 +556,7 @@ def reconcile(conn: Connection, logger: logging.Logger, *, rebuild: bool = False
     to_refresh = _publications_to_refresh(conn, plan, applied, before)
     step(logger, "Recalcul des métadonnées consolidées")
     with track_progress(len(to_refresh), LAST_BRANCH.rstrip(), logger) as progress:
-        for publication_id in to_refresh:
-            progress.advance()
-            _refresh(conn, publication_id)
+        lifecycle.refresh(conn, to_refresh, on_batch=progress.advance)
 
     # Les publications qui gagnent ou perdent un enregistrement source sont marquées pour l'alignement des auteurs.
     mark_publications_for_grouping(conn, sorted(applied.changed))
@@ -586,8 +583,7 @@ def reconcile_source_records(
     plan, rows_by_source_record = _plan(conn)
     before = _snapshot_publications(conn)
     applied = _apply(conn, plan, rows_by_source_record)
-    for publication_id in _publications_to_refresh(conn, plan, applied, before):
-        _refresh(conn, publication_id)
+    lifecycle.refresh(conn, _publications_to_refresh(conn, plan, applied, before))
     mark_publications_for_grouping(conn, sorted(applied.changed))
     conn.execute(text(f"DROP TABLE {_SNAPSHOT}"))
     return applied

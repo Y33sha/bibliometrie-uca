@@ -10,7 +10,7 @@ _CHEMINS = [
     ("/api/feedback/false-negatives", {"structure_id": 10, "search": "\x00"}),
     ("/api/feedback/false-positives", {"structure_id": 10, "search": "\x00"}),
     ("/api/persons/10/name-form-contributions", {"name_form": "\x00"}),
-    ("/api/subjects", {"page": 1, "per_page": 50, "search": "\x00", "min_count": 1}),
+    ("/api/subjects", {"page": 1, "per_page": 50, "search": "\x00"}),
 ]
 
 

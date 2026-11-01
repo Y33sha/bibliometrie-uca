@@ -33,7 +33,9 @@ from domain.source_records.identifiers import (
     SourceIdentifierType,
     isbn_role,
 )
+from domain.sources.hal import hal_domain_subject
 from domain.structures.identifiers import parse_ror_ids
+from domain.subjects.subject import SubjectLink
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs
 from pipeline.ingestion.common.embargoes import Embargo
 from pipeline.ingestion.common.locations import LocationFacts
@@ -62,6 +64,15 @@ def get_publication_date(doc: Mapping[str, JsonValue]) -> PublicationDate | None
     return parse_iso_date(as_str(doc.get("publicationDate_s"))) or date_from_parts(
         as_int(doc.get("producedDateY_i"))
     )
+
+
+def get_subjects(doc: Mapping[str, JsonValue]) -> list[SubjectLink]:
+    """Renvoie les domaines HAL du dépôt (`fr_domainAllCodeLabel_fs`), avec leurs ancêtres."""
+    return [
+        SubjectLink(subject)
+        for entry in as_strs(doc.get("fr_domainAllCodeLabel_fs"))
+        if (subject := hal_domain_subject(entry))
+    ]
 
 
 def get_title(doc: Mapping[str, JsonValue]) -> str:
@@ -192,11 +203,7 @@ def hal_source_record(
 
     abstract = hal_text_field(doc.get("abstract_s"))
 
-    keywords = list(dict.fromkeys(as_strs(doc.get("keyword_s")))) or None
-
-    # Topics : domaines HAL, stockés sous la forme exposée par la source (code + chemin de libellés).
-    domain_raw = doc.get("fr_domainAllCodeLabel_fs")
-    topics = {"hal_domains": domain_raw} if isinstance(domain_raw, list) and domain_raw else None
+    keywords = parse_tei_keywords(hal_text_field(doc.get("label_xml"))) or None
 
     # Éditeur nommé par HAL.
     biblio_json = compact_biblio(
@@ -224,7 +231,6 @@ def hal_source_record(
         source_extras=extract_hal_source_extras(doc),
         abstract=abstract,
         keywords=keywords,
-        topics=topics,
         license=normalize_license(hal_text_field(doc.get("licence_s"))),
         urls=urls,
         hal_collections=collections_array,
@@ -316,6 +322,19 @@ def _tei_root(label_xml: str | None) -> Element | None:
         return _parse_tei(label_xml)
     except ParseError, DefusedXmlException:
         return None
+
+
+def parse_tei_keywords(label_xml: str | None) -> list[str]:
+    """Renvoie les mots-clés saisis par l'auteur (`keywords[@scheme='author']/term`), sans doublon, espaces réduits. Le champ Solr `keyword_s` en retire la ponctuation."""
+    root = _tei_root(label_xml)
+    if root is None:
+        return []
+    terms = (
+        " ".join("".join(term.itertext()).split())
+        for keywords in root.iterfind(".//tei:keywords[@scheme='author']", _TEI_NS)
+        for term in keywords.findall("tei:term", _TEI_NS)
+    )
+    return list(dict.fromkeys(term for term in terms if term))
 
 
 def _title_authors(root: Element | None) -> list[Element]:
@@ -558,6 +577,9 @@ class HalNormalizer(SourceNormalizer):
 
     def publication_date(self, doc: Document) -> PublicationDate | None:
         return get_publication_date(doc)
+
+    def subjects(self, doc: Document) -> list[SubjectLink]:
+        return get_subjects(doc)
 
     def source_record(
         self, row: StagingRow, doc: Document, containers: Containers

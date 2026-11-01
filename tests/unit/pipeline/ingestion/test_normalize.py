@@ -32,6 +32,7 @@ from pipeline.ingestion.common.source_contributions import AuthorBlock, AuthorRe
 from pipeline.ingestion.common.source_records import SourceRecordUpsert
 from pipeline.ingestion.common.staging import StagingRow
 from pipeline.transformation.publishing.find_or_create import Containers
+from tests.helpers.normalize_doubles import normalizer_arguments
 
 
 def _row(label: str) -> StagingRow:
@@ -66,21 +67,6 @@ class _FakeStaging:
             return self.batch_id_rows.get(tuple(ids), [])
         ids_set = set(ids)
         return [r for r in self.pending_rows if r.id in ids_set]
-
-
-def _stores(staging) -> dict[str, Any]:
-    """Renvoie les arguments du constructeur commun : `staging`, et des MagicMock pour les autres stores."""
-    return {
-        "conn": MagicMock(invalidated=False),
-        "logger": logging.getLogger("test"),
-        "staging_store": staging,
-        "record_store": MagicMock(),
-        "monograph_store": MagicMock(),
-        "publisher_store": MagicMock(),
-        "contribution_store": MagicMock(),
-        "location_store": MagicMock(),
-        "embargo_store": MagicMock(),
-    }
 
 
 class _StubNorm(SourceNormalizer):
@@ -119,7 +105,7 @@ class _Norm(_StubNorm):
         results: list[Any] | None = None,
         raises_on: set[str] | None = None,
     ) -> None:
-        super().__init__(**_stores(staging))
+        super().__init__(**normalizer_arguments(staging_store=staging))
         self.results = results or []
         self.raises_on = raises_on or set()
         self.processed_rows: list[StagingRow] = []
@@ -296,7 +282,7 @@ class _MinimalNorm(_StubNorm):
     """Normaliseur qui lit le titre et l'année dans le payload, pour `process_work`."""
 
     def __init__(self, staging: MagicMock) -> None:
-        super().__init__(**_stores(staging))
+        super().__init__(**normalizer_arguments(staging_store=staging))
         self.normalized: list[StagingRow] = []
 
     def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
@@ -386,7 +372,7 @@ class _WritingNorm(_StubNorm):
         publisher: PublisherFacts | None = None,
         facts: ContainerDescription | None = None,
     ) -> None:
-        super().__init__(**_stores(MagicMock()))
+        super().__init__(**normalizer_arguments())
         self._doc = doc
         self._publisher = publisher
         self._facts = facts

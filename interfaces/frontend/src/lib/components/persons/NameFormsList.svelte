@@ -55,7 +55,7 @@
         {nf.name_form}
       </span>
     {/if}
-    <span class="publication-count" class:zero={nf.publication_count === 0}>
+    <span class="chip-count" class:zero={nf.publication_count === 0}>
       {nf.publication_count.toLocaleString("fr-FR")} publication{nf.publication_count > 1 ? "s" : ""}
     </span>
     {#if nf.shared_count > 0}
@@ -70,7 +70,7 @@
 {/snippet}
 
 {#if activeForms.length}
-  <div class="forms-list">
+  <div class="chip-list">
     {#each activeForms as nf}
       {@render formRow(nf)}
     {/each}
@@ -81,7 +81,7 @@
 
 {#if rejectedForms.length}
   <RejectedFold {personId} label="les formes rejetées">
-    <div class="forms-list">
+    <div class="chip-list">
       {#each rejectedForms as nf}
         {@render formRow(nf)}
       {/each}
@@ -90,23 +90,18 @@
 {/if}
 
 <style>
-  .forms-list {
+  .chip-list {
     display: flex;
     flex-direction: column;
     gap: 4px;
     align-items: flex-start;
   }
-  .chip-row {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-  }
-  .publication-count {
+  .chip-count {
     font-size: var(--fs-sm);
     color: var(--muted);
     white-space: nowrap;
   }
-  .publication-count.zero {
+  .chip-count.zero {
     color: var(--text-faint);
   }
   .shared {

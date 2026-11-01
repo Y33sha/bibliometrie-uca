@@ -16,7 +16,7 @@ def _metrics():
             "skip:ambiguous_name_form": 3,
             "create": 1,
         },
-        arbitration={"neutralized": 5, "marked_contributions": 2, "transferred": 1},
+        arbitration={"neutralized": 5, "marked_contributions": 2},
         name_forms={"inserted": 7},
         purge={"reorphaned": 2, "deleted_attributions": 0, "deleted_persons": 3},
     )
@@ -40,7 +40,7 @@ def test_le_resume_garde_les_compteurs_du_rattachement_et_des_autres_taches():
     assert summary["written"] == 6
     assert summary["skip:ambiguous_name_form"] == 3
     assert summary["create"] == 1
-    assert summary["identifiers_transferred"] == 1
+    assert summary["identifiers_neutralized"] == 5
     assert summary["deleted_persons"] == 3
     assert summary["name_forms_inserted"] == 7
 

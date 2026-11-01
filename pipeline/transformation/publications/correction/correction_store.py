@@ -4,7 +4,7 @@ La phase écrit sur les enregistrements sources les valeurs corrigées par les r
 """
 
 import json
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import fields
 from typing import NamedTuple
 
@@ -43,7 +43,11 @@ from domain.types import JsonValue
 from infrastructure.db.doi_targets import unversioned_doi_sql
 from infrastructure.db.queues import Queue, enqueue
 from infrastructure.db.rows import rows_as
-from infrastructure.db.source_record_identifiers import identifiers_json_sql, parse_identifiers
+from infrastructure.db.source_record_identifiers import (
+    fetch_identifiers,
+    identifiers_json_sql,
+    parse_identifiers,
+)
 from infrastructure.db.tables import source_records
 from infrastructure.sql_fragments import (
     corrected,
@@ -135,7 +139,15 @@ class DoiClusterRow(NamedTuple):
     source: str = ""
     source_id: str = ""
     author_names: tuple[str, ...] = ()
-    """Noms de famille normalisés des contributions sources individuelles, renseignés pour les groupes où un dépôt HAL et l'enregistrement source Crossref n'ont aucun nom commun."""
+    """Noms de famille normalisés des contributions sources individuelles, renseignés pour les groupes où un enregistrement source a un titre éloigné de celui de l'enregistrement source Crossref."""
+
+
+class CrossrefTitlePair(NamedTuple):
+    """Enregistrement source qui partage un DOI avec un enregistrement source Crossref."""
+
+    doi: str
+    title_normalized: str | None
+    crossref_title_normalized: str | None
 
 
 class DoiCorrectionUpdate(NamedTuple):
@@ -162,6 +174,7 @@ _DATACITE_DIRECT_RELATIONS_SQL = (
 # Expression SQL de chaque fait de `MetadataForCorrection`, sur l'enregistrement source `sr` et les jointures de `_SELECT`. Les faits de `_DOI_FACTS` se calculent sur les identifiants (`_unary_rows`).
 _FACTS: dict[str, str] = {
     "title": "sr.title",
+    "title_normalized": "COALESCE(sr.title_normalized, '')",
     "doc_type": "sr.doc_type",
     "serial_id": "sr.serial_id",
     "serial_type": "j.serial_type::text",
@@ -208,7 +221,6 @@ def _persist_statuses(
 # Chaque variante ajoute son `WHERE`.
 _SELECT = f"""
     SELECT sr.id, sr.source_id, sr.corrections,
-           {identifiers_json_sql("sr.id")} AS identifiers,
            {", ".join(f"{expression} AS {name}" for name, expression in _FACTS.items())}
     FROM source_records sr
     LEFT JOIN serials j ON j.id = sr.serial_id
@@ -217,17 +229,19 @@ _SELECT = f"""
 
 
 def _unary_row(
-    r: Row[tuple[object, ...]], registrant_types: Mapping[str, str]
+    r: Row[tuple[object, ...]],
+    identifiers: tuple[SourceIdentifier, ...],
+    registrant_types: Mapping[str, str],
 ) -> UnaryCorrectionRow:
-    identifiers = parse_identifiers(r.identifiers)
     dois = frozenset(own_dois(active(identifiers)))
     types = {registrant_types.get(doi.split("/", 1)[0]) for doi in dois}
+    columns = r._mapping
     return UnaryCorrectionRow(
         id=r.id,
         source_id=r.source_id,
         corrections=r.corrections,
         facts=MetadataForCorrection(
-            **{name: r._mapping[name] for name in _FACTS},
+            **{name: columns[name] for name in _FACTS},
             dois=dois,
             registrant_publisher_types=frozenset(t for t in types if t is not None),
         ),
@@ -267,11 +281,13 @@ def _persist_updates(conn: Connection, updates: Sequence[Mapping[str, object]]) 
     return len(updates)
 
 
-# L'enregistrement source `{source_record}` a au moins une contribution source individuelle.
-_HAS_INDIVIDUAL_SOURCE_CONTRIBUTION = (
-    "EXISTS (SELECT 1 FROM source_contributions s"
-    " WHERE s.source_record_id = {source_record} AND NOT s.collective)"
-)
+# DOI de rôle autre que `related` de chaque enregistrement source, quel que soit leur statut.
+_RECORD_DOIS_SQL = f"""
+    SELECT source_record_id AS id, id_value AS doi, role
+    FROM source_record_identifiers
+    WHERE id_type = '{SourceIdentifierType.DOI.value}'
+      AND role <> '{SourceIdentifierRole.RELATED.value}'
+"""
 
 
 class SourceRecordCorrectionStore:
@@ -285,7 +301,7 @@ class SourceRecordCorrectionStore:
 
         Certaines règles valent quel que soit le type (URL theses.fr ou DUMAS), et un enregistrement source sans type reste candidat : aucun filtre par règle.
         """
-        return self._unary_rows(_SELECT, {})
+        return self._unary_rows(_SELECT, {}, whole_table=True)
 
     def fetch_for_unary_correction_by_serial(self, serial_id: int) -> list[UnaryCorrectionRow]:
         """Renvoie les enregistrements sources d'une revue, pour le recalcul ciblé après un changement de son type dans l'administration."""
@@ -299,7 +315,10 @@ class SourceRecordCorrectionStore:
             _SELECT + " WHERE sr.source = 'hal' AND sr.source_id = ANY(:ids)", {"ids": hal_ids}
         )
 
-    def _unary_rows(self, query: str, params: Mapping[str, object]) -> list[UnaryCorrectionRow]:
+    def _unary_rows(
+        self, query: str, params: Mapping[str, object], *, whole_table: bool = False
+    ) -> list[UnaryCorrectionRow]:
+        """Renvoie les lignes de correction unaire de `query`. `whole_table` : la requête lit tous les enregistrements sources, et leurs identifiants se lisent sans filtre."""
         registrant_types: dict[str, str] = dict(
             self._conn.execute(
                 text("""
@@ -309,7 +328,9 @@ class SourceRecordCorrectionStore:
                 """)
             ).all()
         )
-        return [_unary_row(r, registrant_types) for r in self._conn.execute(text(query), params)]
+        rows = self._conn.execute(text(query), params).all()
+        identifiers = fetch_identifiers(self._conn, None if whole_table else [r.id for r in rows])
+        return [_unary_row(r, identifiers.get(r.id, ()), registrant_types) for r in rows]
 
     def persist_corrections(self, updates: list[CorrectionUpdate]) -> int:
         """Écrit en lot les colonnes corrigées, `corrections` et les statuts des identifiants. Marque les enregistrements sources pour la réconciliation : leur type et leurs identifiants sont des clés. Renvoie le nombre de lignes."""
@@ -349,7 +370,6 @@ class SourceRecordCorrectionStore:
             text(f"""
                 SELECT id, is_matchable, source::text AS source, source_id, title_normalized,
                        COALESCE(urls, '{{}}') AS urls,
-                       {identifiers_json_sql("source_records.id")} AS identifiers,
                        EXISTS (
                            SELECT 1 FROM source_record_identifiers p
                            JOIN doi_targets t ON t.doi = p.id_value
@@ -364,7 +384,8 @@ class SourceRecordCorrectionStore:
                        ) AS primary_doi_target_recorded
                 FROM source_records
             """)
-        )
+        ).all()
+        identifiers = fetch_identifiers(self._conn)
         return [
             MatchabilityRow(
                 r.id,
@@ -374,7 +395,7 @@ class SourceRecordCorrectionStore:
                     r.source_id,
                     r.title_normalized,
                     r.urls,
-                    parse_identifiers(r.identifiers),
+                    identifiers.get(r.id, ()),
                     r.primary_doi_target_recorded,
                 ),
             )
@@ -459,13 +480,7 @@ class SourceRecordCorrectionStore:
                     SELECT id, source, doc_type, title_normalized, publication_year, source_extras
                     FROM source_records
                 ),
-                -- DOI de rôle autre que `related` de chaque enregistrement source, quel que soit leur statut.
-                record_dois AS (
-                    SELECT source_record_id AS id, id_value AS doi, role
-                    FROM source_record_identifiers
-                    WHERE id_type = '{SourceIdentifierType.DOI.value}'
-                      AND role <> '{SourceIdentifierRole.RELATED.value}'
-                ),
+                record_dois AS ({_RECORD_DOIS_SQL}),
                 dataset_dois AS (
                     SELECT DISTINCT d.doi AS d
                     FROM sr_eff sr JOIN record_dois d ON d.id = sr.id
@@ -483,6 +498,10 @@ class SourceRecordCorrectionStore:
                       AND starts_with(d.doi, '{FIGSHARE_COLLECTION_DOI_PREFIX}')
                     GROUP BY sr.title_normalized, sr.publication_year
                     HAVING count(DISTINCT d.doi) = 1
+                ),
+                -- DOI d'item figshare, filtrés une seule fois.
+                figshare_items AS MATERIALIZED (
+                    SELECT id, doi FROM record_dois WHERE doi ~ '{FIGSHARE_ITEM_DOI_PATTERN}'
                 ),
                 -- DOI présents en base : DOI de rôle autre que `related` des enregistrements sources, hors retraits de la correction unaire.
                 present_dois AS (
@@ -550,14 +569,13 @@ class SourceRecordCorrectionStore:
                             c.doi AS canonical_doi,
                             '{DoiTargetRule.DATACITE_PACKAGE_PIECE.value}' AS same_work_case
                         FROM sr_eff sr
-                        JOIN record_dois piece ON piece.id = sr.id
+                        JOIN figshare_items piece ON piece.id = sr.id
                         JOIN figshare_collections c
                           ON c.title_normalized = regexp_replace(
                                  sr.title_normalized, '{FIGSHARE_ADDITIONAL_FILE_TITLE_PATTERN}', ''
                              )
                          AND c.publication_year = sr.publication_year
-                        WHERE piece.doi ~ '{FIGSHARE_ITEM_DOI_PATTERN}'
-                          AND sr.title_normalized ~ '{FIGSHARE_ADDITIONAL_FILE_TITLE_PATTERN}'
+                        WHERE sr.title_normalized ~ '{FIGSHARE_ADDITIONAL_FILE_TITLE_PATTERN}'
                     ) s
                     WHERE s.canonical_doi NOT IN (SELECT d FROM unresolved_dois)
                       AND s.secondary_doi NOT IN (SELECT d FROM unresolved_dois)
@@ -580,14 +598,34 @@ class SourceRecordCorrectionStore:
             for row in rows
         ]
 
-    def fetch_doi_cluster_candidates(self) -> list[DoiClusterRow]:
+    def fetch_crossref_title_pairs(self) -> list[CrossrefTitlePair]:
+        """Renvoie les paires d'enregistrements sources de même DOI, l'un Crossref, l'autre d'une autre source, avec leurs titres normalisés."""
+        return rows_as(
+            CrossrefTitlePair,
+            self._conn.execute(
+                text(f"""
+                    WITH record_dois AS ({_RECORD_DOIS_SQL})
+                    SELECT od.doi, o.title_normalized,
+                           c.title_normalized AS crossref_title_normalized
+                    FROM source_records c
+                    JOIN record_dois cd ON cd.id = c.id
+                    JOIN record_dois od ON od.doi = cd.doi AND od.id <> c.id
+                    JOIN source_records o ON o.id = od.id AND o.source <> '{Source.CROSSREF.value}'
+                    WHERE c.source = '{Source.CROSSREF.value}'
+                """)
+            ),
+        )
+
+    def fetch_doi_cluster_candidates(
+        self, distant_title_dois: Collection[str]
+    ) -> list[DoiClusterRow]:
         """Renvoie les membres des groupes de même DOI candidats au retrait du DOI.
 
         Un groupe réunit les enregistrements sources ayant son DOI, de rôle autre que `related`, quel que soit son statut. Un groupe est candidat si :
 
         - il contient un livre, un chapitre ou un volume d'actes ;
         - son DOI est inconnu de doi.org ;
-        - un de ses dépôts HAL partage zéro nom d'auteur avec son enregistrement source Crossref ;
+        - son DOI est dans `distant_title_dois`, avec les noms d'auteur de chaque membre ;
         - il contient un enregistrement source déjà corrigé, à réévaluer.
         """
         rows = self._conn.execute(
@@ -596,41 +634,10 @@ class SourceRecordCorrectionStore:
                     SELECT id, source, source_id, doc_type, title_normalized
                     FROM source_records
                 ),
-                record_dois AS (
-                    SELECT source_record_id AS id, id_value AS doi
-                    FROM source_record_identifiers
-                    WHERE id_type = '{SourceIdentifierType.DOI.value}'
-                      AND role <> '{SourceIdentifierRole.RELATED.value}'
-                ),
+                record_dois AS ({_RECORD_DOIS_SQL}),
                 unresolved_dois AS (
                     SELECT id_value AS d FROM failed_lookups
                     WHERE source = '{DOI_ORG}' AND id_type = 'doi'
-                ),
-                -- DOI dont un dépôt HAL n'a aucun nom d'auteur en commun avec l'enregistrement source Crossref,
-                -- les deux ayant des contributions sources individuelles.
-                hal_crossref AS MATERIALIZED (
-                    SELECT hd.doi AS d, h.id AS hal_id, c.id AS crossref_id
-                    FROM sr_eff h
-                    JOIN record_dois hd ON hd.id = h.id
-                    JOIN record_dois cd ON cd.doi = hd.doi
-                    JOIN sr_eff c ON c.id = cd.id AND c.source = '{Source.CROSSREF.value}'
-                    WHERE h.source = '{Source.HAL.value}'
-                ),
-                foreign_hal_dois AS (
-                    SELECT DISTINCT hc.d FROM hal_crossref hc
-                    WHERE {_HAS_INDIVIDUAL_SOURCE_CONTRIBUTION.format(source_record="hc.hal_id")}
-                      AND {_HAS_INDIVIDUAL_SOURCE_CONTRIBUTION.format(source_record="hc.crossref_id")}
-                      AND NOT EXISTS (
-                          SELECT 1
-                          FROM source_contributions a
-                          JOIN contributor_information ka ON ka.id = a.contributor_information_id
-                          JOIN contributor_information kb
-                            ON kb.last_name_normalized = ka.last_name_normalized
-                          JOIN source_contributions b
-                            ON b.contributor_information_id = kb.id AND b.source_record_id = hc.crossref_id
-                          WHERE a.source_record_id = hc.hal_id
-                            AND NOT a.collective AND NOT b.collective
-                      )
                 ),
                 candidate_dois AS (
                     SELECT d.doi AS d FROM record_dois d JOIN sr_eff sr ON sr.id = d.id
@@ -645,7 +652,7 @@ class SourceRecordCorrectionStore:
                     UNION
                     SELECT d FROM unresolved_dois
                     UNION
-                    SELECT d FROM foreign_hal_dois
+                    SELECT unnest(CAST(:distant_title_dois AS text[]))
                 )
                 SELECT sr.id, sr.doc_type, sr.title_normalized,
                        sr.source::text AS source, sr.source_id,
@@ -653,7 +660,7 @@ class SourceRecordCorrectionStore:
                        m.doi AS shared_doi,
                        m.doi IN (SELECT d FROM unresolved_dois) AS unresolved,
                        EXISTS (SELECT 1 FROM doi_targets t WHERE t.doi = m.doi) AS has_target,
-                       CASE WHEN m.doi IN (SELECT d FROM foreign_hal_dois) THEN ARRAY(
+                       CASE WHEN m.doi = ANY(CAST(:distant_title_dois AS text[])) THEN ARRAY(
                            SELECT DISTINCT ci.last_name_normalized
                            FROM source_contributions sc
                            JOIN contributor_information ci ON ci.id = sc.contributor_information_id
@@ -663,7 +670,8 @@ class SourceRecordCorrectionStore:
                 FROM candidate_dois c
                 JOIN record_dois m ON m.doi = c.d
                 JOIN sr_eff sr ON sr.id = m.id
-            """)
+            """),
+            {"distant_title_dois": sorted(distant_title_dois)},
         ).all()
         return [
             DoiClusterRow(

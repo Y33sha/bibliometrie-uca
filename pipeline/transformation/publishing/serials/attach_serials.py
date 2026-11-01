@@ -4,7 +4,7 @@
 
 `attach_serials` applique les règles de `domain.serials.attachment` :
 
-- chaque ISSN reçoit la revue de son ISSN-L. Cette revue est celle de la ligne de l'ISSN-L, à défaut la plus fréquente parmi les ISSN de cet ISSN-L, à défaut une revue créée. Une revue va à un seul ISSN-L ;
+- chaque ISSN reçoit la revue de son ISSN-L : celui de la table de l'ISSN International Centre (`import_issnl_table`), à défaut celui de l'ISSN qui l'annule d'après le Sudoc, à défaut celui d'OpenAlex, à défaut l'ISSN lui-même. Cette revue est celle de la ligne de l'ISSN-L, à défaut la plus fréquente parmi les ISSN de cet ISSN-L, à défaut une revue créée. Une revue va à un seul ISSN-L ;
 - chaque enregistrement source rejoint la revue de l'ISSN-L de ses ISSN, à défaut la revue de son identifiant OpenAlex, à défaut la revue de son titre : décision de l'administration (`serial_title_decisions`), seule revue à ISSN de même titre, revue à ISSN de titre compatible d'un autre enregistrement source de sa publication au run précédent, ou revue sans ISSN de même titre, créée au besoin. L'éditeur départage plusieurs revues à ISSN de même titre ;
 - le titre d'une revue est celui de la notice Sudoc de son ISSN-L, à défaut celui d'un autre de ses ISSN, à défaut le plus fréquent parmi ses enregistrements sources. Son identifiant OpenAlex et son modèle OA viennent des enregistrements sources OpenAlex dont l'ISSN-L, d'après OpenAlex, est celui de la revue. Un champ saisi à la main reste inchangé.
 
@@ -56,6 +56,8 @@ _SERIES = text(f"""
 """)
 
 _ISSN_ROWS = text("SELECT issn, issnl, serial_id, status FROM serial_issns")
+
+_REPLACEMENTS = text("SELECT issn, linked_issn FROM issn_links WHERE link_type = 'replaced_by'")
 
 _SERIALS = text("""
     SELECT s.id, s.title, s.title_normalized, s.publisher_id, s.openalex_id, s.manual_fields,
@@ -218,7 +220,21 @@ def _issn_serials(
 ) -> tuple[dict[str, str], dict[str, int], int]:
     """Renvoie l'ISSN-L de chaque ISSN, la revue de chaque ISSN-L, et le nombre de revues créées. Écrit la revue de chaque ISSN."""
     rows = {r.issn: r for r in conn.execute(_ISSN_ROWS)}
-    issnl_of = {issn: effective_issnl(issn, r.issnl, oa_issnls) for issn, r in rows.items()}
+    replacement_of = {r.issn: r.linked_issn for r in conn.execute(_REPLACEMENTS)}
+
+    def own_issnl(issn: str) -> str:
+        row = rows.get(issn)
+        return effective_issnl(issn, row.issnl if row else None, oa_issnls)
+
+    issnl_of = {
+        issn: effective_issnl(
+            issn,
+            r.issnl,
+            oa_issnls,
+            own_issnl(replacement_of[issn]) if issn in replacement_of else None,
+        )
+        for issn, r in rows.items()
+    }
     groups: dict[str, list[str]] = {}
     for issn, issnl in issnl_of.items():
         groups.setdefault(issnl, []).append(issn)

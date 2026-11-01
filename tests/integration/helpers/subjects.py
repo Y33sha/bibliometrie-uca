@@ -3,13 +3,22 @@
 from sqlalchemy import Connection
 
 from domain.normalize import normalize_text
+from domain.subjects.subject import SubjectVocabulary
+from pipeline.transformation.publications.subjects.subject_store import SubjectStore
 from tests.integration.helpers.rows import insert_row
 
 
 def insert_subject(
-    conn: Connection, label: str, *, usage_count: int | None = None, language: str | None = None
+    conn: Connection,
+    label: str,
+    *,
+    usage_count: int | None = None,
+    vocabulary: SubjectVocabulary = SubjectVocabulary.OPENALEX,
+    code: str | None = None,
+    level: int = 1,
+    parent_id: int | None = None,
 ) -> int:
-    """Insère un sujet et renvoie son `id`. Une colonne laissée à `None` prend la valeur par défaut du schéma."""
+    """Insère un sujet et renvoie son `id`. Son code vaut par défaut son libellé. Une colonne laissée à `None` prend la valeur par défaut du schéma."""
     return insert_row(
         conn,
         "subjects",
@@ -17,8 +26,12 @@ def insert_subject(
             "label": label,
             "label_normalized": normalize_text(label),
             "usage_count": usage_count,
-            "language": language,
+            "vocabulary": vocabulary.value,
+            "code": code or label,
+            "level": level,
+            "parent_id": parent_id,
         },
+        {"vocabulary": "subject_vocabulary"},
     )
 
 
@@ -33,3 +46,11 @@ def insert_publication_subject(
         {"source": "source_type"},
         returning=False,
     )
+
+
+def refresh_subject_usage(conn: Connection) -> None:
+    """Recalcule le nombre de publications de chaque sujet, puis rafraîchit les vues des sujets regroupés par libellé et de leurs co-occurrences, comme la phase `subjects`."""
+    store = SubjectStore(conn)
+    store.recompute_usage_counts()
+    store.refresh_labels()
+    store.refresh_cooccurrences()

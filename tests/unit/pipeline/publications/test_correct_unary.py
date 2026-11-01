@@ -3,6 +3,7 @@
 import logging
 from unittest.mock import MagicMock
 
+from domain.normalize import normalize_text
 from domain.source_records.corrections import stash_entry
 from domain.source_records.identifiers import (
     SourceIdentifier,
@@ -117,6 +118,7 @@ def _source_record(**overrides: object) -> UnaryCorrectionRow:
         facts["dois"] = frozenset({doi})
     for key, value in overrides.items():
         (row if key in _ROW_FIELDS else facts)[key] = value
+    facts.setdefault("title_normalized", normalize_text(str(facts["title"])))
     return UnaryCorrectionRow(**row, facts=MetadataForCorrection(**facts))  # type: ignore[arg-type]
 
 

@@ -40,7 +40,7 @@
 - **Les titres identiques ne font pas une file de triage** : 5 063 publications, sans discriminant.
 - **Les verdicts s'ancrent sur la clé naturelle `(source, source_id)` des enregistrements sources** : elle survit à la suppression puis à la réapparition d'un enregistrement source.
 - **Une fusion manuelle pose un jeton de fusion** sur tous les enregistrements sources des deux publications. La réconciliation lit ce jeton comme une clé de confirmation. Il équivaut aux arêtes affirmées de CRISalid (voir le [benchmark](archived/2026-10-12_benchmark-pipelines.md)).
-- **La fusion manuelle est refusée entre deux publications à DOI distincts**, en vertu de la règle « un DOI, une œuvre ». Ces cas relèvent d'une correction de DOI.
+- **La fusion manuelle est refusée entre deux publications à DOI distincts**, en vertu de la règle « un DOI, une œuvre ». Ces cas relèvent d'une correction de DOI. Un DOI de dépôt (serveur de preprints, archive de copies, dépôt de texte sur Zenodo) reste hors du compte, comme à la réconciliation.
 - **La fusion manuelle prend effet immédiatement**, comme la fusion des revues, des éditeurs et des personnes. Les sujets, les pays, le statut OA et les relations suivent au prochain passage du pipeline.
 - **Après une fusion manuelle, chaque contribution reçoit la personne de ses contributions sources**, avec le mode de rattachement le plus prioritaire. Deux personnes font un conflit : la contribution reste sans personne. L'aperçu de la fusion compte les conflits.
 - **Veto sur le lien entre une contribution source et une structure.** Un auteur parti garde dans HAL une affiliation obsolète. Sa contribution source HAL fait entrer dans le périmètre une publication faite ailleurs. La personne est bien l'auteur, et du périmètre pour d'autres publications : le rejet du lien personne–publication et l'exclusion de la personne sont inadaptés. Le veto vise le lien entre la contribution source et la structure, stable dans le temps. Un groupe de contributions sources est recalculé à chaque passage.
@@ -84,4 +84,5 @@ Prérequis : phase 3 du chantier [alignement des auteurs](archived/2026-10-24_DA
 
 - **Auteurs** : comment les présenter dans le volet ? La comparaison des sources de la page publique y a sa place, mais l'alignement par position devient illisible au-delà de quatre ou cinq sources.
 - **Disposition du volet** : une colonne par enregistrement source et une ligne par champ, à l'essai. À partir de combien d'enregistrements sources la disposition inverse devient-elle plus lisible ? Largeur ?
-- **Interdiction de fusion** : forme du verdict, et son effet sur deux enregistrements sources qui partagent un DOI.
+- **Interdiction de fusion** : forme du verdict, et son effet sur deux enregistrements sources qui partagent un DOI. Cas : un DOI secondaire cité par un seul enregistrement source d'agrégateur réunit deux œuvres (165353, 27616).
+- **Preprints reliés à leur version publiée par le seul titre** (`is_preprint_of`) : les fusions manuelles diront si des critères de fusion automatique existent.

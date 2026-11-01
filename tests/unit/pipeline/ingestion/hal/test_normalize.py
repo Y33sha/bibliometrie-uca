@@ -5,9 +5,7 @@ Couvre les fonctions de lecture d'un document HAL, la lecture du TEI, la lecture
 
 from __future__ import annotations
 
-import logging
 from datetime import date
-from unittest.mock import MagicMock
 
 from domain.persons.contributor_name import ContributorName
 from domain.serials.issns import IssnSupport, SerialIssn
@@ -25,6 +23,7 @@ from pipeline.ingestion.hal.normalize import (
     extract_hal_author_block,
     get_container_facts,
     get_locations,
+    get_subjects,
     get_title,
     hal_source_record,
     page_range,
@@ -37,6 +36,7 @@ from tests.helpers.normalize_doubles import (
     FakeSourceRecordStore,
     FakeStagingStore,
     identifier_values,
+    normalizer_arguments,
     staging_row,
 )
 
@@ -399,22 +399,42 @@ class TestHalSourceRecord:
         captured = self._call({})
         assert identifier_values(captured) == {"hal_id": ["hal-01234567"]}
 
-    def test_keywords_deduplicated(self):
-        captured = self._call({"keyword_s": ["a", "b", "a", "c"]})
-        assert captured.keywords == ["a", "b", "c"]
+    def test_keywords_from_tei(self):
+        """Les mots-clés de l'auteur gardent leur ponctuation ; les doublons et les espaces répétés disparaissent."""
+        tei = (
+            '<TEI xmlns="http://www.tei-c.org/ns/1.0"><text><profileDesc><textClass>'
+            '<keywords scheme="author">'
+            '<term xml:lang="fr">eau destinée à la consommation humaine (EDCH)</term>'
+            '<term xml:lang="en">Industry  4.0</term>'
+            '<term xml:lang="en">Industry 4.0</term>'
+            "<term/>"
+            "</keywords>"
+            '<keywords scheme="other"><term>hors auteur</term></keywords>'
+            "</textClass></profileDesc></text></TEI>"
+        )
+        captured = self._call({"label_xml": tei})
+        assert captured.keywords == [
+            "eau destinée à la consommation humaine (EDCH)",
+            "Industry 4.0",
+        ]
 
-    def test_keywords_empty(self):
-        captured = self._call({"keyword_s": []})
-        assert captured.keywords is None
+    def test_keywords_without_tei(self):
+        assert self._call({}).keywords is None
 
-    def test_topics_from_domain(self):
-        """Les domaines sont stockés tels que la source les expose ; la phase `subjects` les découpe en libellés."""
+    def test_subjects_from_domains(self):
+        """Chaque domaine du dépôt est un sujet, avec ses ancêtres ; une entrée mal formée est écartée."""
         entries = [
             "sdv.bibs_FacetSep_Sciences du Vivant [q-bio]/Biostatistiques",
             "info.algo_FacetSep_Informatique [cs]/Algorithme et structure de données",
+            "sans séparateur",
         ]
-        captured = self._call({"fr_domainAllCodeLabel_fs": entries})
-        assert captured.topics == {"hal_domains": entries}
+        links = get_subjects({"fr_domainAllCodeLabel_fs": entries})
+        assert [
+            (link.subject.code, link.subject.parent and link.subject.parent.code) for link in links
+        ] == [
+            ("sdv.bibs", "sdv"),
+            ("info.algo", "info"),
+        ]
 
     def test_biblio_built_from_volume_issue_pages(self):
         captured = self._call({"volume_s": "10", "issue_s": "2", "page_s": "100-120"})
@@ -609,15 +629,11 @@ class TestBuildHalAuthorRecords:
 
 def _make_normalizer():
     return HalNormalizer(
-        conn=MagicMock(),
-        logger=logging.getLogger("test"),
-        staging_store=FakeStagingStore(),
-        record_store=FakeSourceRecordStore(),
-        monograph_store=MagicMock(),
-        publisher_store=MagicMock(),
-        contribution_store=FakeSourceContributionStore(),
-        location_store=MagicMock(),
-        embargo_store=MagicMock(),
+        **normalizer_arguments(
+            staging_store=FakeStagingStore(),
+            record_store=FakeSourceRecordStore(),
+            contribution_store=FakeSourceContributionStore(),
+        )
     )
 
 

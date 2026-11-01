@@ -4,7 +4,7 @@ Les épinglages s'appliquent d'abord : une contribution à contribution source �
 
 Sont décidées :
 
-- les contributions sans personne ayant une contribution source du périmètre, une contribution source épinglée, ou une contribution source à identifiant fiable attribué à une personne ;
+- les contributions sans personne ayant une contribution source du périmètre, une contribution source épinglée, ou une contribution source à identifiant fiable attribué à une personne non marquée hors périmètre ;
 - les contributions non manuelles de la file.
 
 Une contribution de la file garde sa personne si sa décision la désigne encore, et la perd sinon. Les contributions du périmètre au nom inconnu sont traitées ensuite, une à une, contre l'index tenu à jour. Chacune rejoint une personne créée dans le même passage, ou fonde la sienne (`create_persons`).
@@ -32,7 +32,7 @@ from domain.persons.contribution_matching import (
 from domain.persons.contributor_name import ContributorName
 from domain.persons.identifiers import AttributionStatus, PersonIdentifierType
 from domain.persons.matching import Namesake
-from domain.persons.person import validated_name
+from domain.persons.person import PersonExclusion, validated_name
 from domain.publications.contribution_roles import ContributionRole
 from infrastructure.db.queues import Queue, delete_processed, snapshot
 from infrastructure.repositories.person_repository import PgPersonRepository
@@ -69,6 +69,14 @@ _RESOLUTION_SNAPSHOT = "contribution_resolution_snapshot"
 # Contributions à décider, matérialisées en début de tâche.
 _CANDIDATES_TABLE = "contribution_resolution_candidates"
 
+# Attributions d'identifiant qui font décider une contribution sans personne. Une personne marquée hors périmètre garde les contributions où elle est déjà rattachée, sans en gagner par la recherche de ses identifiants.
+_SEARCHED_IDENTIFIERS = f"""(
+    SELECT pi.person_id, pi.id_type, pi.id_value, pi.status
+    FROM person_identifiers pi
+    JOIN persons p ON p.id = pi.person_id
+    WHERE p.exclusion IS DISTINCT FROM '{PersonExclusion.OUT_OF_PERIMETER}'
+)"""
+
 # `contributions.in_perimeter` réunit les indices de périmètre de ses contributions sources (`propagate_contribution_attributes_sql`).
 _CANDIDATES_SQL = " UNION ".join(
     [
@@ -92,7 +100,7 @@ _CANDIDATES_SQL = " UNION ".join(
         *(
             strong_identifier_source_contributions(
                 id_type,
-                identifiers="person_identifiers",
+                identifiers=_SEARCHED_IDENTIFIERS,
                 select="gm.contribution_id",
                 joins="""
                     JOIN aligned_source_contributions gm ON gm.source_contribution_id = sc_auth.id

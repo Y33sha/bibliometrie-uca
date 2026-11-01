@@ -6,12 +6,13 @@
 
 Les valeurs sont celles de l'enregistrement source corrigé (phase `metadata_correction`). Le voisinage SQL de la réconciliation (`_UNIVERSE_SQL`) réécrit ces clés, et `TestUniverseMatchesPythonTokens` vérifie que les deux concordent. Un type d'identifiant de plus demande son entrée dans `CONFIRMATION_ID_TYPES` et un champ de même nom dans `ConfirmationKeys`. Une clé composite demande aussi sa branche dans `_UNIVERSE_SQL`.
 
-Les ancres d'un ensemble d'enregistrements sources (`doi_anchors`) sont les DOI qui le coupent à la réconciliation et qui donnent son DOI à une publication.
+Les ancres d'un ensemble d'enregistrements sources (`doi_anchors`) sont les DOI qui le coupent à la réconciliation et qui donnent son DOI à une publication. Un DOI de dépôt (`is_deposit_doi`) est seulement le DOI d'une publication sans ancre (`deposit_anchors`) : un preprint ou une copie rejoint ainsi la publication de sa version publiée.
 """
 
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, fields
 
+from domain.platforms.registry import is_deposit_doi
 from domain.source_records.identifiers import (
     SourceIdentifier,
     SourceIdentifierRole,
@@ -44,16 +45,29 @@ class DoiKeys:
     """DOI de rôle `primary` ou `derived`."""
     weak: frozenset[str] = frozenset()
     """DOI de rôle `secondary`, absents de `strong`."""
+    doc_type: str | None = None
+    """Type de document de l'enregistrement source : il décide des DOI de dépôt d'une plateforme comme Zenodo."""
 
     @property
     def all(self) -> frozenset[str]:
         return self.strong | self.weak
 
+    @property
+    def deposits(self) -> frozenset[str]:
+        """DOI de dépôt (`is_deposit_doi`), qui ne coupent pas la réconciliation."""
+        return frozenset(d for d in self.all if is_deposit_doi(d, self.doc_type))
+
 
 def doi_keys(
-    identifiers: Iterable[SourceIdentifier], doi_targets: Mapping[str, str] | None = None
+    identifiers: Iterable[SourceIdentifier],
+    doi_targets: Mapping[str, str] | None = None,
+    doc_type: str | None = None,
 ) -> DoiKeys:
-    """Renvoie les DOI actifs de `identifiers` de rôle autre que `related`, chacun ramené à sa cible dans `doi_targets`."""
+    """Renvoie les DOI actifs de `identifiers` de rôle autre que `related`, chacun ramené à sa cible dans `doi_targets`.
+
+    Args:
+        doc_type: type de document de l'enregistrement source.
+    """
     targets = doi_targets or {}
     strong: set[str] = set()
     weak: set[str] = set()
@@ -61,22 +75,64 @@ def doi_keys(
         if i.id_type is not SourceIdentifierType.DOI or i.role is SourceIdentifierRole.RELATED:
             continue
         (strong if i.role in _STRONG_ROLES else weak).add(targets.get(i.value, i.value))
-    return DoiKeys(frozenset(strong), frozenset(weak - strong))
+    return DoiKeys(frozenset(strong), frozenset(weak - strong), doc_type)
+
+
+def _anchors(keys: Iterable[DoiKeys], *, deposits: bool) -> frozenset[str]:
+    """Renvoie les DOI `primary` ou `derived` des enregistrements sources, à défaut le DOI de ceux qui ont un seul DOI, parmi les DOI de dépôt ou parmi les autres."""
+    kept = []
+    for k in keys:
+        own_deposits = k.deposits
+        kept.append(
+            DoiKeys(
+                frozenset(d for d in k.strong if (d in own_deposits) is deposits),
+                frozenset(d for d in k.weak if (d in own_deposits) is deposits),
+            )
+        )
+    strong = frozenset().union(*(k.strong for k in kept))
+    if strong:
+        return strong
+    return frozenset(next(iter(k.weak)) for k in kept if len(k.weak) == 1)
 
 
 def doi_anchors(keys: Iterable[DoiKeys]) -> frozenset[str]:
-    """Renvoie les ancres d'un ensemble d'enregistrements sources : leurs DOI `primary` ou `derived` ; à défaut, le DOI de ceux qui ont un seul DOI."""
-    keys = list(keys)
-    strong = frozenset().union(*(k.strong for k in keys))
-    if strong:
-        return strong
-    return frozenset(next(iter(k.weak)) for k in keys if len(k.weak) == 1)
+    """Renvoie les ancres d'un ensemble d'enregistrements sources, hors DOI de dépôt : leurs DOI `primary` ou `derived` ; à défaut, le DOI de ceux qui ont un seul DOI."""
+    return _anchors(keys, deposits=False)
+
+
+def deposit_anchors(keys: Iterable[DoiKeys]) -> frozenset[str]:
+    """Renvoie les DOI de dépôt d'un ensemble d'enregistrements sources, choisis comme les ancres (`doi_anchors`). Ils donnent son DOI à une publication sans ancre."""
+    return _anchors(keys, deposits=True)
 
 
 def anchor_of(keys: DoiKeys, anchors: frozenset[str]) -> str | None:
     """Renvoie l'ancre rejointe par un enregistrement source : celle de son DOI `primary` ou `derived`, à défaut l'unique ancre parmi ses DOI `secondary`. `None` sans ancre unique."""
     own = keys.strong & anchors or keys.weak & anchors
     return next(iter(own)) if len(own) == 1 else None
+
+
+@dataclass(frozen=True, slots=True)
+class Derivation:
+    """Identifiants qui relient un enregistrement source dérivé à son parent, l'enregistrement source dont l'identifiant primaire est son identifiant dérivé."""
+
+    primary: frozenset[tuple[str, str]] = frozenset()
+    """Identifiants actifs de rôle `primary`, en couples (type, valeur)."""
+    derived: tuple[str, str] | None = None
+    """Identifiant actif de rôle `derived`, en couple (type, valeur)."""
+
+
+def derivation(identifiers: Iterable[SourceIdentifier]) -> Derivation:
+    """Renvoie les identifiants primaires et l'identifiant dérivé actifs de `identifiers`."""
+    kept = active(identifiers)
+    return Derivation(
+        primary=frozenset(
+            (i.id_type.value, i.value) for i in kept if i.role is SourceIdentifierRole.PRIMARY
+        ),
+        derived=next(
+            ((i.id_type.value, i.value) for i in kept if i.role is SourceIdentifierRole.DERIVED),
+            None,
+        ),
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -138,7 +194,7 @@ def project_confirmation_keys(
         else None
     )
     return ConfirmationKeys(
-        doi=doi_keys(identifiers, doi_targets),
+        doi=doi_keys(identifiers, doi_targets, doc_type),
         metadata_block=metadata_block,
         **confirmation_identifiers(identifiers),
     )

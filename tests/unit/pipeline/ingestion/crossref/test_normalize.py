@@ -7,8 +7,6 @@ Les fonctions de `pipeline.ingestion.crossref.payload` sont testées dans `test_
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
-
 from domain.persons.contributor_name import ContributorName
 from domain.publications.licenses import License
 from domain.serials.issns import IssnSupport, SerialIssn
@@ -41,7 +39,7 @@ from pipeline.ingestion.crossref.normalize import (
     get_title,
 )
 from pipeline.transformation.publishing.find_or_create import Containers
-from tests.helpers.normalize_doubles import identifier_values, staging_row
+from tests.helpers.normalize_doubles import identifier_values, normalizer_arguments, staging_row
 
 
 class TestGetLocations:
@@ -552,17 +550,7 @@ def _message(**surcharges) -> dict:
 
 
 def _normalizer() -> CrossrefNormalizer:
-    return CrossrefNormalizer(
-        conn=MagicMock(),
-        logger=MagicMock(),
-        staging_store=MagicMock(),
-        record_store=MagicMock(),
-        monograph_store=MagicMock(),
-        publisher_store=MagicMock(),
-        contribution_store=MagicMock(),
-        location_store=MagicMock(),
-        embargo_store=MagicMock(),
-    )
+    return CrossrefNormalizer(**normalizer_arguments())
 
 
 class TestCrossrefSourceRecord:

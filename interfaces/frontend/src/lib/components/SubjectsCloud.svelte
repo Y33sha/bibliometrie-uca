@@ -9,7 +9,8 @@
 	type SubjectFrequency = components['schemas']['SubjectFrequency'];
 
 	interface CloudWord extends cloud.Word {
-		id: number;
+		/** Libellé normalisé du sujet : identifiant de sa page. */
+		key: string;
 		color: string;
 	}
 
@@ -62,7 +63,7 @@
 			return {
 				text: s.label,
 				size: MIN_SIZE + weight * (MAX_SIZE - MIN_SIZE),
-				id: s.id,
+				key: s.label_normalized,
 				color: mixColors(light, dark, 0.45 + weight * 0.55),
 			};
 		});
@@ -113,8 +114,8 @@
 	{:else}
 		<svg {width} {height} viewBox="0 0 {width} {height}" preserveAspectRatio="xMidYMid meet">
 			<g transform="translate({width / 2}, {height / 2})">
-				{#each placedWords as w (w.id)}
-					<a href={resolve(`subjects/${w.id}`)}>
+				{#each placedWords as w (w.key)}
+					<a href={resolve(`subjects/${w.key}`)}>
 						<text
 							text-anchor="middle"
 							font-family="system-ui, sans-serif"

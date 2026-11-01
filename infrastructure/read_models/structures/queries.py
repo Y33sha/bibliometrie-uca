@@ -8,10 +8,7 @@ from sqlalchemy import Connection, Row, text
 from domain.structures.ror import ROR_TYPE_LABELS_FR, RorType
 from infrastructure.read_models._common import FacetOption
 from infrastructure.read_models.csv_export import csv_chunks, fetch_export_rows
-from infrastructure.read_models.filters import (
-    OWN_RORS_SQL,
-    entity_subjects_sql,
-)
+from infrastructure.read_models.filters import OWN_RORS_SQL
 from infrastructure.read_models.structures.models import (
     NameFormOut,
     PartnerFacetOption,
@@ -30,6 +27,7 @@ from infrastructure.read_models.structures.models import (
     StructureSort,
 )
 from infrastructure.read_models.subjects.models import SubjectFrequency
+from infrastructure.read_models.subjects.queries import entity_subjects
 from infrastructure.sql_fragments import has_author_role
 
 # Liens publication–ROR des publications de la structure `:structure_id`, hors ses ROR propres (`OWN_RORS_SQL`).
@@ -439,22 +437,16 @@ class StructuresQueries:
         )
 
     def get_structure_subjects(self, structure_id: int, *, limit: int) -> list[SubjectFrequency]:
-        """Renvoie les sujets des publications d'une structure, les plus fréquents d'abord.
-
-        `publication_subjects` a une ligne par source pour une même paire (publication, sujet), d'où le `COUNT(DISTINCT p.id)`.
-        """
-        rows = self._conn.execute(
-            text(
-                entity_subjects_sql(
-                    "EXISTS (SELECT 1 FROM contributions a "
-                    "JOIN contribution_structures aus ON aus.contribution_id = a.id "
-                    "WHERE a.publication_id = p.id AND aus.structure_id = :structure_id "
-                    f"AND {has_author_role('a')})"
-                )
-            ),
-            {"structure_id": structure_id, "lim": limit},
-        ).all()
-        return [SubjectFrequency(id=r.id, label=r.label, count=r.n) for r in rows]
+        """Renvoie les sujets des publications d'une structure, les plus fréquents d'abord."""
+        return entity_subjects(
+            self._conn,
+            "EXISTS (SELECT 1 FROM contributions a "
+            "JOIN contribution_structures aus ON aus.contribution_id = a.id "
+            "WHERE a.publication_id = p.id AND aus.structure_id = :structure_id "
+            f"AND {has_author_role('a')})",
+            {"structure_id": structure_id},
+            limit=limit,
+        )
 
     def get_structure_partners(
         self,

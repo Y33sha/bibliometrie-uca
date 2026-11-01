@@ -1,4 +1,4 @@
-"""Recalcul des métadonnées d'une publication depuis ses enregistrements sources (`refresh_from_sources`) : priorité par source, statut open access tiré des copies, fusion des mots-clés et des topics.
+"""Recalcul des métadonnées d'une publication depuis ses enregistrements sources (`lifecycle.refresh`) : priorité par source, statut open access tiré des copies, fusion des mots-clés.
 
 Les publications sont semées par `PublicationStore.create`, sans réconciliation. La réconciliation est testée dans `tests/unit/domain/publications/test_reconciliation.py` et `tests/integration/pipeline/test_reprocessing.py`.
 """
@@ -11,7 +11,7 @@ from sqlalchemy import text
 from domain.normalize import normalize_text
 from domain.publications.licenses import License
 from pipeline.ingestion.common.locations import LocationFacts, LocationStore
-from pipeline.transformation.publications.consolidation import RefreshVerdict, refresh_from_sources
+from pipeline.transformation.publications.consolidation import RefreshVerdict
 from pipeline.transformation.publications.lifecycle import refresh
 from pipeline.transformation.publications.store import PublicationStore
 from tests.integration.helpers.contributions import insert_contribution
@@ -51,7 +51,7 @@ class TestRefreshFromSources:
             doc_type="article",
         )
         _source_record(sa_sync_conn, id1, source_id=f"hal-{id1}-closed", language="en")
-        refresh_from_sources(sa_sync_conn, id1)
+        refresh(sa_sync_conn, [id1])
 
         lang = _scalar(sa_sync_conn, "SELECT language FROM publications WHERE id = :id", id=id1)
         assert lang == "en"
@@ -71,7 +71,7 @@ class TestRefreshFromSources:
             doc_type="article",
             publisher_id=current,
         )
-        refresh_from_sources(sa_sync_conn, id1)
+        refresh(sa_sync_conn, [id1])
 
         assert (
             _scalar(sa_sync_conn, "SELECT publisher_id FROM publications WHERE id = :id", id=id1)
@@ -84,7 +84,7 @@ class TestRefreshFromSources:
         _source_record(
             sa_sync_conn, id1, source_id=f"hal-{id1}", doc_type="article", publisher_id=publisher
         )
-        refresh_from_sources(sa_sync_conn, id1)
+        refresh(sa_sync_conn, [id1])
 
         assert (
             _scalar(sa_sync_conn, "SELECT publisher_id FROM publications WHERE id = :id", id=id1)
@@ -98,7 +98,7 @@ class TestRefreshFromSources:
         LocationStore(sa_sync_conn).replace_locations(
             hal, [LocationFacts("https://hal.science/hal-01607327", is_oa=True)]
         )
-        refresh_from_sources(sa_sync_conn, id1)
+        refresh(sa_sync_conn, [id1])
 
         oa = _scalar(sa_sync_conn, "SELECT oa_status FROM publications WHERE id = :id", id=id1)
         assert oa == "green"
@@ -113,7 +113,7 @@ class TestRefreshFromSources:
             record,
             [LocationFacts("https://doi.org/10.1234/dia", license=License.CC_BY, is_oa=True)],
         )
-        refresh_from_sources(sa_sync_conn, id1)
+        refresh(sa_sync_conn, [id1])
 
         oa = _scalar(sa_sync_conn, "SELECT oa_status FROM publications WHERE id = :id", id=id1)
         assert oa == "diamond"
@@ -133,7 +133,7 @@ class TestRefreshFromSources:
             source_id=f"openalex-{id1}",
             doi="10.1234/upw",
         )
-        refresh_from_sources(sa_sync_conn, id1)
+        refresh(sa_sync_conn, [id1])
 
         oa = _scalar(sa_sync_conn, "SELECT oa_status FROM publications WHERE id = :id", id=id1)
         assert oa == "closed"
@@ -147,7 +147,7 @@ class TestRefreshFromSources:
             source_id=f"openalex-{id1}",
             doi="10.1234/agg",
         )
-        refresh_from_sources(sa_sync_conn, id1)
+        refresh(sa_sync_conn, [id1])
 
         oa = _scalar(sa_sync_conn, "SELECT oa_status FROM publications WHERE id = :id", id=id1)
         assert oa == "unknown"
@@ -168,7 +168,7 @@ class TestRefreshFromSources:
                 LocationFacts("https://open.org/1", version="publishedVersion", is_oa=True),
             ],
         )
-        refresh_from_sources(sa_sync_conn, id1)
+        refresh(sa_sync_conn, [id1])
 
         url = _scalar(sa_sync_conn, "SELECT best_copy_url FROM publications WHERE id = :id", id=id1)
         assert url == "https://open.org/1"
@@ -182,7 +182,7 @@ class TestRefreshFromSources:
             sa_sync_conn, id1, source="openalex", source_id=f"openalex-{id1}-", language="en"
         )
         _source_record(sa_sync_conn, id1, source_id=f"hal-{id1}-", language="fr")
-        refresh_from_sources(sa_sync_conn, id1)
+        refresh(sa_sync_conn, [id1])
 
         lang = _scalar(sa_sync_conn, "SELECT language FROM publications WHERE id = :id", id=id1)
         assert lang == "fr"
@@ -201,7 +201,7 @@ class TestRefreshFromSources:
             doc_type="thesis",
             language="fr",
         )
-        refresh_from_sources(sa_sync_conn, id1)
+        refresh(sa_sync_conn, [id1])
 
         lang = _scalar(sa_sync_conn, "SELECT language FROM publications WHERE id = :id", id=id1)
         assert lang == "fr"
@@ -222,7 +222,7 @@ class TestRefreshFromSources:
             doc_type="article",
             language="fr",
         )
-        refresh_from_sources(sa_sync_conn, id1)
+        refresh(sa_sync_conn, [id1])
 
         lang = _scalar(sa_sync_conn, "SELECT language FROM publications WHERE id = :id", id=id1)
         assert lang == "en"
@@ -233,7 +233,7 @@ class TestRefreshFromSources:
         _source_record(
             sa_sync_conn, id1, source="theses", source_id=f"theses-{id1}-", doc_type="thesis"
         )
-        refresh_from_sources(sa_sync_conn, id1)
+        refresh(sa_sync_conn, [id1])
 
         dt = _scalar(sa_sync_conn, "SELECT doc_type FROM publications WHERE id = :id", id=id1)
         assert dt == "thesis"
@@ -246,7 +246,7 @@ class TestRefreshFromSources:
         _source_record(
             conn, pid, source="openalex", source_id=f"openalex-{pid}-", doc_type=out_of_scope_type
         )
-        assert refresh(conn, pid) == RefreshVerdict.INADMISSIBLE_TYPE
+        assert refresh(conn, [pid]) == {pid: RefreshVerdict.INADMISSIBLE_TYPE}
 
         assert _scalar(conn, "SELECT count(*) FROM publications WHERE id = :id", id=pid) == 0
         source_record_publication = _scalar(
@@ -265,7 +265,7 @@ class TestRefreshFromSources:
         )
         person_id = insert_person(conn, "Testauthor", first_name="A", normalizer="lower")
         insert_contribution(conn, pid, person_id=person_id, author_position=1)
-        refresh(conn, pid)
+        refresh(conn, [pid])
 
         assert _scalar(conn, "SELECT count(*) FROM publications WHERE id = :id", id=pid) == 0
         assert (
@@ -289,7 +289,7 @@ class TestRefreshFromSources:
             source_id="oa-kw1",
             keywords=["Data", "machine learning"],
         )
-        refresh_from_sources(sa_sync_conn, id1)
+        refresh(sa_sync_conn, [id1])
 
         kw = _scalar(
             sa_sync_conn,
@@ -303,74 +303,12 @@ class TestRefreshFromSources:
         assert "data" in lower_kw
         assert "machine learning" in lower_kw
 
-    def test_topics_composite_by_source(self, sa_sync_conn):
-        """Les topics de la publication sont rangés par source, chacun sous sa forme d'origine, même quand deux sources utilisent la même clé."""
-        id1 = _insert_publication(sa_sync_conn, publication_year=2024, doc_type="article")
-        _source_record(
-            sa_sync_conn,
-            id1,
-            source_id="hal-tp1",
-            topics={"hal_domains": ["info_FacetSep_Informatique [cs]"]},
-        )
-        _source_record(
-            sa_sync_conn,
-            id1,
-            source="openalex",
-            source_id="oa-tp1",
-            topics={"concepts": ["AI"], "hal_domains": ["math"]},
-        )
-        refresh_from_sources(sa_sync_conn, id1)
-
-        topics = _scalar(
-            sa_sync_conn,
-            "SELECT topics FROM publications_detail WHERE publication_id = :id",
-            id=id1,
-        )
-        assert topics["hal"] == {"hal_domains": ["info_FacetSep_Informatique [cs]"]}
-        assert topics["openalex"] == {"concepts": ["AI"], "hal_domains": ["math"]}
-
-    def test_topics_composite_supports_openalex_list(self, sa_sync_conn):
-        """Les topics OpenAlex, une liste (hiérarchie domain/field/subfield/topic), sont gardés tels quels sous la clé `openalex`, à côté du dictionnaire de theses.fr."""
-        id1 = _insert_publication(sa_sync_conn, publication_year=2024, doc_type="article")
-        _source_record(
-            sa_sync_conn,
-            id1,
-            source="openalex",
-            source_id="oa-tp2",
-            topics=[
-                {
-                    "domain": "SS",
-                    "field": "Eco",
-                    "subfield": "Micro",
-                    "topic": "Behav",
-                    "score": 0.95,
-                }
-            ],
-        )
-        _source_record(
-            sa_sync_conn,
-            id1,
-            source="theses",
-            source_id="th-tp2",
-            topics={"discipline": "Info", "rameau": ["Algo"]},
-        )
-        refresh_from_sources(sa_sync_conn, id1)
-
-        topics = _scalar(
-            sa_sync_conn,
-            "SELECT topics FROM publications_detail WHERE publication_id = :id",
-            id=id1,
-        )
-        assert isinstance(topics["openalex"], list)
-        assert topics["openalex"][0]["domain"] == "SS"
-        assert topics["theses"]["discipline"] == "Info"
-
     def test_is_retracted_or(self, sa_sync_conn):
         """La publication est rétractée dès qu'une source la déclare rétractée."""
         id1 = _insert_publication(sa_sync_conn, publication_year=2024, doc_type="article")
         _source_record(sa_sync_conn, id1, source_id="hal-ret1", is_retracted=False)
         _source_record(sa_sync_conn, id1, source="openalex", source_id="oa-ret1", is_retracted=True)
-        refresh_from_sources(sa_sync_conn, id1)
+        refresh(sa_sync_conn, [id1])
 
         is_ret = _scalar(
             sa_sync_conn, "SELECT is_retracted FROM publications WHERE id = :id", id=id1

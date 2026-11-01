@@ -4,21 +4,23 @@ from collections.abc import Iterator
 
 from sqlalchemy import Connection, Row, text
 
-from domain.normalize import normalize_text
+from domain.normalize import normalize_text, to_plain_text
+from domain.publishers.names import publisher_name_key
 from domain.publishers.publisher import PUBLISHER_TYPE_LABELS_FR, PUBLISHER_TYPES, PublisherType
 from infrastructure.read_models._common import FacetOption, YesNoCount
 from infrastructure.read_models.csv_export import csv_chunks, fetch_export_rows
-from infrastructure.read_models.filters import entity_subjects_sql
 from infrastructure.read_models.publishers.models import (
     DoiPrefixInfo,
     Publisher,
     PublisherFilters,
     PublisherListItem,
     PublisherListResponse,
+    PublisherNameForm,
     PublishersFacetsResponse,
     PublisherSort,
 )
 from infrastructure.read_models.subjects.models import SubjectFrequency
+from infrastructure.read_models.subjects.queries import entity_subjects
 
 
 def _build_publisher_where(
@@ -234,13 +236,34 @@ class PublisherQueries:
             return None
         return _row_to_publisher(row)
 
-    def get_publisher_subjects(self, publisher_id: int, *, limit: int) -> list[SubjectFrequency]:
-        """Renvoie les sujets des publications de l'éditeur, les plus fréquents d'abord.
+    def get_publisher_name_forms(self, publisher_id: int) -> list[PublisherNameForm]:
+        """Renvoie les formes de nom de l'éditeur, les plus fréquentes parmi ses enregistrements sources d'abord.
 
-        `COUNT(DISTINCT p.id)` est nécessaire : `publication_subjects` a une ligne par source pour une même paire (publication, sujet).
+        La forme d'un enregistrement source est la clé du nom d'éditeur qu'il donne (`publisher_name_key`), comme à la normalisation.
         """
-        rows = self._conn.execute(
-            text(entity_subjects_sql("p.publisher_id = :id")),
-            {"id": publisher_id, "lim": limit},
-        ).all()
-        return [SubjectFrequency(id=r.id, label=r.label, count=r.n) for r in rows]
+        params = {"id": publisher_id}
+        forms = self._conn.execute(
+            text("SELECT form_normalized FROM publisher_name_forms WHERE publisher_id = :id"),
+            params,
+        ).scalars()
+        counts = dict.fromkeys(forms, 0)
+        for r in self._conn.execute(
+            text("""
+                SELECT biblio->>'publisher' AS name, count(*) AS n
+                FROM source_records WHERE publisher_id = :id GROUP BY 1
+            """),
+            params,
+        ):
+            form = publisher_name_key(to_plain_text(r.name or ""))
+            if form in counts:
+                counts[form] += r.n
+        return [
+            PublisherNameForm(form=form, source_record_count=n)
+            for form, n in sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+        ]
+
+    def get_publisher_subjects(self, publisher_id: int, *, limit: int) -> list[SubjectFrequency]:
+        """Renvoie les sujets des publications de l'éditeur, les plus fréquents d'abord."""
+        return entity_subjects(
+            self._conn, "p.publisher_id = :id", {"id": publisher_id}, limit=limit
+        )

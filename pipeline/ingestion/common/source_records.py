@@ -7,7 +7,7 @@ Les colonnes absentes de l'import restent en l'état : le rattachement à la pub
 
 import json
 import logging
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, fields
 
 from sqlalchemy import Connection, bindparam, text
@@ -68,7 +68,6 @@ class SourceRecordUpsert:
     abstract: str | None = None
     """Résumé. L'écriture retire la version MathML d'une formule déposée aussi en LaTeX (`drop_duplicate_mathml`) et l'intitulé « Abstract » ou « Résumé » en tête (`strip_abstract_label`)."""
     keywords: list[str] | None = None
-    topics: JsonValue = None
 
     # Open access
     license: License | None = None
@@ -321,10 +320,14 @@ def delete_source_records_before(conn: Connection, start_year: int) -> tuple[int
             {"start_year": start_year, "ongoing": DocType.ONGOING_THESIS},
         ).scalars()
     )
+    return delete_staged_documents(conn, staging_ids)
+
+
+def delete_staged_documents(conn: Connection, staging_ids: Sequence[int]) -> tuple[int, int]:
+    """Supprime les enregistrements sources des lignes de `staging` données (`_delete_source_records`), puis ces lignes. Renvoie le nombre d'enregistrements sources et de lignes de `staging` supprimés."""
     if not staging_ids:
         return 0, 0
-    deleted = _delete_source_records(conn, "s.id = ANY(:ids)", {"ids": staging_ids})
-    staged = conn.execute(
-        text("DELETE FROM staging WHERE id = ANY(:ids)"), {"ids": staging_ids}
-    ).rowcount
+    params: dict[str, object] = {"ids": list(staging_ids)}
+    deleted = _delete_source_records(conn, "s.id = ANY(:ids)", params)
+    staged = conn.execute(text("DELETE FROM staging WHERE id = ANY(:ids)"), params).rowcount
     return deleted, staged

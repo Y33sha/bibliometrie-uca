@@ -16,7 +16,7 @@ def test_licences_enregistrees_puis_relues(sa_sync_conn):
     publication = store.find_by_id(publication_id)
     assert publication is not None
     publication.license, publication.deposit_license = "cc-by", "repository-distribution"
-    store.save(publication)
+    store.save([publication])
 
     relue = store.find_by_id(publication_id)
     assert relue is not None

@@ -2,6 +2,7 @@
 
 from collections.abc import Collection, Iterable, Mapping
 from dataclasses import dataclass
+from typing import NamedTuple
 
 from domain.errors import ValidationError
 from domain.persons.contribution_matching import (
@@ -11,17 +12,27 @@ from domain.persons.contribution_matching import (
     ContributionOutcome,
     settle_publication,
 )
+from domain.platforms.registry import is_deposit_doi
 
 _RANK = {reason: rank for rank, reason in enumerate(MATCH_REASON_PRIORITY)}
 
 
-def check_mergeable(dois: Iterable[str | None]) -> None:
-    """Refuse la fusion de publications à DOI distincts : un DOI désigne une seule œuvre.
+class PublicationDoi(NamedTuple):
+    """DOI d'une publication, avec son type de document."""
+
+    doi: str | None
+    doc_type: str | None
+
+
+def check_mergeable(publications: Iterable[PublicationDoi]) -> None:
+    """Refuse la fusion de publications à DOI distincts : un DOI désigne une seule œuvre. Un DOI de dépôt (`is_deposit_doi`) reste hors du compte, comme à la réconciliation.
 
     Raises:
         ValidationError: DOI distincts.
     """
-    distinct = sorted({doi.lower() for doi in dois if doi})
+    distinct = sorted(
+        {p.doi.lower() for p in publications if p.doi and not is_deposit_doi(p.doi, p.doc_type)}
+    )
     if len(distinct) > 1:
         raise ValidationError(f"Fusion impossible : DOI distincts ({', '.join(distinct)})")
 

@@ -225,7 +225,7 @@ class TestRelationTargetDeletionCascades:
         )
 
         # `lifecycle.refresh` supprime ainsi une publication devenue orpheline.
-        PublicationStore(sa_sync_conn).delete(parent)
+        PublicationStore(sa_sync_conn).delete([parent])
 
         remaining = sa_sync_conn.execute(
             text("SELECT count(*) FROM publication_relations WHERE from_publication_id = :c"),
