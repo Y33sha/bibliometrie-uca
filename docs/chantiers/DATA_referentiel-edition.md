@@ -44,7 +44,7 @@ CRISalid, Academic Observatory et OpenAIRE identifient la revue par ses seuls IS
 
 Base locale au 2026-11-01 : 6 785 éditeurs, dont 5 698 nommés par au moins un enregistrement source. Doublons possibles, par signal :
 
-- Même nom, formes juridiques et mots génériques retirés : 51 groupes, 108 éditeurs. « Copernicus GmbH » et « Copernicus Publ », « Brepols Publ » et « Brepols Publishers », « ISTE Group » et « ISTE ». La fusion des autres noms rattache seulement un nom au titulaire des préfixes DOI de ses enregistrements sources, quand au moins 5 d'entre eux ont un DOI Crossref.
+- Même nom, formes juridiques et mots génériques retirés : 51 groupes, 108 éditeurs. « Copernicus GmbH » et « Copernicus Publ », « Brepols Publ » et « Brepols Publishers », « ISTE Group » et « ISTE ».
 - Noms compatibles : 350 paires. Vrais doublons (« Presses Universitaires De France » et « Presses Univ France », « Académie des sciences (Paris) » et « ACAD SCIENCES ») et faux (« American Physiological Society » et « American Physical Society », « INRIA » et « INRA »).
 - Noms emboîtés : 1 735 paires. Souvent un nom composé de deux éditeurs : « Published by Elsevier (since 2021) / Cambridge University Press », « Juris éditions, Dalloz [2013-2017] ».
 - Même identifiant OpenAlex, même membre Crossref : aucun.
@@ -86,6 +86,7 @@ Les personnes et les publications ont un volet latéral (`PersonDrawer`, `Public
 - Un enregistrement source sans revue, dont les DOI sont tous ceux d'un serveur de preprints, passe de « article » ou « autre » à « preprint ».
 - `serial_type` perd `repository` et `preprint_server`, `oa_model` perd `repository`. Les revues de ces types passent au type inconnu.
 - L'administration fusionne une revue sans ISSN dans une autre revue. Une table titre normalisé → revue garde la décision, et le rattachement par titre la consulte. La fusion de deux revues à ISSN-L est refusée.
+- Deux éditeurs de même nom, aux formes juridiques et aux mots génériques près, fusionnent. L'éditeur gardé est le seul titulaire de préfixe DOI du groupe, à défaut le plus nommé par les enregistrements sources. Un groupe à plusieurs titulaires de préfixe, ou de nom réduit à un mot courant (« Academic »), reste en l'état.
 
 ## Phasage
 
@@ -118,6 +119,7 @@ Les personnes et les publications ont un volet latéral (`PersonDrawer`, `Public
 - [ ] Doublons d'éditeurs que révèle le titulaire DataCite du préfixe
 - [ ] Lieu et directeur d'ouvrage dans les noms d'éditeur
 - [x] Mesure des autres doublons d'éditeurs sous des noms différents
+- [x] Fusion des éditeurs de même nom aux formes juridiques et mots génériques près (2a553667a)
 
 ### Phase 4 — Conteneur libre
 
@@ -149,3 +151,4 @@ Les personnes et les publications ont un volet latéral (`PersonDrawer`, `Public
 
 1. Source de chaque liste : fichier publié par l'organisme, API ou saisie dans l'administration. Accès à la liste des revues indexées dans le WoS après la résiliation de l'abonnement.
 2. Mise à jour d'une liste : import complet qui la remplace, ajouts et retraits datés, ou liste posée une fois. Rattachement d'une entrée à une revue : par ISSN, par titre à défaut. Sort des entrées sans revue dans le référentiel.
+3. Marques et maisons mères : « BioMed Central » et Springer, « SCITEPRESS » et INSTICC. Éditeurs distincts, éditeur unique, ou marque reliée à sa maison mère.
