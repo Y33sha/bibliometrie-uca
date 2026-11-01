@@ -3,6 +3,7 @@
 Le package est organisé par thème d'agrégat, une classe par module :
 - `pivot` : agrégation générique et schéma de son registre
 - `collaborations` : décompte des pays étrangers co-affiliés
+- `citations` : indicateurs de citation de chaque publication
 
 Leurs conditions de filtrage sont celles de la liste des publications (`publications.filtering`). Les décomptes des filtres sont ceux de la liste.
 
@@ -11,11 +12,12 @@ Leurs conditions de filtrage sont celles de la liste des publications (`publicat
 
 from sqlalchemy import Connection
 
+from infrastructure.read_models.stats.citations import StatsCitationQueries
 from infrastructure.read_models.stats.collaborations import StatsCollaborationQueries
 from infrastructure.read_models.stats.pivot import StatsPivotQueries
 
 
-class StatsQueries(StatsPivotQueries, StatsCollaborationQueries):
+class StatsQueries(StatsPivotQueries, StatsCollaborationQueries, StatsCitationQueries):
     """Agrégats des tableaux de bord.
 
     Le filtre `has_apc` classe un paiement d'APC en « interne » quand sa structure de budget appartient au périmètre `persons`. Ce périmètre est résolu par la lecture, sans paramètre de l'appelant.

@@ -43,6 +43,22 @@ class PivotResponse(Model):
     """Valeur de chaque groupement (clés de `groups`), et mesure sous la clé `value`, `null` si le dénominateur est nul."""
 
 
+class CitationPoint(Model):
+    """Indicateurs de citation d'une publication."""
+
+    id: int
+    title: str
+    year: int
+    cited_by_count: int
+    fwci: float | None
+
+
+class CitationPointsResponse(Model):
+    """Publications pourvues d'un nombre de citations, une par point du nuage."""
+
+    points: list[CitationPoint]
+
+
 class CountryCollaboration(Model):
     """Décompte de collaborations pour un pays."""
 

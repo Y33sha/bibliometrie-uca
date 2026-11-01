@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Depends, Query
 
 from infrastructure.read_models.stats.models import (
+    CitationPointsResponse,
     CollaborationsResponse,
     PivotResponse,
     PivotSchemaResponse,
@@ -24,6 +25,15 @@ def collaborations(
     Le décompte se lit dans la colonne `countries` des publications, le pays de l'établissement écarté.
     """
     return queries.collaborations(filters=filters.to_filters())
+
+
+@router.get("/citation-points", response_model=CitationPointsResponse)
+def citation_points(
+    filters: StatsFilters,
+    queries: StatsQueries = Depends(stats_queries),
+) -> CitationPointsResponse:
+    """Renvoie un point par publication pourvue d'un nombre de citations, sous les filtres actifs : année, nombre de citations, FWCI."""
+    return queries.citation_points(filters=filters.to_filters())
 
 
 @router.get("/pivot/schema", response_model=PivotSchemaResponse)

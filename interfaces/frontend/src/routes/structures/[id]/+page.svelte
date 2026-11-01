@@ -212,6 +212,7 @@
 				<PublicationsDashboard
 					context={{ kind: 'lab', id: lab.id }}
 					apiKey="lab-dashboard"
+					citationScatter
 					figures={dashboardLoaded && rhPersonsCount > 0
 						? [{ value: rhPersonsCount.toLocaleString('fr-FR'), label: 'personnes (SI RH)' }]
 						: []}

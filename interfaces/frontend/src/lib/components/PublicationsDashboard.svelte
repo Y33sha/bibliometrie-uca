@@ -5,6 +5,7 @@
 	import KeyFigures from '#lib/components/KeyFigures.svelte';
 	import BarChart from '#lib/components/charts/BarChart.svelte';
 	import StackedBarChart from '#lib/components/charts/StackedBarChart.svelte';
+	import YearScatterChart from '#lib/components/charts/YearScatterChart.svelte';
 	import { cssColor } from '#lib/components/charts/cssVar.js';
 	import { countryName } from '#lib/countryNames.js';
 	import { defaultYears } from '#lib/defaultYears.js';
@@ -15,6 +16,8 @@
 
 	type PivotResponse = components['schemas']['PivotResponse'];
 	type CollaborationsResponse = components['schemas']['CollaborationsResponse'];
+	type CitationPoint = components['schemas']['CitationPoint'];
+	type CitationPointsResponse = components['schemas']['CitationPointsResponse'];
 	type Row = PivotResponse['rows'][number];
 	type Figure = { value: string; label: string; tone?: 'open'; title?: string };
 
@@ -24,6 +27,7 @@
 		apiKey,
 		thesesFigure = true,
 		citationFigure = true,
+		citationScatter = false,
 		countries = true,
 		oaBreakdown = 'oa_access',
 		figures = [],
@@ -36,6 +40,8 @@
 		thesesFigure?: boolean;
 		/** Affiche la part dans le top 10 % des plus citées parmi les chiffres clés. */
 		citationFigure?: boolean;
+		/** Affiche le nuage des citations ou du FWCI de chaque publication, par année. */
+		citationScatter?: boolean;
 		/** Affiche les pays partenaires. */
 		countries?: boolean;
 		/** Découpage des publications par année : niveau d'accès, ou modèle open access. */
@@ -56,6 +62,8 @@
 	let collab = $state<CollaborationsResponse | null>(null);
 	// Publications par classe de citation, sur les années récentes.
 	let citationClasses = $state<Row[]>([]);
+	let citationPoints = $state<CitationPoint[]>([]);
+	let scatterValue = $state<'citations' | 'fwci'>('citations');
 
 	function query(docTypes: string[] | null, extra: Record<string, string>): string {
 		const params = contextParams(context);
@@ -75,7 +83,7 @@
 		byYear = all.rows.filter((r) => recent.includes(String(r.year)));
 		if (recent.length) {
 			const year = recent.join(',');
-			[types, collab, chartRows, citationClasses] = await Promise.all([
+			[types, collab, chartRows, citationClasses, citationPoints] = await Promise.all([
 				api<PivotResponse>(`/api/stats/pivot?${query(null, { indicator: 'doc_type_grouped', year })}`, {
 					key: `${apiKey}-types`,
 				}).then((r) => r.rows),
@@ -94,12 +102,19 @@
 							{ key: `${apiKey}-citation-classes` },
 						).then((r) => r.rows)
 					: Promise.resolve([]),
+				citationScatter
+					? api<CitationPointsResponse>(
+							`/api/stats/citation-points?${query(publicationsDocTypes(), { year })}`,
+							{ key: `${apiKey}-citation-points` },
+						).then((r) => r.points)
+					: Promise.resolve([]),
 			]);
 		} else {
 			types = [];
 			collab = null;
 			chartRows = [];
 			citationClasses = [];
+			citationPoints = [];
 		}
 		loaded = true;
 	}
@@ -151,6 +166,17 @@
 		})),
 	);
 
+	const scatterPoints = $derived(
+		citationPoints
+			.filter((p) => scatterValue === 'citations' || p.fwci != null)
+			.map((p) => ({
+				key: p.id,
+				year: p.year,
+				value: scatterValue === 'citations' ? p.cited_by_count : Math.round((p.fwci ?? 0) * 100) / 100,
+				label: p.title,
+			})),
+	);
+
 	const typeValues = $derived(orderedPivotValues('doc_type_grouped', types));
 	const topCountries = $derived(countries ? (collab?.rows ?? []).slice(0, 5) : []);
 </script>
@@ -178,6 +204,22 @@
 				horizontal
 			/>
 		</div>
+		{#if citationScatter && citationPoints.length}
+			<div class="dash-card">
+				<div class="scatter-head">
+					<h2>{scatterValue === 'citations' ? 'Citations' : 'FWCI'} par publication</h2>
+					<div class="scatter-toggle" role="group" aria-label="Valeur">
+						<button type="button" aria-pressed={scatterValue === 'citations'} onclick={() => (scatterValue = 'citations')}>Citations</button>
+						<button type="button" aria-pressed={scatterValue === 'fwci'} onclick={() => (scatterValue = 'fwci')}>FWCI</button>
+					</div>
+				</div>
+				<YearScatterChart
+					points={scatterPoints}
+					valueLabel={scatterValue === 'citations' ? 'Citations' : 'FWCI'}
+					reference={scatterValue === 'fwci' ? 1 : undefined}
+				/>
+			</div>
+		{/if}
 		{#if topCountries.length}
 			<div class="dash-card">
 				<h2>Pays partenaires</h2>
@@ -198,5 +240,31 @@
 		margin: -24px 0 24px;
 		font-size: var(--fs-sm);
 		color: var(--text-secondary);
+	}
+	.scatter-head {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 12px;
+	}
+	.scatter-toggle {
+		display: inline-flex;
+		border: 1px solid var(--border);
+		border-radius: var(--radius);
+		overflow: hidden;
+	}
+	.scatter-toggle button {
+		padding: 2px 10px;
+		border: none;
+		background: var(--surface);
+		font: inherit;
+		font-size: var(--fs-sm);
+		color: var(--text-secondary);
+		cursor: pointer;
+	}
+	.scatter-toggle button[aria-pressed='true'] {
+		background: var(--accent-light);
+		color: var(--accent);
+		font-weight: 600;
 	}
 </style>

@@ -273,6 +273,16 @@ def has_source_extra(key: SourceExtra, alias: str = "sr") -> str:
     return f"{alias}.source_extras ? '{key}'"
 
 
+def cited_by_count(alias: str = "p") -> str:
+    """Renvoie le nombre de citations de la ligne aliasée `alias`, publication ou enregistrement source. NULL sans indicateur."""
+    return f"({alias}.impact ->> 'cited_by_count')::int"
+
+
+def fwci(alias: str = "p") -> str:
+    """Renvoie le FWCI de la ligne aliasée `alias`, publication ou enregistrement source. NULL sans indicateur."""
+    return f"({alias}.impact ->> 'fwci')::float8"
+
+
 def reaches_citation_top(top: CitationTop, alias: str = "p") -> str:
     """Renvoie la condition vraie quand la ligne aliasée `alias`, publication ou enregistrement source, atteint le seuil de citation `top`. Sans indicateur, la condition est fausse."""
     return f"COALESCE(({alias}.impact ->> '{top}')::boolean, FALSE)"
