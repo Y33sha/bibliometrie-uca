@@ -140,7 +140,8 @@ Règle simulée : les discussions Copernicus forment un serveur de preprints, au
 
 - 95 publications fusionnent, en 93 groupes : discussion paper et article final. Une fusion est fausse : un discussion paper rejoint une thèse par un work OpenAlex typé thèse (173176, 283259). Cinq autres réunissent des titres modifiés entre la discussion et l'article.
 - 110 discussion papers restent seuls, dont 100 du périmètre. Tous deviennent preprints : 52 le sont, 40 sont typés `other` et 18 article. Les 64 rattachés à une revue la perdent.
-- Le statut open access des discussion papers seuls passe de `gold` à `green` : copie sur un serveur de preprints.
+
+Après remédiation : 94 publications fusionnent, la fusion fausse comprise. 103 discussion papers restent seuls. 96 sont des preprints sans revue. 5 sont des articles : leur dépôt HAL est un article de revue. 2 sont des preprints à revue donnée par OpenAlex. Leur statut open access reste `gold`, verdict d'Unpaywall.
 
 ## Décisions
 
@@ -179,8 +180,8 @@ Règle simulée : les discussions Copernicus forment un serveur de preprints, au
 - [x] Publication publiée par le conteneur d'un enregistrement source typé autrement que preprint : revue, actes, ouvrage (6269b46ef)
 - [x] DOI de dépôt hors des ancres : archives de copies (DESY, RWTH, GSI, ResearchGate), dépôts de textes sur Zenodo ; fusion manuelle comprise (4e4f0775f)
 - [x] Remédiation du stock : reconstruction des publications pour les DOI de dépôt, run du 2026-11-01
-- [x] Discussions Copernicus au registre des serveurs de preprints, hors du rattachement par espace de noms DOI
-- [ ] Remédiation du stock : réconciliation des enregistrements sources à DOI de discussion Copernicus
+- [x] Discussions Copernicus au registre des serveurs de preprints, hors du rattachement par espace de noms DOI (8c58a0d54)
+- [x] Remédiation du stock : réconciliation des enregistrements sources à DOI de discussion Copernicus, run du 2026-11-01
 
 ### Phase 3 — Affichage
 
