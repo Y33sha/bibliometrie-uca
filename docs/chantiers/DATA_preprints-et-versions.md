@@ -140,7 +140,7 @@ Le titre change souvent entre preprint et article : les titres différents d'une
 - [x] DOI des serveurs de preprints écartés des ancres de la réconciliation (7a291b64c)
 - [x] DOI de la publication : DOI extérieur aux serveurs de preprints, à défaut DOI d'un serveur de preprints (7a291b64c)
 - [x] Fusion manuelle : DOI des serveurs de preprints ignorés (7a291b64c)
-- [ ] Arbitrage : enregistrements sources preprint après les autres
+- [x] Arbitrage : enregistrements sources preprint après les autres (96b9bc228)
 - [ ] Remédiation du stock : commande de remise en réconciliation des publications concernées
 
 ### Phase 3 — Affichage

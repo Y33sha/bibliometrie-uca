@@ -227,9 +227,10 @@ class TestAccessAndReferences:
 
         detail = publications_queries(sa_sync_conn).get_publication_detail(publication)
         assert detail is not None
+        # La copie arXiv, d'un serveur de preprints, passe après le dépôt HAL.
         assert [(a.label, a.url) for a in detail.access] == [
-            ("arXiv", "https://arxiv.org/abs/2401.001"),
             ("HAL", "https://hal.science/hal-1"),
+            ("arXiv", "https://arxiv.org/abs/2401.001"),
         ]
         # Crossref est couvert par le DOI, HAL donne une copie : seul OpenAlex référence.
         assert [s.source for s in detail.referenced_by] == ["openalex"]

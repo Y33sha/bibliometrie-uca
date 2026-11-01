@@ -42,10 +42,8 @@ def _access(copies) -> Access:
 def test_version_puis_ordre_d_arrivee():
     result = _access(
         [
-            _copy("https://hal.science/hal-1", platform="HAL", described=True, arrival=1),
-            _copy(
-                "https://arxiv.org/abs/1", version="submittedVersion", platform="arXiv", arrival=3
-            ),
+            _copy("https://hal.science/hal-1", platform="HAL", described=True, arrival=3),
+            _copy("https://www.ncbi.nlm.nih.gov/pmc/articles/PMC1/", version="acceptedVersion"),
             _copy("https://doi.org/10.1/x", version="publishedVersion", arrival=2),
         ]
     )
@@ -53,10 +51,38 @@ def test_version_puis_ordre_d_arrivee():
     assert result == Access(
         url="https://doi.org/10.1/x",
         links=[
-            AccessLink("arXiv", "https://arxiv.org/abs/1", known=True),
+            AccessLink(
+                "ncbi.nlm.nih.gov",
+                "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC1/",
+                known=False,
+            ),
             AccessLink("HAL", "https://hal.science/hal-1", known=True),
         ],
     )
+
+
+def test_les_copies_d_un_preprint_passent_apres_les_autres():
+    """La copie arXiv soumise et la copie du dépôt HAL du preprint passent après la copie Zenodo, de version inconnue."""
+    preprint_hal = replace(
+        _copy("https://hal.science/hal-2", platform="HAL", described=True, arrival=1),
+        preprint_record=True,
+    )
+    result = _access(
+        [
+            _copy(
+                "https://arxiv.org/abs/1", version="submittedVersion", platform="arXiv", arrival=1
+            ),
+            preprint_hal,
+            _copy("https://zenodo.org/records/1", platform="Zenodo", arrival=3),
+        ]
+    )
+    assert result.url == "https://zenodo.org/records/1"
+    assert [link.label for link in result.links] == ["Zenodo", "arXiv", "HAL"]
+
+
+def test_un_preprint_seul_donne_l_adresse_d_acces():
+    copy = _copy("https://arxiv.org/abs/1", version="submittedVersion", platform="arXiv")
+    assert _access([copy]).url == "https://arxiv.org/abs/1"
 
 
 def test_une_copie_par_plateforme():

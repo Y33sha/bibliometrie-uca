@@ -1,6 +1,6 @@
 """Liens d'accès d'une publication : ses copies ouvertes, une par plateforme.
 
-Seules les copies ouvertes comptent (`open_copies`). Une copie se classe par sa version (éditeur, acceptée, soumise, inconnue), puis par l'ordre d'arrivée de son enregistrement source. Chaque plateforme donne sa meilleure copie ; une copie sans plateforme se range sous l'hôte de son URL.
+Seules les copies ouvertes comptent (`open_copies`). Les copies d'un preprint passent après les autres (`Copy.of_preprint`). Une copie se classe ensuite par sa version (éditeur, acceptée, soumise, inconnue), puis par l'ordre d'arrivée de son enregistrement source. Chaque plateforme donne sa meilleure copie ; une copie sans plateforme se range sous l'hôte de son URL.
 
 La meilleure copie donne l'adresse d'accès. Une copie désignée par un DOI figure parmi les liens quand une archive ou un serveur de preprints l'héberge (Zenodo), ou quand une autre plateforme l'héberge sous un autre DOI que celui de la publication. Le DOI de la publication chez son éditeur s'affiche à part.
 """
@@ -46,6 +46,13 @@ class Copy:
     """La copie vient de l'enregistrement source donné par la plateforme elle-même."""
     arrival: int
     """Ordre d'arrivée de l'enregistrement source ; zéro pour la copie de l'URL de résolution du DOI."""
+    preprint_record: bool = False
+    """La copie vient d'un enregistrement source typé preprint."""
+
+    @property
+    def of_preprint(self) -> bool:
+        """Vrai pour la copie d'un enregistrement source preprint, ou d'un serveur de preprints."""
+        return self.preprint_record or self.platform_type is PlatformType.PREPRINT_SERVER
 
 
 @dataclass(frozen=True, slots=True)
@@ -82,8 +89,12 @@ def _listed(copy: Copy, doi: str | None) -> bool:
     return copy.platform is not None and target != (doi or "").lower()
 
 
-def _rank(copy: Copy) -> tuple[int, int]:
-    return _VERSION_RANK.get(copy.version or "", _UNKNOWN_VERSION_RANK), copy.arrival
+def _rank(copy: Copy) -> tuple[bool, int, int]:
+    return (
+        copy.of_preprint,
+        _VERSION_RANK.get(copy.version or "", _UNKNOWN_VERSION_RANK),
+        copy.arrival,
+    )
 
 
 def registered_url_copy(url: str) -> Copy | None:
