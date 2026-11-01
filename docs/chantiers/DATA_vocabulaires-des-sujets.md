@@ -49,10 +49,10 @@ Base locale au 2026-11-01.
 ### Phase 3 — Stock, entre la migration et le run suivant
 
 - [x] Script ponctuel `write_source_record_subjects` : HAL et ScanR depuis `source_records.topics`, où les codes sont présents (b0b93124e)
-- [ ] Même script : OpenAlex depuis le raw store, enregistrements sources sans sujet seulement
+- [ ] Même script : OpenAlex et ScanR depuis le raw store, enregistrements sources sans sujet seulement
 - [x] Retrait de `source_records.topics` ; scripts de la pertinence des sujets (`sample_subject_relevance`, `prototype_subject_vote`) adaptés (ac2de2b5d)
-- [ ] theses.fr : `raw_hash` vidé et `last_seen_at` vieilli pour toutes les thèses, puis `fetch_stale` sur toutes les années. La normalisation qui suit retire aussi `source_extras.discipline`
-- [ ] HAL : `last_seen_at` vieilli pour tous les dépôts, puis run sur toutes les années. Le moissonnage relit les 59 720 dépôts des collections, `fetch_stale` les 7 352 autres. Leur normalisation écrit les mots-clés du TEI
+- [x] theses.fr : `raw_hash` vidé et `last_seen_at` vieilli pour toutes les thèses, puis `fetch_stale`. La normalisation qui suit retire aussi `source_extras.discipline`
+- [x] HAL : `last_seen_at` vieilli pour tous les dépôts, puis run. Le moissonnage relit les dépôts des collections, `fetch_stale` les autres. Leur normalisation écrit les mots-clés du TEI
 
 ### Phase 4 — MeSH
 
