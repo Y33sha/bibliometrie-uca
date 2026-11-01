@@ -120,9 +120,9 @@ La reconstruction des publications fusionne 1 047 publications. 709 paires `is_p
 
 - **Un preprint et sa version publiée forment une seule publication quand une clé de confirmation les réunit.** Seuls les DOI extérieurs aux serveurs de preprints du registre coupent les regroupements. Une communication sans actes, une HDR ou un article sans localisation éditeur réunit ainsi ses copies de serveurs de preprints.
 - **Le DOI d'une publication est son DOI extérieur aux serveurs de preprints**, à défaut le DOI d'un serveur de preprints.
-- **Dans une publication à DOI extérieur aux serveurs de preprints, les enregistrements sources preprint passent après les autres** pour arbitrer le type, la date, le titre et les autres champs.
+- **Dans une publication publiée, les enregistrements sources preprint passent après les autres** pour arbitrer le type, la date, le titre et les autres champs. Une publication est publiée quand son DOI est extérieur aux serveurs de preprints, ou quand un enregistrement source typé autrement que preprint a un conteneur.
+- **Une publication publiée par son conteneur prend le type du conteneur** : article dans une revue, communication dans des actes, chapitre dans un ouvrage. La correction des métadonnées aligne déjà le type de l'enregistrement source sur son conteneur.
 - **Un dépôt arXiv est un preprint**, même accepté pour publication : la plateforme impose le type.
-- **Une publication typée preprint prend le type de son conteneur** : article dans une revue, communication dans des actes, chapitre dans un ouvrage.
 - **Les copies d'un preprint passent après les autres copies ouvertes dans le volet Accès** : un preprint donne l'accès principal seulement s'il est la seule copie ouverte. Le nom de la plateforme suffit à reconnaître un preprint.
 - **Un preprint sans clé commune avec sa version publiée reste une publication distincte et visible**, reliée par `is_preprint_of`. L'administration fusionne la paire à la main. La fusion manuelle ignore les DOI des serveurs de preprints, comme la réconciliation.
 
@@ -147,7 +147,8 @@ La reconstruction des publications fusionne 1 047 publications. 709 paires `is_p
 - [x] Fusion manuelle : DOI des serveurs de preprints ignorés (7a291b64c)
 - [x] Arbitrage : enregistrements sources preprint après les autres (96b9bc228)
 - [x] Remédiation du stock : reconstruction des publications (`--rebuild-publications`), run du 2026-11-01
-- [ ] Type d'une publication preprint d'après son conteneur : revue, actes, ouvrage
+- [x] Retrait du DOI d'une autre œuvre étendu à toutes les sources, pour la fusion fausse de 15705 (1004d75d1)
+- [x] Publication publiée par le conteneur d'un enregistrement source typé autrement que preprint : revue, actes, ouvrage
 
 ### Phase 3 — Affichage
 

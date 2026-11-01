@@ -133,11 +133,22 @@ def prioritized(
 def arbitration_order(
     sources: list[SourceRecord], source_priority: tuple[str, ...], *, doi: str | None
 ) -> list[SourceRecord]:
-    """Trie `sources` dans l'ordre de `source_priority`. Dans une publication de DOI `doi` extérieur aux serveurs de preprints, les enregistrements sources preprint passent après les autres."""
+    """Trie `sources` dans l'ordre de `source_priority`. Dans une publication publiée (`is_published`), les enregistrements sources preprint passent après les autres."""
     ordered = prioritized(sources, source_priority)
-    if doi is None or is_preprint_server_doi(doi):
+    if not is_published(sources, doi=doi):
         return ordered
     return sorted(ordered, key=lambda s: s.doc_type == DocType.PREPRINT)
+
+
+def is_published(sources: list[SourceRecord], *, doi: str | None) -> bool:
+    """Vrai si la publication de DOI `doi` est publiée : DOI extérieur aux serveurs de preprints, ou revue ou monographie d'un enregistrement source typé autrement que preprint."""
+    if doi is not None and not is_preprint_server_doi(doi):
+        return True
+    return any(
+        s.doc_type not in (None, DocType.PREPRINT)
+        and (s.serial_id is not None or s.monograph_id is not None)
+        for s in sources
+    )
 
 
 def _textes(valeurs: list[JsonValue] | None) -> tuple[str, ...]:

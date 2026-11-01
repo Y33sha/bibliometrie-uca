@@ -113,6 +113,36 @@ def test_une_publication_au_doi_de_serveur_de_preprints_garde_l_ordre_des_source
     assert publication.doc_type == "preprint"
 
 
+@pytest.mark.parametrize(
+    ("doc_type", "container"),
+    [
+        ("article", {"serial_id": 7}),
+        ("conference_paper", {"serial_id": 8}),
+        ("book_chapter", {"monograph_id": 9}),
+    ],
+)
+def test_le_conteneur_d_un_depot_publie_fait_passer_le_preprint_apres(doc_type, container):
+    """Le dépôt HAL dans une revue, des actes ou un ouvrage donne son type à la publication au DOI arXiv."""
+    preprint = _source_record(id=1, source="datacite", doc_type="preprint", doi="10.48550/arxiv.1")
+    deposit = _source_record(id=2, source="hal", doc_type=doc_type, doi=None, **container)
+
+    publication = _publication()
+    refresh_from_sources(publication, [preprint, deposit], source_priority=("datacite", "hal"))
+    assert (publication.doi, publication.doc_type) == (DOI("10.48550/arxiv.1"), doc_type)
+
+
+def test_la_revue_d_un_enregistrement_preprint_laisse_le_preprint_en_tete():
+    """Seul le conteneur d'un enregistrement source typé autrement que preprint compte."""
+    preprint = _source_record(
+        id=1, source="datacite", doc_type="preprint", doi="10.48550/arxiv.1", serial_id=7
+    )
+    work = _source_record(id=2, source="openalex", doc_type="article", doi=None)
+
+    publication = _publication()
+    refresh_from_sources(publication, [preprint, work], source_priority=("datacite", "openalex"))
+    assert (publication.doc_type, publication.serial_id) == ("preprint", 7)
+
+
 def test_une_source_sans_doc_type_laisse_la_suivante_le_donner():
     """Le type de document vient de la première source qui en donne un."""
     muette = _source_record(id=1, source="openalex", doc_type=None)
