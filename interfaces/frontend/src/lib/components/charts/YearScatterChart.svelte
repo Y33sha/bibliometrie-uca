@@ -80,6 +80,8 @@
 				responsive: true,
 				maintainAspectRatio: false,
 				animation: false,
+				// Survol et infobulle du seul point le plus proche, même là où les points se recouvrent.
+				interaction: { mode: 'nearest', intersect: true, axis: 'xy' },
 				plugins: {
 					legend: { display: false },
 					datalabels: { display: false },
