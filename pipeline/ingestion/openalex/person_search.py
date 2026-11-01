@@ -1,6 +1,8 @@
 """Moissonnage d'OpenAlex par ORCID : tâche `harvest_by_person.openalex`.
 
-La requête `/works` reçoit le filtre `authorships.author.orcid`, avec les ORCID d'un lot réunis par OU, borné par `publication_year`. La pagination suit le curseur (`next_cursor`).
+La requête `/works` filtre sur l'ORCID déposé des auteurs (`raw_orcid`), avec les ORCID d'un lot réunis par OU, borné par `publication_year`. La pagination suit le curseur (`next_cursor`).
+
+La normalisation retient seulement l'ORCID déposé (`_extract_openalex_orcid`). L'ORCID de l'auteur désambiguïsé par OpenAlex (`author.orcid`) ramène des works sans l'ORCID déposé de la personne.
 """
 
 from __future__ import annotations
@@ -18,8 +20,8 @@ from pipeline.ingestion.openalex.api import OpenalexClient
 
 
 def build_orcid_filter(orcids: list[str], first_year: int, last_year: int) -> str:
-    """Construit la valeur du paramètre `filter` : works d'un des ORCID, parus de `first_year` à `last_year`."""
-    return f"authorships.author.orcid:{'|'.join(orcids)},publication_year:{first_year}-{last_year}"
+    """Construit la valeur du paramètre `filter` : works où l'un des ORCID est déposé, parus de `first_year` à `last_year`."""
+    return f"authorships.raw_orcid:{'|'.join(orcids)},publication_year:{first_year}-{last_year}"
 
 
 class OpenalexPersonHarvester(PersonSearchHarvester[OpenalexClient]):
