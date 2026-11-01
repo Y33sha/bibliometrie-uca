@@ -103,6 +103,38 @@ class TestListSubjects:
             assert keys == expected, sort
 
 
+class TestVocabularyFilter:
+    def _seed(self) -> tuple[str, str, str]:
+        """Sème un sujet HAL et RAMEAU, et un sujet OpenAlex, de même préfixe. Renvoie le préfixe et les deux libellés normalisés."""
+        token = uniq("VocabSubject")
+        shared = seed_subject(f"{token} chimie", vocabulary=SubjectVocabulary.HAL_DOMAIN)
+        shared_rameau = seed_subject(f"{token} chimie", vocabulary=SubjectVocabulary.RAMEAU)
+        english = seed_subject(f"{token} chemistry")
+        _publications(shared, shared_rameau, english)
+        return token, normalize_text(f"{token} chimie"), normalize_text(f"{token} chemistry")
+
+    def test_retains_subjects_of_one_of_the_vocabularies(self, client):
+        token, shared, english = self._seed()
+        keys = {i["label_normalized"] for i in _items(client, search=token, vocabulary="rameau")}
+        assert keys == {shared}
+        keys = {
+            i["label_normalized"]
+            for i in _items(client, search=token, vocabulary="rameau,openalex")
+        }
+        assert keys == {shared, english}
+
+    def test_unknown_vocabulary_rejected(self, client):
+        r = client.get("/api/subjects", params={"vocabulary": "mesh"})
+        assert r.status_code == 422
+
+    def test_facets_count_subjects_per_vocabulary_ignoring_their_own_filter(self, client):
+        token, _, _ = self._seed()
+        r = client.get("/api/subjects/facets", params={"search": token, "vocabulary": "rameau"})
+        assert r.status_code == 200
+        counts = {o["value"]: o["count"] for o in r.json()["vocabularies"]}
+        assert counts == {"openalex": 1, "hal_domain": 1, "rameau": 1, "theses_discipline": 0}
+
+
 class TestGetSubject:
     def test_404_when_unknown(self, client):
         r = client.get(f"/api/subjects/{uniq('unknown')}")

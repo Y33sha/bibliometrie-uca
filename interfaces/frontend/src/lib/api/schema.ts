@@ -2802,6 +2802,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/subjects/facets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Subjects Facets
+         * @description Compte les sujets de chaque vocabulaire. Le décompte écarte le filtre des vocabulaires.
+         */
+        get: operations["subjects_facets_api_subjects_facets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/subjects/export.csv": {
         parameters: {
             query?: never;
@@ -6254,6 +6274,14 @@ export interface components {
          * @enum {string}
          */
         SubjectVocabulary: "openalex" | "hal_domain" | "rameau" | "theses_discipline";
+        /**
+         * SubjectsFacetsResponse
+         * @description Facettes de la liste des sujets. Le décompte d'un vocabulaire écarte le filtre des vocabulaires : il donne le nombre de sujets retenus si l'option est cochée.
+         */
+        SubjectsFacetsResponse: {
+            /** Vocabularies */
+            vocabularies: components["schemas"]["FacetOption"][];
+        };
         /**
          * SuspectMergeOut
          * @description Publication de la file des fusions suspectes : moins de la moitié de ses contributions sources d'auteur ont un correspondant dans un autre enregistrement source.
@@ -10854,8 +10882,8 @@ export interface operations {
                 page?: number;
                 per_page?: number;
                 sort?: "label_asc" | "label_desc" | "publications_asc" | "publications_desc";
-                /** @description Recherche sur le libellé, insensible à la casse et aux accents */
-                search?: string | null;
+                search?: string;
+                vocabulary?: string;
             };
             header?: never;
             path?: never;
@@ -10883,12 +10911,44 @@ export interface operations {
             };
         };
     };
+    subjects_facets_api_subjects_facets_get: {
+        parameters: {
+            query?: {
+                search?: string;
+                vocabulary?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubjectsFacetsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     export_subjects_csv_api_subjects_export_csv_get: {
         parameters: {
             query?: {
                 sort?: "label_asc" | "label_desc" | "publications_asc" | "publications_desc";
-                /** @description Recherche sur le libellé, insensible à la casse et aux accents */
-                search?: string | null;
+                search?: string;
+                vocabulary?: string;
             };
             header?: never;
             path?: never;

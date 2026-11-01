@@ -1,9 +1,11 @@
 <script lang="ts">
   import PageHeader from "#lib/components/PageHeader.svelte";
   import ListToolbar from "#lib/components/ListToolbar.svelte";
+  import FacetDropdown from "#lib/components/FacetDropdown.svelte";
   import SortChevron from "#lib/components/SortChevron.svelte";
   import { onMount } from "svelte";
   import { resolve } from "$app/paths";
+  import { useFacets } from "#lib/composables/useFacets.svelte.js";
   import { usePaginatedFetch } from "#lib/composables/usePaginatedFetch.svelte.js";
   import { subjectVocabularyLabels } from "#lib/labels.js";
   import { withBase } from "#lib/paths.js";
@@ -16,13 +18,21 @@
   type SubjectListItem = components["schemas"]["SubjectListItem"];
 
   let search = $state("");
+  let selectedVocabularies: string[] = $state([]);
   let currentSort = $state("publications_desc");
   let searchTimer: ReturnType<typeof setTimeout> | undefined;
 
-  function buildParams(): URLSearchParams {
+  // Paramètres partagés par la liste, son export et ses facettes : les décomptes suivent la recherche.
+  function buildFilterParams(): URLSearchParams {
     const params = new URLSearchParams();
     const q = search.trim();
     if (q) params.set("search", q);
+    if (selectedVocabularies.length) params.set("vocabulary", selectedVocabularies.join(","));
+    return params;
+  }
+
+  function buildParams(): URLSearchParams {
+    const params = buildFilterParams();
     params.set("sort", currentSort);
     return params;
   }
@@ -35,14 +45,26 @@
     buildParams,
   });
 
+  const facets = useFacets({
+    endpoint: "/api/subjects/facets",
+    apiKey: "subjects-facets",
+    buildParams: buildFilterParams,
+    facets: {
+      vocabularies: { type: "label_map", apiKey: "vocabularies", labels: subjectVocabularyLabels },
+    },
+  });
+
   const exportUrl = $derived(withBase(`/api/subjects/export.csv?${paramsToQuery(buildParams())}`));
+
+  function onFilterChange() {
+    list.page = 1;
+    list.load();
+    facets.load();
+  }
 
   function onSearchInput() {
     if (searchTimer) clearTimeout(searchTimer);
-    searchTimer = setTimeout(() => {
-      list.page = 1;
-      list.load();
-    }, 300);
+    searchTimer = setTimeout(onFilterChange, 300);
   }
 
   function setSort(column: "label" | "publications") {
@@ -53,12 +75,17 @@
 
   onMount(() => {
     list.load();
+    facets.load();
   });
 </script>
 
 <PageHeader title="Sujets" hidden />
 
-<ListToolbar bind:search placeholder="Rechercher dans les libellés" onsearch={onSearchInput} {list} one="sujet" many="sujets" {exportUrl} />
+<ListToolbar bind:search placeholder="Rechercher dans les libellés" onsearch={onSearchInput} {list} one="sujet" many="sujets" {exportUrl}>
+  {#snippet filters()}
+    <FacetDropdown label="Vocabulaires" options={facets.options.vocabularies} bind:selected={selectedVocabularies} onchange={onFilterChange} />
+  {/snippet}
+</ListToolbar>
 
 <ListStatus {list} emptyText="Aucun sujet ne correspond à ces critères.">
   <table class="data-table">

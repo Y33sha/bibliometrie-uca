@@ -9,17 +9,20 @@ from collections.abc import Iterator, Mapping
 from sqlalchemy import Connection, Row, text
 
 from domain.normalize import normalize_text
-from domain.subjects.subject import VOCABULARY_LABELS
+from domain.subjects.subject import VOCABULARY_LABELS, SubjectVocabulary
+from infrastructure.read_models._common import FacetOption
 from infrastructure.read_models.csv_export import csv_chunks, fetch_export_rows
 from infrastructure.read_models.subjects.models import (
     SubjectChildOut,
     SubjectDetailResponse,
+    SubjectFilters,
     SubjectFrequency,
     SubjectLabelRef,
     SubjectListItem,
     SubjectListResponse,
     SubjectNeighborLink,
     SubjectNeighborOut,
+    SubjectsFacetsResponse,
     SubjectSort,
     VocabularySubjectOut,
 )
@@ -86,20 +89,32 @@ _NEIGHBOR_LINKS_SQL = text("""
 """)
 
 
-def _search_clause(search: str | None) -> tuple[str, dict[str, object]]:
-    """Renvoie la clause de recherche de l'annuaire des sujets sur le libellé normalisé, avec ses paramètres. La liste et son total la partagent."""
-    normalized = normalize_text(search or "")
-    if not normalized:
-        return "TRUE", {}
-    return "sl.label_normalized LIKE :search", {"search": f"%{normalized}%"}
+# Sujets (`sl`) avec leurs vocabulaires (`v`) : source de la liste, de son total et de ses facettes.
+_FROM = (
+    f"subject_labels sl JOIN ({_VOCABULARIES_SQL}) v ON v.label_normalized = sl.label_normalized"
+)
+
+
+def _where(
+    filters: SubjectFilters, *, skip_vocabularies: bool = False
+) -> tuple[str, dict[str, object]]:
+    """Renvoie la clause WHERE de la liste des sujets, avec ses paramètres : libellé normalisé, vocabulaires. `skip_vocabularies` écarte le filtre des vocabulaires, pour le décompte de leur facette."""
+    parts: list[str] = []
+    binds: dict[str, object] = {}
+    if normalized := normalize_text(filters.search):
+        parts.append("sl.label_normalized LIKE :search")
+        binds["search"] = f"%{normalized}%"
+    if filters.vocabularies and not skip_vocabularies:
+        parts.append("v.vocabularies && CAST(:vocabularies AS text[])")
+        binds["vocabularies"] = list(filters.vocabularies)
+    return " AND ".join(parts) or "TRUE", binds
 
 
 def _list_sql(where: str, sort: SubjectSort) -> str:
     """Renvoie la requête triée de la liste des sujets, sans pagination."""
     return f"""
         SELECT sl.label_normalized, sl.label, sl.usage_count, v.vocabularies
-        FROM subject_labels sl
-        JOIN ({_VOCABULARIES_SQL}) v ON v.label_normalized = sl.label_normalized
+        FROM {_FROM}
         WHERE {where}
         ORDER BY {_SORT_MAP[sort]}
     """
@@ -149,30 +164,48 @@ class SubjectsQueries:
         self._conn = conn
 
     def list_subjects(
-        self, *, search: str | None, sort: SubjectSort, page: int, per_page: int
+        self, *, filters: SubjectFilters, sort: SubjectSort, page: int, per_page: int
     ) -> SubjectListResponse:
-        where, binds = _search_clause(search)
+        where, binds = _where(filters)
         rows = self._conn.execute(
             text(f"{_list_sql(where, sort)} LIMIT :lim OFFSET :off"),
             {**binds, "lim": per_page, "off": (page - 1) * per_page},
         ).all()
         items = [_subject_list_item(r) for r in rows]
-        total = (
-            self._conn.execute(
-                text(f"SELECT COUNT(*) AS n FROM subject_labels sl WHERE {where}"),
-                binds,
-            )
-            .one()
-            .n
-        )
+        total = self._conn.execute(
+            text(f"SELECT COUNT(*) AS n FROM {_FROM} WHERE {where}"), binds
+        ).scalar_one()
         return SubjectListResponse(items=items, total=total, page=page, per_page=per_page)
 
-    def export_subjects_csv(self, *, search: str | None, sort: SubjectSort) -> Iterator[str]:
+    def subjects_facets(self, *, filters: SubjectFilters) -> SubjectsFacetsResponse:
+        """Compte les sujets de chaque vocabulaire, sous la recherche."""
+        where, binds = _where(filters, skip_vocabularies=True)
+        counts = {
+            r.vocabulary: r.n
+            for r in self._conn.execute(
+                text(f"""
+                    SELECT vocabulary, count(*) AS n
+                    FROM {_FROM}
+                    CROSS JOIN LATERAL unnest(v.vocabularies) AS vocabulary
+                    WHERE {where}
+                    GROUP BY vocabulary
+                """),
+                binds,
+            )
+        }
+        return SubjectsFacetsResponse(
+            vocabularies=[
+                FacetOption(value=vocabulary.value, count=counts.get(vocabulary.value, 0))
+                for vocabulary in SubjectVocabulary
+            ]
+        )
+
+    def export_subjects_csv(self, *, filters: SubjectFilters, sort: SubjectSort) -> Iterator[str]:
         """Renvoie l'export CSV de la liste des sujets, aux filtres et au tri de la liste.
 
         La requête s'exécute à l'appel. Le parcours qui suit lit des lignes en mémoire.
         """
-        where, binds = _search_clause(search)
+        where, binds = _where(filters)
         rows, truncated = fetch_export_rows(
             self._conn, _list_sql(where, sort), binds, name="sujets"
         )

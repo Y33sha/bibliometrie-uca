@@ -68,6 +68,7 @@ Base locale au 2026-11-01.
 - [x] API : liste et export par libellé, avec les vocabulaires de chaque libellé ; détail d'un libellé avec les sujets de chaque vocabulaire, leurs parents, leurs enfants et les voisins par co-occurrence
 - [x] Filtre des publications par sujet, facette et nuages de sujets : par libellé normalisé
 - [x] Frontend : liste, page d'un sujet, liens des fiches de publications et des nuages
+- [x] Liste des sujets : facette des vocabulaires
 - [x] Documentation : `docs/donnees/03-publications.md`, `docs/pipeline/11-enrichissements.md`, guide utilisateur
 
 ## Questions ouvertes

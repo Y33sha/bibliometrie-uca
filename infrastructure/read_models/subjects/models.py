@@ -7,14 +7,31 @@ Un sujet de vocabulaire est une ligne de `subjects`. Les pages publiques regroup
 `SubjectFrequency` sert aussi les nuages de sujets des personnes, des laboratoires, des revues et des éditeurs.
 """
 
+from dataclasses import dataclass
 from typing import Literal
 
 from application.ports.model import Model
 from domain.subjects.subject import SubjectVocabulary
-from infrastructure.read_models._common import PaginatedResponse
+from infrastructure.read_models._common import FacetOption, PaginatedResponse
 
 # Vocabulaire de tri de la liste des sujets : le champ, puis le sens.
 SubjectSort = Literal["label_asc", "label_desc", "publications_asc", "publications_desc"]
+
+
+@dataclass(frozen=True, slots=True)
+class SubjectFilters:
+    """Filtres de la liste des sujets."""
+
+    search: str = ""
+    """Terme cherché dans le libellé normalisé."""
+    vocabularies: tuple[str, ...] = ()
+    """Vocabulaires retenus : le sujet en a au moins un. Vide, tous les vocabulaires."""
+
+
+class SubjectsFacetsResponse(Model):
+    """Facettes de la liste des sujets. Le décompte d'un vocabulaire écarte le filtre des vocabulaires : il donne le nombre de sujets retenus si l'option est cochée."""
+
+    vocabularies: list[FacetOption]
 
 
 class SubjectOut(Model):
