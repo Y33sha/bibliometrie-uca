@@ -110,6 +110,31 @@ class TestLicense:
         assert filtered.rows == [{"value": 1}]
 
 
+class TestCitationClass:
+    def test_classes_exclusives_et_publications_sans_indicateur(self, sa_sync_conn):
+        impacts = [
+            '{"top_1_percent": true, "top_10_percent": true}',
+            '{"top_1_percent": false, "top_10_percent": true}',
+            '{"top_1_percent": false, "top_10_percent": false}',
+            '{"cited_by_count": 3}',
+            None,
+        ]
+        for impact in impacts:
+            publication_id = insert_publication(sa_sync_conn, in_perimeter=True)
+            sa_sync_conn.execute(
+                text("UPDATE publications SET impact = CAST(:impact AS jsonb) WHERE id = :id"),
+                {"impact": impact, "id": publication_id},
+            )
+
+        res = _piv(sa_sync_conn, "publication_count", ["citation_class"], doc_types=())
+        assert {r["citation_class"]: r["value"] for r in res.rows} == {
+            "top_1_percent": 1,
+            "top_10_percent": 1,
+            "below": 1,
+            "none": 2,
+        }
+
+
 class TestApcAmount:
     """Montant des APC : paiements imputés au budget d'une structure du périmètre, tous frais confondus."""
 

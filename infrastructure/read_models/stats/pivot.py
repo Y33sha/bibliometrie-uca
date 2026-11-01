@@ -24,6 +24,7 @@ from domain.errors import ValidationError
 from domain.publications.doc_types import DOC_TYPE_FAMILIES
 from domain.publications.metadata import OaStatus
 from infrastructure.read_models.filters import (
+    CITATION_CLASS_SQL,
     OA_OPEN_SQL,
     OWN_RORS_SQL,
     own_structure_ids,
@@ -186,6 +187,14 @@ DIMENSIONS: dict[str, Dimension] = {
             comparable=False,
             group_sql=f"COALESCE(p.license::text, '{NO_LICENSE}')",
         ),
+        Dimension(
+            "citation_class",
+            "Top citations",
+            "low",
+            ordinal=False,
+            comparable=False,
+            group_sql=CITATION_CLASS_SQL,
+        ),
     )
 }
 
@@ -229,6 +238,7 @@ INDICATORS: dict[str, Indicator] = {
         Indicator("oa_access", "Open access", "publication_count", "oa_access"),
         Indicator("oa_voie", "Modèle OA", "publication_count", "oa_voie"),
         Indicator("license", "Licence", "publication_count", "license"),
+        Indicator("citation_class", "Top citations", "publication_count", "citation_class"),
         Indicator("apc_amount", "Montant des APC", "apc_amount", "oa_voie"),
     )
 }

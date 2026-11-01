@@ -90,6 +90,10 @@ OTHER_DOI_AGENCY = "other"
 NO_DOI = "none"
 DOI_AGENCY_FILTER_VALUES: tuple[str, ...] = (*DOI_AGENCY_SOURCES, OTHER_DOI_AGENCY, NO_DOI)
 
+# Classes de citation d'une publication hors seuils (`CitationTop`) : sous le top 10 %, ou sans indicateur.
+BELOW_CITATION_TOPS = "below"
+NO_CITATION_INDICATOR = "none"
+
 # Positions d'auteur d'une personne dans une publication, chacune avec sa colonne booléenne de `contributions`.
 AUTHOR_POSITION_COLUMNS: dict[str, str] = {"corresponding": "is_corresponding"}
 

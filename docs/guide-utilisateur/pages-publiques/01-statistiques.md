@@ -4,7 +4,7 @@
 
 L'indicateur choisit ce que montre chaque barre :
 
-- nombre de publications par type de production, par accès, par [voie *open access*](../../glossaire.md#voies-open-access) ou par licence ;
+- nombre de publications par type de production, par accès, par [voie *open access*](../../glossaire.md#voies-open-access), par licence ou par seuil de citation d'OpenAlex (top 1 %, top 10 %) ;
 - montant des APC payées par l'établissement, par voie *open access* ;
 - collaborations internationales, sur une carte.
 
