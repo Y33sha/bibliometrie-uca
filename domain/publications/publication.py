@@ -39,5 +39,7 @@ class Publication:
     keywords: tuple[str, ...] = field(default=())
     biblio: dict[str, JsonValue] | None = None
     source_extras: dict[str, JsonValue] | None = None
+    impact: dict[str, JsonValue] | None = None
+    """Indicateurs de citation (`domain.source_records.impact`) d'un enregistrement source OpenAlex."""
     corrections: dict[str, JsonValue] = field(default_factory=dict)
     """Valeur d'avant correction et règle de chaque champ corrigé (`domain.source_records.corrections`)."""

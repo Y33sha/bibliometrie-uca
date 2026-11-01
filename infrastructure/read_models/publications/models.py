@@ -54,6 +54,7 @@ EXPORT_COLUMNS: frozenset[str] = frozenset(
         "doi",
         "oa_status",
         "license",
+        "citation_top",
         "hal_status",
         "sources",
         "access",
@@ -88,6 +89,10 @@ DOI_AGENCY_SOURCES: tuple[Source, ...] = tuple(
 OTHER_DOI_AGENCY = "other"
 NO_DOI = "none"
 DOI_AGENCY_FILTER_VALUES: tuple[str, ...] = (*DOI_AGENCY_SOURCES, OTHER_DOI_AGENCY, NO_DOI)
+
+# Classes de citation d'une publication hors seuils (`CitationTop`) : sous le top 10 %, ou sans indicateur.
+BELOW_CITATION_TOPS = "below"
+NO_CITATION_INDICATOR = "none"
 
 # Positions d'auteur d'une personne dans une publication, chacune avec sa colonne booléenne de `contributions`.
 AUTHOR_POSITION_COLUMNS: dict[str, str] = {"corresponding": "is_corresponding"}
@@ -127,6 +132,8 @@ class PublicationFilters:
     """Valeurs de `AUTHOR_POSITION_FILTER_VALUES`, combinées en OR."""
     has_apc: list[str] = field(default_factory=list)
     """Valeurs `yes` et `no`, combinées en OR. `yes` retient les publications à paiement d'APC imputé au budget d'une structure du périmètre."""
+    citation_tops: list[str] = field(default_factory=list)
+    """Valeurs de `CitationTop`, combinées en OR."""
     country_values: list[str] = field(default_factory=list)
     language_codes: list[str] = field(default_factory=list)
     hal_status_values: list[str] = field(default_factory=list)
@@ -172,6 +179,8 @@ class PublicationListItem(Model):
     """Lien d'accès (`domain.publications.access.access_url`)."""
     license: str | None
     """Licence de la version éditeur."""
+    citation_top: str | None
+    """Seuil de citation le plus haut atteint (`CitationTop`)."""
     serial: str | None
     serial_id: int | None
     publisher: str | None
@@ -235,6 +244,8 @@ class PublicationsFacetsResponse(Model):
     """Rempli seulement avec `person_id` ou des laboratoires. Une publication compte dans chaque position occupée."""
     source_counts: dict[str, YesNoCount]
     apc: list[FacetOption]
+    citation_tops: list[FacetOption]
+    """Une publication du top 1 % compte aussi dans le top 10 %."""
     countries: list[FacetOption]
     languages: list[FacetOption]
     hal_status: list[FacetOption]

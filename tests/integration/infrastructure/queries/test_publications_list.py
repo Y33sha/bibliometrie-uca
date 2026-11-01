@@ -792,6 +792,80 @@ class TestDoiAgency:
         ]
 
 
+class TestCitationTop:
+    """Filtre, facette, colonne et export du seuil de citation, lu dans `publications.impact`."""
+
+    def _seed(self, conn):
+        lab = _lab(conn)
+        impacts = {
+            "top_1": '{"top_1_percent": true, "top_10_percent": true}',
+            "top_10": '{"top_1_percent": false, "top_10_percent": true}',
+            "below": '{"top_1_percent": false, "top_10_percent": false}',
+            "none": None,
+        }
+        publications = {}
+        for key, impact in impacts.items():
+            publications[key] = insert_publication(conn, key, in_perimeter=True)
+            conn.execute(
+                text("UPDATE publications SET impact = CAST(:impact AS jsonb) WHERE id = :id"),
+                {"impact": impact, "id": publications[key]},
+            )
+            _attach(conn, publications[key], lab)
+        return lab, publications
+
+    def _listed(self, conn, lab, citation_tops):
+        res = publications_queries(conn).list_publications(
+            filters=PublicationFilters(lab_ids=[lab], citation_tops=citation_tops),
+            page=1,
+            per_page=50,
+            sort="year_desc",
+        )
+        return {p.id: p.citation_top for p in res.publications}
+
+    def test_le_top_10_comprend_le_top_1_et_la_colonne_donne_le_plus_haut(self, sa_sync_conn):
+        lab, publications = self._seed(sa_sync_conn)
+
+        assert self._listed(sa_sync_conn, lab, ["top_1_percent"]) == {
+            publications["top_1"]: "top_1_percent"
+        }
+        assert self._listed(sa_sync_conn, lab, ["top_10_percent"]) == {
+            publications["top_1"]: "top_1_percent",
+            publications["top_10"]: "top_10_percent",
+        }
+        all_listed = self._listed(sa_sync_conn, lab, [])
+        assert (all_listed[publications["below"]], all_listed[publications["none"]]) == (
+            None,
+            None,
+        )
+
+    def test_facette(self, sa_sync_conn):
+        lab, _ = self._seed(sa_sync_conn)
+
+        builder = _PublicationFacetsBuilder(
+            sa_sync_conn,
+            PublicationFilters(lab_ids=[lab], citation_tops=["top_1_percent"]),
+            FilterContext([], None),
+        )
+        assert [(o.value, o.label, o.count) for o in builder._facet_citation_tops()] == [
+            ("top_1_percent", "Top 1 %", 1),
+            ("top_10_percent", "Top 10 %", 2),
+        ]
+
+    def test_export(self, sa_sync_conn):
+        lab, _ = self._seed(sa_sync_conn)
+
+        csv = "".join(
+            publications_queries(sa_sync_conn).export_publications_csv(
+                filters=PublicationFilters(lab_ids=[lab], citation_tops=["top_10_percent"]),
+                sort="year_desc",
+                columns=["citation_top"],
+            )
+        )
+        assert "Top citations" in csv
+        assert "Top 1 %" in csv
+        assert "Top 10 %" in csv
+
+
 def test_le_lien_d_acces_suit_la_meilleure_copie_et_le_statut(sa_sync_conn):
     lab = _lab(sa_sync_conn)
     deposited = insert_publication(sa_sync_conn, "Deposited", oa_status="green")

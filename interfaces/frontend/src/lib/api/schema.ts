@@ -90,6 +90,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/stats/citation-points": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Citation Points
+         * @description Renvoie un point par publication pourvue d'un nombre de citations, sous les filtres actifs : année, nombre de citations, FWCI.
+         */
+        get: operations["citation_points_api_stats_citation_points_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/stats/pivot/schema": {
         parameters: {
             query?: never;
@@ -3251,6 +3271,35 @@ export interface components {
             reason: string;
         };
         /**
+         * CitationPoint
+         * @description Indicateurs de citation d'une publication.
+         */
+        CitationPoint: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+            /**
+             * Serial
+             * @description Titre de la revue.
+             */
+            serial: string | null;
+            /** Year */
+            year: number;
+            /** Cited By Count */
+            cited_by_count: number;
+            /** Fwci */
+            fwci: number | null;
+        };
+        /**
+         * CitationPointsResponse
+         * @description Publications pourvues d'un nombre de citations, une par point du nuage.
+         */
+        CitationPointsResponse: {
+            /** Points */
+            points: components["schemas"]["CitationPoint"][];
+        };
+        /**
          * CollaborationsResponse
          * @description Collaborations internationales ventilées par pays étranger (source `publications.countries`).
          */
@@ -5030,6 +5079,11 @@ export interface components {
              * @description Licence de la version éditeur.
              */
             license: string | null;
+            /**
+             * Citation Top
+             * @description Seuil de citation le plus haut atteint (`CitationTop`).
+             */
+            citation_top: string | null;
             /** Serial */
             serial: string | null;
             /** Serial Id */
@@ -5162,6 +5216,11 @@ export interface components {
             };
             /** Apc */
             apc: components["schemas"]["FacetOption"][];
+            /**
+             * Citation Tops
+             * @description Une publication du top 1 % compte aussi dans le top 10 %.
+             */
+            citation_tops: components["schemas"]["FacetOption"][];
             /** Countries */
             countries: components["schemas"]["FacetOption"][];
             /** Languages */
@@ -6551,6 +6610,7 @@ export interface operations {
                 doc_type?: string;
                 excluded_doc_type?: string;
                 has_apc?: string;
+                citation_top?: string;
                 country?: string;
                 language?: string;
                 partner_ror?: string;
@@ -6568,6 +6628,58 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CollaborationsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    citation_points_api_stats_citation_points_get: {
+        parameters: {
+            query?: {
+                search?: string;
+                lab_id?: string;
+                year?: string;
+                publisher_id?: number | null;
+                serial_id?: number | null;
+                monograph_id?: number | null;
+                person_id?: number | null;
+                author_id?: number | null;
+                /** @description Libellés normalisés des sujets */
+                subject?: string;
+                access?: string;
+                oa_status?: string;
+                license?: string;
+                doi_agency?: string;
+                source_filter?: string;
+                doc_type?: string;
+                excluded_doc_type?: string;
+                has_apc?: string;
+                citation_top?: string;
+                country?: string;
+                language?: string;
+                partner_ror?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CitationPointsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6624,6 +6736,7 @@ export interface operations {
                 doc_type?: string;
                 excluded_doc_type?: string;
                 has_apc?: string;
+                citation_top?: string;
                 country?: string;
                 language?: string;
                 partner_ror?: string;
@@ -6715,6 +6828,7 @@ export interface operations {
                 doc_type?: string;
                 excluded_doc_type?: string;
                 has_apc?: string;
+                citation_top?: string;
                 country?: string;
                 language?: string;
                 partner_ror?: string;
@@ -6771,6 +6885,7 @@ export interface operations {
                 doc_type?: string;
                 excluded_doc_type?: string;
                 has_apc?: string;
+                citation_top?: string;
                 country?: string;
                 language?: string;
                 partner_ror?: string;
@@ -6827,6 +6942,7 @@ export interface operations {
                 doc_type?: string;
                 excluded_doc_type?: string;
                 has_apc?: string;
+                citation_top?: string;
                 country?: string;
                 language?: string;
                 partner_ror?: string;
@@ -7139,6 +7255,7 @@ export interface operations {
                 doc_type?: string;
                 excluded_doc_type?: string;
                 has_apc?: string;
+                citation_top?: string;
                 country?: string;
                 language?: string;
                 partner_ror?: string;

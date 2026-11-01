@@ -22,8 +22,8 @@ _SAVED = """jsonb_to_recordset(:payload) AS t(
     publication_date date, publication_date_precision date_precision, doi text,
     oa_status oa_type, license license_type, deposit_license license_type, best_copy_url text,
     serial_id integer, monograph_id integer, publisher_id integer, container_title text,
-    language text, is_retracted boolean, countries text[], source_extras jsonb, corrections jsonb,
-    abstract text, keywords text[], biblio jsonb
+    language text, is_retracted boolean, countries text[], source_extras jsonb, impact jsonb,
+    corrections jsonb, abstract text, keywords text[], biblio jsonb
 )"""
 
 _RELEASE_CHANGED_DOIS_SQL = text(f"""
@@ -53,19 +53,21 @@ _SAVE_CHANGED_SQL = text(f"""
         serial_id = c.serial_id, monograph_id = c.monograph_id, publisher_id = c.publisher_id,
         container_title = c.container_title, language = c.language,
         is_retracted = c.is_retracted, countries = c.countries,
-        source_extras = c.source_extras, corrections = c.corrections, sources = c.sources,
-        subjects_ingested_at = NULL, updated_at = now()
+        source_extras = c.source_extras, impact = c.impact, corrections = c.corrections,
+        sources = c.sources, subjects_ingested_at = NULL, updated_at = now()
     FROM computed c
     WHERE p.id = c.id
       AND (p.title, p.title_normalized, p.doc_type, p.publication_date,
            p.publication_date_precision, p.doi, p.oa_status, p.license, p.deposit_license,
            p.best_copy_url, p.serial_id, p.monograph_id, p.publisher_id, p.container_title,
-           p.language, p.is_retracted, p.countries, p.source_extras, p.corrections, p.sources)
+           p.language, p.is_retracted, p.countries, p.source_extras, p.impact, p.corrections,
+           p.sources)
           IS DISTINCT FROM
           (c.title, c.title_normalized, c.doc_type, c.kept_date,
            c.kept_precision, c.doi, c.oa_status, c.license, c.deposit_license,
            c.best_copy_url, c.serial_id, c.monograph_id, c.publisher_id, c.container_title,
-           c.language, c.is_retracted, c.countries, c.source_extras, c.corrections, c.sources)
+           c.language, c.is_retracted, c.countries, c.source_extras, c.impact, c.corrections,
+           c.sources)
 """).bindparams(bindparam("payload", type_=Jsonb))
 
 # Les colonnes volumineuses (résumé, mots-clés, biblio) vont dans `publications_detail`.
@@ -123,7 +125,7 @@ class PublicationStore:
                        CAST(p.deposit_license AS text) AS deposit_license,
                        p.best_copy_url, p.serial_id, p.monograph_id, p.publisher_id, p.container_title, p.language,
                        d.abstract, p.is_retracted, p.countries, d.keywords,
-                       d.biblio, p.source_extras, p.corrections
+                       d.biblio, p.source_extras, p.impact, p.corrections
                 FROM publications p
                 LEFT JOIN publications_detail d ON d.publication_id = p.id
                 WHERE p.id = ANY(:ids)
@@ -258,6 +260,7 @@ def _publication_from_row(m: RowMapping) -> Publication:
         keywords=tuple(m["keywords"]) if m["keywords"] else (),
         biblio=m["biblio"],
         source_extras=m["source_extras"],
+        impact=m["impact"],
         corrections=m["corrections"],
     )
 
@@ -285,6 +288,7 @@ def _save_payload(publication: Publication) -> dict[str, JsonValue]:
         "is_retracted": publication.is_retracted,
         "countries": list(publication.countries) if publication.countries else None,
         "source_extras": publication.source_extras,
+        "impact": publication.impact,
         "corrections": publication.corrections,
         "abstract": publication.abstract,
         "keywords": list(publication.keywords) if publication.keywords else None,

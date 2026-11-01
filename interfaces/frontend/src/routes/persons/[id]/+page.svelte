@@ -236,6 +236,7 @@
 					context={{ kind: 'person', id: profile.id }}
 					apiKey="person-detail-dashboard"
 					thesesFigure={false}
+					citationFigure={false}
 					countries={false}
 					figures={thesesCount > 0
 						? [{ value: thesesCount.toLocaleString('fr-FR'), label: 'thèses (direction ou jury)' }]

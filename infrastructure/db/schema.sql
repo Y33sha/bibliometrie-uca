@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict eS7SGgEQt1aWSBhaaWA5h4aGnlXWUaatGYGWSIgYZvhxq6ztQY4WHMgurYqzlcb
+\restrict xnSnRGFlx7TO84IbzxEHM7plBNfhZ37E6jNdO7ZY0NDFzJyKQtNyVfPeQitVCQw
 
 -- Dumped from database version 18.4
 -- Dumped by pg_dump version 18.4
@@ -1819,7 +1819,9 @@ CREATE TABLE publications.publications (
     publication_date date NOT NULL,
     publication_date_precision public.date_precision NOT NULL,
     publication_year smallint GENERATED ALWAYS AS ((EXTRACT(year FROM publication_date))::smallint) STORED,
-    CONSTRAINT publications_corrections_is_object CHECK ((jsonb_typeof(corrections) = 'object'::text))
+    impact jsonb,
+    CONSTRAINT publications_corrections_is_object CHECK ((jsonb_typeof(corrections) = 'object'::text)),
+    CONSTRAINT publications_impact_is_object CHECK (((impact IS NULL) OR (jsonb_typeof(impact) = 'object'::text)))
 );
 
 
@@ -1863,6 +1865,13 @@ COMMENT ON COLUMN publications.publications.publication_date_precision IS 'Préc
 --
 
 COMMENT ON COLUMN publications.publications.publication_year IS 'Année de publication_date.';
+
+
+--
+-- Name: COLUMN publications.impact; Type: COMMENT; Schema: publications; Owner: -
+--
+
+COMMENT ON COLUMN publications.publications.impact IS 'Indicateurs de citation de l''enregistrement source OpenAlex retenu par la consolidation.';
 
 
 --
@@ -5959,5 +5968,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict eS7SGgEQt1aWSBhaaWA5h4aGnlXWUaatGYGWSIgYZvhxq6ztQY4WHMgurYqzlcb
+\unrestrict xnSnRGFlx7TO84IbzxEHM7plBNfhZ37E6jNdO7ZY0NDFzJyKQtNyVfPeQitVCQw
 

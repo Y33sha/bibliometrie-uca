@@ -60,6 +60,7 @@ class _SourceRecordRow(NamedTuple):
     publisher_id: int | None
     publication_date: date | None
     publication_date_precision: str | None
+    impact: dict[str, JsonValue] | None
 
 
 def _source_record_from_row(
@@ -94,6 +95,7 @@ def _source_record_from_row(
         publication_date=PublicationDate.stored(
             row.publication_date, row.publication_date_precision
         ),
+        impact=row.impact,
     )
 
 
@@ -111,7 +113,8 @@ def source_records_of(
                    sr.countries, sr.urls, sr.keywords,
                    sr.biblio, sr.source_extras, sr.license::text AS license,
                    sr.publisher_id, sr.publication_date,
-                   sr.publication_date_precision::text AS publication_date_precision
+                   sr.publication_date_precision::text AS publication_date_precision,
+                   sr.impact
             FROM source_records sr
             WHERE sr.publication_id = ANY(:ids)
             ORDER BY sr.publication_id, sr.id

@@ -234,10 +234,17 @@ export const columnLabels = {
 	apc: 'APC',
 	oaStatus: 'Voie OA',
 	license: 'Licence',
+	citationTop: 'Top citations',
 	sources: 'Sources',
 	access: 'Accès',
 	publications: 'Publications',
 } as const;
+
+/** Seuils de citation (`CitationTop` côté API). */
+export const citationTopLabels: Record<string, string> = {
+	top_1_percent: 'Top 1 %',
+	top_10_percent: 'Top 10 %',
+};
 
 /** Noms des filtres communs à plusieurs listes : au pluriel pour un choix multiple, au singulier pour un choix unique. */
 export const filterLabels = {
@@ -252,6 +259,7 @@ export const filterLabels = {
 	apc: 'APC',
 	oaStatuses: 'Voies OA',
 	licenses: 'Licences',
+	citationTops: 'Top citations',
 	access: 'Accès',
 	sources: 'Sources',
 } as const;

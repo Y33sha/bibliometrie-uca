@@ -10,6 +10,7 @@ from domain.normalize import normalize_text, to_plain_text
 from domain.publications.access import access_url
 from domain.publications.dates import DatePrecision, PublicationDate
 from domain.publications.licenses import license_label
+from domain.source_records.impact import CITATION_TOP_LABELS, CitationTop
 from domain.source_records.source_extras import SourceExtra
 from domain.sources.hal import HAL_DEPOSIT_STATUS_LABELS
 from domain.sources.registry import Source, source_record_url
@@ -19,7 +20,11 @@ from infrastructure.read_models.csv_export import (
     cap_export_rows,
     chunked,
 )
-from infrastructure.read_models.filters import WhereClause, hal_status_expression
+from infrastructure.read_models.filters import (
+    CITATION_TOP_SQL,
+    WhereClause,
+    hal_status_expression,
+)
 from infrastructure.read_models.publications.filtering import (
     filter_context,
     publication_filter_where,
@@ -172,6 +177,9 @@ def _publication_lines(
             "APC (€)": round(row.apc_total) if row.apc_total else "",
             "Voie OA": row.oa_status or "",
             "Licence": license_label(row.license) if row.license else "",
+            "Top citations": CITATION_TOP_LABELS[CitationTop(row.citation_top)]
+            if row.citation_top
+            else "",
             "Statut HAL": HAL_DEPOSIT_STATUS_LABELS.get(row.hal_status or "", ""),
             "DOI": doi_url,
             "Sources": json.dumps(sources, ensure_ascii=False) if sources else "",
@@ -259,6 +267,7 @@ class PublicationListQueries:
                     p.id, p.title, p.publication_year, p.doi, p.doc_type::text AS doc_type,
                     p.oa_status::text AS oa_status, p.best_copy_url,
                     p.license::text AS license,
+                    {CITATION_TOP_SQL} AS citation_top,
                     j.id AS serial_id,
                     j.title AS journal_title,
                     pub.id AS publisher_id,
@@ -331,6 +340,7 @@ class PublicationListQueries:
                 oa_status=r.oa_status,
                 access_url=access_url(r.best_copy_url, oa_status=r.oa_status, doi=r.doi),
                 license=r.license,
+                citation_top=r.citation_top,
                 serial_id=r.serial_id,
                 serial=r.journal_title,
                 publisher_id=r.publisher_id,
@@ -388,6 +398,7 @@ class PublicationListQueries:
                     p.publication_date, p.publication_date_precision::text AS precision,
                     p.oa_status::text AS oa_status, p.best_copy_url,
                     p.license::text AS license,
+                    {CITATION_TOP_SQL} AS citation_top,
                     j.title AS journal_title,
                     pub.name AS publisher_name,
                     {hal_status.sql} AS hal_status,
@@ -445,6 +456,7 @@ class PublicationListQueries:
             ("apc", "APC (€)"),
             ("oa_status", "Voie OA"),
             ("license", "Licence"),
+            ("citation_top", "Top citations"),
             ("hal_status", "Statut HAL"),
             ("sources", "Sources"),
             ("access", "Accès"),

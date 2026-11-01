@@ -13,6 +13,7 @@ from sqlalchemy import Connection, text
 from domain.countries import NO_COUNTRY_CODE
 from domain.publications.licenses import license_label
 from domain.publications.metadata import OaStatus
+from domain.source_records.impact import CITATION_TOP_LABELS, CitationTop
 from domain.sources.hal import HAL_DEPOSIT_STATUS_LABELS, HAL_DEPOSIT_STATUSES
 from domain.sources.registry import source_label
 from infrastructure.db.rows import rows_as
@@ -51,7 +52,7 @@ from infrastructure.read_models.publications.models import (
     PublicationFilters,
     PublicationsFacetsResponse,
 )
-from infrastructure.sql_fragments import is_laboratory
+from infrastructure.sql_fragments import is_laboratory, reaches_citation_top
 
 
 class _PublicationFacetsBuilder:
@@ -273,6 +274,20 @@ class _PublicationFacetsBuilder:
             FacetOption(value="no", label="Sans APC", count=r.apc_no),
         ]
 
+    def _facet_citation_tops(self) -> list[FacetOption]:
+        """Renvoie la facette des seuils de citation. Une publication du top 1 % compte aussi dans le top 10 %."""
+        where_sql, binds = self._clauses_skipping("citation_top")
+        columns = ", ".join(
+            f"COUNT(*) FILTER (WHERE {reaches_citation_top(top)}) AS {top}" for top in CitationTop
+        )
+        row = self.conn.execute(
+            text(f"SELECT {columns} FROM publications p WHERE {where_sql}"), binds
+        ).one()
+        return [
+            FacetOption(value=top, label=CITATION_TOP_LABELS[top], count=getattr(row, top))
+            for top in CitationTop
+        ]
+
     def _facet_countries(self) -> list[FacetOption]:
         where_sql, binds = self._clauses_skipping("country")
         rows = self.conn.execute(
@@ -389,6 +404,7 @@ class PublicationFacetQueries:
             "author_positions": "_facet_author_positions",
             "source_counts": "_facet_source_counts",
             "apc": "_facet_apc",
+            "citation_tops": "_facet_citation_tops",
             "countries": "_facet_countries",
             "languages": "_facet_languages",
             "hal_status": "_facet_hal_status",
@@ -415,6 +431,7 @@ class PublicationFacetQueries:
             author_positions=results["author_positions"],
             source_counts=results["source_counts"],
             apc=results["apc"],
+            citation_tops=results["citation_tops"],
             countries=results["countries"],
             languages=results["languages"],
             hal_status=results["hal_status"],

@@ -44,7 +44,6 @@ uv run python -m interfaces.cli.oneshot.delete_openalex_person_harvest_orphans
 ## Publique
 * [ ] page "affiliations divergentes hal": requête incorrecte, capture trop de publis
 * [ ] auteur premier, dernier, correspondant: sur les facettes et les stats
-* [ ] mesures d'impact à intégrer dans les stats, les dashboards, et les facettes
 * [ ] stats en compte fractionnaire vs compte entier?
 * [ ] embargo dans HAL: signaler dans la page publication (cf 165044)
 * [ ] liens ISSN: généraliser

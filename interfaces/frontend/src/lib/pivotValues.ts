@@ -16,6 +16,14 @@ const OA_ACCESS_LABELS: Record<string, string> = {
 	ferme: 'Fermé',
 	indetermine: 'Indéterminé',
 };
+// Classes de citation, exclusives : une barre empilée compte le top 10 % en deux segments. Couleur dans `--citation-<valeur>`.
+const CITATION_CLASS_ORDER = ['top_1_percent', 'top_10_percent', 'below', 'none'];
+const CITATION_CLASS_LABELS: Record<string, string> = {
+	top_1_percent: 'Top 1 %',
+	top_10_percent: 'Top 10 % hors top 1 %',
+	below: 'Hors top 10 %',
+	none: 'Sans indicateur',
+};
 // Statut OA dont un niveau d'accès reprend la couleur.
 const OA_ACCESS_STATUS: Record<string, string> = {
 	ouvert: 'open',
@@ -35,6 +43,7 @@ export function pivotValueLabel(
 	if (dim === 'doc_type_grouped')
 		return docTypePluralLabels()[value] ?? docTypeFamilies().find((f) => f.key === value)?.label ?? value;
 	if (dim === 'license') return licenseLabel?.(value) ?? value;
+	if (dim === 'citation_class') return CITATION_CLASS_LABELS[value] ?? value;
 	return value;
 }
 
@@ -44,6 +53,7 @@ export function pivotValueColor(dim: string, value: string, idx: number): string
 	if (dim === 'oa_access') return oaStatusColor(OA_ACCESS_STATUS[value]) ?? chartColor(idx);
 	if (dim === 'doc_type_grouped') return cssColor(docTypeGroupColorVar(value));
 	if (dim === 'license') return cssColor(`license-${value}`) || chartColor(idx);
+	if (dim === 'citation_class') return cssColor(`citation-${value}`) || chartColor(idx);
 	return chartColor(idx);
 }
 
@@ -54,6 +64,7 @@ export function orderedPivotValues(dim: string, rows: Record<string, unknown>[])
 	if (dim === 'oa_access') return OA_ACCESS_ORDER.filter((v) => present.includes(v));
 	if (dim === 'oa_voie') return OA_VOIE_ORDER.filter((v) => present.includes(v));
 	if (dim === 'license') return licenseOrder.filter((v) => present.includes(v));
+	if (dim === 'citation_class') return CITATION_CLASS_ORDER.filter((v) => present.includes(v));
 	if (dim === 'doc_type_grouped') {
 		// Famille « publications » éclatée en types fins, autres familles agrégées sous leur clé.
 		const order = docTypeFamilies().flatMap((f) => (f.key === 'publications' ? f.types : [f.key]));
