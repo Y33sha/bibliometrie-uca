@@ -53,13 +53,16 @@
 
 ### 3. Statistiques
 
+- [x] Indicateur « Top citations » : publications par classe de citation (top 1 %, top 10 % hors top 1 %, hors top 10 %, sans indicateur) (f6f85b85a).
+- [ ] Affichage en part et tri par part de l'indicateur « Top citations » : dénominateur limité aux publications pourvues de l'indicateur.
 - [ ] Moteur : indicateurs de ratio, avec dénominateur et couverture.
 - [ ] Indicateurs « Nombre de citations », « Part dans le top 10 % », « FWCI moyen ».
 - [ ] Interface : graphique d'un ratio, ligne de référence, couverture.
 
 ### 4. Dashboards
 
-- [ ] Chiffres clés des dashboards de structure, d'éditeur et de revue.
+- [x] Chiffre clé « dans le top 10 % des plus citées » des dashboards de structure, d'éditeur et de revue, rapporté aux publications pourvues de l'indicateur, couverture au survol (f6f85b85a).
+- [ ] Chiffre clé « FWCI moyen ».
 - [ ] API : points du beeswarm, une publication par point.
 - [ ] Beeswarm des citations ou du FWCI par année.
 - [ ] Guide utilisateur : définition, source et couverture de chaque indicateur.
