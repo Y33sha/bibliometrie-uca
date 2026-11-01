@@ -63,10 +63,6 @@ Sept entrées de `serials` ont un type de plateforme, pour 560 publications : `r
 
 Aucune table ne rattache une revue à une liste de référence : revues indexées dans le WoS, revues de confiance recommandées par la conférence des doyens de médecine.
 
-### Administration
-
-Les personnes et les publications ont un volet latéral (`PersonDrawer`, `PublicationDrawer`). Les pages Éditeurs et Revues (`publishers/`, `journals/`) ouvrent une page par entité.
-
 ## Décisions
 
 - `biblio.journal` décrit la série qui sert au rattachement : titre, identifiant OpenAlex, liste des ISSN avec leur support et l'indicateur ISSN-L.
@@ -86,6 +82,7 @@ Les personnes et les publications ont un volet latéral (`PersonDrawer`, `Public
 - Un enregistrement source sans revue, dont les DOI sont tous ceux d'un serveur de preprints, passe de « article » ou « autre » à « preprint ».
 - `serial_type` perd `repository` et `preprint_server`, `oa_model` perd `repository`. Les revues de ces types passent au type inconnu.
 - L'administration fusionne une revue sans ISSN dans une autre revue. Une table titre normalisé → revue garde la décision, et le rattachement par titre la consulte. La fusion de deux revues à ISSN-L est refusée.
+- En session d'administration, une icône ouvre le volet de gestion d'un éditeur ou d'une revue, en tête de ligne des listes et à gauche du titre des fiches. Le volet de l'éditeur montre ses formes de nom. La fusion se fait depuis le volet.
 - Deux éditeurs de même nom, aux formes juridiques et aux mots génériques près, fusionnent. L'éditeur gardé est le seul titulaire de préfixe DOI du groupe, à défaut le plus nommé par les enregistrements sources. Un groupe à plusieurs titulaires de préfixe, ou de nom réduit à un mot courant (« Academic »), reste en l'état.
 
 ## Phasage
@@ -128,7 +125,7 @@ Les personnes et les publications ont un volet latéral (`PersonDrawer`, `Public
 
 ### Phase 5 — Administration
 
-- [ ] Volet latéral des pages Éditeurs et Revues
+- [x] Volet latéral des pages Éditeurs et Revues : édition, formes de nom de l'éditeur, fusion ; colonne d'actions retirée des listes (042ffbef5)
 
 ### Phase 6 — Listes de revues
 
