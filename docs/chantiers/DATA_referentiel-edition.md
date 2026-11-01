@@ -42,6 +42,15 @@ CRISalid, Academic Observatory et OpenAIRE identifient la revue par ses seuls IS
   - « INRAE » (13895) et « National Research Institute for Agriculture, Food and Environment » (83482), titulaire « Institut National de Recherche pour l'Agriculture, l'Alimentation et l'Environnement » (76867).
 - Des noms d'éditeur contiennent un lieu ou un directeur d'ouvrage : « Paris: Classiques Garnier » (14077), « A. Hatzenberger dir., Classiques Garnier » (84199).
 
+Base locale au 2026-11-01 : 6 785 éditeurs, dont 5 698 nommés par au moins un enregistrement source. Doublons possibles, par signal :
+
+- Même nom, formes juridiques et mots génériques retirés : 51 groupes, 108 éditeurs. « Copernicus GmbH » et « Copernicus Publ », « Brepols Publ » et « Brepols Publishers », « ISTE Group » et « ISTE ». La fusion des autres noms rattache seulement un nom au titulaire des préfixes DOI de ses enregistrements sources, quand au moins 5 d'entre eux ont un DOI Crossref.
+- Noms compatibles : 350 paires. Vrais doublons (« Presses Universitaires De France » et « Presses Univ France », « Académie des sciences (Paris) » et « ACAD SCIENCES ») et faux (« American Physiological Society » et « American Physical Society », « INRIA » et « INRA »).
+- Noms emboîtés : 1 735 paires. Souvent un nom composé de deux éditeurs : « Published by Elsevier (since 2021) / Cambridge University Press », « Juris éditions, Dalloz [2013-2017] ».
+- Même identifiant OpenAlex, même membre Crossref : aucun.
+- Éditeurs nommés par les enregistrements sources d'une même revue à ISSN : 206 paires dans au moins 3 revues. Surtout une marque et sa maison mère : « BioMed Central » et Springer (132 revues), Birkhäuser et Springer, Lippincott Williams & Wilkins et Ovid. Parfois un doublon : « BioMed Central » et « BMC » (80 revues).
+- « INSTICC » et « SCITEPRESS », éditeurs des 54 collections de monographies dédoublées, sont l'institut et sa marque d'édition.
+
 ### Conteneur libre
 
 `publications.container_title` est renseigné pour 39 690 publications, dont 10 202 à revue et 8 876 à monographie. OpenAlex y met le nom d'un repository : « HAL (Le Centre pour la Communication Scientifique Directe) » pour 28 846 de ses 52 116 enregistrements sources à conteneur, puis arXiv, theses.fr, Figshare, Zenodo.
@@ -108,7 +117,7 @@ Les personnes et les publications ont un volet latéral (`PersonDrawer`, `Public
 
 - [ ] Doublons d'éditeurs que révèle le titulaire DataCite du préfixe
 - [ ] Lieu et directeur d'ouvrage dans les noms d'éditeur
-- [ ] Mesure des autres doublons d'éditeurs sous des noms différents
+- [x] Mesure des autres doublons d'éditeurs sous des noms différents
 
 ### Phase 4 — Conteneur libre
 
