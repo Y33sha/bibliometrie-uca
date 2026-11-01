@@ -1416,16 +1416,6 @@ a.badge-doaj:hover {
 	color: white;
 }
 
-.btn-nav {
-	padding: 4px 10px;
-	font-size: var(--fs-base);
-	line-height: 1;
-}
-
-.btn-nav:disabled {
-	opacity: 0.3;
-}
-
 .btn-merge {
 	border-color: var(--success);
 	color: var(--success);
@@ -1437,32 +1427,6 @@ a.badge-doaj:hover {
 }
 
 .btn-merge:disabled {
-	opacity: 0.5;
-	cursor: default;
-}
-
-.btn-distinct {
-	color: var(--muted);
-}
-
-.btn-distinct:hover:not(:disabled) {
-	background: var(--warning-light);
-}
-
-.btn-distinct:disabled {
-	opacity: 0.5;
-	cursor: default;
-}
-
-.btn-skip {
-	color: var(--muted);
-}
-
-.btn-skip:hover:not(:disabled) {
-	background: var(--hover);
-}
-
-.btn-skip:disabled {
 	opacity: 0.5;
 	cursor: default;
 }
