@@ -3,12 +3,13 @@
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass
+from urllib.parse import urlsplit
 
 from domain.platforms.platform import PlatformType
 from domain.publications.identifiers import clean_doi, is_hal_host
 from domain.serials.titles import compatible_titles, nested_titles
 from domain.source_records.identifiers import SourceIdentifierType
-from domain.urls import is_host, is_on_site, url_host
+from domain.urls import is_host, on_site, url_host
 
 
 @dataclass(frozen=True, slots=True)
@@ -273,8 +274,9 @@ def known_platform_of_url(url: str) -> KnownPlatform | None:
         return None
     if is_hal_host(host):
         return HAL
+    path = urlsplit(url).path
     for platform in KNOWN_PLATFORMS:
-        if any(is_on_site(url, h) for h in platform.hosts):
+        if any(on_site(host, path, h) for h in platform.hosts):
             return platform
     platforms = _platforms_of_doi_url(url)
     return platforms[0] if len(platforms) == 1 else None
