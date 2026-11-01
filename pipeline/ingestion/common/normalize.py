@@ -117,6 +117,7 @@ class NormalizePhase:
         def run(ctx: PhaseContext) -> PhaseMetrics:
             stats = self.normalize_one(ctx, source)
             metrics = PhaseMetrics()
+            metrics.report = _report(stats)
             metrics.details["row"] = {
                 "key": source,
                 "processed": stats.processed,
@@ -153,6 +154,16 @@ class NormalizePhase:
         if deleted:
             metrics.report = f"{quantity(deleted, 'adresse supprimée', 'adresses supprimées')}"
         return metrics
+
+
+def _report(stats: NormalizeStats) -> str | None:
+    """Renvoie la ligne de bilan d'une source : documents normalisés, erreurs. `None` sans document traité, et la ligne affiche « rien à faire »."""
+    parts = []
+    if stats.processed:
+        parts.append(quantity(stats.processed, "document normalisé", "documents normalisés"))
+    if stats.errors:
+        parts.append(quantity(stats.errors, "erreur"))
+    return ", ".join(parts) or None
 
 
 type NormalizerFactory = Callable[[Connection, logging.Logger], SourceNormalizer]
