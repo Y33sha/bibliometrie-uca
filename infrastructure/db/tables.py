@@ -1304,7 +1304,6 @@ source_records = Table(
     Column("is_retracted", Boolean),
     Column("abstract", Text),
     Column("keywords", ARRAY(Text)),
-    Column("topics", Jsonb),
     Column("biblio", Jsonb),
     Column("source_extras", Jsonb),
     Column(

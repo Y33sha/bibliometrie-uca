@@ -9,7 +9,7 @@ Tire des publications sans remise : d'abord `--random` publications au hasard, p
 4. Health × Life : exactement ces deux domains ;
 5. un seul domain.
 
-Le domain d'une publication, pour la répartition d'une revue, est celui de son premier topic OpenAlex. `--scale` multiplie l'effectif de chaque strate. `--exclude` écarte les publications d'un échantillon déjà tiré.
+Le domain d'une publication, pour la répartition d'une revue, est celui de son topic OpenAlex de plus haut score. `--scale` multiplie l'effectif de chaque strate. `--exclude` écarte les publications d'un échantillon déjà tiré.
 
 Écrit un fichier JSON : une entrée par publication, avec titre, résumé, revue et l'arbre des libellés OpenAlex (domain, field, subfield, topic), chaque libellé avec un identifiant, son parent et le score maximal de ses topics descendants. Les sujets des autres sources sont exclus : la qualification se fait sur le titre, le résumé et la revue.
 
@@ -44,17 +44,27 @@ _STRATA = (
     ("single_domain", 20),
 )
 
+# Topics OpenAlex de chaque enregistrement source, avec leurs ancêtres, du plus haut score au plus bas.
 _CANDIDATES_SQL = """
-    SELECT sr.publication_id, p.serial_id, sr.topics,
+    SELECT sr.publication_id, p.serial_id, sr.id AS source_record_id,
+           d.label AS domain, f.label AS field, sf.label AS subfield, t.label AS topic, srs.score,
            EXISTS (
-               SELECT 1 FROM source_records a
+               SELECT 1
+               FROM source_records a
+               JOIN source_record_subjects asub ON asub.source_record_id = a.id
+               JOIN subjects s ON s.id = asub.subject_id
                WHERE a.publication_id = sr.publication_id
-                 AND a.source IN ('hal', 'theses') AND a.topics IS NOT NULL
+                 AND s.vocabulary IN ('hal_domain', 'theses_discipline')
            ) AS has_arbiter
     FROM source_records sr
     JOIN publications p ON p.id = sr.publication_id
-    WHERE sr.source = 'openalex' AND jsonb_typeof(sr.topics) = 'array'
-    ORDER BY sr.publication_id, sr.id
+    JOIN source_record_subjects srs ON srs.source_record_id = sr.id
+    JOIN subjects t ON t.id = srs.subject_id AND t.vocabulary = 'openalex' AND t.level = 4
+    JOIN subjects sf ON sf.id = t.parent_id
+    JOIN subjects f ON f.id = sf.parent_id
+    JOIN subjects d ON d.id = f.parent_id
+    WHERE sr.source = 'openalex'
+    ORDER BY sr.publication_id, sr.id, srs.score DESC NULLS LAST
 """
 
 _DETAILS_SQL = """
@@ -96,13 +106,18 @@ def _first_domains(topic_lists: list[list[dict]]) -> list[str]:
 
 def sample(output: Path, seed: int, random_size: int, scale: float, excluded: set[int]) -> int:
     with get_sync_engine().connect() as conn:
-        topics_by_publication: dict[int, list[list[dict]]] = defaultdict(list)
+        topics_by_record: dict[tuple[int, int], list[dict]] = defaultdict(list)
         serial_by_publication: dict[int, int | None] = {}
         arbiter: dict[int, bool] = {}
         for row in conn.execute(text(_CANDIDATES_SQL)):
-            topics_by_publication[row.publication_id].append(row.topics)
+            topics_by_record[row.publication_id, row.source_record_id].append(
+                {**{level: getattr(row, level) for level in _LEVELS}, "score": row.score}
+            )
             serial_by_publication[row.publication_id] = row.serial_id
             arbiter[row.publication_id] = row.has_arbiter
+        topics_by_publication: dict[int, list[list[dict]]] = defaultdict(list)
+        for (publication_id, _), topics in topics_by_record.items():
+            topics_by_publication[publication_id].append(topics)
 
         domains_by_serial: dict[int, Counter[str]] = defaultdict(Counter)
         for publication_id, topic_lists in topics_by_publication.items():

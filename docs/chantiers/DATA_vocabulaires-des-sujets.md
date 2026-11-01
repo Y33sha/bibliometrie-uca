@@ -35,7 +35,7 @@ Base locale au 2026-11-01.
 
 ### Phase 2 — Sujets écrits à la normalisation
 
-- [x] Schéma : `subjects` contient vocabulaire, code, niveau et parent ; unicité sur (vocabulaire, code) à la place de l'unicité sur le libellé ; `language` retirée. Table `source_record_subjects` : enregistrement source, sujet, score
+- [x] Schéma : `subjects` contient vocabulaire, code, niveau et parent ; unicité sur (vocabulaire, code) à la place de l'unicité sur le libellé ; `language` retirée. Table `source_record_subjects` : enregistrement source, sujet, score (9b2ed7d01)
 - [x] Écriture commune aux normalizers : sujets et liens en une requête par lot
 - [x] HAL : domaines par leur code, chaque niveau rattaché au niveau supérieur
 - [x] OpenAlex : identifiant de chaque niveau, score du topic
@@ -48,10 +48,11 @@ Base locale au 2026-11-01.
 
 ### Phase 3 — Stock, entre la migration et le run suivant
 
-- [ ] Script ponctuel `write_source_record_subjects` : HAL et ScanR depuis `source_records.topics`, où les codes sont présents ; OpenAlex depuis le raw store
-- [ ] HAL : `last_seen_at` vieilli pour tous les dépôts, puis run sur toutes les années. Le moissonnage relit les 59 720 dépôts des collections, `fetch_stale` les 7 352 autres. Leur normalisation écrit les mots-clés du TEI
+- [x] Script ponctuel `write_source_record_subjects` : HAL et ScanR depuis `source_records.topics`, où les codes sont présents (b0b93124e)
+- [ ] Même script : OpenAlex depuis le raw store
+- [ ] Retrait de `source_records.topics` (migration `2ac26ec26f63`), une fois le script passé ; scripts de la pertinence des sujets (`sample_subject_relevance`, `prototype_subject_vote`) adaptés
 - [ ] theses.fr : `raw_hash` vidé et `last_seen_at` vieilli pour toutes les thèses, puis `fetch_stale` sur toutes les années. La normalisation qui suit retire aussi `source_extras.discipline`
-- [ ] Retrait de `source_records.topics` ; scripts de la pertinence des sujets (`sample_subject_relevance`, `prototype_subject_vote`) adaptés
+- [ ] HAL : `last_seen_at` vieilli pour tous les dépôts, puis run sur toutes les années. Le moissonnage relit les 59 720 dépôts des collections, `fetch_stale` les 7 352 autres. Leur normalisation écrit les mots-clés du TEI
 
 ### Phase 4 — MeSH
 

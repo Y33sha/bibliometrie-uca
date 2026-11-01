@@ -152,12 +152,16 @@ _PROFILE_MIN = 20
 
 _EVIDENCE_SQL = """
     SELECT p.id, p.serial_id,
-           (SELECT array_agg(DISTINCT split_part(e, '_FacetSep_', 1))
-            FROM source_records sr, jsonb_array_elements_text(sr.topics -> 'hal_domains') e
-            WHERE sr.publication_id = p.id AND sr.source = 'hal') AS hal_codes,
-           (SELECT array_agg(DISTINCT sr.topics ->> 'discipline')
+           (SELECT array_agg(DISTINCT s.code)
             FROM source_records sr
-            WHERE sr.publication_id = p.id AND sr.source = 'theses' AND sr.topics ? 'discipline') AS disciplines,
+            JOIN source_record_subjects srs ON srs.source_record_id = sr.id
+            JOIN subjects s ON s.id = srs.subject_id
+            WHERE sr.publication_id = p.id AND s.vocabulary = 'hal_domain') AS hal_codes,
+           (SELECT array_agg(DISTINCT s.label)
+            FROM source_records sr
+            JOIN source_record_subjects srs ON srs.source_record_id = sr.id
+            JOIN subjects s ON s.id = srs.subject_id
+            WHERE sr.publication_id = p.id AND s.vocabulary = 'theses_discipline') AS disciplines,
            (SELECT array_agg(DISTINCT ps.structure_id)
             FROM publication_structures ps JOIN structures st ON st.id = ps.structure_id
             WHERE ps.publication_id = p.id AND st.structure_type = 'labo') AS labs
