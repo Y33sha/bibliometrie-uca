@@ -57,7 +57,7 @@ class PublicationStore:
                        CAST(p.deposit_license AS text) AS deposit_license,
                        p.best_copy_url, p.serial_id, p.monograph_id, p.publisher_id, p.container_title, p.language,
                        d.abstract, p.is_retracted, p.countries, d.keywords,
-                       d.topics, d.biblio, p.source_extras, p.corrections
+                       d.biblio, p.source_extras, p.corrections
                 FROM publications p
                 LEFT JOIN publications_detail d ON d.publication_id = p.id
                 WHERE p.id = :id
@@ -90,7 +90,6 @@ class PublicationStore:
             is_retracted=m["is_retracted"],
             countries=tuple(m["countries"]) if m["countries"] else (),
             keywords=tuple(m["keywords"]) if m["keywords"] else (),
-            topics=m["topics"],
             biblio=m["biblio"],
             source_extras=m["source_extras"],
             corrections=m["corrections"],
@@ -154,24 +153,21 @@ class PublicationStore:
                 "corrections": json.dumps(publication.corrections),
             },
         )
-        # Les colonnes volumineuses (résumé, mots-clés, sujets, biblio) vont dans `publications_detail`.
+        # Les colonnes volumineuses (résumé, mots-clés, biblio) vont dans `publications_detail`.
         self._conn.execute(
             text("""
                 INSERT INTO publications_detail
-                    (publication_id, abstract, keywords, topics, biblio)
-                VALUES (:id, :abstract, CAST(:keywords AS text[]),
-                        CAST(:topics AS jsonb), CAST(:biblio AS jsonb))
+                    (publication_id, abstract, keywords, biblio)
+                VALUES (:id, :abstract, CAST(:keywords AS text[]), CAST(:biblio AS jsonb))
                 ON CONFLICT (publication_id) DO UPDATE SET
                     abstract = EXCLUDED.abstract,
                     keywords = EXCLUDED.keywords,
-                    topics = EXCLUDED.topics,
                     biblio = EXCLUDED.biblio
             """),
             {
                 "id": publication.id,
                 "abstract": publication.abstract,
                 "keywords": list(publication.keywords) if publication.keywords else None,
-                "topics": _json_dumps_or_none(publication.topics),
                 "biblio": _json_dumps_or_none(publication.biblio),
             },
         )

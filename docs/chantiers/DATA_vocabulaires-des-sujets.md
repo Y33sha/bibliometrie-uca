@@ -11,11 +11,10 @@ Base locale au 2026-11-01.
   - Domaines HAL : `topics.hal_domains` garde le code de la feuille (`sdv.bbm.bm`). Le code de chaque ancêtre en est un préfixe.
   - RAMEAU : chaque vedette a un PPN, vedettes construites comprises (« Béton armé -- Fissuration »). ScanR le garde dans `topics`. theses.fr le donne dans le champ `query` de `mapSujets`, et le normalizer l'écarte. Les PPN des deux sources concordent pour 2 557 des 2 558 libellés communs. Chez ScanR, 51 PPN ont deux formes d'une même vedette (« Poumon -- Cancer », « Cancer du poumon »).
   - Discipline de theses.fr : libellé libre, 471 distincts.
-- **Raw store.** Il est complet pour OpenAlex (116 813 payloads pour 116 331 enregistrements sources), presque complet pour HAL (66 523 pour 67 303). Pour theses.fr, il compte 2 670 payloads pour 3 912 enregistrements sources, dont 2 636 au format de la liste de résultats de la recherche, illisible par le normalizer.
+- **Raw store.** Il est complet pour OpenAlex (116 813 payloads pour 116 331 enregistrements sources), presque complet pour HAL (66 523 pour 67 303).
 - **MeSH.** Aucun sujet MeSH. Le moissonnage OpenAlex omet le champ `mesh` des works (`pipeline/ingestion/openalex/api.py`). PubMed n'est pas moissonné.
 - **Besoins de l'interface.** Les nuages de sujets (`SubjectsCloud.svelte`) et le graphe des co-occurrences (`/subjects/[id]`) colorent par fréquence. Ils demandent une couleur par grand domaine, et de pouvoir écarter les niveaux hauts, qui encombrent sans informer.
-- **`publications_detail.topics`** copie les `topics` des enregistrements sources de chaque publication. Aucune page ni aucune phase ne la lit.
-- **Mots-clés HAL.** Le normalizer HAL lit `keyword_s`, qui perd les parenthèses : « eau destinée à la consommation humaine (EDCH) » devient « Eau destinée à la consommation humaine EDCH ».
+- **Mots-clés HAL.** Le normalizer HAL lit `keyword_s`, qui met une majuscule initiale et retire la ponctuation : « Industry 4.0 » devient « Industry 40 », « eau destinée à la consommation humaine (EDCH) » devient « Eau destinée à la consommation humaine EDCH ». Les `<term>` du TEI (`label_xml`) gardent la saisie de l'auteur. Ils sont présents dans chaque dépôt pourvu de `keyword_s`, sur un échantillon de 4 160 dépôts.
 
 ## Décisions
 
@@ -30,16 +29,16 @@ Base locale au 2026-11-01.
 
 ### Phase 1 — Correctifs indépendants
 
-- [ ] Normalizer HAL : mots-clés lus dans les `<term>` du TEI (`label_xml`), `keyword_s` à défaut
+- [ ] Normalizer HAL : mots-clés lus dans les `<term>` du TEI ; `keyword_s` retiré des champs demandés à l'API
 - [ ] Stock HAL : script ponctuel qui relit les mots-clés TEI dans le raw store
-- [ ] Retrait de `publications_detail.topics` et de `Publication.topics`
+- [x] Retrait de `publications_detail.topics` et de `Publication.topics`
 
 ### Phase 2 — Codes dans les enregistrements sources
 
 - [ ] Normalizer OpenAlex : `extract_topics` garde l'identifiant de chaque niveau
 - [ ] Normalizer theses.fr : chaque vedette RAMEAU garde son PPN ; fonction de lecture des sujets theses.fr adaptée au format de `topics`
 - [ ] Stock OpenAlex : script ponctuel qui réécrit `topics` depuis le raw store
-- [ ] Stock theses.fr : script ponctuel qui relit le détail de chaque thèse dans theses.fr et réécrit `topics`. Il retire aussi `source_extras.discipline`
+- [ ] Stock theses.fr : `raw_hash` vidé et `last_seen_at` vieilli pour toutes les thèses, puis `fetch_stale` sur toutes les années. La normalisation qui suit retire aussi `source_extras.discipline`
 
 ### Phase 3 — Sujets identifiés par vocabulaire et code
 

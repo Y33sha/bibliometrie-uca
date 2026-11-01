@@ -34,7 +34,6 @@ def refresh_from_sources(
     - Rétractation : déclarée par une source au moins.
     - Mots-clés et pays : union sans doublon.
     - `biblio` et `source_extras` : fusion par clé, la source prioritaire l'emporte.
-    - `topics` : sous la clé de chaque source.
 
     Raises:
         ValueError: `sources` vide ; une publication sans enregistrement source se supprime.
@@ -77,7 +76,6 @@ def refresh_from_sources(
     publication.abstract = as_str(first_non_null(sorted_sources, "abstract"))
     publication.keywords = _textes(merge_lists_dedup_ci(sorted_sources, "keywords"))
     publication.countries = _textes(merge_lists_dedup_ci(sorted_sources, "countries"))
-    publication.topics = topics_by_source(sorted_sources)
     publication.biblio = shallow_merge_jsonb(sorted_sources, "biblio")
     publication.source_extras = shallow_merge_jsonb(sorted_sources, "source_extras")
     publication.is_retracted = any(s.is_retracted for s in sorted_sources if s.is_retracted)
@@ -167,17 +165,6 @@ def shallow_merge_jsonb(sources: list[SourceRecord], attr: str) -> dict[str, Jso
                 if k not in merged:
                     merged[k] = v
     return merged or None
-
-
-def topics_by_source(
-    sources: list[SourceRecord],
-) -> dict[str, JsonValue] | None:
-    """Renvoie les `topics` de chaque source, sous la clé de la source : leur forme diffère d'une source à l'autre."""
-    out: dict[str, JsonValue] = {}
-    for s in sources:
-        if s.topics:
-            out[s.source] = s.topics
-    return out or None
 
 
 def arbitrate_doc_type_with_article_subtype(sources: list[SourceRecord]) -> str:

@@ -53,7 +53,6 @@ class _SourceRecordRow(NamedTuple):
     countries: list[str] | None
     urls: list[str] | None
     keywords: list[str] | None
-    topics: dict[str, JsonValue] | None
     biblio: dict[str, JsonValue] | None
     source_extras: dict[str, JsonValue] | None
     license: str | None
@@ -87,7 +86,6 @@ def _source_record_from_row(
         countries=tuple(row.countries or ()),
         urls=tuple(row.urls or ()),
         keywords=tuple(row.keywords or ()),
-        topics=row.topics,
         biblio=row.biblio,
         source_extras=row.source_extras,
         license=row.license,
@@ -108,7 +106,7 @@ def source_records_of(conn: Connection, publication_id: int) -> list[SourceRecor
                    sr.serial_id, sr.monograph_id, sr.container_title, sr.language,
                    sr.is_retracted, sr.abstract,
                    sr.countries, sr.urls, sr.keywords,
-                   sr.topics, sr.biblio, sr.source_extras, sr.license::text AS license,
+                   sr.biblio, sr.source_extras, sr.license::text AS license,
                    sr.publisher_id, sr.publication_date,
                    sr.publication_date_precision::text AS publication_date_precision
             FROM source_records sr

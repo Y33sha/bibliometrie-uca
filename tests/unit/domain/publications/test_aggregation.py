@@ -33,7 +33,6 @@ def _source_record(**overrides) -> SourceRecord:
         "countries": (),
         "keywords": (),
         "urls": (),
-        "topics": None,
         "biblio": None,
         "source_extras": None,
     }
@@ -120,7 +119,6 @@ class TestChampsAgreges:
             container_title="Revue d'agronomie",
             language="fr",
             countries=("FR",),
-            topics={"domaine": "agronomie"},
             biblio={"volume": "3"},
             source_extras={"licence": "cc-by"},
             is_retracted=True,
@@ -137,7 +135,6 @@ class TestChampsAgreges:
         assert publication.container_title == "Revue d'agronomie"
         assert publication.language == "fr"
         assert publication.countries == ("FR",)
-        assert publication.topics == {"datacite": {"domaine": "agronomie"}}
         assert publication.biblio == {"volume": "3"}
         assert publication.source_extras == {"licence": "cc-by"}
         assert publication.is_retracted is True

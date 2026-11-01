@@ -1184,7 +1184,7 @@ publications = Table(
         server_default=text("'{}'::jsonb"),
     ),
     Column("is_retracted", Boolean, nullable=False, server_default="false"),
-    # Résumé, mots-clés, topics et numérotation sont dans `publications_detail` (1:1), lu seulement par la page de détail. `publications` reste étroite pour les listes et les facettes.
+    # Résumé, mots-clés et numérotation sont dans `publications_detail` (1:1), lu seulement par la page de détail. `publications` reste étroite pour les listes et les facettes.
     # Indices des contributions de personnes non exclues, maintenus par la phase `finalize` et à l'exclusion d'une personne. `in_perimeter` en découle ; le filtre de périmètre des listes le lit.
     Column(
         "perimeter_evidence",
@@ -1215,7 +1215,6 @@ publications_detail = Table(
     Column("publication_id", Integer, primary_key=True),
     Column("abstract", Text),
     Column("keywords", ARRAY(Text)),
-    Column("topics", Jsonb),
     Column("biblio", Jsonb),
     schema="publications",
 )

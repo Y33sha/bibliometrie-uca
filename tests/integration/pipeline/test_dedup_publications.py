@@ -1,4 +1,4 @@
-"""Recalcul des métadonnées d'une publication depuis ses enregistrements sources (`refresh_from_sources`) : priorité par source, statut open access tiré des copies, fusion des mots-clés et des topics.
+"""Recalcul des métadonnées d'une publication depuis ses enregistrements sources (`refresh_from_sources`) : priorité par source, statut open access tiré des copies, fusion des mots-clés.
 
 Les publications sont semées par `PublicationStore.create`, sans réconciliation. La réconciliation est testée dans `tests/unit/domain/publications/test_reconciliation.py` et `tests/integration/pipeline/test_reprocessing.py`.
 """
@@ -302,68 +302,6 @@ class TestRefreshFromSources:
         assert "python" in lower_kw
         assert "data" in lower_kw
         assert "machine learning" in lower_kw
-
-    def test_topics_composite_by_source(self, sa_sync_conn):
-        """Les topics de la publication sont rangés par source, chacun sous sa forme d'origine, même quand deux sources utilisent la même clé."""
-        id1 = _insert_publication(sa_sync_conn, publication_year=2024, doc_type="article")
-        _source_record(
-            sa_sync_conn,
-            id1,
-            source_id="hal-tp1",
-            topics={"hal_domains": ["info_FacetSep_Informatique [cs]"]},
-        )
-        _source_record(
-            sa_sync_conn,
-            id1,
-            source="openalex",
-            source_id="oa-tp1",
-            topics={"concepts": ["AI"], "hal_domains": ["math"]},
-        )
-        refresh_from_sources(sa_sync_conn, id1)
-
-        topics = _scalar(
-            sa_sync_conn,
-            "SELECT topics FROM publications_detail WHERE publication_id = :id",
-            id=id1,
-        )
-        assert topics["hal"] == {"hal_domains": ["info_FacetSep_Informatique [cs]"]}
-        assert topics["openalex"] == {"concepts": ["AI"], "hal_domains": ["math"]}
-
-    def test_topics_composite_supports_openalex_list(self, sa_sync_conn):
-        """Les topics OpenAlex, une liste (hiérarchie domain/field/subfield/topic), sont gardés tels quels sous la clé `openalex`, à côté du dictionnaire de theses.fr."""
-        id1 = _insert_publication(sa_sync_conn, publication_year=2024, doc_type="article")
-        _source_record(
-            sa_sync_conn,
-            id1,
-            source="openalex",
-            source_id="oa-tp2",
-            topics=[
-                {
-                    "domain": "SS",
-                    "field": "Eco",
-                    "subfield": "Micro",
-                    "topic": "Behav",
-                    "score": 0.95,
-                }
-            ],
-        )
-        _source_record(
-            sa_sync_conn,
-            id1,
-            source="theses",
-            source_id="th-tp2",
-            topics={"discipline": "Info", "rameau": ["Algo"]},
-        )
-        refresh_from_sources(sa_sync_conn, id1)
-
-        topics = _scalar(
-            sa_sync_conn,
-            "SELECT topics FROM publications_detail WHERE publication_id = :id",
-            id=id1,
-        )
-        assert isinstance(topics["openalex"], list)
-        assert topics["openalex"][0]["domain"] == "SS"
-        assert topics["theses"]["discipline"] == "Info"
 
     def test_is_retracted_or(self, sa_sync_conn):
         """La publication est rétractée dès qu'une source la déclare rétractée."""
