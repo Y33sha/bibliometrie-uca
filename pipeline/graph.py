@@ -568,7 +568,6 @@ TASKS: tuple[Task, ...] = (
             "source_records.publisher_id",
             "source_records.publication_id",
             "publications.doi_prefix",
-            "doi_prefixes.ra",
             "doi_prefixes.publisher_id",
             "publishers.id",
             "publishers.name",

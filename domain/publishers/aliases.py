@@ -1,6 +1,6 @@
 """Autres noms d'un éditeur : un éditeur nommé par les sources, rattaché au titulaire des préfixes DOI de ses publications, ou à l'éditeur de même nom réduit.
 
-Pour le titulaire de préfixe, deux signaux doivent concorder. Les enregistrements sources qui nomment l'éditeur ont presque tous un DOI Crossref d'un même titulaire de préfixe. Les deux noms sont compatibles : l'un abrège l'autre, l'emboîte ou en est l'acronyme, aux mots génériques près. Une marque ou un éditeur racheté (« BioMed Central » et Springer, « Mary Ann Liebert » et SAGE) partage le titulaire, sans nom compatible : il reste distinct.
+Pour le titulaire de préfixe, deux signaux doivent concorder. Les enregistrements sources qui nomment l'éditeur ont presque tous un DOI d'un même titulaire de préfixe. Les deux noms sont compatibles : l'un abrège l'autre, l'emboîte ou en est l'acronyme, aux mots génériques près. Une marque ou un éditeur racheté (« BioMed Central » et Springer, « Mary Ann Liebert » et SAGE) partage le titulaire, sans nom compatible : il reste distinct.
 
 Deux éditeurs de même nom réduit (`core_publisher_name`) sont un même éditeur : « Brepols Publ » et « Brepols Publishers ».
 """
@@ -13,7 +13,7 @@ from domain.publishers.names import publisher_name_key
 from domain.serials.titles import compatible_titles, nested_titles
 
 MIN_RECORDS = 5
-"""Nombre minimal d'enregistrements sources à DOI Crossref qui nomment l'éditeur."""
+"""Nombre minimal d'enregistrements sources à DOI qui nomment l'éditeur."""
 
 MIN_SHARE = 0.9
 """Part minimale de ces enregistrements qui ont le même titulaire de préfixe."""

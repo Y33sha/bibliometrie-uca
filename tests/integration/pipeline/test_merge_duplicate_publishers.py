@@ -59,6 +59,15 @@ def test_un_autre_nom_rejoint_le_titulaire_du_prefixe(sa_sync_conn):
     assert publishers == [holder]
 
 
+def test_le_titulaire_d_un_prefixe_datacite_compte(sa_sync_conn):
+    holder = insert_publisher(sa_sync_conn, "Librairie Classiques Garnier")
+    named = insert_publisher(sa_sync_conn, "Classiques Garnier")
+    insert_doi_prefix(sa_sync_conn, "10.15122", ra="DataCite", publisher_id=holder)
+    _records(sa_sync_conn, "10.15122", named, 5)
+    aliases = find_publisher_aliases(sa_sync_conn)
+    assert [(a.source_id, a.target_id) for a in aliases] == [(named, holder)]
+
+
 def test_une_marque_reste_distincte(sa_sync_conn):
     holder = insert_publisher(sa_sync_conn, "Springer")
     brand = insert_publisher(sa_sync_conn, "BioMed Central")

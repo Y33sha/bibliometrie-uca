@@ -1,6 +1,6 @@
 """Sous-étape de la phase `publishing` : fusion des autres noms d'un éditeur.
 
-Un éditeur nommé par les sources, sans préfixe DOI, rejoint le titulaire des préfixes Crossref de ses enregistrements sources quand leurs noms sont compatibles (`domain.publishers.aliases`). Les préfixes des plateformes d'éditeurs sont écartés : ils désignent la plateforme. Les éditeurs de même nom réduit fusionnent ensuite (`same_name_merges`). La fusion est celle de l'administration des éditeurs, sans les revues homonymes : les formes de nom passent à l'éditeur gardé, retrouvé ensuite par ce nom. Le journal garde les deux noms.
+Un éditeur nommé par les sources, sans préfixe DOI, rejoint le titulaire des préfixes DOI de ses enregistrements sources quand leurs noms sont compatibles (`domain.publishers.aliases`). Les préfixes des plateformes d'éditeurs sont écartés : ils désignent la plateforme. Les éditeurs de même nom réduit fusionnent ensuite (`same_name_merges`). La fusion est celle de l'administration des éditeurs, sans les revues homonymes : les formes de nom passent à l'éditeur gardé, retrouvé ensuite par ce nom. Le journal garde les deux noms.
 """
 
 import logging
@@ -26,12 +26,12 @@ LABEL = "Autres noms des éditeurs"
 MergePublishers = Callable[[int, int], None]
 """`(cible, source)` : fusionne l'éditeur source dans la cible et valide la transaction."""
 
-# Enregistrements sources qui nomment un éditeur sans préfixe DOI, par titulaire du préfixe Crossref de leur publication.
+# Enregistrements sources qui nomment un éditeur sans préfixe DOI, par titulaire du préfixe DOI de leur publication.
 _EVIDENCE = text("""
     SELECT sr.publisher_id AS named_id, dp.publisher_id AS holder_id, dp.prefix, count(*) AS records
     FROM source_records sr
     JOIN publications p ON p.id = sr.publication_id
-    JOIN doi_prefixes dp ON dp.prefix = p.doi_prefix AND dp.ra = 'Crossref'
+    JOIN doi_prefixes dp ON dp.prefix = p.doi_prefix
     WHERE sr.publisher_id IS NOT NULL
       AND dp.publisher_id IS NOT NULL
       AND dp.publisher_id <> sr.publisher_id
