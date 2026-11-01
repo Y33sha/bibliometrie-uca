@@ -265,16 +265,19 @@
       {:else if nameForms.length === 0}
         <span class="muted">Aucune</span>
       {:else}
-        <div class="chip-list">
-          {#each nameForms as nf (nf.form)}
-            <div class="chip-row">
-              <span class="status-chip">{nf.form}</span>
-              <span class="chip-count" class:zero={nf.source_record_count === 0}>
-                {nf.source_record_count.toLocaleString("fr-FR")} enregistrement{nf.source_record_count > 1 ? "s" : ""} source{nf.source_record_count > 1 ? "s" : ""}
-              </span>
-            </div>
-          {/each}
-        </div>
+        <table class="data-table forms-table">
+          <thead>
+            <tr><th>Forme</th><th class="num">Enregistrements sources</th></tr>
+          </thead>
+          <tbody>
+            {#each nameForms as nf (nf.form)}
+              <tr>
+                <td>{nf.form}</td>
+                <td class="num" class:zero={nf.source_record_count === 0}>{nf.source_record_count.toLocaleString("fr-FR")}</td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
       {/if}
     </section>
   {/if}
@@ -283,6 +286,12 @@
 <style>
   .muted {
     color: var(--muted);
+  }
+  .forms-table {
+    width: 100%;
+  }
+  .forms-table td.zero {
+    color: var(--text-faint);
   }
   .blocking {
     background: var(--warning-light);

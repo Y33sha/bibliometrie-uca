@@ -90,6 +90,20 @@
 {/if}
 
 <style>
+  .chip-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: flex-start;
+  }
+  .chip-count {
+    font-size: var(--fs-sm);
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .chip-count.zero {
+    color: var(--text-faint);
+  }
   .shared {
     font-size: var(--fs-sm);
     color: var(--warning-text);
