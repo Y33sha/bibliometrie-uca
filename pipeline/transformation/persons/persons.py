@@ -3,12 +3,8 @@
 from __future__ import annotations
 
 import time
-from collections.abc import Callable
 from dataclasses import dataclass
 
-from sqlalchemy import Connection
-
-from infrastructure.repositories.person_repository import PgPersonRepository
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.log_format import LAST_BRANCH
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -23,8 +19,6 @@ from pipeline.transformation.persons.purge import purge
 
 @dataclass(frozen=True)
 class PersonsPhase:
-    repo_factory: Callable[[Connection], PgPersonRepository]
-
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
         """Exécute les quatre tâches de la phase personnes et renvoie ses métriques."""
         by_task = run_tasks(
@@ -52,7 +46,7 @@ class PersonsPhase:
 
     def _arbitrate_identifiers(self, ctx: PhaseContext) -> PhaseMetrics:
         with ctx.open_tx() as conn:
-            counts = arbitrate_identifier_conflicts(conn, ctx.logger, repo=self.repo_factory(conn))
+            counts = arbitrate_identifier_conflicts(conn, ctx.logger)
         return PhaseMetrics(extras=counts)
 
     def _resolve_contributions(self, ctx: PhaseContext) -> PhaseMetrics:
@@ -77,4 +71,4 @@ class PersonsPhase:
 
 
 def build() -> Phase:
-    return PersonsPhase(repo_factory=PgPersonRepository)
+    return PersonsPhase()

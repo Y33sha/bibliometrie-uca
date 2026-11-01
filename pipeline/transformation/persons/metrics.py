@@ -36,7 +36,6 @@ def build_metrics(
     metrics.details["summary"] = {
         **resolution,
         "identifiers_neutralized": arbitration.get("neutralized", 0),
-        "identifiers_transferred": arbitration.get("transferred", 0),
         "ambiguous_marked": purge.get("ambiguous_marked", 0),
         "deleted_attributions": purge.get("deleted_attributions", 0),
         "deleted_persons": purge.get("deleted_persons", 0),

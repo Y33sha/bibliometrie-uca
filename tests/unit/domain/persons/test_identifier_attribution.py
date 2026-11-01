@@ -55,31 +55,6 @@ class TestReattributeTo:
         assert ident.status is AttributionStatus.CONFIRMED
 
 
-class TestTransferTo:
-    def test_moves_to_new_person_from_pending(self):
-        ident = _make(status=AttributionStatus.PENDING)
-        ident.transfer_to(99, source="auto")
-        assert ident.person_id == 99
-        assert ident.status is AttributionStatus.PENDING
-        assert ident.source == "auto"
-
-    def test_raises_on_confirmed(self):
-        # Une attribution confirmée reste à sa personne.
-        ident = _make(status=AttributionStatus.CONFIRMED)
-        with pytest.raises(IdentifierAttributionConflictError):
-            ident.transfer_to(99, source="auto")
-        assert ident.person_id == 10
-        assert ident.status is AttributionStatus.CONFIRMED
-
-    def test_raises_on_rejected(self):
-        # Une attribution rejetée change de personne seulement par `reattribute_to`.
-        ident = _make(status=AttributionStatus.REJECTED)
-        with pytest.raises(IdentifierAttributionConflictError):
-            ident.transfer_to(99, source="auto")
-        assert ident.person_id == 10
-        assert ident.status is AttributionStatus.REJECTED
-
-
 class TestAttributionOutcome:
     def test_absent_identifier_is_added(self):
         assert attribution_outcome(None, 10) is AttributionOutcome.ADDED

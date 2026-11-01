@@ -51,23 +51,6 @@ class IdentifierAttribution:
         self.status = AttributionStatus.PENDING
         self.source = source
 
-    def transfer_to(self, new_person_id: int, *, source: IdentifierOrigin) -> None:
-        """Déplace une attribution `pending` vers une autre personne, en `pending`.
-
-        Sert à l'arbitrage automatique des conflits : la valeur revient à la personne désignée par la majorité des contributions qui la contiennent.
-
-        Raises:
-            IdentifierAttributionConflictError: attribution d'un autre statut.
-        """
-        if self.status is not AttributionStatus.PENDING:
-            raise IdentifierAttributionConflictError(
-                f"Impossible de transférer l'identifiant {self.id_type}={self.id_value!r} "
-                f"depuis le statut {self.status.value!r} ; seul un identifiant pending est "
-                "transférable.",
-            )
-        self.person_id = new_person_id
-        self.source = source
-
 
 class AttributionResult(NamedTuple):
     """Résultat de l'attribution d'un identifiant à une personne."""
