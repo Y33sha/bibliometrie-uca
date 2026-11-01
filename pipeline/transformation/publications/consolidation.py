@@ -97,7 +97,7 @@ def _source_record_from_row(
 
 
 def source_records_of(conn: Connection, publication_id: int) -> list[SourceRecord]:
-    """Renvoie les enregistrements sources d'une publication, pour l'agrégation. Le DOI d'une forme secondaire est remplacé par sa cible (`doi_targets`)."""
+    """Renvoie les enregistrements sources d'une publication, pour l'agrégation, dans l'ordre d'arrivée : il départage deux enregistrements sources d'une même source. Le DOI d'une forme secondaire est remplacé par sa cible (`doi_targets`)."""
     result = conn.execute(
         text(f"""
             SELECT sr.id, sr.source::text AS source, sr.source_id,
@@ -111,6 +111,7 @@ def source_records_of(conn: Connection, publication_id: int) -> list[SourceRecor
                    sr.publication_date_precision::text AS publication_date_precision
             FROM source_records sr
             WHERE sr.publication_id = :id
+            ORDER BY sr.id
         """),
         {"id": publication_id},
     )
