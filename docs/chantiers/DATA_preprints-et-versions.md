@@ -41,6 +41,20 @@ Dépôts HAL d'un type publié réunis au DOI d'un preprint :
 - Working papers typés `other` : le type `other` de DataCite passe devant le type `preprint` de HAL. 87 publications, dont 72 à DOI OSF (`10.17605`) (14691, 255632).
 - Œuvres distinctes réunies : 496 publications typées communication ont un enregistrement source Crossref `article` et un dépôt HAL communication, dont 154 avec plusieurs dépôts HAL. 620 réunit un article de revue et une communication de 2021 par les `hal_id` secondaires de ScanR : le sous-type de la communication l'emporte sur `article`.
 
+**Simulation de scission.** `plan_reconciliation` est rejoué sur les membres de chaque publication où OpenAlex, ScanR ou un dépôt HAL cite un `hal_id`, un identifiant arXiv ou un DOI secondaire. La règle V5 écarte, entre natures différentes (preprint, version publiée) :
+
+- le `hal_id` secondaire cité par un enregistrement source OpenAlex ou ScanR qui décrit un autre document (DOI ou identifiant arXiv dérivé) ;
+- l'identifiant arXiv d'un enregistrement source d'un type publié. Une copie arXiv compte comme preprint.
+
+| Règle | Publications scindées | Parts détachées |
+|---|---|---|
+| `hal_id` secondaires d'OpenAlex et ScanR tous écartés | 1 344 | dépôts HAL d'articles, de communications, de chapitres détachés de leur propre version : doublons |
+| Écartés quand l'enregistrement source cite plusieurs `hal_id` | 461 | mêmes doublons, moins nombreux |
+| V5 | 357 | 197 dépôts HAL preprint détachés d'une version publiée, 109 dépôts HAL d'un type publié détachés d'un preprint, 46 works OpenAlex arXiv, 1 doublon (171019) |
+| V5, plus le DOI secondaire cité par un work OpenAlex preprint | 550 | 190 works OpenAlex arXiv de plus, dont celui de 165044 |
+
+Sous V5, 21 versions publiées sortent du périmètre, leur part détachée y reste. La simulation ignore les autres publications : une part détachée peut en rejoindre une par une autre clé.
+
 **Liens `is_preprint_of`** (relations du 2026-10-31) : 1 724 vers une publication du corpus. 63 viennent de preprints à plusieurs cibles. 78 visent un type non publié, 81 une publication sans DOI vue par HAL, 13 une publication sans DOI vue par le seul WoS (165044 vers 301756, doublon de l'article). 15 relient un preprint du périmètre à une cible hors périmètre. 48 partent d'un preprint qui contient un dépôt HAL d'un type publié.
 
 ### Mesures du 2026-10-30
@@ -92,6 +106,7 @@ Le titre change souvent entre preprint et article : les titres différents d'une
 - **Le lien est vérifié à sa création.** La phase `relations` relie un preprint à une seule version publiée, sous la garde des auteurs. Une communication orale, un poster, une thèse, un jeu de données, un logiciel ou un `other` reste une œuvre liée par une autre relation.
 - **`relations` précède `finalize`**, hors des enrichissements : le masquage pèse sur le périmètre et les compteurs.
 - **Le statut open access de la version publiée tient compte des copies de son preprint masqué.** Pour 73 paires, la version publiée est fermée et le preprint ouvert.
+- **Un dépôt arXiv est un preprint**, même accepté pour publication : la plateforme impose le type.
 - **Les copies d'un preprint figurent avec la mention *preprint* dans le volet Accès.** Elles passent après les autres copies ouvertes : un preprint donne l'accès principal seulement s'il est la seule copie ouverte.
 
 ## Phasage
@@ -100,7 +115,8 @@ Le titre change souvent entre preprint et article : les titres différents d'une
 
 - [x] Preprints du périmètre dont la version publiée est hors périmètre
 - [x] Typologie des publications qui réunissent un preprint et sa version publiée
-- [ ] Fiabilité du type des dépôts HAL d'un type publié réunis à un preprint, sur échantillon (2658 : contribution Snowmass typée communication)
+- [x] Simulation de scission par nature
+- [ ] Relecture d'un échantillon de 50 scissions V5 : type HAL, justesse de la scission (2658 : contribution Snowmass typée communication)
 
 ### Phase 2 — Réunion et type des preprints
 
@@ -135,12 +151,12 @@ Le titre change souvent entre preprint et article : les titres différents d'une
 ## Questions ouvertes
 
 - **Dépôts HAL réunis à une œuvre d'une autre nature.** Les `hal_id` secondaires d'OpenAlex et de ScanR réunissent un dépôt HAL preprint sans DOI à l'article (209 publications), un dépôt HAL d'article ou de communication au preprint arXiv (142), une communication à l'article (620). Deux voies :
-  - scinder : le dépôt forme sa propre publication, reliée puis masquée. Un preprint sans DOI forme alors aussi une publication distincte.
+  - scinder : le dépôt forme sa propre publication, reliée puis masquée. Un preprint sans DOI forme alors aussi une publication distincte. La règle V5 scinde 357 publications.
   - typer : la publication prend le type de la version publiée, avec le DOI du preprint. Une communication sans revue ni recueil (57) garde un type incertain.
 - **Version publiée hors périmètre** (49 paires ; 15 en base locale) : le masquage sort l'œuvre du périmètre. Deux voies : le preprint reste visible ; ou la version publiée entre dans le périmètre par ses preprints masqués, comme par un enregistrement source preprint réuni (16 publications). La seconde voie pose la question des laboratoires des preprints masqués.
 - **Revue d'un preprint.** La revue de l'article, donnée par l'espace de noms DOI, compte 149 discussion papers parmi ses publications.
 - **Working papers typés `other`** (87) : le type `preprint` de HAL devant le type `other` de DataCite ?
-- **Portée de la mention *preprint*.** Une copie arXiv vient du preprint masqué (DataCite, sans version) ou des localisations OpenAlex de l'article (`submittedVersion`). Une plateforme garde une seule copie : la mention dépend alors du chemin. Piste : la mention vaut pour la copie d'un enregistrement source preprint, et pour toute copie hébergée par un serveur de preprints.
+- **Portée de la mention *preprint*.** Une copie arXiv vient du preprint masqué (DataCite, sans version) ou des localisations OpenAlex de l'article (`submittedVersion`). Une plateforme garde une seule copie : la mention dépend alors du chemin. Piste : la mention vaut pour la copie d'un enregistrement source preprint, et pour toute copie hébergée par un serveur de preprints, comme arXiv.
 - **Fiabilité de la version déclarée.** La version des localisations d'entrepôt est peu fiable chez OpenAlex comme chez Unpaywall : 200 949 localisations d'entrepôt sur 258 875 sont en `submittedVersion`, y compris dans Cairn, qui héberge des versions publiées.
 - **Cible antérieure au preprint** (29 paires) : repost tardif ou fausse paire ?
 - **Rejet d'un lien par l'administration**, pour une fausse paire passée à travers la garde des auteurs.
