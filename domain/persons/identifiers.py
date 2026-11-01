@@ -7,7 +7,7 @@ from enum import StrEnum
 from typing import NamedTuple
 
 from domain.errors import ValidationError
-from domain.identifiers import NormalizedIdentifier
+from domain.identifiers import IdRef, NormalizedIdentifier
 from domain.types import JsonValue
 
 
@@ -112,32 +112,6 @@ class IdHAL(NormalizedIdentifier):
 
     label = "IdHAL"
     normalize = staticmethod(_normalize_idhal)
-
-
-_IDREF_URL_RE = re.compile(r"idref\.fr/(\d{8}[\dX])(?:/id)?", re.IGNORECASE)
-# PPN : 8 chiffres + 1 caractère de contrôle (chiffre ou X)
-_IDREF_CANONICAL = re.compile(r"^\d{8}[\dX]$")
-
-
-def _normalize_idref(raw: str | None) -> str | None:
-    """Renvoie la forme normalisée d'un IdRef, écrit seul ou dans une URL idref.fr ; `None` si le format est invalide."""
-    if not raw:
-        return None
-    s = "".join(raw.split())
-    m = _IDREF_URL_RE.search(s)
-    if m:
-        s = m.group(1)
-    s = s.upper()
-    if not _IDREF_CANONICAL.match(s):
-        return None
-    return s
-
-
-class IdRef(NormalizedIdentifier):
-    """IdRef (PPN du Sudoc) : 8 chiffres et une clé de contrôle."""
-
-    label = "IdRef"
-    normalize = staticmethod(_normalize_idref)
 
 
 _HAL_PERSON_ID_CANONICAL = re.compile(r"^[1-9][0-9]*$")

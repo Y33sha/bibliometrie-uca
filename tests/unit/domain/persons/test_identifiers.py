@@ -3,11 +3,11 @@
 import pytest
 
 from domain.errors import ValidationError
+from domain.identifiers import IdRef
 from domain.persons.identifiers import (
     ORCID,
     HalPersonId,
     IdHAL,
-    IdRef,
     compact_identifiers,
     normalized_identifier_value,
     shared_identifier_neutralizations,

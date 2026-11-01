@@ -5,7 +5,7 @@ Chaque source a son format de `topics`. Ces fonctions pures le réduisent à une
 
 from collections.abc import Callable
 
-from domain.sources.hal import hal_domain_labels
+from domain.sources.hal import hal_domain_subject
 from domain.types import JsonValue, as_mapping, as_str
 from pipeline.transformation.publications.subjects.subject_cache import dedup_strs
 
@@ -16,13 +16,14 @@ _OPENALEX_LEVELS = ("domain", "field", "subfield", "topic")
 def hal_labels(topics: JsonValue) -> list[str]:
     """Renvoie les domaines HAL (`{"hal_domains": [...]}`), chaque niveau du chemin à plat.
 
-    Chaque entrée contient le code du domaine et le chemin de ses libellés, découpé par `hal_domain_labels`. Les niveaux sont liés à plat, comme les quatre niveaux OpenAlex.
+    Chaque entrée contient le code du domaine et le chemin de ses libellés, lu par `hal_domain_subject`. Les niveaux sont liés à plat, comme les quatre niveaux OpenAlex.
     """
     if not isinstance(topics, dict):
         return []
     labels: list[str] = []
     for entry in dedup_strs(topics.get("hal_domains")):
-        labels.extend(hal_domain_labels(entry))
+        if subject := hal_domain_subject(entry):
+            labels.extend(s.label for s in subject.lineage())
     return labels
 
 
