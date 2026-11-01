@@ -5,9 +5,6 @@ Couvre les fonctions de lecture d'un work OpenAlex, la lecture des auteurs et le
 
 from __future__ import annotations
 
-import logging
-from unittest.mock import MagicMock
-
 from domain.persons.contributor_name import ContributorName
 from domain.platforms.platform import PlatformType
 from domain.publications.licenses import License
@@ -34,6 +31,7 @@ from tests.helpers.normalize_doubles import (
     FakeSourceRecordStore,
     FakeStagingStore,
     identifier_values,
+    normalizer_arguments,
     staging_row,
 )
 
@@ -760,15 +758,9 @@ class TestBuildOpenalexAuthorRecords:
 
 def _make_normalizer():
     return OpenalexNormalizer(
-        conn=MagicMock(),
-        logger=logging.getLogger("test"),
-        staging_store=FakeStagingStore(),
-        record_store=FakeSourceRecordStore(),
-        monograph_store=MagicMock(),
-        publisher_store=MagicMock(),
-        contribution_store=MagicMock(),
-        location_store=MagicMock(),
-        embargo_store=MagicMock(),
+        **normalizer_arguments(
+            staging_store=FakeStagingStore(), record_store=FakeSourceRecordStore()
+        )
     )
 
 

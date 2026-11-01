@@ -5,8 +5,6 @@ Couvre l'enregistrement source construit par `scanr_source_record`, l'éditeur, 
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
-
 import pytest
 
 from domain.persons.contributor_name import ContributorName
@@ -24,7 +22,7 @@ from pipeline.ingestion.scanr.normalize import (
     scanr_source_record,
 )
 from pipeline.transformation.publishing.find_or_create import Containers
-from tests.helpers.normalize_doubles import identifier_values, staging_row
+from tests.helpers.normalize_doubles import identifier_values, normalizer_arguments, staging_row
 
 _NO_CONTAINERS = Containers(has_series=False, monograph_id=None)
 
@@ -401,17 +399,7 @@ class TestScanrSourceRecordChamps:
 
 
 def _normalizer() -> ScanrNormalizer:
-    return ScanrNormalizer(
-        conn=MagicMock(),
-        logger=MagicMock(),
-        staging_store=MagicMock(),
-        record_store=MagicMock(),
-        monograph_store=MagicMock(),
-        publisher_store=MagicMock(),
-        contribution_store=MagicMock(),
-        location_store=MagicMock(),
-        embargo_store=MagicMock(),
-    )
+    return ScanrNormalizer(**normalizer_arguments())
 
 
 class TestScanrNormalizer:

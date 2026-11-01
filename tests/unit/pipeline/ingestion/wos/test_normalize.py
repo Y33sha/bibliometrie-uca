@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import logging
 from typing import Any
-from unittest.mock import MagicMock
 
 from domain.persons.contributor_name import ContributorName
 from domain.serials.issns import IssnSupport, SerialIssn
@@ -34,7 +33,7 @@ from pipeline.ingestion.wos.normalize import (
     wos_source_record,
 )
 from pipeline.transformation.publishing.find_or_create import Containers
-from tests.helpers.normalize_doubles import identifier_values, staging_row
+from tests.helpers.normalize_doubles import identifier_values, normalizer_arguments, staging_row
 
 # ── _safe_list ───────────────────────────────────────────────────
 
@@ -952,17 +951,7 @@ class TestBuildWosAuthorRecords:
 
 
 def _normalizer(logger) -> WosNormalizer:
-    return WosNormalizer(
-        MagicMock(),
-        logger,
-        staging_store=MagicMock(),
-        record_store=MagicMock(),
-        monograph_store=MagicMock(),
-        publisher_store=MagicMock(),
-        contribution_store=MagicMock(),
-        location_store=MagicMock(),
-        embargo_store=MagicMock(),
-    )
+    return WosNormalizer(**normalizer_arguments(logger=logger))
 
 
 class TestWosNormalizer:

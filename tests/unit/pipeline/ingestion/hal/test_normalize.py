@@ -5,9 +5,7 @@ Couvre les fonctions de lecture d'un document HAL, la lecture du TEI, la lecture
 
 from __future__ import annotations
 
-import logging
 from datetime import date
-from unittest.mock import MagicMock
 
 from domain.persons.contributor_name import ContributorName
 from domain.serials.issns import IssnSupport, SerialIssn
@@ -37,6 +35,7 @@ from tests.helpers.normalize_doubles import (
     FakeSourceRecordStore,
     FakeStagingStore,
     identifier_values,
+    normalizer_arguments,
     staging_row,
 )
 
@@ -623,15 +622,11 @@ class TestBuildHalAuthorRecords:
 
 def _make_normalizer():
     return HalNormalizer(
-        conn=MagicMock(),
-        logger=logging.getLogger("test"),
-        staging_store=FakeStagingStore(),
-        record_store=FakeSourceRecordStore(),
-        monograph_store=MagicMock(),
-        publisher_store=MagicMock(),
-        contribution_store=FakeSourceContributionStore(),
-        location_store=MagicMock(),
-        embargo_store=MagicMock(),
+        **normalizer_arguments(
+            staging_store=FakeStagingStore(),
+            record_store=FakeSourceRecordStore(),
+            contribution_store=FakeSourceContributionStore(),
+        )
     )
 
 

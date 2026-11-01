@@ -3,10 +3,27 @@
 Quelle que soit sa source, un normaliseur verse ses enregistrements sources dans `source_records`, écrit leurs contributions sources et marque sa ligne de staging traitée. Ces doublures valent donc pour toutes les sources.
 """
 
+import inspect
+import logging
+from typing import Any
+from unittest.mock import MagicMock
+
 from domain.source_records.identifiers import normalize_identifiers
+from pipeline.ingestion.common.normalizer import SourceNormalizer
 from pipeline.ingestion.common.source_contribution_store import StoredSourceContributionRow
 from pipeline.ingestion.common.source_records import SourceRecordUpsert
 from pipeline.ingestion.common.staging import StagingRow
+
+
+def normalizer_arguments(**overrides: Any) -> dict[str, Any]:
+    """Renvoie les arguments du constructeur commun des normaliseurs : `overrides`, et un `MagicMock` pour chaque autre argument."""
+    names = list(inspect.signature(SourceNormalizer.__init__).parameters)[1:]
+    return {
+        **{name: MagicMock() for name in names},
+        "conn": MagicMock(invalidated=False),
+        "logger": logging.getLogger("test"),
+        **overrides,
+    }
 
 
 def identifier_values(record: SourceRecordUpsert) -> dict[str, list[str]]:

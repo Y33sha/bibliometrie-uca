@@ -3,8 +3,6 @@
 Le format DataCite loge ses métadonnées sous `attributes` et nomme ses auteurs `creators`. Une ressource sans DOI est refusée. L'enregistrement source est construit sans entrée-sortie.
 """
 
-from unittest.mock import MagicMock
-
 from domain.persons.contributor_name import ContributorName
 from domain.serials.issns import SerialIssn
 from pipeline.ingestion.common.normalizer import PublisherFacts
@@ -17,21 +15,11 @@ from pipeline.ingestion.datacite.normalize import (
     get_container_facts,
 )
 from pipeline.transformation.publishing.find_or_create import Containers
-from tests.helpers.normalize_doubles import identifier_values, staging_row
+from tests.helpers.normalize_doubles import identifier_values, normalizer_arguments, staging_row
 
 
 def _normalizer() -> DataciteNormalizer:
-    return DataciteNormalizer(
-        conn=MagicMock(),
-        logger=MagicMock(),
-        staging_store=MagicMock(),
-        record_store=MagicMock(),
-        monograph_store=MagicMock(),
-        publisher_store=MagicMock(),
-        contribution_store=MagicMock(),
-        location_store=MagicMock(),
-        embargo_store=MagicMock(),
-    )
+    return DataciteNormalizer(**normalizer_arguments())
 
 
 class TestAuthorRecords:

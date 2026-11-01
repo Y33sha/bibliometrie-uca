@@ -5,9 +5,7 @@ Couvre le titre et l'année (soutenance, sinon inscription), les champs propres 
 
 from __future__ import annotations
 
-import logging
 from datetime import date
-from unittest.mock import MagicMock
 
 from domain.publications.dates import DatePrecision, PublicationDate
 from pipeline.ingestion.common.embargoes import Embargo
@@ -28,6 +26,7 @@ from tests.helpers.normalize_doubles import (
     FakeSourceRecordStore,
     FakeStagingStore,
     identifier_values,
+    normalizer_arguments,
     staging_row,
 )
 
@@ -271,15 +270,11 @@ class TestBuildThesesAuthorRecords:
 
 def _make_normalizer():
     return ThesesNormalizer(
-        conn=MagicMock(),
-        logger=logging.getLogger("test"),
-        staging_store=FakeStagingStore(),
-        record_store=FakeSourceRecordStore(),
-        monograph_store=MagicMock(),
-        publisher_store=MagicMock(),
-        contribution_store=FakeSourceContributionStore(),
-        location_store=MagicMock(),
-        embargo_store=MagicMock(),
+        **normalizer_arguments(
+            staging_store=FakeStagingStore(),
+            record_store=FakeSourceRecordStore(),
+            contribution_store=FakeSourceContributionStore(),
+        )
     )
 
 
