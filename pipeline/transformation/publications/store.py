@@ -1,20 +1,82 @@
-"""Persistance d'une publication : lecture, enregistrement, création, suppression."""
+"""Persistance des publications : lecture, enregistrement, création, suppression."""
 
-import json
-from collections.abc import Mapping
+from collections.abc import Sequence
 
-from sqlalchemy import Connection, text
+from sqlalchemy import Connection, RowMapping, bindparam, text
 
 from domain.merge import MergedEntity
 from domain.publications.dates import PublicationDate
 from domain.publications.identifiers import DOI
 from domain.publications.publication import Publication
 from domain.types import JsonValue
+from infrastructure.db.jsonb import Jsonb
 from infrastructure.db.queues import Queue, enqueue_sql
 from infrastructure.db.scalars import scalar_int
 from infrastructure.repositories.merge_steps import record_redirect
 
 _MARK_INSERTED = enqueue_sql(Queue.PUBLICATION_CONTRIBUTIONS, "SELECT id FROM inserted")
+
+# Colonnes du lot écrit par `save` (`_save_payload`), lues par `jsonb_to_recordset`.
+_SAVED = """jsonb_to_recordset(:payload) AS t(
+    id integer, title text, title_normalized text, doc_type doc_type,
+    publication_date date, publication_date_precision date_precision, doi text,
+    oa_status oa_type, license license_type, deposit_license license_type, best_copy_url text,
+    serial_id integer, monograph_id integer, publisher_id integer, container_title text,
+    language text, is_retracted boolean, countries text[], source_extras jsonb, corrections jsonb,
+    abstract text, keywords text[], biblio jsonb
+)"""
+
+_RELEASE_CHANGED_DOIS_SQL = text(f"""
+    UPDATE publications p SET doi = NULL, updated_at = now()
+    FROM {_SAVED}
+    WHERE p.id = t.id AND p.doi IS NOT NULL AND p.doi IS DISTINCT FROM t.doi
+""").bindparams(bindparam("payload", type_=Jsonb))
+
+_SAVE_CHANGED_SQL = text(f"""
+    WITH computed AS (
+        SELECT t.*,
+               coalesce(t.publication_date, p.publication_date) AS kept_date,
+               coalesce(t.publication_date_precision, p.publication_date_precision) AS kept_precision,
+               coalesce(
+                   (SELECT array_agg(DISTINCT sr.source ORDER BY sr.source)
+                    FROM source_records sr WHERE sr.publication_id = t.id),
+                   '{{}}'
+               ) AS sources
+        FROM {_SAVED}
+        JOIN publications p ON p.id = t.id
+    )
+    UPDATE publications p SET
+        title = c.title, title_normalized = c.title_normalized, doc_type = c.doc_type,
+        publication_date = c.kept_date, publication_date_precision = c.kept_precision,
+        doi = c.doi, oa_status = c.oa_status, license = c.license,
+        deposit_license = c.deposit_license, best_copy_url = c.best_copy_url,
+        serial_id = c.serial_id, monograph_id = c.monograph_id, publisher_id = c.publisher_id,
+        container_title = c.container_title, language = c.language,
+        is_retracted = c.is_retracted, countries = c.countries,
+        source_extras = c.source_extras, corrections = c.corrections, sources = c.sources,
+        subjects_ingested_at = NULL, updated_at = now()
+    FROM computed c
+    WHERE p.id = c.id
+      AND (p.title, p.title_normalized, p.doc_type, p.publication_date,
+           p.publication_date_precision, p.doi, p.oa_status, p.license, p.deposit_license,
+           p.best_copy_url, p.serial_id, p.monograph_id, p.publisher_id, p.container_title,
+           p.language, p.is_retracted, p.countries, p.source_extras, p.corrections, p.sources)
+          IS DISTINCT FROM
+          (c.title, c.title_normalized, c.doc_type, c.kept_date,
+           c.kept_precision, c.doi, c.oa_status, c.license, c.deposit_license,
+           c.best_copy_url, c.serial_id, c.monograph_id, c.publisher_id, c.container_title,
+           c.language, c.is_retracted, c.countries, c.source_extras, c.corrections, c.sources)
+""").bindparams(bindparam("payload", type_=Jsonb))
+
+# Les colonnes volumineuses (résumé, mots-clés, biblio) vont dans `publications_detail`.
+_SAVE_DETAIL_SQL = text(f"""
+    INSERT INTO publications_detail (publication_id, abstract, keywords, biblio)
+    SELECT t.id, t.abstract, t.keywords, t.biblio FROM {_SAVED}
+    ON CONFLICT (publication_id) DO UPDATE SET
+        abstract = EXCLUDED.abstract, keywords = EXCLUDED.keywords, biblio = EXCLUDED.biblio
+    WHERE (publications_detail.abstract, publications_detail.keywords, publications_detail.biblio)
+          IS DISTINCT FROM (EXCLUDED.abstract, EXCLUDED.keywords, EXCLUDED.biblio)
+""").bindparams(bindparam("payload", type_=Jsonb))
 
 
 class PublicationStore:
@@ -45,7 +107,11 @@ class PublicationStore:
 
     def find_by_id(self, publication_id: int) -> Publication | None:
         """Renvoie la publication de cet identifiant, sans ses contributions, ou `None`."""
-        row = self._conn.execute(
+        return self.find_by_ids([publication_id]).get(publication_id)
+
+    def find_by_ids(self, publication_ids: Sequence[int]) -> dict[int, Publication]:
+        """Renvoie les publications de ces identifiants, sans leurs contributions. Un identifiant inconnu est absent de la réponse."""
+        rows = self._conn.execute(
             text("""
                 SELECT p.id, p.title, p.title_normalized,
                        CAST(p.doc_type AS text) AS doc_type,
@@ -60,116 +126,33 @@ class PublicationStore:
                        d.biblio, p.source_extras, p.corrections
                 FROM publications p
                 LEFT JOIN publications_detail d ON d.publication_id = p.id
-                WHERE p.id = :id
+                WHERE p.id = ANY(:ids)
             """),
-            {"id": publication_id},
-        ).first()
-        if not row:
-            return None
-        m = row._mapping
-        return Publication(
-            id=m["id"],
-            title=m["title"],
-            publication_year=m["publication_year"],
-            publication_date=PublicationDate.stored(
-                m["publication_date"], m["publication_date_precision"]
-            ),
-            title_normalized=m["title_normalized"],
-            doc_type=m["doc_type"],
-            doi=DOI(m["doi"]) if m["doi"] else None,
-            oa_status=m["oa_status"],
-            license=m["license"],
-            deposit_license=m["deposit_license"],
-            best_copy_url=m["best_copy_url"],
-            serial_id=m["serial_id"],
-            monograph_id=m["monograph_id"],
-            publisher_id=m["publisher_id"],
-            container_title=m["container_title"],
-            language=m["language"],
-            abstract=m["abstract"],
-            is_retracted=m["is_retracted"],
-            countries=tuple(m["countries"]) if m["countries"] else (),
-            keywords=tuple(m["keywords"]) if m["keywords"] else (),
-            biblio=m["biblio"],
-            source_extras=m["source_extras"],
-            corrections=m["corrections"],
+            {"ids": list(publication_ids)},
         )
+        return {row.id: _publication_from_row(row._mapping) for row in rows}
 
-    def save(self, publication: Publication) -> None:
-        """Enregistre les champs modifiables d'une publication déjà insérée."""
-        if publication.id is None:
-            raise ValueError(
-                "save(publication) : publication.id doit être posé (utiliser create pour insérer)"
-            )
+    def save(self, publications: Sequence[Publication]) -> None:
+        """Enregistre les champs modifiables de publications déjà insérées, et recalcule `sources` depuis leurs enregistrements sources.
+
+        Seules les lignes dont une valeur change sont réécrites, avec leur date de mise à jour. Une date de publication absente garde la date en base. Toutes les publications reçues repassent à ingérer par la phase subjects (`subjects_ingested_at` vidé) : leurs enregistrements sources ont pu changer de sujets.
+        """
+        if not publications:
+            return
+        if any(p.id is None for p in publications):
+            raise ValueError("save : chaque publication doit avoir un id (create pour insérer)")
+        payload = [_save_payload(p) for p in publications]
+        params = {"payload": payload}
+        # Un index unique couvre le DOI, contrôlé ligne à ligne : un DOI qui passe d'une publication du lot à une autre est d'abord retiré de la première.
+        self._conn.execute(_RELEASE_CHANGED_DOIS_SQL, params)
+        self._conn.execute(_SAVE_CHANGED_SQL, params)
+        self._conn.execute(_SAVE_DETAIL_SQL, params)
         self._conn.execute(
-            text("""
-                UPDATE publications SET
-                    title = :title,
-                    title_normalized = :tn,
-                    doc_type = CAST(:dt AS doc_type),
-                    publication_date = coalesce(:publication_date, publication_date),
-                    publication_date_precision = coalesce(
-                        CAST(:publication_date_precision AS date_precision),
-                        publication_date_precision
-                    ),
-                    doi = :doi,
-                    oa_status = CAST(:oa AS oa_type),
-                    license = CAST(:license AS license_type),
-                    deposit_license = CAST(:deposit_license AS license_type),
-                    best_copy_url = :best_copy_url,
-                    serial_id = :jid,
-                    monograph_id = :mid,
-                    publisher_id = :pid,
-                    container_title = :ct,
-                    language = :lang,
-                    is_retracted = :is_retracted,
-                    countries = CAST(:countries AS text[]),
-                    source_extras = CAST(:source_extras AS jsonb),
-                    corrections = CAST(:corrections AS jsonb),
-                    -- Sources recalculées : la phase subjects ingère de nouveau la publication.
-                    subjects_ingested_at = NULL,
-                    updated_at = now()
-                WHERE id = :id
-            """),
-            {
-                "id": publication.id,
-                "title": publication.title,
-                "tn": publication.title_normalized,
-                "dt": publication.doc_type,
-                **_date_params(publication.publication_date),
-                "doi": str(publication.doi) if publication.doi else None,
-                "oa": publication.oa_status,
-                "license": publication.license,
-                "deposit_license": publication.deposit_license,
-                "best_copy_url": publication.best_copy_url,
-                "jid": publication.serial_id,
-                "mid": publication.monograph_id,
-                "pid": publication.publisher_id,
-                "ct": publication.container_title,
-                "lang": publication.language,
-                "is_retracted": publication.is_retracted,
-                "countries": list(publication.countries) if publication.countries else None,
-                "source_extras": _json_dumps_or_none(publication.source_extras),
-                "corrections": json.dumps(publication.corrections),
-            },
-        )
-        # Les colonnes volumineuses (résumé, mots-clés, biblio) vont dans `publications_detail`.
-        self._conn.execute(
-            text("""
-                INSERT INTO publications_detail
-                    (publication_id, abstract, keywords, biblio)
-                VALUES (:id, :abstract, CAST(:keywords AS text[]), CAST(:biblio AS jsonb))
-                ON CONFLICT (publication_id) DO UPDATE SET
-                    abstract = EXCLUDED.abstract,
-                    keywords = EXCLUDED.keywords,
-                    biblio = EXCLUDED.biblio
-            """),
-            {
-                "id": publication.id,
-                "abstract": publication.abstract,
-                "keywords": list(publication.keywords) if publication.keywords else None,
-                "biblio": _json_dumps_or_none(publication.biblio),
-            },
+            text(
+                "UPDATE publications SET subjects_ingested_at = NULL"
+                " WHERE id = ANY(:ids) AND subjects_ingested_at IS NOT NULL"
+            ),
+            {"ids": [p.id for p in publications]},
         )
 
     def create(
@@ -228,11 +211,13 @@ class PublicationStore:
             self._conn, MergedEntity.PUBLICATION, to_publication_id, from_publication_id
         )
 
-    def delete(self, publication_id: int) -> None:
-        """Supprime une publication, avec ses `contributions` et ses `publication_subjects`. `apc_payments.publication_id` et `source_records.publication_id` passent à NULL."""
+    def delete(self, publication_ids: Sequence[int]) -> None:
+        """Supprime des publications, avec leurs `contributions` et leurs `publication_subjects`. `apc_payments.publication_id` et `source_records.publication_id` passent à NULL."""
+        if not publication_ids:
+            return
         self._conn.execute(
-            text("DELETE FROM publications WHERE id = :id"),
-            {"id": publication_id},
+            text("DELETE FROM publications WHERE id = ANY(:ids)"),
+            {"ids": list(publication_ids)},
         )
 
 
@@ -246,8 +231,62 @@ def _date_params(publication_date: PublicationDate | None) -> dict[str, object]:
     }
 
 
-def _json_dumps_or_none(value: Mapping[str, JsonValue] | None) -> str | None:
-    """Renvoie le texte JSON de `value` pour `CAST(:p AS jsonb)`, ou `None`."""
-    if value is None:
-        return None
-    return json.dumps(value)
+def _publication_from_row(m: RowMapping) -> Publication:
+    """Construit la publication d'une ligne lue par `find_by_ids`."""
+    return Publication(
+        id=m["id"],
+        title=m["title"],
+        publication_year=m["publication_year"],
+        publication_date=PublicationDate.stored(
+            m["publication_date"], m["publication_date_precision"]
+        ),
+        title_normalized=m["title_normalized"],
+        doc_type=m["doc_type"],
+        doi=DOI(m["doi"]) if m["doi"] else None,
+        oa_status=m["oa_status"],
+        license=m["license"],
+        deposit_license=m["deposit_license"],
+        best_copy_url=m["best_copy_url"],
+        serial_id=m["serial_id"],
+        monograph_id=m["monograph_id"],
+        publisher_id=m["publisher_id"],
+        container_title=m["container_title"],
+        language=m["language"],
+        abstract=m["abstract"],
+        is_retracted=m["is_retracted"],
+        countries=tuple(m["countries"]) if m["countries"] else (),
+        keywords=tuple(m["keywords"]) if m["keywords"] else (),
+        biblio=m["biblio"],
+        source_extras=m["source_extras"],
+        corrections=m["corrections"],
+    )
+
+
+def _save_payload(publication: Publication) -> dict[str, JsonValue]:
+    """Renvoie la ligne du lot écrit par `save` pour une publication. Un tuple vide s'écrit NULL."""
+    date = publication.publication_date
+    return {
+        "id": publication.id,
+        "title": publication.title,
+        "title_normalized": publication.title_normalized,
+        "doc_type": publication.doc_type,
+        "publication_date": date.value.isoformat() if date else None,
+        "publication_date_precision": date.precision.value if date else None,
+        "doi": str(publication.doi) if publication.doi else None,
+        "oa_status": publication.oa_status,
+        "license": publication.license,
+        "deposit_license": publication.deposit_license,
+        "best_copy_url": publication.best_copy_url,
+        "serial_id": publication.serial_id,
+        "monograph_id": publication.monograph_id,
+        "publisher_id": publication.publisher_id,
+        "container_title": publication.container_title,
+        "language": publication.language,
+        "is_retracted": publication.is_retracted,
+        "countries": list(publication.countries) if publication.countries else None,
+        "source_extras": publication.source_extras,
+        "corrections": publication.corrections,
+        "abstract": publication.abstract,
+        "keywords": list(publication.keywords) if publication.keywords else None,
+        "biblio": publication.biblio,
+    }

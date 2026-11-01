@@ -116,8 +116,7 @@ def merge_serials(conn: Connection, target_id: int, source_id: int) -> None:
     absorbed_publication_ids = store.find_ids_by_serial_id(source_id)
     merge_serial_into(conn, target_id, source_id)
     correct_serial_records(conn, target_id)
-    for publication_id in absorbed_publication_ids:
-        lifecycle.refresh(conn, publication_id)
+    lifecycle.refresh(conn, absorbed_publication_ids)
 
 
 class SerialRecompute:

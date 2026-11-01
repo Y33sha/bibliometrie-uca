@@ -12,7 +12,7 @@ from domain.publications.licenses import License
 from infrastructure.db.tables import metadata
 from interfaces.api.deps import person_service
 from pipeline.ingestion.common.locations import LocationFacts, LocationStore
-from pipeline.transformation.publications.consolidation import refresh_from_sources
+from pipeline.transformation.publications.lifecycle import refresh
 from pipeline.transformation.publications.store import PublicationStore
 from tests.integration.helpers.persons import (
     insert_hr_record,
@@ -88,7 +88,7 @@ def _seed_publication(
 
 class TestRefreshFromSources:
     def test_enrich_via_refresh(self, sa_sync_conn, publication_repo):
-        """`refresh_from_sources` reprend les métadonnées des enregistrements sources (revue) et déduit le statut open access de leurs copies."""
+        """`lifecycle.refresh` reprend les métadonnées des enregistrements sources (revue) et déduit le statut open access de leurs copies."""
         serial_id = insert_serial(sa_sync_conn, "Science", oa_model="full_oa")
         publication_id = _seed_publication(publication_repo, "Pub", doi="10.5555/enrich-test")
         record = insert_source_record(
@@ -108,7 +108,7 @@ class TestRefreshFromSources:
                 )
             ],
         )
-        refresh_from_sources(sa_sync_conn, publication_id)
+        refresh(sa_sync_conn, [publication_id])
         row = sa_sync_conn.execute(
             text("SELECT oa_status, serial_id FROM publications WHERE id = :id"),
             {"id": publication_id},

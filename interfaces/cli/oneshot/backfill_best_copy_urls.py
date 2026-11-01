@@ -1,5 +1,5 @@
 # STATUS: oneshot (2026-10-26)
-"""Calcule `best_copy_url` des publications du stock d'après les localisations de leurs enregistrements sources, comme la consolidation d'une publication (`refresh_from_sources`).
+"""Calcule `best_copy_url` des publications du stock d'après les localisations de leurs enregistrements sources, comme la consolidation des publications (`consolidate`).
 
 Les publications se traitent par lots d'identifiants, un commit par lot. Seules les valeurs qui changent s'écrivent. Idempotent.
 

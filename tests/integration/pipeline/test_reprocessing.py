@@ -56,7 +56,7 @@ def _get_publication_oa_status(conn, hal_id):
 def _fetch_stale_publications(conn):
     """Rejoue `metadata_correction` puis la réconciliation, comme le pipeline après une renormalisation.
 
-    La renormalisation marque les enregistrements sources modifiés pour la réconciliation, qui recalcule les métadonnées de leurs publications (`refresh_from_sources`). Elle réécrit aussi les valeurs brutes de la source (`THESE`, `ART`…) : `metadata_correction` les corrige d'abord, et `refresh_from_sources` lit les valeurs corrigées.
+    La renormalisation marque les enregistrements sources modifiés pour la réconciliation, qui recalcule les métadonnées de leurs publications (`lifecycle.refresh`). Elle réécrit aussi les valeurs brutes de la source (`THESE`, `ART`…) : `metadata_correction` les corrige d'abord, et `lifecycle.refresh` lit les valeurs corrigées.
     """
     from pipeline.transformation.publications.reconciliation import reconcile
 

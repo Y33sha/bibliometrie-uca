@@ -54,7 +54,7 @@ class TestRelevesRendantUneListe:
         assert queries.fetch_serial_by_doi_candidates() == []
 
     def test_les_publications_sources_d_une_publication_s_accordent(self, sa_sync_conn_owner):
-        assert source_records_of(sa_sync_conn_owner, 1) == []
+        assert source_records_of(sa_sync_conn_owner, [1]) == {}
 
     def test_les_lignes_de_staging_s_accordent(self, sa_sync_conn_owner):
         store = StagingStore(sa_sync_conn_owner)

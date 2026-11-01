@@ -426,7 +426,7 @@ class TestMergeSerials:
         target = _serial(sa_sync_conn, title="Target")
         source = _serial(sa_sync_conn, title="Source")
         publication_id = insert_publication(sa_sync_conn, serial_id=source)
-        # La requalification qui suit la fusion appelle `refresh_from_sources`, qui supprime une publication sans enregistrement source.
+        # La requalification qui suit la fusion appelle `lifecycle.refresh`, qui supprime une publication sans enregistrement source.
         _openalex_source_record(
             sa_sync_conn, publication_id, source_id="W-transfer", serial_id=source
         )

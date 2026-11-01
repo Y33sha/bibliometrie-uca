@@ -1,6 +1,6 @@
-"""Recalcul de l'état consolidé d'une publication depuis ses `source_records`."""
+"""Recalcul de l'état consolidé des publications depuis leurs `source_records`, par lot : chaque lecture porte sur tout le lot."""
 
-from collections.abc import Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import date
 from enum import StrEnum
 from typing import NamedTuple
@@ -37,6 +37,7 @@ from pipeline.transformation.publications.store import PublicationStore
 class _SourceRecordRow(NamedTuple):
     """Colonnes de `source_records` lues par l'agrégation."""
 
+    publication_id: int
     id: int
     source: str
     source_id: str
@@ -96,11 +97,13 @@ def _source_record_from_row(
     )
 
 
-def source_records_of(conn: Connection, publication_id: int) -> list[SourceRecord]:
-    """Renvoie les enregistrements sources d'une publication, pour l'agrégation, dans l'ordre d'arrivée : il départage deux enregistrements sources d'une même source. Le DOI d'une forme secondaire est remplacé par sa cible (`doi_targets`)."""
+def source_records_of(
+    conn: Connection, publication_ids: Sequence[int]
+) -> dict[int, list[SourceRecord]]:
+    """Renvoie les enregistrements sources de chaque publication, pour l'agrégation, dans l'ordre d'arrivée : il départage deux enregistrements sources d'une même source. Le DOI d'une forme secondaire est remplacé par sa cible (`doi_targets`). Une publication sans enregistrement source est absente de la réponse."""
     result = conn.execute(
         text(f"""
-            SELECT sr.id, sr.source::text AS source, sr.source_id,
+            SELECT sr.publication_id, sr.id, sr.source::text AS source, sr.source_id,
                    sr.title, sr.publication_year, sr.doc_type::text AS doc_type,
                    {identifiers_json_sql("sr.id")} AS identifiers,
                    sr.serial_id, sr.monograph_id, sr.container_title, sr.language,
@@ -110,14 +113,19 @@ def source_records_of(conn: Connection, publication_id: int) -> list[SourceRecor
                    sr.publisher_id, sr.publication_date,
                    sr.publication_date_precision::text AS publication_date_precision
             FROM source_records sr
-            WHERE sr.publication_id = :id
-            ORDER BY sr.id
+            WHERE sr.publication_id = ANY(:ids)
+            ORDER BY sr.publication_id, sr.id
         """),
-        {"id": publication_id},
+        {"ids": list(publication_ids)},
     )
     rows = [(row, parse_identifiers(row.identifiers)) for row in rows_as(_SourceRecordRow, result)]
     doi_targets = fetch_doi_targets(conn, (i for _, ids in rows for i in ids))
-    return [_source_record_from_row(row, ids, doi_targets) for row, ids in rows]
+    by_publication: dict[int, list[SourceRecord]] = {}
+    for row, ids in rows:
+        by_publication.setdefault(row.publication_id, []).append(
+            _source_record_from_row(row, ids, doi_targets)
+        )
+    return by_publication
 
 
 def monograph_serial_ids(conn: Connection, monograph_ids: Sequence[int]) -> dict[int, int | None]:
@@ -129,11 +137,13 @@ def monograph_serial_ids(conn: Connection, monograph_ids: Sequence[int]) -> dict
     return {r.id: r.serial_id for r in rows}
 
 
-def unpaywall_verdict(conn: Connection, doi: str) -> str | None:
-    """Renvoie le verdict d'Unpaywall sur un DOI, `None` sans verdict."""
-    return conn.execute(
-        text("SELECT unpaywall_oa_status::text FROM dois WHERE doi = :doi"), {"doi": doi}
-    ).scalar_one_or_none()
+def unpaywall_verdicts(conn: Connection, dois: Sequence[str]) -> dict[str, str | None]:
+    """Renvoie le verdict d'Unpaywall sur chaque DOI connu, `None` sans verdict."""
+    rows = conn.execute(
+        text("SELECT doi, unpaywall_oa_status::text AS verdict FROM dois WHERE doi = ANY(:dois)"),
+        {"dois": list(dois)},
+    )
+    return {r.doi: r.verdict for r in rows}
 
 
 def crossref_prefix_publishers(conn: Connection, prefixes: Sequence[str]) -> dict[str, int]:
@@ -148,53 +158,37 @@ def crossref_prefix_publishers(conn: Connection, prefixes: Sequence[str]) -> dic
     return {r.prefix: r.publisher_id for r in rows}
 
 
-def under_embargo(conn: Connection, publication_id: int) -> bool:
-    """Vrai si un enregistrement source de la publication est sous embargo actif."""
-    return bool(
-        conn.execute(
-            text(
-                "SELECT EXISTS (SELECT 1 FROM source_records sr"
-                f" WHERE sr.publication_id = :id AND {under_active_embargo('sr')})"
-            ),
-            {"id": publication_id},
-        ).scalar()
+def embargoed_publications(conn: Connection, publication_ids: Sequence[int]) -> set[int]:
+    """Renvoie les publications dont un enregistrement source est sous embargo actif."""
+    rows = conn.execute(
+        text(
+            "SELECT DISTINCT sr.publication_id FROM source_records sr"
+            f" WHERE sr.publication_id = ANY(:ids) AND {under_active_embargo('sr')}"
+        ),
+        {"ids": list(publication_ids)},
     )
+    return set(rows.scalars())
 
 
-def serial_oa_model_of(conn: Connection, serial_id: int) -> str | None:
-    """Renvoie le modèle open access d'une revue, ou `None`, pour le statut open access de ses publications."""
-    return conn.execute(
-        text("SELECT oa_model::text FROM serials WHERE id = :id"),
-        {"id": serial_id},
-    ).scalar_one_or_none()
+class SerialFacts(NamedTuple):
+    """Champs d'une revue lus par le recalcul de ses publications."""
+
+    serial_type: str | None
+    """Pour le rejeu des corrections dépendantes du type de la revue."""
+    oa_model: str | None
+    """Pour le statut open access."""
 
 
-def serial_type_of(conn: Connection, serial_id: int) -> str | None:
-    """Renvoie le type d'une revue, ou `None`, pour le rejeu des corrections dépendantes de ce type."""
-    return conn.execute(
-        text("SELECT serial_type::text FROM serials WHERE id = :id"),
-        {"id": serial_id},
-    ).scalar_one_or_none()
-
-
-def _refresh_sources(conn: Connection, publication_id: int) -> None:
-    """Recalcule `publications.sources` depuis les enregistrements sources de la publication."""
-    conn.execute(
-        text("""
-            UPDATE publications SET sources = COALESCE(sub.srcs, '{}'),
-                                    updated_at = now()
-            FROM (
-                SELECT array_agg(
-                    DISTINCT CAST(source AS source_type)
-                    ORDER BY CAST(source AS source_type)
-                ) AS srcs
-                FROM source_records
-                WHERE publication_id = :id
-            ) sub
-            WHERE id = :id
-        """),
-        {"id": publication_id},
+def serial_facts(conn: Connection, serial_ids: Sequence[int]) -> dict[int, SerialFacts]:
+    """Renvoie le type et le modèle open access de chaque revue connue."""
+    rows = conn.execute(
+        text(
+            "SELECT id, serial_type::text AS serial_type, oa_model::text AS oa_model"
+            " FROM serials WHERE id = ANY(:ids)"
+        ),
+        {"ids": list(serial_ids)},
     )
+    return {r.id: SerialFacts(r.serial_type, r.oa_model) for r in rows}
 
 
 class RefreshVerdict(StrEnum):
@@ -206,66 +200,99 @@ class RefreshVerdict(StrEnum):
     INADMISSIBLE_TYPE = "inadmissible_type"
 
 
-def refresh_from_sources(conn: Connection, publication_id: int) -> RefreshVerdict:
-    """Recalcule les métadonnées d'une publication depuis ses enregistrements sources.
+class Consolidation(NamedTuple):
+    """Recalcul d'un lot de publications, à écrire par l'appelant."""
 
-    Recalcul complet : lit tous les enregistrements sources rattachés, agrège (`domain.publications.aggregation`), rejoue les corrections nées de l'arbitrage, choisit l'URL du texte intégral (`domain.publications.access`), déduit le statut open access des copies (`domain.publications.open_access`), pose l'éditeur d'après le type corrigé, persiste. Rattrape les métadonnées périmées (`ongoing_thesis` → `thesis` après soutenance).
+    verdicts: dict[int, RefreshVerdict]
+    """Verdict de chaque publication du lot."""
+    saved: list[Publication]
+    """Publications de verdict `SAVED`, dans leur état recalculé."""
 
-    Une publication sans enregistrement source (`NO_SOURCE`), ou de `doc_type` résolu dans `OUT_OF_SCOPE_DOC_TYPES` (`INADMISSIBLE_TYPE`), reste en l'état. Le module du cycle de vie la supprime sur ce verdict.
 
-    Modifie seulement la publication reçue, hors `notes`. La réconciliation décide quels enregistrements sources forment une même œuvre.
+def consolidate(conn: Connection, publication_ids: Sequence[int]) -> Consolidation:
+    """Recalcule les métadonnées d'un lot de publications depuis leurs enregistrements sources, sans rien écrire.
+
+    Recalcul complet : lit tous les enregistrements sources rattachés, agrège (`domain.publications.aggregation`), rejoue les corrections nées de l'arbitrage, choisit l'URL du texte intégral (`domain.publications.access`), déduit le statut open access des copies (`domain.publications.open_access`), pose l'éditeur d'après le type corrigé. Rattrape les métadonnées périmées (`ongoing_thesis` → `thesis` après soutenance).
+
+    Une publication absente de la base (`ABSENT`), sans enregistrement source (`NO_SOURCE`), ou de `doc_type` résolu dans `OUT_OF_SCOPE_DOC_TYPES` (`INADMISSIBLE_TYPE`) reste hors de `saved`. Le module du cycle de vie supprime les deux dernières.
+
+    Chaque publication reçoit les données de ses seuls enregistrements sources, de sa revue, de son DOI et de son préfixe. La réconciliation décide quels enregistrements sources forment une même œuvre.
     """
-    store = PublicationStore(conn)
-    publication = store.find_by_id(publication_id)
-    if publication is None:
-        return RefreshVerdict.ABSENT
-
-    sources = source_records_of(conn, publication_id)
-    if not sources:
-        return RefreshVerdict.NO_SOURCE
+    publications = PublicationStore(conn).find_by_ids(publication_ids)
+    verdicts = dict.fromkeys(publication_ids, RefreshVerdict.ABSENT)
+    sources = source_records_of(conn, list(publications))
+    monograph_ids = sorted(
+        {
+            s.monograph_id
+            for records in sources.values()
+            for s in records
+            if s.monograph_id is not None
+        }
+    )
+    monograph_serials = monograph_serial_ids(conn, monograph_ids) if monograph_ids else {}
 
     # L'agrégation part des colonnes corrigées par la phase `metadata_correction`.
-    monograph_ids = sorted({s.monograph_id for s in sources if s.monograph_id is not None})
-    _refresh_aggregate(
-        publication,
-        sources,
-        source_priority=SOURCE_PRIORITY,
-        monograph_serials=monograph_serial_ids(conn, monograph_ids) if monograph_ids else {},
-    )
-    _apply_canonical_doc_type_correction(
-        publication,
-        serial_type=serial_type_of(conn, publication.serial_id)
-        if publication.serial_id is not None
-        else None,
-    )
-    copies = publication_copies(conn, [publication_id]).get(publication_id, [])
-    publication.best_copy_url = access(
-        copies, doi=str(publication.doi) if publication.doi else None
-    ).url
-    publication.oa_status = publication_oa_status(
-        copies,
-        embargoed=under_embargo(conn, publication_id),
-        restricted=is_restricted(publication.doc_type, publication.source_extras),
-        unpaywall=unpaywall_verdict(conn, publication.doi.value) if publication.doi else None,
-        has_serial=publication.serial_id is not None,
-        serial_oa_model=serial_oa_model_of(conn, publication.serial_id)
-        if publication.serial_id is not None
-        else None,
-    )
-    prefixes = [publication.doi.prefix.value] if publication.doi else []
-    assign_publisher(
-        publication,
-        sources,
-        source_priority=SOURCE_PRIORITY,
-        prefix_publishers=crossref_prefix_publishers(conn, prefixes) if prefixes else {},
-    )
+    aggregated: dict[int, Publication] = {}
+    for publication_id, publication in publications.items():
+        records = sources.get(publication_id)
+        if not records:
+            verdicts[publication_id] = RefreshVerdict.NO_SOURCE
+            continue
+        _refresh_aggregate(
+            publication,
+            records,
+            source_priority=SOURCE_PRIORITY,
+            monograph_serials=_subset(monograph_serials, (r.monograph_id for r in records)),
+        )
+        aggregated[publication_id] = publication
 
-    if publication.doc_type in OUT_OF_SCOPE_DOC_TYPES:
-        return RefreshVerdict.INADMISSIBLE_TYPE
+    serials = serial_facts(
+        conn, sorted({p.serial_id for p in aggregated.values() if p.serial_id is not None})
+    )
+    copies = publication_copies(conn, list(aggregated))
+    embargoed = embargoed_publications(conn, list(aggregated))
+    dois = sorted({p.doi.value for p in aggregated.values() if p.doi})
+    unpaywall = unpaywall_verdicts(conn, dois) if dois else {}
+    prefixes = sorted({p.doi.prefix.value for p in aggregated.values() if p.doi})
+    prefix_publishers = crossref_prefix_publishers(conn, prefixes) if prefixes else {}
 
-    store.save(publication)
-    _refresh_sources(conn, publication_id)
-    return RefreshVerdict.SAVED
+    saved: list[Publication] = []
+    for publication_id, publication in aggregated.items():
+        serial = serials.get(publication.serial_id) if publication.serial_id is not None else None
+        _apply_canonical_doc_type_correction(
+            publication, serial_type=serial.serial_type if serial else None
+        )
+        publication_copies_ = copies.get(publication_id, [])
+        publication.best_copy_url = access(
+            publication_copies_, doi=str(publication.doi) if publication.doi else None
+        ).url
+        publication.oa_status = publication_oa_status(
+            publication_copies_,
+            embargoed=publication_id in embargoed,
+            restricted=is_restricted(publication.doc_type, publication.source_extras),
+            unpaywall=unpaywall.get(publication.doi.value) if publication.doi else None,
+            has_serial=publication.serial_id is not None,
+            serial_oa_model=serial.oa_model if serial else None,
+        )
+        assign_publisher(
+            publication,
+            sources[publication_id],
+            source_priority=SOURCE_PRIORITY,
+            prefix_publishers=_subset(
+                prefix_publishers, [publication.doi.prefix.value] if publication.doi else []
+            ),
+        )
+        if publication.doc_type in OUT_OF_SCOPE_DOC_TYPES:
+            verdicts[publication_id] = RefreshVerdict.INADMISSIBLE_TYPE
+            continue
+        verdicts[publication_id] = RefreshVerdict.SAVED
+        saved.append(publication)
+    return Consolidation(verdicts, saved)
+
+
+def _subset[K, V](mapping: Mapping[K, V], keys: Iterable[K | None]) -> dict[K, V]:
+    """Renvoie les entrées de `mapping` des clés `keys` présentes."""
+    return {k: mapping[k] for k in keys if k is not None and k in mapping}
 
 
 def _apply_canonical_doc_type_correction(

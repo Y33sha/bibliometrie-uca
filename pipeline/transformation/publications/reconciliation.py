@@ -40,7 +40,6 @@ from domain.source_records.keys import (
 )
 from infrastructure.db.doi_targets import doi_or_target_sql, fetch_doi_targets
 from infrastructure.db.queues import Queue, delete_processed, enqueue, snapshot
-from infrastructure.db.savepoint import savepoint
 from infrastructure.db.scalars import scalar_int
 from infrastructure.db.source_record_identifiers import (
     first_of_its_type_sql,
@@ -461,17 +460,18 @@ def _apply(
             for source_record in plan.detached
             if (p := rows_by_source_record[source_record].publication_id) is not None
         )
-        for publication_id in sorted(
-            {
-                p
-                for source_record in plan.detached
-                if (p := rows_by_source_record[source_record].publication_id) is not None
-            }
-            - survivors
-            - dissolved_ids
-        ):
-            with savepoint(conn):
-                lifecycle.refresh(conn, publication_id)
+        lifecycle.refresh(
+            conn,
+            sorted(
+                {
+                    p
+                    for source_record in plan.detached
+                    if (p := rows_by_source_record[source_record].publication_id) is not None
+                }
+                - survivors
+                - dissolved_ids
+            ),
+        )
 
     # Dissolutions, avant le recalcul des survivants : la suppression libère le DOI repris par un survivant, refusé sinon par la contrainte unique.
     for dissolved in plan.dissolved:
@@ -483,12 +483,6 @@ def _apply(
         created=created,
         splits=splits,
     )
-
-
-def _refresh(conn: Connection, publication_id: int) -> None:
-    """Recalcule les métadonnées consolidées d'une publication depuis ses enregistrements sources."""
-    with savepoint(conn):
-        lifecycle.refresh(conn, publication_id)
 
 
 def _snapshot_publications(conn: Connection) -> set[int]:
@@ -554,9 +548,7 @@ def reconcile(conn: Connection, logger: logging.Logger, *, rebuild: bool = False
     to_refresh = _publications_to_refresh(conn, plan, applied, before)
     step(logger, "Recalcul des métadonnées consolidées")
     with track_progress(len(to_refresh), LAST_BRANCH.rstrip(), logger) as progress:
-        for publication_id in to_refresh:
-            progress.advance()
-            _refresh(conn, publication_id)
+        lifecycle.refresh(conn, to_refresh, on_batch=progress.advance)
 
     # Les publications qui gagnent ou perdent un enregistrement source sont marquées pour l'alignement des auteurs.
     mark_publications_for_grouping(conn, sorted(applied.changed))
@@ -583,8 +575,7 @@ def reconcile_source_records(
     plan, rows_by_source_record = _plan(conn)
     before = _snapshot_publications(conn)
     applied = _apply(conn, plan, rows_by_source_record)
-    for publication_id in _publications_to_refresh(conn, plan, applied, before):
-        _refresh(conn, publication_id)
+    lifecycle.refresh(conn, _publications_to_refresh(conn, plan, applied, before))
     mark_publications_for_grouping(conn, sorted(applied.changed))
     conn.execute(text(f"DROP TABLE {_SNAPSHOT}"))
     return applied

@@ -109,7 +109,7 @@ class TestRunOrchestrator:
         repo = PublicationStore(sa_sync_conn)
         publication_entity = repo.find_by_id(publication)
         assert publication_entity is not None
-        repo.save(publication_entity)
+        repo.save([publication_entity])
 
         m2 = run(queries, logger)
         assert m2.new == 1
