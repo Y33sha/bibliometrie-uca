@@ -39,11 +39,11 @@
 
 ### 1. Schéma et consolidation
 
-- [ ] Migration : colonne `publications.impact`, contrainte d'objet JSON. Snapshot du schéma.
-- [ ] `SourceRecord` contient ses indicateurs, lus par `source_records_of`.
-- [ ] Règle d'agrégation (`domain/publications/aggregation.py`) et ses tests ; écriture par `PublicationStore`.
-- [ ] Documentation : modèle de données, phase `publications`.
-- [ ] Stock : `run_pipeline --only publications --rebuild-publications`.
+- [x] Migration : colonne `publications.impact`, contrainte d'objet JSON. Snapshot du schéma (e2dfe9308).
+- [x] `SourceRecord` contient ses indicateurs, lus par `source_records_of` (e2dfe9308).
+- [x] Règle d'agrégation (`domain/publications/aggregation.py`) et ses tests ; écriture par `PublicationStore` (e2dfe9308).
+- [x] Documentation : modèle de données, phase `publications` (e2dfe9308).
+- [ ] Stock : migration de remplissage de `publications.impact`.
 
 ### 2. Liste et fiche d'une publication
 
