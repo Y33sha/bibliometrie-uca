@@ -132,6 +132,18 @@ def test_ror_sans_adresse_seulement(sa_sync_conn):
     }
 
 
+def test_ror_sans_adresse_ecarte_pour_une_contribution_source_a_adresse(sa_sync_conn):
+    """Les structures d'une contribution source se déduisent de ses adresses, à défaut de ses ROR sans adresse."""
+    _perimeter(sa_sync_conn)
+    record = insert_source_record(sa_sync_conn)
+    ailleurs = _source_contribution(sa_sync_conn, record, 0, ror=_LAB_ROR)
+    insert_source_contribution_address(
+        sa_sync_conn, ailleurs, address_id=insert_address(sa_sync_conn, "Ailleurs")
+    )
+
+    assert not any(s == ailleurs for s, _, _ in _reached(sa_sync_conn))
+
+
 def test_structure_hal_rattachee_explicitement(sa_sync_conn):
     _, lab = _perimeter(sa_sync_conn)
     # Une fiche hors de la hiérarchie, sans ROR, rattachée au laboratoire par `structure_id`.
