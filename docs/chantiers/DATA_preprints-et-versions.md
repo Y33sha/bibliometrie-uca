@@ -132,6 +132,8 @@ Le type DataCite « Working Paper » des dépôts DESY et RWTH donne le type pre
 
 La reconstruction des publications fusionne 1 047 publications. 709 paires `is_preprint_of` restent distinctes. 301756 rejoint 165044. 109 publications au DOI d'un serveur de preprints réunissent un enregistrement source d'un type publié et restent typées preprint, dont 43 avec revue (3059).
 
+La seconde reconstruction, DOI de dépôt compris, fusionne 294 publications. Les publications DESY typées preprint passent de 173 à 19, celles de RWTH de 112 à 38. Les publications Zenodo typées preprint passent de 25 à 84 : des working papers, typés article par OpenAlex, que leur DOI Zenodo faisait passer pour publiés. L'article « Octagon Embeddings » quitte 15705 (319879).
+
 ## Décisions
 
 - **Un preprint et sa version publiée forment une seule publication quand une clé de confirmation les réunit.** Seuls les DOI extérieurs aux serveurs de preprints du registre coupent les regroupements. Une communication sans actes, une HDR ou un article sans localisation éditeur réunit ainsi ses copies de serveurs de preprints.
@@ -167,7 +169,7 @@ La reconstruction des publications fusionne 1 047 publications. 709 paires `is_p
 - [x] Retrait du DOI d'une autre œuvre étendu à toutes les sources, pour la fusion fausse de 15705 (1004d75d1)
 - [x] Publication publiée par le conteneur d'un enregistrement source typé autrement que preprint : revue, actes, ouvrage (6269b46ef)
 - [x] DOI de dépôt hors des ancres : archives de copies (DESY, RWTH, GSI, ResearchGate), dépôts de textes sur Zenodo ; fusion manuelle comprise (4e4f0775f)
-- [ ] Remédiation du stock : reconstruction des publications pour les DOI de dépôt
+- [x] Remédiation du stock : reconstruction des publications pour les DOI de dépôt, run du 2026-11-01
 
 ### Phase 3 — Affichage
 
@@ -175,7 +177,7 @@ La reconstruction des publications fusionne 1 047 publications. 709 paires `is_p
 
 ### Phase 4 — Fin de chantier
 
-- [x] Mise à jour de la documentation : réconciliation, agrégation, fusion manuelle
+- [x] Mise à jour de la documentation : réconciliation, agrégation, fusion manuelle (47015e278)
 
 ## Questions ouvertes
 
