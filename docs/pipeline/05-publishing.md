@@ -1,6 +1,6 @@
 # Référentiels de l'édition
 
-*À jour le 2026-10-31.*
+*À jour le 2026-11-01.*
 
 La phase `publishing` complète les [référentiels de l'édition](../donnees/07-publishing.md) alimentés par la phase [normalize](03-normalize.md). Elle rattache chaque préfixe DOI à son éditeur. Elle vérifie les ISSN dans le Sudoc et rattache chaque enregistrement source à sa publication en série. Elle cherche le type des publications en série auprès de sources externes. Elle fusionne les monographies en double et les rattache à leur collection. La phase [finalize](10-finalize.md) supprime les entrées vides. La phase [metadata_correction](06-metadata-correction.md), qui suit, corrige le type de document des publications d'après le `serial_type`.
 
@@ -24,7 +24,7 @@ Phase à part, juste avant `publishing`. Elle interroge doi.org sur les préfixe
 - **`type_proceedings_serials`** — type en recueil d'actes les revues composées surtout d'articles de congrès, et les revues sans ISSN au titre nommant une édition datée ou des actes (« proceedings »).
 - **`type_journal_serials`** — type en revue les entrées de type inconnu composées en majorité d'articles.
 - **`learn_serial_doi_namespaces`** — calcule les espaces de noms DOI qui désignent une revue (`10.1016/j.physletb.`), d'après les DOI de ses enregistrements sources (`domain/serials/doi_namespaces.py`).
-- **`enrich_serials_from_doaj`** — importe l'export CSV du [DOAJ](../sources/09-sources-supplementaires.md#doaj) : fiche DOAJ et présence dans le DOAJ de chaque revue, appariée par ISSN. Une entrée de type inconnu présente dans le DOAJ devient une revue.
+- **`enrich_serials_from_doaj`** — importe l'export CSV du [DOAJ](../sources/09-sources-supplementaires.md#doaj) : fiche DOAJ et présence dans le DOAJ de chaque revue, rattachée par ISSN. Une entrée de type inconnu présente dans le DOAJ devient une revue.
 
 ## Monographies
 

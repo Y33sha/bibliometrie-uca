@@ -110,14 +110,15 @@ Sept entrées de `serials` ont un type de plateforme, pour 560 publications : `r
 ### Phase 2 — Éditeurs
 
 - [x] Doublons d'éditeurs que révèle le titulaire DataCite du préfixe : la fusion des autres noms lit aussi les préfixes DataCite (603483936)
-- [ ] Lieu et directeur d'ouvrage dans les noms d'éditeur
+- [x] Lieu et directeur d'ouvrage dans les noms d'éditeur : 156 noms à deux-points, 0,26 % des enregistrements sources ; fusion à la main depuis le volet
 - [x] Mesure des autres doublons d'éditeurs sous des noms différents
 - [x] Fusion des éditeurs de même nom aux formes juridiques et mots génériques près (2a553667a)
 
 ### Phase 4 — Conteneur libre
 
-- [ ] Usage de `container_title` à côté de `serial_id` et `monograph_id` : exploitation ou suppression de la colonne
-- [ ] Noms de repository dans le `container_title` d'OpenAlex
+- [x] Usage de `container_title` à côté de `serial_id` et `monograph_id` : colonne gardée, elle donne le nom du congrès ou du livre de 17 526 publications sans revue ni monographie
+- [x] Noms de repository dans le `container_title` d'OpenAlex : la normalisation les écarte ; restes de stock en base locale (2 525 publications)
+- [ ] Restes de stock en production
 
 ### Phase 5 — Administration
 
@@ -132,7 +133,7 @@ Sept entrées de `serials` ont un type de plateforme, pour 560 publications : `r
 
 ### Phase 8 — Fin de chantier
 
-- [ ] Mise à jour de la documentation
+- [x] Mise à jour de la documentation
 
 ## Questions ouvertes
 
