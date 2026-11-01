@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict IVQjXIRzJKIxBVC3uGvFS2UHQNND8PvfWZpBIT3nalBbZ8501O7NLPPyjaeZGI0
+\restrict AvRjhJQbCaw3ElJfa87Mue4EnaZVJQ6w1518GSXJf3uAZp7YfLtcGdIhhz1B4ky
 
 -- Dumped from database version 18.4
 -- Dumped by pg_dump version 18.4
@@ -217,7 +217,8 @@ CREATE TYPE public.identifier_status AS ENUM (
 
 CREATE TYPE public.issn_link_type AS ENUM (
     'continued_by',
-    'supplement'
+    'supplement',
+    'replaced_by'
 );
 
 
@@ -2068,7 +2069,7 @@ CREATE TABLE publishing.issn_links (
 -- Name: TABLE issn_links; Type: COMMENT; Schema: publishing; Owner: -
 --
 
-COMMENT ON TABLE publishing.issn_links IS 'Liens entre ISSN lus dans le Sudoc, une ligne par lien : continued_by, titre précédent vers titre suivant ; supplement, revue principale vers supplément.';
+COMMENT ON TABLE publishing.issn_links IS 'Liens entre ISSN lus dans le Sudoc, une ligne par lien : continued_by, titre précédent vers titre suivant ; supplement, revue principale vers supplément ; replaced_by, ISSN annulé vers l''ISSN de la notice Sudoc qui l''annule.';
 
 
 --
@@ -5889,5 +5890,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict IVQjXIRzJKIxBVC3uGvFS2UHQNND8PvfWZpBIT3nalBbZ8501O7NLPPyjaeZGI0
+\unrestrict AvRjhJQbCaw3ElJfa87Mue4EnaZVJQ6w1518GSXJf3uAZp7YfLtcGdIhhz1B4ky
 
