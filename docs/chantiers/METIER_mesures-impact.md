@@ -32,7 +32,7 @@
 - **Indicateurs de ratio dans le moteur des statistiques.** Un ratio s'affiche en une valeur par barre, sans ventilation empilée. Son dénominateur compte les publications pourvues de l'indicateur. La couverture s'affiche avec la valeur. Une ligne marque la référence mondiale : 10 % pour le top 10 %, 1 pour le FWCI.
 - **Indicateurs de la page Statistiques** : « Nombre de citations », mesure additive ventilée par statut d'accès ; « Part dans le top 10 % » et « FWCI moyen », ratios.
 - **Dashboards de structure, d'éditeur et de revue** : chiffres clés « dans le top 10 % » et « FWCI moyen », avec leur couverture. Beeswarm : un point par publication, années en abscisse, citations ou FWCI en ordonnée.
-- **Liste des publications** : colonnes « Citations », « FWCI », « Top 10 % » ; tri par citations et par FWCI ; mêmes colonnes à l'export CSV ; filtre « Top 10 % » dans la barre de filtres commune à la page Statistiques.
+- **Liste des publications** : colonne et filtre « Top citations » (top 1 %, top 10 %). Le top 10 % comprend le top 1 %. La colonne donne le seuil le plus haut atteint et figure à l'export CSV. Le filtre est commun à la page Statistiques.
 - **Fiche d'une publication** : les trois indicateurs. Volet d'administration : nombre de citations de chaque enregistrement source.
 
 ## Phasage
@@ -47,9 +47,9 @@
 
 ### 2. Liste et fiche d'une publication
 
-- [ ] Fragment SQL de chaque indicateur, partagé par la liste, les filtres et les statistiques.
-- [ ] API : indicateurs dans la liste, la fiche, le volet d'administration et l'export CSV ; tri ; filtre « Top 10 % » et sa facette.
-- [ ] Interface : colonnes, tri, filtre ; fiche ; volet.
+- [x] Fragment SQL des seuils de citation, partagé par la liste, le filtre et la facette (e5b360394).
+- [x] Colonne et filtre « Top citations » : API, export CSV, interface (e5b360394).
+- [ ] Fiche d'une publication et volet d'administration : indicateurs.
 
 ### 3. Statistiques
 
@@ -68,6 +68,7 @@
 
 - **Beeswarm d'une grande structure** : l'établissement compte environ 40 000 publications sur cinq ans, autant de points. Réserver le beeswarm aux laboratoires, ou passer à une densité au-delà d'un seuil ?
 - **FWCI moyen ou médian** : quelques publications très citées élèvent la moyenne.
-- **Top 1 %** : à afficher ?
+- **Colonnes « Citations » et « FWCI »** dans la liste des publications, avec leur tri ?
+- **Top 1 % dans les statistiques et les dashboards**, à côté de la part dans le top 10 % ?
 - **Part dans le top 10 % ventilée** (par statut d'accès, par type de document), en barres groupées ?
 - **Graphe des citations de l'établissement** : stocker les publications citées et citantes ? OpenAlex donne les références de chaque work (`referenced_works`), absentes des champs demandés (`SELECT_FIELDS`). Les références des publications du périmètre suffisent aux citations internes à l'établissement. Les publications citantes extérieures demandent des requêtes supplémentaires (filtre `cites`).
