@@ -3279,6 +3279,11 @@ export interface components {
             id: number;
             /** Title */
             title: string;
+            /**
+             * Serial
+             * @description Titre de la revue.
+             */
+            serial: string | null;
             /** Year */
             year: number;
             /** Cited By Count */

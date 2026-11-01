@@ -48,6 +48,8 @@ class CitationPoint(Model):
 
     id: int
     title: str
+    serial: str | None
+    """Titre de la revue."""
     year: int
     cited_by_count: int
     fwci: float | None

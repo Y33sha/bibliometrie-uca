@@ -174,6 +174,7 @@
 				year: p.year,
 				value: scatterValue === 'citations' ? p.cited_by_count : Math.round((p.fwci ?? 0) * 100) / 100,
 				label: p.title,
+				detail: p.serial,
 			})),
 	);
 

@@ -3,7 +3,8 @@
 	import { Chart } from '#lib/components/charts/chart.js';
 
 	// Nuage de points par année : un point par élément, décalé dans la largeur de son année pour limiter les recouvrements.
-	type Point = { key: number; year: number; value: number; label: string };
+	// `detail` s'affiche sous `label` dans l'infobulle.
+	type Point = { key: number; year: number; value: number; label: string; detail?: string | null };
 	// Coordonnées d'un point du canevas ; `point` manque sur la ligne de référence.
 	type Datum = { x: number; y: number; point?: Point };
 
@@ -83,6 +84,7 @@
 					legend: { display: false },
 					datalabels: { display: false },
 					tooltip: {
+						displayColors: false,
 						filter: (item) => item.datasetIndex === 0,
 						callbacks: {
 							title: (items) => {
@@ -91,7 +93,9 @@
 							},
 							label: (item) => {
 								const point = (item.raw as Datum).point;
-								return point ? `${valueLabel} : ${point.value.toLocaleString('fr-FR')} (${point.year})` : '';
+								if (!point) return '';
+								const value = `${valueLabel} : ${point.value.toLocaleString('fr-FR')} (${point.year})`;
+								return point.detail ? [point.detail, value] : value;
 							},
 						},
 					},
