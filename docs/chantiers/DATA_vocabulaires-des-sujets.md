@@ -13,7 +13,7 @@ Base locale au 2026-11-01.
   - Discipline de theses.fr : libellé libre, 644 distincts à la casse et aux accents près. La discipline de 1 090 thèses sur 3 912 coïncide avec une vedette RAMEAU (« Informatique », « Mathématiques »). Les autres disciplines sont composées (« Biologie santé », « Mécanique, génie mécanique, génie civil »).
 - **Raw store.** Il est complet pour OpenAlex : 116 813 payloads pour 116 331 enregistrements sources.
 - **MeSH.** Aucun sujet MeSH. Le moissonnage OpenAlex omet le champ `mesh` des works (`pipeline/ingestion/openalex/api.py`). PubMed n'est pas moissonné. Chaque entrée de `mesh` contient l'identifiant du descripteur (`D008175`), son libellé, un qualificatif facultatif (`Q000453`, « epidemiology ») et un indicateur de sujet majeur. Les numéros d'arborescence sont absents.
-- **Besoins de l'interface.** Les nuages de sujets (`SubjectsCloud.svelte`) et le graphe des co-occurrences (`/subjects/[id]`) colorent par fréquence. Ils demandent une couleur par grand domaine, et de pouvoir écarter les niveaux hauts, qui encombrent sans informer.
+- **Besoins de l'interface.** Les nuages de sujets (`SubjectsCloud.svelte`) et le graphe des co-occurrences (`/subjects/[id]`) demandent de pouvoir écarter les niveaux hauts, qui encombrent sans informer.
 - **Mots-clés HAL.** Le champ Solr `keyword_s` met une majuscule initiale et retire la ponctuation : « Industry 4.0 » devient « Industry 40 », « eau destinée à la consommation humaine (EDCH) » devient « Eau destinée à la consommation humaine EDCH ». Les `<term>` du TEI (`label_xml`) gardent la saisie de l'auteur. Ils sont présents dans chaque dépôt pourvu de `keyword_s`, sur un échantillon de 4 160 dépôts.
 
 ## Décisions
@@ -23,7 +23,8 @@ Base locale au 2026-11-01.
 - **Sujets écrits à la normalisation.** La clé (vocabulaire, code) se passe de résolution entre sources, comme celle des adresses. Le normalizer de chaque source écrit donc les sujets donnés par la source dans `subjects`, et leurs liens dans `source_record_subjects`, avec le score OpenAlex. La phase `subjects` dérive `publication_subjects` en SQL, ancêtres compris. `source_records.topics` disparaît.
 - **Sujets WoS abandonnés.** Ils sont les seuls sujets de 558 publications (0,7 %), presque toutes présentes seulement dans le WoS : résumés de congrès, articles sans enregistrement OpenAlex.
 - **MeSH lu dans OpenAlex.** Le champ `mesh` des works donne les descripteurs des publications indexées dans PubMed.
-- **Couleurs.** Les domaines de haut niveau de tous les vocabulaires partagent une palette commune.
+- **Sujets regroupés par libellé.** Les sujets de même libellé normalisé forment un seul sujet affiché, tous vocabulaires confondus. « Chimie » réunit le domaine HAL, la vedette RAMEAU et la discipline de thèse. Son nombre de publications est l'union de leurs publications. Liste, page d'un sujet, filtre, nuages et co-occurrences portent sur ce regroupement. La page d'un sujet montre chaque vocabulaire, avec parents et enfants.
+- **Une vue matérialisée.** Rafraîchie par la phase `subjects`, elle contient une ligne par libellé normalisé : la forme la plus fréquente du libellé et le nombre de publications. Le libellé normalisé identifie le sujet dans l'URL.
 - **Les 4 domains OpenAlex sont écartés des graphiques.**
 
 ## Phasage
@@ -60,12 +61,14 @@ Base locale au 2026-11-01.
 - [ ] `mesh` ajouté aux champs demandés à OpenAlex. L'empreinte de chaque payload OpenAlex change : chaque work relu est normalisé une fois de plus
 - [ ] Normalizer : descripteurs MeSH identifiés par leur code, avec leur niveau et leur parent
 
-### Phase 5 — Couleurs dans l'interface
+### Phase 5 — Sujets regroupés par libellé
 
-- [ ] Rattachement des domaines de haut niveau de chaque vocabulaire à la palette commune : codes HAL, mots-clés des disciplines theses.fr (correspondances de `prototype_subject_vote`)
-- [ ] API : classe de couleur de chaque sujet des nuages et du graphe des co-occurrences
-- [ ] Nuages de sujets et graphe des co-occurrences : couleur par classe, légende ; domains OpenAlex écartés
-- [ ] Guide utilisateur : sens des couleurs
+- [ ] Migration : vue matérialisée des libellés normalisés ; `subject_cooccurrences` entre libellés normalisés
+- [ ] Phase `subjects` : rafraîchissement des deux vues
+- [ ] API : liste et export par libellé, avec les vocabulaires de chaque libellé ; détail d'un libellé avec les sujets de chaque vocabulaire, leurs parents, leurs enfants et les voisins par co-occurrence
+- [ ] Filtre des publications par sujet, facette et nuages de sujets : par libellé normalisé
+- [ ] Frontend : liste, page d'un sujet, liens des fiches de publications et des nuages
+- [ ] Documentation : `docs/donnees/03-publications.md`, `docs/pipeline/11-enrichissements.md`, guide utilisateur
 
 ## Questions ouvertes
 
@@ -75,6 +78,5 @@ Base locale au 2026-11-01.
 - **Indicateur de sujet majeur** : score du lien, ou écarté.
 - **Parents des vedettes RAMEAU** : termes génériques lus dans IdRef, ou aucun parent.
 - **Libellé d'un sujet différent selon les sources** : 51 PPN RAMEAU à deux libellés chez ScanR.
-- **Classes de la palette commune.** Les correspondances du prototype de vote rattachent des codes HAL et des disciplines à plusieurs domains OpenAlex (`sdv.neu` : Health et Life ; `scco` : Social Sciences, Life et Health). Une couleur par sujet demande une seule classe.
-- **Doublons à l'affichage** : une cinquantaine de libellés communs à deux vocabulaires (« Informatique », domaine HAL et discipline de thèse), et des homonymes internes à OpenAlex (« Biochemistry », subfield de deux fields). À regrouper à l'affichage s'ils gênent.
+- **Libellés OpenAlex en anglais** : 7 coïncident avec un autre vocabulaire. Sujets OpenAlex à part, ou traduction des niveaux hauts (4 domains, 26 fields, 250 subfields).
 - **Niveaux écartés des graphiques** au-delà des domains OpenAlex : fields, premier niveau HAL.
