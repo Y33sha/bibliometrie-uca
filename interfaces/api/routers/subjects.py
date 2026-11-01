@@ -83,7 +83,7 @@ def get_subject(
     min_cooccurrence: int = Query(2, ge=1),
     queries: SubjectsQueries = Depends(subjects_queries),
 ) -> SubjectDetailResponse:
-    """Renvoie le détail d'un sujet, identifié par son libellé normalisé, avec ses voisins par co-occurrence, les plus fréquents d'abord."""
+    """Renvoie le détail d'un sujet, identifié par son libellé normalisé, avec ses voisins par co-occurrence, les plus spécifiques d'abord. La spécificité d'un voisin est la part de ses publications qui ont aussi le sujet."""
     detail = queries.get_subject_detail(
         label_normalized, neighbors_limit=neighbors_limit, min_cooccurrence_count=min_cooccurrence
     )

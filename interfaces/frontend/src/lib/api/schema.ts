@@ -2851,7 +2851,7 @@ export interface paths {
         };
         /**
          * Get Subject
-         * @description Renvoie le détail d'un sujet, identifié par son libellé normalisé, avec ses voisins par co-occurrence, les plus fréquents d'abord.
+         * @description Renvoie le détail d'un sujet, identifié par son libellé normalisé, avec ses voisins par co-occurrence, les plus spécifiques d'abord. La spécificité d'un voisin est la part de ses publications qui ont aussi le sujet.
          */
         get: operations["get_subject_api_subjects__label_normalized__get"];
         put?: never;

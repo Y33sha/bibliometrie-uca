@@ -52,9 +52,9 @@
     loadFor(subjectKey, NEIGHBORS_LIMIT, MIN_COOCCURRENCE);
   });
 
-  // Tableau des sujets associés, trié par publications en commun par défaut. Spécificité : part des publications du sujet associé qui portent aussi le sujet de la page.
+  // Tableau des sujets associés, trié par spécificité par défaut : part des publications du sujet associé qui portent aussi le sujet de la page.
   type NeighborSort = "common" | "specificity" | "total";
-  let neighborSort = $state<NeighborSort>("common");
+  let neighborSort = $state<NeighborSort>("specificity");
   const specificity = (n: { cooccurrence_count: number; usage_count: number }) =>
     Math.min(1, n.cooccurrence_count / Math.max(n.usage_count, 1));
   const sortedNeighbors = $derived(

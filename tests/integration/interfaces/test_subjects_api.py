@@ -178,6 +178,19 @@ class TestGetSubject:
         a, b = sorted([_key(n1), _key(n2)])
         assert body["neighbor_links"] == [{"label_a": a, "label_b": b, "cooccurrence_count": 2}]
 
+    def test_most_specific_neighbors_first(self, client):
+        main, big, small = (seed_subject(uniq(name)) for name in ("Main", "Big", "Small"))
+        # `big` : 3 publications en commun sur 9 ; `small` : 2 sur 2.
+        _publications(main, big, small, count=2)
+        _publications(main, big)
+        _publications(big, count=6)
+
+        r = client.get(
+            f"/api/subjects/{_key(main)}", params={"min_cooccurrence": 1, "neighbors_limit": 1}
+        )
+        assert r.status_code == 200
+        assert [n["label_normalized"] for n in r.json()["neighbors"]] == [_key(small)]
+
     def test_min_cooccurrence_filters(self, client):
         main, weak = seed_subject(uniq("MainFilter")), seed_subject(uniq("WeakNeighbor"))
         _publications(main, weak, count=2)

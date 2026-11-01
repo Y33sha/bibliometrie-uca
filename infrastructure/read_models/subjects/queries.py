@@ -69,6 +69,7 @@ _CHILDREN_SQL = text("""
     ORDER BY usage_count DESC, label_normalized
 """)
 
+# Spécificité d'un voisin : part de ses publications qui ont aussi le sujet.
 _NEIGHBORS_SQL = text("""
     SELECT sl.label_normalized, sl.label, sl.usage_count, c.n AS cooccurrence_count
     FROM (
@@ -78,7 +79,7 @@ _NEIGHBORS_SQL = text("""
     ) c
     JOIN subject_labels sl ON sl.label_normalized = c.other
     WHERE c.n >= :min_count
-    ORDER BY c.n DESC, sl.label_normalized
+    ORDER BY c.n::real / greatest(sl.usage_count, 1) DESC, c.n DESC, sl.label_normalized
     LIMIT :lim
 """)
 
