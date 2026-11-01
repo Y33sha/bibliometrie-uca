@@ -59,6 +59,23 @@ def test_source_priority_decides_the_title_and_lists_are_merged():
     assert set(publication.keywords) == {"blé", "orge"}
 
 
+def test_le_doi_d_un_serveur_de_preprints_cede_au_doi_de_la_version_publiee():
+    preprint = _source_record(id=1, source="datacite", doc_type="preprint", doi="10.48550/arxiv.1")
+    article = _source_record(id=2, source="openalex", doc_type="article", doi="10.1016/article")
+
+    publication = _publication()
+    refresh_from_sources(publication, [preprint, article], source_priority=_PRIORITY)
+    assert publication.doi == DOI("10.1016/article")
+
+
+def test_une_publication_sans_autre_doi_garde_celui_de_son_serveur_de_preprints():
+    preprint = _source_record(id=1, source="datacite", doc_type="preprint", doi="10.48550/arxiv.1")
+
+    publication = _publication()
+    refresh_from_sources(publication, [preprint], source_priority=_PRIORITY)
+    assert publication.doi == DOI("10.48550/arxiv.1")
+
+
 def test_une_source_sans_doc_type_laisse_la_suivante_le_donner():
     """Le type de document vient de la première source qui en donne un."""
     muette = _source_record(id=1, source="openalex", doc_type=None)

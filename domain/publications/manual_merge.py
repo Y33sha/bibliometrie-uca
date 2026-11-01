@@ -11,17 +11,18 @@ from domain.persons.contribution_matching import (
     ContributionOutcome,
     settle_publication,
 )
+from domain.source_records.keys import is_preprint_server_doi
 
 _RANK = {reason: rank for rank, reason in enumerate(MATCH_REASON_PRIORITY)}
 
 
 def check_mergeable(dois: Iterable[str | None]) -> None:
-    """Refuse la fusion de publications à DOI distincts : un DOI désigne une seule œuvre.
+    """Refuse la fusion de publications à DOI distincts : un DOI désigne une seule œuvre. Un DOI de serveur de preprints reste hors du compte, comme à la réconciliation (`doi_anchors`).
 
     Raises:
         ValidationError: DOI distincts.
     """
-    distinct = sorted({doi.lower() for doi in dois if doi})
+    distinct = sorted({doi.lower() for doi in dois if doi and not is_preprint_server_doi(doi)})
     if len(distinct) > 1:
         raise ValidationError(f"Fusion impossible : DOI distincts ({', '.join(distinct)})")
 

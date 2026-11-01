@@ -206,33 +206,33 @@ class TestDoiAnchors:
         assert plan.groups[0].doi == "10.1/x"
 
     def test_member_joins_the_anchor_of_its_primary_or_derived_doi(self):
-        """Un enregistrement source scanR : DOI dérivé de l'article, DOI secondaire du preprint."""
+        """Un enregistrement source scanR : DOI dérivé de l'article, DOI secondaire de la communication."""
         plan = plan_reconciliation(
             [
                 _m(1, 10, doi="10.1/article", tokens=[("doi", "10.1/article")]),
-                _m(2, 20, doi="10.1101/preprint", tokens=[("doi", "10.1101/preprint")]),
+                _m(2, 20, doi="10.2/communication", tokens=[("doi", "10.2/communication")]),
                 _m(
                     3,
                     20,
                     doi="10.1/article",
-                    weak=("10.1101/preprint",),
-                    tokens=[("doi", "10.1/article"), ("doi", "10.1101/preprint")],
+                    weak=("10.2/communication",),
+                    tokens=[("doi", "10.1/article"), ("doi", "10.2/communication")],
                 ),
             ]
         )
         assert _groups(plan) == {10: (1, 3), 20: (2,)}
 
     def test_member_without_a_unique_anchor_stays_on_its_publication(self):
-        """Un enregistrement source OpenAlex cite en DOI secondaires l'article et le preprint, deux ancres."""
+        """Un enregistrement source OpenAlex cite en DOI secondaires l'article et la communication, deux ancres."""
         plan = plan_reconciliation(
             [
                 _m(1, 10, doi="10.1/article", tokens=[("doi", "10.1/article")]),
-                _m(2, 20, doi="10.48550/arxiv.1", tokens=[("doi", "10.48550/arxiv.1")]),
+                _m(2, 20, doi="10.2/communication", tokens=[("doi", "10.2/communication")]),
                 _m(
                     3,
                     30,
-                    weak=("10.1/article", "10.48550/arxiv.1"),
-                    tokens=[("doi", "10.1/article"), ("doi", "10.48550/arxiv.1")],
+                    weak=("10.1/article", "10.2/communication"),
+                    tokens=[("doi", "10.1/article"), ("doi", "10.2/communication")],
                 ),
             ]
         )
@@ -240,15 +240,63 @@ class TestDoiAnchors:
         assert plan.dissolved == ()
 
 
+class TestPreprintServerDois:
+    """Un DOI de serveur de preprints du registre coupe aucune composante."""
+
+    def test_preprint_joins_its_published_version(self):
+        """L'enregistrement source DataCite d'un preprint arXiv et l'article partagent l'identifiant arXiv : le preprint rejoint l'article."""
+        plan = plan_reconciliation(
+            [
+                _m(
+                    1,
+                    10,
+                    publication_doi="10.1/article",
+                    doi="10.1/article",
+                    tokens=[("doi", "10.1/article"), ("arxiv_id", "1")],
+                ),
+                _m(
+                    2,
+                    20,
+                    publication_doi="10.48550/arxiv.1",
+                    doi="10.48550/arxiv.1",
+                    tokens=[("doi", "10.48550/arxiv.1"), ("arxiv_id", "1")],
+                ),
+            ]
+        )
+        assert _groups(plan) == {10: (1, 2)}
+        assert plan.groups[0].doi == "10.1/article"
+        assert plan.dissolved == (DissolvedPublication(20, 10),)
+
+    def test_preprints_of_two_servers_stay_together(self):
+        """Le même preprint, déposé sur arXiv et sur Research Square, sans version publiée."""
+        plan = plan_reconciliation(
+            [
+                _m(
+                    1,
+                    10,
+                    doi="10.48550/arxiv.1",
+                    tokens=[("doi", "10.48550/arxiv.1"), ("arxiv_id", "1")],
+                ),
+                _m(
+                    2,
+                    20,
+                    doi="10.21203/rs.3.rs-1/v1",
+                    tokens=[("doi", "10.21203/rs.3.rs-1/v1"), ("arxiv_id", "1")],
+                ),
+            ]
+        )
+        assert _groups(plan) == {10: (1, 2)}
+
+
 _HAL = ("hal_id", "hal-1")
 _ARTICLE = _m(1, 10, doi="10.1/article", tokens=[("doi", "10.1/article")])
-_PREPRINT = _m(
-    2, 20, doi="10.48550/arxiv.1", tokens=[("doi", "10.48550/arxiv.1"), ("arxiv_id", "1")]
+_COMMUNICATION = _m(
+    2, 20, doi="10.2/communication", tokens=[("doi", "10.2/communication"), ("pmid", "1")]
 )
 
 
 class TestDerivedRecords:
-    """Composante à deux ancres, l'article et le preprint : un enregistrement source dérivé suit l'ancre de son parent."""
+    """Composante à deux ancres, l'article et la communication : un enregistrement source dérivé suit l'ancre de son parent."""
 
     def test_un_enregistrement_derive_suit_son_parent(self):
         """Le dépôt HAL cite le DOI de l'article ; l'enregistrement scanR dérivé du dépôt, sans DOI, le suit."""
@@ -259,9 +307,9 @@ class TestDerivedRecords:
             tokens=[_HAL, ("doi", "10.1/article")],
             primary=[_HAL],
         )
-        scanr = _m(4, 40, tokens=[_HAL, ("arxiv_id", "1")], derived=_HAL)
+        scanr = _m(4, 40, tokens=[_HAL, ("pmid", "1")], derived=_HAL)
 
-        plan = plan_reconciliation([_ARTICLE, _PREPRINT, hal, scanr])
+        plan = plan_reconciliation([_ARTICLE, _COMMUNICATION, hal, scanr])
 
         assert _groups(plan) == {10: (1, 3, 4), 20: (2,)}
 
@@ -270,14 +318,14 @@ class TestDerivedRecords:
         openalex = _m(
             3, 30, weak=("10.1/article",), tokens=[_HAL, ("doi", "10.1/article")], derived=_HAL
         )
-        scanr = _m(4, 40, tokens=[_HAL, ("arxiv_id", "1")], derived=_HAL)
+        scanr = _m(4, 40, tokens=[_HAL, ("pmid", "1")], derived=_HAL)
 
-        plan = plan_reconciliation([_ARTICLE, _PREPRINT, openalex, scanr])
+        plan = plan_reconciliation([_ARTICLE, _COMMUNICATION, openalex, scanr])
 
         assert _groups(plan) == {10: (1, 3, 4), 20: (2,)}
 
     def test_l_ancre_du_parent_l_emporte_sur_celle_de_l_enregistrement_derive(self):
-        """Le work OpenAlex dérivé du dépôt HAL cite le DOI du preprint ; il suit le dépôt, qui cite l'article."""
+        """Le work OpenAlex dérivé du dépôt HAL cite le DOI de la communication ; il suit le dépôt, qui cite l'article."""
         hal = _m(
             3,
             30,
@@ -288,12 +336,12 @@ class TestDerivedRecords:
         openalex = _m(
             4,
             40,
-            weak=("10.48550/arxiv.1",),
-            tokens=[_HAL, ("doi", "10.48550/arxiv.1")],
+            weak=("10.2/communication",),
+            tokens=[_HAL, ("doi", "10.2/communication")],
             derived=_HAL,
         )
 
-        plan = plan_reconciliation([_ARTICLE, _PREPRINT, hal, openalex])
+        plan = plan_reconciliation([_ARTICLE, _COMMUNICATION, hal, openalex])
 
         assert _groups(plan) == {10: (1, 3, 4), 20: (2,)}
 

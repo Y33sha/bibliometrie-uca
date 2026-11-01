@@ -12,7 +12,7 @@ from domain.publications.identifiers import DOI
 from domain.publications.licenses import DEPOSIT_LICENSE_SOURCE, publisher_license_sources
 from domain.publications.publication import Publication
 from domain.publishers.attribution import publication_publisher
-from domain.source_records.keys import anchor_of, doi_anchors
+from domain.source_records.keys import anchor_of, doi_anchors, preprint_server_anchors
 from domain.source_records.source_record import SourceRecord
 from domain.sources.registry import Source
 from domain.types import JsonValue, as_int, as_str
@@ -103,11 +103,13 @@ def assign_publisher(
 
 
 def publication_doi(sources: list[SourceRecord]) -> str | None:
-    """Renvoie le DOI d'une publication : l'ancre de ses enregistrements sources (`doi_anchors`). Entre plusieurs ancres, celle du premier enregistrement source de `sources` qui en rejoint une."""
-    anchors = doi_anchors(s.dois for s in sources)
-    if len(anchors) == 1:
-        return next(iter(anchors))
-    return next((a for s in sources if (a := anchor_of(s.dois, anchors)) is not None), None)
+    """Renvoie le DOI d'une publication : l'ancre de ses enregistrements sources (`doi_anchors`), à défaut un DOI de serveur de preprints (`preprint_server_anchors`). Entre plusieurs candidats, celui du premier enregistrement source de `sources` qui en rejoint un."""
+    candidates = doi_anchors(s.dois for s in sources) or preprint_server_anchors(
+        s.dois for s in sources
+    )
+    if len(candidates) == 1:
+        return next(iter(candidates))
+    return next((a for s in sources if (a := anchor_of(s.dois, candidates)) is not None), None)
 
 
 def prioritized(

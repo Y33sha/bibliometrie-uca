@@ -6,12 +6,13 @@
 
 Les valeurs sont celles de l'enregistrement source corrigé (phase `metadata_correction`). Le voisinage SQL de la réconciliation (`_UNIVERSE_SQL`) réécrit ces clés, et `TestUniverseMatchesPythonTokens` vérifie que les deux concordent. Un type d'identifiant de plus demande son entrée dans `CONFIRMATION_ID_TYPES` et un champ de même nom dans `ConfirmationKeys`. Une clé composite demande aussi sa branche dans `_UNIVERSE_SQL`.
 
-Les ancres d'un ensemble d'enregistrements sources (`doi_anchors`) sont les DOI qui le coupent à la réconciliation et qui donnent son DOI à une publication.
+Les ancres d'un ensemble d'enregistrements sources (`doi_anchors`) sont les DOI qui le coupent à la réconciliation et qui donnent son DOI à une publication. Un DOI de serveur de preprints est seulement le DOI d'une publication sans ancre (`preprint_server_anchors`) : un preprint rejoint ainsi la publication de sa version publiée.
 """
 
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, fields
 
+from domain.platforms.registry import preprint_servers_of_doi
 from domain.source_records.identifiers import (
     SourceIdentifier,
     SourceIdentifierRole,
@@ -64,13 +65,34 @@ def doi_keys(
     return DoiKeys(frozenset(strong), frozenset(weak - strong))
 
 
-def doi_anchors(keys: Iterable[DoiKeys]) -> frozenset[str]:
-    """Renvoie les ancres d'un ensemble d'enregistrements sources : leurs DOI `primary` ou `derived` ; à défaut, le DOI de ceux qui ont un seul DOI."""
-    keys = list(keys)
-    strong = frozenset().union(*(k.strong for k in keys))
+def is_preprint_server_doi(doi: str) -> bool:
+    """Vrai pour un DOI d'un serveur de preprints du registre des plateformes."""
+    return bool(preprint_servers_of_doi(doi))
+
+
+def _anchors(keys: Iterable[DoiKeys], *, preprint_servers: bool) -> frozenset[str]:
+    """Renvoie les DOI `primary` ou `derived` des enregistrements sources, à défaut le DOI de ceux qui ont un seul DOI, parmi les DOI de serveurs de preprints ou parmi les autres."""
+    kept = [
+        DoiKeys(
+            frozenset(d for d in k.strong if is_preprint_server_doi(d) is preprint_servers),
+            frozenset(d for d in k.weak if is_preprint_server_doi(d) is preprint_servers),
+        )
+        for k in keys
+    ]
+    strong = frozenset().union(*(k.strong for k in kept))
     if strong:
         return strong
-    return frozenset(next(iter(k.weak)) for k in keys if len(k.weak) == 1)
+    return frozenset(next(iter(k.weak)) for k in kept if len(k.weak) == 1)
+
+
+def doi_anchors(keys: Iterable[DoiKeys]) -> frozenset[str]:
+    """Renvoie les ancres d'un ensemble d'enregistrements sources, hors DOI de serveurs de preprints : leurs DOI `primary` ou `derived` ; à défaut, le DOI de ceux qui ont un seul DOI."""
+    return _anchors(keys, preprint_servers=False)
+
+
+def preprint_server_anchors(keys: Iterable[DoiKeys]) -> frozenset[str]:
+    """Renvoie les DOI de serveurs de preprints d'un ensemble d'enregistrements sources, choisis comme les ancres (`doi_anchors`). Ils donnent son DOI à une publication sans ancre."""
+    return _anchors(keys, preprint_servers=True)
 
 
 def anchor_of(keys: DoiKeys, anchors: frozenset[str]) -> str | None:

@@ -533,6 +533,36 @@ class TestEndToEnd:
         assert _source_record_state(conn, source_record_a)[1] is False
         assert _source_record_state(conn, source_record_b)[1] is False
 
+    def test_preprint_server_doi_does_not_keep_the_preprint_apart(self, sa_sync_conn):
+        """Le preprint arXiv et l'article partagent un hal-id : le DOI arXiv coupe aucune composante, le preprint rejoint la publication de l'article, qui garde son DOI."""
+        conn = sa_sync_conn
+        article = _seed_publication(conn, doi="10.1/x")
+        preprint = _seed_publication(conn, doi="10.48550/arxiv.2401.00001")
+        hal_id = _hal(_SECONDARY, "hal-01000001")
+        source_record_article = _source_record(
+            conn, article, source_id="a", doi="10.1/x", identifiers=hal_id
+        )
+        source_record_preprint = _source_record(
+            conn,
+            preprint,
+            source_id="p",
+            doi="10.48550/arxiv.2401.00001",
+            doc_type="preprint",
+            identifiers=hal_id,
+        )
+
+        reconcile(conn, logger)
+
+        assert _source_record_state(conn, source_record_article) == (article, False)
+        assert _source_record_state(conn, source_record_preprint) == (article, False)
+        assert not _publication_exists(conn, preprint)
+        assert (
+            conn.execute(
+                text("SELECT doi FROM publications WHERE id = :id"), {"id": article}
+            ).scalar()
+            == "10.1/x"
+        )
+
     def test_publication_of_a_residual_source_record_is_refreshed(self, sa_sync_conn):
         """L'enregistrement source sans DOI d'une composante à deux DOI reste sur sa publication, recalculée sans le DOI perdu."""
         conn = sa_sync_conn

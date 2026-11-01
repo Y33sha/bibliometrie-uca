@@ -18,6 +18,7 @@ from domain.source_records.keys import (
     anchor_of,
     derivation,
     doi_anchors,
+    preprint_server_anchors,
     project_confirmation_keys,
 )
 
@@ -65,6 +66,21 @@ class TestAnchors:
     def test_without_primary_or_derived_doi_single_dois_are_the_anchors(self):
         keys = [DoiKeys(frozenset(), frozenset({"a"})), DoiKeys(frozenset(), frozenset({"a", "b"}))]
         assert doi_anchors(keys) == {"a"}
+
+    def test_preprint_server_dois_are_not_anchors(self):
+        arxiv, article = "10.48550/arxiv.1", "10.1016/article"
+        assert doi_anchors([DoiKeys(frozenset({arxiv})), DoiKeys(frozenset({article}))]) == {
+            article
+        }
+        assert doi_anchors([DoiKeys(frozenset({arxiv}))]) == frozenset()
+        assert doi_anchors(
+            [DoiKeys(frozenset({arxiv})), DoiKeys(frozenset(), frozenset({article}))]
+        ) == {article}
+
+    def test_preprint_server_anchors_are_chosen_like_anchors(self):
+        arxiv, ssrn = "10.48550/arxiv.1", "10.2139/ssrn.1"
+        keys = [DoiKeys(frozenset({arxiv})), DoiKeys(frozenset(), frozenset({ssrn}))]
+        assert preprint_server_anchors(keys) == {arxiv}
 
     def test_anchor_of_a_member(self):
         anchors = frozenset({"a", "b"})

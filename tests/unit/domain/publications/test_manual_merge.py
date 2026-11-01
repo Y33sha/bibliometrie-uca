@@ -19,6 +19,10 @@ def test_one_doi_and_a_publication_without_doi_are_mergeable():
     check_mergeable(["10.1/X", None, "10.1/x"])
 
 
+def test_a_preprint_server_doi_stays_out_of_the_count():
+    check_mergeable(["10.1/x", "10.48550/arxiv.2401.00001"])
+
+
 def test_priority_follows_the_order_of_the_decision():
     assert MATCH_REASON_PRIORITY == (
         ContributionMatchReason.MANUAL,
