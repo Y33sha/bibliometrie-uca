@@ -59,18 +59,25 @@ def mark_ambiguous_nominal(conn: Connection) -> int:
 
 def delete_unsupported_identifier_attributions(conn: Connection) -> int:
     """Supprime les attributions d'identifiant d'origine `auto` et en attente, absentes des contributions sources des contributions de leur personne. Une contribution source neutralisant l'identifiant compte comme sans lui. Les attributions confirmées, authentifiées ou saisies à la main restent. Renvoie le nombre d'attributions supprimées."""
+    # La sous-requête latérale part des contributions de chaque personne. Un `NOT EXISTS`, décorrélé par le planificateur, joint toutes les contributions rattachées à une personne.
     return conn.execute(
         text(f"""
-            DELETE FROM person_identifiers pi
-            WHERE pi.source = '{IdentifierOrigin.AUTO.value}'
-              AND pi.status = '{AttributionStatus.PENDING.value}'
-              AND NOT EXISTS (
-                  SELECT 1
-                  FROM {CONTRIBUTIONS_AND_SOURCES}
-                  WHERE g.person_id = pi.person_id
-                    AND ci.identifiers ->> pi.id_type::text = pi.id_value
-                    AND NOT {identifier_neutralized("pi.id_type::text")}
-              )
+            DELETE FROM person_identifiers
+            WHERE id IN (
+                SELECT pi.id
+                FROM person_identifiers pi
+                LEFT JOIN LATERAL (
+                    SELECT 1 AS supported
+                    FROM {CONTRIBUTIONS_AND_SOURCES}
+                    WHERE g.person_id = pi.person_id
+                      AND ci.identifiers ->> pi.id_type::text = pi.id_value
+                      AND NOT {identifier_neutralized("pi.id_type::text")}
+                    LIMIT 1
+                ) support ON TRUE
+                WHERE pi.source = '{IdentifierOrigin.AUTO.value}'
+                  AND pi.status = '{AttributionStatus.PENDING.value}'
+                  AND support.supported IS NULL
+            )
         """)
     ).rowcount
 
