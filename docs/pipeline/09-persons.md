@@ -28,7 +28,7 @@ Dans une publication, une personne revient à une seule contribution : la mieux 
 
 ### Contributions hors périmètre
 
-Une contribution sans contribution source du périmètre est rattachée seulement par épinglage ou par identifiant. Le critère de nom vaut seulement pour les contributions du périmètre.
+Une contribution sans contribution source du périmètre est rattachée seulement par épinglage ou par identifiant. Le critère de nom vaut seulement pour les contributions du périmètre. Une personne marquée hors périmètre gagne des contributions hors périmètre seulement par épinglage.
 
 ## Rattachements conservés d'un run à l'autre
 
