@@ -118,6 +118,8 @@ class DoiPrefix(NormalizedIdentifier):
 HAL_DOC_PATTERN = r"[a-z][a-z0-9]*[-_]\d{8,}"
 """Motif d'un identifiant de dépôt HAL, insensible à la casse ; repris en SQL par `sql_fragments`."""
 _HAL_DOC_BASE = re.compile(f"({HAL_DOC_PATTERN})", re.IGNORECASE)
+# Identifiant HAL nu, suffixe de version compris.
+_BARE_HAL_ID = re.compile(f"({HAL_DOC_PATTERN})(?:v\\d+)?", re.IGNORECASE)
 
 # Autorité d'un identifiant OAI-PMH `[<préfixe>:]oai:<autorité>:<id local>`, comme `oai:HAL:hal-04123456v1` dans les localisations OpenAlex.
 _OAI_AUTHORITY = re.compile(r"(?:^|:)oai:([^:]+):", re.IGNORECASE)
@@ -134,7 +136,7 @@ def is_hal_host(host: str) -> bool:
 def extract_hal_id_from_url(raw: str | None) -> str | None:
     """Renvoie l'identifiant HAL sans version, tiré d'une URL de portail HAL, d'un identifiant OAI-PMH HAL (`oai:HAL:hal-04123456v1`) ou d'un identifiant nu.
 
-    `None` pour une URL d'un autre hôte, ou un identifiant OAI-PMH d'une autre autorité : leurs fragments `mot-chiffres` ressemblent à un identifiant HAL (`oai:pure.rug.nl:openaire/1b9c53c2-4cfa-49c4-b454-3339841149ee`).
+    `None` pour une URL d'un autre hôte, un identifiant OAI-PMH d'une autre autorité, ou une autre chaîne que l'identifiant entier : leurs fragments `mot-chiffres` ressemblent à un identifiant HAL (`oai:pure.rug.nl:openaire/1b9c53c2-4cfa-49c4-b454-3339841149ee`, `doi:10.3929/ethz-b-000124558`).
     """
     if not raw:
         return None
@@ -143,8 +145,12 @@ def extract_hal_id_from_url(raw: str | None) -> str | None:
     if host:
         if not is_hal_host(host):
             return None
-    elif (oai := _OAI_AUTHORITY.search(s)) and oai.group(1) != "hal":
-        return None
+    elif oai := _OAI_AUTHORITY.search(s):
+        if oai.group(1) != "hal":
+            return None
+    else:
+        bare = _BARE_HAL_ID.fullmatch(s)
+        return bare.group(1) if bare else None
     m = _HAL_DOC_BASE.search(s)
     return m.group(1) if m else None
 

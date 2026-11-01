@@ -248,6 +248,8 @@ class TestHALIdConstruction:
             # Identifiants OAI-PMH de dépôts institutionnels, hors HAL : le fragment d'UUID (b454-3339841149, f-2861829395) a la forme d'un docid.
             "pmh:oai:pure.rug.nl:openaire/1b9c53c2-4cfa-49c4-b454-3339841149ee",
             "pmh:oai:pure.atira.dk:openaire_cris_publications/c9b1b138-2601-400d-855f-2861829395c5",
+            # Identifiant DOI d'une localisation OpenAlex (`location.id`) : son suffixe contient un fragment au format d'un docid.
+            "doi:10.3929/ethz-b-000124558",
         ],
     )
     def test_raises_on_invalid(self, raw):
