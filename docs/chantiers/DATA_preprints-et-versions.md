@@ -12,12 +12,36 @@ La phase `relations` reconstruit `publication_relations` à chaque run. Elle sui
 
 Le volet Accès de la fiche d'une publication classe ses copies ouvertes par version (éditeur, acceptée, soumise, inconnue), puis par ordre d'arrivée. Les localisations HAL et DataCite sont sans version : une localisation OpenAlex arXiv en `submittedVersion` passe devant le dépôt HAL. La phase `publications` calcule l'adresse d'accès (`best_copy_url`) et le statut open access d'une publication recalculée, sur les copies de ses enregistrements sources.
 
-### Publications qui réunissent un preprint et sa version publiée
+### Typologie du 2026-11-01, base locale
 
-Le type d'une publication vient du premier enregistrement source typé, dans l'ordre de priorité des sources (theses.fr, Crossref, DataCite, HAL, OpenAlex, ScanR, WoS), puis dans l'ordre d'arrivée. Configurations observées en base locale :
+Le type d'une publication vient du premier enregistrement source typé, dans l'ordre de priorité des sources (theses.fr, Crossref, DataCite, HAL, OpenAlex, ScanR, WoS), puis dans l'ordre d'arrivée.
 
-- **DOI de la version publiée, type `preprint`.** Le type vient d'un enregistrement source preprint sans le DOI de la publication : dépôt HAL face au seul work OpenAlex de l'article, version `.v1` d'un DOI Crossref arrivée avant l'article. Une telle publication se relie par titre à un doublon de l'article : 165044 vers 301756, le même article vu par le seul WoS, sans DOI.
-- **DOI du preprint, dépôt HAL d'un type publié.** L'enregistrement source DataCite arXiv et un dépôt HAL typé article ou communication partagent l'identifiant arXiv. Le dépôt HAL est sans DOI. La publication a le DOI arXiv et le type `preprint`. Quand la version publiée forme sa propre publication, `is_preprint_of` les relie (253165 vers 180195). Sinon, le dépôt HAL est la seule description de la version publiée : la communication NeurIPS 299298 compte parmi les preprints.
+**Clés de réunion.** Un work OpenAlex ou un enregistrement source ScanR cite en `secondary` les `hal_id` de plusieurs dépôts HAL : preprint, article, communication, poster. La clé de confirmation d'un type d'identifiant est l'identifiant de rôle le plus fort, puis de plus petite valeur : entre plusieurs dépôts, le numéro décide. OpenAlex type aussi `preprint` des works de dépôts HAL d'articles. Le bloc de métadonnées (type, titre, année) relie alors un tel work à l'enregistrement source DataCite arXiv (3059).
+
+**Publications qui contiennent un enregistrement source preprint et un enregistrement source d'un type publié.** L'ancre est le DOI de la publication, jugé sur les enregistrements sources Crossref, DataCite, HAL et theses.fr dont il est le DOI propre.
+
+| Ancre | Publications | Enregistrements sources réunis | Type retenu | Exemples |
+|---|---|---|---|---|
+| DOI de la version publiée | 644 | dépôt HAL preprint sans DOI (209), qui cite le DOI (31) ; work OpenAlex typé preprint : arXiv (182), dépôt HAL (114), qui cite le DOI (87), au DOI de la publication (29) | publié, sauf 19474 | 1800, 373, 292, 25884 |
+| DOI du preprint, type publié donné par OpenAlex ou ScanR seuls | 200 | work OpenAlex typé article : arXiv, Zenodo, discussions Copernicus, DESY | preprint | 9524, 184561, 312726 |
+| DOI du preprint, dépôt HAL d'un type publié | 142 | article (72), communication (62), chapitre (6), data paper | preprint | 3059, 299298, 2658 |
+| Sans DOI | 144 | dépôt HAL d'un type publié, work OpenAlex du dépôt typé preprint | type HAL | 26982, 3060 |
+
+Dépôts HAL d'un type publié réunis au DOI d'un preprint :
+
+- 45 articles sans aucun DOI, tous avec revue. 14 sont reliés par `is_preprint_of` à une version publiée distincte.
+- 27 articles qui citent le DOI du preprint (2934 : article de Nature Communications déposé avec le DOI bioRxiv).
+- 57 communications sans aucun DOI, aucune avec revue ou recueil. 12 sont reliées.
+
+16 publications typées version publiée sont dans le périmètre par leurs seuls enregistrements sources preprint.
+
+**Autres cas.**
+
+- Revue d'un preprint : 149 discussion papers (Copernicus) prennent la revue de l'article par l'espace de noms DOI (`SERIAL_BY_DOI_NAMESPACE`) ; 70 preprints prennent celle d'un dépôt HAL d'article réuni.
+- Working papers typés `other` : le type `other` de DataCite passe devant le type `preprint` de HAL. 87 publications, dont 72 à DOI OSF (`10.17605`) (14691, 255632).
+- Œuvres distinctes réunies : 496 publications typées communication ont un enregistrement source Crossref `article` et un dépôt HAL communication, dont 154 avec plusieurs dépôts HAL. 620 réunit un article de revue et une communication de 2021 par les `hal_id` secondaires de ScanR : le sous-type de la communication l'emporte sur `article`.
+
+**Liens `is_preprint_of`** (relations du 2026-10-31) : 1 724 vers une publication du corpus. 63 viennent de preprints à plusieurs cibles. 78 visent un type non publié, 81 une publication sans DOI vue par HAL, 13 une publication sans DOI vue par le seul WoS (165044 vers 301756, doublon de l'article). 15 relient un preprint du périmètre à une cible hors périmètre. 48 partent d'un preprint qui contient un dépôt HAL d'un type publié.
 
 ### Mesures du 2026-10-30
 
@@ -72,18 +96,17 @@ Le titre change souvent entre preprint et article : les titres différents d'une
 
 ## Phasage
 
-### Phase 1 — Mesures sur la base de prod
+### Phase 1 — Mesures
 
 - [x] Preprints du périmètre dont la version publiée est hors périmètre
-- [ ] Publications à DOI de version publiée, typées `preprint` par un enregistrement source preprint sans ce DOI (165044)
-- [ ] Publications à DOI de preprint qui réunissent un dépôt HAL d'un type publié, reliées ou non à une version publiée (253165, 299298)
+- [x] Typologie des publications qui réunissent un preprint et sa version publiée
+- [ ] Fiabilité du type des dépôts HAL d'un type publié réunis à un preprint, sur échantillon (2658 : contribution Snowmass typée communication)
 
-### Phase 2 — Type des preprints
+### Phase 2 — Réunion et type des preprints
 
 - [x] Type `preprint` d'après le préfixe DOI du serveur de preprints, pour un enregistrement source sans revue (67c1b73ef)
 - [x] Enregistrements sources lus dans l'ordre d'arrivée pour l'agrégation (c1b6d7615)
-- [ ] Type d'une publication à DOI de version publiée qui réunit des enregistrements sources preprint
-- [ ] Type d'une publication à DOI de preprint qui réunit un dépôt HAL d'un type publié
+- [ ] Dépôts HAL réunis à une œuvre d'une autre nature : preprint et version publiée
 
 ### Phase 3 — Création du lien
 
@@ -95,7 +118,7 @@ Le titre change souvent entre preprint et article : les titres différents d'une
 
 - [ ] `relations` avant `finalize`
 - [ ] Preprints masqués filtrés dans toutes les vues : listes, facettes, statistiques, compteurs, bibliographies, exports
-- [ ] Copies des preprints masqués lues avec celles de leur version publiée : adresse d'accès et statut open access, recalculés à la création et au retrait du lien
+- [ ] Adresse d'accès et statut open access calculés après `relations`, sur les copies de la publication et de ses preprints masqués
 
 ### Phase 5 — Lien des preprints sans cible
 
@@ -111,9 +134,12 @@ Le titre change souvent entre preprint et article : les titres différents d'une
 
 ## Questions ouvertes
 
-- **Type d'une publication à DOI de version publiée.** Piste : un enregistrement source preprint donne le type seulement si le DOI de la publication est son propre DOI, en rôle `primary` ou `derived`. Le DOI propre d'une version `.v1` est celui de la version, remplacé par sa cible dans l'agrégation.
-- **Type d'une publication à DOI de preprint avec un dépôt HAL d'un type publié.** Sans version publiée distincte, l'œuvre publiée compte comme preprint (299298).
-- **Version publiée hors périmètre** (49 paires) : le masquage sort l'œuvre du périmètre. Piste : un preprint du périmètre reste visible quand sa version publiée est hors périmètre.
+- **Dépôts HAL réunis à une œuvre d'une autre nature.** Les `hal_id` secondaires d'OpenAlex et de ScanR réunissent un dépôt HAL preprint sans DOI à l'article (209 publications), un dépôt HAL d'article ou de communication au preprint arXiv (142), une communication à l'article (620). Deux voies :
+  - scinder : le dépôt forme sa propre publication, reliée puis masquée. Un preprint sans DOI forme alors aussi une publication distincte.
+  - typer : la publication prend le type de la version publiée, avec le DOI du preprint. Une communication sans revue ni recueil (57) garde un type incertain.
+- **Version publiée hors périmètre** (49 paires ; 15 en base locale) : le masquage sort l'œuvre du périmètre. Deux voies : le preprint reste visible ; ou la version publiée entre dans le périmètre par ses preprints masqués, comme par un enregistrement source preprint réuni (16 publications). La seconde voie pose la question des laboratoires des preprints masqués.
+- **Revue d'un preprint.** La revue de l'article, donnée par l'espace de noms DOI, compte 149 discussion papers parmi ses publications.
+- **Working papers typés `other`** (87) : le type `preprint` de HAL devant le type `other` de DataCite ?
 - **Portée de la mention *preprint*.** Une copie arXiv vient du preprint masqué (DataCite, sans version) ou des localisations OpenAlex de l'article (`submittedVersion`). Une plateforme garde une seule copie : la mention dépend alors du chemin. Piste : la mention vaut pour la copie d'un enregistrement source preprint, et pour toute copie hébergée par un serveur de preprints.
 - **Fiabilité de la version déclarée.** La version des localisations d'entrepôt est peu fiable chez OpenAlex comme chez Unpaywall : 200 949 localisations d'entrepôt sur 258 875 sont en `submittedVersion`, y compris dans Cairn, qui héberge des versions publiées.
 - **Cible antérieure au preprint** (29 paires) : repost tardif ou fausse paire ?
