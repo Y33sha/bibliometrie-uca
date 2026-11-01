@@ -25,6 +25,7 @@ HOTES_DECLARES = frozenset(
         "doaj.org",
         "doi.org",
         "theses.fr",
+        "portal.issn.org",
         "cluster-production.elasticsearch.dataesr.ovh",
         "www.sudoc.fr",
         "zenodo.org",
