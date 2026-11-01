@@ -527,7 +527,8 @@ issn_links = Table(
     Column("link_type", issn_link_type_enum, primary_key=True),
     comment=(
         "Liens entre ISSN lus dans le Sudoc, une ligne par lien : continued_by, titre précédent "
-        "vers titre suivant ; supplement, revue principale vers supplément."
+        "vers titre suivant ; supplement, revue principale vers supplément ; replaced_by, ISSN "
+        "annulé vers l'ISSN de la notice Sudoc qui l'annule."
     ),
     schema="publishing",
 )

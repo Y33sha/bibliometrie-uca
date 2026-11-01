@@ -37,6 +37,7 @@ def test_issn_annule_de_la_notice():
         IssnFacts("0302-2889", None, IssnStatus.CANCELLED),
         IssnFacts("0028-0836", IssnSupport.PRINT, IssnStatus.ACTIVE),
     )
+    assert reading.links == (IssnLink("0302-2889", "0028-0836", IssnLinkType.REPLACED_BY),)
 
 
 def test_liens_orientes_du_titre_precedent_vers_le_suivant():

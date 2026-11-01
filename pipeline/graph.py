@@ -633,6 +633,8 @@ TASKS: tuple[Task, ...] = (
             "source_records.publisher_id",
             "source_records.corrections",
             "serial_issns",
+            # ISSN qui annule chaque ISSN annulé.
+            "issn_links",
             "serials",
             "serial_title_decisions",
             "monographs.serial_id",

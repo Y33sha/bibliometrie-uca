@@ -81,6 +81,22 @@ def test_les_issn_d_un_meme_issn_l_vont_a_une_revue(conn):
     )
 
 
+def test_un_issn_annule_prend_l_issn_l_de_l_issn_qui_l_annule(conn):
+    """Cas réel : la notice Sudoc de Nature annule 0302-2889, absent de la table ISSN-L."""
+    current = _record(conn, "a", title="Nature", issns=_issns("0028-0836"))
+    cancelled = _record(conn, "b", title="Nature", issns=_issns("0302-2889"))
+    insert_serial_issn(conn, None, issn="0028-0836", issnl="0028-0836", sudoc_checked=True)
+    insert_serial_issn(conn, None, issn="0302-2889", status="cancelled", sudoc_checked=True)
+    conn.execute(
+        text(
+            "INSERT INTO issn_links (issn, linked_issn, link_type)"
+            " VALUES ('0302-2889', '0028-0836', 'replaced_by')"
+        )
+    )
+    _attach(conn)
+    assert _serial_of(conn, cancelled) == _serial_of(conn, current) is not None
+
+
 def test_sans_notice_sudoc_l_issn_l_vient_d_openalex(conn):
     openalex = _record(
         conn,

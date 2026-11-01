@@ -66,7 +66,7 @@ Les personnes et les publications ont un volet latéral (`PersonDrawer`, `Public
 
 - `biblio.journal` décrit la série qui sert au rattachement : titre, identifiant OpenAlex, liste des ISSN avec leur support et l'indicateur ISSN-L.
 - Une revue correspond à un ISSN-L.
-- `serial_issns` contient une ligne par ISSN, avec son ISSN-L : celui de la table de l'ISSN International Centre, à défaut celui d'OpenAlex, à défaut l'ISSN lui-même. La table est importée chaque mois. Le Sudoc donne le titre, le support, le statut et les liens entre ISSN. La colonne `serial_id` est calculée.
+- `serial_issns` contient une ligne par ISSN, avec son ISSN-L : celui de la table de l'ISSN International Centre, à défaut celui de l'ISSN qui l'annule d'après le Sudoc, à défaut celui d'OpenAlex, à défaut l'ISSN lui-même. La table est importée chaque mois et omet les ISSN annulés. Le Sudoc donne le titre, le support, le statut et les liens entre ISSN. La colonne `serial_id` est calculée.
 - Une table relie les ISSN, une ligne par lien : titre précédent vers titre suivant, revue principale vers supplément. Un titre précédent, un titre suivant ou un supplément forme une revue distincte.
 - À chaque passage de `publishing`, un enregistrement source est rattaché à la revue de l'ISSN-L de ses ISSN, à défaut à la revue de son identifiant OpenAlex.
 - Un enregistrement source dont les ISSN mènent à plusieurs ISSN-L rejoint la seule revue de même titre normalisé, à défaut la seule revue de titre compatible (`compatible_titles`). Sinon, il reste sans revue par ISSN.

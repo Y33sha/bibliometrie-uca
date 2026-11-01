@@ -16,6 +16,8 @@ class IssnLinkType(StrEnum):
     """Titre précédent vers titre suivant."""
     SUPPLEMENT = "supplement"
     """Revue principale vers supplément."""
+    REPLACED_BY = "replaced_by"
+    """ISSN annulé vers l'ISSN de la notice Sudoc qui l'annule."""
 
 
 ISSN_LINK_TYPES = tuple(IssnLinkType)
@@ -53,7 +55,7 @@ class SudocReading:
 def read_sudoc_record(issn: str, record: SudocSerialRecord | None) -> SudocReading:
     """Renvoie les faits sur `issn` tirés de sa notice Sudoc, `record`, éventuellement absente.
 
-    Sans notice Sudoc, l'ISSN est `unverified`. La notice Sudoc donne le support et le statut de `issn`, de son propre ISSN quand il diffère, et de ses ISSN annulés. Les zones 430, 440, 421 et 422 donnent les liens, orientés du titre précédent vers le titre suivant, de la revue principale vers le supplément.
+    Sans notice Sudoc, l'ISSN est `unverified`. La notice Sudoc donne le support et le statut de `issn`, de son propre ISSN quand il diffère, et de ses ISSN annulés. Les zones 430, 440, 421 et 422 donnent les liens, orientés du titre précédent vers le titre suivant, de la revue principale vers le supplément. Chaque ISSN annulé est lié à l'ISSN de la notice Sudoc.
     """
     if record is None:
         return SudocReading((IssnFacts(issn, None, IssnStatus.UNVERIFIED),))
@@ -78,6 +80,7 @@ def read_sudoc_record(issn: str, record: SudocSerialRecord | None) -> SudocReadi
         *(IssnLink(own, s, IssnLinkType.CONTINUED_BY) for s in record.continued_by),
         *(IssnLink(own, s, IssnLinkType.SUPPLEMENT) for s in record.supplements),
         *(IssnLink(m, own, IssnLinkType.SUPPLEMENT) for m in record.supplement_of),
+        *(IssnLink(c, own, IssnLinkType.REPLACED_BY) for c in record.cancelled_issns),
     ]
     return SudocReading(
         tuple(facts),

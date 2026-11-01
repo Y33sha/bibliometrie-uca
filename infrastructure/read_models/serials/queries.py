@@ -60,17 +60,19 @@ _SERIAL_DETAIL_COLUMNS = f"""
     j.openalex_id, j.is_academic
 """
 
-# Revues liées par les liens entre ISSN, lus dans les deux sens. Un ISSN lié sans revue reste nommé par lui-même.
+# Revues liées par les liens entre titres et entre revue principale et supplément, lus dans les deux sens. Un ISSN lié sans revue reste nommé par lui-même.
 _RELATIONS = text("""
     WITH own AS (SELECT issn FROM serial_issns WHERE serial_id = :id),
     linked AS (
         SELECT CASE l.link_type WHEN 'continued_by' THEN 'next_title' ELSE 'supplement' END AS kind,
                l.linked_issn AS issn
         FROM issn_links l JOIN own o ON o.issn = l.issn
+        WHERE l.link_type IN ('continued_by', 'supplement')
         UNION ALL
         SELECT CASE l.link_type WHEN 'continued_by' THEN 'previous_title' ELSE 'main_serial' END,
                l.issn
         FROM issn_links l JOIN own o ON o.issn = l.linked_issn
+        WHERE l.link_type IN ('continued_by', 'supplement')
     )
     SELECT DISTINCT k.kind, s.id AS serial_id, s.title, CASE WHEN s.id IS NULL THEN k.issn END AS issn
     FROM linked k
