@@ -34,6 +34,6 @@ def test_contribution_source_collective_ne_vote_pas(sa_sync_conn):
     )
 
     align_unaligned(sa_sync_conn)
-    votes = fetch_identifier_votes(sa_sync_conn, "orcid")
+    votes = fetch_identifier_votes(sa_sync_conn)
 
-    assert votes[_ORCID] == {"jean zetaindividu": 1}
+    assert votes[("orcid", _ORCID)] == {"jean zetaindividu": 1}

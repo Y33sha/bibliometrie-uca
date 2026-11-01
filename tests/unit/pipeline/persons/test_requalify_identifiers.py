@@ -22,10 +22,12 @@ def _install(monkeypatch, queries: MagicMock) -> None:
 
 
 def test_consensus_retient_la_majorite_stricte(monkeypatch):
-    votes = {"orcid": {"X": {"s dahbi": 3, "t dado": 1}, "Y": {"a b": 1, "c d": 1}}}
     queries = MagicMock()
     _install(monkeypatch, queries)
-    queries.fetch_identifier_votes.side_effect = lambda conn, id_type: votes.get(id_type, {})
+    queries.fetch_identifier_votes.return_value = {
+        ("orcid", "X"): {"s dahbi": 3, "t dado": 1},
+        ("orcid", "Y"): {"a b": 1, "c d": 1},
+    }
     assert compute_identifier_consensus(MagicMock()) == {("orcid", "X"): "s dahbi"}
 
 
