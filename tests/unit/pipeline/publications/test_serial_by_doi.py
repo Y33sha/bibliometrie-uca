@@ -43,6 +43,13 @@ def test_doi_hors_espace_de_noms_intact():
     assert compute_updates([_row(doi="10.5194/amt-12-1-2019")], _NAMESPACES) == []
 
 
+def test_discussion_copernicus_sans_revue():
+    """La discussion d'un article partage l'espace de noms de la revue (`10.5194/acp-`) : son DOI de serveur de preprints reste hors du rattachement."""
+    assert compute_updates([_row(doi="10.5194/acp-2020-123")], _NAMESPACES) == []
+    attached = _row(doi="10.5194/acp-2020-123", serial_id=2, corrections={"serial_id": _STASH})
+    assert compute_updates([attached], _NAMESPACES) == [SerialCorrectionUpdate(1, None, {})]
+
+
 def test_enregistrement_sans_doi_intact():
     assert compute_updates([_row(doi=None)], _NAMESPACES) == []
 

@@ -25,7 +25,7 @@ class KnownPlatform:
     hosts: tuple[str, ...] = ()
     """Hôtes de la plateforme. Un hôte vaut pour ses sous-domaines. Il peut se compléter d'un début de chemin (`ncbi.nlm.nih.gov/pmc`)."""
     doi_suffix: re.Pattern[str] | None = None
-    """Début du suffixe des DOI de la plateforme, quand ses préfixes couvrent aussi d'autres publications."""
+    """Motif du suffixe des DOI de la plateforme, lu depuis son début, quand ses préfixes couvrent aussi d'autres publications."""
     fully_open: bool = False
     """La plateforme donne librement accès à tout son contenu, d'après sa propre déclaration."""
     deposit_doc_types: frozenset[str] | None = frozenset()
@@ -173,6 +173,15 @@ KNOWN_PLATFORMS: tuple[KnownPlatform, ...] = (
         ("S3005729997",),
         ("medrxiv.org",),
         re.compile(r"\d"),
+        fully_open=True,
+    ),
+    # Discussions des revues de Copernicus et preprints EGUsphere : DOI `<revue>-<année>-<numéro>`. Un article publié a un DOI `<revue>-<volume>-<page>-<année>`, un commentaire d'évaluation un suffixe `-ac1`.
+    _preprint_server(
+        "Copernicus Discussions",
+        {"10.5194"},
+        (),
+        ("copernicus.org/preprints",),
+        re.compile(r"[a-z]+-\d{4}-\d+$"),
         fully_open=True,
     ),
     _preprint_server("SSRN", {"10.2139"}, ("S4210172589",), ("ssrn.com",)),

@@ -150,6 +150,7 @@ Règle simulée : les discussions Copernicus forment un serveur de preprints, au
 - **Dans une publication qui a une version publiée, les enregistrements sources preprint passent après les autres** pour arbitrer le type, la date, le titre et les autres champs. Une publication a une version publiée quand ses enregistrements sources ont une ancre, ou quand un enregistrement source typé autrement que preprint a un conteneur.
 - **Une publication publiée par son conteneur prend le type du conteneur** : article dans une revue, communication dans des actes, chapitre dans un ouvrage. La correction des métadonnées aligne déjà le type de l'enregistrement source sur son conteneur.
 - **Un dépôt arXiv est un preprint**, même accepté pour publication : la plateforme impose le type.
+- **Les discussions des revues de Copernicus forment un serveur de preprints**, preprints EGUsphere compris. Leur DOI reste hors du rattachement à une revue par espace de noms.
 - **Les copies d'un preprint passent après les autres copies ouvertes dans le volet Accès** : un preprint donne l'accès principal seulement s'il est la seule copie ouverte. Le nom de la plateforme suffit à reconnaître un preprint.
 - **Un preprint sans clé commune avec sa version publiée reste une publication distincte et visible**, reliée par `is_preprint_of`. L'administration fusionne la paire à la main. La fusion manuelle ignore les DOI de dépôt, comme la réconciliation.
 
@@ -178,6 +179,8 @@ Règle simulée : les discussions Copernicus forment un serveur de preprints, au
 - [x] Publication publiée par le conteneur d'un enregistrement source typé autrement que preprint : revue, actes, ouvrage (6269b46ef)
 - [x] DOI de dépôt hors des ancres : archives de copies (DESY, RWTH, GSI, ResearchGate), dépôts de textes sur Zenodo ; fusion manuelle comprise (4e4f0775f)
 - [x] Remédiation du stock : reconstruction des publications pour les DOI de dépôt, run du 2026-11-01
+- [x] Discussions Copernicus au registre des serveurs de preprints, hors du rattachement par espace de noms DOI
+- [ ] Remédiation du stock : réconciliation des enregistrements sources à DOI de discussion Copernicus
 
 ### Phase 3 — Affichage
 
@@ -189,5 +192,4 @@ Règle simulée : les discussions Copernicus forment un serveur de preprints, au
 
 ## Questions ouvertes
 
-- **Discussion papers Copernicus.** Leur DOI coupe : 189 paires `is_preprint_of` restent distinctes, et la fusion manuelle est refusée. 149 discussion papers prennent la revue de l'article par l'espace de noms DOI.
 - **Doublons hors preprints.** Copies de repository (Apollo), articles à deux DOI, revues qui changent de préfixe DOI, articles vus par le seul WoS sans DOI (301756) : chaque copie ou double DOI forme une publication de plus.

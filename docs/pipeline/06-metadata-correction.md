@@ -6,7 +6,7 @@ La phase `metadata_correction` prépare les `source_records` pour que le [rattac
 
 Les corrections sont écrites sur les colonnes des `source_records` ; la valeur d'origine est conservée dans `corrections`, et chaque correction est recalculée à partir d'elle à chaque exécution. Un identifiant retiré reste dans `source_record_identifiers`, avec la règle qui le retire (`removed_by`).
 
-- **`serial_by_doi`** — renseigne `serial_id` lorsqu'il est vide et que les DOI actifs de l'enregistrement source tombent dans l'espace de noms d'une seule revue (`serial_doi_namespaces`, calculée par [`publishing`](05-publishing.md)).
+- **`serial_by_doi`** — renseigne `serial_id` lorsqu'il est vide et que les DOI actifs de l'enregistrement source tombent dans l'espace de noms d'une seule revue (`serial_doi_namespaces`, calculée par [`publishing`](05-publishing.md)). Les DOI de serveur de preprints restent hors du rattachement : la discussion d'un article Copernicus partage l'espace de noms de sa revue.
 
 - **`correct_unary`** — applique les règles de correction qui s'appliquent à un enregistrement isolé. Ces règles corrigent le type de document et les identifiants associés au document. Un dépôt HAL introuvable dans HAL (`failed_lookups`) est retiré des identifiants, des liens et des localisations.
     *Exemples : un document typé « thèse » paru dans une revue est retypé en article, et perd ses identifiants de thèse ; un article avec un titre préfixé « Erratum: » est retypé en erratum.*

@@ -61,6 +61,21 @@ class TestKnownPlatforms:
         assert preprint_servers_of_doi("10.1101/gad.1") == ()
         assert preprint_servers_of_doi("10.3917/rfg.1") == ()
 
+    @pytest.mark.parametrize(
+        ("doi", "discussion"),
+        [
+            ("10.5194/acp-2020-123", True),
+            ("10.5194/egusphere-2023-2270", True),
+            ("10.5194/acp-21-1234-2021", False),
+            ("10.5194/acp-2020-123-ac1", False),
+            ("10.5194/acp-2016-1044-supplement", False),
+            ("10.5194/egusphere-egu21-1234", False),
+        ],
+    )
+    def test_discussions_copernicus(self, doi, discussion):
+        """Seule la discussion d'un article Copernicus est un preprint : l'article publié, le commentaire d'évaluation, le supplément et le résumé de congrès gardent leur DOI."""
+        assert bool(preprint_servers_of_doi(doi)) is discussion
+
 
 class TestNamesPlatform:
     @pytest.mark.parametrize(
