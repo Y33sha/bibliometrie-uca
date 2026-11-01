@@ -66,6 +66,8 @@ Sous V5, 21 versions publiées sortent du périmètre, leur part détachée y re
 - Le DOI d'un dépôt institutionnel typé preprint (DESY, RWTH) reste une ancre, et devient le DOI de la publication fusionnée.
 - Une publication sans DOI extérieur aux serveurs de preprints garde l'un des DOI de ses serveurs comme DOI.
 
+**Relecture de 41 fusions**, tirées par strate : 39 justes, 1 fausse, 1 doute. La fusion fausse tient à un seul lien : l'enregistrement source ScanR d'un article cite en `secondary` le DOI Research Square d'une autre œuvre (165353, 27616). Le doute porte sur un changement de titre, alors que le dépôt HAL de l'article cite l'identifiant arXiv du preprint (27589, 287499).
+
 **Liens `is_preprint_of`** (relations du 2026-10-31) : 1 724 vers une publication du corpus. 63 viennent de preprints à plusieurs cibles. 78 visent un type non publié, 81 une publication sans DOI vue par HAL, 13 une publication sans DOI vue par le seul WoS (165044 vers 301756, doublon de l'article). 15 relient un preprint du périmètre à une cible hors périmètre. 48 partent d'un preprint qui contient un dépôt HAL d'un type publié.
 
 ### Mesures du 2026-10-30
@@ -129,7 +131,7 @@ Le titre change souvent entre preprint et article : les titres différents d'une
 - [x] Simulation de scission par nature
 - [x] Relecture d'un échantillon de 50 scissions V5
 - [x] Simulation de fusion : DOI des serveurs de preprints écartés des ancres
-- [ ] Relecture d'un échantillon de 41 fusions
+- [x] Relecture d'un échantillon de 41 fusions
 
 ### Phase 2 — Réunion et type des preprints
 
