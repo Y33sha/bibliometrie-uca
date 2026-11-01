@@ -12,6 +12,7 @@ from fastapi.responses import StreamingResponse
 from infrastructure.read_models.subjects.models import (
     SubjectDetailResponse,
     SubjectListResponse,
+    SubjectSort,
 )
 from infrastructure.read_models.subjects.queries import SubjectsQueries
 from interfaces.api.csv_export import csv_response
@@ -33,9 +34,6 @@ class SubjectFilterParams:
             description="Recherche sur le libellé, insensible à la casse et aux accents",
         ),
     ] = None
-    min_count: Annotated[
-        int, Query(ge=1, description="Nombre minimal de publications portant le sujet")
-    ] = 1
 
 
 Filters = Annotated[SubjectFilterParams, Depends()]
@@ -46,24 +44,24 @@ def list_subjects(
     filters: Filters,
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
+    sort: SubjectSort = "publications_desc",
     queries: SubjectsQueries = Depends(subjects_queries),
 ) -> SubjectListResponse:
-    """Liste les sujets par page, les plus fréquents dans les publications d'abord."""
-    return queries.list_subjects(
-        search=filters.search, page=page, per_page=per_page, min_usage_count=filters.min_count
-    )
+    """Liste les sujets par page, avec leur nombre de publications."""
+    return queries.list_subjects(search=filters.search, sort=sort, page=page, per_page=per_page)
 
 
 @router.get("/export.csv")
 def export_subjects_csv(
     filters: Filters,
+    sort: SubjectSort = "publications_desc",
     queries: SubjectsQueries = Depends(subjects_queries),
     _rate_limit: None = Depends(export_rate_limit),
     slot: ExportSlot = Depends(export_slot),
 ) -> StreamingResponse:
     """Exporte en CSV la liste des sujets, aux filtres et au tri de la liste."""
     return csv_response(
-        queries.export_subjects_csv(search=filters.search, min_usage_count=filters.min_count),
+        queries.export_subjects_csv(search=filters.search, sort=sort),
         filename="sujets.csv",
         slot=slot,
     )

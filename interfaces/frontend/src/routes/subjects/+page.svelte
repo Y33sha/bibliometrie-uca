@@ -1,10 +1,12 @@
 <script lang="ts">
   import PageHeader from "#lib/components/PageHeader.svelte";
   import ListToolbar from "#lib/components/ListToolbar.svelte";
+  import SortChevron from "#lib/components/SortChevron.svelte";
   import { onMount } from "svelte";
   import { resolve } from "$app/paths";
   import { usePaginatedFetch } from "#lib/composables/usePaginatedFetch.svelte.js";
   import { withBase } from "#lib/paths.js";
+  import { nextSort, sortDirection } from "#lib/sort.js";
   import { paramsToQuery } from "#lib/utils.js";
   import ListStatus from "#lib/components/ListStatus.svelte";
   import Pagination from "#lib/components/Pagination.svelte";
@@ -13,14 +15,14 @@
   type SubjectListItem = components["schemas"]["SubjectListItem"];
 
   let search = $state("");
-  let minCount = $state(3);
+  let currentSort = $state("publications_desc");
   let searchTimer: ReturnType<typeof setTimeout> | undefined;
 
-  function buildFilterParams(): URLSearchParams {
+  function buildParams(): URLSearchParams {
     const params = new URLSearchParams();
     const q = search.trim();
     if (q) params.set("search", q);
-    params.set("min_count", String(minCount));
+    params.set("sort", currentSort);
     return params;
   }
 
@@ -29,10 +31,10 @@
     itemsKey: "items",
     apiKey: "subjects",
     pageParam: null,
-    buildParams: buildFilterParams,
+    buildParams,
   });
 
-  const exportUrl = $derived(withBase(`/api/subjects/export.csv?${paramsToQuery(buildFilterParams())}`));
+  const exportUrl = $derived(withBase(`/api/subjects/export.csv?${paramsToQuery(buildParams())}`));
 
   function onSearchInput() {
     if (searchTimer) clearTimeout(searchTimer);
@@ -42,7 +44,8 @@
     }, 300);
   }
 
-  function onMinCountChange() {
+  function setSort(column: "label" | "publications") {
+    currentSort = nextSort(currentSort, column, column === "label" ? "asc" : "desc");
     list.page = 1;
     list.load();
   }
@@ -54,21 +57,14 @@
 
 <PageHeader title="Sujets" hidden />
 
-<ListToolbar bind:search placeholder="Rechercher dans les libellés" onsearch={onSearchInput} {list} one="sujet" many="sujets" {exportUrl}>
-  {#snippet filters()}
-    <label class="min-count">
-      Occurrences minimales
-      <input type="number" min="1" bind:value={minCount} onchange={onMinCountChange} />
-    </label>
-  {/snippet}
-</ListToolbar>
+<ListToolbar bind:search placeholder="Rechercher dans les libellés" onsearch={onSearchInput} {list} one="sujet" many="sujets" {exportUrl} />
 
 <ListStatus {list} emptyText="Aucun sujet ne correspond à ces critères.">
   <table class="data-table">
     <thead>
       <tr>
-        <th>Libellé</th>
-        <th class="num">Occurrences</th>
+        <th class="sortable" onclick={() => setSort("label")}>Libellé <SortChevron direction={sortDirection(currentSort, "label")} /></th>
+        <th class="num sortable" onclick={() => setSort("publications")}>Occurrences <SortChevron direction={sortDirection(currentSort, "publications")} /></th>
       </tr>
     </thead>
     <tbody>
@@ -85,17 +81,3 @@
 
   <Pagination page={list.page} pages={list.pages} onchange={list.goToPage} />
 </ListStatus>
-
-<style>
-  .min-count {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding-left: 10px;
-    font-size: var(--fs-md);
-    white-space: nowrap;
-  }
-  .min-count input {
-    width: 70px;
-  }
-</style>

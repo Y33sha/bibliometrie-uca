@@ -1,7 +1,7 @@
 """Tests d'intégration du router des sujets (`interfaces.api.routers.subjects`).
 
 Couvre :
-- GET /api/subjects (liste, pagination, recherche, min_count)
+- GET /api/subjects (liste, pagination, recherche, tri)
 - GET /api/subjects/{id} (fiche, voisins et liens entre voisins, 404)
 """
 
@@ -45,8 +45,8 @@ class TestListSubjects:
         r = client.get("/api/subjects", params={"page": 0})
         assert r.status_code == 422
 
-    def test_min_count_below_one_rejected(self, client):
-        r = client.get("/api/subjects", params={"min_count": 0})
+    def test_unknown_sort_rejected(self, client):
+        r = client.get("/api/subjects", params={"sort": "usage_desc"})
         assert r.status_code == 422
 
     def test_search_by_label(self, client):
@@ -57,15 +57,26 @@ class TestListSubjects:
         ids = [item["id"] for item in r.json()["items"]]
         assert sid in ids
 
-    def test_min_count_filter(self, client):
-        low = seed_subject(uniq("LowCount"), usage_count=1)
-        high = seed_subject(uniq("HighCount"), usage_count=50)
-        # `min_count=10` écarte `low` et retient `high`.
-        r = client.get("/api/subjects", params={"min_count": 10, "per_page": 200})
+    def test_subject_without_publication_excluded(self, client):
+        label = uniq("UnusedSubject")
+        sid = seed_subject(label=label, usage_count=0)
+        r = client.get("/api/subjects", params={"search": label})
         assert r.status_code == 200
-        ids = [item["id"] for item in r.json()["items"]]
-        assert high in ids
-        assert low not in ids
+        assert sid not in [item["id"] for item in r.json()["items"]]
+
+    def test_sort(self, client):
+        token = uniq("SortSubject")
+        alpha = seed_subject(f"{token} alpha", usage_count=50)
+        beta = seed_subject(f"{token} beta", usage_count=1)
+        for sort, expected in (
+            ("label_asc", [alpha, beta]),
+            ("label_desc", [beta, alpha]),
+            ("publications_asc", [beta, alpha]),
+            ("publications_desc", [alpha, beta]),
+        ):
+            r = client.get("/api/subjects", params={"search": token, "sort": sort})
+            assert r.status_code == 200
+            assert [item["id"] for item in r.json()["items"]] == expected, sort
 
 
 class TestGetSubject:

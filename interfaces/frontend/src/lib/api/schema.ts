@@ -2791,7 +2791,7 @@ export interface paths {
         };
         /**
          * List Subjects
-         * @description Liste les sujets par page, les plus fréquents dans les publications d'abord.
+         * @description Liste les sujets par page, avec leur nombre de publications.
          */
         get: operations["list_subjects_api_subjects_get"];
         put?: never;
@@ -10799,10 +10799,9 @@ export interface operations {
             query?: {
                 page?: number;
                 per_page?: number;
+                sort?: "label_asc" | "label_desc" | "publications_asc" | "publications_desc";
                 /** @description Recherche sur le libellé, insensible à la casse et aux accents */
                 search?: string | null;
-                /** @description Nombre minimal de publications portant le sujet */
-                min_count?: number;
             };
             header?: never;
             path?: never;
@@ -10833,10 +10832,9 @@ export interface operations {
     export_subjects_csv_api_subjects_export_csv_get: {
         parameters: {
             query?: {
+                sort?: "label_asc" | "label_desc" | "publications_asc" | "publications_desc";
                 /** @description Recherche sur le libellé, insensible à la casse et aux accents */
                 search?: string | null;
-                /** @description Nombre minimal de publications portant le sujet */
-                min_count?: number;
             };
             header?: never;
             path?: never;

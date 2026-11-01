@@ -5,9 +5,14 @@ Les écritures du référentiel appartiennent à la phase `subjects` (`pipeline/
 `SubjectFrequency` sert aussi les nuages de sujets des personnes, des laboratoires, des revues et des éditeurs.
 """
 
+from typing import Literal
+
 from application.ports.model import Model
 from domain.subjects.subject import SubjectVocabulary
 from infrastructure.read_models._common import PaginatedResponse
+
+# Vocabulaire de tri de la liste des sujets : le champ, puis le sens.
+SubjectSort = Literal["label_asc", "label_desc", "publications_asc", "publications_desc"]
 
 
 class SubjectOut(Model):

@@ -15,26 +15,34 @@ from infrastructure.read_models.subjects.models import (
     SubjectListResponse,
     SubjectNeighborLink,
     SubjectNeighborOut,
+    SubjectSort,
 )
 
+_SORT_MAP: dict[SubjectSort, str] = {
+    "label_asc": "label_normalized ASC, id",
+    "label_desc": "label_normalized DESC, id",
+    "publications_asc": "usage_count ASC, label_normalized",
+    "publications_desc": "usage_count DESC, label_normalized",
+}
 
-def _search_clause(search: str | None, min_usage_count: int) -> tuple[str, dict[str, object]]:
-    """Renvoie la clause de recherche de l'annuaire des sujets, avec ses paramètres. La liste et son total la partagent."""
-    where = "usage_count >= :min_count"
-    binds: dict[str, object] = {"min_count": min_usage_count}
+
+def _search_clause(search: str | None) -> tuple[str, dict[str, object]]:
+    """Renvoie la clause de recherche de l'annuaire des sujets, avec ses paramètres : sujets d'au moins une publication. La liste et son total la partagent."""
+    where = "usage_count > 0"
+    binds: dict[str, object] = {}
     if search:
         where += " AND unaccent(label) ILIKE unaccent(:search)"
         binds["search"] = f"%{search}%"
     return where, binds
 
 
-def _list_sql(where: str) -> str:
-    """Renvoie la requête de la liste des sujets, sans pagination, les plus fréquents d'abord."""
+def _list_sql(where: str, sort: SubjectSort) -> str:
+    """Renvoie la requête triée de la liste des sujets, sans pagination."""
     return f"""
         SELECT id, label, vocabulary::text AS vocabulary, level, usage_count
         FROM subjects
         WHERE {where}
-        ORDER BY usage_count DESC, lower(label)
+        ORDER BY {_SORT_MAP[sort]}
     """
 
 
@@ -55,11 +63,11 @@ class SubjectsQueries:
         self._conn = conn
 
     def list_subjects(
-        self, *, search: str | None, page: int, per_page: int, min_usage_count: int
+        self, *, search: str | None, sort: SubjectSort, page: int, per_page: int
     ) -> SubjectListResponse:
-        where, binds = _search_clause(search, min_usage_count)
+        where, binds = _search_clause(search)
         rows = self._conn.execute(
-            text(f"{_list_sql(where)} LIMIT :lim OFFSET :off"),
+            text(f"{_list_sql(where, sort)} LIMIT :lim OFFSET :off"),
             {**binds, "lim": per_page, "off": (page - 1) * per_page},
         ).all()
         items = [_subject_list_item(r) for r in rows]
@@ -73,13 +81,15 @@ class SubjectsQueries:
         )
         return SubjectListResponse(items=items, total=total, page=page, per_page=per_page)
 
-    def export_subjects_csv(self, *, search: str | None, min_usage_count: int) -> Iterator[str]:
+    def export_subjects_csv(self, *, search: str | None, sort: SubjectSort) -> Iterator[str]:
         """Renvoie l'export CSV de la liste des sujets, aux filtres et au tri de la liste.
 
         La requête s'exécute à l'appel. Le parcours qui suit lit des lignes en mémoire.
         """
-        where, binds = _search_clause(search, min_usage_count)
-        rows, truncated = fetch_export_rows(self._conn, _list_sql(where), binds, name="sujets")
+        where, binds = _search_clause(search)
+        rows, truncated = fetch_export_rows(
+            self._conn, _list_sql(where, sort), binds, name="sujets"
+        )
         return csv_chunks(
             ["Libellé", "Vocabulaire", "Occurrences"],
             ([r.label, VOCABULARY_LABELS[r.vocabulary], r.usage_count] for r in rows),
