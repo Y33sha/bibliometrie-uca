@@ -13,6 +13,7 @@
 ### Non commencé
 
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
+- [Listes de revues](DATA_listes-de-revues.md)
 - [Résolution probabiliste des personnes](DATA_resolution-personnes-probabiliste.md)
 - [Signatures institutionnelles](METIER_signatures-institutionnelles.md)
 - [Types de document](DATA_types-document.md)

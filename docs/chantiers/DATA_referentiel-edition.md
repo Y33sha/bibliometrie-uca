@@ -59,10 +59,6 @@ Base locale au 2026-11-01 : 6 785 éditeurs, dont 5 698 nommés par au moins un 
 
 Sept entrées de `serials` ont un type de plateforme, pour 560 publications : `repository` (SSRN Electronic Journal, AEA Randomized Controlled Trials, Global Monitoring Laboratory) et `preprint_server` (bioRxiv, Research Square, Preprints.org, ArXiv.org). Leurs 702 enregistrements sources viennent de ScanR (598), Crossref (78) et HAL (26). Trois ont un type saisi à la main, trois ont `oa_model = repository`. SSRN, bioRxiv, Research Square, Preprints.org et arXiv figurent dans la liste des plateformes connues (`domain/platforms/registry.py`). Lecteurs des deux types : enrichissement OpenAlex (`enrich_serials_from_openalex`), correction du type de document (`preprint_server` donne `preprint`), espaces de noms DOI.
 
-### Listes de revues
-
-Aucune table ne rattache une revue à une liste de référence : revues indexées dans le WoS, revues de confiance recommandées par la conférence des doyens de médecine.
-
 ## Décisions
 
 - `biblio.journal` décrit la série qui sert au rattachement : titre, identifiant OpenAlex, liste des ISSN avec leur support et l'indicateur ISSN-L.
@@ -127,12 +123,6 @@ Aucune table ne rattache une revue à une liste de référence : revues indexée
 
 - [x] Volet latéral des pages Éditeurs et Revues : édition, formes de nom de l'éditeur, fusion ; colonne d'actions retirée des listes (042ffbef5)
 
-### Phase 6 — Listes de revues
-
-- [ ] Modélisation : table des listes, table de liaison entre revues et listes
-- [ ] Source de chaque liste (question 1)
-- [ ] Mise à jour de chaque liste (question 2)
-
 ### Phase 7 — Plateformes typées comme revues
 
 - [x] Normalisation : série qui désigne une plateforme écartée ; DOI d'un serveur de preprints donnant une copie sur ce serveur (67c1b73ef, e4898057b)
@@ -146,6 +136,4 @@ Aucune table ne rattache une revue à une liste de référence : revues indexée
 
 ## Questions ouvertes
 
-1. Source de chaque liste : fichier publié par l'organisme, API ou saisie dans l'administration. Accès à la liste des revues indexées dans le WoS après la résiliation de l'abonnement.
-2. Mise à jour d'une liste : import complet qui la remplace, ajouts et retraits datés, ou liste posée une fois. Rattachement d'une entrée à une revue : par ISSN, par titre à défaut. Sort des entrées sans revue dans le référentiel.
-3. Marques et maisons mères : « BioMed Central » et Springer, « SCITEPRESS » et INSTICC. Éditeurs distincts, éditeur unique, ou marque reliée à sa maison mère.
+1. Marques et maisons mères : « BioMed Central » et Springer, « SCITEPRESS » et INSTICC. Éditeurs distincts, éditeur unique, ou marque reliée à sa maison mère.
