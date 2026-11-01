@@ -26,13 +26,12 @@
 
 ## Décisions
 
-- **Colonnes typées sur `publications`** : `cited_by_count`, `fwci`, `top_10_percent`. La liste les trie et les filtre, le moteur des statistiques les agrège.
-- **Les trois indicateurs viennent du premier enregistrement OpenAlex dans l'ordre d'arbitrage** (`arbitration_order`), donc de la version publiée avant le preprint. Ils décrivent ainsi la même œuvre, comptée dans la même base. Une publication absente d'OpenAlex est sans indicateur.
+- **Colonne JSONB `publications.impact`**, de même forme que `source_records.impact`. Un fragment SQL par indicateur sert au tri, au filtre et aux statistiques.
+- **Les indicateurs viennent du premier enregistrement OpenAlex dans l'ordre d'arbitrage** (`arbitration_order`), donc de la version publiée avant le preprint. Ils décrivent ainsi la même œuvre, comptée dans la même base. Une publication absente d'OpenAlex est sans indicateur.
 - **La phase `publications` pose les indicateurs** (`refresh_from_sources`). Un réimport (moissonnage, `fetch_stale`) marque l'enregistrement source pour cette phase. Les indicateurs suivent donc les sources.
 - **Indicateurs de ratio dans le moteur des statistiques.** Un ratio s'affiche en une valeur par barre, sans ventilation empilée. Son dénominateur compte les publications pourvues de l'indicateur. La couverture s'affiche avec la valeur. Une ligne marque la référence mondiale : 10 % pour le top 10 %, 1 pour le FWCI.
 - **Indicateurs de la page Statistiques** : « Nombre de citations », mesure additive ventilée par statut d'accès ; « Part dans le top 10 % » et « FWCI moyen », ratios.
-- **Dashboards de structure, d'éditeur et de revue** : chiffres clés « dans le top 10 % » et « FWCI moyen », avec leur couverture. Beeswarm : un point par publication, années en abscisse, citations ou FWCI en ordonnée, en échelle logarithmique.
-- **Aucun indicateur d'impact sur le dashboard d'une personne** : le Manifeste de Leiden (principe 7) fonde l'évaluation d'un chercheur sur un jugement qualitatif de ses travaux.
+- **Dashboards de structure, d'éditeur et de revue** : chiffres clés « dans le top 10 % » et « FWCI moyen », avec leur couverture. Beeswarm : un point par publication, années en abscisse, citations ou FWCI en ordonnée.
 - **Liste des publications** : colonnes « Citations », « FWCI », « Top 10 % » ; tri par citations et par FWCI ; mêmes colonnes à l'export CSV ; filtre « Top 10 % » dans la barre de filtres commune à la page Statistiques.
 - **Fiche d'une publication** : les trois indicateurs. Volet d'administration : nombre de citations de chaque enregistrement source.
 
@@ -40,7 +39,7 @@
 
 ### 1. Schéma et consolidation
 
-- [ ] Migration : colonnes `cited_by_count`, `fwci`, `top_10_percent` sur `publications`. Snapshot du schéma.
+- [ ] Migration : colonne `publications.impact`, contrainte d'objet JSON. Snapshot du schéma.
 - [ ] `SourceRecord` contient ses indicateurs, lus par `source_records_of`.
 - [ ] Règle d'agrégation (`domain/publications/aggregation.py`) et ses tests ; écriture par `PublicationStore`.
 - [ ] Documentation : modèle de données, phase `publications`.
@@ -48,6 +47,7 @@
 
 ### 2. Liste et fiche d'une publication
 
+- [ ] Fragment SQL de chaque indicateur, partagé par la liste, les filtres et les statistiques.
 - [ ] API : indicateurs dans la liste, la fiche, le volet d'administration et l'export CSV ; tri ; filtre « Top 10 % » et sa facette.
 - [ ] Interface : colonnes, tri, filtre ; fiche ; volet.
 
@@ -66,9 +66,8 @@
 
 ## Questions ouvertes
 
-- **Indicateurs d'une personne hors de son dashboard** : colonnes d'impact dans la liste de ses publications ? Indicateurs de la page Statistiques sous le filtre Auteur ?
 - **Beeswarm d'une grande structure** : l'établissement compte environ 40 000 publications sur cinq ans, autant de points. Réserver le beeswarm aux laboratoires, ou passer à une densité au-delà d'un seuil ?
 - **FWCI moyen ou médian** : quelques publications très citées élèvent la moyenne.
-- **Top 1 %** : OpenAlex le fournit. À stocker et afficher ?
+- **Top 1 %** : à afficher ?
 - **Part dans le top 10 % ventilée** (par statut d'accès, par type de document), en barres groupées ?
 - **Graphe des citations de l'établissement** : stocker les publications citées et citantes ? OpenAlex donne les références de chaque work (`referenced_works`), absentes des champs demandés (`SELECT_FIELDS`). Les références des publications du périmètre suffisent aux citations internes à l'établissement. Les publications citantes extérieures demandent des requêtes supplémentaires (filtre `cites`).

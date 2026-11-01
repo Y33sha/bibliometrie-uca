@@ -327,6 +327,16 @@ AVANT :
 APRÈS :
     La collection HAL n'est pas un indice : elle double la structure HAL.
 
+## Justifier ce qu'on ne fait pas
+
+Une fonctionnalité écartée ne se mentionne pas, et ne se justifie pas.
+
+AVANT :
+    - **Aucun indicateur d'impact sur le dashboard d'une personne** : le Manifeste de Leiden (principe 7) fonde l'évaluation d'un chercheur sur un jugement qualitatif de ses travaux.
+
+APRÈS :
+    (rien)
+
 ## Doc qui explique ce qu'on ne fait pas, sans dire ce qu'il faut faire
 
 AVANT :
