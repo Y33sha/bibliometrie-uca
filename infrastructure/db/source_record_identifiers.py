@@ -1,4 +1,10 @@
-"""Lecture de `source_record_identifiers` : identifiants d'un enregistrement source en tableau JSON joint à sa ligne, et conditions SQL sur un identifiant aliasé."""
+"""Lecture de `source_record_identifiers` : identifiants d'un enregistrement source en tableau JSON joint à sa ligne, identifiants de nombreux enregistrements sources lus à plat, et conditions SQL sur un identifiant aliasé."""
+
+from collections.abc import Sequence
+from itertools import groupby
+from operator import attrgetter
+
+from sqlalchemy import Connection, text
 
 from domain.source_records.identifiers import (
     SourceIdentifier,
@@ -84,6 +90,38 @@ def identifiers_json_sql(source_record: str) -> str:
             FROM source_record_identifiers i WHERE i.source_record_id = {source_record}
         ), '[]'::jsonb)
     """  # noqa: S608 — `source_record` est une expression de la requête hôte, jamais une entrée
+
+
+def fetch_identifiers(
+    conn: Connection, source_record_ids: Sequence[int] | None = None
+) -> dict[int, tuple[SourceIdentifier, ...]]:
+    """Renvoie les identifiants des enregistrements sources `source_record_ids`, ou de tous, triés comme par `identifiers_json_sql`. Un enregistrement source sans identifiant est absent de la réponse.
+
+    Sert aux lectures de nombreux enregistrements sources : une ligne par identifiant, sans tableau JSON.
+    """
+    where = "" if source_record_ids is None else "WHERE i.source_record_id = ANY(:ids)"
+    rows = conn.execute(
+        text(f"""
+            SELECT i.source_record_id, i.id_type::text AS id_type, i.id_value,
+                   i.role::text AS role, i.removed_by
+            FROM source_record_identifiers i
+            {where}
+            ORDER BY i.source_record_id, i.id_type, i.id_value
+        """),  # noqa: S608 — `where` est un fragment fixe
+        {} if source_record_ids is None else {"ids": list(source_record_ids)},
+    )
+    return {
+        source_record_id: tuple(
+            SourceIdentifier(
+                SourceIdentifierType(r.id_type),
+                r.id_value,
+                SourceIdentifierRole(r.role),
+                r.removed_by,
+            )
+            for r in group
+        )
+        for source_record_id, group in groupby(rows, key=attrgetter("source_record_id"))
+    }
 
 
 def parse_identifiers(raw: list[dict[str, str | None]]) -> tuple[SourceIdentifier, ...]:

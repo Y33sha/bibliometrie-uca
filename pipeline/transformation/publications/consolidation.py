@@ -310,6 +310,7 @@ def _apply_canonical_doc_type_correction(
     corrected = effective_metadata(
         MetadataForCorrection.for_publication(
             title=publication.title,
+            title_normalized=publication.title_normalized or "",
             doc_type=publication.doc_type,
             doi=str(publication.doi) if publication.doi else None,
             serial_id=publication.serial_id,

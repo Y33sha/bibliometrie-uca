@@ -43,7 +43,11 @@ from domain.types import JsonValue
 from infrastructure.db.doi_targets import unversioned_doi_sql
 from infrastructure.db.queues import Queue, enqueue
 from infrastructure.db.rows import rows_as
-from infrastructure.db.source_record_identifiers import identifiers_json_sql, parse_identifiers
+from infrastructure.db.source_record_identifiers import (
+    fetch_identifiers,
+    identifiers_json_sql,
+    parse_identifiers,
+)
 from infrastructure.db.tables import source_records
 from infrastructure.sql_fragments import (
     corrected,
@@ -162,6 +166,7 @@ _DATACITE_DIRECT_RELATIONS_SQL = (
 # Expression SQL de chaque fait de `MetadataForCorrection`, sur l'enregistrement source `sr` et les jointures de `_SELECT`. Les faits de `_DOI_FACTS` se calculent sur les identifiants (`_unary_rows`).
 _FACTS: dict[str, str] = {
     "title": "sr.title",
+    "title_normalized": "COALESCE(sr.title_normalized, '')",
     "doc_type": "sr.doc_type",
     "serial_id": "sr.serial_id",
     "serial_type": "j.serial_type::text",
@@ -208,7 +213,6 @@ def _persist_statuses(
 # Chaque variante ajoute son `WHERE`.
 _SELECT = f"""
     SELECT sr.id, sr.source_id, sr.corrections,
-           {identifiers_json_sql("sr.id")} AS identifiers,
            {", ".join(f"{expression} AS {name}" for name, expression in _FACTS.items())}
     FROM source_records sr
     LEFT JOIN serials j ON j.id = sr.serial_id
@@ -217,9 +221,10 @@ _SELECT = f"""
 
 
 def _unary_row(
-    r: Row[tuple[object, ...]], registrant_types: Mapping[str, str]
+    r: Row[tuple[object, ...]],
+    identifiers: tuple[SourceIdentifier, ...],
+    registrant_types: Mapping[str, str],
 ) -> UnaryCorrectionRow:
-    identifiers = parse_identifiers(r.identifiers)
     dois = frozenset(own_dois(active(identifiers)))
     types = {registrant_types.get(doi.split("/", 1)[0]) for doi in dois}
     columns = r._mapping
@@ -286,7 +291,7 @@ class SourceRecordCorrectionStore:
 
         Certaines règles valent quel que soit le type (URL theses.fr ou DUMAS), et un enregistrement source sans type reste candidat : aucun filtre par règle.
         """
-        return self._unary_rows(_SELECT, {})
+        return self._unary_rows(_SELECT, {}, whole_table=True)
 
     def fetch_for_unary_correction_by_serial(self, serial_id: int) -> list[UnaryCorrectionRow]:
         """Renvoie les enregistrements sources d'une revue, pour le recalcul ciblé après un changement de son type dans l'administration."""
@@ -300,7 +305,10 @@ class SourceRecordCorrectionStore:
             _SELECT + " WHERE sr.source = 'hal' AND sr.source_id = ANY(:ids)", {"ids": hal_ids}
         )
 
-    def _unary_rows(self, query: str, params: Mapping[str, object]) -> list[UnaryCorrectionRow]:
+    def _unary_rows(
+        self, query: str, params: Mapping[str, object], *, whole_table: bool = False
+    ) -> list[UnaryCorrectionRow]:
+        """Renvoie les lignes de correction unaire de `query`. `whole_table` : la requête lit tous les enregistrements sources, et leurs identifiants se lisent sans filtre."""
         registrant_types: dict[str, str] = dict(
             self._conn.execute(
                 text("""
@@ -310,7 +318,9 @@ class SourceRecordCorrectionStore:
                 """)
             ).all()
         )
-        return [_unary_row(r, registrant_types) for r in self._conn.execute(text(query), params)]
+        rows = self._conn.execute(text(query), params).all()
+        identifiers = fetch_identifiers(self._conn, None if whole_table else [r.id for r in rows])
+        return [_unary_row(r, identifiers.get(r.id, ()), registrant_types) for r in rows]
 
     def persist_corrections(self, updates: list[CorrectionUpdate]) -> int:
         """Écrit en lot les colonnes corrigées, `corrections` et les statuts des identifiants. Marque les enregistrements sources pour la réconciliation : leur type et leurs identifiants sont des clés. Renvoie le nombre de lignes."""
@@ -350,7 +360,6 @@ class SourceRecordCorrectionStore:
             text(f"""
                 SELECT id, is_matchable, source::text AS source, source_id, title_normalized,
                        COALESCE(urls, '{{}}') AS urls,
-                       {identifiers_json_sql("source_records.id")} AS identifiers,
                        EXISTS (
                            SELECT 1 FROM source_record_identifiers p
                            JOIN doi_targets t ON t.doi = p.id_value
@@ -365,7 +374,8 @@ class SourceRecordCorrectionStore:
                        ) AS primary_doi_target_recorded
                 FROM source_records
             """)
-        )
+        ).all()
+        identifiers = fetch_identifiers(self._conn)
         return [
             MatchabilityRow(
                 r.id,
@@ -375,7 +385,7 @@ class SourceRecordCorrectionStore:
                     r.source_id,
                     r.title_normalized,
                     r.urls,
-                    parse_identifiers(r.identifiers),
+                    identifiers.get(r.id, ()),
                     r.primary_doi_target_recorded,
                 ),
             )

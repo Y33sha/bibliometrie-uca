@@ -2,6 +2,7 @@
 
 import pytest
 
+from domain.normalize import normalize_text
 from domain.source_records.identifiers import (
     SourceIdentifier,
     SourceIdentifierRole,
@@ -25,6 +26,7 @@ def _publication(**overrides: object) -> MetadataForCorrection:
         "serial_type": None,
     }
     defaults.update(overrides)
+    defaults.setdefault("title_normalized", normalize_text(str(defaults["title"])))
     return MetadataForCorrection.for_publication(**defaults)  # type: ignore[arg-type]
 
 
@@ -45,6 +47,7 @@ def _view(doi: str | None = None, **overrides: object) -> MetadataForCorrection:
         "declares_conference": False,
     }
     defaults.update(overrides)
+    defaults.setdefault("title_normalized", normalize_text(str(defaults["title"])))
     return MetadataForCorrection(**defaults)  # type: ignore[arg-type]
 
 
