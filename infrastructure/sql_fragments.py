@@ -13,6 +13,7 @@ from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
 from domain.publications.contribution_roles import ContributionRole
 from domain.serials.serial import OaModel
 from domain.source_records.corrections import CORRECTED_BY, RAW
+from domain.source_records.impact import CitationTop
 from domain.source_records.source_extras import CROSSREF_PREPRINT_OF, SourceExtra
 from domain.sources.registry import SEARCHED_IDENTIFIER_STATUSES
 from domain.structures.perimeter_evidence import PerimeterEvidence
@@ -270,6 +271,11 @@ def source_extra_json(key: SourceExtra, alias: str = "sr") -> str:
 def has_source_extra(key: SourceExtra, alias: str = "sr") -> str:
     """Renvoie la condition vraie quand les champs propres à la source de la ligne aliasée `alias` contiennent la clé `key`."""
     return f"{alias}.source_extras ? '{key}'"
+
+
+def reaches_citation_top(top: CitationTop, alias: str = "p") -> str:
+    """Renvoie la condition vraie quand la ligne aliasée `alias`, publication ou enregistrement source, atteint le seuil de citation `top`. Sans indicateur, la condition est fausse."""
+    return f"COALESCE(({alias}.impact ->> '{top}')::boolean, FALSE)"
 
 
 def under_active_embargo(source_record: str = "sr") -> str:

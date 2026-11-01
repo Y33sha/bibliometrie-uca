@@ -4,6 +4,7 @@ Chaque source renseigne les indicateurs qu'elle expose. Le nombre de citations v
 """
 
 from dataclasses import dataclass, fields
+from enum import StrEnum
 
 from domain.types import JsonValue
 
@@ -23,3 +24,20 @@ class Impact:
             f.name: value for f in fields(self) if (value := getattr(self, f.name)) is not None
         }
         return values or None
+
+
+class CitationTop(StrEnum):
+    """Seuil de citation, nommé comme son champ de `Impact`. Le top 1 % est inclus dans le top 10 %."""
+
+    TOP_1_PERCENT = "top_1_percent"
+    TOP_10_PERCENT = "top_10_percent"
+
+
+CITATION_TOP_LABELS: dict[CitationTop, str] = {
+    CitationTop.TOP_1_PERCENT: "Top 1 %",
+    CitationTop.TOP_10_PERCENT: "Top 10 %",
+}
+
+assert {top.value for top in CitationTop} <= {f.name for f in fields(Impact)}, (
+    "chaque seuil de citation est un champ de Impact"
+)

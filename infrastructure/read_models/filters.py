@@ -15,6 +15,7 @@ from domain.publications.metadata import (
     OA_OPEN_STATUSES,
     OaStatus,
 )
+from domain.source_records.impact import CitationTop
 from domain.sources.registry import PROFILES, SOURCE_FILTER_PREFIXES, Source
 from infrastructure.read_models.publications.models import (
     AUTHOR_POSITION_COLUMNS,
@@ -24,7 +25,12 @@ from infrastructure.read_models.publications.models import (
     OTHER_AUTHOR_POSITION,
     OTHER_DOI_AGENCY,
 )
-from infrastructure.sql_fragments import has_author_role, is_laboratory, pending_name_form
+from infrastructure.sql_fragments import (
+    has_author_role,
+    is_laboratory,
+    pending_name_form,
+    reaches_citation_top,
+)
 
 
 def _sql_list(values: Iterable[str]) -> str:
@@ -162,6 +168,22 @@ def doi_agency_clause(values: list[str]) -> WhereClause | None:
     return WhereClause(
         f"{DOI_AGENCY_SQL} = ANY(CAST(:flt_doi_agency AS text[]))", {"flt_doi_agency": values}
     )
+
+
+# Seuil de citation le plus haut atteint par la publication `p` (`CitationTop`), NULL sans seuil atteint. La liste et l'export lisent cette expression.
+CITATION_TOP_SQL = (
+    "(CASE "
+    + " ".join(f"WHEN {reaches_citation_top(top)} THEN '{top}'" for top in CitationTop)
+    + " END)"
+)
+
+
+def citation_top_clause(values: list[str]) -> WhereClause | None:
+    """Renvoie le filtre par seuil de citation (`CitationTop`), les valeurs combinées en OR. Le top 10 % comprend le top 1 %."""
+    parts = [reaches_citation_top(top) for top in CitationTop if top in values]
+    if not parts:
+        return None
+    return WhereClause("(" + " OR ".join(parts) + ")", {})
 
 
 def oa_clause(oa_status: list[str]) -> WhereClause | None:

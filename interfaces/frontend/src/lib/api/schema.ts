@@ -5030,6 +5030,11 @@ export interface components {
              * @description Licence de la version éditeur.
              */
             license: string | null;
+            /**
+             * Citation Top
+             * @description Seuil de citation le plus haut atteint (`CitationTop`).
+             */
+            citation_top: string | null;
             /** Serial */
             serial: string | null;
             /** Serial Id */
@@ -5162,6 +5167,11 @@ export interface components {
             };
             /** Apc */
             apc: components["schemas"]["FacetOption"][];
+            /**
+             * Citation Tops
+             * @description Une publication du top 1 % compte aussi dans le top 10 %.
+             */
+            citation_tops: components["schemas"]["FacetOption"][];
             /** Countries */
             countries: components["schemas"]["FacetOption"][];
             /** Languages */
@@ -6551,6 +6561,7 @@ export interface operations {
                 doc_type?: string;
                 excluded_doc_type?: string;
                 has_apc?: string;
+                citation_top?: string;
                 country?: string;
                 language?: string;
                 partner_ror?: string;
@@ -6624,6 +6635,7 @@ export interface operations {
                 doc_type?: string;
                 excluded_doc_type?: string;
                 has_apc?: string;
+                citation_top?: string;
                 country?: string;
                 language?: string;
                 partner_ror?: string;
@@ -6715,6 +6727,7 @@ export interface operations {
                 doc_type?: string;
                 excluded_doc_type?: string;
                 has_apc?: string;
+                citation_top?: string;
                 country?: string;
                 language?: string;
                 partner_ror?: string;
@@ -6771,6 +6784,7 @@ export interface operations {
                 doc_type?: string;
                 excluded_doc_type?: string;
                 has_apc?: string;
+                citation_top?: string;
                 country?: string;
                 language?: string;
                 partner_ror?: string;
@@ -6827,6 +6841,7 @@ export interface operations {
                 doc_type?: string;
                 excluded_doc_type?: string;
                 has_apc?: string;
+                citation_top?: string;
                 country?: string;
                 language?: string;
                 partner_ror?: string;
@@ -7139,6 +7154,7 @@ export interface operations {
                 doc_type?: string;
                 excluded_doc_type?: string;
                 has_apc?: string;
+                citation_top?: string;
                 country?: string;
                 language?: string;
                 partner_ror?: string;

@@ -10,6 +10,7 @@ from fastapi import Depends, Query
 
 from domain.publications.doc_types import DOC_TYPES
 from domain.publications.metadata import ACCESS_LEVELS, OA_STATUSES
+from domain.source_records.impact import CitationTop
 from domain.sources.hal import HAL_DEPOSIT_STATUSES
 from domain.sources.registry import SOURCE_FILTER_VALUES
 from infrastructure.read_models.publications.models import (
@@ -53,6 +54,7 @@ class PublicationFilterParams:
     doc_type: Annotated[str, Query()] = ""
     excluded_doc_type: Annotated[str, Query()] = ""
     has_apc: Annotated[str, Query()] = ""
+    citation_top: Annotated[str, Query()] = ""
     country: Annotated[str, Query()] = ""
     language: Annotated[str, Query()] = ""
     partner_ror: Annotated[str, Query()] = ""
@@ -87,6 +89,9 @@ class PublicationFilterParams:
                 self.excluded_doc_type, allowed=DOC_TYPES, param="excluded_doc_type"
             ),
             has_apc=parse_vocabulary_csv(self.has_apc, allowed=TOGGLE_VALUES, param="has_apc"),
+            citation_tops=parse_vocabulary_csv(
+                self.citation_top, allowed=frozenset(CitationTop), param="citation_top"
+            ),
             country_values=parse_str_csv(self.country),
             language_codes=parse_str_csv(self.language),
             partner_rors=parse_ror_csv(self.partner_ror, param="partner_ror"),

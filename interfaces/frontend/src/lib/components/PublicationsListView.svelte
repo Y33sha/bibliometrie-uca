@@ -28,7 +28,7 @@
 	} from '#lib/filterRegistry.js';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import LicenseBadge from '#lib/components/LicenseBadge.svelte';
-	import { columnLabels, oaStatusLabel } from '#lib/labels.js';
+	import { citationTopLabels, columnLabels, oaStatusLabel } from '#lib/labels.js';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
 	import TableStatusRow from '#lib/components/TableStatusRow.svelte';
 	import { usePublicationFacets } from '#lib/composables/usePublicationFacets.svelte.js';
@@ -98,11 +98,12 @@
 		{ key: 'apc',        label: columnLabels.apc },
 		{ key: 'oa_status',  label: columnLabels.oaStatus },
 		{ key: 'license',    label: columnLabels.license },
+		{ key: 'citation_top', label: columnLabels.citationTop },
 		...(isLab ? [{ key: 'hal_status', label: 'Statut HAL' }] : []),
 		{ key: 'sources',    label: columnLabels.sources },
 		{ key: 'access',     label: columnLabels.access, fixed: true },
 	];
-	const initialHidden = ['apc', 'oa_status', 'license', 'publisher', 'sources'];
+	const initialHidden = ['apc', 'oa_status', 'license', 'citation_top', 'publisher', 'sources'];
 	if (isLab) initialHidden.push('hal_status');
 	const cv = useColumnVisibility('publication-table-columns', columnDefs, initialHidden);
 	const col = cv.col;
@@ -287,6 +288,7 @@
 			</th>{/if}
 			{#if col('oa_status')}<th style="width:60px">{columnLabels.oaStatus}</th>{/if}
 			{#if col('license')}<th style="width:90px">{columnLabels.license}</th>{/if}
+			{#if col('citation_top')}<th style="width:80px">{columnLabels.citationTop}</th>{/if}
 			{#if isLab && col('hal_status')}<th style="width:100px">Statut HAL</th>{/if}
 			{#if col('sources')}<th style="width:100px">{columnLabels.sources}</th>{/if}
 			<th style="width:120px" class="col-menu-th">
@@ -363,6 +365,9 @@
 						{/if}
 					</td>{/if}
 					{#if col('license')}<td class="license-cell">{#if p.license}<LicenseBadge license={p.license} />{/if}</td>{/if}
+					{#if col('citation_top')}<td>
+						{#if p.citation_top}<span class="citation-top citation-{p.citation_top}">{citationTopLabels[p.citation_top]}</span>{/if}
+					</td>{/if}
 					{#if isLab && col('hal_status')}
 						<td>{#if p.hal_status}<span class="hal-badge hal-{p.hal_status}">{halStatusLabel(p.hal_status)}</span>{/if}</td>
 					{/if}
@@ -408,6 +413,18 @@
 	.hal-notice          { background: var(--warning-light); color: var(--warning-text); }
 	.hal-hors_collection { background: var(--attention-light); color: var(--attention); }
 	.hal-hors_hal        { background: var(--danger-light); color: var(--danger); }
+
+	/* Seuil de citation */
+	.citation-top {
+		display: inline-block;
+		padding: 2px 7px;
+		border-radius: var(--radius);
+		font-size: var(--fs-sm);
+		font-weight: 500;
+		white-space: nowrap;
+	}
+	.citation-top_1_percent  { background: var(--accent); color: var(--accent-light); }
+	.citation-top_10_percent { background: var(--accent-light); color: var(--accent); }
 
 	/* Auteur correspondant (person) */
 	.corr-cell { text-align: center; }

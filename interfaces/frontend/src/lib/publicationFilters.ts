@@ -80,6 +80,15 @@ export function publicationFilters(
 			facet: { type: 'labeled', apiKey: 'access' },
 		},
 		{
+			key: 'citationTops',
+			control: 'checkbox',
+			label: filterLabels.citationTops,
+			param: 'citation_top',
+			facet: { type: 'labeled', apiKey: 'citation_tops' },
+			tooltip: "D'après OpenAlex. Le top 10 % comprend le top 1 %",
+			showColumns: ['citation_top'],
+		},
+		{
 			key: 'halStatus',
 			control: 'checkbox',
 			label: 'Statut HAL',
