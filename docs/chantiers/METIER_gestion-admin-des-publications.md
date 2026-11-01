@@ -84,4 +84,5 @@ Prérequis : phase 3 du chantier [alignement des auteurs](archived/2026-10-24_DA
 
 - **Auteurs** : comment les présenter dans le volet ? La comparaison des sources de la page publique y a sa place, mais l'alignement par position devient illisible au-delà de quatre ou cinq sources.
 - **Disposition du volet** : une colonne par enregistrement source et une ligne par champ, à l'essai. À partir de combien d'enregistrements sources la disposition inverse devient-elle plus lisible ? Largeur ?
-- **Interdiction de fusion** : forme du verdict, et son effet sur deux enregistrements sources qui partagent un DOI.
+- **Interdiction de fusion** : forme du verdict, et son effet sur deux enregistrements sources qui partagent un DOI. Cas : un DOI secondaire cité par un seul enregistrement source d'agrégateur réunit deux œuvres (165353, 27616).
+- **Preprints reliés à leur version publiée par le seul titre** (`is_preprint_of`) : les fusions manuelles diront si des critères de fusion automatique existent.

@@ -181,9 +181,5 @@ La seconde reconstruction, DOI de dépôt compris, fusionne 294 publications. Le
 
 ## Questions ouvertes
 
-- **Fusion fausse.** Un DOI secondaire cité par un seul enregistrement source d'agrégateur suffit à réunir deux œuvres (165353, 27616). Recours : l'interdiction de fusion, prévue par le chantier de gestion admin des publications.
-- **Preprints restés distincts** (813 paires) : discussion papers Copernicus, paires reliées par le seul titre. Les fusions manuelles de l'administration diront si des critères de fusion automatique existent. Une fusion manuelle reste refusée entre deux DOI qui coupent : discussion papers Copernicus (189).
-- **Revue d'un preprint.** La revue de l'article, donnée par l'espace de noms DOI, compte 149 discussion papers parmi ses publications.
-- **Working papers typés `other`** (87) : le type `preprint` de HAL devant le type `other` de DataCite ?
-- **Fiabilité de la version déclarée.** La version des localisations d'entrepôt est peu fiable chez OpenAlex comme chez Unpaywall : 200 949 localisations d'entrepôt sur 258 875 sont en `submittedVersion`, y compris dans Cairn, qui héberge des versions publiées.
+- **Discussion papers Copernicus.** Leur DOI coupe : 189 paires `is_preprint_of` restent distinctes, et la fusion manuelle est refusée. 149 discussion papers prennent la revue de l'article par l'espace de noms DOI.
 - **Doublons hors preprints.** Copies de repository (Apollo), articles à deux DOI, revues qui changent de préfixe DOI, articles vus par le seul WoS sans DOI (301756) : chaque copie ou double DOI forme une publication de plus.

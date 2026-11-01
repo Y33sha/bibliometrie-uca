@@ -77,7 +77,7 @@ OpenAlex et ScanR ont 1 468 enregistrements sources `memoir` avec une URL DUMAS.
 
 ### Phase 3 — Arbitrage
 
-- [ ] `other` d'une source prioritaire face au type précis d'une autre source, compte tenu du type `article` qu'OpenAlex attribue par défaut.
+- [ ] `other` d'une source prioritaire face au type précis d'une autre source, compte tenu du type `article` qu'OpenAlex attribue par défaut. Cas : 87 working papers typés `other` par DataCite et `preprint` par HAL, dont 72 à DOI OSF (`10.17605`) (14691, 255632).
 
 ### Phase 4 — Cas particuliers
 
