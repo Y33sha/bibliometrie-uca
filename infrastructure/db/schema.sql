@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict AvRjhJQbCaw3ElJfa87Mue4EnaZVJQ6w1518GSXJf3uAZp7YfLtcGdIhhz1B4ky
+\restrict eS7SGgEQt1aWSBhaaWA5h4aGnlXWUaatGYGWSIgYZvhxq6ztQY4WHMgurYqzlcb
 
 -- Dumped from database version 18.4
 -- Dumped by pg_dump version 18.4
@@ -1898,22 +1898,6 @@ ALTER SEQUENCE publications.publications_id_seq OWNED BY publications.publicatio
 
 
 --
--- Name: subject_cooccurrences; Type: MATERIALIZED VIEW; Schema: publications; Owner: -
---
-
-CREATE MATERIALIZED VIEW publications.subject_cooccurrences AS
- SELECT ps1.subject_id AS subject_a_id,
-    ps2.subject_id AS subject_b_id,
-    (count(DISTINCT ps1.publication_id))::integer AS count
-   FROM (publications.publication_subjects ps1
-     JOIN publications.publication_subjects ps2 ON (((ps1.publication_id = ps2.publication_id) AND (ps1.subject_id < ps2.subject_id))))
-  WHERE ((NOT ps1.rejected) AND (NOT ps2.rejected))
-  GROUP BY ps1.subject_id, ps2.subject_id
- HAVING (count(DISTINCT ps1.publication_id) >= 2)
-  WITH NO DATA;
-
-
---
 -- Name: subjects; Type: TABLE; Schema: publications; Owner: -
 --
 
@@ -1956,6 +1940,70 @@ COMMENT ON COLUMN publications.subjects.level IS 'Profondeur dans le vocabulaire
 --
 
 COMMENT ON COLUMN publications.subjects.parent_id IS 'Sujet du niveau supérieur, du même vocabulaire.';
+
+
+--
+-- Name: subject_cooccurrences; Type: MATERIALIZED VIEW; Schema: publications; Owner: -
+--
+
+CREATE MATERIALIZED VIEW publications.subject_cooccurrences AS
+ WITH links AS (
+         SELECT DISTINCT ps.publication_id,
+            s.label_normalized
+           FROM (publications.publication_subjects ps
+             JOIN publications.subjects s ON ((s.id = ps.subject_id)))
+          WHERE (NOT ps.rejected)
+        )
+ SELECT a.label_normalized AS label_a,
+    b.label_normalized AS label_b,
+    (count(*))::integer AS count
+   FROM (links a
+     JOIN links b ON (((b.publication_id = a.publication_id) AND (a.label_normalized < b.label_normalized))))
+  GROUP BY a.label_normalized, b.label_normalized
+ HAVING (count(*) >= 2)
+  WITH NO DATA;
+
+
+--
+-- Name: MATERIALIZED VIEW subject_cooccurrences; Type: COMMENT; Schema: publications; Owner: -
+--
+
+COMMENT ON MATERIALIZED VIEW publications.subject_cooccurrences IS 'Paires de libellés normalisés de sujets présents ensemble sur au moins deux publications, label_a < label_b.';
+
+
+--
+-- Name: subject_labels; Type: MATERIALIZED VIEW; Schema: publications; Owner: -
+--
+
+CREATE MATERIALIZED VIEW publications.subject_labels AS
+ WITH links AS (
+         SELECT DISTINCT s.label_normalized,
+            s.label,
+            ps.publication_id
+           FROM (publications.publication_subjects ps
+             JOIN publications.subjects s ON ((s.id = ps.subject_id)))
+          WHERE (NOT ps.rejected)
+        ), forms AS (
+         SELECT DISTINCT ON (links.label_normalized) links.label_normalized,
+            links.label
+           FROM links
+          GROUP BY links.label_normalized, links.label
+          ORDER BY links.label_normalized, (count(*)) DESC, links.label
+        )
+ SELECT f.label_normalized,
+    f.label,
+    (count(DISTINCT l.publication_id))::integer AS usage_count
+   FROM (forms f
+     JOIN links l ON ((l.label_normalized = f.label_normalized)))
+  GROUP BY f.label_normalized, f.label
+  WITH NO DATA;
+
+
+--
+-- Name: MATERIALIZED VIEW subject_labels; Type: COMMENT; Schema: publications; Owner: -
+--
+
+COMMENT ON MATERIALIZED VIEW publications.subject_labels IS 'Sujets regroupés par libellé normalisé, tous vocabulaires confondus : forme la plus fréquente du libellé, nombre de publications des liens non rejetés.';
 
 
 --
@@ -4698,7 +4746,7 @@ CREATE UNIQUE INDEX publications_doi_lower_key ON publications.publications USIN
 -- Name: subject_cooccurrences_b_idx; Type: INDEX; Schema: publications; Owner: -
 --
 
-CREATE INDEX subject_cooccurrences_b_idx ON publications.subject_cooccurrences USING btree (subject_b_id);
+CREATE INDEX subject_cooccurrences_b_idx ON publications.subject_cooccurrences USING btree (label_b);
 
 
 --
@@ -4712,7 +4760,21 @@ CREATE INDEX subject_cooccurrences_count_idx ON publications.subject_cooccurrenc
 -- Name: subject_cooccurrences_pkey; Type: INDEX; Schema: publications; Owner: -
 --
 
-CREATE UNIQUE INDEX subject_cooccurrences_pkey ON publications.subject_cooccurrences USING btree (subject_a_id, subject_b_id);
+CREATE UNIQUE INDEX subject_cooccurrences_pkey ON publications.subject_cooccurrences USING btree (label_a, label_b);
+
+
+--
+-- Name: subject_labels_pkey; Type: INDEX; Schema: publications; Owner: -
+--
+
+CREATE UNIQUE INDEX subject_labels_pkey ON publications.subject_labels USING btree (label_normalized);
+
+
+--
+-- Name: subject_labels_usage_count_idx; Type: INDEX; Schema: publications; Owner: -
+--
+
+CREATE INDEX subject_labels_usage_count_idx ON publications.subject_labels USING btree (usage_count DESC);
 
 
 --
@@ -5897,5 +5959,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict AvRjhJQbCaw3ElJfa87Mue4EnaZVJQ6w1518GSXJf3uAZp7YfLtcGdIhhz1B4ky
+\unrestrict eS7SGgEQt1aWSBhaaWA5h4aGnlXWUaatGYGWSIgYZvhxq6ztQY4WHMgurYqzlcb
 
