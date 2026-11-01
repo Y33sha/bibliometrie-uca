@@ -32,7 +32,7 @@ Base locale au 2026-11-01, après le rattachement par ISSN-L :
 - 55 titres sont partagés par plusieurs revues sans ISSN, dont 54 collections de monographies. Les actes SciTePress se répartissent entre deux éditeurs (79458, 15030).
 - Le titulaire du préfixe DOI Crossref départagerait 5 enregistrements sources rattachés par un titre de plusieurs revues à ISSN. 6 monographies ont une collection sans ISSN et aucun éditeur.
 
-CRISalid, Academic Observatory et OpenAIRE identifient la revue par ses seuls ISSN ou ISSN-L, et recalculent le rattachement des publications à chaque passage ([benchmark](archived/2026-10-12_benchmark-pipelines.md)).
+CRISalid, Academic Observatory et OpenAIRE identifient la revue par ses seuls ISSN ou ISSN-L, et recalculent le rattachement des publications à chaque passage ([benchmark](2026-10-12_benchmark-pipelines.md)).
 
 ### Éditeurs
 
