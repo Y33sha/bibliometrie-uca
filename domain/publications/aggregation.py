@@ -12,7 +12,12 @@ from domain.publications.identifiers import DOI
 from domain.publications.licenses import DEPOSIT_LICENSE_SOURCE, publisher_license_sources
 from domain.publications.publication import Publication
 from domain.publishers.attribution import publication_publisher
-from domain.source_records.keys import anchor_of, doi_anchors, preprint_server_anchors
+from domain.source_records.keys import (
+    anchor_of,
+    doi_anchors,
+    is_preprint_server_doi,
+    preprint_server_anchors,
+)
 from domain.source_records.source_record import SourceRecord
 from domain.sources.registry import Source
 from domain.types import JsonValue, as_int, as_str
@@ -27,7 +32,8 @@ def refresh_from_sources(
 ) -> None:
     """Recalcule sur place les métadonnées de `publication` depuis ses enregistrements sources. L'éditeur se pose ensuite, par `assign_publisher`, et le statut open access d'après les copies (`domain.publications.open_access`).
 
-    - Champs simples : première valeur non nulle dans l'ordre de `source_priority`. Sans revue dans aucune source, la publication prend la collection de sa monographie (`monograph_serials`).
+    - DOI : `publication_doi`.
+    - Champs simples : première valeur non nulle dans l'ordre d'arbitrage (`arbitration_order`). Sans revue dans aucune source, la publication prend la collection de sa monographie (`monograph_serials`).
     - Type de document : `arbitrate_doc_type_with_article_subtype`, puis `arbitrate_conference`.
     - Date de publication : `arbitrate_publication_date` ; l'année en dérive.
     - Licence : celle de la version éditeur (`publisher_license_sources`). Licence de dépôt : celle du fichier déposé dans HAL.
@@ -43,7 +49,9 @@ def refresh_from_sources(
             "refresh_from_sources requiert au moins une source ; le cas orphelin est à traiter côté caller (suppression de la publication)"
         )
 
-    sorted_sources = prioritized(sources, source_priority)
+    new_doi_str = publication_doi(prioritized(sources, source_priority))
+    publication.doi = DOI(new_doi_str) if new_doi_str else None
+    sorted_sources = arbitration_order(sources, source_priority, doi=new_doi_str)
 
     new_title = as_str(first_non_null(sorted_sources, "title"))
     publication.title = new_title if new_title is not None else publication.title
@@ -59,9 +67,6 @@ def refresh_from_sources(
     )
     if publication.publication_date is not None:
         publication.publication_year = publication.publication_date.year
-
-    new_doi_str = publication_doi(sorted_sources)
-    publication.doi = DOI(new_doi_str) if new_doi_str else None
 
     publication.serial_id = as_int(first_non_null(sorted_sources, "serial_id"))
     publication.monograph_id = as_int(first_non_null(sorted_sources, "monograph_id"))
@@ -97,7 +102,12 @@ def assign_publisher(
     publication.publisher_id = publication_publisher(
         publication.doc_type,
         (prefix_publishers or {}).get(prefix) if prefix else None,
-        (s.publisher_id for s in prioritized(sources, source_priority)),
+        (
+            s.publisher_id
+            for s in arbitration_order(
+                sources, source_priority, doi=str(publication.doi) if publication.doi else None
+            )
+        ),
         platform_prefix=prefix is not None and is_publisher_platform_prefix(prefix),
     )
 
@@ -118,6 +128,16 @@ def prioritized(
     """Trie `sources` dans l'ordre de `source_priority`."""
     rank = {s: i for i, s in enumerate(source_priority)}
     return sorted(sources, key=lambda s: rank.get(s.source, 99))
+
+
+def arbitration_order(
+    sources: list[SourceRecord], source_priority: tuple[str, ...], *, doi: str | None
+) -> list[SourceRecord]:
+    """Trie `sources` dans l'ordre de `source_priority`. Dans une publication de DOI `doi` extérieur aux serveurs de preprints, les enregistrements sources preprint passent après les autres."""
+    ordered = prioritized(sources, source_priority)
+    if doi is None or is_preprint_server_doi(doi):
+        return ordered
+    return sorted(ordered, key=lambda s: s.doc_type == DocType.PREPRINT)
 
 
 def _textes(valeurs: list[JsonValue] | None) -> tuple[str, ...]:

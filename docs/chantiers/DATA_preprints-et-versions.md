@@ -137,9 +137,9 @@ Le titre change souvent entre preprint et article : les titres différents d'une
 
 - [x] Type `preprint` d'après le préfixe DOI du serveur de preprints, pour un enregistrement source sans revue (67c1b73ef)
 - [x] Enregistrements sources lus dans l'ordre d'arrivée pour l'agrégation (c1b6d7615)
-- [ ] DOI des serveurs de preprints écartés des ancres de la réconciliation
-- [ ] DOI de la publication : DOI extérieur aux serveurs de preprints, à défaut DOI d'un serveur de preprints
-- [ ] Fusion manuelle : DOI des serveurs de preprints ignorés
+- [x] DOI des serveurs de preprints écartés des ancres de la réconciliation (7a291b64c)
+- [x] DOI de la publication : DOI extérieur aux serveurs de preprints, à défaut DOI d'un serveur de preprints (7a291b64c)
+- [x] Fusion manuelle : DOI des serveurs de preprints ignorés (7a291b64c)
 - [ ] Arbitrage : enregistrements sources preprint après les autres
 - [ ] Remédiation du stock : commande de remise en réconciliation des publications concernées
 

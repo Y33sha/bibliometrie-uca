@@ -76,6 +76,43 @@ def test_une_publication_sans_autre_doi_garde_celui_de_son_serveur_de_preprints(
     assert publication.doi == DOI("10.48550/arxiv.1")
 
 
+def test_les_enregistrements_preprint_passent_apres_la_version_publiee():
+    """Le DOI de la publication est celui de l'article : le preprint DataCite, prioritaire par sa source, passe après l'article pour le type, le titre et la date."""
+    preprint = _source_record(
+        id=1,
+        source="datacite",
+        doc_type="preprint",
+        doi="10.48550/arxiv.1",
+        title="Titre du preprint",
+        publication_date=PublicationDate.of_year(2021),
+    )
+    article = _source_record(
+        id=2,
+        source="openalex",
+        doc_type="article",
+        doi="10.1016/article",
+        title="Titre de l'article",
+        publication_date=PublicationDate.of_year(2023),
+    )
+
+    publication = _publication()
+    refresh_from_sources(publication, [preprint, article], source_priority=("datacite", "openalex"))
+    assert (publication.doc_type, publication.title, publication.publication_year) == (
+        "article",
+        "Titre de l'article",
+        2023,
+    )
+
+
+def test_une_publication_au_doi_de_serveur_de_preprints_garde_l_ordre_des_sources():
+    preprint = _source_record(id=1, source="datacite", doc_type="preprint", doi="10.48550/arxiv.1")
+    article = _source_record(id=2, source="openalex", doc_type="article", doi=None)
+
+    publication = _publication()
+    refresh_from_sources(publication, [preprint, article], source_priority=("datacite", "openalex"))
+    assert publication.doc_type == "preprint"
+
+
 def test_une_source_sans_doc_type_laisse_la_suivante_le_donner():
     """Le type de document vient de la première source qui en donne un."""
     muette = _source_record(id=1, source="openalex", doc_type=None)
@@ -273,6 +310,16 @@ class TestAssignPublisher:
             publication, sources, source_priority=self._ORDRE, prefix_publishers={"10.1017": 3}
         )
         assert publication.publisher_id is None
+
+    def test_l_editeur_d_un_preprint_cede_a_celui_de_la_version_publiee(self):
+        """L'article a un DOI hors des serveurs de preprints : l'éditeur du dépôt HAL du preprint passe après celui du work OpenAlex de l'article."""
+        publication = self._publication("article", doi="10.1/article")
+        sources = [
+            _source_record(id=1, source="hal", doc_type="preprint", publisher_id=8),
+            _source_record(id=2, source="openalex", doc_type="article", publisher_id=9),
+        ]
+        assign_publisher(publication, sources, source_priority=self._ORDRE)
+        assert publication.publisher_id == 9
 
     def test_le_prefixe_d_une_plateforme_d_editeurs_cede_a_l_editeur_des_sources(self):
         """Cairn (10.3917) est titulaire du préfixe et nommé par Crossref : l'éditeur vient de HAL."""
