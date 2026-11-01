@@ -15,10 +15,10 @@ Le voisinage direct suffit : l'invariant du marquage garantit que toute arête a
 
 import logging
 import time
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import NamedTuple
 
-from sqlalchemy import Connection, bindparam, text
+from sqlalchemy import Connection, text
 
 from domain.publications.reconciliation import (
     ReconcileMember,
@@ -296,26 +296,32 @@ def fetch_publication_sizes(conn: Connection, publication_ids: list[int]) -> dic
     return {row.publication_id: row.n for row in rows}
 
 
-def repoint_source_records(
-    conn: Connection, source_record_ids: list[int], publication_id: int
-) -> None:
-    """Rattache des enregistrements sources à `publication_id` (assignation d'un groupe)."""
-    if not source_record_ids:
+def repoint_source_records(conn: Connection, assignments: Mapping[int, int]) -> None:
+    """Rattache chaque enregistrement source à sa publication (`{source_record_id: publication_id}`), en une requête. Seules les lignes qui changent de publication sont réécrites."""
+    if not assignments:
         return
-    stmt = text("UPDATE source_records SET publication_id = :pid WHERE id = ANY(:ids)").bindparams(
-        bindparam("ids")
+    conn.execute(
+        text("""
+            UPDATE source_records sr SET publication_id = a.publication_id
+            FROM unnest(CAST(:ids AS integer[]), CAST(:publications AS integer[]))
+                AS a(id, publication_id)
+            WHERE sr.id = a.id AND sr.publication_id IS DISTINCT FROM a.publication_id
+        """),
+        {"ids": list(assignments), "publications": list(assignments.values())},
     )
-    conn.execute(stmt, {"pid": publication_id, "ids": source_record_ids})
 
 
 def detach_source_records(conn: Connection, source_record_ids: list[int]) -> None:
-    """Détache des enregistrements sources de leur publication : ils deviennent orphelins."""
+    """Détache des enregistrements sources de leur publication : ils deviennent orphelins. Seules les lignes rattachées sont réécrites."""
     if not source_record_ids:
         return
-    stmt = text("UPDATE source_records SET publication_id = NULL WHERE id = ANY(:ids)").bindparams(
-        bindparam("ids")
+    conn.execute(
+        text(
+            "UPDATE source_records SET publication_id = NULL"
+            " WHERE id = ANY(:ids) AND publication_id IS NOT NULL"
+        ),
+        {"ids": source_record_ids},
     )
-    conn.execute(stmt, {"ids": source_record_ids})
 
 
 def mark_publications_for_grouping(conn: Connection, publication_ids: list[int]) -> int:
@@ -429,6 +435,7 @@ def _apply(
     membership_changed: set[int] = set()
     created = 0
     splits = 0
+    assignments: dict[int, int] = {}
 
     # Groupes : chaque enregistrement source rejoint son ancre, ou une publication créée.
     # Une publication est créée pour des orphelins du périmètre, ou pour la partition perdante d'une scission.
@@ -443,11 +450,12 @@ def _apply(
             created += 1
             if from_existing:
                 splits += 1
-        repoint_source_records(conn, list(group.source_record_ids), target)
+        assignments.update(dict.fromkeys(group.source_record_ids, target))
         survivors.add(target)
         for source_record in group.source_record_ids:
             if (previous := rows_by_source_record[source_record].publication_id) != target:
                 membership_changed.update(p for p in (previous, target) if p is not None)
+    repoint_source_records(conn, assignments)
 
     # Détachements : les enregistrements sources écartés et les membres d'une partition incapable de fonder une publication deviennent orphelins.
     # Leur ancienne publication est recalculée, et supprimée si elle reste sans enregistrement source.
