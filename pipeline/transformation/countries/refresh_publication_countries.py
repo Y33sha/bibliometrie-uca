@@ -1,7 +1,7 @@
 """Recalcul des pays des contributions sources, des enregistrements sources et des publications à partir de `addresses.countries`.
 
 Trois caches dénormalisés, en cascade :
-  1. `source_contributions.countries` — pays retenus des adresses de la contribution source, pays de ses organisations ROR sans adresse et de ses structures HAL.
+  1. `source_contributions.countries` — pays retenus des adresses de la contribution source, à défaut pays de ses organisations ROR sans adresse ; pays de ses structures HAL.
   2. `source_records.countries` — union des `source_contributions.countries` de l'enregistrement source.
   3. `publications.countries` — union des `source_records.countries` de même publication_id.
 
@@ -71,6 +71,11 @@ _SOURCE_CONTRIBUTION_COUNTRIES_FROM_SCOPE = """,
         JOIN source_contribution_rors scr ON scr.source_contribution_id = s.id
         JOIN ror_organizations ro ON ro.ror_id = scr.ror_id
         WHERE scr.address_id IS NULL
+          AND NOT EXISTS (
+              SELECT 1 FROM source_contribution_addresses sca
+              JOIN addresses a ON a.id = sca.address_id
+              WHERE sca.source_contribution_id = s.id AND cardinality(a.countries) > 0
+          )
         UNION
         SELECT h.source_contribution_id, hs.country_code::text
         FROM scoped_sa s

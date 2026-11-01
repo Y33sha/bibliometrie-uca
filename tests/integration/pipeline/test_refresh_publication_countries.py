@@ -16,6 +16,7 @@ from domain.normalize import normalize_text
 from pipeline.transformation.countries.refresh_publication_countries import refresh
 from tests.integration.helpers.addresses import insert_address
 from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.rors import insert_ror_tree
 from tests.integration.helpers.sources import (
     insert_source_contribution,
     insert_source_contribution_address,
@@ -125,6 +126,51 @@ class TestCascade:
 
         assert updated == 0
         assert _get_publication_countries(sa_sync_conn, publication) is None
+
+
+class TestRorWithoutAddress:
+    """Les pays d'une contribution source viennent de ses adresses, à défaut de ses ROR sans adresse."""
+
+    def _contribution(self, conn, address_countries: list[str] | None) -> tuple[int, int]:
+        """Insère une contribution source qui cite sans adresse le laboratoire allemand, avec une adresse aux pays `address_countries` (aucune adresse pour `None`). Renvoie l'enregistrement source et la contribution source.
+
+        La contribution source est en file pour le recalcul des pays (`insert_source_contribution`).
+        """
+        insert_ror_tree(conn)
+        source_record = _source_record(conn, insert_publication(conn), source_id="W1")
+        sa = _insert_source_contribution(conn, source_record)
+        conn.execute(
+            text(
+                "INSERT INTO source_contribution_rors (source_contribution_id, ror_id)"
+                " VALUES (:s, '0ger00001')"
+            ),
+            {"s": sa},
+        )
+        if address_countries is not None:
+            addr = insert_address(conn, "addr", countries=address_countries or None)
+            insert_source_contribution_address(conn, sa, address_id=addr)
+        return source_record, sa
+
+    def test_les_pays_des_adresses_l_emportent(self, sa_sync_conn, log):
+        source_record, _ = self._contribution(sa_sync_conn, ["fr"])
+
+        refresh(sa_sync_conn, log)
+
+        assert _get_source_record_countries(sa_sync_conn, source_record) == ["fr"]
+
+    def test_le_ror_donne_le_pays_d_une_adresse_sans_pays(self, sa_sync_conn, log):
+        source_record, _ = self._contribution(sa_sync_conn, [])
+
+        refresh(sa_sync_conn, log)
+
+        assert _get_source_record_countries(sa_sync_conn, source_record) == ["de"]
+
+    def test_le_ror_donne_le_pays_d_une_contribution_source_sans_adresse(self, sa_sync_conn, log):
+        source_record, _ = self._contribution(sa_sync_conn, None)
+
+        refresh(sa_sync_conn, log)
+
+        assert _get_source_record_countries(sa_sync_conn, source_record) == ["de"]
 
 
 class TestIdempotence:
