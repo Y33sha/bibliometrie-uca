@@ -4,7 +4,6 @@
 
 ### En cours
 
-- [Preprints et versions d'une publication](DATA_preprints-et-versions.md)
 - [Audit de la qualité de la résolution des personnes](DATA_audit-qualite-resolution-personnes.md)
 - [Pertinence des sujets](DATA_pertinence-des-sujets.md)
 - [Vocabulaires des sujets](DATA_vocabulaires-des-sujets.md)
@@ -20,6 +19,7 @@
 
 ## Chantiers archivés
 
+- 2026-11-01 — [Preprints et versions d'une publication](archived/2026-11-01_DATA_preprints-et-versions.md)
 - 2026-11-01 — [Qualité du référentiel de l'édition](archived/2026-11-01_DATA_referentiel-edition.md)
 - 2026-10-31 — [Date de publication](archived/2026-10-31_DATA_date-de-publication.md)
 - 2026-10-31 — [URL de résolution des DOI](archived/2026-10-31_DATA_url-de-resolution-des-doi.md)

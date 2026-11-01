@@ -143,17 +143,6 @@ Règle simulée : les discussions Copernicus forment un serveur de preprints, au
 
 Après remédiation : 94 publications fusionnent, la fusion fausse comprise. 103 discussion papers restent seuls. 96 sont des preprints sans revue. 5 sont des articles : leur dépôt HAL est un article de revue. 2 sont des preprints à revue donnée par OpenAlex. Leur statut open access reste `gold`, verdict d'Unpaywall.
 
-### Doublons hors preprints, mesure du 2026-11-01
-
-3 758 paires de publications ont le même titre normalisé, à un an près, l'une au moins dans le périmètre : 1 432 à deux DOI, 1 781 à un seul DOI, 545 sans DOI.
-
-- **Enregistrements sources sans identifiant.** 13 990 enregistrements sources WoS et 1 677 OpenAlex ont un DOI au staging et aucun identifiant. Leur payload est absent du raw store, donc le remplissage de `source_record_identifiers` les a laissés vides. Le oneshot `fill_missing_source_record_dois` lisait la colonne `doi`, retirée depuis. 3 018 de ces enregistrements WoS ont le DOI d'une autre publication : ils forment l'essentiel des paires à un seul DOI (WoS de type `editorial`, `review` ou `letter` face à un `article`, ou d'une autre année).
-- **Archives de copies hors registre** : Apollo, l'archive de Cambridge (`10.17863`, 184 paires), ZORA, celle de Zurich (`10.5167`, 31).
-- **Serveur de preprints hors registre** : ESSOAr (`10.1002/essoar.`, 21 paires).
-- **DOI d'une même œuvre chez un éditeur** : versions eLife (`10.7554/elife.<n>.<version>`, 29 paires), DOI provisoires d'Inderscience (`10.1504/<revue>.<année>.100…`, 10), éditions d'Angewandte Chemie (`ange` et `anie`, 4).
-- **Preprints reliés par le seul titre** : discussions Copernicus (57 paires), SSRN (15), arXiv (13), RWTH (13).
-- **Faux doublons** : chapitres au titre de leur ouvrage (Cairn, 226 paires), jeux de données au titre de leur article (Figshare, 156), version de congrès et version de revue d'un article (33).
-
 ## Décisions
 
 - **Un preprint et sa version publiée forment une seule publication quand une clé de confirmation les réunit.** Seuls les DOI extérieurs aux serveurs de preprints du registre coupent les regroupements. Une communication sans actes, une HDR ou un article sans localisation éditeur réunit ainsi ses copies de serveurs de preprints.
@@ -204,4 +193,20 @@ Après remédiation : 94 publications fusionnent, la fusion fausse comprise. 103
 
 ## Questions ouvertes
 
-- **Doublons hors preprints.** Copies de repository (Apollo), articles à deux DOI, revues qui changent de préfixe DOI, articles vus par le seul WoS sans DOI (301756) : chaque copie ou double DOI forme une publication de plus.
+- **Doublons hors preprints.** Sur la base locale, le 2026-11-01, 3 758 paires de publications ont le même titre normalisé, à un an près, l'une au moins dans le périmètre : 1 432 à deux DOI, 1 781 à un seul DOI, 545 sans DOI.
+  - **Enregistrements sources sans identifiant.** 13 990 enregistrements sources WoS et 1 677 OpenAlex ont un DOI au staging et aucun identifiant. Leur payload est absent du raw store, donc le remplissage de `source_record_identifiers` les a laissés vides. Le oneshot `fill_missing_source_record_dois` lisait la colonne `doi`, retirée depuis. 3 018 de ces enregistrements WoS ont le DOI d'une autre publication. Ils forment l'essentiel des paires à un seul DOI : WoS de type `editorial`, `review` ou `letter` face à un `article`, ou d'une autre année. Remède : écrire le DOI du staging dans la table, au rôle donné par la normalisation (secondaire pour WoS, dérivé pour OpenAlex), puis marquer ces enregistrements sources pour la réconciliation. Contrôle en production :
+
+    ```sql
+    SELECT sr.source, count(*) FROM sources.staging st
+    JOIN sources.source_records sr ON sr.source = st.source AND sr.source_id = st.source_id
+    WHERE st.doi IS NOT NULL
+      AND NOT EXISTS (SELECT 1 FROM sources.source_record_identifiers i WHERE i.source_record_id = sr.id)
+    GROUP BY 1;
+    ```
+
+  - **Archives de copies hors registre** : Apollo, l'archive de Cambridge (`10.17863`, 184 paires), ZORA, celle de Zurich (`10.5167`, 31). Elles relèvent des DOI de dépôt, après une mesure des fusions par clé partagée.
+  - **Serveur de preprints hors registre** : ESSOAr (`10.1002/essoar.`, 21 paires).
+  - **DOI d'une même œuvre chez un éditeur** : versions eLife (`10.7554/elife.<n>.<version>`, 29 paires), DOI provisoires d'Inderscience (`10.1504/<revue>.<année>.100…`, 10), éditions d'Angewandte Chemie (`ange` et `anie`, 4).
+  - **Preprints reliés par le seul titre** : discussions Copernicus (57 paires), SSRN (15), arXiv (13), RWTH (13). La fusion manuelle les réunit.
+  - **Faux doublons** : chapitres au titre de leur ouvrage (Cairn, 226 paires), jeux de données au titre de leur article (Figshare, 156), version de congrès et version de revue d'un article (33).
+  - **Paires sans DOI** (545), à analyser : surtout des dépôts HAL, dont 324 paires reliées par `is_related_to`.
