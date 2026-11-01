@@ -10,6 +10,7 @@
   import PublicationsListView from "#lib/components/PublicationsListView.svelte";
   import TabNav from "#lib/components/TabNav.svelte";
   import SortChevron from "#lib/components/SortChevron.svelte";
+  import ClampedBlock from "#lib/components/ClampedBlock.svelte";
   import { subjectVocabularyLabels } from "#lib/labels.js";
 
   type SubjectDetailResponse = components["schemas"]["SubjectDetailResponse"];
@@ -104,11 +105,17 @@
             <span class="muted-num">{v.usage_count.toLocaleString("fr-FR")} publications</span>
           </div>
           {#if v.children.length > 0}
-            <div class="detail-tags">
-              {#each v.children as c (c.label_normalized)}
-                <a href={resolve(`subjects/${c.label_normalized}`)}>{c.label} <span class="muted-num">{c.usage_count.toLocaleString("fr-FR")}</span></a>
-              {/each}
-            </div>
+            <div class="detail-sublabel">Sous-sujets</div>
+            <!-- Deux lignes et demie de pastilles. -->
+            {#key `${data.subject.label_normalized}:${v.vocabulary}:${v.code}`}
+              <ClampedBlock maxHeight="4.5rem" moreLabel={`Voir les ${v.children.length} sous-sujets`}>
+                <div class="detail-tags">
+                  {#each v.children as c (c.label_normalized)}
+                    <a href={resolve(`subjects/${c.label_normalized}`)}>{c.label} <span class="muted-num">{c.usage_count.toLocaleString("fr-FR")}</span></a>
+                  {/each}
+                </div>
+              </ClampedBlock>
+            {/key}
           {/if}
         </div>
       {/each}
