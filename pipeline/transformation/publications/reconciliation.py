@@ -111,69 +111,64 @@ _DOI_KEY_SQL = (
     f" AND {{a}}.role <> '{SourceIdentifierRole.RELATED.value}'"
 )
 
+# Le voisinage s'unit sur les seuls identifiants : une clé partagée par k enregistrements sources produit k² paires. Les colonnes se calculent ensuite une fois par enregistrement source.
 _UNIVERSE_SQL = text(f"""
     WITH dirty AS (
-        SELECT {_COLS.format(a="sr")}
+        SELECT sr.id, sr.source, sr.source_id, sr.doc_type, sr.title_normalized, sr.publication_year
         FROM {_SNAPSHOT} m
         JOIN source_records sr ON sr.id = m.id
-        LEFT JOIN publications p ON p.id = sr.publication_id
+    ), neighbours AS (
+        SELECT id FROM dirty
+        UNION
+        -- DOI : une clé DOI de l'autre enregistrement source égale à une clé DOI de `d`, cible
+        -- appliquée (`doi_targets`), par l'index `idx_source_record_identifiers_value`.
+        SELECT oi.source_record_id
+        FROM dirty d
+        JOIN source_record_identifiers di ON di.source_record_id = d.id AND {_DOI_KEY_SQL.format(a="di")}
+        JOIN source_record_identifiers oi
+          ON oi.id_type = di.id_type AND oi.id_value = {doi_or_target_sql("di.id_value")}
+             AND {_DOI_KEY_SQL.format(a="oi")}
+        UNION
+        -- DOI d'une forme secondaire dont la cible est une clé DOI de `d`.
+        SELECT oi.source_record_id
+        FROM dirty d
+        JOIN source_record_identifiers di ON di.source_record_id = d.id AND {_DOI_KEY_SQL.format(a="di")}
+        JOIN doi_targets t ON t.target_doi = {doi_or_target_sql("di.id_value")}
+        JOIN source_record_identifiers oi
+          ON oi.id_type = di.id_type AND oi.id_value = t.doi AND {_DOI_KEY_SQL.format(a="oi")}
+        UNION
+        -- Identifiants : même type et même valeur, clé de confirmation de part et d'autre (index
+        -- `idx_source_record_identifiers_value`).
+        SELECT oi.source_record_id
+        FROM dirty d
+        JOIN source_record_identifiers di
+          ON di.source_record_id = d.id AND {_CONFIRMATION_KEY_SQL.format(a="di")}
+        JOIN source_record_identifiers oi
+          ON oi.id_type = di.id_type AND oi.id_value = di.id_value
+             AND {_CONFIRMATION_KEY_SQL.format(a="oi")}
+        UNION
+        -- Token metadata_block : même doc_type + titre + année, pour tout doc_type, titre assez long.
+        SELECT o.id
+        FROM dirty d
+        JOIN source_records o
+          ON o.doc_type = d.doc_type
+             AND o.title_normalized = d.title_normalized
+             AND o.publication_year = d.publication_year
+        WHERE d.doc_type IS NOT NULL
+          AND length(d.title_normalized) > {DISCRIMINANT_TITLE_MIN_LENGTH}
+          AND d.publication_year IS NOT NULL
+        UNION
+        -- Fusion manuelle : les enregistrements sources désignés par une même fusion manuelle.
+        SELECT o.id
+        FROM dirty d
+        JOIN manual_merge_source_records dm ON dm.source = d.source AND dm.source_id = d.source_id
+        JOIN manual_merge_source_records m ON m.manual_merge_id = dm.manual_merge_id
+        JOIN source_records o ON o.source = m.source AND o.source_id = m.source_id
     )
-    SELECT id, identifiers, publication_id, doc_type, title_normalized, publication_year,
-           is_matchable, publication_doi, in_perimeter, manual_merge_ids
-    FROM dirty
-    UNION
-    -- DOI : une clé DOI de l'autre enregistrement source égale à une clé DOI de `d`, cible
-    -- appliquée (`doi_targets`), par l'index `idx_source_record_identifiers_value`.
     SELECT {_COLS.format(a="o")}
-    FROM dirty d
-    JOIN source_record_identifiers di ON di.source_record_id = d.id AND {_DOI_KEY_SQL.format(a="di")}
-    JOIN source_record_identifiers oi
-      ON oi.id_type = di.id_type AND oi.id_value = {doi_or_target_sql("di.id_value")}
-         AND {_DOI_KEY_SQL.format(a="oi")}
-    JOIN source_records o ON o.id = oi.source_record_id
+    FROM neighbours n
+    JOIN source_records o ON o.id = n.id
     LEFT JOIN publications p ON p.id = o.publication_id
-    UNION
-    -- DOI d'une forme secondaire dont la cible est une clé DOI de `d`.
-    SELECT {_COLS.format(a="o")}
-    FROM dirty d
-    JOIN source_record_identifiers di ON di.source_record_id = d.id AND {_DOI_KEY_SQL.format(a="di")}
-    JOIN doi_targets t ON t.target_doi = {doi_or_target_sql("di.id_value")}
-    JOIN source_record_identifiers oi
-      ON oi.id_type = di.id_type AND oi.id_value = t.doi AND {_DOI_KEY_SQL.format(a="oi")}
-    JOIN source_records o ON o.id = oi.source_record_id
-    LEFT JOIN publications p ON p.id = o.publication_id
-    UNION
-    -- Identifiants : même type et même valeur, clé de confirmation de part et d'autre (index
-    -- `idx_source_record_identifiers_value`).
-    SELECT {_COLS.format(a="o")}
-    FROM dirty d
-    JOIN source_record_identifiers di
-      ON di.source_record_id = d.id AND {_CONFIRMATION_KEY_SQL.format(a="di")}
-    JOIN source_record_identifiers oi
-      ON oi.id_type = di.id_type AND oi.id_value = di.id_value
-         AND {_CONFIRMATION_KEY_SQL.format(a="oi")}
-    JOIN source_records o ON o.id = oi.source_record_id
-    LEFT JOIN publications p ON p.id = o.publication_id
-    UNION
-    -- Token metadata_block : même doc_type + titre + année, pour tout doc_type, titre assez long.
-    SELECT {_COLS.format(a="o")}
-    FROM dirty d
-    JOIN source_records o
-      ON o.doc_type = d.doc_type
-         AND o.title_normalized = d.title_normalized
-         AND o.publication_year = d.publication_year
-    LEFT JOIN publications p ON p.id = o.publication_id
-    WHERE d.doc_type IS NOT NULL
-      AND length(d.title_normalized) > {DISCRIMINANT_TITLE_MIN_LENGTH}
-      AND d.publication_year IS NOT NULL
-    UNION
-    -- Fusion manuelle : les enregistrements sources désignés par une même fusion manuelle.
-    SELECT {_COLS.format(a="o")}
-    FROM dirty d
-    JOIN manual_merge_source_records m ON m.manual_merge_id = ANY(d.manual_merge_ids)
-    JOIN source_records o ON o.source = m.source AND o.source_id = m.source_id
-    LEFT JOIN publications p ON p.id = o.publication_id
-    WHERE cardinality(d.manual_merge_ids) > 0
 """)
 
 
