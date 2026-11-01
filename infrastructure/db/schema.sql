@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 8VYH6AHlVedH9y4jEJzxoazbb2W0K0FjEQig1jm4bHoslTXs28bfdLaAUYJcSyE
+\restrict FOzVqAkw0LSLpW2XqFpWYFbYpQ8wvaabm8J04JLN04WHHPmVnS49ZnfEnjecd0w
 
 -- Dumped from database version 18.4
 -- Dumped by pg_dump version 18.4
@@ -1861,7 +1861,6 @@ CREATE TABLE publications.publications_detail (
     publication_id integer NOT NULL,
     abstract text,
     keywords text[],
-    topics jsonb,
     biblio jsonb
 );
 
@@ -5775,5 +5774,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 8VYH6AHlVedH9y4jEJzxoazbb2W0K0FjEQig1jm4bHoslTXs28bfdLaAUYJcSyE
+\unrestrict FOzVqAkw0LSLpW2XqFpWYFbYpQ8wvaabm8J04JLN04WHHPmVnS49ZnfEnjecd0w
 
