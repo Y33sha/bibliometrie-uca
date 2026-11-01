@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict TURmMYkTj8neUYGcTz3uDc0pRgkHprBjzdC1p3oewIlZbJXBtAmDysfauKnKW6V
+\restrict IVQjXIRzJKIxBVC3uGvFS2UHQNND8PvfWZpBIT3nalBbZ8501O7NLPPyjaeZGI0
 
 -- Dumped from database version 18.4
 -- Dumped by pg_dump version 18.4
@@ -1269,7 +1269,6 @@ CREATE TABLE sources.source_records (
     is_retracted boolean,
     abstract text,
     keywords text[],
-    topics jsonb,
     biblio jsonb,
     source_extras jsonb,
     updated_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
@@ -5890,5 +5889,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict TURmMYkTj8neUYGcTz3uDc0pRgkHprBjzdC1p3oewIlZbJXBtAmDysfauKnKW6V
+\unrestrict IVQjXIRzJKIxBVC3uGvFS2UHQNND8PvfWZpBIT3nalBbZ8501O7NLPPyjaeZGI0
 

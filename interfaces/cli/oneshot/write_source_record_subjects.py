@@ -1,10 +1,10 @@
 # STATUS: oneshot (2026-11-01)
-"""Écrit les sujets des enregistrements sources déjà normalisés, avant la première dérivation de `publication_subjects`.
+"""Écrit les sujets des enregistrements sources OpenAlex déjà normalisés, lus dans le payload du raw store.
 
-HAL et ScanR lisent leurs sujets dans `source_records.topics`, qui garde le code des domaines HAL et le PPN des vedettes RAMEAU de ScanR. OpenAlex les lit dans le payload du raw store : `topics` garde les libellés sans les identifiants. Un enregistrement source OpenAlex sans payload au raw store reste sans sujet. Les thèses reçoivent leurs sujets au remoissonnage de theses.fr.
+Seuls les enregistrements sources OpenAlex sans sujet sont lus : un passage interrompu reprend où il s'est arrêté. Un enregistrement source sans payload au raw store reste sans sujet.
 
 Usage :
-    uv run python -m interfaces.cli.oneshot.write_source_record_subjects [--sources hal,scanr,openalex] [--dry-run]
+    uv run python -m interfaces.cli.oneshot.write_source_record_subjects [--dry-run]
 """
 
 from __future__ import annotations
@@ -13,77 +13,53 @@ import argparse
 import json
 import os
 from collections import Counter
-from collections.abc import Callable
 
-from sqlalchemy import Connection, Row, text
+from sqlalchemy import Connection, text
 
-from domain.sources.hal import hal_domain_subject
 from domain.subjects.subject import SubjectLink
-from domain.types import as_mapping, as_strs
+from domain.types import as_mapping
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.raw_store import UnreadablePayloadError, get_raw_store
 from pipeline.ingestion.common.subjects import SourceRecordSubjectStore
-from pipeline.ingestion.openalex.normalize import get_subjects as openalex_subjects
-from pipeline.ingestion.scanr.payload import scanr_subjects
+from pipeline.ingestion.openalex.normalize import get_subjects
 
 log = setup_logger("write_source_record_subjects", os.path.dirname(__file__))
 
 _BATCH = 1000
-_SOURCES = ("hal", "scanr", "openalex")
 
-_COUNT = text("SELECT count(*) FROM source_records WHERE source = CAST(:source AS source_type)")
+_WITHOUT_SUBJECTS = """
+    sr.source = 'openalex'
+    AND NOT EXISTS (SELECT 1 FROM source_record_subjects srs WHERE srs.source_record_id = sr.id)
+"""
 
-_BATCH_ROWS = text("""
-    SELECT id, source_id, topics
-    FROM source_records
-    WHERE source = CAST(:source AS source_type) AND id > :after
-    ORDER BY id
+_COUNT = text(f"SELECT count(*) FROM source_records sr WHERE {_WITHOUT_SUBJECTS}")
+
+_BATCH_ROWS = text(f"""
+    SELECT sr.id, sr.source_id
+    FROM source_records sr
+    WHERE {_WITHOUT_SUBJECTS} AND sr.id > :after
+    ORDER BY sr.id
     LIMIT :limit
 """)
 
 
-def _hal_links(row: Row) -> list[SubjectLink] | None:
-    entries = as_strs(as_mapping(row.topics).get("hal_domains"))
-    return [SubjectLink(subject) for entry in entries if (subject := hal_domain_subject(entry))]
-
-
-def _scanr_links(row: Row) -> list[SubjectLink] | None:
-    return scanr_subjects(row.topics)
-
-
-def _openalex_links(row: Row) -> list[SubjectLink] | None:
-    """Renvoie les topics du payload au raw store, ou `None` sans payload lisible."""
-    try:
-        work = json.loads(get_raw_store().get("openalex", row.source_id))
-    except KeyError, UnreadablePayloadError, ValueError:
-        return None
-    return openalex_subjects(as_mapping(work))
-
-
-_READERS: dict[str, Callable[[Row], list[SubjectLink] | None]] = {
-    "hal": _hal_links,
-    "scanr": _scanr_links,
-    "openalex": _openalex_links,
-}
-
-
-def _write_source(conn: Connection, source: str, *, dry_run: bool) -> None:
-    total = conn.execute(_COUNT, {"source": source}).scalar_one()
-    log.info("%s : %d enregistrements sources à traiter", source, total)
+def _write(conn: Connection, *, dry_run: bool) -> None:
+    total = conn.execute(_COUNT).scalar_one()
+    log.info("%d enregistrements sources OpenAlex sans sujet", total)
     store = SourceRecordSubjectStore(conn)
-    read = _READERS[source]
+    raw_store = get_raw_store()
     counts: Counter[str] = Counter()
     after = 0
-    while rows := conn.execute(
-        _BATCH_ROWS, {"source": source, "after": after, "limit": _BATCH}
-    ).all():
+    while rows := conn.execute(_BATCH_ROWS, {"after": after, "limit": _BATCH}).all():
         links_by_source_record: dict[int, list[SubjectLink]] = {}
         for row in rows:
-            links = read(row)
-            if links is None:
+            try:
+                work = json.loads(raw_store.get("openalex", row.source_id))
+            except KeyError, UnreadablePayloadError, ValueError:
                 counts["sans payload"] += 1
                 continue
+            links = get_subjects(as_mapping(work))
             counts["avec sujets" if links else "sans sujet"] += 1
             links_by_source_record[row.id] = links
         if links_by_source_record and not dry_run:
@@ -91,22 +67,16 @@ def _write_source(conn: Connection, source: str, *, dry_run: bool) -> None:
             conn.commit()
         after = rows[-1].id
         counts["traités"] += len(rows)
-        log.info("%s : %d / %d traités", source, counts["traités"], total)
-    log.info("%s : %s", source, dict(counts))
+        log.info("%d / %d traités", counts["traités"], total)
+    log.info("%s", dict(counts))
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--sources",
-        help=f"Sources à traiter, séparées par des virgules. Par défaut : {', '.join(_SOURCES)}.",
-    )
     parser.add_argument("--dry-run", action="store_true", help="Compte les sujets sans rien écrire")
     args = parser.parse_args()
-    sources = args.sources.split(",") if args.sources else list(_SOURCES)
     with get_sync_engine().connect() as conn:
-        for source in sources:
-            _write_source(conn, source, dry_run=args.dry_run)
+        _write(conn, dry_run=args.dry_run)
         if args.dry_run:
             log.info("Dry-run, rien écrit.")
 
