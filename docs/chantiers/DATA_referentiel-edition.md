@@ -22,6 +22,16 @@ Base locale au 2026-10-31 :
 - `serial_issns` compte 18 740 lignes pour 18 736 ISSN. Un ISSN retiré d'une revue par la vérification Sudoc reste dans une ligne sans revue.
 - D'après les ISSN-L des revues, 1 139 enregistrements sources donnent des ISSN de plusieurs ISSN-L, dans 449 publications : OpenAlex 542, ScanR 370, Crossref 116, HAL 90, WoS 21. Pour 1 011 d'entre eux, l'un des ISSN est celui d'un titre précédent, d'un titre suivant ou d'un supplément.
 
+Base locale au 2026-11-01, après le rattachement par ISSN-L :
+
+- 12 267 revues, contre 11 023 : 1 374 créées, dont 373 sans ISSN ; 130 disparues, dont 54 absorbées avec une redirection. Les quatre titres partagés par deux revues restent sur deux revues.
+- Un titre précédent garde sa revue : « Physical review D Particles and fields » (0556-2821) à côté de « Physical review D » (2470-0010), « Materials in engineering » à côté de « Materials & design ». Un enregistrement source DataCite de 2022 donne l'ISSN du titre précédent de Physical Review D.
+- 118 titres Sudoc sont partagés par plusieurs ISSN-L, et 60 d'entre eux ont des enregistrements sources sur deux revues. 54 opposent un ISSN papier et un ISSN électronique. Le Sudoc donne parfois un ISSN-L faux : 0093-4127, ISSN du titre précédent, pour l'ISSN papier de Journal of Comparative Psychology (0735-7036).
+- 3 839 ISSN sont sans notice Sudoc, donc sans ISSN-L Sudoc. 2 734 enregistrements sources donnent un tel ISSN à côté d'ISSN d'une autre revue. Les combinaisons les plus fréquentes réunissent des revues distinctes : titres successifs (Physical Review C, INRA et INRAE productions animales), éditions (The Conversation, Australie et France).
+- 812 revues sans ISSN ont des enregistrements sources. 62 ont un titre compatible avec une seule revue à ISSN : vraies variantes (« Geochim.Cosmochim.Acta ») et faux acronymes (« Act II » et « AI »). 132 ont un titre compatible avec plusieurs revues à ISSN, souvent deux revues de même titre Sudoc.
+- 55 titres sont partagés par plusieurs revues sans ISSN, dont 54 collections de monographies. Les actes SciTePress se répartissent entre deux éditeurs (79458, 15030).
+- Le titulaire du préfixe DOI Crossref départagerait 5 enregistrements sources rattachés par un titre de plusieurs revues à ISSN. 6 monographies ont une collection sans ISSN et aucun éditeur.
+
 CRISalid, Academic Observatory et OpenAIRE identifient la revue par ses seuls ISSN ou ISSN-L, et recalculent le rattachement des publications à chaque passage ([benchmark](archived/2026-10-12_benchmark-pipelines.md)).
 
 ### Éditeurs
@@ -91,11 +101,11 @@ Les personnes et les publications ont un volet latéral (`PersonDrawer`, `Public
 - [x] Administration : ISSN en lecture seule, fusion limitée aux revues sans ISSN et gardée dans la table des titres (27f9ef446)
 - [x] Normalisation sans recherche ni création de revue. Collection sans ISSN des monographies : revue sans ISSN de son titre et de son éditeur (27f9ef446)
 - [x] Retrait de `serial_name_forms`, de `find_or_create_serial` et des règles de fusion remplacées par le calcul et les relations (27f9ef446)
-- [ ] Comparaison des revues avant et après sur le stock, dont les quatre titres partagés par deux revues et les titres de Materials & Design (67208, 106232) et de Physical Review D (9, 106629)
-- [ ] Mesure des ISSN-L distincts de même titre Sudoc : « Perspectives médiévales », 0338-2338 et 2103-6527
-- [ ] Mesure des ISSN sans ISSN-L donnés ensemble par un même enregistrement source
-- [ ] Mesure des séries sans ISSN de titre compatible avec une revue à ISSN, sans autre enregistrement source de leur publication rattaché à cette revue
-- [ ] Mesure des collections sans ISSN des monographies réparties entre plusieurs éditeurs
+- [x] Comparaison des revues avant et après sur le stock, dont les quatre titres partagés par deux revues et les titres de Materials & Design (67208, 106232) et de Physical Review D (9, 106629)
+- [x] Mesure des ISSN-L distincts de même titre Sudoc : « Perspectives médiévales », 0338-2338 et 2103-6527
+- [x] Mesure des ISSN sans ISSN-L donnés ensemble par un même enregistrement source
+- [x] Mesure des séries sans ISSN de titre compatible avec une revue à ISSN, sans autre enregistrement source de leur publication rattaché à cette revue
+- [x] Mesure des collections sans ISSN des monographies réparties entre plusieurs éditeurs
 
 ### Phase 2 — Éditeurs
 
