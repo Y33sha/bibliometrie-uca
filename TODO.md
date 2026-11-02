@@ -1,6 +1,6 @@
 # Pipeline
 ## Extraction
-* [ ] Dimensions?; ArXiv, PMC, Pubmed; Sudoc? (liens personnes-thèses plus complets que theses.fr, j'ai l'impression); Cairn, Persée pour augmenter couverture SHS? creuser ISTEX
+* [ ] Dimensions?; Sudoc? (liens personnes-thèses plus complets que theses.fr, j'ai l'impression); Cairn, Persée pour augmenter couverture SHS? creuser ISTEX
 * [ ] payloads bruts: ne plus faire transiter par la base?
 ## Suite du traitement
 * [ ] normalisation en parallèle de l'extraction?
@@ -16,7 +16,6 @@
 * [ ] fusionner structures
 * [ ] bloquer les opérations destructrices côté admin lorsque le pipeline est actif (recenser les actions qui peuvent poser problème)
 ## Publique
-* [ ] page "affiliations divergentes hal": requête incorrecte, capture trop de publis
 * [ ] auteur premier, dernier, correspondant: sur les facettes et les stats
 * [ ] stats en compte fractionnaire vs compte entier?
 ### Visualisation
