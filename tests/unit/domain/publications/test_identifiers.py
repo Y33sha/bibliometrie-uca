@@ -20,9 +20,7 @@ from domain.publications.identifiers import (
     extract_doi_from_url,
     find_isbns,
     is_hal_host,
-    issn_rejection_reason,
     issn_search_prefix,
-    issn_typo_candidates,
     normalize_arxiv_id,
     normalize_pmcid,
     normalize_pmid,
@@ -440,28 +438,6 @@ class TestIssnSearchPrefix:
     )
     def test_ecarte_ce_qui_n_est_pas_un_issn(self, raw):
         assert issn_search_prefix(raw) is None
-
-
-class TestIssnRejectionReason:
-    def test_wrong_check_digit(self):
-        """Cas réel : les sources donnent `1365-8711` à Monthly Notices of the Royal Astronomical Society."""
-        assert issn_rejection_reason("1365-8711") == "clé de contrôle fausse"
-
-    def test_invalid_form(self):
-        assert issn_rejection_reason("(Internet)") == "forme invalide"
-
-
-class TestIssnTypoCandidates:
-    def test_substitution_and_transposition(self):
-        assert "1468-2494" in issn_typo_candidates("1467-2494")  # chiffre remplacé
-        assert "1365-4632" in issn_typo_candidates("1365-4362")  # voisins inversés
-
-    def test_candidates_are_valid_issns(self):
-        assert all(ISSN.try_parse(c) for c in issn_typo_candidates("1467-2494"))
-
-    def test_value_of_another_length(self):
-        assert issn_typo_candidates("(Internet)") == frozenset()
-        assert issn_typo_candidates("1950-629") == frozenset()
 
 
 class TestISBN:

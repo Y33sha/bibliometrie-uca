@@ -115,11 +115,10 @@ class DoiPrefix(NormalizedIdentifier):
 
 
 # Dépôt HAL : `<code de portail>-<numéro>`, `_` pour séparateur sur ArchiveSIC. Tout code est accepté. Au moins 8 chiffres, pour écarter des fragments d'URL (`pubdb-2020`).
-HAL_DOC_PATTERN = r"[a-z][a-z0-9]*[-_]\d{8,}"
-"""Motif d'un identifiant de dépôt HAL, insensible à la casse ; repris en SQL par `sql_fragments`."""
-_HAL_DOC_BASE = re.compile(f"({HAL_DOC_PATTERN})", re.IGNORECASE)
+_HAL_DOC_PATTERN = r"[a-z][a-z0-9]*[-_]\d{8,}"
+_HAL_DOC_BASE = re.compile(f"({_HAL_DOC_PATTERN})", re.IGNORECASE)
 # Identifiant HAL nu, suffixe de version compris.
-_BARE_HAL_ID = re.compile(f"({HAL_DOC_PATTERN})(?:v\\d+)?", re.IGNORECASE)
+_BARE_HAL_ID = re.compile(f"({_HAL_DOC_PATTERN})(?:v\\d+)?", re.IGNORECASE)
 
 # Autorité d'un identifiant OAI-PMH `[<préfixe>:]oai:<autorité>:<id local>`, comme `oai:HAL:hal-04123456v1` dans les localisations OpenAlex.
 _OAI_AUTHORITY = re.compile(r"(?:^|:)oai:([^:]+):", re.IGNORECASE)
@@ -290,13 +289,6 @@ def _normalize_issn(raw: str | None) -> str | None:
     return f"{first}-{middle}{check}"
 
 
-def issn_rejection_reason(raw: str) -> str:
-    """Renvoie le motif du rejet d'une valeur d'ISSN : clé de contrôle fausse si la forme `NNNN-NNNC` est respectée, forme invalide sinon."""
-    if _ISSN_RE.fullmatch(raw.strip().translate(_DASH_TRANSLATION)):
-        return "clé de contrôle fausse"
-    return "forme invalide"
-
-
 class ISSN(NormalizedIdentifier):
     """International Standard Serial Number (`NNNN-NNNC`), clé de contrôle vérifiée."""
 
@@ -320,16 +312,6 @@ def isbn_search_prefix(raw: str) -> str | None:
     """Renvoie le début d'ISBN-13 d'un terme de recherche, sans séparateur ; `None` si le terme n'a pas cette forme. Un ISBN-13 commence par 978 ou 979."""
     cleaned = _SEPARATORS_RE.sub("", raw.strip().translate(_DASH_TRANSLATION))
     return cleaned if _ISBN_SEARCH_RE.fullmatch(cleaned) else None
-
-
-def issn_typo_candidates(raw: str) -> frozenset[str]:
-    """Renvoie les ISSN valides à une faute de frappe près d'une valeur : un caractère remplacé, ou deux caractères voisins inversés. Vide si la valeur n'a pas huit caractères hors tiret."""
-    s = raw.replace("-", "").strip().upper()
-    if len(s) != 8:
-        return frozenset()
-    variants = [s[:i] + c + s[i + 1 :] for i in range(8) for c in "0123456789X" if c != s[i]]
-    variants += [s[:i] + s[i + 1] + s[i] + s[i + 2 :] for i in range(7) if s[i] != s[i + 1]]
-    return frozenset(str(issn) for v in variants if (issn := ISSN.try_parse(v)))
 
 
 _ISBN_PREFIX_RE = re.compile(r"ISBN(?:-1[03])?[:\s]*", re.IGNORECASE)
@@ -381,10 +363,10 @@ def find_isbns(text: str | None) -> list[str]:
     return found
 
 
-def meme_registrant(doi_a: str | None, doi_b: str | None) -> bool:
+def same_registrant(doi_a: str | None, doi_b: str | None) -> bool:
     """Vrai si deux DOI ont le même préfixe, donc le même registrant."""
-    prefixe = DoiPrefix.try_parse(doi_a)
-    return prefixe is not None and prefixe == DoiPrefix.try_parse(doi_b)
+    prefix = DoiPrefix.try_parse(doi_a)
+    return prefix is not None and prefix == DoiPrefix.try_parse(doi_b)
 
 
 def extract_doi_from_url(url: str | None) -> str | None:

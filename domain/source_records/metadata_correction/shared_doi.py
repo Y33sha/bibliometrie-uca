@@ -11,7 +11,7 @@ from itertools import combinations
 from typing import NamedTuple
 
 from domain.publications.doc_types import DocType
-from domain.publications.identifiers import NNT, HALId, doi_version, meme_registrant
+from domain.publications.identifiers import NNT, HALId, doi_version, same_registrant
 from domain.source_records.identifiers import SourceIdentifier, SourceIdentifierType
 from domain.source_records.keys import CONFIRMATION_ID_TYPES
 from domain.sources.registry import AGGREGATOR_SOURCES, Source
@@ -73,7 +73,7 @@ def meme_oeuvre_declaree(
 
     Une pièce de dataset rejoint son parent, et deux DOI d'un même registrant forment une seule œuvre. Entre deux registrants, une copie de repository rejoint la forme publiée, sauf un enregistrement source `preprint`. Une version d'un autre registrant relie deux œuvres, comme un preprint arXiv et l'article publié.
     """
-    if case is DoiTargetRule.DATACITE_PACKAGE_PIECE or meme_registrant(own_doi, target_doi):
+    if case is DoiTargetRule.DATACITE_PACKAGE_PIECE or same_registrant(own_doi, target_doi):
         return True
     return case is DoiTargetRule.DATACITE_VARIANT_TO_PRIMARY and doc_type != DocType.PREPRINT
 
