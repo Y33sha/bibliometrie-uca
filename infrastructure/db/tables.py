@@ -51,7 +51,7 @@ from domain.persons.person import PersonExclusion
 from domain.platforms.platform import PlatformType
 from domain.publications.author_grouping import GroupingMethod
 from domain.publications.dates import DatePrecision
-from domain.publications.doc_types import DOC_TYPES
+from domain.publications.doc_types import DocType
 from domain.publications.licenses import License
 from domain.publications.metadata import OA_RANK
 from domain.publications.relations import RelationType
@@ -677,7 +677,7 @@ platform_type_enum = PgEnum(*PlatformType, name="platform_type", create_type=Fal
 
 perimeter_evidence_enum = PgEnum(*PerimeterEvidence, name="perimeter_evidence", create_type=False)
 
-doc_type_enum = PgEnum(*DOC_TYPES, name="doc_type", create_type=False)
+doc_type_enum = PgEnum(*DocType, name="doc_type", create_type=False)
 date_precision_enum = PgEnum(*DatePrecision, name="date_precision", create_type=False)
 
 
