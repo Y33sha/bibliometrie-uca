@@ -1,5 +1,7 @@
-import { Chart, registerables, type Element, type Plugin, type VisualElement } from 'chart.js';
+import { Chart, registerables, type BarElement, type Element, type FontSpec, type Plugin, type VisualElement } from 'chart.js';
+import { toFont } from 'chart.js/helpers';
 import ChartDataLabels from 'chartjs-plugin-datalabels';
+import type { Context as DataLabelsContext } from 'chartjs-plugin-datalabels';
 import { cssColor, cssVar, fontSize } from './cssVar';
 
 /** Opacité des éléments de l'année en cours, incomplète. */
@@ -44,5 +46,26 @@ Chart.register(...registerables, ChartDataLabels, currentYearPlugin);
 Chart.defaults.font.family = cssVar('font');
 Chart.defaults.font.size = fontSize('sm');
 Chart.defaults.color = cssColor('text-secondary');
+
+/** Marge intérieure minimale autour d'une étiquette de valeur dans son segment de barre, en pixels. */
+const BAR_LABEL_PADDING = 4;
+
+/**
+ * Vrai si `text`, écrit dans la police `font`, tient dans le segment de barre de l'étiquette `ctx` : en longueur et en épaisseur, marges comprises.
+ */
+export function fitsInBar(ctx: DataLabelsContext, text: string, font: Partial<FontSpec>): boolean {
+	const bar = ctx.chart.getDatasetMeta(ctx.datasetIndex).data[ctx.dataIndex] as BarElement;
+	const { x, y, base, width, height, horizontal } = bar.getProps(['x', 'y', 'base', 'width', 'height', 'horizontal'], true);
+	const length = Math.abs(((horizontal ? x : y) ?? base) - base);
+	const thickness = horizontal ? height : width;
+	const resolved = toFont(font);
+	const canvas = ctx.chart.ctx;
+	canvas.save();
+	canvas.font = resolved.string;
+	const textLength = canvas.measureText(text).width;
+	canvas.restore();
+	const [along, across] = horizontal ? [textLength, resolved.lineHeight] : [resolved.lineHeight, textLength];
+	return length >= along + 2 * BAR_LABEL_PADDING && thickness >= across;
+}
 
 export { Chart };

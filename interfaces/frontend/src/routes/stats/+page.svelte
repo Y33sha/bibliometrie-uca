@@ -3,7 +3,7 @@
 	import { onMount, tick } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { api, latestRequest } from '#lib/api/index.js';
-	import { Chart } from '#lib/components/charts/chart.js';
+	import { Chart, fitsInBar } from '#lib/components/charts/chart.js';
 	import { cssColor, fontSize } from '#lib/components/charts/cssVar.js';
 	import { readableOn } from '#lib/components/charts/contrast.js';
 	import Pagination from '#lib/components/Pagination.svelte';
@@ -297,6 +297,15 @@
 			for (const d of datasets) d.data = d.data.map((c, ci) => (totals[ci] ? ((c as number) / totals[ci]) * 100 : 0));
 		}
 
+		// Étiquette d'un segment : sa part dans la barre, affichée seulement si elle tient dans le segment.
+		const BAR_LABEL_FONT = { weight: 'bold' as const };
+		const barShareLabel = (ctx: { chart: Chart; dataIndex: number; datasetIndex: number }) => {
+			const datasets = ctx.chart.data.datasets;
+			const total = datasets.reduce((s, ds) => s + ((ds.data[ctx.dataIndex] as number) || 0), 0);
+			const val = (datasets[ctx.datasetIndex].data[ctx.dataIndex] as number) || 0;
+			return total ? Math.round((val / total) * 100) + '%' : '';
+		};
+
 		yearChart = new Chart(chartCanvas, {
 			type: 'bar',
 			plugins: [whiteBgPlugin],
@@ -329,12 +338,9 @@
 					},
 					datalabels: {
 								color: (ctx) => readableOn(String(ctx.dataset.backgroundColor), cssColor('text')),
-								font: { weight: 'bold' },
-								formatter: (val: number, ctx) => {
-									const total = ctx.chart.data.datasets.reduce((s, ds) => s + ((ds.data[ctx.dataIndex] as number) || 0), 0);
-									const pct = total ? (val / total) * 100 : 0;
-									return pct >= 10 ? Math.round(pct) + '%' : '';
-								},
+								font: BAR_LABEL_FONT,
+								display: (ctx) => fitsInBar(ctx, barShareLabel(ctx), BAR_LABEL_FONT),
+								formatter: (_val: number, ctx) => barShareLabel(ctx),
 								anchor: 'center' as const,
 								align: 'center' as const,
 								listeners: {}
