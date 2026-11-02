@@ -24,7 +24,7 @@ from tests.integration.helpers.serials import insert_serial
 from tests.integration.helpers.sources import insert_source_record
 
 # Fiche RH du département « Test » par défaut.
-_rh = partial(insert_hr_record, department_name="Test")
+_rh = insert_hr_record
 
 # Personne normalisée par `lower`.
 _person = partial(insert_person, normalizer="lower")

@@ -104,24 +104,9 @@ def insert_hr_record(
     person_id: int,
     *,
     email: str | None = None,
-    department_name: str | None = None,
-    role_title: str | None = None,
-    start_date: datetime.date | None = None,
-    end_date: datetime.date | None = None,
 ) -> int:
     """Insère une fiche RH de la personne `person_id` et renvoie son `id`."""
-    return insert_row(
-        conn,
-        "hr_records",
-        {
-            "person_id": person_id,
-            "email": email,
-            "department_name": department_name,
-            "role_title": role_title,
-            "start_date": start_date,
-            "end_date": end_date,
-        },
-    )
+    return insert_row(conn, "hr_records", {"person_id": person_id, "email": email})
 
 
 def insert_hr_period(

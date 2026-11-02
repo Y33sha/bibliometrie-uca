@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict IrUieVnaaURYZyuDwPNnHto3c37wL3ztFXUxqrEzN8N7n7RLQthsOwIEgIgbGk7
+\restrict otZ2tBSVTJQcqkSqH8VcVI1GxCb0SAuM0qSe8d7A4AUQP9WJeojFLNMa752rjmA
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -900,10 +900,6 @@ CREATE TABLE persons.hr_records (
     id integer NOT NULL,
     person_id integer NOT NULL,
     email text,
-    role_title text,
-    department_name text,
-    start_date date,
-    end_date date,
     hr_export_date date,
     created_at timestamp with time zone DEFAULT now(),
     siham_id text,
@@ -4578,13 +4574,6 @@ CREATE INDEX idx_hr_periods_structure_id ON persons.hr_periods USING btree (stru
 
 
 --
--- Name: idx_hr_records_department; Type: INDEX; Schema: persons; Owner: -
---
-
-CREATE INDEX idx_hr_records_department ON persons.hr_records USING btree (department_name);
-
-
---
 -- Name: idx_hr_records_person_id; Type: INDEX; Schema: persons; Owner: -
 --
 
@@ -6076,5 +6065,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict IrUieVnaaURYZyuDwPNnHto3c37wL3ztFXUxqrEzN8N7n7RLQthsOwIEgIgbGk7
+\unrestrict otZ2tBSVTJQcqkSqH8VcVI1GxCb0SAuM0qSe8d7A4AUQP9WJeojFLNMa752rjmA
 
