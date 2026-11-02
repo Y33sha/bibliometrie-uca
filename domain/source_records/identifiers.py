@@ -115,24 +115,16 @@ def isbn_role(
     )
 
 
-def _via[VO](try_parse: Callable[[str], VO | None]) -> Callable[[str], str | None]:
-    def normalize(raw: str) -> str | None:
-        vo = try_parse(raw)
-        return str(vo) if vo is not None else None
-
-    return normalize
-
-
-# Normalisation d'une valeur par type ; `None` signale une valeur invalide.
+# Normalisation d'une valeur par type ; une valeur vide ou `None` signale une valeur invalide.
 _NORMALIZERS: dict[SourceIdentifierType, Callable[[str], str | None]] = {
-    SourceIdentifierType.DOI: _via(DOI.try_parse),
-    SourceIdentifierType.HAL_ID: _via(HALId.try_parse),
-    SourceIdentifierType.NNT: _via(NNT.try_parse),
-    SourceIdentifierType.PMID: _via(PMID.try_parse),
-    SourceIdentifierType.PMCID: _via(PMCID.try_parse),
-    SourceIdentifierType.ARXIV_ID: _via(ArxivId.try_parse),
-    SourceIdentifierType.ISBN: _via(ISBN.try_parse),
-    SourceIdentifierType.EISBN: _via(ISBN.try_parse),
+    SourceIdentifierType.DOI: DOI.normalize,
+    SourceIdentifierType.HAL_ID: HALId.normalize,
+    SourceIdentifierType.NNT: NNT.normalize,
+    SourceIdentifierType.PMID: PMID.normalize,
+    SourceIdentifierType.PMCID: PMCID.normalize,
+    SourceIdentifierType.ARXIV_ID: ArxivId.normalize,
+    SourceIdentifierType.ISBN: ISBN.normalize,
+    SourceIdentifierType.EISBN: ISBN.normalize,
 }
 
 
@@ -147,7 +139,7 @@ def normalize_identifiers(
     rejected: list[SourceIdentifier] = []
     for identifier in identifiers:
         value = _NORMALIZERS[identifier.id_type](identifier.value)
-        if value is None:
+        if not value:
             rejected.append(identifier)
             continue
         key = (identifier.id_type, value)
