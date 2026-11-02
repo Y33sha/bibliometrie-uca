@@ -8,7 +8,7 @@ Usage :
 
 Les en-têtes sont sur la première ligne qui nomme le nom et le prénom. Les lignes au-dessus donnent la fenêtre d'observation de l'export (« Date début d'observation : », « Date fin d'observation : » ou « Date d'observation : »), à défaut `--export-date`. Colonnes reconnues : `SCALAR_COLUMNS` et `UNIT_COLUMNS`.
 
-Un agent se rattache à une fiche `hr_records` par son matricule, à défaut par son email. Sinon, l'import ajoute la fiche à l'unique homonyme sans fiche RH (`_unique_homonym_without_record`), à défaut crée la personne et sa fiche. Les attributs de la fiche prennent les valeurs non vides de l'export. Les périodes de présence suivent `updated_periods`. L'import refuse un export antérieur au dernier importé.
+Un agent se rattache à une fiche `hr_records` par son matricule, à défaut par son email. Sinon, l'import ajoute la fiche à l'unique homonyme sans fiche RH (`_unique_homonym_without_record`), à défaut crée la personne et sa fiche. Le nom d'une personne en base reste inchangé. Les attributs de la fiche prennent les valeurs non vides de l'export. Les périodes de présence suivent `updated_periods`. L'import refuse un export antérieur au dernier importé.
 """
 
 import argparse

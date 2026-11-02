@@ -280,6 +280,29 @@ def test_prenom_a_initiale_sans_rattachement_a_l_homonyme(sa_sync_conn):
     assert counts[RhImportOutcome.CREATED] == 1
 
 
+@pytest.mark.parametrize(
+    "agent",
+    [
+        pytest.param(HrRow("FRANCOIS", "HELENE", siham_id="UCA01"), id="par matricule"),
+        pytest.param(HrRow("FRANCOIS", "HELENE", email="h@uca.fr"), id="par email"),
+    ],
+)
+def test_nom_corrige_a_la_main_conserve(sa_sync_conn, agent):
+    """Le nom de la personne reste celui en base, accents et cédilles compris."""
+    person = insert_person(sa_sync_conn, "François", first_name="Hélène")
+    insert_hr_record(sa_sync_conn, person, email="h@uca.fr")
+    sa_sync_conn.execute(
+        text("UPDATE hr_records SET siham_id = 'UCA01' WHERE person_id = :p"), {"p": person}
+    )
+
+    import_export(sa_sync_conn, _export(agent))
+
+    name = sa_sync_conn.execute(
+        text("SELECT last_name, first_name FROM persons WHERE id = :p"), {"p": person}
+    ).one()
+    assert tuple(name) == ("François", "Hélène")
+
+
 def test_export_anterieur_au_dernier_importe_refuse(sa_sync_conn):
     import_export(sa_sync_conn, _export(HrRow("Durand", "Marie", siham_id="UCA01")))
     with pytest.raises(OlderExportError):
