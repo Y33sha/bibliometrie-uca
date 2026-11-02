@@ -40,11 +40,6 @@ def most_frequent[T: str | int](counter: Counter[T]) -> T:
     return min(value for value, n in counter.items() if n == best)
 
 
-def title_key(title: str | None) -> str:
-    """Renvoie la forme de comparaison d'un titre de série reçu d'une source."""
-    return normalize_text(title or "")
-
-
 def choose_issnl(title: str | None, candidates: Mapping[str, str]) -> str | None:
     """Renvoie l'ISSN-L de l'enregistrement source parmi `candidates`, ou `None` s'ils restent indiscernables.
 
@@ -57,8 +52,8 @@ def choose_issnl(title: str | None, candidates: Mapping[str, str]) -> str | None
         return next(iter(candidates))
     if not title:
         return None
-    key = title_key(title)
-    matches = [issnl for issnl, name in candidates.items() if title_key(name) == key] or [
+    key = normalize_text(title)
+    matches = [issnl for issnl, name in candidates.items() if normalize_text(name) == key] or [
         issnl for issnl, name in candidates.items() if compatible_titles(title, name)
     ]
     return matches[0] if len(matches) == 1 else None

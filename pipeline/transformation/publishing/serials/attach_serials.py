@@ -28,7 +28,6 @@ from domain.serials.attachment import (
     match_in_publication,
     most_frequent,
     openalex_issnls,
-    title_key,
 )
 from domain.serials.containers import SeriesDescription
 from domain.serials.serial import ManualField
@@ -335,7 +334,7 @@ def _attach(
             result.serial_of[m.id] = by_openalex[series.openalex_id]
             result.by_way["openalex"] += 1
             continue
-        title_normalized = title_key(series.title)
+        title_normalized = normalize_text(series.title or "")
         if not title_normalized:
             result.serial_of[m.id] = None
             result.by_way["unattached"] += 1
