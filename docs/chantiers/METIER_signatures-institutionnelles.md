@@ -19,9 +19,10 @@ Mesure du 2026-10-27, base locale, enseignants-chercheurs de l'UCA : 71 % des pu
 ## Décisions
 
 1. **Adresse brute** : texte de l'adresse tel qu'il figure dans la publication. La colonne énumérée `origin` de `addresses` distingue l'adresse brute du libellé HAL et du nom seul.
-2. **Critères** : propriétés du texte, confronté aux référentiels HAL et ROR. `origin` vaut pour toutes les sources qui donnent le texte. Le pipeline calcule seulement les `origin` vides.
-3. **Portée** : `origin` filtre les indicateurs. Toute adresse reste un indice de périmètre et rattache ses structures.
-4. **Indicateur** : structures citées dans les adresses brutes de la personne, en part de ses publications avec adresse brute. Il vaut pour toute personne.
+2. **Critères** : propriétés du texte, confronté aux référentiels HAL et ROR. `origin` vaut pour toutes les sources qui donnent le texte.
+3. **Calcul** : une tâche de la phase `affiliations`, placée avant la résolution des adresses, calcule les `origin` vides.
+4. **Portée** : `origin` filtre les indicateurs. Toute adresse reste un indice de périmètre et rattache ses structures.
+5. **Indicateur** : structures citées dans les adresses brutes de la personne, en part de ses publications avec adresse brute. Il vaut pour toute personne.
 
 ## Phasage
 
@@ -42,9 +43,6 @@ Mesure du 2026-10-27, base locale, enseignants-chercheurs de l'UCA : 71 % des pu
 - [ ] Dashboard de la personne : structures citées dans ses adresses brutes, toutes années confondues.
 - [ ] Documentation.
 
-## Questions ouvertes
-
-- **Calcul de `origin`** : quelle phase ? Les critères lisent les noms HAL, les noms ROR et les noms de pays.
 ## Liens
 
 - Convention de signature : <https://www.uca.fr/recherche/science-ouverte-et-publication/politique-de-signature-des-publications>

@@ -4,9 +4,10 @@ La phase s'arrête en échec si le périmètre d'extraction ne contient aucune s
 
 1. **Référentiel ROR** (`affiliations.refresh_ror`) : importe la dernière version du dump ROR, si elle reste à importer.
 2. **Référentiel des structures HAL** (`affiliations.refresh_hal_structures`) : charge les structures HAL citées et absentes du référentiel.
-3. **Résolution des adresses** (`affiliations.resolve_addresses`) : rattache les adresses aux structures connues.
-4. **Partenaires de thèse** (`affiliations.resolve_thesis_partners`) : rattache aux structures les PPN des laboratoires partenaires de thèse.
-5. **Contributions sources du périmètre** (`affiliations.populate`) : pose sur chaque contribution source les indices de son entrée dans le périmètre, d'après les structures atteintes et les identifiants des personnes à fiche RH.
+3. **Origine des adresses** (`affiliations.classify_addresses`) : classe le texte des adresses sans origine en adresse brute, libellé HAL ou nom seul.
+4. **Résolution des adresses** (`affiliations.resolve_addresses`) : rattache les adresses aux structures connues.
+5. **Partenaires de thèse** (`affiliations.resolve_thesis_partners`) : rattache aux structures les PPN des laboratoires partenaires de thèse.
+6. **Contributions sources du périmètre** (`affiliations.populate`) : pose sur chaque contribution source les indices de son entrée dans le périmètre, d'après les structures atteintes et les identifiants des personnes à fiche RH.
 """
 
 from __future__ import annotations
@@ -30,6 +31,7 @@ from pipeline.runtime.observability.log_format import LAST_BRANCH
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import waiting
 from pipeline.task_runner import TaskStep, run_tasks
+from pipeline.transformation.structures.address_origin import classify_addresses
 from pipeline.transformation.structures.address_resolution import (
     run_resolution,
 )
@@ -50,6 +52,7 @@ from pipeline.transformation.structures.ror import RorStore, run_refresh_ror
 class AffiliationsPhase:
     refresh_ror: Callable[[PhaseContext], PhaseMetrics]
     refresh_hal_structures: Callable[[PhaseContext, bool], PhaseMetrics]
+    classify_addresses: Callable[[Connection, logging.Logger], PhaseMetrics]
     resolve_thesis_partners: Callable[[Connection, logging.Logger], int]
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
@@ -67,6 +70,9 @@ class AffiliationsPhase:
                         ctx, ctx.options.policy.refresh_hal_structures
                     )
                 ),
+                "affiliations.classify_addresses": TaskStep(
+                    self._classify_addresses, section="Origine des adresses"
+                ),
                 "affiliations.resolve_addresses": TaskStep(
                     self._resolve_addresses,
                     section="Identification des structures dans les adresses institutionnelles",
@@ -82,6 +88,10 @@ class AffiliationsPhase:
         metrics.details.update(by_task["affiliations.refresh_ror"].details)
         metrics.details.update(by_task["affiliations.refresh_hal_structures"].details)
         return metrics
+
+    def _classify_addresses(self, ctx: PhaseContext) -> PhaseMetrics:
+        with ctx.open_tx() as conn:
+            return self.classify_addresses(conn, ctx.logger)
 
     def _resolve_addresses(self, ctx: PhaseContext) -> PhaseMetrics:
         with ctx.open_tx() as conn:
@@ -121,6 +131,7 @@ def build() -> Phase:
     return AffiliationsPhase(
         refresh_ror=_run_refresh_ror,
         refresh_hal_structures=_run_refresh_hal_structures,
+        classify_addresses=classify_addresses,
         resolve_thesis_partners=resolve_thesis_partners,
     )
 

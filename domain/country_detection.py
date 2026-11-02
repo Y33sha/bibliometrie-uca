@@ -1,7 +1,8 @@
-"""Pays d'une adresse : moyens de détection et préséance entre les candidats."""
+"""Pays d'une adresse : moyens de détection, nom de pays final et préséance entre les candidats."""
 
 from collections import Counter
 from collections.abc import Iterable, Mapping
+from dataclasses import dataclass, field
 from enum import StrEnum
 
 
@@ -21,6 +22,27 @@ SOURCE_COUNTRY_METHODS: dict[str, CountryDetectionMethod] = {
     "scanr": CountryDetectionMethod.SOURCE_SCANR,
     "openalex": CountryDetectionMethod.SOURCE_OPENALEX,
 }
+
+
+@dataclass(frozen=True, slots=True)
+class CountryNames:
+    """Formes normalisées des noms de pays, avec le code ISO du pays désigné."""
+
+    iso_by_form: Mapping[str, str]
+    _max_tokens: int = field(init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        tokens = max((form.count(" ") + 1 for form in self.iso_by_form), default=1)
+        object.__setattr__(self, "_max_tokens", tokens)
+
+    def trailing_country(self, normalized_text: str) -> str | None:
+        """Renvoie le code ISO du plus long nom de pays qui termine le texte normalisé : « united kingdom » prime sur « kingdom »."""
+        tokens = normalized_text.split()
+        for n in range(min(self._max_tokens, len(tokens)), 0, -1):
+            if iso := self.iso_by_form.get(" ".join(tokens[-n:])):
+                return iso
+        return None
+
 
 # Moyens par rang de préséance, d'après une revue à la main des désaccords.
 _PRECEDENCE: tuple[CountryDetectionMethod, ...] = (
