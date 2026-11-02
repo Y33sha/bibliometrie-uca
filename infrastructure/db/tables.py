@@ -811,10 +811,16 @@ idref_structures = Table(
 rejected_contributions = Table(
     "rejected_contributions",
     metadata,
-    Column("source_record_id", Integer, nullable=False),
     Column("person_id", Integer, nullable=False),
     Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
-    PrimaryKeyConstraint("source_record_id", "person_id", name="rejected_contributions_pkey"),
+    Column("source", source_type_enum, nullable=False),
+    Column("source_id", Text, nullable=False),
+    PrimaryKeyConstraint("source", "source_id", "person_id", name="rejected_contributions_pkey"),
+    comment=(
+        "Couples (enregistrement source, personne) rejetés par l'administration, "
+        "par clé naturelle de l'enregistrement source. Le rejet d'un enregistrement source "
+        "disparu de sa source s'applique à son retour."
+    ),
     schema="persons",
 )
 

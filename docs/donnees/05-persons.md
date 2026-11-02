@@ -25,7 +25,7 @@ Deux tables contiennent les décisions de l'administration sur le rattachement d
 
 | Table | Décision | Clé |
 |---|---|---|
-| `rejected_contributions` | La personne est écartée de la publication. Le rejet s'enregistre sur chaque enregistrement source de la publication | `(source_record_id, person_id)` |
+| `rejected_contributions` | La personne est écartée de la publication. Le rejet s'enregistre sur chaque enregistrement source de la publication, par sa clé naturelle. Il s'applique au retour d'un enregistrement source disparu de sa source | `(source, source_id, person_id)` |
 | `confirmed_source_contributions` | La contribution source est épinglée à la personne | `source_contribution_id` |
 
 ## Écriture
