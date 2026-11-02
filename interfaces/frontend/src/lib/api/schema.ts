@@ -2916,10 +2916,10 @@ export interface components {
             /** Url */
             url: string;
             /**
-             * Known
-             * @description La copie est hébergée par une plateforme du registre.
+             * Icon
+             * @description Fichier de l'icône de la plateforme (`static/icons/`). Seules les copies à icône figurent parmi les autres accès.
              */
-            known: boolean;
+            icon: string | null;
         };
         /** AddIdentifier */
         AddIdentifier: {

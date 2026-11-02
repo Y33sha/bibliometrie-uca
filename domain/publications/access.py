@@ -1,6 +1,6 @@
 """Liens d'accès d'une publication : ses copies ouvertes, une par plateforme.
 
-Seules les copies ouvertes comptent (`open_copies`). Les copies d'un preprint passent après les autres (`Copy.of_preprint`). Une copie se classe ensuite par sa version (éditeur, acceptée, soumise, inconnue), puis par l'ordre d'arrivée de son enregistrement source. Chaque plateforme donne sa meilleure copie ; une copie sans plateforme se range sous l'hôte de son URL.
+Seules les copies ouvertes comptent (`open_copies`). La copie de l'éditeur, désignée par le DOI de la publication, passe en tête. Suivent les copies des plateformes à icône (`KnownPlatform.icon`), puis les autres. Dans chaque groupe, les copies d'un preprint passent après les autres (`Copy.of_preprint`). Une copie se classe ensuite par sa version (éditeur, acceptée, soumise, inconnue), puis par l'ordre d'arrivée de son enregistrement source. Chaque plateforme donne sa meilleure copie ; une copie sans plateforme se range sous l'hôte de son URL.
 
 La meilleure copie donne l'adresse d'accès. Une copie désignée par un DOI figure parmi les liens quand une archive ou un serveur de preprints l'héberge (Zenodo), ou quand une autre plateforme l'héberge sous un autre DOI que celui de la publication. Le DOI de la publication chez son éditeur s'affiche à part.
 """
@@ -59,8 +59,8 @@ class Copy:
 class AccessLink:
     label: str
     url: str
-    known: bool
-    """La copie est hébergée par une plateforme du registre."""
+    icon: str | None
+    """Icône de la plateforme qui héberge la copie (`KnownPlatform.icon`)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,16 +81,34 @@ def _label(copy: Copy) -> str:
     return copy.platform or _host(copy).removeprefix("www.")
 
 
+def _icon(copy: Copy) -> str | None:
+    return copy.known_platform.icon if copy.known_platform else None
+
+
+def _doi_target(copy: Copy) -> str | None:
+    """Renvoie le DOI désigné par une copie à l'adresse de doi.org, en minuscules, ou `None` pour une autre adresse."""
+    if _host(copy) not in _DOI_HOSTS:
+        return None
+    return unquote(urlsplit(copy.url).path).lstrip("/").lower()
+
+
+def _from_publisher(copy: Copy, doi: str | None) -> bool:
+    """Vrai pour la copie de l'éditeur : la page du DOI de la publication, ou l'URL de résolution de ce DOI."""
+    return copy.arrival == 0 or (doi is not None and _doi_target(copy) == doi.lower())
+
+
 def _listed(copy: Copy, doi: str | None) -> bool:
     """Vrai si la copie figure parmi les liens."""
-    if _host(copy) not in _DOI_HOSTS or copy.platform_type in ARCHIVE_TYPES:
+    target = _doi_target(copy)
+    if target is None or copy.platform_type in ARCHIVE_TYPES:
         return True
-    target = unquote(urlsplit(copy.url).path).lstrip("/").lower()
     return copy.platform is not None and target != (doi or "").lower()
 
 
-def _rank(copy: Copy) -> tuple[bool, int, int]:
+def _rank(copy: Copy, doi: str | None) -> tuple[bool, bool, bool, int, int]:
     return (
+        not _from_publisher(copy, doi),
+        _icon(copy) is None,
         copy.of_preprint,
         _VERSION_RANK.get(copy.version or "", _UNKNOWN_VERSION_RANK),
         copy.arrival,
@@ -142,17 +160,14 @@ def open_copies(copies: Iterable[Copy]) -> list[Copy]:
 
 def access(copies: Iterable[Copy], *, doi: str | None) -> Access:
     """Calcule l'adresse d'accès et les liens d'accès d'une publication de DOI `doi`."""
-    ranked = sorted(open_copies(copies), key=_rank)
+    ranked = sorted(open_copies(copies), key=lambda copy: _rank(copy, doi))
     best: dict[str, Copy] = {}
     for copy in ranked:
         if _listed(copy, doi):
             best.setdefault(_label(copy), copy)
     return Access(
         url=ranked[0].url if ranked else None,
-        links=[
-            AccessLink(label, copy.url, copy.known_platform is not None)
-            for label, copy in best.items()
-        ],
+        links=[AccessLink(label, copy.url, _icon(copy)) for label, copy in best.items()],
     )
 
 

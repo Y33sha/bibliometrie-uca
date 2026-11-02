@@ -387,7 +387,7 @@ class PublicationDetailQueries:
                 doi=publication_row.doi,
             ),
             access=[
-                AccessLinkOut(label=a.label, url=a.url, known=a.known)
+                AccessLinkOut(label=a.label, url=a.url, icon=a.icon)
                 for a in publication_access.links
             ],
             referenced_by=_referenced_by(sources, publication_access),
