@@ -124,7 +124,7 @@ class PersonService:
         Raises:
             ValidationError: type hors de `PUBLIC_PERSON_IDENTIFIER_TYPES`, ou valeur mal formée.
             NotFoundError: personne absente.
-            IdentifierAttributionConflictError: identifiant détenu par une autre personne en `pending` ou `confirmed`.
+            ConflictError: identifiant détenu par une autre personne en `pending` ou `confirmed`.
         """
         if id_type not in PUBLIC_PERSON_IDENTIFIER_TYPES:
             raise ValidationError(f"id_type doit être l'un de {PUBLIC_PERSON_IDENTIFIER_TYPES}")

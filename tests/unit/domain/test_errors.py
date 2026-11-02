@@ -1,11 +1,6 @@
 """Exceptions métier : champs structurés et message lisible."""
 
-from domain.errors import (
-    ContributionAlreadyAssignedError,
-    IdentifierAttributionConflictError,
-    PublisherMergeBlockedError,
-    RejectedPairError,
-)
+from domain.errors import PublisherMergeBlockedError, RejectedPairError
 
 
 def _paire_de_revues() -> dict:
@@ -22,20 +17,6 @@ def _paire_rejetee() -> dict:
     return {"publication_id": 10, "person_id": 20, "rejected_at": "2026-01-01T00:00:00+00:00"}
 
 
-class TestIdentifierAttributionConflictError:
-    def test_porte_les_champs_du_conflit(self):
-        exc = IdentifierAttributionConflictError(
-            "ORCID déjà attribué",
-            id_type="orcid",
-            id_value="0000-0002-1825-0097",
-            existing_person_id=42,
-            existing_status="confirmed",
-        )
-        assert str(exc) == "ORCID déjà attribué"
-        assert (exc.id_type, exc.id_value) == ("orcid", "0000-0002-1825-0097")
-        assert (exc.existing_person_id, exc.existing_status) == (42, "confirmed")
-
-
 class TestPublisherMergeBlockedError:
     def test_une_paire(self):
         paires = [_paire_de_revues()]
@@ -46,16 +27,6 @@ class TestPublisherMergeBlockedError:
     def test_plusieurs_paires(self):
         exc = PublisherMergeBlockedError([_paire_de_revues(), _paire_de_revues()])
         assert str(exc) == "Fusion bloquée par 2 paires de revues à traiter manuellement"
-
-
-class TestContributionAlreadyAssignedError:
-    def test_nomme_la_contribution_et_sa_detentrice(self):
-        exc = ContributionAlreadyAssignedError(7, 42)
-        assert (exc.contribution_id, exc.owner_person_id) == (7, 42)
-        assert str(exc) == (
-            "La contribution #7 est déjà attribuée à la personne #42 ; "
-            "seule une contribution orpheline peut être attribuée."
-        )
 
 
 class TestRejectedPairError:

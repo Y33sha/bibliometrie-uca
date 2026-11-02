@@ -2,7 +2,7 @@
 
 import pytest
 
-from domain.errors import IdentifierAttributionConflictError
+from domain.errors import ConflictError
 from domain.persons.identifier_attribution import (
     AttributionOutcome,
     IdentifierAttribution,
@@ -42,14 +42,14 @@ class TestReattributeTo:
 
     def test_raises_on_pending(self):
         ident = _make(status=AttributionStatus.PENDING)
-        with pytest.raises(IdentifierAttributionConflictError):
+        with pytest.raises(ConflictError):
             ident.reattribute_to(99, source="manual")
         assert ident.person_id == 10
         assert ident.status is AttributionStatus.PENDING
 
     def test_raises_on_confirmed(self):
         ident = _make(status=AttributionStatus.CONFIRMED)
-        with pytest.raises(IdentifierAttributionConflictError):
+        with pytest.raises(ConflictError):
             ident.reattribute_to(99, source="manual")
         assert ident.person_id == 10
         assert ident.status is AttributionStatus.CONFIRMED
@@ -72,5 +72,5 @@ class TestAttributionOutcome:
 
     def test_held_elsewhere_conflict_names_the_holder(self):
         conflict = held_elsewhere_conflict(_make(status=AttributionStatus.CONFIRMED), 99)
-        assert isinstance(conflict, IdentifierAttributionConflictError)
-        assert (conflict.existing_person_id, conflict.existing_status) == (10, "confirmed")
+        assert isinstance(conflict, ConflictError)
+        assert "person_id=10 avec statut 'confirmed'" in str(conflict)

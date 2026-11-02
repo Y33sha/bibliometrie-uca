@@ -19,25 +19,6 @@ class ConflictError(DomainError):
     """Opération refusée : elle violerait un invariant métier."""
 
 
-class IdentifierAttributionConflictError(ConflictError):
-    """Attribution d'un identifiant refusée par le statut de son attribution existante."""
-
-    def __init__(
-        self,
-        message: str,
-        *,
-        id_type: str | None = None,
-        id_value: str | None = None,
-        existing_person_id: int | None = None,
-        existing_status: str | None = None,
-    ) -> None:
-        self.id_type = id_type
-        self.id_value = id_value
-        self.existing_person_id = existing_person_id
-        self.existing_status = existing_status
-        super().__init__(message)
-
-
 class BlockingSerial(TypedDict):
     """Paire de revues qui bloque la fusion de deux éditeurs."""
 
@@ -58,27 +39,6 @@ class PublisherMergeBlockedError(ConflictError):
         super().__init__(
             f"Fusion bloquée par {n} paire{'s' if n > 1 else ''} de revues à traiter manuellement"
         )
-
-
-class ContributionAlreadyAssignedError(ConflictError):
-    """Attribution refusée : la contribution est déjà rattachée à une personne. Seule une contribution orpheline s'attribue."""
-
-    def __init__(self, contribution_id: int, owner_person_id: int) -> None:
-        self.contribution_id = contribution_id
-        self.owner_person_id = owner_person_id
-        super().__init__(
-            f"La contribution #{contribution_id} est déjà attribuée à la personne "
-            f"#{owner_person_id} ; seule une contribution orpheline peut être attribuée."
-        )
-
-
-class PersonAlreadyInPublicationError(ConflictError):
-    """Attribution refusée : la personne a déjà, dans la publication, une contribution rattachée à la main. Une personne a au plus une contribution par publication."""
-
-    def __init__(self, publication_id: int, contribution_id: int) -> None:
-        self.publication_id = publication_id
-        self.contribution_id = contribution_id
-        super().__init__("Cette personne est déjà rattachée à cette publication.")
 
 
 class RejectedPair(TypedDict):

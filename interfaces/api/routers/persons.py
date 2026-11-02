@@ -383,7 +383,7 @@ def add_person_identifier(
 
     La décision (insertion, idempotence, réattribution, conflit) appartient à `add_identifier`, avec l'origine manuelle par défaut (`IdentifierOrigin.MANUAL`). Le service refuse alors les types non attribuables à la main, et vérifie l'existence de la personne.
 
-    Renvoie 404 sur une personne absente (`NotFoundError`), 409 sur un conflit (`IdentifierAttributionConflictError`), 422 sur un type ou une valeur refusés (`ValidationError`).
+    Renvoie 404 sur une personne absente (`NotFoundError`), 409 sur un identifiant détenu par une autre personne, 422 sur un type ou une valeur refusés (`ValidationError`).
     """
     result = persons.add_identifier(person_id, data.id_type, data.id_value)
     if result.outcome is AttributionOutcome.ALREADY_EXISTS:

@@ -1477,7 +1477,7 @@ export interface paths {
          *
          *     La décision (insertion, idempotence, réattribution, conflit) appartient à `add_identifier`, avec l'origine manuelle par défaut (`IdentifierOrigin.MANUAL`). Le service refuse alors les types non attribuables à la main, et vérifie l'existence de la personne.
          *
-         *     Renvoie 404 sur une personne absente (`NotFoundError`), 409 sur un conflit (`IdentifierAttributionConflictError`), 422 sur un type ou une valeur refusés (`ValidationError`).
+         *     Renvoie 404 sur une personne absente (`NotFoundError`), 409 sur un identifiant détenu par une autre personne, 422 sur un type ou une valeur refusés (`ValidationError`).
          */
         post: operations["add_person_identifier_api_persons__person_id__identifiers_post"];
         delete?: never;
@@ -1689,7 +1689,7 @@ export interface paths {
          *
          *     Renvoie 422 sans `person_id` ni `create_person`, et sans nom de famille à la création (`assign_orphan_contribution_to_new_person`). Renvoie 404 sur une personne ou une contribution introuvable.
          *
-         *     Renvoie 409 sur une paire déjà rejetée (`RejectedPairError`), sauf si `force` retire le rejet au passage. Renvoie aussi 409 sur une contribution déjà rattachée à une personne (`ContributionAlreadyAssignedError`), et quand la personne a déjà une contribution manuelle dans la publication (`PersonAlreadyInPublicationError`).
+         *     Renvoie 409 sur une paire déjà rejetée (`RejectedPairError`), sauf si `force` retire le rejet au passage. Renvoie aussi 409 sur une contribution déjà rattachée à une personne, et quand la personne a déjà une contribution manuelle dans la publication.
          */
         post: operations["assign_orphan_contribution_api_contributions_orphans_assign_post"];
         delete?: never;

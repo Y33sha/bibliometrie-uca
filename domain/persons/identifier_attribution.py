@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import NamedTuple
 
-from domain.errors import IdentifierAttributionConflictError
+from domain.errors import ConflictError
 from domain.persons.identifiers import AttributionStatus, IdentifierOrigin
 
 
@@ -39,10 +39,10 @@ class IdentifierAttribution:
             source: origine de la réattribution.
 
         Raises:
-            IdentifierAttributionConflictError: attribution d'un autre statut.
+            ConflictError: attribution d'un autre statut.
         """
         if self.status is not AttributionStatus.REJECTED:
-            raise IdentifierAttributionConflictError(
+            raise ConflictError(
                 f"Impossible de réattribuer l'identifiant {self.id_type}={self.id_value!r} "
                 f"depuis le statut {self.status.value!r} ; seuls les identifiants rejected "
                 "peuvent être réattribués.",
@@ -75,16 +75,10 @@ def attribution_outcome(
     return AttributionOutcome.HELD_ELSEWHERE
 
 
-def held_elsewhere_conflict(
-    existing: IdentifierAttribution, person_id: int
-) -> IdentifierAttributionConflictError:
+def held_elsewhere_conflict(existing: IdentifierAttribution, person_id: int) -> ConflictError:
     """Construit l'erreur qui refuse l'attribution à `person_id` d'un identifiant détenu par l'attribution `existing` (`HELD_ELSEWHERE`)."""
-    return IdentifierAttributionConflictError(
+    return ConflictError(
         f"Identifiant {existing.id_type}={existing.id_value!r} déjà attribué à "
         f"person_id={existing.person_id} avec statut {existing.status.value!r} ; impossible "
-        f"d'attribuer à person_id={person_id}.",
-        id_type=existing.id_type,
-        id_value=existing.id_value,
-        existing_person_id=existing.person_id,
-        existing_status=existing.status.value,
+        f"d'attribuer à person_id={person_id}."
     )

@@ -82,7 +82,7 @@ def assign_orphan_contribution(
 
     Renvoie 422 sans `person_id` ni `create_person`, et sans nom de famille à la création (`assign_orphan_contribution_to_new_person`). Renvoie 404 sur une personne ou une contribution introuvable.
 
-    Renvoie 409 sur une paire déjà rejetée (`RejectedPairError`), sauf si `force` retire le rejet au passage. Renvoie aussi 409 sur une contribution déjà rattachée à une personne (`ContributionAlreadyAssignedError`), et quand la personne a déjà une contribution manuelle dans la publication (`PersonAlreadyInPublicationError`).
+    Renvoie 409 sur une paire déjà rejetée (`RejectedPairError`), sauf si `force` retire le rejet au passage. Renvoie aussi 409 sur une contribution déjà rattachée à une personne, et quand la personne a déjà une contribution manuelle dans la publication.
     """
     if body.create_person is not None:
         person_id = contributions.assign_orphan_contribution_to_new_person(

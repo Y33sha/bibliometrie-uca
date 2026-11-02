@@ -7,7 +7,6 @@ from sqlalchemy import text
 
 from domain.errors import (
     ConflictError,
-    ContributionAlreadyAssignedError,
     NotFoundError,
     RejectedPairError,
     ValidationError,
@@ -192,16 +191,12 @@ class TestAddIdentifier:
         assert row.status == "pending"
 
     def test_raises_when_pending_on_other_person(self, sa_sync_conn, service):
-        """Un identifiant en attente sur une autre personne lève `IdentifierAttributionConflictError` : sa réattribution demande d'abord son rejet."""
-        import pytest
-
-        from domain.errors import IdentifierAttributionConflictError
-
+        """Un identifiant en attente sur une autre personne lève `ConflictError` : sa réattribution demande d'abord son rejet."""
         p1 = _person(sa_sync_conn, last_name="A", first_name="A")
         p2 = _person(sa_sync_conn, last_name="B", first_name="B")
         service.add_identifier(p1, "orcid", "0000-0001-2345-6789")
 
-        with pytest.raises(IdentifierAttributionConflictError):
+        with pytest.raises(ConflictError):
             service.add_identifier(p2, "orcid", "0000-0001-2345-6789")
 
         # L'identifiant reste rattaché à p1.
@@ -1053,9 +1048,8 @@ class TestAssignOrphanContribution:
             sa_sync_conn, contribution, person_id=other_id, mode="name"
         )
 
-        with pytest.raises(ContributionAlreadyAssignedError) as exc:
+        with pytest.raises(ConflictError, match=f"personne #{other_id} "):
             contribution_service.assign_orphan_contribution(person_id, contribution)
-        assert exc.value.owner_person_id == other_id
         assert _contribution_person(sa_sync_conn, contribution) == (other_id, "name")
         assert _pinned_to(sa_sync_conn, [source_contribution_id]) == [None]
 
