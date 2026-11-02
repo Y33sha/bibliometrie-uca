@@ -11,8 +11,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from interfaces.cli.maintenance import import_authenticated_orcids as module
-from interfaces.cli.maintenance.import_authenticated_orcids import (
+from interfaces.cli.imports import import_authenticated_orcids as module
+from interfaces.cli.imports.import_authenticated_orcids import (
     AuthenticateOrcidOutcome,
     _load_rows,
     find_reassignments,
@@ -133,7 +133,7 @@ class TestMain:
                 ),
             )
             monkeypatch.setattr(
-                sys, "argv", ["import_authenticated_orcids", "--file", str(chemin), *arguments]
+                sys, "argv", ["import_authenticated_orcids", str(chemin), *arguments]
             )
             return main(), authentifies
 

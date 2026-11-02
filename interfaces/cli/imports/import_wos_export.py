@@ -1,4 +1,4 @@
-# STATUS: maintenance
+# STATUS: recurring (imports)
 """Importe dans `staging` des exports tabulés de l'interface Web of Science.
 
 Chaque ligne d'export devient une ligne `staging` de la source `wos`, identifiée par son UT, avec le mode d'entrée `manual_export`. Le payload est la ligne elle-même : un objet indexé par les balises WoS non vides (`UT`, `TI`, `AF`, `C1`, `RP`…). L'écriture passe par l'écriture commune au moissonnage : une ligne inchangée reste en l'état. Un UT présent dans plusieurs fichiers est importé une fois.
@@ -9,8 +9,8 @@ La normalisation se lance à part :
     run_pipeline --from normalize --sources wos
 
 Usage :
-    uv run python -m interfaces.cli.maintenance.import_wos_export data/imports/wos/2026-10-07 [--dry-run]
-    uv run python -m interfaces.cli.maintenance.import_wos_export export1.txt export2.txt
+    uv run python -m interfaces.cli.imports.import_wos_export data/imports/wos/2026-10-07 [--dry-run]
+    uv run python -m interfaces.cli.imports.import_wos_export export1.txt export2.txt
 """
 
 from __future__ import annotations

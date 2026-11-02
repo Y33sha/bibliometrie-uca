@@ -10,7 +10,7 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 
-from interfaces.cli.maintenance.import_authenticated_orcids import (
+from interfaces.cli.imports.import_authenticated_orcids import (
     AuthenticateOrcidOutcome,
     authenticate_orcid,
     authenticate_orcids,

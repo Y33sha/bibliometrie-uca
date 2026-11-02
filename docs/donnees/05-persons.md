@@ -33,7 +33,7 @@ Deux tables contiennent les décisions de l'administration sur le rattachement d
 
 **Import RH** (`interfaces/cli/imports/import_persons.py`). Crée la personne et sa fiche RH.
 
-**Import des ORCID authentifiés** (`interfaces/cli/maintenance/import_authenticated_orcids.py`). Seul cet import pose le statut `authenticated`. Ce statut est définitif. Un déclencheur PostgreSQL garantit ces deux règles.
+**Import des ORCID authentifiés** (`interfaces/cli/imports/import_authenticated_orcids.py`). Seul cet import pose le statut `authenticated`. Ce statut est définitif. Un déclencheur PostgreSQL garantit ces deux règles.
 
 **Administration** (`application/services/persons.py`) :
 
