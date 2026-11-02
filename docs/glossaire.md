@@ -6,6 +6,9 @@
 ## Adresse
 Chaîne de caractères qui donne l'[affiliation](#affiliation) d'un auteur dans une publication, fournie par l'auteur à l'éditeur. Appelée *address* ou *affiliation string* dans les métadonnées, et *signature* dans le langage courant.
 
+## Adresse brute
+[Adresse](#adresse) telle qu'elle figure dans la publication. Le champ d'adresse des sources contient aussi des libellés de structures HAL et des noms seuls d'établissement.
+
 ## Affiliation
 Structure ou structures de rattachement d'un auteur dans une publication. Elle est liée au couple personne-publication, et non à la personne.
 

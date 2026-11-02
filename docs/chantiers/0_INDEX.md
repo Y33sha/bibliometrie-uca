@@ -14,12 +14,12 @@
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
 - [Listes de revues](DATA_listes-de-revues.md)
 - [Résolution probabiliste des personnes](DATA_resolution-personnes-probabiliste.md)
-- [Signatures institutionnelles](METIER_signatures-institutionnelles.md)
 - [Types de document](DATA_types-document.md)
 - [Vérification des affiliations des sources](DATA_verification-affiliations.md)
 
 ## Chantiers archivés
 
+- 2026-11-02 — [Signatures institutionnelles : adresses brutes](archived/2026-11-02_METIER_signatures-institutionnelles.md)
 - 2026-11-02 — [Vocabulaires des sujets](archived/2026-11-02_DATA_vocabulaires-des-sujets.md)
 - 2026-11-02 — [Mesures d'impact](archived/2026-11-02_METIER_mesures-impact.md)
 - 2026-11-02 — [Export RH SIHAM : matricule, périodes de présence, laboratoires](archived/2026-11-02_DATA_export-rh-siham.md)
