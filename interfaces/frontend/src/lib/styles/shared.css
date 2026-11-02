@@ -14,8 +14,7 @@
 	--fs-lg: 1.15rem;   /* titres de volet */
 	--fs-xl: 1.3rem;    /* sigle d'une fiche, titre de la connexion */
 	--fs-2xl: 1.5rem;   /* titre de page */
-	--fs-3xl: 1.85rem;  /* titre d'une fiche */
-	--fs-4xl: 2.2rem;   /* chiffres clés */
+	--fs-3xl: 1.85rem;  /* titre d'une fiche, chiffres clés */
 
 	/* Texte */
 	--text: #1d2433;

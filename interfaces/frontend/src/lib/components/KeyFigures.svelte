@@ -30,15 +30,17 @@
 
 <style>
 	.key-figures {
+		/* Hauteur de la ligne des chiffres : la période et les icônes s'y centrent. */
+		--value-line: calc(var(--fs-3xl) * 1.1);
 		display: flex;
 		flex-wrap: wrap;
-		gap: 24px 56px;
+		gap: 20px 40px;
 		margin-bottom: 36px;
 	}
 	.key-figures-period {
 		display: flex;
 		align-items: center;
-		height: calc(var(--fs-4xl) * 1.1);
+		height: var(--value-line);
 		font-size: var(--fs-2xl);
 		font-weight: 700;
 		color: var(--accent);
@@ -49,18 +51,17 @@
 		align-items: flex-start;
 		gap: 14px;
 	}
-	/* Icône centrée sur la ligne du chiffre, quelle que soit la hauteur du libellé. */
 	.key-figure-icon {
 		display: flex;
 		align-items: center;
-		height: calc(var(--fs-4xl) * 1.1);
-		font-size: var(--fs-3xl);
+		height: var(--value-line);
+		font-size: var(--fs-2xl);
 		color: var(--muted);
 	}
 	.key-figure-value {
-		font-size: var(--fs-4xl);
+		font-size: var(--fs-3xl);
 		font-weight: 700;
-		line-height: 1.1;
+		line-height: var(--value-line);
 		letter-spacing: -0.02em;
 	}
 	.open .key-figure-icon,
