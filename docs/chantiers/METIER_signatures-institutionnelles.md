@@ -12,16 +12,15 @@ Une adresse est un texte, partagé par toutes les sources qui le donnent. Une ad
 
 - libellés HAL complets, « SIGLE - Nom (adresse postale - Pays) » : 11 835 adresses, presque toutes chez OpenAlex ;
 - noms seuls de structure ou d'établissement : nom HAL (« Université Clermont Auvergne [2017-2020] »), nom ROR (« University of Liverpool »), nom suivi du sigle (« Laboratoire Magmas et Volcans (LMV) ») ;
-- arborescences de structures HAL chez scanR : nom, code et sigle du laboratoire, puis ses tutelles et son adresse postale (« Institut Pascal, UMR6602, UMR6602, IP, CNRS, UCA… ») ;
 - textes étrangers à une adresse (« Author to whom correspondence should be addressed. », « Professeur »).
 
 Mesure du 2026-10-27, base locale, enseignants-chercheurs de l'UCA : 71 % des publications avec adresse brute mentionnent l'université, 62 % en comptant les libellés HAL repris par OpenAlex.
 
 ## Décisions
 
-1. **Adresse brute** : texte de l'adresse tel qu'il figure dans la publication. La colonne `is_raw` de `addresses` la distingue des autres textes.
-2. **Critères** : propriétés du texte seul. `is_raw` vaut pour toutes les sources qui donnent le texte.
-3. **Portée** : `is_raw` filtre les indicateurs. Toute adresse reste un indice de périmètre et rattache ses structures.
+1. **Adresse brute** : texte de l'adresse tel qu'il figure dans la publication. La colonne énumérée `origin` de `addresses` distingue l'adresse brute du libellé HAL et du nom seul.
+2. **Critères** : propriétés du texte, confronté aux référentiels HAL et ROR. `origin` vaut pour toutes les sources qui donnent le texte. Le pipeline calcule seulement les `origin` vides.
+3. **Portée** : `origin` filtre les indicateurs. Toute adresse reste un indice de périmètre et rattache ses structures.
 4. **Indicateur** : structures citées dans les adresses brutes de la personne, en part de ses publications avec adresse brute. Il vaut pour toute personne.
 5. **Restitution** : sur la personne seulement. Le lien entre une personne et une structure se déduit des structures de ses contributions : un indicateur par structure serait circulaire.
 
@@ -31,10 +30,11 @@ Mesure du 2026-10-27, base locale, enseignants-chercheurs de l'UCA : 71 % des pu
 
 - [x] Adresses sans virgule, hors libellés HAL complets. Base locale, 2026-11-02 : 40 924 adresses, pour 376 722 couples (adresse, enregistrement source).
   - 52 % des couples : nom exact d'une structure HAL ou d'une organisation ROR.
-  - 11 % : texte terminé par un nom de pays. Échantillon de 15 : 12 adresses brutes (« Breast Unit Institute Gustave Roussy Villejuif France »), 3 noms suivis du pays entre parenthèses.
+  - 11 % : texte terminé par un nom de pays. Échantillon de 15 : 12 adresses brutes (« Breast Unit Institute Gustave Roussy Villejuif France »), 3 noms suivis du pays entre parenthèses, au format des libellés HAL (« Narvik University College (Norway) »).
   - 37 % : reste. Échantillon de 40 : surtout des noms seuls et des textes étrangers à une adresse ; 3 adresses brutes sans pays (« Department of Pediatrics University Hospital Rouen »).
-- [ ] Critères : libellé HAL complet ; nom exact d'une structure HAL ou d'une organisation ROR ; texte sans virgule et sans nom de pays final ; arborescence de structures HAL.
-- [ ] Colonne `is_raw` sur `addresses`, calculée par le pipeline. La migration remplit le stock.
+- [x] Arborescences de structures HAL chez scanR (« Institut Pascal, UMR6602, IP, CNRS, UCA… »). Base locale, 2026-11-02 : 3 929 adresses. Le payload brut leur donne un `structId`, donc le normaliseur en tire des structures HAL. Il garde 21 de ces textes comme adresses, tous bruts. La resynchronisation des contributions sources scanR (réhydratation du staging, normalisation avec `--normalize-full`) retire les autres.
+- [ ] Critères : libellé HAL, avec ou sans adresse postale ; nom exact d'une structure HAL ou d'une organisation ROR ; texte sans virgule et sans nom de pays final.
+- [ ] Colonne `origin` sur `addresses`. La migration crée la colonne vide, le passage suivant du pipeline la remplit.
 - [ ] Adresses non brutes signalées sur la page d'administration des adresses.
 
 ### Phase 2 — Indicateurs
@@ -45,9 +45,7 @@ Mesure du 2026-10-27, base locale, enseignants-chercheurs de l'UCA : 71 % des pu
 
 ## Questions ouvertes
 
-- **Arborescences de structures HAL** : quel critère de texte ? Elles contiennent des virgules.
-- **Calcul de `is_raw`** : quelle phase ? Les critères lisent les noms HAL, les noms ROR et les noms de pays. Recalcul de toutes les adresses à chaque passage, ou des seules adresses créées ?
-- **Visibilité de l'indicateur** sur le dashboard de la personne : tous les utilisateurs, ou l'administration seulement, comme l'onglet Adresses ?
+- **Calcul de `origin`** : quelle phase ? Les critères lisent les noms HAL, les noms ROR et les noms de pays.
 
 ## Liens
 
