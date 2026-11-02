@@ -1,7 +1,6 @@
 # Pipeline
 ## Extraction
 * [ ] Dimensions?; ArXiv, PMC, Pubmed; Sudoc? (liens personnes-thèses plus complets que theses.fr, j'ai l'impression); Cairn, Persée pour augmenter couverture SHS? creuser ISTEX
-* [ ] INPI pour les brevets
 * [ ] payloads bruts: ne plus faire transiter par la base?
 ## Suite du traitement
 * [ ] normalisation en parallèle de l'extraction?
@@ -26,5 +25,4 @@
 * [ ] visualisation des collab avec carte (monde, Europe, France) qui les localise au niveau de leur ville
 
 # Cas particuliers, bizarreries à élucider
-* 165044 et 301756: pourquoi les records openalex fusionnent avec le preprint et pas l'article?
 * "How Self-Location Predicts the Degree and Quality of the Felt Sense of Connection" => preprint de ... (DOI non résolu) + lien open access renvoie sur la v1
