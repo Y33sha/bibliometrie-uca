@@ -12,7 +12,7 @@ from domain.users import SessionUser
 from infrastructure.read_models.config.models import (
     ConfigItem,
 )
-from infrastructure.read_models.config.queries import ConfigQueries
+from infrastructure.read_models.config.queries import ConfigQueries, config_item
 from infrastructure.read_models.perimeters.models import (
     InstitutionOut,
 )
@@ -57,8 +57,4 @@ def update_config(
     L'écriture exige une session : le middleware garde toutes les méthodes autres que `GET`. Les clés sont déclarées dans les migrations : la route modifie une clé existante, et une clé inconnue renvoie 404.
     """
     row = config.update_config_value(key, body.value)
-    return ConfigItem(
-        key=cast(str, row["key"]),
-        value=row["value"],
-        description=cast("str | None", row["description"]),
-    )
+    return config_item(cast(str, row["key"]), row["value"], cast("str | None", row["description"]))

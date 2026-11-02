@@ -13,7 +13,7 @@ from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from domain.config import DEFAULT_BRAND_HUE, DEFAULT_INSTITUTION_COUNTRY, ConfigKey
+from domain.config import SETTINGS, ConfigKey
 from domain.countries import normalize_country_code
 from domain.normalize import normalize_text
 from domain.structures.identifiers import normalize_ror_id
@@ -255,19 +255,23 @@ def build_institution_seed(
         for key, description in _PERIMETER_DESCRIPTIONS.items()
     ]
     config.append(
-        {"key": ConfigKey.SITE_TITLE, "value": "", "description": _SITE_TITLE_DESCRIPTION}
+        {
+            "key": ConfigKey.SITE_TITLE,
+            "value": SETTINGS[ConfigKey.SITE_TITLE].default,
+            "description": _SITE_TITLE_DESCRIPTION,
+        }
     )
     config.append(
         {
             "key": ConfigKey.BRAND_HUE,
-            "value": DEFAULT_BRAND_HUE,
+            "value": SETTINGS[ConfigKey.BRAND_HUE].default,
             "description": _BRAND_HUE_DESCRIPTION,
         }
     )
     config.append(
         {
             "key": ConfigKey.INSTITUTION_COUNTRY,
-            "value": root.country_code or DEFAULT_INSTITUTION_COUNTRY,
+            "value": root.country_code or SETTINGS[ConfigKey.INSTITUTION_COUNTRY].default,
             "description": _INSTITUTION_COUNTRY_DESCRIPTION,
         }
     )

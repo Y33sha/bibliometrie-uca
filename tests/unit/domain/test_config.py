@@ -7,13 +7,14 @@ import pytest
 
 from domain.config import (
     DEFAULT_START_YEAR_OFFSET,
-    MAX_YEAR,
-    MIN_YEAR,
     ConfigKey,
+    integer_bounds,
     normalize_config_value,
     start_year_value,
 )
-from domain.errors import ValidationError
+from domain.errors import NotFoundError, ValidationError
+
+MIN_YEAR, MAX_YEAR = integer_bounds(ConfigKey.PIPELINE_START_YEAR_FULL)
 
 _PLAFOND = "unpaywall_max_per_run"
 _ANNEE = "pipeline_start_year_full"
@@ -34,13 +35,13 @@ class TestPlafonds:
     def test_une_valeur_vide_retire_la_borne(self, valeur):
         assert normalize_config_value(_PLAFOND, valeur) == 0
 
-    @pytest.mark.parametrize("valeur", [-1, "texte", True, 3.5, [], {}])
+    @pytest.mark.parametrize("valeur", [-1, 10_000_001, "texte", True, 3.5, [], {}])
     def test_toute_autre_valeur_est_refusee(self, valeur):
-        with pytest.raises(ValidationError, match="entier positif"):
+        with pytest.raises(ValidationError, match="entier de 0 à"):
             normalize_config_value(_PLAFOND, valeur)
 
     def test_le_second_plafond_suit_la_meme_regle(self):
-        with pytest.raises(ValidationError, match="entier positif"):
+        with pytest.raises(ValidationError, match="entier de 0 à"):
             normalize_config_value("fetch_missing_max_per_source", "-4")
 
 
@@ -78,9 +79,9 @@ class TestDelais:
     def test_un_nombre_ecrit_en_chaine_est_lu(self):
         assert normalize_config_value(_DELAI, "30") == 30
 
-    @pytest.mark.parametrize("valeur", [0, -1, None, "", "texte", True, 1.5, []])
-    def test_moins_d_un_jour_ou_illisible_est_refuse(self, valeur):
-        with pytest.raises(ValidationError, match="au moins 1"):
+    @pytest.mark.parametrize("valeur", [0, -1, 3651, None, "", "texte", True, 1.5, []])
+    def test_hors_bornes_ou_illisible_est_refuse(self, valeur):
+        with pytest.raises(ValidationError, match="entier de 1 à 3650"):
             normalize_config_value(_DELAI, valeur)
 
 
@@ -141,3 +142,8 @@ class TestTypesDeLaboratoire:
 
 def test_une_cle_sans_forme_imposee_passe_telle_quelle():
     assert normalize_config_value("perimeter_extraction", "alliance_uca") == "alliance_uca"
+
+
+def test_une_cle_inconnue_est_refusee():
+    with pytest.raises(NotFoundError, match="introuvable"):
+        normalize_config_value("cle_inconnue", "x")

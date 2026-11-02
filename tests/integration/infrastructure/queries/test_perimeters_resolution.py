@@ -63,11 +63,11 @@ def test_configured_persons_perimeter_prevails(sa_sync_conn):
     assert get_persons_perimeter_name(conn) == "Personnes"
 
 
-def test_institution_country_defaults_when_absent(sa_sync_conn):
+def test_institution_country_is_read(sa_sync_conn):
     conn = sa_sync_conn
-    conn.execute(text("DELETE FROM config WHERE key = 'institution_country'"))
+    set_config(conn, "institution_country", "be")
 
-    assert get_institution_country(conn) == "fr"
+    assert get_institution_country(conn) == "be"
 
 
 def test_persons_perimeter_countries_by_frequency(sa_sync_conn):

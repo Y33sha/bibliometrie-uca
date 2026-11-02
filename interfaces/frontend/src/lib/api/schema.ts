@@ -3331,6 +3331,21 @@ export interface components {
             value: unknown;
             /** Description */
             description: string | null;
+            /**
+             * Minimum
+             * @description Borne inférieure incluse d'une clé entière.
+             */
+            minimum?: number | null;
+            /**
+             * Maximum
+             * @description Borne supérieure incluse d'une clé entière.
+             */
+            maximum?: number | null;
+            /**
+             * Value If Null
+             * @description Valeur appliquée quand `value` est nulle : première année moissonnée sans année fixée.
+             */
+            value_if_null?: number | null;
         };
         /**
          * ConfigValueUpdate

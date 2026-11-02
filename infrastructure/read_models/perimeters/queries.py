@@ -7,7 +7,7 @@ Le moissonnage, le pipeline et les adaptateurs lisent tous le périmètre par ce
 
 from sqlalchemy import Connection, text
 
-from domain.config import DEFAULT_BRAND_HUE, DEFAULT_INSTITUTION_COUNTRY, ConfigKey
+from domain.config import ConfigKey
 from infrastructure.read_models.perimeters.models import (
     InstitutionOut,
     PerimeterCountryOut,
@@ -33,7 +33,7 @@ def get_perimeter_structure_ids(conn: Connection, perimeter_code: str) -> set[in
 
 
 def _config_perimeter_code(conn: Connection, config_key: ConfigKey) -> str | None:
-    """Renvoie le code de périmètre lu dans `config`, ou `None` si la clé est absente ou vide."""
+    """Renvoie le code de périmètre lu dans `config`, ou `None` si la clé est absente ou vide. Le seed d'établissement pose les clés de périmètre."""
     value = conn.execute(
         text("SELECT value FROM config WHERE key = :key"),
         {"key": config_key},
@@ -122,11 +122,10 @@ def get_persons_perimeter_root_ids(conn: Connection) -> list[int]:
 
 
 def get_institution_country(conn: Connection) -> str:
-    """Renvoie le pays de l'établissement lu dans `config`, `DEFAULT_INSTITUTION_COUNTRY` si la clé est absente."""
-    value = conn.execute(
+    """Renvoie le pays de l'établissement lu dans `config`."""
+    return conn.execute(
         text("SELECT value FROM config WHERE key = :key"), {"key": ConfigKey.INSTITUTION_COUNTRY}
-    ).scalar_one_or_none()
-    return DEFAULT_INSTITUTION_COUNTRY if value is None else value
+    ).scalar_one()
 
 
 def get_persons_perimeter_name(conn: Connection) -> str:
@@ -159,12 +158,11 @@ class PerimetersQueries:
                 {"title": ConfigKey.SITE_TITLE, "hue": ConfigKey.BRAND_HUE},
             ).all()
         )
-        hue = values.get(ConfigKey.BRAND_HUE)
         return InstitutionOut(
             name=get_persons_perimeter_name(self._conn),
             root_structure_ids=get_persons_perimeter_root_ids(self._conn),
-            title=values.get(ConfigKey.SITE_TITLE) or None,
-            brand_hue=DEFAULT_BRAND_HUE if hue is None else hue,
+            title=values[ConfigKey.SITE_TITLE] or None,
+            brand_hue=values[ConfigKey.BRAND_HUE],
         )
 
     def persons_perimeter_countries(self) -> list[PerimeterCountryOut]:

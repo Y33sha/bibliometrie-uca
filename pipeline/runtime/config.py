@@ -5,26 +5,28 @@ La table `config` contient ces réglages, modifiables dans l'interface d'adminis
 
 from sqlalchemy import Connection, text
 
-from domain.config import ConfigKey, cap_value, delay_value, start_year_value
+from domain.config import ConfigKey, start_year_value
 from domain.dates import today
 
 
 def _stored_int(conn: Connection, key: ConfigKey) -> int | None:
-    """Renvoie la valeur entière de `key` dans la table `config`, ou `None` si la clé est absente ou vide. La table impose à ces clés un nombre entier."""
+    """Renvoie la valeur entière de `key` dans la table `config`, ou `None` si elle est vide. La table impose à ces clés un nombre entier."""
     value = conn.execute(
         text("SELECT value FROM config WHERE key = :key"), {"key": key.value}
-    ).scalar_one_or_none()
+    ).scalar_one()
     return None if value is None else int(value)
 
 
 def cap(conn: Connection, key: ConfigKey) -> int | None:
-    """Renvoie le plafond d'interrogations de `key`, ou `None` sans plafond (`cap_value`)."""
-    return cap_value(key, _stored_int(conn, key))
+    """Renvoie le plafond d'interrogations de `key`, ou `None` sans plafond : zéro vaut illimité."""
+    return _stored_int(conn, key) or None
 
 
 def delay(conn: Connection, key: ConfigKey) -> int:
-    """Renvoie le délai de réinterrogation de `key`, en jours (`delay_value`)."""
-    return delay_value(key, _stored_int(conn, key))
+    """Renvoie le délai de réinterrogation de `key`, en jours."""
+    value = _stored_int(conn, key)
+    assert value is not None, key
+    return value
 
 
 def fixed_start_year(conn: Connection) -> int | None:

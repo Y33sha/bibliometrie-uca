@@ -139,7 +139,6 @@
     { key: "doi_resolution_max_per_run", label: "doi.org (URL des DOI)" },
     { key: "sudoc_max_per_run", label: "Sudoc : revues vérifiées" },
   ];
-  const CAP_KEYS = new Set(CAPS.map((cap) => cap.key));
 
   /** Délais au-delà desquels le pipeline interroge de nouveau une source, en jours. */
   const DELAYS = [
@@ -150,12 +149,6 @@
     { key: "doaj_refresh_after_days", label: "Fichier du DOAJ" },
     { key: "issnl_table_refresh_after_days", label: "Table ISSN-L (ISSN International Centre)" },
   ];
-  const DELAY_KEYS = new Set(DELAYS.map((delay) => delay.key));
-
-  const MIN_YEAR = 1970;
-  const MAX_YEAR = 2100;
-  /** Sans première année fixée, la première année moissonnée précède l'année courante de ce nombre d'années. */
-  const DEFAULT_START_YEAR_OFFSET = 5;
 
   const activeTab = $derived(page.url.searchParams.get("tab") === "display" ? "display" : "pipeline");
 
@@ -163,12 +156,11 @@
   /** Clés dont la valeur est un texte libre, enregistré tel quel. */
   const TEXT_KEYS = new Set([SITE_TITLE_KEY]);
 
-  /** Bornes du champ pour une clé numérique, `null` pour les autres. */
+  /** Bornes du champ pour une clé entière, `null` pour les autres. */
   function numericBounds(key: string): { min: number; max: number } | null {
-    if (CAP_KEYS.has(key)) return { min: 0, max: 10_000_000 };
-    if (DELAY_KEYS.has(key)) return { min: 1, max: 3650 };
-    if (key === "pipeline_start_year_full") return { min: MIN_YEAR, max: MAX_YEAR };
-    return null;
+    const item = configByKey(key);
+    if (item?.minimum == null || item.maximum == null) return null;
+    return { min: item.minimum, max: item.maximum };
   }
 
   /** Plafond d'interrogations : zéro retire la borne. */
@@ -196,7 +188,7 @@
   const BRAND_HUE_KEY = "brand_hue";
   const brandHueItem = $derived(configByKey(BRAND_HUE_KEY));
   let hueDraft = $state<number | null>(null);
-  const hueShown = $derived(hueDraft ?? (typeof brandHueItem?.value === "number" ? brandHueItem.value : 196));
+  const hueShown = $derived(hueDraft ?? Number(brandHueItem?.value));
   // Spectre du curseur, plus clair et plus saturé que --accent pour que chaque teinte se reconnaisse.
   const hueSpectrum = `linear-gradient(to right, ${Array.from({ length: 13 }, (_, i) => `oklch(0.75 0.11 ${i * 30})`).join(", ")})`;
 
@@ -287,9 +279,7 @@
     try {
       const text = String(editValue ?? "");
       let parsed;
-      if (CAP_KEYS.has(key) && text.trim() === "") {
-        parsed = 0;
-      } else if (TEXT_KEYS.has(key)) {
+      if (TEXT_KEYS.has(key)) {
         parsed = text;
       } else {
         try {
@@ -350,7 +340,7 @@
           {:else}
             {#if item.value === null}
               <span class="config-value-inline default-value">
-                {new Date().getFullYear() - DEFAULT_START_YEAR_OFFSET} (par défaut : {DEFAULT_START_YEAR_OFFSET} ans avant l'année courante)
+                {item.value_if_null} (par défaut)
               </span>
             {:else}
               <span class="config-value-inline">{item.value}</span>
@@ -519,8 +509,8 @@
             id="brand-hue"
             class="hue-slider"
             type="range"
-            min="0"
-            max="359"
+            min={brandHueItem.minimum}
+            max={brandHueItem.maximum}
             step="1"
             value={hueShown}
             style:background={hueSpectrum}

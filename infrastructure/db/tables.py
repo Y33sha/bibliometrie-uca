@@ -34,7 +34,14 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import ARRAY, ENUM as PgEnum
 
-from domain.config import CAP_KEYS, DELAY_KEYS, MAX_YEAR, MIN_YEAR, ConfigKey
+from domain.config import (
+    CAP_BOUNDS,
+    CAP_KEYS,
+    DELAY_BOUNDS,
+    DELAY_KEYS,
+    ConfigKey,
+    integer_bounds,
+)
 from domain.countries import NO_COUNTRY_CODE, PlaceNameKind
 from domain.country_detection import CountryDetectionMethod
 from domain.merge import MergedEntity
@@ -129,6 +136,9 @@ audit_log = Table(
 )
 
 
+_YEAR_BOUNDS = integer_bounds(ConfigKey.PIPELINE_START_YEAR_FULL)
+_HUE_BOUNDS = integer_bounds(ConfigKey.BRAND_HUE)
+
 config = Table(
     "config",
     metadata,
@@ -139,20 +149,20 @@ config = Table(
     # `value` est jsonb : la forme attendue dépend de la clé. Le domaine énumère les clés.
     CheckConstraint(
         f"key NOT IN ({', '.join(repr(key) for key in sorted(CAP_KEYS))}) "
-        "OR (jsonb_typeof(value) = 'number' AND (value)::numeric >= 0 "
+        f"OR (jsonb_typeof(value) = 'number' AND (value)::numeric >= {CAP_BOUNDS[0]} "
         "AND (value)::numeric = trunc((value)::numeric))",
         name="config_cap_is_non_negative_integer",
     ),
     CheckConstraint(
         f"key <> '{ConfigKey.PIPELINE_START_YEAR_FULL}' OR jsonb_typeof(value) = 'null' "
         f"OR (jsonb_typeof(value) = 'number' "
-        f"AND (value)::numeric BETWEEN {MIN_YEAR} AND {MAX_YEAR} "
+        f"AND (value)::numeric BETWEEN {_YEAR_BOUNDS[0]} AND {_YEAR_BOUNDS[1]} "
         "AND (value)::numeric = trunc((value)::numeric))",
         name="config_year_is_in_range",
     ),
     CheckConstraint(
         f"key NOT IN ({', '.join(repr(key) for key in sorted(DELAY_KEYS))}) "
-        "OR (jsonb_typeof(value) = 'number' AND (value)::numeric >= 1 "
+        f"OR (jsonb_typeof(value) = 'number' AND (value)::numeric >= {DELAY_BOUNDS[0]} "
         "AND (value)::numeric = trunc((value)::numeric))",
         name="config_delay_is_positive_integer",
     ),
@@ -162,7 +172,7 @@ config = Table(
     ),
     CheckConstraint(
         f"key <> '{ConfigKey.BRAND_HUE}' OR (jsonb_typeof(value) = 'number' "
-        "AND (value)::numeric BETWEEN 0 AND 359 "
+        f"AND (value)::numeric BETWEEN {_HUE_BOUNDS[0]} AND {_HUE_BOUNDS[1]} "
         "AND (value)::numeric = trunc((value)::numeric))",
         name="config_brand_hue_is_angle",
     ),

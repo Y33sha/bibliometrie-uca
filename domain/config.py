@@ -5,7 +5,7 @@ from enum import StrEnum
 from typing import NamedTuple
 
 from domain.countries import NO_COUNTRY_CODE, normalize_country_code
-from domain.errors import ValidationError
+from domain.errors import NotFoundError, ValidationError
 from domain.structures.structure import StructureType
 from domain.types import JsonValue
 
@@ -49,14 +49,8 @@ class ConfigKey(StrEnum):
     """Pays de l'établissement : code ISO 3166-1 en minuscules. Une publication co-affiliée à un autre pays est une collaboration internationale."""
 
 
-MIN_YEAR = 1970
-MAX_YEAR = 2100
-
 DEFAULT_START_YEAR_OFFSET = 5
 """Sans première année fixée, la première année moissonnée précède l'année courante de ce nombre d'années."""
-
-DEFAULT_BRAND_HUE = 196
-DEFAULT_INSTITUTION_COUNTRY = "fr"
 
 
 def _parse_int(value: JsonValue) -> int | None:
@@ -77,36 +71,30 @@ def _is_blank(value: JsonValue) -> bool:
     return value is None or (isinstance(value, str) and not value.strip())
 
 
-def _year(key: str, value: JsonValue) -> JsonValue:
-    """Année entre `MIN_YEAR` et `MAX_YEAR`. Une valeur vide laisse l'année non fixée."""
-    if _is_blank(value):
-        return None
-    annee = _parse_int(value)
-    if annee is None or not (MIN_YEAR <= annee <= MAX_YEAR):
+def _bounded_int(key: str, value: JsonValue) -> JsonValue:
+    """Entier compris dans les bornes de la clé (`ConfigSetting.bounds`)."""
+    minimum, maximum = integer_bounds(ConfigKey(key))
+    entier = _parse_int(value)
+    if entier is None or not (minimum <= entier <= maximum):
         raise ValidationError(
-            f"`{key}` attend une année entre {MIN_YEAR} et {MAX_YEAR} ; reçu : {value!r}"
+            f"`{key}` attend un entier de {minimum} à {maximum} ; reçu : {value!r}"
         )
-    return annee
+    return entier
+
+
+def _year(key: str, value: JsonValue) -> JsonValue:
+    """Année dans les bornes de la clé. Une valeur vide laisse l'année non fixée."""
+    return None if _is_blank(value) else _bounded_int(key, value)
 
 
 def _cap(key: str, value: JsonValue) -> JsonValue:
-    """Plafond d'interrogations, entier positif ou nul ; zéro pour illimité. Une valeur vide vaut zéro."""
-    if _is_blank(value):
-        return 0
-    plafond = _parse_int(value)
-    if plafond is None or plafond < 0:
-        raise ValidationError(f"`{key}` attend un entier positif ou nul ; reçu : {value!r}")
-    return plafond
+    """Plafond d'interrogations dans les bornes de la clé ; zéro pour illimité. Une valeur vide vaut zéro."""
+    return 0 if _is_blank(value) else _bounded_int(key, value)
 
 
 def _delay(key: str, value: JsonValue) -> JsonValue:
-    """Délai de réinterrogation, en jours, au moins un."""
-    delai = _parse_int(value)
-    if delai is None or delai < 1:
-        raise ValidationError(
-            f"`{key}` attend un nombre entier de jours, au moins 1 ; reçu : {value!r}"
-        )
-    return delai
+    """Délai de réinterrogation, en jours, dans les bornes de la clé."""
+    return _bounded_int(key, value)
 
 
 def _laboratory_types(key: str, value: JsonValue) -> JsonValue:
@@ -130,14 +118,6 @@ def _site_title(key: str, value: JsonValue) -> JsonValue:
     return value.strip()
 
 
-def _brand_hue(key: str, value: JsonValue) -> JsonValue:
-    """Entier de 0 à 359."""
-    teinte = _parse_int(value)
-    if teinte is None or not (0 <= teinte <= 359):
-        raise ValidationError(f"`{key}` attend un entier de 0 à 359 ; reçu : {value!r}")
-    return teinte
-
-
 def _institution_country(key: str, value: JsonValue) -> JsonValue:
     """Code pays à deux lettres, en minuscules."""
     code = normalize_country_code(value) if isinstance(value, str) else None
@@ -156,37 +136,47 @@ class ConfigSetting(NamedTuple):
     normalize: Normalizer | None
     """Forme imposée à la valeur. `None` : valeur libre."""
     default: JsonValue = None
-    """Valeur retenue quand la clé est absente. Valeur initiale d'une clé commune."""
+    """Valeur initiale, posée par le seed. Une migration insère chaque clé, sauf les clés de périmètre, posées par le seed d'établissement."""
     institution: bool = False
     """Clé propre à l'établissement, posée par le seed d'établissement. Le seed commun pose les autres clés."""
     public: bool = False
     """Clé lisible sans session."""
+    bounds: tuple[int, int] | None = None
+    """Bornes incluses d'une clé entière."""
 
+
+CAP_BOUNDS = (0, 10_000_000)
+DELAY_BOUNDS = (1, 3650)
 
 SETTINGS: dict[ConfigKey, ConfigSetting] = {
-    ConfigKey.PIPELINE_START_YEAR_FULL: ConfigSetting(_year),
-    ConfigKey.UNPAYWALL_MAX_PER_RUN: ConfigSetting(_cap, 10_000),
-    ConfigKey.FETCH_MISSING_MAX_PER_SOURCE: ConfigSetting(_cap, 0),
-    ConfigKey.SUDOC_MAX_PER_RUN: ConfigSetting(_cap, 10_000),
-    ConfigKey.DOI_RESOLUTION_MAX_PER_RUN: ConfigSetting(_cap, 10_000),
-    ConfigKey.FETCH_STALE_AFTER_DAYS: ConfigSetting(_delay, 90),
-    ConfigKey.FETCH_MISSING_RETRY_AFTER_DAYS: ConfigSetting(_delay, 30),
-    ConfigKey.UNPAYWALL_RECHECK_AFTER_DAYS: ConfigSetting(_delay, 15),
-    ConfigKey.DOI_RESOLUTION_RECHECK_AFTER_DAYS: ConfigSetting(_delay, 180),
-    ConfigKey.DOAJ_REFRESH_AFTER_DAYS: ConfigSetting(_delay, 30),
-    ConfigKey.ISSNL_TABLE_REFRESH_AFTER_DAYS: ConfigSetting(_delay, 30),
+    ConfigKey.PIPELINE_START_YEAR_FULL: ConfigSetting(_year, bounds=(1970, 2100)),
+    ConfigKey.UNPAYWALL_MAX_PER_RUN: ConfigSetting(_cap, 10_000, bounds=CAP_BOUNDS),
+    ConfigKey.FETCH_MISSING_MAX_PER_SOURCE: ConfigSetting(_cap, 0, bounds=CAP_BOUNDS),
+    ConfigKey.SUDOC_MAX_PER_RUN: ConfigSetting(_cap, 10_000, bounds=CAP_BOUNDS),
+    ConfigKey.DOI_RESOLUTION_MAX_PER_RUN: ConfigSetting(_cap, 10_000, bounds=CAP_BOUNDS),
+    ConfigKey.FETCH_STALE_AFTER_DAYS: ConfigSetting(_delay, 90, bounds=DELAY_BOUNDS),
+    ConfigKey.FETCH_MISSING_RETRY_AFTER_DAYS: ConfigSetting(_delay, 30, bounds=DELAY_BOUNDS),
+    ConfigKey.UNPAYWALL_RECHECK_AFTER_DAYS: ConfigSetting(_delay, 15, bounds=DELAY_BOUNDS),
+    ConfigKey.DOI_RESOLUTION_RECHECK_AFTER_DAYS: ConfigSetting(_delay, 180, bounds=DELAY_BOUNDS),
+    ConfigKey.DOAJ_REFRESH_AFTER_DAYS: ConfigSetting(_delay, 30, bounds=DELAY_BOUNDS),
+    ConfigKey.ISSNL_TABLE_REFRESH_AFTER_DAYS: ConfigSetting(_delay, 30, bounds=DELAY_BOUNDS),
     ConfigKey.LABORATORY_TYPES: ConfigSetting(
         _laboratory_types, [StructureType.LABO.value], public=True
     ),
     ConfigKey.PERIMETER_EXTRACTION: ConfigSetting(None, institution=True),
     ConfigKey.PERIMETER_PERSONS: ConfigSetting(None, institution=True),
     ConfigKey.SITE_TITLE: ConfigSetting(_site_title, "", institution=True),
-    ConfigKey.BRAND_HUE: ConfigSetting(_brand_hue, DEFAULT_BRAND_HUE, institution=True),
-    ConfigKey.INSTITUTION_COUNTRY: ConfigSetting(
-        _institution_country, DEFAULT_INSTITUTION_COUNTRY, institution=True
-    ),
+    ConfigKey.BRAND_HUE: ConfigSetting(_bounded_int, 196, institution=True, bounds=(0, 359)),
+    ConfigKey.INSTITUTION_COUNTRY: ConfigSetting(_institution_country, "fr", institution=True),
 }
 assert set(SETTINGS) == set(ConfigKey)
+
+
+def integer_bounds(key: ConfigKey) -> tuple[int, int]:
+    """Renvoie les bornes incluses de la clé entière `key`."""
+    bounds = SETTINGS[key].bounds
+    assert bounds is not None, key
+    return bounds
 
 
 def _keys_normalized_by(normalize: Normalizer) -> frozenset[str]:
@@ -214,35 +204,19 @@ INITIAL_CONFIG_VALUES: dict[str, JsonValue] = {
 """Valeur initiale de chaque clé commune à tous les établissements."""
 
 
-def _int_default(key: ConfigKey) -> int:
-    default = SETTINGS[key].default
-    assert isinstance(default, int), key
-    return default
-
-
-def cap_value(key: ConfigKey, stored: int | None) -> int | None:
-    """Renvoie le plafond à appliquer pour `key` d'après la valeur stockée, `None` pour illimité. Une valeur absente donne le défaut ; zéro retire la borne."""
-    value = _int_default(key) if stored is None else stored
-    return value or None
-
-
-def delay_value(key: ConfigKey, stored: int | None) -> int:
-    """Renvoie le délai à appliquer pour `key` d'après la valeur stockée, en jours. Une valeur absente donne le défaut."""
-    return _int_default(key) if stored is None else stored
-
-
 def start_year_value(stored: int | None, current_year: int) -> int:
     """Renvoie la première année moissonnée d'après la valeur stockée. Sans année fixée, elle précède l'année courante de `DEFAULT_START_YEAR_OFFSET` ans."""
     return current_year - DEFAULT_START_YEAR_OFFSET if stored is None else stored
 
 
 def normalize_config_value(key: str, value: JsonValue) -> JsonValue:
-    """Renvoie la valeur à écrire pour `key`, ramenée à la forme imposée par la clé.
-
-    Une clé inconnue ou sans forme imposée passe telle quelle.
+    """Renvoie la valeur à écrire pour `key`, ramenée à la forme imposée par la clé. Une clé sans forme imposée passe telle quelle.
 
     Raises:
+        NotFoundError: clé inconnue.
         ValidationError: valeur hors de la forme imposée.
     """
-    normalize = SETTINGS[ConfigKey(key)].normalize if key in ConfigKey else None
+    if key not in ConfigKey:
+        raise NotFoundError(f"Paramètre '{key}' introuvable")
+    normalize = SETTINGS[ConfigKey(key)].normalize
     return value if normalize is None else normalize(key, value)

@@ -10,16 +10,16 @@ import pytest
 from tests.integration.helpers.db import owner_pool
 from tests.integration.helpers.seeds import seed_config
 
-_CLE = "test_audit_config_key"
+_CLE = "site_title"
 
 
 @pytest.fixture
 def cle_posee(client):
-    """Pose un paramètre de test, puis le retire : la route refuse une clé inconnue."""
+    """Pose un titre de test, puis rend au titre sa valeur initiale."""
     seed_config(_CLE, "avant")
     yield _CLE
+    seed_config(_CLE, "")
     with owner_pool() as cur:
-        cur.execute("DELETE FROM config WHERE key = %s", (_CLE,))
         cur.execute("DELETE FROM audit_log WHERE event_type = 'config.updated'")
 
 
