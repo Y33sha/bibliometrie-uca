@@ -386,51 +386,50 @@ class HalProblemsQueries:
     def hal_affiliation_conflicts(
         self, *, page: int, per_page: int
     ) -> HalAffiliationConflictsResponse:
-        offset = (page - 1) * per_page
         # Contribution en conflit : HAL la place dans le périmètre ; WoS et OpenAlex lui donnent une adresse ou un ROR, hors du périmètre.
-        base_cte = f"""
-        WITH conflict_contributions AS (
-            SELECT g.id AS contribution_id, g.publication_id, g.person_id, g.reference_position,
-                   MIN({contributor_display_name()}) AS name,
-                   array_agg(sc.id) AS hal_source_contribution_ids
-            FROM source_contributions sc
-            JOIN aligned_source_contributions m ON m.source_contribution_id = sc.id
-            JOIN contributions g ON g.id = m.contribution_id
-            WHERE sc.source = 'hal'
-              AND sc.in_perimeter
-              AND NOT EXISTS (
-                  SELECT 1 FROM aligned_source_contributions m2
-                  JOIN source_contributions sc2 ON sc2.id = m2.source_contribution_id
-                  WHERE m2.contribution_id = g.id
-                    AND sc2.source IN ('wos', 'openalex')
-                    AND sc2.in_perimeter
-              )
-              AND EXISTS (
-                  SELECT 1 FROM aligned_source_contributions m2
-                  JOIN source_contributions sc2 ON sc2.id = m2.source_contribution_id
-                  WHERE m2.contribution_id = g.id
-                    AND sc2.source IN ('wos', 'openalex')
-                    AND (EXISTS (SELECT 1 FROM source_contribution_addresses sca
-                                 WHERE sca.source_contribution_id = sc2.id)
-                         OR EXISTS (SELECT 1 FROM source_contribution_rors scr
-                                    WHERE scr.source_contribution_id = sc2.id))
-              )
-            GROUP BY g.id
-        ),
-        conflict_pubs AS (
-            SELECT DISTINCT publication_id FROM conflict_contributions
-        )
-        """
-
-        total_row = self._conn.execute(
-            text(f"{base_cte} SELECT COUNT(*) AS n FROM conflict_pubs")
-        ).one()
-        total = total_row.n
-
+        # Une seule requête renvoie le total et la page : la ligne du total est présente même pour une page vide.
         rows = self._conn.execute(
             text(f"""
-                {base_cte}
-                SELECT p.id, p.title, p.publication_year, p.doc_type::text AS doc_type, p.doi,
+                WITH conflict_source_contributions AS (
+                    SELECT m.contribution_id,
+                           MIN({contributor_display_name()}) AS name,
+                           array_agg(sc.id) AS hal_source_contribution_ids
+                    FROM source_contributions sc
+                    JOIN aligned_source_contributions m ON m.source_contribution_id = sc.id
+                    WHERE sc.source = 'hal'
+                      AND sc.in_perimeter
+                      AND NOT EXISTS (
+                          SELECT 1 FROM aligned_source_contributions m2
+                          JOIN source_contributions sc2 ON sc2.id = m2.source_contribution_id
+                          WHERE m2.contribution_id = m.contribution_id
+                            AND sc2.source IN ('wos', 'openalex')
+                            AND sc2.in_perimeter
+                      )
+                      AND EXISTS (
+                          SELECT 1 FROM aligned_source_contributions m2
+                          JOIN source_contributions sc2 ON sc2.id = m2.source_contribution_id
+                          WHERE m2.contribution_id = m.contribution_id
+                            AND sc2.source IN ('wos', 'openalex')
+                            AND (EXISTS (SELECT 1 FROM source_contribution_addresses sca
+                                         WHERE sca.source_contribution_id = sc2.id)
+                                 OR EXISTS (SELECT 1 FROM source_contribution_rors scr
+                                            WHERE scr.source_contribution_id = sc2.id))
+                      )
+                    GROUP BY m.contribution_id
+                ),
+                conflict_contributions AS (
+                    SELECT c.contribution_id, c.name, c.hal_source_contribution_ids,
+                           g.publication_id, g.person_id, g.reference_position
+                    FROM conflict_source_contributions c
+                    JOIN contributions g ON g.id = c.contribution_id
+                ),
+                conflict_pubs AS (
+                    SELECT DISTINCT publication_id FROM conflict_contributions
+                ),
+                counted AS (
+                    SELECT COUNT(*) AS total FROM conflict_pubs
+                )
+                SELECT counted.total, p.id, p.title, p.publication_year, p.doc_type, p.doi,
                        (SELECT array_agg(sr2.source_id) FROM source_records sr2
                         WHERE sr2.publication_id = p.id AND sr2.source = 'hal') AS halids,
                        (SELECT json_agg(json_build_object(
@@ -447,17 +446,24 @@ class HalProblemsQueries:
                         FROM conflict_contributions cc
                         WHERE cc.publication_id = p.id
                        ) AS authors
-                FROM conflict_pubs cp
-                JOIN publications p ON p.id = cp.publication_id
+                FROM counted
+                LEFT JOIN LATERAL (
+                    SELECT p.id, p.title, p.publication_year, p.doc_type::text AS doc_type, p.doi,
+                           p.publication_date
+                    FROM conflict_pubs cp
+                    JOIN publications p ON p.id = cp.publication_id
+                    ORDER BY p.publication_date DESC, p.id DESC
+                    LIMIT :pg_limit OFFSET :pg_offset
+                ) p ON TRUE
                 ORDER BY p.publication_date DESC, p.id DESC
-                LIMIT :pg_limit OFFSET :pg_offset
             """),
             {
                 "pg_limit": per_page,
-                "pg_offset": offset,
+                "pg_offset": (page - 1) * per_page,
                 "perimeter_ids": get_persons_structure_ids_list(self._conn),
             },
         ).all()
+        total = rows[0].total
         publications = [
             HalAffiliationConflictPublication(
                 id=r.id,
@@ -469,6 +475,7 @@ class HalProblemsQueries:
                 authors=[HalAffiliationConflictAuthor.model_validate(x) for x in r.authors],
             )
             for r in rows
+            if r.id is not None
         ]
 
         return HalAffiliationConflictsResponse(

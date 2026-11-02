@@ -335,6 +335,18 @@ class TestHalAffiliationConflicts:
 
         assert _conflict_ids(sa_sync_conn) == [publication]
 
+    def test_counts_conflicts_beyond_the_last_page(self, sa_sync_conn):
+        publication = insert_publication(sa_sync_conn)
+        contribution = _create_hal_contribution(sa_sync_conn, publication, "LAB-PAGE")
+        oa_source_record = _source_record(
+            sa_sync_conn, publication, source="openalex", source_id="oa-page"
+        )
+        _add_source_contribution(sa_sync_conn, oa_source_record, contribution, source="openalex")
+
+        res = _q(sa_sync_conn).hal_affiliation_conflicts(page=2, per_page=1)
+
+        assert (res.total, res.publications) == (1, [])
+
     def test_detects_conflict_with_wos(self, sa_sync_conn):
         publication = insert_publication(sa_sync_conn)
         contribution = _create_hal_contribution(sa_sync_conn, publication, "LAB-WOS")
