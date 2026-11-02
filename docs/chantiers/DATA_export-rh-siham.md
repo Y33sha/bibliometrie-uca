@@ -43,16 +43,16 @@ Les dates des deux affectations diffèrent sur 74 lignes.
 
 ### Phase 2 — Import
 
-- [ ] Lecture du format SIHAM : titre et fenêtre d'observation sur les deux premières lignes, en-têtes sur la troisième.
-- [ ] Rattachement des matricules de l'export de décembre aux fiches existantes, par l'email (oneshot `attach_siham_ids`).
-- [ ] Rattachement par matricule, puis par email : un agent présent en base est mis à jour, sans création de personne.
-- [ ] Mise à jour des périodes sur la fenêtre d'observation, fusion des périodes d'une même unité.
-- [ ] Correspondance des libellés d'unité avec `structures`. L'import liste les libellés sans correspondance.
-- [ ] Refus d'un export antérieur au dernier importé.
+- [x] Lecture du format SIHAM : titre et fenêtre d'observation sur les deux premières lignes, en-têtes sur la troisième.
+- [x] Rattachement des matricules de l'export de décembre aux fiches existantes, par l'email (oneshot `attach_siham_ids`).
+- [x] Rattachement par matricule, puis par email : un agent présent en base est mis à jour, sans création de personne.
+- [x] Mise à jour des périodes sur la fenêtre d'observation, fusion des périodes d'une même unité.
+- [x] Correspondance des libellés d'unité avec `structures`. L'import liste les libellés sans correspondance.
+- [x] Refus d'un export antérieur au dernier importé.
 
 ### Phase 3 — Consommateurs
 
-- [ ] Années de présence du périmètre calculées depuis les périodes.
+- [x] Années de présence du périmètre calculées depuis les périodes, réunies en intervalles de présence continue toutes unités confondues.
 - [ ] `person_search`, purge des personnes, fusion de personnes (`_merge.py`) : lecture de la table des périodes.
 - [ ] Liste des personnes : facettes catégorie, laboratoire, corps.
 - [ ] Fiche personne : périodes de présence.
