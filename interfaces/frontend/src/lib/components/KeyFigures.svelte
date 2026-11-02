@@ -29,11 +29,14 @@
 	}
 	.key-figure {
 		display: flex;
-		align-items: center;
+		align-items: flex-start;
 		gap: 14px;
 	}
+	/* Icône centrée sur la ligne du chiffre, quelle que soit la hauteur du libellé. */
 	.key-figure-icon {
 		display: flex;
+		align-items: center;
+		height: calc(var(--fs-4xl) * 1.1);
 		font-size: var(--fs-3xl);
 		color: var(--muted);
 	}
