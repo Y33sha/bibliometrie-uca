@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 
+from domain.publications.doc_types import DocType
 from domain.publications.identifiers import clean_doi
 from domain.source_records.metadata_correction.shared_doi import (
     DATACITE_DIRECT_CONVERGENCE,
@@ -183,9 +184,9 @@ def extract_datacite_distinct_works(
 # Types de document dépendants, sujets d'une relation vers l'œuvre principale : preprint, erratum, jeu de données.
 # Ils typent la relation de deux publications qui partagent une clé (`infer_shared_key_relation`) ou un titre (phase `relations`).
 DEPENDENT_DOC_TYPE_RELATIONS: dict[str, RelationType] = {
-    "preprint": RelationType.IS_PREPRINT_OF,
-    "erratum": RelationType.IS_CORRECTION_OF,
-    "dataset": RelationType.IS_SUPPLEMENT_TO,
+    DocType.PREPRINT: RelationType.IS_PREPRINT_OF,
+    DocType.ERRATUM: RelationType.IS_CORRECTION_OF,
+    DocType.DATASET: RelationType.IS_SUPPLEMENT_TO,
 }
 
 
@@ -196,7 +197,7 @@ def infer_shared_key_relation(
 
     Un preprint, un erratum, un jeu de données, ou un chapitre face à son ouvrage, donnent une relation orientée. Les autres couples donnent `is_related_to`.
     """
-    if "peer_review" in (doc_type_a, doc_type_b):
+    if DocType.PEER_REVIEW in (doc_type_a, doc_type_b):
         return None
     for dependent, relation in DEPENDENT_DOC_TYPE_RELATIONS.items():
         a_is_dependent = doc_type_a == dependent
@@ -205,9 +206,9 @@ def infer_shared_key_relation(
             return relation, "a"
         if b_is_dependent and not a_is_dependent:
             return relation, "b"
-    if {doc_type_a, doc_type_b} == {"book", "book_chapter"}:
+    if {doc_type_a, doc_type_b} == {DocType.BOOK, DocType.BOOK_CHAPTER}:
         # Le chapitre est partie de l'ouvrage.
-        return RelationType.IS_PART_OF, ("a" if doc_type_a == "book_chapter" else "b")
+        return RelationType.IS_PART_OF, ("a" if doc_type_a == DocType.BOOK_CHAPTER else "b")
     return RelationType.IS_RELATED_TO, "sym"
 
 
