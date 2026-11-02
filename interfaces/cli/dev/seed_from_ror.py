@@ -16,7 +16,7 @@ from pathlib import Path
 from domain.config import SETTINGS, ConfigKey
 from domain.countries import normalize_country_code
 from domain.normalize import normalize_text
-from domain.structures.identifiers import normalize_ror_id
+from domain.structures.identifiers import RorId
 from domain.structures.name_forms import is_short_form
 from domain.structures.structure import StructureType
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str
@@ -135,7 +135,8 @@ def parse_organization(record: Mapping[str, JsonValue]) -> RorOrganization:
 
 
 def _ror_short_id(ror_url: str) -> str:
-    return normalize_ror_id(ror_url) or ror_url
+    ror = RorId.try_parse(ror_url)
+    return ror.value if ror else ror_url
 
 
 def child_structure_type(org: RorOrganization) -> StructureType | None:
@@ -440,16 +441,16 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
 
-    ror_id = normalize_ror_id(args.ror_id)
-    if ror_id is None:
+    ror = RorId.try_parse(args.ror_id)
+    if ror is None:
         raise SystemExit(f"Identifiant ROR invalide : {args.ror_id}")
     with source_circuit_breaker("ror"):
-        root = fetch_ror(ror_id)
+        root = fetch_ror(ror.value)
         children = [fetch_ror(child_id) for child_id in root.child_ids]
     with source_circuit_breaker("hal", max_per_second=request_budget("hal")):
         hal_collections = fetch_hal_collections(root, children)
     with source_circuit_breaker("openalex", max_per_second=request_budget("openalex")):
-        openalex_ids = fetch_openalex_ids(ror_id)
+        openalex_ids = fetch_openalex_ids(ror.value)
     seed = build_institution_seed(root, children, openalex_ids, args.code, hal_collections)
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
