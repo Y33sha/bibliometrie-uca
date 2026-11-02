@@ -5,16 +5,12 @@ from dataclasses import dataclass, replace
 from enum import StrEnum
 
 from domain.normalize import normalize_text, optional_plain_text
+from domain.publications.doc_types import DocType
 from domain.serials.issns import SerialIssn, received_issns
 from domain.serials.serial import OaModel
 from domain.serials.series import ContainerLevel, container_level, series_title
 from domain.serials.titles import names_a_dated_event, names_ebook_platform, names_proceedings
 from domain.source_records.doc_types import map_doc_type
-
-_ARTICLE = "article"
-_BOOK = "book"
-_BOOK_CHAPTER = "book_chapter"
-_CONFERENCE_PAPER = "conference_paper"
 
 
 class ContainerRole(StrEnum):
@@ -38,9 +34,9 @@ def container_role(
 ) -> ContainerRole:
     """Renvoie le rôle du conteneur d'un document, d'après son type brut dans la source. Un document qui déclare un congrès (`declares_conference`) est un article de congrès."""
     types = _doc_types(raw_doc_type, source)
-    if declares_conference or types & {_BOOK_CHAPTER, _CONFERENCE_PAPER}:
+    if declares_conference or types & {DocType.BOOK_CHAPTER, DocType.CONFERENCE_PAPER}:
         return ContainerRole.PART
-    if _BOOK in types:
+    if DocType.BOOK in types:
         return ContainerRole.BOOK
     return ContainerRole.JOURNAL
 
@@ -48,14 +44,16 @@ def container_role(
 def is_book_or_chapter(raw_doc_type: str | None, source: str) -> bool:
     """Vrai si un document est un livre ou un chapitre, hors article de congrès."""
     types = _doc_types(raw_doc_type, source)
-    return bool(types & {_BOOK, _BOOK_CHAPTER}) and _CONFERENCE_PAPER not in types
+    return (
+        bool(types & {DocType.BOOK, DocType.BOOK_CHAPTER}) and DocType.CONFERENCE_PAPER not in types
+    )
 
 
 def is_conference(
     raw_doc_type: str | None, source: str, *, declares_conference: bool = False
 ) -> bool:
     """Vrai si un document est issu d'un congrès : sa monographie est un volume d'actes."""
-    return declares_conference or _CONFERENCE_PAPER in _doc_types(raw_doc_type, source)
+    return declares_conference or DocType.CONFERENCE_PAPER in _doc_types(raw_doc_type, source)
 
 
 def conference_paper_share(records: Iterable[tuple[str, str | None]]) -> tuple[int, int]:
@@ -67,7 +65,7 @@ def conference_paper_share(records: Iterable[tuple[str, str | None]]) -> tuple[i
     total = conference = 0
     for source, raw_doc_type in records:
         total += 1
-        conference += _CONFERENCE_PAPER in _doc_types(raw_doc_type, source)
+        conference += DocType.CONFERENCE_PAPER in _doc_types(raw_doc_type, source)
     return conference, total
 
 
@@ -90,7 +88,9 @@ def holds_mostly_conference_papers(records: Iterable[tuple[str, str | None]]) ->
 def holds_mostly_articles(records: Iterable[tuple[str, str | None]]) -> bool:
     """Vrai si la majorité stricte des documents d'une revue sont des articles, d'après le type brut de chacun : `(source, type brut)`."""
     records = list(records)
-    articles = sum(_ARTICLE in _doc_types(raw_doc_type, source) for source, raw_doc_type in records)
+    articles = sum(
+        DocType.ARTICLE in _doc_types(raw_doc_type, source) for source, raw_doc_type in records
+    )
     return articles * 2 > len(records)
 
 
