@@ -24,10 +24,13 @@ Les dates des deux affectations diffèrent sur 74 lignes.
 ## Décisions
 
 - Les dates de présence sont relatives aux unités.
-- Catégorie, statut, corps et grade sont des attributs de la personne, dans `hr_records`. Chaque import les met à jour.
+- Catégorie, statut, corps et grade sont des attributs de la personne, dans `hr_records`. Chaque import les remplace par ses valeurs non vides.
 - Le matricule SIHAM est une colonne de `hr_records`.
-- Une table des périodes de présence réunit personne, début, fin, libellé de l'unité et `structure_id`. `structure_id` est renseigné quand l'unité est un laboratoire présent dans `structures`.
-- Le libellé de l'unité est d'abord comparé au nom et au sigle des laboratoires de `structures`. A défaut de correspondance exacte, la reconnaissance des structures s'applique au libellé complété du nom de l'établissement.
+- Une table des périodes de présence réunit personne, début, fin, libellé de l'unité et `structure_id`. Les deux affectations de l'export alimentent la table, sans distinction.
+- `structure_id` est renseigné quand l'unité est reconnue dans `structures`. Le libellé est d'abord comparé au nom et au sigle des structures. A défaut de correspondance exacte, la reconnaissance des structures s'applique au libellé, avec les structures du périmètre des personnes comme contexte.
+- L'import rattache un agent par son matricule, à défaut par son email.
+- Sur la fenêtre d'observation, l'export fait foi. Les périodes en base d'un agent présent dans l'export s'arrêtent la veille du début de la fenêtre. Les périodes de l'export s'ajoutent. Les périodes d'une même unité qui se chevauchent ou se suivent fusionnent.
+- Les imports se font dans l'ordre chronologique. L'import refuse un export antérieur au dernier importé.
 - La catégorie de personnel est une facette de la liste des personnes.
 
 ## Phasage
@@ -41,11 +44,11 @@ Les dates des deux affectations diffèrent sur 74 lignes.
 ### Phase 2 — Import
 
 - [ ] Lecture du format SIHAM : titre et fenêtre d'observation sur les deux premières lignes, en-têtes sur la troisième.
-- [ ] Rattachement par matricule : un agent présent en base est mis à jour, sans création de personne.
-- [ ] Rattachement des fiches sans matricule, par nom et email, à l'import de l'export de décembre.
-- [ ] Fusion des périodes contiguës dans la même unité.
-- [ ] Correspondance des libellés d'unité avec `structures` : correspondance exacte, puis reconnaissance des structures. L'import liste les libellés sans correspondance.
-- [ ] Remplacement des périodes d'un agent comprises dans la fenêtre d'observation. Les périodes antérieures sont conservées.
+- [ ] Rattachement des matricules de l'export de décembre aux fiches existantes, par l'email (oneshot `attach_siham_ids`).
+- [ ] Rattachement par matricule, puis par email : un agent présent en base est mis à jour, sans création de personne.
+- [ ] Mise à jour des périodes sur la fenêtre d'observation, fusion des périodes d'une même unité.
+- [ ] Correspondance des libellés d'unité avec `structures`. L'import liste les libellés sans correspondance.
+- [ ] Refus d'un export antérieur au dernier importé.
 
 ### Phase 3 — Consommateurs
 
@@ -63,5 +66,4 @@ Les dates des deux affectations diffèrent sur 74 lignes.
 
 - L'absence d'un matricule de l'export de décembre dans l'export de novembre vaut-elle départ ? Sur ces 99 matricules, 54 sont des CCU-AH et 76 ont une fin de contrat postérieure au 2025-12-15.
 - Le sexe est présent dans l'export. Le stocker ou non.
-- L'affectation principale et la répartition organisationnelle alimentent-elles toutes deux la table des périodes, sans distinction ? La double affectation est peut-être propre à l'établissement.
 - Les périodes dans un laboratoire alimentent-elles le périmètre ou l'affiliation des contributions ?
