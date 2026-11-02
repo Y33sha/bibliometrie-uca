@@ -10,7 +10,6 @@ from enum import StrEnum
 from typing import NamedTuple
 
 from domain.normalize import normalize_text
-from domain.serials.serial import SerialType
 from domain.serials.titles import names_a_dated_event
 
 # Ordinal d'édition, anglais (« 8th », « 21st »), français (« 34es », « 6èmes », « 1re »), allemand (« 74. Jahrestagung »).
@@ -43,14 +42,6 @@ _DETACHED_HYPHEN = re.compile(r"\s+([-–])(?=\w)")
 _TRAILING_PREPOSITION = re.compile(
     r"\s+(?:du|de|des|le|la|les|en|au|aux|à|of|the|in|on|at)$", re.IGNORECASE
 )
-
-
-_SERIES_OF_VOLUMES = frozenset({SerialType.PROCEEDINGS, SerialType.BOOK_SERIES})
-
-
-def holds_volumes(serial_type: SerialType) -> bool:
-    """Vrai si une entrée de `serials` de ce type réunit des volumes : série d'actes ou collection de livres. Le titre d'une revue peut contenir une année (« Periodontology 2000 »)."""
-    return serial_type in _SERIES_OF_VOLUMES
 
 
 class ContainerLevel(StrEnum):
@@ -90,19 +81,6 @@ def series_title(title: str) -> str:
     title = _DETACHED_HYPHEN.sub(r"\1", title)
     title = _SPACES.sub(" ", title).strip(" ,;:–-")
     return _TRAILING_PREPOSITION.sub("", title).strip(" ,;:–-")
-
-
-def reference_series_title(title: str, sudoc_title: str | None) -> str | None:
-    """Renvoie le titre de référence d'une série à ISSN dont le titre en base a la forme d'un volume, ou `None` pour garder ce titre.
-
-    Le titre de la notice Sudoc fait référence, s'il a lui-même la forme d'une série. À défaut, le titre de série du titre en base (`series_title`).
-    """
-    if container_level(title) is ContainerLevel.SERIES:
-        return None
-    for candidate in (sudoc_title, series_title(title)):
-        if candidate and container_level(candidate) is ContainerLevel.SERIES:
-            return candidate
-    return None
 
 
 def series_key(title: str) -> str:
