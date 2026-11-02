@@ -65,7 +65,7 @@ def _strip_comments(text: str) -> str:
 _MAX_UNESCAPE_PASSES = 4
 
 
-def unescape_html(text: str) -> str:
+def _unescape_html(text: str) -> str:
     """Décode les entités HTML jusqu'à stabilisation."""
     for _ in range(_MAX_UNESCAPE_PASSES):
         decoded = html.unescape(text)
@@ -75,22 +75,37 @@ def unescape_html(text: str) -> str:
     return text
 
 
+# Caractères invisibles : formatage (espace sans chasse), contrôle, substituts isolés, usage privé.
+_INVISIBLE_CATEGORIES = frozenset({"Cf", "Cc", "Cs", "Co"})
+
+
 def to_plain_text(text: str | None) -> str:
-    """Renvoie le texte brut d'une valeur reçue d'une source : commentaires, balises et entités HTML retirés, espacement réduit à un espace simple. Une balise échappée (`&lt;p&gt;`) est retirée aussi.
+    """Renvoie le texte brut d'une valeur reçue d'une source : commentaires, balises, entités HTML et caractères invisibles retirés, espacement réduit à un espace simple. Une balise échappée (`&lt;p&gt;`) est retirée aussi. Casse, accents et ponctuation restent.
 
     Les titres et les résumés gardent leur balisage, qui a un sens (exposants, MathML). Ils passent par ici seulement pour un export en tableur.
     """
     if not text:
         return ""
-    without_comments = _strip_comments(unescape_html(text))
-    return " ".join(strip_markup(without_comments).split())
+    plain = _strip_markup(_strip_comments(_unescape_html(text)))
+    if not plain.isprintable():
+        plain = "".join(
+            ch
+            for ch in plain
+            if ch.isspace() or unicodedata.category(ch) not in _INVISIBLE_CATEGORIES
+        )
+    return " ".join(plain.split())
+
+
+def optional_plain_text(text: str | None) -> str | None:
+    """Renvoie le texte brut de `text` (`to_plain_text`), ou `None` s'il est vide."""
+    return to_plain_text(text) or None
 
 
 # Le retrait d'une balise imbriquée (`<ab<aa>a>`) en reconstitue une autre. Chaque passe coûte un parcours du texte.
 _MAX_MARKUP_PASSES = 8
 
 
-def strip_markup(text: str) -> str:
+def _strip_markup(text: str) -> str:
     """Retire les balises HTML et MathML. Une balise de mise en forme disparaît sans couper le mot (`CO<sub>2</sub>` → `CO2`), les autres deviennent un espace. Les indices de Miller (`<111>`) et les inégalités (`2.96<yCMS<3.53`) restent."""
     for _ in range(_MAX_MARKUP_PASSES):
         stripped = _MARKUP_RE.sub(_markup_replacement, text)
@@ -158,7 +173,7 @@ def _annotation_tex(match: re.Match[str]) -> str:
     return f"$${annotation.group(1).strip()}$$" if annotation else match.group()
 
 
-def drop_duplicate_mathml(abstract: str | None) -> str | None:
+def _drop_duplicate_mathml(abstract: str | None) -> str | None:
     """Garde une seule version de chaque formule d'un résumé : la version LaTeX, si l'éditeur la dépose.
 
     Un éditeur dépose une formule en deux versions de deux manières. Soit la version LaTeX `$$…$$` précède la formule MathML. Plusieurs formules LaTeX consécutives précèdent alors leurs versions MathML consécutives. Soit la formule MathML contient sa version LaTeX dans une annotation `<mml:annotation encoding="application/x-tex">`. La formule MathML est retirée, et la version LaTeX prend sa place. Une formule MathML seule reste.
@@ -191,7 +206,7 @@ _ABSTRACT_LABEL_RE = re.compile(
 _MAX_ABSTRACT_LABELS = 3
 
 
-def strip_abstract_label(abstract: str | None) -> str | None:
+def _strip_abstract_label(abstract: str | None) -> str | None:
     """Retire les intitulés placés en tête du résumé par certaines sources (« Abstract », « Résumé : », `<title>Abstract</title>`, « Abstract Summary »).
 
     Un mot suivi d'une minuscule ouvre une phrase (« Summary statistics are… ») : il reste.
@@ -243,7 +258,7 @@ _LATEX_LETTERS = {
 _LATEX_LETTER_RE = re.compile(r"\\(ss|Ss|SS|(?:aa|AA|ae|AE|oe|OE|[oOlLi])(?![A-Za-z]))")
 
 
-def strip_latex(text: str) -> str:
+def _strip_latex(text: str) -> str:
     """Retire les commandes LaTeX d'un texte. Une lettre accentuée (`\\'e`) garde sa lettre, une lettre grecque (`\\psi`) devient le caractère grec, toute autre commande (`\\rm`, `\\sqrt`, `\\bar`) disparaît. Les arguments restent ; les délimiteurs (`$ { } ^ _`) sont laissés à l'appelant."""
     if "\\" not in text:
         return text
@@ -259,13 +274,12 @@ def _accented(m: re.Match[str]) -> str:
     )
 
 
-def decode_latex_accents(text: str) -> str:
-    """Convertit les accents et les lettres LaTeX en caractères, et retire les accolades de groupement : `Fr\\'ed\\'eric` → Frédéric, `Besan\\c{c}on` → Besançon, `J{\\o}rgensen` → Jørgensen."""
+def _decode_latex_accents(text: str) -> str:
+    """Convertit les accents et les lettres LaTeX en caractères : `Fr\\'ed\\'eric` → Frédéric, `Besan\\c{c}on` → Besançon, `J{\\o}rgensen` → J{ø}rgensen."""
     if "\\" not in text:
         return text
     text = _LATEX_LETTER_RE.sub(lambda m: _LATEX_LETTERS[m.group(1)], text)
-    text = _LATEX_ACCENT_RE.sub(_accented, text)
-    return unicodedata.normalize("NFC", text.replace("{", "").replace("}", ""))
+    return unicodedata.normalize("NFC", _LATEX_ACCENT_RE.sub(_accented, text))
 
 
 # Formule délimitée par des dollars : $$...$$ ou $...$.
@@ -357,7 +371,7 @@ def _undouble_backslashes(text: str) -> str:
 
 def clean_source_text(text: str) -> str:
     """Nettoie un titre ou un résumé reçu d'une source, en gardant balises et formules : entités HTML décodées, barres obliques multipliées par un échappement répété ramenées à une, accents LaTeX hors formule convertis en caractères (`Th\\'eorie` → Théorie). L'espacement est laissé à l'appelant."""
-    return _decode_prose_latex_accents(_undouble_backslashes(unescape_html(text)))
+    return _decode_prose_latex_accents(_undouble_backslashes(_unescape_html(text)))
 
 
 _ABSTRACT_SPACES_RE = re.compile(r"[ \t\r\f\v]+")
@@ -366,12 +380,13 @@ _ABSTRACT_BLANK_LINES_RE = re.compile(r"\n{3,}")
 
 
 def clean_abstract(abstract: str | None) -> str | None:
-    """Nettoie un résumé à son écriture (`clean_source_text`). Les suites d'espaces ASCII se réduisent à un espace. Les sauts de ligne restent, et une ligne vide au plus sépare deux paragraphes. Les espaces insécables restent."""
+    """Nettoie un résumé à son écriture (`clean_source_text`). Les suites d'espaces ASCII se réduisent à un espace. Les sauts de ligne restent, et une ligne vide au plus sépare deux paragraphes. Les espaces insécables restent. La version MathML d'une formule déposée aussi en LaTeX est retirée, ainsi que l'intitulé « Abstract » ou « Résumé » en tête."""
     if not abstract:
         return abstract
     text = _ABSTRACT_SPACES_RE.sub(" ", clean_source_text(abstract))
     text = _ABSTRACT_LINE_EDGES_RE.sub("\n", text)
-    return _ABSTRACT_BLANK_LINES_RE.sub("\n\n", text).strip()
+    text = _ABSTRACT_BLANK_LINES_RE.sub("\n\n", text).strip()
+    return _strip_abstract_label(_drop_duplicate_mathml(text))
 
 
 def _byte_readings(byte: int) -> str:
@@ -386,13 +401,11 @@ def _byte_readings(byte: int) -> str:
 _BYTES = {c: b for b in range(0x80, 0x100) for c in _byte_readings(b)}
 _CONTINUATION = "".join(_byte_readings(b) for b in range(0x80, 0xC0))
 # Caractère UTF-8 lu comme du Latin-1 ou du Windows-1252 : un octet de tête, puis autant d'octets de continuation qu'il en annonce.
-_UTF8_AS_CP1252 = f"[Â-ß][{_CONTINUATION}]|[à-ï][{_CONTINUATION}]{{2}}|[ð-ô][{_CONTINUATION}]{{3}}"
+_UTF8_AS_CP1252_RE = re.compile(
+    f"[Â-ß][{_CONTINUATION}]|[à-ï][{_CONTINUATION}]{{2}}|[ð-ô][{_CONTINUATION}]{{3}}"
+)
 # Texte Windows-1252 lu comme du GBK : une lettre accentuée et la lettre ASCII qui la suit forment un idéogramme, collé à une lettre latine.
-_CP1252_AS_GBK = "(?<=[A-Za-z])[一-鿿]+"
-# Expression des deux défauts d'encodage réparés par `repair_encoding`, valable aussi pour PostgreSQL.
-ENCODING_ERROR_PATTERN = f"{_UTF8_AS_CP1252}|{_CP1252_AS_GBK}"
-_UTF8_AS_CP1252_RE = re.compile(_UTF8_AS_CP1252)
-_CP1252_AS_GBK_RE = re.compile(_CP1252_AS_GBK)
+_CP1252_AS_GBK_RE = re.compile("(?<=[A-Za-z])[一-鿿]+")
 
 
 def _from_utf8(m: re.Match[str]) -> str:
@@ -417,35 +430,11 @@ def _from_gbk(m: re.Match[str]) -> str:
         return m.group()
 
 
-def repair_encoding(text: str) -> str:
+def _repair_encoding(text: str) -> str:
     """Répare un encodage erroné : UTF-8 lu comme du Latin-1 ou du Windows-1252 (« TÃ©lesphore » → Télesphore), Windows-1252 lu comme du GBK (« Fran鏾is » → François)."""
     if text.isascii():
         return text
     return _CP1252_AS_GBK_RE.sub(_from_gbk, _UTF8_AS_CP1252_RE.sub(_from_utf8, text))
-
-
-def sanitize_raw_text(text: str) -> str:
-    """Renvoie le texte brut sans balisage, sans entités HTML ni caractères invisibles, espacement réduit à un espace simple. Casse, accents et ponctuation restent : le texte sert à l'affichage et à la recherche."""
-    if not text:
-        return ""
-    text = to_plain_text(text)
-    # `to_plain_text` réduit déjà l'espacement : un texte imprimable est déjà propre.
-    if text.isprintable():
-        return text
-    out: list[str] = []
-    for ch in text:
-        if ch.isspace():
-            out.append(" ")
-        elif unicodedata.category(ch) in ("Cf", "Cc", "Cs", "Co"):
-            continue
-        else:
-            out.append(ch)
-    return re.sub(r" +", " ", "".join(out)).strip()
-
-
-def sanitize_optional_text(text: str | None) -> str | None:
-    """Nettoie la valeur d'un champ importé par `sanitize_raw_text` ; renvoie `None` si elle est vide."""
-    return sanitize_raw_text(text or "") or None
 
 
 _ASCII_SEPARATORS_RE = re.compile(r"[^a-z0-9]+")
@@ -465,7 +454,7 @@ def normalize_text(text: str) -> str:
     """Renvoie la forme de comparaison d'un texte, pour le dédoublonnage et le rattachement : sans balises ni commandes LaTeX, en minuscules, ligatures et exposants décomposés (ﬁ → fi, ² → 2), sans diacritiques sur les lettres latines et grecques. Tout caractère autre qu'une lettre ou un chiffre devient un espace."""
     if not text:
         return ""
-    text = strip_latex(strip_markup(text)).lower()
+    text = _strip_latex(_strip_markup(text)).lower()
     if text.isascii():
         return " ".join(_ASCII_SEPARATORS_RE.sub(" ", text).split())
     # La décomposition produit des majuscules (№ → No) : seconde mise en minuscules.
@@ -498,8 +487,9 @@ def clean_raw_author_name(raw: str) -> str:
     """
     if not raw:
         return raw
-    text = decode_latex_accents(repair_encoding(to_plain_text(raw)))
-    # Accolades de groupement LaTeX restées sans commande : « Geß{}ner ».
+    # L'encodage se répare avant le retrait des caractères invisibles : « GroÃ\x9f » contient un contrôle C1.
+    text = _decode_latex_accents(to_plain_text(_repair_encoding(raw)))
+    # Accolades de groupement LaTeX : « J{\o}rgensen », « Geß{}ner ».
     text = text.replace("{", "").replace("}", "")
     cleaned = " ".join(_EMPTY_BRACKETS_RE.sub(" ", _DIGITS_RE.sub("", text)).split())
     # Parenthèse détachée de son contenu par le retrait des chiffres : « (EA 999) » → « (EA) ».

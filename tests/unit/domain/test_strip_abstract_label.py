@@ -1,8 +1,8 @@
-"""Tests unitaires de `domain.normalize.strip_abstract_label`, sur des débuts de résumés réels."""
+"""Retrait de l'intitulé de tête d'un résumé par `domain.normalize.clean_abstract`, sur des débuts de résumés réels."""
 
 import pytest
 
-from domain.normalize import strip_abstract_label
+from domain.normalize import clean_abstract
 
 
 @pytest.mark.parametrize(
@@ -22,7 +22,7 @@ from domain.normalize import strip_abstract_label
     ],
 )
 def test_retire_l_intitule(abstract: str, expected: str) -> None:
-    assert strip_abstract_label(abstract) == expected
+    assert clean_abstract(abstract) == expected
 
 
 @pytest.mark.parametrize(
@@ -35,9 +35,9 @@ def test_retire_l_intitule(abstract: str, expected: str) -> None:
     ],
 )
 def test_garde_une_phrase_qui_commence_par_le_mot(abstract: str) -> None:
-    assert strip_abstract_label(abstract) == abstract
+    assert clean_abstract(abstract) == abstract
 
 
 def test_resume_vide() -> None:
-    assert strip_abstract_label(None) is None
-    assert strip_abstract_label("") == ""
+    assert clean_abstract(None) is None
+    assert clean_abstract("") == ""

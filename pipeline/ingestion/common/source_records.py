@@ -12,7 +12,7 @@ from dataclasses import dataclass, fields
 
 from sqlalchemy import Connection, bindparam, text
 
-from domain.normalize import clean_abstract, drop_duplicate_mathml, strip_abstract_label
+from domain.normalize import clean_abstract
 from domain.publications.dates import PublicationDate
 from domain.publications.doc_types import DocType
 from domain.publications.licenses import License
@@ -66,7 +66,7 @@ class SourceRecordUpsert:
 
     # Contenu
     abstract: str | None = None
-    """Résumé. L'écriture retire la version MathML d'une formule déposée aussi en LaTeX (`drop_duplicate_mathml`) et l'intitulé « Abstract » ou « Résumé » en tête (`strip_abstract_label`)."""
+    """Résumé."""
     keywords: list[str] | None = None
 
     # Open access
@@ -173,11 +173,6 @@ def date_columns(publication_date: PublicationDate | None) -> dict[str, object]:
     }
 
 
-def stored_abstract(abstract: str | None) -> str | None:
-    """Renvoie le résumé tel qu'il est écrit : nettoyé, sans copie MathML d'une formule TeX ni intitulé de tête (« Abstract »)."""
-    return strip_abstract_label(drop_duplicate_mathml(clean_abstract(abstract)))
-
-
 class SourceRecordStore:
     """Écriture des enregistrements sources et de leurs identifiants. Les formes de langue se chargent à la première écriture."""
 
@@ -203,7 +198,7 @@ class SourceRecordStore:
             params["publisher_id"] = None
         if row.container_title and names_ebook_platform(row.container_title):
             params["container_title"] = None
-        params["abstract"] = stored_abstract(row.abstract)
+        params["abstract"] = clean_abstract(row.abstract)
         params["language"] = language_code(row.raw_language, self._forms())
         params |= date_columns(row.publication_date)
         identifiers = normalized_identifiers(row)

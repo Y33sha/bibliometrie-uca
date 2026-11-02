@@ -15,7 +15,7 @@ from typing import NamedTuple
 from sqlalchemy import Connection, and_, func, not_, select, update
 
 from domain.dates import date_to_french
-from domain.normalize import sanitize_optional_text
+from domain.normalize import optional_plain_text
 from domain.pipeline_runs import PhaseStatus
 from domain.publications.identifiers import ISSN
 from domain.serials.serial import OaModel, SerialType
@@ -146,7 +146,7 @@ def clean_doaj_row(row: dict[str, str]) -> dict[str, str]:
     """
     out: dict[str, str] = {}
     for k, v in row.items():
-        cleaned = sanitize_optional_text(v)
+        cleaned = optional_plain_text(v)
         if cleaned:
             out[k] = cleaned
     return out
@@ -157,7 +157,7 @@ def _extract_issns(row: dict[str, str]) -> list[str]:
     return [
         str(issn)
         for key in ISSN_KEYS
-        if (issn := ISSN.try_parse(sanitize_optional_text(row.get(key))))
+        if (issn := ISSN.try_parse(optional_plain_text(row.get(key))))
     ]
 
 

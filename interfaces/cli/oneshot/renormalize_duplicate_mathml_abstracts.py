@@ -1,7 +1,7 @@
 # STATUS: oneshot (2026-10-28)
 """Remet en file de normalisation les enregistrements sources dont le résumé contient une formule en deux versions, LaTeX et MathML.
 
-Ces résumés contiennent une formule MathML et soit une formule LaTeX `$$…$$`, soit une annotation LaTeX. Leur payload est réinjecté en `staging` depuis le raw store (`rehydrate_staging_row`) ; la normalisation les réécrit ensuite avec `drop_duplicate_mathml`, puis la phase `publications` recalcule le résumé de leurs publications :
+Ces résumés contiennent une formule MathML et soit une formule LaTeX `$$…$$`, soit une annotation LaTeX. Leur payload est réinjecté en `staging` depuis le raw store (`rehydrate_staging_row`) ; la normalisation les réécrit ensuite avec `clean_abstract`, puis la phase `publications` recalcule le résumé de leurs publications :
     run_pipeline --from normalize --sources crossref,openalex
 
 Usage :

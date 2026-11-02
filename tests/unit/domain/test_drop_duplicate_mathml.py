@@ -1,6 +1,6 @@
-"""Tests unitaires de `domain.normalize.drop_duplicate_mathml`, sur des extraits de résumés réels."""
+"""Retrait de la version MathML d'une formule déposée aussi en LaTeX par `domain.normalize.clean_abstract`, sur des extraits de résumés réels."""
 
-from domain.normalize import drop_duplicate_mathml
+from domain.normalize import clean_abstract
 
 
 def test_mathml_apres_la_formule_latex():
@@ -16,10 +16,8 @@ def test_mathml_apres_la_formule_latex():
         "                        </mml:math>\n"
         "                    and a"
     )
-    assert drop_duplicate_mathml(abstract) == (
-        "contains two charm quarks, a\n                      \n"
-        "                        $$\\overline{{{{{u}}}}}$$\n"
-        "                    and a"
+    assert clean_abstract(abstract) == (
+        "contains two charm quarks, a\n\n$$\\overline{{{{{u}}}}}$$\nand a"
     )
 
 
@@ -30,7 +28,7 @@ def test_mathml_apres_la_formule_latex_sur_une_ligne():
         '<mml:math xmlns:mml="http://www.w3.org/1998/Math/MathML"> <mml:msqrt> <mml:mi>s</mml:mi> '
         "</mml:msqrt> </mml:math> = 13 TeV"
     )
-    assert drop_duplicate_mathml(abstract) == "collision data at $$ \\sqrt{s} $$ = 13 TeV"
+    assert clean_abstract(abstract) == "collision data at $$ \\sqrt{s} $$ = 13 TeV"
 
 
 def test_formules_latex_consecutives_puis_leurs_versions_mathml():
@@ -41,7 +39,7 @@ def test_formules_latex_consecutives_puis_leurs_versions_mathml():
         "<mml:math><mml:mi>σ</mml:mi><mml:mn>2</mml:mn></mml:math>\n"
         "<mml:math><mml:mi>σ</mml:mi><mml:mn>3</mml:mn></mml:math> The"
     )
-    assert drop_duplicate_mathml(abstract) == (
+    assert clean_abstract(abstract) == (
         "measured: $$ \\sigma_1 $$$$ \\sigma_2 $$$$ \\sigma_3 $$ The"
     )
 
@@ -49,12 +47,12 @@ def test_formules_latex_consecutives_puis_leurs_versions_mathml():
 def test_resume_tronque_en_pleine_formule_mathml():
     # OpenAlex W4404641639, W1583011294 : le résumé s'arrête dans la formule.
     after_tex = 'decay $$ {B}^0 $$ <mml:math xmlns:mml="http://www.w3.org/1998/Math/MathML">'
-    assert drop_duplicate_mathml(after_tex) == "decay $$ {B}^0 $$"
+    assert clean_abstract(after_tex) == "decay $$ {B}^0 $$"
     with_annotation = (
         'class of order <mml:math alttext="alpha"> <mml:semantics> <mml:mi> α </mml:mi> '
         '<mml:annotation encoding="application/x-tex">\\alpha</mml:annotation>'
     )
-    assert drop_duplicate_mathml(with_annotation) == "class of order $$\\alpha$$"
+    assert clean_abstract(with_annotation) == "class of order $$\\alpha$$"
 
 
 def test_annotation_latex_remplace_la_formule_mathml():
@@ -71,12 +69,9 @@ def test_annotation_latex_remplace_la_formule_mathml():
         "                    </inline-formula>\n"
         "                    , every pair"
     )
-    assert drop_duplicate_mathml(abstract) == (
-        "Given a hypergraph\n"
-        '                    <inline-formula content-type="math/mathml">\n'
-        "                      $$W$$\n"
-        "                    </inline-formula>\n"
-        "                    , every pair"
+    assert clean_abstract(abstract) == (
+        'Given a hypergraph\n<inline-formula content-type="math/mathml">\n$$W$$\n'
+        "</inline-formula>\n, every pair"
     )
 
 
@@ -87,14 +82,14 @@ def test_mathml_seul_reste():
         '<mml:math xmlns:mml="http://www.w3.org/1998/Math/MathML"><mml:mi mathvariant="bold">G</mml:mi></mml:math>'
         " over a field of positive characteristic"
     )
-    assert drop_duplicate_mathml(abstract) == abstract
+    assert clean_abstract(abstract) == abstract
 
 
 def test_formule_latex_separee_du_mathml_par_du_texte():
     abstract = (
         "where $$\\ell$$ is prime and <mml:math><mml:mo>≥</mml:mo><mml:mn>3</mml:mn></mml:math>"
     )
-    assert drop_duplicate_mathml(abstract) == abstract
+    assert clean_abstract(abstract) == abstract
 
 
 def test_formule_mathml_sans_fermeture_reste():
@@ -104,11 +99,9 @@ def test_formule_mathml_sans_fermeture_reste():
         '<mml:math><mml:semantics><mml:mi>b</mml:mi><mml:annotation encoding="application/x-tex">b'
         "</mml:annotation></mml:semantics></mml:math>"
     )
-    assert drop_duplicate_mathml(abstract) == (
-        "$$a$$ <mml:math><mml:mi>a</mml:mi> truncated text $$b$$"
-    )
+    assert clean_abstract(abstract) == ("$$a$$ <mml:math><mml:mi>a</mml:mi> truncated text $$b$$")
 
 
 def test_resume_sans_mathml():
-    assert drop_duplicate_mathml("Let $$K$$ be a field.") == "Let $$K$$ be a field."
-    assert drop_duplicate_mathml(None) is None
+    assert clean_abstract("Let $$K$$ be a field.") == "Let $$K$$ be a field."
+    assert clean_abstract(None) is None

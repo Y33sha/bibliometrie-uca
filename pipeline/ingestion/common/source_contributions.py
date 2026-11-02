@@ -12,7 +12,7 @@ from collections.abc import Callable, Hashable, Mapping, Sequence
 from dataclasses import dataclass, field
 
 from domain.country_detection import SOURCE_COUNTRY_METHODS
-from domain.normalize import normalize_text, sanitize_raw_text
+from domain.normalize import normalize_text, to_plain_text
 from domain.persons.collective_names import is_collective_name
 from domain.persons.contributor_name import ContributorName
 from domain.persons.identifiers import compact_identifiers, shared_identifier_neutralizations
@@ -43,14 +43,14 @@ class AddressRecord:
     """Une affiliation textuelle d'un auteur."""
 
     text: str
-    """Texte assaini à la construction (`sanitize_raw_text`). Une affiliation réduite à du bruit invisible a un texte vide et ne s'écrit pas."""
+    """Texte brut à la construction (`to_plain_text`). Une affiliation réduite à du bruit invisible a un texte vide et ne s'écrit pas."""
     countries: list[str] | None = None
     """Codes pays donnés par la source, candidats du moyen de détection de la source (`SOURCE_COUNTRY_METHODS`)."""
     ror_ids: frozenset[RorId] = frozenset()
     """ROR attribués par la source à l'affiliation."""
 
     def __post_init__(self) -> None:
-        self.text = sanitize_raw_text(self.text)
+        self.text = to_plain_text(self.text)
 
 
 @dataclass(slots=True)

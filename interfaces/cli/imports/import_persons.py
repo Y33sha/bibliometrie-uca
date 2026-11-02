@@ -18,7 +18,7 @@ from enum import StrEnum
 
 from sqlalchemy import Connection, text
 
-from domain.normalize import normalize_text, sanitize_optional_text
+from domain.normalize import normalize_text, optional_plain_text
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.scalars import scalar_int
 from infrastructure.observability.log import setup_logger
@@ -217,7 +217,7 @@ def read_csv_tsv(filepath: str) -> list[dict[str, str]]:
             record = {}
             for field, idx in col_map.items():
                 # Mise à plat comme sur les champs moissonnés : un export RH transite par un tableur, d'où des espaces insécables et, sur les cellules recopiées depuis une page web, du balisage et des entités HTML.
-                cell = sanitize_optional_text(row[idx]) if idx < len(row) else None
+                cell = optional_plain_text(row[idx]) if idx < len(row) else None
                 record[field] = cell or ""
             rows.append(record)
 
@@ -238,8 +238,8 @@ def import_persons(
     export_dt = parse_date(export_date) if export_date else None
 
     for rec in records:
-        last_name = sanitize_optional_text(rec.get("last_name"))
-        first_name = sanitize_optional_text(rec.get("first_name"))
+        last_name = optional_plain_text(rec.get("last_name"))
+        first_name = optional_plain_text(rec.get("first_name"))
         if not last_name or not first_name:
             skipped += 1
             continue
@@ -252,9 +252,9 @@ def import_persons(
             conn,
             last_name,
             first_name,
-            email=sanitize_optional_text(rec.get("email")),
-            department=sanitize_optional_text(rec.get("department_name")),
-            role=sanitize_optional_text(rec.get("role_title")),
+            email=optional_plain_text(rec.get("email")),
+            department=optional_plain_text(rec.get("department_name")),
+            role=optional_plain_text(rec.get("role_title")),
             start_date=parse_date(rec.get("start_date", "")),
             end_date=parse_date(rec.get("end_date", "")),
             export_date=export_dt,

@@ -23,7 +23,7 @@ from pathlib import Path
 
 from sqlalchemy import Connection, text
 
-from domain.normalize import sanitize_optional_text
+from domain.normalize import optional_plain_text
 from domain.persons.identifiers import IdentifierOrigin, normalize_orcid
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
@@ -42,10 +42,10 @@ def _load_rows(path: str | Path) -> list[tuple[str, str]]:
             if len(record) < 2:
                 continue
             # Mise à plat des deux cellules : un fichier composé dans un tableur y glisse des espaces insécables et des caractères invisibles.
-            email = sanitize_optional_text(record[0])
+            email = optional_plain_text(record[0])
             if not email:
                 continue
-            rows.append((email, sanitize_optional_text(record[1]) or ""))
+            rows.append((email, optional_plain_text(record[1]) or ""))
     return rows
 
 
