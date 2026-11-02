@@ -28,8 +28,7 @@
 	} from '#lib/filterRegistry.js';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import LicenseBadge from '#lib/components/LicenseBadge.svelte';
-	import CitationTopBadge from '#lib/components/CitationTopBadge.svelte';
-	import { columnLabels, oaStatusLabel } from '#lib/labels.js';
+	import { citationTopLabels, columnLabels, oaStatusLabel } from '#lib/labels.js';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
 	import TableStatusRow from '#lib/components/TableStatusRow.svelte';
 	import { usePublicationFacets } from '#lib/composables/usePublicationFacets.svelte.js';
@@ -367,7 +366,7 @@
 					</td>{/if}
 					{#if col('license')}<td class="license-cell">{#if p.license}<LicenseBadge license={p.license} />{/if}</td>{/if}
 					{#if col('citation_top')}<td>
-						{#if p.citation_top}<CitationTopBadge top={p.citation_top} />{/if}
+						{#if p.citation_top}<span class="citation-top citation-{p.citation_top}">{citationTopLabels[p.citation_top]}</span>{/if}
 					</td>{/if}
 					{#if isLab && col('hal_status')}
 						<td>{#if p.hal_status}<span class="hal-badge hal-{p.hal_status}">{halStatusLabel(p.hal_status)}</span>{/if}</td>
@@ -409,6 +408,18 @@
 	.hal-notice          { background: var(--warning-light); color: var(--warning-text); }
 	.hal-hors_collection { background: var(--attention-light); color: var(--attention); }
 	.hal-hors_hal        { background: var(--danger-light); color: var(--danger); }
+
+	/* Seuil de citation */
+	.citation-top {
+		display: inline-block;
+		padding: 2px 7px;
+		border-radius: var(--radius);
+		font-size: var(--fs-sm);
+		font-weight: 500;
+		white-space: nowrap;
+	}
+	.citation-top_1_percent  { background: var(--accent); color: var(--accent-light); }
+	.citation-top_10_percent { background: var(--accent-light); color: var(--accent); }
 
 	/* Auteur correspondant (person) */
 	.corr-cell { text-align: center; }

@@ -289,10 +289,6 @@ class PublicationDetailCore(Model):
     publisher_id: int | None
     """Éditeur de la revue, à défaut celui de la monographie."""
     publisher_name: str | None
-    cited_by_count: int | None
-    """Nombre de citations, d'après OpenAlex."""
-    citation_top: str | None
-    """Seuil de citation le plus haut atteint (`CitationTop`)."""
 
 
 class SourceRecordOut(Model):

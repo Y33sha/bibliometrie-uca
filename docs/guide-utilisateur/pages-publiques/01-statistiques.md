@@ -5,7 +5,6 @@
 L'indicateur choisit ce que montre chaque barre :
 
 - nombre de publications par type de production, par accès, par [voie *open access*](../../glossaire.md#voies-open-access), par licence ou par [seuil de citation](../../glossaire.md#seuils-de-citation) (top 1 %, top 10 %) ;
-- nombre de [citations](../../glossaire.md#citations), par accès ;
 - montant des APC payées par l'établissement, par voie *open access* ;
 - collaborations internationales, sur une carte.
 

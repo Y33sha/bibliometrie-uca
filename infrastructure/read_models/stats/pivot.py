@@ -7,7 +7,7 @@ Propriétés d'une dimension :
 - **ordinal** : axe ordonné (l'année) ou catégoriel, qui change le tri et l'éligibilité au filtrage par plage.
 - **comparable** : la dimension sert aussi d'axe de comparaison (abscisse). Toute dimension sert de ventilation.
 
-Une mesure s'agrège sur les publications distinctes de chaque groupe : leur nombre, la somme de leurs citations, ou le montant des APC payées pour elles par l'établissement. Le taux d'open access relève de la présentation.
+Une mesure s'agrège sur les publications distinctes de chaque groupe : leur nombre, ou le montant des APC payées pour elles par l'établissement. Le taux d'open access relève de la présentation.
 
 Un **indicateur** est une mesure proposée par l'interface, ventilée par une dimension empilée dans chaque barre. L'indicateur impose sa mesure. Un axe de comparaison facultatif s'ajoute à la ventilation (`indicator_pivot`).
 
@@ -40,7 +40,7 @@ from infrastructure.read_models.stats.models import (
     PivotResponse,
     PivotSchemaResponse,
 )
-from infrastructure.sql_fragments import cited_by_count, is_laboratory
+from infrastructure.sql_fragments import is_laboratory
 
 Cardinality = Literal["low", "high"]
 
@@ -71,7 +71,7 @@ class Measure:
     join_sql: str = ""
     """Jointure demandée par `agg_sql`."""
     unit: str = ""
-    """Unité affichée, vide pour un nombre de publications ou de citations."""
+    """Unité affichée, vide pour un nombre de publications."""
 
 
 def doc_type_grouped_sql(column: str = "p.doc_type") -> str:
@@ -203,13 +203,6 @@ MEASURES: dict[str, Measure] = {
     m.key: m
     for m in (
         Measure("publication_count", "Nombre de publications", agg_sql="COUNT(*)"),
-        # Citations comptées par OpenAlex. Une publication sans indicateur compte pour zéro.
-        Measure(
-            "citation_count",
-            "Nombre de citations",
-            agg_sql=f"COALESCE(SUM({cited_by_count('cp')}), 0)",
-            join_sql="JOIN publications cp ON cp.id = g.publication_id",
-        ),
         # Tous les frais de publication imputés au budget d'une structure du périmètre : APC et frais hors open access.
         Measure(
             "apc_amount",
@@ -246,7 +239,6 @@ INDICATORS: dict[str, Indicator] = {
         Indicator("oa_voie", "Modèle OA", "publication_count", "oa_voie"),
         Indicator("license", "Licence", "publication_count", "license"),
         Indicator("citation_class", "Top citations", "publication_count", "citation_class"),
-        Indicator("citation_count", "Nombre de citations", "citation_count", "oa_access"),
         Indicator("apc_amount", "Montant des APC", "apc_amount", "oa_voie"),
     )
 }

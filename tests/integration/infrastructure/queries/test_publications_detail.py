@@ -142,21 +142,6 @@ class TestGetPublicationDetail:
         assert detail is not None
         assert detail.thesis_meta is None
 
-    def test_citations_et_seuil_le_plus_haut_atteint(self, sa_sync_conn):
-        publication = insert_publication(sa_sync_conn)
-        sa_sync_conn.execute(
-            text(
-                "UPDATE publications SET impact = "
-                '\'{"cited_by_count": 40, "top_10_percent": true, "top_1_percent": false}\' '
-                "WHERE id = :id"
-            ),
-            {"id": publication},
-        )
-        detail = publications_queries(sa_sync_conn).get_publication_detail(publication)
-        assert detail is not None
-        core = detail.publication
-        assert (core.cited_by_count, core.citation_top) == (40, "top_10_percent")
-
     def test_doi_ra_resolved_from_doi_prefixes(self, sa_sync_conn):
         """`doi_ra` est l'agence d'enregistrement du préfixe DOI : elle distingue les DOI DataCite (Zenodo, figshare, arXiv) pour le choix du lien d'accès."""
         insert_doi_prefix(sa_sync_conn, "10.5281", ra="DataCite")

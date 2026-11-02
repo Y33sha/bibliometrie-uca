@@ -5073,16 +5073,6 @@ export interface components {
             publisher_id: number | null;
             /** Publisher Name */
             publisher_name: string | null;
-            /**
-             * Cited By Count
-             * @description Nombre de citations, d'après OpenAlex.
-             */
-            cited_by_count: number | null;
-            /**
-             * Citation Top
-             * @description Seuil de citation le plus haut atteint (`CitationTop`).
-             */
-            citation_top: string | null;
         };
         /**
          * PublicationDetailResponse
