@@ -42,6 +42,8 @@ def retained_countries(
     """Renvoie les pays retenus d'une adresse, d'après les candidats de chaque moyen.
 
     Le premier moyen qui propose un pays l'emporte. `manual` l'emporte toujours. Un autre premier moyen cède quand deux autres moyens proposent un même autre pays et qu'aucun ne soutient le sien.
+
+    Quand `source_openalex` est le premier moyen, seuls ses pays soutenus par un autre moyen restent, s'il y en a. OpenAlex rattache parfois une affiliation à une institution homonyme d'un autre pays.
     """
     proposals = [frozenset(candidates.get(method, ())) for method in _PRECEDENCE]
     first = next((rank for rank, codes in enumerate(proposals) if codes), None)
@@ -53,7 +55,9 @@ def retained_countries(
     others = Counter(
         code for rank, codes in enumerate(proposals) if rank != first for code in codes
     )
-    if chosen & others.keys():
+    if supported := chosen & others.keys():
+        if _PRECEDENCE[first] is CountryDetectionMethod.SOURCE_OPENALEX:
+            return supported
         return chosen
     contrary = frozenset(code for code, n in others.items() if n >= _CONTRARY_QUORUM)
     return contrary or chosen

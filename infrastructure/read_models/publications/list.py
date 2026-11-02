@@ -9,10 +9,10 @@ from sqlalchemy import Connection, Row, text
 from domain.normalize import normalize_text, to_plain_text
 from domain.publications.access import access_url
 from domain.publications.dates import DatePrecision, PublicationDate
+from domain.publications.hal_deposit import HAL_DEPOSIT_STATUS_LABELS, HalDepositStatus
 from domain.publications.licenses import license_label
 from domain.source_records.impact import CITATION_TOP_LABELS, CitationTop
 from domain.source_records.source_extras import SourceExtra
-from domain.sources.hal import HAL_DEPOSIT_STATUS_LABELS
 from domain.sources.registry import Source, source_record_url
 from infrastructure.read_models.csv_export import (
     MAX_EXPORT_ROWS,
@@ -180,7 +180,9 @@ def _publication_lines(
             "Top citations": CITATION_TOP_LABELS[CitationTop(row.citation_top)]
             if row.citation_top
             else "",
-            "Statut HAL": HAL_DEPOSIT_STATUS_LABELS.get(row.hal_status or "", ""),
+            "Statut HAL": HAL_DEPOSIT_STATUS_LABELS[HalDepositStatus(row.hal_status)]
+            if row.hal_status
+            else "",
             "DOI": doi_url,
             "Sources": json.dumps(sources, ensure_ascii=False) if sources else "",
             "Accès": access_url(row.best_copy_url, oa_status=row.oa_status, doi=row.doi) or "",

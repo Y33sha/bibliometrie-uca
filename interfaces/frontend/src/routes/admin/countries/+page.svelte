@@ -15,6 +15,7 @@
 	import type { FacetOption } from '#lib/components/FacetDropdown.svelte';
 
 	import type { components } from '#lib/api/schema.js';
+	import { formatCount } from '#lib/plural.js';
 	type Address = components['schemas']['AddressForCountryAttribution'];
 	type Country = components['schemas']['CountryOut'];
 	type Method = components['schemas']['CountryDetectionMethod'];
@@ -170,7 +171,7 @@
 		// try/finally pour ne jamais laisser `batchApplying = true` sticky en cas d'erreur HTTP — sinon le bouton reste disabled à vie après une 504/500.
 		try {
 			const data = await addressesApi.batchSetCountry(body);
-			batchResult = `${data.updated} adresse${data.updated > 1 ? 's' : ''} mise${data.updated > 1 ? 's' : ''} à jour`;
+			batchResult = formatCount(data.updated, 'adresse mise à jour', 'adresses mises à jour');
 			selectedIds = new Set();
 		} catch (e) {
 			batchResult = 'Erreur : ' + errorMessage(e);
@@ -209,7 +210,7 @@
 	</select>
 	{#if selectedIds.size > 0 && batchCountry}
 		<button class="btn btn-primary" onclick={() => batchAddCountry(false)} disabled={batchApplying}>
-			Ajouter aux {selectedIds.size} sélectionnée{selectedIds.size > 1 ? 's' : ''}
+			Ajouter aux {formatCount(selectedIds.size, 'sélectionnée')}
 		</button>
 	{/if}
 	{#if batchCountry && hasActiveFilter}

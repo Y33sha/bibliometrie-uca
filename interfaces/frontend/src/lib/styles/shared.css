@@ -14,8 +14,7 @@
 	--fs-lg: 1.15rem;   /* titres de volet */
 	--fs-xl: 1.3rem;    /* sigle d'une fiche, titre de la connexion */
 	--fs-2xl: 1.5rem;   /* titre de page */
-	--fs-3xl: 1.85rem;  /* titre d'une fiche */
-	--fs-4xl: 2.2rem;   /* chiffres clés */
+	--fs-3xl: 1.85rem;  /* titre d'une fiche, chiffres clés */
 
 	/* Texte */
 	--text: #1d2433;
@@ -39,7 +38,7 @@
 	--accent: oklch(0.446 0.064 var(--brand-hue));       /* texte, bouton plein, titres de section */
 	--accent-mid: oklch(0.581 0.084 var(--brand-hue));   /* trait d'onglet actif, focus */
 	--accent-light: oklch(0.952 0.013 var(--brand-hue)); /* fond de pastille, encart */
-	--accent-soft: oklch(0.83 0.041 var(--brand-hue));   /* barre de graphique atténuée (année en cours) */
+	--accent-soft: oklch(0.83 0.041 var(--brand-hue));   /* teinte claire du nuage de sujets */
 
 	/* Barre de navigation */
 	--nav-public: oklch(0.475 0.067 var(--brand-hue));
@@ -520,6 +519,13 @@
 	background: var(--accent-light);
 }
 
+/* Cellule d'actions d'une ligne : réduite à ses icônes. */
+.data-table th.row-actions,
+.data-table td.row-actions {
+	width: 1%;
+	white-space: nowrap;
+}
+
 /* Icônes d'action d'une ligne (modifier, supprimer, exclure, ouvrir le volet) : estompées au repos, en pleine couleur au survol de la ligne ou au focus clavier, sur les écrans à pointeur. Les boutons à libellé restent lisibles. */
 @media (hover: hover) {
 	.data-table .row-actions > .icon-btn {
@@ -631,7 +637,7 @@
 	margin-right: 6px;
 	background: none;
 }
-.data-table .lab-tag:hover {
+.data-table a.lab-tag:hover {
 	background: none;
 	text-decoration: underline;
 }
@@ -1120,7 +1126,7 @@ a.id-badge.id-confirmed:hover {
 	text-decoration: none;
 }
 
-.lab-tag:hover {
+a.lab-tag:hover {
 	background: color-mix(in srgb, var(--accent) 20%, white);
 }
 

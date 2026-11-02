@@ -322,9 +322,6 @@
 	.acronym-cell {
 		white-space: nowrap;
 	}
-	.row-actions {
-		width: 1%;
-	}
 	.acronym-cell .entity-link {
 		font-weight: 600;
 	}

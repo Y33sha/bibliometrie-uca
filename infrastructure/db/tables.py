@@ -34,19 +34,26 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import ARRAY, ENUM as PgEnum
 
-from domain.config import CAP_KEYS, DELAY_KEYS, MAX_YEAR, MIN_YEAR, ConfigKey
+from domain.config import (
+    CAP_BOUNDS,
+    CAP_KEYS,
+    DELAY_BOUNDS,
+    DELAY_KEYS,
+    ConfigKey,
+    integer_bounds,
+)
 from domain.countries import NO_COUNTRY_CODE, PlaceNameKind
 from domain.country_detection import CountryDetectionMethod
 from domain.merge import MergedEntity
 from domain.persons.contribution_matching import ContributionMatchReason
 from domain.persons.identifiers import AttributionStatus
 from domain.persons.person import PersonExclusion
-from domain.platforms.platform import PLATFORM_TYPES
+from domain.platforms.platform import PlatformType
 from domain.publications.author_grouping import GroupingMethod
 from domain.publications.dates import DatePrecision
-from domain.publications.doc_types import DOC_TYPES
+from domain.publications.doc_types import DocType
 from domain.publications.licenses import License
-from domain.publications.metadata import OA_RANK
+from domain.publications.oa_status import OA_RANK
 from domain.publications.relations import RelationType
 from domain.publishers.publisher import PUBLISHER_TYPES
 from domain.serials.issn_facts import ISSN_LINK_TYPES
@@ -57,7 +64,7 @@ from domain.source_records.identifiers import (
     SourceIdentifierRole,
     SourceIdentifierType,
 )
-from domain.sources.registry import ALL_SOURCES, LOOKUP_SOURCES
+from domain.sources.registry import LOOKUP_SOURCES, Source
 from domain.sources.staging import StagingEntryMode
 from domain.structures.hal_structures import HalStructureStatus
 from domain.structures.perimeter_evidence import PerimeterEvidence
@@ -129,6 +136,9 @@ audit_log = Table(
 )
 
 
+_YEAR_BOUNDS = integer_bounds(ConfigKey.PIPELINE_START_YEAR_FULL)
+_HUE_BOUNDS = integer_bounds(ConfigKey.BRAND_HUE)
+
 config = Table(
     "config",
     metadata,
@@ -139,20 +149,20 @@ config = Table(
     # `value` est jsonb : la forme attendue dépend de la clé. Le domaine énumère les clés.
     CheckConstraint(
         f"key NOT IN ({', '.join(repr(key) for key in sorted(CAP_KEYS))}) "
-        "OR (jsonb_typeof(value) = 'number' AND (value)::numeric >= 0 "
+        f"OR (jsonb_typeof(value) = 'number' AND (value)::numeric >= {CAP_BOUNDS[0]} "
         "AND (value)::numeric = trunc((value)::numeric))",
         name="config_cap_is_non_negative_integer",
     ),
     CheckConstraint(
         f"key <> '{ConfigKey.PIPELINE_START_YEAR_FULL}' OR jsonb_typeof(value) = 'null' "
         f"OR (jsonb_typeof(value) = 'number' "
-        f"AND (value)::numeric BETWEEN {MIN_YEAR} AND {MAX_YEAR} "
+        f"AND (value)::numeric BETWEEN {_YEAR_BOUNDS[0]} AND {_YEAR_BOUNDS[1]} "
         "AND (value)::numeric = trunc((value)::numeric))",
         name="config_year_is_in_range",
     ),
     CheckConstraint(
         f"key NOT IN ({', '.join(repr(key) for key in sorted(DELAY_KEYS))}) "
-        "OR (jsonb_typeof(value) = 'number' AND (value)::numeric >= 1 "
+        f"OR (jsonb_typeof(value) = 'number' AND (value)::numeric >= {DELAY_BOUNDS[0]} "
         "AND (value)::numeric = trunc((value)::numeric))",
         name="config_delay_is_positive_integer",
     ),
@@ -162,7 +172,7 @@ config = Table(
     ),
     CheckConstraint(
         f"key <> '{ConfigKey.BRAND_HUE}' OR (jsonb_typeof(value) = 'number' "
-        "AND (value)::numeric BETWEEN 0 AND 359 "
+        f"AND (value)::numeric BETWEEN {_HUE_BOUNDS[0]} AND {_HUE_BOUNDS[1]} "
         "AND (value)::numeric = trunc((value)::numeric))",
         name="config_brand_hue_is_angle",
     ),
@@ -655,7 +665,7 @@ identifier_origin_enum = PgEnum(
     create_type=False,
 )
 
-source_type_enum = PgEnum(*ALL_SOURCES, name="source_type", create_type=False)
+source_type_enum = PgEnum(*Source, name="source_type", create_type=False)
 lookup_source_enum = PgEnum(*LOOKUP_SOURCES, name="lookup_source", create_type=False)
 
 # Tout statut open access est classable par ouverture : les clés d'`OA_RANK` sont le vocabulaire.
@@ -663,11 +673,11 @@ oa_type_enum = PgEnum(*OA_RANK, name="oa_type", create_type=False)
 
 license_type_enum = PgEnum(*License, name="license_type", create_type=False)
 
-platform_type_enum = PgEnum(*PLATFORM_TYPES, name="platform_type", create_type=False)
+platform_type_enum = PgEnum(*PlatformType, name="platform_type", create_type=False)
 
 perimeter_evidence_enum = PgEnum(*PerimeterEvidence, name="perimeter_evidence", create_type=False)
 
-doc_type_enum = PgEnum(*DOC_TYPES, name="doc_type", create_type=False)
+doc_type_enum = PgEnum(*DocType, name="doc_type", create_type=False)
 date_precision_enum = PgEnum(*DatePrecision, name="date_precision", create_type=False)
 
 
@@ -1097,13 +1107,37 @@ hr_records = Table(
     Column("id", Integer, primary_key=True),
     Column("person_id", Integer, nullable=False),
     Column("email", Text),
-    Column("role_title", Text),
-    Column("department_name", Text),
-    Column("start_date", Date),
-    Column("end_date", Date),
     Column("hr_export_date", Date),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    Column("siham_id", Text),
+    Column("staff_category", Text),
+    Column("employment_status", Text),
+    Column("corps", Text),
+    Column("grade", Text),
     UniqueConstraint("person_id", name="hr_records_person_id_key"),
+    UniqueConstraint("siham_id", name="hr_records_siham_id_key"),
+    schema="persons",
+)
+
+
+# Période de présence d'une personne dans une unité, d'après l'export RH. `structure_id` est renseigné quand l'unité est un laboratoire de `structures`.
+hr_periods = Table(
+    "hr_periods",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("person_id", Integer, nullable=False),
+    Column("unit_label", Text, nullable=False),
+    Column("structure_id", Integer),
+    Column("start_date", Date),
+    Column("end_date", Date),
+    Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    UniqueConstraint(
+        "person_id",
+        "unit_label",
+        "start_date",
+        name="hr_periods_person_unit_start_key",
+        postgresql_nulls_not_distinct=True,
+    ),
     schema="persons",
 )
 

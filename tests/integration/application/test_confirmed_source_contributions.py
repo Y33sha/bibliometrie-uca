@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy import text
 
 from application.services.contributions import reject_pair
-from domain.errors import PersonAlreadyInPublicationError
+from domain.errors import ConflictError
 from infrastructure.db.queues import Queue
 from infrastructure.repositories import contribution_repository
 from interfaces.api.deps import contribution_service, person_service
@@ -106,9 +106,8 @@ def test_attach_refuse_quand_la_personne_a_une_contribution_manuelle_dans_la_pub
 ):
     pid = insert_person(sa_sync_conn, "Martin", first_name="Jean")
     _, contribution, publication = _orphan_source_contribution(sa_sync_conn)
-    manual = insert_contribution(sa_sync_conn, publication, person_id=pid)
+    insert_contribution(sa_sync_conn, publication, person_id=pid)
 
-    with pytest.raises(PersonAlreadyInPublicationError) as error:
+    with pytest.raises(ConflictError) as error:
         contribution_service(sa_sync_conn).assign_orphan_contribution(pid, contribution)
-    assert error.value.contribution_id == manual
     assert str(error.value) == "Cette personne est déjà rattachée à cette publication."

@@ -7,7 +7,7 @@ from collections.abc import Sequence
 from typing import NamedTuple
 
 from domain.monographs.matching import choose_monograph
-from domain.normalize import normalize_text, to_plain_text
+from domain.normalize import normalize_text
 from domain.publications.identifiers import ISBN
 from domain.publishers.names import publisher_name_key
 from domain.serials.containers import SeriesDescription, VolumeDescription
@@ -32,7 +32,7 @@ def find_or_create_publisher(
     if openalex_id:
         publisher_id = repo.find_publisher_by_openalex_id(openalex_id)
         if publisher_id:
-            name_key = publisher_name_key(to_plain_text(name))
+            name_key = publisher_name_key(name)
             if name_key:
                 repo.add_publisher_name_form(publisher_id, name_key)
             return publisher_id
@@ -48,11 +48,7 @@ def find_or_create_publisher(
 
 
 def match_or_create_publisher(name: str, *, repo: PublisherStore) -> tuple[int, bool] | None:
-    """Trouve par sa clé de nom, ou crée, l'éditeur désigné par `name`. Renvoie `(id, created)`, ou `None` si le nom est vide une fois normalisé.
-
-    Le nom affiché, le nom normalisé et la clé dérivent tous du nom mis à plat : un nom reçu avec des entités (`Wood &amp; Fire`) retrouve le même éditeur que reçu en clair.
-    """
-    name = to_plain_text(name)
+    """Trouve par sa clé de nom, ou crée, l'éditeur désigné par `name`. Renvoie `(id, created)`, ou `None` si le nom est vide une fois normalisé."""
     name_normalized = normalize_text(name)
     name_key = publisher_name_key(name)
     if not name_normalized or not name_key:
@@ -104,7 +100,7 @@ def find_or_create_monograph(
         if (found := repo.find_monograph_by_isbn(value)) is not None:
             return enrich(found)
 
-    title = to_plain_text(title) if title else ""
+    title = title or ""
     title_normalized = normalize_text(title)
     if not title_normalized:
         return None

@@ -14,12 +14,7 @@ from sqlalchemy import Connection, ScalarResult, text
 
 from domain.publications.identifiers import clean_doi
 from domain.source_records.identifiers import SourceIdentifierType
-from domain.sources.registry import (
-    ALL_SOURCES_SET as VALID_SOURCES,
-    DOI_ORG,
-    PROFILES,
-    Source,
-)
+from domain.sources.registry import DOI_ORG, PROFILES, Source
 from domain.sources.staging import StagingEntryMode
 from infrastructure.db.doi_targets import unversioned_doi_sql
 from pipeline.http.lookup import UNAVAILABLE, Unavailable
@@ -67,8 +62,8 @@ def get_missing_dois(
 
     `years` borne les candidats à la fenêtre d'années du run : un DOI est retenu quand l'un des enregistrements sources de sa publication a son année dans la fenêtre. Les sources d'une même publication diffèrent souvent d'un an.
     """
-    if target not in VALID_SOURCES:
-        raise ValueError(f"Source inconnue : {target}. Valides : {', '.join(VALID_SOURCES)}")
+    if target not in Source:
+        raise ValueError(f"Source inconnue : {target}. Valides : {', '.join(Source)}")
 
     target_ra = PROFILES[Source(target)].registration_agency
     join_clause = (

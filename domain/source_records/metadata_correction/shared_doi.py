@@ -11,7 +11,7 @@ from itertools import combinations
 from typing import NamedTuple
 
 from domain.publications.doc_types import DocType
-from domain.publications.identifiers import NNT, HALId, doi_version, meme_registrant
+from domain.publications.identifiers import NNT, HALId, doi_version, same_registrant
 from domain.source_records.identifiers import SourceIdentifier, SourceIdentifierType
 from domain.source_records.keys import CONFIRMATION_ID_TYPES
 from domain.sources.registry import AGGREGATOR_SOURCES, Source
@@ -66,14 +66,14 @@ FIGSHARE_COLLECTION_DOI_PREFIX = "10.6084/m9.figshare.c."
 FIGSHARE_ADDITIONAL_FILE_TITLE_PATTERN = r"^additional file( [0-9]+)? of "
 
 
-def meme_oeuvre_declaree(
+def declares_same_work(
     case: DoiTargetRule, doc_type: str | None, own_doi: str | None, target_doi: str | None
 ) -> bool:
     """Vrai si la relation déclarée par un enregistrement source réunit son DOI `own_doi` et `target_doi` en une seule œuvre.
 
     Une pièce de dataset rejoint son parent, et deux DOI d'un même registrant forment une seule œuvre. Entre deux registrants, une copie de repository rejoint la forme publiée, sauf un enregistrement source `preprint`. Une version d'un autre registrant relie deux œuvres, comme un preprint arXiv et l'article publié.
     """
-    if case is DoiTargetRule.DATACITE_PACKAGE_PIECE or meme_registrant(own_doi, target_doi):
+    if case is DoiTargetRule.DATACITE_PACKAGE_PIECE or same_registrant(own_doi, target_doi):
         return True
     return case is DoiTargetRule.DATACITE_VARIANT_TO_PRIMARY and doc_type != DocType.PREPRINT
 
@@ -129,7 +129,7 @@ class ConfirmationIdRemoval(NamedTuple):
 
 
 # Cas où des œuvres distinctes partagent un DOI : le membre qui le perd est une autre œuvre.
-DIVERGENCE_CASES: frozenset[DoiClusterCase] = frozenset(
+_DIVERGENCE_CASES: frozenset[DoiClusterCase] = frozenset(
     {
         DoiClusterCase.OUVRAGE_VS_CHAPITRE,
         DoiClusterCase.CHAPITRES_TITRES_DIFFERENTS,
@@ -151,27 +151,28 @@ def confirmation_ids(identifiers: Iterable[SourceIdentifier]) -> dict[str, tuple
 def source_record_own_ids(source: str, source_id: str) -> dict[str, tuple[str, ...]]:
     """Renvoie les identifiants propres d'un enregistrement source, par type : le dépôt HAL d'un enregistrement source HAL ou d'un enregistrement source ScanR issu de HAL, le NNT d'un enregistrement source theses.fr."""
     if source == Source.HAL:
-        hal_id = HALId.try_parse(source_id)
+        parsed = HALId.try_parse(source_id)
+        hal_id = str(parsed) if parsed else None
     elif source == Source.SCANR:
-        hal_id = HALId.try_parse(extract_hal_id_from_scanr_id(source_id) or "")
+        hal_id = extract_hal_id_from_scanr_id(source_id)
     elif source == Source.THESES:
         nnt = NNT.try_parse(source_id)
         return {SourceIdentifierType.NNT.value: (str(nnt),)} if nnt else {}
     else:
         return {}
-    return {SourceIdentifierType.HAL_ID.value: (str(hal_id),)} if hal_id else {}
+    return {SourceIdentifierType.HAL_ID.value: (hal_id,)} if hal_id else {}
 
 
 def confirmation_id_removals(
     group: list[DoiClusterMember], decisions: list[DoiClusterDecision]
 ) -> list[ConfirmationIdRemoval]:
-    """Calcule les retraits d'identifiants après une divergence (`DIVERGENCE_CASES`).
+    """Calcule les retraits d'identifiants après une divergence (`_DIVERGENCE_CASES`).
 
     Une clé de confirmation partagée avec un membre qui perd le DOI appartient à cette autre œuvre : le membre qui garde le DOI la perd. Sans quoi la clé réunirait encore les deux œuvres, par exemple le dépôt HAL d'une communication recopié par l'enregistrement source OpenAlex du volume d'actes.
 
     Une clé reste en place quand un membre qui garde le DOI la tient en propre (`own_ids`), ou quand ce membre vient d'une source autre qu'un agrégateur (`AGGREGATOR_SOURCES`). Une telle source décrit son propre document : le PMID d'un dépôt HAL est celui de l'article, même recopié par l'enregistrement source ScanR d'un volume de résumés.
     """
-    losers = {d.id: d.case for d in decisions if d.case in DIVERGENCE_CASES}
+    losers = {d.id: d.case for d in decisions if d.case in _DIVERGENCE_CASES}
     if not losers:
         return []
     kept: dict[str, set[str]] = {}
@@ -246,7 +247,7 @@ def _volume_communications(group: list[DoiClusterMember]) -> list[DoiClusterMemb
     ]
 
 
-SHARED_TITLE_WORDS_MIN = 0.35
+_SHARED_TITLE_WORDS_MIN = 0.35
 _TITLE_WORD_MIN_LENGTH = 3
 
 
@@ -260,12 +261,12 @@ def _shared_title_words(a: str | None, b: str | None) -> float | None:
 
 
 def distant_titles(a: str | None, b: str | None) -> bool:
-    """Vrai si moins de 35 % des mots du plus court des deux titres normalisés sont présents dans l'autre (`SHARED_TITLE_WORDS_MIN`).
+    """Vrai si moins de 35 % des mots du plus court des deux titres normalisés sont présents dans l'autre (`_SHARED_TITLE_WORDS_MIN`).
 
     Seuls comptent les mots de 3 lettres ou plus : les mots grammaticaux et les restes de formules mathématiques sont ignorés. Un titre sans mot retenu n'est éloigné d'aucun autre.
     """
     shared = _shared_title_words(a, b)
-    return shared is not None and shared < SHARED_TITLE_WORDS_MIN
+    return shared is not None and shared < _SHARED_TITLE_WORDS_MIN
 
 
 def _records_of_another_work(group: list[DoiClusterMember]) -> list[DoiClusterMember]:
@@ -292,12 +293,12 @@ def _records_of_another_work(group: list[DoiClusterMember]) -> list[DoiClusterMe
 
 
 def doi_target(declarations: Iterable[SecondaryFormDeclaration], *, doi: str) -> DoiTarget | None:
-    """Renvoie la cible de `doi` quand un enregistrement source le déclare forme secondaire d'une autre forme de la même œuvre (cf. `meme_oeuvre_declaree`) : version → concept, variante → version publiée, fichier → dépôt parent."""
+    """Renvoie la cible de `doi` quand un enregistrement source le déclare forme secondaire d'une autre forme de la même œuvre (cf. `declares_same_work`) : version → concept, variante → version publiée, fichier → dépôt parent."""
     declaration = next(
         (
             d
             for d in declarations
-            if d.target_doi != doi and meme_oeuvre_declaree(d.rule, d.doc_type, doi, d.target_doi)
+            if d.target_doi != doi and declares_same_work(d.rule, d.doc_type, doi, d.target_doi)
         ),
         None,
     )

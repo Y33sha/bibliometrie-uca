@@ -8,6 +8,7 @@
   import Pagination from "#lib/components/Pagination.svelte";
   import { confirmMerge } from "#lib/components/persons/confirmMerge.js";
   import type { CurationPerson } from "#lib/components/persons/types.js";
+  import { formatCount } from "#lib/plural.js";
 
   let {
     endpoint,
@@ -137,7 +138,7 @@
       {titleCase(p.first_name)}
     </button>
     {#if p.has_rh}<RhCheck />{/if}
-    <div class="meta">{p.contribution_count} publication{p.contribution_count !== 1 ? "s" : ""}</div>
+    <div class="meta">{formatCount(p.contribution_count, "publication")}</div>
     {#if p.labs.length}
       <div class="labs">
         {#each p.labs as lab (lab)}<span class="lab-badge">{lab}</span>{/each}

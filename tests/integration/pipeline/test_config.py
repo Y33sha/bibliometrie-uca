@@ -1,13 +1,13 @@
 """Lecture de la configuration du pipeline depuis la table `config`.
 
-Les clés de forme imposée (plafonds d'interrogation, délais de réinterrogation, année de départ) sont contrôlées à l'écriture, et la table refuse une valeur hors de cette forme. Une clé absente prend sa valeur par défaut. Une année de départ vide équivaut à une clé absente.
+Les clés de forme imposée (plafonds d'interrogation, délais de réinterrogation, année de départ) sont contrôlées à l'écriture, et la table refuse une valeur hors de cette forme. Chaque clé est présente en base. Une année de départ vide laisse l'année non fixée.
 """
 
 import pytest
 from sqlalchemy import text
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, NoResultFound
 
-from domain.config import DEFAULT_START_YEAR_OFFSET, SETTINGS, ConfigKey
+from domain.config import DEFAULT_START_YEAR_OFFSET, ConfigKey
 from domain.dates import today
 from pipeline.runtime.config import cap, delay, fixed_start_year, get_years
 from tests.integration.helpers.config import set_config
@@ -31,9 +31,14 @@ class TestGetYears:
             range(current - DEFAULT_START_YEAR_OFFSET, current + 1)
         )
 
-    def test_la_cle_absente_vaut_annee_non_fixee(self, sa_sync_conn):
-        sa_sync_conn.execute(text("DELETE FROM config WHERE key = 'pipeline_start_year_full'"))
+    def test_la_valeur_vide_vaut_annee_non_fixee(self, sa_sync_conn):
+        set_config(sa_sync_conn, "pipeline_start_year_full", None)
         assert fixed_start_year(sa_sync_conn) is None
+
+    def test_une_cle_absente_est_une_erreur(self, sa_sync_conn):
+        sa_sync_conn.execute(text("DELETE FROM config WHERE key = 'pipeline_start_year_full'"))
+        with pytest.raises(NoResultFound):
+            fixed_start_year(sa_sync_conn)
 
     def test_l_annee_fixee_est_lue(self, sa_sync_conn):
         set_config(sa_sync_conn, "pipeline_start_year_full", 2020)
@@ -77,23 +82,12 @@ class TestPlafondsParRun:
         set_config(sa_sync_conn, "unpaywall_max_per_run", 0)
         assert cap(sa_sync_conn, ConfigKey.UNPAYWALL_MAX_PER_RUN) is None
 
-    def test_la_cle_absente_laisse_le_plafond_par_defaut(self, sa_sync_conn):
-        sa_sync_conn.execute(text("DELETE FROM config WHERE key = 'unpaywall_max_per_run'"))
-        assert (
-            cap(sa_sync_conn, ConfigKey.UNPAYWALL_MAX_PER_RUN)
-            == SETTINGS[ConfigKey.UNPAYWALL_MAX_PER_RUN].default
-        )
-
     def test_le_plafond_de_fetch_missing_configure_est_lu(self, sa_sync_conn):
         set_config(sa_sync_conn, "fetch_missing_max_per_source", 5000)
         assert cap(sa_sync_conn, ConfigKey.FETCH_MISSING_MAX_PER_SOURCE) == 5000
 
     def test_zero_vaut_illimite_pour_fetch_missing(self, sa_sync_conn):
         set_config(sa_sync_conn, "fetch_missing_max_per_source", 0)
-        assert cap(sa_sync_conn, ConfigKey.FETCH_MISSING_MAX_PER_SOURCE) is None
-
-    def test_fetch_missing_sans_cle_est_illimite(self, sa_sync_conn):
-        sa_sync_conn.execute(text("DELETE FROM config WHERE key = 'fetch_missing_max_per_source'"))
         assert cap(sa_sync_conn, ConfigKey.FETCH_MISSING_MAX_PER_SOURCE) is None
 
 
@@ -113,10 +107,3 @@ class TestDelais:
     def test_le_delai_configure_est_lu(self, sa_sync_conn, key):
         set_config(sa_sync_conn, key.value, 7)
         assert delay(sa_sync_conn, key) == 7
-
-    def test_la_cle_absente_laisse_le_delai_par_defaut(self, sa_sync_conn):
-        sa_sync_conn.execute(text("DELETE FROM config WHERE key = 'fetch_stale_after_days'"))
-        assert (
-            delay(sa_sync_conn, ConfigKey.FETCH_STALE_AFTER_DAYS)
-            == SETTINGS[ConfigKey.FETCH_STALE_AFTER_DAYS].default
-        )

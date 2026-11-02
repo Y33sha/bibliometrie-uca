@@ -74,11 +74,7 @@ def load_retained(conn: Connection) -> tuple[CountrySets, dict[int, str]]:
     raw_text: dict[int, str] = {}
     for r in conn.execute(text("SELECT id, raw_text, countries FROM addresses")):
         raw_text[r.id] = r.raw_text
-        codes = frozenset(
-            code
-            for c in r.countries or ()
-            if (code := normalize_country_code(c)) and code != NO_COUNTRY_CODE
-        )
+        codes = frozenset(code for c in r.countries or () if (code := normalize_country_code(c)))
         if codes:
             retained[r.id] = codes
     return retained, raw_text

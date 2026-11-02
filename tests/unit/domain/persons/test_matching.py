@@ -3,13 +3,11 @@
 from domain.persons.contributor_name import ContributorName
 from domain.persons.matching import (
     IdentifiedPerson,
-    NameFormDecision,
     Namesake,
     attested_full_first_names,
     compatible_namesakes,
     compatible_persons,
     decide_match_by_identifier,
-    decide_name_form_outcome,
     full_namesakes,
     identifier_misplaced,
     strict_majority,
@@ -74,76 +72,6 @@ class TestIdentifierMisplaced:
 
     def test_no_consensus(self):
         assert not identifier_misplaced("t dado", None)
-
-
-class TestDecideNameFormOutcome:
-    def test_single_person_id_matches(self):
-        decision = decide_name_form_outcome([42], allow_create=True)
-        assert decision == NameFormDecision(action="match", person_id=42)
-
-    def test_multiple_person_ids_skip_ambiguous(self):
-        decision = decide_name_form_outcome([42, 17], allow_create=True)
-        assert decision.action == "skip"
-        assert decision.reason == "ambiguous_name_form"
-        assert decision.person_id is None
-
-    def test_no_match_with_allow_create(self):
-        decision = decide_name_form_outcome(None, allow_create=True)
-        assert decision == NameFormDecision(action="create")
-
-    def test_no_match_without_allow_create_skips(self):
-        """Forme de nom inconnue, création interdite (membre du jury d'une thèse, par exemple) : aucun rattachement."""
-        decision = decide_name_form_outcome(None, allow_create=False)
-        assert decision.action == "skip"
-        assert decision.reason == "creation_not_allowed"
-
-    def test_multiple_person_ids_overrides_allow_create(self):
-        """Plusieurs personnes ont la forme de nom, création interdite : l'ambiguïté motive le refus."""
-        decision = decide_name_form_outcome([42, 17], allow_create=False)
-        assert decision.action == "skip"
-        assert decision.reason == "ambiguous_name_form"
-
-    def test_rejected_candidate_eliminated_disambiguates(self):
-        """Deux candidates, dont une rejetée pour la publication : la contribution est rattachée à l'autre."""
-        decision = decide_name_form_outcome(
-            [42, 17], allow_create=True, rejected_person_ids=frozenset({17})
-        )
-        assert decision == NameFormDecision(action="match", person_id=42)
-
-    def test_single_rejected_candidate_skips(self):
-        """Seule candidate rejetée pour la publication : ni rattachement, ni création."""
-        decision = decide_name_form_outcome(
-            [42], allow_create=True, rejected_person_ids=frozenset({42})
-        )
-        assert decision.action == "skip"
-        assert decision.reason == "all_candidates_rejected"
-
-    def test_all_candidates_rejected_skips(self):
-        decision = decide_name_form_outcome(
-            [42, 17], allow_create=True, rejected_person_ids=frozenset({42, 17})
-        )
-        assert decision.action == "skip"
-        assert decision.reason == "all_candidates_rejected"
-
-    def test_unknown_form_single_compatible_person_matches(self):
-        """Forme inconnue, une seule personne aux initiales compatibles : rattachement, pas de création."""
-        decision = decide_name_form_outcome(None, allow_create=True, compatible_person_ids=[42])
-        assert decision == NameFormDecision(action="match", person_id=42, reason="compatible_name")
-
-    def test_unknown_form_several_compatible_persons_skip(self):
-        decision = decide_name_form_outcome(None, allow_create=True, compatible_person_ids=[42, 17])
-        assert decision == NameFormDecision(action="skip", reason="ambiguous_name_form")
-
-    def test_unknown_form_compatible_person_rejected_skips(self):
-        """La seule personne compatible est rejetée pour la publication : ni rattachement, ni création."""
-        decision = decide_name_form_outcome(
-            None, allow_create=True, rejected_person_ids=frozenset({42}), compatible_person_ids=[42]
-        )
-        assert decision == NameFormDecision(action="skip", reason="all_candidates_rejected")
-
-    def test_known_form_ignores_compatible_persons(self):
-        decision = decide_name_form_outcome([7], allow_create=True, compatible_person_ids=[42])
-        assert decision == NameFormDecision(action="match", person_id=7)
 
 
 class TestCompatibleNamesakes:

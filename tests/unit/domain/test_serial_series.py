@@ -8,7 +8,6 @@ from domain.serials.series import (
     VolumeTitle,
     container_level,
     group_series,
-    reference_series_title,
     series_key,
     series_title,
     split_collection_and_volume,
@@ -88,23 +87,6 @@ def test_volumes_d_une_meme_serie_partagent_la_cle():
 )
 def test_titre_de_serie_d_un_volume(title, expected):
     assert series_title(title) == expected
-
-
-class TestReferenceSeriesTitle:
-    def test_titre_de_serie_garde(self):
-        assert reference_series_title("Lecture notes in computer science", None) is None
-
-    def test_titre_sudoc_fait_reference(self):
-        assert (
-            reference_series_title("ICORES 2023", "Operations research and enterprise systems")
-            == "Operations research and enterprise systems"
-        )
-
-    def test_sans_enregistrement_source_titre_sans_marques(self):
-        assert reference_series_title("8th CoDIT", None) == "CoDIT"
-
-    def test_titre_sudoc_de_volume_ignore(self):
-        assert reference_series_title("NuFACT 2022", "NuFACT 2021") == "NuFACT"
 
 
 class TestGroupSeries:

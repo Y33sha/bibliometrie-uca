@@ -10,23 +10,21 @@ from application.ports.repositories.structure_repository import (
     StructureUpdate,
 )
 from domain.errors import NotFoundError, ValidationError
-from domain.structures.identifiers import HalCollection, RorId
 from domain.structures.structure import StructureType
 from infrastructure.read_models.structures.models import StructureOut
-from infrastructure.repositories import structure_repository
 from interfaces.api.deps import structure_service
 
 
 def _create_structure(*, service, structure_type, **fields):
     """Crée une structure par le service, et renvoie sa réponse d'API en dict."""
-    structure = service.create_structure(StructureCreate(type=structure_type, **fields))
-    return StructureOut.from_structure(structure).model_dump()
+    row = service.create_structure(StructureCreate(type=structure_type, **fields))
+    return StructureOut.model_validate(row).model_dump()
 
 
 def _update_structure(structure_id, *, update, service):
     """Met à jour une structure par le service, et renvoie sa réponse d'API en dict."""
-    structure = service.update_structure(structure_id, update=update)
-    return StructureOut.from_structure(structure).model_dump()
+    row = service.update_structure(structure_id, update=update)
+    return StructureOut.model_validate(row).model_dump()
 
 
 def _create_name_form(*, service, **fields):
@@ -35,67 +33,11 @@ def _create_name_form(*, service, **fields):
 
 
 @pytest.fixture
-def repo(sa_sync_conn):
-    return structure_repository(sa_sync_conn)
-
-
-@pytest.fixture
 def service(sa_sync_conn):
     return structure_service(sa_sync_conn)
 
 
 # ── structures ────────────────────────────────────────────────────
-
-
-class TestFindById:
-    def test_returns_none_if_missing(self, sa_sync_conn, repo):
-        assert repo.find_by_id(999999) is None
-
-    def test_hydrates_minimal_structure(self, sa_sync_conn, repo, service):
-        row = _create_structure(code="MIN", name="Min", structure_type="labo", service=service)
-        s = repo.find_by_id(row["id"])
-        assert s is not None
-        assert s.id == row["id"]
-        assert s.code == "MIN"
-        assert s.name == "Min"
-        assert s.structure_type is StructureType.LABO
-        assert s.acronym is None
-        assert s.ror_id is None
-        assert s.hal_collection is None
-        assert s.api_ids is None
-        assert s.name_forms == ()
-
-    def test_hydrates_full_structure_with_vos(self, sa_sync_conn, repo, service):
-        row = _create_structure(
-            code="UMR-LIMOS",
-            name="LIMOS",
-            structure_type="labo",
-            acronym="LIMOS",
-            ror_id="02feahw73",
-            hal_collection="LIMOS",
-            api_ids={"openalex": ["I1"], "wos": ["W1"]},
-            service=service,
-        )
-        s = repo.find_by_id(row["id"])
-        assert s is not None
-        assert s.ror_id == RorId("02feahw73")
-        assert s.hal_collection == HalCollection("LIMOS")
-        assert s.api_ids == {"openalex": ["I1"], "wos": ["W1"]}
-
-    def test_hydrates_name_forms(self, sa_sync_conn, repo, service):
-        row = _create_structure(code="S", name="S", structure_type="labo", service=service)
-        _create_name_form(structure_id=row["id"], form_text="lab x", service=service)
-        _create_name_form(
-            structure_id=row["id"],
-            form_text="autre forme",
-            is_word_boundary=True,
-            service=service,
-        )
-        s = repo.find_by_id(row["id"])
-        assert s is not None
-        assert len(s.name_forms) == 2
-        forms = {name_form.form_text for name_form in s.name_forms}
-        assert forms == {"lab x", "autre forme"}
 
 
 class TestCreateStructure:
@@ -107,6 +49,30 @@ class TestCreateStructure:
         assert row["name"] == "Université"
         assert row["type"] == "universite"
         assert row["acronym"] is None
+
+    def test_hal_collection_normalized(self, sa_sync_conn, service):
+        row = _create_structure(
+            code="H1", name="H1", structure_type="labo", hal_collection=" limos ", service=service
+        )
+        assert row["hal_collection"] == "LIMOS"
+
+    @pytest.mark.parametrize("vide", ["", "   "])
+    def test_blank_identifiers_are_absent(self, sa_sync_conn, service, vide):
+        row = _create_structure(
+            code="B1",
+            name="B1",
+            structure_type="labo",
+            ror_id=vide,
+            hal_collection=vide,
+            service=service,
+        )
+        assert (row["ror_id"], row["hal_collection"]) == (None, None)
+
+    def test_hal_collection_invalid_raises(self, sa_sync_conn, service):
+        with pytest.raises(ValidationError, match="hal_collection invalide : 'LAB X'"):
+            _create_structure(
+                code="H2", name="H2", structure_type="labo", hal_collection="LAB X", service=service
+            )
 
     def test_with_api_ids(self, sa_sync_conn, service):
         row = _create_structure(

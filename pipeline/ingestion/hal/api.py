@@ -7,7 +7,6 @@ from collections.abc import Collection, Mapping, Sequence
 import httpx2
 
 from domain.sources.registry import source_record_url
-from domain.structures.hal_structures import HAL_STRUCTURE_FIELDS
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, at_path
 from pipeline.http.circuit_breaker import SourceUnavailableError
 from pipeline.http.http_retry import (
@@ -17,6 +16,7 @@ from pipeline.http.http_retry import (
 )
 from pipeline.http.lookup import NOT_FOUND, UNAVAILABLE, LookupOutcome, NotFound, Unavailable
 from pipeline.ingestion.api_params import API_BASE_URLS, HAL_PER_PAGE
+from pipeline.ingestion.hal.structures import HAL_STRUCTURE_FIELDS
 
 type SolrParams = dict[str, str | int | float | bool | None]
 

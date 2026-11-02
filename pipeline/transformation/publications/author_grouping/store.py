@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from sqlalchemy import Connection, text
 
-from domain.persons.identifiers import AttributionStatus
+from domain.persons.identifiers import HUMAN_ATTRIBUTION_STATUSES
 from infrastructure.db.queues import Queue, delete_processed, enqueue, enqueue_sql, snapshot
 from infrastructure.db.rows import rows_as
 from infrastructure.sql_fragments import (
@@ -13,9 +13,6 @@ from infrastructure.sql_fragments import (
     propagate_contribution_attributes_sql,
     usable_identifier,
 )
-
-# Statuts d'un rattachement d'identifiant posé par un humain.
-_HUMAN_STATUSES = (AttributionStatus.CONFIRMED.value, AttributionStatus.AUTHENTICATED.value)
 
 # Relevé de la file `publication_contributions_queue`, gardé d'un lot à l'autre : une table temporaire survit aux commits.
 _SNAPSHOT = "publication_contributions_marks"
@@ -37,7 +34,7 @@ def _known_first_name(id_type: str) -> str:
     return f"""(
         SELECT p.first_name_normalized FROM person_identifiers pi JOIN persons p ON p.id = pi.person_id
         WHERE pi.id_type = '{id_type}' AND pi.id_value = {usable_identifier(f"'{id_type}'")}
-          AND pi.status::text IN {in_clause(_HUMAN_STATUSES)}
+          AND pi.status::text IN {in_clause(HUMAN_ATTRIBUTION_STATUSES)}
     )"""
 
 
@@ -94,7 +91,7 @@ _SET_COPIES_SQL = text("""
 _UPDATE_POSITIONS_SQL = text("""
     UPDATE contributions g SET reference_position = u.position
     FROM unnest(CAST(:ids AS integer[]), CAST(:positions AS smallint[])) AS u(id, position)
-    WHERE g.id = u.id
+    WHERE g.id = u.id AND g.reference_position IS DISTINCT FROM u.position
 """)
 
 _NEW_CONTRIBUTION_IDS_SQL = text(

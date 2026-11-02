@@ -91,6 +91,8 @@ def stage_details(conn: Connection, log: logging.Logger, theses_ids: list[str]) 
                 fetch=one_at_a_time(fetch_thesis),
                 on_absent=lambda conn, theses_id: None,
                 stage=lambda staging, thesis: staging.stage("theses", thesis),
+                # La barre de la recherche et le bilan comptent déjà ces thèses.
+                shown=False,
             ),
             theses_ids,
         )

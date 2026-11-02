@@ -3,7 +3,7 @@
 import re
 from enum import Enum
 
-from domain.normalize import clean_raw_author_name, normalize_text
+from domain.normalize import normalize_text
 
 # Particules qui ouvrent un nom de famille (« da Silva », « van der Berg », « d'Incan »).
 _PARTICLES = frozenset(
@@ -26,6 +26,12 @@ def is_initials(text: str) -> bool:
     return bool(words) and all(len(word) == 1 for word in words)
 
 
+def is_full_first_name(text: str) -> bool:
+    """Vrai si chaque mot normalisé de `text` compte au moins deux lettres (« Jean-Luc », pas « Jean L. »)."""
+    words = normalize_text(text).split()
+    return bool(words) and all(len(word) >= 2 for word in words)
+
+
 def orient_initials(last_name: str, first_name: str) -> tuple[str, str]:
     """Renvoie (nom, prénom), inversés quand le nom se réduit à des initiales et que le prénom n'en est pas : « M. » / « Brigante » donne « Brigante » / « M. »."""
     if is_initials(last_name) and first_name.strip() and not is_initials(first_name):
@@ -44,16 +50,15 @@ def _trailing_initials_start(words: list[str]) -> int | None:
 
 
 def parse_raw_author_name(raw_name: str | None) -> tuple[str, str]:
-    """Découpe un nom brut en nom de famille et prénom.
+    """Découpe un nom brut, nettoyé par `clean_raw_author_name`, en nom de famille et prénom.
 
     - « Nom, Prénom » : des initiales avant la virgule passent en prénom (« C., Küll »).
     - « Nom I. » : des initiales finales forment le prénom (« Del Buono L. »).
     - « Prénom Nom » : le nom de famille commence à la première particule après le premier mot (« Alison da Silva »), sinon il se réduit au dernier mot.
     """
-    if not raw_name:
+    raw = (raw_name or "").strip()
+    if not raw:
         return "", ""
-    # Retire un identifiant entre parenthèses d'un nom brut lu sans nettoyage préalable.
-    raw = clean_raw_author_name(raw_name).strip()
     if "," in raw:
         parts = raw.split(",", 1)
         return orient_initials(parts[0].strip(), parts[1].strip())
@@ -70,11 +75,11 @@ def parse_raw_author_name(raw_name: str | None) -> tuple[str, str]:
 
 
 def family_name_splits(raw_name: str | None) -> list[tuple[str, str]]:
-    """Renvoie les découpages possibles d'un nom brut en nom de famille et prénom.
+    """Renvoie les découpages possibles d'un nom brut, nettoyé par `clean_raw_author_name`, en nom de famille et prénom.
 
     Au format « Nom, Prénom » ou « Nom I. », le seul découpage de `parse_raw_author_name`. Sinon, chaque groupe de mots final après le premier mot, du plus long au plus court : « Florence Caldefie Chezet » donne (« Caldefie Chezet », « Florence ») puis (« Chezet », « Florence Caldefie »).
     """
-    raw = clean_raw_author_name(raw_name or "").strip()
+    raw = (raw_name or "").strip()
     if not raw:
         return []
     words = raw.split()

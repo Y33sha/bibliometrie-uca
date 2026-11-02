@@ -5,7 +5,6 @@ from enum import StrEnum
 
 from domain.publications.doc_types import DocType
 from domain.sources.registry import Source
-from domain.types import JsonValue, as_mapping, as_sequence, as_str
 
 
 class License(StrEnum):
@@ -69,36 +68,36 @@ OPEN_LICENSES: frozenset[License] = frozenset(
 )
 """Licences qui ouvrent la réutilisation."""
 
-NO_LICENSE_LABEL = "Aucune licence"
+_NO_LICENSE_LABEL = "Aucune licence"
 
 
 def license_label(value: str | None) -> str:
-    """Renvoie le libellé français d'une licence, `NO_LICENSE_LABEL` sans licence."""
-    return LICENSE_LABELS[License(value)] if value else NO_LICENSE_LABEL
+    """Renvoie le libellé français d'une licence, `_NO_LICENSE_LABEL` sans licence."""
+    return LICENSE_LABELS[License(value)] if value else _NO_LICENSE_LABEL
 
 
 # Sources de la licence de la version éditeur d'une publication, par priorité.
-PUBLISHER_LICENSE_SOURCES: tuple[Source, ...] = (
+_PUBLISHER_LICENSE_SOURCES: tuple[Source, ...] = (
     Source.CROSSREF,
     Source.OPENALEX,
     Source.SCANR,
     Source.DATACITE,
 )
 # Pour un jeu de données ou un logiciel, DataCite passe en tête.
-DATA_LICENSE_SOURCES: tuple[Source, ...] = (
+_DATA_LICENSE_SOURCES: tuple[Source, ...] = (
     Source.DATACITE,
     Source.CROSSREF,
     Source.OPENALEX,
     Source.SCANR,
 )
-DATA_DOC_TYPES: frozenset[str] = frozenset({DocType.DATASET, DocType.SOFTWARE})
+_DATA_DOC_TYPES: frozenset[str] = frozenset({DocType.DATASET, DocType.SOFTWARE})
 # Source de la licence du fichier déposé.
 DEPOSIT_LICENSE_SOURCE = Source.HAL
 
 
 def publisher_license_sources(doc_type: str | None) -> tuple[Source, ...]:
     """Renvoie les sources de la licence de la version éditeur, par priorité, selon le type de document."""
-    return DATA_LICENSE_SOURCES if doc_type in DATA_DOC_TYPES else PUBLISHER_LICENSE_SOURCES
+    return _DATA_LICENSE_SOURCES if doc_type in _DATA_DOC_TYPES else _PUBLISHER_LICENSE_SOURCES
 
 
 # Éléments d'une licence Creative Commons, dans l'ordre de son code.
@@ -207,28 +206,3 @@ def normalize_license(raw: str | None) -> License | None:
     if "/" in value:
         return _from_url(value)
     return _from_code(value)
-
-
-def crossref_license(entries: JsonValue) -> License | None:
-    """Renvoie la licence de la version éditeur d'un enregistrement source Crossref (`license`) : entrée `vor`, à défaut `unspecified`."""
-    for version in ("vor", "unspecified"):
-        for entry in as_sequence(entries):
-            item = as_mapping(entry)
-            if as_str(item.get("content-version")) == version:
-                if found := normalize_license(as_str(item.get("URL"))):
-                    return found
-    return None
-
-
-def datacite_license(rights: JsonValue) -> License | None:
-    """Renvoie la licence d'un enregistrement source DataCite (`rightsList`) : identifiant SPDX, à défaut URI. Une licence déclarée par son URI mais non reconnue vaut `OTHER`."""
-    declared = False
-    for entry in as_sequence(rights):
-        item = as_mapping(entry)
-        uri = as_str(item.get("rightsUri"))
-        if found := normalize_license(as_str(item.get("rightsIdentifier"))) or normalize_license(
-            uri
-        ):
-            return found
-        declared = declared or bool(uri and uri.strip() and not is_access_right(uri))
-    return License.OTHER if declared else None

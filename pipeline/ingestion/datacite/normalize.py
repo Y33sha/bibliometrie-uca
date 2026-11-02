@@ -15,7 +15,7 @@ from domain.persons.identifiers import normalize_orcid
 from domain.publications.contribution_roles import ContributionRole
 from domain.publications.dates import PublicationDate
 from domain.publications.identifiers import clean_doi
-from domain.publications.licenses import datacite_license
+from domain.publications.licenses import License, is_access_right, normalize_license
 from domain.serials.containers import ContainerDescription
 from domain.serials.issns import source_issns
 from domain.source_records.biblio import compact_biblio
@@ -95,6 +95,20 @@ def get_biblio(attributes: Mapping[str, JsonValue]) -> dict[str, JsonValue] | No
         last_page=as_text(container.get("lastPage")),
         publisher=get_publisher_name(attributes),
     )
+
+
+def datacite_license(rights: JsonValue) -> License | None:
+    """Renvoie la licence déclarée (`rightsList`) : identifiant SPDX, à défaut URI. Une licence déclarée par son URI mais non reconnue vaut `OTHER`."""
+    declared = False
+    for entry in as_sequence(rights):
+        item = as_mapping(entry)
+        uri = as_str(item.get("rightsUri"))
+        if found := normalize_license(as_str(item.get("rightsIdentifier"))) or normalize_license(
+            uri
+        ):
+            return found
+        declared = declared or bool(uri and uri.strip() and not is_access_right(uri))
+    return License.OTHER if declared else None
 
 
 def _creator_name(creator: Mapping[str, JsonValue]) -> ContributorName | None:

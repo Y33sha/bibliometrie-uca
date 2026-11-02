@@ -8,7 +8,7 @@ from itertools import batched
 
 from sqlalchemy import Connection, text
 
-from domain.publications.metadata import OA_STATUS_UNKNOWN_DEFAULT
+from domain.publications.oa_status import OaStatus
 from pipeline.transformation.publications.consolidation import RefreshVerdict, consolidate
 from pipeline.transformation.publications.store import PublicationStore
 
@@ -36,7 +36,7 @@ def create(
         doc_type=doc_type or "other",
         publication_year=publication_year,
         doi=doi,
-        oa_status=OA_STATUS_UNKNOWN_DEFAULT,
+        oa_status=OaStatus.UNKNOWN,
     )
 
 

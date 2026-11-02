@@ -1,6 +1,6 @@
 """Client Sudoc : correspondance ISSN → PPN (service `issn2ppn`) et notices MARCXML des publications en série.
 
-Les requêtes passent par `http_retry`, sur un client asynchrone partagé : nouvelles tentatives, backoff et circuit-breaker de la source. Le XML est lu avec `defusedxml`, qui refuse les déclarations d'entités. L'interprétation des zones de la notice appartient à `domain.sources.sudoc`.
+Les requêtes passent par `http_retry`, sur un client asynchrone partagé : nouvelles tentatives, backoff et circuit-breaker de la source. La lecture des notices est définie dans `sudoc_record`.
 """
 
 from __future__ import annotations
@@ -13,13 +13,14 @@ import httpx2
 from defusedxml.common import DefusedXmlException
 
 from domain.publications.identifiers import ISSN
-from domain.sources.sudoc import MarcField, SudocSerialRecord, parse_sudoc_serial_record
+from domain.sources.sudoc import SudocSerialRecord
 from domain.types import as_mapping, as_sequence, as_str
 from pipeline.http.http_retry import (
     http_get_text_with_retry_async,
     http_request_with_retry_async,
 )
 from pipeline.ingestion.api_params import SUDOC_ISSN2PPN_BATCH
+from pipeline.ingestion.complements.sudoc_record import marc_fields, parse_sudoc_serial_record
 
 logger = logging.getLogger(__name__)
 
@@ -58,29 +59,6 @@ async def fetch_ppns(
             if issn is not None and ppns:
                 result[str(issn)] = ppns
     return result
-
-
-def marc_fields(xml: str) -> list[MarcField]:
-    """Lit les zones de données d'une notice MARCXML, dans l'ordre de la notice."""
-    root = ET.fromstring(xml)
-    fields: list[MarcField] = []
-    for element in root.iter():
-        if element.tag.rsplit("}", 1)[-1] != "datafield":
-            continue
-        subfields = tuple(
-            (sub.get("code") or "", (sub.text or "").strip())
-            for sub in element
-            if sub.tag.rsplit("}", 1)[-1] == "subfield"
-        )
-        fields.append(
-            MarcField(
-                tag=element.get("tag") or "",
-                ind1=element.get("ind1") or "",
-                ind2=element.get("ind2") or "",
-                subfields=subfields,
-            )
-        )
-    return fields
 
 
 async def fetch_serial_record(

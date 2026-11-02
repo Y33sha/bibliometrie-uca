@@ -667,6 +667,12 @@ class TestHalNormalizerClass:
         )
         assert norm.publisher({"publisher_s": "Springer"}) == PublisherFacts("Springer")
 
+    def test_editeur_en_texte_brut(self):
+        """Cas réel : HAL encode l'esperluette du nom d'éditeur."""
+        assert _make_normalizer().publisher({"publisher_s": "TAYLOR &amp; FRANCIS"}) == (
+            PublisherFacts("TAYLOR & FRANCIS")
+        )
+
     def test_sans_editeur(self):
         assert _make_normalizer().publisher({}) is None
 

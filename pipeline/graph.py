@@ -11,7 +11,6 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
 from domain.sources.registry import (
-    ALL_SOURCES,
     DOI_SEARCHABLE_SOURCES,
     HARVESTED_SOURCES,
     PERSON_SEARCHED_SOURCES,
@@ -273,7 +272,7 @@ TASKS: tuple[Task, ...] = (
             network=source,
             parallel_group="fetch_stale",
         )
-        for source in ALL_SOURCES
+        for source in Source
     ),
     _task(
         "fetch_truncated.refetch_openalex",

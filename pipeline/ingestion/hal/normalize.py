@@ -33,7 +33,6 @@ from domain.source_records.identifiers import (
     SourceIdentifierType,
     isbn_role,
 )
-from domain.sources.hal import hal_domain_subject
 from domain.structures.identifiers import parse_ror_ids
 from domain.subjects.subject import SubjectLink
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs
@@ -52,6 +51,7 @@ from pipeline.ingestion.common.staging import StagingRow
 from pipeline.ingestion.hal.payload import (
     communication_annex,
     extract_hal_source_extras,
+    hal_domain_subject,
     hal_text_field,
 )
 from pipeline.transformation.publishing.find_or_create import (

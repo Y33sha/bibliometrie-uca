@@ -14,7 +14,7 @@ from infrastructure.read_models._common import (
     YesNoCount,
 )
 
-# Vocabulaire de tri : le champ, puis le sens. Les deux dénombrements sont triables, comme la fonction et le département.
+# Vocabulaire de tri : le champ, puis le sens. Les deux dénombrements sont triables, comme le laboratoire actuel et le corps.
 PersonSort = Literal[
     "name_asc",
     "name_desc",
@@ -22,10 +22,10 @@ PersonSort = Literal[
     "contributions_desc",
     "in_perimeter_contributions_asc",
     "in_perimeter_contributions_desc",
-    "dept_asc",
-    "dept_desc",
-    "role_asc",
-    "role_desc",
+    "lab_asc",
+    "lab_desc",
+    "corps_asc",
+    "corps_desc",
 ]
 
 
@@ -37,9 +37,11 @@ class PersonFilters:
     """
 
     search: str = ""
-    departments: list[str] = field(default_factory=list)
-    """Multi-valué : une option cochée s'ajoute aux autres."""
-    roles: list[str] = field(default_factory=list)
+    categories: list[str] = field(default_factory=list)
+    """Catégories de personnel. Multi-valué : une option cochée s'ajoute aux autres."""
+    laboratories: list[int] = field(default_factory=list)
+    """Structures des périodes de présence actuelles. Multi-valué."""
+    corps: list[str] = field(default_factory=list)
     """Multi-valué : une option cochée s'ajoute aux autres."""
     has_orcid: bool | None = None
     has_idhal: bool | None = None
@@ -54,7 +56,7 @@ class PersonFilters:
     active: bool | None = None
     """Au moins une contribution ou une fiche RH. Une personne conservée pour ses seules décisions est inactive."""
     lab_id: int | None = None
-    """Restreint la liste aux personnes du laboratoire, et leurs dénombrements à ce laboratoire."""
+    """Restreint la liste aux personnes du laboratoire (période de présence ou contribution d'auteur), et leurs dénombrements aux contributions du laboratoire."""
 
 
 # ---------------------------------------------------------------------------
@@ -95,8 +97,18 @@ class PersonSearchResult(Model):
     id: int
     last_name: str
     first_name: str
-    department_name: str | None
+    current_unit: str | None
+    """Unité actuelle, pour départager des homonymes (`current_unit`)."""
     has_rh: bool
+
+
+class PersonLaboratoryOut(Model):
+    """Laboratoire d'une personne, d'après ses périodes de présence."""
+
+    id: int
+    label: str
+    current: bool
+    """Faux pour le laboratoire de la dernière période d'une personne partie."""
 
 
 class PersonOut(Model):
@@ -105,10 +117,10 @@ class PersonOut(Model):
     id: int
     last_name: str
     first_name: str
-    role_title: str | None
-    department_name: str | None
-    start_date: date | None
-    end_date: date | None
+    corps: str | None
+    staff_category: str | None
+    laboratories: list[PersonLaboratoryOut]
+    """Laboratoires actuels, à défaut celui de la dernière période (`laboratories_of`)."""
     has_rh: bool
     exclusion: PersonExclusion | None
     contribution_count: int
@@ -130,8 +142,9 @@ class PersonListResponse(PaginatedResponse):
 class PersonsFacetsResponse(Model):
     """Réponse de `/api/persons/facets`."""
 
-    departments: list[FacetOption]
-    roles: list[FacetOption]
+    categories: list[FacetOption]
+    laboratories: list[FacetOption]
+    corps: list[FacetOption]
     orcid: YesNoCount
     idhal: YesNoCount
     idref: YesNoCount
@@ -145,16 +158,27 @@ class PersonsFacetsResponse(Model):
 # ---------------------------------------------------------------------------
 
 
+class PersonPeriodOut(Model):
+    """Période de présence dans une unité."""
+
+    unit_label: str
+    structure_id: int | None
+    """Structure reconnue de l'unité."""
+    structure_label: str | None
+    start_date: date | None
+    end_date: date | None
+    current: bool
+
+
 class PersonProfileCore(Model):
     """Bloc `person` de `/api/persons/{id}`."""
 
     id: int
     last_name: str
     first_name: str
-    role_title: str | None
-    department_name: str | None
-    start_date: date | None
-    end_date: date | None
+    corps: str | None
+    staff_category: str | None
+    periods: list[PersonPeriodOut]
 
 
 class PersonProfileResponse(Model):
@@ -240,7 +264,8 @@ class OtherPersonOut(Model):
     person_id: int
     first_name: str
     last_name: str
-    department_name: str | None
+    current_unit: str | None
+    """Unité actuelle, pour départager des homonymes (`current_unit`)."""
     has_rh: bool
 
 

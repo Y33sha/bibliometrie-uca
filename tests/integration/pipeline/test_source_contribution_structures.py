@@ -5,7 +5,7 @@ import logging
 
 from sqlalchemy import text
 
-from domain.structures.hal_structures import parse_hal_structure
+from pipeline.ingestion.hal.structures import parse_hal_structure
 from pipeline.transformation.structures.hal_structures import HalStructureStore
 from pipeline.transformation.structures.idref_resolution import resolve_thesis_partners
 from pipeline.transformation.structures.perimeter import refresh_perimeter_structures

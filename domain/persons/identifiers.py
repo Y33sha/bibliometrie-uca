@@ -23,7 +23,7 @@ class IdentifierOrigin(StrEnum):
 class AttributionStatus(StrEnum):
     """Statut d'une attribution d'identifiant. Reflet du type PostgreSQL `identifier_status`.
 
-    L'administration pose librement `PENDING`, `CONFIRMED` ou `REJECTED`. Le pipeline change le statut par les méthodes de `IdentifierAttribution`.
+    L'administration pose librement `PENDING`, `CONFIRMED` ou `REJECTED`.
 
     `AUTHENTICATED` atteste que le chercheur a authentifié son ORCID en se connectant à son compte. Seul un ORCID a ce statut. Un trigger PostgreSQL le rend définitif, et le réserve à l'import des ORCID authentifiés.
     """
@@ -32,6 +32,12 @@ class AttributionStatus(StrEnum):
     CONFIRMED = "confirmed"
     REJECTED = "rejected"
     AUTHENTICATED = "authenticated"
+
+
+# Statuts d'une attribution posée par un humain : confirmée par l'administration, ou authentifiée par le chercheur. Seuls les identifiants à ces statuts servent au moissonnage par personne et à l'alignement des auteurs.
+HUMAN_ATTRIBUTION_STATUSES: frozenset[AttributionStatus] = frozenset(
+    {AttributionStatus.CONFIRMED, AttributionStatus.AUTHENTICATED}
+)
 
 
 class PersonIdentifierType(StrEnum):
@@ -50,7 +56,6 @@ PERSON_IDENTIFIER_LABELS: dict[PersonIdentifierType, str] = {
     PersonIdentifierType.HAL_PERSON_ID: "compte HAL",
 }
 
-PERSON_IDENTIFIER_TYPES: tuple[PersonIdentifierType, ...] = tuple(PersonIdentifierType)
 # Types de l'interface publique, seuls attribuables à la main. Le compte HAL vient seulement du moissonnage de HAL.
 PUBLIC_PERSON_IDENTIFIER_TYPES: tuple[PersonIdentifierType, ...] = (
     PersonIdentifierType.ORCID,

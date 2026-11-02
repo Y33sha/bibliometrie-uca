@@ -5,7 +5,7 @@ from enum import StrEnum
 from urllib.parse import quote
 
 from domain.errors import ValidationError
-from domain.persons.identifiers import AttributionStatus, PersonIdentifierType
+from domain.persons.identifiers import PersonIdentifierType
 from domain.publications.identifiers import hal_id_url
 
 
@@ -86,17 +86,12 @@ PROFILES: dict[Source, SourceProfile] = {
     ),
 }
 
-SOURCE_LABELS: dict[str, str] = {source: profile.label for source, profile in PROFILES.items()}
-
-# Statuts d'un identifiant de personne RH qui la font interroger par la phase `harvest_by_person`.
-SEARCHED_IDENTIFIER_STATUSES: frozenset[AttributionStatus] = frozenset(
-    {AttributionStatus.CONFIRMED, AttributionStatus.AUTHENTICATED}
-)
+_SOURCE_LABELS: dict[str, str] = {source: profile.label for source, profile in PROFILES.items()}
 
 
 def source_label(source: str) -> str:
     """Renvoie le nom lisible d'une source. Une clé inconnue est renvoyée telle quelle."""
-    return SOURCE_LABELS.get(source, source)
+    return _SOURCE_LABELS.get(source, source)
 
 
 def source_record_url(source: str, source_id: str) -> str:
@@ -124,10 +119,6 @@ def source_record_url(source: str, source_id: str) -> str:
             return f"https://doi.org/{quote(source_id, safe='/:')}"
 
 
-# Toutes les sources, dans leur ordre d'intégration.
-ALL_SOURCES: tuple[Source, ...] = tuple(Source)
-ALL_SOURCES_SET: frozenset[str] = frozenset(Source)
-
 # Préfixe d'une source dans un filtre de lecture, court parce qu'il figure dans une URL.
 SOURCE_FILTER_PREFIXES: dict[str, Source] = {
     "hal": Source.HAL,
@@ -153,12 +144,7 @@ AGGREGATOR_SOURCES: frozenset[Source] = frozenset(s for s, p in PROFILES.items()
 
 # Registre des DOI, interrogé pour vérifier qu'un DOI existe. Il figure parmi les sources des recherches infructueuses, sans fournir d'enregistrements sources.
 DOI_ORG = "doi_org"
-LOOKUP_SOURCES: tuple[str, ...] = (*ALL_SOURCES, DOI_ORG)
-
-# Couples (source, type d'identifiant) dont la source est le registre qui attribue l'identifiant. Un identifiant absent de son registre n'existe pas : l'échec de sa recherche est définitif.
-REGISTRY_LOOKUPS: frozenset[tuple[str, str]] = frozenset(
-    {(Source.HAL, "hal_id"), (Source.THESES, "nnt"), (DOI_ORG, "doi")}
-)
+LOOKUP_SOURCES: tuple[str, ...] = (*Source, DOI_ORG)
 
 
 # Ordre d'autorité des sources, pour l'agrégation des métadonnées, la position d'auteur et l'ordre des normaliseurs.
@@ -190,7 +176,7 @@ def require_known_source(source: str) -> None:
     Raises:
         ValidationError: source hors du registre. Le message nomme la source, absente de l'erreur PostgreSQL sur `source_type`.
     """
-    if source not in ALL_SOURCES_SET:
+    if source not in Source:
         raise ValidationError(
-            f"Source inconnue : {source!r}. Sources valides : {', '.join(sorted(ALL_SOURCES))}."
+            f"Source inconnue : {source!r}. Sources valides : {', '.join(sorted(Source))}."
         )

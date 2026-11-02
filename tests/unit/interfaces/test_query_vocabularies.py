@@ -40,11 +40,11 @@ LISTES_LIBRES: dict[tuple[str, str], str] = {
         "Mêmes codes pays que la liste des publications, liés à une comparaison `= ANY` : une "
         "valeur inconnue ne rend aucune ligne, au lieu d'annuler le filtre."
     ),
-    ("persons.py", "department"): (
-        "Libellés de départements issus de l'extraction du référentiel des personnels : ils "
+    ("persons.py", "category"): (
+        "Catégories de personnels issues de l'extraction du référentiel des personnels : elles "
         "vivent dans les données, pas dans le code."
     ),
-    ("persons.py", "role"): "Fonctions issues de la même extraction, pour la même raison.",
+    ("persons.py", "corps"): "Corps issus de la même extraction, pour la même raison.",
 }
 """Appels à `parse_str_csv` dans l'API, et ce qui justifie l'absence de vocabulaire fermé.
 
@@ -81,22 +81,3 @@ class TestListesLibres:
     def test_chaque_motif_dit_quelque_chose(self):
         for cle, motif in LISTES_LIBRES.items():
             assert len(motif) > 40, cle
-
-
-class TestVocabulairesFermes:
-    """Vocabulaires opposés aux paramètres par les routes, et leur origine."""
-
-    def test_les_valeurs_du_filtre_par_source_derivent_du_registre(self):
-        """Le vocabulaire se calcule depuis les préfixes : une source ajoutée au registre entre dans le filtre sans autre modification."""
-        from domain.sources.registry import SOURCE_FILTER_PREFIXES, SOURCE_FILTER_VALUES
-
-        assert SOURCE_FILTER_VALUES == {
-            f"{prefixe}_{presence}"
-            for prefixe in SOURCE_FILTER_PREFIXES
-            for presence in ("yes", "no")
-        }
-
-    def test_les_prefixes_de_source_designent_des_sources_du_registre(self):
-        from domain.sources.registry import ALL_SOURCES_SET, SOURCE_FILTER_PREFIXES
-
-        assert {s.value for s in SOURCE_FILTER_PREFIXES.values()} <= ALL_SOURCES_SET

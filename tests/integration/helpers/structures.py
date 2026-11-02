@@ -215,9 +215,11 @@ def add_source_contribution_structure(conn, source_contribution_id: int, structu
     insert_source_contribution_address(conn, source_contribution_id, address_id=addr_id)
     insert_address_structure(conn, addr_id, structure_id=structure_id)
     # La vue `source_contribution_structures` retient seulement les structures du périmètre d'extraction. Un périmètre d'extraction déjà configuré par le test est gardé.
-    set_config(conn, "perimeter_extraction", "alliance_uca", replace=False)
     code = conn.execute(
         text("SELECT value #>> '{}' FROM config WHERE key = 'perimeter_extraction'")
     ).scalar_one()
+    if code is None:
+        code = "alliance_uca"
+        set_config(conn, "perimeter_extraction", code)
     add_to_perimeter(conn, structure_id, code=code, name="test extraction perimeter")
     refresh_structure_matviews(conn)

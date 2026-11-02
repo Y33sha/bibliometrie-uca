@@ -23,7 +23,7 @@ from sqlalchemy import Connection, text
 
 from domain.config import ConfigKey
 from domain.publications.access import Copy
-from domain.publications.metadata import OaStatus
+from domain.publications.oa_status import OaStatus
 from domain.publications.open_access import is_restricted, publication_oa_status
 from infrastructure.db.scalars import scalar_int
 from infrastructure.read_models.publications.copies import publication_copies

@@ -3,13 +3,13 @@
 Chaque `*_clause(...)` renvoie un `WhereClause | None`, à assembler par `assemble_where(...)`. Les fragments emploient les paramètres nommés `:nom` de SQLAlchemy.
 """
 
-from collections.abc import Iterable
 from dataclasses import dataclass
 
 from domain.normalize import normalize_text
 from domain.persons.identifiers import AttributionStatus
 from domain.persons.person import PersonExclusion
-from domain.publications.metadata import (
+from domain.publications.hal_deposit import HalDepositStatus
+from domain.publications.oa_status import (
     ACCESS_LEVELS,
     OA_CLOSED_STATUSES,
     OA_OPEN_STATUSES,
@@ -27,21 +27,17 @@ from infrastructure.read_models.publications.models import (
     OTHER_AUTHOR_POSITION,
     OTHER_DOI_AGENCY,
 )
+from infrastructure.read_models.sql_fragments import current_hr_period, current_laboratory_label
 from infrastructure.sql_fragments import (
     has_author_role,
+    in_clause,
     is_laboratory,
     pending_name_form,
     reaches_citation_top,
 )
 
-
-def _sql_list(values: Iterable[str]) -> str:
-    """Renvoie la liste SQL littérale `('a','b',…)` de constantes du domaine. Les valeurs sont interpolées telles quelles : jamais de valeur saisie."""
-    return "(" + ",".join(f"'{v}'" for v in sorted(values)) + ")"
-
-
-OA_OPEN_SQL = _sql_list(OA_OPEN_STATUSES)
-OA_CLOSED_SQL = _sql_list(OA_CLOSED_STATUSES)
+OA_OPEN_SQL = in_clause(OA_OPEN_STATUSES)
+OA_CLOSED_SQL = in_clause(OA_CLOSED_STATUSES)
 
 # Colonnes de ventilation open access (alias `p` des publications) : une colonne par statut de `OaStatus`, nommée par sa valeur, dans l'ordre de l'enum. Partagées par les statistiques des éditeurs, revues, laboratoires et années.
 OA_BREAKDOWN_COLS_SQL = ",\n            ".join(
@@ -378,21 +374,22 @@ _SQL_IN_COLLECTION_SOURCE_CONTRIBUTION = (
 
 
 def hal_status_expression(lab_hal_col: str | None) -> WhereClause:
-    """Renvoie l'expression SQL du statut de dépôt HAL de la publication `p` (`HAL_DEPOSIT_STATUSES`), au regard de la collection du laboratoire.
+    """Renvoie l'expression SQL du statut de dépôt HAL de la publication `p` (`HalDepositStatus`), au regard de la collection du laboratoire.
 
     Sans collection déclarée, aucune publication n'est en collection : un dépôt HAL vaut `hors_collection`. Le filtre, la facette et l'export lisent tous cette expression, donc classent de la même façon.
     """
     if lab_hal_col is None:
         return WhereClause(
-            f"(CASE WHEN {_SQL_HAS_HAL_SOURCE_CONTRIBUTION} THEN 'hors_collection' ELSE 'hors_hal' END)",
+            f"(CASE WHEN {_SQL_HAS_HAL_SOURCE_CONTRIBUTION} THEN '{HalDepositStatus.OUTSIDE_COLLECTION}'"
+            f" ELSE '{HalDepositStatus.OUTSIDE_HAL}' END)",
             {},
         )
     return WhereClause(
         f"""(CASE
-            WHEN NOT {_SQL_HAS_HAL_SOURCE_CONTRIBUTION} THEN 'hors_hal'
-            WHEN NOT {_SQL_IN_COLLECTION_SOURCE_CONTRIBUTION} THEN 'hors_collection'
-            WHEN p.oa_status IS NULL OR p.oa_status::text IN {OA_CLOSED_SQL} THEN 'notice'
-            ELSE 'ok'
+            WHEN NOT {_SQL_HAS_HAL_SOURCE_CONTRIBUTION} THEN '{HalDepositStatus.OUTSIDE_HAL}'
+            WHEN NOT {_SQL_IN_COLLECTION_SOURCE_CONTRIBUTION} THEN '{HalDepositStatus.OUTSIDE_COLLECTION}'
+            WHEN p.oa_status IS NULL OR p.oa_status::text IN {OA_CLOSED_SQL} THEN '{HalDepositStatus.NOTICE}'
+            ELSE '{HalDepositStatus.OK}'
         END)""",
         {"flt_hal_collection": lab_hal_col},
     )
@@ -546,20 +543,33 @@ def person_has_pending_identifiers_clause(value: bool | None) -> WhereClause | N
     return WhereClause(f"{negate}{PERSON_HAS_PENDING_IDENTIFIERS_SQL}", {})
 
 
-def person_department_clause(departments: list[str]) -> WhereClause | None:
-    """Renvoie le filtre : la personne est affectée à l'un des départements RH donnés (alias `prh`)."""
-    if not departments:
+def person_category_clause(categories: list[str]) -> WhereClause | None:
+    """Renvoie le filtre : la personne relève de l'une des catégories de personnel données (alias `prh`)."""
+    if not categories:
+        return None
+    return WhereClause("prh.staff_category = ANY(:flt_categories)", {"flt_categories": categories})
+
+
+def person_corps_clause(corps: list[str]) -> WhereClause | None:
+    """Renvoie le filtre : la personne appartient à l'un des corps donnés (alias `prh`)."""
+    if not corps:
+        return None
+    return WhereClause("prh.corps = ANY(:flt_corps)", {"flt_corps": corps})
+
+
+def person_laboratory_clause(structure_ids: list[int]) -> WhereClause | None:
+    """Renvoie le filtre : la personne (alias `p`) a une période de présence actuelle dans l'une des structures données."""
+    if not structure_ids:
         return None
     return WhereClause(
-        "prh.department_name = ANY(:flt_departments)", {"flt_departments": departments}
+        f"""EXISTS (
+            SELECT 1 FROM hr_periods lab_hp
+            WHERE lab_hp.person_id = p.id
+              AND lab_hp.structure_id = ANY(:flt_laboratories)
+              AND {current_hr_period("lab_hp")}
+        )""",
+        {"flt_laboratories": structure_ids},
     )
-
-
-def person_role_clause(roles: list[str]) -> WhereClause | None:
-    """Renvoie le filtre : la personne a l'un des intitulés de poste donnés (alias `prh`)."""
-    if not roles:
-        return None
-    return WhereClause("prh.role_title = ANY(:flt_roles)", {"flt_roles": roles})
 
 
 def person_has_rh_clause(value: bool | None) -> WhereClause | None:
@@ -591,17 +601,20 @@ def person_exclusion_clause(exclusions: list[PersonExclusion | None]) -> WhereCl
 
 
 def person_in_lab_clause(lab_id: int | None) -> WhereClause | None:
-    """Renvoie le filtre : la personne (alias `p`) a une contribution d'auteur rattachée au laboratoire. Restreint l'annuaire et ses facettes à un laboratoire, comme `lab_clause` pour les publications."""
+    """Renvoie le filtre : la personne (alias `p`) a une période de présence dans le laboratoire, ou une contribution d'auteur rattachée au laboratoire. Restreint l'annuaire et ses facettes à un laboratoire, comme `lab_clause` pour les publications."""
     if not lab_id:
         return None
     return WhereClause(
-        f"""EXISTS (
+        f"""(EXISTS (
+            SELECT 1 FROM hr_periods in_lab_hp
+            WHERE in_lab_hp.person_id = p.id AND in_lab_hp.structure_id = :flt_person_lab_id
+        ) OR EXISTS (
             SELECT 1 FROM contributions a
             JOIN contribution_structures aus ON aus.contribution_id = a.id
             WHERE a.person_id = p.id
               AND aus.structure_id = :flt_person_lab_id
               AND {has_author_role("a")}
-        )""",
+        ))""",
         {"flt_person_lab_id": lab_id},
     )
 
@@ -613,10 +626,10 @@ _PERSONS_SORT_MAP = {
     "contributions_desc": "contribution_count DESC, LOWER(p.last_name) ASC",
     "in_perimeter_contributions_asc": "in_perimeter_contribution_count ASC, LOWER(p.last_name) ASC",
     "in_perimeter_contributions_desc": "in_perimeter_contribution_count DESC, LOWER(p.last_name) ASC",
-    "dept_asc": "prh.department_name ASC NULLS LAST, LOWER(p.last_name) ASC",
-    "dept_desc": "prh.department_name DESC NULLS LAST, LOWER(p.last_name) ASC",
-    "role_asc": "prh.role_title ASC NULLS LAST, LOWER(p.last_name) ASC",
-    "role_desc": "prh.role_title DESC NULLS LAST, LOWER(p.last_name) ASC",
+    "lab_asc": f"{current_laboratory_label()} ASC NULLS LAST, LOWER(p.last_name) ASC",
+    "lab_desc": f"{current_laboratory_label()} DESC NULLS LAST, LOWER(p.last_name) ASC",
+    "corps_asc": "prh.corps ASC NULLS LAST, LOWER(p.last_name) ASC",
+    "corps_desc": "prh.corps DESC NULLS LAST, LOWER(p.last_name) ASC",
 }
 
 

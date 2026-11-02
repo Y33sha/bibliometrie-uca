@@ -14,7 +14,7 @@ from domain.persons.contributor_name import ContributorName
 from domain.publications.contribution_roles import ContributionRole
 from domain.publications.dates import PublicationDate
 from domain.publications.identifiers import clean_doi
-from domain.publications.licenses import crossref_license
+from domain.publications.licenses import License, normalize_license
 from domain.serials.containers import ContainerDescription, ContainerRole, container_role
 from domain.serials.series import split_collection_and_volume
 from domain.source_records.biblio import PageRange, compact_biblio, parse_pages
@@ -108,6 +108,17 @@ def get_abstract(msg: Mapping[str, JsonValue]) -> str | None:
 def get_cited_by_count(msg: Mapping[str, JsonValue]) -> int | None:
     val = msg.get("is-referenced-by-count")
     return val if isinstance(val, int) else None
+
+
+def crossref_license(entries: JsonValue) -> License | None:
+    """Renvoie la licence de la version éditeur (`license`) : entrée `vor`, à défaut `unspecified`."""
+    for version in ("vor", "unspecified"):
+        for entry in as_sequence(entries):
+            item = as_mapping(entry)
+            if as_str(item.get("content-version")) == version:
+                if found := normalize_license(as_str(item.get("URL"))):
+                    return found
+    return None
 
 
 def get_language(msg: Mapping[str, JsonValue]) -> str | None:

@@ -13,6 +13,7 @@
   import Pagination from "#lib/components/Pagination.svelte";
 
   import type { components } from "#lib/api/schema.js";
+  import { formatCount } from "#lib/plural.js";
   type PersonRow = components["schemas"]["HalDuplicateAccountPerson"];
 
   const list = usePaginatedFetch<PersonRow>({
@@ -67,7 +68,7 @@
                   {ha.hal_person_id}
                 </a>
                 <span class="hal-name">{ha.full_name}</span>
-                <span class="hal-publications">{ha.publication_count} publication{ha.publication_count > 1 ? "s" : ""}</span>
+                <span class="hal-publications">{formatCount(ha.publication_count, "publication")}</span>
                 {#if ha.idhal}
                   <span class="hal-secondary-id">idHAL: {ha.idhal}</span>
                 {/if}

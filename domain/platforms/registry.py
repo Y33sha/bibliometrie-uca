@@ -30,6 +30,8 @@ class KnownPlatform:
     """La plateforme donne librement accès à tout son contenu, d'après sa propre déclaration."""
     deposit_doc_types: frozenset[str] | None = frozenset()
     """Types de document dont le DOI de la plateforme est un DOI de dépôt (`is_deposit_doi`). `None` pour tous les types, absent compris."""
+    icon: str | None = None
+    """Fichier de l'icône de la plateforme dans l'interface (`static/icons/`). Les copies d'une plateforme à icône sont mises en avant parmi les accès d'une publication (`domain.publications.access`)."""
 
 
 def _preprint_server(
@@ -40,6 +42,7 @@ def _preprint_server(
     doi_suffix: re.Pattern[str] | None = None,
     *,
     fully_open: bool = False,
+    icon: str | None = None,
 ) -> KnownPlatform:
     return KnownPlatform(
         name,
@@ -50,14 +53,20 @@ def _preprint_server(
         doi_suffix,
         fully_open,
         deposit_doc_types=None,
+        icon=icon,
     )
 
 
 def _publisher_platform(
-    name: str, prefixes: set[str], openalex_ids: tuple[str, ...] = (), hosts: tuple[str, ...] = ()
+    name: str,
+    prefixes: set[str],
+    openalex_ids: tuple[str, ...] = (),
+    hosts: tuple[str, ...] = (),
+    *,
+    icon: str | None = None,
 ) -> KnownPlatform:
     return KnownPlatform(
-        name, PlatformType.PUBLISHER_PLATFORM, frozenset(prefixes), openalex_ids, hosts
+        name, PlatformType.PUBLISHER_PLATFORM, frozenset(prefixes), openalex_ids, hosts, icon=icon
     )
 
 
@@ -69,6 +78,7 @@ def _repository(
     *,
     fully_open: bool = False,
     deposit_doc_types: frozenset[str] | None = frozenset(),
+    icon: str | None = None,
 ) -> KnownPlatform:
     return KnownPlatform(
         name,
@@ -78,6 +88,7 @@ def _repository(
         hosts,
         fully_open=fully_open,
         deposit_doc_types=deposit_doc_types,
+        icon=icon,
     )
 
 
@@ -102,7 +113,9 @@ _TEXT_DOC_TYPES = frozenset(
 
 
 HAL = _repository(
-    "HAL", ("S4306402512", "S4406922276", "S4406922393", "S4406922470", "S4377196329")
+    "HAL",
+    ("S4306402512", "S4406922276", "S4406922393", "S4406922470", "S4377196329"),
+    icon="hal.ico",
 )
 """L'archive ouverte HAL. OpenAlex range aussi des copies de HAL sous des sources de portails. Ses hôtes sont les portails HAL (`is_hal_host`)."""
 
@@ -111,16 +124,27 @@ PUBMED_CENTRAL = _repository(
     ("S2764455111", "S4306400806"),
     ("ncbi.nlm.nih.gov/pmc", "pmc.ncbi.nlm.nih.gov", "europepmc.org"),
     fully_open=True,
+    icon="ncbi.png",
 )
 """L'archive de PubMed Central, que désigne aussi l'identifiant PMCID d'un document. La source OpenAlex de son miroir Europe PMC donne surtout des adresses de PubMed Central."""
 
 ZENODO = _repository(
-    "Zenodo", ("S4306400562",), ("zenodo.org",), {"10.5281"}, deposit_doc_types=_TEXT_DOC_TYPES
+    "Zenodo",
+    ("S4306400562",),
+    ("zenodo.org",),
+    {"10.5281"},
+    deposit_doc_types=_TEXT_DOC_TYPES,
+    icon="zenodo.png",
 )
 """L'archive ouverte Zenodo, du CERN."""
 
 ARXIV = _preprint_server(
-    "arXiv", {"10.48550"}, ("S4306400194", "S4393918464"), ("arxiv.org",), fully_open=True
+    "arXiv",
+    {"10.48550"},
+    ("S4306400194", "S4393918464"),
+    ("arxiv.org",),
+    fully_open=True,
+    icon="arxiv.png",
 )
 """Le serveur de preprints arXiv, que désigne aussi l'identifiant arXiv d'un document."""
 
@@ -128,8 +152,8 @@ KNOWN_PLATFORMS: tuple[KnownPlatform, ...] = (
     HAL,
     PUBMED_CENTRAL,
     ZENODO,
-    _repository("Figshare", ("S4377196282",), ("figshare.com",)),
-    _repository("CERN Document Server", ("S4306402195",), ("cds.cern.ch",)),
+    _repository("Figshare", ("S4377196282",), ("figshare.com",), icon="figshare.png"),
+    _repository("CERN Document Server", ("S4306402195",), ("cds.cern.ch",), icon="cds.ico"),
     _repository("theses.fr", ("S4406923047",), ("theses.fr",)),
     _copy_archive(
         "DESY Publication Database",
@@ -214,6 +238,7 @@ KNOWN_PLATFORMS: tuple[KnownPlatform, ...] = (
         {"10.4000"},
         ("S4306402281", "S4306401026"),
         ("openedition.org", "calenda.org", "hypotheses.org"),
+        icon="openedition.png",
     ),
     _publisher_platform("Érudit", {"10.7202"}, hosts=("erudit.org",)),
     _publisher_platform("Persée", {"10.3406"}, hosts=("persee.fr",)),
@@ -380,6 +405,6 @@ def preprint_servers_of_prefix(prefix: str) -> tuple[KnownPlatform, ...]:
     """Renvoie les serveurs de preprints dont `prefix` est un préfixe DOI, dans l'ordre de la liste."""
     return tuple(
         p
-        for p in KNOWN_PLATFORMS
-        if p.platform_type is PlatformType.PREPRINT_SERVER and prefix in p.doi_prefixes
+        for p in _PLATFORMS_OF_PREFIX.get(prefix, ())
+        if p.platform_type is PlatformType.PREPRINT_SERVER
     )

@@ -15,12 +15,12 @@ import os
 
 from sqlalchemy import Connection, bindparam, text
 
+from domain.normalize import clean_abstract
 from domain.publications.metadata import clean_publication_title, normalized_title
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.db.queues import Queue, enqueue
 from infrastructure.observability.log import setup_logger
-from pipeline.ingestion.common.source_records import stored_abstract
 
 log = setup_logger("clean_source_record_texts", os.path.dirname(__file__))
 
@@ -51,7 +51,7 @@ def _changed_abstracts(conn: Connection) -> list[dict[str, object]]:
     return [
         {"id": row.id, "before": row.abstract, "after": cleaned}
         for row in rows
-        if (cleaned := stored_abstract(row.abstract)) != row.abstract
+        if (cleaned := clean_abstract(row.abstract)) != row.abstract
     ]
 
 

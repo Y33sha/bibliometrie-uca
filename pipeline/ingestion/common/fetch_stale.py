@@ -19,7 +19,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from domain.config import ConfigKey
-from domain.sources.registry import ALL_SOURCES, Source, source_label
+from domain.sources.registry import Source, source_label
 from pipeline.ingestion.adapters import ADAPTERS
 from pipeline.ingestion.common.stale_refetch import refresh
 from pipeline.runtime.config import delay, window_years
@@ -47,7 +47,7 @@ class FetchStalePhase:
         if not options.policy.fetch_stale:
             logger.info("%sSautée en mode %s", LAST_BRANCH, options.mode)
             return metrics
-        targets = set(select_targets(ALL_SOURCES, options.sources, include_wos=options.include_wos))
+        targets = set(select_targets(Source, options.sources, include_wos=options.include_wos))
 
         years = self.get_years_for_window(ctx, options.start_year, options.year)
 
@@ -66,13 +66,13 @@ class FetchStalePhase:
                     progress_bar=True,
                     when=selected(source),
                 )
-                for source in ALL_SOURCES
+                for source in Source
             },
             ctx,
         )
 
         by_source: dict[str, dict[str, float | None]] = {}
-        for source in ALL_SOURCES:
+        for source in Source:
             source_metrics = by_task[f"fetch_stale.{source}"]
             metrics.merge(source_metrics)
             if source not in targets or skipped(source_metrics):

@@ -20,11 +20,9 @@ from domain.persons.creation import allow_person_creation
 from domain.persons.identifiers import PersonIdentifierType
 from domain.persons.matching import (
     IdentifiedPerson,
-    MatchReason,
     Namesake,
     compatible_persons,
     decide_match_by_identifier,
-    decide_name_form_outcome,
     trusted_identifier,
 )
 from domain.persons.name_forms import compute_person_name_forms, contributor_name_forms
@@ -166,6 +164,39 @@ def _single(candidates: set[int]) -> int | None:
     return next(iter(candidates)) if len(candidates) == 1 else None
 
 
+def name_form_decision(
+    person_ids: list[int] | None,
+    rejected_person_ids: frozenset[int] = frozenset(),
+    compatible_person_ids: Sequence[int] = (),
+) -> ContributionDecision | None:
+    """Décide par le nom d'une contribution source. `None` sans aucun candidat.
+
+    - Un candidat → `match`, motif `name`, ou `compatible_name` pour des initiales compatibles.
+    - Plusieurs candidats → `skip`, `ambiguous_name_form`.
+    - Candidats tous rejetés → `skip`, `all_candidates_rejected`.
+
+    Args:
+        person_ids: personnes de la forme de nom exacte, `None` si la forme est inconnue.
+        rejected_person_ids: personnes rejetées pour la publication, écartées des candidats.
+        compatible_person_ids: personnes désignées par les initiales, candidates seulement si la forme est inconnue.
+    """
+    reason = ContributionMatchReason.NAME
+    if person_ids is None:
+        if not compatible_person_ids:
+            return None
+        person_ids, reason = list(compatible_person_ids), ContributionMatchReason.COMPATIBLE_NAME
+    candidates = [pid for pid in person_ids if pid not in rejected_person_ids]
+    if len(candidates) == 1:
+        return ContributionDecision(ContributionOutcome.MATCH, candidates[0], reason)
+    if not candidates:
+        return ContributionDecision(
+            ContributionOutcome.SKIP, reason=ContributionSkipReason.ALL_CANDIDATES_REJECTED
+        )
+    return ContributionDecision(
+        ContributionOutcome.SKIP, reason=ContributionSkipReason.AMBIGUOUS_NAME_FORM
+    )
+
+
 def decide_contribution(
     members: Sequence[AlignedSourceContribution],
     index: PersonIndex,
@@ -244,26 +275,19 @@ def _decide_by_name(
             (list(index.name_forms[f]) for f in m.name_forms if f in index.name_forms), None
         )
         compatible = compatible_persons(m.name, index.namesakes) if person_ids is None else []
-        outcome = decide_name_form_outcome(
-            person_ids,
-            allow_create,
-            rejected_person_ids=rejected_person_ids,
-            compatible_person_ids=compatible,
-        )
-        if outcome.action == "match":
-            assert outcome.person_id is not None
-            reason = (
-                ContributionMatchReason.COMPATIBLE_NAME
-                if outcome.reason == MatchReason.COMPATIBLE_NAME
-                else ContributionMatchReason.NAME
-            )
+        decision = name_form_decision(person_ids, rejected_person_ids, compatible)
+        if decision is None:
+            continue
+        if decision.outcome is ContributionOutcome.MATCH:
+            assert decision.person_id is not None
+            assert isinstance(decision.reason, ContributionMatchReason)
             # Une forme exacte prime sur des initiales compatibles pour la même personne.
-            if matched.get(outcome.person_id) != ContributionMatchReason.NAME:
-                matched[outcome.person_id] = reason
-            evidence.append((reason, m.source, outcome.person_id))
-        elif outcome.reason == MatchReason.AMBIGUOUS_NAME_FORM:
+            if matched.get(decision.person_id) != ContributionMatchReason.NAME:
+                matched[decision.person_id] = decision.reason
+            evidence.append((decision.reason, m.source, decision.person_id))
+        elif decision.reason is ContributionSkipReason.AMBIGUOUS_NAME_FORM:
             undecidable = ContributionSkipReason.AMBIGUOUS_NAME_FORM
-        elif outcome.reason == MatchReason.ALL_CANDIDATES_REJECTED and undecidable is None:
+        elif undecidable is None:
             undecidable = ContributionSkipReason.ALL_CANDIDATES_REJECTED
     if matched:
         if (person_id := _single(set(matched))) is not None:
@@ -334,7 +358,7 @@ def settle_publication(
 
 
 # Préséance des sources pour le nom d'une personne créée. HAL vient après les autres agrégateurs : un compte HAL attribué à tort donne le nom d'une autre personne. WoS ferme la marche, pour ses erreurs de reconnaissance de caractères.
-NAME_SOURCE_PRIORITY: tuple[Source, ...] = (
+_NAME_SOURCE_PRIORITY: tuple[Source, ...] = (
     Source.THESES,
     Source.CROSSREF,
     Source.DATACITE,
@@ -343,11 +367,11 @@ NAME_SOURCE_PRIORITY: tuple[Source, ...] = (
     Source.HAL,
     Source.WOS,
 )
-_NAME_SOURCE_RANK = {source.value: rank for rank, source in enumerate(NAME_SOURCE_PRIORITY)}
+_NAME_SOURCE_RANK = {source.value: rank for rank, source in enumerate(_NAME_SOURCE_PRIORITY)}
 
 
 def founding_name(members: Sequence[AlignedSourceContribution]) -> tuple[str, str]:
-    """Renvoie le nom de famille et le prénom d'une personne créée depuis une contribution. Ils viennent de préférence d'une source qui sépare nom et prénom, puis d'un prénom complet, puis de la source la mieux placée dans `NAME_SOURCE_PRIORITY`."""
+    """Renvoie le nom de famille et le prénom d'une personne créée depuis une contribution. Ils viennent de préférence d'une source qui sépare nom et prénom, puis d'un prénom complet, puis de la source la mieux placée dans `_NAME_SOURCE_PRIORITY`."""
 
     def rank(member: AlignedSourceContribution) -> tuple[bool, bool, int, tuple[str, str]]:
         last_name, first_name = member.name.split()
@@ -355,7 +379,7 @@ def founding_name(members: Sequence[AlignedSourceContribution]) -> tuple[str, st
         return (
             not member.name.split_by_source,
             reduced,
-            _NAME_SOURCE_RANK.get(member.source, len(NAME_SOURCE_PRIORITY)),
+            _NAME_SOURCE_RANK.get(member.source, len(_NAME_SOURCE_PRIORITY)),
             (last_name, first_name),
         )
 

@@ -132,7 +132,7 @@ def create_structure(
     structures: StructureService = Depends(structure_service),
 ) -> StructureOut:
     """Crée une structure. Renvoie 409 si le `code` ou le `ror_id` est déjà utilisé."""
-    return StructureOut.from_structure(structures.create_structure(data))
+    return StructureOut.model_validate(structures.create_structure(data))
 
 
 # ── Tutelles entre structures ────────────────────────────────────
@@ -293,7 +293,7 @@ def update_structure(
 
     Seuls les champs présents dans le corps de la requête sont écrits ; `null` efface un champ facultatif. Renvoie 404 sur une structure inconnue.
     """
-    return StructureOut.from_structure(structures.update_structure(structure_id, data))
+    return StructureOut.model_validate(structures.update_structure(structure_id, data))
 
 
 @router.delete("/{structure_id}", response_model=DeletedResponse)

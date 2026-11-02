@@ -1,5 +1,5 @@
-# STATUS: maintenance
-"""Importe les ORCID authentifiés par les chercheurs (fichier `data/authenticated_orcids.csv`).
+# STATUS: recurring (imports)
+"""Importe les ORCID authentifiés par les chercheurs.
 
 Le fichier, sans en-tête, a une ligne `email,orcid` par chercheur : les ORCID authentifiés par leur titulaire en se connectant à son compte ORCID. Chaque ligne est rattachée à la personne par son email (`hr_records.email`, sans égard à la casse) et reçoit le statut `authenticated`.
 
@@ -8,7 +8,7 @@ Cet import est le seul contexte autorisé à écrire ce statut : un trigger Post
 Réappliqué sur un fichier inchangé, l'import n'écrit rien.
 
 Usage :
-    uv run python -m interfaces.cli.maintenance.import_authenticated_orcids [--file CHEMIN] [--dry-run]
+    uv run python -m interfaces.cli.imports.import_authenticated_orcids data/imports/authenticated_orcids/export.csv [--dry-run]
 """
 
 from __future__ import annotations
@@ -23,15 +23,12 @@ from pathlib import Path
 
 from sqlalchemy import Connection, text
 
-from domain.normalize import sanitize_optional_text
+from domain.normalize import optional_plain_text
 from domain.persons.identifiers import IdentifierOrigin, normalize_orcid
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 
 log = setup_logger("import_authenticated_orcids", os.path.dirname(__file__))
-
-# `parents[3]` remonte interfaces/cli/maintenance/ → racine du dépôt ; le fichier est sous data/.
-_DEFAULT_FILE = Path(__file__).resolve().parents[3] / "data" / "authenticated_orcids.csv"
 
 
 def _load_rows(path: str | Path) -> list[tuple[str, str]]:
@@ -42,10 +39,10 @@ def _load_rows(path: str | Path) -> list[tuple[str, str]]:
             if len(record) < 2:
                 continue
             # Mise à plat des deux cellules : un fichier composé dans un tableur y glisse des espaces insécables et des caractères invisibles.
-            email = sanitize_optional_text(record[0])
+            email = optional_plain_text(record[0])
             if not email:
                 continue
-            rows.append((email, sanitize_optional_text(record[1]) or ""))
+            rows.append((email, optional_plain_text(record[1]) or ""))
     return rows
 
 
@@ -186,9 +183,7 @@ def authenticate_orcids(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--file", default=_DEFAULT_FILE, help=f"Chemin du CSV (défaut {_DEFAULT_FILE})."
-    )
+    parser.add_argument("file", type=Path, help="CSV `email,orcid`, sans en-tête")
     parser.add_argument(
         "--dry-run", action="store_true", help="N'écrit rien : affiche le plan et sort."
     )

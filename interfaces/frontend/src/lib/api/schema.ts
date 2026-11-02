@@ -1477,7 +1477,7 @@ export interface paths {
          *
          *     La décision (insertion, idempotence, réattribution, conflit) appartient à `add_identifier`, avec l'origine manuelle par défaut (`IdentifierOrigin.MANUAL`). Le service refuse alors les types non attribuables à la main, et vérifie l'existence de la personne.
          *
-         *     Renvoie 404 sur une personne absente (`NotFoundError`), 409 sur un conflit (`IdentifierAttributionConflictError`), 422 sur un type ou une valeur refusés (`ValidationError`).
+         *     Renvoie 404 sur une personne absente (`NotFoundError`), 409 sur un identifiant détenu par une autre personne, 422 sur un type ou une valeur refusés (`ValidationError`).
          */
         post: operations["add_person_identifier_api_persons__person_id__identifiers_post"];
         delete?: never;
@@ -1689,7 +1689,7 @@ export interface paths {
          *
          *     Renvoie 422 sans `person_id` ni `create_person`, et sans nom de famille à la création (`assign_orphan_contribution_to_new_person`). Renvoie 404 sur une personne ou une contribution introuvable.
          *
-         *     Renvoie 409 sur une paire déjà rejetée (`RejectedPairError`), sauf si `force` retire le rejet au passage. Renvoie aussi 409 sur une contribution déjà rattachée à une personne (`ContributionAlreadyAssignedError`), et quand la personne a déjà une contribution manuelle dans la publication (`PersonAlreadyInPublicationError`).
+         *     Renvoie 409 sur une paire déjà rejetée (`RejectedPairError`), sauf si `force` retire le rejet au passage. Renvoie aussi 409 sur une contribution déjà rattachée à une personne, et quand la personne a déjà une contribution manuelle dans la publication.
          */
         post: operations["assign_orphan_contribution_api_contributions_orphans_assign_post"];
         delete?: never;
@@ -2916,10 +2916,10 @@ export interface components {
             /** Url */
             url: string;
             /**
-             * Known
-             * @description La copie est hébergée par une plateforme du registre.
+             * Icon
+             * @description Fichier de l'icône de la plateforme (`static/icons/`). Seules les copies à icône figurent parmi les autres accès.
              */
-            known: boolean;
+            icon: string | null;
         };
         /** AddIdentifier */
         AddIdentifier: {
@@ -3171,7 +3171,7 @@ export interface components {
          * AttributionStatus
          * @description Statut d'une attribution d'identifiant. Reflet du type PostgreSQL `identifier_status`.
          *
-         *     L'administration pose librement `PENDING`, `CONFIRMED` ou `REJECTED`. Le pipeline change le statut par les méthodes de `IdentifierAttribution`.
+         *     L'administration pose librement `PENDING`, `CONFIRMED` ou `REJECTED`.
          *
          *     `AUTHENTICATED` atteste que le chercheur a authentifié son ORCID en se connectant à son compte. Seul un ORCID a ce statut. Un trigger PostgreSQL le rend définitif, et le réserve à l'import des ORCID authentifiés.
          * @enum {string}
@@ -3331,6 +3331,21 @@ export interface components {
             value: unknown;
             /** Description */
             description: string | null;
+            /**
+             * Minimum
+             * @description Borne inférieure incluse d'une clé entière.
+             */
+            minimum?: number | null;
+            /**
+             * Maximum
+             * @description Borne supérieure incluse d'une clé entière.
+             */
+            maximum?: number | null;
+            /**
+             * Value If Null
+             * @description Valeur appliquée quand `value` est nulle : première année moissonnée sans année fixée.
+             */
+            value_if_null?: number | null;
         };
         /**
          * ConfigValueUpdate
@@ -3748,6 +3763,21 @@ export interface components {
             /** Publication Count */
             publication_count: number;
         };
+        /**
+         * HalAffiliationConflictAuthor
+         * @description Auteur d'une contribution en conflit : nom donné par HAL, personne rattachée, structures du périmètre attribuées par HAL.
+         */
+        HalAffiliationConflictAuthor: {
+            /** Person Id */
+            person_id: number | null;
+            /** Name */
+            name: string;
+            /**
+             * Structures
+             * @description L'affichage choisit entre acronyme et nom.
+             */
+            structures: components["schemas"]["StructureRef"][];
+        };
         /** HalAffiliationConflictPublication */
         HalAffiliationConflictPublication: {
             /** Id */
@@ -3761,10 +3791,10 @@ export interface components {
             /** Doi */
             doi: string | null;
             /**
-             * Laboratories
-             * @description Laboratoires du périmètre de la publication ; l'affichage choisit entre acronyme et nom.
+             * Authors
+             * @description Auteurs des contributions en conflit, dans l'ordre des auteurs de la publication.
              */
-            laboratories: components["schemas"]["StructureRef"][];
+            authors: components["schemas"]["HalAffiliationConflictAuthor"][];
             /**
              * Hal Links
              * @description Dépôts HAL de la publication, avec leur lien.
@@ -4409,8 +4439,11 @@ export interface components {
             first_name: string;
             /** Last Name */
             last_name: string;
-            /** Department Name */
-            department_name: string | null;
+            /**
+             * Current Unit
+             * @description Unité actuelle, pour départager des homonymes (`current_unit`).
+             */
+            current_unit: string | null;
             /** Has Rh */
             has_rh: boolean;
         };
@@ -4629,6 +4662,21 @@ export interface components {
          * @enum {string}
          */
         PersonIdentifierType: "orcid" | "idhal" | "idref" | "hal_person_id";
+        /**
+         * PersonLaboratoryOut
+         * @description Laboratoire d'une personne, d'après ses périodes de présence.
+         */
+        PersonLaboratoryOut: {
+            /** Id */
+            id: number;
+            /** Label */
+            label: string;
+            /**
+             * Current
+             * @description Faux pour le laboratoire de la dernière période d'une personne partie.
+             */
+            current: boolean;
+        };
         /** PersonListResponse */
         PersonListResponse: {
             /** Total */
@@ -4653,14 +4701,15 @@ export interface components {
             last_name: string;
             /** First Name */
             first_name: string;
-            /** Role Title */
-            role_title: string | null;
-            /** Department Name */
-            department_name: string | null;
-            /** Start Date */
-            start_date: string | null;
-            /** End Date */
-            end_date: string | null;
+            /** Corps */
+            corps: string | null;
+            /** Staff Category */
+            staff_category: string | null;
+            /**
+             * Laboratories
+             * @description Laboratoires actuels, à défaut celui de la dernière période (`laboratories_of`).
+             */
+            laboratories: components["schemas"]["PersonLaboratoryOut"][];
             /** Has Rh */
             has_rh: boolean;
             exclusion: components["schemas"]["PersonExclusion"] | null;
@@ -4678,6 +4727,27 @@ export interface components {
             identifiers: components["schemas"]["PersonIdentifierOut"][];
         };
         /**
+         * PersonPeriodOut
+         * @description Période de présence dans une unité.
+         */
+        PersonPeriodOut: {
+            /** Unit Label */
+            unit_label: string;
+            /**
+             * Structure Id
+             * @description Structure reconnue de l'unité.
+             */
+            structure_id: number | null;
+            /** Structure Label */
+            structure_label: string | null;
+            /** Start Date */
+            start_date: string | null;
+            /** End Date */
+            end_date: string | null;
+            /** Current */
+            current: boolean;
+        };
+        /**
          * PersonProfileCore
          * @description Bloc `person` de `/api/persons/{id}`.
          */
@@ -4688,14 +4758,12 @@ export interface components {
             last_name: string;
             /** First Name */
             first_name: string;
-            /** Role Title */
-            role_title: string | null;
-            /** Department Name */
-            department_name: string | null;
-            /** Start Date */
-            start_date: string | null;
-            /** End Date */
-            end_date: string | null;
+            /** Corps */
+            corps: string | null;
+            /** Staff Category */
+            staff_category: string | null;
+            /** Periods */
+            periods: components["schemas"]["PersonPeriodOut"][];
         };
         /** PersonProfileResponse */
         PersonProfileResponse: {
@@ -4716,8 +4784,11 @@ export interface components {
             last_name: string;
             /** First Name */
             first_name: string;
-            /** Department Name */
-            department_name: string | null;
+            /**
+             * Current Unit
+             * @description Unité actuelle, pour départager des homonymes (`current_unit`).
+             */
+            current_unit: string | null;
             /** Has Rh */
             has_rh: boolean;
         };
@@ -4763,10 +4834,12 @@ export interface components {
          * @description Réponse de `/api/persons/facets`.
          */
         PersonsFacetsResponse: {
-            /** Departments */
-            departments: components["schemas"]["FacetOption"][];
-            /** Roles */
-            roles: components["schemas"]["FacetOption"][];
+            /** Categories */
+            categories: components["schemas"]["FacetOption"][];
+            /** Laboratories */
+            laboratories: components["schemas"]["FacetOption"][];
+            /** Corps */
+            corps: components["schemas"]["FacetOption"][];
             orcid: components["schemas"]["YesNoCount"];
             idhal: components["schemas"]["YesNoCount"];
             idref: components["schemas"]["YesNoCount"];
@@ -5120,7 +5193,7 @@ export interface components {
             contribution_id: number | null;
             /**
              * Hal Status
-             * @description Statut de dépôt HAL (`HAL_DEPOSIT_STATUSES`) au regard de la collection du laboratoire, pour une liste restreinte à un seul laboratoire ; `None` sinon.
+             * @description Statut de dépôt HAL (`HalDepositStatus`) au regard de la collection du laboratoire, pour une liste restreinte à un seul laboratoire ; `None` sinon.
              */
             hal_status: string | null;
             /**
@@ -8336,10 +8409,11 @@ export interface operations {
             query?: {
                 page?: number;
                 per_page?: number;
-                sort?: "name_asc" | "name_desc" | "contributions_asc" | "contributions_desc" | "in_perimeter_contributions_asc" | "in_perimeter_contributions_desc" | "dept_asc" | "dept_desc" | "role_asc" | "role_desc";
+                sort?: "name_asc" | "name_desc" | "contributions_asc" | "contributions_desc" | "in_perimeter_contributions_asc" | "in_perimeter_contributions_desc" | "lab_asc" | "lab_desc" | "corps_asc" | "corps_desc";
                 search?: string;
-                department?: string;
-                role?: string;
+                category?: string;
+                laboratory?: string;
+                corps?: string;
                 has_orcid?: boolean | null;
                 has_idhal?: boolean | null;
                 has_idref?: boolean | null;
@@ -8379,10 +8453,11 @@ export interface operations {
     export_persons_csv_api_persons_export_csv_get: {
         parameters: {
             query?: {
-                sort?: "name_asc" | "name_desc" | "contributions_asc" | "contributions_desc" | "in_perimeter_contributions_asc" | "in_perimeter_contributions_desc" | "dept_asc" | "dept_desc" | "role_asc" | "role_desc";
+                sort?: "name_asc" | "name_desc" | "contributions_asc" | "contributions_desc" | "in_perimeter_contributions_asc" | "in_perimeter_contributions_desc" | "lab_asc" | "lab_desc" | "corps_asc" | "corps_desc";
                 search?: string;
-                department?: string;
-                role?: string;
+                category?: string;
+                laboratory?: string;
+                corps?: string;
                 has_orcid?: boolean | null;
                 has_idhal?: boolean | null;
                 has_idref?: boolean | null;
@@ -8423,8 +8498,9 @@ export interface operations {
         parameters: {
             query?: {
                 search?: string;
-                department?: string;
-                role?: string;
+                category?: string;
+                laboratory?: string;
+                corps?: string;
                 has_orcid?: boolean | null;
                 has_idhal?: boolean | null;
                 has_idref?: boolean | null;

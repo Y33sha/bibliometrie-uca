@@ -1,6 +1,6 @@
 """Repository PostgreSQL de l'entité Serial, pour l'édition dans l'administration.
 
-L'entité Publisher est dans `publisher_repository.py`. La fusion de deux revues relève du pipeline (`pipeline/transformation/publishing/serials/serial_merge.py`). Les erreurs sont celles du domaine ; l'orchestration est dans `application/services/serials/`.
+La fusion de deux revues relève du pipeline (`pipeline/transformation/publishing/serials/serial_merge.py`). Les erreurs sont celles du domaine ; l'orchestration est dans `application/services/serials/`.
 """
 
 from typing import NamedTuple, cast

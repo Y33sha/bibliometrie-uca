@@ -9,10 +9,10 @@ from domain.normalize import to_plain_text
 from domain.persons.identifiers import AttributionStatus, PersonIdentifierType
 from domain.source_records.keys import DISCRIMINANT_TITLE_MIN_LENGTH
 from infrastructure.db.source_record_identifiers import source_record_doi_sql
-from infrastructure.read_models._common import StructureRef
 from infrastructure.read_models.csv_export import MAX_EXPORT_ROWS, csv_chunks
 from infrastructure.read_models.hal_problems.models import (
     HalAccountSummary,
+    HalAffiliationConflictAuthor,
     HalAffiliationConflictPublication,
     HalAffiliationConflictsResponse,
     HalCollectionLab,
@@ -30,13 +30,15 @@ from infrastructure.read_models.hal_problems.models import (
 )
 from infrastructure.read_models.perimeters.queries import get_persons_structure_ids_list
 from infrastructure.read_models.sql_fragments import contributor_display_name
-from infrastructure.sql_fragments import usable_identifier
+from infrastructure.sql_fragments import identifier_neutralized, usable_identifier
 
 # Identifiants d'une contribution source `sc`, hors identifiants neutralisés.
-_HAL_PERSON_ID = usable_identifier("'hal_person_id'")
 _ORCID = usable_identifier("'orcid'")
 _IDHAL = usable_identifier("'idhal'")
 _IDREF = usable_identifier("'idref'")
+
+# Condition vraie quand la contribution source `sc` neutralise sa référence de compte HAL.
+_HAL_PERSON_ID_NEUTRALIZED = identifier_neutralized("'hal_person_id'")
 
 # Condition sur une attribution d'identifiant `pi` : compte HAL attribué à la personne `pi.person_id`, hors attributions rejetées.
 _HAL_ACCOUNT_ATTRIBUTION = (
@@ -125,6 +127,7 @@ class HalProblemsQueries:
         total = total_row.total
 
         # Détail de chaque compte HAL attribué : contributions sources HAL des contributions de la personne contenant sa référence. Un compte absent de ces contributions a un nom vide et zéro publication.
+        # La lecture part du compte, par l'index partiel `contributor_information_hal_person_id_idx` : seules les contributions sources du compte sont lues.
         rows = self._conn.execute(
             text(f"""
                 WITH page_persons AS MATERIALIZED (
@@ -145,13 +148,15 @@ class HalProblemsQueries:
                             MIN({_IDHAL}) AS idhal,
                             MIN({_IDREF}) AS idref,
                             COUNT(*) AS publication_count
-                        FROM contributions g
-                        JOIN aligned_source_contributions m ON m.contribution_id = g.id
-                        JOIN source_contributions sc ON sc.id = m.source_contribution_id
-                        JOIN contributor_information ci ON ci.id = sc.contributor_information_id
-                        WHERE g.person_id = pi.person_id
+                        FROM contributor_information ci
+                        JOIN source_contributions sc ON sc.contributor_information_id = ci.id
+                        JOIN aligned_source_contributions m ON m.source_contribution_id = sc.id
+                        JOIN contributions g ON g.id = m.contribution_id
+                        WHERE ci.identifiers ? 'hal_person_id'
+                          AND ci.identifiers ->> 'hal_person_id' = pi.id_value
+                          AND NOT {_HAL_PERSON_ID_NEUTRALIZED}
                           AND sc.source = 'hal'
-                          AND {_HAL_PERSON_ID} = pi.id_value
+                          AND g.person_id = pi.person_id
                     ) s
                     WHERE {_HAL_ACCOUNT_ATTRIBUTION}
                       AND pi.person_id IN (SELECT id FROM page_persons)
@@ -381,70 +386,84 @@ class HalProblemsQueries:
     def hal_affiliation_conflicts(
         self, *, page: int, per_page: int
     ) -> HalAffiliationConflictsResponse:
-        offset = (page - 1) * per_page
-        # Conflit d'affiliation : HAL met la publication dans le périmètre, WoS et OpenAlex, seules sources à donner des adresses, la laissent hors du périmètre.
-        base_cte = """
-        WITH hal_in_perimeter_pubs AS (
-            SELECT DISTINCT sr.publication_id
-            FROM source_records sr
-            JOIN source_contributions sc ON sc.source_record_id = sr.id
-            WHERE sr.source = 'hal'
-              AND sc.in_perimeter = TRUE
-              AND sr.publication_id IS NOT NULL
-        ),
-        conflict_pubs AS (
-            SELECT h.publication_id
-            FROM hal_in_perimeter_pubs h
-            WHERE NOT EXISTS (
-                SELECT 1 FROM source_records sr
-                JOIN source_contributions sc ON sc.source_record_id = sr.id
-                WHERE sr.publication_id = h.publication_id
-                  AND sr.source IN ('wos', 'openalex')
-                  AND sc.in_perimeter = TRUE
-            )
-            AND EXISTS (
-                SELECT 1 FROM source_records sr
-                JOIN source_contributions sc ON sc.source_record_id = sr.id
-                JOIN source_contribution_addresses sca ON sca.source_contribution_id = sc.id
-                WHERE sr.publication_id = h.publication_id
-                  AND sr.source IN ('wos', 'openalex')
-            )
-        )
-        """
-
-        total_row = self._conn.execute(
-            text(f"{base_cte} SELECT COUNT(*) AS n FROM conflict_pubs")
-        ).one()
-        total = total_row.n
-
+        # Contribution en conflit : HAL la place dans le périmètre ; WoS et OpenAlex lui donnent une adresse ou un ROR, hors du périmètre.
+        # Une seule requête renvoie le total et la page : la ligne du total est présente même pour une page vide.
         rows = self._conn.execute(
             text(f"""
-                {base_cte}
-                SELECT p.id, p.title, p.publication_year, p.doc_type::text AS doc_type, p.doi,
+                WITH conflict_source_contributions AS (
+                    SELECT m.contribution_id,
+                           MIN({contributor_display_name()}) AS name,
+                           array_agg(sc.id) AS hal_source_contribution_ids
+                    FROM source_contributions sc
+                    JOIN aligned_source_contributions m ON m.source_contribution_id = sc.id
+                    WHERE sc.source = 'hal'
+                      AND sc.in_perimeter
+                      AND NOT EXISTS (
+                          SELECT 1 FROM aligned_source_contributions m2
+                          JOIN source_contributions sc2 ON sc2.id = m2.source_contribution_id
+                          WHERE m2.contribution_id = m.contribution_id
+                            AND sc2.source IN ('wos', 'openalex')
+                            AND sc2.in_perimeter
+                      )
+                      AND EXISTS (
+                          SELECT 1 FROM aligned_source_contributions m2
+                          JOIN source_contributions sc2 ON sc2.id = m2.source_contribution_id
+                          WHERE m2.contribution_id = m.contribution_id
+                            AND sc2.source IN ('wos', 'openalex')
+                            AND (EXISTS (SELECT 1 FROM source_contribution_addresses sca
+                                         WHERE sca.source_contribution_id = sc2.id)
+                                 OR EXISTS (SELECT 1 FROM source_contribution_rors scr
+                                            WHERE scr.source_contribution_id = sc2.id))
+                      )
+                    GROUP BY m.contribution_id
+                ),
+                conflict_contributions AS (
+                    SELECT c.contribution_id, c.name, c.hal_source_contribution_ids,
+                           g.publication_id, g.person_id, g.reference_position
+                    FROM conflict_source_contributions c
+                    JOIN contributions g ON g.id = c.contribution_id
+                ),
+                conflict_pubs AS (
+                    SELECT DISTINCT publication_id FROM conflict_contributions
+                ),
+                counted AS (
+                    SELECT COUNT(*) AS total FROM conflict_pubs
+                )
+                SELECT counted.total, p.id, p.title, p.publication_year, p.doc_type, p.doi,
                        (SELECT array_agg(sr2.source_id) FROM source_records sr2
                         WHERE sr2.publication_id = p.id AND sr2.source = 'hal') AS halids,
-                       (SELECT json_agg(json_build_object('acronym', l.acronym, 'name', l.name)
-                                        ORDER BY COALESCE(l.acronym, l.name))
-                        FROM (SELECT DISTINCT s.acronym, s.name
-                              FROM contributions a2
-                              JOIN contribution_structures aus2 ON aus2.contribution_id = a2.id
-                              JOIN structures s ON s.id = aus2.structure_id
-                              WHERE a2.publication_id = p.id
-                                AND a2.in_perimeter = TRUE
-                                AND s.hal_collection IS NOT NULL
-                                AND s.id = ANY(:perimeter_ids)) l
-                       ) AS laboratories
-                FROM conflict_pubs cp
-                JOIN publications p ON p.id = cp.publication_id
+                       (SELECT json_agg(json_build_object(
+                                   'person_id', cc.person_id,
+                                   'name', cc.name,
+                                   'structures', (
+                                       SELECT COALESCE(json_agg(json_build_object('acronym', s.acronym, 'name', s.name)
+                                                                ORDER BY COALESCE(s.acronym, s.name)), '[]')
+                                       FROM structures s
+                                       WHERE s.id = ANY(:perimeter_ids)
+                                         AND s.id IN (SELECT scs.structure_id FROM source_contribution_structures scs
+                                                      WHERE scs.source_contribution_id = ANY(cc.hal_source_contribution_ids))))
+                                ORDER BY cc.reference_position NULLS LAST, cc.contribution_id)
+                        FROM conflict_contributions cc
+                        WHERE cc.publication_id = p.id
+                       ) AS authors
+                FROM counted
+                LEFT JOIN LATERAL (
+                    SELECT p.id, p.title, p.publication_year, p.doc_type::text AS doc_type, p.doi,
+                           p.publication_date
+                    FROM conflict_pubs cp
+                    JOIN publications p ON p.id = cp.publication_id
+                    ORDER BY p.publication_date DESC, p.id DESC
+                    LIMIT :pg_limit OFFSET :pg_offset
+                ) p ON TRUE
                 ORDER BY p.publication_date DESC, p.id DESC
-                LIMIT :pg_limit OFFSET :pg_offset
             """),
             {
                 "pg_limit": per_page,
-                "pg_offset": offset,
+                "pg_offset": (page - 1) * per_page,
                 "perimeter_ids": get_persons_structure_ids_list(self._conn),
             },
         ).all()
+        total = rows[0].total
         publications = [
             HalAffiliationConflictPublication(
                 id=r.id,
@@ -453,9 +472,10 @@ class HalProblemsQueries:
                 doc_type=r.doc_type,
                 doi=r.doi,
                 halids=list(r.halids) if r.halids else None,
-                laboratories=[StructureRef.model_validate(x) for x in (r.laboratories or [])],
+                authors=[HalAffiliationConflictAuthor.model_validate(x) for x in r.authors],
             )
             for r in rows
+            if r.id is not None
         ]
 
         return HalAffiliationConflictsResponse(
@@ -573,7 +593,7 @@ class HalProblemsQueries:
             self.hal_affiliation_conflicts(page=1, per_page=_EXPORT_PAGE).publications
         )
         return csv_chunks(
-            ["Année", "Type", "Titre", "DOI", "Dépôts HAL", "Laboratoires"],
+            ["Année", "Type", "Titre", "DOI", "Dépôts HAL", "Auteurs en conflit"],
             (
                 [
                     p.publication_year or "",
@@ -581,7 +601,7 @@ class HalProblemsQueries:
                     to_plain_text(p.title),
                     _doi_url(p.doi),
                     " ".join(p.halids or []),
-                    ", ".join(lab.acronym or lab.name for lab in p.laboratories),
+                    "; ".join(_author_with_structures(a) for a in p.authors),
                 ]
                 for p in publications
             ),
@@ -596,6 +616,12 @@ _EXPORT_PAGE = MAX_EXPORT_ROWS + 1
 def _capped[T](items: Sequence[T]) -> tuple[Sequence[T], bool]:
     """Renvoie les éléments ramenés au plafond des exports, et si la coupe a eu lieu."""
     return items[:MAX_EXPORT_ROWS], len(items) > MAX_EXPORT_ROWS
+
+
+def _author_with_structures(author: HalAffiliationConflictAuthor) -> str:
+    """Renvoie « Nom (structure, structure) », ou le nom seul sans structure."""
+    structures = ", ".join(s.acronym or s.name for s in author.structures)
+    return f"{author.name} ({structures})" if structures else author.name
 
 
 def _doi_url(doi: str | None) -> str:

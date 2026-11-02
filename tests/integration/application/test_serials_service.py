@@ -96,17 +96,12 @@ def _fetch_one(conn, sql_text: str, **params):
 # ── find_by_id ─────────────────────────────────────────────────────
 
 
-class TestPublisherFindById:
-    def test_returns_none_if_missing(self, publisher_repo):
-        assert publisher_repo.find_by_id(999999) is None
+class TestPublisherExists:
+    def test_absent(self, publisher_repo):
+        assert not publisher_repo.exists(999999)
 
-    def test_hydrates(self, sa_sync_conn, publisher_repo):
-        publication_id = insert_publisher(sa_sync_conn, "Elsevier", openalex_id="P123")
-        p = publisher_repo.find_by_id(publication_id)
-        assert p is not None
-        assert p.id == publication_id
-        assert p.name == "Elsevier"
-        assert p.openalex_id == "P123"
+    def test_present(self, sa_sync_conn, publisher_repo):
+        assert publisher_repo.exists(insert_publisher(sa_sync_conn, "Elsevier"))
 
 
 class TestSerialFindById:

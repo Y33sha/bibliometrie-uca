@@ -4,7 +4,7 @@ from collections import defaultdict
 
 from sqlalchemy import Connection, bindparam, text
 
-from domain.persons.identifiers import PERSON_IDENTIFIER_TYPES, AttributionStatus
+from domain.persons.identifiers import AttributionStatus, PersonIdentifierType
 from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
 from domain.persons.name_matching import names_compatible
 from infrastructure.db.source_record_identifiers import source_record_doi_sql
@@ -26,6 +26,7 @@ from infrastructure.read_models.persons.models import (
     SharingPersonOut,
 )
 from infrastructure.read_models.sql_fragments import (
+    current_unit,
     name_form_holder,
     other_name_form_holders,
 )
@@ -53,7 +54,7 @@ _AMBIGUOUS_FORMS_SQL = f"""
 # ── Conflits d'identifiant (file de triage) ──────────────────────
 
 # Liste SQL des types d'identifiant à examiner, dérivée du vocabulaire `PersonIdentifierType`.
-_ID_TYPES_ARRAY_SQL = "ARRAY[" + ", ".join(f"'{t.value}'" for t in PERSON_IDENTIFIER_TYPES) + "]"
+_ID_TYPES_ARRAY_SQL = "ARRAY[" + ", ".join(f"'{t.value}'" for t in PersonIdentifierType) + "]"
 
 # Paires de personnes non exclues au même identifiant brut, hors identifiants neutralisés par la contribution source et hors paires déjà distinctes. Seules comptent les valeurs à attribution `pending`.
 _IDENTIFIER_CONFLICT_PAIRS = f"""
@@ -326,10 +327,9 @@ class PersonAdminQueries:
         other_rows = self._conn.execute(
             text(f"""
                 SELECT p.id AS person_id, p.first_name, p.last_name,
-                       pr.department_name,
+                       {current_unit("p")} AS current_unit,
                        EXISTS(SELECT 1 FROM hr_records rh WHERE rh.person_id = p.id) AS has_rh
                 FROM persons p
-                LEFT JOIN hr_records pr ON pr.person_id = p.id
                 WHERE p.id IN ({other_name_form_holders(":nf", ":pid")})
                 ORDER BY p.last_name, p.first_name
             """),
@@ -352,7 +352,7 @@ class PersonAdminQueries:
                     person_id=r.person_id,
                     first_name=r.first_name,
                     last_name=r.last_name,
-                    department_name=r.department_name,
+                    current_unit=r.current_unit,
                     has_rh=r.has_rh,
                 )
                 for r in other_rows

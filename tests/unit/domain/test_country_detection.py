@@ -36,5 +36,21 @@ def test_les_pays_multiples_du_premier_moyen_sont_gardes():
     assert retained_countries({M.COUNTRY_NAME: ["fr", "re"]}) == {"fr", "re"}
 
 
+def test_openalex_premier_moyen_garde_ses_pays_soutenus():
+    """« Institut Pascal » : OpenAlex y ajoute l'Universidad Blas Pascal, en Argentine."""
+    candidates = {M.SOURCE_OPENALEX: ["ar", "fr"], M.INSTITUTION: ["fr"]}
+    assert retained_countries(candidates) == {"fr"}
+
+
+def test_openalex_premier_moyen_sans_soutien_garde_ses_pays():
+    assert retained_countries({M.SOURCE_OPENALEX: ["ar", "fr"]}) == {"ar", "fr"}
+
+
+def test_un_autre_premier_moyen_garde_ses_pays_partiellement_soutenus():
+    """Affiliations de plusieurs auteurs : la ville reconnaît seulement une partie des pays."""
+    candidates = {M.INSTITUTION: ["fr", "gb", "gr"], M.CITY: ["fr"]}
+    assert retained_countries(candidates) == {"fr", "gb", "gr"}
+
+
 def test_le_premier_moyen_present_peut_etre_un_rang_inferieur():
     assert retained_countries({M.CITY: ["it"], M.SOURCE_SCANR: ["fr"]}) == {"it"}

@@ -106,12 +106,17 @@ class StructureNameMatcher:
                     matched.add(f.id)
         return matched
 
-    def resolve(self, text_normalized: str) -> list[StructureMatch]:
+    def resolve(
+        self, text_normalized: str, context: frozenset[int] = frozenset()
+    ) -> list[StructureMatch]:
         """Renvoie les structures reconnues dans un texte normalisé, avec la forme de nom à l'origine de chacune.
 
         Une structure est reconnue par une forme présente, hors exclusion, sans contexte ou de contexte reconnu. Les contextes s'enchaînent : le calcul se répète tant qu'une structure s'ajoute. Pour chaque structure, la première forme valide par `id` l'emporte.
 
         Les structures sans valeur d'affiliation (sites) servent de contexte sans figurer au résultat.
+
+        Args:
+            context: structures valant contexte reconnu, sans figurer au résultat faute de forme présente dans le texte.
         """
         matched_ids = self._matched_form_ids(text_normalized)
         if not matched_ids:
@@ -128,7 +133,7 @@ class StructureNameMatcher:
                 if f.structure_id in recognized and recognized[f.structure_id] <= f.id:
                     continue
                 ctx = f.requires_context_of
-                if ctx and not any(cid in recognized for cid in ctx):
+                if ctx and not any(cid in recognized or cid in context for cid in ctx):
                     continue
                 recognized[f.structure_id] = f.id
                 changed = True

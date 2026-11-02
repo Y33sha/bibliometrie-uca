@@ -10,6 +10,7 @@ from infrastructure.read_models._common import (
     page_count,
 )
 from infrastructure.read_models.persons.identifiers import person_identifiers
+from infrastructure.read_models.persons.laboratories import person_periods
 from infrastructure.read_models.persons.models import (
     PersonAddressesResponse,
     PersonAddressOut,
@@ -63,9 +64,7 @@ class PersonDetailQueries:
         """Renvoie le profil public : informations et identifiants."""
         person_row = self._conn.execute(
             text("""
-                SELECT p.id, p.last_name, p.first_name,
-                       prh.role_title, prh.department_name,
-                       prh.start_date, prh.end_date
+                SELECT p.id, p.last_name, p.first_name, prh.corps, prh.staff_category
                 FROM persons p
                 LEFT JOIN hr_records prh ON prh.person_id = p.id
                 WHERE p.id = :pid
@@ -98,10 +97,9 @@ class PersonDetailQueries:
                 id=person_row.id,
                 last_name=person_row.last_name,
                 first_name=person_row.first_name,
-                role_title=person_row.role_title,
-                department_name=person_row.department_name,
-                start_date=person_row.start_date,
-                end_date=person_row.end_date,
+                corps=person_row.corps,
+                staff_category=person_row.staff_category,
+                periods=person_periods(self._conn, [person_id]).get(person_id, []),
             ),
             identifiers=identifiers,
             theses_count=theses_count_row.n,

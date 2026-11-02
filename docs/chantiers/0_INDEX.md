@@ -10,6 +10,7 @@
 
 ### Non commencé
 
+- [Brevets](DATA_brevets.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
 - [Listes de revues](DATA_listes-de-revues.md)
 - [Mesures d'impact](METIER_mesures-impact.md)
@@ -20,6 +21,7 @@
 
 ## Chantiers archivés
 
+- 2026-11-02 — [Export RH SIHAM : matricule, périodes de présence, laboratoires](archived/2026-11-02_DATA_export-rh-siham.md)
 - 2026-11-01 — [Preprints et versions d'une publication](archived/2026-11-01_DATA_preprints-et-versions.md)
 - 2026-11-01 — [Qualité du référentiel de l'édition](archived/2026-11-01_DATA_referentiel-edition.md)
 - 2026-10-31 — [Date de publication](archived/2026-10-31_DATA_date-de-publication.md)

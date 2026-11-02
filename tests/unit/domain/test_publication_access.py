@@ -39,7 +39,7 @@ def _access(copies) -> Access:
     return access(copies, doi=_DOI)
 
 
-def test_version_puis_ordre_d_arrivee():
+def test_l_editeur_puis_les_plateformes_a_icone_puis_les_autres():
     result = _access(
         [
             _copy("https://hal.science/hal-1", platform="HAL", described=True, arrival=3),
@@ -51,14 +51,66 @@ def test_version_puis_ordre_d_arrivee():
     assert result == Access(
         url="https://doi.org/10.1/x",
         links=[
+            AccessLink("HAL", "https://hal.science/hal-1", icon=HAL.icon),
             AccessLink(
                 "ncbi.nlm.nih.gov",
                 "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC1/",
-                known=False,
+                icon=None,
             ),
-            AccessLink("HAL", "https://hal.science/hal-1", known=True),
         ],
     )
+
+
+def test_la_copie_de_l_editeur_passe_avant_une_meilleure_version_sur_une_plateforme():
+    result = _access(
+        [
+            _copy("https://hal.science/hal-1", version="publishedVersion", platform="HAL"),
+            _copy("https://doi.org/10.1/X", version="submittedVersion", arrival=2),
+        ]
+    )
+    assert result.url == "https://doi.org/10.1/X"
+
+
+def test_une_version_editeur_passe_avant_une_plateforme_a_icone():
+    """Le Handle d'une archive institutionnelle, en version éditeur, passe avant HAL en version acceptée."""
+    result = _access(
+        [
+            _copy(
+                "http://hdl.handle.net/20.500.1/1", version="publishedVersion", platform="Handle"
+            ),
+            _copy(
+                "https://hal.science/hal-1", version="acceptedVersion", platform="HAL", arrival=2
+            ),
+        ]
+    )
+    assert result.url == "http://hdl.handle.net/20.500.1/1"
+    assert [link.icon for link in result.links] == [None, HAL.icon]
+
+
+def test_une_plateforme_a_icone_passe_avant_une_meilleure_version_sans_icone():
+    """Hors version éditeur, l'icône prime sur la version : HAL soumis passe avant une copie acceptée sans icône."""
+    result = _access(
+        [
+            _copy("https://example.org/1", version="acceptedVersion"),
+            _copy(
+                "https://hal.science/hal-1", version="submittedVersion", platform="HAL", arrival=2
+            ),
+        ]
+    )
+    assert result.url == "https://hal.science/hal-1"
+
+
+def test_la_version_editeur_d_un_preprint_reste_avec_les_preprints():
+    """La « version publiée » d'un preprint arXiv passe après HAL en version acceptée."""
+    result = _access(
+        [
+            _copy("https://arxiv.org/abs/1", version="publishedVersion", platform="arXiv"),
+            _copy(
+                "https://hal.science/hal-1", version="acceptedVersion", platform="HAL", arrival=2
+            ),
+        ]
+    )
+    assert result.url == "https://hal.science/hal-1"
 
 
 def test_les_copies_d_un_preprint_passent_apres_les_autres():
@@ -94,7 +146,7 @@ def test_une_copie_par_plateforme():
             ),
         ]
     ).links
-    assert links == [AccessLink("arXiv", "https://arxiv.org/abs/1v2", known=True)]
+    assert links == [AccessLink("arXiv", "https://arxiv.org/abs/1v2", icon=ARXIV.icon)]
 
 
 def test_les_copies_fermees_sont_ecartees():
@@ -123,7 +175,7 @@ def test_hal_decide_seulement_pour_ses_propres_depots():
         _copy("https://hal.science/hal-01651302", platform="HAL", arrival=2),
     ]
     assert _access(copies).links == [
-        AccessLink("HAL", "https://hal.science/hal-01651302", known=True)
+        AccessLink("HAL", "https://hal.science/hal-01651302", icon=HAL.icon)
     ]
 
 
@@ -134,13 +186,13 @@ def test_seule_une_adresse_web_compte():
         _copy("https://x.org/a", arrival=2),
     ]
     assert _access(copies) == Access(
-        "https://x.org/a", [AccessLink("x.org", "https://x.org/a", known=False)]
+        "https://x.org/a", [AccessLink("x.org", "https://x.org/a", icon=None)]
     )
 
 
 def test_un_depot_hors_registre_est_inconnu():
     links = _access([_copy("https://escholarship.org/uc/item/1", platform="eScholarship")]).links
-    assert links == [AccessLink("eScholarship", "https://escholarship.org/uc/item/1", known=False)]
+    assert links == [AccessLink("eScholarship", "https://escholarship.org/uc/item/1", icon=None)]
 
 
 def test_une_copie_designee_par_un_autre_doi_figure_sur_sa_plateforme():
@@ -152,7 +204,7 @@ def test_une_copie_designee_par_un_autre_doi_figure_sur_sa_plateforme():
             _copy("https://doi.org/10.9/y", arrival=3),
         ]
     ).links
-    assert links == [AccessLink("Zenodo", "https://doi.org/10.5281/zenodo.1", known=True)]
+    assert links == [AccessLink("Zenodo", "https://doi.org/10.5281/zenodo.1", icon=ZENODO.icon)]
 
 
 def test_le_doi_de_la_publication_sur_une_plateforme_du_registre_figure_parmi_les_liens():
@@ -166,7 +218,7 @@ def test_le_doi_de_la_publication_sur_une_plateforme_du_registre_figure_parmi_le
     )
     assert result == Access(
         url="https://doi.org/10.5281/zenodo.8278818",
-        links=[AccessLink("Zenodo", "https://doi.org/10.5281/zenodo.8278818", known=True)],
+        links=[AccessLink("Zenodo", "https://doi.org/10.5281/zenodo.8278818", icon=ZENODO.icon)],
     )
 
 
@@ -193,7 +245,7 @@ def test_une_plateforme_du_registre_porte_le_nom_du_registre():
         described_by_platform=False,
         arrival=1,
     )
-    assert _access([copy]).links == [AccessLink("Zenodo", copy.url, known=True)]
+    assert _access([copy]).links == [AccessLink("Zenodo", copy.url, icon=ZENODO.icon)]
 
 
 def test_l_adresse_enregistree_d_un_pdf_donne_une_copie_ouverte_de_l_editeur():

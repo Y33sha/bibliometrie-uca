@@ -129,6 +129,12 @@ export const personExclusionLabels: Record<PersonExclusion, string> = {
 	out_of_perimeter: 'Hors périmètre'
 };
 
+/** Libellés FR des catégories de personnel de l'export RH (`hr_records.staff_category`). Une catégorie absente s'affiche telle quelle. */
+export const staffCategoryLabels: Record<string, string> = {
+	ENSEIG: 'Enseignants',
+	BIATSS: 'BIATSS'
+};
+
 /** Libellés FR des vocabulaires de sujets — enum PG `subject_vocabulary`. */
 export const subjectVocabularyLabels: Record<SubjectVocabulary, string> = {
 	openalex: 'OpenAlex',

@@ -1,13 +1,13 @@
-"""Attribution d'un identifiant externe à une personne, et ses changements de statut.
+"""Attribution d'un identifiant externe à une personne, et issue d'une nouvelle attribution.
 
-Le statut (`pending`, `confirmed`, `rejected`) qualifie l'attribution. Elle forme donc une entité distincte de `Person`, et une réattribution modifie seulement l'attribution. `Person.identifiers` donne une copie des attributions en lecture.
+Le statut (`pending`, `confirmed`, `rejected`) qualifie l'attribution.
 """
 
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import NamedTuple
 
-from domain.errors import IdentifierAttributionConflictError
+from domain.errors import ConflictError
 from domain.persons.identifiers import AttributionStatus, IdentifierOrigin
 
 
@@ -20,36 +20,17 @@ class AttributionOutcome(StrEnum):
     HELD_ELSEWHERE = "held_elsewhere"  # une autre personne le détient en `pending` ou `confirmed`
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class IdentifierAttribution:
     """Attribution d'un identifiant externe (ORCID, idHAL, IdRef, compte HAL) à une personne. Une valeur d'identifiant appartient à une seule personne."""
 
-    id: int | None
+    id: int
     person_id: int
     id_type: str
     id_value: str
     """Valeur sous forme canonique."""
-    status: AttributionStatus = AttributionStatus.PENDING
-    source: IdentifierOrigin | None = None
-
-    def reattribute_to(self, new_person_id: int, *, source: IdentifierOrigin) -> None:
-        """Déplace une attribution `rejected` vers une autre personne, en `pending`.
-
-        Args:
-            source: origine de la réattribution.
-
-        Raises:
-            IdentifierAttributionConflictError: attribution d'un autre statut.
-        """
-        if self.status is not AttributionStatus.REJECTED:
-            raise IdentifierAttributionConflictError(
-                f"Impossible de réattribuer l'identifiant {self.id_type}={self.id_value!r} "
-                f"depuis le statut {self.status.value!r} ; seuls les identifiants rejected "
-                "peuvent être réattribués.",
-            )
-        self.person_id = new_person_id
-        self.status = AttributionStatus.PENDING
-        self.source = source
+    status: AttributionStatus
+    source: IdentifierOrigin | None
 
 
 class AttributionResult(NamedTuple):
@@ -75,16 +56,10 @@ def attribution_outcome(
     return AttributionOutcome.HELD_ELSEWHERE
 
 
-def held_elsewhere_conflict(
-    existing: IdentifierAttribution, person_id: int
-) -> IdentifierAttributionConflictError:
+def held_elsewhere_conflict(existing: IdentifierAttribution, person_id: int) -> ConflictError:
     """Construit l'erreur qui refuse l'attribution à `person_id` d'un identifiant détenu par l'attribution `existing` (`HELD_ELSEWHERE`)."""
-    return IdentifierAttributionConflictError(
+    return ConflictError(
         f"Identifiant {existing.id_type}={existing.id_value!r} déjà attribué à "
         f"person_id={existing.person_id} avec statut {existing.status.value!r} ; impossible "
-        f"d'attribuer à person_id={person_id}.",
-        id_type=existing.id_type,
-        id_value=existing.id_value,
-        existing_person_id=existing.person_id,
-        existing_status=existing.status.value,
+        f"d'attribuer à person_id={person_id}."
     )

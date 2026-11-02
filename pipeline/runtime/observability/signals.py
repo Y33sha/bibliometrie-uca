@@ -1,7 +1,7 @@
 """Signaux des phases qui interrogent des sources externes."""
 
 import logging
-from collections.abc import Sequence, Set
+from collections.abc import Collection, Set
 
 from domain.pipeline_runs import PhaseStatus
 from domain.sources.registry import PROFILES
@@ -50,7 +50,7 @@ def signal_source_unavailable(
     )
 
 
-def select_targets(base: Sequence[str], sources: Set[str], *, include_wos: bool) -> list[str]:
+def select_targets(base: Collection[str], sources: Set[str], *, include_wos: bool) -> list[str]:
     """Renvoie les sources à interroger : celles de `base` présentes dans `sources`, moins les sources sur option (`SourceProfile.opt_in`) sans `include_wos`, dans l'ordre de `base`."""
     opt_in = set() if include_wos else {s for s, p in PROFILES.items() if p.opt_in}
     eligible = (set(base) & sources) - opt_in

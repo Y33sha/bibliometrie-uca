@@ -17,8 +17,6 @@ class PlatformType(StrEnum):
     UNKNOWN = "unknown"
 
 
-PLATFORM_TYPES: tuple[PlatformType, ...] = tuple(PlatformType)
-
 ARCHIVE_TYPES = frozenset({PlatformType.REPOSITORY, PlatformType.PREPRINT_SERVER})
 """Types des archives et des serveurs de preprints : une copie hébergée ailleurs est chez l'éditeur."""
 

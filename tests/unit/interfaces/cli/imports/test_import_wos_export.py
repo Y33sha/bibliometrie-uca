@@ -1,6 +1,6 @@
 """Lecture des exports tabulés du Web of Science par `import_wos_export`."""
 
-from interfaces.cli.maintenance.import_wos_export import export_files, read_export
+from interfaces.cli.imports.import_wos_export import export_files, read_export
 
 _HEADER = "PT\tAU\tTI\tDI\tUT\n"
 

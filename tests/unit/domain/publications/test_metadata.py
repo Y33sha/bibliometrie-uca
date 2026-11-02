@@ -1,14 +1,13 @@
 """Règles sur les métadonnées d'une publication : rang des statuts open access, niveaux d'accès, titre (nettoyage, normalisation, longueur), métadonnées minimales."""
 
 from domain.publications.metadata import (
-    ACCESS_LEVELS,
-    OA_RANK,
     TITLE_NORMALIZED_MAX_LENGTH,
     clean_publication_title,
     has_minimal_publication_metadata,
     is_overlong_title,
     normalized_title,
 )
+from domain.publications.oa_status import ACCESS_LEVELS, OA_RANK
 
 
 class TestAccessLevels:

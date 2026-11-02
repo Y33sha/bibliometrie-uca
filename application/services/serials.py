@@ -92,7 +92,9 @@ class SerialService:
             ValidationError: deux identifiants égaux, ou revue source à ISSN-L quand la cible en a un.
             NotFoundError: revue introuvable.
         """
-        check_merge_pair(target_id, source_id, self._serials.find_by_id, label="Revue")
+        check_merge_pair(
+            target_id, source_id, lambda i: self._serials.find_by_id(i) is not None, label="Revue"
+        )
         source_issnl = self._serials.issnl_of(source_id)
         if source_issnl is not None and self._serials.issnl_of(target_id) is not None:
             raise ValidationError("Deux revues à ISSN-L distincts ne fusionnent pas")

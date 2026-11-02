@@ -30,7 +30,7 @@ from pathlib import Path
 
 from sqlalchemy import Connection, text
 
-from domain.normalize import normalize_text, sanitize_optional_text
+from domain.normalize import normalize_text, optional_plain_text
 from domain.publications.identifiers import clean_doi
 from domain.structures.identifiers import RorId
 from domain.structures.structure import StructureType
@@ -84,7 +84,7 @@ _INSERT = text("""
 
 def clean(cell: str | None) -> str | None:
     """Met la cellule à plat — balises, entités HTML et caractères invisibles retirés — et renvoie None si elle est vide."""
-    return sanitize_optional_text(cell)
+    return optional_plain_text(cell)
 
 
 def parse_amount(cell: str | None) -> float | None:

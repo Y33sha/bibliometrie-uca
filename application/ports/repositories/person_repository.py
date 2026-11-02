@@ -1,10 +1,10 @@
-"""Port PersonRepository : accès à l'entité Person."""
+"""Port PersonRepository : accès aux personnes."""
 
 from typing import Protocol, TypedDict
 
-from domain.persons.identifier_attribution import AttributionResult, IdentifierAttribution
+from domain.persons.identifier_attribution import AttributionResult
 from domain.persons.identifiers import IdentifierOrigin
-from domain.persons.person import Person, PersonExclusion
+from domain.persons.person import PersonExclusion
 
 
 class IdentifierStatusRow(TypedDict):
@@ -25,12 +25,12 @@ class NameFormStatusRow(TypedDict):
 
 
 class PersonRepository(Protocol):
-    """Contrat d'accès à l'entité Person : tables `persons`, `person_identifiers`, `person_name_forms`, `distinct_persons`, et une partie de `source_contributions`."""
+    """Contrat d'accès aux personnes : tables `persons`, `person_identifiers`, `person_name_forms`, `distinct_persons`, et une partie de `source_contributions`."""
 
     # ── persons ────────────────────────────────────────────────────
 
-    def find_by_id(self, person_id: int) -> Person | None:
-        """Charge l'entité `Person` avec `identifiers` et `name_forms`, ou `None` si la personne est introuvable. Identifiants et formes de nom se modifient par les méthodes dédiées."""
+    def exists(self, person_id: int) -> bool:
+        """Vrai si la personne existe."""
         ...
 
     def create(self, last_name: str, first_name: str = "") -> int:
@@ -79,18 +79,6 @@ class PersonRepository(Protocol):
         ...
 
     # ── person_identifiers ─────────────────────────────────────────
-
-    def find_identifier(self, id_type: str, id_value: str) -> IdentifierAttribution | None:
-        """Charge l'attribution de l'identifiant `(id_type, id_value)`, unique, ou `None` si elle est absente."""
-        ...
-
-    def insert_identifier(self, ident: IdentifierAttribution) -> int:
-        """Insère l'attribution et renvoie son id, posé aussi sur `ident.id`. Lève une erreur si `(id_type, id_value)` existe déjà. L'appelant vérifie l'unicité par `find_identifier`."""
-        ...
-
-    def update_identifier(self, ident: IdentifierAttribution) -> None:
-        """Écrit la personne, le statut et la source d'une attribution existante. `ident.id` doit être posé."""
-        ...
 
     def attribute_identifier(
         self, person_id: int, id_type: str, id_value: str, *, source: IdentifierOrigin

@@ -2,7 +2,7 @@
 	import type { Snippet } from 'svelte';
 	import { api } from '#lib/api/index.js';
 	import type { components } from '#lib/api/schema.js';
-	import KeyFigures from '#lib/components/KeyFigures.svelte';
+	import KeyFigures, { type KeyFigure } from '#lib/components/KeyFigures.svelte';
 	import BarChart from '#lib/components/charts/BarChart.svelte';
 	import StackedBarChart from '#lib/components/charts/StackedBarChart.svelte';
 	import YearScatterChart from '#lib/components/charts/YearScatterChart.svelte';
@@ -12,6 +12,7 @@
 	import { publicationsDocTypes } from '#lib/docTypes.svelte.js';
 	import { orderedPivotValues, pivotValueColor, pivotValueLabel } from '#lib/pivotValues.js';
 	import { contextParams, type PublicationListContext } from '#lib/publicationListContext.js';
+	import { plural } from '#lib/plural.js';
 	import { paramsToQuery } from '#lib/utils.js';
 
 	type PivotResponse = components['schemas']['PivotResponse'];
@@ -19,7 +20,6 @@
 	type CitationPoint = components['schemas']['CitationPoint'];
 	type CitationPointsResponse = components['schemas']['CitationPointsResponse'];
 	type Row = PivotResponse['rows'][number];
-	type Figure = { value: string; label: string; tone?: 'open'; tooltip?: string };
 
 	// Dashboard des publications d'une entité, calculé par le moteur de la page Statistiques. Le corpus est celui de l'onglet Publications, restreint à la famille « Publications » et aux années récentes. La répartition par types de documents compte toutes les familles, sur les mêmes années.
 	let {
@@ -47,7 +47,7 @@
 		/** Découpage des publications par année : niveau d'accès, ou modèle open access. */
 		oaBreakdown?: 'oa_access' | 'oa_voie';
 		/** Chiffres clés propres à la page, après ceux du dashboard. */
-		figures?: Figure[];
+		figures?: KeyFigure[];
 		/** Bloc des sujets, fourni par la page, à côté des publications par année. */
 		subjects?: Snippet;
 	} = $props();
@@ -125,7 +125,7 @@
 	});
 
 	const sum = (rows: Row[]) => rows.reduce((total, r) => total + Number(r.value ?? 0), 0);
-	const percent = (part: number, whole: number) => `${Math.round((part / whole) * 100)} %`;
+	const percent = (part: number, whole: number) => `${Math.round((part / whole) * 100)} %`;
 
 	const total = $derived(sum(byYear));
 	const openAccess = $derived(sum(byYear.filter((r) => r.oa_access === 'ouvert')));
@@ -136,28 +136,42 @@
 	);
 	const withCitationClass = $derived(sum(citationClasses.filter((r) => r.citation_class !== 'none')));
 
-	const keyFigures = $derived<Figure[]>([
-		{ value: total.toLocaleString('fr-FR'), label: 'publications' },
-		...(total > 0 ? [{ value: percent(openAccess, total), label: 'en open access', tone: 'open' as const }] : []),
+	const keyFigures = $derived<KeyFigure[]>([
+		{ value: total.toLocaleString('fr-FR'), label: plural(total, 'publication'), icon: 'book-open-cover' },
+		...(total > 0
+			? [{ value: percent(openAccess, total), label: 'en open access', tone: 'open' as const, icon: 'unlock' }]
+			: []),
 		...(withCitationClass > 0
 			? [
 					{
 						value: percent(topCited, withCitationClass),
-						label: 'dans le top 10 % des plus citées',
+						label: 'dans le top 10 % des plus citées',
+						icon: 'star',
 						tooltip: `D'après OpenAlex, sur les ${withCitationClass.toLocaleString('fr-FR')} publications pourvues de l'indicateur (${percent(withCitationClass, total)} du corpus)`,
 					},
 				]
 			: []),
 		...(collab && collab.total_count > 0
-			? [{ value: percent(collab.international_count, collab.total_count), label: 'en collaboration internationale' }]
+			? [
+					{
+						value: percent(collab.international_count, collab.total_count),
+						label: 'en collaboration internationale',
+						icon: 'globe',
+					},
+				]
 			: []),
-		...(thesesFigure && theses > 0 ? [{ value: theses.toLocaleString('fr-FR'), label: 'thèses' }] : []),
+		...(thesesFigure && theses > 0
+			? [{ value: theses.toLocaleString('fr-FR'), label: plural(theses, 'thèse'), icon: 'graduation-cap' }]
+			: []),
 		...figures,
 	]);
 
 	// Publications par année, empilées selon `oaBreakdown`. L'année en cours est incomplète.
 	const currentYear = new Date().getFullYear();
 	const yearLabels = $derived(years.map((y) => (y === currentYear ? `${y} (en cours)` : String(y))));
+	const period = $derived(
+		years.length === 0 ? undefined : years.length === 1 ? String(years[0]) : `${years[0]}–${years[years.length - 1]}`,
+	);
 	const accessSeries = $derived(
 		orderedPivotValues(oaBreakdown, chartRows).map((value, i) => ({
 			label: pivotValueLabel(oaBreakdown, value),
@@ -185,10 +199,7 @@
 {#if !loaded}
 	<div class="loading">Chargement…</div>
 {:else}
-	<KeyFigures items={keyFigures} />
-	{#if years.length}
-		<p class="dash-corpus">Publications parues de {years[0]} à {years[years.length - 1]}.</p>
-	{/if}
+	<KeyFigures items={keyFigures} {period} />
 	<div class="dash-grid">
 		<div class="dash-card">
 			<h2>Publications par année</h2>
@@ -237,11 +248,6 @@
 {/if}
 
 <style>
-	.dash-corpus {
-		margin: -24px 0 24px;
-		font-size: var(--fs-sm);
-		color: var(--text-secondary);
-	}
 	.scatter-head {
 		display: flex;
 		align-items: baseline;

@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 
 from domain.config import ConfigKey
 from domain.pipeline_runs import PhaseStatus
-from domain.sources.registry import ALL_SOURCES
+from domain.sources.registry import Source
 from infrastructure.observability.log import (
     PHASE_MARKER,
     RUN_END_MARKER,
@@ -147,7 +147,7 @@ def _source_list(value: str) -> str:
     sources = [s.strip() for s in value.split(",") if s.strip()]
     if not sources:
         raise argparse.ArgumentTypeError("au moins une source attendue")
-    if unknown := [s for s in sources if s not in ALL_SOURCES]:
+    if unknown := [s for s in sources if s not in Source]:
         raise argparse.ArgumentTypeError(f"source(s) inconnue(s) : {', '.join(unknown)}")
     return ",".join(sources)
 
@@ -238,8 +238,8 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--sources",
         type=_source_list,
-        default=",".join(ALL_SOURCES),
-        help=f"Sources, séparées par des virgules (défaut : {','.join(ALL_SOURCES)})",
+        default=",".join(Source),
+        help=f"Sources, séparées par des virgules (défaut : {','.join(Source)})",
     )
     parser.add_argument("--year", type=int, help="Moissonner cette seule année")
     parser.add_argument(
@@ -482,7 +482,7 @@ def _execute_phases(
     # Enregistre le run et chacune de ses phases : identifiant de séquence, entrées, sorties, statut.
     recorder = start_run(
         mode=args.mode,
-        sources=select_targets(ALL_SOURCES, sources, include_wos=args.include_wos),
+        sources=select_targets(Source, sources, include_wos=args.include_wos),
     )
     if recorder.run_id is not None:
         log.info("%s%d", RUN_MARKER, recorder.run_id)

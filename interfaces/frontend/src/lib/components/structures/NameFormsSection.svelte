@@ -136,7 +136,7 @@
               {@render ctxAdd(f.id)}
             {/if}
           </td>
-          <td class="row-actions" style="white-space:nowrap">
+          <td class="row-actions">
             <IconButton icon="edit" label="Modifier la forme" onclick={() => oneditForm(f)} />
             <IconButton icon="delete" label="Supprimer la forme" onclick={() => ondeleteForm(f.id)} />
           </td>

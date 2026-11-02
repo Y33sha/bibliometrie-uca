@@ -7,8 +7,8 @@ import pytest
 from domain.normalize import (
     clean_abstract,
     normalize_text,
-    sanitize_optional_text,
-    sanitize_raw_text,
+    optional_plain_text,
+    to_plain_text,
 )
 
 
@@ -123,7 +123,7 @@ class TestLatex:
         assert normalize_text(raw) == expected
 
 
-class TestSanitizeRawText:
+class TestToPlainText:
     @pytest.mark.parametrize(
         "raw, expected",
         [
@@ -163,28 +163,28 @@ class TestSanitizeRawText:
             ),
         ],
     )
-    def test_sanitize_raw_text(self, raw: str, expected: str) -> None:
-        assert sanitize_raw_text(raw) == expected
+    def test_to_plain_text(self, raw: str, expected: str) -> None:
+        assert to_plain_text(raw) == expected
 
     def test_nbsp_collapses_to_searchable_form(self) -> None:
         """Un texte à espace insécable donne la forme tapée au clavier."""
         with_nbsp = "Université Clermont Auvergne"
         typed = "Université Clermont Auvergne"
-        assert sanitize_raw_text(with_nbsp) == sanitize_raw_text(typed) == typed
+        assert to_plain_text(with_nbsp) == to_plain_text(typed) == typed
 
 
-class TestSanitizeOptionalText:
-    """Variante des imports de fichiers : même mise à plat, absence notée `None`."""
+class TestOptionalPlainText:
+    """Même mise à plat que `to_plain_text`, absence notée `None`."""
 
-    def test_met_a_plat_comme_sanitize_raw_text(self) -> None:
-        assert sanitize_optional_text("<i>Journal of Physics</i>") == "Journal of Physics"
-        assert sanitize_optional_text("Universit&eacute; Clermont Auvergne") == (
+    def test_met_a_plat_comme_to_plain_text(self) -> None:
+        assert optional_plain_text("<i>Journal of Physics</i>") == "Journal of Physics"
+        assert optional_plain_text("Universit&eacute; Clermont Auvergne") == (
             "Université Clermont Auvergne"
         )
 
     @pytest.mark.parametrize("raw", [None, "", "   ", "\u200b", "<br/>", "<!-- vide -->"])
-    def test_rend_none_quand_la_valeur_ne_porte_rien(self, raw: str | None) -> None:
-        assert sanitize_optional_text(raw) is None
+    def test_rend_none_quand_la_valeur_est_vide(self, raw: str | None) -> None:
+        assert optional_plain_text(raw) is None
 
 
 class TestCleanAbstract:

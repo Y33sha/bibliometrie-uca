@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 
 from sqlalchemy import Connection, Row, text
 
-from domain.normalize import normalize_text, to_plain_text
+from domain.normalize import normalize_text
 from domain.publications.identifiers import ISSN
 from domain.serials.attachment import (
     TitledSerial,
@@ -28,7 +28,6 @@ from domain.serials.attachment import (
     match_in_publication,
     most_frequent,
     openalex_issnls,
-    title_key,
 )
 from domain.serials.containers import SeriesDescription
 from domain.serials.serial import ManualField
@@ -335,7 +334,7 @@ def _attach(
             result.serial_of[m.id] = by_openalex[series.openalex_id]
             result.by_way["openalex"] += 1
             continue
-        title_normalized = title_key(series.title)
+        title_normalized = normalize_text(series.title or "")
         if not title_normalized:
             result.serial_of[m.id] = None
             result.by_way["unattached"] += 1
@@ -450,7 +449,6 @@ def _refresh_attributes(
         if title is None and serial_id in titles:
             title = most_frequent(titles[serial_id])
         if title:
-            title = to_plain_text(title)
             serial_titles.append({"id": serial_id, "title": title, "key": normalize_text(title)})
     if serial_titles:
         conn.execute(_WRITE_TITLES, {"rows": json.dumps(serial_titles)})

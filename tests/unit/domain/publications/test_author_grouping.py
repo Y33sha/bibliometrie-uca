@@ -365,37 +365,45 @@ class TestAlignPublication:
             assert len(source_records_of_contribution) == len(set(source_records_of_contribution))
 
 
+def _position_only(x, y):
+    return position_only(comparison_levels(x, y))
+
+
+def _conflicting_initials(x, y):
+    return conflicting_initials(x, y, comparison_levels(x, y))
+
+
 class TestPositionOnly:
     def test_noms_sans_ressemblance(self):
-        assert position_only(_author("martin", "anne"), _author("durand", "claire"))
+        assert _position_only(_author("martin", "anne"), _author("durand", "claire"))
 
     def test_prenom_absent(self):
-        assert position_only(_author("martin", ""), _author("durand", "claire"))
+        assert _position_only(_author("martin", ""), _author("durand", "claire"))
 
     def test_patronyme_proche(self):
-        assert not position_only(_author("martin", "anne"), _author("martins", "claire"))
+        assert not _position_only(_author("martin", "anne"), _author("martins", "claire"))
 
     def test_identifiant_commun(self):
-        assert not position_only(
+        assert not _position_only(
             _author("martin", "anne", orcid="0000"), _author("durand", "claire", orcid="0000")
         )
 
 
 class TestConflictingInitials:
     def test_patronyme_proche_et_initiales_differentes(self):
-        assert conflicting_initials(_author("balakrishnan", "v"), _author("balaji", "s"))
+        assert _conflicting_initials(_author("balakrishnan", "v"), _author("balaji", "s"))
 
     def test_patronyme_identique(self):
-        assert not conflicting_initials(_author("mcdonald", "millie"), _author("mcdonald", "e f"))
+        assert not _conflicting_initials(_author("mcdonald", "millie"), _author("mcdonald", "e f"))
 
     def test_initiales_concordantes(self):
-        assert not conflicting_initials(_author("soh", "d a"), _author("su", "daxian"))
+        assert not _conflicting_initials(_author("soh", "d a"), _author("su", "daxian"))
 
     def test_prenom_absent(self):
-        assert not conflicting_initials(_author("balakrishnan", ""), _author("balaji", "s"))
+        assert not _conflicting_initials(_author("balakrishnan", ""), _author("balaji", "s"))
 
     def test_identifiant_commun(self):
-        assert not conflicting_initials(
+        assert not _conflicting_initials(
             _author("balakrishnan", "v", orcid="0000"), _author("balaji", "s", orcid="0000")
         )
 
@@ -502,7 +510,7 @@ class TestResidualModel:
                 "gap": {"même trou": 6.0},
             }
         )
-        assert model.score(_author(), _author()) == 19.0
+        assert model.score_levels(comparison_levels(_author(), _author())) == 19.0
 
 
 def test_seuil_log2_du_nombre_de_contributions():

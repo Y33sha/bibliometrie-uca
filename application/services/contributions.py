@@ -14,12 +14,7 @@ from application.ports.repositories.contribution_repository import (
     ContributionRow,
 )
 from application.ports.repositories.person_repository import PersonRepository
-from domain.errors import (
-    ContributionAlreadyAssignedError,
-    NotFoundError,
-    PersonAlreadyInPublicationError,
-    RejectedPairError,
-)
+from domain.errors import ConflictError, NotFoundError, RejectedPairError
 
 logger = logging.getLogger(__name__)
 
@@ -103,8 +98,7 @@ class ContributionService:
         Raises:
             RejectedPairError: paire rejetée, sans `force`.
             NotFoundError: personne ou contribution absente.
-            ContributionAlreadyAssignedError: contribution déjà rattachée à une personne.
-            PersonAlreadyInPublicationError: la personne a déjà une contribution manuelle dans la publication.
+            ConflictError: contribution déjà rattachée à une personne, ou personne qui a déjà une contribution manuelle dans la publication.
         """
         self._require_person(person_id)
 
@@ -112,14 +106,15 @@ class ContributionService:
         if contribution is None:
             raise NotFoundError(f"Contribution #{contribution_id} introuvable")
         if contribution["person_id"] is not None:
-            raise ContributionAlreadyAssignedError(contribution_id, contribution["person_id"])
+            raise ConflictError(
+                f"La contribution #{contribution_id} est déjà attribuée à la personne "
+                f"#{contribution['person_id']} ; seule une contribution orpheline peut être attribuée."
+            )
         manual = self._contributions.manual_contributions_of_person(
             person_id, [contribution["publication_id"]]
         )
         if contribution["publication_id"] in manual:
-            raise PersonAlreadyInPublicationError(
-                contribution["publication_id"], manual[contribution["publication_id"]]
-            )
+            raise ConflictError("Cette personne est déjà rattachée à cette publication.")
 
         self._resolve_rejection(person_id, [contribution["publication_id"]], force=force)
         self._attach_contributions(person_id, [contribution])
@@ -195,7 +190,7 @@ class ContributionService:
 
     def _require_person(self, person_id: int) -> None:
         """Refuse une personne cible absente (`NotFoundError`)."""
-        if self._persons.find_by_id(person_id) is None:
+        if not self._persons.exists(person_id):
             raise NotFoundError(f"Personne {person_id} introuvable")
 
     def _resolve_rejection(

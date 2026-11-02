@@ -16,6 +16,7 @@
 	import DetachNameFormModal from './DetachNameFormModal.svelte';
 	import PersonDrawer from './PersonDrawer.svelte';
 	import { confirmMerge } from './confirmMerge';
+	import { formatCount, plural } from '#lib/plural.js';
 
 	type NameFormContributionRef = components['schemas']['NameFormContributionRef'];
 
@@ -99,7 +100,7 @@
 		const { propagated } = await personsApi.setIdentifierStatus(identId, status);
 		if (propagated > 0) {
 			toast(
-				`${propagated} identifiant${propagated > 1 ? 's' : ''} du même compte HAL ${propagated > 1 ? 'ont' : 'a'} reçu le même statut`,
+				`${formatCount(propagated, 'identifiant')} du même compte HAL ${plural(propagated, 'a', 'ont')} reçu le même statut`,
 			);
 		}
 		await refreshAfterChange();

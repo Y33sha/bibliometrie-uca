@@ -10,8 +10,10 @@
   import Drawer from "#lib/components/Drawer.svelte";
   import IconButton from "#lib/components/IconButton.svelte";
   import Picker from "#lib/components/Picker.svelte";
+  import IssnBadge from "./IssnBadge.svelte";
   import { mergeSerial } from "./mergeSerial";
   import type { components } from "#lib/api/schema.js";
+  import { formatCount } from "#lib/plural.js";
 
   type SerialDetail = components["schemas"]["SerialDetailResponse"];
   type Serial = components["schemas"]["SerialListItem"];
@@ -103,8 +105,7 @@
     try {
       const impact = await serialsApi.typeChangeImpact(id, next);
       if (impact.count > 0) {
-        const plural = impact.count > 1 ? "s" : "";
-        const message = `Ce changement entraînera un recalcul de la métadonnée « type de document » sur ${impact.count} publication${plural}. Continuer ?`;
+        const message = `Ce changement entraînera un recalcul de la métadonnée « type de document » sur ${formatCount(impact.count, "publication")}. Continuer ?`;
         if (!(await confirmDialog({ message }))) {
           select.value = previous;
           return;
@@ -227,7 +228,7 @@
         <dl class="drawer-fields">
           {#each serial.issn_details.filter((i) => i.status === "active" || i.linking) as issn (issn.issn)}
             <dt>{issnLabel(issn)}</dt>
-            <dd><span class="id-badge">{issn.issn}</span></dd>
+            <dd><IssnBadge issn={issn.issn} /></dd>
           {/each}
         </dl>
       </section>

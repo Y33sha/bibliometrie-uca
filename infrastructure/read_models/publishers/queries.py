@@ -4,7 +4,7 @@ from collections.abc import Iterator
 
 from sqlalchemy import Connection, Row, text
 
-from domain.normalize import normalize_text, to_plain_text
+from domain.normalize import normalize_text
 from domain.publishers.names import publisher_name_key
 from domain.publishers.publisher import PUBLISHER_TYPE_LABELS_FR, PUBLISHER_TYPES, PublisherType
 from infrastructure.read_models._common import FacetOption, YesNoCount
@@ -254,7 +254,7 @@ class PublisherQueries:
             """),
             params,
         ):
-            form = publisher_name_key(to_plain_text(r.name or ""))
+            form = publisher_name_key(r.name or "")
             if form in counts:
                 counts[form] += r.n
         return [

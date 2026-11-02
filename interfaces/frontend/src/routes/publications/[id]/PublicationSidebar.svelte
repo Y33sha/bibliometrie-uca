@@ -1,5 +1,6 @@
 <script lang="ts">
   import { asset } from "$app/paths";
+  import type { AssetPath } from "$app/types";
   import AccessButton from "#lib/components/AccessButton.svelte";
   import SourceTag from "#lib/components/SourceTag.svelte";
   import { accessTag } from "#lib/labels.js";
@@ -30,16 +31,6 @@
     nnt: { label: "Thèses.fr", icon: asset('icons/theses.ico'), url: (v) => `https://theses.fr/${v}` },
   };
 
-  // Plateformes connues dont l'interface a l'icône, par leur nom (`domain/platforms/registry.py`).
-  const PLATFORM_ICONS: Record<string, string> = {
-    HAL: asset('icons/hal.ico'),
-    arXiv: asset('icons/arxiv.png'),
-    "PubMed Central": asset('icons/ncbi.png'),
-    Zenodo: asset('icons/zenodo.png'),
-    Figshare: asset('icons/figshare.png'),
-    "CERN Document Server": asset('icons/cds.ico'),
-    OpenEdition: asset('icons/openedition.png'),
-  };
   // Pastilles colorées des icônes claires.
   const PLATFORM_TAG_CLASSES: Record<string, string> = { Zenodo: "tag-zenodo" };
 
@@ -59,10 +50,8 @@
   // Plateforme de la copie donnée par le bouton : une copie listée, ou l'éditeur quand le bouton mène au DOI.
   const accessCopy = $derived(access.find((a) => a.url === accessUrl) ?? null);
   const viaPublisher = $derived(accessUrl != null && accessCopy == null);
-  const otherAccess = $derived(access.filter((a) => a !== accessCopy));
-  // Les plateformes du registre restent visibles ; les autres dépôts sont repliés.
-  const knownAccess = $derived(otherAccess.filter((a) => a.known));
-  const unknownAccess = $derived(otherAccess.filter((a) => !a.known));
+  // Seules les plateformes à icône figurent parmi les autres accès.
+  const otherAccess = $derived(access.filter((a) => a !== accessCopy && a.icon));
 
   // Licence de la copie donnée : celle de la version éditeur par le DOI, celle du dépôt par HAL ; inconnue pour les autres plateformes.
   const accessLicense = $derived(viaPublisher ? pub.license : accessCopy?.label === "HAL" ? pub.deposit_license : null);
@@ -84,9 +73,7 @@
   {#snippet copyRow(copy: AccessLink)}
     <a href={copy.url} target="_blank" rel="noopener noreferrer" class="source-row" title={copy.url}>
       <span class="source-tag {PLATFORM_TAG_CLASSES[copy.label] ?? ''}">
-        {#if PLATFORM_ICONS[copy.label]}
-          <img src={PLATFORM_ICONS[copy.label]} alt={copy.label} />
-        {/if}
+        <img src={asset(`icons/${copy.icon}` as AssetPath)} alt={copy.label} />
       </span>
       <span class="row-label">{copy.label}</span>
     </a>
@@ -96,16 +83,8 @@
     <div class="sidebar-block">
       <h2 class="sidebar-title">Autres accès</h2>
       <div class="sidebar-sources">
-        {#each knownAccess as copy (copy.url)}{@render copyRow(copy)}{/each}
+        {#each otherAccess as copy (copy.url)}{@render copyRow(copy)}{/each}
       </div>
-      {#if unknownAccess.length}
-        <details class="folded">
-          <summary>{unknownAccess.length} {knownAccess.length ? "autres dépôts" : unknownAccess.length > 1 ? "dépôts" : "dépôt"}</summary>
-          <div class="sidebar-sources">
-            {#each unknownAccess as copy (copy.url)}{@render copyRow(copy)}{/each}
-          </div>
-        </details>
-      {/if}
     </div>
   {/if}
 
@@ -228,22 +207,5 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-  /* Groupe replié, fermé par défaut : dépôts hors registre, sources secondaires. */
-  .folded {
-    margin-top: 6px;
-  }
-  .folded > summary {
-    font-size: var(--fs-sm);
-    color: var(--muted);
-    cursor: pointer;
-    padding: 3px 0;
-    user-select: none;
-  }
-  .folded > summary:hover {
-    color: var(--text);
-  }
-  .folded[open] > summary {
-    margin-bottom: 6px;
   }
 </style>

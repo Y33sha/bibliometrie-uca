@@ -11,6 +11,7 @@
 	import FacetDropdown from '#lib/components/FacetDropdown.svelte';
 	import IconButton from '#lib/components/IconButton.svelte';
 	import SerialDrawer from '#lib/components/serials/SerialDrawer.svelte';
+	import IssnBadge from '#lib/components/serials/IssnBadge.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import TableStatusRow from '#lib/components/TableStatusRow.svelte';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
@@ -281,7 +282,7 @@
 							<span class="badge-doaj" title="Indexée dans DOAJ">DOAJ</span>
 						{/if}
 					{/if}				</td>
-				<td><div class="id-list">{#each j.issns as issn (issn)}<span class="id-badge">{issn}</span>{/each}</div></td>
+				<td><div class="id-list">{#each j.issns as issn (issn)}<IssnBadge {issn} />{/each}</div></td>
 				{#if !publisherFixed}
 					<td class="muted">
 						{#if j.publisher_name}
@@ -329,7 +330,6 @@
 <style>
 	.journals-table { min-width: 660px; }
 	.journals-table td.num { color: var(--muted); }
-	.row-actions { width: 1%; }
 	.diamond-col { width: 1.5rem; padding-right: 0; }
 	.diamond { display: inline-flex; color: var(--diamond-text); vertical-align: middle; }
 	.muted { color: var(--muted); }

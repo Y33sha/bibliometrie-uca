@@ -1,10 +1,10 @@
 """Le graphe de dépendances du pipeline (`pipeline.graph`) est cohérent avec l'ordre d'exécution."""
 
 from domain.sources.registry import (
-    ALL_SOURCES,
     DOI_SEARCHABLE_SOURCES,
     HARVESTED_SOURCES,
     SOURCE_PRIORITY,
+    Source,
 )
 from pipeline.graph import PHASE_ORDER, TASKS, Task, dependencies, order_violations
 from pipeline.ingestion.common.normalize import normalizer_builders
@@ -31,7 +31,7 @@ def test_une_tache_d_extraction_par_source_moissonnee():
 def test_une_tache_de_relecture_par_source():
     """Crossref aussi : `fetch_stale` relit toutes les sources par identifiant natif."""
     stale_tasks = [n.name for n in TASKS if n.phase == "fetch_stale"]
-    assert stale_tasks == [f"fetch_stale.{s}" for s in ALL_SOURCES]
+    assert stale_tasks == [f"fetch_stale.{s}" for s in Source]
 
 
 def test_une_tache_de_recherche_par_doi_par_source_interrogeable():

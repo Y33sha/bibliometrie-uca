@@ -2,6 +2,7 @@
   import type { components } from "#lib/api/schema.js";
   import PhaseRibbon from "./PhaseRibbon.svelte";
   import { CELL_COLOR, fmtDate, fmtDuration, STATUS_LABEL, type Status } from "./helpers";
+  import { formatCount } from "#lib/plural.js";
 
   type RunSummary = components["schemas"]["RunSummary"];
 
@@ -53,9 +54,9 @@
         <div class="run-sub">
           <span>{run.mode}</span>
           {#if run.sources.length}
-            <span>· {run.sources.length} source{run.sources.length > 1 ? "s" : ""}</span>
+            <span>· {formatCount(run.sources.length, "source")}</span>
           {/if}
-          <span>· {run.phase_count} phase{run.phase_count > 1 ? "s" : ""}</span>
+          <span>· {formatCount(run.phase_count, "phase")}</span>
         </div>
         <div class="ribbon-wrap">
           <PhaseRibbon {allPhases} statuses={statusMap(run)} />

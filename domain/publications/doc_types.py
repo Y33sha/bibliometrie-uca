@@ -39,8 +39,7 @@ class DocType(StrEnum):
     PHYSICAL_OBJECT = "physical_object"
 
 
-DOC_TYPES: tuple[DocType, ...] = tuple(DocType)
-DOC_TYPES_SET: frozenset[str] = frozenset(DocType)
+DOC_TYPES: frozenset[str] = frozenset(DocType)
 
 # Sous-types d'article, qui l'emportent sur `article` à l'agrégation (`arbitrate_doc_type_with_article_subtype`).
 ARTICLE_SUBTYPES: frozenset[str] = frozenset(

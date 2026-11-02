@@ -44,6 +44,12 @@ def test_sans_valeur_rien():
     assert compact_biblio(volume="", publisher=None) is None
 
 
+def test_editeur_en_texte_brut():
+    """Cas réel : HAL encode l'esperluette du nom d'éditeur."""
+    assert compact_biblio(publisher="TAYLOR &amp; FRANCIS") == {"publisher": "TAYLOR & FRANCIS"}
+    assert compact_biblio(publisher="<br/>") is None
+
+
 _SERIES = SeriesDescription(
     title="Journal of Physics",
     issns=(

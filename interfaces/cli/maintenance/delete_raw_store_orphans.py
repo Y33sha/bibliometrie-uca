@@ -17,7 +17,7 @@ from pathlib import Path
 
 from sqlalchemy import Connection, ScalarResult, text
 
-from domain.sources.registry import ALL_SOURCES
+from domain.sources.registry import Source
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.raw_store.factory import get_raw_store
@@ -57,7 +57,7 @@ def main() -> int:
         return 1
 
     store = get_raw_store(args.root)
-    sources = [args.source] if args.source else list(ALL_SOURCES)
+    sources = [args.source] if args.source else list(Source)
     log.info("Sources : %s%s", ", ".join(sources), " [DRY-RUN]" if args.dry_run else "")
 
     engine = get_sync_engine()

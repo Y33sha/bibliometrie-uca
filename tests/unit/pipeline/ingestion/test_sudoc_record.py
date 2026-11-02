@@ -1,11 +1,12 @@
-"""Tests de la lecture des notices Sudoc de publications en série (`domain.sources.sudoc`)."""
+"""Tests de la lecture des notices Sudoc de publications en série (`pipeline.ingestion.complements.sudoc_record`)."""
 
 from domain.serials.issns import IssnSupport
-from domain.sources.sudoc import MarcField, SudocSerialRecord, parse_sudoc_serial_record
+from domain.sources.sudoc import SudocSerialRecord
+from pipeline.ingestion.complements.sudoc_record import MarcField, parse_sudoc_serial_record
 
 
-def _field(tag: str, *subfields: tuple[str, str], ind1: str = "#", ind2: str = "#") -> MarcField:
-    return MarcField(tag, ind1, ind2, tuple(subfields))
+def _field(tag: str, *subfields: tuple[str, str]) -> MarcField:
+    return MarcField(tag, tuple(subfields))
 
 
 class TestParseSudocSerialRecord:
@@ -15,7 +16,7 @@ class TestParseSudocSerialRecord:
             "122563522",
             [
                 _field("011", ("a", "1963-1006"), ("f", "0767-9513")),
-                _field("135", ("a", "dr|||||||||||"), ind1=" ", ind2=" "),
+                _field("135", ("a", "dr|||||||||||")),
                 _field("182", ("c", "c")),
                 _field("183", ("a", "ceb")),
                 _field("200", ("a", "Hermès")),
@@ -79,7 +80,7 @@ class TestParseSudocSerialRecord:
             "118354507",
             [
                 _field("182", ("c", "c")),
-                _field("135", ("a", "dr|||||||||||"), ind1=" ", ind2=" "),
+                _field("135", ("a", "dr|||||||||||")),
                 _field("200", ("a", "The l & o on cd-rom")),
             ],
         )

@@ -4,7 +4,7 @@ Les revues homonymes des deux éditeurs sont fusionnées d'abord, par la fusion 
 
 from sqlalchemy import Connection, text
 
-from domain.merge import DataNature, MergedEntity
+from domain.merge import MergedEntity
 from domain.publishers.publisher import PublisherType
 from infrastructure.repositories.merge_steps import (
     MergeStep,
@@ -23,13 +23,11 @@ MERGE_STEPS: dict[str, MergeStep] = {
     "apc_payments": transfer("apc_payments", "publisher_id"),
     "doi_prefixes": transfer("doi_prefixes", "publisher_id"),
     "name_forms": transfer("publisher_name_forms", "publisher_id"),
-    "name": untouched("publishers", "name", "name_normalized").of_nature(DataNature.MIXED),
+    "name": untouched("publishers", "name", "name_normalized"),
     "created_at": untouched("publishers", "created_at"),
     "openalex_id": fill_empty_unique("publishers", "openalex_id"),
-    "country": fill_empty("publishers", "country").of_nature(DataNature.MIXED),
-    "publisher_type": fill_empty(
-        "publishers", "publisher_type", empty=PublisherType.UNKNOWN.value
-    ).of_nature(DataNature.MIXED),
+    "country": fill_empty("publishers", "country"),
+    "publisher_type": fill_empty("publishers", "publisher_type", empty=PublisherType.UNKNOWN.value),
     "publication_count": untouched("publishers", "publication_count"),
 }
 

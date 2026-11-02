@@ -9,10 +9,13 @@ from typing import Literal
 from sqlalchemy import Connection, text
 
 from domain.publications.identifiers import clean_doi
-from domain.sources.registry import REGISTRY_LOOKUPS, Source
+from domain.sources.registry import DOI_ORG, Source
 
 LookupIdType = Literal["doi", "hal_id", "nnt"]
 """Types d'identifiants cherchés par la phase `fetch_missing`, contraints par `failed_lookups_id_type_check`."""
+
+# Registre qui attribue chaque type d'identifiant. Un identifiant absent de son registre n'existe pas : l'échec de sa recherche est définitif.
+_REGISTRIES: dict[LookupIdType, str] = {"doi": DOI_ORG, "hal_id": Source.HAL, "nnt": Source.THESES}
 
 _RECORD_SQL = text(
     """
@@ -58,20 +61,15 @@ def forget_failed_hal_id_lookup(conn: Connection, hal_id: str) -> None:
 
 
 def pending_failed_lookup_sql(*, source_sql: str, id_type: LookupIdType, value_sql: str) -> str:
-    """Renvoie la condition SQL vraie quand la recherche de l'identifiant dans la source a échoué il y a moins de `:retry_after_days` jours, ou à n'importe quelle date quand la source est le registre de ce type d'identifiant (`REGISTRY_LOOKUPS`).
+    """Renvoie la condition SQL vraie quand la recherche de l'identifiant dans la source a échoué il y a moins de `:retry_after_days` jours, ou à n'importe quelle date quand la source est le registre de ce type d'identifiant (`_REGISTRIES`).
 
     Source et identifiant sont des expressions SQL : paramètre lié, littéral ou colonne. Les sélections de la phase `fetch_missing` l'emploient sous `NOT`.
     """
-    registries = sorted(str(source) for source, t in REGISTRY_LOOKUPS if t == id_type)
-    definitive = (
-        " OR fl.source::text IN (" + ", ".join(f"'{s}'" for s in registries) + ")"
-        if registries
-        else ""
-    )
     return (
         "EXISTS (SELECT 1 FROM failed_lookups fl"
         f" WHERE fl.source = CAST(CAST({source_sql} AS text) AS lookup_source)"
         f" AND fl.id_type = '{id_type}'"
         f" AND fl.id_value = {value_sql}"
-        f" AND (fl.not_found_at > now() - make_interval(days => :retry_after_days){definitive}))"
+        " AND (fl.not_found_at > now() - make_interval(days => :retry_after_days)"
+        f" OR fl.source::text = '{_REGISTRIES[id_type]}'))"
     )

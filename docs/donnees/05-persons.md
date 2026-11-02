@@ -1,6 +1,6 @@
 # Personnes
 
-*À jour le 2026-10-26.*
+*À jour le 2026-11-02.*
 
 Une personne est une personne réelle, identifiée à travers les sources. La phase `persons` rattache chaque [contribution](04-contributions.md) à une personne, et crée les personnes des contributions du périmètre. L'import du référentiel RH crée aussi des personnes. L'administration corrige le résultat, et le pipeline conserve ses décisions.
 
@@ -15,7 +15,8 @@ Schéma PostgreSQL `persons`.
 | `persons` | Nom et prénom, leurs formes normalisées, motif d'exclusion (`exclusion`) | |
 | `person_identifiers` | Identifiants de la personne : [ORCID](../glossaire.md#orcid), [idHAL](../glossaire.md#idhal), [IdRef](../glossaire.md#idref), compte HAL. `source` vaut `auto` pour le pipeline, `manual` pour l'administration. `status` vaut `pending`, `confirmed`, `rejected` ou `authenticated` | Un identifiant appartient à une seule personne |
 | `person_name_forms` | Formes de nom qui désignent la personne, avec leur `status` | Une forme peut désigner plusieurs personnes |
-| `hr_records` | Fiche du référentiel RH ([import](../sources/10-imports-manuels.md#extraction-rh)) | Une fiche par personne. La fiche empêche la suppression de la personne |
+| `hr_records` | Fiche du référentiel RH ([import](../sources/10-imports-manuels.md#extraction-rh)) : matricule, catégorie, corps, grade | Une fiche par personne. La fiche empêche la suppression de la personne |
+| `hr_periods` | Périodes de présence dans une unité, avec la structure reconnue | |
 | `distinct_persons` | Paires de personnes déclarées distinctes | |
 
 ## Décisions humaines
@@ -31,9 +32,9 @@ Deux tables contiennent les décisions de l'administration sur le rattachement d
 
 **Pipeline.** La [phase `persons`](../pipeline/09-persons.md) arbitre les identifiants, rattache les contributions, crée les personnes, régénère les formes de nom et purge. Les identifiants lus dans les sources entrent avec le statut `pending`.
 
-**Import RH** (`interfaces/cli/imports/import_persons.py`). Crée la personne et sa fiche RH.
+**Import RH** (`interfaces/cli/imports/import_persons.py`). Rattache chaque agent à sa fiche RH, ou crée la personne, et met à jour ses périodes de présence.
 
-**Import des ORCID authentifiés** (`interfaces/cli/maintenance/import_authenticated_orcids.py`). Seul cet import pose le statut `authenticated`. Ce statut est définitif. Un déclencheur PostgreSQL garantit ces deux règles.
+**Import des ORCID authentifiés** (`interfaces/cli/imports/import_authenticated_orcids.py`). Seul cet import pose le statut `authenticated`. Ce statut est définitif. Un déclencheur PostgreSQL garantit ces deux règles.
 
 **Administration** (`application/services/persons.py`) :
 

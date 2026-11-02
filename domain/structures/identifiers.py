@@ -13,7 +13,7 @@ _ROR_URL_PREFIXES = (
 _ROR_CANONICAL = re.compile(r"^0[0-9a-hjkmnp-z]{8}$")
 
 
-def normalize_ror_id(raw: str | None) -> str | None:
+def _normalize_ror_id(raw: str | None) -> str | None:
     """Renvoie la forme courte d'un ROR, écrit seul ou dans une URL `ror.org` ; `None` si le format est invalide."""
     if not raw:
         return None
@@ -32,7 +32,7 @@ class RorId(NormalizedIdentifier):
     """Identifiant ROR, sous forme courte : `0` et 8 caractères d'un alphabet sans i, l, o ni u. L'URL `https://ror.org/<id>` sert seulement à l'affichage."""
 
     label = "ROR"
-    normalize = staticmethod(normalize_ror_id)
+    normalize = staticmethod(_normalize_ror_id)
 
 
 def parse_ror_ids(raws: Iterable[str | None]) -> frozenset[RorId]:
@@ -44,7 +44,7 @@ def parse_ror_ids(raws: Iterable[str | None]) -> frozenset[RorId]:
 _HAL_COLLECTION_CANONICAL = re.compile(r"^[A-Z0-9][A-Z0-9_-]*$")
 
 
-def normalize_hal_collection(raw: str | None) -> str | None:
+def _normalize_hal_collection(raw: str | None) -> str | None:
     """Renvoie le code de collection HAL en majuscules ; `None` s'il contient d'autres caractères."""
     if not raw:
         return None
@@ -58,4 +58,4 @@ class HalCollection(NormalizedIdentifier):
     """Code de collection HAL, en majuscules (`LIMOS`, `INSTITUT_PASCAL`)."""
 
     label = "Collection HAL"
-    normalize = staticmethod(normalize_hal_collection)
+    normalize = staticmethod(_normalize_hal_collection)

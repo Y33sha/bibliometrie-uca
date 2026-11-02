@@ -9,27 +9,30 @@ from infrastructure.read_models.filters import (
     WhereClause,
     assemble_where,
     person_active_clause,
-    person_department_clause,
+    person_category_clause,
+    person_corps_clause,
     person_exclusion_clause,
     person_has_identifier_clause,
     person_has_pending_identifiers_clause,
     person_has_pending_name_forms_clause,
     person_has_rh_clause,
     person_in_lab_clause,
-    person_role_clause,
+    person_laboratory_clause,
     person_search_clause,
     persons_sort_clause,
 )
 from infrastructure.read_models.persons.identifiers import person_identifiers
+from infrastructure.read_models.persons.laboratories import laboratories_of, person_periods
 from infrastructure.read_models.persons.models import (
     NameFormSummaryOut,
     PersonFilters,
     PersonIdentifierOut,
+    PersonLaboratoryOut,
     PersonListResponse,
     PersonOut,
     PersonSearchResult,
 )
-from infrastructure.read_models.sql_fragments import other_name_form_holders
+from infrastructure.read_models.sql_fragments import current_unit, other_name_form_holders
 from infrastructure.sql_fragments import CONTRIBUTIONS_AND_SOURCES, has_author_role
 
 # Avec `lab_id`, chaque dénombrement se limite aux contributions de la personne rattachées à ce laboratoire, comme la liste. Le paramètre `:flt_person_lab_id` vient de `person_in_lab_clause`.
@@ -55,8 +58,9 @@ def _person_where(filters: PersonFilters) -> tuple[str, dict[str, object]]:
     """Renvoie la clause WHERE de la liste des personnes, sur les alias `p` (`persons`) et `prh` (`hr_records`)."""
     clauses: list[WhereClause | None] = [
         person_search_clause(filters.search),
-        person_department_clause(filters.departments),
-        person_role_clause(filters.roles),
+        person_category_clause(filters.categories),
+        person_laboratory_clause(filters.laboratories),
+        person_corps_clause(filters.corps),
         person_has_identifier_clause("orcid", filters.has_orcid),
         person_has_identifier_clause("idhal", filters.has_idhal),
         person_has_identifier_clause("idref", filters.has_idref),
@@ -74,7 +78,7 @@ def _list_sql(filters: PersonFilters, where_sql: str, sort: str) -> str:
     """Renvoie la requête triée de la liste des personnes, sans pagination."""
     return f"""
         SELECT p.id, p.last_name, p.first_name,
-            prh.role_title, prh.department_name, prh.start_date, prh.end_date,
+            prh.corps, prh.staff_category,
             (prh.id IS NOT NULL) AS has_rh, p.exclusion,
             {_contribution_counts_sql(lab_scoped=filters.lab_id is not None)}
         FROM persons p
@@ -84,16 +88,19 @@ def _list_sql(filters: PersonFilters, where_sql: str, sort: str) -> str:
     """
 
 
-def _person_out(row: Row[tuple[object, ...]], identifiers: list[PersonIdentifierOut]) -> PersonOut:
+def _person_out(
+    row: Row[tuple[object, ...]],
+    identifiers: list[PersonIdentifierOut],
+    laboratories: list[PersonLaboratoryOut],
+) -> PersonOut:
     """Construit le `PersonOut` d'une ligne de la projection commune à la liste et à `person_curation`."""
     return PersonOut(
         id=row.id,
         last_name=row.last_name,
         first_name=row.first_name,
-        role_title=row.role_title,
-        department_name=row.department_name,
-        start_date=row.start_date,
-        end_date=row.end_date,
+        corps=row.corps,
+        staff_category=row.staff_category,
+        laboratories=laboratories,
         has_rh=row.has_rh,
         exclusion=row.exclusion,
         contribution_count=row.contribution_count,
@@ -113,7 +120,7 @@ class PersonListQueries:
         where_sql, binds = assemble_where([person_exclusion_clause([None]), search_clause])
         rows = self._conn.execute(
             text(f"""
-                SELECT p.id, p.last_name, p.first_name, prh.department_name,
+                SELECT p.id, p.last_name, p.first_name, {current_unit("p")} AS current_unit,
                        (prh.id IS NOT NULL) AS has_rh
                 FROM persons p
                 LEFT JOIN hr_records prh ON prh.person_id = p.id
@@ -128,7 +135,7 @@ class PersonListQueries:
                 id=r.id,
                 last_name=r.last_name,
                 first_name=r.first_name,
-                department_name=r.department_name,
+                current_unit=r.current_unit,
                 has_rh=r.has_rh,
             )
             for r in rows
@@ -158,8 +165,13 @@ class PersonListQueries:
             {**binds, "pg_limit": per_page, "pg_offset": offset},
         ).all()
         # Tous les identifiants de chaque personne, rejetés compris, avec leur type et leur statut : chaque vue filtre selon ses besoins.
-        by_person = person_identifiers(self._conn, [r.id for r in rows], public_only=False)
-        persons = [_person_out(r, by_person.get(r.id, [])) for r in rows]
+        ids = [r.id for r in rows]
+        by_person = person_identifiers(self._conn, ids, public_only=False)
+        periods = person_periods(self._conn, ids)
+        persons = [
+            _person_out(r, by_person.get(r.id, []), laboratories_of(periods.get(r.id, [])))
+            for r in rows
+        ]
 
         return PersonListResponse(total=total, page=page, per_page=per_page, persons=persons)
 
@@ -172,7 +184,12 @@ class PersonListQueries:
         rows, truncated = fetch_export_rows(
             self._conn, _list_sql(filters, where_sql, sort), binds, name="personnes"
         )
-        by_person = person_identifiers(self._conn, [r.id for r in rows], public_only=True)
+        ids = [r.id for r in rows]
+        by_person = person_identifiers(self._conn, ids, public_only=True)
+        periods = person_periods(self._conn, ids)
+
+        def laboratories(person_id: int) -> str:
+            return ", ".join(lab.label for lab in laboratories_of(periods.get(person_id, [])))
 
         def values(person_id: int, id_type: str) -> str:
             found = {i.id_value for i in by_person.get(person_id, []) if i.id_type == id_type}
@@ -186,8 +203,8 @@ class PersonListQueries:
                 "ORCID",
                 "idHAL",
                 "IdRef",
-                "Fonction",
-                "Département",
+                "Corps",
+                "Laboratoire",
                 "Publications",
             ],
             (
@@ -198,8 +215,8 @@ class PersonListQueries:
                     values(r.id, "orcid"),
                     values(r.id, "idhal"),
                     values(r.id, "idref"),
-                    r.role_title or "",
-                    r.department_name or "",
+                    r.corps or "",
+                    laboratories(r.id),
                     r.contribution_count,
                 ]
                 for r in rows
@@ -247,7 +264,7 @@ class PersonListQueries:
         row = self._conn.execute(
             text(f"""
                 SELECT p.id, p.last_name, p.first_name,
-                    prh.role_title, prh.department_name, prh.start_date, prh.end_date,
+                    prh.corps, prh.staff_category,
                     (prh.id IS NOT NULL) AS has_rh, p.exclusion,
                     {_contribution_counts_sql(lab_scoped=False)}
                 FROM persons p
@@ -259,4 +276,5 @@ class PersonListQueries:
         if row is None:
             return None
         by_person = person_identifiers(self._conn, [row.id], public_only=False)
-        return _person_out(row, by_person.get(row.id, []))
+        periods = person_periods(self._conn, [row.id])
+        return _person_out(row, by_person.get(row.id, []), laboratories_of(periods.get(row.id, [])))

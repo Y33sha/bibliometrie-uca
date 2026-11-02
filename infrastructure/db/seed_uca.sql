@@ -724,10 +724,11 @@ INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary,
 SELECT setval(pg_get_serial_sequence('structure_name_forms', 'id'), (SELECT COALESCE(MAX(id), 0) FROM structure_name_forms));
 
 -- config (5 lignes)
-INSERT INTO config (key, value, description) VALUES ('brand_hue', '248', 'Teinte de l''interface : angle OKLCH en degrés, de 0 à 359.') ON CONFLICT (key) DO NOTHING;
-INSERT INTO config (key, value, description) VALUES ('institution_country', '"fr"', 'Pays de l''établissement, code ISO 3166-1. Une publication co-affiliée à un autre pays est une collaboration internationale.') ON CONFLICT (key) DO NOTHING;
-INSERT INTO config (key, value, description) VALUES ('perimeter_extraction', '"alliance_uca"', 'Périmètre pour déterminer les structures à interroger lors de l''extraction') ON CONFLICT (key) DO NOTHING;
-INSERT INTO config (key, value, description) VALUES ('perimeter_persons', '"alliance_uca"', 'Périmètre pour la création des personnes (contributions is_uca)') ON CONFLICT (key) DO NOTHING;
-INSERT INTO config (key, value, description) VALUES ('site_title', '"Bibliométrie UCA"', 'Titre de l''application. Vide : « Bibliométrie » suivi du nom de l''établissement.') ON CONFLICT (key) DO NOTHING;
+DELETE FROM config WHERE (key IN ('brand_hue', 'institution_country', 'perimeter_extraction', 'perimeter_persons', 'site_title')) AND (key) NOT IN (('brand_hue'), ('institution_country'), ('perimeter_extraction'), ('perimeter_persons'), ('site_title'));
+INSERT INTO config (key, value, description) VALUES ('brand_hue', '248', 'Teinte de l''interface : angle OKLCH en degrés, de 0 à 359.') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, description = EXCLUDED.description;
+INSERT INTO config (key, value, description) VALUES ('institution_country', '"fr"', 'Pays de l''établissement, code ISO 3166-1. Une publication co-affiliée à un autre pays est une collaboration internationale.') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, description = EXCLUDED.description;
+INSERT INTO config (key, value, description) VALUES ('perimeter_extraction', '"alliance_uca"', 'Périmètre pour déterminer les structures à interroger lors de l''extraction') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, description = EXCLUDED.description;
+INSERT INTO config (key, value, description) VALUES ('perimeter_persons', '"alliance_uca"', 'Périmètre pour la création des personnes (contributions is_uca)') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, description = EXCLUDED.description;
+INSERT INTO config (key, value, description) VALUES ('site_title', '"Bibliométrie UCA"', 'Titre de l''application. Vide : « Bibliométrie » suivi du nom de l''établissement.') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, description = EXCLUDED.description;
 
 COMMIT;

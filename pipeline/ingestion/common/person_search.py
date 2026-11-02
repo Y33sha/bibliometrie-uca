@@ -12,8 +12,12 @@ from typing import ClassVar
 
 from sqlalchemy import Connection, text
 
-from domain.persons.identifiers import PERSON_IDENTIFIER_LABELS, PersonIdentifierType
-from domain.sources.registry import PROFILES, SEARCHED_IDENTIFIER_STATUSES, Source
+from domain.persons.identifiers import (
+    HUMAN_ATTRIBUTION_STATUSES,
+    PERSON_IDENTIFIER_LABELS,
+    PersonIdentifierType,
+)
+from domain.sources.registry import PROFILES, Source
 from domain.sources.staging import StagingEntryMode
 from domain.types import JsonValue
 from pipeline.http.circuit_breaker import SourceUnavailableError, trip_source
@@ -35,7 +39,7 @@ type Identifiers = Mapping[PersonIdentifierType, list[str]]
 def searched_persons(
     conn: Connection, id_types: Collection[PersonIdentifierType]
 ) -> list[Identifiers]:
-    """Renvoie, par personne RH, ses identifiants des types `id_types` aux statuts `SEARCHED_IDENTIFIER_STATUSES`. Une personne sans identifiant de ces types est absente."""
+    """Renvoie, par personne RH, ses identifiants des types `id_types` aux statuts `HUMAN_ATTRIBUTION_STATUSES`. Une personne sans identifiant de ces types est absente."""
     rows = conn.execute(
         text("""
             SELECT pi.person_id, pi.id_type::text AS id_type, pi.id_value
@@ -45,7 +49,7 @@ def searched_persons(
               AND EXISTS (SELECT 1 FROM hr_records r WHERE r.person_id = pi.person_id)
             ORDER BY pi.person_id, pi.id_type, pi.id_value
         """),
-        {"id_types": sorted(id_types), "statuses": sorted(SEARCHED_IDENTIFIER_STATUSES)},
+        {"id_types": sorted(id_types), "statuses": sorted(HUMAN_ATTRIBUTION_STATUSES)},
     )
     persons: dict[int, dict[PersonIdentifierType, list[str]]] = {}
     for r in rows:

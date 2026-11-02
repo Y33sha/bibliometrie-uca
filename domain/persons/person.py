@@ -1,11 +1,8 @@
-"""Personne, et motifs de son exclusion."""
+"""Nom d'une personne, et motifs de son exclusion."""
 
-from dataclasses import dataclass, field
 from enum import StrEnum
 
 from domain.errors import ValidationError
-from domain.persons.identifier_attribution import IdentifierAttribution
-from domain.persons.name_forms import PersonNameForm
 
 
 def validated_name(last_name: str, first_name: str) -> tuple[str, str]:
@@ -27,17 +24,3 @@ class PersonExclusion(StrEnum):
     NOT_A_PERSON = "not_a_person"
     # Personne réelle, rattachée au périmètre par erreur.
     OUT_OF_PERIMETER = "out_of_perimeter"
-
-
-@dataclass(slots=True)
-class Person:
-    """Chercheur, qui réunit ses contributions sources de toutes les sources."""
-
-    id: int | None
-    last_name: str
-    first_name: str
-    last_name_normalized: str
-    first_name_normalized: str
-    exclusion: PersonExclusion | None = None
-    identifiers: tuple[IdentifierAttribution, ...] = field(default=())
-    name_forms: tuple[PersonNameForm, ...] = field(default=())

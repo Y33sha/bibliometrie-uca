@@ -50,6 +50,8 @@
 		chart = new Chart(canvas, {
 			type: 'scatter',
 			data: {
+				// Année de chaque point, lue par l'atténuation de l'année en cours ; l'axe linéaire ignore les libellés.
+				labels: scattered.map((d) => String(d.point?.year)),
 				datasets: [
 					{
 						label: valueLabel,

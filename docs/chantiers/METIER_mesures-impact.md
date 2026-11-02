@@ -22,7 +22,7 @@
 
 **Moteur des statistiques** (`infrastructure/read_models/stats/pivot.py`). Un indicateur agrège une mesure additive sur chaque groupe : nombre de publications, montant des APC. Une dimension empilée ventile chaque barre. Une part (top 10 %) ou une moyenne (FWCI) ne s'additionne pas, donc ne s'empile pas.
 
-**Dashboards.** Les dashboards de structure, de personne, d'éditeur et de revue (`PublicationsDashboard.svelte`) passent par le même moteur. Chiffres clés : publications, part en open access, part de collaborations internationales, thèses. Corpus : famille « Publications », cinq dernières années, année en cours comprise.
+**Dashboards.** Les dashboards de structure, de personne, d'éditeur et de revue (`PublicationsDashboard.svelte`) passent par le même moteur. Corpus : famille « Publications », année en cours et cinq années précédentes.
 
 ## Décisions
 

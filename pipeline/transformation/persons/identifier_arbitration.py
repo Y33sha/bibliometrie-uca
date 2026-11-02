@@ -14,7 +14,7 @@ from typing import NamedTuple
 
 from sqlalchemy import Connection, bindparam, text
 
-from domain.persons.identifiers import PERSON_IDENTIFIER_TYPES, IdentifierNeutralization
+from domain.persons.identifiers import IdentifierNeutralization, PersonIdentifierType
 from domain.persons.matching import identifier_misplaced, strict_majority
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.db.queues import Queue, enqueue, enqueue_sql
@@ -80,7 +80,7 @@ def fetch_identifier_votes(conn: Connection) -> dict[IdentifierKey, dict[str, in
             {_IDENTIFIERS}
             JOIN source_contributions sc ON sc.contributor_information_id = ci.id
             WHERE ci.author_name_normalized IS NOT NULL
-              AND {_trusted_identifier_of_types(PERSON_IDENTIFIER_TYPES)}
+              AND {_trusted_identifier_of_types(tuple(PersonIdentifierType))}
               AND {person_source_contribution("sc")}
               AND NOT {shared}
             GROUP BY 1, 2, 3
@@ -238,7 +238,7 @@ def requalify_misplaced_identifiers(
     Renvoie `{neutralized, marked_contributions}` : nombres d'identifiants neutralisés et de contributions marquées.
     """
     misplaced: dict[int, list[str]] = defaultdict(list)
-    for id_type in PERSON_IDENTIFIER_TYPES:
+    for id_type in PersonIdentifierType:
         for information in fetch_contributor_information_identifiers(conn, id_type):
             if identifier_misplaced(information.name, consensus.get((id_type, information.value))):
                 misplaced[information.contributor_information_id].append(id_type)

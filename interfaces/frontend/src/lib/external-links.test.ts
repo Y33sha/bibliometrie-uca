@@ -36,7 +36,7 @@ const HOTES_AFFICHABLES = new Set([
 	'doaj.org',
 	// Rapport de participation d'un membre Crossref, depuis la liste des éditeurs.
 	'www.crossref.org',
-	// Notice d'un ISSN lié à une revue sans y être rattaché, depuis la fiche de la revue.
+	// Notice d'un ISSN.
 	'portal.issn.org'
 ]);
 
