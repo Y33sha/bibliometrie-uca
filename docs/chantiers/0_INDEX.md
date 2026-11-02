@@ -4,7 +4,6 @@
 
 ### En cours
 
-- [Ancrage des décisions humaines](CODE_ancrage-des-decisions-humaines.md)
 - [Audit de la qualité de la résolution des personnes](DATA_audit-qualite-resolution-personnes.md)
 - [Pertinence des sujets](DATA_pertinence-des-sujets.md)
 
@@ -19,6 +18,7 @@
 
 ## Chantiers archivés
 
+- 2026-11-02 — [Ancrage des décisions humaines](archived/2026-11-02_CODE_ancrage-des-decisions-humaines.md)
 - 2026-11-02 — [Signatures institutionnelles : adresses brutes](archived/2026-11-02_METIER_signatures-institutionnelles.md)
 - 2026-11-02 — [Vocabulaires des sujets](archived/2026-11-02_DATA_vocabulaires-des-sujets.md)
 - 2026-11-02 — [Mesures d'impact](archived/2026-11-02_METIER_mesures-impact.md)

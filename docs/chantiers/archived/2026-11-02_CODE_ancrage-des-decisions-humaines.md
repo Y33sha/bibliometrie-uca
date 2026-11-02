@@ -16,9 +16,9 @@ Base locale, 2026-11-02 : le journal d'audit compte 3 289 contributions sources 
 
 D'autres chantiers prévoient des décisions de même nature :
 
-- [gestion des publications](METIER_gestion-admin-des-publications.md) : interdiction de fusion, veto sur un lien entre contribution source et structure ;
-- [audit de la résolution des personnes](DATA_audit-qualite-resolution-personnes.md) : scission d'une contribution, revue des liens d'alignement ;
-- [pertinence des sujets](DATA_pertinence-des-sujets.md) : rejet manuel d'un sujet.
+- [gestion des publications](../METIER_gestion-admin-des-publications.md) : interdiction de fusion, veto sur un lien entre contribution source et structure ;
+- [audit de la résolution des personnes](../DATA_audit-qualite-resolution-personnes.md) : scission d'une contribution, revue des liens d'alignement ;
+- [pertinence des sujets](../DATA_pertinence-des-sujets.md) : rejet manuel d'un sujet.
 
 ## Décisions
 
@@ -46,9 +46,3 @@ D'autres chantiers prévoient des décisions de même nature :
 ### Phase 4 — Documentation
 
 - [x] Normalisation des contributions sources, rejets, purge des adresses (e0287e2c6, fb42e6542, dd0b879af).
-
-## Questions ouvertes
-
-- **Rejets en sommeil** : les compter dans le journal du pipeline, les lister dans l'administration ?
-- **Épinglages perdus** : le journal d'audit donne l'identifiant des contributions sources supprimées, et la publication d'un épinglage unitaire. Une récupération partielle est-elle utile ?
-- **Purge des personnes** : un statut décidé d'identifiant ou de forme de nom épargne-t-il la personne ?
