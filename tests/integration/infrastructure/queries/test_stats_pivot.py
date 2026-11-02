@@ -135,6 +135,26 @@ class TestCitationClass:
         }
 
 
+class TestCitationCount:
+    def test_somme_par_acces_publication_sans_indicateur_a_zero(self, sa_sync_conn):
+        for oa_status, impact in (
+            ("gold", '{"cited_by_count": 5}'),
+            ("gold", '{"cited_by_count": 2}'),
+            ("closed", '{"top_10_percent": false}'),
+            ("closed", None),
+        ):
+            publication_id = insert_publication(
+                sa_sync_conn, in_perimeter=True, oa_status=oa_status
+            )
+            sa_sync_conn.execute(
+                text("UPDATE publications SET impact = CAST(:impact AS jsonb) WHERE id = :id"),
+                {"impact": impact, "id": publication_id},
+            )
+
+        res = _piv(sa_sync_conn, "citation_count", ["oa_access"], doc_types=())
+        assert {r["oa_access"]: r["value"] for r in res.rows} == {"ouvert": 7, "ferme": 0}
+
+
 class TestApcAmount:
     """Montant des APC : paiements imputés au budget d'une structure du périmètre, tous frais confondus."""
 

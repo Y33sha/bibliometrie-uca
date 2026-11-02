@@ -11,6 +11,7 @@ from domain.source_records.source_extras import SourceExtra
 from domain.sources.registry import Source
 from domain.subjects.subject import SubjectVocabulary
 from infrastructure.db.source_record_identifiers import source_record_doi_sql
+from infrastructure.read_models.filters import CITATION_TOP_SQL
 from infrastructure.read_models.publications.copies import publication_copies
 from infrastructure.read_models.publications.models import (
     AccessLinkOut,
@@ -29,7 +30,7 @@ from infrastructure.read_models.sql_fragments import (
     contributor_display_name,
 )
 from infrastructure.read_models.subjects.models import SubjectOut
-from infrastructure.sql_fragments import active_issns, is_laboratory
+from infrastructure.sql_fragments import active_issns, cited_by_count, is_laboratory
 
 
 def get_publication_relations(conn: Connection, publication_id: int) -> list[RelatedPublicationOut]:
@@ -201,7 +202,8 @@ class PublicationDetailQueries:
                        j.oa_model,
                        m.id AS monograph_id, m.title AS monograph_title,
                        pub.id AS publisher_id, pub.name AS publisher_name,
-                       dp.ra AS doi_ra
+                       dp.ra AS doi_ra,
+                       {cited_by_count()} AS cited_by_count, {CITATION_TOP_SQL} AS citation_top
                 FROM publications p
                 LEFT JOIN publications_detail d ON d.publication_id = p.id
                 LEFT JOIN serials j ON j.id = p.serial_id
@@ -372,6 +374,8 @@ class PublicationDetailQueries:
                 monograph_title=publication_row.monograph_title,
                 publisher_id=publication_row.publisher_id,
                 publisher_name=publication_row.publisher_name,
+                cited_by_count=publication_row.cited_by_count,
+                citation_top=publication_row.citation_top,
             ),
             sources=sources,
             contributions=contributions,

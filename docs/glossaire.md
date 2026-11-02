@@ -21,6 +21,9 @@ Référentiel d'entités de HAL : auteurs, structures, revues.
 ## Auteur correspondant
 Auteur désigné comme contact principal de l'éditeur. Une publication en a parfois deux ou trois. Les [APC](#apc) sont en général payés par la structure de rattachement de l'auteur correspondant. Les sources renseignent inégalement cette information.
 
+## Citations
+Nombre de publications qui citent une publication. Chaque base compte les citations dans son propre corpus. Le nombre affiché pour une publication est celui d'[OpenAlex](#openalex). Il croît avec l'âge de la publication et varie selon la discipline.
+
 ## Collection HAL
 Sous-portail HAL qui réunit les publications d'une structure : les dépôts avec au moins un auteur affilié à cette structure. Chaque collection a un code, souvent l'acronyme du laboratoire (exemple : https://hal.science/PIAF). La collection d'une tutelle réunit les publications de ses sous-structures, d'après l'arborescence d'[AuréHAL](#auréhal).
 
@@ -120,6 +123,11 @@ Publication en série périodique, identifiée par un ou plusieurs [ISSN](#issn)
 
 ## ScanR
 Portail du ministère de l'Enseignement supérieur et de la Recherche sur la recherche française. Voir [détails](sources/05-scanr.md).
+
+## Seuils de citation
+Publications parmi les 1 % ou les 10 % les plus citées au monde. La comparaison porte sur les publications de même type, de même année et de même sous-discipline. Les seuils sont calculés par [OpenAlex](#openalex). Le top 10 % comprend le top 1 %. La référence mondiale vaut donc 10 % pour le top 10 % et 1 % pour le top 1 %.
+
+Les publications absentes d'OpenAlex sont sans seuil, comme la plupart des thèses, preprints, rapports et jeux de données. Les parts des dashboards se rapportent aux publications pourvues d'un seuil.
 
 ## Synthèse
 Article de synthèse, ou revue de la littérature (*review*). Dans WoS, *book review* désigne un compte rendu d'ouvrage.

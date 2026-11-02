@@ -63,7 +63,7 @@
 	const indicatorDef = $derived(pivotSchema?.indicators.find((i) => i.key === indicator));
 	// Dimension empilée dans chaque barre, imposée par l'indicateur.
 	const breakdown = $derived(indicatorDef?.breakdown ?? '');
-	// Valeur affichée d'une barre ou d'un total : entier pour un nombre de publications, montant arrondi à l'euro suivi de l'unité pour une somme.
+	// Valeur affichée d'une barre ou d'un total : entier, suivi de l'unité de la mesure quand elle en a une.
 	function formatValue(value: number): string {
 		const unit = indicatorDef?.unit;
 		const text = Math.round(value).toLocaleString('fr-FR');

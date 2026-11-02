@@ -18,6 +18,7 @@ from infrastructure.read_models.sql_fragments import (
     contributor_display_name,
     source_contribution_structure_ids,
 )
+from infrastructure.sql_fragments import cited_by_count
 
 
 def _text(mapping: Mapping[str, object], key: str) -> str | None:
@@ -65,6 +66,7 @@ def _record(r: Row[tuple[object, ...]]) -> SourceRecordMetadataOut:
         issue=_text(biblio, BiblioKey.ISSUE),
         pages=_pages(biblio),
         article_number=_text(biblio, BiblioKey.ARTICLE_NUMBER),
+        cited_by_count=r.cited_by_count,
     )
 
 
@@ -146,7 +148,7 @@ class PublicationSourceRecordQueries:
                        lang.name AS language_name,
                        CASE WHEN sr.raw_language IS DISTINCT FROM sr.language
                             THEN sr.raw_language END AS language_raw,
-                       sr.container_title, sr.biblio,
+                       sr.container_title, sr.biblio, {cited_by_count("sr")} AS cited_by_count,
                        j.id AS serial_id, j.title AS journal_title,
                        pub.id AS publisher_id, pub.name AS publisher_name
                 FROM source_records sr

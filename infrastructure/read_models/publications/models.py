@@ -289,6 +289,10 @@ class PublicationDetailCore(Model):
     publisher_id: int | None
     """Éditeur de la revue, à défaut celui de la monographie."""
     publisher_name: str | None
+    cited_by_count: int | None
+    """Nombre de citations, d'après OpenAlex."""
+    citation_top: str | None
+    """Seuil de citation le plus haut atteint (`CitationTop`)."""
 
 
 class SourceRecordOut(Model):
@@ -463,6 +467,8 @@ class SourceRecordMetadataOut(Model):
     pages: str | None
     """Plage de pages de la source, ou composée de la première et de la dernière page."""
     article_number: str | None
+    cited_by_count: int | None
+    """Nombre de citations, compté dans la base de la source."""
 
     @computed_field
     @property

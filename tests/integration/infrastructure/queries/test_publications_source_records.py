@@ -136,6 +136,20 @@ class TestGetPublicationSources:
         [record] = _records(sa_sync_conn, publication)
         assert (record.pages, record.article_number) == ("e1234", "e1235")
 
+    def test_citations_counted_by_each_source(self, sa_sync_conn):
+        publication = insert_publication(sa_sync_conn)
+        _source_record(sa_sync_conn, publication, source="openalex", source_id="W3")
+        _source_record(sa_sync_conn, publication, source="hal", source_id="hal-3")
+        sa_sync_conn.execute(
+            text(
+                'UPDATE source_records SET impact = \'{"cited_by_count": 12, "fwci": 1.5}\' '
+                "WHERE source = 'openalex' AND publication_id = :pid"
+            ),
+            {"pid": publication},
+        )
+        records = _records(sa_sync_conn, publication)
+        assert {r.source: r.cited_by_count for r in records} == {"openalex": 12, "hal": None}
+
     def test_language_name_and_source_value(self, sa_sync_conn):
         publication = insert_publication(sa_sync_conn)
         _source_record(sa_sync_conn, publication, source="wos", source_id="WOS:1")

@@ -2,7 +2,9 @@
   import { asset } from "$app/paths";
   import type { AssetPath } from "$app/types";
   import AccessButton from "#lib/components/AccessButton.svelte";
+  import CitationTopBadge from "#lib/components/CitationTopBadge.svelte";
   import SourceTag from "#lib/components/SourceTag.svelte";
+  import { formatCount } from "#lib/plural.js";
   import { accessTag } from "#lib/labels.js";
   import LicenseBadge from "#lib/components/LicenseBadge.svelte";
   import { sourceLabel, sourceOrder } from "#lib/sources.svelte.js";
@@ -127,6 +129,17 @@
       </div>
     </div>
   {/if}
+
+  {#if pub.cited_by_count != null}
+    <div class="sidebar-block">
+      <h2 class="sidebar-title">Citations</h2>
+      <div class="citations">
+        <span class="row-label">{formatCount(pub.cited_by_count, "citation")}</span>
+        {#if pub.citation_top}<CitationTopBadge top={pub.citation_top} />{/if}
+      </div>
+      <div class="citations-source">d'après OpenAlex</div>
+    </div>
+  {/if}
 </aside>
 
 <style>
@@ -207,5 +220,15 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  .citations {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .citations-source {
+    margin-top: 4px;
+    font-size: var(--fs-sm);
+    color: var(--muted);
   }
 </style>
