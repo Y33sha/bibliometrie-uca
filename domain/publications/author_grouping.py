@@ -227,12 +227,8 @@ def comparison_levels(x: Author, y: Author) -> dict[Comparison, ComparisonLevel 
     return levels
 
 
-def position_only(x: Author, y: Author) -> bool:
-    """Vrai si seule la position relie les deux auteurs : noms de famille sans ressemblance, prénoms sans ressemblance ou absents, aucun identifiant commun."""
-    return _position_only(comparison_levels(x, y))
-
-
-def _position_only(levels: Mapping[Comparison, ComparisonLevel | None]) -> bool:
+def position_only(levels: Mapping[Comparison, ComparisonLevel | None]) -> bool:
+    """Vrai si seule la position relie deux auteurs, d'après leurs niveaux de comparaison (`comparison_levels`) : noms de famille sans ressemblance, prénoms sans ressemblance ou absents, aucun identifiant commun."""
     return (
         levels[Comparison.LAST_NAME] == ComparisonLevel.ELSE
         and levels[Comparison.FIRST_NAME] in (ComparisonLevel.ELSE, None)
@@ -240,14 +236,10 @@ def _position_only(levels: Mapping[Comparison, ComparisonLevel | None]) -> bool:
     )
 
 
-def conflicting_initials(x: Author, y: Author) -> bool:
-    """Vrai pour des noms de famille seulement proches et des premières initiales différentes, sans identifiant commun : « V. Balakrishnan » et « S. Balaji »."""
-    return _conflicting_initials(x, y, comparison_levels(x, y))
-
-
-def _conflicting_initials(
+def conflicting_initials(
     x: Author, y: Author, levels: Mapping[Comparison, ComparisonLevel | None]
 ) -> bool:
+    """Vrai pour des noms de famille seulement proches et des premières initiales différentes, sans identifiant commun : « V. Balakrishnan » et « S. Balaji ». `levels` : niveaux de comparaison des deux auteurs (`comparison_levels`)."""
     return (
         levels[Comparison.LAST_NAME]
         in (ComparisonLevel.JW_092, ComparisonLevel.JW_08, ComparisonLevel.ELSE)
@@ -268,12 +260,8 @@ class ResidualModel:
 
     weights: Mapping[str, Mapping[str, float]]
 
-    def score(self, x: Author, y: Author) -> float:
-        """Renvoie la somme des poids des comparaisons entre deux auteurs, sans a priori."""
-        return self.score_levels(comparison_levels(x, y))
-
     def score_levels(self, levels: Mapping[Comparison, ComparisonLevel | None]) -> float:
-        """Renvoie la somme des poids de niveaux de comparaison déjà calculés."""
+        """Renvoie la somme des poids des niveaux de comparaison de deux auteurs (`comparison_levels`), sans a priori."""
         return sum(
             self.weights[name].get(level, 0.0)
             for name, level in levels.items()
@@ -710,8 +698,8 @@ def _residual_links(
             kept = [
                 (y, levels)
                 for y in members[index]
-                if not _position_only(levels := comparison_levels(x, y))
-                and not _conflicting_initials(x, y, levels)
+                if not position_only(levels := comparison_levels(x, y))
+                and not conflicting_initials(x, y, levels)
             ]
             # Le blocage s'applique seulement aux contributions sources retenues ; le trou est celui de la contribution.
             if not kept or not (
