@@ -19,7 +19,7 @@ Les dates des deux affectations diffèrent sur 74 lignes.
 - Catégorie : 2 020 lignes `ENSEIG`, 534 lignes `BIATSS`.
 - 1 547 matricules sont présents dans les deux exports. 528 sont présents seulement dans l'export de novembre, en majorité `BIATSS`. 99 sont présents seulement dans l'export de décembre.
 - La répartition organisationnelle compte 48 libellés abrégés. Certains laboratoires ont plusieurs libellés, suffixés (` - Sciences`, ` - SVSAE`…). D'autres libellés désignent des laboratoires extérieurs ou des services.
-- La reconnaissance des structures (`StructureNameMatcher`) trouve une structure pour 44 de ces 48 libellés, avec le nom de l'établissement comme contexte. Deux libellés de laboratoire restent sans correspondance.
+- La reconnaissance des structures (`StructureNameMatcher`) trouve une structure pour 44 de ces 48 libellés, avec le nom de l'établissement comme contexte. Trois libellés de laboratoire restent sans correspondance. Deux laboratoires sont absents de `structures`. Le troisième a une forme courte, un mot courant, reconnue seulement avec le contexte d'un autre établissement.
 
 ## Décisions
 
