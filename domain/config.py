@@ -4,7 +4,7 @@ from collections.abc import Callable
 from enum import StrEnum
 from typing import NamedTuple
 
-from domain.countries import NO_COUNTRY_CODE, normalize_country_code
+from domain.countries import normalize_country_code
 from domain.errors import NotFoundError, ValidationError
 from domain.structures.structure import StructureType
 from domain.types import JsonValue
@@ -121,7 +121,7 @@ def _site_title(key: str, value: JsonValue) -> JsonValue:
 def _institution_country(key: str, value: JsonValue) -> JsonValue:
     """Code pays à deux lettres, en minuscules."""
     code = normalize_country_code(value) if isinstance(value, str) else None
-    if code is None or code == NO_COUNTRY_CODE:
+    if code is None:
         raise ValidationError(f"`{key}` attend un code pays à deux lettres ; reçu : {value!r}")
     return code
 
