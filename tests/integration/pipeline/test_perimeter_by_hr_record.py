@@ -1,4 +1,4 @@
-"""Entrée dans le périmètre par les identifiants d'une personne qui a une fiche RH : identifiant fort, dates du contrat, filtres de confiance, recalcul après édition d'une adresse."""
+"""Entrée dans le périmètre par les identifiants d'une personne qui a une fiche RH : identifiant fort, périodes de présence, filtres de confiance, recalcul après édition d'une adresse."""
 
 import datetime
 
@@ -10,6 +10,7 @@ from pipeline.transformation.structures.perimeter_evidence import (
     sync_perimeter_evidence,
 )
 from tests.integration.helpers.persons import (
+    insert_hr_period,
     insert_hr_record,
     insert_person,
     insert_person_identifier,
@@ -21,9 +22,10 @@ _ORCID = "0000-0001-2345-6789"
 
 @pytest.fixture
 def rh_person(sa_sync_conn) -> int:
-    """Insère une personne RH sous contrat de 2020 à 2023, à ORCID confirmé."""
+    """Insère une personne RH présente de 2020 à 2023, à ORCID confirmé."""
     person = insert_person(sa_sync_conn, "Rh")
-    insert_hr_record(
+    insert_hr_record(sa_sync_conn, person)
+    insert_hr_period(
         sa_sync_conn,
         person,
         start_date=datetime.date(2020, 9, 1),
@@ -100,6 +102,54 @@ def test_contribution_source_de_l_annee_d_arrivee_reste_hors_perimetre(sa_sync_c
     assert not _in_perimeter(sa_sync_conn, arrivee)
 
 
+def test_changement_d_unite_sans_interruption_garde_la_presence(sa_sync_conn):
+    """Composante jusqu'en 2023, laboratoire dès le lendemain : 2024 reste une année de présence."""
+    person = insert_person(sa_sync_conn, "Rh")
+    insert_hr_record(sa_sync_conn, person)
+    insert_hr_period(
+        sa_sync_conn,
+        person,
+        unit_label="UFR",
+        start_date=datetime.date(2010, 9, 1),
+        end_date=datetime.date(2023, 12, 31),
+    )
+    insert_hr_period(sa_sync_conn, person, unit_label="LAB", start_date=datetime.date(2024, 1, 1))
+    insert_person_identifier(
+        sa_sync_conn, person, id_type="orcid", id_value=_ORCID, status="confirmed"
+    )
+    source_contribution = _source_contribution(sa_sync_conn, publication_year=2024)
+
+    sync_perimeter_evidence(sa_sync_conn, perimeter_ids=[])
+
+    assert _in_perimeter(sa_sync_conn, source_contribution)
+
+
+def test_annee_du_retour_apres_un_depart_reste_hors_perimetre(sa_sync_conn):
+    person = insert_person(sa_sync_conn, "Rh")
+    insert_hr_record(sa_sync_conn, person)
+    insert_hr_period(
+        sa_sync_conn,
+        person,
+        start_date=datetime.date(2010, 9, 1),
+        end_date=datetime.date(2015, 8, 31),
+    )
+    insert_hr_period(sa_sync_conn, person, start_date=datetime.date(2020, 9, 1))
+    insert_person_identifier(
+        sa_sync_conn, person, id_type="orcid", id_value=_ORCID, status="confirmed"
+    )
+    absent, retour, ensuite = (
+        _source_contribution(sa_sync_conn, publication_year=2017),
+        _source_contribution(sa_sync_conn, publication_year=2020),
+        _source_contribution(sa_sync_conn, publication_year=2021),
+    )
+
+    sync_perimeter_evidence(sa_sync_conn, perimeter_ids=[])
+
+    assert not _in_perimeter(sa_sync_conn, absent)
+    assert not _in_perimeter(sa_sync_conn, retour)
+    assert _in_perimeter(sa_sync_conn, ensuite)
+
+
 def test_orcid_d_une_source_non_fiable_ou_neutralise_ignore(sa_sync_conn, rh_person):
     wos = _source_contribution(sa_sync_conn, publication_year=2021, source="wos")
     neutralise = _source_contribution(
@@ -114,7 +164,8 @@ def test_orcid_d_une_source_non_fiable_ou_neutralise_ignore(sa_sync_conn, rh_per
 
 def test_identifiant_en_attente_ignore(sa_sync_conn):
     person = insert_person(sa_sync_conn, "Rh")
-    insert_hr_record(sa_sync_conn, person, start_date=datetime.date(2020, 1, 1))
+    insert_hr_record(sa_sync_conn, person)
+    insert_hr_period(sa_sync_conn, person, start_date=datetime.date(2020, 1, 1))
     insert_person_identifier(sa_sync_conn, person, id_type="orcid", id_value=_ORCID)
     source_contribution = _source_contribution(sa_sync_conn, publication_year=2021)
 

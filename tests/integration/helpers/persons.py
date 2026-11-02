@@ -124,6 +124,29 @@ def insert_hr_record(
     )
 
 
+def insert_hr_period(
+    conn: Connection,
+    person_id: int,
+    *,
+    unit_label: str = "Test",
+    start_date: datetime.date | None = None,
+    end_date: datetime.date | None = None,
+    structure_id: int | None = None,
+) -> int:
+    """Insère une période de présence de la personne `person_id` et renvoie son `id`."""
+    return insert_row(
+        conn,
+        "hr_periods",
+        {
+            "person_id": person_id,
+            "unit_label": unit_label,
+            "start_date": start_date,
+            "end_date": end_date,
+            "structure_id": structure_id,
+        },
+    )
+
+
 def insert_rejected_contribution(
     conn: Connection, publication_id: int, *, person_id: int, ignore_conflict: bool = False
 ) -> None:

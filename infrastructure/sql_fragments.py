@@ -152,13 +152,32 @@ def strong_identifier_source_contributions(
     """
 
 
-# Identifiants des personnes RH, aux statuts interrogés, avec les années de présence : de l'année qui suit l'arrivée à l'année de fin de contrat. Sans date : 0, 9999.
+# Intervalles de présence continue d'une personne, toutes unités confondues : une période ouvre un intervalle quand elle commence plus d'un jour après la fin de toutes les précédentes. Une date absente est une borne ouverte.
+_HR_PRESENCE = """(
+    SELECT person_id, min(start_date) AS start_date,
+           CASE WHEN bool_or(end_date IS NULL) THEN NULL ELSE max(end_date) END AS end_date
+    FROM (
+        SELECT *, sum(opens) OVER (PARTITION BY person_id ORDER BY start_date NULLS FIRST, id) AS span
+        FROM (
+            SELECT id, person_id, start_date, end_date,
+                   CASE WHEN start_date <= max(coalesce(end_date, 'infinity'::date)) OVER (
+                            PARTITION BY person_id ORDER BY start_date NULLS FIRST, id
+                            ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING
+                        ) + 1
+                        THEN 0 ELSE 1 END AS opens
+            FROM hr_periods
+        ) periods
+    ) numbered
+    GROUP BY person_id, span
+)"""
+
+# Identifiants des personnes RH, aux statuts interrogés, avec les années de présence de chaque intervalle : de l'année qui suit le début à l'année de fin. Sans date : 0, 9999.
 _RH_IDENTIFIERS = f"""(
     SELECT pi.person_id, pi.id_type::text AS id_type, pi.id_value,
            coalesce(extract(year FROM r.start_date)::int + 1, 0) AS first_year,
            coalesce(extract(year FROM r.end_date)::int, 9999) AS last_year
     FROM person_identifiers pi
-    JOIN hr_records r ON r.person_id = pi.person_id
+    JOIN {_HR_PRESENCE} r ON r.person_id = pi.person_id
     WHERE pi.status::text IN {in_clause(tuple(sorted(SEARCHED_IDENTIFIER_STATUSES)))}
 )"""
 
@@ -166,7 +185,7 @@ _RH_IDENTIFIERS = f"""(
 def hr_record_source_contributions(source_contribution_filter: str = "") -> str:
     """Renvoie la requête des ids des contributions sources entrées dans le périmètre par l'identifiant fort d'une personne à fiche RH.
 
-    La publication paraît entre l'année suivant l'arrivée de la personne et l'année de fin de son contrat. La personne est sans rejet pour l'enregistrement source.
+    La publication paraît pendant un intervalle de présence de la personne, de l'année suivant son début à l'année de sa fin. La personne est sans rejet pour l'enregistrement source.
 
     Args:
         source_contribution_filter: condition supplémentaire sur la contribution source `sc_auth`.
