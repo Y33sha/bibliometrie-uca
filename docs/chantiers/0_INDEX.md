@@ -13,7 +13,6 @@
 - [Brevets](DATA_brevets.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
 - [Listes de revues](DATA_listes-de-revues.md)
-- [Mesures d'impact](METIER_mesures-impact.md)
 - [Résolution probabiliste des personnes](DATA_resolution-personnes-probabiliste.md)
 - [Signatures institutionnelles](METIER_signatures-institutionnelles.md)
 - [Types de document](DATA_types-document.md)
@@ -21,6 +20,7 @@
 
 ## Chantiers archivés
 
+- 2026-11-02 — [Mesures d'impact](archived/2026-11-02_METIER_mesures-impact.md)
 - 2026-11-02 — [Export RH SIHAM : matricule, périodes de présence, laboratoires](archived/2026-11-02_DATA_export-rh-siham.md)
 - 2026-11-01 — [Preprints et versions d'une publication](archived/2026-11-01_DATA_preprints-et-versions.md)
 - 2026-11-01 — [Qualité du référentiel de l'édition](archived/2026-11-01_DATA_referentiel-edition.md)

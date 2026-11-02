@@ -29,11 +29,11 @@
 - **Colonne JSONB `publications.impact`**, de même forme que `source_records.impact`. Un fragment SQL par indicateur sert au tri, au filtre et aux statistiques.
 - **Les indicateurs viennent du premier enregistrement OpenAlex dans l'ordre d'arbitrage** (`arbitration_order`), donc de la version publiée avant le preprint. Ils décrivent ainsi la même œuvre, comptée dans la même base. Une publication absente d'OpenAlex est sans indicateur.
 - **La phase `publications` pose les indicateurs** (`refresh_from_sources`). Un réimport (moissonnage, `fetch_stale`) marque l'enregistrement source pour cette phase. Les indicateurs suivent donc les sources.
-- **Indicateurs de ratio dans le moteur des statistiques.** Un ratio s'affiche en une valeur par barre, sans ventilation empilée. Son dénominateur compte les publications pourvues de l'indicateur. La couverture s'affiche avec la valeur. Une ligne marque la référence mondiale : 10 % pour le top 10 %, 1 pour le FWCI.
-- **Indicateurs de la page Statistiques** : « Nombre de citations », mesure additive ventilée par statut d'accès ; « Part dans le top 10 % » et « FWCI moyen », ratios.
-- **Dashboards de structure, d'éditeur et de revue** : chiffres clés « dans le top 10 % » et « FWCI moyen », avec leur couverture. Beeswarm : un point par publication, années en abscisse, citations ou FWCI en ordonnée.
+- **Indicateurs normalisés : seuils de citation et FWCI.** Le nombre de citations, non normalisé, s'affiche seulement en option du beeswarm et dans le volet d'administration.
+- **Page Statistiques** : l'indicateur « Top citations » compte seulement les publications pourvues des seuils. En part, il donne la part dans le top 10 %.
+- **Dashboards de structure, d'éditeur et de revue** : chiffre clé « dans le top 10 % », avec sa couverture. Beeswarm : un point par publication, années en abscisse, FWCI en ordonnée par défaut, ou citations.
 - **Liste des publications** : colonne et filtre « Top citations » (top 1 %, top 10 %). Le top 10 % comprend le top 1 %. La colonne donne le seuil le plus haut atteint et figure à l'export CSV. Le filtre est commun à la page Statistiques.
-- **Fiche d'une publication** : les trois indicateurs. Volet d'administration : nombre de citations de chaque enregistrement source.
+- **Volet d'administration** : nombre de citations de chaque enregistrement source.
 
 ## Phasage
 
@@ -43,34 +43,29 @@
 - [x] `SourceRecord` contient ses indicateurs, lus par `source_records_of` (e2dfe9308).
 - [x] Règle d'agrégation (`domain/publications/aggregation.py`) et ses tests ; écriture par `PublicationStore` (e2dfe9308).
 - [x] Documentation : modèle de données, phase `publications` (e2dfe9308).
-- [ ] Stock : migration de remplissage de `publications.impact`.
+- [x] Stock : migration de remplissage de `publications.impact` (c7702eb1a).
 
 ### 2. Liste et fiche d'une publication
 
 - [x] Fragment SQL des seuils de citation, partagé par la liste, le filtre et la facette (e5b360394).
 - [x] Colonne et filtre « Top citations » : API, export CSV, interface (e5b360394).
-- [ ] Fiche d'une publication et volet d'administration : indicateurs.
+- [x] Volet d'administration : nombre de citations de chaque enregistrement source (129e9a740).
 
 ### 3. Statistiques
 
-- [x] Indicateur « Top citations » : publications par classe de citation (top 1 %, top 10 % hors top 1 %, hors top 10 %, sans indicateur) (f6f85b85a).
-- [ ] Moteur : indicateurs de ratio, avec dénominateur et couverture.
-- [ ] Indicateurs « Nombre de citations », « Part dans le top 10 % », « FWCI moyen ».
-- [ ] Interface : graphique d'un ratio, ligne de référence, couverture.
+- [x] Indicateur « Top citations » : publications pourvues des seuils, par classe de citation (top 1 %, top 10 % hors top 1 %, hors top 10 %) (f6f85b85a, e7f341d62, b8f8c4d6f).
+- [x] Indicateur « Part dans le top 10 % » : « Top citations » en part (e7f341d62).
 
 ### 4. Dashboards
 
 - [x] Chiffre clé « dans le top 10 % des plus citées » des dashboards de structure, d'éditeur et de revue, rapporté aux publications pourvues de l'indicateur, couverture au survol (f6f85b85a).
-- [ ] Chiffre clé « FWCI moyen ».
 - [x] API : points du beeswarm, une publication par point (4e0a0185a).
-- [ ] Beeswarm des citations ou du FWCI par année. Prototype en nuage de points natif de Chart.js, chaque point décalé dans la largeur de son année, sur le dashboard d'une structure (4e0a0185a).
-- [ ] Guide utilisateur : définition, source et couverture de chaque indicateur.
+- [x] Beeswarm des citations ou du FWCI par année. Prototype en nuage de points natif de Chart.js, chaque point décalé dans la largeur de son année, sur le dashboard d'une structure (4e0a0185a).
+- [x] FWCI par défaut dans le beeswarm (b886e297c).
+- [x] Guide utilisateur : définition, source et couverture de chaque indicateur (129e9a740, b886e297c).
 
 ## Questions ouvertes
 
 - **Beeswarm d'une grande structure** : l'établissement compte environ 40 000 publications sur cinq ans, autant de points. Réserver le beeswarm aux laboratoires, ou passer à une densité au-delà d'un seuil ?
-- **FWCI moyen ou médian** : quelques publications très citées élèvent la moyenne.
-- **Colonnes « Citations » et « FWCI »** dans la liste des publications, avec leur tri ?
-- **Top 1 % dans les statistiques et les dashboards**, à côté de la part dans le top 10 % ?
 - **Part dans le top 10 % ventilée** (par statut d'accès, par type de document), en barres groupées ?
-- **Graphe des citations de l'établissement** : stocker les publications citées et citantes ? OpenAlex donne les références de chaque work (`referenced_works`), absentes des champs demandés (`SELECT_FIELDS`). Les références des publications du périmètre suffisent aux citations internes à l'établissement. Les publications citantes extérieures demandent des requêtes supplémentaires (filtre `cites`).
+- **Graphe des citations de l'établissement** : stocker les publications citées et citantes ? OpenAlex donne les références de chaque work (`referenced_works`), absentes des champs demandés (`SELECT_FIELDS`). Les références des publications du périmètre suffisent aux citations internes à l'établissement. Les publications citantes extérieures demandent des requêtes supplémentaires (filtre `cites`). Un tel graphe demande un projet distinct, sur une autre stack.
