@@ -34,9 +34,9 @@ Les dates des deux affectations diffèrent sur 74 lignes.
 
 ### Phase 1 — Schéma
 
-- [ ] `hr_records` : matricule SIHAM unique, catégorie, statut, corps, grade.
-- [ ] Table des périodes de présence.
-- [ ] Reprise des fiches existantes : `department_name` et les dates deviennent une période. Suppression de `role_title`, `department_name`, `start_date` et `end_date` de `hr_records`.
+- [x] `hr_records` : matricule SIHAM unique, catégorie, statut, corps, grade.
+- [x] Table des périodes de présence.
+- [x] Reprise des fiches existantes : `department_name` et les dates deviennent une période.
 
 ### Phase 2 — Import
 
@@ -53,6 +53,7 @@ Les dates des deux affectations diffèrent sur 74 lignes.
 - [ ] `person_search`, purge des personnes, fusion de personnes (`_merge.py`) : lecture de la table des périodes.
 - [ ] Liste des personnes : facettes catégorie, laboratoire, corps.
 - [ ] Fiche personne : périodes de présence.
+- [ ] Suppression de `role_title`, `department_name`, `start_date` et `end_date` de `hr_records`.
 
 ### Phase 4 — Documentation
 
