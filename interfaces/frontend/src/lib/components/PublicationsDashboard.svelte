@@ -134,7 +134,7 @@
 	const topCited = $derived(
 		sum(citationClasses.filter((r) => r.citation_class === 'top_1_percent' || r.citation_class === 'top_10_percent')),
 	);
-	const withCitationClass = $derived(sum(citationClasses.filter((r) => r.citation_class !== 'none')));
+	const withCitationClass = $derived(sum(citationClasses));
 
 	const keyFigures = $derived<KeyFigure[]>([
 		{ value: total.toLocaleString('fr-FR'), label: plural(total, 'publication'), icon: 'book-open-cover' },

@@ -127,7 +127,7 @@ Portail du ministère de l'Enseignement supérieur et de la Recherche sur la rec
 ## Seuils de citation
 Publications parmi les 1 % ou les 10 % les plus citées au monde. La comparaison porte sur les publications de même type, de même année et de même discipline. Les seuils sont calculés par [OpenAlex](#openalex). Le top 10 % comprend le top 1 %. La référence mondiale vaut donc 10 % pour le top 10 % et 1 % pour le top 1 %.
 
-Les publications absentes d'OpenAlex sont sans seuil, comme la plupart des thèses, preprints, rapports et jeux de données. Les parts des dashboards se rapportent aux publications pourvues d'un seuil.
+Les publications absentes d'OpenAlex sont sans seuil, comme la plupart des thèses, preprints, rapports et jeux de données. La page Statistiques et les dashboards comptent seulement les publications pourvues d'un seuil.
 
 ## Synthèse
 Article de synthèse, ou revue de la littérature (*review*). Dans WoS, *book review* désigne un compte rendu d'ouvrage.

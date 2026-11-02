@@ -21,7 +21,6 @@ from infrastructure.read_models.publications.models import (
     AUTHOR_POSITION_COLUMNS,
     BELOW_CITATION_TOPS,
     DOI_AGENCY_SOURCES,
-    NO_CITATION_INDICATOR,
     NO_DOI,
     NO_LICENSE,
     OTHER_AUTHOR_POSITION,
@@ -176,11 +175,11 @@ CITATION_TOP_SQL = (
 )
 
 
-# Classe de citation de la publication `p` : seuil le plus haut atteint, `BELOW_CITATION_TOPS` sous le top 10 %, `NO_CITATION_INDICATOR` sans indicateur.
-CITATION_CLASS_SQL = (
-    f"COALESCE({CITATION_TOP_SQL}, CASE WHEN p.impact ? '{CitationTop.TOP_10_PERCENT}'"
-    f" THEN '{BELOW_CITATION_TOPS}' ELSE '{NO_CITATION_INDICATOR}' END)"
-)
+# Condition vraie quand la publication `p` est pourvue des seuils de citation.
+HAS_CITATION_TOPS_SQL = f"p.impact ? '{CitationTop.TOP_10_PERCENT}'"
+
+# Classe de citation de la publication `p`, pourvue des seuils : seuil le plus haut atteint, `BELOW_CITATION_TOPS` sous le top 10 %.
+CITATION_CLASS_SQL = f"COALESCE({CITATION_TOP_SQL}, '{BELOW_CITATION_TOPS}')"
 
 
 def citation_top_clause(values: list[str]) -> WhereClause | None:
