@@ -7,9 +7,11 @@ from sqlalchemy import text
 from infrastructure.read_models.hal_problems.models import NoMissingCollections
 from infrastructure.read_models.hal_problems.queries import HalProblemsQueries
 from tests.integration.helpers.addresses import insert_address
-from tests.integration.helpers.alignment import align_source_contributions
+from tests.integration.helpers.alignment import (
+    add_aligned_source_contribution,
+    align_source_contributions,
+)
 from tests.integration.helpers.config import set_config
-from tests.integration.helpers.contributions import insert_contribution
 from tests.integration.helpers.persons import insert_person, insert_person_identifier
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import (
@@ -18,7 +20,7 @@ from tests.integration.helpers.sources import (
     insert_source_record,
 )
 from tests.integration.helpers.structures import (
-    add_contribution_structure,
+    add_source_contribution_structure,
     add_to_perimeter,
     insert_structure,
 )
@@ -31,8 +33,8 @@ def _q(conn) -> HalProblemsQueries:
     return HalProblemsQueries(conn)
 
 
-def _create_lab(conn, code="LAB", hal_collection=None):
-    lab_id = insert_structure(conn, code, name="L", hal_collection=hal_collection)
+def _create_lab(conn, code="LAB", hal_collection=None, acronym=None):
+    lab_id = insert_structure(conn, code, name="L", acronym=acronym, hal_collection=hal_collection)
     # Rattache au périmètre des personnes : les lectures HAL se limitent au périmètre, pas au type de structure.
     set_config(conn, "perimeter_persons", "uca")
     add_to_perimeter(conn, lab_id, code="uca", name="test persons perimeter")
@@ -40,7 +42,13 @@ def _create_lab(conn, code="LAB", hal_collection=None):
 
 
 def _create_hal_source_contribution_with_hal_id(
-    conn, *, person_id, hal_person_id, source_id="h-acc", raw_author_name="X"
+    conn,
+    *,
+    person_id,
+    hal_person_id,
+    source_id="h-acc",
+    raw_author_name="X",
+    neutralized_identifiers=None,
 ):
     """Crée une contribution source HAL avec `hal_person_id` dans ses informations du contributeur, contribution source d'une contribution rattachée à `person_id`."""
     publication = insert_publication(
@@ -52,6 +60,7 @@ def _create_hal_source_contribution_with_hal_id(
         source_record,
         raw_author_name=raw_author_name,
         identifiers={"hal_person_id": hal_person_id},
+        neutralized_identifiers=neutralized_identifiers,
     )
     contribution = align_source_contributions(
         conn, publication, [(source_contribution, source_record)]
@@ -103,6 +112,45 @@ class TestHalDuplicateAccounts:
         assert [(a.full_name, a.publication_count) for a in ours.hal_accounts] == [
             (None, 0),
             (None, 0),
+        ]
+
+    def test_counts_only_the_contributions_of_the_person(self, sa_sync_conn):
+        """Un compte attribué à la personne et présent dans les contributions d'une autre personne compte seulement les contributions de la personne."""
+        pid = insert_person(sa_sync_conn)
+        other = insert_person(sa_sync_conn)
+        _attribute_hal_account(sa_sync_conn, pid, 42)
+        _attribute_hal_account(sa_sync_conn, pid, 43)
+        _create_hal_source_contribution_with_hal_id(
+            sa_sync_conn, person_id=pid, hal_person_id=42, source_id="hal-1"
+        )
+        _create_hal_source_contribution_with_hal_id(
+            sa_sync_conn, person_id=other, hal_person_id=42, source_id="hal-2"
+        )
+
+        [ours] = _q(sa_sync_conn).hal_duplicate_accounts(page=1, per_page=50).persons
+
+        assert [(a.hal_person_id, a.publication_count) for a in ours.hal_accounts] == [
+            (42, 1),
+            (43, 0),
+        ]
+
+    def test_ignores_contributions_neutralizing_the_account(self, sa_sync_conn):
+        pid = insert_person(sa_sync_conn)
+        _attribute_hal_account(sa_sync_conn, pid, 42)
+        _attribute_hal_account(sa_sync_conn, pid, 43)
+        _create_hal_source_contribution_with_hal_id(
+            sa_sync_conn,
+            person_id=pid,
+            hal_person_id=42,
+            source_id="hal-1",
+            neutralized_identifiers={"hal_person_id": "misplaced"},
+        )
+
+        [ours] = _q(sa_sync_conn).hal_duplicate_accounts(page=1, per_page=50).persons
+
+        assert [(a.hal_person_id, a.publication_count) for a in ours.hal_accounts] == [
+            (42, 0),
+            (43, 0),
         ]
 
     def test_ignores_single_account(self, sa_sync_conn):
@@ -212,19 +260,22 @@ class TestHalMissingCollections:
         assert res.lab_acronym is None  # structure sans acronyme
 
 
-def _create_contribution_uca(conn, publication_id, lab_id, position=0):
-    """Insère une contribution du périmètre, de rôle auteur, rattachée au laboratoire `lab_id` et à une personne créée. Renvoie la personne."""
-    person_id = insert_person(conn)
-    contribution_id = insert_contribution(
-        conn,
-        publication_id,
-        person_id=person_id,
-        author_position=position,
-        in_perimeter=True,
-        roles=["author"],
+def _create_hal_contribution(conn, publication, code):
+    """Crée une contribution de `publication`, rattachée à une personne créée, dont la contribution source HAL est dans le périmètre et atteint le laboratoire d'acronyme `code`. Renvoie la contribution."""
+    lab = _create_lab(conn, code=code, hal_collection=f"COLL-{code}", acronym=code)
+    hal_source_record = _source_record(conn, publication, source_id=f"h-{code}")
+    hal_source_contribution = insert_source_contribution(conn, hal_source_record, in_perimeter=True)
+    contribution = align_source_contributions(
+        conn, publication, [(hal_source_contribution, hal_source_record)]
     )
-    add_contribution_structure(conn, contribution_id, lab_id)
-    return person_id
+    conn.execute(
+        text(
+            "UPDATE contributions SET person_id = :person, resolution_mode = 'manual' WHERE id = :g"
+        ),
+        {"person": insert_person(conn), "g": contribution},
+    )
+    add_source_contribution_structure(conn, hal_source_contribution, lab)
+    return contribution
 
 
 def _create_address_for_source_contribution(conn, source_contribution_id):
@@ -236,8 +287,36 @@ def _create_address_for_source_contribution(conn, source_contribution_id):
     return addr_id
 
 
+def _add_source_contribution(
+    conn,
+    source_record,
+    contribution,
+    *,
+    source,
+    in_perimeter=None,
+    address=True,
+    author_position=0,
+):
+    """Aligne dans `contribution` une contribution source de `source_record`, avec une adresse si `address`. Renvoie la contribution source."""
+    source_contribution = insert_source_contribution(
+        conn,
+        source_record,
+        source=source,
+        in_perimeter=in_perimeter,
+        author_position=author_position,
+    )
+    add_aligned_source_contribution(conn, contribution, source_contribution, source_record)
+    if address:
+        _create_address_for_source_contribution(conn, source_contribution)
+    return source_contribution
+
+
+def _conflict_ids(conn):
+    return [p.id for p in _q(conn).hal_affiliation_conflicts(page=1, per_page=50).publications]
+
+
 class TestHalAffiliationConflicts:
-    """Conflit : une contribution source HAL de la publication est dans le périmètre, aucune contribution source WoS ou OpenAlex ne l'est, et au moins une contribution source WoS ou OpenAlex a une adresse."""
+    """Conflit : la contribution source HAL d'une contribution est dans le périmètre ; ses contributions sources WoS ou OpenAlex donnent une adresse ou un ROR, et sont toutes hors du périmètre."""
 
     def test_noop_when_no_data(self, sa_sync_conn):
         res = _q(sa_sync_conn).hal_affiliation_conflicts(page=1, per_page=50)
@@ -245,140 +324,139 @@ class TestHalAffiliationConflicts:
         assert res.publications == []
 
     def test_detects_conflict_with_openalex(self, sa_sync_conn):
-        publication = insert_publication(sa_sync_conn, title="Conflict OA")
-        lab = _create_lab(sa_sync_conn, code="LAB-OA")
-        hal_source_record = _source_record(sa_sync_conn, publication, source_id="h-oa-1")
-        _create_contribution_uca(sa_sync_conn, publication, lab, position=0)
-        insert_source_contribution(sa_sync_conn, hal_source_record, in_perimeter=True)
+        publication = insert_publication(sa_sync_conn)
+        contribution = _create_hal_contribution(sa_sync_conn, publication, "LAB-OA")
         oa_source_record = _source_record(
             sa_sync_conn, publication, source="openalex", source_id="oa-1"
         )
-        oa_source_contribution = insert_source_contribution(
-            sa_sync_conn, oa_source_record, source="openalex"
-        )
-        _create_address_for_source_contribution(sa_sync_conn, oa_source_contribution)
+        _add_source_contribution(sa_sync_conn, oa_source_record, contribution, source="openalex")
 
-        res = _q(sa_sync_conn).hal_affiliation_conflicts(page=1, per_page=50)
-        assert publication in [p.id for p in res.publications]
+        assert _conflict_ids(sa_sync_conn) == [publication]
 
     def test_detects_conflict_with_wos(self, sa_sync_conn):
-        publication = insert_publication(sa_sync_conn, title="Conflict WoS")
-        lab = _create_lab(sa_sync_conn, code="LAB-WOS")
-        hal_source_record = _source_record(sa_sync_conn, publication, source_id="h-wos-1")
-        _create_contribution_uca(sa_sync_conn, publication, lab, position=0)
-        insert_source_contribution(sa_sync_conn, hal_source_record, in_perimeter=True)
+        publication = insert_publication(sa_sync_conn)
+        contribution = _create_hal_contribution(sa_sync_conn, publication, "LAB-WOS")
         wos_source_record = _source_record(
             sa_sync_conn, publication, source="wos", source_id="WOS:1"
         )
-        wos_source_contribution = insert_source_contribution(
-            sa_sync_conn, wos_source_record, source="wos"
+        _add_source_contribution(sa_sync_conn, wos_source_record, contribution, source="wos")
+
+        assert _conflict_ids(sa_sync_conn) == [publication]
+
+    def test_detects_conflict_with_ror_without_address(self, sa_sync_conn):
+        publication = insert_publication(sa_sync_conn)
+        contribution = _create_hal_contribution(sa_sync_conn, publication, "LAB-ROR")
+        oa_source_record = _source_record(
+            sa_sync_conn, publication, source="openalex", source_id="oa-ror"
         )
-        _create_address_for_source_contribution(sa_sync_conn, wos_source_contribution)
+        oa_source_contribution = _add_source_contribution(
+            sa_sync_conn, oa_source_record, contribution, source="openalex", address=False
+        )
+        sa_sync_conn.execute(
+            text(
+                "INSERT INTO source_contribution_rors (source_contribution_id, ror_id) VALUES (:s, '0abcdef00')"
+            ),
+            {"s": oa_source_contribution},
+        )
 
-        res = _q(sa_sync_conn).hal_affiliation_conflicts(page=1, per_page=50)
-        assert publication in [p.id for p in res.publications]
+        assert _conflict_ids(sa_sync_conn) == [publication]
 
-    def test_ignores_oa_without_address(self, sa_sync_conn):
-        # Sans adresse, la contribution source OpenAlex ne dit rien de l'affiliation : pas de conflit.
-        publication = insert_publication(sa_sync_conn, title="OA no address")
-        lab = _create_lab(sa_sync_conn, code="LAB-NOADDR")
-        hal_source_record = _source_record(sa_sync_conn, publication, source_id="h-noaddr-1")
-        _create_contribution_uca(sa_sync_conn, publication, lab, position=0)
-        insert_source_contribution(sa_sync_conn, hal_source_record, in_perimeter=True)
+    def test_ignores_openalex_without_affiliation(self, sa_sync_conn):
+        # Sans adresse ni ROR, la contribution source OpenAlex ne dit rien de l'affiliation.
+        publication = insert_publication(sa_sync_conn)
+        contribution = _create_hal_contribution(sa_sync_conn, publication, "LAB-NOADDR")
         oa_source_record = _source_record(
             sa_sync_conn, publication, source="openalex", source_id="oa-noaddr"
         )
-        insert_source_contribution(sa_sync_conn, oa_source_record, source="openalex")
-
-        res = _q(sa_sync_conn).hal_affiliation_conflicts(page=1, per_page=50)
-        assert publication not in [p.id for p in res.publications]
-
-    def test_detects_regardless_of_position(self, sa_sync_conn):
-        # La comparaison se fait par publication, sans égard à la position : HAL dans le périmètre en position 0, OpenAlex hors du périmètre en position 1 → conflit.
-        publication = insert_publication(sa_sync_conn, title="Position independent")
-        lab = _create_lab(sa_sync_conn, code="LAB-POS")
-        hal_source_record = _source_record(sa_sync_conn, publication, source_id="h-pos-1")
-        _create_contribution_uca(sa_sync_conn, publication, lab, position=0)
-        insert_source_contribution(sa_sync_conn, hal_source_record, in_perimeter=True)
-        oa_source_record = _source_record(
-            sa_sync_conn, publication, source="openalex", source_id="oa-pos"
+        _add_source_contribution(
+            sa_sync_conn, oa_source_record, contribution, source="openalex", address=False
         )
-        oa_source_contribution = insert_source_contribution(
+
+        assert _conflict_ids(sa_sync_conn) == []
+
+    def test_ignores_affiliation_of_another_author(self, sa_sync_conn):
+        # La contribution source OpenAlex de l'auteur placé dans le périmètre par HAL est sans affiliation ; celle d'un autre auteur a une adresse hors du périmètre.
+        publication = insert_publication(sa_sync_conn)
+        contribution = _create_hal_contribution(sa_sync_conn, publication, "LAB-OTHER")
+        oa_source_record = _source_record(
+            sa_sync_conn, publication, source="openalex", source_id="oa-other"
+        )
+        _add_source_contribution(
+            sa_sync_conn, oa_source_record, contribution, source="openalex", address=False
+        )
+        other_source_contribution = insert_source_contribution(
             sa_sync_conn, oa_source_record, source="openalex", author_position=1
         )
-        _create_address_for_source_contribution(sa_sync_conn, oa_source_contribution)
+        align_source_contributions(
+            sa_sync_conn, publication, [(other_source_contribution, oa_source_record)]
+        )
+        _create_address_for_source_contribution(sa_sync_conn, other_source_contribution)
 
-        res = _q(sa_sync_conn).hal_affiliation_conflicts(page=1, per_page=50)
-        assert publication in [p.id for p in res.publications]
+        assert _conflict_ids(sa_sync_conn) == []
 
     def test_ignores_scanr(self, sa_sync_conn):
         # ScanR moissonne HAL et reproduit ses affiliations : il est exclu de la comparaison.
-        publication = insert_publication(sa_sync_conn, title="ScanR only")
-        lab = _create_lab(sa_sync_conn, code="LAB-SCANR")
-        hal_source_record = _source_record(sa_sync_conn, publication, source_id="h-scanr-1")
-        _create_contribution_uca(sa_sync_conn, publication, lab, position=0)
-        insert_source_contribution(sa_sync_conn, hal_source_record, in_perimeter=True)
+        publication = insert_publication(sa_sync_conn)
+        contribution = _create_hal_contribution(sa_sync_conn, publication, "LAB-SCANR")
         scanr_source_record = _source_record(
             sa_sync_conn, publication, source="scanr", source_id="sr-1"
         )
-        scanr_source_contribution = insert_source_contribution(
-            sa_sync_conn, scanr_source_record, source="scanr"
-        )
-        _create_address_for_source_contribution(sa_sync_conn, scanr_source_contribution)
+        _add_source_contribution(sa_sync_conn, scanr_source_record, contribution, source="scanr")
 
-        res = _q(sa_sync_conn).hal_affiliation_conflicts(page=1, per_page=50)
-        assert publication not in [p.id for p in res.publications]
+        assert _conflict_ids(sa_sync_conn) == []
 
-    def test_ignores_when_oa_confirms_uca(self, sa_sync_conn):
-        # OpenAlex met aussi la publication dans le périmètre → pas de conflit.
-        publication = insert_publication(sa_sync_conn, title="OA confirms")
-        lab = _create_lab(sa_sync_conn, code="LAB-CONFIRM")
-        hal_source_record = _source_record(sa_sync_conn, publication, source_id="h-confirm-1")
-        _create_contribution_uca(sa_sync_conn, publication, lab, position=0)
-        insert_source_contribution(sa_sync_conn, hal_source_record, in_perimeter=True)
+    def test_ignores_when_openalex_confirms(self, sa_sync_conn):
+        publication = insert_publication(sa_sync_conn)
+        contribution = _create_hal_contribution(sa_sync_conn, publication, "LAB-CONFIRM")
         oa_source_record = _source_record(
             sa_sync_conn, publication, source="openalex", source_id="oa-confirm"
         )
-        oa_source_contribution = insert_source_contribution(
-            sa_sync_conn, oa_source_record, source="openalex", in_perimeter=True
+        _add_source_contribution(
+            sa_sync_conn, oa_source_record, contribution, source="openalex", in_perimeter=True
         )
-        _create_address_for_source_contribution(sa_sync_conn, oa_source_contribution)
 
-        res = _q(sa_sync_conn).hal_affiliation_conflicts(page=1, per_page=50)
-        assert publication not in [p.id for p in res.publications]
+        assert _conflict_ids(sa_sync_conn) == []
 
-    def test_ignores_when_one_of_wos_oa_confirms(self, sa_sync_conn):
-        # OpenAlex contredit HAL, WoS le confirme → pas de conflit.
-        publication = insert_publication(sa_sync_conn, title="Mixed conf")
-        lab = _create_lab(sa_sync_conn, code="LAB-MIXED")
-        hal_source_record = _source_record(sa_sync_conn, publication, source_id="h-mixed-1")
-        _create_contribution_uca(sa_sync_conn, publication, lab, position=0)
-        insert_source_contribution(sa_sync_conn, hal_source_record, in_perimeter=True)
+    def test_ignores_when_one_of_wos_openalex_confirms(self, sa_sync_conn):
+        # OpenAlex contredit HAL, WoS le confirme.
+        publication = insert_publication(sa_sync_conn)
+        contribution = _create_hal_contribution(sa_sync_conn, publication, "LAB-MIXED")
         oa_source_record = _source_record(
             sa_sync_conn, publication, source="openalex", source_id="oa-mixed"
         )
-        oa_source_contribution = insert_source_contribution(
-            sa_sync_conn, oa_source_record, source="openalex"
-        )
-        _create_address_for_source_contribution(sa_sync_conn, oa_source_contribution)
+        _add_source_contribution(sa_sync_conn, oa_source_record, contribution, source="openalex")
         wos_source_record = _source_record(
             sa_sync_conn, publication, source="wos", source_id="WOS:mixed"
         )
-        wos_source_contribution = insert_source_contribution(
-            sa_sync_conn, wos_source_record, source="wos", in_perimeter=True
+        _add_source_contribution(
+            sa_sync_conn, wos_source_record, contribution, source="wos", in_perimeter=True
         )
-        _create_address_for_source_contribution(sa_sync_conn, wos_source_contribution)
 
-        res = _q(sa_sync_conn).hal_affiliation_conflicts(page=1, per_page=50)
-        assert publication not in [p.id for p in res.publications]
+        assert _conflict_ids(sa_sync_conn) == []
 
-    def test_requires_at_least_one_wos_or_oa(self, sa_sync_conn):
-        # Publication présente seulement dans HAL → pas de comparaison possible, pas de conflit.
-        publication = insert_publication(sa_sync_conn, title="HAL only")
-        lab = _create_lab(sa_sync_conn, code="LAB-HALONLY")
-        hal_source_record = _source_record(sa_sync_conn, publication, source_id="h-only-1")
-        _create_contribution_uca(sa_sync_conn, publication, lab, position=0)
-        insert_source_contribution(sa_sync_conn, hal_source_record, in_perimeter=True)
+    def test_requires_wos_or_openalex(self, sa_sync_conn):
+        publication = insert_publication(sa_sync_conn)
+        _create_hal_contribution(sa_sync_conn, publication, "LAB-HALONLY")
 
-        res = _q(sa_sync_conn).hal_affiliation_conflicts(page=1, per_page=50)
-        assert publication not in [p.id for p in res.publications]
+        assert _conflict_ids(sa_sync_conn) == []
+
+    def test_lists_laboratories_of_conflicting_contributions(self, sa_sync_conn):
+        # La seconde contribution est dans le périmètre selon HAL et selon OpenAlex.
+        publication = insert_publication(sa_sync_conn)
+        conflicting = _create_hal_contribution(sa_sync_conn, publication, "LAB-A")
+        confirmed = _create_hal_contribution(sa_sync_conn, publication, "LAB-B")
+        oa_source_record = _source_record(
+            sa_sync_conn, publication, source="openalex", source_id="oa-labs"
+        )
+        _add_source_contribution(sa_sync_conn, oa_source_record, conflicting, source="openalex")
+        _add_source_contribution(
+            sa_sync_conn,
+            oa_source_record,
+            confirmed,
+            source="openalex",
+            in_perimeter=True,
+            author_position=1,
+        )
+
+        [conflict] = _q(sa_sync_conn).hal_affiliation_conflicts(page=1, per_page=50).publications
+        assert [lab.acronym for lab in conflict.laboratories] == ["LAB-A"]

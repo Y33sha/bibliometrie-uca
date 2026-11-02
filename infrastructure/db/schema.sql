@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict VhyuvSTahypcNh6y5zKpyJEtcVCnSgWcSXhNHbrigdDm8G4knuZ9CbTyiMAbTrT
+\restrict UV2kiRPqetNj0LrdSV51NDa7VR43hRnSGl0zzkcnBK09iQH2OxQ0KDp9KObkQ3L
 
--- Dumped from database version 18.4
--- Dumped by pg_dump version 18.4
+-- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
+-- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -4997,6 +4997,13 @@ CREATE INDEX contributor_information_author_name_normalized_idx ON sources.contr
 
 
 --
+-- Name: contributor_information_hal_person_id_idx; Type: INDEX; Schema: sources; Owner: -
+--
+
+CREATE INDEX contributor_information_hal_person_id_idx ON sources.contributor_information USING btree (((identifiers ->> 'hal_person_id'::text))) WHERE (identifiers ? 'hal_person_id'::text);
+
+
+--
 -- Name: contributor_information_idref_idx; Type: INDEX; Schema: sources; Owner: -
 --
 
@@ -5295,6 +5302,13 @@ CREATE INDEX idx_structures_type ON structures.structures USING btree (structure
 --
 
 CREATE INDEX ix_idref_structures_structure_id ON structures.idref_structures USING btree (structure_id);
+
+
+--
+-- Name: contributor_information_hal_person_id_stat; Type: STATISTICS; Schema: sources; Owner: -
+--
+
+CREATE STATISTICS sources.contributor_information_hal_person_id_stat ON (identifiers ->> 'hal_person_id'::text) FROM sources.contributor_information;
 
 
 --
@@ -5968,5 +5982,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict VhyuvSTahypcNh6y5zKpyJEtcVCnSgWcSXhNHbrigdDm8G4knuZ9CbTyiMAbTrT
+\unrestrict UV2kiRPqetNj0LrdSV51NDa7VR43hRnSGl0zzkcnBK09iQH2OxQ0KDp9KObkQ3L
 

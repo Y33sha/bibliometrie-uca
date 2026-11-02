@@ -30,13 +30,15 @@ from infrastructure.read_models.hal_problems.models import (
 )
 from infrastructure.read_models.perimeters.queries import get_persons_structure_ids_list
 from infrastructure.read_models.sql_fragments import contributor_display_name
-from infrastructure.sql_fragments import usable_identifier
+from infrastructure.sql_fragments import identifier_neutralized, usable_identifier
 
 # Identifiants d'une contribution source `sc`, hors identifiants neutralisés.
-_HAL_PERSON_ID = usable_identifier("'hal_person_id'")
 _ORCID = usable_identifier("'orcid'")
 _IDHAL = usable_identifier("'idhal'")
 _IDREF = usable_identifier("'idref'")
+
+# Condition vraie quand la contribution source `sc` neutralise sa référence de compte HAL.
+_HAL_PERSON_ID_NEUTRALIZED = identifier_neutralized("'hal_person_id'")
 
 # Condition sur une attribution d'identifiant `pi` : compte HAL attribué à la personne `pi.person_id`, hors attributions rejetées.
 _HAL_ACCOUNT_ATTRIBUTION = (
@@ -125,6 +127,7 @@ class HalProblemsQueries:
         total = total_row.total
 
         # Détail de chaque compte HAL attribué : contributions sources HAL des contributions de la personne contenant sa référence. Un compte absent de ces contributions a un nom vide et zéro publication.
+        # La lecture part du compte, par l'index partiel `contributor_information_hal_person_id_idx` : seules les contributions sources du compte sont lues.
         rows = self._conn.execute(
             text(f"""
                 WITH page_persons AS MATERIALIZED (
@@ -145,13 +148,15 @@ class HalProblemsQueries:
                             MIN({_IDHAL}) AS idhal,
                             MIN({_IDREF}) AS idref,
                             COUNT(*) AS publication_count
-                        FROM contributions g
-                        JOIN aligned_source_contributions m ON m.contribution_id = g.id
-                        JOIN source_contributions sc ON sc.id = m.source_contribution_id
-                        JOIN contributor_information ci ON ci.id = sc.contributor_information_id
-                        WHERE g.person_id = pi.person_id
+                        FROM contributor_information ci
+                        JOIN source_contributions sc ON sc.contributor_information_id = ci.id
+                        JOIN aligned_source_contributions m ON m.source_contribution_id = sc.id
+                        JOIN contributions g ON g.id = m.contribution_id
+                        WHERE ci.identifiers ? 'hal_person_id'
+                          AND ci.identifiers ->> 'hal_person_id' = pi.id_value
+                          AND NOT {_HAL_PERSON_ID_NEUTRALIZED}
                           AND sc.source = 'hal'
-                          AND {_HAL_PERSON_ID} = pi.id_value
+                          AND g.person_id = pi.person_id
                     ) s
                     WHERE {_HAL_ACCOUNT_ATTRIBUTION}
                       AND pi.person_id IN (SELECT id FROM page_persons)
@@ -382,33 +387,35 @@ class HalProblemsQueries:
         self, *, page: int, per_page: int
     ) -> HalAffiliationConflictsResponse:
         offset = (page - 1) * per_page
-        # Conflit d'affiliation : HAL met la publication dans le périmètre, WoS et OpenAlex, seules sources à donner des adresses, la laissent hors du périmètre.
+        # Contribution en conflit : HAL la place dans le périmètre ; WoS et OpenAlex lui donnent une adresse ou un ROR, hors du périmètre.
         base_cte = """
-        WITH hal_in_perimeter_pubs AS (
-            SELECT DISTINCT sr.publication_id
-            FROM source_records sr
-            JOIN source_contributions sc ON sc.source_record_id = sr.id
-            WHERE sr.source = 'hal'
-              AND sc.in_perimeter = TRUE
-              AND sr.publication_id IS NOT NULL
+        WITH conflict_contributions AS (
+            SELECT DISTINCT g.publication_id, g.id AS contribution_id
+            FROM source_contributions sc
+            JOIN aligned_source_contributions m ON m.source_contribution_id = sc.id
+            JOIN contributions g ON g.id = m.contribution_id
+            WHERE sc.source = 'hal'
+              AND sc.in_perimeter
+              AND NOT EXISTS (
+                  SELECT 1 FROM aligned_source_contributions m2
+                  JOIN source_contributions sc2 ON sc2.id = m2.source_contribution_id
+                  WHERE m2.contribution_id = g.id
+                    AND sc2.source IN ('wos', 'openalex')
+                    AND sc2.in_perimeter
+              )
+              AND EXISTS (
+                  SELECT 1 FROM aligned_source_contributions m2
+                  JOIN source_contributions sc2 ON sc2.id = m2.source_contribution_id
+                  WHERE m2.contribution_id = g.id
+                    AND sc2.source IN ('wos', 'openalex')
+                    AND (EXISTS (SELECT 1 FROM source_contribution_addresses sca
+                                 WHERE sca.source_contribution_id = sc2.id)
+                         OR EXISTS (SELECT 1 FROM source_contribution_rors scr
+                                    WHERE scr.source_contribution_id = sc2.id))
+              )
         ),
         conflict_pubs AS (
-            SELECT h.publication_id
-            FROM hal_in_perimeter_pubs h
-            WHERE NOT EXISTS (
-                SELECT 1 FROM source_records sr
-                JOIN source_contributions sc ON sc.source_record_id = sr.id
-                WHERE sr.publication_id = h.publication_id
-                  AND sr.source IN ('wos', 'openalex')
-                  AND sc.in_perimeter = TRUE
-            )
-            AND EXISTS (
-                SELECT 1 FROM source_records sr
-                JOIN source_contributions sc ON sc.source_record_id = sr.id
-                JOIN source_contribution_addresses sca ON sca.source_contribution_id = sc.id
-                WHERE sr.publication_id = h.publication_id
-                  AND sr.source IN ('wos', 'openalex')
-            )
+            SELECT DISTINCT publication_id FROM conflict_contributions
         )
         """
 
@@ -426,11 +433,10 @@ class HalProblemsQueries:
                        (SELECT json_agg(json_build_object('acronym', l.acronym, 'name', l.name)
                                         ORDER BY COALESCE(l.acronym, l.name))
                         FROM (SELECT DISTINCT s.acronym, s.name
-                              FROM contributions a2
-                              JOIN contribution_structures aus2 ON aus2.contribution_id = a2.id
+                              FROM conflict_contributions cc
+                              JOIN contribution_structures aus2 ON aus2.contribution_id = cc.contribution_id
                               JOIN structures s ON s.id = aus2.structure_id
-                              WHERE a2.publication_id = p.id
-                                AND a2.in_perimeter = TRUE
+                              WHERE cc.publication_id = p.id
                                 AND s.hal_collection IS NOT NULL
                                 AND s.id = ANY(:perimeter_ids)) l
                        ) AS laboratories

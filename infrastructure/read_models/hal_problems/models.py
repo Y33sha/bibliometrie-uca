@@ -107,7 +107,7 @@ class HalAffiliationConflictPublication(Model):
     doi: str | None
     halids: list[str] | None = Field(exclude=True)
     laboratories: list[StructureRef]
-    """Laboratoires du périmètre de la publication ; l'affichage choisit entre acronyme et nom."""
+    """Laboratoires du périmètre des contributions en conflit ; l'affichage choisit entre acronyme et nom."""
 
     @computed_field
     @property

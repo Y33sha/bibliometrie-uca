@@ -42,7 +42,7 @@
 </script>
 
 <PageHeader title="Affiliations HAL divergentes">
-	Publications affiliées à {institution.name} dans HAL mais pas dans une autre source. La publication est présente dans au moins une source non-HAL avec des adresses, mais sans signature {institution.name} à la même position d'auteur.
+	Publications dont un auteur est affilié à {institution.name} dans HAL, et seulement hors de {institution.name} dans WoS ou OpenAlex.
 </PageHeader>
 
 <ListToolbar {list} one="publication" many="publications" exportUrl={withBase('/api/hal-problems/affiliation-conflicts/export.csv')} />

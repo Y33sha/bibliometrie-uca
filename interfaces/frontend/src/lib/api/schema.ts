@@ -3777,7 +3777,7 @@ export interface components {
             doi: string | null;
             /**
              * Laboratories
-             * @description Laboratoires du périmètre de la publication ; l'affichage choisit entre acronyme et nom.
+             * @description Laboratoires du périmètre des contributions en conflit ; l'affichage choisit entre acronyme et nom.
              */
             laboratories: components["schemas"]["StructureRef"][];
             /**
