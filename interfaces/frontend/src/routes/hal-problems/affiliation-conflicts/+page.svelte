@@ -94,4 +94,11 @@
 	.conflict-author + .conflict-author {
 		margin-top: 0.25rem;
 	}
+	.conflict-author .lab-tag {
+		color: var(--text-secondary);
+		font-weight: 400;
+	}
+	.conflict-author .lab-tag:first-of-type {
+		margin-left: 0.5rem;
+	}
 </style>
