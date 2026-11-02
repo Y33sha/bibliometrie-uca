@@ -2,7 +2,7 @@
 
 La phase suit `publications` : les enregistrements sources sont rattachés à leur publication, et un DOI cible se résout en publication quand elle est en base. Les relations viennent de trois signaux :
 
-- **Signal #1, relations déclarées** par DataCite (`related_identifiers`) et Crossref (`relation`), traduites par `domain.publications.relations`. Une relation de même œuvre (`IsVersionOf`, `IsVariantFormOf`) entre deux œuvres distinctes selon `meme_oeuvre_declaree` reçoit son type d'après les types de document des deux publications. Exemple : un preprint arXiv et l'article publié.
+- **Signal #1, relations déclarées** par DataCite (`related_identifiers`) et Crossref (`relation`), traduites par `domain.publications.relations`. Une relation de même œuvre (`IsVersionOf`, `IsVariantFormOf`) entre deux œuvres distinctes selon `declares_same_work` reçoit son type d'après les types de document des deux publications. Exemple : un preprint arXiv et l'article publié.
 - **Signal #2, clés de confirmation partagées** (hal_id, arXiv, PMID, NNT) par deux publications distinctes : leurs types de document donnent la relation (`infer_shared_key_relation`).
 - **Signal #3, titre** : un erratum rejoint l'article corrigé (titre de l'article à la suite de « Erratum: »), un preprint sa version publiée (même titre), à condition qu'un seul candidat ait ce titre.
 """
