@@ -162,14 +162,14 @@ def publications_by_year_and_type(
     """Nombre de publications signées par la structure, par année et par type."""
     rows = conn.execute(
         text(f"""
-            SELECT p.publication_year AS pub_year, p.doc_type, count(*) AS n
+            SELECT p.publication_year, p.doc_type, count(*) AS n
             FROM publications p
             WHERE {_REPORT_PUBLICATION}
             GROUP BY 1, 2
         """),  # noqa: S608 — fragments SQL constants
         _params(structure_id, period),
     ).all()
-    return [YearDocTypeCount(r.pub_year, DocType(r.doc_type), r.n) for r in rows]
+    return [YearDocTypeCount(r.publication_year, DocType(r.doc_type), r.n) for r in rows]
 
 
 def key_role_publications_by_year(
@@ -194,14 +194,14 @@ def _count_by_year(conn: Connection, condition: str, params: dict[str, object]) 
     """Nombre de publications du rapport satisfaisant `condition`, par année."""
     rows = conn.execute(
         text(f"""
-            SELECT p.publication_year AS pub_year, count(*) AS n
+            SELECT p.publication_year, count(*) AS n
             FROM publications p
             WHERE {_REPORT_PUBLICATION} AND {condition}
             GROUP BY 1
         """),  # noqa: S608 — fragments SQL constants
         params,
     ).all()
-    return {r.pub_year: r.n for r in rows}
+    return {r.publication_year: r.n for r in rows}
 
 
 @dataclass(frozen=True, slots=True)
@@ -218,7 +218,7 @@ def top_10_percent_by_year(
     """Publications signées par la structure dans le top 10 % des plus citées, par année, et publications dont le percentile est connu. Le percentile vient des enregistrements sources OpenAlex de la publication."""
     rows = conn.execute(
         text(f"""
-            SELECT p.publication_year AS pub_year,
+            SELECT p.publication_year,
                    count(*) FILTER (WHERE oa.top_10) AS top_10,
                    count(*) AS with_percentile
             FROM publications p
@@ -235,7 +235,7 @@ def top_10_percent_by_year(
         """),  # noqa: S608 — fragments SQL constants
         _params(structure_id, period),
     ).all()
-    return {r.pub_year: Top10Count(r.top_10, r.with_percentile) for r in rows}
+    return {r.publication_year: Top10Count(r.top_10, r.with_percentile) for r in rows}
 
 
 # Publication `p` dans le top 10 % des plus citées selon un de ses enregistrements sources OpenAlex.
@@ -303,7 +303,7 @@ def publication_impacts(
     """Indicateurs d'impact de chaque publication signée par la structure."""
     rows = conn.execute(
         text(f"""
-            SELECT p.publication_year AS pub_year, p.doc_type, p.language, i.citations, i.fwci,
+            SELECT p.publication_year, p.doc_type, p.language, i.citations, i.fwci,
                    {_TOP_10_PERCENT} AS top_10,
                    {_key_role_condition(roles)} AS key_role
             FROM publications p
@@ -319,7 +319,13 @@ def publication_impacts(
     ).all()
     return [
         PublicationImpact(
-            r.pub_year, DocType(r.doc_type), r.language, r.citations, r.fwci, r.top_10, r.key_role
+            r.publication_year,
+            DocType(r.doc_type),
+            r.language,
+            r.citations,
+            r.fwci,
+            r.top_10,
+            r.key_role,
         )
         for r in rows
     ]
