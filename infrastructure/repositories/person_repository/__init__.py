@@ -11,14 +11,9 @@ from application.ports.repositories.person_repository import PersonRepository
 from domain.persons.identifier_attribution import (
     AttributionOutcome,
     AttributionResult,
-    IdentifierAttribution,
     attribution_outcome,
 )
-from domain.persons.identifiers import (
-    AttributionStatus,
-    IdentifierOrigin,
-    normalized_identifier_value,
-)
+from domain.persons.identifiers import IdentifierOrigin, normalized_identifier_value
 from domain.persons.person import validated_name
 from infrastructure.repositories.person_repository import (
     _core,
@@ -87,35 +82,16 @@ class PgPersonRepository(PersonRepository):
 
     # ── person_identifiers ─────────────────────────────────────────
 
-    def find_identifier(self, id_type: str, id_value: str) -> IdentifierAttribution | None:
-        return _identifiers.find_identifier(self._conn, id_type, id_value)
-
-    def insert_identifier(self, ident: IdentifierAttribution) -> int:
-        return _identifiers.insert_identifier(self._conn, ident)
-
-    def update_identifier(self, ident: IdentifierAttribution) -> None:
-        _identifiers.update_identifier(self._conn, ident)
-
     def attribute_identifier(
         self, person_id: int, id_type: str, id_value: str, *, source: IdentifierOrigin
     ) -> AttributionResult:
         id_value = normalized_identifier_value(id_type, id_value)
-        existing = self.find_identifier(id_type, id_value)
+        existing = _identifiers.find_identifier(self._conn, id_type, id_value)
         outcome = attribution_outcome(existing, person_id)
         if outcome is AttributionOutcome.ADDED:
-            self.insert_identifier(
-                IdentifierAttribution(
-                    id=None,
-                    person_id=person_id,
-                    id_type=id_type,
-                    id_value=id_value,
-                    status=AttributionStatus.PENDING,
-                    source=source,
-                )
-            )
+            _identifiers.insert_pending_identifier(self._conn, person_id, id_type, id_value, source)
         elif existing is not None and outcome is AttributionOutcome.REASSIGNED:
-            existing.reattribute_to(person_id, source=source)
-            self.update_identifier(existing)
+            _identifiers.reassign_identifier(self._conn, existing.id, person_id, source)
         return AttributionResult(outcome, id_value, existing)
 
     def update_identifier_status(self, ident_id: int, status: str) -> IdentifierStatusRow:

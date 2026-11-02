@@ -11,7 +11,6 @@ from domain.errors import NotFoundError
 from domain.persons.identifier_attribution import IdentifierAttribution
 from domain.persons.identifiers import AttributionStatus, IdentifierOrigin, PersonIdentifierType
 from infrastructure.db.queues import Queue, enqueue_sql
-from infrastructure.db.scalars import row_int
 from infrastructure.sql_fragments import CONTRIBUTIONS_AND_SOURCES, identifier_neutralized
 
 
@@ -37,43 +36,29 @@ def find_identifier(conn: Connection, id_type: str, id_value: str) -> Identifier
     )
 
 
-def insert_identifier(conn: Connection, ident: IdentifierAttribution) -> int:
-    row = conn.execute(
+def insert_pending_identifier(
+    conn: Connection, person_id: int, id_type: str, id_value: str, source: IdentifierOrigin
+) -> None:
+    conn.execute(
         text("""
             INSERT INTO person_identifiers (person_id, id_type, id_value, source, status)
-            VALUES (:pid, :it, :iv, :src, CAST(:st AS identifier_status))
-            RETURNING id
+            VALUES (:pid, :it, :iv, :src, 'pending')
         """),
-        {
-            "pid": ident.person_id,
-            "it": ident.id_type,
-            "iv": ident.id_value,
-            "src": ident.source,
-            "st": ident.status.value,
-        },
-    ).first()
-    assert row is not None  # RETURNING garantit une ligne
-    ident.id = row_int(row.id)
-    return ident.id
+        {"pid": person_id, "it": id_type, "iv": id_value, "src": source},
+    )
 
 
-def update_identifier(conn: Connection, ident: IdentifierAttribution) -> None:
-    if ident.id is None:
-        raise ValueError("update_identifier : ident.id doit être posé (utiliser insert_identifier)")
+def reassign_identifier(
+    conn: Connection, ident_id: int, person_id: int, source: IdentifierOrigin
+) -> None:
+    """Déplace l'attribution vers `person_id`, en `pending`."""
     conn.execute(
         text("""
             UPDATE person_identifiers
-            SET person_id = :pid,
-                status = CAST(:st AS identifier_status),
-                source = :src
+            SET person_id = :pid, status = 'pending', source = :src
             WHERE id = :id
         """),
-        {
-            "id": ident.id,
-            "pid": ident.person_id,
-            "st": ident.status.value,
-            "src": ident.source,
-        },
+        {"id": ident_id, "pid": person_id, "src": source},
     )
 
 

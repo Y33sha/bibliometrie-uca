@@ -2,7 +2,7 @@
 
 from typing import Protocol, TypedDict
 
-from domain.persons.identifier_attribution import AttributionResult, IdentifierAttribution
+from domain.persons.identifier_attribution import AttributionResult
 from domain.persons.identifiers import IdentifierOrigin
 from domain.persons.person import PersonExclusion
 
@@ -79,18 +79,6 @@ class PersonRepository(Protocol):
         ...
 
     # ── person_identifiers ─────────────────────────────────────────
-
-    def find_identifier(self, id_type: str, id_value: str) -> IdentifierAttribution | None:
-        """Charge l'attribution de l'identifiant `(id_type, id_value)`, unique, ou `None` si elle est absente."""
-        ...
-
-    def insert_identifier(self, ident: IdentifierAttribution) -> int:
-        """Insère l'attribution et renvoie son id, posé aussi sur `ident.id`. Lève une erreur si `(id_type, id_value)` existe déjà. L'appelant vérifie l'unicité par `find_identifier`."""
-        ...
-
-    def update_identifier(self, ident: IdentifierAttribution) -> None:
-        """Écrit la personne, le statut et la source d'une attribution existante. `ident.id` doit être posé."""
-        ...
 
     def attribute_identifier(
         self, person_id: int, id_type: str, id_value: str, *, source: IdentifierOrigin

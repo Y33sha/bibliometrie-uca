@@ -1,4 +1,4 @@
-"""Tests de l'entité `IdentifierAttribution`."""
+"""Issue de l'attribution d'un identifiant à une personne."""
 
 import pytest
 
@@ -21,38 +21,6 @@ def _make(status: AttributionStatus = AttributionStatus.PENDING) -> IdentifierAt
         status=status,
         source="auto",
     )
-
-
-class TestIdentifierAttributionConstruction:
-    def test_defaults_to_pending(self):
-        ident = IdentifierAttribution(
-            id=None, person_id=10, id_type="orcid", id_value="0000-0000-0000-0001"
-        )
-        assert ident.status is AttributionStatus.PENDING
-        assert ident.source is None
-
-
-class TestReattributeTo:
-    def test_moves_to_new_person_from_rejected(self):
-        ident = _make(status=AttributionStatus.REJECTED)
-        ident.reattribute_to(99, source="manual")
-        assert ident.person_id == 99
-        assert ident.status is AttributionStatus.PENDING
-        assert ident.source == "manual"
-
-    def test_raises_on_pending(self):
-        ident = _make(status=AttributionStatus.PENDING)
-        with pytest.raises(ConflictError):
-            ident.reattribute_to(99, source="manual")
-        assert ident.person_id == 10
-        assert ident.status is AttributionStatus.PENDING
-
-    def test_raises_on_confirmed(self):
-        ident = _make(status=AttributionStatus.CONFIRMED)
-        with pytest.raises(ConflictError):
-            ident.reattribute_to(99, source="manual")
-        assert ident.person_id == 10
-        assert ident.status is AttributionStatus.CONFIRMED
 
 
 class TestAttributionOutcome:

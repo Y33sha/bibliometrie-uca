@@ -1,6 +1,6 @@
-"""Attribution d'un identifiant externe à une personne, et ses changements de statut.
+"""Attribution d'un identifiant externe à une personne, et issue d'une nouvelle attribution.
 
-Le statut (`pending`, `confirmed`, `rejected`) qualifie l'attribution. Une réattribution modifie seulement l'attribution.
+Le statut (`pending`, `confirmed`, `rejected`) qualifie l'attribution.
 """
 
 from dataclasses import dataclass
@@ -20,36 +20,17 @@ class AttributionOutcome(StrEnum):
     HELD_ELSEWHERE = "held_elsewhere"  # une autre personne le détient en `pending` ou `confirmed`
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class IdentifierAttribution:
     """Attribution d'un identifiant externe (ORCID, idHAL, IdRef, compte HAL) à une personne. Une valeur d'identifiant appartient à une seule personne."""
 
-    id: int | None
+    id: int
     person_id: int
     id_type: str
     id_value: str
     """Valeur sous forme canonique."""
-    status: AttributionStatus = AttributionStatus.PENDING
-    source: IdentifierOrigin | None = None
-
-    def reattribute_to(self, new_person_id: int, *, source: IdentifierOrigin) -> None:
-        """Déplace une attribution `rejected` vers une autre personne, en `pending`.
-
-        Args:
-            source: origine de la réattribution.
-
-        Raises:
-            ConflictError: attribution d'un autre statut.
-        """
-        if self.status is not AttributionStatus.REJECTED:
-            raise ConflictError(
-                f"Impossible de réattribuer l'identifiant {self.id_type}={self.id_value!r} "
-                f"depuis le statut {self.status.value!r} ; seuls les identifiants rejected "
-                "peuvent être réattribués.",
-            )
-        self.person_id = new_person_id
-        self.status = AttributionStatus.PENDING
-        self.source = source
+    status: AttributionStatus
+    source: IdentifierOrigin | None
 
 
 class AttributionResult(NamedTuple):
