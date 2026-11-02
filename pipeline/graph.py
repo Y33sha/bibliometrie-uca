@@ -1110,6 +1110,8 @@ TASKS: tuple[Task, ...] = (
             "person_identifiers",
             "person_name_forms",
             "persons",
+            # Personnes à fiche RH, dont la complétion des prénoms laisse le prénom tel quel.
+            "hr_records",
             "contribution_resolution_queue",
         ),
         writes=(
