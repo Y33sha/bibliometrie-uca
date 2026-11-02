@@ -46,7 +46,7 @@ def test_les_adresses_sans_origine_sont_classees(sa_sync_conn):
     ):
         _address(sa_sync_conn, raw_text)
 
-    metrics = classify_addresses(sa_sync_conn, LOGGER)
+    metrics = classify_addresses(sa_sync_conn, LOGGER, chunk_size=4)
 
     assert metrics.updated == 6
     assert _origins(sa_sync_conn) == {
