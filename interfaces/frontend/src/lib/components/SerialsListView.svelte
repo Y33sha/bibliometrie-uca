@@ -330,7 +330,6 @@
 <style>
 	.journals-table { min-width: 660px; }
 	.journals-table td.num { color: var(--muted); }
-	.row-actions { width: 1%; }
 	.diamond-col { width: 1.5rem; padding-right: 0; }
 	.diamond { display: inline-flex; color: var(--diamond-text); vertical-align: middle; }
 	.muted { color: var(--muted); }

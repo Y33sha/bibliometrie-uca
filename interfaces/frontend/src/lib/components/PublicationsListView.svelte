@@ -393,11 +393,6 @@
 		font-size: var(--fs-sm);
 	}
 	.publication-table { min-width: 760px; }
-	/* La cellule d'actions se réduit à ses icônes. */
-	.publication-table .row-actions {
-		width: 1%;
-		white-space: nowrap;
-	}
 	.access-cell { white-space: nowrap; }
 
 	/* Statut HAL (lab) */

@@ -279,7 +279,6 @@
 	.publishers-table { min-width: 620px; }
 	.publishers-table td.num { color: var(--muted); }
 	.muted { color: var(--muted); }
-	.row-actions { width: 1%; }
 
 	.crossref-link { text-decoration: none; margin-left: 5px; vertical-align: text-bottom; }
 </style>

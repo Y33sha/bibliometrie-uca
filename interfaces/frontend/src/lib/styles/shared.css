@@ -520,6 +520,13 @@
 	background: var(--accent-light);
 }
 
+/* Cellule d'actions d'une ligne : réduite à ses icônes. */
+.data-table th.row-actions,
+.data-table td.row-actions {
+	width: 1%;
+	white-space: nowrap;
+}
+
 /* Icônes d'action d'une ligne (modifier, supprimer, exclure, ouvrir le volet) : estompées au repos, en pleine couleur au survol de la ligne ou au focus clavier, sur les écrans à pointeur. Les boutons à libellé restent lisibles. */
 @media (hover: hover) {
 	.data-table .row-actions > .icon-btn {

@@ -99,11 +99,6 @@
 {/if}
 
 <style>
-	/* La cellule d'actions se réduit à son icône. */
-	.row-actions {
-		width: 1%;
-		white-space: nowrap;
-	}
 	.conflict-author {
 		white-space: nowrap;
 	}
