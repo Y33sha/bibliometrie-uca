@@ -69,36 +69,36 @@ OPEN_LICENSES: frozenset[License] = frozenset(
 )
 """Licences qui ouvrent la réutilisation."""
 
-NO_LICENSE_LABEL = "Aucune licence"
+_NO_LICENSE_LABEL = "Aucune licence"
 
 
 def license_label(value: str | None) -> str:
-    """Renvoie le libellé français d'une licence, `NO_LICENSE_LABEL` sans licence."""
-    return LICENSE_LABELS[License(value)] if value else NO_LICENSE_LABEL
+    """Renvoie le libellé français d'une licence, `_NO_LICENSE_LABEL` sans licence."""
+    return LICENSE_LABELS[License(value)] if value else _NO_LICENSE_LABEL
 
 
 # Sources de la licence de la version éditeur d'une publication, par priorité.
-PUBLISHER_LICENSE_SOURCES: tuple[Source, ...] = (
+_PUBLISHER_LICENSE_SOURCES: tuple[Source, ...] = (
     Source.CROSSREF,
     Source.OPENALEX,
     Source.SCANR,
     Source.DATACITE,
 )
 # Pour un jeu de données ou un logiciel, DataCite passe en tête.
-DATA_LICENSE_SOURCES: tuple[Source, ...] = (
+_DATA_LICENSE_SOURCES: tuple[Source, ...] = (
     Source.DATACITE,
     Source.CROSSREF,
     Source.OPENALEX,
     Source.SCANR,
 )
-DATA_DOC_TYPES: frozenset[str] = frozenset({DocType.DATASET, DocType.SOFTWARE})
+_DATA_DOC_TYPES: frozenset[str] = frozenset({DocType.DATASET, DocType.SOFTWARE})
 # Source de la licence du fichier déposé.
 DEPOSIT_LICENSE_SOURCE = Source.HAL
 
 
 def publisher_license_sources(doc_type: str | None) -> tuple[Source, ...]:
     """Renvoie les sources de la licence de la version éditeur, par priorité, selon le type de document."""
-    return DATA_LICENSE_SOURCES if doc_type in DATA_DOC_TYPES else PUBLISHER_LICENSE_SOURCES
+    return _DATA_LICENSE_SOURCES if doc_type in _DATA_DOC_TYPES else _PUBLISHER_LICENSE_SOURCES
 
 
 # Éléments d'une licence Creative Commons, dans l'ordre de son code.
@@ -193,7 +193,7 @@ def _from_url(url: str) -> License | None:
     return None
 
 
-def is_access_right(raw: str) -> bool:
+def _is_access_right(raw: str) -> bool:
     """Vrai pour un droit d'accès (vocabulaire COAR, `info:eu-repo`), qui n'est pas une licence."""
     value = re.sub(r"^https?://", "", raw.strip().lower())
     return value.startswith(("info:eu-repo", "purl.org/coar"))
@@ -201,7 +201,7 @@ def is_access_right(raw: str) -> bool:
 
 def normalize_license(raw: str | None) -> License | None:
     """Renvoie la licence désignée par une forme brute, ou `None` pour une forme vide, non reconnue, ou qui n'est pas une licence (droit d'accès, URL d'éditeur)."""
-    if not raw or not raw.strip() or is_access_right(raw):
+    if not raw or not raw.strip() or _is_access_right(raw):
         return None
     value = raw.strip()
     if "/" in value:
@@ -230,5 +230,5 @@ def datacite_license(rights: JsonValue) -> License | None:
             uri
         ):
             return found
-        declared = declared or bool(uri and uri.strip() and not is_access_right(uri))
+        declared = declared or bool(uri and uri.strip() and not _is_access_right(uri))
     return License.OTHER if declared else None
