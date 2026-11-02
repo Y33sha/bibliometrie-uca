@@ -12,7 +12,7 @@ from dataclasses import dataclass, replace
 
 from sqlalchemy import Connection, text
 
-from domain.merge import DataNature, MergedEntity
+from domain.merge import MergedEntity
 
 type MergeApply = Callable[[Connection, int, int], None]
 
@@ -23,11 +23,12 @@ class MergeStep:
     """Paires (table, colonne) rattachant la donnée à l'entité."""
     apply: MergeApply
     """Applique la règle de fusion. Arguments : connexion, id conservé, id absorbé."""
-    nature: DataNature = DataNature.DERIVED
+    decision: bool = False
+    """La donnée est une décision humaine."""
 
-    def of_nature(self, nature: DataNature) -> MergeStep:
-        """Renvoie la même étape, pour une donnée de nature `nature`."""
-        return replace(self, nature=nature)
+    def as_decision(self) -> MergeStep:
+        """Renvoie la même étape, pour une donnée de décision humaine."""
+        return replace(self, decision=True)
 
 
 def _noop(conn: Connection, target_id: int, source_id: int) -> None:
@@ -111,13 +112,13 @@ def fill_empty_unique(table: str, column: str) -> MergeStep:
 
 
 def without_decision_sql(table: str, alias: str, steps: dict[str, MergeStep]) -> str:
-    """Renvoie la condition SQL vraie quand l'entité `alias` (ligne de `table`) est sans donnée de nature décision.
+    """Renvoie la condition SQL vraie quand l'entité `alias` (ligne de `table`) est sans donnée de décision humaine.
 
     Chaque colonne de `table` est nulle, chaque clé étrangère est sans ligne.
     """
     clauses = []
     for step in steps.values():
-        if step.nature != DataNature.DECISION:
+        if not step.decision:
             continue
         for column_table, column in step.columns:
             if column_table == table:

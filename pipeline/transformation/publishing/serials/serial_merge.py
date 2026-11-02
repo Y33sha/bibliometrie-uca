@@ -2,7 +2,7 @@
 
 from sqlalchemy import Connection, text
 
-from domain.merge import DataNature, MergedEntity
+from domain.merge import MergedEntity
 from domain.serials.serial import ManualField, SerialType
 from infrastructure.repositories.merge_steps import (
     MergeStep,
@@ -51,7 +51,7 @@ def _fill_empty_with_marker(
             {"t": target_id, "s": source_id, "field": field.value},
         )
 
-    return MergeStep(tuple(("serials", c) for c in columns), apply, DataNature.MIXED)
+    return MergeStep(tuple(("serials", c) for c in columns), apply)
 
 
 def _merge_is_in_doaj(conn: Connection, target_id: int, source_id: int) -> None:
@@ -76,7 +76,7 @@ MERGE_STEPS: dict[str, MergeStep] = {
     # Une décision de rattachement par titre qui désignait l'absorbée la suit.
     "title_decisions": transfer("serial_title_decisions", "serial_id"),
     "doi_namespaces": untouched("serial_doi_namespaces", "serial_id"),
-    "title": untouched("serials", "title", "title_normalized").of_nature(DataNature.MIXED),
+    "title": untouched("serials", "title", "title_normalized"),
     "created_at": untouched("serials", "created_at"),
     # Éditeur calculé d'après les publications, recalculé après la fusion.
     "publisher": untouched("serials", "publisher_id"),
@@ -87,12 +87,12 @@ MERGE_STEPS: dict[str, MergeStep] = {
         ("serial_type",),
         f"t.serial_type = '{SerialType.UNKNOWN.value}'",
     ),
-    "is_academic": untouched("serials", "is_academic").of_nature(DataNature.MIXED),
-    "is_in_doaj": MergeStep((("serials", "is_in_doaj"),), _merge_is_in_doaj, DataNature.MIXED),
+    "is_academic": untouched("serials", "is_academic"),
+    "is_in_doaj": MergeStep((("serials", "is_in_doaj"),), _merge_is_in_doaj),
     "doaj_record": untouched("serials", "doaj_payload", "doaj_imported_at"),
     "publication_count": untouched("serials", "publication_count"),
     # Un champ repris de l'absorbée ajoute son marqueur à `manual_fields` (`_fill_empty_with_marker`).
-    "manual_fields": untouched("serials", "manual_fields").of_nature(DataNature.DECISION),
+    "manual_fields": untouched("serials", "manual_fields"),
 }
 
 

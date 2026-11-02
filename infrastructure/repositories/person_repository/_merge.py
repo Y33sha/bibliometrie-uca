@@ -2,7 +2,7 @@
 
 from sqlalchemy import Connection, text
 
-from domain.merge import DataNature, MergedEntity
+from domain.merge import MergedEntity
 from domain.persons.identifiers import AttributionStatus
 from domain.persons.merge import merged_exclusion
 from domain.persons.person import PersonExclusion
@@ -106,27 +106,23 @@ MERGE_STEPS: dict[str, MergeStep] = {
     "contributions": MergeStep((("contributions", "person_id"),), _merge_contributions),
     "rejected_contributions": transfer_unique(
         "rejected_contributions", "person_id", "source_record_id"
-    ).of_nature(DataNature.DECISION),
-    "confirmed_signatures": transfer("confirmed_source_contributions", "person_id").of_nature(
-        DataNature.DECISION
-    ),
+    ).as_decision(),
+    "confirmed_signatures": transfer("confirmed_source_contributions", "person_id").as_decision(),
     "distinct_persons": MergeStep(
         (("distinct_persons", "person_id_a"), ("distinct_persons", "person_id_b")),
         _merge_distinct_persons,
-        DataNature.DECISION,
+        decision=True,
     ),
-    "identifiers": transfer("person_identifiers", "person_id").of_nature(DataNature.MIXED),
-    "name_forms": MergeStep(
-        (("person_name_forms", "person_id"),), _merge_name_forms, DataNature.MIXED
-    ),
+    "identifiers": transfer("person_identifiers", "person_id"),
+    "name_forms": MergeStep((("person_name_forms", "person_id"),), _merge_name_forms),
     # L'absorbée n'a jamais de fiche RH : celle qui en a une est conservée (`merge_roles`).
     "rh_record": untouched("hr_records", "person_id"),
     # Les formes de nom de l'absorbée restent (`name_forms`).
     "name": untouched(
         "persons", "last_name", "first_name", "last_name_normalized", "first_name_normalized"
-    ).of_nature(DataNature.MIXED),
+    ),
     "created_at": untouched("persons", "created_at"),
-    "exclusion": MergeStep((("persons", "exclusion"),), _merge_exclusion, DataNature.DECISION),
+    "exclusion": MergeStep((("persons", "exclusion"),), _merge_exclusion, decision=True),
 }
 
 
