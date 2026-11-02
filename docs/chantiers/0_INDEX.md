@@ -10,6 +10,7 @@
 
 ### Non commencé
 
+- [Brevets](DATA_brevets.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
 - [Listes de revues](DATA_listes-de-revues.md)
 - [Mesures d'impact](METIER_mesures-impact.md)
