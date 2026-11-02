@@ -1,26 +1,23 @@
-"""Repository PostgreSQL de l'entité Structure : structures, tutelles et formes de nom."""
+"""Repository PostgreSQL des structures, de leurs tutelles et de leurs formes de nom."""
 
-from typing import NamedTuple, cast
+from typing import cast
 
 from pydantic import ValidationError as PydanticValidationError
 from sqlalchemy import Connection, Text, bindparam, cast as sql_cast, delete, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from application.ports.repositories.structure_repository import (
+    StructureColumns,
     StructureNameFormDeletedRow,
     StructureNameFormRow,
     StructureNameFormUpdateFields,
     StructureRepository,
+    StructureRow,
     StructureTutelleDeletedRow,
     StructureTutelleRow,
 )
 from domain.errors import NotFoundError, ValidationError
-from domain.structures.identifiers import HalCollection, RorId
-from domain.structures.name_forms import StructureNameForm
-from domain.structures.structure import Structure, StructureType
 from domain.types import JsonValue
-from infrastructure.db.rows import row_as, rows_as
-from infrastructure.db.scalars import scalar_int
 from infrastructure.db.tables import (
     structure_name_forms,
     structure_parents,
@@ -40,59 +37,21 @@ _NAME_FORM_COLUMNS = (
 )
 
 
-class _StructureNameFormRow(NamedTuple):
-    """Projection SQL sur `structure_name_forms` (find_by_id de l'entité Structure)."""
-
-    form_text: str
-    is_word_boundary: bool
-    is_excluding: bool
-    requires_context_of: list[int] | None
-
-
-class _StructureRow(NamedTuple):
-    """Projection SQL `find_by_id` sur `structures`."""
-
-    id: int
-    code: str
-    name: str
-    acronym: str | None
-    structure_type: str
-    ror_id: str | None
-    rnsr_id: str | None
-    hal_collection: str | None
-    api_ids: dict[str, list[str]] | None
+# Colonnes de `structures` renvoyées par l'insertion et la mise à jour (`StructureRow`).
+_STRUCTURE_COLUMNS = (
+    structures.c.id,
+    structures.c.code,
+    structures.c.name,
+    structures.c.acronym,
+    sql_cast(structures.c.structure_type, Text).label("type"),
+    structures.c.ror_id,
+    structures.c.rnsr_id,
+    structures.c.hal_collection,
+    structures.c.api_ids,
+)
 
 
-def _structure_name_form_from_row(row: _StructureNameFormRow) -> StructureNameForm:
-    """Renvoie la forme de nom de domaine d'une ligne de `structure_name_forms`."""
-    return StructureNameForm(
-        form_text=row.form_text,
-        is_word_boundary=row.is_word_boundary,
-        is_excluding=row.is_excluding,
-        requires_context_of=tuple(row.requires_context_of or ()),
-    )
-
-
-def _structure_from_row(row: _StructureRow, name_forms: tuple[StructureNameForm, ...]) -> Structure:
-    """Renvoie la structure de domaine d'une ligne de `structures`, avec ses formes de nom, chargées à part par `find_by_id`.
-
-    Le ROR et la collection HAL se lisent en strict : une valeur mal normalisée en base lève `ValidationError`, et signale une corruption.
-    """
-    return Structure(
-        id=row.id,
-        code=row.code,
-        name=row.name,
-        structure_type=StructureType(row.structure_type),
-        acronym=row.acronym,
-        ror_id=RorId(row.ror_id) if row.ror_id else None,
-        rnsr_id=row.rnsr_id,
-        hal_collection=HalCollection(row.hal_collection) if row.hal_collection else None,
-        api_ids=row.api_ids,
-        name_forms=name_forms,
-    )
-
-
-def _normalize_api_ids(raw: dict[str, list[str]] | None) -> dict[str, list[str]] | None:
+def _normalize_api_ids(raw: dict[str, str | list[str]] | None) -> dict[str, list[str]] | None:
     """Renvoie la forme normalisée de `api_ids` (`StructureApiIds`), ou `None` pour une entrée vide. Lève `ValidationError` si le schéma est violé.
 
     La validation se fait dans le repository : toute écriture passe par lui, y compris celle des scripts hors couche application.
@@ -105,86 +64,36 @@ def _normalize_api_ids(raw: dict[str, list[str]] | None) -> dict[str, list[str]]
         raise ValidationError(f"api_ids invalide : {e}") from e
 
 
+def _values(columns: StructureColumns) -> dict[str, object]:
+    """Renvoie les valeurs SQL des colonnes fournies, `api_ids` validé et normalisé."""
+    values: dict[str, object] = dict(columns)
+    if "api_ids" in columns:
+        values["api_ids"] = _normalize_api_ids(columns["api_ids"])
+    return values
+
+
 class PgStructureRepository(StructureRepository):
-    """Accès PostgreSQL sync à l'entité Structure."""
+    """Accès PostgreSQL sync aux structures, à leurs tutelles et à leurs formes de nom."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
 
-    # ── Chargement ─────────────────────────────────────────────────
-
-    def find_by_id(self, structure_id: int) -> Structure | None:
-        row = self._conn.execute(
-            select(
-                structures.c.id,
-                structures.c.code,
-                structures.c.name,
-                structures.c.acronym,
-                sql_cast(structures.c.structure_type, Text).label("structure_type"),
-                structures.c.ror_id,
-                structures.c.rnsr_id,
-                structures.c.hal_collection,
-                structures.c.api_ids,
-            ).where(structures.c.id == structure_id)
-        ).first()
-        if row is None:
-            return None
-        name_form_result = self._conn.execute(
-            select(
-                structure_name_forms.c.form_text,
-                structure_name_forms.c.is_word_boundary,
-                structure_name_forms.c.is_excluding,
-                structure_name_forms.c.requires_context_of,
-            ).where(structure_name_forms.c.structure_id == structure_id)
-        )
-        name_forms = tuple(
-            _structure_name_form_from_row(name_form)
-            for name_form in rows_as(_StructureNameFormRow, name_form_result)
-        )
-        return _structure_from_row(row_as(_StructureRow, row), name_forms)
-
     # ── structures ─────────────────────────────────────────────────
 
-    def add(self, structure: Structure) -> int:
-        """Insère une structure et renvoie son id. `api_ids` est validé, et posé sous sa forme normalisée sur l'entité."""
-        structure.api_ids = _normalize_api_ids(structure.api_ids)
-        return scalar_int(
-            self._conn.execute(
-                structures.insert()
-                .values(
-                    code=structure.code,
-                    name=structure.name,
-                    structure_type=structure.structure_type.value,
-                    acronym=structure.acronym,
-                    ror_id=structure.ror_id.value if structure.ror_id else None,
-                    rnsr_id=structure.rnsr_id,
-                    hal_collection=structure.hal_collection.value
-                    if structure.hal_collection
-                    else None,
-                    api_ids=structure.api_ids,
-                )
-                .returning(structures.c.id)
-            )
-        )
+    def add(self, code: str, columns: StructureColumns) -> StructureRow:
+        row = self._conn.execute(
+            structures.insert().values(code=code, **_values(columns)).returning(*_STRUCTURE_COLUMNS)
+        ).one()
+        return cast(StructureRow, dict(row._mapping))
 
-    def save(self, structure: Structure) -> None:
-        """Écrit les champs modifiables d'une structure chargée ; le code reste. `api_ids` est validé. Lève `NotFoundError` si l'id est absent."""
-        structure.api_ids = _normalize_api_ids(structure.api_ids)
-        result = self._conn.execute(
+    def update(self, structure_id: int, columns: StructureColumns) -> StructureRow | None:
+        row = self._conn.execute(
             update(structures)
-            .where(structures.c.id == structure.id)
-            .values(
-                name=structure.name,
-                structure_type=structure.structure_type.value,
-                acronym=structure.acronym,
-                ror_id=structure.ror_id.value if structure.ror_id else None,
-                rnsr_id=structure.rnsr_id,
-                hal_collection=structure.hal_collection.value if structure.hal_collection else None,
-                api_ids=structure.api_ids,
-            )
-        )
-        if result.rowcount == 0:
-            raise NotFoundError(f"Structure {structure.id} introuvable")
+            .where(structures.c.id == structure_id)
+            .values(**_values(columns))
+            .returning(*_STRUCTURE_COLUMNS)
+        ).first()
+        return cast(StructureRow, dict(row._mapping)) if row else None
 
     def delete_structure(self, structure_id: int) -> dict[str, JsonValue] | None:
         snapshot = self._conn.execute(

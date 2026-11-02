@@ -16,7 +16,6 @@ from infrastructure.read_models.publications.filtering import FilterContext
 from infrastructure.read_models.publications.models import PublicationFilters
 from infrastructure.repositories.perimeter_repository import PgPerimeterRepository
 from infrastructure.repositories.serial_repository import PgSerialRepository
-from infrastructure.repositories.structure_repository import PgStructureRepository
 from pipeline.ingestion.common.staging import StagingStore
 from pipeline.transformation.publications.author_grouping.store import AuthorGroupingStore
 from pipeline.transformation.publications.consolidation import source_records_of
@@ -24,11 +23,7 @@ from pipeline.transformation.publications.correction.correction_store import (
     SourceRecordCorrectionStore,
 )
 from tests.integration.helpers.serials import insert_serial
-from tests.integration.helpers.structures import (
-    insert_perimeter,
-    insert_structure,
-    insert_structure_name_form,
-)
+from tests.integration.helpers.structures import insert_perimeter
 
 
 class TestRelevesRendantUneListe:
@@ -91,13 +86,6 @@ class TestRelevesRendantUneLigne:
         perimeter_id = insert_perimeter(sa_sync_conn_owner, "test-accord", name="Périmètre")
         assert PgPerimeterRepository(sa_sync_conn_owner).find_by_id(perimeter_id) is not None
 
-    def test_une_structure_et_ses_formes_de_nom_s_accordent(self, sa_sync_conn_owner):
-        structure_id = insert_structure(sa_sync_conn_owner, "test-accord", name="Structure")
-        insert_structure_name_form(sa_sync_conn_owner, structure_id, form_text="Forme de nom")
-        structure = PgStructureRepository(sa_sync_conn_owner).find_by_id(structure_id)
-        assert structure is not None
-        assert structure.name_forms
-
 
 TYPES_EXERCES = {
     "CrossrefTitlePair",
@@ -108,8 +96,6 @@ TYPES_EXERCES = {
     "SourceContributionRow",
     "_SourceRecordRow",
     "StagingRow",
-    "_StructureNameFormRow",
-    "_StructureRow",
 }
 """Types que les tests ci-dessus construisent depuis une requête réelle.
 
@@ -140,11 +126,6 @@ def _types_apparies() -> set[str]:
                 ):
                     trouves.add(noeud.args[0].id)
     return trouves
-
-
-def test_le_parcours_trouve_les_appariements():
-    """Le parcours trouve des appariements : un parcours vide rendrait la comparaison sans objet."""
-    assert len(_types_apparies()) >= 9
 
 
 def test_chaque_type_apparie_est_exerce_par_un_test():

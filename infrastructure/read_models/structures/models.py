@@ -5,10 +5,9 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Literal, cast
+from typing import Literal
 
 from application.ports.model import Model
-from domain.structures.structure import Structure
 from infrastructure.read_models._common import (
     FacetOption,
     PaginatedResponse,
@@ -82,21 +81,6 @@ class StructureOut(Model):
     rnsr_id: str | None
     hal_collection: str | None
     api_ids: dict[str, list[str]] | None
-
-    @classmethod
-    def from_structure(cls, structure: Structure) -> StructureOut:
-        """Renvoie la réponse d'une structure enregistrée : son type sous le nom `type`, ses identifiants ROR et HAL en chaînes."""
-        return cls(
-            id=cast(int, structure.id),
-            code=structure.code,
-            name=structure.name,
-            acronym=structure.acronym,
-            type=structure.structure_type.value,
-            ror_id=structure.ror_id.value if structure.ror_id else None,
-            rnsr_id=structure.rnsr_id,
-            hal_collection=structure.hal_collection.value if structure.hal_collection else None,
-            api_ids=structure.api_ids,
-        )
 
 
 class RelatedStructureOut(Model):

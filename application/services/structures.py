@@ -1,7 +1,9 @@
-"""Service des structures : écritures sur l'entité Structure, ses tutelles et ses formes de nom.
+"""Service des structures : écritures sur les structures, leurs tutelles et leurs formes de nom.
 
 Le repository valide `api_ids` à chaque écriture.
 """
+
+from collections.abc import Set
 
 from application.audit_log import emit_event
 from application.ports.pipeline.perimeter_structures import PerimeterStructures
@@ -9,39 +11,61 @@ from application.ports.repositories.perimeter_repository import PerimeterReposit
 from application.ports.repositories.structure_repository import (
     NameFormCreate,
     NameFormUpdate,
+    StructureColumns,
     StructureCreate,
     StructureNameFormRow,
     StructureNameFormUpdateFields,
     StructureRepository,
+    StructureRow,
     StructureTutelleRow,
     StructureUpdate,
 )
 from domain.errors import NotFoundError, ValidationError
+from domain.identifiers import NormalizedIdentifier
 from domain.normalize import normalize_text
+from domain.structures.identifiers import HalCollection, RorId
 from domain.structures.name_forms import is_short_form
-from domain.structures.structure import Structure, StructureEdit
 from domain.structures.tutelles import check_can_create_tutelle
 
 
-def _structure_edit(update: StructureUpdate) -> StructureEdit:
-    """Renvoie les champs fournis de `update`, sous la forme reçue par l'entité."""
-    provided = update.model_fields_set
-    changes = StructureEdit()
-    if "name" in provided and update.name is not None:
-        changes["name"] = update.name
-    if "type" in provided and update.type is not None:
-        changes["structure_type"] = update.type
+def _normalized(identifier: type[NormalizedIdentifier], raw: str | None, field: str) -> str | None:
+    """Renvoie la forme normalisée d'un identifiant saisi, `None` pour une saisie vide.
+
+    Raises:
+        ValidationError: saisie invalide. Le message nomme le champ `field`.
+    """
+    if not raw or not raw.strip():
+        return None
+    parsed = identifier.try_parse(raw)
+    if parsed is None:
+        raise ValidationError(f"{field} invalide : {raw!r}")
+    return parsed.value
+
+
+def _columns(data: StructureCreate | StructureUpdate, provided: Set[str]) -> StructureColumns:
+    """Renvoie les colonnes à écrire pour les champs `provided` de `data`. Un nom ou un type nul vaut champ non fourni.
+
+    Raises:
+        ValidationError: ROR ou collection HAL invalide.
+    """
+    columns = StructureColumns()
+    if "name" in provided and data.name is not None:
+        columns["name"] = data.name
+    if "type" in provided and data.type is not None:
+        columns["structure_type"] = data.type
     if "acronym" in provided:
-        changes["acronym"] = update.acronym
+        columns["acronym"] = data.acronym
     if "ror_id" in provided:
-        changes["ror_id"] = update.ror_id
+        columns["ror_id"] = _normalized(RorId, data.ror_id, "ror_id")
     if "rnsr_id" in provided:
-        changes["rnsr_id"] = update.rnsr_id
+        columns["rnsr_id"] = data.rnsr_id
     if "hal_collection" in provided:
-        changes["hal_collection"] = update.hal_collection
+        columns["hal_collection"] = _normalized(
+            HalCollection, data.hal_collection, "hal_collection"
+        )
     if "api_ids" in provided:
-        changes["api_ids"] = update.api_ids
-    return changes
+        columns["api_ids"] = data.api_ids
+    return columns
 
 
 class StructureService:
@@ -63,54 +87,41 @@ class StructureService:
 
     # ── Structures ──
 
-    def create_structure(self, create: StructureCreate) -> Structure:
-        """Crée une structure et la renvoie.
+    def create_structure(self, create: StructureCreate) -> StructureRow:
+        """Crée une structure et renvoie la ligne écrite.
 
         Raises:
-            ValidationError: champ invalide (`type` hors énumération, `ror_id` ou `hal_collection` mal formé, `api_ids` non conforme).
+            ValidationError: `ror_id` ou `hal_collection` mal formé, `api_ids` non conforme.
         """
-        structure = Structure.create(
-            code=create.code,
-            name=create.name,
-            structure_type=create.type,
-            acronym=create.acronym,
-            ror_id=create.ror_id,
-            rnsr_id=create.rnsr_id,
-            hal_collection=create.hal_collection,
-            api_ids=create.api_ids,
-        )
-        structure.id = self._structures.add(structure)
+        row = self._structures.add(create.code, _columns(create, set(StructureCreate.model_fields)))
         emit_event(
             "structure.created",
             "structure",
-            structure.id,
+            row["id"],
             {"code": create.code, "name": create.name, "type": create.type},
         )
-        return structure
+        return row
 
-    def update_structure(self, structure_id: int, update: StructureUpdate) -> Structure:
-        """Applique les champs fournis à la structure et l'enregistre. `null` efface un champ facultatif, et vaut champ non fourni sur le nom ou le type.
+    def update_structure(self, structure_id: int, update: StructureUpdate) -> StructureRow:
+        """Écrit les champs fournis de la structure et renvoie la ligne écrite. `null` efface un champ facultatif, et vaut champ non fourni sur le nom ou le type.
 
         Raises:
             NotFoundError: structure introuvable.
             ValidationError: aucun champ fourni, ou valeur invalide.
         """
-        structure = self._structures.find_by_id(structure_id)
-        if structure is None:
-            raise NotFoundError(f"Structure {structure_id} introuvable")
-
-        applied = structure.apply(**_structure_edit(update))
-        if not applied:
+        columns = _columns(update, update.model_fields_set)
+        if not columns:
             raise ValidationError("Aucun champ à mettre à jour")
-
-        self._structures.save(structure)
+        row = self._structures.update(structure_id, columns)
+        if row is None:
+            raise NotFoundError(f"Structure {structure_id} introuvable")
         emit_event(
             "structure.updated",
             "structure",
             structure_id,
-            {"fields": sorted(applied)},
+            {"fields": sorted(columns)},
         )
-        return structure
+        return row
 
     def delete_structure(self, structure_id: int) -> None:
         """Supprime une structure. Lève `NotFoundError` si elle n'existe pas.

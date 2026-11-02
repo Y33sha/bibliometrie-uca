@@ -1,10 +1,10 @@
-"""Port StructureRepository : accès à l'entité Structure."""
+"""Port StructureRepository : accès aux structures, à leurs tutelles et à leurs formes de nom."""
 
 from datetime import datetime
 from typing import Protocol, TypedDict
 
 from application.ports.model import Model
-from domain.structures.structure import Structure, StructureType
+from domain.structures.structure import StructureType
 from domain.types import JsonValue
 
 
@@ -54,6 +54,33 @@ class NameFormUpdate(Model):
     """`null` efface la valeur."""
 
 
+class StructureColumns(TypedDict, total=False):
+    """Colonnes de `structures` à écrire. Le ROR et la collection HAL sont déjà normalisés."""
+
+    name: str
+    structure_type: StructureType
+    acronym: str | None
+    ror_id: str | None
+    rnsr_id: str | None
+    hal_collection: str | None
+    api_ids: dict[str, str | list[str]] | None
+    """Validé et normalisé par le repository (`StructureApiIds`)."""
+
+
+class StructureRow(TypedDict):
+    """Structure écrite, renvoyée par la création et la mise à jour."""
+
+    id: int
+    code: str
+    name: str
+    acronym: str | None
+    type: str
+    ror_id: str | None
+    rnsr_id: str | None
+    hal_collection: str | None
+    api_ids: dict[str, list[str]] | None
+
+
 class StructureNameFormUpdateFields(TypedDict, total=False):
     """Champs d'une forme de nom à écrire, `form_text` déjà normalisé."""
 
@@ -100,18 +127,14 @@ class StructureNameFormDeletedRow(TypedDict):
 class StructureRepository(Protocol):
     """Accès aux structures, à leurs tutelles et à leurs formes de nom."""
 
-    # ── Entité : chargement et écriture ───────────────────────────
+    # ── structures ────────────────────────────────────────────────
 
-    def find_by_id(self, structure_id: int) -> Structure | None:
-        """Charge l'entité `Structure` avec ses formes de nom, ou `None` si la structure n'existe pas. Les tutelles sont hors de l'entité (`get_ancestor_ids`)."""
+    def add(self, code: str, columns: StructureColumns) -> StructureRow:
+        """Insère une structure et renvoie la ligne écrite. `columns` contient au moins le nom et le type. Lève `ValidationError` si `api_ids` est invalide."""
         ...
 
-    def add(self, structure: Structure) -> int:
-        """Insère une structure et renvoie son id. `api_ids` est validé, et posé sous sa forme normalisée sur l'entité."""
-        ...
-
-    def save(self, structure: Structure) -> None:
-        """Enregistre les champs éditables d'une structure chargée. Le code est immuable. Lève `NotFoundError` si la structure n'existe pas."""
+    def update(self, structure_id: int, columns: StructureColumns) -> StructureRow | None:
+        """Écrit les colonnes fournies et renvoie la ligne écrite, ou `None` si la structure est introuvable. Le code reste. Lève `ValidationError` si `api_ids` est invalide."""
         ...
 
     def delete_structure(self, structure_id: int) -> dict[str, JsonValue] | None:
