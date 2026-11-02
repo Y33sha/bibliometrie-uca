@@ -1,69 +1,56 @@
 # Chantier — Signatures institutionnelles
 
-Mesurer, pour chaque personne, la part de ses publications dont l'adresse mentionne l'université.
+Distinguer les adresses brutes, et montrer pour chaque personne les structures citées dans ses adresses brutes.
 
 ## Contexte
 
 Une partie des publications de l'Alliance UCA est absente des publications de l'université dans les bases bibliographiques : l'adresse de l'auteur omet l'université. Cas typique : un enseignant-chercheur de l'UCA qui exerce au CHU signe « CHU Clermont-Ferrand » seul.
 
-Le moissonnage interroge le périmètre Alliance UCA (`perimeter_extraction`). L'entrée d'une contribution source dans le périmètre se calcule sur le périmètre UCA (`perimeter_persons`). Une contribution source dont l'adresse cite seulement le CHU est donc moissonnée, mais reste hors périmètre. Elle entre dans le périmètre par un autre indice : identifiant d'une personne RH (ORCID, idHAL, IdRef), structure HAL du laboratoire. Sans ces indices, elle reste sans personne : la phase `persons` rattache une contribution hors périmètre seulement par identifiant. Son enregistrement source reste sans publication si aucun coauteur n'est dans le périmètre.
+`address_structures` rattache une adresse à chaque structure dont une forme de nom figure dans le texte. L'onglet Adresses d'une personne, réservé à l'administration, montre par année la part de ses publications avec une adresse rattachée à chaque structure.
 
-Seules OpenAlex, Web of Science, Crossref et DataCite donnent le texte de l'adresse. Chez Crossref et DataCite, la chaîne est parfois le seul nom de l'établissement, transmis par l'éditeur. OpenAlex reprend aussi les libellés des structures HAL (« IP - Institut Pascal (Campus Universitaire des Cézeaux… - France) ») parmi ses adresses. HAL, ScanR et theses.fr donnent des structures de leur référentiel.
+Une adresse est un texte, partagé par toutes les sources qui le donnent. Une adresse brute reproduit l'adresse imprimée dans la publication. Le champ d'adresse des sources contient aussi d'autres textes :
 
-`address_structures` rattache une adresse à chaque structure dont une forme de nom figure dans le texte : université, laboratoire, CHU, organisme. OpenAlex pose aussi des ROR sur chaque affiliation (`source_contribution_rors`). Il ajoute souvent le ROR du parent quand l'adresse cite l'enfant. Quand l'adresse cite seulement le CHU, le ROR du CHU est souvent le seul.
+- libellés HAL complets, « SIGLE - Nom (adresse postale - Pays) » : 11 835 adresses, presque toutes chez OpenAlex ;
+- noms seuls de structure ou d'établissement : nom HAL (« Université Clermont Auvergne [2017-2020] »), nom ROR (« University of Liverpool »), nom suivi du sigle (« Laboratoire Magmas et Volcans (LMV) ») ;
+- arborescences de structures HAL chez scanR : nom, code et sigle du laboratoire, puis ses tutelles et son adresse postale (« Institut Pascal, UMR6602, UMR6602, IP, CNRS, UCA… ») ;
+- textes étrangers à une adresse (« Author to whom correspondence should be addressed. », « Professeur »).
 
-`hr_records` contient une fiche par personne, avec une seule période (`start_date`, `end_date`). L'export du 15/12/2025 couvre seulement les enseignants-chercheurs de l'UCA.
+Mesure du 2026-10-27, base locale, enseignants-chercheurs de l'UCA : 71 % des publications avec adresse brute mentionnent l'université, 62 % en comptant les libellés HAL repris par OpenAlex.
 
 ## Décisions
 
-1. **Ordre du chantier** : mesurer d'abord ce qui manque, par requêtes hors pipeline, enregistrements sources sans publication compris. Publier ensuite un indicateur par personne. Inclure enfin les publications de l'Alliance absentes du périmètre.
-2. **Population** : les personnes du référentiel RH.
-3. **Dénominateur** : les publications de la personne parues pendant sa période RH, avec une tolérance en fin de période. Une publication dont les adresses de la personne citent seulement des structures hors Alliance est comptée à part et sort du dénominateur.
-4. **Indicateur, en trois comptes par personne** : publications ; parmi elles, publications avec une adresse exploitable ; parmi celles-ci, publications dont une adresse mentionne l'université.
-5. **Adresse exploitable** : texte d'affiliation d'OpenAlex ou de WoS ; de Crossref ou DataCite quand la chaîne est une adresse, et pas le seul nom de l'établissement. Un libellé HAL repris par OpenAlex est exclu. Il est reconnu à son format : sigle et nom d'une structure HAL, ou adresse entre parenthèses terminée par le pays.
-6. **Mention de l'université**, sous n'importe quelle forme : `address_structures` rattache l'adresse à l'université elle-même. Un laboratoire de l'université cité seul ne vaut pas mention.
-7. **Grain de la publication** : une publication compte une fois par personne. Les comptes sont aussi donnés par source.
-8. **ROR d'OpenAlex** : mesure d'appoint, à côté du texte.
-9. **Restitution** : tableau de bord de la personne, visible de l'administration seulement.
+1. **Adresse brute** : texte de l'adresse tel qu'il figure dans la publication. La colonne `is_raw` de `addresses` la distingue des autres textes.
+2. **Critères** : propriétés du texte seul. `is_raw` vaut pour toutes les sources qui donnent le texte.
+3. **Portée** : `is_raw` filtre les indicateurs. Toute adresse reste un indice de périmètre et rattache ses structures.
+4. **Indicateur** : structures citées dans les adresses brutes de la personne, en part de ses publications avec adresse brute. Il vaut pour toute personne.
+5. **Restitution** : sur la personne seulement. Le lien entre une personne et une structure se déduit des structures de ses contributions : un indicateur par structure serait circulaire.
 
 ## Phasage
 
-### Phase 1 — Audit
+### Phase 1 — Adresses brutes
 
-- [x] Enregistrements sources sans contribution rattachée à la personne : rapprocher par le nom les personnes RH des contributions sources hors périmètre dont l'adresse cite une structure de l'Alliance, pendant la période RH (41d5aab8d). Base locale, 2026-10-27 : 1 692 couples (personne, travail) absents des publications de la personne, pour 155 personnes RH, presque toutes de l'UFR de médecine. 1 808 contributions sources sont sans publication. 615 sont dans une publication, souvent du périmètre, mais sans personne : la phase `persons` rattache une contribution hors périmètre seulement par identifiant.
-- [x] Classement des adresses sans l'université, sur les publications rattachées et sur les enregistrements sources rapprochés : structure de l'université seule, structure de l'Alliance hors UCA, autre structure connue, aucune structure reconnue. Base locale, 2026-10-27, datasets et noms ambigus exclus : 49 329 travaux, dont 33 835 exploitables. 71 % des travaux exploitables mentionnent l'université. Sans mention : structure de l'université seule 4 206, Alliance 4 039, aucune structure reconnue 1 323, autre structure 173. Avec les libellés HAL d'OpenAlex, le taux tombe à 62 %, et la structure de l'université seule monte à 10 449.
-- [ ] Revue des 500 adresses sans l'université les plus fréquentes, sur la page d'audit : forme de l'université non reconnue, ou nom de structure repris d'un référentiel.
-- [ ] Sources divergentes : examiner sur pièces les publications où une source mentionne l'université et une autre non, pour la même personne. Distinguer l'erreur de source de l'erreur de fusion des enregistrements sources.
-- [ ] ROR d'OpenAlex sur les adresses sans l'université : part avec le ROR de l'université, part avec le seul ROR du CHU.
-- [ ] Crossref et DataCite : séparer les adresses des noms d'établissement, par comparaison avec la chaîne OpenAlex du même auteur.
+- [x] Adresses sans virgule, hors libellés HAL complets. Base locale, 2026-11-02 : 40 924 adresses, pour 376 722 couples (adresse, enregistrement source).
+  - 52 % des couples : nom exact d'une structure HAL ou d'une organisation ROR.
+  - 11 % : texte terminé par un nom de pays. Échantillon de 15 : 12 adresses brutes (« Breast Unit Institute Gustave Roussy Villejuif France »), 3 noms suivis du pays entre parenthèses.
+  - 37 % : reste. Échantillon de 40 : surtout des noms seuls et des textes étrangers à une adresse ; 3 adresses brutes sans pays (« Department of Pediatrics University Hospital Rouen »).
+- [ ] Critères : libellé HAL complet ; nom exact d'une structure HAL ou d'une organisation ROR ; texte sans virgule et sans nom de pays final ; arborescence de structures HAL.
+- [ ] Colonne `is_raw` sur `addresses`, calculée par le pipeline. La migration remplit le stock.
+- [ ] Adresses non brutes signalées sur la page d'administration des adresses.
 
-### Phase 2 — Indicateur par personne
+### Phase 2 — Indicateurs
 
-- [ ] Calcul des trois comptes par personne.
-- [ ] Affichage sur le tableau de bord de la personne, réservé à l'administration.
-- [ ] Liste des publications sans mention de l'université, ouverte depuis l'indicateur.
-
-### Phase 3 — Publications de l'Alliance hors périmètre
-
-- [ ] Choisir la voie d'inclusion. Pistes :
-  - rapprochement par le nom, dans la phase `persons`, des contributions sources dont l'adresse cite une structure de l'Alliance, sans création de personne ;
-  - `perimeter_persons` sur le périmètre Alliance UCA. Ce périmètre fixe aussi l'entrée des contributions sources dans le périmètre, donc le périmètre des publications et le nom de l'établissement affiché.
-- [ ] Mesurer l'effet sur les publications, les contributions et les personnes du périmètre.
+- [ ] Onglet Adresses de la personne : comptes calculés sur les seules adresses brutes.
+- [ ] Dashboard de la personne : structures citées dans ses adresses brutes, toutes années confondues.
+- [ ] Documentation.
 
 ## Questions ouvertes
 
-- **Indicateur et publications manquantes** : calculé sur les publications rattachées à la personne, l'indicateur omet les cas visés, restés en enregistrements sources sans contribution rattachée. L'inclusion (phase 3) doit-elle précéder la publication de l'indicateur ?
-- **Sources divergentes** : quelle règle de comptage, d'après l'examen de la phase 1 ?
-- **Tolérance de fin de période** : quelle durée ? L'indice `hr_record` retient les documents parus entre l'année qui suit l'arrivée et la fin du contrat.
-- **Personnes hors référentiel RH** : chercheurs des organismes, doctorants, contractuels, émérites. Sans période connue, aucune attente de mention.
-- **Mention reconnaissable** : quelles formes de l'université permettent à WoS de relier la publication à l'établissement ?
-- **Conformité de forme** : la convention de signature (cf. Liens) impose une ligne unique, dans cet ordre : université, tutelles, laboratoire, code postal, ville, pays. Faut-il mesurer aussi les écarts de forme, d'ordre et d'éléments ?
-- **Liste blanche des `doc_type`** au dénominateur : quels types retenir ?
-- **Conséquences du périmètre Alliance UCA** comme `perimeter_persons` : personnes créées pour les chercheurs de l'Alliance hors UCA ; publications de l'Alliance sans auteur de l'université comptées dans les publications de l'université.
-- **Périmètre d'une publication rapprochée par le nom** : la contribution d'une personne RH, rattachée par le nom sur une adresse de l'Alliance, fait-elle entrer la publication dans le périmètre ? L'indice `hr_record` suppose un identifiant.
+- **Arborescences de structures HAL** : quel critère de texte ? Elles contiennent des virgules.
+- **Calcul de `is_raw`** : quelle phase ? Les critères lisent les noms HAL, les noms ROR et les noms de pays. Recalcul de toutes les adresses à chaque passage, ou des seules adresses créées ?
+- **Visibilité de l'indicateur** sur le dashboard de la personne : tous les utilisateurs, ou l'administration seulement, comme l'onglet Adresses ?
 
 ## Liens
 
 - Convention de signature : <https://www.uca.fr/recherche/science-ouverte-et-publication/politique-de-signature-des-publications>
-- Tables : `addresses`, `source_contribution_addresses`, `address_structures`, `source_contribution_rors`, `structures`, `perimeters`, `hr_records`.
+- Tables : `addresses`, `source_contribution_addresses`, `address_structures`, `hal_structures`, `ror_organizations`, `place_name_forms`.
 - Phase `affiliations` : `pipeline/transformation/structures/`.
