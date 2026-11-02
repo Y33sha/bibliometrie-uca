@@ -39,11 +39,9 @@
 		display: flex;
 		align-items: center;
 		height: calc(var(--fs-4xl) * 1.1);
-		padding-right: 32px;
-		border-right: 1px solid var(--border);
-		font-size: var(--fs-3xl);
+		font-size: var(--fs-2xl);
 		font-weight: 700;
-		color: var(--text-secondary);
+		color: var(--accent);
 		white-space: nowrap;
 	}
 	.key-figure {
