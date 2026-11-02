@@ -124,7 +124,7 @@
 	});
 
 	const sum = (rows: Row[]) => rows.reduce((total, r) => total + Number(r.value ?? 0), 0);
-	const percent = (part: number, whole: number) => `${Math.round((part / whole) * 100)} %`;
+	const percent = (part: number, whole: number) => `${Math.round((part / whole) * 100)} %`;
 
 	const total = $derived(sum(byYear));
 	const openAccess = $derived(sum(byYear.filter((r) => r.oa_access === 'ouvert')));
@@ -144,7 +144,7 @@
 			? [
 					{
 						value: percent(topCited, withCitationClass),
-						label: 'dans le top 10 % des plus citées',
+						label: 'dans le top 10 % des plus citées',
 						icon: 'star',
 						tooltip: `D'après OpenAlex, sur les ${withCitationClass.toLocaleString('fr-FR')} publications pourvues de l'indicateur (${percent(withCitationClass, total)} du corpus)`,
 					},

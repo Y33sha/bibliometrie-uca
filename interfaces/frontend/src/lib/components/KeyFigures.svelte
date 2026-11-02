@@ -48,6 +48,7 @@
 		color: var(--open-text);
 	}
 	.key-figure-label {
+		max-width: 120px;
 		margin-top: 4px;
 		font-size: var(--fs-sm);
 		color: var(--text-secondary);
