@@ -11,7 +11,6 @@ from domain.publications.dates import (
     date_from_parts,
     parse_date_parts,
     parse_iso_date,
-    parse_wos_date,
 )
 
 YEAR, MONTH, DAY = DatePrecision.YEAR, DatePrecision.MONTH, DatePrecision.DAY
@@ -39,21 +38,6 @@ def test_date_crossref():
         date(2024, 10, 1), MONTH
     )
     assert parse_date_parts({"date-parts": [[None]]}) is None
-
-
-@pytest.mark.parametrize(
-    ("raw", "year", "expected"),
-    [
-        ("OCT 10 2023", None, PublicationDate(date(2023, 10, 10), DAY)),
-        ("DEC 2024", None, PublicationDate(date(2024, 12, 1), MONTH)),
-        ("2026 AUG 31", None, PublicationDate(date(2026, 8, 31), DAY)),
-        ("OCT 15", 2024, PublicationDate(date(2024, 10, 15), DAY)),
-        ("SPR", 2024, PublicationDate(date(2024, 1, 1), YEAR)),
-        ("OCT 15", None, None),
-    ],
-)
-def test_date_wos(raw, year, expected):
-    assert parse_wos_date(raw, year) == expected
 
 
 def test_date_de_la_source_prioritaire_precisee_par_les_autres():

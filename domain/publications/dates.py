@@ -115,26 +115,3 @@ def parse_date_parts(value: JsonValue) -> PublicationDate | None:
     first = as_sequence(parts[0]) if parts else []
     year, month, day = ([as_int(p) for p in first] + [None, None, None])[:3]
     return date_from_parts(year, month, day)
-
-
-_MONTHS = {m.upper(): i for i, m in enumerate(calendar.month_abbr) if m}
-# Date WoS : mois abrégé facultatif (« OCT », « OCT-NOV », « SPR »), jour facultatif, année facultative.
-_WOS = re.compile(r"^(?:([A-Z]{3})[A-Z-]*)?\s*(\d{1,2})?(?:-\d{1,2})?\s*(\d{4})?$")
-# Date WoS année en tête : « 2026 AUG 31 ».
-_WOS_YEAR_FIRST = re.compile(r"^(\d{4})\s+([A-Z]{3})\s*(\d{1,2})?$")
-
-
-def parse_wos_date(raw: str | None, year: int | None = None) -> PublicationDate | None:
-    """Lit une date WoS en mois abrégé (« OCT 10 2023 », « DEC 2024 », « 2025 », « 2026 AUG 31 ») ; `year` à défaut d'année dans le texte. Une saison (« SPR ») donne l'année."""
-    cleaned = (raw or "").strip().upper()
-    if m := _WOS_YEAR_FIRST.match(cleaned):
-        text_year, month_name, day = m.groups()
-    elif m := _WOS.match(cleaned):
-        month_name, day, text_year = m.groups()
-    else:
-        return None
-    return date_from_parts(
-        int(text_year) if text_year else year,
-        _MONTHS.get(month_name or ""),
-        int(day) if day else None,
-    )
