@@ -35,11 +35,10 @@ Mesure du 2026-10-27, base locale, enseignants-chercheurs de l'UCA : 71 % des pu
 - [x] Arborescences de structures HAL chez scanR (« Institut Pascal, UMR6602, IP, CNRS, UCA… »). Base locale, 2026-11-02 : 3 929 adresses. Le payload brut leur donne un `structId`, donc le normaliseur en tire des structures HAL. Il garde 21 de ces textes comme adresses, tous bruts. La resynchronisation des contributions sources scanR (réhydratation du staging, normalisation avec `--normalize-full`) retire les autres.
 - [x] Critères : libellé HAL, avec ou sans adresse postale ; nom exact d'une structure HAL ou d'une organisation ROR ; texte sans virgule et sans nom de pays final (`dc2e61268`).
 - [x] Colonne `origin` sur `addresses`. La migration crée la colonne vide, le passage suivant du pipeline la remplit (`dc2e61268`).
-- [ ] Adresses non brutes signalées sur la page d'administration des adresses.
 
 ### Phase 2 — Indicateurs
 
-- [ ] Onglet Adresses de la personne : comptes calculés sur les seules adresses brutes.
+- [x] Onglets Adresses de la personne et de la structure : seules les adresses brutes figurent (`b1755062a`).
 - [ ] Dashboard de la personne : structures citées dans ses adresses brutes, toutes années confondues.
 - [ ] Documentation.
 
