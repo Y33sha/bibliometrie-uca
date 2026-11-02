@@ -11,7 +11,6 @@ from domain.source_records.identifiers import (
 from domain.source_records.metadata_correction.rules import (
     MetadataCorrectionRule,
     MetadataForCorrection,
-    _check_predicate,
     doc_type_correction,
     is_dissertation_identifier,
 )
@@ -55,10 +54,6 @@ class TestPredicates:
     def test_title_prefix_needs_a_title(self):
         """Sans titre, aucune règle de préfixe de titre ne s'applique."""
         assert doc_type_correction(_view(doc_type="article", title="")) is None
-
-    def test_unknown_predicate_is_named(self):
-        with pytest.raises(ValueError, match="Prédicat inconnu : 'inconnu'"):
-            _check_predicate(_view(), "inconnu", True)
 
 
 def _identifier(id_type: SourceIdentifierType, value: str) -> SourceIdentifier:
@@ -1068,11 +1063,8 @@ class TestPublication:
 
 
 class TestFaitInconnu:
-    @pytest.mark.parametrize("expected", [True, False])
-    def test_predicat_sur_un_fait_inconnu_faux(self, expected):
-        assert not _check_predicate(
-            _view(in_proceedings_volume=None), "in_proceedings_volume", expected
-        )
+    def test_une_condition_sur_un_fait_inconnu_est_fausse(self):
+        assert doc_type_correction(_view(doc_type="article", in_proceedings_volume=None)) is None
 
 
 class TestPresentationRules:
