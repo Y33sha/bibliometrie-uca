@@ -19,7 +19,7 @@ from domain.source_records.corrections import (
 from domain.types import JsonValue
 
 # Provenance inscrite dans `corrections.serial_id.corrected_by`.
-SERIAL_BY_DOI_NAMESPACE = "SERIAL_BY_DOI_NAMESPACE"
+_SERIAL_BY_DOI_NAMESPACE = "SERIAL_BY_DOI_NAMESPACE"
 
 
 class SerialAttachment(NamedTuple):
@@ -52,5 +52,5 @@ def attach_serial_by_doi(
     }
     if len(serials) != 1:
         return SerialAttachment(None, new_corrections)
-    new_corrections[CorrectionKey.SERIAL_ID] = stash_entry(None, SERIAL_BY_DOI_NAMESPACE)
+    new_corrections[CorrectionKey.SERIAL_ID] = stash_entry(None, _SERIAL_BY_DOI_NAMESPACE)
     return SerialAttachment(serials.pop(), new_corrections)
