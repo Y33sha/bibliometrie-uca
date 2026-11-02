@@ -2,7 +2,7 @@
 
 from domain.normalize import normalize_text
 
-COLLECTIVE_WORDS: frozenset[str] = frozenset(
+_COLLECTIVE_WORDS: frozenset[str] = frozenset(
     {
         "agence",
         "agency",
@@ -58,10 +58,10 @@ COLLECTIVE_WORDS: frozenset[str] = frozenset(
     }
 )
 
-COLLECTIVE_PHRASES: tuple[str, ...] = ("on behalf of", "for the", "task force")
+_COLLECTIVE_PHRASES: tuple[str, ...] = ("on behalf of", "for the", "task force")
 
 # Noms qui désignent un collectif seulement quand ils forment le nom entier.
-COLLECTIVE_NAMES: frozenset[str] = frozenset({"et al"})
+_COLLECTIVE_NAMES: frozenset[str] = frozenset({"et al"})
 
 
 def is_collective_name(name: str | None) -> bool:
@@ -69,7 +69,7 @@ def is_collective_name(name: str | None) -> bool:
     normalized = normalize_text(name or "")
     if not normalized:
         return False
-    if normalized in COLLECTIVE_NAMES or COLLECTIVE_WORDS.intersection(normalized.split()):
+    if normalized in _COLLECTIVE_NAMES or _COLLECTIVE_WORDS.intersection(normalized.split()):
         return True
     padded = f" {normalized} "
-    return any(f" {phrase} " in padded for phrase in COLLECTIVE_PHRASES)
+    return any(f" {phrase} " in padded for phrase in _COLLECTIVE_PHRASES)
