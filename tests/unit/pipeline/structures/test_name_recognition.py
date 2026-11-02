@@ -123,6 +123,15 @@ class TestResolve:
         structure_ids = {sid for sid, _ in result}
         assert 1 not in structure_ids
 
+    def test_context_given(self):
+        """Forme à `requires_context_of` : le contexte est donné à la reconnaissance, et absent du résultat."""
+        forms = [
+            _form(1, "ressources", form_id=10, requires_context_of=[2]),
+            _form(2, "clermont", form_id=20),
+        ]
+        result = StructureNameMatcher(forms).resolve("ressources", context=frozenset({2}))
+        assert {sid for sid, _ in result} == {1}
+
     def test_u999_paris_no_match_lrl(self):
         """« u999 », forme de LRL qui exige le contexte de l'UCA, reste sans effet dans une adresse parisienne sans l'UCA."""
         forms = [
