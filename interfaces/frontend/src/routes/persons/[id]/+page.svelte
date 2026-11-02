@@ -217,7 +217,7 @@
 							<a href={resolve(`structures/${period.structure_id}`)} class="entity-link">{period.structure_label}</a>
 							{#if period.structure_label !== period.unit_label}<span class="period-unit">({period.unit_label})</span>{/if}
 						{:else}
-							{period.unit_label}
+							<span class="period-structure">{period.unit_label}</span>
 						{/if}
 						<span class="period-dates">
 							{period.start_date ? formatDate(period.start_date) : '?'}
@@ -405,6 +405,8 @@
 	.hr-periods li { margin: 2px 0; }
 	.past-period { color: var(--text-faint); }
 	.past-period .entity-link { color: inherit; }
+	/* Structure sans fiche : même graisse que le lien vers une fiche. */
+	.period-structure { font-weight: 500; }
 	.period-unit, .period-dates { color: var(--text-secondary); margin-left: 6px; }
 	.past-period .period-unit, .past-period .period-dates { color: inherit; }
 	.thesis-role-heading {
