@@ -33,7 +33,7 @@ from collections.abc import Iterator, Mapping
 
 from sqlalchemy import Connection, bindparam, text
 
-from domain.sources.registry import ALL_SOURCES_SET, Source
+from domain.sources.registry import Source
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.observability.log import setup_logger
@@ -123,9 +123,9 @@ _DOI_NATIVE_SOURCES = frozenset({"crossref", "datacite"})
 
 def _parse_sources(raw: str) -> list[str]:
     sources = [s.strip() for s in raw.split(",") if s.strip()]
-    unknown = [s for s in sources if s not in ALL_SOURCES_SET]
+    unknown = [s for s in sources if s not in Source]
     if unknown:
-        valides = ", ".join(sorted(ALL_SOURCES_SET))
+        valides = ", ".join(sorted(Source))
         raise SystemExit(f"Source(s) inconnue(s) : {', '.join(unknown)}. Valides : {valides}")
     if not sources:
         raise SystemExit("Aucune source fournie.")

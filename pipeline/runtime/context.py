@@ -13,7 +13,7 @@ from typing import Protocol
 
 from sqlalchemy import Connection
 
-from domain.sources.registry import ALL_SOURCES_SET
+from domain.sources.registry import Source
 from pipeline.runtime.modes import MODES, ModePolicy
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
@@ -35,7 +35,7 @@ class RunOptions:
     """
 
     mode: str = "full"
-    sources: frozenset[str] = ALL_SOURCES_SET
+    sources: frozenset[str] = frozenset(Source)
     """Sources du run, toutes par défaut."""
     year: int | None = None
     start_year: int | None = None

@@ -99,7 +99,7 @@ _COLS = (
 # L'identifiant aliasé `{a}` de `source_record_identifiers` est la clé de confirmation de son type (`confirmation_identifiers`).
 _CONFIRMATION_KEY_SQL = (
     "{a}.id_type::text IN "
-    + in_clause(tuple(map(str, CONFIRMATION_ID_TYPES)))
+    + in_clause(CONFIRMATION_ID_TYPES)
     + " AND "
     + first_of_its_type_sql("{a}")
 )

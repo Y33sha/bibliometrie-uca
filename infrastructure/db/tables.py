@@ -64,7 +64,7 @@ from domain.source_records.identifiers import (
     SourceIdentifierRole,
     SourceIdentifierType,
 )
-from domain.sources.registry import ALL_SOURCES, LOOKUP_SOURCES
+from domain.sources.registry import LOOKUP_SOURCES, Source
 from domain.sources.staging import StagingEntryMode
 from domain.structures.hal_structures import HalStructureStatus
 from domain.structures.perimeter_evidence import PerimeterEvidence
@@ -665,7 +665,7 @@ identifier_origin_enum = PgEnum(
     create_type=False,
 )
 
-source_type_enum = PgEnum(*ALL_SOURCES, name="source_type", create_type=False)
+source_type_enum = PgEnum(*Source, name="source_type", create_type=False)
 lookup_source_enum = PgEnum(*LOOKUP_SOURCES, name="lookup_source", create_type=False)
 
 # Tout statut open access est classable par ouverture : les clés d'`OA_RANK` sont le vocabulaire.

@@ -13,7 +13,7 @@ import httpx2
 from sqlalchemy import Connection, text
 
 from domain.publications.doc_types import DocType
-from domain.sources.registry import ALL_SOURCES_SET as VALID_SOURCES
+from domain.sources.registry import Source
 from domain.types import JsonValue
 from pipeline.http.lookup import LookupOutcome
 from pipeline.ingestion.common.lookup import LookupChannel, by_native_id, look_up
@@ -68,8 +68,8 @@ def get_stale_source_ids(
 
     `years` borne la sélection aux documents de ces années, et aux thèses en cours.
     """
-    if source not in VALID_SOURCES:
-        raise ValueError(f"Source inconnue : {source}. Valides : {', '.join(VALID_SOURCES)}")
+    if source not in Source:
+        raise ValueError(f"Source inconnue : {source}. Valides : {', '.join(Source)}")
     params: dict[str, object] = {"source": source, "days": after_days}
     year_clause = ""
     if years is not None:

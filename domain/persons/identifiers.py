@@ -34,6 +34,12 @@ class AttributionStatus(StrEnum):
     AUTHENTICATED = "authenticated"
 
 
+# Statuts d'une attribution posée par un humain : confirmée par l'administration, ou authentifiée par le chercheur. Seuls les identifiants à ces statuts servent au moissonnage par personne et à l'alignement des auteurs.
+HUMAN_ATTRIBUTION_STATUSES: frozenset[AttributionStatus] = frozenset(
+    {AttributionStatus.CONFIRMED, AttributionStatus.AUTHENTICATED}
+)
+
+
 class PersonIdentifierType(StrEnum):
     """Type d'un identifiant de personne, valeur de `person_identifiers.id_type`. `hal_person_id` désigne un compte HAL (`personId`)."""
 

@@ -3,7 +3,6 @@
 Chaque `*_clause(...)` renvoie un `WhereClause | None`, à assembler par `assemble_where(...)`. Les fragments emploient les paramètres nommés `:nom` de SQLAlchemy.
 """
 
-from collections.abc import Iterable
 from dataclasses import dataclass
 
 from domain.normalize import normalize_text
@@ -31,19 +30,14 @@ from infrastructure.read_models.publications.models import (
 from infrastructure.read_models.sql_fragments import current_hr_period, current_laboratory_label
 from infrastructure.sql_fragments import (
     has_author_role,
+    in_clause,
     is_laboratory,
     pending_name_form,
     reaches_citation_top,
 )
 
-
-def _sql_list(values: Iterable[str]) -> str:
-    """Renvoie la liste SQL littérale `('a','b',…)` de constantes du domaine. Les valeurs sont interpolées telles quelles : jamais de valeur saisie."""
-    return "(" + ",".join(f"'{v}'" for v in sorted(values)) + ")"
-
-
-OA_OPEN_SQL = _sql_list(OA_OPEN_STATUSES)
-OA_CLOSED_SQL = _sql_list(OA_CLOSED_STATUSES)
+OA_OPEN_SQL = in_clause(OA_OPEN_STATUSES)
+OA_CLOSED_SQL = in_clause(OA_CLOSED_STATUSES)
 
 # Colonnes de ventilation open access (alias `p` des publications) : une colonne par statut de `OaStatus`, nommée par sa valeur, dans l'ordre de l'enum. Partagées par les statistiques des éditeurs, revues, laboratoires et années.
 OA_BREAKDOWN_COLS_SQL = ",\n            ".join(

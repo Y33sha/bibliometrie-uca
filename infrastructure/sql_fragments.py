@@ -3,9 +3,15 @@
 Le module contient des fragments construits depuis des constantes du domaine (`in_clause`, `case_priority`), des expressions construites depuis les alias de la requête hôte, et des expressions SQL figées. Les constantes du domaine (valeurs d'enums, ordres de priorité) sont sans entrée utilisateur, donc sûres à interpoler.
 """
 
+from collections.abc import Iterable
+
 from application.ports.repositories.address_repository import AddressCountryFilter
 from domain.config import ConfigKey
-from domain.persons.identifiers import AttributionStatus, PersonIdentifierType
+from domain.persons.identifiers import (
+    HUMAN_ATTRIBUTION_STATUSES,
+    AttributionStatus,
+    PersonIdentifierType,
+)
 from domain.persons.matching import ORCID_MATCH_SOURCES, STRONG_PERSON_IDENTIFIER_TYPES
 from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
 from domain.publications.contribution_roles import ContributionRole
@@ -13,13 +19,12 @@ from domain.serials.serial import OaModel
 from domain.source_records.corrections import CORRECTED_BY, RAW
 from domain.source_records.impact import CitationTop
 from domain.source_records.source_extras import CROSSREF_PREPRINT_OF, SourceExtra
-from domain.sources.registry import SEARCHED_IDENTIFIER_STATUSES
 from domain.structures.perimeter_evidence import PerimeterEvidence
 
 
-def in_clause(values: tuple[str, ...]) -> str:
-    """Renvoie le contenu d'une clause SQL `IN` : `('a', 'b', …)`, prêt à interpoler dans `col IN {...}`."""
-    return "(" + ", ".join(f"'{v}'" for v in values) + ")"
+def in_clause(values: Iterable[str]) -> str:
+    """Renvoie le contenu d'une clause SQL `IN` : `('a', 'b', …)`, prêt à interpoler dans `col IN {...}`. Les valeurs sont triées : le texte de la requête est stable."""
+    return "(" + ", ".join(f"'{v}'" for v in sorted(values)) + ")"
 
 
 def case_priority(values: tuple[str, ...], col: str) -> str:
@@ -120,7 +125,7 @@ def trusted_identifier_sql(id_type: str, source_contribution: str = "sc") -> str
     """Renvoie la condition SQL de `trusted_identifier` pour l'identifiant `id_type` de la contribution source aliasée `source_contribution`."""
     if id_type != PersonIdentifierType.ORCID:
         return "TRUE"
-    return f"{source_contribution}.source::text IN {in_clause(tuple(sorted(ORCID_MATCH_SOURCES)))}"
+    return f"{source_contribution}.source::text IN {in_clause(ORCID_MATCH_SOURCES)}"
 
 
 def strong_identifier_source_contributions(
@@ -178,7 +183,7 @@ _RH_IDENTIFIERS = f"""(
            coalesce(extract(year FROM r.end_date)::int, 9999) AS last_year
     FROM person_identifiers pi
     JOIN {_HR_PRESENCE} r ON r.person_id = pi.person_id
-    WHERE pi.status::text IN {in_clause(tuple(sorted(SEARCHED_IDENTIFIER_STATUSES)))}
+    WHERE pi.status::text IN {in_clause(HUMAN_ATTRIBUTION_STATUSES)}
 )"""
 
 

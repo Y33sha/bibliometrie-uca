@@ -6,7 +6,7 @@ Le retrait des enregistrements sources disparus précède le nettoyage des infor
 import dataclasses
 import logging
 
-from domain.sources.registry import ALL_SOURCES_SET, SOURCE_PRIORITY
+from domain.sources.registry import SOURCE_PRIORITY, Source
 from pipeline.ingestion.common.normalize import NormalizePhase
 from pipeline.ingestion.common.normalizer import NormalizeStats
 
@@ -37,7 +37,7 @@ def test_le_retrait_precede_le_nettoyage_des_identites_et_des_adresses(contexte)
 
 def test_toutes_les_sources_sont_normalisees_dans_l_ordre(contexte):
     appels: list[str] = []
-    _run(contexte, appels, sources=ALL_SOURCES_SET)
+    _run(contexte, appels, sources=frozenset(Source))
     assert appels[: len(SOURCE_PRIORITY)] == [f"normalize:{s.value}" for s in SOURCE_PRIORITY]
 
 

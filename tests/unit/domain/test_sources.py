@@ -4,9 +4,9 @@ import pytest
 
 from domain.errors import ValidationError
 from domain.sources.registry import (
-    ALL_SOURCES,
     DOI_SEARCHABLE_SOURCES,
     SOURCE_PRIORITY,
+    Source,
     require_known_source,
     source_record_url,
 )
@@ -29,7 +29,7 @@ class TestSourcePriority:
         assert SOURCE_PRIORITY[-1] == "wos"
 
     def test_contains_all_sources(self):
-        assert set(SOURCE_PRIORITY) == set(ALL_SOURCES)
+        assert set(SOURCE_PRIORITY) == set(Source)
 
 
 class TestDoiSearchableSources:
