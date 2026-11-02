@@ -18,6 +18,7 @@
 	import Pagination from '#lib/components/Pagination.svelte';
 
 	import type { components } from '#lib/api/schema.js';
+	import { formatCount } from '#lib/plural.js';
 	type DoiPair = components['schemas']['HalDoiDuplicatePair'];
 	type MetaPair = components['schemas']['HalMetaDuplicatePair'];
 	type HalDoc = components['schemas']['HalDocSummary'];
@@ -163,7 +164,7 @@
 {#snippet halDoc(hd: HalDoc)}
 	<div class="hal-row">
 		<a href={hd.record_url} target="_blank" rel="noopener" class="id-badge">{hd.halid}</a>
-		<span class="hal-details">{[hd.hal_publication_year, hd.hal_doc_type ? docTypeLabel(hd.hal_doc_type) : null, `${hd.author_count} auteur${hd.author_count > 1 ? 's' : ''}`].filter(Boolean).join(' · ')}</span>
+		<span class="hal-details">{[hd.hal_publication_year, hd.hal_doc_type ? docTypeLabel(hd.hal_doc_type) : null, formatCount(hd.author_count, 'auteur')].filter(Boolean).join(' · ')}</span>
 	</div>
 {/snippet}
 

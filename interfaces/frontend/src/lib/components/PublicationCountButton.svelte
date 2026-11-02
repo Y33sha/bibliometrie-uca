@@ -1,10 +1,12 @@
 <script lang="ts">
+	import { formatCount } from '#lib/plural.js';
+
 	/** Badge du nombre de publications : bouton qui déplie la liste des publications. */
 	let { count, expanded, onclick }: { count: number; expanded: boolean; onclick: () => void } = $props();
 </script>
 
 <button type="button" class="publication-count-tag" aria-expanded={expanded} {onclick}
-	>{count.toLocaleString('fr-FR')} publication{count > 1 ? 's' : ''}</button
+	>{formatCount(count, 'publication')}</button
 >
 
 <style>

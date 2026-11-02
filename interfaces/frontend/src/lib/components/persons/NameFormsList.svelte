@@ -2,6 +2,7 @@
   import StatusToggles from "#lib/components/StatusToggles.svelte";
   import RejectedFold from "./RejectedFold.svelte";
   import type { NameForm } from "./types";
+  import { formatCount } from "#lib/plural.js";
 
   let {
     personId,
@@ -56,7 +57,7 @@
       </span>
     {/if}
     <span class="chip-count" class:zero={nf.publication_count === 0}>
-      {nf.publication_count.toLocaleString("fr-FR")} publication{nf.publication_count > 1 ? "s" : ""}
+      {formatCount(nf.publication_count, "publication")}
     </span>
     {#if nf.shared_count > 0}
       <span

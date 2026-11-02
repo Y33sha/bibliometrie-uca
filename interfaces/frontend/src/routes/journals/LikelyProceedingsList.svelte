@@ -4,6 +4,7 @@
 	import { api, serials as serialsApi, errorMessage } from '#lib/api/index.js';
 	import { confirmDialog, toast } from '#lib/dialogs.svelte.js';
 	import type { components } from '#lib/api/schema.js';
+	import { formatCount } from '#lib/plural.js';
 
 	type Response = components['schemas']['LikelyProceedingsResponse'];
 	type Item = components['schemas']['LikelyProceedingsItem'];
@@ -39,9 +40,8 @@
 		busy = true;
 		try {
 			const impact = await serialsApi.typeChangeImpact(j.id, 'proceedings');
-			const plural = impact.count > 1 ? 's' : '';
 			const recalcul = impact.count
-				? ` Le type de document de ${impact.count} publication${plural} sera recalculé.`
+				? ` Le type de document de ${formatCount(impact.count, 'publication')} sera recalculé.`
 				: '';
 			const message = `Typer « ${j.title} » en recueil d'actes ?${recalcul}`;
 			if (!(await confirmDialog({ message }))) return;

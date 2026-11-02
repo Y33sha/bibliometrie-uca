@@ -13,6 +13,7 @@
 	import AmbiguousFormsList from './AmbiguousFormsList.svelte';
 	import IdentifierConflictsList from './IdentifierConflictsList.svelte';
 	import NameDuplicatesList from './NameDuplicatesList.svelte';
+	import { plural } from '#lib/plural.js';
 
 	/* ── Onglets de la session admin : la liste, puis les files de triage ── */
 
@@ -103,8 +104,8 @@
 {:else}
 	{#if isAdmin() && orphanCount > 0}
 		<a href={resolve('admin/orphan-contributions')} class="orphan-link">
-			{orphanCount} contribution{orphanCount > 1 ? 's' : ''} {institution.name} orpheline{orphanCount > 1 ? 's' : ''}
-			(non reliée{orphanCount > 1 ? 's' : ''} à une personne)
+			{orphanCount.toLocaleString('fr-FR')} {plural(orphanCount, 'contribution')} {institution.name} {plural(orphanCount, 'orpheline')}
+			({plural(orphanCount, 'non reliée')} à une personne)
 		</a>
 	{/if}
 	<PersonsListView

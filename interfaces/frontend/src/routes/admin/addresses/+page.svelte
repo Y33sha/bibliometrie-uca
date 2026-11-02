@@ -20,6 +20,7 @@
 	// ---- Type definitions ----
 
 	import type { components } from '#lib/api/schema.js';
+	import { formatCount } from '#lib/plural.js';
 	type Stats = components['schemas']['AddressStatsResponse'];
 	type AddressStructure = components['schemas']['AddressStructureSummary'];
 	type Address = components['schemas']['AddressOut'];
@@ -536,7 +537,7 @@
 	<!-- Batch action bar -->
 	{#if selectedCount > 0}
 		<div class="batch-bar">
-			<span>{selectedCount} sélectionnée{selectedCount > 1 ? 's' : ''}</span>
+			<span>{formatCount(selectedCount, 'sélectionnée')}</span>
 			<div class="batch-actions">
 				<button onclick={() => batchReview(false)}>Rejeter</button>
 				<button onclick={() => batchReview(true)}>Relier</button>

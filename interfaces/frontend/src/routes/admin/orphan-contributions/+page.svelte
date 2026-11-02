@@ -28,6 +28,7 @@
 	import { columnLabels, filterLabels } from '#lib/labels.js';
 	import type { FacetOption } from '#lib/components/FacetDropdown.svelte';
 	import type { components } from '#lib/api/schema.js';
+	import { formatCount, plural } from '#lib/plural.js';
 
 	type PersonResult = components['schemas']['PersonSearchResult'];
 	type OrphanContribution = components['schemas']['OrphanContributionOut'];
@@ -205,9 +206,8 @@
 	function reportSkipped(requested: number, assigned: number) {
 		const skipped = requested - assigned;
 		if (skipped <= 0) return;
-		const plural = skipped > 1 ? 's' : '';
 		toast(
-			`${skipped} contribution${plural} écartée${plural} : personne déjà rattachée à la publication.`,
+			`${formatCount(skipped, 'contribution écartée', 'contributions écartées')} : personne déjà rattachée à la publication.`,
 			'warning',
 			8000,
 		);
@@ -284,7 +284,7 @@
 
 {#if selectedIds.size > 0}
 	<div class="batch-bar" use:stickyHeight={{ variable: '--batch-bar-height' }}>
-		<span>{selectedIds.size} sélectionnée{selectedIds.size > 1 ? 's' : ''}</span>
+		<span>{formatCount(selectedIds.size, 'sélectionnée')}</span>
 		<input type="search" placeholder="Attribuer à une personne existante" value={batchSearch.query}
 			onkeydown={(e) => { if (e.key === 'Escape') { batchSearch.setQuery(''); } }}
 			oninput={(e) => batchSearch.setQuery((e.target as HTMLInputElement).value)} autocomplete="off" />
@@ -393,7 +393,7 @@
 
 {#if createModal}
 	<Modal
-		title={`Créer une personne (${createModal.items.length} contribution${createModal.items.length > 1 ? 's' : ''})`}
+		title={`Créer une personne (${formatCount(createModal.items.length, 'contribution')})`}
 		maxWidth="440px"
 		onclose={() => { createModal = null; }}
 		onsubmit={confirmCreate}
@@ -419,7 +419,7 @@
 	<Modal title="Réassignation déjà rejetée" onclose={() => { rejectModal = null; }}>
 			<p class="reject-detail">{rejectModal.detail}</p>
 			<p class="reject-muted">
-				Cette personne a été détachée de {rejectModal.pairs.length > 1 ? 'ces publications' : 'cette publication'} manuellement.
+				Cette personne a été détachée de {plural(rejectModal.pairs.length, 'cette publication', 'ces publications')} manuellement.
 				Confirmer lèvera le rejet et recréera le lien.
 			</p>
 			<ul class="reject-list">

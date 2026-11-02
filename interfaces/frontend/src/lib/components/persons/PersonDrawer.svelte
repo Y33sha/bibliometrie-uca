@@ -12,6 +12,7 @@
   import IdentifierEditor from "./IdentifierEditor.svelte";
   import Picker from "#lib/components/Picker.svelte";
   import NameFormsList from "./NameFormsList.svelte";
+  import { formatCount } from "#lib/plural.js";
 
   type SharingPerson = components["schemas"]["SharingPersonOut"];
   type DistinctPerson = components["schemas"]["DistinctPersonOut"];
@@ -248,7 +249,7 @@
               </button>
               {#if sp.has_rh}<RhCheck />{/if}
               <span class="sharing-forms" title={sp.shared_forms.join(", ")}>
-                {sp.shared_forms.length} forme{sp.shared_forms.length > 1 ? "s" : ""}
+                {formatCount(sp.shared_forms.length, "forme")}
               </span>
             </div>
           {/each}

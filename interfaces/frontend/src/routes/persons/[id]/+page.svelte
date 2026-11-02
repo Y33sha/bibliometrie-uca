@@ -7,6 +7,7 @@
 	import { onMount } from 'svelte';
 	import { api, apiDetail, contributions } from '#lib/api/index.js';
 	import { isAdmin } from '#lib/session.svelte.js';
+	import { formatCount, plural } from '#lib/plural.js';
 	import { titleCase, formatDate } from '#lib/utils.js';
 	import { structureLabel } from '#lib/structureLabels.js';
 	import PublicationsDashboard from '#lib/components/PublicationsDashboard.svelte';
@@ -81,7 +82,7 @@
 	const addrStructures = $derived(addrSummary?.structures ?? []);
 	const addrShare = (publications: number) =>
 		`${Math.round((100 * publications) / (addrSummary?.publications_with_address || 1))} %`;
-	const publicationCount = (n: number) => `${n.toLocaleString('fr-FR')} publication${n > 1 ? 's' : ''}`;
+	const publicationCount = (n: number) => formatCount(n, 'publication');
 	let expandedAddrId = $state<number | null>(null);
 	let addrPublications = $state<AddressPublication[]>([]);
 	let addrPublicationsLoading = $state(false);
@@ -254,7 +255,7 @@
 						? [
 								{
 									value: thesesCount.toLocaleString('fr-FR'),
-									label: thesesCount > 1 ? 'thèses liées' : 'thèse liée',
+									label: plural(thesesCount, 'thèse liée', 'thèses liées'),
 									icon: 'graduation-cap',
 								},
 							]

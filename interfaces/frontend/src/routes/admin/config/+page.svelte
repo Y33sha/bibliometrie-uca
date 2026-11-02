@@ -14,6 +14,7 @@
   import { autofocus } from "#lib/actions/focus.js";
   import { applyBrandHue, defaultSiteTitle, institution, previewBrandHue } from "#lib/institution.svelte.js";
   import type { components } from "#lib/api/schema.js";
+  import { formatCount } from "#lib/plural.js";
 
   type StructureListItem = components["schemas"]["StructureListItem"];
   type StructureListResponse = components["schemas"]["StructureListResponse"];
@@ -169,7 +170,7 @@
   }
 
   function delayLabel(value: number): string {
-    return `${value} jour${value > 1 ? "s" : ""}`;
+    return formatCount(value, "jour");
   }
 
   function configByKey(key: string): ConfigItem | undefined {

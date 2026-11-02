@@ -5,6 +5,7 @@
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 	import { api } from '#lib/api/index.js';
+	import { plural } from '#lib/plural.js';
 	import { rorShortId, rorFullUrl } from '#lib/utils.js';
 	import { structureLabel } from '#lib/structureLabels.js';
 	import PublicationsDashboard from '#lib/components/PublicationsDashboard.svelte';
@@ -222,10 +223,16 @@
 					figures={dashboardLoaded
 						? [
 								...(ongoingThesesCount > 0
-									? [{ value: ongoingThesesCount.toLocaleString('fr-FR'), label: 'thèses en cours', icon: 'graduation-cap' }]
+									? [
+											{
+												value: ongoingThesesCount.toLocaleString('fr-FR'),
+												label: plural(ongoingThesesCount, 'thèse en cours', 'thèses en cours'),
+												icon: 'graduation-cap',
+											},
+										]
 									: []),
 								...(personsCount > 0
-									? [{ value: personsCount.toLocaleString('fr-FR'), label: 'personnes', icon: 'user' }]
+									? [{ value: personsCount.toLocaleString('fr-FR'), label: plural(personsCount, 'personne'), icon: 'user' }]
 									: []),
 							]
 						: []}

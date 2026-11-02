@@ -12,6 +12,7 @@
 	import { publicationsDocTypes } from '#lib/docTypes.svelte.js';
 	import { orderedPivotValues, pivotValueColor, pivotValueLabel } from '#lib/pivotValues.js';
 	import { contextParams, type PublicationListContext } from '#lib/publicationListContext.js';
+	import { plural } from '#lib/plural.js';
 	import { paramsToQuery } from '#lib/utils.js';
 
 	type PivotResponse = components['schemas']['PivotResponse'];
@@ -136,7 +137,7 @@
 	const withCitationClass = $derived(sum(citationClasses.filter((r) => r.citation_class !== 'none')));
 
 	const keyFigures = $derived<KeyFigure[]>([
-		{ value: total.toLocaleString('fr-FR'), label: 'publications', icon: 'book-open-cover' },
+		{ value: total.toLocaleString('fr-FR'), label: plural(total, 'publication'), icon: 'book-open-cover' },
 		...(total > 0
 			? [{ value: percent(openAccess, total), label: 'en open access', tone: 'open' as const, icon: 'unlock' }]
 			: []),
@@ -160,7 +161,7 @@
 				]
 			: []),
 		...(thesesFigure && theses > 0
-			? [{ value: theses.toLocaleString('fr-FR'), label: 'thèses', icon: 'graduation-cap' }]
+			? [{ value: theses.toLocaleString('fr-FR'), label: plural(theses, 'thèse'), icon: 'graduation-cap' }]
 			: []),
 		...figures,
 	]);

@@ -3,6 +3,7 @@
 	import { sourceLabel } from '#lib/sources.svelte.js';
 	import type { components } from '#lib/api/schema.js';
 	import SerialGroupsList from './SerialGroupsList.svelte';
+	import { formatCount } from '#lib/plural.js';
 
 	type Response = components['schemas']['DoiNamespaceConflictsResponse'];
 	type Conflict = components['schemas']['DoiNamespaceConflict'];
@@ -18,7 +19,7 @@
 		return Object.entries(c.sources)
 			.map(([source, n], i) =>
 				i === 0
-					? `${n} document${n > 1 ? 's' : ''} ${sourceLabel(source)}`
+					? `${formatCount(n, 'document')} ${sourceLabel(source)}`
 					: `${n} ${sourceLabel(source)}`
 			)
 			.join(', ');

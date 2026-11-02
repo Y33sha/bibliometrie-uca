@@ -5,6 +5,7 @@
   import { sourceLabel } from "#lib/sources.svelte.js";
   import { titleText } from "#lib/utils.js";
   import type { DetachModalState } from "./types";
+  import { formatCount } from "#lib/plural.js";
 
   let {
     state = $bindable(),
@@ -94,7 +95,7 @@
     {#if !state.loading}
       <button class="btn" onclick={onclose}>Annuler</button>
       <button class="btn btn-danger" disabled={checkedCount === 0} onclick={onconfirmDetach}>
-        Détacher {checkedCount} publication{checkedCount > 1 ? "s" : ""}
+        Détacher {formatCount(checkedCount, "publication")}
       </button>
     {/if}
   {/snippet}
