@@ -94,7 +94,7 @@ _SET_COPIES_SQL = text("""
 _UPDATE_POSITIONS_SQL = text("""
     UPDATE contributions g SET reference_position = u.position
     FROM unnest(CAST(:ids AS integer[]), CAST(:positions AS smallint[])) AS u(id, position)
-    WHERE g.id = u.id
+    WHERE g.id = u.id AND g.reference_position IS DISTINCT FROM u.position
 """)
 
 _NEW_CONTRIBUTION_IDS_SQL = text(

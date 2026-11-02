@@ -163,6 +163,20 @@ def test_un_recalcul_sans_changement_laisse_les_appartenances_en_place(conn):
     assert dict(conn.execute(text(tuples)).all()) == before
 
 
+def test_un_recalcul_sans_changement_laisse_les_contributions_en_place(conn):
+    publication = insert_publication(conn)
+    _source_record(conn, publication, "hal", "hal-1", [("martin", "anne"), ("petit", "bruno")])
+    _source_record(conn, publication, "openalex", "W1", [("martin", "a"), ("petit", "b")])
+    _run(conn)
+    tuples = "SELECT id, ctid::text FROM contributions WHERE publication_id = :p"
+    before = dict(conn.execute(text(tuples), {"p": publication}).all())
+    mark(conn, Queue.PUBLICATION_CONTRIBUTIONS, [publication])
+
+    _run(conn)
+
+    assert dict(conn.execute(text(tuples), {"p": publication}).all()) == before
+
+
 def test_la_reconstruction_realigne_les_publications_non_marquees(conn):
     publication = insert_publication(conn)
     _source_record(conn, publication, "hal", "hal-1", [("martin", "anne"), ("petit", "b")])
