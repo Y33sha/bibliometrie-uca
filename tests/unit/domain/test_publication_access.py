@@ -5,7 +5,7 @@ from dataclasses import replace
 import pytest
 
 from domain.platforms.platform import ARCHIVE_TYPES, PlatformType
-from domain.platforms.registry import ARXIV, HAL, ZENODO
+from domain.platforms.registry import HAL, KNOWN_PLATFORMS
 from domain.publications.access import (
     Access,
     AccessLink,
@@ -15,7 +15,8 @@ from domain.publications.access import (
     registered_url_copy,
 )
 
-_KNOWN = {p.name: p for p in (ARXIV, HAL, ZENODO)}
+_KNOWN = {p.name: p for p in KNOWN_PLATFORMS if p.name in {"arXiv", "HAL", "Zenodo"}}
+_ARXIV, _ZENODO = _KNOWN["arXiv"], _KNOWN["Zenodo"]
 _DOI = "10.1/x"
 
 
@@ -146,7 +147,7 @@ def test_une_copie_par_plateforme():
             ),
         ]
     ).links
-    assert links == [AccessLink("arXiv", "https://arxiv.org/abs/1v2", icon=ARXIV.icon)]
+    assert links == [AccessLink("arXiv", "https://arxiv.org/abs/1v2", icon=_ARXIV.icon)]
 
 
 def test_les_copies_fermees_sont_ecartees():
@@ -204,7 +205,7 @@ def test_une_copie_designee_par_un_autre_doi_figure_sur_sa_plateforme():
             _copy("https://doi.org/10.9/y", arrival=3),
         ]
     ).links
-    assert links == [AccessLink("Zenodo", "https://doi.org/10.5281/zenodo.1", icon=ZENODO.icon)]
+    assert links == [AccessLink("Zenodo", "https://doi.org/10.5281/zenodo.1", icon=_ZENODO.icon)]
 
 
 def test_le_doi_de_la_publication_sur_une_plateforme_du_registre_figure_parmi_les_liens():
@@ -218,7 +219,7 @@ def test_le_doi_de_la_publication_sur_une_plateforme_du_registre_figure_parmi_le
     )
     assert result == Access(
         url="https://doi.org/10.5281/zenodo.8278818",
-        links=[AccessLink("Zenodo", "https://doi.org/10.5281/zenodo.8278818", icon=ZENODO.icon)],
+        links=[AccessLink("Zenodo", "https://doi.org/10.5281/zenodo.8278818", icon=_ZENODO.icon)],
     )
 
 
@@ -238,14 +239,14 @@ def test_une_plateforme_du_registre_porte_le_nom_du_registre():
         version=None,
         is_oa=True,
         platform="Zenodo (CERN European Organization for Nuclear Research)",
-        known_platform=ZENODO,
-        platform_type=ZENODO.platform_type,
+        known_platform=_ZENODO,
+        platform_type=_ZENODO.platform_type,
         license=None,
         embargoed=False,
         described_by_platform=False,
         arrival=1,
     )
-    assert _access([copy]).links == [AccessLink("Zenodo", copy.url, icon=ZENODO.icon)]
+    assert _access([copy]).links == [AccessLink("Zenodo", copy.url, icon=_ZENODO.icon)]
 
 
 def test_l_adresse_enregistree_d_un_pdf_donne_une_copie_ouverte_de_l_editeur():

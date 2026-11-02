@@ -31,16 +31,16 @@ class KnownPlatform:
     deposit_doc_types: frozenset[str] | None = frozenset()
     """Types de document dont le DOI de la plateforme est un DOI de dépôt (`is_deposit_doi`). `None` pour tous les types, absent compris."""
     icon: str | None = None
-    """Fichier de l'icône de la plateforme dans l'interface (`static/icons/`). Les copies d'une plateforme à icône sont mises en avant parmi les accès d'une publication (`domain.publications.access`)."""
+    """Fichier de l'icône de la plateforme dans l'interface (`static/icons/`)."""
 
 
 def _preprint_server(
     name: str,
-    prefixes: set[str],
-    openalex_ids: tuple[str, ...],
+    *,
+    prefixes: Iterable[str] = (),
+    openalex_ids: tuple[str, ...] = (),
     hosts: tuple[str, ...] = (),
     doi_suffix: re.Pattern[str] | None = None,
-    *,
     fully_open: bool = False,
     icon: str | None = None,
 ) -> KnownPlatform:
@@ -59,10 +59,10 @@ def _preprint_server(
 
 def _publisher_platform(
     name: str,
-    prefixes: set[str],
+    *,
+    prefixes: Iterable[str] = (),
     openalex_ids: tuple[str, ...] = (),
     hosts: tuple[str, ...] = (),
-    *,
     icon: str | None = None,
 ) -> KnownPlatform:
     return KnownPlatform(
@@ -72,10 +72,10 @@ def _publisher_platform(
 
 def _repository(
     name: str,
+    *,
+    prefixes: Iterable[str] = (),
     openalex_ids: tuple[str, ...] = (),
     hosts: tuple[str, ...] = (),
-    prefixes: set[str] | None = None,
-    *,
     fully_open: bool = False,
     deposit_doc_types: frozenset[str] | None = frozenset(),
     icon: str | None = None,
@@ -83,7 +83,7 @@ def _repository(
     return KnownPlatform(
         name,
         PlatformType.REPOSITORY,
-        frozenset(prefixes or ()),
+        frozenset(prefixes),
         openalex_ids,
         hosts,
         fully_open=fully_open,
@@ -93,10 +93,16 @@ def _repository(
 
 
 def _copy_archive(
-    name: str, openalex_ids: tuple[str, ...], prefixes: set[str], hosts: tuple[str, ...] = ()
+    name: str,
+    *,
+    prefixes: Iterable[str],
+    openalex_ids: tuple[str, ...] = (),
+    hosts: tuple[str, ...] = (),
 ) -> KnownPlatform:
     """Archive de copies de documents publiés ailleurs : tout DOI de l'archive est un DOI de dépôt."""
-    return _repository(name, openalex_ids, hosts, prefixes, deposit_doc_types=None)
+    return _repository(
+        name, prefixes=prefixes, openalex_ids=openalex_ids, hosts=hosts, deposit_doc_types=None
+    )
 
 
 _TEXT_DOC_TYPES = frozenset(
@@ -114,150 +120,183 @@ _TEXT_DOC_TYPES = frozenset(
 
 HAL = _repository(
     "HAL",
-    ("S4306402512", "S4406922276", "S4406922393", "S4406922470", "S4377196329"),
+    openalex_ids=("S4306402512", "S4406922276", "S4406922393", "S4406922470", "S4377196329"),
     icon="hal.ico",
 )
 """L'archive ouverte HAL. OpenAlex range aussi des copies de HAL sous des sources de portails. Ses hôtes sont les portails HAL (`is_hal_host`)."""
 
 PUBMED_CENTRAL = _repository(
     "PubMed Central",
-    ("S2764455111", "S4306400806"),
-    ("ncbi.nlm.nih.gov/pmc", "pmc.ncbi.nlm.nih.gov", "europepmc.org"),
+    openalex_ids=("S2764455111", "S4306400806"),
+    hosts=("ncbi.nlm.nih.gov/pmc", "pmc.ncbi.nlm.nih.gov", "europepmc.org"),
     fully_open=True,
     icon="ncbi.png",
 )
 """L'archive de PubMed Central, que désigne aussi l'identifiant PMCID d'un document. La source OpenAlex de son miroir Europe PMC donne surtout des adresses de PubMed Central."""
 
-ZENODO = _repository(
-    "Zenodo",
-    ("S4306400562",),
-    ("zenodo.org",),
-    {"10.5281"},
-    deposit_doc_types=_TEXT_DOC_TYPES,
-    icon="zenodo.png",
-)
-"""L'archive ouverte Zenodo, du CERN."""
-
-ARXIV = _preprint_server(
-    "arXiv",
-    {"10.48550"},
-    ("S4306400194", "S4393918464"),
-    ("arxiv.org",),
-    fully_open=True,
-    icon="arxiv.png",
-)
-"""Le serveur de preprints arXiv, que désigne aussi l'identifiant arXiv d'un document."""
-
 KNOWN_PLATFORMS: tuple[KnownPlatform, ...] = (
     HAL,
     PUBMED_CENTRAL,
-    ZENODO,
-    _repository("Figshare", ("S4377196282",), ("figshare.com",), icon="figshare.png"),
-    _repository("CERN Document Server", ("S4306402195",), ("cds.cern.ch",), icon="cds.ico"),
-    _repository("theses.fr", ("S4406923047",), ("theses.fr",)),
+    # L'archive ouverte Zenodo, du CERN.
+    _repository(
+        "Zenodo",
+        prefixes={"10.5281"},
+        openalex_ids=("S4306400562",),
+        hosts=("zenodo.org",),
+        deposit_doc_types=_TEXT_DOC_TYPES,
+        icon="zenodo.png",
+    ),
+    _repository(
+        "Figshare", openalex_ids=("S4377196282",), hosts=("figshare.com",), icon="figshare.png"
+    ),
+    _repository(
+        "CERN Document Server",
+        openalex_ids=("S4306402195",),
+        hosts=("cds.cern.ch",),
+        icon="cds.ico",
+    ),
+    _repository("theses.fr", openalex_ids=("S4406923047",), hosts=("theses.fr",)),
     _copy_archive(
         "DESY Publication Database",
-        ("S4306400383", "S4306401365", "S4377196278"),
-        {"10.3204"},
-        ("bib-pubdb1.desy.de",),
+        prefixes={"10.3204"},
+        openalex_ids=("S4306400383", "S4306401365", "S4377196278"),
+        hosts=("bib-pubdb1.desy.de",),
     ),
     _copy_archive(
         "RWTH Publications",
-        ("S4306401033", "S4306401362"),
-        {"10.18154"},
-        ("publications.rwth-aachen.de",),
+        prefixes={"10.18154"},
+        openalex_ids=("S4306401033", "S4306401362"),
+        hosts=("publications.rwth-aachen.de",),
     ),
     _copy_archive(
-        "GSI Repository", ("S4306400339", "S4306401977"), {"10.15120"}, ("repository.gsi.de",)
+        "GSI Repository",
+        prefixes={"10.15120"},
+        openalex_ids=("S4306400339", "S4306401977"),
+        hosts=("repository.gsi.de",),
     ),
-    _repository("Infoscience", ("S4306400487", "S4306400488"), ("infoscience.epfl.ch",)),
-    _repository("ORBi", ("S4306401300",), ("orbi.uliege.be",)),
-    _repository("OSTI", ("S4306402487",), ("osti.gov",)),
+    _repository(
+        "Infoscience", openalex_ids=("S4306400487", "S4306400488"), hosts=("infoscience.epfl.ch",)
+    ),
+    _repository("ORBi", openalex_ids=("S4306401300",), hosts=("orbi.uliege.be",)),
+    _repository("OSTI", openalex_ids=("S4306402487",), hosts=("osti.gov",)),
     _repository("Enlighten", hosts=("eprints.gla.ac.uk",)),
     _repository("Wageningen University & Research", hosts=("research.wur.nl",)),
     _repository("Aarhus University", hosts=("pure.au.dk",)),
-    _copy_archive("ResearchGate", (), {"10.13140"}, ("researchgate.net",)),
+    _copy_archive("ResearchGate", prefixes={"10.13140"}, hosts=("researchgate.net",)),
     # Résolveur des identifiants Handle, surtout ceux des archives institutionnelles.
     _repository("Handle", hosts=("hdl.handle.net",)),
     # Posters et diaporamas déposés sur F1000Research, hors de sa revue.
     _repository("F1000Research (posters et diaporamas)", prefixes={"10.7490"}),
-    ARXIV,
+    # Le serveur de preprints arXiv, que désigne aussi l'identifiant arXiv d'un document.
+    _preprint_server(
+        "arXiv",
+        prefixes={"10.48550"},
+        openalex_ids=("S4306400194", "S4393918464"),
+        hosts=("arxiv.org",),
+        fully_open=True,
+        icon="arxiv.png",
+    ),
     # Le préfixe 10.1101 couvre aussi les revues de Cold Spring Harbor (`10.1101/gad.…`).
     _preprint_server(
         "bioRxiv",
-        {"10.1101", "10.64898"},
-        ("S4306402567",),
-        ("biorxiv.org",),
-        re.compile(r"\d"),
+        prefixes={"10.1101", "10.64898"},
+        openalex_ids=("S4306402567",),
+        hosts=("biorxiv.org",),
+        doi_suffix=re.compile(r"\d"),
         fully_open=True,
     ),
     _preprint_server(
         "medRxiv",
-        {"10.1101", "10.64898"},
-        ("S3005729997",),
-        ("medrxiv.org",),
-        re.compile(r"\d"),
+        prefixes={"10.1101", "10.64898"},
+        openalex_ids=("S3005729997",),
+        hosts=("medrxiv.org",),
+        doi_suffix=re.compile(r"\d"),
         fully_open=True,
     ),
     # Discussions des revues de Copernicus et preprints EGUsphere : DOI `<revue>-<année>-<numéro>`. Un article publié a un DOI `<revue>-<volume>-<page>-<année>`, un commentaire d'évaluation un suffixe `-ac1`.
     _preprint_server(
         "Copernicus Discussions",
-        {"10.5194"},
-        (),
-        ("copernicus.org/preprints",),
-        re.compile(r"[a-z]+-\d{4}-\d+$"),
+        prefixes={"10.5194"},
+        hosts=("copernicus.org/preprints",),
+        doi_suffix=re.compile(r"[a-z]+-\d{4}-\d+$"),
         fully_open=True,
     ),
-    _preprint_server("SSRN", {"10.2139"}, ("S4210172589",), ("ssrn.com",)),
     _preprint_server(
-        "Research Square", {"10.21203"}, ("S4306525896", "S4306402450"), ("researchsquare.com",)
+        "SSRN", prefixes={"10.2139"}, openalex_ids=("S4210172589",), hosts=("ssrn.com",)
     ),
-    _preprint_server("Preprints.org", {"10.20944"}, ("S6309402219",), ("preprints.org",)),
-    _preprint_server("ChemRxiv", {"10.26434"}, ("S4393918830",), ("chemrxiv.org",)),
-    _preprint_server("Authorea", {"10.22541"}, ("S4363604296",), ("authorea.com",)),
+    _preprint_server(
+        "Research Square",
+        prefixes={"10.21203"},
+        openalex_ids=("S4306525896", "S4306402450"),
+        hosts=("researchsquare.com",),
+    ),
+    _preprint_server(
+        "Preprints.org",
+        prefixes={"10.20944"},
+        openalex_ids=("S6309402219",),
+        hosts=("preprints.org",),
+    ),
+    _preprint_server(
+        "ChemRxiv", prefixes={"10.26434"}, openalex_ids=("S4393918830",), hosts=("chemrxiv.org",)
+    ),
+    _preprint_server(
+        "Authorea", prefixes={"10.22541"}, openalex_ids=("S4363604296",), hosts=("authorea.com",)
+    ),
     # Le préfixe 10.2196 couvre aussi les revues de JMIR.
-    _preprint_server("JMIR Preprints", {"10.2196"}, (), (), re.compile(r"preprints\.")),
+    _preprint_server("JMIR Preprints", prefixes={"10.2196"}, doi_suffix=re.compile(r"preprints\.")),
     # Les URL d'osf.io désignent plusieurs serveurs de preprints sans les distinguer : seule la source OpenAlex les départage.
-    _preprint_server("OSF Preprints", {"10.31219"}, ("S4306401127",)),
-    _preprint_server("PsyArXiv", {"10.31234"}, ("S4306401687",)),
-    _preprint_server("SocArXiv", {"10.31235"}, ("S4306401238",)),
+    _preprint_server("OSF Preprints", prefixes={"10.31219"}, openalex_ids=("S4306401127",)),
+    _preprint_server("PsyArXiv", prefixes={"10.31234"}, openalex_ids=("S4306401687",)),
+    _preprint_server("SocArXiv", prefixes={"10.31235"}, openalex_ids=("S4306401238",)),
     _preprint_server(
-        "EarthArXiv", {"10.31223"}, ("S4306401273", "S4306402614"), ("eartharxiv.org",)
+        "EarthArXiv",
+        prefixes={"10.31223"},
+        openalex_ids=("S4306401273", "S4306402614"),
+        hosts=("eartharxiv.org",),
     ),
-    _preprint_server("AfricArXiv", set(), ("S4306402219",)),
-    _preprint_server("BioHackrXiv", set(), ("S4306402587",)),
-    _preprint_server("MindRxiv", set(), ("S4306401745",)),
-    _preprint_server("ECSarXiv", set(), ("S4306402531",)),
-    _preprint_server("SportRxiv", set(), ("S4306402352",)),
-    _preprint_server("Arabixiv", set(), ("S4306400047",)),
-    _preprint_server("EdArXiv", set(), ("S4306402530",)),
-    _preprint_server("EcoEvoRxiv", set(), ("S4306402488",)),
-    _publisher_platform("Cairn", {"10.3917"}, ("S4406923042",), ("cairn.info",)),
+    _preprint_server("AfricArXiv", openalex_ids=("S4306402219",)),
+    _preprint_server("BioHackrXiv", openalex_ids=("S4306402587",)),
+    _preprint_server("MindRxiv", openalex_ids=("S4306401745",)),
+    _preprint_server("ECSarXiv", openalex_ids=("S4306402531",)),
+    _preprint_server("SportRxiv", openalex_ids=("S4306402352",)),
+    _preprint_server("Arabixiv", openalex_ids=("S4306400047",)),
+    _preprint_server("EdArXiv", openalex_ids=("S4306402530",)),
+    _preprint_server("EcoEvoRxiv", openalex_ids=("S4306402488",)),
+    _publisher_platform(
+        "Cairn", prefixes={"10.3917"}, openalex_ids=("S4406923042",), hosts=("cairn.info",)
+    ),
     _publisher_platform(
         "OpenEdition",
-        {"10.4000"},
-        ("S4306402281", "S4306401026"),
-        ("openedition.org", "calenda.org", "hypotheses.org"),
+        prefixes={"10.4000"},
+        openalex_ids=("S4306402281", "S4306401026"),
+        hosts=("openedition.org", "calenda.org", "hypotheses.org"),
         icon="openedition.png",
     ),
-    _publisher_platform("Érudit", {"10.7202"}, hosts=("erudit.org",)),
-    _publisher_platform("Persée", {"10.3406"}, hosts=("persee.fr",)),
+    _publisher_platform("Érudit", prefixes={"10.7202"}, hosts=("erudit.org",)),
+    _publisher_platform("Persée", prefixes={"10.3406"}, hosts=("persee.fr",)),
     _publisher_platform(
-        "SciELO", {"10.1590", "10.4067", "10.7476"}, hosts=("scielo.br", "scielo.org", "scielo.cl")
+        "SciELO",
+        prefixes={"10.1590", "10.4067", "10.7476"},
+        hosts=("scielo.br", "scielo.org", "scielo.cl"),
     ),
-    _publisher_platform("Prairial", {"10.35562"}),
-    _publisher_platform("Episciences", {"10.46298", "10.23638"}, hosts=("episciences.org",)),
-    _publisher_platform("Centre Mersenne", {"10.5802"}, hosts=("centre-mersenne.org",)),
-    _publisher_platform("Project MUSE", {"10.1353"}, hosts=("muse.jhu.edu",)),
-    _publisher_platform("Université de Bordeaux", {"10.20870"}),
-    # Éditeurs déposant leurs DOI chez DataCite, qu'OpenAlex range parmi les entrepôts. Leurs préfixes désignent l'éditeur lui-même, pas une plateforme d'éditeurs.
-    _publisher_platform("Classiques Garnier", set(), ("S7407051766", "S7407051950")),
-    _publisher_platform("Éditions et presses universitaires de Reims", set(), ("S7407051763",)),
-    _publisher_platform("Underline Science", set(), ("S7407053148",)),
-    _publisher_platform("IUGG 2023", set(), ("S7407051559",)),
-    _publisher_platform("Association Universitaire de Génie Civil", set(), ("S7407051738",)),
+    _publisher_platform("Prairial", prefixes={"10.35562"}),
     _publisher_platform(
-        "Association Française d'Etudes et de Recherches sur les Aérosols", set(), ("S7407051736",)
+        "Episciences", prefixes={"10.46298", "10.23638"}, hosts=("episciences.org",)
+    ),
+    _publisher_platform("Centre Mersenne", prefixes={"10.5802"}, hosts=("centre-mersenne.org",)),
+    _publisher_platform("Project MUSE", prefixes={"10.1353"}, hosts=("muse.jhu.edu",)),
+    _publisher_platform("Université de Bordeaux", prefixes={"10.20870"}),
+    # Éditeurs déposant leurs DOI chez DataCite, qu'OpenAlex range parmi les entrepôts. Leurs préfixes désignent l'éditeur lui-même, pas une plateforme d'éditeurs.
+    _publisher_platform("Classiques Garnier", openalex_ids=("S7407051766", "S7407051950")),
+    _publisher_platform(
+        "Éditions et presses universitaires de Reims", openalex_ids=("S7407051763",)
+    ),
+    _publisher_platform("Underline Science", openalex_ids=("S7407053148",)),
+    _publisher_platform("IUGG 2023", openalex_ids=("S7407051559",)),
+    _publisher_platform("Association Universitaire de Génie Civil", openalex_ids=("S7407051738",)),
+    _publisher_platform(
+        "Association Française d'Etudes et de Recherches sur les Aérosols",
+        openalex_ids=("S7407051736",),
     ),
 )
 
@@ -277,10 +316,11 @@ _PUBLISHER_PLATFORM_PREFIXES = frozenset(
     if p.platform_type is PlatformType.PUBLISHER_PLATFORM
     for prefix in p.doi_prefixes
 )
-_PLATFORMS_OF_PREFIX: dict[str, list[KnownPlatform]] = {}
-for _platform in KNOWN_PLATFORMS:
-    for _prefix in _platform.doi_prefixes:
-        _PLATFORMS_OF_PREFIX.setdefault(_prefix, []).append(_platform)
+_PLATFORMS_OF_PREFIX: dict[str, list[KnownPlatform]] = {
+    prefix: [p for p in KNOWN_PLATFORMS if prefix in p.doi_prefixes]
+    for prefix in {prefix for p in KNOWN_PLATFORMS for prefix in p.doi_prefixes}
+}
+"""Plateformes de chaque préfixe DOI, dans l'ordre de la liste."""
 
 
 def known_platform_of_source(openalex_id: str) -> KnownPlatform | None:
@@ -328,7 +368,7 @@ def is_deposit_doi(doi: str, doc_type: str | None) -> bool:
 
 def is_fully_open(url: str) -> bool:
     """Vrai si `url` désigne une plateforme de la liste donnant librement accès à tout son contenu. Le DOI de plusieurs plateformes toutes ouvertes compte aussi (bioRxiv et medRxiv)."""
-    if (known := known_platform_of_url(url)) is not None:
+    if (known := _known_platform_of_url(url)) is not None:
         return known.fully_open
     platforms = _platforms_of_doi_url(url)
     return bool(platforms) and all(p.fully_open for p in platforms)
@@ -340,7 +380,7 @@ def preprint_copy_url(doi: str) -> str | None:
     return f"https://doi.org/{cleaned}" if cleaned and preprint_servers_of_doi(cleaned) else None
 
 
-def known_platform_of_url(url: str) -> KnownPlatform | None:
+def _known_platform_of_url(url: str) -> KnownPlatform | None:
     """Renvoie la plateforme de la liste désignée par `url` : par son hôte, à défaut par le DOI d'une URL doi.org propre à une seule plateforme."""
     host = url_host(url)
     if not host:
@@ -357,7 +397,7 @@ def known_platform_of_url(url: str) -> KnownPlatform | None:
 
 def known_platform_of_copy(url: str, openalex_id: str | None) -> KnownPlatform | None:
     """Renvoie la plateforme de la liste d'une copie : celle de son URL, à défaut celle de sa source OpenAlex."""
-    if known := known_platform_of_url(url):
+    if known := _known_platform_of_url(url):
         return known
     return known_platform_of_source(openalex_id) if openalex_id else None
 
