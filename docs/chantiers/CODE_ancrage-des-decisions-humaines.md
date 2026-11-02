@@ -36,16 +36,16 @@ D'autres chantiers prévoient des décisions de même nature :
 
 ### Phase 2 — Rejets
 
-- [ ] Migration : `rejected_contributions` ancrée sur (source, source_id, person_id), sans clé étrangère vers `source_records`. Remplie depuis les lignes existantes.
-- [ ] Lecture (`infrastructure/sql_fragments.py`), écriture de l'administration et fusion des personnes sur (source, source_id).
+- [x] Migration : `rejected_contributions` ancrée sur (source, source_id, person_id), sans clé étrangère vers `source_records`. Remplie depuis les lignes existantes (fb42e6542).
+- [x] Lecture (`infrastructure/sql_fragments.py`), écriture de l'administration et fusion des personnes sur (source, source_id) (fb42e6542).
 
 ### Phase 3 — Adresses
 
-- [ ] Purge des adresses sans contribution source : les adresses décidées restent.
+- [x] Purge des adresses sans contribution source : les adresses décidées restent (dd0b879af).
 
 ### Phase 4 — Documentation
 
-- [ ] Normalisation des contributions sources, rejets, purge des adresses.
+- [x] Normalisation des contributions sources, rejets, purge des adresses (e0287e2c6, fb42e6542, dd0b879af).
 
 ## Questions ouvertes
 
