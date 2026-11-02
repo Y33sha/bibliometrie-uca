@@ -96,13 +96,16 @@ class TestUpsertSourceRecord:
         book = store.upsert_source_record(
             _row(staging_id, source_id="2023ABC002", container_title="Actes du colloque")
         )
+        encoded = store.upsert_source_record(
+            _row(staging_id, source_id="2023ABC003", container_title="Arts &amp; Sciences")
+        )
         titles = dict(
             sa_sync_conn.execute(
-                text("SELECT id, container_title FROM source_records WHERE id IN (:a, :b)"),
-                {"a": platform, "b": book},
+                text("SELECT id, container_title FROM source_records WHERE id IN (:a, :b, :c)"),
+                {"a": platform, "b": book, "c": encoded},
             ).all()
         )
-        assert titles == {platform: None, book: "Actes du colloque"}
+        assert titles == {platform: None, book: "Actes du colloque", encoded: "Arts & Sciences"}
 
     def test_abstract_keeps_one_version_of_each_formula(self, sa_sync_conn):
         staging_id = _thesis_staging(sa_sync_conn)

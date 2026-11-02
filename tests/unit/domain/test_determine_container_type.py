@@ -61,6 +61,18 @@ def test_plateforme_d_ebooks_sans_conteneur():
     ) == (None, None)
 
 
+def test_titres_en_texte_brut():
+    """Cas réel : Crossref encode l'esperluette du titre de revue."""
+    series, _ = determine_container_type(
+        _describe(
+            raw_doc_type="journal-article",
+            journal_title="Communications Earth &amp; Environment",
+            issn="2662-4435",
+        )
+    )
+    assert series.title == "Communications Earth & Environment"
+
+
 def test_chapitre_livre_et_collection():
     """Cas réel : chapitre d'un livre de la collection IFIP AICT."""
     series, volume = determine_container_type(

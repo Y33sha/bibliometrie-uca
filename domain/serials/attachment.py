@@ -7,7 +7,7 @@ from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 
-from domain.normalize import normalize_text, to_plain_text
+from domain.normalize import normalize_text
 from domain.serials.titles import compatible_titles
 
 
@@ -42,7 +42,7 @@ def most_frequent[T: str | int](counter: Counter[T]) -> T:
 
 def title_key(title: str | None) -> str:
     """Renvoie la forme de comparaison d'un titre de série reçu d'une source."""
-    return normalize_text(to_plain_text(title)) if title else ""
+    return normalize_text(title or "")
 
 
 def choose_issnl(title: str | None, candidates: Mapping[str, str]) -> str | None:

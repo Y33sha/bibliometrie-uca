@@ -12,7 +12,7 @@ from dataclasses import dataclass, fields
 
 from sqlalchemy import Connection, bindparam, text
 
-from domain.normalize import clean_abstract
+from domain.normalize import clean_abstract, optional_plain_text
 from domain.publications.dates import PublicationDate
 from domain.publications.doc_types import DocType
 from domain.publications.licenses import License
@@ -59,7 +59,7 @@ class SourceRecordUpsert:
     publisher_id: int | None = None
     """Éditeur nommé par la source. L'écriture le retire d'une production hébergée sans être publiée (`source_record_has_publisher`)."""
     container_title: str | None = None
-    """Titre libre du conteneur. L'écriture retire un titre de plateforme d'ebooks (`names_ebook_platform`)."""
+    """Titre libre du conteneur. L'écriture le met en texte brut (`to_plain_text`) et retire un titre de plateforme d'ebooks (`names_ebook_platform`)."""
     raw_language: str | None = None
     """Langue dans le vocabulaire de la source."""
     biblio: JsonValue = None
@@ -196,8 +196,10 @@ class SourceRecordStore:
             has_container=has_series or row.monograph_id is not None,
         ):
             params["publisher_id"] = None
-        if row.container_title and names_ebook_platform(row.container_title):
-            params["container_title"] = None
+        container_title = optional_plain_text(row.container_title)
+        if container_title and names_ebook_platform(container_title):
+            container_title = None
+        params["container_title"] = container_title
         params["abstract"] = clean_abstract(row.abstract)
         params["language"] = language_code(row.raw_language, self._forms())
         params |= date_columns(row.publication_date)

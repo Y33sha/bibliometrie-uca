@@ -8,11 +8,12 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Iterator, Mapping
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from typing import ClassVar, NamedTuple
 
 from sqlalchemy import Connection
 
+from domain.normalize import to_plain_text
 from domain.platforms.registry import names_platform
 from domain.publications.dates import PublicationDate
 from domain.publications.metadata import has_minimal_publication_metadata, is_overlong_title
@@ -56,11 +57,15 @@ type Document = Mapping[str, JsonValue]
 """Document décrit par la source, lu dans une ligne de `staging`."""
 
 
-class PublisherFacts(NamedTuple):
-    """Éditeur d'un document, tel que la source le nomme, et son identifiant OpenAlex s'il est connu."""
+@dataclass(frozen=True, slots=True)
+class PublisherFacts:
+    """Éditeur d'un document, tel que la source le nomme, et son identifiant OpenAlex s'il est connu. La construction met le nom en texte brut (`to_plain_text`)."""
 
     name: str
     openalex_id: str | None = None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "name", to_plain_text(self.name))
 
 
 class NormalizeStats(NamedTuple):

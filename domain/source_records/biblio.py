@@ -5,6 +5,7 @@ from collections.abc import Mapping
 from enum import StrEnum
 from typing import NamedTuple
 
+from domain.normalize import to_plain_text
 from domain.serials.containers import SeriesDescription
 from domain.serials.issns import IssnSupport, SerialIssn
 from domain.serials.serial import OaModel
@@ -153,7 +154,7 @@ def compact_biblio(
     article_number: str | None = None,
     publisher: str | None = None,
 ) -> dict[str, JsonValue] | None:
-    """Construit `biblio` réduit aux valeurs non vides, sans série ; `None` sans aucune valeur. La normalisation y ajoute la série (`with_journal`)."""
+    """Construit `biblio` réduit aux valeurs non vides, sans série ; `None` sans aucune valeur. Le nom de l'éditeur est mis en texte brut (`to_plain_text`). La normalisation ajoute la série (`with_journal`)."""
     biblio: dict[str, JsonValue] = {
         key: value
         for key, value in (
@@ -162,7 +163,7 @@ def compact_biblio(
             (BiblioKey.FIRST_PAGE, first_page),
             (BiblioKey.LAST_PAGE, last_page),
             (BiblioKey.ARTICLE_NUMBER, article_number),
-            (BiblioKey.PUBLISHER, publisher),
+            (BiblioKey.PUBLISHER, to_plain_text(publisher)),
         )
         if value
     }

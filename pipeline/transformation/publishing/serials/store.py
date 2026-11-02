@@ -9,7 +9,7 @@ from typing import NamedTuple
 from sqlalchemy import ColumnElement, Connection, any_, exists, literal, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from domain.normalize import normalize_text, to_plain_text
+from domain.normalize import normalize_text
 from domain.serials.serial import ManualField, SerialType
 from infrastructure.db.scalars import scalar_int
 from infrastructure.db.tables import serial_issns, serials
@@ -76,7 +76,6 @@ class SerialStore:
         self, title: str, publisher_id: int | None, *conditions: ColumnElement[bool]
     ) -> int:
         """Renvoie la plus ancienne revue sans ISSN de ce titre normalisé qui remplit `conditions`, créée avec l'éditeur `publisher_id` si elle manque."""
-        title = to_plain_text(title)
         found: int | None = self._conn.execute(
             select(serials.c.id)
             .where(
@@ -92,7 +91,6 @@ class SerialStore:
         return self._create_serial(title, publisher_id=publisher_id)
 
     def _create_serial(self, title: str, *, publisher_id: int | None = None) -> int:
-        title = to_plain_text(title)
         return scalar_int(
             self._conn.execute(
                 serials.insert()

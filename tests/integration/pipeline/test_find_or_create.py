@@ -44,14 +44,6 @@ class TestFindOrCreatePublisher:
         )
         assert found == existing
 
-    def test_un_nom_encode_rejoint_le_meme_editeur_que_le_nom_en_clair(
-        self, sa_sync_conn, publisher_store
-    ):
-        """Un nom avec entités HTML (`&amp;`) rejoint l'éditeur du nom en clair."""
-        premier = find_or_create_publisher("Taylor & Francis", repo=publisher_store)
-        second = find_or_create_publisher("TAYLOR &amp; FRANCIS", repo=publisher_store)
-        assert second == premier
-
     def test_finds_existing_by_name_form(self, sa_sync_conn, publisher_store):
         existing = find_or_create_publisher("Elsevier", repo=publisher_store)
         found = find_or_create_publisher("elsevier", repo=publisher_store)
@@ -90,12 +82,12 @@ class TestSerialStore:
         assert tuple(row) == ("Nature", serial_id)
 
     def test_revue_sans_issn_d_un_titre(self, sa_sync_conn, gateway):
-        serial_id = gateway.serial_for_title("Revue &amp; Société")
+        serial_id = gateway.serial_for_title("REVUE & SOCIÉTÉ")
         assert gateway.serial_for_title("Revue & Société") == serial_id
 
     def test_revue_sans_issn_d_un_titre_et_d_un_editeur(self, sa_sync_conn, gateway):
         elsevier = insert_publisher(sa_sync_conn, "Elsevier")
-        serial_id = gateway.serial_for_title_and_publisher("Revue &amp; Société", elsevier)
+        serial_id = gateway.serial_for_title_and_publisher("REVUE & SOCIÉTÉ", elsevier)
         assert gateway.serial_for_title_and_publisher("Revue & Société", elsevier) == serial_id
         assert gateway.serial_for_title_and_publisher("Revue & Société", None) != serial_id
 

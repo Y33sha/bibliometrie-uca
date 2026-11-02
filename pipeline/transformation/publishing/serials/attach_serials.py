@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 
 from sqlalchemy import Connection, Row, text
 
-from domain.normalize import normalize_text, to_plain_text
+from domain.normalize import normalize_text
 from domain.publications.identifiers import ISSN
 from domain.serials.attachment import (
     TitledSerial,
@@ -450,7 +450,6 @@ def _refresh_attributes(
         if title is None and serial_id in titles:
             title = most_frequent(titles[serial_id])
         if title:
-            title = to_plain_text(title)
             serial_titles.append({"id": serial_id, "title": title, "key": normalize_text(title)})
     if serial_titles:
         conn.execute(_WRITE_TITLES, {"rows": json.dumps(serial_titles)})

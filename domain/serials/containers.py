@@ -4,7 +4,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, replace
 from enum import StrEnum
 
-from domain.normalize import normalize_text, to_plain_text
+from domain.normalize import normalize_text, optional_plain_text
 from domain.serials.issns import SerialIssn, received_issns
 from domain.serials.serial import OaModel
 from domain.serials.series import ContainerLevel, container_level, series_title
@@ -98,7 +98,7 @@ def holds_mostly_articles(records: Iterable[tuple[str, str | None]]) -> bool:
 class ContainerDescription:
     """Conteneur d'un document décrit par une source, tous niveaux mêlés.
 
-    La construction normalise les ISSN (`received_issns`). Elle retire les titres de plateforme d'ebooks (`names_ebook_platform`), qui ne nomment aucun conteneur.
+    La construction normalise les ISSN (`received_issns`) et met les titres en texte brut (`to_plain_text`). Elle retire les titres de plateforme d'ebooks (`names_ebook_platform`), qui ne nomment aucun conteneur.
     """
 
     source: str
@@ -122,10 +122,12 @@ class ContainerDescription:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "issns", received_issns(self.issns))
+        object.__setattr__(self, "document_title", optional_plain_text(self.document_title))
         for name in ("journal_title", "collection_title", "book_title"):
-            title = getattr(self, name)
+            title = optional_plain_text(getattr(self, name))
             if title and names_ebook_platform(title):
-                object.__setattr__(self, name, None)
+                title = None
+            object.__setattr__(self, name, title)
 
     def without_series(self) -> ContainerDescription:
         """Renvoie la description privée de sa revue et de sa collection, avec leurs ISSN."""
@@ -165,10 +167,6 @@ class VolumeDescription:
     year: int | None = None
 
 
-def _normalized(title: str | None) -> str:
-    return normalize_text(to_plain_text(title)) if title else ""
-
-
 def determine_container_type(
     description: ContainerDescription,
 ) -> tuple[SeriesDescription | None, VolumeDescription | None]:
@@ -205,8 +203,8 @@ def determine_container_type(
         if d.has_issn
         else None
     )
-    same_as_collection = bool(volume_title) and _normalized(volume_title) == _normalized(
-        collection_title
+    same_as_collection = bool(volume_title) and normalize_text(volume_title or "") == (
+        normalize_text(collection_title or "")
     )
     if same_as_collection or not (volume_title or d.isbns or d.eisbns):
         return series, None
