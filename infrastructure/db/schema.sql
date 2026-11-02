@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict UV2kiRPqetNj0LrdSV51NDa7VR43hRnSGl0zzkcnBK09iQH2OxQ0KDp9KObkQ3L
+\restrict IrUieVnaaURYZyuDwPNnHto3c37wL3ztFXUxqrEzN8N7n7RLQthsOwIEgIgbGk7
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -858,6 +858,41 @@ ALTER SEQUENCE persons.distinct_persons_id_seq OWNED BY persons.distinct_persons
 
 
 --
+-- Name: hr_periods; Type: TABLE; Schema: persons; Owner: -
+--
+
+CREATE TABLE persons.hr_periods (
+    id integer NOT NULL,
+    person_id integer NOT NULL,
+    unit_label text NOT NULL,
+    structure_id integer,
+    start_date date,
+    end_date date,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: hr_periods_id_seq; Type: SEQUENCE; Schema: persons; Owner: -
+--
+
+CREATE SEQUENCE persons.hr_periods_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: hr_periods_id_seq; Type: SEQUENCE OWNED BY; Schema: persons; Owner: -
+--
+
+ALTER SEQUENCE persons.hr_periods_id_seq OWNED BY persons.hr_periods.id;
+
+
+--
 -- Name: hr_records; Type: TABLE; Schema: persons; Owner: -
 --
 
@@ -870,7 +905,12 @@ CREATE TABLE persons.hr_records (
     start_date date,
     end_date date,
     hr_export_date date,
-    created_at timestamp with time zone DEFAULT now()
+    created_at timestamp with time zone DEFAULT now(),
+    siham_id text,
+    staff_category text,
+    employment_status text,
+    corps text,
+    grade text
 );
 
 
@@ -3430,6 +3470,13 @@ ALTER TABLE ONLY persons.distinct_persons ALTER COLUMN id SET DEFAULT nextval('p
 
 
 --
+-- Name: hr_periods id; Type: DEFAULT; Schema: persons; Owner: -
+--
+
+ALTER TABLE ONLY persons.hr_periods ALTER COLUMN id SET DEFAULT nextval('persons.hr_periods_id_seq'::regclass);
+
+
+--
 -- Name: hr_records id; Type: DEFAULT; Schema: persons; Owner: -
 --
 
@@ -3699,6 +3746,22 @@ ALTER TABLE ONLY persons.distinct_persons
 
 
 --
+-- Name: hr_periods hr_periods_person_unit_start_key; Type: CONSTRAINT; Schema: persons; Owner: -
+--
+
+ALTER TABLE ONLY persons.hr_periods
+    ADD CONSTRAINT hr_periods_person_unit_start_key UNIQUE NULLS NOT DISTINCT (person_id, unit_label, start_date);
+
+
+--
+-- Name: hr_periods hr_periods_pkey; Type: CONSTRAINT; Schema: persons; Owner: -
+--
+
+ALTER TABLE ONLY persons.hr_periods
+    ADD CONSTRAINT hr_periods_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: hr_records hr_records_person_id_key; Type: CONSTRAINT; Schema: persons; Owner: -
 --
 
@@ -3712,6 +3775,14 @@ ALTER TABLE ONLY persons.hr_records
 
 ALTER TABLE ONLY persons.hr_records
     ADD CONSTRAINT hr_records_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: hr_records hr_records_siham_id_key; Type: CONSTRAINT; Schema: persons; Owner: -
+--
+
+ALTER TABLE ONLY persons.hr_records
+    ADD CONSTRAINT hr_records_siham_id_key UNIQUE (siham_id);
 
 
 --
@@ -4497,6 +4568,13 @@ CREATE INDEX idx_phase_exec_started_at ON ops.pipeline_phase_executions USING bt
 --
 
 CREATE INDEX idx_confirmed_source_contributions_person ON persons.confirmed_source_contributions USING btree (person_id);
+
+
+--
+-- Name: idx_hr_periods_structure_id; Type: INDEX; Schema: persons; Owner: -
+--
+
+CREATE INDEX idx_hr_periods_structure_id ON persons.hr_periods USING btree (structure_id);
 
 
 --
@@ -5395,6 +5473,22 @@ ALTER TABLE ONLY persons.distinct_persons
 
 
 --
+-- Name: hr_periods hr_periods_person_id_fkey; Type: FK CONSTRAINT; Schema: persons; Owner: -
+--
+
+ALTER TABLE ONLY persons.hr_periods
+    ADD CONSTRAINT hr_periods_person_id_fkey FOREIGN KEY (person_id) REFERENCES persons.persons(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: hr_periods hr_periods_structure_id_fkey; Type: FK CONSTRAINT; Schema: persons; Owner: -
+--
+
+ALTER TABLE ONLY persons.hr_periods
+    ADD CONSTRAINT hr_periods_structure_id_fkey FOREIGN KEY (structure_id) REFERENCES structures.structures(id) ON DELETE SET NULL;
+
+
+--
 -- Name: hr_records hr_records_person_id_fkey; Type: FK CONSTRAINT; Schema: persons; Owner: -
 --
 
@@ -5982,5 +6076,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict UV2kiRPqetNj0LrdSV51NDa7VR43hRnSGl0zzkcnBK09iQH2OxQ0KDp9KObkQ3L
+\unrestrict IrUieVnaaURYZyuDwPNnHto3c37wL3ztFXUxqrEzN8N7n7RLQthsOwIEgIgbGk7
 

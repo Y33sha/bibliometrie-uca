@@ -117,6 +117,7 @@ MERGE_STEPS: dict[str, MergeStep] = {
     "name_forms": MergeStep((("person_name_forms", "person_id"),), _merge_name_forms),
     # L'absorbée n'a jamais de fiche RH : celle qui en a une est conservée (`merge_roles`).
     "rh_record": untouched("hr_records", "person_id"),
+    "rh_periods": untouched("hr_periods", "person_id"),
     # Les formes de nom de l'absorbée restent (`name_forms`).
     "name": untouched(
         "persons", "last_name", "first_name", "last_name_normalized", "first_name_normalized"

@@ -53,7 +53,7 @@ from domain.publications.author_grouping import GroupingMethod
 from domain.publications.dates import DatePrecision
 from domain.publications.doc_types import DocType
 from domain.publications.licenses import License
-from domain.publications.metadata import OA_RANK
+from domain.publications.oa_status import OA_RANK
 from domain.publications.relations import RelationType
 from domain.publishers.publisher import PUBLISHER_TYPES
 from domain.serials.issn_facts import ISSN_LINK_TYPES
@@ -1113,7 +1113,35 @@ hr_records = Table(
     Column("end_date", Date),
     Column("hr_export_date", Date),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    Column("siham_id", Text),
+    Column("staff_category", Text),
+    Column("employment_status", Text),
+    Column("corps", Text),
+    Column("grade", Text),
     UniqueConstraint("person_id", name="hr_records_person_id_key"),
+    UniqueConstraint("siham_id", name="hr_records_siham_id_key"),
+    schema="persons",
+)
+
+
+# Période de présence d'une personne dans une unité, d'après l'export RH. `structure_id` est renseigné quand l'unité est un laboratoire de `structures`.
+hr_periods = Table(
+    "hr_periods",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("person_id", Integer, nullable=False),
+    Column("unit_label", Text, nullable=False),
+    Column("structure_id", Integer),
+    Column("start_date", Date),
+    Column("end_date", Date),
+    Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    UniqueConstraint(
+        "person_id",
+        "unit_label",
+        "start_date",
+        name="hr_periods_person_unit_start_key",
+        postgresql_nulls_not_distinct=True,
+    ),
     schema="persons",
 )
 
