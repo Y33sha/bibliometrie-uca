@@ -9,7 +9,7 @@ import pytest
 
 from interfaces.cli.imports.import_apc import clean
 from interfaces.cli.imports.import_authenticated_orcids import _load_rows
-from interfaces.cli.imports.import_persons import read_csv_tsv
+from interfaces.cli.imports.import_persons import read_export
 from pipeline.transformation.publishing.serials.enrich_serials_from_doaj import (
     clean_doaj_row,
 )
@@ -40,15 +40,14 @@ class TestPersonnesRh:
             "nom,prenom,email,laboratoire\n"
             "Dupont ,<b>Marie</b>,marie@example.org,Institut&nbsp;Pascal\n",
         )
-        (record,) = read_csv_tsv(path)
-        assert record["last_name"] == "Dupont"
-        assert record["first_name"] == "Marie"
-        assert record["department_name"] == "Institut Pascal"
+        (record,) = read_export(path).rows
+        assert record.last_name == "Dupont"
+        assert record.first_name == "Marie"
+        assert record.periods[0].unit_label == "Institut Pascal"
 
     def test_un_nom_reduit_au_balisage_est_lu_comme_absent(self, tmp_path):
-        path = self._write(tmp_path, "nom,prenom\n<p></p>,Marie\n")
-        (record,) = read_csv_tsv(path)
-        assert record["last_name"] == ""
+        path = self._write(tmp_path, "nom,prenom\nDurand,Jean\n<p></p>,Marie\n")
+        assert [r.first_name for r in read_export(path).rows] == ["Jean"]
 
 
 class TestOrcidAuthentifies:
@@ -87,5 +86,5 @@ def test_le_lecteur_rh_accepte_le_tsv(tmp_path):
         writer = csv.writer(f, delimiter="\t")
         writer.writerow(["nom", "prenom"])
         writer.writerow(["Dupont", "Marie"])
-    (record,) = read_csv_tsv(str(path))
-    assert (record["last_name"], record["first_name"]) == ("Dupont", "Marie")
+    (record,) = read_export(str(path)).rows
+    assert (record.last_name, record.first_name) == ("Dupont", "Marie")
