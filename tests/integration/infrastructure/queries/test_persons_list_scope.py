@@ -1,6 +1,6 @@
 """Filtres de la liste des personnes et de ses facettes (`/api/persons`).
 
-`PersonFilters.lab_id` restreint la liste aux personnes qui ont une contribution de rôle auteur rattachée au laboratoire. Les autres tests couvrent le filtre d'exclusion et la facette « À confirmer ».
+`PersonFilters.lab_id` restreint la liste aux personnes qui ont une période de présence dans le laboratoire, ou une contribution de rôle auteur rattachée au laboratoire. Les autres tests couvrent le filtre d'exclusion et la facette « À confirmer ».
 """
 
 from sqlalchemy import text
@@ -10,6 +10,8 @@ from infrastructure.read_models.persons.models import PersonFilters
 from infrastructure.read_models.persons.queries import PersonsQueries
 from tests.integration.helpers.contributions import insert_contribution
 from tests.integration.helpers.persons import (
+    insert_hr_period,
+    insert_hr_record,
     insert_person,
     insert_person_identifier,
     insert_person_name_form,
@@ -45,6 +47,17 @@ class TestListLabScope:
         ids = {p.id for p in res.persons}
         assert p_in in ids
         assert p_out not in ids
+
+    def test_list_includes_lab_member_without_contribution(self, sa_sync_conn):
+        lab = insert_structure(sa_sync_conn, "LAB-RH")
+        member = insert_person(sa_sync_conn, "Member")
+        insert_hr_record(sa_sync_conn, member)
+        insert_hr_period(sa_sync_conn, member, unit_label="LAB-RH", structure_id=lab)
+
+        res = PersonsQueries(sa_sync_conn).list_persons(
+            filters=PersonFilters(lab_id=lab), page=1, per_page=50, sort="name_asc"
+        )
+        assert member in {p.id for p in res.persons}
 
     def test_list_unscoped_includes_both(self, sa_sync_conn):
         lab = insert_structure(sa_sync_conn, "LAB-DIR2")

@@ -72,13 +72,13 @@
 			<th>Identifiants</th>
 			<th
 				class="sortable"
-				class:active={sortDirection(sort, 'role') !== null}
-				onclick={() => toggleSort('role')}>Fonction<SortChevron direction={sortDirection(sort, 'role')} /></th
+				class:active={sortDirection(sort, 'corps') !== null}
+				onclick={() => toggleSort('corps')}>Corps<SortChevron direction={sortDirection(sort, 'corps')} /></th
 			>
 			<th
 				class="sortable"
-				class:active={sortDirection(sort, 'dept') !== null}
-				onclick={() => toggleSort('dept')}>Département<SortChevron direction={sortDirection(sort, 'dept')} /></th
+				class:active={sortDirection(sort, 'lab') !== null}
+				onclick={() => toggleSort('lab')}>Laboratoire<SortChevron direction={sortDirection(sort, 'lab')} /></th
 			>
 			{#each countColumns as col (col.sortKey)}
 				<th
@@ -111,8 +111,15 @@
 					<td>
 						<IdentifiersCell identifiers={p.identifiers} />
 					</td>
-					<td class="secondary-cell">{p.role_title || ''}</td>
-					<td class="secondary-cell">{p.department_name || ''}</td>
+					<td class="secondary-cell">{p.corps || ''}</td>
+					<td class="secondary-cell">
+						{#each p.laboratories as lab, i (lab.id)}{#if i > 0}, {/if}<a
+								href={resolve(`structures/${lab.id}`)}
+								class="lab-link"
+								class:past-lab={!lab.current}
+								title={lab.current ? undefined : 'Dernier laboratoire'}>{lab.label}</a
+							>{/each}
+					</td>
 					{#each countColumns as col (col.sortKey)}
 						<td class="num">{col.value(p)}</td>
 					{/each}
@@ -134,4 +141,7 @@
 	tr.excluded .person-link { text-decoration: line-through; }
 	.person-last { font-weight: 600; }
 	.secondary-cell { font-size: var(--fs-md); color: var(--text-secondary); }
+	.lab-link { color: inherit; text-decoration: none; }
+	.lab-link:hover { text-decoration: underline; }
+	.past-lab { color: var(--text-faint); }
 </style>

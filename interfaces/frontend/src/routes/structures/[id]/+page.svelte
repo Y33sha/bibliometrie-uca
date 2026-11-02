@@ -61,9 +61,9 @@
 		pageParam: 'apage',
 	});
 
-	// Dashboard tab : les publications passent par `PublicationsDashboard` ; la page ajoute les personnes présentes dans le SI RH et les sujets.
+	// Dashboard tab : les publications passent par `PublicationsDashboard` ; la page ajoute les personnes rattachées au laboratoire et les sujets.
 	let dashboardLoaded = $state(false);
-	let rhPersonsCount = $state(0);
+	let personsCount = $state(0);
 	type SubjectFrequency = components['schemas']['SubjectFrequency'];
 	let dashSubjects: SubjectFrequency[] = $state([]);
 
@@ -88,15 +88,15 @@
 	}
 
 	async function loadDashboard() {
-		// Le décompte des personnes reprend les réglages par défaut de l'onglet Personnes : présentes dans le SI RH, retenues, actives.
-		const persons = new URLSearchParams({ lab_id: String(labId), has_rh: 'true', exclusion: 'none', active: 'true', per_page: '1' });
+		// Le décompte reprend le réglage par défaut de l'onglet Personnes : personnes retenues, à période de présence actuelle dans le laboratoire.
+		const persons = new URLSearchParams({ laboratory: String(labId), exclusion: 'none', per_page: '1' });
 		const [personsPage, subjects] = await Promise.all([
-			api<{ total: number }>(`/api/persons?${persons}`, { key: 'lab-rh-persons' }),
+			api<{ total: number }>(`/api/persons?${persons}`, { key: 'lab-persons' }),
 			api<SubjectFrequency[]>(`/api/structures/${labId}/subjects?limit=30`, {
 				key: 'lab-subjects',
 			}),
 		]);
-		rhPersonsCount = personsPage.total;
+		personsCount = personsPage.total;
 		dashSubjects = subjects;
 		dashboardLoaded = true;
 	}
@@ -213,8 +213,8 @@
 					context={{ kind: 'lab', id: lab.id }}
 					apiKey="lab-dashboard"
 					citationScatter
-					figures={dashboardLoaded && rhPersonsCount > 0
-						? [{ value: rhPersonsCount.toLocaleString('fr-FR'), label: 'personnes (SI RH)' }]
+					figures={dashboardLoaded && personsCount > 0
+						? [{ value: personsCount.toLocaleString('fr-FR'), label: 'personnes' }]
 						: []}
 				>
 					{#snippet subjects()}

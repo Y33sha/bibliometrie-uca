@@ -1,4 +1,4 @@
-"""Facettes de la liste des personnes : départements, rôles, identifiants, fiche RH, éléments à confirmer."""
+"""Facettes de la liste des personnes : catégories de personnel, laboratoires actuels, corps, identifiants, fiche RH, éléments à confirmer."""
 
 from sqlalchemy import Connection, text
 
@@ -9,7 +9,8 @@ from infrastructure.read_models.filters import (
     WhereClause,
     assemble_where,
     person_active_clause,
-    person_department_clause,
+    person_category_clause,
+    person_corps_clause,
     person_exclusion_clause,
     person_has_identifier_clause,
     person_has_identifier_sql,
@@ -17,13 +18,14 @@ from infrastructure.read_models.filters import (
     person_has_pending_name_forms_clause,
     person_has_rh_clause,
     person_in_lab_clause,
-    person_role_clause,
+    person_laboratory_clause,
     person_search_clause,
 )
 from infrastructure.read_models.persons.models import (
     PersonFilters,
     PersonsFacetsResponse,
 )
+from infrastructure.read_models.sql_fragments import current_hr_period
 
 _BASE_FROM = "persons p LEFT JOIN hr_records prh ON prh.person_id = p.id"
 
@@ -50,10 +52,12 @@ class PersonFacetQueries:
                 person_in_lab_clause(filters.lab_id),
                 person_search_clause(filters.search),
             ]
-            if skip != "department":
-                out.append(person_department_clause(filters.departments))
-            if skip != "role":
-                out.append(person_role_clause(filters.roles))
+            if skip != "category":
+                out.append(person_category_clause(filters.categories))
+            if skip != "laboratory":
+                out.append(person_laboratory_clause(filters.laboratories))
+            if skip != "corps":
+                out.append(person_corps_clause(filters.corps))
             if skip != "ids":
                 out.append(person_has_identifier_clause("orcid", filters.has_orcid))
                 out.append(person_has_identifier_clause("idhal", filters.has_idhal))
@@ -66,31 +70,33 @@ class PersonFacetQueries:
                 out.append(person_has_pending_identifiers_clause(filters.has_pending_identifiers))
             return out
 
-        # DÉPARTEMENTS
-        where_sql, binds = assemble_where(base_clauses(skip="department"))
-        dept_rows = self._conn.execute(
-            text(f"""
-                SELECT prh.department_name AS value, COUNT(*) AS n
-                FROM {_BASE_FROM}
-                WHERE {where_sql} AND prh.department_name IS NOT NULL
-                GROUP BY prh.department_name ORDER BY n DESC
-            """),
-            binds,
-        ).all()
-        dept_facets = [FacetOption(value=r.value, count=r.n) for r in dept_rows]
+        def hr_record_facet(column: str, skip: str) -> list[FacetOption]:
+            where_sql, binds = assemble_where(base_clauses(skip=skip))
+            rows = self._conn.execute(
+                text(f"""
+                    SELECT prh.{column} AS value, COUNT(*) AS n
+                    FROM {_BASE_FROM}
+                    WHERE {where_sql} AND prh.{column} IS NOT NULL
+                    GROUP BY prh.{column} ORDER BY n DESC
+                """),
+                binds,
+            ).all()
+            return [FacetOption(value=r.value, count=r.n) for r in rows]
 
-        # RÔLES
-        where_sql, binds = assemble_where(base_clauses(skip="role"))
-        role_rows = self._conn.execute(
+        # LABORATOIRES ACTUELS
+        where_sql, binds = assemble_where(base_clauses(skip="laboratory"))
+        lab_rows = self._conn.execute(
             text(f"""
-                SELECT prh.role_title AS value, COUNT(*) AS n
+                SELECT s.id, coalesce(s.acronym, s.name) AS label, COUNT(DISTINCT p.id) AS n
                 FROM {_BASE_FROM}
-                WHERE {where_sql} AND prh.role_title IS NOT NULL
-                GROUP BY prh.role_title ORDER BY n DESC
+                JOIN hr_periods hp ON hp.person_id = p.id AND {current_hr_period("hp")}
+                JOIN structures s ON s.id = hp.structure_id
+                WHERE {where_sql}
+                GROUP BY s.id, label ORDER BY n DESC, label
             """),
             binds,
         ).all()
-        role_facets = [FacetOption(value=r.value, count=r.n) for r in role_rows]
+        lab_facets = [FacetOption(value=str(r.id), label=r.label, count=r.n) for r in lab_rows]
 
         # ORCID / IDHAL / IDREF partagent la population (skip='ids') : un seul passage.
         where_sql, binds = assemble_where(base_clauses(skip="ids"))
@@ -130,8 +136,9 @@ class PersonFacetQueries:
         ).one()
 
         return PersonsFacetsResponse(
-            departments=dept_facets,
-            roles=role_facets,
+            categories=hr_record_facet("staff_category", "category"),
+            laboratories=lab_facets,
+            corps=hr_record_facet("corps", "corps"),
             orcid=YesNoCount(yes=ids.orcid_yes, no=ids.orcid_no),
             idhal=YesNoCount(yes=ids.idhal_yes, no=ids.idhal_no),
             idref=YesNoCount(yes=ids.idref_yes, no=ids.idref_no),

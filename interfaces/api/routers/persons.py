@@ -36,7 +36,7 @@ from infrastructure.read_models.subjects.models import SubjectFrequency
 from interfaces.api.csv_export import csv_response
 from interfaces.api.deps import entity_detail, person_service, persons_queries
 from interfaces.api.entity_detail import EntityDetail
-from interfaces.api.filters import parse_str_csv, parse_vocabulary_csv
+from interfaces.api.filters import parse_int_csv, parse_str_csv, parse_vocabulary_csv
 from interfaces.api.models import (
     AddIdentifier,
     AddIdentifierResponse,
@@ -74,8 +74,9 @@ RETAINED = "none"
 
 def person_filters(
     search: SearchTerm = "",
-    department: str = Query(""),
-    role: str = Query(""),
+    category: str = Query(""),
+    laboratory: str = Query(""),
+    corps: str = Query(""),
     has_orcid: bool | None = Query(None),
     has_idhal: bool | None = Query(None),
     has_idref: bool | None = Query(None),
@@ -88,12 +89,13 @@ def person_filters(
 ) -> PersonFilters:
     """Lit les filtres communs à la liste des personnes et à ses facettes.
 
-    `department`, `role` et `exclusion` acceptent plusieurs valeurs séparées par des virgules. `exclusion` prend des motifs d'exclusion et `none` pour les personnes retenues ; omis, il laisse tout passer, et l'annuaire public pose `exclusion=none`. `active=true` retient les personnes qui ont une contribution ou une fiche RH ; l'annuaire public le pose aussi. `lab_id` restreint aux personnes d'un laboratoire, et leurs dénombrements à ce laboratoire.
+    `category`, `laboratory` (identifiants de structures), `corps` et `exclusion` acceptent plusieurs valeurs séparées par des virgules. `laboratory` retient les personnes dont une période de présence actuelle est dans l'une des structures. `exclusion` prend des motifs d'exclusion et `none` pour les personnes retenues ; omis, il laisse tout passer, et l'annuaire public pose `exclusion=none`. `active=true` retient les personnes qui ont une contribution ou une fiche RH ; l'annuaire public le pose aussi. `lab_id` restreint aux personnes d'un laboratoire (période de présence ou contribution d'auteur), et leurs dénombrements aux contributions du laboratoire.
     """
     return PersonFilters(
         search=search,
-        departments=parse_str_csv(department),
-        roles=parse_str_csv(role),
+        categories=parse_str_csv(category),
+        laboratories=parse_int_csv(laboratory, param="laboratory"),
+        corps=parse_str_csv(corps),
         has_orcid=has_orcid,
         has_idhal=has_idhal,
         has_idref=has_idref,

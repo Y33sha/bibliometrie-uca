@@ -297,7 +297,7 @@
 					<button class="result-btn" onclick={() => batchAssign(r.id)}>
 						<strong>{titleCase(r.last_name)}</strong> {titleCase(r.first_name)}
 						{#if r.has_rh}<RhCheck />{/if}
-						<span class="result-hint">{r.department_name || `#${r.id}`}</span>
+						<span class="result-hint">{r.current_unit || `#${r.id}`}</span>
 					</button>
 				{/each}
 			</div>
@@ -362,7 +362,7 @@
 													<button class="result-btn" onclick={() => assign(o, r.id)}>
 														<strong>{titleCase(r.last_name)}</strong> {titleCase(r.first_name)}
 														{#if r.has_rh}<RhCheck />{/if}
-														<span class="result-hint">{r.department_name || `#${r.id}`}</span>
+														<span class="result-hint">{r.current_unit || `#${r.id}`}</span>
 													</button>
 												{/each}
 											</div>

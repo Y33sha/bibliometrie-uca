@@ -5,7 +5,7 @@
 	import FacetDropdown, { type FacetOption } from '#lib/components/FacetDropdown.svelte';
 	import PresenceFilterToggle from '#lib/components/PresenceFilterToggle.svelte';
 	import { IDENTIFIER_ITEMS, PENDING_ITEMS } from '#lib/filterItems.js';
-	import { personExclusionLabels } from '#lib/labels.js';
+	import { personExclusionLabels, staffCategoryLabels } from '#lib/labels.js';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import PersonsTable from '#lib/components/PersonsTable.svelte';
 	import type { PersonRow } from '#lib/components/PersonsTable.svelte';
@@ -22,8 +22,8 @@
 
 	// Vue-liste des personnes réutilisable. Utilisée par :
 	// - `/persons` (annuaire autonome avec sync URL)
-	// - `/structures/[id]?tab=persons` (labo fixe via `labId`, sans sync URL)
-	// La session admin y gagne les facettes Exclusion et À confirmer, les personnes sans contribution ni fiche RH, la colonne des publications du périmètre, et une icône qui ouvre le volet de la personne.
+	// - `/structures/[id]?tab=persons` (labo fixe via `labId`, sans sync URL ; la facette Laboratoires y présélectionne le labo)
+	// La session admin y gagne les facettes Exclusion et À confirmer, les personnes sans contribution ni fiche RH, la colonne des publications du périmètre hors page de laboratoire, et une icône qui ouvre le volet de la personne.
 	let {
 		apiKey = 'persons-dir',
 		labId,
@@ -34,7 +34,7 @@
 		activeId = null,
 	}: {
 		apiKey?: string;
-		/** Contexte labo fixe : scope l'annuaire aux personnes du laboratoire. */
+		/** Contexte labo fixe : restreint l'annuaire aux personnes du laboratoire (période de présence ou contribution), et présélectionne le laboratoire dans la facette Laboratoires. */
 		labId?: number;
 		urlSync?: boolean;
 		basePath?: string;
@@ -58,8 +58,10 @@
 	];
 
 	let search = $state('');
-	let selectedDepts: string[] = $state([]);
-	let selectedRoles: string[] = $state([]);
+	let selectedCategories: string[] = $state([]);
+	// svelte-ignore state_referenced_locally
+	let selectedLabs: string[] = $state(labId != null ? [String(labId)] : []);
+	let selectedCorps: string[] = $state([]);
 	let idStates = $state<Record<string, IdState>>({});
 	let selectedRh: string[] = $state(['yes']);
 	let currentSort = $state('name_asc');
@@ -82,8 +84,9 @@
 		if (selectedExclusions.length) params.set('exclusion', selectedExclusions.join(','));
 		// L'annuaire public écarte les personnes sans contribution ni fiche RH, conservées pour leurs décisions.
 		if (!isAdmin()) params.set('active', 'yes');
-		if (selectedDepts.length) params.set('department', selectedDepts.join(','));
-		if (selectedRoles.length) params.set('role', selectedRoles.join(','));
+		if (selectedCategories.length) params.set('category', selectedCategories.join(','));
+		if (selectedLabs.length) params.set('laboratory', selectedLabs.join(','));
+		if (selectedCorps.length) params.set('corps', selectedCorps.join(','));
 		for (const [key, qk] of Object.entries(idQueryKey)) {
 			const v = idStates[key];
 			if (v === 'yes' || v === 'no') params.set(qk, v);
@@ -131,8 +134,9 @@
 			return params;
 		},
 		facets: {
-			depts: { type: 'simple', apiKey: 'departments' },
-			roles: { type: 'simple', apiKey: 'roles' },
+			categories: { type: 'label_map', apiKey: 'categories', labels: staffCategoryLabels },
+			labs: { type: 'labeled', apiKey: 'laboratories' },
+			corps: { type: 'simple', apiKey: 'corps' },
 			orcid: { type: 'boolean', apiKey: 'orcid', yesLabel: 'Avec', noLabel: 'Sans' },
 			idhal: { type: 'boolean', apiKey: 'idhal', yesLabel: 'Avec', noLabel: 'Sans' },
 			idref: { type: 'boolean', apiKey: 'idref', yesLabel: 'Avec', noLabel: 'Sans' },
@@ -164,8 +168,9 @@
 		basePath: () => basePath,
 		debounceMs: 300,
 		filters: {
-			selectedDepts: { type: 'string_array', urlKey: 'department' },
-			selectedRoles: { type: 'string_array', urlKey: 'role' },
+			selectedCategories: { type: 'string_array', urlKey: 'category' },
+			selectedLabs: { type: 'string_array', urlKey: 'laboratory' },
+			selectedCorps: { type: 'string_array', urlKey: 'corps' },
 			idStates: { type: 'source_states', urlKey: 'id_filter' },
 			hasRh: { type: 'single', urlKey: 'has_rh', defaultValue: 'yes' },
 			exclusion: { type: 'single', urlKey: 'exclusion', defaultValue: 'none' },
@@ -179,8 +184,9 @@
 	function syncUrl() {
 		if (!urlSync) return;
 		url.syncUrl(() => ({
-			selectedDepts,
-			selectedRoles,
+			selectedCategories,
+			selectedLabs,
+			selectedCorps,
 			idStates,
 			hasRh: selectedRh.length === 1 ? selectedRh[0] : 'all',
 			exclusion: selectedExclusions.length ? selectedExclusions.join(',') : 'all',
@@ -215,8 +221,9 @@
 	onMount(async () => {
 		if (urlSync) {
 			const restored = url.restoreFromUrl(page.url.searchParams);
-			if (restored.selectedDepts) selectedDepts = restored.selectedDepts as string[];
-			if (restored.selectedRoles) selectedRoles = restored.selectedRoles as string[];
+			if (restored.selectedCategories) selectedCategories = restored.selectedCategories as string[];
+			if (restored.selectedLabs) selectedLabs = restored.selectedLabs as string[];
+			if (restored.selectedCorps) selectedCorps = restored.selectedCorps as string[];
 			if (restored.idStates) idStates = restored.idStates as Record<string, IdState>;
 			if (restored.hasRh != null) {
 				const rh = restored.hasRh as string;
@@ -247,8 +254,9 @@
 			counts={idCounts}
 			onchange={onFilterChange}
 		/>
-		<FacetDropdown label="Fonctions" options={facets.options.roles} searchable bind:selected={selectedRoles} onchange={onFilterChange} />
-		<FacetDropdown label="Départements" options={facets.options.depts} searchable bind:selected={selectedDepts} onchange={onFilterChange} />
+		<FacetDropdown label="Catégories" options={facets.options.categories} bind:selected={selectedCategories} onchange={onFilterChange} />
+		<FacetDropdown label="Laboratoires" options={facets.options.labs} searchable bind:selected={selectedLabs} onchange={onFilterChange} />
+		<FacetDropdown label="Corps" options={facets.options.corps} searchable bind:selected={selectedCorps} onchange={onFilterChange} />
 		<FacetDropdown label="Base RH" options={facets.options.rh} bind:selected={selectedRh} onchange={onFilterChange} />
 		{#if isAdmin()}
 			<PresenceFilterToggle
@@ -269,7 +277,7 @@
 	error={dir.error}
 	sort={currentSort}
 	{onSortChange}
-	perimeterCount={isAdmin()}
+	perimeterCount={isAdmin() && labId == null}
 	onopen={ownDrawer ? drawer.open : onopen}
 	activeId={ownDrawer ? drawer.id : activeId}
 />

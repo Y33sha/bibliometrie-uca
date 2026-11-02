@@ -4439,8 +4439,11 @@ export interface components {
             first_name: string;
             /** Last Name */
             last_name: string;
-            /** Department Name */
-            department_name: string | null;
+            /**
+             * Current Unit
+             * @description Unité actuelle, pour départager des homonymes (`current_unit`).
+             */
+            current_unit: string | null;
             /** Has Rh */
             has_rh: boolean;
         };
@@ -4659,6 +4662,21 @@ export interface components {
          * @enum {string}
          */
         PersonIdentifierType: "orcid" | "idhal" | "idref" | "hal_person_id";
+        /**
+         * PersonLaboratoryOut
+         * @description Laboratoire d'une personne, d'après ses périodes de présence.
+         */
+        PersonLaboratoryOut: {
+            /** Id */
+            id: number;
+            /** Label */
+            label: string;
+            /**
+             * Current
+             * @description Faux pour le laboratoire de la dernière période d'une personne partie.
+             */
+            current: boolean;
+        };
         /** PersonListResponse */
         PersonListResponse: {
             /** Total */
@@ -4683,14 +4701,15 @@ export interface components {
             last_name: string;
             /** First Name */
             first_name: string;
-            /** Role Title */
-            role_title: string | null;
-            /** Department Name */
-            department_name: string | null;
-            /** Start Date */
-            start_date: string | null;
-            /** End Date */
-            end_date: string | null;
+            /** Corps */
+            corps: string | null;
+            /** Staff Category */
+            staff_category: string | null;
+            /**
+             * Laboratories
+             * @description Laboratoires actuels, à défaut celui de la dernière période (`laboratories_of`).
+             */
+            laboratories: components["schemas"]["PersonLaboratoryOut"][];
             /** Has Rh */
             has_rh: boolean;
             exclusion: components["schemas"]["PersonExclusion"] | null;
@@ -4708,6 +4727,27 @@ export interface components {
             identifiers: components["schemas"]["PersonIdentifierOut"][];
         };
         /**
+         * PersonPeriodOut
+         * @description Période de présence dans une unité.
+         */
+        PersonPeriodOut: {
+            /** Unit Label */
+            unit_label: string;
+            /**
+             * Structure Id
+             * @description Structure reconnue de l'unité.
+             */
+            structure_id: number | null;
+            /** Structure Label */
+            structure_label: string | null;
+            /** Start Date */
+            start_date: string | null;
+            /** End Date */
+            end_date: string | null;
+            /** Current */
+            current: boolean;
+        };
+        /**
          * PersonProfileCore
          * @description Bloc `person` de `/api/persons/{id}`.
          */
@@ -4718,14 +4758,12 @@ export interface components {
             last_name: string;
             /** First Name */
             first_name: string;
-            /** Role Title */
-            role_title: string | null;
-            /** Department Name */
-            department_name: string | null;
-            /** Start Date */
-            start_date: string | null;
-            /** End Date */
-            end_date: string | null;
+            /** Corps */
+            corps: string | null;
+            /** Staff Category */
+            staff_category: string | null;
+            /** Periods */
+            periods: components["schemas"]["PersonPeriodOut"][];
         };
         /** PersonProfileResponse */
         PersonProfileResponse: {
@@ -4746,8 +4784,11 @@ export interface components {
             last_name: string;
             /** First Name */
             first_name: string;
-            /** Department Name */
-            department_name: string | null;
+            /**
+             * Current Unit
+             * @description Unité actuelle, pour départager des homonymes (`current_unit`).
+             */
+            current_unit: string | null;
             /** Has Rh */
             has_rh: boolean;
         };
@@ -4793,10 +4834,12 @@ export interface components {
          * @description Réponse de `/api/persons/facets`.
          */
         PersonsFacetsResponse: {
-            /** Departments */
-            departments: components["schemas"]["FacetOption"][];
-            /** Roles */
-            roles: components["schemas"]["FacetOption"][];
+            /** Categories */
+            categories: components["schemas"]["FacetOption"][];
+            /** Laboratories */
+            laboratories: components["schemas"]["FacetOption"][];
+            /** Corps */
+            corps: components["schemas"]["FacetOption"][];
             orcid: components["schemas"]["YesNoCount"];
             idhal: components["schemas"]["YesNoCount"];
             idref: components["schemas"]["YesNoCount"];
@@ -8366,10 +8409,11 @@ export interface operations {
             query?: {
                 page?: number;
                 per_page?: number;
-                sort?: "name_asc" | "name_desc" | "contributions_asc" | "contributions_desc" | "in_perimeter_contributions_asc" | "in_perimeter_contributions_desc" | "dept_asc" | "dept_desc" | "role_asc" | "role_desc";
+                sort?: "name_asc" | "name_desc" | "contributions_asc" | "contributions_desc" | "in_perimeter_contributions_asc" | "in_perimeter_contributions_desc" | "lab_asc" | "lab_desc" | "corps_asc" | "corps_desc";
                 search?: string;
-                department?: string;
-                role?: string;
+                category?: string;
+                laboratory?: string;
+                corps?: string;
                 has_orcid?: boolean | null;
                 has_idhal?: boolean | null;
                 has_idref?: boolean | null;
@@ -8409,10 +8453,11 @@ export interface operations {
     export_persons_csv_api_persons_export_csv_get: {
         parameters: {
             query?: {
-                sort?: "name_asc" | "name_desc" | "contributions_asc" | "contributions_desc" | "in_perimeter_contributions_asc" | "in_perimeter_contributions_desc" | "dept_asc" | "dept_desc" | "role_asc" | "role_desc";
+                sort?: "name_asc" | "name_desc" | "contributions_asc" | "contributions_desc" | "in_perimeter_contributions_asc" | "in_perimeter_contributions_desc" | "lab_asc" | "lab_desc" | "corps_asc" | "corps_desc";
                 search?: string;
-                department?: string;
-                role?: string;
+                category?: string;
+                laboratory?: string;
+                corps?: string;
                 has_orcid?: boolean | null;
                 has_idhal?: boolean | null;
                 has_idref?: boolean | null;
@@ -8453,8 +8498,9 @@ export interface operations {
         parameters: {
             query?: {
                 search?: string;
-                department?: string;
-                role?: string;
+                category?: string;
+                laboratory?: string;
+                corps?: string;
                 has_orcid?: boolean | null;
                 has_idhal?: boolean | null;
                 has_idref?: boolean | null;

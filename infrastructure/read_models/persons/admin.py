@@ -26,6 +26,7 @@ from infrastructure.read_models.persons.models import (
     SharingPersonOut,
 )
 from infrastructure.read_models.sql_fragments import (
+    current_unit,
     name_form_holder,
     other_name_form_holders,
 )
@@ -326,10 +327,9 @@ class PersonAdminQueries:
         other_rows = self._conn.execute(
             text(f"""
                 SELECT p.id AS person_id, p.first_name, p.last_name,
-                       pr.department_name,
+                       {current_unit("p")} AS current_unit,
                        EXISTS(SELECT 1 FROM hr_records rh WHERE rh.person_id = p.id) AS has_rh
                 FROM persons p
-                LEFT JOIN hr_records pr ON pr.person_id = p.id
                 WHERE p.id IN ({other_name_form_holders(":nf", ":pid")})
                 ORDER BY p.last_name, p.first_name
             """),
@@ -352,7 +352,7 @@ class PersonAdminQueries:
                     person_id=r.person_id,
                     first_name=r.first_name,
                     last_name=r.last_name,
-                    department_name=r.department_name,
+                    current_unit=r.current_unit,
                     has_rh=r.has_rh,
                 )
                 for r in other_rows

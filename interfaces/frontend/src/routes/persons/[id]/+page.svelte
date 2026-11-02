@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Breadcrumb from '#lib/components/Breadcrumb.svelte';
 	import { pageTitle } from '#lib/institution.svelte.js';
-	import { columnLabels } from '#lib/labels.js';
+	import { columnLabels, staffCategoryLabels } from '#lib/labels.js';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import { onMount } from 'svelte';
@@ -201,20 +201,32 @@
 			</h1>
 		</TitleRow>
 		<div class="entity-meta">
-			{#if profile.role_title}
-				<span class="entity-tag">{profile.role_title}</span>
+			{#if profile.corps}
+				<span class="entity-tag">{profile.corps}</span>
 			{/if}
-			{#if profile.department_name}
-				<span>{profile.department_name}</span>
-			{/if}
-			{#if profile.start_date || profile.end_date}
-				<span>
-					Du {profile.start_date ? formatDate(profile.start_date) : '?'}
-					— {profile.end_date ? formatDate(profile.end_date) : 'en poste'}
-				</span>
+			{#if profile.staff_category}
+				<span class="entity-tag">{staffCategoryLabels[profile.staff_category] ?? profile.staff_category}</span>
 			{/if}
 			<IdentifiersCell {identifiers} />
 		</div>
+		{#if profile.periods.length}
+			<ul class="hr-periods">
+				{#each profile.periods as period, i (i)}
+					<li class:past-period={!period.current}>
+						{#if period.structure_id != null}
+							<a href={resolve(`structures/${period.structure_id}`)} class="entity-link">{period.structure_label}</a>
+							{#if period.structure_label !== period.unit_label}<span class="period-unit">({period.unit_label})</span>{/if}
+						{:else}
+							{period.unit_label}
+						{/if}
+						<span class="period-dates">
+							{period.start_date ? formatDate(period.start_date) : '?'}
+							— {period.end_date ? formatDate(period.end_date) : 'en poste'}
+						</span>
+					</li>
+				{/each}
+			</ul>
+		{/if}
 	</div>
 
 	<!-- Tabs -->
@@ -389,6 +401,12 @@
 {/if}
 
 <style>
+	.hr-periods { list-style: none; margin: 8px 0 0; padding: 0; font-size: var(--fs-md); }
+	.hr-periods li { margin: 2px 0; }
+	.past-period { color: var(--text-faint); }
+	.past-period .entity-link { color: inherit; }
+	.period-unit, .period-dates { color: var(--text-secondary); margin-left: 6px; }
+	.past-period .period-unit, .past-period .period-dates { color: inherit; }
 	.thesis-role-heading {
 		font-size: var(--fs-base);
 		font-weight: 600;

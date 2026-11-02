@@ -40,8 +40,8 @@
               <div class="other-person-row">
                 <span class="other-person-name">
                   {op.first_name} <strong>{op.last_name}</strong>
-                  {#if op.department_name}<span class="other-person-dept"
-                      >({op.department_name})</span
+                  {#if op.current_unit}<span class="other-person-dept"
+                      >({op.current_unit})</span
                     >{/if}
                   {#if op.has_rh}<span class="tag tag-rh">RH</span>{/if}
                 </span>

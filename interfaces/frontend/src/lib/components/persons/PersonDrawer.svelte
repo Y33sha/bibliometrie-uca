@@ -4,7 +4,7 @@
   import { resolve } from "$app/paths";
   import { api } from "#lib/api/index.js";
   import { titleCase } from "#lib/utils.js";
-  import { personExclusionLabels } from "#lib/labels.js";
+  import { personExclusionLabels, staffCategoryLabels } from "#lib/labels.js";
   import { autofocus } from "#lib/actions/focus.js";
   import Drawer from "#lib/components/Drawer.svelte";
   import type { Person, IdFormState, PersonSearchResult } from "./types";
@@ -128,17 +128,6 @@
     if (await onrename(person.id, lastName, firstName)) editing = false;
   }
 
-  function formatDate(d: string | null): string {
-    return d ? new Date(d).toLocaleDateString("fr-FR") : "";
-  }
-
-  function dateRange(start: string | null, end: string | null): string {
-    if (start && end) return `${formatDate(start)} – ${formatDate(end)}`;
-    if (start) return `depuis le ${formatDate(start)}`;
-    if (end) return `jusqu'au ${formatDate(end)}`;
-    return "";
-  }
-
   // Échap annule d'abord l'édition du nom en cours.
   function onescape() {
     if (editing) editing = false;
@@ -204,17 +193,17 @@
       <section class="drawer-section">
         <h3>Fiche RH</h3>
         <dl class="rh-info">
-          {#if person.role_title}
-            <dt>Rôle</dt>
-            <dd>{person.role_title}</dd>
+          {#if person.corps}
+            <dt>Corps</dt>
+            <dd>{person.corps}</dd>
           {/if}
-          {#if person.department_name}
-            <dt>Département</dt>
-            <dd>{person.department_name}</dd>
+          {#if person.staff_category}
+            <dt>Catégorie</dt>
+            <dd>{staffCategoryLabels[person.staff_category] ?? person.staff_category}</dd>
           {/if}
-          {#if person.start_date || person.end_date}
-            <dt>Dates</dt>
-            <dd>{dateRange(person.start_date, person.end_date)}</dd>
+          {#if person.laboratories.length}
+            <dt>{person.laboratories.every((lab) => lab.current) ? 'Laboratoire' : 'Dernier laboratoire'}</dt>
+            <dd>{person.laboratories.map((lab) => lab.label).join(', ')}</dd>
           {/if}
         </dl>
       </section>
@@ -306,7 +295,7 @@
           {#snippet item(r)}
             <strong>{r.last_name}</strong>
             {r.first_name}
-            {#if r.department_name}<span class="merge-dept">{r.department_name}</span>{/if}
+            {#if r.current_unit}<span class="merge-dept">{r.current_unit}</span>{/if}
             {#if r.has_rh}<RhCheck />{/if}
           {/snippet}
         </Picker>
