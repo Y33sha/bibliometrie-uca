@@ -1,7 +1,6 @@
 """Métadonnées d'une publication, agrégées depuis ses enregistrements sources."""
 
-from collections.abc import Mapping
-from typing import cast
+from collections.abc import Iterable, Mapping
 
 from domain.normalize import normalize_text
 from domain.platforms.registry import is_publisher_platform_prefix
@@ -15,7 +14,7 @@ from domain.publishers.attribution import publication_publisher
 from domain.source_records.keys import anchor_of, deposit_anchors, doi_anchors
 from domain.source_records.source_record import SourceRecord
 from domain.sources.registry import Source
-from domain.types import JsonValue, as_int, as_str
+from domain.types import JsonValue
 
 
 def refresh_from_sources(
@@ -28,7 +27,7 @@ def refresh_from_sources(
     """Recalcule sur place les métadonnées de `publication` depuis ses enregistrements sources. L'éditeur se pose ensuite, par `assign_publisher`, et le statut open access d'après les copies (`domain.publications.open_access`).
 
     - DOI : `publication_doi`.
-    - Champs simples : première valeur non nulle dans l'ordre d'arbitrage (`arbitration_order`). Sans revue dans aucune source, la publication prend la collection de sa monographie (`monograph_serials`).
+    - Champs simples : première valeur non nulle dans l'ordre d'arbitrage (`_arbitration_order`). Sans revue dans aucune source, la publication prend la collection de sa monographie (`monograph_serials`).
     - Type de document : `arbitrate_doc_type_with_article_subtype`, puis `arbitrate_conference`.
     - Date de publication : `arbitrate_publication_date` ; l'année en dérive.
     - Licence : celle de la version éditeur (`publisher_license_sources`). Licence de dépôt : celle du fichier déposé dans HAL.
@@ -45,11 +44,11 @@ def refresh_from_sources(
             "refresh_from_sources requiert au moins une source ; le cas orphelin est à traiter côté caller (suppression de la publication)"
         )
 
-    new_doi_str = publication_doi(prioritized(sources, source_priority))
+    new_doi_str = publication_doi(_prioritized(sources, source_priority))
     publication.doi = DOI(new_doi_str) if new_doi_str else None
-    sorted_sources = arbitration_order(sources, source_priority)
+    sorted_sources = _arbitration_order(sources, source_priority)
 
-    new_title = as_str(first_non_null(sorted_sources, "title"))
+    new_title = _first(s.title for s in sorted_sources)
     publication.title = new_title if new_title is not None else publication.title
     publication.title_normalized = normalize_text(publication.title) if publication.title else None
     publication.doc_type = arbitrate_conference(
@@ -64,21 +63,21 @@ def refresh_from_sources(
     if publication.publication_date is not None:
         publication.publication_year = publication.publication_date.year
 
-    publication.serial_id = as_int(first_non_null(sorted_sources, "serial_id"))
-    publication.monograph_id = as_int(first_non_null(sorted_sources, "monograph_id"))
+    publication.serial_id = _first(s.serial_id for s in sorted_sources)
+    publication.monograph_id = _first(s.monograph_id for s in sorted_sources)
     if publication.serial_id is None and publication.monograph_id is not None and monograph_serials:
         publication.serial_id = monograph_serials.get(publication.monograph_id)
-    publication.license = license_by_source(
+    publication.license = _license_by_source(
         sorted_sources, publisher_license_sources(publication.doc_type)
     )
-    publication.deposit_license = license_by_source(sorted_sources, (DEPOSIT_LICENSE_SOURCE,))
-    publication.container_title = as_str(first_non_null(sorted_sources, "container_title"))
-    publication.language = as_str(first_non_null(sorted_sources, "language"))
-    publication.abstract = as_str(first_non_null(sorted_sources, "abstract"))
-    publication.keywords = _textes(merge_lists_dedup_ci(sorted_sources, "keywords"))
-    publication.countries = _textes(merge_lists_dedup_ci(sorted_sources, "countries"))
-    publication.biblio = shallow_merge_jsonb(sorted_sources, "biblio")
-    publication.source_extras = shallow_merge_jsonb(sorted_sources, "source_extras")
+    publication.deposit_license = _license_by_source(sorted_sources, (DEPOSIT_LICENSE_SOURCE,))
+    publication.container_title = _first(s.container_title for s in sorted_sources)
+    publication.language = _first(s.language for s in sorted_sources)
+    publication.abstract = _first(s.abstract for s in sorted_sources)
+    publication.keywords = _union_ci(s.keywords for s in sorted_sources)
+    publication.countries = _union_ci(s.countries for s in sorted_sources)
+    publication.biblio = _merge_by_key(s.biblio for s in sorted_sources)
+    publication.source_extras = _merge_by_key(s.source_extras for s in sorted_sources)
     publication.is_retracted = any(s.is_retracted for s in sorted_sources if s.is_retracted)
     publication.impact = next(
         (s.impact for s in sorted_sources if s.source == Source.OPENALEX), None
@@ -101,7 +100,7 @@ def assign_publisher(
     publication.publisher_id = publication_publisher(
         publication.doc_type,
         (prefix_publishers or {}).get(prefix) if prefix else None,
-        (s.publisher_id for s in arbitration_order(sources, source_priority)),
+        (s.publisher_id for s in _arbitration_order(sources, source_priority)),
         platform_prefix=prefix is not None and is_publisher_platform_prefix(prefix),
     )
 
@@ -114,7 +113,7 @@ def publication_doi(sources: list[SourceRecord]) -> str | None:
     return next((a for s in sources if (a := anchor_of(s.dois, candidates)) is not None), None)
 
 
-def prioritized(
+def _prioritized(
     sources: list[SourceRecord], source_priority: tuple[str, ...]
 ) -> list[SourceRecord]:
     """Trie `sources` dans l'ordre de `source_priority`."""
@@ -122,17 +121,17 @@ def prioritized(
     return sorted(sources, key=lambda s: rank.get(s.source, 99))
 
 
-def arbitration_order(
+def _arbitration_order(
     sources: list[SourceRecord], source_priority: tuple[str, ...]
 ) -> list[SourceRecord]:
-    """Trie `sources` dans l'ordre de `source_priority`. Dans une publication qui a une version publiée (`has_published_version`), les enregistrements sources preprint passent après les autres."""
-    ordered = prioritized(sources, source_priority)
-    if not has_published_version(sources):
+    """Trie `sources` dans l'ordre de `source_priority`. Dans une publication qui a une version publiée (`_has_published_version`), les enregistrements sources preprint passent après les autres."""
+    ordered = _prioritized(sources, source_priority)
+    if not _has_published_version(sources):
         return ordered
     return sorted(ordered, key=lambda s: s.doc_type == DocType.PREPRINT)
 
 
-def has_published_version(sources: list[SourceRecord]) -> bool:
+def _has_published_version(sources: list[SourceRecord]) -> bool:
     """Vrai si une publication a une version publiée : une ancre (`doi_anchors`), ou la revue ou la monographie d'un enregistrement source typé autrement que preprint."""
     if doi_anchors(s.dois for s in sources):
         return True
@@ -143,12 +142,7 @@ def has_published_version(sources: list[SourceRecord]) -> bool:
     )
 
 
-def _textes(valeurs: list[JsonValue] | None) -> tuple[str, ...]:
-    """Renvoie les valeurs textuelles d'une liste fusionnée ; les autres sont écartées."""
-    return tuple(texte for v in valeurs or () if (texte := as_str(v)))
-
-
-def license_by_source(sources: list[SourceRecord], order: tuple[Source, ...]) -> str | None:
+def _license_by_source(sources: list[SourceRecord], order: tuple[Source, ...]) -> str | None:
     """Renvoie la première licence des `sources` dans l'ordre de sources `order`, puis dans l'ordre de `sources`."""
     for source in order:
         for s in sources:
@@ -157,38 +151,31 @@ def license_by_source(sources: list[SourceRecord], order: tuple[Source, ...]) ->
     return None
 
 
-def first_non_null(sources: list[SourceRecord], attr: str) -> JsonValue:
-    """Renvoie la première valeur non nulle de l'attribut `attr` dans l'ordre des `sources`, ou `None`."""
-    for s in sources:
-        v = getattr(s, attr)
-        if v is not None:
-            # Valeur de colonne, donc valeur JSON. Le vérificateur de types ne la déduit pas d'un `getattr`.
-            return cast("JsonValue", v)
-    return None
+def _first[T](values: Iterable[T | None]) -> T | None:
+    """Renvoie la première valeur non nulle, ou `None`."""
+    return next((v for v in values if v is not None), None)
 
 
-def merge_lists_dedup_ci(sources: list[SourceRecord], attr: str) -> list[JsonValue] | None:
-    """Renvoie l'union des listes de l'attribut `attr`, sans doublon, dans l'ordre d'apparition. Le texte se compare sans la casse. `None` si toutes les listes sont vides."""
-    seen: set[JsonValue] = set()
-    result: list[JsonValue] = []
-    for s in sources:
-        for item in getattr(s, attr) or ():
-            key = item.lower() if isinstance(item, str) else item
-            if key not in seen:
-                seen.add(key)
+def _union_ci(lists: Iterable[Iterable[str]]) -> tuple[str, ...]:
+    """Renvoie l'union des listes, sans doublon, dans l'ordre d'apparition. Le texte se compare sans la casse."""
+    seen: set[str] = set()
+    result: list[str] = []
+    for items in lists:
+        for item in items:
+            if item.lower() not in seen:
+                seen.add(item.lower())
                 result.append(item)
-    return result or None
+    return tuple(result)
 
 
-def shallow_merge_jsonb(sources: list[SourceRecord], attr: str) -> dict[str, JsonValue] | None:
-    """Fusionne par clé les objets de l'attribut `attr`. La première source qui donne une clé l'emporte."""
+def _merge_by_key(
+    objects: Iterable[Mapping[str, JsonValue] | None],
+) -> dict[str, JsonValue] | None:
+    """Fusionne les objets par clé. Le premier objet qui donne une clé l'emporte. `None` sans aucune clé."""
     merged: dict[str, JsonValue] = {}
-    for s in sources:
-        d = getattr(s, attr)
-        if isinstance(d, dict):
-            for k, v in d.items():
-                if k not in merged:
-                    merged[k] = v
+    for obj in objects:
+        for k, v in (obj or {}).items():
+            merged.setdefault(k, v)
     return merged or None
 
 
