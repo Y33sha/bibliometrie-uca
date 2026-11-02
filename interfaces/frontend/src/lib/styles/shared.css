@@ -39,7 +39,7 @@
 	--accent: oklch(0.446 0.064 var(--brand-hue));       /* texte, bouton plein, titres de section */
 	--accent-mid: oklch(0.581 0.084 var(--brand-hue));   /* trait d'onglet actif, focus */
 	--accent-light: oklch(0.952 0.013 var(--brand-hue)); /* fond de pastille, encart */
-	--accent-soft: oklch(0.83 0.041 var(--brand-hue));   /* barre de graphique atténuée (année en cours) */
+	--accent-soft: oklch(0.83 0.041 var(--brand-hue));   /* teinte claire du nuage de sujets */
 
 	/* Barre de navigation */
 	--nav-public: oklch(0.475 0.067 var(--brand-hue));
