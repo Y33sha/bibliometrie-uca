@@ -31,8 +31,8 @@ D'autres chantiers prévoient des décisions de même nature :
 
 ### Phase 1 — Correspondance de la normalisation
 
-- [ ] `plan_source_contribution_sync` : nom donné par la source, puis position.
-- [ ] Contribution source retrouvée avec d'autres identifiants : informations du contributeur réécrites, personne à résoudre de nouveau.
+- [x] `plan_source_contribution_sync` : nom donné par la source, puis position (e0287e2c6).
+- [x] Contribution source retrouvée avec d'autres identifiants : informations du contributeur réécrites, personne à résoudre de nouveau (e0287e2c6).
 
 ### Phase 2 — Rejets
 
