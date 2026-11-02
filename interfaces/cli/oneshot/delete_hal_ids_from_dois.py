@@ -1,7 +1,7 @@
 # STATUS: oneshot (2026-11-01)
 """Supprime les identifiants HAL des enregistrements sources OpenAlex contenus dans un de leurs DOI, et marque ces enregistrements sources pour la réconciliation.
 
-Un identifiant de localisation OpenAlex `doi:<doi>` contient parfois un fragment au format d'un identifiant HAL : `doi:10.3929/ethz-b-000124558` contient `b-000124558`. `extract_hal_id_from_url` reconnaît un identifiant HAL nu seulement s'il forme toute la chaîne. Le script aligne le stock sur cette règle.
+Un identifiant de localisation OpenAlex `doi:<doi>` contient parfois un fragment au format d'un identifiant HAL : `doi:10.3929/ethz-b-000124558` contient `b-000124558`. `HALId.normalize` reconnaît un identifiant HAL nu seulement s'il forme toute la chaîne. Le script aligne le stock sur cette règle.
 
 Usage :
     uv run python -m interfaces.cli.oneshot.delete_hal_ids_from_dois [--dry-run]

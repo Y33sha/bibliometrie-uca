@@ -12,7 +12,7 @@ from typing import Protocol
 import httpx2
 from sqlalchemy import Connection, ScalarResult, text
 
-from domain.publications.identifiers import clean_doi
+from domain.publications.identifiers import DOI
 from domain.source_records.identifiers import SourceIdentifierType
 from domain.sources.registry import DOI_ORG, PROFILES, Source
 from domain.sources.staging import StagingEntryMode
@@ -117,8 +117,8 @@ def get_missing_dois(
     if target_ra:
         params["target_ra"] = target_ra
     rows: ScalarResult[str] = conn.execute(text(query), params).scalars()
-    # `staging.doi` peut contenir des DOI non normalisés : les candidats repassent par `clean_doi`, puis `dict.fromkeys` dédoublonne en gardant l'ordre.
-    return list(dict.fromkeys(c for d in rows if (c := clean_doi(d))))
+    # `staging.doi` peut contenir des DOI non normalisés : les candidats repassent par `DOI.normalize`, puis `dict.fromkeys` dédoublonne en gardant l'ordre.
+    return list(dict.fromkeys(c for d in rows if (c := DOI.normalize(d))))
 
 
 async def fetch_missing_doi(

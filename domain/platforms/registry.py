@@ -7,7 +7,7 @@ from urllib.parse import urlsplit
 
 from domain.platforms.platform import PlatformType
 from domain.publications.doc_types import DocType
-from domain.publications.identifiers import clean_doi, is_hal_host
+from domain.publications.identifiers import DOI, is_hal_host
 from domain.serials.titles import compatible_titles, nested_titles
 from domain.source_records.identifiers import SourceIdentifierType
 from domain.urls import is_host, on_site, url_host
@@ -300,14 +300,14 @@ def _platforms_of_doi(doi: str) -> list[KnownPlatform]:
 
 def _platforms_of_doi_url(url: str) -> list[KnownPlatform]:
     """Renvoie les plateformes de la liste dont le DOI d'une URL doi.org a la forme."""
-    if not is_host(url, "doi.org") or not (doi := clean_doi(url)):
+    if not is_host(url, "doi.org") or not (doi := DOI.normalize(url)):
         return []
     return _platforms_of_doi(doi)
 
 
 def preprint_servers_of_doi(doi: str) -> tuple[KnownPlatform, ...]:
     """Renvoie les serveurs de preprints de la liste qui ont la forme du DOI : bioRxiv et medRxiv pour `10.1101/2020.…`, aucun pour `10.1101/gad.…`."""
-    cleaned = clean_doi(doi)
+    cleaned = DOI.normalize(doi)
     if not cleaned:
         return ()
     return tuple(
@@ -317,7 +317,7 @@ def preprint_servers_of_doi(doi: str) -> tuple[KnownPlatform, ...]:
 
 def is_deposit_doi(doi: str, doc_type: str | None) -> bool:
     """Vrai pour un DOI de dépôt : DOI attribué par une plateforme de la liste à un document de type `doc_type`, dont l'œuvre peut avoir un autre DOI. Serveur de preprints, archive de copies (DESY), dépôt de texte sur Zenodo."""
-    cleaned = clean_doi(doi)
+    cleaned = DOI.normalize(doi)
     if not cleaned:
         return False
     return any(
@@ -336,7 +336,7 @@ def is_fully_open(url: str) -> bool:
 
 def preprint_copy_url(doi: str) -> str | None:
     """Renvoie l'adresse de la copie désignée par le DOI d'un serveur de preprints de la liste, ou `None` pour un autre DOI."""
-    cleaned = clean_doi(doi)
+    cleaned = DOI.normalize(doi)
     return f"https://doi.org/{cleaned}" if cleaned and preprint_servers_of_doi(cleaned) else None
 
 

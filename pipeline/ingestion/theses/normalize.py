@@ -9,7 +9,7 @@ from collections.abc import Mapping
 from domain.dates import french_date_to_iso
 from domain.publications.contribution_roles import THESES_FIELD_ROLES
 from domain.publications.dates import PublicationDate, parse_iso_date
-from domain.publications.identifiers import clean_doi, normalize_nnt
+from domain.publications.identifiers import DOI, NNT
 from domain.source_records.identifiers import (
     SourceIdentifier,
     SourceIdentifierRole,
@@ -145,9 +145,9 @@ def theses_source_record(
 
     Sans conteneur. Le type dépend de la présence d'une date de soutenance. La langue est la première de `langues`, le résumé celui de la première langue pourvue d'un résumé.
     """
-    doi = clean_doi(as_str(thesis.get("doi")))
+    doi = DOI.normalize(as_str(thesis.get("doi")))
     identifiers: list[SourceIdentifier] = []
-    if nnt := normalize_nnt(as_str(thesis.get("nnt"))):
+    if nnt := NNT.normalize(as_str(thesis.get("nnt"))):
         identifiers.append(
             SourceIdentifier(SourceIdentifierType.NNT, nnt, SourceIdentifierRole.PRIMARY)
         )

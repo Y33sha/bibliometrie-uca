@@ -11,10 +11,10 @@ from collections.abc import Mapping
 
 from domain.dates import today
 from domain.persons.contributor_name import ContributorName
-from domain.persons.identifiers import normalize_orcid
+from domain.persons.identifiers import ORCID
 from domain.publications.contribution_roles import ContributionRole
 from domain.publications.dates import PublicationDate
-from domain.publications.identifiers import clean_doi
+from domain.publications.identifiers import DOI
 from domain.publications.licenses import License, is_access_right, normalize_license
 from domain.serials.containers import ContainerDescription
 from domain.serials.issns import source_issns
@@ -131,7 +131,7 @@ def _creator_orcid(creator: Mapping[str, JsonValue]) -> str | None:
             continue
         scheme = (as_str(fields.get("nameIdentifierScheme")) or "").strip().lower()
         if scheme == "orcid" or is_host(as_str(fields.get("schemeUri")), "orcid.org"):
-            orcid = normalize_orcid(as_str(fields.get("nameIdentifier")))
+            orcid = ORCID.normalize(as_str(fields.get("nameIdentifier")))
             if orcid:
                 return orcid
     return None
@@ -207,7 +207,7 @@ def extract_datacite_author_block(attributes: Mapping[str, JsonValue]) -> Author
 
 def datacite_doi(attributes: Mapping[str, JsonValue], staging_doi: str | None) -> str | None:
     """Renvoie le DOI de la ressource : `attributes.doi`, à défaut celui de sa ligne de `staging`."""
-    return clean_doi(as_str(attributes.get("doi"))) or staging_doi
+    return DOI.normalize(as_str(attributes.get("doi"))) or staging_doi
 
 
 def datacite_identifiers(

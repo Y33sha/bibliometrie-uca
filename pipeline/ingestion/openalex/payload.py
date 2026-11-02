@@ -8,13 +8,13 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 
 from domain.publications.identifiers import (
+    NNT,
+    PMCID,
+    PMID,
+    ArxivId,
+    HALId,
     extract_doi_from_url,
-    extract_hal_id_from_url,
     is_hal_host,
-    normalize_arxiv_id,
-    normalize_nnt,
-    normalize_pmcid,
-    normalize_pmid,
 )
 from domain.source_records.identifiers import (
     SourceIdentifier,
@@ -112,8 +112,8 @@ def is_repository_location(loc: OpenalexLocation) -> bool:
 
 
 def is_hal_location(loc: OpenalexLocation) -> bool:
-    """Renvoie vrai si la localisation désigne HAL : sa page est un identifiant HAL reconnu (`extract_hal_id_from_url`), ou sa source est un `repository` à page d'accueil sur un portail HAL ou à nom contenant « hal »."""
-    if extract_hal_id_from_url(loc.landing_page_url) is not None:
+    """Renvoie vrai si la localisation désigne HAL : sa page est un identifiant HAL reconnu (`HALId.normalize`), ou sa source est un `repository` à page d'accueil sur un portail HAL ou à nom contenant « hal »."""
+    if HALId.normalize(loc.landing_page_url) is not None:
         return True
     if loc.source_type == "repository":
         host = url_host(loc.source_homepage_url)
@@ -152,11 +152,11 @@ def extract_nnt_from_location(loc: OpenalexLocation) -> str | None:
     if loc.location_id:
         m = _PMH_NNT_RE.match(loc.location_id)
         if m:
-            return normalize_nnt(m.group(1))
+            return NNT.normalize(m.group(1))
     if loc.landing_page_url:
         m = _THESES_FR_URL_RE.search(loc.landing_page_url)
         if m:
-            return normalize_nnt(m.group(1))
+            return NNT.normalize(m.group(1))
     return None
 
 
@@ -165,14 +165,14 @@ def url_identifiers(urls: list[str]) -> list[SourceIdentifier]:
     identifiers: list[SourceIdentifier] = []
     for url in urls:
         for id_type, value in (
-            (SourceIdentifierType.HAL_ID, extract_hal_id_from_url(url)),
+            (SourceIdentifierType.HAL_ID, HALId.normalize(url)),
             (
                 SourceIdentifierType.NNT,
                 m.group(1) if (m := _THESES_FR_URL_RE.search(url)) else None,
             ),
-            (SourceIdentifierType.PMID, normalize_pmid(url)),
-            (SourceIdentifierType.PMCID, normalize_pmcid(url)),
-            (SourceIdentifierType.ARXIV_ID, normalize_arxiv_id(url)),
+            (SourceIdentifierType.PMID, PMID.normalize(url)),
+            (SourceIdentifierType.PMCID, PMCID.normalize(url)),
+            (SourceIdentifierType.ARXIV_ID, ArxivId.normalize(url)),
         ):
             if value:
                 identifiers.append(SourceIdentifier(id_type, value, SourceIdentifierRole.SECONDARY))
@@ -186,11 +186,11 @@ def openalex_derived_identifier(primary: OpenalexLocation | None) -> SourceIdent
     if is_theses_fr_location(primary) and (nnt := extract_nnt_from_location(primary)):
         return SourceIdentifier(SourceIdentifierType.NNT, nnt, SourceIdentifierRole.DERIVED)
     for id_type, extract in (
-        (SourceIdentifierType.HAL_ID, extract_hal_id_from_url),
+        (SourceIdentifierType.HAL_ID, HALId.normalize),
         (SourceIdentifierType.DOI, extract_doi_from_url),
-        (SourceIdentifierType.PMCID, normalize_pmcid),
-        (SourceIdentifierType.PMID, normalize_pmid),
-        (SourceIdentifierType.ARXIV_ID, normalize_arxiv_id),
+        (SourceIdentifierType.PMCID, PMCID.normalize),
+        (SourceIdentifierType.PMID, PMID.normalize),
+        (SourceIdentifierType.ARXIV_ID, ArxivId.normalize),
     ):
         for raw in (primary.landing_page_url, primary.location_id):
             if value := extract(raw):

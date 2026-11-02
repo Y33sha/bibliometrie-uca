@@ -16,7 +16,7 @@ from typing import NamedTuple
 from sqlalchemy import Connection, bindparam, text
 
 from domain.publications.doc_types import DocType
-from domain.publications.identifiers import clean_doi
+from domain.publications.identifiers import DOI
 from domain.publications.relations import (
     DEPENDENT_DOC_TYPE_RELATIONS,
     RELATION_PAIR_LABELS,
@@ -476,7 +476,7 @@ def _build_shared_key_edges(
             RelationEdge(
                 from_id,
                 relation.value,
-                clean_doi(target_doi) if target_doi else None,
+                DOI.normalize(target_doi) if target_doi else None,
                 "shared_key",
                 target_publication_id=target_id,
             )
@@ -492,7 +492,7 @@ def _build_title_match_edges(
         RelationEdge(
             match.child_id,
             relation_type.value,
-            clean_doi(match.parent_doi) if match.parent_doi else None,
+            DOI.normalize(match.parent_doi) if match.parent_doi else None,
             "title_match",
             target_publication_id=match.parent_id,
         )

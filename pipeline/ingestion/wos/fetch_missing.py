@@ -67,7 +67,7 @@ class WosDoiSearch:
         if not complete:
             # Lot interrompu : les records reçus sont écrits, sans conclure sur les absents.
             return LookupBatch(records=records) if records else UNAVAILABLE
-        # Lot complet : un DOI interrogé sans record est absent de WoS. Les DOI des records et les DOI cherchés passent tous par `clean_doi`.
+        # Lot complet : un DOI interrogé sans record est absent de WoS. Les DOI des records et les DOI cherchés passent tous par `DOI.normalize`.
         found = {d for r in records if (d := extract_doi(r))}
         return LookupBatch(
             records=records, absent=[orig for orig, c in queried if c and c not in found]

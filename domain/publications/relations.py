@@ -13,7 +13,7 @@ from __future__ import annotations
 from enum import StrEnum
 
 from domain.publications.doc_types import DocType
-from domain.publications.identifiers import clean_doi
+from domain.publications.identifiers import DOI
 from domain.source_records.metadata_correction.shared_doi import (
     DATACITE_DIRECT_CONVERGENCE,
     declares_same_work,
@@ -152,7 +152,7 @@ def extract_datacite_relations(
         if not isinstance(item, dict):
             continue
         canonical = map_datacite_relation(as_str(item.get("relation_type")) or "")
-        target = clean_doi(as_str(item.get("doi")))
+        target = DOI.normalize(as_str(item.get("doi")))
         if canonical and target:
             out.append((canonical, target))
     return out
@@ -175,7 +175,7 @@ def extract_datacite_distinct_works(
         case = DATACITE_DIRECT_CONVERGENCE.get(as_str(item.get("relation_type")) or "")
         if case is None:
             continue
-        target = clean_doi(as_str(item.get("doi")))
+        target = DOI.normalize(as_str(item.get("doi")))
         if target and not declares_same_work(case, doc_type, own_doi, target):
             out.append(target)
     return out
@@ -227,7 +227,7 @@ def extract_crossref_relations(
         for entry in entries:
             if not isinstance(entry, dict) or entry.get("id-type") != "doi":
                 continue
-            target = clean_doi(as_str(entry.get("id")))
+            target = DOI.normalize(as_str(entry.get("id")))
             if target:
                 out.append((canonical, target))
     return out

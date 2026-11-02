@@ -14,7 +14,7 @@ from enum import StrEnum
 
 from sqlalchemy import Connection, bindparam, text
 
-from domain.publications.identifiers import clean_doi
+from domain.publications.identifiers import DOI
 from domain.sources.registry import DOI_ORG, PROFILES, Source
 from domain.sources.staging import StagingEntryMode
 from domain.types import JsonValue
@@ -221,7 +221,7 @@ class StagingStore:
             {
                 "source": source,
                 "source_id": source_id,
-                "doi": clean_doi(doi),
+                "doi": DOI.normalize(doi),
                 "raw_data": raw_data,
                 "raw_hash": change_detection_hash(source, raw_data),
                 "authors_truncated": authors_truncated,

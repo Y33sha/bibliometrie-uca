@@ -9,7 +9,7 @@ from domain.persons.contributor_name import ContributorName
 from domain.publications.contribution_roles import map_role, merge_roles
 from domain.publications.dates import PublicationDate, date_from_parts, parse_iso_date
 from domain.publications.doc_types import DOC_TYPE_FAMILIES
-from domain.publications.identifiers import extract_hal_id_from_url
+from domain.publications.identifiers import HALId
 from domain.publications.licenses import normalize_license
 from domain.serials.containers import ContainerDescription
 from domain.serials.issns import source_issns
@@ -112,10 +112,10 @@ def get_locations(doc: Mapping[str, JsonValue]) -> list[LocationFacts]:
     evidence_url = as_str(evidence.get("url"))
     locations: list[LocationFacts] = []
     if evidence_url:
-        landing_hal_id = extract_hal_id_from_url(landing)
+        landing_hal_id = HALId.normalize(landing)
         url = as_str(evidence.get("landingPageUrl")) or evidence_url
         if url == evidence_url and landing and landing_hal_id is not None:
-            if landing_hal_id == extract_hal_id_from_url(evidence_url):
+            if landing_hal_id == HALId.normalize(evidence_url):
                 url = landing
         pdf_url = as_str(evidence.get("pdfUrl")) or evidence_url
         if _address(pdf_url) == _address(url):

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from domain.publications.identifiers import clean_doi
+from domain.publications.identifiers import DOI
 from domain.types import JsonValue, as_str
 from pipeline.ingestion.openalex.payload import short_openalex_id
 
@@ -16,4 +16,4 @@ def extract_openalex_id(work: Mapping[str, JsonValue]) -> str:
 
 def extract_doi(work: Mapping[str, JsonValue]) -> str | None:
     """Renvoie le DOI nettoyé d'un work OpenAlex, sans préfixe d'URL."""
-    return clean_doi(as_str(work.get("doi")))
+    return DOI.normalize(as_str(work.get("doi")))

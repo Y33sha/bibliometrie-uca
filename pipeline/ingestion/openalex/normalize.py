@@ -10,12 +10,7 @@ from domain.platforms.platform import PlatformType
 from domain.platforms.registry import PMC_ARTICLE_URL, PUBMED_CENTRAL, known_platform_of_source
 from domain.publications.contribution_roles import ContributionRole
 from domain.publications.dates import PublicationDate, date_from_parts, parse_iso_date
-from domain.publications.identifiers import (
-    clean_doi,
-    extract_doi_from_url,
-    extract_hal_id_from_url,
-    normalize_pmcid,
-)
+from domain.publications.identifiers import DOI, PMCID, HALId, extract_doi_from_url
 from domain.publications.licenses import normalize_license
 from domain.serials.containers import ContainerDescription
 from domain.serials.issns import source_issns
@@ -88,7 +83,7 @@ def extract_locations_data(
 
     identifiers = url_identifiers(urls)
     for s in (*urls, *location_ids):
-        if hal_id := extract_hal_id_from_url(s):
+        if hal_id := HALId.normalize(s):
             identifiers.append(
                 SourceIdentifier(
                     SourceIdentifierType.HAL_ID, hal_id, SourceIdentifierRole.SECONDARY
@@ -143,7 +138,7 @@ def get_locations(work: Mapping[str, JsonValue]) -> list[LocationFacts]:
 
 def _pmc_url(url: str, pdf_url: str | None) -> str:
     """Renvoie l'adresse d'une copie rangée par OpenAlex sous PubMed Central. Une page PubMed, page descriptive, devient la page de l'article sur PMC, d'après le PMCID de son PDF."""
-    if urlsplit(url).hostname == "pubmed.ncbi.nlm.nih.gov" and (pmcid := normalize_pmcid(pdf_url)):
+    if urlsplit(url).hostname == "pubmed.ncbi.nlm.nih.gov" and (pmcid := PMCID.normalize(pdf_url)):
         return PMC_ARTICLE_URL.format(pmcid)
     return url
 
@@ -287,7 +282,7 @@ def openalex_source_record(  # noqa: C901
     if primary is None:
         primary = parse_primary_location(work)
 
-    doi = clean_doi(as_str(work.get("doi")))
+    doi = DOI.normalize(as_str(work.get("doi")))
 
     urls, location_identifiers = extract_locations_data(work)
 

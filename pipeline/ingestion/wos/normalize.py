@@ -7,7 +7,7 @@ from domain.normalize import normalize_text
 from domain.persons.contributor_name import ContributorName
 from domain.publications.contribution_roles import ContributionRole, map_role
 from domain.publications.dates import PublicationDate, date_from_parts
-from domain.publications.identifiers import clean_doi, find_isbns
+from domain.publications.identifiers import DOI, find_isbns
 from domain.serials.containers import ContainerDescription
 from domain.serials.issns import source_issns
 from domain.source_records.biblio import compact_biblio
@@ -166,7 +166,7 @@ def _get_api_doi(dynamic: Mapping[str, JsonValue]) -> str | None:
         identifiers = at_path(dynamic, "cluster_related", "identifiers").get("identifier", [])
         for ident in _safe_list(identifiers):
             if isinstance(ident, dict) and ident.get("type") == "doi":
-                return clean_doi(str(ident.get("value", "")))
+                return DOI.normalize(str(ident.get("value", "")))
     except KeyError, TypeError:
         pass
     return None
@@ -202,7 +202,7 @@ def extract_from_api(raw: Mapping[str, JsonValue], staging_doi: str | None) -> d
     summary = at_path(static, "summary")
     publication_info = at_path(summary, "pub_info")
 
-    doi = _get_api_doi(dynamic) or clean_doi(staging_doi)
+    doi = _get_api_doi(dynamic) or DOI.normalize(staging_doi)
     title = _get_api_title(static, "item") or "(sans titre)"
 
     publication_year = as_int(publication_info.get("pubyear"))
@@ -345,7 +345,7 @@ def extract_from_export(
     authors = _export_authors(raw)
     return {
         "ut": field("UT") or "",
-        "doi": clean_doi(field("DI")) or clean_doi(staging_doi),
+        "doi": DOI.normalize(field("DI")) or DOI.normalize(staging_doi),
         "title": field("TI") or "(sans titre)",
         "publication_year": int(py) if (py := field("PY")) and py.isdigit() else None,
         "doc_type": doc_types[0] if doc_types else "other",

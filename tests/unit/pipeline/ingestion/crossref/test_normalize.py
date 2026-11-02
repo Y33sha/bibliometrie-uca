@@ -64,7 +64,7 @@ class TestGetLocations:
 
 class TestGetDoi:
     def test_cleans_url_prefix(self):
-        # `clean_doi` retire le préfixe URL.
+        # `DOI.normalize` retire le préfixe URL.
         assert get_doi({"DOI": "https://doi.org/10.1000/abc"}) == "10.1000/abc"
 
     def test_bare_doi(self):

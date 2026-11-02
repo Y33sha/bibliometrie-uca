@@ -9,7 +9,7 @@ import re
 from collections.abc import Iterable, Mapping
 
 from domain.publications.dates import PublicationDate, parse_iso_date
-from domain.publications.identifiers import clean_doi, find_isbns
+from domain.publications.identifiers import DOI, find_isbns
 from domain.source_records.source_extras import SourceExtra
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
 
@@ -260,7 +260,7 @@ def _doi_related_identifiers(attributes: Mapping[str, JsonValue]) -> list[dict[s
             continue
         if entry.get("relatedIdentifierType") != "DOI":
             continue
-        doi = clean_doi(as_str(entry.get("relatedIdentifier")))
+        doi = DOI.normalize(as_str(entry.get("relatedIdentifier")))
         relation_type = entry.get("relationType")
         if doi and isinstance(relation_type, str) and relation_type:
             out.append({"doi": doi, "relation_type": relation_type})
@@ -291,7 +291,7 @@ def extract_related_dois(attributes: Mapping[str, JsonValue], self_doi: str) -> 
 
     Ces DOI deviennent des identifiants liés, cherchés dans chaque source par la phase `fetch_missing`.
     """
-    self_doi_clean = clean_doi(self_doi)
+    self_doi_clean = DOI.normalize(self_doi)
     out: list[str] = []
     seen: set[str] = set()
     for item in _doi_related_identifiers(attributes):

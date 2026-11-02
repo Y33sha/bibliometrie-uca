@@ -21,9 +21,6 @@ from domain.publications.identifiers import (
     find_isbns,
     is_hal_host,
     issn_search_prefix,
-    normalize_arxiv_id,
-    normalize_pmcid,
-    normalize_pmid,
 )
 
 
@@ -322,19 +319,19 @@ class TestNNT:
 
 class TestNormalizeIdHelpers:
     def test_pmid_from_url_and_raw(self):
-        assert normalize_pmid("https://pubmed.ncbi.nlm.nih.gov/28973220") == "28973220"
-        assert normalize_pmid("28973220") == "28973220"
-        assert normalize_pmid(None) is None
-        assert normalize_pmid("not-a-pmid") is None
+        assert PMID.normalize("https://pubmed.ncbi.nlm.nih.gov/28973220") == "28973220"
+        assert PMID.normalize("28973220") == "28973220"
+        assert PMID.normalize(None) is None
+        assert PMID.normalize("not-a-pmid") is None
 
     def test_pmcid_with_without_prefix_and_url(self):
         assert (
-            normalize_pmcid("https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5625084") == "PMC5625084"
+            PMCID.normalize("https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5625084") == "PMC5625084"
         )
-        assert normalize_pmcid("https://www.ncbi.nlm.nih.gov/pmc/articles/5625084") == "PMC5625084"
-        assert normalize_pmcid("PMC5625084") == "PMC5625084"
-        assert normalize_pmcid("5625084") == "PMC5625084"
-        assert normalize_pmcid("https://hal.science/hal-04123456") is None
+        assert PMCID.normalize("https://www.ncbi.nlm.nih.gov/pmc/articles/5625084") == "PMC5625084"
+        assert PMCID.normalize("PMC5625084") == "PMC5625084"
+        assert PMCID.normalize("5625084") == "PMC5625084"
+        assert PMCID.normalize("https://hal.science/hal-04123456") is None
 
     @pytest.mark.parametrize(
         ("raw", "expected"),
@@ -349,7 +346,7 @@ class TestNormalizeIdHelpers:
         ],
     )
     def test_arxiv_id_from_url_and_raw(self, raw, expected):
-        assert normalize_arxiv_id(raw) == expected
+        assert ArxivId.normalize(raw) == expected
 
 
 class TestExtractDoiFromUrl:

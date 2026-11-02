@@ -24,7 +24,7 @@ from pathlib import Path
 from sqlalchemy import Connection, text
 
 from domain.normalize import optional_plain_text
-from domain.persons.identifiers import IdentifierOrigin, normalize_orcid
+from domain.persons.identifiers import ORCID, IdentifierOrigin
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 
@@ -72,7 +72,7 @@ def plan_authentications(
     unmatched: list[str] = []
     ambiguous: list[str] = []
     for raw_email, raw_orcid in rows:
-        orcid = normalize_orcid(raw_orcid)
+        orcid = ORCID.normalize(raw_orcid)
         if orcid is None:
             malformed.append(f"{raw_email} → {raw_orcid!r}")
             continue

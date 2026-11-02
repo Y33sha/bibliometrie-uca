@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import httpx2
 
-from domain.publications.identifiers import clean_doi
+from domain.publications.identifiers import DOI
 from domain.types import as_mapping
 from pipeline.http.http_retry import lookup_json_async
 from pipeline.http.lookup import NOT_FOUND, LookupOutcome, NotFound, Unavailable
@@ -33,8 +33,8 @@ async def fetch_oa_status(
 
     `NOT_FOUND` couvre un DOI inexploitable, un DOI absent d'Unpaywall et un statut hors vocabulaire.
     """
-    # La colonne d'origine peut contenir un DOI non normalisé : `clean_doi` repasse avant l'appel. Un DOI inexploitable renvoie `NOT_FOUND` sans appel.
-    cleaned = clean_doi(doi)
+    # La colonne d'origine peut contenir un DOI non normalisé : `DOI.normalize` repasse avant l'appel. Un DOI inexploitable renvoie `NOT_FOUND` sans appel.
+    cleaned = DOI.normalize(doi)
     if not cleaned:
         return NOT_FOUND
     outcome = await lookup_json_async(

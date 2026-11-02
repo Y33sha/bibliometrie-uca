@@ -53,7 +53,7 @@ class TestGetRecordsFound:
 
 
 class TestFilterDoiForWos:
-    # `filter_doi_for_wos` reçoit un DOI normalisé par `clean_doi` et fait seulement le filtrage propre à WoS.
+    # `filter_doi_for_wos` reçoit un DOI normalisé par `DOI.normalize` et fait seulement le filtrage propre à WoS.
 
     def test_passes_through_indexed_doi(self):
         assert filter_doi_for_wos("10.1000/abc") == "10.1000/abc"
