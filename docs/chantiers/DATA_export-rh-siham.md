@@ -27,7 +27,7 @@ Les dates des deux affectations diffèrent sur 74 lignes.
 - Catégorie, statut, corps et grade sont des attributs de la personne, dans `hr_records`. Chaque import les met à jour.
 - Le matricule SIHAM est une colonne de `hr_records`.
 - Une table des périodes de présence réunit personne, début, fin, libellé de l'unité et `structure_id`. `structure_id` est renseigné quand l'unité est un laboratoire présent dans `structures`.
-- La reconnaissance des structures s'applique au libellé de l'unité, complété du nom de l'établissement.
+- Le libellé de l'unité est d'abord comparé au nom et au sigle des laboratoires de `structures`. A défaut de correspondance exacte, la reconnaissance des structures s'applique au libellé complété du nom de l'établissement.
 - La catégorie de personnel est une facette de la liste des personnes.
 
 ## Phasage
@@ -44,7 +44,7 @@ Les dates des deux affectations diffèrent sur 74 lignes.
 - [ ] Rattachement par matricule : un agent présent en base est mis à jour, sans création de personne.
 - [ ] Rattachement des fiches sans matricule, par nom et email, à l'import de l'export de décembre.
 - [ ] Fusion des périodes contiguës dans la même unité.
-- [ ] Reconnaissance des structures sur les libellés d'unité. L'import liste les libellés sans correspondance.
+- [ ] Correspondance des libellés d'unité avec `structures` : correspondance exacte, puis reconnaissance des structures. L'import liste les libellés sans correspondance.
 - [ ] Remplacement des périodes d'un agent comprises dans la fenêtre d'observation. Les périodes antérieures sont conservées.
 
 ### Phase 3 — Consommateurs
