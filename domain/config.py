@@ -91,17 +91,17 @@ YEAR_KEYS = _keys_of(ConfigKind.YEAR)
 
 
 def cap_value(key: ConfigKey, stored: int | None) -> int | None:
-    """Renvoie le plafond à appliquer pour `key` d'après la valeur stockée, `None` pour illimité. Une valeur absente donne le défaut ; zéro ou une valeur négative retire la borne."""
+    """Renvoie le plafond à appliquer pour `key` d'après la valeur stockée, `None` pour illimité. Une valeur absente donne le défaut ; zéro retire la borne."""
     value = SETTINGS[key].default if stored is None else stored
     assert value is not None
-    return value if value > 0 else None
+    return value or None
 
 
 def delay_value(key: ConfigKey, stored: int | None) -> int:
-    """Renvoie le délai à appliquer pour `key` d'après la valeur stockée, en jours. Une valeur absente ou inférieure à un jour donne le défaut."""
+    """Renvoie le délai à appliquer pour `key` d'après la valeur stockée, en jours. Une valeur absente donne le défaut."""
     default = SETTINGS[key].default
     assert default is not None
-    return stored if stored is not None and stored >= 1 else default
+    return default if stored is None else stored
 
 
 PERIMETER_EXTRACTION_KEY = "perimeter_extraction"
@@ -150,7 +150,7 @@ MIN_YEAR = 1970
 MAX_YEAR = 2100
 
 
-def _as_int(value: JsonValue) -> int | None:
+def _parse_int(value: JsonValue) -> int | None:
     """Renvoie l'entier contenu dans `value`, entier ou texte ; sinon `None`. Écarte les booléens, tenus pour des entiers par Python."""
     if isinstance(value, bool):
         return None
@@ -173,7 +173,7 @@ def _site_title(key: str, value: JsonValue) -> JsonValue:
 
 
 def _brand_hue(key: str, value: JsonValue) -> JsonValue:
-    teinte = _as_int(value)
+    teinte = _parse_int(value)
     if teinte is None or not (0 <= teinte <= 359):
         raise ValidationError(f"`{key}` attend un entier de 0 à 359 ; reçu : {value!r}")
     return teinte
@@ -201,14 +201,14 @@ def _laboratory_types(key: str, value: JsonValue) -> JsonValue:
 def _cap(key: str, value: JsonValue) -> JsonValue:
     if value is None or (isinstance(value, str) and not value.strip()):
         return 0
-    plafond = _as_int(value)
+    plafond = _parse_int(value)
     if plafond is None or plafond < 0:
         raise ValidationError(f"`{key}` attend un entier positif ou nul ; reçu : {value!r}")
     return plafond
 
 
 def _delay(key: str, value: JsonValue) -> JsonValue:
-    delai = _as_int(value)
+    delai = _parse_int(value)
     if delai is None or delai < 1:
         raise ValidationError(
             f"`{key}` attend un nombre entier de jours, au moins 1 ; reçu : {value!r}"
@@ -217,7 +217,7 @@ def _delay(key: str, value: JsonValue) -> JsonValue:
 
 
 def _year(key: str, value: JsonValue) -> JsonValue:
-    annee = _as_int(value)
+    annee = _parse_int(value)
     if annee is None or not (MIN_YEAR <= annee <= MAX_YEAR):
         raise ValidationError(
             f"`{key}` attend une année entre {MIN_YEAR} et {MAX_YEAR} ; reçu : {value!r}"

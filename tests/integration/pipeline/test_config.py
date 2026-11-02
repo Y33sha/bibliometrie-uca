@@ -1,6 +1,6 @@
 """Lecture de la configuration du pipeline depuis la table `config`.
 
-Les clés de forme imposée (plafonds d'interrogation, délais de réinterrogation, année de départ) sont contrôlées à l'écriture, et la table refuse une valeur hors de cette forme. Pour les autres clés, une valeur illisible est signalée et le réglage prend sa valeur par défaut ; le pipeline continue.
+Les clés de forme imposée (plafonds d'interrogation, délais de réinterrogation, année de départ) sont contrôlées à l'écriture, et la table refuse une valeur hors de cette forme. Une clé absente prend sa valeur par défaut.
 """
 
 import pytest

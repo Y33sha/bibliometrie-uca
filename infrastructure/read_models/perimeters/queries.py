@@ -132,7 +132,7 @@ def get_institution_country(conn: Connection) -> str:
     value = conn.execute(
         text("SELECT value FROM config WHERE key = :key"), {"key": INSTITUTION_COUNTRY_KEY}
     ).scalar_one_or_none()
-    return value if isinstance(value, str) else DEFAULT_INSTITUTION_COUNTRY
+    return DEFAULT_INSTITUTION_COUNTRY if value is None else value
 
 
 def get_persons_perimeter_name(conn: Connection) -> str:
@@ -170,7 +170,7 @@ class PerimetersQueries:
             name=get_persons_perimeter_name(self._conn),
             root_structure_ids=get_persons_perimeter_root_ids(self._conn),
             title=values.get(SITE_TITLE_KEY) or None,
-            brand_hue=hue if isinstance(hue, int) else DEFAULT_BRAND_HUE,
+            brand_hue=DEFAULT_BRAND_HUE if hue is None else hue,
         )
 
     def persons_perimeter_countries(self) -> list[PerimeterCountryOut]:

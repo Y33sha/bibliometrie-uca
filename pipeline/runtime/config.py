@@ -3,30 +3,18 @@
 La table `config` contient ces réglages, modifiables dans l'interface d'administration.
 """
 
-import logging
-
 from sqlalchemy import Connection, text
 
 from domain.config import ConfigKey, cap_value, delay_value
 from domain.dates import today
 
-logger = logging.getLogger(__name__)
-
 
 def _stored_int(conn: Connection, key: ConfigKey) -> int | None:
-    """Renvoie la valeur entière de `key` dans la table `config`, ou `None` si elle est absente ou illisible. Une valeur illisible est journalisée."""
-    row = conn.execute(
+    """Renvoie la valeur entière de `key` dans la table `config`, ou `None` si la clé est absente. La table impose à ces clés un nombre entier."""
+    value = conn.execute(
         text("SELECT value FROM config WHERE key = :key"), {"key": key.value}
-    ).one_or_none()
-    value = row.value if row else None
-    if isinstance(value, (int, str, float)) and not isinstance(value, bool):
-        try:
-            return int(value)
-        except ValueError, TypeError:
-            pass
-    if value is not None:
-        logger.warning("Valeur invalide pour %s: %s", key, value)
-    return None
+    ).scalar_one_or_none()
+    return None if value is None else int(value)
 
 
 def cap(conn: Connection, key: ConfigKey) -> int | None:
