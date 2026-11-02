@@ -251,7 +251,13 @@
 					citationFigure={false}
 					countries={false}
 					figures={thesesCount > 0
-						? [{ value: thesesCount.toLocaleString('fr-FR'), label: 'thèses liées', icon: 'graduation-cap' }]
+						? [
+								{
+									value: thesesCount.toLocaleString('fr-FR'),
+									label: thesesCount > 1 ? 'thèses liées' : 'thèse liée',
+									icon: 'graduation-cap',
+								},
+							]
 						: []}
 				>
 					{#snippet subjects()}
