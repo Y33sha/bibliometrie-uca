@@ -71,8 +71,8 @@ def test_la_copie_de_l_editeur_passe_avant_une_meilleure_version_sur_une_platefo
     assert result.url == "https://doi.org/10.1/X"
 
 
-def test_une_plateforme_a_icone_passe_avant_une_meilleure_version_sans_icone():
-    """Le Handle d'une archive institutionnelle, en version éditeur, passe après HAL en version acceptée."""
+def test_une_version_editeur_passe_avant_une_plateforme_a_icone():
+    """Le Handle d'une archive institutionnelle, en version éditeur, passe avant HAL en version acceptée."""
     result = _access(
         [
             _copy(
@@ -83,8 +83,34 @@ def test_une_plateforme_a_icone_passe_avant_une_meilleure_version_sans_icone():
             ),
         ]
     )
+    assert result.url == "http://hdl.handle.net/20.500.1/1"
+    assert [link.icon for link in result.links] == [None, HAL.icon]
+
+
+def test_une_plateforme_a_icone_passe_avant_une_meilleure_version_sans_icone():
+    """Hors version éditeur, l'icône prime sur la version : HAL soumis passe avant une copie acceptée sans icône."""
+    result = _access(
+        [
+            _copy("https://example.org/1", version="acceptedVersion"),
+            _copy(
+                "https://hal.science/hal-1", version="submittedVersion", platform="HAL", arrival=2
+            ),
+        ]
+    )
     assert result.url == "https://hal.science/hal-1"
-    assert [link.icon for link in result.links] == [HAL.icon, None]
+
+
+def test_la_version_editeur_d_un_preprint_reste_avec_les_preprints():
+    """La « version publiée » d'un preprint arXiv passe après HAL en version acceptée."""
+    result = _access(
+        [
+            _copy("https://arxiv.org/abs/1", version="publishedVersion", platform="arXiv"),
+            _copy(
+                "https://hal.science/hal-1", version="acceptedVersion", platform="HAL", arrival=2
+            ),
+        ]
+    )
+    assert result.url == "https://hal.science/hal-1"
 
 
 def test_les_copies_d_un_preprint_passent_apres_les_autres():

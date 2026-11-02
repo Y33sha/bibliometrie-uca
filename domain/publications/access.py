@@ -1,6 +1,6 @@
 """Liens d'accès d'une publication : ses copies ouvertes, une par plateforme.
 
-Seules les copies ouvertes comptent (`open_copies`). La copie de l'éditeur, désignée par le DOI de la publication, passe en tête. Suivent les copies des plateformes à icône (`KnownPlatform.icon`), puis les autres. Dans chaque groupe, les copies d'un preprint passent après les autres (`Copy.of_preprint`). Une copie se classe ensuite par sa version (éditeur, acceptée, soumise, inconnue), puis par l'ordre d'arrivée de son enregistrement source. Chaque plateforme donne sa meilleure copie ; une copie sans plateforme se range sous l'hôte de son URL.
+Seules les copies ouvertes comptent (`open_copies`). La copie de l'éditeur, désignée par le DOI de la publication, passe en tête, puis les autres copies en version éditeur, hors preprint. Suivent les copies des plateformes à icône (`KnownPlatform.icon`), puis les autres. Dans chaque groupe, les copies d'un preprint passent après les autres (`Copy.of_preprint`). Une copie se classe ensuite par sa version (éditeur, acceptée, soumise, inconnue), puis par l'ordre d'arrivée de son enregistrement source. Chaque plateforme donne sa meilleure copie ; une copie sans plateforme se range sous l'hôte de son URL.
 
 La meilleure copie donne l'adresse d'accès. Une copie désignée par un DOI figure parmi les liens quand une archive ou un serveur de preprints l'héberge (Zenodo), ou quand une autre plateforme l'héberge sous un autre DOI que celui de la publication. Le DOI de la publication chez son éditeur s'affiche à part.
 """
@@ -105,9 +105,10 @@ def _listed(copy: Copy, doi: str | None) -> bool:
     return copy.platform is not None and target != (doi or "").lower()
 
 
-def _rank(copy: Copy, doi: str | None) -> tuple[bool, bool, bool, int, int]:
+def _rank(copy: Copy, doi: str | None) -> tuple[bool, bool, bool, bool, int, int]:
     return (
         not _from_publisher(copy, doi),
+        copy.version != "publishedVersion" or copy.of_preprint,
         _icon(copy) is None,
         copy.of_preprint,
         _VERSION_RANK.get(copy.version or "", _UNKNOWN_VERSION_RANK),
