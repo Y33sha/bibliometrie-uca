@@ -12,7 +12,12 @@ from enum import StrEnum
 from functools import cached_property, lru_cache
 from typing import NamedTuple
 
-from domain.persons.name_matching import first_name_initials, full_first_name_extends, is_initials
+from domain.persons.name_matching import (
+    first_name_initials,
+    full_first_name_extends,
+    is_full_first_name,
+    is_initials,
+)
 
 
 class GroupingMethod(StrEnum):
@@ -30,9 +35,7 @@ class GroupingMethod(StrEnum):
     """Modèle probabiliste, avec un score et une marge."""
 
 
-def _full_first_name(first_name: str) -> str:
-    """Renvoie le prénom complet, ou une chaîne vide quand le prénom se réduit à des initiales."""
-    return "" if not first_name or _is_initials(first_name) else first_name
+_is_full_first_name = lru_cache(maxsize=1_000_000)(is_full_first_name)
 
 
 @lru_cache(maxsize=1_000_000)
@@ -42,7 +45,7 @@ def with_known_first_name(first_name: str, known: str) -> str:
     Args:
         known: prénom de la personne à laquelle un humain a rattaché l'ORCID ou l'IdRef de la contribution source.
     """
-    if not _full_first_name(known) or _full_first_name(first_name):
+    if not _is_full_first_name(known) or _is_full_first_name(first_name):
         return first_name
     if not first_name:
         return known
@@ -357,8 +360,9 @@ def _name_key(s: SourceContribution) -> str:
 
 
 def _full_name_key(s: SourceContribution) -> tuple[str, str] | None:
-    full = _full_first_name(s.first_name)
-    return (s.last_name, full) if s.last_name and full else None
+    return (
+        (s.last_name, s.first_name) if s.last_name and _is_full_first_name(s.first_name) else None
+    )
 
 
 def _initial_key(s: SourceContribution) -> tuple[str, str] | None:

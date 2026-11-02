@@ -27,9 +27,8 @@ def is_initials(text: str) -> bool:
 
 
 def is_full_first_name(text: str) -> bool:
-    """Vrai si chaque mot normalisé de `text` compte au moins deux lettres (« Jean-Luc », pas « Jean L. »)."""
-    words = normalize_text(text).split()
-    return bool(words) and all(len(word) >= 2 for word in words)
+    """Vrai si le prénom n'est pas réduit à des initiales : un de ses mots normalisés compte au moins deux lettres (« Jean L. », « LEA »)."""
+    return any(len(word) > 1 for word in normalize_text(text).split())
 
 
 def orient_initials(last_name: str, first_name: str) -> tuple[str, str]:

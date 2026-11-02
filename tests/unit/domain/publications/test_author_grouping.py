@@ -10,7 +10,6 @@ from domain.publications.author_grouping import (
     ResidualModel,
     SourceContribution,
     _conflicting_initials,
-    _full_first_name,
     _jaro_winkler,
     _link_threshold,
     _longest_ordered,
@@ -412,14 +411,6 @@ class TestConflictingInitials:
         assert all(
             len(g.members) == 1 for g in contributions if g.reference.last_name.startswith("bala")
         )
-
-
-class TestFullFirstName:
-    def test_un_prenom_en_initiales_est_vide(self):
-        assert _full_first_name("j a") == ""
-
-    def test_un_prenom_complet_reste(self):
-        assert _full_first_name("jean a") == "jean a"
 
 
 class TestWithKnownFirstName:

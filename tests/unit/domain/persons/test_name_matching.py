@@ -139,7 +139,14 @@ def test_initiales_d_un_prenom(first_name, initials):
 
 @pytest.mark.parametrize(
     ("first_name", "full"),
-    [("Jean-Luc", True), ("LEA", True), ("Jean L.", False), ("J.", False), ("", False)],
+    [
+        ("Jean-Luc", True),
+        ("LEA", True),
+        ("Jean L.", True),
+        ("J.", False),
+        ("J.-P.", False),
+        ("", False),
+    ],
 )
 def test_prenom_complet(first_name, full):
     assert is_full_first_name(first_name) is full
