@@ -58,7 +58,6 @@ Les dates des deux affectations diffèrent sur 74 lignes.
 
 ## Questions ouvertes
 
-- Les 99 matricules absents de l'export de novembre : départs avant le 2025-12-15, ou export restreint aux agents affectés à un laboratoire ?
-- Le fichier de novembre s'appelle `Listing_ORCID`, sans colonne ORCID.
+- L'absence d'un matricule de l'export de décembre dans l'export de novembre vaut-elle départ ? Sur ces 99 matricules, 54 sont des CCU-AH et 76 ont une fin de contrat postérieure au 2025-12-15.
 - Le sexe est présent dans l'export. Le stocker ou non.
 - Les affectations aux laboratoires alimentent-elles le périmètre ou l'affiliation des contributions ?
