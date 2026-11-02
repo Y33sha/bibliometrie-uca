@@ -64,6 +64,9 @@ class StoredSourceContributionRow(NamedTuple):
     content_hash: str | None
     collective: bool
     roles: list[str] | None
+    raw_author_name: str | None
+    raw_last_name: str | None
+    raw_first_name: str | None
 
 
 class AddressBatchItem(TypedDict):
@@ -115,13 +118,24 @@ def key_hash_sql(exprs: Sequence[str]) -> str:
 
 _KEY_COLUMNS_SQL = ", ".join(CONTRIBUTOR_INFORMATION_KEY_COLUMNS)
 
-# Marque les contributions liées aux contributions sources de la CTE `updated(id, attributes_changed)` à rôles ou statut de correspondant changés.
+# Marque les contributions liées aux contributions sources de la CTE `updated(id, attributes_changed, contributor_changed)` à rôles ou statut de correspondant changés.
 _MARK_CONTRIBUTIONS_OF_UPDATED = enqueue_sql(
     Queue.CONTRIBUTION_ATTRIBUTES,
     """
     SELECT gm.contribution_id FROM aligned_source_contributions gm
     JOIN updated u ON u.id = gm.source_contribution_id
     WHERE u.attributes_changed
+    """,
+)
+
+# Marque pour la redécision de leur personne les contributions rattachées dont une contribution source de la CTE `updated` change d'informations du contributeur.
+_MARK_RESOLUTION_OF_UPDATED = enqueue_sql(
+    Queue.CONTRIBUTION_RESOLUTION,
+    """
+    SELECT g.id FROM contributions g
+    JOIN aligned_source_contributions gm ON gm.contribution_id = g.id
+    JOIN updated u ON u.id = gm.source_contribution_id
+    WHERE u.contributor_changed AND g.person_id IS NOT NULL
     """,
 )
 
@@ -200,19 +214,7 @@ class SourceContributionStore:
             }
             for v in values
         ]
-        # Informations du contributeur du lot absentes de la base. Un `DO UPDATE` réécrirait à chaque enregistrement source les lignes déjà présentes.
-        self._conn.execute(
-            text(f"""
-                INSERT INTO contributor_information ({_KEY_COLUMNS_SQL})
-                SELECT DISTINCT t.last_name_normalized, t.first_name_normalized,
-                       t.identifiers
-                FROM jsonb_to_recordset(:payload) AS t(
-                    last_name_normalized text, first_name_normalized text,
-                    identifiers jsonb)
-                ON CONFLICT ({_KEY_COLUMNS_SQL}) DO NOTHING
-            """).bindparams(bindparam("payload", type_=Jsonb)),
-            {"payload": payload},
-        )
+        self._insert_missing_contributor_information(payload)
         # Contributions sources, marquées pour le recalcul des pays. `write_source_contributions` supprime puis déduplique par position : l'insertion se passe d'`ON CONFLICT`.
         stmt = text(
             """
@@ -244,6 +246,23 @@ class SourceContributionStore:
             },
         )
 
+    def _insert_missing_contributor_information(
+        self, payload: Sequence[Mapping[str, object]]
+    ) -> None:
+        """Insère les informations du contributeur du lot absentes de la base. Un `DO UPDATE` réécrirait à chaque enregistrement source les lignes déjà présentes."""
+        self._conn.execute(
+            text(f"""
+                INSERT INTO contributor_information ({_KEY_COLUMNS_SQL})
+                SELECT DISTINCT t.last_name_normalized, t.first_name_normalized,
+                       t.identifiers
+                FROM jsonb_to_recordset(:payload) AS t(
+                    last_name_normalized text, first_name_normalized text,
+                    identifiers jsonb)
+                ON CONFLICT ({_KEY_COLUMNS_SQL}) DO NOTHING
+            """).bindparams(bindparam("payload", type_=Jsonb)),
+            {"payload": payload},
+        )
+
     def fetch_stored_source_contributions(
         self, source_record_id: int
     ) -> list[StoredSourceContributionRow]:
@@ -251,7 +270,8 @@ class SourceContributionStore:
             text("""
                 SELECT sc.id, sc.author_position, ci.last_name_normalized,
                        ci.first_name_normalized, ci.identifiers, sc.content_hash,
-                       sc.collective, sc.roles
+                       sc.collective, sc.roles,
+                       sc.raw_author_name, sc.raw_last_name, sc.raw_first_name
                 FROM source_contributions sc
                 JOIN contributor_information ci ON ci.id = sc.contributor_information_id
                 WHERE sc.source_record_id = :spid
@@ -276,7 +296,10 @@ class SourceContributionStore:
             )
 
     def update_source_contributions_batch(self, values: list[SourceContributionUpdate]) -> None:
-        """Réécrit en place des contributions sources et les marque pour le recalcul des pays. Marque aussi leurs contributions, si les rôles ou le statut de correspondant changent."""
+        """Réécrit en place des contributions sources, informations du contributeur comprises, et les marque pour le recalcul des pays.
+
+        Marque aussi leurs contributions : pour la recomposition de leurs attributs, si les rôles ou le statut de correspondant changent ; pour la redécision de leur personne, si les informations du contributeur changent.
+        """
         # Une seule instruction : la contrainte `(source_record_id, author_position)`, différable, se vérifie en fin d'instruction. Les permutations de positions passent donc.
         if not values:
             return
@@ -284,6 +307,9 @@ class SourceContributionStore:
             {
                 "id": v["id"],
                 "author_position": v["author_position"],
+                "last_name_normalized": v["last_name_normalized"],
+                "first_name_normalized": v["first_name_normalized"],
+                "identifiers": v["identifiers"],
                 "is_corresponding": v["is_corresponding"],
                 "collective": v["collective"],
                 "roles": v["roles"],
@@ -295,6 +321,7 @@ class SourceContributionStore:
             }
             for v in values
         ]
+        self._insert_missing_contributor_information(payload)
         self._conn.execute(
             text(
                 """
@@ -307,17 +334,28 @@ class SourceContributionStore:
                     raw_author_name = t.raw_author_name,
                     raw_last_name = t.raw_last_name,
                     raw_first_name = t.raw_first_name,
+                    contributor_information_id = ci.id,
                     neutralized_identifiers = t.neutralized_identifiers,
                     content_hash = t.content_hash
                 FROM jsonb_to_recordset(:payload) AS t(
-                    id integer, author_position smallint, is_corresponding boolean,
+                    id integer, author_position smallint, last_name_normalized text,
+                    first_name_normalized text, identifiers jsonb, is_corresponding boolean,
                     collective boolean, roles text[], raw_author_name text, raw_last_name text,
                     raw_first_name text, neutralized_identifiers jsonb, content_hash text)
+                JOIN contributor_information ci
+                  ON ci.key_hash = """
+                + key_hash_sql([f"t.{c}" for c in CONTRIBUTOR_INFORMATION_KEY_COLUMNS])
+                + """
                 WHERE sc.id = t.id
                 RETURNING sc.id,
                     (old.is_corresponding, old.roles) IS DISTINCT FROM (new.is_corresponding, new.roles)
-                        AS attributes_changed
+                        AS attributes_changed,
+                    old.contributor_information_id IS DISTINCT FROM new.contributor_information_id
+                        AS contributor_changed
                 ),
+                marked_resolution AS ("""
+                + _MARK_RESOLUTION_OF_UPDATED
+                + """),
                 marked_contributions AS ("""
                 + _MARK_CONTRIBUTIONS_OF_UPDATED
                 + ")"

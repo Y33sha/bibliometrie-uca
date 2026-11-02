@@ -111,7 +111,7 @@ def write_source_contributions(
 ) -> None:
     """Synchronise les contributions sources d'un enregistrement source avec les auteurs lus (`plan_source_contribution_sync`).
 
-    Une contribution source retrouvée en base garde son identifiant, donc sa personne et sa confirmation. Elle est réécrite, adresses et ROR compris, seulement si son empreinte change. Les contributions sources sans correspondant sont insérées ou supprimées. Une insertion, une suppression, ou un changement de position ou de rôles marque la publication de l'enregistrement source pour le groupement des auteurs. L'enregistrement source reçoit son nombre de contributions sources d'auteur individuelles et de noms complets distincts parmi elles (`is_individual_author`).
+    Une contribution source retrouvée en base garde son identifiant, donc sa personne et sa confirmation. Elle est réécrite, adresses et ROR compris, seulement si son empreinte ou ses informations du contributeur changent. Les contributions sources sans correspondant sont insérées ou supprimées. Une insertion, une suppression, ou un changement de position, de rôles ou d'informations du contributeur marque la publication de l'enregistrement source pour le groupement des auteurs. L'enregistrement source reçoit son nombre de contributions sources d'auteur individuelles et de noms complets distincts parmi elles (`is_individual_author`).
 
     Une contribution source entrante est identifiée par son rang dans la liste des auteurs. Les positions non nulles de cette liste sont uniques ; chaque normaliseur le garantit.
     """
@@ -155,6 +155,7 @@ def write_source_contributions(
             StoredSourceContribution(
                 s.id,
                 s.author_position,
+                _source_name(s.raw_author_name, s.raw_last_name, s.raw_first_name, s.collective),
                 _stored_contributor_information(s),
                 s.content_hash,
                 _roles(s.roles),
@@ -165,6 +166,12 @@ def write_source_contributions(
             IncomingSourceContribution(
                 key,
                 item["author_position"],
+                _source_name(
+                    item["raw_author_name"],
+                    item["raw_last_name"],
+                    item["raw_first_name"],
+                    item["collective"],
+                ),
                 _item_contributor_information(item),
                 item["content_hash"] or "",
                 _roles(item["roles"]),
@@ -273,16 +280,32 @@ def contributor_name_fields(name: ContributorName) -> ContributorNameFields:
     }
 
 
+def _source_name(
+    raw_author_name: str | None,
+    raw_last_name: str | None,
+    raw_first_name: str | None,
+    collective: bool,
+) -> Hashable:
+    """Renvoie la clé de correspondance d'une contribution source : nom donné par la source, sous sa forme de comparaison (`normalize_text`), plus la marque collective.
+
+    La clé ignore le découpage du nom et la normalisation des prénoms : une modification de ces règles laisse la contribution source en place. Une contribution source devenue collective est réinsérée sans personne.
+    """
+    return (
+        *(
+            normalize_text(part) if part else None
+            for part in (raw_author_name, raw_last_name, raw_first_name)
+        ),
+        collective,
+    )
+
+
 def _contributor_information(
     last_name_normalized: str | None,
     first_name_normalized: str | None,
     identifiers: object,
     collective: bool,
 ) -> Hashable:
-    """Renvoie la clé de synchronisation d'une contribution source : nom et prénom normalisés et identifiants, comme `contributor_information`, plus la marque collective.
-
-    Une contribution source devenue collective est donc réinsérée sans personne.
-    """
+    """Renvoie les informations du contributeur d'une contribution source : nom et prénom normalisés et identifiants, comme `contributor_information`, plus la marque collective."""
     ids = json.dumps(identifiers, sort_keys=True) if identifiers is not None else None
     return (last_name_normalized, first_name_normalized, ids, collective)
 

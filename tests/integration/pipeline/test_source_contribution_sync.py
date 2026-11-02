@@ -101,6 +101,50 @@ def test_auteur_ajoute_en_tete_conserve_l_epinglage(sa_sync_conn):
     )
 
 
+def test_identifiant_ajoute_garde_la_contribution_source_et_son_epinglage(sa_sync_conn):
+    """Un ORCID ajouté par la source réécrit en place les informations du contributeur. La contribution est à redécider, la publication à regrouper."""
+    conn = sa_sync_conn
+    publication = insert_publication(conn)
+    source_record = _source_record(conn, publication)
+    _write(conn, source_record, [_rec(0, "Xu, Z.")])
+    xu_id = _source_contributions(conn, source_record)[0][0]
+    person = _pin(conn, xu_id)
+    contribution = align_source_contributions(conn, publication, [(xu_id, source_record)])
+    conn.execute(
+        text("UPDATE contributions SET person_id = :p, resolution_mode = 'name' WHERE id = :c"),
+        {"p": person, "c": contribution},
+    )
+    clear(conn, Queue.CONTRIBUTION_RESOLUTION)
+    clear(conn, Queue.PUBLICATION_CONTRIBUTIONS)
+
+    orcid = {"orcid": "0000-0002-1825-0097"}
+    _write(conn, source_record, [_rec(0, "Xu, Z.", identifiers=orcid)])
+
+    assert _source_contributions(conn, source_record)[0][0] == xu_id
+    assert (
+        conn.execute(
+            text(
+                "SELECT ci.identifiers FROM source_contributions sc "
+                "JOIN contributor_information ci ON ci.id = sc.contributor_information_id "
+                "WHERE sc.id = :i"
+            ),
+            {"i": xu_id},
+        ).scalar_one()
+        == orcid
+    )
+    assert (
+        conn.execute(
+            text(
+                "SELECT person_id FROM confirmed_source_contributions WHERE source_contribution_id = :i"
+            ),
+            {"i": xu_id},
+        ).scalar_one()
+        == person
+    )
+    assert queued(conn, Queue.CONTRIBUTION_RESOLUTION) == {contribution}
+    assert _marked_for_grouping(conn, publication)
+
+
 def test_permutation_de_positions(sa_sync_conn):
     """Deux contributions sources échangent leur position en une instruction (contrainte différable)."""
     conn = sa_sync_conn

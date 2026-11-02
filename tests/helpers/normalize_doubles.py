@@ -109,6 +109,9 @@ class FakeSourceContributionStore:
                     v["content_hash"],
                     v["collective"],
                     v["roles"],
+                    v["raw_author_name"],
+                    v["raw_last_name"],
+                    v["raw_first_name"],
                 )
             )
 

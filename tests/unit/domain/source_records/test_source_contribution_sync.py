@@ -9,15 +9,25 @@ from domain.source_records.source_contribution_sync import (
 )
 
 
+def _stored(id_, position, name, content_hash, *, contributor=None, roles=None):
+    """Contribution source en base ; ses informations du contributeur valent son nom, sauf `contributor`."""
+    return StoredSourceContribution(id_, position, name, contributor or name, content_hash, roles)
+
+
+def _incoming(key, position, name, content_hash, *, contributor=None, roles=None):
+    return IncomingSourceContribution(key, position, name, contributor or name, content_hash, roles)
+
+
 def _plan(stored, incoming) -> SourceContributionSyncPlan:
     """Planifie la synchronisation ; la clé entrante vaut la position.
 
     Args:
-        incoming: triplets (position, informations du contributeur, empreinte).
+        stored: quadruplets (identifiant, position, nom, empreinte).
+        incoming: triplets (position, nom, empreinte).
     """
     return plan_source_contribution_sync(
-        [StoredSourceContribution(*s) for s in stored],
-        [IncomingSourceContribution(i[0], *i) for i in incoming],
+        [_stored(*s) for s in stored],
+        [_incoming(i[0], *i) for i in incoming],
     )
 
 
@@ -31,7 +41,7 @@ class TestPlanSourceContributionSync:
         )
 
     def test_auteur_ajoute_en_tete_decale_les_autres(self):
-        """Informations du contributeur uniques : la contribution source garde son identifiant malgré le changement de position."""
+        """Noms uniques : la contribution source garde son identifiant malgré le changement de position."""
         plan = _plan(
             [(10, 0, "dupont", "h1"), (11, 1, "xu", "h2")],
             [(0, "martin", "h0"), (1, "dupont", "h1-bis"), (2, "xu", "h2-bis")],
@@ -46,7 +56,7 @@ class TestPlanSourceContributionSync:
             updates=((11, 0),), kept=(), inserts=(), deletes=(10,), regroup=True
         )
 
-    def test_informations_repetees_departagees_par_position(self):
+    def test_noms_repetes_departages_par_position(self):
         """Deux « Z. Xu » sur la même publication : retrouvés par leur position."""
         plan = _plan(
             [(10, 2, "xu z", "h2"), (11, 5, "xu z", "h5")],
@@ -56,7 +66,7 @@ class TestPlanSourceContributionSync:
             updates=(), kept=(10, 11), inserts=(7,), deletes=(), regroup=True
         )
 
-    def test_informations_repetees_sans_position_commune(self):
+    def test_noms_repetes_sans_position_commune(self):
         plan = _plan(
             [(10, 2, "xu z", "h2"), (11, 5, "xu z", "h5")], [(3, "xu z", "h3"), (6, "xu z", "h6")]
         )
@@ -64,45 +74,43 @@ class TestPlanSourceContributionSync:
             updates=(), kept=(), inserts=(3, 6), deletes=(10, 11), regroup=True
         )
 
-    def test_informations_uniques_en_base_repetees_a_l_arrivee(self):
+    def test_nom_unique_en_base_repete_a_l_arrivee(self):
         plan = _plan([(10, 2, "xu z", "h2")], [(2, "xu z", "h2"), (4, "xu z", "h4")])
         assert plan == SourceContributionSyncPlan(
             updates=(), kept=(10,), inserts=(4,), deletes=(), regroup=True
         )
 
-    def test_informations_differentes_sans_correspondance(self):
-        """Le nom normalisé fait partie des informations du contributeur : un nom corrigé donne une autre contribution source."""
+    def test_nom_corrige_sans_correspondance(self):
+        """Un nom corrigé par la source donne une autre contribution source."""
         plan = _plan([(10, 0, "bartoli adrien 1977", "h1")], [(0, "bartoli adrien", "h1")])
         assert plan == SourceContributionSyncPlan(
             updates=(), kept=(), inserts=(0,), deletes=(10,), regroup=True
         )
 
-    def test_contribution_source_sans_position_retrouvee_par_identifiant(self):
-        """Un directeur de thèse est sans position d'auteur : ses informations du contributeur suffisent."""
+    def test_identifiant_ajoute_garde_la_contribution_source(self):
+        """Un ORCID ajouté par la source change les informations du contributeur : la contribution source est réécrite en place, et son groupe recalculé."""
         plan = plan_source_contribution_sync(
-            [
-                StoredSourceContribution(10, 0, "doctorant", "h0"),
-                StoredSourceContribution(11, None, "directeur", "h1"),
-            ],
-            [
-                IncomingSourceContribution(0, 0, "doctorant", "h0"),
-                IncomingSourceContribution(1, None, "directeur", "h1"),
-            ],
+            [_stored(10, 0, "xu z", "h1", contributor=("xu", "z", None))],
+            [_incoming(0, 0, "xu z", "h1", contributor=("xu", "z", "0000-0002-1825-0097"))],
+        )
+        assert plan == SourceContributionSyncPlan(
+            updates=((10, 0),), kept=(), inserts=(), deletes=(), regroup=True
+        )
+
+    def test_contribution_source_sans_position_retrouvee_par_son_nom(self):
+        """Un directeur de thèse est sans position d'auteur : son nom suffit."""
+        plan = plan_source_contribution_sync(
+            [_stored(10, 0, "doctorant", "h0"), _stored(11, None, "directeur", "h1")],
+            [_incoming(0, 0, "doctorant", "h0"), _incoming(1, None, "directeur", "h1")],
         )
         assert plan == SourceContributionSyncPlan(
             updates=(), kept=(10, 11), inserts=(), deletes=(), regroup=False
         )
 
-    def test_informations_repetees_sans_position_sans_correspondance(self):
+    def test_noms_repetes_sans_position_sans_correspondance(self):
         plan = plan_source_contribution_sync(
-            [
-                StoredSourceContribution(10, None, "dupont", "h1"),
-                StoredSourceContribution(11, None, "dupont", "h2"),
-            ],
-            [
-                IncomingSourceContribution(0, None, "dupont", "h1"),
-                IncomingSourceContribution(1, None, "dupont", "h2"),
-            ],
+            [_stored(10, None, "dupont", "h1"), _stored(11, None, "dupont", "h2")],
+            [_incoming(0, None, "dupont", "h1"), _incoming(1, None, "dupont", "h2")],
         )
         assert plan == SourceContributionSyncPlan(
             updates=(), kept=(), inserts=(0, 1), deletes=(10, 11), regroup=True
@@ -122,8 +130,8 @@ class TestPlanSourceContributionSync:
 
     def test_roles_modifies_regroupent(self):
         plan = plan_source_contribution_sync(
-            [StoredSourceContribution(10, None, "dupont", "h1", ("thesis_reviewer",))],
-            [IncomingSourceContribution(0, None, "dupont", "h2", ("jury_president",))],
+            [_stored(10, None, "dupont", "h1", roles=("thesis_reviewer",))],
+            [_incoming(0, None, "dupont", "h2", roles=("jury_president",))],
         )
         assert plan.updates == ((10, 0),)
         assert plan.regroup
