@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict xnSnRGFlx7TO84IbzxEHM7plBNfhZ37E6jNdO7ZY0NDFzJyKQtNyVfPeQitVCQw
+\restrict VhyuvSTahypcNh6y5zKpyJEtcVCnSgWcSXhNHbrigdDm8G4knuZ9CbTyiMAbTrT
 
 -- Dumped from database version 18.4
 -- Dumped by pg_dump version 18.4
@@ -702,7 +702,7 @@ CREATE TABLE ops.config (
     CONSTRAINT config_delay_is_positive_integer CHECK (((key <> ALL (ARRAY['doaj_refresh_after_days'::text, 'doi_resolution_recheck_after_days'::text, 'fetch_missing_retry_after_days'::text, 'fetch_stale_after_days'::text, 'issnl_table_refresh_after_days'::text, 'unpaywall_recheck_after_days'::text])) OR ((jsonb_typeof(value) = 'number'::text) AND ((value)::numeric >= (1)::numeric) AND ((value)::numeric = trunc((value)::numeric))))),
     CONSTRAINT config_institution_country_is_code CHECK (((key <> 'institution_country'::text) OR ((jsonb_typeof(value) = 'string'::text) AND ((value #>> '{}'::text[]) ~ '^[a-z]{2}$'::text) AND ((value #>> '{}'::text[]) <> 'xx'::text)))),
     CONSTRAINT config_site_title_is_text CHECK (((key <> 'site_title'::text) OR (jsonb_typeof(value) = 'string'::text))),
-    CONSTRAINT config_year_is_in_range CHECK (((key <> 'pipeline_start_year_full'::text) OR ((jsonb_typeof(value) = 'number'::text) AND (((value)::numeric >= (1970)::numeric) AND ((value)::numeric <= (2100)::numeric)) AND ((value)::numeric = trunc((value)::numeric)))))
+    CONSTRAINT config_year_is_in_range CHECK (((key <> 'pipeline_start_year_full'::text) OR (jsonb_typeof(value) = 'null'::text) OR ((jsonb_typeof(value) = 'number'::text) AND (((value)::numeric >= (1970)::numeric) AND ((value)::numeric <= (2100)::numeric)) AND ((value)::numeric = trunc((value)::numeric)))))
 );
 
 
@@ -5968,5 +5968,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict xnSnRGFlx7TO84IbzxEHM7plBNfhZ37E6jNdO7ZY0NDFzJyKQtNyVfPeQitVCQw
+\unrestrict VhyuvSTahypcNh6y5zKpyJEtcVCnSgWcSXhNHbrigdDm8G4knuZ9CbTyiMAbTrT
 

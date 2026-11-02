@@ -8,7 +8,7 @@ from pathlib import Path
 
 from sqlalchemy import text
 
-from domain.config import INITIAL_CONFIG_VALUES, LABORATORY_TYPES_KEY
+from domain.config import INITIAL_CONFIG_VALUES, ConfigKey
 from infrastructure.db import tables
 from interfaces.cli.dev.generate_seed import (
     COMMON_SEED,
@@ -85,7 +85,7 @@ def test_generate_seed_splits_config_keys(sa_sync_conn, tmp_path):
 def test_common_seed_writes_initial_config_values(sa_sync_conn, tmp_path):
     """Le seed commun contient la valeur initiale de chaque clé commune, quelle que soit la valeur en base."""
     set_config(sa_sync_conn, "unpaywall_max_per_run", 5)
-    set_config(sa_sync_conn, LABORATORY_TYPES_KEY, ["labo", "chu"])
+    set_config(sa_sync_conn, ConfigKey.LABORATORY_TYPES, ["labo", "chu"])
     common = tmp_path / "common.sql"
 
     generate_seed(sa_sync_conn, COMMON_SEED, common)

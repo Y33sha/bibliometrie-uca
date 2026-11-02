@@ -154,6 +154,8 @@
 
   const MIN_YEAR = 1970;
   const MAX_YEAR = 2100;
+  /** Sans première année fixée, la première année moissonnée précède l'année courante de ce nombre d'années. */
+  const DEFAULT_START_YEAR_OFFSET = 5;
 
   const activeTab = $derived(page.url.searchParams.get("tab") === "display" ? "display" : "pipeline");
 
@@ -258,6 +260,8 @@
     editingKey = key;
     if (typeof item.value === "string") {
       editValue = item.value;
+    } else if (item.value === null) {
+      editValue = "";
     } else {
       editValue = JSON.stringify(item.value, null, typeof item.value === "object" ? 2 : undefined);
     }
@@ -344,7 +348,13 @@
           {#if editingKey === key}
             {@render inlineEdit(key)}
           {:else}
-            <span class="config-value-inline">{item.value}</span>
+            {#if item.value === null}
+              <span class="config-value-inline default-value">
+                {new Date().getFullYear() - DEFAULT_START_YEAR_OFFSET} (par défaut : {DEFAULT_START_YEAR_OFFSET} ans avant l'année courante)
+              </span>
+            {:else}
+              <span class="config-value-inline">{item.value}</span>
+            {/if}
             <IconButton icon="edit" label="Modifier" onclick={() => startEdit(key)} />
           {/if}
         </div>

@@ -4,7 +4,7 @@ from functools import partial
 
 from sqlalchemy import text
 
-from domain.config import LABORATORY_TYPES_KEY
+from domain.config import ConfigKey
 from domain.publications.dates import date_from_parts
 from infrastructure.read_models.publications.facets import _PublicationFacetsBuilder
 from infrastructure.read_models.publications.filtering import FilterContext, filter_context
@@ -486,14 +486,14 @@ class TestLaboratoryTypes:
 
     def test_structure_outside_the_types_is_not_a_laboratory(self, sa_sync_conn):
         self._seed(sa_sync_conn)
-        set_config(sa_sync_conn, LABORATORY_TYPES_KEY, ["labo"])
+        set_config(sa_sync_conn, ConfigKey.LABORATORY_TYPES, ["labo"])
 
         assert self._facet(sa_sync_conn) == ([], 1)
         assert self._labs_column(sa_sync_conn) == [[]]
 
     def test_structure_of_a_listed_type_is_a_laboratory(self, sa_sync_conn):
         institute = self._seed(sa_sync_conn)
-        set_config(sa_sync_conn, LABORATORY_TYPES_KEY, ["labo", "admin"])
+        set_config(sa_sync_conn, ConfigKey.LABORATORY_TYPES, ["labo", "admin"])
 
         labs, no_lab_count = self._facet(sa_sync_conn)
         assert [(o.value, o.count) for o in labs] == [(str(institute), 1)]

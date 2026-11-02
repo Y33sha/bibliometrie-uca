@@ -1,15 +1,15 @@
 """Lecture de la configuration du pipeline depuis la table `config`.
 
-Les clés de forme imposée (plafonds d'interrogation, délais de réinterrogation, année de départ) sont contrôlées à l'écriture, et la table refuse une valeur hors de cette forme. Pour les autres clés, une valeur illisible est signalée et le réglage prend sa valeur par défaut ; le pipeline continue.
+Les clés de forme imposée (plafonds d'interrogation, délais de réinterrogation, année de départ) sont contrôlées à l'écriture, et la table refuse une valeur hors de cette forme. Une clé absente prend sa valeur par défaut. Une année de départ vide équivaut à une clé absente.
 """
 
 import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
-from domain.config import SETTINGS, ConfigKey
+from domain.config import DEFAULT_START_YEAR_OFFSET, SETTINGS, ConfigKey
 from domain.dates import today
-from pipeline.runtime.config import cap, delay, get_years
+from pipeline.runtime.config import cap, delay, fixed_start_year, get_years
 from tests.integration.helpers.config import set_config
 
 
@@ -24,10 +24,20 @@ class TestGetYears:
         current = today().year
         assert get_years(sa_sync_conn, start_year=2020) == list(range(2020, current + 1))
 
-    def test_falls_back_to_current_year_when_unset(self, sa_sync_conn):
-        sa_sync_conn.execute(text("DELETE FROM config WHERE key = 'pipeline_start_year_full'"))
+    def test_sans_annee_fixee_la_fenetre_suit_l_annee_courante(self, sa_sync_conn):
+        set_config(sa_sync_conn, "pipeline_start_year_full", None)
         current = today().year
-        assert get_years(sa_sync_conn) == [current]
+        assert get_years(sa_sync_conn) == list(
+            range(current - DEFAULT_START_YEAR_OFFSET, current + 1)
+        )
+
+    def test_la_cle_absente_vaut_annee_non_fixee(self, sa_sync_conn):
+        sa_sync_conn.execute(text("DELETE FROM config WHERE key = 'pipeline_start_year_full'"))
+        assert fixed_start_year(sa_sync_conn) is None
+
+    def test_l_annee_fixee_est_lue(self, sa_sync_conn):
+        set_config(sa_sync_conn, "pipeline_start_year_full", 2020)
+        assert fixed_start_year(sa_sync_conn) == 2020
 
     def test_falls_back_when_start_year_in_future(self, sa_sync_conn):
         current = today().year

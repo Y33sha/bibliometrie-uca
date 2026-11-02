@@ -5,13 +5,9 @@ from functools import partial
 from sqlalchemy import text
 
 from infrastructure.db.queues import Queue
-from interfaces.cli.maintenance.delete_source_records_out_of_window import (
-    count_targets,
-    fetch_cutoff,
-)
+from interfaces.cli.maintenance.delete_source_records_out_of_window import count_targets
 from pipeline.ingestion.common.source_records import delete_source_records_before
 from pipeline.transformation.publications.store import PublicationStore
-from tests.integration.helpers.config import set_config
 from tests.integration.helpers.queues import queued
 from tests.integration.helpers.sources import insert_source_record
 from tests.integration.helpers.staging import insert_staging
@@ -54,11 +50,6 @@ def _source_record_staged(
 def _existe(conn, table: str, ident: int) -> bool:
     query = text(f"SELECT count(*) FROM {table} WHERE id = :id")  # noqa: S608
     return conn.execute(query, {"id": ident}).scalar_one() == 1
-
-
-def test_l_annee_de_debut_est_lue_en_configuration(sa_sync_conn_owner):
-    set_config(sa_sync_conn_owner, "pipeline_start_year_full", 2020)
-    assert fetch_cutoff(sa_sync_conn_owner) == 2020
 
 
 def test_l_enregistrement_source_ancien_part_avec_sa_ligne_de_staging(sa_sync_conn_owner):

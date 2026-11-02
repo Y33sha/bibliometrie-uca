@@ -1,5 +1,5 @@
 # STATUS: maintenance
-"""Supprime les enregistrements sources parus avant l'année de début du pipeline (`config.pipeline_start_year_full`), avec leur ligne de `staging`. Une thèse en cours, sans année de soutenance, est conservée.
+"""Supprime les enregistrements sources parus avant l'année de début du pipeline (`config.pipeline_start_year_full`), avec leur ligne de `staging`. Une thèse en cours, sans année de soutenance, est conservée. Le script demande une année de début fixée.
 
 Les enregistrements sources de la même publication sont marqués à réconcilier (`delete_source_records_before`). Le pipeline supprime ensuite les publications vidées (phase `publications`), puis les personnes vidées (phase `persons`).
 
@@ -16,20 +16,11 @@ from sqlalchemy import Connection, text
 
 from domain.publications.doc_types import DocType
 from infrastructure.db.engine import get_sync_engine
-from infrastructure.db.scalars import scalar_int
 from infrastructure.observability.log import setup_logger
 from pipeline.ingestion.common.source_records import delete_source_records_before
+from pipeline.runtime.config import fixed_start_year
 
 log = setup_logger("delete_source_records_out_of_window", os.path.dirname(__file__))
-
-
-def fetch_cutoff(conn: Connection) -> int:
-    """Renvoie l'année de début du pipeline (`config.pipeline_start_year_full`)."""
-    return scalar_int(
-        conn.execute(
-            text("SELECT (value #>> '{}')::int FROM config WHERE key = 'pipeline_start_year_full'")
-        )
-    )
 
 
 def count_targets(conn: Connection, cutoff: int) -> dict[str, int]:
@@ -56,7 +47,10 @@ def main() -> int:
 
     engine = get_sync_engine()
     with engine.connect() as conn:
-        cutoff = fetch_cutoff(conn)
+        cutoff = fixed_start_year(conn)
+        if cutoff is None:
+            log.error("Aucune année de début fixée dans la configuration : rien n'est supprimé.")
+            return 1
         targets = count_targets(conn, cutoff)
     log.info("Enregistrements sources parus avant %d : %d", cutoff, sum(targets.values()))
     for source, n in targets.items():

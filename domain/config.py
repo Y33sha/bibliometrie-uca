@@ -1,4 +1,4 @@
-"""Règles des paramètres applicatifs : forme imposée à chaque clé, valeur appliquée quand la clé est absente."""
+"""Règles des paramètres applicatifs : forme imposée à chaque clé, valeur appliquée quand la clé est absente, portée."""
 
 from collections.abc import Callable
 from enum import StrEnum
@@ -9,19 +9,12 @@ from domain.errors import ValidationError
 from domain.structures.structure import StructureType
 from domain.types import JsonValue
 
-LABORATORY_TYPES_KEY = "laboratory_types"
-"""Clé des types de structure traités comme laboratoires."""
-
-DEFAULT_LABORATORY_TYPES: tuple[StructureType, ...] = (StructureType.LABO,)
-"""Types de structure traités comme laboratoires quand la clé est absente."""
-
-# Clés de configuration consommées par une page publique
-PUBLIC_CONFIG_KEYS: frozenset[str] = frozenset({LABORATORY_TYPES_KEY})
-
 
 class ConfigKey(StrEnum):
-    """Clé d'un réglage numérique du pipeline."""
+    """Clé d'un paramètre applicatif."""
 
+    PIPELINE_START_YEAR_FULL = "pipeline_start_year_full"
+    """Première année moissonnée."""
     UNPAYWALL_MAX_PER_RUN = "unpaywall_max_per_run"
     """Nombre de DOI vérifiés auprès d'Unpaywall par run."""
     FETCH_MISSING_MAX_PER_SOURCE = "fetch_missing_max_per_source"
@@ -42,115 +35,31 @@ class ConfigKey(StrEnum):
     """Délai avant de télécharger de nouveau le fichier du DOAJ."""
     ISSNL_TABLE_REFRESH_AFTER_DAYS = "issnl_table_refresh_after_days"
     """Délai avant de télécharger de nouveau la table ISSN-L de l'ISSN International Centre."""
-    PIPELINE_START_YEAR_FULL = "pipeline_start_year_full"
-    """Première année moissonnée."""
+    LABORATORY_TYPES = "laboratory_types"
+    """Types de structure traités comme laboratoires."""
+    PERIMETER_EXTRACTION = "perimeter_extraction"
+    """Code du périmètre moissonné."""
+    PERIMETER_PERSONS = "perimeter_persons"
+    """Code du périmètre de création des personnes."""
+    SITE_TITLE = "site_title"
+    """Titre de l'application. Pour un texte vide, l'interface compose le titre avec le nom de l'établissement."""
+    BRAND_HUE = "brand_hue"
+    """Teinte de l'interface : angle OKLCH en degrés, entier de 0 à 359."""
+    INSTITUTION_COUNTRY = "institution_country"
+    """Pays de l'établissement : code ISO 3166-1 en minuscules. Une publication co-affiliée à un autre pays est une collaboration internationale."""
 
-
-class ConfigKind(StrEnum):
-    """Forme d'un réglage numérique."""
-
-    CAP = "cap"
-    """Plafond d'interrogations, entier positif ou nul ; zéro pour illimité."""
-    DELAY = "delay"
-    """Délai de réinterrogation, en jours, au moins un."""
-    YEAR = "year"
-    """Année, entre `MIN_YEAR` et `MAX_YEAR`."""
-
-
-class ConfigSetting(NamedTuple):
-    """Forme d'un réglage, et valeur retenue quand la clé est absente ou illisible."""
-
-    kind: ConfigKind
-    default: int | None = None
-
-
-SETTINGS: dict[ConfigKey, ConfigSetting] = {
-    ConfigKey.UNPAYWALL_MAX_PER_RUN: ConfigSetting(ConfigKind.CAP, 10_000),
-    ConfigKey.FETCH_MISSING_MAX_PER_SOURCE: ConfigSetting(ConfigKind.CAP, 0),
-    ConfigKey.SUDOC_MAX_PER_RUN: ConfigSetting(ConfigKind.CAP, 10_000),
-    ConfigKey.DOI_RESOLUTION_MAX_PER_RUN: ConfigSetting(ConfigKind.CAP, 10_000),
-    ConfigKey.FETCH_STALE_AFTER_DAYS: ConfigSetting(ConfigKind.DELAY, 90),
-    ConfigKey.FETCH_MISSING_RETRY_AFTER_DAYS: ConfigSetting(ConfigKind.DELAY, 30),
-    ConfigKey.UNPAYWALL_RECHECK_AFTER_DAYS: ConfigSetting(ConfigKind.DELAY, 15),
-    ConfigKey.DOI_RESOLUTION_RECHECK_AFTER_DAYS: ConfigSetting(ConfigKind.DELAY, 180),
-    ConfigKey.DOAJ_REFRESH_AFTER_DAYS: ConfigSetting(ConfigKind.DELAY, 30),
-    ConfigKey.ISSNL_TABLE_REFRESH_AFTER_DAYS: ConfigSetting(ConfigKind.DELAY, 30),
-    ConfigKey.PIPELINE_START_YEAR_FULL: ConfigSetting(ConfigKind.YEAR),
-}
-assert set(SETTINGS) == set(ConfigKey)
-assert all(s.default is not None for s in SETTINGS.values() if s.kind is not ConfigKind.YEAR)
-
-
-def _keys_of(kind: ConfigKind) -> frozenset[str]:
-    return frozenset(key.value for key, setting in SETTINGS.items() if setting.kind is kind)
-
-
-CAP_KEYS = _keys_of(ConfigKind.CAP)
-DELAY_KEYS = _keys_of(ConfigKind.DELAY)
-YEAR_KEYS = _keys_of(ConfigKind.YEAR)
-
-
-def cap_value(key: ConfigKey, stored: int | None) -> int | None:
-    """Renvoie le plafond à appliquer pour `key` d'après la valeur stockée, `None` pour illimité. Une valeur absente donne le défaut ; zéro ou une valeur négative retire la borne."""
-    value = SETTINGS[key].default if stored is None else stored
-    assert value is not None
-    return value if value > 0 else None
-
-
-def delay_value(key: ConfigKey, stored: int | None) -> int:
-    """Renvoie le délai à appliquer pour `key` d'après la valeur stockée, en jours. Une valeur absente ou inférieure à un jour donne le défaut."""
-    default = SETTINGS[key].default
-    assert default is not None
-    return stored if stored is not None and stored >= 1 else default
-
-
-PERIMETER_EXTRACTION_KEY = "perimeter_extraction"
-"""Clé du code du périmètre moissonné."""
-
-PERIMETER_PERSONS_KEY = "perimeter_persons"
-"""Clé du code du périmètre de création des personnes."""
-
-SITE_TITLE_KEY = "site_title"
-"""Clé du titre de l'application. Pour un texte vide, l'interface compose le titre avec le nom de l'établissement."""
-
-BRAND_HUE_KEY = "brand_hue"
-"""Clé de la teinte de l'interface : angle OKLCH en degrés, entier de 0 à 359."""
-
-DEFAULT_BRAND_HUE = 196
-"""Teinte de l'interface quand la clé est absente."""
-
-INSTITUTION_COUNTRY_KEY = "institution_country"
-"""Clé du pays de l'établissement : code ISO 3166-1 en minuscules. Une publication co-affiliée à un autre pays est une collaboration internationale."""
-
-DEFAULT_INSTITUTION_COUNTRY = "fr"
-"""Pays de l'établissement quand la clé est absente."""
-
-INSTITUTION_CONFIG_KEYS: frozenset[str] = frozenset(
-    {
-        PERIMETER_EXTRACTION_KEY,
-        PERIMETER_PERSONS_KEY,
-        SITE_TITLE_KEY,
-        BRAND_HUE_KEY,
-        INSTITUTION_COUNTRY_KEY,
-    }
-)
-"""Clés propres à l'établissement."""
-
-INITIAL_START_YEAR = 2017
-"""Première année moissonnée d'une installation."""
-
-INITIAL_CONFIG_VALUES: dict[str, JsonValue] = {
-    **{key.value: s.default for key, s in SETTINGS.items() if s.default is not None},
-    ConfigKey.PIPELINE_START_YEAR_FULL.value: INITIAL_START_YEAR,
-    LABORATORY_TYPES_KEY: [t.value for t in DEFAULT_LABORATORY_TYPES],
-}
-"""Valeur initiale de chaque clé commune à tous les établissements : sa valeur par défaut, et `INITIAL_START_YEAR` pour la première année moissonnée."""
 
 MIN_YEAR = 1970
 MAX_YEAR = 2100
 
+DEFAULT_START_YEAR_OFFSET = 5
+"""Sans première année fixée, la première année moissonnée précède l'année courante de ce nombre d'années."""
 
-def _as_int(value: JsonValue) -> int | None:
+DEFAULT_BRAND_HUE = 196
+DEFAULT_INSTITUTION_COUNTRY = "fr"
+
+
+def _parse_int(value: JsonValue) -> int | None:
     """Renvoie l'entier contenu dans `value`, entier ou texte ; sinon `None`. Écarte les booléens, tenus pour des entiers par Python."""
     if isinstance(value, bool):
         return None
@@ -164,30 +73,44 @@ def _as_int(value: JsonValue) -> int | None:
     return None
 
 
-def _site_title(key: str, value: JsonValue) -> JsonValue:
-    if value is None:
-        return ""
-    if not isinstance(value, str):
-        raise ValidationError(f"`{key}` attend un texte ; reçu : {value!r}")
-    return value.strip()
+def _is_blank(value: JsonValue) -> bool:
+    return value is None or (isinstance(value, str) and not value.strip())
 
 
-def _brand_hue(key: str, value: JsonValue) -> JsonValue:
-    teinte = _as_int(value)
-    if teinte is None or not (0 <= teinte <= 359):
-        raise ValidationError(f"`{key}` attend un entier de 0 à 359 ; reçu : {value!r}")
-    return teinte
+def _year(key: str, value: JsonValue) -> JsonValue:
+    """Année entre `MIN_YEAR` et `MAX_YEAR`. Une valeur vide laisse l'année non fixée."""
+    if _is_blank(value):
+        return None
+    annee = _parse_int(value)
+    if annee is None or not (MIN_YEAR <= annee <= MAX_YEAR):
+        raise ValidationError(
+            f"`{key}` attend une année entre {MIN_YEAR} et {MAX_YEAR} ; reçu : {value!r}"
+        )
+    return annee
 
 
-def _institution_country(key: str, value: JsonValue) -> JsonValue:
-    code = normalize_country_code(value) if isinstance(value, str) else None
-    if code is None or code == NO_COUNTRY_CODE:
-        raise ValidationError(f"`{key}` attend un code pays à deux lettres ; reçu : {value!r}")
-    return code
+def _cap(key: str, value: JsonValue) -> JsonValue:
+    """Plafond d'interrogations, entier positif ou nul ; zéro pour illimité. Une valeur vide vaut zéro."""
+    if _is_blank(value):
+        return 0
+    plafond = _parse_int(value)
+    if plafond is None or plafond < 0:
+        raise ValidationError(f"`{key}` attend un entier positif ou nul ; reçu : {value!r}")
+    return plafond
+
+
+def _delay(key: str, value: JsonValue) -> JsonValue:
+    """Délai de réinterrogation, en jours, au moins un."""
+    delai = _parse_int(value)
+    if delai is None or delai < 1:
+        raise ValidationError(
+            f"`{key}` attend un nombre entier de jours, au moins 1 ; reçu : {value!r}"
+        )
+    return delai
 
 
 def _laboratory_types(key: str, value: JsonValue) -> JsonValue:
-    """Renvoie les types sans doublon, dans l'ordre de `StructureType`."""
+    """Liste non vide de types de structure, sans doublon, dans l'ordre de `StructureType`."""
     if not isinstance(value, list) or not value:
         raise ValidationError(
             f"`{key}` attend une liste non vide de types de structure ; reçu : {value!r}"
@@ -198,55 +121,128 @@ def _laboratory_types(key: str, value: JsonValue) -> JsonValue:
     return [t.value for t in StructureType if t in value]
 
 
-def _cap(key: str, value: JsonValue) -> JsonValue:
-    if value is None or (isinstance(value, str) and not value.strip()):
-        return 0
-    plafond = _as_int(value)
-    if plafond is None or plafond < 0:
-        raise ValidationError(f"`{key}` attend un entier positif ou nul ; reçu : {value!r}")
-    return plafond
+def _site_title(key: str, value: JsonValue) -> JsonValue:
+    """Texte sans les espaces qui l'entourent. Une valeur absente vaut un texte vide."""
+    if value is None:
+        return ""
+    if not isinstance(value, str):
+        raise ValidationError(f"`{key}` attend un texte ; reçu : {value!r}")
+    return value.strip()
 
 
-def _delay(key: str, value: JsonValue) -> JsonValue:
-    delai = _as_int(value)
-    if delai is None or delai < 1:
-        raise ValidationError(
-            f"`{key}` attend un nombre entier de jours, au moins 1 ; reçu : {value!r}"
-        )
-    return delai
+def _brand_hue(key: str, value: JsonValue) -> JsonValue:
+    """Entier de 0 à 359."""
+    teinte = _parse_int(value)
+    if teinte is None or not (0 <= teinte <= 359):
+        raise ValidationError(f"`{key}` attend un entier de 0 à 359 ; reçu : {value!r}")
+    return teinte
 
 
-def _year(key: str, value: JsonValue) -> JsonValue:
-    annee = _as_int(value)
-    if annee is None or not (MIN_YEAR <= annee <= MAX_YEAR):
-        raise ValidationError(
-            f"`{key}` attend une année entre {MIN_YEAR} et {MAX_YEAR} ; reçu : {value!r}"
-        )
-    return annee
+def _institution_country(key: str, value: JsonValue) -> JsonValue:
+    """Code pays à deux lettres, en minuscules."""
+    code = normalize_country_code(value) if isinstance(value, str) else None
+    if code is None or code == NO_COUNTRY_CODE:
+        raise ValidationError(f"`{key}` attend un code pays à deux lettres ; reçu : {value!r}")
+    return code
 
 
-_BY_KIND: dict[ConfigKind, Callable[[str, JsonValue], JsonValue]] = {
-    ConfigKind.CAP: _cap,
-    ConfigKind.DELAY: _delay,
-    ConfigKind.YEAR: _year,
+type Normalizer = Callable[[str, JsonValue], JsonValue]
+"""Ramène une valeur écrite à la forme imposée par sa clé, ou lève `ValidationError`."""
+
+
+class ConfigSetting(NamedTuple):
+    """Règles d'une clé."""
+
+    normalize: Normalizer | None
+    """Forme imposée à la valeur. `None` : valeur libre."""
+    default: JsonValue = None
+    """Valeur retenue quand la clé est absente. Valeur initiale d'une clé commune."""
+    institution: bool = False
+    """Clé propre à l'établissement, posée par le seed d'établissement. Le seed commun pose les autres clés."""
+    public: bool = False
+    """Clé lisible sans session."""
+
+
+SETTINGS: dict[ConfigKey, ConfigSetting] = {
+    ConfigKey.PIPELINE_START_YEAR_FULL: ConfigSetting(_year),
+    ConfigKey.UNPAYWALL_MAX_PER_RUN: ConfigSetting(_cap, 10_000),
+    ConfigKey.FETCH_MISSING_MAX_PER_SOURCE: ConfigSetting(_cap, 0),
+    ConfigKey.SUDOC_MAX_PER_RUN: ConfigSetting(_cap, 10_000),
+    ConfigKey.DOI_RESOLUTION_MAX_PER_RUN: ConfigSetting(_cap, 10_000),
+    ConfigKey.FETCH_STALE_AFTER_DAYS: ConfigSetting(_delay, 90),
+    ConfigKey.FETCH_MISSING_RETRY_AFTER_DAYS: ConfigSetting(_delay, 30),
+    ConfigKey.UNPAYWALL_RECHECK_AFTER_DAYS: ConfigSetting(_delay, 15),
+    ConfigKey.DOI_RESOLUTION_RECHECK_AFTER_DAYS: ConfigSetting(_delay, 180),
+    ConfigKey.DOAJ_REFRESH_AFTER_DAYS: ConfigSetting(_delay, 30),
+    ConfigKey.ISSNL_TABLE_REFRESH_AFTER_DAYS: ConfigSetting(_delay, 30),
+    ConfigKey.LABORATORY_TYPES: ConfigSetting(
+        _laboratory_types, [StructureType.LABO.value], public=True
+    ),
+    ConfigKey.PERIMETER_EXTRACTION: ConfigSetting(None, institution=True),
+    ConfigKey.PERIMETER_PERSONS: ConfigSetting(None, institution=True),
+    ConfigKey.SITE_TITLE: ConfigSetting(_site_title, "", institution=True),
+    ConfigKey.BRAND_HUE: ConfigSetting(_brand_hue, DEFAULT_BRAND_HUE, institution=True),
+    ConfigKey.INSTITUTION_COUNTRY: ConfigSetting(
+        _institution_country, DEFAULT_INSTITUTION_COUNTRY, institution=True
+    ),
 }
+assert set(SETTINGS) == set(ConfigKey)
 
-_NORMALIZERS: dict[str, Callable[[str, JsonValue], JsonValue]] = {
-    SITE_TITLE_KEY: _site_title,
-    BRAND_HUE_KEY: _brand_hue,
-    INSTITUTION_COUNTRY_KEY: _institution_country,
-    LABORATORY_TYPES_KEY: _laboratory_types,
-    **{key.value: _BY_KIND[setting.kind] for key, setting in SETTINGS.items()},
+
+def _keys_normalized_by(normalize: Normalizer) -> frozenset[str]:
+    return frozenset(key.value for key, s in SETTINGS.items() if s.normalize is normalize)
+
+
+CAP_KEYS = _keys_normalized_by(_cap)
+"""Clés des plafonds d'interrogations."""
+
+DELAY_KEYS = _keys_normalized_by(_delay)
+"""Clés des délais de réinterrogation."""
+
+PUBLIC_CONFIG_KEYS = frozenset(key.value for key, s in SETTINGS.items() if s.public)
+"""Clés lisibles sans session."""
+
+INSTITUTION_CONFIG_KEYS = frozenset(key.value for key, s in SETTINGS.items() if s.institution)
+"""Clés propres à l'établissement."""
+
+PERIMETER_CONFIG_KEYS = frozenset({ConfigKey.PERIMETER_EXTRACTION, ConfigKey.PERIMETER_PERSONS})
+"""Clés dont la valeur est le code d'un périmètre."""
+
+INITIAL_CONFIG_VALUES: dict[str, JsonValue] = {
+    key.value: s.default for key, s in SETTINGS.items() if not s.institution
 }
+"""Valeur initiale de chaque clé commune à tous les établissements."""
+
+
+def _int_default(key: ConfigKey) -> int:
+    default = SETTINGS[key].default
+    assert isinstance(default, int), key
+    return default
+
+
+def cap_value(key: ConfigKey, stored: int | None) -> int | None:
+    """Renvoie le plafond à appliquer pour `key` d'après la valeur stockée, `None` pour illimité. Une valeur absente donne le défaut ; zéro retire la borne."""
+    value = _int_default(key) if stored is None else stored
+    return value or None
+
+
+def delay_value(key: ConfigKey, stored: int | None) -> int:
+    """Renvoie le délai à appliquer pour `key` d'après la valeur stockée, en jours. Une valeur absente donne le défaut."""
+    return _int_default(key) if stored is None else stored
+
+
+def start_year_value(stored: int | None, current_year: int) -> int:
+    """Renvoie la première année moissonnée d'après la valeur stockée. Sans année fixée, elle précède l'année courante de `DEFAULT_START_YEAR_OFFSET` ans."""
+    return current_year - DEFAULT_START_YEAR_OFFSET if stored is None else stored
 
 
 def normalize_config_value(key: str, value: JsonValue) -> JsonValue:
     """Renvoie la valeur à écrire pour `key`, ramenée à la forme imposée par la clé.
 
-    Une valeur absente ou vide vaut zéro pour un plafond, un texte vide pour le titre. Les clés sans forme imposée passent telles quelles.
+    Une clé inconnue ou sans forme imposée passe telle quelle.
 
     Raises:
         ValidationError: valeur hors de la forme imposée.
     """
-    normalizer = _NORMALIZERS.get(key)
-    return value if normalizer is None else normalizer(key, value)
+    normalize = SETTINGS[ConfigKey(key)].normalize if key in ConfigKey else None
+    return value if normalize is None else normalize(key, value)

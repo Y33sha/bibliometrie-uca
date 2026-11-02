@@ -34,16 +34,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import ARRAY, ENUM as PgEnum
 
-from domain.config import (
-    BRAND_HUE_KEY,
-    CAP_KEYS,
-    DELAY_KEYS,
-    INSTITUTION_COUNTRY_KEY,
-    MAX_YEAR,
-    MIN_YEAR,
-    SITE_TITLE_KEY,
-    YEAR_KEYS,
-)
+from domain.config import CAP_KEYS, DELAY_KEYS, MAX_YEAR, MIN_YEAR, ConfigKey
 from domain.countries import NO_COUNTRY_CODE, PlaceNameKind
 from domain.country_detection import CountryDetectionMethod
 from domain.merge import MergedEntity
@@ -153,7 +144,7 @@ config = Table(
         name="config_cap_is_non_negative_integer",
     ),
     CheckConstraint(
-        f"key NOT IN ({', '.join(repr(key) for key in sorted(YEAR_KEYS))}) "
+        f"key <> '{ConfigKey.PIPELINE_START_YEAR_FULL}' OR jsonb_typeof(value) = 'null' "
         f"OR (jsonb_typeof(value) = 'number' "
         f"AND (value)::numeric BETWEEN {MIN_YEAR} AND {MAX_YEAR} "
         "AND (value)::numeric = trunc((value)::numeric))",
@@ -166,17 +157,17 @@ config = Table(
         name="config_delay_is_positive_integer",
     ),
     CheckConstraint(
-        f"key <> '{SITE_TITLE_KEY}' OR jsonb_typeof(value) = 'string'",
+        f"key <> '{ConfigKey.SITE_TITLE}' OR jsonb_typeof(value) = 'string'",
         name="config_site_title_is_text",
     ),
     CheckConstraint(
-        f"key <> '{BRAND_HUE_KEY}' OR (jsonb_typeof(value) = 'number' "
+        f"key <> '{ConfigKey.BRAND_HUE}' OR (jsonb_typeof(value) = 'number' "
         "AND (value)::numeric BETWEEN 0 AND 359 "
         "AND (value)::numeric = trunc((value)::numeric))",
         name="config_brand_hue_is_angle",
     ),
     CheckConstraint(
-        f"key <> '{INSTITUTION_COUNTRY_KEY}' OR (jsonb_typeof(value) = 'string' "
+        f"key <> '{ConfigKey.INSTITUTION_COUNTRY}' OR (jsonb_typeof(value) = 'string' "
         "AND value #>> '{}' ~ '^[a-z]{2}$' "
         f"AND value #>> '{{}}' <> '{NO_COUNTRY_CODE}')",
         name="config_institution_country_is_code",

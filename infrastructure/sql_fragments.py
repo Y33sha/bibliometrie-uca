@@ -6,7 +6,7 @@ Le module contient des fragments construits depuis des constantes du domaine (`i
 import json
 
 from application.ports.repositories.address_repository import AddressCountryFilter
-from domain.config import DEFAULT_LABORATORY_TYPES, LABORATORY_TYPES_KEY
+from domain.config import SETTINGS, ConfigKey
 from domain.persons.identifiers import AttributionStatus, PersonIdentifierType
 from domain.persons.matching import ORCID_MATCH_SOURCES, STRONG_PERSON_IDENTIFIER_TYPES
 from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
@@ -81,11 +81,12 @@ def diamond_journal_sql(serial: str = "j") -> str:
 
 
 def is_laboratory(structure: str = "s") -> str:
-    """Renvoie la condition vraie quand la structure aliasée `structure` est d'un type traité comme laboratoire (clé de config `LABORATORY_TYPES_KEY`, `DEFAULT_LABORATORY_TYPES` en son absence). La liste des types se calcule une fois par requête."""
-    default = json.dumps([t.value for t in DEFAULT_LABORATORY_TYPES])
+    """Renvoie la condition vraie quand la structure aliasée `structure` est d'un type traité comme laboratoire (clé de config `laboratory_types`, sa valeur par défaut en son absence). La liste des types se calcule une fois par requête."""
+    key = ConfigKey.LABORATORY_TYPES
+    default = json.dumps(SETTINGS[key].default)
     return (
         f"{structure}.structure_type = ANY(ARRAY(SELECT jsonb_array_elements_text(COALESCE("
-        f"(SELECT value FROM config WHERE key = '{LABORATORY_TYPES_KEY}'), '{default}'::jsonb)"
+        f"(SELECT value FROM config WHERE key = '{key}'), '{default}'::jsonb)"
         "))::structure_type[])"
     )
 
