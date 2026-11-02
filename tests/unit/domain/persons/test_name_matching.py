@@ -11,6 +11,7 @@ from domain.persons.name_matching import (
     first_name_initials,
     full_first_name_extends,
     initials_extend,
+    is_full_first_name,
     names_compatible,
 )
 
@@ -134,6 +135,14 @@ def test_distance_d_edition(a, b, distance):
 )
 def test_initiales_d_un_prenom(first_name, initials):
     assert first_name_initials(first_name) == initials
+
+
+@pytest.mark.parametrize(
+    ("first_name", "full"),
+    [("Jean-Luc", True), ("LEA", True), ("Jean L.", False), ("J.", False), ("", False)],
+)
+def test_prenom_complet(first_name, full):
+    assert is_full_first_name(first_name) is full
 
 
 @pytest.mark.parametrize(

@@ -8,7 +8,7 @@ Usage :
 
 Les en-têtes sont sur la première ligne qui nomme le nom et le prénom. Les lignes au-dessus donnent la fenêtre d'observation de l'export (« Date début d'observation : », « Date fin d'observation : » ou « Date d'observation : »), à défaut `--export-date`. Colonnes reconnues : `SCALAR_COLUMNS` et `UNIT_COLUMNS`.
 
-Un agent se rattache à une fiche `hr_records` par son matricule, à défaut par son email. Sinon, l'import crée la personne et sa fiche. Les attributs de la fiche prennent les valeurs non vides de l'export. Les périodes de présence suivent `updated_periods`. L'import refuse un export antérieur au dernier importé.
+Un agent se rattache à une fiche `hr_records` par son matricule, à défaut par son email. Sinon, l'import ajoute la fiche à l'unique homonyme sans fiche RH (`_unique_homonym_without_record`), à défaut crée la personne et sa fiche. Les attributs de la fiche prennent les valeurs non vides de l'export. Les périodes de présence suivent `updated_periods`. L'import refuse un export antérieur au dernier importé.
 """
 
 import argparse
@@ -25,6 +25,7 @@ from sqlalchemy import Connection, text
 
 from domain.normalize import normalize_text, optional_plain_text
 from domain.persons.hr_periods import HrPeriod, merge_periods, updated_periods
+from domain.persons.name_matching import is_full_first_name
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.read_models.perimeters.queries import (
@@ -329,6 +330,7 @@ class RhImportOutcome(StrEnum):
     CREATED = "created"  # personne et fiche RH créées
     BY_SIHAM_ID = "by_siham_id"  # fiche rattachée par le matricule
     BY_EMAIL = "by_email"  # fiche rattachée par l'email
+    BY_NAME = "by_name"  # fiche ajoutée à l'unique homonyme, sans fiche RH
 
 
 _BY_SIHAM_ID = text("SELECT person_id FROM hr_records WHERE siham_id = :siham_id")
@@ -336,6 +338,12 @@ _BY_SIHAM_ID = text("SELECT person_id FROM hr_records WHERE siham_id = :siham_id
 _BY_EMAIL = text("""
     SELECT person_id FROM hr_records
     WHERE lower(email) = lower(:email) AND (siham_id IS NULL OR CAST(:siham_id AS text) IS NULL)
+""")
+
+_HOMONYMS = text("""
+    SELECT p.id, p.exclusion, EXISTS (SELECT 1 FROM hr_records r WHERE r.person_id = p.id) AS has_record
+    FROM persons p
+    WHERE p.last_name_normalized = :last_name AND p.first_name_normalized = :first_name
 """)
 
 _UPDATE_RECORD = text("""
@@ -377,6 +385,23 @@ def _find_record(conn: Connection, agent: HrRow) -> tuple[int, RhImportOutcome] 
     return None
 
 
+def _unique_homonym_without_record(conn: Connection, agent: HrRow) -> int | None:
+    """Renvoie l'unique personne de même nom et même prénom que l'agent, quand elle est sans fiche RH ni exclusion. Le prénom est complet, sans initiale."""
+    if not is_full_first_name(agent.first_name):
+        return None
+    homonyms = conn.execute(
+        _HOMONYMS,
+        {
+            "last_name": normalize_text(agent.last_name),
+            "first_name": normalize_text(agent.first_name),
+        },
+    ).all()
+    if len(homonyms) != 1:
+        return None
+    [homonym] = homonyms
+    return None if homonym.has_record or homonym.exclusion else homonym.id
+
+
 def import_agent(
     conn: Connection,
     agent: HrRow,
@@ -385,7 +410,7 @@ def import_agent(
     window_start: date | None,
     export_date: date | None,
 ) -> RhImportOutcome:
-    """Rattache l'agent à sa fiche RH ou la crée, met à jour ses attributs et ses périodes de présence."""
+    """Rattache l'agent à sa fiche RH, à défaut ajoute la fiche à son unique homonyme ou crée la personne. Met à jour ses attributs et ses périodes de présence."""
     attributes = {
         "siham_id": agent.siham_id,
         "email": agent.email,
@@ -397,9 +422,13 @@ def import_agent(
     }
     found = _find_record(conn, agent)
     if found is None:
-        person_id = person_repository(conn).create(agent.last_name, agent.first_name)
+        homonym = _unique_homonym_without_record(conn, agent)
+        if homonym is None:
+            person_id = person_repository(conn).create(agent.last_name, agent.first_name)
+            outcome = RhImportOutcome.CREATED
+        else:
+            person_id, outcome = homonym, RhImportOutcome.BY_NAME
         conn.execute(_INSERT_RECORD, {"person_id": person_id, **attributes})
-        outcome = RhImportOutcome.CREATED
     else:
         person_id, outcome = found
         conn.execute(_UPDATE_RECORD, {"person_id": person_id, **attributes})
@@ -501,8 +530,10 @@ def main() -> None:
             log.error(str(e))
             sys.exit(1)
         log.info(
-            "=== %s personnes créées, %s fiches rattachées par matricule, %s par email ===",
+            "=== %s personnes créées, %s fiches ajoutées à un homonyme, "
+            "%s fiches rattachées par matricule, %s par email ===",
             counts[RhImportOutcome.CREATED],
+            counts[RhImportOutcome.BY_NAME],
             counts[RhImportOutcome.BY_SIHAM_ID],
             counts[RhImportOutcome.BY_EMAIL],
         )

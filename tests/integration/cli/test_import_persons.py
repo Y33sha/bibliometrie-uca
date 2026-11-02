@@ -236,6 +236,50 @@ def test_attribut_absent_de_l_export_conserve(sa_sync_conn):
     assert (record.corps, record.grade) == ("MCF", "HC")
 
 
+def test_fiche_ajoutee_a_l_unique_homonyme_sans_fiche(sa_sync_conn):
+    person = insert_person(sa_sync_conn, "Durand", first_name="Marie-Anne")
+
+    counts = import_export(sa_sync_conn, _export(HrRow("DURAND", "MARIE ANNE", siham_id="UCA01")))
+
+    assert counts[RhImportOutcome.BY_NAME] == 1
+    assert _person_of(sa_sync_conn, "UCA01") == person
+
+
+@pytest.mark.parametrize(
+    "homonymes",
+    [
+        pytest.param([{}, {}], id="deux homonymes"),
+        pytest.param([{"exclusion": "not_a_person"}], id="homonyme exclu"),
+    ],
+)
+def test_personne_creee_sans_homonyme_unique_disponible(sa_sync_conn, homonymes):
+    existing = {
+        insert_person(sa_sync_conn, "Durand", first_name="Marie", **kwargs) for kwargs in homonymes
+    }
+
+    counts = import_export(sa_sync_conn, _export(HrRow("Durand", "Marie", siham_id="UCA01")))
+
+    assert counts[RhImportOutcome.CREATED] == 1
+    assert _person_of(sa_sync_conn, "UCA01") not in existing
+
+
+def test_homonyme_deja_rh_laisse_creer_la_personne(sa_sync_conn):
+    person = insert_person(sa_sync_conn, "Durand", first_name="Marie")
+    insert_hr_record(sa_sync_conn, person, email="autre@uca.fr")
+
+    counts = import_export(sa_sync_conn, _export(HrRow("Durand", "Marie", siham_id="UCA01")))
+
+    assert counts[RhImportOutcome.CREATED] == 1
+
+
+def test_prenom_a_initiale_sans_rattachement_a_l_homonyme(sa_sync_conn):
+    insert_person(sa_sync_conn, "Durand", first_name="Jean L.")
+
+    counts = import_export(sa_sync_conn, _export(HrRow("Durand", "Jean L.", siham_id="UCA01")))
+
+    assert counts[RhImportOutcome.CREATED] == 1
+
+
 def test_export_anterieur_au_dernier_importe_refuse(sa_sync_conn):
     import_export(sa_sync_conn, _export(HrRow("Durand", "Marie", siham_id="UCA01")))
     with pytest.raises(OlderExportError):
