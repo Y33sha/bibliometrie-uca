@@ -2,7 +2,7 @@
 	import type { Snippet } from 'svelte';
 	import { api } from '#lib/api/index.js';
 	import type { components } from '#lib/api/schema.js';
-	import KeyFigures from '#lib/components/KeyFigures.svelte';
+	import KeyFigures, { type KeyFigure } from '#lib/components/KeyFigures.svelte';
 	import BarChart from '#lib/components/charts/BarChart.svelte';
 	import StackedBarChart from '#lib/components/charts/StackedBarChart.svelte';
 	import YearScatterChart from '#lib/components/charts/YearScatterChart.svelte';
@@ -19,7 +19,6 @@
 	type CitationPoint = components['schemas']['CitationPoint'];
 	type CitationPointsResponse = components['schemas']['CitationPointsResponse'];
 	type Row = PivotResponse['rows'][number];
-	type Figure = { value: string; label: string; tone?: 'open'; tooltip?: string };
 
 	// Dashboard des publications d'une entité, calculé par le moteur de la page Statistiques. Le corpus est celui de l'onglet Publications, restreint à la famille « Publications » et aux années récentes. La répartition par types de documents compte toutes les familles, sur les mêmes années.
 	let {
@@ -47,7 +46,7 @@
 		/** Découpage des publications par année : niveau d'accès, ou modèle open access. */
 		oaBreakdown?: 'oa_access' | 'oa_voie';
 		/** Chiffres clés propres à la page, après ceux du dashboard. */
-		figures?: Figure[];
+		figures?: KeyFigure[];
 		/** Bloc des sujets, fourni par la page, à côté des publications par année. */
 		subjects?: Snippet;
 	} = $props();
@@ -136,22 +135,33 @@
 	);
 	const withCitationClass = $derived(sum(citationClasses.filter((r) => r.citation_class !== 'none')));
 
-	const keyFigures = $derived<Figure[]>([
-		{ value: total.toLocaleString('fr-FR'), label: 'publications' },
-		...(total > 0 ? [{ value: percent(openAccess, total), label: 'en open access', tone: 'open' as const }] : []),
+	const keyFigures = $derived<KeyFigure[]>([
+		{ value: total.toLocaleString('fr-FR'), label: 'publications', icon: 'book-open-cover' },
+		...(total > 0
+			? [{ value: percent(openAccess, total), label: 'en open access', tone: 'open' as const, icon: 'unlock' }]
+			: []),
 		...(withCitationClass > 0
 			? [
 					{
 						value: percent(topCited, withCitationClass),
 						label: 'dans le top 10 % des plus citées',
+						icon: 'star',
 						tooltip: `D'après OpenAlex, sur les ${withCitationClass.toLocaleString('fr-FR')} publications pourvues de l'indicateur (${percent(withCitationClass, total)} du corpus)`,
 					},
 				]
 			: []),
 		...(collab && collab.total_count > 0
-			? [{ value: percent(collab.international_count, collab.total_count), label: 'en collaboration internationale' }]
+			? [
+					{
+						value: percent(collab.international_count, collab.total_count),
+						label: 'en collaboration internationale',
+						icon: 'globe',
+					},
+				]
 			: []),
-		...(thesesFigure && theses > 0 ? [{ value: theses.toLocaleString('fr-FR'), label: 'thèses' }] : []),
+		...(thesesFigure && theses > 0
+			? [{ value: theses.toLocaleString('fr-FR'), label: 'thèses', icon: 'graduation-cap' }]
+			: []),
 		...figures,
 	]);
 

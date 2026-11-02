@@ -61,8 +61,9 @@
 		pageParam: 'apage',
 	});
 
-	// Dashboard tab : les publications passent par `PublicationsDashboard` ; la page ajoute les personnes rattachées au laboratoire et les sujets.
+	// Dashboard tab : les publications passent par `PublicationsDashboard` ; la page ajoute les thèses en cours, les personnes rattachées au laboratoire et les sujets.
 	let dashboardLoaded = $state(false);
+	let ongoingThesesCount = $state(0);
 	let personsCount = $state(0);
 	type SubjectFrequency = components['schemas']['SubjectFrequency'];
 	let dashSubjects: SubjectFrequency[] = $state([]);
@@ -89,13 +90,17 @@
 
 	async function loadDashboard() {
 		// Le décompte reprend le réglage par défaut de l'onglet Personnes : personnes retenues, à période de présence actuelle dans le laboratoire.
+		// Le décompte des thèses en cours reprend le filtre « En cours » de l'onglet Thèses.
+		const ongoingTheses = new URLSearchParams({ lab_id: String(labId), doc_type: 'ongoing_thesis', per_page: '1' });
 		const persons = new URLSearchParams({ laboratory: String(labId), exclusion: 'none', per_page: '1' });
-		const [personsPage, subjects] = await Promise.all([
+		const [ongoingThesesPage, personsPage, subjects] = await Promise.all([
+			api<{ total: number }>(`/api/publications?${ongoingTheses}`, { key: 'lab-ongoing-theses' }),
 			api<{ total: number }>(`/api/persons?${persons}`, { key: 'lab-persons' }),
 			api<SubjectFrequency[]>(`/api/structures/${labId}/subjects?limit=30`, {
 				key: 'lab-subjects',
 			}),
 		]);
+		ongoingThesesCount = ongoingThesesPage.total;
 		personsCount = personsPage.total;
 		dashSubjects = subjects;
 		dashboardLoaded = true;
@@ -212,9 +217,17 @@
 				<PublicationsDashboard
 					context={{ kind: 'lab', id: lab.id }}
 					apiKey="lab-dashboard"
+					thesesFigure={false}
 					citationScatter
-					figures={dashboardLoaded && personsCount > 0
-						? [{ value: personsCount.toLocaleString('fr-FR'), label: 'personnes' }]
+					figures={dashboardLoaded
+						? [
+								...(ongoingThesesCount > 0
+									? [{ value: ongoingThesesCount.toLocaleString('fr-FR'), label: 'thèses en cours', icon: 'graduation-cap' }]
+									: []),
+								...(personsCount > 0
+									? [{ value: personsCount.toLocaleString('fr-FR'), label: 'personnes', icon: 'user' }]
+									: []),
+							]
 						: []}
 				>
 					{#snippet subjects()}
