@@ -92,14 +92,9 @@ def _m(member_id, doc_type, title=_OWN_TITLE) -> DoiClusterMember:
     return DoiClusterMember(member_id, doc_type, title)
 
 
-def _resoudre(group, shared_doi="10.1/x"):
-    """Renvoie la décision pour un groupe ; le DOI partagé importe peu au cas testé."""
-    return resolve_cluster_doi_corrections(group, shared_doi=shared_doi)
-
-
 def test_un_doi_inconnu_de_doi_org_est_nulle_sur_tous_les_membres_avant_toute_autre_regle():
     group = [_m(1, "book"), _m(2, "book_chapter"), _m(3, "dataset")]
-    decisions = resolve_cluster_doi_corrections(group, shared_doi="10.1/x", unresolved=True)
+    decisions = resolve_cluster_doi_corrections(group, unresolved=True)
     assert decisions == [
         DoiClusterDecision(i, DoiClusterCase.UNRESOLVED_DOI_TO_NULL) for i in (1, 2, 3)
     ]
@@ -107,10 +102,7 @@ def test_un_doi_inconnu_de_doi_org_est_nulle_sur_tous_les_membres_avant_toute_au
 
 def test_le_doi_d_une_forme_secondaire_prime_sur_les_regles_ouvrage():
     group = [_m(1, "book"), _m(2, "book_chapter")]
-    assert (
-        resolve_cluster_doi_corrections(group, shared_doi="10.5281/zenodo.10", has_target=True)
-        == []
-    )
+    assert resolve_cluster_doi_corrections(group, has_target=True) == []
 
 
 # Ouvrage et chapitre
@@ -118,22 +110,26 @@ def test_le_doi_d_une_forme_secondaire_prime_sur_les_regles_ouvrage():
 
 def test_book_and_chapter_chapter_loses_doi():
     group = [_m(1, "book"), _m(2, "book_chapter")]
-    assert _resoudre(group) == [DoiClusterDecision(2, DoiClusterCase.OUVRAGE_VS_CHAPITRE)]
+    assert resolve_cluster_doi_corrections(group) == [
+        DoiClusterDecision(2, DoiClusterCase.OUVRAGE_VS_CHAPITRE)
+    ]
 
 
 def test_chapitre_au_titre_de_l_ouvrage_garde_le_doi():
     """Même œuvre typée livre par une source et chapitre par une autre : rien à corriger."""
     group = [_m(1, "book", "surf a contre courant"), _m(2, "book_chapter", "surf a contre courant")]
-    assert _resoudre(group) == []
+    assert resolve_cluster_doi_corrections(group) == []
 
 
 def test_only_book_no_correction():
-    assert _resoudre([_m(1, "book")]) == []
+    assert resolve_cluster_doi_corrections([_m(1, "book")]) == []
 
 
 def test_article_sharing_book_doi_is_ignored():
     group = [_m(1, "book"), _m(2, "book_chapter"), _m(3, "article")]
-    assert _resoudre(group) == [DoiClusterDecision(2, DoiClusterCase.OUVRAGE_VS_CHAPITRE)]
+    assert resolve_cluster_doi_corrections(group) == [
+        DoiClusterDecision(2, DoiClusterCase.OUVRAGE_VS_CHAPITRE)
+    ]
 
 
 # Chapitres entre eux
@@ -144,14 +140,16 @@ def test_chapters_distinct_titles_all_lose_doi():
         _m(1, "book_chapter", "geographie de l environnement"),
         _m(2, "book_chapter", "le monde a la une"),
     ]
-    decisions = _resoudre(group)
+    decisions = resolve_cluster_doi_corrections(group)
     assert {d.case for d in decisions} == {DoiClusterCase.CHAPITRES_TITRES_DIFFERENTS}
     assert {d.id for d in decisions} == {1, 2}
 
 
 def test_chapters_same_title_no_correction():
     assert (
-        _resoudre([_m(1, "book_chapter", "introduction"), _m(2, "book_chapter", "introduction")])
+        resolve_cluster_doi_corrections(
+            [_m(1, "book_chapter", "introduction"), _m(2, "book_chapter", "introduction")]
+        )
         == []
     )
 
@@ -161,7 +159,7 @@ def test_chapters_chapter_number_prefix_is_same():
         _m(1, "book_chapter", "chapitre 14 les limnosystemes"),
         _m(2, "book_chapter", "les limnosystemes"),
     ]
-    assert _resoudre(g) == []
+    assert resolve_cluster_doi_corrections(g) == []
 
 
 def test_chapters_subtitle_truncation_is_same():
@@ -169,7 +167,7 @@ def test_chapters_subtitle_truncation_is_same():
         _m(1, "book_chapter", "contested concepts"),
         _m(2, "book_chapter", "contested concepts plutarch on common notions"),
     ]
-    assert _resoudre(g) == []
+    assert resolve_cluster_doi_corrections(g) == []
 
 
 def test_chapters_number_glued_to_a_word_is_same():
@@ -177,7 +175,7 @@ def test_chapters_number_glued_to_a_word_is_same():
         _m(1, "book_chapter", "covid19 et societe"),
         _m(2, "book_chapter", "covid et societe"),
     ]
-    assert _resoudre(g) == []
+    assert resolve_cluster_doi_corrections(g) == []
 
 
 def test_chapters_marker_inside_the_title_is_same():
@@ -185,11 +183,16 @@ def test_chapters_marker_inside_the_title_is_same():
         _m(1, "book_chapter", "introduction partie generale"),
         _m(2, "book_chapter", "introduction generale"),
     ]
-    assert _resoudre(g) == []
+    assert resolve_cluster_doi_corrections(g) == []
 
 
 def test_chapter_without_title_is_not_compared():
-    assert _resoudre([_m(1, "book_chapter", None), _m(2, "book_chapter", "introduction")]) == []
+    assert (
+        resolve_cluster_doi_corrections(
+            [_m(1, "book_chapter", None), _m(2, "book_chapter", "introduction")]
+        )
+        == []
+    )
 
 
 def test_chapters_typo_is_false_positive_left_to_admin():
@@ -197,7 +200,9 @@ def test_chapters_typo_is_false_positive_left_to_admin():
         _m(1, "book_chapter", "les effets thermomecaniques"),
         _m(2, "book_chapter", "les effets thermomecanqiues"),
     ]
-    assert _resoudre(g) != []  # comparaison exacte des titres, sans tolérance aux fautes de frappe
+    assert (
+        resolve_cluster_doi_corrections(g) != []
+    )  # comparaison exacte des titres, sans tolérance aux fautes de frappe
 
 
 # Volume d'actes et communication
@@ -210,7 +215,7 @@ def test_communications_d_un_volume_perdent_le_doi():
         _m(3, "conference_paper", "transshipment station location problem"),
         _m(4, "poster", "total pain in palliative cancer patients"),
     ]
-    assert _resoudre(group) == [
+    assert resolve_cluster_doi_corrections(group) == [
         DoiClusterDecision(3, DoiClusterCase.ACTES_VS_COMMUNICATION),
         DoiClusterDecision(4, DoiClusterCase.ACTES_VS_COMMUNICATION),
     ]
@@ -221,17 +226,17 @@ def test_titre_tronque_du_volume_garde_le_doi():
         _m(1, "proceedings", "31st european congress on obesity eco 2024"),
         _m(2, "article", "31st european congress on obesity eco 2024 abstracts"),
     ]
-    assert _resoudre(group) == []
+    assert resolve_cluster_doi_corrections(group) == []
 
 
 def test_sans_volume_aucune_decision():
     group = [_m(1, "conference_paper", "a"), _m(2, "conference_paper", "b")]
-    assert _resoudre(group) == []
+    assert resolve_cluster_doi_corrections(group) == []
 
 
 def test_communication_sans_titre_garde_le_doi():
     group = [_m(1, "proceedings", "book of abstracts"), _m(2, "conference_paper", None)]
-    assert _resoudre(group) == []
+    assert resolve_cluster_doi_corrections(group) == []
 
 
 # compute_updates
@@ -432,7 +437,9 @@ def test_depot_hal_d_une_autre_oeuvre_perd_le_doi():
         ),
         _source_record(3, "openalex", "a brief history of oleds emitter development", {"zhang"}),
     ]
-    assert _resoudre(group) == [DoiClusterDecision(2, DoiClusterCase.DOI_D_UNE_AUTRE_OEUVRE)]
+    assert resolve_cluster_doi_corrections(group) == [
+        DoiClusterDecision(2, DoiClusterCase.DOI_D_UNE_AUTRE_OEUVRE)
+    ]
 
 
 def test_work_openalex_d_une_autre_oeuvre_perd_le_doi():
@@ -454,7 +461,9 @@ def test_work_openalex_d_une_autre_oeuvre_perd_le_doi():
             3, "scanr", "multi scale temporal neural network for stock trend prediction", {"song"}
         ),
     ]
-    assert _resoudre(group) == [DoiClusterDecision(2, DoiClusterCase.DOI_D_UNE_AUTRE_OEUVRE)]
+    assert resolve_cluster_doi_corrections(group) == [
+        DoiClusterDecision(2, DoiClusterCase.DOI_D_UNE_AUTRE_OEUVRE)
+    ]
 
 
 def test_une_traduction_garde_le_doi():
@@ -463,7 +472,7 @@ def test_une_traduction_garde_le_doi():
         _source_record(1, "crossref", "awakening girls to science", {"rouquette"}),
         _source_record(2, "openalex", "l eveil des filles aux sciences", {"rouquette"}),
     ]
-    assert _resoudre(group) == []
+    assert resolve_cluster_doi_corrections(group) == []
 
 
 def test_depot_hal_au_titre_proche_garde_le_doi():
@@ -482,7 +491,7 @@ def test_depot_hal_au_titre_proche_garde_le_doi():
             {"abreu", "adam"},
         ),
     ]
-    assert _resoudre(group) == []
+    assert resolve_cluster_doi_corrections(group) == []
 
 
 def test_depot_hal_avec_un_auteur_commun_garde_le_doi():
@@ -490,7 +499,7 @@ def test_depot_hal_avec_un_auteur_commun_garde_le_doi():
         _source_record(1, "crossref", "l encampement du monde", {"agier"}),
         _source_record(2, "hal", "sociopoetique des migrations introduction", {"agier", "durand"}),
     ]
-    assert _resoudre(group) == []
+    assert resolve_cluster_doi_corrections(group) == []
 
 
 def test_enregistrement_source_crossref_sans_auteur_aucune_decision():
@@ -498,4 +507,4 @@ def test_enregistrement_source_crossref_sans_auteur_aucune_decision():
         _source_record(1, "crossref", "comptes rendus de lecture", set()),
         _source_record(2, "hal", "jean chateauvert et gilles delavaud", {"martin"}),
     ]
-    assert _resoudre(group) == []
+    assert resolve_cluster_doi_corrections(group) == []

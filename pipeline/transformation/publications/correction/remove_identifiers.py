@@ -65,7 +65,7 @@ def _compute_update(
     for removal in confirmation_removals:
         for id_type, values in removal.removed.items():
             for value in values:
-                removals.setdefault((SourceIdentifierType(id_type), value), removal.case.value)
+                removals.setdefault((id_type, value), removal.case.value)
     identifiers = with_removals(row.identifiers, CLUSTER_IDENTIFIER_RULES, removals)
 
     if identifiers == row.identifiers:
@@ -107,7 +107,6 @@ def compute_updates(rows: list[DoiClusterRow]) -> list[DoiCorrectionUpdate]:
         ]
         decisions = resolve_cluster_doi_corrections(
             group,
-            shared_doi=shared_doi,
             unresolved=any(m.unresolved for m in members),
             has_target=any(m.has_target for m in members),
         )
