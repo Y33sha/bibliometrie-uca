@@ -10,6 +10,7 @@ from domain.persons.contribution_matching import (
     PersonIndex,
     decide_contribution,
     founding_name,
+    name_form_decision,
     settle_publication,
 )
 from domain.persons.contributor_name import ContributorName
@@ -210,6 +211,54 @@ def test_une_personne_deja_rattachee_dans_la_publication_n_est_pas_reprise():
     settled = settle_publication({10: (decision, 3)}, taken=frozenset({1}))
 
     assert settled[10].reason == ContributionSkipReason.PERSON_IN_OTHER_CONTRIBUTION
+
+
+class TestNameFormDecision:
+    _MATCH, _SKIP = ContributionOutcome.MATCH, ContributionOutcome.SKIP
+
+    def test_un_candidat_rattache(self):
+        assert name_form_decision([42]) == ContributionDecision(
+            self._MATCH, 42, ContributionMatchReason.NAME
+        )
+
+    def test_plusieurs_candidats_laissent_le_nom_ambigu(self):
+        assert name_form_decision([42, 17]) == ContributionDecision(
+            self._SKIP, reason=ContributionSkipReason.AMBIGUOUS_NAME_FORM
+        )
+
+    def test_sans_candidat_aucune_decision(self):
+        assert name_form_decision(None) is None
+
+    def test_le_rejet_d_une_candidate_tranche(self):
+        """Deux candidates, dont une rejetée pour la publication : la contribution est rattachée à l'autre."""
+        assert name_form_decision([42, 17], frozenset({17})) == ContributionDecision(
+            self._MATCH, 42, ContributionMatchReason.NAME
+        )
+
+    def test_candidates_toutes_rejetees(self):
+        assert name_form_decision([42, 17], frozenset({42, 17})) == ContributionDecision(
+            self._SKIP, reason=ContributionSkipReason.ALL_CANDIDATES_REJECTED
+        )
+
+    def test_forme_inconnue_une_personne_aux_initiales_compatibles(self):
+        assert name_form_decision(None, compatible_person_ids=[42]) == ContributionDecision(
+            self._MATCH, 42, ContributionMatchReason.COMPATIBLE_NAME
+        )
+
+    def test_forme_inconnue_plusieurs_personnes_compatibles(self):
+        assert name_form_decision(None, compatible_person_ids=[42, 17]) == ContributionDecision(
+            self._SKIP, reason=ContributionSkipReason.AMBIGUOUS_NAME_FORM
+        )
+
+    def test_forme_inconnue_personne_compatible_rejetee(self):
+        assert name_form_decision(
+            None, frozenset({42}), compatible_person_ids=[42]
+        ) == ContributionDecision(self._SKIP, reason=ContributionSkipReason.ALL_CANDIDATES_REJECTED)
+
+    def test_une_forme_connue_ignore_les_personnes_compatibles(self):
+        assert name_form_decision([7], compatible_person_ids=[42]) == ContributionDecision(
+            self._MATCH, 7, ContributionMatchReason.NAME
+        )
 
 
 def _split_member(last, first, source):

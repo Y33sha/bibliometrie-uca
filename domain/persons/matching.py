@@ -3,8 +3,7 @@
 from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from enum import StrEnum
-from typing import Literal, NamedTuple
+from typing import NamedTuple
 
 from domain.normalize import normalize_text
 from domain.persons.contributor_name import ContributorName
@@ -39,15 +38,6 @@ STRONG_PERSON_IDENTIFIER_TYPES: tuple[PersonIdentifierType, ...] = (
 def trusted_identifier(id_type: str, source: str) -> bool:
     """Vrai si l'identifiant d'une contribution source sert au rattachement. Un ORCID sert seulement s'il vient de `ORCID_MATCH_SOURCES`."""
     return id_type != PersonIdentifierType.ORCID or source in ORCID_MATCH_SOURCES
-
-
-class MatchReason(StrEnum):
-    """Motif d'une décision par forme de nom (`decide_name_form_outcome`)."""
-
-    COMPATIBLE_NAME = "compatible_name"
-    AMBIGUOUS_NAME_FORM = "ambiguous_name_form"
-    ALL_CANDIDATES_REJECTED = "all_candidates_rejected"
-    CREATION_NOT_ALLOWED = "creation_not_allowed"
 
 
 class Namesake(NamedTuple):
@@ -130,50 +120,6 @@ def attested_full_first_names(
     return {
         norm: min(counter, key=lambda s: (-counter[s], s)) for norm, counter in spellings.items()
     }
-
-
-@dataclass(frozen=True)
-class NameFormDecision:
-    """Décision par forme de nom : rattacher (`match`), créer une personne (`create`) ou s'abstenir (`skip`)."""
-
-    action: Literal["match", "create", "skip"]
-    person_id: int | None = None
-    reason: MatchReason | None = None
-    """Motif d'un `skip`, ou marque d'un `match` par initiales compatibles."""
-
-
-def decide_name_form_outcome(
-    person_ids: list[int] | None,
-    allow_create: bool,
-    rejected_person_ids: frozenset[int] = frozenset(),
-    compatible_person_ids: Sequence[int] = (),
-) -> NameFormDecision:
-    """Décide par forme de nom.
-
-    - Un candidat → `match`.
-    - Plusieurs candidats → `skip`, `ambiguous_name_form`.
-    - Candidats tous rejetés → `skip`, `all_candidates_rejected`.
-    - Aucun candidat → `create` si `allow_create`, sinon `skip`, `creation_not_allowed`.
-
-    Args:
-        person_ids: personnes de la forme de nom exacte, `None` si la forme est inconnue.
-        rejected_person_ids: personnes rejetées pour la publication, écartées des candidats.
-        compatible_person_ids: personnes désignées par les initiales, candidates seulement si la forme est inconnue.
-    """
-    match_reason: MatchReason | None = None
-    if person_ids is None:
-        if not compatible_person_ids:
-            if allow_create:
-                return NameFormDecision(action="create")
-            return NameFormDecision(action="skip", reason=MatchReason.CREATION_NOT_ALLOWED)
-        person_ids = list(compatible_person_ids)
-        match_reason = MatchReason.COMPATIBLE_NAME
-    candidates = [pid for pid in person_ids if pid not in rejected_person_ids]
-    if len(candidates) == 1:
-        return NameFormDecision(action="match", person_id=candidates[0], reason=match_reason)
-    if not candidates:
-        return NameFormDecision(action="skip", reason=MatchReason.ALL_CANDIDATES_REJECTED)
-    return NameFormDecision(action="skip", reason=MatchReason.AMBIGUOUS_NAME_FORM)
 
 
 @dataclass(frozen=True)
