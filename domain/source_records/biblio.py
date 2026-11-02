@@ -47,7 +47,7 @@ class IssnKey(StrEnum):
     """Vrai pour une valeur gardée telle que reçue, à forme ou clé de contrôle fausse."""
 
 
-def journal_biblio(series: SeriesDescription) -> dict[str, JsonValue] | None:
+def _journal_biblio(series: SeriesDescription) -> dict[str, JsonValue] | None:
     """Construit `biblio.journal` d'après une série, réduit aux valeurs non vides ; `None` sans aucune valeur."""
     issns: list[JsonValue] = [
         {
@@ -81,7 +81,7 @@ def with_journal(
     """Renvoie `biblio` dont la série est remplacée par `series` ; `None` sans aucune valeur."""
     entries = biblio.items() if isinstance(biblio, Mapping) else ()
     result = {key: value for key, value in entries if key != BiblioKey.JOURNAL}
-    journal = journal_biblio(series) if series else None
+    journal = _journal_biblio(series) if series else None
     if journal:
         result[BiblioKey.JOURNAL] = journal
     return result or None
