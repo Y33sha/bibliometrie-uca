@@ -21,7 +21,7 @@ from domain.platforms.platform import PlatformType
 from domain.platforms.registry import known_platform_of_copy, preprint_servers_of_prefix
 from domain.publications.doc_types import DocType
 from domain.publications.licenses import OPEN_LICENSES, license_label
-from domain.publications.metadata import OaStatus
+from domain.publications.oa_status import OaStatus
 from domain.sources.registry import source_label
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.read_models.perimeters.queries import get_institution_country

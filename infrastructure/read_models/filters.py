@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from domain.normalize import normalize_text
 from domain.persons.identifiers import AttributionStatus
 from domain.persons.person import PersonExclusion
-from domain.publications.metadata import (
+from domain.publications.oa_status import (
     ACCESS_LEVELS,
     OA_CLOSED_STATUSES,
     OA_OPEN_STATUSES,

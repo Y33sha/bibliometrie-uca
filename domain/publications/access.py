@@ -18,7 +18,7 @@ from domain.platforms.registry import (
 )
 from domain.publications.identifiers import extract_hal_id_from_url
 from domain.publications.licenses import License
-from domain.publications.metadata import OA_OPEN_STATUSES, OaStatus
+from domain.publications.oa_status import OA_OPEN_STATUSES, OaStatus
 
 _DOI_HOSTS = frozenset({"doi.org", "dx.doi.org"})
 _WEB_SCHEMES = frozenset({"http", "https"})

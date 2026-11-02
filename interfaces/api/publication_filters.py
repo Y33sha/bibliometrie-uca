@@ -9,7 +9,7 @@ from typing import Annotated
 from fastapi import Depends, Query
 
 from domain.publications.doc_types import DOC_TYPES
-from domain.publications.metadata import ACCESS_LEVELS, OA_STATUSES
+from domain.publications.oa_status import ACCESS_LEVELS, OA_STATUSES
 from domain.source_records.impact import CitationTop
 from domain.sources.hal import HAL_DEPOSIT_STATUSES
 from domain.sources.registry import SOURCE_FILTER_VALUES

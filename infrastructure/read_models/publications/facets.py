@@ -12,7 +12,7 @@ from sqlalchemy import Connection, text
 
 from domain.countries import NO_COUNTRY_CODE
 from domain.publications.licenses import license_label
-from domain.publications.metadata import OaStatus
+from domain.publications.oa_status import OaStatus
 from domain.source_records.impact import CITATION_TOP_LABELS, CitationTop
 from domain.sources.hal import HAL_DEPOSIT_STATUS_LABELS, HAL_DEPOSIT_STATUSES
 from domain.sources.registry import source_label
