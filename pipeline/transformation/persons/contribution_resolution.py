@@ -362,14 +362,12 @@ def create_persons(
                     ContributionOutcome.CREATE,
                     person_id,
                     ContributionMatchReason.NAME,
-                    decision.evidence,
                     decision.refused,
                 )
             elif decision.outcome == ContributionOutcome.MATCH and decision.person_id in taken_here:
                 decision = ContributionDecision(
                     ContributionOutcome.SKIP,
                     reason=ContributionSkipReason.PERSON_IN_OTHER_CONTRIBUTION,
-                    evidence=decision.evidence,
                     refused=decision.refused,
                 )
             decisions[contribution_id] = decision
