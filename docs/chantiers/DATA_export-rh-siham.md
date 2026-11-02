@@ -49,13 +49,16 @@ Les dates des deux affectations diffèrent sur 74 lignes.
 - [x] Mise à jour des périodes sur la fenêtre d'observation, fusion des périodes d'une même unité.
 - [x] Correspondance des libellés d'unité avec `structures`. L'import liste les libellés sans correspondance.
 - [x] Refus d'un export antérieur au dernier importé.
+- [x] Fiche RH ajoutée à l'unique homonyme sans fiche RH (même nom, prénom complet, sans exclusion), à défaut création de la personne. Le nom d'une personne en base reste inchangé.
+- [x] Fusion des personnes RH créées en double d'un homonyme (oneshot `merge_hr_homonyms`).
 
 ### Phase 3 — Consommateurs
 
 - [x] Années de présence du périmètre calculées depuis les périodes, réunies en intervalles de présence continue toutes unités confondues.
-- [ ] `person_search`, purge des personnes, fusion de personnes (`_merge.py`) : lecture de la table des périodes.
-- [ ] Liste des personnes : facettes catégorie, laboratoire, corps.
-- [ ] Fiche personne : périodes de présence.
+- [x] Liste des personnes : colonnes corps et laboratoire, facettes catégorie, laboratoire actuel, corps. Une personne partie garde le laboratoire de sa dernière période, grisé.
+- [x] Fiche personne : corps, catégorie, périodes de présence.
+- [x] Administration : l'unité actuelle départage les homonymes.
+- [x] Page d'un laboratoire : l'onglet Personnes réunit les personnes rattachées et celles qui y publient, laboratoire présélectionné. Le compteur du dashboard compte les personnes rattachées.
 - [ ] Suppression de `role_title`, `department_name`, `start_date` et `end_date` de `hr_records`.
 
 ### Phase 4 — Documentation
