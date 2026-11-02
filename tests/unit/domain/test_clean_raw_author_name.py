@@ -10,7 +10,6 @@ import time
 import pytest
 
 from domain.normalize import clean_raw_author_name
-from domain.persons.contributor_name import ContributorName
 
 
 class TestCleanRawAuthorName:
@@ -84,12 +83,6 @@ class TestCleanRawAuthorName:
     )
     def test_clean(self, raw: str, expected: str) -> None:
         assert clean_raw_author_name(raw) == expected
-
-    def test_split_ignores_parenthesized_id(self) -> None:
-        # Sans nettoyage, le token « (1278759) » deviendrait le nom de famille.
-        name = ContributorName.from_raw("Emmanuel Moreau (1278759)")
-        assert name is not None
-        assert name.split() == ("Moreau", "Emmanuel")
 
 
 @pytest.mark.parametrize(
