@@ -5,6 +5,7 @@ import pytest
 
 from domain.serials.issns import IssnSupport
 from pipeline.ingestion.complements import sudoc as client
+from pipeline.ingestion.complements.sudoc_record import marc_fields
 
 _BASE = "https://www.sudoc.fr"
 
@@ -92,13 +93,13 @@ class TestFetchPpns:
 
 class TestMarcFields:
     def test_reads_datafields_in_order(self):
-        fields = client.marc_fields(_SOURCE_RECORD)
+        fields = marc_fields(_SOURCE_RECORD)
         assert [f.tag for f in fields] == ["011", "182", "183", "200"]
         assert fields[0].subfields == (("a", "1476-4687"), ("f", "0028-0836"))
 
     def test_reads_namespaced_record(self):
         xml = _SOURCE_RECORD.replace("<record>", '<record xmlns="http://www.loc.gov/MARC21/slim">')
-        assert [f.tag for f in client.marc_fields(xml)] == ["011", "182", "183", "200"]
+        assert [f.tag for f in marc_fields(xml)] == ["011", "182", "183", "200"]
 
 
 class TestFetchSerialRecord:
