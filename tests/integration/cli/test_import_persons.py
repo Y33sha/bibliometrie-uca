@@ -272,10 +272,19 @@ def test_homonyme_deja_rh_laisse_creer_la_personne(sa_sync_conn):
     assert counts[RhImportOutcome.CREATED] == 1
 
 
-def test_prenom_a_initiale_sans_rattachement_a_l_homonyme(sa_sync_conn):
-    insert_person(sa_sync_conn, "Durand", first_name="Jean L.")
+def test_prenom_avec_initiale_rattache_a_l_homonyme(sa_sync_conn):
+    person = insert_person(sa_sync_conn, "Durand", first_name="Jean L.")
 
     counts = import_export(sa_sync_conn, _export(HrRow("Durand", "Jean L.", siham_id="UCA01")))
+
+    assert counts[RhImportOutcome.BY_NAME] == 1
+    assert _person_of(sa_sync_conn, "UCA01") == person
+
+
+def test_prenom_reduit_a_des_initiales_sans_rattachement_a_l_homonyme(sa_sync_conn):
+    insert_person(sa_sync_conn, "Durand", first_name="J. L.")
+
+    counts = import_export(sa_sync_conn, _export(HrRow("Durand", "J. L.", siham_id="UCA01")))
 
     assert counts[RhImportOutcome.CREATED] == 1
 

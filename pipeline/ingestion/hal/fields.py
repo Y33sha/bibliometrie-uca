@@ -2,7 +2,7 @@
 
 from collections.abc import Mapping
 
-from domain.publications.identifiers import clean_doi
+from domain.publications.identifiers import DOI
 from domain.types import JsonValue
 from pipeline.ingestion.hal.payload import hal_text_field
 
@@ -17,4 +17,4 @@ def extract_doi(doc: Mapping[str, JsonValue]) -> str | None:
 
     `doiId_s` arrive en scalaire depuis le moissonnage, en liste depuis la recherche par identifiant HAL : les deux formes passent au nettoyage.
     """
-    return clean_doi(hal_text_field(doc.get("doiId_s")))
+    return DOI.normalize(hal_text_field(doc.get("doiId_s")))

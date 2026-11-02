@@ -14,14 +14,7 @@ from domain.persons.contributor_name import ContributorName
 from domain.publications.contribution_roles import map_role
 from domain.publications.dates import PublicationDate, date_from_parts, parse_iso_date
 from domain.publications.doc_types import DocType
-from domain.publications.identifiers import (
-    clean_doi,
-    find_isbns,
-    normalize_arxiv_id,
-    normalize_nnt,
-    normalize_pmcid,
-    normalize_pmid,
-)
+from domain.publications.identifiers import DOI, NNT, PMCID, PMID, ArxivId, find_isbns
 from domain.publications.licenses import normalize_license
 from domain.serials.containers import ContainerDescription
 from domain.serials.issns import source_issns
@@ -163,7 +156,7 @@ def build_hal_identifiers(
     identifiers = [
         SourceIdentifier(SourceIdentifierType.HAL_ID, hal_id, SourceIdentifierRole.PRIMARY)
     ]
-    if doi := clean_doi(hal_text_field(doc.get("doiId_s"))):
+    if doi := DOI.normalize(hal_text_field(doc.get("doiId_s"))):
         identifiers.append(SourceIdentifier(SourceIdentifierType.DOI, doi, secondary))
     if nnt:
         identifiers.append(SourceIdentifier(SourceIdentifierType.NNT, nnt, secondary))
@@ -172,15 +165,15 @@ def build_hal_identifiers(
         SourceIdentifier(SourceIdentifierType.ISBN, isbn, role)
         for isbn in parse_tei_isbns(hal_text_field(doc.get("label_xml")))
     )
-    if pmid := normalize_pmid(hal_text_field(doc.get("pubmedId_s"))):
+    if pmid := PMID.normalize(hal_text_field(doc.get("pubmedId_s"))):
         identifiers.append(SourceIdentifier(SourceIdentifierType.PMID, pmid, secondary))
     raw = doc.get("linkExtUrl_s")
     link_urls = [raw] if isinstance(raw, str) else as_sequence(raw)
     for entry in link_urls:
         url = hal_text_field(entry)
-        if pmcid := normalize_pmcid(url):
+        if pmcid := PMCID.normalize(url):
             identifiers.append(SourceIdentifier(SourceIdentifierType.PMCID, pmcid, secondary))
-        if arxiv_id := normalize_arxiv_id(url):
+        if arxiv_id := ArxivId.normalize(url):
             identifiers.append(SourceIdentifier(SourceIdentifierType.ARXIV_ID, arxiv_id, secondary))
     return tuple(identifiers)
 
@@ -196,7 +189,7 @@ def hal_source_record(
     Le titre libre du conteneur se pose seulement sans revue.
     """
     doc_type = get_doc_type(doc)
-    nnt = normalize_nnt(hal_text_field(doc.get("nntId_s")))
+    nnt = NNT.normalize(hal_text_field(doc.get("nntId_s")))
 
     # Toutes les collections du dépôt.
     collections_array = sorted(set(as_strs(doc.get("collCode_s")))) or None

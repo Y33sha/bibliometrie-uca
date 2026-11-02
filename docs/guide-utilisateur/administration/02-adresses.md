@@ -8,6 +8,10 @@ Le bouton « Qualité de la détection » liste les rattachements créés ou rej
 
 ![Affiliations des adresses](../../img/screenshots/admin_addresses.png)
 
+## Onglets Adresses d'une personne et d'une structure
+
+En session d'administration, la fiche d'une personne et celle d'une structure ont un onglet Adresses. Il montre les seules [adresses brutes](../../glossaire.md#adresse-brute). La phase [`affiliations`](../../pipeline/04-affiliations.md) en écarte les libellés HAL et les noms seuls.
+
 ## Pays des adresses `/admin/countries`
 
 Correction des pays des adresses. Une correction se propage aux publications, sans relancer le pipeline.

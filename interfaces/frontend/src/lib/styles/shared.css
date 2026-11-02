@@ -99,11 +99,10 @@
 	--doctype-data: #4f93a3;
 	--doctype-misc: #cfd3d6;
 
-	/* Classes de citation : rampe d'une teinte, du top 1 % (foncé) aux publications sous le top 10 % (clair), puis gris sans indicateur. */
+	/* Classes de citation : top 1 % foncé, top 10 % clair, gris hors top 10 %. */
 	--citation-top_1_percent: var(--accent);
-	--citation-top_10_percent: oklch(0.6 0.085 var(--brand-hue));
-	--citation-below: oklch(0.76 0.065 var(--brand-hue));
-	--citation-none: var(--border);
+	--citation-top_10_percent: oklch(0.76 0.065 var(--brand-hue));
+	--citation-below: var(--border);
 
 	/* Licences : domaine public (bleu), puis du plus ouvert (vert) au moins ouvert (jaune, orange), puis les autorisations sans licence ouverte et l'absence de licence (gris sombre). */
 	--license-public-domain: #2e669e;

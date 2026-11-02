@@ -45,7 +45,6 @@ from pipeline.transformation.publications.author_grouping.store import (
 # Plafonds d'un lot de publications : nombre de publications, nombre de contributions sources d'auteur chargées en mémoire.
 BATCH_SIZE = 1000
 BATCH_SOURCE_CONTRIBUTIONS = 200_000
-_MODEL = ResidualModel(RESIDUAL_WEIGHTS)
 # Source classée après les autres à longueur de liste égale : elle fonde une contribution seulement à défaut d'une autre source.
 DEFERRED_SOURCE = "scanr"
 
@@ -74,6 +73,9 @@ def assign(matrix: Sequence[Sequence[float]]) -> Iterable[tuple[int, int]]:
     """Renvoie l'affectation de gain maximal (algorithme hongrois)."""
     rows, cols = linear_sum_assignment([[-value for value in row] for row in matrix])
     return zip(rows.tolist(), cols.tolist(), strict=True)
+
+
+_MODEL = ResidualModel(RESIDUAL_WEIGHTS, assign)
 
 
 def contributions_by_source_record(
@@ -114,9 +116,7 @@ def align_publication_contributions(
         n: [s for s in record_contributions if s.id not in copies]
         for n, record_contributions in source_records.items()
     }
-    contributions = align_publication(
-        kept, model=_MODEL, assign=assign, deferred=deferred_source_records(rows)
-    )
+    contributions = align_publication(kept, model=_MODEL, deferred=deferred_source_records(rows))
     return contributions, copies
 
 

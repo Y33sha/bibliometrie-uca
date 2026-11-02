@@ -19,6 +19,7 @@ from domain.serials.serial import OaModel
 from domain.source_records.corrections import CORRECTED_BY, RAW
 from domain.source_records.impact import CitationTop
 from domain.source_records.source_extras import CROSSREF_PREPRINT_OF, SourceExtra
+from domain.structures.address_origin import AddressOrigin
 from domain.structures.perimeter_evidence import PerimeterEvidence
 
 
@@ -90,6 +91,11 @@ def is_laboratory(structure: str = "s") -> str:
         f"(SELECT value FROM config WHERE key = '{ConfigKey.LABORATORY_TYPES}')"
         "))::structure_type[])"
     )
+
+
+def is_raw_address(address: str = "a") -> str:
+    """Renvoie la condition vraie quand l'adresse aliasée `address` est une adresse brute. Une adresse sans origine en est exclue."""
+    return f"{address}.origin = '{AddressOrigin.RAW.value}'"
 
 
 def has_author_role(source_contribution: str = "sc") -> str:
@@ -199,7 +205,7 @@ def hr_record_source_contributions(source_contribution_filter: str = "") -> str:
         "sr_rh.publication_year BETWEEN pi.first_year AND pi.last_year",
         (
             "NOT EXISTS (SELECT 1 FROM rejected_contributions rej"
-            " WHERE rej.source_record_id = sc_auth.source_record_id"
+            " WHERE rej.source = sr_rh.source AND rej.source_id = sr_rh.source_id"
             " AND rej.person_id = pi.person_id)"
         ),
     ]
@@ -217,18 +223,20 @@ def hr_record_source_contributions(source_contribution_filter: str = "") -> str:
     )
 
 
-# Paires (publication, personne) rejetées : une publication est rejetée pour une personne dès qu'un de ses enregistrements sources l'est.
-REJECTED_PAIRS = (
-    "SELECT sr_rej.publication_id, rej.person_id FROM rejected_contributions rej"
-    " JOIN source_records sr_rej ON sr_rej.id = rej.source_record_id"
+# Rejets `rej` et leurs enregistrements sources présents `sr_rej`, par clé naturelle. Un rejet sans enregistrement source présent reste en sommeil.
+_REJECTIONS = (
+    "rejected_contributions rej"
+    " JOIN source_records sr_rej ON sr_rej.source = rej.source AND sr_rej.source_id = rej.source_id"
 )
+
+# Paires (publication, personne) rejetées : une publication est rejetée pour une personne dès qu'un de ses enregistrements sources l'est.
+REJECTED_PAIRS = f"SELECT sr_rej.publication_id, rej.person_id FROM {_REJECTIONS}"
 
 
 def publication_rejected_for(publication_id: str, person_id: str) -> str:
     """Renvoie la condition vraie quand la publication `publication_id` est rejetée pour la personne `person_id` (expressions SQL) : un de ses enregistrements sources l'est."""
     return (
-        "EXISTS (SELECT 1 FROM rejected_contributions rej"
-        " JOIN source_records sr_rej ON sr_rej.id = rej.source_record_id"
+        f"EXISTS (SELECT 1 FROM {_REJECTIONS}"
         f" WHERE sr_rej.publication_id = {publication_id} AND rej.person_id = {person_id})"
     )
 

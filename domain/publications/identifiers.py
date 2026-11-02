@@ -30,7 +30,7 @@ _DOI_PREFIX_RE = re.compile(r"(10\.\d+)(?![\w.])")
 _SEPARATORS_RE = re.compile(r"[\s-]")
 
 
-def clean_doi(raw: str | None) -> str | None:
+def _normalize_doi(raw: str | None) -> str | None:
     """Renvoie la forme normalisée d'un DOI brut : en minuscules, sans préfixe d'URL ni schéma, sans artefact de copier-coller. `None` si la valeur n'a pas la forme d'un DOI. Les DOI sont insensibles à la casse."""
     if not raw:
         return None
@@ -93,7 +93,7 @@ class DOI(NormalizedIdentifier):
     """DOI normalisé. Lève `ValidationError` si la valeur nettoyée n'a pas la forme `10.<chiffres>/<suffixe>`."""
 
     label = "DOI"
-    normalize = staticmethod(clean_doi)
+    normalize = staticmethod(_normalize_doi)
 
     @property
     def prefix(self) -> DoiPrefix:
@@ -101,7 +101,7 @@ class DOI(NormalizedIdentifier):
         return DoiPrefix(self.value.split("/", 1)[0])
 
 
-def _doi_prefix(raw: str | None) -> str | None:
+def _normalize_doi_prefix(raw: str | None) -> str | None:
     """Renvoie le préfixe en tête de `raw`, ou `None`."""
     match = _DOI_PREFIX_RE.match((raw or "").strip())
     return match.group(1) if match else None
@@ -111,7 +111,7 @@ class DoiPrefix(NormalizedIdentifier):
     """Préfixe DOI (`10.<chiffres>`), partie d'un DOI avant la première barre oblique. Accepte un DOI complet, des espaces ou une ponctuation finale. Lève `ValidationError` sans préfixe en tête (« doi:10.5194 », « https: »)."""
 
     label = "Préfixe DOI"
-    normalize = staticmethod(_doi_prefix)
+    normalize = staticmethod(_normalize_doi_prefix)
 
 
 # Dépôt HAL : `<code de portail>-<numéro>`, `_` pour séparateur sur ArchiveSIC. Tout code est accepté. Au moins 8 chiffres, pour écarter des fragments d'URL (`pubdb-2020`).
@@ -132,7 +132,7 @@ def is_hal_host(host: str) -> bool:
     return any(label == "hal" or label.startswith("hal-") for label in host.split("."))
 
 
-def extract_hal_id_from_url(raw: str | None) -> str | None:
+def _normalize_hal_id(raw: str | None) -> str | None:
     """Renvoie l'identifiant HAL sans version, tiré d'une URL de portail HAL, d'un identifiant OAI-PMH HAL (`oai:HAL:hal-04123456v1`) ou d'un identifiant nu.
 
     `None` pour une URL d'un autre hôte, un identifiant OAI-PMH d'une autre autorité, ou une autre chaîne que l'identifiant entier : leurs fragments `mot-chiffres` ressemblent à un identifiant HAL (`oai:pure.rug.nl:openaire/1b9c53c2-4cfa-49c4-b454-3339841149ee`, `doi:10.3929/ethz-b-000124558`).
@@ -165,7 +165,7 @@ def hal_deposit_url(url: str) -> str | None:
     host = urlparse(url.strip().lower()).hostname
     if not host or not is_hal_host(host):
         return None
-    hal_id = extract_hal_id_from_url(url)
+    hal_id = _normalize_hal_id(url)
     return hal_id_url(hal_id) if hal_id else None
 
 
@@ -173,13 +173,13 @@ class HALId(NormalizedIdentifier):
     """Identifiant HAL d'un dépôt (`hal-…`, `tel-…`, `halshs-…`), en minuscules et sans version (`hal-04123456v2` → `hal-04123456`). Accepte une URL."""
 
     label = "HAL ID"
-    normalize = staticmethod(extract_hal_id_from_url)
+    normalize = staticmethod(_normalize_hal_id)
 
 
 _NNT_RE = re.compile(r"[0-9A-Z]+")
 
 
-def normalize_nnt(raw: str | None) -> str | None:
+def _normalize_nnt(raw: str | None) -> str | None:
     """Renvoie le NNT en majuscules. `None` s'il contient autre chose que des chiffres et des lettres ASCII, comme les identifiants OAI-PMH donnés à sa place par OpenAlex (`oai:HAL:…`, `ark:/…`)."""
     if not raw:
         return None
@@ -193,7 +193,7 @@ class NNT(NormalizedIdentifier):
     """Numéro national de thèse, le plus souvent de la forme année, code d'établissement, séquence (`2021CLFAC030`)."""
 
     label = "NNT"
-    normalize = staticmethod(normalize_nnt)
+    normalize = staticmethod(_normalize_nnt)
 
 
 _PMID_URL_RE = re.compile(r"pubmed\.ncbi\.nlm\.nih\.gov/(\d+)")
@@ -203,7 +203,7 @@ _PMC_URL_RE = re.compile(
 _PMCID_BARE_RE = re.compile(r"^(?:PMC)?(\d+)$", re.IGNORECASE)
 
 
-def normalize_pmid(raw: str | None) -> str | None:
+def _normalize_pmid(raw: str | None) -> str | None:
     """Extrait le PMID d'une URL PubMed ou d'un identifiant brut (suite de chiffres)."""
     if not raw:
         return None
@@ -214,7 +214,7 @@ def normalize_pmid(raw: str | None) -> str | None:
     return s if s.isdigit() else None
 
 
-def normalize_pmcid(raw: str | None) -> str | None:
+def _normalize_pmcid(raw: str | None) -> str | None:
     """Extrait le PMCID (`PMC<chiffres>`) d'une URL PubMed Central ou d'un identifiant brut."""
     if not raw:
         return None
@@ -230,14 +230,14 @@ class PMID(NormalizedIdentifier):
     """PubMed ID (suite de chiffres). Accepte une URL PubMed."""
 
     label = "PMID"
-    normalize = staticmethod(normalize_pmid)
+    normalize = staticmethod(_normalize_pmid)
 
 
 class PMCID(NormalizedIdentifier):
     """PubMed Central ID (`PMC<chiffres>`). Accepte une URL PubMed Central."""
 
     label = "PMCID"
-    normalize = staticmethod(normalize_pmcid)
+    normalize = staticmethod(_normalize_pmcid)
 
 
 _ARXIV_URL_RE = re.compile(
@@ -247,7 +247,7 @@ _ARXIV_URL_RE = re.compile(
 _ARXIV_BARE_RE = re.compile(r"^(\d{4}\.\d{4,5}|[a-z.\-]+/\d{7})(?:v\d+)?$", re.IGNORECASE)
 
 
-def normalize_arxiv_id(raw: str | None) -> str | None:
+def _normalize_arxiv_id(raw: str | None) -> str | None:
     """Extrait l'identifiant arXiv, `AAAA.NNNNN` (`2103.00001`) ou `catégorie/NNNNNNN` (`math/0211159`), d'une URL `arxiv.org/abs|pdf/<id>` ou d'un identifiant brut. Suffixe de version (`v2`) et extension `.pdf` sont ignorés."""
     if not raw:
         return None
@@ -263,7 +263,7 @@ class ArxivId(NormalizedIdentifier):
     """Identifiant arXiv. Accepte une URL arXiv."""
 
     label = "arXiv ID"
-    normalize = staticmethod(normalize_arxiv_id)
+    normalize = staticmethod(_normalize_arxiv_id)
 
 
 _ISSN_RE = re.compile(r"(?:ISSN[:\s]*)?(\d{4})-?(\d{3})([\dX])", re.IGNORECASE | re.ASCII)
@@ -380,7 +380,7 @@ def extract_doi_from_url(url: str | None) -> str | None:
     if not url:
         return None
     if url.startswith("doi:"):
-        return clean_doi(url[4:])
+        return _normalize_doi(url[4:])
     if is_host(url, "doi.org"):
-        return clean_doi(url)
+        return _normalize_doi(url)
     return None

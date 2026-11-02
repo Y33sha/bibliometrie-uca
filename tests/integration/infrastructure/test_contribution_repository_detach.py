@@ -1,8 +1,11 @@
 """Les détachements du repository des contributions retirent la personne et le mode de résolution de la contribution."""
 
+from sqlalchemy import text
+
 from infrastructure.db.queues import Queue
 from infrastructure.repositories import contribution_repository
 from infrastructure.repositories.contribution_repository import detach_rejected_contributions
+from infrastructure.sql_fragments import REJECTED_PAIRS
 from tests.integration.helpers.alignment import contribution_person, insert_person_contribution
 from tests.integration.helpers.persons import insert_person, insert_rejected_contribution
 from tests.integration.helpers.publications import insert_publication
@@ -28,6 +31,23 @@ def test_detachement_d_une_paire_rejetee(sa_sync_conn):
     assert detach_rejected_contributions(sa_sync_conn, person) == 1
 
     assert contribution_person(sa_sync_conn, contribution) == (None, None)
+
+
+def test_rejet_retrouve_au_retour_de_son_enregistrement_source(sa_sync_conn):
+    """L'enregistrement source disparu revient sous un autre identifiant, dans une autre publication : son rejet s'y applique."""
+    conn = sa_sync_conn
+    person = insert_person(conn, "Dupont", first_name="Jean")
+    publication = insert_publication(conn)
+    source_record = insert_source_record(conn, publication, source_id="hal-retour")
+    insert_rejected_contribution(conn, publication, person_id=person)
+    conn.execute(text("DELETE FROM source_records WHERE id = :id"), {"id": source_record})
+    rejected = f"SELECT publication_id, person_id FROM ({REJECTED_PAIRS}) rp"
+    assert conn.execute(text(rejected)).all() == []
+
+    other_publication = insert_publication(conn)
+    insert_source_record(conn, other_publication, source_id="hal-retour")
+
+    assert [tuple(r) for r in conn.execute(text(rejected))] == [(other_publication, person)]
 
 
 def test_marquage_par_forme_de_nom(sa_sync_conn):

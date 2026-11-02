@@ -9,16 +9,14 @@ from domain.publications.author_grouping import (
     GroupingMethod,
     ResidualModel,
     SourceContribution,
+    _conflicting_initials,
+    _jaro_winkler,
+    _link_threshold,
+    _longest_ordered,
+    _position_only,
     align_publication,
     comparison_levels,
-    conflicting_initials,
-    full_first_name,
-    gap,
-    jaro_winkler,
-    link_threshold,
-    longest_ordered,
     plan_contribution_ids,
-    position_only,
     with_known_first_name,
 )
 from pipeline.transformation.publications.author_grouping.residual_weights import (
@@ -50,6 +48,9 @@ def _greedy(matrix):
             taken_cols.add(j)
             out.append((i, j))
     return out
+
+
+_MODEL = ResidualModel(RESIDUAL_WEIGHTS, _greedy)
 
 
 def _aligned(contributions):
@@ -310,14 +311,13 @@ class TestAlignPublication:
                 "orcid": {},
                 "idref": {},
                 "gap": {"même trou": 6.0, "trou voisin": 4.0, "ailleurs": -1.0},
-            }
+            },
+            assign=_greedy,
         )
         reference = [("martin", "a"), ("garcia navarro", "j e"), ("durand", "c")]
         other = [("martin", "a"), ("navarro", "j e garcia"), ("durand", "c")]
         contributions = align_publication(
-            {1: _source_record(1, reference), 2: _source_record(2, other)},
-            model=model,
-            assign=_greedy,
+            {1: _source_record(1, reference), 2: _source_record(2, other)}, model=model
         )
         variant = next(g for g in contributions if g.reference.id == 101)
         member = next(m for m in variant.members if m.source_contribution == 201)
@@ -327,27 +327,23 @@ class TestAlignPublication:
 
     def test_la_position_seule_ne_lie_pas(self):
         """Deux listes sans aucun nom commun : le même trou ne suffit pas à lier deux auteurs."""
-        model = ResidualModel(RESIDUAL_WEIGHTS)
         contributions = align_publication(
             {
                 1: _source_record(1, [("martin", "anne"), ("petit", "bruno")]),
                 2: _source_record(2, [("durand", "claire"), ("leroy", "denis")]),
             },
-            model=model,
-            assign=_greedy,
+            model=_MODEL,
         )
         assert _aligned(contributions) == []
 
     def test_un_identifiant_commun_lie_malgre_des_noms_sans_ressemblance(self):
-        model = ResidualModel(RESIDUAL_WEIGHTS)
         orcid = "0000-0001-2345-6789"
         contributions = align_publication(
             {
                 1: [SourceContribution(100, 1, 0, "martin", "anne", orcid)],
                 2: [SourceContribution(200, 2, 0, "dupont", "claire", orcid)],
             },
-            model=model,
-            assign=_greedy,
+            model=_MODEL,
         )
         assert _aligned(contributions) == [
             [(100, GroupingMethod.REFERENCE), (200, GroupingMethod.MODEL)]
@@ -365,45 +361,45 @@ class TestAlignPublication:
             assert len(source_records_of_contribution) == len(set(source_records_of_contribution))
 
 
-def _position_only(x, y):
-    return position_only(comparison_levels(x, y))
+def _only_position(x, y):
+    return _position_only(comparison_levels(x, y))
 
 
-def _conflicting_initials(x, y):
-    return conflicting_initials(x, y, comparison_levels(x, y))
+def _initials_conflict(x, y):
+    return _conflicting_initials(x, y, comparison_levels(x, y))
 
 
 class TestPositionOnly:
     def test_noms_sans_ressemblance(self):
-        assert _position_only(_author("martin", "anne"), _author("durand", "claire"))
+        assert _only_position(_author("martin", "anne"), _author("durand", "claire"))
 
     def test_prenom_absent(self):
-        assert _position_only(_author("martin", ""), _author("durand", "claire"))
+        assert _only_position(_author("martin", ""), _author("durand", "claire"))
 
     def test_patronyme_proche(self):
-        assert not _position_only(_author("martin", "anne"), _author("martins", "claire"))
+        assert not _only_position(_author("martin", "anne"), _author("martins", "claire"))
 
     def test_identifiant_commun(self):
-        assert not _position_only(
+        assert not _only_position(
             _author("martin", "anne", orcid="0000"), _author("durand", "claire", orcid="0000")
         )
 
 
 class TestConflictingInitials:
     def test_patronyme_proche_et_initiales_differentes(self):
-        assert _conflicting_initials(_author("balakrishnan", "v"), _author("balaji", "s"))
+        assert _initials_conflict(_author("balakrishnan", "v"), _author("balaji", "s"))
 
     def test_patronyme_identique(self):
-        assert not _conflicting_initials(_author("mcdonald", "millie"), _author("mcdonald", "e f"))
+        assert not _initials_conflict(_author("mcdonald", "millie"), _author("mcdonald", "e f"))
 
     def test_initiales_concordantes(self):
-        assert not _conflicting_initials(_author("soh", "d a"), _author("su", "daxian"))
+        assert not _initials_conflict(_author("soh", "d a"), _author("su", "daxian"))
 
     def test_prenom_absent(self):
-        assert not _conflicting_initials(_author("balakrishnan", ""), _author("balaji", "s"))
+        assert not _initials_conflict(_author("balakrishnan", ""), _author("balaji", "s"))
 
     def test_identifiant_commun(self):
-        assert not _conflicting_initials(
+        assert not _initials_conflict(
             _author("balakrishnan", "v", orcid="0000"), _author("balaji", "s", orcid="0000")
         )
 
@@ -411,22 +407,10 @@ class TestConflictingInitials:
         """« V. Balakrishnan » occupe la place de « S. Balaji » entre deux auteurs liés : le modèle ne les lie pas."""
         reference = _source_record(1, [("martin", "a"), ("balaji", "s"), ("durand", "c")])
         other = _source_record(2, [("martin", "a"), ("balakrishnan", "v"), ("durand", "c")])
-        contributions = align_publication(
-            {1: reference, 2: other},
-            model=ResidualModel(RESIDUAL_WEIGHTS),
-            assign=_greedy,
-        )
+        contributions = align_publication({1: reference, 2: other}, model=_MODEL)
         assert all(
             len(g.members) == 1 for g in contributions if g.reference.last_name.startswith("bala")
         )
-
-
-class TestFullFirstName:
-    def test_un_prenom_en_initiales_est_vide(self):
-        assert full_first_name("j a") == ""
-
-    def test_un_prenom_complet_reste(self):
-        assert full_first_name("jean a") == "jean a"
 
 
 class TestWithKnownFirstName:
@@ -459,15 +443,10 @@ class TestLongestOrdered:
     def test_un_lien_qui_croise_les_autres_est_ecarte(self):
         """Nom de famille unique lié à 1 800 positions d'écart : « A. Ferrer » en 757, « J. A. Valls Ferrer » en 2579."""
         links = [(10, 1, 1), (20, 2, 2), (757, 2579, 3), (800, 800, 4), (900, 900, 5)]
-        assert longest_ordered(links) == {1, 2, 4, 5}
+        assert _longest_ordered(links) == {1, 2, 4, 5}
 
     def test_aucun_lien(self):
-        assert longest_ordered([]) == set()
-
-
-class TestGap:
-    def test_nombre_d_ancres_qui_precedent(self):
-        assert [gap([10, 20, 30], v) for v in (5, 15, 25, 35)] == [0, 1, 2, 3]
+        assert _longest_ordered([]) == set()
 
 
 class TestJaroWinkler:
@@ -482,7 +461,7 @@ class TestJaroWinkler:
     )
     def test_valeurs_de_duckdb(self, a, b, expected):
         """Les demi-transpositions s'arrondissent à l'entier inférieur, comme dans DuckDB."""
-        assert jaro_winkler(a, b) == pytest.approx(expected)
+        assert _jaro_winkler(a, b) == pytest.approx(expected)
 
 
 class TestComparisonLevels:
@@ -508,15 +487,16 @@ class TestResidualModel:
                 "orcid": {"exact": 12.0},
                 "idref": {},
                 "gap": {"même trou": 6.0},
-            }
+            },
+            assign=_greedy,
         )
         assert model.score_levels(comparison_levels(_author(), _author())) == 19.0
 
 
 def test_seuil_log2_du_nombre_de_contributions():
-    assert link_threshold(8) == 3.0
-    assert link_threshold(1) == 1.0
-    assert link_threshold(1000) == pytest.approx(math.log2(1000))
+    assert _link_threshold(8) == 3.0
+    assert _link_threshold(1) == 1.0
+    assert _link_threshold(1000) == pytest.approx(math.log2(1000))
 
 
 class TestPlanContributionIds:

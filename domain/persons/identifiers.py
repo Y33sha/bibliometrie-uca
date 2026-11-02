@@ -68,7 +68,7 @@ _ORCID_URL_PREFIXES = ("https://orcid.org/", "http://orcid.org/", "orcid.org/")
 _ORCID_CANONICAL = re.compile(r"^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$")
 
 
-def normalize_orcid(raw: str | None) -> str | None:
+def _normalize_orcid(raw: str | None) -> str | None:
     """Renvoie la forme normalisée d'un ORCID (`0000-0002-1825-0097`), écrit avec ou sans URL, avec ou sans tirets ; `None` si le format est invalide."""
     if not raw:
         return None
@@ -95,7 +95,7 @@ class ORCID(NormalizedIdentifier):
     """ORCID. Seul le format est contrôlé, sans la clé de contrôle MOD 11-2."""
 
     label = "ORCID"
-    normalize = staticmethod(normalize_orcid)
+    normalize = staticmethod(_normalize_orcid)
 
 
 # Un IdHAL est une chaîne sans espace. Sa forme par défaut est `prenom-nom`.

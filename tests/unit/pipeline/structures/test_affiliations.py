@@ -1,6 +1,6 @@
-"""Orchestrateur de la phase `affiliations` : enchaînement des trois sous-étapes.
+"""Orchestrateur de la phase `affiliations` : enchaînement des tâches, transactions et métriques.
 
-La phase rafraîchit le périmètre, résout les adresses, puis pose `in_perimeter`. Chaque sous-étape ouvre sa propre transaction. Le périmètre est lu une fois, après le rafraîchissement, et passé aux deux sous-étapes suivantes.
+Chaque tâche ouvre sa propre transaction. La résolution des adresses et la pose des indices de périmètre lisent le périmètre des personnes.
 """
 
 from unittest.mock import patch
@@ -24,6 +24,15 @@ def perimetre(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[int]]:
     return lus
 
 
+def _phase(ror: PhaseMetrics | None = None) -> phase.AffiliationsPhase:
+    return phase.AffiliationsPhase(
+        refresh_ror=lambda _ctx: ror or PhaseMetrics(),
+        refresh_hal_structures=lambda _ctx, _stale: PhaseMetrics(),
+        classify_addresses=lambda _conn, _logger: PhaseMetrics(),
+        resolve_thesis_partners=lambda _conn, _logger: 0,
+    )
+
+
 def _run(contexte, *, processed=7, in_perimeter=3):
     vus: dict[str, set[int]] = {}
     with (
@@ -41,11 +50,7 @@ def _run(contexte, *, processed=7, in_perimeter=3):
             side_effect=lambda conn, logger, ids: vus.__setitem__("populate", ids),
         ),
     ):
-        metrics = phase.AffiliationsPhase(
-            refresh_ror=lambda _ctx: PhaseMetrics(),
-            refresh_hal_structures=lambda _ctx, _stale: PhaseMetrics(),
-            resolve_thesis_partners=lambda _conn, _logger: 0,
-        ).run(contexte())
+        metrics = _phase().run(contexte())
     return metrics, vus
 
 
@@ -59,7 +64,7 @@ def test_assemble_les_metriques_de_la_resolution(contexte):
 def test_chaque_sous_etape_dans_sa_transaction(open_tx, contexte):
     _run(contexte)
 
-    assert open_tx.transactions == 4
+    assert open_tx.transactions == 5
 
 
 def test_les_deux_taches_lisent_le_perimetre_des_personnes(contexte):
@@ -75,11 +80,7 @@ def test_perimetre_d_extraction_vide_arrete_la_phase(contexte, perimetre):
         patch.object(phase, "run_resolution") as resolution,
         pytest.raises(EmptyExtractionPerimeterError),
     ):
-        phase.AffiliationsPhase(
-            refresh_ror=lambda _ctx: PhaseMetrics(),
-            refresh_hal_structures=lambda _ctx, _stale: PhaseMetrics(),
-            resolve_thesis_partners=lambda _conn, _logger: 0,
-        ).run(contexte())
+        _phase().run(contexte())
 
     resolution.assert_not_called()
 
@@ -95,10 +96,6 @@ def test_rafraichit_le_referentiel_ror_et_reprend_ses_metriques(contexte):
         ),
         patch.object(phase, "populate"),
     ):
-        metrics = phase.AffiliationsPhase(
-            refresh_ror=lambda _ctx: ror,
-            refresh_hal_structures=lambda _ctx, _stale: PhaseMetrics(),
-            resolve_thesis_partners=lambda _conn, _logger: 0,
-        ).run(contexte())
+        metrics = _phase(ror).run(contexte())
 
     assert metrics.details["ror"] == {"version": "v2.14", "imported": True}

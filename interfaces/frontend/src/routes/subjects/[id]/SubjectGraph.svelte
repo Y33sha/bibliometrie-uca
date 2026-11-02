@@ -2,6 +2,7 @@
   import { resolve } from "$app/paths";
   import type { components } from "#lib/api/schema.js";
   import { CX, CY, subjectGraphLayout, type GraphNode } from "./subjectGraphLayout";
+  import { specificityPercent } from "./specificity";
 
   type SubjectListItem = components["schemas"]["SubjectListItem"];
   type SubjectNeighbor = components["schemas"]["SubjectNeighborOut"];
@@ -22,10 +23,6 @@
 
   // Brut : comparé par identité aux nœuds du placement, il ne doit pas être enveloppé dans un proxy.
   let hovered = $state.raw<GraphNode | null>(null);
-
-  function percent(spec: number): string {
-    return (spec * 100).toLocaleString("fr-FR", { maximumFractionDigits: 1 }) + " %";
-  }
 </script>
 
 <div class="graph">
@@ -83,7 +80,7 @@
       <div class="tip-title">{hovered.neighbor.label}</div>
       <div>{hovered.neighbor.cooccurrence_count.toLocaleString("fr-FR")} publications en commun</div>
       <div>
-        {percent(hovered.specificity)} des publications de ce sujet portent aussi « {subject.label} »
+        {specificityPercent(hovered.neighbor)}&nbsp;% des publications de ce sujet portent aussi « {subject.label} »
       </div>
       <div class="tip-muted">{hovered.neighbor.usage_count.toLocaleString("fr-FR")} publications au total</div>
     </div>

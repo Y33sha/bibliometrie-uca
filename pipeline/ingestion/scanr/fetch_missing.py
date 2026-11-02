@@ -5,7 +5,7 @@
 
 Une requête Elasticsearch `terms` sur `externalIds.id.keyword` cherche un lot de 50 identifiants, en authentification basique.
 
-ScanR stocke les DOI en casse variable : les DOI de ses réponses passent par `clean_doi` avant d'être comparés aux DOI demandés.
+ScanR stocke les DOI en casse variable : les DOI de ses réponses passent par `DOI.normalize` avant d'être comparés aux DOI demandés.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from collections.abc import Callable
 import httpx2
 from sqlalchemy import Connection, text
 
-from domain.publications.identifiers import clean_doi
+from domain.publications.identifiers import DOI
 from domain.source_records.identifiers import SourceIdentifierType
 from domain.sources.staging import StagingEntryMode
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
@@ -70,7 +70,7 @@ class ScanrDoiSearch:
         self, client: httpx2.AsyncClient, dois: list[str]
     ) -> LookupBatch | Unavailable:
         # Comparaison sur DOI nettoyé, cohérente avec les DOI en minuscules de `get_missing_dois`.
-        return await search_by_external_ids(client, dois, id_type="doi", normalize=clean_doi)
+        return await search_by_external_ids(client, dois, id_type="doi", normalize=DOI.normalize)
 
 
 _HAL_ID_PENDING = pending_failed_lookup_sql(

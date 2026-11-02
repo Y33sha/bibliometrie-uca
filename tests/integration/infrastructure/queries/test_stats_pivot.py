@@ -111,7 +111,7 @@ class TestLicense:
 
 
 class TestCitationClass:
-    def test_classes_exclusives_et_publications_sans_indicateur(self, sa_sync_conn):
+    def test_classes_exclusives_publications_sans_indicateur_exclues(self, sa_sync_conn):
         impacts = [
             '{"top_1_percent": true, "top_10_percent": true}',
             '{"top_1_percent": false, "top_10_percent": true}',
@@ -131,7 +131,6 @@ class TestCitationClass:
             "top_1_percent": 1,
             "top_10_percent": 1,
             "below": 1,
-            "none": 2,
         }
 
 

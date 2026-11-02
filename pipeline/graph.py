@@ -418,6 +418,20 @@ TASKS: tuple[Task, ...] = (
         network="hal",
     ),
     _task(
+        "affiliations.classify_addresses",
+        "affiliations",
+        reads=(
+            "addresses.raw_text",
+            "addresses.normalized_text",
+            "addresses.origin",
+            "hal_structures",
+            "ror_organizations",
+            "place_name_forms",
+        ),
+        writes=("addresses.origin",),
+        previous_run=("addresses.origin",),
+    ),
+    _task(
         "affiliations.resolve_addresses",
         "affiliations",
         reads=(
@@ -1096,6 +1110,8 @@ TASKS: tuple[Task, ...] = (
             "person_identifiers",
             "person_name_forms",
             "persons",
+            # Personnes à fiche RH, dont la complétion des prénoms laisse le prénom tel quel.
+            "hr_records",
             "contribution_resolution_queue",
         ),
         writes=(

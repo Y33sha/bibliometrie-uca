@@ -147,8 +147,9 @@ def insert_rejected_contribution(
     conflict = " ON CONFLICT DO NOTHING" if ignore_conflict else ""
     conn.execute(
         text(
-            "INSERT INTO rejected_contributions (source_record_id, person_id) "
-            f"SELECT id, :pid FROM source_records WHERE publication_id = :publication{conflict}"
+            "INSERT INTO rejected_contributions (source, source_id, person_id) "
+            "SELECT source, source_id, :pid FROM source_records"
+            f" WHERE publication_id = :publication{conflict}"
         ),
         {"publication": publication_id, "pid": person_id},
     )

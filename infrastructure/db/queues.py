@@ -27,7 +27,7 @@ class Queue(StrEnum):
     CONTRIBUTION_ATTRIBUTES = "contribution_attributes_queue"
     """Contributions dont les attributs sont à recomposer : une contribution source a changé de rôles, de statut de correspondant ou d'indices de périmètre, ou le groupement a changé les contributions sources."""
     CONTRIBUTION_RESOLUTION = "contribution_resolution_queue"
-    """Contributions dont la personne est à redécider : le groupement a changé leurs contributions sources, ou un identifiant ou une forme de nom qui les rattachait est invalidé."""
+    """Contributions dont la personne est à redécider : le groupement a changé leurs contributions sources, une de leurs contributions sources a changé d'informations du contributeur, ou un identifiant ou une forme de nom qui les rattachait est invalidé."""
 
 
 def enqueue_sql(queue: Queue, ids_sql: str) -> str:

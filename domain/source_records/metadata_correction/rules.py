@@ -1,19 +1,14 @@
-"""Correction des métadonnées par table de règles, pour un enregistrement source comme pour une publication.
+"""Correction du type de document par table de règles, pour un enregistrement source comme pour une publication.
 
-`doc_type_correction` applique les règles aux faits de `MetadataForCorrection`, et corrige le type de document.
-
-Une règle est un membre de `MetadataCorrectionRule` et son entrée dans `_RULES`. `applies_to` liste ses prédicats, tous requis. `corrected_to` donne le type cible. La première règle de `_RULES` qui s'applique l'emporte.
-
-Les prédicats sont les clés de `_AppliesTo`. Une clé qui nomme un champ de `MetadataForCorrection` teste l'égalité. Les autres clés ont leur branche dans `_check_predicate`.
-
-Un fait inconnu vaut `None`, et les prédicats qui le testent sont faux. Une publication connaît seulement les faits de `MetadataForCorrection.for_publication`.
+Une règle est un membre de `MetadataCorrectionRule` et son entrée dans `_RULES`. La première règle de `_RULES` qui s'applique aux faits l'emporte. Un fait inconnu vaut `None`, et les conditions qui le lisent sont fausses. Une publication connaît seulement les faits de `MetadataForCorrection.for_publication`.
 """
 
 import re
-from dataclasses import dataclass, field, fields
+from collections.abc import Callable
+from dataclasses import dataclass
 from enum import StrEnum
 from functools import cache
-from typing import NamedTuple, TypedDict
+from typing import NamedTuple
 
 from domain.platforms.registry import preprint_servers_of_doi
 from domain.publications.doc_types import DocType
@@ -48,12 +43,6 @@ class MetadataForCorrection:
     source: str | None = None
     author_count: int | None = None
     """`source_records.author_count` : contributions sources d'auteur non collectives."""
-    preprint_server_dois: bool = field(init=False)
-    """Les `dois`, un au moins, sont tous des DOI de serveur de preprints (`preprint_servers_of_doi`)."""
-
-    def __post_init__(self) -> None:
-        on_server = bool(self.dois) and all(preprint_servers_of_doi(doi) for doi in self.dois)
-        object.__setattr__(self, "preprint_server_dois", on_server)
 
     @classmethod
     def for_publication(
@@ -112,10 +101,10 @@ class MetadataCorrectionRule(StrEnum):
     HAL_DEPOSIT_MISSING_TO_REMOVED = "HAL_DEPOSIT_MISSING_TO_REMOVED"
 
 
-class Correction[T](NamedTuple):
-    """Valeur corrigée, et règle qui la produit."""
+class Correction(NamedTuple):
+    """Type de document corrigé, et règle qui le produit."""
 
-    value: T
+    value: str
     rule: MetadataCorrectionRule
 
 
@@ -181,46 +170,44 @@ _VOLUME_TITLE_PREFIX_PATTERN = re.compile(
 _THESIS_REGISTRY_DOI_PREFIXES = ("10.70675",)
 
 
-class _AppliesTo(TypedDict, total=False):
-    """Prédicats d'une règle, tous requis.
-
-    Une clé au nom d'un champ de `MetadataForCorrection` est une égalité sur ce champ.
-    """
-
-    doc_type: str | frozenset[str]
-    """Type ou types de document, comparés en minuscules. Limite la règle aux types plausibles."""
-    doc_type_not_in: frozenset[str]
-    """Types laissés en l'état par la règle. Un type absent est hors de l'ensemble."""
-    serial_type: str
-    url_contains: str
-    """Sous-chaîne d'au moins une des `urls`."""
-    doi_contains: str
-    """Sous-chaîne d'au moins un des `dois`."""
-    title_prefix_normalized: tuple[str, ...]
-    """Préfixes de `title_normalized`."""
-    title_regex: re.Pattern[str]
-    """Motif cherché dans le titre."""
-    serial_id_present: bool
-    """Présence d'un `serial_id`."""
-    doi_prefix_not_in: tuple[str, ...]
-    """Au moins un des `dois` a un préfixe hors du tuple."""
-    preprint_server_dois: bool
-    self_declared_preprint: bool
-    declares_conference: bool
-    registrant_publisher_type: str
-    """Élément de `registrant_publisher_types`."""
-    in_proceedings_volume: bool
-    group_title: frozenset[str]
-    """Valeurs admises, comparées en minuscules."""
-    source: str
-    author_count_max: int
-    """`author_count` connu et au plus égal à la valeur."""
+def _url_contains(facts: MetadataForCorrection, part: str) -> bool:
+    return any(part in url for url in facts.urls or ())
 
 
-class _RuleDefinition(TypedDict):
-    applies_to: _AppliesTo
-    corrected_to: str
-    """Type de document cible."""
+def _doi_contains(facts: MetadataForCorrection, part: str) -> bool:
+    return any(part in doi for doi in facts.dois)
+
+
+def _title_starts_with(facts: MetadataForCorrection, prefixes: tuple[str, ...]) -> bool:
+    return bool(facts.title) and facts.title_normalized.startswith(prefixes)
+
+
+def _title_matches(facts: MetadataForCorrection, pattern: re.Pattern[str]) -> bool:
+    return bool(facts.title and pattern.search(facts.title))
+
+
+def _doi_prefix_outside(facts: MetadataForCorrection, prefixes: tuple[str, ...]) -> bool:
+    """Vrai si un des DOI a un préfixe hors de `prefixes`."""
+    return any(doi.split("/", 1)[0] not in prefixes for doi in facts.dois)
+
+
+def _preprint_server_dois(facts: MetadataForCorrection) -> bool:
+    """Vrai si les DOI, un au moins, sont tous des DOI de serveur de preprints."""
+    return bool(facts.dois) and all(preprint_servers_of_doi(doi) for doi in facts.dois)
+
+
+def _group_title_in(facts: MetadataForCorrection, values: frozenset[str]) -> bool:
+    return (facts.group_title or "").lower() in values
+
+
+class _Rule(NamedTuple):
+    """Règle de correction du type de document."""
+
+    doc_types: frozenset[str] | None
+    """Types de document que la règle corrige, `None` pour tous, type absent compris."""
+    applies: Callable[[MetadataForCorrection], bool]
+    """Condition sur les faits, hors type de document."""
+    corrected_to: DocType
 
 
 # Types qu'une règle de titre peut corriger.
@@ -228,307 +215,192 @@ _ARTICLE_OR_OTHER = frozenset({DocType.ARTICLE, DocType.OTHER})
 
 
 # Ordre de priorité : URL, type de revue, puis titre.
-_RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
+_RULES: dict[MetadataCorrectionRule, _Rule] = {
     # theses.fr fait autorité sur les thèses françaises. Un enregistrement source theses.fr rattaché à une revue relève de `THESIS_WITH_SERIAL_TO_ARTICLE`.
-    MetadataCorrectionRule.THESES_FR_URL_TO_THESIS: {
-        "applies_to": {"url_contains": "theses.fr/", "serial_id_present": False},
-        "corrected_to": DocType.THESIS,
-    },
+    MetadataCorrectionRule.THESES_FR_URL_TO_THESIS: _Rule(
+        None,
+        lambda f: _url_contains(f, "theses.fr/") and f.serial_id is None,
+        DocType.THESIS,
+    ),
     # DUMAS héberge des mémoires et des thèses d'exercice. Seul l'enregistrement source HAL distingue la thèse d'exercice, par le diplôme : elle garde son type. Même exception que theses.fr pour un enregistrement source rattaché à une revue.
-    MetadataCorrectionRule.DUMAS_URL_TO_MEMOIR: {
-        "applies_to": {
-            "url_contains": "dumas.ccsd",
-            "serial_id_present": False,
-            "doc_type_not_in": frozenset({DocType.PRACTICE_THESIS}),
-        },
-        "corrected_to": DocType.MEMOIR,
-    },
+    MetadataCorrectionRule.DUMAS_URL_TO_MEMOIR: _Rule(
+        None,
+        lambda f: (
+            _url_contains(f, "dumas.ccsd")
+            and f.serial_id is None
+            and f.doc_type != DocType.PRACTICE_THESIS
+        ),
+        DocType.MEMOIR,
+    ),
     # Thèse ou mémoire rattaché à une revue, avec un DOI d'éditeur : c'est l'article publié, que OpenAlex ou ScanR confondent avec la thèse.
     # Avec un DOI de registre de thèses, ou sans DOI, le type reste thèse. L'article perd ses identifiants de thèse (`is_dissertation_identifier`).
-    MetadataCorrectionRule.THESIS_WITH_SERIAL_TO_ARTICLE: {
-        "applies_to": {
-            "doc_type": frozenset(
-                {DocType.THESIS, DocType.ONGOING_THESIS, DocType.PRACTICE_THESIS, DocType.MEMOIR}
-            ),
-            "serial_id_present": True,
-            "doi_prefix_not_in": _THESIS_REGISTRY_DOI_PREFIXES,
-        },
-        "corrected_to": DocType.ARTICLE,
-    },
+    MetadataCorrectionRule.THESIS_WITH_SERIAL_TO_ARTICLE: _Rule(
+        frozenset(
+            {DocType.THESIS, DocType.ONGOING_THESIS, DocType.PRACTICE_THESIS, DocType.MEMOIR}
+        ),
+        lambda f: f.serial_id is not None and _doi_prefix_outside(f, _THESIS_REGISTRY_DOI_PREFIXES),
+        DocType.ARTICLE,
+    ),
     # Revue typée `media` à la main ⇒ `media`, quel que soit le `doc_type`.
-    MetadataCorrectionRule.SERIAL_TYPE_MEDIA_TO_MEDIA: {
-        "applies_to": {"serial_type": SerialType.MEDIA},
-        "corrected_to": DocType.MEDIA,
-    },
+    MetadataCorrectionRule.SERIAL_TYPE_MEDIA_TO_MEDIA: _Rule(
+        None, lambda f: f.serial_type == SerialType.MEDIA, DocType.MEDIA
+    ),
     # DOI déposé par un éditeur de presse ⇒ `media`, quel que soit le `doc_type`. The Conversation dépose ses articles sans titre de revue.
-    MetadataCorrectionRule.DOI_REGISTRANT_MEDIA_TO_MEDIA: {
-        "applies_to": {"registrant_publisher_type": PublisherType.MEDIA},
-        "corrected_to": DocType.MEDIA,
-    },
+    MetadataCorrectionRule.DOI_REGISTRANT_MEDIA_TO_MEDIA: _Rule(
+        None, lambda f: PublisherType.MEDIA in f.registrant_publisher_types, DocType.MEDIA
+    ),
     # Enregistrement source Crossref sans auteur dont le titre nomme un volume d'actes ou un recueil de résumés ⇒ `proceedings`.
-    MetadataCorrectionRule.CROSSREF_AUTHORLESS_VOLUME_TITLE_TO_PROCEEDINGS: {
-        "applies_to": {
-            "source": "crossref",
-            "author_count_max": 0,
-            "doc_type": frozenset({DocType.ARTICLE, DocType.CONFERENCE_PAPER, DocType.OTHER}),
-            "title_regex": _VOLUME_TITLE_PATTERN,
-        },
-        "corrected_to": DocType.PROCEEDINGS,
-    },
+    MetadataCorrectionRule.CROSSREF_AUTHORLESS_VOLUME_TITLE_TO_PROCEEDINGS: _Rule(
+        frozenset({DocType.ARTICLE, DocType.CONFERENCE_PAPER, DocType.OTHER}),
+        lambda f: (
+            f.source == "crossref"
+            and f.author_count == 0
+            and _title_matches(f, _VOLUME_TITLE_PATTERN)
+        ),
+        DocType.PROCEEDINGS,
+    ),
     # Enregistrement source Crossref dont le titre commence par un mot de volume ⇒ `proceedings`, quel que soit son nombre d'auteurs.
-    MetadataCorrectionRule.CROSSREF_VOLUME_TITLE_PREFIX_TO_PROCEEDINGS: {
-        "applies_to": {
-            "source": "crossref",
-            "doc_type": frozenset({DocType.ARTICLE, DocType.CONFERENCE_PAPER, DocType.OTHER}),
-            "title_regex": _VOLUME_TITLE_PREFIX_PATTERN,
-        },
-        "corrected_to": DocType.PROCEEDINGS,
-    },
+    MetadataCorrectionRule.CROSSREF_VOLUME_TITLE_PREFIX_TO_PROCEEDINGS: _Rule(
+        frozenset({DocType.ARTICLE, DocType.CONFERENCE_PAPER, DocType.OTHER}),
+        lambda f: f.source == "crossref" and _title_matches(f, _VOLUME_TITLE_PREFIX_PATTERN),
+        DocType.PROCEEDINGS,
+    ),
     # Article ou chapitre d'une revue d'actes ⇒ `conference_paper`. Un `book` peut être un volume entier d'actes.
-    MetadataCorrectionRule.SERIAL_TYPE_PROCEEDINGS_TO_CONFERENCE_PAPER: {
-        "applies_to": {
-            "serial_type": SerialType.PROCEEDINGS,
-            "doc_type": frozenset({DocType.ARTICLE, DocType.BOOK_CHAPTER}),
-        },
-        "corrected_to": DocType.CONFERENCE_PAPER,
-    },
+    MetadataCorrectionRule.SERIAL_TYPE_PROCEEDINGS_TO_CONFERENCE_PAPER: _Rule(
+        frozenset({DocType.ARTICLE, DocType.BOOK_CHAPTER}),
+        lambda f: f.serial_type == SerialType.PROCEEDINGS,
+        DocType.CONFERENCE_PAPER,
+    ),
     # Article ou chapitre d'un volume d'actes (sa monographie) ⇒ `conference_paper`.
-    MetadataCorrectionRule.PROCEEDINGS_VOLUME_TO_CONFERENCE_PAPER: {
-        "applies_to": {
-            "in_proceedings_volume": True,
-            "doc_type": frozenset({DocType.ARTICLE, DocType.BOOK_CHAPTER}),
-        },
-        "corrected_to": DocType.CONFERENCE_PAPER,
-    },
+    MetadataCorrectionRule.PROCEEDINGS_VOLUME_TO_CONFERENCE_PAPER: _Rule(
+        frozenset({DocType.ARTICLE, DocType.BOOK_CHAPTER}),
+        lambda f: bool(f.in_proceedings_volume),
+        DocType.CONFERENCE_PAPER,
+    ),
     # Contenu déposé sans sous-type `preprint`, présenté oralement (`oral`, `pico`) ⇒ `conference`. Copernicus dépose ainsi les résumés de ses réunions (assemblée générale de l'EGU).
-    MetadataCorrectionRule.PRESENTATION_ORAL_TO_CONFERENCE: {
-        "applies_to": {"doc_type": DocType.OTHER, "group_title": frozenset({"oral", "pico"})},
-        "corrected_to": DocType.CONFERENCE,
-    },
+    MetadataCorrectionRule.PRESENTATION_ORAL_TO_CONFERENCE: _Rule(
+        frozenset({DocType.OTHER}),
+        lambda f: _group_title_in(f, frozenset({"oral", "pico"})),
+        DocType.CONFERENCE,
+    ),
     # Même contenu présenté en session d'affichage (`display`) ⇒ `poster`.
-    MetadataCorrectionRule.PRESENTATION_DISPLAY_TO_POSTER: {
-        "applies_to": {"doc_type": DocType.OTHER, "group_title": frozenset({"display"})},
-        "corrected_to": DocType.POSTER,
-    },
+    MetadataCorrectionRule.PRESENTATION_DISPLAY_TO_POSTER: _Rule(
+        frozenset({DocType.OTHER}),
+        lambda f: _group_title_in(f, frozenset({"display"})),
+        DocType.POSTER,
+    ),
     # Chapitre qui nomme le congrès dont il est issu ⇒ `conference_paper`. Springer décrit ainsi les actes publiés en livre.
-    MetadataCorrectionRule.CONFERENCE_DECLARED_TO_CONFERENCE_PAPER: {
-        "applies_to": {
-            "declares_conference": True,
-            "doc_type": DocType.BOOK_CHAPTER,
-        },
-        "corrected_to": DocType.CONFERENCE_PAPER,
-    },
+    MetadataCorrectionRule.CONFERENCE_DECLARED_TO_CONFERENCE_PAPER: _Rule(
+        frozenset({DocType.BOOK_CHAPTER}),
+        lambda f: bool(f.declares_conference),
+        DocType.CONFERENCE_PAPER,
+    ),
     # DOI de serveur de preprints (arXiv, bioRxiv, SSRN, Research Square, …), sans revue + doc_type ∈ {article, other} ⇒ `preprint`. Une revue désigne l'article publié, déposé sous le DOI du preprint.
-    MetadataCorrectionRule.DOI_PREPRINT_SERVER_TO_PREPRINT: {
-        "applies_to": {
-            "preprint_server_dois": True,
-            "serial_id_present": False,
-            "doc_type": _ARTICLE_OR_OTHER,
-        },
-        "corrected_to": DocType.PREPRINT,
-    },
+    MetadataCorrectionRule.DOI_PREPRINT_SERVER_TO_PREPRINT: _Rule(
+        _ARTICLE_OR_OTHER,
+        lambda f: f.serial_id is None and _preprint_server_dois(f),
+        DocType.PREPRINT,
+    ),
     # L'enregistrement source se déclare preprint d'une autre œuvre (relation Crossref `is-preprint-of`). La déclaration prime sur tout type de document, absent compris.
-    MetadataCorrectionRule.PREPRINT_RELATION_TO_PREPRINT: {
-        "applies_to": {"self_declared_preprint": True},
-        "corrected_to": DocType.PREPRINT,
-    },
+    MetadataCorrectionRule.PREPRINT_RELATION_TO_PREPRINT: _Rule(
+        None, lambda f: bool(f.self_declared_preprint), DocType.PREPRINT
+    ),
     # Titre `interview`/`reportage`/`podcast` + `doc_type` ∈ {article, other, recorded_talk} ⇒ `media`.
-    MetadataCorrectionRule.TITLE_MEDIA_PREFIX_TO_MEDIA: {
-        "applies_to": {
-            "doc_type": _ARTICLE_OR_OTHER | {DocType.RECORDED_TALK},
-            "title_prefix_normalized": _MEDIA_TITLE_PREFIXES,
-        },
-        "corrected_to": DocType.MEDIA,
-    },
+    MetadataCorrectionRule.TITLE_MEDIA_PREFIX_TO_MEDIA: _Rule(
+        _ARTICLE_OR_OTHER | {DocType.RECORDED_TALK},
+        lambda f: _title_starts_with(f, _MEDIA_TITLE_PREFIXES),
+        DocType.MEDIA,
+    ),
     # Collection Figshare (`10.6084/m9.figshare.c.<id>`), ensemble de fichiers supplémentaires ⇒ `dataset`. Son titre est celui de l'article, d'où une règle sur le DOI.
-    MetadataCorrectionRule.DOI_FIGSHARE_COLLECTION_TO_DATASET: {
-        "applies_to": {
-            "doc_type": _ARTICLE_OR_OTHER,
-            "doi_contains": "m9.figshare.c.",
-        },
-        "corrected_to": DocType.DATASET,
-    },
+    MetadataCorrectionRule.DOI_FIGSHARE_COLLECTION_TO_DATASET: _Rule(
+        _ARTICLE_OR_OTHER, lambda f: _doi_contains(f, "m9.figshare.c."), DocType.DATASET
+    ),
     # Titre de fichiers complémentaires + doc_type ∈ {article, other, conference, recorded_talk} ⇒ `dataset`. DataCite et des entrepôts (Dryad, Zenodo) les décrivent à part ; Figshare en type certains `Presentation`, DataCite les vidéos `Audiovisual`.
-    MetadataCorrectionRule.TITLE_SUPPLEMENTARY_CONTENT_TO_DATASET: {
-        "applies_to": {
-            "doc_type": _ARTICLE_OR_OTHER | {DocType.CONFERENCE, DocType.RECORDED_TALK},
-            "title_prefix_normalized": _SUPPLEMENTARY_CONTENT_TITLE_PREFIXES,
-        },
-        "corrected_to": DocType.DATASET,
-    },
+    MetadataCorrectionRule.TITLE_SUPPLEMENTARY_CONTENT_TO_DATASET: _Rule(
+        _ARTICLE_OR_OTHER | {DocType.CONFERENCE, DocType.RECORDED_TALK},
+        lambda f: _title_starts_with(f, _SUPPLEMENTARY_CONTENT_TITLE_PREFIXES),
+        DocType.DATASET,
+    ),
     # Titre d'erratum ⇒ `erratum`. OpenAlex type souvent les errata `article`, `preprint` ou `data_paper`.
-    MetadataCorrectionRule.TITLE_ERRATUM_PREFIX_TO_ERRATUM: {
-        "applies_to": {
-            "doc_type": frozenset(
-                {
-                    DocType.ARTICLE,
-                    DocType.PREPRINT,
-                    DocType.REVIEW,
-                    DocType.CONFERENCE_PAPER,
-                    DocType.DATA_PAPER,
-                    DocType.LETTER,
-                    DocType.OTHER,
-                }
-            ),
-            "title_prefix_normalized": _ERRATUM_TITLE_PREFIXES,
-        },
-        "corrected_to": DocType.ERRATUM,
-    },
+    MetadataCorrectionRule.TITLE_ERRATUM_PREFIX_TO_ERRATUM: _Rule(
+        frozenset(
+            {
+                DocType.ARTICLE,
+                DocType.PREPRINT,
+                DocType.REVIEW,
+                DocType.CONFERENCE_PAPER,
+                DocType.DATA_PAPER,
+                DocType.LETTER,
+                DocType.OTHER,
+            }
+        ),
+        lambda f: _title_starts_with(f, _ERRATUM_TITLE_PREFIXES),
+        DocType.ERRATUM,
+    ),
     # Titre d'avis de rétractation + doc_type ∈ {article, other} ⇒ `retraction`.
-    MetadataCorrectionRule.TITLE_RETRACTION_PREFIX_TO_RETRACTION: {
-        "applies_to": {
-            "doc_type": _ARTICLE_OR_OTHER,
-            "title_prefix_normalized": _RETRACTION_TITLE_PREFIXES,
-        },
-        "corrected_to": DocType.RETRACTION,
-    },
+    MetadataCorrectionRule.TITLE_RETRACTION_PREFIX_TO_RETRACTION: _Rule(
+        _ARTICLE_OR_OTHER,
+        lambda f: _title_starts_with(f, _RETRACTION_TITLE_PREFIXES),
+        DocType.RETRACTION,
+    ),
     # Titre « Editorial: … » + doc_type ∈ {article, other} ⇒ `editorial`. Les sources typent souvent ces éditoriaux `article`.
-    MetadataCorrectionRule.TITLE_EDITORIAL_PREFIX_TO_EDITORIAL: {
-        "applies_to": {
-            "doc_type": _ARTICLE_OR_OTHER,
-            "title_regex": _EDITORIAL_PREFIX_PATTERN,
-        },
-        "corrected_to": DocType.EDITORIAL,
-    },
+    MetadataCorrectionRule.TITLE_EDITORIAL_PREFIX_TO_EDITORIAL: _Rule(
+        _ARTICLE_OR_OTHER,
+        lambda f: _title_matches(f, _EDITORIAL_PREFIX_PATTERN),
+        DocType.EDITORIAL,
+    ),
     # Titre « Letter: … » + doc_type ∈ {article, other} ⇒ `letter`.
-    MetadataCorrectionRule.TITLE_LETTER_PREFIX_TO_LETTER: {
-        "applies_to": {
-            "doc_type": _ARTICLE_OR_OTHER,
-            "title_regex": _LETTER_PREFIX_PATTERN,
-        },
-        "corrected_to": DocType.LETTER,
-    },
+    MetadataCorrectionRule.TITLE_LETTER_PREFIX_TO_LETTER: _Rule(
+        _ARTICLE_OR_OTHER, lambda f: _title_matches(f, _LETTER_PREFIX_PATTERN), DocType.LETTER
+    ),
     # Titre de revue systématique + doc_type `article` ⇒ `review`. Une revue systématique peut aussi être un poster, un preprint ou un mémoire.
-    MetadataCorrectionRule.TITLE_SYSTEMATIC_REVIEW_TO_REVIEW: {
-        "applies_to": {
-            "doc_type": frozenset({DocType.ARTICLE}),
-            "title_regex": _SYSTEMATIC_REVIEW_PATTERN,
-        },
-        "corrected_to": DocType.REVIEW,
-    },
+    MetadataCorrectionRule.TITLE_SYSTEMATIC_REVIEW_TO_REVIEW: _Rule(
+        frozenset({DocType.ARTICLE}),
+        lambda f: _title_matches(f, _SYSTEMATIC_REVIEW_PATTERN),
+        DocType.REVIEW,
+    ),
     # Titre avec un ISBN + doc_type ∈ {article, review, other} ⇒ `book_review`. Un livre ou un chapitre a parfois son propre ISBN dans le titre (saisie HAL).
-    MetadataCorrectionRule.TITLE_ISBN_TO_BOOK_REVIEW: {
-        "applies_to": {
-            "doc_type": frozenset({DocType.ARTICLE, DocType.REVIEW, DocType.OTHER}),
-            "title_regex": _ISBN_PATTERN,
-        },
-        "corrected_to": DocType.BOOK_REVIEW,
-    },
+    MetadataCorrectionRule.TITLE_ISBN_TO_BOOK_REVIEW: _Rule(
+        frozenset({DocType.ARTICLE, DocType.REVIEW, DocType.OTHER}),
+        lambda f: _title_matches(f, _ISBN_PATTERN),
+        DocType.BOOK_REVIEW,
+    ),
     # Titre terminé par « AAAA, N p. » + mêmes types que la règle ISBN ⇒ `book_review`. Moins sûre, elle suit la règle ISBN.
-    MetadataCorrectionRule.TITLE_YEAR_PAGES_END_TO_BOOK_REVIEW: {
-        "applies_to": {
-            "doc_type": frozenset({DocType.ARTICLE, DocType.REVIEW, DocType.OTHER}),
-            "title_regex": _YEAR_PAGES_END_PATTERN,
-        },
-        "corrected_to": DocType.BOOK_REVIEW,
-    },
+    MetadataCorrectionRule.TITLE_YEAR_PAGES_END_TO_BOOK_REVIEW: _Rule(
+        frozenset({DocType.ARTICLE, DocType.REVIEW, DocType.OTHER}),
+        lambda f: _title_matches(f, _YEAR_PAGES_END_PATTERN),
+        DocType.BOOK_REVIEW,
+    ),
     # Titre de recension ⇒ `book_review`. OpenAlex type souvent les recensions `preprint`.
-    MetadataCorrectionRule.TITLE_RECENSION_TO_BOOK_REVIEW: {
-        "applies_to": {
-            "doc_type": frozenset(
-                {DocType.ARTICLE, DocType.REVIEW, DocType.OTHER, DocType.PREPRINT}
-            ),
-            "title_regex": _RECENSION_TITLE_PATTERN,
-        },
-        "corrected_to": DocType.BOOK_REVIEW,
-    },
+    MetadataCorrectionRule.TITLE_RECENSION_TO_BOOK_REVIEW: _Rule(
+        frozenset({DocType.ARTICLE, DocType.REVIEW, DocType.OTHER, DocType.PREPRINT}),
+        lambda f: _title_matches(f, _RECENSION_TITLE_PATTERN),
+        DocType.BOOK_REVIEW,
+    ),
     # Revue de données + doc_type `article` ⇒ `data_paper`. Les sources typent `article` les data papers de ces revues. Évaluée après les règles de titre : un erratum ou un éditorial d'une revue de données garde son type.
-    MetadataCorrectionRule.SERIAL_TYPE_DATA_JOURNAL_TO_DATA_PAPER: {
-        "applies_to": {
-            "serial_type": SerialType.DATA_JOURNAL,
-            "doc_type": DocType.ARTICLE,
-        },
-        "corrected_to": DocType.DATA_PAPER,
-    },
+    MetadataCorrectionRule.SERIAL_TYPE_DATA_JOURNAL_TO_DATA_PAPER: _Rule(
+        frozenset({DocType.ARTICLE}),
+        lambda f: f.serial_type == SerialType.DATA_JOURNAL,
+        DocType.DATA_PAPER,
+    ),
 }
-
-_FIELDS = frozenset(f.name for f in fields(MetadataForCorrection))
-
-# Prédicats sur le type de document, évalués une fois par type pour toutes les règles (`_candidate_rules`).
-_DOC_TYPE_KEYS = frozenset({"doc_type", "doc_type_not_in"})
-
-
-def _doc_type_admitted(doc_type: str, key: str, value: object) -> bool:
-    """Vrai si le type de document `doc_type`, en minuscules, vérifie le prédicat de type `key` de valeur `value`."""
-    if key == "doc_type":
-        return doc_type in value if isinstance(value, frozenset) else doc_type == value
-    assert isinstance(value, frozenset)
-    return doc_type not in value
-
-
-def _lower_doc_type(source_record: MetadataForCorrection) -> str:
-    """Renvoie le type de document des faits, en minuscules, vide sans type."""
-    return (source_record.doc_type or "").lower()
-
-
-def _check_predicate(source_record: MetadataForCorrection, key: str, value: object) -> bool:
-    """Vrai si les faits vérifient le prédicat `key` de valeur `value` (`_AppliesTo`)."""
-    if key in _DOC_TYPE_KEYS:
-        return _doc_type_admitted(_lower_doc_type(source_record), key, value)
-    if key == "author_count_max":
-        assert isinstance(value, int)
-        return source_record.author_count is not None and source_record.author_count <= value
-    if key == "group_title":
-        assert isinstance(value, frozenset)
-        return (source_record.group_title or "").lower() in value
-    if key == "url_contains":
-        assert isinstance(value, str)
-        return any(value in (u or "") for u in (source_record.urls or ()))
-    if key == "doi_contains":
-        assert isinstance(value, str)
-        return any(value in doi for doi in source_record.dois)
-    if key == "title_prefix_normalized":
-        assert isinstance(value, tuple)
-        if not source_record.title:
-            return False
-        return any(source_record.title_normalized.startswith(p) for p in value)
-    if key == "title_regex":
-        assert isinstance(value, re.Pattern)
-        return bool(source_record.title and value.search(source_record.title))
-    if key == "serial_id_present":
-        assert isinstance(value, bool)
-        return (source_record.serial_id is not None) == value
-    if key == "doi_prefix_not_in":
-        assert isinstance(value, tuple)
-        return any(doi.split("/", 1)[0] not in value for doi in source_record.dois)
-    if key == "registrant_publisher_type":
-        return value in source_record.registrant_publisher_types
-    if key in _FIELDS:
-        return bool(getattr(source_record, key) == value)
-    raise ValueError(f"Prédicat inconnu : {key!r}")
-
-
-class _CandidateRule(NamedTuple):
-    """Règle dont les prédicats de type admettent un type de document."""
-
-    rule_id: MetadataCorrectionRule
-    corrected_to: str
-    predicates: tuple[tuple[str, object], ...]
-    """Prédicats de la règle autres que de type de document."""
 
 
 @cache
-def _candidate_rules(doc_type: str) -> tuple[_CandidateRule, ...]:
-    """Renvoie, dans l'ordre de `_RULES`, les règles dont les prédicats de type admettent `doc_type` (en minuscules)."""
-    candidates = []
-    for rule_id, rule_def in _RULES.items():
-        applies_to = rule_def["applies_to"].items()
-        if all(_doc_type_admitted(doc_type, k, v) for k, v in applies_to if k in _DOC_TYPE_KEYS):
-            candidates.append(
-                _CandidateRule(
-                    rule_id,
-                    rule_def["corrected_to"],
-                    tuple((k, v) for k, v in applies_to if k not in _DOC_TYPE_KEYS),
-                )
-            )
-    return tuple(candidates)
+def _candidate_rules(doc_type: str | None) -> tuple[tuple[MetadataCorrectionRule, _Rule], ...]:
+    """Renvoie, dans l'ordre de `_RULES`, les règles qui corrigent le type `doc_type`."""
+    return tuple(
+        (rule_id, rule)
+        for rule_id, rule in _RULES.items()
+        if rule.doc_types is None or doc_type in rule.doc_types
+    )
 
 
-def doc_type_correction(source_record: MetadataForCorrection) -> Correction[str] | None:
+def doc_type_correction(facts: MetadataForCorrection) -> Correction | None:
     """Renvoie la correction du type de document par la première règle de `_RULES` qui s'applique, `None` sans correction. Une correction qui dépend d'une autre, comme un type corrigé selon le type de la revue rattachée, passe par l'ordre des sous-étapes de la phase `metadata_correction`."""
-    for rule in _candidate_rules(_lower_doc_type(source_record)):
-        if all(_check_predicate(source_record, k, v) for k, v in rule.predicates):
-            return Correction(rule.corrected_to, rule.rule_id)
+    for rule_id, rule in _candidate_rules(facts.doc_type):
+        if rule.applies(facts):
+            return Correction(rule.corrected_to, rule_id)
     return None
 
 
@@ -547,7 +419,7 @@ def is_dissertation_identifier(identifier: SourceIdentifier) -> bool:
 
 def origin_doc_type_correction(
     doc_type: str | None, origin_doc_type: str | None
-) -> Correction[str] | None:
+) -> Correction | None:
     """Renvoie la correction de type d'un enregistrement source ScanR issu d'un dépôt HAL : il prend le type corrigé de ce dépôt.
 
     Args:

@@ -13,7 +13,7 @@ from domain.normalize import drop_flattened_mathml
 from domain.persons.contributor_name import ContributorName
 from domain.publications.contribution_roles import ContributionRole
 from domain.publications.dates import PublicationDate
-from domain.publications.identifiers import clean_doi
+from domain.publications.identifiers import DOI
 from domain.publications.licenses import License, normalize_license
 from domain.serials.containers import ContainerDescription, ContainerRole, container_role
 from domain.serials.series import split_collection_and_volume
@@ -55,7 +55,7 @@ from pipeline.transformation.publishing.find_or_create import (
 
 def get_doi(msg: Mapping[str, JsonValue]) -> str | None:
     """Renvoie le DOI normalisé ; Crossref le donne tel que déposé."""
-    return clean_doi(as_str(msg.get("DOI")))
+    return DOI.normalize(as_str(msg.get("DOI")))
 
 
 def get_title(msg: Mapping[str, JsonValue]) -> str | None:

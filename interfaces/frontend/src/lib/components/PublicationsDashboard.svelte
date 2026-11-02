@@ -63,7 +63,7 @@
 	// Publications par classe de citation, sur les années récentes.
 	let citationClasses = $state<Row[]>([]);
 	let citationPoints = $state<CitationPoint[]>([]);
-	let scatterValue = $state<'citations' | 'fwci'>('citations');
+	let scatterValue = $state<'citations' | 'fwci'>('fwci');
 
 	function query(docTypes: string[] | null, extra: Record<string, string>): string {
 		const params = contextParams(context);
@@ -134,7 +134,7 @@
 	const topCited = $derived(
 		sum(citationClasses.filter((r) => r.citation_class === 'top_1_percent' || r.citation_class === 'top_10_percent')),
 	);
-	const withCitationClass = $derived(sum(citationClasses.filter((r) => r.citation_class !== 'none')));
+	const withCitationClass = $derived(sum(citationClasses));
 
 	const keyFigures = $derived<KeyFigure[]>([
 		{ value: total.toLocaleString('fr-FR'), label: plural(total, 'publication'), icon: 'book-open-cover' },
@@ -221,8 +221,8 @@
 				<div class="scatter-head">
 					<h2>{scatterValue === 'citations' ? 'Citations' : 'FWCI'} par publication</h2>
 					<div class="scatter-toggle" role="group" aria-label="Valeur">
-						<button type="button" aria-pressed={scatterValue === 'citations'} onclick={() => (scatterValue = 'citations')}>Citations</button>
 						<button type="button" aria-pressed={scatterValue === 'fwci'} onclick={() => (scatterValue = 'fwci')}>FWCI</button>
+						<button type="button" aria-pressed={scatterValue === 'citations'} onclick={() => (scatterValue = 'citations')}>Citations</button>
 					</div>
 				</div>
 				<YearScatterChart

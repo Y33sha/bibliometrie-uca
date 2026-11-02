@@ -49,11 +49,12 @@ class FirstNameCompletion(NamedTuple):
 def complete_reduced_first_names(
     conn: Connection, *, repo: PgPersonRepository
 ) -> FirstNameCompletion:
-    """Donne à chaque personne au prénom réduit le prénom plein, s'il est seul donné par les contributions sources de ses contributions."""
+    """Donne à chaque personne au prénom réduit le prénom plein, s'il est seul donné par les contributions sources de ses contributions. Le prénom d'une personne à fiche RH vient du SI RH et reste tel quel."""
+    hr_persons = set(conn.execute(text("SELECT DISTINCT person_id FROM hr_records")).scalars())
     reduced = {}
     for namesake in fetch_namesakes(conn):
         initials = first_name_initials(namesake.first_name)
-        if initials is not None:
+        if initials is not None and namesake.person_id not in hr_persons:
             reduced[namesake.person_id] = (namesake, initials)
     names = fetch_linked_contributor_names(conn, sorted(reduced))
 

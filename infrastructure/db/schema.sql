@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict otZ2tBSVTJQcqkSqH8VcVI1GxCb0SAuM0qSe8d7A4AUQP9WJeojFLNMa752rjmA
+\restrict tra27bfv8t74bEICJLP4UaLmnm6zP9ujAMP8xacjhcRyucIalXl5dt5OvAnAjM7
 
--- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
--- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
+-- Dumped from database version 18.4
+-- Dumped by pg_dump version 18.4
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -101,6 +101,17 @@ CREATE EXTENSION IF NOT EXISTS unaccent WITH SCHEMA public;
 --
 
 COMMENT ON EXTENSION unaccent IS 'text search dictionary that removes accents';
+
+
+--
+-- Name: address_origin; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public.address_origin AS ENUM (
+    'raw',
+    'hal_label',
+    'name_only'
+);
 
 
 --
@@ -1025,10 +1036,18 @@ ALTER SEQUENCE persons.persons_id_seq OWNED BY persons.persons.id;
 --
 
 CREATE TABLE persons.rejected_contributions (
-    source_record_id integer NOT NULL,
     person_id integer NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    source public.source_type NOT NULL,
+    source_id text NOT NULL
 );
+
+
+--
+-- Name: TABLE rejected_contributions; Type: COMMENT; Schema: persons; Owner: -
+--
+
+COMMENT ON TABLE persons.rejected_contributions IS 'Couples (enregistrement source, personne) rejetés par l''administration, par clé naturelle de l''enregistrement source. Le rejet d''un enregistrement source disparu de sa source s''applique à son retour.';
 
 
 --
@@ -3318,8 +3337,16 @@ CREATE TABLE structures.addresses (
     created_at timestamp with time zone DEFAULT now(),
     publication_count integer DEFAULT 0,
     countries character(2)[],
+    origin public.address_origin,
     CONSTRAINT ck_addresses_normalized_text_not_empty CHECK ((normalized_text <> ''::text))
 );
+
+
+--
+-- Name: COLUMN addresses.origin; Type: COMMENT; Schema: structures; Owner: -
+--
+
+COMMENT ON COLUMN structures.addresses.origin IS 'Origine du texte : adresse brute, libellé HAL ou nom seul. La phase affiliations la pose sur les adresses sans origine.';
 
 
 --
@@ -3818,7 +3845,7 @@ ALTER TABLE ONLY persons.persons
 --
 
 ALTER TABLE ONLY persons.rejected_contributions
-    ADD CONSTRAINT rejected_contributions_pkey PRIMARY KEY (source_record_id, person_id);
+    ADD CONSTRAINT rejected_contributions_pkey PRIMARY KEY (source, source_id, person_id);
 
 
 --
@@ -5510,14 +5537,6 @@ ALTER TABLE ONLY persons.rejected_contributions
 
 
 --
--- Name: rejected_contributions rejected_contributions_source_record_id_fkey; Type: FK CONSTRAINT; Schema: persons; Owner: -
---
-
-ALTER TABLE ONLY persons.rejected_contributions
-    ADD CONSTRAINT rejected_contributions_source_record_id_fkey FOREIGN KEY (source_record_id) REFERENCES sources.source_records(id) ON DELETE CASCADE;
-
-
---
 -- Name: aligned_source_contributions aligned_source_contributions_contribution_id_fkey; Type: FK CONSTRAINT; Schema: publications; Owner: -
 --
 
@@ -6065,5 +6084,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict otZ2tBSVTJQcqkSqH8VcVI1GxCb0SAuM0qSe8d7A4AUQP9WJeojFLNMa752rjmA
+\unrestrict tra27bfv8t74bEICJLP4UaLmnm6zP9ujAMP8xacjhcRyucIalXl5dt5OvAnAjM7
 

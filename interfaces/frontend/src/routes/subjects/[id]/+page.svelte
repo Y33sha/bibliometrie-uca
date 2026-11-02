@@ -7,6 +7,7 @@
   import { latestRequest } from "#lib/api/index.js";
   import type { components } from "#lib/api/schema.js";
   import SubjectGraph from "./SubjectGraph.svelte";
+  import { specificity, specificityPercent } from "./specificity";
   import PublicationsListView from "#lib/components/PublicationsListView.svelte";
   import TabNav from "#lib/components/TabNav.svelte";
   import SortChevron from "#lib/components/SortChevron.svelte";
@@ -53,11 +54,9 @@
     loadFor(subjectKey, NEIGHBORS_LIMIT, MIN_COOCCURRENCE);
   });
 
-  // Tableau des sujets associés, trié par spécificité par défaut : part des publications du sujet associé qui portent aussi le sujet de la page.
+  // Tableau des sujets associés, trié par spécificité par défaut.
   type NeighborSort = "common" | "specificity" | "total";
   let neighborSort = $state<NeighborSort>("specificity");
-  const specificity = (n: { cooccurrence_count: number; usage_count: number }) =>
-    Math.min(1, n.cooccurrence_count / Math.max(n.usage_count, 1));
   const sortedNeighbors = $derived(
     [...(data?.neighbors ?? [])].sort((a, b) =>
       neighborSort === "common"
@@ -176,7 +175,7 @@
                     <td class="num">
                       <span class="spec-cell">
                         <span class="spec-bar" style="width: {(specificity(n) / maxSpecificity) * 60}px"></span>
-                        {(specificity(n) * 100).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} %
+                        <span><span class="spec-value">{specificityPercent(n)}</span>&nbsp;%</span>
                       </span>
                     </td>
                     <td class="num muted-num">{n.usage_count.toLocaleString("fr-FR")}</td>
@@ -248,6 +247,11 @@
     align-items: center;
     justify-content: flex-end;
     gap: 8px;
+  }
+  /* Largeur de trois chiffres : les barres s'alignent quel que soit le nombre de chiffres. */
+  .spec-value {
+    display: inline-block;
+    min-width: 3ch;
   }
   .spec-bar {
     display: inline-block;

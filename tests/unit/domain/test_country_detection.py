@@ -1,6 +1,35 @@
-"""Préséance entre les pays candidats d'une adresse."""
+"""Nom de pays final et préséance entre les pays candidats d'une adresse."""
 
-from domain.country_detection import CountryDetectionMethod as M, retained_countries
+from domain.country_detection import CountryDetectionMethod as M, CountryNames, retained_countries
+
+COUNTRY_NAMES = CountryNames(
+    {
+        "france": "fr",
+        "kingdom": "xx",  # piège : sous-chaîne de « united kingdom »
+        "united kingdom": "gb",
+        "new zealand": "nz",
+    }
+)
+
+
+def test_nom_de_pays_final():
+    assert COUNTRY_NAMES.trailing_country("cnrs paris france") == "fr"
+
+
+def test_le_plus_long_nom_de_pays_l_emporte():
+    assert COUNTRY_NAMES.trailing_country("some lab london united kingdom") == "gb"
+
+
+def test_texte_reduit_a_un_nom_de_pays():
+    assert COUNTRY_NAMES.trailing_country("new zealand") == "nz"
+
+
+def test_nom_de_pays_ailleurs_qu_a_la_fin_ignore():
+    assert COUNTRY_NAMES.trailing_country("france avenue de paris") is None
+
+
+def test_texte_vide_sans_pays():
+    assert COUNTRY_NAMES.trailing_country("") is None
 
 
 def test_sans_candidat_aucun_pays():

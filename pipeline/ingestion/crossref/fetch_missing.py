@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import httpx2
 
-from domain.publications.identifiers import clean_doi
+from domain.publications.identifiers import DOI
 from domain.types import as_str
 from pipeline.http.lookup import UNAVAILABLE, NotFound, Unavailable
 from pipeline.ingestion.common.lookup import LookupBatch
@@ -34,7 +34,7 @@ class CrossrefDoiSearch:
             return LookupBatch(absent=[doi])
         if isinstance(message, Unavailable):
             return UNAVAILABLE
-        if clean_doi(as_str(message.get("DOI"))) != doi:
+        if DOI.normalize(as_str(message.get("DOI"))) != doi:
             # DOI alias, redirigé vers le DOI principal du document reçu.
             return LookupBatch(records=[message], absent=[doi])
         return LookupBatch(records=[message])

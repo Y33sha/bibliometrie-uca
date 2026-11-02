@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from domain.publications.identifiers import clean_doi
+from domain.publications.identifiers import DOI
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
 
 
@@ -19,7 +19,7 @@ def extract_dois(doc: Mapping[str, JsonValue]) -> list[str]:
         doi
         for entry in as_sequence(doc.get("externalIds"))
         if as_str((ext := as_mapping(entry)).get("type")) == "doi"
-        and (doi := clean_doi(as_str(ext.get("id"))))
+        and (doi := DOI.normalize(as_str(ext.get("id"))))
     ]
 
 

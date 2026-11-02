@@ -19,10 +19,10 @@ Mesure du 2026-10-27, base locale, enseignants-chercheurs de l'UCA : 71 % des pu
 ## Décisions
 
 1. **Adresse brute** : texte de l'adresse tel qu'il figure dans la publication. La colonne énumérée `origin` de `addresses` distingue l'adresse brute du libellé HAL et du nom seul.
-2. **Critères** : propriétés du texte, confronté aux référentiels HAL et ROR. `origin` vaut pour toutes les sources qui donnent le texte. Le pipeline calcule seulement les `origin` vides.
-3. **Portée** : `origin` filtre les indicateurs. Toute adresse reste un indice de périmètre et rattache ses structures.
-4. **Indicateur** : structures citées dans les adresses brutes de la personne, en part de ses publications avec adresse brute. Il vaut pour toute personne.
-5. **Restitution** : sur la personne seulement. Le lien entre une personne et une structure se déduit des structures de ses contributions : un indicateur par structure serait circulaire.
+2. **Critères** : propriétés du texte, confronté aux référentiels HAL et ROR. `origin` vaut pour toutes les sources qui donnent le texte.
+3. **Calcul** : une tâche de la phase `affiliations`, placée avant la résolution des adresses, calcule les `origin` vides.
+4. **Portée** : `origin` filtre les onglets Adresses de la personne et de la structure. Toute adresse reste un indice de périmètre et rattache ses structures.
+5. **Indicateur** : structures citées dans les adresses brutes de la personne, en part de ses publications avec adresse brute. Il vaut pour toute personne.
 
 ## Phasage
 
@@ -32,20 +32,14 @@ Mesure du 2026-10-27, base locale, enseignants-chercheurs de l'UCA : 71 % des pu
   - 52 % des couples : nom exact d'une structure HAL ou d'une organisation ROR.
   - 11 % : texte terminé par un nom de pays. Échantillon de 15 : 12 adresses brutes (« Breast Unit Institute Gustave Roussy Villejuif France »), 3 noms suivis du pays entre parenthèses, au format des libellés HAL (« Narvik University College (Norway) »).
   - 37 % : reste. Échantillon de 40 : surtout des noms seuls et des textes étrangers à une adresse ; 3 adresses brutes sans pays (« Department of Pediatrics University Hospital Rouen »).
-- [x] Arborescences de structures HAL chez scanR (« Institut Pascal, UMR6602, IP, CNRS, UCA… »). Base locale, 2026-11-02 : 3 929 adresses. Le payload brut leur donne un `structId`, donc le normaliseur en tire des structures HAL. Il garde 21 de ces textes comme adresses, tous bruts. La resynchronisation des contributions sources scanR (réhydratation du staging, normalisation avec `--normalize-full`) retire les autres.
-- [ ] Critères : libellé HAL, avec ou sans adresse postale ; nom exact d'une structure HAL ou d'une organisation ROR ; texte sans virgule et sans nom de pays final.
-- [ ] Colonne `origin` sur `addresses`. La migration crée la colonne vide, le passage suivant du pipeline la remplit.
-- [ ] Adresses non brutes signalées sur la page d'administration des adresses.
+- [x] Arborescences de structures HAL chez scanR (« Institut Pascal, UMR6602, IP, CNRS, UCA… »). Base locale, 2026-11-02 : 3 929 adresses. Le payload brut leur donne un `structId`, donc le normaliseur en tire des structures HAL. Il garde 21 de ces textes comme adresses, tous bruts.
+- [x] Critères : libellé HAL, avec ou sans adresse postale ; nom exact d'une structure HAL ou d'une organisation ROR ; texte sans virgule et sans nom de pays final (`dc2e61268`). Crochets contenant une période, des lieux ou un nom de structure ; « Nom, Pays » en deux segments (`2a22e8e0f`). « CHU Clermont Ferrand, Clermont Ferrand, France » reste une adresse brute : elle reproduit souvent la signature imprimée.
+- [x] Colonne `origin` sur `addresses`. La migration crée la colonne vide, le passage suivant du pipeline la remplit (`dc2e61268`).
 
 ### Phase 2 — Indicateurs
 
-- [ ] Onglet Adresses de la personne : comptes calculés sur les seules adresses brutes.
-- [ ] Dashboard de la personne : structures citées dans ses adresses brutes, toutes années confondues.
-- [ ] Documentation.
-
-## Questions ouvertes
-
-- **Calcul de `origin`** : quelle phase ? Les critères lisent les noms HAL, les noms ROR et les noms de pays.
+- [x] Onglets Adresses de la personne et de la structure : seules les adresses brutes figurent (`b1755062a`).
+- [x] Documentation : glossaire, guide d'administration, phase `affiliations`, données.
 
 ## Liens
 

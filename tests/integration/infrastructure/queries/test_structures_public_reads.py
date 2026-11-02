@@ -192,6 +192,24 @@ class TestGetLaboratoryAddresses:
         ids = [a.id for a in res.addresses]
         assert addr not in ids
 
+    def test_lists_raw_addresses_only(self, sa_sync_conn):
+        """Un libellé HAL, un nom seul ou une adresse sans origine sont absents de la liste et du total."""
+        lab = insert_structure(sa_sync_conn, "LAB")
+        raw = insert_address(sa_sync_conn, "Laboratoire, Aubière, France")
+        insert_address_structure(sa_sync_conn, raw, structure_id=lab)
+        for raw_text, origin in (
+            ("LAB - Laboratoire (Aubière - France)", "hal_label"),
+            ("Laboratoire", "name_only"),
+            ("Adresse à classer", None),
+        ):
+            address = insert_address(sa_sync_conn, raw_text, origin=origin)
+            insert_address_structure(sa_sync_conn, address, structure_id=lab)
+
+        res = StructuresQueries(sa_sync_conn).get_structure_addresses(lab, page=1, per_page=50)
+
+        assert [a.id for a in res.addresses] == [raw]
+        assert res.total == 1
+
 
 class TestGetLaboratorySubjects:
     def test_top_subjects_by_frequency(self, sa_sync_conn):

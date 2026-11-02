@@ -25,6 +25,7 @@ from domain.publications.doc_types import DOC_TYPE_FAMILIES
 from domain.publications.oa_status import OaStatus
 from infrastructure.read_models.filters import (
     CITATION_CLASS_SQL,
+    HAS_CITATION_TOPS_SQL,
     OA_OPEN_SQL,
     OWN_RORS_SQL,
     own_structure_ids,
@@ -59,6 +60,8 @@ class Dimension:
     """Expression de groupement sur la publication `p` et la revue `j`."""
     join_sql: str = ""
     """Jointure demandée par `group_sql`."""
+    where_sql: str = ""
+    """Condition sur la publication `p`, qui restreint le groupement aux publications pourvues d'une valeur."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -194,6 +197,7 @@ DIMENSIONS: dict[str, Dimension] = {
             ordinal=False,
             comparable=False,
             group_sql=CITATION_CLASS_SQL,
+            where_sql=HAS_CITATION_TOPS_SQL,
         ),
     )
 }
@@ -334,13 +338,14 @@ class StatsPivotQueries:
         perimeter_structure_ids = context.perimeter_structure_ids
         where, binds = publication_filter_where(filters, context)
         joins = " ".join(dict.fromkeys(d.join_sql for d in dims if d.join_sql))
+        restrictions = "".join(f" AND {d.where_sql}" for d in dims if d.where_sql)
         inner_select = ", ".join(
             [*[f"{d.group_sql} AS {d.key}" for d in dims], "p.id AS publication_id"]
         )
         inner = (
             f"SELECT DISTINCT {inner_select} FROM publications p "
             f"LEFT JOIN serials j ON j.id = p.serial_id {joins} "
-            f"WHERE {where}"
+            f"WHERE {where}{restrictions}"
         )
         keys = [d.key for d in dims]
         select = ", ".join([*keys, f"{m.agg_sql} AS value"])

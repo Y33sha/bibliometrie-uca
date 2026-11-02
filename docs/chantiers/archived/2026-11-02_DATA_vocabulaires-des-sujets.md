@@ -22,7 +22,6 @@ Base locale au 2026-11-01.
 - **Une seule table de sujets.** `subjects` contient le vocabulaire, le code, le libellé, le niveau et le parent. La langue du libellé découle du vocabulaire. Les vedettes RAMEAU, identifiées par leur PPN chez ScanR comme chez theses.fr, forment un seul sujet quelle que soit la source.
 - **Sujets écrits à la normalisation.** La clé (vocabulaire, code) se passe de résolution entre sources, comme celle des adresses. Le normalizer de chaque source écrit donc les sujets donnés par la source dans `subjects`, et leurs liens dans `source_record_subjects`, avec le score OpenAlex. La phase `subjects` dérive `publication_subjects` en SQL, ancêtres compris. `source_records.topics` disparaît.
 - **Sujets WoS abandonnés.** Ils sont les seuls sujets de 558 publications (0,7 %), presque toutes présentes seulement dans le WoS : résumés de congrès, articles sans enregistrement OpenAlex.
-- **MeSH lu dans OpenAlex.** Le champ `mesh` des works donne les descripteurs des publications indexées dans PubMed.
 - **Sujets regroupés par libellé.** Les sujets de même libellé normalisé forment un seul sujet affiché, tous vocabulaires confondus. « Chimie » réunit le domaine HAL, la vedette RAMEAU et la discipline de thèse. Son nombre de publications est l'union de leurs publications. Liste, page d'un sujet, filtre, nuages et co-occurrences portent sur ce regroupement. La page d'un sujet montre chaque vocabulaire, avec parents et enfants.
 - **Une vue matérialisée.** Rafraîchie par la phase `subjects`, elle contient une ligne par libellé normalisé : la forme la plus fréquente du libellé et le nombre de publications. Le libellé normalisé identifie le sujet dans l'URL.
 - **Les 4 domains OpenAlex sont écartés des graphiques.**
@@ -56,12 +55,7 @@ Base locale au 2026-11-01.
 - [x] theses.fr : `raw_hash` vidé et `last_seen_at` vieilli pour toutes les thèses, puis `fetch_stale`. La normalisation qui suit retire aussi `source_extras.discipline`
 - [x] HAL : `last_seen_at` vieilli pour tous les dépôts, puis run. Le moissonnage relit les dépôts des collections, `fetch_stale` les autres. Leur normalisation écrit les mots-clés du TEI
 
-### Phase 4 — MeSH
-
-- [ ] `mesh` ajouté aux champs demandés à OpenAlex. L'empreinte de chaque payload OpenAlex change : chaque work relu est normalisé une fois de plus
-- [ ] Normalizer : descripteurs MeSH identifiés par leur code, avec leur niveau et leur parent
-
-### Phase 5 — Sujets regroupés par libellé
+### Phase 4 — Sujets regroupés par libellé
 
 - [x] Migration : vue matérialisée des libellés normalisés (`subject_labels`) ; `subject_cooccurrences` entre libellés normalisés (d6db5fc18)
 - [x] Phase `subjects` : rafraîchissement des deux vues
@@ -73,10 +67,11 @@ Base locale au 2026-11-01.
 
 ## Questions ouvertes
 
-- **Parents des descripteurs MeSH** : arborescence publiée par la NLM, ou aucun parent. Un descripteur occupe plusieurs positions dans l'arborescence : `subjects` lui donne un seul parent.
-- **Qualificatifs MeSH** : écartés, ou sujets à part.
-- **Descripteurs démographiques MeSH** (« Humans », « Male », « Female », « Aged ») : présents sur la plupart des publications médicales.
-- **Indicateur de sujet majeur** : score du lien, ou écarté.
+- **MeSH**, en suspens faute de demande. Mesure du 2026-11-02, base locale, 400 publications à PMID :
+  - Les descripteurs concernent seulement les publications à PMID (19 % du périmètre). 76 % de ces publications ont des descripteurs.
+  - Une publication pourvue de MeSH a en moyenne 10,5 descripteurs, dont 2,6 démographiques (« Humans », « Male », tranches d'âge). Elle a en moyenne 11 sujets des autres vocabulaires.
+  - Avec leurs ancêtres, à un parent par descripteur, les descripteurs donnent 40 sujets par publication. Un descripteur occupe en moyenne 2,1 positions dans l'arborescence.
+  - Le fichier XML annuel de la NLM contient le vocabulaire complet et son arborescence : 31 110 descripteurs en 2026. Le MeSH bilingue de l'Inserm donne les libellés français, sous licence CC BY-NC 4.0.
 - **Parents des vedettes RAMEAU** : termes génériques lus dans IdRef, ou aucun parent.
 - **Libellé d'un sujet différent selon les sources** : 51 PPN RAMEAU à deux libellés chez ScanR.
 - **Libellés OpenAlex en anglais** : 7 coïncident avec un autre vocabulaire. Sujets OpenAlex à part, ou traduction des niveaux hauts (4 domains, 26 fields, 250 subfields).

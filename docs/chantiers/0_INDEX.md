@@ -6,21 +6,22 @@
 
 - [Audit de la qualité de la résolution des personnes](DATA_audit-qualite-resolution-personnes.md)
 - [Pertinence des sujets](DATA_pertinence-des-sujets.md)
-- [Vocabulaires des sujets](DATA_vocabulaires-des-sujets.md)
 
 ### Non commencé
 
 - [Brevets](DATA_brevets.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
 - [Listes de revues](DATA_listes-de-revues.md)
-- [Mesures d'impact](METIER_mesures-impact.md)
 - [Résolution probabiliste des personnes](DATA_resolution-personnes-probabiliste.md)
-- [Signatures institutionnelles](METIER_signatures-institutionnelles.md)
 - [Types de document](DATA_types-document.md)
 - [Vérification des affiliations des sources](DATA_verification-affiliations.md)
 
 ## Chantiers archivés
 
+- 2026-11-02 — [Ancrage des décisions humaines](archived/2026-11-02_CODE_ancrage-des-decisions-humaines.md)
+- 2026-11-02 — [Signatures institutionnelles : adresses brutes](archived/2026-11-02_METIER_signatures-institutionnelles.md)
+- 2026-11-02 — [Vocabulaires des sujets](archived/2026-11-02_DATA_vocabulaires-des-sujets.md)
+- 2026-11-02 — [Mesures d'impact](archived/2026-11-02_METIER_mesures-impact.md)
 - 2026-11-02 — [Export RH SIHAM : matricule, périodes de présence, laboratoires](archived/2026-11-02_DATA_export-rh-siham.md)
 - 2026-11-01 — [Preprints et versions d'une publication](archived/2026-11-01_DATA_preprints-et-versions.md)
 - 2026-11-01 — [Qualité du référentiel de l'édition](archived/2026-11-01_DATA_referentiel-edition.md)

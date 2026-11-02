@@ -15,9 +15,10 @@ def insert_address(
     normalized_text: str | None = None,
     countries: list[str] | None = None,
     publication_count: int | None = None,
+    origin: str | None = "raw",
     reuse: bool = False,
 ) -> int:
-    """Insère une adresse, la marque pour la détection de son pays comme la normalisation, et renvoie son `id`. `row_id` fixe l'`id`. Le texte normalisé vaut par défaut le texte brut en minuscules. `reuse` renvoie l'adresse de même texte brut si elle existe."""
+    """Insère une adresse, la marque pour la détection de son pays comme la normalisation, et renvoie son `id`. `row_id` fixe l'`id`. Le texte normalisé vaut par défaut le texte brut en minuscules. `origin` vaut par défaut adresse brute. `reuse` renvoie l'adresse de même texte brut si elle existe."""
     if reuse:
         existing = conn.execute(
             text("SELECT id FROM addresses WHERE md5(raw_text) = md5(:raw)"), {"raw": raw_text}
@@ -33,7 +34,9 @@ def insert_address(
             "normalized_text": normalized_text if normalized_text is not None else raw_text.lower(),
             "countries": countries,
             "publication_count": publication_count,
+            "origin": origin,
         },
+        casts={"origin": "address_origin"},
     )
     mark(conn, Queue.ADDRESS_CANDIDATES, [address_id])
     return address_id

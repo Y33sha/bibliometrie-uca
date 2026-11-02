@@ -1,4 +1,5 @@
 import type { components } from "#lib/api/schema.js";
+import { specificity } from "./specificity";
 
 type SubjectListItem = components["schemas"]["SubjectListItem"];
 type SubjectNeighbor = components["schemas"]["SubjectNeighborOut"];
@@ -29,8 +30,6 @@ export interface GraphNode {
   neighbor: SubjectNeighbor;
   r: number;
   labelWidth: number;
-  /** Spécificité côté voisin : part de ses publications qui portent aussi le sujet central. */
-  specificity: number;
   /** Distance au centre, mesurée sur l'ellipse. */
   distance: number;
   x: number;
@@ -108,7 +107,7 @@ export function subjectGraphLayout(
 ) {
   const maxUsage = Math.max(subject.usage_count, ...neighbors.map((n) => n.usage_count), 1);
   const maxCooc = Math.max(...neighbors.map((n) => n.cooccurrence_count), 1);
-  const specs = neighbors.map((n) => Math.min(1, n.cooccurrence_count / Math.max(n.usage_count, 1)));
+  const specs = neighbors.map(specificity);
   const logMin = Math.log(Math.min(...specs));
   const logMax = Math.log(Math.max(...specs));
   // Distance au centre : l'anneau intérieur pour les plus spécifiques, puis un écart croissant quand la spécificité baisse, en échelle log pour ne pas écraser les faibles spécificités.
@@ -120,7 +119,6 @@ export function subjectGraphLayout(
     neighbor: n,
     r: radius(n.usage_count, maxUsage),
     labelWidth: labelWidth(n.label, LABEL_SIZE),
-    specificity: specs[i],
     distance: distanceOf(specs[i]),
     x: CX,
     y: CY,

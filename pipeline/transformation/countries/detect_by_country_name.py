@@ -5,38 +5,13 @@ Confronte les derniers tokens du `normalized_text` de chaque adresse en file (`a
 
 import logging
 
-from sqlalchemy import Connection, text
+from sqlalchemy import Connection
 
-from domain.countries import PlaceNameKind
 from domain.country_detection import CountryDetectionMethod
 from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, quantity, step
 from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.transformation.countries.place_names import load_country_names
 from pipeline.transformation.countries.store import CountryCandidatesStore
-
-
-def load_country_forms(conn: Connection) -> dict[str, str]:
-    """Renvoie les formes normalisées des noms de pays, avec le code ISO du pays désigné : `{forme: code ISO}`."""
-    rows = conn.execute(
-        text(
-            "SELECT form_normalized, iso_code FROM place_name_forms "
-            f"WHERE kind = '{PlaceNameKind.COUNTRY.value}'"
-        )
-    ).all()
-    return {r.form_normalized: r.iso_code for r in rows}
-
-
-def _match_trailing_country(
-    normalized_text: str, country_forms: dict[str, str], max_tokens: int
-) -> str | None:
-    """Renvoie le code ISO du plus long nom de pays en fin de `normalized_text`, ou None.
-
-    Les suffixes sont testés du plus long (`max_tokens` tokens) au plus court : « united kingdom » prime sur « kingdom »."""
-    tokens = normalized_text.split()
-    for n in range(min(max_tokens, len(tokens)), 0, -1):
-        iso = country_forms.get(" ".join(tokens[-n:]))
-        if iso:
-            return iso
-    return None
 
 
 def run(conn: Connection, logger: logging.Logger) -> PhaseMetrics:
@@ -46,15 +21,14 @@ def run(conn: Connection, logger: logging.Logger) -> PhaseMetrics:
     """
     step(logger, "Pays des adresses d'après le nom de pays qui les termine")
     store = CountryCandidatesStore(conn)
-    country_forms = load_country_forms(conn)
-    max_tokens = max((form.count(" ") + 1 for form in country_forms), default=1)
+    country_names = load_country_names(conn)
 
     rows = store.queued_addresses()
     logger.info("%s%s à traiter", BRANCH, quantity(len(rows), "adresse"))
 
     matched: list[tuple[int, list[str]]] = []
     for addr_id, normalized_text in rows:
-        if iso := _match_trailing_country(normalized_text, country_forms, max_tokens):
+        if iso := country_names.trailing_country(normalized_text):
             matched.append((addr_id, [iso]))
 
     added = store.replace_for_queued_addresses(CountryDetectionMethod.COUNTRY_NAME, matched)

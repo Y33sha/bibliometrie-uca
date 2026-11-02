@@ -31,7 +31,7 @@ from pathlib import Path
 from sqlalchemy import Connection, text
 
 from domain.normalize import normalize_text, optional_plain_text
-from domain.publications.identifiers import clean_doi
+from domain.publications.identifiers import DOI
 from domain.structures.identifiers import RorId
 from domain.structures.structure import StructureType
 from domain.types import JsonValue
@@ -122,7 +122,7 @@ def open_apc_payment(row: Mapping[str, str]) -> Payment:
     """
     period = parse_year(row.get("period"))
     return {
-        "doi": clean_doi(row.get("doi")),
+        "doi": DOI.normalize(row.get("doi")),
         "amount_eur_ht": parse_amount(row.get("euro")),
         "billing_year": period,
         "publication_year": period,
@@ -143,7 +143,7 @@ def non_oa_fee_payment(row: Mapping[str, str]) -> Payment:
     coman_id = (row.get("CoMan Id.") or "").strip()
     budget = clean(row.get("Budget"))
     return {
-        "doi": clean_doi(row.get("DOI")),
+        "doi": DOI.normalize(row.get("DOI")),
         "amount_eur_ht": parse_amount(row.get("Montant payé en EURHT")),
         "billing_year": parse_year(row.get("Année de facturation")),
         "publication_year": parse_year(row.get("Année de publication")),
@@ -168,7 +168,7 @@ def institution_survey_payment(row: Mapping[str, str], *, open_access_fee: bool)
     couperin = clean(row.get("Réponse Couperin"))
     remarks = [clean(row.get("commentaire")), f"Couperin : {couperin}" if couperin else None]
     return {
-        "doi": clean_doi(row.get("doi")),
+        "doi": DOI.normalize(row.get("doi")),
         "amount_eur_ht": parse_amount(row.get("montant_euros_ht")),
         "billing_year": parse_year(row.get("année_facturation")),
         "publication_year": None,

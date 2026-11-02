@@ -12,6 +12,7 @@ from tests.integration.helpers.alignment import (
     recompose_contribution_attributes,
 )
 from tests.integration.helpers.persons import (
+    insert_hr_record,
     insert_person,
     insert_person_identifier,
     insert_person_name_form,
@@ -321,6 +322,27 @@ def test_le_prenom_reduit_est_complete_par_les_contributions_sources_des_contrib
             text("SELECT first_name FROM persons WHERE id = :p"), {"p": person}
         ).scalar_one()
         == "Jean"
+    )
+
+
+def test_le_prenom_d_une_personne_rh_reste_tel_quel(sa_sync_conn):
+    """« LEA », venu du SI RH en capitales, se lit comme les initiales L. E. A. : la complétion le laisse tel quel."""
+    conn = sa_sync_conn
+    person = insert_person(conn, "Martin", first_name="LEA")
+    insert_hr_record(conn, person)
+    contribution = _contribution(
+        conn, insert_publication(conn), [("hal", "Laure Eve Anne Martin", None, True)]
+    )
+    _attach(conn, contribution, person, "manual")
+
+    counts = resolve_contributions(conn, logging.getLogger("test"))
+
+    assert counts["first_names_completed"] == 0
+    assert (
+        conn.execute(
+            text("SELECT first_name FROM persons WHERE id = :p"), {"p": person}
+        ).scalar_one()
+        == "LEA"
     )
 
 

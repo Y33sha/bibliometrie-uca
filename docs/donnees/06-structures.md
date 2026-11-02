@@ -30,7 +30,7 @@ Deux clés de la [configuration](08-ref-et-ops.md) désignent les périmètres e
 
 | Table | Contenu | Contrainte |
 |---|---|---|
-| `addresses` | Texte brut et texte normalisé, pays retenus (`countries`), nombre de publications | Une adresse par texte normalisé |
+| `addresses` | Texte brut et texte normalisé, origine du texte (`origin` : adresse brute, libellé HAL ou nom seul), pays retenus (`countries`), nombre de publications | Une adresse par texte normalisé |
 | `address_structures` | Rattachement d'une adresse à une structure. `matched_form_id` : forme de nom détectée, vide pour un rattachement saisi à la main. `is_confirmed` : vide en attente, vrai si confirmé, faux si rejeté | Un rattachement par adresse et structure |
 | `address_country_candidates` | Pays proposé pour une adresse par un moyen de détection : source, nom de pays, institution, ville, saisie manuelle | Un pays par adresse et par moyen |
 
@@ -48,6 +48,6 @@ Les contributions sources sont reliées à leurs adresses par `source_contributi
 
 - Le pipeline recalcule `perimeter_structures` avant sa première phase.
 - La phase [`normalize`](../pipeline/03-normalize.md) crée les adresses et les pays qu'en donnent les sources.
-- La phase [`affiliations`](../pipeline/04-affiliations.md) écrit les rattachements détectés et `idref_structures`. Elle conserve les rattachements confirmés ou saisis à la main.
+- La phase [`affiliations`](../pipeline/04-affiliations.md) écrit l'origine des adresses sans origine, les rattachements détectés et `idref_structures`. Elle conserve les rattachements confirmés ou saisis à la main.
 - La phase `publications` compte les publications des adresses.
 - La phase [`countries`](../pipeline/11-enrichissements.md#pays-des-adresses-countries) détecte et retient les pays des adresses.

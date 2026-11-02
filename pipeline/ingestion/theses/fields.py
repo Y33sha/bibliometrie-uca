@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from domain.publications.identifiers import clean_doi
+from domain.publications.identifiers import DOI
 from domain.types import JsonValue, as_str
 
 
@@ -21,7 +21,7 @@ def extract_id(thesis: Mapping[str, JsonValue]) -> str:
 def extract_doi(thesis: Mapping[str, JsonValue]) -> str | None:
     """Renvoie le DOI nettoyé d'une thèse (champ `doi`), ou `None`."""
     doi = thesis.get("doi")
-    return clean_doi(doi) if isinstance(doi, str) else None
+    return DOI.normalize(doi) if isinstance(doi, str) else None
 
 
 def is_ongoing(thesis: Mapping[str, JsonValue]) -> bool:

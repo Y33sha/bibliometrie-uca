@@ -11,7 +11,7 @@ from collections.abc import Mapping
 
 import httpx2
 
-from domain.publications.identifiers import clean_doi
+from domain.publications.identifiers import DOI
 from domain.types import JsonValue
 from pipeline.http.lookup import UNAVAILABLE, NotFound, Unavailable
 from pipeline.ingestion.common.lookup import LookupBatch
@@ -39,5 +39,5 @@ class DataciteDoiSearch:
                 found[doi] = record
         return LookupBatch(
             records=list(found.values()),
-            absent=[d for d in dois if clean_doi(d) not in found],
+            absent=[d for d in dois if DOI.normalize(d) not in found],
         )

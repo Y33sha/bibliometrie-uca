@@ -186,7 +186,7 @@ _FACTS: dict[str, str] = {
     "source": "sr.source::text",
     "author_count": "sr.author_count",
 }
-_DOI_FACTS = frozenset({"dois", "registrant_publisher_types", "preprint_server_dois"})
+_DOI_FACTS = frozenset({"dois", "registrant_publisher_types"})
 assert set(_FACTS) | _DOI_FACTS == {f.name for f in fields(MetadataForCorrection)}, (
     "projection des faits désynchronisée de MetadataForCorrection"
 )

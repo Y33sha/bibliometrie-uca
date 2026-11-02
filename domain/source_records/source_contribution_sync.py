@@ -1,6 +1,6 @@
 """Synchronisation des contributions sources d'un enregistrement source renormalisé avec celles en base.
 
-La renormalisation d'un enregistrement source retrouve en base ses contributions sources entrantes. Une contribution source retrouvée garde son identifiant, et donc sa personne et son épinglage ; elle est réécrite seulement si son empreinte change. Les contributions sources sans correspondant sont insérées ou supprimées.
+La renormalisation d'un enregistrement source retrouve en base ses contributions sources entrantes, par le nom donné par la source. Une contribution source retrouvée garde son identifiant, et donc sa personne et son épinglage ; elle est réécrite seulement si son empreinte ou ses informations du contributeur changent. Les contributions sources sans correspondant sont insérées ou supprimées.
 """
 
 from collections import defaultdict
@@ -16,6 +16,8 @@ class StoredSourceContribution(NamedTuple):
 
     id: int
     position: int | None
+    name_key: Hashable
+    """Nom donné par la source, sous sa forme de comparaison, et marque collective."""
     contributor_key: Hashable
     """Nom normalisé et identifiants du contributeur."""
     content_hash: str | None
@@ -30,6 +32,7 @@ class IncomingSourceContribution(NamedTuple):
     """Rang dans l'enregistrement source."""
     position: int | None
     """`None` pour une contribution source sans rôle d'auteur."""
+    name_key: Hashable
     contributor_key: Hashable
     content_hash: str
     roles: tuple[str, ...] | None = None
@@ -40,7 +43,7 @@ class SourceContributionSyncPlan:
     """Plan de synchronisation des contributions sources d'un enregistrement source renormalisé."""
 
     updates: tuple[tuple[int, int], ...]
-    """Couples (identifiant en base, clé entrante) dont l'empreinte change."""
+    """Couples (identifiant en base, clé entrante) dont l'empreinte ou les informations du contributeur changent."""
     kept: tuple[int, ...]
     """Identifiants en base retrouvés et inchangés."""
     inserts: tuple[int, ...]
@@ -48,30 +51,26 @@ class SourceContributionSyncPlan:
     deletes: tuple[int, ...]
     """Identifiants en base sans correspondant."""
     regroup: bool
-    """Une contribution source est insérée ou supprimée, ou change de position ou de rôles. Les contributions sources de la publication sont alors à regrouper."""
+    """Une contribution source est insérée ou supprimée, ou change de position, de rôles ou d'informations du contributeur. Les contributions sources de la publication sont alors à regrouper."""
 
 
 def plan_source_contribution_sync(
     stored: Sequence[StoredSourceContribution], incoming: Sequence[IncomingSourceContribution]
 ) -> SourceContributionSyncPlan:
-    """Retrouve en base les contributions sources entrantes.
+    """Retrouve en base les contributions sources entrantes, par le nom donné par la source.
 
-    Des informations du contributeur présentes dans une seule contribution source de chaque côté suffisent à la correspondance. Répétées, elles valent seulement entre contributions sources de même position d'auteur.
+    Un nom présent dans une seule contribution source de chaque côté suffit à la correspondance. Répété, il vaut seulement entre contributions sources de même position d'auteur. Un identifiant ajouté ou retiré par la source laisse donc la contribution source en place.
     """
-    stored_by_contributor_information: dict[Hashable, list[StoredSourceContribution]] = defaultdict(
-        list
-    )
+    stored_by_name: dict[Hashable, list[StoredSourceContribution]] = defaultdict(list)
     for s in stored:
-        stored_by_contributor_information[s.contributor_key].append(s)
-    incoming_by_contributor_information: dict[Hashable, list[IncomingSourceContribution]] = (
-        defaultdict(list)
-    )
+        stored_by_name[s.name_key].append(s)
+    incoming_by_name: dict[Hashable, list[IncomingSourceContribution]] = defaultdict(list)
     for i in incoming:
-        incoming_by_contributor_information[i.contributor_key].append(i)
+        incoming_by_name[i.name_key].append(i)
 
     pairs: list[tuple[StoredSourceContribution, IncomingSourceContribution]] = []
-    for contributor_key, candidates in incoming_by_contributor_information.items():
-        existing = stored_by_contributor_information.get(contributor_key, [])
+    for name_key, candidates in incoming_by_name.items():
+        existing = stored_by_name.get(name_key, [])
         if len(existing) == 1 and len(candidates) == 1:
             pairs.append((existing[0], candidates[0]))
             continue
@@ -86,13 +85,21 @@ def plan_source_contribution_sync(
     matched_incoming = {i.key for _, i in pairs}
     inserts = tuple(sorted(i.key for i in incoming if i.key not in matched_incoming))
     deletes = tuple(sorted(s.id for s in stored if s.id not in matched_stored))
+    changed = {
+        s.id
+        for s, i in pairs
+        if (s.content_hash, s.contributor_key) != (i.content_hash, i.contributor_key)
+    }
     return SourceContributionSyncPlan(
-        updates=tuple(sorted((s.id, i.key) for s, i in pairs if s.content_hash != i.content_hash)),
-        kept=tuple(sorted(s.id for s, i in pairs if s.content_hash == i.content_hash)),
+        updates=tuple(sorted((s.id, i.key) for s, i in pairs if s.id in changed)),
+        kept=tuple(sorted(s.id for s, _ in pairs if s.id not in changed)),
         inserts=inserts,
         deletes=deletes,
         regroup=bool(inserts or deletes)
-        or any((s.position, s.roles) != (i.position, i.roles) for s, i in pairs),
+        or any(
+            (s.position, s.roles, s.contributor_key) != (i.position, i.roles, i.contributor_key)
+            for s, i in pairs
+        ),
     )
 
 

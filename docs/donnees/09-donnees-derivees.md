@@ -35,6 +35,7 @@ Certaines colonnes dupliquent une information calculable, pour éviter une joint
 | `publication_count` | `serials`, `publishers` | phase `finalize` |
 | `publisher_id` | `serials` | phase `finalize`, d'après les publications |
 | `publication_count` | `addresses` | phase `publications` |
+| `origin` | `addresses` | phase `affiliations`, pour les adresses sans origine |
 | `usage_count` | `subjects` | phase `subjects` |
 
 

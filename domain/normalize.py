@@ -80,10 +80,7 @@ _INVISIBLE_CATEGORIES = frozenset({"Cf", "Cc", "Cs", "Co"})
 
 
 def to_plain_text(text: str | None) -> str:
-    """Renvoie le texte brut d'une valeur reçue d'une source : commentaires, balises, entités HTML et caractères invisibles retirés, espacement réduit à un espace simple. Une balise échappée (`&lt;p&gt;`) est retirée aussi. Casse, accents et ponctuation restent.
-
-    Les titres et les résumés gardent leur balisage, qui a un sens (exposants, MathML). Ils passent par ici seulement pour un export en tableur.
-    """
+    """Renvoie le texte brut d'une valeur reçue d'une source : commentaires, balises, entités HTML et caractères invisibles retirés, espacement réduit à un espace simple. Une balise échappée (`&lt;p&gt;`) est retirée aussi. Casse, accents et ponctuation restent."""
     if not text:
         return ""
     plain = _strip_markup(_strip_comments(_unescape_html(text)))
@@ -132,11 +129,11 @@ def _flattened_mathml(line: str, depth: int) -> bool:
 
 
 def drop_flattened_mathml(title: str) -> str:
-    """Retire du titre la version MathML de ses formules, et réduit l'espacement à un espace simple.
+    """Retire du titre la version MathML de ses formules, et les espaces de bordure.
 
     Un éditeur dépose chaque formule d'un titre en deux versions : LaTeX (`$$…$$`) et MathML. Crossref renvoie le titre avec l'indentation du XML déposé et sans les balises MathML. La formule LaTeX occupe une ligne. Chaque symbole MathML occupe une ligne d'indentation supérieure, avant ou après. ScanR recopie ce titre. Ces lignes de symboles isolés sont retirées. L'interface affiche la formule LaTeX.
 
-    Un titre déjà mis sur une ligne (OpenAlex) ne garde aucun repère : seul son espacement est réduit.
+    Un titre déjà mis sur une ligne ne garde aucun repère : il reste tel quel.
     """
     lines = title.split("\n")
     dropped: set[int] = set()
@@ -154,7 +151,7 @@ def drop_flattened_mathml(title: str) -> str:
             ):
                 dropped.add(j)
                 j += step
-    return " ".join(" ".join(line for k, line in enumerate(lines) if k not in dropped).split())
+    return "\n".join(line for k, line in enumerate(lines) if k not in dropped).strip()
 
 
 # Formule MathML. Son corps exclut une autre ouverture. La fin du texte ferme une formule : OpenAlex tronque des résumés en pleine formule.
@@ -369,9 +366,20 @@ def _undouble_backslashes(text: str) -> str:
     return text
 
 
-def clean_source_text(text: str) -> str:
-    """Nettoie un titre ou un résumé reçu d'une source, en gardant balises et formules : entités HTML décodées, barres obliques multipliées par un échappement répété ramenées à une, accents LaTeX hors formule convertis en caractères (`Th\\'eorie` → Théorie). L'espacement est laissé à l'appelant."""
+def _clean_source_text(text: str) -> str:
+    """Nettoyage commun aux titres et aux résumés, hors espacement (`clean_title`)."""
     return _decode_prose_latex_accents(_undouble_backslashes(_unescape_html(text)))
+
+
+# Espaces ASCII seuls : les espaces insécables de la typographie (« pratiques : ») restent.
+_ASCII_SPACES_RE = re.compile(r"[ \t\n\r\f\v]+")
+
+
+def clean_title(title: str | None) -> str | None:
+    """Nettoie un titre à son écriture, en gardant balises et formules : entités HTML décodées, barres obliques multipliées par un échappement répété ramenées à une, accents LaTeX hors formule convertis en caractères (`Th\\'eorie` → Théorie). Les suites d'espaces ASCII se réduisent à un espace, les espaces de bordure sont retirés. Les espaces insécables restent."""
+    if not title:
+        return title
+    return _ASCII_SPACES_RE.sub(" ", _clean_source_text(title)).strip()
 
 
 _ABSTRACT_SPACES_RE = re.compile(r"[ \t\r\f\v]+")
@@ -380,10 +388,10 @@ _ABSTRACT_BLANK_LINES_RE = re.compile(r"\n{3,}")
 
 
 def clean_abstract(abstract: str | None) -> str | None:
-    """Nettoie un résumé à son écriture (`clean_source_text`). Les suites d'espaces ASCII se réduisent à un espace. Les sauts de ligne restent, et une ligne vide au plus sépare deux paragraphes. Les espaces insécables restent. La version MathML d'une formule déposée aussi en LaTeX est retirée, ainsi que l'intitulé « Abstract » ou « Résumé » en tête."""
+    """Nettoie un résumé à son écriture, comme un titre (`clean_title`), en gardant ses sauts de ligne : une ligne vide au plus sépare deux paragraphes. La version MathML d'une formule déposée aussi en LaTeX est retirée, ainsi que l'intitulé « Abstract » ou « Résumé » en tête."""
     if not abstract:
         return abstract
-    text = _ABSTRACT_SPACES_RE.sub(" ", clean_source_text(abstract))
+    text = _ABSTRACT_SPACES_RE.sub(" ", _clean_source_text(abstract))
     text = _ABSTRACT_LINE_EDGES_RE.sub("\n", text)
     text = _ABSTRACT_BLANK_LINES_RE.sub("\n\n", text).strip()
     return _strip_abstract_label(_drop_duplicate_mathml(text))

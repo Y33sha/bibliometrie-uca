@@ -7,7 +7,7 @@ from domain.persons.name_matching import (
     names_compatible,
     parse_raw_author_name,
 )
-from domain.publications.identifiers import clean_doi
+from domain.publications.identifiers import DOI
 
 
 class TestNormalizeName:
@@ -48,29 +48,29 @@ class TestNormalizeName:
 
 class TestCleanDoi:
     def test_strip_https(self):
-        assert clean_doi("https://doi.org/10.1234/test") == "10.1234/test"
+        assert DOI.normalize("https://doi.org/10.1234/test") == "10.1234/test"
 
     def test_strip_http(self):
-        assert clean_doi("http://doi.org/10.1234/test") == "10.1234/test"
+        assert DOI.normalize("http://doi.org/10.1234/test") == "10.1234/test"
 
     def test_plain_doi(self):
-        assert clean_doi("10.1234/test") == "10.1234/test"
+        assert DOI.normalize("10.1234/test") == "10.1234/test"
 
     def test_none(self):
-        assert clean_doi(None) is None
+        assert DOI.normalize(None) is None
 
     def test_empty(self):
-        assert clean_doi("") is None
+        assert DOI.normalize("") is None
 
     def test_whitespace(self):
-        assert clean_doi("  10.1234/test  ") == "10.1234/test"
+        assert DOI.normalize("  10.1234/test  ") == "10.1234/test"
 
     def test_version_suffix_kept(self):
-        assert clean_doi("10.6084/m9.figshare.31023197.v1") == "10.6084/m9.figshare.31023197.v1"
+        assert DOI.normalize("10.6084/m9.figshare.31023197.v1") == "10.6084/m9.figshare.31023197.v1"
 
     def test_no_false_positive_on_v_in_doi(self):
         """Un `.v` suivi d'autre chose qu'un chiffre est conservé."""
-        assert clean_doi("10.1234/journal.v12.issue3") == "10.1234/journal.v12.issue3"
+        assert DOI.normalize("10.1234/journal.v12.issue3") == "10.1234/journal.v12.issue3"
 
 
 class TestParseRawAuthorName:

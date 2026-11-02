@@ -66,6 +66,7 @@ from domain.source_records.identifiers import (
 )
 from domain.sources.registry import LOOKUP_SOURCES, Source
 from domain.sources.staging import StagingEntryMode
+from domain.structures.address_origin import AddressOrigin
 from domain.structures.hal_structures import HalStructureStatus
 from domain.structures.perimeter_evidence import PerimeterEvidence
 from domain.structures.ror import RorStatus, RorType
@@ -708,6 +709,8 @@ def publication_date_columns(*, nullable: bool) -> tuple[Column[date], Column[st
 # ── Adresses ──────────────────────────────────────────────────────
 
 
+address_origin_enum = PgEnum(*AddressOrigin, name="address_origin", create_type=False)
+
 addresses = Table(
     "addresses",
     metadata,
@@ -717,6 +720,14 @@ addresses = Table(
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("publication_count", Integer, server_default="0"),
     Column("countries", ARRAY(CHAR(2))),
+    Column(
+        "origin",
+        address_origin_enum,
+        comment=(
+            "Origine du texte : adresse brute, libellé HAL ou nom seul. La phase affiliations"
+            " la pose sur les adresses sans origine."
+        ),
+    ),
     schema="structures",
 )
 
@@ -800,10 +811,16 @@ idref_structures = Table(
 rejected_contributions = Table(
     "rejected_contributions",
     metadata,
-    Column("source_record_id", Integer, nullable=False),
     Column("person_id", Integer, nullable=False),
     Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
-    PrimaryKeyConstraint("source_record_id", "person_id", name="rejected_contributions_pkey"),
+    Column("source", source_type_enum, nullable=False),
+    Column("source_id", Text, nullable=False),
+    PrimaryKeyConstraint("source", "source_id", "person_id", name="rejected_contributions_pkey"),
+    comment=(
+        "Couples (enregistrement source, personne) rejetés par l'administration, "
+        "par clé naturelle de l'enregistrement source. Le rejet d'un enregistrement source "
+        "disparu de sa source s'applique à son retour."
+    ),
     schema="persons",
 )
 

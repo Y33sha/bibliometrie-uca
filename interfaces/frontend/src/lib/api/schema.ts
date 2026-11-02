@@ -933,7 +933,7 @@ export interface paths {
         };
         /**
          * Get Structure Addresses
-         * @description Liste les adresses rattachées à la structure, hors rattachements rejetés.
+         * @description Liste les adresses brutes rattachées à la structure, hors rattachements rejetés.
          */
         get: operations["get_structure_addresses_api_structures__structure_id__addresses_get"];
         put?: never;
@@ -1329,7 +1329,7 @@ export interface paths {
         };
         /**
          * Person Addresses
-         * @description Liste les adresses des contributions sources de cette personne, les plus fréquentes d'abord. `year` restreint aux publications de l'année.
+         * @description Liste les adresses brutes des contributions sources de cette personne, les plus fréquentes d'abord. `year` restreint aux publications de l'année.
          */
         get: operations["person_addresses_api_persons__person_id__addresses_get"];
         put?: never;
@@ -1349,7 +1349,7 @@ export interface paths {
         };
         /**
          * Person Address Summary
-         * @description Compte les publications de cette personne, puis, par structure, celles dont une adresse est rattachée à la structure. `year` restreint aux publications de l'année.
+         * @description Compte les publications de cette personne, puis, par structure, celles dont une adresse brute est rattachée à la structure. `year` restreint aux publications de l'année.
          */
         get: operations["person_address_summary_api_persons__person_id__address_summary_get"];
         put?: never;
@@ -5973,6 +5973,11 @@ export interface components {
             pages: string | null;
             /** Article Number */
             article_number: string | null;
+            /**
+             * Cited By Count
+             * @description Nombre de citations, compté dans la base de la source.
+             */
+            cited_by_count: number | null;
             /**
              * Record Url
              * @description Lien vers l'enregistrement sur le portail de sa source.

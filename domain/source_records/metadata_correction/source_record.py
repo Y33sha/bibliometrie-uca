@@ -3,7 +3,7 @@
 from collections.abc import Mapping, Sequence, Set
 from typing import NamedTuple
 
-from domain.publications.identifiers import extract_hal_id_from_url
+from domain.publications.identifiers import HALId
 from domain.source_records.corrections import (
     UNARY_KEYS,
     CorrectionKey,
@@ -105,7 +105,7 @@ def correct_source_record(
         missing_rule = MetadataCorrectionRule.HAL_DEPOSIT_MISSING_TO_REMOVED.value
         for hal_id in cited & missing_hal_ids:
             removals.setdefault((SourceIdentifierType.HAL_ID, hal_id), missing_rule)
-        kept_urls = [u for u in urls or () if extract_hal_id_from_url(u) not in missing_hal_ids]
+        kept_urls = [u for u in urls or () if HALId.normalize(u) not in missing_hal_ids]
         if len(kept_urls) != len(urls or ()):
             urls = kept_urls or None
             new_corrections[CorrectionKey.URLS] = stash_entry(before.urls, missing_rule)

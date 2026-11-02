@@ -42,6 +42,7 @@ function record(overrides: Partial<SourceRecord>): SourceRecord {
 		issue: null,
 		pages: null,
 		article_number: null,
+		cited_by_count: null,
 		...overrides,
 	};
 }
@@ -168,6 +169,15 @@ describe('comparisonRows', () => {
 	it('affiche le nom de la langue, avec en note la valeur que donnait la source', () => {
 		const rows = comparisonRows([record({ source: 'wos', language_raw: 'English' })]);
 		expect(row(rows, 'language').cells).toEqual([{ text: 'Anglais', note: 'English' }]);
+	});
+
+	it('affiche les citations de chaque source sans signaler leur écart', () => {
+		const rows = comparisonRows([
+			record({ source: 'openalex', cited_by_count: 1200 }),
+			record({ id: 2, source: 'wos', cited_by_count: 950 }),
+		]);
+		expect(row(rows, 'cited_by_count').cells.map((c) => c.text)).toEqual([(1200).toLocaleString('fr-FR'), '950']);
+		expect(row(rows, 'cited_by_count').divergent).toBe(false);
 	});
 });
 

@@ -44,6 +44,5 @@ Un jeu d'évaluation tiré des verdicts humains existe depuis le 2026-10-19 (`bu
 ## Questions ouvertes
 
 - Périmètre des publications : il réunit les indices des seules contributions rattachées à une personne non exclue. Une erreur d'affiliation relève de la contribution source, pas de la personne.
-- Ancrage des épinglages : `confirmed_source_contributions` vise la contribution source, en `ON DELETE CASCADE`. La renormalisation supprime puis réinsère une contribution source dont les identifiants changent, et l'épinglage disparaît. Ancrer sur l'enregistrement source et la position, ou sur l'enregistrement source et le nom ?
 - Recalcul immédiat des contributions invalidées par une décision de l'administration, exposé par le pipeline (`pipeline/public.py`) sur un index réduit aux valeurs de leurs contributions sources.
 - Deux idées de ReCiter : enregistrer ce qui a concordé et pas seulement la règle ; réutiliser les confirmations et les rejets d'une personne comme indices pour ses autres contributions.

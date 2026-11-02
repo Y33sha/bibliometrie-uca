@@ -128,6 +128,35 @@ class TestMemberReads:
 
         assert [address.id for address in response.addresses] == [member_address]
 
+    def test_addresses_are_raw_addresses_only(self, sa_sync_conn):
+        """Un libellé HAL, un nom seul ou une adresse sans origine sont absents des adresses et du compte des publications avec adresse."""
+        person = insert_person(sa_sync_conn, "Adressee")
+        texts_by_publication = (
+            [
+                ("Institut Pascal, Aubière, France", "raw"),
+                ("IP - Institut Pascal (Aubière - France)", "hal_label"),
+            ],
+            [("Institut Pascal", "name_only"), ("Adresse à classer", None)],
+        )
+        raw_address = None
+        for texts in texts_by_publication:
+            publication = insert_publication(sa_sync_conn)
+            insert_contribution(sa_sync_conn, publication, person_id=person, roles=["author"])
+            member = _source_contribution(sa_sync_conn, publication)
+            _join_contribution(sa_sync_conn, member, publication_id=publication, person_id=person)
+            for raw_text, origin in texts:
+                address = insert_address(sa_sync_conn, raw_text, origin=origin)
+                insert_source_contribution_address(sa_sync_conn, member[0], address_id=address)
+                if origin == "raw":
+                    raw_address = address
+        queries = PersonsQueries(sa_sync_conn)
+
+        response = queries.person_addresses(person, year=None, page=1, per_page=50)
+        summary = queries.person_address_summary(person, year=None)
+
+        assert [address.id for address in response.addresses] == [raw_address]
+        assert (summary.publications, summary.publications_with_address) == (2, 1)
+
 
 class TestAddressesByYear:
     """Adresses de la personne sur les publications d'une année : CHU sur deux publications de 2024 et une de 2023, UCA sur une de 2024, une publication de 2024 sans adresse."""

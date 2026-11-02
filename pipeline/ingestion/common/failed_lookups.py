@@ -8,7 +8,7 @@ from typing import Literal
 
 from sqlalchemy import Connection, text
 
-from domain.publications.identifiers import clean_doi
+from domain.publications.identifiers import DOI
 from domain.sources.registry import DOI_ORG, Source
 
 LookupIdType = Literal["doi", "hal_id", "nnt"]
@@ -48,9 +48,9 @@ _FORGET_SQL = text(
 def forget_failed_doi_lookups(conn: Connection, source: str, dois: Sequence[str | None]) -> None:
     """Efface les échecs inscrits dans la source pour ces DOI : DOI d'un document renvoyé par la source, ou DOI connus de doi.org (`DOI_ORG`).
 
-    Les DOI passent par `clean_doi` : un document peut les donner sous toute forme.
+    Les DOI passent par `DOI.normalize` : un document peut les donner sous toute forme.
     """
-    cleaned = [clean for doi in dois if (clean := clean_doi(doi))]
+    cleaned = [clean for doi in dois if (clean := DOI.normalize(doi))]
     if cleaned:
         conn.execute(_FORGET_SQL, {"source": source, "id_type": "doi", "values": cleaned})
 

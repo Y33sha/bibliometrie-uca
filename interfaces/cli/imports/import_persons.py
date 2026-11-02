@@ -386,7 +386,7 @@ def _find_record(conn: Connection, agent: HrRow) -> tuple[int, RhImportOutcome] 
 
 
 def _unique_homonym_without_record(conn: Connection, agent: HrRow) -> int | None:
-    """Renvoie l'unique personne de même nom et même prénom que l'agent, quand elle est sans fiche RH ni exclusion. Le prénom est complet, sans initiale."""
+    """Renvoie l'unique personne de même nom et même prénom que l'agent, quand elle est sans fiche RH ni exclusion. Le prénom de l'agent n'est pas réduit à des initiales."""
     if not is_full_first_name(agent.first_name):
         return None
     homonyms = conn.execute(

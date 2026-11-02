@@ -16,7 +16,7 @@ from domain.platforms.registry import (
     known_platform_of_copy,
     platform_type_of_copy,
 )
-from domain.publications.identifiers import extract_hal_id_from_url
+from domain.publications.identifiers import HALId
 from domain.publications.licenses import License
 from domain.publications.oa_status import OA_OPEN_STATUSES, OaStatus
 
@@ -146,16 +146,14 @@ def open_copies(copies: Iterable[Copy]) -> list[Copy]:
     """Renvoie les copies ouvertes, à adresse `http` ou `https`. Quand HAL décrit lui-même un dépôt, seule sa description décide de l'ouverture des copies de ce dépôt."""
     copies = list(copies)
     self_described = {
-        hal_id
-        for c in copies
-        if c.described_by_platform and (hal_id := extract_hal_id_from_url(c.url))
+        hal_id for c in copies if c.described_by_platform and (hal_id := HALId.normalize(c.url))
     }
     return [
         c
         for c in copies
         if c.is_oa
         and urlsplit(c.url).scheme in _WEB_SCHEMES
-        and (c.described_by_platform or extract_hal_id_from_url(c.url) not in self_described)
+        and (c.described_by_platform or HALId.normalize(c.url) not in self_described)
     ]
 
 

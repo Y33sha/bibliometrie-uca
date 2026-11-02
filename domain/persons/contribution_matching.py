@@ -11,7 +11,7 @@ Deux personnes désignées au même niveau laissent la contribution sans personn
 """
 
 from collections.abc import Mapping, MutableMapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import StrEnum
 
 from domain.normalize import normalize_text
@@ -88,6 +88,13 @@ MATCH_REASON_PRIORITY: tuple[ContributionMatchReason, ...] = (
 """Signaux de rattachement dans l'ordre où la décision les essaie : épinglage, identifiants du plus fiable au moins fiable, nom."""
 
 
+def _strength(reason: ContributionMatchReason) -> int:
+    """Renvoie le rang d'un rattachement, du mieux appuyé au moins bien appuyé : épinglage, identifiant, nom."""
+    if reason == ContributionMatchReason.MANUAL:
+        return 0
+    return 2 if reason in NAME_MATCH_REASONS else 1
+
+
 @dataclass(frozen=True)
 class AlignedSourceContribution:
     """Contribution source alignée dans une contribution."""
@@ -154,47 +161,12 @@ class ContributionDecision:
     outcome: ContributionOutcome
     person_id: int | None = None
     reason: ContributionMatchReason | ContributionSkipReason | None = None
-    evidence: tuple[tuple[str, str, int], ...] = field(default=())
-    """Signaux qui désignent une personne : `(signal, source de la contribution source, personne)`."""
-    refused: tuple[tuple[str, str, int], ...] = field(default=())
-    """Identifiants refusés faute de nom compatible : `(type, valeur, personne)`."""
+    refused: tuple[tuple[str, str], ...] = ()
+    """Identifiants refusés faute de nom compatible : `(type, valeur)`."""
 
 
 def _single(candidates: set[int]) -> int | None:
     return next(iter(candidates)) if len(candidates) == 1 else None
-
-
-def name_form_decision(
-    person_ids: list[int] | None,
-    rejected_person_ids: frozenset[int] = frozenset(),
-    compatible_person_ids: Sequence[int] = (),
-) -> ContributionDecision | None:
-    """Décide par le nom d'une contribution source. `None` sans aucun candidat.
-
-    - Un candidat → `match`, motif `name`, ou `compatible_name` pour des initiales compatibles.
-    - Plusieurs candidats → `skip`, `ambiguous_name_form`.
-    - Candidats tous rejetés → `skip`, `all_candidates_rejected`.
-
-    Args:
-        person_ids: personnes de la forme de nom exacte, `None` si la forme est inconnue.
-        rejected_person_ids: personnes rejetées pour la publication, écartées des candidats.
-        compatible_person_ids: personnes désignées par les initiales, candidates seulement si la forme est inconnue.
-    """
-    reason = ContributionMatchReason.NAME
-    if person_ids is None:
-        if not compatible_person_ids:
-            return None
-        person_ids, reason = list(compatible_person_ids), ContributionMatchReason.COMPATIBLE_NAME
-    candidates = [pid for pid in person_ids if pid not in rejected_person_ids]
-    if len(candidates) == 1:
-        return ContributionDecision(ContributionOutcome.MATCH, candidates[0], reason)
-    if not candidates:
-        return ContributionDecision(
-            ContributionOutcome.SKIP, reason=ContributionSkipReason.ALL_CANDIDATES_REJECTED
-        )
-    return ContributionDecision(
-        ContributionOutcome.SKIP, reason=ContributionSkipReason.AMBIGUOUS_NAME_FORM
-    )
 
 
 def decide_contribution(
@@ -217,8 +189,9 @@ def decide_contribution(
             ContributionOutcome.SKIP, reason=ContributionSkipReason.PIN_CONFLICT
         )
 
-    evidence: list[tuple[str, str, int]] = []
-    refused: list[tuple[str, str, int]] = []
+    # Personne désignée par chaque identifiant fiable, avec le plus fiable des types qui la désignent.
+    identified: dict[int, PersonIdentifierType] = {}
+    refused: list[tuple[str, str]] = []
     for id_type in IDENTIFIER_ORDER:
         identifier_map = index.identifiers.get(id_type, {})
         for m in members:
@@ -229,24 +202,20 @@ def decide_contribution(
                 value, identifier_map, m.name, m.name_forms, index.name_form_status
             )
             if match.person_id is not None and match.person_id not in rejected_person_ids:
-                evidence.append((id_type, m.source, match.person_id))
+                identified.setdefault(match.person_id, id_type)
             elif match.rejection is not None:
-                refused.append((id_type, value, match.rejection[0]))
-    identified = {person_id for _, _, person_id in evidence}
+                refused.append((id_type, value))
     if identified:
-        if (person_id := _single(identified)) is not None:
-            strongest = PersonIdentifierType(evidence[0][0])
+        if (person_id := _single(set(identified))) is not None:
             return ContributionDecision(
                 ContributionOutcome.MATCH,
                 person_id,
-                _REASON_BY_IDENTIFIER[strongest],
-                tuple(evidence),
+                _REASON_BY_IDENTIFIER[identified[person_id]],
                 tuple(refused),
             )
         return ContributionDecision(
             ContributionOutcome.SKIP,
             reason=ContributionSkipReason.IDENTIFIER_CONFLICT,
-            evidence=tuple(evidence),
             refused=tuple(refused),
         )
 
@@ -263,42 +232,39 @@ def _decide_by_name(
     members: Sequence[AlignedSourceContribution],
     index: PersonIndex,
     rejected_person_ids: frozenset[int],
-    refused: tuple[tuple[str, str, int], ...],
+    refused: tuple[tuple[str, str], ...],
 ) -> ContributionDecision:
-    """Décide par le nom des contributions sources. Une contribution source dont la forme désigne une seule personne l'emporte sur une contribution source au nom ambigu. Deux contributions sources qui désignent deux personnes laissent la contribution sans personne."""
+    """Décide par le nom des contributions sources. La forme de nom exacte désigne ses personnes ; à défaut, les initiales compatibles (`compatible_persons`) désignent les leurs. Les personnes rejetées pour la publication sont écartées.
+
+    Une contribution source qui désigne une seule personne l'emporte sur une contribution source au nom ambigu. Deux contributions sources qui désignent deux personnes laissent la contribution sans personne.
+    """
     allow_create = any(allow_person_creation(list(m.roles)) for m in members)
     matched: dict[int, ContributionMatchReason] = {}
-    evidence: list[tuple[str, str, int]] = []
     undecidable: ContributionSkipReason | None = None
     for m in members:
+        reason = ContributionMatchReason.NAME
         person_ids = next(
-            (list(index.name_forms[f]) for f in m.name_forms if f in index.name_forms), None
+            (index.name_forms[f] for f in m.name_forms if f in index.name_forms), None
         )
-        compatible = compatible_persons(m.name, index.namesakes) if person_ids is None else []
-        decision = name_form_decision(person_ids, rejected_person_ids, compatible)
-        if decision is None:
-            continue
-        if decision.outcome is ContributionOutcome.MATCH:
-            assert decision.person_id is not None
-            assert isinstance(decision.reason, ContributionMatchReason)
+        if person_ids is None:
+            person_ids = compatible_persons(m.name, index.namesakes)
+            reason = ContributionMatchReason.COMPATIBLE_NAME
+        candidates = [pid for pid in person_ids if pid not in rejected_person_ids]
+        if len(candidates) == 1:
             # Une forme exacte prime sur des initiales compatibles pour la même personne.
-            if matched.get(decision.person_id) != ContributionMatchReason.NAME:
-                matched[decision.person_id] = decision.reason
-            evidence.append((decision.reason, m.source, decision.person_id))
-        elif decision.reason is ContributionSkipReason.AMBIGUOUS_NAME_FORM:
+            if matched.get(candidates[0]) != ContributionMatchReason.NAME:
+                matched[candidates[0]] = reason
+        elif candidates:
             undecidable = ContributionSkipReason.AMBIGUOUS_NAME_FORM
-        elif undecidable is None:
+        elif person_ids and undecidable is None:
             undecidable = ContributionSkipReason.ALL_CANDIDATES_REJECTED
     if matched:
         if (person_id := _single(set(matched))) is not None:
             return ContributionDecision(
-                ContributionOutcome.MATCH, person_id, matched[person_id], tuple(evidence), refused
+                ContributionOutcome.MATCH, person_id, matched[person_id], refused
             )
         return ContributionDecision(
-            ContributionOutcome.SKIP,
-            reason=ContributionSkipReason.NAME_CONFLICT,
-            evidence=tuple(evidence),
-            refused=refused,
+            ContributionOutcome.SKIP, reason=ContributionSkipReason.NAME_CONFLICT, refused=refused
         )
     if undecidable is not None:
         return ContributionDecision(ContributionOutcome.SKIP, reason=undecidable, refused=refused)
@@ -309,17 +275,6 @@ def _decide_by_name(
         reason=ContributionSkipReason.CREATION_NOT_ALLOWED,
         refused=refused,
     )
-
-
-_STRENGTH: dict[ContributionMatchReason, int] = {
-    ContributionMatchReason.MANUAL: 0,
-    ContributionMatchReason.ORCID: 1,
-    ContributionMatchReason.HAL_PERSON_ID: 1,
-    ContributionMatchReason.IDREF: 1,
-    ContributionMatchReason.NAME: 2,
-    ContributionMatchReason.COMPATIBLE_NAME: 2,
-}
-"""Rang d'un rattachement, du mieux appuyé au moins bien appuyé : épinglage, identifiant, nom."""
 
 
 def settle_publication(
@@ -337,7 +292,7 @@ def settle_publication(
     def rank(contribution_id: int) -> tuple[int, int, int]:
         decision, member_count = decisions[contribution_id]
         assert isinstance(decision.reason, ContributionMatchReason)
-        return (_STRENGTH[decision.reason], -member_count, contribution_id)
+        return (_strength(decision.reason), -member_count, contribution_id)
 
     by_person: dict[int, list[int]] = {}
     for contribution_id, (decision, _) in decisions.items():
@@ -351,7 +306,6 @@ def settle_publication(
             settled[contribution_id] = ContributionDecision(
                 ContributionOutcome.SKIP,
                 reason=ContributionSkipReason.PERSON_IN_OTHER_CONTRIBUTION,
-                evidence=decision.evidence,
                 refused=decision.refused,
             )
     return settled
@@ -390,7 +344,7 @@ def identifiers_to_attribute(
     members: Sequence[AlignedSourceContribution], decision: ContributionDecision
 ) -> list[dict[str, str]]:
     """Renvoie les identifiants fiables des contributions sources d'une contribution rattachée, à attribuer à sa personne. Les valeurs refusées faute de nom compatible sont écartées."""
-    refused = {(id_type, value) for id_type, value, _ in decision.refused}
+    refused = set(decision.refused)
     return [
         {
             id_type: value

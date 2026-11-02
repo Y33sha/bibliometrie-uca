@@ -141,8 +141,8 @@ class PgContributionRepository(ContributionRepository):
     def reject_contribution(self, publication_id: int, person_id: int) -> None:
         self._conn.execute(
             text("""
-                INSERT INTO rejected_contributions (source_record_id, person_id)
-                SELECT id, :pid FROM source_records WHERE publication_id = :publication
+                INSERT INTO rejected_contributions (source, source_id, person_id)
+                SELECT source, source_id, :pid FROM source_records WHERE publication_id = :publication
                 ON CONFLICT DO NOTHING
             """),
             {"publication": publication_id, "pid": person_id},
@@ -152,7 +152,7 @@ class PgContributionRepository(ContributionRepository):
         return self._conn.execute(
             text("""
                 SELECT min(r.created_at) FROM rejected_contributions r
-                JOIN source_records sr ON sr.id = r.source_record_id
+                JOIN source_records sr ON sr.source = r.source AND sr.source_id = r.source_id
                 WHERE sr.publication_id = :publication AND r.person_id = :pid
             """),
             {"publication": publication_id, "pid": person_id},
@@ -163,7 +163,7 @@ class PgContributionRepository(ContributionRepository):
             text("""
                 DELETE FROM rejected_contributions r
                 USING source_records sr
-                WHERE sr.id = r.source_record_id
+                WHERE sr.source = r.source AND sr.source_id = r.source_id
                   AND sr.publication_id = :publication AND r.person_id = :pid
             """),
             {"publication": publication_id, "pid": person_id},

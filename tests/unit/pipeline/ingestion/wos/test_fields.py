@@ -48,8 +48,8 @@ class TestExtractDoi:
         }
         assert extract_doi(rec) == "10.1000/abc"
 
-    def test_normalizes_value_via_clean_doi(self):
-        # Le DOI extrait passe par `clean_doi`, qui normalise préfixe URL, casse et espaces.
+    def test_normalizes_value_via_doi_normalize(self):
+        # Le DOI extrait passe par `DOI.normalize`, qui normalise préfixe URL, casse et espaces.
         rec = {
             "dynamic_data": {
                 "cluster_related": {

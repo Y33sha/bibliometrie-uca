@@ -8,10 +8,10 @@ from domain.platforms.platform import PlatformType, is_descriptive_page
 from domain.platforms.registry import (
     HAL,
     KNOWN_PLATFORMS,
+    _known_platform_of_url,
     is_publisher_platform_prefix,
     known_platform_of_copy,
     known_platform_of_source,
-    known_platform_of_url,
     names_platform,
     platform_type_of_copy,
     preprint_servers_of_doi,
@@ -142,7 +142,7 @@ class TestKnownPlatformOfUrl:
         ],
     )
     def test_plateforme_reconnue(self, url, expected):
-        known = known_platform_of_url(url)
+        known = _known_platform_of_url(url)
         assert known is not None
         assert known.name == expected
 
@@ -157,7 +157,7 @@ class TestKnownPlatformOfUrl:
         ],
     )
     def test_plateforme_inconnue(self, url):
-        assert known_platform_of_url(url) is None
+        assert _known_platform_of_url(url) is None
 
     def test_l_url_prime_sur_la_source_openalex(self):
         """OpenAlex range sous HAL des copies d'OpenEdition."""

@@ -5,7 +5,7 @@ from functools import partial
 import pytest
 from sqlalchemy import text
 
-from domain.publications.identifiers import clean_doi
+from domain.publications.identifiers import DOI
 from domain.source_records.identifiers import (
     SourceIdentifier,
     SourceIdentifierRole,
@@ -111,31 +111,31 @@ class TestStripVolatileForHash:
 
 class TestCleanDoi:
     def test_none(self):
-        assert clean_doi(None) is None
+        assert DOI.normalize(None) is None
 
     def test_empty(self):
-        assert clean_doi("") is None
+        assert DOI.normalize("") is None
 
     def test_whitespace_only(self):
-        assert clean_doi("   ") is None
+        assert DOI.normalize("   ") is None
 
     def test_plain_doi(self):
-        assert clean_doi("10.1234/test.5678") == "10.1234/test.5678"
+        assert DOI.normalize("10.1234/test.5678") == "10.1234/test.5678"
 
     def test_https_prefix(self):
-        assert clean_doi("https://doi.org/10.1234/test") == "10.1234/test"
+        assert DOI.normalize("https://doi.org/10.1234/test") == "10.1234/test"
 
     def test_http_prefix(self):
-        assert clean_doi("http://doi.org/10.1234/test") == "10.1234/test"
+        assert DOI.normalize("http://doi.org/10.1234/test") == "10.1234/test"
 
     def test_dx_prefix(self):
-        assert clean_doi("https://dx.doi.org/10.1234/test") == "10.1234/test"
+        assert DOI.normalize("https://dx.doi.org/10.1234/test") == "10.1234/test"
 
     def test_strips_whitespace(self):
-        assert clean_doi("  https://doi.org/10.1234/test  ") == "10.1234/test"
+        assert DOI.normalize("  https://doi.org/10.1234/test  ") == "10.1234/test"
 
     def test_case_insensitive_prefix(self):
-        assert clean_doi("HTTPS://DOI.ORG/10.1234/test") == "10.1234/test"
+        assert DOI.normalize("HTTPS://DOI.ORG/10.1234/test") == "10.1234/test"
 
 
 def _add_inperim_source_record(conn, source, sid, *, doi=None, identifiers=None):

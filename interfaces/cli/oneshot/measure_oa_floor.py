@@ -21,7 +21,7 @@ from sqlalchemy import Connection, text
 
 from domain.platforms.platform import is_descriptive_page
 from domain.publications.access import Copy
-from domain.publications.identifiers import extract_hal_id_from_url
+from domain.publications.identifiers import HALId
 from domain.publications.oa_status import OA_OPEN_STATUSES, OA_RANK, OaStatus
 from domain.publications.open_access import (
     OpenAccessFacts,
@@ -87,7 +87,7 @@ def _copies(p: _Publication) -> list[Copy]:
     with_file = _hal_deposits_with_file()
     return [
         replace(c, is_oa=True)
-        if c.described_by_platform and extract_hal_id_from_url(c.url) in with_file
+        if c.described_by_platform and HALId.normalize(c.url) in with_file
         else c
         for c in p.copies
     ]

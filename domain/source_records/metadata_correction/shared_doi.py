@@ -21,34 +21,31 @@ from domain.sources.scanr import extract_hal_id_from_scanr_id
 class DoiTargetRule(StrEnum):
     """Règle qui donne une cible au DOI d'une forme secondaire. Inscrite dans `doi_targets.rule`."""
 
-    DATACITE_VERSION_TO_CONCEPT = "DATACITE_VERSION_TO_CONCEPT"  # version → concept (IsVersionOf)
-    DATACITE_VARIANT_TO_PRIMARY = (
-        "DATACITE_VARIANT_TO_PRIMARY"  # copie repository → version publiée (IsVariantFormOf)
-    )
-    DATACITE_PACKAGE_PIECE = "DATACITE_PACKAGE_PIECE"  # pièce d'un dataset → dataset parent présent (IsPartOf, ou fichier complémentaire figshare)
-    DOI_VERSION_TO_UNVERSIONED = "DOI_VERSION_TO_UNVERSIONED"  # DOI à suffixe de version → sa forme sans version, DOI `primary` ou `derived` d'un enregistrement source
-    DOI_VERSION_TO_LATEST = (
-        "DOI_VERSION_TO_LATEST"  # DOI à suffixe de version → version de plus grand numéro en base
-    )
+    DATACITE_VERSION_TO_CONCEPT = "DATACITE_VERSION_TO_CONCEPT"
+    """Version → concept (`IsVersionOf`)."""
+    DATACITE_VARIANT_TO_PRIMARY = "DATACITE_VARIANT_TO_PRIMARY"
+    """Copie de repository → version publiée (`IsVariantFormOf`)."""
+    DATACITE_PACKAGE_PIECE = "DATACITE_PACKAGE_PIECE"
+    """Pièce d'un dataset → dataset parent présent (`IsPartOf`, ou fichier complémentaire figshare)."""
+    DOI_VERSION_TO_UNVERSIONED = "DOI_VERSION_TO_UNVERSIONED"
+    """DOI à suffixe de version → sa forme sans version, DOI `primary` ou `derived` d'un enregistrement source."""
+    DOI_VERSION_TO_LATEST = "DOI_VERSION_TO_LATEST"
+    """DOI à suffixe de version → version de plus grand numéro en base."""
 
 
 class DoiClusterCase(StrEnum):
     """Cas de retrait du DOI d'un membre d'un groupe partageant un DOI. Inscrit dans `source_record_identifiers.removed_by`."""
 
-    # Ouvrage et chapitre partageant un DOI : le DOI est celui de l'ouvrage, le chapitre d'un autre titre le perd.
     OUVRAGE_VS_CHAPITRE = "OUVRAGE_VS_CHAPITRE"
-
-    # Chapitres de titres différents partageant un DOI : celui de l'ouvrage, absent du groupe. Tous le perdent.
+    """Ouvrage et chapitre partageant un DOI : le DOI est celui de l'ouvrage, le chapitre d'un autre titre le perd."""
     CHAPITRES_TITRES_DIFFERENTS = "CHAPITRES_TITRES_DIFFERENTS"
-
-    # Volume d'actes et documents d'autres titres partageant son DOI : ces communications perdent le DOI.
+    """Chapitres de titres différents partageant un DOI : celui de l'ouvrage, absent du groupe. Tous le perdent."""
     ACTES_VS_COMMUNICATION = "ACTES_VS_COMMUNICATION"
-
-    # Enregistrement source dont le DOI est celui d'une autre œuvre (`_records_of_another_work`) → il le perd.
+    """Volume d'actes et documents d'autres titres partageant son DOI : ces communications perdent le DOI."""
     DOI_D_UNE_AUTRE_OEUVRE = "DOI_D_UNE_AUTRE_OEUVRE"
-
-    # DOI inconnu de doi.org (`failed_lookups`, source `doi_org`) → tous les membres le perdent.
+    """Enregistrement source dont le DOI est celui d'une autre œuvre (`_records_of_another_work`) : il le perd."""
     UNRESOLVED_DOI_TO_NULL = "UNRESOLVED_DOI_TO_NULL"
+    """DOI inconnu de doi.org (`failed_lookups`, source `doi_org`) : tous les membres le perdent."""
 
 
 # Types de relation DataCite qui désignent l'œuvre principale par son DOI. La requête des candidats en tire son `CASE` et son filtre.
@@ -95,9 +92,9 @@ class DoiClusterMember(NamedTuple):
     doc_type: str | None
     """Type après la correction unaire."""
     title_normalized: str | None
-    confirmation_ids: Mapping[str, tuple[str, ...]] = {}
+    confirmation_ids: Mapping[SourceIdentifierType, tuple[str, ...]] = {}
     """Valeurs des clés de confirmation (`CONFIRMATION_ID_TYPES`) de ses identifiants, par type."""
-    own_ids: Mapping[str, tuple[str, ...]] = {}
+    own_ids: Mapping[SourceIdentifierType, tuple[str, ...]] = {}
     """Identifiants propres de l'enregistrement source, par type : le `hal_id` d'un enregistrement source HAL, le NNT d'un enregistrement source theses.fr."""
     source: str = ""
     author_names: frozenset[str] = frozenset()
@@ -123,7 +120,7 @@ class ConfirmationIdRemoval(NamedTuple):
     """Identifiants retirés d'un membre qui garde le DOI partagé."""
 
     id: int
-    removed: dict[str, list[str]]
+    removed: dict[SourceIdentifierType, list[str]]
     """Valeurs partagées avec un membre qui perd le DOI, par type."""
     case: DoiClusterCase
 
@@ -139,16 +136,20 @@ _DIVERGENCE_CASES: frozenset[DoiClusterCase] = frozenset(
 )
 
 
-def confirmation_ids(identifiers: Iterable[SourceIdentifier]) -> dict[str, tuple[str, ...]]:
+def confirmation_ids(
+    identifiers: Iterable[SourceIdentifier],
+) -> dict[SourceIdentifierType, tuple[str, ...]]:
     """Renvoie les valeurs des clés de confirmation (`CONFIRMATION_ID_TYPES`) parmi `identifiers`, par type."""
-    out: dict[str, list[str]] = {}
+    out: dict[SourceIdentifierType, list[str]] = {}
     for identifier in identifiers:
         if identifier.id_type in CONFIRMATION_ID_TYPES:
-            out.setdefault(identifier.id_type.value, []).append(identifier.value)
+            out.setdefault(identifier.id_type, []).append(identifier.value)
     return {id_type: tuple(values) for id_type, values in out.items()}
 
 
-def source_record_own_ids(source: str, source_id: str) -> dict[str, tuple[str, ...]]:
+def source_record_own_ids(
+    source: str, source_id: str
+) -> dict[SourceIdentifierType, tuple[str, ...]]:
     """Renvoie les identifiants propres d'un enregistrement source, par type : le dépôt HAL d'un enregistrement source HAL ou d'un enregistrement source ScanR issu de HAL, le NNT d'un enregistrement source theses.fr."""
     if source == Source.HAL:
         parsed = HALId.try_parse(source_id)
@@ -157,10 +158,10 @@ def source_record_own_ids(source: str, source_id: str) -> dict[str, tuple[str, .
         hal_id = extract_hal_id_from_scanr_id(source_id)
     elif source == Source.THESES:
         nnt = NNT.try_parse(source_id)
-        return {SourceIdentifierType.NNT.value: (str(nnt),)} if nnt else {}
+        return {SourceIdentifierType.NNT: (str(nnt),)} if nnt else {}
     else:
         return {}
-    return {SourceIdentifierType.HAL_ID.value: (hal_id,)} if hal_id else {}
+    return {SourceIdentifierType.HAL_ID: (hal_id,)} if hal_id else {}
 
 
 def confirmation_id_removals(
@@ -175,7 +176,7 @@ def confirmation_id_removals(
     losers = {d.id: d.case for d in decisions if d.case in _DIVERGENCE_CASES}
     if not losers:
         return []
-    kept: dict[str, set[str]] = {}
+    kept: dict[SourceIdentifierType, set[str]] = {}
     for m in group:
         if m.id in losers:
             continue
@@ -183,7 +184,7 @@ def confirmation_id_removals(
         for ids in held:
             for id_type, values in ids.items():
                 kept.setdefault(id_type, set()).update(values)
-    lost: dict[str, set[str]] = {}
+    lost: dict[SourceIdentifierType, set[str]] = {}
     for m in group:
         if m.id in losers:
             for id_type, values in m.confirmation_ids.items():
@@ -331,11 +332,10 @@ def version_targets(dois: Iterable[str], anchor_dois: Set[str]) -> list[DoiTarge
 def resolve_cluster_doi_corrections(
     group: list[DoiClusterMember],
     *,
-    shared_doi: str,
     unresolved: bool = False,
     has_target: bool = False,
 ) -> list[DoiClusterDecision]:
-    """Renvoie les membres d'un groupe qui partagent `shared_doi` et le perdent, avec le cas qui le décide.
+    """Renvoie les membres d'un groupe d'enregistrements sources de même DOI qui perdent ce DOI, avec le cas qui le décide.
 
     - **DOI inconnu de doi.org** (`unresolved`) : tous les membres perdent le DOI. Prime sur les cas ci-dessous.
     - **DOI d'une forme secondaire** (`has_target`, cf. `doi_target`) : aucun membre ne perd le DOI. Prime sur les cas ci-dessous, réservés à la famille ouvrage/chapitre.

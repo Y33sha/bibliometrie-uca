@@ -1,12 +1,22 @@
 # Résolution des affiliations
 
-*À jour le 2026-10-26.*
+*À jour le 2026-11-02.*
 
 La phase `affiliations` rattache les contributions sources aux structures du périmètre, et marque leur entrée dans le périmètre.
 
 - **`refresh_ror`** — importe la dernière version du dump ROR, publié sur Zenodo, si elle n'est pas déjà importée.
 
 - **`refresh_hal_structures`** — charge depuis l'API HAL les structures citées par les contributions sources et absentes du référentiel `ref.hal_structures`, puis leurs parents.
+
+- **`classify_addresses`** — pose l'origine du texte des adresses sans origine (`addresses.origin`). La première règle applicable décide :
+   - « SIGLE - Nom (adresse postale - Pays) » : libellé HAL ;
+   - crochets contenant une période, des lieux ou un nom de structure (« University of Mons [Belgium] ») : libellé HAL ;
+   - texte égal au nom d'une structure HAL ou d'une organisation ROR, après normalisation : nom seul ;
+   - « Nom, Pays », le nom étant celui d'une structure HAL sans ses crochets ou d'une organisation ROR : nom seul ;
+   - texte avec virgule : adresse brute ;
+   - texte terminé par un pays entre parenthèses : libellé HAL ;
+   - texte terminé par un nom de pays : adresse brute ;
+   - autre texte : nom seul.
 
 - **`resolve_addresses`** — cherche dans le texte de chaque adresse normalisée les formes de nom des structures (`structure_name_forms`). Le résultat est écrit dans `address_structures`, avec la forme de nom détectée. Les rattachements confirmés ou saisis à la main restent en place.
 

@@ -6,6 +6,9 @@
 ## Adresse
 Chaîne de caractères qui donne l'[affiliation](#affiliation) d'un auteur dans une publication, fournie par l'auteur à l'éditeur. Appelée *address* ou *affiliation string* dans les métadonnées, et *signature* dans le langage courant.
 
+## Adresse brute
+[Adresse](#adresse) telle qu'elle figure dans la publication. Le champ d'adresse des sources contient aussi des libellés de structures HAL et des noms seuls d'établissement.
+
 ## Affiliation
 Structure ou structures de rattachement d'un auteur dans une publication. Elle est liée au couple personne-publication, et non à la personne.
 
@@ -47,6 +50,9 @@ Agence d'enregistrement de DOI, surtout pour les jeux de données, logiciels et 
 
 ## Éditeur
 Maison d'édition scientifique (Elsevier, Springer Nature, EDP Sciences…), qui publie les documents et reçoit les frais de publication.
+
+## FWCI
+*Field-Weighted Citation Impact*. Rapport entre les citations reçues par une publication et la moyenne mondiale des citations des publications de même type, de même année et de même discipline. Le FWCI est calculé par [OpenAlex](#openalex). La moyenne mondiale vaut 1. La couverture du FWCI est celle des [seuils de citation](#seuils-de-citation).
 
 ## HAL
 Archive ouverte nationale française. Voir [détails](sources/02-hal.md).
@@ -120,6 +126,11 @@ Publication en série périodique, identifiée par un ou plusieurs [ISSN](#issn)
 
 ## ScanR
 Portail du ministère de l'Enseignement supérieur et de la Recherche sur la recherche française. Voir [détails](sources/05-scanr.md).
+
+## Seuils de citation
+Publications parmi les 1 % ou les 10 % les plus citées au monde. La comparaison porte sur les publications de même type, de même année et de même discipline. Les seuils sont calculés par [OpenAlex](#openalex). Le top 10 % comprend le top 1 %. La référence mondiale vaut donc 10 % pour le top 10 % et 1 % pour le top 1 %.
+
+Les publications absentes d'OpenAlex sont sans seuil, comme la plupart des thèses, preprints, rapports et jeux de données. La page Statistiques et les dashboards comptent seulement les publications pourvues d'un seuil.
 
 ## Synthèse
 Article de synthèse, ou revue de la littérature (*review*). Dans WoS, *book review* désigne un compte rendu d'ouvrage.

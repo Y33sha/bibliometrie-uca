@@ -173,6 +173,13 @@ function fields(records: SourceRecord[]): Field[] {
 			cell: (r) => ({ text: r.language_name ?? r.language, note: r.language_raw ?? undefined }),
 			compared: (r) => r.language,
 		},
+		{
+			key: 'cited_by_count',
+			label: 'Citations',
+			cell: (r) => ({ text: r.cited_by_count?.toLocaleString('fr-FR') ?? null }),
+			// Chaque source compte les citations dans sa propre base : un écart entre sources est attendu.
+			compared: () => null,
+		},
 	];
 }
 
