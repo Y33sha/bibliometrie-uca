@@ -115,7 +115,7 @@ class TestDeletePerimeter:
         assert result.first() is None
 
     def test_raises_if_used_by_config(self, sa_sync_conn, service):
-        """La suppression d'un périmètre désigné par une clé de configuration `perimeter_*` est refusée."""
+        """La suppression d'un périmètre désigné par une clé de configuration est refusée."""
         p = insert_perimeter(sa_sync_conn, "used_perim", name="Test")
         set_config(sa_sync_conn, "perimeter_extraction", "used_perim")
 

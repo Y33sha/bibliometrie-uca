@@ -3,6 +3,7 @@
 from sqlalchemy import Connection, text, update
 
 from application.ports.repositories.config_repository import ConfigRepository
+from domain.config import PERIMETER_CONFIG_KEYS
 from domain.types import JsonValue
 from infrastructure.db.tables import config
 
@@ -16,8 +17,8 @@ class PgConfigRepository(ConfigRepository):
     def config_keys_referencing_perimeter(self, perimeter_code: str) -> list[str]:
         # `#>> '{}'` extrait le scalaire JSON ; SQLAlchemy Core est sans opérateur pour lui, d'où `text()` et un paramètre nommé.
         result = self._conn.execute(
-            text("SELECT key FROM config WHERE key LIKE 'perimeter_%' AND value #>> '{}' = :code"),
-            {"code": perimeter_code},
+            text("SELECT key FROM config WHERE key = ANY(:keys) AND value #>> '{}' = :code"),
+            {"keys": sorted(PERIMETER_CONFIG_KEYS), "code": perimeter_code},
         )
         return [r.key for r in result]
 

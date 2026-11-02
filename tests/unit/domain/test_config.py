@@ -6,13 +6,12 @@ Le contrôle vaut à l'écriture, quelle que soit la voie : une valeur hors form
 import pytest
 
 from domain.config import (
-    BRAND_HUE_KEY,
-    INSTITUTION_COUNTRY_KEY,
-    LABORATORY_TYPES_KEY,
+    DEFAULT_START_YEAR_OFFSET,
     MAX_YEAR,
     MIN_YEAR,
-    SITE_TITLE_KEY,
+    ConfigKey,
     normalize_config_value,
+    start_year_value,
 )
 from domain.errors import ValidationError
 
@@ -56,10 +55,20 @@ class TestAnnee:
     def test_les_bornes_sont_incluses(self, valeur):
         assert normalize_config_value(_ANNEE, valeur) == valeur
 
-    @pytest.mark.parametrize("valeur", [MIN_YEAR - 1, MAX_YEAR + 1, "n", "", None, True, []])
+    @pytest.mark.parametrize("valeur", [None, "", "   "])
+    def test_une_valeur_vide_laisse_l_annee_non_fixee(self, valeur):
+        assert normalize_config_value(_ANNEE, valeur) is None
+
+    @pytest.mark.parametrize("valeur", [MIN_YEAR - 1, MAX_YEAR + 1, "n", True, []])
     def test_hors_bornes_ou_illisible_est_refuse(self, valeur):
         with pytest.raises(ValidationError, match=str(MIN_YEAR)):
             normalize_config_value(_ANNEE, valeur)
+
+    def test_une_annee_fixee_est_retenue(self):
+        assert start_year_value(2017, current_year=2026) == 2017
+
+    def test_sans_annee_fixee_la_premiere_annee_suit_l_annee_courante(self):
+        assert start_year_value(None, current_year=2026) == 2026 - DEFAULT_START_YEAR_OFFSET
 
 
 class TestDelais:
@@ -77,42 +86,45 @@ class TestDelais:
 
 class TestTitre:
     def test_les_espaces_de_bord_sont_retires(self):
-        assert normalize_config_value(SITE_TITLE_KEY, "  Bibliométrie Test ") == "Bibliométrie Test"
+        assert (
+            normalize_config_value(ConfigKey.SITE_TITLE, "  Bibliométrie Test ")
+            == "Bibliométrie Test"
+        )
 
     @pytest.mark.parametrize("valeur", [None, "", "   "])
     def test_un_titre_absent_vaut_un_texte_vide(self, valeur):
-        assert normalize_config_value(SITE_TITLE_KEY, valeur) == ""
+        assert normalize_config_value(ConfigKey.SITE_TITLE, valeur) == ""
 
     @pytest.mark.parametrize("valeur", [3, True, [], {}])
     def test_une_valeur_autre_qu_un_texte_est_refusee(self, valeur):
         with pytest.raises(ValidationError, match="texte"):
-            normalize_config_value(SITE_TITLE_KEY, valeur)
+            normalize_config_value(ConfigKey.SITE_TITLE, valeur)
 
 
 class TestTeinte:
     @pytest.mark.parametrize(("valeur", "attendu"), [(0, 0), (359, 359), ("  120 ", 120)])
     def test_un_angle_entier_est_retenu(self, valeur, attendu):
-        assert normalize_config_value(BRAND_HUE_KEY, valeur) == attendu
+        assert normalize_config_value(ConfigKey.BRAND_HUE, valeur) == attendu
 
     @pytest.mark.parametrize("valeur", [-1, 360, 12.5, "rouge", None, True])
     def test_une_valeur_hors_de_0_a_359_est_refusee(self, valeur):
         with pytest.raises(ValidationError, match="0 à 359"):
-            normalize_config_value(BRAND_HUE_KEY, valeur)
+            normalize_config_value(ConfigKey.BRAND_HUE, valeur)
 
 
 class TestPaysEtablissement:
     def test_le_code_est_ramene_en_minuscules(self):
-        assert normalize_config_value(INSTITUTION_COUNTRY_KEY, " BE ") == "be"
+        assert normalize_config_value(ConfigKey.INSTITUTION_COUNTRY, " BE ") == "be"
 
     @pytest.mark.parametrize("valeur", [None, "", "fra", "xx", 33, ["fr"]])
     def test_une_valeur_autre_qu_un_code_pays_est_refusee(self, valeur):
         with pytest.raises(ValidationError, match="code pays"):
-            normalize_config_value(INSTITUTION_COUNTRY_KEY, valeur)
+            normalize_config_value(ConfigKey.INSTITUTION_COUNTRY, valeur)
 
 
 class TestTypesDeLaboratoire:
     def test_les_types_sont_dedoublonnes_dans_l_ordre_de_l_enum(self):
-        assert normalize_config_value(LABORATORY_TYPES_KEY, ["admin", "labo", "admin"]) == [
+        assert normalize_config_value(ConfigKey.LABORATORY_TYPES, ["admin", "labo", "admin"]) == [
             "labo",
             "admin",
         ]
@@ -120,11 +132,11 @@ class TestTypesDeLaboratoire:
     @pytest.mark.parametrize("valeur", [None, [], "labo"])
     def test_une_valeur_autre_qu_une_liste_non_vide_est_refusee(self, valeur):
         with pytest.raises(ValidationError, match="liste non vide"):
-            normalize_config_value(LABORATORY_TYPES_KEY, valeur)
+            normalize_config_value(ConfigKey.LABORATORY_TYPES, valeur)
 
     def test_un_type_inconnu_est_refuse(self):
         with pytest.raises(ValidationError, match="inconnus"):
-            normalize_config_value(LABORATORY_TYPES_KEY, ["labo", "institut"])
+            normalize_config_value(ConfigKey.LABORATORY_TYPES, ["labo", "institut"])
 
 
 def test_une_cle_sans_forme_imposee_passe_telle_quelle():

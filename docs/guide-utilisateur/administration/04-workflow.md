@@ -47,6 +47,8 @@ Le pipeline a [deux modes](../../pipeline/01-vue-d-ensemble.md) :
 - le mode *full* interroge les sources depuis l'année de début configurée jusqu'à l'année courante ;
 - le mode *daily* interroge seulement les dépôts HAL parus depuis le dernier lancement.
 
+Une année de début vide fait commencer le moissonnage cinq ans avant l'année courante.
+
 #### Délais de réinterrogation
 
 Au-delà d'un délai réglable en jours, le pipeline interroge de nouveau une source :

@@ -13,15 +13,7 @@ from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from domain.config import (
-    BRAND_HUE_KEY,
-    DEFAULT_BRAND_HUE,
-    DEFAULT_INSTITUTION_COUNTRY,
-    INSTITUTION_COUNTRY_KEY,
-    PERIMETER_EXTRACTION_KEY,
-    PERIMETER_PERSONS_KEY,
-    SITE_TITLE_KEY,
-)
+from domain.config import DEFAULT_BRAND_HUE, DEFAULT_INSTITUTION_COUNTRY, ConfigKey
 from domain.countries import normalize_country_code
 from domain.normalize import normalize_text
 from domain.structures.identifiers import normalize_ror_id
@@ -63,8 +55,8 @@ HAL_COLLECTION_CANDIDATES = 25
 
 # Le périmètre de l'établissement sert au moissonnage et à la création des personnes.
 _PERIMETER_DESCRIPTIONS = {
-    PERIMETER_EXTRACTION_KEY: "Périmètre pour déterminer les structures à interroger lors de l'extraction",
-    PERIMETER_PERSONS_KEY: "Périmètre pour la création des personnes",
+    ConfigKey.PERIMETER_EXTRACTION: "Périmètre pour déterminer les structures à interroger lors de l'extraction",
+    ConfigKey.PERIMETER_PERSONS: "Périmètre pour la création des personnes",
 }
 _SITE_TITLE_DESCRIPTION = (
     "Titre de l'application. Vide : « Bibliométrie » suivi du nom de l'établissement."
@@ -262,13 +254,19 @@ def build_institution_seed(
         {"key": key, "value": perimeter_code, "description": description}
         for key, description in _PERIMETER_DESCRIPTIONS.items()
     ]
-    config.append({"key": SITE_TITLE_KEY, "value": "", "description": _SITE_TITLE_DESCRIPTION})
     config.append(
-        {"key": BRAND_HUE_KEY, "value": DEFAULT_BRAND_HUE, "description": _BRAND_HUE_DESCRIPTION}
+        {"key": ConfigKey.SITE_TITLE, "value": "", "description": _SITE_TITLE_DESCRIPTION}
     )
     config.append(
         {
-            "key": INSTITUTION_COUNTRY_KEY,
+            "key": ConfigKey.BRAND_HUE,
+            "value": DEFAULT_BRAND_HUE,
+            "description": _BRAND_HUE_DESCRIPTION,
+        }
+    )
+    config.append(
+        {
+            "key": ConfigKey.INSTITUTION_COUNTRY,
             "value": root.country_code or DEFAULT_INSTITUTION_COUNTRY,
             "description": _INSTITUTION_COUNTRY_DESCRIPTION,
         }

@@ -148,9 +148,9 @@ def row_key(table: SeedTable, key: Sequence[str] | None = None) -> list[str]:
     return list(key) if key else [c.name for c in table.primary_key.columns]
 
 
-def escape_sql(value: JsonValue, is_jsonb: bool = False) -> str:
-    """Échappe une valeur pour une insertion SQL ; une valeur de colonne JSONB devient du JSON valide."""
-    if value is None:
+def escape_sql(value: JsonValue, is_jsonb: bool = False, nullable: bool = True) -> str:
+    """Échappe une valeur pour une insertion SQL ; une valeur de colonne JSONB devient du JSON valide. Dans une colonne JSONB non nullable, `None` est le `null` JSON."""
+    if value is None and (nullable or not is_jsonb):
         return "NULL"
     if is_jsonb:
         s = json.dumps(value, ensure_ascii=False).replace("'", "''")
@@ -213,6 +213,7 @@ def render_seed(description: str, output_path: Path, sections: Sequence[SeedSect
         col_list = ", ".join(columns)
         key = row_key(section.table, section.key)
         jsonb_cols = {c.name for c in section.table.columns if isinstance(c.type, type(Jsonb))}
+        not_null_cols = {c.name for c in section.table.columns if not c.nullable}
         lines.append(f"-- {table} ({len(section.rows)} lignes)")
         if section.keep_existing:
             upsert = _upsert_clause(key, key)
@@ -228,7 +229,9 @@ def render_seed(description: str, output_path: Path, sections: Sequence[SeedSect
             lines.append(f"DELETE FROM {table} WHERE {' AND '.join(conditions)};")
         for row in section.rows:
             values = ", ".join(
-                escape_sql(value, is_jsonb=(column in jsonb_cols))
+                escape_sql(
+                    value, is_jsonb=(column in jsonb_cols), nullable=(column not in not_null_cols)
+                )
                 for column, value in zip(columns, row, strict=True)
             )
             lines.append(f"INSERT INTO {table} ({col_list}) VALUES ({values}){upsert};")

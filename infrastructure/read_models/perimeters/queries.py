@@ -7,15 +7,7 @@ Le moissonnage, le pipeline et les adaptateurs lisent tous le périmètre par ce
 
 from sqlalchemy import Connection, text
 
-from domain.config import (
-    BRAND_HUE_KEY,
-    DEFAULT_BRAND_HUE,
-    DEFAULT_INSTITUTION_COUNTRY,
-    INSTITUTION_COUNTRY_KEY,
-    PERIMETER_EXTRACTION_KEY,
-    PERIMETER_PERSONS_KEY,
-    SITE_TITLE_KEY,
-)
+from domain.config import DEFAULT_BRAND_HUE, DEFAULT_INSTITUTION_COUNTRY, ConfigKey
 from infrastructure.read_models.perimeters.models import (
     InstitutionOut,
     PerimeterCountryOut,
@@ -40,7 +32,7 @@ def get_perimeter_structure_ids(conn: Connection, perimeter_code: str) -> set[in
     return {row.structure_id for row in result}
 
 
-def _config_perimeter_code(conn: Connection, config_key: str) -> str | None:
+def _config_perimeter_code(conn: Connection, config_key: ConfigKey) -> str | None:
     """Renvoie le code de périmètre lu dans `config`, ou `None` si la clé est absente ou vide."""
     value = conn.execute(
         text("SELECT value FROM config WHERE key = :key"),
@@ -51,12 +43,14 @@ def _config_perimeter_code(conn: Connection, config_key: str) -> str | None:
 
 def extraction_perimeter_code(conn: Connection) -> str | None:
     """Renvoie le code du périmètre de moissonnage, ou `None` sans configuration."""
-    return _config_perimeter_code(conn, PERIMETER_EXTRACTION_KEY)
+    return _config_perimeter_code(conn, ConfigKey.PERIMETER_EXTRACTION)
 
 
 def persons_perimeter_code(conn: Connection) -> str | None:
     """Renvoie le code du périmètre des personnes, à défaut celui du périmètre de moissonnage."""
-    return _config_perimeter_code(conn, PERIMETER_PERSONS_KEY) or extraction_perimeter_code(conn)
+    return _config_perimeter_code(conn, ConfigKey.PERIMETER_PERSONS) or extraction_perimeter_code(
+        conn
+    )
 
 
 def get_extraction_structure_ids(conn: Connection) -> set[int]:
@@ -130,7 +124,7 @@ def get_persons_perimeter_root_ids(conn: Connection) -> list[int]:
 def get_institution_country(conn: Connection) -> str:
     """Renvoie le pays de l'établissement lu dans `config`, `DEFAULT_INSTITUTION_COUNTRY` si la clé est absente."""
     value = conn.execute(
-        text("SELECT value FROM config WHERE key = :key"), {"key": INSTITUTION_COUNTRY_KEY}
+        text("SELECT value FROM config WHERE key = :key"), {"key": ConfigKey.INSTITUTION_COUNTRY}
     ).scalar_one_or_none()
     return DEFAULT_INSTITUTION_COUNTRY if value is None else value
 
@@ -162,14 +156,14 @@ class PerimetersQueries:
         values = dict(
             self._conn.execute(
                 text("SELECT key, value FROM config WHERE key IN (:title, :hue)"),
-                {"title": SITE_TITLE_KEY, "hue": BRAND_HUE_KEY},
+                {"title": ConfigKey.SITE_TITLE, "hue": ConfigKey.BRAND_HUE},
             ).all()
         )
-        hue = values.get(BRAND_HUE_KEY)
+        hue = values.get(ConfigKey.BRAND_HUE)
         return InstitutionOut(
             name=get_persons_perimeter_name(self._conn),
             root_structure_ids=get_persons_perimeter_root_ids(self._conn),
-            title=values.get(SITE_TITLE_KEY) or None,
+            title=values.get(ConfigKey.SITE_TITLE) or None,
             brand_hue=DEFAULT_BRAND_HUE if hue is None else hue,
         )
 
