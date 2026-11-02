@@ -7,7 +7,7 @@ import logging
 from collections.abc import Mapping, Sequence
 
 from domain.errors import ValidationError
-from domain.persons.identifiers import PERSON_IDENTIFIER_TYPES, IdentifierOrigin
+from domain.persons.identifiers import IdentifierOrigin, PersonIdentifierType
 from infrastructure.repositories.person_repository import PgPersonRepository
 
 logger = logging.getLogger(__name__)
@@ -28,7 +28,7 @@ def add_identifiers_from_contributions(
     """
     seen: set[tuple[str, str]] = set()
     for a in contributions:
-        for id_type in PERSON_IDENTIFIER_TYPES:
+        for id_type in PersonIdentifierType:
             value = a.get(id_type)
             if not value or (id_type, value) in seen:
                 continue

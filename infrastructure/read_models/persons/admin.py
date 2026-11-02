@@ -4,7 +4,7 @@ from collections import defaultdict
 
 from sqlalchemy import Connection, bindparam, text
 
-from domain.persons.identifiers import PERSON_IDENTIFIER_TYPES, AttributionStatus
+from domain.persons.identifiers import AttributionStatus, PersonIdentifierType
 from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
 from domain.persons.name_matching import names_compatible
 from infrastructure.db.source_record_identifiers import source_record_doi_sql
@@ -53,7 +53,7 @@ _AMBIGUOUS_FORMS_SQL = f"""
 # ── Conflits d'identifiant (file de triage) ──────────────────────
 
 # Liste SQL des types d'identifiant à examiner, dérivée du vocabulaire `PersonIdentifierType`.
-_ID_TYPES_ARRAY_SQL = "ARRAY[" + ", ".join(f"'{t.value}'" for t in PERSON_IDENTIFIER_TYPES) + "]"
+_ID_TYPES_ARRAY_SQL = "ARRAY[" + ", ".join(f"'{t.value}'" for t in PersonIdentifierType) + "]"
 
 # Paires de personnes non exclues au même identifiant brut, hors identifiants neutralisés par la contribution source et hors paires déjà distinctes. Seules comptent les valeurs à attribution `pending`.
 _IDENTIFIER_CONFLICT_PAIRS = f"""

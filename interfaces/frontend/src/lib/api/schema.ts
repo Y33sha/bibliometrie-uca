@@ -3171,7 +3171,7 @@ export interface components {
          * AttributionStatus
          * @description Statut d'une attribution d'identifiant. Reflet du type PostgreSQL `identifier_status`.
          *
-         *     L'administration pose librement `PENDING`, `CONFIRMED` ou `REJECTED`. Le pipeline change le statut par les méthodes de `IdentifierAttribution`.
+         *     L'administration pose librement `PENDING`, `CONFIRMED` ou `REJECTED`.
          *
          *     `AUTHENTICATED` atteste que le chercheur a authentifié son ORCID en se connectant à son compte. Seul un ORCID a ce statut. Un trigger PostgreSQL le rend définitif, et le réserve à l'import des ORCID authentifiés.
          * @enum {string}
