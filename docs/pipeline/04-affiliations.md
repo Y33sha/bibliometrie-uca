@@ -10,7 +10,9 @@ La phase `affiliations` rattache les contributions sources aux structures du pé
 
 - **`classify_addresses`** — pose l'origine du texte des adresses sans origine (`addresses.origin`). La première règle applicable décide :
    - « SIGLE - Nom (adresse postale - Pays) » : libellé HAL ;
+   - crochets contenant une période, des lieux ou un nom de structure (« University of Mons [Belgium] ») : libellé HAL ;
    - texte égal au nom d'une structure HAL ou d'une organisation ROR, après normalisation : nom seul ;
+   - « Nom, Pays », le nom étant celui d'une structure HAL sans ses crochets ou d'une organisation ROR : nom seul ;
    - texte avec virgule : adresse brute ;
    - texte terminé par un pays entre parenthèses : libellé HAL ;
    - texte terminé par un nom de pays : adresse brute ;

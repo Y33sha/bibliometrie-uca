@@ -6,8 +6,8 @@ from collections import Counter
 
 from sqlalchemy import Connection, text
 
-from domain.normalize import normalize_text
-from domain.structures.address_origin import AddressOrigin, address_origin
+from domain.countries import PlaceNameKind
+from domain.structures.address_origin import AddressOrigin, OriginReferentials, address_origin
 from infrastructure.db.scalars import scalar_int
 from pipeline.runtime.observability.log_format import (
     BRANCH,
@@ -18,7 +18,7 @@ from pipeline.runtime.observability.log_format import (
 )
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import track_progress
-from pipeline.transformation.countries.country_names import load_country_names
+from pipeline.transformation.countries.place_names import load_country_names, load_place_forms
 
 # Adresses par tranche : la taille borne la mémoire et le nombre d'allers-retours SQL.
 CHUNK_SIZE = 10_000
@@ -38,12 +38,16 @@ _UPDATE_ORIGINS = text("""
 """)
 
 
-def load_structure_names(conn: Connection) -> frozenset[str]:
-    """Renvoie les noms normalisés des structures HAL et des organisations ROR."""
+def load_referentials(conn: Connection) -> OriginReferentials:
+    """Renvoie les noms des structures HAL et des organisations ROR, des villes et des pays."""
     names = conn.execute(
         text("SELECT name FROM hal_structures UNION SELECT name FROM ror_organizations")
     ).scalars()
-    return frozenset(normalize_text(name) for name in names)
+    return OriginReferentials.from_names(
+        names,
+        city_names=load_place_forms(conn, PlaceNameKind.CITY),
+        country_names=load_country_names(conn),
+    )
 
 
 def classify_addresses(
@@ -55,8 +59,7 @@ def classify_addresses(
         nothing_to_do(logger)
         return PhaseMetrics()
 
-    structure_names = load_structure_names(conn)
-    country_names = load_country_names(conn)
+    referentials = load_referentials(conn)
     counts: Counter[AddressOrigin] = Counter()
     after_id = 0
     with track_progress(total, BRANCH.rstrip(), logger) as progress:
@@ -65,16 +68,7 @@ def classify_addresses(
         ).all():
             after_id = rows[-1].id
             origins = [
-                (
-                    r.id,
-                    address_origin(
-                        r.raw_text,
-                        r.normalized_text,
-                        structure_names=structure_names,
-                        country_names=country_names,
-                    ),
-                )
-                for r in rows
+                (r.id, address_origin(r.raw_text, r.normalized_text, referentials)) for r in rows
             ]
             payload = [{"id": address_id, "origin": origin.value} for address_id, origin in origins]
             conn.execute(_UPDATE_ORIGINS, {"payload": json.dumps(payload)})

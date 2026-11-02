@@ -25,7 +25,7 @@ def _seed_referentials(conn) -> None:
     conn.execute(
         text("""
             INSERT INTO place_name_forms (iso_code, form_normalized, kind)
-            VALUES ('fr', 'france', 'country') ON CONFLICT DO NOTHING;
+            VALUES ('fr', 'france', 'country'), ('fr', 'aubiere', 'city') ON CONFLICT DO NOTHING;
             INSERT INTO hal_structures (hal_structure_id, name, structure_type, status)
             VALUES (990001, 'Laboratoire de test HAL', 'laboratory', 'VALID');
             INSERT INTO ror_organizations (ror_id, name, country_code, types, status)
@@ -36,27 +36,23 @@ def _seed_referentials(conn) -> None:
 
 def test_les_adresses_sans_origine_sont_classees(sa_sync_conn):
     _seed_referentials(sa_sync_conn)
-    for raw_text in (
-        "IP - Institut Pascal (Campus des Cézeaux, 63178 Aubière - France)",
-        "Laboratoire de test HAL",
-        "ORGANISATION DE TEST ROR",
-        "Institut Pascal, Aubière, France",
-        "Department of Pediatrics University Hospital Rouen France",
-        "Professeur",
-    ):
-        _address(sa_sync_conn, raw_text)
-
-    metrics = classify_addresses(sa_sync_conn, LOGGER, chunk_size=4)
-
-    assert metrics.updated == 6
-    assert _origins(sa_sync_conn) == {
+    expected = {
         "IP - Institut Pascal (Campus des Cézeaux, 63178 Aubière - France)": "hal_label",
+        "Service de test [Aubière], Aubière, France": "hal_label",
         "Laboratoire de test HAL": "name_only",
         "ORGANISATION DE TEST ROR": "name_only",
+        "Laboratoire de test HAL, France": "name_only",
         "Institut Pascal, Aubière, France": "raw",
         "Department of Pediatrics University Hospital Rouen France": "raw",
         "Professeur": "name_only",
     }
+    for raw_text in expected:
+        _address(sa_sync_conn, raw_text)
+
+    metrics = classify_addresses(sa_sync_conn, LOGGER, chunk_size=4)
+
+    assert metrics.updated == len(expected)
+    assert _origins(sa_sync_conn) == expected
 
 
 def test_une_origine_posee_reste_en_place(sa_sync_conn):

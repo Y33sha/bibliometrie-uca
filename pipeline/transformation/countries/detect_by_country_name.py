@@ -10,7 +10,7 @@ from sqlalchemy import Connection
 from domain.country_detection import CountryDetectionMethod
 from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, quantity, step
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.transformation.countries.country_names import load_country_names
+from pipeline.transformation.countries.place_names import load_country_names
 from pipeline.transformation.countries.store import CountryCandidatesStore
 
 

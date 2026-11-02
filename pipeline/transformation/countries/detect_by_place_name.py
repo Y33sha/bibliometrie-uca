@@ -5,13 +5,14 @@ Les noms d'institutions et de villes connus (`place_name_forms`), associés chac
 
 import logging
 
-from sqlalchemy import Connection, text
+from sqlalchemy import Connection
 
 from domain.countries import PlaceNameKind
 from domain.country_detection import CountryDetectionMethod
 from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, quantity, step
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.countries.place_name_detector import PlaceNameDetector
+from pipeline.transformation.countries.place_names import load_place_forms
 from pipeline.transformation.countries.store import CountryCandidatesStore
 
 _METHODS = {
@@ -19,15 +20,6 @@ _METHODS = {
     PlaceNameKind.CITY: CountryDetectionMethod.CITY,
 }
 _LABELS = {PlaceNameKind.INSTITUTION: "institutions", PlaceNameKind.CITY: "villes"}
-
-
-def load_place_forms(conn: Connection, kind: PlaceNameKind) -> dict[str, str]:
-    """Renvoie les formes normalisées des noms de lieux de nature `kind`, avec le code ISO de leur pays : `{forme: code ISO}`."""
-    rows = conn.execute(
-        text("SELECT form_normalized, iso_code FROM place_name_forms WHERE kind = :kind"),
-        {"kind": kind.value},
-    ).all()
-    return {r.form_normalized: r.iso_code for r in rows}
 
 
 def run(conn: Connection, logger: logging.Logger) -> PhaseMetrics:

@@ -38,8 +38,8 @@ from infrastructure.raw_store import UnreadablePayloadError, get_raw_store
 from pipeline.ingestion.common.source_contributions import AuthorRecord
 from pipeline.ingestion.openalex.normalize import build_openalex_author_records
 from pipeline.ingestion.scanr.normalize import build_scanr_author_records
-from pipeline.transformation.countries.country_names import load_country_names
 from pipeline.transformation.countries.place_name_detector import PlaceNameDetector
+from pipeline.transformation.countries.place_names import load_country_names
 
 log = setup_logger("measure_address_country_candidates", os.path.dirname(__file__))
 
