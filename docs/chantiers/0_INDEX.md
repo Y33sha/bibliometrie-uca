@@ -4,6 +4,7 @@
 
 ### En cours
 
+- [Ancrage des décisions humaines](CODE_ancrage-des-decisions-humaines.md)
 - [Audit de la qualité de la résolution des personnes](DATA_audit-qualite-resolution-personnes.md)
 - [Pertinence des sujets](DATA_pertinence-des-sujets.md)
 

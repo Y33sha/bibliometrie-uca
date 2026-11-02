@@ -71,13 +71,14 @@ Prérequis : phase 3 du chantier [alignement des auteurs](archived/2026-10-24_DA
 
 ### 4. Verdicts durables
 
+Prérequis : chantier [ancrage des décisions humaines](CODE_ancrage-des-decisions-humaines.md).
+
 - [x] Tables des fusions manuelles, ancrées sur `(source, source_id)` (4523e022c).
 - [x] Jeton de fusion lu par la réconciliation : un bras du voisinage, une clé de confirmation (6d7c53b69).
 - [x] Réconciliation ciblée sur une liste d'enregistrements sources, hors de la file (0ef354ac6).
 - [x] Fusion manuelle et son aperçu dans l'API : verdict, réconciliation ciblée, réalignement des auteurs de la publication conservée, personnes des contributions, périmètre (dfe23db02).
 - [x] Volet : doublons potentiels par similarité de titre, champ « Fusionner » (identifiant, DOI ou titre), modale de confirmation qui annonce les conflits d'auteurs (19d64011d, dcba16174).
 - [ ] Interdiction de fusion, relue par la réconciliation.
-- [ ] Ancrage de `persons.rejected_contributions` sur `(source, source_id)`.
 - [ ] Veto de l'administration sur un lien entre contribution source et structure, relu par le calcul du périmètre. Action dans le volet.
 
 ## Questions ouvertes
