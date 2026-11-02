@@ -19,7 +19,7 @@ from domain.source_records.identifiers import (
 from domain.source_records.metadata_correction.rules import (
     MetadataCorrectionRule,
     MetadataForCorrection,
-    effective_metadata,
+    doc_type_correction,
     is_dissertation_identifier,
     origin_doc_type_correction,
 )
@@ -56,7 +56,7 @@ def corrected_doc_type(
 ) -> str | None:
     """Renvoie le type d'un enregistrement source après les règles de correction."""
     before = hydrate_raw_view(facts, corrections)
-    corrected = effective_metadata(before).doc_type
+    corrected = doc_type_correction(before)
     return corrected.value if corrected is not None else before.doc_type
 
 
@@ -80,13 +80,13 @@ def correct_source_record(
         missing_hal_ids: dépôts HAL introuvables dans HAL.
     """
     before = hydrate_raw_view(facts, corrections)
-    corrected = effective_metadata(before)
+    corrected = doc_type_correction(before)
     new_corrections = other_entries(corrections, UNARY_KEYS)
 
     doc_type = before.doc_type
     doc_type_rule: str | None = None
-    if corrected.doc_type is not None and corrected.doc_type.value != before.doc_type:
-        doc_type, doc_type_rule = corrected.doc_type.value, corrected.doc_type.rule.value
+    if corrected is not None and corrected.value != before.doc_type:
+        doc_type, doc_type_rule = corrected.value, corrected.rule.value
     if origin := origin_doc_type_correction(doc_type, origin_doc_type):
         doc_type, doc_type_rule = origin.value, origin.rule.value
     if doc_type_rule is not None:
@@ -94,7 +94,7 @@ def correct_source_record(
 
     removals: dict[tuple[SourceIdentifierType, str], str] = {}
     thesis_to_article = MetadataCorrectionRule.THESIS_WITH_SERIAL_TO_ARTICLE
-    if corrected.doc_type is not None and corrected.doc_type.rule == thesis_to_article:
+    if corrected is not None and corrected.rule == thesis_to_article:
         for identifier in identifiers:
             if is_dissertation_identifier(identifier):
                 removals.setdefault(identifier.key, thesis_to_article.value)

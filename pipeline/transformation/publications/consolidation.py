@@ -21,7 +21,7 @@ from domain.source_records.identifiers import SourceIdentifier
 from domain.source_records.keys import doi_keys
 from domain.source_records.metadata_correction.rules import (
     MetadataForCorrection,
-    effective_metadata,
+    doc_type_correction,
 )
 from domain.source_records.source_record import SourceRecord
 from domain.sources.registry import SOURCE_PRIORITY
@@ -310,7 +310,7 @@ def _apply_canonical_doc_type_correction(
     Args:
         serial_type: type de la revue `publication.serial_id`.
     """
-    corrected = effective_metadata(
+    corrected = doc_type_correction(
         MetadataForCorrection.for_publication(
             title=publication.title,
             title_normalized=publication.title_normalized or "",
@@ -319,7 +319,7 @@ def _apply_canonical_doc_type_correction(
             serial_id=publication.serial_id,
             serial_type=serial_type,
         )
-    ).doc_type
+    )
     publication.corrections = {}
     if corrected is not None and corrected.value != publication.doc_type:
         publication.corrections = {
