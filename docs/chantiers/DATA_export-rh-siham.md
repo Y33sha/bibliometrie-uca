@@ -59,11 +59,11 @@ Les dates des deux affectations diffèrent sur 74 lignes.
 - [x] Fiche personne : corps, catégorie, périodes de présence.
 - [x] Administration : l'unité actuelle départage les homonymes.
 - [x] Page d'un laboratoire : l'onglet Personnes réunit les personnes rattachées et celles qui y publient, laboratoire présélectionné. Le compteur du dashboard compte les personnes rattachées.
-- [ ] Suppression de `role_title`, `department_name`, `start_date` et `end_date` de `hr_records`.
+- [x] Suppression de `role_title`, `department_name`, `start_date` et `end_date` de `hr_records`.
 
 ### Phase 4 — Documentation
 
-- [ ] Mise à jour de la documentation de l'import RH et du périmètre.
+- [x] Mise à jour de la documentation de l'import RH et du périmètre.
 
 ## Questions ouvertes
 

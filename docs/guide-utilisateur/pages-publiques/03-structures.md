@@ -8,7 +8,7 @@
 
 ## Détails `/structures/{id}`
 
-L'onglet Personnes montre les personnes qui ont publié avec une affiliation à la structure, quelle que soit leur affectation administrative. L'onglet Collaborations classe les [organisations partenaires](../../glossaire.md#organisation-partenaire) par nombre de copublications.
+L'onglet Personnes montre les personnes rattachées à la structure par la base RH et celles qui ont publié avec une affiliation à la structure. La facette Laboratoires y présélectionne la structure. L'onglet Collaborations classe les [organisations partenaires](../../glossaire.md#organisation-partenaire) par nombre de copublications.
 
 ![Dashboard d'une structure](../../img/screenshots/structure_dashboard.png)
 

@@ -1,17 +1,17 @@
 # Imports manuels
 
-*À jour le 2026-09-07.*
+*À jour le 2026-11-02.*
 
 ## Extraction RH
 
-Fichier CSV importé via [interfaces/cli/imports/import_persons.py](https://github.com/Y33sha/bibliometrie-uca/blob/master/interfaces/cli/imports/import_persons.py) → table `hr_records`.
-- Contient : email, nom, prénom, département, rôle, dates de début/fin;
-- Rattaché à une personne du référentiel via `hr_records.person_id`;
-- Les personnes présentes dans la base RH se filtrent et sont marquées d'une coche dans la [liste des personnes](../guide-utilisateur/pages-publiques/04-personnes.md#liste-persons).
+`uv run python -m interfaces.cli.imports.import_persons <fichier>` importe un export RH, CSV ou TSV :
 
-Le département RH est affiché pour information. Les liens entre personnes et structures viennent des [contributions](../glossaire.md#contribution).
+- `hr_records` : une fiche par personne, avec matricule, email, catégorie de personnel, statut, corps et grade ;
+- `hr_periods` : périodes de présence dans une unité. Une unité reconnue dans `structures` reçoit son `structure_id`.
 
-L'import crée la personne et sa fiche RH. La fiche enrichit la personne, et une personne avec une fiche RH est toujours conservée par une fusion.
+Un agent se rattache à sa fiche par son matricule, à défaut par son email, à défaut à l'unique homonyme sans fiche RH. Sinon, l'import crée la personne. Le nom d'une personne en base reste inchangé. Sur la fenêtre d'observation de l'export, l'export fait foi, et les périodes antérieures sont conservées. L'import refuse un export antérieur au dernier importé.
+
+Les personnes présentes dans la base RH sont marquées d'une coche dans la [liste des personnes](../guide-utilisateur/pages-publiques/04-personnes.md#liste-persons). Une personne avec une fiche RH est toujours conservée par une fusion.
 
 ## Données APC
 
