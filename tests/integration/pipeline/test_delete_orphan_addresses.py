@@ -30,11 +30,29 @@ def test_seules_les_adresses_sans_contribution_source_sont_supprimees(sa_sync_co
     assert _address_ids(sa_sync_conn) == {liee}
 
 
-def test_une_orpheline_part_avec_ses_liens_aux_structures_meme_confirmes(sa_sync_conn):
+def test_une_orpheline_part_avec_ses_liens_detectes(sa_sync_conn):
     orpheline = insert_address(sa_sync_conn, "Adresse orpheline")
-    insert_address_structure(
-        sa_sync_conn, orpheline, structure_id=insert_structure(sa_sync_conn), is_confirmed=True
-    )
+    insert_address_structure(sa_sync_conn, orpheline, structure_id=insert_structure(sa_sync_conn))
 
     assert delete_orphan_addresses(sa_sync_conn) == 1
     assert sa_sync_conn.execute(text("SELECT count(*) FROM address_structures")).scalar_one() == 0
+
+
+def test_une_orpheline_decidee_reste(sa_sync_conn):
+    """Lien à une structure infirmé, pays saisi à la main : l'adresse garde son identifiant, et la décision avec lui."""
+    conn = sa_sync_conn
+    infirmee = insert_address(conn, "Adresse au lien infirmé")
+    insert_address_structure(
+        conn, infirmee, structure_id=insert_structure(conn), is_confirmed=False
+    )
+    pays_manuel = insert_address(conn, "Adresse au pays saisi")
+    conn.execute(
+        text(
+            "INSERT INTO address_country_candidates (address_id, country_code, method) "
+            "VALUES (:a, 'fr', 'manual')"
+        ),
+        {"a": pays_manuel},
+    )
+
+    assert delete_orphan_addresses(conn) == 0
+    assert _address_ids(conn) == {infirmee, pays_manuel}

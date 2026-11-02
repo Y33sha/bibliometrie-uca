@@ -170,15 +170,23 @@ def delete_orphan_contributor_information(conn: Connection) -> int:
 
 
 def delete_orphan_addresses(conn: Connection) -> int:
-    """Supprime les adresses sans contribution source, avec leurs liens aux structures.
+    """Supprime les adresses sans contribution source et sans décision de l'administration, avec leurs liens aux structures. Renvoie le nombre d'adresses supprimées.
 
-    Une adresse devient orpheline quand la dernière contribution source qui la référençait est réécrite sans elle ou supprimée avec son enregistrement source. Renvoie le nombre d'adresses supprimées.
+    Une adresse devient orpheline quand la dernière contribution source qui la référençait est réécrite sans elle ou supprimée avec son enregistrement source. Une adresse décidée reste : lien à une structure confirmé ou infirmé, pays saisi à la main. Son identifiant garde ainsi la décision au retour du texte.
     """
     return conn.execute(
-        text("""
+        text(f"""
             DELETE FROM addresses a
             WHERE NOT EXISTS (
                 SELECT 1 FROM source_contribution_addresses sca WHERE sca.address_id = a.id
+            )
+              AND NOT EXISTS (
+                SELECT 1 FROM address_structures ast
+                WHERE ast.address_id = a.id AND ast.is_confirmed IS NOT NULL
+            )
+              AND NOT EXISTS (
+                SELECT 1 FROM address_country_candidates acc
+                WHERE acc.address_id = a.id AND acc.method = '{CountryDetectionMethod.MANUAL}'
             )
         """)
     ).rowcount
