@@ -6,7 +6,6 @@
 
 - [Audit de la qualité de la résolution des personnes](DATA_audit-qualite-resolution-personnes.md)
 - [Pertinence des sujets](DATA_pertinence-des-sujets.md)
-- [Vocabulaires des sujets](DATA_vocabulaires-des-sujets.md)
 
 ### Non commencé
 
@@ -20,6 +19,7 @@
 
 ## Chantiers archivés
 
+- 2026-11-02 — [Vocabulaires des sujets](archived/2026-11-02_DATA_vocabulaires-des-sujets.md)
 - 2026-11-02 — [Mesures d'impact](archived/2026-11-02_METIER_mesures-impact.md)
 - 2026-11-02 — [Export RH SIHAM : matricule, périodes de présence, laboratoires](archived/2026-11-02_DATA_export-rh-siham.md)
 - 2026-11-01 — [Preprints et versions d'une publication](archived/2026-11-01_DATA_preprints-et-versions.md)

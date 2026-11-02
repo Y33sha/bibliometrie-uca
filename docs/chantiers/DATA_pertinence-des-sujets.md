@@ -152,7 +152,7 @@ Les pistes n'opèrent pas au même grain. Elles peuvent se combiner.
 
 - [ ] Choix de la piste ou de la combinaison, d'après les bilans des phases 2 à 5
 - [ ] Forme du stockage des rejets automatiques et manuels
-- [ ] Phasage de la mise en œuvre dans la phase `subjects`. Le rejet d'un sujet s'étend à ses descendants d'après la hiérarchie stockée par le chantier [Vocabulaires des sujets](DATA_vocabulaires-des-sujets.md)
+- [ ] Phasage de la mise en œuvre dans la phase `subjects`. Le rejet d'un sujet s'étend à ses descendants d'après la hiérarchie stockée par le chantier [Vocabulaires des sujets](archived/2026-11-02_DATA_vocabulaires-des-sujets.md)
 
 ### Phase 7 — Rejets dans l'interface
 
