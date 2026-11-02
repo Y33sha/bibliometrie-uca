@@ -136,7 +136,7 @@ class ConfigSetting(NamedTuple):
     normalize: Normalizer | None
     """Forme imposée à la valeur. `None` : valeur libre."""
     default: JsonValue = None
-    """Valeur initiale, posée par le seed. Une migration insère chaque clé, sauf les clés de périmètre, posées par le seed d'établissement."""
+    """Valeur initiale, posée par le seed. Une migration insère chaque clé."""
     institution: bool = False
     """Clé propre à l'établissement, posée par le seed d'établissement. Le seed commun pose les autres clés."""
     public: bool = False

@@ -476,6 +476,9 @@
               } catch {}
             }}
           >
+            {#if item.value === null}
+              <option value={null} disabled>Aucun périmètre</option>
+            {/if}
             {#each perimeters as p (p.id)}
               <option value={p.code}>{p.name} ({p.code})</option>
             {/each}

@@ -33,11 +33,11 @@ def get_perimeter_structure_ids(conn: Connection, perimeter_code: str) -> set[in
 
 
 def _config_perimeter_code(conn: Connection, config_key: ConfigKey) -> str | None:
-    """Renvoie le code de périmètre lu dans `config`, ou `None` si la clé est absente ou vide. Le seed d'établissement pose les clés de périmètre."""
+    """Renvoie le code de périmètre lu dans `config`, ou `None` s'il est vide."""
     value = conn.execute(
         text("SELECT value FROM config WHERE key = :key"),
         {"key": config_key},
-    ).scalar_one_or_none()
+    ).scalar_one()
     return value if isinstance(value, str) and value else None
 
 

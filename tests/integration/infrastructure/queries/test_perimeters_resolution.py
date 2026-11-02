@@ -18,9 +18,8 @@ from tests.integration.helpers.structures import insert_perimeter, insert_struct
 
 
 def _clear_perimeter_config(conn) -> None:
-    conn.execute(
-        text("DELETE FROM config WHERE key IN ('perimeter_extraction', 'perimeter_persons')")
-    )
+    set_config(conn, "perimeter_extraction", None)
+    set_config(conn, "perimeter_persons", None)
 
 
 def _perimeter(conn, code: str, name: str) -> int:
@@ -121,7 +120,7 @@ class TestGetHalCollections:
 
     def test_sans_perimetre_configure(self, sa_sync_conn):
         conn = sa_sync_conn
-        conn.execute(text("DELETE FROM config WHERE key = 'perimeter_extraction'"))
+        set_config(conn, "perimeter_extraction", None)
 
         assert get_hal_collections(conn) == {}
 
@@ -171,7 +170,7 @@ class TestGetExtractionApiIds:
 
     def test_sans_perimetre_configure(self, sa_sync_conn):
         conn = sa_sync_conn
-        conn.execute(text("DELETE FROM config WHERE key = 'perimeter_extraction'"))
+        set_config(conn, "perimeter_extraction", None)
 
         assert get_extraction_api_ids(conn, "openalex") == []
 

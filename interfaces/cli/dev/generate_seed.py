@@ -1,7 +1,7 @@
 # STATUS: recurring (dev)
 """Génère le seed commun et le seed d'établissement à partir des données de référence de la base courante.
 
-Le seed commun (`infrastructure/db/seed.sql`) contient les référentiels partagés par tous les établissements, et la valeur initiale des clés de configuration communes (`INITIAL_CONFIG_VALUES`). Le chargement d'un seed garde la configuration en base. Le seed d'établissement (`infrastructure/db/seed_uca.sql` pour UCA) contient les structures, leurs tutelles, les périmètres, les formes de noms, les clés de configuration propres à l'établissement. Les deux seeds se chargent indépendamment l'un de l'autre.
+Le seed commun (`infrastructure/db/seed.sql`) contient les référentiels partagés par tous les établissements, et la valeur initiale des clés de configuration communes (`INITIAL_CONFIG_VALUES`). Le seed d'établissement (`infrastructure/db/seed_uca.sql` pour UCA) contient les structures, leurs tutelles, les périmètres, les formes de noms, les clés de configuration propres à l'établissement. Les deux seeds se chargent indépendamment l'un de l'autre.
 
 Usage :
     uv run python -m interfaces.cli.dev.generate_seed
@@ -51,8 +51,6 @@ class TableSpec(_TableExportee, total=False):
     """Restreint les lignes exportées et supprimées au chargement."""
     key: tuple[str, ...]
     """Identifie une ligne d'une base à l'autre, à défaut de la clé primaire, alors absente de l'export."""
-    keep_existing: bool
-    """Garde les lignes de la base au chargement : le seed ajoute seulement les lignes absentes."""
     rows: Callable[[Connection], list[tuple[JsonValue, ...]]]
     """Fournit les lignes à la place de la base."""
 
@@ -79,8 +77,6 @@ class SeedSection:
     """Restreint les lignes supprimées au chargement."""
     key: tuple[str, ...] | None = None
     """Identifie une ligne, à défaut de la clé primaire."""
-    keep_existing: bool = False
-    """Garde les lignes de la base au chargement."""
 
 
 def initial_config_rows(conn: Connection) -> list[tuple[JsonValue, ...]]:
@@ -101,7 +97,11 @@ _INSTITUTION_KEYS_SQL = ", ".join(f"'{key}'" for key in sorted(INSTITUTION_CONFI
 COMMON_SEED = SeedSpec(
     description="Seed commun : référentiels partagés par tous les établissements.",
     tables=(
-        {"table": tables.config, "keep_existing": True, "rows": initial_config_rows},
+        {
+            "table": tables.config,
+            "where": f"key NOT IN ({_INSTITUTION_KEYS_SQL})",
+            "rows": initial_config_rows,
+        },
         {"table": tables.countries},
         {"table": tables.languages},
         {"table": tables.language_forms},
@@ -125,11 +125,7 @@ INSTITUTION_SEED = SeedSpec(
         {"table": tables.structure_parents},
         {"table": tables.perimeters},
         {"table": tables.structure_name_forms},
-        {
-            "table": tables.config,
-            "where": f"key IN ({_INSTITUTION_KEYS_SQL})",
-            "keep_existing": True,
-        },
+        {"table": tables.config, "where": f"key IN ({_INSTITUTION_KEYS_SQL})"},
     ),
     default_path=_DB_DIR / "seed_uca.sql",
 )
@@ -190,7 +186,7 @@ def _upsert_clause(columns: Sequence[str], key: Sequence[str]) -> str:
 def render_seed(description: str, output_path: Path, sections: Sequence[SeedSection]) -> str:
     """Renvoie le texte SQL d'un seed : une transaction qui aligne chaque table sur le seed, et recale les séquences.
 
-    Une table perd les lignes absentes du seed. Elle reçoit les autres, mises à jour sur place quand leur clé (`row_key`) existe : les lignes qui les référencent restent intactes. Une section `keep_existing` garde toutes les lignes de la base et ajoute seulement les lignes absentes.
+    Une table perd les lignes absentes du seed. Elle reçoit les autres, mises à jour sur place quand leur clé (`row_key`) existe : les lignes qui les référencent restent intactes.
     """
     lines = [
         "-- Seed généré automatiquement par interfaces/cli/dev/generate_seed.py",
@@ -215,18 +211,14 @@ def render_seed(description: str, output_path: Path, sections: Sequence[SeedSect
         jsonb_cols = {c.name for c in section.table.columns if isinstance(c.type, type(Jsonb))}
         not_null_cols = {c.name for c in section.table.columns if not c.nullable}
         lines.append(f"-- {table} ({len(section.rows)} lignes)")
-        if section.keep_existing:
-            upsert = _upsert_clause(key, key)
-        else:
-            key_positions = [columns.index(c) for c in key]
-            kept = ", ".join(
-                "(" + ", ".join(escape_sql(row[i]) for i in key_positions) + ")"
-                for row in section.rows
-            )
-            conditions = [f"({section.where})"] if section.where else []
-            conditions.append(f"({', '.join(key)}) NOT IN ({kept})")
-            upsert = _upsert_clause(columns, key)
-            lines.append(f"DELETE FROM {table} WHERE {' AND '.join(conditions)};")
+        key_positions = [columns.index(c) for c in key]
+        kept = ", ".join(
+            "(" + ", ".join(escape_sql(row[i]) for i in key_positions) + ")" for row in section.rows
+        )
+        conditions = [f"({section.where})"] if section.where else []
+        conditions.append(f"({', '.join(key)}) NOT IN ({kept})")
+        upsert = _upsert_clause(columns, key)
+        lines.append(f"DELETE FROM {table} WHERE {' AND '.join(conditions)};")
         for row in section.rows:
             values = ", ".join(
                 escape_sql(
@@ -274,8 +266,7 @@ def read_sections(conn: Connection, seed: SeedSpec) -> list[SeedSection]:
                 text(f"SELECT {col_list} FROM {table.name}{filtre} ORDER BY {order}")
             )
             rows = [tuple(row) for row in result]
-        keep_existing = spec.get("keep_existing", False)
-        sections.append(SeedSection(table, rows, where, key, keep_existing))
+        sections.append(SeedSection(table, rows, where, key))
     return sections
 
 

@@ -20,8 +20,7 @@ from tests.integration.helpers.seeds import (
 
 
 def _clear_config(key: str) -> None:
-    with owner_pool() as cur:
-        cur.execute("DELETE FROM config WHERE key = %s", (key,))
+    seed_config(key, None)
 
 
 class TestListPerimeters:
