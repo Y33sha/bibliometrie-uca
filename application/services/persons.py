@@ -1,4 +1,4 @@
-"""Service des personnes : écritures sur l'entité Person.
+"""Service des personnes : écritures.
 
 Tables `persons`, `person_identifiers` et `person_name_forms`, et détachement des contributions (`contributions`). Le renommage et l'attribution d'un identifiant passent par le repository des personnes, utilisé aussi par la phase `persons` du pipeline.
 """
@@ -128,7 +128,7 @@ class PersonService:
         """
         if id_type not in PUBLIC_PERSON_IDENTIFIER_TYPES:
             raise ValidationError(f"id_type doit être l'un de {PUBLIC_PERSON_IDENTIFIER_TYPES}")
-        if self._persons.find_by_id(person_id) is None:
+        if not self._persons.exists(person_id):
             raise NotFoundError(f"Personne {person_id} introuvable")
         outcome, id_value, existing = self._persons.attribute_identifier(
             person_id, id_type, id_value, source=IdentifierOrigin.MANUAL
@@ -266,7 +266,7 @@ class PersonService:
             NotFoundError: cible ou source introuvable.
             ConflictError: les deux personnes ont une fiche RH.
         """
-        check_merge_pair(target_id, source_id, self._persons.find_by_id, label="Personne")
+        check_merge_pair(target_id, source_id, self._persons.exists, label="Personne")
         target_id, source_id = merge_roles(
             target_id, source_id, with_rh=self._persons.ids_with_rh([target_id, source_id])
         )

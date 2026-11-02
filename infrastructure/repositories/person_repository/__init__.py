@@ -1,4 +1,4 @@
-"""Repository PostgreSQL de l'entité Person.
+"""Repository PostgreSQL des personnes.
 
 Implémente le port `application.ports.repositories.person_repository.PersonRepository`. Le SQL est réparti par thème dans les sous-modules `_core`, `_identifiers`, `_merge`, `_name_forms`. `PgPersonRepository` détient la connexion et délègue aux sous-modules. Le renommage et l'attribution d'un identifiant y appliquent les règles de `domain.persons`, pour l'API comme pour la phase `persons`.
 """
@@ -40,19 +40,19 @@ if TYPE_CHECKING:
         IdentifierStatusRow,
         NameFormStatusRow,
     )
-    from domain.persons.person import Person, PersonExclusion
+    from domain.persons.person import PersonExclusion
 
 
 class PgPersonRepository(PersonRepository):
-    """Accès PostgreSQL à l'entité Person via une `Connection` SQLAlchemy."""
+    """Accès PostgreSQL aux personnes via une `Connection` SQLAlchemy."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
 
     # ── persons ────────────────────────────────────────────────────
 
-    def find_by_id(self, person_id: int) -> Person | None:
-        return _core.find_by_id(self._conn, person_id)
+    def exists(self, person_id: int) -> bool:
+        return _core.exists(self._conn, person_id)
 
     def create(self, last_name: str, first_name: str = "") -> int:
         last_name, first_name = validated_name(last_name, first_name)

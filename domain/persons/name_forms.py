@@ -1,24 +1,7 @@
 """Formes de nom, pour le matching des personnes : chaînes « prénom nom » normalisées, comparables telles quelles à `contributor_information.author_name_normalized`."""
 
-from dataclasses import dataclass
-
-from domain.errors import ValidationError
 from domain.normalize import clean_raw_author_name, normalize_text
 from domain.persons.name_matching import normalize_first_name
-
-
-@dataclass(frozen=True)
-class PersonNameForm:
-    """Forme de nom d'une personne, non vide."""
-
-    value: str
-
-    def __post_init__(self) -> None:
-        if not self.value or not self.value.strip():
-            raise ValidationError("PersonNameForm ne peut pas être vide")
-
-    def __str__(self) -> str:
-        return self.value
 
 
 def name_form(last_name: str, first_name: str | None) -> str:

@@ -69,7 +69,12 @@ class PublisherService:
             ConflictError: membres Crossref distincts de part et d'autre.
             PublisherMergeBlockedError: paire de revues homonymes aux ISSN contradictoires, ou doublon de titre chez l'un des éditeurs.
         """
-        check_merge_pair(target_id, source_id, self._publishers.find_by_id, label="Éditeur")
+        check_merge_pair(
+            target_id,
+            source_id,
+            lambda i: self._publishers.find_by_id(i) is not None,
+            label="Éditeur",
+        )
 
         # Deux membres Crossref distincts désignent deux éditeurs distincts.
         if conflict := crossref_member_conflict(

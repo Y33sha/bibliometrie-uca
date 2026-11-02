@@ -54,9 +54,7 @@ class PublicationMergeService:
             NotFoundError: publication introuvable.
         """
         dois = self._merges.dois([publication_id, other_id])
-        check_merge_pair(
-            publication_id, other_id, lambda pid: pid if pid in dois else None, label="Publication"
-        )
+        check_merge_pair(publication_id, other_id, dois.__contains__, label="Publication")
         check_mergeable(dois.values())
 
         publication_ids = [publication_id, other_id]

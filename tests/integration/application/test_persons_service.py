@@ -392,11 +392,10 @@ class TestSetExclusion:
     def _exclusion(self, conn, p):
         return _scalar(conn, "SELECT exclusion::text FROM persons WHERE id = :p", p=p)
 
-    def test_excludes(self, sa_sync_conn, repo, service):
+    def test_excludes(self, sa_sync_conn, service):
         p = _person(sa_sync_conn)
         service.set_exclusion(p, PersonExclusion.OUT_OF_PERIMETER)
         assert self._exclusion(sa_sync_conn, p) == "out_of_perimeter"
-        assert repo.find_by_id(p).exclusion is PersonExclusion.OUT_OF_PERIMETER
 
     def test_retains(self, sa_sync_conn, service):
         p = _person(sa_sync_conn)

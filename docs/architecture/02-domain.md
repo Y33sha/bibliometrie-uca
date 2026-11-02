@@ -12,7 +12,7 @@ Les tables de chaque entité et leurs écritures sont décrites dans le [modèle
 |---|---|---|
 | `SourceRecord` | `domain/source_records/` | [enregistrement source](../donnees/02-sources.md) |
 | `Publication` | `domain/publications/` | [publication](../donnees/03-publications.md) |
-| `Person`, `IdentifierAttribution` | `domain/persons/` | [personne](../donnees/05-persons.md) et attribution d'un identifiant |
+| `IdentifierAttribution` | `domain/persons/` | attribution d'un identifiant à une [personne](../donnees/05-persons.md) |
 | `Structure` | `domain/structures/` | [structure](../donnees/06-structures.md) |
 | `Perimeter` | `domain/perimeters/` | [périmètre](../donnees/06-structures.md#périmètres) |
 | `Serial` | `domain/serials/` | [publication en série](../donnees/07-publishing.md#publications-en-série) |

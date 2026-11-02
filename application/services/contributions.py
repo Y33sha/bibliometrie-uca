@@ -190,7 +190,7 @@ class ContributionService:
 
     def _require_person(self, person_id: int) -> None:
         """Refuse une personne cible absente (`NotFoundError`)."""
-        if self._persons.find_by_id(person_id) is None:
+        if not self._persons.exists(person_id):
             raise NotFoundError(f"Personne {person_id} introuvable")
 
     def _resolve_rejection(

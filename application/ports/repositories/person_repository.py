@@ -1,10 +1,10 @@
-"""Port PersonRepository : accès à l'entité Person."""
+"""Port PersonRepository : accès aux personnes."""
 
 from typing import Protocol, TypedDict
 
 from domain.persons.identifier_attribution import AttributionResult, IdentifierAttribution
 from domain.persons.identifiers import IdentifierOrigin
-from domain.persons.person import Person, PersonExclusion
+from domain.persons.person import PersonExclusion
 
 
 class IdentifierStatusRow(TypedDict):
@@ -25,12 +25,12 @@ class NameFormStatusRow(TypedDict):
 
 
 class PersonRepository(Protocol):
-    """Contrat d'accès à l'entité Person : tables `persons`, `person_identifiers`, `person_name_forms`, `distinct_persons`, et une partie de `source_contributions`."""
+    """Contrat d'accès aux personnes : tables `persons`, `person_identifiers`, `person_name_forms`, `distinct_persons`, et une partie de `source_contributions`."""
 
     # ── persons ────────────────────────────────────────────────────
 
-    def find_by_id(self, person_id: int) -> Person | None:
-        """Charge l'entité `Person` avec `identifiers` et `name_forms`, ou `None` si la personne est introuvable. Identifiants et formes de nom se modifient par les méthodes dédiées."""
+    def exists(self, person_id: int) -> bool:
+        """Vrai si la personne existe."""
         ...
 
     def create(self, last_name: str, first_name: str = "") -> int:

@@ -4,64 +4,15 @@ from sqlalchemy import Connection, text
 
 from domain.errors import NotFoundError
 from domain.normalize import normalize_text
-from domain.persons.identifier_attribution import IdentifierAttribution
-from domain.persons.identifiers import AttributionStatus, IdentifierOrigin
-from domain.persons.name_forms import PersonNameForm
-from domain.persons.person import Person, PersonExclusion
+from domain.persons.person import PersonExclusion
 from infrastructure.db.scalars import scalar_int
 
 
-def find_by_id(conn: Connection, person_id: int) -> Person | None:
-    row = conn.execute(
-        text("""
-            SELECT id, last_name, first_name,
-                   last_name_normalized, first_name_normalized, exclusion
-            FROM persons WHERE id = :id
-        """),
-        {"id": person_id},
-    ).first()
-    if row is None:
-        return None
-
-    id_rows = conn.execute(
-        text("""
-            SELECT id, person_id, id_type, id_value, source,
-                   CAST(status AS text) AS status
-            FROM person_identifiers
-            WHERE person_id = :pid
-        """),
-        {"pid": person_id},
-    ).all()
-    identifiers = tuple(
-        IdentifierAttribution(
-            id=r.id,
-            person_id=r.person_id,
-            id_type=r.id_type,
-            id_value=r.id_value,
-            status=AttributionStatus(r.status),
-            source=IdentifierOrigin(r.source),
-        )
-        for r in id_rows
-    )
-
-    name_form_rows = conn.execute(
-        text(
-            "SELECT DISTINCT name_form FROM person_name_forms "
-            "WHERE person_id = :pid ORDER BY name_form"
-        ),
-        {"pid": person_id},
-    ).all()
-    name_forms = tuple(PersonNameForm(value=r.name_form) for r in name_form_rows)
-
-    return Person(
-        id=row.id,
-        last_name=row.last_name,
-        first_name=row.first_name,
-        last_name_normalized=row.last_name_normalized,
-        first_name_normalized=row.first_name_normalized,
-        exclusion=PersonExclusion(row.exclusion) if row.exclusion else None,
-        identifiers=identifiers,
-        name_forms=name_forms,
+def exists(conn: Connection, person_id: int) -> bool:
+    return bool(
+        conn.execute(
+            text("SELECT EXISTS (SELECT 1 FROM persons WHERE id = :id)"), {"id": person_id}
+        ).scalar()
     )
 
 

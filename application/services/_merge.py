@@ -8,7 +8,7 @@ from domain.errors import NotFoundError, ValidationError
 def check_merge_pair(
     target_id: int,
     source_id: int,
-    find_by_id: Callable[[int], object | None],
+    exists: Callable[[int], bool],
     *,
     label: str,
 ) -> None:
@@ -22,5 +22,5 @@ def check_merge_pair(
             f"Fusion impossible : cible et source identiques ({label} #{target_id})"
         )
     for entity_id in (target_id, source_id):
-        if find_by_id(entity_id) is None:
+        if not exists(entity_id):
             raise NotFoundError(f"{label} #{entity_id} introuvable")
