@@ -33,8 +33,8 @@ Mesure du 2026-10-27, base locale, enseignants-chercheurs de l'UCA : 71 % des pu
   - 11 % : texte terminé par un nom de pays. Échantillon de 15 : 12 adresses brutes (« Breast Unit Institute Gustave Roussy Villejuif France »), 3 noms suivis du pays entre parenthèses, au format des libellés HAL (« Narvik University College (Norway) »).
   - 37 % : reste. Échantillon de 40 : surtout des noms seuls et des textes étrangers à une adresse ; 3 adresses brutes sans pays (« Department of Pediatrics University Hospital Rouen »).
 - [x] Arborescences de structures HAL chez scanR (« Institut Pascal, UMR6602, IP, CNRS, UCA… »). Base locale, 2026-11-02 : 3 929 adresses. Le payload brut leur donne un `structId`, donc le normaliseur en tire des structures HAL. Il garde 21 de ces textes comme adresses, tous bruts. La resynchronisation des contributions sources scanR (réhydratation du staging, normalisation avec `--normalize-full`) retire les autres.
-- [ ] Critères : libellé HAL, avec ou sans adresse postale ; nom exact d'une structure HAL ou d'une organisation ROR ; texte sans virgule et sans nom de pays final.
-- [ ] Colonne `origin` sur `addresses`. La migration crée la colonne vide, le passage suivant du pipeline la remplit.
+- [x] Critères : libellé HAL, avec ou sans adresse postale ; nom exact d'une structure HAL ou d'une organisation ROR ; texte sans virgule et sans nom de pays final (`dc2e61268`).
+- [x] Colonne `origin` sur `addresses`. La migration crée la colonne vide, le passage suivant du pipeline la remplit (`dc2e61268`).
 - [ ] Adresses non brutes signalées sur la page d'administration des adresses.
 
 ### Phase 2 — Indicateurs
