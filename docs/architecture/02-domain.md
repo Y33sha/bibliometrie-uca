@@ -16,7 +16,6 @@ Les tables de chaque entité et leurs écritures sont décrites dans le [modèle
 | `Structure` | `domain/structures/` | [structure](../donnees/06-structures.md) |
 | `Perimeter` | `domain/perimeters/` | [périmètre](../donnees/06-structures.md#périmètres) |
 | `Serial` | `domain/serials/` | [publication en série](../donnees/07-publishing.md#publications-en-série) |
-| `Publisher` | `domain/publishers/` | [éditeur](../donnees/07-publishing.md#éditeurs) |
 
 ## Value objects
 

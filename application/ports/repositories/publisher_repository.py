@@ -1,11 +1,11 @@
-"""Port PublisherRepository : édition et fusion de l'entité Publisher."""
+"""Port PublisherRepository : édition et fusion des éditeurs."""
 
 from typing import Protocol
 
 from pydantic import field_validator
 
 from application.ports.model import Model
-from domain.publishers.publisher import Publisher, PublisherType
+from domain.publishers.publisher import PublisherType
 
 
 class PublisherUpdate(Model):
@@ -23,14 +23,14 @@ class PublisherUpdate(Model):
 
 
 class PublisherRepository(Protocol):
-    """Contrat d'édition et de fusion de l'entité Publisher."""
+    """Contrat d'édition et de fusion des éditeurs."""
 
-    def find_by_id(self, publisher_id: int) -> Publisher | None:
-        """Charge l'entité `Publisher`, ou `None` si l'éditeur n'existe pas. Ses formes de nom sont hors de l'entité."""
+    def exists(self, publisher_id: int) -> bool:
+        """Vrai si l'éditeur existe."""
         ...
 
-    def save(self, publisher: Publisher) -> None:
-        """Enregistre les champs modifiables d'un éditeur chargé. Lève `NotFoundError` si l'éditeur n'existe pas."""
+    def update(self, publisher_id: int, fields: PublisherUpdate) -> bool:
+        """Écrit les champs fournis de `fields` ; le nom normalisé suit le nom. Renvoie faux si l'éditeur n'existe pas."""
         ...
 
     # ── Fusion ─────────────────────────────────────────────────────

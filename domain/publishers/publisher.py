@@ -1,6 +1,5 @@
-"""Éditeurs et types d'éditeur."""
+"""Types d'éditeur."""
 
-from dataclasses import dataclass
 from enum import StrEnum
 
 
@@ -17,7 +16,6 @@ class PublisherType(StrEnum):
 
 
 PUBLISHER_TYPES: tuple[PublisherType, ...] = tuple(PublisherType)
-PUBLISHER_TYPES_SET: frozenset[str] = frozenset(PublisherType)
 
 # Libellés français des types d'éditeur, servis à l'interface par `/api/publishers/types`.
 PUBLISHER_TYPE_LABELS_FR: dict[PublisherType, str] = {
@@ -29,12 +27,3 @@ PUBLISHER_TYPE_LABELS_FR: dict[PublisherType, str] = {
     PublisherType.MEDIA: "Média",
     PublisherType.UNKNOWN: "Type inconnu",
 }
-
-
-@dataclass(slots=True)
-class Publisher:
-    id: int | None
-    name: str
-    country: str | None = None
-    openalex_id: str | None = None
-    publisher_type: PublisherType = PublisherType.UNKNOWN

@@ -15,7 +15,6 @@ from infrastructure.read_models.publications.facets import _PublicationFacetsBui
 from infrastructure.read_models.publications.filtering import FilterContext
 from infrastructure.read_models.publications.models import PublicationFilters
 from infrastructure.repositories.perimeter_repository import PgPerimeterRepository
-from infrastructure.repositories.publisher_repository import PgPublisherRepository
 from infrastructure.repositories.serial_repository import PgSerialRepository
 from infrastructure.repositories.structure_repository import PgStructureRepository
 from pipeline.ingestion.common.staging import StagingStore
@@ -24,7 +23,7 @@ from pipeline.transformation.publications.consolidation import source_records_of
 from pipeline.transformation.publications.correction.correction_store import (
     SourceRecordCorrectionStore,
 )
-from tests.integration.helpers.serials import insert_publisher, insert_serial
+from tests.integration.helpers.serials import insert_serial
 from tests.integration.helpers.structures import (
     insert_perimeter,
     insert_structure,
@@ -88,10 +87,6 @@ class TestRelevesRendantUneLigne:
         serial_id = insert_serial(sa_sync_conn_owner, "Revue")
         assert PgSerialRepository(sa_sync_conn_owner).find_by_id(serial_id) is not None
 
-    def test_un_editeur_s_accorde(self, sa_sync_conn_owner):
-        publisher_id = insert_publisher(sa_sync_conn_owner, "Éditeur", name_normalized="editeur")
-        assert PgPublisherRepository(sa_sync_conn_owner).find_by_id(publisher_id) is not None
-
     def test_un_perimetre_s_accorde(self, sa_sync_conn_owner):
         perimeter_id = insert_perimeter(sa_sync_conn_owner, "test-accord", name="Périmètre")
         assert PgPerimeterRepository(sa_sync_conn_owner).find_by_id(perimeter_id) is not None
@@ -110,7 +105,6 @@ TYPES_EXERCES = {
     "DoiNamespace",
     "_SerialRow",
     "_PerimeterRow",
-    "_PublisherRow",
     "SourceContributionRow",
     "_SourceRecordRow",
     "StagingRow",

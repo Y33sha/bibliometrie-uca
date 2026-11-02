@@ -1,1 +1,1 @@
-"""Éditeurs : entité `Publisher`, noms et membres."""
+"""Éditeurs : types, noms et membres."""

@@ -1,4 +1,4 @@
-"""Service des éditeurs : mise à jour et fusion de l'entité Publisher."""
+"""Service des éditeurs : mise à jour et fusion."""
 
 from application.audit_log import emit_event
 from application.ports.pipeline.publication_count import PublicationCountRecompute
@@ -47,16 +47,14 @@ class PublisherService:
         if not update.model_fields_set:
             raise ValidationError("Aucun champ à mettre à jour")
 
-        publisher = self._publishers.find_by_id(publisher_id)
-        if publisher is None:
+        if not self._publishers.update(publisher_id, update):
             raise NotFoundError(f"Éditeur {publisher_id} introuvable")
-
-        # Les champs de `PublisherUpdate` ont les noms des attributs de l'entité.
-        champs = update.model_dump(exclude_unset=True, mode="json")
-        for field_name, value in update.model_dump(exclude_unset=True).items():
-            setattr(publisher, field_name, value)
-        self._publishers.save(publisher)
-        emit_event("publisher.updated", "publisher", publisher_id, champs)
+        emit_event(
+            "publisher.updated",
+            "publisher",
+            publisher_id,
+            update.model_dump(exclude_unset=True, mode="json"),
+        )
 
     def merge_publishers(self, target_id: int, source_id: int) -> None:
         """Fusionne l'éditeur source dans l'éditeur cible, puis recalcule le `publication_count` de la cible.
@@ -69,12 +67,7 @@ class PublisherService:
             ConflictError: membres Crossref distincts de part et d'autre.
             PublisherMergeBlockedError: paire de revues homonymes aux ISSN contradictoires, ou doublon de titre chez l'un des éditeurs.
         """
-        check_merge_pair(
-            target_id,
-            source_id,
-            lambda i: self._publishers.find_by_id(i) is not None,
-            label="Éditeur",
-        )
+        check_merge_pair(target_id, source_id, self._publishers.exists, label="Éditeur")
 
         # Deux membres Crossref distincts désignent deux éditeurs distincts.
         if conflict := crossref_member_conflict(
