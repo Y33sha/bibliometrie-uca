@@ -1,12 +1,14 @@
 # Chantier — Signatures institutionnelles
 
-Distinguer les adresses brutes, et montrer pour chaque personne les structures citées dans ses adresses brutes.
+Distinguer les adresses brutes, et montrer les structures citées dans les adresses brutes d'une personne, ou des personnes d'une structure.
 
 ## Contexte
 
 Une partie des publications de l'Alliance UCA est absente des publications de l'université dans les bases bibliographiques : l'adresse de l'auteur omet l'université. Cas typique : un enseignant-chercheur de l'UCA qui exerce au CHU signe « CHU Clermont-Ferrand » seul.
 
 `address_structures` rattache une adresse à chaque structure dont une forme de nom figure dans le texte. L'onglet Adresses d'une personne, réservé à l'administration, montre par année la part de ses publications avec une adresse rattachée à chaque structure.
+
+`hr_periods` donne les périodes de présence d'une personne du référentiel RH dans une unité, avec la structure reconnue.
 
 Une adresse est un texte, partagé par toutes les sources qui le donnent. Une adresse brute reproduit l'adresse imprimée dans la publication. Le champ d'adresse des sources contient aussi d'autres textes :
 
@@ -21,8 +23,8 @@ Mesure du 2026-10-27, base locale, enseignants-chercheurs de l'UCA : 71 % des pu
 1. **Adresse brute** : texte de l'adresse tel qu'il figure dans la publication. La colonne énumérée `origin` de `addresses` distingue l'adresse brute du libellé HAL et du nom seul.
 2. **Critères** : propriétés du texte, confronté aux référentiels HAL et ROR. `origin` vaut pour toutes les sources qui donnent le texte. Le pipeline calcule seulement les `origin` vides.
 3. **Portée** : `origin` filtre les indicateurs. Toute adresse reste un indice de périmètre et rattache ses structures.
-4. **Indicateur** : structures citées dans les adresses brutes de la personne, en part de ses publications avec adresse brute. Il vaut pour toute personne.
-5. **Restitution** : sur la personne seulement. Le lien entre une personne et une structure se déduit des structures de ses contributions : un indicateur par structure serait circulaire.
+4. **Indicateur** : structures citées dans les adresses brutes d'une population de personnes, en part de ses publications avec adresse brute. Une publication compte une fois.
+5. **Population** : une personne ; ou les personnes d'une structure d'après `hr_periods`, pour leurs publications des périodes de présence. Le lien déduit des structures des contributions rendrait l'indicateur de la structure circulaire.
 
 ## Phasage
 
@@ -41,14 +43,17 @@ Mesure du 2026-10-27, base locale, enseignants-chercheurs de l'UCA : 71 % des pu
 
 - [ ] Onglet Adresses de la personne : comptes calculés sur les seules adresses brutes.
 - [ ] Dashboard de la personne : structures citées dans ses adresses brutes, toutes années confondues.
+- [ ] Dashboard de la structure : structures citées dans les adresses brutes de ses personnes.
 - [ ] Documentation.
 
 ## Questions ouvertes
 
 - **Calcul de `origin`** : quelle phase ? Les critères lisent les noms HAL, les noms ROR et les noms de pays.
+- **Années de présence** : règle de l'indice `hr_record`, de l'année qui suit le début à l'année de fin, appliquée par unité ?
+- **Structures filles** : leurs personnes comptent-elles pour la structure mère ?
 
 ## Liens
 
 - Convention de signature : <https://www.uca.fr/recherche/science-ouverte-et-publication/politique-de-signature-des-publications>
-- Tables : `addresses`, `source_contribution_addresses`, `address_structures`, `hal_structures`, `ror_organizations`, `place_name_forms`.
+- Tables : `addresses`, `source_contribution_addresses`, `address_structures`, `hal_structures`, `ror_organizations`, `place_name_forms`, `hr_periods`.
 - Phase `affiliations` : `pipeline/transformation/structures/`.
