@@ -22,38 +22,33 @@ D'autres chantiers prévoient des décisions de même nature :
 
 ## Décisions
 
-- **Une décision humaine s'ancre sur la clé naturelle de sa cible**, jamais sur l'identifiant d'une ligne recalculée par le pipeline. Aucune décision ne disparaît par cascade depuis une ligne recalculée. Une décision sans cible reste en sommeil et s'applique au retour de la cible.
-- **Clés naturelles** :
-  - enregistrement source : (source, source_id) ;
-  - contribution source : enregistrement source, nom normalisé (nom, prénom), et position parmi les contributions sources de même nom dans l'enregistrement source ;
-  - personne, structure : identifiant. Une fusion transfère les décisions et redirige l'identifiant.
-- **Une adresse décidée échappe à la purge des adresses sans contribution source.** Son identifiant reste donc stable.
-- **La normalisation retrouve une contribution source par son nom et ses identifiants, puis par son nom seul, puis par sa position.** Une contribution source garde ainsi son identifiant quand la source ajoute ou retire un identifiant.
+- **Une décision humaine vise une ligne à l'identifiant stable.** Le pipeline garde l'identifiant d'une ligne tant qu'elle désigne la même chose.
+- **La normalisation reconnaît une contribution source par le nom donné par la source, puis par sa position quand ce nom se répète dans l'enregistrement source.** Une contribution source garde son identifiant quand la source ajoute ou retire un identifiant. Un nom modifié par la source recrée la contribution source, et son épinglage tombe.
+- **Une adresse décidée échappe à la purge des adresses sans contribution source.**
+- **Un rejet s'ancre sur l'enregistrement source par (source, source_id)**, sans clé étrangère. Le rejet d'un enregistrement source disparu de sa source reste en sommeil et s'applique à son retour.
 
 ## Phasage
 
 ### Phase 1 — Correspondance de la normalisation
 
-- [ ] `plan_source_contribution_sync` : nom et identifiants, puis nom seul, puis position.
+- [ ] `plan_source_contribution_sync` : nom donné par la source, puis position.
+- [ ] Contribution source retrouvée avec d'autres identifiants : informations du contributeur réécrites, personne à résoudre de nouveau.
 
-### Phase 2 — Schéma
+### Phase 2 — Rejets
 
 - [ ] Migration : `rejected_contributions` ancrée sur (source, source_id, person_id), sans clé étrangère vers `source_records`. Remplie depuis les lignes existantes.
-- [ ] Migration : `confirmed_source_contributions` ancrée sur la clé naturelle de la contribution source, sans clé étrangère vers `source_contributions`. Remplie depuis les lignes existantes.
+- [ ] Lecture (`infrastructure/sql_fragments.py`), écriture de l'administration et fusion des personnes sur (source, source_id).
 
-### Phase 3 — Lecture et écriture
+### Phase 3 — Adresses
 
-- [ ] Résolution des décisions vers les lignes courantes, par un fragment SQL par cible. La résolution des personnes et les fragments de `infrastructure/sql_fragments.py` le lisent.
-- [ ] Écritures de l'administration (épinglage, rejet) et fusion des personnes sur les clés naturelles.
 - [ ] Purge des adresses sans contribution source : les adresses décidées restent.
 
 ### Phase 4 — Documentation
 
-- [ ] Décisions humaines et leurs clés naturelles, dans `docs/donnees/`.
+- [ ] Normalisation des contributions sources, rejets, purge des adresses.
 
 ## Questions ouvertes
 
-- **Décisions en sommeil** : les compter dans le journal du pipeline, les lister dans l'administration ?
+- **Rejets en sommeil** : les compter dans le journal du pipeline, les lister dans l'administration ?
 - **Épinglages perdus** : le journal d'audit donne l'identifiant des contributions sources supprimées, et la publication d'un épinglage unitaire. Une récupération partielle est-elle utile ?
-- **Nom corrigé par la source** : l'épinglage ne retrouve plus la contribution source. Repli sur la position seule ?
 - **Purge des personnes** : un statut décidé d'identifiant ou de forme de nom épargne-t-il la personne ?
