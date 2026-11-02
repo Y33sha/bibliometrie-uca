@@ -7,7 +7,6 @@
 	import { onMount, tick } from 'svelte';
 	import { api, apiDetail } from '#lib/api/index.js';
 	import { issnLabel, serialRelationLabels } from '#lib/labels.js';
-	import { issnPortalUrl } from '#lib/utils.js';
 	import TabNav from '#lib/components/TabNav.svelte';
 	import PublicationsListView from '#lib/components/PublicationsListView.svelte';
 	import MonographsListView from '#lib/components/MonographsListView.svelte';
@@ -15,6 +14,7 @@
 	import SubjectsCloud from '#lib/components/SubjectsCloud.svelte';
 	import TitleRow from '#lib/components/TitleRow.svelte';
 	import SerialDrawer from '#lib/components/serials/SerialDrawer.svelte';
+	import IssnBadge from '#lib/components/serials/IssnBadge.svelte';
 	import { useDrawerParam } from '#lib/composables/useDrawerParam.svelte.js';
 	import { isAdmin } from '#lib/session.svelte.js';
 	import type { components } from '#lib/api/schema.js';
@@ -127,7 +127,7 @@
 		</TitleRow>
 		<div class="entity-meta">
 			{#each journal.issn_details.filter((i) => i.status === 'active' || i.linking) as issn (issn.issn)}
-				<EntityMetaItem label={issnLabel(issn)}><span class="id-badge">{issn.issn}</span></EntityMetaItem>
+				<EntityMetaItem label={issnLabel(issn)}><IssnBadge issn={issn.issn} /></EntityMetaItem>
 			{/each}
 		</div>
 		{#if journal.relations.length}
@@ -137,7 +137,7 @@
 						{#if relation.serial_id}
 							<a href={resolve(`journals/${relation.serial_id}`)}>{relation.title}</a>
 						{:else if relation.issn}
-							<a class="id-badge" href={issnPortalUrl(relation.issn)} target="_blank" rel="noopener" title="Portail ISSN (nouvel onglet)">{relation.issn}</a>
+							<IssnBadge issn={relation.issn} />
 						{/if}
 					</EntityMetaItem>
 				{/each}

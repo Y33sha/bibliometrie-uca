@@ -10,6 +10,7 @@
   import Drawer from "#lib/components/Drawer.svelte";
   import IconButton from "#lib/components/IconButton.svelte";
   import Picker from "#lib/components/Picker.svelte";
+  import IssnBadge from "./IssnBadge.svelte";
   import { mergeSerial } from "./mergeSerial";
   import type { components } from "#lib/api/schema.js";
 
@@ -227,7 +228,7 @@
         <dl class="drawer-fields">
           {#each serial.issn_details.filter((i) => i.status === "active" || i.linking) as issn (issn.issn)}
             <dt>{issnLabel(issn)}</dt>
-            <dd><span class="id-badge">{issn.issn}</span></dd>
+            <dd><IssnBadge issn={issn.issn} /></dd>
           {/each}
         </dl>
       </section>
