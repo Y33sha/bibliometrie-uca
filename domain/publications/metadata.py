@@ -1,8 +1,6 @@
 """Règles sur les métadonnées d'une publication : titre, métadonnées minimales."""
 
-import re
-
-from domain.normalize import clean_source_text, normalize_text
+from domain.normalize import clean_title, normalize_text
 
 
 def has_minimal_publication_metadata(title: str | None, publication_year: int | None) -> bool:
@@ -18,17 +16,6 @@ def is_overlong_title(title: str | None) -> bool:
     return bool(title) and len(normalize_text(title)) > TITLE_NORMALIZED_MAX_LENGTH
 
 
-# Espaces ASCII seuls : les espaces insécables de la typographie (« pratiques : ») restent.
-_ASCII_WHITESPACE_RE = re.compile(r"[ \t\n\r\f\v]+")
-
-
-def clean_publication_title(title: str | None) -> str | None:
-    """Nettoie un titre à son écriture (`clean_source_text`). Les suites d'espaces ASCII se réduisent à un espace, les espaces de bordure sont retirés."""
-    if not title:
-        return title
-    return _ASCII_WHITESPACE_RE.sub(" ", clean_source_text(title)).strip()
-
-
 def normalized_title(title: str | None) -> str:
     """Renvoie la forme de comparaison d'un titre, valeur de `source_records.title_normalized`."""
-    return normalize_text(clean_publication_title(title) or "")
+    return normalize_text(clean_title(title) or "")

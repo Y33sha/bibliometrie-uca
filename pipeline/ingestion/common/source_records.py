@@ -12,11 +12,11 @@ from dataclasses import dataclass, fields
 
 from sqlalchemy import Connection, bindparam, text
 
-from domain.normalize import clean_abstract, optional_plain_text
+from domain.normalize import clean_abstract, clean_title, optional_plain_text
 from domain.publications.dates import PublicationDate
 from domain.publications.doc_types import DocType
 from domain.publications.licenses import License
-from domain.publications.metadata import clean_publication_title, normalized_title
+from domain.publications.metadata import normalized_title
 from domain.publishers.attribution import source_record_has_publisher
 from domain.serials.titles import names_ebook_platform
 from domain.source_records.doc_types import map_doc_type
@@ -36,7 +36,7 @@ class SourceRecordUpsert:
 
     Le jeu de colonnes est commun à toutes les sources ; une colonne non renseignée par la source reste à `None`. Les absences suivent les données exposées par chaque source : theses.fr est sans résumé, HAL et theses.fr sans indicateur de citation ; `hal_collections` existe seulement pour HAL, `is_retracted` seulement pour OpenAlex.
 
-    `title` et `abstract` sont nettoyés à l'écriture (`clean_publication_title`, `clean_abstract`), et `title_normalized` se dérive du titre. `doc_type` de `raw_doc_type` (`map_doc_type`) et `language` de `raw_language` (`language_code`). `publication_id`, rattachement à la publication, est posé par la phase `publications`.
+    `title` et `abstract` sont nettoyés à l'écriture (`clean_title`, `clean_abstract`), et `title_normalized` se dérive du titre. `doc_type` de `raw_doc_type` (`map_doc_type`) et `language` de `raw_language` (`language_code`). `publication_id`, rattachement à la publication, est posé par la phase `publications`.
     """
 
     # Clé de l'enregistrement source
@@ -187,7 +187,7 @@ class SourceRecordStore:
             has_series: l'enregistrement source décrit une série ; avec sa monographie, cela décide de son éditeur (`source_record_has_publisher`).
         """
         params: dict[str, object] = {name: getattr(row, name) for name in _ROW_FIELDS}
-        params["title"] = clean_publication_title(row.title)
+        params["title"] = clean_title(row.title)
         params["title_normalized"] = normalized_title(row.title)
         params["doc_type"] = _doc_type(row)
         if not source_record_has_publisher(

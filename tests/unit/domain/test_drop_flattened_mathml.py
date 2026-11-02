@@ -1,6 +1,6 @@
 """Tests unitaires de `domain.normalize.drop_flattened_mathml`, sur des titres Crossref réels."""
 
-from domain.normalize import drop_flattened_mathml
+from domain.normalize import clean_title, drop_flattened_mathml
 
 
 def test_symboles_mathml_apres_la_formule():
@@ -12,7 +12,7 @@ def test_symboles_mathml_apres_la_formule():
         "                          B\n                        s\n                        0\n"
         "                      →\n                      ϕ"
     )
-    assert drop_flattened_mathml(title) == (
+    assert clean_title(drop_flattened_mathml(title)) == (
         "Study of charmonium production in $${b} $$ -hadron decays and first evidence"
         " for the decay $${{{B}} ^0_{{s}}} \\!\\rightarrow \\phi \\phi \\phi $$"
     )
@@ -25,7 +25,7 @@ def test_symboles_mathml_avant_la_formule():
         "                      +\n                    →\n                    p\n"
         "                $$ {B}^{+}\\to p\\overline{\\varLambda} $$"
     )
-    assert drop_flattened_mathml(title) == (
+    assert clean_title(drop_flattened_mathml(title)) == (
         "Evidence for the two-body charmless baryonic decay $$ {B}^{+}\\to p\\overline{\\varLambda} $$"
     )
 
@@ -37,12 +37,22 @@ def test_formule_en_debut_de_ligne_garde_le_texte_moins_indente():
         "                \n                    \n                        Δ\n"
         "                    \n                \n            -function"
     )
-    assert drop_flattened_mathml(title) == (
+    assert clean_title(drop_flattened_mathml(title)) == (
         "Powers of Jacobi triple product, Cohen’s numbers and the Ramanujan $${\\Delta }$$ -function"
     )
 
 
 def test_titre_sur_une_ligne_garde_ses_symboles():
-    # OpenAlex : aucun repère d'indentation.
+    # Aucun repère d'indentation.
     title = "Study of charmonium production in $${b} $$ b -hadron decays"
     assert drop_flattened_mathml(title) == title
+
+
+def test_les_espaces_insecables_restent():
+    assert drop_flattened_mathml(" Les pratiques\xa0: une étude !\n") == (
+        "Les pratiques\xa0: une étude !"
+    )
+
+
+def test_un_titre_blanc_devient_vide():
+    assert drop_flattened_mathml(" \n   \n") == ""

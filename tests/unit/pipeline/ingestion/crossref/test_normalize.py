@@ -7,6 +7,7 @@ Les fonctions de `pipeline.ingestion.crossref.payload` sont testées dans `test_
 
 from __future__ import annotations
 
+from domain.normalize import clean_title
 from domain.persons.contributor_name import ContributorName
 from domain.publications.licenses import License
 from domain.serials.issns import IssnSupport, SerialIssn
@@ -87,10 +88,10 @@ class TestGetTitle:
     def test_strips_whitespace(self):
         assert get_title({"title": ["  Spaced  "]}) == "Spaced"
 
-    def test_reduces_whitespace(self):
-        assert get_title({"title": ["Imprimitive\n   complex  reflection groups"]}) == (
-            "Imprimitive complex reflection groups"
-        )
+    def test_whitespace_reduced_at_write(self):
+        """L'espacement se réduit à l'écriture du titre (`clean_title`)."""
+        title = get_title({"title": ["Imprimitive\n   complex  reflection groups"]})
+        assert clean_title(title) == "Imprimitive complex reflection groups"
 
     def test_none_when_empty_list(self):
         assert get_title({"title": []}) is None

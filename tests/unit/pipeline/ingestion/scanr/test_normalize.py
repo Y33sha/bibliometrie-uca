@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import pytest
 
+from domain.normalize import clean_title
 from domain.persons.contributor_name import ContributorName
 from domain.serials.issns import SerialIssn
 from domain.subjects.subject import Subject, SubjectLink, SubjectVocabulary
@@ -212,7 +213,9 @@ class TestGetTitle:
 
     def test_titre_recopie_de_crossref_sans_mathml_aplati(self):
         title = "Measurement of \n                $$\\tau $$\n                    τ\n              polarisation"
-        assert get_title({"title": {"default": title}}) == "Measurement of $$\\tau $$ polarisation"
+        assert clean_title(get_title({"title": {"default": title}})) == (
+            "Measurement of $$\\tau $$ polarisation"
+        )
 
 
 class TestEditeurEtConteneur:

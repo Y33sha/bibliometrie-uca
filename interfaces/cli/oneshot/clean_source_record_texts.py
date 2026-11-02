@@ -15,8 +15,8 @@ import os
 
 from sqlalchemy import Connection, bindparam, text
 
-from domain.normalize import clean_abstract
-from domain.publications.metadata import clean_publication_title, normalized_title
+from domain.normalize import clean_abstract, clean_title
+from domain.publications.metadata import normalized_title
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.db.queues import Queue, enqueue
@@ -38,7 +38,7 @@ def _changed_titles(conn: Connection) -> list[dict[str, object]]:
     return [
         {"id": row.id, "before": row.title, "after": cleaned, "tn": normalized_title(cleaned)}
         for row in rows
-        if (cleaned := clean_publication_title(row.title)) != row.title
+        if (cleaned := clean_title(row.title)) != row.title
     ]
 
 
