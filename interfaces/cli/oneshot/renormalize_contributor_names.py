@@ -63,7 +63,7 @@ def main() -> None:
     with get_sync_engine().begin() as conn:
         ids: set[int] = set()
         stale_names: set[str] = set()
-        rows = conn.execution_options(stream_results=True, yield_per=20_000).execute(_NAMES)
+        rows = conn.execute(_NAMES, execution_options={"stream_results": True, "yield_per": 20_000})
         for source_record_id, *names in rows:
             stale = {name for name in names if _stale(name)}
             if stale:
