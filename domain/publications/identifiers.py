@@ -30,7 +30,7 @@ _DOI_PREFIX_RE = re.compile(r"(10\.\d+)(?![\w.])")
 _SEPARATORS_RE = re.compile(r"[\s-]")
 
 
-def _clean_doi(raw: str | None) -> str | None:
+def _normalize_doi(raw: str | None) -> str | None:
     """Renvoie la forme normalisée d'un DOI brut : en minuscules, sans préfixe d'URL ni schéma, sans artefact de copier-coller. `None` si la valeur n'a pas la forme d'un DOI. Les DOI sont insensibles à la casse."""
     if not raw:
         return None
@@ -93,7 +93,7 @@ class DOI(NormalizedIdentifier):
     """DOI normalisé. Lève `ValidationError` si la valeur nettoyée n'a pas la forme `10.<chiffres>/<suffixe>`."""
 
     label = "DOI"
-    normalize = staticmethod(_clean_doi)
+    normalize = staticmethod(_normalize_doi)
 
     @property
     def prefix(self) -> DoiPrefix:
@@ -101,7 +101,7 @@ class DOI(NormalizedIdentifier):
         return DoiPrefix(self.value.split("/", 1)[0])
 
 
-def _doi_prefix(raw: str | None) -> str | None:
+def _normalize_doi_prefix(raw: str | None) -> str | None:
     """Renvoie le préfixe en tête de `raw`, ou `None`."""
     match = _DOI_PREFIX_RE.match((raw or "").strip())
     return match.group(1) if match else None
@@ -111,7 +111,7 @@ class DoiPrefix(NormalizedIdentifier):
     """Préfixe DOI (`10.<chiffres>`), partie d'un DOI avant la première barre oblique. Accepte un DOI complet, des espaces ou une ponctuation finale. Lève `ValidationError` sans préfixe en tête (« doi:10.5194 », « https: »)."""
 
     label = "Préfixe DOI"
-    normalize = staticmethod(_doi_prefix)
+    normalize = staticmethod(_normalize_doi_prefix)
 
 
 # Dépôt HAL : `<code de portail>-<numéro>`, `_` pour séparateur sur ArchiveSIC. Tout code est accepté. Au moins 8 chiffres, pour écarter des fragments d'URL (`pubdb-2020`).
@@ -132,7 +132,7 @@ def is_hal_host(host: str) -> bool:
     return any(label == "hal" or label.startswith("hal-") for label in host.split("."))
 
 
-def _extract_hal_id(raw: str | None) -> str | None:
+def _normalize_hal_id(raw: str | None) -> str | None:
     """Renvoie l'identifiant HAL sans version, tiré d'une URL de portail HAL, d'un identifiant OAI-PMH HAL (`oai:HAL:hal-04123456v1`) ou d'un identifiant nu.
 
     `None` pour une URL d'un autre hôte, un identifiant OAI-PMH d'une autre autorité, ou une autre chaîne que l'identifiant entier : leurs fragments `mot-chiffres` ressemblent à un identifiant HAL (`oai:pure.rug.nl:openaire/1b9c53c2-4cfa-49c4-b454-3339841149ee`, `doi:10.3929/ethz-b-000124558`).
@@ -165,7 +165,7 @@ def hal_deposit_url(url: str) -> str | None:
     host = urlparse(url.strip().lower()).hostname
     if not host or not is_hal_host(host):
         return None
-    hal_id = _extract_hal_id(url)
+    hal_id = _normalize_hal_id(url)
     return hal_id_url(hal_id) if hal_id else None
 
 
@@ -173,7 +173,7 @@ class HALId(NormalizedIdentifier):
     """Identifiant HAL d'un dépôt (`hal-…`, `tel-…`, `halshs-…`), en minuscules et sans version (`hal-04123456v2` → `hal-04123456`). Accepte une URL."""
 
     label = "HAL ID"
-    normalize = staticmethod(_extract_hal_id)
+    normalize = staticmethod(_normalize_hal_id)
 
 
 _NNT_RE = re.compile(r"[0-9A-Z]+")
@@ -380,7 +380,7 @@ def extract_doi_from_url(url: str | None) -> str | None:
     if not url:
         return None
     if url.startswith("doi:"):
-        return _clean_doi(url[4:])
+        return _normalize_doi(url[4:])
     if is_host(url, "doi.org"):
-        return _clean_doi(url)
+        return _normalize_doi(url)
     return None
