@@ -3763,6 +3763,21 @@ export interface components {
             /** Publication Count */
             publication_count: number;
         };
+        /**
+         * HalAffiliationConflictAuthor
+         * @description Auteur d'une contribution en conflit : nom donné par HAL, personne rattachée, structures du périmètre attribuées par HAL.
+         */
+        HalAffiliationConflictAuthor: {
+            /** Person Id */
+            person_id: number | null;
+            /** Name */
+            name: string;
+            /**
+             * Structures
+             * @description L'affichage choisit entre acronyme et nom.
+             */
+            structures: components["schemas"]["StructureRef"][];
+        };
         /** HalAffiliationConflictPublication */
         HalAffiliationConflictPublication: {
             /** Id */
@@ -3776,10 +3791,10 @@ export interface components {
             /** Doi */
             doi: string | null;
             /**
-             * Laboratories
-             * @description Laboratoires du périmètre des contributions en conflit ; l'affichage choisit entre acronyme et nom.
+             * Authors
+             * @description Auteurs des contributions en conflit, dans l'ordre des auteurs de la publication.
              */
-            laboratories: components["schemas"]["StructureRef"][];
+            authors: components["schemas"]["HalAffiliationConflictAuthor"][];
             /**
              * Hal Links
              * @description Dépôts HAL de la publication, avec leur lien.

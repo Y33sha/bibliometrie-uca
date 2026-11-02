@@ -99,6 +99,15 @@ class NoMissingCollections(StrEnum):
     NO_COLLECTION = "no_collection"
 
 
+class HalAffiliationConflictAuthor(Model):
+    """Auteur d'une contribution en conflit : nom donné par HAL, personne rattachée, structures du périmètre attribuées par HAL."""
+
+    person_id: int | None
+    name: str
+    structures: list[StructureRef]
+    """L'affichage choisit entre acronyme et nom."""
+
+
 class HalAffiliationConflictPublication(Model):
     id: int
     title: str
@@ -106,8 +115,8 @@ class HalAffiliationConflictPublication(Model):
     doc_type: str
     doi: str | None
     halids: list[str] | None = Field(exclude=True)
-    laboratories: list[StructureRef]
-    """Laboratoires du périmètre des contributions en conflit ; l'affichage choisit entre acronyme et nom."""
+    authors: list[HalAffiliationConflictAuthor]
+    """Auteurs des contributions en conflit, dans l'ordre des auteurs de la publication."""
 
     @computed_field
     @property

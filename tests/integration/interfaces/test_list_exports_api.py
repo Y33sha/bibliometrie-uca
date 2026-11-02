@@ -86,7 +86,7 @@ def _rows(text: str) -> list[list[str]]:
         (
             "/api/hal-problems/affiliation-conflicts/export.csv",
             {},
-            ["Année", "Type", "Titre", "DOI", "Dépôts HAL", "Laboratoires"],
+            ["Année", "Type", "Titre", "DOI", "Dépôts HAL", "Auteurs en conflit"],
         ),
     ],
 )

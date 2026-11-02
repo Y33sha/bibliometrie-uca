@@ -261,10 +261,12 @@ class TestHalMissingCollections:
 
 
 def _create_hal_contribution(conn, publication, code):
-    """Crée une contribution de `publication`, rattachée à une personne créée, dont la contribution source HAL est dans le périmètre et atteint le laboratoire d'acronyme `code`. Renvoie la contribution."""
+    """Crée une contribution de `publication`, rattachée à une personne créée, dont la contribution source HAL, au nom d'auteur `code`, est dans le périmètre et atteint le laboratoire d'acronyme `code`. Renvoie la contribution."""
     lab = _create_lab(conn, code=code, hal_collection=f"COLL-{code}", acronym=code)
     hal_source_record = _source_record(conn, publication, source_id=f"h-{code}")
-    hal_source_contribution = insert_source_contribution(conn, hal_source_record, in_perimeter=True)
+    hal_source_contribution = insert_source_contribution(
+        conn, hal_source_record, raw_author_name=code, in_perimeter=True
+    )
     contribution = align_source_contributions(
         conn, publication, [(hal_source_contribution, hal_source_record)]
     )
@@ -440,7 +442,7 @@ class TestHalAffiliationConflicts:
 
         assert _conflict_ids(sa_sync_conn) == []
 
-    def test_lists_laboratories_of_conflicting_contributions(self, sa_sync_conn):
+    def test_lists_conflicting_authors_with_their_structures(self, sa_sync_conn):
         # La seconde contribution est dans le périmètre selon HAL et selon OpenAlex.
         publication = insert_publication(sa_sync_conn)
         conflicting = _create_hal_contribution(sa_sync_conn, publication, "LAB-A")
@@ -459,4 +461,7 @@ class TestHalAffiliationConflicts:
         )
 
         [conflict] = _q(sa_sync_conn).hal_affiliation_conflicts(page=1, per_page=50).publications
-        assert [lab.acronym for lab in conflict.laboratories] == ["LAB-A"]
+        [author] = conflict.authors
+        assert (author.name, [s.acronym for s in author.structures]) == ("LAB-A", ["LAB-A"])
+        assert author.person_id is not None
+        assert "LAB-A (LAB-A)" in "".join(_q(sa_sync_conn).export_affiliation_conflicts_csv())

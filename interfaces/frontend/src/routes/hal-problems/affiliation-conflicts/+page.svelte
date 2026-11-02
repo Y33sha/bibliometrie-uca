@@ -1,6 +1,5 @@
 <script lang="ts">
 	import TableScroll from '#lib/components/TableScroll.svelte';
-	import { institution } from '#lib/institution.svelte.js';
 	import PageHeader from '#lib/components/PageHeader.svelte';
 	import DocTypePill from '#lib/components/DocTypePill.svelte';
 	import DoiLink from '#lib/components/DoiLink.svelte';
@@ -41,9 +40,7 @@
 	});
 </script>
 
-<PageHeader title="Affiliations HAL divergentes">
-	Publications dont un auteur est affilié à {institution.name} dans HAL, et seulement hors de {institution.name} dans WoS ou OpenAlex.
-</PageHeader>
+<PageHeader title="Affiliations HAL divergentes" />
 
 <ListToolbar {list} one="publication" many="publications" exportUrl={withBase('/api/hal-problems/affiliation-conflicts/export.csv')} />
 
@@ -56,7 +53,7 @@
 					<th>{columnLabels.year}</th>
 					<th>{columnLabels.doi}</th>
 					<th>{columnLabels.title}</th>
-					<th>{columnLabels.labs}</th>
+					<th>Auteurs en conflit</th>
 					<th>Dépôts HAL</th>
 				</tr>
 			</thead>
@@ -67,7 +64,14 @@
 						<td>{pub.publication_year ?? ''}</td>
 						<td>{#if pub.doi}<DoiLink doi={pub.doi} />{/if}</td>
 						<td><a href={resolve(`publications/${pub.id}`)} class="publication-title"><PublicationTitle titre={pub.title} /></a></td>
-						<td>{#each pub.laboratories as lab (lab.name)}<span class="lab-tag" title={lab.name}>{structureLabel(lab)}</span>{/each}</td>
+						<td>
+							{#each pub.authors as author, i (i)}
+								<div class="conflict-author">
+									{#if author.person_id}<a href={resolve(`persons/${author.person_id}`)}>{author.name}</a>{:else}{author.name}{/if}
+									{#each author.structures as structure (structure.name)}<span class="lab-tag" title={structure.name}>{structureLabel(structure)}</span>{/each}
+								</div>
+							{/each}
+						</td>
 						<td>
 							<div class="id-list">
 								{#each pub.hal_links as link (link.source_id)}
@@ -82,3 +86,12 @@
 	</TableScroll>
 	<Pagination page={list.page} pages={list.pages} onchange={(p) => { list.goToPage(p); syncUrl(); }} />
 </ListStatus>
+
+<style>
+	.conflict-author {
+		white-space: nowrap;
+	}
+	.conflict-author + .conflict-author {
+		margin-top: 0.25rem;
+	}
+</style>
