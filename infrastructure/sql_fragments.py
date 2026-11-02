@@ -19,6 +19,7 @@ from domain.serials.serial import OaModel
 from domain.source_records.corrections import CORRECTED_BY, RAW
 from domain.source_records.impact import CitationTop
 from domain.source_records.source_extras import CROSSREF_PREPRINT_OF, SourceExtra
+from domain.structures.address_origin import AddressOrigin
 from domain.structures.perimeter_evidence import PerimeterEvidence
 
 
@@ -90,6 +91,11 @@ def is_laboratory(structure: str = "s") -> str:
         f"(SELECT value FROM config WHERE key = '{ConfigKey.LABORATORY_TYPES}')"
         "))::structure_type[])"
     )
+
+
+def is_raw_address(address: str = "a") -> str:
+    """Renvoie la condition vraie quand l'adresse aliasée `address` est une adresse brute. Une adresse sans origine en est exclue."""
+    return f"{address}.origin = '{AddressOrigin.RAW.value}'"
 
 
 def has_author_role(source_contribution: str = "sc") -> str:

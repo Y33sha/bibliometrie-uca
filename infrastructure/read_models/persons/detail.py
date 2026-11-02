@@ -25,7 +25,7 @@ from infrastructure.read_models.persons.models import (
 )
 from infrastructure.read_models.subjects.models import SubjectFrequency
 from infrastructure.read_models.subjects.queries import entity_subjects
-from infrastructure.sql_fragments import has_author_role, in_clause, is_laboratory
+from infrastructure.sql_fragments import has_author_role, in_clause, is_laboratory, is_raw_address
 
 _THESIS_ROLES = (
     ContributionRole.THESIS_DIRECTOR,
@@ -42,7 +42,7 @@ _THESIS_ROLE_LABELS = {
 
 
 def _person_address_publications_cte(year: int | None) -> str:
-    """Renvoie la CTE `person_address_publications` : couples (publication, adresse) des contributions sources des contributions de la personne `:pid`. Avec `year`, seules les publications de l'année `:year` figurent."""
+    """Renvoie la CTE `person_address_publications` : couples (publication, adresse brute) des contributions sources des contributions de la personne `:pid`. Avec `year`, seules les publications de l'année `:year` figurent."""
     year_filter = "AND p.publication_year = :year" if year is not None else ""
     return f"""
         WITH person_address_publications AS (
@@ -51,8 +51,9 @@ def _person_address_publications_cte(year: int | None) -> str:
             JOIN aligned_source_contributions m ON m.contribution_id = g.id
             JOIN source_contribution_addresses sca
               ON sca.source_contribution_id = m.source_contribution_id
+            JOIN addresses a ON a.id = sca.address_id
             JOIN publications p ON p.id = g.publication_id
-            WHERE g.person_id = :pid {year_filter}
+            WHERE g.person_id = :pid AND {is_raw_address("a")} {year_filter}
         )
     """
 
@@ -186,7 +187,7 @@ class PersonDetailQueries:
     def person_addresses(
         self, person_id: int, *, year: int | None, page: int, per_page: int
     ) -> PersonAddressesResponse:
-        """Renvoie les adresses des contributions sources des contributions de la personne, les plus fréquentes d'abord. `year` restreint aux publications de l'année."""
+        """Renvoie les adresses brutes des contributions sources des contributions de la personne, les plus fréquentes d'abord. `year` restreint aux publications de l'année."""
         cte = _person_address_publications_cte(year)
         binds = {"pid": person_id, "year": year}
         total = self._conn.execute(
@@ -237,7 +238,7 @@ class PersonDetailQueries:
         )
 
     def person_address_summary(self, person_id: int, *, year: int | None) -> PersonAddressSummary:
-        """Compte les publications de la personne, puis, par structure, celles dont une adresse est rattachée à la structure. `year` restreint aux publications de l'année."""
+        """Compte les publications de la personne, puis, par structure, celles dont une adresse brute est rattachée à la structure. `year` restreint aux publications de l'année."""
         cte = _person_address_publications_cte(year)
         binds = {"pid": person_id, "year": year}
         counts = self._conn.execute(

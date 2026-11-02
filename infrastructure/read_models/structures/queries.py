@@ -28,7 +28,7 @@ from infrastructure.read_models.structures.models import (
 )
 from infrastructure.read_models.subjects.models import SubjectFrequency
 from infrastructure.read_models.subjects.queries import entity_subjects
-from infrastructure.sql_fragments import has_author_role
+from infrastructure.sql_fragments import has_author_role, is_raw_address
 
 # Liens publication–ROR des publications de la structure `:structure_id`, hors ses ROR propres (`OWN_RORS_SQL`).
 _PARTNER_LINKS = f"""
@@ -404,12 +404,13 @@ class StructuresQueries:
     def get_structure_addresses(
         self, structure_id: int, *, page: int, per_page: int
     ) -> StructureAddressesResponse:
-        """Renvoie les adresses rattachées à une structure, hors rattachements rejetés."""
-        from_where = """
+        """Renvoie les adresses brutes rattachées à une structure, hors rattachements rejetés."""
+        from_where = f"""
             FROM addresses a
             JOIN address_structures ast ON ast.address_id = a.id
             WHERE ast.structure_id = :structure_id
               AND ast.is_confirmed IS DISTINCT FROM FALSE
+              AND {is_raw_address("a")}
         """
         offset = (page - 1) * per_page
         count_row = self._conn.execute(

@@ -233,7 +233,7 @@ def get_structure_addresses(
     per_page: int = Query(50, ge=1, le=200),
     queries: StructuresQueries = Depends(structures_queries),
 ) -> StructureAddressesResponse:
-    """Liste les adresses rattachées à la structure, hors rattachements rejetés."""
+    """Liste les adresses brutes rattachées à la structure, hors rattachements rejetés."""
     return queries.get_structure_addresses(structure_id, page=page, per_page=per_page)
 
 

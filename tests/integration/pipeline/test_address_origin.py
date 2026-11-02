@@ -12,7 +12,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 def _address(conn, raw_text: str) -> int:
-    return insert_address(conn, raw_text, normalized_text=normalize_text(raw_text))
+    return insert_address(conn, raw_text, normalized_text=normalize_text(raw_text), origin=None)
 
 
 def _origins(conn) -> dict[str, str]:
