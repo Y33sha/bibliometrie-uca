@@ -10,6 +10,7 @@
 
 ### Non commencé
 
+- [Export RH SIHAM : matricule, périodes de présence, laboratoires](DATA_export-rh-siham.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
 - [Listes de revues](DATA_listes-de-revues.md)
 - [Mesures d'impact](METIER_mesures-impact.md)
