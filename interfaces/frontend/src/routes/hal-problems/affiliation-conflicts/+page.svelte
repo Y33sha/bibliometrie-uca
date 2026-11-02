@@ -15,6 +15,9 @@
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
 	import ListStatus from '#lib/components/ListStatus.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
+	import IconButton from '#lib/components/IconButton.svelte';
+	import PublicationDrawer from '#lib/components/publications/PublicationDrawer.svelte';
+	import { useDrawerParam } from '#lib/composables/useDrawerParam.svelte.js';
 
 	import type { components } from '#lib/api/schema.js';
 	type Pub = components['schemas']['HalAffiliationConflictPublication'];
@@ -25,6 +28,8 @@
 		apiKey: 'hal-affiliation-conflicts',
 		buildParams: () => new URLSearchParams(),
 	});
+
+	const drawer = useDrawerParam('publication');
 
 	function syncUrl() {
 		const p = new URLSearchParams();
@@ -49,6 +54,7 @@
 		<table class="data-table">
 			<thead>
 				<tr>
+					<th class="row-actions"></th>
 					<th>{columnLabels.type}</th>
 					<th>{columnLabels.year}</th>
 					<th>{columnLabels.doi}</th>
@@ -59,7 +65,8 @@
 			</thead>
 			<tbody>
 				{#each list.items as pub (pub.id)}
-					<tr>
+					<tr class:active-row={pub.id === drawer.id}>
+						<td class="row-actions"><IconButton icon="panel" label="Ouvrir le volet" onclick={() => drawer.open(pub.id)} /></td>
 						<td>{#if pub.doc_type}<DocTypePill docType={pub.doc_type} />{/if}</td>
 						<td>{pub.publication_year ?? ''}</td>
 						<td>{#if pub.doi}<DoiLink doi={pub.doi} />{/if}</td>
@@ -87,7 +94,16 @@
 	<Pagination page={list.page} pages={list.pages} onchange={(p) => { list.goToPage(p); syncUrl(); }} />
 </ListStatus>
 
+{#if drawer.id !== null}
+	<PublicationDrawer publicationId={drawer.id} onclose={() => drawer.open(null)} onopen={drawer.open} />
+{/if}
+
 <style>
+	/* La cellule d'actions se réduit à son icône. */
+	.row-actions {
+		width: 1%;
+		white-space: nowrap;
+	}
 	.conflict-author {
 		white-space: nowrap;
 	}
