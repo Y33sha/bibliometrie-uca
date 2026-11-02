@@ -1,10 +1,10 @@
-"""Tests de `domain.sources.hal.hal_domain_subject`.
+"""Tests de `pipeline.ingestion.hal.payload.hal_domain_subject`.
 
 Les entrées sont des valeurs réelles du champ `fr_domainAllCodeLabel_fs` de l'API HAL.
 """
 
-from domain.sources.hal import hal_domain_subject
 from domain.subjects.subject import SubjectVocabulary
+from pipeline.ingestion.hal.payload import hal_domain_subject
 
 
 def _lineage(entry: str) -> list[tuple[str, str]]:

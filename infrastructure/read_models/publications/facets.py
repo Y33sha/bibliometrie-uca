@@ -11,10 +11,10 @@ from typing import Any
 from sqlalchemy import Connection, text
 
 from domain.countries import NO_COUNTRY_CODE
+from domain.publications.hal_deposit import HAL_DEPOSIT_STATUS_LABELS, HalDepositStatus
 from domain.publications.licenses import license_label
 from domain.publications.oa_status import OaStatus
 from domain.source_records.impact import CITATION_TOP_LABELS, CitationTop
-from domain.sources.hal import HAL_DEPOSIT_STATUS_LABELS, HAL_DEPOSIT_STATUSES
 from domain.sources.registry import source_label
 from infrastructure.db.rows import rows_as
 from infrastructure.read_models._common import (
@@ -342,7 +342,7 @@ class _PublicationFacetsBuilder:
         counts = {r.value: r.n for r in rows}
         return [
             FacetOption(value=s, label=HAL_DEPOSIT_STATUS_LABELS[s], count=counts.get(s, 0))
-            for s in HAL_DEPOSIT_STATUSES
+            for s in HalDepositStatus
         ]
 
     def _facet_in_perimeter(self) -> list[FacetOption]:

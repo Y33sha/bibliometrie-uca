@@ -217,7 +217,7 @@ class PublicationListItem(Model):
     is_corresponding: bool | None
     contribution_id: int | None
     hal_status: str | None
-    """Statut de dépôt HAL (`HAL_DEPOSIT_STATUSES`) au regard de la collection du laboratoire, pour une liste restreinte à un seul laboratoire ; `None` sinon."""
+    """Statut de dépôt HAL (`HalDepositStatus`) au regard de la collection du laboratoire, pour une liste restreinte à un seul laboratoire ; `None` sinon."""
 
 
 class PublicationListResponse(PaginatedResponse):

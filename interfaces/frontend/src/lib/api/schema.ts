@@ -5193,7 +5193,7 @@ export interface components {
             contribution_id: number | null;
             /**
              * Hal Status
-             * @description Statut de dépôt HAL (`HAL_DEPOSIT_STATUSES`) au regard de la collection du laboratoire, pour une liste restreinte à un seul laboratoire ; `None` sinon.
+             * @description Statut de dépôt HAL (`HalDepositStatus`) au regard de la collection du laboratoire, pour une liste restreinte à un seul laboratoire ; `None` sinon.
              */
             hal_status: string | null;
             /**

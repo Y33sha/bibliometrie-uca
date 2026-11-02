@@ -151,15 +151,16 @@ def confirmation_ids(identifiers: Iterable[SourceIdentifier]) -> dict[str, tuple
 def source_record_own_ids(source: str, source_id: str) -> dict[str, tuple[str, ...]]:
     """Renvoie les identifiants propres d'un enregistrement source, par type : le dépôt HAL d'un enregistrement source HAL ou d'un enregistrement source ScanR issu de HAL, le NNT d'un enregistrement source theses.fr."""
     if source == Source.HAL:
-        hal_id = HALId.try_parse(source_id)
+        parsed = HALId.try_parse(source_id)
+        hal_id = str(parsed) if parsed else None
     elif source == Source.SCANR:
-        hal_id = HALId.try_parse(extract_hal_id_from_scanr_id(source_id) or "")
+        hal_id = extract_hal_id_from_scanr_id(source_id)
     elif source == Source.THESES:
         nnt = NNT.try_parse(source_id)
         return {SourceIdentifierType.NNT.value: (str(nnt),)} if nnt else {}
     else:
         return {}
-    return {SourceIdentifierType.HAL_ID.value: (str(hal_id),)} if hal_id else {}
+    return {SourceIdentifierType.HAL_ID.value: (hal_id,)} if hal_id else {}
 
 
 def confirmation_id_removals(

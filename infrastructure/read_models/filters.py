@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from domain.normalize import normalize_text
 from domain.persons.identifiers import AttributionStatus
 from domain.persons.person import PersonExclusion
+from domain.publications.hal_deposit import HalDepositStatus
 from domain.publications.oa_status import (
     ACCESS_LEVELS,
     OA_CLOSED_STATUSES,
@@ -379,21 +380,22 @@ _SQL_IN_COLLECTION_SOURCE_CONTRIBUTION = (
 
 
 def hal_status_expression(lab_hal_col: str | None) -> WhereClause:
-    """Renvoie l'expression SQL du statut de dépôt HAL de la publication `p` (`HAL_DEPOSIT_STATUSES`), au regard de la collection du laboratoire.
+    """Renvoie l'expression SQL du statut de dépôt HAL de la publication `p` (`HalDepositStatus`), au regard de la collection du laboratoire.
 
     Sans collection déclarée, aucune publication n'est en collection : un dépôt HAL vaut `hors_collection`. Le filtre, la facette et l'export lisent tous cette expression, donc classent de la même façon.
     """
     if lab_hal_col is None:
         return WhereClause(
-            f"(CASE WHEN {_SQL_HAS_HAL_SOURCE_CONTRIBUTION} THEN 'hors_collection' ELSE 'hors_hal' END)",
+            f"(CASE WHEN {_SQL_HAS_HAL_SOURCE_CONTRIBUTION} THEN '{HalDepositStatus.OUTSIDE_COLLECTION}'"
+            f" ELSE '{HalDepositStatus.OUTSIDE_HAL}' END)",
             {},
         )
     return WhereClause(
         f"""(CASE
-            WHEN NOT {_SQL_HAS_HAL_SOURCE_CONTRIBUTION} THEN 'hors_hal'
-            WHEN NOT {_SQL_IN_COLLECTION_SOURCE_CONTRIBUTION} THEN 'hors_collection'
-            WHEN p.oa_status IS NULL OR p.oa_status::text IN {OA_CLOSED_SQL} THEN 'notice'
-            ELSE 'ok'
+            WHEN NOT {_SQL_HAS_HAL_SOURCE_CONTRIBUTION} THEN '{HalDepositStatus.OUTSIDE_HAL}'
+            WHEN NOT {_SQL_IN_COLLECTION_SOURCE_CONTRIBUTION} THEN '{HalDepositStatus.OUTSIDE_COLLECTION}'
+            WHEN p.oa_status IS NULL OR p.oa_status::text IN {OA_CLOSED_SQL} THEN '{HalDepositStatus.NOTICE}'
+            ELSE '{HalDepositStatus.OK}'
         END)""",
         {"flt_hal_collection": lab_hal_col},
     )

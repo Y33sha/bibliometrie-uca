@@ -9,9 +9,9 @@ from typing import Annotated
 from fastapi import Depends, Query
 
 from domain.publications.doc_types import DOC_TYPES
+from domain.publications.hal_deposit import HalDepositStatus
 from domain.publications.oa_status import ACCESS_LEVELS, OA_STATUSES
 from domain.source_records.impact import CitationTop
-from domain.sources.hal import HAL_DEPOSIT_STATUSES
 from domain.sources.registry import SOURCE_FILTER_VALUES
 from infrastructure.read_models.publications.models import (
     AUTHOR_POSITION_FILTER_VALUES,
@@ -114,7 +114,7 @@ class PublicationListFilterParams(PublicationFilterParams):
                 self.author_position, allowed=AUTHOR_POSITION_FILTER_VALUES, param="author_position"
             ),
             hal_status_values=parse_vocabulary_csv(
-                self.hal_status, allowed=HAL_DEPOSIT_STATUSES, param="hal_status"
+                self.hal_status, allowed=frozenset(HalDepositStatus), param="hal_status"
             ),
             in_perimeter=parse_vocabulary_csv(
                 self.in_perimeter, allowed=TOGGLE_VALUES, param="in_perimeter"
