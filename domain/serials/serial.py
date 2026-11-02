@@ -18,7 +18,6 @@ class SerialType(StrEnum):
 
 
 SERIAL_TYPES: tuple[SerialType, ...] = tuple(SerialType)
-SERIAL_TYPES_SET: frozenset[str] = frozenset(SerialType)
 
 # Libellés français des types, servis à l'interface par `/api/serials/types`.
 SERIAL_TYPE_LABELS_FR: dict[SerialType, str] = {
