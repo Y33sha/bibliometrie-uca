@@ -4,8 +4,9 @@ from dataclasses import replace
 
 from sqlalchemy import text
 
-from domain.structures.hal_structures import HalStructureStatus, parse_hal_structure
+from domain.structures.hal_structures import HalStructureStatus
 from infrastructure.db.queues import Queue
+from pipeline.ingestion.hal.structures import parse_hal_structure
 from pipeline.transformation.structures.hal_structures import HalStructureStore
 from tests.integration.helpers.queues import clear, queued
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record

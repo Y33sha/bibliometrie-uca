@@ -11,11 +11,11 @@ from typing import Protocol
 
 from sqlalchemy import Connection, text
 
-from domain.structures.hal_structures import HalStructure, parse_hal_structure
 from domain.types import JsonValue
 from infrastructure.db.queues import Queue, enqueue
 from pipeline.http.circuit_breaker import SourceUnavailableError
 from pipeline.ingestion.hal.api import HAL_STRUCTURES_BATCH
+from pipeline.ingestion.hal.structures import HalStructure, parse_hal_structure
 from pipeline.runtime.observability.log_format import LAST_BRANCH, step
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import Progress, track_progress

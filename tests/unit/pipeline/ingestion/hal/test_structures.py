@@ -2,7 +2,8 @@
 
 import datetime
 
-from domain.structures.hal_structures import HalStructureStatus, parse_hal_structure
+from domain.structures.hal_structures import HalStructureStatus
+from pipeline.ingestion.hal.structures import parse_hal_structure
 
 _LMV = {
     "docid": "483019",
