@@ -168,6 +168,9 @@
 	// Publications par année, empilées selon `oaBreakdown`. L'année en cours est incomplète.
 	const currentYear = new Date().getFullYear();
 	const yearLabels = $derived(years.map((y) => (y === currentYear ? `${y} (en cours)` : String(y))));
+	const period = $derived(
+		years.length === 0 ? undefined : years.length === 1 ? String(years[0]) : `${years[0]}–${years[years.length - 1]}`,
+	);
 	const accessSeries = $derived(
 		orderedPivotValues(oaBreakdown, chartRows).map((value, i) => ({
 			label: pivotValueLabel(oaBreakdown, value),
@@ -195,10 +198,7 @@
 {#if !loaded}
 	<div class="loading">Chargement…</div>
 {:else}
-	<KeyFigures items={keyFigures} />
-	{#if years.length}
-		<p class="dash-corpus">Publications parues de {years[0]} à {years[years.length - 1]}.</p>
-	{/if}
+	<KeyFigures items={keyFigures} {period} />
 	<div class="dash-grid">
 		<div class="dash-card">
 			<h2>Publications par année</h2>
@@ -247,11 +247,6 @@
 {/if}
 
 <style>
-	.dash-corpus {
-		margin: -24px 0 24px;
-		font-size: var(--fs-sm);
-		color: var(--text-secondary);
-	}
 	.scatter-head {
 		display: flex;
 		align-items: baseline;

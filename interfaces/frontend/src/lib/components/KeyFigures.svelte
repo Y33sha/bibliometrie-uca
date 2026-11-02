@@ -5,10 +5,18 @@
 
 <script lang="ts">
 	// Rangée de chiffres clés en tête d'un dashboard : icône facultative à gauche, gros chiffre, libellé discret dessous.
-	let { items }: { items: KeyFigure[] } = $props();
+	let {
+		items,
+		period,
+	}: {
+		items: KeyFigure[];
+		/** Période couverte par les chiffres, affichée en tête de la rangée. */
+		period?: string;
+	} = $props();
 </script>
 
 <div class="key-figures">
+	{#if period}<div class="key-figures-period">{period}</div>{/if}
 	{#each items as item (item.label)}
 		<div class="key-figure" class:open={item.tone === 'open'} title={item.tooltip}>
 			{#if item.icon}<i class="fi fi-rr-{item.icon} key-figure-icon" aria-hidden="true"></i>{/if}
@@ -26,6 +34,17 @@
 		flex-wrap: wrap;
 		gap: 24px 56px;
 		margin-bottom: 36px;
+	}
+	.key-figures-period {
+		display: flex;
+		align-items: center;
+		height: calc(var(--fs-4xl) * 1.1);
+		padding-right: 32px;
+		border-right: 1px solid var(--border);
+		font-size: var(--fs-3xl);
+		font-weight: 700;
+		color: var(--text-secondary);
+		white-space: nowrap;
 	}
 	.key-figure {
 		display: flex;
