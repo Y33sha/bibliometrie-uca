@@ -18,7 +18,7 @@ _PLACEHOLDER_RE = re.compile(
 )
 
 
-def is_placeholder_name(name: str) -> bool:
+def _is_placeholder_name(name: str) -> bool:
     """Vrai si le nom se compose seulement de mots écrits à la place d'un nom absent (« (:Unap) », « None, None »). « Paolo None » est un nom réel."""
     words = [w for w in re.split(r"[\s,]+", name) if w]
     return bool(words) and all(_PLACEHOLDER_RE.fullmatch(w) for w in words)
@@ -45,10 +45,10 @@ class ContributorName:
 
     @classmethod
     def from_parts(cls, last_name: str | None, first_name: str | None) -> ContributorName | None:
-        """Construit le nom séparé par la source. Sans nom de famille, le prénom seul devient la chaîne brute. Renvoie `None` sans aucun nom, ou pour un nom absent (`is_placeholder_name`)."""
+        """Construit le nom séparé par la source. Sans nom de famille, le prénom seul devient la chaîne brute. Renvoie `None` sans aucun nom, ou pour un nom absent (`_is_placeholder_name`)."""
         last = clean_raw_author_name(last_name or "").strip()
         first = clean_raw_author_name(first_name or "").strip()
-        if is_placeholder_name(f"{last} {first}"):
+        if _is_placeholder_name(f"{last} {first}"):
             return None
         if not last:
             return cls.from_raw(first)
@@ -56,9 +56,9 @@ class ContributorName:
 
     @classmethod
     def from_raw(cls, raw: str | None) -> ContributorName | None:
-        """Construit le nom depuis une chaîne brute. Renvoie `None` pour une chaîne vide ou un nom absent (`is_placeholder_name`)."""
+        """Construit le nom depuis une chaîne brute. Renvoie `None` pour une chaîne vide ou un nom absent (`_is_placeholder_name`)."""
         cleaned = clean_raw_author_name(raw or "").strip()
-        return cls(raw=cleaned) if cleaned and not is_placeholder_name(cleaned) else None
+        return cls(raw=cleaned) if cleaned and not _is_placeholder_name(cleaned) else None
 
     @classmethod
     def from_columns(
