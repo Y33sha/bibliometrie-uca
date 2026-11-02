@@ -405,6 +405,6 @@ def preprint_servers_of_prefix(prefix: str) -> tuple[KnownPlatform, ...]:
     """Renvoie les serveurs de preprints dont `prefix` est un préfixe DOI, dans l'ordre de la liste."""
     return tuple(
         p
-        for p in KNOWN_PLATFORMS
-        if p.platform_type is PlatformType.PREPRINT_SERVER and prefix in p.doi_prefixes
+        for p in _PLATFORMS_OF_PREFIX.get(prefix, ())
+        if p.platform_type is PlatformType.PREPRINT_SERVER
     )

@@ -48,7 +48,7 @@ from domain.merge import MergedEntity
 from domain.persons.contribution_matching import ContributionMatchReason
 from domain.persons.identifiers import AttributionStatus
 from domain.persons.person import PersonExclusion
-from domain.platforms.platform import PLATFORM_TYPES
+from domain.platforms.platform import PlatformType
 from domain.publications.author_grouping import GroupingMethod
 from domain.publications.dates import DatePrecision
 from domain.publications.doc_types import DOC_TYPES
@@ -673,7 +673,7 @@ oa_type_enum = PgEnum(*OA_RANK, name="oa_type", create_type=False)
 
 license_type_enum = PgEnum(*License, name="license_type", create_type=False)
 
-platform_type_enum = PgEnum(*PLATFORM_TYPES, name="platform_type", create_type=False)
+platform_type_enum = PgEnum(*PlatformType, name="platform_type", create_type=False)
 
 perimeter_evidence_enum = PgEnum(*PerimeterEvidence, name="perimeter_evidence", create_type=False)
 
