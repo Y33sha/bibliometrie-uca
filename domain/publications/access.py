@@ -11,14 +11,17 @@ from urllib.parse import unquote, urlsplit
 
 from domain.platforms.platform import ARCHIVE_TYPES, PlatformType
 from domain.platforms.registry import (
+    HAL,
     KnownPlatform,
     is_fully_open,
     known_platform_of_copy,
     platform_type_of_copy,
 )
+from domain.publications.doc_types import DocType
 from domain.publications.identifiers import HALId
 from domain.publications.licenses import License
 from domain.publications.oa_status import OA_OPEN_STATUSES, OaStatus
+from domain.sources.registry import Source
 
 _DOI_HOSTS = frozenset({"doi.org", "dx.doi.org"})
 _WEB_SCHEMES = frozenset({"http", "https"})
@@ -49,6 +52,47 @@ class Copy:
     preprint_record: bool = False
     """La copie vient d'un enregistrement source typé preprint."""
 
+    @classmethod
+    def of_location(
+        cls,
+        url: str,
+        *,
+        version: str | None,
+        declared_oa: bool | None,
+        arrival: int,
+        embargoed: bool = False,
+        license: License | None = None,  # noqa: A002 — nom du champ de la copie
+        source_platform: str | None = None,
+        source_platform_type: PlatformType | None = None,
+        platform_openalex_id: str | None = None,
+        record_source: str | None = None,
+        record_doc_type: str | None = None,
+    ) -> Copy:
+        """Renvoie la copie d'une localisation d'un enregistrement source.
+
+        La plateforme de la liste donne son nom et son type, à défaut ceux donnés par la source. Une copie sous embargo est fermée. La copie HAL d'un enregistrement HAL est décrite par sa plateforme. Une copie garde le type preprint de son enregistrement source.
+
+        Args:
+            declared_oa: ouverture déclarée par la source.
+            platform_openalex_id: identifiant OpenAlex de la plateforme donnée par la source.
+            record_source: source de l'enregistrement source.
+            record_doc_type: type de document de l'enregistrement source.
+        """
+        known = known_platform_of_copy(url, platform_openalex_id)
+        return cls(
+            url=url,
+            version=version,
+            is_oa=declared_oa and not embargoed,
+            platform=known.name if known else source_platform,
+            known_platform=known,
+            platform_type=platform_type_of_copy(url, platform_openalex_id) or source_platform_type,
+            license=license,
+            embargoed=embargoed,
+            described_by_platform=record_source == Source.HAL and known is HAL,
+            arrival=arrival,
+            preprint_record=record_doc_type == DocType.PREPRINT,
+        )
+
     @property
     def of_preprint(self) -> bool:
         """Vrai pour la copie d'un enregistrement source preprint, ou d'un serveur de preprints."""
@@ -76,8 +120,6 @@ def _host(copy: Copy) -> str:
 
 
 def _label(copy: Copy) -> str:
-    if copy.known_platform:
-        return copy.known_platform.name
     return copy.platform or _host(copy).removeprefix("www.")
 
 
@@ -127,19 +169,7 @@ def registered_url_copy(url: str) -> Copy | None:
         version = "publishedVersion"
     else:
         return None
-    known = known_platform_of_copy(url, None)
-    return Copy(
-        url=url,
-        version=version,
-        is_oa=True,
-        platform=known.name if known else None,
-        known_platform=known,
-        platform_type=platform_type_of_copy(url, None),
-        license=None,
-        embargoed=False,
-        described_by_platform=False,
-        arrival=0,
-    )
+    return Copy.of_location(url, version=version, declared_oa=True, arrival=0)
 
 
 def open_copies(copies: Iterable[Copy]) -> list[Copy]:

@@ -6,16 +6,13 @@ from collections.abc import Sequence
 from sqlalchemy import Connection, text
 
 from domain.platforms.platform import PlatformType
-from domain.platforms.registry import HAL, known_platform_of_copy, platform_type_of_copy
 from domain.publications.access import Copy, registered_url_copy
-from domain.publications.doc_types import DocType
 from domain.publications.licenses import License
-from domain.sources.registry import Source
 from infrastructure.sql_fragments import under_active_embargo
 
 
 def publication_copies(conn: Connection, publication_ids: Sequence[int]) -> dict[int, list[Copy]]:
-    """Renvoie les localisations des enregistrements sources de chaque publication, et la copie de l'URL de résolution de son DOI (`registered_url_copy`). Une publication sans copie est absente de la réponse. Le fichier déposé d'un enregistrement source sous embargo, sa copie à PDF, est fermé jusqu'à la fin de l'embargo. La copie HAL d'un enregistrement HAL est décrite par sa plateforme. Une copie garde le type preprint de son enregistrement source."""
+    """Renvoie les copies des localisations des enregistrements sources de chaque publication (`Copy.of_location`), et la copie de l'URL de résolution de son DOI (`registered_url_copy`). Une publication sans copie est absente de la réponse. Pour un enregistrement source sous embargo, seule la copie à PDF, son fichier déposé, est sous embargo."""
     rows = conn.execute(
         text(f"""
             SELECT sr.publication_id, sr.source::text AS source, sr.doc_type::text AS doc_type,
@@ -34,21 +31,19 @@ def publication_copies(conn: Connection, publication_ids: Sequence[int]) -> dict
     ).all()
     copies: dict[int, list[Copy]] = defaultdict(list)
     for r in rows:
-        known = known_platform_of_copy(r.url, r.platform_openalex_id)
         copies[r.publication_id].append(
-            Copy(
-                url=r.url,
+            Copy.of_location(
+                r.url,
                 version=r.version,
-                is_oa=r.declared_oa and not r.embargoed,
-                platform=known.name if known else r.platform,
-                known_platform=known,
-                platform_type=platform_type_of_copy(r.url, r.platform_openalex_id)
-                or (PlatformType(r.platform_type) if r.platform_type else None),
-                license=License(r.license) if r.license else None,
-                embargoed=r.embargoed,
-                described_by_platform=r.source == Source.HAL and known is HAL,
+                declared_oa=r.declared_oa,
                 arrival=r.arrival,
-                preprint_record=r.doc_type == DocType.PREPRINT,
+                embargoed=r.embargoed,
+                license=License(r.license) if r.license else None,
+                source_platform=r.platform,
+                source_platform_type=PlatformType(r.platform_type) if r.platform_type else None,
+                platform_openalex_id=r.platform_openalex_id,
+                record_source=r.source,
+                record_doc_type=r.doc_type,
             )
         )
     registered = conn.execute(
