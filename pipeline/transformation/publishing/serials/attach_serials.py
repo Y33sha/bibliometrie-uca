@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 
 from sqlalchemy import Connection, Row, text
 
+from domain.entity_resolution import most_frequent
 from domain.normalize import normalize_text
 from domain.publications.identifiers import ISSN
 from domain.serials.attachment import (
@@ -26,7 +27,6 @@ from domain.serials.attachment import (
     effective_issnl,
     match_by_title,
     match_in_publication,
-    most_frequent,
     openalex_issnls,
 )
 from domain.serials.containers import SeriesDescription

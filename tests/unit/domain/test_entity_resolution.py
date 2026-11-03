@@ -1,11 +1,13 @@
-"""Composantes connexes des enregistrements sources reliés par des clés partagées (`domain.entity_resolution.connected_components`).
+"""Résolution d'entités (`domain.entity_resolution`).
 
-Les composantes sont transitives et triées ; deux clés de types différents restent distinctes ; un enregistrement source sans clé forme sa propre composante.
+Composantes connexes des enregistrements sources reliés par des clés partagées : transitives et triées ; deux clés de types différents restent distinctes ; un enregistrement source sans clé forme sa propre composante. Valeur majoritaire d'un groupe.
 """
 
 from __future__ import annotations
 
-from domain.entity_resolution import connected_components
+from collections import Counter
+
+from domain.entity_resolution import connected_components, most_frequent
 
 
 def _tok(*pairs: tuple[str, str]) -> frozenset[tuple[str, str]]:
@@ -84,3 +86,7 @@ class TestConnectedComponents:
             ]
         )
         assert result == [[1, 2, 3]]
+
+
+def test_most_frequent_value_then_smallest():
+    assert most_frequent(Counter({"b": 2, "a": 2, "c": 1})) == "a"

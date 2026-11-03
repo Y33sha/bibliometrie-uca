@@ -8,8 +8,8 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import NamedTuple
 
+from domain.entity_resolution import most_frequent
 from domain.publishers.names import publisher_name_key
-from domain.serials.attachment import most_frequent
 
 
 class PublisherRecord(NamedTuple):

@@ -7,6 +7,7 @@ from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 
+from domain.entity_resolution import most_frequent
 from domain.normalize import normalize_text
 from domain.title_comparison import compatible_titles
 
@@ -32,12 +33,6 @@ def openalex_issnls(series: Iterable[tuple[str, Sequence[str]]]) -> dict[str, st
         for issn in (issnl, *issns):
             votes.setdefault(issn, Counter())[issnl] += 1
     return {issn: most_frequent(counter) for issn, counter in votes.items()}
-
-
-def most_frequent[T: str | int](counter: Counter[T]) -> T:
-    """Renvoie la valeur la plus fréquente ; à égalité, la plus petite."""
-    best = max(counter.values())
-    return min(value for value, n in counter.items() if n == best)
 
 
 def choose_issnl(title: str | None, candidates: Mapping[str, str]) -> str | None:
