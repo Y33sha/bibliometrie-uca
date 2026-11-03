@@ -43,7 +43,10 @@ Constats :
 
 ### Phase 2 — Normalisation indépendante de l'ordre
 
-- [ ] Inventaire des écritures au résultat dépendant de l'ordre : monographies, éditeurs, adresses, plateformes, sujets.
+- [x] Inventaire des écritures au résultat dépendant de l'ordre.
+  - **Monographies : rattachement dépendant de l'ordre.** Un enregistrement source avec ISBN rejoint la seule monographie de son titre sans ISBN. Un enregistrement source sans ISBN reste sans monographie entre plusieurs volumes de son titre. Exemple, un titre à deux volumes d'ISBN I1 et I2, et un enregistrement source B sans ISBN. Ordre I1, I2, B : deux monographies, B sans monographie. Ordre B, I1, I2 : B et I1 dans la même monographie, I2 dans une autre. La fusion des monographies en double (`publishing`) laisse cet écart.
+  - **Éditeurs : rattachement dépendant de l'ordre dans un cas.** Un éditeur trouvé par son identifiant OpenAlex reçoit la forme de nom de l'enregistrement source, si elle est libre. Un enregistrement source d'une autre source normalisé avant crée un éditeur distinct avec cette forme. La fusion des autres noms des éditeurs (`publishing`) en rattrape une partie.
+  - **Rattachement indépendant de l'ordre**, seule la forme stockée varie : adresses (`raw_text` de la première), plateformes (nom et type de la dernière écriture), sujets (libellé et parent de la dernière écriture), informations du contributeur (clé sur tout le contenu), nom et identifiant OpenAlex d'un éditeur.
 - [ ] Rattachement juste quel que soit l'ordre, pour chaque cas retenu.
 - [ ] Test : deux ordres de normalisation des sources donnent les mêmes rattachements.
 
