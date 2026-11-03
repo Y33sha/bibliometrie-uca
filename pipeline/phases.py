@@ -94,8 +94,8 @@ PHASES: tuple[Phase, ...] = (
     Phase(
         "metadata_correction",
         "Correction des métadonnées de publication",
-        phase_tasks("metadata_correction"),
-        build=metadata_correction.build,
+        metadata_correction.TASKS,
+        assemble=metadata_correction.assemble,
     ),
     Phase(
         "publications",

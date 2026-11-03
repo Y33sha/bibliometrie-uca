@@ -7,6 +7,8 @@ La phase assemble ensuite un bilan : les compteurs des passes, et la ventilation
 
 from unittest.mock import patch
 
+from pipeline.phases import PHASES
+from pipeline.task_runner import run_phase
 from pipeline.transformation.publications.correction import metadata_correction as phase
 from pipeline.transformation.publications.correction.correct_unary import UnaryCorrectionStats
 from pipeline.transformation.publications.correction.doi_targets import DoiTargetStats
@@ -37,7 +39,7 @@ def _run(contexte, *, serial=None, unary=None, targets=None, removals=None, matc
         ),
         patch.object(phase, "run_matchable", side_effect=step("matchable", matchable)),
     ):
-        metrics = phase.MetadataCorrectionPhase().run(contexte())
+        metrics = run_phase(next(p for p in PHASES if p.name == "metadata_correction"), contexte())
     return metrics, ordre
 
 
