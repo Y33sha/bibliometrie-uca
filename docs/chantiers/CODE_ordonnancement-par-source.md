@@ -39,7 +39,7 @@ Constats :
 ### Phase 1 — Mesures
 
 - [x] Durée de chaque tâche enregistrée dans `pipeline_phase_executions.metrics` (`task_durations_s`).
-- [ ] Durée des files par API sur plusieurs runs `full`, et part de la normalisation exécutable pendant l'acquisition.
+- [x] Durée des files par API. Premier run `full` mesuré : acquisition de 500 s phase après phase ; file la plus longue DataCite, 411 s, dont 375 s de `harvest_by_person` ; Crossref 387 s, dont 381 s de `harvest_by_person` ; OpenAlex 166 s. Gain de l'ordonnancement par API sur l'acquisition : environ 90 s. Normalisation des documents de ce run : 14 s. À confirmer sur plusieurs runs.
 
 ### Phase 2 — Normalisation indépendante de l'ordre
 
