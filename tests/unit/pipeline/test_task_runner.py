@@ -2,8 +2,9 @@
 
 import pytest
 
+from pipeline.graph import Phase, task
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.task_runner import TaskStep, run_tasks
+from pipeline.task_runner import TaskStep, run_phase, run_tasks
 
 
 def test_des_etapes_qui_ne_couvrent_pas_les_taches_de_la_phase_sont_refusees(contexte):
@@ -29,3 +30,19 @@ def test_l_executeur_mesure_la_duree_des_seules_taches_executees(contexte):
         "countries.detect",
         "countries.refresh_publication_countries",
     }
+
+
+_TACHES = (
+    task("essai.une", run=lambda _ctx: PhaseMetrics(new=1)),
+    task("essai.deux", run=lambda _ctx: PhaseMetrics(new=2)),
+)
+
+
+def test_une_phase_somme_par_defaut_les_metriques_de_ses_taches(contexte):
+    assert run_phase(Phase("essai", "Essai", _TACHES), contexte()).new == 3
+
+
+def test_une_phase_assemble_ses_metriques_par_sa_fonction(contexte):
+    phase = Phase("essai", "Essai", _TACHES, assemble=lambda by_task: by_task["essai.deux"])
+
+    assert run_phase(phase, contexte()).new == 2

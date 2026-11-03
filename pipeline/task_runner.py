@@ -183,10 +183,13 @@ def _outcome(metrics: PhaseMetrics) -> str:
 
 
 def run_phase(phase: GraphPhase, ctx: PhaseContext) -> PhaseMetrics:
-    """Exécute les tâches d'une phase et renvoie la somme de leurs métriques."""
+    """Exécute les tâches d'une phase et renvoie les métriques de la phase."""
     if phase.build is not None:
         return phase.build().run(ctx)
+    by_task = execute_tasks(phase.tasks, ctx)
+    if phase.assemble is not None:
+        return phase.assemble(by_task)
     metrics = PhaseMetrics()
-    for task_metrics in execute_tasks(phase.tasks, ctx).values():
+    for task_metrics in by_task.values():
         metrics.merge(task_metrics)
     return metrics

@@ -111,8 +111,8 @@ PHASES: tuple[Phase, ...] = (
     Phase(
         "persons",
         "Résolution des personnes",
-        phase_tasks("persons"),
-        build=persons.build,
+        persons.TASKS,
+        assemble=persons.assemble,
     ),
     Phase(
         "finalize",

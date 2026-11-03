@@ -7,7 +7,7 @@ Une tâche dépend des tâches placées avant elle et écrivant une donnée lue 
 La maintenance d'une tâche (`VACUUM`, `ANALYZE`) suit ses écritures et ne crée aucune dépendance. Des tâches consécutives du même `parallel_group` s'exécutent en parallèle : leurs écritures communes ne dépendent pas de leur ordre, et aucune ne dépend d'une autre tâche du groupe.
 """
 
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -1097,125 +1097,6 @@ TASKS: tuple[Task, ...] = (
         ),
     ),
     _task(
-        "persons.arbitrate_identifiers",
-        "persons",
-        reads=(
-            "contributor_information",
-            "source_contributions.neutralized_identifiers",
-            "source_contributions.contributor_information_id",
-            "source_contributions.source",
-            "source_contributions.source_record_id",
-            "source_records.publication_id",
-            "contributions.id",
-            "contributions.person_id",
-            "contributions.resolution_mode",
-            "aligned_source_contributions",
-            "person_identifiers",
-        ),
-        writes=(
-            "source_contributions.neutralized_identifiers",
-            # Publications dont une contribution source change de neutralisation : leurs contributions sont à recalculer.
-            "publication_contributions_queue",
-            # Contributions rattachées par un identifiant neutralisé ou transféré, à redécider.
-            "contribution_resolution_queue",
-            "person_identifiers",
-        ),
-        # Identifiants attribués par `resolve_contributions` et supprimés par `purge` ; contributions rattachées par `resolve_contributions` et vidées par `purge`.
-        previous_run=(
-            "person_identifiers",
-            "contributions.person_id",
-            "contributions.resolution_mode",
-        ),
-    ),
-    _task(
-        "persons.resolve_contributions",
-        "persons",
-        reads=(
-            "contributions.id",
-            "contributions.publication_id",
-            "contributions.person_id",
-            "aligned_source_contributions",
-            "source_contributions.in_perimeter",
-            "source_contributions.contributor_information_id",
-            "source_contributions.neutralized_identifiers",
-            "source_contributions.roles",
-            "source_records.publication_id",
-            "contributor_information",
-            "confirmed_source_contributions",
-            "rejected_contributions",
-            "person_identifiers",
-            "person_name_forms",
-            "persons",
-            # Personnes à fiche RH, dont la complétion des prénoms laisse le prénom tel quel.
-            "hr_records",
-            "contribution_resolution_queue",
-        ),
-        writes=(
-            "contributions.person_id",
-            "contributions.resolution_mode",
-            "person_identifiers",
-            "persons",
-            "person_name_forms",
-            # Marquages traités, retirés de la file.
-            "contribution_resolution_queue",
-        ),
-        # Formes de nom régénérées par `populate` ; personnes, identifiants et formes supprimés, contributions vidées et marquées par `purge`.
-        previous_run=(
-            "person_identifiers",
-            "person_name_forms",
-            "persons",
-            "contributions.person_id",
-            "contribution_resolution_queue",
-        ),
-    ),
-    _task(
-        "persons.populate_person_name_forms",
-        "persons",
-        reads=(
-            "persons",
-            "contributions.person_id",
-            "aligned_source_contributions",
-            "source_contributions.source",
-            "source_contributions.contributor_information_id",
-            "contributor_information",
-            "person_name_forms",
-        ),
-        writes=("person_name_forms",),
-        # Contributions vidées et personnes supprimées par `purge`.
-        previous_run=("persons", "person_name_forms", "contributions.person_id"),
-    ),
-    _task(
-        "persons.purge",
-        "persons",
-        reads=(
-            "contributions.publication_id",
-            "contributions.person_id",
-            "contributions.resolution_mode",
-            "contributions.perimeter_evidence",
-            "aligned_source_contributions",
-            "source_contributions.contributor_information_id",
-            "source_contributions.neutralized_identifiers",
-            "source_records.publication_id",
-            "contributor_information",
-            "person_name_forms",
-            "person_identifiers",
-            "persons",
-            "hr_records",
-            "confirmed_source_contributions",
-            "rejected_contributions",
-            "distinct_persons",
-        ),
-        # La suppression d'une personne emporte ses formes de nom et vide ses contributions ; une contribution à forme de nom ambiguë est marquée pour la redécision de sa personne.
-        writes=(
-            "contributions.person_id",
-            "contributions.resolution_mode",
-            "contribution_resolution_queue",
-            "person_identifiers.id",
-            "persons.id",
-            "person_name_forms.id",
-        ),
-    ),
-    _task(
         "finalize.publications_in_perimeter",
         "finalize",
         reads=(
@@ -1429,5 +1310,7 @@ class Phase:
     """Moissonnage : le journal de la phase se termine par le total de ses sources."""
     label_fields: Callable[[Connection], dict[str, str]] | None = None
     """Valeurs des champs du libellé, lues dans la configuration."""
+    assemble: Callable[[Mapping[str, PhaseMetrics]], PhaseMetrics] | None = None
+    """Métriques de la phase, d'après celles de ses tâches, par nom de tâche. `None` : leur somme."""
     build: Callable[[], ExecutablePhase] | None = None
     """Construction de la phase exécutée par sa propre classe."""
