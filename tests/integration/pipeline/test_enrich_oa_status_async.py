@@ -8,6 +8,7 @@ Le store est simulé et capture les écritures. Les réponses HTTP viennent de l
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import logging
 from contextlib import contextmanager
 from unittest.mock import MagicMock
@@ -21,8 +22,11 @@ from domain.publications.licenses import License
 from pipeline.http.lookup import LookupOutcome
 from pipeline.ingestion.complements.doi_org import fetch_registered_url
 from pipeline.ingestion.complements.unpaywall import fetch_oa_status
+from pipeline.phases import PHASES
 from pipeline.runtime.context import PhaseContext, RunOptions
 from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.task_runner import run_phase
+from pipeline.transformation.publications import oa_status
 from pipeline.transformation.publications.oa_status import (
     DOI_ORG,
     MAX_CONCURRENT,
@@ -30,7 +34,6 @@ from pipeline.transformation.publications.oa_status import (
     DoiFetcher,
     DoiLookupTask,
     DoiService,
-    OaStatusPhase,
     PublicationOaInputs,
 )
 
@@ -351,19 +354,26 @@ def test_skips_without_unpaywall_configuration(logger):
     queries = _FakeStore([])
     unconfigured = _FakeStore([_publication(1, "10.1/a", "closed")])
     open_tx = MagicMock(side_effect=_open_tx)
-    phase = OaStatusPhase(
-        resolution=_task(queries, _doi_org_fetcher, service=DOI_ORG),
-        unpaywall=_task(unconfigured, _make_fetcher()),
+    resolution, unpaywall = oa_status.TASKS
+    phase = dataclasses.replace(
+        next(p for p in PHASES if p.name == "oa_status"),
+        tasks=(
+            dataclasses.replace(
+                resolution, run=_task(queries, _doi_org_fetcher, service=DOI_ORG).run
+            ),
+            dataclasses.replace(unpaywall, run=_task(unconfigured, _make_fetcher()).run),
+        ),
     )
 
-    metrics = phase.run(
+    metrics = run_phase(
+        phase,
         _context(
             logger,
             open_tx=open_tx,
             credentials_missing=lambda source: (
                 "adresse polite pool absente" if source == "unpaywall" else None
             ),
-        )
+        ),
     )
 
     open_tx.assert_called_once()

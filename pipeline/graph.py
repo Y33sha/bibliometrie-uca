@@ -204,28 +204,6 @@ def order_violations(tasks: Sequence[Task]) -> list[tuple[str, str, str]]:
     )
 
 
-# Lectures d'une tâche de la phase `oa_status` : DOI à interroger, données du statut des publications.
-_OA_STATUS_INPUTS = (
-    "publications.id",
-    "publications.doi",
-    "publications.oa_status",
-    "publications.serial_id",
-    "publications.doc_type",
-    "publications.source_extras",
-    "serials.oa_model",
-    "dois",
-    "source_records.publication_id",
-    "source_records.source",
-    # Copies des publications, dont le statut se déduit.
-    "source_record_locations",
-    "platforms.name",
-    "platforms.openalex_id",
-    "platforms.platform_type",
-    "embargoes",
-    "config",
-)
-
-
 TASKS: tuple[Task, ...] = (
     _task(
         "perimeter_structures",
@@ -620,32 +598,6 @@ TASKS: tuple[Task, ...] = (
             "contributions.person_id",
             "contributions.resolution_mode",
         ),
-    ),
-    _task(
-        "oa_status.resolve_dois",
-        "oa_status",
-        reads=_OA_STATUS_INPUTS,
-        writes=(
-            "publications.oa_status",
-            "dois.doi",
-            "dois.registered_url",
-            "dois.resolved_at",
-        ),
-        # Verdicts d'Unpaywall et statut des publications, lus par le recalcul de ce statut.
-        previous_run=("dois.unpaywall_oa_status", "publications.oa_status"),
-        network="doi.org",
-    ),
-    _task(
-        "oa_status.verify_unpaywall",
-        "oa_status",
-        reads=(*_OA_STATUS_INPUTS, "doi_prefixes.ra"),
-        writes=(
-            "publications.oa_status",
-            "dois.doi",
-            "dois.unpaywall_oa_status",
-            "dois.unpaywall_checked_at",
-        ),
-        network="unpaywall",
     ),
 )
 

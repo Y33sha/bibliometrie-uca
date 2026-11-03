@@ -7,10 +7,12 @@ import logging
 from unittest.mock import patch
 
 from pipeline.http.circuit_breaker import SourceUnavailableError, get_current_breaker
+from pipeline.phases import PHASES
 from pipeline.runtime.access_source import access_source
 from pipeline.runtime.context import RunOptions
 from pipeline.runtime.execution import phase_context
 from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.task_runner import run_phase
 from pipeline.transformation.publications import oa_status
 
 _LOG = logging.getLogger("test")
@@ -102,12 +104,13 @@ def _run_oa_status(credentials_missing) -> tuple[PhaseMetrics, list[oa_status.Do
         return PhaseMetrics(new=4)
 
     with patch.object(oa_status.DoiLookupTask, "run", autospec=True, side_effect=run):
-        metrics = oa_status.build().run(
+        metrics = run_phase(
+            next(p for p in PHASES if p.name == "oa_status"),
             phase_context(
                 RunOptions(),
                 credentials_missing=credentials_missing,
                 request_budget=lambda _source: None,
-            )
+            ),
         )
     return metrics, services
 

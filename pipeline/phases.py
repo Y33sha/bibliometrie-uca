@@ -142,9 +142,9 @@ PHASES: tuple[Phase, ...] = (
     Phase(
         "oa_status",
         "Statut open access des publications",
-        phase_tasks("oa_status"),
+        oa_status.TASKS,
         extra=True,
-        build=oa_status.build,
+        assemble=oa_status.assemble,
     ),
 )
 

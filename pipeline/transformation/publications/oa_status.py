@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import NamedTuple
 
@@ -28,6 +28,7 @@ from domain.publications.open_access import is_restricted, publication_oa_status
 from infrastructure.db.scalars import scalar_int
 from infrastructure.read_models.publications.copies import publication_copies
 from infrastructure.sql_fragments import under_active_embargo
+from pipeline.graph import task
 from pipeline.http.lookup import LookupOutcome, NotFound, Unavailable
 from pipeline.http.polite_pool import default_user_agent, get_polite_pool_email_optional
 from pipeline.http.tls import tls_context
@@ -35,7 +36,7 @@ from pipeline.ingestion.api_params import API_BASE_URLS
 from pipeline.ingestion.complements.doi_org import fetch_registered_url
 from pipeline.ingestion.complements.unpaywall import fetch_oa_status
 from pipeline.runtime.config import cap, delay
-from pipeline.runtime.context import Phase, PhaseContext
+from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.log_format import (
     BRANCH,
     LAST_BRANCH,
@@ -46,7 +47,6 @@ from pipeline.runtime.observability.log_format import (
 )
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import track_progress
-from pipeline.task_runner import TaskStep, run_tasks
 
 type DoiFetcher = Callable[[httpx2.AsyncClient, str], Awaitable[LookupOutcome[str]]]
 """Interrogation d'un service sur un DOI : `(client, doi) → réponse, NotFound ou Unavailable`."""
@@ -416,55 +416,94 @@ def _apply_answers(
             store.update_oa_status(publication.id, status)
 
 
-@dataclass(frozen=True)
-class OaStatusPhase:
-    """Phase `oa_status` : lecture des URL de résolution, puis vérification sur Unpaywall."""
+# Lectures d'une tâche de la phase `oa_status` : DOI à interroger, données du statut des publications.
+_OA_STATUS_INPUTS = (
+    "publications.id",
+    "publications.doi",
+    "publications.oa_status",
+    "publications.serial_id",
+    "publications.doc_type",
+    "publications.source_extras",
+    "serials.oa_model",
+    "dois",
+    "source_records.publication_id",
+    "source_records.source",
+    # Copies des publications, dont le statut se déduit.
+    "source_record_locations",
+    "platforms.name",
+    "platforms.openalex_id",
+    "platforms.platform_type",
+    "embargoes",
+    "config",
+)
 
-    resolution: DoiLookupTask
-    unpaywall: DoiLookupTask
 
-    def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Exécute les deux tâches et renvoie les métriques de la vérification sur Unpaywall."""
-        by_task = run_tasks(
-            "oa_status",
-            {
-                RESOLVE_TASK: TaskStep(self.resolution.run),
-                UNPAYWALL_TASK: TaskStep(self.unpaywall.run),
-            },
-            ctx,
-        )
-        return by_task[UNPAYWALL_TASK]
-
-
-def build() -> Phase:
-    base_url = API_BASE_URLS["unpaywall"]
-    email = get_polite_pool_email_optional() or ""
+def _resolve_dois(ctx: PhaseContext) -> PhaseMetrics:
     # L'API des handles de doi.org est publique : l'adresse du polite pool y est facultative.
     user_agent = default_user_agent()
 
-    async def unpaywall_fetcher(client: httpx2.AsyncClient, doi: str) -> LookupOutcome[str]:
-        return await fetch_oa_status(client, doi, base_url=base_url, email=email)
-
-    async def doi_org_fetcher(client: httpx2.AsyncClient, doi: str) -> LookupOutcome[str]:
+    async def fetcher(client: httpx2.AsyncClient, doi: str) -> LookupOutcome[str]:
         return await fetch_registered_url(client, doi, user_agent=user_agent)
 
-    return OaStatusPhase(
-        resolution=DoiLookupTask(
-            DOI_ORG,
-            doi_org_fetcher,
-            title="URL de résolution des DOI sur doi.org",
-            participle="lu",
-            not_found=("inconnu de doi.org", "inconnus de doi.org"),
-            staleness_days=lambda conn: delay(conn, ConfigKey.DOI_RESOLUTION_RECHECK_AFTER_DAYS),
-            max_per_run=lambda conn: cap(conn, ConfigKey.DOI_RESOLUTION_MAX_PER_RUN),
+    return DoiLookupTask(
+        DOI_ORG,
+        fetcher,
+        title="URL de résolution des DOI sur doi.org",
+        participle="lu",
+        not_found=("inconnu de doi.org", "inconnus de doi.org"),
+        staleness_days=lambda conn: delay(conn, ConfigKey.DOI_RESOLUTION_RECHECK_AFTER_DAYS),
+        max_per_run=lambda conn: cap(conn, ConfigKey.DOI_RESOLUTION_MAX_PER_RUN),
+    ).run(ctx)
+
+
+def _verify_unpaywall(ctx: PhaseContext) -> PhaseMetrics:
+    base_url = API_BASE_URLS["unpaywall"]
+    email = get_polite_pool_email_optional() or ""
+
+    async def fetcher(client: httpx2.AsyncClient, doi: str) -> LookupOutcome[str]:
+        return await fetch_oa_status(client, doi, base_url=base_url, email=email)
+
+    return DoiLookupTask(
+        UNPAYWALL,
+        fetcher,
+        title="Vérification du statut open access sur Unpaywall",
+        participle="vérifié",
+        not_found=("non trouvé", "non trouvés"),
+        staleness_days=lambda conn: delay(conn, ConfigKey.UNPAYWALL_RECHECK_AFTER_DAYS),
+        max_per_run=lambda conn: cap(conn, ConfigKey.UNPAYWALL_MAX_PER_RUN),
+    ).run(ctx)
+
+
+TASKS = (
+    task(
+        RESOLVE_TASK,
+        reads=_OA_STATUS_INPUTS,
+        writes=(
+            "publications.oa_status",
+            "dois.doi",
+            "dois.registered_url",
+            "dois.resolved_at",
         ),
-        unpaywall=DoiLookupTask(
-            UNPAYWALL,
-            unpaywall_fetcher,
-            title="Vérification du statut open access sur Unpaywall",
-            participle="vérifié",
-            not_found=("non trouvé", "non trouvés"),
-            staleness_days=lambda conn: delay(conn, ConfigKey.UNPAYWALL_RECHECK_AFTER_DAYS),
-            max_per_run=lambda conn: cap(conn, ConfigKey.UNPAYWALL_MAX_PER_RUN),
+        # Verdicts d'Unpaywall et statut des publications, lus par le recalcul de ce statut.
+        previous_run=("dois.unpaywall_oa_status", "publications.oa_status"),
+        network="doi.org",
+        run=_resolve_dois,
+    ),
+    task(
+        UNPAYWALL_TASK,
+        reads=(*_OA_STATUS_INPUTS, "doi_prefixes.ra"),
+        writes=(
+            "publications.oa_status",
+            "dois.doi",
+            "dois.unpaywall_oa_status",
+            "dois.unpaywall_checked_at",
         ),
-    )
+        network="unpaywall",
+        run=_verify_unpaywall,
+    ),
+)
+
+
+def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
+    """Renvoie les métriques de la vérification sur Unpaywall."""
+    return by_task[UNPAYWALL_TASK]
