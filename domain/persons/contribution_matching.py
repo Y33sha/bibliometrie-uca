@@ -3,7 +3,7 @@
 Une contribution réunit les contributions sources d'un même auteur dans une publication (phase `author_grouping`). La décision réunit les signaux de toutes ses contributions sources avant de trancher, du plus fiable au moins fiable :
 
 1. épinglage d'une contribution source par l'administration ;
-2. identifiants fiables des contributions sources (ORCID déposé par l'auteur, compte HAL, IdRef), chacun corroboré par le nom de la contribution source qui le contient ;
+2. identifiants fiables des contributions sources (ORCID déposé par l'auteur, compte HAL, IdRef), chacun corroboré par le nom de la contribution source qui le contient ; hors périmètre, seulement un identifiant à attribution confirmée ou authentifiée ;
 3. forme de nom, seulement pour une contribution du périmètre ;
 4. création d'une personne, pour une contribution du périmètre au nom inconnu.
 
@@ -189,6 +189,7 @@ def decide_contribution(
             ContributionOutcome.SKIP, reason=ContributionSkipReason.PIN_CONFLICT
         )
 
+    in_perimeter = any(m.in_perimeter for m in members)
     # Personne désignée par chaque identifiant fiable, avec le plus fiable des types qui la désignent.
     identified: dict[int, PersonIdentifierType] = {}
     refused: list[tuple[str, str]] = []
@@ -197,6 +198,10 @@ def decide_contribution(
         for m in members:
             value = m.trusted_identifiers.get(id_type)
             if not value:
+                continue
+            if not in_perimeter and not (
+                value in identifier_map and identifier_map[value].human_attribution
+            ):
                 continue
             match = decide_match_by_identifier(
                 value, identifier_map, m.name, m.name_forms, index.name_form_status
@@ -219,7 +224,7 @@ def decide_contribution(
             refused=tuple(refused),
         )
 
-    if not any(m.in_perimeter for m in members):
+    if not in_perimeter:
         return ContributionDecision(
             ContributionOutcome.SKIP,
             reason=ContributionSkipReason.OUT_OF_PERIMETER,

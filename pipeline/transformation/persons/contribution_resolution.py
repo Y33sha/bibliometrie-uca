@@ -4,7 +4,7 @@ Les épinglages s'appliquent d'abord : une contribution à contribution source �
 
 Sont décidées :
 
-- les contributions sans personne ayant une contribution source du périmètre, une contribution source épinglée, ou une contribution source à identifiant fiable attribué à une personne non marquée hors périmètre ;
+- les contributions sans personne ayant une contribution source du périmètre, une contribution source épinglée, ou une contribution source à identifiant fiable d'attribution confirmée ou authentifiée, à une personne non marquée hors périmètre ;
 - les contributions non manuelles de la file.
 
 Une contribution de la file garde sa personne si sa décision la désigne encore, et la perd sinon. Les contributions du périmètre au nom inconnu sont traitées ensuite, une à une, contre l'index tenu à jour. Chacune rejoint une personne créée dans le même passage, ou fonde la sienne (`create_persons`).
@@ -30,7 +30,7 @@ from domain.persons.contribution_matching import (
     settle_publication,
 )
 from domain.persons.contributor_name import ContributorName
-from domain.persons.identifiers import AttributionStatus, PersonIdentifierType
+from domain.persons.identifiers import HUMAN_ATTRIBUTION_STATUSES, PersonIdentifierType
 from domain.persons.matching import Namesake
 from domain.persons.person import PersonExclusion, validated_name
 from domain.publications.contribution_roles import ContributionRole
@@ -39,6 +39,7 @@ from infrastructure.repositories.person_repository import PgPersonRepository
 from infrastructure.sql_fragments import (
     CONTRIBUTIONS_AND_SOURCES,
     DETACHED_CONTRIBUTION,
+    in_clause,
     pinned_contributions_sql,
     strong_identifier_source_contributions,
     usable_identifier,
@@ -69,12 +70,14 @@ _RESOLUTION_SNAPSHOT = "contribution_resolution_snapshot"
 # Contributions à décider, matérialisées en début de tâche.
 _CANDIDATES_TABLE = "contribution_resolution_candidates"
 
-# Attributions d'identifiant qui font décider une contribution sans personne. Une personne marquée hors périmètre garde les contributions où elle est déjà rattachée, sans en gagner par la recherche de ses identifiants.
+# Attributions confirmées ou authentifiées qui font décider une contribution sans personne, hors périmètre compris.
+# Une personne marquée hors périmètre garde les contributions où elle est déjà rattachée, sans en gagner par la recherche de ses identifiants.
 _SEARCHED_IDENTIFIERS = f"""(
-    SELECT pi.person_id, pi.id_type, pi.id_value, pi.status
+    SELECT pi.person_id, pi.id_type, pi.id_value
     FROM person_identifiers pi
     JOIN persons p ON p.id = pi.person_id
     WHERE p.exclusion IS DISTINCT FROM '{PersonExclusion.OUT_OF_PERIMETER}'
+      AND pi.status::text IN {in_clause(HUMAN_ATTRIBUTION_STATUSES)}
 )"""
 
 # `contributions.in_perimeter` réunit les indices de périmètre de ses contributions sources (`propagate_contribution_attributes_sql`).
@@ -106,7 +109,7 @@ _CANDIDATES_SQL = " UNION ".join(
                     JOIN aligned_source_contributions gm ON gm.source_contribution_id = sc_auth.id
                     JOIN contributions g ON g.id = gm.contribution_id
                 """,
-                where=f"g.person_id IS NULL AND pi.status <> '{AttributionStatus.REJECTED.value}'",
+                where="g.person_id IS NULL",
             )
             for id_type in IDENTIFIER_ORDER
         ),

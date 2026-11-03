@@ -32,8 +32,8 @@ def _member(raw, source="hal", identifiers=None, in_perimeter=True, roles=(), pi
     )
 
 
-def _index(persons=(), orcid=None, idref=None):
-    """Construit l'index des personnes `(person_id, nom, prénom)`, avec des attributions d'identifiants `{valeur: person_id}`."""
+def _index(persons=(), orcid=None, idref=None, pending=frozenset()):
+    """Construit l'index des personnes `(person_id, nom, prénom)`, avec des attributions d'identifiants `{valeur: person_id}`, confirmées sauf les valeurs de `pending`."""
     by_id = {p[0]: p for p in persons}
     name_forms: dict[str, list[int]] = {}
     namesakes: dict[str, list[Namesake]] = {}
@@ -45,7 +45,10 @@ def _index(persons=(), orcid=None, idref=None):
     def identified(attributions):
         return {
             value: IdentifiedPerson(
-                pid, normalize_text(by_id[pid][1]), normalize_text(by_id[pid][2])
+                pid,
+                normalize_text(by_id[pid][1]),
+                normalize_text(by_id[pid][2]),
+                human_attribution=value not in pending,
             )
             for value, pid in (attributions or {}).items()
         }
@@ -106,6 +109,31 @@ def test_l_orcid_d_une_source_sans_depot_par_l_auteur_est_ignore():
     members = [_member("Jean Martin", "wos", {"orcid": _ORCID}, in_perimeter=False)]
 
     assert decide_contribution(members, index).reason == ContributionSkipReason.OUT_OF_PERIMETER
+
+
+def test_un_identifiant_confirme_rattache_hors_perimetre():
+    index = _index([(1, "Martin", "Jean")], idref={_IDREF: 1})
+    members = [_member("Jean Martin", "hal", {"idref": _IDREF}, in_perimeter=False)]
+
+    decision = decide_contribution(members, index)
+
+    assert (decision.person_id, decision.reason) == (1, ContributionMatchReason.IDREF)
+
+
+def test_un_identifiant_en_attente_ne_rattache_pas_hors_perimetre():
+    index = _index([(1, "Martin", "Jean")], idref={_IDREF: 1}, pending={_IDREF})
+    members = [_member("Jean Martin", "hal", {"idref": _IDREF}, in_perimeter=False)]
+
+    assert decide_contribution(members, index).reason == ContributionSkipReason.OUT_OF_PERIMETER
+
+
+def test_un_identifiant_en_attente_rattache_dans_le_perimetre():
+    index = _index([(1, "Martin", "Jean")], idref={_IDREF: 1}, pending={_IDREF})
+    members = [_member("Jean Martin", "hal", {"idref": _IDREF})]
+
+    decision = decide_contribution(members, index)
+
+    assert (decision.person_id, decision.reason) == (1, ContributionMatchReason.IDREF)
 
 
 def test_un_identifiant_au_nom_incompatible_est_refuse():

@@ -2,10 +2,10 @@
 
 from sqlalchemy import Connection, text
 
-from domain.persons.identifiers import AttributionStatus
+from domain.persons.identifiers import HUMAN_ATTRIBUTION_STATUSES, AttributionStatus
 from domain.persons.matching import IdentifiedPerson, Namesake
 from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
-from infrastructure.sql_fragments import REJECTED_PAIRS, active_name_form
+from infrastructure.sql_fragments import REJECTED_PAIRS, active_name_form, in_clause
 
 
 def fetch_namesakes(conn: Connection) -> list[Namesake]:
@@ -23,11 +23,12 @@ def fetch_namesakes(conn: Connection) -> list[Namesake]:
 
 
 def fetch_identifier_to_person_map(conn: Connection, id_type: str) -> dict[str, IdentifiedPerson]:
-    """Renvoie la personne de chaque valeur d'un type d'identifiant, avec son nom normalisé, attributions rejetées exclues. Le nom corrobore le rattachement par identifiant (`decide_match_by_identifier`)."""
+    """Renvoie la personne de chaque valeur d'un type d'identifiant, avec son nom normalisé et le statut de l'attribution, attributions rejetées exclues. Le nom corrobore le rattachement par identifiant (`decide_match_by_identifier`)."""
     rows = conn.execute(
         text(f"""
             SELECT pi.id_value, pi.person_id,
-                   p.last_name_normalized AS ln, p.first_name_normalized AS fn
+                   p.last_name_normalized AS ln, p.first_name_normalized AS fn,
+                   pi.status::text IN {in_clause(HUMAN_ATTRIBUTION_STATUSES)} AS human_attribution
             FROM person_identifiers pi
             JOIN persons p ON p.id = pi.person_id
             WHERE pi.id_type = :id_type
@@ -35,7 +36,10 @@ def fetch_identifier_to_person_map(conn: Connection, id_type: str) -> dict[str, 
         """),
         {"id_type": id_type},
     ).all()
-    return {r.id_value: IdentifiedPerson(r.person_id, r.ln or "", r.fn or "") for r in rows}
+    return {
+        r.id_value: IdentifiedPerson(r.person_id, r.ln or "", r.fn or "", r.human_attribution)
+        for r in rows
+    }
 
 
 def fetch_name_form_map(conn: Connection) -> dict[str, list[int]]:
