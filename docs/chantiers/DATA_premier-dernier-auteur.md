@@ -72,8 +72,8 @@ Une liste d'un seul auteur plus courte que la plus longue contient le premier au
 
 ### Phase 3 — Facette et rapports
 
-- [ ] Facette « Position auteur » : premier et dernier auteur, libellés dans le frontend.
-- [ ] Rapports : rôles lus dans `author_positions`, lecture de la liste OpenAlex supprimée. Libellé « PDC (premier, dernier ou correspondant) » pour les unités qui comptent les trois rôles.
+- [x] Facette « Position auteur » : premier et dernier auteur, libellés dans le frontend. 62ecc651c
+- [x] Rapports : rôles lus dans `author_positions`, lecture de la liste OpenAlex supprimée. Libellé « PDC (premier, dernier ou correspondant) » pour les unités qui comptent les trois rôles. 0c3846001
 
 ### Phase 4 — Co-premiers et co-derniers auteurs
 
