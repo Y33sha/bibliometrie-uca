@@ -6,7 +6,7 @@ from domain.sources.registry import (
     SOURCE_PRIORITY,
     Source,
 )
-from pipeline.graph import TASKS, Task, dependencies, order_violations
+from pipeline.graph import Task, dependencies, order_violations
 from pipeline.ingestion.common.normalize import normalizer_builders
 from pipeline.phases import ALL_TASKS
 
@@ -14,10 +14,6 @@ from pipeline.phases import ALL_TASKS
 def test_noms_uniques():
     names = [n.name for n in ALL_TASKS]
     assert len(names) == len(set(names))
-
-
-def test_chaque_tache_appartient_a_une_phase():
-    assert {n.name for n in TASKS} <= {n.name for n in ALL_TASKS}
 
 
 def test_une_tache_d_extraction_par_source_moissonnee():
@@ -53,19 +49,19 @@ def test_aucune_tache_ne_lit_une_donnee_ecrite_apres_elle():
 
 
 def test_lecture_non_declaree_detectee():
-    writer = Task("b", "g", writes=frozenset({"t.c"}))
-    reader = Task("a", "g", reads=frozenset({"t"}))
+    writer = Task("b", writes=frozenset({"t.c"}))
+    reader = Task("a", reads=frozenset({"t"}))
     assert order_violations([reader, writer]) == [("a", "t", "b")]
-    declared = Task("a", "g", reads=frozenset({"t"}), previous_run=frozenset({"t.c"}))
+    declared = Task("a", reads=frozenset({"t"}), previous_run=frozenset({"t.c"}))
     assert order_violations([declared, writer]) == []
 
 
 def test_creation_de_lignes_change_toute_lecture_de_la_table():
-    writer = Task("b", "g", writes=frozenset({"t.id"}))
-    reader = Task("a", "g", reads=frozenset({"t.c"}))
+    writer = Task("b", writes=frozenset({"t.id"}))
+    reader = Task("a", reads=frozenset({"t.c"}))
     assert order_violations([reader, writer]) == [("a", "t.c", "b")]
-    column_writer = Task("b", "g", writes=frozenset({"t.c"}))
-    id_reader = Task("a", "g", reads=frozenset({"t.id"}))
+    column_writer = Task("b", writes=frozenset({"t.c"}))
+    id_reader = Task("a", reads=frozenset({"t.id"}))
     assert order_violations([id_reader, column_writer]) == []
 
 

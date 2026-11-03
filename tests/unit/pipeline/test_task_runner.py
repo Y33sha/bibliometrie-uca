@@ -4,13 +4,7 @@ import pytest
 
 from pipeline.graph import Phase, task
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.task_runner import TaskStep, execute_tasks, run_phase, run_tasks
-
-
-def test_des_etapes_qui_ne_couvrent_pas_les_taches_de_la_phase_sont_refusees(contexte):
-    steps = {"relations.inconnu": TaskStep(lambda _ctx: PhaseMetrics())}
-    with pytest.raises(ValueError, match="divergent"):
-        run_tasks("relations", steps, contexte())
+from pipeline.task_runner import execute_tasks, run_phase
 
 
 def test_l_executeur_mesure_la_duree_des_seules_taches_executees(contexte):

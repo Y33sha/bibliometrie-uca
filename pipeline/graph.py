@@ -1,4 +1,6 @@
-"""Graphe de dépendances du pipeline : les tâches, leurs lectures et leurs écritures, dans l'ordre d'exécution. Chaque tâche appartient à une phase. `pipeline.phases` donne l'ordre des phases.
+"""Tâches et phases du pipeline, et graphe de dépendances des tâches d'après leurs lectures et leurs écritures.
+
+Le module de chaque phase déclare ses tâches. `pipeline.phases` liste les phases, et donc les tâches, dans l'ordre d'exécution.
 
 Une donnée se désigne par sa table (`"serials"`) ou par une colonne (`"serials.serial_type"`). `"serials.id"` désigne l'existence des lignes, créées et supprimées par les écrivains. Une table et l'une de ses colonnes se recouvrent.
 
@@ -14,7 +16,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from sqlalchemy import Connection
 
-    from pipeline.runtime.context import Phase as ExecutablePhase, PhaseContext, RunOptions
+    from pipeline.runtime.context import PhaseContext, RunOptions
     from pipeline.runtime.observability.metrics import PhaseMetrics
 
 
@@ -23,8 +25,7 @@ class Task:
     """Tâche du pipeline, avec ses lectures et ses écritures."""
 
     name: str
-    phase: str
-    """Phase d'exécution de la tâche, pour l'affichage et la sélection."""
+    """Nom de la tâche, préfixé du nom de sa phase : `publishing.attach_serials`."""
     reads: frozenset[str] = frozenset()
     writes: frozenset[str] = frozenset()
     previous_run: frozenset[str] = frozenset()
@@ -36,6 +37,7 @@ class Task:
     parallel_group: str | None = None
     """Groupe de tâches consécutives exécutées en parallèle."""
     run: TaskRun | None = None
+    """Exécution de la tâche. `None` : tâche exécutée par l'orchestrateur."""
     section: str | None = None
     """Titre de la sous-étape ouverte par la tâche. `None` : la tâche écrit sous le titre courant."""
     label: str | None = None
@@ -48,6 +50,11 @@ class Task:
     """Condition d'exécution, évaluée avant l'accès à la source. Une tâche écartée n'écrit rien."""
     silent_when_empty: bool = False
     """La tâche n'écrit rien sans élément traité : `total` nul, sans signal."""
+
+    @property
+    def phase(self) -> str:
+        """Nom de la phase de la tâche."""
+        return self.name.partition(".")[0]
 
 
 type TaskRun = Callable[[PhaseContext], PhaseMetrics]
@@ -71,10 +78,9 @@ def task(
     when: Callable[[PhaseContext], bool] | None = None,
     silent_when_empty: bool = False,
 ) -> Task:
-    """Renvoie la tâche `name`, de la phase nommée par son préfixe, exécutée par `run`."""
+    """Renvoie la tâche `name`, exécutée par `run`."""
     return Task(
         name,
-        name.partition(".")[0],
         frozenset(reads),
         frozenset(writes),
         frozenset(previous_run),
@@ -88,30 +94,6 @@ def task(
         threshold,
         when,
         silent_when_empty,
-    )
-
-
-def _task(
-    name: str,
-    phase: str,
-    *,
-    reads: Iterable[str] = (),
-    writes: Iterable[str] = (),
-    previous_run: Iterable[str] = (),
-    network: str | None = None,
-    maintenance: tuple[str, ...] = (),
-    parallel_group: str | None = None,
-) -> Task:
-    """Renvoie une tâche de `phase`."""
-    return Task(
-        name,
-        phase,
-        frozenset(reads),
-        frozenset(writes),
-        frozenset(previous_run),
-        network,
-        maintenance,
-        parallel_group,
     )
 
 
@@ -161,25 +143,6 @@ def order_violations(tasks: Sequence[Task]) -> list[tuple[str, str, str]]:
     )
 
 
-TASKS: tuple[Task, ...] = (
-    _task(
-        "perimeter_structures",
-        "run",
-        reads=("perimeters", "structure_parents", "structures"),
-        writes=("perimeter_structures",),
-    ),
-)
-
-
-RUN_PHASE = "run"
-"""Groupe des tâches exécutées par l'orchestrateur avant toute phase."""
-
-
-def phase_tasks(phase: str) -> tuple[Task, ...]:
-    """Renvoie les tâches de `phase` déclarées dans `TASKS`, dans leur ordre."""
-    return tuple(task for task in TASKS if task.phase == phase)
-
-
 @dataclass(frozen=True)
 class Phase:
     """Phase du pipeline : tâches consécutives, avec leur libellé et leurs attributs."""
@@ -200,5 +163,3 @@ class Phase:
     """Précondition, vérifiée avant les tâches : lève une exception si elle n'est pas remplie."""
     assemble: Callable[[Mapping[str, PhaseMetrics]], PhaseMetrics] | None = None
     """Métriques de la phase, d'après celles de ses tâches exécutées, par nom de tâche. `None` : leur somme."""
-    build: Callable[[], ExecutablePhase] | None = None
-    """Construction de la phase exécutée par sa propre classe."""

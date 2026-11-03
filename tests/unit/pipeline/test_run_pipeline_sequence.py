@@ -10,13 +10,12 @@ import logging
 import sys
 from contextlib import nullcontext
 from dataclasses import fields
-from types import SimpleNamespace
 
 import pytest
 from sqlalchemy.exc import OperationalError, PendingRollbackError
 
 from pipeline import run as run_pipeline
-from pipeline.graph import Phase
+from pipeline.graph import Phase, task
 from pipeline.runtime.context import RunOptions
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
@@ -29,7 +28,7 @@ def _args(**surcharges) -> argparse.Namespace:
 
 def _phase(run, name: str = "persons", harvesting: bool = False) -> Phase:
     """Renvoie la phase `name`, dont l'exécution appelle `run(ctx)`."""
-    return Phase(name, "Libellé", (), harvesting=harvesting, build=lambda: SimpleNamespace(run=run))
+    return Phase(name, "Libellé", (task(f"{name}.essai", run=run),), harvesting=harvesting)
 
 
 class _FakeRecorder:

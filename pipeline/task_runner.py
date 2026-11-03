@@ -1,78 +1,20 @@
-"""Exécution des tâches d'une phase, dans l'ordre du graphe (`pipeline.graph`).
+"""Exécution des phases et de leurs tâches (`pipeline.graph`).
 
-Une tâche déclare sa fonction d'exécution et son affichage, ou les reçoit d'un `TaskStep`. L'exécuteur ouvre la section de la tâche, puis l'exécute. Une tâche réseau passe par l'accès à sa source. L'exécuteur range ensuite la durée de la tâche dans le contexte, écrit sa ligne de bilan et lance sa maintenance.
+Une tâche déclare sa fonction d'exécution et son affichage. L'exécuteur ouvre la section de la tâche, puis l'exécute. Une tâche réseau passe par l'accès à sa source. L'exécuteur range ensuite la durée de la tâche dans le contexte, écrit sa ligne de bilan et lance sa maintenance.
 """
 
 from __future__ import annotations
 
 import time
-from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, replace
+from collections.abc import Mapping, Sequence
 from functools import partial
 
-from pipeline.graph import Phase as GraphPhase, Task, TaskRun, phase_tasks
+from pipeline.graph import Phase, Task
 from pipeline.runtime.access_source import access_source
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, nothing_to_do, step
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.parallel import RunParallel, run_parallel
-
-
-@dataclass(frozen=True)
-class TaskStep:
-    """Description d'une tâche pour l'exécuteur, en complément du graphe."""
-
-    run: TaskRun
-    section: str | None = None
-    """Titre de la sous-étape ouverte par la tâche. `None` : la tâche écrit sous le titre courant."""
-    label: str | None = None
-    """Libellé de la ligne de bilan. `None` : la tâche écrit elle-même ses lignes."""
-    progress_bar: bool = False
-    """La tâche affiche une barre d'avancement en terminal, donc sa ligne de bilan va seulement au journal."""
-    threshold: int | None = None
-    """Échecs consécutifs avant la coupure du circuit-breaker de la source. `None` : seuil par défaut."""
-    when: Callable[[PhaseContext], bool] | None = None
-    """Condition d'exécution, évaluée avant l'accès à la source. Une tâche écartée renvoie des métriques vides et n'écrit rien."""
-    silent_when_empty: bool = False
-    """La tâche n'écrit rien sans élément traité : `total` nul, sans signal."""
-
-
-def run_tasks(
-    phase: str,
-    steps: Mapping[str, TaskStep],
-    ctx: PhaseContext,
-    *,
-    parallel: RunParallel = run_parallel,
-) -> dict[str, PhaseMetrics]:
-    """Exécute les tâches de `phase` déclarées dans `TASKS`, chacune par son étape dans `steps`, et renvoie leurs métriques, par nom de tâche. Une tâche écartée par sa condition reçoit des métriques vides.
-
-    Raises:
-        ValueError: `steps` diffère des tâches de la phase.
-    """
-    tasks = phase_tasks(phase)
-    if set(steps) != {task.name for task in tasks}:
-        raise ValueError(
-            f"Les étapes de {phase} et ses tâches divergent : "
-            f"{set(steps) ^ {task.name for task in tasks}}"
-        )
-    executed = execute_tasks(
-        [
-            replace(
-                task,
-                run=steps[task.name].run,
-                section=steps[task.name].section,
-                label=steps[task.name].label,
-                progress_bar=steps[task.name].progress_bar,
-                threshold=steps[task.name].threshold,
-                when=steps[task.name].when,
-                silent_when_empty=steps[task.name].silent_when_empty,
-            )
-            for task in tasks
-        ],
-        ctx,
-        parallel=parallel,
-    )
-    return {task.name: executed.get(task.name, PhaseMetrics()) for task in tasks}
 
 
 def execute_tasks(
@@ -183,10 +125,8 @@ def _outcome(metrics: PhaseMetrics) -> str:
     return metrics.as_summary()
 
 
-def run_phase(phase: GraphPhase, ctx: PhaseContext) -> PhaseMetrics:
+def run_phase(phase: Phase, ctx: PhaseContext) -> PhaseMetrics:
     """Exécute les tâches d'une phase et renvoie les métriques de la phase."""
-    if phase.build is not None:
-        return phase.build().run(ctx)
     if phase.when is not None and not phase.when(ctx.options):
         ctx.logger.info("%sSautée en mode %s", LAST_BRANCH, ctx.options.mode)
         return PhaseMetrics()

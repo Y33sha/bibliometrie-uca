@@ -6,7 +6,7 @@ Les enrichissements (`extra`) viennent en dernier. Chacun est indépendant des a
 from sqlalchemy import Connection
 
 from domain.config import ConfigKey
-from pipeline.graph import RUN_PHASE, Phase, Task, phase_tasks
+from pipeline.graph import Phase, Task
 from pipeline.ingestion.common import (
     fetch_missing,
     fetch_stale,
@@ -152,8 +152,15 @@ PHASES: tuple[Phase, ...] = (
     ),
 )
 
+PERIMETER_STRUCTURES = Task(
+    "perimeter_structures",
+    reads=frozenset({"perimeters", "structure_parents", "structures"}),
+    writes=frozenset({"perimeter_structures"}),
+)
+"""Matérialisation des structures des périmètres, exécutée par l'orchestrateur avant toute phase (`refresh_perimeter_structures`)."""
+
 ALL_TASKS: tuple[Task, ...] = (
-    *phase_tasks(RUN_PHASE),
+    PERIMETER_STRUCTURES,
     *(task for phase in PHASES for task in phase.tasks),
 )
-"""Tâches du pipeline dans l'ordre d'exécution : celles de l'orchestrateur, puis celles de chaque phase."""
+"""Tâches du pipeline dans l'ordre d'exécution : celle de l'orchestrateur, puis celles de chaque phase."""
