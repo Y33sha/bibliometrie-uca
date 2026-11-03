@@ -1234,12 +1234,14 @@ TASKS: tuple[Task, ...] = (
         reads=(
             "serials.id",
             "publications.serial_id",
+            "publications.monograph_id",
             "publications.publisher_id",
             "publications.publication_year",
+            "monographs.serial_id",
         ),
         writes=("serials.publisher_id",),
-        # Les revues supprimées ensuite par `delete_empty_containers` n'ont pas de publication, donc pas d'éditeur.
-        previous_run=("serials.id",),
+        # Les revues et les monographies supprimées ensuite par `delete_empty_containers` n'ont pas de publication : leur suppression ne change aucun éditeur.
+        previous_run=("serials.id", "monographs.serial_id"),
     ),
     _task(
         "finalize.delete_empty_containers",
