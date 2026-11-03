@@ -23,7 +23,7 @@ from sqlalchemy import Connection, text
 from domain.dates import today
 from domain.publications.author_positions import AuthorPosition
 from domain.publications.doc_types import DocType
-from domain.sources.registry import source_label
+from domain.sources.registry import Source, source_label
 from domain.structures.structure import StructureType
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
@@ -35,13 +35,13 @@ from infrastructure.sql_fragments import has_author_position
 
 log = setup_logger("structure_report", os.path.dirname(__file__))
 
-DOC_TYPE_LABELS: dict[DocType, str] = {
-    DocType.ARTICLE: "Articles",
-    DocType.REVIEW: "Articles de synthèse",
-    DocType.BOOK: "Ouvrages",
-    DocType.BOOK_CHAPTER: "Chapitres",
-    DocType.CONFERENCE_PAPER: "Conference papers",
-}
+REPORT_DOC_TYPES = (
+    DocType.ARTICLE,
+    DocType.REVIEW,
+    DocType.BOOK,
+    DocType.BOOK_CHAPTER,
+    DocType.CONFERENCE_PAPER,
+)
 
 REPORTS_DIR = Path("data/reports/bibliometrie")
 """Dossier des rapports, avec un sous-dossier par date de génération."""
@@ -58,13 +58,6 @@ class ReportStructure:
     code: str
     acronym: str | None
     name: str
-
-
-@dataclass(frozen=True, slots=True)
-class YearDocTypeCount:
-    year: int
-    doc_type: DocType
-    count: int
 
 
 def report_structures(conn: Connection, codes: list[str] | None) -> list[ReportStructure]:
@@ -122,24 +115,13 @@ def _params(structure_id: int, period: Period) -> dict[str, object]:
         "structure_id": structure_id,
         "first_year": period.first,
         "last_year": period.last,
-        "doc_types": [t.value for t in DOC_TYPE_LABELS],
+        "doc_types": [t.value for t in REPORT_DOC_TYPES],
     }
 
 
-def publications_by_year_and_type(
-    conn: Connection, structure_id: int, period: Period
-) -> list[YearDocTypeCount]:
-    """Nombre de publications signées par la structure, par année et par type."""
-    rows = conn.execute(
-        text(f"""
-            SELECT p.publication_year, p.doc_type, count(*) AS n
-            FROM publications p
-            WHERE {_REPORT_PUBLICATION}
-            GROUP BY 1, 2
-        """),  # noqa: S608 — fragments SQL constants
-        _params(structure_id, period),
-    ).all()
-    return [YearDocTypeCount(r.publication_year, DocType(r.doc_type), r.n) for r in rows]
+def publications_by_year(conn: Connection, structure_id: int, period: Period) -> dict[int, int]:
+    """Nombre de publications signées par la structure, par année."""
+    return _count_by_year(conn, "TRUE", _params(structure_id, period))
 
 
 def key_role_publications_by_year(
@@ -366,18 +348,26 @@ def top_journals(
     ]
 
 
+REPORT_EXCLUDED_SOURCES = (Source.CROSSREF,)
+"""Sources absentes du tableau des sources."""
+
+
 def publications_by_source(conn: Connection, structure_id: int, period: Period) -> dict[str, int]:
-    """Nombre de publications signées par la structure présentes dans chaque source, par ordre décroissant."""
+    """Nombre de publications signées par la structure présentes dans chaque source hors `REPORT_EXCLUDED_SOURCES`, par ordre décroissant."""
     rows = conn.execute(
         text(f"""
             SELECT sp.source::text AS source, count(DISTINCT p.id) AS n
             FROM publications p
             JOIN source_records sp ON sp.publication_id = p.id
             WHERE {_REPORT_PUBLICATION}
+              AND sp.source::text <> ALL(:excluded_sources)
             GROUP BY 1
             ORDER BY n DESC, 1
         """),  # noqa: S608 — fragments SQL constants
-        _params(structure_id, period),
+        {
+            **_params(structure_id, period),
+            "excluded_sources": [s.value for s in REPORT_EXCLUDED_SOURCES],
+        },
     ).all()
     return {r.source: r.n for r in rows}
 
@@ -426,7 +416,7 @@ _KEY_ROLES_LABELS = {
 @dataclass(frozen=True, slots=True)
 class StructureReportData:
     structure: ReportStructure
-    by_year_and_type: Sequence[YearDocTypeCount]
+    by_year: Mapping[int, int]
     key_roles: Collection[AuthorPosition]
     key_role_by_year: Mapping[int, int]
     top_10_by_year: Mapping[int, Top10Count]
@@ -451,39 +441,18 @@ def _table(header: Sequence[str], rows: Sequence[Sequence[str]]) -> list[str]:
     return lines
 
 
-def _by_type(data: StructureReportData, years: Sequence[int]) -> dict[DocType, list[int]]:
-    counts = {(c.year, c.doc_type): c.count for c in data.by_year_and_type}
-    return {t: [counts.get((y, t), 0) for y in years] for t in DOC_TYPE_LABELS}
-
-
-def _totals(data: StructureReportData, years: Sequence[int]) -> list[int]:
-    by_type = _by_type(data, years)
-    return [sum(counts[i] for counts in by_type.values()) for i in range(len(years))]
-
-
 def _synthesis_rows(data: StructureReportData, years: Sequence[int]) -> list[list[str]]:
     role_label = _KEY_ROLES_LABELS[frozenset(data.key_roles)]
     top_10 = [data.top_10_by_year.get(y, Top10Count(0, 0)) for y in years]
     return [
-        ["Publications", *map(str, _totals(data, years))],
+        ["Publications", *(str(data.by_year.get(y, 0)) for y in years)],
         [f"Avec {role_label}", *(str(data.key_role_by_year.get(y, 0)) for y in years)],
-        ["Dans le top 10 % des plus citées", *(str(c.top_10) for c in top_10)],
         ["Part dans le top 10 %", *(_percent(c.top_10, c.with_percentile) for c in top_10)],
         [
             f"Dans le top 10 %, avec {role_label}",
             *(str(data.top_10_key_role_by_year.get(y, 0)) for y in years),
         ],
     ]
-
-
-def _typology_rows(data: StructureReportData, years: Sequence[int]) -> list[list[str]]:
-    rows = [
-        [DOC_TYPE_LABELS[t], *map(str, counts)]
-        for t, counts in _by_type(data, years).items()
-        if any(counts)
-    ]
-    rows.append(["**Total**", *(f"**{n}**" for n in _totals(data, years))])
-    return rows
 
 
 _IMPACT_INDICATORS: tuple[tuple[str, str, Callable[[ImpactSummary], str]], ...] = (
@@ -541,11 +510,8 @@ def _journal_rows(journals: Sequence[JournalCounts]) -> list[list[str]]:
     ]
 
 
-def _source_rows(data: StructureReportData, years: Sequence[int]) -> list[list[str]]:
-    total = sum(_totals(data, years))
-    return [
-        [source_label(source), str(n), _percent(n, total)] for source, n in data.by_source.items()
-    ]
+def _source_rows(by_source: Mapping[str, int]) -> list[list[str]]:
+    return [[source_label(source), str(n)] for source, n in by_source.items()]
 
 
 def _percent(part: int, whole: int) -> str:
@@ -580,22 +546,12 @@ def render_report(
         "",
         "## Synthèse",
         "",
-        "Tous types confondus. Part dans le top 10 % calculée sur les publications dont le percentile de citations est connu dans OpenAlex.",
-        "",
         *_table(["", *year_headers], _synthesis_rows(data, years)),
-        "",
-        "## Typologie des publications",
-        "",
-        *_table(["Type", *year_headers], _typology_rows(data, years)),
         "",
         "## Impact",
         "",
-        "Citations : maximum des nombres de citations des sources. FWCI (Field-Weighted Citation Impact) : citations rapportées à la moyenne mondiale des publications de même thématique, année et type, selon OpenAlex. Moyenne sur les publications dont le FWCI est connu. Les publications non anglophones sont des articles, des articles de synthèse ou des conference papers.",
-        "",
         *_impact_section(data, years, year_headers),
         "## Revues",
-        "",
-        f"Les {TOP_JOURNALS} revues où l'unité publie le plus sur la période.",
         "",
         *_table(
             [
@@ -610,9 +566,7 @@ def render_report(
         "",
         "## Sources",
         "",
-        "Publications de la période présentes dans chaque source.",
-        "",
-        *_table(["Source", "Publications", "Part"], _source_rows(data, years)),
+        *_table(["Source", "Publications"], _source_rows(data.by_source)),
     ]
     return "\n".join(lines) + "\n"
 
@@ -624,7 +578,7 @@ def _report_data(
     sid = structure.id
     return StructureReportData(
         structure=structure,
-        by_year_and_type=publications_by_year_and_type(conn, sid, period),
+        by_year=publications_by_year(conn, sid, period),
         key_roles=roles,
         key_role_by_year=key_role_publications_by_year(conn, sid, period, roles),
         top_10_by_year=top_10_percent_by_year(conn, sid, period),
@@ -670,17 +624,17 @@ def main() -> int:
         if unknown:
             log.error("Structures inconnues : %s", ", ".join(sorted(unknown)))
             return 1
-        reports = [_report_data(conn, s, period) for s in structures]
-
-    args.output_dir.mkdir(parents=True, exist_ok=True)
-    for data in reports:
-        path = args.output_dir / f"{data.structure.code}.md"
-        path.write_text(
-            render_report(data, years=years, current_year=current_year, generated_on=generated_on),
-            # Le BOM signale l'UTF-8 aux navigateurs qui ouvrent le fichier hors serveur.
-            encoding="utf-8-sig",
-        )
-        log.info("Rapport écrit : %s", path)
+        args.output_dir.mkdir(parents=True, exist_ok=True)
+        for structure in structures:
+            data = _report_data(conn, structure, period)
+            path = args.output_dir / f"{structure.code}.md"
+            path.write_text(
+                render_report(
+                    data, years=years, current_year=current_year, generated_on=generated_on
+                ),
+                encoding="utf-8",
+            )
+            log.info("Rapport écrit : %s", path)
     return 0
 
 
