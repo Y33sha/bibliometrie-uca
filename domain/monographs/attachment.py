@@ -8,7 +8,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import NamedTuple
 
-from domain.entity_resolution import most_frequent
+from domain.entity_resolution import connected_components, most_frequent
 from domain.normalize import normalize_text
 from domain.publications.identifiers import ISBN
 
@@ -105,27 +105,6 @@ class _Group:
         )
 
 
-class _IsbnUnion:
-    """Union-find des ISBN : deux ISBN d'un même enregistrement source ou d'une même monographie sont réunis."""
-
-    def __init__(self) -> None:
-        self._parent: dict[str, str] = {}
-
-    def find(self, isbn: str) -> str:
-        self._parent.setdefault(isbn, isbn)
-        root = isbn
-        while self._parent[root] != root:
-            root = self._parent[root]
-        while self._parent[isbn] != root:
-            self._parent[isbn], isbn = root, self._parent[isbn]
-        return root
-
-    def union(self, isbns: Sequence[str]) -> None:
-        roots = sorted({self.find(i) for i in isbns})
-        for other in roots[1:]:
-            self._parent[other] = roots[0]
-
-
 def group_volumes(
     records: Iterable[VolumeRecord], monographs: Iterable[ExistingMonograph]
 ) -> list[Volume]:
@@ -156,31 +135,35 @@ def _isbn_groups(
     with_isbn: Sequence[tuple[VolumeRecord, list[str], list[str]]],
     monographs: Sequence[ExistingMonograph],
 ) -> list[_Group]:
-    """Renvoie les volumes à ISBN : enregistrements sources réunis par leurs ISBN, avec les monographies existantes de ces ISBN."""
-    union = _IsbnUnion()
-    for _, paper, electronic in with_isbn:
-        union.union([*paper, *electronic])
-    for monograph in monographs:
-        if isbns := [i for i in (monograph.isbn, monograph.eisbn) if i]:
-            union.union(isbns)
-
-    by_root: dict[str, _Group] = defaultdict(_Group)
-    for record, paper, electronic in with_isbn:
-        group = by_root[union.find((paper or electronic)[0])]
-        group.records.append(record)
-        group.paper.update(paper)
-        group.electronic.update(electronic)
-        if title := normalize_text(record.title or ""):
-            group.titles.add(title)
-    for monograph in monographs:
-        isbn = monograph.isbn or monograph.eisbn
-        if isbn and union.find(isbn) in by_root:
-            group = by_root[union.find(isbn)]
-            group.monograph_ids.add(monograph.id)
-            group.titles.add(monograph.title_normalized)
-            if monograph.publisher_id is not None:
-                group.monograph_publishers.add(monograph.publisher_id)
-    return list(by_root.values())
+    """Renvoie les volumes à ISBN : enregistrements sources réunis par leurs ISBN (`connected_components`), avec les monographies existantes de ces ISBN."""
+    isbn_monographs = [m for m in monographs if m.isbn or m.eisbn]
+    # Enregistrements sources puis monographies, numérotés à la suite : leurs identifiants viennent de deux tables.
+    keys = [
+        *(frozenset(paper + electronic) for _, paper, electronic in with_isbn),
+        *(frozenset(i for i in (m.isbn, m.eisbn) if i) for m in isbn_monographs),
+    ]
+    groups: list[_Group] = []
+    for component in connected_components(
+        (rank, frozenset(("isbn", isbn) for isbn in isbns)) for rank, isbns in enumerate(keys)
+    ):
+        group = _Group()
+        for rank in component:
+            if rank < len(with_isbn):
+                record, paper, electronic = with_isbn[rank]
+                group.records.append(record)
+                group.paper.update(paper)
+                group.electronic.update(electronic)
+                if title := normalize_text(record.title or ""):
+                    group.titles.add(title)
+            else:
+                monograph = isbn_monographs[rank - len(with_isbn)]
+                group.monograph_ids.add(monograph.id)
+                group.titles.add(monograph.title_normalized)
+                if monograph.publisher_id is not None:
+                    group.monograph_publishers.add(monograph.publisher_id)
+        if group.records:
+            groups.append(group)
+    return groups
 
 
 def _attach_without_isbn(
