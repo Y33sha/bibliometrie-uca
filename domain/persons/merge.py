@@ -1,4 +1,4 @@
-"""Fusion de deux personnes : rôles des deux personnes, exclusion de la personne fusionnée."""
+"""Fusion de deux personnes : sens de la fusion, exclusion de la personne fusionnée."""
 
 from collections.abc import Collection
 
@@ -6,8 +6,8 @@ from domain.errors import ConflictError
 from domain.persons.person import PersonExclusion
 
 
-def merge_roles(target_id: int, source_id: int, *, with_rh: Collection[int]) -> tuple[int, int]:
-    """Renvoie les personnes conservée et absorbée d'une fusion demandée de `source` dans `target`. Une personne qui a une fiche RH est conservée.
+def merge_direction(target_id: int, source_id: int, *, with_rh: Collection[int]) -> tuple[int, int]:
+    """Renvoie le sens d'une fusion demandée de `source` dans `target` : la personne conservée, puis la personne absorbée. Une personne qui a une fiche RH est conservée.
 
     Args:
         with_rh: personnes qui ont une fiche RH.

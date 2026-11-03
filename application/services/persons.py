@@ -24,7 +24,7 @@ from domain.persons.identifiers import (
     AttributionStatus,
     IdentifierOrigin,
 )
-from domain.persons.merge import merge_roles
+from domain.persons.merge import merge_direction
 from domain.persons.person import PersonExclusion
 
 
@@ -240,7 +240,7 @@ class PersonService:
     def merge_person(self, target_id: int, source_id: int) -> tuple[int, int]:
         """Fusionne deux personnes, et renvoie l'id conservé et l'id absorbé.
 
-        Les rôles demandés sont inversés si seule `source_id` a une fiche RH (`merge_roles`). Le repository reprend ensuite les clés étrangères (`PersonRepository.merge_into`). Émet l'événement d'audit `person.merged`.
+        Le sens demandé est inversé si seule `source_id` a une fiche RH (`merge_direction`). Le repository reprend ensuite les clés étrangères (`PersonRepository.merge_into`). Émet l'événement d'audit `person.merged`.
 
         Raises:
             ValidationError: deux identifiants égaux.
@@ -248,7 +248,7 @@ class PersonService:
             ConflictError: les deux personnes ont une fiche RH.
         """
         check_merge_pair(target_id, source_id, self._persons.exists, label="Personne")
-        target_id, source_id = merge_roles(
+        target_id, source_id = merge_direction(
             target_id, source_id, with_rh=self._persons.ids_with_rh([target_id, source_id])
         )
         self._persons.merge_into(target_id, source_id)
