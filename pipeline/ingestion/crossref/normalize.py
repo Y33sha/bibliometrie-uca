@@ -1,6 +1,6 @@
 """Normalisation des enregistrements sources Crossref.
 
-- Le type brut est le `type` Crossref, suivi du sous-type quand Crossref en donne un (`crossref_raw_doc_type`). `arbitrate_doc_type_with_article_subtype` arbitre ensuite un `journal-article` contre les sous-types plus précis des autres sources (`ARTICLE_SUBTYPES`).
+- Le type brut est le `type` Crossref, suivi du sous-type quand Crossref en donne un (`crossref_raw_doc_type`). L'agrégation (`refresh_from_sources`) arbitre ensuite un `journal-article` contre les sous-types plus précis des autres sources (`ARTICLE_SUBTYPES`).
 - Le statut open access de Crossref est peu fiable : il reste vide, et le statut vient des autres sources (`refresh_from_sources`).
 """
 

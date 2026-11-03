@@ -3,7 +3,7 @@
 import pytest
 
 from domain.publications.aggregation import (
-    arbitrate_doc_type_with_article_subtype,
+    _arbitrate_doc_type_with_article_subtype,
     assign_publisher,
     refresh_from_sources,
 )
@@ -169,7 +169,7 @@ def test_un_sous_type_d_article_prime_sur_l_article_generique():
 
 
 def test_sans_source_l_agregation_est_refusee():
-    with pytest.raises(ValueError, match=r"^refresh_from_sources requiert au moins une source"):
+    with pytest.raises(ValueError, match=r"requiert au moins un enregistrement source"):
         refresh_from_sources(_publication(), [], source_priority=_PRIORITY)
 
 
@@ -408,11 +408,11 @@ class TestAssignPublisher:
 
 
 class TestArbitrageDuSousTypeDArticle:
-    """`arbitrate_doc_type_with_article_subtype` opère sur des types déjà traduits dans le référentiel, dans l'ordre de priorité des sources."""
+    """`_arbitrate_doc_type_with_article_subtype` opère sur des types déjà traduits dans le référentiel, dans l'ordre de priorité des sources."""
 
     @staticmethod
     def _arbitrate(*pairs: tuple[str, str | None]) -> str:
-        return arbitrate_doc_type_with_article_subtype(
+        return _arbitrate_doc_type_with_article_subtype(
             [_source_record(source=source, doc_type=doc_type) for source, doc_type in pairs]
         )
 
@@ -452,7 +452,7 @@ class TestArbitrageDuSousTypeDArticle:
         )
 
     def test_sans_source_le_type_est_other(self):
-        assert arbitrate_doc_type_with_article_subtype([]) == "other"
+        assert _arbitrate_doc_type_with_article_subtype([]) == "other"
 
     def test_des_sources_sans_type_donnent_other(self):
         assert self._arbitrate(("crossref", None), ("hal", None)) == "other"

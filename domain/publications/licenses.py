@@ -16,21 +16,21 @@ class License(StrEnum):
     CC_BY_NC = "cc-by-nc"
     CC_BY_NC_SA = "cc-by-nc-sa"
     CC_BY_NC_ND = "cc-by-nc-nd"
-    # Domaine public : renonciation CC0, Public Domain Mark (œuvre d'un agent fédéral américain, par exemple).
     PUBLIC_DOMAIN = "public-domain"
-    # Licence Ouverte Etalab.
+    """Domaine public : renonciation CC0, Public Domain Mark (œuvre d'un agent fédéral américain, par exemple)."""
     LICENCE_OUVERTE = "licence-ouverte"
-    # Licence de logiciel libre : MIT, BSD, GPL, LGPL, Apache, CeCILL, AFL.
+    """Licence Ouverte Etalab."""
     OPEN_SOURCE = "open-source"
-    # Autorisation de diffusion donnée à une archive : HAL, licence non exclusive arXiv.
+    """Licence de logiciel libre : MIT, BSD, GPL, LGPL, Apache, CeCILL, AFL."""
     REPOSITORY_DISTRIBUTION = "repository-distribution"
-    # Licence ouverte propre à l'éditeur (`publisher-specific-oa` d'OpenAlex et de scanR).
+    """Autorisation de diffusion donnée à une archive : HAL, licence non exclusive arXiv."""
     PUBLISHER_OPEN = "publisher-open"
-    # Licence ouverte non précisée (`other-oa` d'OpenAlex).
+    """Licence ouverte propre à l'éditeur (`publisher-specific-oa` d'OpenAlex et de scanR)."""
     OTHER_OA = "other-oa"
+    """Licence ouverte non précisée (`other-oa` d'OpenAlex)."""
     ALL_RIGHTS_RESERVED = "all-rights-reserved"
-    # Licence déclarée mais non classée : politique de données d'un projet, par exemple.
     OTHER = "other"
+    """Licence déclarée mais non classée : politique de données d'un projet, par exemple."""
 
 
 LICENSE_LABELS: dict[License, str] = {
