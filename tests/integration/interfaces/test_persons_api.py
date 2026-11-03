@@ -439,7 +439,7 @@ class TestDetachContributions:
     def test_requires_admin(self, client):
         r = client.post(
             "/api/persons/1/detach-contributions",
-            json={"contributions": []},
+            json={"publication_ids": []},
         )
         assert r.status_code == 401
 
@@ -447,7 +447,7 @@ class TestDetachContributions:
         pid = seed_person()
         r = auth_client.post(
             f"/api/persons/{pid}/detach-contributions",
-            json={"contributions": []},
+            json={"publication_ids": []},
         )
         assert r.status_code == 200
 

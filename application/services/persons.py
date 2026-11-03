@@ -26,14 +26,6 @@ from domain.persons.identifiers import (
 )
 from domain.persons.merge import merge_roles
 from domain.persons.person import PersonExclusion
-from domain.sources.registry import require_known_source
-
-
-class ContributionRef(TypedDict):
-    """Référence d'une contribution source, en entrée de `detach_contributions`."""
-
-    source: str
-    source_contribution_id: int
 
 
 class DetachResult(TypedDict):
@@ -195,24 +187,13 @@ class PersonService:
         )
         return row
 
-    def detach_contributions(
-        self, person_id: int, contributions: list[ContributionRef]
-    ) -> DetachResult:
-        """Rejette durablement les paires (publication, personne) des contributions sources sélectionnées. Renvoie le nombre de contributions détachées et de formes supprimées.
+    def detach_contributions(self, person_id: int, publication_ids: list[int]) -> DetachResult:
+        """Rejette durablement les paires (publication, personne) des publications données (`reject_pair`). Renvoie le nombre de contributions détachées et de formes supprimées.
 
-        Le rejet vaut pour la publication entière : `reject_pair` s'applique à chaque publication des contributions sources sélectionnées. Les formes de nom de la personne absentes de ses contributions sources restantes sont ensuite supprimées.
+        Les formes de nom de la personne absentes de ses contributions sources restantes sont ensuite supprimées.
         """
-        publication_ids: set[int] = set()
-        for a in contributions:
-            require_known_source(a["source"])
-            publication_id = self._contributions.find_publication_id_for_source_contribution(
-                a["source_contribution_id"]
-            )
-            if publication_id is not None:
-                publication_ids.add(publication_id)
-
         detached = 0
-        for publication_id in publication_ids:
+        for publication_id in set(publication_ids):
             detached += reject_pair(
                 publication_id,
                 person_id,

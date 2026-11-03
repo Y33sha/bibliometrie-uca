@@ -1583,7 +1583,7 @@ export interface paths {
         put?: never;
         /**
          * Detach Contributions
-         * @description Rejette durablement les paires (publication, personne) des contributions sources choisies, et supprime les formes de nom devenues sans objet.
+         * @description Rejette durablement les paires (publication, personne) des publications choisies, et supprime les formes de nom devenues sans objet.
          */
         post: operations["detach_contributions_api_persons__person_id__detach_contributions_post"];
         delete?: never;
@@ -3484,8 +3484,8 @@ export interface components {
         };
         /** DetachContributions */
         DetachContributions: {
-            /** Contributions */
-            contributions: components["schemas"]["SourceContributionRef"][];
+            /** Publication Ids */
+            publication_ids: number[];
         };
         /**
          * DetachContributionsResponse
@@ -4219,8 +4219,6 @@ export interface components {
         NameFormContributionRef: {
             /** Source */
             source: string;
-            /** Source Contribution Id */
-            source_contribution_id: number;
             /** Publication Id */
             publication_id: number;
             /** Title */
@@ -5879,13 +5877,6 @@ export interface components {
              * @description Marge de l'entrée, en bits.
              */
             margin: number | null;
-        };
-        /** SourceContributionRef */
-        SourceContributionRef: {
-            /** Source */
-            source: string;
-            /** Source Contribution Id */
-            source_contribution_id: number;
         };
         /**
          * SourceLink

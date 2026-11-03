@@ -17,16 +17,15 @@ export type PersonExclusion = components["schemas"]["PersonExclusion"];
 export type CurationPerson = components["schemas"]["CurationPersonOut"];
 
 // ── Extensions UI (champs ajoutés côté front) ──
-type NameFormContributionRef = components["schemas"]["NameFormContributionRef"];
 
 /**
- * Publication regroupant toutes ses sources observées sous une même forme de nom. Le rejet porte sur la publication entière (toutes ses sources) : la modale affiche une ligne par publication, pas par source.
+ * Publication regroupant toutes ses sources observées sous une même forme de nom. Le rejet porte sur la publication entière : la modale affiche une ligne par publication.
  */
 export interface DetachPublication {
   publication_id: number;
   title: string;
   publication_year: number | null;
-  sources: Pick<NameFormContributionRef, "source" | "source_contribution_id">[];
+  sources: string[];
   checked: boolean;
 }
 

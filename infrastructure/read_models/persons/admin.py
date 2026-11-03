@@ -313,8 +313,7 @@ class PersonAdminQueries:
         """Renvoie les contributions sources de la personne sous une forme de nom donnée, et les autres personnes ayant cette forme non rejetée."""
         auth_rows = self._conn.execute(
             text(f"""
-                SELECT sc.source, sc.id AS source_contribution_id,
-                       sr.publication_id, sr.title, sr.publication_year,
+                SELECT sc.source, sr.publication_id, sr.title, sr.publication_year,
                        {source_record_doi_sql("sr")} AS doi
                 FROM {CONTRIBUTIONS_AND_SOURCES}
                 JOIN source_records sr ON sr.id = sc.source_record_id
@@ -339,7 +338,6 @@ class PersonAdminQueries:
             contributions=[
                 NameFormContributionRef(
                     source=r.source,
-                    source_contribution_id=r.source_contribution_id,
                     publication_id=r.publication_id,
                     title=r.title,
                     publication_year=r.publication_year,

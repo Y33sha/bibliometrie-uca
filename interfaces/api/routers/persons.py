@@ -460,15 +460,9 @@ def detach_contributions(
     body: DetachContributions,
     persons: PersonService = Depends(person_service),
 ) -> DetachContributionsResponse:
-    """Rejette durablement les paires (publication, personne) des contributions sources choisies, et supprime les formes de nom devenues sans objet."""
+    """Rejette durablement les paires (publication, personne) des publications choisies, et supprime les formes de nom devenues sans objet."""
     return DetachContributionsResponse.model_validate(
-        persons.detach_contributions(
-            person_id,
-            [
-                {"source": a.source, "source_contribution_id": a.source_contribution_id}
-                for a in body.contributions
-            ],
-        )
+        persons.detach_contributions(person_id, body.publication_ids)
     )
 
 

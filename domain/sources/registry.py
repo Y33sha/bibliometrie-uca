@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from enum import StrEnum
 from urllib.parse import quote
 
-from domain.errors import ValidationError
 from domain.persons.identifiers import PersonIdentifierType
 from domain.publications.identifiers import hal_id_url
 
@@ -168,15 +167,3 @@ STRUCTURE_API_SOURCES: tuple[Source, ...] = (
     Source.THESES,
     Source.DATACITE,
 )
-
-
-def require_known_source(source: str) -> None:
-    """Vérifie que la source figure au registre.
-
-    Raises:
-        ValidationError: source hors du registre. Le message nomme la source, absente de l'erreur PostgreSQL sur `source_type`.
-    """
-    if source not in Source:
-        raise ValidationError(
-            f"Source inconnue : {source!r}. Sources valides : {', '.join(sorted(Source))}."
-        )

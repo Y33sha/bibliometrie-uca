@@ -1,24 +1,13 @@
-"""Registre des sources (`domain.sources.registry`) : sources connues, ordre de priorité, sources interrogeables par DOI."""
+"""Registre des sources (`domain.sources.registry`) : ordre de priorité, sources interrogeables par DOI, liens vers les portails."""
 
 import pytest
 
-from domain.errors import ValidationError
 from domain.sources.registry import (
     DOI_SEARCHABLE_SOURCES,
     SOURCE_PRIORITY,
     Source,
-    require_known_source,
     source_record_url,
 )
-
-
-class TestRequireKnownSource:
-    def test_known_source_passes(self):
-        require_known_source("hal")
-
-    def test_unknown_source_is_named(self):
-        with pytest.raises(ValidationError, match="Source inconnue : 'inconnue'"):
-            require_known_source("inconnue")
 
 
 class TestSourcePriority:

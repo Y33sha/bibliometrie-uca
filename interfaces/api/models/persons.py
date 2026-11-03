@@ -5,7 +5,6 @@ from typing import Literal
 from application.ports.model import Model
 from domain.persons.identifiers import AttributionStatus, PersonIdentifierType
 from domain.persons.person import PersonExclusion
-from interfaces.api.models.contributions import SourceContributionRef
 
 # ----- Corps des requêtes -----
 
@@ -38,7 +37,7 @@ class MarkDistinctPersons(Model):
 
 
 class DetachContributions(Model):
-    contributions: list[SourceContributionRef]
+    publication_ids: list[int]
 
 
 class UpdateNameFormStatus(Model):
