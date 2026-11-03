@@ -23,7 +23,8 @@ from domain.sources.registry import (
 if TYPE_CHECKING:
     from sqlalchemy import Connection
 
-    from pipeline.runtime.context import Phase as ExecutablePhase
+    from pipeline.runtime.context import Phase as ExecutablePhase, PhaseContext
+    from pipeline.runtime.observability.metrics import PhaseMetrics
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,13 +37,67 @@ class Task:
     reads: frozenset[str] = frozenset()
     writes: frozenset[str] = frozenset()
     previous_run: frozenset[str] = frozenset()
-    """Lectures de données écrites au run précédent, par une tâche plus loin dans l'ordre ou par la tâche elle-même."""
+    """Lectures de données écrites au run précédent, par une tâche placée après elle ou par la tâche elle-même."""
     network: str | None = None
     """API interrogée, si la tâche sort sur le réseau."""
     maintenance: tuple[str, ...] = ()
     """Maintenance physique des tables, dans l'ordre : `VACUUM staging`, `ANALYZE source_contributions`."""
     parallel_group: str | None = None
     """Groupe de tâches consécutives exécutées en parallèle."""
+    run: TaskRun | None = None
+    section: str | None = None
+    """Titre de la sous-étape ouverte par la tâche. `None` : la tâche écrit sous le titre courant."""
+    label: str | None = None
+    """Libellé de la ligne de bilan. `None` : la tâche écrit elle-même ses lignes."""
+    progress_bar: bool = False
+    """La tâche affiche une barre d'avancement en terminal, donc sa ligne de bilan va seulement au journal."""
+    threshold: int | None = None
+    """Échecs consécutifs avant la coupure du circuit-breaker de la source. `None` : seuil par défaut."""
+    when: Callable[[PhaseContext], bool] | None = None
+    """Condition d'exécution, évaluée avant l'accès à la source. Une tâche écartée renvoie des métriques vides et n'écrit rien."""
+    silent_when_empty: bool = False
+    """La tâche n'écrit rien sans élément traité : `total` nul, sans signal."""
+
+
+type TaskRun = Callable[[PhaseContext], PhaseMetrics]
+"""Exécute une tâche dans le contexte de sa phase."""
+
+
+def task(
+    name: str,
+    *,
+    reads: Iterable[str] = (),
+    writes: Iterable[str] = (),
+    previous_run: Iterable[str] = (),
+    run: TaskRun,
+    network: str | None = None,
+    maintenance: tuple[str, ...] = (),
+    parallel_group: str | None = None,
+    section: str | None = None,
+    label: str | None = None,
+    progress_bar: bool = False,
+    threshold: int | None = None,
+    when: Callable[[PhaseContext], bool] | None = None,
+    silent_when_empty: bool = False,
+) -> Task:
+    """Renvoie la tâche `name`, de la phase nommée par son préfixe, exécutée par `run`."""
+    return Task(
+        name,
+        name.partition(".")[0],
+        frozenset(reads),
+        frozenset(writes),
+        frozenset(previous_run),
+        network,
+        maintenance,
+        parallel_group,
+        run,
+        section,
+        label,
+        progress_bar,
+        threshold,
+        when,
+        silent_when_empty,
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -493,18 +548,6 @@ TASKS: tuple[Task, ...] = (
             "source_contributions.neutralized_identifiers",
             "aligned_source_contributions",
         ),
-    ),
-    _task(
-        "resolve_ra.resolve_prefixes",
-        "resolve_ra",
-        reads=(
-            "doi_prefixes.id",
-            "source_record_identifiers",
-            "publication_relations",
-        ),
-        writes=("doi_prefixes.id", "doi_prefixes.ra"),
-        previous_run=("source_records", "source_record_identifiers", "publication_relations"),
-        network="doi.org",
     ),
     _task(
         "publishing.resolve_crossref_publishers",

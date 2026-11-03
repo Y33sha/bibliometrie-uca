@@ -17,7 +17,7 @@ def test_noms_uniques():
 
 
 def test_chaque_tache_appartient_a_une_phase():
-    assert sorted(n.name for n in ALL_TASKS) == sorted(n.name for n in TASKS)
+    assert {n.name for n in TASKS} <= {n.name for n in ALL_TASKS}
 
 
 def test_une_tache_d_extraction_par_source_moissonnee():

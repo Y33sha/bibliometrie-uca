@@ -84,8 +84,7 @@ PHASES: tuple[Phase, ...] = (
     Phase(
         "resolve_ra",
         "Résolution des agences d'enregistrement des DOI",
-        phase_tasks("resolve_ra"),
-        build=resolve_ra.build,
+        resolve_ra.TASKS,
     ),
     Phase(
         "publishing",

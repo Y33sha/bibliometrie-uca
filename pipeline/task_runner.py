@@ -1,24 +1,21 @@
 """Exécution des tâches d'une phase, dans l'ordre du graphe (`pipeline.graph`).
 
-Une phase fournit un `TaskStep` par tâche. L'exécuteur ouvre la section de la tâche, puis l'exécute. Une tâche réseau passe par l'accès à sa source. L'exécuteur range ensuite la durée de la tâche dans le contexte, écrit sa ligne de bilan et lance sa maintenance.
+Une tâche déclare sa fonction d'exécution et son affichage, ou les reçoit d'un `TaskStep`. L'exécuteur ouvre la section de la tâche, puis l'exécute. Une tâche réseau passe par l'accès à sa source. L'exécuteur range ensuite la durée de la tâche dans le contexte, écrit sa ligne de bilan et lance sa maintenance.
 """
 
 from __future__ import annotations
 
 import time
-from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass, replace
 from functools import partial
 
-from pipeline.graph import TASKS, Phase as GraphPhase, Task
+from pipeline.graph import Phase as GraphPhase, Task, TaskRun, phase_tasks
 from pipeline.runtime.access_source import access_source
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, nothing_to_do, step
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.parallel import RunParallel, run_parallel
-
-type TaskRun = Callable[[PhaseContext], PhaseMetrics]
-"""Exécute une tâche dans le contexte de sa phase."""
 
 
 @dataclass(frozen=True)
@@ -47,93 +44,98 @@ def run_tasks(
     *,
     parallel: RunParallel = run_parallel,
 ) -> dict[str, PhaseMetrics]:
-    """Exécute les tâches de `phase` dans l'ordre du graphe et renvoie leurs métriques, par nom de tâche.
-
-    Les tâches consécutives d'un même groupe parallèle s'exécutent ensemble par `parallel`. Leurs lignes de bilan suivent, dans l'ordre du graphe.
+    """Exécute les tâches de `phase` déclarées dans `TASKS`, chacune par son étape dans `steps`, et renvoie leurs métriques, par nom de tâche.
 
     Raises:
         ValueError: `steps` diffère des tâches de la phase.
     """
-    tasks = [task for task in TASKS if task.phase == phase]
+    tasks = phase_tasks(phase)
     if set(steps) != {task.name for task in tasks}:
         raise ValueError(
             f"Les étapes de {phase} et ses tâches divergent : "
             f"{set(steps) ^ {task.name for task in tasks}}"
         )
+    return execute_tasks(
+        [
+            replace(
+                task,
+                run=steps[task.name].run,
+                section=steps[task.name].section,
+                label=steps[task.name].label,
+                progress_bar=steps[task.name].progress_bar,
+                threshold=steps[task.name].threshold,
+                when=steps[task.name].when,
+                silent_when_empty=steps[task.name].silent_when_empty,
+            )
+            for task in tasks
+        ],
+        ctx,
+        parallel=parallel,
+    )
+
+
+def execute_tasks(
+    tasks: Sequence[Task], ctx: PhaseContext, *, parallel: RunParallel = run_parallel
+) -> dict[str, PhaseMetrics]:
+    """Exécute `tasks` dans leur ordre et renvoie leurs métriques, par nom de tâche.
+
+    Les tâches consécutives d'un même groupe parallèle s'exécutent ensemble par `parallel`. Leurs lignes de bilan suivent, dans l'ordre des tâches.
+    """
     results: dict[str, PhaseMetrics] = {task.name: PhaseMetrics() for task in tasks}
-    selected = [task for task in tasks if _selected(steps[task.name], ctx)]
+    selected = [task for task in tasks if task.when is None or task.when(ctx)]
     start = 0
     while start < len(selected):
         end = start + 1
         group = selected[start].parallel_group
         while group is not None and end < len(selected) and selected[end].parallel_group == group:
             end += 1
-        previous_section = steps[selected[start - 1].name].section if start else None
-        section = steps[selected[start].name].section
+        previous_section = selected[start - 1].section if start else None
+        section = selected[start].section
         if section is not None and section != previous_section:
             step(ctx.logger, section)
         chunk = selected[start:end]
         if len(chunk) == 1:
-            task = chunk[0]
-            results[task.name] = _execute(task, steps[task.name], phase, ctx)
+            results[chunk[0].name] = _execute(chunk[0], ctx)
         else:
-            results.update(
-                parallel(
-                    {
-                        task.name: partial(_execute, task, steps[task.name], phase, ctx)
-                        for task in chunk
-                    }
-                )
-            )
+            results.update(parallel({task.name: partial(_execute, task, ctx) for task in chunk}))
         for index in range(start, end):
             task = selected[index]
             ctx.task_durations[task.name] = results[task.name].duration_s or 0.0
-            next_section = (
-                steps[selected[index + 1].name].section if index + 1 < len(selected) else None
-            )
-            _write_lines(task, steps[task.name], results[task.name], next_section, ctx)
-            section = steps[task.name].section
-            if section is not None and section != next_section:
-                _close_if_silent(
-                    [t.name for t in selected if steps[t.name].section == section],
-                    steps,
-                    results,
-                    ctx,
-                )
+            next_section = selected[index + 1].section if index + 1 < len(selected) else None
+            _write_lines(task, results[task.name], next_section, ctx)
+            if task.section is not None and task.section != next_section:
+                _close_if_silent([t for t in selected if t.section == task.section], results, ctx)
         start = end
     return results
 
 
 def _close_if_silent(
-    names: list[str],
-    steps: Mapping[str, TaskStep],
-    results: Mapping[str, PhaseMetrics],
-    ctx: PhaseContext,
+    tasks: list[Task], results: Mapping[str, PhaseMetrics], ctx: PhaseContext
 ) -> None:
-    """Ferme sur « Rien à faire » la section des tâches `names` quand toutes sont silencieuses : le titre a ainsi une ligne sous lui."""
+    """Ferme sur « Rien à faire » la section des tâches `tasks` quand toutes sont silencieuses : le titre a ainsi une ligne sous lui."""
     if all(
-        steps[name].silent_when_empty and results[name].total == 0 and not results[name].signals
-        for name in names
+        task.silent_when_empty and results[task.name].total == 0 and not results[task.name].signals
+        for task in tasks
     ):
         nothing_to_do(ctx.logger)
 
 
 def _write_lines(
-    task: Task, step: TaskStep, metrics: PhaseMetrics, next_section: str | None, ctx: PhaseContext
+    task: Task, metrics: PhaseMetrics, next_section: str | None, ctx: PhaseContext
 ) -> None:
     """Écrit la ligne de bilan de la tâche, lance sa maintenance et écrit une ligne par opération."""
     lines = [
-        *([(step.label, _outcome(metrics))] if step.label is not None else []),
+        *([(task.label, _outcome(metrics))] if task.label is not None else []),
         *_maintain(task, ctx),
     ]
     for rank, (label, outcome) in enumerate(lines):
-        last = step.section != next_section and rank == len(lines) - 1
+        last = task.section != next_section and rank == len(lines) - 1
         ctx.logger.info(
             "%s%s : %s",
             LAST_BRANCH if last else BRANCH,
             label,
             outcome,
-            extra={"detail": step.section is None or (step.progress_bar and rank == 0)},
+            extra={"detail": task.section is None or (task.progress_bar and rank == 0)},
         )
 
 
@@ -149,24 +151,21 @@ def _maintain(task: Task, ctx: PhaseContext) -> list[tuple[str, str]]:
     return lines
 
 
-def _selected(step: TaskStep, ctx: PhaseContext) -> bool:
-    return step.when is None or step.when(ctx)
-
-
-def _execute(task: Task, step: TaskStep, phase: str, ctx: PhaseContext) -> PhaseMetrics:
+def _execute(task: Task, ctx: PhaseContext) -> PhaseMetrics:
     """Exécute la tâche et range sa durée dans `duration_s`."""
+    assert task.run is not None
     t0 = time.perf_counter()
     if task.network is None:
-        metrics = step.run(ctx)
+        metrics = task.run(ctx)
     else:
         metrics = access_source(
             task.network,
-            partial(step.run, ctx),
-            phase=phase,
+            partial(task.run, ctx),
+            phase=task.phase,
             logger=ctx.logger,
             credentials_missing=ctx.credentials_missing,
             request_budget=ctx.request_budget,
-            threshold=step.threshold,
+            threshold=task.threshold,
         )
     metrics.duration_s = round(time.perf_counter() - t0, 1)
     return metrics
@@ -184,9 +183,13 @@ def _outcome(metrics: PhaseMetrics) -> str:
 
 
 def run_phase(phase: GraphPhase, ctx: PhaseContext) -> PhaseMetrics:
-    """Exécute une phase et renvoie ses métriques."""
-    assert phase.build is not None
-    return phase.build().run(ctx)
+    """Exécute les tâches d'une phase et renvoie la somme de leurs métriques."""
+    if phase.build is not None:
+        return phase.build().run(ctx)
+    metrics = PhaseMetrics()
+    for task_metrics in execute_tasks(phase.tasks, ctx).values():
+        metrics.merge(task_metrics)
+    return metrics
 
 
 @dataclass(frozen=True)
