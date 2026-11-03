@@ -18,7 +18,8 @@ from domain.sources.registry import Source
 from pipeline.http.lookup import NOT_FOUND, UNAVAILABLE
 from pipeline.ingestion.common import staging
 from pipeline.ingestion.openalex import fetch_truncated
-from pipeline.ingestion.openalex.fetch_truncated import FetchTruncatedPhase, refetch_openalex
+from pipeline.ingestion.openalex.fetch_truncated import refetch_openalex
+from pipeline.task_runner import execute_tasks
 
 _LOGGER = logging.getLogger("test")
 
@@ -134,7 +135,7 @@ async def test_lot_mele(openalex):
 
 
 def test_phase_sautee_sans_openalex_dans_les_sources(open_tx, contexte):
-    metrics = FetchTruncatedPhase().run(contexte(sources={"hal"}))
+    (metrics,) = execute_tasks(fetch_truncated.TASKS, contexte(sources={"hal"})).values()
     assert metrics.seen == 0
     assert open_tx.transactions == 0
 
@@ -145,6 +146,6 @@ def test_phase_tourne_avec_openalex_dans_les_sources(monkeypatch, open_tx, conte
         return fetch_truncated.PhaseMetrics(updated=1)
 
     monkeypatch.setattr(fetch_truncated, "refetch_openalex", _refetch)
-    metrics = FetchTruncatedPhase().run(contexte(sources=sources))
+    (metrics,) = execute_tasks(fetch_truncated.TASKS, contexte(sources=sources)).values()
     assert metrics.updated == 1
     assert open_tx.transactions == 1

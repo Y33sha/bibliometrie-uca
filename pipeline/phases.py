@@ -65,9 +65,8 @@ PHASES: tuple[Phase, ...] = (
     Phase(
         "fetch_truncated",
         "Re-téléchargement des documents OpenAlex tronqués à 100 auteurs",
-        phase_tasks("fetch_truncated"),
+        fetch_truncated.TASKS,
         harvesting=True,
-        build=fetch_truncated.build,
     ),
     Phase(
         "normalize",

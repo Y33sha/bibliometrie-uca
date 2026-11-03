@@ -10,20 +10,19 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Mapping
-from dataclasses import dataclass
 
 from sqlalchemy import Connection, text
 
 from domain.types import JsonValue, as_sequence
+from pipeline.graph import task
 from pipeline.ingestion.common.lookup import LookupChannel, by_native_id, look_up
 from pipeline.ingestion.common.staging import StagingStore, UpsertOutcome
 from pipeline.ingestion.openalex.api import fetch_work
 from pipeline.ingestion.openalex.fields import extract_openalex_id
 from pipeline.ingestion.openalex.payload import BULK_AUTHORSHIPS_CAP
-from pipeline.runtime.context import Phase, PhaseContext
+from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.log_format import inflect, quantity, step
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.task_runner import SingleTaskPhase
 
 # Plafond OpenAlex 10 req/s.
 MAX_CONCURRENT = 3
@@ -39,14 +38,10 @@ _SELECT_TRUNCATED_SQL = text(
 )
 
 
-@dataclass(frozen=True)
-class FetchTruncatedPhase:
-    def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Relit les works tronqués dans une transaction, si OpenAlex fait partie des sources du run. La phase tourne dans tous les modes."""
-        if "openalex" not in ctx.options.sources:
-            return PhaseMetrics()
-        with ctx.open_tx() as conn:
-            return asyncio.run(refetch_openalex(conn, ctx.logger))
+def _refetch(ctx: PhaseContext) -> PhaseMetrics:
+    """Relit les works tronqués dans une transaction."""
+    with ctx.open_tx() as conn:
+        return asyncio.run(refetch_openalex(conn, ctx.logger))
 
 
 def _complete(staging: StagingStore, work: Mapping[str, JsonValue]) -> UpsertOutcome | None:
@@ -88,5 +83,16 @@ async def refetch_openalex(conn: Connection, log: logging.Logger) -> PhaseMetric
     )
 
 
-def build() -> Phase:
-    return SingleTaskPhase("fetch_truncated.refetch_openalex", FetchTruncatedPhase(), label="Bilan")
+TASKS = (
+    task(
+        "fetch_truncated.refetch_openalex",
+        reads=("staging",),
+        writes=("staging", "staging_normalization_queue"),
+        previous_run=("staging",),
+        network="openalex",
+        run=_refetch,
+        label="Bilan",
+        # La tâche tourne dans tous les modes, si OpenAlex fait partie des sources du run.
+        when=lambda ctx: "openalex" in ctx.options.sources,
+    ),
+)

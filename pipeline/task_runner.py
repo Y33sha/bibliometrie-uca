@@ -12,7 +12,7 @@ from functools import partial
 
 from pipeline.graph import Phase as GraphPhase, Task, TaskRun, phase_tasks
 from pipeline.runtime.access_source import access_source
-from pipeline.runtime.context import Phase, PhaseContext
+from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, nothing_to_do, step
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.parallel import RunParallel, run_parallel
@@ -190,17 +190,3 @@ def run_phase(phase: GraphPhase, ctx: PhaseContext) -> PhaseMetrics:
     for task_metrics in execute_tasks(phase.tasks, ctx).values():
         metrics.merge(task_metrics)
     return metrics
-
-
-@dataclass(frozen=True)
-class SingleTaskPhase:
-    """Phase d'une seule tâche, `task`, exécutée par `phase`."""
-
-    task: str
-    phase: Phase
-    label: str | None = None
-    """Libellé de la ligne de bilan de la tâche, écrite seulement au journal."""
-
-    def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        step = TaskStep(self.phase.run, label=self.label)
-        return run_tasks(self.task.partition(".")[0], {self.task: step}, ctx)[self.task]

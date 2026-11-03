@@ -322,14 +322,6 @@ TASKS: tuple[Task, ...] = (
         )
         for source in Source
     ),
-    _task(
-        "fetch_truncated.refetch_openalex",
-        "fetch_truncated",
-        reads=("staging",),
-        writes=("staging", "staging_normalization_queue"),
-        previous_run=("staging",),
-        network="openalex",
-    ),
     *(
         _task(
             f"normalize.{source}",
