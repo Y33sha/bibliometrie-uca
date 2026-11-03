@@ -94,12 +94,9 @@ DOI_AGENCY_FILTER_VALUES: tuple[str, ...] = (*DOI_AGENCY_SOURCES, OTHER_DOI_AGEN
 # Classe de citation d'une publication pourvue des seuils (`CitationTop`) sans en atteindre aucun.
 BELOW_CITATION_TOPS = "below"
 
-# Positions d'auteur de la facette, valeurs de `contributions.author_positions`.
-FACET_AUTHOR_POSITIONS: tuple[AuthorPosition, ...] = (AuthorPosition.CORRESPONDING,)
-
-# Vocabulaire du filtre par position d'auteur, dans l'ordre de la facette : les positions, puis `other` pour une personne qui n'en occupe aucune.
+# Vocabulaire du filtre par position d'auteur, dans l'ordre de la facette : les positions de `AuthorPosition`, puis `other` pour une personne qui n'en occupe aucune.
 OTHER_AUTHOR_POSITION = "other"
-AUTHOR_POSITION_FILTER_VALUES: tuple[str, ...] = (*FACET_AUTHOR_POSITIONS, OTHER_AUTHOR_POSITION)
+AUTHOR_POSITION_FILTER_VALUES: tuple[str, ...] = (*AuthorPosition, OTHER_AUTHOR_POSITION)
 
 
 @dataclass(frozen=True, slots=True)

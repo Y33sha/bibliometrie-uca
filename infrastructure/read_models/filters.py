@@ -21,7 +21,6 @@ from domain.sources.registry import PROFILES, SOURCE_FILTER_PREFIXES, Source
 from infrastructure.read_models.publications.models import (
     BELOW_CITATION_TOPS,
     DOI_AGENCY_SOURCES,
-    FACET_AUTHOR_POSITIONS,
     NO_DOI,
     NO_LICENSE,
     OTHER_AUTHOR_POSITION,
@@ -346,7 +345,9 @@ def author_position_subject(person_id: int | None, lab_ids: list[int]) -> WhereC
 def author_position_predicate(position: str, subject: WhereClause) -> str:
     """Renvoie le prédicat : une contribution de `subject` occupe la position d'auteur dans la publication `p`. `OTHER_AUTHOR_POSITION` : aucune n'occupe de position."""
     if position == OTHER_AUTHOR_POSITION:
-        return f"NOT ({' OR '.join(author_position_predicate(p, subject) for p in FACET_AUTHOR_POSITIONS)})"
+        return f"""NOT EXISTS (SELECT 1 FROM contributions a
+                WHERE a.publication_id = p.id AND {subject.sql}
+                  AND cardinality(a.author_positions) > 0)"""
     return f"""EXISTS (SELECT 1 FROM contributions a
                 WHERE a.publication_id = p.id AND {subject.sql}
                   AND {has_author_position(AuthorPosition(position))})"""
