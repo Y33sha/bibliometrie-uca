@@ -125,14 +125,12 @@ class Phase:
 
     name: str
     label: str
-    """Libellé lisible sans connaître le schéma. Les champs entre accolades reçoivent les valeurs de `label_fields` au lancement de la phase."""
+    """Libellé lisible sans connaître le schéma."""
     tasks: tuple[Task, ...]
     extra: bool = False
     """Enrichissement, hors résolution d'entités : `--no-extras` l'omet."""
     harvesting: bool = False
     """Moissonnage : le journal de la phase se termine par le total de ses sources."""
-    label_fields: Callable[[Connection], dict[str, str]] | None = None
-    """Valeurs des champs du libellé, lues dans la configuration."""
     when: Callable[[RunOptions], bool] | None = None
     """Condition d'exécution, d'après les options du run. Une phase écartée le signale au journal et renvoie des métriques vides."""
     check: Callable[[PhaseContext], None] | None = None

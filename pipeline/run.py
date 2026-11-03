@@ -37,7 +37,7 @@ from pipeline.ingestion.api_params import request_budget
 from pipeline.ingestion.credentials import source_credentials_missing
 from pipeline.phases import PERIMETER_STRUCTURES, PHASES
 from pipeline.runtime.context import PhaseContext, RunOptions
-from pipeline.runtime.execution import log, open_tx, phase_context
+from pipeline.runtime.execution import log, phase_context
 from pipeline.runtime.lock import PipelineAlreadyRunningError, pipeline_lock
 from pipeline.runtime.modes import MODE_NAMES
 from pipeline.runtime.observability.exception_chain import failure_message, is_user_interruption
@@ -67,20 +67,12 @@ def _install_sigterm_handler() -> None:
     signal.signal(signal.SIGTERM, _sigterm_raises_keyboard_interrupt)
 
 
-class _NamedFields(dict[str, str]):
-    """Champs de libellé sans valeur : chacun s'affiche sous la forme `<nom>`."""
-
-    def __missing__(self, key: str) -> str:
-        return f"<{key}>"
-
-
 def _catalogue_des_phases() -> str:
     """Renvoie les phases dans l'ordre d'exécution, chacune avec son libellé."""
     width = max(len(name) for name in PHASE_NAMES)
     lines = ["Phases, dans l'ordre :"]
     for i, phase in enumerate(PHASES, 1):
-        label = phase.label.format_map(_NamedFields())
-        lines.append(f"  {i:2d}. {phase.name:{width}s}  {label}")
+        lines.append(f"  {i:2d}. {phase.name:{width}s}  {phase.label}")
     return "\n".join(lines)
 
 
@@ -242,14 +234,6 @@ def _framed(lines: list[str]) -> list[str]:
     ]
 
 
-def _phase_label(phase: Phase) -> str:
-    """Renvoie le libellé de la phase, ses champs remplis par la configuration."""
-    if phase.label_fields is None:
-        return phase.label
-    with open_tx() as conn:
-        return phase.label.format(**phase.label_fields(conn))
-
-
 def _phase_title(name: str, label: str) -> list[str]:
     """Renvoie les lignes d'ouverture d'une phase : son nom et son libellé."""
     return _framed([f"{PHASE_MARKER}{name}", label])
@@ -339,7 +323,7 @@ def _run_one_phase(
     try:
         # Ligne vide devant le cadre, pour le séparer de la sortie de la phase précédente.
         log.info("")
-        for line in _phase_title(name, _phase_label(phase)):
+        for line in _phase_title(name, phase.label):
             log.info("%s", line)
         phase_started_at = datetime.datetime.now(datetime.UTC)
         t0_phase = time.time()

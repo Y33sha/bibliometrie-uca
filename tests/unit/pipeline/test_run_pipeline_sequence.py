@@ -343,7 +343,6 @@ class TestMain:
         for nom in run_pipeline.PHASE_NAMES:
             ligne = next(line for line in catalogue.splitlines() if f" {nom} " in line)
             assert ligne.split(nom, 1)[1].strip()
-        assert "Recherche des documents non revus depuis <delai>" in catalogue
 
     def test_pipeline_deja_en_cours(self, monkeypatch, capsys):
         """Deux pipelines simultanés se bloqueraient en base : le second refuse de démarrer."""
