@@ -7,6 +7,7 @@ from collections.abc import Iterable
 
 from application.ports.repositories.address_repository import AddressCountryFilter
 from domain.config import ConfigKey
+from domain.persons.contribution_matching import ContributionMatchReason
 from domain.persons.identifiers import (
     HUMAN_ATTRIBUTION_STATUSES,
     AttributionStatus,
@@ -22,6 +23,7 @@ from domain.source_records.impact import CitationTop
 from domain.source_records.source_extras import CROSSREF_PREPRINT_OF, SourceExtra
 from domain.structures.address_origin import AddressOrigin
 from domain.structures.perimeter_evidence import PerimeterEvidence
+from infrastructure.db.queues import Queue, enqueue_sql
 
 
 def in_clause(values: Iterable[str]) -> str:
@@ -354,7 +356,14 @@ def propagate_contribution_attributes_sql(contribution_ids: str) -> str:
     - `last` : la contribution reçoit la majorité des votes des listes d'auteurs complètes pour le dernier rang.
 
     La liste d'auteurs d'un enregistrement source réunit ses contributions sources individuelles au rôle d'auteur, hors doublons, avec une position. Une liste est tronquée si une autre liste de sa publication est plus longue et si elle compte un seul auteur, ou une longueur de `SCANR_TRUNCATED_LENGTHS` pour scanR. La copie scanR d'un dépôt HAL vote seulement en l'absence de l'enregistrement HAL. Une égalité laisse la publication sans premier ou sans dernier auteur. Seules les contributions à attribut changé sont écrites.
+
+    Une contribution rattachée sans épinglage qui quitte le périmètre est marquée pour la redécision de sa personne. L'instruction renvoie le nombre de contributions écrites.
     """
+    left_perimeter = enqueue_sql(
+        Queue.CONTRIBUTION_RESOLUTION,
+        "SELECT id FROM updated WHERE was_in AND NOT is_in AND person_id IS NOT NULL"
+        f" AND resolution_mode <> '{ContributionMatchReason.MANUAL}'",
+    )
     return f"""
         WITH members AS (
             SELECT gm.contribution_id, sc.is_corresponding, sc.perimeter_evidence, sc.roles
@@ -434,18 +443,24 @@ def propagate_contribution_attributes_sql(contribution_ids: str) -> str:
                 SELECT contribution_id, '{AuthorPosition.CORRESPONDING}'::author_position FROM scal WHERE is_corr
             ) AS p
             GROUP BY contribution_id
-        )
-        UPDATE contributions g
-        SET author_positions = coalesce(pos.positions, {NO_AUTHOR_POSITION}),
-            perimeter_evidence = coalesce(ev.evidence, {NO_PERIMETER_EVIDENCE}),
-            roles = rol.roles
-        FROM scal
-        LEFT JOIN rol ON rol.contribution_id = scal.contribution_id
-        LEFT JOIN ev ON ev.contribution_id = scal.contribution_id
-        LEFT JOIN pos ON pos.contribution_id = scal.contribution_id
-        WHERE g.id = scal.contribution_id
-          AND (g.author_positions, g.perimeter_evidence, g.roles)
-              IS DISTINCT FROM (coalesce(pos.positions, {NO_AUTHOR_POSITION}), coalesce(ev.evidence, {NO_PERIMETER_EVIDENCE}), rol.roles)
+        ),
+        updated AS (
+            UPDATE contributions g
+            SET author_positions = coalesce(pos.positions, {NO_AUTHOR_POSITION}),
+                perimeter_evidence = coalesce(ev.evidence, {NO_PERIMETER_EVIDENCE}),
+                roles = rol.roles
+            FROM scal
+            LEFT JOIN rol ON rol.contribution_id = scal.contribution_id
+            LEFT JOIN ev ON ev.contribution_id = scal.contribution_id
+            LEFT JOIN pos ON pos.contribution_id = scal.contribution_id
+            WHERE g.id = scal.contribution_id
+              AND (g.author_positions, g.perimeter_evidence, g.roles)
+                  IS DISTINCT FROM (coalesce(pos.positions, {NO_AUTHOR_POSITION}), coalesce(ev.evidence, {NO_PERIMETER_EVIDENCE}), rol.roles)
+            RETURNING g.id, old.in_perimeter AS was_in, new.in_perimeter AS is_in,
+                      g.person_id, g.resolution_mode
+        ),
+        marked AS ({left_perimeter})
+        SELECT count(*) FROM updated
     """
 
 

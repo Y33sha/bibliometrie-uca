@@ -1084,12 +1084,21 @@ TASKS: tuple[Task, ...] = (
             "contributions.author_positions",
             "contributions.perimeter_evidence",
             "contributions.roles",
+            "contributions.person_id",
+            "contributions.resolution_mode",
         ),
         writes=(
             "contributions.author_positions",
             "contributions.perimeter_evidence",
             "contributions.roles",
             "contribution_attributes_queue",
+            # Une contribution rattachée sans épinglage qui quitte le périmètre est marquée pour la redécision de sa personne.
+            "contribution_resolution_queue",
+        ),
+        # Personnes des contributions, écrites par la phase `persons`.
+        previous_run=(
+            "contributions.person_id",
+            "contributions.resolution_mode",
         ),
     ),
     _task(
