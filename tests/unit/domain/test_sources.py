@@ -1,13 +1,27 @@
-"""Registre des sources (`domain.sources.registry`) : ordre de priorité, sources interrogeables par DOI, liens vers les portails."""
+"""Registre des sources (`domain.sources.registry`) : noms affichés, ordre de priorité, sources interrogeables par DOI, liens vers les portails."""
 
 import pytest
 
 from domain.sources.registry import (
+    DOI_ORG,
     DOI_SEARCHABLE_SOURCES,
     SOURCE_PRIORITY,
     Source,
+    source_label,
     source_record_url,
 )
+
+
+class TestSourceLabel:
+    def test_source_of_the_registry(self):
+        assert source_label(Source.THESES) == "theses.fr"
+
+    def test_doi_registry(self):
+        assert source_label(DOI_ORG) == "doi.org"
+
+    def test_unknown_source(self):
+        with pytest.raises(KeyError):
+            source_label("inconnue")
 
 
 class TestSourcePriority:

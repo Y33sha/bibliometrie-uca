@@ -85,12 +85,23 @@ PROFILES: dict[Source, SourceProfile] = {
     ),
 }
 
-_SOURCE_LABELS: dict[str, str] = {source: profile.label for source, profile in PROFILES.items()}
+# Registre des DOI, interrogé pour vérifier qu'un DOI existe. Il figure parmi les sources des recherches infructueuses, sans fournir d'enregistrements sources.
+DOI_ORG = "doi_org"
+LOOKUP_SOURCES: tuple[str, ...] = (*Source, DOI_ORG)
+
+_SOURCE_LABELS: dict[str, str] = {
+    **{source: profile.label for source, profile in PROFILES.items()},
+    DOI_ORG: "doi.org",
+}
 
 
 def source_label(source: str) -> str:
-    """Renvoie le nom lisible d'une source. Une clé inconnue est renvoyée telle quelle."""
-    return _SOURCE_LABELS.get(source, source)
+    """Renvoie le nom affiché d'une source de `LOOKUP_SOURCES`.
+
+    Raises:
+        KeyError: source inconnue.
+    """
+    return _SOURCE_LABELS[source]
 
 
 def source_record_url(source: str, source_id: str) -> str:
@@ -126,10 +137,6 @@ PERSON_SEARCHED_SOURCES: tuple[Source, ...] = tuple(
     s for s, p in PROFILES.items() if p.person_identifiers
 )
 AGGREGATOR_SOURCES: frozenset[Source] = frozenset(s for s, p in PROFILES.items() if p.aggregator)
-
-# Registre des DOI, interrogé pour vérifier qu'un DOI existe. Il figure parmi les sources des recherches infructueuses, sans fournir d'enregistrements sources.
-DOI_ORG = "doi_org"
-LOOKUP_SOURCES: tuple[str, ...] = (*Source, DOI_ORG)
 
 
 # Ordre d'autorité des sources, pour l'agrégation des métadonnées, la position d'auteur et l'ordre des normaliseurs.

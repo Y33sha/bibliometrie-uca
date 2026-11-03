@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
-from domain.sources.registry import PROFILES, source_label
+from domain.sources.registry import LOOKUP_SOURCES, source_label
 from pipeline.runtime.observability.logging_scope import ScopedOrPlainLogger
 
 STEP = "▶ "
@@ -20,7 +20,7 @@ BRANCH_CONTINUATION = "  │  "
 """Rattache une ligne à la branche ouverte au-dessus, le trait vertical se prolongeant."""
 
 
-_SOURCE_WIDTH = max(len(profile.label) for profile in PROFILES.values())
+_SOURCE_WIDTH = max(len(source_label(source)) for source in LOOKUP_SOURCES)
 """Colonne des noms de source, à la largeur du plus long."""
 
 
