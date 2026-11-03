@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Orchestrateur du pipeline bibliométrique : sélection et séquence d'exécution des phases.
 
-Le module de chaque phase expose `build`, qui câble ses dépendances et renvoie la phase prête à s'exécuter. `PHASE_ORDER` fixe l'ordre d'exécution et `_PHASE_BUILDERS` associe chaque nom à sa fonction `build`.
+`pipeline.phases.PHASES` donne les phases dans l'ordre d'exécution, avec leur libellé et leurs attributs.
 
 `run_pipeline --help` donne les options et la liste des phases.
 """
@@ -16,15 +16,9 @@ import signal
 import sys
 import textwrap
 import time
-from collections.abc import Callable
 from dataclasses import dataclass
 from types import FrameType
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from sqlalchemy import Connection
-
-from domain.config import ConfigKey
 from domain.pipeline_runs import PhaseStatus
 from domain.sources.registry import Source
 from infrastructure.observability.log import (
@@ -38,36 +32,19 @@ from infrastructure.observability.log import (
     set_log_phase,
 )
 from infrastructure.observability.phase_executions import PhaseExecutionRecorder, start_run
-from pipeline.graph import EXTRA_PHASES, HARVESTING_PHASES, PHASE_LABELS, PHASE_ORDER
+from pipeline.graph import Phase
 from pipeline.ingestion.api_params import request_budget
-from pipeline.ingestion.common import (
-    fetch_missing,
-    fetch_stale,
-    harvest,
-    harvest_by_person,
-    normalize,
-)
 from pipeline.ingestion.credentials import source_credentials_missing
-from pipeline.ingestion.openalex import fetch_truncated
-from pipeline.runtime.config import delay
-from pipeline.runtime.context import Phase, RunOptions
+from pipeline.phases import PHASE_ORDER, PHASES
+from pipeline.runtime.context import RunOptions
 from pipeline.runtime.execution import log, open_tx, phase_context
 from pipeline.runtime.lock import PipelineAlreadyRunningError, pipeline_lock
 from pipeline.runtime.modes import MODE_NAMES
 from pipeline.runtime.observability.exception_chain import failure_message, is_user_interruption
-from pipeline.runtime.observability.log_format import quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import set_bar_stream, write_above_bars
 from pipeline.runtime.observability.signals import select_targets
-from pipeline.transformation import finalize
-from pipeline.transformation.countries import countries
-from pipeline.transformation.persons import persons
-from pipeline.transformation.publications import oa_status, publications, relations
-from pipeline.transformation.publications.author_grouping import author_grouping
-from pipeline.transformation.publications.correction import metadata_correction
-from pipeline.transformation.publications.subjects import subjects
-from pipeline.transformation.publishing import publishing, resolve_ra
-from pipeline.transformation.structures import affiliations
+from pipeline.task_runner import run_phase
 from pipeline.transformation.structures.perimeter import refresh_perimeter_structures
 
 set_console_writer(write_above_bars)
@@ -76,39 +53,6 @@ set_bar_stream(console_stream())
 # Seuil du root logger, destinataire des modules qui appellent `logging.getLogger(__name__)` : les bibliothèques tierces y écrivent trop d'informations pour les laisser passer.
 configure_root_logging(logging.WARNING)
 
-
-# Une phase se construit sans argument : elle reçoit les options du run par son contexte d'exécution.
-type PhaseBuilder = Callable[[], Phase]
-
-# Fonction `build` de chaque phase.
-_PHASE_BUILDERS: dict[str, PhaseBuilder] = {
-    "harvest": harvest.build,
-    "harvest_by_person": harvest_by_person.build,
-    "resolve_ra": resolve_ra.build,
-    "fetch_missing": fetch_missing.build,
-    "fetch_stale": fetch_stale.build,
-    "fetch_truncated": fetch_truncated.build,
-    "normalize": normalize.build,
-    "affiliations": affiliations.build,
-    "publishing": publishing.build,
-    "metadata_correction": metadata_correction.build,
-    "publications": publications.build,
-    "author_grouping": author_grouping.build,
-    "relations": relations.build,
-    "persons": persons.build,
-    "finalize": finalize.build,
-    "countries": countries.build,
-    "subjects": subjects.build,
-    "oa_status": oa_status.build,
-}
-
-if set(_PHASE_BUILDERS) != set(PHASE_ORDER):
-    raise RuntimeError(
-        "Le registre des phases de l'orchestrateur et `PHASE_ORDER` divergent : "
-        f"{set(_PHASE_BUILDERS) ^ set(PHASE_ORDER)}"
-    )
-
-PHASES: list[tuple[str, PhaseBuilder]] = [(name, _PHASE_BUILDERS[name]) for name in PHASE_ORDER]
 
 PHASE_NAMES = list(PHASE_ORDER)
 
@@ -133,12 +77,12 @@ class _NamedFields(dict[str, str]):
 
 
 def _catalogue_des_phases() -> str:
-    """Renvoie les phases dans l'ordre d'exécution, chacune avec son libellé (`PHASE_LABELS`)."""
+    """Renvoie les phases dans l'ordre d'exécution, chacune avec son libellé."""
     width = max(len(name) for name in PHASE_NAMES)
     lines = ["Phases, dans l'ordre :"]
-    for i, name in enumerate(PHASE_NAMES, 1):
-        label = PHASE_LABELS[name].format_map(_NamedFields())
-        lines.append(f"  {i:2d}. {name:{width}s}  {label}")
+    for i, phase in enumerate(PHASES, 1):
+        label = phase.label.format_map(_NamedFields())
+        lines.append(f"  {i:2d}. {phase.name:{width}s}  {label}")
     return "\n".join(lines)
 
 
@@ -264,21 +208,16 @@ def _run_options(args: argparse.Namespace, sources: set[str]) -> RunOptions:
     )
 
 
-def _select_phases_to_run(
-    args: argparse.Namespace,
-) -> list[tuple[str, PhaseBuilder]]:
+def _select_phases_to_run(args: argparse.Namespace) -> list[Phase]:
     """Renvoie les phases à exécuter selon `--only` ou `--from` (sinon toutes), moins les enrichissements avec `--no-extras`.
 
     Une phase nommée par `--only` est renvoyée même si c'est un enrichissement.
     """
     if args.only:
-        return [(n, build) for n, build in PHASES if n == args.only]
-    if args.from_phase:
-        selected = PHASES[PHASE_NAMES.index(args.from_phase) :]
-    else:
-        selected = list(PHASES)
+        return [phase for phase in PHASES if phase.name == args.only]
+    selected = list(PHASES[PHASE_NAMES.index(args.from_phase) :] if args.from_phase else PHASES)
     if args.no_extras:
-        selected = [(n, build) for n, build in selected if n not in EXTRA_PHASES]
+        selected = [phase for phase in selected if not phase.extra]
     return selected
 
 
@@ -305,30 +244,17 @@ def _framed(lines: list[str]) -> list[str]:
     ]
 
 
-def _fetch_stale_fields(conn: Connection) -> dict[str, str]:
-    return {"delai": quantity(delay(conn, ConfigKey.FETCH_STALE_AFTER_DAYS), "jour")}
-
-
-_LABEL_FIELDS: dict[str, Callable[[Connection], dict[str, str]]] = {
-    "fetch_stale": _fetch_stale_fields,
-}
-"""Champs des libellés de phase, lus dans la configuration."""
-
-
-def _phase_label(name: str) -> str | None:
+def _phase_label(phase: Phase) -> str:
     """Renvoie le libellé de la phase, ses champs remplis par la configuration."""
-    # `PHASE_LABELS` couvre les phases du pipeline. Les tests nomment aussi d'autres phases.
-    label = PHASE_LABELS.get(name)
-    fields = _LABEL_FIELDS.get(name)
-    if label is None or fields is None:
-        return label
+    if phase.label_fields is None:
+        return phase.label
     with open_tx() as conn:
-        return label.format(**fields(conn))
+        return phase.label.format(**phase.label_fields(conn))
 
 
-def _phase_title(name: str, label: str | None) -> list[str]:
+def _phase_title(name: str, label: str) -> list[str]:
     """Renvoie les lignes d'ouverture d'une phase : son nom et son libellé."""
-    return _framed([f"{PHASE_MARKER}{name}", *([label] if label else [])])
+    return _framed([f"{PHASE_MARKER}{name}", label])
 
 
 PIPELINE_TITLE = (
@@ -374,7 +300,7 @@ def _banner(settings: list[str]) -> list[str]:
     ]
 
 
-def _run_title(args: argparse.Namespace, phases: list[tuple[str, PhaseBuilder]]) -> list[str]:
+def _run_title(args: argparse.Namespace, phases: list[Phase]) -> list[str]:
     """Renvoie les lignes d'ouverture d'une exécution : son mode, puis ses réglages distincts du lancement par défaut."""
     settings = _setting("mode", args.mode)
 
@@ -384,7 +310,7 @@ def _run_title(args: argparse.Namespace, phases: list[tuple[str, PhaseBuilder]])
         settings += _setting("depuis", str(args.start_year))
 
     if args.only or args.from_phase:
-        settings += _setting("phases", ", ".join(n for n, _ in phases))
+        settings += _setting("phases", ", ".join(phase.name for phase in phases))
     elif args.no_extras:
         settings += _setting("phases", "sans les enrichissements terminaux")
 
@@ -396,23 +322,23 @@ def _run_title(args: argparse.Namespace, phases: list[tuple[str, PhaseBuilder]])
 
 
 def _run_one_phase(
-    name: str,
-    build: PhaseBuilder,
+    phase: Phase,
     *,
     args: argparse.Namespace,
     sources: set[str],
     recorder: PhaseExecutionRecorder,
 ) -> tuple[str, float]:
-    """Construit et exécute une phase, et enregistre son observabilité. Renvoie son nom et sa durée.
+    """Exécute une phase et enregistre son observabilité. Renvoie son nom et sa durée.
 
     Une interruption clavier ou une exception est enregistrée, puis termine le processus. `--from <phase>` reprend la séquence à la phase interrompue.
     """
+    name = phase.name
     # Le nom de la phase préfixe les records émis pendant la phase, y compris par les moissonneurs en threads, qui héritent du contexte.
     phase_token = set_log_phase(name)
     try:
         # Ligne vide devant le cadre, pour le séparer de la sortie de la phase précédente.
         log.info("")
-        for line in _phase_title(name, _phase_label(name)):
+        for line in _phase_title(name, _phase_label(phase)):
             log.info("%s", line)
         phase_started_at = datetime.datetime.now(datetime.UTC)
         t0_phase = time.time()
@@ -422,7 +348,7 @@ def _run_one_phase(
             request_budget=request_budget,
         )
         try:
-            result = build().run(ctx)
+            metrics = run_phase(phase, ctx)
         except (KeyboardInterrupt, Exception) as e:
             # Une interruption en pleine requête invalide la connexion : le nettoyage suivant lève une erreur SQLAlchemy, et le `KeyboardInterrupt` reste dans la chaîne des exceptions.
             interrupted = is_user_interruption(e)
@@ -455,8 +381,7 @@ def _run_one_phase(
             sys.exit(130 if interrupted else 1)
 
         duration = time.time() - t0_phase
-        metrics = result if isinstance(result, PhaseMetrics) else PhaseMetrics()
-        if name in HARVESTING_PHASES:
+        if phase.harvesting:
             log.info("")
             log.info("Total : %s", metrics.as_summary())
         recorder.record(
@@ -472,9 +397,7 @@ def _run_one_phase(
         reset_log_phase(phase_token)
 
 
-def _execute_phases(
-    args: argparse.Namespace, phases_to_run: list[tuple[str, PhaseBuilder]]
-) -> None:
+def _execute_phases(args: argparse.Namespace, phases_to_run: list[Phase]) -> None:
     """Déroule la séquence des phases avec observabilité par run, puis le récapitulatif de fin."""
     sources = {s.strip() for s in args.sources.split(",") if s.strip()}
 
@@ -492,8 +415,8 @@ def _execute_phases(
 
     t0_total = time.time()
     phase_results = [
-        _run_one_phase(name, build, args=args, sources=sources, recorder=recorder)
-        for name, build in phases_to_run
+        _run_one_phase(phase, args=args, sources=sources, recorder=recorder)
+        for phase in phases_to_run
     ]
 
     elapsed_total = time.time() - t0_total

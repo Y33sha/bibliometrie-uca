@@ -1,6 +1,6 @@
 """L'ordre des phases est cohérent : noms uniques."""
 
-from pipeline.graph import EXTRA_PHASES, PHASE_ORDER
+from pipeline.phases import PHASE_ORDER, PHASES
 
 
 def test_phases_uniques():
@@ -15,6 +15,6 @@ def test_ordre_colonne_vertebrale():
 
 def test_les_enrichissements_ferment_la_sequence():
     """Les enrichissements sont les dernières phases : les omettre laisse une séquence continue."""
-    rangs = sorted(PHASE_ORDER.index(p) for p in EXTRA_PHASES)
+    extras = [phase.extra for phase in PHASES]
 
-    assert rangs == list(range(len(PHASE_ORDER) - len(EXTRA_PHASES), len(PHASE_ORDER)))
+    assert extras == sorted(extras)

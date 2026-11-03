@@ -3,7 +3,7 @@
 Elle exporte l'ordre des phases et les recalculs ciblés. `application/` déclare chaque recalcul comme port, et `interfaces/api/deps.py` le remplit depuis ce module.
 """
 
-from pipeline.graph import PHASE_ORDER
+from pipeline.phases import PHASE_ORDER
 from pipeline.transformation.countries.refresh_publication_countries import CountryRecompute
 from pipeline.transformation.publications.publication_perimeter import (
     PublicationPerimeterRecompute,

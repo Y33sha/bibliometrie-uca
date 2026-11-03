@@ -10,7 +10,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from functools import partial
 
-from pipeline.graph import TASKS, Task
+from pipeline.graph import TASKS, Phase as GraphPhase, Task
 from pipeline.runtime.access_source import access_source
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, nothing_to_do, step
@@ -181,6 +181,12 @@ def _outcome(metrics: PhaseMetrics) -> str:
     if metrics.signals:
         return "interrompue"
     return metrics.as_summary()
+
+
+def run_phase(phase: GraphPhase, ctx: PhaseContext) -> PhaseMetrics:
+    """Exécute une phase et renvoie ses métriques."""
+    assert phase.build is not None
+    return phase.build().run(ctx)
 
 
 @dataclass(frozen=True)

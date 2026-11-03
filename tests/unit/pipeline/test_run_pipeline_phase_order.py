@@ -51,5 +51,5 @@ def test_les_decomptes_de_publications_se_recalculent_dans_finalize():
 
 def test_resolve_ra_runs_after_normalize_before_publishing():
     """L'agence d'enregistrement des DOI normalisés dans le run est résolue avant que `publishing` rattache les préfixes à leur éditeur."""
-    names = [n for n, _ in run_pipeline.PHASES]
+    names = run_pipeline.PHASE_NAMES
     assert names.index("normalize") < names.index("resolve_ra") < names.index("publishing")

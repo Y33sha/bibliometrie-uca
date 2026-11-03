@@ -8,7 +8,8 @@ import sys
 
 import pytest
 
-from pipeline.graph import PHASE_LABELS, PHASE_ORDER
+from pipeline.graph import Phase
+from pipeline.phases import PHASE_ORDER, PHASES
 from pipeline.run import (
     PHASE_TITLE_WIDTH,
     _build_arg_parser,
@@ -16,6 +17,8 @@ from pipeline.run import (
     _phase_title,
     _run_title,
 )
+
+_PHASES = {phase.name: phase for phase in PHASES}
 
 
 @pytest.fixture
@@ -33,12 +36,16 @@ def delai_de_rafraichissement(monkeypatch):
     """Délai de rafraîchissement lu par les libellés de phase, sans base : 7 jours, modifiable par le test."""
     delay_days = {"jours": 7}
     monkeypatch.setattr("pipeline.run.open_tx", contextlib.nullcontext)
-    monkeypatch.setattr("pipeline.run.delay", lambda conn, key: delay_days["jours"])
+    monkeypatch.setattr("pipeline.phases.delay", lambda conn, key: delay_days["jours"])
     return delay_days
 
 
-def _titre(phase: str) -> list[str]:
-    return _phase_title(phase, _phase_label(phase))
+def _label(name: str) -> str:
+    return _phase_label(_PHASES[name])
+
+
+def _titre(name: str) -> list[str]:
+    return _phase_title(name, _label(name))
 
 
 @pytest.mark.parametrize("phase", PHASE_ORDER)
@@ -57,19 +64,19 @@ def test_chaque_cadre_porte_le_nom_et_le_libelle(
     lines = _titre(phase)
     text = " ".join(line.strip("║ ") for line in lines)
     assert phase in text
-    for mot in _phase_label(phase).split():
+    for mot in _label(phase).split():
         assert mot in text
 
 
 @pytest.mark.parametrize("phase", PHASE_ORDER)
 def test_chaque_libelle_a_tous_ses_champs_remplis(phase: str, delai_de_rafraichissement) -> None:
-    assert "{" not in _phase_label(phase)
+    assert "{" not in _label(phase)
 
 
 def test_le_libelle_de_fetch_stale_donne_le_delai(delai_de_rafraichissement) -> None:
-    assert _phase_label("fetch_stale") == "Recherche des documents non revus depuis 7 jours"
+    assert _label("fetch_stale") == "Recherche des documents non revus depuis 7 jours"
     delai_de_rafraichissement["jours"] = 1
-    assert _phase_label("fetch_stale") == "Recherche des documents non revus depuis 1 jour"
+    assert _label("fetch_stale") == "Recherche des documents non revus depuis 1 jour"
 
 
 def test_un_libelle_long_tient_sur_deux_lignes(terminal) -> None:
@@ -82,14 +89,7 @@ def test_une_sortie_capturee_recoit_des_filets(sortie_capturee) -> None:
     lines = _titre("normalize")
     assert lines[0].startswith("─")
     assert "PHASE : normalize" in lines[1]
-    assert lines[2] == PHASE_LABELS["normalize"]
-
-
-def test_une_phase_sans_libelle_garde_son_cadre(terminal) -> None:
-    """Une phase absente du pipeline, comme celles des tests de l'orchestrateur, a un cadre sans libellé."""
-    lines = _titre("une")
-    assert len(lines) == 3
-    assert "une" in lines[1]
+    assert lines[2] == _PHASES["normalize"].label
 
 
 def _args(**modifications) -> argparse.Namespace:
@@ -99,6 +99,10 @@ def _args(**modifications) -> argparse.Namespace:
 
 def _texte(lines: list[str]) -> str:
     return " ".join(lines)
+
+
+def _phase(name: str) -> Phase:
+    return Phase(name, "Libellé", ())
 
 
 class TestTitreDuRun:
@@ -113,11 +117,11 @@ class TestTitreDuRun:
         assert "année ···· 2018" in _texte(_run_title(_args(year=2018), []))
 
     def test_les_phases_paraissent_quand_le_lancement_les_restreint(self, terminal) -> None:
-        text = _texte(_run_title(_args(only="persons"), [("persons", None)]))
+        text = _texte(_run_title(_args(only="persons"), [_phase("persons")]))
         assert "phases ··· persons" in text
 
     def test_un_lancement_courant_ne_liste_pas_les_phases(self, terminal) -> None:
-        assert "phases" not in _texte(_run_title(_args(), [("harvest", None)]))
+        assert "phases" not in _texte(_run_title(_args(), [_phase("harvest")]))
 
     def test_les_reconstructions_demandees_paraissent(self, terminal) -> None:
         text = _texte(_run_title(_args(rebuild_subjects=True), []))

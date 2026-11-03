@@ -1,4 +1,4 @@
-"""Graphe de dépendances du pipeline : les tâches, leurs lectures et leurs écritures, dans l'ordre d'exécution. Chaque tâche appartient à une phase. L'ordre des phases suit celui de leurs tâches.
+"""Graphe de dépendances du pipeline : les tâches, leurs lectures et leurs écritures, dans l'ordre d'exécution. Chaque tâche appartient à une phase. `pipeline.phases` donne l'ordre des phases.
 
 Une donnée se désigne par sa table (`"serials"`) ou par une colonne (`"serials.serial_type"`). `"serials.id"` désigne l'existence des lignes, créées et supprimées par les écrivains. Une table et l'une de ses colonnes se recouvrent.
 
@@ -7,8 +7,9 @@ Une tâche dépend des tâches placées avant elle et écrivant une donnée lue 
 La maintenance d'une tâche (`VACUUM`, `ANALYZE`) suit ses écritures et ne crée aucune dépendance. Des tâches consécutives du même `parallel_group` s'exécutent en parallèle : leurs écritures communes ne dépendent pas de leur ordre, et aucune ne dépend d'une autre tâche du groupe.
 """
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from domain.sources.registry import (
     DOI_SEARCHABLE_SOURCES,
@@ -18,6 +19,11 @@ from domain.sources.registry import (
     SOURCE_PRIORITY,
     Source,
 )
+
+if TYPE_CHECKING:
+    from sqlalchemy import Connection
+
+    from pipeline.runtime.context import Phase as ExecutablePhase
 
 
 @dataclass(frozen=True, slots=True)
@@ -1464,55 +1470,28 @@ TASKS: tuple[Task, ...] = (
 )
 
 
-_RUN_PHASE = "run"
+RUN_PHASE = "run"
 """Groupe des tâches exécutées par l'orchestrateur avant toute phase."""
 
-PHASE_ORDER: tuple[str, ...] = tuple(
-    dict.fromkeys(task.phase for task in TASKS if task.phase != _RUN_PHASE)
-)
-"""Ordre d'exécution des phases : celui de leurs tâches dans `TASKS`."""
 
-PHASE_LABELS: dict[str, str] = {
-    "harvest": "Moissonnage par affiliation",
-    "harvest_by_person": "Moissonnage par personne",
-    "resolve_ra": "Résolution des agences d'enregistrement des DOI",
-    "fetch_missing": "Recherche dans chaque source des documents trouvés dans les autres",
-    "fetch_stale": "Recherche des documents non revus depuis {delai}",
-    "fetch_truncated": "Re-téléchargement des documents OpenAlex tronqués à 100 auteurs",
-    "normalize": "Normalisation des données brutes",
-    "affiliations": "Résolution des affiliations par contribution source",
-    "publishing": "Référentiels de l'édition",
-    "metadata_correction": "Correction des métadonnées de publication",
-    "publications": "Dédoublonnage des publications",
-    "author_grouping": "Alignement des auteurs des enregistrements sources d'une même publication",
-    "persons": "Résolution des personnes",
-    "finalize": "Finalisation : périmètre des publications, vues des structures, purges et compteurs",
-    "relations": "Relations entre publications apparentées",
-    "subjects": "Sujets des publications",
-    "countries": "Pays associés aux contributions sources",
-    "oa_status": "Statut open access des publications",
-}
-"""Libellé de chaque phase, lisible sans connaître le schéma.
+def phase_tasks(phase: str) -> tuple[Task, ...]:
+    """Renvoie les tâches de `phase` déclarées dans `TASKS`, dans leur ordre."""
+    return tuple(task for task in TASKS if task.phase == phase)
 
-Les champs entre accolades reçoivent une valeur de configuration au lancement de la phase.
-"""
 
-EXTRA_PHASES: frozenset[str] = frozenset({"relations", "subjects", "countries", "oa_status"})
-"""Enrichissements, hors résolution d'entités : `--no-extras` les omet.
+@dataclass(frozen=True)
+class Phase:
+    """Phase du pipeline : tâches consécutives, avec leur libellé et leurs attributs."""
 
-Chacune est indépendante des autres. Des phases placées avant elles lisent leurs sorties au run suivant : `resolve_ra` et `fetch_missing` lisent les relations, `normalize` et `publications` les pays, `publications` le statut open access.
-"""
-
-HARVESTING_PHASES: frozenset[str] = frozenset(
-    {"harvest", "harvest_by_person", "fetch_missing", "fetch_stale", "fetch_truncated"}
-)
-"""Phases de moissonnage : leur journal se termine par le total de toutes leurs sources."""
-
-if not EXTRA_PHASES <= set(PHASE_ORDER):
-    raise ValueError("EXTRA_PHASES nomme une phase absente du graphe")
-
-if not HARVESTING_PHASES <= set(PHASE_ORDER):
-    raise ValueError("HARVESTING_PHASES nomme une phase absente du graphe")
-
-if set(PHASE_LABELS) != set(PHASE_ORDER):
-    raise ValueError("PHASE_LABELS et le graphe ne nomment pas les mêmes phases")
+    name: str
+    label: str
+    """Libellé lisible sans connaître le schéma. Les champs entre accolades reçoivent les valeurs de `label_fields` au lancement de la phase."""
+    tasks: tuple[Task, ...]
+    extra: bool = False
+    """Enrichissement, hors résolution d'entités : `--no-extras` l'omet."""
+    harvesting: bool = False
+    """Moissonnage : le journal de la phase se termine par le total de ses sources."""
+    label_fields: Callable[[Connection], dict[str, str]] | None = None
+    """Valeurs des champs du libellé, lues dans la configuration."""
+    build: Callable[[], ExecutablePhase] | None = None
+    """Construction de la phase exécutée par sa propre classe."""

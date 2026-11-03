@@ -16,7 +16,7 @@ import pytest
 from sqlalchemy.exc import OperationalError, PendingRollbackError
 
 from pipeline import run as run_pipeline
-from pipeline.graph import EXTRA_PHASES
+from pipeline.graph import Phase
 from pipeline.runtime.context import RunOptions
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
@@ -27,9 +27,9 @@ def _args(**surcharges) -> argparse.Namespace:
     return argparse.Namespace(**{**base, "sources": "hal,openalex,wos", **surcharges})
 
 
-def _phase(run):
-    """Renvoie la fonction `build` d'une phase de méthode `run(ctx)` égale à `run`."""
-    return lambda: SimpleNamespace(run=run)
+def _phase(run, name: str = "persons", harvesting: bool = False) -> Phase:
+    """Renvoie la phase `name`, dont l'exécution appelle `run(ctx)`."""
+    return Phase(name, "Libellé", (), harvesting=harvesting, build=lambda: SimpleNamespace(run=run))
 
 
 class _FakeRecorder:
@@ -53,26 +53,25 @@ class TestSelectPhasesToRun:
         assert run_pipeline._select_phases_to_run(_args()) == list(run_pipeline.PHASES)
 
     def test_sans_extras_omet_les_enrichissements(self):
-        noms = [n for n, _ in run_pipeline._select_phases_to_run(_args(no_extras=True))]
+        choisies = run_pipeline._select_phases_to_run(_args(no_extras=True))
 
-        assert not (set(noms) & EXTRA_PHASES)
-        assert noms == [n for n in run_pipeline.PHASE_NAMES if n not in EXTRA_PHASES]
+        assert choisies == [phase for phase in run_pipeline.PHASES if not phase.extra]
 
     def test_sans_extras_laisse_passer_une_phase_nommee(self):
         """`--only` prime sur `--no-extras` : l'enrichissement nommé est sélectionné."""
         choisies = run_pipeline._select_phases_to_run(_args(only="subjects", no_extras=True))
 
-        assert [n for n, _ in choisies] == ["subjects"]
+        assert [phase.name for phase in choisies] == ["subjects"]
 
     def test_une_seule_phase(self):
         choisies = run_pipeline._select_phases_to_run(_args(only="persons"))
 
-        assert [n for n, _ in choisies] == ["persons"]
+        assert [phase.name for phase in choisies] == ["persons"]
 
     def test_reprise_a_partir_d_une_phase(self):
         """La reprise après incident rejoue la phase nommée et toutes les suivantes."""
         choisies = run_pipeline._select_phases_to_run(_args(from_phase="persons"))
-        noms = [n for n, _ in choisies]
+        noms = [phase.name for phase in choisies]
 
         assert noms[0] == "persons"
         assert noms == run_pipeline.PHASE_NAMES[run_pipeline.PHASE_NAMES.index("persons") :]
@@ -119,7 +118,7 @@ class TestRunOnePhase:
     def _executer(self, run, recorder=None, args=None):
         recorder = recorder or _FakeRecorder()
         resultat = run_pipeline._run_one_phase(
-            "persons", _phase(run), args=args or _args(), sources={"hal"}, recorder=recorder
+            _phase(run), args=args or _args(), sources={"hal"}, recorder=recorder
         )
         return resultat, recorder
 
@@ -143,8 +142,11 @@ class TestRunOnePhase:
     def test_une_phase_de_moissonnage_se_clot_sur_son_total(self, caplog):
         with caplog.at_level(logging.INFO):
             run_pipeline._run_one_phase(
-                "harvest",
-                _phase(lambda ctx: PhaseMetrics(new=2, updated=5, extras={"not_found": 3})),
+                _phase(
+                    lambda ctx: PhaseMetrics(new=2, updated=5, extras={"not_found": 3}),
+                    name="harvest",
+                    harvesting=True,
+                ),
                 args=_args(),
                 sources={"hal"},
                 recorder=_FakeRecorder(),
@@ -157,12 +159,6 @@ class TestRunOnePhase:
             self._executer(lambda ctx: PhaseMetrics(new=3))
 
         assert not any(m.startswith("Total") for m in caplog.messages)
-
-    def test_phase_sans_metriques(self):
-        """Une phase sans valeur de retour est consignée avec des compteurs vides."""
-        _, recorder = self._executer(lambda ctx: None)
-
-        assert recorder.records[0]["status"] == "ok"
 
     def test_interruption_utilisateur(self, caplog):
         """L'arrêt demandé est consigné comme un avertissement et dit par où reprendre."""
@@ -282,8 +278,8 @@ class TestExecutePhases:
 
     def test_chaque_phase_consignee_et_journal_clos(self, run_prepare):
         phases = [
-            ("une", _phase(lambda ctx: PhaseMetrics())),
-            ("deux", _phase(lambda ctx: PhaseMetrics())),
+            _phase(lambda ctx: PhaseMetrics(), name="une"),
+            _phase(lambda ctx: PhaseMetrics(), name="deux"),
         ]
 
         run_pipeline._execute_phases(_args(), phases)
@@ -314,7 +310,7 @@ class TestMain:
         monkeypatch.setattr(
             run_pipeline,
             "_execute_phases",
-            lambda args, phases: executees.append([n for n, _ in phases]),
+            lambda args, phases: executees.append([phase.name for phase in phases]),
         )
 
         def _lancer(*arguments):
