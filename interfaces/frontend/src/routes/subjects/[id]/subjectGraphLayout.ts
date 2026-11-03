@@ -10,25 +10,35 @@ type SubjectNeighborLink = components["schemas"]["SubjectNeighborLink"];
  *
  * - L'ordre des voisins autour du centre met côte à côte les sujets qui se rencontrent souvent.
  * - La distance au centre dépend de la spécificité de l'association : les plus spécifiques au plus près.
- * - Les recouvrements de cercles et de libellés se règlent en faisant glisser les voisins le long de leur ellipse, sans changer leur distance au centre.
+ * - Les recouvrements de cercles et de libellés se règlent en faisant glisser les voisins le long de leur ellipse. Quand la place manque, le graphe s'agrandit.
+ * - L'ellipse s'arrondit quand la largeur disponible manque. Les libellés gardent leur taille.
  */
 
-// Repère du placement, centré sur le sujet central ; le cadre affiché (viewBox) épouse le graphe et ses libellés.
+// Repère du placement, en pixels, centré sur le sujet central ; le cadre affiché (viewBox) épouse le graphe et ses libellés.
 export const CX = 0;
 export const CY = 0;
-/** Étirement horizontal : l'ellipse est plus large que haute, comme l'écran. */
-const STRETCH = 1.6;
-/** Distance au centre des voisins les plus spécifiques, et écart jusqu'aux moins spécifiques. */
-export const INNER_RING = 60;
+/** Étirements horizontaux de l'ellipse, du plus large au plus étroit. */
+const STRETCHES = [1.6, 1.4, 1.2, 1, 0.8, 0.6];
+/** Distance au centre des voisins les plus spécifiques, et écart jusqu'aux moins spécifiques, avant agrandissement du graphe faute de place. */
+const INNER_RING = 60;
 const RING_SPAN = 140;
-const LABEL_SIZE = 13;
-const CENTER_LABEL_SIZE = 15;
+/** Tailles de police, en pixels : libellés des voisins, titre du sujet central. */
+export const LABEL_SIZE = 13.6;
+export const CENTER_LABEL_SIZE = 15.2;
+/** Taille minimale des libellés à l'écran : le graphe rétrécit au plus jusqu'à elle. */
+export const LABEL_FLOOR = 12;
+export const LINE_HEIGHT = LABEL_SIZE * 1.2;
+/** Longueur au-delà de laquelle un libellé passe sur deux lignes. */
+const MAX_LINE_LENGTH = 22;
 /** Largeur approximative d'un libellé, en unités du repère, pour une taille de police donnée. */
 const labelWidth = (label: string, fontSize: number) => label.length * fontSize * 0.54;
 
 export interface GraphNode {
   neighbor: SubjectNeighbor;
   r: number;
+  /** Libellé, sur une ou deux lignes. */
+  lines: string[];
+  /** Largeur de la plus longue ligne. */
   labelWidth: number;
   /** Distance au centre, mesurée sur l'ellipse. */
   distance: number;
@@ -48,23 +58,34 @@ function radius(usage: number, maxUsage: number): number {
   return 5 + (Math.sqrt(usage) / Math.sqrt(maxUsage)) * 17;
 }
 
+/** Libellé trop long coupé en deux lignes, à l'espace le plus proche du milieu. */
+function labelLines(label: string): string[] {
+  if (label.length <= MAX_LINE_LENGTH) return [label];
+  const middle = label.length / 2;
+  let cut = -1;
+  for (let i = label.indexOf(" "); i >= 0; i = label.indexOf(" ", i + 1)) {
+    if (cut < 0 || Math.abs(i - middle) < Math.abs(cut - middle)) cut = i;
+  }
+  return cut < 0 ? [label] : [label.slice(0, cut), label.slice(cut + 1)];
+}
+
 /** Emprise d'un voisin : son cercle et son libellé, placé du côté extérieur du graphe. */
 export function nodeBox(n: GraphNode): Box {
-  const half = Math.max(n.r, LABEL_SIZE * 0.7);
+  const half = Math.max(n.r, LABEL_SIZE * 0.7 + ((n.lines.length - 1) * LINE_HEIGHT) / 2);
   return n.x >= CX
     ? { x0: n.x - n.r, x1: n.x + n.r + 6 + n.labelWidth, y0: n.y - half, y1: n.y + half }
     : { x0: n.x - n.r - 6 - n.labelWidth, x1: n.x + n.r, y0: n.y - half, y1: n.y + half };
 }
 
-/** Place un voisin sur l'ellipse de distance donnée (par défaut la sienne), à l'angle donné. */
-function placeAt(n: GraphNode, angle: number, distance = n.distance): void {
-  n.x = CX + Math.cos(angle) * distance * STRETCH;
+/** Place un voisin sur l'ellipse d'étirement et de distance donnés (par défaut la sienne), à l'angle donné. */
+function placeAt(n: GraphNode, angle: number, stretch: number, distance = n.distance): void {
+  n.x = CX + Math.cos(angle) * distance * stretch;
   n.y = CY + Math.sin(angle) * distance;
 }
 
-/** Angle d'un voisin sur son ellipse. */
-function angleOf(n: GraphNode): number {
-  return Math.atan2(n.y - CY, (n.x - CX) / STRETCH);
+/** Angle d'un voisin sur une ellipse d'étirement donné. */
+function angleOf(n: GraphNode, stretch: number): number {
+  return Math.atan2(n.y - CY, (n.x - CX) / stretch);
 }
 
 /**
@@ -100,6 +121,9 @@ function circularOrder(nodes: GraphNode[], sim: (a: GraphNode, b: GraphNode) => 
   return order;
 }
 
+/**
+ * Placements du graphe d'un sujet, un par étirement de l'ellipse. La fonction renvoyée donne le placement le plus étiré qui tient dans une largeur donnée, sinon le plus étroit. Chaque placement se calcule à sa première demande.
+ */
 export function subjectGraphLayout(
   subject: SubjectListItem,
   neighbors: SubjectNeighbor[],
@@ -115,14 +139,18 @@ export function subjectGraphLayout(
     const t = logMax === logMin ? 0.5 : (Math.log(spec) - logMin) / (logMax - logMin);
     return INNER_RING + RING_SPAN * (1 - t);
   };
-  const nodes: GraphNode[] = neighbors.map((n, i) => ({
-    neighbor: n,
-    r: radius(n.usage_count, maxUsage),
-    labelWidth: labelWidth(n.label, LABEL_SIZE),
-    distance: distanceOf(specs[i]),
-    x: CX,
-    y: CY,
-  }));
+  const nodes: GraphNode[] = neighbors.map((n, i) => {
+    const lines = labelLines(n.label);
+    return {
+      neighbor: n,
+      r: radius(n.usage_count, maxUsage),
+      lines,
+      labelWidth: Math.max(...lines.map((line) => labelWidth(line, LABEL_SIZE))),
+      distance: distanceOf(specs[i]),
+      x: CX,
+      y: CY,
+    };
+  });
   const byLabel = new Map(nodes.map((n) => [n.neighbor.label_normalized, n]));
 
   // Proximité de deux voisins : leurs publications en commun, rapportées à la moyenne géométrique de leurs tailles.
@@ -148,10 +176,11 @@ export function subjectGraphLayout(
     y0: CY - centerR,
     y1: CY + centerR + 24,
   };
+  const strokeWidth = (cooc: number) => 1 + (cooc / maxCooc) * 6;
 
   // Recouvrements : on écarte les emprises le long de l'axe du moindre recouvrement, puis chaque voisin revient sur son ellipse en gardant son nouvel angle. Renvoie vrai si plus rien ne se recouvre.
   const gap = 4;
-  function relax(): boolean {
+  function relax(stretch: number): boolean {
     for (let pass = 0; pass < 300; pass++) {
       let moved = false;
       for (let i = 0; i < nodes.length; i++) {
@@ -178,38 +207,49 @@ export function subjectGraphLayout(
       }
       // Retour vers l'ellipse : chaque voisin garde son nouvel angle et peut s'écarter un peu de sa distance théorique, ce qui règle les recouvrements sur place.
       for (const n of nodes) {
-        const actual = Math.hypot((n.x - CX) / STRETCH, n.y - CY);
-        placeAt(n, angleOf(n), Math.min(Math.max(actual, n.distance * 0.85), n.distance * 1.35));
+        const actual = Math.hypot((n.x - CX) / stretch, n.y - CY);
+        placeAt(n, angleOf(n, stretch), stretch, Math.min(Math.max(actual, n.distance * 0.85), n.distance * 1.35));
       }
       if (!moved) return true;
     }
     return false;
   }
 
-  // Répartition régulière tout autour du centre, dans l'ordre de proximité. Quand la place manque, l'écart au-delà de l'anneau intérieur grandit par paliers : les plus spécifiques restent près du centre, l'ordre des distances ne change pas.
-  for (let scale = 1; scale < 3; scale *= 1.1) {
-    for (const n of nodes) n.distance = INNER_RING + (baseDistance.get(n)! - INNER_RING) * scale;
-    order.forEach((n, i) => placeAt(n, -Math.PI / 2 + (2 * Math.PI * i) / order.length));
-    if (relax()) break;
+  function place(stretch: number) {
+    // Répartition régulière tout autour du centre, dans l'ordre de proximité. Quand la place manque, toutes les distances au centre grandissent par paliers, dans la même proportion : l'ordre des distances ne change pas.
+    for (let scale = 1; scale < 3; scale *= 1.1) {
+      for (const n of nodes) n.distance = baseDistance.get(n)! * scale;
+      order.forEach((n, i) => placeAt(n, -Math.PI / 2 + (2 * Math.PI * i) / order.length, stretch));
+      if (relax(stretch)) break;
+    }
+    // Copie : les voisins de travail servent aux placements suivants.
+    const placed = nodes.map((n) => ({ ...n }));
+
+    // Cadre englobant cercles et libellés, avec une marge.
+    let { x0: minX, x1: maxX, y0: minY, y1: maxY } = centerBox;
+    for (const n of placed) {
+      const b = nodeBox(n);
+      minX = Math.min(minX, b.x0);
+      maxX = Math.max(maxX, b.x1);
+      minY = Math.min(minY, b.y0);
+      maxY = Math.max(maxY, b.y1);
+    }
+    const pad = 12;
+    const box = { x: minX - pad, y: minY - pad, width: maxX - minX + 2 * pad, height: maxY - minY + 2 * pad };
+
+    return { nodes: placed, box, centerBox, centerR, strokeWidth };
   }
 
-  // Cadre englobant cercles et libellés, avec une marge.
-  let { x0: minX, x1: maxX, y0: minY, y1: maxY } = centerBox;
-  for (const n of nodes) {
-    const b = nodeBox(n);
-    minX = Math.min(minX, b.x0);
-    maxX = Math.max(maxX, b.x1);
-    minY = Math.min(minY, b.y0);
-    maxY = Math.max(maxY, b.y1);
-  }
-  const pad = 12;
-  const box = { x: minX - pad, y: minY - pad, width: maxX - minX + 2 * pad, height: maxY - minY + 2 * pad };
-
-  return {
-    nodes,
-    box,
-    centerBox,
-    centerR,
-    strokeWidth: (cooc: number) => 1 + (cooc / maxCooc) * 6,
+  const placements = new Map<number, ReturnType<typeof place>>();
+  const placement = (stretch: number) => {
+    if (!placements.has(stretch)) placements.set(stretch, place(stretch));
+    return placements.get(stretch)!;
+  };
+  return (maxWidth: number) => {
+    for (const stretch of STRETCHES) {
+      const p = placement(stretch);
+      if (p.box.width <= maxWidth) return p;
+    }
+    return STRETCHES.map(placement).reduce((a, b) => (b.box.width < a.box.width ? b : a));
   };
 }
