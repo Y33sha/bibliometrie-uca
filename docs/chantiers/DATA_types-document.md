@@ -95,11 +95,11 @@ OpenAlex et ScanR ont 1 468 enregistrements sources `memoir` avec une URL DUMAS.
 
 Mesures du 2026-11-03, publications du périmètre : 1 895 communications rattachées à une revue, dont 1 869 avec un type brut de résumé. 2 259 publications ont un type brut de résumé.
 
-- [x] Type `conference_abstract`. Correspondance d'OpenAlex `conference-abstract` et du WoS `Meeting Abstract`.
-- [x] Règles de correction : communication rattachée à une revue, revue au titre en « abstract(s) ». Rejeu sur la publication avec le type et le titre de sa revue.
-- [x] Arbitrage : recueil de résumés HAL et enregistrement source `conference_abstract` vers le résumé, poster prioritaire.
-- [ ] Oneshot : type des enregistrements sources OpenAlex et WoS déjà normalisés, publications concernées marquées pour la réconciliation.
-- [ ] Mesures après le run : communications, résumés, posters.
+- [x] Type `conference_abstract`. Correspondance d'OpenAlex `conference-abstract` et du WoS `Meeting Abstract`. 2c6e7ad33
+- [x] Règles de correction : communication rattachée à une revue, revue au titre en « abstract(s) ». Rejeu sur la publication avec le type et le titre de sa revue. 2c6e7ad33
+- [x] Arbitrage : recueil de résumés HAL et enregistrement source `conference_abstract` vers le résumé, poster prioritaire. 2c6e7ad33
+- [x] Oneshot : type des enregistrements sources OpenAlex et WoS déjà normalisés, publications concernées marquées pour la réconciliation. 2999 enregistrements sources requalifiés. 74e47b7c4
+- [x] Mesures après le run : 9 369 communications, 2 362 résumés, 2 657 posters, 84 conférences filmées. Aucune communication rattachée à une revue. 206 posters ont un enregistrement source de résumé. 223 résumés viennent d'un recueil de résumés HAL seul.
 
 ### Phase 6 — Documentation
 
