@@ -72,6 +72,16 @@ class SerialStore:
             title, publisher_id, serials.c.publisher_id.is_not_distinct_from(publisher_id)
         )
 
+    def titles_without_issn(self, serial_ids: Sequence[int]) -> dict[int, str]:
+        """Renvoie le titre normalisé de chaque revue sans ISSN parmi `serial_ids`."""
+        rows = self._conn.execute(
+            select(serials.c.id, serials.c.title_normalized).where(
+                serials.c.id.in_(list(serial_ids)),
+                ~exists().where(serial_issns.c.serial_id == serials.c.id),
+            )
+        )
+        return {r.id: r.title_normalized for r in rows}
+
     def _serial_without_issn(
         self, title: str, publisher_id: int | None, *conditions: ColumnElement[bool]
     ) -> int:

@@ -1,15 +1,17 @@
 """Sous-étape de la phase `publishing` : rattachement de chaque monographie à sa collection.
 
-Les monographies sans collection à ISSN se regroupent en séries (`group_series`, `domain/serials/series.py`) : même clé de série, même éditeur, au moins deux volumes. Chaque série a son entrée dans `serials`, la revue sans ISSN de son titre et de son éditeur (`serial_for_title_and_publisher`), typée série d'actes ou collection de livres selon ses volumes. `choose_monograph_serial` (`domain/monographs/collection.py`) choisit ensuite l'entrée de chaque monographie : sa collection à ISSN, à défaut sa série sans ISSN, à défaut le volume lui-même, à défaut aucune. Une monographie en conflit reste en l'état, signalée. Le calcul se refait à chaque run, d'après les enregistrements sources.
+Les monographies sans collection à ISSN se regroupent en séries (`group_series`, `domain/serials/series.py`) : même clé de série, même éditeur, au moins deux volumes. Chaque série a son entrée dans `serials` : l'entrée sans ISSN de même titre déjà rattachée à ses volumes, à défaut la revue sans ISSN de son titre et de son éditeur (`serial_for_title_and_publisher`). L'entrée est typée série d'actes ou collection de livres selon ses volumes. `choose_monograph_serial` (`domain/monographs/collection.py`) choisit ensuite l'entrée de chaque monographie : sa collection à ISSN, à défaut sa série sans ISSN, à défaut le volume lui-même, à défaut aucune. Une monographie en conflit reste en l'état, signalée. Le calcul se refait à chaque run, d'après les enregistrements sources.
 """
 
 import logging
+from collections import Counter
 from typing import NamedTuple
 
 from sqlalchemy import Connection, text
 
 from domain.monographs.collection import MonographSerialChoice, choose_monograph_serial
 from domain.normalize import normalize_text
+from domain.serials.attachment import most_frequent
 from domain.serials.serial import SerialType
 from domain.serials.series import VolumeTitle, group_series
 from infrastructure.sql_fragments import has_active_issn
@@ -80,8 +82,13 @@ def set_monograph_serial(conn: Connection, monograph_id: int, serial_id: int | N
 def _series_by_monograph(
     candidates: list[MonographSerialCandidates], repo: SerialStore
 ) -> dict[int, int]:
-    """Renvoie la série sans ISSN de chaque monographie qui en a une, trouvée ou créée dans `serials`."""
+    """Renvoie la série sans ISSN de chaque monographie qui en a une.
+
+    Une série reprend l'entrée sans ISSN de même titre déjà rattachée à ses volumes, la plus fréquente, puis la plus ancienne. À défaut, son entrée est trouvée ou créée par titre et éditeur.
+    """
     proceedings = {m.monograph_id: m.proceedings for m in candidates}
+    current = {m.monograph_id: m.serial_id for m in candidates}
+    titles = repo.titles_without_issn([s for s in current.values() if s is not None])
     series: dict[int, int] = {}
     for group in group_series(
         [
@@ -90,9 +97,19 @@ def _series_by_monograph(
             if not m.with_issn
         ]
     ):
-        if not normalize_text(group.title):
+        title = normalize_text(group.title)
+        if not title:
             continue
-        series_id = repo.serial_for_title_and_publisher(group.title, group.publisher_id)
+        attached = Counter(
+            serial_id
+            for i in group.volume_ids
+            if (serial_id := current[i]) is not None and titles.get(serial_id) == title
+        )
+        series_id = (
+            most_frequent(attached)
+            if attached
+            else repo.serial_for_title_and_publisher(group.title, group.publisher_id)
+        )
         kind = (
             SerialType.PROCEEDINGS
             if all(proceedings[i] for i in group.volume_ids)
