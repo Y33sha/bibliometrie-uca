@@ -59,7 +59,7 @@ Constats :
 ### Phase 3 — File de normalisation
 
 - [x] Migration : file `queues.staging_normalization_queue`, garnie des lignes à traiter ; suppression de `staging.processed` et de son index.
-- [ ] Application de la migration, snapshot du schéma.
+- [x] Application de la migration, snapshot du schéma.
 - [x] Mise en file à chaque écriture de `staging` : document nouveau ou modifié et complet, complément des auteurs d'un document tronqué, levée de la marque de troncature, `rehydrate_staging_from_raw_store`.
 - [x] Normalisation de chaque source d'après la file : relevé des couples `(id, seq)` au départ, suppression des couples de chaque lot validé. Une ligne en erreur reste en file.
 - [x] Vidage de `raw_data` conditionné à l'empreinte lue.
