@@ -226,6 +226,9 @@ IMPACT_GROUP_TYPES = {
 NON_ENGLISH_SCOPE = frozenset({ImpactGroup.ARTICLES, ImpactGroup.OTHERS})
 """Groupes dont les publications non anglophones forment le groupe `NON_ENGLISH`."""
 
+IMPACT_GROUP_MIN_SHARE = {ImpactGroup.BOOKS: 0.2}
+"""Part minimale du groupe dans les publications de l'unité sur la période pour que son tableau figure au rapport."""
+
 
 @dataclass(frozen=True, slots=True)
 class PublicationImpact:
@@ -479,12 +482,19 @@ def _impact_rows(
 def _impact_section(
     data: StructureReportData, years: Sequence[int], year_headers: Sequence[str]
 ) -> list[str]:
+    """Un tableau par groupe d'impact non vide, au-dessus de sa part minimale. Le rapport montre soit le tableau des ouvrages et chapitres, soit celui des publications non anglophones."""
     role_label = _KEY_ROLES_LABELS[frozenset(data.key_roles)]
+    by_group = {
+        group: impacts
+        for group in IMPACT_GROUP_LABELS
+        if (impacts := [i for i in data.impacts if group in i.groups()])
+        and len(impacts) >= IMPACT_GROUP_MIN_SHARE.get(group, 0) * len(data.impacts)
+    }
+    if ImpactGroup.BOOKS in by_group:
+        by_group.pop(ImpactGroup.NON_ENGLISH, None)
     lines: list[str] = []
-    for group, label in IMPACT_GROUP_LABELS.items():
-        impacts = [i for i in data.impacts if group in i.groups()]
-        if not impacts:
-            continue
+    for group, impacts in by_group.items():
+        label = IMPACT_GROUP_LABELS[group]
         lines += [
             f"### {label}",
             "",
