@@ -10,16 +10,16 @@ from domain.persons.person import PersonExclusion
 
 
 class AddIdentifier(Model):
-    # Le service restreint l'ajout manuel aux types publics (`PUBLIC_PERSON_IDENTIFIER_TYPES`).
     id_type: PersonIdentifierType
+    """Le service restreint l'ajout manuel aux types publics (`PUBLIC_PERSON_IDENTIFIER_TYPES`)."""
     id_value: str
 
 
 class UpdateIdentifierStatus(Model):
-    # `authenticated` est exclu : posé seulement par l'import ORCID, protégé par un trigger.
     status: Literal[
         AttributionStatus.PENDING, AttributionStatus.CONFIRMED, AttributionStatus.REJECTED
     ]
+    """`authenticated` est exclu : posé seulement par l'import ORCID, protégé par un trigger."""
 
 
 class SetPersonExclusion(Model):

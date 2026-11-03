@@ -78,7 +78,6 @@ def _doi_prefixes_sql() -> str:
     """
 
 
-# Colonnes d'un éditeur (alias `p` = publishers), pour la liste comme pour le profil.
 _PUBLISHER_COLUMNS = f"""
     p.id, p.name, p.openalex_id, p.country,
     p.publisher_type,
@@ -86,6 +85,7 @@ _PUBLISHER_COLUMNS = f"""
     p.publication_count,
     {_doi_prefixes_sql()} AS doi_prefixes
 """.strip()
+"""Colonnes d'un éditeur (alias `p` = publishers), pour la liste comme pour le profil."""
 
 
 def _list_sql(where: str, sort: PublisherSort) -> str:

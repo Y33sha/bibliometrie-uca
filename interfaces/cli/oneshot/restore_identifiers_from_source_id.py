@@ -31,8 +31,8 @@ from pipeline.ingestion.scanr.payload import scanr_derived_identifier
 
 log = setup_logger("restore_identifiers_from_source_id", os.path.dirname(__file__))
 
-# Le `source_id` d'une thèse soutenue est son NNT : l'année, puis des lettres et des chiffres. Celui d'une thèse en cours est son identifiant theses.fr (`s123456`).
 _NNT = re.compile(r"[0-9]{4}[0-9A-Z]+")
+"""Le `source_id` d'une thèse soutenue est son NNT : l'année, puis des lettres et des chiffres. Celui d'une thèse en cours est son identifiant theses.fr (`s123456`)."""
 
 
 def _primary(id_type: SourceIdentifierType) -> Callable[[str], SourceIdentifier]:

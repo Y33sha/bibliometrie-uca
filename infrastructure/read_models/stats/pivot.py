@@ -234,7 +234,6 @@ class Indicator:
     breakdown: str
 
 
-# L'ordre du registre est celui du sélecteur de l'interface.
 INDICATORS: dict[str, Indicator] = {
     i.key: i
     for i in (
@@ -246,6 +245,7 @@ INDICATORS: dict[str, Indicator] = {
         Indicator("apc_amount", "Montant des APC", "apc_amount", "oa_voie"),
     )
 }
+"""L'ordre du registre est celui du sélecteur de l'interface."""
 
 assert all(
     i.measure in MEASURES and i.breakdown in DIMENSIONS and not DIMENSIONS[i.breakdown].comparable

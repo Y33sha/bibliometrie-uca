@@ -112,15 +112,14 @@ class RelationsRebuild(NamedTuple):
     """Arêtes disparues : présentes avant la reconstruction et absentes après."""
 
 
-# Écart d'années toléré entre une œuvre dépendante et son parent, dans les deux sens : un erratum suit son article (parent dans `[année − N … année]`), une version publiée suit son preprint (parent dans `[année … année + N]`).
 _TITLE_MATCH_YEAR_WINDOW = 2
+"""Écart d'années toléré entre une œuvre dépendante et son parent, dans les deux sens : un erratum suit son article (parent dans `[année − N … année]`), une version publiée suit son preprint (parent dans `[année … année + N]`)."""
 
-# Types de clé dont chaque enregistrement source retient une seule valeur (`confirmation_identifiers`).
 _SINGLE_KEY_TYPES = tuple(
     str(t) for t in CONFIRMATION_ID_TYPES if t is not SourceIdentifierType.HAL_ID
 )
+"""Types de clé dont chaque enregistrement source retient une seule valeur (`confirmation_identifiers`)."""
 
-# Paires de publications distinctes partageant une clé de confirmation, héritée par la publication de ses enregistrements sources : tout `hal_id` actif, et pour NNT, PMID et arXiv l'identifiant actif de rôle le plus fort, puis de plus petite valeur. `k1.pid < k2.pid` produit chaque paire une fois ; le `DISTINCT` fusionne les clés multiples.
 _SHARED_KEY_PAIRS_SQL = text(f"""
     WITH pub_keys AS (
         SELECT sr.publication_id AS pid, i.id_type::text AS ktype, i.id_value AS kval
@@ -141,8 +140,8 @@ _SHARED_KEY_PAIRS_SQL = text(f"""
     JOIN publications p1 ON p1.id = k1.pid
     JOIN publications p2 ON p2.id = k2.pid
 """)
+"""Paires de publications distinctes partageant une clé de confirmation, héritée par la publication de ses enregistrements sources : tout `hal_id` actif, et pour NNT, PMID et arXiv l'identifiant actif de rôle le plus fort, puis de plus petite valeur. `k1.pid < k2.pid` produit chaque paire une fois ; le `DISTINCT` fusionne les clés multiples."""
 
-# Signal #3, erratum → article corrigé : titre de l'article suffixe du titre de l'erratum, article publié dans [année − 2 … année]. Garde d'ambiguïté : un seul candidat substantiel, sinon aucune relation.
 _ERRATUM_TITLE_MATCHES_SQL = text(f"""
     WITH child AS (
         SELECT id, title_normalized AS t, publication_year AS y
@@ -171,8 +170,8 @@ _ERRATUM_TITLE_MATCHES_SQL = text(f"""
     JOIN substantive_count s ON s.child_id = c.child_id
     WHERE s.n = 1 AND c.substantive
 """)
+"""Signal #3, erratum → article corrigé : titre de l'article suffixe du titre de l'erratum, article publié dans [année − 2 … année]. Garde d'ambiguïté : un seul candidat substantiel, sinon aucune relation."""
 
-# Preprint → version publiée : titre identique, parent publié dans [année … année + 2]. Garde d'ambiguïté : un seul candidat substantiel (hors `dataset`) au même titre.
 _PREPRINT_TITLE_MATCHES_SQL = text(f"""
     WITH child AS (
         SELECT id, title_normalized AS t, publication_year AS y
@@ -199,6 +198,7 @@ _PREPRINT_TITLE_MATCHES_SQL = text(f"""
     JOIN substantive_count s ON s.child_id = c.child_id
     WHERE s.n = 1 AND c.substantive
 """)
+"""Preprint → version publiée : titre identique, parent publié dans [année … année + 2]. Garde d'ambiguïté : un seul candidat substantiel (hors `dataset`) au même titre."""
 
 
 def fetch_declared_relation_sources(conn: Connection) -> list[DeclaredRelationSource]:
@@ -272,8 +272,8 @@ def fetch_preprint_title_matches(conn: Connection) -> list[TitleMatch]:
     return [TitleMatch(r.child_id, r.parent_id, r.parent_doi) for r in rows]
 
 
-# Colonnes de la contrainte d'unicité, qui identifient une arête. Le diff avant/après les compare.
 _IDENTITY_COLUMNS = "from_publication_id, relation_type, target_publication_id, target_doi"
+"""Colonnes de la contrainte d'unicité, qui identifient une arête. Le diff avant/après les compare."""
 
 
 def rebuild_relations(conn: Connection, edges: list[RelationEdge]) -> RelationsRebuild:

@@ -20,8 +20,8 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import track_progress
 from pipeline.transformation.countries.place_names import load_country_names, load_place_forms
 
-# Adresses par tranche : la taille borne la mémoire et le nombre d'allers-retours SQL.
 CHUNK_SIZE = 10_000
+"""Adresses par tranche : la taille borne la mémoire et le nombre d'allers-retours SQL."""
 
 _COUNT_UNCLASSIFIED = text("SELECT count(*) FROM addresses WHERE origin IS NULL")
 

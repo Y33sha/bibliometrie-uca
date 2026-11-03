@@ -27,8 +27,8 @@ from infrastructure.read_models.subjects.models import (
     VocabularySubjectOut,
 )
 
-# Un sujet dont l'usage global dépasse ce seuil est trop générique pour un nuage de mots : « research article » ou « science » arrivent en tête partout, et masquent ce qui distingue le contexte affiché.
 GENERIC_SUBJECT_MAX_USAGE = 5000
+"""Un sujet dont l'usage global dépasse ce seuil est trop générique pour un nuage de mots : « research article » ou « science » arrivent en tête partout, et masquent ce qui distingue le contexte affiché."""
 
 _SORT_MAP: dict[SubjectSort, str] = {
     "label_asc": "sl.label_normalized ASC",
@@ -37,13 +37,13 @@ _SORT_MAP: dict[SubjectSort, str] = {
     "publications_desc": "sl.usage_count DESC, sl.label_normalized",
 }
 
-# Vocabulaires de chaque libellé normalisé, dans l'ordre de l'enum.
 _VOCABULARIES_SQL = """
     SELECT label_normalized, array_agg(DISTINCT vocabulary ORDER BY vocabulary)::text[] AS vocabularies
     FROM subjects
     WHERE usage_count > 0
     GROUP BY label_normalized
 """
+"""Vocabulaires de chaque libellé normalisé, dans l'ordre de l'enum."""
 
 _ANCESTORS_SQL = text("""
     WITH RECURSIVE chain AS (
@@ -69,7 +69,6 @@ _CHILDREN_SQL = text("""
     ORDER BY usage_count DESC, label_normalized
 """)
 
-# Spécificité d'un voisin : part de ses publications qui ont aussi le sujet.
 _NEIGHBORS_SQL = text("""
     SELECT sl.label_normalized, sl.label, sl.usage_count, c.n AS cooccurrence_count
     FROM (
@@ -82,6 +81,7 @@ _NEIGHBORS_SQL = text("""
     ORDER BY c.n::real / greatest(sl.usage_count, 1) DESC, c.n DESC, sl.label_normalized
     LIMIT :lim
 """)
+"""Spécificité d'un voisin : part de ses publications qui ont aussi le sujet."""
 
 _NEIGHBOR_LINKS_SQL = text("""
     SELECT label_a, label_b, count AS cooccurrence_count
@@ -90,10 +90,10 @@ _NEIGHBOR_LINKS_SQL = text("""
 """)
 
 
-# Sujets (`sl`) avec leurs vocabulaires (`v`) : source de la liste, de son total et de ses facettes.
 _FROM = (
     f"subject_labels sl JOIN ({_VOCABULARIES_SQL}) v ON v.label_normalized = sl.label_normalized"
 )
+"""Sujets (`sl`) avec leurs vocabulaires (`v`) : source de la liste, de son total et de ses facettes."""
 
 
 def _where(

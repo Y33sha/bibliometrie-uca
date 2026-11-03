@@ -13,8 +13,8 @@ from pipeline.ingestion.common.person_search import (
 )
 from pipeline.ingestion.datacite.api import DataciteClient
 
-# Documents par page. Un document de grande collaboration compte un millier de créateurs (environ 200 Kio).
 _PAGE_SIZE = 25
+"""Documents par page. Un document de grande collaboration compte un millier de créateurs (environ 200 Kio)."""
 
 
 def build_orcid_query(orcids: list[str], first_year: int, last_year: int) -> str:

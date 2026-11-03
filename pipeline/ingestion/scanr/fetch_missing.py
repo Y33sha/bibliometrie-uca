@@ -27,8 +27,8 @@ from pipeline.ingestion.scanr.api import search
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
 BATCH_SIZE = 50
-# L'API Elasticsearch publique est sans plafond documenté : 5 requêtes simultanées restent courtoises.
 MAX_CONCURRENT = 5
+"""L'API Elasticsearch publique est sans plafond documenté : 5 requêtes simultanées restent courtoises."""
 
 
 async def search_by_external_ids(

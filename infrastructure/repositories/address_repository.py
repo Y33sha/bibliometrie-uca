@@ -20,8 +20,8 @@ from infrastructure.db.tables import (
 )
 from infrastructure.sql_fragments import address_country_conditions
 
-# Marque les adresses de la CTE `target(id, countries)`.
 _MARK_TARGET = enqueue_sql(Queue.ADDRESS_CANDIDATES, "SELECT id FROM target")
+"""Marque les adresses de la CTE `target(id, countries)`."""
 
 
 class PgAddressRepository(AddressRepository):

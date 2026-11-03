@@ -12,8 +12,8 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from infrastructure.db.query_cancellation import QueryCancellation
 
-# Clé de `request.state` sous laquelle la requête HTTP expose son recensement de connexions.
 _STATE_KEY = "query_cancellation"
+"""Clé de `request.state` sous laquelle la requête HTTP expose son recensement de connexions."""
 
 
 def request_cancellation(request: Request) -> QueryCancellation | None:

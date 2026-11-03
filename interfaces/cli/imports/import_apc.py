@@ -56,12 +56,12 @@ class FileFormat(StrEnum):
     INSTITUTION_SURVEY = "institution_survey"
 
 
-# Colonne propre à chaque format, qui le désigne.
 _FORMAT_MARKERS = {
     "euro": FileFormat.OPEN_APC,
     "Montant payé en EURHT": FileFormat.NON_OA_FEES,
     "montant_euros_ht": FileFormat.INSTITUTION_SURVEY,
 }
+"""Colonne propre à chaque format, qui le désigne."""
 
 # Titres de section de la réponse d'un établissement à l'enquête APC, dans la colonne du laboratoire.
 _NON_OA_FEES_SECTION = "Pas d'APC"
@@ -309,12 +309,11 @@ class UnresolvedLabel:
     """Nombre de paiements à ce libellé."""
 
 
-# Colonne du libellé, colonne de son contexte, colonne de la structure, types de structure admis.
-# Le payeur sert de contexte au laboratoire : il nomme souvent l'établissement de tutelle.
 _LINKS = (
     ("lab_name", "institution", "lab_structure_id", LAB_TYPES),
     ("institution", "NULL::text", "budget_structure_id", PAYER_TYPES),
 )
+"""Colonne du libellé, colonne de son contexte, colonne de la structure, types de structure admis. Le payeur sert de contexte au laboratoire : il nomme souvent l'établissement de tutelle."""
 
 
 def map_structures(conn: Connection, resolver: StructureResolver) -> list[UnresolvedLabel]:

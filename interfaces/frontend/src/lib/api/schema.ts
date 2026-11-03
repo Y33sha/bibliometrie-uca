@@ -2923,6 +2923,7 @@ export interface components {
         };
         /** AddIdentifier */
         AddIdentifier: {
+            /** @description Le service restreint l'ajout manuel aux types publics (`PUBLIC_PERSON_IDENTIFIER_TYPES`). */
             id_type: components["schemas"]["PersonIdentifierType"];
             /** Id Value */
             id_value: string;
@@ -6525,6 +6526,7 @@ export interface components {
         UpdateIdentifierStatus: {
             /**
              * Status
+             * @description `authenticated` est exclu : posé seulement par l'import ORCID, protégé par un trigger.
              * @enum {string}
              */
             status: "pending" | "confirmed" | "rejected";

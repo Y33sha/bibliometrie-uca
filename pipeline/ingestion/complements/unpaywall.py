@@ -12,7 +12,6 @@ from domain.types import as_mapping
 from pipeline.http.http_retry import lookup_json_async
 from pipeline.http.lookup import NOT_FOUND, LookupOutcome, NotFound, Unavailable
 
-# Statut Unpaywall → `oa_type`.
 OA_MAP = {
     "gold": "gold",
     "hybrid": "hybrid",
@@ -20,6 +19,7 @@ OA_MAP = {
     "green": "green",
     "closed": "closed",
 }
+"""Statut Unpaywall → `oa_type`."""
 
 
 async def fetch_oa_status(

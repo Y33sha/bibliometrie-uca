@@ -20,8 +20,8 @@ from pipeline.ingestion.common.person_search import PersonSearchPage
 
 logger = logging.getLogger(__name__)
 
-# Documents par page. Un document de grande collaboration pèse environ 500 Kio, et Crossref refuse une réponse de plus de 100 Mio.
 _ROWS = 50
+"""Documents par page. Un document de grande collaboration pèse environ 500 Kio, et Crossref refuse une réponse de plus de 100 Mio."""
 
 
 def headers() -> dict[str, str]:

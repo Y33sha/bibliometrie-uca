@@ -14,8 +14,8 @@ from domain.source_records.identifiers import (
 from domain.subjects.subject import SubjectLink, rameau_subject
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
 
-# Types des concepts ScanR (`domains`). Les vedettes sudoc (RAMEAU) relèvent d'un vocabulaire contrôlé. Les concepts wikidata, détectés par ScanR dans le texte, et les mots-clés sont des mots-clés libres.
 _RAMEAU_CONCEPT_TYPE = "sudoc"
+"""Types des concepts ScanR (`domains`). Les vedettes sudoc (RAMEAU) relèvent d'un vocabulaire contrôlé. Les concepts wikidata, détectés par ScanR dans le texte, et les mots-clés sont des mots-clés libres."""
 
 _KEYWORD_CONCEPT_TYPES = frozenset({"wikidata", "keyword"})
 
@@ -31,8 +31,8 @@ def select_leaf_affiliations(
     return labo or affiliations
 
 
-# Identifiant ScanR d'une thèse soutenue : `nnt<NNT>` ou `these<NNT>`, le NNT commençant par l'année de soutenance. Une thèse en préparation (`nnts<numéro>`) est sans NNT.
 _THESIS_ID_RE = re.compile(r"^(?:nnt|these)(\d{4}[A-Za-z0-9]+)$")
+"""Identifiant ScanR d'une thèse soutenue : `nnt<NNT>` ou `these<NNT>`, le NNT commençant par l'année de soutenance. Une thèse en préparation (`nnts<numéro>`) est sans NNT."""
 
 
 def extract_nnt_from_scanr_id(scanr_id: str | None) -> str | None:
@@ -42,12 +42,12 @@ def extract_nnt_from_scanr_id(scanr_id: str | None) -> str | None:
     return str(nnt) if nnt else None
 
 
-# Préfixe d'un identifiant ScanR contenant l'identifiant d'un document d'une autre source, et type de cet identifiant.
 _DERIVED_PREFIXES = (
     ("doi", SourceIdentifierType.DOI),
     ("hal", SourceIdentifierType.HAL_ID),
     ("pmid", SourceIdentifierType.PMID),
 )
+"""Préfixe d'un identifiant ScanR contenant l'identifiant d'un document d'une autre source, et type de cet identifiant."""
 
 
 def scanr_derived_identifier(scanr_id: str) -> SourceIdentifier | None:

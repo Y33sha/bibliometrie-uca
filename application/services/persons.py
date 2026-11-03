@@ -55,8 +55,8 @@ class IdentifierStatusResult(NamedTuple):
     """Nombre d'identifiants des mêmes comptes HAL ayant reçu le même statut."""
 
 
-# Statuts propagés d'un identifiant aux identifiants de ses comptes HAL.
 _PROPAGATED_STATUSES = frozenset({AttributionStatus.CONFIRMED, AttributionStatus.REJECTED})
+"""Statuts propagés d'un identifiant aux identifiants de ses comptes HAL."""
 
 
 class PersonService:

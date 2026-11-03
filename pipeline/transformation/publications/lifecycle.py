@@ -14,8 +14,8 @@ from pipeline.transformation.publications.store import PublicationStore
 
 _DELETION_VERDICTS = frozenset({RefreshVerdict.NO_SOURCE, RefreshVerdict.INADMISSIBLE_TYPE})
 
-# Publications recalculées ensemble : chaque lecture du recalcul porte sur un lot.
 _REFRESH_BATCH_SIZE = 500
+"""Publications recalculées ensemble : chaque lecture du recalcul porte sur un lot."""
 
 
 def create(

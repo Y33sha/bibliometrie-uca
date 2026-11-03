@@ -28,9 +28,6 @@ class EntitySql(NamedTuple):
     """Décompte des publications par entité. `COUNT(*)` suffit quand la jointure renvoie une ligne par couple publication–entité."""
 
 
-# Organisation partenaire : ROR des auteurs, ancêtres compris (`publication_rors`), hors ROR propres aux structures `:own_structure_ids`.
-# Auteur : personne non exclue, rattachée à une contribution.
-# Sujet : regroupé par libellé normalisé, tous vocabulaires confondus. `publication_subjects` a une ligne par source pour un même couple publication–sujet.
 ENTITY_SQL: dict[EntityKind, EntitySql] = {
     "serial": EntitySql(
         table="serials j",
@@ -77,6 +74,7 @@ ENTITY_SQL: dict[EntityKind, EntitySql] = {
         id_type="text",
     ),
 }
+"""Organisation partenaire : ROR des auteurs, ancêtres compris (`publication_rors`), hors ROR propres aux structures `:own_structure_ids`. Auteur : personne non exclue, rattachée à une contribution. Sujet : regroupé par libellé normalisé, tous vocabulaires confondus. `publication_subjects` a une ligne par source pour un même couple publication–sujet."""
 
 
 def entity_name_clause(label_sql: str, search: str) -> tuple[str, dict[str, object]]:

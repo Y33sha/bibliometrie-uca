@@ -24,10 +24,9 @@ from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.log_format import inflect, quantity, step
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
-# Plafond OpenAlex 10 req/s.
 MAX_CONCURRENT = 3
+"""Plafond OpenAlex 10 req/s."""
 
-# Le marqueur posé au moissonnage survit à la normalisation, qui vide `raw_data` : la sélection ne dépend ni de l'ordre des phases ni du comptage des auteurs.
 _SELECT_TRUNCATED_SQL = text(
     """
     SELECT source_id
@@ -36,6 +35,7 @@ _SELECT_TRUNCATED_SQL = text(
     ORDER BY id
     """
 )
+"""Le marqueur posé au moissonnage survit à la normalisation, qui vide `raw_data` : la sélection ne dépend ni de l'ordre des phases ni du comptage des auteurs."""
 
 
 def _refetch(ctx: PhaseContext) -> PhaseMetrics:

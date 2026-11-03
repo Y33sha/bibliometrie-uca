@@ -24,8 +24,8 @@ from domain.source_records.identifiers import (
 from domain.types import JsonValue, as_mapping, as_str
 from domain.urls import is_host, url_host
 
-# OpenAlex donne ses identifiants en URL (`https://openalex.org/<id>`) pour tous les types d'entité : W works, A auteurs, S sources, I institutions, P éditeurs. La base garde la forme courte (`S20400310`).
 _OPENALEX_ID_PREFIX = "https://openalex.org/"
+"""OpenAlex donne ses identifiants en URL (`https://openalex.org/<id>`) pour tous les types d'entité : W works, A auteurs, S sources, I institutions, P éditeurs. La base garde la forme courte (`S20400310`)."""
 
 
 def short_openalex_id(id_or_url: str) -> str:
@@ -142,8 +142,8 @@ def names_serial(loc: OpenalexLocation | None) -> bool:
     return names_publisher(loc) and (loc is None or loc.source_type != "ebook platform")
 
 
-# NNT d'un identifiant PMH : « pmh:{NNT} », hors identifiants OAI (`oai:HAL:…`).
 _PMH_NNT_RE = re.compile(r"^pmh:([A-Za-z0-9]+)$", re.IGNORECASE)
+"""NNT d'un identifiant PMH : « pmh:{NNT} », hors identifiants OAI (`oai:HAL:…`)."""
 _THESES_FR_URL_RE = re.compile(r"theses\.fr/([A-Za-z0-9]+)")
 
 

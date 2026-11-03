@@ -99,12 +99,12 @@ class ContributionRorItem(TypedDict):
 _KEY_HASH_NULL = r"E'\x01'"
 _KEY_HASH_SEP = r"E'\x1f'"
 
-# Colonnes de la clé de `contributor_information`, dans l'ordre du `key_hash`.
 CONTRIBUTOR_INFORMATION_KEY_COLUMNS = (
     "last_name_normalized",
     "first_name_normalized",
     "identifiers",
 )
+"""Colonnes de la clé de `contributor_information`, dans l'ordre du `key_hash`."""
 
 
 def key_hash_sql(exprs: Sequence[str]) -> str:
@@ -118,7 +118,6 @@ def key_hash_sql(exprs: Sequence[str]) -> str:
 
 _KEY_COLUMNS_SQL = ", ".join(CONTRIBUTOR_INFORMATION_KEY_COLUMNS)
 
-# Marque les contributions liées aux contributions sources de la CTE `updated(id, attributes_changed, contributor_changed)` à rôles ou statut de correspondant changés.
 _MARK_CONTRIBUTIONS_OF_UPDATED = enqueue_sql(
     Queue.CONTRIBUTION_ATTRIBUTES,
     """
@@ -127,8 +126,8 @@ _MARK_CONTRIBUTIONS_OF_UPDATED = enqueue_sql(
     WHERE u.attributes_changed
     """,
 )
+"""Marque les contributions liées aux contributions sources de la CTE `updated(id, attributes_changed, contributor_changed)` à rôles ou statut de correspondant changés."""
 
-# Marque pour la redécision de leur personne les contributions rattachées dont une contribution source de la CTE `updated` change d'informations du contributeur.
 _MARK_RESOLUTION_OF_UPDATED = enqueue_sql(
     Queue.CONTRIBUTION_RESOLUTION,
     """
@@ -138,6 +137,7 @@ _MARK_RESOLUTION_OF_UPDATED = enqueue_sql(
     WHERE u.contributor_changed AND g.person_id IS NOT NULL
     """,
 )
+"""Marque pour la redécision de leur personne les contributions rattachées dont une contribution source de la CTE `updated` change d'informations du contributeur."""
 
 
 def mark_source_contributions_to_resync(conn: Connection, source: str) -> int:

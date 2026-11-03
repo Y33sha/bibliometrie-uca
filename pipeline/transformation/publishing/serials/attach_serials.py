@@ -72,7 +72,6 @@ _SET_ISSN_SERIALS = text("""
     WHERE i.issn = t.issn AND i.serial_id IS DISTINCT FROM t.serial_id
 """)
 
-# Une revue corrigée garde sa correction : la revue calculée devient sa valeur d'avant correction, que la correction des métadonnées relit.
 _SET_RECORD_SERIALS = text(f"""
     UPDATE source_records s
     SET serial_id = CASE WHEN s.corrections ? '{CorrectionKey.SERIAL_ID}' AND t.serial_id IS NULL
@@ -84,6 +83,7 @@ _SET_RECORD_SERIALS = text(f"""
     FROM jsonb_to_recordset(CAST(:rows AS jsonb)) AS t(id integer, serial_id integer)
     WHERE s.id = t.id
 """)
+"""Une revue corrigée garde sa correction : la revue calculée devient sa valeur d'avant correction, que la correction des métadonnées relit."""
 
 _ADD_ISSNS = text("""
     INSERT INTO serial_issns (issn)

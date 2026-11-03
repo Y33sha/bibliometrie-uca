@@ -111,8 +111,8 @@ class StagingRow:
 
 _COLUMNS = "id, source_id, doi, raw_data, raw_hash"
 
-# Relevé de la file de normalisation, sur la connexion de la normalisation.
 _SNAPSHOT = "staging_normalization_snapshot"
+"""Relevé de la file de normalisation, sur la connexion de la normalisation."""
 
 _PENDING_IDS_SQL = text(f"""
     SELECT t.id FROM pg_temp.{_SNAPSHOT} t
@@ -121,7 +121,6 @@ _PENDING_IDS_SQL = text(f"""
     ORDER BY t.id
 """)  # noqa: S608 — nom de table venu du code
 
-# `old` capture le payload lu avant de le vider. Une réécriture concurrente change `raw_hash` : la ligne garde alors son nouveau payload.
 _CLEAR_PAYLOAD_SQL = text(
     """
     UPDATE staging s
@@ -134,9 +133,9 @@ _CLEAR_PAYLOAD_SQL = text(
     RETURNING old.source AS source, old.source_id AS source_id, old.raw_data AS raw_data
     """
 )
+"""`old` capture le payload lu avant de le vider. Une réécriture concurrente change `raw_hash` : la ligne garde alors son nouveau payload."""
 
 
-# Réécrit `raw_data` sans recalculer `raw_hash` : la ligne garde l'empreinte du document tronqué, retrouvée par le moissonnage suivant. Lève le marqueur et met la ligne en file : la normalisation réécrit les contributions sources complètes.
 _COMPLETE_AUTHORS_SQL = text(
     f"""
     WITH completed AS (
@@ -148,8 +147,8 @@ _COMPLETE_AUTHORS_SQL = text(
     {enqueue_sql(Queue.STAGING_NORMALIZATION, "SELECT id FROM completed")}
     """  # noqa: S608 — nom de file venu du code
 ).bindparams(bindparam("raw_data", type_=Jsonb))
+"""Réécrit `raw_data` sans recalculer `raw_hash` : la ligne garde l'empreinte du document tronqué, retrouvée par le moissonnage suivant. Lève le marqueur et met la ligne en file : la normalisation réécrit les contributions sources complètes."""
 
-# La marque de troncature se pose seulement sur un payload nouveau : sa levée met la ligne en file.
 _CLEAR_TRUNCATED_SQL = text(
     f"""
     WITH cleared AS (
@@ -160,6 +159,7 @@ _CLEAR_TRUNCATED_SQL = text(
     {enqueue_sql(Queue.STAGING_NORMALIZATION, "SELECT id FROM cleared")}
     """  # noqa: S608 — nom de file venu du code
 )
+"""La marque de troncature se pose seulement sur un payload nouveau : sa levée met la ligne en file."""
 
 
 class StagingStore:

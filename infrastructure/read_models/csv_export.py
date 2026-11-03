@@ -9,8 +9,8 @@ from sqlalchemy import Connection, Row, text
 
 logger = logging.getLogger(__name__)
 
-# Caractères de début de formule pour un tableur. Une cellule commençant par l'un d'eux est évaluée à l'ouverture du fichier. Son contenu vient de sources externes : titres et noms de revues de HAL et d'OpenAlex.
 _FORMULA_STARTERS = ("=", "+", "-", "@", "\t", "\r")
+"""Caractères de début de formule pour un tableur. Une cellule commençant par l'un d'eux est évaluée à l'ouverture du fichier. Son contenu vient de sources externes : titres et noms de revues de HAL et d'OpenAlex."""
 
 
 def neutralize_formula(value: object) -> object:
@@ -35,8 +35,8 @@ class _EchoStream:
         return value
 
 
-# Marque d'ordre des octets, en tête du premier bloc. Sans elle, un tableur lit l'UTF-8 comme de l'ANSI, et les accents s'affichent mal.
 BOM = "﻿"
+"""Marque d'ordre des octets, en tête du premier bloc. Sans elle, un tableur lit l'UTF-8 comme de l'ANSI, et les accents s'affichent mal."""
 
 
 class CsvWriter:
@@ -64,8 +64,8 @@ class CsvWriter:
         )
 
 
-# Taille visée d'un bloc envoyé au client. Une ligne par bloc ferait des dizaines de milliers d'envois pour un export. Un bloc trop gros reviendrait à tout mettre en tampon.
 EXPORT_CHUNK_SIZE = 64 * 1024
+"""Taille visée d'un bloc envoyé au client. Une ligne par bloc ferait des dizaines de milliers d'envois pour un export. Un bloc trop gros reviendrait à tout mettre en tampon."""
 
 
 def chunked(lines: Iterator[str], size: int = EXPORT_CHUNK_SIZE) -> Iterator[str]:
@@ -83,8 +83,8 @@ def chunked(lines: Iterator[str], size: int = EXPORT_CHUNK_SIZE) -> Iterator[str
         yield "".join(pending)
 
 
-# Plafond de lignes d'un export, avec la requête et le fichier en mémoire. Assez haut pour un export légitime. Assez bas pour qu'une demande sans filtre, répétable par n'importe qui, laisse de la mémoire disponible.
 MAX_EXPORT_ROWS = 500_000
+"""Plafond de lignes d'un export, avec la requête et le fichier en mémoire. Assez haut pour un export légitime. Assez bas pour qu'une demande sans filtre, répétable par n'importe qui, laisse de la mémoire disponible."""
 
 
 def cap_export_rows(

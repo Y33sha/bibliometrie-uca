@@ -20,7 +20,6 @@ from pipeline.ingestion.hal.structures import HAL_STRUCTURE_FIELDS
 
 type SolrParams = dict[str, str | int | float | bool | None]
 
-# Champs Solr demandés : un champ absent de la liste manque aux documents reçus.
 HAL_FIELDS = [
     "halId_s",
     "doiId_s",
@@ -63,6 +62,7 @@ HAL_FIELDS = [
     "issue_s",
     "page_s",
 ]
+"""Champs Solr demandés : un champ absent de la liste manque aux documents reçus."""
 
 HAL_FIELDS_STR = ",".join(HAL_FIELDS)
 
@@ -141,8 +141,8 @@ async def find_deposit(
     return UNAVAILABLE
 
 
-# Identifiants par requête : la requête Solr reste courte, et la réponse tient en une page.
 HAL_STRUCTURES_BATCH = 100
+"""Identifiants par requête : la requête Solr reste courte, et la réponse tient en une page."""
 
 
 class HalStructuresClient:

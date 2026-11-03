@@ -39,7 +39,6 @@ class StaleRefetch(ABC):
     ) -> FetchOutcome: ...
 
 
-# Filtre sur l'année (`{year_clause}`) : `publication_year` vient de `source_records`. Un document sans enregistrement source reste sélectionné.
 _STALE_ROWS_SQL_TEMPLATE = """
     SELECT s.source_id
     FROM staging s
@@ -51,6 +50,7 @@ _STALE_ROWS_SQL_TEMPLATE = """
       {year_clause}
     ORDER BY s.id
 """
+"""Filtre sur l'année (`{year_clause}`) : `publication_year` vient de `source_records`. Un document sans enregistrement source reste sélectionné."""
 
 _SET_DISAPPEARED_SQL = text(
     """

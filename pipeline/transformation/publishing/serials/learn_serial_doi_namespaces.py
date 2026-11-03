@@ -29,7 +29,6 @@ class DoiSerialRow(NamedTuple):
     serial_type: SerialType
 
 
-# Une revue attribuée par son espace de noms est notée dans `corrections.serial_id`.
 _DOI_SERIAL_PAIRS = text(f"""
     SELECT d.id_value AS doi, s.serial_id, j.serial_type
     FROM source_records s
@@ -37,6 +36,7 @@ _DOI_SERIAL_PAIRS = text(f"""
     JOIN source_record_identifiers d ON d.source_record_id = s.id AND {serial_doi_sql("d", "s")}
     WHERE NOT {corrected("serial_id", "s")}
 """)
+"""Une revue attribuée par son espace de noms est notée dans `corrections.serial_id`."""
 
 
 def find_doi_serial_pairs(conn: Connection) -> list[DoiSerialRow]:

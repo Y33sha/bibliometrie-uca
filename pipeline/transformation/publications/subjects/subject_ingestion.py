@@ -19,8 +19,8 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import track_progress
 from pipeline.transformation.publications.subjects.subject_store import SubjectStore
 
-# Publications dérivées par instruction.
 _BATCH = 2000
+"""Publications dérivées par instruction."""
 
 
 def run(

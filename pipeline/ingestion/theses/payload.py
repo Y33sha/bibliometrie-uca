@@ -15,8 +15,8 @@ from domain.persons.contributor_name import ContributorName
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
 from pipeline.ingestion.common.source_contributions import contributor_identifiers
 
-# Cas de diffusion STAR avec une version de la thèse destinée à Internet. Les cas 5 et 6 réservent la thèse à l'intranet de l'établissement.
 _INTERNET_CASES = frozenset({"cas1", "cas2", "cas3", "cas4"})
+"""Cas de diffusion STAR avec une version de la thèse destinée à Internet. Les cas 5 et 6 réservent la thèse à l'intranet de l'établissement."""
 
 
 def awaits_diffusion(thesis: Mapping[str, JsonValue]) -> bool:

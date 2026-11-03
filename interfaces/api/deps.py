@@ -107,8 +107,8 @@ def ensure_admin_user() -> None:
 # ----- Connexions -----
 
 
-# Méthodes HTTP sans effet de bord. Starlette sert `HEAD` par la route `GET` correspondante.
 READ_ONLY_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
+"""Méthodes HTTP sans effet de bord. Starlette sert `HEAD` par la route `GET` correspondante."""
 
 
 def _open_connection(request: Request) -> Connection:

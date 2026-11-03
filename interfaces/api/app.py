@@ -90,8 +90,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         set_sync_engine(None)
 
 
-# Préfixe de déploiement (`/bibliometrie` en production), vide pour un service à la racine (`route_path`).
 ROOT_PATH = os.environ.get("ROOT_PATH", "")
+"""Préfixe de déploiement (`/bibliometrie` en production), vide pour un service à la racine (`route_path`)."""
 
 # Docs interactives activées par `expose_api_docs`, en développement seulement : elles décrivent toute l'API, admin comprise.
 _expose_docs = settings.expose_api_docs
@@ -181,11 +181,11 @@ async def data_error_handler(request: Request, exc: DataError) -> JSONResponse:
     )
 
 
-# SQLSTATE d'une requête interrompue par Postgres : plafond `statement_timeout` ou annulation.
 _QUERY_CANCELED = "57014"
+"""SQLSTATE d'une requête interrompue par Postgres : plafond `statement_timeout` ou annulation."""
 
-# Statut d'une requête abandonnée par le client, d'usage chez nginx. La réponse n'atteint personne ; le statut sert au journal.
 _CLIENT_CLOSED_REQUEST = 499
+"""Statut d'une requête abandonnée par le client, d'usage chez nginx. La réponse n'atteint personne ; le statut sert au journal."""
 
 
 @app.exception_handler(OperationalError)
@@ -336,7 +336,6 @@ async def timing_middleware(request: Request, call_next: RequestResponseEndpoint
     return response
 
 
-# En-têtes de sécurité posés sur toute réponse. HSTS relève du reverse-proxy TLS.
 _SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",  # Interdit au navigateur de deviner le type MIME.
     "X-Frame-Options": "DENY",  # Contre le clickjacking.
@@ -348,6 +347,7 @@ _SECURITY_HEADERS = {
     # Refuse aux autres origines le chargement des ressources de l'application hors CORS (image, script, cadre).
     "Cross-Origin-Resource-Policy": "same-origin",
 }
+"""En-têtes de sécurité posés sur toute réponse. HSTS relève du reverse-proxy TLS."""
 
 _FRAME_ANCESTORS = "frame-ancestors 'none'"
 """Politique de sécurité de contenu des réponses hors API : aucun autre site ne peut les insérer dans un cadre.

@@ -45,8 +45,8 @@ from pipeline.transformation.publications.author_grouping.store import (
 # Plafonds d'un lot de publications : nombre de publications, nombre de contributions sources d'auteur chargées en mémoire.
 BATCH_SIZE = 1000
 BATCH_SOURCE_CONTRIBUTIONS = 200_000
-# Source classée après les autres à longueur de liste égale : elle fonde une contribution seulement à défaut d'une autre source.
 DEFERRED_SOURCE = "scanr"
+"""Source classée après les autres à longueur de liste égale : elle fonde une contribution seulement à défaut d'une autre source."""
 
 
 def publication_batches(publications: Sequence[tuple[int, int]]) -> list[list[int]]:

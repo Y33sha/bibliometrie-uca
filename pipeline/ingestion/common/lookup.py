@@ -25,8 +25,8 @@ from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import track_progress
 
-# Identifiants écrits entre deux commits.
 COMMIT_EVERY = 50
+"""Identifiants écrits entre deux commits."""
 
 
 @dataclass(frozen=True, slots=True)

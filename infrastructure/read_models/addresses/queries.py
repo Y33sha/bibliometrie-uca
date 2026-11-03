@@ -23,10 +23,10 @@ from infrastructure.read_models.addresses.models import (
 from infrastructure.read_models.sql_fragments import contributor_display_name
 from infrastructure.sql_fragments import address_country_conditions
 
-# Adresse « reconnue » comme une structure : lien en attente ou confirmé. Sert aux prédicats de structure de `list_addresses`.
 _RECOGNIZED_LINK = (
     "((asx.matched_form_id IS NOT NULL AND asx.is_confirmed IS NULL) OR asx.is_confirmed = TRUE)"
 )
+"""Adresse « reconnue » comme une structure : lien en attente ou confirmé. Sert aux prédicats de structure de `list_addresses`."""
 
 
 def _countries_where(filters: AddressCountryFilter) -> tuple[str, dict[str, object]]:

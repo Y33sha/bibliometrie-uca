@@ -7,17 +7,17 @@ from domain.source_records.source_extras import SourceExtra
 from domain.subjects.subject import Subject, SubjectVocabulary
 from domain.types import JsonValue, as_strs
 
-# Types HAL d'une communication orale ou affichée : son annexe (diaporama, poster, résumé) donne accès à son contenu.
 _COMMUNICATION_TYPES = frozenset({"COMM", "POSTER", "PRESCONF"})
+"""Types HAL d'une communication orale ou affichée : son annexe (diaporama, poster, résumé) donne accès à son contenu."""
 
-# Code d'un domaine CCSD : des segments alphanumériques séparés par des points (`sdv.bbm.bm`), le tiret admis dans un segment (`info.info-oh`).
 _DOMAIN_CODE = re.compile(r"^[a-z0-9]+(?:[-.][a-z0-9]+)*$")
+"""Code d'un domaine CCSD : des segments alphanumériques séparés par des points (`sdv.bbm.bm`), le tiret admis dans un segment (`info.info-oh`)."""
 
-# Annotation d'un libellé de domaine : `Informatique [cs]`, `Autre [cs.OH]`.
 _DOMAIN_ANNOTATION = re.compile(r"\s*\[[^]]*\]")
+"""Annotation d'un libellé de domaine : `Informatique [cs]`, `Autre [cs.OH]`."""
 
-# Libellés des feuilles fourre-tout du référentiel CCSD (`chim.othe`, `spi.other`…), qui réuniraient des feuilles sans rapport. Leur parent suffit.
 _GENERIC_DOMAIN_LABELS = frozenset({"autre", "autres"})
+"""Libellés des feuilles fourre-tout du référentiel CCSD (`chim.othe`, `spi.other`…), qui réuniraient des feuilles sans rapport. Leur parent suffit."""
 
 
 def hal_annex(doc: Mapping[str, JsonValue]) -> str | None:

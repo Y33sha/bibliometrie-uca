@@ -26,7 +26,6 @@ from infrastructure.sql_fragments import (
 from pipeline.runtime.observability.log_format import LAST_BRANCH, inflect, quantity, step
 from pipeline.runtime.observability.progress import waiting
 
-# Marque pour le groupement des auteurs les publications des contributions sources de la CTE `modifiees`.
 _MARK_MODIFIED_PUBLICATIONS = enqueue_sql(
     Queue.PUBLICATION_CONTRIBUTIONS,
     """
@@ -34,6 +33,7 @@ _MARK_MODIFIED_PUBLICATIONS = enqueue_sql(
     WHERE sr.id IN (SELECT source_record_id FROM modifiees) AND sr.publication_id IS NOT NULL
     """,
 )
+"""Marque pour le groupement des auteurs les publications des contributions sources de la CTE `modifiees`."""
 
 
 class ContributorInformationIdentifier(NamedTuple):
@@ -47,8 +47,8 @@ class ContributorInformationIdentifier(NamedTuple):
 IdentifierKey = tuple[str, str]
 """`(id_type, id_value)`."""
 
-# Identifiants des informations du contributeur `ci`, une ligne par type : `k.id_type`, `k.id_value`. Une requête lit ainsi les tables une seule fois pour tous les types.
 _IDENTIFIERS = "CROSS JOIN LATERAL jsonb_each_text(ci.identifiers) AS k(id_type, id_value)"
+"""Identifiants des informations du contributeur `ci`, une ligne par type : `k.id_type`, `k.id_value`. Une requête lit ainsi les tables une seule fois pour tous les types."""
 
 
 def _trusted_identifier_of_types(id_types: Sequence[str]) -> str:

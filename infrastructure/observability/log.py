@@ -105,7 +105,6 @@ class _PhaseNameFilter(logging.Filter):
         return True
 
 
-# Attributs internes de `LogRecord` exclus de la sortie JSON : déjà repris, ou trop bavards.
 _STD_RECORD_ATTRS = {
     "name",
     "msg",
@@ -130,6 +129,7 @@ _STD_RECORD_ATTRS = {
     "message",
     "taskName",
 }
+"""Attributs internes de `LogRecord` exclus de la sortie JSON : déjà repris, ou trop bavards."""
 
 
 class JsonFormatter(logging.Formatter):

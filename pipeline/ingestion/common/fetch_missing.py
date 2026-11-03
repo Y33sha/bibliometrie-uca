@@ -222,7 +222,6 @@ TASKS = (
     ),
 )
 
-# Clé de chaque canal dans la table d'observabilité de la phase.
 _CHANNEL_KEYS = {
     _HAL_BY_ID: "hal-id",
     _SCANR_BY_HAL_ID: "hal-id ScanR",
@@ -230,6 +229,7 @@ _CHANNEL_KEYS = {
     _THESES_BY_NNT: "NNT theses.fr",
     **{_doi_task(target): target for target in DOI_SEARCHABLE_SOURCES},
 }
+"""Clé de chaque canal dans la table d'observabilité de la phase."""
 
 
 def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:

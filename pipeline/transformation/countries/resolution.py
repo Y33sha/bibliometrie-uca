@@ -8,13 +8,13 @@ from sqlalchemy import Connection, text
 from domain.addresses.country_detection import CountryDetectionMethod, retained_countries
 from infrastructure.db.queues import Queue, delete_processed, enqueue_sql, snapshot
 
-# Adresses résolues par lot : chaque lot charge ses candidats en mémoire.
 _RESOLVE_BATCH = 50_000
+"""Adresses résolues par lot : chaque lot charge ses candidats en mémoire."""
 
 _MARK_CHANGED = enqueue_sql(Queue.ADDRESS_COUNTRIES, "SELECT id FROM changed")
 
-# Relevé de la file `address_candidates_queue`.
 _SNAPSHOT = "address_candidates_marks"
+"""Relevé de la file `address_candidates_queue`."""
 
 
 def resolve_queued_addresses(conn: Connection) -> int:

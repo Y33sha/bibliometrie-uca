@@ -84,7 +84,6 @@ def _harvest(source: str) -> TaskRun:
     return run
 
 
-# Acquisition : les canaux écrivent la dernière version de chaque document moissonné dans `staging`, dans un ordre indifférent. Leurs lectures de `staging` dédoublonnent et valent quel que soit l'ordre.
 TASKS = tuple(
     task(
         f"harvest.{source}",
@@ -108,6 +107,7 @@ TASKS = tuple(
     )
     for source in HARVESTED_SOURCES
 )
+"""Acquisition : les canaux écrivent la dernière version de chaque document moissonné dans `staging`, dans un ordre indifférent. Leurs lectures de `staging` dédoublonnent et valent quel que soit l'ordre."""
 
 
 def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:

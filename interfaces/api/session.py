@@ -13,7 +13,8 @@ import bcrypt
 
 from infrastructure.settings import settings
 
-SESSION_MAX_AGE = 86400 * 7  # 7 jours
+SESSION_MAX_AGE = 86400 * 7
+"""7 jours."""
 
 MIN_SESSION_SECRET_LENGTH = 32
 """Longueur minimale de la clé de signature : une clé plus courte se retrouve par force brute hors ligne, et permet de forger un jeton."""

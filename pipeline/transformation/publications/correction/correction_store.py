@@ -180,7 +180,6 @@ _DATACITE_DIRECT_RELATIONS_SQL = (
     "(" + ", ".join(f"'{relation}'" for relation in DATACITE_DIRECT_CONVERGENCE) + ")"
 )
 
-# Expression SQL de chaque fait de `MetadataForCorrection`, sur l'enregistrement source `sr` et les jointures de `_SELECT`. Les faits de `_DOI_FACTS` se calculent sur les identifiants (`_unary_rows`).
 _FACTS: dict[str, str] = {
     "title": "sr.title",
     "title_normalized": "COALESCE(sr.title_normalized, '')",
@@ -196,6 +195,7 @@ _FACTS: dict[str, str] = {
     "source": "sr.source::text",
     "author_count": "sr.author_count",
 }
+"""Expression SQL de chaque fait de `MetadataForCorrection`, sur l'enregistrement source `sr` et les jointures de `_SELECT`. Les faits de `_DOI_FACTS` se calculent sur les identifiants (`_unary_rows`)."""
 _DOI_FACTS = frozenset({"dois", "registrant_publisher_types"})
 assert set(_FACTS) | _DOI_FACTS == {f.name for f in fields(MetadataForCorrection)}, (
     "projection des faits désynchronisée de MetadataForCorrection"
@@ -228,7 +228,6 @@ def _persist_statuses(
         conn.execute(_UPDATE_STATUSES, {"rows": json.dumps(rows)})
 
 
-# Chaque variante ajoute son `WHERE`.
 _SELECT = f"""
     SELECT sr.id, sr.source_id, sr.corrections,
            {", ".join(f"{expression} AS {name}" for name, expression in _FACTS.items())}
@@ -236,6 +235,7 @@ _SELECT = f"""
     LEFT JOIN serials j ON j.id = sr.serial_id
     LEFT JOIN monographs m ON m.id = sr.monograph_id
 """
+"""Chaque variante ajoute son `WHERE`."""
 
 
 def _unary_row(
@@ -259,12 +259,12 @@ def _unary_row(
     )
 
 
-# Les colonnes du SET sont les clés des paramètres, typées par la table.
 _UPDATE = (
     source_records.update()
     .where(source_records.c.id == bindparam("source_record_id"))
     .values(updated_at=func.clock_timestamp())
 )
+"""Les colonnes du SET sont les clés des paramètres, typées par la table."""
 
 
 def _persist_updates(conn: Connection, updates: Sequence[Mapping[str, object]]) -> int:
@@ -291,13 +291,13 @@ def _persist_updates(conn: Connection, updates: Sequence[Mapping[str, object]]) 
     return len(updates)
 
 
-# DOI de rôle autre que `related` de chaque enregistrement source, quel que soit leur statut.
 _RECORD_DOIS_SQL = f"""
     SELECT source_record_id AS id, id_value AS doi, role
     FROM source_record_identifiers
     WHERE id_type = '{SourceIdentifierType.DOI.value}'
       AND role <> '{SourceIdentifierRole.RELATED.value}'
 """
+"""DOI de rôle autre que `related` de chaque enregistrement source, quel que soit leur statut."""
 
 
 class SourceRecordCorrectionStore:

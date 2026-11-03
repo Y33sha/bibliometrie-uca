@@ -65,8 +65,8 @@ SOURCE_CONTRIBUTIONS = DATA_DIR / "source_contributions.parquet"
 WEIGHTS_FILE = Path(residual_weights.__file__)
 
 FULL_MODEL_MAX_AUTHORS = 100
-# Contributions sources de l'échantillon du modèle complet, tirées par publication.
 FULL_MODEL_SAMPLE = 1_500_000
+"""Contributions sources de l'échantillon du modèle complet, tirées par publication."""
 RESIDUAL_ITERATIONS = 100
 FULL_MODEL_ITERATIONS = 25
 EM_MAX_PAIRS = 5_000_000

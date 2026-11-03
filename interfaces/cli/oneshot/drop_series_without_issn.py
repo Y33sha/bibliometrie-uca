@@ -24,7 +24,6 @@ from infrastructure.sql_fragments import declares_conference_sql
 
 log = setup_logger("drop_series_without_issn", os.path.dirname(__file__))
 
-# Séries sans ISSN valide.
 _CANDIDATES = text(f"""
     SELECT sr.id, sr.source::text AS source, sr.raw_doc_type, sr.biblio,
            {declares_conference_sql("sr")} AS declares_conference
@@ -35,6 +34,7 @@ _CANDIDATES = text(f"""
           WHERE NOT coalesce((e->>'malformed')::boolean, false)
       )
 """)
+"""Séries sans ISSN valide."""
 
 _WRITE = text("""
     UPDATE source_records sr SET biblio = NULLIF(t.biblio, 'null'::jsonb)

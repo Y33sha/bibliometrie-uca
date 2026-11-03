@@ -24,7 +24,6 @@ from infrastructure.observability.log import setup_logger
 
 log = setup_logger("requalify_journal_issues", os.path.dirname(__file__))
 
-# Enregistrements sources HAL, Crossref et DataCite de type `other` avant correction.
 _CANDIDATES = text("""
     SELECT id, source::text AS source, raw_doc_type,
            corrections->'doc_type'->>'corrected_by' AS corrected_by
@@ -32,6 +31,7 @@ _CANDIDATES = text("""
     WHERE source IN ('hal', 'crossref', 'datacite') AND raw_doc_type IS NOT NULL
       AND coalesce(corrections->'doc_type'->>'raw', doc_type::text) = 'other'
 """)
+"""Enregistrements sources HAL, Crossref et DataCite de type `other` avant correction."""
 
 _UPDATE_DOC_TYPE = text("""
     UPDATE source_records SET doc_type = 'journal_issue', updated_at = clock_timestamp()
@@ -45,7 +45,6 @@ _UPDATE_RAW = text("""
     WHERE id = ANY(:ids)
 """)
 
-# Enregistrements sources requalifiés, et ceux de leurs publications.
 _SOURCE_RECORDS_TO_RECONCILE = """
     SELECT unnest(CAST(:ids AS integer[]))
     UNION
@@ -54,6 +53,7 @@ _SOURCE_RECORDS_TO_RECONCILE = """
         SELECT publication_id FROM source_records WHERE id = ANY(CAST(:ids AS integer[]))
     )
 """
+"""Enregistrements sources requalifiés, et ceux de leurs publications."""
 
 
 def requalify(conn: Connection, *, dry_run: bool) -> None:

@@ -30,7 +30,6 @@ from infrastructure.read_models.subjects.models import SubjectFrequency
 from infrastructure.read_models.subjects.queries import entity_subjects
 from infrastructure.sql_fragments import has_author_role, is_raw_address
 
-# Liens publication–ROR des publications de la structure `:structure_id`, hors ses ROR propres (`OWN_RORS_SQL`).
 _PARTNER_LINKS = f"""
     WITH links AS (
         SELECT pr.publication_id, pr.ror_id, p.publication_year
@@ -41,6 +40,7 @@ _PARTNER_LINKS = f"""
           AND pr.ror_id NOT IN ({OWN_RORS_SQL})
     )
 """
+"""Liens publication–ROR des publications de la structure `:structure_id`, hors ses ROR propres (`OWN_RORS_SQL`)."""
 
 
 def _ror_type_label(value: str) -> str:
@@ -56,7 +56,6 @@ _PARTNER_TYPE = (
     "(CAST(:types AS text[]) = '{}' OR CAST(ro.types AS text[]) && CAST(:types AS text[]))"
 )
 
-# Contribution de la structure `:structure_id` : dans le périmètre, rattachée à la structure par `contribution_structures`, au rôle d'auteur. S'applique à l'alias `a` de `contributions`.
 AUTHOR_SOURCE_CONTRIBUTION = f"""
     a.in_perimeter = TRUE
     AND {has_author_role("a")}
@@ -65,14 +64,15 @@ AUTHOR_SOURCE_CONTRIBUTION = f"""
         WHERE aus.contribution_id = a.id AND aus.structure_id = :structure_id
     )
 """
+"""Contribution de la structure `:structure_id` : dans le périmètre, rattachée à la structure par `contribution_structures`, au rôle d'auteur. S'applique à l'alias `a` de `contributions`."""
 
-# Publication `p` signée par la structure. La forme `EXISTS` compte chaque publication une fois, là où une jointure la dupliquerait par auteur de la structure.
 AUTHORED_PUBLICATION = f"""
     EXISTS (
         SELECT 1 FROM contributions a
         WHERE a.publication_id = p.id AND {AUTHOR_SOURCE_CONTRIBUTION}
     )
 """
+"""Publication `p` signée par la structure. La forme `EXISTS` compte chaque publication une fois, là où une jointure la dupliquerait par auteur de la structure."""
 
 
 StructureFacet = Literal["types", "tutelles", "perimeters"]
@@ -117,13 +117,13 @@ _OUTSIDE_PERIMETERS = (
     "NOT EXISTS (SELECT 1 FROM perimeter_structures ps WHERE ps.structure_id = s.id)"
 )
 
-# Libellés des tutelles de `s`, dans l'ordre alphabétique, joints par des virgules.
 _TUTELLE_LABELS = """(
     SELECT string_agg(COALESCE(sp.acronym, sp.name), ', ' ORDER BY COALESCE(sp.acronym, sp.name))
     FROM structure_parents sr
     JOIN structures sp ON sp.id = sr.parent_id
     WHERE sr.child_id = s.id
 )"""
+"""Libellés des tutelles de `s`, dans l'ordre alphabétique, joints par des virgules."""
 
 _STRUCTURE_SORT: dict[str, str] = {
     "acronym_asc": "lower(COALESCE(s.acronym, s.name)) ASC, s.id",

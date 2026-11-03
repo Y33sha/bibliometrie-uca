@@ -39,8 +39,8 @@ from pipeline.transformation.publications.correction.correction_store import (
     SourceRecordCorrectionStore,
 )
 
-# Règles de retrait d'identifiants de la sous-étape : les cas de `DoiClusterCase`.
 CLUSTER_IDENTIFIER_RULES = frozenset(case.value for case in DoiClusterCase)
+"""Règles de retrait d'identifiants de la sous-étape : les cas de `DoiClusterCase`."""
 
 
 def _base_identifiers(row: DoiClusterRow) -> list[SourceIdentifier]:

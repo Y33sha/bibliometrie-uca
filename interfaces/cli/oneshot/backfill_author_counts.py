@@ -20,8 +20,8 @@ from infrastructure.observability.log import setup_logger
 
 log = setup_logger("backfill_author_counts", os.path.dirname(__file__))
 
-# Contribution source d'auteur individuelle, comme `is_individual_author`.
 _AUTHOR = f"NOT sc.collective AND '{ContributionRole.AUTHOR.value}' = ANY(sc.roles)"
+"""Contribution source d'auteur individuelle, comme `is_individual_author`."""
 
 
 def _update_counts(conn: Connection, source_records: str, params: dict[str, object]) -> int:

@@ -6,8 +6,8 @@ from sqlalchemy import Connection, text
 
 GRANTS_FILE = Path(__file__).with_name("grants.sql")
 
-# Rôles désignés par `grants.sql`, créés par `roles.sql`.
 GRANTED_ROLES = ("bibliometrie_app", "bibliometrie_pipeline")
+"""Rôles désignés par `grants.sql`, créés par `roles.sql`."""
 
 
 def grant_statements() -> list[str]:

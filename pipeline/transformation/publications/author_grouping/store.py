@@ -14,19 +14,19 @@ from infrastructure.sql_fragments import (
     usable_identifier,
 )
 
-# Relevé de la file `publication_contributions_queue`, gardé d'un lot à l'autre : une table temporaire survit aux commits.
 _SNAPSHOT = "publication_contributions_marks"
+"""Relevé de la file `publication_contributions_queue`, gardé d'un lot à l'autre : une table temporaire survit aux commits."""
 
-# Relevé de la file `contribution_attributes_queue`.
 _ATTRIBUTES_SNAPSHOT = "contribution_attributes_marks"
+"""Relevé de la file `contribution_attributes_queue`."""
 
-# Marque les contributions des publications `:publications` pour la recomposition de leurs attributs.
 _MARK_CONTRIBUTIONS_OF_PUBLICATIONS_SQL = text(
     enqueue_sql(
         Queue.CONTRIBUTION_ATTRIBUTES,
         "SELECT id FROM contributions WHERE publication_id = ANY(:publications)",
     )
 )
+"""Marque les contributions des publications `:publications` pour la recomposition de leurs attributs."""
 
 
 def _known_first_name(id_type: str) -> str:
@@ -38,7 +38,6 @@ def _known_first_name(id_type: str) -> str:
     )"""
 
 
-# Contributions sources à aligner, hors collectifs.
 _SOURCE_CONTRIBUTIONS_SQL = text(f"""
     SELECT sr.publication_id, sr.id AS source_record, sr.source::text AS source,
            sc.id, sc.author_position AS position,
@@ -52,6 +51,7 @@ _SOURCE_CONTRIBUTIONS_SQL = text(f"""
     JOIN contributor_information ci ON ci.id = sc.contributor_information_id
     WHERE sr.publication_id = ANY(:publications) AND NOT sc.collective
 """)
+"""Contributions sources à aligner, hors collectifs."""
 
 _CONTRIBUTIONS_SQL = text("""
     SELECT g.id, g.publication_id, gs.source_contribution_id, gs.source_record_id,
@@ -67,13 +67,13 @@ _DELETE_MEMBERSHIPS_SQL = text(
 
 _DELETE_CONTRIBUTIONS_SQL = text("DELETE FROM contributions WHERE id = ANY(:ids)")
 
-# Marque les contributions recomposées `:ids` rattachées à une personne, pour la redécision de leur personne.
 _MARK_RECOMPOSED_SQL = text(
     enqueue_sql(
         Queue.CONTRIBUTION_RESOLUTION,
         "SELECT id FROM contributions WHERE id = ANY(:ids) AND person_id IS NOT NULL",
     )
 )
+"""Marque les contributions recomposées `:ids` rattachées à une personne, pour la redécision de leur personne."""
 
 _CLEAR_DUPLICATES_SQL = text("""
     UPDATE source_contributions sc SET duplicate_of = NULL

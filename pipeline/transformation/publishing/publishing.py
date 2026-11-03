@@ -99,7 +99,6 @@ from pipeline.transformation.publishing.serials.type_proceedings_serials import 
 _PHASE = "publishing"
 
 
-# Ligne de la table d'observabilité de chaque sous-étape : son champ, son libellé, et ce qui compte comme identifié.
 _TABLE: tuple[tuple[str, str, Callable[[PhaseMetrics], int]], ...] = (
     (
         "resolve_crossref_publishers",
@@ -151,6 +150,7 @@ _TABLE: tuple[tuple[str, str, Callable[[PhaseMetrics], int]], ...] = (
         lambda m: m.extras.get("monographs_to_proceedings", 0),
     ),
 )
+"""Ligne de la table d'observabilité de chaque sous-étape : son champ, son libellé, et ce qui compte comme identifié."""
 
 
 def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:

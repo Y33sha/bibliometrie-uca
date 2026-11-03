@@ -4,7 +4,6 @@ from sqlalchemy import Connection, text
 
 from infrastructure.db.scalars import scalar_int
 
-# Sujets des enregistrements sources de chaque publication, ancêtres compris, avec la source de l'enregistrement source.
 _DERIVE_SQL = text("""
     WITH RECURSIVE linked AS (
         SELECT sr.publication_id, srs.subject_id, sr.source
@@ -21,8 +20,8 @@ _DERIVE_SQL = text("""
     SELECT publication_id, subject_id, source FROM linked
     ON CONFLICT (publication_id, subject_id, source) DO NOTHING
 """)
+"""Sujets des enregistrements sources de chaque publication, ancêtres compris, avec la source de l'enregistrement source."""
 
-# Sujets gardés : ceux d'un enregistrement source ou d'une publication, et leurs ancêtres.
 _PURGE_ORPHANS_SQL = text("""
     WITH RECURSIVE kept AS (
         SELECT subject_id AS id FROM source_record_subjects
@@ -33,6 +32,7 @@ _PURGE_ORPHANS_SQL = text("""
     )
     DELETE FROM subjects s WHERE NOT EXISTS (SELECT 1 FROM kept k WHERE k.id = s.id)
 """)
+"""Sujets gardés : ceux d'un enregistrement source ou d'une publication, et leurs ancêtres."""
 
 
 class SubjectStore:

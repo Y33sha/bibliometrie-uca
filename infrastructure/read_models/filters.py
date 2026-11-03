@@ -40,11 +40,11 @@ from infrastructure.sql_fragments import (
 OA_OPEN_SQL = in_clause(OA_OPEN_STATUSES)
 OA_CLOSED_SQL = in_clause(OA_CLOSED_STATUSES)
 
-# Colonnes de ventilation open access (alias `p` des publications) : une colonne par statut de `OaStatus`, nommée par sa valeur, dans l'ordre de l'enum. Partagées par les statistiques des éditeurs, revues, laboratoires et années.
 OA_BREAKDOWN_COLS_SQL = ",\n            ".join(
     f"COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = '{status.value}') AS {status.value}"
     for status in OaStatus
 )
+"""Colonnes de ventilation open access (alias `p` des publications) : une colonne par statut de `OaStatus`, nommée par sa valeur, dans l'ordre de l'enum. Partagées par les statistiques des éditeurs, revues, laboratoires et années."""
 
 
 def publication_in_perimeter(alias: str = "p") -> str:
@@ -55,8 +55,8 @@ def publication_in_perimeter(alias: str = "p") -> str:
     return f"({alias}.in_perimeter)"
 
 
-# La plupart des requêtes aliasent les publications `p` : constante de commodité.
 PUBLICATION_IS_IN_PERIMETER = publication_in_perimeter()
+"""La plupart des requêtes aliasent les publications `p` : constante de commodité."""
 
 
 @dataclass(frozen=True)
@@ -98,7 +98,6 @@ def lab_clause(lab_ids: list[int]) -> WhereClause | None:
     )
 
 
-# ROR propres aux structures `:own_structure_ids` : ceux des structures et de leurs tutelles (`structure_parents`), avec leurs ancêtres ROR. Les organisations partenaires les excluent.
 OWN_RORS_SQL = """
     WITH RECURSIVE own_structures AS (
         SELECT unnest(CAST(:own_structure_ids AS integer[])) AS id
@@ -113,6 +112,7 @@ OWN_RORS_SQL = """
     )
     SELECT ror_id FROM own_rors
 """
+"""ROR propres aux structures `:own_structure_ids` : ceux des structures et de leurs tutelles (`structure_parents`), avec leurs ancêtres ROR. Les organisations partenaires les excluent."""
 
 
 def own_structure_ids(lab_ids: list[int], perimeter_structure_ids: list[int]) -> list[int]:
@@ -169,19 +169,19 @@ def doi_agency_clause(values: list[str]) -> WhereClause | None:
     )
 
 
-# Seuil de citation le plus haut atteint par la publication `p` (`CitationTop`), NULL sans seuil atteint. La liste et l'export lisent cette expression.
 CITATION_TOP_SQL = (
     "(CASE "
     + " ".join(f"WHEN {reaches_citation_top(top)} THEN '{top}'" for top in CitationTop)
     + " END)"
 )
+"""Seuil de citation le plus haut atteint par la publication `p` (`CitationTop`), NULL sans seuil atteint. La liste et l'export lisent cette expression."""
 
 
-# Condition vraie quand la publication `p` est pourvue des seuils de citation.
 HAS_CITATION_TOPS_SQL = f"p.impact ? '{CitationTop.TOP_10_PERCENT}'"
+"""Condition vraie quand la publication `p` est pourvue des seuils de citation."""
 
-# Classe de citation de la publication `p`, pourvue des seuils : seuil le plus haut atteint, `BELOW_CITATION_TOPS` sous le top 10 %.
 CITATION_CLASS_SQL = f"COALESCE({CITATION_TOP_SQL}, '{BELOW_CITATION_TOPS}')"
+"""Classe de citation de la publication `p`, pourvue des seuils : seuil le plus haut atteint, `BELOW_CITATION_TOPS` sous le top 10 %."""
 
 
 def citation_top_clause(values: list[str]) -> WhereClause | None:
@@ -515,17 +515,17 @@ def person_has_identifier_clause(id_type: str, value: bool | None) -> WhereClaus
     return WhereClause(f"{negate}{person_has_identifier_sql(id_type)}", {})
 
 
-# Prédicat : la personne `p` a au moins une forme de nom à confirmer (`pending_name_form`).
 PERSON_HAS_PENDING_NAME_FORMS_SQL = f"""EXISTS (
             SELECT 1 FROM person_name_forms pnf
             WHERE pnf.person_id = p.id AND {pending_name_form("pnf")}
         )"""
+"""Prédicat : la personne `p` a au moins une forme de nom à confirmer (`pending_name_form`)."""
 
-# Prédicat : la personne `p` a au moins un identifiant à confirmer (`pending`).
 PERSON_HAS_PENDING_IDENTIFIERS_SQL = f"""EXISTS (
             SELECT 1 FROM person_identifiers pi
             WHERE pi.person_id = p.id AND pi.status = '{AttributionStatus.PENDING.value}'
         )"""
+"""Prédicat : la personne `p` a au moins un identifiant à confirmer (`pending`)."""
 
 
 def person_has_pending_name_forms_clause(value: bool | None) -> WhereClause | None:

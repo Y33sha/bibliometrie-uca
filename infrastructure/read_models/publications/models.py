@@ -41,7 +41,6 @@ PublicationSort = Literal[
 ]
 
 
-# Vocabulaire des colonnes de l'export des publications. L'appelant nomme les colonnes voulues ; une liste vide les demande toutes. Le titre et les liens sont toujours présents.
 EXPORT_COLUMNS: frozenset[str] = frozenset(
     {
         "type",
@@ -61,9 +60,9 @@ EXPORT_COLUMNS: frozenset[str] = frozenset(
         "access",
     }
 )
+"""Vocabulaire des colonnes de l'export des publications. L'appelant nomme les colonnes voulues ; une liste vide les demande toutes. Le titre et les liens sont toujours présents."""
 
 
-# Vocabulaire des colonnes de l'export des thèses, aux règles de `EXPORT_COLUMNS`.
 THESIS_EXPORT_COLUMNS: frozenset[str] = frozenset(
     {
         "inscription",
@@ -77,6 +76,7 @@ THESIS_EXPORT_COLUMNS: frozenset[str] = frozenset(
         "access",
     }
 )
+"""Vocabulaire des colonnes de l'export des thèses, aux règles de `EXPORT_COLUMNS`."""
 
 
 # Vocabulaire du filtre par licence de la version éditeur : les licences du domaine, et `none` pour une publication sans licence connue.
@@ -91,7 +91,6 @@ OTHER_DOI_AGENCY = "other"
 NO_DOI = "none"
 DOI_AGENCY_FILTER_VALUES: tuple[str, ...] = (*DOI_AGENCY_SOURCES, OTHER_DOI_AGENCY, NO_DOI)
 
-# Sources du filtre par présence dans une source, dans l'ordre de la facette.
 SOURCE_FILTER_SOURCES: tuple[Source, ...] = (
     Source.HAL,
     Source.OPENALEX,
@@ -99,13 +98,14 @@ SOURCE_FILTER_SOURCES: tuple[Source, ...] = (
     Source.WOS,
     Source.THESES,
 )
-# Vocabulaire du filtre par présence dans une source : la source suivie de la présence attendue. `hal_yes` retient les publications présentes dans HAL, `hal_no` les autres.
+"""Sources du filtre par présence dans une source, dans l'ordre de la facette."""
 SOURCE_FILTER_VALUES: frozenset[str] = frozenset(
     f"{source}_{presence}" for source in SOURCE_FILTER_SOURCES for presence in ("yes", "no")
 )
+"""Vocabulaire du filtre par présence dans une source : la source suivie de la présence attendue. `hal_yes` retient les publications présentes dans HAL, `hal_no` les autres."""
 
-# Classe de citation d'une publication pourvue des seuils (`CitationTop`) sans en atteindre aucun.
 BELOW_CITATION_TOPS = "below"
+"""Classe de citation d'une publication pourvue des seuils (`CitationTop`) sans en atteindre aucun."""
 
 # Vocabulaire du filtre par position d'auteur, dans l'ordre de la facette : les positions de `AuthorPosition`, puis `other` pour une personne qui n'en occupe aucune.
 OTHER_AUTHOR_POSITION = "other"

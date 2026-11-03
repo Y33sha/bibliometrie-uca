@@ -68,8 +68,8 @@ router = APIRouter(prefix="/api/persons", tags=["persons"])
 
 # ── Listes et facettes ───────────────────────────────────────────
 
-# Valeur du filtre `exclusion` qui désigne les personnes retenues.
 RETAINED = "none"
+"""Valeur du filtre `exclusion` qui désigne les personnes retenues."""
 
 
 def person_filters(

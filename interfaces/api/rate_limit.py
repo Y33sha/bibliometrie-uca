@@ -28,8 +28,8 @@ _EXPORT_WINDOW_SECONDS = 300
 # Une navigation humaine procède par rafales : une page à facettes compose plusieurs dizaines d'appels, un aller-retour dans l'administration autant. Le plafond laisse passer ce rythme et borne le parcours automatique, qui l'enchaîne sans pause.
 _READ_MAX_REQUESTS = 1200
 _READ_WINDOW_SECONDS = 300
-# Plafond du nombre de compteurs suivis : borne la mémoire même sous un flot d'adresses variées.
 _MAX_KEYS = 4096
+"""Plafond du nombre de compteurs suivis : borne la mémoire même sous un flot d'adresses variées."""
 # Instant du dernier signalement, par pair de proxy non déclaré. Le signalement se répète à intervalle espacé : un réglage oublié reste visible au journal.
 # La table est bornée comme celle des compteurs : sous un flot d'adresses variées, la plus anciennement signalée cède sa place.
 _WARN_INTERVAL_SECONDS = 3600.0

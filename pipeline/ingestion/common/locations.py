@@ -96,7 +96,6 @@ def _either_open(a: bool | None, b: bool | None) -> bool | None:
     return False if False in (a, b) else None
 
 
-# Le nom et le type suivent la source à chaque écriture.
 _UPSERT_PLATFORM = text("""
     INSERT INTO platforms (name, name_normalized, platform_type, openalex_id)
     VALUES (:name, :name_normalized, CAST(:platform_type AS platform_type), :openalex_id)
@@ -105,6 +104,7 @@ _UPSERT_PLATFORM = text("""
         platform_type = EXCLUDED.platform_type
     RETURNING id
 """)
+"""Le nom et le type suivent la source à chaque écriture."""
 
 _DELETE_LOCATIONS = text("DELETE FROM source_record_locations WHERE source_record_id = :id")
 

@@ -211,7 +211,6 @@ def extract_datacite_doc_type_token(attributes: Mapping[str, JsonValue]) -> str 
     return general or None
 
 
-# Types d'un document publié par une revue, une collection ou un recueil d'actes. La valeur contrôlée `JournalArticle` date du schéma 4.4 (2021) ; avant, un article se déclarait `Text`, avec « Journal article » ou « Article » en texte libre.
 _PUBLISHED_TYPES = frozenset(
     {
         "Book",
@@ -222,6 +221,7 @@ _PUBLISHED_TYPES = frozenset(
         "JournalArticle",
     }
 )
+"""Types d'un document publié par une revue, une collection ou un recueil d'actes. La valeur contrôlée `JournalArticle` date du schéma 4.4 (2021) ; avant, un article se déclarait `Text`, avec « Journal article » ou « Article » en texte libre."""
 _ARTICLE_FREE_TEXT = frozenset({"article", "journal article"})
 # Conteneur découpé dans une citation en texte libre (`SeriesInformation`) : volume dans le titre (« Physics letters / B 777 », « Journal of Instrumentation 16(07) »), année ou DOI dans les pages (« 162 (2018). doi:10.1016/… »).
 _VOLUME_IN_TITLE = re.compile(r"/ .*\d|\d+\s*\(\d+\)\s*$")
@@ -267,8 +267,6 @@ def _doi_related_identifiers(attributes: Mapping[str, JsonValue]) -> list[dict[s
     return out
 
 
-# `relationType` DataCite d'un document à rapatrier : même œuvre (versions, formes) ou œuvre étroitement liée (parties, suppléments).
-# Les citations (Cites, IsCitedBy, References, IsReferencedBy) restent hors de la liste : la phase `fetch_missing` rapatrierait toute la bibliographie citée. `source_extras.related_identifiers` garde toutes les relations.
 _CORPUS_RELATION_TYPES = frozenset(
     {
         "IsVersionOf",
@@ -284,6 +282,7 @@ _CORPUS_RELATION_TYPES = frozenset(
         "HasPart",
     }
 )
+"""`relationType` DataCite d'un document à rapatrier : même œuvre (versions, formes) ou œuvre étroitement liée (parties, suppléments). Les citations (Cites, IsCitedBy, References, IsReferencedBy) restent hors de la liste : la phase `fetch_missing` rapatrierait toute la bibliographie citée. `source_extras.related_identifiers` garde toutes les relations."""
 
 
 def extract_related_dois(attributes: Mapping[str, JsonValue], self_doi: str) -> list[str]:

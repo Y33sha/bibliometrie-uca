@@ -9,8 +9,8 @@ from infrastructure.read_models.publications.models import (
     SuspectMergesResponse,
 )
 
-# Moins de la moitié des contributions sources d'auteur ont un correspondant dans un autre enregistrement source.
 _SUSPECT = "2 * pa.matched_source_contributions < pa.source_contributions"
+"""Moins de la moitié des contributions sources d'auteur ont un correspondant dans un autre enregistrement source."""
 
 _SOURCE_RECORDS_SQL = text(f"""
     WITH members AS (

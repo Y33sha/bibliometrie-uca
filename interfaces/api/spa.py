@@ -11,8 +11,8 @@ from infrastructure import PROJECT_ROOT
 
 BUILD_DIR = PROJECT_ROOT / "interfaces" / "frontend" / "build"
 
-# `StaticFiles` renvoie le chemin relatif au point de montage et normalisé par le système : le séparateur est celui de la plateforme, d'où la comparaison sur les segments.
 _API_SEGMENT = "api"
+"""`StaticFiles` renvoie le chemin relatif au point de montage et normalisé par le système : le séparateur est celui de la plateforme, d'où la comparaison sur les segments."""
 
 
 class SPAStaticFiles(StaticFiles):

@@ -4,8 +4,8 @@ import math
 import os
 from pathlib import Path
 
-# Quota de processeur du cgroup v2 : « quota période » en microsecondes, ou « max » sans quota.
 CGROUP_CPU_MAX = Path("/sys/fs/cgroup/cpu.max")
+"""Quota de processeur du cgroup v2 : « quota période » en microsecondes, ou « max » sans quota."""
 
 
 def available_cpus(cpu_max: Path = CGROUP_CPU_MAX) -> int:

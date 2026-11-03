@@ -52,8 +52,8 @@ type DoiFetcher = Callable[[httpx2.AsyncClient, str], Awaitable[LookupOutcome[st
 """Interrogation d'un service sur un DOI : `(client, doi) → réponse, NotFound ou Unavailable`."""
 
 BATCH_SIZE = 50
-# Requêtes simultanées, sous le débit recommandé par Unpaywall (10 par seconde).
 MAX_CONCURRENT = 5
+"""Requêtes simultanées, sous le débit recommandé par Unpaywall (10 par seconde)."""
 
 RESOLVE_TASK = "oa_status.resolve_dois"
 UNPAYWALL_TASK = "oa_status.verify_unpaywall"
@@ -416,7 +416,6 @@ def _apply_answers(
             store.update_oa_status(publication.id, status)
 
 
-# Lectures d'une tâche de la phase `oa_status` : DOI à interroger, données du statut des publications.
 _OA_STATUS_INPUTS = (
     "publications.id",
     "publications.doi",
@@ -436,6 +435,7 @@ _OA_STATUS_INPUTS = (
     "embargoes",
     "config",
 )
+"""Lectures d'une tâche de la phase `oa_status` : DOI à interroger, données du statut des publications."""
 
 
 def _resolve_dois(ctx: PhaseContext) -> PhaseMetrics:

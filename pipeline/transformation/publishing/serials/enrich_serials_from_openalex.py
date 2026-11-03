@@ -19,7 +19,8 @@ LABEL = "Type des publications en série sur OpenAlex"
 """Libellé de la sous-étape dans le journal de la phase."""
 
 BATCH_SIZE = 50
-COMMIT_EVERY = 500  # revues traitées par commit
+COMMIT_EVERY = 500
+"""Revues traitées par commit."""
 
 
 def find_serials_of_unknown_type(

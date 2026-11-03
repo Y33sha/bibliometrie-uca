@@ -9,14 +9,14 @@ from collections.abc import Mapping
 
 from domain.types import JsonValue
 
-# Attributs absents d'une route ou propres à l'enregistrement du DOI auprès de DataCite, inutilisés par la normalisation.
 _ROUTE_OR_REGISTRATION = frozenset(
     {"xml", "prefix", "suffix", "published", "created", "registered", "updated"}
 )
-# Suffixes des compteurs (consultations, téléchargements, références, versions…).
+"""Attributs absents d'une route ou propres à l'enregistrement du DOI auprès de DataCite, inutilisés par la normalisation."""
 _COUNTER_SUFFIXES = ("Count", "OverTime")
-# Compteur lu par la normalisation : il reste dans l'empreinte.
+"""Suffixes des compteurs (consultations, téléchargements, références, versions…)."""
 _READ_COUNTERS = frozenset({"citationCount"})
+"""Compteur lu par la normalisation : il reste dans l'empreinte."""
 
 
 def _kept(key: str, value: JsonValue) -> bool:

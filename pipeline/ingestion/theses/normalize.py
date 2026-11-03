@@ -122,8 +122,8 @@ def _subject_entries(
     ]
 
 
-# PPN d'une vedette RAMEAU, en fin du champ `query` : `"Analgésie" ET 027219046`.
 _RAMEAU_QUERY_PPN = re.compile(r"(\d{8}[\dX])\s*$", re.IGNORECASE)
+"""PPN d'une vedette RAMEAU, en fin du champ `query` : `"Analgésie" ET 027219046`."""
 
 
 def get_subjects(thesis: Mapping[str, JsonValue]) -> list[SubjectLink]:

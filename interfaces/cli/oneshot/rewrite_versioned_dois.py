@@ -40,14 +40,14 @@ log = setup_logger("rewrite_versioned_dois", os.path.dirname(__file__))
 
 _BATCH = 1000
 
-# Sources dont l'identifiant est le DOI, et la fonction qui le tire du payload.
 _IDENTIFY: dict[str, Callable[[Mapping[str, JsonValue]], RecordIdentity | None]] = {
     Source.CROSSREF.value: CROSSREF.identify,
     Source.DATACITE.value: DATACITE.identify,
 }
+"""Sources dont l'identifiant est le DOI, et la fonction qui le tire du payload."""
 
-# DOI à suffixe de version dans le texte d'un payload : le suffixe termine le DOI.
 _VERSIONED_DOI = re.compile(r"10\.\d{4,9}/[^\s\"'<>]+[./]v\d{1,3}(?=[\s\"'<>]|$)", re.IGNORECASE)
+"""DOI à suffixe de version dans le texte d'un payload : le suffixe termine le DOI."""
 
 _BATCH_ROWS = text("""
     SELECT sr.id, sr.source_id, st.id AS staging_id, st.doi,

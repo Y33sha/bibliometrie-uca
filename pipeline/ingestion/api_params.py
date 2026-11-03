@@ -33,32 +33,29 @@ API_BASE_URLS: dict[str, str] = {
 }
 
 
-# Archives ouvertes HAL — API SolR (https://api.archives-ouvertes.fr/search/)
-# Une requête couvre toutes les collections. Au-delà de 100 documents par page, les TEI (`label_xml`) des collections aux milliers d'auteurs (CERN, ATLAS, CMS) font expirer la requête.
 HAL_PER_PAGE = 100
+"""Archives ouvertes HAL — API SolR (https://api.archives-ouvertes.fr/search/) Une requête couvre toutes les collections. Au-delà de 100 documents par page, les TEI (`label_xml`) des collections aux milliers d'auteurs (CERN, ATLAS, CMS) font expirer la requête."""
 
 
-# OpenAlex
-OPENALEX_PER_PAGE = 200  # max imposé par l'API
+OPENALEX_PER_PAGE = 200
+"""OpenAlex max imposé par l'API."""
 
-# Clarivate WoS — API instable
-WOS_PER_PAGE = 10  # recommandation Clarivate (timeouts fréquents au-delà)
+WOS_PER_PAGE = 10
+"""Clarivate WoS — API instable recommandation Clarivate (timeouts fréquents au-delà)"""
 
-# ScanR — Elasticsearch public
-# Pagination par `search_after`. Le cluster ScanR marque des pauses intermittentes (~10 s), d'autant plus fréquentes que les requêtes sont nombreuses. À 2000 documents par page, il coupe la connexion.
 SCANR_PER_PAGE = 1000
+"""ScanR — Elasticsearch public Pagination par `search_after`. Le cluster ScanR marque des pauses intermittentes (~10 s), d'autant plus fréquentes que les requêtes sont nombreuses. À 2000 documents par page, il coupe la connexion."""
 
-# theses.fr — API publique
-THESES_PER_PAGE = 500  # max accepté par l'API
+THESES_PER_PAGE = 500
+"""theses.fr — API publique max accepté par l'API."""
 
-# doi.org/ra — aucune limite documentée ; 200 préfixes par requête passent
-DOI_ORG_RA_BATCH = 100  # préfixes par requête
+DOI_ORG_RA_BATCH = 100
+"""doi.org/ra — aucune limite documentée ; 200 préfixes par requête passent préfixes par requête."""
 
-# Sudoc — aucune limite documentée
 SUDOC_MAX_CONCURRENT = 4
+"""Sudoc — aucune limite documentée."""
 
 
-# Débit consenti à chaque accès, en requêtes par seconde, toutes requêtes confondues. Un accès absent de la table est sans plafond.
 MAX_PER_SECOND: dict[str, float] = {
     # Aucun seuil publié.
     "hal": 5,
@@ -76,6 +73,7 @@ MAX_PER_SECOND: dict[str, float] = {
     # Aucun seuil publié.
     "sudoc": 5,
 }
+"""Débit consenti à chaque accès, en requêtes par seconde, toutes requêtes confondues. Un accès absent de la table est sans plafond."""
 
 
 def request_budget(source: str) -> float | None:
@@ -83,4 +81,5 @@ def request_budget(source: str) -> float | None:
     return MAX_PER_SECOND.get(source)
 
 
-SUDOC_ISSN2PPN_BATCH = 20  # ISSN par requête `issn2ppn`
+SUDOC_ISSN2PPN_BATCH = 20
+"""ISSN par requête `issn2ppn`."""

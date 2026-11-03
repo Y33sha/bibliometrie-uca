@@ -26,11 +26,11 @@ from pipeline.transformation.countries.resolution import resolve_address_countri
 BATCH_SIZE = 50_000
 """Nombre de contributions sources recalculées par requête."""
 
-# Files et tables de leur relevé. `delete_processed_marks` supprime des files les marquages relevés.
 _SNAPSHOTS = (
     (Queue.SOURCE_CONTRIBUTION_COUNTRIES, "source_contribution_countries_marks"),
     (Queue.ADDRESS_COUNTRIES, "address_countries_marks"),
 )
+"""Files et tables de leur relevé. `delete_processed_marks` supprime des files les marquages relevés."""
 
 _CREATE_DIRTY_SCOPE = """
     CREATE TEMP TABLE countries_dirty_scope AS
@@ -57,7 +57,6 @@ _CREATE_RECOMPUTE_SCOPE = """
                   WHERE x.source_contribution_id = d.id)
 """
 
-# Recalcul de `source_contributions.countries` sur la CTE amont `scoped_sa(id)`.
 _SOURCE_CONTRIBUTION_COUNTRIES_FROM_SCOPE = """,
     contributions AS (
         SELECT sca.source_contribution_id AS source_contribution_id, c::text AS code
@@ -96,8 +95,8 @@ _SOURCE_CONTRIBUTION_COUNTRIES_FROM_SCOPE = """,
     WHERE sc.id = s.id
       AND sc.countries IS DISTINCT FROM agg.new_countries
 """
+"""Recalcul de `source_contributions.countries` sur la CTE amont `scoped_sa(id)`."""
 
-# Recalcul de `source_records.countries` sur la CTE amont `scoped_sp(source_record_id)` : union des pays des contributions sources.
 _SOURCE_RECORD_COUNTRIES_FROM_SCOPE = """,
     agg AS (
         SELECT sc.source_record_id AS source_record_id,
@@ -114,8 +113,8 @@ _SOURCE_RECORD_COUNTRIES_FROM_SCOPE = """,
     WHERE sr.id = ss.source_record_id
       AND sr.countries IS DISTINCT FROM agg.new_countries
 """
+"""Recalcul de `source_records.countries` sur la CTE amont `scoped_sp(source_record_id)` : union des pays des contributions sources."""
 
-# Recalcul de `publications.countries` sur la CTE amont `scoped_publications(publication_id)` : union des `source_records.countries` de la publication ; seules les lignes qui changent sont écrites.
 _PUBLICATION_COUNTRIES_FROM_SCOPE = """,
     agg AS (
         SELECT sr.publication_id AS publication_id,
@@ -133,6 +132,7 @@ _PUBLICATION_COUNTRIES_FROM_SCOPE = """,
     WHERE p.id = scp.publication_id
       AND p.countries IS DISTINCT FROM agg.new_countries
 """
+"""Recalcul de `publications.countries` sur la CTE amont `scoped_publications(publication_id)` : union des `source_records.countries` de la publication ; seules les lignes qui changent sont écrites."""
 
 
 def create_dirty_scope(conn: Connection) -> int:

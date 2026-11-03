@@ -101,7 +101,6 @@ def _merge_exclusion(conn: Connection, target_id: int, source_id: int) -> None:
     )
 
 
-# Ordre d'exécution : les rejets et les confirmations sont transférés avant que le rejet l'emporte (`merge_into`).
 MERGE_STEPS: dict[str, MergeStep] = {
     "contributions": MergeStep((("contributions", "person_id"),), _merge_contributions),
     "rejected_contributions": transfer_unique(
@@ -125,6 +124,7 @@ MERGE_STEPS: dict[str, MergeStep] = {
     "created_at": untouched("persons", "created_at"),
     "exclusion": MergeStep((("persons", "exclusion"),), _merge_exclusion, decision=True),
 }
+"""Ordre d'exécution : les rejets et les confirmations sont transférés avant que le rejet l'emporte (`merge_into`)."""
 
 
 def merge_into(conn: Connection, target_id: int, source_id: int) -> None:

@@ -132,12 +132,12 @@ def get_locations(doc: Mapping[str, JsonValue]) -> list[LocationFacts]:
     return locations
 
 
-# Type d'identifiant de chaque type d'`externalIds` lu.
 _EXTERNAL_ID_TYPES = {
     "doi": SourceIdentifierType.DOI,
     "hal": SourceIdentifierType.HAL_ID,
     "pmid": SourceIdentifierType.PMID,
 }
+"""Type d'identifiant de chaque type d'`externalIds` lu."""
 
 
 def scanr_identifiers(doc: Mapping[str, JsonValue], scanr_id: str) -> tuple[SourceIdentifier, ...]:

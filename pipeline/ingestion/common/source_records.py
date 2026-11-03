@@ -38,8 +38,8 @@ class SourceRecordUpsert:
     `title` et `abstract` sont nettoyés à l'écriture (`clean_title`, `clean_abstract`), et `title_normalized` se dérive du titre. `doc_type` de `raw_doc_type` (`map_doc_type`) et `language` de `raw_language` (`language_code`). La phase `publishing` pose l'éditeur, la revue et la monographie, la phase `publications` le rattachement à la publication.
     """
 
-    # Clé de l'enregistrement source
     source: str
+    """Clé de l'enregistrement source."""
     source_id: str
     """Identifiant natif de la source : hal-id, id OpenAlex, UT WoS, id ScanR, id theses.fr ou NNT, DOI pour crossref et datacite."""
     staging_id: int
@@ -48,8 +48,8 @@ class SourceRecordUpsert:
     identifiers: tuple[SourceIdentifier, ...] = ()
     """Identifiants de l'enregistrement source, avec leur rôle, écrits dans `source_record_identifiers`. L'écriture les normalise."""
 
-    # Métadonnées bibliographiques
     title: str
+    """Métadonnées bibliographiques."""
     publication_date: PublicationDate | None = None
     """Date de publication, avec sa précision. La base en tire `publication_year`."""
     raw_doc_type: str | None = None
@@ -74,11 +74,11 @@ class SourceRecordUpsert:
     """Indicateurs de citation, construits par `domain.source_records.impact.Impact.to_json`."""
     is_retracted: bool | None = None
 
-    # Collections HAL
     hal_collections: list[str] | None = None
+    """Collections HAL."""
 
-    # Charge utile propre à la source
     source_extras: JsonValue = None
+    """Charge utile propre à la source."""
 
 
 _FIELDS = tuple(
@@ -90,18 +90,18 @@ _ROW_FIELDS = tuple(f.name for f in _FIELDS)
 _DATE_COLUMNS = ("publication_date", "publication_date_precision")
 _COLUMNS = (*_ROW_FIELDS, "title_normalized", "doc_type", "language", *_DATE_COLUMNS)
 
-# Tout est réécrit, sauf la clé de conflit. `corrections` se vide : ses valeurs d'origine viennent de l'import précédent, et la phase `metadata_correction` refait ses corrections sur les valeurs fraîches.
 _UPDATED_COLUMNS = tuple(c for c in _COLUMNS if c not in ("source", "source_id"))
+"""Tout est réécrit, sauf la clé de conflit. `corrections` se vide : ses valeurs d'origine viennent de l'import précédent, et la phase `metadata_correction` refait ses corrections sur les valeurs fraîches."""
 
-# Colonnes JSONB : les champs annotés `JsonValue` ; les `list[str]` sont des `text[]`. Un champ JSONB ajouté au contrat est typé sans autre geste.
 _JSONB_COLUMNS = tuple(f.name for f in _FIELDS if f.type is JsonValue)
+"""Colonnes JSONB : les champs annotés `JsonValue` ; les `list[str]` sont des `text[]`. Un champ JSONB ajouté au contrat est typé sans autre geste."""
 
-# Colonnes à type énuméré PostgreSQL : le paramètre est converti vers ce type.
 _ENUM_CASTS = {
     "doc_type": "doc_type",
     "license": "license_type",
     "publication_date_precision": "date_precision",
 }
+"""Colonnes à type énuméré PostgreSQL : le paramètre est converti vers ce type."""
 
 
 def _value(column: str) -> str:
@@ -109,7 +109,6 @@ def _value(column: str) -> str:
     return f"CAST(:{column} AS {cast})" if cast else f":{column}"
 
 
-# Chaque écriture marque l'enregistrement source pour la réconciliation.
 _UPSERT_SQL = text(
     f"""
     WITH upserted AS (
@@ -125,6 +124,7 @@ _UPSERT_SQL = text(
     SELECT id FROM upserted
     """  # noqa: S608 — listes de colonnes construites depuis le contrat, sans entrée externe
 ).bindparams(*(bindparam(c, type_=Jsonb) for c in _JSONB_COLUMNS))
+"""Chaque écriture marque l'enregistrement source pour la réconciliation."""
 
 
 _DELETE_IDENTIFIERS = text(

@@ -39,10 +39,10 @@ def _candidates_sql(similarity: str, condition: str, *, ranked: bool = False) ->
 
 _TITLE_SIMILARITY = "similarity(c.title_normalized, :title)"
 
-# Les opérateurs `%` (titre proche du titre de référence) et `<%` (mots de la saisie présents dans le titre) appliquent les seuils de `pg_trgm` et passent par l'index trigramme de `title_normalized`.
 _BY_OWN_TITLE_SQL = text(
     _candidates_sql(_TITLE_SIMILARITY, "c.title_normalized % :title", ranked=True)
 )
+"""Les opérateurs `%` (titre proche du titre de référence) et `<%` (mots de la saisie présents dans le titre) appliquent les seuils de `pg_trgm` et passent par l'index trigramme de `title_normalized`."""
 
 _BY_WORDS_SQL = text(
     _candidates_sql(

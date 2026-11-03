@@ -37,16 +37,15 @@ _ORCID = usable_identifier("'orcid'")
 _IDHAL = usable_identifier("'idhal'")
 _IDREF = usable_identifier("'idref'")
 
-# Condition vraie quand la contribution source `sc` neutralise sa référence de compte HAL.
 _HAL_PERSON_ID_NEUTRALIZED = identifier_neutralized("'hal_person_id'")
+"""Condition vraie quand la contribution source `sc` neutralise sa référence de compte HAL."""
 
-# Condition sur une attribution d'identifiant `pi` : compte HAL attribué à la personne `pi.person_id`, hors attributions rejetées.
 _HAL_ACCOUNT_ATTRIBUTION = (
     f"pi.id_type = '{PersonIdentifierType.HAL_PERSON_ID.value}'"
     f" AND pi.status <> '{AttributionStatus.REJECTED.value}'"
 )
+"""Condition sur une attribution d'identifiant `pi` : compte HAL attribué à la personne `pi.person_id`, hors attributions rejetées."""
 
-# Personnes à au moins deux comptes HAL attribués. Même population pour le comptage et pour la liste.
 _PERSONS_WITH_DUPLICATE_HAL_ACCOUNTS = f"""
     SELECT pi.person_id
     FROM person_identifiers pi
@@ -54,6 +53,7 @@ _PERSONS_WITH_DUPLICATE_HAL_ACCOUNTS = f"""
     GROUP BY pi.person_id
     HAVING COUNT(*) >= 2
 """
+"""Personnes à au moins deux comptes HAL attribués. Même population pour le comptage et pour la liste."""
 
 
 class HalProblemsQueries:
@@ -609,8 +609,8 @@ class HalProblemsQueries:
         )
 
 
-# Taille de la page unique d'un export.
 _EXPORT_PAGE = MAX_EXPORT_ROWS + 1
+"""Taille de la page unique d'un export."""
 
 
 def _capped[T](items: Sequence[T]) -> tuple[Sequence[T], bool]:

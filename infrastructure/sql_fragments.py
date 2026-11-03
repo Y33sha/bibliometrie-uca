@@ -174,7 +174,6 @@ def strong_identifier_source_contributions(
     """
 
 
-# Intervalles de présence continue d'une personne, toutes unités confondues : une période ouvre un intervalle quand elle commence plus d'un jour après la fin de toutes les précédentes. Une date absente est une borne ouverte.
 _HR_PRESENCE = """(
     SELECT person_id, min(start_date) AS start_date,
            CASE WHEN bool_or(end_date IS NULL) THEN NULL ELSE max(end_date) END AS end_date
@@ -192,8 +191,8 @@ _HR_PRESENCE = """(
     ) numbered
     GROUP BY person_id, span
 )"""
+"""Intervalles de présence continue d'une personne, toutes unités confondues : une période ouvre un intervalle quand elle commence plus d'un jour après la fin de toutes les précédentes. Une date absente est une borne ouverte."""
 
-# Identifiants des personnes RH, aux statuts interrogés, avec les années de présence de chaque intervalle : de l'année qui suit le début à l'année de fin. Sans date : 0, 9999.
 _RH_IDENTIFIERS = f"""(
     SELECT pi.person_id, pi.id_type::text AS id_type, pi.id_value,
            coalesce(extract(year FROM r.start_date)::int + 1, 0) AS first_year,
@@ -202,6 +201,7 @@ _RH_IDENTIFIERS = f"""(
     JOIN {_HR_PRESENCE} r ON r.person_id = pi.person_id
     WHERE pi.status::text IN {in_clause(HUMAN_ATTRIBUTION_STATUSES)}
 )"""
+"""Identifiants des personnes RH, aux statuts interrogés, avec les années de présence de chaque intervalle : de l'année qui suit le début à l'année de fin. Sans date : 0, 9999."""
 
 
 def hr_record_source_contributions(source_contribution_filter: str = "") -> str:
@@ -234,14 +234,14 @@ def hr_record_source_contributions(source_contribution_filter: str = "") -> str:
     )
 
 
-# Rejets `rej` et leurs enregistrements sources présents `sr_rej`, par clé naturelle. Un rejet sans enregistrement source présent reste en sommeil.
 _REJECTIONS = (
     "rejected_contributions rej"
     " JOIN source_records sr_rej ON sr_rej.source = rej.source AND sr_rej.source_id = rej.source_id"
 )
+"""Rejets `rej` et leurs enregistrements sources présents `sr_rej`, par clé naturelle. Un rejet sans enregistrement source présent reste en sommeil."""
 
-# Paires (publication, personne) rejetées : une publication est rejetée pour une personne dès qu'un de ses enregistrements sources l'est.
 REJECTED_PAIRS = f"SELECT sr_rej.publication_id, rej.person_id FROM {_REJECTIONS}"
+"""Paires (publication, personne) rejetées : une publication est rejetée pour une personne dès qu'un de ses enregistrements sources l'est."""
 
 
 def publication_rejected_for(publication_id: str, person_id: str) -> str:
@@ -252,11 +252,11 @@ def publication_rejected_for(publication_id: str, person_id: str) -> str:
     )
 
 
-# Tableau d'indices vide : hors du périmètre.
 NO_PERIMETER_EVIDENCE = "'{}'::perimeter_evidence[]"
+"""Tableau d'indices vide : hors du périmètre."""
 
-# Tableau de positions d'auteur vide.
 NO_AUTHOR_POSITION = "'{}'::author_position[]"
+"""Tableau de positions d'auteur vide."""
 
 
 def source_contribution_perimeter_evidence(source_contribution_ids: str | None = None) -> str:
