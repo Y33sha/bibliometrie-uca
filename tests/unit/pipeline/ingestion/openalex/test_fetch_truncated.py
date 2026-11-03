@@ -135,8 +135,7 @@ async def test_lot_mele(openalex):
 
 
 def test_phase_sautee_sans_openalex_dans_les_sources(open_tx, contexte):
-    (metrics,) = execute_tasks(fetch_truncated.TASKS, contexte(sources={"hal"})).values()
-    assert metrics.seen == 0
+    assert execute_tasks(fetch_truncated.TASKS, contexte(sources={"hal"})) == {}
     assert open_tx.transactions == 0
 
 

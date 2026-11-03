@@ -14,7 +14,7 @@ def test_des_etapes_qui_ne_couvrent_pas_les_taches_de_la_phase_sont_refusees(con
 
 
 def test_l_executeur_mesure_la_duree_des_seules_taches_executees(contexte):
-    """Une tâche exécutée reçoit sa durée, rangée aussi dans le contexte. Une tâche écartée par sa condition garde `duration_s` à `None`."""
+    """Une tâche exécutée reçoit sa durée, rangée aussi dans le contexte. Une tâche écartée par sa condition est absente du résultat."""
     tasks = (
         task("essai.une", run=lambda _ctx: PhaseMetrics()),
         task("essai.ecartee", run=lambda _ctx: PhaseMetrics(), when=lambda _ctx: False),
@@ -25,7 +25,7 @@ def test_l_executeur_mesure_la_duree_des_seules_taches_executees(contexte):
     by_task = execute_tasks(tasks, ctx)
 
     assert by_task["essai.une"].duration_s is not None
-    assert by_task["essai.ecartee"].duration_s is None
+    assert "essai.ecartee" not in by_task
     assert set(ctx.task_durations) == {"essai.une", "essai.deux"}
 
 

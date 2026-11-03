@@ -44,7 +44,7 @@ def run_tasks(
     *,
     parallel: RunParallel = run_parallel,
 ) -> dict[str, PhaseMetrics]:
-    """Exécute les tâches de `phase` déclarées dans `TASKS`, chacune par son étape dans `steps`, et renvoie leurs métriques, par nom de tâche.
+    """Exécute les tâches de `phase` déclarées dans `TASKS`, chacune par son étape dans `steps`, et renvoie leurs métriques, par nom de tâche. Une tâche écartée par sa condition reçoit des métriques vides.
 
     Raises:
         ValueError: `steps` diffère des tâches de la phase.
@@ -55,7 +55,7 @@ def run_tasks(
             f"Les étapes de {phase} et ses tâches divergent : "
             f"{set(steps) ^ {task.name for task in tasks}}"
         )
-    return execute_tasks(
+    executed = execute_tasks(
         [
             replace(
                 task,
@@ -72,16 +72,17 @@ def run_tasks(
         ctx,
         parallel=parallel,
     )
+    return {task.name: executed.get(task.name, PhaseMetrics()) for task in tasks}
 
 
 def execute_tasks(
     tasks: Sequence[Task], ctx: PhaseContext, *, parallel: RunParallel = run_parallel
 ) -> dict[str, PhaseMetrics]:
-    """Exécute `tasks` dans leur ordre et renvoie leurs métriques, par nom de tâche.
+    """Exécute `tasks` dans leur ordre et renvoie les métriques des tâches exécutées, par nom de tâche. Une tâche écartée par sa condition est absente du résultat.
 
     Les tâches consécutives d'un même groupe parallèle s'exécutent ensemble par `parallel`. Leurs lignes de bilan suivent, dans l'ordre des tâches.
     """
-    results: dict[str, PhaseMetrics] = {task.name: PhaseMetrics() for task in tasks}
+    results: dict[str, PhaseMetrics] = {}
     selected = [task for task in tasks if task.when is None or task.when(ctx)]
     start = 0
     while start < len(selected):

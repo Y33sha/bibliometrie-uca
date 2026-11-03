@@ -54,7 +54,7 @@ class Task:
     threshold: int | None = None
     """Échecs consécutifs avant la coupure du circuit-breaker de la source. `None` : seuil par défaut."""
     when: Callable[[PhaseContext], bool] | None = None
-    """Condition d'exécution, évaluée avant l'accès à la source. Une tâche écartée renvoie des métriques vides et n'écrit rien."""
+    """Condition d'exécution, évaluée avant l'accès à la source. Une tâche écartée n'écrit rien."""
     silent_when_empty: bool = False
     """La tâche n'écrit rien sans élément traité : `total` nul, sans signal."""
 
@@ -435,6 +435,6 @@ class Phase:
     check: Callable[[PhaseContext], None] | None = None
     """Précondition, vérifiée avant les tâches : lève une exception si elle n'est pas remplie."""
     assemble: Callable[[Mapping[str, PhaseMetrics]], PhaseMetrics] | None = None
-    """Métriques de la phase, d'après celles de ses tâches, par nom de tâche. `None` : leur somme."""
+    """Métriques de la phase, d'après celles de ses tâches exécutées, par nom de tâche. `None` : leur somme."""
     build: Callable[[], ExecutablePhase] | None = None
     """Construction de la phase exécutée par sa propre classe."""
