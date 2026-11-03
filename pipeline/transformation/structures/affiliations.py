@@ -21,7 +21,7 @@ from sqlalchemy import Connection
 from infrastructure.read_models.perimeters.queries import (
     get_persons_structure_ids_list,
 )
-from pipeline.graph import Task
+from pipeline.graph import Task, in_transaction
 from pipeline.http.polite_pool import default_user_agent
 from pipeline.ingestion.complements.ror import ZenodoRorDumpSource
 from pipeline.ingestion.hal.api import HalStructuresClient
@@ -43,11 +43,6 @@ from pipeline.transformation.structures.perimeter_evidence import (
     sync_perimeter_evidence,
 )
 from pipeline.transformation.structures.ror import RorStore, run_refresh_ror
-
-
-def _classify_addresses(ctx: PhaseContext) -> PhaseMetrics:
-    with ctx.open_tx() as conn:
-        return classify_addresses(conn, ctx.logger)
 
 
 def _resolve_addresses(ctx: PhaseContext) -> PhaseMetrics:
@@ -149,7 +144,7 @@ TASKS = (
         ),
         writes=("addresses.origin",),
         previous_run=("addresses.origin",),
-        run=_classify_addresses,
+        run=in_transaction(classify_addresses),
         section="Origine des adresses",
     ),
     Task(

@@ -20,7 +20,7 @@ from collections.abc import Callable, Mapping
 
 from domain.config import ConfigKey
 from infrastructure.repositories.publisher_merge import merge_publisher_into
-from pipeline.graph import Task
+from pipeline.graph import Task, in_transaction
 from pipeline.http.polite_pool import default_user_agent
 from pipeline.ingestion.api_params import (
     API_BASE_URLS,
@@ -41,25 +41,10 @@ from pipeline.transformation.publishing.monographs import (
     link_monographs_to_collections,
     type_proceedings_volumes,
 )
-from pipeline.transformation.publishing.monographs.attach_monographs import run_attach_monographs
-from pipeline.transformation.publishing.monographs.link_monographs_to_collections import (
-    run_link_monographs_to_collections,
-)
-from pipeline.transformation.publishing.monographs.type_proceedings_volumes import (
-    run_type_proceedings_volumes,
-)
 from pipeline.transformation.publishing.publishers import (
     attach_publishers,
     merge_duplicate_publishers,
     resolve_publishers,
-)
-from pipeline.transformation.publishing.publishers.attach_publishers import run_attach_publishers
-from pipeline.transformation.publishing.publishers.merge_duplicate_publishers import (
-    run_merge_duplicate_publishers,
-)
-from pipeline.transformation.publishing.publishers.resolve_publishers import (
-    run_resolve_crossref_publishers,
-    run_resolve_datacite_publishers,
 )
 from pipeline.transformation.publishing.publishers.store import PublisherStore
 from pipeline.transformation.publishing.serials import (
@@ -71,29 +56,6 @@ from pipeline.transformation.publishing.serials import (
     learn_serial_doi_namespaces,
     type_journal_serials,
     type_proceedings_serials,
-)
-from pipeline.transformation.publishing.serials.attach_serials import (
-    run_attach_serials,
-    run_sync_issns,
-)
-from pipeline.transformation.publishing.serials.check_issns_in_sudoc import (
-    run_check_issns_in_sudoc,
-)
-from pipeline.transformation.publishing.serials.enrich_serials_from_doaj import (
-    run_enrich_serials_from_doaj,
-)
-from pipeline.transformation.publishing.serials.enrich_serials_from_openalex import (
-    run_enrich_serials_from_openalex,
-)
-from pipeline.transformation.publishing.serials.import_issnl_table import run_import_issnl_table
-from pipeline.transformation.publishing.serials.learn_serial_doi_namespaces import (
-    run_learn_serial_doi_namespaces,
-)
-from pipeline.transformation.publishing.serials.type_journal_serials import (
-    run_type_journal_serials,
-)
-from pipeline.transformation.publishing.serials.type_proceedings_serials import (
-    run_type_proceedings_serials,
 )
 
 _PHASE = "publishing"
@@ -183,7 +145,7 @@ def _run_resolve_crossref_publishers(
     ctx: PhaseContext,
 ) -> PhaseMetrics:
     with ctx.open_tx() as conn:
-        return run_resolve_crossref_publishers(
+        return resolve_publishers.run_resolve_crossref_publishers(
             conn,
             ctx.logger,
             prefix_store=DoiPrefixStore(conn),
@@ -196,18 +158,13 @@ def _run_resolve_datacite_publishers(
     ctx: PhaseContext,
 ) -> PhaseMetrics:
     with ctx.open_tx() as conn:
-        return run_resolve_datacite_publishers(
+        return resolve_publishers.run_resolve_datacite_publishers(
             conn,
             ctx.logger,
             prefix_store=DoiPrefixStore(conn),
             publisher_store=PublisherStore(conn),
             fetch_prefix_fn=fetch_datacite_prefix,
         )
-
-
-def _run_attach_publishers(ctx: PhaseContext) -> PhaseMetrics:
-    with ctx.open_tx() as conn:
-        return run_attach_publishers(conn, ctx.logger)
 
 
 def _run_merge_duplicate_publishers(ctx: PhaseContext) -> PhaseMetrics:
@@ -217,7 +174,9 @@ def _run_merge_duplicate_publishers(ctx: PhaseContext) -> PhaseMetrics:
             merge_publisher_into(conn, target_id, source_id)
             conn.commit()
 
-        return run_merge_duplicate_publishers(conn, ctx.logger, merge=merge)
+        return merge_duplicate_publishers.run_merge_duplicate_publishers(
+            conn, ctx.logger, merge=merge
+        )
 
 
 def _run_enrich_serials_from_openalex(
@@ -225,23 +184,13 @@ def _run_enrich_serials_from_openalex(
 ) -> PhaseMetrics:
     sources_api = API_BASE_URLS["openalex_sources"]
     with ctx.open_tx() as conn:
-        return run_enrich_serials_from_openalex(
+        return enrich_serials_from_openalex.run_enrich_serials_from_openalex(
             conn,
             ctx.logger,
             fetch_batch=lambda oa_ids: fetch_sources_batch(
                 oa_ids, openalex_sources_api=sources_api
             ),
         )
-
-
-def _run_sync_issns(ctx: PhaseContext) -> PhaseMetrics:
-    with ctx.open_tx() as conn:
-        return run_sync_issns(conn, ctx.logger)
-
-
-def _run_attach_serials(ctx: PhaseContext) -> PhaseMetrics:
-    with ctx.open_tx() as conn:
-        return run_attach_serials(conn, ctx.logger)
 
 
 def _run_check_issns_in_sudoc(
@@ -251,7 +200,7 @@ def _run_check_issns_in_sudoc(
     with ctx.open_tx() as conn:
         # `asyncio.run` transmet aux coroutines la ContextVar du circuit-breaker.
         return asyncio.run(
-            run_check_issns_in_sudoc(
+            check_issns_in_sudoc.run_check_issns_in_sudoc(
                 conn,
                 ctx.logger,
                 fetch_ppns=lambda client, issns: fetch_ppns(client, issns, base_url=base_url),
@@ -264,40 +213,10 @@ def _run_check_issns_in_sudoc(
         )
 
 
-def _run_attach_monographs(ctx: PhaseContext) -> PhaseMetrics:
-    with ctx.open_tx() as conn:
-        return run_attach_monographs(conn, ctx.logger)
-
-
-def _run_link_monographs_to_collections(ctx: PhaseContext) -> PhaseMetrics:
-    with ctx.open_tx() as conn:
-        return run_link_monographs_to_collections(conn, ctx.logger)
-
-
-def _run_type_proceedings_volumes(ctx: PhaseContext) -> PhaseMetrics:
-    with ctx.open_tx() as conn:
-        return run_type_proceedings_volumes(conn, ctx.logger)
-
-
-def _run_type_proceedings_serials(ctx: PhaseContext) -> PhaseMetrics:
-    with ctx.open_tx() as conn:
-        return run_type_proceedings_serials(conn, ctx.logger)
-
-
-def _run_type_journal_serials(ctx: PhaseContext) -> PhaseMetrics:
-    with ctx.open_tx() as conn:
-        return run_type_journal_serials(conn, ctx.logger)
-
-
-def _run_learn_serial_doi_namespaces(ctx: PhaseContext) -> PhaseMetrics:
-    with ctx.open_tx() as conn:
-        return run_learn_serial_doi_namespaces(conn, ctx.logger)
-
-
 def _run_import_issnl_table(ctx: PhaseContext) -> PhaseMetrics:
     user_agent = default_user_agent()
     with ctx.open_tx() as conn:
-        return run_import_issnl_table(
+        return import_issnl_table.run_import_issnl_table(
             conn,
             ctx.logger,
             refresh_after_days=delay(conn, ConfigKey.ISSNL_TABLE_REFRESH_AFTER_DAYS),
@@ -308,7 +227,7 @@ def _run_import_issnl_table(ctx: PhaseContext) -> PhaseMetrics:
 def _run_enrich_serials_from_doaj(ctx: PhaseContext) -> PhaseMetrics:
     user_agent = default_user_agent()
     with ctx.open_tx() as conn:
-        return run_enrich_serials_from_doaj(
+        return enrich_serials_from_doaj.run_enrich_serials_from_doaj(
             conn,
             ctx.logger,
             refresh_after_days=delay(conn, ConfigKey.DOAJ_REFRESH_AFTER_DAYS),
@@ -407,7 +326,7 @@ TASKS = (
             "source_records.corrections",
             "source_records.doc_type",
         ),
-        run=_run_attach_publishers,
+        run=in_transaction(attach_publishers.run_attach_publishers),
         section="Éditeurs",
         label=attach_publishers.LABEL,
     ),
@@ -443,7 +362,7 @@ TASKS = (
         writes=("serial_issns",),
         # Lignes vérifiées par `check_issns_in_sudoc`, revues posées par `attach_serials`, revues supprimées par `finalize.delete_empty_containers`.
         previous_run=("serial_issns",),
-        run=_run_sync_issns,
+        run=in_transaction(attach_serials.run_sync_issns),
         section="Publications en série",
         label=attach_serials.SYNC_LABEL,
     ),
@@ -521,7 +440,7 @@ TASKS = (
             "monographs.serial_id",
             "publications",
         ),
-        run=_run_attach_serials,
+        run=in_transaction(attach_serials.run_attach_serials),
         section="Publications en série",
         label=attach_serials.ATTACH_LABEL,
     ),
@@ -556,7 +475,7 @@ TASKS = (
         ),
         writes=("serials.serial_type",),
         previous_run=("serials", "serial_issns", "source_records.serial_id"),
-        run=_run_type_proceedings_serials,
+        run=in_transaction(type_proceedings_serials.run_type_proceedings_serials),
         section="Publications en série",
         label=type_proceedings_serials.LABEL,
     ),
@@ -574,7 +493,7 @@ TASKS = (
         ),
         writes=("serials.serial_type",),
         previous_run=("serials", "serial_issns", "source_records.serial_id"),
-        run=_run_type_journal_serials,
+        run=in_transaction(type_journal_serials.run_type_journal_serials),
         section="Publications en série",
         label=type_journal_serials.LABEL,
     ),
@@ -589,7 +508,7 @@ TASKS = (
         writes=("serial_doi_namespaces",),
         # Statuts posés par la correction de `metadata_correction`.
         previous_run=("source_records", "serials", "source_record_identifiers.removed_by"),
-        run=_run_learn_serial_doi_namespaces,
+        run=in_transaction(learn_serial_doi_namespaces.run_learn_serial_doi_namespaces),
         section="Publications en série",
         label=learn_serial_doi_namespaces.LABEL,
     ),
@@ -635,7 +554,7 @@ TASKS = (
         ),
         # Monographies créées ou fusionnées aux runs précédents, reprises par les volumes.
         previous_run=("monographs", "source_records.monograph_id"),
-        run=_run_attach_monographs,
+        run=in_transaction(attach_monographs.run_attach_monographs),
         section="Monographies",
         label=attach_monographs.LABEL,
     ),
@@ -658,7 +577,7 @@ TASKS = (
             "monographs.serial_id",
         ),
         previous_run=("monographs", "source_records.serial_id", "serial_issns", "serials"),
-        run=_run_link_monographs_to_collections,
+        run=in_transaction(link_monographs_to_collections.run_link_monographs_to_collections),
         section="Monographies",
         label=link_monographs_to_collections.LABEL,
     ),
@@ -675,7 +594,7 @@ TASKS = (
         ),
         writes=("monographs.proceedings",),
         previous_run=("monographs", "serials"),
-        run=_run_type_proceedings_volumes,
+        run=in_transaction(type_proceedings_volumes.run_type_proceedings_volumes),
         section="Monographies",
         label=type_proceedings_volumes.LABEL,
     ),

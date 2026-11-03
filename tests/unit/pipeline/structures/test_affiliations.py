@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import pytest
 
-from pipeline.graph import Phase
+from pipeline.graph import Phase, in_transaction
 from pipeline.phases import PHASES
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.task_runner import run_phase
@@ -25,22 +25,22 @@ def perimetre(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[int]]:
     lus = {"extraction": [1, 2, 3, 4, 5], "persons": PERIMETRE}
     monkeypatch.setattr(perimeter, "get_extraction_structure_ids", lambda conn: lus["extraction"])
     monkeypatch.setattr(phase, "get_persons_structure_ids_list", lambda conn: lus["persons"])
-    monkeypatch.setattr(phase, "classify_addresses", lambda _conn, _logger: PhaseMetrics())
     monkeypatch.setattr(phase, "resolve_thesis_partners", lambda _conn, _logger: 0)
     return lus
 
 
 def _phase(ror: PhaseMetrics | None = None) -> Phase:
-    """Renvoie la phase `affiliations`, ses deux référentiels remplacés par des tâches sans réseau ni transaction."""
-    referentiels = {
+    """Renvoie la phase `affiliations`, ses deux référentiels remplacés par des tâches sans réseau ni transaction, l'origine des adresses par une transaction vide."""
+    remplacees = {
         "affiliations.refresh_ror": lambda _ctx: ror or PhaseMetrics(),
         "affiliations.refresh_hal_structures": lambda _ctx: PhaseMetrics(),
+        "affiliations.classify_addresses": in_transaction(lambda _conn, _logger: PhaseMetrics()),
     }
     affiliations = next(p for p in PHASES if p.name == "affiliations")
     return dataclasses.replace(
         affiliations,
         tasks=tuple(
-            dataclasses.replace(t, run=referentiels.get(t.name, t.run)) for t in affiliations.tasks
+            dataclasses.replace(t, run=remplacees.get(t.name, t.run)) for t in affiliations.tasks
         ),
     )
 

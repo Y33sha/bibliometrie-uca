@@ -16,7 +16,7 @@ from collections.abc import Callable, Mapping
 from sqlalchemy import Connection, text
 
 from infrastructure.db.scalars import scalar_int
-from pipeline.graph import Task
+from pipeline.graph import Task, in_transaction
 from pipeline.runtime.context import OpenTransaction, PhaseContext
 from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, inflect, quantity, step
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -26,21 +26,12 @@ from pipeline.transformation.publications.publication_perimeter import (
     refresh_publications_perimeter_evidence,
 )
 from pipeline.transformation.publishing.monographs import delete_empty_monographs
-from pipeline.transformation.publishing.monographs.delete_empty_monographs import (
-    run_delete_empty_monographs,
-)
 from pipeline.transformation.publishing.publication_counts import (
     refresh_publisher_publication_counts,
     refresh_serial_publication_counts,
 )
 from pipeline.transformation.publishing.publishers import delete_empty_publishers
-from pipeline.transformation.publishing.publishers.delete_empty_publishers import (
-    run_delete_empty_publishers,
-)
 from pipeline.transformation.publishing.serials import delete_empty_serials
-from pipeline.transformation.publishing.serials.delete_empty_serials import (
-    run_delete_empty_serials,
-)
 from pipeline.transformation.publishing.serials.serial_publishers import (
     refresh_serial_publishers,
 )
@@ -185,25 +176,16 @@ def _refresh_publication_counts(open_tx: OpenTransaction, logger: logging.Logger
         line.conclude(f"{LAST_BRANCH}{quantity(publishers, 'éditeur')} mis à jour")
 
 
-def _run_delete_empty_monographs(ctx: PhaseContext) -> PhaseMetrics:
-    with ctx.open_tx() as conn:
-        return run_delete_empty_monographs(conn, ctx.logger)
-
-
-def _run_delete_empty_serials(ctx: PhaseContext) -> PhaseMetrics:
-    with ctx.open_tx() as conn:
-        return run_delete_empty_serials(conn, ctx.logger)
-
-
-def _run_delete_empty_publishers(ctx: PhaseContext) -> PhaseMetrics:
-    with ctx.open_tx() as conn:
-        return run_delete_empty_publishers(conn, ctx.logger)
-
-
 _EMPTY_CONTAINERS: tuple[tuple[str, Callable[[PhaseContext], PhaseMetrics]], ...] = (
-    (delete_empty_monographs.LABEL, _run_delete_empty_monographs),
-    (delete_empty_serials.LABEL, _run_delete_empty_serials),
-    (delete_empty_publishers.LABEL, _run_delete_empty_publishers),
+    (
+        delete_empty_monographs.LABEL,
+        in_transaction(delete_empty_monographs.run_delete_empty_monographs),
+    ),
+    (delete_empty_serials.LABEL, in_transaction(delete_empty_serials.run_delete_empty_serials)),
+    (
+        delete_empty_publishers.LABEL,
+        in_transaction(delete_empty_publishers.run_delete_empty_publishers),
+    ),
 )
 """Suppressions des référentiels vides, dans l'ordre : (libellé, fonction)."""
 

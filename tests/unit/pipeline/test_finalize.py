@@ -7,6 +7,7 @@ import logging
 from contextlib import ExitStack
 from unittest.mock import patch
 
+from pipeline.graph import in_transaction
 from pipeline.phases import PHASES
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.task_runner import run_phase
@@ -59,13 +60,15 @@ def _patch_sql(counts: _Counts, suppressions: dict[str, int] | None = None) -> l
     """Simule les requêtes de synchronisation, les suppressions de référentiels vides et les décomptes de la phase."""
     suppressions = suppressions or {}
     return [
-        *(
-            patch.object(
-                phase,
-                f"run_delete_empty_{nom}",
-                _suppression(counts.appels, nom, suppressions.get(nom, 0)),
-            )
-            for nom in ("monographs", "serials", "publishers")
+        patch.object(
+            phase,
+            "_EMPTY_CONTAINERS",
+            tuple(
+                (label, in_transaction(_suppression(counts.appels, nom, suppressions.get(nom, 0))))
+                for (label, _), nom in zip(
+                    phase._EMPTY_CONTAINERS, ("monographs", "serials", "publishers"), strict=True
+                )
+            ),
         ),
         *(
             patch.object(phase, name, counts.counter(label, n))
