@@ -44,8 +44,6 @@ class SourceContributionSyncPlan:
 
     updates: tuple[tuple[int, int], ...]
     """Couples (identifiant en base, clé entrante) dont l'empreinte ou les informations du contributeur changent."""
-    kept: tuple[int, ...]
-    """Identifiants en base retrouvés et inchangés."""
     inserts: tuple[int, ...]
     """Clés entrantes sans correspondant."""
     deletes: tuple[int, ...]
@@ -85,14 +83,14 @@ def plan_source_contribution_sync(
     matched_incoming = {i.key for _, i in pairs}
     inserts = tuple(sorted(i.key for i in incoming if i.key not in matched_incoming))
     deletes = tuple(sorted(s.id for s in stored if s.id not in matched_stored))
-    changed = {
-        s.id
-        for s, i in pairs
-        if (s.content_hash, s.contributor_key) != (i.content_hash, i.contributor_key)
-    }
     return SourceContributionSyncPlan(
-        updates=tuple(sorted((s.id, i.key) for s, i in pairs if s.id in changed)),
-        kept=tuple(sorted(s.id for s, _ in pairs if s.id not in changed)),
+        updates=tuple(
+            sorted(
+                (s.id, i.key)
+                for s, i in pairs
+                if (s.content_hash, s.contributor_key) != (i.content_hash, i.contributor_key)
+            )
+        ),
         inserts=inserts,
         deletes=deletes,
         regroup=bool(inserts or deletes)
