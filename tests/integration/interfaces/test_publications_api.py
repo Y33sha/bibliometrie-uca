@@ -127,11 +127,11 @@ class TestPublicationsList:
         assert r.status_code == 200
 
     def test_filter_by_source_present(self, client):
-        r = client.get("/api/publications", params={"source": "hal_yes"})
+        r = client.get("/api/publications", params={"source_filter": "hal_yes"})
         assert r.status_code == 200
 
     def test_filter_by_source_absent(self, client):
-        r = client.get("/api/publications", params={"source": "oa_no"})
+        r = client.get("/api/publications", params={"source_filter": "openalex_no"})
         assert r.status_code == 200
 
     def test_filter_by_publisher(self, client):
@@ -216,6 +216,7 @@ class TestPublicationsFacets:
         assert r.status_code == 200
         data = r.json()
         assert "years" in data
+        assert set(data["source_counts"]) == {"hal", "openalex", "scanr", "wos", "theses"}
 
     def test_language_filter_and_facet(self, client):
         r = client.get("/api/publications/facets", params={"language": "en,fr"})

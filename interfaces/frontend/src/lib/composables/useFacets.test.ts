@@ -169,7 +169,7 @@ describe('useFacets', () => {
 
 	it('peuple sourceCounts depuis la clé déclarée', async () => {
 		apiResponse = {
-			source_counts: { hal: { yes: 100, no: 50 }, oa: { yes: 80, no: 70 } },
+			source_counts: { hal: { yes: 100, no: 50 }, openalex: { yes: 80, no: 70 } },
 		};
 		const f = useFacets({
 			endpoint: '/x',
@@ -181,7 +181,7 @@ describe('useFacets', () => {
 		await f.load();
 		expect(f.sourceCounts).toEqual({
 			hal: { yes: 100, no: 50 },
-			oa: { yes: 80, no: 70 },
+			openalex: { yes: 80, no: 70 },
 		});
 	});
 

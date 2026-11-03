@@ -118,20 +118,6 @@ def source_record_url(source: str, source_id: str) -> str:
             return f"https://doi.org/{quote(source_id, safe='/:')}"
 
 
-# Préfixe d'une source dans un filtre de lecture, court parce qu'il figure dans une URL.
-SOURCE_FILTER_PREFIXES: dict[str, Source] = {
-    "hal": Source.HAL,
-    "oa": Source.OPENALEX,
-    "scanr": Source.SCANR,
-    "wos": Source.WOS,
-    "theses": Source.THESES,
-}
-
-# Valeurs du filtre `source_filter` des lectures : un préfixe suivi de la présence attendue. `hal_yes` retient les publications présentes dans HAL, `hal_no` les autres.
-SOURCE_FILTER_VALUES: frozenset[str] = frozenset(
-    f"{prefixe}_{presence}" for prefixe in SOURCE_FILTER_PREFIXES for presence in ("yes", "no")
-)
-
 HARVESTED_SOURCES: tuple[Source, ...] = tuple(s for s, p in PROFILES.items() if p.harvested)
 DOI_SEARCHABLE_SOURCES: tuple[Source, ...] = tuple(
     s for s, p in PROFILES.items() if p.doi_searchable

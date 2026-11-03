@@ -17,7 +17,7 @@ from domain.publications.oa_status import (
     OaStatus,
 )
 from domain.source_records.impact import CitationTop
-from domain.sources.registry import PROFILES, SOURCE_FILTER_PREFIXES, Source
+from domain.sources.registry import PROFILES, Source
 from infrastructure.read_models.publications.models import (
     BELOW_CITATION_TOPS,
     DOI_AGENCY_SOURCES,
@@ -25,6 +25,7 @@ from infrastructure.read_models.publications.models import (
     NO_LICENSE,
     OTHER_AUTHOR_POSITION,
     OTHER_DOI_AGENCY,
+    SOURCE_FILTER_VALUES,
 )
 from infrastructure.read_models.sql_fragments import current_hr_period, current_laboratory_label
 from infrastructure.sql_fragments import (
@@ -269,21 +270,19 @@ def person_search_clause(search: str) -> WhereClause | None:
     return WhereClause(" AND ".join(conditions), binds)
 
 
+def in_source_sql(source: str) -> str:
+    """Renvoie la condition vraie quand la publication `p` est présente dans la source."""
+    return f"p.sources @> ARRAY['{source}'::source_type]"
+
+
 def source_clause(source_values: list[str]) -> WhereClause | None:
-    """Renvoie le filtre par source, sur `publications.sources`. Les valeurs sont des `{prefix}_{yes|no}`, constantes de l'interface, interpolées sans paramètre."""
+    """Renvoie le filtre par présence dans les sources, les valeurs combinées en AND. Seules comptent les valeurs de `SOURCE_FILTER_VALUES`, interpolées sans paramètre."""
     parts: list[str] = []
-    for sv in source_values:
-        bits = sv.rsplit("_", 1)
-        if len(bits) != 2:
+    for value in source_values:
+        if value not in SOURCE_FILTER_VALUES:
             continue
-        prefix, mode = bits
-        source = SOURCE_FILTER_PREFIXES.get(prefix)
-        if not source or mode not in ("yes", "no"):
-            continue
-        if mode == "yes":
-            parts.append(f"p.sources @> ARRAY['{source.value}'::source_type]")
-        else:
-            parts.append(f"NOT p.sources @> ARRAY['{source.value}'::source_type]")
+        source, presence = value.rsplit("_", 1)
+        parts.append(in_source_sql(source) if presence == "yes" else f"NOT {in_source_sql(source)}")
     if not parts:
         return None
     return WhereClause(" AND ".join(parts), {})

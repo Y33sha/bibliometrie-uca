@@ -13,10 +13,10 @@ from domain.merge import MergedEntity
 from domain.publications.doc_types import DOC_TYPE_FAMILIES, DOC_TYPE_LABELS, DOC_TYPES
 from domain.publications.licenses import LICENSE_LABELS, License
 from domain.publications.oa_status import ACCESS_LEVELS
-from domain.sources.registry import SOURCE_FILTER_VALUES
 from infrastructure.read_models._common import EntityFacetResponse, EntityKind
 from infrastructure.read_models.publications.models import (
     EXPORT_COLUMNS,
+    SOURCE_FILTER_VALUES,
     THESIS_EXPORT_COLUMNS,
     MergeCandidateOut,
     PublicationDetailResponse,

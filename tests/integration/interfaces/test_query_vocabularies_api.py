@@ -36,7 +36,7 @@ class TestValeursAdmises:
     @pytest.mark.parametrize(
         ("chemin", "params"),
         [
-            ("/api/publications", {"source_filter": "hal_yes,oa_no"}),
+            ("/api/publications", {"source_filter": "hal_yes,openalex_no"}),
             ("/api/publications", {"author_position": "corresponding,other"}),
             ("/api/publications", {"in_perimeter": "yes"}),
             ("/api/publications", {"has_apc": "yes,no"}),

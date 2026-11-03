@@ -12,11 +12,11 @@ from domain.publications.doc_types import DOC_TYPES
 from domain.publications.hal_deposit import HalDepositStatus
 from domain.publications.oa_status import ACCESS_LEVELS, OA_STATUSES
 from domain.source_records.impact import CitationTop
-from domain.sources.registry import SOURCE_FILTER_VALUES
 from infrastructure.read_models.publications.models import (
     AUTHOR_POSITION_FILTER_VALUES,
     DOI_AGENCY_FILTER_VALUES,
     LICENSE_FILTER_VALUES,
+    SOURCE_FILTER_VALUES,
     PublicationFilters,
 )
 from interfaces.api.filters import (

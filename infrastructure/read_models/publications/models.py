@@ -91,6 +91,19 @@ OTHER_DOI_AGENCY = "other"
 NO_DOI = "none"
 DOI_AGENCY_FILTER_VALUES: tuple[str, ...] = (*DOI_AGENCY_SOURCES, OTHER_DOI_AGENCY, NO_DOI)
 
+# Sources du filtre par présence dans une source, dans l'ordre de la facette.
+SOURCE_FILTER_SOURCES: tuple[Source, ...] = (
+    Source.HAL,
+    Source.OPENALEX,
+    Source.SCANR,
+    Source.WOS,
+    Source.THESES,
+)
+# Vocabulaire du filtre par présence dans une source : la source suivie de la présence attendue. `hal_yes` retient les publications présentes dans HAL, `hal_no` les autres.
+SOURCE_FILTER_VALUES: frozenset[str] = frozenset(
+    f"{source}_{presence}" for source in SOURCE_FILTER_SOURCES for presence in ("yes", "no")
+)
+
 # Classe de citation d'une publication pourvue des seuils (`CitationTop`) sans en atteindre aucun.
 BELOW_CITATION_TOPS = "below"
 
