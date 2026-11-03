@@ -15,7 +15,7 @@ from typing import NamedTuple
 from sqlalchemy import Connection, bindparam, text
 
 from domain.persons.identifiers import IdentifierNeutralization, PersonIdentifierType
-from domain.persons.matching import identifier_misplaced, strict_majority
+from domain.persons.source_contribution_matching import identifier_misplaced, strict_majority
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.db.queues import Queue, enqueue, enqueue_sql
 from infrastructure.sql_fragments import (

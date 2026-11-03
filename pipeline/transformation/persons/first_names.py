@@ -8,8 +8,8 @@ from typing import NamedTuple
 from sqlalchemy import Connection, text
 
 from domain.persons.contributor_name import ContributorName
-from domain.persons.matching import attested_full_first_names
 from domain.persons.name_matching import first_name_initials
+from domain.persons.source_contribution_matching import attested_full_first_names
 from infrastructure.repositories.person_repository import PgPersonRepository
 from infrastructure.sql_fragments import CONTRIBUTIONS_AND_SOURCES
 from pipeline.transformation.persons.store import fetch_namesakes

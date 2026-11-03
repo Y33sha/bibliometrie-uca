@@ -42,7 +42,7 @@ from domain.source_records.metadata_correction.shared_doi import (
     DoiTargetRule,
     SecondaryFormDeclaration,
 )
-from domain.source_records.metadata_correction.source_record import UnaryCorrection
+from domain.source_records.metadata_correction.unary import UnaryCorrection
 from domain.source_records.source_extras import SourceExtra
 from domain.sources.registry import DOI_ORG, Source
 from domain.types import JsonValue

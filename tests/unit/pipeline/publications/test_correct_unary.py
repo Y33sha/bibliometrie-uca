@@ -11,7 +11,7 @@ from domain.source_records.identifiers import (
     SourceIdentifierType,
 )
 from domain.source_records.metadata_correction.rules import MetadataForCorrection
-from domain.source_records.metadata_correction.source_record import (
+from domain.source_records.metadata_correction.unary import (
     CorrectedSourceRecord,
     UnaryCorrection,
 )

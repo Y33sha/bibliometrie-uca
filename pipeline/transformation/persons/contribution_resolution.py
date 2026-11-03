@@ -32,8 +32,8 @@ from domain.persons.contribution_matching import (
 )
 from domain.persons.contributor_name import ContributorName
 from domain.persons.identifiers import HUMAN_ATTRIBUTION_STATUSES, PersonIdentifierType
-from domain.persons.matching import Namesake
 from domain.persons.person import PersonExclusion, validated_name
+from domain.persons.source_contribution_matching import Namesake
 from infrastructure.db.queues import Queue, delete_processed, snapshot
 from infrastructure.repositories.person_repository import PgPersonRepository
 from infrastructure.sql_fragments import (

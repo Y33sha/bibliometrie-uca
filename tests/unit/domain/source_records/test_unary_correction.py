@@ -8,7 +8,7 @@ from domain.source_records.identifiers import (
     SourceIdentifierType,
 )
 from domain.source_records.metadata_correction.rules import MetadataForCorrection
-from domain.source_records.metadata_correction.source_record import correct_source_record
+from domain.source_records.metadata_correction.unary import correct_source_record
 
 _HAL_1 = SourceIdentifier(SourceIdentifierType.HAL_ID, "hal-1", SourceIdentifierRole.SECONDARY)
 _HAL_2 = SourceIdentifier(SourceIdentifierType.HAL_ID, "hal-2", SourceIdentifierRole.SECONDARY)

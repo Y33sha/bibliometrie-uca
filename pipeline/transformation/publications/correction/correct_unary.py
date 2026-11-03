@@ -11,7 +11,7 @@ from dataclasses import dataclass
 
 from sqlalchemy import Connection
 
-from domain.source_records.metadata_correction.source_record import (
+from domain.source_records.metadata_correction.unary import (
     correct_source_record,
     corrected_doc_type,
 )

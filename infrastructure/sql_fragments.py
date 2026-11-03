@@ -16,8 +16,11 @@ from domain.persons.identifiers import (
     AttributionStatus,
     PersonIdentifierType,
 )
-from domain.persons.matching import ORCID_MATCH_SOURCES, STRONG_PERSON_IDENTIFIER_TYPES
 from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
+from domain.persons.source_contribution_matching import (
+    ORCID_MATCH_SOURCES,
+    STRONG_PERSON_IDENTIFIER_TYPES,
+)
 from domain.serials.serial import OaModel
 from domain.source_records.corrections import CORRECTED_BY, RAW
 from domain.source_records.impact import CitationTop

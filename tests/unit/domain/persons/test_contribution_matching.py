@@ -14,8 +14,8 @@ from domain.persons.contribution_matching import (
     settle_publication,
 )
 from domain.persons.contributor_name import ContributorName
-from domain.persons.matching import IdentifiedPerson, Namesake
 from domain.persons.name_forms import compute_person_name_forms
+from domain.persons.source_contribution_matching import IdentifiedPerson, Namesake
 
 _ORCID = "0000-0002-1825-0097"
 _IDREF = "123456789"

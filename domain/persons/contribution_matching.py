@@ -18,15 +18,15 @@ from domain.normalize import normalize_text
 from domain.persons.contributor_name import ContributorName
 from domain.persons.creation import allow_person_creation
 from domain.persons.identifiers import PersonIdentifierType
-from domain.persons.matching import (
+from domain.persons.name_forms import compute_person_name_forms, contributor_name_forms
+from domain.persons.name_matching import first_name_initials
+from domain.persons.source_contribution_matching import (
     IdentifiedPerson,
     Namesake,
     compatible_persons,
     decide_match_by_identifier,
     trusted_identifier,
 )
-from domain.persons.name_forms import compute_person_name_forms, contributor_name_forms
-from domain.persons.name_matching import first_name_initials
 from domain.sources.registry import Source
 
 IDENTIFIER_ORDER: tuple[PersonIdentifierType, ...] = (
