@@ -250,9 +250,9 @@ class PublicationImpact:
     doc_type: DocType
     language: str | None
     citations: int | None
-    """Maximum des nombres de citations des notices."""
+    """Maximum des nombres de citations des enregistrements sources."""
     fwci: float | None
-    """Maximum des FWCI des notices OpenAlex."""
+    """Maximum des FWCI des enregistrements sources OpenAlex."""
     top_10: bool
     key_role: bool
     """Un auteur de la structure tient un des rôles demandés."""
