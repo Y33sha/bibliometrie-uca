@@ -1,6 +1,6 @@
 """Phase `author_grouping` : regroupement, dans chaque publication, des contributions sources d'un même auteur en contributions (`contributions`, `aligned_source_contributions`).
 
-Les publications de la file `publication_contributions_queue` se recalculent entièrement, par lots. `--rebuild-author-grouping` marque toutes les publications. Les publications d'un lot se répartissent entre des processus, un par processeur disponible (`available_cpus`). Les doublons d'auteur d'un enregistrement source (`domain.publications.list_copies`) reçoivent `duplicate_of` et restent hors des contributions. Les autres contributions sources, tous rôles réunis, s'alignent selon `domain.publications.author_grouping`. Chaque contribution reprend l'identifiant de la contribution en base avec laquelle elle partage le plus de contributions sources.
+Les publications de la file `publication_contributions_queue` se recalculent entièrement, par lots. `--rebuild-author-grouping` marque toutes les publications. Les publications d'un lot se répartissent entre des processus, un par processeur disponible (`available_cpus`). Les doublons d'auteur d'un enregistrement source (`domain.publications.author_duplicates`) reçoivent `duplicate_of` et restent hors des contributions. Les autres contributions sources, tous rôles réunis, s'alignent selon `domain.publications.author_grouping`. Chaque contribution reprend l'identifiant de la contribution en base avec laquelle elle partage le plus de contributions sources.
 """
 
 import logging
@@ -16,6 +16,7 @@ from operator import attrgetter
 from scipy.optimize import linear_sum_assignment
 from sqlalchemy import Connection
 
+from domain.publications.author_duplicates import duplicate_source_contributions
 from domain.publications.author_grouping import (
     Contribution,
     ResidualModel,
@@ -24,7 +25,6 @@ from domain.publications.author_grouping import (
     plan_contribution_ids,
     with_known_first_name,
 )
-from domain.publications.list_copies import copied_source_contributions
 from pipeline.graph import task
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.cpu import available_cpus
@@ -109,15 +109,15 @@ def align_publication_contributions(
 ) -> tuple[list[Contribution], dict[int, int]]:
     """Renvoie les contributions d'une publication et ses doublons d'auteur (doublon → première occurrence de son nom), parmi les contributions sources à position. Les doublons restent hors des contributions."""
     source_records = contributions_by_source_record(rows)
-    copies: dict[int, int] = {}
+    duplicates: dict[int, int] = {}
     for source_contributions in source_records.values():
-        copies |= copied_source_contributions(source_contributions)
+        duplicates |= duplicate_source_contributions(source_contributions)
     kept = {
-        n: [s for s in record_contributions if s.id not in copies]
+        n: [s for s in record_contributions if s.id not in duplicates]
         for n, record_contributions in source_records.items()
     }
     contributions = align_publication(kept, model=_MODEL, deferred=deferred_source_records(rows))
-    return contributions, copies
+    return contributions, duplicates
 
 
 def _same_membership(stored: MembershipRow | None, planned: MembershipRow) -> bool:
@@ -157,7 +157,7 @@ _SOURCE_CONTRIBUTION_FIELDS = attrgetter(*(f.name for f in fields(SourceContribu
 
 def align_rows(rows: Sequence[SourceContributionTuple]) -> Aligned:
     """Applique `align_publication_contributions` aux contributions sources d'une publication, en tuples à l'entrée comme à la sortie."""
-    contributions, copies = align_publication_contributions(
+    contributions, duplicates = align_publication_contributions(
         [SourceContributionRow(*row) for row in rows]
     )
     return [
@@ -169,7 +169,7 @@ def align_rows(rows: Sequence[SourceContributionTuple]) -> Aligned:
             ],
         )
         for g in contributions
-    ], copies
+    ], duplicates
 
 
 type Mapper = Callable[
@@ -217,12 +217,12 @@ def _plan_batch(
     planned: list[tuple[int, ContributionTuple, int | None]] = []
     unmatched: list[int] = []
     recomposed: list[int] = []
-    copies: dict[int, int] = {}
+    duplicates: dict[int, int] = {}
     results = mapper(align_rows, [rows_by_publication.get(p, []) for p in publication_ids])
-    for publication_id, (contributions, publication_copies) in zip(
+    for publication_id, (contributions, publication_duplicates) in zip(
         publication_ids, results, strict=True
     ):
-        copies |= publication_copies
+        duplicates |= publication_duplicates
         old = {gid: frozenset(members) for gid, members in existing.get(publication_id, {}).items()}
         new = [frozenset(m[0] for m in members) for _, members in contributions]
         ids = plan_contribution_ids(old, new)
@@ -252,7 +252,7 @@ def _plan_batch(
             )
     removed, inserted = membership_changes(stored, memberships)
     return BatchPlan(
-        publication_ids, contribution_rows, removed, inserted, unmatched, recomposed, copies
+        publication_ids, contribution_rows, removed, inserted, unmatched, recomposed, duplicates
     )
 
 

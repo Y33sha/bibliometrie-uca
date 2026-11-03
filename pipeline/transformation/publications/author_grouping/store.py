@@ -75,16 +75,16 @@ _MARK_RECOMPOSED_SQL = text(
     )
 )
 
-_CLEAR_COPIES_SQL = text("""
+_CLEAR_DUPLICATES_SQL = text("""
     UPDATE source_contributions sc SET duplicate_of = NULL
     FROM source_records sr
     WHERE sc.source_record_id = sr.id AND sr.publication_id = ANY(:publications)
-      AND sc.duplicate_of IS NOT NULL AND sc.id <> ALL(CAST(:copies AS integer[]))
+      AND sc.duplicate_of IS NOT NULL AND sc.id <> ALL(CAST(:duplicates AS integer[]))
 """)
 
-_SET_COPIES_SQL = text("""
+_SET_DUPLICATES_SQL = text("""
     UPDATE source_contributions sc SET duplicate_of = u.original
-    FROM unnest(CAST(:copies AS integer[]), CAST(:originals AS integer[])) AS u(id, original)
+    FROM unnest(CAST(:duplicates AS integer[]), CAST(:originals AS integer[])) AS u(id, original)
     WHERE sc.id = u.id AND sc.duplicate_of IS DISTINCT FROM u.original
 """)
 
@@ -167,7 +167,7 @@ class BatchPlan:
     """Contributions en base sans correspondant, à supprimer."""
     recomposed: list[int]
     """Contributions en base à contributions sources changées, marquées pour la redécision de leur personne par la phase `persons`."""
-    copies: dict[int, int]
+    duplicates: dict[int, int]
     """Doublon d'auteur → première occurrence de son nom (`duplicate_of`)."""
 
 
@@ -277,13 +277,19 @@ class AuthorGroupingStore:
             plan.contributions,
             plan.removed,
         )
-        memberships, unmatched_ids, copies = plan.memberships, plan.unmatched, plan.copies
-        self._conn.execute(
-            _CLEAR_COPIES_SQL, {"publications": list(publication_ids), "copies": list(copies)}
+        memberships, unmatched_ids, duplicates = (
+            plan.memberships,
+            plan.unmatched,
+            plan.duplicates,
         )
-        if copies:
+        self._conn.execute(
+            _CLEAR_DUPLICATES_SQL,
+            {"publications": list(publication_ids), "duplicates": list(duplicates)},
+        )
+        if duplicates:
             self._conn.execute(
-                _SET_COPIES_SQL, {"copies": list(copies), "originals": list(copies.values())}
+                _SET_DUPLICATES_SQL,
+                {"duplicates": list(duplicates), "originals": list(duplicates.values())},
             )
         if removed:
             self._conn.execute(_DELETE_MEMBERSHIPS_SQL, {"source_contributions": list(removed)})
