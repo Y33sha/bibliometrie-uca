@@ -1,7 +1,7 @@
-"""Doublons d'auteur dans la liste d'un enregistrement source (`domain.publications.author_duplicates`)."""
+"""Doublons d'auteur dans la liste d'un enregistrement source (`domain.contributions.author_duplicates`)."""
 
-from domain.publications.author_duplicates import duplicate_source_contributions
-from domain.publications.author_grouping import SourceContribution
+from domain.contributions.author_duplicates import duplicate_source_contributions
+from domain.contributions.author_grouping import SourceContribution
 
 
 def _source_record(names: list[str]) -> list[SourceContribution]:

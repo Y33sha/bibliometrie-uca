@@ -6,10 +6,10 @@ Une thèse soutenue a pour identifiant son NNT ; une thèse en cours est sans NN
 import re
 from collections.abc import Mapping
 
+from domain.contributions.contribution_roles import THESES_FIELD_ROLES
 from domain.dates import french_date_to_iso
 from domain.documents.dates import PublicationDate, parse_iso_date
 from domain.documents.identifiers import DOI, NNT
-from domain.publications.contribution_roles import THESES_FIELD_ROLES
 from domain.source_records.identifiers import (
     SourceIdentifier,
     SourceIdentifierRole,

@@ -15,13 +15,13 @@ from pathlib import Path
 
 from sqlalchemy import Connection, Row, text
 
+from domain.contributions.author_positions import AuthorPosition
 from domain.countries import non_international_country_codes
 from domain.dates import today
 from domain.documents.doc_types import DocType
 from domain.documents.licenses import OPEN_LICENSES, license_label
 from domain.platforms.platform import PlatformType
 from domain.platforms.registry import known_platform_of_copy, preprint_servers_of_prefix
-from domain.publications.author_positions import AuthorPosition
 from domain.publications.oa_status import OaStatus
 from domain.sources.registry import source_label
 from infrastructure.db.engine import get_sync_engine

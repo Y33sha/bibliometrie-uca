@@ -14,7 +14,7 @@ import os
 
 from sqlalchemy import Connection, text
 
-from domain.publications.contribution_roles import ContributionRole
+from domain.contributions.contribution_roles import ContributionRole
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 

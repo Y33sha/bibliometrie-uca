@@ -2,7 +2,7 @@
 
 from collections.abc import Sequence
 
-from domain.publications.contribution_roles import THESIS_JURY_ROLES
+from domain.contributions.contribution_roles import THESIS_JURY_ROLES
 
 
 def allow_person_creation(roles: Sequence[str]) -> bool:

@@ -9,13 +9,13 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
+from domain.contributions.contribution_roles import ContributionRole
 from domain.dates import today
 from domain.documents.dates import PublicationDate
 from domain.documents.identifiers import DOI
 from domain.documents.licenses import License, is_access_right, normalize_license
 from domain.persons.contributor_name import ContributorName
 from domain.persons.identifiers import ORCID
-from domain.publications.contribution_roles import ContributionRole
 from domain.serials.containers import ContainerDescription
 from domain.serials.issns import source_issns
 from domain.source_records.biblio import compact_biblio

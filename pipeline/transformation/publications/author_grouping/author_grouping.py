@@ -1,6 +1,6 @@
 """Phase `author_grouping` : regroupement, dans chaque publication, des contributions sources d'un même auteur en contributions (`contributions`, `aligned_source_contributions`).
 
-Les publications de la file `publication_contributions_queue` se recalculent entièrement, par lots. `--rebuild-author-grouping` marque toutes les publications. Les publications d'un lot se répartissent entre des processus, un par processeur disponible (`available_cpus`). Les doublons d'auteur d'un enregistrement source (`domain.publications.author_duplicates`) reçoivent `duplicate_of` et restent hors des contributions. Les autres contributions sources, tous rôles réunis, s'alignent selon `domain.publications.author_grouping`. Chaque contribution reprend l'identifiant de la contribution en base avec laquelle elle partage le plus de contributions sources.
+Les publications de la file `publication_contributions_queue` se recalculent entièrement, par lots. `--rebuild-author-grouping` marque toutes les publications. Les publications d'un lot se répartissent entre des processus, un par processeur disponible (`available_cpus`). Les doublons d'auteur d'un enregistrement source (`domain.contributions.author_duplicates`) reçoivent `duplicate_of` et restent hors des contributions. Les autres contributions sources, tous rôles réunis, s'alignent selon `domain.contributions.author_grouping`. Chaque contribution reprend l'identifiant de la contribution en base avec laquelle elle partage le plus de contributions sources.
 """
 
 import logging
@@ -16,8 +16,8 @@ from operator import attrgetter
 from scipy.optimize import linear_sum_assignment
 from sqlalchemy import Connection
 
-from domain.publications.author_duplicates import duplicate_source_contributions
-from domain.publications.author_grouping import (
+from domain.contributions.author_duplicates import duplicate_source_contributions
+from domain.contributions.author_grouping import (
     Contribution,
     ResidualModel,
     SourceContribution,

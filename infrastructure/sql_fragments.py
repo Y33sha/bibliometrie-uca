@@ -7,6 +7,8 @@ from collections.abc import Iterable
 
 from application.ports.repositories.address_repository import AddressCountryFilter
 from domain.config import ConfigKey
+from domain.contributions.author_positions import SCANR_TRUNCATED_LENGTHS, AuthorPosition
+from domain.contributions.contribution_roles import ContributionRole
 from domain.persons.contribution_matching import ContributionMatchReason
 from domain.persons.identifiers import (
     HUMAN_ATTRIBUTION_STATUSES,
@@ -15,8 +17,6 @@ from domain.persons.identifiers import (
 )
 from domain.persons.matching import ORCID_MATCH_SOURCES, STRONG_PERSON_IDENTIFIER_TYPES
 from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
-from domain.publications.author_positions import SCANR_TRUNCATED_LENGTHS, AuthorPosition
-from domain.publications.contribution_roles import ContributionRole
 from domain.serials.serial import OaModel
 from domain.source_records.corrections import CORRECTED_BY, RAW
 from domain.source_records.impact import CitationTop

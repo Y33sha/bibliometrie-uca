@@ -35,8 +35,7 @@ from splink.blocking_rule_library import CustomRule
 from splink.internals.blocking_rule_creator import BlockingRuleCreator
 from sqlalchemy import Connection, text
 
-from domain.dates import today
-from domain.publications.author_grouping import (
+from domain.contributions.author_grouping import (
     JARO_WINKLER_THRESHOLDS,
     Author,
     Comparison,
@@ -44,6 +43,7 @@ from domain.publications.author_grouping import (
     ResidualSink,
     align_publication,
 )
+from domain.dates import today
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from pipeline.transformation.publications.author_grouping import residual_weights
@@ -432,7 +432,7 @@ def _estimate_identifiers() -> dict[str, dict[str, float]]:
 def _render(weights: Mapping[str, Mapping[str, float]]) -> str:
     """Renvoie le contenu de `residual_weights.py`."""
     lines = [
-        '"""Poids en bits du modèle du résidu, par comparaison et par niveau (`domain.publications.author_grouping.comparison_levels`).',
+        '"""Poids en bits du modèle du résidu, par comparaison et par niveau (`domain.contributions.author_grouping.comparison_levels`).',
         "",
         f"Estimés le {today().isoformat()} par `interfaces.cli.dev.estimate_residual_weights`, avec Splink, par EM sur les contributions sources que la règle de noms laisse sans lien dans tout le stock, {RESIDUAL_ITERATIONS} itérations. Les poids d'ORCID et d'IdRef viennent d'un modèle estimé sur toutes les paires de contributions sources d'un échantillon des publications de {FULL_MODEL_MAX_AUTHORS} auteurs au plus : sur le résidu, l'EM ne les identifie pas.",
         '"""',

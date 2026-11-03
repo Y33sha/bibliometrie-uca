@@ -4,7 +4,7 @@ from collections import defaultdict
 from collections.abc import Sequence
 from itertools import pairwise
 
-from domain.publications.author_grouping import SourceContribution
+from domain.contributions.author_grouping import SourceContribution
 
 # Nombre de noms complets répétés qui signale des doublons : au même décalage pour un bloc de la liste, à des décalages quelconques pour une liste de membres.
 MIN_DUPLICATED_NAMES = 2

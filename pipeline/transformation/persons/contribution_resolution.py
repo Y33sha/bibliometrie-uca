@@ -14,6 +14,7 @@ from collections import Counter, defaultdict
 
 from sqlalchemy import Connection, text
 
+from domain.contributions.contribution_roles import ContributionRole
 from domain.errors import ValidationError
 from domain.normalize import normalize_text
 from domain.persons.contribution_matching import (
@@ -33,7 +34,6 @@ from domain.persons.contributor_name import ContributorName
 from domain.persons.identifiers import HUMAN_ATTRIBUTION_STATUSES, PersonIdentifierType
 from domain.persons.matching import Namesake
 from domain.persons.person import PersonExclusion, validated_name
-from domain.publications.contribution_roles import ContributionRole
 from infrastructure.db.queues import Queue, delete_processed, snapshot
 from infrastructure.repositories.person_repository import PgPersonRepository
 from infrastructure.sql_fragments import (

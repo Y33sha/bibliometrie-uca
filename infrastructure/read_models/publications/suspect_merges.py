@@ -2,7 +2,7 @@
 
 from sqlalchemy import Connection, text
 
-from domain.publications.contribution_roles import ContributionRole
+from domain.contributions.contribution_roles import ContributionRole
 from infrastructure.read_models.publications.models import (
     SuspectMergeOut,
     SuspectMergeSourceRecordOut,

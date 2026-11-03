@@ -42,6 +42,8 @@ from domain.config import (
     ConfigKey,
     integer_bounds,
 )
+from domain.contributions.author_grouping import GroupingMethod
+from domain.contributions.author_positions import AuthorPosition
 from domain.countries import NO_COUNTRY_CODE, PlaceNameKind
 from domain.country_detection import CountryDetectionMethod
 from domain.documents.dates import DatePrecision
@@ -52,8 +54,6 @@ from domain.persons.contribution_matching import ContributionMatchReason
 from domain.persons.identifiers import AttributionStatus
 from domain.persons.person import PersonExclusion
 from domain.platforms.platform import PlatformType
-from domain.publications.author_grouping import GroupingMethod
-from domain.publications.author_positions import AuthorPosition
 from domain.publications.oa_status import OaStatus
 from domain.publications.relations import RelationType
 from domain.publishers.publisher import PublisherType

@@ -1,6 +1,6 @@
-"""Tests de `domain.publications.contribution_roles` : traduction des rôles des sources, union des rôles d'une contribution."""
+"""Tests de `domain.contributions.contribution_roles` : traduction des rôles des sources, union des rôles d'une contribution."""
 
-from domain.publications.contribution_roles import map_role, merge_roles
+from domain.contributions.contribution_roles import map_role, merge_roles
 
 
 class TestMapRole:

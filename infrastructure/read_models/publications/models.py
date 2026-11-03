@@ -7,9 +7,9 @@ from typing import Literal
 from pydantic import ConfigDict, computed_field
 
 from application.ports.model import Model
+from domain.contributions.author_positions import AuthorPosition
 from domain.documents.dates import DatePrecision
 from domain.documents.licenses import License
-from domain.publications.author_positions import AuthorPosition
 from domain.sources.registry import PROFILES, Source, source_record_url
 from infrastructure.read_models._common import (
     FacetOption,

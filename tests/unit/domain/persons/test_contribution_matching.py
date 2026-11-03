@@ -1,5 +1,6 @@
 """Tests de la décision de rattachement d'une contribution à une personne."""
 
+from domain.contributions.contribution_roles import ContributionRole
 from domain.normalize import normalize_text
 from domain.persons.contribution_matching import (
     AlignedSourceContribution,
@@ -15,7 +16,6 @@ from domain.persons.contribution_matching import (
 from domain.persons.contributor_name import ContributorName
 from domain.persons.matching import IdentifiedPerson, Namesake
 from domain.persons.name_forms import compute_person_name_forms
-from domain.publications.contribution_roles import ContributionRole
 
 _ORCID = "0000-0002-1825-0097"
 _IDREF = "123456789"
