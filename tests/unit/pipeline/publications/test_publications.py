@@ -1,4 +1,4 @@
-"""Orchestrateur de la phase `publications` : réconciliation, puis décompte des publications.
+"""Tâche `publications.reconcile` : réconciliation, puis décompte des publications.
 
 La réconciliation a ses propres tests.
 """
@@ -24,7 +24,7 @@ def _run(contexte, *, total: int = 40):
             side_effect=lambda conn: appels.append("décompte") or total,
         ),
     ):
-        rendu = phase.PublicationsPhase().run(contexte())
+        rendu = phase._reconcile(contexte())
     return rendu, appels
 
 

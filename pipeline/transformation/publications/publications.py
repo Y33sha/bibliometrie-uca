@@ -7,14 +7,11 @@ Les enregistrements sources modifiés et leurs voisins se regroupent par leurs c
 
 from __future__ import annotations
 
-import logging
-from dataclasses import dataclass
-
 from sqlalchemy import Connection, text
 
-from pipeline.runtime.context import OpenTransaction, Phase, PhaseContext
+from pipeline.graph import task
+from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.task_runner import TaskStep, run_tasks
 from pipeline.transformation.publications.reconciliation import reconcile
 
 
@@ -23,37 +20,14 @@ def count_publications(conn: Connection) -> int:
     return int(conn.execute(text("SELECT count(*) FROM publications")).scalar_one())
 
 
-@dataclass(frozen=True)
-class PublicationsPhase:
-    def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Réconcilie les enregistrements sources avec les publications, puis ajoute le total des publications aux métriques."""
-
-        def reconcile_task(ctx: PhaseContext) -> PhaseMetrics:
-            return _reconcile(ctx.open_tx, ctx.logger, rebuild=ctx.options.rebuild_publications)
-
-        by_task = run_tasks(
-            "publications",
-            {
-                "publications.reconcile": TaskStep(reconcile_task),
-            },
-            ctx,
-        )
-        metrics = by_task["publications.reconcile"]
-        with ctx.open_tx() as conn:
-            publication_total = count_publications(conn)
-        summary = metrics.details["summary"]
-        if isinstance(summary, dict):
-            summary["publication_total"] = publication_total
-        return metrics
-
-
-def _reconcile(open_tx: OpenTransaction, logger: logging.Logger, *, rebuild: bool) -> PhaseMetrics:
-    with open_tx() as conn:
-        stats = reconcile(conn, logger, rebuild=rebuild)
+def _reconcile(ctx: PhaseContext) -> PhaseMetrics:
+    """Réconcilie les enregistrements sources avec les publications, puis compte les publications."""
+    with ctx.open_tx() as conn:
+        stats = reconcile(conn, ctx.logger, rebuild=ctx.options.rebuild_publications)
+        publication_total = count_publications(conn)
 
     metrics = PhaseMetrics()
     metrics.add(seen=stats.processed, new=stats.created)
-    # Chiffres du run. `run` ajoute `publication_total`, compté après la suppression des publications sans enregistrement source.
     metrics.details["summary"] = {
         "processed": stats.processed,
         "publications": stats.publications,
@@ -62,9 +36,56 @@ def _reconcile(open_tx: OpenTransaction, logger: logging.Logger, *, rebuild: boo
         "splits": stats.splits,
         "merges": stats.merges,
         "detached": stats.detached,
+        "publication_total": publication_total,
     }
     return metrics
 
 
-def build() -> Phase:
-    return PublicationsPhase()
+TASKS = (
+    task(
+        "publications.reconcile",
+        reads=(
+            "source_records",
+            "source_record_identifiers",
+            "doi_targets",
+            "source_record_keys_queue",
+            "source_contributions.in_perimeter",
+            "manual_merge_source_records",
+            # Copies des enregistrements sources : la publication retient la meilleure.
+            "source_record_locations",
+            "platforms.name",
+            "platforms.openalex_id",
+            "platforms.platform_type",
+            "embargoes",
+            "dois.registered_url",
+            "publications",
+            "apc_payments",
+            "serials.serial_type",
+            "serials.oa_model",
+            "monographs.serial_id",
+            "dois.unpaywall_oa_status",
+            # Titulaire du préfixe DOI Crossref, éditeur de la publication.
+            "doi_prefixes.ra",
+            "doi_prefixes.publisher_id",
+        ),
+        writes=(
+            "publications",
+            "publications_detail",
+            "source_records.publication_id",
+            "source_record_keys_queue",
+            "apc_payments.publication_id",
+            "publication_contributions_queue",
+        ),
+        # Réponses d'Unpaywall et de doi.org ; publications supprimées par `finalize.purge_publications` ; revues et monographies vides supprimées par `finalize.delete_empty_containers`.
+        previous_run=(
+            "source_records.countries",
+            "publications.id",
+            "publications.oa_status",
+            "dois.unpaywall_oa_status",
+            "dois.registered_url",
+            "serials",
+            "monographs",
+        ),
+        run=_reconcile,
+    ),
+)

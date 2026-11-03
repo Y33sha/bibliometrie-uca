@@ -1017,52 +1017,6 @@ TASKS: tuple[Task, ...] = (
         previous_run=("source_records.is_matchable",),
     ),
     _task(
-        "publications.reconcile",
-        "publications",
-        reads=(
-            "source_records",
-            "source_record_identifiers",
-            "doi_targets",
-            "source_record_keys_queue",
-            "source_contributions.in_perimeter",
-            "manual_merge_source_records",
-            # Copies des enregistrements sources : la publication retient la meilleure.
-            "source_record_locations",
-            "platforms.name",
-            "platforms.openalex_id",
-            "platforms.platform_type",
-            "embargoes",
-            "dois.registered_url",
-            "publications",
-            "apc_payments",
-            "serials.serial_type",
-            "serials.oa_model",
-            "monographs.serial_id",
-            "dois.unpaywall_oa_status",
-            # Titulaire du préfixe DOI Crossref, éditeur de la publication.
-            "doi_prefixes.ra",
-            "doi_prefixes.publisher_id",
-        ),
-        writes=(
-            "publications",
-            "publications_detail",
-            "source_records.publication_id",
-            "source_record_keys_queue",
-            "apc_payments.publication_id",
-            "publication_contributions_queue",
-        ),
-        # Réponses d'Unpaywall et de doi.org ; publications supprimées par `finalize.purge_publications` ; revues et monographies vides supprimées par `finalize.delete_empty_containers`.
-        previous_run=(
-            "source_records.countries",
-            "publications.id",
-            "publications.oa_status",
-            "dois.unpaywall_oa_status",
-            "dois.registered_url",
-            "serials",
-            "monographs",
-        ),
-    ),
-    _task(
         "author_grouping.build",
         "author_grouping",
         reads=(

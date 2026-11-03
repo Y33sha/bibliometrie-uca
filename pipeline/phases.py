@@ -100,8 +100,7 @@ PHASES: tuple[Phase, ...] = (
     Phase(
         "publications",
         "Dédoublonnage des publications",
-        phase_tasks("publications"),
-        build=publications.build,
+        publications.TASKS,
     ),
     Phase(
         "author_grouping",
