@@ -11,11 +11,11 @@ Tâches (`pipeline.graph`), chacune dans sa transaction, dans l'ordre du graphe 
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections.abc import Mapping
 
-from pipeline.runtime.context import Phase, PhaseContext
+from pipeline.graph import task
+from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.task_runner import TaskStep, run_tasks
 from pipeline.transformation.publications.correction.correct_unary import run as run_unary
 from pipeline.transformation.publications.correction.correction_store import (
     SourceRecordCorrectionStore,
@@ -28,81 +28,216 @@ from pipeline.transformation.publications.correction.remove_identifiers import (
 from pipeline.transformation.publications.correction.serial_by_doi import run as run_serial_by_doi
 
 _PHASE = "metadata_correction"
-# Tâches de la phase, dans l'ordre du graphe.
-_NODES = ("serial_by_doi", "unary", "doi_targets", "remove_identifiers", "matchable")
 
 
-@dataclass(frozen=True)
-class MetadataCorrectionPhase:
-    def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Exécute les tâches de la phase, chacune dans sa transaction, et assemble les métriques de la phase."""
-        by_task = run_tasks(_PHASE, self._steps(), ctx)
-        nodes = {name: by_task[f"{_PHASE}.{name}"] for name in _NODES}
+# Chaque tâche écrit sa section du journal et renvoie examinés (`total`), corrigés (`updated`) et décompte par règle (`extras`).
+def _serial_by_doi(ctx: PhaseContext) -> PhaseMetrics:
+    with ctx.open_tx() as conn:
+        stats = run_serial_by_doi(conn, SourceRecordCorrectionStore(conn), ctx.logger)
+    return PhaseMetrics(seen=stats.examined, updated=stats.attached)
 
-        metrics = PhaseMetrics()
-        for node_metrics in nodes.values():
-            metrics.add(seen=node_metrics.total, updated=node_metrics.updated)
-        # Chiffres à plat, `{tâche}_{examined,corrected}`, disposés en matrice par l'interface.
-        metrics.details["summary"] = {
-            f"{name}_{column}": value
-            for name, node_metrics in nodes.items()
-            for column, value in (
-                ("examined", node_metrics.total),
-                ("corrected", node_metrics.updated),
+
+def _unary(ctx: PhaseContext) -> PhaseMetrics:
+    with ctx.open_tx() as conn:
+        stats = run_unary(conn, SourceRecordCorrectionStore(conn), ctx.logger)
+    return PhaseMetrics(
+        seen=stats.examined, updated=stats.corrected, extras=dict(stats.rule_counts)
+    )
+
+
+def _doi_targets(ctx: PhaseContext) -> PhaseMetrics:
+    with ctx.open_tx() as conn:
+        stats = run_doi_targets(conn, SourceRecordCorrectionStore(conn), ctx.logger)
+    return PhaseMetrics(seen=stats.examined, updated=stats.changed, extras=dict(stats.rule_counts))
+
+
+def _remove_identifiers(ctx: PhaseContext) -> PhaseMetrics:
+    with ctx.open_tx() as conn:
+        stats = run_remove_identifiers(conn, SourceRecordCorrectionStore(conn), ctx.logger)
+    return PhaseMetrics(
+        seen=stats.examined, updated=stats.corrected, extras=dict(stats.case_counts)
+    )
+
+
+def _matchable(ctx: PhaseContext) -> PhaseMetrics:
+    with ctx.open_tx() as conn:
+        stats = run_matchable(conn, SourceRecordCorrectionStore(conn), ctx.logger)
+    return PhaseMetrics(seen=stats.examined, updated=stats.changed)
+
+
+TASKS = (
+    task(
+        "metadata_correction.serial_by_doi",
+        reads=(
+            "serial_doi_namespaces",
+            "source_record_identifiers",
+            "source_records.serial_id",
+            "source_records.corrections",
+            "source_records.doc_type",
+        ),
+        writes=(
+            "source_records.serial_id",
+            "source_records.corrections",
+            "source_record_keys_queue",
+        ),
+        previous_run=("source_records", "source_record_identifiers.removed_by"),
+        run=_serial_by_doi,
+    ),
+    task(
+        "metadata_correction.unary",
+        reads=(
+            *(
+                f"source_records.{column}"
+                for column in (
+                    "id",
+                    "source",
+                    "source_id",
+                    "title",
+                    "doc_type",
+                    "doi",
+                    "serial_id",
+                    "monograph_id",
+                    "language",
+                    "urls",
+                    "corrections",
+                    "source_extras",
+                )
+            ),
+            "serials.serial_type",
+            "monographs.proceedings",
+            "doi_prefixes.publisher_id",
+            "publishers.publisher_type",
+            "language_forms",
+            "source_contributions.source_record_id",
+            "source_record_identifiers",
+            # Dépôts HAL introuvables dans HAL.
+            "failed_lookups",
+        ),
+        writes=(
+            "source_records.doc_type",
+            "source_records.language",
+            "source_records.urls",
+            "source_records.corrections",
+            "source_record_identifiers.removed_by",
+            "source_record_locations",
+            "source_record_keys_queue",
+        ),
+        # Les référentiels vides, supprimés plus loin, ne sont référencés par aucun enregistrement source : la correction ne les atteint pas.
+        previous_run=(
+            "source_records",
+            "source_record_identifiers.removed_by",
+            "serials.serial_type",
+            "serials.oa_model",
+            "serials.is_in_doaj",
+            "serials.doaj_payload",
+            "monographs.proceedings",
+            "publishers.publisher_type",
+        ),
+        run=_unary,
+    ),
+    task(
+        "metadata_correction.doi_targets",
+        reads=tuple(
+            f"source_records.{column}"
+            for column in (
+                "id",
+                "source",
+                "doc_type",
+                "doi",
+                "title_normalized",
+                "publication_year",
+                "corrections",
+                "source_extras",
             )
-        }
-        counts = [
-            item
-            for name in ("unary", "doi_targets", "remove_identifiers")
-            for item in nodes[name].extras.items()
-        ]
-        counts.sort(key=lambda kc: kc[1], reverse=True)
-        metrics.details["table"] = {"rows": [{"key": key, "count": count} for key, count in counts]}
-        return metrics
-
-    def _steps(self) -> dict[str, TaskStep]:
-        """Renvoie l'étape de chaque tâche. Chaque étape écrit sa section du journal et renvoie examinés (`total`), corrigés (`updated`) et décompte par règle (`extras`)."""
-
-        def serial_by_doi(ctx: PhaseContext) -> PhaseMetrics:
-            with ctx.open_tx() as conn:
-                stats = run_serial_by_doi(conn, SourceRecordCorrectionStore(conn), ctx.logger)
-            return PhaseMetrics(seen=stats.examined, updated=stats.attached)
-
-        def unary(ctx: PhaseContext) -> PhaseMetrics:
-            with ctx.open_tx() as conn:
-                stats = run_unary(conn, SourceRecordCorrectionStore(conn), ctx.logger)
-            return PhaseMetrics(
-                seen=stats.examined, updated=stats.corrected, extras=dict(stats.rule_counts)
+        )
+        # DOI présents en base.
+        + ("source_record_identifiers",)
+        # DOI inconnus de doi.org.
+        + ("failed_lookups",),
+        writes=("doi_targets", "source_record_keys_queue"),
+        previous_run=("source_records", "source_record_identifiers.removed_by", "doi_targets"),
+        run=_doi_targets,
+    ),
+    task(
+        "metadata_correction.remove_identifiers",
+        reads=tuple(
+            f"source_records.{column}"
+            for column in (
+                "id",
+                "source",
+                "doc_type",
+                "doi",
+                "title_normalized",
+                "corrections",
+                "source_id",
             )
+        )
+        + ("source_record_identifiers", "doi_targets")
+        # DOI inconnus de doi.org.
+        + ("failed_lookups",)
+        # Noms des auteurs d'un dépôt HAL et de l'enregistrement source Crossref de son DOI.
+        + (
+            "source_contributions.source_record_id",
+            "source_contributions.contributor_information_id",
+            "source_contributions.collective",
+            "contributor_information",
+        ),
+        writes=(
+            "source_record_identifiers.removed_by",
+            "source_record_keys_queue",
+        ),
+        previous_run=("source_records", "source_record_identifiers.removed_by"),
+        run=_remove_identifiers,
+    ),
+    task(
+        "metadata_correction.matchable",
+        reads=(
+            *(
+                f"source_records.{column}"
+                for column in (
+                    "id",
+                    "source",
+                    "source_id",
+                    "doi",
+                    "title_normalized",
+                    "urls",
+                    "corrections",
+                    "is_matchable",
+                )
+            ),
+            "source_record_identifiers",
+            "doi_targets",
+            # Dépôts HAL introuvables dans HAL.
+            "failed_lookups",
+        ),
+        writes=("source_records.is_matchable", "source_record_keys_queue"),
+        previous_run=("source_records.is_matchable",),
+        run=_matchable,
+    ),
+)
 
-        def doi_targets(ctx: PhaseContext) -> PhaseMetrics:
-            with ctx.open_tx() as conn:
-                stats = run_doi_targets(conn, SourceRecordCorrectionStore(conn), ctx.logger)
-            return PhaseMetrics(
-                seen=stats.examined, updated=stats.changed, extras=dict(stats.rule_counts)
-            )
 
-        def remove_identifiers(ctx: PhaseContext) -> PhaseMetrics:
-            with ctx.open_tx() as conn:
-                stats = run_remove_identifiers(conn, SourceRecordCorrectionStore(conn), ctx.logger)
-            return PhaseMetrics(
-                seen=stats.examined, updated=stats.corrected, extras=dict(stats.case_counts)
-            )
+def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
+    """Renvoie les métriques de la phase : compteurs des tâches, chiffres par tâche, et décompte par règle."""
+    nodes = {name.removeprefix(f"{_PHASE}."): metrics for name, metrics in by_task.items()}
 
-        def matchable(ctx: PhaseContext) -> PhaseMetrics:
-            with ctx.open_tx() as conn:
-                stats = run_matchable(conn, SourceRecordCorrectionStore(conn), ctx.logger)
-            return PhaseMetrics(seen=stats.examined, updated=stats.changed)
-
-        steps = {
-            "serial_by_doi": serial_by_doi,
-            "unary": unary,
-            "doi_targets": doi_targets,
-            "remove_identifiers": remove_identifiers,
-            "matchable": matchable,
-        }
-        return {f"{_PHASE}.{name}": TaskStep(steps[name]) for name in _NODES}
-
-
-def build() -> Phase:
-    return MetadataCorrectionPhase()
+    metrics = PhaseMetrics()
+    for node_metrics in nodes.values():
+        metrics.add(seen=node_metrics.total, updated=node_metrics.updated)
+    # Chiffres à plat, `{tâche}_{examined,corrected}`, disposés en matrice par l'interface.
+    metrics.details["summary"] = {
+        f"{name}_{column}": value
+        for name, node_metrics in nodes.items()
+        for column, value in (
+            ("examined", node_metrics.total),
+            ("corrected", node_metrics.updated),
+        )
+    }
+    counts = [
+        item
+        for name in ("unary", "doi_targets", "remove_identifiers")
+        for item in nodes[name].extras.items()
+    ]
+    counts.sort(key=lambda kc: kc[1], reverse=True)
+    metrics.details["table"] = {"rows": [{"key": key, "count": count} for key, count in counts]}
+    return metrics

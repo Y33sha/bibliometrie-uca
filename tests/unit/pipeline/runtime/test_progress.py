@@ -2,7 +2,9 @@
 
 import io
 import logging
+import threading
 import time
+from types import SimpleNamespace
 
 import pytest
 
@@ -330,6 +332,36 @@ class TestAttente:
             ligne.conclude("  ├─ 0 contribution source")
             ligne.erase()
         assert "0 contribution source" not in caplog.text
+
+    def test_le_fil_des_points_finit_avant_la_conclusion(self, avec_terminal, monkeypatch):
+        """Le fil des points sort de son attente au moment où le travail finit. Il se termine avant la fin du bloc, donc avant l'écriture de la conclusion."""
+
+        class AttenteTardive(threading.Event):
+            """Première attente expirée juste après la fin du travail."""
+
+            def __init__(self) -> None:
+                super().__init__()
+                self._tardive = True
+
+            def wait(self, timeout: float | None = None) -> bool:
+                if self._tardive:
+                    self._tardive = False
+                    super().wait()
+                    time.sleep(0.05)
+                    return False
+                return super().wait(timeout)
+
+        fils: list[threading.Thread] = []
+
+        def fil(**kwargs) -> threading.Thread:
+            fils.append(threading.Thread(**kwargs))
+            return fils[-1]
+
+        monkeypatch.setattr(module, "_bar_stream", io.StringIO())
+        monkeypatch.setattr(module, "threading", SimpleNamespace(Event=AttenteTardive, Thread=fil))
+        with module.waiting("  └─ ", None) as ligne:
+            ligne.conclude("  └─ 27 identifiants neutralisés")
+        assert [f.is_alive() for f in fils] == [False]
 
     def test_une_exception_arrete_les_points(self, avec_terminal, monkeypatch):
         stream = io.StringIO()

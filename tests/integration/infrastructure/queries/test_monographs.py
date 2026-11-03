@@ -14,9 +14,6 @@ from pipeline.transformation.publishing.monographs.link_monographs_to_collection
     find_monograph_serial_candidates,
     set_monograph_serial,
 )
-from pipeline.transformation.publishing.monographs.merge_duplicate_monographs import (
-    find_monographs_sharing_a_title,
-)
 from pipeline.transformation.publishing.monographs.monograph_merge import merge_monograph_into
 from pipeline.transformation.publishing.monographs.store import MonographStore
 from pipeline.transformation.publishing.monographs.type_proceedings_volumes import (
@@ -64,20 +61,19 @@ def _row(conn, monograph_id):
     ).one()
 
 
-def test_recherche_par_isbn_papier_ou_electronique(repo):
-    mid = _create(repo, isbn=_PAPER, eisbn=_ELECTRONIC)
-    assert repo.find_monograph_by_isbn(_PAPER) == mid
-    assert repo.find_monograph_by_isbn(_ELECTRONIC) == mid
-
-
-def test_recherche_par_titre_tous_editeurs(repo, sa_sync_conn):
+def test_lecture_de_toutes_les_monographies(repo, sa_sync_conn):
     publisher = insert_publisher(sa_sync_conn, "P")
     with_publisher = _create(repo, "Introduction", publisher_id=publisher, isbn=_PAPER)
-    without_publisher = _create(repo, "Introduction")
-    assert repo.find_monographs_by_title("introduction") == [
-        (with_publisher, _PAPER, None, publisher),
-        (without_publisher, None, None, None),
-    ]
+    without_publisher = _create(repo, "Introduction", eisbn=_ELECTRONIC)
+    existing = {m.id: m for m in repo.existing_monographs()}
+    assert existing[with_publisher] == (with_publisher, "introduction", _PAPER, None, publisher)
+    assert existing[without_publisher] == (
+        without_publisher,
+        "introduction",
+        None,
+        _ELECTRONIC,
+        None,
+    )
 
 
 def test_enrichissement_complete_les_champs_vides(repo, sa_sync_conn):
@@ -97,10 +93,6 @@ def test_fusion_reporte_enregistrements_et_isbn(repo, sa_sync_conn):
     source = _create(repo, "Pascal intempestif", isbn=_PAPER, year=2024)
     target = _create(repo, "Pascal intempestif")
     _chapter(sa_sync_conn, source_id="hal-fusion", monograph_id=source)
-    groups = [
-        g for g in find_monographs_sharing_a_title(sa_sync_conn) if g.title == "Pascal intempestif"
-    ]
-    assert [m.id for m in groups[0].monographs] == [source, target]
 
     merge_monograph_into(sa_sync_conn, target, source)
 

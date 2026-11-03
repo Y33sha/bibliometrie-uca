@@ -222,5 +222,13 @@
 />
 
 {#if drawer.id !== null}
-	<PublicationDrawer publicationId={drawer.id} onclose={() => drawer.open(null)} onopen={drawer.open} />
+	<PublicationDrawer
+		publicationId={drawer.id}
+		onclose={() => drawer.open(null)}
+		onopen={drawer.open}
+		onchange={() => {
+			listing.load();
+			facets.load();
+		}}
+	/>
 {/if}

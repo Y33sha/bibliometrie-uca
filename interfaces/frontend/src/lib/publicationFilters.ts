@@ -104,7 +104,12 @@ export function publicationFilters(
 			facet: {
 				type: 'label_map',
 				apiKey: 'author_positions',
-				labels: { corresponding: 'Correspondant', other: 'Autre' },
+				labels: {
+					corresponding: 'Correspondant',
+					first: 'Premier',
+					last: 'Dernier',
+					other: 'Autre',
+				},
 			},
 			enabled: () => context.kind === 'person' || context.kind === 'lab',
 			hideWhenEmpty: true,

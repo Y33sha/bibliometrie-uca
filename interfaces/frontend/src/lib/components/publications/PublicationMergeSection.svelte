@@ -120,6 +120,7 @@
 <style>
   .merge {
     margin-top: 22px;
+    padding-bottom: 16px;
     max-width: 900px;
   }
   .merge h3 {
@@ -132,11 +133,12 @@
   .merge-search {
     width: 100%;
     max-width: 420px;
+    margin-bottom: 10px;
   }
   .hint {
     color: var(--muted);
     font-size: var(--fs-sm);
-    margin: 8px 0 4px;
+    margin: 0 0 4px;
   }
   .candidates {
     list-style: none;

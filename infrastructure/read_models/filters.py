@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from domain.normalize import normalize_text
 from domain.persons.identifiers import AttributionStatus
 from domain.persons.person import PersonExclusion
+from domain.publications.author_positions import AuthorPosition
 from domain.publications.hal_deposit import HalDepositStatus
 from domain.publications.oa_status import (
     ACCESS_LEVELS,
@@ -18,7 +19,6 @@ from domain.publications.oa_status import (
 from domain.source_records.impact import CitationTop
 from domain.sources.registry import PROFILES, SOURCE_FILTER_PREFIXES, Source
 from infrastructure.read_models.publications.models import (
-    AUTHOR_POSITION_COLUMNS,
     BELOW_CITATION_TOPS,
     DOI_AGENCY_SOURCES,
     NO_DOI,
@@ -28,6 +28,7 @@ from infrastructure.read_models.publications.models import (
 )
 from infrastructure.read_models.sql_fragments import current_hr_period, current_laboratory_label
 from infrastructure.sql_fragments import (
+    has_author_position,
     has_author_role,
     in_clause,
     is_laboratory,
@@ -344,10 +345,12 @@ def author_position_subject(person_id: int | None, lab_ids: list[int]) -> WhereC
 def author_position_predicate(position: str, subject: WhereClause) -> str:
     """Renvoie le prédicat : une contribution de `subject` occupe la position d'auteur dans la publication `p`. `OTHER_AUTHOR_POSITION` : aucune n'occupe de position."""
     if position == OTHER_AUTHOR_POSITION:
-        return f"NOT ({' OR '.join(author_position_predicate(p, subject) for p in AUTHOR_POSITION_COLUMNS)})"
+        return f"""NOT EXISTS (SELECT 1 FROM contributions a
+                WHERE a.publication_id = p.id AND {subject.sql}
+                  AND cardinality(a.author_positions) > 0)"""
     return f"""EXISTS (SELECT 1 FROM contributions a
                 WHERE a.publication_id = p.id AND {subject.sql}
-                  AND a.{AUTHOR_POSITION_COLUMNS[position]})"""
+                  AND {has_author_position(AuthorPosition(position))})"""
 
 
 def author_position_clause(

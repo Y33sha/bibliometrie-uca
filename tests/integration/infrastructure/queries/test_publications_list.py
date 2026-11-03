@@ -561,7 +561,7 @@ class TestPersonView:
             add_contribution_structure(conn, contribution, author_lab)
         conn.execute(
             text(
-                "UPDATE contributions SET is_corresponding = TRUE"
+                "UPDATE contributions SET author_positions = '{corresponding,first}'"
                 " WHERE publication_id = :p AND person_id = :person"
             ),
             {"p": publication, "person": person},
@@ -586,7 +586,7 @@ class TestPersonView:
         [item] = self._list(sa_sync_conn, person_id=person)
 
         assert item.contribution_id == contribution_id_of(sa_sync_conn, publication, person)
-        assert item.is_corresponding is True
+        assert item.author_positions == ["corresponding", "first"]
         assert [i.id for i in item.lab_items or []] == [lab]
 
     def test_author_position_and_perimeter_filters_read_the_contribution(self, sa_sync_conn):
@@ -599,7 +599,10 @@ class TestPersonView:
             ]
 
         assert by_position("corresponding") == [publication]
+        assert by_position("first") == [publication]
+        assert by_position("last") == []
         assert by_position("other") == []
+        assert by_position("last", "other") == []
         assert by_position("corresponding", "other") == [publication]
         assert [p.id for p in self._list(sa_sync_conn, person_id=person, in_perimeter=["yes"])] == [
             publication
@@ -610,6 +613,8 @@ class TestPersonView:
         )
         assert {(o.value, o.count) for o in builder._facet_author_positions()} == {
             ("corresponding", 1),
+            ("first", 1),
+            ("last", 0),
             ("other", 0),
         }
         assert {(o.value, o.count) for o in builder._facet_in_perimeter()} == {
@@ -639,6 +644,8 @@ class TestPersonView:
         )
         assert {(o.value, o.count) for o in builder._facet_author_positions()} == {
             ("corresponding", 0),
+            ("first", 0),
+            ("last", 0),
             ("other", 1),
         }
 

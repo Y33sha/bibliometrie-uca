@@ -38,9 +38,6 @@ from pipeline.ingestion.wos.payload import (
     parse_export_researcher_ids,
     split_export_list,
 )
-from pipeline.transformation.publishing.find_or_create import (
-    Containers,
-)
 
 
 def _text_of(value: JsonValue) -> str | None:
@@ -236,14 +233,12 @@ def extract_from_api(raw: Mapping[str, JsonValue], staging_doi: str | None) -> d
     if lang_list:
         language = as_str(as_mapping(lang_list[0]).get("content")) or as_str(lang_list[0])
 
-    # Numérotation et éditeur nommés par WoS.
     page = at_path(publication_info, "page")
     biblio = compact_biblio(
         volume=_text_of(publication_info.get("vol")),
         issue=_text_of(publication_info.get("issue")),
         first_page=_text_of(page.get("begin")),
         last_page=_text_of(page.get("end")),
-        publisher=publisher_name,
     )
 
     frm = at_path(static, "fullrecord_metadata")
@@ -337,7 +332,6 @@ def extract_from_export(
         issue=field("IS"),
         first_page=field("BP"),
         last_page=field("EP"),
-        publisher=field("PU"),
     )
     doc_types = split_export_list(field("DT"))
     languages = split_export_list(field("LA"))
@@ -411,7 +405,7 @@ def wos_identifiers(rec: Mapping[str, JsonValue]) -> tuple[SourceIdentifier, ...
 
 
 def wos_source_record(
-    rec: Mapping[str, JsonValue], staging_id: int, containers: Containers
+    rec: Mapping[str, JsonValue], staging_id: int, *, has_series: bool
 ) -> SourceRecordUpsert:
     """Construit l'enregistrement source WoS d'un record, identifié par son UT.
 
@@ -424,8 +418,7 @@ def wos_source_record(
         identifiers=wos_identifiers(rec),
         title=as_str(rec.get("title")) or "",
         raw_doc_type=as_str(rec.get("doc_type")),
-        monograph_id=containers.monograph_id,
-        container_title=as_str(rec.get("journal_title")) if not containers.has_series else None,
+        container_title=as_str(rec.get("journal_title")) if not has_series else None,
         raw_language=as_str(rec.get("language")),
         biblio=dict(as_mapping(rec.get("biblio"))) or None,
         abstract=as_str(rec.get("abstract")),
@@ -536,9 +529,9 @@ class WosNormalizer(SourceNormalizer):
         return date_from_parts(as_int(doc.get("publication_year")))
 
     def source_record(
-        self, row: StagingRow, doc: Document, containers: Containers
+        self, row: StagingRow, doc: Document, *, has_series: bool
     ) -> SourceRecordUpsert:
-        return wos_source_record(doc, row.id, containers)
+        return wos_source_record(doc, row.id, has_series=has_series)
 
     def author_block(self, doc: Document) -> AuthorBlock:
         return extract_wos_author_block(doc)

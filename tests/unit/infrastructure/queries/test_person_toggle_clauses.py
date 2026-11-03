@@ -37,13 +37,14 @@ def test_author_position_prefers_the_person_over_labs():
 def test_author_position_other_is_negated():
     clause = author_position_clause(42, [], ["other"])
     assert clause is not None
-    assert clause.sql.startswith("(NOT (EXISTS")
+    assert clause.sql.startswith("(NOT EXISTS")
+    assert "cardinality(a.author_positions) > 0" in clause.sql
 
 
 def test_author_position_values_combine_with_or():
     clause = author_position_clause(42, [], ["corresponding", "other"])
     assert clause is not None
-    assert " OR NOT (" in clause.sql
+    assert " OR NOT EXISTS" in clause.sql
 
 
 def test_in_perimeter_none_without_person_or_filter():

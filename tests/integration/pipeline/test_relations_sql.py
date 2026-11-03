@@ -20,7 +20,6 @@ from pipeline.transformation.publications import relations
 from pipeline.transformation.publications.relations import (
     DoiPublication,
     RelationEdge,
-    RelationsPhase,
 )
 from pipeline.transformation.publications.store import PublicationStore
 from tests.integration.helpers.publications import insert_publication, insert_publication_relation
@@ -497,7 +496,7 @@ class TestPhaseRelations:
         def open_tx():
             yield sa_sync_conn
 
-        RelationsPhase().run(
+        relations.rebuild(
             PhaseContext(
                 open_tx=open_tx,
                 logger=logging.getLogger("test"),

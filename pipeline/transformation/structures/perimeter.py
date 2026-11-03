@@ -1,10 +1,14 @@
-"""Périmètres : structures de chaque périmètre, matérialisées dans `perimeter_structures`, et erreur du périmètre d'extraction vide.
+"""Périmètres : structures de chaque périmètre, matérialisées dans `perimeter_structures`, et contrôle du périmètre d'extraction vide.
 
 La table se recalcule avant toute phase du pipeline, et après chaque édition d'un périmètre, d'une structure ou d'une tutelle par l'administration (`PerimeterStructures`)."""
 
 from sqlalchemy import Connection, text
 
-from infrastructure.read_models.perimeters.queries import get_persons_structure_ids_list
+from infrastructure.read_models.perimeters.queries import (
+    get_extraction_structure_ids,
+    get_persons_structure_ids_list,
+)
+from pipeline.runtime.context import PhaseContext
 
 
 class EmptyExtractionPerimeterError(RuntimeError):
@@ -15,6 +19,13 @@ class EmptyExtractionPerimeterError(RuntimeError):
             "Le périmètre d'extraction est vide : la clé `perimeter_extraction` est absente de "
             "`config`, ou désigne un périmètre sans structure."
         )
+
+
+def check_extraction_perimeter(ctx: PhaseContext) -> None:
+    """Lève `EmptyExtractionPerimeterError` si le périmètre d'extraction ne contient aucune structure."""
+    with ctx.open_tx() as conn:
+        if not get_extraction_structure_ids(conn):
+            raise EmptyExtractionPerimeterError()
 
 
 def refresh_perimeter_structures(conn: Connection) -> None:

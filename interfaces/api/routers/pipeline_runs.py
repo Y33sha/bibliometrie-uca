@@ -20,7 +20,7 @@ router = APIRouter(prefix="/api/pipeline", tags=["pipeline"])
 
 @router.get("/phases", response_model=list[str])
 def list_phases() -> list[str]:
-    """Renvoie l'ordre des phases du pipeline (`pipeline.graph`), pour la trame du ruban."""
+    """Renvoie l'ordre des phases du pipeline, pour la trame du ruban."""
     return list(PHASE_ORDER)
 
 

@@ -1,7 +1,8 @@
-"""Compteurs renvoyés par chaque phase du pipeline. L'orchestrateur mesure la durée de la phase et enregistre ses compteurs (`to_payload`)."""
+"""Compteurs renvoyés par chaque phase du pipeline. L'orchestrateur mesure la durée de la phase et enregistre ses compteurs et la durée de ses tâches (`to_payload`)."""
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 
 from domain.pipeline_runs import PhaseMetricsPayload, Signal
@@ -33,7 +34,12 @@ EXTRA_LABELS: dict[str, str | tuple[str, str]] = {
         "monographies à plusieurs collections possibles",
     ),
     "monograph_series": ("série sans ISSN de monographies", "séries sans ISSN de monographies"),
+    "monographs_created": ("monographie créée", "monographies créées"),
     "monographs_deleted": ("monographie vide supprimée", "monographies vides supprimées"),
+    "monographs_detached": (
+        "enregistrement source détaché de sa monographie",
+        "enregistrements sources détachés de leur monographie",
+    ),
     "monographs_linked": (
         "monographie rattachée à sa collection",
         "monographies rattachées à leur collection",
@@ -49,6 +55,10 @@ EXTRA_LABELS: dict[str, str | tuple[str, str]] = {
     "publisher_created": ("éditeur créé", "éditeurs créés"),
     "publisher_matched": ("éditeur retrouvé", "éditeurs retrouvés"),
     "publishers_deleted": ("éditeur vide supprimé", "éditeurs vides supprimés"),
+    "publishers_detached": (
+        "enregistrement source détaché de son éditeur",
+        "enregistrements sources détachés de leur éditeur",
+    ),
     "publishers_merged": ("éditeur fusionné", "éditeurs fusionnés"),
     "resolved": "résolu",
     "skipped": "sauté",
@@ -121,8 +131,10 @@ class PhaseMetrics:
         self.details.update(other.details)
         self.signals.extend(other.signals)
 
-    def to_payload(self, duration_s: float) -> PhaseMetricsPayload:
-        """Renvoie la forme JSON des compteurs, durée comprise (`domain.pipeline_runs.PhaseMetricsPayload`)."""
+    def to_payload(
+        self, duration_s: float, task_durations_s: Mapping[str, float]
+    ) -> PhaseMetricsPayload:
+        """Renvoie la forme JSON des compteurs, durées de la phase et de ses tâches comprises (`domain.pipeline_runs.PhaseMetricsPayload`)."""
         return {
             "new": self.new,
             "updated": self.updated,
@@ -131,6 +143,7 @@ class PhaseMetrics:
             "errors": self.errors,
             "extras": dict(self.extras),
             "duration_s": duration_s,
+            "task_durations_s": dict(task_durations_s),
         }
 
     def as_summary(self) -> str:

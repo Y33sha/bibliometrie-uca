@@ -2,7 +2,7 @@
 
 from collections.abc import Iterable
 from enum import StrEnum
-from typing import TypedDict
+from typing import NotRequired, TypedDict
 
 
 class PhaseStatus(StrEnum):
@@ -30,7 +30,7 @@ class Signal(TypedDict):
 
 
 class PhaseMetricsPayload(TypedDict):
-    """Compteurs et durée d'une exécution de phase, sous forme JSON."""
+    """Compteurs et durées d'une exécution de phase, sous forme JSON."""
 
     new: int
     updated: int
@@ -39,3 +39,5 @@ class PhaseMetricsPayload(TypedDict):
     errors: int
     extras: dict[str, int]
     duration_s: float
+    task_durations_s: NotRequired[dict[str, float]]
+    """Durée de chaque tâche exécutée, par nom de tâche."""

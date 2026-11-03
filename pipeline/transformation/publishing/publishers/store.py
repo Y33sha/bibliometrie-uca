@@ -3,7 +3,7 @@
 L'édition, la fusion et l'enrichissement pays sont dans `infrastructure/repositories/publisher_repository.py`.
 """
 
-from sqlalchemy import Connection, select, update
+from sqlalchemy import Connection, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from infrastructure.db.scalars import scalar_int
@@ -22,25 +22,6 @@ class PublisherStore:
             pg_insert(publisher_name_forms)
             .values(publisher_id=publisher_id, form_normalized=form_normalized)
             .on_conflict_do_nothing(index_elements=["form_normalized"])
-        )
-        self._conn.execute(stmt)
-
-    def find_publisher_by_openalex_id(self, openalex_id: str) -> int | None:
-        return self._conn.execute(
-            select(publishers.c.id).where(publishers.c.openalex_id == openalex_id)
-        ).scalar_one_or_none()
-
-    def set_publisher_openalex_id_if_missing(
-        self,
-        publisher_id: int,
-        openalex_id: str,
-    ) -> None:
-        """Attribue un `openalex_id` à l'éditeur s'il n'en a pas déjà un."""
-        stmt = (
-            update(publishers)
-            .where(publishers.c.id == publisher_id)
-            .where(publishers.c.openalex_id.is_(None))
-            .values(openalex_id=openalex_id)
         )
         self._conn.execute(stmt)
 

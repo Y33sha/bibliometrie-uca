@@ -2751,7 +2751,7 @@ export interface paths {
         };
         /**
          * List Phases
-         * @description Renvoie l'ordre des phases du pipeline (`pipeline.graph`), pour la trame du ruban.
+         * @description Renvoie l'ordre des phases du pipeline, pour la trame du ruban.
          */
         get: operations["list_phases_api_pipeline_phases_get"];
         put?: never;
@@ -3196,6 +3196,12 @@ export interface components {
             roles: string[];
         };
         /**
+         * AuthorPosition
+         * @description Position d'une contribution, valeur de `contributions.author_positions`. Reflet du type PostgreSQL `author_position`.
+         * @enum {string}
+         */
+        AuthorPosition: "corresponding" | "first" | "last";
+        /**
          * BatchAssignOrphanContributions
          * @description Attribution en lot de contributions orphelines, désignées par leurs identifiants, à une personne existante.
          */
@@ -3364,8 +3370,8 @@ export interface components {
             author_position: number | null;
             /** In Perimeter */
             in_perimeter: boolean;
-            /** Is Corresponding */
-            is_corresponding: boolean | null;
+            /** Author Positions */
+            author_positions: components["schemas"]["AuthorPosition"][];
             /** Structure Ids */
             structure_ids: number[] | null;
             /** Source Hal */
@@ -4890,7 +4896,7 @@ export interface components {
         };
         /**
          * PhaseMetricsPayload
-         * @description Compteurs et durée d'une exécution de phase, sous forme JSON.
+         * @description Compteurs et durées d'une exécution de phase, sous forme JSON.
          */
         PhaseMetricsPayload: {
             /** New */
@@ -4909,6 +4915,13 @@ export interface components {
             };
             /** Duration S */
             duration_s: number;
+            /**
+             * Task Durations S
+             * @description Durée de chaque tâche exécutée, par nom de tâche.
+             */
+            task_durations_s?: {
+                [key: string]: number;
+            };
         };
         /**
          * PhaseStatus
@@ -5187,8 +5200,11 @@ export interface components {
             lab_items: components["schemas"]["PublicationLabItem"][] | null;
             /** Apc */
             apc: components["schemas"]["PublicationApcPayment"][] | null;
-            /** Is Corresponding */
-            is_corresponding: boolean | null;
+            /**
+             * Author Positions
+             * @description Positions d'auteur de la personne de la liste ; `None` pour une liste sans personne.
+             */
+            author_positions: components["schemas"]["AuthorPosition"][] | null;
             /** Contribution Id */
             contribution_id: number | null;
             /**

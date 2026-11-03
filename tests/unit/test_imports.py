@@ -33,7 +33,7 @@ MODULES = [
     "pipeline.transformation.countries.detect_by_place_name",
     "pipeline.transformation.publications.consolidation",
     "pipeline.transformation.publications.store",
-    "pipeline.transformation.publishing.find_or_create",
+    "pipeline.transformation.publishing.publishers.attach_publishers",
     "pipeline.transformation.publishing.serials.serial_merge",
     "pipeline.public",
     "application.services.persons",

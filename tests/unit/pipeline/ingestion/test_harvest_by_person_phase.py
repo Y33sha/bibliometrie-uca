@@ -2,32 +2,36 @@
 
 import logging
 
-from pipeline.ingestion.common.harvest_by_person import HarvestByPersonPhase
+import pytest
+
+from pipeline.ingestion.common import harvest_by_person
+from pipeline.phases import PHASES
 from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.task_runner import run_phase
+
+_PHASE = next(phase for phase in PHASES if phase.name == "harvest_by_person")
 
 
-def _run(contexte, mode: str, searched: list[str]) -> PhaseMetrics:
-    def search_one(_ctx, source: str, args) -> PhaseMetrics:
-        searched.append(source)
+@pytest.fixture
+def interrogees(monkeypatch) -> list[str]:
+    """Sources interrogées par la phase, sans réseau."""
+    sources: list[str] = []
+
+    def run_harvest(_ctx, _phase, source, _harvester, _window) -> PhaseMetrics:
+        sources.append(source)
         return PhaseMetrics()
 
-    def run_sequential(thunks):
-        return {label: thunk() for label, thunk in thunks.items()}
-
-    return HarvestByPersonPhase(search_one=search_one, run_parallel=run_sequential).run(
-        contexte(mode=mode, sources={"openalex"})
-    )
+    monkeypatch.setattr(harvest_by_person, "run_harvest", run_harvest)
+    return sources
 
 
-def test_mode_daily_saute_la_phase(contexte, caplog):
-    searched: list[str] = []
+def test_mode_daily_saute_la_phase(contexte, caplog, interrogees):
     with caplog.at_level(logging.INFO, logger="test"):
-        _run(contexte, "daily", searched)
-    assert searched == []
+        run_phase(_PHASE, contexte(mode="daily", sources={"openalex"}))
+    assert interrogees == []
     assert "Sautée en mode daily" in caplog.text
 
 
-def test_mode_full_moissonne_les_sources(contexte):
-    searched: list[str] = []
-    _run(contexte, "full", searched)
-    assert searched == ["openalex"]
+def test_mode_full_moissonne_les_sources_demandees(contexte, interrogees):
+    run_phase(_PHASE, contexte(mode="full", sources={"openalex"}))
+    assert interrogees == ["openalex"]

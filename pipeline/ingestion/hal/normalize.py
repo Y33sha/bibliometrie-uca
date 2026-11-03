@@ -47,9 +47,6 @@ from pipeline.ingestion.hal.payload import (
     hal_domain_subject,
     hal_text_field,
 )
-from pipeline.transformation.publishing.find_or_create import (
-    Containers,
-)
 
 
 def get_publication_date(doc: Mapping[str, JsonValue]) -> PublicationDate | None:
@@ -182,7 +179,8 @@ def hal_source_record(
     doc: Mapping[str, JsonValue],
     staging_id: int,
     hal_id: str,
-    containers: Containers,
+    *,
+    has_series: bool,
 ) -> SourceRecordUpsert:
     """Construit l'enregistrement source HAL d'un dépôt, identifié par son `hal_id`.
 
@@ -198,13 +196,10 @@ def hal_source_record(
 
     keywords = parse_tei_keywords(hal_text_field(doc.get("label_xml"))) or None
 
-    # Éditeur nommé par HAL.
     biblio_json = compact_biblio(
         volume=hal_text_field(doc.get("volume_s")),
         issue=hal_text_field(doc.get("issue_s")),
         **page_range(hal_text_field(doc.get("page_s")), doc_type)._asdict(),
-        publisher=hal_text_field(doc.get("journalPublisher_s"))
-        or hal_text_field(doc.get("publisher_s")),
     )
 
     uri = hal_text_field(doc.get("uri_s"))
@@ -217,8 +212,7 @@ def hal_source_record(
         identifiers=build_hal_identifiers(doc, hal_id, nnt),
         title=get_title(doc),
         raw_doc_type=doc_type,
-        monograph_id=containers.monograph_id,
-        container_title=get_container_title(doc) if not containers.has_series else None,
+        container_title=get_container_title(doc) if not has_series else None,
         raw_language=hal_text_field(doc.get("language_s")),
         biblio=biblio_json,
         source_extras=extract_hal_source_extras(doc),
@@ -575,9 +569,9 @@ class HalNormalizer(SourceNormalizer):
         return get_subjects(doc)
 
     def source_record(
-        self, row: StagingRow, doc: Document, containers: Containers
+        self, row: StagingRow, doc: Document, *, has_series: bool
     ) -> SourceRecordUpsert:
-        return hal_source_record(doc, row.id, row.source_id, containers)
+        return hal_source_record(doc, row.id, row.source_id, has_series=has_series)
 
     def author_block(self, doc: Document) -> AuthorBlock:
         return extract_hal_author_block(doc)

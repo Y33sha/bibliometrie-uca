@@ -73,6 +73,19 @@ def test_un_identifiant_d_une_contribution_source_rattache_la_contribution_hors_
     assert _person(conn, contribution) == (person, "orcid")
 
 
+def test_un_identifiant_en_attente_ne_rattache_pas_la_contribution_hors_perimetre(sa_sync_conn):
+    conn = sa_sync_conn
+    person = insert_person(conn, "Martin", first_name="Jean")
+    insert_person_identifier(conn, person, id_type="orcid", id_value=_ORCID, status="pending")
+    contribution = _contribution(
+        conn, insert_publication(conn), [("crossref", "Jean Martin", {"orcid": _ORCID}, False)]
+    )
+
+    resolve_contributions(conn, logging.getLogger("test"))
+
+    assert _person(conn, contribution) == (None, None)
+
+
 def _person_name(conn, person):
     return tuple(
         conn.execute(

@@ -30,7 +30,6 @@ from pipeline.ingestion.hal.normalize import (
     parse_tei_isbns,
 )
 from pipeline.ingestion.hal.payload import hal_text_field
-from pipeline.transformation.publishing.find_or_create import Containers
 from tests.helpers.normalize_doubles import (
     FakeSourceContributionStore,
     FakeSourceRecordStore,
@@ -187,13 +186,13 @@ class TestContainerDescription:
 # ── métadonnées canoniques ───────────────────────────────────────────────
 
 
-def _record(doc, containers=Containers(False, None)):
-    return hal_source_record(doc, staging_id=1, hal_id="hal-01234567", containers=containers)
+def _record(doc, *, has_series=False):
+    return hal_source_record(doc, staging_id=1, hal_id="hal-01234567", has_series=has_series)
 
 
 class TestCanonicalMetadata:
     def test_minimal(self):
-        record = _record({"title_s": ["T"], "producedDateY_i": 2024}, Containers(True, None))
+        record = _record({"title_s": ["T"], "producedDateY_i": 2024}, has_series=True)
         assert record.title == "T"
         # Une revue identifiée laisse `container_title` vide.
         assert record.container_title is None
@@ -361,8 +360,8 @@ class TestActiveEmbargoUntil:
 
 
 class TestHalSourceRecord:
-    def _call(self, doc, containers=Containers(False, None)):
-        return _record(doc, containers)
+    def _call(self, doc):
+        return _record(doc)
 
     def test_collections_from_coll_codes(self):
         captured = self._call({"collCode_s": ["UCA", "LIMOS", "UCA"]})
@@ -458,23 +457,11 @@ class TestHalSourceRecord:
         captured = self._call({})
         assert captured.biblio is None
 
-    def test_biblio_publisher_from_journalPublisher_s(self):
-        captured = self._call({"journalPublisher_s": "Elsevier"})
-        assert captured.biblio == {"publisher": "Elsevier"}
-
-    def test_biblio_publisher_fallback_to_publisher_s(self):
-        captured = self._call({"publisher_s": "Springer"})
-        assert captured.biblio == {"publisher": "Springer"}
-
-    def test_biblio_journalPublisher_s_wins_over_publisher_s(self):
-        captured = self._call({"journalPublisher_s": "Elsevier", "publisher_s": "Springer"})
-        assert captured.biblio == {"publisher": "Elsevier"}
-
     def test_url_from_uri(self):
         captured = self._call({"uri_s": "https://hal.science/hal-123"})
         assert captured.urls == ["https://hal.science/hal-123"]
 
-    def test_propagates_containers_oa_embargo_lang(self):
+    def test_propagates_container_oa_embargo_lang(self):
         captured = self._call(
             {
                 "fileMain_s": "https://hal.science/hal-123/document",
@@ -483,10 +470,8 @@ class TestHalSourceRecord:
                 ),
                 "language_s": "fr",
                 "bookTitle_s": "Book",
-            },
-            Containers(False, 8),
+            }
         )
-        assert captured.monograph_id == 8
         assert captured.raw_language == "fr"
         assert captured.container_title == "Book"
 
@@ -676,8 +661,7 @@ class TestHalNormalizerClass:
     def test_sans_editeur(self):
         assert _make_normalizer().publisher({}) is None
 
-    def test_enregistrement_source_porte_ligne_et_conteneurs(self):
+    def test_enregistrement_source_porte_sa_ligne(self):
         row = staging_row(staging_id=7, source_id="hal-7", raw={"title_s": ["T"]})
-        record = _make_normalizer().source_record(row, row.raw_data, Containers(True, 4))
+        record = _make_normalizer().source_record(row, row.raw_data, has_series=True)
         assert (record.staging_id, record.source_id) == (7, "hal-7")
-        assert record.monograph_id == 4

@@ -1,1 +1,1 @@
-"""Monographies : fusion des doublons, rattachement aux collections, typage des volumes d'actes."""
+"""Monographies : rattachement des enregistrements sources, rattachement aux collections, typage des volumes d'actes."""

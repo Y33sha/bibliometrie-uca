@@ -15,14 +15,14 @@ L'exécuteur lance ensuite le `VACUUM` de `staging`, vidé de ses payloads : `VA
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
-from dataclasses import dataclass
+from collections.abc import Callable, Mapping
 from typing import cast
 
 from sqlalchemy import Connection
 
 from domain.sources.registry import SOURCE_PRIORITY, source_label
 from infrastructure.raw_store import NullRawStore, get_raw_store
+from pipeline.graph import TaskRun, task
 from pipeline.ingestion.adapters import ADAPTERS
 from pipeline.ingestion.common.adapter import SourceAdapter
 from pipeline.ingestion.common.embargoes import EmbargoStore
@@ -43,117 +43,67 @@ from pipeline.ingestion.common.source_records import (
 )
 from pipeline.ingestion.common.staging import StagingStore
 from pipeline.ingestion.common.subjects import SourceRecordSubjectStore
-from pipeline.runtime.context import Phase, PhaseContext
+from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.log_format import (
     LAST_BRANCH,
     quantity,
 )
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.task_runner import TaskRun, TaskStep, run_tasks
-from pipeline.transformation.publishing.monographs.store import MonographStore
-from pipeline.transformation.publishing.publishers.store import PublisherStore
-
-NormalizeOne = Callable[[PhaseContext, str], NormalizeStats]
-"""Normalise une source et renvoie son bilan."""
 
 
-def _selected(source: str) -> Callable[[PhaseContext], bool]:
-    """Renvoie la condition d'exécution de la tâche de `source` : la source fait partie des sources du run."""
-    return lambda ctx: source in ctx.options.sources
+def _normalize_one(ctx: PhaseContext, source: str) -> NormalizeStats:
+    """Normalise une source. Avec `--normalize-full`, marque d'abord tous ses enregistrements sources à resynchroniser. Avec `--raw-store`, archive les payloads."""
+    if ctx.options.normalize_full:
+        _run_mark_source_contributions_to_resync(ctx, source)
+    return _run_normalize(ctx, normalizer_builders(archive=ctx.options.raw_store)[source])
 
 
-@dataclass(frozen=True)
-class NormalizePhase:
-    """Normalisation des sources du run (toutes par défaut), dans l'ordre de `SOURCE_PRIORITY`."""
+def _normalize(source: str) -> TaskRun:
+    """Renvoie la tâche `normalize.<source>`, qui normalise la source et garde sa ligne de la table d'observabilité."""
 
-    normalize_one: NormalizeOne
-    prune_disappeared: Callable[[PhaseContext], int]
-    cleanup_orphan_contributor_information: Callable[[PhaseContext], int]
-    cleanup_orphan_addresses: Callable[[PhaseContext], int]
-
-    def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Exécute les tâches de la phase et assemble les métriques."""
-        sources = [source.value for source in SOURCE_PRIORITY]
-        steps = {
-            f"normalize.{source}": TaskStep(
-                self._normalize_task(source),
-                label=source_label(source),
-                progress_bar=True,
-                when=_selected(source),
-            )
-            for source in sources
+    def run(ctx: PhaseContext) -> PhaseMetrics:
+        stats = _normalize_one(ctx, source)
+        metrics = PhaseMetrics()
+        metrics.report = _report(stats)
+        metrics.details["row"] = {
+            "key": source,
+            "processed": stats.processed,
+            "skipped": stats.skipped,
+            "errors": stats.errors,
         }
-        steps["normalize.prune_disappeared"] = TaskStep(self._prune)
-        steps["normalize.cleanup_orphan_contributor_information"] = TaskStep(
-            self._cleanup,
-            section="Maintenance des tables",
-            label="Informations du contributeur orphelines",
-        )
-        steps["normalize.cleanup_orphan_addresses"] = TaskStep(
-            self._cleanup_addresses, section="Maintenance des tables", label="Adresses orphelines"
-        )
-        by_task = run_tasks("normalize", steps, ctx)
-
-        rows = [
-            {
-                **cast("dict[str, object]", task.details["row"]),
-                "duration_s": task.duration_s,
-            }
-            for source in sources
-            if "row" in (task := by_task[f"normalize.{source}"]).details
-        ]
-        metrics = PhaseMetrics()
-        normalized = sum(cast("int", row["processed"]) for row in rows)
-        metrics.add(seen=normalized)
-        metrics.details["table"] = {"rows": rows}
-        metrics.details["disappeared_pruned"] = by_task["normalize.prune_disappeared"].extras.get(
-            "disappeared", 0
-        )
         return metrics
 
-    def _normalize_task(self, source: str) -> TaskRun:
-        """Renvoie la tâche `normalize.<source>`, qui normalise la source et garde sa ligne de la table d'observabilité."""
+    return run
 
-        def run(ctx: PhaseContext) -> PhaseMetrics:
-            stats = self.normalize_one(ctx, source)
-            metrics = PhaseMetrics()
-            metrics.report = _report(stats)
-            metrics.details["row"] = {
-                "key": source,
-                "processed": stats.processed,
-                "skipped": stats.skipped,
-                "errors": stats.errors,
-            }
-            return metrics
 
-        return run
+def _prune(ctx: PhaseContext) -> PhaseMetrics:
+    """Supprime les enregistrements sources des documents disparus de leur source, et ferme la section de normalisation."""
+    disappeared = _run_prune_disappeared(ctx)
+    if disappeared:
+        ctx.logger.info(
+            "%s%s (disparus de leur source)",
+            LAST_BRANCH,
+            quantity(disappeared, "document supprimé", "documents supprimés"),
+        )
+    else:
+        ctx.logger.info("%saucun document disparu de sa source", LAST_BRANCH)
+    return PhaseMetrics(extras={"disappeared": disappeared})
 
-    def _prune(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Supprime les enregistrements sources des documents disparus de leur source, et ferme la section de normalisation."""
-        disappeared = self.prune_disappeared(ctx)
-        if disappeared:
-            ctx.logger.info(
-                "%s%s (disparus de leur source)",
-                LAST_BRANCH,
-                quantity(disappeared, "document supprimé", "documents supprimés"),
-            )
-        else:
-            ctx.logger.info("%saucun document disparu de sa source", LAST_BRANCH)
-        return PhaseMetrics(extras={"disappeared": disappeared})
 
-    def _cleanup(self, ctx: PhaseContext) -> PhaseMetrics:
-        deleted = self.cleanup_orphan_contributor_information(ctx)
-        metrics = PhaseMetrics()
-        if deleted:
-            metrics.report = f"{quantity(deleted, 'ligne supprimée', 'lignes supprimées')}"
-        return metrics
+def _cleanup_contributor_information(ctx: PhaseContext) -> PhaseMetrics:
+    deleted = _run_cleanup_orphan_contributor_information(ctx)
+    metrics = PhaseMetrics()
+    if deleted:
+        metrics.report = f"{quantity(deleted, 'ligne supprimée', 'lignes supprimées')}"
+    return metrics
 
-    def _cleanup_addresses(self, ctx: PhaseContext) -> PhaseMetrics:
-        deleted = self.cleanup_orphan_addresses(ctx)
-        metrics = PhaseMetrics()
-        if deleted:
-            metrics.report = f"{quantity(deleted, 'adresse supprimée', 'adresses supprimées')}"
-        return metrics
+
+def _cleanup_addresses(ctx: PhaseContext) -> PhaseMetrics:
+    deleted = _run_cleanup_orphan_addresses(ctx)
+    metrics = PhaseMetrics()
+    if deleted:
+        metrics.report = f"{quantity(deleted, 'adresse supprimée', 'adresses supprimées')}"
+    return metrics
 
 
 def _report(stats: NormalizeStats) -> str | None:
@@ -167,33 +117,6 @@ def _report(stats: NormalizeStats) -> str | None:
 
 
 type NormalizerFactory = Callable[[Connection, logging.Logger], SourceNormalizer]
-
-
-def build() -> Phase:
-    return _NormalizeByOptions()
-
-
-class _NormalizeByOptions:
-    """Construit les normaliseurs selon les options du run (`--raw-store`), puis exécute `NormalizePhase`.
-
-    Avec `--normalize-full`, chaque source marque d'abord tous ses enregistrements sources à resynchroniser.
-    """
-
-    def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        options = ctx.options
-        registry = normalizer_builders(archive=options.raw_store)
-
-        def normalize_one(ctx: PhaseContext, source: str) -> NormalizeStats:
-            if options.normalize_full:
-                _run_mark_source_contributions_to_resync(ctx, source)
-            return _run_normalize(ctx, registry[source])
-
-        return NormalizePhase(
-            normalize_one=normalize_one,
-            prune_disappeared=_run_prune_disappeared,
-            cleanup_orphan_contributor_information=_run_cleanup_orphan_contributor_information,
-            cleanup_orphan_addresses=_run_cleanup_orphan_addresses,
-        ).run(ctx)
 
 
 def _run_mark_source_contributions_to_resync(ctx: PhaseContext, source: str) -> None:
@@ -228,8 +151,6 @@ def normalizer_builders(*, archive: bool = True) -> dict[str, NormalizerFactory]
                 logger,
                 StagingStore(conn, raw_store),
                 SourceRecordStore(conn),
-                monograph_store=MonographStore(conn),
-                publisher_store=PublisherStore(conn),
                 contribution_store=SourceContributionStore(conn),
                 location_store=LocationStore(conn),
                 embargo_store=EmbargoStore(conn),
@@ -244,3 +165,136 @@ def normalizer_builders(*, archive: bool = True) -> dict[str, NormalizerFactory]
 def _run_normalize(ctx: PhaseContext, build: NormalizerFactory) -> NormalizeStats:
     with ctx.open_tx() as conn:
         return build(conn, ctx.logger).run()
+
+
+TASKS = (
+    *(
+        task(
+            f"normalize.{source}",
+            reads=(
+                "staging",
+                "staging_normalization_queue",
+                "source_records.id",
+                "source_records.authors_hash",
+                "source_records.publication_id",
+                "source_contributions.id",
+                "source_contributions.author_position",
+                "source_contributions.roles",
+                "source_contributions.contributor_information_id",
+                "source_contributions.content_hash",
+                "contributor_information",
+                "addresses.id",
+                "countries",
+                "subjects",
+                # Contributions des contributions sources à rôles ou statut de correspondant modifiés.
+                "aligned_source_contributions",
+            ),
+            writes=(
+                "staging_normalization_queue",
+                "staging.raw_data",
+                "source_records",
+                "source_record_identifiers",
+                "source_record_locations",
+                "embargoes",
+                "subjects",
+                "source_record_subjects",
+                "platforms",
+                "source_contributions",
+                "source_contribution_addresses",
+                "source_contribution_rors",
+                "source_contribution_hal_structures",
+                "contributor_information",
+                "addresses.id",
+                "address_candidates_queue",
+                "address_country_candidates",
+                "publication_contributions_queue",
+                "source_contribution_countries_queue",
+                "source_record_keys_queue",
+                "contribution_attributes_queue",
+            ),
+            # Ses propres lignes de `staging`, de la file de normalisation, enregistrements sources et contributions sources ; les contributions écrites par `author_grouping`.
+            previous_run=(
+                "staging",
+                "staging_normalization_queue",
+                "source_records",
+                "source_record_locations",
+                "embargoes",
+                "subjects",
+                "source_record_subjects",
+                "platforms",
+                "source_contributions",
+                "contributor_information",
+                "addresses",
+                "aligned_source_contributions",
+            ),
+            run=_normalize(source),
+            label=source_label(source),
+            progress_bar=True,
+            when=lambda ctx, source=source: source in ctx.options.sources,
+        )
+        for source in SOURCE_PRIORITY
+    ),
+    task(
+        "normalize.prune_disappeared",
+        reads=(
+            "staging.disappeared_at",
+            "source_records.id",
+            "source_records.staging_id",
+            "source_records.publication_id",
+        ),
+        # La suppression d'un enregistrement source emporte ses localisations, ses contributions sources, leurs adresses, ROR et structures HAL, et les décisions qui les visent.
+        writes=(
+            "source_records.id",
+            "source_record_identifiers",
+            "source_record_locations",
+            "embargoes",
+            "source_record_subjects",
+            "source_record_keys_queue",
+            "publication_contributions_queue",
+            "source_contributions.id",
+            "source_contribution_addresses",
+            "source_contribution_rors",
+            "source_contribution_hal_structures",
+            "confirmed_source_contributions",
+            "rejected_contributions",
+        ),
+        previous_run=("source_records",),
+        run=_prune,
+    ),
+    task(
+        "normalize.cleanup_orphan_contributor_information",
+        reads=("source_contributions.contributor_information_id", "contributor_information.id"),
+        writes=("contributor_information.id",),
+        previous_run=("source_contributions",),
+        run=_cleanup_contributor_information,
+        section="Maintenance des tables",
+        label="Informations du contributeur orphelines",
+    ),
+    task(
+        "normalize.cleanup_orphan_addresses",
+        reads=("source_contribution_addresses", "addresses.id"),
+        # La suppression d'une adresse emporte ses liens aux structures.
+        writes=("addresses.id", "address_structures"),
+        # La normalisation vide `staging.raw_data`. `VACUUM FULL` en mode full.
+        maintenance=("VACUUM staging",),
+        run=_cleanup_addresses,
+        section="Maintenance des tables",
+        label="Adresses orphelines",
+    ),
+)
+
+
+def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
+    """Renvoie les métriques de la phase : documents normalisés, table des sources, enregistrements sources disparus supprimés."""
+    rows = [
+        {**cast("dict[str, object]", metrics.details["row"]), "duration_s": metrics.duration_s}
+        for metrics in by_task.values()
+        if "row" in metrics.details
+    ]
+    metrics = PhaseMetrics()
+    metrics.add(seen=sum(cast("int", row["processed"]) for row in rows))
+    metrics.details["table"] = {"rows": rows}
+    metrics.details["disappeared_pruned"] = by_task["normalize.prune_disappeared"].extras.get(
+        "disappeared", 0
+    )
+    return metrics

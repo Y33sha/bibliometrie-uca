@@ -113,11 +113,7 @@
 	let currentStructureId = $state<number | null>(null);
 
 	let allStructures = $state<Structure[]>([]);
-	// Le choix de la structure étudiée se limite à ces types. Le picker des prédicats Structure propose tous les types.
-	const SCOPE_TYPES = ['universite', 'onr', 'chu', 'ecole', 'labo'];
-	const scopeGroups = $derived(
-		groupStructuresByType(allStructures).filter(([type]) => SCOPE_TYPES.includes(type))
-	);
+	const scopeGroups = $derived(groupStructuresByType(allStructures));
 	let stats = $state<Stats>({ total: 0, detected: 0, pending: 0, rejected: 0, confirmed: 0 });
 	const list = usePaginatedFetch<Address, AddressesResponse>({
 		endpoint: '/api/addresses',

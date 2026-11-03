@@ -57,7 +57,6 @@ def insert_wos_staging(conn, docs):
             source_id=doc["ut"],
             doi=doc["doi"],
             raw_data=doc["raw_data"],
-            processed=False,
             replace=True,
         )
 

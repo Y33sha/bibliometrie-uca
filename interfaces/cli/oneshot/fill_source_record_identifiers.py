@@ -23,7 +23,6 @@ from infrastructure.raw_store import UnreadablePayloadError, get_raw_store
 from pipeline.ingestion.common.normalize import normalizer_builders
 from pipeline.ingestion.common.source_records import normalized_identifiers, replace_identifiers
 from pipeline.ingestion.common.staging import StagingRow
-from pipeline.transformation.publishing.find_or_create import Containers
 
 log = setup_logger("fill_source_record_identifiers", os.path.dirname(__file__))
 
@@ -71,7 +70,7 @@ def _fill_source(conn: Connection, source: str) -> None:
             if doc is None:
                 refused += 1
                 continue
-            record = normalizer.source_record(row, doc, Containers(None, None))
+            record = normalizer.source_record(row, doc, has_series=False)
             batch[r.id] = normalized_identifiers(record)
         replace_identifiers(conn, batch)
         conn.commit()

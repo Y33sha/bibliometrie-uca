@@ -6,6 +6,7 @@ import httpx2
 
 from domain.sources.staging import StagingEntryMode
 from pipeline.ingestion.api_params import API_BASE_URLS
+from pipeline.ingestion.crossref import api as crossref_api
 from pipeline.ingestion.crossref.api import CrossrefClient
 from pipeline.ingestion.crossref.person_search import (
     CrossrefPersonHarvester,
@@ -28,16 +29,20 @@ def test_filtre_sur_les_orcid_et_la_plage_d_annees():
     )
 
 
-def test_suit_le_curseur_jusqu_a_la_page_vide(http_mock, identifiants_rh, ecritures):
+def test_suit_le_curseur_jusqu_a_la_page_incomplete(
+    http_mock, identifiants_rh, ecritures, monkeypatch
+):
+    """Crossref renvoie un curseur après la dernière page : une page incomplète clôt la pagination, sans requête de plus."""
+    monkeypatch.setattr(crossref_api, "_ROWS", 2)
     identifiants_rh(["0000-0001-2345-6789"])
     route = http_mock.get(_WORKS).mock(
-        side_effect=[_page(["10.1/A", "10.1/b"], "c1"), _page(["10.1/c"], "c2"), _page([], "c3")]
+        side_effect=[_page(["10.1/A", "10.1/b"], "c1"), _page(["10.1/c"], "c2")]
     )
     client = CrossrefClient(API_BASE_URLS["crossref"])
 
     metrics = moissonneur(CrossrefPersonHarvester, client).run(arguments_du_run())
 
-    assert [call.url.params["cursor"] for call in route.calls] == ["*", "c1", "c2"]
+    assert [call.url.params["cursor"] for call in route.calls] == ["*", "c1"]
     assert route.calls[0].url.params["filter"] == (
         "orcid:0000-0001-2345-6789,from-pub-date:2024,until-pub-date:2025"
     )

@@ -27,7 +27,6 @@ from pipeline.ingestion.openalex.normalize import (
     openalex_source_record,
     reconstruct_abstract,
 )
-from pipeline.transformation.publishing.find_or_create import Containers
 from tests.helpers.normalize_doubles import (
     FakeSourceRecordStore,
     FakeStagingStore,
@@ -101,7 +100,7 @@ class TestOpenalexIdentifiers:
             "primary_location": {"landing_page_url": "https://doi.org/10.1/x"},
             "locations": [{"landing_page_url": "https://doi.org/10.1/x"}],
         }
-        record = openalex_source_record(work, 1, Containers(False, None))
+        record = openalex_source_record(work, 1, has_series=False)
         kept, _ = normalize_identifiers(record.identifiers)
         assert [(str(i.id_type), i.value, str(i.role)) for i in kept] == [
             ("doi", "10.1/x", "derived")
@@ -116,7 +115,7 @@ class TestOpenalexIdentifiers:
                 {"landing_page_url": "https://doi.org/10.1/x"},
             ],
         }
-        record = openalex_source_record(work, 1, Containers(False, None))
+        record = openalex_source_record(work, 1, has_series=False)
         kept, _ = normalize_identifiers(record.identifiers)
         assert {(str(i.id_type), i.value, str(i.role)) for i in kept} == {
             ("doi", "10.1/x", "secondary"),
@@ -429,22 +428,18 @@ class TestContainerDescription:
 
 # ── openalex_source_record (métadonnées canoniques) ──────────────
 
-_NO_CONTAINERS = Containers(has_series=False, monograph_id=None)
-
 
 class TestOpenalexSourceRecordMetadata:
     def test_minimal_work(self):
         record = openalex_source_record(
-            {"title": "T", "publication_year": 2024}, staging_id=1, containers=_NO_CONTAINERS
+            {"title": "T", "publication_year": 2024}, staging_id=1, has_series=False
         )
         assert record.title == "T"
         assert "doi" not in identifier_values(record)
         assert "nnt" not in identifier_values(record)
 
     def test_display_name_fallback(self):
-        record = openalex_source_record(
-            {"display_name": "DN"}, staging_id=1, containers=_NO_CONTAINERS
-        )
+        record = openalex_source_record({"display_name": "DN"}, staging_id=1, has_series=False)
         assert record.title == "DN"
 
     def test_with_series_no_container_title(self):
@@ -453,9 +448,7 @@ class TestOpenalexSourceRecordMetadata:
             "title": "T",
             "primary_location": {"source": {"display_name": "Some Source"}},
         }
-        record = openalex_source_record(
-            work, staging_id=1, containers=Containers(has_series=True, monograph_id=None)
-        )
+        record = openalex_source_record(work, staging_id=1, has_series=True)
         assert record.container_title is None
 
     def test_conteneur_sans_revue(self):
@@ -469,7 +462,7 @@ class TestOpenalexSourceRecordMetadata:
             openalex_source_record(
                 {"title": "T", "primary_location": {"source": source}},
                 staging_id=1,
-                containers=_NO_CONTAINERS,
+                has_series=False,
             ).container_title
             for source in (conference, archive)
         ]
@@ -481,7 +474,7 @@ class TestOpenalexSourceRecordMetadata:
 
 class TestOpenalexSourceRecord:
     def _call(self, work: dict) -> SourceRecordUpsert:
-        return openalex_source_record(work, staging_id=1, containers=_NO_CONTAINERS)
+        return openalex_source_record(work, staging_id=1, has_series=False)
 
     def test_keywords_list_of_strings(self):
         work = {"id": "https://openalex.org/W1", "keywords": ["a", "b"]}
@@ -544,37 +537,6 @@ class TestOpenalexSourceRecord:
         captured = self._call(work)
         assert identifier_values(captured)["doi"] == ["10.1/primary"]
 
-    def test_biblio_publisher_from_primary_location(self):
-        work = {
-            "id": "https://openalex.org/W1",
-            "primary_location": {
-                "source": {
-                    "host_organization_name": "Elsevier",
-                    "display_name": "Journal of Physics",
-                    "id": "https://openalex.org/S123",
-                    "issn": ["0022-3727", "1361-6463"],
-                    "issn_l": "0022-3727",
-                }
-            },
-        }
-        captured = self._call(work)
-        assert captured.biblio == {"publisher": "Elsevier"}
-
-    def test_biblio_skipped_when_primary_is_repository(self):
-        """Un entrepôt héberge le work sans le publier : ni éditeur ni revue dans biblio."""
-        work = {
-            "id": "https://openalex.org/W1",
-            "primary_location": {
-                "source": {
-                    "type": "repository",
-                    "display_name": "Zenodo",
-                    "host_organization_name": "CERN",
-                }
-            },
-        }
-        captured = self._call(work)
-        assert captured.biblio is None
-
     def test_ebook_platform_names_publisher_only(self):
         """Une plateforme d'ebooks donne l'éditeur, pas la revue."""
         work = {
@@ -588,8 +550,9 @@ class TestOpenalexSourceRecord:
                 }
             },
         }
-        captured = self._call(work)
-        assert captured.biblio == {"publisher": "École normale supérieure Editions"}
+        norm = _make_normalizer()
+        assert norm.publisher(work) == PublisherFacts("École normale supérieure Editions", None)
+        assert norm.container_facts(work) is None
 
     def test_theses_fr_nnt_passed_through_to_identifiers(self):
         """Le NNT d'une localisation principale theses.fr figure parmi les identifiants."""

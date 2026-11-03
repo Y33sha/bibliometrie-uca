@@ -7,6 +7,7 @@ from collections.abc import Iterable
 
 from application.ports.repositories.address_repository import AddressCountryFilter
 from domain.config import ConfigKey
+from domain.persons.contribution_matching import ContributionMatchReason
 from domain.persons.identifiers import (
     HUMAN_ATTRIBUTION_STATUSES,
     AttributionStatus,
@@ -14,6 +15,7 @@ from domain.persons.identifiers import (
 )
 from domain.persons.matching import ORCID_MATCH_SOURCES, STRONG_PERSON_IDENTIFIER_TYPES
 from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
+from domain.publications.author_positions import SCANR_TRUNCATED_LENGTHS, AuthorPosition
 from domain.publications.contribution_roles import ContributionRole
 from domain.serials.serial import OaModel
 from domain.source_records.corrections import CORRECTED_BY, RAW
@@ -21,6 +23,7 @@ from domain.source_records.impact import CitationTop
 from domain.source_records.source_extras import CROSSREF_PREPRINT_OF, SourceExtra
 from domain.structures.address_origin import AddressOrigin
 from domain.structures.perimeter_evidence import PerimeterEvidence
+from infrastructure.db.queues import Queue, enqueue_sql
 
 
 def in_clause(values: Iterable[str]) -> str:
@@ -101,6 +104,11 @@ def is_raw_address(address: str = "a") -> str:
 def has_author_role(source_contribution: str = "sc") -> str:
     """Renvoie la condition vraie quand la contribution source ou la contribution aliasée `source_contribution` tient le rôle d'auteur."""
     return f"{source_contribution}.roles && ARRAY['{ContributionRole.AUTHOR.value}']::text[]"
+
+
+def has_author_position(position: AuthorPosition, contribution: str = "a") -> str:
+    """Renvoie la condition vraie quand la contribution aliasée `contribution` occupe la position d'auteur `position`."""
+    return f"'{position}' = ANY({contribution}.author_positions)"
 
 
 def identifier_neutralized(
@@ -244,6 +252,9 @@ def publication_rejected_for(publication_id: str, person_id: str) -> str:
 # Tableau d'indices vide : hors du périmètre.
 NO_PERIMETER_EVIDENCE = "'{}'::perimeter_evidence[]"
 
+# Tableau de positions d'auteur vide.
+NO_AUTHOR_POSITION = "'{}'::author_position[]"
+
 
 def source_contribution_perimeter_evidence(source_contribution_ids: str | None = None) -> str:
     """Renvoie la requête des indices de l'entrée dans le périmètre, par contribution source : colonnes `id` et `evidence`, tableau trié.
@@ -338,8 +349,21 @@ def self_declared_preprint_sql(alias: str = "sr") -> str:
 def propagate_contribution_attributes_sql(contribution_ids: str) -> str:
     """Renvoie l'instruction recomposant les attributs des contributions de la requête `contribution_ids` depuis leurs contributions sources.
 
-    Une contribution est correspondante si une de ses contributions sources l'est. Ses rôles et ses indices de périmètre sont l'union de ceux de ses contributions sources. Seules les contributions à attribut changé sont écrites.
+    Ses rôles et ses indices de périmètre sont l'union de ceux de ses contributions sources. Ses positions d'auteur (`AuthorPosition`) :
+
+    - `corresponding` : une de ses contributions sources est correspondante ;
+    - `first` : la contribution reçoit la majorité des votes des listes d'auteurs pour le premier rang ;
+    - `last` : la contribution reçoit la majorité des votes des listes d'auteurs complètes pour le dernier rang.
+
+    La liste d'auteurs d'un enregistrement source réunit ses contributions sources individuelles au rôle d'auteur, hors doublons, avec une position. Une liste est tronquée si une autre liste de sa publication est plus longue et si elle compte un seul auteur, ou une longueur de `SCANR_TRUNCATED_LENGTHS` pour scanR. La copie scanR d'un dépôt HAL vote seulement en l'absence de l'enregistrement HAL. Une égalité laisse la publication sans premier ou sans dernier auteur. Seules les contributions à attribut changé sont écrites.
+
+    Une contribution rattachée sans épinglage qui quitte le périmètre est marquée pour la redécision de sa personne. L'instruction renvoie le nombre de contributions écrites.
     """
+    left_perimeter = enqueue_sql(
+        Queue.CONTRIBUTION_RESOLUTION,
+        "SELECT id FROM updated WHERE was_in AND NOT is_in AND person_id IS NOT NULL"
+        f" AND resolution_mode <> '{ContributionMatchReason.MANUAL}'",
+    )
     return f"""
         WITH members AS (
             SELECT gm.contribution_id, sc.is_corresponding, sc.perimeter_evidence, sc.roles
@@ -359,15 +383,84 @@ def propagate_contribution_attributes_sql(contribution_ids: str) -> str:
             SELECT m.contribution_id, array_agg(DISTINCT r ORDER BY r) AS roles
             FROM members m, LATERAL unnest(m.roles) AS r
             GROUP BY m.contribution_id
-        )
-        UPDATE contributions g
-        SET is_corresponding = scal.is_corr,
-            perimeter_evidence = coalesce(ev.evidence, {NO_PERIMETER_EVIDENCE}),
-            roles = rol.roles
-        FROM scal LEFT JOIN rol ON rol.contribution_id = scal.contribution_id LEFT JOIN ev ON ev.contribution_id = scal.contribution_id
-        WHERE g.id = scal.contribution_id
-          AND (g.is_corresponding, g.perimeter_evidence, g.roles)
-              IS DISTINCT FROM (scal.is_corr, coalesce(ev.evidence, {NO_PERIMETER_EVIDENCE}), rol.roles)
+        ),
+        author_lists AS (
+            SELECT sr.id AS source_record_id, sr.publication_id, sr.source, sr.source_id,
+                   count(*) AS length,
+                   max(count(*)) OVER (PARTITION BY sr.publication_id) AS longest,
+                   min(sc.author_position) AS first_position, max(sc.author_position) AS last_position
+            FROM source_records sr
+            JOIN source_contributions sc ON sc.source_record_id = sr.id
+            -- `DISTINCT` donne au planificateur une estimation juste du nombre de publications. Il lit donc les contributions sources par l'index.
+            WHERE sr.publication_id IN (SELECT DISTINCT publication_id FROM contributions WHERE id IN ({contribution_ids}))
+              AND {has_author_role("sc")} AND NOT sc.collective
+              AND sc.duplicate_of IS NULL AND sc.author_position IS NOT NULL
+            GROUP BY sr.id
+        ),
+        voting_lists AS (
+            SELECT l.source_record_id, l.publication_id, l.first_position, l.last_position,
+                   l.length < l.longest
+                   AND (l.length = 1 OR (l.source = 'scanr' AND l.length IN ({", ".join(map(str, SCANR_TRUNCATED_LENGTHS))})))
+                       AS truncated
+            FROM author_lists l
+            -- L'identifiant scanR d'une copie de dépôt HAL est l'identifiant HAL préfixé de `hal`.
+            WHERE NOT (l.source = 'scanr' AND EXISTS (
+                SELECT 1 FROM source_records h
+                WHERE h.publication_id = l.publication_id AND h.source = 'hal' AND 'hal' || h.source_id = l.source_id
+            ))
+        ),
+        votes AS (
+            SELECT v.source_record_id, v.publication_id, p.position, gm.contribution_id
+            FROM voting_lists v
+            CROSS JOIN LATERAL (VALUES
+                ('{AuthorPosition.FIRST}'::author_position, v.first_position),
+                ('{AuthorPosition.LAST}'::author_position, CASE WHEN NOT v.truncated THEN v.last_position END)
+            ) AS p (position, author_position)
+            JOIN source_contributions sc
+              ON sc.source_record_id = v.source_record_id AND sc.author_position = p.author_position
+            LEFT JOIN aligned_source_contributions gm ON gm.source_contribution_id = sc.id
+        ),
+        tally AS (
+            -- Une contribution source hors contribution compte comme un candidat distinct, jamais élu.
+            SELECT publication_id, position, contribution_id,
+                   rank() OVER (PARTITION BY publication_id, position ORDER BY count(*) DESC) AS rank
+            FROM votes
+            GROUP BY publication_id, position, contribution_id,
+                     CASE WHEN contribution_id IS NULL THEN source_record_id END
+        ),
+        elected AS (
+            SELECT min(contribution_id) AS contribution_id, position
+            FROM tally WHERE rank = 1
+            GROUP BY publication_id, position
+            HAVING count(*) = 1
+        ),
+        pos AS (
+            SELECT contribution_id, array_agg(position ORDER BY position) AS positions
+            FROM (
+                SELECT contribution_id, position FROM elected
+                WHERE contribution_id IN ({contribution_ids})
+                UNION ALL
+                SELECT contribution_id, '{AuthorPosition.CORRESPONDING}'::author_position FROM scal WHERE is_corr
+            ) AS p
+            GROUP BY contribution_id
+        ),
+        updated AS (
+            UPDATE contributions g
+            SET author_positions = coalesce(pos.positions, {NO_AUTHOR_POSITION}),
+                perimeter_evidence = coalesce(ev.evidence, {NO_PERIMETER_EVIDENCE}),
+                roles = rol.roles
+            FROM scal
+            LEFT JOIN rol ON rol.contribution_id = scal.contribution_id
+            LEFT JOIN ev ON ev.contribution_id = scal.contribution_id
+            LEFT JOIN pos ON pos.contribution_id = scal.contribution_id
+            WHERE g.id = scal.contribution_id
+              AND (g.author_positions, g.perimeter_evidence, g.roles)
+                  IS DISTINCT FROM (coalesce(pos.positions, {NO_AUTHOR_POSITION}), coalesce(ev.evidence, {NO_PERIMETER_EVIDENCE}), rol.roles)
+            RETURNING g.id, old.in_perimeter AS was_in, new.in_perimeter AS is_in,
+                      g.person_id, g.resolution_mode
+        ),
+        marked AS ({left_perimeter})
+        SELECT count(*) FROM updated
     """
 
 

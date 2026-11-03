@@ -22,6 +22,8 @@ class IdentifiedPerson(NamedTuple):
     person_id: int
     last_name: str
     first_name: str
+    human_attribution: bool = False
+    """L'attribution est confirmée par l'administration ou authentifiée par le chercheur (`HUMAN_ATTRIBUTION_STATUSES`)."""
 
 
 ORCID_MATCH_SOURCES = frozenset({"crossref", "datacite", "openalex", "hal"})

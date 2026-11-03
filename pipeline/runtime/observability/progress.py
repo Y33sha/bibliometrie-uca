@@ -356,13 +356,15 @@ class Waiting:
         self._conclusion = ""
         self._erase = False
         self._finished = threading.Event()
+        self._ticker: threading.Thread | None = None
         self._stream = _bar_stream if _interactive_terminal() else None
         if self._stream is None:
             if logger is not None:
                 logger.info("%s…", label)
             return
         self._write(WAITING_DOTS[0])
-        threading.Thread(target=self._tick, daemon=True).start()
+        self._ticker = threading.Thread(target=self._tick, daemon=True)
+        self._ticker.start()
 
     def _write(self, dots: str) -> None:
         """Réécrit la ligne en place, après un retour chariot.
@@ -392,9 +394,11 @@ class Waiting:
     def close(self) -> None:
         """Arrête les points, puis laisse sur la ligne le libellé ou la conclusion, ou efface la ligne.
 
-        En terminal, la ligne laissée va aussi au journal, masquée au terminal (`detail`).
+        Le fil des points se termine avant l'écriture finale, donc ses écritures précèdent la ligne laissée. En terminal, la ligne laissée va aussi au journal, masquée au terminal (`detail`).
         """
         self._finished.set()
+        if self._ticker is not None:
+            self._ticker.join()
         if self._stream is not None:
             if self._erase:
                 self._stream.write(f"\r{CLEAR_TO_END_OF_LINE}")

@@ -23,7 +23,7 @@ from domain.serials.containers import (
     VolumeDescription,
     determine_container_type,
 )
-from domain.source_records.biblio import with_journal
+from domain.source_records.biblio import with_journal, with_monograph, with_publisher
 from domain.subjects.subject import SubjectLink
 from domain.types import JsonValue
 from infrastructure.db.savepoint import rollback_unless_invalidated, savepoint
@@ -45,13 +45,6 @@ from pipeline.runtime.observability.log_format import (
 )
 from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.progress import track_progress
-from pipeline.transformation.publishing.find_or_create import (
-    Containers,
-    find_or_create_containers,
-    find_or_create_publisher,
-)
-from pipeline.transformation.publishing.monographs.store import MonographStore
-from pipeline.transformation.publishing.publishers.store import PublisherStore
 
 type Document = Mapping[str, JsonValue]
 """Document décrit par la source, lu dans une ligne de `staging`."""
@@ -96,8 +89,6 @@ class SourceNormalizer(ABC):
         logger: logging.Logger,
         staging_store: StagingStore,
         record_store: SourceRecordStore,
-        monograph_store: MonographStore,
-        publisher_store: PublisherStore,
         contribution_store: SourceContributionStore,
         location_store: LocationStore,
         embargo_store: EmbargoStore,
@@ -107,8 +98,6 @@ class SourceNormalizer(ABC):
         self.logger = logger
         self._staging = staging_store
         self._record_store = record_store
-        self._monograph_store = monograph_store
-        self._publisher_store = publisher_store
         self._contribution_store = contribution_store
         self._location_store = location_store
         self._embargo_store = embargo_store
@@ -148,9 +137,13 @@ class SourceNormalizer(ABC):
 
     @abstractmethod
     def source_record(
-        self, row: StagingRow, doc: Document, containers: Containers
+        self, row: StagingRow, doc: Document, *, has_series: bool
     ) -> SourceRecordUpsert:
-        """Construit l'enregistrement source du document, rattaché à ses conteneurs."""
+        """Construit l'enregistrement source du document.
+
+        Args:
+            has_series: le document décrit une série, qui sert au rattachement à sa revue.
+        """
 
     @abstractmethod
     def author_block(self, doc: Document) -> AuthorBlock:
@@ -178,33 +171,25 @@ class SourceNormalizer(ABC):
     def normalize_record(self, row: StagingRow) -> bool:
         """Normalise un document à métadonnées minimales et marque sa ligne traitée. Renvoie vrai, ou faux sans rien écrire pour un document refusé.
 
-        Écrit dans l'ordre l'éditeur, les conteneurs, l'enregistrement source rattaché à son éditeur, ses localisations, son embargo, ses sujets et ses contributions sources.
+        Écrit dans l'ordre l'enregistrement source, ses localisations, son embargo, ses sujets et ses contributions sources. L'éditeur, la série et le volume décrits par la source s'écrivent dans `biblio` ; l'éditeur, la revue et la monographie se rattachent dans la phase `publishing`.
         """
         doc = self.parse(row)
         if doc is None:
             return False
         publisher = self.publisher(doc)
-        publisher_id = (
-            find_or_create_publisher(
-                publisher.name, openalex_id=publisher.openalex_id, repo=self._publisher_store
-            )
-            if publisher
-            else None
-        )
         series, volume = self.series_and_volume(row, doc)
-        containers = find_or_create_containers(
-            series, volume, publisher_id=publisher_id, monographs=self._monograph_store
+        record = self.source_record(row, doc, has_series=series is not None)
+        biblio = with_publisher(
+            record.biblio,
+            publisher.name if publisher else None,
+            publisher.openalex_id if publisher else None,
         )
-        record = self.source_record(row, doc, containers)
         record = replace(
             record,
             publication_date=self.publication_date(doc),
-            publisher_id=publisher_id,
-            biblio=with_journal(record.biblio, series),
+            biblio=with_monograph(with_journal(biblio, series), volume),
         )
-        source_record_id = self._record_store.upsert_source_record(
-            record, has_series=containers.has_series
-        )
+        source_record_id = self._record_store.upsert_source_record(record)
         self._location_store.replace_locations(
             source_record_id, [*self.locations(doc), *identifier_locations(record.identifiers)]
         )
@@ -217,7 +202,7 @@ class SourceNormalizer(ABC):
             self.author_block(doc),
             self.author_records,
         )
-        self._staging.mark_done(row.id)
+        self._staging.clear_payload(row)
         return True
 
     def process_work(self, row: StagingRow) -> bool | None:
@@ -226,7 +211,6 @@ class SourceNormalizer(ABC):
         Un document sans titre, sans année, au titre trop long (`is_overlong_title`) ou refusé par la source ne fonde aucune publication (`_reject`).
         """
         if not row.raw_data:
-            self._staging.mark_done(row.id)
             return None
         title, publication_year = self.minimal_metadata(row)
         if not has_minimal_publication_metadata(title, publication_year) or is_overlong_title(
@@ -239,9 +223,9 @@ class SourceNormalizer(ABC):
         return result
 
     def _reject(self, row: StagingRow) -> bool:
-        """Écarte un document refusé : son enregistrement source est supprimé, sa ligne marquée traitée. Renvoie faux, compté comme document incomplet."""
+        """Écarte un document refusé : son enregistrement source est supprimé, son payload vidé. Renvoie faux, compté comme document incomplet."""
         self._staging.discard_source_record(row.id)
-        self._staging.mark_done(row.id)
+        self._staging.clear_payload(row)
         return False
 
     def preload_caches(self) -> None:  # noqa: B027 (hook optionnel)
@@ -250,12 +234,8 @@ class SourceNormalizer(ABC):
     def cleanup(self) -> None:  # noqa: B027 (hook optionnel)
         """Libère les caches en mémoire, après le dernier commit."""
 
-    def _count_pending(self) -> int:
-        return self._staging.count_pending_staging(self.SOURCE)
-
-    def _iter_rows(self) -> Iterator[StagingRow]:
-        """Itère toutes les lignes à traiter par sous-lots de `FETCH_SUB_BATCH`."""
-        work_ids = self._staging.fetch_pending_staging_ids(self.SOURCE)
+    def _iter_rows(self, work_ids: list[int]) -> Iterator[StagingRow]:
+        """Itère les lignes `work_ids` par sous-lots de `FETCH_SUB_BATCH`."""
         for start in range(0, len(work_ids), self.FETCH_SUB_BATCH):
             batch_ids = work_ids[start : start + self.FETCH_SUB_BATCH]
             yield from self._staging.fetch_staging_by_ids(batch_ids)
@@ -281,15 +261,18 @@ class SourceNormalizer(ABC):
             self.logger.info("%s%s", BRANCH_CONTINUATION, identifier)
 
     def run(self) -> NormalizeStats:
-        """Normalise les lignes à traiter, avec un commit tous les `DEFAULT_BATCH_SIZE` enregistrements, et renvoie le bilan."""
+        """Normalise les lignes en file, avec un commit tous les `DEFAULT_BATCH_SIZE` enregistrements, et renvoie le bilan.
+
+        Chaque commit retire de la file les lignes traitées depuis le précédent. Une ligne en erreur reste en file pour le run suivant.
+        """
         self.conn.rollback()
 
         # Préfixe `[source]` sur les lignes de la boucle (progression, bilan) : dans un run multi-sources, chaque batch reste rattaché à sa source sans remonter au bandeau.
         slog = scoped_logger(self.logger, self.SOURCE)
 
         try:
-            total = self._count_pending()
-            if total == 0:
+            work_ids = self._staging.snapshot_pending(self.SOURCE)
+            if not work_ids:
                 return NormalizeStats(0, 0, 0)
 
             self.preload_caches()
@@ -299,9 +282,16 @@ class SourceNormalizer(ABC):
             errors = 0
             # Documents laissés de côté par `process_work` faute de métadonnées exploitables : récapitulés sous la barre en fin de boucle.
             incomplete: list[str] = []
+            # Lignes traitées depuis le dernier commit, à retirer de la file avec lui.
+            done_ids: list[int] = []
 
-            with track_progress(total, source_branch(self.SOURCE), slog) as progress:
-                for row in self._iter_rows():
+            def commit() -> None:
+                self._staging.forget_normalized(done_ids)
+                self.conn.commit()
+                done_ids.clear()
+
+            with track_progress(len(work_ids), source_branch(self.SOURCE), slog) as progress:
+                for row in self._iter_rows(work_ids):
                     progress.advance()
                     try:
                         result = self._process_one(row)
@@ -310,6 +300,7 @@ class SourceNormalizer(ABC):
                         errors += 1
                         continue
 
+                    done_ids.append(row.id)
                     if result is True:
                         processed += 1
                     elif result is None:
@@ -320,9 +311,9 @@ class SourceNormalizer(ABC):
 
                     done = processed + skipped
                     if done > 0 and done % self.DEFAULT_BATCH_SIZE == 0:
-                        self.conn.commit()
+                        commit()
 
-            self.conn.commit()
+            commit()
             self.cleanup()
 
             self._summarize_incomplete(incomplete)

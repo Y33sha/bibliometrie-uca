@@ -25,13 +25,12 @@ HAL_DOC_CLOSED = {
 
 
 def _insert_hal_staging(conn, doc):
-    """Insère un document HAL dans le staging, ou remplace son contenu et le remet à traiter."""
+    """Insère un document HAL dans le staging, ou réécrit son contenu, et le met en file de normalisation."""
     insert_staging(
         conn,
         source_id=doc["halId_s"],
         doi=doc.get("doiId_s"),
         raw_data=doc,
-        processed=False,
         replace=True,
     )
 

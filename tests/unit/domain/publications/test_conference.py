@@ -105,15 +105,56 @@ class TestArbitrateConference:
             _source_record(
                 source="crossref", doc_type="article", serial_id=7, doi="10.1182/blood-2020"
             ),
-            _source_record(id=2, source="wos", doc_type="conference", serial_id=7),
+            _source_record(id=2, source="wos", doc_type="conference_abstract", serial_id=7),
         ]
-        assert arbitrate_conference("article", sources) == "conference"
+        assert arbitrate_conference("article", sources) == "conference_abstract"
 
     def test_recueil_de_resumes_hal(self):
         sources = [
             _source_record(source_extras={"source_title": "Book of abstracts", "proceedings": True})
         ]
-        assert arbitrate_conference("conference_paper", sources) == "conference"
+        assert arbitrate_conference("conference_paper", sources) == "conference_abstract"
+
+    def test_resume_l_emporte_sur_la_communication(self):
+        """Résumé de l'EGU présenté oralement : Crossref donne la communication, OpenAlex le résumé."""
+        sources = [
+            _source_record(source="crossref", doc_type="conference", doi="10.5194/egusphere-1"),
+            _source_record(id=2, source="openalex", doc_type="conference_abstract"),
+        ]
+        assert arbitrate_conference("conference", sources) == "conference_abstract"
+
+    def test_communication_ne_supplante_pas_le_resume(self):
+        sources = [
+            _source_record(source="crossref", doc_type="conference_abstract"),
+            _source_record(id=2, source="hal", doc_type="conference"),
+        ]
+        assert arbitrate_conference("conference_abstract", sources) == "conference_abstract"
+
+    def test_poster_l_emporte_sur_le_resume(self):
+        sources = [
+            _source_record(
+                source="crossref", doc_type="article", serial_id=7, doi="10.1182/blood-2020"
+            ),
+            _source_record(id=2, doc_type="poster"),
+            _source_record(id=3, source="wos", doc_type="conference_abstract", serial_id=7),
+        ]
+        assert arbitrate_conference("article", sources) == "poster"
+
+    def test_poster_l_emporte_sur_la_communication(self):
+        sources = [
+            _source_record(source="datacite", doc_type="conference"),
+            _source_record(id=2, doc_type="poster"),
+        ]
+        assert arbitrate_conference("conference", sources) == "poster"
+
+    def test_poster_laisse_l_article(self):
+        sources = [
+            _source_record(
+                source="crossref", doc_type="article", serial_id=7, doi="10.1182/blood-2020"
+            ),
+            _source_record(id=2, doc_type="poster"),
+        ]
+        assert arbitrate_conference("article", sources) == "article"
 
     def test_autres_types_inchanges(self):
         sources = [

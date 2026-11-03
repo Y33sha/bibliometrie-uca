@@ -1,6 +1,3 @@
-uv run python -m interfaces.cli.oneshot.mark_collective_source_contributions
-run_pipeline --from author_grouping
-
 # Pipeline
 ## Extraction
 * [ ] Dimensions?; Sudoc? (liens personnes-thèses plus complets que theses.fr, j'ai l'impression); Cairn, Persée pour augmenter couverture SHS? creuser ISTEX
@@ -21,6 +18,7 @@ run_pipeline --from author_grouping
 ## Publique
 * [ ] auteur premier, dernier, correspondant: sur les facettes et les stats
 * [ ] stats en compte fractionnaire vs compte entier?
+* [ ] quand on détache une publi d'un auteur: mettre à jour le décompte et la pagination
 ### Visualisation
 * [ ] taux de collaboration
 * [ ] évolution des collaborations dans le temps (graphes de collaboration par labo, avec visualisation animée par année)

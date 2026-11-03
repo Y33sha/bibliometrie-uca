@@ -10,7 +10,7 @@ from pipeline.transformation.publishing.monographs.link_monographs_to_collection
 )
 from pipeline.transformation.publishing.monographs.store import MonographStore
 from pipeline.transformation.publishing.serials.delete_empty_serials import delete_empty_serials
-from tests.integration.helpers.serials import insert_serial
+from tests.integration.helpers.serials import insert_publisher, insert_serial
 from tests.integration.helpers.sources import insert_source_record
 
 
@@ -64,3 +64,26 @@ def test_serie_creee_puis_retrouvee(sa_sync_conn, repo):
 
     deleted = {j.id for j in delete_empty_serials(sa_sync_conn)}
     assert rows[0].series_id not in deleted
+
+
+def test_serie_retrouvee_quand_son_editeur_change(sa_sync_conn, repo):
+    """Cas réel : la série prend l'éditeur des publications, titulaire du préfixe DOI, distinct de l'éditeur nommé par les sources."""
+    first = _volume(sa_sync_conn, repo, "Test Symposium on Series 2022", "series-1")
+    second = _volume(sa_sync_conn, repo, "Test Symposium on Series 2023", "series-2")
+    logger = logging.getLogger("test_series")
+    run_link_monographs_to_collections(sa_sync_conn, logger)
+    series_id = sa_sync_conn.execute(
+        text("SELECT serial_id FROM monographs WHERE id = :id"), {"id": first}
+    ).scalar_one()
+    other = insert_publisher(sa_sync_conn, "Titulaire du préfixe")
+    sa_sync_conn.execute(
+        text("UPDATE serials SET publisher_id = :p WHERE id = :id"), {"p": other, "id": series_id}
+    )
+
+    second_run = run_link_monographs_to_collections(sa_sync_conn, logger)
+
+    assert second_run.extras.get("monographs_linked", 0) == 0
+    assert sa_sync_conn.execute(
+        text("SELECT array_agg(DISTINCT serial_id) FROM monographs WHERE id = ANY(:ids)"),
+        {"ids": [first, second]},
+    ).scalar_one() == [series_id]

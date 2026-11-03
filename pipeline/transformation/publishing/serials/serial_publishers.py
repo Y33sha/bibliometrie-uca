@@ -1,16 +1,27 @@
 """Éditeur d'une revue, calculé d'après ses publications.
 
-L'éditeur d'une revue est le plus fréquent parmi ses publications de la dernière année qui en a un ; à égalité, le plus fréquent sur toutes les années ; à égalité encore, le plus petit identifiant. Une revue sans publication à éditeur reste sans éditeur.
+Les publications d'une revue sont celles qui y sont rattachées et celles de ses monographies. L'éditeur d'une revue est le plus fréquent parmi ses publications de la dernière année qui en a un ; à égalité, le plus fréquent sur toutes les années ; à égalité encore, le plus petit identifiant. Une revue sans publication à éditeur reste sans éditeur.
 """
 
 from sqlalchemy import Connection, text
 
+# `UNION` compte une seule fois une publication rattachée à la revue de sa monographie.
 _REFRESH = text("""
-    WITH counts AS (
-        SELECT serial_id, publisher_id, publication_year, COUNT(*) AS n
+    WITH serial_publications AS (
+        SELECT id, serial_id, publisher_id, publication_year
         FROM publications
         WHERE serial_id IS NOT NULL AND publisher_id IS NOT NULL
           AND (CAST(:serial_id AS integer) IS NULL OR serial_id = :serial_id)
+        UNION
+        SELECT p.id, m.serial_id, p.publisher_id, p.publication_year
+        FROM publications p
+        JOIN monographs m ON m.id = p.monograph_id
+        WHERE m.serial_id IS NOT NULL AND p.publisher_id IS NOT NULL
+          AND (CAST(:serial_id AS integer) IS NULL OR m.serial_id = :serial_id)
+    ),
+    counts AS (
+        SELECT serial_id, publisher_id, publication_year, COUNT(*) AS n
+        FROM serial_publications
         GROUP BY serial_id, publisher_id, publication_year
     ),
     latest AS (

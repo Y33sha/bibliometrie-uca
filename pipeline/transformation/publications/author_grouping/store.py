@@ -191,7 +191,7 @@ class AuthorGroupingStore:
         )
         updated = self._conn.execute(
             text(propagate_contribution_attributes_sql(f"SELECT id FROM {_ATTRIBUTES_SNAPSHOT}"))
-        ).rowcount
+        ).scalar_one()
         delete_processed(self._conn, queue, _ATTRIBUTES_SNAPSHOT)
         self._conn.execute(text(f"DROP TABLE {_ATTRIBUTES_SNAPSHOT}"))
         return queued, updated

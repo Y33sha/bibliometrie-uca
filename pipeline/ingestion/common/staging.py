@@ -1,6 +1,6 @@
-"""Table `staging` : écriture des documents renvoyés par les sources, lecture et marquage par la normalisation.
+"""Table `staging` : écriture des documents renvoyés par les sources, file de normalisation, vidage des payloads normalisés.
 
-`StagingStore` écrit un document pour toutes les voies d'entrée (moissonnages, phases `fetch_missing`, `fetch_stale` et `fetch_truncated`, imports), lit les lignes à normaliser et marque les lignes traitées, en archivant leur payload au raw store.
+`StagingStore` écrit un document pour toutes les voies d'entrée (moissonnages, phases `fetch_missing`, `fetch_stale` et `fetch_truncated`, imports) et le met en file de normalisation (`queues.staging_normalization_queue`). La normalisation relève la file, lit les lignes, vide leur payload en l'archivant au raw store, puis les retire de la file.
 
 Le commit est à la charge de l'appelant.
 """
@@ -19,6 +19,7 @@ from domain.sources.registry import DOI_ORG, PROFILES, Source
 from domain.sources.staging import StagingEntryMode
 from domain.types import JsonValue
 from infrastructure.db.jsonb import Jsonb
+from infrastructure.db.queues import Queue, delete_processed, enqueue_sql, snapshot
 from infrastructure.db.rows import rows_as
 from infrastructure.raw_store import RawStore, get_raw_store
 from pipeline.ingestion.adapters import ADAPTERS
@@ -33,40 +34,46 @@ from pipeline.ingestion.common.source_records import delete_source_record_of_sta
 _logger = logging.getLogger(__name__)
 
 _UPSERT_STAGING_SQL = text(
-    """
+    f"""
     WITH old AS (
         SELECT raw_hash AS old_hash FROM staging
         WHERE source = :source AND source_id = :source_id
-    )
-    INSERT INTO staging (source, source_id, doi, raw_data, raw_hash, authors_truncated, entry_mode)
-    VALUES (:source, :source_id, :doi, :raw_data, :raw_hash, :authors_truncated, :entry_mode)
-    ON CONFLICT (source, source_id) DO UPDATE SET
-        raw_data = CASE
-            WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
-                THEN EXCLUDED.raw_data
-            ELSE staging.raw_data
-        END,
-        raw_hash = COALESCE(EXCLUDED.raw_hash, staging.raw_hash),
-        -- Renseigne le DOI d'une ligne qui en est dépourvue ; un DOI déjà posé reste.
-        doi = COALESCE(staging.doi, EXCLUDED.doi),
-        processed = CASE
-            WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
-                THEN FALSE
-            ELSE staging.processed
-        END,
-        -- Suit `raw_hash`, comme `processed` : un payload inchangé garde le marqueur, y compris son effacement par `fetch_truncated` ; un payload modifié le recalcule.
-        authors_truncated = CASE
-            WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
-                THEN EXCLUDED.authors_truncated
-            ELSE staging.authors_truncated
-        END,
-        -- `entry_mode` garde la provenance de la création.
-        -- Un document rendu par sa source efface le marqueur de disparition.
-        disappeared_at = NULL,
-        last_seen_at = now()
-    RETURNING (xmax = 0) AS inserted,
-              ((SELECT old_hash FROM old) IS DISTINCT FROM :raw_hash) AS changed
-    """
+    ),
+    upserted AS (
+        INSERT INTO staging
+            (source, source_id, doi, raw_data, raw_hash, authors_truncated, entry_mode)
+        VALUES (:source, :source_id, :doi, :raw_data, :raw_hash, :authors_truncated, :entry_mode)
+        ON CONFLICT (source, source_id) DO UPDATE SET
+            raw_data = CASE
+                WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
+                    THEN EXCLUDED.raw_data
+                ELSE staging.raw_data
+            END,
+            raw_hash = COALESCE(EXCLUDED.raw_hash, staging.raw_hash),
+            -- Renseigne le DOI d'une ligne qui en est dépourvue ; un DOI déjà posé reste.
+            doi = COALESCE(staging.doi, EXCLUDED.doi),
+            -- Suit `raw_hash` : un payload inchangé garde le marqueur, y compris son effacement par `fetch_truncated` ; un payload modifié le recalcule.
+            authors_truncated = CASE
+                WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
+                    THEN EXCLUDED.authors_truncated
+                ELSE staging.authors_truncated
+            END,
+            -- `entry_mode` garde la provenance de la création.
+            -- Un document rendu par sa source efface le marqueur de disparition.
+            disappeared_at = NULL,
+            last_seen_at = now()
+        RETURNING id, authors_truncated, (xmax = 0) AS inserted,
+                  ((SELECT old_hash FROM old) IS DISTINCT FROM :raw_hash) AS changed
+    ),
+    -- Un document nouveau ou modifié entre en file de normalisation, sauf s'il est tronqué : il y entre à son complément.
+    marked AS ({
+        enqueue_sql(
+            Queue.STAGING_NORMALIZATION,
+            "SELECT id FROM upserted WHERE (inserted OR changed) AND NOT authors_truncated",
+        )
+    })
+    SELECT inserted, changed FROM upserted
+    """  # noqa: S608 — nom de file venu du code
 ).bindparams(bindparam("raw_data", type_=Jsonb))
 
 
@@ -98,43 +105,67 @@ class StagingRow:
     source_id: str
     doi: str | None
     raw_data: Mapping[str, JsonValue]
+    raw_hash: str | None = None
+    """Empreinte du payload lu. Le vidage de `raw_data` la vérifie : une ligne réécrite entre-temps garde son payload."""
 
 
-_COLUMNS = "id, source_id, doi, raw_data"
+_COLUMNS = "id, source_id, doi, raw_data, raw_hash"
 
+# Relevé de la file de normalisation, sur la connexion de la normalisation.
+_SNAPSHOT = "staging_normalization_snapshot"
 
-_MARK_DONE_SQL = text(
+_PENDING_IDS_SQL = text(f"""
+    SELECT t.id FROM pg_temp.{_SNAPSHOT} t
+    JOIN staging s ON s.id = t.id
+    WHERE s.source = :source
+    ORDER BY t.id
+""")  # noqa: S608 — nom de table venu du code
+
+# `old` capture le payload lu avant de le vider. Une réécriture concurrente change `raw_hash` : la ligne garde alors son nouveau payload.
+_CLEAR_PAYLOAD_SQL = text(
     """
     UPDATE staging s
-    SET processed = TRUE, raw_data = '{}'::jsonb
+    SET raw_data = '{}'::jsonb
     FROM (
         SELECT id, source::text AS source, source_id, raw_data
         FROM staging WHERE id = :sid
     ) old
-    WHERE s.id = old.id
+    WHERE s.id = old.id AND s.raw_hash IS NOT DISTINCT FROM :raw_hash
     RETURNING old.source AS source, old.source_id AS source_id, old.raw_data AS raw_data
     """
 )
 
 
-# Réécrit `raw_data` sans recalculer `raw_hash` : la ligne garde l'empreinte du document tronqué, retrouvée par le moissonnage suivant. Lève le marqueur et repasse `processed = FALSE` : la normalisation réécrit les contributions sources complètes.
+# Réécrit `raw_data` sans recalculer `raw_hash` : la ligne garde l'empreinte du document tronqué, retrouvée par le moissonnage suivant. Lève le marqueur et met la ligne en file : la normalisation réécrit les contributions sources complètes.
 _COMPLETE_AUTHORS_SQL = text(
-    """
-    UPDATE staging
-    SET raw_data = :raw_data, processed = FALSE, authors_truncated = FALSE, last_seen_at = now()
-    WHERE source = :source AND source_id = :source_id
-    """
+    f"""
+    WITH completed AS (
+        UPDATE staging
+        SET raw_data = :raw_data, authors_truncated = FALSE, last_seen_at = now()
+        WHERE source = :source AND source_id = :source_id
+        RETURNING id
+    )
+    {enqueue_sql(Queue.STAGING_NORMALIZATION, "SELECT id FROM completed")}
+    """  # noqa: S608 — nom de file venu du code
 ).bindparams(bindparam("raw_data", type_=Jsonb))
 
+# La marque de troncature se pose seulement sur un payload nouveau : sa levée met la ligne en file.
 _CLEAR_TRUNCATED_SQL = text(
-    "UPDATE staging SET authors_truncated = FALSE WHERE source = :source AND source_id = :source_id"
+    f"""
+    WITH cleared AS (
+        UPDATE staging SET authors_truncated = FALSE
+        WHERE source = :source AND source_id = :source_id AND authors_truncated
+        RETURNING id
+    )
+    {enqueue_sql(Queue.STAGING_NORMALIZATION, "SELECT id FROM cleared")}
+    """  # noqa: S608 — nom de file venu du code
 )
 
 
 class StagingStore:
-    """Écritures des documents renvoyés par les sources, lectures et marquages de `staging` par la normalisation.
+    """Écritures des documents renvoyés par les sources, lecture de la file de normalisation et vidage des payloads normalisés.
 
-    Le raw store reçoit chaque payload juste avant son effacement de la base par `mark_done`. Par défaut, le raw store est celui de `get_raw_store()`, lu au premier `mark_done`.
+    Le raw store reçoit chaque payload juste avant son effacement de la base par `clear_payload`. Par défaut, le raw store est celui de `get_raw_store()`, lu au premier `clear_payload`.
     """
 
     def __init__(self, conn: Connection, raw_store: RawStore | None = None) -> None:
@@ -210,9 +241,9 @@ class StagingStore:
     ) -> tuple[bool, bool]:
         """Écrit une ligne de `staging`, pour `stage` et pour les imports qui identifient eux-mêmes leurs lignes. L'appelant commite.
 
-        Le contenu se réécrit, et la ligne repasse à normaliser, seulement si l'empreinte change (`change_detection_hash`). Une empreinte nulle en base force la réécriture. La date de dernière lecture change toujours. Un DOI manquant se renseigne, un DOI présent reste.
+        Le contenu se réécrit, et la ligne entre en file de normalisation, seulement si l'empreinte change (`change_detection_hash`). Une empreinte nulle en base force la réécriture. La date de dernière lecture change toujours. Un DOI manquant se renseigne, un DOI présent reste.
 
-        Le marqueur de troncature des auteurs suit la même règle : il se pose seulement quand l'empreinte change, et garde sinon son effacement par `fetch_truncated`. La provenance (`entry_mode`) se pose à la création seulement.
+        Le marqueur de troncature des auteurs suit la même règle : il se pose seulement quand l'empreinte change, et garde sinon son effacement par `fetch_truncated`. Une ligne marquée tronquée attend son complément pour entrer en file. La provenance (`entry_mode`) se pose à la création seulement.
 
         Renvoie `(inserted, changed)` : ligne insérée, contenu réécrit.
         """
@@ -230,38 +261,15 @@ class StagingStore:
         ).one()
         return (bool(row.inserted), bool(row.changed))
 
-    def count_pending_staging(self, source: str) -> int:
-        row = self._conn.execute(
-            text(
-                "SELECT COUNT(*) AS cnt FROM staging WHERE source = :source AND processed = FALSE"
-            ),
-            {"source": source},
-        ).one_or_none()
-        return row.cnt if row else 0
+    def snapshot_pending(self, source: str) -> list[int]:
+        """Relève la file de normalisation et renvoie les lignes de `source` à normaliser, par identifiant croissant."""
+        snapshot(self._conn, Queue.STAGING_NORMALIZATION, _SNAPSHOT)
+        return list(self._conn.execute(_PENDING_IDS_SQL, {"source": source}).scalars())
 
-    def fetch_pending_staging(self, source: str, *, limit: int) -> list[StagingRow]:
-        rows = self._conn.execute(
-            text(f"""
-                SELECT {_COLUMNS}
-                FROM staging
-                WHERE source = :source AND processed = FALSE
-                ORDER BY id
-                LIMIT :lim
-            """),
-            {"source": source, "lim": limit},
-        )
-        return rows_as(StagingRow, rows)
-
-    def fetch_pending_staging_ids(self, source: str) -> list[int]:
-        rows = self._conn.execute(
-            text("""
-                SELECT id FROM staging
-                WHERE source = :source AND processed = FALSE
-                ORDER BY id
-            """),
-            {"source": source},
-        ).all()
-        return [r.id for r in rows]
+    def forget_normalized(self, staging_ids: list[int]) -> None:
+        """Retire de la file les lignes normalisées, sauf celles remarquées depuis le relevé (`snapshot_pending`)."""
+        if staging_ids:
+            delete_processed(self._conn, Queue.STAGING_NORMALIZATION, _SNAPSHOT, staging_ids)
 
     def fetch_staging_by_ids(self, staging_ids: list[int]) -> list[StagingRow]:
         rows = self._conn.execute(
@@ -277,19 +285,24 @@ class StagingStore:
     def discard_source_record(self, staging_id: int) -> None:
         delete_source_record_of_staging(self._conn, staging_id)
 
-    def mark_done(self, staging_id: int) -> None:
-        # `old` capture le payload avant de le vider. L'archivage au raw store se fait au mieux : un échec laisse la normalisation continuer, et la base reste la référence.
-        row = self._conn.execute(_MARK_DONE_SQL, {"sid": staging_id}).one_or_none()
-        if row is None or not row.raw_data:  # payload vide : rien à archiver
+    def clear_payload(self, row: StagingRow) -> None:
+        """Archive au raw store le payload normalisé de la ligne, puis le vide en base, si la ligne est inchangée depuis sa lecture."""
+        # L'archivage au raw store se fait au mieux : un échec laisse la normalisation continuer, et la base reste la référence.
+        cleared = self._conn.execute(
+            _CLEAR_PAYLOAD_SQL, {"sid": row.id, "raw_hash": row.raw_hash}
+        ).one_or_none()
+        if cleared is None or not cleared.raw_data:  # payload vide : rien à archiver
             return
         if self._raw_store is None:
             self._raw_store = get_raw_store()
         try:
-            self._raw_store.put(row.source, row.source_id, stable_json_bytes(row.raw_data))
+            self._raw_store.put(
+                cleared.source, cleared.source_id, stable_json_bytes(cleared.raw_data)
+            )
         except Exception:
             _logger.warning(
                 "raw_store.put a échoué pour %s/%s (payload non archivé)",
-                row.source,
-                row.source_id,
+                cleared.source,
+                cleared.source_id,
                 exc_info=True,
             )

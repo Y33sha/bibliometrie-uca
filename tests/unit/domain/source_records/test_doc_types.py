@@ -74,11 +74,11 @@ class TestMapDocType:
     def test_openalex_conference_paper_vers_conference_paper(self):
         assert map_doc_type("conference-paper", source="openalex") == "conference_paper"
 
-    def test_openalex_conference_abstract_vers_conference(self):
-        assert map_doc_type("conference-abstract", source="openalex") == "conference"
+    def test_openalex_conference_abstract_vers_conference_abstract(self):
+        assert map_doc_type("conference-abstract", source="openalex") == "conference_abstract"
 
-    def test_wos_meeting_abstract_vers_conference(self):
-        assert map_doc_type("Meeting Abstract", source="wos") == "conference"
+    def test_wos_meeting_abstract_vers_conference_abstract(self):
+        assert map_doc_type("Meeting Abstract", source="wos") == "conference_abstract"
 
     def test_wos_proceedings_paper_et_meeting_abstract_vers_conference_paper(self):
         assert (

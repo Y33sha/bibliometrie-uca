@@ -7,6 +7,7 @@ from typing import Literal
 from pydantic import ConfigDict, computed_field
 
 from application.ports.model import Model
+from domain.publications.author_positions import AuthorPosition
 from domain.publications.dates import DatePrecision
 from domain.publications.licenses import License
 from domain.sources.registry import PROFILES, Source, source_record_url
@@ -93,12 +94,9 @@ DOI_AGENCY_FILTER_VALUES: tuple[str, ...] = (*DOI_AGENCY_SOURCES, OTHER_DOI_AGEN
 # Classe de citation d'une publication pourvue des seuils (`CitationTop`) sans en atteindre aucun.
 BELOW_CITATION_TOPS = "below"
 
-# Positions d'auteur d'une personne dans une publication, chacune avec sa colonne booléenne de `contributions`.
-AUTHOR_POSITION_COLUMNS: dict[str, str] = {"corresponding": "is_corresponding"}
-
-# Vocabulaire du filtre par position d'auteur, dans l'ordre de la facette : les positions, puis `other` pour une personne qui n'en occupe aucune.
+# Vocabulaire du filtre par position d'auteur, dans l'ordre de la facette : les positions de `AuthorPosition`, puis `other` pour une personne qui n'en occupe aucune.
 OTHER_AUTHOR_POSITION = "other"
-AUTHOR_POSITION_FILTER_VALUES: tuple[str, ...] = (*AUTHOR_POSITION_COLUMNS, OTHER_AUTHOR_POSITION)
+AUTHOR_POSITION_FILTER_VALUES: tuple[str, ...] = (*AuthorPosition, OTHER_AUTHOR_POSITION)
 
 
 @dataclass(frozen=True, slots=True)
@@ -213,7 +211,8 @@ class PublicationListItem(Model):
     thesis_author_person_id: int | None
     lab_items: list[PublicationLabItem] | None
     apc: list[PublicationApcPayment] | None
-    is_corresponding: bool | None
+    author_positions: list[AuthorPosition] | None
+    """Positions d'auteur de la personne de la liste ; `None` pour une liste sans personne."""
     contribution_id: int | None
     hal_status: str | None
     """Statut de dépôt HAL (`HalDepositStatus`) au regard de la collection du laboratoire, pour une liste restreinte à un seul laboratoire ; `None` sinon."""
@@ -325,7 +324,7 @@ class ConsolidatedContributionOut(Model):
 
     author_position: int | None
     in_perimeter: bool
-    is_corresponding: bool | None
+    author_positions: list[AuthorPosition]
     structure_ids: list[int] | None
     source_hal: bool
     source_openalex: bool

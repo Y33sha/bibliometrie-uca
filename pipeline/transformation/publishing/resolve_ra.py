@@ -3,23 +3,19 @@
 Soumet à `doi.org/ra` les préfixes valides (`DoiPrefix`) de tous les DOI connus absents de `doi_prefixes`, et insère `(prefix, ra)`. Un préfixe inconnu de doi.org est inséré avec `ra='unknown'`. Un préfixe sans réponse, faute de requête aboutie, reste à résoudre.
 
 La Registration Agency désigne l'API où chercher un DOI, Crossref ou DataCite. La phase `publishing` rattache ensuite les préfixes à leur éditeur via les API `/prefixes`. Au run suivant, `fetch_missing` adresse chaque DOI à la bonne API et met en attente les DOI à préfixe non résolu.
-
-La requête à `doi.org/ra` est injectée par le câblage de la phase.
 """
 
 from __future__ import annotations
 
 import logging
 from collections.abc import Callable, Iterable, Sequence
-from dataclasses import dataclass
-
-from sqlalchemy import Connection
 
 from domain.publications.identifiers import DoiPrefix
+from pipeline.graph import task
 from pipeline.http.circuit_breaker import SourceUnavailableError
 from pipeline.http.polite_pool import default_user_agent
 from pipeline.ingestion.complements.doi_org import fetch_registration_agencies
-from pipeline.runtime.context import Phase, PhaseContext
+from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.log_format import (
     LAST_BRANCH,
     inflect,
@@ -29,35 +25,37 @@ from pipeline.runtime.observability.log_format import (
 )
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.signals import signal_source_unavailable
-from pipeline.task_runner import SingleTaskPhase
 from pipeline.transformation.publishing.doi_prefixes import DoiPrefixStore
 
 ResolveRasFn = Callable[[Sequence[str]], Iterable[tuple[str, str | None]]]
 """Signature : `(préfixes) -> (préfixe, agence)` pour chaque préfixe auquel doi.org a répondu. Agence `None` : préfixe inconnu de doi.org."""
 
 
-@dataclass(frozen=True)
-class ResolveRaPhase:
-    """Phase `resolve_ra`."""
+def resolve_prefixes(ctx: PhaseContext) -> PhaseMetrics:
+    """Résout l'agence des préfixes absents de `doi_prefixes` auprès de doi.org, dans une transaction."""
+    # doi.org/ra est une API publique : l'adresse du polite pool y est facultative.
+    user_agent = default_user_agent()
+    with ctx.open_tx() as conn:
+        return resolve(
+            ctx.logger,
+            DoiPrefixStore(conn),
+            lambda prefixes: fetch_registration_agencies(prefixes, user_agent=user_agent),
+        )
 
-    prefix_store_factory: Callable[[Connection], DoiPrefixStore]
-    """Construit les requêtes sur les préfixes, sur la connexion de la phase."""
-    resolve_ras_fn: ResolveRasFn
 
-    def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Résout les préfixes dans une transaction.
+def resolve(
+    log: logging.Logger, prefix_store: DoiPrefixStore, resolve_ras_fn: ResolveRasFn
+) -> PhaseMetrics:
+    """Résout l'agence des préfixes de `prefix_store` par `resolve_ras_fn`.
 
-        Une indisponibilité de doi.org donne des métriques vides, signalées : la transaction commit les préfixes insérés avant l'indisponibilité.
-        """
-        with ctx.open_tx() as conn:
-            try:
-                return _resolve(ctx.logger, self.prefix_store_factory(conn), self.resolve_ras_fn)
-            except SourceUnavailableError:
-                metrics = PhaseMetrics()
-                signal_source_unavailable(
-                    metrics, "doi.org/ra", logger=ctx.logger, phase="resolve_ra"
-                )
-                return metrics
+    Une indisponibilité de doi.org donne des métriques vides, signalées. Les préfixes insérés avant l'indisponibilité restent dans la transaction.
+    """
+    try:
+        return _resolve(log, prefix_store, resolve_ras_fn)
+    except SourceUnavailableError:
+        metrics = PhaseMetrics()
+        signal_source_unavailable(metrics, "doi.org/ra", logger=log, phase="resolve_ra")
+        return metrics
 
 
 def _resolve(
@@ -114,15 +112,18 @@ def _resolve(
     return metrics
 
 
-def build() -> Phase:
-
-    # doi.org/ra est une API publique : l'adresse du polite pool y est facultative.
-    user_agent = default_user_agent()
-    return SingleTaskPhase(
+TASKS = (
+    task(
         "resolve_ra.resolve_prefixes",
-        ResolveRaPhase(
-            DoiPrefixStore,
-            lambda prefixes: fetch_registration_agencies(prefixes, user_agent=user_agent),
+        reads=(
+            "doi_prefixes.id",
+            "source_record_identifiers",
+            "publication_relations",
         ),
+        writes=("doi_prefixes.id", "doi_prefixes.ra"),
+        previous_run=("source_records", "source_record_identifiers", "publication_relations"),
+        network="doi.org",
+        run=resolve_prefixes,
         label="Bilan",
-    )
+    ),
+)

@@ -1,4 +1,4 @@
-"""Tests des deux passes de résolution des préfixes DOI : `ResolveRaPhase` (agence d'enregistrement, par doi.org) et les étapes Crossref et DataCite de `resolve_publishers` (éditeur, par les API /prefixes).
+"""Tests des deux passes de résolution des préfixes DOI : la phase `resolve_ra` (agence d'enregistrement, par doi.org) et les étapes Crossref et DataCite de `resolve_publishers` (éditeur, par les API /prefixes).
 
 Faux repositories pour les ports, fonctions locales pour les clients HTTP, sans réseau ni base de données.
 """
@@ -11,12 +11,12 @@ from unittest.mock import MagicMock
 
 from pipeline.http.circuit_breaker import SourceUnavailableError
 from pipeline.http.lookup import NOT_FOUND, UNAVAILABLE
+from pipeline.transformation.publishing import resolve_ra
 from pipeline.transformation.publishing.doi_prefixes import PendingPublisherPrefix
 from pipeline.transformation.publishing.publishers.resolve_publishers import (
     run_resolve_crossref_publishers,
     run_resolve_datacite_publishers,
 )
-from pipeline.transformation.publishing.resolve_ra import ResolveRaPhase
 
 
 @dataclass
@@ -178,8 +178,8 @@ class StubDataCite:
 _LOG = logging.getLogger("test")
 
 
-def _run_ra(contexte, repo, ras_fn):
-    return ResolveRaPhase(lambda conn: repo, ras_fn).run(contexte())  # noqa: ARG005
+def _run_ra(repo, ras_fn):
+    return resolve_ra.resolve(_LOG, repo, ras_fn)
 
 
 def _run_publication(repo, pubrepo, cr=None, dc=None):
@@ -202,14 +202,14 @@ def _run_publication(repo, pubrepo, cr=None, dc=None):
     return crossref
 
 
-# ResolveRaPhase
+# resolve_ra
 
 
-def test_resolve_ra_inserts_ra_only(contexte):
+def test_resolve_ra_inserts_ra_only():
     repo = FakeDoiPrefixRepo(candidates=["10.1038"])
     ras = StubResolveRas(answers={"10.1038": "Crossref"})
 
-    metrics = _run_ra(contexte, repo, ras)
+    metrics = _run_ra(repo, ras)
 
     assert ras.calls == [["10.1038"]]  # le préfixe seul, sans DOI
     assert repo.rows["10.1038"].ra == "Crossref"
@@ -218,25 +218,25 @@ def test_resolve_ra_inserts_ra_only(contexte):
     assert metrics.extras.get("resolved") == 1
 
 
-def test_resolve_ra_ecarte_les_prefixes_malformes(contexte):
+def test_resolve_ra_ecarte_les_prefixes_malformes():
     """Les préfixes malformés « doi:10.5194 » et « https: » restent hors de doi_prefixes."""
     repo = FakeDoiPrefixRepo(candidates=["doi:10.5194", "https:", "10.5194"])
     ras = StubResolveRas(answers={"10.5194": "Crossref"})
 
-    _run_ra(contexte, repo, ras)
+    _run_ra(repo, ras)
 
     assert ras.calls == [["10.5194"]]
     assert set(repo.rows) == {"10.5194"}
 
 
-def test_resolve_ra_expose_la_repartition_par_ra(contexte):
+def test_resolve_ra_expose_la_repartition_par_ra():
     repo = FakeDoiPrefixRepo(
         candidates=["10.1038"],
         ra_breakdown=[("Crossref", 80, 12), ("DataCite", 15, 4), ("unknown", 5, 2)],
     )
     ras = StubResolveRas(answers={"10.1038": "Crossref"})
 
-    metrics = _run_ra(contexte, repo, ras)
+    metrics = _run_ra(repo, ras)
 
     assert metrics.details["summary"] == {"new_prefixes": 1, "resolved": 1}
     rows = metrics.details["table"]["rows"]
@@ -246,36 +246,38 @@ def test_resolve_ra_expose_la_repartition_par_ra(contexte):
     assert rows[1]["new"] == 0  # aucun préfixe DataCite inséré par ce run
 
 
-def test_resolve_ra_unknown_when_doi_org_ignores_the_prefix(contexte):
+def test_resolve_ra_unknown_when_doi_org_ignores_the_prefix():
     repo = FakeDoiPrefixRepo(candidates=["10.99999"])
     ras = StubResolveRas(answers={"10.99999": None})
 
-    metrics = _run_ra(contexte, repo, ras)
+    metrics = _run_ra(repo, ras)
 
     assert repo.rows["10.99999"].ra == "unknown"
     assert metrics.extras.get("unresolved") == 1
 
 
-def test_resolve_ra_prefix_without_answer_stays_to_resolve(contexte):
+def test_resolve_ra_prefix_without_answer_stays_to_resolve():
     """Requête en échec : rien n'est enregistré, le run suivant soumet de nouveau le préfixe."""
     repo = FakeDoiPrefixRepo(candidates=["10.1038"])
 
-    metrics = _run_ra(contexte, repo, StubResolveRas())
+    metrics = _run_ra(repo, StubResolveRas())
 
     assert repo.rows == {}
     assert metrics.total == 0
     assert repo.get_prefixes_to_resolve() == ["10.1038"]
 
 
-def test_resolve_ra_doi_org_indisponible_garde_les_prefixes_inseres(open_tx, contexte):
+def test_resolve_ra_doi_org_indisponible_garde_les_prefixes_inseres(open_tx, contexte, monkeypatch):
     """doi.org indisponible en cours de résolution : la phase signale la source et sort normalement de sa transaction, qui commit les préfixes déjà insérés."""
     repo = FakeDoiPrefixRepo(candidates=["10.1038", "10.5194"])
 
-    def ras(prefixes):
+    def ras(prefixes, user_agent):  # noqa: ARG001
         yield prefixes[0], "Crossref"
         raise SourceUnavailableError("doi.org/ra")
 
-    metrics = _run_ra(contexte, repo, ras)
+    monkeypatch.setattr(resolve_ra, "DoiPrefixStore", lambda conn: repo)  # noqa: ARG005
+    monkeypatch.setattr(resolve_ra, "fetch_registration_agencies", ras)
+    metrics = resolve_ra.resolve_prefixes(contexte())
 
     assert set(repo.rows) == {"10.1038"}
     assert open_tx.transactions == 1

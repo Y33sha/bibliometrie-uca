@@ -23,17 +23,14 @@ from pipeline.ingestion.scanr.normalize import (
     get_title,
     scanr_source_record,
 )
-from pipeline.transformation.publishing.find_or_create import Containers
 from tests.helpers.normalize_doubles import identifier_values, normalizer_arguments, staging_row
-
-_NO_CONTAINERS = Containers(has_series=False, monograph_id=None)
 
 
 class TestScanrSourceRecordLicense:
     """Seule la licence d'une localisation d'éditeur est normalisée ; celle d'une archive reste brute dans `meta`."""
 
     def _call(self, evidence: dict) -> SourceRecordUpsert:
-        return scanr_source_record({"oaEvidence": evidence}, 1, "sc-1", _NO_CONTAINERS)
+        return scanr_source_record({"oaEvidence": evidence}, 1, "sc-1", has_series=False)
 
     def test_licence_de_l_editeur_normalisee(self):
         captured = self._call({"hostType": "publisher", "license": "cc-by"})
@@ -47,22 +44,9 @@ class TestScanrSourceRecordLicense:
         assert captured.source_extras == {"license": authorisation}
 
 
-class TestScanrSourceRecordBiblio:
-    def _call(self, doc) -> SourceRecordUpsert:
-        return scanr_source_record(doc, staging_id=1, scanr_id="sc-1", containers=_NO_CONTAINERS)
-
-    def test_biblio_none_when_no_source_fields(self):
-        captured = self._call({})
-        assert captured.biblio is None
-
-    def test_biblio_publisher_only(self):
-        captured = self._call({"source": {"publisher": "Elsevier"}})
-        assert captured.biblio == {"publisher": "Elsevier"}
-
-
 class TestScanrSourceRecordExternalIds:
     def _call(self, doc) -> SourceRecordUpsert:
-        return scanr_source_record(doc, staging_id=1, scanr_id="sc-1", containers=_NO_CONTAINERS)
+        return scanr_source_record(doc, staging_id=1, scanr_id="sc-1", has_series=False)
 
     def test_every_doi_of_the_external_ids(self):
         doc = {
@@ -86,7 +70,7 @@ class TestBuildScanrAuthorRecords:
     def test_skip_without_full_name(self):
         assert build_scanr_author_records({"authors": [{"role": "author"}]}) == []
 
-    def test_identifiers_and_role(self):
+    def test_idref_et_role_gardes_orcid_ignore(self):
         doc = {
             "authors": [
                 {
@@ -101,7 +85,7 @@ class TestBuildScanrAuthorRecords:
         }
         rec = build_scanr_author_records(doc)[0]
         assert rec.name == ContributorName(raw="Marie Dupont")
-        assert rec.identifiers == {"orcid": "0000-0001-2345-6789", "idref": "123456789"}
+        assert rec.identifiers == {"idref": "123456789"}
         assert rec.roles == ["author"]
 
     def test_affiliation_becomes_address_with_detected_countries(self):
@@ -262,9 +246,9 @@ class TestThese:
         assert _normalizer().container_facts(self._DOC) is None
 
     def test_ni_titre_de_conteneur_ni_revue_dans_la_biblio(self):
-        captured = scanr_source_record(self._DOC, 1, "nnt2023clfac001", _NO_CONTAINERS)
+        captured = scanr_source_record(self._DOC, 1, "nnt2023clfac001", has_series=False)
         assert captured.container_title is None
-        assert captured.biblio == {"publisher": "ABES"}
+        assert captured.biblio is None
 
 
 class TestScanrSourceRecordMetadonnees:
@@ -277,9 +261,7 @@ class TestScanrSourceRecordMetadonnees:
             "isOa": False,
         }
 
-        record = scanr_source_record(
-            doc, 1, "doi10.1/a", Containers(has_series=True, monograph_id=None)
-        )
+        record = scanr_source_record(doc, 1, "doi10.1/a", has_series=True)
 
         assert record.title == "Un titre"
         assert record.raw_doc_type == "journal-article"
@@ -293,20 +275,20 @@ class TestScanrSourceRecordMetadonnees:
     def test_titre_de_contenant_conserve_faute_de_revue(self):
         doc = {"source": {"title": "Actes du colloque"}}
 
-        record = scanr_source_record(doc, 1, "sc-1", _NO_CONTAINERS)
+        record = scanr_source_record(doc, 1, "sc-1", has_series=False)
 
         assert record.container_title == "Actes du colloque"
 
     def test_these_reconnue_a_son_identifiant(self):
         """La source encode les thèses en préfixant leur numéro national."""
-        record = scanr_source_record({}, 1, "these2021CLFAC030", _NO_CONTAINERS)
+        record = scanr_source_record({}, 1, "these2021CLFAC030", has_series=False)
 
         assert identifier_values(record) == {"nnt": ["2021CLFAC030"]}
 
 
 class TestScanrSourceRecordIdentifiants:
     def _call(self, doc, scanr_id: str = "sc-1") -> SourceRecordUpsert:
-        return scanr_source_record(doc, staging_id=1, scanr_id=scanr_id, containers=_NO_CONTAINERS)
+        return scanr_source_record(doc, staging_id=1, scanr_id=scanr_id, has_series=False)
 
     def test_identifiant_pubmed(self):
         document = self._call({"externalIds": [{"type": "pmid", "id": "12345678"}]})
@@ -329,7 +311,7 @@ class TestScanrSourceRecordIdentifiants:
 
 class TestScanrSourceRecordChamps:
     def _call(self, doc, scanr_id: str = "sc-1") -> SourceRecordUpsert:
-        return scanr_source_record(doc, staging_id=1, scanr_id=scanr_id, containers=_NO_CONTAINERS)
+        return scanr_source_record(doc, staging_id=1, scanr_id=scanr_id, has_series=False)
 
     def test_mots_cles_en_liste(self):
         document = self._call({"keywords": {"default": ["climat", " océan "]}})
@@ -424,9 +406,7 @@ class TestScanrNormalizer:
             "source": {"title": "Revue"},
         }
 
-        document = _normalizer().source_record(
-            row, doc, Containers(has_series=True, monograph_id=5)
-        )
+        document = _normalizer().source_record(row, doc, has_series=True)
 
         assert (document.source, document.source_id, document.staging_id) == (
             "scanr",
@@ -434,7 +414,6 @@ class TestScanrNormalizer:
             42,
         )
         assert document.title == "Un titre"
-        assert document.monograph_id == 5
         assert document.container_title is None
         assert identifier_values(document) == {"nnt": ["2021CLFAC030"]}
 

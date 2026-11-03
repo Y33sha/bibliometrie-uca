@@ -5,6 +5,7 @@
 ### En cours
 
 - [Audit de la qualité de la résolution des personnes](DATA_audit-qualite-resolution-personnes.md)
+- [Exécution du graphe des tâches](CODE_execution-du-graphe-des-taches.md)
 - [Pertinence des sujets](DATA_pertinence-des-sujets.md)
 
 ### Non commencé

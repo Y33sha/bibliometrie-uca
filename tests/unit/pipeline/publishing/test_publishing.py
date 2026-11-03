@@ -3,12 +3,13 @@
 import dataclasses
 import logging
 
-from pipeline.graph import TASKS
+from pipeline.phases import PHASES
 from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.task_runner import run_phase
 from pipeline.transformation.publishing import publishing
-from pipeline.transformation.publishing.publishing import PublishingPhase
 
-_CHAMPS = tuple(n.name.removeprefix("publishing.") for n in TASKS if n.phase == "publishing")
+_PHASE = next(phase for phase in PHASES if phase.name == "publishing")
+_CHAMPS = tuple(task.name.removeprefix("publishing.") for task in publishing.TASKS)
 
 
 def _run(
@@ -18,7 +19,7 @@ def _run(
     credentials_missing: str | None = None,
     **metrics: PhaseMetrics,
 ) -> PhaseMetrics:
-    """Exécute la phase avec ses étapes réelles, leurs fonctions remplacées par des enregistreurs."""
+    """Exécute la phase avec ses tâches réelles, leurs fonctions remplacées par des enregistreurs."""
     appels = [] if appels is None else appels
 
     def runner(champ: str):
@@ -28,12 +29,13 @@ def _run(
 
         return run
 
-    steps = {
-        name: dataclasses.replace(step, run=runner(name.removeprefix("publishing.")))
-        for name, step in publishing.build().steps.items()
-    }
-    return PublishingPhase(steps).run(
-        contexte(credentials_missing=lambda _source: credentials_missing)
+    tasks = tuple(
+        dataclasses.replace(task, run=runner(task.name.removeprefix("publishing.")))
+        for task in _PHASE.tasks
+    )
+    return run_phase(
+        dataclasses.replace(_PHASE, tasks=tasks),
+        contexte(credentials_missing=lambda _source: credentials_missing),
     )
 
 
@@ -50,10 +52,11 @@ def test_chaque_tache_ecrit_sa_ligne_sous_sa_section(contexte, caplog):
     with caplog.at_level(logging.INFO, logger="test"):
         _run(contexte, attach_serials=rattachement)
     lignes = [r.getMessage() for r in caplog.records if r.getMessage()]
-    assert lignes[:4] == [
+    assert lignes[:5] == [
         "▶ Éditeurs",
         "  ├─ Éditeurs des préfixes DOI Crossref : rien à faire",
         "  ├─ Éditeurs des préfixes DOI DataCite : rien à faire",
+        "  ├─ Rattachement des enregistrements sources aux éditeurs : rien à faire",
         "  └─ Autres noms des éditeurs : rien à faire",
     ]
     assert "▶ Publications en série" in lignes and "▶ Monographies" in lignes
@@ -65,10 +68,24 @@ def test_chaque_tache_ecrit_sa_ligne_sous_sa_section(contexte, caplog):
 
 
 def test_les_compteurs_des_taches_remontent_a_la_phase(contexte):
-    worked = PhaseMetrics()
-    worked.add(seen=3)
-    metrics = _run(contexte, resolve_crossref_publishers=worked)
-    assert metrics.total == 3
+    publishers = PhaseMetrics()
+    publishers.add(new=1, publisher_matched=2)
+    metrics = _run(
+        contexte,
+        resolve_crossref_publishers=publishers,
+        enrich_serials_from_openalex=PhaseMetrics(updated=5),
+    )
+    assert (metrics.new, metrics.updated) == (1, 5)
+    assert metrics.extras.get("publisher_matched") == 2
+
+
+def test_les_signaux_des_taches_remontent_a_la_phase(contexte):
+    publishers = PhaseMetrics()
+    publishers.signals.append(
+        {"level": "warning", "code": "source_unavailable", "message": "crossref : arrêt"}
+    )
+    metrics = _run(contexte, resolve_crossref_publishers=publishers)
+    assert [s["code"] for s in metrics.signals] == ["source_unavailable"]
 
 
 def test_acces_non_configure_saute_les_taches_a_source(contexte, caplog):

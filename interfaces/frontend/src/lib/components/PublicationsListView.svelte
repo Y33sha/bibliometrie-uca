@@ -44,9 +44,12 @@
 	import type { components } from '#lib/api/schema.js';
 	type Publication = components['schemas']['PublicationListItem'] & {
 		// Champs présents quand l'API est appelée avec `person_id` (cf. routes /api/publications côté backend qui enrichit la réponse). Optionnels car non garantis hors contexte personne.
-		is_corresponding?: boolean | null;
 		contribution_id?: number | null;
 	};
+
+	function isCorresponding(p: Publication): boolean {
+		return p.author_positions?.includes('corresponding') ?? false;
+	}
 
 	// --- Props ---
 	// Composant de liste de publications réutilisable : la liste générale `/publications`, et l'onglet des publications d'un sujet, d'un laboratoire, d'une personne, d'une revue, d'un éditeur ou d'une monographie.
@@ -58,6 +61,7 @@
 		showAdminExclude = false,
 		perPage = 100,
 		onExcludeContribution,
+		onchange,
 	}: {
 		apiKey?: string;
 		context?: PublicationListContext;
@@ -68,6 +72,8 @@
 		/** Nombre d'éléments par page (50 pour les onglets, 100 pour /publications). */
 		perPage?: number;
 		onExcludeContribution?: (contributionId: number, publicationId: number) => void | boolean | Promise<void | boolean>;
+		/** Appelé après une fusion de publications dans le volet. */
+		onchange?: () => void;
 	} = $props();
 
 	// Volet d'une publication : ouvert tant que `?publication=<id>` figure dans l'URL. Une icône en tête de ligne ouvre le volet ; le titre mène toujours à la fiche.
@@ -341,12 +347,12 @@
 						{/each}
 					</td>{/if}
 					{#if isPerson && col('corr')}<td class="corr-cell">
-						{#if p.is_corresponding}<CorrespondingMark />{/if}
+						{#if isCorresponding(p)}<CorrespondingMark />{/if}
 					</td>{/if}
 					{#if col('apc')}<td class="apc-cell">
 						{#if p.apc}
 							{@const ucaApc = p.apc.filter(a => a.in_perimeter)}
-							{@const isPersonNonCorr = isPerson && !p.is_corresponding}
+							{@const isPersonNonCorr = isPerson && !isCorresponding(p)}
 							{#if ucaApc.length > 0}
 								<span class="apc-tag" class:apc-other={isPersonNonCorr}
 									title={ucaApc.map(a => `${a.amount?.toLocaleString('fr-FR')} € (${a.lab_acronym || institution.name})`).join('\n') + (isPersonNonCorr ? '\nAuteur non correspondant' : '')}>
@@ -385,7 +391,16 @@
 <Pagination page={listing.page} pages={listing.pages} onchange={(p) => { listing.goToPage(p); syncUrl(); }} />
 
 {#if drawer.id !== null}
-	<PublicationDrawer publicationId={drawer.id} onclose={() => drawer.open(null)} onopen={drawer.open} />
+	<PublicationDrawer
+		publicationId={drawer.id}
+		onclose={() => drawer.open(null)}
+		onopen={drawer.open}
+		onchange={() => {
+			listing.load();
+			facets.load();
+			onchange?.();
+		}}
+	/>
 {/if}
 
 <style>

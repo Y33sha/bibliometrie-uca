@@ -178,20 +178,22 @@ class SerialFacts(NamedTuple):
 
     serial_type: str | None
     """Pour le rejeu des corrections dépendantes du type de la revue."""
+    title: str
+    """Pour le rejeu des corrections dépendantes du titre de la revue."""
     oa_model: str | None
     """Pour le statut open access."""
 
 
 def serial_facts(conn: Connection, serial_ids: Sequence[int]) -> dict[int, SerialFacts]:
-    """Renvoie le type et le modèle open access de chaque revue connue."""
+    """Renvoie le type, le titre et le modèle open access de chaque revue connue."""
     rows = conn.execute(
         text(
-            "SELECT id, serial_type::text AS serial_type, oa_model::text AS oa_model"
+            "SELECT id, serial_type::text AS serial_type, title, oa_model::text AS oa_model"
             " FROM serials WHERE id = ANY(:ids)"
         ),
         {"ids": list(serial_ids)},
     )
-    return {r.id: SerialFacts(r.serial_type, r.oa_model) for r in rows}
+    return {r.id: SerialFacts(r.serial_type, r.title, r.oa_model) for r in rows}
 
 
 class RefreshVerdict(StrEnum):
@@ -262,9 +264,7 @@ def consolidate(conn: Connection, publication_ids: Sequence[int]) -> Consolidati
     saved: list[Publication] = []
     for publication_id, publication in aggregated.items():
         serial = serials.get(publication.serial_id) if publication.serial_id is not None else None
-        _apply_canonical_doc_type_correction(
-            publication, serial_type=serial.serial_type if serial else None
-        )
+        _apply_canonical_doc_type_correction(publication, serial)
         publication_copies_ = copies.get(publication_id, [])
         publication.best_copy_url = access(
             publication_copies_, doi=str(publication.doi) if publication.doi else None
@@ -299,7 +299,7 @@ def _subset[K, V](mapping: Mapping[K, V], keys: Iterable[K | None]) -> dict[K, V
 
 
 def _apply_canonical_doc_type_correction(
-    publication: Publication, *, serial_type: str | None
+    publication: Publication, serial: SerialFacts | None
 ) -> None:
     """Rejoue les corrections de `doc_type` sur la publication, après l'arbitrage.
 
@@ -308,7 +308,7 @@ def _apply_canonical_doc_type_correction(
     Modifie `publication.doc_type` et réécrit `publication.corrections` : type arbitré et règle, ou vide sans correction. Idempotent.
 
     Args:
-        serial_type: type de la revue `publication.serial_id`.
+        serial: revue `publication.serial_id`, `None` sans revue connue.
     """
     corrected = doc_type_correction(
         MetadataForCorrection.for_publication(
@@ -317,7 +317,8 @@ def _apply_canonical_doc_type_correction(
             doc_type=publication.doc_type,
             doi=str(publication.doi) if publication.doi else None,
             serial_id=publication.serial_id,
-            serial_type=serial_type,
+            serial_type=serial.serial_type if serial else None,
+            serial_title=serial.title if serial else None,
         )
     )
     publication.corrections = {}

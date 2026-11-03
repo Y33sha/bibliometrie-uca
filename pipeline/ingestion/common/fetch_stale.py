@@ -15,96 +15,23 @@ La relecture se borne aux années moissonnées par le run ; une thèse en cours 
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable
-from dataclasses import dataclass
+from collections.abc import Mapping
 
 from domain.config import ConfigKey
 from domain.sources.registry import Source, source_label
+from pipeline.graph import task
 from pipeline.ingestion.adapters import ADAPTERS
 from pipeline.ingestion.common.stale_refetch import refresh
 from pipeline.runtime.config import delay, window_years
-from pipeline.runtime.context import Phase, PhaseContext
-from pipeline.runtime.observability.log_format import LAST_BRANCH
+from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.signals import select_targets, skipped
-from pipeline.task_runner import TaskRun, TaskStep, run_tasks
-
-RefreshOne = Callable[[PhaseContext, str, "list[int] | None"], PhaseMetrics]
-"""Nouvelle lecture des documents d'une source, bornée aux années données."""
-GetYearsForWindow = Callable[[PhaseContext, "int | None", "int | None"], "list[int] | None"]
-"""Années de la fenêtre du run, ou `None` pour tout l'historique."""
 
 
-@dataclass(frozen=True)
-class FetchStalePhase:
-    refresh_one: RefreshOne
-    get_years_for_window: GetYearsForWindow
-
-    def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Relit en parallèle les documents anciens de chaque source retenue, et assemble les métriques."""
-        options, logger = ctx.options, ctx.logger
-        metrics = PhaseMetrics()
-        if not options.policy.fetch_stale:
-            logger.info("%sSautée en mode %s", LAST_BRANCH, options.mode)
-            return metrics
-        targets = set(select_targets(Source, options.sources, include_wos=options.include_wos))
-
-        years = self.get_years_for_window(ctx, options.start_year, options.year)
-
-        def task(source: str) -> TaskRun:
-            return lambda ctx: self.refresh_one(ctx, source, years)
-
-        def selected(source: str) -> Callable[[PhaseContext], bool]:
-            return lambda _ctx: source in targets
-
-        by_task = run_tasks(
-            "fetch_stale",
-            {
-                f"fetch_stale.{source}": TaskStep(
-                    task(source),
-                    label=source_label(source),
-                    progress_bar=True,
-                    when=selected(source),
-                )
-                for source in Source
-            },
-            ctx,
-        )
-
-        by_source: dict[str, dict[str, float | None]] = {}
-        for source in Source:
-            source_metrics = by_task[f"fetch_stale.{source}"]
-            metrics.merge(source_metrics)
-            if source not in targets or skipped(source_metrics):
-                continue
-            by_source[source] = {
-                "interrogated": source_metrics.total,
-                "refreshed": source_metrics.updated,
-                "unchanged": source_metrics.unchanged,
-                "disappeared": source_metrics.extras.get("disappeared", 0),
-                "duration_s": source_metrics.duration_s,
-            }
-
-        if by_source:
-            metrics.details["table"] = {
-                "rows": [{"key": source, **summary} for source, summary in by_source.items()]
-            }
-        return metrics
-
-
-def build() -> Phase:
-    return FetchStalePhase(
-        refresh_one=_run_fetch_stale,
-        get_years_for_window=_get_years_for_window,
-    )
-
-
-def _get_years_for_window(
-    ctx: PhaseContext, start_year: int | None, year: int | None
-) -> list[int] | None:
-    """Renvoie les années de la fenêtre du run (`window_years`)."""
+def _years(ctx: PhaseContext) -> list[int] | None:
+    """Renvoie les années de la fenêtre du run (`window_years`), ou `None` pour tout l'historique."""
     with ctx.open_tx() as conn:
-        return window_years(conn, start_year=start_year, year=year)
+        return window_years(conn, start_year=ctx.options.start_year, year=ctx.options.year)
 
 
 def _run_fetch_stale(ctx: PhaseContext, target: str, years: list[int] | None) -> PhaseMetrics:
@@ -113,3 +40,48 @@ def _run_fetch_stale(ctx: PhaseContext, target: str, years: list[int] | None) ->
     with ctx.open_tx() as conn:
         after_days = delay(conn, ConfigKey.FETCH_STALE_AFTER_DAYS)
         return asyncio.run(refresh(conn, refetch, ctx.logger, after_days=after_days, years=years))
+
+
+def _targets(ctx: PhaseContext) -> set[str]:
+    """Renvoie les sources relues par le run : celles demandées, WoS seulement sur option."""
+    options = ctx.options
+    return set(select_targets(Source, options.sources, include_wos=options.include_wos))
+
+
+TASKS = tuple(
+    task(
+        f"fetch_stale.{source}",
+        reads=("config", "staging", "source_records.publication_year"),
+        writes=("staging", "staging_normalization_queue"),
+        previous_run=("staging", "source_records"),
+        network=source,
+        parallel_group="fetch_stale",
+        run=lambda ctx, source=source: _run_fetch_stale(ctx, source, _years(ctx)),
+        label=source_label(source),
+        progress_bar=True,
+        when=lambda ctx, source=source: source in _targets(ctx),
+    )
+    for source in Source
+)
+
+
+def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
+    """Renvoie la somme des métriques des sources, avec la table des sources relues."""
+    metrics = PhaseMetrics()
+    by_source: dict[str, dict[str, float | None]] = {}
+    for name, source_metrics in by_task.items():
+        metrics.merge(source_metrics)
+        if skipped(source_metrics):
+            continue
+        by_source[name.removeprefix("fetch_stale.")] = {
+            "interrogated": source_metrics.total,
+            "refreshed": source_metrics.updated,
+            "unchanged": source_metrics.unchanged,
+            "disappeared": source_metrics.extras.get("disappeared", 0),
+            "duration_s": source_metrics.duration_s,
+        }
+    if by_source:
+        metrics.details["table"] = {
+            "rows": [{"key": source, **summary} for source, summary in by_source.items()]
+        }
+    return metrics

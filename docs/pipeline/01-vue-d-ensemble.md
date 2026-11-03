@@ -1,6 +1,6 @@
 # Pipeline
 
-*À jour le 2026-10-26.*
+*À jour le 2026-11-03.*
 
 Le pipeline moissonne les sources, normalise leurs données, puis déduit les publications, les contributions et les personnes du référentiel. Le [guide d'exploitation](../exploitation/03-pipeline.md) décrit son lancement et ses options.
 
@@ -8,7 +8,7 @@ Le pipeline moissonne les sources, normalise leurs données, puis déduit les pu
 |---|---|---|
 | moissonnage | phases `harvest` et `harvest_by_person`, protocole `Harvester` | Collecte des sources |
 | phase | `Phase` | Unité du run dans les journaux et l'administration |
-| tâche | `Task` | Étape du graphe du run (`pipeline/graph.py`), avec ses lectures et ses écritures |
+| tâche | `Task` | Étape d'une phase, déclarée dans le module de la phase, avec ses lectures et ses écritures |
 | store | `*Store` | Accès SQL à une entité dans le pipeline |
 
 ## Phases

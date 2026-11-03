@@ -240,7 +240,8 @@ class PublicationDetailQueries:
 
         auth_rows = self._conn.execute(
             text(f"""
-                SELECT a.reference_position AS author_position, a.in_perimeter, a.is_corresponding,
+                SELECT a.reference_position AS author_position, a.in_perimeter,
+                       a.author_positions::text[] AS author_positions,
                        (SELECT array_agg(aus.structure_id ORDER BY aus.structure_id)
                         FROM contribution_structures aus
                         WHERE aus.contribution_id = a.id) AS structure_ids,
@@ -261,7 +262,7 @@ class PublicationDetailQueries:
             ConsolidatedContributionOut(
                 author_position=r.author_position,
                 in_perimeter=r.in_perimeter,
-                is_corresponding=r.is_corresponding,
+                author_positions=r.author_positions,
                 structure_ids=r.structure_ids,
                 source_hal=r.source_hal,
                 source_openalex=r.source_openalex,

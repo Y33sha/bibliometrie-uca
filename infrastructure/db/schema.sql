@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict tra27bfv8t74bEICJLP4UaLmnm6zP9ujAMP8xacjhcRyucIalXl5dt5OvAnAjM7
+\restrict 3ScU5c5RbyhMOripCZsggZZaPGpJMmhVwx0lLyEkkaE065nLrDA69v4BuZqeaVP
 
--- Dumped from database version 18.4
--- Dumped by pg_dump version 18.4
+-- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
+-- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -115,6 +115,17 @@ CREATE TYPE public.address_origin AS ENUM (
 
 
 --
+-- Name: author_position; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public.author_position AS ENUM (
+    'corresponding',
+    'first',
+    'last'
+);
+
+
+--
 -- Name: country_detection_method; Type: TYPE; Schema: public; Owner: -
 --
 
@@ -147,6 +158,7 @@ CREATE TYPE public.doc_type AS ENUM (
     'article',
     'conference_paper',
     'conference',
+    'conference_abstract',
     'recorded_talk',
     'book',
     'book_chapter',
@@ -1103,6 +1115,7 @@ CREATE TABLE publications.aligned_source_contributions (
     margin real,
     CONSTRAINT aligned_source_contributions_score_check CHECK (((method = 'model'::public.grouping_method) OR ((score IS NULL) AND (margin IS NULL))))
 );
+ALTER TABLE ONLY publications.aligned_source_contributions ALTER COLUMN source_record_id SET (n_distinct=-0.0135);
 
 
 --
@@ -1122,13 +1135,14 @@ CREATE TABLE publications.contributions (
     person_id integer,
     resolution_mode public.resolution_mode,
     reference_position smallint,
-    is_corresponding boolean,
     roles text[],
     perimeter_evidence public.perimeter_evidence[] DEFAULT '{}'::public.perimeter_evidence[] NOT NULL,
     in_perimeter boolean GENERATED ALWAYS AS ((cardinality(perimeter_evidence) > 0)) STORED NOT NULL,
+    author_positions public.author_position[] DEFAULT '{}'::public.author_position[] NOT NULL,
     CONSTRAINT contributions_resolution_mode_with_person CHECK (((person_id IS NULL) = (resolution_mode IS NULL)))
 )
 WITH (fillfactor='90');
+ALTER TABLE ONLY publications.contributions ALTER COLUMN publication_id SET (n_distinct=-0.0144);
 
 
 --
@@ -1136,6 +1150,13 @@ WITH (fillfactor='90');
 --
 
 COMMENT ON TABLE publications.contributions IS 'Contributions sources d''un même auteur dans une publication, avec au maximum une contribution source par enregistrement source. reference_position : position dans la liste la plus longue. Une personne a au maximum une contribution par publication.';
+
+
+--
+-- Name: COLUMN contributions.author_positions; Type: COMMENT; Schema: publications; Owner: -
+--
+
+COMMENT ON COLUMN publications.contributions.author_positions IS 'Positions d''auteur : correspondant, premier ou dernier auteur. La phase author_grouping les calcule depuis les listes d''auteurs de la publication.';
 
 
 --
@@ -2721,6 +2742,30 @@ ALTER TABLE queues.source_record_keys_queue ALTER COLUMN seq ADD GENERATED ALWAY
 
 
 --
+-- Name: staging_normalization_queue; Type: TABLE; Schema: queues; Owner: -
+--
+
+CREATE TABLE queues.staging_normalization_queue (
+    id integer NOT NULL,
+    seq bigint NOT NULL
+);
+
+
+--
+-- Name: staging_normalization_queue_seq_seq; Type: SEQUENCE; Schema: queues; Owner: -
+--
+
+ALTER TABLE queues.staging_normalization_queue ALTER COLUMN seq ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME queues.staging_normalization_queue_seq_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
 -- Name: countries; Type: TABLE; Schema: ref; Owner: -
 --
 
@@ -3242,7 +3287,6 @@ CREATE TABLE sources.staging (
     source_id text NOT NULL,
     doi text,
     raw_data jsonb NOT NULL,
-    processed boolean DEFAULT false,
     imported_at timestamp with time zone DEFAULT now(),
     raw_hash text,
     last_seen_at timestamp with time zone DEFAULT now(),
@@ -3257,7 +3301,7 @@ CREATE TABLE sources.staging (
 -- Name: TABLE staging; Type: COMMENT; Schema: sources; Owner: -
 --
 
-COMMENT ON TABLE sources.staging IS 'Documents moissonnés, en transit vers les tables sources. Deux états : à traiter (processed FALSE, raw_data porte le payload de la source), normalisée (processed TRUE, raw_data vidé).';
+COMMENT ON TABLE sources.staging IS 'Documents moissonnés, en transit vers les tables sources. Une ligne à normaliser est dans queues.staging_normalization_queue ; la normalisation vide raw_data.';
 
 
 --
@@ -4182,6 +4226,14 @@ ALTER TABLE ONLY queues.source_contribution_countries_queue
 
 ALTER TABLE ONLY queues.source_record_keys_queue
     ADD CONSTRAINT source_record_keys_queue_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: staging_normalization_queue staging_normalization_queue_pkey; Type: CONSTRAINT; Schema: queues; Owner: -
+--
+
+ALTER TABLE ONLY queues.staging_normalization_queue
+    ADD CONSTRAINT staging_normalization_queue_pkey PRIMARY KEY (id);
 
 
 --
@@ -5238,13 +5290,6 @@ CREATE INDEX idx_staging_doi ON sources.staging USING btree (doi) WHERE (doi IS 
 
 
 --
--- Name: idx_staging_processed; Type: INDEX; Schema: sources; Owner: -
---
-
-CREATE INDEX idx_staging_processed ON sources.staging USING btree (processed) WHERE (NOT processed);
-
-
---
 -- Name: idx_staging_source; Type: INDEX; Schema: sources; Owner: -
 --
 
@@ -6084,5 +6129,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict tra27bfv8t74bEICJLP4UaLmnm6zP9ujAMP8xacjhcRyucIalXl5dt5OvAnAjM7
+\unrestrict 3ScU5c5RbyhMOripCZsggZZaPGpJMmhVwx0lLyEkkaE065nLrDA69v4BuZqeaVP
 

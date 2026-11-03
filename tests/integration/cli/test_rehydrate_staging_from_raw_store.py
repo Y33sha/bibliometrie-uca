@@ -1,22 +1,23 @@
-"""Réhydratation de `staging` depuis le raw store, opération inverse de `StagingStore.mark_done`.
+"""Réhydratation de `staging` depuis le raw store, opération inverse de `StagingStore.clear_payload`.
 
-Couvre aussi le couplage au schéma (colonnes `source, source_id, doi, raw_data, raw_hash, processed`) : un renommage casserait ces requêtes.
+Couvre aussi le couplage au schéma (colonnes `source, source_id, doi, raw_data, raw_hash`, file de normalisation) : un renommage casserait ces requêtes.
 """
 
 from sqlalchemy import text
 
+from infrastructure.db.queues import Queue
 from interfaces.cli.maintenance.rehydrate_staging_from_raw_store import (
     rehydrate_or_create_staging_row,
     rehydrate_staging_row,
 )
+from tests.integration.helpers.queues import queued
 from tests.integration.helpers.staging import insert_staging
 
 
 def _fetch(conn, source_id):
     return conn.execute(
         text(
-            "SELECT raw_data, raw_hash, processed FROM staging "
-            "WHERE source = 'hal' AND source_id = :sid"
+            "SELECT id, raw_data, raw_hash FROM staging WHERE source = 'hal' AND source_id = :sid"
         ),
         {"sid": source_id},
     ).one_or_none()
@@ -29,12 +30,12 @@ class TestRehydrateStagingRow:
         assert _fetch(sa_sync_conn, "hal-absent") is None
 
     def test_updates_existing_row(self, sa_sync_conn):
-        insert_staging(sa_sync_conn, source_id="hal-1", processed=True)
+        insert_staging(sa_sync_conn, source_id="hal-1", queued=False)
         assert rehydrate_staging_row(sa_sync_conn, "hal", "hal-1", {"x": 1}) is True
         row = _fetch(sa_sync_conn, "hal-1")
         assert row.raw_data == {"x": 1}
         assert row.raw_hash is not None
-        assert row.processed is False
+        assert row.id in queued(sa_sync_conn, Queue.STAGING_NORMALIZATION)
 
 
 class TestRehydrateOrCreateStagingRow:
@@ -43,7 +44,7 @@ class TestRehydrateOrCreateStagingRow:
         assert rehydrate_or_create_staging_row(sa_sync_conn, "hal", "hal-2", "10.1/x", {"a": 1})
         row = _fetch(sa_sync_conn, "hal-2")
         assert row.raw_data == {"a": 1}
-        assert row.processed is False
+        assert row.id in queued(sa_sync_conn, Queue.STAGING_NORMALIZATION)
 
         # Deuxième passe : la ligne de même (source, source_id) est mise à jour et garde son DOI d'origine.
         assert not rehydrate_or_create_staging_row(

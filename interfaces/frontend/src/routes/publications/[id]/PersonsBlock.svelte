@@ -23,7 +23,7 @@
 
   // Une personne est correspondante dès qu'une de ses contributions l'est.
   const correspondingIds = $derived(
-    new Set(contributions.filter((a) => a.is_corresponding).map((a) => a.person_id)),
+    new Set(contributions.filter((a) => a.author_positions.includes('corresponding')).map((a) => a.person_id)),
   );
 
   function personName(a: Contribution): string {

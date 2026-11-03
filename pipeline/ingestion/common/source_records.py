@@ -17,7 +17,6 @@ from domain.publications.dates import PublicationDate
 from domain.publications.doc_types import DocType
 from domain.publications.licenses import License
 from domain.publications.metadata import normalized_title
-from domain.publishers.attribution import source_record_has_publisher
 from domain.serials.titles import names_ebook_platform
 from domain.source_records.doc_types import map_doc_type
 from domain.source_records.identifiers import SourceIdentifier, normalize_identifiers
@@ -36,7 +35,7 @@ class SourceRecordUpsert:
 
     Le jeu de colonnes est commun à toutes les sources ; une colonne non renseignée par la source reste à `None`. Les absences suivent les données exposées par chaque source : theses.fr est sans résumé, HAL et theses.fr sans indicateur de citation ; `hal_collections` existe seulement pour HAL, `is_retracted` seulement pour OpenAlex.
 
-    `title` et `abstract` sont nettoyés à l'écriture (`clean_title`, `clean_abstract`), et `title_normalized` se dérive du titre. `doc_type` de `raw_doc_type` (`map_doc_type`) et `language` de `raw_language` (`language_code`). `publication_id`, rattachement à la publication, est posé par la phase `publications`.
+    `title` et `abstract` sont nettoyés à l'écriture (`clean_title`, `clean_abstract`), et `title_normalized` se dérive du titre. `doc_type` de `raw_doc_type` (`map_doc_type`) et `language` de `raw_language` (`language_code`). La phase `publishing` pose l'éditeur, la revue et la monographie, la phase `publications` le rattachement à la publication.
     """
 
     # Clé de l'enregistrement source
@@ -55,9 +54,6 @@ class SourceRecordUpsert:
     """Date de publication, avec sa précision. La base en tire `publication_year`."""
     raw_doc_type: str | None = None
     """Type de document dans le vocabulaire de la source."""
-    monograph_id: int | None = None
-    publisher_id: int | None = None
-    """Éditeur nommé par la source. L'écriture le retire d'une production hébergée sans être publiée (`source_record_has_publisher`)."""
     container_title: str | None = None
     """Titre libre du conteneur. L'écriture le met en texte brut (`to_plain_text`) et retire un titre de plateforme d'ebooks (`names_ebook_platform`)."""
     raw_language: str | None = None
@@ -180,22 +176,12 @@ class SourceRecordStore:
         self._conn = conn
         self._language_forms: dict[str, str] | None = None
 
-    def upsert_source_record(self, row: SourceRecordUpsert, *, has_series: bool = False) -> int:
-        """Écrit l'enregistrement source et ses identifiants, et renvoie son id. La revue se rattache dans la phase `publishing`.
-
-        Args:
-            has_series: l'enregistrement source décrit une série ; avec sa monographie, cela décide de son éditeur (`source_record_has_publisher`).
-        """
+    def upsert_source_record(self, row: SourceRecordUpsert) -> int:
+        """Écrit l'enregistrement source et ses identifiants, et renvoie son id."""
         params: dict[str, object] = {name: getattr(row, name) for name in _ROW_FIELDS}
         params["title"] = clean_title(row.title)
         params["title_normalized"] = normalized_title(row.title)
         params["doc_type"] = _doc_type(row)
-        if not source_record_has_publisher(
-            params["doc_type"],
-            row.source,
-            has_container=has_series or row.monograph_id is not None,
-        ):
-            params["publisher_id"] = None
         container_title = optional_plain_text(row.container_title)
         if container_title and names_ebook_platform(container_title):
             container_title = None

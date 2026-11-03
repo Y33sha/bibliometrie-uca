@@ -13,7 +13,6 @@ from domain.publications.identifiers import HALId
 from domain.publications.licenses import normalize_license
 from domain.serials.containers import ContainerDescription
 from domain.serials.issns import source_issns
-from domain.source_records.biblio import compact_biblio
 from domain.source_records.doc_types import map_doc_type
 from domain.source_records.identifiers import (
     SourceIdentifier,
@@ -42,9 +41,6 @@ from pipeline.ingestion.scanr.payload import (
     scanr_derived_identifier,
     scanr_subjects,
     select_leaf_affiliations,
-)
-from pipeline.transformation.publishing.find_or_create import (
-    Containers,
 )
 
 
@@ -165,7 +161,8 @@ def scanr_source_record(  # noqa: C901
     doc: Mapping[str, JsonValue],
     staging_id: int,
     scanr_id: str,
-    containers: Containers,
+    *,
+    has_series: bool,
 ) -> SourceRecordUpsert:
     """Construit l'enregistrement source ScanR d'un document.
 
@@ -206,9 +203,7 @@ def scanr_source_record(  # noqa: C901
             seen.add(u)
             urls.append(u)
 
-    # Éditeur nommé par ScanR.
     source = as_mapping(doc.get("source"))
-    biblio_json = compact_biblio(publisher=as_str(source.get("publisher")))
 
     return SourceRecordUpsert(
         source="scanr",
@@ -217,12 +212,10 @@ def scanr_source_record(  # noqa: C901
         identifiers=scanr_identifiers(doc, scanr_id),
         title=get_title(doc) or "",
         raw_doc_type=as_str(doc.get("type")),
-        monograph_id=containers.monograph_id,
         container_title=(
-            as_str(source.get("title")) if not (containers.has_series or is_thesis(doc)) else None
+            as_str(source.get("title")) if not (has_series or is_thesis(doc)) else None
         ),
         raw_language=None,
-        biblio=biblio_json,
         abstract=abstract,
         keywords=keywords,
         license=normalize_license(publisher_license),
@@ -235,17 +228,14 @@ def scanr_source_record(  # noqa: C901
 def build_scanr_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecord]:
     """Lit les contributions sources d'un document ScanR.
 
-    - Les identifiants `orcid` et `idref` viennent de `denormalized`, les rôles de `map_role`.
+    - L'IdRef vient de `denormalized`, les rôles de `map_role`. L'ORCID de `denormalized` est ignoré : attribué par le matching interne de ScanR, il est trop peu fiable pour les informations du contributeur.
     - Une affiliation feuille sans `structId` devient une adresse, avec les pays détectés par ScanR dans son texte (`detected_countries`).
     - Une affiliation feuille avec `structId` est une structure HAL de la contribution source : son nom est celui d'une fiche du référentiel HAL, et reste hors des adresses.
     - Le ROR d'une affiliation va sur son adresse, ou sur la contribution source pour une affiliation sans adresse.
     """
     authors = [as_mapping(a) for a in as_sequence(doc.get("authors"))]
     ids_by_position = [
-        contributor_identifiers(
-            orcid=as_str(as_mapping(a.get("denormalized")).get("orcid")),
-            idref=as_str(as_mapping(a.get("denormalized")).get("idref")),
-        )
+        contributor_identifiers(idref=as_str(as_mapping(a.get("denormalized")).get("idref")))
         for a in authors
     ]
 
@@ -353,9 +343,9 @@ class ScanrNormalizer(SourceNormalizer):
         return scanr_subjects(doc.get("domains"))
 
     def source_record(
-        self, row: StagingRow, doc: Document, containers: Containers
+        self, row: StagingRow, doc: Document, *, has_series: bool
     ) -> SourceRecordUpsert:
-        return scanr_source_record(doc, row.id, row.source_id, containers)
+        return scanr_source_record(doc, row.id, row.source_id, has_series=has_series)
 
     def author_block(self, doc: Document) -> AuthorBlock:
         return extract_scanr_author_block(doc)

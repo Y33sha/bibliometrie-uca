@@ -3,12 +3,16 @@
 Chaque tâche ouvre sa propre transaction. La résolution des adresses et la pose des indices de périmètre lisent le périmètre des personnes.
 """
 
+import dataclasses
 from unittest.mock import patch
 
 import pytest
 
+from pipeline.graph import Phase
+from pipeline.phases import PHASES
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.transformation.structures import affiliations as phase
+from pipeline.task_runner import run_phase
+from pipeline.transformation.structures import affiliations as phase, perimeter
 from pipeline.transformation.structures.address_resolution import ResolutionStats
 from pipeline.transformation.structures.perimeter import EmptyExtractionPerimeterError
 
@@ -19,17 +23,25 @@ PERIMETRE = [10, 20]
 def perimetre(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[int]]:
     """Périmètres lus par la phase : `extraction` et `persons`."""
     lus = {"extraction": [1, 2, 3, 4, 5], "persons": PERIMETRE}
-    monkeypatch.setattr(phase, "get_extraction_structure_ids", lambda conn: lus["extraction"])
+    monkeypatch.setattr(perimeter, "get_extraction_structure_ids", lambda conn: lus["extraction"])
     monkeypatch.setattr(phase, "get_persons_structure_ids_list", lambda conn: lus["persons"])
+    monkeypatch.setattr(phase, "classify_addresses", lambda _conn, _logger: PhaseMetrics())
+    monkeypatch.setattr(phase, "resolve_thesis_partners", lambda _conn, _logger: 0)
     return lus
 
 
-def _phase(ror: PhaseMetrics | None = None) -> phase.AffiliationsPhase:
-    return phase.AffiliationsPhase(
-        refresh_ror=lambda _ctx: ror or PhaseMetrics(),
-        refresh_hal_structures=lambda _ctx, _stale: PhaseMetrics(),
-        classify_addresses=lambda _conn, _logger: PhaseMetrics(),
-        resolve_thesis_partners=lambda _conn, _logger: 0,
+def _phase(ror: PhaseMetrics | None = None) -> Phase:
+    """Renvoie la phase `affiliations`, ses deux référentiels remplacés par des tâches sans réseau ni transaction."""
+    referentiels = {
+        "affiliations.refresh_ror": lambda _ctx: ror or PhaseMetrics(),
+        "affiliations.refresh_hal_structures": lambda _ctx: PhaseMetrics(),
+    }
+    affiliations = next(p for p in PHASES if p.name == "affiliations")
+    return dataclasses.replace(
+        affiliations,
+        tasks=tuple(
+            dataclasses.replace(t, run=referentiels.get(t.name, t.run)) for t in affiliations.tasks
+        ),
     )
 
 
@@ -50,7 +62,7 @@ def _run(contexte, *, processed=7, in_perimeter=3):
             side_effect=lambda conn, logger, ids: vus.__setitem__("populate", ids),
         ),
     ):
-        metrics = _phase().run(contexte())
+        metrics = run_phase(_phase(), contexte())
     return metrics, vus
 
 
@@ -80,7 +92,7 @@ def test_perimetre_d_extraction_vide_arrete_la_phase(contexte, perimetre):
         patch.object(phase, "run_resolution") as resolution,
         pytest.raises(EmptyExtractionPerimeterError),
     ):
-        _phase().run(contexte())
+        run_phase(_phase(), contexte())
 
     resolution.assert_not_called()
 
@@ -96,6 +108,6 @@ def test_rafraichit_le_referentiel_ror_et_reprend_ses_metriques(contexte):
         ),
         patch.object(phase, "populate"),
     ):
-        metrics = _phase(ror).run(contexte())
+        metrics = run_phase(_phase(ror), contexte())
 
     assert metrics.details["ror"] == {"version": "v2.14", "imported": True}

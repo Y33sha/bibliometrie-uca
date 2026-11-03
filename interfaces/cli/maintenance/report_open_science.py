@@ -19,6 +19,7 @@ from domain.countries import non_international_country_codes
 from domain.dates import today
 from domain.platforms.platform import PlatformType
 from domain.platforms.registry import known_platform_of_copy, preprint_servers_of_prefix
+from domain.publications.author_positions import AuthorPosition
 from domain.publications.doc_types import DocType
 from domain.publications.licenses import OPEN_LICENSES, license_label
 from domain.publications.oa_status import OaStatus
@@ -29,7 +30,7 @@ from infrastructure.read_models.structures.queries import (
     AUTHOR_SOURCE_CONTRIBUTION,
     AUTHORED_PUBLICATION,
 )
-from infrastructure.sql_fragments import diamond_journal_sql
+from infrastructure.sql_fragments import diamond_journal_sql, has_author_position
 
 EVOLUTION_YEARS = 5
 THESIS_YEARS = 10
@@ -42,7 +43,12 @@ type SqlRow = Row[tuple[object, ...]]
 OA_RATE_TYPES = (DocType.ARTICLE, DocType.REVIEW, DocType.LETTER, DocType.CONFERENCE_PAPER)
 # Types parus dans une revue, pour les modèles de revues et les APC.
 SERIAL_TYPES = (DocType.ARTICLE, DocType.REVIEW, DocType.LETTER, DocType.EDITORIAL)
-CONFERENCE_TYPES = (DocType.CONFERENCE, DocType.CONFERENCE_PAPER, DocType.POSTER)
+CONFERENCE_TYPES = (
+    DocType.CONFERENCE,
+    DocType.CONFERENCE_ABSTRACT,
+    DocType.CONFERENCE_PAPER,
+    DocType.POSTER,
+)
 OPEN_STATUSES = (OaStatus.DIAMOND, OaStatus.GOLD, OaStatus.HYBRID, OaStatus.BRONZE, OaStatus.GREEN)
 
 DOC_TYPE_LABELS = {
@@ -50,6 +56,7 @@ DOC_TYPE_LABELS = {
     DocType.REVIEW: "Revue de littérature (review)",
     DocType.CONFERENCE_PAPER: "Texte publié dans des actes",
     DocType.CONFERENCE: "Communication sans texte publié",
+    DocType.CONFERENCE_ABSTRACT: "Résumé de conférence",
     DocType.RECORDED_TALK: "Conférence filmée",
     DocType.POSTER: "Poster",
     DocType.EDITORIAL: "Éditorial",
@@ -89,6 +96,9 @@ HAL_FULL_TEXT = """
 
 # Publication `p` cosignée hors du pays de l'établissement. Le paramètre `:non_international` liste les codes pays non internationaux.
 INTERNATIONAL = "EXISTS (SELECT 1 FROM unnest(p.countries) c WHERE c <> ALL(:non_international))"
+
+# Contribution `a` d'un auteur correspondant.
+CORRESPONDING = has_author_position(AuthorPosition.CORRESPONDING)
 
 # Revue `j` diamant : marquée diamant, ou dans le DOAJ sans APC ni autres frais.
 DIAMOND_JOURNAL = f"COALESCE({diamond_journal_sql('j')}, false)"
@@ -251,7 +261,7 @@ class OpenScienceReport:
             f"""
             SELECT EXISTS (
                        SELECT 1 FROM contributions a
-                       WHERE a.publication_id = p.id AND a.is_corresponding AND {AUTHOR_SOURCE_CONTRIBUTION}
+                       WHERE a.publication_id = p.id AND {CORRESPONDING} AND {AUTHOR_SOURCE_CONTRIBUTION}
                    ) AS lab_corresponding
             FROM ({LAB_PUBLICATIONS}) p
             JOIN publishing.serials j ON j.id = p.serial_id
@@ -543,7 +553,7 @@ class OpenScienceReport:
                    COUNT(*) FILTER (WHERE {INTERNATIONAL}) AS international,
                    COUNT(*) FILTER (WHERE EXISTS (
                        SELECT 1 FROM contributions a
-                       WHERE a.publication_id = p.id AND a.is_corresponding AND {AUTHOR_SOURCE_CONTRIBUTION}
+                       WHERE a.publication_id = p.id AND {CORRESPONDING} AND {AUTHOR_SOURCE_CONTRIBUTION}
                    )) AS corresponding
             FROM ({LAB_PUBLICATIONS}) p WHERE p.publication_year = :year
             """

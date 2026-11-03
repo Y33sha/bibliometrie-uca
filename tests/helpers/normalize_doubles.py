@@ -1,6 +1,6 @@
 """Doublures des requêtes d'écriture, communes aux tests des normaliseurs.
 
-Quelle que soit sa source, un normaliseur verse ses enregistrements sources dans `source_records`, écrit leurs contributions sources et marque sa ligne de staging traitée. Ces doublures valent donc pour toutes les sources.
+Quelle que soit sa source, un normaliseur verse ses enregistrements sources dans `source_records`, écrit leurs contributions sources et vide le payload de sa ligne de staging. Ces doublures valent donc pour toutes les sources.
 """
 
 import inspect
@@ -57,13 +57,13 @@ class FakeSourceRecordStore:
 
 
 class FakeStagingStore:
-    """`StagingStore` : retient les lignes marquées traitées."""
+    """`StagingStore` : retient les lignes au payload vidé."""
 
     def __init__(self) -> None:
-        self.marked_done: list[int] = []
+        self.cleared: list[int] = []
 
-    def mark_done(self, staging_id: int) -> None:
-        self.marked_done.append(staging_id)
+    def clear_payload(self, row: StagingRow) -> None:
+        self.cleared.append(row.id)
 
 
 class FakeSourceContributionStore:

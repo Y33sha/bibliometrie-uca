@@ -10,10 +10,18 @@ from pipeline.transformation.publishing.monographs.link_monographs_to_collection
 
 
 class _Repo:
-    def __init__(self, candidates: list[MonographSerialCandidates]) -> None:
+    def __init__(
+        self,
+        candidates: list[MonographSerialCandidates],
+        titles_without_issn: dict[int, str] | None = None,
+    ) -> None:
         self._candidates = candidates
+        self._titles = titles_without_issn or {}
         self.set: list[tuple[int, int | None]] = []
         self.created: list[tuple[str, int | None]] = []
+
+    def titles_without_issn(self, serial_ids) -> dict[int, str]:
+        return {s: t for s, t in self._titles.items() if s in set(serial_ids)}
 
     def find_monograph_serial_candidates(self) -> list[MonographSerialCandidates]:
         return self._candidates

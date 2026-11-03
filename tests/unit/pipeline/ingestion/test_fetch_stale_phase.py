@@ -2,30 +2,37 @@
 
 import logging
 
-from pipeline.ingestion.common.fetch_stale import FetchStalePhase
+import pytest
+
+from pipeline.ingestion.common import fetch_stale
+from pipeline.phases import PHASES
 from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.task_runner import run_phase
+
+_PHASE = next(phase for phase in PHASES if phase.name == "fetch_stale")
 
 
-def _run(contexte, mode: str, refreshed: list[str]) -> PhaseMetrics:
-    def refresh_one(_ctx, source: str, years: list[int] | None) -> PhaseMetrics:
-        refreshed.append(source)
+@pytest.fixture
+def relues(monkeypatch) -> list[str]:
+    """Sources relues par la phase, sans réseau ni base."""
+    sources: list[str] = []
+
+    def run_one(_ctx, source: str, _years) -> PhaseMetrics:
+        sources.append(source)
         return PhaseMetrics()
 
-    return FetchStalePhase(
-        refresh_one=refresh_one,
-        get_years_for_window=lambda _ctx, start_year, year: None,
-    ).run(contexte(mode=mode, sources={"openalex"}))
+    monkeypatch.setattr(fetch_stale, "_run_fetch_stale", run_one)
+    monkeypatch.setattr(fetch_stale, "window_years", lambda _conn, *, start_year, year: None)
+    return sources
 
 
-def test_mode_daily_saute_la_phase(contexte, caplog):
-    refreshed: list[str] = []
+def test_mode_daily_saute_la_phase(contexte, caplog, relues):
     with caplog.at_level(logging.INFO, logger="test"):
-        _run(contexte, "daily", refreshed)
-    assert refreshed == []
+        run_phase(_PHASE, contexte(mode="daily", sources={"openalex"}))
+    assert relues == []
     assert "Sautée en mode daily" in caplog.text
 
 
-def test_mode_full_rafraichit_les_sources(contexte):
-    refreshed: list[str] = []
-    _run(contexte, "full", refreshed)
-    assert refreshed == ["openalex"]
+def test_mode_full_rafraichit_les_sources_demandees(contexte, relues):
+    run_phase(_PHASE, contexte(mode="full", sources={"openalex"}))
+    assert relues == ["openalex"]

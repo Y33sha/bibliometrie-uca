@@ -11,6 +11,7 @@ class DocType(StrEnum):
     ARTICLE = "article"
     CONFERENCE_PAPER = "conference_paper"
     CONFERENCE = "conference"
+    CONFERENCE_ABSTRACT = "conference_abstract"
     RECORDED_TALK = "recorded_talk"
     BOOK = "book"
     BOOK_CHAPTER = "book_chapter"
@@ -49,6 +50,7 @@ ARTICLE_SUBTYPES: frozenset[str] = frozenset(
         DocType.DATA_PAPER,
         DocType.CONFERENCE_PAPER,
         DocType.CONFERENCE,
+        DocType.CONFERENCE_ABSTRACT,
         DocType.EDITORIAL,
         DocType.LETTER,
         DocType.ERRATUM,
@@ -68,6 +70,7 @@ DOC_TYPE_LABELS: dict[DocType, DocTypeLabel] = {
     DocType.ARTICLE: DocTypeLabel("Article", "Articles"),
     DocType.CONFERENCE_PAPER: DocTypeLabel("Conference paper", "Conference papers"),
     DocType.CONFERENCE: DocTypeLabel("Communication", "Communications"),
+    DocType.CONFERENCE_ABSTRACT: DocTypeLabel("Résumé de conférence", "Résumés de conférence"),
     DocType.RECORDED_TALK: DocTypeLabel("Conférence filmée", "Conférences filmées"),
     DocType.BOOK: DocTypeLabel("Ouvrage", "Ouvrages"),
     DocType.BOOK_CHAPTER: DocTypeLabel("Chapitre", "Chapitres"),
@@ -118,7 +121,13 @@ DOC_TYPE_FAMILIES: dict[str, DocTypeFamily] = {
         ),
     ),
     "conferences": DocTypeFamily(
-        "Conférences", (DocType.CONFERENCE, DocType.RECORDED_TALK, DocType.POSTER)
+        "Conférences",
+        (
+            DocType.CONFERENCE,
+            DocType.CONFERENCE_ABSTRACT,
+            DocType.RECORDED_TALK,
+            DocType.POSTER,
+        ),
     ),
     "preprints": DocTypeFamily("Prépublications", (DocType.PREPRINT,)),
     # Les thèses d'exercice et les mémoires sont exclus des listes, les thèses en cours y sont invisibles.

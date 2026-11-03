@@ -50,6 +50,7 @@ from domain.persons.identifiers import AttributionStatus
 from domain.persons.person import PersonExclusion
 from domain.platforms.platform import PlatformType
 from domain.publications.author_grouping import GroupingMethod
+from domain.publications.author_positions import AuthorPosition
 from domain.publications.dates import DatePrecision
 from domain.publications.doc_types import DocType
 from domain.publications.licenses import License
@@ -829,6 +830,8 @@ grouping_method_enum = PgEnum(*GroupingMethod, name="grouping_method", create_ty
 
 resolution_mode_enum = PgEnum(*ContributionMatchReason, name="resolution_mode", create_type=False)
 
+author_position_enum = PgEnum(*AuthorPosition, name="author_position", create_type=False)
+
 contributions = Table(
     "contributions",
     metadata,
@@ -837,7 +840,16 @@ contributions = Table(
     Column("person_id", Integer),
     Column("resolution_mode", resolution_mode_enum),
     Column("reference_position", SmallInteger),
-    Column("is_corresponding", Boolean),
+    Column(
+        "author_positions",
+        ARRAY(author_position_enum),
+        nullable=False,
+        server_default="{}",
+        comment=(
+            "Positions d'auteur : correspondant, premier ou dernier auteur. La phase"
+            " author_grouping les calcule depuis les listes d'auteurs de la publication."
+        ),
+    ),
     Column("roles", ARRAY(Text)),
     # Indices de l'entrée dans le périmètre, union de ceux des contributions sources ; `in_perimeter` en découle.
     Column(
@@ -1634,7 +1646,6 @@ staging = Table(
     Column("source_id", Text, nullable=False),
     Column("doi", Text),
     Column("raw_data", Jsonb, nullable=False),
-    Column("processed", Boolean, server_default="false"),
     Column("imported_at", DateTime(timezone=True), server_default=func.now()),
     Column(
         "raw_hash",
@@ -1665,9 +1676,8 @@ staging = Table(
         name="staging_entry_mode_check",
     ),
     comment=(
-        "Documents moissonnés, en transit vers les tables sources. Deux états : à traiter "
-        "(processed FALSE, raw_data porte le payload de la source), normalisée (processed "
-        "TRUE, raw_data vidé)."
+        "Documents moissonnés, en transit vers les tables sources. Une ligne à normaliser est "
+        "dans queues.staging_normalization_queue ; la normalisation vide raw_data."
     ),
     schema="sources",
 )
@@ -1864,6 +1874,7 @@ publication_contributions_queue = _queue("publication_contributions_queue")
 source_record_keys_queue = _queue("source_record_keys_queue")
 contribution_attributes_queue = _queue("contribution_attributes_queue")
 contribution_resolution_queue = _queue("contribution_resolution_queue")
+staging_normalization_queue = _queue("staging_normalization_queue")
 
 
 # `subject_labels` (vue matérialisée) : sujets regroupés par libellé normalisé, tous vocabulaires confondus, avec leur nombre de publications.

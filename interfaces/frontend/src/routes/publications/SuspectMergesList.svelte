@@ -7,19 +7,21 @@
   import Pagination from "#lib/components/Pagination.svelte";
   import PublicationTitle from "#lib/components/PublicationTitle.svelte";
   import SourceTag from "#lib/components/SourceTag.svelte";
+  import PublicationDrawer from "#lib/components/publications/PublicationDrawer.svelte";
+  import { useDrawerParam } from "#lib/composables/useDrawerParam.svelte.js";
   import type { components } from "#lib/api/schema.js";
 
   type Suspect = components["schemas"]["SuspectMergeOut"];
 
   let {
-    onopenPublication,
-    activePublicationId,
+    onchange,
   }: {
-    /** Ouvre le volet d'une publication. */
-    onopenPublication: (publicationId: number) => void;
-    /** Publication dont le volet est ouvert. */
-    activePublicationId: number | null;
+    /** Appelé après une fusion de publications dans le volet. */
+    onchange: () => void;
   } = $props();
+
+  // Volet d'une publication : ouvert tant que `?publication=<id>` figure dans l'URL.
+  const drawer = useDrawerParam("publication");
 
   const list = usePaginatedFetch<Suspect>({
     endpoint: "/api/publications/suspect-merges",
@@ -45,9 +47,9 @@
 <ListStatus {list} emptyText="Aucune fusion suspecte.">
   <div class="triage-list">
     {#each list.items as item (item.publication_id)}
-      <div class="triage-item" class:active={item.publication_id === activePublicationId}>
+      <div class="triage-item" class:active={item.publication_id === drawer.id}>
         <div class="head">
-          <button class="title" onclick={() => onopenPublication(item.publication_id)}>
+          <button class="title" onclick={() => drawer.open(item.publication_id)}>
             <PublicationTitle titre={item.title} />
           </button>
           <span class="meta">
@@ -77,6 +79,18 @@
 
   <Pagination page={list.page} pages={list.pages} onchange={list.goToPage} />
 </ListStatus>
+
+{#if drawer.id !== null}
+  <PublicationDrawer
+    publicationId={drawer.id}
+    onclose={() => drawer.open(null)}
+    onopen={drawer.open}
+    onchange={() => {
+      list.load();
+      onchange();
+    }}
+  />
+{/if}
 
 <style>
   .triage-item.active {
