@@ -8,7 +8,7 @@ from domain.normalize import normalize_text, optional_plain_text
 from domain.publications.doc_types import DocType
 from domain.serials.issns import SerialIssn, received_issns
 from domain.serials.serial import OaModel
-from domain.serials.series import ContainerLevel, container_level, series_title
+from domain.serials.series import names_a_volume, series_title
 from domain.serials.titles import names_a_dated_event, names_ebook_platform, names_proceedings
 from domain.source_records.doc_types import map_doc_type
 
@@ -195,7 +195,7 @@ def determine_container_type(
 
     collection_title = d.collection_title
     volume_title = d.document_title if role is ContainerRole.BOOK else d.book_title
-    if collection_title and container_level(collection_title) is ContainerLevel.VOLUME:
+    if collection_title and names_a_volume(collection_title):
         volume_title = volume_title or collection_title
         collection_title = series_title(collection_title)
     series = _series(d, collection_title) if d.has_issn else None

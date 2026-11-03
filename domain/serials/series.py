@@ -6,7 +6,6 @@ Un titre qui désigne une édition ou un tome précis est celui d'un volume : un
 import re
 from collections import defaultdict
 from collections.abc import Sequence
-from enum import StrEnum
 from typing import NamedTuple
 
 from domain.normalize import normalize_text
@@ -44,26 +43,16 @@ _TRAILING_PREPOSITION = re.compile(
 )
 
 
-class ContainerLevel(StrEnum):
-    """Niveau d'un conteneur."""
-
-    SERIES = "series"
-    VOLUME = "volume"
-
-
-def container_level(title: str) -> ContainerLevel:
-    """Renvoie le niveau d'un titre de conteneur, d'après ses marques d'édition ou de tome."""
-    if names_a_dated_event(title) or _ORDINAL.search(title) or _VOLUME_NUMBER.search(title):
-        return ContainerLevel.VOLUME
-    return ContainerLevel.SERIES
+def names_a_volume(title: str) -> bool:
+    """Vrai si un titre de conteneur désigne un volume, d'après ses marques d'édition ou de tome ; faux pour un titre de série."""
+    return bool(
+        names_a_dated_event(title) or _ORDINAL.search(title) or _VOLUME_NUMBER.search(title)
+    )
 
 
 def split_collection_and_volume(first: str, second: str) -> tuple[str, str]:
-    """Distingue la collection et le volume parmi deux titres de conteneur. Le volume est le seul titre qui a la forme d'un volume (`container_level`) ; à défaut, l'ordre des titres tranche."""
-    if (
-        container_level(first) is ContainerLevel.VOLUME
-        and container_level(second) is ContainerLevel.SERIES
-    ):
+    """Distingue la collection et le volume parmi deux titres de conteneur. Le volume est le seul titre qui a la forme d'un volume (`names_a_volume`) ; à défaut, l'ordre des titres tranche."""
+    if names_a_volume(first) and not names_a_volume(second):
         return second, first
     return first, second
 
@@ -105,19 +94,17 @@ class SeriesGroup(NamedTuple):
 
 
 def group_series(volumes: Sequence[VolumeTitle]) -> list[SeriesGroup]:
-    """Reconnaît les séries entre plusieurs volumes : titres de volume (`container_level`) de même clé de série, chez le même éditeur.
+    """Reconnaît les séries entre plusieurs volumes : titres de volume (`names_a_volume`) de même clé de série, chez le même éditeur.
 
-    Des titres sans marque d'édition identiques désignent un ouvrage en plusieurs volumes, pas une série. Le titre de la série est le titre de série du plus ancien volume.
+    Des titres sans marque d'édition identiques désignent un ouvrage en plusieurs volumes, pas une série. Le titre de la série est le titre de série du plus ancien volume, de plus petit identifiant.
     """
     groups: dict[tuple[str, int | None], list[VolumeTitle]] = defaultdict(list)
     for volume in volumes:
-        if container_level(volume.title) is ContainerLevel.VOLUME and (
-            key := series_key(volume.title)
-        ):
+        if names_a_volume(volume.title) and (key := series_key(volume.title)):
             groups[(key, volume.publisher_id)].append(volume)
     return [
         SeriesGroup(
-            series_title(min(members).title),
+            series_title(min(members, key=lambda v: v.id).title),
             publisher_id,
             tuple(sorted(v.id for v in members)),
         )
