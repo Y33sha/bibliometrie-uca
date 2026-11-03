@@ -6,7 +6,7 @@ from domain.publications.metadata import (
     is_overlong_title,
     normalized_title,
 )
-from domain.publications.oa_status import ACCESS_LEVELS, OA_RANK
+from domain.publications.oa_status import ACCESS_LEVELS, OA_RANK, OaStatus
 
 
 class TestAccessLevels:
@@ -78,6 +78,9 @@ class TestIsOverlongTitle:
 
 
 class TestOaRank:
+    def test_every_status_has_a_rank(self):
+        assert set(OA_RANK) == set(OaStatus)
+
     def test_rank_order_is_strict(self):
         assert OA_RANK["diamond"] > OA_RANK["gold"] > OA_RANK["hybrid"]
         assert OA_RANK["hybrid"] > OA_RANK["green"] > OA_RANK["bronze"]

@@ -54,7 +54,7 @@ from domain.publications.author_positions import AuthorPosition
 from domain.publications.dates import DatePrecision
 from domain.publications.doc_types import DocType
 from domain.publications.licenses import License
-from domain.publications.oa_status import OA_RANK
+from domain.publications.oa_status import OaStatus
 from domain.publications.relations import RelationType
 from domain.publishers.publisher import PublisherType
 from domain.serials.issn_facts import IssnLinkType
@@ -658,8 +658,7 @@ identifier_origin_enum = PgEnum(
 source_type_enum = PgEnum(*Source, name="source_type", create_type=False)
 lookup_source_enum = PgEnum(*LOOKUP_SOURCES, name="lookup_source", create_type=False)
 
-# Tout statut open access est classable par ouverture : les clés d'`OA_RANK` sont le vocabulaire.
-oa_type_enum = PgEnum(*OA_RANK, name="oa_type", create_type=False)
+oa_type_enum = PgEnum(*OaStatus, name="oa_type", create_type=False)
 
 license_type_enum = PgEnum(*License, name="license_type", create_type=False)
 

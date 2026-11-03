@@ -29,9 +29,6 @@ OA_RANK: dict[str, int] = {
     OaStatus.UNKNOWN: 1,
 }
 
-# Statuts open access, qui valident le filtre `oa_status` des lectures.
-OA_STATUSES: frozenset[str] = frozenset(OA_RANK)
-
 # Niveaux d'accès, plus grossiers que les statuts. Chaque statut appartient à un seul niveau.
 ACCESS_LEVELS: dict[str, frozenset[str]] = {
     "open": frozenset(

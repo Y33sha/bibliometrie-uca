@@ -10,7 +10,7 @@ from fastapi import Depends, Query
 
 from domain.publications.doc_types import DocType
 from domain.publications.hal_deposit import HalDepositStatus
-from domain.publications.oa_status import ACCESS_LEVELS, OA_STATUSES
+from domain.publications.oa_status import ACCESS_LEVELS, OaStatus
 from domain.source_records.impact import CitationTop
 from infrastructure.read_models.publications.models import (
     AUTHOR_POSITION_FILTER_VALUES,
@@ -74,7 +74,7 @@ class PublicationFilterParams:
             author_id=self.author_id,
             subject_labels=parse_str_csv(self.subject),
             access=parse_vocabulary_csv(self.access, allowed=ACCESS_LEVELS, param="access"),
-            oa_status=parse_vocabulary_csv(self.oa_status, allowed=OA_STATUSES, param="oa_status"),
+            oa_status=parse_vocabulary_csv(self.oa_status, allowed=OaStatus, param="oa_status"),
             license=parse_vocabulary_csv(
                 self.license, allowed=LICENSE_FILTER_VALUES, param="license"
             ),
