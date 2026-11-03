@@ -37,7 +37,7 @@ class CrossrefClient:
         self._headers = headers()
 
     def fetch_page(self, filters: str, cursor: str | None, label: str) -> PersonSearchPage:
-        """Renvoie une page des œuvres désignées par `filters`, la première quand `cursor` est `None`. Une page vide clôt la pagination."""
+        """Renvoie une page des œuvres désignées par `filters`, la première quand `cursor` est `None`. Une page incomplète clôt la pagination : Crossref renvoie un curseur même après la dernière page."""
         data = as_mapping(
             http_request_with_retry(
                 "GET",
@@ -51,7 +51,9 @@ class CrossrefClient:
         message = as_mapping(data.get("message"))
         records = [as_mapping(item) for item in as_sequence(message.get("items"))]
         following = as_str(message.get("next-cursor"))
-        return PersonSearchPage(records=records, next_token=following if records else None)
+        return PersonSearchPage(
+            records=records, next_token=following if len(records) == _ROWS else None
+        )
 
 
 async def get_message(
