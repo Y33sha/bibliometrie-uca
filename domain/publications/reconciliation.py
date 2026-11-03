@@ -144,8 +144,8 @@ class _Claim(NamedTuple):
     """Publication revendiquée, `None` pour une création."""
     strong: bool
     """Vrai pour la publication qui a le DOI de la partition."""
-    min_source_record: int
     source_record_ids: tuple[int, ...]
+    """Enregistrements sources de la partition, triés."""
     doi: str | None = None
     """Ancre DOI de la partition."""
 
@@ -161,28 +161,24 @@ def _claim(
     Une publication qui a déjà le DOI de la partition sans membre dans le voisinage (`existing_publication_by_doi`) reste l'ancre : une publication créée au même DOI heurterait la contrainte d'unicité.
     """
     source_record_ids = tuple(sorted(m.source_record_id for m in part))
-    min_source_record = min(m.source_record_id for m in part)
-    external_carrier = existing_publication_by_doi.get(doi) if doi else None
+    carriers = sorted(
+        {
+            pid
+            for m in part
+            if doi and m.publication_doi == doi and (pid := m.publication_id) is not None
+        }
+    )
+    if carriers:
+        return _Claim(carriers[0], True, source_record_ids, doi)
+    if doi and (external_carrier := existing_publication_by_doi.get(doi)) is not None:
+        return _Claim(external_carrier, True, source_record_ids, doi)
     materialized = [m for m in part if m.publication_id is not None]
     if materialized:
-        carriers = sorted(
-            {
-                pid
-                for m in materialized
-                if doi and m.publication_doi == doi and (pid := m.publication_id) is not None
-            }
-        )
-        if carriers:
-            return _Claim(carriers[0], True, min_source_record, source_record_ids, doi)
-        if external_carrier is not None:
-            return _Claim(external_carrier, True, min_source_record, source_record_ids, doi)
         anchor_publication = min(materialized, key=lambda m: m.source_record_id).publication_id
-        return _Claim(anchor_publication, False, min_source_record, source_record_ids, doi)
-    if external_carrier is not None:
-        return _Claim(external_carrier, True, min_source_record, source_record_ids, doi)
+        return _Claim(anchor_publication, False, source_record_ids, doi)
     if any(m.materializable for m in part) and any(m.can_found_publication for m in part):
-        return _Claim(None, False, min_source_record, source_record_ids, doi)  # create
-    return None  # skip
+        return _Claim(None, False, source_record_ids, doi)
+    return None
 
 
 def plan_reconciliation(
@@ -216,15 +212,14 @@ def plan_reconciliation(
     )
     target_of_source_record: dict[int, int | None] = {}
     for claim in sorted(
-        claims, key=lambda c: (c.preferred is None, not c.strong, c.min_source_record)
+        claims, key=lambda c: (c.preferred is None, not c.strong, c.source_record_ids[0])
     ):
         if claim.preferred is not None and claim.preferred not in awarded:
             awarded.add(claim.preferred)
             target: int | None = claim.preferred
         else:
-            target = (
-                None  # création, ou publication existante déjà prise → création d'une publication
-            )
+            # Création demandée, ou publication revendiquée déjà prise : la partition crée une publication.
+            target = None
             if not any(by_id[i].publication_year for i in claim.source_record_ids):
                 detached.extend(claim.source_record_ids)
                 continue
