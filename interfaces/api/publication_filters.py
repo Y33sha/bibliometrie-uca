@@ -8,7 +8,7 @@ from typing import Annotated
 
 from fastapi import Depends, Query
 
-from domain.publications.doc_types import DocType
+from domain.documents.doc_types import DocType
 from domain.publications.hal_deposit import HalDepositStatus
 from domain.publications.oa_status import ACCESS_LEVELS, OaStatus
 from domain.source_records.impact import CitationTop

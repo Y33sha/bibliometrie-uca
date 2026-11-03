@@ -5,9 +5,9 @@ from collections.abc import Sequence
 
 from sqlalchemy import Connection, text
 
+from domain.documents.licenses import License
 from domain.platforms.platform import PlatformType
 from domain.publications.access import Copy, registered_url_copy
-from domain.publications.licenses import License
 from infrastructure.sql_fragments import under_active_embargo
 
 

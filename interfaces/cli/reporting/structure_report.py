@@ -21,8 +21,8 @@ from pathlib import Path
 from sqlalchemy import Connection, text
 
 from domain.dates import today
+from domain.documents.doc_types import DocType
 from domain.publications.author_positions import AuthorPosition
-from domain.publications.doc_types import DocType
 from domain.sources.registry import Source, source_label
 from domain.structures.structure import StructureType
 from infrastructure.db.engine import get_sync_engine

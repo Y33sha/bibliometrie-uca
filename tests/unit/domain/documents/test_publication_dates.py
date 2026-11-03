@@ -1,10 +1,10 @@
-"""Date de publication et lecture des dates des sources (`domain.publications.dates`)."""
+"""Date de publication et lecture des dates des sources (`domain.documents.dates`)."""
 
 from datetime import date
 
 import pytest
 
-from domain.publications.dates import (
+from domain.documents.dates import (
     DatePrecision,
     PublicationDate,
     arbitrate_publication_date,

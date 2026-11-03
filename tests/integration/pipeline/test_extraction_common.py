@@ -5,7 +5,7 @@ from functools import partial
 import pytest
 from sqlalchemy import text
 
-from domain.publications.identifiers import DOI
+from domain.documents.identifiers import DOI
 from domain.source_records.identifiers import (
     SourceIdentifier,
     SourceIdentifierRole,

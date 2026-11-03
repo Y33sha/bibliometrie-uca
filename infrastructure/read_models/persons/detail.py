@@ -2,8 +2,8 @@
 
 from sqlalchemy import Connection, text
 
+from domain.documents.doc_types import DOC_TYPE_FAMILIES
 from domain.publications.contribution_roles import ContributionRole
-from domain.publications.doc_types import DOC_TYPE_FAMILIES
 from domain.sources.registry import Source
 from infrastructure.read_models._common import (
     StructureRef,

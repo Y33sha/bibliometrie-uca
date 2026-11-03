@@ -7,9 +7,9 @@ import re
 from collections.abc import Mapping
 
 from domain.dates import french_date_to_iso
+from domain.documents.dates import PublicationDate, parse_iso_date
+from domain.documents.identifiers import DOI, NNT
 from domain.publications.contribution_roles import THESES_FIELD_ROLES
-from domain.publications.dates import PublicationDate, parse_iso_date
-from domain.publications.identifiers import DOI, NNT
 from domain.source_records.identifiers import (
     SourceIdentifier,
     SourceIdentifierRole,

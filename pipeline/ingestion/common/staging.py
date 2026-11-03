@@ -14,7 +14,7 @@ from enum import StrEnum
 
 from sqlalchemy import Connection, bindparam, text
 
-from domain.publications.identifiers import DOI
+from domain.documents.identifiers import DOI
 from domain.sources.registry import DOI_ORG, PROFILES, Source
 from domain.sources.staging import StagingEntryMode
 from domain.types import JsonValue

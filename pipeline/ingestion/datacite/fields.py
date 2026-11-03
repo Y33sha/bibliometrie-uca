@@ -2,7 +2,7 @@
 
 from collections.abc import Mapping
 
-from domain.publications.identifiers import DOI
+from domain.documents.identifiers import DOI
 from domain.types import JsonValue, as_mapping, as_str
 
 

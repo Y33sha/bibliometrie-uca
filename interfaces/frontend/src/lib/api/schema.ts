@@ -161,7 +161,7 @@ export interface paths {
         };
         /**
          * List Licenses
-         * @description Liste les licences d'une publication avec leur libellé français, dans l'ordre de `domain.publications.licenses.License`.
+         * @description Liste les licences d'une publication avec leur libellé français, dans l'ordre de `domain.documents.licenses.License`.
          */
         get: operations["list_licenses_api_publications_licenses_get"];
         put?: never;

@@ -9,12 +9,12 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 from domain.dates import today
+from domain.documents.dates import PublicationDate
+from domain.documents.identifiers import DOI
+from domain.documents.licenses import License, normalize_license
 from domain.normalize import drop_flattened_mathml
 from domain.persons.contributor_name import ContributorName
 from domain.publications.contribution_roles import ContributionRole
-from domain.publications.dates import PublicationDate
-from domain.publications.identifiers import DOI
-from domain.publications.licenses import License, normalize_license
 from domain.serials.containers import ContainerDescription, ContainerRole, container_role
 from domain.serials.series import split_collection_and_volume
 from domain.source_records.biblio import PageRange, compact_biblio, parse_pages

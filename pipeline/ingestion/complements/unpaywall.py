@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import httpx2
 
-from domain.publications.identifiers import DOI
+from domain.documents.identifiers import DOI
 from domain.types import as_mapping
 from pipeline.http.http_retry import lookup_json_async
 from pipeline.http.lookup import NOT_FOUND, LookupOutcome, NotFound, Unavailable

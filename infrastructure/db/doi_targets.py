@@ -4,7 +4,7 @@ from collections.abc import Iterable
 
 from sqlalchemy import Connection, text
 
-from domain.publications.identifiers import DOI_VERSION_SUFFIX_PATTERN
+from domain.documents.identifiers import DOI_VERSION_SUFFIX_PATTERN
 from domain.source_records.identifiers import SourceIdentifier, SourceIdentifierType
 
 

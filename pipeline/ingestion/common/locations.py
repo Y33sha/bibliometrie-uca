@@ -10,11 +10,11 @@ from urllib.parse import urlsplit
 
 from sqlalchemy import Connection, text
 
+from domain.documents.identifiers import hal_deposit_url
+from domain.documents.licenses import License
 from domain.normalize import normalize_text
 from domain.platforms.platform import PlatformType, is_descriptive_page
 from domain.platforms.registry import IDENTIFIER_COPIES, is_fully_open, preprint_copy_url
-from domain.publications.identifiers import hal_deposit_url
-from domain.publications.licenses import License
 from domain.source_records.identifiers import (
     SourceIdentifier,
     SourceIdentifierRole,

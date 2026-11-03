@@ -2,9 +2,9 @@
 
 import pytest
 
+from domain.documents.licenses import License
 from domain.platforms.platform import PlatformType
 from domain.publications.access import Copy
-from domain.publications.licenses import License
 from domain.publications.open_access import (
     OpenAccessFacts,
     copies_facts,

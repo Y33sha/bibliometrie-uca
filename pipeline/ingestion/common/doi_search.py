@@ -12,7 +12,7 @@ from typing import Protocol
 import httpx2
 from sqlalchemy import Connection, ScalarResult, text
 
-from domain.publications.identifiers import DOI
+from domain.documents.identifiers import DOI
 from domain.source_records.identifiers import SourceIdentifierType
 from domain.sources.registry import DOI_ORG, PROFILES, Source
 from domain.sources.staging import StagingEntryMode

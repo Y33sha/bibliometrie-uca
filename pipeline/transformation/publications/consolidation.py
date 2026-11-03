@@ -7,12 +7,12 @@ from typing import NamedTuple
 
 from sqlalchemy import Connection, text
 
+from domain.documents.dates import PublicationDate
 from domain.publications.access import access
 from domain.publications.aggregation import (
     assign_publisher,
     refresh_from_sources as _refresh_aggregate,
 )
-from domain.publications.dates import PublicationDate
 from domain.publications.open_access import is_restricted, publication_oa_status
 from domain.publications.publication import Publication
 from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES

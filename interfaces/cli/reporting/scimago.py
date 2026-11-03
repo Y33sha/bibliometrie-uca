@@ -11,7 +11,7 @@ from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from domain.publications.identifiers import ISSN
+from domain.documents.identifiers import ISSN
 
 SCIMAGO_DIR = Path("data/imports/scimago")
 """Dossier des fichiers SCImago, nommés `scimagojr AAAA.csv`."""

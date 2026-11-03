@@ -3,7 +3,7 @@
 from collections.abc import Sequence
 from typing import NamedTuple
 
-from domain.publications.doc_types import DocType
+from domain.documents.doc_types import DocType
 from domain.publications.metadata import normalized_title
 from domain.source_records.identifiers import (
     SourceIdentifier,

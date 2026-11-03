@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from domain.publications.doc_types import DocType
+from domain.documents.doc_types import DocType
 from domain.source_records.doc_types import _SOURCE_MAPS, map_doc_type
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]

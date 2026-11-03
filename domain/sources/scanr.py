@@ -1,6 +1,6 @@
 """Lecture des identifiants propres à ScanR."""
 
-from domain.publications.identifiers import HALId
+from domain.documents.identifiers import HALId
 
 # Préfixe de l'identifiant ScanR d'un enregistrement source issu de HAL, suivi de l'identifiant HAL.
 _SCANR_HAL_PREFIX = "hal"

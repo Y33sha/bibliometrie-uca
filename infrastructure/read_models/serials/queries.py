@@ -5,8 +5,8 @@ from collections.abc import Iterator
 
 from sqlalchemy import Connection, Row, text
 
+from domain.documents.identifiers import issn_search_prefix
 from domain.normalize import normalize_text
-from domain.publications.identifiers import issn_search_prefix
 from domain.serials.containers import conference_paper_share, holds_mostly_conference_papers
 from domain.serials.doi_namespaces import DoiNamespace, namespace_candidates, resolve_serial
 from domain.serials.serial import (

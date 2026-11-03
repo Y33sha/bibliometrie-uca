@@ -17,7 +17,7 @@ from dataclasses import dataclass
 
 import defusedxml.ElementTree as ET
 
-from domain.publications.identifiers import ISSN
+from domain.documents.identifiers import ISSN
 from domain.serials.issns import IssnSupport
 from domain.sources.sudoc import SudocSerialRecord
 

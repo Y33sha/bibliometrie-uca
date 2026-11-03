@@ -12,10 +12,10 @@ from dataclasses import dataclass, fields
 
 from sqlalchemy import Connection, bindparam, text
 
+from domain.documents.dates import PublicationDate
+from domain.documents.doc_types import DocType
+from domain.documents.licenses import License
 from domain.normalize import clean_abstract, clean_title, optional_plain_text
-from domain.publications.dates import PublicationDate
-from domain.publications.doc_types import DocType
-from domain.publications.licenses import License
 from domain.publications.metadata import normalized_title
 from domain.serials.titles import names_ebook_platform
 from domain.source_records.doc_types import map_doc_type

@@ -2,8 +2,8 @@
 
 import re
 
+from domain.documents.doc_types import DocType
 from domain.normalize import normalize_text
-from domain.publications.doc_types import DocType
 from domain.source_records.biblio import BiblioKey
 from domain.source_records.source_extras import SourceExtra, declares_conference
 from domain.source_records.source_record import SourceRecord

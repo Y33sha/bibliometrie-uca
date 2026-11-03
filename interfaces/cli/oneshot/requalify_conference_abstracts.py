@@ -16,7 +16,7 @@ from collections import Counter
 
 from sqlalchemy import Connection, text
 
-from domain.publications.doc_types import DocType
+from domain.documents.doc_types import DocType
 from domain.source_records.doc_types import map_doc_type
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.queues import Queue, enqueue

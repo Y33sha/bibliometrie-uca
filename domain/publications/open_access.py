@@ -11,10 +11,10 @@ Le verdict d'Unpaywall relève les accès, jamais ne les abaisse.
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, replace
 
+from domain.documents.doc_types import DocType
+from domain.documents.licenses import OPEN_LICENSES
 from domain.platforms.platform import ARCHIVE_TYPES
 from domain.publications.access import Copy, open_copies
-from domain.publications.doc_types import DocType
-from domain.publications.licenses import OPEN_LICENSES
 from domain.publications.oa_status import OaStatus
 from domain.serials.serial import OaModel
 from domain.source_records.source_extras import SourceExtra

@@ -10,8 +10,8 @@ from enum import StrEnum
 from functools import cache
 from typing import NamedTuple
 
+from domain.documents.doc_types import DocType
 from domain.platforms.registry import preprint_servers_of_doi
-from domain.publications.doc_types import DocType
 from domain.publishers.publisher import PublisherType
 from domain.serials.serial import SerialType
 from domain.source_records.identifiers import SourceIdentifier, SourceIdentifierType

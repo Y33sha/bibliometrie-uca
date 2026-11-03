@@ -7,7 +7,7 @@ import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from domain.publications.identifiers import (
+from domain.documents.identifiers import (
     NNT,
     PMCID,
     PMID,

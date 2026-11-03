@@ -6,8 +6,8 @@ Sur une base vide, chaque test exerce une branche des filtres, des tris, des fac
 import pytest
 from sqlalchemy import text
 
-from domain.publications.doc_types import DOC_TYPE_FAMILIES
-from domain.publications.licenses import LICENSE_LABELS
+from domain.documents.doc_types import DOC_TYPE_FAMILIES
+from domain.documents.licenses import LICENSE_LABELS
 from domain.source_records.identifiers import (
     SourceIdentifier,
     SourceIdentifierRole,

@@ -20,8 +20,8 @@ from typing import Literal
 
 from sqlalchemy import Connection, text
 
+from domain.documents.doc_types import DOC_TYPE_FAMILIES
 from domain.errors import ValidationError
-from domain.publications.doc_types import DOC_TYPE_FAMILIES
 from domain.publications.oa_status import OaStatus
 from infrastructure.read_models.filters import (
     CITATION_CLASS_SQL,

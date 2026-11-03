@@ -16,9 +16,9 @@ from unittest.mock import MagicMock
 import httpx2
 import pytest
 
+from domain.documents.licenses import License
 from domain.platforms.platform import PlatformType
 from domain.publications.access import Copy
-from domain.publications.licenses import License
 from pipeline.http.lookup import LookupOutcome
 from pipeline.ingestion.complements.doi_org import fetch_registered_url
 from pipeline.ingestion.complements.unpaywall import fetch_oa_status

@@ -11,8 +11,8 @@ from typing import Any
 from sqlalchemy import Connection, text
 
 from domain.countries import NO_COUNTRY_CODE
+from domain.documents.licenses import license_label
 from domain.publications.hal_deposit import HAL_DEPOSIT_STATUS_LABELS, HalDepositStatus
-from domain.publications.licenses import license_label
 from domain.publications.oa_status import OaStatus
 from domain.source_records.impact import CITATION_TOP_LABELS, CitationTop
 from domain.sources.registry import source_label

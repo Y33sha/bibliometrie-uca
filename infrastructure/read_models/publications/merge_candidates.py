@@ -2,8 +2,8 @@
 
 from sqlalchemy import Connection, text
 
+from domain.documents.identifiers import DOI
 from domain.normalize import normalize_text
-from domain.publications.identifiers import DOI
 from infrastructure.read_models.publications.models import MergeCandidateOut
 
 _LIMIT = 10

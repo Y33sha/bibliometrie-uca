@@ -10,12 +10,12 @@ import defusedxml.ElementTree as ET
 from defusedxml.common import DefusedXmlException
 
 from domain.dates import today
+from domain.documents.dates import PublicationDate, date_from_parts, parse_iso_date
+from domain.documents.doc_types import DocType
+from domain.documents.identifiers import DOI, NNT, PMCID, PMID, ArxivId, find_isbns
+from domain.documents.licenses import normalize_license
 from domain.persons.contributor_name import ContributorName
 from domain.publications.contribution_roles import map_role
-from domain.publications.dates import PublicationDate, date_from_parts, parse_iso_date
-from domain.publications.doc_types import DocType
-from domain.publications.identifiers import DOI, NNT, PMCID, PMID, ArxivId, find_isbns
-from domain.publications.licenses import normalize_license
 from domain.serials.containers import ContainerDescription
 from domain.serials.issns import source_issns
 from domain.source_records.biblio import PageRange, compact_biblio, parse_pages

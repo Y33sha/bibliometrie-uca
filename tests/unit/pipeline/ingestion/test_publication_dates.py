@@ -2,7 +2,7 @@
 
 from datetime import date
 
-from domain.publications.dates import DatePrecision, PublicationDate
+from domain.documents.dates import DatePrecision, PublicationDate
 from pipeline.ingestion.crossref.payload import extract_crossref_publication_date
 from pipeline.ingestion.datacite.payload import extract_datacite_publication_date
 from pipeline.ingestion.hal.normalize import get_publication_date as hal_date

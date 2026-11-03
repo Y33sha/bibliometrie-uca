@@ -4,7 +4,7 @@ from collections.abc import Callable, Iterable, Mapping, Set
 from dataclasses import dataclass, replace
 from enum import StrEnum
 
-from domain.publications.identifiers import DOI, ISBN, NNT, PMCID, PMID, ArxivId, HALId
+from domain.documents.identifiers import DOI, ISBN, NNT, PMCID, PMID, ArxivId, HALId
 from domain.serials.containers import ContainerRole, container_role
 
 

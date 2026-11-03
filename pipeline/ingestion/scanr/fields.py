@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from domain.publications.identifiers import DOI
+from domain.documents.identifiers import DOI
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
 
 

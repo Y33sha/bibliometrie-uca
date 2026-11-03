@@ -10,7 +10,7 @@ from typing import NamedTuple
 
 from sqlalchemy import Connection, Row, bindparam, func, text
 
-from domain.publications.doc_types import DocType
+from domain.documents.doc_types import DocType
 from domain.publications.scope import MatchabilityFacts
 from domain.serials.doi_namespaces import DoiNamespace
 from domain.source_records.corrections import CORRECTED_BY, RAW, CorrectionKey

@@ -6,12 +6,12 @@ from collections.abc import Iterator, Sequence
 
 from sqlalchemy import Connection, Row, text
 
+from domain.documents.dates import DatePrecision, PublicationDate
+from domain.documents.licenses import license_label
 from domain.normalize import normalize_text, to_plain_text
 from domain.publications.access import access_url
 from domain.publications.author_positions import AuthorPosition
-from domain.publications.dates import DatePrecision, PublicationDate
 from domain.publications.hal_deposit import HAL_DEPOSIT_STATUS_LABELS, HalDepositStatus
-from domain.publications.licenses import license_label
 from domain.source_records.impact import CITATION_TOP_LABELS, CitationTop
 from domain.source_records.source_extras import SourceExtra
 from domain.sources.registry import Source, source_record_url

@@ -5,9 +5,9 @@ Couvre les fonctions de lecture d'un work OpenAlex, la lecture des auteurs et le
 
 from __future__ import annotations
 
+from domain.documents.licenses import License
 from domain.persons.contributor_name import ContributorName
 from domain.platforms.platform import PlatformType
-from domain.publications.licenses import License
 from domain.serials.issns import SerialIssn
 from domain.source_records.identifiers import normalize_identifiers
 from domain.subjects.subject import SubjectVocabulary

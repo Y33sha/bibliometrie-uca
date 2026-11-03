@@ -3,7 +3,7 @@
 import re
 from enum import StrEnum
 
-from domain.publications.doc_types import DocType
+from domain.documents.doc_types import DocType
 from domain.sources.registry import Source
 
 

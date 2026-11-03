@@ -4,9 +4,9 @@ from collections.abc import Sequence
 
 from sqlalchemy import Connection, RowMapping, bindparam, text
 
+from domain.documents.dates import PublicationDate
+from domain.documents.identifiers import DOI
 from domain.merge import MergedEntity
-from domain.publications.dates import PublicationDate
-from domain.publications.identifiers import DOI
 from domain.publications.publication import Publication
 from domain.types import JsonValue
 from infrastructure.db.jsonb import Jsonb

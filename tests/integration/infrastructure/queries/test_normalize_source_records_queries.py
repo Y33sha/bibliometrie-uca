@@ -4,7 +4,7 @@ from functools import partial
 
 from sqlalchemy import text
 
-from domain.publications.dates import PublicationDate
+from domain.documents.dates import PublicationDate
 from domain.source_records.identifiers import (
     SourceIdentifier,
     SourceIdentifierRole,

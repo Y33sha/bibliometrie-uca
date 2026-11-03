@@ -1,11 +1,10 @@
-"""Identifiants des publications (`domain.publications.identifiers`) : DOI, identifiant HAL, NNT, PMID, PMCID, arXiv, ISSN, ISBN, préfixe DOI."""
+"""Identifiants des publications (`domain.documents.identifiers`) : DOI, identifiant HAL, NNT, PMID, PMCID, arXiv, ISSN, ISBN, préfixe DOI."""
 
 from dataclasses import FrozenInstanceError
 
 import pytest
 
-from domain.errors import ValidationError
-from domain.publications.identifiers import (
+from domain.documents.identifiers import (
     DOI,
     ISBN,
     ISSN,
@@ -22,6 +21,7 @@ from domain.publications.identifiers import (
     is_hal_host,
     issn_search_prefix,
 )
+from domain.errors import ValidationError
 
 
 class TestDOIConstruction:

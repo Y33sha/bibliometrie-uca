@@ -14,8 +14,8 @@ from collections import defaultdict
 
 from sqlalchemy import text
 
-from domain.publications.identifiers import hal_deposit_url
-from domain.publications.licenses import License
+from domain.documents.identifiers import hal_deposit_url
+from domain.documents.licenses import License
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from pipeline.ingestion.common.locations import LocationFacts, merge_locations

@@ -8,8 +8,8 @@ from functools import partial
 import pytest
 from sqlalchemy import text
 
+from domain.documents.licenses import License
 from domain.normalize import normalize_text
-from domain.publications.licenses import License
 from pipeline.ingestion.common.locations import LocationFacts, LocationStore
 from pipeline.transformation.publications.consolidation import RefreshVerdict
 from pipeline.transformation.publications.lifecycle import refresh

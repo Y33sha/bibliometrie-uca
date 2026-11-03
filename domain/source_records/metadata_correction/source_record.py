@@ -3,7 +3,7 @@
 from collections.abc import Mapping, Sequence, Set
 from typing import NamedTuple
 
-from domain.publications.identifiers import HALId
+from domain.documents.identifiers import HALId
 from domain.source_records.corrections import (
     UNARY_KEYS,
     CorrectionKey,

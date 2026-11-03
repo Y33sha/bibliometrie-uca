@@ -5,7 +5,7 @@ Une production hébergée sans être publiée n'a pas d'éditeur : la plateforme
 
 from collections.abc import Iterable
 
-from domain.publications.doc_types import DocType
+from domain.documents.doc_types import DocType
 from domain.sources.registry import Source
 
 UNPUBLISHED_DOC_TYPES: frozenset[str] = frozenset(

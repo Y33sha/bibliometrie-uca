@@ -8,7 +8,7 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping
 
-from domain.publications.dates import PublicationDate, parse_date_parts
+from domain.documents.dates import PublicationDate, parse_date_parts
 from domain.serials.issns import IssnSupport, SerialIssn, received_issns
 from domain.source_records.source_extras import SourceExtra
 from domain.types import JsonValue, as_mapping, as_sequence, as_str, as_strs

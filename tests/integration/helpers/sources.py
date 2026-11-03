@@ -6,8 +6,8 @@ from datetime import date
 
 from sqlalchemy import Connection, text
 
-from domain.publications.dates import DatePrecision
-from domain.publications.identifiers import DOI
+from domain.documents.dates import DatePrecision
+from domain.documents.identifiers import DOI
 from domain.source_records.identifiers import (
     SourceIdentifier,
     SourceIdentifierRole,

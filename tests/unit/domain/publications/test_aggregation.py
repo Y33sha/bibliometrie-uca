@@ -2,13 +2,13 @@
 
 import pytest
 
+from domain.documents.dates import PublicationDate, date_from_parts
+from domain.documents.identifiers import DOI
 from domain.publications.aggregation import (
     _arbitrate_doc_type_with_article_subtype,
     assign_publisher,
     refresh_from_sources,
 )
-from domain.publications.dates import PublicationDate, date_from_parts
-from domain.publications.identifiers import DOI
 from domain.publications.publication import Publication
 from domain.source_records.keys import DoiKeys
 from domain.source_records.source_record import SourceRecord

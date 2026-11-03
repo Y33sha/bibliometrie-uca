@@ -3,11 +3,11 @@
 import logging
 from collections.abc import Mapping, Sequence
 
+from domain.documents.dates import PublicationDate, date_from_parts
+from domain.documents.identifiers import DOI, find_isbns
 from domain.normalize import normalize_text
 from domain.persons.contributor_name import ContributorName
 from domain.publications.contribution_roles import ContributionRole, map_role
-from domain.publications.dates import PublicationDate, date_from_parts
-from domain.publications.identifiers import DOI, find_isbns
 from domain.serials.containers import ContainerDescription
 from domain.serials.issns import source_issns
 from domain.source_records.biblio import compact_biblio

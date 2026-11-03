@@ -11,8 +11,8 @@ Restent hors du vocabulaire, et donnent `None` :
 from collections.abc import Iterator
 from enum import StrEnum
 
-from domain.publications.doc_types import DocType
-from domain.publications.identifiers import DOI
+from domain.documents.doc_types import DocType
+from domain.documents.identifiers import DOI
 from domain.source_records.metadata_correction.shared_doi import (
     DATACITE_DIRECT_CONVERGENCE,
     declares_same_work,

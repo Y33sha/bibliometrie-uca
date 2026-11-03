@@ -4,8 +4,8 @@ from dataclasses import dataclass
 from enum import StrEnum
 from urllib.parse import quote
 
+from domain.documents.identifiers import hal_id_url
 from domain.persons.identifiers import PersonIdentifierType
-from domain.publications.identifiers import hal_id_url
 
 
 class Source(StrEnum):

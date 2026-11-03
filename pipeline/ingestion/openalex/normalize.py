@@ -5,13 +5,13 @@ from collections.abc import Iterable, Mapping
 from urllib.parse import urlsplit
 
 from domain.countries import normalize_country_code
+from domain.documents.dates import PublicationDate, date_from_parts, parse_iso_date
+from domain.documents.identifiers import DOI, PMCID, HALId, extract_doi_from_url
+from domain.documents.licenses import normalize_license
 from domain.persons.contributor_name import ContributorName
 from domain.platforms.platform import PlatformType
 from domain.platforms.registry import PMC_ARTICLE_URL, PUBMED_CENTRAL, known_platform_of_source
 from domain.publications.contribution_roles import ContributionRole
-from domain.publications.dates import PublicationDate, date_from_parts, parse_iso_date
-from domain.publications.identifiers import DOI, PMCID, HALId, extract_doi_from_url
-from domain.publications.licenses import normalize_license
 from domain.serials.containers import ContainerDescription
 from domain.serials.issns import source_issns
 from domain.serials.serial import OaModel

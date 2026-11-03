@@ -1,4 +1,4 @@
-from domain.publications.doc_types import DocType
+from domain.documents.doc_types import DocType
 from interfaces.cli.reporting.structure_report import ImpactGroup, PublicationImpact, impact_groups
 
 

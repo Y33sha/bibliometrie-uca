@@ -2,9 +2,9 @@
 
 from sqlalchemy import Connection, text
 
+from domain.documents.doc_types import DocType
 from domain.platforms.registry import HAL
 from domain.publications.access import Access, access, access_url
-from domain.publications.doc_types import DocType
 from domain.publications.relations import RelationType, inverse_relation
 from domain.source_records.identifiers import SourceIdentifierType
 from domain.source_records.source_extras import SourceExtra

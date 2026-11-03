@@ -12,7 +12,7 @@ from collections.abc import Mapping
 import httpx2
 from sqlalchemy import Connection, text
 
-from domain.publications.doc_types import DocType
+from domain.documents.doc_types import DocType
 from domain.sources.registry import Source
 from domain.types import JsonValue
 from pipeline.http.lookup import LookupOutcome

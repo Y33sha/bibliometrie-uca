@@ -18,9 +18,9 @@ from dataclasses import dataclass, field
 
 from sqlalchemy import Connection, Row, text
 
+from domain.documents.identifiers import ISSN
 from domain.entity_resolution import most_frequent
 from domain.normalize import normalize_text
-from domain.publications.identifiers import ISSN
 from domain.serials.attachment import (
     TitledSerial,
     choose_issnl,

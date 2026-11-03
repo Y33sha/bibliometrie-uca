@@ -8,8 +8,8 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable, Mapping
 
-from domain.publications.dates import PublicationDate, parse_iso_date
-from domain.publications.identifiers import DOI, find_isbns
+from domain.documents.dates import PublicationDate, parse_iso_date
+from domain.documents.identifiers import DOI, find_isbns
 from domain.source_records.source_extras import SourceExtra
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
 

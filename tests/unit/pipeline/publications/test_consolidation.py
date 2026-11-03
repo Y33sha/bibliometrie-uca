@@ -3,7 +3,7 @@
 Correction du `doc_type` rejouée sur la publication (`_apply_canonical_doc_type_correction`). Le `doc_type` et le `serial_id` de la publication viennent parfois d'enregistrements sources différents. Une correction qui dépend de la revue, appliquée à chaque enregistrement source, ignore la revue retenue pour la publication. Le rejeu l'applique à cette revue.
 """
 
-from domain.publications.identifiers import DOI
+from domain.documents.identifiers import DOI
 from domain.publications.publication import Publication
 from pipeline.transformation.publications.consolidation import (
     SerialFacts,

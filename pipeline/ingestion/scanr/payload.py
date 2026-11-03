@@ -5,7 +5,7 @@ Les payloads sont les objets JSON bruts de l'API, sans schéma typé."""
 import re
 from collections.abc import Mapping
 
-from domain.publications.identifiers import NNT
+from domain.documents.identifiers import NNT
 from domain.source_records.identifiers import (
     SourceIdentifier,
     SourceIdentifierRole,

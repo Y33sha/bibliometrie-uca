@@ -16,7 +16,7 @@ from collections.abc import Callable
 import httpx2
 from sqlalchemy import Connection, text
 
-from domain.publications.identifiers import DOI
+from domain.documents.identifiers import DOI
 from domain.source_records.identifiers import SourceIdentifierType
 from domain.sources.staging import StagingEntryMode
 from domain.types import JsonValue, as_mapping, as_sequence, as_str

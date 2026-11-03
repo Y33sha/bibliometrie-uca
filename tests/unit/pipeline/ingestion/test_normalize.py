@@ -18,7 +18,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from domain.publications.dates import PublicationDate
+from domain.documents.dates import PublicationDate
 from domain.serials.containers import ContainerDescription
 from domain.serials.issns import SerialIssn
 from pipeline.ingestion.common import normalizer as normalizer_module

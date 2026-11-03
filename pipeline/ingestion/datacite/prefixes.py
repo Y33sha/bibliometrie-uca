@@ -11,7 +11,7 @@ from collections.abc import Mapping
 
 import httpx2
 
-from domain.publications.identifiers import DoiPrefix
+from domain.documents.identifiers import DoiPrefix
 from domain.types import JsonValue, as_mapping, as_sequence, as_str, at_path
 from pipeline.http.lookup import NOT_FOUND, LookupOutcome, NotFound, Unavailable
 from pipeline.ingestion.datacite.api import fetch_prefix

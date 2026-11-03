@@ -30,8 +30,8 @@ from pathlib import Path
 
 from sqlalchemy import Connection, text
 
+from domain.documents.identifiers import DOI
 from domain.normalize import normalize_text, optional_plain_text
-from domain.publications.identifiers import DOI
 from domain.structures.identifiers import RorId
 from domain.structures.structure import StructureType
 from domain.types import JsonValue

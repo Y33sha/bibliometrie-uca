@@ -2,7 +2,7 @@
 
 from collections.abc import Mapping
 
-from domain.publications.identifiers import DOI
+from domain.documents.identifiers import DOI
 from domain.types import JsonValue
 from pipeline.ingestion.hal.payload import hal_text_field
 

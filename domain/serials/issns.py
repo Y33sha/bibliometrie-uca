@@ -4,7 +4,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import StrEnum
 
-from domain.publications.identifiers import ISSN
+from domain.documents.identifiers import ISSN
 
 
 class IssnSupport(StrEnum):

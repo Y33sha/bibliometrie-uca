@@ -15,9 +15,9 @@ from typing import NamedTuple
 from sqlalchemy import Connection, and_, func, not_, select, update
 
 from domain.dates import date_to_french
+from domain.documents.identifiers import ISSN
 from domain.normalize import optional_plain_text
 from domain.pipeline_runs import PhaseStatus
-from domain.publications.identifiers import ISSN
 from domain.serials.serial import OaModel, SerialType
 from domain.types import JsonValue
 from infrastructure.db.scalars import scalar_datetime_or_none

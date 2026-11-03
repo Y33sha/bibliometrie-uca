@@ -11,7 +11,7 @@ from collections.abc import Mapping
 
 import httpx2
 
-from domain.publications.identifiers import DOI
+from domain.documents.identifiers import DOI
 from domain.types import JsonValue
 from pipeline.http.lookup import UNAVAILABLE, NotFound, Unavailable
 from pipeline.ingestion.common.lookup import LookupBatch

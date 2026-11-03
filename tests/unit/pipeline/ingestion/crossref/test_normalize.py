@@ -7,9 +7,9 @@ Les fonctions de `pipeline.ingestion.crossref.payload` sont testées dans `test_
 
 from __future__ import annotations
 
+from domain.documents.licenses import License
 from domain.normalize import clean_title
 from domain.persons.contributor_name import ContributorName
-from domain.publications.licenses import License
 from domain.serials.issns import IssnSupport, SerialIssn
 from domain.source_records.identifiers import (
     SourceIdentifier,

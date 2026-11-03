@@ -12,8 +12,8 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import Connection, text
 
 from domain.dates import date_to_french
+from domain.documents.identifiers import ISSN
 from domain.pipeline_runs import PhaseStatus
-from domain.publications.identifiers import ISSN
 from pipeline.http.dump_download import DumpUnavailableError
 from pipeline.runtime.observability.log_format import BRANCH, quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics

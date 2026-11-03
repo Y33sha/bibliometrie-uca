@@ -10,8 +10,8 @@ from enum import StrEnum
 from itertools import combinations
 from typing import NamedTuple
 
-from domain.publications.doc_types import DocType
-from domain.publications.identifiers import doi_version, same_registrant
+from domain.documents.doc_types import DocType
+from domain.documents.identifiers import doi_version, same_registrant
 from domain.source_records.identifiers import STRONG_ROLES, SourceIdentifier, SourceIdentifierType
 from domain.source_records.keys import CONFIRMATION_ID_TYPES
 from domain.sources.registry import AGGREGATOR_SOURCES, Source

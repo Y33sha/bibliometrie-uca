@@ -4,8 +4,8 @@ from collections.abc import Iterable
 from dataclasses import dataclass, replace
 from enum import StrEnum
 
+from domain.documents.doc_types import DocType
 from domain.normalize import normalize_text, optional_plain_text
-from domain.publications.doc_types import DocType
 from domain.serials.issns import SerialIssn, received_issns
 from domain.serials.serial import OaModel
 from domain.serials.series import names_a_volume, series_title

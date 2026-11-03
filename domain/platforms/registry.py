@@ -5,9 +5,9 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from urllib.parse import urlsplit
 
+from domain.documents.doc_types import DocType
+from domain.documents.identifiers import DOI, is_hal_host
 from domain.platforms.platform import PlatformType
-from domain.publications.doc_types import DocType
-from domain.publications.identifiers import DOI, is_hal_host
 from domain.source_records.identifiers import SourceIdentifierType
 from domain.title_comparison import compatible_titles, nested_titles
 from domain.urls import is_host, on_site, url_host

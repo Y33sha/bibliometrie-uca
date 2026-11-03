@@ -8,9 +8,9 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import NamedTuple
 
+from domain.documents.identifiers import ISBN
 from domain.entity_resolution import connected_components, most_frequent
 from domain.normalize import normalize_text
-from domain.publications.identifiers import ISBN
 
 
 class VolumeRecord(NamedTuple):

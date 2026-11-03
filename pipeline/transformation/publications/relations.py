@@ -14,8 +14,8 @@ from typing import NamedTuple
 
 from sqlalchemy import Connection, bindparam, text
 
-from domain.publications.doc_types import DocType
-from domain.publications.identifiers import DOI
+from domain.documents.doc_types import DocType
+from domain.documents.identifiers import DOI
 from domain.publications.relations import (
     DEPENDENT_DOC_TYPE_RELATIONS,
     RELATION_PAIR_LABELS,

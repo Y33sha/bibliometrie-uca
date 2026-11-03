@@ -2,7 +2,7 @@
 
 from sqlalchemy import text
 
-from domain.publications.dates import PublicationDate
+from domain.documents.dates import PublicationDate
 from domain.publications.metadata import normalized_title
 from pipeline.ingestion.common.source_records import (
     SourceRecordStore,

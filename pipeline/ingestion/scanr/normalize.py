@@ -4,13 +4,13 @@ from collections.abc import Mapping
 from urllib.parse import urlsplit
 
 from domain.countries import normalize_country_code
+from domain.documents.dates import PublicationDate, date_from_parts, parse_iso_date
+from domain.documents.doc_types import DOC_TYPE_FAMILIES
+from domain.documents.identifiers import HALId
+from domain.documents.licenses import normalize_license
 from domain.normalize import drop_flattened_mathml
 from domain.persons.contributor_name import ContributorName
 from domain.publications.contribution_roles import map_role, merge_roles
-from domain.publications.dates import PublicationDate, date_from_parts, parse_iso_date
-from domain.publications.doc_types import DOC_TYPE_FAMILIES
-from domain.publications.identifiers import HALId
-from domain.publications.licenses import normalize_license
 from domain.serials.containers import ContainerDescription
 from domain.serials.issns import source_issns
 from domain.source_records.doc_types import map_doc_type

@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable, Iterable, Sequence
 
-from domain.publications.identifiers import DoiPrefix
+from domain.documents.identifiers import DoiPrefix
 from pipeline.graph import task
 from pipeline.http.circuit_breaker import SourceUnavailableError
 from pipeline.http.polite_pool import default_user_agent

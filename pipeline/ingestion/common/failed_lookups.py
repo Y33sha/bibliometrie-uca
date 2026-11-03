@@ -8,7 +8,7 @@ from typing import Literal
 
 from sqlalchemy import Connection, text
 
-from domain.publications.identifiers import DOI
+from domain.documents.identifiers import DOI
 from domain.sources.registry import DOI_ORG, Source
 
 LookupIdType = Literal["doi", "hal_id", "nnt"]

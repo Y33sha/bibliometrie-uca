@@ -1,6 +1,6 @@
 """Traduction du type de document de chaque source dans le vocabulaire du référentiel, l'enum PostgreSQL `doc_type`."""
 
-from domain.publications.doc_types import DocType
+from domain.documents.doc_types import DocType
 
 # Table de chaque source, clés en minuscules.
 _SOURCE_MAPS: dict[str, dict[str, str]] = {

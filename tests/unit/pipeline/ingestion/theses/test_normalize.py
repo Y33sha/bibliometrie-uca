@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from domain.publications.dates import DatePrecision, PublicationDate
+from domain.documents.dates import DatePrecision, PublicationDate
 from domain.subjects.subject import Subject, SubjectVocabulary
 from pipeline.ingestion.common.embargoes import Embargo
 from pipeline.ingestion.common.source_records import SourceRecordUpsert

@@ -9,6 +9,9 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from urllib.parse import unquote, urlsplit
 
+from domain.documents.doc_types import DocType
+from domain.documents.identifiers import HALId
+from domain.documents.licenses import License
 from domain.platforms.platform import ARCHIVE_TYPES, PlatformType
 from domain.platforms.registry import (
     HAL,
@@ -17,9 +20,6 @@ from domain.platforms.registry import (
     known_platform_of_copy,
     platform_type_of_copy,
 )
-from domain.publications.doc_types import DocType
-from domain.publications.identifiers import HALId
-from domain.publications.licenses import License
 from domain.publications.oa_status import OA_OPEN_STATUSES, OaStatus
 from domain.sources.registry import Source
 
