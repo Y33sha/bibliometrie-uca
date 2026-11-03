@@ -58,16 +58,16 @@ Constats :
 
 ### Phase 3 — File de normalisation
 
-- [ ] Table de file (migration), alimentée par toutes les écritures de `staging` : moissonnage, relectures, complément des documents tronqués, `rehydrate_staging_from_raw_store`.
-- [ ] Documents tronqués exclus de la file jusqu'à leur complément.
+- [ ] Migration : file `queues.staging_normalization_queue`, garnie des lignes à traiter ; suppression de `staging.processed` et de son index.
+- [ ] Mise en file à chaque écriture de `staging` : document nouveau ou modifié et complet, complément des auteurs d'un document tronqué, levée de la marque de troncature, `rehydrate_staging_from_raw_store`.
+- [ ] Normalisation de chaque source d'après la file : relevé des couples `(id, seq)` au départ, suppression des couples de chaque lot validé.
 - [ ] Vidage de `raw_data` conditionné à l'empreinte lue.
-- [ ] Suppression de `staging.processed`, mise à jour du hook `renormalisation_guard`.
-- [ ] Normalisation par lots, toutes sources confondues.
+- [ ] Mise à jour du hook `renormalisation_guard`.
 
 ### Phase 4 — Ordonnancement par API
 
 - [ ] Ordonnanceur topologique sur les dépendances du graphe, une tâche à la fois par API.
-- [ ] Normalisation pendant l'acquisition. Suppression des documents disparus, des orphelins et `VACUUM` après la fin de l'acquisition.
+- [ ] Normalisation par lots, toutes sources confondues, pendant l'acquisition. Suppression des documents disparus, des orphelins et `VACUUM` après la fin de l'acquisition.
 - [ ] `--only` et `--from` sur les groupes de tâches.
 - [ ] Enregistrement des exécutions de phases chevauchantes, page des runs comprise.
 
