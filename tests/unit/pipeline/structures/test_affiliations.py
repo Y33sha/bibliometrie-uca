@@ -12,7 +12,7 @@ from pipeline.graph import Phase
 from pipeline.phases import PHASES
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.task_runner import run_phase
-from pipeline.transformation.structures import affiliations as phase
+from pipeline.transformation.structures import affiliations as phase, perimeter
 from pipeline.transformation.structures.address_resolution import ResolutionStats
 from pipeline.transformation.structures.perimeter import EmptyExtractionPerimeterError
 
@@ -23,7 +23,7 @@ PERIMETRE = [10, 20]
 def perimetre(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[int]]:
     """Périmètres lus par la phase : `extraction` et `persons`."""
     lus = {"extraction": [1, 2, 3, 4, 5], "persons": PERIMETRE}
-    monkeypatch.setattr(phase, "get_extraction_structure_ids", lambda conn: lus["extraction"])
+    monkeypatch.setattr(perimeter, "get_extraction_structure_ids", lambda conn: lus["extraction"])
     monkeypatch.setattr(phase, "get_persons_structure_ids_list", lambda conn: lus["persons"])
     monkeypatch.setattr(phase, "classify_addresses", lambda _conn, _logger: PhaseMetrics())
     monkeypatch.setattr(phase, "resolve_thesis_partners", lambda _conn, _logger: 0)

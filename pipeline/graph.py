@@ -13,7 +13,6 @@ from typing import TYPE_CHECKING
 
 from domain.sources.registry import (
     DOI_SEARCHABLE_SOURCES,
-    HARVESTED_SOURCES,
     PERSON_SEARCHED_SOURCES,
     PROFILES,
     SOURCE_PRIORITY,
@@ -212,25 +211,6 @@ TASKS: tuple[Task, ...] = (
         writes=("perimeter_structures",),
     ),
     # Acquisition : les canaux écrivent la dernière version de chaque document moissonné dans `staging`, dans un ordre indifférent. Leurs lectures de `staging` dédoublonnent et valent quel que soit l'ordre.
-    *(
-        _task(
-            f"harvest.{source}",
-            "harvest",
-            reads=(
-                "config",
-                "structures",
-                "perimeters",
-                "perimeter_structures",
-                "staging",
-                "pipeline_phase_executions",
-            ),
-            writes=("staging", "staging_normalization_queue"),
-            previous_run=("staging", "pipeline_phase_executions"),
-            network=source,
-            parallel_group="harvest",
-        )
-        for source in HARVESTED_SOURCES
-    ),
     # Interrogation par identifiant de personne : identifiants des personnes RH, posés par la phase `persons` au run précédent.
     *(
         _task(

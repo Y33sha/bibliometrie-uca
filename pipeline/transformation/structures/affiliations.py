@@ -19,7 +19,6 @@ from collections.abc import Mapping
 from sqlalchemy import Connection
 
 from infrastructure.read_models.perimeters.queries import (
-    get_extraction_structure_ids,
     get_persons_structure_ids_list,
 )
 from pipeline.graph import task
@@ -39,19 +38,11 @@ from pipeline.transformation.structures.hal_structures import (
     run_refresh_hal_structures,
 )
 from pipeline.transformation.structures.idref_resolution import resolve_thesis_partners
-from pipeline.transformation.structures.perimeter import EmptyExtractionPerimeterError
 from pipeline.transformation.structures.perimeter_evidence import (
     refresh_source_contribution_structures,
     sync_perimeter_evidence,
 )
 from pipeline.transformation.structures.ror import RorStore, run_refresh_ror
-
-
-def check_extraction_perimeter(ctx: PhaseContext) -> None:
-    """Lève `EmptyExtractionPerimeterError` si le périmètre d'extraction ne contient aucune structure."""
-    with ctx.open_tx() as conn:
-        if not get_extraction_structure_ids(conn):
-            raise EmptyExtractionPerimeterError()
 
 
 def _classify_addresses(ctx: PhaseContext) -> PhaseMetrics:

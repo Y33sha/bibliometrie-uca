@@ -26,6 +26,7 @@ from pipeline.transformation.publications.correction import metadata_correction
 from pipeline.transformation.publications.subjects import subjects
 from pipeline.transformation.publishing import publishing, resolve_ra
 from pipeline.transformation.structures import affiliations
+from pipeline.transformation.structures.perimeter import check_extraction_perimeter
 
 
 def _fetch_stale_fields(conn: Connection) -> dict[str, str]:
@@ -36,9 +37,10 @@ PHASES: tuple[Phase, ...] = (
     Phase(
         "harvest",
         "Moissonnage par affiliation",
-        phase_tasks("harvest"),
+        harvest.TASKS,
         harvesting=True,
-        build=harvest.build,
+        check=check_extraction_perimeter,
+        assemble=harvest.assemble,
     ),
     Phase(
         "harvest_by_person",
@@ -78,7 +80,7 @@ PHASES: tuple[Phase, ...] = (
         "affiliations",
         "Résolution des affiliations par contribution source",
         affiliations.TASKS,
-        check=affiliations.check_extraction_perimeter,
+        check=check_extraction_perimeter,
         assemble=affiliations.assemble,
     ),
     Phase(
