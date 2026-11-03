@@ -63,7 +63,7 @@ class _FakeStaging:
 class _StubNorm(SourceNormalizer):
     """Normaliseur dont l'analyse d'une ligne est sans objet pour le test."""
 
-    SOURCE = "test"
+    SOURCE = "hal"
 
     def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
         return "Titre", 2024
@@ -86,7 +86,6 @@ class _StubNorm(SourceNormalizer):
 class _Norm(_StubNorm):
     """Normaliseur instrumenté pour observer `run()`."""
 
-    SOURCE = "test"
     DEFAULT_BATCH_SIZE = 2
 
     def __init__(
@@ -327,7 +326,7 @@ class TestProcessWorkMinimalMetadata:
 
 
 _RECORD = SourceRecordUpsert(
-    source="test",
+    source="hal",
     source_id="a",
     staging_id=1,
     title="T",
@@ -402,11 +401,11 @@ class TestNormalizeRecord:
         norm = _WritingNorm(
             doc={"title": "T"},
             publisher=PublisherFacts("Elsevier", "P1"),
-            facts=ContainerDescription(source="test", raw_doc_type=None, journal_title="Revue"),
+            facts=ContainerDescription(source="hal", raw_doc_type=None, journal_title="Revue"),
         )
         norm._record_store.upsert_source_record.return_value = 42
         assert norm.normalize_record(self.ROW) is True
-        assert writes == [("contributions", "test", 42)]
+        assert writes == [("contributions", "hal", 42)]
         assert norm.series_seen == [True]
         norm._record_store.upsert_source_record.assert_called_once_with(
             replace(
@@ -426,7 +425,7 @@ class TestNormalizeRecord:
         norm = _WritingNorm(doc={"title": "T"})
         norm._record_store.upsert_source_record.return_value = 42
         assert norm.normalize_record(self.ROW) is True
-        assert writes == [("contributions", "test", 42)]
+        assert writes == [("contributions", "hal", 42)]
         assert norm.series_seen == [False]
         norm._record_store.upsert_source_record.assert_called_once_with(_RECORD)
 
