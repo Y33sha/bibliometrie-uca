@@ -48,7 +48,7 @@ Schéma PostgreSQL `sources`.
 | Vue | Contenu |
 |---|---|
 | `source_contribution_structures` | Vue matérialisée : structures du périmètre de chaque contribution source, avec l'indice ([données dérivées](09-donnees-derivees.md)) |
-| `known_dois` | DOI actifs des enregistrements sources, cibles des relations, DOI DataCite déduits des identifiants arXiv |
+| `known_dois` | DOI actifs des enregistrements sources, cibles des relations |
 | `candidate_dois` | DOI connus des publications du périmètre, lus par le rattrapage par DOI et la résolution des agences d'enregistrement |
 
 ## Écriture

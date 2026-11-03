@@ -458,6 +458,25 @@ class TestFetchSharedKeyPairs:
 
         assert [(p.a_id, p.a_doi, p.b_id, p.b_doi) for p in pairs] == [(a, None, b, None)]
 
+    def test_communication_et_article_partageant_un_doi_arxiv(self, sa_sync_conn):
+        """Le DOI arXiv, DOI de dépôt, laisse séparées deux versions publiées d'un même preprint : il les relie."""
+        a = _publication(
+            sa_sync_conn, doc_type="conference_paper", title_normalized="t-c", doi="10.1/conf"
+        )
+        b = _publication(sa_sync_conn, doc_type="article", title_normalized="t-d", doi="10.1/art")
+        for publication, source_id in ((a, "W-arx-1"), (b, "W-arx-2")):
+            _source_record(
+                sa_sync_conn,
+                publication,
+                source="openalex",
+                source_id=source_id,
+                identifiers=secondary_identifiers({"doi": "10.48550/arxiv.2401.00001"}),
+            )
+
+        pairs = [p for p in relations.fetch_shared_key_pairs(sa_sync_conn) if p.a_id == a]
+
+        assert [(p.a_id, p.b_id) for p in pairs] == [(a, b)]
+
 
 class TestPhaseRelations:
     def test_relation_declaree_ecarte_le_lien_vague_des_le_premier_run(self, sa_sync_conn):

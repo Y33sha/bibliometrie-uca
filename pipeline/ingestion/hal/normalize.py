@@ -13,9 +13,10 @@ from domain.contributions.contribution_roles import map_role
 from domain.dates import today
 from domain.documents.dates import PublicationDate, date_from_parts, parse_iso_date
 from domain.documents.doc_types import DocType
-from domain.documents.identifiers import DOI, NNT, PMCID, PMID, ArxivId, find_isbns
+from domain.documents.identifiers import DOI, NNT, PMCID, PMID, arxiv_doi, find_isbns
 from domain.documents.licenses import normalize_license
 from domain.persons.contributor_name import ContributorName
+from domain.platforms.registry import PMC_ARTICLE_URL, is_fully_open
 from domain.serials.containers import ContainerDescription
 from domain.serials.issns import source_issns
 from domain.source_records.biblio import PageRange, compact_biblio, parse_pages
@@ -116,11 +117,24 @@ def get_container_title(doc: Mapping[str, JsonValue]) -> str | None:
     )
 
 
+def _external_links(doc: Mapping[str, JsonValue]) -> list[str]:
+    """Renvoie les liens externes du dépôt (`linkExtUrl_s`)."""
+    raw = doc.get("linkExtUrl_s")
+    entries = [raw] if isinstance(raw, str) else as_sequence(raw)
+    return [url for entry in entries if (url := hal_text_field(entry))]
+
+
 def get_locations(doc: Mapping[str, JsonValue]) -> list[LocationFacts]:
-    """Renvoie la page du dépôt HAL (`uri_s`), avec le fichier déposé (`fileMain_s`, à défaut l'annexe d'une communication) et sa licence. La copie est ouverte quand elle a un fichier."""
+    """Renvoie la page du dépôt HAL (`uri_s`), avec le fichier déposé (`fileMain_s`, à défaut l'annexe d'une communication) et sa licence, et la page PubMed Central d'un lien externe. La copie HAL est ouverte quand elle a un fichier."""
+    pmc_pages = [
+        PMC_ARTICLE_URL.format(pmcid)
+        for url in _external_links(doc)
+        if (pmcid := PMCID.normalize(url))
+    ]
+    pmc = [LocationFacts(url=url, is_oa=is_fully_open(url)) for url in pmc_pages]
     uri = hal_text_field(doc.get("uri_s"))
     if not uri:
-        return []
+        return pmc
     file = hal_text_field(doc.get("fileMain_s")) or communication_annex(doc)
     return [
         LocationFacts(
@@ -128,7 +142,8 @@ def get_locations(doc: Mapping[str, JsonValue]) -> list[LocationFacts]:
             pdf_url=file,
             license=normalize_license(hal_text_field(doc.get("licence_s"))),
             is_oa=file is not None,
-        )
+        ),
+        *pmc,
     ]
 
 
@@ -147,7 +162,7 @@ def build_hal_identifiers(
 ) -> tuple[SourceIdentifier, ...]:
     """Renvoie les identifiants d'un dépôt HAL. Le `hal_id` est primaire, les autres sont secondaires, sauf l'ISBN de l'ouvrage contenant le document (`isbn_role`).
 
-    Le PMID vient de `pubmedId_s`, les PMCID et identifiants arXiv des liens externes (`linkExtUrl_s`).
+    Le PMID vient de `pubmedId_s`, le DOI d'un dépôt arXiv des liens externes (`linkExtUrl_s`).
     """
     secondary = SourceIdentifierRole.SECONDARY
     identifiers = [
@@ -164,14 +179,11 @@ def build_hal_identifiers(
     )
     if pmid := PMID.normalize(hal_text_field(doc.get("pubmedId_s"))):
         identifiers.append(SourceIdentifier(SourceIdentifierType.PMID, pmid, secondary))
-    raw = doc.get("linkExtUrl_s")
-    link_urls = [raw] if isinstance(raw, str) else as_sequence(raw)
-    for entry in link_urls:
-        url = hal_text_field(entry)
-        if pmcid := PMCID.normalize(url):
-            identifiers.append(SourceIdentifier(SourceIdentifierType.PMCID, pmcid, secondary))
-        if arxiv_id := ArxivId.normalize(url):
-            identifiers.append(SourceIdentifier(SourceIdentifierType.ARXIV_ID, arxiv_id, secondary))
+    identifiers += (
+        SourceIdentifier(SourceIdentifierType.DOI, doi, secondary)
+        for url in _external_links(doc)
+        if (doi := arxiv_doi(url))
+    )
     return tuple(identifiers)
 
 

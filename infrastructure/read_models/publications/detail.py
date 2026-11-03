@@ -107,7 +107,7 @@ def structures_by_id(conn: Connection, ids: set[int]) -> dict[str, StructureInfo
 
 
 _EXTERNAL_IDENTIFIER_TYPES = (SourceIdentifierType.PMID, SourceIdentifierType.NNT)
-"""Identifiants de bases référençant la publication, affichés dans la colonne latérale, dans l'ordre d'affichage. Le lien source HAL couvre le `hal_id`, le DOI de la publication ses DOI. arXiv et PMCID désignent des copies, donc des localisations."""
+"""Identifiants de bases référençant la publication, affichés dans la colonne latérale, dans l'ordre d'affichage. Le lien source HAL couvre le `hal_id`, le DOI de la publication ses DOI."""
 
 _DOI_SOURCES = frozenset({Source.CROSSREF, Source.DATACITE})
 """Sources dont l'enregistrement est la page du DOI, déjà affiché."""

@@ -4,7 +4,7 @@ from collections.abc import Callable, Iterable, Mapping, Set
 from dataclasses import dataclass, replace
 from enum import StrEnum
 
-from domain.documents.identifiers import DOI, ISBN, NNT, PMCID, PMID, ArxivId, HALId
+from domain.documents.identifiers import DOI, ISBN, NNT, PMID, HALId
 from domain.serials.containers import ContainerRole, container_role
 
 
@@ -15,8 +15,6 @@ class SourceIdentifierType(StrEnum):
     HAL_ID = "hal_id"
     NNT = "nnt"
     PMID = "pmid"
-    PMCID = "pmcid"
-    ARXIV_ID = "arxiv_id"
     ISBN = "isbn"
     EISBN = "eisbn"
 
@@ -121,8 +119,6 @@ _NORMALIZERS: dict[SourceIdentifierType, Callable[[str], str | None]] = {
     SourceIdentifierType.HAL_ID: HALId.normalize,
     SourceIdentifierType.NNT: NNT.normalize,
     SourceIdentifierType.PMID: PMID.normalize,
-    SourceIdentifierType.PMCID: PMCID.normalize,
-    SourceIdentifierType.ARXIV_ID: ArxivId.normalize,
     SourceIdentifierType.ISBN: ISBN.normalize,
     SourceIdentifierType.EISBN: ISBN.normalize,
 }

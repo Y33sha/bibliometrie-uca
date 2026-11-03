@@ -3,7 +3,7 @@
 La phase suit `publications` : les enregistrements sources sont rattachés à leur publication, et un DOI cible se résout en publication quand elle est en base. Les relations viennent de trois signaux :
 
 - **Signal #1, relations déclarées** par DataCite (`related_identifiers`) et Crossref (`relation`), traduites par `domain.publications.relations`. Une relation de même œuvre (`IsVersionOf`, `IsVariantFormOf`) entre deux œuvres distinctes selon `declares_same_work` reçoit son type d'après les types de document des deux publications. Exemple : un preprint arXiv et l'article publié.
-- **Signal #2, clés de confirmation partagées** (hal_id, arXiv, PMID, NNT) par deux publications distinctes : leurs types de document donnent la relation (`infer_shared_key_relation`).
+- **Signal #2, clés de confirmation partagées** (hal_id, PMID, NNT, DOI arXiv) par deux publications distinctes : leurs types de document donnent la relation (`infer_shared_key_relation`).
 - **Signal #3, titre** : un erratum rejoint l'article corrigé (titre de l'article à la suite de « Erratum: »), un preprint sa version publiée (même titre), à condition qu'un seul candidat ait ce titre.
 """
 
@@ -15,7 +15,7 @@ from typing import NamedTuple
 from sqlalchemy import Connection, bindparam, text
 
 from domain.documents.doc_types import DocType
-from domain.documents.identifiers import DOI
+from domain.documents.identifiers import ARXIV_DOI_PREFIX, DOI
 from domain.publications.relations import (
     DEPENDENT_DOC_TYPE_RELATIONS,
     RELATION_PAIR_LABELS,
@@ -130,6 +130,9 @@ _SHARED_KEY_PAIRS_SQL = text(f"""
               (i.id_type = '{SourceIdentifierType.HAL_ID}' AND i.removed_by IS NULL)
               OR (i.id_type::text IN {in_clause(_SINGLE_KEY_TYPES)}
                   AND {first_of_its_type_sql("i")})
+              OR (i.id_type = '{SourceIdentifierType.DOI}' AND i.removed_by IS NULL
+                  AND i.role <> '{SourceIdentifierRole.RELATED}'
+                  AND i.id_value LIKE '{ARXIV_DOI_PREFIX}%')
           )
     )
     SELECT DISTINCT
@@ -140,7 +143,7 @@ _SHARED_KEY_PAIRS_SQL = text(f"""
     JOIN publications p1 ON p1.id = k1.pid
     JOIN publications p2 ON p2.id = k2.pid
 """)
-"""Paires de publications distinctes partageant une clé de confirmation, héritée par la publication de ses enregistrements sources : tout `hal_id` actif, et pour NNT, PMID et arXiv l'identifiant actif de rôle le plus fort, puis de plus petite valeur. `k1.pid < k2.pid` produit chaque paire une fois ; le `DISTINCT` fusionne les clés multiples."""
+"""Paires de publications distinctes partageant une clé de confirmation, héritée par la publication de ses enregistrements sources : tout `hal_id` actif, pour NNT et PMID l'identifiant actif de rôle le plus fort, puis de plus petite valeur, et tout DOI arXiv actif. Le DOI arXiv, DOI de dépôt, laisse séparées deux versions publiées d'un même preprint. `k1.pid < k2.pid` produit chaque paire une fois ; le `DISTINCT` fusionne les clés multiples."""
 
 _ERRATUM_TITLE_MATCHES_SQL = text(f"""
     WITH child AS (

@@ -9,10 +9,9 @@ from dataclasses import dataclass
 
 from domain.documents.identifiers import (
     NNT,
-    PMCID,
     PMID,
-    ArxivId,
     HALId,
+    arxiv_doi,
     extract_doi_from_url,
     is_hal_host,
 )
@@ -167,7 +166,7 @@ def extract_nnt_from_location(loc: OpenalexLocation) -> str | None:
 
 
 def url_identifiers(urls: list[str]) -> list[SourceIdentifier]:
-    """Renvoie les identifiants secondaires exposés dans une liste d'URLs, dans leur ordre : `hal_id` (préfixes `hal-`/`tel-`/`halshs-`…), NNT (URLs `theses.fr/<NNT>`), PMID (PubMed), PMCID et arXiv."""
+    """Renvoie les identifiants secondaires exposés dans une liste d'URLs, dans leur ordre : `hal_id` (préfixes `hal-`/`tel-`/`halshs-`…), NNT (URLs `theses.fr/<NNT>`), PMID (PubMed) et DOI d'un dépôt arXiv."""
     identifiers: list[SourceIdentifier] = []
     for url in urls:
         for id_type, value in (
@@ -177,8 +176,7 @@ def url_identifiers(urls: list[str]) -> list[SourceIdentifier]:
                 m.group(1) if (m := _THESES_FR_URL_RE.search(url)) else None,
             ),
             (SourceIdentifierType.PMID, PMID.normalize(url)),
-            (SourceIdentifierType.PMCID, PMCID.normalize(url)),
-            (SourceIdentifierType.ARXIV_ID, ArxivId.normalize(url)),
+            (SourceIdentifierType.DOI, arxiv_doi(url)),
         ):
             if value:
                 identifiers.append(SourceIdentifier(id_type, value, SourceIdentifierRole.SECONDARY))
@@ -186,7 +184,7 @@ def url_identifiers(urls: list[str]) -> list[SourceIdentifier]:
 
 
 def openalex_derived_identifier(primary: OpenalexLocation | None) -> SourceIdentifier | None:
-    """Renvoie l'identifiant de la localisation principale d'un work : NNT d'une localisation theses.fr, sinon premier `hal_id`, DOI, PMCID, PMID ou identifiant arXiv de sa page ou de son identifiant de localisation."""
+    """Renvoie l'identifiant de la localisation principale d'un work : NNT d'une localisation theses.fr, sinon premier `hal_id`, DOI, PMID ou DOI d'un dépôt arXiv de sa page ou de son identifiant de localisation."""
     if primary is None:
         return None
     if is_theses_fr_location(primary) and (nnt := extract_nnt_from_location(primary)):
@@ -194,9 +192,8 @@ def openalex_derived_identifier(primary: OpenalexLocation | None) -> SourceIdent
     for id_type, extract in (
         (SourceIdentifierType.HAL_ID, HALId.normalize),
         (SourceIdentifierType.DOI, extract_doi_from_url),
-        (SourceIdentifierType.PMCID, PMCID.normalize),
         (SourceIdentifierType.PMID, PMID.normalize),
-        (SourceIdentifierType.ARXIV_ID, ArxivId.normalize),
+        (SourceIdentifierType.DOI, arxiv_doi),
     ):
         for raw in (primary.landing_page_url, primary.location_id):
             if value := extract(raw):

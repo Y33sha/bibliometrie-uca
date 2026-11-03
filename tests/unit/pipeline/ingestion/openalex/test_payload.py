@@ -54,17 +54,11 @@ class TestUrlIdentifiers:
     def test_pmid(self):
         assert _url_ids(["https://pubmed.ncbi.nlm.nih.gov/12345678"]) == [("pmid", "12345678")]
 
-    def test_pmc_with_prefix(self):
-        urls = ["https://www.ncbi.nlm.nih.gov/pmc/articles/PMC987654"]
-        assert _url_ids(urls) == [("pmcid", "PMC987654")]
+    def test_page_pmc_hors_des_identifiants(self):
+        assert _url_ids(["https://www.ncbi.nlm.nih.gov/pmc/articles/PMC987654"]) == []
 
-    def test_pmc_without_prefix(self):
-        """Le préfixe PMC est ajouté même si l'URL ne le contient pas."""
-        urls = ["https://www.ncbi.nlm.nih.gov/pmc/articles/987654"]
-        assert _url_ids(urls) == [("pmcid", "PMC987654")]
-
-    def test_arxiv(self):
-        assert _url_ids(["http://arxiv.org/abs/1210.6893"]) == [("arxiv_id", "1210.6893")]
+    def test_doi_arxiv(self):
+        assert _url_ids(["http://arxiv.org/abs/1210.6893"]) == [("doi", "10.48550/arxiv.1210.6893")]
 
     def test_collecte_chaque_identifiant_distinct_dans_l_ordre(self):
         """Une version HAL ne fait pas un dépôt distinct."""

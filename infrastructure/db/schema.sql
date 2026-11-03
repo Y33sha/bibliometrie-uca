@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 7EDiPFbk9i2SBmFrOCuSRQHGhC1jznGCAegtsTddZLwfOuP1hOdUHm6Pkg25cc5
+\restrict IsRcOAeEdp1D6bVRm2dF9IeHVnzy2XVd6GrsYwcHasKPPaK9jabbeE7g9YYhWjn
 
 -- Dumped from database version 18.4
 -- Dumped by pg_dump version 18.4
@@ -499,8 +499,6 @@ CREATE TYPE public.source_identifier_type AS ENUM (
     'hal_id',
     'nnt',
     'pmid',
-    'pmcid',
-    'arxiv_id',
     'isbn',
     'eisbn'
 );
@@ -2938,37 +2936,14 @@ UNION
     NULL::public.source_type AS source,
     pr.from_publication_id AS publication_id
    FROM publications.publication_relations pr
-  WHERE (pr.target_doi IS NOT NULL)
-UNION
- SELECT ('10.48550/arxiv.'::text || lower(i.id_value)) AS doi,
-    sp.source,
-    sp.publication_id
-   FROM (sources.source_records sp
-     JOIN sources.source_record_identifiers i ON ((i.source_record_id = sp.id)))
-  WHERE ((i.id_type = 'arxiv_id'::public.source_identifier_type) AND (i.removed_by IS NULL) AND (NOT (EXISTS ( SELECT 1
-           FROM sources.source_record_identifiers x
-          WHERE ((x.source_record_id = i.source_record_id) AND (x.id_type = i.id_type) AND (x.removed_by IS NULL) AND (ROW(
-                CASE x.role
-                    WHEN 'primary'::public.source_identifier_role THEN 1
-                    WHEN 'derived'::public.source_identifier_role THEN 2
-                    WHEN 'secondary'::public.source_identifier_role THEN 3
-                    WHEN 'related'::public.source_identifier_role THEN 4
-                    ELSE NULL::integer
-                END, (x.id_value COLLATE "C")) < ROW(
-                CASE i.role
-                    WHEN 'primary'::public.source_identifier_role THEN 1
-                    WHEN 'derived'::public.source_identifier_role THEN 2
-                    WHEN 'secondary'::public.source_identifier_role THEN 3
-                    WHEN 'related'::public.source_identifier_role THEN 4
-                    ELSE NULL::integer
-                END, (i.id_value COLLATE "C"))))))));
+  WHERE (pr.target_doi IS NOT NULL);
 
 
 --
 -- Name: VIEW known_dois; Type: COMMENT; Schema: sources; Owner: -
 --
 
-COMMENT ON VIEW sources.known_dois IS 'Tous les DOI connus : DOI actifs des enregistrements sources, cibles des relations, DOI DataCite déduits des identifiants arXiv. publication_id est la publication de l''enregistrement source, ou la publication d''origine de la relation ; NULL pour un enregistrement source orphelin.';
+COMMENT ON VIEW sources.known_dois IS 'Tous les DOI connus : DOI actifs des enregistrements sources, cibles des relations. publication_id est la publication de l''enregistrement source, ou la publication d''origine de la relation ; NULL pour un enregistrement source orphelin.';
 
 
 --
@@ -6130,5 +6105,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 7EDiPFbk9i2SBmFrOCuSRQHGhC1jznGCAegtsTddZLwfOuP1hOdUHm6Pkg25cc5
+\unrestrict IsRcOAeEdp1D6bVRm2dF9IeHVnzy2XVd6GrsYwcHasKPPaK9jabbeE7g9YYhWjn
 

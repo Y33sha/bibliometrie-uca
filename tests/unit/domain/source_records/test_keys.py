@@ -106,11 +106,10 @@ class TestIdentifiers:
         identifiers = [
             SourceIdentifier(T.NNT, "2021CLFAC030", R.PRIMARY),
             SourceIdentifier(T.PMID, "12345", R.SECONDARY),
-            SourceIdentifier(T.ARXIV_ID, "2301.12345", R.DERIVED),
             SourceIdentifier(T.ISBN, "9780306406157", R.SECONDARY),
         ]
         assert _keys(identifiers) == ConfirmationKeys(
-            DoiKeys(), {"nnt": "2021CLFAC030", "pmid": "12345", "arxiv_id": "2301.12345"}
+            DoiKeys(), {"nnt": "2021CLFAC030", "pmid": "12345"}
         )
 
     def test_strongest_role_then_smallest_value(self):

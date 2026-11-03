@@ -24,7 +24,6 @@ from domain.source_records.identifiers import (
 
 CONFIRMATION_ID_TYPES = (
     SourceIdentifierType.HAL_ID,
-    SourceIdentifierType.ARXIV_ID,
     SourceIdentifierType.PMID,
     SourceIdentifierType.NNT,
 )

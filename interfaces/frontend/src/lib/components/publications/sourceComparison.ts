@@ -41,8 +41,6 @@ const IDENTIFIER_LABELS: Record<string, string> = {
 	hal_id: 'HAL',
 	nnt: 'NNT',
 	pmid: 'PMID',
-	pmcid: 'PMCID',
-	arxiv_id: 'arXiv',
 	isbn: 'ISBN',
 	doi: 'DOI apparentés',
 };

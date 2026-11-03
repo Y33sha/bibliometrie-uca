@@ -15,6 +15,7 @@ from domain.documents.identifiers import (
     DoiPrefix,
     DoiVersion,
     HALId,
+    arxiv_doi,
     doi_version,
     extract_doi_from_url,
     find_isbns,
@@ -386,6 +387,13 @@ class TestPublicationMedArxivVOs:
         assert ArxivId.try_parse(None) is None
         with pytest.raises(ValidationError):
             ArxivId("garbage")
+
+    def test_doi_arxiv(self):
+        assert ArxivId("2401.00123").doi == "10.48550/arxiv.2401.00123"
+        assert (
+            arxiv_doi("https://arxiv.org/pdf/hep-th/9901001v1") == "10.48550/arxiv.hep-th/9901001"
+        )
+        assert arxiv_doi("https://example.com/x") is None
 
 
 class TestISSN:

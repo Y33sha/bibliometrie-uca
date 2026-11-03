@@ -10,7 +10,7 @@ La table est reconstruite à chaque exécution, à partir de signaux indépendan
 
 **Relations déclarées par les sources.** DataCite et Crossref publient des relations typées entre DOI, traduites vers un vocabulaire unifié.
 
-**Clés de confirmation partagées.** Deux publications aux DOI distincts qui partagent un identifiant (HAL, arXiv, PMID, NNT) sont apparentées. La relation se déduit de leurs types de document.
+**Clés de confirmation partagées.** Deux publications aux DOI distincts qui partagent un identifiant (HAL, PMID, NNT) ou un DOI arXiv sont apparentées. La relation se déduit de leurs types de document.
 
 **Titre.** Un erratum est relié à l'article cité dans son titre, un preprint à sa version publiée de même titre. Ce titre doit désigner une seule publication.
 

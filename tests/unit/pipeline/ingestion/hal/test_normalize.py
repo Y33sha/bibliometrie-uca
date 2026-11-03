@@ -104,13 +104,13 @@ class TestBuildHalIdentifiers:
         """Le champ lu pour le PMID figure parmi les champs demandés à l'API HAL."""
         assert "pubmedId_s" in HAL_FIELDS
 
-    def test_pmcid_from_link(self):
+    def test_lien_pmc_hors_des_identifiants(self):
         doc = {"linkExtUrl_s": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5625084"}
-        assert ("pmcid", "PMC5625084", "secondary") in _ids(doc)
+        assert _ids(doc) == {("hal_id", "hal-1", "primary")}
 
-    def test_arxiv_from_link_list(self):
+    def test_doi_arxiv_d_un_lien(self):
         doc = {"linkExtUrl_s": ["https://arxiv.org/abs/2401.00123"]}
-        assert ("arxiv_id", "2401.00123", "secondary") in _ids(doc)
+        assert ("doi", "10.48550/arxiv.2401.00123", "secondary") in _ids(doc)
 
     def test_non_id_link_ignored(self):
         doc = {"linkExtUrl_s": "https://example.com/openaccess"}
@@ -292,6 +292,16 @@ class TestGetLocations:
 
     def test_sans_page_de_depot(self):
         assert get_locations({}) == []
+
+    def test_page_pmc_d_un_lien_externe(self):
+        doc = {
+            "uri_s": "https://hal.science/hal-04",
+            "linkExtUrl_s": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5625084",
+        }
+        assert [location.url for location in get_locations(doc)] == [
+            "https://hal.science/hal-04",
+            "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5625084/",
+        ]
 
 
 class TestParseTeiIsbns:

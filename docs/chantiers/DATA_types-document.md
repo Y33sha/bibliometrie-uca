@@ -93,7 +93,9 @@ Mesures du 2026-11-03, base locale, publications du périmètre : 199 errata sur
 
 ### Phase 4 — Cas particuliers
 
-- [ ] 107270 et 869915 « Computing Pivot-Minors » : article typé preprint par OpenAlex. Déduction du DOI depuis l'identifiant arXiv, et inversement.
+- [ ] « Computing Pivot-Minors » (208937 en base locale) : OpenAlex type l'œuvre `article`. Identifiant arXiv converti en DOI du dépôt (`10.48550/arxiv.<identifiant>`). PMCID retiré des identifiants : la page PMC est une localisation. Valeurs `arxiv_id` et `pmcid` retirées de `source_identifier_type`. Base locale : 141 paires de publications séparées par les deux formes d'un même arXiv.
+- [ ] Mesure à refaire sur la prod. Base locale : 14 934 enregistrements sources WoS sur 17 409 sans identifiant, faute de payload au raw store au remplissage de `source_record_identifiers`. Le DOI est dans `staging.doi` pour 13 990. Exemple : 302143, doublon WoS de « Computing Pivot-Minors ».
+- [x] Adresses d'en-tête HTTP `Link` recopiées par OpenAlex comme localisations, écartées : profils ORCID, pages de navigation d'entrepôts. 1 694 enregistrements sources en base locale. a82e4423f
 - [ ] 206476 : communication de congrès déposée en entrepôt, typée `article` par OpenAlex seul.
 * [ ] 165068 type "commmentary"; 86931 type "meeting report" => comment prendre en compte ces types (et empêcher openalex d'imposer le type article)
 * [ ] règle à créer: si DOI de forme ISBN + _n => conference_paper ou chapitre / si forme ISBN: proceedings ou book (trancher selon type du "journal")

@@ -259,11 +259,26 @@ def _normalize_arxiv_id(raw: str | None) -> str | None:
     return m.group(1) if m else None
 
 
+ARXIV_DOI_PREFIX = "10.48550/arxiv."
+"""Début du DOI attribué par arXiv à chaque dépôt, suivi de l'identifiant arXiv."""
+
+
 class ArxivId(NormalizedIdentifier):
     """Identifiant arXiv. Accepte une URL arXiv."""
 
     label = "arXiv ID"
     normalize = staticmethod(_normalize_arxiv_id)
+
+    @property
+    def doi(self) -> str:
+        """DOI du dépôt arXiv, équivalent de l'identifiant."""
+        return f"{ARXIV_DOI_PREFIX}{self.value.lower()}"
+
+
+def arxiv_doi(raw: str | None) -> str | None:
+    """Renvoie le DOI du dépôt arXiv désigné par `raw`, identifiant ou URL arXiv ; `None` sinon."""
+    arxiv_id = ArxivId.try_parse(raw)
+    return arxiv_id.doi if arxiv_id else None
 
 
 _ISSN_RE = re.compile(r"(?:ISSN[:\s]*)?(\d{4})-?(\d{3})([\dX])", re.IGNORECASE | re.ASCII)
