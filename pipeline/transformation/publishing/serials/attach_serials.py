@@ -46,7 +46,7 @@ ATTACH_LABEL = "Rattachement des enregistrements sources aux publications en sé
 """Libellé de la sous-étape `attach_serials` dans le journal de la phase."""
 
 _SERIES = text(f"""
-    SELECT id, source, publication_id, publisher_id, biblio->'journal' AS journal,
+    SELECT id, source, publication_id, publisher_id, biblio,
            CASE WHEN corrections ? '{CorrectionKey.SERIAL_ID}'
                 THEN CAST(corrections->'{CorrectionKey.SERIAL_ID}'->>'{RAW}' AS integer)
                 ELSE serial_id END AS serial_id
@@ -177,7 +177,7 @@ def _valid(value: str) -> str | None:
 
 
 def _mention(row: Row[tuple[object, ...]]) -> _Mention:
-    series = journal_series({"journal": row.journal}) if row.journal else None
+    series = journal_series(row.biblio)
     issns = tuple(
         dict.fromkeys(
             v for r in (series.issns if series else ()) if not r.malformed and (v := _valid(r.issn))

@@ -193,7 +193,7 @@ _PAGE_COUNT = re.compile(r"^\d+\s*p\.?$")
 
 
 class PageRange(NamedTuple):
-    """Première et dernière page. Les champs ont le nom de leur clé de `biblio`."""
+    """Première et dernière page."""
 
     first_page: str | None = None
     last_page: str | None = None
