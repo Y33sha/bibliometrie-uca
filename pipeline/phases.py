@@ -117,8 +117,8 @@ PHASES: tuple[Phase, ...] = (
     Phase(
         "finalize",
         "Finalisation : périmètre des publications, vues des structures, purges et compteurs",
-        phase_tasks("finalize"),
-        build=finalize.build,
+        finalize.TASKS,
+        assemble=finalize.assemble,
     ),
     Phase(
         "relations",

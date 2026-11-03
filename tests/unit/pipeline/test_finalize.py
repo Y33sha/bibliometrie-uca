@@ -7,8 +7,12 @@ import logging
 from contextlib import ExitStack
 from unittest.mock import patch
 
+from pipeline.phases import PHASES
 from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.task_runner import run_phase
 from pipeline.transformation import finalize as phase
+
+_FINALIZE = next(p for p in PHASES if p.name == "finalize")
 
 
 class _FakePurgeQueries:
@@ -37,21 +41,46 @@ class _Counts:
         return count
 
 
-def _patch_sql(counts: _Counts) -> list:
-    """Simule les requêtes de synchronisation et les décomptes de la phase."""
+def _suppression(appels: list[str], nom: str, n: int = 0):
+    """Renvoie une suppression de référentiels vides qui retient son appel et supprime `n` lignes."""
+
+    def run(_conn, _log) -> PhaseMetrics:
+        appels.append(nom)
+        m = PhaseMetrics()
+        if n:
+            m.add(serials_deleted=n)
+            m.report = f"{n} supprimées"
+        return m
+
+    return run
+
+
+def _patch_sql(counts: _Counts, suppressions: dict[str, int] | None = None) -> list:
+    """Simule les requêtes de synchronisation, les suppressions de référentiels vides et les décomptes de la phase."""
+    suppressions = suppressions or {}
     return [
-        patch.object(phase, name, counts.counter(label, n))
-        for name, label, n in (
-            ("count_contributions_in_perimeter", "périmètre des contributions", 9),
-            ("refresh_publications_perimeter_evidence", "périmètre des publications", 0),
-            ("refresh_contribution_structures", "structures des groupes", None),
-            ("refresh_publication_structures", "structures des publications", None),
-            ("refresh_publication_rors", "ROR des publications", None),
-            ("refresh_serial_publishers", "éditeur des revues", 4),
-            ("recompute_address_publication_count", "adresses", 7),
-            ("refresh_serial_publication_counts", "revues", 3),
-            ("refresh_publisher_publication_counts", "éditeurs", 2),
-        )
+        *(
+            patch.object(
+                phase,
+                f"run_delete_empty_{nom}",
+                _suppression(counts.appels, nom, suppressions.get(nom, 0)),
+            )
+            for nom in ("monographs", "serials", "publishers")
+        ),
+        *(
+            patch.object(phase, name, counts.counter(label, n))
+            for name, label, n in (
+                ("count_contributions_in_perimeter", "périmètre des contributions", 9),
+                ("refresh_publications_perimeter_evidence", "périmètre des publications", 0),
+                ("refresh_contribution_structures", "structures des groupes", None),
+                ("refresh_publication_structures", "structures des publications", None),
+                ("refresh_publication_rors", "ROR des publications", None),
+                ("refresh_serial_publishers", "éditeur des revues", 4),
+                ("recompute_address_publication_count", "adresses", 7),
+                ("refresh_serial_publication_counts", "revues", 3),
+                ("refresh_publisher_publication_counts", "éditeurs", 2),
+            )
+        ),
     ]
 
 
@@ -64,7 +93,7 @@ def _run(contexte, lots):
     ):
         for patcher in _patch_sql(counts):
             stack.enter_context(patcher)
-        rendu = phase.FinalizePhase().run(contexte())
+        rendu = run_phase(_FINALIZE, contexte())
     return rendu, purge, counts
 
 
@@ -87,8 +116,8 @@ def test_rien_a_purger(open_tx, contexte):
 def test_chaque_tache_dans_sa_transaction(open_tx, contexte):
     _run(contexte, [10])
 
-    # périmètre des publications, vues matérialisées, purge, éditeur des revues, puis un décompte par famille : adresses, revues, éditeurs
-    assert open_tx.transactions == 7
+    # périmètre des publications, vues matérialisées, purge, éditeur des revues, une suppression par référentiel vide, puis un décompte par famille : adresses, revues, éditeurs
+    assert open_tx.transactions == 10
 
 
 def test_la_synchronisation_rend_les_contributions_du_perimetre(contexte, caplog):
@@ -105,35 +134,18 @@ def test_la_synchronisation_rend_les_contributions_du_perimetre(contexte, caplog
 
 def test_referentiels_vides_supprimes_apres_la_purge(open_tx, contexte, caplog):
     """Monographies, revues puis éditeurs vides : chaque suppression écrit sa ligne et remonte ses compteurs."""
-    appels: list[str] = []
-
-    def suppression(nom: str, n: int):
-        def run(_ctx) -> PhaseMetrics:
-            appels.append(nom)
-            m = PhaseMetrics()
-            if n:
-                m.add(serials_deleted=n)
-                m.report = f"{n} supprimées"
-            return m
-
-        return run
-
+    counts = _Counts()
     with (
         patch.object(phase, "purge_publications", return_value=0),
         caplog.at_level(logging.INFO, logger="test"),
         ExitStack() as stack,
     ):
-        for patcher in _patch_sql(_Counts()):
+        for patcher in _patch_sql(counts, {"serials": 2}):
             stack.enter_context(patcher)
-        rendu = phase.FinalizePhase(
-            empty_containers=(
-                ("Monographies vides", suppression("monographies", 0)),
-                ("Revues vides", suppression("revues", 2)),
-                ("Éditeurs vides", suppression("éditeurs", 0)),
-            ),
-        ).run(contexte())
+        rendu = run_phase(_FINALIZE, contexte())
 
-    assert appels == ["monographies", "revues", "éditeurs"]
+    suppressions = [a for a in counts.appels if a in ("monographs", "serials", "publishers")]
+    assert suppressions == ["monographs", "serials", "publishers"]
     assert rendu.extras["serials_deleted"] == 2
-    assert "  ├─ Revues vides : 2 supprimées" in caplog.messages
+    assert "  ├─ Publications en série vides : 2 supprimées" in caplog.messages
     assert "  └─ Éditeurs vides : rien à faire" in caplog.messages

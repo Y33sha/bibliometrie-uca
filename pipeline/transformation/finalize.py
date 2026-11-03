@@ -11,17 +11,16 @@ from __future__ import annotations
 
 import logging
 import time
-from collections.abc import Callable
-from dataclasses import dataclass
+from collections.abc import Callable, Mapping
 
 from sqlalchemy import Connection, text
 
 from infrastructure.db.scalars import scalar_int
-from pipeline.runtime.context import OpenTransaction, Phase, PhaseContext
+from pipeline.graph import task
+from pipeline.runtime.context import OpenTransaction, PhaseContext
 from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, inflect, quantity, step
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import waiting
-from pipeline.task_runner import TaskStep, run_tasks
 from pipeline.transformation.publications.lifecycle import purge_publications
 from pipeline.transformation.publications.publication_perimeter import (
     refresh_publications_perimeter_evidence,
@@ -74,83 +73,50 @@ def refresh_publication_rors(conn: Connection) -> None:
     conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY publication_rors"))
 
 
-@dataclass(frozen=True)
-class FinalizePhase:
-    empty_containers: tuple[tuple[str, Callable[[PhaseContext], PhaseMetrics]], ...] = ()
-    """Suppressions des référentiels vides, dans l'ordre : (libellé, runner), fournies par le câblage."""
+def _publications_in_perimeter(ctx: PhaseContext) -> PhaseMetrics:
+    t0 = time.perf_counter()
+    with ctx.open_tx() as conn:
+        refresh_publications_perimeter_evidence(conn)
+        in_perimeter = count_contributions_in_perimeter(conn)
+    metrics = _timed(t0)
+    metrics.details["in_perimeter"] = in_perimeter
+    return metrics
 
-    def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Exécute les tâches de la phase et renvoie ses métriques : celles des référentiels vides, et un résumé."""
 
-        def publications_in_perimeter(ctx: PhaseContext) -> PhaseMetrics:
-            t0 = time.perf_counter()
-            with ctx.open_tx() as conn:
-                refresh_publications_perimeter_evidence(conn)
-                in_perimeter = count_contributions_in_perimeter(conn)
-            metrics = _timed(t0)
-            metrics.details["in_perimeter"] = in_perimeter
-            return metrics
+def _structures(ctx: PhaseContext) -> PhaseMetrics:
+    t0 = time.perf_counter()
+    with ctx.open_tx() as conn:
+        refresh_contribution_structures(conn)
+        refresh_publication_structures(conn)
+        refresh_publication_rors(conn)
+    return _timed(t0)
 
-        def structures(ctx: PhaseContext) -> PhaseMetrics:
-            t0 = time.perf_counter()
-            with ctx.open_tx() as conn:
-                refresh_contribution_structures(conn)
-                refresh_publication_structures(conn)
-                refresh_publication_rors(conn)
-            return _timed(t0)
 
-        def purge(ctx: PhaseContext) -> PhaseMetrics:
-            metrics = PhaseMetrics()
-            metrics.details["purged"] = _purge_publications(ctx.open_tx)
-            return metrics
+def _purge(ctx: PhaseContext) -> PhaseMetrics:
+    metrics = PhaseMetrics()
+    metrics.details["purged"] = _purge_publications(ctx.open_tx)
+    return metrics
 
-        def serial_publishers(ctx: PhaseContext) -> PhaseMetrics:
-            with ctx.open_tx() as conn:
-                changed = refresh_serial_publishers(conn)
-            metrics = PhaseMetrics()
-            metrics.report = (
-                f"{quantity(changed, 'revue')} {inflect(changed, 'mise à jour', 'mises à jour')}"
-            )
-            return metrics
 
-        def empty_containers(ctx: PhaseContext) -> PhaseMetrics:
-            metrics = PhaseMetrics()
-            _delete_empty_containers(self.empty_containers, metrics, ctx)
-            return metrics
+def _serial_publishers(ctx: PhaseContext) -> PhaseMetrics:
+    with ctx.open_tx() as conn:
+        changed = refresh_serial_publishers(conn)
+    metrics = PhaseMetrics()
+    metrics.report = (
+        f"{quantity(changed, 'revue')} {inflect(changed, 'mise à jour', 'mises à jour')}"
+    )
+    return metrics
 
-        def publication_counts(ctx: PhaseContext) -> PhaseMetrics:
-            _refresh_publication_counts(ctx.open_tx, ctx.logger)
-            return PhaseMetrics()
 
-        sync_section = "Synchronisation des tables"
-        by_task = run_tasks(
-            "finalize",
-            {
-                "finalize.publications_in_perimeter": TaskStep(
-                    publications_in_perimeter,
-                    section=sync_section,
-                    label="Périmètre des publications",
-                ),
-                "finalize.structures": TaskStep(
-                    structures, section=sync_section, label="Structures des liens"
-                ),
-                "finalize.purge_publications": TaskStep(purge),
-                "finalize.serial_publishers": TaskStep(
-                    serial_publishers, label="Éditeur des revues"
-                ),
-                "finalize.delete_empty_containers": TaskStep(empty_containers),
-                "finalize.publication_counts": TaskStep(publication_counts),
-            },
-            ctx,
-        )
-        metrics = by_task["finalize.delete_empty_containers"]
-        metrics.details["summary"] = {
-            "total_in_perimeter": by_task["finalize.publications_in_perimeter"].details[
-                "in_perimeter"
-            ],
-            "publications_purged": by_task["finalize.purge_publications"].details["purged"],
-        }
-        return metrics
+def _empty_containers(ctx: PhaseContext) -> PhaseMetrics:
+    metrics = PhaseMetrics()
+    _delete_empty_containers(_EMPTY_CONTAINERS, metrics, ctx)
+    return metrics
+
+
+def _publication_counts(ctx: PhaseContext) -> PhaseMetrics:
+    _refresh_publication_counts(ctx.open_tx, ctx.logger)
+    return PhaseMetrics()
 
 
 def _timed(t0: float) -> PhaseMetrics:
@@ -219,16 +185,6 @@ def _refresh_publication_counts(open_tx: OpenTransaction, logger: logging.Logger
         line.conclude(f"{LAST_BRANCH}{quantity(publishers, 'éditeur')} mis à jour")
 
 
-def build() -> Phase:
-    return FinalizePhase(
-        empty_containers=(
-            (delete_empty_monographs.LABEL, _run_delete_empty_monographs),
-            (delete_empty_serials.LABEL, _run_delete_empty_serials),
-            (delete_empty_publishers.LABEL, _run_delete_empty_publishers),
-        ),
-    )
-
-
 def _run_delete_empty_monographs(ctx: PhaseContext) -> PhaseMetrics:
     with ctx.open_tx() as conn:
         return run_delete_empty_monographs(conn, ctx.logger)
@@ -242,3 +198,136 @@ def _run_delete_empty_serials(ctx: PhaseContext) -> PhaseMetrics:
 def _run_delete_empty_publishers(ctx: PhaseContext) -> PhaseMetrics:
     with ctx.open_tx() as conn:
         return run_delete_empty_publishers(conn, ctx.logger)
+
+
+_EMPTY_CONTAINERS: tuple[tuple[str, Callable[[PhaseContext], PhaseMetrics]], ...] = (
+    (delete_empty_monographs.LABEL, _run_delete_empty_monographs),
+    (delete_empty_serials.LABEL, _run_delete_empty_serials),
+    (delete_empty_publishers.LABEL, _run_delete_empty_publishers),
+)
+"""Suppressions des référentiels vides, dans l'ordre : (libellé, fonction)."""
+
+
+TASKS = (
+    task(
+        "finalize.publications_in_perimeter",
+        reads=(
+            "contributions.person_id",
+            "contributions.perimeter_evidence",
+            "contributions.roles",
+            "persons.exclusion",
+            "publications.id",
+        ),
+        writes=("publications.in_perimeter",),
+        # Lignes supprimées plus loin dans le même run par `finalize.purge_publications`.
+        previous_run=("publications.id",),
+        run=_publications_in_perimeter,
+        section="Synchronisation des tables",
+        label="Périmètre des publications",
+    ),
+    task(
+        "finalize.structures",
+        reads=(
+            "source_contribution_structures",
+            "contributions.id",
+            "contributions.publication_id",
+            "contributions.person_id",
+            "contributions.roles",
+            "aligned_source_contributions",
+            "persons.exclusion",
+            "source_contribution_rors",
+            "ror_relations",
+            "structures.ror_id",
+        ),
+        writes=("contribution_structures", "publication_structures", "publication_rors"),
+        run=_structures,
+        section="Synchronisation des tables",
+        label="Structures des liens",
+    ),
+    task(
+        "finalize.purge_publications",
+        reads=(
+            "publications.id",
+            "source_records.publication_id",
+            "contributions.id",
+            "contributions.publication_id",
+            "contributions.person_id",
+        ),
+        writes=("publications.id",),
+        run=_purge,
+    ),
+    task(
+        "finalize.serial_publishers",
+        reads=(
+            "serials.id",
+            "publications.serial_id",
+            "publications.monograph_id",
+            "publications.publisher_id",
+            "publications.publication_year",
+            "monographs.serial_id",
+        ),
+        writes=("serials.publisher_id",),
+        # Les revues et les monographies supprimées ensuite par `delete_empty_containers` n'ont pas de publication : leur suppression ne change aucun éditeur.
+        previous_run=("serials.id", "monographs.serial_id"),
+        run=_serial_publishers,
+        label="Éditeur des revues",
+    ),
+    task(
+        "finalize.delete_empty_containers",
+        reads=(
+            "monographs.id",
+            "monographs.serial_id",
+            "serials.id",
+            "serials.publisher_id",
+            "publishers.id",
+            "source_records.serial_id",
+            "source_records.monograph_id",
+            "source_records.publisher_id",
+            "publications.serial_id",
+            "publications.monograph_id",
+            "publications.publisher_id",
+            "apc_payments",
+            "doi_prefixes.publisher_id",
+            "serial_title_decisions",
+            # ISSN cités par la série d'un enregistrement source, ou reliés à un autre titre.
+            "serial_issns",
+            "source_records.biblio",
+            "issn_links",
+        ),
+        writes=("monographs.id", "serials.id", "publishers.id", "serial_issns"),
+        run=_empty_containers,
+    ),
+    task(
+        "finalize.publication_counts",
+        reads=(
+            "addresses.id",
+            "source_contribution_addresses",
+            "source_contributions.source_record_id",
+            "source_records.publication_id",
+            "source_records.serial_id",
+            "serials.id",
+            "publishers.id",
+            "publications.id",
+            "publications.in_perimeter",
+            "publications.serial_id",
+            "publications.publisher_id",
+        ),
+        writes=(
+            "addresses.publication_count",
+            "serials.publication_count",
+            "publishers.publication_count",
+        ),
+        previous_run=("addresses",),
+        run=_publication_counts,
+    ),
+)
+
+
+def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
+    """Renvoie les métriques de la phase : celles des référentiels vides, et un résumé."""
+    metrics = by_task["finalize.delete_empty_containers"]
+    metrics.details["summary"] = {
+        "total_in_perimeter": by_task["finalize.publications_in_perimeter"].details["in_perimeter"],
+        "publications_purged": by_task["finalize.purge_publications"].details["purged"],
+    }
+    return metrics
