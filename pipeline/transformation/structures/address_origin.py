@@ -6,8 +6,8 @@ from collections import Counter
 
 from sqlalchemy import Connection, text
 
+from domain.addresses.address_origin import AddressOrigin, OriginReferentials, address_origin
 from domain.countries import PlaceNameKind
-from domain.structures.address_origin import AddressOrigin, OriginReferentials, address_origin
 from infrastructure.db.scalars import scalar_int
 from pipeline.runtime.observability.log_format import (
     BRANCH,

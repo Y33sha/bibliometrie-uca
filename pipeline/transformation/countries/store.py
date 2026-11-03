@@ -7,7 +7,7 @@ import json
 
 from sqlalchemy import Connection, text
 
-from domain.country_detection import CountryDetectionMethod
+from domain.addresses.country_detection import CountryDetectionMethod
 from infrastructure.db.queues import Queue, enqueue, enqueue_sql
 
 # Insertion des candidats `(adresse, pays)` d'un moyen, depuis un payload JSON ; ouvre la CTE `added(address_id)` des candidats ajoutés.

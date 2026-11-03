@@ -34,6 +34,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import ARRAY, ENUM as PgEnum
 
+from domain.addresses.address_origin import AddressOrigin
+from domain.addresses.country_detection import CountryDetectionMethod
 from domain.config import (
     CAP_BOUNDS,
     CAP_KEYS,
@@ -45,7 +47,6 @@ from domain.config import (
 from domain.contributions.author_grouping import GroupingMethod
 from domain.contributions.author_positions import AuthorPosition
 from domain.countries import NO_COUNTRY_CODE, PlaceNameKind
-from domain.country_detection import CountryDetectionMethod
 from domain.documents.dates import DatePrecision
 from domain.documents.doc_types import DocType
 from domain.documents.licenses import License
@@ -67,7 +68,6 @@ from domain.source_records.identifiers import (
 )
 from domain.sources.registry import LOOKUP_SOURCES, Source
 from domain.sources.staging import StagingEntryMode
-from domain.structures.address_origin import AddressOrigin
 from domain.structures.hal_structures import HalStructureStatus
 from domain.structures.perimeter_evidence import PerimeterEvidence
 from domain.structures.ror import RorStatus, RorType

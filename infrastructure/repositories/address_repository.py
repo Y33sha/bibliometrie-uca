@@ -10,7 +10,7 @@ from application.ports.repositories.address_repository import (
     AddressCountryFilter,
     AddressRepository,
 )
-from domain.country_detection import CountryDetectionMethod
+from domain.addresses.country_detection import CountryDetectionMethod
 from domain.errors import NotFoundError
 from infrastructure.db.queues import Queue, enqueue, enqueue_sql
 from infrastructure.db.tables import (

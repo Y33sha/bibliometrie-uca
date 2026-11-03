@@ -7,8 +7,8 @@ import logging
 
 from sqlalchemy import Connection
 
+from domain.addresses.country_detection import CountryDetectionMethod
 from domain.countries import PlaceNameKind
-from domain.country_detection import CountryDetectionMethod
 from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, quantity, step
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.countries.place_name_detector import PlaceNameDetector

@@ -34,7 +34,7 @@ Les sujets liés à aucun enregistrement source ni à aucune publication sont su
 Associe des pays aux adresses, aux contributions sources et aux publications, pour l'analyse des collaborations internationales.
 
 - **Pays trouvés.** Chaque moyen de détection propose des pays pour une adresse (`address_country_candidates`) : pays donnés par OpenAlex et ScanR, nom de pays en fin d'adresse, noms d'institutions et de villes (`place_name_forms`), saisie manuelle.
-- **Pays retenus.** Une fonction de préséance du domaine (`domain/country_detection.py`) compose `addresses.countries` à partir des pays trouvés.
+- **Pays retenus.** Une fonction de préséance du domaine (`domain/addresses/country_detection.py`) compose `addresses.countries` à partir des pays trouvés.
 - **Report.** Le pays d'une contribution source réunit les pays retenus de ses adresses et ceux de ses structures HAL. Quand ses adresses ne donnent aucun pays, il prend ceux de ses organisations ROR sans adresse. `source_records.countries` réunit les pays de ses contributions sources, `publications.countries` ceux de ses enregistrements sources.
 
 Seules les adresses et les contributions sources marquées sont retraitées.

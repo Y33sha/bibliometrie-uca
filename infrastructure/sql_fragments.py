@@ -6,6 +6,7 @@ Le module contient des fragments construits depuis des constantes du domaine (`i
 from collections.abc import Iterable
 
 from application.ports.repositories.address_repository import AddressCountryFilter
+from domain.addresses.address_origin import AddressOrigin
 from domain.config import ConfigKey
 from domain.contributions.author_positions import SCANR_TRUNCATED_LENGTHS, AuthorPosition
 from domain.contributions.contribution_roles import ContributionRole
@@ -21,7 +22,6 @@ from domain.serials.serial import OaModel
 from domain.source_records.corrections import CORRECTED_BY, RAW
 from domain.source_records.impact import CitationTop
 from domain.source_records.source_extras import CROSSREF_PREPRINT_OF, SourceExtra
-from domain.structures.address_origin import AddressOrigin
 from domain.structures.perimeter_evidence import PerimeterEvidence
 from infrastructure.db.queues import Queue, enqueue_sql
 

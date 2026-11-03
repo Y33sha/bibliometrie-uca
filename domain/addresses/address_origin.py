@@ -5,7 +5,7 @@ from collections.abc import Iterable, Set
 from dataclasses import dataclass
 from enum import StrEnum
 
-from domain.country_detection import CountryNames
+from domain.addresses.country_detection import CountryNames
 from domain.normalize import normalize_text
 
 

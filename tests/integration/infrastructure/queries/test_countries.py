@@ -4,7 +4,7 @@ import logging
 
 from sqlalchemy import text
 
-from domain.country_detection import CountryDetectionMethod
+from domain.addresses.country_detection import CountryDetectionMethod
 from infrastructure.db.queues import Queue
 from pipeline.transformation.countries.refresh_publication_countries import (
     create_dirty_scope,

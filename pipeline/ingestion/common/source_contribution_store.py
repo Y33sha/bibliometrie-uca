@@ -9,7 +9,7 @@ from typing import NamedTuple, TypedDict
 
 from sqlalchemy import Connection, bindparam, text
 
-from domain.country_detection import CountryDetectionMethod
+from domain.addresses.country_detection import CountryDetectionMethod
 from domain.types import JsonValue
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.db.queues import Queue, enqueue, enqueue_sql

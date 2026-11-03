@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from application.ports.model import Model
-from domain.country_detection import CountryDetectionMethod
+from domain.addresses.country_detection import CountryDetectionMethod
 from infrastructure.read_models._common import FacetOption, PaginatedResponse
 
 # État de détection d'un rattachement adresse-structure, et état de son arbitrage manuel.

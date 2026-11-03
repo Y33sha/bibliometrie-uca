@@ -5,7 +5,7 @@ from collections import defaultdict
 
 from sqlalchemy import Connection, text
 
-from domain.country_detection import CountryDetectionMethod, retained_countries
+from domain.addresses.country_detection import CountryDetectionMethod, retained_countries
 from infrastructure.db.queues import Queue, delete_processed, enqueue_sql, snapshot
 
 # Adresses résolues par lot : chaque lot charge ses candidats en mémoire.

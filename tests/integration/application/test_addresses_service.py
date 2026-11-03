@@ -3,7 +3,7 @@
 import pytest
 from sqlalchemy import text
 
-from domain.country_detection import CountryDetectionMethod
+from domain.addresses.country_detection import CountryDetectionMethod
 from domain.errors import NotFoundError, ValidationError
 from infrastructure.db.queues import Queue
 from infrastructure.repositories import address_repository, contribution_repository
