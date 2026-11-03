@@ -8,16 +8,19 @@ from unittest.mock import MagicMock, patch
 
 from pipeline.http.circuit_breaker import get_current_breaker
 from pipeline.ingestion.common import fetch_stale
+from pipeline.phases import PHASES
 from pipeline.runtime.context import RunOptions
 from pipeline.runtime.execution import phase_context
 from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.task_runner import run_phase
 
 
 def _run_phase(options: RunOptions) -> PhaseMetrics:
-    return fetch_stale.build().run(
+    return run_phase(
+        next(phase for phase in PHASES if phase.name == "fetch_stale"),
         phase_context(
             options, credentials_missing=lambda _source: None, request_budget=lambda _source: None
-        )
+        ),
     )
 
 

@@ -15,7 +15,6 @@ from domain.sources.registry import (
     DOI_SEARCHABLE_SOURCES,
     PROFILES,
     SOURCE_PRIORITY,
-    Source,
 )
 
 if TYPE_CHECKING:
@@ -254,18 +253,6 @@ TASKS: tuple[Task, ...] = (
             parallel_group="fetch_missing.doi",
         )
         for source in DOI_SEARCHABLE_SOURCES
-    ),
-    *(
-        _task(
-            f"fetch_stale.{source}",
-            "fetch_stale",
-            reads=("config", "staging", "source_records.publication_year"),
-            writes=("staging", "staging_normalization_queue"),
-            previous_run=("staging", "source_records"),
-            network=source,
-            parallel_group="fetch_stale",
-        )
-        for source in Source
     ),
     *(
         _task(

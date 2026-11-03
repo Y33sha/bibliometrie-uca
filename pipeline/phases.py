@@ -59,10 +59,11 @@ PHASES: tuple[Phase, ...] = (
     Phase(
         "fetch_stale",
         "Recherche des documents non revus depuis {delai}",
-        phase_tasks("fetch_stale"),
+        fetch_stale.TASKS,
         harvesting=True,
         label_fields=_fetch_stale_fields,
-        build=fetch_stale.build,
+        when=lambda options: options.policy.fetch_stale,
+        assemble=fetch_stale.assemble,
     ),
     Phase(
         "fetch_truncated",
