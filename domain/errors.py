@@ -46,7 +46,8 @@ class RejectedPair(TypedDict):
 
     publication_id: int
     person_id: int
-    rejected_at: str  # ISO 8601
+    rejected_at: str
+    """ISO 8601."""
 
 
 class RejectedPairError(ConflictError):

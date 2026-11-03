@@ -85,8 +85,8 @@ PROFILES: dict[Source, SourceProfile] = {
     ),
 }
 
-# Registre des DOI, interrogé pour vérifier qu'un DOI existe. Il figure parmi les sources des recherches infructueuses, sans fournir d'enregistrements sources.
 DOI_ORG = "doi_org"
+"""Registre des DOI, interrogé pour vérifier qu'un DOI existe. Il figure parmi les sources des recherches infructueuses, sans fournir d'enregistrements sources."""
 LOOKUP_SOURCES: tuple[str, ...] = (*Source, DOI_ORG)
 
 _SOURCE_LABELS: dict[str, str] = {
@@ -139,8 +139,6 @@ PERSON_SEARCHED_SOURCES: tuple[Source, ...] = tuple(
 AGGREGATOR_SOURCES: frozenset[Source] = frozenset(s for s, p in PROFILES.items() if p.aggregator)
 
 
-# Ordre d'autorité des sources, pour l'agrégation des métadonnées, la position d'auteur et l'ordre des normaliseurs.
-# theses.fr fait autorité sur les thèses. Crossref et DataCite font chacun autorité sur leurs propres DOI.
 SOURCE_PRIORITY: tuple[Source, ...] = (
     Source.THESES,
     Source.CROSSREF,
@@ -150,9 +148,9 @@ SOURCE_PRIORITY: tuple[Source, ...] = (
     Source.SCANR,
     Source.WOS,
 )
+"""Ordre d'autorité des sources, pour l'agrégation des métadonnées, la position d'auteur et l'ordre des normaliseurs. theses.fr fait autorité sur les thèses. Crossref et DataCite font chacun autorité sur leurs propres DOI."""
 
 
-# Sources admises comme clés de `structures.api_ids` : identifiant d'organisation dans la source, ou chaîne d'affiliation interrogée en texte (WoS, mots-clés DataCite).
 STRUCTURE_API_SOURCES: tuple[Source, ...] = (
     Source.OPENALEX,
     Source.WOS,
@@ -160,3 +158,4 @@ STRUCTURE_API_SOURCES: tuple[Source, ...] = (
     Source.THESES,
     Source.DATACITE,
 )
+"""Sources admises comme clés de `structures.api_ids` : identifiant d'organisation dans la source, ou chaîne d'affiliation interrogée en texte (WoS, mots-clés DataCite)."""

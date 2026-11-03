@@ -159,8 +159,8 @@ class ComparisonLevel(StrEnum):
     SAME_GAP = "même trou"
     NEXT_GAP = "trou voisin"
     ELSEWHERE = "ailleurs"
-    # Aucun des niveaux de ressemblance de la comparaison.
     ELSE = "else"
+    """Aucun des niveaux de ressemblance de la comparaison."""
 
 
 JARO_WINKLER_THRESHOLDS: dict[ComparisonLevel, float] = {

@@ -22,18 +22,17 @@ from domain.source_records.identifiers import (
     by_role,
 )
 
-# Types d'identifiants qui sont des clés de confirmation, à côté du DOI et du bloc de métadonnées.
 CONFIRMATION_ID_TYPES = (
     SourceIdentifierType.HAL_ID,
     SourceIdentifierType.ARXIV_ID,
     SourceIdentifierType.PMID,
     SourceIdentifierType.NNT,
 )
+"""Types d'identifiants qui sont des clés de confirmation, à côté du DOI et du bloc de métadonnées."""
 
 
-# Longueur de titre normalisé, en caractères, en deçà de laquelle un titre est trop générique pour servir de clé.
-# Sert aux clés de confirmation, aux relations et au dédoublonnage HAL ; les requêtes SQL l'interpolent.
 DISCRIMINANT_TITLE_MIN_LENGTH = 30
+"""Longueur de titre normalisé, en caractères, en deçà de laquelle un titre est trop générique pour servir de clé. Sert aux clés de confirmation, aux relations et au dédoublonnage HAL ; les requêtes SQL l'interpolent."""
 
 
 @dataclass(frozen=True, slots=True)

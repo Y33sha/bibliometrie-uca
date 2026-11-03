@@ -4,7 +4,6 @@ import re
 
 from domain.normalize import normalize_text
 
-# Formes juridiques retirées en fin de nom : « Elsevier BV », « Taylor & Francis Ltd », « S. Karger AG ».
 _LEGAL_FORMS = frozenset(
     {
         "ag", "b", "bv", "co", "company", "corp", "corporation", "gmbh", "inc", "incorporated",
@@ -12,6 +11,7 @@ _LEGAL_FORMS = frozenset(
         "sas", "spa", "srl", "v",
     }
 )  # fmt: skip
+"""Formes juridiques retirées en fin de nom : « Elsevier BV », « Taylor & Francis Ltd », « S. Karger AG »."""
 _BRACKETS = re.compile(r"\[[^\]]*\]")
 _PARENTHESES = re.compile(r"\([^)]*\)")
 _ON_BEHALF_OF = re.compile(r"\bon behalf of\b.*$", re.IGNORECASE)

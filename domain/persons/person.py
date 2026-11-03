@@ -20,7 +20,7 @@ def validated_name(last_name: str, first_name: str) -> tuple[str, str]:
 class PersonExclusion(StrEnum):
     """Motif d'exclusion d'une personne, décidé à la main. Une personne exclue est absente de l'interface publique et du périmètre. Ses formes de nom servent au matching."""
 
-    # Fausse entité : nom d'équipe, plusieurs noms dans un même champ…
     NOT_A_PERSON = "not_a_person"
-    # Personne réelle, rattachée au périmètre par erreur.
+    """Fausse entité : nom d'équipe, plusieurs noms dans un même champ…"""
     OUT_OF_PERIMETER = "out_of_perimeter"
+    """Personne réelle, rattachée au périmètre par erreur."""

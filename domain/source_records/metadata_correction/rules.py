@@ -115,10 +115,9 @@ class Correction(NamedTuple):
     rule: MetadataCorrectionRule
 
 
-# Débuts de titre normalisé d'une intervention dans les médias.
 _MEDIA_TITLE_PREFIXES = ("interview", "reportage", "podcast")
+"""Débuts de titre normalisé d'une intervention dans les médias."""
 
-# Débuts de titre normalisé d'un contenu supplémentaire. « Supplementary roles of X » est un article.
 _SUPPLEMENTARY_CONTENT_TITLE_PREFIXES = (
     "additional file",
     "supplementary material",
@@ -132,8 +131,8 @@ _SUPPLEMENTARY_CONTENT_TITLE_PREFIXES = (
     "supporting movie",
     "data from",
 )
+"""Débuts de titre normalisé d'un contenu supplémentaire. « Supplementary roles of X » est un article."""
 
-# Débuts de titre normalisé d'un erratum.
 _ERRATUM_TITLE_PREFIXES = (
     DocType.ERRATUM,
     "errata",
@@ -141,42 +140,42 @@ _ERRATUM_TITLE_PREFIXES = (
     "author correction",
     "publisher correction",
 )
+"""Débuts de titre normalisé d'un erratum."""
 
-# Débuts de titre normalisé d'un avis de rétractation. « Retraction of consent in clinical trials » est un article.
 _RETRACTION_TITLE_PREFIXES = ("retraction notice", "retraction note")
+"""Débuts de titre normalisé d'un avis de rétractation. « Retraction of consent in clinical trials » est un article."""
 
-# « Editorial: <titre> » (Frontiers). Le deux-points écarte « Editorial Board » ; `normalize_text` l'efface, d'où un motif sur le titre brut.
 _EDITORIAL_PREFIX_PATTERN = re.compile(r"^\s*editorial\s*:", re.IGNORECASE)
-# « Letter: <titre> » (courrier à l'éditeur, research letter).
+"""« Editorial: <titre> » (Frontiers). Le deux-points écarte « Editorial Board » ; `normalize_text` l'efface, d'où un motif sur le titre brut."""
 _LETTER_PREFIX_PATTERN = re.compile(r"^\s*letter\s*:", re.IGNORECASE)
-# « Systematic review » en tête de titre ou de sous-titre. Au fil du titre (« …cohort, and a systematic review »), la mention désigne une étude primaire.
+"""« Letter: <titre> » (courrier à l'éditeur, research letter)."""
 _SYSTEMATIC_REVIEW_PATTERN = re.compile(r"(^|:\s*)(a\s+)?systematic reviews?\b", re.IGNORECASE)
+"""« Systematic review » en tête de titre ou de sous-titre. Au fil du titre (« …cohort, and a systematic review »), la mention désigne une étude primaire."""
 
-# Recension d'ouvrage : mention « ISBN », ou ISBN-13, dans le titre brut.
 _ISBN_PATTERN = re.compile(r"\bisbn\b|\b97[89][-\s0-9]{10,17}\b", re.IGNORECASE)
-# Recension d'ouvrage : titre terminé par « AAAA, N p. », référence de l'ouvrage saisie dans le titre (HAL). Moins sûr que l'ISBN.
+"""Recension d'ouvrage : mention « ISBN », ou ISBN-13, dans le titre brut."""
 _YEAR_PAGES_END_PATTERN = re.compile(
     r"(19|20)\d{2}[\s,.]+\d{1,4}\s*(pp|pages?|p)\.?\s*$", re.IGNORECASE
 )
-# Recension d'ouvrage : titre commençant par « Recension » ou « Compte(s) rendu(s) : ». Le deux-points écarte les rapports (« Compte rendu de mission : … »).
+"""Recension d'ouvrage : titre terminé par « AAAA, N p. », référence de l'ouvrage saisie dans le titre (HAL). Moins sûr que l'ISBN."""
 _RECENSION_TITLE_PATTERN = re.compile(r"^\s*(recension|comptes?\s+rendus?\s*:)", re.IGNORECASE)
+"""Recension d'ouvrage : titre commençant par « Recension » ou « Compte(s) rendu(s) : ». Le deux-points écarte les rapports (« Compte rendu de mission : … »)."""
 
-# Vocabulaire d'un volume d'actes ou d'un recueil de résumés, n'importe où dans le titre. Seul, il désigne aussi des articles (discours présidentiel, introduction éditoriale) : la règle qui le lit exige un enregistrement source sans auteur.
 _VOLUME_TITLE_PATTERN = re.compile(
     r"\b(proceedings|abstracts?|congress|congrès|congres|meeting|symposium|conference|colloque"
     r"|communications\s+affich[ée]es|poster\s+presentations|posters)\b",
     re.IGNORECASE,
 )
-# Début de titre d'un volume. « Abstract » au singulier en est exclu : « Abstract 4007: … » est un résumé isolé.
+"""Vocabulaire d'un volume d'actes ou d'un recueil de résumés, n'importe où dans le titre. Seul, il désigne aussi des articles (discours présidentiel, introduction éditoriale) : la règle qui le lit exige un enregistrement source sans auteur."""
 _VOLUME_TITLE_PREFIX_PATTERN = re.compile(
     r"^\s*(proceedings|abstracts|book\s+of\s+abstracts|abstract\s+book)\b", re.IGNORECASE
 )
-# Titre de revue ou de collection d'un recueil de résumés : « Goldschmidt Abstracts », « Abstracts with programs ».
+"""Début de titre d'un volume. « Abstract » au singulier en est exclu : « Abstract 4007: … » est un résumé isolé."""
 _ABSTRACTS_SERIAL_TITLE_PATTERN = re.compile(r"\babstracts?\b", re.IGNORECASE)
+"""Titre de revue ou de collection d'un recueil de résumés : « Goldschmidt Abstracts », « Abstracts with programs »."""
 
-# Préfixes DOI des registres de thèses, dont le DOI est celui de la thèse elle-même : `10.70675` (ABES).
-# Les thèses des archives institutionnelles ont des préfixes variés, absents de la liste.
 _THESIS_REGISTRY_DOI_PREFIXES = ("10.70675",)
+"""Préfixes DOI des registres de thèses, dont le DOI est celui de la thèse elle-même : `10.70675` (ABES). Les thèses des archives institutionnelles ont des préfixes variés, absents de la liste."""
 
 
 def _url_contains(facts: MetadataForCorrection, part: str) -> bool:
@@ -219,11 +218,10 @@ class _Rule(NamedTuple):
     corrected_to: DocType
 
 
-# Types qu'une règle de titre peut corriger.
 _ARTICLE_OR_OTHER = frozenset({DocType.ARTICLE, DocType.OTHER})
+"""Types qu'une règle de titre peut corriger."""
 
 
-# Ordre de priorité : URL, type de revue, puis titre.
 _RULES: dict[MetadataCorrectionRule, _Rule] = {
     # theses.fr fait autorité sur les thèses françaises. Un enregistrement source theses.fr rattaché à une revue relève de `THESIS_WITH_SERIAL_TO_ARTICLE`.
     MetadataCorrectionRule.THESES_FR_URL_TO_THESIS: _Rule(
@@ -405,6 +403,7 @@ _RULES: dict[MetadataCorrectionRule, _Rule] = {
         DocType.DATA_PAPER,
     ),
 }
+"""Ordre de priorité : URL, type de revue, puis titre."""
 
 
 @cache
@@ -425,8 +424,8 @@ def doc_type_correction(facts: MetadataForCorrection) -> Correction | None:
     return None
 
 
-# Préfixes d'identifiants HAL des thèses (TEL) et des mémoires (DUMAS).
 _DISSERTATION_HALID_PREFIXES = ("tel-", "dumas-")
+"""Préfixes d'identifiants HAL des thèses (TEL) et des mémoires (DUMAS)."""
 
 
 def is_dissertation_identifier(identifier: SourceIdentifier) -> bool:

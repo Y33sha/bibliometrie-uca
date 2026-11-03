@@ -20,8 +20,8 @@ from domain.source_records.identifiers import SourceIdentifier, own_dois
 from domain.source_records.metadata_correction.shared_doi import DoiClusterCase
 from domain.types import JsonValue
 
-# Provenance inscrite dans `corrections.serial_id.corrected_by`.
 _SERIAL_BY_DOI_NAMESPACE = "SERIAL_BY_DOI_NAMESPACE"
+"""Provenance inscrite dans `corrections.serial_id.corrected_by`."""
 
 NAMESPACE_DOI_REMOVALS: tuple[str | None, ...] = (None, DoiClusterCase.UNRESOLVED_DOI_TO_NULL)
 """Valeurs de `removed_by` des DOI retenus pour le rattachement : DOI actif, DOI inconnu de doi.org."""

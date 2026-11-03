@@ -11,15 +11,14 @@ from typing import NamedTuple
 from domain.normalize import normalize_text
 from domain.serials.titles import names_a_dated_event
 
-# Ordinal d'édition, anglais (« 8th », « 21st »), français (« 34es », « 6èmes », « 1re »), allemand (« 74. Jahrestagung »).
-# Un siècle n'est pas une édition : « 19th-century », « XVIe siècle ».
 _ORDINAL = re.compile(
     r"\b\d{1,3}(?:st|nd|rd|th|e|es|è|ème|èmes|eme|emes|er|re|ère)\b(?![\s-]*(?:centur|siècle|siecle))"
     r"|\b\d{1,3}\.\s+(?=[A-Za-zÀ-ÿ])",
     re.IGNORECASE,
 )
-# Numéro de volume ou de tome : « Volume 364 », « Vol. 3 », « Tome 2 », « Band 12 ».
+"""Ordinal d'édition, anglais (« 8th », « 21st »), français (« 34es », « 6èmes », « 1re »), allemand (« 74. Jahrestagung »). Un siècle n'est pas une édition : « 19th-century », « XVIe siècle »."""
 _VOLUME_NUMBER = re.compile(r"\b(?:vol(?:ume)?|tome|band|bd)\.?\s*\d+\b", re.IGNORECASE)
+"""Numéro de volume ou de tome : « Volume 364 », « Vol. 3 », « Tome 2 », « Band 12 »."""
 _YEAR = re.compile(r"(?<!\d)(?:1[89]\d\d|20\d\d)(?!\d)")
 # Date d'une édition : « September 7 - 12 », « 16 juin », « 6-8 mars ».
 _MONTHS = (

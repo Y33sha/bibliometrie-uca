@@ -20,12 +20,12 @@ class AddressOrigin(StrEnum):
     """Nom seul d'une structure ou d'un établissement, suivi ou non du pays, ou texte étranger à une adresse."""
 
 
-# Libellé HAL complet : adresse postale et pays entre parenthèses finales, séparés par « - ».
 _HAL_LABEL = re.compile(r"\(.* - [^()]+\)$")
+"""Libellé HAL complet : adresse postale et pays entre parenthèses finales, séparés par « - »."""
 _FINAL_PARENTHESES = re.compile(r"\(([^()]+)\)$")
 _BRACKETS = re.compile(r"\[([^\]]*)\]")
-# Période d'un nom HAL : « [2017-2020] », « [2021-...] ».
 _PERIOD = re.compile(r"^\d{4}\s*-\s*(\d{4}|\.\.\.)?$")
+"""Période d'un nom HAL : « [2017-2020] », « [2021-...] »."""
 
 
 @dataclass(frozen=True, slots=True)

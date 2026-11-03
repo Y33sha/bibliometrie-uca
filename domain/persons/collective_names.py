@@ -62,8 +62,8 @@ _COLLECTIVE_WORDS: frozenset[str] = frozenset(
 
 _COLLECTIVE_PHRASES: tuple[str, ...] = ("on behalf of", "for the", "task force")
 
-# Noms qui désignent un collectif seulement quand ils forment le nom entier.
 _COLLECTIVE_NAMES: frozenset[str] = frozenset({"et al"})
+"""Noms qui désignent un collectif seulement quand ils forment le nom entier."""
 
 
 def is_collective_name(name: str | None) -> bool:

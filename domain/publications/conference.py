@@ -9,19 +9,19 @@ from domain.source_records.source_extras import SourceExtra, declares_conference
 from domain.source_records.source_record import SourceRecord
 from domain.types import as_str, as_strs
 
-# Types supplantés par une source désignant explicitement une communication ou un résumé : Crossref dépose un résumé en revue comme `journal-article` et un résumé de réunion comme `posted-content`.
 _SUPPLANTED_BY_CONFERENCE = frozenset(
     {DocType.ARTICLE, DocType.CONFERENCE_PAPER, DocType.PREPRINT, DocType.CONFERENCE}
 )
+"""Types supplantés par une source désignant explicitement une communication ou un résumé : Crossref dépose un résumé en revue comme `journal-article` et un résumé de réunion comme `posted-content`."""
 
-# Types supplantés par un poster déclaré par une source.
 _SUPPLANTED_BY_POSTER = frozenset({DocType.CONFERENCE, DocType.CONFERENCE_ABSTRACT})
+"""Types supplantés par un poster déclaré par une source."""
 
-# Titre d'un recueil de résumés : « Book of abstracts », « Recueil des résumés », « Abstracts with programs ».
 _ABSTRACTS = re.compile(r"\babstracts?\b|\bresumes\b")
+"""Titre d'un recueil de résumés : « Book of abstracts », « Recueil des résumés », « Abstracts with programs »."""
 
-# Éditeur inconnu, en toutes lettres ou abrégé.
 _UNKNOWN_PUBLISHERS = frozenset({"s n", "sn", "sans nom", "unknown"})
+"""Éditeur inconnu, en toutes lettres ou abrégé."""
 
 
 def _hal_titles(source: SourceRecord) -> list[str]:

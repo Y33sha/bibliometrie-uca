@@ -17,11 +17,11 @@ class CountryDetectionMethod(StrEnum):
     SOURCE_SCANR = "source_scanr"
 
 
-# Moyen des pays donnés par une source pour une affiliation, par nom de source.
 SOURCE_COUNTRY_METHODS: dict[str, CountryDetectionMethod] = {
     "scanr": CountryDetectionMethod.SOURCE_SCANR,
     "openalex": CountryDetectionMethod.SOURCE_OPENALEX,
 }
+"""Moyen des pays donnés par une source pour une affiliation, par nom de source."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,7 +44,6 @@ class CountryNames:
         return None
 
 
-# Moyens par rang de préséance, d'après une revue à la main des désaccords.
 _PRECEDENCE: tuple[CountryDetectionMethod, ...] = (
     CountryDetectionMethod.MANUAL,
     CountryDetectionMethod.COUNTRY_NAME,
@@ -53,9 +52,10 @@ _PRECEDENCE: tuple[CountryDetectionMethod, ...] = (
     CountryDetectionMethod.CITY,
     CountryDetectionMethod.SOURCE_SCANR,
 )
+"""Moyens par rang de préséance, d'après une revue à la main des désaccords."""
 
-# Nombre de moyens qui, d'accord sur un autre pays, l'emportent sur le premier moyen.
 _CONTRARY_QUORUM = 2
+"""Nombre de moyens qui, d'accord sur un autre pays, l'emportent sur le premier moyen."""
 
 
 def retained_countries(

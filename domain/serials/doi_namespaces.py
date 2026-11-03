@@ -13,10 +13,10 @@ from typing import NamedTuple
 from domain.serials.serial import SerialType
 
 _SEPARATORS = frozenset("./-_(")
-# DOI construit sur un ISBN : il désigne une monographie, pas une revue.
 _ISBN_SUFFIX = re.compile(r"97[89][-\d]")
-# Tiret interne d'un ISSN (`1748-0221`, `s0273-0979`) : l'ISSN reste d'un seul tenant.
+"""DOI construit sur un ISBN : il désigne une monographie, pas une revue."""
 _ISSN_HYPHEN = re.compile(r"(?<!\d)\d{4}(?=-\d{3}[\dx](?!\d))")
+"""Tiret interne d'un ISSN (`1748-0221`, `s0273-0979`) : l'ISSN reste d'un seul tenant."""
 
 
 def _kind(char: str) -> str:

@@ -14,10 +14,14 @@ from domain.persons.identifiers import AttributionStatus, IdentifierOrigin
 class AttributionOutcome(StrEnum):
     """Issue de l'attribution d'un identifiant à une personne (`attribution_outcome`)."""
 
-    ADDED = "added"  # identifiant absent : inséré en `pending`
-    ALREADY_EXISTS = "already_exists"  # déjà attribué à cette personne
-    REASSIGNED = "reassigned"  # repris d'une autre personne, chez qui il était `rejected`
-    HELD_ELSEWHERE = "held_elsewhere"  # une autre personne le détient en `pending` ou `confirmed`
+    ADDED = "added"
+    """Identifiant absent : inséré en `pending`."""
+    ALREADY_EXISTS = "already_exists"
+    """Déjà attribué à cette personne."""
+    REASSIGNED = "reassigned"
+    """Repris d'une autre personne, chez qui il était `rejected`."""
+    HELD_ELSEWHERE = "held_elsewhere"
+    """Une autre personne le détient en `pending` ou `confirmed`."""
 
 
 @dataclass(frozen=True, slots=True)

@@ -2,8 +2,8 @@
 
 from domain.documents.identifiers import HALId
 
-# Préfixe de l'identifiant ScanR d'un enregistrement source issu de HAL, suivi de l'identifiant HAL.
 _SCANR_HAL_PREFIX = "hal"
+"""Préfixe de l'identifiant ScanR d'un enregistrement source issu de HAL, suivi de l'identifiant HAL."""
 
 
 def extract_hal_id_from_scanr_id(scanr_id: str | None) -> str | None:

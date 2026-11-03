@@ -18,13 +18,13 @@ MIN_RECORDS = 5
 MIN_SHARE = 0.9
 """Part minimale de ces enregistrements qui ont le même titulaire de préfixe."""
 
-# Mots qui désignent l'activité d'éditeur plutôt que l'éditeur : « Karger Publishers » et « S. Karger ».
 _GENERIC_WORDS = frozenset(
     {"the", "publishing", "publishers", "publisher", "publ", "pub", "publications", "verlag", "group", "groupe"}
 )  # fmt: skip
+"""Mots qui désignent l'activité d'éditeur plutôt que l'éditeur : « Karger Publishers » et « S. Karger »."""
 
-# Noms réduits à un mot courant, partagés par des éditeurs distincts : « Academic Publishers » et « Academic Publications ».
 VAGUE_CORE_NAMES = frozenset({"academic", "science", "scientific", "international", "research"})
+"""Noms réduits à un mot courant, partagés par des éditeurs distincts : « Academic Publishers » et « Academic Publications »."""
 
 
 def prefix_holder(holders: Mapping[int, int]) -> int | None:

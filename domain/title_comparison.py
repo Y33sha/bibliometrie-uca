@@ -16,19 +16,19 @@ def nested_titles(a: str | None, b: str | None) -> bool:
     return bool(words_a and words_b) and (words_a <= words_b or words_b <= words_a)
 
 
-# Mots qu'une abréviation de titre laisse tomber. Une lettre isolée compte : elle distingue les sections d'une revue (« Physical Review A », « Physical Review D »).
 _STOP_WORDS = frozenset(
     {"an", "and", "at", "de", "des", "du", "en", "et", "for", "in", "la", "le", "les", "of", "on", "the", "to"}
 )  # fmt: skip
-# Article élidé : « d’histoire », « L'Archétype ».
+"""Mots qu'une abréviation de titre laisse tomber. Une lettre isolée compte : elle distingue les sections d'une revue (« Physical Review A », « Physical Review D »)."""
 _ELISION = re.compile(r"\b[dlDL]['’]")
+"""Article élidé : « d’histoire », « L'Archétype »."""
 _WORD = re.compile(r"[^\W_]+")
-# Un acronyme compte au plus autant de lettres, dont deux capitales : « JINST », « UBB », « HiHEP ».
 _ACRONYM_MAX = 5
-# Titres parallèles : « JCSM/Journal of Clinical Sleep Medicine », « Arthritis Care & Research = Arthritis Care and Research ».
+"""Un acronyme compte au plus autant de lettres, dont deux capitales : « JINST », « UBB », « HiHEP »."""
 _PARALLEL_TITLES = re.compile(r"[/=]")
-# Début d'un sous-titre ou d'un complément : « Notos - Espaces de la création », « Medicine (Baltimore) », « Costellazioni : Rivista di lingue e letterature ».
+"""Titres parallèles : « JCSM/Journal of Clinical Sleep Medicine », « Arthritis Care & Research = Arthritis Care and Research »."""
 _SUBTITLE = re.compile(r"\s[-–—]\s|[:(\[]")
+"""Début d'un sous-titre ou d'un complément : « Notos - Espaces de la création », « Medicine (Baltimore) », « Costellazioni : Rivista di lingue e letterature »."""
 
 
 class _Word(NamedTuple):

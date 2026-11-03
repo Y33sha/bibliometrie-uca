@@ -49,19 +49,19 @@ class DoiClusterCase(StrEnum):
     """DOI inconnu de doi.org (`failed_lookups`, source `doi_org`) : tous les membres le perdent."""
 
 
-# Types de relation DataCite qui désignent l'œuvre principale par son DOI. La requête des candidats en tire son `CASE` et son filtre.
 DATACITE_DIRECT_CONVERGENCE: dict[str, DoiTargetRule] = {
     "IsVersionOf": DoiTargetRule.DATACITE_VERSION_TO_CONCEPT,
     "IsVariantFormOf": DoiTargetRule.DATACITE_VARIANT_TO_PRIMARY,
 }
-# Pièce d'un package : la requête exige en plus que le parent soit un dataset présent en base.
+"""Types de relation DataCite qui désignent l'œuvre principale par son DOI. La requête des candidats en tire son `CASE` et son filtre."""
 DATACITE_PACKAGE_PIECE_RELATION = "IsPartOf"
+"""Pièce d'un package : la requête exige en plus que le parent soit un dataset présent en base."""
 
 # Fichier complémentaire figshare « Additional file [N] of T » : pièce de la collection figshare de titre T.
 FIGSHARE_ITEM_DOI_PATTERN = r"^10\.6084/m9\.figshare\.[0-9]+$"
 FIGSHARE_COLLECTION_DOI_PREFIX = "10.6084/m9.figshare.c."
-# Préfixe du titre normalisé (`normalize_text`) d'un fichier complémentaire figshare.
 FIGSHARE_ADDITIONAL_FILE_TITLE_PATTERN = r"^additional file( [0-9]+)? of "
+"""Préfixe du titre normalisé (`normalize_text`) d'un fichier complémentaire figshare."""
 
 
 def declares_same_work(
@@ -128,7 +128,6 @@ class ConfirmationIdRemoval(NamedTuple):
     case: DoiClusterCase
 
 
-# Cas où des œuvres distinctes partagent un DOI : le membre qui le perd est une autre œuvre.
 _DIVERGENCE_CASES: frozenset[DoiClusterCase] = frozenset(
     {
         DoiClusterCase.OUVRAGE_VS_CHAPITRE,
@@ -138,12 +137,13 @@ _DIVERGENCE_CASES: frozenset[DoiClusterCase] = frozenset(
         DoiClusterCase.DOI_D_UNE_AUTRE_OEUVRE,
     }
 )
+"""Cas où des œuvres distinctes partagent un DOI : le membre qui le perd est une autre œuvre."""
 
-# Types de conteneur, et cas de retrait du DOI aux membres d'un autre titre que le conteneur.
 _CONTAINER_CASES: dict[str, DoiClusterCase] = {
     DocType.PROCEEDINGS: DoiClusterCase.ACTES_VS_COMMUNICATION,
     DocType.JOURNAL_ISSUE: DoiClusterCase.NUMERO_VS_ARTICLE,
 }
+"""Types de conteneur, et cas de retrait du DOI aux membres d'un autre titre que le conteneur."""
 
 CLUSTER_CANDIDATE_DOC_TYPES: frozenset[str] = frozenset(
     {DocType.BOOK, DocType.BOOK_CHAPTER, *_CONTAINER_CASES}
@@ -235,10 +235,10 @@ def confirmation_id_removals(
     return removals
 
 
-# Marqueurs de chapitre, retirés avant comparaison : une source saisit le numéro du chapitre (« chapitre 14 … »), une autre non.
 _CHAPTER_TITLE_MARKERS = re.compile(
     r"\b(chapitre|chapter|chap|ch|section|sec|partie|part|vol|tome|pp|p)\b"
 )
+"""Marqueurs de chapitre, retirés avant comparaison : une source saisit le numéro du chapitre (« chapitre 14 … »), une autre non."""
 
 
 def _clean_title(title_normalized: str | None) -> str:

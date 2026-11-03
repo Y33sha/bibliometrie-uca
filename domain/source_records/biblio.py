@@ -184,8 +184,8 @@ def journal_series(biblio: Mapping[str, object] | None) -> SeriesDescription | N
     )
 
 
-# Une page : un mot sans blanc ni tiret qui contient un chiffre (`45`, `e1234`, `S12`), ou un nombre en chiffres romains (`xiv`).
 _PAGE = r"([^\s\-–]*\d[^\s\-–]*|[ivxlcdm]+)"
+"""Une page : un mot sans blanc ni tiret qui contient un chiffre (`45`, `e1234`, `S12`), ou un nombre en chiffres romains (`xiv`)."""
 _PAGE_PREFIX = r"(?:pp?\.?\s+|pp?\.)?"
 _PAGE_RANGE = re.compile(rf"^{_PAGE_PREFIX}{_PAGE}\s*[-–]+\s*{_PAGE}$", re.IGNORECASE)
 _SINGLE_PAGE = re.compile(rf"^{_PAGE_PREFIX}{_PAGE}$", re.IGNORECASE)

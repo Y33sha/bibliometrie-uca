@@ -45,8 +45,8 @@ STRONG_ROLES: frozenset[SourceIdentifierRole] = frozenset(
 )
 """Rôles d'un identifiant qui désigne l'enregistrement source lui-même, dans sa source ou dans celle dont il est dérivé."""
 
-# Rang de chaque rôle, du plus fort au plus faible.
 _ROLE_RANK = {role: rank for rank, role in enumerate(SourceIdentifierRole)}
+"""Rang de chaque rôle, du plus fort au plus faible."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -116,7 +116,6 @@ def isbn_role(
     )
 
 
-# Normalisation d'une valeur par type ; une valeur vide ou `None` signale une valeur invalide.
 _NORMALIZERS: dict[SourceIdentifierType, Callable[[str], str | None]] = {
     SourceIdentifierType.DOI: DOI.normalize,
     SourceIdentifierType.HAL_ID: HALId.normalize,
@@ -127,6 +126,7 @@ _NORMALIZERS: dict[SourceIdentifierType, Callable[[str], str | None]] = {
     SourceIdentifierType.ISBN: ISBN.normalize,
     SourceIdentifierType.EISBN: ISBN.normalize,
 }
+"""Normalisation d'une valeur par type ; une valeur vide ou `None` signale une valeur invalide."""
 
 
 def normalize_identifiers(

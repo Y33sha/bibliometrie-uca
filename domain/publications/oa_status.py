@@ -17,7 +17,6 @@ class OaStatus(StrEnum):
     """Statut d'une publication sans signal des sources. Le statut d'un enregistrement source sans signal est `NULL`."""
 
 
-# Rang des statuts open access, du plus ouvert au moins ouvert. Un statut à licence connue passe avant `bronze`, sans licence : `green` d'abord.
 OA_RANK: dict[str, int] = {
     OaStatus.DIAMOND: 8,
     OaStatus.GOLD: 7,
@@ -28,8 +27,8 @@ OA_RANK: dict[str, int] = {
     OaStatus.CLOSED: 2,
     OaStatus.UNKNOWN: 1,
 }
+"""Rang des statuts open access, du plus ouvert au moins ouvert. Un statut à licence connue passe avant `bronze`, sans licence : `green` d'abord."""
 
-# Niveaux d'accès, plus grossiers que les statuts. Chaque statut appartient à un seul niveau.
 ACCESS_LEVELS: dict[str, frozenset[str]] = {
     "open": frozenset(
         {OaStatus.DIAMOND, OaStatus.GOLD, OaStatus.HYBRID, OaStatus.BRONZE, OaStatus.GREEN}
@@ -37,8 +36,9 @@ ACCESS_LEVELS: dict[str, frozenset[str]] = {
     "embargo": frozenset({OaStatus.EMBARGOED}),
     "closed": frozenset({OaStatus.CLOSED, OaStatus.UNKNOWN}),
 }
+"""Niveaux d'accès, plus grossiers que les statuts. Chaque statut appartient à un seul niveau."""
 
 OA_OPEN_STATUSES: frozenset[str] = ACCESS_LEVELS["open"]
 
-# Statuts sans signal d'open access.
 OA_CLOSED_STATUSES: frozenset[str] = ACCESS_LEVELS["closed"]
+"""Statuts sans signal d'open access."""

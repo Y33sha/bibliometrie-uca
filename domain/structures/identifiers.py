@@ -40,8 +40,8 @@ def parse_ror_ids(raws: Iterable[str | None]) -> frozenset[RorId]:
     return frozenset(ror for raw in raws if (ror := RorId.try_parse(raw)) is not None)
 
 
-# Code de collection HAL : lettres ASCII, chiffres, tiret et soulignement, d'après les codes observés. HAL n'en publie pas le format.
 _HAL_COLLECTION_CANONICAL = re.compile(r"^[A-Z0-9][A-Z0-9_-]*$")
+"""Code de collection HAL : lettres ASCII, chiffres, tiret et soulignement, d'après les codes observés. HAL n'en publie pas le format."""
 
 
 def _normalize_hal_collection(raw: str | None) -> str | None:

@@ -5,7 +5,6 @@ from enum import Enum
 
 from domain.normalize import normalize_text
 
-# Particules qui ouvrent un nom de famille (« da Silva », « van der Berg », « d'Incan »).
 _PARTICLES = frozenset(
     {
         "abu", "ait", "al", "ben", "bin", "da", "das", "de", "del", "della", "den", "der",
@@ -13,6 +12,7 @@ _PARTICLES = frozenset(
         "von",
     }
 )  # fmt: skip
+"""Particules qui ouvrent un nom de famille (« da Silva », « van der Berg », « d'Incan »)."""
 
 
 def _opens_family_name(word: str) -> bool:

@@ -44,13 +44,13 @@ class UnaryCorrection(NamedTuple):
     """Règles de la correction unaire qui s'appliquent à l'enregistrement source."""
 
 
-# Règles de retrait d'identifiants de la correction unaire.
 _UNARY_IDENTIFIER_RULES = frozenset(
     {
         MetadataCorrectionRule.THESIS_WITH_SERIAL_TO_ARTICLE.value,
         MetadataCorrectionRule.HAL_DEPOSIT_MISSING_TO_REMOVED.value,
     }
 )
+"""Règles de retrait d'identifiants de la correction unaire."""
 
 
 def corrected_doc_type(

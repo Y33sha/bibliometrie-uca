@@ -41,7 +41,6 @@ class DocType(StrEnum):
     PHYSICAL_OBJECT = "physical_object"
 
 
-# Sous-types d'article, qui l'emportent sur `article` à l'agrégation (`refresh_from_sources`).
 ARTICLE_SUBTYPES: frozenset[str] = frozenset(
     {
         DocType.REVIEW,
@@ -56,6 +55,7 @@ ARTICLE_SUBTYPES: frozenset[str] = frozenset(
         DocType.RETRACTION,
     }
 )
+"""Sous-types d'article, qui l'emportent sur `article` à l'agrégation (`refresh_from_sources`)."""
 
 
 class DocTypeLabel(NamedTuple):
@@ -108,7 +108,6 @@ class DocTypeFamily:
     types: tuple[DocType, ...]
 
 
-# Familles dans l'ordre d'affichage, leurs types aussi. Chaque type appartient à une seule famille.
 DOC_TYPE_FAMILIES: dict[str, DocTypeFamily] = {
     "publications": DocTypeFamily(
         "Publications",
@@ -163,3 +162,4 @@ DOC_TYPE_FAMILIES: dict[str, DocTypeFamily] = {
         ),
     ),
 }
+"""Familles dans l'ordre d'affichage, leurs types aussi. Chaque type appartient à une seule famille."""

@@ -15,8 +15,8 @@ from domain.publications.metadata import has_minimal_publication_metadata
 from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES
 from domain.source_records.keys import Derivation, DoiKeys, anchor_of, doi_anchors
 
-# Nom de clé des jetons de fusion manuelle, valeur de clé = identifiant de la fusion manuelle.
 MANUAL_MERGE_KEY = "manual_merge"
+"""Nom de clé des jetons de fusion manuelle, valeur de clé = identifiant de la fusion manuelle."""
 
 
 def manual_merge_tokens(manual_merge_ids: Iterable[int]) -> frozenset[tuple[str, str]]:

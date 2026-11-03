@@ -6,12 +6,12 @@ from itertools import pairwise
 
 from domain.contributions.author_grouping import SourceContribution
 
-# Nombre de noms complets répétés qui signale des doublons : au même décalage pour un bloc de la liste, à des décalages quelconques pour une liste de membres.
 MIN_DUPLICATED_NAMES = 2
-# Part des auteurs de la liste répétés à distance qui signale une liste de membres.
+"""Nombre de noms complets répétés qui signale des doublons : au même décalage pour un bloc de la liste, à des décalages quelconques pour une liste de membres."""
 MIN_MEMBER_LIST_SHARE = 0.10
-# Nombre de paires côte à côte, de noms différents et à la suite, qui signale une liste où chaque nom est répété à sa place.
+"""Part des auteurs de la liste répétés à distance qui signale une liste de membres."""
 MIN_DOUBLED_PAIRS = 4
+"""Nombre de paires côte à côte, de noms différents et à la suite, qui signale une liste où chaque nom est répété à sa place."""
 
 type Name = tuple[str, str]
 # Rang d'une contribution source dans la liste des auteurs, et la contribution source.

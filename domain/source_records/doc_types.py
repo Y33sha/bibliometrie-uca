@@ -2,7 +2,6 @@
 
 from domain.documents.doc_types import DocType
 
-# Table de chaque source, clés en minuscules.
 _SOURCE_MAPS: dict[str, dict[str, str]] = {
     "hal": {
         # Combinaisons type_sous-type (prioritaires)
@@ -219,6 +218,7 @@ _SOURCE_MAPS: dict[str, dict[str, str]] = {
         "other": "other",
     },
 }
+"""Table de chaque source, clés en minuscules."""
 
 
 def _translate(part: str, source_map: dict[str, str]) -> str | None:

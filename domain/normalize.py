@@ -4,7 +4,6 @@ import html
 import re
 import unicodedata
 
-# Lettres non décomposées par NFKD, ramenées à leur forme sans diacritique : « Meyerhofstraße » et « Meyerhofstrasse » ont la même forme normalisée. Appliquée après lower().
 _TRANSLITERATIONS = str.maketrans(
     {
         "ё": "е",  # CYRILLIC SMALL LETTER IO → IE (ё → е)
@@ -24,12 +23,12 @@ _TRANSLITERATIONS = str.maketrans(
         "\u00e6": "ae",  # LATIN SMALL LIGATURE AE
     }
 )
+"""Lettres non décomposées par NFKD, ramenées à leur forme sans diacritique : « Meyerhofstraße » et « Meyerhofstrasse » ont la même forme normalisée. Appliquée après lower()."""
 
 
-# Balise : `<` suivi d'une lettre ou de `/`. Le corps exclut `<` : une suite de `<` sans fermeture se parcourt en temps linéaire.
 _MARKUP_RE = re.compile(r"</?([A-Za-z][^\s<>/]*)(?:[\s/][^<>]*)?>")
+"""Balise : `<` suivi d'une lettre ou de `/`. Le corps exclut `<` : une suite de `<` sans fermeture se parcourt en temps linéaire."""
 
-# Balises de mise en forme (HTML, JATS, MathML), qui s'insèrent dans un mot : `CO<sub>2</sub>`, `<i>E</i>. coli`. Comparées sans préfixe d'espace de noms (`jats:sub`, `mml:mi`).
 _INLINE_TAGS = frozenset(
     {
         "sub", "sup", "i", "b", "em", "strong", "u", "span", "small", "tt", "sc", "scp",
@@ -40,6 +39,7 @@ _INLINE_TAGS = frozenset(
         "inline-formula",
     }
 )  # fmt: skip
+"""Balises de mise en forme (HTML, JATS, MathML), qui s'insèrent dans un mot : `CO<sub>2</sub>`, `<i>E</i>. coli`. Comparées sans préfixe d'espace de noms (`jats:sub`, `mml:mi`)."""
 
 
 def _markup_replacement(match: re.Match[str]) -> str:
@@ -61,8 +61,8 @@ def _strip_comments(text: str) -> str:
     return "".join(parts)
 
 
-# Certaines sources échappent plusieurs fois une valeur (`&amp;amp;`).
 _MAX_UNESCAPE_PASSES = 4
+"""Certaines sources échappent plusieurs fois une valeur (`&amp;amp;`)."""
 
 
 def _unescape_html(text: str) -> str:
@@ -75,8 +75,8 @@ def _unescape_html(text: str) -> str:
     return text
 
 
-# Caractères invisibles : formatage (espace sans chasse), contrôle, substituts isolés, usage privé.
 _INVISIBLE_CATEGORIES = frozenset({"Cf", "Cc", "Cs", "Co"})
+"""Caractères invisibles : formatage (espace sans chasse), contrôle, substituts isolés, usage privé."""
 
 
 def to_plain_text(text: str | None) -> str:
@@ -98,8 +98,8 @@ def optional_plain_text(text: str | None) -> str | None:
     return to_plain_text(text) or None
 
 
-# Le retrait d'une balise imbriquée (`<ab<aa>a>`) en reconstitue une autre. Chaque passe coûte un parcours du texte.
 _MAX_MARKUP_PASSES = 8
+"""Le retrait d'une balise imbriquée (`<ab<aa>a>`) en reconstitue une autre. Chaque passe coûte un parcours du texte."""
 
 
 def _strip_markup(text: str) -> str:
@@ -154,10 +154,10 @@ def drop_flattened_mathml(title: str) -> str:
     return "\n".join(line for k, line in enumerate(lines) if k not in dropped).strip()
 
 
-# Formule MathML. Son corps exclut une autre ouverture. La fin du texte ferme une formule : OpenAlex tronque des résumés en pleine formule.
 _MATHML_FORMULA = r"<mml:math\b(?:(?!<mml:math\b).)*?(?:</mml:math>|\Z)"
-# Formules LaTeX `$$…$$` suivies de leurs versions MathML, sans texte entre elles.
+"""Formule MathML. Son corps exclut une autre ouverture. La fin du texte ferme une formule : OpenAlex tronque des résumés en pleine formule."""
 _TEX_THEN_MATHML_RE = re.compile(rf"(\$\$[^$]+\$\$)(?:\s*{_MATHML_FORMULA})+", re.DOTALL)
+"""Formules LaTeX `$$…$$` suivies de leurs versions MathML, sans texte entre elles."""
 _MATHML_FORMULA_RE = re.compile(_MATHML_FORMULA, re.DOTALL)
 _TEX_ANNOTATION_RE = re.compile(
     r'<mml:annotation\b[^>]*encoding="application/x-tex"[^>]*>(.*?)</mml:annotation>', re.DOTALL
@@ -192,15 +192,15 @@ _ABSTRACT_LABELS = (
 _ABSTRACT_LABEL = "|".join(
     form for label in _ABSTRACT_LABELS for form in (label, label.lower(), label.upper())
 )
-# Intitulé seul dans une balise de titre, suivi d'une ponctuation, ou suivi d'une majuscule, d'un chiffre ou d'une formule.
 _ABSTRACT_LABEL_RE = re.compile(
     rf"^\s*(?:<(?:jats:)?title>\s*(?:{_ABSTRACT_LABEL})\s*[.:]?\s*</(?:jats:)?title>\s*"
     rf"|(?:{_ABSTRACT_LABEL})(?:\s*[.:：–—-]\s*|\s+(?=[A-ZÀ-ÖØ-Þ0-9(\[<$«\"“])))"
 )
+"""Intitulé seul dans une balise de titre, suivi d'une ponctuation, ou suivi d'une majuscule, d'un chiffre ou d'une formule."""
 
 
-# Intitulés empilés en tête d'un même résumé : « Abstract Summary ».
 _MAX_ABSTRACT_LABELS = 3
+"""Intitulés empilés en tête d'un même résumé : « Abstract Summary »."""
 
 
 def _strip_abstract_label(abstract: str | None) -> str | None:
@@ -234,25 +234,24 @@ _GREEK_COMMANDS: dict[str, str] = {
     "ell": "ℓ",
 }
 
-# Accent LaTeX sur une lettre : `\'e`, `\'{e}`, `\c{c}`, `\v c`. Groupe 1 : la commande d'accent ; groupe 2 ou 3 : la lettre. Les commandes faites d'une lettre (`\c`, `\v`) sont suivies d'une accolade ou d'une espace.
-# Une source qui met un nom en majuscules met aussi la commande (`Gon\C Calo`).
 _LATEX_ACCENT_RE = re.compile(
     r"\\([`'^\"~=.]|[cvuHkrCVUKR](?=[\s{]))(?:\{\s*([A-Za-zı])\s*\}|\s*([A-Za-zı]))"
 )
+"""Accent LaTeX sur une lettre : `\\'e`, `\\'{e}`, `\\c{c}`, `\\v c`. Groupe 1 : la commande d'accent ; groupe 2 ou 3 : la lettre. Les commandes faites d'une lettre (`\\c`, `\\v`) sont suivies d'une accolade ou d'une espace. Une source qui met un nom en majuscules met aussi la commande (`Gon\\C Calo`)."""
 _LATEX_COMMAND_RE = re.compile(r"\\([A-Za-z]+)")
-# Diacritique combinant de chaque commande d'accent.
 _LATEX_ACCENTS = {
     "'": "\u0301", "`": "\u0300", "^": "\u0302", '"': "\u0308", "~": "\u0303", "=": "\u0304",
     ".": "\u0307", "u": "\u0306", "v": "\u030c", "H": "\u030b", "c": "\u0327", "k": "\u0328",
     "r": "\u030a", "U": "\u0306", "V": "\u030c", "C": "\u0327", "K": "\u0328", "R": "\u030a",
 }  # fmt: skip
-# Lettres LaTeX sans équivalent ASCII : `\o` → ø, `\ss` → ß. `\i` est le i sans point, qui reçoit un accent (`\'{\i}`).
+"""Diacritique combinant de chaque commande d'accent."""
 _LATEX_LETTERS = {
     "aa": "å", "AA": "Å", "ae": "æ", "AE": "Æ", "oe": "œ", "OE": "Œ", "ss": "ß", "Ss": "ß",
     "SS": "ß", "o": "ø", "O": "Ø", "l": "ł", "L": "Ł", "i": "ı",
 }  # fmt: skip
-# `\ss` se reconnaît même collé au reste du mot (`Ge\ssner`) : aucune autre commande ne commence par ss.
+"""Lettres LaTeX sans équivalent ASCII : `\\o` → ø, `\\ss` → ß. `\\i` est le i sans point, qui reçoit un accent (`\\'{\\i}`)."""
 _LATEX_LETTER_RE = re.compile(r"\\(ss|Ss|SS|(?:aa|AA|ae|AE|oe|OE|[oOlLi])(?![A-Za-z]))")
+"""`\\ss` se reconnaît même collé au reste du mot (`Ge\\ssner`) : aucune autre commande ne commence par ss."""
 
 
 def _strip_latex(text: str) -> str:
@@ -279,17 +278,17 @@ def _decode_latex_accents(text: str) -> str:
     return unicodedata.normalize("NFC", _LATEX_ACCENT_RE.sub(_accented, text))
 
 
-# Formule délimitée par des dollars : $$...$$ ou $...$.
 _MATH_SEGMENT_RE = re.compile(r"\$\$[\s\S]+?\$\$|\$[^$]+?\$")
-# Barre oblique doublée devant une commande d'accent, laissée par un texte échappé deux fois dont une autre commande a gardé sa barre simple.
+"""Formule délimitée par des dollars : $$...$$ ou $...$."""
 _DOUBLED_ACCENT_BACKSLASH_RE = re.compile(r"\\\\(?=[`'^\"~=.]|[cvuHkrCVUKR]\{)")
-# Paire de guillemets échappés (`the \"cold\" case`) : les `\"` du texte sont des guillemets, non des trémas.
+"""Barre oblique doublée devant une commande d'accent, laissée par un texte échappé deux fois dont une autre commande a gardé sa barre simple."""
 _ESCAPED_QUOTE_PAIR_RE = re.compile(r'(?:^|(?<=[\s(]))\\"[A-Za-z][^"]*?[A-Za-z.,!?]\\"')
-# Caractère seul entre accolades : `S{é}ries`, `Poincar{é}`.
+"""Paire de guillemets échappés (`the \\"cold\\" case`) : les `\\"` du texte sont des guillemets, non des trémas."""
 _BRACED_NON_ASCII_RE = re.compile(r"\{([^\x00-\x7f])\}")
+"""Caractère seul entre accolades : `S{é}ries`, `Poincar{é}`."""
 _TRAILING_COMMAND_RE = re.compile(r"\\[A-Za-z]+$")
-# Accolades vides qui terminent une lettre LaTeX : `\L{}ukasiewicz`.
 _EMPTY_BRACES_AFTER_NON_ASCII_RE = re.compile(r"(?<=[^\x00-\x7f])\{\}")
+"""Accolades vides qui terminent une lettre LaTeX : `\\L{}ukasiewicz`."""
 
 
 def _prose_accented(m: re.Match[str]) -> str:
@@ -371,8 +370,8 @@ def _clean_source_text(text: str) -> str:
     return _decode_prose_latex_accents(_undouble_backslashes(_unescape_html(text)))
 
 
-# Espaces ASCII seuls : les espaces insécables de la typographie (« pratiques : ») restent.
 _ASCII_SPACES_RE = re.compile(r"[ \t\n\r\f\v]+")
+"""Espaces ASCII seuls : les espaces insécables de la typographie (« pratiques : ») restent."""
 
 
 def clean_title(title: str | None) -> str | None:
@@ -405,15 +404,15 @@ def _byte_readings(byte: int) -> str:
         return chr(byte)
 
 
-# Octets 0x80 à 0xFF, indexés par leurs lectures Latin-1 et Windows-1252.
 _BYTES = {c: b for b in range(0x80, 0x100) for c in _byte_readings(b)}
+"""Octets 0x80 à 0xFF, indexés par leurs lectures Latin-1 et Windows-1252."""
 _CONTINUATION = "".join(_byte_readings(b) for b in range(0x80, 0xC0))
-# Caractère UTF-8 lu comme du Latin-1 ou du Windows-1252 : un octet de tête, puis autant d'octets de continuation qu'il en annonce.
 _UTF8_AS_CP1252_RE = re.compile(
     f"[Â-ß][{_CONTINUATION}]|[à-ï][{_CONTINUATION}]{{2}}|[ð-ô][{_CONTINUATION}]{{3}}"
 )
-# Texte Windows-1252 lu comme du GBK : une lettre accentuée et la lettre ASCII qui la suit forment un idéogramme, collé à une lettre latine.
+"""Caractère UTF-8 lu comme du Latin-1 ou du Windows-1252 : un octet de tête, puis autant d'octets de continuation qu'il en annonce."""
 _CP1252_AS_GBK_RE = re.compile("(?<=[A-Za-z])[一-鿿]+")
+"""Texte Windows-1252 lu comme du GBK : une lettre accentuée et la lettre ASCII qui la suit forment un idéogramme, collé à une lettre latine."""
 
 
 def _from_utf8(m: re.Match[str]) -> str:
@@ -480,12 +479,12 @@ def normalize_text(text: str) -> str:
 
 
 _DIGITS_RE = re.compile(r"\d+")
-# Parenthèses ou crochets vidés par le retrait des chiffres : « (1278759) », « (1960-2020) ».
 _EMPTY_BRACKETS_RE = re.compile(r"[(\[][^\w()\[\]]*[)\]]")
-# Mot fait de ponctuation seule : le tiret de « Wolff, Charlotta 1976- », isolé par le retrait des chiffres.
+"""Parenthèses ou crochets vidés par le retrait des chiffres : « (1278759) », « (1960-2020) »."""
 _PUNCTUATION_ONLY_RE = re.compile(r"[^\w\s'’]+")
-# Séparateurs en fin de nom : la virgule de « D'Andrea, Carlos, 1973- ». Le point d'une initiale reste.
+"""Mot fait de ponctuation seule : le tiret de « Wolff, Charlotta 1976- », isolé par le retrait des chiffres."""
 _TRAILING_SEPARATORS = ",;:-–—/"
+"""Séparateurs en fin de nom : la virgule de « D'Andrea, Carlos, 1973- ». Le point d'une initiale reste."""
 
 
 def clean_raw_author_name(raw: str) -> str:
