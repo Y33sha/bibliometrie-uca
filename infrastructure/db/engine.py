@@ -52,6 +52,8 @@ def build_sync_engine(identity: DbIdentity = "pipeline") -> Engine:
 
     Pool : `db_pool_min` connexions persistantes, jusqu'à `db_pool_max` sous charge ; `pool_pre_ping` écarte les connexions perdues.
 
+    Plans : `plan_cache_mode=force_custom_plan` planifie chaque exécution d'une requête préparée selon ses paramètres. Psycopg prépare une requête côté serveur après 5 exécutions. PostgreSQL adopte un plan générique après 5 autres. Ce plan multiplie la durée de certaines requêtes par cent ou plus.
+
     Sous pytest, refuse toute base sans suffixe `_test`. Le conftest redirige l'engine vers la base de test ; ce contrôle protège la base de production si la redirection échoue.
     """
     if os.environ.get("PYTEST_CURRENT_TEST") and not settings.db_name.endswith("_test"):
@@ -64,6 +66,7 @@ def build_sync_engine(identity: DbIdentity = "pipeline") -> Engine:
         pool_size=settings.db_pool_min,
         max_overflow=settings.db_pool_max - settings.db_pool_min,
         pool_pre_ping=True,
+        connect_args={"options": "-c plan_cache_mode=force_custom_plan"},
     )
     install_engine_guards(engine)
     return engine
