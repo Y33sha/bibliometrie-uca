@@ -144,7 +144,6 @@ class DoiClusterRow(NamedTuple):
     """Vrai si `shared_doi` a une cible dans `doi_targets`."""
     identifiers: tuple[SourceIdentifier, ...] = ()
     source: str = ""
-    source_id: str = ""
     author_names: tuple[str, ...] = ()
     """Noms de famille normalisés des contributions sources individuelles, renseignés pour les groupes où un enregistrement source a un titre éloigné de celui de l'enregistrement source Crossref."""
 
@@ -644,7 +643,7 @@ class SourceRecordCorrectionStore:
         rows = self._conn.execute(
             text(f"""
                 WITH sr_eff AS (
-                    SELECT id, source, source_id, doc_type, title_normalized
+                    SELECT id, source, doc_type, title_normalized
                     FROM source_records
                 ),
                 record_dois AS ({_RECORD_DOIS_SQL}),
@@ -668,7 +667,7 @@ class SourceRecordCorrectionStore:
                     SELECT unnest(CAST(:distant_title_dois AS text[]))
                 )
                 SELECT sr.id, sr.doc_type, sr.title_normalized,
-                       sr.source::text AS source, sr.source_id,
+                       sr.source::text AS source,
                        {identifiers_json_sql("sr.id")} AS identifiers,
                        m.doi AS shared_doi,
                        m.doi IN (SELECT d FROM unresolved_dois) AS unresolved,
@@ -696,7 +695,6 @@ class SourceRecordCorrectionStore:
                 has_target=row.has_target,
                 identifiers=parse_identifiers(row.identifiers),
                 source=row.source,
-                source_id=row.source_id,
                 author_names=tuple(row.author_names),
             )
             for row in rows
