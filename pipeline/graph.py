@@ -1368,32 +1368,6 @@ TASKS: tuple[Task, ...] = (
         previous_run=("addresses",),
     ),
     _task(
-        "relations.rebuild",
-        "relations",
-        reads=(
-            *(
-                f"source_records.{column}"
-                for column in (
-                    "source_extras",
-                    "corrections",
-                    "doi",
-                    "doc_type",
-                    "publication_id",
-                )
-            ),
-            "source_record_identifiers",
-            "publications.id",
-            "publications.doc_type",
-            "publications.doi",
-            "publications.title_normalized",
-            "publications.publication_year",
-            "publication_relations",
-        ),
-        writes=("publication_relations",),
-        # Lecture de la table avant sa reconstruction, pour compter les arêtes ajoutées et disparues.
-        previous_run=("publication_relations",),
-    ),
-    _task(
         "subjects.ingest",
         "subjects",
         reads=(

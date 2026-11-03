@@ -124,9 +124,8 @@ PHASES: tuple[Phase, ...] = (
     Phase(
         "relations",
         "Relations entre publications apparentées",
-        phase_tasks("relations"),
+        relations.TASKS,
         extra=True,
-        build=relations.build,
     ),
     Phase(
         "subjects",
