@@ -1,8 +1,6 @@
 """Déroulement d'un run : sélection des phases, capture d'observabilité, interruptions.
 
 L'orchestrateur choisit les phases à exécuter, les enchaîne et consigne l'issue de chacune. La trace d'une phase interrompue distingue l'arrêt demandé de l'échec, et indique par où reprendre.
-
-Le câblage des adaptateurs de chaque phase relève du composition root ; le contrôle de types le vérifie.
 """
 
 import argparse

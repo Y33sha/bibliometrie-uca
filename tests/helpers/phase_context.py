@@ -1,6 +1,6 @@
 """Doublures partagées par les tests des orchestrateurs de phase, importées par les `conftest.py` de leurs répertoires.
 
-Un orchestrateur de phase reçoit un `OpenTransaction` et des ports. Avec ces doublures, les tests exercent l'enchaînement des sous-étapes, les métriques assemblées et les bornes de boucle sans base de données.
+Les tâches d'une phase reçoivent un contexte d'exécution (`PhaseContext`) et ouvrent leurs transactions par `open_tx`. Avec ces doublures, les tests exercent l'enchaînement des tâches, les métriques assemblées et les bornes de boucle sans base de données.
 """
 
 import logging
