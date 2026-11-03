@@ -2,14 +2,17 @@
 
 ## Contexte
 
-Le pipeline exécute ses phases l'une après l'autre. Dans une phase d'acquisition, les sources s'exécutent en parallèle, et la phase attend la plus lente. La source la plus lente change d'une phase à l'autre : Crossref pour `harvest_by_person`, OpenAlex et theses.fr pour `fetch_stale`. La normalisation attend la fin de toute l'acquisition.
+Le pipeline exécute ses phases l'une après l'autre. Dans une phase d'acquisition, les sources s'exécutent en parallèle, et la phase attend la plus lente. La source la plus lente change d'une phase à l'autre : ScanR pour `harvest`, Crossref pour `harvest_by_person`. La normalisation attend la fin de toute l'acquisition.
 
-Mesures d'un run `full` de 36 minutes, sur une année :
+Durées médianes des runs `full` sur huit semaines :
 
-- acquisition : 10 minutes ;
-- file OpenAlex : 88 s de moissonnage, 160 s de relecture des documents non revus, 63 s de relecture des documents tronqués, plus sa part de `harvest_by_person` ;
-- file Crossref : 4,7 minutes, presque toutes en `harvest_by_person` ;
-- normalisation : 7 minutes, dont 6,5 de normalisation des documents moissonnés.
+- acquisition : 8,7 minutes ;
+- `harvest` : ScanR 150 s, OpenAlex 89 s, HAL 68 s ;
+- `harvest_by_person` : 4,2 minutes ;
+- `fetch_missing` : une dizaine de secondes par source ;
+- `fetch_stale` : quelques secondes, 2 à 3,5 minutes au 9e décile pour OpenAlex, Crossref et DataCite ;
+- `fetch_truncated` (OpenAlex) : 1,3 minute ;
+- normalisation : 4,7 minutes, 23 minutes au 9e décile.
 
 Les dépendances du graphe relient seulement les tâches d'acquisition d'une même source, par `staging`. Chaque tâche réseau déclare son API (`network`). `staging` sert de file d'attente : une ligne à l'empreinte modifiée repasse à `processed = FALSE`.
 
