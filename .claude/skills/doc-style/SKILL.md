@@ -27,7 +27,7 @@ allowed-tools: Read, Edit, Bash, Grep, Glob
 - Docstrings au format PEP 257, sections du style Google. Ligne de résumé : verbe à l'indicatif présent pour une fonction (« Renvoie », « Fusionne »), groupe nominal pour une classe, un type ou un module. Jamais « Ce que… ».
 - Docstring de fonction simple : la ligne de résumé suffit. 250 caractères au plus.
 - Sections `Args:`, `Returns:`, `Raises:` : seulement pour les éléments non évidents, une ligne par élément. Jamais de liste en prose des paramètres.
-- Champ non évident d'une dataclass, d'un NamedTuple ou d'un modèle : une docstring sous le champ, plutôt qu'une mention dans la docstring de la classe.
+- Champ non évident d'une dataclass, d'un NamedTuple ou d'un modèle, membre d'enum, constante de module : une docstring sous la déclaration, plutôt qu'un commentaire au-dessus ou en fin de ligne, ou qu'une mention dans la docstring de la classe. Un commentaire qui vaut pour un groupe de déclarations reste au-dessus du groupe. Dans un modèle Pydantic, la docstring d'un champ devient sa description dans le schéma OpenAPI : une note d'implémentation y reste un commentaire.
 - Une idée par phrase. 28 mots maximum.
 - Aucun adjectif d'éloge, aucun titre décoratif en commentaire.
 
