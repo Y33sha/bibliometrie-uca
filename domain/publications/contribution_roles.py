@@ -7,40 +7,45 @@ from enum import StrEnum
 class ContributionRole(StrEnum):
     """Rôle d'une contribution source, valeur de `source_contributions.roles`."""
 
-    AUTHOR = "author"  # auteur
-    TRANSLATOR = "translator"  # traducteur
-    EDITOR = "editor"  # directeur de publication / éditeur d'ouvrage
-    SCIENTIFIC_EDITOR = "scientific_editor"  # éditeur scientifique (revue)
-    SPEAKER = "speaker"  # conférencier / orateur
-    CONTRIBUTOR = "contributor"  # contributeur (autre contribution identifiée)
-    THESIS_DIRECTOR = "thesis_director"  # directeur de thèse
-    RAPPORTEUR = "rapporteur"  # rapporteur de thèse
-    JURY_MEMBER = "jury_member"  # membre du jury (examinateur, sans rôle spécifique)
-    JURY_PRESIDENT = "jury_president"  # président du jury
-    OTHER = "other"  # autre rôle non classifiable
+    AUTHOR = "author"
+    TRANSLATOR = "translator"
+    EDITOR = "editor"
+    """Directeur de publication, éditeur d'ouvrage."""
+    SCIENTIFIC_EDITOR = "scientific_editor"
+    """Éditeur scientifique d'une revue."""
+    SPEAKER = "speaker"
+    CONTRIBUTOR = "contributor"
+    """Autre contribution identifiée."""
+    THESIS_DIRECTOR = "thesis_director"
+    RAPPORTEUR = "rapporteur"
+    """Rapporteur de thèse."""
+    JURY_MEMBER = "jury_member"
+    """Membre du jury de thèse sans autre rôle : examinateur."""
+    JURY_PRESIDENT = "jury_president"
+    OTHER = "other"
 
 
-_AUTHOR = [ContributionRole.AUTHOR]
-_CONTRIBUTOR = [ContributionRole.CONTRIBUTOR]
-_OTHER = [ContributionRole.OTHER]
+_AUTHOR = (ContributionRole.AUTHOR,)
+_CONTRIBUTOR = (ContributionRole.CONTRIBUTOR,)
+_OTHER = (ContributionRole.OTHER,)
 
 # Codes MARC relator et extensions HAL, repris par ScanR. La position d'un co-premier ou co-dernier auteur est dans `author_position`.
-_MARC_ROLES: dict[str, list[ContributionRole]] = {
+_MARC_ROLES: dict[str, tuple[ContributionRole, ...]] = {
     "aut": _AUTHOR,
     "crp": _AUTHOR,  # auteur correspondant
     "co_first_author": _AUTHOR,
     "co_last_author": _AUTHOR,
     "first": _AUTHOR,
     "dis": _AUTHOR,  # dissertant
-    "trl": [ContributionRole.TRANSLATOR],
-    "edt": [ContributionRole.EDITOR],
-    "dir": [ContributionRole.EDITOR],  # directeur de publication
-    "scientific_editor": [ContributionRole.SCIENTIFIC_EDITOR],
+    "trl": (ContributionRole.TRANSLATOR,),
+    "edt": (ContributionRole.EDITOR,),
+    "dir": (ContributionRole.EDITOR,),  # directeur de publication
+    "scientific_editor": (ContributionRole.SCIENTIFIC_EDITOR,),
     # Orateur, auteur de la communication.
-    "spk": [ContributionRole.AUTHOR, ContributionRole.SPEAKER],
-    "presenter": [ContributionRole.AUTHOR, ContributionRole.SPEAKER],
+    "spk": (ContributionRole.AUTHOR, ContributionRole.SPEAKER),
+    "presenter": (ContributionRole.AUTHOR, ContributionRole.SPEAKER),
     # Contributeur, cité dans la liste d'auteurs.
-    "ctb": [ContributionRole.AUTHOR, ContributionRole.CONTRIBUTOR],
+    "ctb": (ContributionRole.AUTHOR, ContributionRole.CONTRIBUTOR),
     "sad": _CONTRIBUTOR,  # conseiller scientifique
     "csc": _CONTRIBUTOR,  # consultant
     "preface_writer": _CONTRIBUTOR,
@@ -88,31 +93,31 @@ _MARC_ROLES: dict[str, list[ContributionRole]] = {
 # Code de l'auteur correspondant.
 _CORRESPONDING_CODES = frozenset({"crp"})
 
-_WOS_ROLES: dict[str, list[ContributionRole]] = {
+_WOS_ROLES: dict[str, tuple[ContributionRole, ...]] = {
     "author": _AUTHOR,
-    "book_editor": [ContributionRole.EDITOR],
+    "book_editor": (ContributionRole.EDITOR,),
     "book": _AUTHOR,  # auteur de livre
     "corp": _AUTHOR,  # auteur collectif
     "anon": _AUTHOR,  # auteur anonyme
 }
 
 # ScanR : codes MARC, et rôles de thèse en français sans accents.
-_SCANR_ROLES: dict[str, list[ContributionRole]] = {
+_SCANR_ROLES: dict[str, tuple[ContributionRole, ...]] = {
     **_MARC_ROLES,
     "author": _AUTHOR,
-    "directeurthese": [ContributionRole.THESIS_DIRECTOR],
-    "rapporteur": [ContributionRole.RAPPORTEUR],
-    "membrejury": [ContributionRole.JURY_MEMBER],
-    "presidentjury": [ContributionRole.JURY_PRESIDENT],
+    "directeurthese": (ContributionRole.THESIS_DIRECTOR,),
+    "rapporteur": (ContributionRole.RAPPORTEUR,),
+    "membrejury": (ContributionRole.JURY_MEMBER,),
+    "presidentjury": (ContributionRole.JURY_PRESIDENT,),
 }
 
 # theses.fr donne un champ par rôle.
-THESES_FIELD_ROLES = {
-    "auteurs": [ContributionRole.AUTHOR],
-    "directeurs": [ContributionRole.THESIS_DIRECTOR],
-    "rapporteurs": [ContributionRole.RAPPORTEUR],
-    "membresJury": [ContributionRole.JURY_MEMBER],
-    "presidentJury": [ContributionRole.JURY_PRESIDENT],
+THESES_FIELD_ROLES: dict[str, tuple[ContributionRole, ...]] = {
+    "auteurs": (ContributionRole.AUTHOR,),
+    "directeurs": (ContributionRole.THESIS_DIRECTOR,),
+    "rapporteurs": (ContributionRole.RAPPORTEUR,),
+    "membresJury": (ContributionRole.JURY_MEMBER,),
+    "presidentJury": (ContributionRole.JURY_PRESIDENT,),
 }
 
 # Rôles de jury de thèse, donnés par theses.fr et ScanR.
@@ -132,7 +137,7 @@ _THESIS_ROLES_IMPLYING_JURY = {
     ContributionRole.JURY_PRESIDENT,
 }
 
-_SOURCE_ROLES: dict[str, dict[str, list[ContributionRole]]] = {
+_SOURCE_ROLES: dict[str, dict[str, tuple[ContributionRole, ...]]] = {
     "hal": _MARC_ROLES,
     "wos": _WOS_ROLES,
     "scanr": _SCANR_ROLES,
