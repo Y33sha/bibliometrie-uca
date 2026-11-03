@@ -186,6 +186,8 @@ def run_phase(phase: GraphPhase, ctx: PhaseContext) -> PhaseMetrics:
     """Exécute les tâches d'une phase et renvoie les métriques de la phase."""
     if phase.build is not None:
         return phase.build().run(ctx)
+    if phase.check is not None:
+        phase.check(ctx)
     by_task = execute_tasks(phase.tasks, ctx)
     if phase.assemble is not None:
         return phase.assemble(by_task)

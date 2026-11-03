@@ -43,3 +43,16 @@ def test_une_phase_assemble_ses_metriques_par_sa_fonction(contexte):
     phase = Phase("essai", "Essai", _TACHES, assemble=lambda by_task: by_task["essai.deux"])
 
     assert run_phase(phase, contexte()).new == 2
+
+
+def test_une_precondition_non_remplie_arrete_la_phase_avant_ses_taches(contexte):
+    appels: list[str] = []
+
+    def check(_ctx) -> None:
+        raise RuntimeError("périmètre vide")
+
+    tache = task("essai.une", run=lambda _ctx: appels.append("une") or PhaseMetrics())
+    with pytest.raises(RuntimeError, match="périmètre vide"):
+        run_phase(Phase("essai", "Essai", (tache,), check=check), contexte())
+
+    assert appels == []

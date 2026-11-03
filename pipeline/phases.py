@@ -77,8 +77,9 @@ PHASES: tuple[Phase, ...] = (
     Phase(
         "affiliations",
         "Résolution des affiliations par contribution source",
-        phase_tasks("affiliations"),
-        build=affiliations.build,
+        affiliations.TASKS,
+        check=affiliations.check_extraction_perimeter,
+        assemble=affiliations.assemble,
     ),
     Phase(
         "resolve_ra",

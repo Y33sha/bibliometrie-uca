@@ -407,119 +407,6 @@ TASKS: tuple[Task, ...] = (
         maintenance=("VACUUM staging",),
     ),
     _task(
-        "affiliations.refresh_ror",
-        "affiliations",
-        reads=("ror_dump_imports", "source_contribution_rors"),
-        writes=(
-            "ror_organizations",
-            "ror_relations",
-            "ror_dump_imports",
-            # Dépendants d'une organisation qui change de pays.
-            "source_contribution_countries_queue",
-        ),
-        previous_run=("ror_dump_imports",),
-        network="zenodo",
-    ),
-    _task(
-        "affiliations.refresh_hal_structures",
-        "affiliations",
-        reads=("source_contribution_hal_structures",),
-        writes=(
-            "hal_structures",
-            "hal_structure_relations",
-            "hal_structure_aliases",
-            # Contributions sources d'une structure qui change de pays.
-            "source_contribution_countries_queue",
-        ),
-        previous_run=("hal_structures", "hal_structure_aliases"),
-        network="hal",
-    ),
-    _task(
-        "affiliations.classify_addresses",
-        "affiliations",
-        reads=(
-            "addresses.raw_text",
-            "addresses.normalized_text",
-            "addresses.origin",
-            "hal_structures",
-            "ror_organizations",
-            "place_name_forms",
-        ),
-        writes=("addresses.origin",),
-        previous_run=("addresses.origin",),
-    ),
-    _task(
-        "affiliations.resolve_addresses",
-        "affiliations",
-        reads=(
-            "structure_name_forms",
-            "structures",
-            "addresses.id",
-            "addresses.normalized_text",
-            "address_structures",
-        ),
-        writes=("address_structures.id", "address_structures.matched_form_id"),
-        previous_run=("addresses",),
-    ),
-    _task(
-        "affiliations.resolve_thesis_partners",
-        "affiliations",
-        reads=(
-            "structure_name_forms",
-            "structures",
-            "source_records.source_extras",
-            "idref_structures",
-        ),
-        writes=("idref_structures",),
-        previous_run=("idref_structures",),
-    ),
-    _task(
-        "affiliations.populate",
-        "affiliations",
-        reads=(
-            "address_structures",
-            "perimeter_structures",
-            "config",
-            "source_contribution_addresses",
-            # Branches ROR, structure HAL et thèse de `source_contribution_structures`.
-            "source_contribution_rors",
-            "source_contribution_hal_structures",
-            "hal_structures",
-            "hal_structure_relations",
-            "hal_structure_aliases",
-            "structures.ror_id",
-            "structures.api_ids",
-            "source_records.source_extras",
-            "source_contributions.roles",
-            "idref_structures",
-            "source_contributions.source_record_id",
-            "source_records.publication_id",
-            # Identifiants des personnes à fiche RH : `hr_record_source_contributions`.
-            "hr_records",
-            "person_identifiers",
-            "rejected_contributions",
-            "contributor_information",
-            "source_contributions.contributor_information_id",
-            "source_contributions.neutralized_identifiers",
-            "source_contributions.source",
-            "source_records.publication_year",
-            # Contributions des contributions sources à indices modifiés, marquées pour la recomposition de leurs attributs.
-            "aligned_source_contributions",
-        ),
-        writes=(
-            "source_contribution_structures",
-            "source_contributions.in_perimeter",
-            "source_record_keys_queue",
-            "contribution_attributes_queue",
-        ),
-        previous_run=(
-            "source_records.publication_id",
-            "person_identifiers",
-            "source_contributions.neutralized_identifiers",
-            "aligned_source_contributions",
-        ),
-    ),
-    _task(
         "author_grouping.build",
         "author_grouping",
         reads=(
@@ -625,6 +512,8 @@ class Phase:
     """Moissonnage : le journal de la phase se termine par le total de ses sources."""
     label_fields: Callable[[Connection], dict[str, str]] | None = None
     """Valeurs des champs du libellé, lues dans la configuration."""
+    check: Callable[[PhaseContext], None] | None = None
+    """Précondition, vérifiée avant les tâches : lève une exception si elle n'est pas remplie."""
     assemble: Callable[[Mapping[str, PhaseMetrics]], PhaseMetrics] | None = None
     """Métriques de la phase, d'après celles de ses tâches, par nom de tâche. `None` : leur somme."""
     build: Callable[[], ExecutablePhase] | None = None

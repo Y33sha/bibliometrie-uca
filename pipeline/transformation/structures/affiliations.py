@@ -14,8 +14,7 @@ from __future__ import annotations
 
 import logging
 import time
-from collections.abc import Callable
-from dataclasses import dataclass
+from collections.abc import Mapping
 
 from sqlalchemy import Connection
 
@@ -23,14 +22,14 @@ from infrastructure.read_models.perimeters.queries import (
     get_extraction_structure_ids,
     get_persons_structure_ids_list,
 )
+from pipeline.graph import task
 from pipeline.http.polite_pool import default_user_agent
 from pipeline.ingestion.complements.ror import ZenodoRorDumpSource
 from pipeline.ingestion.hal.api import HalStructuresClient
-from pipeline.runtime.context import Phase, PhaseContext
+from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.log_format import LAST_BRANCH
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import waiting
-from pipeline.task_runner import TaskStep, run_tasks
 from pipeline.transformation.structures.address_origin import classify_addresses
 from pipeline.transformation.structures.address_resolution import (
     run_resolution,
@@ -48,74 +47,43 @@ from pipeline.transformation.structures.perimeter_evidence import (
 from pipeline.transformation.structures.ror import RorStore, run_refresh_ror
 
 
-@dataclass(frozen=True)
-class AffiliationsPhase:
-    refresh_ror: Callable[[PhaseContext], PhaseMetrics]
-    refresh_hal_structures: Callable[[PhaseContext, bool], PhaseMetrics]
-    classify_addresses: Callable[[Connection, logging.Logger], PhaseMetrics]
-    resolve_thesis_partners: Callable[[Connection, logging.Logger], int]
+def check_extraction_perimeter(ctx: PhaseContext) -> None:
+    """Lève `EmptyExtractionPerimeterError` si le périmètre d'extraction ne contient aucune structure."""
+    with ctx.open_tx() as conn:
+        if not get_extraction_structure_ids(conn):
+            raise EmptyExtractionPerimeterError()
 
-    def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Contrôle le périmètre d'extraction, exécute ses tâches et assemble les métriques de la phase."""
-        with ctx.open_tx() as conn:
-            if not get_extraction_structure_ids(conn):
-                raise EmptyExtractionPerimeterError()
 
-        by_task = run_tasks(
-            "affiliations",
-            {
-                "affiliations.refresh_ror": TaskStep(lambda ctx: self.refresh_ror(ctx)),
-                "affiliations.refresh_hal_structures": TaskStep(
-                    lambda ctx: self.refresh_hal_structures(
-                        ctx, ctx.options.policy.refresh_hal_structures
-                    )
-                ),
-                "affiliations.classify_addresses": TaskStep(
-                    self._classify_addresses, section="Origine des adresses"
-                ),
-                "affiliations.resolve_addresses": TaskStep(
-                    self._resolve_addresses,
-                    section="Identification des structures dans les adresses institutionnelles",
-                ),
-                "affiliations.resolve_thesis_partners": TaskStep(self._resolve_thesis_partners),
-                "affiliations.populate": TaskStep(
-                    self._populate, section="Rattachement des structures aux auteurs des documents"
-                ),
-            },
-            ctx,
-        )
-        metrics = by_task["affiliations.resolve_addresses"]
-        metrics.details.update(by_task["affiliations.refresh_ror"].details)
-        metrics.details.update(by_task["affiliations.refresh_hal_structures"].details)
-        return metrics
+def _classify_addresses(ctx: PhaseContext) -> PhaseMetrics:
+    with ctx.open_tx() as conn:
+        return classify_addresses(conn, ctx.logger)
 
-    def _classify_addresses(self, ctx: PhaseContext) -> PhaseMetrics:
-        with ctx.open_tx() as conn:
-            return self.classify_addresses(conn, ctx.logger)
 
-    def _resolve_addresses(self, ctx: PhaseContext) -> PhaseMetrics:
-        with ctx.open_tx() as conn:
-            perimeter_ids = set(get_persons_structure_ids_list(conn))
-            stats = run_resolution(conn, perimeter_ids, ctx.logger)
-        metrics = PhaseMetrics()
-        metrics.add(seen=stats.processed)
-        metrics.details["summary"] = {
-            "adresses": stats.processed,
-            "in_perimeter": stats.in_perimeter,
-        }
-        return metrics
+def _resolve_addresses(ctx: PhaseContext) -> PhaseMetrics:
+    with ctx.open_tx() as conn:
+        perimeter_ids = set(get_persons_structure_ids_list(conn))
+        stats = run_resolution(conn, perimeter_ids, ctx.logger)
+    metrics = PhaseMetrics()
+    metrics.add(seen=stats.processed)
+    metrics.details["summary"] = {
+        "adresses": stats.processed,
+        "in_perimeter": stats.in_perimeter,
+    }
+    return metrics
 
-    def _resolve_thesis_partners(self, ctx: PhaseContext) -> PhaseMetrics:
-        with ctx.open_tx() as conn:
-            self.resolve_thesis_partners(conn, ctx.logger)
-            conn.commit()
-        return PhaseMetrics()
 
-    def _populate(self, ctx: PhaseContext) -> PhaseMetrics:
-        with ctx.open_tx() as conn:
-            perimeter_ids = set(get_persons_structure_ids_list(conn))
-            populate(conn, ctx.logger, perimeter_ids)
-        return PhaseMetrics()
+def _resolve_thesis_partners(ctx: PhaseContext) -> PhaseMetrics:
+    with ctx.open_tx() as conn:
+        resolve_thesis_partners(conn, ctx.logger)
+        conn.commit()
+    return PhaseMetrics()
+
+
+def _populate(ctx: PhaseContext) -> PhaseMetrics:
+    with ctx.open_tx() as conn:
+        perimeter_ids = set(get_persons_structure_ids_list(conn))
+        populate(conn, ctx.logger, perimeter_ids)
+    return PhaseMetrics()
 
 
 def populate(conn: Connection, logger: logging.Logger, perimeter_ids: set[int]) -> None:
@@ -127,16 +95,7 @@ def populate(conn: Connection, logger: logging.Logger, perimeter_ids: set[int]) 
         line.conclude(f"{LAST_BRANCH}Terminé en {time.perf_counter() - t0:.1f}s")
 
 
-def build() -> Phase:
-    return AffiliationsPhase(
-        refresh_ror=_run_refresh_ror,
-        refresh_hal_structures=_run_refresh_hal_structures,
-        classify_addresses=classify_addresses,
-        resolve_thesis_partners=resolve_thesis_partners,
-    )
-
-
-def _run_refresh_hal_structures(ctx: PhaseContext, refresh_stale: bool) -> PhaseMetrics:
+def _refresh_hal_structures(ctx: PhaseContext) -> PhaseMetrics:
     """Charge le référentiel des structures HAL, sur sa propre connexion."""
 
     with ctx.open_tx() as conn:
@@ -145,14 +104,142 @@ def _run_refresh_hal_structures(ctx: PhaseContext, refresh_stale: bool) -> Phase
             source=HalStructuresClient(),
             store=HalStructureStore(conn),
             logger=ctx.logger,
-            refresh_stale=refresh_stale,
+            refresh_stale=ctx.options.policy.refresh_hal_structures,
         )
 
 
-def _run_refresh_ror(ctx: PhaseContext) -> PhaseMetrics:
+def _refresh_ror(ctx: PhaseContext) -> PhaseMetrics:
     """Rafraîchit le référentiel ROR depuis le dump publié sur Zenodo, sur sa propre connexion."""
 
     # Le dump est public : l'adresse du polite pool est facultative.
     source = ZenodoRorDumpSource(user_agent=default_user_agent(), logger=ctx.logger)
     with ctx.open_tx() as conn:
         return run_refresh_ror(conn, source=source, store=RorStore(conn), logger=ctx.logger)
+
+
+TASKS = (
+    task(
+        "affiliations.refresh_ror",
+        reads=("ror_dump_imports", "source_contribution_rors"),
+        writes=(
+            "ror_organizations",
+            "ror_relations",
+            "ror_dump_imports",
+            # Dépendants d'une organisation qui change de pays.
+            "source_contribution_countries_queue",
+        ),
+        previous_run=("ror_dump_imports",),
+        network="zenodo",
+        run=_refresh_ror,
+    ),
+    task(
+        "affiliations.refresh_hal_structures",
+        reads=("source_contribution_hal_structures",),
+        writes=(
+            "hal_structures",
+            "hal_structure_relations",
+            "hal_structure_aliases",
+            # Contributions sources d'une structure qui change de pays.
+            "source_contribution_countries_queue",
+        ),
+        previous_run=("hal_structures", "hal_structure_aliases"),
+        network="hal",
+        run=_refresh_hal_structures,
+    ),
+    task(
+        "affiliations.classify_addresses",
+        reads=(
+            "addresses.raw_text",
+            "addresses.normalized_text",
+            "addresses.origin",
+            "hal_structures",
+            "ror_organizations",
+            "place_name_forms",
+        ),
+        writes=("addresses.origin",),
+        previous_run=("addresses.origin",),
+        run=_classify_addresses,
+        section="Origine des adresses",
+    ),
+    task(
+        "affiliations.resolve_addresses",
+        reads=(
+            "structure_name_forms",
+            "structures",
+            "addresses.id",
+            "addresses.normalized_text",
+            "address_structures",
+        ),
+        writes=("address_structures.id", "address_structures.matched_form_id"),
+        previous_run=("addresses",),
+        run=_resolve_addresses,
+        section="Identification des structures dans les adresses institutionnelles",
+    ),
+    task(
+        "affiliations.resolve_thesis_partners",
+        reads=(
+            "structure_name_forms",
+            "structures",
+            "source_records.source_extras",
+            "idref_structures",
+        ),
+        writes=("idref_structures",),
+        previous_run=("idref_structures",),
+        run=_resolve_thesis_partners,
+    ),
+    task(
+        "affiliations.populate",
+        reads=(
+            "address_structures",
+            "perimeter_structures",
+            "config",
+            "source_contribution_addresses",
+            # Branches ROR, structure HAL et thèse de `source_contribution_structures`.
+            "source_contribution_rors",
+            "source_contribution_hal_structures",
+            "hal_structures",
+            "hal_structure_relations",
+            "hal_structure_aliases",
+            "structures.ror_id",
+            "structures.api_ids",
+            "source_records.source_extras",
+            "source_contributions.roles",
+            "idref_structures",
+            "source_contributions.source_record_id",
+            "source_records.publication_id",
+            # Identifiants des personnes à fiche RH : `hr_record_source_contributions`.
+            "hr_records",
+            "person_identifiers",
+            "rejected_contributions",
+            "contributor_information",
+            "source_contributions.contributor_information_id",
+            "source_contributions.neutralized_identifiers",
+            "source_contributions.source",
+            "source_records.publication_year",
+            # Contributions des contributions sources à indices modifiés, marquées pour la recomposition de leurs attributs.
+            "aligned_source_contributions",
+        ),
+        writes=(
+            "source_contribution_structures",
+            "source_contributions.in_perimeter",
+            "source_record_keys_queue",
+            "contribution_attributes_queue",
+        ),
+        previous_run=(
+            "source_records.publication_id",
+            "person_identifiers",
+            "source_contributions.neutralized_identifiers",
+            "aligned_source_contributions",
+        ),
+        run=_populate,
+        section="Rattachement des structures aux auteurs des documents",
+    ),
+)
+
+
+def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
+    """Renvoie les métriques de la résolution des adresses, avec les détails des deux référentiels."""
+    metrics = by_task["affiliations.resolve_addresses"]
+    metrics.details.update(by_task["affiliations.refresh_ror"].details)
+    metrics.details.update(by_task["affiliations.refresh_hal_structures"].details)
+    return metrics
