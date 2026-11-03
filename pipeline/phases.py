@@ -74,8 +74,8 @@ PHASES: tuple[Phase, ...] = (
     Phase(
         "normalize",
         "Normalisation des données brutes",
-        phase_tasks("normalize"),
-        build=normalize.build,
+        normalize.TASKS,
+        assemble=normalize.assemble,
     ),
     Phase(
         "affiliations",

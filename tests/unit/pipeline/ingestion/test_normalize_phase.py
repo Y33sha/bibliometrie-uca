@@ -6,86 +6,106 @@ Le retrait des enregistrements sources disparus précède le nettoyage des infor
 import dataclasses
 import logging
 
+import pytest
+
 from domain.sources.registry import SOURCE_PRIORITY, Source
-from pipeline.ingestion.common.normalize import NormalizePhase
+from pipeline.ingestion.common import normalize
 from pipeline.ingestion.common.normalizer import NormalizeStats
+from pipeline.phases import PHASES
+from pipeline.task_runner import run_phase
+
+_NORMALIZE = next(phase for phase in PHASES if phase.name == "normalize")
 
 
-def _run(
-    contexte,
-    appels: list[str],
-    *,
-    disparues: int = 0,
-    bilan: NormalizeStats = NormalizeStats(3, 0, 0),
-    **options,
-):
-    ctx = contexte(**{"mode": "daily", "sources": {"hal"}, **options})
-    ctx = dataclasses.replace(ctx, maintain=appels.append)
-    return NormalizePhase(
-        normalize_one=lambda _ctx, source: (appels.append(f"normalize:{source}"), bilan)[1],
-        prune_disappeared=lambda _ctx: (appels.append("prune"), disparues)[1],
-        cleanup_orphan_contributor_information=lambda _ctx: (appels.append("cleanup"), 0)[1],
-        cleanup_orphan_addresses=lambda _ctx: (appels.append("cleanup_addresses"), 0)[1],
-    ).run(ctx)
+@pytest.fixture
+def lancer(contexte, monkeypatch):
+    """Renvoie l'exécution de la phase, ses accès à la base remplacés par des enregistreurs de leurs appels."""
+
+    def _lancer(
+        appels: list[str],
+        *,
+        disparues: int = 0,
+        bilan: NormalizeStats = NormalizeStats(3, 0, 0),
+        **options,
+    ):
+        def appel(nom: str, valeur):
+            return lambda *_args: (appels.append(nom), valeur)[1]
+
+        monkeypatch.setattr(
+            normalize,
+            "_normalize_one",
+            lambda _ctx, source: (appels.append(f"normalize:{source}"), bilan)[1],
+        )
+        monkeypatch.setattr(normalize, "_run_prune_disappeared", appel("prune", disparues))
+        monkeypatch.setattr(
+            normalize, "_run_cleanup_orphan_contributor_information", appel("cleanup", 0)
+        )
+        monkeypatch.setattr(
+            normalize, "_run_cleanup_orphan_addresses", appel("cleanup_addresses", 0)
+        )
+        ctx = contexte(**{"mode": "daily", "sources": {"hal"}, **options})
+        return run_phase(_NORMALIZE, dataclasses.replace(ctx, maintain=appels.append))
+
+    return _lancer
 
 
-def test_le_retrait_precede_le_nettoyage_des_identites_et_des_adresses(contexte):
+def test_le_retrait_precede_le_nettoyage_des_identites_et_des_adresses(lancer):
     appels: list[str] = []
-    _run(contexte, appels)
+    lancer(appels)
     assert appels == ["normalize:hal", "prune", "cleanup", "cleanup_addresses", "VACUUM staging"]
 
 
-def test_toutes_les_sources_sont_normalisees_dans_l_ordre(contexte):
+def test_toutes_les_sources_sont_normalisees_dans_l_ordre(lancer):
     appels: list[str] = []
-    _run(contexte, appels, sources=frozenset(Source))
+    lancer(appels, sources=frozenset(Source))
     assert appels[: len(SOURCE_PRIORITY)] == [f"normalize:{s.value}" for s in SOURCE_PRIORITY]
 
 
-def test_le_mode_full_reecrit_le_staging(contexte):
+def test_le_mode_full_reecrit_le_staging(lancer):
     appels: list[str] = []
-    _run(contexte, appels, mode="full")
+    lancer(appels, mode="full")
     assert appels[-1] == "VACUUM FULL staging"
 
 
-def test_le_decompte_des_retraits_part_dans_les_metriques(contexte):
-    metrics = _run(contexte, [], disparues=7)
+def test_le_decompte_des_retraits_part_dans_les_metriques(lancer):
+    metrics = lancer([], disparues=7)
     assert metrics.details["disappeared_pruned"] == 7
 
 
-def test_le_total_reste_celui_des_documents_normalises(contexte):
-    metrics = _run(contexte, [], disparues=7)
+def test_le_total_reste_celui_des_documents_normalises(lancer):
+    metrics = lancer([], disparues=7)
     assert metrics.total == 3
 
 
-def test_sans_document_la_maintenance_tourne_quand_meme(contexte, caplog):
+def test_sans_document_la_maintenance_tourne_quand_meme(lancer, caplog):
     appels: list[str] = []
     with caplog.at_level(logging.INFO, logger="test"):
-        _run(contexte, appels, bilan=NormalizeStats(0, 0, 0))
+        lancer(appels, bilan=NormalizeStats(0, 0, 0))
     assert appels == ["normalize:hal", "prune", "cleanup", "cleanup_addresses", "VACUUM staging"]
     assert "aucun document disparu de sa source" in caplog.text
     assert "▶ Maintenance des tables" in caplog.text
 
 
-def test_les_retraits_sont_annonces(contexte, caplog):
+def test_les_retraits_sont_annonces(lancer, caplog):
     with caplog.at_level(logging.INFO, logger="test"):
-        _run(contexte, [], disparues=2)
+        lancer([], disparues=2)
     assert "2 documents supprimés (disparus de leur source)" in caplog.text
 
 
-def test_la_ligne_de_la_source_compte_les_documents_normalises_et_les_erreurs(contexte, caplog):
+def test_la_ligne_de_la_source_compte_les_documents_normalises_et_les_erreurs(lancer, caplog):
     with caplog.at_level(logging.INFO, logger="test"):
-        _run(contexte, [], bilan=NormalizeStats(3525, 0, 1))
+        lancer([], bilan=NormalizeStats(3525, 0, 1))
     assert "HAL : 3525 documents normalisés, 1 erreur" in caplog.text
 
 
-def test_sans_document_la_ligne_de_la_source_dit_rien_a_faire(contexte, caplog):
+def test_sans_document_la_ligne_de_la_source_dit_rien_a_faire(lancer, caplog):
     with caplog.at_level(logging.INFO, logger="test"):
-        _run(contexte, [], bilan=NormalizeStats(0, 0, 0))
+        lancer([], bilan=NormalizeStats(0, 0, 0))
     assert "HAL : rien à faire" in caplog.text
 
 
-def test_la_table_porte_une_ligne_par_source(contexte):
-    metrics = _run(contexte, [], bilan=NormalizeStats(3, 1, 2))
+def test_la_table_porte_une_ligne_par_source(lancer):
+    metrics = lancer([], bilan=NormalizeStats(3, 1, 2))
     (ligne,) = metrics.details["table"]["rows"]
     assert {k: v for k, v in ligne.items() if k != "duration_s"} == {
         "key": "hal",

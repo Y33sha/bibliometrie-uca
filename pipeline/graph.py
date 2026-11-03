@@ -11,10 +11,6 @@ from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from domain.sources.registry import (
-    SOURCE_PRIORITY,
-)
-
 if TYPE_CHECKING:
     from sqlalchemy import Connection
 
@@ -171,114 +167,6 @@ TASKS: tuple[Task, ...] = (
         "run",
         reads=("perimeters", "structure_parents", "structures"),
         writes=("perimeter_structures",),
-    ),
-    # Acquisition : les canaux écrivent la dernière version de chaque document moissonné dans `staging`, dans un ordre indifférent. Leurs lectures de `staging` dédoublonnent et valent quel que soit l'ordre.
-    # Interrogation par identifiant de personne : identifiants des personnes RH, posés par la phase `persons` au run précédent.
-    *(
-        _task(
-            f"normalize.{source}",
-            "normalize",
-            reads=(
-                "staging",
-                "staging_normalization_queue",
-                "source_records.id",
-                "source_records.authors_hash",
-                "source_records.publication_id",
-                "source_contributions.id",
-                "source_contributions.author_position",
-                "source_contributions.roles",
-                "source_contributions.contributor_information_id",
-                "source_contributions.content_hash",
-                "contributor_information",
-                "addresses.id",
-                "countries",
-                "subjects",
-                # Contributions des contributions sources à rôles ou statut de correspondant modifiés.
-                "aligned_source_contributions",
-            ),
-            writes=(
-                "staging_normalization_queue",
-                "staging.raw_data",
-                "source_records",
-                "source_record_identifiers",
-                "source_record_locations",
-                "embargoes",
-                "subjects",
-                "source_record_subjects",
-                "platforms",
-                "source_contributions",
-                "source_contribution_addresses",
-                "source_contribution_rors",
-                "source_contribution_hal_structures",
-                "contributor_information",
-                "addresses.id",
-                "address_candidates_queue",
-                "address_country_candidates",
-                "publication_contributions_queue",
-                "source_contribution_countries_queue",
-                "source_record_keys_queue",
-                "contribution_attributes_queue",
-            ),
-            # Ses propres lignes de `staging`, de la file de normalisation, enregistrements sources et contributions sources ; les contributions écrites par `author_grouping`.
-            previous_run=(
-                "staging",
-                "staging_normalization_queue",
-                "source_records",
-                "source_record_locations",
-                "embargoes",
-                "subjects",
-                "source_record_subjects",
-                "platforms",
-                "source_contributions",
-                "contributor_information",
-                "addresses",
-                "aligned_source_contributions",
-            ),
-        )
-        for source in SOURCE_PRIORITY
-    ),
-    _task(
-        "normalize.prune_disappeared",
-        "normalize",
-        reads=(
-            "staging.disappeared_at",
-            "source_records.id",
-            "source_records.staging_id",
-            "source_records.publication_id",
-        ),
-        # La suppression d'un enregistrement source emporte ses localisations, ses contributions sources, leurs adresses, ROR et structures HAL, et les décisions qui les visent.
-        writes=(
-            "source_records.id",
-            "source_record_identifiers",
-            "source_record_locations",
-            "embargoes",
-            "source_record_subjects",
-            "source_record_keys_queue",
-            "publication_contributions_queue",
-            "source_contributions.id",
-            "source_contribution_addresses",
-            "source_contribution_rors",
-            "source_contribution_hal_structures",
-            "confirmed_source_contributions",
-            "rejected_contributions",
-        ),
-        previous_run=("source_records",),
-    ),
-    _task(
-        "normalize.cleanup_orphan_contributor_information",
-        "normalize",
-        reads=("source_contributions.contributor_information_id", "contributor_information.id"),
-        writes=("contributor_information.id",),
-        previous_run=("source_contributions",),
-    ),
-    _task(
-        "normalize.cleanup_orphan_addresses",
-        "normalize",
-        reads=("source_contribution_addresses", "addresses.id"),
-        # La suppression d'une adresse emporte ses liens aux structures.
-        writes=("addresses.id", "address_structures"),
-        # La normalisation vide `staging.raw_data`. `VACUUM FULL` en mode full.
-        maintenance=("VACUUM staging",),
     ),
 )
 

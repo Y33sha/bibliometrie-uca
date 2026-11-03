@@ -27,6 +27,7 @@ def _search(source: str) -> TaskRun:
     return run
 
 
+# Identifiants des personnes RH, posés par la phase `persons` au run précédent.
 TASKS = tuple(
     task(
         f"harvest_by_person.{source}",
