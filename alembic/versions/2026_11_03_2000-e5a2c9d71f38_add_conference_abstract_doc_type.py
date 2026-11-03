@@ -26,8 +26,10 @@ def upgrade() -> None:
 def downgrade() -> None:
     # Postgres ne sait pas retirer une valeur d'enum. Le downgrade passe les lignes de ce type à 'conference' et laisse la valeur dans le type, inutilisée.
     op.execute(
-        "UPDATE publications SET doc_type = 'conference' WHERE doc_type = 'conference_abstract'"
+        "UPDATE publications.publications SET doc_type = 'conference' "
+        "WHERE doc_type = 'conference_abstract'"
     )
     op.execute(
-        "UPDATE source_records SET doc_type = 'conference' WHERE doc_type = 'conference_abstract'"
+        "UPDATE sources.source_records SET doc_type = 'conference' "
+        "WHERE doc_type = 'conference_abstract'"
     )
