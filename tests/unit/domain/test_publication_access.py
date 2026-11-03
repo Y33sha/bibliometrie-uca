@@ -30,7 +30,6 @@ def _copy(url, *, version=None, is_oa=True, platform=None, described=False, arri
         known_platform=known,
         platform_type=known.platform_type if known else None,
         license=None,
-        embargoed=False,
         described_by_platform=described,
         arrival=arrival,
     )
@@ -269,7 +268,7 @@ def test_une_copie_sous_embargo_est_fermee():
         arrival=1,
         embargoed=True,
     )
-    assert (copy.is_oa, copy.embargoed) == (False, True)
+    assert copy.is_oa is False
 
 
 def test_seule_la_copie_hal_d_un_enregistrement_hal_est_decrite_par_sa_plateforme():

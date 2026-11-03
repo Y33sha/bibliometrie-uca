@@ -1,7 +1,5 @@
 """Statut open access déduit des accès constatés (`domain.publications.open_access`)."""
 
-from dataclasses import replace
-
 import pytest
 
 from domain.platforms.platform import PlatformType
@@ -27,7 +25,6 @@ def _copy(url, *, is_oa=True, platform_type=None, licence=None) -> Copy:
         known_platform=None,
         platform_type=platform_type,
         license=licence,
-        embargoed=False,
         described_by_platform=False,
         arrival=1,
     )
@@ -140,7 +137,7 @@ def test_un_embargo_sans_copie_ouverte():
     assert _status([], embargoed=True) == "embargoed"
 
 
-def test_une_copie_sous_embargo():
+def test_une_copie_fermee_d_une_publication_sous_embargo():
     copy = _copy("https://hal.science/hal-01607327", is_oa=False)
     assert _status([copy]) == "closed"
-    assert _status([replace(copy, embargoed=True)]) == "embargoed"
+    assert _status([copy], embargoed=True) == "embargoed"

@@ -43,8 +43,6 @@ class Copy:
     platform_type: PlatformType | None
     """Type de la plateforme : celui de la liste (`platform_type_of_copy`), à défaut celui donné par la source."""
     license: License | None
-    embargoed: bool
-    """La copie est sous embargo actif."""
     described_by_platform: bool
     """La copie vient de l'enregistrement source donné par la plateforme elle-même."""
     arrival: int
@@ -87,7 +85,6 @@ class Copy:
             known_platform=known,
             platform_type=platform_type_of_copy(url, platform_openalex_id) or source_platform_type,
             license=license,
-            embargoed=embargoed,
             described_by_platform=record_source == Source.HAL and known is HAL,
             arrival=arrival,
             preprint_record=record_doc_type == DocType.PREPRINT,

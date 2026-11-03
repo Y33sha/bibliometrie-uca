@@ -80,7 +80,6 @@ def _copy(url: str, *, platform_type: PlatformType | None = None) -> Copy:
         known_platform=None,
         platform_type=platform_type,
         license=License.CC_BY,
-        embargoed=False,
         described_by_platform=False,
         arrival=1,
     )
