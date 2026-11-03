@@ -65,6 +65,11 @@ class TestMapDocType:
         assert map_doc_type("MEM_14", source="hal") == "memoir"
         assert map_doc_type("ART_unknown", source="hal") == "article"
 
+    def test_numeros_de_revue_vers_journal_issue(self):
+        assert map_doc_type("ISSUE", source="hal") == "journal_issue"
+        assert map_doc_type("journal-issue", source="crossref") == "journal_issue"
+        assert map_doc_type("Journal Issue", source="datacite") == "journal_issue"
+
     def test_hal_presconf_vers_conference(self):
         assert map_doc_type("PRESCONF", source="hal") == "conference"
 

@@ -1,4 +1,4 @@
-"""Tests purs du retrait des DOI par groupe (ouvrage et chapitre, chapitres entre eux, volume d'actes et communication, enregistrement source d'une autre œuvre) et de `compute_updates`."""
+"""Tests purs du retrait des DOI par groupe (ouvrage et chapitre, chapitres entre eux, volume d'actes et communication, numéro de revue et article, enregistrement source d'une autre œuvre) et de `compute_updates`."""
 
 from domain.source_records.identifiers import (
     SourceIdentifier,
@@ -236,6 +236,30 @@ def test_sans_volume_aucune_decision():
 
 def test_communication_sans_titre_garde_le_doi():
     group = [_m(1, "proceedings", "book of abstracts"), _m(2, "conference_paper", None)]
+    assert resolve_cluster_doi_corrections(group) == []
+
+
+# Numéro de revue et article
+
+
+def test_articles_d_un_numero_perdent_le_doi():
+    """Le dépôt HAL d'un article d'un numéro thématique contient parfois le DOI du numéro."""
+    group = [
+        _m(1, "journal_issue", "litteratures de genre et strategies litteraires"),
+        _m(2, "other", "litteratures de genre et strategies litteraires"),
+        _m(3, "article", "ce que l auto edition fait aux litteratures de genre"),
+    ]
+    assert resolve_cluster_doi_corrections(group) == [
+        DoiClusterDecision(3, DoiClusterCase.NUMERO_VS_ARTICLE)
+    ]
+
+
+def test_deux_numeros_de_titres_differents_gardent_le_doi():
+    """Titre traduit ou variante : le dépôt HAL du numéro reste avec l'enregistrement source Crossref."""
+    group = [
+        _m(1, "journal_issue", "les espaces urbains dans les fictions criminelles espagnoles"),
+        _m(2, "journal_issue", "urban spaces in spanish crime fiction"),
+    ]
     assert resolve_cluster_doi_corrections(group) == []
 
 

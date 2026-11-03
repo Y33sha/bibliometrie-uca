@@ -187,6 +187,12 @@ class TestTitleEditorialRule:
     def test_editorial_spares_reference_doc_types(self):
         assert doc_type_correction(_view(doc_type="book", title="Editorial: X")) is None
 
+    def test_numero_de_revue_corrige(self):
+        # HAL type `ISSUE` l'éditorial d'un numéro thématique.
+        view = _view(doc_type="journal_issue", title="Editorial: Sol-Gel Science")
+        corrected = doc_type_correction(view)
+        assert corrected is not None and corrected.value == "editorial"
+
 
 class TestTitleLetterRule:
     def test_letter_prefix_corrects_to_letter(self):
@@ -603,6 +609,11 @@ class TestDoiPreprintServerRule:
 
     def test_other_corrige(self):
         view = _view(doc_type="other", doi="10.21203/rs.3.rs-123/v1")
+        corrected = doc_type_correction(view)
+        assert corrected is not None and corrected.value == "preprint"
+
+    def test_numero_de_revue_corrige(self):
+        view = _view(doc_type="journal_issue", doi=self.BIORXIV)
         corrected = doc_type_correction(view)
         assert corrected is not None and corrected.value == "preprint"
 

@@ -31,6 +31,7 @@ from domain.source_records.metadata_correction.serial_by_doi import (
     namespace_dois,
 )
 from domain.source_records.metadata_correction.shared_doi import (
+    CLUSTER_CANDIDATE_DOC_TYPES,
     DATACITE_DIRECT_CONVERGENCE,
     DATACITE_PACKAGE_PIECE_RELATION,
     FIGSHARE_ADDITIONAL_FILE_TITLE_PATTERN,
@@ -173,6 +174,9 @@ _DATACITE_CASE_SQL = (
     + " END"
 )
 _CLUSTER_CASES_SQL = ", ".join(f"'{case.value}'" for case in DoiClusterCase)
+_CLUSTER_CANDIDATE_DOC_TYPES_SQL = ", ".join(
+    f"'{doc_type}'" for doc_type in sorted(CLUSTER_CANDIDATE_DOC_TYPES)
+)
 _DATACITE_DIRECT_RELATIONS_SQL = (
     "(" + ", ".join(f"'{relation}'" for relation in DATACITE_DIRECT_CONVERGENCE) + ")"
 )
@@ -632,7 +636,7 @@ class SourceRecordCorrectionStore:
 
         Un groupe réunit les enregistrements sources ayant son DOI, de rôle autre que `related`, quel que soit son statut. Un groupe est candidat si :
 
-        - il contient un livre, un chapitre ou un volume d'actes ;
+        - il contient un type de `CLUSTER_CANDIDATE_DOC_TYPES` : livre, chapitre, volume d'actes, numéro de revue ;
         - son DOI est inconnu de doi.org ;
         - son DOI est dans `distant_title_dois`, avec les noms d'auteur de chaque membre ;
         - il contient un enregistrement source déjà corrigé, à réévaluer.
@@ -650,7 +654,7 @@ class SourceRecordCorrectionStore:
                 ),
                 candidate_dois AS (
                     SELECT d.doi AS d FROM record_dois d JOIN sr_eff sr ON sr.id = d.id
-                    WHERE sr.doc_type IN ('{DocType.BOOK.value}', '{DocType.BOOK_CHAPTER.value}', '{DocType.PROCEEDINGS.value}')
+                    WHERE sr.doc_type IN ({_CLUSTER_CANDIDATE_DOC_TYPES_SQL})
                     UNION
                     SELECT d.doi AS d FROM record_dois d
                     WHERE EXISTS (

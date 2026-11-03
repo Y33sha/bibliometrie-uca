@@ -42,6 +42,8 @@ class DoiClusterCase(StrEnum):
     """Chapitres de titres différents partageant un DOI : celui de l'ouvrage, absent du groupe. Tous le perdent."""
     ACTES_VS_COMMUNICATION = "ACTES_VS_COMMUNICATION"
     """Volume d'actes et documents d'autres titres partageant son DOI : ces communications perdent le DOI."""
+    NUMERO_VS_ARTICLE = "NUMERO_VS_ARTICLE"
+    """Numéro de revue et documents d'autres titres partageant son DOI : ces articles perdent le DOI."""
     DOI_D_UNE_AUTRE_OEUVRE = "DOI_D_UNE_AUTRE_OEUVRE"
     """Enregistrement source dont le DOI est celui d'une autre œuvre (`_records_of_another_work`) : il le perd."""
     UNRESOLVED_DOI_TO_NULL = "UNRESOLVED_DOI_TO_NULL"
@@ -131,9 +133,21 @@ _DIVERGENCE_CASES: frozenset[DoiClusterCase] = frozenset(
         DoiClusterCase.OUVRAGE_VS_CHAPITRE,
         DoiClusterCase.CHAPITRES_TITRES_DIFFERENTS,
         DoiClusterCase.ACTES_VS_COMMUNICATION,
+        DoiClusterCase.NUMERO_VS_ARTICLE,
         DoiClusterCase.DOI_D_UNE_AUTRE_OEUVRE,
     }
 )
+
+# Types de conteneur, et cas de retrait du DOI aux membres d'un autre titre que le conteneur.
+_CONTAINER_CASES: dict[str, DoiClusterCase] = {
+    DocType.PROCEEDINGS: DoiClusterCase.ACTES_VS_COMMUNICATION,
+    DocType.JOURNAL_ISSUE: DoiClusterCase.NUMERO_VS_ARTICLE,
+}
+
+CLUSTER_CANDIDATE_DOC_TYPES: frozenset[str] = frozenset(
+    {DocType.BOOK, DocType.BOOK_CHAPTER, *_CONTAINER_CASES}
+)
+"""Types dont la présence dans un groupe de même DOI le rend candidat au retrait du DOI."""
 
 
 def confirmation_ids(
@@ -230,21 +244,21 @@ def _group_has_distinct_chapters(titles: list[str | None]) -> bool:
     return any(not _same_title(a, b) for a, b in combinations(cleaned, 2))
 
 
-def _volume_communications(group: list[DoiClusterMember]) -> list[DoiClusterMember]:
-    """Renvoie les membres titrés d'un groupe à volume d'actes (`proceedings`) dont le titre diffère de celui de chaque volume. Vide sans volume titré."""
-    volumes = [
-        t
-        for m in group
-        if m.doc_type == DocType.PROCEEDINGS and (t := _clean_title(m.title_normalized))
+def _container_contents(
+    group: list[DoiClusterMember], container_type: str
+) -> list[DoiClusterMember]:
+    """Renvoie les membres titrés d'un groupe dont le titre diffère de celui de chaque conteneur de type `container_type`. Vide sans conteneur titré."""
+    containers = [
+        t for m in group if m.doc_type == container_type and (t := _clean_title(m.title_normalized))
     ]
-    if not volumes:
+    if not containers:
         return []
     return [
         m
         for m in group
-        if m.doc_type != DocType.PROCEEDINGS
+        if m.doc_type != container_type
         and (t := _clean_title(m.title_normalized))
-        and not any(_same_title(t, v) for v in volumes)
+        and not any(_same_title(t, c) for c in containers)
     ]
 
 
@@ -342,6 +356,7 @@ def resolve_cluster_doi_corrections(
     - **Ouvrage + chapitre** : les `book_chapter` d'un autre titre que l'ouvrage perdent le DOI, celui de l'ouvrage. Un chapitre au titre de l'ouvrage est la même œuvre, typée autrement par sa source : il garde le DOI.
     - **Chapitres seuls, de titres différents** : tous les `book_chapter` perdent le DOI, celui de l'ouvrage absent.
     - **Volume d'actes + communications** : les membres dont le titre diffère de celui du volume (`proceedings`) perdent le DOI, quel que soit leur type. Les membres au titre du volume le gardent.
+    - **Numéro de revue + articles** : même règle avec le numéro (`journal_issue`).
     - **DOI d'une autre œuvre** (`_records_of_another_work`) : un enregistrement source sans nom d'auteur commun avec l'enregistrement source Crossref du DOI, et de titre éloigné du sien, perd le DOI. S'ajoute aux cas précédents.
     """
     if unresolved:
@@ -359,7 +374,7 @@ def resolve_cluster_doi_corrections(
 
 
 def _divergence_decisions(group: list[DoiClusterMember]) -> list[DoiClusterDecision]:
-    """Décide les retraits des familles ouvrage/chapitre et volume d'actes/communication."""
+    """Décide les retraits de la famille ouvrage/chapitre, à défaut ceux des conteneurs (`_CONTAINER_CASES`). Un membre étranger à deux conteneurs prend le cas du premier."""
     book_family = [m for m in group if m.doc_type in (DocType.BOOK, DocType.BOOK_CHAPTER)]
     chapters = [m for m in book_family if m.doc_type == DocType.BOOK_CHAPTER]
     has_book = any(m.doc_type == DocType.BOOK for m in book_family)
@@ -380,7 +395,8 @@ def _divergence_decisions(group: list[DoiClusterMember]) -> list[DoiClusterDecis
         return [
             DoiClusterDecision(m.id, DoiClusterCase.CHAPITRES_TITRES_DIFFERENTS) for m in chapters
         ]
-    return [
-        DoiClusterDecision(m.id, DoiClusterCase.ACTES_VS_COMMUNICATION)
-        for m in _volume_communications(group)
-    ]
+    decisions: dict[int, DoiClusterCase] = {}
+    for container_type, case in _CONTAINER_CASES.items():
+        for m in _container_contents(group, container_type):
+            decisions.setdefault(m.id, case)
+    return [DoiClusterDecision(member_id, case) for member_id, case in decisions.items()]

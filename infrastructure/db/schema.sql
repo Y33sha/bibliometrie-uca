@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict 3ScU5c5RbyhMOripCZsggZZaPGpJMmhVwx0lLyEkkaE065nLrDA69v4BuZqeaVP
+\restrict pFMpkNK06a4Pgy4hFOcBHvbFuRWE2qURZ78xh1ij0MlGQQwvPbAbKP2At6kjeLj
 
--- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
--- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
+-- Dumped from database version 18.4
+-- Dumped by pg_dump version 18.4
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -183,6 +183,7 @@ CREATE TYPE public.doc_type AS ENUM (
     'book_review',
     'data_paper',
     'proceedings',
+    'journal_issue',
     'media',
     'physical_object'
 );
@@ -6129,5 +6130,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 3ScU5c5RbyhMOripCZsggZZaPGpJMmhVwx0lLyEkkaE065nLrDA69v4BuZqeaVP
+\unrestrict pFMpkNK06a4Pgy4hFOcBHvbFuRWE2qURZ78xh1ij0MlGQQwvPbAbKP2At6kjeLj
 

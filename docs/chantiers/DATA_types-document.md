@@ -54,6 +54,7 @@ OpenAlex et ScanR ont 1 468 enregistrements sources `memoir` avec une URL DUMAS.
 - HAL `VIDEO` et DataCite `Audiovisual` donnent `recorded_talk`. Les règles de correction par le titre (interview, fichiers complémentaires) s'appliquent à ce type.
 - HAL `SON` et DataCite `Sound` donnent `media`.
 - Un type `practice_thesis` distingue les thèses d'exercice des mémoires. Il est exclu des publications, comme `memoir`.
+- Un type `journal_issue` désigne le numéro de revue, dirigé ou non. Il est exclu des publications. Un article qui a le DOI de son numéro le perd.
 - `data_paper` rejoint la famille des données et logiciels.
 - Erratum et rétractation quittent les listes de documents. Ils sont rattachés à la publication concernée.
 - Un type `conference_abstract` (« Résumé de conférence »), famille Conférences, désigne le résumé publié d'une communication. Sources : OpenAlex `conference-abstract`, WoS `Meeting Abstract`, recueil de résumés HAL, communication rattachée à une revue, revue au titre en « abstract(s) ».
@@ -72,6 +73,7 @@ OpenAlex et ScanR ont 1 468 enregistrements sources `memoir` avec une URL DUMAS.
 - [x] Palette des couleurs des types et des familles. 574ea0878
 - [x] `data_paper` dans la famille des données et logiciels. 1bae7f9e8
 - [x] Type `practice_thesis` (« Thèse d'exercice »), famille Thèses, exclu des publications comme `memoir`. HAL `MEM` suivi du code de diplôme DUMAS (12, 13, 30, 47, 63). La règle de l'URL DUMAS laisse ce type en l'état.
+- [ ] Type `journal_issue` (« Numéro de revue »), exclu des publications. HAL `ISSUE`, Crossref `journal-issue`, DataCite `Journal Issue`. Retrait du DOI du numéro aux enregistrements sources d'un autre titre (`NUMERO_VS_ARTICLE`). Oneshot `requalify_journal_issues` sur le stock. Mesures du 2026-11-03 : 152 publications avec un numéro Crossref, 422 avec un dépôt HAL `ISSUE`, dont 91 en commun. Sur 100 dépôts HAL `ISSUE` sans Crossref ni DataCite, 3 sont des articles.
 
 ### Phase 2 — Errata et rétractations
 

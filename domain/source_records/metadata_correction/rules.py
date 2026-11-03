@@ -316,9 +316,9 @@ _RULES: dict[MetadataCorrectionRule, _Rule] = {
         lambda f: bool(f.declares_conference),
         DocType.CONFERENCE_PAPER,
     ),
-    # DOI de serveur de preprints (arXiv, bioRxiv, SSRN, Research Square, …), sans revue + doc_type ∈ {article, other} ⇒ `preprint`. Une revue désigne l'article publié, déposé sous le DOI du preprint.
+    # DOI de serveur de preprints (arXiv, bioRxiv, SSRN, Research Square, …), sans revue + doc_type ∈ {article, other, journal_issue} ⇒ `preprint`. Une revue désigne l'article publié, déposé sous le DOI du preprint.
     MetadataCorrectionRule.DOI_PREPRINT_SERVER_TO_PREPRINT: _Rule(
-        _ARTICLE_OR_OTHER,
+        _ARTICLE_OR_OTHER | {DocType.JOURNAL_ISSUE},
         lambda f: f.serial_id is None and _preprint_server_dois(f),
         DocType.PREPRINT,
     ),
@@ -364,9 +364,9 @@ _RULES: dict[MetadataCorrectionRule, _Rule] = {
         lambda f: _title_starts_with(f, _RETRACTION_TITLE_PREFIXES),
         DocType.RETRACTION,
     ),
-    # Titre « Editorial: … » + doc_type ∈ {article, other} ⇒ `editorial`. Les sources typent souvent ces éditoriaux `article`.
+    # Titre « Editorial: … » + doc_type ∈ {article, other, journal_issue} ⇒ `editorial`. Les sources typent souvent ces éditoriaux `article`. HAL type parfois `ISSUE` l'éditorial d'un numéro thématique.
     MetadataCorrectionRule.TITLE_EDITORIAL_PREFIX_TO_EDITORIAL: _Rule(
-        _ARTICLE_OR_OTHER,
+        _ARTICLE_OR_OTHER | {DocType.JOURNAL_ISSUE},
         lambda f: _title_matches(f, _EDITORIAL_PREFIX_PATTERN),
         DocType.EDITORIAL,
     ),

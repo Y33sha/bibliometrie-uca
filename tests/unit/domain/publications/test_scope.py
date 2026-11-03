@@ -15,6 +15,7 @@ class TestOutOfScopeDocTypes:
         assert "practice_thesis" in OUT_OF_SCOPE_DOC_TYPES
         assert "peer_review" in OUT_OF_SCOPE_DOC_TYPES
         assert "physical_object" in OUT_OF_SCOPE_DOC_TYPES
+        assert "journal_issue" in OUT_OF_SCOPE_DOC_TYPES
 
     def test_excludes_active_types(self):
         for active in ("article", "thesis", "book", "preprint", "ongoing_thesis"):

@@ -36,6 +36,7 @@ class DocType(StrEnum):
     BOOK_REVIEW = "book_review"
     DATA_PAPER = "data_paper"
     PROCEEDINGS = "proceedings"
+    JOURNAL_ISSUE = "journal_issue"
     MEDIA = "media"
     PHYSICAL_OBJECT = "physical_object"
 
@@ -95,6 +96,7 @@ DOC_TYPE_LABELS: dict[DocType, DocTypeLabel] = {
     DocType.BOOK_REVIEW: DocTypeLabel("Recension", "Recensions"),
     DocType.DATA_PAPER: DocTypeLabel("Data paper", "Data papers"),
     DocType.PROCEEDINGS: DocTypeLabel("Proceedings", "Proceedings"),
+    DocType.JOURNAL_ISSUE: DocTypeLabel("Numéro de revue", "Numéros de revue"),
     DocType.MEDIA: DocTypeLabel("Intervention média", "Interventions média"),
     DocType.PHYSICAL_OBJECT: DocTypeLabel("Objet physique", "Objets physiques"),
 }
@@ -158,6 +160,7 @@ DOC_TYPE_FAMILIES: dict[str, DocTypeFamily] = {
             DocType.LETTER,
             DocType.BOOK_REVIEW,
             DocType.PROCEEDINGS,
+            DocType.JOURNAL_ISSUE,
             DocType.PHYSICAL_OBJECT,
         ),
     ),
