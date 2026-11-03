@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict tra27bfv8t74bEICJLP4UaLmnm6zP9ujAMP8xacjhcRyucIalXl5dt5OvAnAjM7
+\restrict FurPl8MTrapf3kyNJpfOhvMxeIesS3VQ8IDDiUKda7Wnyuh2xj436cYVKG92dX8
 
--- Dumped from database version 18.4
--- Dumped by pg_dump version 18.4
+-- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
+-- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -111,6 +111,17 @@ CREATE TYPE public.address_origin AS ENUM (
     'raw',
     'hal_label',
     'name_only'
+);
+
+
+--
+-- Name: author_position; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public.author_position AS ENUM (
+    'corresponding',
+    'first',
+    'last'
 );
 
 
@@ -1122,10 +1133,10 @@ CREATE TABLE publications.contributions (
     person_id integer,
     resolution_mode public.resolution_mode,
     reference_position smallint,
-    is_corresponding boolean,
     roles text[],
     perimeter_evidence public.perimeter_evidence[] DEFAULT '{}'::public.perimeter_evidence[] NOT NULL,
     in_perimeter boolean GENERATED ALWAYS AS ((cardinality(perimeter_evidence) > 0)) STORED NOT NULL,
+    author_positions public.author_position[] DEFAULT '{}'::public.author_position[] NOT NULL,
     CONSTRAINT contributions_resolution_mode_with_person CHECK (((person_id IS NULL) = (resolution_mode IS NULL)))
 )
 WITH (fillfactor='90');
@@ -1136,6 +1147,13 @@ WITH (fillfactor='90');
 --
 
 COMMENT ON TABLE publications.contributions IS 'Contributions sources d''un même auteur dans une publication, avec au maximum une contribution source par enregistrement source. reference_position : position dans la liste la plus longue. Une personne a au maximum une contribution par publication.';
+
+
+--
+-- Name: COLUMN contributions.author_positions; Type: COMMENT; Schema: publications; Owner: -
+--
+
+COMMENT ON COLUMN publications.contributions.author_positions IS 'Positions d''auteur : correspondant, premier ou dernier auteur. La phase author_grouping les calcule depuis les listes d''auteurs de la publication.';
 
 
 --
@@ -6084,5 +6102,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict tra27bfv8t74bEICJLP4UaLmnm6zP9ujAMP8xacjhcRyucIalXl5dt5OvAnAjM7
+\unrestrict FurPl8MTrapf3kyNJpfOhvMxeIesS3VQ8IDDiUKda7Wnyuh2xj436cYVKG92dX8
 
