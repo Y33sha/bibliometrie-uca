@@ -4,13 +4,13 @@
 - Identifiants : l'identifiant actif de rôle le plus fort de chaque type de `CONFIRMATION_ID_TYPES`.
 - Bloc de métadonnées : `<type de document>|<titre normalisé>|<année>`, pour un titre assez long. Le type de document dans la clé impose l'égalité des types.
 
-Les valeurs sont celles de l'enregistrement source corrigé (phase `metadata_correction`). Le voisinage SQL de la réconciliation (`_UNIVERSE_SQL`) réécrit ces clés, et `TestUniverseMatchesPythonTokens` vérifie que les deux concordent. Un type d'identifiant de plus demande son entrée dans `CONFIRMATION_ID_TYPES` et un champ de même nom dans `ConfirmationKeys`. Une clé composite demande aussi sa branche dans `_UNIVERSE_SQL`.
+Les valeurs sont celles de l'enregistrement source corrigé (phase `metadata_correction`). Le voisinage SQL de la réconciliation (`_UNIVERSE_SQL`) réécrit ces clés, et `TestUniverseMatchesPythonTokens` vérifie que les deux concordent. Un type d'identifiant de plus demande son entrée dans `CONFIRMATION_ID_TYPES`. Une clé composite demande aussi sa branche dans `_UNIVERSE_SQL`.
 
 Les ancres d'un ensemble d'enregistrements sources (`doi_anchors`) sont les DOI qui le coupent à la réconciliation et qui donnent son DOI à une publication. Un DOI de dépôt (`is_deposit_doi`) est seulement le DOI d'une publication sans ancre (`deposit_anchors`) : un preprint ou une copie rejoint ainsi la publication de sa version publiée.
 """
 
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass, fields
+from dataclasses import dataclass
 
 from domain.platforms.registry import is_deposit_doi
 from domain.source_records.identifiers import (
@@ -137,37 +137,23 @@ def derivation(identifiers: Iterable[SourceIdentifier]) -> Derivation:
 
 @dataclass(frozen=True, slots=True)
 class ConfirmationKeys:
-    """Clés de confirmation d'un enregistrement source ; une clé absente vaut `None`."""
+    """Clés de confirmation d'un enregistrement source."""
 
     doi: DoiKeys
-    nnt: str | None
-    pmid: str | None
-    arxiv_id: str | None
-    hal_id: str | None
-    metadata_block: str | None
+    single_valued: Mapping[str, str]
+    """Clés présentes à une seule valeur, par nom de clé : identifiants de `CONFIRMATION_ID_TYPES` et bloc de métadonnées (`metadata_block`)."""
 
     def tokens(self) -> frozenset[tuple[str, str]]:
         """Renvoie les clés présentes, en jetons `(nom de la clé, valeur)` : un DOI `x` et un NNT `x` restent distincts. Deux enregistrements sources qui partagent un jeton sont reliés dans le graphe des composantes."""
-        singles = {
-            (name, value)
-            for name in _KEY_NAMES
-            if name != "doi" and (value := getattr(self, name)) is not None
-        }
-        return frozenset(singles | {("doi", d) for d in self.doi.all})
+        return frozenset({*self.single_valued.items(), *(("doi", d) for d in self.doi.all)})
 
 
-_KEY_NAMES = tuple(f.name for f in fields(ConfirmationKeys))
-assert set(_KEY_NAMES) == {"doi", "metadata_block", *CONFIRMATION_ID_TYPES}, (
-    "champs de ConfirmationKeys désynchronisés de CONFIRMATION_ID_TYPES"
-)
-
-
-def confirmation_identifiers(identifiers: Iterable[SourceIdentifier]) -> dict[str, str | None]:
-    """Renvoie la clé de chaque type de `CONFIRMATION_ID_TYPES` : l'identifiant actif de rôle le plus fort, puis de plus petite valeur (`by_role`). Un type sans identifiant actif vaut `None`."""
-    keys: dict[str, str | None] = dict.fromkeys(map(str, CONFIRMATION_ID_TYPES))
+def confirmation_identifiers(identifiers: Iterable[SourceIdentifier]) -> dict[str, str]:
+    """Renvoie la clé de chaque type de `CONFIRMATION_ID_TYPES` présent : l'identifiant actif de rôle le plus fort, puis de plus petite valeur (`by_role`)."""
+    keys: dict[str, str] = {}
     for identifier in by_role(active(identifiers)):
-        if keys.get(identifier.id_type.value, "") is None:
-            keys[identifier.id_type.value] = identifier.value
+        if identifier.id_type in CONFIRMATION_ID_TYPES:
+            keys.setdefault(identifier.id_type.value, identifier.value)
     return keys
 
 
@@ -185,16 +171,12 @@ def project_confirmation_keys(
         doi_targets: cible du DOI de chaque forme secondaire.
     """
     identifiers = list(identifiers)
-    metadata_block = (
-        f"{doc_type}|{title_normalized}|{publication_year}"
-        if doc_type
+    single_valued = confirmation_identifiers(identifiers)
+    if (
+        doc_type
         and title_normalized
         and len(title_normalized) > DISCRIMINANT_TITLE_MIN_LENGTH
         and publication_year is not None
-        else None
-    )
-    return ConfirmationKeys(
-        doi=doi_keys(identifiers, doi_targets, doc_type),
-        metadata_block=metadata_block,
-        **confirmation_identifiers(identifiers),
-    )
+    ):
+        single_valued["metadata_block"] = f"{doc_type}|{title_normalized}|{publication_year}"
+    return ConfirmationKeys(doi_keys(identifiers, doi_targets, doc_type), single_valued)
