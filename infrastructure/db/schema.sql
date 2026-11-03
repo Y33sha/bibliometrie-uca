@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict k0lEZQUPPFWNOcUqCwk8Y02hY3W0aHz983Y3RFM1rkke3cxbEq2bVyf8893CHYt
+\restrict Ce8I77HDF1c5wHRwJU0y13IuQZcYrfBua5ekKxFdyYxfxhetUDikg7N45YqbEAD
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -2741,6 +2741,30 @@ ALTER TABLE queues.source_record_keys_queue ALTER COLUMN seq ADD GENERATED ALWAY
 
 
 --
+-- Name: staging_normalization_queue; Type: TABLE; Schema: queues; Owner: -
+--
+
+CREATE TABLE queues.staging_normalization_queue (
+    id integer NOT NULL,
+    seq bigint NOT NULL
+);
+
+
+--
+-- Name: staging_normalization_queue_seq_seq; Type: SEQUENCE; Schema: queues; Owner: -
+--
+
+ALTER TABLE queues.staging_normalization_queue ALTER COLUMN seq ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME queues.staging_normalization_queue_seq_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
 -- Name: countries; Type: TABLE; Schema: ref; Owner: -
 --
 
@@ -3262,7 +3286,6 @@ CREATE TABLE sources.staging (
     source_id text NOT NULL,
     doi text,
     raw_data jsonb NOT NULL,
-    processed boolean DEFAULT false,
     imported_at timestamp with time zone DEFAULT now(),
     raw_hash text,
     last_seen_at timestamp with time zone DEFAULT now(),
@@ -3277,7 +3300,7 @@ CREATE TABLE sources.staging (
 -- Name: TABLE staging; Type: COMMENT; Schema: sources; Owner: -
 --
 
-COMMENT ON TABLE sources.staging IS 'Documents moissonnés, en transit vers les tables sources. Deux états : à traiter (processed FALSE, raw_data porte le payload de la source), normalisée (processed TRUE, raw_data vidé).';
+COMMENT ON TABLE sources.staging IS 'Documents moissonnés, en transit vers les tables sources. Une ligne à normaliser est dans queues.staging_normalization_queue ; la normalisation vide raw_data.';
 
 
 --
@@ -4202,6 +4225,14 @@ ALTER TABLE ONLY queues.source_contribution_countries_queue
 
 ALTER TABLE ONLY queues.source_record_keys_queue
     ADD CONSTRAINT source_record_keys_queue_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: staging_normalization_queue staging_normalization_queue_pkey; Type: CONSTRAINT; Schema: queues; Owner: -
+--
+
+ALTER TABLE ONLY queues.staging_normalization_queue
+    ADD CONSTRAINT staging_normalization_queue_pkey PRIMARY KEY (id);
 
 
 --
@@ -5258,13 +5289,6 @@ CREATE INDEX idx_staging_doi ON sources.staging USING btree (doi) WHERE (doi IS 
 
 
 --
--- Name: idx_staging_processed; Type: INDEX; Schema: sources; Owner: -
---
-
-CREATE INDEX idx_staging_processed ON sources.staging USING btree (processed) WHERE (NOT processed);
-
-
---
 -- Name: idx_staging_source; Type: INDEX; Schema: sources; Owner: -
 --
 
@@ -6104,5 +6128,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict k0lEZQUPPFWNOcUqCwk8Y02hY3W0aHz983Y3RFM1rkke3cxbEq2bVyf8893CHYt
+\unrestrict Ce8I77HDF1c5wHRwJU0y13IuQZcYrfBua5ekKxFdyYxfxhetUDikg7N45YqbEAD
 
