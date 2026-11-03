@@ -61,6 +61,7 @@
 		showAdminExclude = false,
 		perPage = 100,
 		onExcludeContribution,
+		onchange,
 	}: {
 		apiKey?: string;
 		context?: PublicationListContext;
@@ -71,6 +72,8 @@
 		/** Nombre d'éléments par page (50 pour les onglets, 100 pour /publications). */
 		perPage?: number;
 		onExcludeContribution?: (contributionId: number, publicationId: number) => void | boolean | Promise<void | boolean>;
+		/** Appelé après une fusion de publications dans le volet. */
+		onchange?: () => void;
 	} = $props();
 
 	// Volet d'une publication : ouvert tant que `?publication=<id>` figure dans l'URL. Une icône en tête de ligne ouvre le volet ; le titre mène toujours à la fiche.
@@ -388,7 +391,16 @@
 <Pagination page={listing.page} pages={listing.pages} onchange={(p) => { listing.goToPage(p); syncUrl(); }} />
 
 {#if drawer.id !== null}
-	<PublicationDrawer publicationId={drawer.id} onclose={() => drawer.open(null)} onopen={drawer.open} />
+	<PublicationDrawer
+		publicationId={drawer.id}
+		onclose={() => drawer.open(null)}
+		onopen={drawer.open}
+		onchange={() => {
+			listing.load();
+			facets.load();
+			onchange?.();
+		}}
+	/>
 {/if}
 
 <style>

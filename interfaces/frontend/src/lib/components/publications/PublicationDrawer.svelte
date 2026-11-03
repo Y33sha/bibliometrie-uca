@@ -14,13 +14,18 @@
 
   type PublicationSources = components["schemas"]["PublicationSourcesResponse"];
 
-  // `onopen` ouvre le volet d'une autre publication : la publication conservée par une fusion.
+  // `onchange` signale une fusion à la page, avec la publication conservée. `onopen` ouvre ensuite le volet de la publication conservée, si elle diffère de celle du volet.
   let {
     publicationId,
     onclose,
     onopen,
-  }: { publicationId: number; onclose: () => void; onopen: (publicationId: number) => void } =
-    $props();
+    onchange,
+  }: {
+    publicationId: number;
+    onclose: () => void;
+    onopen: (publicationId: number) => void;
+    onchange: (keptId: number) => void;
+  } = $props();
 
   let data = $state<PublicationSources | null>(null);
   let failure = $state<string | null>(null);
@@ -28,6 +33,7 @@
   let version = $state(0);
 
   function merged(keptId: number) {
+    onchange(keptId);
     if (keptId === publicationId) version++;
     else onopen(keptId);
   }

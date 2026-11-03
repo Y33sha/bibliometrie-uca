@@ -388,7 +388,7 @@
 </ListStatus>
 
 {#if drawer.id !== null}
-	<PublicationDrawer publicationId={drawer.id} onclose={() => drawer.open(null)} onopen={drawer.open} />
+	<PublicationDrawer publicationId={drawer.id} onclose={() => drawer.open(null)} onopen={drawer.open} onchange={reload} />
 {/if}
 
 {#if createModal}

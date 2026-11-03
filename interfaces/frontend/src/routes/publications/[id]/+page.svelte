@@ -1,6 +1,8 @@
 <script lang="ts">
   import Breadcrumb from "#lib/components/Breadcrumb.svelte";
   import { pageTitle } from "#lib/institution.svelte.js";
+  import { goto } from "$app/navigation";
+  import { resolve } from "$app/paths";
   import { page } from "$app/state";
   import { apiDetail } from "#lib/api/index.js";
   import { titleText } from "#lib/utils.js";
@@ -47,6 +49,20 @@
 
   async function loadData(id: string) {
     data = await apiDetail<PubResponse>(`/api/publications/${id}`);
+  }
+
+  // Après une fusion dans le volet de la publication de la page, la page passe à la publication conservée.
+  function openKept(keptId: number) {
+    if (drawer.id === Number(publicationId))
+      void goto(`${resolve(`publications/${keptId}`)}?publication=${keptId}`);
+    else drawer.open(keptId);
+  }
+
+  function merged(keptId: number) {
+    if (String(keptId) === publicationId)
+      loadData(publicationId).catch(() => {
+        error = true;
+      });
   }
 
   // Charge la publication de l'identifiant de la page.
@@ -126,7 +142,12 @@
 {/if}
 
 {#if drawer.id !== null}
-  <PublicationDrawer publicationId={drawer.id} onclose={() => drawer.open(null)} onopen={drawer.open} />
+  <PublicationDrawer
+    publicationId={drawer.id}
+    onclose={() => drawer.open(null)}
+    onopen={openKept}
+    onchange={merged}
+  />
 {/if}
 
 <style>
