@@ -396,38 +396,39 @@ def publications_by_source(conn: Connection, structure_id: int, period: Period) 
 
 
 _CORRESPONDING = frozenset({AuthorPosition.CORRESPONDING})
-_CORRESPONDING_OR_FIRST = frozenset({AuthorPosition.CORRESPONDING, AuthorPosition.FIRST})
 _CORRESPONDING_FIRST_OR_LAST = frozenset(AuthorPosition)
 
 # Rôles d'auteur comptés pour chaque unité, selon l'ordre des auteurs dans ses publications. Une unité absente compte seulement l'auteur correspondant : ordre alphabétique, ou trop peu d'auteurs pour juger.
-KEY_ROLES_BY_STRUCTURE: dict[str, frozenset[AuthorPosition]] = {
-    **dict.fromkeys(["acceppt", "geolab", "lamp", "lmge", "lmv", "opgc"], _CORRESPONDING_OR_FIRST),
-    **dict.fromkeys(
-        [
-            "ame2p",
-            "chelter",
-            "croc",
-            "gdec",
-            "iccf",
-            "igred",
-            "imost",
-            "ip",
-            "lapsco",
-            "m2ish",
-            "medis",
-            "neuro_dol",
-            "piaf",
-            "umrf",
-            "umrh",
-            "unh",
-        ],
-        _CORRESPONDING_FIRST_OR_LAST,
-    ),
-}
+KEY_ROLES_BY_STRUCTURE: dict[str, frozenset[AuthorPosition]] = dict.fromkeys(
+    [
+        "acceppt",
+        "ame2p",
+        "chelter",
+        "croc",
+        "gdec",
+        "geolab",
+        "iccf",
+        "igred",
+        "imost",
+        "ip",
+        "lamp",
+        "lapsco",
+        "lmge",
+        "lmv",
+        "m2ish",
+        "medis",
+        "neuro_dol",
+        "opgc",
+        "piaf",
+        "umrf",
+        "umrh",
+        "unh",
+    ],
+    _CORRESPONDING_FIRST_OR_LAST,
+)
 
 _KEY_ROLES_LABELS = {
     _CORRESPONDING: "auteur correspondant",
-    _CORRESPONDING_OR_FIRST: "auteur correspondant ou premier auteur",
     _CORRESPONDING_FIRST_OR_LAST: "PDC (premier, dernier ou correspondant)",
 }
 
