@@ -234,6 +234,102 @@ def _these_lines(
         yield writer.truncation_notice(MAX_EXPORT_ROWS)
 
 
+def publications_csv(
+    conn: Connection,
+    where: WhereClause,
+    *,
+    sort: str,
+    columns: list[str],
+    person_id: int | None = None,
+    lab_hal_collection: str | None = None,
+) -> Iterator[str]:
+    """Renvoie l'export CSV des publications `p` satisfaisant `where`, au format de l'export de la liste : colonnes listées dans `columns` par leurs clés, toutes si `columns` est vide. Titre et accès sont toujours présents.
+
+    `person_id` restreint les laboratoires et l'auteur correspondant à la personne. `lab_hal_collection` est la collection HAL lue par le statut de dépôt.
+
+    Le CSV est renvoyé par blocs, en flux : le fichier entier en mémoire coûterait une quinzaine de fois son poids (tampon qui double en croissant, copie à la relecture, marque d'ordre des octets en tête). La requête s'exécute à l'appel.
+    """
+    conn.execute(text("SET LOCAL jit = off"))
+    sort_join, order = _sort_clauses(sort, person_filter=bool(person_id))
+
+    # Le statut HAL coûte deux sous-requêtes par ligne : il se calcule seulement si sa colonne est demandée.
+    hal_status = (
+        hal_status_expression(lab_hal_collection)
+        if not columns or "hal_status" in columns
+        else WhereClause("NULL", {})
+    )
+
+    rows = conn.execute(
+        text(f"""
+            SELECT
+                p.id, p.title, p.publication_year, p.doi, p.doc_type::text AS doc_type,
+                p.publication_date, p.publication_date_precision::text AS precision,
+                p.oa_status::text AS oa_status, p.best_copy_url,
+                p.license::text AS license,
+                {CITATION_TOP_SQL} AS citation_top,
+                j.title AS journal_title,
+                pub.name AS publisher_name,
+                {hal_status.sql} AS hal_status,
+                src_ids.hal_id, src_ids.openalex_id, src_ids.scanr_id,
+                src_ids.wos_id, src_ids.theses_id,
+                (SELECT COALESCE(SUM(ap.amount_eur_ht), 0) FROM apc_payments ap
+                 WHERE ap.publication_id = p.id) AS apc_total,
+                {_FOCUS_AUTHOR_POSITIONS} AS author_positions,
+                (SELECT string_agg(DISTINCT COALESCE(s.acronym, s.name), ', '
+                         ORDER BY COALESCE(s.acronym, s.name))
+                 {_perimeter_labs(person_filter=bool(person_id))}
+                ) AS labs
+            FROM publications p
+            LEFT JOIN serials j ON j.id = p.serial_id
+            LEFT JOIN publishers pub ON pub.id = p.publisher_id
+            LEFT JOIN LATERAL (
+                SELECT
+                    {_SOURCE_ID_COLUMNS}
+                FROM source_records sr WHERE sr.publication_id = p.id
+            ) src_ids ON TRUE
+            {sort_join}
+            WHERE {where.sql}
+            ORDER BY {order}
+            LIMIT :export_limit
+        """),
+        {
+            **where.binds,
+            "lab_person": person_id,
+            "focus_person": person_id,
+            **hal_status.binds,
+            "export_limit": MAX_EXPORT_ROWS + 1,
+        },
+    ).all()
+    rows, truncated = cap_export_rows(rows, MAX_EXPORT_ROWS)
+    if truncated:
+        logger.warning(
+            "Export des publications tronqué au plafond de %d lignes (paramètres : %s)",
+            MAX_EXPORT_ROWS,
+            where.binds,
+        )
+
+    spec = [
+        ("type", "Type"),
+        # La colonne de l'année donne aussi la date, réduite à sa précision.
+        ("year", "Année"),
+        ("year", "Date"),
+        ("doi", "DOI"),
+        ("title", "Titre"),
+        ("serial", "Revue"),
+        ("publisher", "Éditeur"),
+        ("labs", "Laboratoires"),
+        ("corr", "Corresp."),
+        ("apc", "APC (€)"),
+        ("oa_status", "Voie OA"),
+        ("license", "Licence"),
+        ("citation_top", "Top citations"),
+        ("hal_status", "Statut HAL"),
+        ("sources", "Sources"),
+        ("access", "Accès"),
+    ]
+    return chunked(_publication_lines(rows, _emitted_columns(spec, columns), truncated=truncated))
+
+
 class PublicationListQueries:
     _conn: Connection
 
@@ -383,92 +479,17 @@ class PublicationListQueries:
     ) -> Iterator[str]:
         """Renvoie l'export CSV du tableau affiché : mêmes filtres que la liste (`publication_filter_where`), mêmes colonnes (clés des colonnes visibles, toutes si `columns` est vide). Titre et accès sont toujours présents.
 
-        Le CSV est renvoyé par blocs, en flux : le fichier entier en mémoire coûterait une quinzaine de fois son poids (tampon qui double en croissant, copie à la relecture, marque d'ordre des octets en tête).
-
         La méthode doit rester hors générateur : la requête s'exécute à l'appel, sur la connexion ouverte par la dépendance FastAPI le temps du traitement. Cette connexion se ferme avant l'envoi du corps de la réponse ; un générateur lisant la base pendant l'envoi la trouverait fermée. Seules les lignes déjà en mémoire se parcourent ensuite.
         """
-        self._conn.execute(text("SET LOCAL jit = off"))
         context = filter_context(self._conn, filters)
         where_clause, binds = publication_filter_where(filters, context)
-        sort_join, order = _sort_clauses(sort, person_filter=bool(filters.person_id))
-
-        # Le statut HAL coûte deux sous-requêtes par ligne : il se calcule seulement si sa colonne est demandée.
-        hal_status = (
-            hal_status_expression(context.lab_hal_collection)
-            if not columns or "hal_status" in columns
-            else WhereClause("NULL", {})
-        )
-
-        rows = self._conn.execute(
-            text(f"""
-                SELECT
-                    p.id, p.title, p.publication_year, p.doi, p.doc_type::text AS doc_type,
-                    p.publication_date, p.publication_date_precision::text AS precision,
-                    p.oa_status::text AS oa_status, p.best_copy_url,
-                    p.license::text AS license,
-                    {CITATION_TOP_SQL} AS citation_top,
-                    j.title AS journal_title,
-                    pub.name AS publisher_name,
-                    {hal_status.sql} AS hal_status,
-                    src_ids.hal_id, src_ids.openalex_id, src_ids.scanr_id,
-                    src_ids.wos_id, src_ids.theses_id,
-                    (SELECT COALESCE(SUM(ap.amount_eur_ht), 0) FROM apc_payments ap
-                     WHERE ap.publication_id = p.id) AS apc_total,
-                    {_FOCUS_AUTHOR_POSITIONS} AS author_positions,
-                    (SELECT string_agg(DISTINCT COALESCE(s.acronym, s.name), ', '
-                             ORDER BY COALESCE(s.acronym, s.name))
-                     {_perimeter_labs(person_filter=bool(filters.person_id))}
-                    ) AS labs
-                FROM publications p
-                LEFT JOIN serials j ON j.id = p.serial_id
-                LEFT JOIN publishers pub ON pub.id = p.publisher_id
-                LEFT JOIN LATERAL (
-                    SELECT
-                        {_SOURCE_ID_COLUMNS}
-                    FROM source_records sr WHERE sr.publication_id = p.id
-                ) src_ids ON TRUE
-                {sort_join}
-                WHERE {where_clause}
-                ORDER BY {order}
-                LIMIT :export_limit
-            """),
-            {
-                **binds,
-                "lab_person": filters.person_id,
-                "focus_person": filters.person_id,
-                **hal_status.binds,
-                "export_limit": MAX_EXPORT_ROWS + 1,
-            },
-        ).all()
-        rows, truncated = cap_export_rows(rows, MAX_EXPORT_ROWS)
-        if truncated:
-            logger.warning(
-                "Export des publications tronqué au plafond de %d lignes (filtres : %s)",
-                MAX_EXPORT_ROWS,
-                filters,
-            )
-
-        spec = [
-            ("type", "Type"),
-            # La colonne de l'année donne aussi la date, réduite à sa précision.
-            ("year", "Année"),
-            ("year", "Date"),
-            ("doi", "DOI"),
-            ("title", "Titre"),
-            ("serial", "Revue"),
-            ("publisher", "Éditeur"),
-            ("labs", "Laboratoires"),
-            ("corr", "Corresp."),
-            ("apc", "APC (€)"),
-            ("oa_status", "Voie OA"),
-            ("license", "Licence"),
-            ("citation_top", "Top citations"),
-            ("hal_status", "Statut HAL"),
-            ("sources", "Sources"),
-            ("access", "Accès"),
-        ]
-        return chunked(
-            _publication_lines(rows, _emitted_columns(spec, columns), truncated=truncated)
+        return publications_csv(
+            self._conn,
+            WhereClause(where_clause, binds),
+            sort=sort,
+            columns=columns,
+            person_id=filters.person_id,
+            lab_hal_collection=context.lab_hal_collection,
         )
 
     def export_theses_csv(

@@ -1,5 +1,5 @@
 # STATUS: recurring (reporting)
-"""Rapports bibliométriques par unité de recherche, au format Markdown : un fichier `<code>.md` par unité.
+"""Rapports bibliométriques par unité de recherche, au format Markdown : un fichier `<code>.md` par unité, accompagné de `<code>.csv`, la liste des publications comptées.
 
 Une publication compte pour une unité quand au moins un de ses auteurs du périmètre signe avec cette unité. Les types de documents retenus sont les articles, les articles de synthèse, les ouvrages, les chapitres et les conference papers. La période va par défaut de 2020 à la dernière année complète.
 
@@ -27,6 +27,8 @@ from domain.sources.registry import Source, source_label
 from domain.structures.structure import StructureType
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
+from infrastructure.read_models.filters import WhereClause
+from infrastructure.read_models.publications.list import publications_csv
 from infrastructure.read_models.structures.queries import (
     AUTHOR_SOURCE_CONTRIBUTION,
     AUTHORED_PUBLICATION,
@@ -40,6 +42,9 @@ REPORTS_DIR = Path("data/reports/bibliometrie")
 """Dossier des rapports, avec un sous-dossier par date de génération."""
 
 TOP_JOURNALS = 10
+
+CSV_COLUMNS = ["type", "year", "doi", "title", "serial", "citation_top", "sources", "access"]
+"""Colonnes de la liste des publications, par leurs clés dans l'export des publications. L'année donne aussi la colonne de la date."""
 
 
 # --- Requêtes ---
@@ -110,6 +115,12 @@ def _params(structure_id: int, period: Period) -> dict[str, object]:
         "last_year": period.last,
         "doc_types": [t.value for t in IMPACT_GROUP_TYPES],
     }
+
+
+def publications_list_csv(conn: Connection, structure_id: int, period: Period) -> str:
+    """Liste CSV des publications comptées pour la structure, de la plus récente à la plus ancienne."""
+    where = WhereClause(_REPORT_PUBLICATION, _params(structure_id, period))
+    return "".join(publications_csv(conn, where, sort="year_desc", columns=CSV_COLUMNS))
 
 
 def publications_by_year(conn: Connection, structure_id: int, period: Period) -> dict[int, int]:
@@ -645,7 +656,11 @@ def main() -> int:
                 ),
                 encoding="utf-8",
             )
-            log.info("Rapport écrit : %s", path)
+            csv_path = path.with_suffix(".csv")
+            csv_path.write_text(
+                publications_list_csv(conn, structure.id, period), encoding="utf-8", newline=""
+            )
+            log.info("Rapport écrit : %s, %s", path, csv_path.name)
     return 0
 
 
