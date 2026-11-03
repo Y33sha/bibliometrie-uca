@@ -32,7 +32,7 @@ _PREVIOUS_COMMENT = (
 def upgrade() -> None:
     op.create_table(
         "staging_normalization_queue",
-        sa.Column("id", sa.Integer, primary_key=True),
+        sa.Column("id", sa.Integer, primary_key=True, autoincrement=False),
         sa.Column("seq", sa.BigInteger, sa.Identity(always=True), nullable=False),
         schema="queues",
     )
