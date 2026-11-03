@@ -368,7 +368,7 @@ def resolve_cluster_doi_corrections(
 ) -> list[DoiClusterDecision]:
     """Renvoie les membres d'un groupe d'enregistrements sources de même DOI qui perdent ce DOI, avec le cas qui le décide.
 
-    Un membre qui détient le DOI en propre (`owns_doi`) le garde. S'il y en a, seuls ces membres désignent l'ouvrage ou le conteneur.
+    Hors DOI inconnu de doi.org, un membre qui détient le DOI en propre (`owns_doi`) le garde. S'il y en a, seuls ces membres désignent l'ouvrage ou le conteneur.
 
     - **DOI inconnu de doi.org** (`unresolved`) : tous les membres perdent le DOI. Prime sur les cas ci-dessous.
     - **DOI d'une forme secondaire** (`has_target`, cf. `doi_target`) : aucun membre ne perd le DOI. Prime sur les cas ci-dessous, réservés à la famille ouvrage/chapitre.
