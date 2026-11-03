@@ -77,8 +77,15 @@ OpenAlex et ScanR ont 1 468 enregistrements sources `memoir` avec une URL DUMAS.
 
 ### Phase 2 — Errata et rétractations
 
+Mesures du 2026-11-03, base locale, publications du périmètre : 199 errata sur 427 et 12 rétractations sur 14 sans relation. `is_retracted` est vrai pour 14 publications, dont 7 avis de rétractation et 1 erratum : OpenAlex marque aussi les avis. 6 articles rétractés, dont 1 relié à son avis.
+
+- [ ] `update-to` (erratum ou avis) et `updated-by` (article) de Crossref gardés dans `source_extras`. Oneshot depuis le raw store pour le stock. Errata et avis Crossref sans relation : article en base pour 44 errata et 7 avis de rétractation, absent pour 16 errata et 4 avis, surtout antérieurs à 2017.
+- [ ] Phase `relations` : correction, rétractation et avis de préoccupation tirés de `update-to` et `updated-by`, vers un DOI absent de la base compris. Avis absents de la base, connus par `updated-by`, y compris d'après Retraction Watch : 10.1038/s41467-017-00508-5, 10.1016/j.biortech.2018.03.127, 10.1016/j.biortech.2018.11.031.
+- [ ] Errata WoS sans DOI : référence de l'article (« vol 21 283 2020 ») retirée du titre avant le rapprochement. 74 errata trouvent un seul article, 8 plusieurs, 32 aucun.
+- [ ] Avis de rétractation rapprochés par le titre. Cas : avis 210139 et article 15199, avis sans payload Crossref.
+- [ ] « Rétracté » fondé sur les relations et sur OpenAlex, faux pour les avis eux-mêmes. Rétractation sur place par Elsevier : titre « RETRACTED: », `update-to` vers le DOI de l'article lui-même (10.1016/j.indmarman.2022.05.009).
 - [ ] Erratum et rétractation hors des listes de documents, affichés sur la publication concernée.
-- [ ] Relation entre une rétractation et la publication rétractée.
+- [ ] Facette « Rétracté ». Mise en forme de la page d'un article rétracté.
 
 ### Phase 3 — Arbitrage
 
@@ -112,3 +119,4 @@ Mesures du 2026-11-03, publications du périmètre : 1 895 communications rattac
 - Pièces d'un corpus Nakala (257102) : publications distinctes, ou éléments d'un jeu de données.
 - Films, bandes-annonces et MOOC en `recorded_talk` par la correspondance de HAL `VIDEO` et DataCite `Audiovisual`.
 - « Meeting report » publié en revue, typé `article` par toutes les sources (176417, 180148, 16340).
+- Article corrigé ou rétracté absent de la base, cible d'un erratum ou d'un avis du périmètre : moissonnage par DOI (`fetch_missing`) ?
