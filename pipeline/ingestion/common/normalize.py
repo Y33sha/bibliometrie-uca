@@ -50,7 +50,6 @@ from pipeline.runtime.observability.log_format import (
 )
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.task_runner import TaskRun, TaskStep, run_tasks
-from pipeline.transformation.publishing.publishers.store import PublisherStore
 
 NormalizeOne = Callable[[PhaseContext, str], NormalizeStats]
 """Normalise une source et renvoie son bilan."""
@@ -227,7 +226,6 @@ def normalizer_builders(*, archive: bool = True) -> dict[str, NormalizerFactory]
                 logger,
                 StagingStore(conn, raw_store),
                 SourceRecordStore(conn),
-                publisher_store=PublisherStore(conn),
                 contribution_store=SourceContributionStore(conn),
                 location_store=LocationStore(conn),
                 embargo_store=EmbargoStore(conn),

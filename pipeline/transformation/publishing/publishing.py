@@ -2,7 +2,8 @@
 
 Contraintes d'ordre :
 
-- La fusion des autres noms des éditeurs suit la résolution des préfixes, qui pose leurs titulaires.
+- Le rattachement des enregistrements sources aux éditeurs suit la résolution des préfixes, qui crée des éditeurs avec leurs formes de nom.
+- La fusion des autres noms des éditeurs suit la résolution des préfixes, qui pose leurs titulaires, et le rattachement des enregistrements sources aux éditeurs.
 - Les ISSN des séries précèdent leur vérification Sudoc et l'import de la table ISSN-L, qui précèdent le rattachement des enregistrements sources aux revues : le rattachement lit l'ISSN-L et le titre Sudoc de chaque ISSN.
 - Le typage OpenAlex des revues `unknown` suit le rattachement, qui pose leur identifiant OpenAlex, et précède le typage en recueil d'actes, qui vise aussi les revues `unknown`.
 - Les espaces de noms DOI suivent le rattachement et le typage des revues.
@@ -53,9 +54,11 @@ from pipeline.transformation.publishing.monographs.type_proceedings_volumes impo
     run_type_proceedings_volumes,
 )
 from pipeline.transformation.publishing.publishers import (
+    attach_publishers,
     merge_duplicate_publishers,
     resolve_publishers,
 )
+from pipeline.transformation.publishing.publishers.attach_publishers import run_attach_publishers
 from pipeline.transformation.publishing.publishers.merge_duplicate_publishers import (
     run_merge_duplicate_publishers,
 )
@@ -128,6 +131,7 @@ _TABLE: tuple[tuple[str, str, Callable[[PhaseMetrics], int]], ...] = (
         "préfixes DOI DataCite → éditeurs",
         lambda m: m.extras.get("publisher_matched", 0),
     ),
+    ("attach_publishers", "enregistrements sources rattachés aux éditeurs", lambda m: m.updated),
     ("sync_issns", "ISSN des séries", lambda m: m.new),
     (
         "check_issns_in_sudoc",
@@ -211,6 +215,9 @@ def build() -> Phase:
                     _run_resolve_datacite_publishers,
                     "Éditeurs",
                     resolve_publishers.LABELS["DataCite"],
+                ),
+                "attach_publishers": TaskStep(
+                    _run_attach_publishers, "Éditeurs", attach_publishers.LABEL
                 ),
                 "merge_duplicate_publishers": TaskStep(
                     _run_merge_duplicate_publishers, "Éditeurs", merge_duplicate_publishers.LABEL
@@ -304,6 +311,11 @@ def _run_resolve_datacite_publishers(
             publisher_store=PublisherStore(conn),
             fetch_prefix_fn=fetch_datacite_prefix,
         )
+
+
+def _run_attach_publishers(ctx: PhaseContext) -> PhaseMetrics:
+    with ctx.open_tx() as conn:
+        return run_attach_publishers(conn, ctx.logger)
 
 
 def _run_merge_duplicate_publishers(ctx: PhaseContext) -> PhaseMetrics:

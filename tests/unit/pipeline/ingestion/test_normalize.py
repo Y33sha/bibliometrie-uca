@@ -394,17 +394,12 @@ class _WritingNorm(_StubNorm):
 
 @pytest.fixture
 def writes(monkeypatch) -> list[tuple]:
-    """Écritures de la séquence, dans l'ordre : éditeur, contributions sources."""
+    """Écritures des contributions sources."""
     calls: list[tuple] = []
-
-    def publisher(name, *, openalex_id, repo):
-        calls.append(("publisher", name, openalex_id))
-        return 5
 
     def sync(store, source, source_record_id, block, build):
         calls.append(("contributions", source, source_record_id))
 
-    monkeypatch.setattr(normalizer_module, "find_or_create_publisher", publisher)
     monkeypatch.setattr(normalizer_module, "sync_source_contributions", sync)
     return calls
 
@@ -419,7 +414,7 @@ class TestNormalizeRecord:
         norm._record_store.upsert_source_record.assert_not_called()
         norm._staging.mark_done.assert_not_called()
 
-    def test_editeur_puis_enregistrement_et_contributions(self, writes):
+    def test_enregistrement_avec_editeur_et_serie_decrits_puis_contributions(self, writes):
         norm = _WritingNorm(
             doc={"title": "T"},
             publisher=PublisherFacts("Elsevier", "P1"),
@@ -427,19 +422,17 @@ class TestNormalizeRecord:
         )
         norm._record_store.upsert_source_record.return_value = 42
         assert norm.normalize_record(self.ROW) is True
-        assert writes == [("publisher", "Elsevier", "P1"), ("contributions", "test", 42)]
+        assert writes == [("contributions", "test", 42)]
         assert norm.series_seen == [True]
         norm._record_store.upsert_source_record.assert_called_once_with(
             replace(
                 _RECORD,
-                publisher_id=5,
                 biblio={
                     "publisher": "Elsevier",
                     "publisher_openalex_id": "P1",
                     "journal": {"title": "Revue"},
                 },
-            ),
-            has_container=True,
+            )
         )
         norm._location_store.replace_locations.assert_called_once_with(42, [])
         norm._embargo_store.replace_embargo.assert_called_once_with(42, None)
@@ -451,9 +444,7 @@ class TestNormalizeRecord:
         assert norm.normalize_record(self.ROW) is True
         assert writes == [("contributions", "test", 42)]
         assert norm.series_seen == [False]
-        norm._record_store.upsert_source_record.assert_called_once_with(
-            replace(_RECORD, publisher_id=None), has_container=False
-        )
+        norm._record_store.upsert_source_record.assert_called_once_with(_RECORD)
 
 
 class TestSeriesAndVolume:

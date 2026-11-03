@@ -143,13 +143,6 @@ def order_violations(tasks: Sequence[Task]) -> list[tuple[str, str, str]]:
     )
 
 
-# Référentiels trouvés ou créés par la normalisation, fusionnés et supprimés par `publishing`.
-_CONTAINERS = (
-    "publishers",
-    "publisher_name_forms",
-)
-
-
 # Lectures d'une tâche de la phase `oa_status` : DOI à interroger, données du statut des publications.
 _OA_STATUS_INPUTS = (
     "publications.id",
@@ -170,11 +163,6 @@ _OA_STATUS_INPUTS = (
     "embargoes",
     "config",
 )
-
-
-def _containers(source: Source) -> tuple[str, ...]:
-    """Renvoie les référentiels de publication lus et écrits par la normalisation de `source` : aucun pour theses.fr."""
-    return () if source == Source.THESES else _CONTAINERS
 
 
 TASKS: tuple[Task, ...] = (
@@ -301,7 +289,6 @@ TASKS: tuple[Task, ...] = (
                 "subjects",
                 # Contributions des contributions sources à rôles ou statut de correspondant modifiés.
                 "aligned_source_contributions",
-                *_containers(source),
             ),
             writes=(
                 "staging.processed",
@@ -325,9 +312,8 @@ TASKS: tuple[Task, ...] = (
                 "source_contribution_countries_queue",
                 "source_record_keys_queue",
                 "contribution_attributes_queue",
-                *_containers(source),
             ),
-            # Ses propres lignes de `staging`, enregistrements sources et contributions sources ; les référentiels trouvés ou créés par toutes les sources, fusionnés et supprimés par `publishing` ; les contributions écrites par `author_grouping`.
+            # Ses propres lignes de `staging`, enregistrements sources et contributions sources ; les contributions écrites par `author_grouping`.
             previous_run=(
                 "staging",
                 "source_records",
@@ -340,7 +326,6 @@ TASKS: tuple[Task, ...] = (
                 "contributor_information",
                 "addresses",
                 "aligned_source_contributions",
-                *_containers(source),
             ),
         )
         for source in SOURCE_PRIORITY
@@ -572,6 +557,34 @@ TASKS: tuple[Task, ...] = (
         ),
         previous_run=("publishers", "publisher_name_forms"),
         network="datacite",
+    ),
+    _task(
+        "publishing.attach_publishers",
+        "publishing",
+        reads=(
+            "source_records.source",
+            "source_records.doc_type",
+            "source_records.corrections",
+            "source_records.biblio",
+            "source_records.publisher_id",
+            "publishers.openalex_id",
+            "publisher_name_forms",
+        ),
+        writes=(
+            "publishers.id",
+            "publishers.openalex_id",
+            "publisher_name_forms",
+            "source_records.publisher_id",
+            "source_record_keys_queue",
+        ),
+        # Éditeurs et formes de nom des runs précédents ; types corrigés par `metadata_correction`, lus sous leur valeur d'avant correction.
+        previous_run=(
+            "publishers",
+            "publisher_name_forms",
+            "source_records.publisher_id",
+            "source_records.corrections",
+            "source_records.doc_type",
+        ),
     ),
     _task(
         "publishing.merge_duplicate_publishers",

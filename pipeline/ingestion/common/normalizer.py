@@ -45,8 +45,6 @@ from pipeline.runtime.observability.log_format import (
 )
 from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.progress import track_progress
-from pipeline.transformation.publishing.find_or_create import find_or_create_publisher
-from pipeline.transformation.publishing.publishers.store import PublisherStore
 
 type Document = Mapping[str, JsonValue]
 """Document décrit par la source, lu dans une ligne de `staging`."""
@@ -91,7 +89,6 @@ class SourceNormalizer(ABC):
         logger: logging.Logger,
         staging_store: StagingStore,
         record_store: SourceRecordStore,
-        publisher_store: PublisherStore,
         contribution_store: SourceContributionStore,
         location_store: LocationStore,
         embargo_store: EmbargoStore,
@@ -101,7 +98,6 @@ class SourceNormalizer(ABC):
         self.logger = logger
         self._staging = staging_store
         self._record_store = record_store
-        self._publisher_store = publisher_store
         self._contribution_store = contribution_store
         self._location_store = location_store
         self._embargo_store = embargo_store
@@ -175,19 +171,12 @@ class SourceNormalizer(ABC):
     def normalize_record(self, row: StagingRow) -> bool:
         """Normalise un document à métadonnées minimales et marque sa ligne traitée. Renvoie vrai, ou faux sans rien écrire pour un document refusé.
 
-        Écrit dans l'ordre l'éditeur, l'enregistrement source rattaché à son éditeur, ses localisations, son embargo, ses sujets et ses contributions sources. La monographie se rattache dans la phase `publishing`.
+        Écrit dans l'ordre l'enregistrement source, ses localisations, son embargo, ses sujets et ses contributions sources. L'éditeur, la série et le volume décrits par la source s'écrivent dans `biblio` ; l'éditeur, la revue et la monographie se rattachent dans la phase `publishing`.
         """
         doc = self.parse(row)
         if doc is None:
             return False
         publisher = self.publisher(doc)
-        publisher_id = (
-            find_or_create_publisher(
-                publisher.name, openalex_id=publisher.openalex_id, repo=self._publisher_store
-            )
-            if publisher
-            else None
-        )
         series, volume = self.series_and_volume(row, doc)
         record = self.source_record(row, doc, has_series=series is not None)
         biblio = with_publisher(
@@ -198,12 +187,9 @@ class SourceNormalizer(ABC):
         record = replace(
             record,
             publication_date=self.publication_date(doc),
-            publisher_id=publisher_id,
             biblio=with_monograph(with_journal(biblio, series), volume),
         )
-        source_record_id = self._record_store.upsert_source_record(
-            record, has_container=series is not None or volume is not None
-        )
+        source_record_id = self._record_store.upsert_source_record(record)
         self._location_store.replace_locations(
             source_record_id, [*self.locations(doc), *identifier_locations(record.identifiers)]
         )

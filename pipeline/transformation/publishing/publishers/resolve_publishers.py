@@ -16,6 +16,7 @@ import httpx2
 from sqlalchemy import Connection
 
 from domain.normalize import normalize_text, to_plain_text
+from domain.publishers.names import publisher_name_key
 from pipeline.http.circuit_breaker import source_tripped
 from pipeline.http.fetch_pool import run_fetch_pool
 from pipeline.http.lookup import UNAVAILABLE, LookupOutcome, NotFound, Unavailable
@@ -27,7 +28,6 @@ from pipeline.transformation.publishing.doi_prefixes import (
     DoiPrefixStore,
     PendingPublisherPrefix,
 )
-from pipeline.transformation.publishing.find_or_create import match_or_create_publisher
 from pipeline.transformation.publishing.publishers.store import PublisherStore
 
 LABELS: dict[Agency, str] = {
@@ -38,6 +38,16 @@ LABELS: dict[Agency, str] = {
 
 MAX_CONCURRENT = 3
 """Requêtes `/prefixes` simultanées, sous les plafonds des pools polis Crossref et DataCite."""
+
+
+def match_or_create_publisher(name: str, *, repo: PublisherStore) -> tuple[int, bool] | None:
+    """Trouve par sa clé de nom, ou crée, l'éditeur désigné par `name`. Renvoie `(id, created)`, ou `None` si le nom est vide une fois normalisé."""
+    name_normalized = normalize_text(name)
+    name_key = publisher_name_key(name)
+    if not name_normalized or not name_key:
+        return None
+    return repo.match_or_create_by_name_form(name, name_normalized, name_key)
+
 
 COMMIT_EVERY = 50
 

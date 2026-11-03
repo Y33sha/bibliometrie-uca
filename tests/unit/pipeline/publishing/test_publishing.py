@@ -50,10 +50,11 @@ def test_chaque_tache_ecrit_sa_ligne_sous_sa_section(contexte, caplog):
     with caplog.at_level(logging.INFO, logger="test"):
         _run(contexte, attach_serials=rattachement)
     lignes = [r.getMessage() for r in caplog.records if r.getMessage()]
-    assert lignes[:4] == [
+    assert lignes[:5] == [
         "▶ Éditeurs",
         "  ├─ Éditeurs des préfixes DOI Crossref : rien à faire",
         "  ├─ Éditeurs des préfixes DOI DataCite : rien à faire",
+        "  ├─ Rattachement des enregistrements sources aux éditeurs : rien à faire",
         "  └─ Autres noms des éditeurs : rien à faire",
     ]
     assert "▶ Publications en série" in lignes and "▶ Monographies" in lignes

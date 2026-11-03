@@ -282,15 +282,23 @@ class TestNormalizeScanrIdempotence:
         assert cnt == 1
 
     def test_publisher_dedup(self, sa_sync_conn):
-        """L'éditeur commun aux documents existe une seule fois, même après une seconde normalisation."""
+        """L'éditeur commun aux documents existe une seule fois, même après une seconde normalisation et un second rattachement."""
+        import logging
+
         from sqlalchemy import text
+
+        from pipeline.transformation.publishing.publishers.attach_publishers import (
+            run_attach_publishers,
+        )
 
         insert_scanr_staging(sa_sync_conn, SCANR_STAGING_DOCS)
         run_normalize_scanr(sa_sync_conn)
+        run_attach_publishers(sa_sync_conn, logging.getLogger("test"))
 
         # La normalisation vide `raw_data` : le test réinsère le contenu pour relancer.
         insert_scanr_staging(sa_sync_conn, SCANR_STAGING_DOCS)
         assert run_normalize_scanr(sa_sync_conn) == 3
+        run_attach_publishers(sa_sync_conn, logging.getLogger("test"))
 
         cnt = sa_sync_conn.execute(
             text("SELECT count(*) AS cnt FROM publishers WHERE name_normalized LIKE '%elsevier%'")

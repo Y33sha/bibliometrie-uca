@@ -55,6 +55,10 @@ EXTRA_LABELS: dict[str, str | tuple[str, str]] = {
     "publisher_created": ("éditeur créé", "éditeurs créés"),
     "publisher_matched": ("éditeur retrouvé", "éditeurs retrouvés"),
     "publishers_deleted": ("éditeur vide supprimé", "éditeurs vides supprimés"),
+    "publishers_detached": (
+        "enregistrement source détaché de son éditeur",
+        "enregistrements sources détachés de leur éditeur",
+    ),
     "publishers_merged": ("éditeur fusionné", "éditeurs fusionnés"),
     "resolved": "résolu",
     "skipped": "sauté",
