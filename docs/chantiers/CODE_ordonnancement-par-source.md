@@ -47,7 +47,13 @@ Constats :
   - **Monographies : rattachement dépendant de l'ordre.** Un enregistrement source avec ISBN rejoint la seule monographie de son titre sans ISBN. Un enregistrement source sans ISBN reste sans monographie entre plusieurs volumes de son titre. Exemple, un titre à deux volumes d'ISBN I1 et I2, et un enregistrement source B sans ISBN. Ordre I1, I2, B : deux monographies, B sans monographie. Ordre B, I1, I2 : B et I1 dans la même monographie, I2 dans une autre. La fusion des monographies en double (`publishing`) laisse cet écart.
   - **Éditeurs : rattachement dépendant de l'ordre dans un cas.** Un éditeur trouvé par son identifiant OpenAlex reçoit la forme de nom de l'enregistrement source, si elle est libre. Un enregistrement source d'une autre source normalisé avant crée un éditeur distinct avec cette forme. La fusion des autres noms des éditeurs (`publishing`) en rattrape une partie.
   - **Rattachement indépendant de l'ordre**, seule la forme stockée varie : adresses (`raw_text` de la première), plateformes (nom et type de la dernière écriture), sujets (libellé et parent de la dernière écriture), informations du contributeur (clé sur tout le contenu), nom et identifiant OpenAlex d'un éditeur.
-- [ ] Rattachement juste quel que soit l'ordre, pour chaque cas retenu.
+- [ ] La normalisation écrit dans `biblio` l'éditeur et le volume décrits par la source : `publisher` (nom), `publisher_openalex_id`, `monograph` (titre, ISBN, eISBN, actes, année).
+- [ ] Oneshot : `publisher_openalex_id` et `monograph` du stock extraits du raw store, à défaut déduits des rattachements existants.
+- [ ] Rattachement des éditeurs en lot, première tâche de `publishing`. Chaque identifiant OpenAlex rejoint son éditeur, à défaut celui d'une de ses formes de nom, à défaut un éditeur créé. Les enregistrements sources sans identifiant OpenAlex rejoignent l'éditeur de leur forme de nom. Chaque forme restée libre crée un éditeur. Une forme attribuée garde son éditeur.
+- [ ] Rattachement des monographies en lot, après les éditeurs. Les enregistrements sources partageant un ISBN forment un volume. Un enregistrement source sans ISBN rejoint le seul volume à ISBN de son titre et d'éditeur compatible. Sans volume à ISBN, les enregistrements sources sans ISBN forment un volume par titre et éditeur. Chaque volume reprend sa monographie existante.
+- [ ] Règle de l'éditeur nommé par DataCite appliquée d'après la série et le volume décrits.
+- [ ] Normalisation sans recherche ni création d'éditeur ou de monographie.
+- [ ] Fusion des monographies en double : vérification sur le stock, suppression si inutile.
 - [ ] Test : deux ordres de normalisation des sources donnent les mêmes rattachements.
 
 ### Phase 3 — File de normalisation
