@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import argparse
 import os
-from collections.abc import Collection, Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -303,30 +303,19 @@ def publication_impacts(
 @dataclass(frozen=True, slots=True)
 class ImpactSummary:
     publications: int
-    key_role: int
     citations: int
     mean_fwci: float | None
     """Moyenne sur les publications dont le FWCI est connu."""
-    key_role_mean_fwci: float | None
     top_10: int
-    top_10_key_role: int
-
-
-def _mean_fwci(impacts: Sequence[PublicationImpact]) -> float | None:
-    values = [i.fwci for i in impacts if i.fwci is not None]
-    return sum(values) / len(values) if values else None
 
 
 def summarize_impact(impacts: Sequence[PublicationImpact]) -> ImpactSummary:
-    key_role = [i for i in impacts if i.key_role]
+    fwcis = [i.fwci for i in impacts if i.fwci is not None]
     return ImpactSummary(
         publications=len(impacts),
-        key_role=len(key_role),
         citations=sum(i.citations or 0 for i in impacts),
-        mean_fwci=_mean_fwci(impacts),
-        key_role_mean_fwci=_mean_fwci(key_role),
+        mean_fwci=sum(fwcis) / len(fwcis) if fwcis else None,
         top_10=sum(i.top_10 for i in impacts),
-        top_10_key_role=sum(i.top_10 for i in key_role),
     )
 
 
@@ -496,19 +485,26 @@ def _typology_rows(data: StructureReportData, years: Sequence[int]) -> list[list
     return rows
 
 
+_IMPACT_INDICATORS: tuple[tuple[str, str, Callable[[ImpactSummary], str]], ...] = (
+    ("Publications", "Avec {}", lambda s: str(s.publications)),
+    ("Citations", "Citations, avec {}", lambda s: str(s.citations)),
+    ("FWCI moyen", "FWCI moyen, avec {}", lambda s: _decimal(s.mean_fwci)),
+    ("Dans le top 10 % des plus citées", "Dans le top 10 %, avec {}", lambda s: str(s.top_10)),
+)
+"""Indicateurs du tableau d'impact : libellé sur toutes les publications, libellé sur les publications avec rôle clé, valeur."""
+
+
 def _impact_rows(
     impacts: Sequence[PublicationImpact], years: Sequence[int], role_label: str
 ) -> list[list[str]]:
-    by_year = [summarize_impact([i for i in impacts if i.year == y]) for y in years]
-    return [
-        ["Publications", *(str(s.publications) for s in by_year)],
-        [f"Avec {role_label}", *(str(s.key_role) for s in by_year)],
-        ["Citations", *(str(s.citations) for s in by_year)],
-        ["FWCI moyen", *(_decimal(s.mean_fwci) for s in by_year)],
-        [f"FWCI moyen, avec {role_label}", *(_decimal(s.key_role_mean_fwci) for s in by_year)],
-        ["Dans le top 10 % des plus citées", *(str(s.top_10) for s in by_year)],
-        [f"Dans le top 10 %, avec {role_label}", *(str(s.top_10_key_role) for s in by_year)],
-    ]
+    by_year = [[i for i in impacts if i.year == y] for y in years]
+    summaries = [summarize_impact(year) for year in by_year]
+    key_role_summaries = [summarize_impact([i for i in year if i.key_role]) for year in by_year]
+    rows: list[list[str]] = []
+    for label, key_role_label, value in _IMPACT_INDICATORS:
+        rows.append([label, *(value(s) for s in summaries)])
+        rows.append([key_role_label.format(role_label), *(value(s) for s in key_role_summaries)])
+    return rows
 
 
 def _impact_section(
