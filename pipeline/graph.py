@@ -12,8 +12,6 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from domain.sources.registry import (
-    DOI_SEARCHABLE_SOURCES,
-    PROFILES,
     SOURCE_PRIORITY,
 )
 
@@ -97,39 +95,6 @@ def task(
     )
 
 
-@dataclass(frozen=True, slots=True)
-class _PhaseIo:
-    """Lectures et écritures communes à toutes les tâches d'une phase."""
-
-    reads: tuple[str, ...] = ()
-    writes: tuple[str, ...] = ()
-    previous_run: tuple[str, ...] = ()
-
-
-_PHASE_IO: dict[str, _PhaseIo] = {
-    # Identifiants des publications du périmètre, cherchés dans les autres sources ; échecs retenus dans `failed_lookups`.
-    "fetch_missing": _PhaseIo(
-        reads=(
-            "config",
-            "staging",
-            "failed_lookups",
-            "source_records.source",
-            "source_record_identifiers",
-            "source_records.publication_id",
-            "publications.in_perimeter",
-        ),
-        writes=("staging", "staging_normalization_queue", "failed_lookups"),
-        previous_run=(
-            "staging",
-            "failed_lookups",
-            "source_records",
-            "source_record_identifiers",
-            "publications.in_perimeter",
-        ),
-    ),
-}
-
-
 def _task(
     name: str,
     phase: str,
@@ -141,14 +106,13 @@ def _task(
     maintenance: tuple[str, ...] = (),
     parallel_group: str | None = None,
 ) -> Task:
-    """Renvoie une tâche de `phase`, avec les lectures et écritures communes à la phase (`_PHASE_IO`)."""
-    shared = _PHASE_IO.get(phase, _PhaseIo())
+    """Renvoie une tâche de `phase`."""
     return Task(
         name,
         phase,
-        frozenset((*shared.reads, *reads)),
-        frozenset((*shared.writes, *writes)),
-        frozenset((*shared.previous_run, *previous_run)),
+        frozenset(reads),
+        frozenset(writes),
+        frozenset(previous_run),
         network,
         maintenance,
         parallel_group,
@@ -210,50 +174,6 @@ TASKS: tuple[Task, ...] = (
     ),
     # Acquisition : les canaux écrivent la dernière version de chaque document moissonné dans `staging`, dans un ordre indifférent. Leurs lectures de `staging` dédoublonnent et valent quel que soit l'ordre.
     # Interrogation par identifiant de personne : identifiants des personnes RH, posés par la phase `persons` au run précédent.
-    _task(
-        "fetch_missing.hal_by_id",
-        "fetch_missing",
-        network="hal",
-        parallel_group="fetch_missing.hal_id",
-    ),
-    _task(
-        "fetch_missing.scanr_by_hal_id",
-        "fetch_missing",
-        reads=("source_records.source_id",),
-        network="scanr",
-        parallel_group="fetch_missing.hal_id",
-    ),
-    _task(
-        "fetch_missing.hal_by_nnt",
-        "fetch_missing",
-        reads=("publications.doc_type",),
-        previous_run=("publications.doc_type",),
-        network="hal",
-        parallel_group="fetch_missing.nnt",
-    ),
-    _task(
-        "fetch_missing.theses_by_nnt",
-        "fetch_missing",
-        network="theses",
-        parallel_group="fetch_missing.nnt",
-    ),
-    *(
-        _task(
-            f"fetch_missing.doi.{source}",
-            "fetch_missing",
-            # DOI candidats de la vue `candidate_dois`, bornés à la fenêtre d'années du run par les enregistrements sources de leur publication, et agence d'enregistrement pour Crossref et DataCite.
-            reads=(
-                "source_record_identifiers",
-                "source_records.publication_year",
-                "publication_relations",
-                *(("doi_prefixes.ra",) if PROFILES[source].registration_agency else ()),
-            ),
-            previous_run=("doi_prefixes", "publication_relations"),
-            network=source,
-            parallel_group="fetch_missing.doi",
-        )
-        for source in DOI_SEARCHABLE_SOURCES
-    ),
     *(
         _task(
             f"normalize.{source}",

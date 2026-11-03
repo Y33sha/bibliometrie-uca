@@ -52,9 +52,9 @@ PHASES: tuple[Phase, ...] = (
     Phase(
         "fetch_missing",
         "Recherche dans chaque source des documents trouvés dans les autres",
-        phase_tasks("fetch_missing"),
+        fetch_missing.TASKS,
         harvesting=True,
-        build=fetch_missing.build,
+        assemble=fetch_missing.assemble,
     ),
     Phase(
         "fetch_stale",

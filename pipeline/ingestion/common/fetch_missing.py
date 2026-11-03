@@ -12,24 +12,17 @@ Un identifiant cherché en vain est inscrit dans `failed_lookups`, et cherché d
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable
-from dataclasses import dataclass
+from collections.abc import Callable, Mapping
 
 from domain.config import ConfigKey
-from domain.sources.registry import DOI_SEARCHABLE_SOURCES, Source
+from domain.sources.registry import DOI_SEARCHABLE_SOURCES, PROFILES, Source
+from pipeline.graph import Task, TaskRun, task
 from pipeline.ingestion.adapters import ADAPTERS
 from pipeline.ingestion.common.doi_search import fetch_missing_doi
 from pipeline.runtime.config import cap, delay, window_years
-from pipeline.runtime.context import Phase, PhaseContext
+from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.signals import select_targets, skipped
-from pipeline.runtime.parallel import RunParallel, run_parallel
-from pipeline.task_runner import TaskRun, TaskStep, run_tasks
-
-FetchChannel = Callable[[PhaseContext], PhaseMetrics]
-"""Recherche par hal-id ou par NNT : renvoie les métriques du canal."""
-FetchDoiOne = Callable[[PhaseContext, str], PhaseMetrics]
-"""Recherche par DOI dans une source cible."""
 
 _HAL_BY_ID = "fetch_missing.hal_by_id"
 _SCANR_BY_HAL_ID = "fetch_missing.scanr_by_hal_id"
@@ -51,111 +44,6 @@ def _summary(metrics: PhaseMetrics) -> dict[str, float | None]:
         "not_found": metrics.extras.get("not_found", 0),
         "duration_s": metrics.duration_s,
     }
-
-
-@dataclass(frozen=True)
-class FetchMissingPhase:
-    fetch_hal_by_id: FetchChannel
-    fetch_scanr_by_hal_id: FetchChannel
-    fetch_hal_by_nnt: FetchChannel
-    fetch_theses_by_nnt: FetchChannel
-    fetch_doi_one: FetchDoiOne
-    run_parallel: RunParallel
-
-    def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Exécute les recherches par hal-id, par NNT, puis le lot parallèle de la recherche par DOI, et assemble les métriques."""
-        options = ctx.options
-        hal = "hal" in options.sources
-        scanr = "scanr" in options.sources
-        theses = "theses" in options.sources
-        # WoS opt-in.
-        doi_targets = set(
-            select_targets(DOI_SEARCHABLE_SOURCES, options.sources, include_wos=options.include_wos)
-        )
-        selected_tasks = {
-            _HAL_BY_ID: hal,
-            _SCANR_BY_HAL_ID: scanr,
-            _HAL_BY_NNT: hal and options.mode == "full",
-            _THESES_BY_NNT: theses,
-            **{_doi_task(target): target in doi_targets for target in DOI_SEARCHABLE_SOURCES},
-        }
-
-        def when_selected(task: str) -> Callable[[PhaseContext], bool]:
-            return lambda _ctx: selected_tasks[task]
-
-        def doi(target: str) -> TaskRun:
-            return lambda ctx: self.fetch_doi_one(ctx, target)
-
-        by_task = run_tasks(
-            "fetch_missing",
-            {
-                _HAL_BY_ID: TaskStep(
-                    self.fetch_hal_by_id,
-                    section=_HAL_ID_SECTION,
-                    when=when_selected(_HAL_BY_ID),
-                    silent_when_empty=True,
-                ),
-                _SCANR_BY_HAL_ID: TaskStep(
-                    self.fetch_scanr_by_hal_id,
-                    section=_HAL_ID_SECTION,
-                    when=when_selected(_SCANR_BY_HAL_ID),
-                    silent_when_empty=True,
-                ),
-                _HAL_BY_NNT: TaskStep(
-                    self.fetch_hal_by_nnt,
-                    section=_NNT_SECTION,
-                    when=when_selected(_HAL_BY_NNT),
-                    silent_when_empty=True,
-                ),
-                _THESES_BY_NNT: TaskStep(
-                    self.fetch_theses_by_nnt,
-                    section=_NNT_SECTION,
-                    when=when_selected(_THESES_BY_NNT),
-                    silent_when_empty=True,
-                ),
-                **{
-                    _doi_task(target): TaskStep(
-                        doi(target),
-                        section="Recherche par DOI des documents manquants dans chaque source",
-                        when=when_selected(_doi_task(target)),
-                        silent_when_empty=True,
-                    )
-                    for target in DOI_SEARCHABLE_SOURCES
-                },
-            },
-            ctx,
-            parallel=self.run_parallel,
-        )
-
-        metrics = PhaseMetrics()
-        by_channel: dict[str, dict[str, float | None]] = {}
-        channels = {
-            _HAL_BY_ID: "hal-id",
-            _SCANR_BY_HAL_ID: "hal-id ScanR",
-            _HAL_BY_NNT: "NNT",
-            _THESES_BY_NNT: "NNT theses.fr",
-            **{_doi_task(target): target for target in DOI_SEARCHABLE_SOURCES},
-        }
-        for task, key in channels.items():
-            metrics.merge(by_task[task])
-            if selected_tasks[task] and not skipped(by_task[task]):
-                by_channel[key] = _summary(by_task[task])
-        if by_channel:
-            metrics.details["table"] = {
-                "rows": [{"key": channel, **summary} for channel, summary in by_channel.items()]
-            }
-        return metrics
-
-
-def build() -> Phase:
-    return FetchMissingPhase(
-        fetch_hal_by_id=_run_fetch_missing_hal_by_id,
-        fetch_scanr_by_hal_id=_run_fetch_missing_scanr_by_hal_id,
-        fetch_hal_by_nnt=_run_fetch_missing_hal_by_nnt,
-        fetch_theses_by_nnt=_run_fetch_missing_theses_by_nnt,
-        fetch_doi_one=_run_fetch_missing_doi,
-        run_parallel=run_parallel,
-    )
 
 
 def _run_fetch_missing_hal_by_id(ctx: PhaseContext) -> PhaseMetrics:
@@ -221,3 +109,139 @@ def _run_fetch_missing_doi(ctx: PhaseContext, target: str) -> PhaseMetrics:
                 years=years,
             )
         )
+
+
+def _channel(
+    name: str,
+    *,
+    reads: tuple[str, ...] = (),
+    previous_run: tuple[str, ...] = (),
+    network: str,
+    parallel_group: str,
+    run: TaskRun,
+    section: str,
+    when: Callable[[PhaseContext], bool],
+) -> Task:
+    """Renvoie la tâche d'un canal de recherche, avec les lectures et écritures communes aux canaux : identifiants des publications du périmètre, cherchés dans les autres sources ; échecs retenus dans `failed_lookups`."""
+    return task(
+        name,
+        reads=(
+            "config",
+            "staging",
+            "failed_lookups",
+            "source_records.source",
+            "source_record_identifiers",
+            "source_records.publication_id",
+            "publications.in_perimeter",
+            *reads,
+        ),
+        writes=("staging", "staging_normalization_queue", "failed_lookups"),
+        previous_run=(
+            "staging",
+            "failed_lookups",
+            "source_records",
+            "source_record_identifiers",
+            "publications.in_perimeter",
+            *previous_run,
+        ),
+        network=network,
+        parallel_group=parallel_group,
+        run=run,
+        section=section,
+        when=when,
+        silent_when_empty=True,
+    )
+
+
+def _requested(source: str) -> Callable[[PhaseContext], bool]:
+    return lambda ctx: source in ctx.options.sources
+
+
+def _doi_targets(ctx: PhaseContext) -> set[str]:
+    """Renvoie les sources cherchées par DOI : celles demandées, WoS seulement sur option."""
+    options = ctx.options
+    return set(
+        select_targets(DOI_SEARCHABLE_SOURCES, options.sources, include_wos=options.include_wos)
+    )
+
+
+TASKS = (
+    _channel(
+        _HAL_BY_ID,
+        network="hal",
+        parallel_group="fetch_missing.hal_id",
+        run=_run_fetch_missing_hal_by_id,
+        section=_HAL_ID_SECTION,
+        when=_requested("hal"),
+    ),
+    _channel(
+        _SCANR_BY_HAL_ID,
+        reads=("source_records.source_id",),
+        network="scanr",
+        parallel_group="fetch_missing.hal_id",
+        run=_run_fetch_missing_scanr_by_hal_id,
+        section=_HAL_ID_SECTION,
+        when=_requested("scanr"),
+    ),
+    _channel(
+        _HAL_BY_NNT,
+        reads=("publications.doc_type",),
+        previous_run=("publications.doc_type",),
+        network="hal",
+        parallel_group="fetch_missing.nnt",
+        run=_run_fetch_missing_hal_by_nnt,
+        section=_NNT_SECTION,
+        when=lambda ctx: "hal" in ctx.options.sources and ctx.options.mode == "full",
+    ),
+    _channel(
+        _THESES_BY_NNT,
+        network="theses",
+        parallel_group="fetch_missing.nnt",
+        run=_run_fetch_missing_theses_by_nnt,
+        section=_NNT_SECTION,
+        when=_requested("theses"),
+    ),
+    *(
+        _channel(
+            _doi_task(target),
+            # DOI candidats de la vue `candidate_dois`, bornés à la fenêtre d'années du run par les enregistrements sources de leur publication, et agence d'enregistrement pour Crossref et DataCite.
+            reads=(
+                "source_record_identifiers",
+                "source_records.publication_year",
+                "publication_relations",
+                *(("doi_prefixes.ra",) if PROFILES[target].registration_agency else ()),
+            ),
+            previous_run=("doi_prefixes", "publication_relations"),
+            network=target,
+            parallel_group="fetch_missing.doi",
+            run=lambda ctx, target=target: _run_fetch_missing_doi(ctx, target),
+            section="Recherche par DOI des documents manquants dans chaque source",
+            when=lambda ctx, target=target: target in _doi_targets(ctx),
+        )
+        for target in DOI_SEARCHABLE_SOURCES
+    ),
+)
+
+# Clé de chaque canal dans la table d'observabilité de la phase.
+_CHANNEL_KEYS = {
+    _HAL_BY_ID: "hal-id",
+    _SCANR_BY_HAL_ID: "hal-id ScanR",
+    _HAL_BY_NNT: "NNT",
+    _THESES_BY_NNT: "NNT theses.fr",
+    **{_doi_task(target): target for target in DOI_SEARCHABLE_SOURCES},
+}
+
+
+def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
+    """Renvoie la somme des métriques des canaux, avec la table des canaux interrogés."""
+    metrics = PhaseMetrics()
+    by_channel: dict[str, dict[str, float | None]] = {}
+    for name, channel_metrics in by_task.items():
+        metrics.merge(channel_metrics)
+        if not skipped(channel_metrics):
+            by_channel[_CHANNEL_KEYS[name]] = _summary(channel_metrics)
+    if by_channel:
+        metrics.details["table"] = {
+            "rows": [{"key": channel, **summary} for channel, summary in by_channel.items()]
+        }
+    return metrics

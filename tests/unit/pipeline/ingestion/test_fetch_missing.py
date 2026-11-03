@@ -1,18 +1,60 @@
-"""Orchestrateur de la phase `fetch_missing` : canaux HAL séquentiels, puis lot parallèle de la recherche par DOI.
+"""Phase `fetch_missing` : canaux par hal-id et par NNT, puis lot parallèle de la recherche par DOI.
 
-Les dépendances techniques sont injectées (exécution par canal et par source, parallélisme). L'orchestrateur se teste donc sans I/O ni threads : `run_parallel` est simulé par une exécution synchrone déterministe.
+Les fonctions des tâches sont remplacées : la phase se teste sans I/O.
 """
 
+import dataclasses
 import logging
+from collections.abc import Callable
 
-from pipeline.ingestion.common.fetch_missing import FetchMissingPhase
+from pipeline.graph import Phase
+from pipeline.phases import PHASES
 from pipeline.runtime.observability.log_format import LAST_BRANCH
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.signals import signal_source_unconfigured
+from pipeline.task_runner import run_phase
+
+_FETCH_MISSING = next(phase for phase in PHASES if phase.name == "fetch_missing")
+
+type Channel = Callable[..., PhaseMetrics]
 
 
-def _sync_run_parallel(thunks):
-    return {label: thunk() for label, thunk in thunks.items()}
+def _vide(*_args) -> PhaseMetrics:
+    return PhaseMetrics()
+
+
+class FetchMissingPhase:
+    """Phase `fetch_missing`, chaque canal exécuté par la fonction donnée."""
+
+    def __init__(
+        self,
+        *,
+        fetch_hal_by_id: Channel = _vide,
+        fetch_scanr_by_hal_id: Channel = _vide,
+        fetch_hal_by_nnt: Channel = _vide,
+        fetch_theses_by_nnt: Channel = _vide,
+        fetch_doi_one: Channel = _vide,
+    ) -> None:
+        runs = {
+            "fetch_missing.hal_by_id": fetch_hal_by_id,
+            "fetch_missing.scanr_by_hal_id": fetch_scanr_by_hal_id,
+            "fetch_missing.hal_by_nnt": fetch_hal_by_nnt,
+            "fetch_missing.theses_by_nnt": fetch_theses_by_nnt,
+        }
+
+        def run(name: str) -> Channel:
+            if name in runs:
+                return runs[name]
+            target = name.removeprefix("fetch_missing.doi.")
+            return lambda ctx: fetch_doi_one(ctx, target)
+
+        self.phase: Phase = dataclasses.replace(
+            _FETCH_MISSING,
+            tasks=tuple(dataclasses.replace(t, run=run(t.name)) for t in _FETCH_MISSING.tasks),
+        )
+
+    def run(self, ctx) -> PhaseMetrics:
+        return run_phase(self.phase, ctx)
 
 
 def _non_configuree(source: str) -> PhaseMetrics:
@@ -34,7 +76,6 @@ def test_hal_channels_then_parallel_doi_with_skip(contexte):
         fetch_doi_one=lambda _ctx, source: (
             PhaseMetrics(new=5) if source == "openalex" else _non_configuree(source)
         ),
-        run_parallel=_sync_run_parallel,
     ).run(contexte(mode="full"))
 
     channels = {r["key"] for r in metrics.details["table"]["rows"]}
@@ -57,7 +98,6 @@ def test_nnt_channel_only_in_full_mode(contexte):
         fetch_hal_by_nnt=lambda _ctx: calls.append("nnt") or PhaseMetrics(),
         fetch_theses_by_nnt=lambda _ctx: PhaseMetrics(),
         fetch_doi_one=lambda _ctx, source: PhaseMetrics(),
-        run_parallel=_sync_run_parallel,
     ).run(contexte(mode="daily"))
 
     assert calls == ["id"]  # NNT réservé au mode full
@@ -72,7 +112,6 @@ def _run_doi_only(contexte, fetch_doi_one, caplog) -> str:
             fetch_hal_by_nnt=lambda _ctx: PhaseMetrics(),
             fetch_theses_by_nnt=lambda _ctx: PhaseMetrics(),
             fetch_doi_one=fetch_doi_one,
-            run_parallel=_sync_run_parallel,
         ).run(contexte(mode="daily", sources={"openalex", "crossref"}))
     return caplog.text
 
@@ -114,7 +153,6 @@ def test_les_recherches_par_nnt_sans_rien_a_chercher_ferment_leur_section_une_fo
             fetch_hal_by_nnt=lambda _ctx: PhaseMetrics(),
             fetch_theses_by_nnt=lambda _ctx: PhaseMetrics(),
             fetch_doi_one=lambda _ctx, source: PhaseMetrics(seen=1),
-            run_parallel=_sync_run_parallel,
         ).run(contexte(mode="full", sources={"hal", "theses"}))
 
     messages = caplog.messages
@@ -133,7 +171,6 @@ def test_theses_channel_suit_le_filtre_des_sources(contexte):
             fetch_hal_by_nnt=lambda _ctx: PhaseMetrics(),
             fetch_theses_by_nnt=lambda _ctx: calls.append("theses") or PhaseMetrics(),
             fetch_doi_one=lambda _ctx, source: PhaseMetrics(),
-            run_parallel=_sync_run_parallel,
         )
 
     phase().run(contexte(mode="daily", sources={"openalex"}))
@@ -151,7 +188,6 @@ def test_hal_skipped_when_sources_excludes_it(contexte):
         fetch_hal_by_nnt=lambda _ctx: calls.append("nnt") or PhaseMetrics(),
         fetch_theses_by_nnt=lambda _ctx: PhaseMetrics(),
         fetch_doi_one=lambda _ctx, source: PhaseMetrics(new=3),
-        run_parallel=_sync_run_parallel,
     ).run(contexte(mode="full", sources={"openalex"}))  # HAL hors du filtre : canaux HAL sautés
 
     assert calls == []  # aucun canal HAL
@@ -168,7 +204,6 @@ def test_les_recherches_par_hal_id_partagent_une_section(contexte, caplog):
             fetch_hal_by_nnt=lambda _ctx: PhaseMetrics(),
             fetch_theses_by_nnt=lambda _ctx: PhaseMetrics(),
             fetch_doi_one=lambda _ctx, source: PhaseMetrics(seen=1),
-            run_parallel=_sync_run_parallel,
         )
 
     with caplog.at_level(logging.INFO, logger="test"):
