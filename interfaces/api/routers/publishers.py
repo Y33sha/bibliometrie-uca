@@ -9,7 +9,7 @@ from fastapi.responses import StreamingResponse
 from application.ports.repositories.publisher_repository import PublisherUpdate
 from application.services.publishers import PublisherService
 from domain.merge import MergedEntity
-from domain.publishers.publisher import PUBLISHER_TYPE_LABELS_FR, PUBLISHER_TYPES
+from domain.publishers.publisher import PUBLISHER_TYPE_LABELS_FR, PublisherType
 from infrastructure.read_models.publishers.models import (
     Publisher,
     PublisherFilters,
@@ -41,9 +41,9 @@ router = APIRouter(prefix="/api/publishers", tags=["publishers"])
 def list_publisher_types() -> list[EnumOption]:
     """Liste les valeurs possibles de l'enum `publisher_type` avec leur libellé français.
 
-    Les valeurs viennent de `domain.publishers.publisher.PUBLISHER_TYPES` et `PUBLISHER_TYPE_LABELS_FR`. Un test d'intégration vérifie leur accord avec l'enum SQL. Alimente la liste déroulante de la page d'administration des éditeurs et la colonne « Type » des pages publiques.
+    Les valeurs viennent de `domain.publishers.publisher.PublisherType` et `PUBLISHER_TYPE_LABELS_FR`. Un test d'intégration vérifie leur accord avec l'enum SQL. Alimente la liste déroulante de la page d'administration des éditeurs et la colonne « Type » des pages publiques.
     """
-    return [EnumOption(value=v, label_fr=PUBLISHER_TYPE_LABELS_FR[v]) for v in PUBLISHER_TYPES]
+    return [EnumOption(value=v, label_fr=PUBLISHER_TYPE_LABELS_FR[v]) for v in PublisherType]
 
 
 def publisher_filters(
@@ -59,7 +59,7 @@ def publisher_filters(
     return PublisherFilters(
         search=search,
         publisher_types=parse_vocabulary_csv(
-            publisher_type, allowed=PUBLISHER_TYPES, param="publisher_type"
+            publisher_type, allowed=PublisherType, param="publisher_type"
         ),
         countries=parse_str_csv(country),
         has_publications=has_publications,

@@ -36,7 +36,7 @@ class TotalCountResponse(Model):
 
 
 class EnumOption(Model):
-    """Valeur d'enum pour les listes déroulantes de l'interface (publisher_type, serial_type…) : `{value, label_fr}`. L'ordre vient de la constante du domaine (`domain.publishers.PUBLISHER_TYPES`, par exemple)."""
+    """Valeur d'enum pour les listes déroulantes de l'interface (publisher_type, serial_type…) : `{value, label_fr}`. L'ordre vient de l'énumération du domaine (`domain.publishers.publisher.PublisherType`, par exemple)."""
 
     value: str
     label_fr: str

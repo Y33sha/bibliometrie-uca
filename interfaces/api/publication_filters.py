@@ -8,7 +8,7 @@ from typing import Annotated
 
 from fastapi import Depends, Query
 
-from domain.publications.doc_types import DOC_TYPES
+from domain.publications.doc_types import DocType
 from domain.publications.hal_deposit import HalDepositStatus
 from domain.publications.oa_status import ACCESS_LEVELS, OA_STATUSES
 from domain.source_records.impact import CitationTop
@@ -84,9 +84,9 @@ class PublicationFilterParams:
             source_values=parse_vocabulary_csv(
                 self.source_filter, allowed=SOURCE_FILTER_VALUES, param="source_filter"
             ),
-            doc_types=parse_vocabulary_csv(self.doc_type, allowed=DOC_TYPES, param="doc_type"),
+            doc_types=parse_vocabulary_csv(self.doc_type, allowed=DocType, param="doc_type"),
             excluded_types=parse_vocabulary_csv(
-                self.excluded_doc_type, allowed=DOC_TYPES, param="excluded_doc_type"
+                self.excluded_doc_type, allowed=DocType, param="excluded_doc_type"
             ),
             has_apc=parse_vocabulary_csv(self.has_apc, allowed=TOGGLE_VALUES, param="has_apc"),
             citation_tops=parse_vocabulary_csv(

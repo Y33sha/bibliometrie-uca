@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from domain.publications.doc_types import DOC_TYPES
+from domain.publications.doc_types import DocType
 from domain.source_records.doc_types import _SOURCE_MAPS, map_doc_type
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
@@ -24,8 +24,8 @@ def _read_pg_doc_type_enum() -> set[str]:
 
 class TestDocTypeEnum:
     def test_doc_types_couvre_exactement_l_enum_pg(self):
-        """`DOC_TYPES` a exactement les valeurs de l'enum PostgreSQL `doc_type`."""
-        assert DOC_TYPES == _read_pg_doc_type_enum()
+        """`DocType` a exactement les valeurs de l'enum PostgreSQL `doc_type`."""
+        assert set(DocType) == _read_pg_doc_type_enum()
 
 
 class TestMapDocType:
@@ -170,7 +170,7 @@ _COMMON_TYPES = {
 class TestNomenclaturesDesSources:
     @pytest.mark.parametrize("source", sorted(_SOURCE_MAPS))
     def test_chaque_traduction_est_un_type_du_referentiel(self, source):
-        assert set(_SOURCE_MAPS[source].values()) <= DOC_TYPES
+        assert set(_SOURCE_MAPS[source].values()) <= set(DocType)
 
     @pytest.mark.parametrize(
         ("source", "raw"),

@@ -11,9 +11,9 @@ from domain.serials.containers import conference_paper_share, holds_mostly_confe
 from domain.serials.doi_namespaces import DoiNamespace, namespace_candidates, resolve_serial
 from domain.serials.serial import (
     OA_MODEL_LABELS_FR,
-    OA_MODELS,
     SERIAL_TYPE_LABELS_FR,
-    SERIAL_TYPES,
+    OaModel,
+    SerialType,
 )
 from infrastructure.db.source_record_identifiers import serial_doi_sql
 from infrastructure.read_models._common import (
@@ -389,7 +389,7 @@ class SerialQueries:
                 label=SERIAL_TYPE_LABELS_FR[v],
                 count=jt_counts.get(v, 0),
             )
-            for v in SERIAL_TYPES
+            for v in SerialType
         ]
 
         where_oa, binds_oa = _build_serial_where(filters, skip_oa_models=True)
@@ -409,7 +409,7 @@ class SerialQueries:
                 label=OA_MODEL_LABELS_FR[v],
                 count=oa_counts.get(v, 0),
             )
-            for v in OA_MODELS
+            for v in OaModel
         ]
 
         where_d, binds_d = _build_serial_where(filters, skip_doaj=True)

@@ -10,7 +10,7 @@ from fastapi.responses import StreamingResponse
 
 from application.services.publication_merge import PublicationMergeService
 from domain.merge import MergedEntity
-from domain.publications.doc_types import DOC_TYPE_FAMILIES, DOC_TYPE_LABELS, DOC_TYPES
+from domain.publications.doc_types import DOC_TYPE_FAMILIES, DOC_TYPE_LABELS, DocType
 from domain.publications.licenses import LICENSE_LABELS, License
 from domain.publications.oa_status import ACCESS_LEVELS
 from infrastructure.read_models._common import EntityFacetResponse, EntityKind
@@ -160,7 +160,7 @@ def export_theses_csv(
         source_values=parse_vocabulary_csv(
             source_filter, allowed=SOURCE_FILTER_VALUES, param="source_filter"
         ),
-        doc_types=parse_vocabulary_csv(doc_type, allowed=DOC_TYPES, param="doc_type")
+        doc_types=parse_vocabulary_csv(doc_type, allowed=DocType, param="doc_type")
         or ["thesis", "ongoing_thesis"],
     )
     return csv_response(

@@ -2117,7 +2117,7 @@ export interface paths {
          * List Publisher Types
          * @description Liste les valeurs possibles de l'enum `publisher_type` avec leur libellé français.
          *
-         *     Les valeurs viennent de `domain.publishers.publisher.PUBLISHER_TYPES` et `PUBLISHER_TYPE_LABELS_FR`. Un test d'intégration vérifie leur accord avec l'enum SQL. Alimente la liste déroulante de la page d'administration des éditeurs et la colonne « Type » des pages publiques.
+         *     Les valeurs viennent de `domain.publishers.publisher.PublisherType` et `PUBLISHER_TYPE_LABELS_FR`. Un test d'intégration vérifie leur accord avec l'enum SQL. Alimente la liste déroulante de la page d'administration des éditeurs et la colonne « Type » des pages publiques.
          */
         get: operations["list_publisher_types_api_publishers_types_get"];
         put?: never;
@@ -2299,7 +2299,7 @@ export interface paths {
          * List Oa Models
          * @description Liste les valeurs possibles de `oa_model` avec leur libellé français.
          *
-         *     Les valeurs viennent de `domain.serials.serial.OA_MODELS` et `OA_MODEL_LABELS_FR`. Alimente la facette « Modèle OA » des listes de revues et la liste déroulante de la fenêtre d'édition de l'administration.
+         *     Les valeurs viennent de `domain.serials.serial.OaModel` et `OA_MODEL_LABELS_FR`. Alimente la facette « Modèle OA » des listes de revues et la liste déroulante de la fenêtre d'édition de l'administration.
          */
         get: operations["list_oa_models_api_serials_oa_models_get"];
         put?: never;
@@ -2321,7 +2321,7 @@ export interface paths {
          * List Serial Types
          * @description Liste les valeurs possibles de l'enum `serial_type` avec leur libellé français.
          *
-         *     Les valeurs viennent de `domain.serials.serial.SERIAL_TYPES` et `SERIAL_TYPE_LABELS_FR`. Un test d'intégration vérifie leur accord avec l'enum SQL. Alimente la liste déroulante de la page d'administration des revues et la colonne « Type » des pages publiques.
+         *     Les valeurs viennent de `domain.serials.serial.SerialType` et `SERIAL_TYPE_LABELS_FR`. Un test d'intégration vérifie leur accord avec l'enum SQL. Alimente la liste déroulante de la page d'administration des revues et la colonne « Type » des pages publiques.
          */
         get: operations["list_serial_types_api_serials_types_get"];
         put?: never;
@@ -3642,7 +3642,7 @@ export interface components {
         };
         /**
          * EnumOption
-         * @description Valeur d'enum pour les listes déroulantes de l'interface (publisher_type, serial_type…) : `{value, label_fr}`. L'ordre vient de la constante du domaine (`domain.publishers.PUBLISHER_TYPES`, par exemple).
+         * @description Valeur d'enum pour les listes déroulantes de l'interface (publisher_type, serial_type…) : `{value, label_fr}`. L'ordre vient de l'énumération du domaine (`domain.publishers.publisher.PublisherType`, par exemple).
          */
         EnumOption: {
             /** Value */

@@ -26,10 +26,6 @@ class IssnStatus(StrEnum):
     """ISSN sans notice Sudoc."""
 
 
-ISSN_SUPPORTS = tuple(IssnSupport)
-ISSN_STATUSES = tuple(IssnStatus)
-
-
 @dataclass(frozen=True, slots=True, kw_only=True)
 class SerialIssn:
     """Un ISSN d'une série, tel que la source le donne."""

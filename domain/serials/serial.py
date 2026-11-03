@@ -17,8 +17,6 @@ class SerialType(StrEnum):
     UNKNOWN = "unknown"
 
 
-SERIAL_TYPES: tuple[SerialType, ...] = tuple(SerialType)
-
 # Libellés français des types, servis à l'interface par `/api/serials/types`.
 SERIAL_TYPE_LABELS_FR: dict[SerialType, str] = {
     SerialType.JOURNAL: "Revue",
@@ -38,8 +36,6 @@ class OaModel(StrEnum):
     DIAMOND = "diamond"
     """Revue en open access sans frais de publication : présente dans le DOAJ sans APC ni autres frais, ou marquée à la main."""
 
-
-OA_MODELS: tuple[OaModel, ...] = tuple(OaModel)
 
 # Libellés français des modèles, servis à l'interface par `/api/serials/oa-models`.
 OA_MODEL_LABELS_FR: dict[OaModel, str] = {

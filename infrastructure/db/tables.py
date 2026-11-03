@@ -56,10 +56,10 @@ from domain.publications.doc_types import DocType
 from domain.publications.licenses import License
 from domain.publications.oa_status import OA_RANK
 from domain.publications.relations import RelationType
-from domain.publishers.publisher import PUBLISHER_TYPES
-from domain.serials.issn_facts import ISSN_LINK_TYPES
-from domain.serials.issns import ISSN_STATUSES, ISSN_SUPPORTS
-from domain.serials.serial import OA_MODELS, SERIAL_TYPES
+from domain.publishers.publisher import PublisherType
+from domain.serials.issn_facts import IssnLinkType
+from domain.serials.issns import IssnStatus, IssnSupport
+from domain.serials.serial import OaModel, SerialType
 from domain.source_records.identifiers import (
     SOURCE_IDENTIFIER_ROLE_DEFINITIONS,
     SourceIdentifierRole,
@@ -282,26 +282,18 @@ perimeter_structures = Table(
 
 # Les enums PostgreSQL déclarent leur type côté SQLAlchemy : un paramètre lié prend le type de l'enum (un paramètre VARCHAR échoue), et la lecture reconnaît la valeur.
 # Le domaine déclare le vocabulaire ; `create_type=False` laisse les migrations créer le type. `TestPgEnumsMatchDb` vérifie l'accord des trois.
-structure_type_enum = PgEnum(
-    *(t.value for t in StructureType),
-    name="structure_type",
-    create_type=False,
-)
+structure_type_enum = PgEnum(*StructureType, name="structure_type", create_type=False)
 
-publisher_type_enum = PgEnum(*PUBLISHER_TYPES, name="publisher_type", create_type=False)
+publisher_type_enum = PgEnum(*PublisherType, name="publisher_type", create_type=False)
 
-person_exclusion_enum = PgEnum(
-    *(e.value for e in PersonExclusion),
-    name="person_exclusion",
-    create_type=False,
-)
+person_exclusion_enum = PgEnum(*PersonExclusion, name="person_exclusion", create_type=False)
 
-serial_type_enum = PgEnum(*SERIAL_TYPES, name="serial_type", create_type=False)
+serial_type_enum = PgEnum(*SerialType, name="serial_type", create_type=False)
 
-oa_model_enum = PgEnum(*OA_MODELS, name="oa_model", create_type=False)
-issn_support_enum = PgEnum(*ISSN_SUPPORTS, name="issn_support", create_type=False)
-issn_status_enum = PgEnum(*ISSN_STATUSES, name="issn_status", create_type=False)
-issn_link_type_enum = PgEnum(*ISSN_LINK_TYPES, name="issn_link_type", create_type=False)
+oa_model_enum = PgEnum(*OaModel, name="oa_model", create_type=False)
+issn_support_enum = PgEnum(*IssnSupport, name="issn_support", create_type=False)
+issn_status_enum = PgEnum(*IssnStatus, name="issn_status", create_type=False)
+issn_link_type_enum = PgEnum(*IssnLinkType, name="issn_link_type", create_type=False)
 
 
 structures = Table(
@@ -360,8 +352,8 @@ structure_name_forms = Table(
 )
 
 
-ror_status_enum = PgEnum(*(s.value for s in RorStatus), name="ror_status", create_type=False)
-ror_type_enum = PgEnum(*(t.value for t in RorType), name="ror_type", create_type=False)
+ror_status_enum = PgEnum(*RorStatus, name="ror_status", create_type=False)
+ror_type_enum = PgEnum(*RorType, name="ror_type", create_type=False)
 
 ror_organizations = Table(
     "ror_organizations",
@@ -392,7 +384,7 @@ ror_relations = Table(
 
 
 hal_structure_status_enum = PgEnum(
-    *(s.value for s in HalStructureStatus), name="hal_structure_status", create_type=False
+    *HalStructureStatus, name="hal_structure_status", create_type=False
 )
 
 hal_structures = Table(
@@ -653,11 +645,7 @@ doi_prefixes = Table(
 # ── Enums Postgres communs ────────────────────────────────────────
 
 
-identifier_status_enum = PgEnum(
-    *(s.value for s in AttributionStatus),
-    name="identifier_status",
-    create_type=False,
-)
+identifier_status_enum = PgEnum(*AttributionStatus, name="identifier_status", create_type=False)
 
 # Provenance d'un identifiant : posé par une utilisatrice, ou promu depuis les contributions sources. Seul ce module déclare le vocabulaire.
 identifier_origin_enum = PgEnum(
@@ -1797,11 +1785,7 @@ publication_subjects = Table(
 )
 
 
-relation_type_enum = PgEnum(
-    *(r.value for r in RelationType),
-    name="relation_type",
-    create_type=False,
-)
+relation_type_enum = PgEnum(*RelationType, name="relation_type", create_type=False)
 
 
 # Relations sémantiques entre publications distinctes, du sujet vers l'objet. La cible est une publication du corpus (`target_publication_id`) ou un DOI hors corpus (`target_doi`) : l'unicité `NULLS NOT DISTINCT` dédoublonne sur la colonne renseignée.

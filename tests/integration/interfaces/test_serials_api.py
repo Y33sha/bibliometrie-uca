@@ -605,7 +605,7 @@ class TestOaModels:
         r = client.get("/api/serials/oa-models")
         assert r.status_code == 200
         models = r.json()
-        # Référence : `OA_MODELS` et `OA_MODEL_LABELS_FR` de `domain.serials.journal`.
+        # Référence : `OaModel` et `OA_MODEL_LABELS_FR` de `domain.serials.serial`.
         values = [m["value"] for m in models]
         assert values == ["subscription", "full_oa", "diamond"]
         assert all("label_fr" in m and m["label_fr"] for m in models)

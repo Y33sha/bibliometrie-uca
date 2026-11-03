@@ -6,7 +6,7 @@ from sqlalchemy import Connection, Row, text
 
 from domain.normalize import normalize_text
 from domain.publishers.names import publisher_name_key
-from domain.publishers.publisher import PUBLISHER_TYPE_LABELS_FR, PUBLISHER_TYPES, PublisherType
+from domain.publishers.publisher import PUBLISHER_TYPE_LABELS_FR, PublisherType
 from infrastructure.read_models._common import FacetOption, YesNoCount
 from infrastructure.read_models.csv_export import csv_chunks, fetch_export_rows
 from infrastructure.read_models.publishers.models import (
@@ -186,7 +186,7 @@ class PublisherQueries:
                 label=PUBLISHER_TYPE_LABELS_FR[v],
                 count=pt_counts.get(v, 0),
             )
-            for v in PUBLISHER_TYPES
+            for v in PublisherType
         ]
 
         where_c, binds_c = _build_publisher_where(filters, skip_countries=True)
