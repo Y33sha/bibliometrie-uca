@@ -40,6 +40,11 @@ SOURCE_IDENTIFIER_ROLE_DEFINITIONS: dict[SourceIdentifierRole, str] = {
     SourceIdentifierRole.RELATED: "identifiant d'un document lié.",
 }
 
+STRONG_ROLES: frozenset[SourceIdentifierRole] = frozenset(
+    {SourceIdentifierRole.PRIMARY, SourceIdentifierRole.DERIVED}
+)
+"""Rôles d'un identifiant qui désigne l'enregistrement source lui-même, dans sa source ou dans celle dont il est dérivé."""
+
 # Rang de chaque rôle, du plus fort au plus faible.
 _ROLE_RANK = {role: rank for rank, role in enumerate(SourceIdentifierRole)}
 
@@ -71,17 +76,13 @@ def active(identifiers: Iterable[SourceIdentifier]) -> list[SourceIdentifier]:
 
 
 def own_dois(identifiers: Iterable[SourceIdentifier]) -> set[str]:
-    """Renvoie les DOI propres d'un enregistrement source parmi `identifiers` : ses DOI `primary` ou `derived`, à défaut ses DOI `secondary`."""
+    """Renvoie les DOI propres d'un enregistrement source parmi `identifiers` : ses DOI de rôle fort (`STRONG_ROLES`), à défaut ses DOI `secondary`."""
     dois = [
         i
         for i in identifiers
         if i.id_type is SourceIdentifierType.DOI and i.role is not SourceIdentifierRole.RELATED
     ]
-    strong = {
-        i.value
-        for i in dois
-        if i.role in (SourceIdentifierRole.PRIMARY, SourceIdentifierRole.DERIVED)
-    }
+    strong = {i.value for i in dois if i.role in STRONG_ROLES}
     return strong or {i.value for i in dois}
 
 

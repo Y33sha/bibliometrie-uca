@@ -15,6 +15,7 @@ from domain.publications.scope import MatchabilityFacts
 from domain.serials.doi_namespaces import DoiNamespace
 from domain.source_records.corrections import CORRECTED_BY, RAW, CorrectionKey
 from domain.source_records.identifiers import (
+    STRONG_ROLES,
     SourceIdentifier,
     SourceIdentifierRole,
     SourceIdentifierType,
@@ -56,6 +57,7 @@ from infrastructure.db.tables import source_records
 from infrastructure.sql_fragments import (
     corrected,
     declares_conference_sql,
+    in_clause,
     self_declared_preprint_sql,
     source_extra,
     source_extra_json,
@@ -466,12 +468,12 @@ class SourceRecordCorrectionStore:
         return list(rows.scalars())
 
     def fetch_anchor_dois(self, dois: Iterable[str]) -> frozenset[str]:
-        """Renvoie les DOI de `dois` actifs en rôle `primary` ou `derived` d'un enregistrement source : ancres de la réconciliation."""
+        """Renvoie les DOI de `dois` actifs en rôle fort (`STRONG_ROLES`) d'un enregistrement source : ancres de la réconciliation."""
         rows = self._conn.execute(
             text(f"""
                 SELECT DISTINCT id_value FROM source_record_identifiers
                 WHERE id_type = '{SourceIdentifierType.DOI.value}'
-                  AND role IN ('{SourceIdentifierRole.PRIMARY.value}', '{SourceIdentifierRole.DERIVED.value}')
+                  AND role IN {in_clause(STRONG_ROLES)}
                   AND removed_by IS NULL
                   AND id_value = ANY(:dois)
             """),

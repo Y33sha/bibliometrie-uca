@@ -14,6 +14,7 @@ from dataclasses import dataclass
 
 from domain.platforms.registry import is_deposit_doi
 from domain.source_records.identifiers import (
+    STRONG_ROLES,
     SourceIdentifier,
     SourceIdentifierRole,
     SourceIdentifierType,
@@ -33,8 +34,6 @@ CONFIRMATION_ID_TYPES = (
 # Longueur de titre normalisé, en caractères, en deçà de laquelle un titre est trop générique pour servir de clé.
 # Sert aux clés de confirmation, aux relations et au dédoublonnage HAL ; les requêtes SQL l'interpolent.
 DISCRIMINANT_TITLE_MIN_LENGTH = 30
-
-_STRONG_ROLES = frozenset({SourceIdentifierRole.PRIMARY, SourceIdentifierRole.DERIVED})
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,7 +73,7 @@ def doi_keys(
     for i in active(identifiers):
         if i.id_type is not SourceIdentifierType.DOI or i.role is SourceIdentifierRole.RELATED:
             continue
-        (strong if i.role in _STRONG_ROLES else weak).add(targets.get(i.value, i.value))
+        (strong if i.role in STRONG_ROLES else weak).add(targets.get(i.value, i.value))
     return DoiKeys(frozenset(strong), frozenset(weak - strong), doc_type)
 
 

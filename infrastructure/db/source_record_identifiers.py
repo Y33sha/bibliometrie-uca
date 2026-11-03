@@ -7,12 +7,13 @@ from operator import attrgetter
 from sqlalchemy import Connection, text
 
 from domain.source_records.identifiers import (
+    STRONG_ROLES,
     SourceIdentifier,
     SourceIdentifierRole,
     SourceIdentifierType,
 )
 from domain.sources.registry import AGGREGATOR_SOURCES
-from infrastructure.sql_fragments import case_priority
+from infrastructure.sql_fragments import case_priority, in_clause
 
 
 def first_of_its_type_sql(identifier: str) -> str:
@@ -60,18 +61,18 @@ def serial_doi_sql(identifier: str, source_record: str) -> str:
         identifier: alias SQL de l'identifiant.
         source_record: alias SQL de l'enregistrement source.
     """
-    aggregators = ", ".join(f"'{s.value}'" for s in sorted(AGGREGATOR_SOURCES))
-    strong = f"'{SourceIdentifierRole.PRIMARY}', '{SourceIdentifierRole.DERIVED}'"
+    aggregators = in_clause(AGGREGATOR_SOURCES)
+    strong = in_clause(STRONG_ROLES)
     # noqa S608 : `identifier` et `source_record` sont des alias de la requête hôte, jamais une entrée.
     return (
         f"{identifier}.id_type = '{SourceIdentifierType.DOI}' AND {identifier}.removed_by IS NULL"  # noqa: S608
-        f" AND ({identifier}.role IN ({strong})"
+        f" AND ({identifier}.role IN {strong}"
         f" OR ({identifier}.role = '{SourceIdentifierRole.SECONDARY}'"
-        f" AND {source_record}.source::text NOT IN ({aggregators})"
+        f" AND {source_record}.source::text NOT IN {aggregators}"
         " AND NOT EXISTS (SELECT 1 FROM source_record_identifiers x"
         f" WHERE x.source_record_id = {identifier}.source_record_id"
         f" AND x.id_type = '{SourceIdentifierType.DOI}' AND x.removed_by IS NULL"
-        f" AND x.role IN ({strong}))))"
+        f" AND x.role IN {strong})))"
     )
 
 
