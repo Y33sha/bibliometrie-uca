@@ -1,16 +1,19 @@
-"""`compact_biblio` : données bibliographiques réduites aux valeurs non vides. `parse_pages` : pagination décomposée. `with_journal`, `journal_series` : série de l'enregistrement source dans `biblio.journal`."""
+"""`compact_biblio` : numérotation réduite aux valeurs non vides. `parse_pages` : pagination décomposée. `with_publisher` : éditeur de l'enregistrement source. `with_journal`, `journal_series` : série dans `biblio.journal`. `with_monograph`, `monograph_volume` : volume dans `biblio.monograph`."""
 
 import pytest
 
-from domain.serials.containers import SeriesDescription
+from domain.serials.containers import SeriesDescription, VolumeDescription
 from domain.serials.issns import IssnSupport, SerialIssn
 from domain.serials.serial import OaModel
 from domain.source_records.biblio import (
     PageRange,
     compact_biblio,
     journal_series,
+    monograph_volume,
     parse_pages,
     with_journal,
+    with_monograph,
+    with_publisher,
 )
 
 
@@ -41,13 +44,52 @@ def test_parse_pages(raw, expected):
 
 
 def test_sans_valeur_rien():
-    assert compact_biblio(volume="", publisher=None) is None
+    assert compact_biblio(volume="", issue=None) is None
 
 
 def test_editeur_en_texte_brut():
     """Cas réel : HAL encode l'esperluette du nom d'éditeur."""
-    assert compact_biblio(publisher="TAYLOR &amp; FRANCIS") == {"publisher": "TAYLOR & FRANCIS"}
-    assert compact_biblio(publisher="<br/>") is None
+    assert with_publisher(None, "TAYLOR &amp; FRANCIS", None) == {"publisher": "TAYLOR & FRANCIS"}
+    assert with_publisher(None, "<br/>", None) is None
+
+
+def test_editeur_et_son_identifiant_openalex_remplaces():
+    biblio = {"volume": "12", "publisher": "Ancien", "publisher_openalex_id": "P1"}
+    assert with_publisher(biblio, "Wiley", "P2") == {
+        "volume": "12",
+        "publisher": "Wiley",
+        "publisher_openalex_id": "P2",
+    }
+    assert with_publisher(biblio, None, None) == {"volume": "12"}
+
+
+_VOLUME = VolumeDescription(
+    title="Proceedings of ICBBM 2025",
+    isbns=("9783031123456",),
+    eisbns=("9783031123463",),
+    proceedings=True,
+    year=2025,
+)
+
+
+def test_volume_ecrit_dans_monograph_et_relu():
+    biblio = with_monograph({"volume": "12"}, _VOLUME)
+    assert biblio == {
+        "volume": "12",
+        "monograph": {
+            "title": "Proceedings of ICBBM 2025",
+            "isbns": ["9783031123456"],
+            "eisbns": ["9783031123463"],
+            "proceedings": True,
+            "year": 2025,
+        },
+    }
+    assert monograph_volume(biblio) == _VOLUME
+
+
+def test_volume_absent_retire_monograph():
+    assert with_monograph({"monograph": {"title": "X"}}, None) is None
+    assert monograph_volume({"volume": "12"}) is None
 
 
 _SERIES = SeriesDescription(

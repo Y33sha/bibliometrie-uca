@@ -306,9 +306,6 @@ class TestGetBiblio:
     def test_none_when_all_blank(self):
         assert get_biblio({"volume": "", "issue": "  ", "page": None}) is None
 
-    def test_publisher_extracted(self):
-        assert get_biblio({"publisher": "Elsevier"}) == {"publisher": "Elsevier"}
-
 
 class TestAuthorName:
     def test_given_and_family(self):

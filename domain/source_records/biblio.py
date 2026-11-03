@@ -1,4 +1,4 @@
-"""Données bibliographiques d'un enregistrement source (`source_records.biblio`) : numérotation, éditeur et série, tels que la source les donne. La pagination est décomposée en première et dernière page."""
+"""Données bibliographiques d'un enregistrement source (`source_records.biblio`) : numérotation, éditeur, série et monographie, tels que la source les donne. La pagination est décomposée en première et dernière page."""
 
 import re
 from collections.abc import Mapping
@@ -6,7 +6,7 @@ from enum import StrEnum
 from typing import NamedTuple
 
 from domain.normalize import to_plain_text
-from domain.serials.containers import SeriesDescription
+from domain.serials.containers import SeriesDescription, VolumeDescription
 from domain.serials.issns import IssnSupport, SerialIssn
 from domain.serials.serial import OaModel
 from domain.types import JsonValue
@@ -22,8 +22,12 @@ class BiblioKey(StrEnum):
     ARTICLE_NUMBER = "article_number"
     PUBLISHER = "publisher"
     """Nom de l'éditeur."""
+    PUBLISHER_OPENALEX_ID = "publisher_openalex_id"
+    """Identifiant OpenAlex de l'éditeur."""
     JOURNAL = "journal"
     """Série qui sert au rattachement de l'enregistrement source à sa revue, clés `JournalKey`."""
+    MONOGRAPH = "monograph"
+    """Livre ou volume d'actes qui sert au rattachement de l'enregistrement source à sa monographie, clés `MonographKey`."""
 
 
 class JournalKey(StrEnum):
@@ -34,6 +38,17 @@ class JournalKey(StrEnum):
     """Liste d'ISSN, clés `IssnKey`."""
     OPENALEX_ID = "openalex_id"
     OA_MODEL = "oa_model"
+
+
+class MonographKey(StrEnum):
+    """Clé de `biblio.monograph`."""
+
+    TITLE = "title"
+    ISBNS = "isbns"
+    EISBNS = "eisbns"
+    PROCEEDINGS = "proceedings"
+    """Vrai pour un volume d'actes."""
+    YEAR = "year"
 
 
 class IssnKey(StrEnum):
@@ -75,16 +90,71 @@ def _journal_biblio(series: SeriesDescription) -> dict[str, JsonValue] | None:
     return journal or None
 
 
+def _monograph_biblio(volume: VolumeDescription) -> dict[str, JsonValue] | None:
+    """Construit `biblio.monograph` d'après un volume, réduit aux valeurs non vides ; `None` sans aucune valeur."""
+    monograph: dict[str, JsonValue] = {
+        key: value
+        for key, value in (
+            (MonographKey.TITLE, volume.title),
+            (MonographKey.ISBNS, list(volume.isbns)),
+            (MonographKey.EISBNS, list(volume.eisbns)),
+            (MonographKey.PROCEEDINGS, volume.proceedings),
+            (MonographKey.YEAR, volume.year),
+        )
+        if value
+    }
+    return monograph or None
+
+
+def _with_entry(biblio: JsonValue, key: BiblioKey, value: JsonValue) -> dict[str, JsonValue] | None:
+    """Renvoie `biblio` dont l'entrée `key` est remplacée par `value`, retirée si `value` est vide ; `None` sans aucune valeur."""
+    entries = biblio.items() if isinstance(biblio, Mapping) else ()
+    result = {k: v for k, v in entries if k != key}
+    if value:
+        result[key] = value
+    return result or None
+
+
 def with_journal(
     biblio: JsonValue, series: SeriesDescription | None
 ) -> dict[str, JsonValue] | None:
     """Renvoie `biblio` dont la série est remplacée par `series` ; `None` sans aucune valeur."""
-    entries = biblio.items() if isinstance(biblio, Mapping) else ()
-    result = {key: value for key, value in entries if key != BiblioKey.JOURNAL}
-    journal = _journal_biblio(series) if series else None
-    if journal:
-        result[BiblioKey.JOURNAL] = journal
-    return result or None
+    return _with_entry(biblio, BiblioKey.JOURNAL, _journal_biblio(series) if series else None)
+
+
+def with_monograph(
+    biblio: JsonValue, volume: VolumeDescription | None
+) -> dict[str, JsonValue] | None:
+    """Renvoie `biblio` dont la monographie est remplacée par `volume` ; `None` sans aucune valeur."""
+    return _with_entry(biblio, BiblioKey.MONOGRAPH, _monograph_biblio(volume) if volume else None)
+
+
+def with_publisher(
+    biblio: JsonValue, name: str | None, openalex_id: str | None
+) -> dict[str, JsonValue] | None:
+    """Renvoie `biblio` dont le nom et l'identifiant OpenAlex de l'éditeur sont remplacés ; `None` sans aucune valeur. Le nom est mis en texte brut (`to_plain_text`)."""
+    named = _with_entry(biblio, BiblioKey.PUBLISHER, to_plain_text(name))
+    return _with_entry(named, BiblioKey.PUBLISHER_OPENALEX_ID, openalex_id)
+
+
+def monograph_volume(biblio: Mapping[str, object] | None) -> VolumeDescription | None:
+    """Renvoie le volume décrit par `biblio.monograph`, ou `None` sans monographie."""
+    monograph = (biblio or {}).get(BiblioKey.MONOGRAPH)
+    if not isinstance(monograph, Mapping):
+        return None
+    title = monograph.get(MonographKey.TITLE)
+    year = monograph.get(MonographKey.YEAR)
+    return VolumeDescription(
+        title=str(title) if title else None,
+        isbns=tuple(_strings(monograph.get(MonographKey.ISBNS))),
+        eisbns=tuple(_strings(monograph.get(MonographKey.EISBNS))),
+        proceedings=bool(monograph.get(MonographKey.PROCEEDINGS)),
+        year=year if isinstance(year, int) else None,
+    )
+
+
+def _strings(value: object) -> list[str]:
+    return [str(v) for v in value] if isinstance(value, list) else []
 
 
 def journal_series(biblio: Mapping[str, object] | None) -> SeriesDescription | None:
@@ -152,9 +222,8 @@ def compact_biblio(
     first_page: str | None = None,
     last_page: str | None = None,
     article_number: str | None = None,
-    publisher: str | None = None,
 ) -> dict[str, JsonValue] | None:
-    """Construit `biblio` réduit aux valeurs non vides, sans série ; `None` sans aucune valeur. Le nom de l'éditeur est mis en texte brut (`to_plain_text`). La normalisation ajoute la série (`with_journal`)."""
+    """Construit la numérotation de `biblio`, réduite aux valeurs non vides ; `None` sans aucune valeur. La normalisation ajoute l'éditeur, la série et la monographie (`with_publisher`, `with_journal`, `with_monograph`)."""
     biblio: dict[str, JsonValue] = {
         key: value
         for key, value in (
@@ -163,7 +232,6 @@ def compact_biblio(
             (BiblioKey.FIRST_PAGE, first_page),
             (BiblioKey.LAST_PAGE, last_page),
             (BiblioKey.ARTICLE_NUMBER, article_number),
-            (BiblioKey.PUBLISHER, to_plain_text(publisher)),
         )
         if value
     }

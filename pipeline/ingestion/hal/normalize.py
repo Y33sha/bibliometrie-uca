@@ -198,13 +198,10 @@ def hal_source_record(
 
     keywords = parse_tei_keywords(hal_text_field(doc.get("label_xml"))) or None
 
-    # Éditeur nommé par HAL.
     biblio_json = compact_biblio(
         volume=hal_text_field(doc.get("volume_s")),
         issue=hal_text_field(doc.get("issue_s")),
         **page_range(hal_text_field(doc.get("page_s")), doc_type)._asdict(),
-        publisher=hal_text_field(doc.get("journalPublisher_s"))
-        or hal_text_field(doc.get("publisher_s")),
     )
 
     uri = hal_text_field(doc.get("uri_s"))

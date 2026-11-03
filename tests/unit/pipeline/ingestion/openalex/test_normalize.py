@@ -544,37 +544,6 @@ class TestOpenalexSourceRecord:
         captured = self._call(work)
         assert identifier_values(captured)["doi"] == ["10.1/primary"]
 
-    def test_biblio_publisher_from_primary_location(self):
-        work = {
-            "id": "https://openalex.org/W1",
-            "primary_location": {
-                "source": {
-                    "host_organization_name": "Elsevier",
-                    "display_name": "Journal of Physics",
-                    "id": "https://openalex.org/S123",
-                    "issn": ["0022-3727", "1361-6463"],
-                    "issn_l": "0022-3727",
-                }
-            },
-        }
-        captured = self._call(work)
-        assert captured.biblio == {"publisher": "Elsevier"}
-
-    def test_biblio_skipped_when_primary_is_repository(self):
-        """Un entrepôt héberge le work sans le publier : ni éditeur ni revue dans biblio."""
-        work = {
-            "id": "https://openalex.org/W1",
-            "primary_location": {
-                "source": {
-                    "type": "repository",
-                    "display_name": "Zenodo",
-                    "host_organization_name": "CERN",
-                }
-            },
-        }
-        captured = self._call(work)
-        assert captured.biblio is None
-
     def test_ebook_platform_names_publisher_only(self):
         """Une plateforme d'ebooks donne l'éditeur, pas la revue."""
         work = {
@@ -588,8 +557,9 @@ class TestOpenalexSourceRecord:
                 }
             },
         }
-        captured = self._call(work)
-        assert captured.biblio == {"publisher": "École normale supérieure Editions"}
+        norm = _make_normalizer()
+        assert norm.publisher(work) == PublisherFacts("École normale supérieure Editions", None)
+        assert norm.container_facts(work) is None
 
     def test_theses_fr_nnt_passed_through_to_identifiers(self):
         """Le NNT d'une localisation principale theses.fr figure parmi les identifiants."""

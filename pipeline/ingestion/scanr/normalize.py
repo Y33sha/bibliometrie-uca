@@ -13,7 +13,6 @@ from domain.publications.identifiers import HALId
 from domain.publications.licenses import normalize_license
 from domain.serials.containers import ContainerDescription
 from domain.serials.issns import source_issns
-from domain.source_records.biblio import compact_biblio
 from domain.source_records.doc_types import map_doc_type
 from domain.source_records.identifiers import (
     SourceIdentifier,
@@ -206,9 +205,7 @@ def scanr_source_record(  # noqa: C901
             seen.add(u)
             urls.append(u)
 
-    # Éditeur nommé par ScanR.
     source = as_mapping(doc.get("source"))
-    biblio_json = compact_biblio(publisher=as_str(source.get("publisher")))
 
     return SourceRecordUpsert(
         source="scanr",
@@ -222,7 +219,6 @@ def scanr_source_record(  # noqa: C901
             as_str(source.get("title")) if not (containers.has_series or is_thesis(doc)) else None
         ),
         raw_language=None,
-        biblio=biblio_json,
         abstract=abstract,
         keywords=keywords,
         license=normalize_license(publisher_license),

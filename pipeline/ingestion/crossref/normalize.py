@@ -164,14 +164,13 @@ def page_range(page: str | None, article_number: str | None) -> PageRange:
 
 
 def get_biblio(msg: Mapping[str, JsonValue]) -> dict[str, JsonValue] | None:
-    """Renvoie volume, numéro, pages et numéro d'article, avec l'éditeur nommé par Crossref."""
+    """Renvoie volume, numéro, pages et numéro d'article."""
     article_number = as_text(msg.get("article-number"))
     return compact_biblio(
         volume=as_text(msg.get("volume")),
         issue=as_text(msg.get("issue")),
         **page_range(as_text(msg.get("page")), article_number)._asdict(),
         article_number=article_number,
-        publisher=get_publisher_name(msg),
     )
 
 

@@ -288,17 +288,12 @@ def openalex_source_record(  # noqa: C901
 
     is_retracted = bool(work.get("is_retracted"))
 
-    # Numérotation et éditeur nommés par OpenAlex.
-    # Éditeur écarté pour une localisation principale hébergeant le work sans le publier (HAL, theses.fr, Zenodo…).
     raw_biblio = as_mapping(work.get("biblio"))
-    primary_source = as_mapping(as_mapping(work.get("primary_location")).get("source"))
-    publisher_source = primary_source if names_publisher(primary) else {}
     biblio_json = compact_biblio(
         volume=as_str(raw_biblio.get("volume")),
         issue=as_str(raw_biblio.get("issue")),
         first_page=as_str(raw_biblio.get("first_page")),
         last_page=as_str(raw_biblio.get("last_page")),
-        publisher=as_str(publisher_source.get("host_organization_name")),
     )
 
     abstract = reconstruct_abstract(as_mapping(work.get("abstract_inverted_index")))

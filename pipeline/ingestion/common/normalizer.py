@@ -23,7 +23,7 @@ from domain.serials.containers import (
     VolumeDescription,
     determine_container_type,
 )
-from domain.source_records.biblio import with_journal
+from domain.source_records.biblio import with_journal, with_monograph, with_publisher
 from domain.subjects.subject import SubjectLink
 from domain.types import JsonValue
 from infrastructure.db.savepoint import rollback_unless_invalidated, savepoint
@@ -196,11 +196,16 @@ class SourceNormalizer(ABC):
             series, volume, publisher_id=publisher_id, monographs=self._monograph_store
         )
         record = self.source_record(row, doc, containers)
+        biblio = with_publisher(
+            record.biblio,
+            publisher.name if publisher else None,
+            publisher.openalex_id if publisher else None,
+        )
         record = replace(
             record,
             publication_date=self.publication_date(doc),
             publisher_id=publisher_id,
-            biblio=with_journal(record.biblio, series),
+            biblio=with_monograph(with_journal(biblio, series), volume),
         )
         source_record_id = self._record_store.upsert_source_record(
             record, has_series=containers.has_series

@@ -86,14 +86,13 @@ def get_container_facts(attributes: Mapping[str, JsonValue]) -> ContainerDescrip
 
 
 def get_biblio(attributes: Mapping[str, JsonValue]) -> dict[str, JsonValue] | None:
-    """Renvoie volume, numéro et pages du conteneur, avec l'éditeur nommé par DataCite."""
+    """Renvoie volume, numéro et pages du conteneur."""
     container = as_mapping(attributes.get("container"))
     return compact_biblio(
         volume=as_text(container.get("volume")),
         issue=as_text(container.get("issue")),
         first_page=as_text(container.get("firstPage")),
         last_page=as_text(container.get("lastPage")),
-        publisher=get_publisher_name(attributes),
     )
 
 

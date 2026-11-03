@@ -236,14 +236,12 @@ def extract_from_api(raw: Mapping[str, JsonValue], staging_doi: str | None) -> d
     if lang_list:
         language = as_str(as_mapping(lang_list[0]).get("content")) or as_str(lang_list[0])
 
-    # Numérotation et éditeur nommés par WoS.
     page = at_path(publication_info, "page")
     biblio = compact_biblio(
         volume=_text_of(publication_info.get("vol")),
         issue=_text_of(publication_info.get("issue")),
         first_page=_text_of(page.get("begin")),
         last_page=_text_of(page.get("end")),
-        publisher=publisher_name,
     )
 
     frm = at_path(static, "fullrecord_metadata")
@@ -337,7 +335,6 @@ def extract_from_export(
         issue=field("IS"),
         first_page=field("BP"),
         last_page=field("EP"),
-        publisher=field("PU"),
     )
     doc_types = split_export_list(field("DT"))
     languages = split_export_list(field("LA"))

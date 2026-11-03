@@ -47,19 +47,6 @@ class TestScanrSourceRecordLicense:
         assert captured.source_extras == {"license": authorisation}
 
 
-class TestScanrSourceRecordBiblio:
-    def _call(self, doc) -> SourceRecordUpsert:
-        return scanr_source_record(doc, staging_id=1, scanr_id="sc-1", containers=_NO_CONTAINERS)
-
-    def test_biblio_none_when_no_source_fields(self):
-        captured = self._call({})
-        assert captured.biblio is None
-
-    def test_biblio_publisher_only(self):
-        captured = self._call({"source": {"publisher": "Elsevier"}})
-        assert captured.biblio == {"publisher": "Elsevier"}
-
-
 class TestScanrSourceRecordExternalIds:
     def _call(self, doc) -> SourceRecordUpsert:
         return scanr_source_record(doc, staging_id=1, scanr_id="sc-1", containers=_NO_CONTAINERS)
@@ -264,7 +251,7 @@ class TestThese:
     def test_ni_titre_de_conteneur_ni_revue_dans_la_biblio(self):
         captured = scanr_source_record(self._DOC, 1, "nnt2023clfac001", _NO_CONTAINERS)
         assert captured.container_title is None
-        assert captured.biblio == {"publisher": "ABES"}
+        assert captured.biblio is None
 
 
 class TestScanrSourceRecordMetadonnees:

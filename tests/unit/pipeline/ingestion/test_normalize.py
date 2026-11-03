@@ -441,7 +441,15 @@ class TestNormalizeRecord:
         ]
         assert norm.containers_seen == [Containers(True, None)]
         norm._record_store.upsert_source_record.assert_called_once_with(
-            replace(_RECORD, publisher_id=5, biblio={"journal": {"title": "Revue"}}),
+            replace(
+                _RECORD,
+                publisher_id=5,
+                biblio={
+                    "publisher": "Elsevier",
+                    "publisher_openalex_id": "P1",
+                    "journal": {"title": "Revue"},
+                },
+            ),
             has_series=True,
         )
         norm._location_store.replace_locations.assert_called_once_with(42, [])
