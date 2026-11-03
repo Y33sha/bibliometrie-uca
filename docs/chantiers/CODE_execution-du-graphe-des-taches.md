@@ -1,8 +1,13 @@
-# Ordonnancement par source et normalisation au fil de l'eau
+# Exécution du graphe des tâches
 
 ## Contexte
 
-Le pipeline exécute ses phases l'une après l'autre. Dans une phase d'acquisition, les sources s'exécutent en parallèle, et la phase attend la plus lente. La source la plus lente change d'une phase à l'autre : ScanR pour `harvest`, Crossref pour `harvest_by_person`. La normalisation attend la fin de toute l'acquisition.
+L'orchestration du pipeline mêle deux modèles. Le graphe (`pipeline/graph.py`) décrit les tâches, leurs lectures et leurs écritures. Les phases exécutent leurs tâches elles-mêmes, une classe par phase, par `run_tasks`. D'où :
+
+- Une tâche est déclarée deux fois, reliées par son nom : lectures, écritures et API dans le graphe (`Task`), fonction et affichage dans sa phase (`TaskStep`). `run_tasks` vérifie à l'exécution la concordance des deux.
+- Une phase est déclarée à six endroits : `TASKS`, `PHASE_LABELS`, `EXTRA_PHASES`, `HARVESTING_PHASES`, `_PHASE_BUILDERS`, `_LABEL_FIELDS`. Trois vérifications au chargement les gardent cohérents.
+- Chaque phase a sa classe et sa fonction `build()`, qui appellent `run_tasks` et injectent des fonctions à implémentation unique.
+- Les lectures et écritures déclarées servent seulement à un test d'ordre ; l'ordre d'exécution est celui de la liste.
 
 Durées médianes des runs `full` sur huit semaines :
 
@@ -14,9 +19,7 @@ Durées médianes des runs `full` sur huit semaines :
 - `fetch_truncated` (OpenAlex) : 1,3 minute ;
 - normalisation : 4,7 minutes, 23 minutes au 9e décile.
 
-Les dépendances du graphe relient seulement les tâches d'acquisition d'une même source, par `staging`. Chaque tâche réseau déclare son API (`network`). `staging` sert de file d'attente : une ligne à l'empreinte modifiée repasse à `processed = FALSE`.
-
-Constats :
+Constats sur la normalisation :
 
 - La normalisation vide `raw_data` sans vérifier que la ligne est inchangée depuis sa lecture. Une réécriture concurrente serait effacée.
 - La normalisation traite aussi les documents marqués tronqués. Seul l'ordre des phases garantit leur complément avant la normalisation.
@@ -24,22 +27,22 @@ Constats :
 
 ## Décisions
 
-- **Orchestrateur maison.** Un ordonnanceur topologique (`graphlib`) et la contrainte « une tâche à la fois par API » suffisent.
-- **Une file par API.** Une tâche démarre dès que ses dépendances sont satisfaites et que son API est libre.
-- **Normalisation au fil de l'eau.** Elle consomme `staging` par lots, toutes sources confondues, pendant l'acquisition.
+- **Une déclaration par tâche, dans le graphe.** Elle contient les lectures, les écritures, l'API, la fonction et l'affichage de la tâche.
+- **L'orchestrateur exécute le graphe**, dans l'ordre de la liste des tâches. Les lectures et écritures déclarées vérifient cet ordre. Les classes de phase, leurs `build()` et la vérification de concordance disparaissent.
+- **Une phase est un groupe de tâches**, déclaré une fois : nom, libellé, enrichissement ou non, bilan. Elle sert à `--only`, `--from`, au journal et à l'enregistrement des exécutions.
+- **Orchestrateur maison.**
 - **File de normalisation sur le modèle des files `*_queue`** (`infrastructure/db/queues.py`) : relevé des couples `(id, seq)` au début, suppression de ces seuls couples à la fin. Elle remplace `staging.processed`.
 - `raw_data` se vide seulement si `raw_hash` égale l'empreinte lue.
 - Un document tronqué entre dans la file une fois complété.
 - **Normalisation indépendante de l'ordre.** Une entité garde la forme de sa création. Le rattachement des enregistrements sources suivants est juste quel que soit l'ordre. L'ordre d'autorité des sources vaut pour les métadonnées de publication.
-- **Le journal s'adapte au pipeline.** Les barres d'avancement de chaque file restent en direct. Le bilan de chaque tâche s'écrit d'un bloc à sa fin.
-- **Les phases d'acquisition restent des noms de groupes de tâches**, pour `--only`, `--from` et le journal. L'ordonnancement les ignore.
+- **Exécution simultanée par API reportée.** Gain mesuré sur l'acquisition : environ 90 s.
 
 ## Phasage
 
 ### Phase 1 — Mesures
 
 - [x] Durée de chaque tâche enregistrée dans `pipeline_phase_executions.metrics` (`task_durations_s`).
-- [x] Durée des files par API. Premier run `full` mesuré : acquisition de 500 s phase après phase ; file la plus longue DataCite, 411 s, dont 375 s de `harvest_by_person` ; Crossref 387 s, dont 381 s de `harvest_by_person` ; OpenAlex 166 s. Gain de l'ordonnancement par API sur l'acquisition : environ 90 s. Normalisation des documents de ce run : 14 s. À confirmer sur plusieurs runs.
+- [x] Durée des files par API. Premier run `full` mesuré : acquisition de 500 s phase après phase ; file la plus longue DataCite, 411 s, dont 375 s de `harvest_by_person` ; Crossref 387 s, dont 381 s de `harvest_by_person` ; OpenAlex 166 s. Gain de l'exécution simultanée par API sur l'acquisition : environ 90 s. Normalisation des documents de ce run : 14 s.
 
 ### Phase 2 — Normalisation indépendante de l'ordre
 
@@ -65,23 +68,14 @@ Constats :
 - [x] Vidage de `raw_data` conditionné à l'empreinte lue.
 - [x] Mise à jour du hook `renormalisation_guard`.
 
-### Phase 4 — Ordonnancement par API
+### Phase 4 — Graphe exécuté par l'orchestrateur
 
-- [ ] Ordonnanceur topologique sur les dépendances du graphe, une tâche à la fois par API.
-- [ ] Normalisation par lots, toutes sources confondues, pendant l'acquisition. Suppression des documents disparus, des orphelins et `VACUUM` après la fin de l'acquisition.
-- [ ] `--only` et `--from` sur les groupes de tâches.
-- [ ] Enregistrement des exécutions de phases chevauchantes, page des runs comprise.
+- [ ] Conception : déclaration d'une tâche et d'une phase, points d'extension des phases (conditions, bilans), journal.
+- [ ] Une déclaration par tâche, dans le graphe ; suppression de `TaskStep` et de la vérification de concordance.
+- [ ] Une déclaration par phase : libellé, enrichissement, bilan ; suppression de `PHASE_LABELS`, `EXTRA_PHASES`, `HARVESTING_PHASES`, `_PHASE_BUILDERS`, `_LABEL_FIELDS`.
+- [ ] Exécution du graphe par l'orchestrateur ; suppression des classes de phase et de leurs `build()`.
+- [ ] `--only`, `--from` et enregistrement des exécutions par phase.
 
-### Phase 5 — Journal
-
-- [ ] Barres d'avancement par file, bilan de chaque tâche écrit à sa fin.
-
-### Phase 6 — Documentation
+### Phase 5 — Documentation
 
 - [ ] Mise à jour de `docs/pipeline/` et de la liste des phases du `CLAUDE.md`.
-
-## Questions ouvertes
-
-- `fetch_missing` lit des enregistrements sources en partie mis à jour par le run en cours. Un document est trouvé dès ce run ou au suivant, selon le moment d'exécution de chaque tâche.
-- Effet de la normalisation concurrente sur la durée de l'acquisition : charge de la base, processeur.
-- Une tâche est déclarée en deux moitiés reliées par son nom : lectures, écritures et API dans le graphe (`Task`), fonction et affichage dans sa phase (`TaskStep`).
