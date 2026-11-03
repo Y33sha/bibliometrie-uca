@@ -32,9 +32,9 @@ def _keys(identifiers=(), doc_type=None, title_normalized=None, publication_year
     )
 
 
-def _none(**overrides):
-    keys = dict.fromkeys(("nnt", "pmid", "arxiv_id", "hal_id", "metadata_block"))
-    return ConfirmationKeys(**{"doi": DoiKeys(), **keys, **overrides})
+def _block(keys: ConfirmationKeys) -> str | None:
+    """Renvoie le bloc de métadonnées des clés, `None` sans bloc."""
+    return keys.single_valued.get("metadata_block")
 
 
 class TestDoi:
@@ -109,7 +109,9 @@ class TestIdentifiers:
             SourceIdentifier(T.ARXIV_ID, "2301.12345", R.DERIVED),
             SourceIdentifier(T.ISBN, "9780306406157", R.SECONDARY),
         ]
-        assert _keys(identifiers) == _none(nnt="2021CLFAC030", pmid="12345", arxiv_id="2301.12345")
+        assert _keys(identifiers) == ConfirmationKeys(
+            DoiKeys(), {"nnt": "2021CLFAC030", "pmid": "12345", "arxiv_id": "2301.12345"}
+        )
 
     def test_strongest_role_then_smallest_value(self):
         """La clé HAL est le `hal_id` dérivé ; à rôle égal, la plus petite valeur. Les autres ne relient rien."""
@@ -120,7 +122,7 @@ class TestIdentifiers:
             SourceIdentifier(T.PMID, "1", R.SECONDARY),
         ]
         keys = _keys(identifiers)
-        assert (keys.hal_id, keys.pmid) == ("hal-04123456", "1")
+        assert (keys.single_valued["hal_id"], keys.single_valued["pmid"]) == ("hal-04123456", "1")
         assert ("hal_id", "hal-00000001") not in keys.tokens()
 
     def test_removed_identifier_is_no_key(self):
@@ -128,7 +130,7 @@ class TestIdentifiers:
             SourceIdentifier(T.HAL_ID, "hal-04123456", R.PRIMARY, "HAL_DEPOSIT_MISSING_TO_REMOVED"),
             SourceIdentifier(T.HAL_ID, "hal-00000001", R.SECONDARY),
         ]
-        assert _keys(identifiers).hal_id == "hal-00000001"
+        assert _keys(identifiers).single_valued["hal_id"] == "hal-00000001"
 
 
 class TestMetadataBlock:
@@ -138,49 +140,50 @@ class TestMetadataBlock:
         """Un titre long et une année donnent le token `<doc_type>|<title>|<year>`, quel que soit le type de document, thèse comprise."""
         for dt in ("conference_paper", "book_chapter", "article", "thesis", "report"):
             keys = _keys(doc_type=dt, title_normalized=self.LONG, publication_year=2020)
-            assert keys.metadata_block == f"{dt}|{self.LONG}|2020"
+            assert _block(keys) == f"{dt}|{self.LONG}|2020"
 
     def test_doc_type_in_key_separates_types(self):
         """Un même titre et une même année donnent deux clés différentes pour deux types de document."""
         article = _keys(doc_type="article", title_normalized=self.LONG, publication_year=2020)
         chapter = _keys(doc_type="book_chapter", title_normalized=self.LONG, publication_year=2020)
-        assert article.metadata_block != chapter.metadata_block
+        assert _block(article) != _block(chapter)
 
     def test_short_title_no_token(self):
         """Un titre court ne donne aucun token : les titres génériques sont écartés."""
         keys = _keys(
             doc_type="conference_paper", title_normalized="court titre", publication_year=2020
         )
-        assert keys.metadata_block is None
+        assert _block(keys) is None
 
     def test_title_at_the_threshold_no_token(self):
         seuil = "a" * DISCRIMINANT_TITLE_MIN_LENGTH
         assert (
-            _keys(doc_type="article", title_normalized=seuil, publication_year=2020).metadata_block
-            is None
+            _block(_keys(doc_type="article", title_normalized=seuil, publication_year=2020)) is None
         )
-        assert _keys(
-            doc_type="article", title_normalized=seuil + "b", publication_year=2020
-        ).metadata_block
+        assert _block(
+            _keys(doc_type="article", title_normalized=seuil + "b", publication_year=2020)
+        )
 
     def test_no_doc_type_no_token(self):
         keys = _keys(doc_type=None, title_normalized=self.LONG, publication_year=2020)
-        assert keys.metadata_block is None
+        assert _block(keys) is None
 
     def test_without_year_no_token(self):
         keys = _keys(doc_type="poster", title_normalized=self.LONG, publication_year=None)
-        assert keys.metadata_block is None
+        assert _block(keys) is None
 
 
 class TestTokens:
     def test_tokens_namespaced_by_type(self):
-        keys = _none(
-            doi=DoiKeys(frozenset({"d"}), frozenset({"e"})),
-            nnt="n",
-            pmid="p",
-            arxiv_id="a",
-            hal_id="h1",
-            metadata_block="conference_paper|titre|2020",
+        keys = ConfirmationKeys(
+            DoiKeys(frozenset({"d"}), frozenset({"e"})),
+            {
+                "nnt": "n",
+                "pmid": "p",
+                "arxiv_id": "a",
+                "hal_id": "h1",
+                "metadata_block": "conference_paper|titre|2020",
+            },
         )
         assert keys.tokens() == frozenset(
             {
@@ -195,10 +198,10 @@ class TestTokens:
         )
 
     def test_absent_keys_produce_no_token(self):
-        assert _none(doi=DoiKeys(frozenset({"d"}))).tokens() == frozenset({("doi", "d")})
+        assert ConfirmationKeys(DoiKeys(frozenset({"d"})), {}).tokens() == frozenset({("doi", "d")})
 
     def test_no_keys_empty_token_set(self):
-        assert _none().tokens() == frozenset()
+        assert ConfirmationKeys(DoiKeys(), {}).tokens() == frozenset()
 
 
 def test_derivation_lit_les_identifiants_primaires_et_l_identifiant_derive_actifs():

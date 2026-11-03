@@ -41,7 +41,7 @@ class DocType(StrEnum):
 
 DOC_TYPES: frozenset[str] = frozenset(DocType)
 
-# Sous-types d'article, qui l'emportent sur `article` à l'agrégation (`arbitrate_doc_type_with_article_subtype`).
+# Sous-types d'article, qui l'emportent sur `article` à l'agrégation (`refresh_from_sources`).
 ARTICLE_SUBTYPES: frozenset[str] = frozenset(
     {
         DocType.REVIEW,

@@ -118,7 +118,7 @@ def initials_extend(initials: tuple[str, ...], first_name: str) -> bool:
 
 
 def full_first_name_extends(initials: tuple[str, ...], first_name: str) -> bool:
-    """Vrai si `first_name` est un prénom plein commencé par `initials` (`initials_extend`) : (« a »,) et « Abdellah », mais ni « A. B. » ni un prénom vide."""
+    """Vrai si `first_name` est un prénom plein commencé par `initials` (`initials_extend`) : (« a »,) et « Abdellah », mais ni « A. B. » ni un prénom vide. Plein s'entend au sens de `first_name_initials` : deux ou trois capitales accolées (« JP ») comptent comme des initiales."""
     return first_name_initials(first_name) is None and initials_extend(initials, first_name)
 
 

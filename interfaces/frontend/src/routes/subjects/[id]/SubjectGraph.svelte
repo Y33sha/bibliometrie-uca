@@ -1,7 +1,16 @@
 <script lang="ts">
   import { resolve } from "$app/paths";
   import type { components } from "#lib/api/schema.js";
-  import { CX, CY, subjectGraphLayout, type GraphNode } from "./subjectGraphLayout";
+  import {
+    CENTER_LABEL_SIZE,
+    CX,
+    CY,
+    LABEL_FLOOR,
+    LABEL_SIZE,
+    LINE_HEIGHT,
+    subjectGraphLayout,
+    type GraphNode,
+  } from "./subjectGraphLayout";
   import { specificityPercent } from "./specificity";
 
   type SubjectListItem = components["schemas"]["SubjectListItem"];
@@ -19,83 +28,111 @@
     links: SubjectNeighborLink[];
   } = $props();
 
-  const layout = $derived(subjectGraphLayout(subject, neighbors, links));
+  const layoutFor = $derived(subjectGraphLayout(subject, neighbors, links));
+  // Largeur disponible dans la page, connue une fois le conteneur affiché.
+  let width = $state(0);
+  const layout = $derived(width > 0 ? layoutFor(width) : null);
+  // En deçà de cette largeur, les libellés passeraient sous la taille minimale : le graphe défile horizontalement.
+  const minWidth = $derived(layout ? (layout.box.width * LABEL_FLOOR) / LABEL_SIZE : 0);
+  const overflowing = $derived(minWidth > width);
+
+  let scroller = $state<HTMLDivElement>();
+  // Le défilement horizontal part du centre du graphe.
+  $effect(() => {
+    if (overflowing && scroller) scroller.scrollLeft = (scroller.scrollWidth - scroller.clientWidth) / 2;
+  });
 
   // Brut : comparé par identité aux nœuds du placement, il ne doit pas être enveloppé dans un proxy.
   let hovered = $state.raw<GraphNode | null>(null);
 </script>
 
-<div class="graph">
-  <svg
-    viewBox="{layout.box.x} {layout.box.y} {layout.box.width} {layout.box.height}"
-    style="max-width: {layout.box.width}px"
-    role="group"
-    aria-label="Graphe des sujets associés à {subject.label}"
-  >
-    {#each layout.nodes as n (n.neighbor.label_normalized)}
-      <line
-        x1={CX}
-        y1={CY}
-        x2={n.x}
-        y2={n.y}
-        class="edge"
-        class:active={hovered === n}
-        stroke-width={layout.strokeWidth(n.neighbor.cooccurrence_count)}
-      />
-    {/each}
-
-    <circle cx={CX} cy={CY} r={layout.centerR} class="center" />
-
-    {#each layout.nodes as n (n.neighbor.label_normalized)}
-      {@const right = n.x >= CX}
-      <a
-        href={resolve(`subjects/${n.neighbor.label_normalized}`)}
-        class="node"
-        class:active={hovered === n}
-        onmouseenter={() => (hovered = n)}
-        onmouseleave={() => (hovered = null)}
-        onfocus={() => (hovered = n)}
-        onblur={() => (hovered = null)}
+<div class="graph" class:overflowing bind:clientWidth={width} bind:this={scroller}>
+  {#if layout}
+    <div class="plot" style="max-width: {layout.box.width}px; min-width: {minWidth}px">
+      <svg
+        viewBox="{layout.box.x} {layout.box.y} {layout.box.width} {layout.box.height}"
+        role="group"
+        aria-label="Graphe des sujets associés à {subject.label}"
       >
-        <circle cx={n.x} cy={n.y} r={n.r} />
+        {#each layout.nodes as n (n.neighbor.label_normalized)}
+          <line
+            x1={CX}
+            y1={CY}
+            x2={n.x}
+            y2={n.y}
+            class="edge"
+            class:active={hovered === n}
+            stroke-width={layout.strokeWidth(n.neighbor.cooccurrence_count)}
+          />
+        {/each}
+
+        <circle cx={CX} cy={CY} r={layout.centerR} class="center" />
+
+        {#each layout.nodes as n (n.neighbor.label_normalized)}
+          {@const right = n.x >= CX}
+          {@const labelX = n.x + (right ? n.r + 6 : -n.r - 6)}
+          <a
+            href={resolve(`subjects/${n.neighbor.label_normalized}`)}
+            class="node"
+            class:active={hovered === n}
+            onmouseenter={() => (hovered = n)}
+            onmouseleave={() => (hovered = null)}
+            onfocus={() => (hovered = n)}
+            onblur={() => (hovered = null)}
+          >
+            <circle cx={n.x} cy={n.y} r={n.r} />
+            <!-- Lignes centrées verticalement sur le cercle. -->
+            <text
+              y={n.y}
+              class="label"
+              font-size={LABEL_SIZE}
+              text-anchor={right ? "start" : "end"}
+              dominant-baseline="middle"
+              >{#each n.lines as line, i (i)}<tspan x={labelX} dy={i === 0 ? (-(n.lines.length - 1) * LINE_HEIGHT) / 2 : LINE_HEIGHT}>{line}</tspan>{/each}</text
+            >
+          </a>
+        {/each}
+
+        <!-- Titre du sujet central, dessiné en dernier pour rester au-dessus. -->
         <text
-          x={n.x + (right ? n.r + 6 : -n.r - 6)}
-          y={n.y}
-          class="label"
-          text-anchor={right ? "start" : "end"}
-          dominant-baseline="middle">{n.neighbor.label}</text
+          x={CX}
+          y={CY + layout.centerR + 18}
+          class="label center-label"
+          font-size={CENTER_LABEL_SIZE}
+          text-anchor="middle">{subject.label}</text
         >
-      </a>
-    {/each}
+      </svg>
 
-    <!-- Titre du sujet central, dessiné en dernier pour rester au-dessus. -->
-    <text x={CX} y={CY + layout.centerR + 18} class="label center-label" text-anchor="middle">{subject.label}</text>
-  </svg>
-
-  {#if hovered}
-    <div
-      class="graph-tip"
-      style="left: {((hovered.x - layout.box.x) / layout.box.width) * 100}%; top: {((hovered.y + hovered.r - layout.box.y) / layout.box.height) * 100}%"
-    >
-      <div class="tip-title">{hovered.neighbor.label}</div>
-      <div>{hovered.neighbor.cooccurrence_count.toLocaleString("fr-FR")} publications en commun</div>
-      <div>
-        {specificityPercent(hovered.neighbor)}&nbsp;% des publications de ce sujet portent aussi « {subject.label} »
-      </div>
-      <div class="tip-muted">{hovered.neighbor.usage_count.toLocaleString("fr-FR")} publications au total</div>
+      {#if hovered}
+        <div
+          class="graph-tip"
+          style="left: {((hovered.x - layout.box.x) / layout.box.width) * 100}%; top: {((hovered.y + hovered.r - layout.box.y) / layout.box.height) * 100}%"
+        >
+          <div class="tip-title">{hovered.neighbor.label}</div>
+          <div>{hovered.neighbor.cooccurrence_count.toLocaleString("fr-FR")} publications en commun</div>
+          <div>
+            {specificityPercent(hovered.neighbor)}&nbsp;% des publications de ce sujet portent aussi « {subject.label} »
+          </div>
+          <div class="tip-muted">{hovered.neighbor.usage_count.toLocaleString("fr-FR")} publications au total</div>
+        </div>
+      {/if}
     </div>
   {/if}
 </div>
 
 <style>
-  .graph {
+  .graph.overflowing {
+    overflow-x: auto;
+  }
+  /* Zone du graphe : elle épouse le dessin, l'infobulle s'y positionne. */
+  .plot {
     position: relative;
+    margin: 0 auto;
   }
   svg {
     display: block;
     width: 100%;
     height: auto;
-    margin: 0 auto;
     overflow: visible;
   }
   .edge {
@@ -128,7 +165,6 @@
     fill: var(--accent-mid);
   }
   .label {
-    font-size: var(--fs-sm);
     fill: var(--text);
     /* Halo du fond de page : les libellés restent lisibles sur les liens. */
     paint-order: stroke;
@@ -141,7 +177,6 @@
     font-weight: 600;
   }
   .center-label {
-    font-size: var(--fs-md);
     font-weight: 700;
     fill: var(--accent);
   }

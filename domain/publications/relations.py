@@ -8,8 +8,7 @@ Restent hors du vocabulaire, et donnent `None` :
 - les dérivations vagues (`IsDerivedFrom`, `is-related-material`…).
 """
 
-from __future__ import annotations
-
+from collections.abc import Iterator
 from enum import StrEnum
 
 from domain.publications.doc_types import DocType
@@ -39,30 +38,27 @@ class RelationType(StrEnum):
     HAS_CONCERN = "has_concern"
     IS_TRANSLATION_OF = "is_translation_of"
     HAS_TRANSLATION = "has_translation"
-    # Data paper → jeu de données décrit. Un article qui décrit un jeu de données est un data paper.
     DESCRIBES = "describes"
+    """Data paper → jeu de données décrit. Un article qui décrit un jeu de données est un data paper."""
     IS_DESCRIBED_BY = "is_described_by"
-    # Symétrique : deux publications distinctes partagent une clé de confirmation, et leurs types de document ne précisent pas la relation.
     IS_RELATED_TO = "is_related_to"
+    """Relation symétrique : deux publications distinctes partagent une clé de confirmation, et leurs types de document ne précisent pas la relation."""
 
+
+_PAIRS: tuple[tuple[RelationType, RelationType, str], ...] = (
+    (RelationType.IS_PREPRINT_OF, RelationType.HAS_PREPRINT, "préprint/article"),
+    (RelationType.IS_SUPPLEMENT_TO, RelationType.HAS_SUPPLEMENT, "article/données supplémentaires"),
+    (RelationType.IS_PART_OF, RelationType.HAS_PART, "partie/ensemble"),
+    (RelationType.IS_CORRECTION_OF, RelationType.HAS_CORRECTION, "article/erratum"),
+    (RelationType.IS_RETRACTION_OF, RelationType.HAS_RETRACTION, "article/rétractation"),
+    (RelationType.IS_CONCERN_ABOUT, RelationType.HAS_CONCERN, "article/avis de préoccupation"),
+    (RelationType.IS_TRANSLATION_OF, RelationType.HAS_TRANSLATION, "traduction/original"),
+    (RelationType.DESCRIBES, RelationType.IS_DESCRIBED_BY, "data paper/jeu de données"),
+)
+"""Paires de types inverses, avec leur libellé commun : sur la page de B, `A is_preprint_of B` se lit `B has_preprint A`."""
 
 RELATION_PAIR_LABELS: dict[RelationType, str] = {
-    RelationType.IS_PREPRINT_OF: "préprint/article",
-    RelationType.HAS_PREPRINT: "préprint/article",
-    RelationType.IS_CORRECTION_OF: "article/erratum",
-    RelationType.HAS_CORRECTION: "article/erratum",
-    RelationType.IS_RETRACTION_OF: "article/rétractation",
-    RelationType.HAS_RETRACTION: "article/rétractation",
-    RelationType.IS_CONCERN_ABOUT: "article/avis de préoccupation",
-    RelationType.HAS_CONCERN: "article/avis de préoccupation",
-    RelationType.IS_SUPPLEMENT_TO: "article/données supplémentaires",
-    RelationType.HAS_SUPPLEMENT: "article/données supplémentaires",
-    RelationType.IS_PART_OF: "partie/ensemble",
-    RelationType.HAS_PART: "partie/ensemble",
-    RelationType.IS_TRANSLATION_OF: "traduction/original",
-    RelationType.HAS_TRANSLATION: "traduction/original",
-    RelationType.DESCRIBES: "data paper/jeu de données",
-    RelationType.IS_DESCRIBED_BY: "data paper/jeu de données",
+    **{relation: label for a, b, label in _PAIRS for relation in (a, b)},
     RelationType.IS_RELATED_TO: "apparentées, type à qualifier",
 }
 """Libellé commun à un type et à son inverse."""
@@ -106,22 +102,10 @@ _CROSSREF_MAP: dict[str, RelationType] = {
 }
 
 
-# Paires inverses : sur la page de B, `A is_preprint_of B` se lit `B has_preprint A`.
-_INVERSE_PAIRS: tuple[tuple[RelationType, RelationType], ...] = (
-    (RelationType.IS_PREPRINT_OF, RelationType.HAS_PREPRINT),
-    (RelationType.IS_SUPPLEMENT_TO, RelationType.HAS_SUPPLEMENT),
-    (RelationType.IS_PART_OF, RelationType.HAS_PART),
-    (RelationType.IS_CORRECTION_OF, RelationType.HAS_CORRECTION),
-    (RelationType.IS_RETRACTION_OF, RelationType.HAS_RETRACTION),
-    (RelationType.IS_CONCERN_ABOUT, RelationType.HAS_CONCERN),
-    (RelationType.IS_TRANSLATION_OF, RelationType.HAS_TRANSLATION),
-    (RelationType.DESCRIBES, RelationType.IS_DESCRIBED_BY),
-)
 _INVERSE_RELATIONS: dict[RelationType, RelationType] = {
     RelationType.IS_RELATED_TO: RelationType.IS_RELATED_TO,
-    # Les deux sens s'écrivent en parallèle, ce qui se lit mieux que `dict(_INVERSE_PAIRS)`.
-    **{a: b for a, b in _INVERSE_PAIRS},  # noqa: C416
-    **{b: a for a, b in _INVERSE_PAIRS},
+    **{a: b for a, b, _ in _PAIRS},
+    **{b: a for a, b, _ in _PAIRS},
 }
 
 
@@ -130,32 +114,25 @@ def inverse_relation(relation: RelationType) -> RelationType:
     return _INVERSE_RELATIONS[relation]
 
 
-def map_datacite_relation(relation_type: str) -> RelationType | None:
-    """Renvoie le type d'un `relationType` DataCite, ou `None`."""
-    return _DATACITE_MAP.get(relation_type)
-
-
-def map_crossref_relation(relation_key: str) -> RelationType | None:
-    """Renvoie le type d'une clé de `relation` Crossref, ou `None`."""
-    return _CROSSREF_MAP.get(relation_key)
+def _datacite_related(source_extras: dict[str, JsonValue] | None) -> Iterator[tuple[str, str]]:
+    """Renvoie les relations déclarées par un enregistrement source DataCite : `(relationType, DOI cible)`. Les entrées sans DOI sont ignorées."""
+    related = (source_extras or {}).get(SourceExtra.RELATED_IDENTIFIERS)
+    if not isinstance(related, list):
+        return
+    for item in related:
+        if isinstance(item, dict) and (target := DOI.normalize(as_str(item.get("doi")))):
+            yield as_str(item.get("relation_type")) or "", target
 
 
 def extract_datacite_relations(
     source_extras: dict[str, JsonValue] | None,
 ) -> list[tuple[RelationType, str]]:
-    """Renvoie les relations du vocabulaire déclarées par un enregistrement source DataCite : `(type, DOI cible)`. Les entrées sans DOI sont ignorées."""
-    related = (source_extras or {}).get(SourceExtra.RELATED_IDENTIFIERS)
-    if not isinstance(related, list):
-        return []
-    out: list[tuple[RelationType, str]] = []
-    for item in related:
-        if not isinstance(item, dict):
-            continue
-        canonical = map_datacite_relation(as_str(item.get("relation_type")) or "")
-        target = DOI.normalize(as_str(item.get("doi")))
-        if canonical and target:
-            out.append((canonical, target))
-    return out
+    """Renvoie les relations du vocabulaire déclarées par un enregistrement source DataCite : `(type, DOI cible)`."""
+    return [
+        (relation, target)
+        for relation_type, target in _datacite_related(source_extras)
+        if (relation := _DATACITE_MAP.get(relation_type))
+    ]
 
 
 def extract_datacite_distinct_works(
@@ -165,20 +142,12 @@ def extract_datacite_distinct_works(
 
     `own_doi` et `doc_type` sont ceux de l'enregistrement source déclarant, lus par `declares_same_work`.
     """
-    related = (source_extras or {}).get(SourceExtra.RELATED_IDENTIFIERS)
-    if not isinstance(related, list):
-        return []
-    out: list[str] = []
-    for item in related:
-        if not isinstance(item, dict):
-            continue
-        case = DATACITE_DIRECT_CONVERGENCE.get(as_str(item.get("relation_type")) or "")
-        if case is None:
-            continue
-        target = DOI.normalize(as_str(item.get("doi")))
-        if target and not declares_same_work(case, doc_type, own_doi, target):
-            out.append(target)
-    return out
+    return [
+        target
+        for relation_type, target in _datacite_related(source_extras)
+        if (case := DATACITE_DIRECT_CONVERGENCE.get(relation_type)) is not None
+        and not declares_same_work(case, doc_type, own_doi, target)
+    ]
 
 
 # Types de document dépendants, sujets d'une relation vers l'œuvre principale : preprint, erratum, jeu de données.
@@ -192,8 +161,8 @@ DEPENDENT_DOC_TYPE_RELATIONS: dict[str, RelationType] = {
 
 def infer_shared_key_relation(
     doc_type_a: str | None, doc_type_b: str | None
-) -> tuple[RelationType, str] | None:
-    """Déduit la relation de deux publications distinctes qui partagent une clé de confirmation, d'après leurs types de document : `(type, sujet)`, le sujet valant `"a"`, `"b"`, ou `"sym"` pour `is_related_to`. `None` pour une évaluation par les pairs.
+) -> tuple[RelationType, bool] | None:
+    """Déduit la relation de deux publications distinctes qui partagent une clé de confirmation, d'après leurs types de document : `(type, le sujet est b)`. Sans sujet désigné, A est le sujet. `None` pour une évaluation par les pairs.
 
     Un preprint, un erratum, un jeu de données, ou un chapitre face à son ouvrage, donnent une relation orientée. Les autres couples donnent `is_related_to`.
     """
@@ -203,13 +172,13 @@ def infer_shared_key_relation(
         a_is_dependent = doc_type_a == dependent
         b_is_dependent = doc_type_b == dependent
         if a_is_dependent and not b_is_dependent:
-            return relation, "a"
+            return relation, False
         if b_is_dependent and not a_is_dependent:
-            return relation, "b"
+            return relation, True
     if {doc_type_a, doc_type_b} == {DocType.BOOK, DocType.BOOK_CHAPTER}:
         # Le chapitre est partie de l'ouvrage.
-        return RelationType.IS_PART_OF, ("a" if doc_type_a == DocType.BOOK_CHAPTER else "b")
-    return RelationType.IS_RELATED_TO, "sym"
+        return RelationType.IS_PART_OF, doc_type_b == DocType.BOOK_CHAPTER
+    return RelationType.IS_RELATED_TO, False
 
 
 def extract_crossref_relations(
@@ -221,7 +190,7 @@ def extract_crossref_relations(
         return []
     out: list[tuple[RelationType, str]] = []
     for key, entries in relation.items():
-        canonical = map_crossref_relation(key)
+        canonical = _CROSSREF_MAP.get(key)
         if not canonical or not isinstance(entries, list):
             continue
         for entry in entries:

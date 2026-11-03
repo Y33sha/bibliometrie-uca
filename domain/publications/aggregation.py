@@ -26,9 +26,9 @@ def refresh_from_sources(
 ) -> None:
     """Recalcule sur place les métadonnées de `publication` depuis ses enregistrements sources. L'éditeur se pose ensuite, par `assign_publisher`, et le statut open access d'après les copies (`domain.publications.open_access`).
 
-    - DOI : `publication_doi`.
+    - DOI : `_publication_doi`.
     - Champs simples : première valeur non nulle dans l'ordre d'arbitrage (`_arbitration_order`). Sans revue dans aucune source, la publication prend la collection de sa monographie (`monograph_serials`).
-    - Type de document : `arbitrate_doc_type_with_article_subtype`, puis `arbitrate_conference`.
+    - Type de document : `_arbitrate_doc_type_with_article_subtype`, puis `arbitrate_conference`.
     - Date de publication : `arbitrate_publication_date` ; l'année en dérive.
     - Licence : celle de la version éditeur (`publisher_license_sources`). Licence de dépôt : celle du fichier déposé dans HAL.
     - Rétractation : déclarée par une source au moins.
@@ -40,11 +40,9 @@ def refresh_from_sources(
         ValueError: `sources` vide ; une publication sans enregistrement source se supprime.
     """
     if not sources:
-        raise ValueError(
-            "refresh_from_sources requiert au moins une source ; le cas orphelin est à traiter côté caller (suppression de la publication)"
-        )
+        raise ValueError("refresh_from_sources requiert au moins un enregistrement source")
 
-    new_doi_str = publication_doi(_prioritized(sources, source_priority))
+    new_doi_str = _publication_doi(_prioritized(sources, source_priority))
     publication.doi = DOI(new_doi_str) if new_doi_str else None
     sorted_sources = _arbitration_order(sources, source_priority)
 
@@ -52,7 +50,7 @@ def refresh_from_sources(
     publication.title = new_title if new_title is not None else publication.title
     publication.title_normalized = normalize_text(publication.title) if publication.title else None
     publication.doc_type = arbitrate_conference(
-        arbitrate_doc_type_with_article_subtype(sorted_sources), sorted_sources
+        _arbitrate_doc_type_with_article_subtype(sorted_sources), sorted_sources
     )
     publication.publication_date = (
         arbitrate_publication_date(
@@ -78,7 +76,7 @@ def refresh_from_sources(
     publication.countries = _union_ci(s.countries for s in sorted_sources)
     publication.biblio = _merge_by_key(s.biblio for s in sorted_sources)
     publication.source_extras = _merge_by_key(s.source_extras for s in sorted_sources)
-    publication.is_retracted = any(s.is_retracted for s in sorted_sources if s.is_retracted)
+    publication.is_retracted = any(s.is_retracted for s in sorted_sources)
     publication.impact = next(
         (s.impact for s in sorted_sources if s.source == Source.OPENALEX), None
     )
@@ -105,7 +103,7 @@ def assign_publisher(
     )
 
 
-def publication_doi(sources: list[SourceRecord]) -> str | None:
+def _publication_doi(sources: list[SourceRecord]) -> str | None:
     """Renvoie le DOI d'une publication : l'ancre de ses enregistrements sources (`doi_anchors`), à défaut un DOI de dépôt (`deposit_anchors`). Entre plusieurs candidats, celui du premier enregistrement source de `sources` qui en rejoint un."""
     candidates = doi_anchors(s.dois for s in sources) or deposit_anchors(s.dois for s in sources)
     if len(candidates) == 1:
@@ -118,7 +116,7 @@ def _prioritized(
 ) -> list[SourceRecord]:
     """Trie `sources` dans l'ordre de `source_priority`."""
     rank = {s: i for i, s in enumerate(source_priority)}
-    return sorted(sources, key=lambda s: rank.get(s.source, 99))
+    return sorted(sources, key=lambda s: rank.get(s.source, len(source_priority)))
 
 
 def _arbitration_order(
@@ -179,7 +177,7 @@ def _merge_by_key(
     return merged or None
 
 
-def arbitrate_doc_type_with_article_subtype(sources: list[SourceRecord]) -> str:
+def _arbitrate_doc_type_with_article_subtype(sources: list[SourceRecord]) -> str:
     """Arbitre le type de document : le premier non nul dans l'ordre des `sources`. Le premier sous-type d'article, toutes sources confondues, l'emporte sur `article`, donné par Crossref pour tous les sous-types. Un `data_paper` déclaré par HAL seul compte pour `article`."""
     doc_types = [_corroborated_doc_type(s, sources) for s in sources]
     article_subtype_present = next((t for t in doc_types if t in ARTICLE_SUBTYPES), None)
@@ -190,7 +188,7 @@ def arbitrate_doc_type_with_article_subtype(sources: list[SourceRecord]) -> str:
         if doc_type == DocType.ARTICLE and article_subtype_present:
             return article_subtype_present
         return doc_type
-    return "other"
+    return DocType.OTHER
 
 
 def _corroborated_doc_type(source: SourceRecord, sources: list[SourceRecord]) -> str | None:

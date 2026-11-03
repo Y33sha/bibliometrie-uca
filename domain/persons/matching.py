@@ -7,7 +7,7 @@ from typing import NamedTuple
 
 from domain.normalize import normalize_text
 from domain.persons.contributor_name import ContributorName
-from domain.persons.identifiers import PersonIdentifierType
+from domain.persons.identifiers import AttributionStatus, PersonIdentifierType
 from domain.persons.name_matching import (
     first_name_initials,
     full_first_name_extends,
@@ -48,14 +48,23 @@ class Namesake(NamedTuple):
     first_name: str
     conflicting: bool = False
     """Vrai pour une personne au prénom réduit, à qui ses contributions sources donnent plusieurs prénoms pleins. Le rattachement par initiales l'écarte pour un prénom plein."""
+    hr_record: bool = False
+    """La personne a une fiche RH : son prénom vient du SI RH, jamais réduit à des initiales."""
+
+    @property
+    def matching_first_name(self) -> str:
+        """Prénom lu par le rattachement par initiales. Un prénom du SI RH, écrit en capitales, passe en minuscules : deux ou trois capitales accolées (« LEA ») ne s'y lisent pas comme des initiales (`first_name_initials`)."""
+        return self.first_name.lower() if self.hr_record else self.first_name
 
 
-def full_namesakes(initials: tuple[str, ...], namesakes: Iterable[Namesake]) -> list[int]:
+def _full_namesakes(initials: tuple[str, ...], namesakes: Iterable[Namesake]) -> list[int]:
     """Renvoie les personnes au prénom plein dont les initiales commencent par `initials`."""
-    return [n.person_id for n in namesakes if full_first_name_extends(initials, n.first_name)]
+    return [
+        n.person_id for n in namesakes if full_first_name_extends(initials, n.matching_first_name)
+    ]
 
 
-def compatible_namesakes(contributor_first_name: str, namesakes: Sequence[Namesake]) -> list[int]:
+def _compatible_namesakes(contributor_first_name: str, namesakes: Sequence[Namesake]) -> list[int]:
     """Renvoie les personnes de même nom de famille désignées par les initiales d'une contribution source.
 
     - Prénom réduit (« A. ») : toute personne dont les initiales du prénom commencent par celles de la contribution source (« Abdul-Majeed », « A. M. »).
@@ -65,20 +74,22 @@ def compatible_namesakes(contributor_first_name: str, namesakes: Sequence[Namesa
     contributor_initials = first_name_initials(contributor_first_name)
     if contributor_initials is not None:
         return [
-            n.person_id for n in namesakes if initials_extend(contributor_initials, n.first_name)
+            n.person_id
+            for n in namesakes
+            if initials_extend(contributor_initials, n.matching_first_name)
         ]
     if not normalize_text(contributor_first_name):
         return []
     candidates = []
     for n in namesakes:
-        initials = first_name_initials(n.first_name)
+        initials = first_name_initials(n.matching_first_name)
         if (
             initials is None
             or n.conflicting
             or not initials_extend(initials, contributor_first_name)
         ):
             continue
-        if not full_namesakes(initials, namesakes):
+        if not _full_namesakes(initials, namesakes):
             candidates.append(n.person_id)
     return candidates
 
@@ -94,7 +105,7 @@ def compatible_persons(
     found: list[int] = []
     for last, first in source_contribution.splits():
         namesakes = namesakes_by_last_name.get(normalize_text(last), ())
-        for person_id in compatible_namesakes(first, namesakes):
+        for person_id in _compatible_namesakes(first, namesakes):
             if person_id not in found:
                 found.append(person_id)
     return found
@@ -128,8 +139,8 @@ class IdentifierMatch:
 
     person_id: int | None = None
     """Personne désignée, si son nom est compatible."""
-    rejection: tuple[int, str] | None = None
-    """Personne désignée et son nom, si ce nom est incompatible. Sert à journaliser le refus."""
+    rejected: bool = False
+    """Une personne est désignée, mais son nom est incompatible."""
 
 
 def decide_match_by_identifier(
@@ -161,19 +172,17 @@ def decide_match_by_identifier(
         ),
         None,
     )
-    if verdict == "confirmed":
+    if verdict == AttributionStatus.CONFIRMED:
         return IdentifierMatch(person_id=person_id)
-    if verdict == "rejected":
-        return IdentifierMatch(
-            rejection=(person_id, f"{target.first_name} {target.last_name}".strip())
-        )
+    if verdict == AttributionStatus.REJECTED:
+        return IdentifierMatch(rejected=True)
 
     contributor_last_name, contributor_first_name = source_contribution.split()
     if names_compatible(
         contributor_last_name, contributor_first_name, target.last_name, target.first_name
     ):
         return IdentifierMatch(person_id=person_id)
-    return IdentifierMatch(rejection=(person_id, f"{target.first_name} {target.last_name}".strip()))
+    return IdentifierMatch(rejected=True)
 
 
 def strict_majority[K](votes: Mapping[K, int]) -> K | None:

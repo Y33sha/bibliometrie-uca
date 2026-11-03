@@ -1,14 +1,14 @@
 """Relations entre publications : traduction des relations des sources, extraction, inférence par clé partagée."""
 
 from domain.publications.relations import (
+    _CROSSREF_MAP,
+    _DATACITE_MAP,
     RelationType,
     extract_crossref_relations,
     extract_datacite_distinct_works,
     extract_datacite_relations,
     infer_shared_key_relation,
     inverse_relation,
-    map_crossref_relation,
-    map_datacite_relation,
 )
 
 
@@ -28,50 +28,50 @@ class TestInverseRelation:
 
 class TestDataciteMapping:
     def test_supplement_and_part(self):
-        assert map_datacite_relation("IsSupplementTo") == RelationType.IS_SUPPLEMENT_TO
-        assert map_datacite_relation("IsSupplementedBy") == RelationType.HAS_SUPPLEMENT
-        assert map_datacite_relation("IsPartOf") == RelationType.IS_PART_OF
-        assert map_datacite_relation("HasPart") == RelationType.HAS_PART
+        assert _DATACITE_MAP.get("IsSupplementTo") == RelationType.IS_SUPPLEMENT_TO
+        assert _DATACITE_MAP.get("IsSupplementedBy") == RelationType.HAS_SUPPLEMENT
+        assert _DATACITE_MAP.get("IsPartOf") == RelationType.IS_PART_OF
+        assert _DATACITE_MAP.get("HasPart") == RelationType.HAS_PART
 
     def test_describes_family(self):
-        assert map_datacite_relation("Describes") == RelationType.DESCRIBES
-        assert map_datacite_relation("IsDescribedBy") == RelationType.IS_DESCRIBED_BY
-        assert map_datacite_relation("IsDocumentedBy") == RelationType.IS_DESCRIBED_BY
+        assert _DATACITE_MAP.get("Describes") == RelationType.DESCRIBES
+        assert _DATACITE_MAP.get("IsDescribedBy") == RelationType.IS_DESCRIBED_BY
+        assert _DATACITE_MAP.get("IsDocumentedBy") == RelationType.IS_DESCRIBED_BY
 
     def test_out_of_scope(self):
         # Citations, même œuvre, peer review, relation imprécise.
         for raw in ("References", "Cites", "IsVersionOf", "IsVariantFormOf", "IsReviewedBy"):
-            assert map_datacite_relation(raw) is None
+            assert _DATACITE_MAP.get(raw) is None
 
     def test_unknown(self):
-        assert map_datacite_relation("WhateverNewType") is None
+        assert _DATACITE_MAP.get("WhateverNewType") is None
 
 
 class TestCrossrefMapping:
     def test_preprint_supplement_translation(self):
-        assert map_crossref_relation("is-preprint-of") == RelationType.IS_PREPRINT_OF
-        assert map_crossref_relation("has-preprint") == RelationType.HAS_PREPRINT
-        assert map_crossref_relation("is-supplement-to") == RelationType.IS_SUPPLEMENT_TO
-        assert map_crossref_relation("is-translation-of") == RelationType.IS_TRANSLATION_OF
+        assert _CROSSREF_MAP.get("is-preprint-of") == RelationType.IS_PREPRINT_OF
+        assert _CROSSREF_MAP.get("has-preprint") == RelationType.HAS_PREPRINT
+        assert _CROSSREF_MAP.get("is-supplement-to") == RelationType.IS_SUPPLEMENT_TO
+        assert _CROSSREF_MAP.get("is-translation-of") == RelationType.IS_TRANSLATION_OF
 
     def test_correction_family_on_article(self):
         for raw in ("erratum", "correction", "corrigendum", "addendum", "clarification"):
-            assert map_crossref_relation(raw) == RelationType.HAS_CORRECTION
-        assert map_crossref_relation("corrected") == RelationType.IS_CORRECTION_OF
+            assert _CROSSREF_MAP.get(raw) == RelationType.HAS_CORRECTION
+        assert _CROSSREF_MAP.get("corrected") == RelationType.IS_CORRECTION_OF
 
     def test_retraction_and_concern_family(self):
-        assert map_crossref_relation("retraction") == RelationType.HAS_RETRACTION
-        assert map_crossref_relation("withdrawal") == RelationType.HAS_RETRACTION
-        assert map_crossref_relation("expression_of_concern") == RelationType.HAS_CONCERN
+        assert _CROSSREF_MAP.get("retraction") == RelationType.HAS_RETRACTION
+        assert _CROSSREF_MAP.get("withdrawal") == RelationType.HAS_RETRACTION
+        assert _CROSSREF_MAP.get("expression_of_concern") == RelationType.HAS_CONCERN
 
     def test_data_paper_describes(self):
-        assert map_crossref_relation("is-part-of") == RelationType.DESCRIBES
-        assert map_crossref_relation("has-part") == RelationType.IS_DESCRIBED_BY
+        assert _CROSSREF_MAP.get("is-part-of") == RelationType.DESCRIBES
+        assert _CROSSREF_MAP.get("has-part") == RelationType.IS_DESCRIBED_BY
 
     def test_out_of_scope(self):
         # Peer review et commentaire (type `peer_review`), citations, même œuvre.
         for raw in ("has-review", "is-review-of", "is-comment-on", "references", "is-version-of"):
-            assert map_crossref_relation(raw) is None
+            assert _CROSSREF_MAP.get(raw) is None
 
 
 class TestExtractDatacite:
@@ -197,26 +197,26 @@ class TestInferSharedKeyRelation:
         # Le preprint est le sujet de la relation.
         assert infer_shared_key_relation("article", "preprint") == (
             RelationType.IS_PREPRINT_OF,
-            "b",
+            True,
         )
         assert infer_shared_key_relation("preprint", "conference_paper") == (
             RelationType.IS_PREPRINT_OF,
-            "a",
+            False,
         )
 
     def test_erratum_and_dataset(self):
         assert infer_shared_key_relation("erratum", "article") == (
             RelationType.IS_CORRECTION_OF,
-            "a",
+            False,
         )
         assert infer_shared_key_relation("article", "dataset") == (
             RelationType.IS_SUPPLEMENT_TO,
-            "b",
+            True,
         )
 
     def test_book_chapter_is_part_of_book(self):
-        assert infer_shared_key_relation("book", "book_chapter") == (RelationType.IS_PART_OF, "b")
-        assert infer_shared_key_relation("book_chapter", "book") == (RelationType.IS_PART_OF, "a")
+        assert infer_shared_key_relation("book", "book_chapter") == (RelationType.IS_PART_OF, True)
+        assert infer_shared_key_relation("book_chapter", "book") == (RelationType.IS_PART_OF, False)
 
     def test_unexpected_couples_are_undefined(self):
         # Deux exemplaires d'une même œuvre à DOI distincts, ou couple non typé : apparenté.
@@ -227,4 +227,4 @@ class TestInferSharedKeyRelation:
             ("preprint", "preprint"),  # deux preprints : aucun n'est sujet unique
             ("thesis", "thesis"),
         ]:
-            assert infer_shared_key_relation(a, b) == (RelationType.IS_RELATED_TO, "sym")
+            assert infer_shared_key_relation(a, b) == (RelationType.IS_RELATED_TO, False)

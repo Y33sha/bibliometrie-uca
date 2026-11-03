@@ -4,11 +4,11 @@ from domain.persons.contributor_name import ContributorName
 from domain.persons.matching import (
     IdentifiedPerson,
     Namesake,
+    _compatible_namesakes,
+    _full_namesakes,
     attested_full_first_names,
-    compatible_namesakes,
     compatible_persons,
     decide_match_by_identifier,
-    full_namesakes,
     identifier_misplaced,
     strict_majority,
     trusted_identifier,
@@ -76,11 +76,11 @@ class TestIdentifierMisplaced:
 
 class TestCompatibleNamesakes:
     def test_full_name_finds_the_reduced_person(self):
-        assert compatible_namesakes("Abdellah", [Namesake(1, "Tnourji", "A.")]) == [1]
+        assert _compatible_namesakes("Abdellah", [Namesake(1, "Tnourji", "A.")]) == [1]
 
     def test_reduced_name_finds_the_compound_first_name(self):
         """« A. » prolonge « Abdul-Majeed », dont les formes à initiales donnent seulement « a m »."""
-        assert compatible_namesakes("A.", [Namesake(1, "Al-Izeri", "Abdul-Majeed")]) == [1]
+        assert _compatible_namesakes("A.", [Namesake(1, "Al-Izeri", "Abdul-Majeed")]) == [1]
 
     def test_reduced_name_finds_every_compatible_person(self):
         namesakes = [
@@ -88,27 +88,36 @@ class TestCompatibleNamesakes:
             Namesake(2, "Martin", "Joseph"),
             Namesake(3, "Martin", "Paul"),
         ]
-        assert compatible_namesakes("J.", namesakes) == [1, 2]
+        assert _compatible_namesakes("J.", namesakes) == [1, 2]
 
     def test_initials_follow_the_order_of_the_first_name(self):
         """« H. » ne prolonge pas « Bo-Hyung » : l'initiale doit commencer le prénom."""
-        assert compatible_namesakes("H.", [Namesake(1, "Lee", "Bo-Hyung")]) == []
-        assert compatible_namesakes("Bo-Hyung", [Namesake(1, "Lee", "H.")]) == []
+        assert _compatible_namesakes("H.", [Namesake(1, "Lee", "Bo-Hyung")]) == []
+        assert _compatible_namesakes("Bo-Hyung", [Namesake(1, "Lee", "H.")]) == []
 
     def test_reduced_person_claimed_by_a_full_namesake_is_not_a_candidate(self):
         """« Martin Jean » est le prénom plein possible de « Martin J. » : « Julien » ne se rattache pas à « Martin J. »."""
         namesakes = [Namesake(1, "Martin", "J."), Namesake(2, "Martin", "Jean")]
-        assert compatible_namesakes("Julien", namesakes) == []
+        assert _compatible_namesakes("Julien", namesakes) == []
 
     def test_conflicting_reduced_person_is_not_a_candidate(self):
-        assert compatible_namesakes("Julien", [Namesake(1, "Martin", "J.", conflicting=True)]) == []
+        assert (
+            _compatible_namesakes("Julien", [Namesake(1, "Martin", "J.", conflicting=True)]) == []
+        )
 
     def test_full_name_ignores_full_namesakes(self):
         """Deux prénoms pleins distincts désignent deux personnes, même à initiales communes."""
-        assert compatible_namesakes("Abdellah", [Namesake(1, "Tnourji", "Abdelkader")]) == []
+        assert _compatible_namesakes("Abdellah", [Namesake(1, "Tnourji", "Abdelkader")]) == []
 
     def test_source_contribution_without_first_name(self):
-        assert compatible_namesakes("", [Namesake(1, "Martin", "J.")]) == []
+        assert _compatible_namesakes("", [Namesake(1, "Martin", "J.")]) == []
+
+    def test_hr_first_name_in_capitals_is_full(self):
+        """« LEA », venu du SI RH en capitales, est un prénom plein : il réclame « Martin L. » face à « Laurent »."""
+        hr = Namesake(2, "Martin", "LEA", hr_record=True)
+        assert _compatible_namesakes("Laurent", [Namesake(1, "Martin", "L."), hr]) == []
+        assert _compatible_namesakes("L.", [hr]) == [2]
+        assert _compatible_namesakes("L. E.", [hr]) == []
 
 
 class TestCompatiblePersons:
@@ -141,10 +150,10 @@ class TestFullNamesakes:
             Namesake(2, "Caillaud", "D."),
             Namesake(3, "Caillaud", "Marc"),
         ]
-        assert full_namesakes(("d",), namesakes) == [1]
+        assert _full_namesakes(("d",), namesakes) == [1]
 
     def test_initials_must_open_the_first_name(self):
-        assert full_namesakes(("b",), [Namesake(1, "Zhang", "Xiao-Bing")]) == []
+        assert _full_namesakes(("b",), [Namesake(1, "Zhang", "Xiao-Bing")]) == []
 
 
 class TestAttestedFullFirstNames:
@@ -179,7 +188,7 @@ class TestDecideMatchByIdentifier:
             "252404955", idref_map, _contribution("Jean Dupont"), ("jean dupont",), {}
         )
         assert result.person_id == 42
-        assert result.rejection is None
+        assert not result.rejected
 
     def test_incompatible_name_rejected(self):
         """Sans verdict sur la forme de nom, un nom incompatible fait refuser le rattachement, et le rejet est renvoyé."""
@@ -188,7 +197,7 @@ class TestDecideMatchByIdentifier:
             "252404955", idref_map, _contribution("Paul Martin"), ("paul martin",), {}
         )
         assert result.person_id is None
-        assert result.rejection == (42, "jean dupont")
+        assert result.rejected
 
     def test_confirmed_name_form_matches_without_token_test(self):
         """Une forme de nom confirmée pour la personne la rattache, même à tokens incompatibles (changement de nom : « Van Lander » confirmée pour « Maneval »)."""
@@ -198,7 +207,7 @@ class TestDecideMatchByIdentifier:
             "x", idref_map, _contribution("Van Lander Axelle"), ("van lander axelle",), status
         )
         assert result.person_id == 42
-        assert result.rejection is None
+        assert not result.rejected
 
     def test_rejected_name_form_refused_even_if_compatible(self):
         """Une forme de nom rejetée pour la personne fait refuser le rattachement, même à tokens compatibles."""
@@ -208,13 +217,13 @@ class TestDecideMatchByIdentifier:
             "x", idref_map, _contribution("Jean Dupont"), ("jean dupont",), status
         )
         assert result.person_id is None
-        assert result.rejection == (42, "jean dupont")
+        assert result.rejected
 
     def test_value_absent_returns_empty(self):
         idref_map = {"252404955": IdentifiedPerson(42, "dupont", "jean")}
         result = decide_match_by_identifier("999999999", idref_map, _contribution("X"), ("x",), {})
         assert result.person_id is None
-        assert result.rejection is None
+        assert not result.rejected
 
     def test_falsy_value_returns_empty(self):
         """Une valeur vide ou `None` laisse la contribution sans rattachement."""
@@ -235,7 +244,7 @@ class TestDecideMatchByIdentifier:
             "x", idref_map, _contribution("Dupont"), ("dupont",), {}
         )
         assert result.person_id == 42
-        assert result.rejection is None
+        assert not result.rejected
 
     def test_works_for_orcid_too(self):
         """Même règle pour un ORCID que pour un IdRef."""
@@ -252,7 +261,7 @@ class TestDecideMatchByIdentifier:
             "x", idref_map, _contribution("Toufic Khalil"), ("toufic khalil",), {}
         )
         assert result.person_id == 42
-        assert result.rejection is None
+        assert not result.rejected
 
     def test_surname_homonym_still_rejected(self):
         """Même nom de famille, prénom franchement autre : le rattachement est refusé."""
@@ -261,7 +270,7 @@ class TestDecideMatchByIdentifier:
             "x", idref_map, _contribution("Herve Chanal"), ("herve chanal",), {}
         )
         assert result.person_id is None
-        assert result.rejection == (42, "helene chanal")
+        assert result.rejected
 
     def test_verdict_on_inverted_form(self):
         """Contribution source au nom et prénom inversés : le verdict de sa forme « nom prénom » tranche."""

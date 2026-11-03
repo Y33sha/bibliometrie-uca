@@ -9,16 +9,17 @@ from infrastructure.sql_fragments import REJECTED_PAIRS, active_name_form
 
 
 def fetch_namesakes(conn: Connection) -> list[Namesake]:
-    """Renvoie les personnes non exclues, avec leur nom et prénom saisis, pour le rattachement par initiales compatibles."""
+    """Renvoie les personnes non exclues, avec leur nom et prénom saisis et la présence d'une fiche RH, pour le rattachement par initiales compatibles."""
     rows = conn.execute(
         text("""
-            SELECT id, last_name, COALESCE(first_name, '') AS first_name
-            FROM persons
-            WHERE exclusion IS NULL
-            ORDER BY id
+            SELECT p.id, p.last_name, COALESCE(p.first_name, '') AS first_name,
+                   EXISTS (SELECT 1 FROM hr_records h WHERE h.person_id = p.id) AS hr_record
+            FROM persons p
+            WHERE p.exclusion IS NULL
+            ORDER BY p.id
         """)
     ).all()
-    return [Namesake(r.id, r.last_name, r.first_name) for r in rows]
+    return [Namesake(r.id, r.last_name, r.first_name, hr_record=r.hr_record) for r in rows]
 
 
 def fetch_identifier_to_person_map(conn: Connection, id_type: str) -> dict[str, IdentifiedPerson]:

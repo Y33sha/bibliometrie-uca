@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { CX, CY, INNER_RING, nodeBox, subjectGraphLayout, type Box } from './subjectGraphLayout';
+import { specificity } from './specificity';
+import { CX, CY, nodeBox, subjectGraphLayout, type Box } from './subjectGraphLayout';
 
 const LABELS = [
 	'Social sciences',
@@ -44,8 +45,17 @@ function overlaps(a: Box, b: Box): boolean {
 	return Math.min(a.x1, b.x1) > Math.max(a.x0, b.x0) && Math.min(a.y1, b.y1) > Math.max(a.y0, b.y0);
 }
 
+function expectNoOverlap(layout: ReturnType<ReturnType<typeof subjectGraphLayout>>): void {
+	const boxes = layout.nodes.map(nodeBox);
+	for (let i = 0; i < boxes.length; i++) {
+		expect(overlaps(boxes[i], layout.centerBox)).toBe(false);
+		for (let j = i + 1; j < boxes.length; j++) expect(overlaps(boxes[i], boxes[j])).toBe(false);
+	}
+}
+
 describe('subjectGraphLayout', () => {
-	const layout = subjectGraphLayout(subject, neighbors, links);
+	const layoutFor = subjectGraphLayout(subject, neighbors, links);
+	const layout = layoutFor(Infinity);
 
 	it('donne des coordonnées finies', () => {
 		for (const n of layout.nodes) {
@@ -64,16 +74,42 @@ describe('subjectGraphLayout', () => {
 	});
 
 	it('ne laisse aucune emprise en recouvrir une autre', () => {
-		const boxes = layout.nodes.map(nodeBox);
-		for (let i = 0; i < boxes.length; i++) {
-			expect(overlaps(boxes[i], layout.centerBox)).toBe(false);
-			for (let j = i + 1; j < boxes.length; j++) expect(overlaps(boxes[i], boxes[j])).toBe(false);
-		}
+		expectNoOverlap(layout);
 	});
 
-	it('laisse le voisin le plus spécifique sur l\'anneau intérieur', () => {
-		const closest = Math.min(...layout.nodes.map((n) => n.distance));
-		expect(closest).toBe(INNER_RING);
+	it('coupe un libellé long en deux lignes, à l\'espace le plus proche du milieu', () => {
+		const n = layout.nodes.find((m) => m.neighbor.label === 'Biochemistry, Genetics and Molecular Biology')!;
+		expect(n.lines).toEqual(['Biochemistry, Genetics', 'and Molecular Biology']);
+		expect(layout.nodes.find((m) => m.neighbor.label === 'Genetics')!.lines).toEqual(['Genetics']);
+	});
+
+	it('resserre le graphe quand la largeur manque, sans recouvrement', () => {
+		const narrow = layoutFor(layout.box.width - 1);
+		expect(narrow.box.width).toBeLessThan(layout.box.width);
+		expectNoOverlap(narrow);
+	});
+
+	it('sépare les libellés de nombreux voisins à 100 % de spécificité', () => {
+		const tied = LABELS.slice(0, 12).map((label, i) => ({
+			label_normalized: label.toLowerCase(),
+			label,
+			usage_count: 50 + i * 10,
+			cooccurrence_count: 50 + i * 10
+		}));
+		expectNoOverlap(subjectGraphLayout(subject, tied, [])(Infinity));
+	});
+
+	it('donne le placement le plus étroit quand aucun ne tient', () => {
+		const narrowest = layoutFor(1);
+		expect(narrowest.box.width).toBeLessThanOrEqual(layoutFor(layout.box.width - 1).box.width);
+		expectNoOverlap(narrowest);
+	});
+
+	it('rapproche du centre les voisins les plus spécifiques', () => {
+		const bySpecificity = [...layout.nodes].sort((a, b) => specificity(b.neighbor) - specificity(a.neighbor));
+		for (let i = 1; i < bySpecificity.length; i++) {
+			expect(bySpecificity[i].distance).toBeGreaterThanOrEqual(bySpecificity[i - 1].distance);
+		}
 	});
 
 	it('place côte à côte deux sujets très liés', () => {

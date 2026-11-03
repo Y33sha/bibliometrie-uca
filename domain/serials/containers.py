@@ -167,6 +167,16 @@ class VolumeDescription:
     year: int | None = None
 
 
+def _series(description: ContainerDescription, title: str | None) -> SeriesDescription:
+    """Renvoie la série de titre `title`, avec les ISSN, la source OpenAlex et le modèle open access de la description."""
+    return SeriesDescription(
+        title=title,
+        issns=description.issns,
+        openalex_id=description.openalex_id,
+        oa_model=description.oa_model,
+    )
+
+
 def determine_container_type(
     description: ContainerDescription,
 ) -> tuple[SeriesDescription | None, VolumeDescription | None]:
@@ -181,30 +191,16 @@ def determine_container_type(
             return None, None
         if d.journal_title and is_dated_event_without_issn(d.journal_title, has_issn=d.has_issn):
             return None, VolumeDescription(title=d.journal_title, proceedings=True, year=d.year)
-        return SeriesDescription(
-            title=d.journal_title,
-            issns=d.issns,
-            openalex_id=d.openalex_id,
-            oa_model=d.oa_model,
-        ), None
+        return _series(d, d.journal_title), None
 
     collection_title = d.collection_title
     volume_title = d.document_title if role is ContainerRole.BOOK else d.book_title
     if collection_title and container_level(collection_title) is ContainerLevel.VOLUME:
         volume_title = volume_title or collection_title
         collection_title = series_title(collection_title)
-    series = (
-        SeriesDescription(
-            title=collection_title,
-            issns=d.issns,
-            openalex_id=d.openalex_id,
-            oa_model=d.oa_model,
-        )
-        if d.has_issn
-        else None
-    )
-    same_as_collection = bool(volume_title) and normalize_text(volume_title or "") == (
-        normalize_text(collection_title or "")
+    series = _series(d, collection_title) if d.has_issn else None
+    same_as_collection = bool(volume_title) and normalize_text(volume_title) == normalize_text(
+        collection_title or ""
     )
     if same_as_collection or not (volume_title or d.isbns or d.eisbns):
         return series, None
