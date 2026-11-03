@@ -4,9 +4,9 @@
 Une publication compte pour une unité quand au moins un de ses auteurs du périmètre signe avec cette unité. Les types de documents retenus sont les articles, les articles de synthèse, les ouvrages, les chapitres et les conference papers. La période va par défaut de 2020 à la dernière année complète.
 
 Usage :
-    uv run python -m interfaces.cli.reporting.structure_report [--structure CODE ...] [--from-year 2020] [--to-year AAAA] [--output-dir data/reports/bibliometrie]
+    uv run python -m interfaces.cli.reporting.structure_report [--structure CODE ...] [--from-year 2020] [--to-year AAAA] [--output-dir data/reports/bibliometrie/AAAA-MM-JJ]
 
-Sans `--structure`, un rapport par laboratoire.
+Sans `--structure`, un rapport par laboratoire. Sans `--output-dir`, les rapports vont dans le sous-dossier de la date du jour.
 """
 
 from __future__ import annotations
@@ -43,7 +43,8 @@ DOC_TYPE_LABELS: dict[DocType, str] = {
     DocType.CONFERENCE_PAPER: "Conference papers",
 }
 
-DEFAULT_OUTPUT_DIR = Path("data/reports/bibliometrie")
+REPORTS_DIR = Path("data/reports/bibliometrie")
+"""Dossier des rapports, avec un sous-dossier par date de génération."""
 
 TOP_JOURNALS = 10
 
@@ -644,6 +645,7 @@ def main() -> int:
         help="code de la structure (option répétable) ; tous les laboratoires par défaut",
     )
     current_year = today().year
+    generated_on = today().isoformat()
     parser.add_argument("--from-year", type=int, default=2020, help="première année (2020)")
     parser.add_argument(
         "--to-year",
@@ -652,7 +654,10 @@ def main() -> int:
         help=f"dernière année ({current_year - 1})",
     )
     parser.add_argument(
-        "--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR, help=f"({DEFAULT_OUTPUT_DIR})"
+        "--output-dir",
+        type=Path,
+        default=REPORTS_DIR / generated_on,
+        help=f"({REPORTS_DIR / generated_on})",
     )
     args = parser.parse_args()
 
@@ -671,9 +676,7 @@ def main() -> int:
     for data in reports:
         path = args.output_dir / f"{data.structure.code}.md"
         path.write_text(
-            render_report(
-                data, years=years, current_year=current_year, generated_on=today().isoformat()
-            ),
+            render_report(data, years=years, current_year=current_year, generated_on=generated_on),
             # Le BOM signale l'UTF-8 aux navigateurs qui ouvrent le fichier hors serveur.
             encoding="utf-8-sig",
         )
