@@ -10,6 +10,7 @@ _COLLECTIVE_WORDS: frozenset[str] = frozenset(
         "association",
         "center",
         "centre",
+        "collaborat",  # abréviation WoS
         "collaboration",
         "collaborations",
         "collaborative",
@@ -31,6 +32,7 @@ _COLLECTIVE_WORDS: frozenset[str] = frozenset(
         "group",
         "groupe",
         "groups",
+        "grp",  # abréviation WoS
         "initiative",
         "institut",
         "institute",

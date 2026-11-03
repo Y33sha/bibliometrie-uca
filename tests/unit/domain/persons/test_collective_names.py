@@ -31,6 +31,8 @@ from domain.persons.collective_names import is_collective_name
         "Universität Hamburg, Germany",
         "Rutherford Appleton Laboratory",
         "The PLOS ONE Editors",
+        "FACE BD Grp",
+        "LSST Dark Energy Sci Collaborat",
     ],
 )
 def test_reconnait_un_collectif(name):
