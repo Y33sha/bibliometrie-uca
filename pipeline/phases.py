@@ -106,8 +106,8 @@ PHASES: tuple[Phase, ...] = (
     Phase(
         "author_grouping",
         "Alignement des auteurs des enregistrements sources d'une même publication",
-        phase_tasks("author_grouping"),
-        build=author_grouping.build,
+        author_grouping.TASKS,
+        assemble=author_grouping.assemble,
     ),
     Phase(
         "persons",

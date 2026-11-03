@@ -10,7 +10,7 @@ from collections import Counter
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from concurrent.futures import ProcessPoolExecutor
 from contextlib import nullcontext
-from dataclasses import dataclass, fields
+from dataclasses import fields
 from operator import attrgetter
 
 from scipy.optimize import linear_sum_assignment
@@ -25,12 +25,12 @@ from domain.publications.author_grouping import (
     with_known_first_name,
 )
 from domain.publications.list_copies import copied_source_contributions
-from pipeline.runtime.context import Phase, PhaseContext
+from pipeline.graph import task
+from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.cpu import available_cpus
 from pipeline.runtime.observability.log_format import LAST_BRANCH, nothing_to_do, quantity, step
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import track_progress, waiting
-from pipeline.task_runner import TaskStep, run_tasks
 from pipeline.transformation.publications.author_grouping.residual_weights import (
     RESIDUAL_WEIGHTS,
 )
@@ -335,53 +335,124 @@ def build_contributions(
     return metrics
 
 
-@dataclass(frozen=True)
-class AuthorGroupingPhase:
-    def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Recalcule les contributions des publications en file, puis les attributs des contributions en file. Les attributs ont leur propre file : l'affiliation d'une contribution source change sans changer sa contribution."""
-
-        def build_task(ctx: PhaseContext) -> PhaseMetrics:
-            with ctx.open_tx() as conn:
-                return build_contributions(
-                    conn,
-                    AuthorGroupingStore(conn),
-                    ctx.logger,
-                    rebuild=ctx.options.rebuild_author_grouping,
-                )
-
-        def attributes_task(ctx: PhaseContext) -> PhaseMetrics:
-            step(ctx.logger, "Attributs des contributions")
-            t0 = time.perf_counter()
-            with (
-                waiting(f"{LAST_BRANCH}en cours", ctx.logger) as line,
-                ctx.open_tx() as conn,
-            ):
-                queued, updated = AuthorGroupingStore(conn).propagate_attributes()
-                line.conclude(
-                    f"{LAST_BRANCH}{quantity(queued, 'contribution examinée', 'contributions examinées')},"
-                    f" {quantity(updated, 'mise à jour', 'mises à jour')}"
-                    f" en {time.perf_counter() - t0:.1f} s"
-                )
-            metrics = PhaseMetrics(seen=queued, updated=updated)
-            metrics.report = quantity(
-                updated, "contribution mise à jour", "contributions mises à jour"
-            )
-            return metrics
-
-        by_task = run_tasks(
-            "author_grouping",
-            {
-                "author_grouping.build": TaskStep(build_task, label="Bilan"),
-                "author_grouping.attributes": TaskStep(
-                    attributes_task, label="Attributs des contributions"
-                ),
-            },
-            ctx,
+def _build(ctx: PhaseContext) -> PhaseMetrics:
+    """Recalcule les contributions des publications en file."""
+    with ctx.open_tx() as conn:
+        return build_contributions(
+            conn,
+            AuthorGroupingStore(conn),
+            ctx.logger,
+            rebuild=ctx.options.rebuild_author_grouping,
         )
-        metrics = by_task["author_grouping.build"]
-        metrics.details["attributes_updated"] = by_task["author_grouping.attributes"].updated
-        return metrics
 
 
-def build() -> Phase:
-    return AuthorGroupingPhase()
+def _attributes(ctx: PhaseContext) -> PhaseMetrics:
+    """Recalcule les attributs des contributions en file. Les attributs ont leur propre file : l'affiliation d'une contribution source change sans changer sa contribution."""
+    step(ctx.logger, "Attributs des contributions")
+    t0 = time.perf_counter()
+    with (
+        waiting(f"{LAST_BRANCH}en cours", ctx.logger) as line,
+        ctx.open_tx() as conn,
+    ):
+        queued, updated = AuthorGroupingStore(conn).propagate_attributes()
+        line.conclude(
+            f"{LAST_BRANCH}{quantity(queued, 'contribution examinée', 'contributions examinées')},"
+            f" {quantity(updated, 'mise à jour', 'mises à jour')}"
+            f" en {time.perf_counter() - t0:.1f} s"
+        )
+    metrics = PhaseMetrics(seen=queued, updated=updated)
+    metrics.report = quantity(updated, "contribution mise à jour", "contributions mises à jour")
+    return metrics
+
+
+TASKS = (
+    task(
+        "author_grouping.build",
+        reads=(
+            "publications.id",
+            "publication_contributions_queue",
+            "source_records.publication_id",
+            "source_records.source_id",
+            "source_records.corrections",
+            "source_contributions.id",
+            "source_contributions.source_record_id",
+            "source_contributions.author_position",
+            "source_contributions.collective",
+            "source_contributions.contributor_information_id",
+            "source_contributions.neutralized_identifiers",
+            "contributor_information",
+            # Prénom de la personne à laquelle un humain a rattaché l'identifiant d'une contribution source.
+            "person_identifiers",
+            "persons",
+            "contributions",
+            "aligned_source_contributions",
+        ),
+        writes=(
+            "contributions.id",
+            "contributions.reference_position",
+            "aligned_source_contributions.id",
+            "source_contributions.duplicate_of",
+            "publication_contributions_queue",
+            "contribution_attributes_queue",
+            # Une contribution rattachée dont les contributions sources changent est marquée pour la redécision de sa personne.
+            "contribution_resolution_queue",
+            "publication_author_alignment",
+        ),
+        # Publications supprimées plus loin dans le même run par `finalize.purge_publications` ; marquages retirés par la tâche elle-même ; personnes, identifiants, neutralisations et personnes des contributions, écrits par la phase `persons`.
+        previous_run=(
+            "publications.id",
+            "publication_contributions_queue",
+            "person_identifiers",
+            "persons",
+            "source_contributions.neutralized_identifiers",
+            "contributions.person_id",
+            "contributions.resolution_mode",
+        ),
+        run=_build,
+        label="Bilan",
+    ),
+    task(
+        "author_grouping.attributes",
+        reads=(
+            "contribution_attributes_queue",
+            "aligned_source_contributions",
+            "source_contributions.is_corresponding",
+            "source_contributions.perimeter_evidence",
+            "source_contributions.roles",
+            "source_contributions.author_position",
+            "source_contributions.collective",
+            "source_contributions.duplicate_of",
+            "source_records.publication_id",
+            "source_records.source_id",
+            "contributions.id",
+            "contributions.publication_id",
+            "contributions.author_positions",
+            "contributions.perimeter_evidence",
+            "contributions.roles",
+            "contributions.person_id",
+            "contributions.resolution_mode",
+        ),
+        writes=(
+            "contributions.author_positions",
+            "contributions.perimeter_evidence",
+            "contributions.roles",
+            "contribution_attributes_queue",
+            # Une contribution rattachée sans épinglage qui quitte le périmètre est marquée pour la redécision de sa personne.
+            "contribution_resolution_queue",
+        ),
+        # Personnes des contributions, écrites par la phase `persons`.
+        previous_run=(
+            "contributions.person_id",
+            "contributions.resolution_mode",
+        ),
+        run=_attributes,
+        label="Attributs des contributions",
+    ),
+)
+
+
+def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
+    """Renvoie les métriques du recalcul des contributions, avec le nombre de contributions aux attributs mis à jour."""
+    metrics = by_task["author_grouping.build"]
+    metrics.details["attributes_updated"] = by_task["author_grouping.attributes"].updated
+    return metrics
