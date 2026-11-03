@@ -348,25 +348,25 @@ def top_journals(
     ]
 
 
-REPORT_EXCLUDED_SOURCES = (Source.CROSSREF,)
-"""Sources absentes du tableau des sources."""
+REPORT_SOURCES = (Source.HAL, Source.OPENALEX, Source.WOS, Source.SCANR)
+"""Bases bibliographiques du tableau des sources."""
 
 
 def publications_by_source(conn: Connection, structure_id: int, period: Period) -> dict[str, int]:
-    """Nombre de publications signées par la structure présentes dans chaque source hors `REPORT_EXCLUDED_SOURCES`, par ordre décroissant."""
+    """Nombre de publications signées par la structure présentes dans chaque source de `REPORT_SOURCES`, par ordre décroissant."""
     rows = conn.execute(
         text(f"""
             SELECT sp.source::text AS source, count(DISTINCT p.id) AS n
             FROM publications p
             JOIN source_records sp ON sp.publication_id = p.id
             WHERE {_REPORT_PUBLICATION}
-              AND sp.source::text <> ALL(:excluded_sources)
+              AND sp.source::text = ANY(:sources)
             GROUP BY 1
             ORDER BY n DESC, 1
         """),  # noqa: S608 — fragments SQL constants
         {
             **_params(structure_id, period),
-            "excluded_sources": [s.value for s in REPORT_EXCLUDED_SOURCES],
+            "sources": [s.value for s in REPORT_SOURCES],
         },
     ).all()
     return {r.source: r.n for r in rows}
