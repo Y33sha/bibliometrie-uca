@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict pFMpkNK06a4Pgy4hFOcBHvbFuRWE2qURZ78xh1ij0MlGQQwvPbAbKP2At6kjeLj
+\restrict 7EDiPFbk9i2SBmFrOCuSRQHGhC1jznGCAegtsTddZLwfOuP1hOdUHm6Pkg25cc5
 
 -- Dumped from database version 18.4
 -- Dumped by pg_dump version 18.4
@@ -1416,7 +1416,7 @@ COMMENT ON COLUMN sources.source_records.publisher_id IS 'Éditeur que nomme la 
 -- Name: COLUMN source_records.is_matchable; Type: COMMENT; Schema: sources; Owner: -
 --
 
-COMMENT ON COLUMN sources.source_records.is_matchable IS 'Faux pour un enregistrement source écarté de la réconciliation : préfixe DOI exclu, titre de paratexte, enregistrement ScanR issu d''un dépôt HAL introuvable, enregistrement d''agrégateur sans DOI, lien ni clé de confirmation.';
+COMMENT ON COLUMN sources.source_records.is_matchable IS 'Faux pour un enregistrement source écarté de la réconciliation.';
 
 
 --
@@ -6130,5 +6130,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict pFMpkNK06a4Pgy4hFOcBHvbFuRWE2qURZ78xh1ij0MlGQQwvPbAbKP2At6kjeLj
+\unrestrict 7EDiPFbk9i2SBmFrOCuSRQHGhC1jznGCAegtsTddZLwfOuP1hOdUHm6Pkg25cc5
 

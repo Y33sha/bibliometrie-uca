@@ -1396,11 +1396,7 @@ source_records = Table(
         Boolean,
         nullable=False,
         server_default=text("true"),
-        comment=(
-            "Faux pour un enregistrement source écarté de la réconciliation : préfixe DOI exclu, "
-            "titre de paratexte, enregistrement ScanR issu d'un dépôt HAL introuvable, "
-            "enregistrement d'agrégateur sans DOI, lien ni clé de confirmation."
-        ),
+        comment="Faux pour un enregistrement source écarté de la réconciliation.",
     ),
     UniqueConstraint("source", "source_id", name="source_records_source_source_id_key"),
     CheckConstraint(
