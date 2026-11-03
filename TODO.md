@@ -18,6 +18,7 @@
 ## Publique
 * [ ] auteur premier, dernier, correspondant: sur les facettes et les stats
 * [ ] stats en compte fractionnaire vs compte entier?
+* [ ] quand on détache une publi d'un auteur: mettre à jour le décompte et la pagination
 ### Visualisation
 * [ ] taux de collaboration
 * [ ] évolution des collaborations dans le temps (graphes de collaboration par labo, avec visualisation animée par année)
