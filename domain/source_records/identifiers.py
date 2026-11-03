@@ -29,7 +29,10 @@ class SourceIdentifierRole(StrEnum):
 
 
 SOURCE_IDENTIFIER_ROLE_DEFINITIONS: dict[SourceIdentifierRole, str] = {
-    SourceIdentifierRole.PRIMARY: "identifiant de l'enregistrement dans la source.",
+    SourceIdentifierRole.PRIMARY: (
+        "identifiant de l'enregistrement dans la source. "
+        "Un enregistrement source a au plus un identifiant primaire."
+    ),
     SourceIdentifierRole.DERIVED: (
         "identifiant de l'enregistrement d'une autre source dont l'enregistrement source est "
         "dérivé. Un enregistrement source a au plus un identifiant dérivé."

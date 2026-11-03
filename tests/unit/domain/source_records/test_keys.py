@@ -203,14 +203,18 @@ class TestTokens:
         assert ConfirmationKeys(DoiKeys(), {}).tokens() == frozenset()
 
 
-def test_derivation_lit_les_identifiants_primaires_et_l_identifiant_derive_actifs():
+def test_derivation_lit_l_identifiant_primaire_et_l_identifiant_derive_actifs():
     hal, doi = SourceIdentifierType.HAL_ID, SourceIdentifierType.DOI
     identifiers = [
         SourceIdentifier(hal, "hal-1", SourceIdentifierRole.DERIVED),
         SourceIdentifier(doi, "10.1/x", SourceIdentifierRole.PRIMARY),
-        SourceIdentifier(doi, "10.1/y", SourceIdentifierRole.PRIMARY, removed_by="RULE"),
         SourceIdentifier(doi, "10.1/z", SourceIdentifierRole.SECONDARY),
     ]
-    assert derivation(identifiers) == Derivation(
-        frozenset({("doi", "10.1/x")}), ("hal_id", "hal-1")
+    assert derivation(identifiers) == Derivation(("doi", "10.1/x"), ("hal_id", "hal-1"))
+
+
+def test_derivation_ignore_un_identifiant_primaire_retire():
+    removed = SourceIdentifier(
+        SourceIdentifierType.DOI, "10.1/y", SourceIdentifierRole.PRIMARY, removed_by="RULE"
     )
+    assert derivation([removed]) == Derivation()

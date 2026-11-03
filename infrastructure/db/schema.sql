@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict IsRcOAeEdp1D6bVRm2dF9IeHVnzy2XVd6GrsYwcHasKPPaK9jabbeE7g9YYhWjn
+\restrict D2VmuphnK38t9TSQYQfVMrrhxVcw4Jop1dr1W9TwbqvjcpOIfhWKVeJgi5BGM8a
 
 -- Dumped from database version 18.4
 -- Dumped by pg_dump version 18.4
@@ -2910,7 +2910,7 @@ COMMENT ON COLUMN sources.source_record_identifiers.id_value IS 'Forme normalis�
 -- Name: COLUMN source_record_identifiers.role; Type: COMMENT; Schema: sources; Owner: -
 --
 
-COMMENT ON COLUMN sources.source_record_identifiers.role IS 'primary : identifiant de l''enregistrement dans la source. derived : identifiant de l''enregistrement d''une autre source dont l''enregistrement source est dérivé. Un enregistrement source a au plus un identifiant dérivé. secondary : identifiant que la source attribue au même document. related : identifiant d''un document lié.';
+COMMENT ON COLUMN sources.source_record_identifiers.role IS 'primary : identifiant de l''enregistrement dans la source. Un enregistrement source a au plus un identifiant primaire. derived : identifiant de l''enregistrement d''une autre source dont l''enregistrement source est dérivé. Un enregistrement source a au plus un identifiant dérivé. secondary : identifiant que la source attribue au même document. related : identifiant d''un document lié.';
 
 
 --
@@ -5329,6 +5329,13 @@ CREATE UNIQUE INDEX uq_source_record_identifiers_derived ON sources.source_recor
 
 
 --
+-- Name: uq_source_record_identifiers_primary; Type: INDEX; Schema: sources; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_source_record_identifiers_primary ON sources.source_record_identifiers USING btree (source_record_id) WHERE (role = 'primary'::public.source_identifier_role);
+
+
+--
 -- Name: addresses_normalized_text_key; Type: INDEX; Schema: structures; Owner: -
 --
 
@@ -6105,5 +6112,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict IsRcOAeEdp1D6bVRm2dF9IeHVnzy2XVd6GrsYwcHasKPPaK9jabbeE7g9YYhWjn
+\unrestrict D2VmuphnK38t9TSQYQfVMrrhxVcw4Jop1dr1W9TwbqvjcpOIfhWKVeJgi5BGM8a
 

@@ -95,7 +95,7 @@ def _derived_anchors(
     members: list[ReconcileMember], own_anchors: Mapping[int, str | None]
 ) -> dict[int, str]:
     """Renvoie l'ancre suivie par chaque enregistrement source dérivé : celle de son parent. Sans parent parmi `members`, les enregistrements sources de même identifiant dérivé suivent l'unique ancre parmi les leurs."""
-    parents = {key: m for m in members for key in m.derivation.primary}
+    parents = {m.derivation.primary: m for m in members if m.derivation.primary is not None}
     families: dict[tuple[str, str], list[ReconcileMember]] = defaultdict(list)
     for m in members:
         if m.derivation.derived is not None:

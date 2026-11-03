@@ -25,7 +25,7 @@ def _m(
     year=2024,
     doc_type=None,
     matchable=True,
-    primary=(),
+    primary=None,
     derived=None,
 ):
     """Construit un membre du voisinage.
@@ -33,7 +33,7 @@ def _m(
     Args:
         doi: DOI primaire.
         weak: DOI secondaires.
-        primary: identifiants primaires, en couples (type, valeur).
+        primary: identifiant primaire, en couple (type, valeur).
         derived: identifiant dérivé, en couple (type, valeur).
     """
     return ReconcileMember(
@@ -42,7 +42,7 @@ def _m(
         publication_doi=publication_doi,
         doi_keys=DoiKeys(frozenset({doi} if doi else ()), frozenset(weak)),
         tokens=frozenset(tokens),
-        derivation=Derivation(frozenset(primary), derived),
+        derivation=Derivation(primary, derived),
         in_perimeter=in_perimeter,
         title_normalized=tn,
         publication_year=year,
@@ -305,7 +305,7 @@ class TestDerivedRecords:
             30,
             weak=("10.1/article",),
             tokens=[_HAL, ("doi", "10.1/article")],
-            primary=[_HAL],
+            primary=_HAL,
         )
         scanr = _m(4, 40, tokens=[_HAL, ("pmid", "1")], derived=_HAL)
 
@@ -331,7 +331,7 @@ class TestDerivedRecords:
             30,
             weak=("10.1/article",),
             tokens=[_HAL, ("doi", "10.1/article")],
-            primary=[_HAL],
+            primary=_HAL,
         )
         openalex = _m(
             4,
