@@ -2751,7 +2751,7 @@ export interface paths {
         };
         /**
          * List Phases
-         * @description Renvoie l'ordre des phases du pipeline (`pipeline.graph`), pour la trame du ruban.
+         * @description Renvoie l'ordre des phases du pipeline, pour la trame du ruban.
          */
         get: operations["list_phases_api_pipeline_phases_get"];
         put?: never;

@@ -1,6 +1,11 @@
 """L'ordre des phases est cohérent : noms uniques."""
 
-from pipeline.phases import PHASE_ORDER, PHASES
+from pipeline.phases import PHASES
+from pipeline.public import PHASE_ORDER
+
+
+def test_l_ordre_public_suit_les_phases():
+    assert tuple(phase.name for phase in PHASES) == PHASE_ORDER
 
 
 def test_phases_uniques():

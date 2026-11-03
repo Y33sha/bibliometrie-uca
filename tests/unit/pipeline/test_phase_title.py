@@ -9,7 +9,8 @@ import sys
 import pytest
 
 from pipeline.graph import Phase
-from pipeline.phases import PHASE_ORDER, PHASES
+from pipeline.phases import PHASES
+from pipeline.public import PHASE_ORDER
 from pipeline.run import (
     PHASE_TITLE_WIDTH,
     _build_arg_parser,

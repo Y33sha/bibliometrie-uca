@@ -152,9 +152,6 @@ PHASES: tuple[Phase, ...] = (
     ),
 )
 
-PHASE_ORDER: tuple[str, ...] = tuple(phase.name for phase in PHASES)
-"""Noms des phases, dans l'ordre d'exécution."""
-
 ALL_TASKS: tuple[Task, ...] = (
     *phase_tasks(RUN_PHASE),
     *(task for phase in PHASES for task in phase.tasks),

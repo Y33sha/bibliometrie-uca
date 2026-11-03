@@ -35,7 +35,7 @@ from infrastructure.observability.phase_executions import PhaseExecutionRecorder
 from pipeline.graph import Phase
 from pipeline.ingestion.api_params import request_budget
 from pipeline.ingestion.credentials import source_credentials_missing
-from pipeline.phases import PHASE_ORDER, PHASES
+from pipeline.phases import PHASES
 from pipeline.runtime.context import RunOptions
 from pipeline.runtime.execution import log, open_tx, phase_context
 from pipeline.runtime.lock import PipelineAlreadyRunningError, pipeline_lock
@@ -54,7 +54,7 @@ set_bar_stream(console_stream())
 configure_root_logging(logging.WARNING)
 
 
-PHASE_NAMES = list(PHASE_ORDER)
+PHASE_NAMES = [phase.name for phase in PHASES]
 
 
 def _sigterm_raises_keyboard_interrupt(_signum: int, _frame: FrameType | None) -> None:
