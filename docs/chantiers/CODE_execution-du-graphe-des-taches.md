@@ -78,4 +78,4 @@ Constats sur la normalisation :
 
 ### Phase 5 — Documentation
 
-- [ ] Mise à jour de `docs/pipeline/` et de la liste des phases du `CLAUDE.md`.
+- [x] Mise à jour de `docs/pipeline/`, `docs/architecture/` et du `CLAUDE.md`.
