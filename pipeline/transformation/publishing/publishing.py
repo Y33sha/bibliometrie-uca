@@ -6,6 +6,7 @@ Contraintes d'ordre :
 - Les ISSN des séries précèdent leur vérification Sudoc et l'import de la table ISSN-L, qui précèdent le rattachement des enregistrements sources aux revues : le rattachement lit l'ISSN-L et le titre Sudoc de chaque ISSN.
 - Le typage OpenAlex des revues `unknown` suit le rattachement, qui pose leur identifiant OpenAlex, et précède le typage en recueil d'actes, qui vise aussi les revues `unknown`.
 - Les espaces de noms DOI suivent le rattachement et le typage des revues.
+- Le rattachement des enregistrements sources aux monographies suit la fusion des autres noms des éditeurs : l'éditeur départage les volumes de même titre.
 - Le rattachement des monographies à leur collection suit le rattachement des enregistrements sources. La nature des monographies lit le type de la collection posé par le rattachement.
 
 `import_issnl_table` importe la table ISSN-L de l'ISSN International Centre, qui fait autorité sur `serial_issns.issnl`, quand le dernier import date de plus de `issnl_table_refresh_after_days` jours. `enrich_serials_from_doaj` importe le dump CSV du DOAJ, qui fait autorité sur `is_in_doaj`, quand le dernier import date de plus de `doaj_refresh_after_days` jours. L'enrichissement des éditeurs (pays, ROR, type) se lance à la demande, par `interfaces/cli/maintenance/enrich_publishers.py`.
@@ -36,10 +37,12 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.task_runner import TaskStep, run_tasks
 from pipeline.transformation.publishing.doi_prefixes import DoiPrefixStore
 from pipeline.transformation.publishing.monographs import (
+    attach_monographs,
     link_monographs_to_collections,
     merge_duplicate_monographs,
     type_proceedings_volumes,
 )
+from pipeline.transformation.publishing.monographs.attach_monographs import run_attach_monographs
 from pipeline.transformation.publishing.monographs.link_monographs_to_collections import (
     run_link_monographs_to_collections,
 )
@@ -149,6 +152,11 @@ _TABLE: tuple[tuple[str, str, Callable[[PhaseMetrics], int]], ...] = (
         lambda m: m.extras.get("serial_doi_namespaces", 0),
     ),
     (
+        "attach_monographs",
+        "enregistrements sources rattachés aux monographies",
+        lambda m: m.updated,
+    ),
+    (
         "merge_duplicate_monographs",
         "monographies en double fusionnées",
         lambda m: m.extras.get("monographs_merged", 0),
@@ -249,6 +257,9 @@ def build() -> Phase:
                     "Publications en série",
                     enrich_serials_from_doaj.LABEL,
                 ),
+                "attach_monographs": TaskStep(
+                    _run_attach_monographs, "Monographies", attach_monographs.LABEL
+                ),
                 "merge_duplicate_monographs": TaskStep(
                     _run_merge_duplicate_monographs,
                     "Monographies",
@@ -347,6 +358,11 @@ def _run_check_issns_in_sudoc(
                 max_per_run=cap(conn, ConfigKey.SUDOC_MAX_PER_RUN),
             )
         )
+
+
+def _run_attach_monographs(ctx: PhaseContext) -> PhaseMetrics:
+    with ctx.open_tx() as conn:
+        return run_attach_monographs(conn, ctx.logger)
 
 
 def _run_merge_duplicate_monographs(ctx: PhaseContext) -> PhaseMetrics:

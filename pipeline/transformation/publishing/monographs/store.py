@@ -1,18 +1,12 @@
-"""Store des monographies : recherche, création et enrichissement de la table `monographs`, pour le pipeline."""
+"""Store des monographies : lecture, création et enrichissement de la table `monographs`, pour le pipeline."""
 
 from sqlalchemy import Connection, text
 
-from domain.monographs.matching import MonographCandidate
+from domain.monographs.attachment import ExistingMonograph
 from infrastructure.db.scalars import scalar_int
 
-_FIND_BY_ISBN = text("""
-    SELECT id FROM monographs WHERE isbn = :isbn OR eisbn = :isbn ORDER BY id LIMIT 1
-""")
-
-_FIND_BY_TITLE = text("""
-    SELECT id, isbn, eisbn, publisher_id FROM monographs
-    WHERE title_normalized = :title_normalized
-    ORDER BY id
+_EXISTING = text("""
+    SELECT id, title_normalized, isbn, eisbn, publisher_id FROM monographs ORDER BY id
 """)
 
 _CREATE = text("""
@@ -47,14 +41,12 @@ class MonographStore:
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
 
-    def find_monograph_by_isbn(self, isbn: str) -> int | None:
-        """Renvoie la monographie qui a cet ISBN, papier ou électronique."""
-        return self._conn.execute(_FIND_BY_ISBN, {"isbn": isbn}).scalar_one_or_none()
-
-    def find_monographs_by_title(self, title_normalized: str) -> list[MonographCandidate]:
-        """Renvoie les monographies de ce titre normalisé, de la plus ancienne à la plus récente."""
-        rows = self._conn.execute(_FIND_BY_TITLE, {"title_normalized": title_normalized})
-        return [MonographCandidate(r.id, r.isbn, r.eisbn, r.publisher_id) for r in rows]
+    def existing_monographs(self) -> list[ExistingMonograph]:
+        """Renvoie toutes les monographies, par identifiant croissant."""
+        return [
+            ExistingMonograph(r.id, r.title_normalized, r.isbn, r.eisbn, r.publisher_id)
+            for r in self._conn.execute(_EXISTING)
+        ]
 
     def create_monograph(
         self,

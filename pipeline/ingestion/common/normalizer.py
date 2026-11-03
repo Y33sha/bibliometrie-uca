@@ -45,12 +45,7 @@ from pipeline.runtime.observability.log_format import (
 )
 from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.progress import track_progress
-from pipeline.transformation.publishing.find_or_create import (
-    Containers,
-    find_or_create_containers,
-    find_or_create_publisher,
-)
-from pipeline.transformation.publishing.monographs.store import MonographStore
+from pipeline.transformation.publishing.find_or_create import find_or_create_publisher
 from pipeline.transformation.publishing.publishers.store import PublisherStore
 
 type Document = Mapping[str, JsonValue]
@@ -96,7 +91,6 @@ class SourceNormalizer(ABC):
         logger: logging.Logger,
         staging_store: StagingStore,
         record_store: SourceRecordStore,
-        monograph_store: MonographStore,
         publisher_store: PublisherStore,
         contribution_store: SourceContributionStore,
         location_store: LocationStore,
@@ -107,7 +101,6 @@ class SourceNormalizer(ABC):
         self.logger = logger
         self._staging = staging_store
         self._record_store = record_store
-        self._monograph_store = monograph_store
         self._publisher_store = publisher_store
         self._contribution_store = contribution_store
         self._location_store = location_store
@@ -148,9 +141,13 @@ class SourceNormalizer(ABC):
 
     @abstractmethod
     def source_record(
-        self, row: StagingRow, doc: Document, containers: Containers
+        self, row: StagingRow, doc: Document, *, has_series: bool
     ) -> SourceRecordUpsert:
-        """Construit l'enregistrement source du document, rattaché à ses conteneurs."""
+        """Construit l'enregistrement source du document.
+
+        Args:
+            has_series: le document décrit une série, qui sert au rattachement à sa revue.
+        """
 
     @abstractmethod
     def author_block(self, doc: Document) -> AuthorBlock:
@@ -178,7 +175,7 @@ class SourceNormalizer(ABC):
     def normalize_record(self, row: StagingRow) -> bool:
         """Normalise un document à métadonnées minimales et marque sa ligne traitée. Renvoie vrai, ou faux sans rien écrire pour un document refusé.
 
-        Écrit dans l'ordre l'éditeur, les conteneurs, l'enregistrement source rattaché à son éditeur, ses localisations, son embargo, ses sujets et ses contributions sources.
+        Écrit dans l'ordre l'éditeur, l'enregistrement source rattaché à son éditeur, ses localisations, son embargo, ses sujets et ses contributions sources. La monographie se rattache dans la phase `publishing`.
         """
         doc = self.parse(row)
         if doc is None:
@@ -192,10 +189,7 @@ class SourceNormalizer(ABC):
             else None
         )
         series, volume = self.series_and_volume(row, doc)
-        containers = find_or_create_containers(
-            series, volume, publisher_id=publisher_id, monographs=self._monograph_store
-        )
-        record = self.source_record(row, doc, containers)
+        record = self.source_record(row, doc, has_series=series is not None)
         biblio = with_publisher(
             record.biblio,
             publisher.name if publisher else None,
@@ -208,7 +202,7 @@ class SourceNormalizer(ABC):
             biblio=with_monograph(with_journal(biblio, series), volume),
         )
         source_record_id = self._record_store.upsert_source_record(
-            record, has_series=containers.has_series
+            record, has_container=series is not None or volume is not None
         )
         self._location_store.replace_locations(
             source_record_id, [*self.locations(doc), *identifier_locations(record.identifiers)]

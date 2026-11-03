@@ -35,7 +35,6 @@ from pipeline.ingestion.common.source_records import normalized_identifiers
 from pipeline.ingestion.common.staging import StagingRow
 from pipeline.ingestion.crossref import ADAPTER as CROSSREF
 from pipeline.ingestion.datacite import ADAPTER as DATACITE
-from pipeline.transformation.publishing.find_or_create import Containers
 
 log = setup_logger("rewrite_versioned_dois", os.path.dirname(__file__))
 
@@ -147,7 +146,7 @@ class _Rewriter:
         doc = self.normalizer.parse(row)
         if doc is None:
             return
-        record = self.normalizer.source_record(row, doc, Containers(None, None))
+        record = self.normalizer.source_record(row, doc, has_series=False)
         dois = [i for i in normalized_identifiers(record) if i.id_type is SourceIdentifierType.DOI]
         if {(i.value, i.role.value) for i in dois} != {(d["value"], d["role"]) for d in r.dois}:
             self.counts["jeux de DOI réécrits"] += 1

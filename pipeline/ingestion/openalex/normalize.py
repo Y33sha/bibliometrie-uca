@@ -56,9 +56,6 @@ from pipeline.ingestion.openalex.payload import (
     short_openalex_id,
     url_identifiers,
 )
-from pipeline.transformation.publishing.find_or_create import (
-    Containers,
-)
 
 
 def extract_locations_data(
@@ -271,7 +268,8 @@ def get_publication_date(work: Mapping[str, JsonValue]) -> PublicationDate | Non
 def openalex_source_record(  # noqa: C901
     work: Mapping[str, JsonValue],
     staging_id: int,
-    containers: Containers,
+    *,
+    has_series: bool,
     primary: OpenalexLocation | None = None,
 ) -> SourceRecordUpsert:
     """Construit l'enregistrement source OpenAlex d'un work.
@@ -313,11 +311,10 @@ def openalex_source_record(  # noqa: C901
         identifiers=openalex_identifiers(location_identifiers, doi, primary),
         title=get_title(work) or "",
         raw_doc_type=as_str(work.get("type")),
-        monograph_id=containers.monograph_id,
         # Une archive, un entrepôt ou une plateforme d'ebooks héberge le work sans le contenir.
         container_title=(
             primary.source_display_name
-            if primary and names_serial(primary) and not containers.has_series
+            if primary and names_serial(primary) and not has_series
             else None
         ),
         raw_language=as_str(work.get("language")),
@@ -465,9 +462,11 @@ class OpenalexNormalizer(SourceNormalizer):
         return get_subjects(doc)
 
     def source_record(
-        self, row: StagingRow, doc: Document, containers: Containers
+        self, row: StagingRow, doc: Document, *, has_series: bool
     ) -> SourceRecordUpsert:
-        return openalex_source_record(doc, row.id, containers, parse_primary_location(doc))
+        return openalex_source_record(
+            doc, row.id, has_series=has_series, primary=parse_primary_location(doc)
+        )
 
     def author_block(self, doc: Document) -> AuthorBlock:
         return extract_openalex_author_block(doc)

@@ -14,7 +14,6 @@ from pipeline.ingestion.datacite.normalize import (
     get_biblio,
     get_container_facts,
 )
-from pipeline.transformation.publishing.find_or_create import Containers
 from tests.helpers.normalize_doubles import identifier_values, normalizer_arguments, staging_row
 
 
@@ -374,7 +373,7 @@ class TestSourceRecord:
         attributs = _attributs()
 
         document = datacite_source_record(
-            attributs, 42, datacite_doi(attributs, None), Containers(False, None)
+            attributs, 42, datacite_doi(attributs, None), has_series=False
         )
 
         assert document.source == "datacite"
@@ -394,21 +393,16 @@ class TestSourceRecord:
             ]
         )
 
-        document = datacite_source_record(
-            attributs, 42, "10.5281/zenodo.1", Containers(False, None)
-        )
+        document = datacite_source_record(attributs, 42, "10.5281/zenodo.1", has_series=False)
 
         assert identifier_values(document) == {"doi": ["10.5281/zenodo.0", "10.5281/zenodo.1"]}
 
     def test_titre_du_conteneur_garde_sans_revue_resolue(self):
         attributs = _attributs(container={"title": "Une collection"})
 
-        sans_revue = datacite_source_record(attributs, 42, "10.5281/zenodo.1", Containers(False, 8))
-        avec_revue = datacite_source_record(
-            attributs, 42, "10.5281/zenodo.1", Containers(True, None)
-        )
+        sans_revue = datacite_source_record(attributs, 42, "10.5281/zenodo.1", has_series=False)
+        avec_revue = datacite_source_record(attributs, 42, "10.5281/zenodo.1", has_series=True)
 
-        assert sans_revue.monograph_id == 8
         assert sans_revue.container_title == "Une collection"
         assert avec_revue.container_title is None
 
@@ -423,7 +417,7 @@ class TestDoi:
         row = staging_row(staging_id=42, raw={"attributes": attributs}, doi="10.5281/zenodo.9")
         normalizer = _normalizer()
 
-        document = normalizer.source_record(row, normalizer.parse(row), Containers(False, None))
+        document = normalizer.source_record(row, normalizer.parse(row), has_series=False)
 
         assert identifier_values(document)["doi"] == ["10.5281/zenodo.9"]
 

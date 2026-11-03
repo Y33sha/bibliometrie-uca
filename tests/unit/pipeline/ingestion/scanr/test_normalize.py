@@ -23,17 +23,14 @@ from pipeline.ingestion.scanr.normalize import (
     get_title,
     scanr_source_record,
 )
-from pipeline.transformation.publishing.find_or_create import Containers
 from tests.helpers.normalize_doubles import identifier_values, normalizer_arguments, staging_row
-
-_NO_CONTAINERS = Containers(has_series=False, monograph_id=None)
 
 
 class TestScanrSourceRecordLicense:
     """Seule la licence d'une localisation d'éditeur est normalisée ; celle d'une archive reste brute dans `meta`."""
 
     def _call(self, evidence: dict) -> SourceRecordUpsert:
-        return scanr_source_record({"oaEvidence": evidence}, 1, "sc-1", _NO_CONTAINERS)
+        return scanr_source_record({"oaEvidence": evidence}, 1, "sc-1", has_series=False)
 
     def test_licence_de_l_editeur_normalisee(self):
         captured = self._call({"hostType": "publisher", "license": "cc-by"})
@@ -49,7 +46,7 @@ class TestScanrSourceRecordLicense:
 
 class TestScanrSourceRecordExternalIds:
     def _call(self, doc) -> SourceRecordUpsert:
-        return scanr_source_record(doc, staging_id=1, scanr_id="sc-1", containers=_NO_CONTAINERS)
+        return scanr_source_record(doc, staging_id=1, scanr_id="sc-1", has_series=False)
 
     def test_every_doi_of_the_external_ids(self):
         doc = {
@@ -249,7 +246,7 @@ class TestThese:
         assert _normalizer().container_facts(self._DOC) is None
 
     def test_ni_titre_de_conteneur_ni_revue_dans_la_biblio(self):
-        captured = scanr_source_record(self._DOC, 1, "nnt2023clfac001", _NO_CONTAINERS)
+        captured = scanr_source_record(self._DOC, 1, "nnt2023clfac001", has_series=False)
         assert captured.container_title is None
         assert captured.biblio is None
 
@@ -264,9 +261,7 @@ class TestScanrSourceRecordMetadonnees:
             "isOa": False,
         }
 
-        record = scanr_source_record(
-            doc, 1, "doi10.1/a", Containers(has_series=True, monograph_id=None)
-        )
+        record = scanr_source_record(doc, 1, "doi10.1/a", has_series=True)
 
         assert record.title == "Un titre"
         assert record.raw_doc_type == "journal-article"
@@ -280,20 +275,20 @@ class TestScanrSourceRecordMetadonnees:
     def test_titre_de_contenant_conserve_faute_de_revue(self):
         doc = {"source": {"title": "Actes du colloque"}}
 
-        record = scanr_source_record(doc, 1, "sc-1", _NO_CONTAINERS)
+        record = scanr_source_record(doc, 1, "sc-1", has_series=False)
 
         assert record.container_title == "Actes du colloque"
 
     def test_these_reconnue_a_son_identifiant(self):
         """La source encode les thèses en préfixant leur numéro national."""
-        record = scanr_source_record({}, 1, "these2021CLFAC030", _NO_CONTAINERS)
+        record = scanr_source_record({}, 1, "these2021CLFAC030", has_series=False)
 
         assert identifier_values(record) == {"nnt": ["2021CLFAC030"]}
 
 
 class TestScanrSourceRecordIdentifiants:
     def _call(self, doc, scanr_id: str = "sc-1") -> SourceRecordUpsert:
-        return scanr_source_record(doc, staging_id=1, scanr_id=scanr_id, containers=_NO_CONTAINERS)
+        return scanr_source_record(doc, staging_id=1, scanr_id=scanr_id, has_series=False)
 
     def test_identifiant_pubmed(self):
         document = self._call({"externalIds": [{"type": "pmid", "id": "12345678"}]})
@@ -316,7 +311,7 @@ class TestScanrSourceRecordIdentifiants:
 
 class TestScanrSourceRecordChamps:
     def _call(self, doc, scanr_id: str = "sc-1") -> SourceRecordUpsert:
-        return scanr_source_record(doc, staging_id=1, scanr_id=scanr_id, containers=_NO_CONTAINERS)
+        return scanr_source_record(doc, staging_id=1, scanr_id=scanr_id, has_series=False)
 
     def test_mots_cles_en_liste(self):
         document = self._call({"keywords": {"default": ["climat", " océan "]}})
@@ -411,9 +406,7 @@ class TestScanrNormalizer:
             "source": {"title": "Revue"},
         }
 
-        document = _normalizer().source_record(
-            row, doc, Containers(has_series=True, monograph_id=5)
-        )
+        document = _normalizer().source_record(row, doc, has_series=True)
 
         assert (document.source, document.source_id, document.staging_id) == (
             "scanr",
@@ -421,7 +414,6 @@ class TestScanrNormalizer:
             42,
         )
         assert document.title == "Un titre"
-        assert document.monograph_id == 5
         assert document.container_title is None
         assert identifier_values(document) == {"nnt": ["2021CLFAC030"]}
 

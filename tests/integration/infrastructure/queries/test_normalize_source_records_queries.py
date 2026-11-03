@@ -272,12 +272,12 @@ class TestUpsertSourceRecord:
 class TestPublisher:
     """L'éditeur nommé par la source s'écrit, sauf pour une production hébergée sans être publiée."""
 
-    def _publisher_of(self, conn, *, has_series: bool = False, **overrides) -> int | None:
+    def _publisher_of(self, conn, *, has_container: bool = False, **overrides) -> int | None:
         publisher_id = insert_publisher(conn, "Éditeur")
         staging_id = insert_staging(conn, source="datacite", source_id="dc-stg")
         defaults = {"source": "datacite", "source_id": "10.9/x", "publisher_id": publisher_id}
         source_record_id = SourceRecordStore(conn).upsert_source_record(
-            _row(staging_id, **{**defaults, **overrides}), has_series=has_series
+            _row(staging_id, **{**defaults, **overrides}), has_container=has_container
         )
         return conn.execute(
             text("SELECT publisher_id FROM source_records WHERE id = :id"),
@@ -286,7 +286,7 @@ class TestPublisher:
 
     def test_article_datacite_dans_une_revue(self, sa_sync_conn):
         assert (
-            self._publisher_of(sa_sync_conn, raw_doc_type="JournalArticle", has_series=True)
+            self._publisher_of(sa_sync_conn, raw_doc_type="JournalArticle", has_container=True)
             is not None
         )
 
@@ -294,4 +294,4 @@ class TestPublisher:
         assert self._publisher_of(sa_sync_conn, raw_doc_type="JournalArticle") is None
 
     def test_jeu_de_donnees(self, sa_sync_conn):
-        assert self._publisher_of(sa_sync_conn, raw_doc_type="Dataset", has_series=True) is None
+        assert self._publisher_of(sa_sync_conn, raw_doc_type="Dataset", has_container=True) is None

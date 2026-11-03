@@ -34,7 +34,12 @@ EXTRA_LABELS: dict[str, str | tuple[str, str]] = {
         "monographies à plusieurs collections possibles",
     ),
     "monograph_series": ("série sans ISSN de monographies", "séries sans ISSN de monographies"),
+    "monographs_created": ("monographie créée", "monographies créées"),
     "monographs_deleted": ("monographie vide supprimée", "monographies vides supprimées"),
+    "monographs_detached": (
+        "enregistrement source détaché de sa monographie",
+        "enregistrements sources détachés de leur monographie",
+    ),
     "monographs_linked": (
         "monographie rattachée à sa collection",
         "monographies rattachées à leur collection",

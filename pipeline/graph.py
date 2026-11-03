@@ -147,7 +147,6 @@ def order_violations(tasks: Sequence[Task]) -> list[tuple[str, str, str]]:
 _CONTAINERS = (
     "publishers",
     "publisher_name_forms",
-    "monographs",
 )
 
 
@@ -757,6 +756,25 @@ TASKS: tuple[Task, ...] = (
         ),
         previous_run=("serial_issns", "serials"),
         network="doaj",
+    ),
+    _task(
+        "publishing.attach_monographs",
+        "publishing",
+        reads=(
+            "source_records.biblio",
+            "source_records.monograph_id",
+            "source_records.publisher_id",
+            "monographs",
+        ),
+        writes=(
+            "monographs",
+            "source_records.monograph_id",
+            "publications.monograph_id",
+            "source_record_keys_queue",
+            "merge_redirects",
+        ),
+        # Monographies créées ou fusionnées aux runs précédents, reprises par les volumes.
+        previous_run=("monographs", "source_records.monograph_id"),
     ),
     _task(
         "publishing.merge_duplicate_monographs",

@@ -8,7 +8,7 @@ from typing import NamedTuple
 
 
 class MonographCandidate(NamedTuple):
-    """Monographie de même titre qu'un enregistrement source."""
+    """Monographie d'un groupe de même titre."""
 
     id: int
     isbn: str | None
@@ -20,43 +20,13 @@ class MonographCandidate(NamedTuple):
         return bool(self.isbn or self.eisbn)
 
 
-class MonographChoice(NamedTuple):
-    """Monographie existante retenue, création d'une monographie, ou ni l'une ni l'autre."""
-
-    monograph_id: int | None
-    create: bool
-
-
-_CREATE = MonographChoice(None, create=True)
-_ABSTAIN = MonographChoice(None, create=False)
-
-
-def _same_publisher(first: int | None, second: int | None) -> bool:
+def compatible_publishers(first: int | None, second: int | None) -> bool:
+    """Vrai si les deux éditeurs sont égaux ou l'un absent."""
     return first is None or second is None or first == second
 
 
-def choose_monograph(
-    candidates: Sequence[MonographCandidate], *, publisher_id: int | None, has_isbn: bool
-) -> MonographChoice:
-    """Choisit la monographie d'un enregistrement source parmi celles de même titre, à défaut de monographie de même ISBN.
-
-    Les monographies du même éditeur passent avant celles sans éditeur. Avec ISBN, l'enregistrement source rejoint une monographie sans ISBN, sinon il en crée une. Sans ISBN, il rejoint la seule monographie compatible, ou la seule sans ISBN. Entre plusieurs volumes, il reste sans monographie. Sans monographie compatible, il en crée une.
-    """
-    compatible = [c for c in candidates if _same_publisher(c.publisher_id, publisher_id)]
-    same = [c for c in compatible if publisher_id is not None and c.publisher_id == publisher_id]
-    pool = same or compatible
-    without_isbn = [c for c in pool if not c.has_isbn]
-    if has_isbn:
-        return MonographChoice(without_isbn[0].id, create=False) if without_isbn else _CREATE
-    if len(pool) == 1:
-        return MonographChoice(pool[0].id, create=False)
-    if len(without_isbn) == 1:
-        return MonographChoice(without_isbn[0].id, create=False)
-    return _ABSTAIN if pool else _CREATE
-
-
 def _compatible(first: MonographCandidate, second: MonographCandidate) -> bool:
-    return _same_publisher(first.publisher_id, second.publisher_id) and not (
+    return compatible_publishers(first.publisher_id, second.publisher_id) and not (
         first.has_isbn and second.has_isbn
     )
 

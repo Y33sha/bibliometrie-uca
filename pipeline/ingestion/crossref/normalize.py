@@ -48,9 +48,6 @@ from pipeline.ingestion.crossref.payload import (
     extract_crossref_source_extras,
     strip_jats_tags,
 )
-from pipeline.transformation.publishing.find_or_create import (
-    Containers,
-)
 
 
 def get_doi(msg: Mapping[str, JsonValue]) -> str | None:
@@ -301,7 +298,7 @@ def get_locations(msg: Mapping[str, JsonValue]) -> list[LocationFacts]:
 
 
 def crossref_source_record(
-    msg: Mapping[str, JsonValue], staging_id: int, containers: Containers
+    msg: Mapping[str, JsonValue], staging_id: int, *, has_series: bool
 ) -> SourceRecordUpsert:
     """Construit l'enregistrement source Crossref d'une œuvre, identifiée par son DOI."""
     doi = get_doi(msg)
@@ -315,8 +312,7 @@ def crossref_source_record(
         identifiers=crossref_identifiers(msg, doi),
         title=title,
         raw_doc_type=crossref_raw_doc_type(msg),
-        monograph_id=containers.monograph_id,
-        container_title=get_container_title(msg) if not containers.has_series else None,
+        container_title=get_container_title(msg) if not has_series else None,
         raw_language=get_language(msg),
         biblio=get_biblio(msg),
         abstract=get_abstract(msg),
@@ -352,9 +348,9 @@ class CrossrefNormalizer(SourceNormalizer):
         return extract_crossref_publication_date(doc, max_year=today().year + 1)
 
     def source_record(
-        self, row: StagingRow, doc: Document, containers: Containers
+        self, row: StagingRow, doc: Document, *, has_series: bool
     ) -> SourceRecordUpsert:
-        return crossref_source_record(doc, row.id, containers)
+        return crossref_source_record(doc, row.id, has_series=has_series)
 
     def author_block(self, doc: Document) -> AuthorBlock:
         return extract_crossref_author_block(doc)

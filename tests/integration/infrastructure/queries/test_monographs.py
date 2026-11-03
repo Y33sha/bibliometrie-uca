@@ -64,20 +64,19 @@ def _row(conn, monograph_id):
     ).one()
 
 
-def test_recherche_par_isbn_papier_ou_electronique(repo):
-    mid = _create(repo, isbn=_PAPER, eisbn=_ELECTRONIC)
-    assert repo.find_monograph_by_isbn(_PAPER) == mid
-    assert repo.find_monograph_by_isbn(_ELECTRONIC) == mid
-
-
-def test_recherche_par_titre_tous_editeurs(repo, sa_sync_conn):
+def test_lecture_de_toutes_les_monographies(repo, sa_sync_conn):
     publisher = insert_publisher(sa_sync_conn, "P")
     with_publisher = _create(repo, "Introduction", publisher_id=publisher, isbn=_PAPER)
-    without_publisher = _create(repo, "Introduction")
-    assert repo.find_monographs_by_title("introduction") == [
-        (with_publisher, _PAPER, None, publisher),
-        (without_publisher, None, None, None),
-    ]
+    without_publisher = _create(repo, "Introduction", eisbn=_ELECTRONIC)
+    existing = {m.id: m for m in repo.existing_monographs()}
+    assert existing[with_publisher] == (with_publisher, "introduction", _PAPER, None, publisher)
+    assert existing[without_publisher] == (
+        without_publisher,
+        "introduction",
+        None,
+        _ELECTRONIC,
+        None,
+    )
 
 
 def test_enrichissement_complete_les_champs_vides(repo, sa_sync_conn):

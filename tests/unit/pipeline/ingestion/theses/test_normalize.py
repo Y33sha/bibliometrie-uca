@@ -22,7 +22,6 @@ from pipeline.ingestion.theses.normalize import (
     get_title,
     theses_source_record,
 )
-from pipeline.transformation.publishing.find_or_create import Containers
 from tests.helpers.normalize_doubles import (
     FakeSourceContributionStore,
     FakeSourceRecordStore,
@@ -318,7 +317,7 @@ class TestThesesNormalizerClass:
         """L'enregistrement source reprend la ligne de staging et les métadonnées lues dans la thèse."""
         thesis = {"titrePrincipal": "T", "nnt": "2024clfac001", "dateSoutenance": "15/03/2024"}
         row = staging_row(staging_id=42, source_id="2024CLFAC001", raw=thesis)
-        record = _make_normalizer().source_record(row, thesis, Containers(False, None))
+        record = _make_normalizer().source_record(row, thesis, has_series=False)
         assert (record.source, record.source_id, record.staging_id) == (
             "theses",
             "2024CLFAC001",

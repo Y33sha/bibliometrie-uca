@@ -55,7 +55,6 @@ class SourceRecordUpsert:
     """Date de publication, avec sa précision. La base en tire `publication_year`."""
     raw_doc_type: str | None = None
     """Type de document dans le vocabulaire de la source."""
-    monograph_id: int | None = None
     publisher_id: int | None = None
     """Éditeur nommé par la source. L'écriture le retire d'une production hébergée sans être publiée (`source_record_has_publisher`)."""
     container_title: str | None = None
@@ -180,20 +179,18 @@ class SourceRecordStore:
         self._conn = conn
         self._language_forms: dict[str, str] | None = None
 
-    def upsert_source_record(self, row: SourceRecordUpsert, *, has_series: bool = False) -> int:
-        """Écrit l'enregistrement source et ses identifiants, et renvoie son id. La revue se rattache dans la phase `publishing`.
+    def upsert_source_record(self, row: SourceRecordUpsert, *, has_container: bool = False) -> int:
+        """Écrit l'enregistrement source et ses identifiants, et renvoie son id. La revue et la monographie se rattachent dans la phase `publishing`.
 
         Args:
-            has_series: l'enregistrement source décrit une série ; avec sa monographie, cela décide de son éditeur (`source_record_has_publisher`).
+            has_container: l'enregistrement source décrit une série ou un volume ; cela décide de son éditeur (`source_record_has_publisher`).
         """
         params: dict[str, object] = {name: getattr(row, name) for name in _ROW_FIELDS}
         params["title"] = clean_title(row.title)
         params["title_normalized"] = normalized_title(row.title)
         params["doc_type"] = _doc_type(row)
         if not source_record_has_publisher(
-            params["doc_type"],
-            row.source,
-            has_container=has_series or row.monograph_id is not None,
+            params["doc_type"], row.source, has_container=has_container
         ):
             params["publisher_id"] = None
         container_title = optional_plain_text(row.container_title)

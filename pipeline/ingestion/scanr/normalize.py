@@ -42,9 +42,6 @@ from pipeline.ingestion.scanr.payload import (
     scanr_subjects,
     select_leaf_affiliations,
 )
-from pipeline.transformation.publishing.find_or_create import (
-    Containers,
-)
 
 
 def get_title(doc: Mapping[str, JsonValue]) -> str | None:
@@ -164,7 +161,8 @@ def scanr_source_record(  # noqa: C901
     doc: Mapping[str, JsonValue],
     staging_id: int,
     scanr_id: str,
-    containers: Containers,
+    *,
+    has_series: bool,
 ) -> SourceRecordUpsert:
     """Construit l'enregistrement source ScanR d'un document.
 
@@ -214,9 +212,8 @@ def scanr_source_record(  # noqa: C901
         identifiers=scanr_identifiers(doc, scanr_id),
         title=get_title(doc) or "",
         raw_doc_type=as_str(doc.get("type")),
-        monograph_id=containers.monograph_id,
         container_title=(
-            as_str(source.get("title")) if not (containers.has_series or is_thesis(doc)) else None
+            as_str(source.get("title")) if not (has_series or is_thesis(doc)) else None
         ),
         raw_language=None,
         abstract=abstract,
@@ -346,9 +343,9 @@ class ScanrNormalizer(SourceNormalizer):
         return scanr_subjects(doc.get("domains"))
 
     def source_record(
-        self, row: StagingRow, doc: Document, containers: Containers
+        self, row: StagingRow, doc: Document, *, has_series: bool
     ) -> SourceRecordUpsert:
-        return scanr_source_record(doc, row.id, row.source_id, containers)
+        return scanr_source_record(doc, row.id, row.source_id, has_series=has_series)
 
     def author_block(self, doc: Document) -> AuthorBlock:
         return extract_scanr_author_block(doc)

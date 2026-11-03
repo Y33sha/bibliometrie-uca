@@ -31,7 +31,6 @@ from pipeline.ingestion.common.normalizer import (
 from pipeline.ingestion.common.source_contributions import AuthorBlock, AuthorRecord
 from pipeline.ingestion.common.source_records import SourceRecordUpsert
 from pipeline.ingestion.common.staging import StagingRow
-from pipeline.transformation.publishing.find_or_create import Containers
 from tests.helpers.normalize_doubles import normalizer_arguments
 
 
@@ -81,7 +80,7 @@ class _StubNorm(SourceNormalizer):
         return PublicationDate.of_year(2020)
 
     def source_record(
-        self, row: StagingRow, doc: Document, containers: Containers
+        self, row: StagingRow, doc: Document, *, has_series: bool
     ) -> SourceRecordUpsert:
         raise NotImplementedError
 
@@ -350,7 +349,6 @@ _RECORD = SourceRecordUpsert(
     title="T",
     publication_date=PublicationDate.of_year(2020),
     raw_doc_type=None,
-    monograph_id=None,
     container_title=None,
     raw_language=None,
     biblio=None,
@@ -376,7 +374,7 @@ class _WritingNorm(_StubNorm):
         self._doc = doc
         self._publisher = publisher
         self._facts = facts
-        self.containers_seen: list[Containers] = []
+        self.series_seen: list[bool] = []
 
     def parse(self, row: StagingRow) -> Document | None:
         return self._doc
@@ -388,30 +386,25 @@ class _WritingNorm(_StubNorm):
         return self._facts
 
     def source_record(
-        self, row: StagingRow, doc: Document, containers: Containers
+        self, row: StagingRow, doc: Document, *, has_series: bool
     ) -> SourceRecordUpsert:
-        self.containers_seen.append(containers)
+        self.series_seen.append(has_series)
         return _RECORD
 
 
 @pytest.fixture
 def writes(monkeypatch) -> list[tuple]:
-    """Écritures de la séquence, dans l'ordre : éditeur, conteneurs, contributions sources."""
+    """Écritures de la séquence, dans l'ordre : éditeur, contributions sources."""
     calls: list[tuple] = []
 
     def publisher(name, *, openalex_id, repo):
         calls.append(("publisher", name, openalex_id))
         return 5
 
-    def containers(series, volume, *, publisher_id, monographs):
-        calls.append(("containers", publisher_id))
-        return Containers(series is not None, None)
-
     def sync(store, source, source_record_id, block, build):
         calls.append(("contributions", source, source_record_id))
 
     monkeypatch.setattr(normalizer_module, "find_or_create_publisher", publisher)
-    monkeypatch.setattr(normalizer_module, "find_or_create_containers", containers)
     monkeypatch.setattr(normalizer_module, "sync_source_contributions", sync)
     return calls
 
@@ -426,7 +419,7 @@ class TestNormalizeRecord:
         norm._record_store.upsert_source_record.assert_not_called()
         norm._staging.mark_done.assert_not_called()
 
-    def test_editeur_puis_conteneurs_puis_enregistrement_et_contributions(self, writes):
+    def test_editeur_puis_enregistrement_et_contributions(self, writes):
         norm = _WritingNorm(
             doc={"title": "T"},
             publisher=PublisherFacts("Elsevier", "P1"),
@@ -434,12 +427,8 @@ class TestNormalizeRecord:
         )
         norm._record_store.upsert_source_record.return_value = 42
         assert norm.normalize_record(self.ROW) is True
-        assert writes == [
-            ("publisher", "Elsevier", "P1"),
-            ("containers", 5),
-            ("contributions", "test", 42),
-        ]
-        assert norm.containers_seen == [Containers(True, None)]
+        assert writes == [("publisher", "Elsevier", "P1"), ("contributions", "test", 42)]
+        assert norm.series_seen == [True]
         norm._record_store.upsert_source_record.assert_called_once_with(
             replace(
                 _RECORD,
@@ -450,7 +439,7 @@ class TestNormalizeRecord:
                     "journal": {"title": "Revue"},
                 },
             ),
-            has_series=True,
+            has_container=True,
         )
         norm._location_store.replace_locations.assert_called_once_with(42, [])
         norm._embargo_store.replace_embargo.assert_called_once_with(42, None)
@@ -460,16 +449,11 @@ class TestNormalizeRecord:
         norm = _WritingNorm(doc={"title": "T"})
         norm._record_store.upsert_source_record.return_value = 42
         assert norm.normalize_record(self.ROW) is True
-        assert writes == [("containers", None), ("contributions", "test", 42)]
-        assert norm.containers_seen == [Containers(False, None)]
-
-    def test_conteneurs_sans_editeur(self, writes):
-        norm = _WritingNorm(
-            doc={"title": "T"},
-            facts=ContainerDescription(source="test", raw_doc_type=None, journal_title="Revue"),
+        assert writes == [("contributions", "test", 42)]
+        assert norm.series_seen == [False]
+        norm._record_store.upsert_source_record.assert_called_once_with(
+            replace(_RECORD, publisher_id=None), has_container=False
         )
-        norm.normalize_record(self.ROW)
-        assert writes[0] == ("containers", None)
 
 
 class TestSeriesAndVolume:

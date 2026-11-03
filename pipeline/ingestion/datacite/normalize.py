@@ -58,9 +58,6 @@ from pipeline.ingestion.datacite.payload import (
     host_isbns,
     own_isbns,
 )
-from pipeline.transformation.publishing.find_or_create import (
-    Containers,
-)
 
 
 def get_container_facts(attributes: Mapping[str, JsonValue]) -> ContainerDescription:
@@ -229,7 +226,7 @@ def datacite_identifiers(
 
 
 def datacite_source_record(
-    attributes: Mapping[str, JsonValue], staging_id: int, doi: str, containers: Containers
+    attributes: Mapping[str, JsonValue], staging_id: int, doi: str, *, has_series: bool
 ) -> SourceRecordUpsert:
     """Construit l'enregistrement source DataCite d'une ressource, identifié par son DOI."""
     title = get_title(attributes)
@@ -243,8 +240,7 @@ def datacite_source_record(
         identifiers=datacite_identifiers(attributes, doi),
         title=title,
         raw_doc_type=extract_datacite_doc_type_token(attributes),
-        monograph_id=containers.monograph_id,
-        container_title=container_title if not containers.has_series else None,
+        container_title=container_title if not has_series else None,
         raw_language=get_language(attributes),
         biblio=get_biblio(attributes),
         abstract=get_abstract(attributes),
@@ -285,11 +281,11 @@ class DataciteNormalizer(SourceNormalizer):
         return extract_datacite_publication_date(doc, max_year=today().year + 1)
 
     def source_record(
-        self, row: StagingRow, doc: Document, containers: Containers
+        self, row: StagingRow, doc: Document, *, has_series: bool
     ) -> SourceRecordUpsert:
         doi = datacite_doi(doc, row.doi)
         assert doi, "garanti par `parse`"
-        return datacite_source_record(doc, row.id, doi, containers)
+        return datacite_source_record(doc, row.id, doi, has_series=has_series)
 
     def author_block(self, doc: Document) -> AuthorBlock:
         return extract_datacite_author_block(doc)

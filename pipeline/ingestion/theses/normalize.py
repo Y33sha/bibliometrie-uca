@@ -34,7 +34,6 @@ from pipeline.ingestion.theses.payload import (
     derive_theses_doc_type,
     intranet_only,
 )
-from pipeline.transformation.publishing.find_or_create import Containers
 
 
 def _defense_date(thesis: Mapping[str, JsonValue]) -> str | None:
@@ -173,7 +172,6 @@ def theses_source_record(
         identifiers=tuple(identifiers),
         title=get_title(thesis) or "",
         raw_doc_type=derive_theses_doc_type(_defense_date(thesis)),
-        monograph_id=None,
         container_title=None,
         raw_language=languages[0] if languages else None,
         abstract=abstract,
@@ -211,7 +209,7 @@ class ThesesNormalizer(SourceNormalizer):
         return get_title(row.raw_data), get_publication_year(row.raw_data)
 
     def source_record(
-        self, row: StagingRow, doc: Document, containers: Containers
+        self, row: StagingRow, doc: Document, *, has_series: bool
     ) -> SourceRecordUpsert:
         """Construit l'enregistrement source de la thèse, sans éditeur ni conteneur."""
         return theses_source_record(doc, row.id, row.source_id)

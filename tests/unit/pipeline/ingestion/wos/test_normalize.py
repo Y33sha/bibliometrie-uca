@@ -32,7 +32,6 @@ from pipeline.ingestion.wos.normalize import (
     get_container_facts,
     wos_source_record,
 )
-from pipeline.transformation.publishing.find_or_create import Containers
 from tests.helpers.normalize_doubles import identifier_values, normalizer_arguments, staging_row
 
 # ── _safe_list ───────────────────────────────────────────────────
@@ -748,9 +747,7 @@ class TestWosSourceRecord:
             "urls": ["https://x"],
         }
 
-        row_arg = wos_source_record(
-            rec, staging_id=10, containers=Containers(has_series=True, monograph_id=None)
-        )
+        row_arg = wos_source_record(rec, staging_id=10, has_series=True)
 
         assert row_arg.source_id == "WOS:1"
         assert identifier_values(row_arg)["doi"] == ["10.1/x"]
@@ -763,9 +760,7 @@ class TestWosSourceRecord:
 
     def test_none_values_propagate(self):
         rec = {"ut": "WOS:1", "title": "T", "doc_type": "other"}
-        row_arg = wos_source_record(
-            rec, staging_id=5, containers=Containers(has_series=False, monograph_id=None)
-        )
+        row_arg = wos_source_record(rec, staging_id=5, has_series=False)
 
         assert "doi" not in identifier_values(row_arg)
 
@@ -779,9 +774,7 @@ class TestWosSourceRecord:
             "language": "en",
             "journal_title": "J Name",
         }
-        row_arg = wos_source_record(
-            rec, staging_id=1, containers=Containers(has_series=True, monograph_id=None)
-        )
+        row_arg = wos_source_record(rec, staging_id=1, has_series=True)
         assert row_arg.title == "T"
         assert row_arg.container_title is None
 
@@ -796,9 +789,7 @@ class TestWosSourceRecord:
             "language": None,
             "journal_title": "Container Title",
         }
-        row_arg = wos_source_record(
-            rec, staging_id=1, containers=Containers(has_series=False, monograph_id=None)
-        )
+        row_arg = wos_source_record(rec, staging_id=1, has_series=False)
         assert row_arg.container_title == "Container Title"
 
 
@@ -912,11 +903,10 @@ class TestWosNormalizer:
     def test_publisher_absent(self, logger):
         assert _normalizer(logger).publisher({"publisher_name": None}) is None
 
-    def test_source_record_porte_les_conteneurs_et_la_ligne(self, logger):
+    def test_source_record_porte_la_ligne(self, logger):
         norm = _normalizer(logger)
         row = staging_row(staging_id=7, source_id="WOS:001", raw=_export_row())
         doc = norm.parse(row)
-        upsert = norm.source_record(row, doc, Containers(has_series=True, monograph_id=33))
+        upsert = norm.source_record(row, doc, has_series=True)
         assert (upsert.source_id, upsert.staging_id) == ("WOS:001", 7)
-        assert upsert.monograph_id == 33
         assert upsert.container_title is None
