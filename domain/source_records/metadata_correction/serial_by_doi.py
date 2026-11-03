@@ -1,9 +1,9 @@
 """Rattachement d'une revue à un enregistrement source via l'espace de noms de ses DOI.
 
-Un enregistrement source à DOI mais sans revue reçoit la revue désignée par les espaces de noms de ses DOI (`domain/serials/doi_namespaces.py`). Si ses DOI désignent plusieurs revues, il reste sans revue. Un livre ou un chapitre reste sans revue : un éditeur publie sous un même espace de noms une revue et des livres (EAC, `10.17184/eac.`), ou une revue et les livres de sa collection (Hermès chez CAIRN, `10.3917/herm.`). Les DOI de serveur de preprints restent hors du rattachement : la discussion d'un article Copernicus partage l'espace de noms de sa revue (`10.5194/acp-`).
+Un enregistrement source à DOI mais sans revue reçoit la revue désignée par les espaces de noms de ses DOI (`domain/serials/doi_namespaces.py`). Un DOI inconnu de doi.org compte : son espace de noms désigne la revue, enregistrée ou non chez doi.org. Si ses DOI désignent plusieurs revues, il reste sans revue. Un livre ou un chapitre reste sans revue : un éditeur publie sous un même espace de noms une revue et des livres (EAC, `10.17184/eac.`), ou une revue et les livres de sa collection (Hermès chez CAIRN, `10.3917/herm.`). Les DOI de serveur de preprints restent hors du rattachement : la discussion d'un article Copernicus partage l'espace de noms de sa revue (`10.5194/acp-`).
 """
 
-from collections.abc import Collection, Mapping
+from collections.abc import Collection, Iterable, Mapping
 from typing import NamedTuple
 
 from domain.platforms.registry import preprint_servers_of_doi
@@ -16,10 +16,20 @@ from domain.source_records.corrections import (
     raw_value,
     stash_entry,
 )
+from domain.source_records.identifiers import SourceIdentifier, own_dois
+from domain.source_records.metadata_correction.shared_doi import DoiClusterCase
 from domain.types import JsonValue
 
 # Provenance inscrite dans `corrections.serial_id.corrected_by`.
 _SERIAL_BY_DOI_NAMESPACE = "SERIAL_BY_DOI_NAMESPACE"
+
+NAMESPACE_DOI_REMOVALS: tuple[str | None, ...] = (None, DoiClusterCase.UNRESOLVED_DOI_TO_NULL)
+"""Valeurs de `removed_by` des DOI retenus pour le rattachement : DOI actif, DOI inconnu de doi.org."""
+
+
+def namespace_dois(identifiers: Iterable[SourceIdentifier]) -> set[str]:
+    """Renvoie les DOI propres d'un enregistrement source (`own_dois`) retenus pour le rattachement par espace de noms."""
+    return own_dois(i for i in identifiers if i.removed_by in NAMESPACE_DOI_REMOVALS)
 
 
 class SerialAttachment(NamedTuple):

@@ -90,8 +90,35 @@ def test_serial_by_doi_attaches_then_doc_type_converges_same_run(sa_sync_conn):
     assert raw2["serial_id"] == {"raw": None, "corrected_by": "SERIAL_BY_DOI_NAMESPACE"}
 
 
-def test_serial_by_doi_ignores_a_removed_doi(sa_sync_conn):
-    """Un DOI retiré par la correction est faux : il ne désigne aucune revue."""
+def test_serial_by_doi_reads_a_doi_unknown_to_doi_org(sa_sync_conn):
+    """Cas réel : un DOI d'Hématologie, inconnu de doi.org, relève de l'espace de noms `10.1684/hma.` de la revue."""
+    conn = sa_sync_conn
+    serial = _seed_serial(conn, "journal", namespace="10.1684/hma.")
+    source_record = _source_record(
+        conn,
+        source_id="W_unresolved",
+        doc_type="article",
+        identifiers=[
+            SourceIdentifier(
+                SourceIdentifierType.DOI,
+                "10.1684/hma.2023.1807",
+                SourceIdentifierRole.SECONDARY,
+                "UNRESOLVED_DOI_TO_NULL",
+            )
+        ],
+    )
+
+    assert _apply_serial_by_doi(conn) == 1
+    assert (
+        conn.execute(
+            text("SELECT serial_id FROM source_records WHERE id = :id"), {"id": source_record}
+        ).scalar_one()
+        == serial
+    )
+
+
+def test_serial_by_doi_ignores_the_doi_of_another_work(sa_sync_conn):
+    """Un DOI retiré parce qu'il appartient à une autre œuvre désigne une revue étrangère à l'enregistrement source."""
     conn = sa_sync_conn
     _seed_serial(conn, "journal", namespace="10.5194/acp-")
     _source_record(
@@ -103,7 +130,7 @@ def test_serial_by_doi_ignores_a_removed_doi(sa_sync_conn):
                 SourceIdentifierType.DOI,
                 "10.5194/acp-20-1-2020",
                 SourceIdentifierRole.SECONDARY,
-                "UNRESOLVED_DOI_TO_NULL",
+                "DOI_D_UNE_AUTRE_OEUVRE",
             )
         ],
     )

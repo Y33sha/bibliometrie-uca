@@ -25,6 +25,10 @@ from domain.source_records.metadata_correction.rules import (
     MetadataCorrectionRule,
     MetadataForCorrection,
 )
+from domain.source_records.metadata_correction.serial_by_doi import (
+    NAMESPACE_DOI_REMOVALS,
+    namespace_dois,
+)
 from domain.source_records.metadata_correction.shared_doi import (
     DATACITE_DIRECT_CONVERGENCE,
     DATACITE_PACKAGE_PIECE_RELATION,
@@ -414,7 +418,8 @@ class SourceRecordCorrectionStore:
         return rows_as(DoiNamespace, rows)
 
     def fetch_serial_by_doi_candidates(self) -> list[SerialCorrectionRow]:
-        """Renvoie les enregistrements sources candidats au rattachement : sans revue avec un DOI actif, ou déjà rattachés par espace de noms, pour réévaluation."""
+        """Renvoie les enregistrements sources candidats au rattachement : sans revue avec un DOI retenu par `namespace_dois`, ou déjà rattachés par espace de noms, pour réévaluation."""
+        removals = [r for r in NAMESPACE_DOI_REMOVALS if r is not None]
         rows = self._conn.execute(
             text(f"""
                 SELECT sr.id, sr.source::text AS source, sr.raw_doc_type,
@@ -426,16 +431,17 @@ class SourceRecordCorrectionStore:
                           WHERE i.source_record_id = sr.id
                             AND i.id_type = '{SourceIdentifierType.DOI.value}'
                             AND i.role <> '{SourceIdentifierRole.RELATED.value}'
-                            AND i.removed_by IS NULL))
+                            AND (i.removed_by IS NULL OR i.removed_by = ANY(:removals))))
                    OR {corrected("serial_id")}
-            """)
+            """),
+            {"removals": removals},
         )
         return [
             SerialCorrectionRow(
                 id=r.id,
                 source=r.source,
                 raw_doc_type=r.raw_doc_type,
-                dois=frozenset(own_dois(active(parse_identifiers(r.identifiers)))),
+                dois=frozenset(namespace_dois(parse_identifiers(r.identifiers))),
                 serial_id=r.serial_id,
                 corrections=r.corrections,
             )
