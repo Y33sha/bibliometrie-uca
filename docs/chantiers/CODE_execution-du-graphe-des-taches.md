@@ -27,7 +27,7 @@ Constats sur la normalisation :
 
 ## Décisions
 
-- **Une déclaration par tâche, dans le graphe.** Elle contient les lectures, les écritures, l'API, la fonction et l'affichage de la tâche.
+- **Une déclaration par tâche, dans le module de sa phase.** Elle contient les lectures, les écritures, l'API, la fonction et l'affichage de la tâche. `pipeline/phases.py` assemble les phases ; le noyau d'exécution reste ignorant des phases.
 - **L'orchestrateur exécute le graphe**, dans l'ordre de la liste des tâches. Les lectures et écritures déclarées vérifient cet ordre. Les classes de phase, leurs `build()` et la vérification de concordance disparaissent.
 - **Une phase est un groupe de tâches**, déclaré une fois : nom, libellé, enrichissement ou non, bilan. Elle sert à `--only`, `--from`, au journal et à l'enregistrement des exécutions.
 - **Orchestrateur maison.**
@@ -70,11 +70,11 @@ Constats sur la normalisation :
 
 ### Phase 4 — Graphe exécuté par l'orchestrateur
 
-- [ ] Conception : déclaration d'une tâche et d'une phase, points d'extension des phases (conditions, bilans), journal.
-- [ ] Une déclaration par tâche, dans le graphe ; suppression de `TaskStep` et de la vérification de concordance.
-- [ ] Une déclaration par phase : libellé, enrichissement, bilan ; suppression de `PHASE_LABELS`, `EXTRA_PHASES`, `HARVESTING_PHASES`, `_PHASE_BUILDERS`, `_LABEL_FIELDS`.
-- [ ] Exécution du graphe par l'orchestrateur ; suppression des classes de phase et de leurs `build()`.
-- [ ] `--only`, `--from` et enregistrement des exécutions par phase.
+- [x] Conception : déclaration d'une tâche et d'une phase, points d'extension des phases, journal.
+- [x] Une déclaration par tâche, dans le module de sa phase ; suppression de `TaskStep` et de la vérification de concordance.
+- [x] Une déclaration par phase dans `pipeline/phases.py` : libellé, enrichissement, moissonnage, condition de mode, précondition, assemblage des métriques ; suppression de `PHASE_LABELS`, `EXTRA_PHASES`, `HARVESTING_PHASES`, `_PHASE_BUILDERS`, `_LABEL_FIELDS`. L'ordre des noms, lu par l'API, est déclaré dans `pipeline/public.py`.
+- [x] Exécution des phases par `run_phase` ; suppression des classes de phase, de leurs `build()` et des dépendances injectées.
+- [x] `--only`, `--from` et enregistrement des exécutions par phase.
 
 ### Phase 5 — Documentation
 
