@@ -10,7 +10,7 @@ from collections.abc import Iterable, Mapping
 from typing import NamedTuple
 
 from domain.publishers.names import publisher_name_key
-from domain.serials.titles import compatible_titles, nested_titles
+from domain.title_comparison import compatible_titles, nested_titles
 
 MIN_RECORDS = 5
 """Nombre minimal d'enregistrements sources à DOI qui nomment l'éditeur."""

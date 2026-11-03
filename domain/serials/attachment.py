@@ -8,7 +8,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 
 from domain.normalize import normalize_text
-from domain.serials.titles import compatible_titles
+from domain.title_comparison import compatible_titles
 
 
 def effective_issnl(
