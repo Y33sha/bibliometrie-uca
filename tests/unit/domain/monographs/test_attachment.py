@@ -76,6 +76,24 @@ def test_le_volume_a_isbn_du_meme_editeur_passe_avant_celui_sans_editeur():
     assert _attachment(group_volumes(records, [])) == {(1, 3), (2,)}
 
 
+def test_un_volume_a_isbn_est_compatible_avec_chacun_des_editeurs_de_ses_enregistrements():
+    """Cas réel : « Littérature et voyages de santé », un ISBN nommé par deux formes d'éditeur."""
+    records = [
+        _record(1, isbns=(_I1,), publisher_id=7),
+        _record(2, isbns=(_I1,), publisher_id=7),
+        _record(3, isbns=(_I1,), publisher_id=8),
+        _record(4, publisher_id=8),
+    ]
+    assert _attachment(group_volumes(records, [])) == {(1, 2, 3, 4)}
+
+
+def test_un_volume_a_isbn_est_compatible_avec_l_editeur_de_sa_monographie_existante():
+    """Cas réel : « Itinéraires méthodologiques », un éditeur nommé seulement par la monographie existante."""
+    existing = [ExistingMonograph(10, "proceedings of icbbm", _I1, None, 8)]
+    records = [_record(1, isbns=(_I1,), publisher_id=7), _record(2, publisher_id=8)]
+    assert _attachment(group_volumes(records, existing)) == {(1, 2)}
+
+
 def test_un_editeur_different_ecarte_le_volume_a_isbn():
     records = [_record(1, isbns=(_I1,), publisher_id=7), _record(2, publisher_id=8)]
     assert _attachment(group_volumes(records, [])) == {(1,), (2,)}

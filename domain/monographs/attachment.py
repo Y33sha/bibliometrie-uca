@@ -1,6 +1,6 @@
 """Rattachement des enregistrements sources à leur monographie, calculé sur tous les enregistrements sources qui décrivent un volume.
 
-Les enregistrements sources qui partagent un ISBN forment un volume. Les ISBN d'une même monographie existante appartiennent au même volume. Un enregistrement source sans ISBN rejoint le seul volume à ISBN de son titre et d'éditeur compatible ; les volumes du même éditeur passent avant ceux sans éditeur. Entre plusieurs, il reste sans monographie. Sans volume à ISBN de son titre, il forme un volume avec les enregistrements sources sans ISBN de même titre et d'éditeur compatible. Le résultat est indépendant de l'ordre des enregistrements sources.
+Les enregistrements sources qui partagent un ISBN forment un volume. Les ISBN d'une même monographie existante appartiennent au même volume. Un enregistrement source sans ISBN rejoint le seul volume à ISBN de son titre et d'éditeur compatible : un volume est compatible avec chacun des éditeurs de ses enregistrements sources et de ses monographies existantes, et avec tout éditeur s'il n'en a aucun. Les volumes du même éditeur passent avant ceux sans éditeur. Entre plusieurs, il reste sans monographie. Sans volume à ISBN de son titre, il forme un volume avec les enregistrements sources sans ISBN de même titre et d'éditeur compatible. Le résultat est indépendant de l'ordre des enregistrements sources.
 """
 
 from collections import Counter, defaultdict
@@ -70,6 +70,15 @@ class _Group:
     electronic: Counter[str] = field(default_factory=Counter)
     monograph_ids: set[int] = field(default_factory=set)
     titles: set[str] = field(default_factory=set)
+    monograph_publishers: set[int] = field(default_factory=set)
+    """Éditeurs des monographies existantes du volume."""
+
+    def publishers(self) -> frozenset[int]:
+        """Éditeurs compatibles avec le volume : ceux de ses enregistrements sources et de ses monographies existantes."""
+        return frozenset(
+            {r.publisher_id for r in self.records if r.publisher_id is not None}
+            | self.monograph_publishers
+        )
 
     def publisher_id(self) -> int | None:
         publishers = Counter(r.publisher_id for r in self.records if r.publisher_id is not None)
@@ -118,20 +127,37 @@ def group_volumes(
 ) -> list[Volume]:
     """Renvoie les volumes formés par `records`, chacun avec ses monographies existantes. Un enregistrement source absent des volumes reste sans monographie."""
     monographs = list(monographs)
-    union = _IsbnUnion()
     with_isbn: list[tuple[VolumeRecord, list[str], list[str]]] = []
     without_isbn: list[VolumeRecord] = []
     for record in records:
         paper = _valid_isbns(record.isbns)
         electronic = [i for i in _valid_isbns(record.eisbns) if i not in paper]
         if paper or electronic:
-            union.union([*paper, *electronic])
             with_isbn.append((record, paper, electronic))
         else:
             without_isbn.append(record)
+
+    isbn_groups = _isbn_groups(with_isbn, monographs)
+    orphans_by_title = _attach_without_isbn(without_isbn, isbn_groups)
+    volumes = [
+        volume
+        for volume in (g.volume() for g in isbn_groups)
+        if volume.monograph_ids or volume.title
+    ]
+    volumes += _volumes_without_isbn(orphans_by_title, monographs)
+    return sorted(volumes, key=lambda v: v.record_ids)
+
+
+def _isbn_groups(
+    with_isbn: Sequence[tuple[VolumeRecord, list[str], list[str]]],
+    monographs: Sequence[ExistingMonograph],
+) -> list[_Group]:
+    """Renvoie les volumes à ISBN : enregistrements sources réunis par leurs ISBN, avec les monographies existantes de ces ISBN."""
+    union = _IsbnUnion()
+    for _, paper, electronic in with_isbn:
+        union.union([*paper, *electronic])
     for monograph in monographs:
-        isbns = [i for i in (monograph.isbn, monograph.eisbn) if i]
-        if isbns:
+        if isbns := [i for i in (monograph.isbn, monograph.eisbn) if i]:
             union.union(isbns)
 
     by_root: dict[str, _Group] = defaultdict(_Group)
@@ -148,13 +174,21 @@ def group_volumes(
             group = by_root[union.find(isbn)]
             group.monograph_ids.add(monograph.id)
             group.titles.add(monograph.title_normalized)
+            if monograph.publisher_id is not None:
+                group.monograph_publishers.add(monograph.publisher_id)
+    return list(by_root.values())
 
-    # Éditeur de chaque volume à ISBN, figé avant l'arrivée des enregistrements sources sans ISBN.
-    isbn_groups_by_title: dict[str, list[tuple[_Group, int | None]]] = defaultdict(list)
-    for group in by_root.values():
-        publisher_id = group.publisher_id()
+
+def _attach_without_isbn(
+    without_isbn: Sequence[VolumeRecord], isbn_groups: Sequence[_Group]
+) -> dict[str, list[VolumeRecord]]:
+    """Ajoute chaque enregistrement source sans ISBN au seul volume à ISBN compatible de son titre. Renvoie, par titre, ceux sans volume à ISBN compatible."""
+    # Éditeurs de chaque volume à ISBN, figés avant l'arrivée des enregistrements sources sans ISBN.
+    by_title: dict[str, list[tuple[_Group, frozenset[int]]]] = defaultdict(list)
+    for group in isbn_groups:
+        publishers = group.publishers()
         for title in group.titles:
-            isbn_groups_by_title[title].append((group, publisher_id))
+            by_title[title].append((group, publishers))
 
     orphans_by_title: dict[str, list[VolumeRecord]] = defaultdict(list)
     for record in without_isbn:
@@ -162,27 +196,18 @@ def group_volumes(
         if not title:
             continue
         compatible = [
-            (group, publisher_id)
-            for group, publisher_id in isbn_groups_by_title.get(title, [])
-            if compatible_publishers(publisher_id, record.publisher_id)
+            (group, publishers)
+            for group, publishers in by_title.get(title, [])
+            if record.publisher_id is None or not publishers or record.publisher_id in publishers
         ]
         # Les volumes du même éditeur passent avant ceux sans éditeur.
-        same = [
-            g for g, p in compatible if record.publisher_id is not None and p == record.publisher_id
-        ]
+        same = [g for g, publishers in compatible if record.publisher_id in publishers]
         candidates = same or [g for g, _ in compatible]
         if len(candidates) == 1:
             candidates[0].records.append(record)
         elif not candidates:
             orphans_by_title[title].append(record)
-
-    volumes = [
-        volume
-        for volume in (g.volume() for g in by_root.values())
-        if volume.monograph_ids or volume.title
-    ]
-    volumes += _volumes_without_isbn(orphans_by_title, monographs)
-    return sorted(volumes, key=lambda v: v.record_ids)
+    return orphans_by_title
 
 
 def _volumes_without_isbn(
