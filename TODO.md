@@ -1,6 +1,3 @@
-uv run python -m interfaces.cli.oneshot.mark_collective_source_contributions
-run_pipeline --from author_grouping
-
 # Pipeline
 ## Extraction
 * [ ] Dimensions?; Sudoc? (liens personnes-thèses plus complets que theses.fr, j'ai l'impression); Cairn, Persée pour augmenter couverture SHS? creuser ISTEX
