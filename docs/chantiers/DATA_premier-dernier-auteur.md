@@ -75,10 +75,6 @@ Une liste d'un seul auteur plus courte que la plus longue contient le premier au
 - [x] Facette « Position auteur » : premier et dernier auteur, libellés dans le frontend. 62ecc651c
 - [x] Rapports : rôles lus dans `author_positions`, lecture de la liste OpenAlex supprimée. Libellé « PDC (premier, dernier ou correspondant) » pour les unités qui comptent les trois rôles. 0c3846001
 
-### Phase 4 — Co-premiers et co-derniers auteurs
-
-- [ ] Remplissage des rôles HAL `co_first_author` et `co_last_author`, perdus à la normalisation (`domain/publications/contribution_roles.py`).
-
-### Phase 5 — Documentation
+### Phase 4 — Documentation
 
 - [ ] Positions d'auteur dans la documentation des contributions.
