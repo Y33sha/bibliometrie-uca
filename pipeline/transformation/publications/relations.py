@@ -413,8 +413,8 @@ def _build_distinct_work_edges(
             )
             if inferred is None:
                 continue
-            relation, subject = inferred
-            if subject == "b":
+            relation, subject_is_b = inferred
+            if subject_is_b:
                 # Une cible typée est au corpus : la relation dirigée part d'elle.
                 assert target is not None
                 edges.append(
@@ -455,22 +455,22 @@ def _build_shared_key_edges(
 ) -> list[RelationEdge]:
     """Construit une arête dirigée par paire partageant une clé. La cible est désignée par son `publication_id`, avec son DOI quand elle en a un.
 
-    `infer_shared_key_relation` donne le type et le sujet : `"a"`, `"b"`, ou `"sym"` (symétrique, orienté depuis A, de plus petit id). Les paires sans relation (peer-review) sont écartées. Un `is_related_to` (type à qualifier) sur une paire déjà reliée par le signal #1 est écarté aussi.
+    `infer_shared_key_relation` donne le type, et si B est le sujet. Sinon, la relation part de A, de plus petit id, y compris une relation symétrique. Les paires sans relation (peer-review) sont écartées. Un `is_related_to` (type à qualifier) sur une paire déjà reliée par le signal #1 est écarté aussi.
     """
     edges: list[RelationEdge] = []
     for pair in pairs:
         inferred = infer_shared_key_relation(pair.a_doc_type, pair.b_doc_type)
         if inferred is None:
             continue
-        relation, subject = inferred
+        relation, subject_is_b = inferred
         if (
             relation is RelationType.IS_RELATED_TO
             and frozenset((pair.a_id, pair.b_id)) in declared_pairs
         ):
             continue
-        if subject == "b":
+        if subject_is_b:
             from_id, target_id, target_doi = pair.b_id, pair.a_id, pair.a_doi
-        else:  # "a" ou "sym" : A est le sujet (a_id < b_id rend l'orientation stable)
+        else:  # A est le sujet : a_id < b_id rend l'orientation stable
             from_id, target_id, target_doi = pair.a_id, pair.b_id, pair.b_doi
         edges.append(
             RelationEdge(
