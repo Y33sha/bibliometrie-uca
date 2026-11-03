@@ -49,11 +49,11 @@ Constats :
   - **Rattachement indépendant de l'ordre**, seule la forme stockée varie : adresses (`raw_text` de la première), plateformes (nom et type de la dernière écriture), sujets (libellé et parent de la dernière écriture), informations du contributeur (clé sur tout le contenu), nom et identifiant OpenAlex d'un éditeur.
 - [x] La normalisation écrit dans `biblio` l'éditeur et le volume décrits par la source : `publisher` (nom), `publisher_openalex_id`, `monograph` (titre, ISBN, eISBN, actes, année).
 - [x] Oneshot `fill_biblio_publisher_and_monograph` : `publisher_openalex_id` et `monograph` du stock extraits du raw store, à défaut déduits des rattachements existants.
-- [ ] Exécution du oneshot sur la base.
+- [x] Exécution du oneshot sur la base.
 - [ ] Rattachement des éditeurs en lot, première tâche de `publishing`. Chaque identifiant OpenAlex rejoint son éditeur, à défaut celui d'une de ses formes de nom, à défaut un éditeur créé. Les enregistrements sources sans identifiant OpenAlex rejoignent l'éditeur de leur forme de nom. Chaque forme restée libre crée un éditeur. Une forme attribuée garde son éditeur.
-- [ ] Rattachement des monographies en lot, après les éditeurs. Les enregistrements sources partageant un ISBN forment un volume. Un enregistrement source sans ISBN rejoint le seul volume à ISBN de son titre et d'éditeur compatible. Sans volume à ISBN, les enregistrements sources sans ISBN forment un volume par titre et éditeur. Chaque volume reprend sa monographie existante.
+- [x] Rattachement des monographies en lot (`publishing.attach_monographs`), après la fusion des autres noms des éditeurs. Les enregistrements sources partageant un ISBN forment un volume. Un enregistrement source sans ISBN rejoint le seul volume à ISBN de son titre et d'éditeur compatible ; le volume du même éditeur passe avant celui sans éditeur. Sans volume à ISBN, les enregistrements sources sans ISBN forment un volume par titre et éditeur. Chaque volume reprend ses monographies existantes. Normalisation sans recherche ni création de monographie.
 - [ ] Règle de l'éditeur nommé par DataCite appliquée d'après la série et le volume décrits.
-- [ ] Normalisation sans recherche ni création d'éditeur ou de monographie.
+- [ ] Normalisation sans recherche ni création d'éditeur.
 - [ ] Fusion des monographies en double : vérification sur le stock, suppression si inutile.
 - [ ] Test : deux ordres de normalisation des sources donnent les mêmes rattachements.
 
