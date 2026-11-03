@@ -1,6 +1,15 @@
-"""Comparaison d'une URL à un domaine, par son hôte."""
+"""Comparaison d'une URL à un domaine, par son hôte. Fragments d'en-tête HTTP `Link`."""
 
+import re
 from urllib.parse import urlparse, urlsplit
+
+_LINK_HEADER_END = re.compile(r">[,;]?\s*$")
+"""Fin d'une adresse dans un en-tête HTTP `Link` : `<https://orcid.org/…>; rel="author"`."""
+
+
+def is_link_header_fragment(url: str) -> bool:
+    """Vrai si `url` est une adresse recopiée d'un en-tête HTTP `Link`, avec le `>` qui la ferme. Elle désigne une page liée au document : profil d'un auteur, page de navigation d'un entrepôt."""
+    return bool(_LINK_HEADER_END.search(url))
 
 
 def url_host(url: str | None) -> str | None:

@@ -178,4 +178,5 @@ Document `W4395704497` (2 auteurs, article de mathématiques). `abstract_inverte
 ## Particularités
 
 - Les requêtes paginées tronquent les `authorships` à **100 auteurs** par publication. Ces works sont marqués `staging.authors_truncated` au moissonnage, et [fetch_truncated](https://github.com/Y33sha/bibliometrie-uca/blob/master/pipeline/ingestion/openalex/fetch_truncated.py) les retélécharge un par un pour lire la liste complète.
+- OpenAlex recopie parfois comme adresse de localisation un lien d'en-tête HTTP `Link` d'un entrepôt, terminé par `>` : profil ORCID d'un auteur, page de navigation de l'entrepôt. La normalisation écarte ces adresses.
 - OpenAlex rattache chaque auteur à une entité auteur construite par algorithme, souvent fautive (`author.display_name`, `author.orcid`). Le pipeline lit le nom (`raw_author_name`) et l'ORCID (`raw_orcid`) donnés par la source amont d'OpenAlex. Cet ORCID sert au rattachement des personnes, comme ceux de Crossref, DataCite et HAL (`ORCID_MATCH_SOURCES`).

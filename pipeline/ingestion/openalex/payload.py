@@ -22,7 +22,7 @@ from domain.source_records.identifiers import (
     SourceIdentifierType,
 )
 from domain.types import JsonValue, as_mapping, as_str
-from domain.urls import is_host, url_host
+from domain.urls import is_host, is_link_header_fragment, url_host
 
 _OPENALEX_ID_PREFIX = "https://openalex.org/"
 """OpenAlex donne ses identifiants en URL (`https://openalex.org/<id>`) pour tous les types d'entité : W works, A auteurs, S sources, I institutions, P éditeurs. La base garde la forme courte (`S20400310`)."""
@@ -79,6 +79,12 @@ class OpenalexLocation:
     """Ex. la page d'accueil de HAL."""
 
 
+def location_url(loc: Mapping[str, JsonValue], key: str) -> str | None:
+    """Renvoie l'adresse `key` d'une localisation (`landing_page_url`, `pdf_url`). OpenAlex recopie parfois une adresse d'en-tête HTTP `Link` (`is_link_header_fragment`) : elle est écartée."""
+    url = as_str(loc.get(key))
+    return None if url is None or is_link_header_fragment(url) else url
+
+
 def _parse_one_location(loc: JsonValue) -> OpenalexLocation | None:
     loc_fields = as_mapping(loc)
     if not loc_fields:
@@ -86,7 +92,7 @@ def _parse_one_location(loc: JsonValue) -> OpenalexLocation | None:
     src = as_mapping(loc_fields.get("source"))
     return OpenalexLocation(
         location_id=as_str(loc_fields.get("id")),
-        landing_page_url=as_str(loc_fields.get("landing_page_url")),
+        landing_page_url=location_url(loc_fields, "landing_page_url"),
         source_id=as_str(src.get("id")),
         source_type=as_str(src.get("type")),
         source_display_name=as_str(src.get("display_name")),

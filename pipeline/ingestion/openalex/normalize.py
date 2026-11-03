@@ -48,6 +48,7 @@ from pipeline.ingestion.common.source_records import (
 from pipeline.ingestion.common.staging import StagingRow
 from pipeline.ingestion.openalex.payload import (
     OpenalexLocation,
+    location_url,
     names_publisher,
     names_serial,
     openalex_derived_identifier,
@@ -70,7 +71,7 @@ def extract_locations_data(
     for entry in as_sequence(work.get("locations")):
         loc = as_mapping(entry)
         for key in ("landing_page_url", "pdf_url"):
-            url = as_str(loc.get(key))
+            url = location_url(loc, key)
             if url and url not in seen:
                 seen.add(url)
                 urls.append(url)
@@ -110,8 +111,8 @@ def get_locations(work: Mapping[str, JsonValue]) -> list[LocationFacts]:
     locations: list[LocationFacts] = []
     for entry in as_sequence(work.get("locations")):
         loc = as_mapping(entry)
-        pdf_url = as_str(loc.get("pdf_url"))
-        url = as_str(loc.get("landing_page_url")) or pdf_url
+        pdf_url = location_url(loc, "pdf_url")
+        url = location_url(loc, "landing_page_url") or pdf_url
         if not url:
             continue
         location_id = as_str(loc.get("id")) or ""
