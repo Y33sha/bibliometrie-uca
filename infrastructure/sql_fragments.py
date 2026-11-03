@@ -382,7 +382,8 @@ def propagate_contribution_attributes_sql(contribution_ids: str) -> str:
                    min(sc.author_position) AS first_position, max(sc.author_position) AS last_position
             FROM source_records sr
             JOIN source_contributions sc ON sc.source_record_id = sr.id
-            WHERE sr.publication_id IN (SELECT publication_id FROM contributions WHERE id IN ({contribution_ids}))
+            -- `DISTINCT` : sans lui, le planificateur estime une publication par contribution et parcourt toutes les contributions sources.
+            WHERE sr.publication_id IN (SELECT DISTINCT publication_id FROM contributions WHERE id IN ({contribution_ids}))
               AND {has_author_role("sc")} AND NOT sc.collective
               AND sc.duplicate_of IS NULL AND sc.author_position IS NOT NULL
             GROUP BY sr.id
