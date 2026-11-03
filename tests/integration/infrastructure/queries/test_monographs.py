@@ -14,9 +14,6 @@ from pipeline.transformation.publishing.monographs.link_monographs_to_collection
     find_monograph_serial_candidates,
     set_monograph_serial,
 )
-from pipeline.transformation.publishing.monographs.merge_duplicate_monographs import (
-    find_monographs_sharing_a_title,
-)
 from pipeline.transformation.publishing.monographs.monograph_merge import merge_monograph_into
 from pipeline.transformation.publishing.monographs.store import MonographStore
 from pipeline.transformation.publishing.monographs.type_proceedings_volumes import (
@@ -96,10 +93,6 @@ def test_fusion_reporte_enregistrements_et_isbn(repo, sa_sync_conn):
     source = _create(repo, "Pascal intempestif", isbn=_PAPER, year=2024)
     target = _create(repo, "Pascal intempestif")
     _chapter(sa_sync_conn, source_id="hal-fusion", monograph_id=source)
-    groups = [
-        g for g in find_monographs_sharing_a_title(sa_sync_conn) if g.title == "Pascal intempestif"
-    ]
-    assert [m.id for m in groups[0].monographs] == [source, target]
 
     merge_monograph_into(sa_sync_conn, target, source)
 

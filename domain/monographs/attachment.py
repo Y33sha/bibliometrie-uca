@@ -8,7 +8,6 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import NamedTuple
 
-from domain.monographs.matching import compatible_publishers
 from domain.normalize import normalize_text
 from domain.publications.identifiers import ISBN
 from domain.serials.attachment import most_frequent
@@ -49,6 +48,11 @@ class Volume:
     proceedings: bool
     year: int | None
     publisher_id: int | None
+
+
+def _compatible_publishers(first: int | None, second: int | None) -> bool:
+    """Vrai si les deux éditeurs sont égaux ou l'un absent."""
+    return first is None or second is None or first == second
 
 
 def _valid_isbns(values: Iterable[str]) -> list[str]:
@@ -236,7 +240,7 @@ def _volumes_without_isbn(
                 (
                     m
                     for m in existing[title]
-                    if m.id not in taken and compatible_publishers(m.publisher_id, publisher_id)
+                    if m.id not in taken and _compatible_publishers(m.publisher_id, publisher_id)
                 ),
                 key=lambda m: (m.publisher_id != publisher_id, m.id),
                 default=None,

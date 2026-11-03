@@ -40,15 +40,11 @@ from pipeline.transformation.publishing.doi_prefixes import DoiPrefixStore
 from pipeline.transformation.publishing.monographs import (
     attach_monographs,
     link_monographs_to_collections,
-    merge_duplicate_monographs,
     type_proceedings_volumes,
 )
 from pipeline.transformation.publishing.monographs.attach_monographs import run_attach_monographs
 from pipeline.transformation.publishing.monographs.link_monographs_to_collections import (
     run_link_monographs_to_collections,
-)
-from pipeline.transformation.publishing.monographs.merge_duplicate_monographs import (
-    run_merge_duplicate_monographs,
 )
 from pipeline.transformation.publishing.monographs.type_proceedings_volumes import (
     run_type_proceedings_volumes,
@@ -161,11 +157,6 @@ _TABLE: tuple[tuple[str, str, Callable[[PhaseMetrics], int]], ...] = (
         lambda m: m.updated,
     ),
     (
-        "merge_duplicate_monographs",
-        "monographies en double fusionnées",
-        lambda m: m.extras.get("monographs_merged", 0),
-    ),
-    (
         "link_monographs_to_collections",
         "monographies rattachées à leur collection",
         lambda m: m.extras.get("monographs_linked", 0),
@@ -266,11 +257,6 @@ def build() -> Phase:
                 ),
                 "attach_monographs": TaskStep(
                     _run_attach_monographs, "Monographies", attach_monographs.LABEL
-                ),
-                "merge_duplicate_monographs": TaskStep(
-                    _run_merge_duplicate_monographs,
-                    "Monographies",
-                    merge_duplicate_monographs.LABEL,
                 ),
                 "link_monographs_to_collections": TaskStep(
                     _run_link_monographs_to_collections,
@@ -375,11 +361,6 @@ def _run_check_issns_in_sudoc(
 def _run_attach_monographs(ctx: PhaseContext) -> PhaseMetrics:
     with ctx.open_tx() as conn:
         return run_attach_monographs(conn, ctx.logger)
-
-
-def _run_merge_duplicate_monographs(ctx: PhaseContext) -> PhaseMetrics:
-    with ctx.open_tx() as conn:
-        return run_merge_duplicate_monographs(conn, ctx.logger)
 
 
 def _run_link_monographs_to_collections(ctx: PhaseContext) -> PhaseMetrics:

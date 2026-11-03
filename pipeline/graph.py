@@ -790,13 +790,6 @@ TASKS: tuple[Task, ...] = (
         previous_run=("monographs", "source_records.monograph_id"),
     ),
     _task(
-        "publishing.merge_duplicate_monographs",
-        "publishing",
-        reads=("monographs.id", "monographs.title_normalized"),
-        writes=("monographs.id", "source_records.monograph_id", "publications.monograph_id"),
-        previous_run=("monographs",),
-    ),
-    _task(
         "publishing.link_monographs_to_collections",
         "publishing",
         reads=(
