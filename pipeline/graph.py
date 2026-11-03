@@ -10,10 +10,12 @@ La maintenance d'une tâche (`VACUUM`, `ANALYZE`) suit ses écritures et ne cré
 """
 
 from collections.abc import Callable, Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import KW_ONLY, dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    import logging
+
     from sqlalchemy import Connection
 
     from pipeline.runtime.context import PhaseContext, RunOptions
@@ -26,9 +28,11 @@ class Task:
 
     name: str
     """Nom de la tâche, préfixé du nom de sa phase : `publishing.attach_serials`."""
-    reads: frozenset[str] = frozenset()
-    writes: frozenset[str] = frozenset()
-    previous_run: frozenset[str] = frozenset()
+    _: KW_ONLY
+    run: TaskRun
+    reads: tuple[str, ...] = ()
+    writes: tuple[str, ...] = ()
+    previous_run: tuple[str, ...] = ()
     """Lectures de données écrites au run précédent, par une tâche placée après elle ou par la tâche elle-même."""
     network: str | None = None
     """API interrogée, si la tâche sort sur le réseau."""
@@ -36,8 +40,6 @@ class Task:
     """Maintenance physique des tables, dans l'ordre : `VACUUM staging`, `ANALYZE source_contributions`."""
     parallel_group: str | None = None
     """Groupe de tâches consécutives exécutées en parallèle."""
-    run: TaskRun | None = None
-    """Exécution de la tâche. `None` : tâche exécutée par l'orchestrateur."""
     section: str | None = None
     """Titre de la sous-étape ouverte par la tâche. `None` : la tâche écrit sous le titre courant."""
     label: str | None = None
@@ -61,40 +63,14 @@ type TaskRun = Callable[[PhaseContext], PhaseMetrics]
 """Exécute une tâche dans le contexte de sa phase."""
 
 
-def task(
-    name: str,
-    *,
-    reads: Iterable[str] = (),
-    writes: Iterable[str] = (),
-    previous_run: Iterable[str] = (),
-    run: TaskRun,
-    network: str | None = None,
-    maintenance: tuple[str, ...] = (),
-    parallel_group: str | None = None,
-    section: str | None = None,
-    label: str | None = None,
-    progress_bar: bool = False,
-    threshold: int | None = None,
-    when: Callable[[PhaseContext], bool] | None = None,
-    silent_when_empty: bool = False,
-) -> Task:
-    """Renvoie la tâche `name`, exécutée par `run`."""
-    return Task(
-        name,
-        frozenset(reads),
-        frozenset(writes),
-        frozenset(previous_run),
-        network,
-        maintenance,
-        parallel_group,
-        run,
-        section,
-        label,
-        progress_bar,
-        threshold,
-        when,
-        silent_when_empty,
-    )
+def in_transaction(run: Callable[[Connection, logging.Logger], PhaseMetrics]) -> TaskRun:
+    """Renvoie l'exécution de `run` dans une transaction de la phase."""
+
+    def execute(ctx: PhaseContext) -> PhaseMetrics:
+        with ctx.open_tx() as conn:
+            return run(conn, ctx.logger)
+
+    return execute
 
 
 def overlaps(a: str, b: str) -> bool:

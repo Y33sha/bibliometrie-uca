@@ -22,7 +22,7 @@ from sqlalchemy import Connection
 
 from domain.sources.registry import SOURCE_PRIORITY, source_label
 from infrastructure.raw_store import NullRawStore, get_raw_store
-from pipeline.graph import TaskRun, task
+from pipeline.graph import Task, TaskRun
 from pipeline.ingestion.adapters import ADAPTERS
 from pipeline.ingestion.common.adapter import SourceAdapter
 from pipeline.ingestion.common.embargoes import EmbargoStore
@@ -169,7 +169,7 @@ def _run_normalize(ctx: PhaseContext, build: NormalizerFactory) -> NormalizeStat
 
 TASKS = (
     *(
-        task(
+        Task(
             f"normalize.{source}",
             reads=(
                 "staging",
@@ -234,7 +234,7 @@ TASKS = (
         )
         for source in SOURCE_PRIORITY
     ),
-    task(
+    Task(
         "normalize.prune_disappeared",
         reads=(
             "staging.disappeared_at",
@@ -261,7 +261,7 @@ TASKS = (
         previous_run=("source_records",),
         run=_prune,
     ),
-    task(
+    Task(
         "normalize.cleanup_orphan_contributor_information",
         reads=("source_contributions.contributor_information_id", "contributor_information.id"),
         writes=("contributor_information.id",),
@@ -270,7 +270,7 @@ TASKS = (
         section="Maintenance des tables",
         label="Informations du contributeur orphelines",
     ),
-    task(
+    Task(
         "normalize.cleanup_orphan_addresses",
         reads=("source_contribution_addresses", "addresses.id"),
         # La suppression d'une adresse emporte ses liens aux structures.

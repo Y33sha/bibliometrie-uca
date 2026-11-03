@@ -28,7 +28,7 @@ from domain.publications.open_access import is_restricted, publication_oa_status
 from infrastructure.db.scalars import scalar_int
 from infrastructure.read_models.publications.copies import publication_copies
 from infrastructure.sql_fragments import under_active_embargo
-from pipeline.graph import task
+from pipeline.graph import Task
 from pipeline.http.lookup import LookupOutcome, NotFound, Unavailable
 from pipeline.http.polite_pool import default_user_agent, get_polite_pool_email_optional
 from pipeline.http.tls import tls_context
@@ -475,7 +475,7 @@ def _verify_unpaywall(ctx: PhaseContext) -> PhaseMetrics:
 
 
 TASKS = (
-    task(
+    Task(
         RESOLVE_TASK,
         reads=_OA_STATUS_INPUTS,
         writes=(
@@ -489,7 +489,7 @@ TASKS = (
         network="doi.org",
         run=_resolve_dois,
     ),
-    task(
+    Task(
         UNPAYWALL_TASK,
         reads=(*_OA_STATUS_INPUTS, "doi_prefixes.ra"),
         writes=(

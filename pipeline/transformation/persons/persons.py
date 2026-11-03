@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 from collections.abc import Mapping
 
-from pipeline.graph import task
+from pipeline.graph import Task
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.log_format import LAST_BRANCH
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -47,7 +47,7 @@ def _purge(ctx: PhaseContext) -> PhaseMetrics:
 
 
 TASKS = (
-    task(
+    Task(
         "persons.arbitrate_identifiers",
         reads=(
             "contributor_information",
@@ -78,7 +78,7 @@ TASKS = (
         ),
         run=_arbitrate_identifiers,
     ),
-    task(
+    Task(
         "persons.resolve_contributions",
         reads=(
             "contributions.id",
@@ -120,7 +120,7 @@ TASKS = (
         run=_resolve_contributions,
         section="Identification des contributions",
     ),
-    task(
+    Task(
         "persons.populate_person_name_forms",
         reads=(
             "persons",
@@ -137,7 +137,7 @@ TASKS = (
         run=_populate,
         section="Rafraîchissement des formes de nom associées aux personnes",
     ),
-    task(
+    Task(
         "persons.purge",
         reads=(
             "contributions.publication_id",

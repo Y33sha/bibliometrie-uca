@@ -16,7 +16,7 @@ from collections.abc import Callable, Mapping
 from sqlalchemy import Connection, text
 
 from infrastructure.db.scalars import scalar_int
-from pipeline.graph import task
+from pipeline.graph import Task
 from pipeline.runtime.context import OpenTransaction, PhaseContext
 from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, inflect, quantity, step
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -209,7 +209,7 @@ _EMPTY_CONTAINERS: tuple[tuple[str, Callable[[PhaseContext], PhaseMetrics]], ...
 
 
 TASKS = (
-    task(
+    Task(
         "finalize.publications_in_perimeter",
         reads=(
             "contributions.person_id",
@@ -225,7 +225,7 @@ TASKS = (
         section="Synchronisation des tables",
         label="Périmètre des publications",
     ),
-    task(
+    Task(
         "finalize.structures",
         reads=(
             "source_contribution_structures",
@@ -244,7 +244,7 @@ TASKS = (
         section="Synchronisation des tables",
         label="Structures des liens",
     ),
-    task(
+    Task(
         "finalize.purge_publications",
         reads=(
             "publications.id",
@@ -256,7 +256,7 @@ TASKS = (
         writes=("publications.id",),
         run=_purge,
     ),
-    task(
+    Task(
         "finalize.serial_publishers",
         reads=(
             "serials.id",
@@ -272,7 +272,7 @@ TASKS = (
         run=_serial_publishers,
         label="Éditeur des revues",
     ),
-    task(
+    Task(
         "finalize.delete_empty_containers",
         reads=(
             "monographs.id",
@@ -297,7 +297,7 @@ TASKS = (
         writes=("monographs.id", "serials.id", "publishers.id", "serial_issns"),
         run=_empty_containers,
     ),
-    task(
+    Task(
         "finalize.publication_counts",
         reads=(
             "addresses.id",

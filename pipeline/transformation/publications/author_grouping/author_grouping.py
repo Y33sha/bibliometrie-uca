@@ -25,7 +25,7 @@ from domain.contributions.author_grouping import (
     plan_contribution_ids,
     with_known_first_name,
 )
-from pipeline.graph import task
+from pipeline.graph import Task
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.cpu import available_cpus
 from pipeline.runtime.observability.log_format import LAST_BRANCH, nothing_to_do, quantity, step
@@ -366,7 +366,7 @@ def _attributes(ctx: PhaseContext) -> PhaseMetrics:
 
 
 TASKS = (
-    task(
+    Task(
         "author_grouping.build",
         reads=(
             "publications.id",
@@ -411,7 +411,7 @@ TASKS = (
         run=_build,
         label="Bilan",
     ),
-    task(
+    Task(
         "author_grouping.attributes",
         reads=(
             "contribution_attributes_queue",

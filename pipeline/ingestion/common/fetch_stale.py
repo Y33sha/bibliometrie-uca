@@ -19,7 +19,7 @@ from collections.abc import Mapping
 
 from domain.config import ConfigKey
 from domain.sources.registry import Source, source_label
-from pipeline.graph import task
+from pipeline.graph import Task
 from pipeline.ingestion.adapters import ADAPTERS
 from pipeline.ingestion.common.stale_refetch import refresh
 from pipeline.runtime.config import delay, window_years
@@ -49,7 +49,7 @@ def _targets(ctx: PhaseContext) -> set[str]:
 
 
 TASKS = tuple(
-    task(
+    Task(
         f"fetch_stale.{source}",
         reads=("config", "staging", "source_records.publication_year"),
         writes=("staging", "staging_normalization_queue"),

@@ -16,7 +16,9 @@ from pipeline.ingestion.common import (
 )
 from pipeline.ingestion.openalex import fetch_truncated
 from pipeline.runtime.config import delay
+from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.log_format import quantity
+from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation import finalize
 from pipeline.transformation.countries import countries
 from pipeline.transformation.persons import persons
@@ -26,7 +28,10 @@ from pipeline.transformation.publications.correction import metadata_correction
 from pipeline.transformation.publications.subjects import subjects
 from pipeline.transformation.publishing import publishing, resolve_ra
 from pipeline.transformation.structures import affiliations
-from pipeline.transformation.structures.perimeter import check_extraction_perimeter
+from pipeline.transformation.structures.perimeter import (
+    check_extraction_perimeter,
+    refresh_perimeter_structures,
+)
 
 
 def _fetch_stale_fields(conn: Connection) -> dict[str, str]:
@@ -152,12 +157,20 @@ PHASES: tuple[Phase, ...] = (
     ),
 )
 
+
+def _refresh_perimeter_structures(ctx: PhaseContext) -> PhaseMetrics:
+    with ctx.open_tx() as conn:
+        refresh_perimeter_structures(conn)
+    return PhaseMetrics()
+
+
 PERIMETER_STRUCTURES = Task(
     "perimeter_structures",
-    reads=frozenset({"perimeters", "structure_parents", "structures"}),
-    writes=frozenset({"perimeter_structures"}),
+    reads=("perimeters", "structure_parents", "structures"),
+    writes=("perimeter_structures",),
+    run=_refresh_perimeter_structures,
 )
-"""Matérialisation des structures des périmètres, exécutée par l'orchestrateur avant toute phase (`refresh_perimeter_structures`)."""
+"""Matérialisation des structures des périmètres, exécutée par l'orchestrateur avant toute phase."""
 
 ALL_TASKS: tuple[Task, ...] = (
     PERIMETER_STRUCTURES,

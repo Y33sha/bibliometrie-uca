@@ -21,7 +21,7 @@ from sqlalchemy import Connection
 from infrastructure.read_models.perimeters.queries import (
     get_persons_structure_ids_list,
 )
-from pipeline.graph import task
+from pipeline.graph import Task
 from pipeline.http.polite_pool import default_user_agent
 from pipeline.ingestion.complements.ror import ZenodoRorDumpSource
 from pipeline.ingestion.hal.api import HalStructuresClient
@@ -109,7 +109,7 @@ def _refresh_ror(ctx: PhaseContext) -> PhaseMetrics:
 
 
 TASKS = (
-    task(
+    Task(
         "affiliations.refresh_ror",
         reads=("ror_dump_imports", "source_contribution_rors"),
         writes=(
@@ -123,7 +123,7 @@ TASKS = (
         network="zenodo",
         run=_refresh_ror,
     ),
-    task(
+    Task(
         "affiliations.refresh_hal_structures",
         reads=("source_contribution_hal_structures",),
         writes=(
@@ -137,7 +137,7 @@ TASKS = (
         network="hal",
         run=_refresh_hal_structures,
     ),
-    task(
+    Task(
         "affiliations.classify_addresses",
         reads=(
             "addresses.raw_text",
@@ -152,7 +152,7 @@ TASKS = (
         run=_classify_addresses,
         section="Origine des adresses",
     ),
-    task(
+    Task(
         "affiliations.resolve_addresses",
         reads=(
             "structure_name_forms",
@@ -166,7 +166,7 @@ TASKS = (
         run=_resolve_addresses,
         section="Identification des structures dans les adresses institutionnelles",
     ),
-    task(
+    Task(
         "affiliations.resolve_thesis_partners",
         reads=(
             "structure_name_forms",
@@ -178,7 +178,7 @@ TASKS = (
         previous_run=("idref_structures",),
         run=_resolve_thesis_partners,
     ),
-    task(
+    Task(
         "affiliations.populate",
         reads=(
             "address_structures",

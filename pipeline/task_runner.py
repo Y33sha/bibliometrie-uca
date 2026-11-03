@@ -96,7 +96,6 @@ def _maintain(task: Task, ctx: PhaseContext) -> list[tuple[str, str]]:
 
 def _execute(task: Task, ctx: PhaseContext) -> PhaseMetrics:
     """Exécute la tâche et range sa durée dans `duration_s`."""
-    assert task.run is not None
     t0 = time.perf_counter()
     if task.network is None:
         metrics = task.run(ctx)

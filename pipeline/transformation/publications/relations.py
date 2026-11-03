@@ -38,7 +38,7 @@ from infrastructure.db.jsonb import Jsonb
 from infrastructure.db.scalars import scalar_int
 from infrastructure.db.source_record_identifiers import first_of_its_type_sql
 from infrastructure.sql_fragments import has_source_extra, in_clause
-from pipeline.graph import task
+from pipeline.graph import Task
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.log_format import (
     LAST_BRANCH,
@@ -576,7 +576,7 @@ def _count_by_pair_label(added_by_type: list[tuple[str, int]]) -> dict[str, int]
 
 
 TASKS = (
-    task(
+    Task(
         "relations.rebuild",
         reads=(
             *(

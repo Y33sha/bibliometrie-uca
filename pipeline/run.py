@@ -35,8 +35,8 @@ from infrastructure.observability.phase_executions import PhaseExecutionRecorder
 from pipeline.graph import Phase
 from pipeline.ingestion.api_params import request_budget
 from pipeline.ingestion.credentials import source_credentials_missing
-from pipeline.phases import PHASES
-from pipeline.runtime.context import RunOptions
+from pipeline.phases import PERIMETER_STRUCTURES, PHASES
+from pipeline.runtime.context import PhaseContext, RunOptions
 from pipeline.runtime.execution import log, open_tx, phase_context
 from pipeline.runtime.lock import PipelineAlreadyRunningError, pipeline_lock
 from pipeline.runtime.modes import MODE_NAMES
@@ -45,7 +45,6 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import set_bar_stream, write_above_bars
 from pipeline.runtime.observability.signals import select_targets
 from pipeline.task_runner import run_phase
-from pipeline.transformation.structures.perimeter import refresh_perimeter_structures
 
 set_console_writer(write_above_bars)
 set_bar_stream(console_stream())
@@ -86,14 +85,14 @@ def _catalogue_des_phases() -> str:
     return "\n".join(lines)
 
 
-def _source_list(value: str) -> str:
+def _source_list(value: str) -> frozenset[str]:
     """Valide `--sources` : au moins une source, toutes connues du registre."""
     sources = [s.strip() for s in value.split(",") if s.strip()]
     if not sources:
         raise argparse.ArgumentTypeError("au moins une source attendue")
     if unknown := [s for s in sources if s not in Source]:
         raise argparse.ArgumentTypeError(f"source(s) inconnue(s) : {', '.join(unknown)}")
-    return ",".join(sources)
+    return frozenset(sources)
 
 
 @dataclass(frozen=True)
@@ -182,7 +181,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--sources",
         type=_source_list,
-        default=",".join(Source),
+        default=frozenset(Source),
         help=f"Sources, séparées par des virgules (défaut : {','.join(Source)})",
     )
     parser.add_argument("--year", type=int, help="Moissonner cette seule année")
@@ -197,11 +196,11 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _run_options(args: argparse.Namespace, sources: set[str]) -> RunOptions:
+def _run_options(args: argparse.Namespace) -> RunOptions:
     """Renvoie les options du run transmises aux phases."""
     return RunOptions(
         mode=args.mode,
-        sources=frozenset(sources),
+        sources=args.sources,
         year=args.year,
         start_year=args.start_year,
         **{flag.dest: getattr(args, flag.dest) for flag in _RUN_FLAGS},
@@ -321,12 +320,15 @@ def _run_title(args: argparse.Namespace, phases: list[Phase]) -> list[str]:
     return _banner(settings)
 
 
+def _context(options: RunOptions) -> PhaseContext:
+    """Renvoie un contexte d'exécution, avec l'accès aux identifiants et au débit des sources."""
+    return phase_context(
+        options, credentials_missing=source_credentials_missing, request_budget=request_budget
+    )
+
+
 def _run_one_phase(
-    phase: Phase,
-    *,
-    args: argparse.Namespace,
-    sources: set[str],
-    recorder: PhaseExecutionRecorder,
+    phase: Phase, *, options: RunOptions, recorder: PhaseExecutionRecorder
 ) -> tuple[str, float]:
     """Exécute une phase et enregistre son observabilité. Renvoie son nom et sa durée.
 
@@ -342,11 +344,7 @@ def _run_one_phase(
             log.info("%s", line)
         phase_started_at = datetime.datetime.now(datetime.UTC)
         t0_phase = time.time()
-        ctx = phase_context(
-            _run_options(args, sources),
-            credentials_missing=source_credentials_missing,
-            request_budget=request_budget,
-        )
+        ctx = _context(options)
         try:
             metrics = run_phase(phase, ctx)
         except (KeyboardInterrupt, Exception) as e:
@@ -397,26 +395,22 @@ def _run_one_phase(
         reset_log_phase(phase_token)
 
 
-def _execute_phases(args: argparse.Namespace, phases_to_run: list[Phase]) -> None:
+def _execute_phases(options: RunOptions, phases_to_run: list[Phase]) -> None:
     """Déroule la séquence des phases avec observabilité par run, puis le récapitulatif de fin."""
-    sources = {s.strip() for s in args.sources.split(",") if s.strip()}
-
     # Enregistre le run et chacune de ses phases : identifiant de séquence, entrées, sorties, statut.
     recorder = start_run(
-        mode=args.mode,
-        sources=select_targets(Source, sources, include_wos=args.include_wos),
+        mode=options.mode,
+        sources=select_targets(Source, options.sources, include_wos=options.include_wos),
     )
     if recorder.run_id is not None:
         log.info("%s%d", RUN_MARKER, recorder.run_id)
 
-    # Matérialise `perimeter_structures` avant toute phase, même avec `--only` ou `--from` : les phases lisent le périmètre sans le recalculer.
-    with open_tx() as perimeter_conn:
-        refresh_perimeter_structures(perimeter_conn)
+    # Avant toute phase, même avec `--only` ou `--from` : les phases lisent le périmètre sans le recalculer.
+    PERIMETER_STRUCTURES.run(_context(options))
 
     t0_total = time.time()
     phase_results = [
-        _run_one_phase(phase, args=args, sources=sources, recorder=recorder)
-        for phase in phases_to_run
+        _run_one_phase(phase, options=options, recorder=recorder) for phase in phases_to_run
     ]
 
     elapsed_total = time.time() - t0_total
@@ -446,7 +440,7 @@ def main() -> None:
     # Une seule exécution à la fois sur la base : deux en parallèle s'interbloquent.
     try:
         with pipeline_lock():
-            _execute_phases(args, phases_to_run)
+            _execute_phases(_run_options(args), phases_to_run)
     except PipelineAlreadyRunningError as exc:
         print(str(exc), file=sys.stderr)
         sys.exit(1)

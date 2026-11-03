@@ -2,7 +2,7 @@
 
 import pytest
 
-from pipeline.graph import Phase, task
+from pipeline.graph import Phase, Task
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.task_runner import execute_tasks, run_phase
 
@@ -10,9 +10,9 @@ from pipeline.task_runner import execute_tasks, run_phase
 def test_l_executeur_mesure_la_duree_des_seules_taches_executees(contexte):
     """Une tâche exécutée reçoit sa durée, rangée aussi dans le contexte. Une tâche écartée par sa condition est absente du résultat."""
     tasks = (
-        task("essai.une", run=lambda _ctx: PhaseMetrics()),
-        task("essai.ecartee", run=lambda _ctx: PhaseMetrics(), when=lambda _ctx: False),
-        task("essai.deux", run=lambda _ctx: PhaseMetrics()),
+        Task("essai.une", run=lambda _ctx: PhaseMetrics()),
+        Task("essai.ecartee", run=lambda _ctx: PhaseMetrics(), when=lambda _ctx: False),
+        Task("essai.deux", run=lambda _ctx: PhaseMetrics()),
     )
 
     ctx = contexte()
@@ -24,8 +24,8 @@ def test_l_executeur_mesure_la_duree_des_seules_taches_executees(contexte):
 
 
 _TACHES = (
-    task("essai.une", run=lambda _ctx: PhaseMetrics(new=1)),
-    task("essai.deux", run=lambda _ctx: PhaseMetrics(new=2)),
+    Task("essai.une", run=lambda _ctx: PhaseMetrics(new=1)),
+    Task("essai.deux", run=lambda _ctx: PhaseMetrics(new=2)),
 )
 
 
@@ -45,7 +45,7 @@ def test_une_precondition_non_remplie_arrete_la_phase_avant_ses_taches(contexte)
     def check(_ctx) -> None:
         raise RuntimeError("périmètre vide")
 
-    tache = task("essai.une", run=lambda _ctx: appels.append("une") or PhaseMetrics())
+    tache = Task("essai.une", run=lambda _ctx: appels.append("une") or PhaseMetrics())
     with pytest.raises(RuntimeError, match="périmètre vide"):
         run_phase(Phase("essai", "Essai", (tache,), check=check), contexte())
 

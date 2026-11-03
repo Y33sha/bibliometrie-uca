@@ -5,7 +5,7 @@ La phase `finalize` supprime au préalable les publications sans contribution ra
 
 from __future__ import annotations
 
-from pipeline.graph import task
+from pipeline.graph import Task
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publications.subjects.subject_cooccurrences import (
@@ -29,7 +29,7 @@ def _usage(ctx: PhaseContext) -> PhaseMetrics:
 
 
 TASKS = (
-    task(
+    Task(
         "subjects.ingest",
         reads=(
             "publications.id",
@@ -44,7 +44,7 @@ TASKS = (
         previous_run=("publications.subjects_ingested_at", "subjects"),
         run=_ingest,
     ),
-    task(
+    Task(
         "subjects.usage",
         reads=(
             "publication_subjects",

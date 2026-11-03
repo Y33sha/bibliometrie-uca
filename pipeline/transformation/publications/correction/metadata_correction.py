@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from pipeline.graph import task
+from pipeline.graph import Task
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publications.correction.correct_unary import run as run_unary
@@ -66,7 +66,7 @@ def _matchable(ctx: PhaseContext) -> PhaseMetrics:
 
 
 TASKS = (
-    task(
+    Task(
         "metadata_correction.serial_by_doi",
         reads=(
             "serial_doi_namespaces",
@@ -83,7 +83,7 @@ TASKS = (
         previous_run=("source_records", "source_record_identifiers.removed_by"),
         run=_serial_by_doi,
     ),
-    task(
+    Task(
         "metadata_correction.unary",
         reads=(
             *(
@@ -135,7 +135,7 @@ TASKS = (
         ),
         run=_unary,
     ),
-    task(
+    Task(
         "metadata_correction.doi_targets",
         reads=tuple(
             f"source_records.{column}"
@@ -158,7 +158,7 @@ TASKS = (
         previous_run=("source_records", "source_record_identifiers.removed_by", "doi_targets"),
         run=_doi_targets,
     ),
-    task(
+    Task(
         "metadata_correction.remove_identifiers",
         reads=tuple(
             f"source_records.{column}"
@@ -189,7 +189,7 @@ TASKS = (
         previous_run=("source_records", "source_record_identifiers.removed_by"),
         run=_remove_identifiers,
     ),
-    task(
+    Task(
         "metadata_correction.matchable",
         reads=(
             *(

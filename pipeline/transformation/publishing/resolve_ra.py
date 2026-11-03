@@ -11,7 +11,7 @@ import logging
 from collections.abc import Callable, Iterable, Sequence
 
 from domain.documents.identifiers import DoiPrefix
-from pipeline.graph import task
+from pipeline.graph import Task
 from pipeline.http.circuit_breaker import SourceUnavailableError
 from pipeline.http.polite_pool import default_user_agent
 from pipeline.ingestion.complements.doi_org import fetch_registration_agencies
@@ -113,7 +113,7 @@ def _resolve(
 
 
 TASKS = (
-    task(
+    Task(
         "resolve_ra.resolve_prefixes",
         reads=(
             "doi_prefixes.id",

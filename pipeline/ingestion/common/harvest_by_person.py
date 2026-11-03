@@ -8,7 +8,7 @@ Le profil de chaque source liste les types d'identifiant de personne acceptés (
 from __future__ import annotations
 
 from domain.sources.registry import PERSON_SEARCHED_SOURCES, Source, source_label
-from pipeline.graph import TaskRun, task
+from pipeline.graph import Task, TaskRun
 from pipeline.ingestion.adapters import ADAPTERS
 from pipeline.ingestion.common.harvester import HarvestWindow, run_harvest
 from pipeline.runtime.context import PhaseContext
@@ -28,7 +28,7 @@ def _search(source: str) -> TaskRun:
 
 
 TASKS = tuple(
-    task(
+    Task(
         f"harvest_by_person.{source}",
         reads=("config", "hr_records", "person_identifiers", "staging"),
         writes=("staging", "staging_normalization_queue"),

@@ -16,7 +16,7 @@ from collections.abc import Callable, Mapping
 
 from domain.config import ConfigKey
 from domain.sources.registry import DOI_SEARCHABLE_SOURCES, PROFILES, Source
-from pipeline.graph import Task, TaskRun, task
+from pipeline.graph import Task, TaskRun
 from pipeline.ingestion.adapters import ADAPTERS
 from pipeline.ingestion.common.doi_search import fetch_missing_doi
 from pipeline.runtime.config import cap, delay, window_years
@@ -123,7 +123,7 @@ def _channel(
     when: Callable[[PhaseContext], bool],
 ) -> Task:
     """Renvoie la tâche d'un canal de recherche, avec les lectures et écritures communes aux canaux : identifiants des publications du périmètre, cherchés dans les autres sources ; échecs retenus dans `failed_lookups`."""
-    return task(
+    return Task(
         name,
         reads=(
             "config",

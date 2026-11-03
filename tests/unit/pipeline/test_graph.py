@@ -9,6 +9,7 @@ from domain.sources.registry import (
 from pipeline.graph import Task, dependencies, order_violations
 from pipeline.ingestion.common.normalize import normalizer_builders
 from pipeline.phases import ALL_TASKS
+from pipeline.runtime.observability.metrics import PhaseMetrics
 
 
 def test_noms_uniques():
@@ -48,20 +49,24 @@ def test_aucune_tache_ne_lit_une_donnee_ecrite_apres_elle():
     assert order_violations(ALL_TASKS) == []
 
 
+def _task(name: str, **declarations: tuple[str, ...]) -> Task:
+    return Task(name, run=lambda _ctx: PhaseMetrics(), **declarations)
+
+
 def test_lecture_non_declaree_detectee():
-    writer = Task("b", writes=frozenset({"t.c"}))
-    reader = Task("a", reads=frozenset({"t"}))
+    writer = _task("b", writes=("t.c",))
+    reader = _task("a", reads=("t",))
     assert order_violations([reader, writer]) == [("a", "t", "b")]
-    declared = Task("a", reads=frozenset({"t"}), previous_run=frozenset({"t.c"}))
+    declared = _task("a", reads=("t",), previous_run=("t.c",))
     assert order_violations([declared, writer]) == []
 
 
 def test_creation_de_lignes_change_toute_lecture_de_la_table():
-    writer = Task("b", writes=frozenset({"t.id"}))
-    reader = Task("a", reads=frozenset({"t.c"}))
+    writer = _task("b", writes=("t.id",))
+    reader = _task("a", reads=("t.c",))
     assert order_violations([reader, writer]) == [("a", "t.c", "b")]
-    column_writer = Task("b", writes=frozenset({"t.c"}))
-    id_reader = Task("a", reads=frozenset({"t.id"}))
+    column_writer = _task("b", writes=("t.c",))
+    id_reader = _task("a", reads=("t.id",))
     assert order_violations([id_reader, column_writer]) == []
 
 

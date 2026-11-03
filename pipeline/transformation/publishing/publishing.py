@@ -20,7 +20,7 @@ from collections.abc import Callable, Mapping
 
 from domain.config import ConfigKey
 from infrastructure.repositories.publisher_merge import merge_publisher_into
-from pipeline.graph import task
+from pipeline.graph import Task
 from pipeline.http.polite_pool import default_user_agent
 from pipeline.ingestion.api_params import (
     API_BASE_URLS,
@@ -317,7 +317,7 @@ def _run_enrich_serials_from_doaj(ctx: PhaseContext) -> PhaseMetrics:
 
 
 TASKS = (
-    task(
+    Task(
         "publishing.resolve_crossref_publishers",
         reads=(
             "doi_prefixes.id",
@@ -351,7 +351,7 @@ TASKS = (
         section="Éditeurs",
         label=resolve_publishers.LABELS["Crossref"],
     ),
-    task(
+    Task(
         "publishing.resolve_datacite_publishers",
         reads=(
             "doi_prefixes.id",
@@ -381,7 +381,7 @@ TASKS = (
         section="Éditeurs",
         label=resolve_publishers.LABELS["DataCite"],
     ),
-    task(
+    Task(
         "publishing.attach_publishers",
         reads=(
             "source_records.source",
@@ -411,7 +411,7 @@ TASKS = (
         section="Éditeurs",
         label=attach_publishers.LABEL,
     ),
-    task(
+    Task(
         "publishing.merge_duplicate_publishers",
         reads=(
             "source_records.publisher_id",
@@ -437,7 +437,7 @@ TASKS = (
         section="Éditeurs",
         label=merge_duplicate_publishers.LABEL,
     ),
-    task(
+    Task(
         "publishing.sync_issns",
         reads=("source_records.biblio", "serial_issns"),
         writes=("serial_issns",),
@@ -447,7 +447,7 @@ TASKS = (
         section="Publications en série",
         label=attach_serials.SYNC_LABEL,
     ),
-    task(
+    Task(
         "publishing.check_issns_in_sudoc",
         reads=(
             "serial_issns",
@@ -470,7 +470,7 @@ TASKS = (
         label=check_issns_in_sudoc.LABEL,
         threshold=3,
     ),
-    task(
+    Task(
         "publishing.import_issnl_table",
         reads=("serial_issns", "config"),
         writes=("serial_issns.issnl", "serial_issns.issnl_checked_at"),
@@ -481,7 +481,7 @@ TASKS = (
         section="Publications en série",
         label=import_issnl_table.LABEL,
     ),
-    task(
+    Task(
         "publishing.attach_serials",
         reads=(
             "source_records.source",
@@ -525,7 +525,7 @@ TASKS = (
         section="Publications en série",
         label=attach_serials.ATTACH_LABEL,
     ),
-    task(
+    Task(
         "publishing.enrich_serials_from_openalex",
         reads=(
             "serials.id",
@@ -542,7 +542,7 @@ TASKS = (
         # Trois lots consécutifs en 429 signalent l'épuisement du quota OpenAlex du jour. Le reste attend le run suivant.
         threshold=3,
     ),
-    task(
+    Task(
         "publishing.type_proceedings_serials",
         reads=(
             "serials.id",
@@ -560,7 +560,7 @@ TASKS = (
         section="Publications en série",
         label=type_proceedings_serials.LABEL,
     ),
-    task(
+    Task(
         "publishing.type_journal_serials",
         reads=(
             "serials.id",
@@ -578,7 +578,7 @@ TASKS = (
         section="Publications en série",
         label=type_journal_serials.LABEL,
     ),
-    task(
+    Task(
         "publishing.learn_serial_doi_namespaces",
         reads=(
             "source_record_identifiers",
@@ -593,7 +593,7 @@ TASKS = (
         section="Publications en série",
         label=learn_serial_doi_namespaces.LABEL,
     ),
-    task(
+    Task(
         "publishing.enrich_serials_from_doaj",
         reads=(
             "serial_issns",
@@ -618,7 +618,7 @@ TASKS = (
         section="Publications en série",
         label=enrich_serials_from_doaj.LABEL,
     ),
-    task(
+    Task(
         "publishing.attach_monographs",
         reads=(
             "source_records.biblio",
@@ -639,7 +639,7 @@ TASKS = (
         section="Monographies",
         label=attach_monographs.LABEL,
     ),
-    task(
+    Task(
         "publishing.link_monographs_to_collections",
         reads=(
             "monographs",
@@ -662,7 +662,7 @@ TASKS = (
         section="Monographies",
         label=link_monographs_to_collections.LABEL,
     ),
-    task(
+    Task(
         "publishing.type_proceedings_volumes",
         reads=(
             "monographs.id",

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from sqlalchemy import Connection, text
 
-from pipeline.graph import task
+from pipeline.graph import Task
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publications.reconciliation import reconcile
@@ -42,7 +42,7 @@ def _reconcile(ctx: PhaseContext) -> PhaseMetrics:
 
 
 TASKS = (
-    task(
+    Task(
         "publications.reconcile",
         reads=(
             "source_records",

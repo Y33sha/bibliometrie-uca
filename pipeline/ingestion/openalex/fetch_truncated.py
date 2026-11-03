@@ -14,7 +14,7 @@ from collections.abc import Mapping
 from sqlalchemy import Connection, text
 
 from domain.types import JsonValue, as_sequence
-from pipeline.graph import task
+from pipeline.graph import Task
 from pipeline.ingestion.common.lookup import LookupChannel, by_native_id, look_up
 from pipeline.ingestion.common.staging import StagingStore, UpsertOutcome
 from pipeline.ingestion.openalex.api import fetch_work
@@ -84,7 +84,7 @@ async def refetch_openalex(conn: Connection, log: logging.Logger) -> PhaseMetric
 
 
 TASKS = (
-    task(
+    Task(
         "fetch_truncated.refetch_openalex",
         reads=("staging",),
         writes=("staging", "staging_normalization_queue"),
