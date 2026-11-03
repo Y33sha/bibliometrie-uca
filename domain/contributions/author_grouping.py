@@ -275,7 +275,7 @@ class ResidualModel:
 
 
 def _link_threshold(candidate_contributions: int) -> float:
-    """Renvoie le score au-delà duquel un lien du résidu est retenu : log2 du nombre de contributions candidates, soit une probabilité supérieure à 1/2 avec un a priori de 1 sur ce nombre."""
+    """Renvoie le score au-delà duquel un lien du résidu est retenu : log2 du nombre de contributions candidates. Avec un a priori de 1 sur ce nombre, ce score donne une probabilité supérieure à 1/2."""
     return math.log2(max(candidate_contributions, 2))
 
 
@@ -461,7 +461,7 @@ class _SourceRecordLinks:
         *,
         swapped: bool = False,
     ) -> None:
-        """Lie une contribution source et une contribution quand la clé de la contribution source vaut la clé de la référence et qu'elle est unique des deux côtés, parmi les contributions sources données et les contributions restées sans lien.
+        """Lie une contribution source et une contribution de même clé. La clé est unique des deux côtés : parmi les contributions sources données, et parmi les références des contributions restées sans lien.
 
         Args:
             swapped: la clé de la référence porte sur ses nom de famille et prénom intervertis. La contribution source se lie seulement si son nom de famille est absent des références sans lien.

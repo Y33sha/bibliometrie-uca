@@ -18,7 +18,7 @@ _LEGAL_PROCEEDINGS = re.compile(
 def names_proceedings(title: str) -> bool:
     """Vrai si le titre annonce des actes : « Proceedings of the Thirtieth International Joint Conference on Artificial Intelligence ».
 
-    Une société savante, une académie ou une institution publient des revues ainsi nommées : « Proceedings of the National Academy of Sciences », « Proceedings of the Institution of Civil Engineers ». Leur titre ne compte pas, pas plus qu'une procédure judiciaire : « Third Parties in Criminal Proceedings ».
+    Une société savante, une académie ou une institution publient des revues ainsi nommées : « Proceedings of the National Academy of Sciences », « Proceedings of the Institution of Civil Engineers ». Leur titre est écarté, comme celui d'une procédure judiciaire : « Third Parties in Criminal Proceedings ».
 
     Seul le mot anglais compte : en sciences humaines, les chapitres d'« Actes du colloque » restent des chapitres.
     """
@@ -37,7 +37,7 @@ def names_ebook_platform(title: str) -> bool:
 def names_a_dated_event(title: str) -> bool:
     """Vrai si le titre nomme une édition datée : « NuFACT 2022 », « 2024 IEEE SENSORS », « Goldschmidt2023 abstracts ».
 
-    Ne comptent pas : une période (« Poetry, 1960–2015 »), une année seule entre parenthèses (« 22 Seiten (2023). »), un titre qui contient le mot « journal » (« Journal of high energy physics 2018(7) »).
+    Sont écartés : une période (« Poetry, 1960–2015 »), une année seule entre parenthèses (« 22 Seiten (2023). »), un titre qui contient le mot « journal » (« Journal of high energy physics 2018(7) »).
     """
     if _JOURNAL_WORD.search(title):
         return False

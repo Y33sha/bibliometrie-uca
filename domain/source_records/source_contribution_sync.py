@@ -113,7 +113,7 @@ def source_contribution_content(
     hal_structure_ids: Iterable[int] = (),
     collective: bool = False,
 ) -> JsonValue:
-    """Renvoie les champs écrits par la normalisation d'une contribution source, dont l'empreinte détecte un changement. Les ROR, les structures HAL et la marque collective figurent dans le contenu seulement s'ils sont présents.
+    """Renvoie les champs écrits par la normalisation d'une contribution source. Leur empreinte détecte un changement. Les ROR, les structures HAL et la marque collective figurent dans le contenu seulement s'ils sont présents.
 
     Args:
         name: chaîne brute, nom et prénom de la source.

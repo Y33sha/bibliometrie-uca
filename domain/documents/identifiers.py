@@ -135,7 +135,7 @@ def is_hal_host(host: str) -> bool:
 def _normalize_hal_id(raw: str | None) -> str | None:
     """Renvoie l'identifiant HAL sans version, tiré d'une URL de portail HAL, d'un identifiant OAI-PMH HAL (`oai:HAL:hal-04123456v1`) ou d'un identifiant nu.
 
-    `None` pour une URL d'un autre hôte, un identifiant OAI-PMH d'une autre autorité, ou une autre chaîne que l'identifiant entier : leurs fragments `mot-chiffres` ressemblent à un identifiant HAL (`oai:pure.rug.nl:openaire/1b9c53c2-4cfa-49c4-b454-3339841149ee`, `doi:10.3929/ethz-b-000124558`).
+    `None` pour une URL d'un autre hôte, un identifiant OAI-PMH d'une autre autorité, ou une autre chaîne que l'identifiant entier. Leurs fragments `mot-chiffres` ressemblent à un identifiant HAL (`oai:pure.rug.nl:openaire/1b9c53c2-4cfa-49c4-b454-3339841149ee`, `doi:10.3929/ethz-b-000124558`).
     """
     if not raw:
         return None

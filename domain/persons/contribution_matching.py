@@ -84,7 +84,7 @@ MATCH_REASON_PRIORITY: tuple[ContributionMatchReason, ...] = (
     *(_REASON_BY_IDENTIFIER[id_type] for id_type in IDENTIFIER_ORDER),
     *NAME_MATCH_REASONS,
 )
-"""Signaux de rattachement dans l'ordre où la décision les essaie : épinglage, identifiants du plus fiable au moins fiable, nom."""
+"""Signaux de rattachement, dans l'ordre d'examen de la décision : épinglage, identifiants du plus fiable au moins fiable, nom."""
 
 
 def _strength(reason: ContributionMatchReason) -> int:

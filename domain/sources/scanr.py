@@ -7,7 +7,7 @@ _SCANR_HAL_PREFIX = "hal"
 
 
 def extract_hal_id_from_scanr_id(scanr_id: str | None) -> str | None:
-    """Renvoie l'identifiant du dépôt HAL dont un enregistrement source ScanR est issu, ou `None`.
+    """Renvoie l'identifiant du dépôt HAL d'origine d'un enregistrement source ScanR, ou `None`.
 
     ScanR encode un enregistrement source issu de HAL sous la forme `hal<identifiant HAL>` (ex. `halhal-04501427` → `hal-04501427`, `haltel-01234567` → `tel-01234567`).
     """

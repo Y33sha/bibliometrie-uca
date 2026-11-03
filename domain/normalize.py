@@ -133,7 +133,7 @@ def drop_flattened_mathml(title: str) -> str:
 
     Un éditeur dépose chaque formule d'un titre en deux versions : LaTeX (`$$…$$`) et MathML. Crossref renvoie le titre avec l'indentation du XML déposé et sans les balises MathML. La formule LaTeX occupe une ligne. Chaque symbole MathML occupe une ligne d'indentation supérieure, avant ou après. ScanR recopie ce titre. Ces lignes de symboles isolés sont retirées. L'interface affiche la formule LaTeX.
 
-    Un titre déjà mis sur une ligne ne garde aucun repère : il reste tel quel.
+    Un titre déjà mis sur une ligne, sans indentation de repère, reste tel quel.
     """
     lines = title.split("\n")
     dropped: set[int] = set()

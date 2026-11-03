@@ -25,4 +25,4 @@ class SudocSerialRecord:
     supplements: tuple[str, ...] = ()
     """ISSN du supplément (`421`)."""
     supplement_of: tuple[str, ...] = ()
-    """ISSN de la revue dont elle est le supplément (`422`)."""
+    """ISSN de la revue principale (`422`)."""

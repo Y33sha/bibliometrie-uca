@@ -428,7 +428,7 @@ def _divergence_decisions(group: list[DoiClusterMember]) -> list[DoiClusterDecis
 def _co_owners_of_lost_keys(
     group: list[DoiClusterMember], decisions: list[DoiClusterDecision]
 ) -> list[DoiClusterDecision]:
-    """Renvoie le retrait du DOI des membres qui le gardent sans le détenir en propre, et qui détiennent en propre une clé de confirmation détenue en propre par un membre qui perd le DOI. Ils décrivent l'œuvre de ce membre : ils perdent le DOI, détenu en `secondary`, plutôt que leur clé."""
+    """Renvoie le retrait du DOI des membres qui le gardent sans le détenir en propre. Chacun détient en propre une clé de confirmation, détenue en propre aussi par un membre qui perd le DOI. Ils décrivent l'œuvre de ce membre : ils perdent le DOI, détenu en `secondary`, plutôt que leur clé."""
     losers = {d.id: d.case for d in decisions if d.case in _DIVERGENCE_CASES}
     if not losers:
         return []

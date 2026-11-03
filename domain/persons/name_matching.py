@@ -27,7 +27,7 @@ def is_initials(text: str) -> bool:
 
 
 def is_full_first_name(text: str) -> bool:
-    """Vrai si le prénom n'est pas réduit à des initiales : un de ses mots normalisés compte au moins deux lettres (« Jean L. », « LEA »)."""
+    """Vrai si le prénom est complet : un de ses mots normalisés compte au moins deux lettres (« Jean L. », « LEA »)."""
     return any(len(word) > 1 for word in normalize_text(text).split())
 
 

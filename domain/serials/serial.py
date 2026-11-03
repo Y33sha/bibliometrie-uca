@@ -75,7 +75,7 @@ class Serial:
     manual_fields: frozenset[ManualField] = frozenset()
 
     def edit(self, **changes: Unpack[SerialEdit]) -> frozenset[ManualField]:
-        """Applique une saisie de l'administration. Renvoie les champs saisis à la main dont elle change la valeur ; ils rejoignent `manual_fields`."""
+        """Applique une saisie de l'administration. Renvoie les champs saisis à la main changés par cette saisie ; ils rejoignent `manual_fields`."""
         before = self._manual_values()
         if "title" in changes:
             self.title = changes["title"]

@@ -38,7 +38,7 @@ def openalex_issnls(series: Iterable[tuple[str, Sequence[str]]]) -> dict[str, st
 def choose_issnl(title: str | None, candidates: Mapping[str, str]) -> str | None:
     """Renvoie l'ISSN-L de l'enregistrement source parmi `candidates`, ou `None` s'ils restent indiscernables.
 
-    Un seul candidat l'emporte d'office. Parmi plusieurs, l'emporte la seule revue de même titre normalisé que `title`, à défaut la seule de titre compatible (`compatible_titles`) : « INRA productions animales » est compatible avec « INRAE Productions Animales », « INRAE productions animales » est identique.
+    Un seul candidat l'emporte d'office. Parmi plusieurs, l'emporte la seule revue de même titre normalisé que `title`, à défaut la seule de titre compatible (`compatible_titles`). « INRA productions animales » est compatible avec « INRAE Productions Animales », « INRAE productions animales » est identique.
 
     Args:
         candidates: titre de la revue de chaque ISSN-L candidat.

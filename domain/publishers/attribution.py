@@ -1,6 +1,6 @@
 """Éditeur d'un enregistrement source et d'une publication.
 
-Une production hébergée sans être publiée n'a pas d'éditeur : la plateforme ou l'institution qui la diffuse n'en est pas l'éditeur.
+Une production hébergée sans être publiée est sans éditeur : la plateforme ou l'institution qui la diffuse l'héberge seulement.
 """
 
 from collections.abc import Iterable

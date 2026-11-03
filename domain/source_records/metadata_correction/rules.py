@@ -34,7 +34,7 @@ class MetadataForCorrection:
     self_declared_preprint: bool | None = None
     """L'enregistrement source déclare la relation Crossref `is-preprint-of` : il est le preprint d'une autre œuvre."""
     declares_conference: bool | None = None
-    """L'enregistrement source nomme le congrès dont il est issu (Crossref `event`, ou `assertion` Springer)."""
+    """L'enregistrement source nomme son congrès (Crossref `event`, ou `assertion` Springer)."""
     registrant_publisher_types: frozenset[str] = frozenset()
     """Types des éditeurs qui ont déposé le préfixe de l'un des `dois` (`doi_prefixes`)."""
     in_proceedings_volume: bool | None = None
@@ -308,7 +308,7 @@ _RULES: dict[MetadataCorrectionRule, _Rule] = {
         lambda f: _group_title_in(f, frozenset({"display"})),
         DocType.POSTER,
     ),
-    # Chapitre qui nomme le congrès dont il est issu ⇒ `conference_paper`. Springer décrit ainsi les actes publiés en livre.
+    # Chapitre qui nomme son congrès ⇒ `conference_paper`. Springer décrit ainsi les actes publiés en livre.
     MetadataCorrectionRule.CONFERENCE_DECLARED_TO_CONFERENCE_PAPER: _Rule(
         frozenset({DocType.BOOK_CHAPTER}),
         lambda f: bool(f.declares_conference),

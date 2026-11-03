@@ -123,7 +123,7 @@ def _publishers_of_openalex_ids(
 def _free_forms(
     by_openalex: Mapping[str, list[_FormedRecord]], publisher_of_form: Mapping[str, int]
 ) -> dict[str, str]:
-    """Renvoie l'identifiant OpenAlex qui reçoit chaque forme libre : celui qui la porte le plus."""
+    """Renvoie, pour chaque forme libre, l'identifiant OpenAlex le plus fréquent parmi les enregistrements sources de cette forme."""
     claims: dict[str, Counter[str]] = defaultdict(Counter)
     for openalex_id, members in by_openalex.items():
         for _, form in members:

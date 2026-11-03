@@ -107,7 +107,7 @@ def _monograph_biblio(volume: VolumeDescription) -> dict[str, JsonValue] | None:
 
 
 def _with_entry(biblio: JsonValue, key: BiblioKey, value: JsonValue) -> dict[str, JsonValue] | None:
-    """Renvoie `biblio` dont l'entrée `key` est remplacée par `value`, retirée si `value` est vide ; `None` sans aucune valeur."""
+    """Renvoie `biblio` avec l'entrée `key` remplacée par `value`, retirée si `value` est vide ; `None` sans aucune valeur."""
     entries = biblio.items() if isinstance(biblio, Mapping) else ()
     result = {k: v for k, v in entries if k != key}
     if value:
@@ -118,21 +118,21 @@ def _with_entry(biblio: JsonValue, key: BiblioKey, value: JsonValue) -> dict[str
 def with_journal(
     biblio: JsonValue, series: SeriesDescription | None
 ) -> dict[str, JsonValue] | None:
-    """Renvoie `biblio` dont la série est remplacée par `series` ; `None` sans aucune valeur."""
+    """Renvoie `biblio` avec la série `series` ; `None` sans aucune valeur."""
     return _with_entry(biblio, BiblioKey.JOURNAL, _journal_biblio(series) if series else None)
 
 
 def with_monograph(
     biblio: JsonValue, volume: VolumeDescription | None
 ) -> dict[str, JsonValue] | None:
-    """Renvoie `biblio` dont la monographie est remplacée par `volume` ; `None` sans aucune valeur."""
+    """Renvoie `biblio` avec la monographie `volume` ; `None` sans aucune valeur."""
     return _with_entry(biblio, BiblioKey.MONOGRAPH, _monograph_biblio(volume) if volume else None)
 
 
 def with_publisher(
     biblio: JsonValue, name: str | None, openalex_id: str | None
 ) -> dict[str, JsonValue] | None:
-    """Renvoie `biblio` dont le nom et l'identifiant OpenAlex de l'éditeur sont remplacés ; `None` sans aucune valeur. Le nom est mis en texte brut (`to_plain_text`)."""
+    """Renvoie `biblio` avec le nom et l'identifiant OpenAlex de l'éditeur donnés ; `None` sans aucune valeur. Le nom est mis en texte brut (`to_plain_text`)."""
     named = _with_entry(biblio, BiblioKey.PUBLISHER, to_plain_text(name))
     return _with_entry(named, BiblioKey.PUBLISHER_OPENALEX_ID, openalex_id)
 

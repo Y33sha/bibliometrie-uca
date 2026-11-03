@@ -78,7 +78,7 @@ def correct_source_record(
         facts: valeurs courantes, éventuellement corrigées par un passage précédent.
         identifiers: tous les identifiants de l'enregistrement source, avec leur statut courant.
         corrections: colonne `corrections` courante.
-        origin_doc_type: type corrigé du dépôt HAL dont l'enregistrement source ScanR est issu ; il prime sur son type.
+        origin_doc_type: type corrigé du dépôt HAL d'origine de l'enregistrement source ScanR ; il prime sur son type.
         missing_hal_ids: dépôts HAL introuvables dans HAL.
     """
     before = hydrate_raw_view(facts, corrections)
