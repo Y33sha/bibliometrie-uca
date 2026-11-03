@@ -1,10 +1,10 @@
 # STATUS: recurring (reporting)
 """Rapports bibliométriques par unité de recherche, au format Markdown : un fichier `<code>.md` par unité, accompagné de `<code>.csv`, la liste des publications comptées.
 
-Une publication compte pour une unité quand au moins un de ses auteurs du périmètre signe avec cette unité. Les types de documents retenus sont les articles, les articles de synthèse, les ouvrages, les chapitres et les conference papers. La période va par défaut de 2020 à la dernière année complète.
+Une publication compte pour une unité quand au moins un de ses auteurs du périmètre signe avec cette unité. Les types de documents retenus sont les articles, les articles de synthèse, les ouvrages, les chapitres et les conference papers. La période va par défaut de 2020 à la dernière année complète. Les revues Q1 viennent du classement SCImago, par défaut le plus récent de `data/imports/scimago`.
 
 Usage :
-    uv run python -m interfaces.cli.reporting.structure_report [--structure CODE ...] [--from-year 2020] [--to-year AAAA] [--output-dir data/reports/bibliometrie/AAAA-MM-JJ]
+    uv run python -m interfaces.cli.reporting.structure_report [--structure CODE ...] [--from-year 2020] [--to-year AAAA] [--output-dir data/reports/bibliometrie/AAAA-MM-JJ] [--scimago FICHIER]
 
 Sans `--structure`, un rapport par laboratoire. Sans `--output-dir`, les rapports vont dans le sous-dossier de la date du jour.
 """
@@ -34,6 +34,12 @@ from infrastructure.read_models.structures.queries import (
     AUTHORED_PUBLICATION,
 )
 from infrastructure.sql_fragments import has_author_position
+from interfaces.cli.reporting.scimago import (
+    SCIMAGO_DIR,
+    ScimagoRanking,
+    latest_scimago_file,
+    read_scimago_ranking,
+)
 
 log = setup_logger("structure_report", os.path.dirname(__file__))
 
@@ -143,6 +149,22 @@ def top_10_key_role_publications_by_year(
         conn,
         f"{_TOP_10_PERCENT} AND {_key_role_condition(roles)}",
         _params(structure_id, period),
+    )
+
+
+def q1_publications_by_year(
+    conn: Connection, structure_id: int, period: Period, q1_issns: Sequence[str]
+) -> dict[int, int]:
+    """Nombre de publications signées par la structure dans une revue dont un ISSN figure dans `q1_issns`, par année."""
+    return _count_by_year(
+        conn,
+        """
+            EXISTS (
+                SELECT 1 FROM serial_issns si
+                WHERE si.serial_id = p.serial_id AND si.issn = ANY(:q1_issns)
+            )
+        """,
+        {**_params(structure_id, period), "q1_issns": list(q1_issns)},
     )
 
 
@@ -326,12 +348,18 @@ class JournalCounts:
     """Publications où un auteur de la structure tient un des rôles demandés."""
     top_10_key_role: int
     """Publications dans le top 10 % où un auteur de la structure tient un des rôles demandés."""
+    q1_categories: Sequence[str]
+    """Catégories SCImago où la revue est Q1."""
 
 
 def top_journals(
-    conn: Connection, structure_id: int, period: Period, roles: Collection[AuthorPosition]
+    conn: Connection,
+    structure_id: int,
+    period: Period,
+    roles: Collection[AuthorPosition],
+    scimago: ScimagoRanking,
 ) -> list[JournalCounts]:
-    """Les `TOP_JOURNALS` revues où la structure publie le plus sur la période, avec leur éditeur. Tri par nombre de publications décroissant, puis par titre."""
+    """Les `TOP_JOURNALS` revues où la structure publie le plus sur la période, avec leur éditeur et leurs catégories Q1. Tri par nombre de publications décroissant, puis par titre."""
     rows = conn.execute(
         text(f"""
             WITH pubs AS (
@@ -345,7 +373,10 @@ def top_journals(
                    count(*) AS publications,
                    count(*) FILTER (WHERE top_10) AS top_10,
                    count(*) FILTER (WHERE key_role) AS key_role,
-                   count(*) FILTER (WHERE top_10 AND key_role) AS top_10_key_role
+                   count(*) FILTER (WHERE top_10 AND key_role) AS top_10_key_role,
+                   ARRAY(
+                       SELECT si.issn FROM serial_issns si WHERE si.serial_id = pubs.serial_id
+                   ) AS issns
             FROM pubs
             JOIN serials j ON j.id = pubs.serial_id
             LEFT JOIN publishers pb ON pb.id = j.publisher_id
@@ -356,7 +387,15 @@ def top_journals(
         {**_params(structure_id, period), "limit": TOP_JOURNALS},
     ).all()
     return [
-        JournalCounts(r.title, r.publisher, r.publications, r.top_10, r.key_role, r.top_10_key_role)
+        JournalCounts(
+            r.title,
+            r.publisher,
+            r.publications,
+            r.top_10,
+            r.key_role,
+            r.top_10_key_role,
+            scimago.q1_categories(r.issns),
+        )
         for r in rows
     ]
 
@@ -434,6 +473,8 @@ class StructureReportData:
     key_role_by_year: Mapping[int, int]
     top_10_by_year: Mapping[int, Top10Count]
     top_10_key_role_by_year: Mapping[int, int]
+    q1_by_year: Mapping[int, int]
+    """Publications dans une revue Q1 selon SCImago, par année."""
     impacts: Sequence[PublicationImpact]
     journals: Sequence[JournalCounts]
     by_source: Mapping[str, int]
@@ -454,7 +495,9 @@ def _table(header: Sequence[str], rows: Sequence[Sequence[str]]) -> list[str]:
     return lines
 
 
-def _synthesis_rows(data: StructureReportData, years: Sequence[int]) -> list[list[str]]:
+def _synthesis_rows(
+    data: StructureReportData, years: Sequence[int], scimago_year: int
+) -> list[list[str]]:
     role_label = _KEY_ROLES_LABELS[frozenset(data.key_roles)]
     top_10 = [data.top_10_by_year.get(y, Top10Count(0, 0)) for y in years]
     return [
@@ -464,6 +507,10 @@ def _synthesis_rows(data: StructureReportData, years: Sequence[int]) -> list[lis
         [
             f"Dans le top 10 %, avec {role_label}",
             *(str(data.top_10_key_role_by_year.get(y, 0)) for y in years),
+        ],
+        [
+            f"Part dans une revue Q1 (SCImago {scimago_year})",
+            *(_percent(data.q1_by_year.get(y, 0), data.by_year.get(y, 0)) for y in years),
         ],
     ]
 
@@ -516,7 +563,10 @@ def _impact_section(
 
 
 def _journal_label(journal: JournalCounts) -> str:
-    return f"{journal.title} ({journal.publisher})" if journal.publisher else journal.title
+    label = f"{journal.title} ({journal.publisher})" if journal.publisher else journal.title
+    if journal.q1_categories:
+        label += f" — *Q1 : {', '.join(journal.q1_categories)}*"
+    return label
 
 
 def _journal_rows(journals: Sequence[JournalCounts]) -> list[list[str]]:
@@ -550,7 +600,12 @@ def _capitalized(label: str) -> str:
 
 
 def render_report(
-    data: StructureReportData, *, years: Sequence[int], current_year: int, generated_on: str
+    data: StructureReportData,
+    *,
+    years: Sequence[int],
+    current_year: int,
+    generated_on: str,
+    scimago_year: int,
 ) -> str:
     """Rapport Markdown d'une structure."""
     structure = data.structure
@@ -568,7 +623,7 @@ def render_report(
         "",
         "## Synthèse",
         "",
-        *_table(["", *year_headers], _synthesis_rows(data, years)),
+        *_table(["", *year_headers], _synthesis_rows(data, years, scimago_year)),
         "",
         "## Impact",
         "",
@@ -594,7 +649,7 @@ def render_report(
 
 
 def _report_data(
-    conn: Connection, structure: ReportStructure, period: Period
+    conn: Connection, structure: ReportStructure, period: Period, scimago: ScimagoRanking
 ) -> StructureReportData:
     roles = KEY_ROLES_BY_STRUCTURE.get(structure.code, _CORRESPONDING)
     sid = structure.id
@@ -605,8 +660,9 @@ def _report_data(
         key_role_by_year=key_role_publications_by_year(conn, sid, period, roles),
         top_10_by_year=top_10_percent_by_year(conn, sid, period),
         top_10_key_role_by_year=top_10_key_role_publications_by_year(conn, sid, period, roles),
+        q1_by_year=q1_publications_by_year(conn, sid, period, scimago.q1_issns()),
         impacts=publication_impacts(conn, sid, period, roles),
-        journals=top_journals(conn, sid, period, roles),
+        journals=top_journals(conn, sid, period, roles, scimago),
         by_source=publications_by_source(conn, sid, period),
     )
 
@@ -635,10 +691,20 @@ def main() -> int:
         default=REPORTS_DIR / generated_on,
         help=f"({REPORTS_DIR / generated_on})",
     )
+    parser.add_argument(
+        "--scimago",
+        type=Path,
+        default=latest_scimago_file(),
+        help=f"classement SCImago (fichier le plus récent de {SCIMAGO_DIR})",
+    )
     args = parser.parse_args()
+    if args.scimago is None:
+        log.error("Aucun classement SCImago dans %s", SCIMAGO_DIR)
+        return 1
 
     period = Period(args.from_year, args.to_year)
     years = period.years
+    scimago = read_scimago_ranking(args.scimago)
 
     with get_sync_engine().connect() as conn:
         structures = report_structures(conn, args.structures)
@@ -648,11 +714,15 @@ def main() -> int:
             return 1
         args.output_dir.mkdir(parents=True, exist_ok=True)
         for structure in structures:
-            data = _report_data(conn, structure, period)
+            data = _report_data(conn, structure, period, scimago)
             path = args.output_dir / f"{structure.code}.md"
             path.write_text(
                 render_report(
-                    data, years=years, current_year=current_year, generated_on=generated_on
+                    data,
+                    years=years,
+                    current_year=current_year,
+                    generated_on=generated_on,
+                    scimago_year=scimago.year,
                 ),
                 encoding="utf-8",
             )
