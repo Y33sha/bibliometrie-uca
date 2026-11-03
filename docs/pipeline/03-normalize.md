@@ -12,7 +12,7 @@ Une contribution source collective (collaboration, consortium, groupe d'étude�
 
 Le type de document et la langue de la source sont traduits dans le vocabulaire du référentiel : `doc_type` par la table de correspondance de la source, `language` par les formes de `language_forms`. `raw_doc_type` et `raw_language` gardent la valeur de la source.
 
-Chaque normaliseur pose aussi la licence de l'enregistrement source (`source_records.license`), ramenée au vocabulaire fermé de `domain/publications/licenses.py`. La forme brute reste dans `source_extras`.
+Chaque normaliseur pose aussi la licence de l'enregistrement source (`source_records.license`), ramenée au vocabulaire fermé de `domain/publications/licenses.py`.
 
 En fin de phase, les `source_records` d'un document marqué `disappeared_at` par [`fetch_stale`](02-harvest.md#documents-périmés-et-disparus-fetch_stale) sont supprimées ; leurs `source_contributions` sont supprimées en cascade. La ligne de `staging` reste, avec sa marque.
 
