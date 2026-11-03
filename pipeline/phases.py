@@ -3,6 +3,8 @@
 Les enrichissements (`extra`) viennent en dernier. Chacun est indépendant des autres. Des phases placées avant eux lisent leurs sorties au run suivant : `resolve_ra` et `fetch_missing` lisent les relations, `normalize` et `publications` les pays, `publications` le statut open access.
 """
 
+from dataclasses import replace
+
 from pipeline.graph import Phase, Task
 from pipeline.ingestion.common import (
     fetch_missing,
@@ -161,8 +163,19 @@ PERIMETER_STRUCTURES = Task(
 )
 """Matérialisation des structures des périmètres, exécutée par l'orchestrateur avant toute phase."""
 
+
+def _qualified(phase: str, task: Task) -> Task:
+    """Renvoie la tâche, son nom et son groupe parallèle préfixés du nom de sa phase : `publishing.attach_serials`."""
+    group = task.parallel_group
+    return replace(
+        task,
+        name=f"{phase}.{task.name}",
+        parallel_group=f"{phase}.{group}" if group is not None else None,
+    )
+
+
 ALL_TASKS: tuple[Task, ...] = (
     PERIMETER_STRUCTURES,
-    *(task for phase in PHASES for task in phase.tasks),
+    *(_qualified(phase.name, task) for phase in PHASES for task in phase.tasks),
 )
-"""Tâches du pipeline dans l'ordre d'exécution : celle de l'orchestrateur, puis celles de chaque phase."""
+"""Tâches du pipeline dans l'ordre d'exécution, pour le graphe des dépendances : celle de l'orchestrateur, puis celles de chaque phase, préfixées du nom de leur phase."""

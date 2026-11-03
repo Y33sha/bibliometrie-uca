@@ -105,7 +105,7 @@ def _refresh_ror(ctx: PhaseContext) -> PhaseMetrics:
 
 TASKS = (
     Task(
-        "affiliations.refresh_ror",
+        "refresh_ror",
         reads=("ror_dump_imports", "source_contribution_rors"),
         writes=(
             "ror_organizations",
@@ -119,7 +119,7 @@ TASKS = (
         run=_refresh_ror,
     ),
     Task(
-        "affiliations.refresh_hal_structures",
+        "refresh_hal_structures",
         reads=("source_contribution_hal_structures",),
         writes=(
             "hal_structures",
@@ -133,7 +133,7 @@ TASKS = (
         run=_refresh_hal_structures,
     ),
     Task(
-        "affiliations.classify_addresses",
+        "classify_addresses",
         reads=(
             "addresses.raw_text",
             "addresses.normalized_text",
@@ -148,7 +148,7 @@ TASKS = (
         section="Origine des adresses",
     ),
     Task(
-        "affiliations.resolve_addresses",
+        "resolve_addresses",
         reads=(
             "structure_name_forms",
             "structures",
@@ -162,7 +162,7 @@ TASKS = (
         section="Identification des structures dans les adresses institutionnelles",
     ),
     Task(
-        "affiliations.resolve_thesis_partners",
+        "resolve_thesis_partners",
         reads=(
             "structure_name_forms",
             "structures",
@@ -174,7 +174,7 @@ TASKS = (
         run=_resolve_thesis_partners,
     ),
     Task(
-        "affiliations.populate",
+        "populate",
         reads=(
             "address_structures",
             "perimeter_structures",
@@ -225,7 +225,7 @@ TASKS = (
 
 def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
     """Renvoie les métriques de la résolution des adresses, avec les détails des deux référentiels."""
-    metrics = by_task["affiliations.resolve_addresses"]
-    metrics.details.update(by_task["affiliations.refresh_ror"].details)
-    metrics.details.update(by_task["affiliations.refresh_hal_structures"].details)
+    metrics = by_task["resolve_addresses"]
+    metrics.details.update(by_task["refresh_ror"].details)
+    metrics.details.update(by_task["refresh_hal_structures"].details)
     return metrics

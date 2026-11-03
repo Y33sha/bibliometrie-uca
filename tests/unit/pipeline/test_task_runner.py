@@ -10,22 +10,22 @@ from pipeline.task_runner import execute_tasks, run_phase
 def test_l_executeur_mesure_la_duree_des_seules_taches_executees(contexte):
     """Une tâche exécutée reçoit sa durée, rangée aussi dans le contexte. Une tâche écartée par sa condition est absente du résultat."""
     tasks = (
-        Task("essai.une", run=lambda _ctx: PhaseMetrics()),
-        Task("essai.ecartee", run=lambda _ctx: PhaseMetrics(), when=lambda _ctx: False),
-        Task("essai.deux", run=lambda _ctx: PhaseMetrics()),
+        Task("une", run=lambda _ctx: PhaseMetrics()),
+        Task("ecartee", run=lambda _ctx: PhaseMetrics(), when=lambda _ctx: False),
+        Task("deux", run=lambda _ctx: PhaseMetrics()),
     )
 
     ctx = contexte()
     by_task = execute_tasks(tasks, ctx)
 
-    assert by_task["essai.une"].duration_s is not None
-    assert "essai.ecartee" not in by_task
-    assert set(ctx.task_durations) == {"essai.une", "essai.deux"}
+    assert by_task["une"].duration_s is not None
+    assert "ecartee" not in by_task
+    assert set(ctx.task_durations) == {"une", "deux"}
 
 
 _TACHES = (
-    Task("essai.une", run=lambda _ctx: PhaseMetrics(new=1)),
-    Task("essai.deux", run=lambda _ctx: PhaseMetrics(new=2)),
+    Task("une", run=lambda _ctx: PhaseMetrics(new=1)),
+    Task("deux", run=lambda _ctx: PhaseMetrics(new=2)),
 )
 
 
@@ -34,7 +34,7 @@ def test_une_phase_somme_par_defaut_les_metriques_de_ses_taches(contexte):
 
 
 def test_une_phase_assemble_ses_metriques_par_sa_fonction(contexte):
-    phase = Phase("essai", "Essai", _TACHES, assemble=lambda by_task: by_task["essai.deux"])
+    phase = Phase("essai", "Essai", _TACHES, assemble=lambda by_task: by_task["deux"])
 
     assert run_phase(phase, contexte()).new == 2
 
@@ -45,7 +45,7 @@ def test_une_precondition_non_remplie_arrete_la_phase_avant_ses_taches(contexte)
     def check(_ctx) -> None:
         raise RuntimeError("périmètre vide")
 
-    tache = Task("essai.une", run=lambda _ctx: appels.append("une") or PhaseMetrics())
+    tache = Task("une", run=lambda _ctx: appels.append("une") or PhaseMetrics())
     with pytest.raises(RuntimeError, match="périmètre vide"):
         run_phase(Phase("essai", "Essai", (tache,), check=check), contexte())
 

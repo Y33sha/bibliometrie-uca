@@ -24,16 +24,16 @@ from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.signals import skipped
 
-_HAL_BY_ID = "fetch_missing.hal_by_id"
-_SCANR_BY_HAL_ID = "fetch_missing.scanr_by_hal_id"
-_HAL_BY_NNT = "fetch_missing.hal_by_nnt"
-_THESES_BY_NNT = "fetch_missing.theses_by_nnt"
+_HAL_BY_ID = "hal_by_id"
+_SCANR_BY_HAL_ID = "scanr_by_hal_id"
+_HAL_BY_NNT = "hal_by_nnt"
+_THESES_BY_NNT = "theses_by_nnt"
 _HAL_ID_SECTION = "Recherche des documents avec hal-id trouvés ailleurs"
 _NNT_SECTION = "Recherche par NNT des thèses trouvées ailleurs"
 
 
 def _doi_task(target: str) -> str:
-    return f"fetch_missing.doi.{target}"
+    return f"doi.{target}"
 
 
 def _summary(metrics: PhaseMetrics) -> dict[str, float | None]:
@@ -161,7 +161,7 @@ TASKS = (
     _channel(
         _HAL_BY_ID,
         network="hal",
-        parallel_group="fetch_missing.hal_id",
+        parallel_group="hal_id",
         run=_run_fetch_missing_hal_by_id,
         section=_HAL_ID_SECTION,
         when=_requested("hal"),
@@ -170,7 +170,7 @@ TASKS = (
         _SCANR_BY_HAL_ID,
         reads=("source_records.source_id",),
         network="scanr",
-        parallel_group="fetch_missing.hal_id",
+        parallel_group="hal_id",
         run=_run_fetch_missing_scanr_by_hal_id,
         section=_HAL_ID_SECTION,
         when=_requested("scanr"),
@@ -180,7 +180,7 @@ TASKS = (
         reads=("publications.doc_type",),
         previous_run=("publications.doc_type",),
         network="hal",
-        parallel_group="fetch_missing.nnt",
+        parallel_group="nnt",
         run=_run_fetch_missing_hal_by_nnt,
         section=_NNT_SECTION,
         when=lambda ctx: "hal" in ctx.options.sources and ctx.options.mode == "full",
@@ -188,7 +188,7 @@ TASKS = (
     _channel(
         _THESES_BY_NNT,
         network="theses",
-        parallel_group="fetch_missing.nnt",
+        parallel_group="nnt",
         run=_run_fetch_missing_theses_by_nnt,
         section=_NNT_SECTION,
         when=_requested("theses"),
@@ -205,7 +205,7 @@ TASKS = (
             ),
             previous_run=("doi_prefixes", "publication_relations"),
             network=target,
-            parallel_group="fetch_missing.doi",
+            parallel_group="doi",
             run=lambda ctx, target=target: _run_fetch_missing_doi(ctx, target),
             section="Recherche par DOI des documents manquants dans chaque source",
             when=lambda ctx, target=target: target in ctx.options.queried_sources,

@@ -83,7 +83,7 @@ def _refresh(ctx: PhaseContext) -> PhaseMetrics:
 
 TASKS = (
     Task(
-        "countries.detect",
+        "detect",
         reads=(
             "place_name_forms",
             "countries",
@@ -97,7 +97,7 @@ TASKS = (
         run=_detect,
     ),
     Task(
-        "countries.resolve",
+        "resolve",
         reads=(
             "address_country_candidates",
             "addresses.id",
@@ -112,7 +112,7 @@ TASKS = (
         run=_resolve,
     ),
     Task(
-        "countries.refresh_publication_countries",
+        "refresh_publication_countries",
         reads=(
             "source_contribution_countries_queue",
             "source_contributions.source_record_id",

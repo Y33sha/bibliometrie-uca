@@ -32,9 +32,9 @@ def perimetre(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[int]]:
 def _phase(ror: PhaseMetrics | None = None) -> Phase:
     """Renvoie la phase `affiliations`, ses deux référentiels remplacés par des tâches sans réseau ni transaction, l'origine des adresses par une transaction vide."""
     remplacees = {
-        "affiliations.refresh_ror": lambda _ctx: ror or PhaseMetrics(),
-        "affiliations.refresh_hal_structures": lambda _ctx: PhaseMetrics(),
-        "affiliations.classify_addresses": in_transaction(lambda _conn, _logger: PhaseMetrics()),
+        "refresh_ror": lambda _ctx: ror or PhaseMetrics(),
+        "refresh_hal_structures": lambda _ctx: PhaseMetrics(),
+        "classify_addresses": in_transaction(lambda _conn, _logger: PhaseMetrics()),
     }
     affiliations = next(p for p in PHASES if p.name == "affiliations")
     return dataclasses.replace(

@@ -27,7 +27,7 @@ class Task:
     """Tâche du pipeline, avec ses lectures et ses écritures."""
 
     name: str
-    """Nom de la tâche, préfixé du nom de sa phase : `publishing.attach_serials`."""
+    """Nom de la tâche, unique dans sa phase : `attach_serials`."""
     _: KW_ONLY
     run: TaskRun
     reads: tuple[str, ...] = ()
@@ -39,7 +39,7 @@ class Task:
     maintenance: tuple[str, ...] = ()
     """Maintenance physique des tables, dans l'ordre : `VACUUM staging`, `ANALYZE source_contributions`."""
     parallel_group: str | None = None
-    """Groupe de tâches consécutives exécutées en parallèle."""
+    """Groupe de tâches consécutives exécutées en parallèle, nommé dans sa phase."""
     section: str | None = None
     """Titre de la sous-étape ouverte par la tâche. `None` : la tâche écrit sous le titre courant."""
     label: str | None = None
@@ -52,11 +52,6 @@ class Task:
     """Condition d'exécution, évaluée avant l'accès à la source. Une tâche écartée n'écrit rien."""
     silent_when_empty: bool = False
     """La tâche n'écrit rien sans élément traité : `total` nul, sans signal."""
-
-    @property
-    def phase(self) -> str:
-        """Nom de la phase de la tâche."""
-        return self.name.partition(".")[0]
 
 
 type TaskRun = Callable[[PhaseContext], PhaseMetrics]

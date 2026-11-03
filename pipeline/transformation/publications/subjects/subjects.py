@@ -30,7 +30,7 @@ def _usage(ctx: PhaseContext) -> PhaseMetrics:
 
 TASKS = (
     Task(
-        "subjects.ingest",
+        "ingest",
         reads=(
             "publications.id",
             "publications.subjects_ingested_at",
@@ -45,7 +45,7 @@ TASKS = (
         run=_ingest,
     ),
     Task(
-        "subjects.usage",
+        "usage",
         reads=(
             "publication_subjects",
             "subjects.id",

@@ -55,8 +55,8 @@ BATCH_SIZE = 50
 MAX_CONCURRENT = 5
 """Requêtes simultanées, sous le débit recommandé par Unpaywall (10 par seconde)."""
 
-RESOLVE_TASK = "oa_status.resolve_dois"
-UNPAYWALL_TASK = "oa_status.verify_unpaywall"
+RESOLVE_TASK = "resolve_dois"
+UNPAYWALL_TASK = "verify_unpaywall"
 
 
 class DoiService(NamedTuple):

@@ -7,7 +7,7 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 
 
 def signal_source_unconfigured(
-    metrics: PhaseMetrics, source: str, reason: str, *, logger: logging.Logger, phase: str
+    metrics: PhaseMetrics, source: str, reason: str, *, logger: logging.Logger
 ) -> None:
     """Marque comme sauté un accès à configuration manquante : identifiants ou périmètre d'interrogation.
 
@@ -15,9 +15,8 @@ def signal_source_unconfigured(
 
     Args:
         reason: motif du saut.
-        phase: situe l'avertissement dans le journal.
     """
-    logger.warning("%s : source %s non configurée — sautée : %s", phase, source, reason)
+    logger.warning("Source %s non configurée — sautée : %s", source, reason)
     metrics.signals.append(
         {
             "level": PhaseStatus.WARNING,
@@ -28,15 +27,14 @@ def signal_source_unconfigured(
 
 
 def signal_source_unavailable(
-    metrics: PhaseMetrics, source: str, *, logger: logging.Logger, phase: str
+    metrics: PhaseMetrics, source: str, *, logger: logging.Logger
 ) -> None:
     """Marque comme indisponible une source coupée en cours de tâche.
 
     La phase se termine avec les sources abouties, en avertissement. Le run suivant reprend les éléments non traités.
     """
     logger.warning(
-        "%s : source %s coupée après une série de requêtes en échec, items reportés au prochain run",
-        phase,
+        "Source %s coupée après une série de requêtes en échec, items reportés au prochain run",
         source,
     )
     metrics.signals.append(

@@ -577,7 +577,7 @@ def _count_by_pair_label(added_by_type: list[tuple[str, int]]) -> dict[str, int]
 
 TASKS = (
     Task(
-        "relations.rebuild",
+        "rebuild",
         reads=(
             *(
                 f"source_records.{column}"

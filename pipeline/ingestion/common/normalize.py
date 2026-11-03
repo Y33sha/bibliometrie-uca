@@ -170,7 +170,7 @@ def _run_normalize(ctx: PhaseContext, build: NormalizerFactory) -> NormalizeStat
 TASKS = (
     *(
         Task(
-            f"normalize.{source}",
+            str(source),
             reads=(
                 "staging",
                 "staging_normalization_queue",
@@ -235,7 +235,7 @@ TASKS = (
         for source in SOURCE_PRIORITY
     ),
     Task(
-        "normalize.prune_disappeared",
+        "prune_disappeared",
         reads=(
             "staging.disappeared_at",
             "source_records.id",
@@ -262,7 +262,7 @@ TASKS = (
         run=_prune,
     ),
     Task(
-        "normalize.cleanup_orphan_contributor_information",
+        "cleanup_orphan_contributor_information",
         reads=("source_contributions.contributor_information_id", "contributor_information.id"),
         writes=("contributor_information.id",),
         previous_run=("source_contributions",),
@@ -271,7 +271,7 @@ TASKS = (
         label="Informations du contributeur orphelines",
     ),
     Task(
-        "normalize.cleanup_orphan_addresses",
+        "cleanup_orphan_addresses",
         reads=("source_contribution_addresses", "addresses.id"),
         # La suppression d'une adresse emporte ses liens aux structures.
         writes=("addresses.id", "address_structures"),
@@ -294,7 +294,7 @@ def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
     metrics = PhaseMetrics()
     metrics.add(seen=sum(cast("int", row["processed"]) for row in rows))
     metrics.details["table"] = {"rows": rows}
-    metrics.details["disappeared_pruned"] = by_task["normalize.prune_disappeared"].extras.get(
+    metrics.details["disappeared_pruned"] = by_task["prune_disappeared"].extras.get(
         "disappeared", 0
     )
     return metrics

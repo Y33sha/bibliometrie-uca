@@ -174,7 +174,7 @@ def test_une_source_non_configuree_est_sautee_avec_un_signal(contexte):
             raise HarvestConfigError("aucun PPN")
 
     metrics = run_harvest(
-        contexte(), "harvest", "theses", lambda conn, log: _SansConfiguration(), HarvestWindow()
+        contexte(), "theses", lambda conn, log: _SansConfiguration(), HarvestWindow()
     )
 
     assert [s["code"] for s in metrics.signals] == ["source_unconfigured"]

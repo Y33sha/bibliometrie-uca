@@ -44,12 +44,12 @@ def _run_fetch_stale(ctx: PhaseContext, target: str, years: list[int] | None) ->
 
 TASKS = tuple(
     Task(
-        f"fetch_stale.{source}",
+        str(source),
         reads=("config", "staging", "source_records.publication_year"),
         writes=("staging", "staging_normalization_queue"),
         previous_run=("staging", "source_records"),
         network=source,
-        parallel_group="fetch_stale",
+        parallel_group="sources",
         run=lambda ctx, source=source: _run_fetch_stale(ctx, source, _years(ctx)),
         label=source_label(source),
         progress_bar=True,
@@ -67,7 +67,7 @@ def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
         metrics.merge(source_metrics)
         if skipped(source_metrics):
             continue
-        by_source[name.removeprefix("fetch_stale.")] = {
+        by_source[name] = {
             "interrogated": source_metrics.total,
             "refreshed": source_metrics.updated,
             "unchanged": source_metrics.unchanged,

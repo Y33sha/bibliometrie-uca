@@ -367,7 +367,7 @@ def _attributes(ctx: PhaseContext) -> PhaseMetrics:
 
 TASKS = (
     Task(
-        "author_grouping.build",
+        "build",
         reads=(
             "publications.id",
             "publication_contributions_queue",
@@ -412,7 +412,7 @@ TASKS = (
         label="Bilan",
     ),
     Task(
-        "author_grouping.attributes",
+        "attributes",
         reads=(
             "contribution_attributes_queue",
             "aligned_source_contributions",
@@ -453,6 +453,6 @@ TASKS = (
 
 def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
     """Renvoie les métriques du recalcul des contributions, avec le nombre de contributions aux attributs mis à jour."""
-    metrics = by_task["author_grouping.build"]
-    metrics.details["attributes_updated"] = by_task["author_grouping.attributes"].updated
+    metrics = by_task["build"]
+    metrics.details["attributes_updated"] = by_task["attributes"].updated
     return metrics

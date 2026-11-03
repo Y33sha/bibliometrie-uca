@@ -235,7 +235,6 @@ type HarvesterFactory = Callable[[Connection, logging.Logger], Harvester]
 
 def run_harvest(
     ctx: PhaseContext,
-    phase: str,
     source: str,
     make_harvester: HarvesterFactory,
     window: HarvestWindow,
@@ -250,5 +249,5 @@ def run_harvest(
             return make_harvester(conn, source_log).run(window)
     except HarvestConfigError as exc:
         metrics = PhaseMetrics()
-        signal_source_unconfigured(metrics, source, str(exc), logger=ctx.logger, phase=phase)
+        signal_source_unconfigured(metrics, source, str(exc), logger=ctx.logger)
         return metrics

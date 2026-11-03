@@ -263,7 +263,7 @@ def _import_doaj(
         # Le téléchargement précède toute écriture : le référentiel reste celui du dernier import.
         metrics = PhaseMetrics()
         logger.warning("Dump DOAJ inaccessible, référentiel inchangé : %s", e)
-        signal_source_unavailable(metrics, "DOAJ", logger=logger, phase="publishing")
+        signal_source_unavailable(metrics, "DOAJ", logger=logger)
         metrics.report = "dump inaccessible, import repris au prochain run"
         return metrics
     metrics = PhaseMetrics(extras={"matched": stats.matched})

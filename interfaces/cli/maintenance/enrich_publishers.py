@@ -222,7 +222,6 @@ def main() -> int:
         access_source(
             "openalex",
             enrich,
-            phase="enrich_publishers",
             logger=log,
             credentials_missing=source_credentials_missing,
             request_budget=request_budget,

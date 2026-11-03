@@ -58,9 +58,6 @@ from pipeline.transformation.publishing.serials import (
     type_proceedings_serials,
 )
 
-_PHASE = "publishing"
-
-
 _TABLE: tuple[tuple[str, str, Callable[[PhaseMetrics], int]], ...] = (
     (
         "resolve_crossref_publishers",
@@ -112,31 +109,30 @@ _TABLE: tuple[tuple[str, str, Callable[[PhaseMetrics], int]], ...] = (
         lambda m: m.extras.get("monographs_to_proceedings", 0),
     ),
 )
-"""Ligne de la table d'observabilité de chaque sous-étape : son champ, son libellé, et ce qui compte comme identifié."""
+"""Ligne de la table d'observabilité de chaque tâche : son nom, son libellé, et ce qui compte comme identifié."""
 
 
 def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
     """Renvoie les métriques de la phase : celles des tâches, dans l'ordre de leur exécution, et la table d'observabilité."""
-    by_step = {name.removeprefix(f"{_PHASE}."): metrics for name, metrics in by_task.items()}
     metrics = PhaseMetrics()
     # Les compteurs et signaux des sous-étapes remontent à la phase : une source coupée la fait passer en avertissement.
-    for sub in by_step.values():
+    for sub in by_task.values():
         metrics.merge(sub)
 
     metrics.details["table"] = {
         "rows": [
             {
                 "key": key,
-                "traités": by_step[field].total,
-                "identifiés": identifies(by_step[field]),
-                "créés": by_step[field].extras.get("publisher_created", 0),
+                "traités": by_task[name].total,
+                "identifiés": identifies(by_task[name]),
+                "créés": by_task[name].extras.get("publisher_created", 0),
             }
-            for field, key, identifies in _TABLE
+            for name, key, identifies in _TABLE
         ]
     }
     # DOAJ : ligne à part (sous-étape conditionnelle, métrique propre).
     metrics.details["summary"] = {
-        "doaj_matched": by_step["enrich_serials_from_doaj"].extras.get("matched", 0)
+        "doaj_matched": by_task["enrich_serials_from_doaj"].extras.get("matched", 0)
     }
     return metrics
 
@@ -237,7 +233,7 @@ def _run_enrich_serials_from_doaj(ctx: PhaseContext) -> PhaseMetrics:
 
 TASKS = (
     Task(
-        "publishing.resolve_crossref_publishers",
+        "resolve_crossref_publishers",
         reads=(
             "doi_prefixes.id",
             "doi_prefixes.ra",
@@ -271,7 +267,7 @@ TASKS = (
         label=resolve_publishers.LABELS["Crossref"],
     ),
     Task(
-        "publishing.resolve_datacite_publishers",
+        "resolve_datacite_publishers",
         reads=(
             "doi_prefixes.id",
             "doi_prefixes.ra",
@@ -301,7 +297,7 @@ TASKS = (
         label=resolve_publishers.LABELS["DataCite"],
     ),
     Task(
-        "publishing.attach_publishers",
+        "attach_publishers",
         reads=(
             "source_records.source",
             "source_records.doc_type",
@@ -331,7 +327,7 @@ TASKS = (
         label=attach_publishers.LABEL,
     ),
     Task(
-        "publishing.merge_duplicate_publishers",
+        "merge_duplicate_publishers",
         reads=(
             "source_records.publisher_id",
             "source_records.publication_id",
@@ -357,7 +353,7 @@ TASKS = (
         label=merge_duplicate_publishers.LABEL,
     ),
     Task(
-        "publishing.sync_issns",
+        "sync_issns",
         reads=("source_records.biblio", "serial_issns"),
         writes=("serial_issns",),
         # Lignes vérifiées par `check_issns_in_sudoc`, revues posées par `attach_serials`, revues supprimées par `finalize.delete_empty_containers`.
@@ -367,7 +363,7 @@ TASKS = (
         label=attach_serials.SYNC_LABEL,
     ),
     Task(
-        "publishing.check_issns_in_sudoc",
+        "check_issns_in_sudoc",
         reads=(
             "serial_issns",
             "serials.id",
@@ -390,7 +386,7 @@ TASKS = (
         threshold=3,
     ),
     Task(
-        "publishing.import_issnl_table",
+        "import_issnl_table",
         reads=("serial_issns", "config"),
         writes=("serial_issns.issnl", "serial_issns.issnl_checked_at"),
         # Date du dernier import, posée par la tâche elle-même.
@@ -401,7 +397,7 @@ TASKS = (
         label=import_issnl_table.LABEL,
     ),
     Task(
-        "publishing.attach_serials",
+        "attach_serials",
         reads=(
             "source_records.source",
             "source_records.biblio",
@@ -445,7 +441,7 @@ TASKS = (
         label=attach_serials.ATTACH_LABEL,
     ),
     Task(
-        "publishing.enrich_serials_from_openalex",
+        "enrich_serials_from_openalex",
         reads=(
             "serials.id",
             "serials.openalex_id",
@@ -462,7 +458,7 @@ TASKS = (
         threshold=3,
     ),
     Task(
-        "publishing.type_proceedings_serials",
+        "type_proceedings_serials",
         reads=(
             "serials.id",
             "serials.title",
@@ -480,7 +476,7 @@ TASKS = (
         label=type_proceedings_serials.LABEL,
     ),
     Task(
-        "publishing.type_journal_serials",
+        "type_journal_serials",
         reads=(
             "serials.id",
             "serials.title",
@@ -498,7 +494,7 @@ TASKS = (
         label=type_journal_serials.LABEL,
     ),
     Task(
-        "publishing.learn_serial_doi_namespaces",
+        "learn_serial_doi_namespaces",
         reads=(
             "source_record_identifiers",
             "source_records.serial_id",
@@ -513,7 +509,7 @@ TASKS = (
         label=learn_serial_doi_namespaces.LABEL,
     ),
     Task(
-        "publishing.enrich_serials_from_doaj",
+        "enrich_serials_from_doaj",
         reads=(
             "serial_issns",
             "serials.doaj_imported_at",
@@ -538,7 +534,7 @@ TASKS = (
         label=enrich_serials_from_doaj.LABEL,
     ),
     Task(
-        "publishing.attach_monographs",
+        "attach_monographs",
         reads=(
             "source_records.biblio",
             "source_records.monograph_id",
@@ -559,7 +555,7 @@ TASKS = (
         label=attach_monographs.LABEL,
     ),
     Task(
-        "publishing.link_monographs_to_collections",
+        "link_monographs_to_collections",
         reads=(
             "monographs",
             "source_records.monograph_id",
@@ -582,7 +578,7 @@ TASKS = (
         label=link_monographs_to_collections.LABEL,
     ),
     Task(
-        "publishing.type_proceedings_volumes",
+        "type_proceedings_volumes",
         reads=(
             "monographs.id",
             "monographs.serial_id",

@@ -36,16 +36,16 @@ class FetchMissingPhase:
         fetch_doi_one: Channel = _vide,
     ) -> None:
         runs = {
-            "fetch_missing.hal_by_id": fetch_hal_by_id,
-            "fetch_missing.scanr_by_hal_id": fetch_scanr_by_hal_id,
-            "fetch_missing.hal_by_nnt": fetch_hal_by_nnt,
-            "fetch_missing.theses_by_nnt": fetch_theses_by_nnt,
+            "hal_by_id": fetch_hal_by_id,
+            "scanr_by_hal_id": fetch_scanr_by_hal_id,
+            "hal_by_nnt": fetch_hal_by_nnt,
+            "theses_by_nnt": fetch_theses_by_nnt,
         }
 
         def run(name: str) -> Channel:
             if name in runs:
                 return runs[name]
-            target = name.removeprefix("fetch_missing.doi.")
+            target = name.removeprefix("doi.")
             return lambda ctx: fetch_doi_one(ctx, target)
 
         self.phase: Phase = dataclasses.replace(
@@ -61,7 +61,7 @@ def _non_configuree(source: str) -> PhaseMetrics:
     """Renvoie les métriques de l'accès à une source sans identifiants."""
     metrics = PhaseMetrics()
     signal_source_unconfigured(
-        metrics, source, "pas de credentials", logger=logging.getLogger("test"), phase="test"
+        metrics, source, "pas de credentials", logger=logging.getLogger("test")
     )
     return metrics
 

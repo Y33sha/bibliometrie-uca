@@ -48,7 +48,7 @@ def _purge(ctx: PhaseContext) -> PhaseMetrics:
 
 TASKS = (
     Task(
-        "persons.arbitrate_identifiers",
+        "arbitrate_identifiers",
         reads=(
             "contributor_information",
             "source_contributions.neutralized_identifiers",
@@ -79,7 +79,7 @@ TASKS = (
         run=_arbitrate_identifiers,
     ),
     Task(
-        "persons.resolve_contributions",
+        "resolve_contributions",
         reads=(
             "contributions.id",
             "contributions.publication_id",
@@ -121,7 +121,7 @@ TASKS = (
         section="Identification des contributions",
     ),
     Task(
-        "persons.populate_person_name_forms",
+        "populate_person_name_forms",
         reads=(
             "persons",
             "contributions.person_id",
@@ -138,7 +138,7 @@ TASKS = (
         section="Rafraîchissement des formes de nom associées aux personnes",
     ),
     Task(
-        "persons.purge",
+        "purge",
         reads=(
             "contributions.publication_id",
             "contributions.person_id",
@@ -174,8 +174,8 @@ TASKS = (
 def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
     """Renvoie les métriques de la phase, d'après les décomptes de ses tâches."""
     return build_metrics(
-        resolution=by_task["persons.resolve_contributions"].extras,
-        arbitration=by_task["persons.arbitrate_identifiers"].extras,
-        name_forms=by_task["persons.populate_person_name_forms"].extras,
-        purge=by_task["persons.purge"].extras,
+        resolution=by_task["resolve_contributions"].extras,
+        arbitration=by_task["arbitrate_identifiers"].extras,
+        name_forms=by_task["populate_person_name_forms"].extras,
+        purge=by_task["purge"].extras,
     )

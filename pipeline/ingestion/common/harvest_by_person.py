@@ -22,19 +22,19 @@ def _search(source: str) -> TaskRun:
         window = HarvestWindow(start_year=ctx.options.start_year, year=ctx.options.year)
         harvester = ADAPTERS[Source(source)].person_harvester
         assert harvester is not None, f"{source} : source cherchée par personne sans moissonneur"
-        return run_harvest(ctx, "harvest_by_person", source, harvester, window)
+        return run_harvest(ctx, source, harvester, window)
 
     return run
 
 
 TASKS = tuple(
     Task(
-        f"harvest_by_person.{source}",
+        str(source),
         reads=("config", "hr_records", "person_identifiers", "staging"),
         writes=("staging", "staging_normalization_queue"),
         previous_run=("staging", "person_identifiers"),
         network=source,
-        parallel_group="harvest_by_person",
+        parallel_group="sources",
         run=_search(source),
         label=source_label(source),
         progress_bar=True,

@@ -39,7 +39,7 @@ def lancer(monkeypatch, contexte):
         monkeypatch.setattr(
             harvest,
             "run_harvest",
-            lambda ctx, _phase, source, _harvester, window: harvest_one(ctx, source, window),
+            lambda ctx, source, _harvester, window: harvest_one(ctx, source, window),
         )
         monkeypatch.setattr(harvest, "get_last_daily_harvest_date", lambda: last_daily)
         monkeypatch.setattr(
@@ -54,14 +54,14 @@ def lancer(monkeypatch, contexte):
 
 def _non_configuree(ctx, source: str) -> PhaseMetrics:
     metrics = PhaseMetrics()
-    signal_source_unconfigured(metrics, source, "aucune clé", logger=ctx.logger, phase="harvest")
+    signal_source_unconfigured(metrics, source, "aucune clé", logger=ctx.logger)
     return metrics
 
 
 def _indisponible(source: str) -> PhaseMetrics:
     """Renvoie les métriques de l'accès à une source indisponible."""
     metrics = PhaseMetrics()
-    signal_source_unavailable(metrics, source, logger=logging.getLogger("test"), phase="harvest")
+    signal_source_unavailable(metrics, source, logger=logging.getLogger("test"))
     return metrics
 
 

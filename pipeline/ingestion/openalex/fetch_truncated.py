@@ -85,7 +85,7 @@ async def refetch_openalex(conn: Connection, log: logging.Logger) -> PhaseMetric
 
 TASKS = (
     Task(
-        "fetch_truncated.refetch_openalex",
+        "refetch_openalex",
         reads=("staging",),
         writes=("staging", "staging_normalization_queue"),
         previous_run=("staging",),

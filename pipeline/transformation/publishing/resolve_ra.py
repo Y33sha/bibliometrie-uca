@@ -54,7 +54,7 @@ def resolve(
         return _resolve(log, prefix_store, resolve_ras_fn)
     except SourceUnavailableError:
         metrics = PhaseMetrics()
-        signal_source_unavailable(metrics, "doi.org/ra", logger=log, phase="resolve_ra")
+        signal_source_unavailable(metrics, "doi.org/ra", logger=log)
         return metrics
 
 
@@ -114,7 +114,7 @@ def _resolve(
 
 TASKS = (
     Task(
-        "resolve_ra.resolve_prefixes",
+        "resolve_prefixes",
         reads=(
             "doi_prefixes.id",
             "source_record_identifiers",

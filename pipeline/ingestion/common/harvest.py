@@ -72,14 +72,14 @@ def _harvest(source: str) -> TaskRun:
         window = HarvestWindow(start_year=options.start_year, year=options.year, since=since)
         harvester = ADAPTERS[Source(source)].harvester
         assert harvester is not None, f"{source} : source moissonnée sans moissonneur"
-        return run_harvest(ctx, "harvest", source, harvester, window)
+        return run_harvest(ctx, source, harvester, window)
 
     return run
 
 
 TASKS = tuple(
     Task(
-        f"harvest.{source}",
+        str(source),
         reads=(
             "config",
             "structures",
@@ -91,7 +91,7 @@ TASKS = tuple(
         writes=("staging", "staging_normalization_queue"),
         previous_run=("staging", "pipeline_phase_executions"),
         network=source,
-        parallel_group="harvest",
+        parallel_group="sources",
         run=_harvest(source),
         label=source_label(source),
         progress_bar=True,
@@ -110,7 +110,7 @@ def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
     for name, source_metrics in by_task.items():
         metrics.merge(source_metrics)
         if not skipped(source_metrics):
-            by_source[name.removeprefix("harvest.")] = _source_summary(source_metrics)
+            by_source[name] = _source_summary(source_metrics)
     if by_source:
         metrics.details["table"] = {
             "rows": [{"key": source, **summary} for source, summary in by_source.items()]

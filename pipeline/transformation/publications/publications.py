@@ -43,7 +43,7 @@ def _reconcile(ctx: PhaseContext) -> PhaseMetrics:
 
 TASKS = (
     Task(
-        "publications.reconcile",
+        "reconcile",
         reads=(
             "source_records",
             "source_record_identifiers",

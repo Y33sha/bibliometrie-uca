@@ -30,7 +30,7 @@ def _args(**surcharges) -> argparse.Namespace:
 
 def _phase(run, name: str = "persons", harvesting: bool = False) -> Phase:
     """Renvoie la phase `name`, dont l'exécution appelle `run(ctx)`."""
-    return Phase(name, "Libellé", (Task(f"{name}.essai", run=run),), harvesting=harvesting)
+    return Phase(name, "Libellé", (Task("essai", run=run),), harvesting=harvesting)
 
 
 class _FakeRecorder:

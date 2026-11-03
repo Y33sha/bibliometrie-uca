@@ -8,8 +8,14 @@ from domain.sources.registry import (
 )
 from pipeline.graph import Task, dependencies, order_violations
 from pipeline.ingestion.common.normalize import normalizer_builders
-from pipeline.phases import ALL_TASKS
+from pipeline.phases import ALL_TASKS, PHASES
 from pipeline.runtime.observability.metrics import PhaseMetrics
+
+_TASKS = {phase.name: phase.tasks for phase in PHASES}
+
+
+def _names(phase: str) -> list[str]:
+    return [task.name for task in _TASKS[phase]]
 
 
 def test_noms_uniques():
@@ -18,28 +24,22 @@ def test_noms_uniques():
 
 
 def test_une_tache_d_extraction_par_source_moissonnee():
-    extract_tasks = [n.name for n in ALL_TASKS if n.phase == "harvest"]
-    assert extract_tasks == [f"harvest.{s}" for s in HARVESTED_SOURCES]
+    assert _names("harvest") == list(HARVESTED_SOURCES)
 
 
 def test_une_tache_de_relecture_par_source():
     """Crossref aussi : `fetch_stale` relit toutes les sources par identifiant natif."""
-    stale_tasks = [n.name for n in ALL_TASKS if n.phase == "fetch_stale"]
-    assert stale_tasks == [f"fetch_stale.{s}" for s in Source]
+    assert _names("fetch_stale") == list(Source)
 
 
 def test_une_tache_de_recherche_par_doi_par_source_interrogeable():
     """HAL aussi : `fetch_missing` l'interroge par DOI, en plus des canaux hal-id et NNT."""
-    doi_tasks = [n.name for n in ALL_TASKS if n.name.startswith("fetch_missing.doi.")]
-    assert doi_tasks == [f"fetch_missing.doi.{s}" for s in DOI_SEARCHABLE_SOURCES]
+    doi_tasks = [name for name in _names("fetch_missing") if name.startswith("doi.")]
+    assert doi_tasks == [f"doi.{s}" for s in DOI_SEARCHABLE_SOURCES]
 
 
 def test_normalisation_dans_l_ordre_de_priorite_des_sources():
-    normalize_tasks = [
-        n.name.removeprefix("normalize.")
-        for n in ALL_TASKS
-        if n.phase == "normalize" and n.name.removeprefix("normalize.") in set(SOURCE_PRIORITY)
-    ]
+    normalize_tasks = [name for name in _names("normalize") if name in set(SOURCE_PRIORITY)]
     assert normalize_tasks == [s.value for s in SOURCE_PRIORITY]
     assert set(normalizer_builders(archive=False)) == {s.value for s in SOURCE_PRIORITY}
 
@@ -116,10 +116,10 @@ def test_la_normalisation_de_theses_ne_touche_pas_aux_referentiels_de_publicatio
 
 def test_chaque_canal_de_fetch_missing_declare_ses_propres_lectures():
     """Les lectures communes viennent du groupe ; seuls les canaux Crossref et DataCite lisent l'agence des préfixes."""
-    reads = {n.name: n.reads for n in ALL_TASKS if n.phase == "fetch_missing"}
+    reads = {task.name: task.reads for task in _TASKS["fetch_missing"]}
     assert all("failed_lookups" in r for r in reads.values())
     lisent_l_agence = {name for name, r in reads.items() if "doi_prefixes.ra" in r}
-    assert lisent_l_agence == {"fetch_missing.doi.crossref", "fetch_missing.doi.datacite"}
+    assert lisent_l_agence == {"doi.crossref", "doi.datacite"}
 
 
 def test_un_lot_est_d_un_seul_tenant_et_sans_dependance_interne():

@@ -22,7 +22,6 @@ def _access(execute, *, missing=None):
     return access_source(
         "crossref",
         execute,
-        phase="test",
         logger=_LOG,
         credentials_missing=lambda _source: missing,
         request_budget=lambda _source: None,
@@ -64,7 +63,6 @@ def test_le_rythme_suit_le_budget_de_la_source():
     access_source(
         "crossref",
         execute,
-        phase="test",
         logger=_LOG,
         credentials_missing=lambda _source: None,
         request_budget=lambda source: 5 if source == "crossref" else None,

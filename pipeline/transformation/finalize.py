@@ -192,7 +192,7 @@ _EMPTY_CONTAINERS: tuple[tuple[str, Callable[[PhaseContext], PhaseMetrics]], ...
 
 TASKS = (
     Task(
-        "finalize.publications_in_perimeter",
+        "publications_in_perimeter",
         reads=(
             "contributions.person_id",
             "contributions.perimeter_evidence",
@@ -208,7 +208,7 @@ TASKS = (
         label="Périmètre des publications",
     ),
     Task(
-        "finalize.structures",
+        "structures",
         reads=(
             "source_contribution_structures",
             "contributions.id",
@@ -227,7 +227,7 @@ TASKS = (
         label="Structures des liens",
     ),
     Task(
-        "finalize.purge_publications",
+        "purge_publications",
         reads=(
             "publications.id",
             "source_records.publication_id",
@@ -239,7 +239,7 @@ TASKS = (
         run=_purge,
     ),
     Task(
-        "finalize.serial_publishers",
+        "serial_publishers",
         reads=(
             "serials.id",
             "publications.serial_id",
@@ -255,7 +255,7 @@ TASKS = (
         label="Éditeur des revues",
     ),
     Task(
-        "finalize.delete_empty_containers",
+        "delete_empty_containers",
         reads=(
             "monographs.id",
             "monographs.serial_id",
@@ -280,7 +280,7 @@ TASKS = (
         run=_empty_containers,
     ),
     Task(
-        "finalize.publication_counts",
+        "publication_counts",
         reads=(
             "addresses.id",
             "source_contribution_addresses",
@@ -307,9 +307,9 @@ TASKS = (
 
 def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
     """Renvoie les métriques de la phase : celles des référentiels vides, et un résumé."""
-    metrics = by_task["finalize.delete_empty_containers"]
+    metrics = by_task["delete_empty_containers"]
     metrics.details["summary"] = {
-        "total_in_perimeter": by_task["finalize.publications_in_perimeter"].details["in_perimeter"],
-        "publications_purged": by_task["finalize.purge_publications"].details["purged"],
+        "total_in_perimeter": by_task["publications_in_perimeter"].details["in_perimeter"],
+        "publications_purged": by_task["purge_publications"].details["purged"],
     }
     return metrics

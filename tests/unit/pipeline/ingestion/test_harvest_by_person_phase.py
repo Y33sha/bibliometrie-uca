@@ -17,7 +17,7 @@ def interrogees(monkeypatch) -> list[str]:
     """Sources interrogées par la phase, sans réseau."""
     sources: list[str] = []
 
-    def run_harvest(_ctx, _phase, source, _harvester, _window) -> PhaseMetrics:
+    def run_harvest(_ctx, source, _harvester, _window) -> PhaseMetrics:
         sources.append(source)
         return PhaseMetrics()
 

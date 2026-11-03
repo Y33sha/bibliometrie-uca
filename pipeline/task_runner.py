@@ -103,7 +103,6 @@ def _execute(task: Task, ctx: PhaseContext) -> PhaseMetrics:
         metrics = access_source(
             task.network,
             partial(task.run, ctx),
-            phase=task.phase,
             logger=ctx.logger,
             credentials_missing=ctx.credentials_missing,
             request_budget=ctx.request_budget,
