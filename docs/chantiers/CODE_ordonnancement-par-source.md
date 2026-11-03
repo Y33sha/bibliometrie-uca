@@ -50,12 +50,11 @@ Constats :
 - [x] La normalisation écrit dans `biblio` l'éditeur et le volume décrits par la source : `publisher` (nom), `publisher_openalex_id`, `monograph` (titre, ISBN, eISBN, actes, année).
 - [x] Oneshot `fill_biblio_publisher_and_monograph` : `publisher_openalex_id` et `monograph` du stock extraits du raw store, à défaut déduits des rattachements existants.
 - [x] Exécution du oneshot sur la base.
-- [ ] Rattachement des éditeurs en lot, première tâche de `publishing`. Chaque identifiant OpenAlex rejoint son éditeur, à défaut celui d'une de ses formes de nom, à défaut un éditeur créé. Les enregistrements sources sans identifiant OpenAlex rejoignent l'éditeur de leur forme de nom. Chaque forme restée libre crée un éditeur. Une forme attribuée garde son éditeur.
-- [x] Rattachement des monographies en lot (`publishing.attach_monographs`), après la fusion des autres noms des éditeurs. Les enregistrements sources partageant un ISBN forment un volume. Un enregistrement source sans ISBN rejoint le seul volume à ISBN de son titre et d'éditeur compatible ; le volume du même éditeur passe avant celui sans éditeur. Sans volume à ISBN, les enregistrements sources sans ISBN forment un volume par titre et éditeur. Chaque volume reprend ses monographies existantes. Normalisation sans recherche ni création de monographie.
-- [ ] Règle de l'éditeur nommé par DataCite appliquée d'après la série et le volume décrits.
-- [ ] Normalisation sans recherche ni création d'éditeur.
-- [ ] Fusion des monographies en double : vérification sur le stock, suppression si inutile.
-- [ ] Test : deux ordres de normalisation des sources donnent les mêmes rattachements.
+- [x] Rattachement des éditeurs en lot (`publishing.attach_publishers`), après la résolution des préfixes DOI. Chaque identifiant OpenAlex rejoint son éditeur, à défaut celui d'une de ses formes de nom, à défaut un éditeur créé. Les enregistrements sources sans identifiant OpenAlex rejoignent l'éditeur de leur forme de nom. Chaque forme restée libre crée un éditeur. Une forme attribuée garde son éditeur. Normalisation sans recherche ni création d'éditeur.
+- [x] Règle de l'éditeur nommé par DataCite appliquée dans `attach_publishers`, d'après le type de document d'avant correction et la série ou le volume décrits.
+- [x] Rattachement des monographies en lot (`publishing.attach_monographs`), après la fusion des autres noms des éditeurs. Les enregistrements sources partageant un ISBN forment un volume. Un enregistrement source sans ISBN rejoint le seul volume à ISBN de son titre et d'éditeur compatible : un volume est compatible avec les éditeurs de ses enregistrements sources et de ses monographies existantes. Le volume du même éditeur passe avant celui sans éditeur. Sans volume à ISBN, les enregistrements sources sans ISBN forment un volume par titre et éditeur. Chaque volume reprend ses monographies existantes. Normalisation sans recherche ni création de monographie.
+- [x] Fusion des monographies en double supprimée : après le rattachement en lot, elle ne trouve plus rien sur le stock.
+- [x] Indépendance à l'ordre : la normalisation écrit seulement les lignes de sa source, et les tests du domaine vérifient chaque rattachement en lot dans tous les ordres.
 
 ### Phase 3 — File de normalisation
 
