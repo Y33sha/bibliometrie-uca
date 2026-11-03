@@ -9,7 +9,7 @@ from typing import NamedTuple
 
 from sqlalchemy import Connection, text
 
-from domain.serials.doi_namespaces import DoiNamespace, designated_by_namespace, learn_namespaces
+from domain.serials.doi_namespaces import DoiNamespace, learn_namespaces
 from domain.serials.serial import SerialType
 from infrastructure.db.source_record_identifiers import serial_doi_sql
 from infrastructure.db.tables import serial_doi_namespaces
@@ -57,8 +57,7 @@ def store_doi_namespaces(conn: Connection, namespaces: Sequence[DoiNamespace]) -
 def run_learn_serial_doi_namespaces(conn: Connection, logger: logging.Logger) -> PhaseMetrics:
     """Calcule les espaces de noms DOI des revues et les enregistre."""
     pairs = find_doi_serial_pairs(conn)
-    platforms = {p.serial_id for p in pairs if not designated_by_namespace(p.serial_type)}
-    namespaces = learn_namespaces(((p.doi, p.serial_id) for p in pairs), platforms=platforms)
+    namespaces = learn_namespaces(pairs)
     store_doi_namespaces(conn, list(namespaces.values()))
     serials = len({ns.serial_id for ns in namespaces.values()})
     metrics = PhaseMetrics()

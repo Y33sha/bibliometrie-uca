@@ -1,12 +1,13 @@
 """Tests des espaces de noms DOI des revues (`domain.serials.doi_namespaces`)."""
 
 from domain.serials.doi_namespaces import (
-    designated_by_namespace,
     learn_namespaces,
     namespace_candidates,
     resolve_serial,
 )
 from domain.serials.serial import SerialType
+
+_JOURNAL = SerialType.JOURNAL
 
 
 def test_candidats_coupes_aux_separateurs_qu_ils_incluent():
@@ -39,13 +40,15 @@ def test_doi_construit_sur_un_isbn_sans_candidat():
     assert namespace_candidates("10.1007/978-3-030-58080-3_309-1") == []
 
 
-def _evidence(prefix: str, serial_id: int, n: int) -> list[tuple[str, int]]:
-    return [(f"{prefix}{i:05d}", serial_id) for i in range(n)]
+def _evidence(
+    prefix: str, serial_id: int, n: int, serial_type: SerialType = _JOURNAL
+) -> list[tuple[str, int, SerialType]]:
+    return [(f"{prefix}{i:05d}", serial_id, serial_type) for i in range(n)]
 
 
 def test_espace_retenu_malgre_une_erreur_isolee():
     """Un enregistrement source HAL qui rattache à tort un article à une revue voisine ne défait pas l'espace."""
-    evidence = _evidence("10.1016/j.physletb.", 1, 20) + [("10.1016/j.physletb.00003", 2)]
+    evidence = _evidence("10.1016/j.physletb.", 1, 20) + [("10.1016/j.physletb.00003", 2, _JOURNAL)]
     evidence += _evidence("10.1016/j.epsl.", 4, 20)
     namespaces = learn_namespaces(evidence)
     assert namespaces["10.1016/j.physletb."].serial_id == 1
@@ -57,7 +60,7 @@ def test_doi_partage_entre_deux_revues_vote_au_prorata_des_enregistrements():
     evidence = _evidence("10.1103/physrevc.1", 1, 20)
     for i in range(7):
         doi = f"10.1103/physrevc.109.{i:06d}"
-        evidence += [(doi, 1)] * 4 + [(doi, 2)]
+        evidence += [(doi, 1, _JOURNAL)] * 4 + [(doi, 2, _JOURNAL)]
     namespaces = learn_namespaces(evidence)
     assert "10.1103/physrevc.109." not in namespaces
     assert resolve_serial("10.1103/physrevc.109.000001", namespaces).serial_id == 1
@@ -96,14 +99,9 @@ def test_sous_le_seuil_non_retenu():
     assert learn_namespaces(_evidence("10.1234/abc.", 1, 4)) == {}
 
 
-def test_une_plateforme_n_est_designee_par_aucun_espace():
-    """Cas réel : le préfixe de SSRN désigne la plateforme. Ses DOI comptent dans le total : une revue qui en a quelques-uns ne capte pas l'espace."""
-    evidence = _evidence("10.2139/ssrn.", 1, 20) + [("10.2139/ssrn.00003", 2)]
-    namespaces = learn_namespaces(evidence, platforms={1})
-    assert resolve_serial("10.2139/ssrn.99999", namespaces) is None
-
-
-def test_types_designes_par_un_espace():
-    assert designated_by_namespace(SerialType.JOURNAL)
-    assert designated_by_namespace(SerialType.MEDIA)
-    assert not designated_by_namespace(SerialType.BOOK_SERIES)
+def test_une_collection_d_ouvrages_n_est_designee_par_aucun_espace():
+    """Ses DOI comptent dans le total : une revue qui en a quelques-uns ne capte pas l'espace."""
+    evidence = _evidence("10.4000/books.", 1, 20, SerialType.BOOK_SERIES)
+    evidence += [("10.4000/books.00003", 2, _JOURNAL)]
+    namespaces = learn_namespaces(evidence)
+    assert resolve_serial("10.4000/books.99999", namespaces) is None

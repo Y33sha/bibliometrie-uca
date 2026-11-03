@@ -7,7 +7,7 @@ Une collection de livres n'est désignée par aucun espace de noms : la suite du
 
 import re
 from collections import Counter, defaultdict
-from collections.abc import Collection, Iterable, Mapping
+from collections.abc import Iterable, Mapping
 from typing import NamedTuple
 
 from domain.serials.serial import SerialType
@@ -57,25 +57,22 @@ class DoiNamespace(NamedTuple):
     """Part des voix de ces DOI qui va à la revue."""
 
 
-def designated_by_namespace(serial_type: SerialType) -> bool:
-    """Vrai si un espace de noms DOI peut désigner une revue de ce type."""
-    return serial_type is not SerialType.BOOK_SERIES
-
-
 def learn_namespaces(
-    evidence: Iterable[tuple[str, int]],
+    evidence: Iterable[tuple[str, int, SerialType]],
     *,
-    platforms: Collection[int] = (),
     min_dois: int = 5,
     min_share: float = 0.9,
 ) -> dict[str, DoiNamespace]:
-    """Apprend les espaces de noms désignés par les couples `(DOI, revue)` des enregistrements sources, un couple par enregistrement source.
+    """Apprend les espaces de noms désignés par les triplets `(DOI, revue, type de la revue)` des enregistrements sources, un triplet par enregistrement source.
 
-    Chaque DOI donne une voix, répartie entre ses revues au prorata de ses enregistrements sources. Un espace est retenu s'il couvre au moins `min_dois` DOI distincts et qu'une revue hors de `platforms` y recueille au moins `min_share` des voix. Les DOI des revues de `platforms` comptent dans le total. Un espace est écarté quand un espace plus court, retenu, désigne déjà la même revue.
+    Chaque DOI donne une voix, répartie entre ses revues au prorata de ses enregistrements sources. Un espace est retenu s'il couvre au moins `min_dois` DOI distincts et qu'une revue autre qu'une collection d'ouvrages y recueille au moins `min_share` des voix. Les DOI des collections d'ouvrages comptent dans le total. Un espace est écarté quand un espace plus court, retenu, désigne déjà la même revue.
     """
     records_by_doi: dict[str, Counter[int]] = defaultdict(Counter)
-    for doi, serial_id in evidence:
+    book_series: set[int] = set()
+    for doi, serial_id, serial_type in evidence:
         records_by_doi[doi][serial_id] += 1
+        if serial_type is SerialType.BOOK_SERIES:
+            book_series.add(serial_id)
     dois_by_namespace: Counter[str] = Counter()
     votes: dict[str, defaultdict[int, float]] = defaultdict(lambda: defaultdict(float))
     for doi, records in records_by_doi.items():
@@ -90,7 +87,7 @@ def learn_namespaces(
         if total < min_dois:
             continue
         serial_id, count = max(votes[namespace].items(), key=lambda vote: vote[1])
-        if count / total < min_share or serial_id in platforms:
+        if count / total < min_share or serial_id in book_series:
             continue
         shorter = _longest_retained(namespace, retained)
         if shorter is not None and shorter.serial_id == serial_id:
