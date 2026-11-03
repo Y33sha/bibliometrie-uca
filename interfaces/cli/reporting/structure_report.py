@@ -105,49 +105,15 @@ _REPORT_PUBLICATION = f"""
 """
 
 
-class KeyAuthorRole(StrEnum):
-    """Rôle d'auteur retenu pour compter les publications qu'une structure mène."""
-
-    CORRESPONDING = "corresponding"
-    FIRST = "first"
-    LAST = "last"
-
-
-# Publication `p` dont un auteur de la position donnée (`min` : premier, `max` : dernier) dans l'enregistrement source OpenAlex signe avec la structure `:structure_id`.
-_OPENALEX_POSITION = f"""
-    EXISTS (
-        SELECT 1
-        FROM source_records sp
-        JOIN source_contributions sa ON sa.source_record_id = sp.id
-        JOIN aligned_source_contributions asc_ ON asc_.source_contribution_id = sa.id
-        JOIN contributions a ON a.id = asc_.contribution_id
-        WHERE sp.publication_id = p.id
-          AND sp.source = 'openalex'
-          AND {AUTHOR_SOURCE_CONTRIBUTION}
-          AND sa.author_position = (
-              SELECT {{bound}}(x.author_position) FROM source_contributions x
-              WHERE x.source_record_id = sp.id AND 'author' = ANY(x.roles)
-          )
-    )
-"""  # noqa: S608 — fragment SQL constant
-
-# Publication `p` où un auteur qui signe avec la structure `:structure_id` tient le rôle.
-_KEY_ROLE_CONDITIONS = {
-    KeyAuthorRole.CORRESPONDING: f"""
+def _key_role_condition(roles: Collection[AuthorPosition]) -> str:
+    """Publication `p` où un auteur qui signe avec la structure `:structure_id` occupe au moins une des positions `roles`."""
+    positions = " OR ".join(has_author_position(r) for r in AuthorPosition if r in roles)
+    return f"""
         EXISTS (
             SELECT 1 FROM contributions a
-            WHERE a.publication_id = p.id AND {has_author_position(AuthorPosition.CORRESPONDING)}
-              AND {AUTHOR_SOURCE_CONTRIBUTION}
+            WHERE a.publication_id = p.id AND ({positions}) AND {AUTHOR_SOURCE_CONTRIBUTION}
         )
-    """,  # noqa: S608 — fragment SQL constant
-    KeyAuthorRole.FIRST: _OPENALEX_POSITION.format(bound="min"),
-    KeyAuthorRole.LAST: _OPENALEX_POSITION.format(bound="max"),
-}
-
-
-def _key_role_condition(roles: Collection[KeyAuthorRole]) -> str:
-    """Publication `p` où un auteur de la structure tient au moins un des rôles."""
-    return "(" + " OR ".join(_KEY_ROLE_CONDITIONS[r] for r in KeyAuthorRole if r in roles) + ")"
+    """  # noqa: S608 — fragment SQL constant
 
 
 def _params(structure_id: int, period: Period) -> dict[str, object]:
@@ -176,14 +142,14 @@ def publications_by_year_and_type(
 
 
 def key_role_publications_by_year(
-    conn: Connection, structure_id: int, period: Period, roles: Collection[KeyAuthorRole]
+    conn: Connection, structure_id: int, period: Period, roles: Collection[AuthorPosition]
 ) -> dict[int, int]:
-    """Nombre de publications signées par la structure où un de ses auteurs tient un des `roles`, par année. Premier et dernier auteur se lisent dans l'enregistrement source OpenAlex."""
+    """Nombre de publications signées par la structure où un de ses auteurs occupe une des positions `roles`, par année."""
     return _count_by_year(conn, _key_role_condition(roles), _params(structure_id, period))
 
 
 def top_10_key_role_publications_by_year(
-    conn: Connection, structure_id: int, period: Period, roles: Collection[KeyAuthorRole]
+    conn: Connection, structure_id: int, period: Period, roles: Collection[AuthorPosition]
 ) -> dict[int, int]:
     """Nombre de publications de `key_role_publications_by_year` dans le top 10 % des plus citées, par année."""
     return _count_by_year(
@@ -301,7 +267,7 @@ class PublicationImpact:
 
 
 def publication_impacts(
-    conn: Connection, structure_id: int, period: Period, roles: Collection[KeyAuthorRole]
+    conn: Connection, structure_id: int, period: Period, roles: Collection[AuthorPosition]
 ) -> list[PublicationImpact]:
     """Indicateurs d'impact de chaque publication signée par la structure."""
     rows = conn.execute(
@@ -378,7 +344,7 @@ class JournalCounts:
 
 
 def top_journals(
-    conn: Connection, structure_id: int, period: Period, roles: Collection[KeyAuthorRole]
+    conn: Connection, structure_id: int, period: Period, roles: Collection[AuthorPosition]
 ) -> list[JournalCounts]:
     """Les `TOP_JOURNALS` revues où la structure publie le plus sur la période, avec leur éditeur. Tri par nombre de publications décroissant, puis par titre."""
     rows = conn.execute(
@@ -429,12 +395,12 @@ def publications_by_source(conn: Connection, structure_id: int, period: Period) 
 # --- Rendu Markdown ---
 
 
-_CORRESPONDING = frozenset({KeyAuthorRole.CORRESPONDING})
-_CORRESPONDING_OR_FIRST = frozenset({KeyAuthorRole.CORRESPONDING, KeyAuthorRole.FIRST})
-_CORRESPONDING_FIRST_OR_LAST = frozenset(KeyAuthorRole)
+_CORRESPONDING = frozenset({AuthorPosition.CORRESPONDING})
+_CORRESPONDING_OR_FIRST = frozenset({AuthorPosition.CORRESPONDING, AuthorPosition.FIRST})
+_CORRESPONDING_FIRST_OR_LAST = frozenset(AuthorPosition)
 
 # Rôles d'auteur comptés pour chaque unité, selon l'ordre des auteurs dans ses publications. Une unité absente compte seulement l'auteur correspondant : ordre alphabétique, ou trop peu d'auteurs pour juger.
-KEY_ROLES_BY_STRUCTURE: dict[str, frozenset[KeyAuthorRole]] = {
+KEY_ROLES_BY_STRUCTURE: dict[str, frozenset[AuthorPosition]] = {
     **dict.fromkeys(["acceppt", "geolab", "lamp", "lmge", "lmv", "opgc"], _CORRESPONDING_OR_FIRST),
     **dict.fromkeys(
         [
@@ -462,7 +428,7 @@ KEY_ROLES_BY_STRUCTURE: dict[str, frozenset[KeyAuthorRole]] = {
 _KEY_ROLES_LABELS = {
     _CORRESPONDING: "auteur correspondant",
     _CORRESPONDING_OR_FIRST: "auteur correspondant ou premier auteur",
-    _CORRESPONDING_FIRST_OR_LAST: "auteur correspondant, premier ou dernier auteur",
+    _CORRESPONDING_FIRST_OR_LAST: "PDC (premier, dernier ou correspondant)",
 }
 
 
@@ -470,7 +436,7 @@ _KEY_ROLES_LABELS = {
 class StructureReportData:
     structure: ReportStructure
     by_year_and_type: Sequence[YearDocTypeCount]
-    key_roles: Collection[KeyAuthorRole]
+    key_roles: Collection[AuthorPosition]
     key_role_by_year: Mapping[int, int]
     top_10_by_year: Mapping[int, Top10Count]
     top_10_key_role_by_year: Mapping[int, int]
@@ -592,6 +558,11 @@ def _decimal(value: float | None) -> str:
     return "–" if value is None else f"{value:.2f}".replace(".", ",")
 
 
+def _capitalized(label: str) -> str:
+    """Renvoie le libellé avec une majuscule initiale, sigles intacts."""
+    return label[:1].upper() + label[1:]
+
+
 def render_report(
     data: StructureReportData, *, years: Sequence[int], current_year: int, generated_on: str
 ) -> str:
@@ -633,7 +604,7 @@ def render_report(
                 "Revue",
                 "Publications",
                 "Top 10 %",
-                _KEY_ROLES_LABELS[frozenset(data.key_roles)].capitalize(),
+                _capitalized(_KEY_ROLES_LABELS[frozenset(data.key_roles)]),
                 "Les deux",
             ],
             _journal_rows(data.journals),
