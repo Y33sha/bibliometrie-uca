@@ -48,11 +48,20 @@ class Namesake(NamedTuple):
     first_name: str
     conflicting: bool = False
     """Vrai pour une personne au prénom réduit, à qui ses contributions sources donnent plusieurs prénoms pleins. Le rattachement par initiales l'écarte pour un prénom plein."""
+    hr_record: bool = False
+    """La personne a une fiche RH : son prénom vient du SI RH, jamais réduit à des initiales."""
+
+    @property
+    def matching_first_name(self) -> str:
+        """Prénom lu par le rattachement par initiales. Un prénom du SI RH, écrit en capitales, passe en minuscules : deux ou trois capitales accolées (« LEA ») ne s'y lisent pas comme des initiales (`first_name_initials`)."""
+        return self.first_name.lower() if self.hr_record else self.first_name
 
 
 def _full_namesakes(initials: tuple[str, ...], namesakes: Iterable[Namesake]) -> list[int]:
     """Renvoie les personnes au prénom plein dont les initiales commencent par `initials`."""
-    return [n.person_id for n in namesakes if full_first_name_extends(initials, n.first_name)]
+    return [
+        n.person_id for n in namesakes if full_first_name_extends(initials, n.matching_first_name)
+    ]
 
 
 def _compatible_namesakes(contributor_first_name: str, namesakes: Sequence[Namesake]) -> list[int]:
@@ -65,13 +74,15 @@ def _compatible_namesakes(contributor_first_name: str, namesakes: Sequence[Names
     contributor_initials = first_name_initials(contributor_first_name)
     if contributor_initials is not None:
         return [
-            n.person_id for n in namesakes if initials_extend(contributor_initials, n.first_name)
+            n.person_id
+            for n in namesakes
+            if initials_extend(contributor_initials, n.matching_first_name)
         ]
     if not normalize_text(contributor_first_name):
         return []
     candidates = []
     for n in namesakes:
-        initials = first_name_initials(n.first_name)
+        initials = first_name_initials(n.matching_first_name)
         if (
             initials is None
             or n.conflicting

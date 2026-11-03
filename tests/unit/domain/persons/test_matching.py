@@ -105,12 +105,19 @@ class TestCompatibleNamesakes:
             _compatible_namesakes("Julien", [Namesake(1, "Martin", "J.", conflicting=True)]) == []
         )
 
-    def test_full_name_ignores__full_namesakes(self):
+    def test_full_name_ignores_full_namesakes(self):
         """Deux prénoms pleins distincts désignent deux personnes, même à initiales communes."""
         assert _compatible_namesakes("Abdellah", [Namesake(1, "Tnourji", "Abdelkader")]) == []
 
     def test_source_contribution_without_first_name(self):
         assert _compatible_namesakes("", [Namesake(1, "Martin", "J.")]) == []
+
+    def test_hr_first_name_in_capitals_is_full(self):
+        """« LEA », venu du SI RH en capitales, est un prénom plein : il réclame « Martin L. » face à « Laurent »."""
+        hr = Namesake(2, "Martin", "LEA", hr_record=True)
+        assert _compatible_namesakes("Laurent", [Namesake(1, "Martin", "L."), hr]) == []
+        assert _compatible_namesakes("L.", [hr]) == [2]
+        assert _compatible_namesakes("L. E.", [hr]) == []
 
 
 class TestCompatiblePersons:
