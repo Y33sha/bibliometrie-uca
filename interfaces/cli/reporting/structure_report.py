@@ -232,7 +232,7 @@ ENGLISH = "en"
 
 
 class ImpactGroup(StrEnum):
-    """Groupe de publications du tableau d'impact. Les publications non anglophones recoupent les articles et le groupe des articles de synthèse et conference papers."""
+    """Groupe de publications du tableau d'impact."""
 
     ARTICLES = "articles"
     OTHERS = "others"
@@ -276,12 +276,40 @@ class PublicationImpact:
     key_role: bool
     """Un auteur de la structure tient un des rôles demandés."""
 
-    def groups(self) -> list[ImpactGroup]:
+    def group(self, *, separate_non_english: bool) -> ImpactGroup:
+        """Groupe de la publication selon son type. Avec `separate_non_english`, une publication non anglophone d'un groupe de `NON_ENGLISH_SCOPE` va dans `NON_ENGLISH`."""
         group = IMPACT_GROUP_TYPES[self.doc_type]
-        groups = [group]
-        if group in NON_ENGLISH_SCOPE and self.language is not None and self.language != ENGLISH:
-            groups.append(ImpactGroup.NON_ENGLISH)
-        return groups
+        if (
+            separate_non_english
+            and group in NON_ENGLISH_SCOPE
+            and self.language is not None
+            and self.language != ENGLISH
+        ):
+            return ImpactGroup.NON_ENGLISH
+        return group
+
+
+def impact_groups(
+    impacts: Sequence[PublicationImpact],
+) -> dict[ImpactGroup, list[PublicationImpact]]:
+    """Publications de chaque tableau d'impact, sans recoupement. Un groupe sous sa part minimale est absent. Les publications non anglophones forment leur propre groupe, sauf quand le groupe des ouvrages et chapitres est présent : elles restent alors dans le groupe de leur type."""
+
+    def by_group(separate_non_english: bool) -> dict[ImpactGroup, list[PublicationImpact]]:
+        return {
+            group: members
+            for group in IMPACT_GROUP_LABELS
+            if (
+                members := [
+                    i
+                    for i in impacts
+                    if i.group(separate_non_english=separate_non_english) == group
+                ]
+            )
+            and len(members) >= IMPACT_GROUP_MIN_SHARE.get(group, 0) * len(impacts)
+        }
+
+    by_type = by_group(separate_non_english=False)
+    return by_type if ImpactGroup.BOOKS in by_type else by_group(separate_non_english=True)
 
 
 def publication_impacts(
@@ -540,18 +568,10 @@ def _impact_rows(
 def _impact_section(
     data: StructureReportData, years: Sequence[int], year_headers: Sequence[str]
 ) -> list[str]:
-    """Un tableau par groupe d'impact non vide, au-dessus de sa part minimale. Le rapport montre soit le tableau des ouvrages et chapitres, soit celui des publications non anglophones."""
+    """Un tableau par groupe de `impact_groups`."""
     role_label = _KEY_ROLES_LABELS[frozenset(data.key_roles)]
-    by_group = {
-        group: impacts
-        for group in IMPACT_GROUP_LABELS
-        if (impacts := [i for i in data.impacts if group in i.groups()])
-        and len(impacts) >= IMPACT_GROUP_MIN_SHARE.get(group, 0) * len(data.impacts)
-    }
-    if ImpactGroup.BOOKS in by_group:
-        by_group.pop(ImpactGroup.NON_ENGLISH, None)
     lines: list[str] = []
-    for group, impacts in by_group.items():
+    for group, impacts in impact_groups(data.impacts).items():
         label = IMPACT_GROUP_LABELS[group]
         lines += [
             f"### {label}",
