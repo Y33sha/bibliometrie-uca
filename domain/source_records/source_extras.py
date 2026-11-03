@@ -12,8 +12,6 @@ from domain.types import JsonValue
 class SourceExtra(StrEnum):
     """Clé de `source_extras`."""
 
-    LICENSE = "license"
-    """Licence brute (Crossref, OpenAlex, ScanR)."""
     FUNDER = "funder"
     """Financeurs déclarés (Crossref)."""
     RELATION = "relation"
@@ -32,8 +30,6 @@ class SourceExtra(StrEnum):
     """Collections (HAL)."""
     SOURCE_TITLE = "source_title"
     """Titre de la source (HAL)."""
-    LICENCE = "licence"
-    """Licence du dépôt (HAL)."""
     ANNEX_DEPOSIT = "annex_deposit"
     """Dépôt réduit à des annexes, sans fichier principal (HAL)."""
     RELATED_IDENTIFIERS = "related_identifiers"

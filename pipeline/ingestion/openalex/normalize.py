@@ -22,7 +22,6 @@ from domain.source_records.identifiers import (
     SourceIdentifierType,
 )
 from domain.source_records.impact import Impact
-from domain.source_records.source_extras import SourceExtra
 from domain.structures.identifiers import RorId, parse_ror_ids
 from domain.subjects.subject import Subject, SubjectLink, SubjectVocabulary
 from domain.types import (
@@ -300,7 +299,7 @@ def openalex_source_record(  # noqa: C901
     ]
     keywords = [m for m in words if m] or None
 
-    # Licence de la localisation principale seule : HAL et Crossref donnent celles de leurs propres localisations. Une localisation sans éditeur (archive, entrepôt) garde sa forme brute dans `source_extras`, sans licence normalisée.
+    # Licence de la localisation principale seule : HAL et Crossref donnent celles de leurs propres localisations.
     raw_license = as_str(as_mapping(work.get("primary_location")).get("license"))
     publisher_license = raw_license if names_publisher(primary) else None
 
@@ -325,7 +324,6 @@ def openalex_source_record(  # noqa: C901
         urls=urls or None,
         impact=extract_impact(work).to_json(),
         is_retracted=is_retracted,
-        source_extras={SourceExtra.LICENSE: raw_license} if raw_license else None,
     )
 
 

@@ -53,9 +53,9 @@ def hal_text_field(value: JsonValue) -> str | None:
 
 
 def extract_hal_source_extras(doc: Mapping[str, JsonValue]) -> dict[str, JsonValue] | None:
-    """Renvoie les informations HAL sur la publication d'une communication et sur la licence du fichier déposé, ou `None` à défaut.
+    """Renvoie les informations HAL sur la publication d'une communication, ou `None` à défaut.
 
-    `proceedings` reprend l'indicateur « avec actes » (`proceedings_s`, saisi par le déposant), `series` les collections (`serie_s`), `source_title` le titre de la source (`source_s`), souvent celui des actes. `licence` reprend l'URL de la licence du fichier déposé (`licence_s`). `annex_deposit` marque un dépôt réduit à des annexes (`hal_annex`).
+    `proceedings` reprend l'indicateur « avec actes » (`proceedings_s`, saisi par le déposant), `series` les collections (`serie_s`), `source_title` le titre de la source (`source_s`), souvent celui des actes. `annex_deposit` marque un dépôt réduit à des annexes (`hal_annex`).
     """
     source_extras: dict[str, JsonValue] = {}
     proceedings = hal_text_field(doc.get("proceedings_s"))
@@ -66,8 +66,6 @@ def extract_hal_source_extras(doc: Mapping[str, JsonValue]) -> dict[str, JsonVal
         source_extras[SourceExtra.SERIES] = list(dict.fromkeys(series))
     if source_title := (hal_text_field(doc.get("source_s")) or "").strip():
         source_extras[SourceExtra.SOURCE_TITLE] = source_title
-    if licence := (hal_text_field(doc.get("licence_s")) or "").strip():
-        source_extras[SourceExtra.LICENCE] = licence
     if hal_annex(doc):
         source_extras[SourceExtra.ANNEX_DEPOSIT] = True
     return source_extras or None

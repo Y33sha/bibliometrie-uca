@@ -27,7 +27,7 @@ from tests.helpers.normalize_doubles import identifier_values, normalizer_argume
 
 
 class TestScanrSourceRecordLicense:
-    """Seule la licence d'une localisation d'éditeur est normalisée ; celle d'une archive reste brute dans `meta`."""
+    """Seule la licence d'une localisation d'éditeur est celle de l'enregistrement source."""
 
     def _call(self, evidence: dict) -> SourceRecordUpsert:
         return scanr_source_record({"oaEvidence": evidence}, 1, "sc-1", has_series=False)
@@ -35,13 +35,11 @@ class TestScanrSourceRecordLicense:
     def test_licence_de_l_editeur_normalisee(self):
         captured = self._call({"hostType": "publisher", "license": "cc-by"})
         assert captured.license == "cc-by"
-        assert captured.source_extras == {"license": "cc-by"}
 
-    def test_licence_d_archive_gardee_brute(self):
+    def test_licence_d_archive_ecartee(self):
         authorisation = "https://about.hal.science/hal-authorisation-v1/"
         captured = self._call({"hostType": "repository", "license": authorisation})
         assert captured.license is None
-        assert captured.source_extras == {"license": authorisation}
 
 
 class TestScanrSourceRecordExternalIds:

@@ -141,17 +141,16 @@ class TestStripJatsTags:
 class TestExtractCrossrefMeta:
     def test_keeps_whitelisted(self):
         msg = {
-            "license": [{"URL": "https://x"}],
             "funder": [{"name": "ANR"}],
             "relation": {"is-supplemented-by": []},
             "references-count": 42,
             "indexed": {"timestamp": 1234567890},
             "title": ["ignored"],  # hors de la liste des champs conservés
+            "license": [{"URL": "https://x"}],  # hors de la liste des champs conservés
         }
         meta = extract_crossref_source_extras(msg)
         assert meta is not None
         assert meta == {
-            "license": [{"URL": "https://x"}],
             "funder": [{"name": "ANR"}],
             "relation": {"is-supplemented-by": []},
             "references_count": 42,

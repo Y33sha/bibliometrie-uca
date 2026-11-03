@@ -20,7 +20,6 @@ from domain.source_records.identifiers import (
     SourceIdentifierType,
 )
 from domain.source_records.impact import Impact
-from domain.source_records.source_extras import SourceExtra
 from domain.structures.identifiers import RorId, parse_ror_ids
 from domain.subjects.subject import SubjectLink
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs
@@ -193,7 +192,7 @@ def scanr_source_record(  # noqa: C901
     seen: set[str] = set()
     oa_ev = as_mapping(doc.get("oaEvidence"))
     raw_license = as_str(oa_ev.get("license"))
-    # La licence d'une localisation d'archive (dépôt HAL…) garde sa forme brute dans `source_extras`, sans licence normalisée : HAL donne la licence de ses dépôts.
+    # Seule la licence d'une localisation d'éditeur est celle de l'enregistrement source : HAL donne la licence de ses dépôts.
     publisher_license = raw_license if oa_ev.get("hostType") == "publisher" else None
     addresses = [doc.get(f) for f in ("landingPage", "doiUrl", "pdfUrl")]
     addresses += [oa_ev.get(f) for f in ("landingPageUrl", "url", "pdfUrl")]
@@ -221,7 +220,6 @@ def scanr_source_record(  # noqa: C901
         license=normalize_license(publisher_license),
         urls=urls or None,
         impact=Impact(cited_by_count=cited_by_count).to_json(),
-        source_extras={SourceExtra.LICENSE: raw_license} if raw_license else None,
     )
 
 

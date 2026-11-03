@@ -25,11 +25,5 @@ class TestExtractHalMeta:
     def test_sans_actes(self):
         assert extract_hal_source_extras({"proceedings_s": "0"}) == {"proceedings": False}
 
-    def test_licence_du_fichier_depose(self):
-        doc = {"licence_s": "https://creativecommons.org/licenses/by/4.0/"}
-        assert extract_hal_source_extras(doc) == {
-            "licence": "https://creativecommons.org/licenses/by/4.0/"
-        }
-
     def test_enregistrement_source_muet(self):
         assert extract_hal_source_extras({"title_s": ["Titre"]}) is None
