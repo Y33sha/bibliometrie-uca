@@ -34,10 +34,10 @@ class AttributionStatus(StrEnum):
     AUTHENTICATED = "authenticated"
 
 
-# Statuts d'une attribution posée par un humain : confirmée par l'administration, ou authentifiée par le chercheur. Seuls les identifiants à ces statuts servent au moissonnage par personne et à l'alignement des auteurs.
 HUMAN_ATTRIBUTION_STATUSES: frozenset[AttributionStatus] = frozenset(
     {AttributionStatus.CONFIRMED, AttributionStatus.AUTHENTICATED}
 )
+"""Statuts d'une attribution posée par un humain : confirmée par l'administration, ou authentifiée par le chercheur. Seuls les identifiants à ces statuts servent au moissonnage par personne et à l'alignement des auteurs."""
 
 
 class PersonIdentifierType(StrEnum):
@@ -56,14 +56,15 @@ PERSON_IDENTIFIER_LABELS: dict[PersonIdentifierType, str] = {
     PersonIdentifierType.HAL_PERSON_ID: "compte HAL",
 }
 
-# Types de l'interface publique, seuls attribuables à la main. Le compte HAL vient seulement du moissonnage de HAL.
 PUBLIC_PERSON_IDENTIFIER_TYPES: tuple[PersonIdentifierType, ...] = (
     PersonIdentifierType.ORCID,
     PersonIdentifierType.IDHAL,
     PersonIdentifierType.IDREF,
 )
+"""Types de l'interface publique, seuls attribuables à la main. Le compte HAL vient seulement du moissonnage de HAL."""
 
-_ORCID_URL_PREFIXES = ("https://orcid.org/", "http://orcid.org/", "orcid.org/")
+_ORCID_URI_PREFIX = "https://orcid.org/"
+_ORCID_URL_PREFIXES = (_ORCID_URI_PREFIX, "http://orcid.org/", "orcid.org/")
 # Le dernier caractère, clé de contrôle, peut valoir X.
 _ORCID_CANONICAL = re.compile(r"^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$")
 
@@ -88,7 +89,7 @@ def _normalize_orcid(raw: str | None) -> str | None:
 
 def orcid_uri(orcid: str) -> str:
     """Renvoie la forme URI d'un ORCID normalisé : `https://orcid.org/XXXX-XXXX-XXXX-XXXX`."""
-    return f"{_ORCID_URL_PREFIXES[0]}{orcid}"
+    return f"{_ORCID_URI_PREFIX}{orcid}"
 
 
 class ORCID(NormalizedIdentifier):
