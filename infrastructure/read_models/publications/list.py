@@ -8,6 +8,7 @@ from sqlalchemy import Connection, Row, text
 
 from domain.normalize import normalize_text, to_plain_text
 from domain.publications.access import access_url
+from domain.publications.author_positions import AuthorPosition
 from domain.publications.dates import DatePrecision, PublicationDate
 from domain.publications.hal_deposit import HAL_DEPOSIT_STATUS_LABELS, HalDepositStatus
 from domain.publications.licenses import license_label
@@ -37,6 +38,11 @@ from infrastructure.read_models.publications.models import (
 from infrastructure.sql_fragments import has_author_role, is_laboratory, source_extra
 
 logger = logging.getLogger(__name__)
+
+# Positions d'auteur de la personne `:focus_person` dans la publication `p`.
+_FOCUS_AUTHOR_POSITIONS = """(SELECT a.author_positions::text[] FROM contributions a
+                     WHERE a.publication_id = p.id AND a.person_id = :focus_person
+                     LIMIT 1)"""
 
 # Libellés des statuts thèse pour l'export CSV.
 _THESES_STATUS_LABELS = {"thesis": "Soutenue", "ongoing_thesis": "En cours"}
@@ -173,7 +179,9 @@ def _publication_lines(
             "Revue": row.journal_title or "",
             "Éditeur": row.publisher_name or "",
             "Laboratoires": row.labs or "",
-            "Corresp.": "oui" if row.is_corresponding else "",
+            "Corresp.": "oui"
+            if AuthorPosition.CORRESPONDING in (row.author_positions or ())
+            else "",
             "APC (€)": round(row.apc_total) if row.apc_total else "",
             "Voie OA": row.oa_status or "",
             "Licence": license_label(row.license) if row.license else "",
@@ -281,9 +289,7 @@ class PublicationListQueries:
                     {source_extra(SourceExtra.DATE_INSCRIPTION, "p")} AS date_inscription,
                     {_thesis_author("pe.first_name || ' ' || pe.last_name")} AS thesis_author_name,
                     {_thesis_author("pe.id")} AS thesis_author_person_id,
-                    (SELECT a.is_corresponding FROM contributions a
-                     WHERE a.publication_id = p.id AND a.person_id = :focus_person
-                     LIMIT 1) AS is_corresponding,
+                    {_FOCUS_AUTHOR_POSITIONS} AS author_positions,
                     (SELECT a.id FROM contributions a
                      WHERE a.publication_id = p.id AND a.person_id = :focus_person
                      LIMIT 1) AS contribution_id,
@@ -358,7 +364,7 @@ class PublicationListQueries:
                 thesis_author_person_id=r.thesis_author_person_id,
                 lab_items=r.lab_items,
                 apc=r.apc_details,
-                is_corresponding=r.is_corresponding,
+                author_positions=r.author_positions,
                 contribution_id=r.contribution_id,
                 hal_status=r.hal_status,
             )
@@ -408,9 +414,7 @@ class PublicationListQueries:
                     src_ids.wos_id, src_ids.theses_id,
                     (SELECT COALESCE(SUM(ap.amount_eur_ht), 0) FROM apc_payments ap
                      WHERE ap.publication_id = p.id) AS apc_total,
-                    (SELECT a.is_corresponding FROM contributions a
-                     WHERE a.publication_id = p.id AND a.person_id = :focus_person
-                     LIMIT 1) AS is_corresponding,
+                    {_FOCUS_AUTHOR_POSITIONS} AS author_positions,
                     (SELECT string_agg(DISTINCT COALESCE(s.acronym, s.name), ', '
                              ORDER BY COALESCE(s.acronym, s.name))
                      {_perimeter_labs(person_filter=bool(filters.person_id))}

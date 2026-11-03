@@ -50,6 +50,7 @@ from domain.persons.identifiers import AttributionStatus
 from domain.persons.person import PersonExclusion
 from domain.platforms.platform import PlatformType
 from domain.publications.author_grouping import GroupingMethod
+from domain.publications.author_positions import AuthorPosition
 from domain.publications.dates import DatePrecision
 from domain.publications.doc_types import DocType
 from domain.publications.licenses import License
@@ -829,6 +830,8 @@ grouping_method_enum = PgEnum(*GroupingMethod, name="grouping_method", create_ty
 
 resolution_mode_enum = PgEnum(*ContributionMatchReason, name="resolution_mode", create_type=False)
 
+author_position_enum = PgEnum(*AuthorPosition, name="author_position", create_type=False)
+
 contributions = Table(
     "contributions",
     metadata,
@@ -837,7 +840,16 @@ contributions = Table(
     Column("person_id", Integer),
     Column("resolution_mode", resolution_mode_enum),
     Column("reference_position", SmallInteger),
-    Column("is_corresponding", Boolean),
+    Column(
+        "author_positions",
+        ARRAY(author_position_enum),
+        nullable=False,
+        server_default="{}",
+        comment=(
+            "Positions d'auteur : correspondant, premier ou dernier auteur. La phase"
+            " author_grouping les calcule depuis les listes d'auteurs de la publication."
+        ),
+    ),
     Column("roles", ARRAY(Text)),
     # Indices de l'entrée dans le périmètre, union de ceux des contributions sources ; `in_perimeter` en découle.
     Column(

@@ -561,7 +561,7 @@ class TestPersonView:
             add_contribution_structure(conn, contribution, author_lab)
         conn.execute(
             text(
-                "UPDATE contributions SET is_corresponding = TRUE"
+                "UPDATE contributions SET author_positions = '{corresponding}'"
                 " WHERE publication_id = :p AND person_id = :person"
             ),
             {"p": publication, "person": person},
@@ -586,7 +586,7 @@ class TestPersonView:
         [item] = self._list(sa_sync_conn, person_id=person)
 
         assert item.contribution_id == contribution_id_of(sa_sync_conn, publication, person)
-        assert item.is_corresponding is True
+        assert item.author_positions == ["corresponding"]
         assert [i.id for i in item.lab_items or []] == [lab]
 
     def test_author_position_and_perimeter_filters_read_the_contribution(self, sa_sync_conn):

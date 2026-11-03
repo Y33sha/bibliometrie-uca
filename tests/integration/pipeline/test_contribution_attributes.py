@@ -61,7 +61,8 @@ def _contribution_of_two(conn) -> int:
 def _attributes(conn, contribution):
     return conn.execute(
         text(
-            "SELECT is_corresponding, roles, perimeter_evidence::text[] AS evidence, in_perimeter"
+            "SELECT author_positions::text[] AS positions, roles,"
+            " perimeter_evidence::text[] AS evidence, in_perimeter"
             " FROM contributions WHERE id = :g"
         ),
         {"g": contribution},
@@ -78,8 +79,9 @@ def test_les_attributs_de_la_contribution_reunissent_ceux_de_ses_contributions_s
     assert store.propagate_attributes() == (1, 1)
 
     row = _attributes(conn, contribution)
-    assert (row.is_corresponding, row.roles, row.evidence, row.in_perimeter) == (
-        True,
+    # Seul auteur de la liste HAL, la contribution en est le premier et le dernier auteur.
+    assert (row.positions, row.roles, row.evidence, row.in_perimeter) == (
+        ["corresponding", "first", "last"],
         ["author", "editor"],
         ["address", "hal_structure", "ror"],
         True,

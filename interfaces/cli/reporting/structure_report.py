@@ -21,6 +21,7 @@ from pathlib import Path
 from sqlalchemy import Connection, text
 
 from domain.dates import today
+from domain.publications.author_positions import AuthorPosition
 from domain.publications.doc_types import DocType
 from domain.sources.registry import source_label
 from domain.structures.structure import StructureType
@@ -30,6 +31,7 @@ from infrastructure.read_models.structures.queries import (
     AUTHOR_SOURCE_CONTRIBUTION,
     AUTHORED_PUBLICATION,
 )
+from infrastructure.sql_fragments import has_author_position
 
 log = setup_logger("structure_report", os.path.dirname(__file__))
 
@@ -134,7 +136,8 @@ _KEY_ROLE_CONDITIONS = {
     KeyAuthorRole.CORRESPONDING: f"""
         EXISTS (
             SELECT 1 FROM contributions a
-            WHERE a.publication_id = p.id AND a.is_corresponding AND {AUTHOR_SOURCE_CONTRIBUTION}
+            WHERE a.publication_id = p.id AND {has_author_position(AuthorPosition.CORRESPONDING)}
+              AND {AUTHOR_SOURCE_CONTRIBUTION}
         )
     """,  # noqa: S608 — fragment SQL constant
     KeyAuthorRole.FIRST: _OPENALEX_POSITION.format(bound="min"),

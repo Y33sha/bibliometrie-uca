@@ -3196,6 +3196,12 @@ export interface components {
             roles: string[];
         };
         /**
+         * AuthorPosition
+         * @description Position d'une contribution, valeur de `contributions.author_positions`. Reflet du type PostgreSQL `author_position`.
+         * @enum {string}
+         */
+        AuthorPosition: "corresponding" | "first" | "last";
+        /**
          * BatchAssignOrphanContributions
          * @description Attribution en lot de contributions orphelines, désignées par leurs identifiants, à une personne existante.
          */
@@ -3364,8 +3370,8 @@ export interface components {
             author_position: number | null;
             /** In Perimeter */
             in_perimeter: boolean;
-            /** Is Corresponding */
-            is_corresponding: boolean | null;
+            /** Author Positions */
+            author_positions: components["schemas"]["AuthorPosition"][];
             /** Structure Ids */
             structure_ids: number[] | null;
             /** Source Hal */
@@ -5187,8 +5193,11 @@ export interface components {
             lab_items: components["schemas"]["PublicationLabItem"][] | null;
             /** Apc */
             apc: components["schemas"]["PublicationApcPayment"][] | null;
-            /** Is Corresponding */
-            is_corresponding: boolean | null;
+            /**
+             * Author Positions
+             * @description Positions d'auteur de la personne de la liste ; `None` pour une liste sans personne.
+             */
+            author_positions: components["schemas"]["AuthorPosition"][] | null;
             /** Contribution Id */
             contribution_id: number | null;
             /**
