@@ -13,7 +13,6 @@ from typing import TYPE_CHECKING
 
 from domain.sources.registry import (
     DOI_SEARCHABLE_SOURCES,
-    PERSON_SEARCHED_SOURCES,
     PROFILES,
     SOURCE_PRIORITY,
     Source,
@@ -22,7 +21,7 @@ from domain.sources.registry import (
 if TYPE_CHECKING:
     from sqlalchemy import Connection
 
-    from pipeline.runtime.context import Phase as ExecutablePhase, PhaseContext
+    from pipeline.runtime.context import Phase as ExecutablePhase, PhaseContext, RunOptions
     from pipeline.runtime.observability.metrics import PhaseMetrics
 
 
@@ -212,18 +211,6 @@ TASKS: tuple[Task, ...] = (
     ),
     # Acquisition : les canaux écrivent la dernière version de chaque document moissonné dans `staging`, dans un ordre indifférent. Leurs lectures de `staging` dédoublonnent et valent quel que soit l'ordre.
     # Interrogation par identifiant de personne : identifiants des personnes RH, posés par la phase `persons` au run précédent.
-    *(
-        _task(
-            f"harvest_by_person.{source}",
-            "harvest_by_person",
-            reads=("config", "hr_records", "person_identifiers", "staging"),
-            writes=("staging", "staging_normalization_queue"),
-            previous_run=("staging", "person_identifiers"),
-            network=source,
-            parallel_group="harvest_by_person",
-        )
-        for source in PERSON_SEARCHED_SOURCES
-    ),
     _task(
         "fetch_missing.hal_by_id",
         "fetch_missing",
@@ -412,6 +399,8 @@ class Phase:
     """Moissonnage : le journal de la phase se termine par le total de ses sources."""
     label_fields: Callable[[Connection], dict[str, str]] | None = None
     """Valeurs des champs du libellé, lues dans la configuration."""
+    when: Callable[[RunOptions], bool] | None = None
+    """Condition d'exécution, d'après les options du run. Une phase écartée le signale au journal et renvoie des métriques vides."""
     check: Callable[[PhaseContext], None] | None = None
     """Précondition, vérifiée avant les tâches : lève une exception si elle n'est pas remplie."""
     assemble: Callable[[Mapping[str, PhaseMetrics]], PhaseMetrics] | None = None

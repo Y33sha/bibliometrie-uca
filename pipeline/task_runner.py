@@ -187,6 +187,9 @@ def run_phase(phase: GraphPhase, ctx: PhaseContext) -> PhaseMetrics:
     """Exécute les tâches d'une phase et renvoie les métriques de la phase."""
     if phase.build is not None:
         return phase.build().run(ctx)
+    if phase.when is not None and not phase.when(ctx.options):
+        ctx.logger.info("%sSautée en mode %s", LAST_BRANCH, ctx.options.mode)
+        return PhaseMetrics()
     if phase.check is not None:
         phase.check(ctx)
     by_task = execute_tasks(phase.tasks, ctx)

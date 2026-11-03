@@ -45,9 +45,9 @@ PHASES: tuple[Phase, ...] = (
     Phase(
         "harvest_by_person",
         "Moissonnage par personne",
-        phase_tasks("harvest_by_person"),
+        harvest_by_person.TASKS,
         harvesting=True,
-        build=harvest_by_person.build,
+        when=lambda options: options.policy.harvest_by_person,
     ),
     Phase(
         "fetch_missing",
