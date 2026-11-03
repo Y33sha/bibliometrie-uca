@@ -130,9 +130,8 @@ PHASES: tuple[Phase, ...] = (
     Phase(
         "subjects",
         "Sujets des publications",
-        phase_tasks("subjects"),
+        subjects.TASKS,
         extra=True,
-        build=subjects.build,
     ),
     Phase(
         "countries",

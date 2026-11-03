@@ -5,11 +5,9 @@ La phase `finalize` supprime au préalable les publications sans contribution ra
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
-from pipeline.runtime.context import Phase, PhaseContext
+from pipeline.graph import task
+from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.task_runner import TaskStep, run_tasks
 from pipeline.transformation.publications.subjects.subject_cooccurrences import (
     run as run_cooccurrences,
 )
@@ -17,29 +15,45 @@ from pipeline.transformation.publications.subjects.subject_ingestion import run 
 from pipeline.transformation.publications.subjects.subject_store import SubjectStore
 
 
-@dataclass(frozen=True)
-class SubjectsPhase:
-    def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Ingère les sujets, puis recalcule l'usage des sujets et les cooccurrences. Renvoie les métriques d'ingestion. L'option `rebuild_subjects` force la ré-ingestion de toutes les publications."""
+def _ingest(ctx: PhaseContext) -> PhaseMetrics:
+    """Ingère les sujets. L'option `rebuild_subjects` force la ré-ingestion de toutes les publications."""
+    with ctx.open_tx() as conn:
+        return run_ingest(SubjectStore(conn), ctx.logger, rebuild=ctx.options.rebuild_subjects)
 
-        def ingest(ctx: PhaseContext) -> PhaseMetrics:
-            with ctx.open_tx() as conn:
-                return run_ingest(
-                    SubjectStore(conn), ctx.logger, rebuild=ctx.options.rebuild_subjects
-                )
 
-        def usage(ctx: PhaseContext) -> PhaseMetrics:
-            with ctx.open_tx() as conn:
-                run_cooccurrences(SubjectStore(conn), ctx.logger)
-            return PhaseMetrics()
+def _usage(ctx: PhaseContext) -> PhaseMetrics:
+    """Recalcule l'usage des sujets et les cooccurrences."""
+    with ctx.open_tx() as conn:
+        run_cooccurrences(SubjectStore(conn), ctx.logger)
+    return PhaseMetrics()
 
-        by_task = run_tasks(
+
+TASKS = (
+    task(
+        "subjects.ingest",
+        reads=(
+            "publications.id",
+            "publications.subjects_ingested_at",
+            "source_records.publication_id",
+            "source_records.source",
+            "source_record_subjects",
             "subjects",
-            {"subjects.ingest": TaskStep(ingest), "subjects.usage": TaskStep(usage)},
-            ctx,
-        )
-        return by_task["subjects.ingest"]
-
-
-def build() -> Phase:
-    return SubjectsPhase()
+            "publication_subjects",
+        ),
+        writes=("publication_subjects", "subjects.id", "publications.subjects_ingested_at"),
+        previous_run=("publications.subjects_ingested_at", "subjects"),
+        run=_ingest,
+    ),
+    task(
+        "subjects.usage",
+        reads=(
+            "publication_subjects",
+            "subjects.id",
+            "subjects.label",
+            "subjects.label_normalized",
+        ),
+        writes=("subjects.usage_count", "subject_labels", "subject_cooccurrences"),
+        previous_run=("subjects",),
+        run=_usage,
+    ),
+)

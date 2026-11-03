@@ -1368,33 +1368,6 @@ TASKS: tuple[Task, ...] = (
         previous_run=("addresses",),
     ),
     _task(
-        "subjects.ingest",
-        "subjects",
-        reads=(
-            "publications.id",
-            "publications.subjects_ingested_at",
-            "source_records.publication_id",
-            "source_records.source",
-            "source_record_subjects",
-            "subjects",
-            "publication_subjects",
-        ),
-        writes=("publication_subjects", "subjects.id", "publications.subjects_ingested_at"),
-        previous_run=("publications.subjects_ingested_at", "subjects"),
-    ),
-    _task(
-        "subjects.usage",
-        "subjects",
-        reads=(
-            "publication_subjects",
-            "subjects.id",
-            "subjects.label",
-            "subjects.label_normalized",
-        ),
-        writes=("subjects.usage_count", "subject_labels", "subject_cooccurrences"),
-        previous_run=("subjects",),
-    ),
-    _task(
         "countries.detect",
         "countries",
         reads=(
