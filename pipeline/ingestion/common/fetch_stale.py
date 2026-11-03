@@ -25,7 +25,7 @@ from pipeline.ingestion.common.stale_refetch import refresh
 from pipeline.runtime.config import delay, window_years
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.signals import select_targets, skipped
+from pipeline.runtime.observability.signals import skipped
 
 
 def _years(ctx: PhaseContext) -> list[int] | None:
@@ -42,12 +42,6 @@ def _run_fetch_stale(ctx: PhaseContext, target: str, years: list[int] | None) ->
         return asyncio.run(refresh(conn, refetch, ctx.logger, after_days=after_days, years=years))
 
 
-def _targets(ctx: PhaseContext) -> set[str]:
-    """Renvoie les sources relues par le run : celles demandées, WoS seulement sur option."""
-    options = ctx.options
-    return set(select_targets(Source, options.sources, include_wos=options.include_wos))
-
-
 TASKS = tuple(
     Task(
         f"fetch_stale.{source}",
@@ -59,7 +53,7 @@ TASKS = tuple(
         run=lambda ctx, source=source: _run_fetch_stale(ctx, source, _years(ctx)),
         label=source_label(source),
         progress_bar=True,
-        when=lambda ctx, source=source: source in _targets(ctx),
+        when=lambda ctx, source=source: source in ctx.options.queried_sources,
     )
     for source in Source
 )

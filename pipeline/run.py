@@ -43,7 +43,6 @@ from pipeline.runtime.modes import MODE_NAMES
 from pipeline.runtime.observability.exception_chain import failure_message, is_user_interruption
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import set_bar_stream, write_above_bars
-from pipeline.runtime.observability.signals import select_targets
 from pipeline.task_runner import run_phase
 
 set_console_writer(write_above_bars)
@@ -399,8 +398,7 @@ def _execute_phases(options: RunOptions, phases_to_run: list[Phase]) -> None:
     """Déroule la séquence des phases avec observabilité par run, puis le récapitulatif de fin."""
     # Enregistre le run et chacune de ses phases : identifiant de séquence, entrées, sorties, statut.
     recorder = start_run(
-        mode=options.mode,
-        sources=select_targets(Source, options.sources, include_wos=options.include_wos),
+        mode=options.mode, sources=[s for s in Source if s in options.queried_sources]
     )
     if recorder.run_id is not None:
         log.info("%s%d", RUN_MARKER, recorder.run_id)

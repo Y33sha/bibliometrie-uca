@@ -22,10 +22,7 @@ from pipeline.ingestion.common.harvester import HarvestWindow, run_harvest
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.log_format import BRANCH
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.signals import (
-    select_targets,
-    skipped,
-)
+from pipeline.runtime.observability.signals import skipped
 
 
 def _source_summary(metrics: PhaseMetrics) -> dict[str, float | None]:
@@ -40,13 +37,9 @@ def _source_summary(metrics: PhaseMetrics) -> dict[str, float | None]:
     }
 
 
-def _effective_sources(ctx: PhaseContext) -> set[str]:
-    """Renvoie les sources moissonnées par le run : celles demandées, restreintes par le mode."""
-    options = ctx.options
-    effective = set(
-        select_targets(HARVESTED_SOURCES, options.sources, include_wos=options.include_wos)
-    )
-    return effective & options.policy.harvest_sources
+def _effective_sources(ctx: PhaseContext) -> frozenset[str]:
+    """Renvoie les sources moissonnées par le run : celles interrogées, restreintes par le mode."""
+    return ctx.options.queried_sources & ctx.options.policy.harvest_sources
 
 
 def _since_last_daily() -> tuple[date, str]:

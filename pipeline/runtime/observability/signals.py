@@ -1,10 +1,8 @@
 """Signaux des phases qui interrogent des sources externes."""
 
 import logging
-from collections.abc import Collection, Set
 
 from domain.pipeline_runs import PhaseStatus
-from domain.sources.registry import PROFILES
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
 
@@ -48,13 +46,6 @@ def signal_source_unavailable(
             "message": f"{source} coupée après une série de requêtes en échec, items reportés au prochain run",
         }
     )
-
-
-def select_targets(base: Collection[str], sources: Set[str], *, include_wos: bool) -> list[str]:
-    """Renvoie les sources à interroger : celles de `base` présentes dans `sources`, moins les sources sur option (`SourceProfile.opt_in`) sans `include_wos`, dans l'ordre de `base`."""
-    opt_in = set() if include_wos else {s for s, p in PROFILES.items() if p.opt_in}
-    eligible = (set(base) & sources) - opt_in
-    return [t for t in base if t in eligible]
 
 
 def skipped(metrics: PhaseMetrics) -> bool:

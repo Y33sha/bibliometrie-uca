@@ -22,7 +22,7 @@ from pipeline.ingestion.common.doi_search import fetch_missing_doi
 from pipeline.runtime.config import cap, delay, window_years
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.signals import select_targets, skipped
+from pipeline.runtime.observability.signals import skipped
 
 _HAL_BY_ID = "fetch_missing.hal_by_id"
 _SCANR_BY_HAL_ID = "fetch_missing.scanr_by_hal_id"
@@ -157,14 +157,6 @@ def _requested(source: str) -> Callable[[PhaseContext], bool]:
     return lambda ctx: source in ctx.options.sources
 
 
-def _doi_targets(ctx: PhaseContext) -> set[str]:
-    """Renvoie les sources cherchées par DOI : celles demandées, WoS seulement sur option."""
-    options = ctx.options
-    return set(
-        select_targets(DOI_SEARCHABLE_SOURCES, options.sources, include_wos=options.include_wos)
-    )
-
-
 TASKS = (
     _channel(
         _HAL_BY_ID,
@@ -216,7 +208,7 @@ TASKS = (
             parallel_group="fetch_missing.doi",
             run=lambda ctx, target=target: _run_fetch_missing_doi(ctx, target),
             section="Recherche par DOI des documents manquants dans chaque source",
-            when=lambda ctx, target=target: target in _doi_targets(ctx),
+            when=lambda ctx, target=target: target in ctx.options.queried_sources,
         )
         for target in DOI_SEARCHABLE_SOURCES
     ),

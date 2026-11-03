@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 
 from sqlalchemy import Connection
 
-from domain.sources.registry import Source
+from domain.sources.registry import PROFILES, Source
 from pipeline.runtime.modes import MODES, ModePolicy
 
 # Fabrique de transaction gérée en context-manager : commit en sortie de bloc si succès, rollback sur exception. Une phase ouvre une transaction par sous-étape.
@@ -48,6 +48,13 @@ class RunOptions:
     def policy(self) -> ModePolicy:
         """Politique du mode du run (`MODES`)."""
         return MODES[self.mode]
+
+    @property
+    def queried_sources(self) -> frozenset[str]:
+        """Sources interrogées par le run : les sources demandées, une source sur option (`SourceProfile.opt_in`) seulement avec `--include-wos`."""
+        if self.include_wos:
+            return self.sources
+        return frozenset(s for s in self.sources if not PROFILES[Source(s)].opt_in)
 
 
 @dataclass(frozen=True, slots=True)
