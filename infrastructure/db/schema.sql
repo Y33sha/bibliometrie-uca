@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict FurPl8MTrapf3kyNJpfOhvMxeIesS3VQ8IDDiUKda7Wnyuh2xj436cYVKG92dX8
+\restrict k0lEZQUPPFWNOcUqCwk8Y02hY3W0aHz983Y3RFM1rkke3cxbEq2bVyf8893CHYt
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -1114,6 +1114,7 @@ CREATE TABLE publications.aligned_source_contributions (
     margin real,
     CONSTRAINT aligned_source_contributions_score_check CHECK (((method = 'model'::public.grouping_method) OR ((score IS NULL) AND (margin IS NULL))))
 );
+ALTER TABLE ONLY publications.aligned_source_contributions ALTER COLUMN source_record_id SET (n_distinct=-0.0135);
 
 
 --
@@ -1140,6 +1141,7 @@ CREATE TABLE publications.contributions (
     CONSTRAINT contributions_resolution_mode_with_person CHECK (((person_id IS NULL) = (resolution_mode IS NULL)))
 )
 WITH (fillfactor='90');
+ALTER TABLE ONLY publications.contributions ALTER COLUMN publication_id SET (n_distinct=-0.0144);
 
 
 --
@@ -6102,5 +6104,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict FurPl8MTrapf3kyNJpfOhvMxeIesS3VQ8IDDiUKda7Wnyuh2xj436cYVKG92dX8
+\unrestrict k0lEZQUPPFWNOcUqCwk8Y02hY3W0aHz983Y3RFM1rkke3cxbEq2bVyf8893CHYt
 
