@@ -66,9 +66,9 @@ Une liste d'un seul auteur plus courte que la plus longue contient le premier au
 ### Phase 2 — Positions des contributions
 
 - [x] Critère de troncature d'une liste.
-- [ ] Enum `author_position` et colonne `contributions.author_positions`, remplie par sa migration. Suppression de `contributions.is_corresponding`.
-- [ ] Calcul des positions dans la recomposition des attributs (`propagate_contribution_attributes_sql`). Un changement de rôles d'une contribution source marque toutes les contributions de sa publication.
-- [ ] Lectures de `contributions.is_corresponding` reprises : liste et export des publications, détail d'une publication, filtres, frontend, tests.
+- [x] Enum `author_position` et colonne `contributions.author_positions`. La migration reprend la position de correspondant et marque toutes les contributions pour la recomposition de leurs attributs. Suppression de `contributions.is_corresponding`. a8d65d67f
+- [x] Calcul des positions dans la recomposition des attributs (`propagate_contribution_attributes_sql`). Un changement de position ou de rôles d'une contribution source marque la publication pour le groupement des auteurs, donc toutes ses contributions. a8d65d67f
+- [x] Lectures de `contributions.is_corresponding` reprises : liste et export des publications, détail d'une publication, filtres, rapports, frontend, tests. a8d65d67f
 
 ### Phase 3 — Facette et rapports
 
