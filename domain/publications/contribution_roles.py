@@ -131,11 +131,7 @@ THESIS_JURY_ROLES: frozenset[str] = frozenset(
 )
 
 # Rôles de thèse qui impliquent l'appartenance au jury, et rendent `JURY_MEMBER` superflu.
-_THESIS_ROLES_IMPLYING_JURY = {
-    ContributionRole.THESIS_DIRECTOR,
-    ContributionRole.RAPPORTEUR,
-    ContributionRole.JURY_PRESIDENT,
-}
+_THESIS_ROLES_IMPLYING_JURY = THESIS_JURY_ROLES - {ContributionRole.JURY_MEMBER}
 
 _SOURCE_ROLES: dict[str, dict[str, tuple[ContributionRole, ...]]] = {
     "hal": _MARC_ROLES,
