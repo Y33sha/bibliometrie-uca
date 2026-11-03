@@ -73,7 +73,7 @@ OpenAlex et ScanR ont 1 468 enregistrements sources `memoir` avec une URL DUMAS.
 - [x] Palette des couleurs des types et des familles. 574ea0878
 - [x] `data_paper` dans la famille des données et logiciels. 1bae7f9e8
 - [x] Type `practice_thesis` (« Thèse d'exercice »), famille Thèses, exclu des publications comme `memoir`. HAL `MEM` suivi du code de diplôme DUMAS (12, 13, 30, 47, 63). La règle de l'URL DUMAS laisse ce type en l'état.
-- [ ] Type `journal_issue` (« Numéro de revue »), exclu des publications. HAL `ISSUE`, Crossref `journal-issue`, DataCite `Journal Issue`. Retrait du DOI du numéro aux enregistrements sources d'un autre titre (`NUMERO_VS_ARTICLE`). Entre œuvres distinctes, le DOI reste à l'enregistrement source qui le détient en `primary` ou `derived`. Oneshot `requalify_journal_issues` sur le stock. Mesures du 2026-11-03 : 152 publications avec un numéro Crossref, 422 avec un dépôt HAL `ISSUE`, dont 91 en commun. Sur 100 dépôts HAL `ISSUE` sans Crossref ni DataCite, 3 sont des articles.
+- [x] Type `journal_issue` (« Numéro de revue »), exclu des publications. HAL `ISSUE`, Crossref `journal-issue`, DataCite `Journal Issue`. Retrait du DOI du numéro aux enregistrements sources d'un autre titre (`NUMERO_VS_ARTICLE`). Entre œuvres distinctes, le DOI reste à l'enregistrement source qui le détient en `primary` ou `derived`. Oneshot `requalify_journal_issues` sur le stock. Mesures du 2026-11-03 : 152 publications avec un numéro Crossref, 422 avec un dépôt HAL `ISSUE`, dont 91 en commun. Sur 100 dépôts HAL `ISSUE` sans Crossref ni DataCite, 3 sont des articles. Après le run, aucune publication de type numéro. 9a837b4ac, 0ef7eee2f
 
 ### Phase 2 — Errata et rétractations
 
