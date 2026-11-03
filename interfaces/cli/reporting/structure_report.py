@@ -35,13 +35,6 @@ from infrastructure.sql_fragments import has_author_position
 
 log = setup_logger("structure_report", os.path.dirname(__file__))
 
-REPORT_DOC_TYPES = (
-    DocType.ARTICLE,
-    DocType.REVIEW,
-    DocType.BOOK,
-    DocType.BOOK_CHAPTER,
-    DocType.CONFERENCE_PAPER,
-)
 
 REPORTS_DIR = Path("data/reports/bibliometrie")
 """Dossier des rapports, avec un sous-dossier par date de génération."""
@@ -115,7 +108,7 @@ def _params(structure_id: int, period: Period) -> dict[str, object]:
         "structure_id": structure_id,
         "first_year": period.first,
         "last_year": period.last,
-        "doc_types": [t.value for t in REPORT_DOC_TYPES],
+        "doc_types": [t.value for t in IMPACT_GROUP_TYPES],
     }
 
 
@@ -206,16 +199,18 @@ ENGLISH = "en"
 
 
 class ImpactGroup(StrEnum):
-    """Groupe de publications du tableau d'impact. Les publications non anglophones recoupent les deux autres groupes."""
+    """Groupe de publications du tableau d'impact. Les publications non anglophones recoupent les articles et le groupe des articles de synthèse et conference papers."""
 
     ARTICLES = "articles"
     OTHERS = "others"
+    BOOKS = "books"
     NON_ENGLISH = "non_english"
 
 
 IMPACT_GROUP_LABELS = {
     ImpactGroup.ARTICLES: "Articles",
     ImpactGroup.OTHERS: "Articles de synthèse et conference papers",
+    ImpactGroup.BOOKS: "Ouvrages et chapitres",
     ImpactGroup.NON_ENGLISH: "Publications non anglophones",
 }
 
@@ -223,8 +218,13 @@ IMPACT_GROUP_TYPES = {
     DocType.ARTICLE: ImpactGroup.ARTICLES,
     DocType.REVIEW: ImpactGroup.OTHERS,
     DocType.CONFERENCE_PAPER: ImpactGroup.OTHERS,
+    DocType.BOOK: ImpactGroup.BOOKS,
+    DocType.BOOK_CHAPTER: ImpactGroup.BOOKS,
 }
-"""Groupe de chaque type de document du tableau d'impact. Les autres types sont hors du tableau."""
+"""Types de documents du rapport, avec leur groupe dans le tableau d'impact."""
+
+NON_ENGLISH_SCOPE = frozenset({ImpactGroup.ARTICLES, ImpactGroup.OTHERS})
+"""Groupes dont les publications non anglophones forment le groupe `NON_ENGLISH`."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -241,10 +241,9 @@ class PublicationImpact:
     """Un auteur de la structure tient un des rôles demandés."""
 
     def groups(self) -> list[ImpactGroup]:
-        if (group := IMPACT_GROUP_TYPES.get(self.doc_type)) is None:
-            return []
+        group = IMPACT_GROUP_TYPES[self.doc_type]
         groups = [group]
-        if self.language is not None and self.language != ENGLISH:
+        if group in NON_ENGLISH_SCOPE and self.language is not None and self.language != ENGLISH:
             groups.append(ImpactGroup.NON_ENGLISH)
         return groups
 
@@ -484,6 +483,8 @@ def _impact_section(
     lines: list[str] = []
     for group, label in IMPACT_GROUP_LABELS.items():
         impacts = [i for i in data.impacts if group in i.groups()]
+        if not impacts:
+            continue
         lines += [
             f"### {label}",
             "",
