@@ -25,6 +25,8 @@ Enregistrements sources au dernier auteur différent de celui de la majorité : 
 - WoS compte comme auteur un collectif abrégé, « FACE BD Grp » (6523). Les mots de collectif (`domain/persons/collective_names.py`) omettent les abréviations WoS `Grp` et `Collaborat`, présentes dans 13 contributions sources.
 - Dans 60 cas, les listes plus courtes se réduisent au premier auteur.
 
+Dans 120 publications, la liste HAL continue après sa dernière contribution source présente dans une autre source, scanR mis à part. Ces fins de liste comptent 3 705 contributions sources, dont 1 130 au rôle `ctb` et 3 531 sans personne. Une même personne figure dans 7 de ces fins de liste au plus.
+
 Crossref donne une liste pour 21 947 publications (70,5 %). Son dernier auteur est celui de la règle à listes plus courtes écartées dans 21 314 cas. La règle trouve un désaccord dans 386 cas. Crossref donne un autre dernier auteur dans 247 cas, toujours avec une liste plus courte que la plus longue. La règle trouve un dernier auteur pour 9 112 publications sans liste Crossref.
 
 ## Décisions
@@ -40,7 +42,7 @@ Crossref donne une liste pour 21 947 publications (70,5 %). Son dernier auteur e
 
 ### Phase 1 — Collectifs abrégés
 
-- [ ] Abréviations `grp` et `collaborat` dans les mots de collectif. Script ponctuel ciblé pour les contributions sources existantes.
+- [x] Abréviations `grp` et `collaborat` dans les mots de collectif. Script ponctuel `mark_collective_source_contributions` pour les contributions sources existantes. 2bf85b364
 
 ### Phase 2 — Positions des contributions
 
