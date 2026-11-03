@@ -148,7 +148,6 @@ def insert_scanr_staging(conn, docs):
             source_id=doc["scanr_id"],
             doi=doc["doi"],
             raw_data=doc["raw_data"],
-            processed=False,
             replace=True,
         )
 

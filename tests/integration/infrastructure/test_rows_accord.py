@@ -55,7 +55,6 @@ class TestRelevesRendantUneListe:
 
     def test_les_lignes_de_staging_s_accordent(self, sa_sync_conn_owner):
         store = StagingStore(sa_sync_conn_owner)
-        assert store.fetch_pending_staging("hal", limit=1) == []
         assert store.fetch_staging_by_ids([1]) == []
 
     def test_les_contributions_sources_a_grouper_s_accordent(self, sa_sync_conn_owner):

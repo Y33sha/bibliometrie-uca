@@ -40,26 +40,18 @@ def _row(label: str) -> StagingRow:
 
 
 class _FakeStaging:
-    """Stub minimal du port `StagingStore`."""
+    """Stub minimal du port `StagingStore` : la file contient `pending_rows`, et retient les lignes retirées."""
 
     def __init__(self) -> None:
-        self.count_returns = 0
         self.pending_rows: list[StagingRow] = []
-        self.batch_ids: list[int] = []
         self.batch_id_rows: dict[tuple[int, ...], list[StagingRow]] = {}
+        self.forgotten: list[int] = []
 
-    def count_pending_staging(self, source: str) -> int:
-        return self.count_returns
-
-    def fetch_pending_staging(self, source: str, *, limit: int) -> list[StagingRow]:
-        return self.pending_rows[:limit]
-
-    def fetch_pending_staging_ids(self, source: str) -> list[int]:
-        # Le test dédié à `FETCH_SUB_BATCH` peuple `batch_ids` directement.
-        # Pour les autres tests qui peuplent `pending_rows`, on dérive les ids.
-        if self.batch_ids:
-            return self.batch_ids
+    def snapshot_pending(self, source: str) -> list[int]:
         return [r.id for r in self.pending_rows]
+
+    def forget_normalized(self, ids: list[int]) -> None:
+        self.forgotten.extend(ids)
 
     def fetch_staging_by_ids(self, ids: list[int]) -> list[StagingRow]:
         if self.batch_id_rows:
@@ -132,7 +124,6 @@ class TestRunNoWork:
     def test_nothing_to_do(self, caplog):
         """Une source sans document en attente laisse le journal vide : la barre des autres sources reste lisible."""
         staging = _FakeStaging()
-        staging.count_returns = 0
         norm = _Norm(staging)
         with caplog.at_level(logging.INFO):
             norm.run()
@@ -144,7 +135,6 @@ class TestRunNoWork:
 class TestRunHappyPath:
     def test_processes_all_rows(self):
         staging = _FakeStaging()
-        staging.count_returns = 3
         staging.pending_rows = [_row("r1"), _row("r2"), _row("r3")]
         norm = _Norm(staging, results=[True, True, True])
         norm.run()
@@ -155,7 +145,6 @@ class TestRunHappyPath:
     def test_mixes_success_skip_error(self, caplog):
         """`True` → processed, `None` → skipped, `False` → errors, récapitulé par son identifiant."""
         staging = _FakeStaging()
-        staging.count_returns = 3
         staging.pending_rows = [_row("ok"), _row("skip"), _row("err")]
         norm = _Norm(staging, results=[True, None, False])
         with caplog.at_level(logging.INFO):
@@ -166,7 +155,6 @@ class TestRunHappyPath:
 
     def test_sans_document_incomplet_aucun_recapitulatif(self, caplog):
         staging = _FakeStaging()
-        staging.count_returns = 2
         staging.pending_rows = [_row("ok"), _row("skip")]
         norm = _Norm(staging, results=[True, None])
         with caplog.at_level(logging.INFO):
@@ -176,16 +164,15 @@ class TestRunHappyPath:
     def test_le_commit_tombe_a_chaque_lot(self):
         """Avec DEFAULT_BATCH_SIZE=2 sur quatre documents : deux commits de lot, plus celui de fin."""
         staging = _FakeStaging()
-        staging.count_returns = 4
         staging.pending_rows = [_row(s) for s in ("a", "b", "c", "d")]
         norm = _Norm(staging, results=[True, True, True, True])
         norm.run()
         assert norm.conn.commit.call_count == 3
+        assert staging.forgotten == [r.id for r in staging.pending_rows]
 
     def test_un_run_sans_erreur_se_tait(self, caplog):
         """La barre affiche l'avancement ; le compte des documents ignorés passe par les métriques."""
         staging = _FakeStaging()
-        staging.count_returns = 2
         staging.pending_rows = [_row("a"), _row("b")]
         norm = _Norm(staging, results=[True, None])
         with caplog.at_level(logging.INFO):
@@ -197,7 +184,6 @@ class TestRunHappyPath:
 class TestRunWorkException:
     def test_savepoint_rollback_continues_batch(self, caplog):
         staging = _FakeStaging()
-        staging.count_returns = 2
         staging.pending_rows = [_row("a"), _row("b")]
         norm = _Norm(staging, results=[True, True], raises_on={"a"})
         with caplog.at_level(logging.INFO):
@@ -208,12 +194,13 @@ class TestRunWorkException:
         assert "b" in [r.source_id for r in norm.processed_rows]
         # Une exception est journalisée avec son motif, distincte d'un document incomplet.
         assert "métadonnées incomplètes" not in caplog.text
+        # Le document en échec reste en file pour le run suivant.
+        assert staging.forgotten == [_row("b").id]
 
 
 class TestRunKeyboardInterrupt:
     def test_rollback_and_reraise(self, caplog):
         staging = _FakeStaging()
-        staging.count_returns = 1
         staging.pending_rows = [_row("a")]
 
         class _Kb(_Norm):
@@ -230,7 +217,6 @@ class TestRunKeyboardInterrupt:
     def test_connexion_invalidee_laisse_remonter_l_interruption(self):
         """Un Ctrl+C en pleine requête invalide la connexion : son `rollback()` lèverait `PendingRollbackError` à la place du `KeyboardInterrupt`."""
         staging = _FakeStaging()
-        staging.count_returns = 1
         staging.pending_rows = [_row("a")]
 
         class _Kb(_Norm):
@@ -247,7 +233,6 @@ class TestRunFatalException:
     def test_rollback_and_reraise(self, caplog):
         """Une exception de `preload_caches`, avant la boucle, est fatale : rollback, journalisation, exception relevée."""
         staging = _FakeStaging()
-        staging.count_returns = 1
         staging.pending_rows = [_row("a")]
 
         class _Fatal(_Norm):
@@ -269,11 +254,10 @@ class TestIterRowsSubBatch:
             FETCH_SUB_BATCH = 2
 
         staging = _FakeStaging()
-        staging.batch_ids = [10, 20, 30]
         a, b, c = _row("a"), _row("b"), _row("c")
         staging.batch_id_rows = {(10, 20): [a, b], (30,): [c]}
         norm = _SubBatch(staging)
-        rows = list(norm._iter_rows())
+        rows = list(norm._iter_rows([10, 20, 30]))
         assert rows == [a, b, c]
 
 
@@ -298,7 +282,7 @@ class TestProcessWorkMinimalMetadata:
         norm = _MinimalNorm(staging)
         row = StagingRow(id=1, source_id="a", doi=None, raw_data={})
         assert norm.process_work(row) is None
-        staging.mark_done.assert_called_once()
+        staging.clear_payload.assert_not_called()
         staging.discard_source_record.assert_not_called()
 
     def test_enregistrement_source_sans_annee_ecarte_et_supprime(self):
@@ -308,7 +292,7 @@ class TestProcessWorkMinimalMetadata:
         row = StagingRow(id=7, source_id="W3131333980", doi=None, raw_data={"title": "T"})
         assert norm.process_work(row) is False
         staging.discard_source_record.assert_called_once_with(7)
-        staging.mark_done.assert_called_once_with(7)
+        staging.clear_payload.assert_called_once_with(row)
         assert norm.normalized == []
 
     def test_enregistrement_source_refuse_par_la_source(self):
@@ -319,7 +303,7 @@ class TestProcessWorkMinimalMetadata:
         row = StagingRow(id=3, source_id="c", doi=None, raw_data={"title": "T", "year": 2020})
         assert norm.process_work(row) is False
         staging.discard_source_record.assert_called_once_with(3)
-        staging.mark_done.assert_called_once_with(3)
+        staging.clear_payload.assert_called_once_with(row)
 
     def test_enregistrement_source_au_titre_trop_long_ecarte(self):
         """OpenAlex donne pour titre de W7223893444 le programme d'un congrès, d'environ 5 000 caractères."""
@@ -412,7 +396,7 @@ class TestNormalizeRecord:
         assert norm.normalize_record(self.ROW) is False
         assert writes == []
         norm._record_store.upsert_source_record.assert_not_called()
-        norm._staging.mark_done.assert_not_called()
+        norm._staging.clear_payload.assert_not_called()
 
     def test_enregistrement_avec_editeur_et_serie_decrits_puis_contributions(self, writes):
         norm = _WritingNorm(
@@ -436,7 +420,7 @@ class TestNormalizeRecord:
         )
         norm._location_store.replace_locations.assert_called_once_with(42, [])
         norm._embargo_store.replace_embargo.assert_called_once_with(42, None)
-        norm._staging.mark_done.assert_called_once_with(1)
+        norm._staging.clear_payload.assert_called_once_with(self.ROW)
 
     def test_sans_editeur_ni_conteneur(self, writes):
         norm = _WritingNorm(doc={"title": "T"})

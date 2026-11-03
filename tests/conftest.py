@@ -33,7 +33,7 @@ def pytest_configure(config):
 def _isolate_raw_store(tmp_path_factory):
     """Dirige le raw store vers un répertoire temporaire de la session pytest.
 
-    `StagingStore.mark_done` archive chaque payload dans le raw store, par défaut `data/raw_store`.
+    `StagingStore.clear_payload` archive chaque payload dans le raw store, par défaut `data/raw_store`.
     """
     from infrastructure.settings import settings
 

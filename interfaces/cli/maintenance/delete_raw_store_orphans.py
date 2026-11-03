@@ -1,7 +1,7 @@
 # STATUS: maintenance
 """Supprime les payloads orphelins d'un raw store : fichiers dont le `source_id` est absent de `staging`.
 
-Le raw store grossit seulement : `mark_done` y écrit sans jamais supprimer. Au fil des imports, des changements d'identifiants et des purges de `staging`, des payloads y restent sans ligne `staging`. Le script confronte chaque clé du store aux `source_id` de `staging`, source par source, et supprime les clés absentes. La base reste la référence : un payload supprimé du store est archivé de nouveau à la prochaine normalisation, s'il revient dans `staging`.
+Le raw store grossit seulement : `clear_payload` y écrit sans jamais supprimer. Au fil des imports, des changements d'identifiants et des purges de `staging`, des payloads y restent sans ligne `staging`. Le script confronte chaque clé du store aux `source_id` de `staging`, source par source, et supprime les clés absentes. La base reste la référence : un payload supprimé du store est archivé de nouveau à la prochaine normalisation, s'il revient dans `staging`.
 
 Le store élagué est celui de la configuration (`BIBLIO_RAW_STORE_DIR`). `--root` en désigne un autre, par exemple une copie hors ligne.
 

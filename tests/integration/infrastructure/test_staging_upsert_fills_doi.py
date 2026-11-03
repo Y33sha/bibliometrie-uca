@@ -10,7 +10,7 @@ from tests.integration.helpers.staging import insert_staging
 
 
 def _insert_existing(conn, source_id, doi):
-    insert_staging(conn, source_id=source_id, doi=doi, processed=True, raw_hash="oldhash")
+    insert_staging(conn, source_id=source_id, doi=doi, queued=False, raw_hash="oldhash")
 
 
 def _staging_doi(conn, source_id):

@@ -5,8 +5,10 @@ import logging
 
 from sqlalchemy import Connection, text
 
+from infrastructure.db.queues import Queue
 from pipeline.ingestion.common.normalize import normalizer_builders
 from pipeline.ingestion.common.staging import StagingStore
+from tests.integration.helpers.queues import mark
 
 
 def insert_staging(
@@ -16,7 +18,7 @@ def insert_staging(
     source_id: str,
     raw_data: object = None,
     doi: str | None = None,
-    processed: bool | None = None,
+    queued: bool = True,
     raw_hash: str | None = None,
     seen_days_ago: int | None = None,
     disappeared: bool = False,
@@ -24,14 +26,13 @@ def insert_staging(
 ) -> int:
     """Insère une ligne de staging et renvoie son `id`.
 
-    `raw_data` vaut `{}` par défaut. `seen_days_ago` recule `last_seen_at` d'autant de jours avant l'instant de la transaction ; `disappeared` date la disparition de cet instant. Une colonne laissée à `None` prend la valeur par défaut du schéma. Sur une ligne (source, source_id) existante, `replace` remplace son contenu et la remet à traiter.
+    `raw_data` vaut `{}` par défaut. `queued` met la ligne en file de normalisation, comme un document moissonné. `seen_days_ago` recule `last_seen_at` d'autant de jours avant l'instant de la transaction ; `disappeared` date la disparition de cet instant. Une colonne laissée à `None` prend la valeur par défaut du schéma. `replace` réécrit le contenu d'une ligne (source, source_id) existante.
     """
     values = {
         "source": source,
         "source_id": source_id,
         "doi": doi,
         "raw_data": json.dumps(raw_data if raw_data is not None else {}),
-        "processed": processed,
         "raw_hash": raw_hash,
     }
     expressions = {
@@ -51,17 +52,20 @@ def insert_staging(
     columns += [column for column in expressions if column not in values]
     placeholders = [expressions.get(column, f":{column}") for column in columns]
     conflict = (
-        " ON CONFLICT (source, source_id) DO UPDATE SET processed = FALSE, raw_data = EXCLUDED.raw_data"
+        " ON CONFLICT (source, source_id) DO UPDATE SET raw_data = EXCLUDED.raw_data"
         if replace
         else ""
     )
-    return conn.execute(
+    staging_id = conn.execute(
         text(
             f"INSERT INTO staging ({', '.join(columns)}) VALUES ({', '.join(placeholders)})"
             f"{conflict} RETURNING id"
         ),
         {column: value for column, value in values.items() if value is not None},
     ).scalar_one()
+    if queued:
+        mark(conn, Queue.STAGING_NORMALIZATION, [staging_id])
+    return staging_id
 
 
 def insert_failed_lookup(
@@ -84,7 +88,10 @@ def insert_failed_lookup(
 
 
 def normalize_pending(conn: Connection, source: str) -> int:
-    """Normalise les lignes de staging à traiter de `source`, avec le normaliseur de la phase, dans la transaction du test. Renvoie le nombre d'enregistrements sources normalisés."""
+    """Normalise les lignes de `source` en file, avec le normaliseur de la phase, dans la transaction du test, puis les retire de la file. Renvoie le nombre d'enregistrements sources normalisés."""
     normalizer = normalizer_builders(archive=False)[source](conn, logging.getLogger("test"))
-    rows = StagingStore(conn).fetch_pending_staging(source, limit=10_000)
-    return sum(1 for row in rows if normalizer.process_work(row))
+    store = StagingStore(conn)
+    ids = store.snapshot_pending(source)
+    normalized = sum(1 for row in store.fetch_staging_by_ids(ids) if normalizer.process_work(row))
+    store.forget_normalized(ids)
+    return normalized

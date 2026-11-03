@@ -60,7 +60,7 @@ _PHASE_IO: dict[str, _PhaseIo] = {
             "source_records.publication_id",
             "publications.in_perimeter",
         ),
-        writes=("staging", "failed_lookups"),
+        writes=("staging", "staging_normalization_queue", "failed_lookups"),
         previous_run=(
             "staging",
             "failed_lookups",
@@ -185,7 +185,7 @@ TASKS: tuple[Task, ...] = (
                 "staging",
                 "pipeline_phase_executions",
             ),
-            writes=("staging",),
+            writes=("staging", "staging_normalization_queue"),
             previous_run=("staging", "pipeline_phase_executions"),
             network=source,
             parallel_group="harvest",
@@ -198,7 +198,7 @@ TASKS: tuple[Task, ...] = (
             f"harvest_by_person.{source}",
             "harvest_by_person",
             reads=("config", "hr_records", "person_identifiers", "staging"),
-            writes=("staging",),
+            writes=("staging", "staging_normalization_queue"),
             previous_run=("staging", "person_identifiers"),
             network=source,
             parallel_group="harvest_by_person",
@@ -254,7 +254,7 @@ TASKS: tuple[Task, ...] = (
             f"fetch_stale.{source}",
             "fetch_stale",
             reads=("config", "staging", "source_records.publication_year"),
-            writes=("staging",),
+            writes=("staging", "staging_normalization_queue"),
             previous_run=("staging", "source_records"),
             network=source,
             parallel_group="fetch_stale",
@@ -265,7 +265,7 @@ TASKS: tuple[Task, ...] = (
         "fetch_truncated.refetch_openalex",
         "fetch_truncated",
         reads=("staging",),
-        writes=("staging",),
+        writes=("staging", "staging_normalization_queue"),
         previous_run=("staging",),
         network="openalex",
     ),
@@ -275,6 +275,7 @@ TASKS: tuple[Task, ...] = (
             "normalize",
             reads=(
                 "staging",
+                "staging_normalization_queue",
                 "source_records.id",
                 "source_records.authors_hash",
                 "source_records.publication_id",
@@ -291,7 +292,7 @@ TASKS: tuple[Task, ...] = (
                 "aligned_source_contributions",
             ),
             writes=(
-                "staging.processed",
+                "staging_normalization_queue",
                 "staging.raw_data",
                 "source_records",
                 "source_record_identifiers",
@@ -313,9 +314,10 @@ TASKS: tuple[Task, ...] = (
                 "source_record_keys_queue",
                 "contribution_attributes_queue",
             ),
-            # Ses propres lignes de `staging`, enregistrements sources et contributions sources ; les contributions écrites par `author_grouping`.
+            # Ses propres lignes de `staging`, de la file de normalisation, enregistrements sources et contributions sources ; les contributions écrites par `author_grouping`.
             previous_run=(
                 "staging",
+                "staging_normalization_queue",
                 "source_records",
                 "source_record_locations",
                 "embargoes",

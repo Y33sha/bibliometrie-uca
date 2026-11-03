@@ -1,9 +1,9 @@
 # STATUS: maintenance
 """Réhydrate `staging.raw_data` depuis le raw store, pour normaliser de nouveau une source.
 
-Opération inverse de `StagingStore.mark_done` (`pipeline/ingestion/common/staging.py`), qui archive le payload au raw store, vide `staging.raw_data` et marque la ligne traitée. Une source normalisée garde son payload brut seulement dans le raw store ; ce script le remet en base pour rejouer la normalisation.
+Opération inverse de `StagingStore.clear_payload` (`pipeline/ingestion/common/staging.py`), qui archive le payload au raw store et vide `staging.raw_data`. Une source normalisée garde son payload brut seulement dans le raw store ; ce script le remet en base pour rejouer la normalisation.
 
-Pour chaque source demandée, le script parcourt les clés du raw store (`data/raw_store/{source}/{source_id}.json.gz`), lit chaque payload et réhydrate la ligne `(source, source_id)` : `raw_data` reçoit le payload, `raw_hash` son empreinte (`change_detection_hash`, celle du moissonnage), et la ligne repasse à normaliser.
+Pour chaque source demandée, le script parcourt les clés du raw store (`data/raw_store/{source}/{source_id}.json.gz`), lit chaque payload et réhydrate la ligne `(source, source_id)` : `raw_data` reçoit le payload, `raw_hash` son empreinte (`change_detection_hash`, celle du moissonnage), et la ligne entre en file de normalisation.
 
 Modes :
 
@@ -36,6 +36,7 @@ from sqlalchemy import Connection, bindparam, text
 from domain.sources.registry import Source
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.jsonb import Jsonb
+from infrastructure.db.queues import Queue, enqueue_sql
 from infrastructure.observability.log import setup_logger
 from infrastructure.raw_store import UnreadablePayloadError, get_raw_store
 from pipeline.ingestion.adapters import ADAPTERS
@@ -48,42 +49,48 @@ from domain.types import JsonValue
 _COMMIT_BATCH = 500
 
 _REHYDRATE_UPDATE_SQL = text(
-    """
-    UPDATE staging
-    SET raw_data = :raw_data, raw_hash = :raw_hash, processed = FALSE
-    WHERE source = :source AND source_id = :source_id
-    """
+    f"""
+    WITH rehydrated AS (
+        UPDATE staging
+        SET raw_data = :raw_data, raw_hash = :raw_hash
+        WHERE source = :source AND source_id = :source_id
+        RETURNING id
+    ),
+    marked AS ({enqueue_sql(Queue.STAGING_NORMALIZATION, "SELECT id FROM rehydrated")})
+    SELECT count(*) FROM rehydrated
+    """  # noqa: S608 — nom de file venu du code
 ).bindparams(bindparam("raw_data", type_=Jsonb))
 
 _REHYDRATE_UPSERT_SQL = text(
-    """
-    INSERT INTO staging (source, source_id, doi, raw_data, raw_hash, processed)
-    VALUES (:source, :source_id, :doi, :raw_data, :raw_hash, FALSE)
-    ON CONFLICT (source, source_id) DO UPDATE SET
-        raw_data = EXCLUDED.raw_data,
-        raw_hash = EXCLUDED.raw_hash,
-        processed = FALSE
-    RETURNING (xmax = 0) AS inserted
-    """
+    f"""
+    WITH rehydrated AS (
+        INSERT INTO staging (source, source_id, doi, raw_data, raw_hash)
+        VALUES (:source, :source_id, :doi, :raw_data, :raw_hash)
+        ON CONFLICT (source, source_id) DO UPDATE SET
+            raw_data = EXCLUDED.raw_data,
+            raw_hash = EXCLUDED.raw_hash
+        RETURNING id, (xmax = 0) AS inserted
+    ),
+    marked AS ({enqueue_sql(Queue.STAGING_NORMALIZATION, "SELECT id FROM rehydrated")})
+    SELECT inserted FROM rehydrated
+    """  # noqa: S608 — nom de file venu du code
 ).bindparams(bindparam("raw_data", type_=Jsonb))
 
 
 def rehydrate_staging_row(
     conn: Connection, source: str, source_id: str, raw_data: Mapping[str, JsonValue]
 ) -> bool:
-    """Remet un payload archivé dans une ligne `staging` existante, prête à normaliser : `raw_data`, `raw_hash` (`change_detection_hash`) et état à traiter. Renvoie faux si la ligne est absente (clé orpheline du raw store)."""
-    return (
-        conn.execute(
-            _REHYDRATE_UPDATE_SQL,
-            {
-                "raw_data": raw_data,
-                "raw_hash": change_detection_hash(source, raw_data),
-                "source": source,
-                "source_id": source_id,
-            },
-        ).rowcount
-        > 0
-    )
+    """Remet un payload archivé dans une ligne `staging` existante, avec son empreinte (`change_detection_hash`), et met la ligne en file de normalisation. Renvoie faux si la ligne est absente (clé orpheline du raw store)."""
+    rehydrated: int = conn.execute(
+        _REHYDRATE_UPDATE_SQL,
+        {
+            "raw_data": raw_data,
+            "raw_hash": change_detection_hash(source, raw_data),
+            "source": source,
+            "source_id": source_id,
+        },
+    ).scalar_one()
+    return rehydrated > 0
 
 
 def rehydrate_or_create_staging_row(
@@ -218,7 +225,7 @@ def main() -> None:
             conn.commit()
             if args.full:
                 log.info(
-                    "%s : %d insérés, %d mis à jour (processed=FALSE), %d illisibles",
+                    "%s : %d insérés, %d mis à jour, tous en file de normalisation, %d illisibles",
                     source,
                     inserted,
                     updated,
@@ -226,7 +233,7 @@ def main() -> None:
                 )
             else:
                 log.info(
-                    "%s : %d mis à jour (processed=FALSE), %d orphelins ignorés, %d illisibles",
+                    "%s : %d mis à jour et en file de normalisation, %d orphelins ignorés, %d illisibles",
                     source,
                     updated,
                     orphans,

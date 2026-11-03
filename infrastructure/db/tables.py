@@ -1646,7 +1646,6 @@ staging = Table(
     Column("source_id", Text, nullable=False),
     Column("doi", Text),
     Column("raw_data", Jsonb, nullable=False),
-    Column("processed", Boolean, server_default="false"),
     Column("imported_at", DateTime(timezone=True), server_default=func.now()),
     Column(
         "raw_hash",
@@ -1677,9 +1676,8 @@ staging = Table(
         name="staging_entry_mode_check",
     ),
     comment=(
-        "Documents moissonnés, en transit vers les tables sources. Deux états : à traiter "
-        "(processed FALSE, raw_data porte le payload de la source), normalisée (processed "
-        "TRUE, raw_data vidé)."
+        "Documents moissonnés, en transit vers les tables sources. Une ligne à normaliser est "
+        "dans queues.staging_normalization_queue ; la normalisation vide raw_data."
     ),
     schema="sources",
 )
@@ -1876,6 +1874,7 @@ publication_contributions_queue = _queue("publication_contributions_queue")
 source_record_keys_queue = _queue("source_record_keys_queue")
 contribution_attributes_queue = _queue("contribution_attributes_queue")
 contribution_resolution_queue = _queue("contribution_resolution_queue")
+staging_normalization_queue = _queue("staging_normalization_queue")
 
 
 # `subject_labels` (vue matérialisée) : sujets regroupés par libellé normalisé, tous vocabulaires confondus, avec leur nombre de publications.

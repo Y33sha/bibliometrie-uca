@@ -2,18 +2,20 @@
 
 Crossref est moissonné par DOI (`fetch_missing_doi`), puis normalisé en enregistrements sources et contributions sources. Les affiliations textuelles deviennent des adresses (`addresses`, `source_contribution_addresses`), d'où la phase `affiliations` tire les indices de périmètre des contributions sources Crossref.
 
-Le module vérifie qu'une seconde normalisation laisse les comptes inchangés, liens aux adresses compris, et qu'un document sans contenu, sans DOI, ou sans titre ni année est marqué traité sans insertion.
+Le module vérifie qu'une seconde normalisation laisse les comptes inchangés, liens aux adresses compris, et qu'un document sans contenu, sans DOI, ou sans titre ni année sort de la file sans insertion.
 """
 
 from __future__ import annotations
 
 from functools import partial
 
+from infrastructure.db.queues import Queue
 from tests.integration.helpers.publications_phase import create_all_publications
+from tests.integration.helpers.queues import queued
 from tests.integration.helpers.staging import insert_staging, normalize_pending
 
 # Ligne de staging Crossref à traiter.
-_crossref_staging = partial(insert_staging, source="crossref", processed=False)
+_crossref_staging = partial(insert_staging, source="crossref")
 
 CROSSREF_STAGING_DOCS = [
     {
@@ -72,7 +74,6 @@ def _insert_crossref_staging(conn, docs):
             source_id=doc["source_id"],
             doi=doc["doi"],
             raw_data=doc["raw_data"],
-            processed=False,
             replace=True,
         )
 
@@ -179,43 +180,28 @@ class TestNormalizeCrossrefIdempotence:
 
 class TestNormalizeCrossrefSkipBranches:
     def test_skips_when_raw_data_empty(self, sa_sync_conn):
-        # `raw_data` vide : rien d'inséré, ligne marquée traitée.
-        from sqlalchemy import text
-
-        _crossref_staging(sa_sync_conn, source_id="10.9999/cr-empty", doi="10.9999/cr-empty")
+        # `raw_data` vide : rien d'inséré, ligne retirée de la file.
+        staging_id = _crossref_staging(
+            sa_sync_conn, source_id="10.9999/cr-empty", doi="10.9999/cr-empty"
+        )
 
         processed = _run_normalize_crossref(sa_sync_conn)
         assert processed == 0
-        # Marquée traitée, la ligne est laissée de côté au passage suivant.
-        row = sa_sync_conn.execute(
-            text(
-                "SELECT processed FROM staging WHERE source = 'crossref' "
-                "AND source_id = '10.9999/cr-empty'"
-            )
-        ).one()
-        assert row.processed is True
+        assert staging_id not in queued(sa_sync_conn, Queue.STAGING_NORMALIZATION)
 
     def test_skips_when_no_doi(self, sa_sync_conn):
-        # `raw_data` sans DOI : rien d'inséré, ligne marquée traitée.
-        from sqlalchemy import text
-
-        _crossref_staging(sa_sync_conn, source_id="no-doi-001", raw_data={"title": ["Untitled"]})
+        # `raw_data` sans DOI : rien d'inséré, ligne retirée de la file.
+        staging_id = _crossref_staging(
+            sa_sync_conn, source_id="no-doi-001", raw_data={"title": ["Untitled"]}
+        )
 
         processed = _run_normalize_crossref(sa_sync_conn)
         assert processed == 0
-        row = sa_sync_conn.execute(
-            text(
-                "SELECT processed FROM staging WHERE source = 'crossref' "
-                "AND source_id = 'no-doi-001'"
-            )
-        ).one()
-        assert row.processed is True
+        assert staging_id not in queued(sa_sync_conn, Queue.STAGING_NORMALIZATION)
 
     def test_skips_when_no_title_or_year(self, sa_sync_conn):
-        # `raw_data` avec DOI, sans titre ni année : rien d'inséré.
-        from sqlalchemy import text
-
-        _crossref_staging(
+        # `raw_data` avec DOI, sans titre ni année : rien d'inséré, ligne retirée de la file.
+        staging_id = _crossref_staging(
             sa_sync_conn,
             source_id="10.9999/no-title",
             doi="10.9999/no-title",
@@ -224,10 +210,4 @@ class TestNormalizeCrossrefSkipBranches:
 
         processed = _run_normalize_crossref(sa_sync_conn)
         assert processed == 0
-        row = sa_sync_conn.execute(
-            text(
-                "SELECT processed FROM staging WHERE source = 'crossref' "
-                "AND source_id = '10.9999/no-title'"
-            )
-        ).one()
-        assert row.processed is True
+        assert staging_id not in queued(sa_sync_conn, Queue.STAGING_NORMALIZATION)

@@ -202,7 +202,7 @@ class SourceNormalizer(ABC):
             self.author_block(doc),
             self.author_records,
         )
-        self._staging.mark_done(row.id)
+        self._staging.clear_payload(row)
         return True
 
     def process_work(self, row: StagingRow) -> bool | None:
@@ -211,7 +211,6 @@ class SourceNormalizer(ABC):
         Un document sans titre, sans année, au titre trop long (`is_overlong_title`) ou refusé par la source ne fonde aucune publication (`_reject`).
         """
         if not row.raw_data:
-            self._staging.mark_done(row.id)
             return None
         title, publication_year = self.minimal_metadata(row)
         if not has_minimal_publication_metadata(title, publication_year) or is_overlong_title(
@@ -224,9 +223,9 @@ class SourceNormalizer(ABC):
         return result
 
     def _reject(self, row: StagingRow) -> bool:
-        """Écarte un document refusé : son enregistrement source est supprimé, sa ligne marquée traitée. Renvoie faux, compté comme document incomplet."""
+        """Écarte un document refusé : son enregistrement source est supprimé, son payload vidé. Renvoie faux, compté comme document incomplet."""
         self._staging.discard_source_record(row.id)
-        self._staging.mark_done(row.id)
+        self._staging.clear_payload(row)
         return False
 
     def preload_caches(self) -> None:  # noqa: B027 (hook optionnel)
@@ -235,12 +234,8 @@ class SourceNormalizer(ABC):
     def cleanup(self) -> None:  # noqa: B027 (hook optionnel)
         """Libère les caches en mémoire, après le dernier commit."""
 
-    def _count_pending(self) -> int:
-        return self._staging.count_pending_staging(self.SOURCE)
-
-    def _iter_rows(self) -> Iterator[StagingRow]:
-        """Itère toutes les lignes à traiter par sous-lots de `FETCH_SUB_BATCH`."""
-        work_ids = self._staging.fetch_pending_staging_ids(self.SOURCE)
+    def _iter_rows(self, work_ids: list[int]) -> Iterator[StagingRow]:
+        """Itère les lignes `work_ids` par sous-lots de `FETCH_SUB_BATCH`."""
         for start in range(0, len(work_ids), self.FETCH_SUB_BATCH):
             batch_ids = work_ids[start : start + self.FETCH_SUB_BATCH]
             yield from self._staging.fetch_staging_by_ids(batch_ids)
@@ -266,15 +261,18 @@ class SourceNormalizer(ABC):
             self.logger.info("%s%s", BRANCH_CONTINUATION, identifier)
 
     def run(self) -> NormalizeStats:
-        """Normalise les lignes à traiter, avec un commit tous les `DEFAULT_BATCH_SIZE` enregistrements, et renvoie le bilan."""
+        """Normalise les lignes en file, avec un commit tous les `DEFAULT_BATCH_SIZE` enregistrements, et renvoie le bilan.
+
+        Chaque commit retire de la file les lignes traitées depuis le précédent. Une ligne en erreur reste en file pour le run suivant.
+        """
         self.conn.rollback()
 
         # Préfixe `[source]` sur les lignes de la boucle (progression, bilan) : dans un run multi-sources, chaque batch reste rattaché à sa source sans remonter au bandeau.
         slog = scoped_logger(self.logger, self.SOURCE)
 
         try:
-            total = self._count_pending()
-            if total == 0:
+            work_ids = self._staging.snapshot_pending(self.SOURCE)
+            if not work_ids:
                 return NormalizeStats(0, 0, 0)
 
             self.preload_caches()
@@ -284,9 +282,16 @@ class SourceNormalizer(ABC):
             errors = 0
             # Documents laissés de côté par `process_work` faute de métadonnées exploitables : récapitulés sous la barre en fin de boucle.
             incomplete: list[str] = []
+            # Lignes traitées depuis le dernier commit, à retirer de la file avec lui.
+            done_ids: list[int] = []
 
-            with track_progress(total, source_branch(self.SOURCE), slog) as progress:
-                for row in self._iter_rows():
+            def commit() -> None:
+                self._staging.forget_normalized(done_ids)
+                self.conn.commit()
+                done_ids.clear()
+
+            with track_progress(len(work_ids), source_branch(self.SOURCE), slog) as progress:
+                for row in self._iter_rows(work_ids):
                     progress.advance()
                     try:
                         result = self._process_one(row)
@@ -295,6 +300,7 @@ class SourceNormalizer(ABC):
                         errors += 1
                         continue
 
+                    done_ids.append(row.id)
                     if result is True:
                         processed += 1
                     elif result is None:
@@ -305,9 +311,9 @@ class SourceNormalizer(ABC):
 
                     done = processed + skipped
                     if done > 0 and done % self.DEFAULT_BATCH_SIZE == 0:
-                        self.conn.commit()
+                        commit()
 
-            self.conn.commit()
+            commit()
             self.cleanup()
 
             self._summarize_incomplete(incomplete)

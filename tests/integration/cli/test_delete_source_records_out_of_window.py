@@ -35,7 +35,7 @@ def _source_record_staged(
     publication_year: int,
     doc_type: str | None = None,
 ) -> int:
-    staging_id = insert_staging(conn, source, source_id=source_id, processed=True)
+    staging_id = insert_staging(conn, source, source_id=source_id, queued=False)
     return _source_record(
         conn,
         publication_id,

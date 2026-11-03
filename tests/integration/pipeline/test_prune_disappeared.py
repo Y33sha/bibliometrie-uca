@@ -17,7 +17,7 @@ from tests.integration.helpers.sources import insert_source_contribution, insert
 from tests.integration.helpers.staging import insert_staging
 
 # Ligne de staging HAL traitée.
-_staging = partial(insert_staging, processed=True)
+_staging = partial(insert_staging, queued=False)
 
 # Enregistrement source de titre « Titre », absent de la file de la réconciliation.
 _source_record = partial(insert_source_record, title="Titre", marked=False)
