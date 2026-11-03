@@ -4896,7 +4896,7 @@ export interface components {
         };
         /**
          * PhaseMetricsPayload
-         * @description Compteurs et durée d'une exécution de phase, sous forme JSON.
+         * @description Compteurs et durées d'une exécution de phase, sous forme JSON.
          */
         PhaseMetricsPayload: {
             /** New */
@@ -4915,6 +4915,13 @@ export interface components {
             };
             /** Duration S */
             duration_s: number;
+            /**
+             * Task Durations S
+             * @description Durée de chaque tâche exécutée, par nom de tâche.
+             */
+            task_durations_s?: {
+                [key: string]: number;
+            };
         };
         /**
          * PhaseStatus

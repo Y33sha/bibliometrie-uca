@@ -1,6 +1,6 @@
 """Exécution des tâches d'une phase, dans l'ordre du graphe (`pipeline.graph`).
 
-Une phase fournit un `TaskStep` par tâche. L'exécuteur ouvre la section de la tâche, puis l'exécute. Une tâche réseau passe par l'accès à sa source. L'exécuteur écrit ensuite la ligne de bilan de la tâche et lance sa maintenance.
+Une phase fournit un `TaskStep` par tâche. L'exécuteur ouvre la section de la tâche, puis l'exécute. Une tâche réseau passe par l'accès à sa source. L'exécuteur range ensuite la durée de la tâche dans le contexte, écrit sa ligne de bilan et lance sa maintenance.
 """
 
 from __future__ import annotations
@@ -87,6 +87,7 @@ def run_tasks(
             )
         for index in range(start, end):
             task = selected[index]
+            ctx.task_durations[task.name] = results[task.name].duration_s or 0.0
             next_section = (
                 steps[selected[index + 1].name].section if index + 1 < len(selected) else None
             )

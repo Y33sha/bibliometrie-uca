@@ -1,6 +1,6 @@
 """Contrat commun aux phases du pipeline.
 
-Une phase est un objet construit avec ses ports, exécuté sur le contexte du run : `phase.run(ctx)`. Le contexte regroupe les dépendances communes à toutes les phases. Chaque phase reçoit ses dépendances propres à sa construction.
+Une phase est un objet construit avec ses ports, exécuté sur le contexte du run : `phase.run(ctx)`. Le contexte regroupe les dépendances communes à toutes les phases, et recueille la durée de leurs tâches. Chaque phase reçoit ses dépendances propres à sa construction.
 """
 
 from __future__ import annotations
@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 from contextlib import AbstractContextManager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Protocol
 
 from sqlalchemy import Connection
@@ -63,6 +63,8 @@ class PhaseContext:
     """Lance `VACUUM` et `ANALYZE` sur une table, hors transaction."""
     credentials_missing: CredentialsMissing
     request_budget: RequestBudget
+    task_durations: dict[str, float] = field(default_factory=dict)
+    """Durée en secondes de chaque tâche exécutée, par nom de tâche, écrite par l'exécuteur des tâches (`run_tasks`)."""
 
 
 class Phase(Protocol):

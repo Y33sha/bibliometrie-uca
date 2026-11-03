@@ -14,7 +14,7 @@ def test_recorder_desactive_est_noop():
         phase="normalize",
         started_at=datetime.datetime.now(datetime.UTC),
         status="ok",
-        metrics=PhaseMetrics().to_payload(1.0),
+        metrics=PhaseMetrics().to_payload(1.0, {}),
         signals=[],
         details={},
     )

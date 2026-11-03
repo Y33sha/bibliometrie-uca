@@ -416,14 +416,13 @@ def _run_one_phase(
             log.info("%s", line)
         phase_started_at = datetime.datetime.now(datetime.UTC)
         t0_phase = time.time()
+        ctx = phase_context(
+            _run_options(args, sources),
+            credentials_missing=source_credentials_missing,
+            request_budget=request_budget,
+        )
         try:
-            result = build().run(
-                phase_context(
-                    _run_options(args, sources),
-                    credentials_missing=source_credentials_missing,
-                    request_budget=request_budget,
-                )
-            )
+            result = build().run(ctx)
         except (KeyboardInterrupt, Exception) as e:
             # Une interruption en pleine requête invalide la connexion : le nettoyage suivant lève une erreur SQLAlchemy, et le `KeyboardInterrupt` reste dans la chaîne des exceptions.
             interrupted = is_user_interruption(e)
@@ -443,7 +442,7 @@ def _run_one_phase(
                 phase=name,
                 started_at=phase_started_at,
                 status=PhaseStatus.WARNING if interrupted else PhaseStatus.ERROR,
-                metrics=PhaseMetrics().to_payload(time.time() - t0_phase),
+                metrics=PhaseMetrics().to_payload(time.time() - t0_phase, ctx.task_durations),
                 signals=[
                     {
                         "level": PhaseStatus.WARNING if interrupted else PhaseStatus.ERROR,
@@ -464,7 +463,7 @@ def _run_one_phase(
             phase=name,
             started_at=phase_started_at,
             status=PhaseStatus.WARNING if metrics.signals else PhaseStatus.OK,
-            metrics=metrics.to_payload(duration),
+            metrics=metrics.to_payload(duration, ctx.task_durations),
             signals=metrics.signals,
             details=metrics.details,
         )
