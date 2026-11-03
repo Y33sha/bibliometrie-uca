@@ -231,17 +231,14 @@ def scanr_source_record(  # noqa: C901
 def build_scanr_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecord]:
     """Lit les contributions sources d'un document ScanR.
 
-    - Les identifiants `orcid` et `idref` viennent de `denormalized`, les rôles de `map_role`.
+    - L'IdRef vient de `denormalized`, les rôles de `map_role`. L'ORCID de `denormalized` est ignoré : attribué par le matching interne de ScanR, il est trop peu fiable pour les informations du contributeur.
     - Une affiliation feuille sans `structId` devient une adresse, avec les pays détectés par ScanR dans son texte (`detected_countries`).
     - Une affiliation feuille avec `structId` est une structure HAL de la contribution source : son nom est celui d'une fiche du référentiel HAL, et reste hors des adresses.
     - Le ROR d'une affiliation va sur son adresse, ou sur la contribution source pour une affiliation sans adresse.
     """
     authors = [as_mapping(a) for a in as_sequence(doc.get("authors"))]
     ids_by_position = [
-        contributor_identifiers(
-            orcid=as_str(as_mapping(a.get("denormalized")).get("orcid")),
-            idref=as_str(as_mapping(a.get("denormalized")).get("idref")),
-        )
+        contributor_identifiers(idref=as_str(as_mapping(a.get("denormalized")).get("idref")))
         for a in authors
     ]
 

@@ -73,7 +73,7 @@ class TestBuildScanrAuthorRecords:
     def test_skip_without_full_name(self):
         assert build_scanr_author_records({"authors": [{"role": "author"}]}) == []
 
-    def test_identifiers_and_role(self):
+    def test_idref_et_role_gardes_orcid_ignore(self):
         doc = {
             "authors": [
                 {
@@ -88,7 +88,7 @@ class TestBuildScanrAuthorRecords:
         }
         rec = build_scanr_author_records(doc)[0]
         assert rec.name == ContributorName(raw="Marie Dupont")
-        assert rec.identifiers == {"orcid": "0000-0001-2345-6789", "idref": "123456789"}
+        assert rec.identifiers == {"idref": "123456789"}
         assert rec.roles == ["author"]
 
     def test_affiliation_becomes_address_with_detected_countries(self):
