@@ -27,6 +27,6 @@ Les enregistrements sources se traitent de la liste d'auteurs la plus longue à 
 
 Chaque contribution reprend l'identifiant de la contribution en base avec laquelle elle partage le plus de contributions sources. La personne suit l'identifiant. Une contribution en base sans correspondant est supprimée. Une contribution rattachée entre dans la file de redécision de sa personne (`contribution_resolution_queue`) quand ses contributions sources changent.
 
-La tâche `author_grouping.attributes` recompose les attributs des contributions de la file `contribution_attributes_queue` : `roles`, `is_corresponding` et `perimeter_evidence` sont l'union de ceux des contributions sources alignées.
+La tâche `author_grouping.attributes` recompose les attributs des contributions de la file `contribution_attributes_queue`. `roles` et `perimeter_evidence` sont l'union de ceux des contributions sources alignées. `author_positions` réunit les positions d'auteur. Une contribution est correspondante si une de ses contributions sources l'est. Les listes d'auteurs de la publication votent pour le premier et le dernier auteur, à la majorité. Les listes tronquées votent seulement pour le premier auteur.
 
 La vue matérialisée `publication_author_alignment` mesure le recouvrement des listes d'auteurs de chaque publication. Elle sert l'onglet des fusions suspectes de l'administration.

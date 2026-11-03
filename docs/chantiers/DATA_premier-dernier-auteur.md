@@ -77,4 +77,4 @@ Une liste d'un seul auteur plus courte que la plus longue contient le premier au
 
 ### Phase 4 — Documentation
 
-- [ ] Positions d'auteur dans la documentation des contributions.
+- [x] Positions d'auteur dans la documentation des contributions.
