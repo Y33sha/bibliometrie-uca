@@ -182,6 +182,7 @@ _FACTS: dict[str, str] = {
     "doc_type": "sr.doc_type",
     "serial_id": "sr.serial_id",
     "serial_type": "j.serial_type::text",
+    "serial_title": "j.title",
     "urls": "sr.urls",
     "self_declared_preprint": self_declared_preprint_sql(),
     "declares_conference": declares_conference_sql(),

@@ -43,7 +43,12 @@ type SqlRow = Row[tuple[object, ...]]
 OA_RATE_TYPES = (DocType.ARTICLE, DocType.REVIEW, DocType.LETTER, DocType.CONFERENCE_PAPER)
 # Types parus dans une revue, pour les modèles de revues et les APC.
 SERIAL_TYPES = (DocType.ARTICLE, DocType.REVIEW, DocType.LETTER, DocType.EDITORIAL)
-CONFERENCE_TYPES = (DocType.CONFERENCE, DocType.CONFERENCE_PAPER, DocType.POSTER)
+CONFERENCE_TYPES = (
+    DocType.CONFERENCE,
+    DocType.CONFERENCE_ABSTRACT,
+    DocType.CONFERENCE_PAPER,
+    DocType.POSTER,
+)
 OPEN_STATUSES = (OaStatus.DIAMOND, OaStatus.GOLD, OaStatus.HYBRID, OaStatus.BRONZE, OaStatus.GREEN)
 
 DOC_TYPE_LABELS = {
@@ -51,6 +56,7 @@ DOC_TYPE_LABELS = {
     DocType.REVIEW: "Revue de littérature (review)",
     DocType.CONFERENCE_PAPER: "Texte publié dans des actes",
     DocType.CONFERENCE: "Communication sans texte publié",
+    DocType.CONFERENCE_ABSTRACT: "Résumé de conférence",
     DocType.RECORDED_TALK: "Conférence filmée",
     DocType.POSTER: "Poster",
     DocType.EDITORIAL: "Éditorial",

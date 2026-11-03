@@ -1,4 +1,4 @@
-"""Arbitrage entre communication sans texte publié, résumés compris (`conference`), et texte publié dans des actes (`conference_paper`), sur l'ensemble des enregistrements sources d'une publication."""
+"""Arbitrage entre communication sans texte publié (`conference`), résumé publié (`conference_abstract`), poster et texte publié dans des actes (`conference_paper`), sur l'ensemble des enregistrements sources d'une publication."""
 
 import re
 
@@ -9,10 +9,13 @@ from domain.source_records.source_extras import SourceExtra, declares_conference
 from domain.source_records.source_record import SourceRecord
 from domain.types import as_str, as_strs
 
-# Types supplantés par une source désignant explicitement une communication : Crossref dépose un résumé en revue comme `journal-article` et un résumé de réunion comme `posted-content`.
+# Types supplantés par une source désignant explicitement une communication ou un résumé : Crossref dépose un résumé en revue comme `journal-article` et un résumé de réunion comme `posted-content`.
 _SUPPLANTED_BY_CONFERENCE = frozenset(
     {DocType.ARTICLE, DocType.CONFERENCE_PAPER, DocType.PREPRINT, DocType.CONFERENCE}
 )
+
+# Types supplantés par un poster déclaré par une source.
+_SUPPLANTED_BY_POSTER = frozenset({DocType.CONFERENCE, DocType.CONFERENCE_ABSTRACT})
 
 # Titre d'un recueil de résumés : « Book of abstracts », « Recueil des résumés », « Abstracts with programs ».
 _ABSTRACTS = re.compile(r"\babstracts?\b|\bresumes\b")
@@ -68,12 +71,21 @@ def attests_publication(source: SourceRecord) -> bool:
 def arbitrate_conference(doc_type: str, sources: list[SourceRecord]) -> str:
     """Arbitre le type d'une publication issue d'un congrès.
 
-    Un enregistrement source qui désigne une communication (`conference`, recueil de résumés HAL) l'emporte sur `article`, `conference_paper` et `preprint`. Une `conference_paper` sans enregistrement source qui décrive un texte publié devient une `conference`.
+    Un enregistrement source qui désigne un résumé (`conference_abstract`, recueil de résumés HAL) l'emporte sur `article`, `conference_paper`, `preprint` et `conference`. À défaut, un enregistrement source `conference` l'emporte sur les trois premiers. Une `conference_paper` sans enregistrement source qui décrive un texte publié devient une `conference`. Un poster déclaré par une source l'emporte ensuite sur la communication et le résumé.
     """
-    if doc_type in _SUPPLANTED_BY_CONFERENCE and any(
-        s.doc_type == DocType.CONFERENCE or names_abstracts(s) for s in sources
-    ):
-        return DocType.CONFERENCE
+    doc_type = _arbitrate_communication(doc_type, sources)
+    if doc_type in _SUPPLANTED_BY_POSTER and any(s.doc_type == DocType.POSTER for s in sources):
+        return DocType.POSTER
+    return doc_type
+
+
+def _arbitrate_communication(doc_type: str, sources: list[SourceRecord]) -> str:
+    """Arbitre entre texte publié, résumé et communication (`arbitrate_conference`)."""
+    if doc_type in _SUPPLANTED_BY_CONFERENCE:
+        if any(s.doc_type == DocType.CONFERENCE_ABSTRACT or names_abstracts(s) for s in sources):
+            return DocType.CONFERENCE_ABSTRACT
+        if any(s.doc_type == DocType.CONFERENCE for s in sources):
+            return DocType.CONFERENCE
     if doc_type == DocType.CONFERENCE_PAPER and not any(attests_publication(s) for s in sources):
         return DocType.CONFERENCE
     return doc_type

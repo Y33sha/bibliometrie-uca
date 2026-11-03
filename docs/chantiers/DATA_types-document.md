@@ -56,6 +56,9 @@ OpenAlex et ScanR ont 1 468 enregistrements sources `memoir` avec une URL DUMAS.
 - Un type `practice_thesis` distingue les thèses d'exercice des mémoires. Il est exclu des publications, comme `memoir`.
 - `data_paper` rejoint la famille des données et logiciels.
 - Erratum et rétractation quittent les listes de documents. Ils sont rattachés à la publication concernée.
+- Un type `conference_abstract` (« Résumé de conférence »), famille Conférences, désigne le résumé publié d'une communication. Sources : OpenAlex `conference-abstract`, WoS `Meeting Abstract`, recueil de résumés HAL, communication rattachée à une revue, revue au titre en « abstract(s) ».
+- À l'arbitrage, le résumé l'emporte sur la communication. Un poster déclaré par une source (HAL, DataCite, session d'affichage Crossref) l'emporte sur les deux.
+- Les rapports par unité de recherche excluent les résumés.
 
 ## Phasage
 
@@ -86,10 +89,19 @@ OpenAlex et ScanR ont 1 468 enregistrements sources `memoir` avec une URL DUMAS.
 * [ ] 165068 type "commmentary"; 86931 type "meeting report" => comment prendre en compte ces types (et empêcher openalex d'imposer le type article)
 * [ ] règle à créer: si DOI de forme ISBN + _n => conference_paper ou chapitre / si forme ISBN: proceedings ou book (trancher selon type du "journal")
 * [ ] doc_types souvent suspects, à investiguer: "preprint", "autre" (voir aussi si le type "article" peut être affiné selon des critères objectifs: ie la revue)
-* [ ] goldschmidt abstracts: faire un nouveau type abstract, ou le mettre comme "conférence"?
 * "(No longer) Hiking hypothetical trails in one direction: How unidirectional comparisons hinder theoretical progress in social psychology, and how reversing the direction of comparisons can advance it" => openalex type "article"
 
-### Phase 5 — Documentation
+### Phase 5 — Résumés de conférence
+
+Mesures du 2026-11-03, publications du périmètre : 1 895 communications rattachées à une revue, dont 1 869 avec un type brut de résumé. 2 259 publications ont un type brut de résumé.
+
+- [x] Type `conference_abstract`. Correspondance d'OpenAlex `conference-abstract` et du WoS `Meeting Abstract`.
+- [x] Règles de correction : communication rattachée à une revue, revue au titre en « abstract(s) ». Rejeu sur la publication avec le type et le titre de sa revue.
+- [x] Arbitrage : recueil de résumés HAL et enregistrement source `conference_abstract` vers le résumé, poster prioritaire.
+- [ ] Oneshot : type des enregistrements sources OpenAlex et WoS déjà normalisés, publications concernées marquées pour la réconciliation.
+- [ ] Mesures après le run : communications, résumés, posters.
+
+### Phase 6 — Documentation
 
 - [ ] Mise à jour de la documentation.
 

@@ -23,6 +23,7 @@ def _publication(**overrides: object) -> MetadataForCorrection:
         "doi": None,
         "serial_id": None,
         "serial_type": None,
+        "serial_title": None,
     }
     defaults.update(overrides)
     defaults.setdefault("title_normalized", normalize_text(str(defaults["title"])))
@@ -504,6 +505,47 @@ class TestCrossrefVolumeRules:
 
     def test_publication_sans_source_ni_auteurs_non_corrigee(self):
         view = _publication(doc_type="article", title="Poster Abstracts")
+        assert doc_type_correction(view) is None
+
+
+class TestConferenceAbstractRules:
+    def test_conference_in_journal_corrects(self):
+        view = _view(doc_type="conference", serial_type="journal")
+        corrected = doc_type_correction(view)
+        assert corrected is not None
+        assert corrected.value == "conference_abstract"
+        assert (
+            corrected.rule
+            == MetadataCorrectionRule.SERIAL_TYPE_JOURNAL_CONFERENCE_TO_CONFERENCE_ABSTRACT
+        )
+
+    def test_conference_in_proceedings_is_spared(self):
+        view = _view(doc_type="conference", serial_type="proceedings", serial_title="Actes")
+        assert doc_type_correction(view) is None
+
+    def test_article_in_journal_is_spared(self):
+        view = _view(doc_type="article", serial_type="journal")
+        assert doc_type_correction(view) is None
+
+    @pytest.mark.parametrize("doc_type", ["article", "conference_paper", "conference"])
+    def test_abstracts_serial_title_corrects(self, doc_type):
+        view = _view(doc_type=doc_type, serial_type="journal", serial_title="Endocrine Abstracts")
+        corrected = doc_type_correction(view)
+        assert corrected is not None
+        assert corrected.value == "conference_abstract"
+        assert (
+            corrected.rule == MetadataCorrectionRule.SERIAL_TITLE_ABSTRACTS_TO_CONFERENCE_ABSTRACT
+        )
+
+    def test_abstracts_serial_title_wins_over_serial_type_proceedings(self):
+        view = _view(
+            doc_type="article", serial_type="proceedings", serial_title="Goldschmidt Abstracts"
+        )
+        corrected = doc_type_correction(view)
+        assert corrected is not None and corrected.value == "conference_abstract"
+
+    def test_abstracts_serial_title_spares_other_types(self):
+        view = _view(doc_type="review", serial_title="Bone abstracts")
         assert doc_type_correction(view) is None
 
 

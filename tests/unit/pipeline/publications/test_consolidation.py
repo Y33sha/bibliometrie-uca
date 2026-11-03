@@ -6,6 +6,7 @@ Correction du `doc_type` rejouée sur la publication (`_apply_canonical_doc_type
 from domain.publications.identifiers import DOI
 from domain.publications.publication import Publication
 from pipeline.transformation.publications.consolidation import (
+    SerialFacts,
     _apply_canonical_doc_type_correction,
 )
 
@@ -22,27 +23,52 @@ def _publication(**overrides: object) -> Publication:
     return Publication(**defaults)  # type: ignore[arg-type]
 
 
+def _serial(serial_type: str, title: str = "Une revue") -> SerialFacts:
+    return SerialFacts(serial_type=serial_type, title=title, oa_model=None)
+
+
 def test_serial_type_media_decoupling_is_repaired():
     # doc_type retenu : preprint, d'un enregistrement source sans revue ; serial_id retenu : une revue de type média, d'un autre enregistrement source. Le rejeu applique SERIAL_TYPE_MEDIA_TO_MEDIA à cette revue.
     publication = _publication(doc_type="preprint", serial_id=7)
-    _apply_canonical_doc_type_correction(publication, serial_type="media")
+    _apply_canonical_doc_type_correction(publication, _serial("media"))
     assert publication.doc_type == "media"
     assert publication.corrections == {
         "doc_type": {"raw": "preprint", "corrected_by": "SERIAL_TYPE_MEDIA_TO_MEDIA"}
     }
 
 
-def test_no_serial_type_no_change():
+def test_conference_in_journal_decoupling_is_repaired():
+    # doc_type retenu : conference, d'une communication HAL sans revue ; serial_id retenu : une revue, d'un autre enregistrement source. Le rejeu en fait un résumé de conférence.
+    publication = _publication(doc_type="conference", serial_id=7)
+    _apply_canonical_doc_type_correction(publication, _serial("journal"))
+    assert publication.doc_type == "conference_abstract"
+    assert publication.corrections == {
+        "doc_type": {
+            "raw": "conference",
+            "corrected_by": "SERIAL_TYPE_JOURNAL_CONFERENCE_TO_CONFERENCE_ABSTRACT",
+        }
+    }
+
+
+def test_conference_paper_in_abstracts_serial_is_repaired():
+    publication = _publication(doc_type="conference_paper", serial_id=7)
+    _apply_canonical_doc_type_correction(
+        publication, _serial("proceedings", "Goldschmidt Abstracts")
+    )
+    assert publication.doc_type == "conference_abstract"
+
+
+def test_no_serial_no_change():
     publication = _publication(doc_type="preprint", serial_id=None)
-    _apply_canonical_doc_type_correction(publication, serial_type=None)
+    _apply_canonical_doc_type_correction(publication, None)
     assert publication.doc_type == "preprint"
     assert publication.corrections == {}
 
 
 def test_serial_type_without_rule_leaves_doc_type():
-    # Aucune règle ne dépend d'une revue de type journal : aucune correction.
+    # Aucune règle ne corrige un preprint d'une revue de type journal : aucune correction.
     publication = _publication(doc_type="preprint", serial_id=7)
-    _apply_canonical_doc_type_correction(publication, serial_type="journal")
+    _apply_canonical_doc_type_correction(publication, _serial("journal"))
     assert publication.doc_type == "preprint"
     assert publication.corrections == {}
 
@@ -50,7 +76,7 @@ def test_serial_type_without_rule_leaves_doc_type():
 def test_full_cascade_replayed_thesis_with_publisher_doi():
     # Le rejeu reprend toutes les règles : une thèse avec revue et DOI d'éditeur devient un article.
     publication = _publication(doc_type="thesis", serial_id=7, doi=DOI("10.1016/j.ex.2020.01.001"))
-    _apply_canonical_doc_type_correction(publication, serial_type="journal")
+    _apply_canonical_doc_type_correction(publication, _serial("journal"))
     assert publication.doc_type == "article"
     assert publication.corrections == {
         "doc_type": {"raw": "thesis", "corrected_by": "THESIS_WITH_SERIAL_TO_ARTICLE"}
@@ -59,14 +85,14 @@ def test_full_cascade_replayed_thesis_with_publisher_doi():
 
 def test_thesis_with_abes_doi_stays_thesis():
     publication = _publication(doc_type="thesis", serial_id=7, doi=DOI("10.70675/abc"))
-    _apply_canonical_doc_type_correction(publication, serial_type="journal")
+    _apply_canonical_doc_type_correction(publication, _serial("journal"))
     assert publication.doc_type == "thesis"
     assert publication.corrections == {}
 
 
 def test_source_extras_untouched_by_the_correction():
     publication = _publication(doc_type="preprint", serial_id=7, source_extras={"k": "v"})
-    _apply_canonical_doc_type_correction(publication, serial_type="media")
+    _apply_canonical_doc_type_correction(publication, _serial("media"))
     assert publication.source_extras == {"k": "v"}
 
 
@@ -76,5 +102,5 @@ def test_correction_that_no_longer_applies_is_cleared():
         serial_id=7,
         corrections={"doc_type": {"raw": "preprint", "corrected_by": "SERIAL_TYPE_MEDIA_TO_MEDIA"}},
     )
-    _apply_canonical_doc_type_correction(publication, serial_type="journal")
+    _apply_canonical_doc_type_correction(publication, _serial("journal"))
     assert publication.corrections == {}

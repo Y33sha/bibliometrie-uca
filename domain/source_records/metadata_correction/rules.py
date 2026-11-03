@@ -29,6 +29,7 @@ class MetadataForCorrection:
     dois: frozenset[str] = frozenset()
     """DOI propres actifs d'un enregistrement source (`own_dois`), DOI d'une publication."""
     serial_type: str | None = None
+    serial_title: str | None = None
     urls: list[str] | None = None
     self_declared_preprint: bool | None = None
     """L'enregistrement source déclare la relation Crossref `is-preprint-of` : il est le preprint d'une autre œuvre."""
@@ -54,8 +55,9 @@ class MetadataForCorrection:
         doi: str | None,
         serial_id: int | None,
         serial_type: str | None,
+        serial_title: str | None,
     ) -> MetadataForCorrection:
-        """Construit les faits d'une publication : les champs arbitrés par l'agrégation, et le type de sa revue."""
+        """Construit les faits d'une publication : les champs arbitrés par l'agrégation, le type et le titre de sa revue."""
         return cls(
             title=title,
             title_normalized=title_normalized,
@@ -63,6 +65,7 @@ class MetadataForCorrection:
             dois=frozenset({doi} if doi else ()),
             serial_id=serial_id,
             serial_type=serial_type,
+            serial_title=serial_title,
         )
 
 
@@ -73,6 +76,10 @@ class MetadataCorrectionRule(StrEnum):
     DUMAS_URL_TO_MEMOIR = "DUMAS_URL_TO_MEMOIR"
     THESIS_WITH_SERIAL_TO_ARTICLE = "THESIS_WITH_SERIAL_TO_ARTICLE"
     SERIAL_TYPE_MEDIA_TO_MEDIA = "SERIAL_TYPE_MEDIA_TO_MEDIA"
+    SERIAL_TITLE_ABSTRACTS_TO_CONFERENCE_ABSTRACT = "SERIAL_TITLE_ABSTRACTS_TO_CONFERENCE_ABSTRACT"
+    SERIAL_TYPE_JOURNAL_CONFERENCE_TO_CONFERENCE_ABSTRACT = (
+        "SERIAL_TYPE_JOURNAL_CONFERENCE_TO_CONFERENCE_ABSTRACT"
+    )
     SERIAL_TYPE_PROCEEDINGS_TO_CONFERENCE_PAPER = "SERIAL_TYPE_PROCEEDINGS_TO_CONFERENCE_PAPER"
     CONFERENCE_DECLARED_TO_CONFERENCE_PAPER = "CONFERENCE_DECLARED_TO_CONFERENCE_PAPER"
     PROCEEDINGS_VOLUME_TO_CONFERENCE_PAPER = "PROCEEDINGS_VOLUME_TO_CONFERENCE_PAPER"
@@ -164,6 +171,8 @@ _VOLUME_TITLE_PATTERN = re.compile(
 _VOLUME_TITLE_PREFIX_PATTERN = re.compile(
     r"^\s*(proceedings|abstracts|book\s+of\s+abstracts|abstract\s+book)\b", re.IGNORECASE
 )
+# Titre de revue ou de collection d'un recueil de résumés : « Goldschmidt Abstracts », « Abstracts with programs ».
+_ABSTRACTS_SERIAL_TITLE_PATTERN = re.compile(r"\babstracts?\b", re.IGNORECASE)
 
 # Préfixes DOI des registres de thèses, dont le DOI est celui de la thèse elle-même : `10.70675` (ABES).
 # Les thèses des archives institutionnelles ont des préfixes variés, absents de la liste.
@@ -264,6 +273,18 @@ _RULES: dict[MetadataCorrectionRule, _Rule] = {
         frozenset({DocType.ARTICLE, DocType.CONFERENCE_PAPER, DocType.OTHER}),
         lambda f: f.source == "crossref" and _title_matches(f, _VOLUME_TITLE_PREFIX_PATTERN),
         DocType.PROCEEDINGS,
+    ),
+    # Article, conference paper ou communication d'une revue ou d'une collection de résumés ⇒ `conference_abstract`. Évaluée avant la règle des revues d'actes : « Goldschmidt Abstracts » est une revue d'actes.
+    MetadataCorrectionRule.SERIAL_TITLE_ABSTRACTS_TO_CONFERENCE_ABSTRACT: _Rule(
+        frozenset({DocType.ARTICLE, DocType.CONFERENCE_PAPER, DocType.CONFERENCE}),
+        lambda f: bool(f.serial_title and _ABSTRACTS_SERIAL_TITLE_PATTERN.search(f.serial_title)),
+        DocType.CONFERENCE_ABSTRACT,
+    ),
+    # Communication rattachée à une revue ⇒ `conference_abstract`. La revue publie son résumé.
+    MetadataCorrectionRule.SERIAL_TYPE_JOURNAL_CONFERENCE_TO_CONFERENCE_ABSTRACT: _Rule(
+        frozenset({DocType.CONFERENCE}),
+        lambda f: f.serial_type == SerialType.JOURNAL,
+        DocType.CONFERENCE_ABSTRACT,
     ),
     # Article ou chapitre d'une revue d'actes ⇒ `conference_paper`. Un `book` peut être un volume entier d'actes.
     MetadataCorrectionRule.SERIAL_TYPE_PROCEEDINGS_TO_CONFERENCE_PAPER: _Rule(
