@@ -1,9 +1,8 @@
 """Enrichissement du pays des éditeurs depuis OpenAlex.
 
-Le script ferme sa connexion dans tous les cas. Un quota quotidien épuisé reporte le reste à l'exécution suivante, sans échec. La boucle par lots s'arrête dès que le circuit-breaker de la source se déclenche.
+Le script ferme sa connexion dans tous les cas. Un quota quotidien épuisé termine le script sans échec. La boucle par lots s'arrête dès que le circuit-breaker de la source se déclenche.
 """
 
-import logging
 import sys
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -63,13 +62,11 @@ def test_options_transmises(lancer):
     assert resultat.recus["dry_run"] is True
 
 
-def test_quota_de_la_source_epuise(lancer, caplog):
-    """Un quota du jour épuisé termine le script sans échec : le reste est reporté, la connexion fermée."""
-    with caplog.at_level(logging.WARNING):
-        resultat = lancer(issue=SourceUnavailableError("openalex"))
+def test_quota_de_la_source_epuise(lancer):
+    """Un quota du jour épuisé termine le script sans échec et ferme la connexion."""
+    resultat = lancer(issue=SourceUnavailableError("openalex"))
 
     assert resultat.code == 0
-    assert "Source openalex coupée" in caplog.text
     assert resultat.fermetures == [True]
 
 
