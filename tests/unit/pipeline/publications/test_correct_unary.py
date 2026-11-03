@@ -52,9 +52,10 @@ def test_tally_corrections_compte_les_regles():
                     {"doc_type": stash_entry("article", "THESIS_WITH_SERIAL_TO_ARTICLE")},
                 ),
                 (),
+                frozenset({"THESIS_WITH_SERIAL_TO_ARTICLE"}),
             ),
         ),
-        # deux champs corrigés sur un même enregistrement source : un enregistrement source, deux déclenchements
+        # deux règles sur un même enregistrement source : un enregistrement source, deux déclenchements
         CorrectionUpdate(
             3,
             UnaryCorrection(
@@ -69,6 +70,7 @@ def test_tally_corrections_compte_les_regles():
                     },
                 ),
                 (),
+                frozenset({"SERIAL_TYPE_MEDIA_TO_MEDIA", "HAL_DEPOSIT_MISSING_TO_REMOVED"}),
             ),
         ),
         # correction défaite : mise à jour sans règle
