@@ -203,7 +203,7 @@ def decide_contribution(
             )
             if match.person_id is not None and match.person_id not in rejected_person_ids:
                 identified.setdefault(match.person_id, id_type)
-            elif match.rejection is not None:
+            elif match.rejected:
                 refused.append((id_type, value))
     if identified:
         if (person_id := _single(set(identified))) is not None:
