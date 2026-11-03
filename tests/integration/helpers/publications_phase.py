@@ -41,9 +41,7 @@ def apply_metadata_corrections(conn: Connection) -> None:
     queries.replace_doi_targets(compute_doi_targets(queries.fetch_secondary_form_declarations()))
     queries.persist_doi_corrections(compute_removal_updates(fetch_candidates(queries)))
 
-    matchable_updates = compute_matchable_updates(
-        queries.fetch_matchability_rows(), missing_hal_ids
-    )
+    matchable_updates = compute_matchable_updates(queries.fetch_matchability_rows())
     queries.persist_matchability(matchable_updates)
 
 

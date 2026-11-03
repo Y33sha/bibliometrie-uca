@@ -378,7 +378,7 @@ class SourceRecordCorrectionStore:
         """Renvoie tous les enregistrements sources, avec leur valeur de `is_matchable` et les faits qui la décident."""
         rows = self._conn.execute(
             text(f"""
-                SELECT id, is_matchable, source::text AS source, source_id, title_normalized,
+                SELECT id, is_matchable, source::text AS source, title_normalized,
                        COALESCE(urls, '{{}}') AS urls,
                        EXISTS (
                            SELECT 1 FROM source_record_identifiers p
@@ -402,7 +402,6 @@ class SourceRecordCorrectionStore:
                 r.is_matchable,
                 MatchabilityFacts(
                     r.source,
-                    r.source_id,
                     r.title_normalized,
                     r.urls,
                     identifiers.get(r.id, ()),

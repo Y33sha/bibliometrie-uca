@@ -1,6 +1,6 @@
 """Périmètre des publications : types de document admissibles, enregistrements sources écartés."""
 
-from collections.abc import Sequence, Set
+from collections.abc import Sequence
 from typing import NamedTuple
 
 from domain.publications.doc_types import DocType
@@ -14,7 +14,6 @@ from domain.source_records.identifiers import (
 )
 from domain.source_records.keys import CONFIRMATION_ID_TYPES
 from domain.sources.registry import AGGREGATOR_SOURCES, Source
-from domain.sources.scanr import extract_hal_id_from_scanr_id
 
 OUT_OF_SCOPE_DOC_TYPES = frozenset(
     {
@@ -70,7 +69,6 @@ class MatchabilityFacts(NamedTuple):
     """Faits d'un enregistrement source lus par `is_matchable`."""
 
     source: str
-    source_id: str
     title_normalized: str | None
     urls: Sequence[str]
     """URL de copie, privées des dépôts HAL introuvables."""
@@ -80,13 +78,12 @@ class MatchabilityFacts(NamedTuple):
     """Le DOI `primary` a une cible dans `doi_targets`, et cette cible est le DOI `primary` d'un autre enregistrement source."""
 
 
-def is_matchable(facts: MatchabilityFacts, missing_hal_ids: Set[str]) -> bool:
+def is_matchable(facts: MatchabilityFacts) -> bool:
     """Vrai si l'enregistrement source entre dans la réconciliation. Il en est écarté si :
 
     - tous ses DOI propres (`own_dois`), quel que soit leur statut, ont un préfixe de `_EXCLUDED_DOI_PREFIXES` ;
     - il vient de DataCite et la cible de son DOI `primary` est le DOI `primary` d'un autre enregistrement source : il est une forme secondaire d'une œuvre représentée par cet enregistrement source ;
     - son titre normalisé est dans `_PARATEXT_TITLES` ;
-    - il vient de ScanR et il est issu d'un dépôt HAL de `missing_hal_ids` ;
     - il vient d'une source de `AGGREGATOR_SOURCES` et il n'a aucun DOI actif de rôle autre que `related`, aucune URL de copie et aucune clé de confirmation active.
     """
     own = own_dois(facts.identifiers)
@@ -95,10 +92,6 @@ def is_matchable(facts: MatchabilityFacts, missing_hal_ids: Set[str]) -> bool:
     if facts.source == Source.DATACITE and facts.primary_doi_target_recorded:
         return False
     if facts.title_normalized in _PARATEXT_TITLES:
-        return False
-    if facts.source == Source.SCANR and (
-        extract_hal_id_from_scanr_id(facts.source_id) in missing_hal_ids
-    ):
         return False
     if facts.source in AGGREGATOR_SOURCES:
         return bool(facts.urls) or any(

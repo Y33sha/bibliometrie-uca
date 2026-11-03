@@ -2,7 +2,6 @@
 
 import logging
 import time
-from collections.abc import Set
 from dataclasses import dataclass
 
 from sqlalchemy import Connection
@@ -17,18 +16,12 @@ from pipeline.transformation.publications.correction.correction_store import (
 )
 
 
-def compute_updates(
-    rows: list[MatchabilityRow], missing_hal_ids: Set[str]
-) -> list[MatchabilityUpdate]:
-    """Calcule les mises à jour des enregistrements sources à valeur de `is_matchable` changée.
-
-    Args:
-        missing_hal_ids: dépôts introuvables dans HAL.
-    """
+def compute_updates(rows: list[MatchabilityRow]) -> list[MatchabilityUpdate]:
+    """Calcule les mises à jour des enregistrements sources à valeur de `is_matchable` changée."""
     return [
         MatchabilityUpdate(row.id, matchable)
         for row in rows
-        if (matchable := is_matchable(row.facts, missing_hal_ids)) != row.is_matchable
+        if (matchable := is_matchable(row.facts)) != row.is_matchable
     ]
 
 
@@ -52,7 +45,7 @@ def run(
     rows = store.fetch_matchability_rows()
     logger.info("%s%s %s", BRANCH, quantity(len(rows), "document"), inflect(len(rows), "examiné"))
 
-    updates = compute_updates(rows, store.fetch_missing_hal_ids())
+    updates = compute_updates(rows)
     changed = {u.id: u.is_matchable for u in updates}
     excluded = sum(1 for row in rows if not changed.get(row.id, row.is_matchable))
     logger.info("%s%s %s", BRANCH, quantity(excluded, "document"), inflect(excluded, "écarté"))
