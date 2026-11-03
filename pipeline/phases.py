@@ -135,9 +135,9 @@ PHASES: tuple[Phase, ...] = (
     Phase(
         "countries",
         "Pays associés aux contributions sources",
-        phase_tasks("countries"),
+        countries.TASKS,
         extra=True,
-        build=countries.build,
+        assemble=countries.assemble,
     ),
     Phase(
         "oa_status",

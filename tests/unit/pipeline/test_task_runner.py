@@ -4,7 +4,7 @@ import pytest
 
 from pipeline.graph import Phase, task
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.task_runner import TaskStep, run_phase, run_tasks
+from pipeline.task_runner import TaskStep, execute_tasks, run_phase, run_tasks
 
 
 def test_des_etapes_qui_ne_couvrent_pas_les_taches_de_la_phase_sont_refusees(contexte):
@@ -15,21 +15,18 @@ def test_des_etapes_qui_ne_couvrent_pas_les_taches_de_la_phase_sont_refusees(con
 
 def test_l_executeur_mesure_la_duree_des_seules_taches_executees(contexte):
     """Une tâche exécutée reçoit sa durée, rangée aussi dans le contexte. Une tâche écartée par sa condition garde `duration_s` à `None`."""
-    steps = {
-        "countries.detect": TaskStep(lambda _ctx: PhaseMetrics()),
-        "countries.resolve": TaskStep(lambda _ctx: PhaseMetrics(), when=lambda _ctx: False),
-        "countries.refresh_publication_countries": TaskStep(lambda _ctx: PhaseMetrics()),
-    }
+    tasks = (
+        task("essai.une", run=lambda _ctx: PhaseMetrics()),
+        task("essai.ecartee", run=lambda _ctx: PhaseMetrics(), when=lambda _ctx: False),
+        task("essai.deux", run=lambda _ctx: PhaseMetrics()),
+    )
 
     ctx = contexte()
-    by_task = run_tasks("countries", steps, ctx)
+    by_task = execute_tasks(tasks, ctx)
 
-    assert by_task["countries.detect"].duration_s is not None
-    assert by_task["countries.resolve"].duration_s is None
-    assert set(ctx.task_durations) == {
-        "countries.detect",
-        "countries.refresh_publication_countries",
-    }
+    assert by_task["essai.une"].duration_s is not None
+    assert by_task["essai.ecartee"].duration_s is None
+    assert set(ctx.task_durations) == {"essai.une", "essai.deux"}
 
 
 _TACHES = (

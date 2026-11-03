@@ -1,13 +1,15 @@
 """Orchestrateur de la phase `countries` : enchaînement des sous-étapes et bilan.
 
-La phase encadre ses sous-étapes de deux bilans et en tire un résumé : adresses sans pays au départ, adresses dotées d'un pays par la passe, adresses restantes. Les sous-étapes ont leurs propres tests.
+La phase relève deux bilans, avant la détection et après le choix du pays, et en tire un résumé : adresses sans pays au départ, adresses dotées d'un pays par la passe, adresses restantes. Les sous-étapes ont leurs propres tests.
 """
 
 from unittest.mock import patch
 
 import pytest
 
+from pipeline.phases import PHASES
 from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.task_runner import run_phase
 from pipeline.transformation.countries import countries as phase
 from pipeline.transformation.countries.countries import AddressCountryStatus
 
@@ -27,6 +29,10 @@ class _FakeCountryQueries:
             phase, "count_address_country_status", self.count_address_country_status
         )
         monkeypatch.setattr(phase, "resolve_queued_addresses", lambda conn: 3)
+
+
+def _run(contexte) -> PhaseMetrics:
+    return run_phase(next(p for p in PHASES if p.name == "countries"), contexte(mode="daily"))
 
 
 def _bilan(total: int, with_country: int) -> AddressCountryStatus:
@@ -52,7 +58,7 @@ def sous_etapes():
 def test_resume_l_entonnoir_des_bilans(contexte, sous_etapes, monkeypatch):
     _FakeCountryQueries([_bilan(100, 60), _bilan(100, 85)]).install(monkeypatch)
 
-    metrics = phase.CountriesPhase().run(contexte(mode="daily"))
+    metrics = _run(contexte)
 
     assert metrics.details["summary"] == {
         "total": 100,
@@ -66,7 +72,7 @@ def test_resume_l_entonnoir_des_bilans(contexte, sous_etapes, monkeypatch):
 def test_cumule_les_metriques_des_sous_etapes(contexte, sous_etapes, monkeypatch):
     _FakeCountryQueries([_bilan(10, 5), _bilan(10, 9)]).install(monkeypatch)
 
-    metrics = phase.CountriesPhase().run(contexte(mode="daily"))
+    metrics = _run(contexte)
 
     assert metrics.new == 10  # 4 (nom de pays) + 6 (nom de lieu)
     assert metrics.updated == 3  # adresses au pays changé par la résolution
@@ -76,7 +82,7 @@ def test_cumule_les_metriques_des_sous_etapes(contexte, sous_etapes, monkeypatch
 def test_base_vide_sans_division_par_zero(contexte, sous_etapes, monkeypatch):
     _FakeCountryQueries([_bilan(0, 0), _bilan(0, 0)]).install(monkeypatch)
 
-    metrics = phase.CountriesPhase().run(contexte(mode="daily"))
+    metrics = _run(contexte)
 
     assert metrics.details["summary"]["without_pct"] == 0
 
@@ -84,6 +90,6 @@ def test_base_vide_sans_division_par_zero(contexte, sous_etapes, monkeypatch):
 def test_chaque_sous_etape_dans_sa_transaction(open_tx, contexte, sous_etapes, monkeypatch):
     _FakeCountryQueries([_bilan(10, 5), _bilan(10, 9)]).install(monkeypatch)
 
-    phase.CountriesPhase().run(contexte(mode="daily"))
+    _run(contexte)
 
-    assert open_tx.transactions == 6  # deux bilans + quatre sous-étapes
+    assert open_tx.transactions == 4
