@@ -83,11 +83,7 @@ class PersonRepository(Protocol):
     def attribute_identifier(
         self, person_id: int, id_type: str, id_value: str, *, source: IdentifierOrigin
     ) -> AttributionResult:
-        """Attribue l'identifiant à la personne selon `attribution_outcome` : insertion en `pending`, ou reprise d'une attribution `rejected`. Une attribution détenue par une autre personne reste inchangée.
-
-        Raises:
-            ValidationError: valeur mal formée (`normalized_identifier_value`).
-        """
+        """Attribue l'identifiant de valeur normalisée `id_value` à la personne selon `attribution_outcome` : insertion en `pending`, ou reprise d'une attribution `rejected`. Une attribution détenue par une autre personne reste inchangée."""
         ...
 
     def update_identifier_status(self, ident_id: int, status: str) -> IdentifierStatusRow:

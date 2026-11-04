@@ -41,8 +41,6 @@ class AttributionResult(NamedTuple):
     """Résultat de l'attribution d'un identifiant à une personne."""
 
     outcome: AttributionOutcome
-    id_value: str
-    """Valeur normalisée."""
     existing: IdentifierAttribution | None
     """Attribution trouvée en base, à défaut `None`."""
 
