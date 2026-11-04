@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict nBHDlwrnlllQZyH2VSfp2hQu7IDyg1qz1CzxXnsCXR9Us3tCGgeR3ESfTNBpfcT
+\restrict ApTTGWg1DSKgMxnXP9v4ilwcjGGRRgHqeaoxGIHykgtmubbCd4lWvuM48a3gdbr
 
--- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
--- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
+-- Dumped from database version 18.4
+-- Dumped by pg_dump version 18.4
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -2496,6 +2496,73 @@ ALTER SEQUENCE publishing.serial_issns_id_seq OWNED BY publishing.serial_issns.i
 
 
 --
+-- Name: serial_list_entries; Type: TABLE; Schema: publishing; Owner: -
+--
+
+CREATE TABLE publishing.serial_list_entries (
+    serial_id integer NOT NULL,
+    list_code text NOT NULL
+);
+
+
+--
+-- Name: TABLE serial_list_entries; Type: COMMENT; Schema: publishing; Owner: -
+--
+
+COMMENT ON TABLE publishing.serial_list_entries IS 'Appartenance d''une publication en série à une liste, d''après OpenAlex.';
+
+
+--
+-- Name: serial_lists; Type: TABLE; Schema: publishing; Owner: -
+--
+
+CREATE TABLE publishing.serial_lists (
+    code text NOT NULL,
+    ranking_code text,
+    label text NOT NULL,
+    display_order integer NOT NULL,
+    maintainer text,
+    url text,
+    edition date
+);
+
+
+--
+-- Name: TABLE serial_lists; Type: COMMENT; Schema: publishing; Owner: -
+--
+
+COMMENT ON TABLE publishing.serial_lists IS 'Listes de revues. Un classement à niveaux est une ligne sans appartenances, parente de ses niveaux.';
+
+
+--
+-- Name: COLUMN serial_lists.code; Type: COMMENT; Schema: publishing; Owner: -
+--
+
+COMMENT ON COLUMN publishing.serial_lists.code IS 'Code de la liste dans OpenAlex (`listed_in`), ou code du classement.';
+
+
+--
+-- Name: COLUMN serial_lists.ranking_code; Type: COMMENT; Schema: publishing; Owner: -
+--
+
+COMMENT ON COLUMN publishing.serial_lists.ranking_code IS 'Classement du niveau.';
+
+
+--
+-- Name: COLUMN serial_lists.maintainer; Type: COMMENT; Schema: publishing; Owner: -
+--
+
+COMMENT ON COLUMN publishing.serial_lists.maintainer IS 'Organisme qui publie la liste, d''après OpenAlex.';
+
+
+--
+-- Name: COLUMN serial_lists.edition; Type: COMMENT; Schema: publishing; Owner: -
+--
+
+COMMENT ON COLUMN publishing.serial_lists.edition IS 'Date de l''édition de la liste chargée par OpenAlex.';
+
+
+--
 -- Name: serial_title_decisions; Type: TABLE; Schema: publishing; Owner: -
 --
 
@@ -4133,6 +4200,22 @@ ALTER TABLE ONLY publishing.serial_doi_namespaces
 
 ALTER TABLE ONLY publishing.serial_issns
     ADD CONSTRAINT serial_issns_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: serial_list_entries serial_list_entries_pkey; Type: CONSTRAINT; Schema: publishing; Owner: -
+--
+
+ALTER TABLE ONLY publishing.serial_list_entries
+    ADD CONSTRAINT serial_list_entries_pkey PRIMARY KEY (serial_id, list_code);
+
+
+--
+-- Name: serial_lists serial_lists_pkey; Type: CONSTRAINT; Schema: publishing; Owner: -
+--
+
+ALTER TABLE ONLY publishing.serial_lists
+    ADD CONSTRAINT serial_lists_pkey PRIMARY KEY (code);
 
 
 --
@@ -5786,6 +5869,30 @@ ALTER TABLE ONLY publishing.serial_issns
 
 
 --
+-- Name: serial_list_entries serial_list_entries_list_code_fkey; Type: FK CONSTRAINT; Schema: publishing; Owner: -
+--
+
+ALTER TABLE ONLY publishing.serial_list_entries
+    ADD CONSTRAINT serial_list_entries_list_code_fkey FOREIGN KEY (list_code) REFERENCES publishing.serial_lists(code) ON DELETE CASCADE;
+
+
+--
+-- Name: serial_list_entries serial_list_entries_serial_id_fkey; Type: FK CONSTRAINT; Schema: publishing; Owner: -
+--
+
+ALTER TABLE ONLY publishing.serial_list_entries
+    ADD CONSTRAINT serial_list_entries_serial_id_fkey FOREIGN KEY (serial_id) REFERENCES publishing.serials(id) ON DELETE CASCADE;
+
+
+--
+-- Name: serial_lists serial_lists_ranking_code_fkey; Type: FK CONSTRAINT; Schema: publishing; Owner: -
+--
+
+ALTER TABLE ONLY publishing.serial_lists
+    ADD CONSTRAINT serial_lists_ranking_code_fkey FOREIGN KEY (ranking_code) REFERENCES publishing.serial_lists(code);
+
+
+--
 -- Name: serial_title_decisions serial_title_decisions_serial_id_fkey; Type: FK CONSTRAINT; Schema: publishing; Owner: -
 --
 
@@ -6125,5 +6232,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict nBHDlwrnlllQZyH2VSfp2hQu7IDyg1qz1CzxXnsCXR9Us3tCGgeR3ESfTNBpfcT
+\unrestrict ApTTGWg1DSKgMxnXP9v4ilwcjGGRRgHqeaoxGIHykgtmubbCd4lWvuM48a3gdbr
 

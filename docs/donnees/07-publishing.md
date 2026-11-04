@@ -15,6 +15,8 @@ Schéma PostgreSQL `publishing`.
 | `issn_links` | Liens entre ISSN lus dans le Sudoc : titre précédent vers titre suivant, revue principale vers supplément, ISSN annulé vers l'ISSN qui l'annule | Un lien par couple d'ISSN et par type |
 | `serial_title_decisions` | Fusions décidées par l'administration : une série sans ISSN de ce titre normalisé est rattachée à la publication en série | Une décision par titre |
 | `serial_doi_namespaces` | Espaces de noms DOI qui désignent une publication en série, avec la part de leurs DOI qui la désignent | |
+| `serial_lists` | Listes de revues reprises d'OpenAlex : libellé, ordre d'affichage, organisme, URL, édition. Un classement à niveaux (registre norvégien, FNEGE) est une ligne parente de ses niveaux | Une ligne par code |
+| `serial_list_entries` | Appartenance d'une publication en série à une liste | Une ligne par publication en série et par liste |
 
 ## Monographies
 

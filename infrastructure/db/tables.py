@@ -556,6 +556,39 @@ serial_doi_namespaces = Table(
 )
 
 
+serial_lists = Table(
+    "serial_lists",
+    metadata,
+    Column(
+        "code",
+        Text,
+        primary_key=True,
+        comment="Code de la liste dans OpenAlex (`listed_in`), ou code du classement.",
+    ),
+    Column("ranking_code", Text, comment="Classement du niveau."),
+    Column("label", Text, nullable=False),
+    Column("display_order", Integer, nullable=False),
+    Column("maintainer", Text, comment="Organisme qui publie la liste, d'après OpenAlex."),
+    Column("url", Text),
+    Column("edition", Date, comment="Date de l'édition de la liste chargée par OpenAlex."),
+    comment=(
+        "Listes de revues. Un classement à niveaux est une ligne sans appartenances, parente de "
+        "ses niveaux."
+    ),
+    schema="publishing",
+)
+
+
+serial_list_entries = Table(
+    "serial_list_entries",
+    metadata,
+    Column("serial_id", Integer, primary_key=True),
+    Column("list_code", Text, primary_key=True),
+    comment="Appartenance d'une publication en série à une liste, d'après OpenAlex.",
+    schema="publishing",
+)
+
+
 monographs = Table(
     "monographs",
     metadata,
