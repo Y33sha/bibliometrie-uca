@@ -141,9 +141,13 @@ class TestRunOrchestrator:
             insert_publication_subject(sa_sync_conn, p1, subject_id=s)
             insert_publication_subject(sa_sync_conn, p2, subject_id=s)
 
-        stats = run(SubjectStore(sa_sync_conn), logging.getLogger("test"))
-        assert stats["labels"] == 2
-        assert stats["cooccurrence_pairs"] == 1  # (a,b) count=2
+        run(sa_sync_conn, logging.getLogger("test"))
+        assert sa_sync_conn.execute(text("SELECT count(*) FROM subject_labels")).scalar_one() == 2
+        # Paire (a, b), présente dans deux publications.
+        assert (
+            sa_sync_conn.execute(text("SELECT count(*) FROM subject_cooccurrences")).scalar_one()
+            == 1
+        )
         # Chacun des deux sujets est dans deux publications.
         rows = sa_sync_conn.execute(
             text("SELECT id, usage_count FROM subjects WHERE id = ANY(:ids) ORDER BY id"),
