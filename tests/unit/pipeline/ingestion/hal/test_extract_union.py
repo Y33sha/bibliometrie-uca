@@ -8,11 +8,11 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 from pipeline.ingestion.common.staging import UpsertOutcome
-from pipeline.ingestion.hal.harvest import HalHarvestConfig, harvest_union
+from pipeline.ingestion.hal.harvest import harvest_union
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import Progress
 
-_CONFIG = HalHarvestConfig(all_collections={"C": "Coll"})
+_COLLECTIONS = ["C"]
 
 
 def _page(docs: list[dict], next_cursor: str) -> dict:
@@ -34,7 +34,7 @@ def _extrait(client: MagicMock, **options) -> PhaseMetrics:
     metrics = PhaseMetrics()
     harvest_union(
         client,
-        _CONFIG,
+        _COLLECTIONS,
         MagicMock(),
         Progress(None, "HAL", None),
         metrics,

@@ -35,21 +35,19 @@ class Ecriture:
 def configuration(monkeypatch):
     """Pose la configuration lue par un moissonneur : identifiants du périmètre, années.
 
-    Les identifiants sont posés dans le module du moissonneur s'il les lit, les années dans la classe commune des moissonneurs.
+    Les identifiants et les années sont posés dans le patron des moissonneurs (`harvester`).
     """
 
     def _poser(
-        module,
         *,
         api_ids: list[str] | None = None,
         annees: list[int] | None = None,
     ) -> None:
-        if hasattr(module, "get_extraction_api_ids"):
-            monkeypatch.setattr(
-                module,
-                "get_extraction_api_ids",
-                lambda conn, source: ["X"] if api_ids is None else api_ids,
-            )
+        monkeypatch.setattr(
+            harvester,
+            "get_extraction_api_ids",
+            lambda conn, source: ["X"] if api_ids is None else api_ids,
+        )
         monkeypatch.setattr(
             harvester,
             "window_years",
@@ -96,7 +94,7 @@ def identifiants_rh(monkeypatch, configuration):
 
     Une chaîne désigne une personne à un seul ORCID ; un dictionnaire, les identifiants d'une personne par type.
     """
-    configuration(person_search, annees=[2024, 2025])
+    configuration(annees=[2024, 2025])
 
     def _poser(personnes: list) -> None:
         identifiants = [

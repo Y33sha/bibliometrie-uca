@@ -6,15 +6,12 @@ La requête à l'index Elasticsearch de ScanR cible les affiliations du périmè
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
 
 from sqlalchemy import Connection
 
 from domain.types import JsonValue, as_mapping, as_sequence, at_path
-from infrastructure.read_models.perimeters.queries import get_extraction_api_ids
 from pipeline.ingestion.api_params import SCANR_PER_PAGE
 from pipeline.ingestion.common.harvester import (
-    HarvestConfigError,
     HarvestWindow,
     SourceHarvester,
     stage_document,
@@ -25,14 +22,6 @@ from pipeline.runtime.observability.progress import Progress
 
 _COMMIT_EVERY = 500
 """Nombre de documents écrits entre deux commits."""
-
-
-@dataclass(frozen=True)
-class ScanrHarvestConfig:
-    """Configuration du moissonnage ScanR, lue en base."""
-
-    affiliation_ids: list[str]
-    """Identifiants ScanR des structures du périmètre de moissonnage."""
 
 
 def build_query(
@@ -98,21 +87,14 @@ def harvest_year(
     conn.commit()
 
 
-class ScanrHarvester(SourceHarvester[ScanrHarvestConfig, ScanrClient]):
+class ScanrHarvester(SourceHarvester[ScanrClient]):
     """Moissonnage ScanR des documents des structures du périmètre, année par année."""
 
     SOURCE = "scanr"
+    MISSING_API_IDS = "aucun affiliation_id"
 
-    def load_config(self, conn: Connection) -> ScanrHarvestConfig:
-        affiliation_ids = get_extraction_api_ids(conn, "scanr")
-        if not affiliation_ids:
-            raise HarvestConfigError(
-                "aucun affiliation_id (api_ids->'scanr' vide pour le périmètre d'extraction)"
-            )
-        return ScanrHarvestConfig(affiliation_ids=affiliation_ids)
-
-    def harvest_all(self, window: HarvestWindow, config: ScanrHarvestConfig) -> PhaseMetrics:
-        ids = config.affiliation_ids
+    def run(self, window: HarvestWindow) -> PhaseMetrics:
+        ids = self._api_ids()
         client = self._client
         years = self._years(window)
         return self._harvest_by_year(

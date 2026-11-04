@@ -71,13 +71,6 @@ def merge_identifiers(persons: list[Identifiers]) -> dict[PersonIdentifierType, 
 
 
 @dataclass(frozen=True)
-class PersonSearchConfig:
-    """Personnes interrogées."""
-
-    persons: list[Identifiers]
-
-
-@dataclass(frozen=True)
 class PersonSearchPage:
     """Une page de résultats."""
 
@@ -86,7 +79,7 @@ class PersonSearchPage:
     """Jeton de la page suivante, `None` en fin de résultats."""
 
 
-class PersonSearchHarvester[ClientT](SourceHarvester[PersonSearchConfig, ClientT]):
+class PersonSearchHarvester[ClientT](SourceHarvester[ClientT]):
     """Documents des personnes RH, cherchés par lots de personnes."""
 
     BATCH_SIZE: ClassVar[int] = 10
@@ -107,16 +100,12 @@ class PersonSearchHarvester[ClientT](SourceHarvester[PersonSearchConfig, ClientT
     ) -> PersonSearchPage:
         """Renvoie une page des documents d'un des `identifiers`, parus entre les deux années de `years`. Renvoie la première page quand `next_token` est `None`."""
 
-    def load_config(self, conn: Connection) -> PersonSearchConfig:
-        persons = searched_persons(conn, self.id_types)
+    def run(self, window: HarvestWindow) -> PhaseMetrics:
+        persons = searched_persons(self.conn, self.id_types)
         if not persons:
             raise HarvestConfigError("aucune personne RH à identifiant confirmé ou authentifié")
-        return PersonSearchConfig(persons=persons)
-
-    def harvest_all(self, window: HarvestWindow, config: PersonSearchConfig) -> PhaseMetrics:
         all_years = self._years(window)
         years = (min(all_years), max(all_years))
-        persons = config.persons
         batches = [
             persons[i : i + self.BATCH_SIZE] for i in range(0, len(persons), self.BATCH_SIZE)
         ]

@@ -9,13 +9,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from dataclasses import dataclass
 
 from sqlalchemy import Connection, text
 
 from domain.types import as_int, as_mapping, as_sequence
-from infrastructure.read_models.perimeters.queries import get_extraction_api_ids
-from pipeline.ingestion.common.harvester import HarvestConfigError, HarvestWindow, SourceHarvester
+from pipeline.ingestion.common.harvester import HarvestWindow, SourceHarvester
 from pipeline.ingestion.common.lookup import LookupChannel, look_up, one_at_a_time
 from pipeline.ingestion.theses.api import ThesesClient, fetch_thesis
 from pipeline.ingestion.theses.fields import is_ongoing, listed_id
@@ -25,14 +23,6 @@ from pipeline.runtime.observability.progress import Progress, track_progress
 _STAGED_IDS_SQL = text(
     "SELECT source_id FROM staging WHERE source = 'theses' AND disappeared_at IS NULL"
 )
-
-
-@dataclass(frozen=True)
-class ThesesHarvestConfig:
-    """Configuration du moissonnage theses.fr, lue en base."""
-
-    ppns: list[str]
-    """PPN des établissements de soutenance du périmètre de moissonnage."""
 
 
 def build_query(ppns: list[str]) -> str:
@@ -99,26 +89,19 @@ def stage_details(conn: Connection, log: logging.Logger, theses_ids: list[str]) 
     )
 
 
-class ThesesHarvester(SourceHarvester[ThesesHarvestConfig, ThesesClient]):
+class ThesesHarvester(SourceHarvester[ThesesClient]):
     """Moissonnage theses.fr des thèses des établissements du périmètre."""
 
     SOURCE = "theses"
+    MISSING_API_IDS = "aucun PPN d'établissement"
     DOCUMENT = "thèse"
     FEMININE = True
 
-    def load_config(self, conn: Connection) -> ThesesHarvestConfig:
-        ppns = get_extraction_api_ids(conn, "theses")
-        if not ppns:
-            raise HarvestConfigError(
-                "aucun PPN d'établissement (api_ids->'theses' vide pour le périmètre d'extraction)"
-            )
-        return ThesesHarvestConfig(ppns=ppns)
-
-    def harvest_all(self, window: HarvestWindow, config: ThesesHarvestConfig) -> PhaseMetrics:
+    def run(self, window: HarvestWindow) -> PhaseMetrics:
         years = self._years(window)
         scope = f"{years[0]}-{years[-1]}" if len(years) > 1 else str(years[0])
         with track_progress(None, self._label(scope), self.logger, count_kept=True) as progress:
-            seen, kept = list_theses(self._client, config.ppns, progress, years=years)
+            seen, kept = list_theses(self._client, self._api_ids(), progress, years=years)
         staged = staged_theses_ids(self.conn)
         metrics = stage_details(
             self.conn, self.logger, [theses_id for theses_id in kept if theses_id not in staged]

@@ -1,6 +1,6 @@
 """Tests unitaires de `pipeline.ingestion.common.harvester.SourceHarvester`.
 
-Couvre la séquence de `run` (`load_config`, `setup_logging`, puis `harvest_all`) et le bilan.
+Couvre le moissonnage par année, le bilan et la source sans configuration.
 
 Sans base ni réseau : un faux moissonneur déterministe et une connexion simulée.
 """
@@ -9,51 +9,18 @@ from __future__ import annotations
 
 import argparse
 import logging
-from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 
 from pipeline.http.circuit_breaker import SourceUnavailableError, source_circuit_breaker
+from pipeline.ingestion.common import harvester
 from pipeline.ingestion.common.harvester import (
     HarvestConfigError,
     HarvestWindow,
     SourceHarvester,
     run_harvest,
 )
-from pipeline.runtime.observability.metrics import PhaseMetrics
-
-
-class _FakeHarvester(SourceHarvester):
-    """Implémentation déterministe pour les tests."""
-
-    SOURCE = "fake"
-
-    def __init__(
-        self,
-        conn,
-        logger,
-        *,
-        config: dict[str, Any] | None = None,
-        metrics: PhaseMetrics | None = None,
-    ) -> None:
-        super().__init__(conn, logger, MagicMock())
-        self._config = config or {"affiliations": ["UCA"]}
-        self._metrics = metrics or PhaseMetrics(new=42)
-        self.load_config_calls = 0
-        self.extract_all_calls: list[dict[str, Any]] = []
-        self.setup_logging_calls = 0
-
-    def load_config(self, conn):  # type: ignore[no-untyped-def]
-        self.load_config_calls += 1
-        return self._config
-
-    def harvest_all(self, args, config):  # type: ignore[no-untyped-def]
-        self.extract_all_calls.append({"args": args, "config": config})
-        return self._metrics
-
-    def setup_logging(self, args, config):  # type: ignore[no-untyped-def]
-        self.setup_logging_calls += 1
 
 
 @pytest.fixture
@@ -87,10 +54,7 @@ class _ParAnnee(SourceHarvester):
         self.totaux: list[int | None] = []
         self.progress = None
 
-    def load_config(self, conn):  # type: ignore[no-untyped-def]
-        return None
-
-    def harvest_all(self, args, config):  # type: ignore[no-untyped-def]
+    def run(self, window):  # type: ignore[no-untyped-def]
         def harvest_step(year, progress, metrics):
             self.progress = progress
             self.log_format.append(progress._label)
@@ -160,23 +124,6 @@ class TestExtractionParAnnee:
         assert sum(ext._count(count_year, year) for year in ext.volumes) == 2
 
 
-class TestRun:
-    def test_happy_path_calls_pipeline_in_order(self, conn, logger):
-        ext = _FakeHarvester(conn, logger)
-        args = HarvestWindow()
-
-        metrics = ext.run(args)
-
-        assert ext.load_config_calls == 1
-        assert ext.setup_logging_calls == 1
-        # harvest_all reçoit args, config.
-        assert len(ext.extract_all_calls) == 1
-        call = ext.extract_all_calls[0]
-        assert call["args"] is args
-        assert call["config"] == {"affiliations": ["UCA"]}
-        assert metrics.new == 42
-
-
 def test_une_source_non_configuree_est_sautee_avec_un_signal(contexte):
     class _SansConfiguration:
         def run(self, window):
@@ -187,3 +134,14 @@ def test_une_source_non_configuree_est_sautee_avec_un_signal(contexte):
     )
 
     assert [s["code"] for s in metrics.signals] == ["source_unconfigured"]
+
+
+def test_une_source_sans_identifiant_dans_le_perimetre_leve_une_erreur_de_configuration(
+    monkeypatch, logger
+):
+    monkeypatch.setattr(harvester, "get_extraction_api_ids", lambda conn, source: [])
+    ext = _ParAnnee(logger, {})
+    ext.MISSING_API_IDS = "aucune affiliation"
+
+    with pytest.raises(HarvestConfigError, match="aucune affiliation"):
+        ext._api_ids()

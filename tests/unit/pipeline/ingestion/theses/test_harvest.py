@@ -121,7 +121,7 @@ def details(monkeypatch):
 
 def test_seul_le_detail_des_theses_absentes_est_lu(configuration, details):
     """Le détail d'une thèse présente dans `staging` reste à la relecture par `fetch_stale`."""
-    configuration(harvest, annees=[2020])
+    configuration(annees=[2020])
     lus, presentes = details
     presentes.add("2020A")
     client = _client([[_these("2020A"), _these("2020B")]])
@@ -131,20 +131,20 @@ def test_seul_le_detail_des_theses_absentes_est_lu(configuration, details):
 
 
 def test_run_interroge_tous_les_etablissements_d_un_coup(configuration, details):
-    configuration(harvest, api_ids=["PPN1", "PPN2"], annees=[2020])
+    configuration(api_ids=["PPN1", "PPN2"], annees=[2020])
     client = _client([[_these("2020A"), _these("2020B")]])
     assert moissonneur(ThesesHarvester, client).run(arguments_du_run()).new == 2
     assert client.fetch_page.call_args.args[0] == build_query(["PPN1", "PPN2"])
 
 
 def test_run_avec_une_annee_fait_le_bilan_des_theses_retenues(configuration, details):
-    configuration(harvest)
+    configuration()
     client = _client([[_these("2020A"), _these("2021A")]])
     metrics = moissonneur(ThesesHarvester, client).run(arguments_du_run(years=(2021, 2021)))
     assert metrics.new == 1
 
 
 def test_run_sans_ppn_configure_refuse(configuration):
-    configuration(harvest, api_ids=[])
+    configuration(api_ids=[])
     with pytest.raises(HarvestConfigError, match="aucun PPN"):
         moissonneur(ThesesHarvester, _client([])).run(arguments_du_run())

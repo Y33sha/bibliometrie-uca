@@ -12,7 +12,7 @@ import pytest
 
 from pipeline.ingestion.common.harvester import HarvestConfigError
 from pipeline.ingestion.common.staging import UpsertOutcome
-from pipeline.ingestion.openalex import api, harvest
+from pipeline.ingestion.openalex import api
 from pipeline.ingestion.openalex.api import build_params
 from pipeline.ingestion.openalex.harvest import OpenalexHarvester, harvest_period
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -141,7 +141,7 @@ def test_page_sans_resultat_interrompt(ecritures):
 
 
 def test_run_parcourt_les_annees_de_la_configuration(configuration, ecritures):
-    configuration(harvest, annees=[2023, 2024])
+    configuration(annees=[2023, 2024])
     client = _client([_page([_work("W1")]), _page([_work("W2")])])
     metrics = moissonneur(OpenalexHarvester, client).run(arguments_du_run())
     assert metrics.new == 2
@@ -149,13 +149,13 @@ def test_run_parcourt_les_annees_de_la_configuration(configuration, ecritures):
 
 
 def test_run_avec_une_annee_demandee_ignore_la_configuration(configuration, ecritures):
-    configuration(harvest, annees=[2020, 2021])
+    configuration(annees=[2020, 2021])
     client = _client([_page([_work("W1")])])
     moissonneur(OpenalexHarvester, client).run(arguments_du_run(years=(2024, 2024)))
     assert client.fetch_page.call_args.kwargs["years"] == [2024]
 
 
 def test_run_sans_institution_refuse(configuration):
-    configuration(harvest, api_ids=[])
+    configuration(api_ids=[])
     with pytest.raises(HarvestConfigError, match="aucun institution_id"):
         moissonneur(OpenalexHarvester, _client([])).run(arguments_du_run())

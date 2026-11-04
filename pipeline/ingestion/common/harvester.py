@@ -1,6 +1,6 @@
 """Socle des moissonneurs : patron commun et écriture d'un document dans `staging`.
 
-Le patron gère l'en-tête et le bilan du journal, la barre de progression et l'arrêt sur source indisponible. Chaque source hérite de `SourceHarvester` et implémente `load_config()` et `harvest_all()`. La pagination reste propre à chaque source.
+Le patron gère l'en-tête et le bilan du journal, la barre de progression et l'arrêt sur source indisponible. Chaque source hérite de `SourceHarvester` et implémente `run()`. La pagination reste propre à chaque source.
 """
 
 from __future__ import annotations
@@ -17,6 +17,7 @@ from domain.sources.staging import StagingEntryMode
 from domain.types import JsonValue
 from infrastructure import PROJECT_ROOT
 from infrastructure.observability.log import setup_logger
+from infrastructure.read_models.perimeters.queries import get_extraction_api_ids
 from pipeline.http.circuit_breaker import SourceUnavailableError, trip_source
 from pipeline.ingestion.common.staging import StagingStore, UpsertOutcome
 from pipeline.runtime.config import YearRange, window_years
@@ -87,7 +88,7 @@ def stage_document(
 class HarvestConfigError(Exception):
     """Configuration de moissonnage incomplète : un paramètre indispensable à l'API manque (identifiants d'institution, affiliations, PPN).
 
-    `load_config` la lève avant toute requête. La source est alors sautée avec un message explicite.
+    Le moissonneur la lève avant toute requête. La source est alors sautée avec un message explicite.
     """
 
 
@@ -101,15 +102,15 @@ class HarvestWindow:
     """Date de modification minimale du mode incrémental, au format `YYYY-MM-DD`."""
 
 
-class SourceHarvester[ConfigT, ClientT](ABC):
+class SourceHarvester[ClientT](ABC):
     """Patron d'un moissonneur, de l'API de la source vers `staging`.
 
-    `ConfigT` est le type de la configuration propre à la source, renvoyée par `load_config` et reçue par `harvest_all`. `ClientT` est le type du client HTTP de la source, reçu à la construction.
-
-    Une sous-classe définit `SOURCE`, `load_config` et `harvest_all`, et peut définir `setup_logging`.
+    `ClientT` est le type du client HTTP de la source, reçu à la construction. Une sous-classe définit `SOURCE` et `run`.
     """
 
     SOURCE: ClassVar[str] = ""
+    MISSING_API_IDS: ClassVar[str] = ""
+    """Message d'une source sans identifiant dans le périmètre d'extraction : « aucune affiliation »."""
     DOCUMENT: ClassVar[str] = "document"
     """Nom des éléments rapportés par la source, au singulier."""
     FEMININE: ClassVar[bool] = False
@@ -215,30 +216,28 @@ class SourceHarvester[ConfigT, ClientT](ABC):
             quantity(metrics.unchanged, *unchanged_form),
         )
 
-    @abstractmethod
-    def load_config(self, conn: Connection) -> ConfigT:
-        """Charge depuis la base la configuration propre à la source."""
+    def _api_ids(self) -> list[str]:
+        """Renvoie les identifiants de la source dans le périmètre d'extraction (`api_ids`).
+
+        Raises:
+            HarvestConfigError: le périmètre d'extraction est sans identifiant pour la source.
+        """
+        ids = get_extraction_api_ids(self.conn, self.SOURCE)
+        if not ids:
+            raise HarvestConfigError(
+                f"{self.MISSING_API_IDS} (api_ids->'{self.SOURCE}' vide pour le périmètre d'extraction)"
+            )
+        return ids
 
     @abstractmethod
-    def harvest_all(self, window: HarvestWindow, config: ConfigT) -> PhaseMetrics:
-        """Moissonne la fenêtre et renvoie les métriques."""
-
-    def setup_logging(  # noqa: B027
-        self, window: HarvestWindow, config: ConfigT
-    ) -> None:
-        """Écrit l'en-tête du journal propre à la source : affiliations, collections, années."""
-
     def run(self, window: HarvestWindow) -> PhaseMetrics:
-        """Charge la configuration, écrit l'en-tête du journal, puis moissonne. Les exceptions remontent à l'appelant."""
-        config = self.load_config(self.conn)
-        self.setup_logging(window, config)
-        return self.harvest_all(window, config)
+        """Moissonne la fenêtre et renvoie les métriques. Une source sans configuration lève `HarvestConfigError`."""
 
 
 class Harvester(Protocol):
     """Point d'entrée d'un `SourceHarvester`, seul appelé par les orchestrateurs.
 
-    Le protocole efface les paramètres de type de `SourceHarvester`, la configuration et le client propres à chaque source.
+    Le protocole efface le paramètre de type de `SourceHarvester`, le client propre à chaque source.
     """
 
     def run(self, window: HarvestWindow) -> PhaseMetrics: ...

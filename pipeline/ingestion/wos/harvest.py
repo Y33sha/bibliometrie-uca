@@ -6,13 +6,10 @@ La requête à l'API WoS Expanded cible les affiliations du périmètre (`OG=`),
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass
 
 from sqlalchemy import Connection
 
-from infrastructure.read_models.perimeters.queries import get_extraction_api_ids
 from pipeline.ingestion.common.harvester import (
-    HarvestConfigError,
     HarvestWindow,
     SourceHarvester,
     stage_document,
@@ -29,14 +26,6 @@ _BETWEEN_YEARS_SECS = 30
 """Pause entre deux années."""
 _WOS_FIRST_RECORD_LIMIT = 100_000
 """Plafond de l'API : `firstRecord` ne dépasse pas 100 000 sur une requête."""
-
-
-@dataclass(frozen=True)
-class WosHarvestConfig:
-    """Configuration du moissonnage WoS, lue en base."""
-
-    affiliations: list[str]
-    """Variantes d'affiliation (Organization-Enhanced) du périmètre de moissonnage."""
 
 
 def harvest_year(
@@ -97,23 +86,17 @@ def harvest_year(
             data = client.fetch_page(year, first_record, affiliations)
 
 
-class WosHarvester(SourceHarvester[WosHarvestConfig, WosClient]):
+class WosHarvester(SourceHarvester[WosClient]):
     """Moissonnage WoS des records des affiliations du périmètre, année par année.
 
     Une erreur sur une année est journalisée, et le moissonnage passe à la suivante.
     """
 
     SOURCE = "wos"
+    MISSING_API_IDS = "aucune affiliation"
 
-    def load_config(self, conn: Connection) -> WosHarvestConfig:
-        affiliations = get_extraction_api_ids(conn, "wos")
-        if not affiliations:
-            raise HarvestConfigError(
-                "aucune affiliation (api_ids->'wos' vide pour le périmètre d'extraction)"
-            )
-        return WosHarvestConfig(affiliations=affiliations)
-
-    def setup_logging(self, window: HarvestWindow, config: WosHarvestConfig) -> None:
+    def _log_quota(self) -> None:
+        """Écrit le quota annuel restant de l'API."""
         try:
             remaining = self._client.check_quota()
         except Exception as e:
@@ -122,8 +105,9 @@ class WosHarvester(SourceHarvester[WosHarvestConfig, WosClient]):
         if remaining:
             self.logger.info("Quota annuel restant : %s records", remaining)
 
-    def harvest_all(self, window: HarvestWindow, config: WosHarvestConfig) -> PhaseMetrics:
-        affiliations = config.affiliations
+    def run(self, window: HarvestWindow) -> PhaseMetrics:
+        affiliations = self._api_ids()
+        self._log_quota()
         client = self._client
         years = self._years(window)
 
