@@ -98,11 +98,31 @@ class TestSelectPhasesToRun:
 
         assert args.sources == {"hal", "wos"}
 
+    def test_sans_annees_le_run_suit_la_configuration(self):
+        assert run_pipeline._build_arg_parser().parse_args([]).years is None
+
+    def test_une_annee_seule(self):
+        args = run_pipeline._build_arg_parser().parse_args(["--years", "2017"])
+
+        assert args.years == (2017, 2017)
+
+    def test_une_plage_d_annees(self):
+        args = run_pipeline._build_arg_parser().parse_args(["--years", "2017", "2020"])
+
+        assert args.years == (2017, 2020)
+
+    @pytest.mark.parametrize("valeurs", [["2017", "2018", "2019"], ["2020", "2017"], ["deux"]])
+    def test_plage_d_annees_invalide_arrete_le_run(self, valeurs):
+        with pytest.raises(SystemExit) as sortie:
+            run_pipeline._build_arg_parser().parse_args(["--years", *valeurs])
+
+        assert sortie.value.code == 2
+
 
 def test_les_arguments_deviennent_les_options_du_run():
-    options = run_pipeline._run_options(_args(mode="daily", year=2024))
+    options = run_pipeline._run_options(_args(mode="daily", years=(2024, 2024)))
 
-    assert (options.mode, options.year) == ("daily", 2024)
+    assert (options.mode, options.years) == ("daily", (2024, 2024))
     assert options.sources == {"hal", "openalex", "wos"}
 
 
@@ -235,7 +255,7 @@ class TestRunOnePhase:
 
     def test_options_du_run_transmises_a_la_phase(self):
         recus: dict = {}
-        options = RunOptions(mode="daily", year=2024, include_wos=True)
+        options = RunOptions(mode="daily", years=(2024, 2024), include_wos=True)
 
         self._executer(
             lambda ctx: recus.update(options=ctx.options) or PhaseMetrics(), options=options
@@ -357,8 +377,9 @@ class TestMain:
                 "run_pipeline",
                 "--mode",
                 "daily",
-                "--start-year",
+                "--years",
                 "2020",
+                "2022",
                 "--sources",
                 "hal,openalex",
                 "--include-wos",
@@ -370,7 +391,7 @@ class TestMain:
 
         (options,) = recues
         assert options.mode == "daily"
-        assert options.start_year == 2020
+        assert options.years == (2020, 2022)
         assert options.sources == {"hal", "openalex"}
         assert options.include_wos is True
         assert options.raw_store is True

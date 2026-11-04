@@ -99,16 +99,16 @@ def test_since_last_hal_non_configure(lancer):
 
 
 def test_toutes_les_sources_suivent_la_fenetre_d_annees(lancer):
-    seen: dict[str, tuple[int | None, int | None]] = {}
+    seen: dict[str, tuple[int, int] | None] = {}
 
     def harvest_one(_ctx, source, window):
-        seen[source] = (window.start_year, window.year)
+        seen[source] = window.years
         return PhaseMetrics()
 
-    lancer(harvest_one, mode="full", sources={"hal", "theses"}, start_year=2020)
+    lancer(harvest_one, mode="full", sources={"hal", "theses"}, years=(2020, 2022))
 
-    assert seen["hal"] == (2020, None)
-    assert seen["theses"] == (2020, None)
+    assert seen["hal"] == (2020, 2022)
+    assert seen["theses"] == (2020, 2022)
 
 
 def test_parallel_skips_unavailable_source(lancer):

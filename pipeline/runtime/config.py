@@ -34,19 +34,22 @@ def fixed_start_year(conn: Connection) -> int | None:
     return _stored_int(conn, ConfigKey.PIPELINE_START_YEAR_FULL)
 
 
-def get_years(conn: Connection, start_year: int | None = None) -> list[int]:
-    """Renvoie les années à moissonner, de `start_year` à l'année courante.
+type YearRange = tuple[int, int]
+"""Première et dernière années d'un run, incluses."""
 
-    Sans `start_year`, la première année vient de la configuration (`start_year_value`). Si la première année est future, seule l'année courante est renvoyée.
-    """
+
+def get_years(conn: Connection) -> list[int]:
+    """Renvoie les années moissonnées par défaut, de la première année configurée (`start_year_value`) à l'année courante. Si la première année est future, seule l'année courante est renvoyée."""
     current_year = today().year
-    if start_year is None:
-        start_year = start_year_value(fixed_start_year(conn), current_year)
+    start_year = start_year_value(fixed_start_year(conn), current_year)
     if start_year <= current_year:
         return list(range(start_year, current_year + 1))
     return [current_year]
 
 
-def window_years(conn: Connection, *, start_year: int | None, year: int | None) -> list[int]:
-    """Renvoie les années de la fenêtre du run : `year` (`--year`), sinon de `start_year` à l'année courante (`get_years`)."""
-    return [year] if year else get_years(conn, start_year)
+def window_years(conn: Connection, years: YearRange | None) -> list[int]:
+    """Renvoie les années de la fenêtre du run : celles de `years` (`--years`), sinon les années par défaut (`get_years`)."""
+    if years is None:
+        return get_years(conn)
+    first, last = years
+    return list(range(first, last + 1))

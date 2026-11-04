@@ -68,7 +68,7 @@ def _run_fetch_missing_doi(ctx: PhaseContext, target: str) -> PhaseMetrics:
     with ctx.open_tx() as conn:
         retry_after_days = delay(conn, ConfigKey.FETCH_MISSING_RETRY_AFTER_DAYS)
         limit = cap(conn, ConfigKey.FETCH_MISSING_MAX_PER_SOURCE)
-        years = window_years(conn, start_year=options.start_year, year=options.year)
+        years = window_years(conn, options.years)
         return asyncio.run(
             fetch_missing_doi(
                 conn,

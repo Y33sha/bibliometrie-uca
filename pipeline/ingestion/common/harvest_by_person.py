@@ -1,6 +1,6 @@
 """Phase `harvest_by_person` : moissonnage des sources par les identifiants des personnes à fiche RH, vers `staging`.
 
-Une tâche par source, en parallèle, sur la plage d'années du moissonnage ou la seule année `--year`. La phase est sautée dans un mode dont la policy l'exclut (`daily`). `--sources` restreint les sources.
+Une tâche par source, en parallèle, sur les années du run (`--years`). La phase est sautée dans un mode dont la policy l'exclut (`daily`). `--sources` restreint les sources.
 
 Le profil de chaque source liste les types d'identifiant de personne acceptés (`domain/sources/registry.py`).
 """
@@ -19,7 +19,7 @@ def _search(source: str) -> TaskRun:
     """Renvoie l'exécution de l'interrogation de `source` par les identifiants des personnes."""
 
     def run(ctx: PhaseContext) -> PhaseMetrics:
-        window = HarvestWindow(start_year=ctx.options.start_year, year=ctx.options.year)
+        window = HarvestWindow(years=ctx.options.years)
         harvester = ADAPTERS[Source(source)].person_harvester
         assert harvester is not None, f"{source} : source cherchée par personne sans moissonneur"
         return run_harvest(ctx, source, harvester, window)

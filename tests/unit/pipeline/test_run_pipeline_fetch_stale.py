@@ -36,7 +36,9 @@ def _called_targets(stack) -> MagicMock:
     stack.enter_context(
         patch(
             "pipeline.ingestion.common.fetch_stale.window_years",
-            side_effect=lambda conn, *, start_year, year: [year] if year else [2024],
+            side_effect=lambda conn, years: (
+                list(range(years[0], years[1] + 1)) if years else [2024]
+            ),
         )
     )
     return run_one
@@ -77,10 +79,10 @@ def test_fetch_stale_toutes_les_sources_suivent_la_fenetre():
 
 
 def test_fetch_stale_year_narrows_all_including_theses():
-    # `--year` cible une seule année pour toutes les sources, theses comprise.
+    # `--years` cible une seule année pour toutes les sources, theses comprise.
     with ExitStack() as stack:
         run_one = _called_targets(stack)
-        _run_phase(RunOptions(year=2023))
+        _run_phase(RunOptions(years=(2023, 2023)))
     by_target = {c.args[1]: c.args[2] for c in run_one.call_args_list}
     assert by_target["theses"] == [2023]
     assert by_target["hal"] == [2023]
@@ -110,7 +112,9 @@ def test_la_relecture_d_une_source_tourne_sous_son_circuit_breaker():
         stack.enter_context(
             patch(
                 "pipeline.ingestion.common.fetch_stale.window_years",
-                side_effect=lambda conn, *, start_year, year: [year] if year else [2024],
+                side_effect=lambda conn, years: (
+                    list(range(years[0], years[1] + 1)) if years else [2024]
+                ),
             )
         )
         _run_phase(RunOptions(sources={"hal"}))

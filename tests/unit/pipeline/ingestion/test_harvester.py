@@ -97,7 +97,7 @@ class _ParAnnee(SourceHarvester):
 
 
 def _args() -> argparse.Namespace:
-    return argparse.Namespace(year=None, start_year=None)
+    return HarvestWindow()
 
 
 class TestExtractionParAnnee:
@@ -135,7 +135,7 @@ class TestExtractionParAnnee:
 class TestRun:
     def test_happy_path_calls_pipeline_in_order(self, conn, logger):
         ext = _FakeHarvester(conn, logger)
-        args = argparse.Namespace(year=None, start_year=None)
+        args = HarvestWindow()
 
         metrics = ext.run(args)
 

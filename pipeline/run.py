@@ -16,8 +16,10 @@ import signal
 import sys
 import textwrap
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass
 from types import FrameType
+from typing import cast
 
 from domain.pipeline_runs import PhaseStatus
 from domain.sources.registry import Source
@@ -84,6 +86,25 @@ def _source_list(value: str) -> frozenset[str]:
     if unknown := [s for s in sources if s not in Source]:
         raise argparse.ArgumentTypeError(f"source(s) inconnue(s) : {', '.join(unknown)}")
     return frozenset(sources)
+
+
+class _YearRange(argparse.Action):
+    """Lit `--years` : une année, ou la première et la dernière d'une plage."""
+
+    def __call__(
+        self,
+        parser: argparse.ArgumentParser,
+        namespace: argparse.Namespace,
+        values: str | Sequence[object] | None,
+        option_string: str | None = None,
+    ) -> None:
+        years = cast("list[int]", values)
+        if len(years) > 2:
+            parser.error("--years : une année, ou la première et la dernière d'une plage")
+        first, last = years[0], years[-1]
+        if first > last:
+            parser.error(f"--years : {first} est postérieure à {last}")
+        setattr(namespace, self.dest, (first, last))
 
 
 @dataclass(frozen=True)
@@ -175,12 +196,14 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         default=frozenset(Source),
         help=f"Sources, séparées par des virgules (défaut : {','.join(Source)})",
     )
-    parser.add_argument("--year", type=int, help="Moissonner cette seule année")
     parser.add_argument(
-        "--start-year",
+        "--years",
         type=int,
-        help="Première année moissonnée (mode full ; défaut : clé de configuration "
-        "pipeline_start_year_full)",
+        nargs="+",
+        action=_YearRange,
+        metavar="ANNÉE",
+        help="Une année, ou la première et la dernière d'une plage (défaut : de la clé de "
+        "configuration pipeline_start_year_full à l'année courante)",
     )
     for flag in _RUN_FLAGS:
         parser.add_argument(flag.option, action="store_true", help=flag.help)
@@ -192,8 +215,7 @@ def _run_options(args: argparse.Namespace) -> RunOptions:
     return RunOptions(
         mode=args.mode,
         sources=args.sources,
-        year=args.year,
-        start_year=args.start_year,
+        years=args.years,
         **{flag.dest: getattr(args, flag.dest) for flag in _RUN_FLAGS},
     )
 
@@ -286,10 +308,12 @@ def _run_title(args: argparse.Namespace, phases: list[Phase]) -> list[str]:
     """Renvoie les lignes d'ouverture d'une exécution : son mode, puis ses réglages distincts du lancement par défaut."""
     settings = _setting("mode", args.mode)
 
-    if args.year:
-        settings += _setting("année", str(args.year))
-    elif args.start_year:
-        settings += _setting("depuis", str(args.start_year))
+    if args.years:
+        first, last = args.years
+        if first == last:
+            settings += _setting("année", str(first))
+        else:
+            settings += _setting("années", f"{first}-{last}")
 
     if args.only or args.from_phase:
         settings += _setting("phases", ", ".join(phase.name for phase in phases))

@@ -148,7 +148,7 @@ def test_run_parcourt_les_annees_de_la_configuration(configuration, ecritures):
 def test_run_avec_une_annee_demandee_ignore_la_configuration(configuration, ecritures):
     configuration(harvest, annees=[2020, 2021])
     client = _client([_page([_work("W1")])])
-    moissonneur(OpenalexHarvester, client).run(arguments_du_run(year=2024))
+    moissonneur(OpenalexHarvester, client).run(arguments_du_run(years=(2024, 2024)))
     assert client.fetch_page.call_args.kwargs["years"] == [2024]
 
 

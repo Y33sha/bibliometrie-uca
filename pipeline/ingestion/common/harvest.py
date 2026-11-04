@@ -2,7 +2,7 @@
 
 La phase s'arrête en échec si le périmètre de moissonnage (`perimeter_extraction`) est vide. La policy du mode (`modes.py`) fixe les sources et la fenêtre :
 
-- les années de `start_year` à l'année courante, ou la seule année `--year` ;
+- les années `--years`, par défaut de la première année configurée à l'année courante ;
 - en mode incrémental (quotidien), parmi ces années, les documents modifiés depuis le dernier moissonnage quotidien réussi, à défaut depuis 30 jours.
 
 Une source dont le périmètre d'interrogation manque est sautée avec un signal (`run_harvest`).
@@ -69,7 +69,7 @@ def _harvest(source: str) -> TaskRun:
                 origin,
             )
             since = last_daily.isoformat()
-        window = HarvestWindow(start_year=options.start_year, year=options.year, since=since)
+        window = HarvestWindow(years=options.years, since=since)
         harvester = ADAPTERS[Source(source)].harvester
         assert harvester is not None, f"{source} : source moissonnée sans moissonneur"
         return run_harvest(ctx, source, harvester, window)

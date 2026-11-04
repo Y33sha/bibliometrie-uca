@@ -20,7 +20,7 @@ def relues(monkeypatch) -> list[str]:
         return PhaseMetrics()
 
     monkeypatch.setattr(fetch_stale, "_run_fetch_stale", run_one)
-    monkeypatch.setattr(fetch_stale, "window_years", lambda _conn, *, start_year, year: None)
+    monkeypatch.setattr(fetch_stale, "window_years", lambda _conn, _years: None)
     return sources
 
 

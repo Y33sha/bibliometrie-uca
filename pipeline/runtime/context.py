@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from sqlalchemy import Connection
 
 from domain.sources.registry import PROFILES, Source
+from pipeline.runtime.config import YearRange
 from pipeline.runtime.modes import MODES, ModePolicy
 
 # Fabrique de transaction gérée en context-manager : commit en sortie de bloc si succès, rollback sur exception. Une phase ouvre une transaction par sous-étape.
@@ -35,8 +36,8 @@ class RunOptions:
     mode: str = "full"
     sources: frozenset[str] = frozenset(Source)
     """Sources du run, toutes par défaut."""
-    year: int | None = None
-    start_year: int | None = None
+    years: YearRange | None = None
+    """Années du run (`--years`). `None` : de la première année configurée à l'année courante."""
     include_wos: bool = False
     rebuild_publications: bool = False
     rebuild_author_grouping: bool = False

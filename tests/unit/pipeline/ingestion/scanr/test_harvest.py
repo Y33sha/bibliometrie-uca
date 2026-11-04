@@ -119,7 +119,7 @@ def test_run_parcourt_les_annees_de_la_configuration(configuration, ecritures):
 def test_run_avec_une_annee_demandee_ignore_la_configuration(configuration, ecritures):
     configuration(harvest, annees=[2020, 2021, 2022])
     client = _client([_page([_hit("a")]), _page([])])
-    assert moissonneur(ScanrHarvester, client).run(arguments_du_run(year=2024)).total == 1
+    assert moissonneur(ScanrHarvester, client).run(arguments_du_run(years=(2024, 2024))).total == 1
     filtre = client.fetch_page.call_args_list[0].args[0]["query"]["bool"]["filter"]
     assert filtre[0] == {"term": {"year": 2024}}
 

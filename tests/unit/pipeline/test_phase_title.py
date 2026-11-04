@@ -85,7 +85,7 @@ class TestTitreDuRun:
         assert "sources" not in _texte(_run_title(_args(), [])).lower()
 
     def test_une_annee_demandee_parait(self, terminal) -> None:
-        assert "année ···· 2018" in _texte(_run_title(_args(year=2018), []))
+        assert "année ···· 2018" in _texte(_run_title(_args(years=(2018, 2018)), []))
 
     def test_les_phases_paraissent_quand_le_lancement_les_restreint(self, terminal) -> None:
         text = _texte(_run_title(_args(only="persons"), [_phase("persons")]))

@@ -1,13 +1,13 @@
 # Moissonnage
 
-*À jour le 2026-10-30.*
+*À jour le 2026-11-04.*
 
 Récupère les données brutes depuis les API et les stocke en JSONB dans le *staging*.
 
 ## Moissonnage par affiliation (`harvest`)
 
 **Critères de requête**:
-- **années** de publication : de l'année de début à l'année courante. L'année de début est l'argument `--start-year`, à défaut la valeur [configurable](../guide-utilisateur/administration/04-workflow.md#années) dans `admin/config`. Une thèse soutenue suit la fenêtre par son année de soutenance ; une thèse en cours est toujours retenue ;
+- **années** de publication : celles de l'argument `--years`, une année ou une plage. À défaut, de l'année de début [configurable](../guide-utilisateur/administration/04-workflow.md#années) dans `admin/config` à l'année courante. Une thèse soutenue suit la fenêtre par son année de soutenance ; une thèse en cours est toujours retenue ;
 - **affiliation** des publications ([périmètre configurable](../guide-utilisateur/administration/04-workflow.md#périmètres) dans `admin/config`). Il s'agit des affiliations *renseignées par chaque source*. Elles peuvent varier d'une source à l'autre et être incomplètes ou erronées. DataCite donne les affiliations en texte libre et s'interroge par mots-clés saisis pour chaque structure.
 
 En mode `daily`, seul HAL est moissonné : les dépôts de la même plage d'années, modifiés depuis le dernier moissonnage quotidien réussi, ou depuis 30 jours à défaut.

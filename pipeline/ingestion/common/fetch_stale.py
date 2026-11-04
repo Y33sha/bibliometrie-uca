@@ -31,7 +31,7 @@ from pipeline.runtime.observability.signals import skipped
 def _years(ctx: PhaseContext) -> list[int] | None:
     """Renvoie les années de la fenêtre du run (`window_years`), ou `None` pour tout l'historique."""
     with ctx.open_tx() as conn:
-        return window_years(conn, start_year=ctx.options.start_year, year=ctx.options.year)
+        return window_years(conn, ctx.options.years)
 
 
 def _run_fetch_stale(ctx: PhaseContext, target: str, years: list[int] | None) -> PhaseMetrics:
