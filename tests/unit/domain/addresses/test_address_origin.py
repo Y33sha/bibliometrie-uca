@@ -51,6 +51,10 @@ def _origin(raw_text: str) -> AddressOrigin:
             AddressOrigin.RAW,
         ),
         ("Narvik University College (Norway)", AddressOrigin.HAL_LABEL),
+        (
+            "GePEB - Génie des Procédés, Energétique et Biosystèmes (France)",
+            AddressOrigin.HAL_LABEL,
+        ),
         ("Laboratoire de Génétique CHU de Nancy Nancy France", AddressOrigin.RAW),
         ("Karlsruher Institut für Technologie", AddressOrigin.NAME_ONLY),
         ("Professeur", AddressOrigin.NAME_ONLY),
