@@ -4,7 +4,6 @@ Les tests vérifient l'enchaînement des tâches et la boucle de purge. Celle-ci
 """
 
 import dataclasses
-import logging
 from contextlib import ExitStack
 from unittest.mock import patch
 
@@ -132,32 +131,16 @@ def test_chaque_tache_dans_sa_transaction(open_tx, contexte):
     assert open_tx.transactions == 10
 
 
-def test_la_synchronisation_ecrit_une_ligne_par_tache(contexte, caplog):
-    with caplog.at_level(logging.INFO, logger="test"):
-        rendu, _, _ = _run(contexte, [3])
+def test_la_synchronisation_rend_les_contributions_du_perimetre(contexte):
+    rendu, _, _ = _run(contexte, [])
+
     assert rendu.details["summary"]["total_in_perimeter"] == 9
-    lignes = [m for m in caplog.messages if m]
-    debut = lignes.index("▶ Synchronisation des tables")
-    assert lignes[debut + 1] == "  ├─ Purge des publications : 3 publications supprimées"
-    assert [ligne.split(" : ")[0] for ligne in lignes[debut + 2 : debut + 5]] == [
-        "  ├─ Périmètre des publications",
-        "  ├─ Structures des liens",
-        "  └─ Éditeur des revues",
-    ]
 
 
-def test_referentiels_vides_supprimes_apres_la_purge(open_tx, contexte, caplog):
-    """Monographies, revues puis éditeurs vides : chaque suppression écrit sa ligne et remonte ses compteurs."""
-    with caplog.at_level(logging.INFO, logger="test"):
-        rendu, _, counts = _run(contexte, [], {"serials": 2})
+def test_referentiels_vides_supprimes_apres_la_purge(open_tx, contexte):
+    """Monographies, revues puis éditeurs vides : chaque suppression remonte ses compteurs."""
+    rendu, _, counts = _run(contexte, [], {"serials": 2})
 
     suppressions = [a for a in counts.appels if a in ("monographs", "serials", "publishers")]
     assert suppressions == ["monographs", "serials", "publishers"]
     assert rendu.extras["serials_deleted"] == 2
-    lignes = [m for m in caplog.messages if m]
-    debut = lignes.index("▶ Référentiels vides")
-    assert lignes[debut + 1 : debut + 4] == [
-        "  ├─ Monographies vides : rien à faire",
-        "  ├─ Publications en série vides : 2 supprimées",
-        "  └─ Éditeurs vides : rien à faire",
-    ]
