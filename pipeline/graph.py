@@ -13,6 +13,8 @@ from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import KW_ONLY, dataclass
 from typing import TYPE_CHECKING
 
+from pipeline.http.circuit_breaker import DEFAULT_THRESHOLD
+
 if TYPE_CHECKING:
     import logging
 
@@ -46,8 +48,8 @@ class Task:
     """Libellé de la ligne de bilan. `None` : la tâche écrit elle-même ses lignes."""
     progress_bar: bool = False
     """La tâche affiche une barre d'avancement en terminal, donc sa ligne de bilan va seulement au journal."""
-    threshold: int | None = None
-    """Échecs consécutifs avant la coupure du circuit-breaker de la source. `None` : seuil par défaut."""
+    threshold: int = DEFAULT_THRESHOLD
+    """Échecs consécutifs avant la coupure du circuit-breaker de la source."""
     when: Callable[[PhaseContext], bool] | None = None
     """Condition d'exécution, évaluée avant l'accès à la source. Une tâche écartée n'écrit rien."""
     silent_when_empty: bool = False

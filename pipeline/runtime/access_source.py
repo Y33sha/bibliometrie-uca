@@ -28,7 +28,7 @@ def access_source(
     logger: logging.Logger,
     credentials_missing: CredentialsMissing,
     request_budget: RequestBudget,
-    threshold: int | None = None,
+    threshold: int = DEFAULT_THRESHOLD,
 ) -> PhaseMetrics:
     """Exécute `execute` sur `source` : identifiants contrôlés, circuit-breaker posé, indisponibilité signalée."""
     if reason := credentials_missing(source):
@@ -36,7 +36,7 @@ def access_source(
         signal_source_unconfigured(metrics, source, reason, logger=logger)
         return metrics
     with source_circuit_breaker(
-        source, threshold=threshold or DEFAULT_THRESHOLD, max_per_second=request_budget(source)
+        source, threshold=threshold, max_per_second=request_budget(source)
     ) as breaker:
         try:
             metrics = execute()

@@ -14,15 +14,13 @@ from pipeline.runtime.access_source import access_source
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, nothing_to_do, step
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.parallel import RunParallel, run_parallel
+from pipeline.runtime.parallel import run_parallel
 
 
-def execute_tasks(
-    tasks: Sequence[Task], ctx: PhaseContext, *, parallel: RunParallel = run_parallel
-) -> dict[str, PhaseMetrics]:
+def execute_tasks(tasks: Sequence[Task], ctx: PhaseContext) -> dict[str, PhaseMetrics]:
     """Exécute `tasks` dans leur ordre et renvoie les métriques des tâches exécutées, par nom de tâche. Une tâche écartée par sa condition est absente du résultat.
 
-    Les tâches consécutives d'un même groupe parallèle s'exécutent ensemble par `parallel`. Leurs lignes de bilan suivent, dans l'ordre des tâches.
+    Les tâches consécutives d'un même groupe parallèle s'exécutent ensemble (`run_parallel`). Leurs lignes de bilan suivent, dans l'ordre des tâches.
     """
     results: dict[str, PhaseMetrics] = {}
     selected = [task for task in tasks if task.when is None or task.when(ctx)]
@@ -40,7 +38,9 @@ def execute_tasks(
         if len(chunk) == 1:
             results[chunk[0].name] = _execute(chunk[0], ctx)
         else:
-            results.update(parallel({task.name: partial(_execute, task, ctx) for task in chunk}))
+            results.update(
+                run_parallel({task.name: partial(_execute, task, ctx) for task in chunk})
+            )
         for index in range(start, end):
             task = selected[index]
             ctx.task_durations[task.name] = results[task.name].duration_s or 0.0

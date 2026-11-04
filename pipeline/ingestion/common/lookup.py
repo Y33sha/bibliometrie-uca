@@ -184,14 +184,9 @@ def _stage(
     """Écrit `records` par `stage`, les compte dans `metrics`, et renvoie le nombre de documents écrits."""
     written = 0
     for record in records:
-        match stage(staging, record):
-            case UpsertOutcome.NEW:
-                metrics.add(new=1)
-            case UpsertOutcome.UPDATED:
-                metrics.add(updated=1)
-            case UpsertOutcome.UNCHANGED:
-                metrics.add(unchanged=1)
-            case None:
-                continue
+        outcome = stage(staging, record)
+        if outcome is None:
+            continue
+        metrics.add(**{outcome.value: 1})
         written += 1
     return written

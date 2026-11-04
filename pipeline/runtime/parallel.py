@@ -3,20 +3,13 @@
 import contextvars
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Protocol
-
-
-class RunParallel(Protocol):
-    """Exécution parallèle de thunks étiquetés, avec leurs résultats par étiquette.
-
-    Chaque thunk s'exécute dans une copie du contexte courant, donc garde l'estampille de phase des journaux. L'exception d'un thunk se propage et fait échouer la phase.
-    """
-
-    def __call__[T](self, thunks: dict[str, Callable[[], T]]) -> dict[str, T]: ...
 
 
 def run_parallel[T](thunks: dict[str, Callable[[], T]]) -> dict[str, T]:
-    """Exécute les thunks en parallèle et renvoie `{étiquette: résultat}` (ordre d'achèvement)."""
+    """Exécute les thunks en parallèle et renvoie `{étiquette: résultat}` (ordre d'achèvement).
+
+    Chaque thunk s'exécute dans une copie du contexte courant, donc garde l'estampille de phase des journaux. L'exception d'un thunk se propage et fait échouer la phase.
+    """
     if not thunks:
         return {}
     results: dict[str, T] = {}

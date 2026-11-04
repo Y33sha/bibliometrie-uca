@@ -20,7 +20,7 @@ from infrastructure.observability.log import setup_logger
 from infrastructure.read_models.perimeters.queries import get_extraction_api_ids
 from pipeline.http.circuit_breaker import SourceUnavailableError, trip_source
 from pipeline.ingestion.common.pages import Page
-from pipeline.ingestion.common.staging import StagingStore, UpsertOutcome
+from pipeline.ingestion.common.staging import StagingStore
 from pipeline.runtime.config import YearRange, window_years
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.log_format import (
@@ -74,15 +74,10 @@ def stage_document(
     entry_mode: StagingEntryMode = StagingEntryMode.BULK,
 ) -> bool:
     """Écrit un document reçu d'une réponse de liste dans `staging` et le compte dans `metrics` : nouveau, mis à jour ou inchangé. Renvoie `False` pour un document sans identifiant, ni écrit ni compté."""
-    match StagingStore(conn).stage(source, record, entry_mode=entry_mode):
-        case None:
-            return False
-        case UpsertOutcome.NEW:
-            metrics.add(new=1)
-        case UpsertOutcome.UPDATED:
-            metrics.add(updated=1)
-        case UpsertOutcome.UNCHANGED:
-            metrics.add(unchanged=1)
+    outcome = StagingStore(conn).stage(source, record, entry_mode=entry_mode)
+    if outcome is None:
+        return False
+    metrics.add(**{outcome.value: 1})
     return True
 
 

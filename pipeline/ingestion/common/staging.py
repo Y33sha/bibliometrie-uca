@@ -78,7 +78,7 @@ _UPSERT_STAGING_SQL = text(
 
 
 class UpsertOutcome(StrEnum):
-    """Issue de l'écriture d'une ligne de `staging`.
+    """Issue de l'écriture d'une ligne de `staging`. Chaque valeur nomme le compteur de `PhaseMetrics` qui la compte.
 
     - `NEW` : ligne insérée ;
     - `UPDATED` : ligne existante au contenu changé, réécrite ;
