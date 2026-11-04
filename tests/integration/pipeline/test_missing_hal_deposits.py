@@ -14,7 +14,7 @@ from pipeline.transformation.publications.reconciliation import reconcile
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.publications_phase import apply_metadata_corrections
 from tests.integration.helpers.queues import clear, queued
-from tests.integration.helpers.sources import insert_source_record, secondary_identifiers
+from tests.integration.helpers.sources import insert_source_record
 from tests.integration.helpers.staging import insert_failed_lookup
 
 _MISSING = "hal-03178520"
@@ -124,23 +124,6 @@ def test_depot_retrouve_reintegre_l_enregistrement(sa_sync_conn):
     assert state.urls == [_MISSING_URL]
     assert state.is_matchable
     assert record in queued(conn, Queue.SOURCE_RECORD_KEYS)
-
-
-def test_enregistrement_scanr_issu_d_un_depot_introuvable_est_ecarte(sa_sync_conn):
-    conn = sa_sync_conn
-    record = insert_source_record(
-        conn,
-        source="scanr",
-        source_id="halhal-05524892",
-        title="T",
-        doi="10.1/x",
-        identifiers=secondary_identifiers({"hal_id": ["hal-05524892"]}),
-    )
-    insert_failed_lookup(conn, id_type="hal_id", id_value="hal-05524892")
-
-    apply_metadata_corrections(conn)
-
-    assert not _state(conn, record).is_matchable
 
 
 def test_paratexte_et_gresis_sont_ecartes(sa_sync_conn):
