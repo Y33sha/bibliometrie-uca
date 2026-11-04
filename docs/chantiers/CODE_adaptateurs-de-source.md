@@ -31,8 +31,8 @@ Chaque source moissonnée (HAL, OpenAlex, WoS, ScanR, theses.fr, DataCite, Cross
 
 ### Phase 2 — Moissonneur
 
-- [ ] `load_config` commun ; suppression du paramètre de type de configuration, des dataclasses de configuration et de `setup_logging`.
-- [ ] Type de page unique et boucle de pagination commune à HAL, OpenAlex, ScanR, DataCite et Crossref.
+- [x] `load_config` commun ; suppression du paramètre de type de configuration, des dataclasses de configuration et de `setup_logging`.
+- [x] Type de page unique et boucle de pagination commune à HAL, OpenAlex, ScanR, DataCite et Crossref.
 
 ### Phase 3 — Import des sources
 
