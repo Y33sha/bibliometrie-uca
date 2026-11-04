@@ -13,7 +13,6 @@ from domain.publications.aggregation import (
     assign_publisher,
     refresh_from_sources as _refresh_aggregate,
 )
-from domain.publications.open_access import is_restricted, publication_oa_status
 from domain.publications.publication import Publication
 from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES
 from domain.source_records.corrections import stash_entry
@@ -29,8 +28,7 @@ from domain.types import JsonValue
 from infrastructure.db.doi_targets import fetch_doi_targets
 from infrastructure.db.rows import rows_as
 from infrastructure.db.source_record_identifiers import identifiers_json_sql, parse_identifiers
-from infrastructure.read_models.publications.copies import publication_copies
-from infrastructure.sql_fragments import under_active_embargo
+from pipeline.transformation.publications.oa_inputs import OaFacts, oa_inputs
 from pipeline.transformation.publications.store import PublicationStore
 
 
@@ -140,15 +138,6 @@ def monograph_serial_ids(conn: Connection, monograph_ids: Sequence[int]) -> dict
     return {r.id: r.serial_id for r in rows}
 
 
-def unpaywall_verdicts(conn: Connection, dois: Sequence[str]) -> dict[str, str | None]:
-    """Renvoie le verdict d'Unpaywall sur chaque DOI connu, `None` sans verdict."""
-    rows = conn.execute(
-        text("SELECT doi, unpaywall_oa_status::text AS verdict FROM dois WHERE doi = ANY(:dois)"),
-        {"dois": list(dois)},
-    )
-    return {r.doi: r.verdict for r in rows}
-
-
 def crossref_prefix_publishers(conn: Connection, prefixes: Sequence[str]) -> dict[str, int]:
     """Renvoie le titulaire de chaque préfixe DOI Crossref connu, pour l'éditeur des publications."""
     rows = conn.execute(
@@ -161,18 +150,6 @@ def crossref_prefix_publishers(conn: Connection, prefixes: Sequence[str]) -> dic
     return {r.prefix: r.publisher_id for r in rows}
 
 
-def embargoed_publications(conn: Connection, publication_ids: Sequence[int]) -> set[int]:
-    """Renvoie les publications dont un enregistrement source est sous embargo actif."""
-    rows = conn.execute(
-        text(
-            "SELECT DISTINCT sr.publication_id FROM source_records sr"
-            f" WHERE sr.publication_id = ANY(:ids) AND {under_active_embargo('sr')}"
-        ),
-        {"ids": list(publication_ids)},
-    )
-    return set(rows.scalars())
-
-
 class SerialFacts(NamedTuple):
     """Champs d'une revue lus par le recalcul de ses publications."""
 
@@ -180,20 +157,17 @@ class SerialFacts(NamedTuple):
     """Pour le rejeu des corrections dépendantes du type de la revue."""
     title: str
     """Pour le rejeu des corrections dépendantes du titre de la revue."""
-    oa_model: str | None
-    """Pour le statut open access."""
 
 
 def serial_facts(conn: Connection, serial_ids: Sequence[int]) -> dict[int, SerialFacts]:
-    """Renvoie le type, le titre et le modèle open access de chaque revue connue."""
+    """Renvoie le type et le titre de chaque revue connue."""
     rows = conn.execute(
         text(
-            "SELECT id, serial_type::text AS serial_type, title, oa_model::text AS oa_model"
-            " FROM serials WHERE id = ANY(:ids)"
+            "SELECT id, serial_type::text AS serial_type, title FROM serials WHERE id = ANY(:ids)"
         ),
         {"ids": list(serial_ids)},
     )
-    return {r.id: SerialFacts(r.serial_type, r.title, r.oa_model) for r in rows}
+    return {r.id: SerialFacts(r.serial_type, r.title) for r in rows}
 
 
 class RefreshVerdict(StrEnum):
@@ -254,29 +228,33 @@ def consolidate(conn: Connection, publication_ids: Sequence[int]) -> Consolidati
     serials = serial_facts(
         conn, sorted({p.serial_id for p in aggregated.values() if p.serial_id is not None})
     )
-    copies = publication_copies(conn, list(aggregated))
-    embargoed = embargoed_publications(conn, list(aggregated))
-    dois = sorted({p.doi.value for p in aggregated.values() if p.doi})
-    unpaywall = unpaywall_verdicts(conn, dois) if dois else {}
     prefixes = sorted({p.doi.prefix.value for p in aggregated.values() if p.doi})
     prefix_publishers = crossref_prefix_publishers(conn, prefixes) if prefixes else {}
 
-    saved: list[Publication] = []
-    for publication_id, publication in aggregated.items():
+    # Le statut open access lit le type corrigé.
+    for publication in aggregated.values():
         serial = serials.get(publication.serial_id) if publication.serial_id is not None else None
         _apply_canonical_doc_type_correction(publication, serial)
-        publication_copies_ = copies.get(publication_id, [])
+    oa = oa_inputs(
+        conn,
+        [
+            OaFacts(
+                publication_id,
+                publication.doi.value if publication.doi else None,
+                publication.serial_id,
+                publication.doc_type,
+                publication.source_extras,
+            )
+            for publication_id, publication in aggregated.items()
+        ],
+    )
+
+    saved: list[Publication] = []
+    for publication_id, publication in aggregated.items():
         publication.best_copy_url = access(
-            publication_copies_, doi=str(publication.doi) if publication.doi else None
+            oa[publication_id].copies, doi=str(publication.doi) if publication.doi else None
         ).url
-        publication.oa_status = publication_oa_status(
-            publication_copies_,
-            embargoed=publication_id in embargoed,
-            restricted=is_restricted(publication.doc_type, publication.source_extras),
-            unpaywall=unpaywall.get(publication.doi.value) if publication.doi else None,
-            has_serial=publication.serial_id is not None,
-            serial_oa_model=serial.oa_model if serial else None,
-        )
+        publication.oa_status = oa[publication_id].status()
         assign_publisher(
             publication,
             sources[publication_id],

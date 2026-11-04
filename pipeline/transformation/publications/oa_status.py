@@ -22,12 +22,8 @@ import httpx2
 from sqlalchemy import Connection, text
 
 from domain.config import ConfigKey
-from domain.publications.access import Copy
 from domain.publications.oa_status import OaStatus
-from domain.publications.open_access import is_restricted, publication_oa_status
 from infrastructure.db.scalars import scalar_int
-from infrastructure.read_models.publications.copies import publication_copies
-from infrastructure.sql_fragments import under_active_embargo
 from pipeline.graph import Task
 from pipeline.http.lookup import LookupOutcome, NotFound, Unavailable
 from pipeline.http.polite_pool import default_user_agent, get_polite_pool_email_optional
@@ -47,6 +43,7 @@ from pipeline.runtime.observability.log_format import (
 )
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import track_progress
+from pipeline.transformation.publications.oa_inputs import OaFacts, OaInputs, oa_inputs
 
 type DoiFetcher = Callable[[httpx2.AsyncClient, str], Awaitable[LookupOutcome[str]]]
 """Interrogation d'un service sur un DOI : `(client, doi) → réponse, NotFound ou Unavailable`."""
@@ -73,32 +70,15 @@ UNPAYWALL = DoiService("unpaywall_oa_status", "oa_type", "unpaywall_checked_at",
 DOI_ORG = DoiService("registered_url", "text", "resolved_at", False)
 
 
-class PublicationOaInputs(NamedTuple):
-    """Données du calcul du statut OA d'une publication."""
+class PublicationOa(NamedTuple):
+    """Statut open access d'une publication, enregistré et à recalculer."""
 
     id: int
     doi: str | None
     oa_status: str | None
-    has_serial: bool
-    serial_oa_model: str | None
-    embargoed: bool
-    """Un enregistrement source de la publication est sous embargo actif."""
-    restricted: bool
-    """La publication est fermée par nature (`is_restricted`)."""
-    unpaywall: str | None
-    """Verdict d'Unpaywall sur le DOI de la publication, `None` sans verdict."""
-    copies: list[Copy]
-
-    def computed_status(self) -> OaStatus:
-        """Renvoie le statut OA déduit de ces données (`publication_oa_status`)."""
-        return publication_oa_status(
-            self.copies,
-            embargoed=self.embargoed,
-            restricted=self.restricted,
-            unpaywall=self.unpaywall,
-            has_serial=self.has_serial,
-            serial_oa_model=self.serial_oa_model,
-        )
+    """Statut enregistré."""
+    inputs: OaInputs
+    """Données du recalcul."""
 
 
 def _stale_dois(service: DoiService) -> str:
@@ -178,48 +158,29 @@ class OaStatusStore:
             {"dois": [d for d, _ in answers], "answers": [a for _, a in answers]},
         )
 
-    def fetch_oa_inputs(self, dois: Sequence[str]) -> list[PublicationOaInputs]:
+    def fetch_oa_inputs(self, dois: Sequence[str]) -> list[PublicationOa]:
         """Renvoie les publications de ces DOI, avec les données du calcul de leur statut OA."""
         return self._fetch_oa_inputs("lower(p.doi) = ANY(:keys)", list(dois))
 
-    def fetch_oa_inputs_of(self, publication_ids: Sequence[int]) -> list[PublicationOaInputs]:
+    def fetch_oa_inputs_of(self, publication_ids: Sequence[int]) -> list[PublicationOa]:
         """Renvoie ces publications, avec les données du calcul de leur statut OA."""
         return self._fetch_oa_inputs("p.id = ANY(:keys)", list(publication_ids))
 
-    def _fetch_oa_inputs(
-        self, where: str, keys: list[str] | list[int]
-    ) -> list[PublicationOaInputs]:
+    def _fetch_oa_inputs(self, where: str, keys: list[str] | list[int]) -> list[PublicationOa]:
         rows = self._conn.execute(
             text(f"""
                 SELECT p.id, lower(p.doi) AS doi, p.oa_status::text AS oa_status,
-                       p.serial_id IS NOT NULL AS has_serial, s.oa_model::text AS oa_model,
-                       p.doc_type::text AS doc_type, p.source_extras,
-                       bool_or({under_active_embargo("sr")}) AS embargoed,
-                       d.unpaywall_oa_status::text AS unpaywall
+                       p.serial_id, p.doc_type::text AS doc_type, p.source_extras
                 FROM publications p
-                JOIN source_records sr ON sr.publication_id = p.id
-                LEFT JOIN serials s ON s.id = p.serial_id
-                LEFT JOIN dois d ON d.doi = lower(p.doi)
                 WHERE {where}
-                GROUP BY p.id, s.oa_model, d.unpaywall_oa_status
             """),  # noqa: S608 — condition choisie par le code
             {"keys": keys},
         ).all()
-        copies = publication_copies(self._conn, [r.id for r in rows])
-        return [
-            PublicationOaInputs(
-                r.id,
-                r.doi,
-                r.oa_status,
-                r.has_serial,
-                r.oa_model,
-                r.embargoed,
-                is_restricted(r.doc_type, r.source_extras),
-                r.unpaywall,
-                copies.get(r.id, []),
-            )
-            for r in rows
-        ]
+        inputs = oa_inputs(
+            self._conn,
+            [OaFacts(r.id, r.doi, r.serial_id, r.doc_type, r.source_extras) for r in rows],
+        )
+        return [PublicationOa(r.id, r.doi, r.oa_status, inputs[r.id]) for r in rows]
 
     def update_oa_status(self, publication_id: int, oa_status: str) -> None:
         """Écrit le statut OA d'une publication."""
@@ -411,7 +372,7 @@ def _apply_answers(
             progress["unchanged"] += 1
     store.record_answers(service, answers)
     for publication in store.fetch_oa_inputs([doi for doi, _ in answers]):
-        status = publication.computed_status()
+        status = publication.inputs.status()
         if status != publication.oa_status:
             store.update_oa_status(publication.id, status)
 

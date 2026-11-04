@@ -40,7 +40,7 @@ def main() -> int:
         store = OaStatusStore(conn)
         for lo in range(min_id, max_id + 1, args.batch):
             for p in store.fetch_oa_inputs_of(list(range(lo, lo + args.batch))):
-                status = p.computed_status()
+                status = p.inputs.status()
                 if status != p.oa_status:
                     transitions[(p.oa_status, status)] += 1
                     store.update_oa_status(p.id, status)

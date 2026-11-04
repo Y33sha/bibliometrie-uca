@@ -146,9 +146,10 @@ class TestPublicationsOfDois:
         )
         _verdict(sa_sync_conn, "10.1/p", "green", days_ago=1)
 
-        [inputs] = OaStatusStore(sa_sync_conn).fetch_oa_inputs(["10.1/p"])
+        [read] = OaStatusStore(sa_sync_conn).fetch_oa_inputs(["10.1/p"])
 
-        assert (inputs.id, inputs.doi, inputs.oa_status) == (publication, "10.1/p", "closed")
+        assert (read.id, read.doi, read.oa_status) == (publication, "10.1/p", "closed")
+        inputs = read.inputs
         assert (inputs.embargoed, inputs.restricted, inputs.copies) == (True, True, [])
         assert inputs.unpaywall == "green"
 
