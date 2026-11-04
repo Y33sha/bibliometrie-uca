@@ -236,7 +236,7 @@ def test_sans_revue_trouvee_la_revue_corrigee_reste(conn):
     assert (row.serial_id, row.raw) == (corrected, None)
 
 
-def test_identifiant_openalex_et_modele_oa_d_openalex(conn):
+def test_modele_oa_d_openalex(conn):
     record = _record(
         conn,
         "W1",
@@ -247,11 +247,13 @@ def test_identifiant_openalex_et_modele_oa_d_openalex(conn):
         oa_model="full_oa",
     )
     _attach(conn)
-    row = conn.execute(
-        text("SELECT openalex_id, oa_model::text AS oa_model FROM serials WHERE id = :id"),
-        {"id": _serial_of(conn, record)},
-    ).one()
-    assert tuple(row) == ("S202381698", "full_oa")
+    assert (
+        conn.execute(
+            text("SELECT oa_model::text FROM serials WHERE id = :id"),
+            {"id": _serial_of(conn, record)},
+        ).scalar_one()
+        == "full_oa"
+    )
 
 
 def _title(conn, serial_id: int) -> str:

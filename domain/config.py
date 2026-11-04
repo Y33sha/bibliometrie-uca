@@ -35,6 +35,8 @@ class ConfigKey(StrEnum):
     """Délai avant de télécharger de nouveau le fichier du DOAJ."""
     ISSNL_TABLE_REFRESH_AFTER_DAYS = "issnl_table_refresh_after_days"
     """Délai avant de télécharger de nouveau la table ISSN-L de l'ISSN International Centre."""
+    SERIAL_OPENALEX_RECHECK_AFTER_DAYS = "serial_openalex_recheck_after_days"
+    """Délai avant de relire une revue dans OpenAlex : source, type et listes."""
     LABORATORY_TYPES = "laboratory_types"
     """Types de structure traités comme laboratoires."""
     PERIMETER_EXTRACTION = "perimeter_extraction"
@@ -160,6 +162,7 @@ SETTINGS: dict[ConfigKey, ConfigSetting] = {
     ConfigKey.DOI_RESOLUTION_RECHECK_AFTER_DAYS: ConfigSetting(_delay, 180, bounds=DELAY_BOUNDS),
     ConfigKey.DOAJ_REFRESH_AFTER_DAYS: ConfigSetting(_delay, 30, bounds=DELAY_BOUNDS),
     ConfigKey.ISSNL_TABLE_REFRESH_AFTER_DAYS: ConfigSetting(_delay, 30, bounds=DELAY_BOUNDS),
+    ConfigKey.SERIAL_OPENALEX_RECHECK_AFTER_DAYS: ConfigSetting(_delay, 7, bounds=DELAY_BOUNDS),
     ConfigKey.LABORATORY_TYPES: ConfigSetting(
         _laboratory_types, [StructureType.LABO.value], public=True
     ),

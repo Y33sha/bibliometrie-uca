@@ -23,6 +23,7 @@ API_BASE_URLS: dict[str, str] = {
     # Référentiels et compléments
     "hal_structures": "https://api.archives-ouvertes.fr/ref/structure/",
     "openalex_sources": "https://api.openalex.org/sources",
+    "openalex_source_lists": "https://api.openalex.org/source-lists",
     "openalex_publishers": "https://api.openalex.org/publishers",
     "openalex_institutions": "https://api.openalex.org/institutions",
     "unpaywall": "https://api.unpaywall.org/v2",

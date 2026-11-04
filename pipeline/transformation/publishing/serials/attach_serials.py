@@ -6,7 +6,7 @@
 
 - chaque ISSN reçoit la revue de son ISSN-L : celui de la table de l'ISSN International Centre (`import_issnl_table`), à défaut celui de l'ISSN qui l'annule d'après le Sudoc, à défaut celui d'OpenAlex, à défaut l'ISSN lui-même. Cette revue est celle de la ligne de l'ISSN-L, à défaut la plus fréquente parmi les ISSN de cet ISSN-L, à défaut une revue créée. Une revue va à un seul ISSN-L ;
 - chaque enregistrement source rejoint la revue de l'ISSN-L de ses ISSN, à défaut la revue de son identifiant OpenAlex, à défaut la revue de son titre : décision de l'administration (`serial_title_decisions`), seule revue à ISSN de même titre, revue à ISSN de titre compatible d'un autre enregistrement source de sa publication au run précédent, ou revue sans ISSN de même titre, créée au besoin. L'éditeur départage plusieurs revues à ISSN de même titre ;
-- le titre d'une revue est celui de la notice Sudoc de son ISSN-L, à défaut celui d'un autre de ses ISSN, à défaut le plus fréquent parmi ses enregistrements sources. Son identifiant OpenAlex et son modèle OA viennent des enregistrements sources OpenAlex dont l'ISSN-L, d'après OpenAlex, est celui de la revue. Un champ saisi à la main reste inchangé.
+- le titre d'une revue est celui de la notice Sudoc de son ISSN-L, à défaut celui d'un autre de ses ISSN, à défaut le plus fréquent parmi ses enregistrements sources. Son modèle OA vient des enregistrements sources OpenAlex dont l'ISSN-L, d'après OpenAlex, est celui de la revue. Un champ saisi à la main reste inchangé.
 
 Un enregistrement source qui change de revue est marqué pour la réconciliation. Pour un enregistrement source dont la revue est corrigée par la correction des métadonnées, la revue calculée devient la valeur d'avant correction (`corrections.serial_id.raw`). Une revue vidée de ses enregistrements sources, sans ISSN ni monographie, est absorbée par la revue qui en reçoit le plus, avec une redirection.
 """
@@ -98,24 +98,6 @@ _UNUSED_SERIALS = text("""
       AND NOT EXISTS (SELECT 1 FROM source_records r WHERE r.serial_id = s.id)
       AND NOT EXISTS (SELECT 1 FROM serial_issns i WHERE i.serial_id = s.id)
       AND NOT EXISTS (SELECT 1 FROM monographs m WHERE m.serial_id = s.id)
-""")
-
-_SET_OPENALEX_IDS = text("""
-    WITH wanted AS (
-        SELECT * FROM jsonb_to_recordset(CAST(:rows AS jsonb)) AS t(id integer, openalex_id text)
-    ), freed AS (
-        UPDATE serials s SET openalex_id = NULL
-        FROM wanted w
-        WHERE s.openalex_id = w.openalex_id AND s.id <> w.id
-        RETURNING s.id
-    )
-    SELECT count(*) FROM freed
-""")
-
-_WRITE_OPENALEX_IDS = text("""
-    UPDATE serials s SET openalex_id = t.openalex_id
-    FROM jsonb_to_recordset(CAST(:rows AS jsonb)) AS t(id integer, openalex_id text)
-    WHERE s.id = t.id AND s.openalex_id IS DISTINCT FROM t.openalex_id
 """)
 
 _NOTICE_TITLES = text("SELECT issn, sudoc_title FROM serial_issns WHERE sudoc_title IS NOT NULL")
@@ -416,10 +398,9 @@ def _refresh_attributes(
     issnl_of: dict[str, str],
     serial_of_issnl: dict[str, int],
 ) -> None:
-    """Écrit le titre, l'identifiant OpenAlex et le modèle OA des revues."""
+    """Écrit le titre et le modèle OA des revues."""
     issnl_of_serial = {serial_id: issnl for issnl, serial_id in serial_of_issnl.items()}
     titles: dict[int, Counter[str]] = {}
-    openalex_ids: dict[int, Counter[str]] = {}
     oa_models: dict[int, Counter[str]] = {}
     for m in mentions:
         serial_id = attachment.serial_of[m.id]
@@ -428,14 +409,15 @@ def _refresh_attributes(
         if m.series.title:
             titles.setdefault(serial_id, Counter())[m.series.title] += 1
         own_issnl = issnl_of_serial.get(serial_id)
-        if m.source == "openalex" and (
-            m.openalex_issnl is None
-            or issnl_of.get(m.openalex_issnl, m.openalex_issnl) == own_issnl
+        if (
+            m.source == "openalex"
+            and m.series.oa_model
+            and (
+                m.openalex_issnl is None
+                or issnl_of.get(m.openalex_issnl, m.openalex_issnl) == own_issnl
+            )
         ):
-            if m.series.openalex_id:
-                openalex_ids.setdefault(serial_id, Counter())[m.series.openalex_id] += 1
-            if m.series.oa_model:
-                oa_models.setdefault(serial_id, Counter())[m.series.oa_model] += 1
+            oa_models.setdefault(serial_id, Counter())[m.series.oa_model] += 1
     notice_titles = _notice_titles(conn, issnl_of)
     serial_titles = []
     for serial_id in sorted(set(titles) | set(issnl_of_serial)):
@@ -446,16 +428,6 @@ def _refresh_attributes(
             serial_titles.append({"id": serial_id, "title": title, "key": normalize_text(title)})
     if serial_titles:
         conn.execute(_WRITE_TITLES, {"rows": json.dumps(serial_titles)})
-    # Un identifiant OpenAlex va à une seule revue : celle qui le reçoit de plus d'enregistrements sources.
-    votes: dict[str, tuple[int, int]] = {}
-    for serial_id, counter in openalex_ids.items():
-        openalex_id = most_frequent(counter)
-        if openalex_id not in votes or counter[openalex_id] > votes[openalex_id][1]:
-            votes[openalex_id] = (serial_id, counter[openalex_id])
-    rows = [{"id": serial_id, "openalex_id": oid} for oid, (serial_id, _) in votes.items()]
-    if rows:
-        conn.execute(_SET_OPENALEX_IDS, {"rows": json.dumps(rows)})
-        conn.execute(_WRITE_OPENALEX_IDS, {"rows": json.dumps(rows)})
     models = [{"id": s, "oa_model": most_frequent(c)} for s, c in oa_models.items()]
     if models:
         conn.execute(_WRITE_OA_MODELS, {"rows": json.dumps(models)})

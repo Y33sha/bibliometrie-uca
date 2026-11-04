@@ -118,11 +118,11 @@ def test_le_rattachement_des_revues_suit_la_verification_sudoc():
     assert {"publishing.sync_issns", "publishing.check_issns_in_sudoc"} <= deps
 
 
-def test_le_typage_openalex_suit_le_rattachement_des_revues():
-    """Le typage OpenAlex lit l'identifiant OpenAlex des revues, écrit par le rattachement."""
+def test_la_lecture_des_revues_dans_openalex_suit_le_rattachement_des_revues():
+    """La lecture des revues dans OpenAlex lit leurs ISSN et leurs enregistrements sources, écrits par le rattachement."""
     assert (
         "publishing.attach_serials"
-        in dependencies(ALL_TASKS)["publishing.enrich_serials_from_openalex"]
+        in dependencies(ALL_TASKS)["publishing.check_serials_in_openalex"]
     )
 
 

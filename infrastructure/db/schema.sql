@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict ApTTGWg1DSKgMxnXP9v4ilwcjGGRRgHqeaoxGIHykgtmubbCd4lWvuM48a3gdbr
+\restrict gGQufxhmr649ikHvOPcdwaSTDe5HVhwWyM3NDla5NxkdWRYLjJPv0dp8ODzyPuF
 
 -- Dumped from database version 18.4
 -- Dumped by pg_dump version 18.4
@@ -720,7 +720,7 @@ CREATE TABLE ops.config (
     created_at timestamp with time zone DEFAULT now(),
     CONSTRAINT config_brand_hue_is_angle CHECK (((key <> 'brand_hue'::text) OR ((jsonb_typeof(value) = 'number'::text) AND (((value)::numeric >= (0)::numeric) AND ((value)::numeric <= (359)::numeric)) AND ((value)::numeric = trunc((value)::numeric))))),
     CONSTRAINT config_cap_is_non_negative_integer CHECK (((key <> ALL (ARRAY['doi_resolution_max_per_run'::text, 'fetch_missing_max_per_source'::text, 'sudoc_max_per_run'::text, 'unpaywall_max_per_run'::text])) OR ((jsonb_typeof(value) = 'number'::text) AND ((value)::numeric >= (0)::numeric) AND ((value)::numeric = trunc((value)::numeric))))),
-    CONSTRAINT config_delay_is_positive_integer CHECK (((key <> ALL (ARRAY['doaj_refresh_after_days'::text, 'doi_resolution_recheck_after_days'::text, 'fetch_missing_retry_after_days'::text, 'fetch_stale_after_days'::text, 'issnl_table_refresh_after_days'::text, 'unpaywall_recheck_after_days'::text])) OR ((jsonb_typeof(value) = 'number'::text) AND ((value)::numeric >= (1)::numeric) AND ((value)::numeric = trunc((value)::numeric))))),
+    CONSTRAINT config_delay_is_positive_integer CHECK (((key <> ALL (ARRAY['doaj_refresh_after_days'::text, 'doi_resolution_recheck_after_days'::text, 'fetch_missing_retry_after_days'::text, 'fetch_stale_after_days'::text, 'issnl_table_refresh_after_days'::text, 'serial_openalex_recheck_after_days'::text, 'unpaywall_recheck_after_days'::text])) OR ((jsonb_typeof(value) = 'number'::text) AND ((value)::numeric >= (1)::numeric) AND ((value)::numeric = trunc((value)::numeric))))),
     CONSTRAINT config_institution_country_is_code CHECK (((key <> 'institution_country'::text) OR ((jsonb_typeof(value) = 'string'::text) AND ((value #>> '{}'::text[]) ~ '^[a-z]{2}$'::text) AND ((value #>> '{}'::text[]) <> 'xx'::text)))),
     CONSTRAINT config_site_title_is_text CHECK (((key <> 'site_title'::text) OR (jsonb_typeof(value) = 'string'::text))),
     CONSTRAINT config_year_is_in_range CHECK (((key <> 'pipeline_start_year_full'::text) OR (jsonb_typeof(value) = 'null'::text) OR ((jsonb_typeof(value) = 'number'::text) AND (((value)::numeric >= (1970)::numeric) AND ((value)::numeric <= (2100)::numeric)) AND ((value)::numeric = trunc((value)::numeric)))))
@@ -2619,8 +2619,16 @@ CREATE TABLE publishing.serials (
     doaj_payload jsonb,
     doaj_imported_at timestamp with time zone,
     publication_count integer DEFAULT 0 NOT NULL,
-    manual_fields text[] DEFAULT '{}'::text[] NOT NULL
+    manual_fields text[] DEFAULT '{}'::text[] NOT NULL,
+    openalex_checked_at timestamp with time zone
 );
+
+
+--
+-- Name: COLUMN serials.openalex_checked_at; Type: COMMENT; Schema: publishing; Owner: -
+--
+
+COMMENT ON COLUMN publishing.serials.openalex_checked_at IS 'Date de la dernière lecture de la revue dans OpenAlex. NULL : jamais lue.';
 
 
 --
@@ -6232,5 +6240,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ApTTGWg1DSKgMxnXP9v4ilwcjGGRRgHqeaoxGIHykgtmubbCd4lWvuM48a3gdbr
+\unrestrict gGQufxhmr649ikHvOPcdwaSTDe5HVhwWyM3NDla5NxkdWRYLjJPv0dp8ODzyPuF
 

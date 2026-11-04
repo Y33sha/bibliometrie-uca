@@ -121,7 +121,7 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
           check_issns_in_sudoc: "ISSN vérifiés dans le Sudoc",
           import_issnl_table: "ISSN trouvés dans la table ISSN-L",
           attach_serials: "enregistrements sources rattachés aux revues",
-          enrich_serials_from_openalex: "revues OpenAlex",
+          check_serials_in_openalex: "revues lues dans OpenAlex",
           type_proceedings_serials: "revues typées recueils d'actes",
           type_journal_serials: "entrées typées revues",
           learn_serial_doi_namespaces: "DOI → espaces de noms des revues",

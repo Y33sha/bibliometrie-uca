@@ -451,6 +451,11 @@ serials = Table(
     Column("title_normalized", Text, nullable=False),
     Column("publisher_id", Integer),
     Column("openalex_id", Text),
+    Column(
+        "openalex_checked_at",
+        DateTime(timezone=True),
+        comment="Date de la dernière lecture de la revue dans OpenAlex. NULL : jamais lue.",
+    ),
     Column("is_in_doaj", Boolean, server_default="false"),
     Column("oa_model", oa_model_enum),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),

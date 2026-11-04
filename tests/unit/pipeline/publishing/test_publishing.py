@@ -54,7 +54,7 @@ def test_les_compteurs_des_taches_remontent_a_la_phase(contexte):
     metrics = _run(
         contexte,
         resolve_crossref_publishers=publishers,
-        enrich_serials_from_openalex=PhaseMetrics(updated=5),
+        check_serials_in_openalex=PhaseMetrics(updated=5),
     )
     assert (metrics.new, metrics.updated) == (1, 5)
     assert metrics.extras.get("publisher_matched") == 2
@@ -73,6 +73,6 @@ def test_acces_non_configure_saute_les_taches_a_source(contexte):
     """Sans identifiants, une tâche à source est sautée avant l'appel de sa fonction, et signalée."""
     appels: list[str] = []
     metrics = _run(contexte, appels, credentials_missing="clé absente")
-    assert "enrich_serials_from_openalex" not in appels
+    assert "check_serials_in_openalex" not in appels
     assert "attach_serials" in appels  # tâche sans source
     assert {s["code"] for s in metrics.signals} == {"source_unconfigured"}

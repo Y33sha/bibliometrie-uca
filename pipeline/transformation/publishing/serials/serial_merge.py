@@ -55,6 +55,13 @@ def _fill_empty_with_marker(
     return MergeStep(tuple(("serials", c) for c in columns), apply)
 
 
+def _recheck_in_openalex(conn: Connection, target_id: int, source_id: int) -> None:
+    """Fait relire la revue conservée dans OpenAlex au run suivant : ses ISSN comprennent ceux de l'absorbée."""
+    conn.execute(
+        text("UPDATE serials SET openalex_checked_at = NULL WHERE id = :t"), {"t": target_id}
+    )
+
+
 def _merge_is_in_doaj(conn: Connection, target_id: int, source_id: int) -> None:
     """Marque la revue conservée présente au DOAJ si l'une des deux l'est."""
     conn.execute(
@@ -82,6 +89,7 @@ MERGE_STEPS: dict[str, MergeStep] = {
     # Éditeur calculé d'après les publications, recalculé après la fusion.
     "publisher": untouched("serials", "publisher_id"),
     "openalex_id": fill_empty_unique("serials", "openalex_id"),
+    "openalex_checked_at": MergeStep((("serials", "openalex_checked_at"),), _recheck_in_openalex),
     "oa_model": _fill_empty_with_marker(ManualField.OA_MODEL, ("oa_model",), "t.oa_model IS NULL"),
     "serial_type": _fill_empty_with_marker(
         ManualField.SERIAL_TYPE,

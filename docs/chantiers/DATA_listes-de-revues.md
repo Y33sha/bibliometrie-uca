@@ -24,8 +24,11 @@ Hors OpenAlex : la Master Journal List de Clarivate (revues du Web of Science, C
 - Le DOAJ est une liste parmi d'autres.
 - Les listes viennent d'OpenAlex (`listed_in`, `/source-lists`).
 - Listes retenues : `doyens`, `doaj`, `medline`, `cwts-core`, `ddh`, `erih-plus`, `norway-1`, `norway-2`, les cinq rangs du classement FNEGE (`fnege-1-star` à `fnege-4`).
-- Une liste donne l'appartenance actuelle d'une revue, sans historique. Chaque import remplace les appartenances.
+- Une liste donne l'appartenance actuelle d'une revue, sans historique.
 - Chaque niveau d'un classement est une liste, rattachée à son classement (registre norvégien, FNEGE).
+- Une seule sous-étape pose `openalex_id`. Une revue à ISSN prend la source OpenAlex de ses ISSN (`/sources`). Une revue sans ISSN prend la source la plus fréquente parmi ses enregistrements sources OpenAlex.
+- Une source OpenAlex retrouvée par les ISSN de plusieurs revues donne son identifiant à la revue qui a le plus de publications, et ses listes à toutes.
+- Chaque revue est relue dans OpenAlex au terme d'un délai réglable, 7 jours par défaut (`openalex_checked_at`). La lecture d'une revue remplace son identifiant, son type inconnu et ses appartenances.
 - La facette « DOAJ » de la liste des revues devient une facette « Listes ». Elle a un sélecteur à trois états (indifférent, présente, absente) par liste et par classement, combinés par un ET.
 - Sous un classement indifférent ou présent, une case à cocher par niveau restreint la sélection aux niveaux cochés, combinés par un OU.
 
@@ -33,17 +36,17 @@ Hors OpenAlex : la Master Journal List de Clarivate (revues du Web of Science, C
 
 ### Phase 1 — Modèle
 
-- [ ] Table des listes (code OpenAlex, classement, nom, organisme, URL, édition), table des appartenances (revue, liste)
+- [x] Table des listes (code OpenAlex, classement, nom, organisme, URL, édition), table des appartenances (revue, liste) (42eb2d92a)
 
 ### Phase 2 — Source OpenAlex et listes de chaque revue
 
-- [ ] Sous-étape de la phase `publishing` : source OpenAlex de chaque revue par ISSN (`/sources`), appartenances aux listes retenues (question 1)
-- [ ] `openalex_id` des revues sans enregistrement source OpenAlex ou rattachées à une source OpenAlex de plusieurs titres (question 1)
-- [ ] Retrait de l'identifiant d'une revue vidée de ses enregistrements sources OpenAlex
+- [ ] Colonne `serials.openalex_checked_at`, délai de relecture dans `ops.config`
+- [ ] Sous-étape de la phase `publishing` : source OpenAlex, type et appartenances des revues à relire
+- [ ] `openalex_id` posé par cette seule sous-étape : vote retiré d'`attach_serials`, `enrich_serials_from_openalex` supprimée
 
 ### Phase 3 — DOAJ en liste
 
-- [ ] `is_in_doaj` lu dans les appartenances (question 2)
+- [ ] `is_in_doaj` lu dans les appartenances (question 1)
 
 ### Phase 4 — Interface
 
@@ -53,6 +56,5 @@ Hors OpenAlex : la Master Journal List de Clarivate (revues du Web of Science, C
 
 ## Questions ouvertes
 
-1. `openalex_id` posé par la recherche par ISSN et par `attach_serials` d'après les enregistrements sources OpenAlex : priorité entre les deux. Type des revues lu dans la même requête, à la place d'`enrich_serials_from_openalex`.
-2. Dump du DOAJ : il reste nécessaire à `doaj_payload` (classement diamant, page de la revue). Appartenance au DOAJ lue dans le dump ou dans OpenAlex.
-3. Quartiles par catégorie : import de SCImago.
+1. Dump du DOAJ : il reste nécessaire à `doaj_payload` (classement diamant, page de la revue). Appartenance au DOAJ lue dans le dump ou dans OpenAlex.
+2. Quartiles par catégorie : import de SCImago.
