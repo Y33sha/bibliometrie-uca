@@ -3,7 +3,6 @@
 Le rattachement se calcule sur tous les enregistrements sources qui décrivent un volume (`biblio.monograph`), selon `domain.monographs.attachment`. Chaque volume reprend sa monographie existante. Plusieurs monographies existantes d'un même volume fusionnent dans la plus ancienne. Un volume sans monographie existante en crée une. La monographie reçoit les champs qui lui manquent. Un enregistrement source hors de tout volume perd sa monographie. Un enregistrement source qui change de monographie est marqué pour la réconciliation.
 """
 
-import json
 import logging
 
 from sqlalchemy import Connection, text
@@ -11,11 +10,11 @@ from sqlalchemy import Connection, text
 from domain.monographs.attachment import Volume, VolumeRecord, group_volumes
 from domain.normalize import normalize_text
 from domain.source_records.biblio import monograph_volume
-from infrastructure.db.queues import Queue, enqueue
 from pipeline.runtime.observability.log_format import quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publishing.monographs.monograph_merge import merge_monograph_into
 from pipeline.transformation.publishing.monographs.store import MonographStore
+from pipeline.transformation.publishing.source_record_links import changed_links, write_links
 
 LABEL = "Rattachement des enregistrements sources aux monographies"
 """Libellé de la sous-étape dans le journal de la phase."""
@@ -24,12 +23,6 @@ _RECORDS = text("""
     SELECT id, monograph_id, publisher_id, biblio
     FROM source_records
     WHERE biblio ? 'monograph' OR monograph_id IS NOT NULL
-""")
-
-_SET_MONOGRAPHS = text("""
-    UPDATE source_records sr SET monograph_id = t.monograph_id
-    FROM jsonb_to_recordset(CAST(:rows AS jsonb)) AS t(id integer, monograph_id integer)
-    WHERE sr.id = t.id
 """)
 
 
@@ -95,20 +88,9 @@ def run_attach_monographs(conn: Connection, logger: logging.Logger) -> PhaseMetr
         created += is_new
         merged += max(len(volume.monograph_ids) - 1, 0)
         desired |= dict.fromkeys(volume.record_ids, monograph_id)
-    changed = [
-        {"id": record_id, "monograph_id": monograph_id}
-        for record_id, monograph_id in desired.items()
-        if monograph_id != current.get(record_id)
-    ]
-    if changed:
-        conn.execute(_SET_MONOGRAPHS, {"rows": json.dumps(changed)})
-        enqueue(
-            conn,
-            Queue.SOURCE_RECORD_KEYS,
-            "SELECT unnest(CAST(:ids AS integer[]))",
-            {"ids": [row["id"] for row in changed]},
-        )
-    detached = sum(row["monograph_id"] is None for row in changed)
+    changed = changed_links(desired, current)
+    write_links(conn, "monograph_id", changed)
+    detached = sum(monograph_id is None for monograph_id in changed.values())
     metrics = PhaseMetrics()
     metrics.add(
         seen=len(desired),

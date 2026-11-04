@@ -12,9 +12,9 @@ import pytest
 from pipeline.ingestion.api_params import SCANR_PER_PAGE
 from pipeline.ingestion.common.harvester import HarvestConfigError
 from pipeline.ingestion.common.staging import UpsertOutcome
-from pipeline.ingestion.scanr import harvest
 from pipeline.ingestion.scanr.fields import extract_doi, extract_id
 from pipeline.ingestion.scanr.harvest import ScanrHarvester, build_query, harvest_year
+from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import Progress
 from tests.helpers.harvesters import arguments_du_run, moissonneur
 
@@ -77,8 +77,10 @@ def _client(pages: list[dict]) -> MagicMock:
     return client
 
 
-def _extraire(client: MagicMock):
-    return harvest_year(client, MagicMock(), 2024, ["S1"], Progress(None, "ScanR", None))
+def _extraire(client: MagicMock) -> PhaseMetrics:
+    metrics = PhaseMetrics()
+    harvest_year(client, MagicMock(), 2024, ["S1"], Progress(None, "ScanR", None), metrics)
+    return metrics
 
 
 def test_pagination_jusqu_a_la_page_vide(ecritures):
@@ -106,7 +108,7 @@ def test_le_curseur_suit_la_cle_de_tri_du_dernier_document(ecritures):
 
 
 def test_run_parcourt_les_annees_de_la_configuration(configuration, ecritures):
-    configuration(harvest, annees=[2023, 2024])
+    configuration(annees=[2023, 2024])
     client = _client([_page([_hit("a")]), _page([]), _page([_hit("b")]), _page([])])
     assert moissonneur(ScanrHarvester, client).run(arguments_du_run()).new == 2
     annees = [
@@ -117,7 +119,7 @@ def test_run_parcourt_les_annees_de_la_configuration(configuration, ecritures):
 
 
 def test_run_avec_une_annee_demandee_ignore_la_configuration(configuration, ecritures):
-    configuration(harvest, annees=[2020, 2021, 2022])
+    configuration(annees=[2020, 2021, 2022])
     client = _client([_page([_hit("a")]), _page([])])
     assert moissonneur(ScanrHarvester, client).run(arguments_du_run(years=(2024, 2024))).total == 1
     filtre = client.fetch_page.call_args_list[0].args[0]["query"]["bool"]["filter"]
@@ -125,6 +127,6 @@ def test_run_avec_une_annee_demandee_ignore_la_configuration(configuration, ecri
 
 
 def test_run_sans_affiliation_refuse(configuration):
-    configuration(harvest, api_ids=[])
+    configuration(api_ids=[])
     with pytest.raises(HarvestConfigError, match="aucun affiliation_id"):
         moissonneur(ScanrHarvester, _client([])).run(arguments_du_run())

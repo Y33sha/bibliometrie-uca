@@ -16,7 +16,7 @@ from pipeline.http.http_retry import http_request_with_retry, lookup_json_async
 from pipeline.http.lookup import UNAVAILABLE, LookupOutcome, NotFound, Unavailable
 from pipeline.http.polite_pool import polite_user_agent
 from pipeline.ingestion.api_params import API_BASE_URLS
-from pipeline.ingestion.common.person_search import PersonSearchPage
+from pipeline.ingestion.common.pages import Page
 
 logger = logging.getLogger(__name__)
 
@@ -32,11 +32,11 @@ def headers() -> dict[str, str]:
 class CrossrefClient:
     """Client de `GET /works`."""
 
-    def __init__(self, base_url: str) -> None:
-        self._url = f"{base_url}/works"
+    def __init__(self) -> None:
+        self._url = f"{API_BASE_URLS['crossref']}/works"
         self._headers = headers()
 
-    def fetch_page(self, filters: str, cursor: str | None, label: str) -> PersonSearchPage:
+    def fetch_page(self, filters: str, cursor: str | None, label: str) -> Page:
         """Renvoie une page des œuvres désignées par `filters`, la première quand `cursor` est `None`. Une page incomplète clôt la pagination : Crossref renvoie un curseur même après la dernière page."""
         data = as_mapping(
             http_request_with_retry(
@@ -51,9 +51,7 @@ class CrossrefClient:
         message = as_mapping(data.get("message"))
         records = [as_mapping(item) for item in as_sequence(message.get("items"))]
         following = as_str(message.get("next-cursor"))
-        return PersonSearchPage(
-            records=records, next_token=following if len(records) == _ROWS else None
-        )
+        return Page(records, following if len(records) == _ROWS else None)
 
 
 async def get_message(

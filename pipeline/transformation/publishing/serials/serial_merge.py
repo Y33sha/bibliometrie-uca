@@ -7,14 +7,14 @@ from domain.serials.serial import ManualField, SerialType
 from infrastructure.repositories.merge_steps import (
     MergeStep,
     fill_empty_unique,
-    record_redirect,
+    merge_into,
     transfer,
     untouched,
 )
 from pipeline.transformation.publications import lifecycle
 from pipeline.transformation.publications.store import PublicationStore
 from pipeline.transformation.publishing.publication_counts import (
-    refresh_serial_publication_count,
+    refresh_serial_publication_counts,
 )
 from pipeline.transformation.publishing.serials.requalify_serial import (
     correct_serial_records,
@@ -98,12 +98,9 @@ MERGE_STEPS: dict[str, MergeStep] = {
 
 def merge_serial_into(conn: Connection, target_id: int, source_id: int) -> None:
     """Applique chaque étape de `MERGE_STEPS`, supprime la revue absorbée et enregistre sa redirection, puis recalcule le nombre de publications et l'éditeur de la revue conservée."""
-    for step in MERGE_STEPS.values():
-        step.apply(conn, target_id, source_id)
-    conn.execute(text("DELETE FROM serials WHERE id = :s"), {"s": source_id})
-    record_redirect(conn, MergedEntity.SERIAL, target_id, source_id)
+    merge_into(conn, MergedEntity.SERIAL, "serials", MERGE_STEPS, target_id, source_id)
 
-    refresh_serial_publication_count(conn, target_id)
+    refresh_serial_publication_counts(conn, target_id)
     refresh_serial_publishers(conn, target_id)
 
 

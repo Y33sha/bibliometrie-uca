@@ -22,14 +22,14 @@ from infrastructure.db.jsonb import Jsonb
 from infrastructure.db.queues import Queue, delete_processed, enqueue_sql, snapshot
 from infrastructure.db.rows import rows_as
 from infrastructure.raw_store import RawStore, get_raw_store
-from pipeline.ingestion.adapters import ADAPTERS
 from pipeline.ingestion.common.change_detection import change_detection_hash
 from pipeline.ingestion.common.failed_lookups import (
     forget_failed_doi_lookups,
-    forget_failed_hal_id_lookup,
+    forget_failed_native_id_lookup,
 )
 from pipeline.ingestion.common.fingerprint import stable_json_bytes
 from pipeline.ingestion.common.source_records import delete_source_record_of_staging
+from pipeline.ingestion.payload_readers import payload_reader
 
 _logger = logging.getLogger(__name__)
 
@@ -78,7 +78,7 @@ _UPSERT_STAGING_SQL = text(
 
 
 class UpsertOutcome(StrEnum):
-    """Issue de l'écriture d'une ligne de `staging`.
+    """Issue de l'écriture d'une ligne de `staging`. Chaque valeur nomme le compteur de `PhaseMetrics` qui la compte.
 
     - `NEW` : ligne insérée ;
     - `UPDATED` : ligne existante au contenu changé, réécrite ;
@@ -187,12 +187,12 @@ class StagingStore:
         Args:
             listed: le document vient d'une réponse de liste, où la source peut plafonner les auteurs.
         """
-        adapter = ADAPTERS[Source(source)]
-        identity = adapter.identify(record)
+        reader = payload_reader(Source(source))
+        identity = reader.identify(record)
         if identity is None:
             return None
         truncated = (
-            listed and adapter.authors_truncated is not None and adapter.authors_truncated(record)
+            listed and reader.authors_truncated is not None and reader.authors_truncated(record)
         )
         inserted, changed = self.upsert(
             source=source,
@@ -205,8 +205,7 @@ class StagingStore:
         forget_failed_doi_lookups(self._conn, source, identity.dois)
         if PROFILES[Source(source)].registration_agency is not None:
             forget_failed_doi_lookups(self._conn, DOI_ORG, identity.dois)
-        if source == Source.HAL:
-            forget_failed_hal_id_lookup(self._conn, identity.source_id)
+        forget_failed_native_id_lookup(self._conn, source, identity.source_id)
         return UpsertOutcome.of(inserted=inserted, changed=changed)
 
     def complete_authors(
@@ -216,7 +215,7 @@ class StagingStore:
 
         Tant que le moissonnage renvoie le même document tronqué, son empreinte égale celle en base, et l'écriture laisse la version complète en place. Renvoie `UPDATED`, ou `None` pour un document sans identifiant.
         """
-        identity = ADAPTERS[Source(source)].identify(record)
+        identity = payload_reader(Source(source)).identify(record)
         if identity is None:
             return None
         self._conn.execute(

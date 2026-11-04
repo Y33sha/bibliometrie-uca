@@ -64,7 +64,7 @@ class _StubNorm(SourceNormalizer):
 
     SOURCE = "hal"
 
-    def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
+    def minimal_metadata(self, doc: Document) -> tuple[str | None, int | None]:
         return "Titre", 2024
 
     def publication_date(self, doc: Document) -> PublicationDate | None:
@@ -235,12 +235,11 @@ class _MinimalNorm(_StubNorm):
         super().__init__(**normalizer_arguments(staging_store=staging))
         self.normalized: list[StagingRow] = []
 
-    def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
-        return row.raw_data.get("title"), row.raw_data.get("year")  # type: ignore[return-value]
+    def minimal_metadata(self, doc: Document) -> tuple[str | None, int | None]:
+        return doc.get("title"), doc.get("year")  # type: ignore[return-value]
 
-    def normalize_record(self, row: StagingRow) -> bool:
+    def normalize_record(self, row: StagingRow, doc: Document) -> None:
         self.normalized.append(row)
-        return True
 
 
 class TestProcessWorkMinimalMetadata:
@@ -263,10 +262,10 @@ class TestProcessWorkMinimalMetadata:
         assert norm.normalized == []
 
     def test_enregistrement_source_refuse_par_la_source(self):
-        """`normalize_record` renvoie False (Crossref sans DOI, HAL sans auteur) : même sort qu'un enregistrement source incomplet."""
+        """`parse` renvoie `None` (Crossref sans DOI, HAL sans auteur) : même sort qu'un enregistrement source incomplet."""
         staging = MagicMock()
         norm = _MinimalNorm(staging)
-        norm.normalize_record = lambda row: False  # type: ignore[method-assign]
+        norm.parse = lambda row: None  # type: ignore[method-assign]
         row = StagingRow(id=3, source_id="c", doi=None, raw_data={"title": "T", "year": 2020})
         assert norm.process_work(row) is False
         staging.discard_source_record.assert_called_once_with(3)
@@ -358,13 +357,6 @@ def writes(monkeypatch) -> list[tuple]:
 class TestNormalizeRecord:
     ROW = StagingRow(id=1, source_id="a", doi=None, raw_data={"title": "T"})
 
-    def test_enregistrement_refuse_sans_ecriture(self, writes):
-        norm = _WritingNorm(doc=None)
-        assert norm.normalize_record(self.ROW) is False
-        assert writes == []
-        norm._record_store.upsert_source_record.assert_not_called()
-        norm._staging.clear_payload.assert_not_called()
-
     def test_enregistrement_avec_editeur_et_serie_decrits_puis_contributions(self, writes):
         norm = _WritingNorm(
             doc={"title": "T"},
@@ -372,7 +364,7 @@ class TestNormalizeRecord:
             facts=ContainerDescription(source="hal", raw_doc_type=None, journal_title="Revue"),
         )
         norm._record_store.upsert_source_record.return_value = 42
-        assert norm.normalize_record(self.ROW) is True
+        norm.normalize_record(self.ROW, {"title": "T"})
         assert writes == [("contributions", "hal", 42)]
         assert norm.series_seen == [True]
         norm._record_store.upsert_source_record.assert_called_once_with(
@@ -392,7 +384,7 @@ class TestNormalizeRecord:
     def test_sans_editeur_ni_conteneur(self, writes):
         norm = _WritingNorm(doc={"title": "T"})
         norm._record_store.upsert_source_record.return_value = 42
-        assert norm.normalize_record(self.ROW) is True
+        norm.normalize_record(self.ROW, {"title": "T"})
         assert writes == [("contributions", "hal", 42)]
         assert norm.series_seen == [False]
         norm._record_store.upsert_source_record.assert_called_once_with(_RECORD)

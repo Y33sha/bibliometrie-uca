@@ -6,7 +6,7 @@ from domain.merge import MergedEntity
 from infrastructure.repositories.merge_steps import (
     MergeStep,
     fill_empty,
-    record_redirect,
+    merge_into,
     transfer,
     untouched,
 )
@@ -58,7 +58,4 @@ MERGE_STEPS: dict[str, MergeStep] = {
 
 def merge_monograph_into(conn: Connection, target_id: int, source_id: int) -> None:
     """Applique chaque étape de `MERGE_STEPS`, supprime la monographie absorbée et enregistre sa redirection."""
-    for step in MERGE_STEPS.values():
-        step.apply(conn, target_id, source_id)
-    conn.execute(text("DELETE FROM monographs WHERE id = :s"), {"s": source_id})
-    record_redirect(conn, MergedEntity.MONOGRAPH, target_id, source_id)
+    merge_into(conn, MergedEntity.MONOGRAPH, "monographs", MERGE_STEPS, target_id, source_id)

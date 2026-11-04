@@ -506,10 +506,6 @@ class SourceContributionOut(Model):
     """Position de la contribution source de référence de la contribution ; absente en attente d'alignement."""
     method: str | None
     """Méthode d'entrée de la contribution source dans sa contribution."""
-    score: float | None
-    """Score de l'entrée, en bits."""
-    margin: float | None
-    """Marge de l'entrée, en bits."""
 
 
 class PublicationSourcesResponse(Model):

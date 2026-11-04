@@ -39,8 +39,8 @@ from infrastructure.db.jsonb import Jsonb
 from infrastructure.db.queues import Queue, enqueue_sql
 from infrastructure.observability.log import setup_logger
 from infrastructure.raw_store import UnreadablePayloadError, get_raw_store
-from pipeline.ingestion.adapters import ADAPTERS
 from pipeline.ingestion.common.change_detection import change_detection_hash
+from pipeline.ingestion.payload_readers import payload_reader
 
 log = setup_logger("rehydrate_staging_from_raw_store", os.path.dirname(__file__))
 
@@ -120,7 +120,7 @@ def rehydrate_or_create_staging_row(
 
 def _doi_for(source: str, raw_data: Mapping[str, JsonValue]) -> str | None:
     """Renvoie le DOI à poser en staging pour un payload réhydraté, lu par l'adaptateur de la source."""
-    identity = ADAPTERS[Source(source)].identify(raw_data)
+    identity = payload_reader(Source(source)).identify(raw_data)
     return identity.doi if identity else None
 
 

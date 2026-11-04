@@ -11,8 +11,7 @@ import pytest
 
 from pipeline.http.circuit_breaker import SourceUnavailableError
 from pipeline.ingestion.common.harvester import HarvestConfigError
-from pipeline.ingestion.datacite import harvest
-from pipeline.ingestion.datacite.api import DatacitePage
+from pipeline.ingestion.common.pages import Page
 from pipeline.ingestion.datacite.harvest import DataciteHarvester, build_query
 from tests.helpers.harvesters import arguments_du_run, moissonneur
 
@@ -32,17 +31,17 @@ def test_guillemets_d_un_mot_cle_echappes():
 
 def _client(pages: list) -> MagicMock:
     client = MagicMock()
-    client.count.return_value = sum(len(p.records) for p in pages if isinstance(p, DatacitePage))
+    client.count.return_value = sum(len(p.records) for p in pages if isinstance(p, Page))
     client.fetch_page.side_effect = pages
     return client
 
 
 def test_suit_le_curseur_jusqu_a_la_derniere_page(configuration, ecritures):
-    configuration(harvest)
+    configuration()
     client = _client(
         [
-            DatacitePage(records=[{"id": "10.1/a"}, {"id": "10.1/b"}], next_url="https://next/1"),
-            DatacitePage(records=[{"id": "10.1/c"}], next_url=None),
+            Page(records=[{"id": "10.1/a"}, {"id": "10.1/b"}], next_token="https://next/1"),
+            Page(records=[{"id": "10.1/c"}], next_token=None),
         ]
     )
     assert moissonneur(DataciteHarvester, client).run(arguments_du_run()).new == 3
@@ -50,17 +49,17 @@ def test_suit_le_curseur_jusqu_a_la_derniere_page(configuration, ecritures):
 
 
 def test_noeud_sans_doi_ignore(configuration, ecritures):
-    configuration(harvest)
-    client = _client([DatacitePage(records=[{"id": ""}, {"id": "10.1/b"}], next_url=None)])
+    configuration()
+    client = _client([Page(records=[{"id": ""}, {"id": "10.1/b"}], next_token=None)])
     moissonneur(DataciteHarvester, client).run(arguments_du_run())
     assert [e.source_id for e in ecritures] == ["10.1/b"]
 
 
 def test_une_erreur_garde_les_pages_deja_ecrites(configuration, ecritures):
-    configuration(harvest)
+    configuration()
     client = _client(
         [
-            DatacitePage(records=[{"id": "10.1/a"}], next_url="https://next/1"),
+            Page(records=[{"id": "10.1/a"}], next_token="https://next/1"),
             RuntimeError("API indisponible"),
         ]
     )
@@ -68,7 +67,7 @@ def test_une_erreur_garde_les_pages_deja_ecrites(configuration, ecritures):
 
 
 def test_source_indisponible_saute_les_annees_suivantes(configuration, ecritures):
-    configuration(harvest, annees=[2023, 2024])
+    configuration(annees=[2023, 2024])
     client = _client([SourceUnavailableError("datacite")])
     metrics = moissonneur(DataciteHarvester, client).run(arguments_du_run())
     assert metrics.total == 0
@@ -76,6 +75,6 @@ def test_source_indisponible_saute_les_annees_suivantes(configuration, ecritures
 
 
 def test_configuration_sans_mot_cle_refusee(configuration):
-    configuration(harvest, api_ids=[])
+    configuration(api_ids=[])
     with pytest.raises(HarvestConfigError, match="aucun mot-clé"):
         moissonneur(DataciteHarvester, _client([])).run(arguments_du_run())

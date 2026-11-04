@@ -255,10 +255,7 @@ class TestNormalizeScanrIdempotence:
         create_all_publications(sa_sync_conn)
 
         cnt = sa_sync_conn.execute(
-            text(
-                "SELECT count(*) AS cnt FROM publications "
-                "WHERE lower(doi) = '10.1234/test-article-001'"
-            )
+            text("SELECT count(*) AS cnt FROM publications WHERE doi = '10.1234/test-article-001'")
         ).scalar_one()
         assert cnt == 1, "Le DOI devrait être dédupliqué"
 

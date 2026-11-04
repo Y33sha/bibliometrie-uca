@@ -1,76 +1,40 @@
 """Nombre de publications du périmètre de chaque revue et de chaque éditeur (`publication_count`).
 
-Les recalculs de toutes les revues et de tous les éditeurs se font dans la phase `finalize`, après celui du périmètre. Les recalculs ciblés servent aux fusions de revues et d'éditeurs. Tous sont idempotents.
+Le recalcul de toutes les revues et de tous les éditeurs se fait dans la phase `finalize`, après celui du périmètre. Le recalcul d'une seule revue ou d'un seul éditeur sert aux fusions. Tous sont idempotents.
 """
 
 from sqlalchemy import Connection, text
 
 
-def refresh_serial_publication_count(conn: Connection, serial_id: int) -> None:
-    """Recalcule le `publication_count` d'une seule revue (fusion depuis l'administration)."""
-    conn.execute(
-        text("""
-            UPDATE serials j SET publication_count = COALESCE((
-                SELECT COUNT(*) FROM publications p
-                WHERE p.serial_id = j.id AND p.in_perimeter
-            ), 0)
-            WHERE j.id = :jid
-        """),
-        {"jid": serial_id},
-    )
+def refresh_serial_publication_counts(conn: Connection, serial_id: int | None = None) -> int:
+    """Recalcule le `publication_count` de chaque revue, ou de la seule revue `serial_id`. Renvoie le nombre de lignes changées."""
+    return _refresh(conn, "serials", "serial_id", serial_id)
 
 
-def refresh_publisher_publication_count(conn: Connection, publisher_id: int) -> None:
-    """Recalcule le `publication_count` d'un seul éditeur (fusion depuis l'administration)."""
-    conn.execute(
-        text("""
-            UPDATE publishers p SET publication_count = COALESCE((
-                SELECT COUNT(*) FROM publications pu
-                WHERE pu.publisher_id = p.id AND pu.in_perimeter
-            ), 0)
-            WHERE p.id = :pid
-        """),
-        {"pid": publisher_id},
-    )
+def refresh_publisher_publication_counts(conn: Connection, publisher_id: int | None = None) -> int:
+    """Recalcule le `publication_count` de chaque éditeur, ou du seul éditeur `publisher_id`. Renvoie le nombre de lignes changées."""
+    return _refresh(conn, "publishers", "publisher_id", publisher_id)
 
 
-def refresh_serial_publication_counts(conn: Connection) -> int:
-    """Recalcule le `publication_count` de chaque revue. Renvoie le nombre de lignes changées."""
+def _refresh(conn: Connection, table: str, column: str, entity_id: int | None) -> int:
+    """Recalcule le `publication_count` des lignes de `table`, ou de la seule ligne `entity_id`, d'après la colonne `column` des publications du périmètre."""
     return conn.execute(
-        text("""
+        text(f"""
             WITH counts AS (
-                SELECT serial_id, COUNT(*) AS n
+                SELECT {column} AS id, COUNT(*) AS n
                 FROM publications
-                WHERE in_perimeter
-                  AND serial_id IS NOT NULL
-                GROUP BY serial_id
+                WHERE in_perimeter AND {column} IS NOT NULL
+                  AND (CAST(:id AS integer) IS NULL OR {column} = :id)
+                GROUP BY {column}
             )
-            UPDATE serials j
+            UPDATE {table} t
             SET publication_count = COALESCE(c.n, 0)
-            FROM serials j2
-            LEFT JOIN counts c ON c.serial_id = j2.id
-            WHERE j2.id = j.id AND j.publication_count IS DISTINCT FROM COALESCE(c.n, 0)
-        """)
-    ).rowcount
-
-
-def refresh_publisher_publication_counts(conn: Connection) -> int:
-    """Recalcule le `publication_count` de chaque éditeur. Renvoie le nombre de lignes changées."""
-    return conn.execute(
-        text("""
-            WITH counts AS (
-                SELECT publisher_id, COUNT(*) AS n
-                FROM publications
-                WHERE in_perimeter
-                  AND publisher_id IS NOT NULL
-                GROUP BY publisher_id
-            )
-            UPDATE publishers p
-            SET publication_count = COALESCE(c.n, 0)
-            FROM publishers p2
-            LEFT JOIN counts c ON c.publisher_id = p2.id
-            WHERE p2.id = p.id AND p.publication_count IS DISTINCT FROM COALESCE(c.n, 0)
-        """)
+            FROM {table} t2
+            LEFT JOIN counts c ON c.id = t2.id
+            WHERE t2.id = t.id AND t.publication_count IS DISTINCT FROM COALESCE(c.n, 0)
+              AND (CAST(:id AS integer) IS NULL OR t2.id = :id)
+        """),  # noqa: S608 — table et colonne choisies par le code
+        {"id": entity_id},
     ).rowcount
 
 
@@ -82,4 +46,4 @@ class PublicationCountRecompute:
 
     def refresh_publisher_publication_count(self, publisher_id: int) -> None:
         """Recalcule le `publication_count` de l'éditeur."""
-        refresh_publisher_publication_count(self._conn, publisher_id)
+        refresh_publisher_publication_counts(self._conn, publisher_id)

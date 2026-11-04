@@ -78,12 +78,10 @@ def address_origin(
         return AddressOrigin.HAL_LABEL
     if normalized_text in referentials.structure_names or _is_name_and_country(text, referentials):
         return AddressOrigin.NAME_ONLY
-    if "," in text:
-        return AddressOrigin.RAW
     final = _FINAL_PARENTHESES.search(text)
     if final and referentials.is_country(normalize_text(final.group(1))):
         return AddressOrigin.HAL_LABEL
-    if referentials.country_names.trailing_country(normalized_text):
+    if "," in text or referentials.country_names.trailing_country(normalized_text):
         return AddressOrigin.RAW
     return AddressOrigin.NAME_ONLY
 

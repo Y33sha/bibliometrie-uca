@@ -24,7 +24,7 @@ def _publication(**overrides: object) -> Publication:
 
 
 def _serial(serial_type: str, title: str = "Une revue") -> SerialFacts:
-    return SerialFacts(serial_type=serial_type, title=title, oa_model=None)
+    return SerialFacts(serial_type=serial_type, title=title)
 
 
 def test_serial_type_media_decoupling_is_repaired():

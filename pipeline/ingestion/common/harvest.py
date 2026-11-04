@@ -17,7 +17,7 @@ from domain.dates import date_to_french, today
 from domain.sources.registry import HARVESTED_SOURCES, Source, source_label
 from infrastructure.observability.phase_executions import get_last_daily_harvest_date
 from pipeline.graph import Task, TaskRun
-from pipeline.ingestion.adapters import ADAPTERS
+from pipeline.ingestion.adapters import adapter
 from pipeline.ingestion.common.harvester import HarvestWindow, run_harvest
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.log_format import BRANCH
@@ -70,7 +70,7 @@ def _harvest(source: str) -> TaskRun:
             )
             since = last_daily.isoformat()
         window = HarvestWindow(years=options.years, since=since)
-        harvester = ADAPTERS[Source(source)].harvester
+        harvester = adapter(Source(source)).harvester
         assert harvester is not None, f"{source} : source moissonnée sans moissonneur"
         return run_harvest(ctx, source, harvester, window)
 

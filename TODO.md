@@ -1,8 +1,3 @@
-uv run python -m interfaces.cli.oneshot.requalify_journal_issues
-run_pipeline --from metadata_correction
-fill_source_record_identifiers => wos TSV
-uv run python -m interfaces.cli.oneshot.remove_link_header_urls
-
 # Pipeline
 ## Extraction
 * [ ] Dimensions?; Sudoc? (liens personnes-thèses plus complets que theses.fr, j'ai l'impression); Cairn, Persée pour augmenter couverture SHS? creuser ISTEX
@@ -24,6 +19,7 @@ uv run python -m interfaces.cli.oneshot.remove_link_header_urls
 * [ ] auteur premier, dernier, correspondant: sur les facettes et les stats
 * [ ] stats en compte fractionnaire vs compte entier?
 * [ ] quand on détache une publi d'un auteur: mettre à jour le décompte et la pagination
+* [ ] page publisher: pas de tab monographies si count=0
 ### Visualisation
 * [ ] taux de collaboration
 * [ ] évolution des collaborations dans le temps (graphes de collaboration par labo, avec visualisation animée par année)

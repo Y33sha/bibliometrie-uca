@@ -5,7 +5,7 @@ Marquer une ligne consiste à insérer son identifiant dans la file avec un nouv
 Les files sont sans clé étrangère. L'identifiant d'une ligne supprimée reste en file. La tâche l'ignore en joignant la table traitée, puis supprime son marquage avec les autres.
 """
 
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from enum import StrEnum
 
 from sqlalchemy import Connection, text
@@ -51,6 +51,11 @@ def enqueue_sql(queue: Queue, ids_sql: str) -> str:
 def enqueue(conn: Connection, queue: Queue, ids_sql: str, params: dict[str, object]) -> int:
     """Marque dans `queue` les identifiants renvoyés par la requête `ids_sql`, à une colonne. Renvoie le nombre d'identifiants marqués."""
     return conn.execute(text(enqueue_sql(queue, ids_sql)), params).rowcount
+
+
+def enqueue_ids(conn: Connection, queue: Queue, ids: Iterable[int]) -> int:
+    """Marque dans `queue` les identifiants `ids`. Renvoie le nombre d'identifiants marqués."""
+    return enqueue(conn, queue, "SELECT unnest(CAST(:ids AS integer[]))", {"ids": list(ids)})
 
 
 def snapshot(conn: Connection, queue: Queue, table: str) -> None:

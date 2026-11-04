@@ -18,20 +18,7 @@ import pytest
 from pipeline.http.lookup import NOT_FOUND, UNAVAILABLE
 from pipeline.ingestion.common import lookup, stale_refetch
 from pipeline.ingestion.common.staging import StagingStore
-from pipeline.ingestion.common.stale_refetch import StaleRefetch, refresh
-
-
-class _Lecture(StaleRefetch):
-    """Lecture simulée : l'issue de chaque identifiant est posée par `outcomes`."""
-
-    source_key = "openalex"
-    max_concurrent = 2
-
-    def __init__(self, outcomes: dict) -> None:
-        self.outcomes = outcomes
-
-    async def fetch_by_native_id(self, client, source_id):
-        return self.outcomes[source_id]
+from pipeline.ingestion.common.stale_refetch import refresh
 
 
 @dataclass
@@ -64,8 +51,12 @@ def lancer(monkeypatch):
             "set_disappeared",
             lambda conn, source, source_id: base.disparus.append(source_id),
         )
+
+        async def _fetch_one(_client, source_id):
+            return outcomes[source_id]
+
         metrics = asyncio.run(
-            refresh(MagicMock(), _Lecture(outcomes), logging.getLogger("test"), after_days=90)
+            refresh(MagicMock(), "openalex", _fetch_one, logging.getLogger("test"), after_days=90)
         )
         return metrics, base
 

@@ -1,13 +1,12 @@
 """Recherche par DOI dans une source cible : les DOI vus dans les autres sources et absents de la cible, interrogés par lots.
 
-Chaque source implémente `DoiSearch` (`pipeline/ingestion/<source>/fetch_missing.py`) : la requête d'un lot. `fetch_missing_doi` sélectionne les DOI et les cherche par la boucle commune (`pipeline.ingestion.common.lookup`).
+L'adaptateur de chaque source interrogeable par DOI fournit sa recherche (`DoiSearch`) : la requête d'un lot. `fetch_missing_doi` sélectionne les DOI et les cherche par la boucle commune (`pipeline.ingestion.common.lookup`).
 """
 
 from __future__ import annotations
 
 import logging
-from collections.abc import Awaitable
-from typing import Protocol
+from dataclasses import dataclass
 
 import httpx2
 from sqlalchemy import Connection, ScalarResult, text
@@ -23,28 +22,19 @@ from pipeline.ingestion.common.failed_lookups import (
     pending_failed_lookup_sql,
     record_failed_lookup,
 )
-from pipeline.ingestion.common.lookup import LookupBatch, LookupChannel, look_up
+from pipeline.ingestion.common.lookup import Fetch, LookupBatch, LookupChannel, look_up
 from pipeline.ingestion.complements.doi_org import doi_existence
 from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
 
-class DoiSearch(Protocol):
-    """Recherche par DOI dans une source : requête d'un lot de DOI.
+@dataclass(frozen=True, slots=True)
+class DoiSearch:
+    """Recherche par DOI dans une source."""
 
-    Le débit suit le budget de la source (`api_params.MAX_PER_SECOND`).
-    """
-
-    source_key: str
-    batch_size: int
-    """Taille de lot : 1 pour un appel par DOI, plus de 1 pour un appel groupé."""
-    max_concurrent: int
-    """Plafond de requêtes simultanées, sous le rate-limit de l'API."""
-
-    def fetch_async(
-        self, client: httpx2.AsyncClient, dois: list[str]
-    ) -> Awaitable[LookupBatch | Unavailable]:
-        """Interroge l'API pour un lot de 1 à `batch_size` DOI."""
+    fetch: Fetch
+    """Requête d'un lot de 1 à `batch_size` DOI."""
+    batch_size: int = 1
 
 
 def get_missing_dois(
@@ -123,6 +113,7 @@ def get_missing_dois(
 
 async def fetch_missing_doi(
     conn: Connection,
+    source: str,
     search: DoiSearch,
     log: logging.Logger,
     *,
@@ -136,7 +127,6 @@ async def fetch_missing_doi(
 
     Renvoie les compteurs de `look_up`, avec le nombre de DOI inconnus de doi.org (`unknown_to_doi_org`).
     """
-    source = search.source_key
     dois = get_missing_dois(conn, source, retry_after_days=retry_after_days, years=years)
     if limit and len(dois) > limit:
         scoped_logger(log, source).info(
@@ -155,13 +145,12 @@ async def fetch_missing_doi(
         log,
         LookupChannel(
             source=source,
-            fetch=search.fetch_async,
+            fetch=search.fetch,
             on_absent=_absent,
             stage=lambda staging, record: staging.stage(
                 source, record, entry_mode=StagingEntryMode.FETCH_MISSING_DOI
             ),
             batch_size=search.batch_size,
-            max_concurrent=search.max_concurrent,
         ),
         dois,
     )
@@ -184,6 +173,5 @@ def _doi_org_channel() -> LookupChannel:
         fetch=_fetch,
         on_absent=lambda conn, doi: record_failed_lookup(conn, DOI_ORG, "doi", doi),
         absent_metric="unknown_to_doi_org",
-        max_concurrent=3,
         shown=False,
     )

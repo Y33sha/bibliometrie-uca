@@ -329,8 +329,8 @@ class CrossrefNormalizer(SourceNormalizer):
     SOURCE = "crossref"
     DEFAULT_BATCH_SIZE = 100
 
-    def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
-        return get_title(row.raw_data), get_publication_year(row.raw_data)
+    def minimal_metadata(self, doc: Document) -> tuple[str | None, int | None]:
+        return get_title(doc), get_publication_year(doc)
 
     def parse(self, row: StagingRow) -> Document | None:
         """Renvoie le `message` de l'œuvre, ou `None` sans DOI."""

@@ -305,7 +305,7 @@ class TestThesesNormalizerClass:
         assert "intranet_only" not in (other.source_extras or {})
 
     def test_metadonnees_minimales(self):
-        assert _make_normalizer().minimal_metadata(staging_row(raw={})) == (None, None)
+        assert _make_normalizer().minimal_metadata({}) == (None, None)
 
     def test_sans_editeur_ni_conteneur(self):
         norm = _make_normalizer()

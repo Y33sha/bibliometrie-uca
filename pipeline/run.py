@@ -19,7 +19,7 @@ import time
 from collections.abc import Sequence
 from dataclasses import dataclass
 from types import FrameType
-from typing import cast
+from typing import NoReturn, cast
 
 from domain.pipeline_runs import PhaseStatus
 from domain.sources.registry import Source
@@ -355,35 +355,14 @@ def _run_one_phase(
         try:
             metrics = run_phase(phase, ctx)
         except (KeyboardInterrupt, Exception) as e:
-            # Une interruption en pleine requête invalide la connexion : le nettoyage suivant lève une erreur SQLAlchemy, et le `KeyboardInterrupt` reste dans la chaîne des exceptions.
-            interrupted = is_user_interruption(e)
-            if interrupted:
-                message = "Interrompu par l'utilisateur (action contrôlée)"
-                log.warning("Pipeline interrompu par l'utilisateur à la phase '%s'", name)
-            else:
-                message = failure_message(e)
-                log.error("Pipeline interrompu à la phase '%s' : %s", name, message)
-                log.error("Trace de l'échec", exc_info=e, extra={"detail": True})
-            log.log(
-                logging.INFO if interrupted else logging.ERROR,
-                "Pour reprendre : run_pipeline --from %s",
-                name,
-            )
-            recorder.record(
+            _stop_on_failure(
+                e,
                 phase=name,
                 started_at=phase_started_at,
-                status=PhaseStatus.WARNING if interrupted else PhaseStatus.ERROR,
-                metrics=PhaseMetrics().to_payload(time.time() - t0_phase, ctx.task_durations),
-                signals=[
-                    {
-                        "level": PhaseStatus.WARNING if interrupted else PhaseStatus.ERROR,
-                        "code": "interrupted" if interrupted else "exception",
-                        "message": message,
-                    }
-                ],
-                details={},
+                duration=time.time() - t0_phase,
+                ctx=ctx,
+                recorder=recorder,
             )
-            sys.exit(130 if interrupted else 1)
 
         duration = time.time() - t0_phase
         if phase.harvesting:
@@ -400,6 +379,48 @@ def _run_one_phase(
         return (name, duration)
     finally:
         reset_log_phase(phase_token)
+
+
+def _stop_on_failure(
+    error: BaseException,
+    *,
+    phase: str,
+    started_at: datetime.datetime,
+    duration: float,
+    ctx: PhaseContext,
+    recorder: PhaseExecutionRecorder,
+) -> NoReturn:
+    """Journalise l'échec de la phase et la commande de reprise, enregistre la phase en échec, puis termine le processus."""
+    # Une interruption en pleine requête invalide la connexion : le nettoyage suivant lève une erreur SQLAlchemy, et le `KeyboardInterrupt` reste dans la chaîne des exceptions.
+    interrupted = is_user_interruption(error)
+    if interrupted:
+        message = "Interrompu par l'utilisateur (action contrôlée)"
+        log.warning("Pipeline interrompu par l'utilisateur à la phase '%s'", phase)
+    else:
+        message = failure_message(error)
+        log.error("Pipeline interrompu à la phase '%s' : %s", phase, message)
+        log.error("Trace de l'échec", exc_info=error, extra={"detail": True})
+    log.log(
+        logging.INFO if interrupted else logging.ERROR,
+        "Pour reprendre : run_pipeline --from %s",
+        phase,
+    )
+    status = PhaseStatus.WARNING if interrupted else PhaseStatus.ERROR
+    recorder.record(
+        phase=phase,
+        started_at=started_at,
+        status=status,
+        metrics=PhaseMetrics().to_payload(duration, ctx.task_durations),
+        signals=[
+            {
+                "level": status,
+                "code": "interrupted" if interrupted else "exception",
+                "message": message,
+            }
+        ],
+        details={},
+    )
+    sys.exit(130 if interrupted else 1)
 
 
 def _execute_phases(options: RunOptions, phases_to_run: list[Phase]) -> None:

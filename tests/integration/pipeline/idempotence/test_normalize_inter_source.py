@@ -155,7 +155,7 @@ class TestNormalizeInterSourceIdempotence:
 
         # L'article partagé, au même DOI, donne une seule publication.
         cnt = sa_sync_conn.execute(
-            text("SELECT COUNT(*) AS cnt FROM publications WHERE lower(doi) = lower(:doi)"),
+            text("SELECT COUNT(*) AS cnt FROM publications WHERE doi = :doi"),
             {"doi": SHARED_DOI},
         ).scalar_one()
         assert cnt == 1, "L'article partagé ne doit exister qu'une fois"

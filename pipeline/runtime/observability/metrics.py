@@ -121,13 +121,14 @@ class PhaseMetrics:
 
     def merge(self, other: PhaseMetrics) -> None:
         """Ajoute en place les compteurs, détails et signaux de `other`."""
-        self.new += other.new
-        self.updated += other.updated
-        self.unchanged += other.unchanged
-        self.seen += other.seen
-        self.errors += other.errors
-        for k, v in other.extras.items():
-            self.extras[k] = self.extras.get(k, 0) + v
+        self.add(
+            new=other.new,
+            updated=other.updated,
+            unchanged=other.unchanged,
+            seen=other.seen,
+            errors=other.errors,
+            **other.extras,
+        )
         self.details.update(other.details)
         self.signals.extend(other.signals)
 

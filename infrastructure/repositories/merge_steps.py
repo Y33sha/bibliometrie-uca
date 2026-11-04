@@ -7,7 +7,7 @@ Chaque fusion enregistre aussi la redirection de l'identifiant absorbé (`record
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 
 from sqlalchemy import Connection, text
@@ -147,3 +147,18 @@ def record_redirect(conn: Connection, entity: MergedEntity, target_id: int, sour
         """),
         params,
     )
+
+
+def merge_into(
+    conn: Connection,
+    entity: MergedEntity,
+    table: str,
+    steps: Mapping[str, MergeStep],
+    target_id: int,
+    source_id: int,
+) -> None:
+    """Applique chaque étape de `steps`, supprime de `table` la ligne absorbée `source_id` et enregistre sa redirection vers `target_id`."""
+    for step in steps.values():
+        step.apply(conn, target_id, source_id)
+    conn.execute(text(f"DELETE FROM {table} WHERE id = :s"), {"s": source_id})  # noqa: S608 — table choisie par le code
+    record_redirect(conn, entity, target_id, source_id)

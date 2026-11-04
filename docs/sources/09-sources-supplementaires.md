@@ -1,6 +1,6 @@
 # Sources supplémentaires
 
-*À jour le 2026-09-07.*
+*À jour le 2026-11-04.*
 
 Sources consultées pour enrichir les publications, les revues et les éditeurs. Elles ne produisent pas d'enregistrement source : leurs données vont dans des tables dédiées ou dans le référentiel.
 
@@ -59,7 +59,7 @@ Source des titres des revues et des liens entre leurs ISSN. Consommée par `chec
 - `https://www.sudoc.fr/services/issn2ppn/<ISSN>,<ISSN>&format=text/json` : PPN de la notice Sudoc de chaque ISSN, par lots de 20 ISSN.
 - `https://www.sudoc.fr/<ppn>.xml` : notice Sudoc en MARCXML.
 
-Aucun identifiant d'accès n'est requis. Aucune limite de débit n'est documentée : le pipeline s'en tient à 5 requêtes par seconde, 4 lots d'ISSN à la fois (`MAX_PER_SECOND`, `SUDOC_MAX_CONCURRENT`, `pipeline/ingestion/api_params.py`). Licence ouverte Etalab.
+Aucun identifiant d'accès n'est requis. Aucune limite de débit n'est documentée : le pipeline s'en tient à 5 requêtes par seconde, 4 lots d'ISSN à la fois (`MAX_PER_SECOND`, `MAX_CONCURRENT`, `pipeline/ingestion/api_params.py`). Licence ouverte Etalab.
 
 ### Données récupérées
 

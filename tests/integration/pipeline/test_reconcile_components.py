@@ -554,12 +554,12 @@ class TestEndToEnd:
         assert _source_record_state(conn, source_record_copy) == (article, False)
         assert _source_record_state(conn, source_record_dataset) == (dataset, False)
 
-    def test_publication_of_a_residual_source_record_is_refreshed(self, sa_sync_conn):
-        """L'enregistrement source sans DOI d'une composante à deux DOI reste sur sa publication, recalculée sans le DOI perdu."""
+    def test_publication_of_a_bridge_is_refreshed(self, sa_sync_conn):
+        """L'enregistrement source sans DOI relie les deux DOI d'une composante : il forme sa propre partition, sur sa publication, recalculée sans le DOI perdu."""
         conn = sa_sync_conn
         hal_id = _hal(_SECONDARY, "hal-01234567")
         stale = _seed_publication(conn, doi="10.9/retire")
-        residual = _source_record(conn, stale, source_id="a", identifiers=hal_id)
+        bridge = _source_record(conn, stale, source_id="a", identifiers=hal_id)
         for source_id, doi in (("b", "10.1/x"), ("c", "10.2/y")):
             _source_record(
                 conn,
@@ -578,7 +578,7 @@ class TestEndToEnd:
 
         reconcile(conn, logger)
 
-        assert _source_record_state(conn, residual) == (stale, False)
+        assert _source_record_state(conn, bridge) == (stale, False)
         assert (
             conn.execute(
                 text("SELECT doi FROM publications WHERE id = :id"), {"id": stale}
@@ -936,7 +936,7 @@ class TestExternalDoiCarrier:
         )  # DOI, sans enregistrement source
         sp1 = _source_record(conn, source_id="t1", title_normalized="t", doi="10.70675/abc")
         sp2 = _source_record(conn, source_id="t2", doi="10.70675/abc")
-        # Avec une contribution source du périmètre, ces orphelins créeraient une publication au DOI déjà pris (`publications_doi_lower_key`).
+        # Avec une contribution source du périmètre, ces orphelins créeraient une publication au DOI déjà pris (`publications_doi_key`).
         insert_source_contribution(
             conn, sp1, source="openalex", author_position=None, in_perimeter=True
         )
@@ -947,7 +947,7 @@ class TestExternalDoiCarrier:
         assert _source_record_state(conn, sp1)[0] == orphan_publication
         assert _source_record_state(conn, sp2)[0] == orphan_publication
         n = conn.execute(
-            text("SELECT count(*) FROM publications WHERE lower(doi) = '10.70675/abc'")
+            text("SELECT count(*) FROM publications WHERE doi = '10.70675/abc'")
         ).scalar_one()
         assert n == 1
 

@@ -38,17 +38,3 @@ class TestAddIdentifiersFromContributions:
         ).all()
         id_types = [r.id_type for r in rows]
         assert id_types == ["idhal", "idref", "orcid"]
-
-    def test_skips_malformed_and_keeps_valid(self, sa_sync_conn, repo):
-        """Un identifiant mal formé est journalisé et ignoré, sans exception ; les identifiants valides du même lot sont ajoutés à la personne."""
-        person_id = _person(sa_sync_conn)
-        contributions = [
-            {"source": "hal", "orcid": "pas-un-orcid", "idhal": "jdupont"},
-        ]
-        add_identifiers_from_contributions(person_id, contributions, repo=repo)
-
-        rows = sa_sync_conn.execute(
-            text("SELECT id_type FROM person_identifiers WHERE person_id = :pid ORDER BY id_type"),
-            {"pid": person_id},
-        ).all()
-        assert [r.id_type for r in rows] == ["idhal"]

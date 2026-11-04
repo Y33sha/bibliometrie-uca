@@ -9,7 +9,6 @@ Usage :
             progress.advance(len(batch))
 """
 
-import logging
 import sys
 import threading
 import time
@@ -17,6 +16,8 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from types import TracebackType
 from typing import Protocol
+
+from pipeline.runtime.observability.logging_scope import ScopedOrPlainLogger
 
 try:
     from tqdm import tqdm
@@ -38,9 +39,6 @@ COUNTER_WIDTH = 13
 
 BAR_FORMAT = "{desc} {percentage:3.0f}% |{bar}| {counter} {elapsed}"
 """Barre réduite à l'avancement et au temps écoulé."""
-
-KEPT_BAR_FORMAT = BAR_FORMAT
-"""Barre dont le compteur donne les éléments retenus, quand le remplissage suit les parcourus."""
 
 
 class TextStream(Protocol):
@@ -140,9 +138,6 @@ REFRESH_S = 0.1
 WAITING_REFRESH_S = 0.4
 """Délai entre deux points d'une attente : assez lent pour se suivre à l'œil."""
 
-type LoggerLike = logging.Logger | logging.LoggerAdapter[logging.Logger]
-"""Destination d'une ligne de journal : un logger, ou l'adaptateur qui le préfixe."""
-
 
 _bar_stream: TextStream | None = None
 
@@ -184,7 +179,7 @@ class Progress:
         self,
         total: int | None,
         label: str,
-        logger: LoggerLike | None,
+        logger: ScopedOrPlainLogger | None,
         *,
         interval_s: float = MILESTONE_INTERVAL_S,
         count_kept: bool = False,
@@ -206,7 +201,7 @@ class Progress:
             bar_class(
                 total=total,
                 desc=label,
-                bar_format=KEPT_BAR_FORMAT if count_kept else BAR_FORMAT,
+                bar_format=BAR_FORMAT,
                 # `close` écrit elle-même la dernière image de la barre : `tqdm` la laisserait en tête du bloc des barres concurrentes, sur la ligne d'une autre barre.
                 leave=False,
                 file=_bar_stream,
@@ -312,7 +307,7 @@ class Progress:
 def track_progress(
     total: int | None,
     label: str,
-    logger: LoggerLike | None,
+    logger: ScopedOrPlainLogger | None,
     *,
     interval_s: float = MILESTONE_INTERVAL_S,
     count_kept: bool = False,
@@ -350,7 +345,7 @@ class Waiting:
     L'écriture va directement au flux, sans `tqdm` : il n'y a aucun avancement à mesurer. Aucune barre n'est active pendant l'attente : la maintenance suit les boucles de la phase.
     """
 
-    def __init__(self, label: str, logger: LoggerLike | None) -> None:
+    def __init__(self, label: str, logger: ScopedOrPlainLogger | None) -> None:
         self._label = label
         self._logger = logger
         self._conclusion = ""
@@ -415,7 +410,7 @@ class Waiting:
 
 
 @contextmanager
-def waiting(label: str, logger: LoggerLike | None) -> Iterator[Waiting]:
+def waiting(label: str, logger: ScopedOrPlainLogger | None) -> Iterator[Waiting]:
     """Signale un travail en cours pendant tout le bloc, sans mesure d'avancement."""
     w = Waiting(label, logger)
     try:

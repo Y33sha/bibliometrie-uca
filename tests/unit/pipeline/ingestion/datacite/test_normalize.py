@@ -430,9 +430,5 @@ class TestDoi:
         assert _normalizer().parse(staging_row(raw={"attributes": attributs})) is attributs
 
 
-def test_metadonnees_minimales_d_attributs_illisibles():
-    normalizer = _normalizer()
-    assert normalizer.minimal_metadata(staging_row(raw={"attributes": "pas un objet"})) == (
-        None,
-        None,
-    )
+def test_attributs_illisibles_refuses():
+    assert _normalizer().parse(staging_row(raw={"attributes": "pas un objet"})) is None

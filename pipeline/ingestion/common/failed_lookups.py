@@ -55,9 +55,11 @@ def forget_failed_doi_lookups(conn: Connection, source: str, dois: Sequence[str 
         conn.execute(_FORGET_SQL, {"source": source, "id_type": "doi", "values": cleaned})
 
 
-def forget_failed_hal_id_lookup(conn: Connection, hal_id: str) -> None:
-    """Efface l'échec de la recherche dans HAL d'un dépôt renvoyé par HAL."""
-    conn.execute(_FORGET_SQL, {"source": Source.HAL.value, "id_type": "hal_id", "values": [hal_id]})
+def forget_failed_native_id_lookup(conn: Connection, source: str, source_id: str) -> None:
+    """Efface l'échec de la recherche d'un document renvoyé par la source qui attribue son identifiant natif (`_REGISTRIES`) : hal-id dans HAL, NNT dans theses.fr."""
+    id_type = next((t for t, registry in _REGISTRIES.items() if registry == source), None)
+    if id_type is not None:
+        conn.execute(_FORGET_SQL, {"source": source, "id_type": id_type, "values": [source_id]})
 
 
 def pending_failed_lookup_sql(*, source_sql: str, id_type: LookupIdType, value_sql: str) -> str:

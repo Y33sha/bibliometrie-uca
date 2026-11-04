@@ -13,7 +13,7 @@ from domain.persons.identifier_attribution import (
     AttributionResult,
     attribution_outcome,
 )
-from domain.persons.identifiers import IdentifierOrigin, normalized_identifier_value
+from domain.persons.identifiers import IdentifierOrigin
 from domain.persons.person import validated_name
 from infrastructure.repositories.person_repository import (
     _core,
@@ -85,14 +85,13 @@ class PgPersonRepository(PersonRepository):
     def attribute_identifier(
         self, person_id: int, id_type: str, id_value: str, *, source: IdentifierOrigin
     ) -> AttributionResult:
-        id_value = normalized_identifier_value(id_type, id_value)
         existing = _identifiers.find_identifier(self._conn, id_type, id_value)
         outcome = attribution_outcome(existing, person_id)
         if outcome is AttributionOutcome.ADDED:
             _identifiers.insert_pending_identifier(self._conn, person_id, id_type, id_value, source)
         elif existing is not None and outcome is AttributionOutcome.REASSIGNED:
             _identifiers.reassign_identifier(self._conn, existing.id, person_id, source)
-        return AttributionResult(outcome, id_value, existing)
+        return AttributionResult(outcome, existing)
 
     def update_identifier_status(self, ident_id: int, status: str) -> IdentifierStatusRow:
         return _identifiers.update_identifier_status(self._conn, ident_id, status)

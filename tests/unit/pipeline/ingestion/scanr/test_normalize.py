@@ -420,7 +420,7 @@ class TestScanrNormalizer:
         [({"year": 2024}, (None, 2024)), ({"title": {"default": "T"}}, ("T", None))],
     )
     def test_metadonnees_minimales(self, raw, attendu):
-        assert _normalizer().minimal_metadata(staging_row(raw=raw)) == attendu
+        assert _normalizer().minimal_metadata(raw) == attendu
 
 
 class TestGetLocations:

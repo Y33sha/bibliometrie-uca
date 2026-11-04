@@ -255,19 +255,14 @@ class DataciteNormalizer(SourceNormalizer):
     SOURCE = "datacite"
     DEFAULT_BATCH_SIZE = 100
 
-    def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
-        attributes = row.raw_data.get("attributes")
-        if not isinstance(attributes, dict):
-            return None, None
-        return get_title(attributes), extract_datacite_publication_year(
-            attributes, max_year=today().year + 1
-        )
+    def minimal_metadata(self, doc: Document) -> tuple[str | None, int | None]:
+        return get_title(doc), extract_datacite_publication_year(doc, max_year=today().year + 1)
 
     def parse(self, row: StagingRow) -> Document | None:
-        """Renvoie les `attributes` de la ressource JSON:API, ou `None` sans DOI."""
+        """Renvoie les `attributes` de la ressource JSON:API, ou `None` sans attributs ou sans DOI."""
         attributes = row.raw_data.get("attributes")
-        # Garanti par `SourceNormalizer` : `minimal_metadata` renvoie (None, None) sinon.
-        assert isinstance(attributes, dict)
+        if not isinstance(attributes, dict):
+            return None
         return attributes if datacite_doi(attributes, row.doi) else None
 
     def publisher(self, doc: Document) -> PublisherFacts | None:

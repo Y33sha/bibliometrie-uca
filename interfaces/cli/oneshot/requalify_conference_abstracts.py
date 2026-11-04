@@ -19,7 +19,7 @@ from sqlalchemy import Connection, text
 from domain.documents.doc_types import DocType
 from domain.source_records.doc_types import map_doc_type
 from infrastructure.db.engine import get_sync_engine
-from infrastructure.db.queues import Queue, enqueue
+from infrastructure.db.queues import Queue, enqueue, enqueue_ids
 from infrastructure.observability.log import setup_logger
 
 log = setup_logger("requalify_conference_abstracts", os.path.dirname(__file__))
@@ -74,12 +74,7 @@ def requalify(conn: Connection, *, dry_run: bool) -> None:
         return
     conn.execute(_UPDATE_DOC_TYPE, {"ids": uncorrected})
     conn.execute(_UPDATE_RAW, {"ids": corrected})
-    marked = enqueue(
-        conn,
-        Queue.SOURCE_RECORD_KEYS,
-        "SELECT unnest(CAST(:ids AS integer[]))",
-        {"ids": uncorrected + corrected},
-    )
+    marked = enqueue_ids(conn, Queue.SOURCE_RECORD_KEYS, uncorrected + corrected)
     marked += enqueue(conn, Queue.SOURCE_RECORD_KEYS, _CONFERENCE_SOURCE_RECORDS, {})
     log.info("Marqués pour la réconciliation : %d", marked)
 

@@ -27,6 +27,7 @@ from pipeline.runtime.context import PhaseContext, RunOptions
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.task_runner import run_phase
 from pipeline.transformation.publications import oa_status
+from pipeline.transformation.publications.oa_inputs import OaInputs
 from pipeline.transformation.publications.oa_status import (
     DOI_ORG,
     MAX_CONCURRENT,
@@ -34,7 +35,7 @@ from pipeline.transformation.publications.oa_status import (
     DoiFetcher,
     DoiLookupTask,
     DoiService,
-    PublicationOaInputs,
+    PublicationOa,
 )
 
 UNPAYWALL_BASE = "https://api.unpaywall.org/v2"
@@ -87,18 +88,20 @@ def _copy(url: str, *, platform_type: PlatformType | None = None) -> Copy:
 
 def _publication(
     publication_id: int, doi: str, current: str | None, *copies: Copy
-) -> PublicationOaInputs:
+) -> PublicationOa:
     """Construit la publication d'un DOI, de statut `current`, dans une revue `full_oa`, sans embargo, avec ses `copies`."""
-    return PublicationOaInputs(
+    return PublicationOa(
         publication_id,
         doi,
         current,
-        True,
-        "full_oa",
-        False,
-        False,
-        None,
-        list(copies),
+        OaInputs(
+            has_serial=True,
+            serial_oa_model="full_oa",
+            embargoed=False,
+            restricted=False,
+            unpaywall=None,
+            copies=list(copies),
+        ),
     )
 
 
@@ -107,7 +110,7 @@ class _FakeStore:
 
     def __init__(
         self,
-        publications: list[PublicationOaInputs],
+        publications: list[PublicationOa],
         *,
         stale_total: int | None = None,
         oa_distribution: dict[str, int] | None = None,
@@ -138,10 +141,10 @@ class _FakeStore:
         self.services.add(service)
         self.answers.extend(answers)
 
-    def fetch_oa_inputs(self, dois) -> list[PublicationOaInputs]:
+    def fetch_oa_inputs(self, dois) -> list[PublicationOa]:
         verdicts = dict(self.answers) if UNPAYWALL in self.services else {}
         return [
-            p._replace(unpaywall=verdicts.get(p.doi, p.unpaywall))
+            p._replace(inputs=p.inputs._replace(unpaywall=verdicts.get(p.doi, p.inputs.unpaywall)))
             for p in self._publications
             if p.doi in set(dois)
         ]

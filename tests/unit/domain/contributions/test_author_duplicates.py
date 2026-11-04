@@ -1,12 +1,54 @@
 """Doublons d'auteur dans la liste d'un enregistrement source (`domain.contributions.author_duplicates`)."""
 
-from domain.contributions.author_duplicates import duplicate_source_contributions
-from domain.contributions.author_grouping import SourceContribution
+from domain.contributions.author_duplicates import (
+    duplicate_source_contributions,
+    unaligned_duplicates,
+)
+from domain.contributions.author_grouping import SourceContribution, align_publication
 
 
 def _source_record(names: list[str]) -> list[SourceContribution]:
     """Construit les contributions sources d'un enregistrement source, dans l'ordre : identifiant = position + 1, prénom = initiale du nom."""
     return [SourceContribution(i + 1, 1, i, name, name[0]) for i, name in enumerate(names)]
+
+
+def _record(source_record: int, names: list[tuple[str, str]]) -> list[SourceContribution]:
+    """Construit les contributions sources d'un enregistrement source, numérotées `source_record * 100 + position`, à partir de couples (nom de famille, prénom)."""
+    return [
+        SourceContribution(source_record * 100 + pos, source_record, pos, last, first)
+        for pos, (last, first) in enumerate(names)
+    ]
+
+
+def _unaligned_duplicates(source_records: dict[int, list[SourceContribution]]) -> dict[int, int]:
+    contributions = align_publication(source_records)
+    by_id = {s.id: s for record in source_records.values() for s in record}
+    return unaligned_duplicates(contributions, by_id)
+
+
+class TestUnalignedDuplicates:
+    def test_un_nom_repete_une_fois_reste_seul_et_devient_doublon(self):
+        """HAL répète « delabaere / amelie » en tête de liste ; les autres sources l'ont une fois, en deuxième position."""
+        hal = _record(
+            1,
+            [
+                ("delabaere", "amelie"),
+                ("leduc", "france"),
+                ("delabaere", "amelie"),
+                ("fuchs", "florent"),
+            ],
+        )
+        openalex = _record(2, [("leduc", "france"), ("delabaere", "amelie"), ("fuchs", "florent")])
+        assert _unaligned_duplicates({1: hal, 2: openalex}) == {100: 102}
+
+    def test_des_homonymes_a_initiales_restent_deux_auteurs(self):
+        wos = _record(1, [("martin", "a"), ("wang", "z"), ("wang", "z"), ("durand", "c")])
+        crossref = _record(2, [("martin", "a"), ("wang", "zhen"), ("durand", "c")])
+        assert _unaligned_duplicates({1: wos, 2: crossref}) == {}
+
+    def test_des_homonymes_d_une_source_unique_restent_deux_auteurs(self):
+        hal = _record(1, [("martin", "anne"), ("martin", "anne")])
+        assert _unaligned_duplicates({1: hal}) == {}
 
 
 def test_une_liste_recopiee_a_la_suite_vise_la_premiere_occurrence():

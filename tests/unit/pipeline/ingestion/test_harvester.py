@@ -1,6 +1,6 @@
 """Tests unitaires de `pipeline.ingestion.common.harvester.SourceHarvester`.
 
-Couvre la séquence de `run` (`load_config`, `setup_logging`, puis `harvest_all`) et le bilan.
+Couvre le moissonnage par année, le bilan et la source sans configuration.
 
 Sans base ni réseau : un faux moissonneur déterministe et une connexion simulée.
 """
@@ -9,51 +9,18 @@ from __future__ import annotations
 
 import argparse
 import logging
-from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 
 from pipeline.http.circuit_breaker import SourceUnavailableError, source_circuit_breaker
+from pipeline.ingestion.common import harvester
 from pipeline.ingestion.common.harvester import (
     HarvestConfigError,
     HarvestWindow,
     SourceHarvester,
     run_harvest,
 )
-from pipeline.runtime.observability.metrics import PhaseMetrics
-
-
-class _FakeHarvester(SourceHarvester):
-    """Implémentation déterministe pour les tests."""
-
-    SOURCE = "fake"
-
-    def __init__(
-        self,
-        conn,
-        logger,
-        *,
-        config: dict[str, Any] | None = None,
-        metrics: PhaseMetrics | None = None,
-    ) -> None:
-        super().__init__(conn, logger, MagicMock())
-        self._config = config or {"affiliations": ["UCA"]}
-        self._metrics = metrics or PhaseMetrics(new=42)
-        self.load_config_calls = 0
-        self.extract_all_calls: list[dict[str, Any]] = []
-        self.setup_logging_calls = 0
-
-    def load_config(self, conn):  # type: ignore[no-untyped-def]
-        self.load_config_calls += 1
-        return self._config
-
-    def harvest_all(self, args, config):  # type: ignore[no-untyped-def]
-        self.extract_all_calls.append({"args": args, "config": config})
-        return self._metrics
-
-    def setup_logging(self, args, config):  # type: ignore[no-untyped-def]
-        self.setup_logging_calls += 1
 
 
 @pytest.fixture
@@ -67,31 +34,37 @@ def conn():
 
 
 class _ParAnnee(SourceHarvester):
-    """Moissonneur rapportant, pour chaque année, un document inséré et des documents inchangés selon `volumes`. La source est indisponible à partir de l'année `unavailable_from`."""
+    """Moissonneur rapportant, pour chaque année, un document inséré et des documents inchangés selon `volumes`. La source est indisponible à partir de l'année `unavailable_from`. L'année `failing` échoue après avoir écrit son document inséré."""
 
     SOURCE = "hal"
 
     def __init__(
-        self, logger, volumes: dict[int, int], *, unavailable_from: int | None = None
+        self,
+        logger,
+        volumes: dict[int, int],
+        *,
+        unavailable_from: int | None = None,
+        failing: int | None = None,
     ) -> None:
         super().__init__(MagicMock(), logger, MagicMock())
         self.volumes = volumes
         self.unavailable_from = unavailable_from
+        self.failing = failing
         self.log_format: list[str] = []
         self.totaux: list[int | None] = []
         self.progress = None
 
-    def load_config(self, conn):  # type: ignore[no-untyped-def]
-        return None
-
-    def harvest_all(self, args, config):  # type: ignore[no-untyped-def]
-        def harvest_step(year, progress):
+    def run(self, window):  # type: ignore[no-untyped-def]
+        def harvest_step(year, progress, metrics):
             self.progress = progress
             self.log_format.append(progress._label)
             self.totaux.append(progress._total)
             if self.unavailable_from is not None and year >= self.unavailable_from:
                 raise SourceUnavailableError(self.SOURCE)
-            return PhaseMetrics(new=1, unchanged=self.volumes[year] - 1)
+            metrics.add(new=1)
+            if year == self.failing:
+                raise ValueError("réponse illisible")
+            metrics.add(unchanged=self.volumes[year] - 1)
 
         return self._harvest_by_year(list(self.volumes), self.volumes.__getitem__, harvest_step)
 
@@ -131,22 +104,24 @@ class TestExtractionParAnnee:
         assert metrics.total == 2
         assert breaker.tripped
 
+    def test_une_erreur_sur_une_annee_passe_a_la_suivante(self, logger, caplog):
+        """L'erreur est journalisée, la page en cours annulée, et les écritures déjà comptées restent dans le bilan."""
+        ext = _ParAnnee(logger, {2023: 2, 2024: 3, 2025: 1}, failing=2024)
+        with caplog.at_level(logging.ERROR):
+            metrics = ext.run(_args())
+        assert (metrics.new, metrics.unchanged) == (3, 1)
+        ext.conn.rollback.assert_called_once()
+        assert "réponse illisible" in caplog.text
 
-class TestRun:
-    def test_happy_path_calls_pipeline_in_order(self, conn, logger):
-        ext = _FakeHarvester(conn, logger)
-        args = HarvestWindow()
+    def test_une_erreur_de_decompte_compte_l_annee_pour_zero(self, logger):
+        ext = _ParAnnee(logger, {2023: 2, 2024: 3})
 
-        metrics = ext.run(args)
+        def count_year(year: int) -> int:
+            if year == 2024:
+                raise ValueError("réponse illisible")
+            return ext.volumes[year]
 
-        assert ext.load_config_calls == 1
-        assert ext.setup_logging_calls == 1
-        # harvest_all reçoit args, config.
-        assert len(ext.extract_all_calls) == 1
-        call = ext.extract_all_calls[0]
-        assert call["args"] is args
-        assert call["config"] == {"affiliations": ["UCA"]}
-        assert metrics.new == 42
+        assert sum(ext._count(count_year, year) for year in ext.volumes) == 2
 
 
 def test_une_source_non_configuree_est_sautee_avec_un_signal(contexte):
@@ -159,3 +134,14 @@ def test_une_source_non_configuree_est_sautee_avec_un_signal(contexte):
     )
 
     assert [s["code"] for s in metrics.signals] == ["source_unconfigured"]
+
+
+def test_une_source_sans_identifiant_dans_le_perimetre_leve_une_erreur_de_configuration(
+    monkeypatch, logger
+):
+    monkeypatch.setattr(harvester, "get_extraction_api_ids", lambda conn, source: [])
+    ext = _ParAnnee(logger, {})
+    ext.MISSING_API_IDS = "aucune affiliation"
+
+    with pytest.raises(HarvestConfigError, match="aucune affiliation"):
+        ext._api_ids()

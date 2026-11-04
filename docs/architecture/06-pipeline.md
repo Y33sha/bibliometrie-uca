@@ -1,6 +1,6 @@
 # Pipeline
 
-*À jour le 2026-11-03.*
+*À jour le 2026-11-04.*
 
 Le pipeline est le traitement par lots qui moissonne les sources et en déduit le référentiel. Ses [phases](../pipeline/01-vue-d-ensemble.md) sont décrites avec le pipeline. C'est un paquet racine, hors des couches : chaque tâche contient son SQL. Il importe `domain/` et `infrastructure/`. Seul `interfaces/` l'importe, par `pipeline/public.py`.
 
@@ -26,7 +26,7 @@ Un verrou PostgreSQL limite chaque base à une exécution du pipeline à la fois
 
 ## Accès aux sources
 
-Chaque source expose un adaptateur (`pipeline/ingestion/<source>/`), utilisé par les tâches : moissonneur, recherche par identifiant, normaliseur. Tout appel à une API tierce passe par `access_source`, qui saute l'étape quand les identifiants de la source manquent. Un circuit-breaker par source coupe les requêtes d'une source en panne : la phase passe en avertissement, et le run suivant reprend les éléments non traités.
+Le paquet de chaque source (`pipeline/ingestion/<source>/`) déclare la lecture des documents reçus : identifiant, empreinte. Son module `adapter.py` déclare les implémentations utilisées par les tâches : moissonneurs, relecture par identifiant, recherche par DOI, normaliseur. Le code d'une source se charge à sa première demande. Tout appel à une API tierce passe par `access_source`, qui saute l'étape quand les identifiants de la source manquent. Un circuit-breaker par source coupe les requêtes d'une source en panne : la phase passe en avertissement, et le run suivant reprend les éléments non traités.
 
 ## Recalculs déclenchés par l'API
 

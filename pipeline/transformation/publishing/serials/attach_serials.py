@@ -33,11 +33,12 @@ from domain.serials.containers import SeriesDescription
 from domain.serials.serial import ManualField
 from domain.source_records.biblio import journal_series
 from domain.source_records.corrections import RAW, CorrectionKey
-from infrastructure.db.queues import Queue, enqueue
+from infrastructure.sql_fragments import corrected, stashed_raw
 from pipeline.runtime.observability.log_format import quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publishing.serials.serial_merge import merge_serial_into
 from pipeline.transformation.publishing.serials.store import SerialStore
+from pipeline.transformation.publishing.source_record_links import write_links
 
 SYNC_LABEL = "ISSN des séries"
 """Libellé de la sous-étape `sync_issns` dans le journal de la phase."""
@@ -47,8 +48,8 @@ ATTACH_LABEL = "Rattachement des enregistrements sources aux publications en sé
 
 _SERIES = text(f"""
     SELECT id, source, publication_id, publisher_id, biblio,
-           CASE WHEN corrections ? '{CorrectionKey.SERIAL_ID}'
-                THEN CAST(corrections->'{CorrectionKey.SERIAL_ID}'->>'{RAW}' AS integer)
+           CASE WHEN {corrected(CorrectionKey.SERIAL_ID, "source_records")}
+                THEN CAST({stashed_raw(CorrectionKey.SERIAL_ID, "source_records")} AS integer)
                 ELSE serial_id END AS serial_id
     FROM source_records
     WHERE biblio ? 'journal' OR serial_id IS NOT NULL
@@ -74,9 +75,9 @@ _SET_ISSN_SERIALS = text("""
 
 _SET_RECORD_SERIALS = text(f"""
     UPDATE source_records s
-    SET serial_id = CASE WHEN s.corrections ? '{CorrectionKey.SERIAL_ID}' AND t.serial_id IS NULL
+    SET serial_id = CASE WHEN {corrected(CorrectionKey.SERIAL_ID, "s")} AND t.serial_id IS NULL
                          THEN s.serial_id ELSE t.serial_id END,
-        corrections = CASE WHEN s.corrections ? '{CorrectionKey.SERIAL_ID}'
+        corrections = CASE WHEN {corrected(CorrectionKey.SERIAL_ID, "s")}
                            THEN jsonb_set(s.corrections, '{{{CorrectionKey.SERIAL_ID},{RAW}}}',
                                           coalesce(to_jsonb(t.serial_id), 'null'::jsonb))
                            ELSE s.corrections END
@@ -380,19 +381,12 @@ def _write_attachment(
         new = attachment.serial_of[m.id]
         if m.serial_id is not None and new is not None:
             received.setdefault(m.serial_id, Counter())[new] += 1
-    if changed:
-        ids = [m.id for m in changed]
-        conn.execute(
-            _SET_RECORD_SERIALS,
-            {
-                "rows": json.dumps(
-                    [{"id": m.id, "serial_id": attachment.serial_of[m.id]} for m in changed]
-                )
-            },
-        )
-        enqueue(
-            conn, Queue.SOURCE_RECORD_KEYS, "SELECT unnest(CAST(:ids AS integer[]))", {"ids": ids}
-        )
+    write_links(
+        conn,
+        "serial_id",
+        {m.id: attachment.serial_of[m.id] for m in changed},
+        update=_SET_RECORD_SERIALS,
+    )
     return [m.id for m in changed], received
 
 

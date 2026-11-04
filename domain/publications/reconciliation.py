@@ -1,6 +1,6 @@
 """Réconciliation des publications : rattachement, fusion et scission, en une seule décision.
 
-Les enregistrements sources du voisinage se répartissent en partitions : composantes connexes de clés de confirmation, coupées par leurs ancres DOI (`doi_anchors`). Une composante à une ancre au plus reste entière. Dans une composante à plusieurs ancres, un enregistrement source rejoint l'ancre de son DOI `primary` ou `derived`, à défaut l'unique ancre parmi ses DOI `secondary`. Sans ancre unique, il reste sur sa publication. Un enregistrement source dérivé suit l'ancre de son parent, l'enregistrement source dont l'identifiant primaire est son identifiant dérivé.
+Les enregistrements sources du voisinage se répartissent en partitions : composantes connexes de clés de confirmation, coupées par leurs ancres DOI (`doi_anchors`). Une composante à une ancre au plus reste entière. Dans une composante à plusieurs ancres, un enregistrement source rejoint l'ancre de son DOI `primary` ou `derived`, à défaut l'unique ancre parmi ses DOI `secondary`. Un enregistrement source dérivé suit l'ancre de son parent, l'enregistrement source dont l'identifiant primaire est son identifiant dérivé. Les enregistrements sources restants forment des sous-composantes par leurs clés partagées. Une sous-composante reliée à une seule ancre la rejoint. Une sous-composante reliée à plusieurs ancres fait le pont entre elles : elle rejoint l'unique ancre de même type de document, à défaut elle forme sa propre partition.
 
 Chaque partition aboutit sur une seule publication, son ancre : celle qui a déjà son DOI, sinon celle du plus petit enregistrement source rattaché. L'ancre garde son identifiant, et donc les corrections faites à la main. Une partition d'enregistrements sources orphelins, sans publication, en crée une si l'un d'eux peut la fonder ; sinon, elle reste orpheline. Un enregistrement source écarté (`is_matchable`) quitte sa publication.
 """
@@ -112,16 +112,37 @@ def _derived_anchors(
     return followed
 
 
+def _components(members: list[ReconcileMember]) -> list[list[ReconcileMember]]:
+    """Renvoie les composantes connexes de `members`, reliés par leurs clés partagées."""
+    by_id = {m.source_record_id: m for m in members}
+    components = connected_components([(m.source_record_id, m.tokens) for m in members])
+    return [[by_id[source_record_id] for source_record_id in c] for c in components]
+
+
+def _doc_types(members: Iterable[ReconcileMember]) -> set[str]:
+    return {m.doc_type for m in members if m.doc_type is not None}
+
+
+def _bridge_anchor(
+    bridge: list[ReconcileMember],
+    by_anchor: Mapping[str, list[ReconcileMember]],
+    anchors_by_token: Mapping[tuple[str, str], set[str]],
+) -> str | None:
+    """Renvoie l'ancre rejointe par une sous-composante sans ancre : l'unique ancre reliée à elle par une clé, à défaut l'unique ancre reliée qui partage un type de document avec elle. `None` sans ancre unique."""
+    linked = {a for m in bridge for t in m.tokens for a in anchors_by_token.get(t, ())}
+    if len(linked) == 1:
+        return next(iter(linked))
+    doc_types = _doc_types(bridge)
+    same_type = {a for a in linked if _doc_types(by_anchor[a]) & doc_types}
+    return next(iter(same_type)) if len(same_type) == 1 else None
+
+
 def _partitions(
     members: list[ReconcileMember],
 ) -> list[tuple[str | None, list[ReconcileMember]]]:
-    """Renvoie les partitions du voisinage, avec leur ancre DOI : composantes connexes, coupées par leurs ancres. Dans une composante à plusieurs ancres, un enregistrement source dérivé suit l'ancre de son parent (`_derived_anchors`) ; un autre enregistrement source sans ancre unique reste hors partition."""
-    by_id = {m.source_record_id: m for m in members}
-    components = connected_components([(m.source_record_id, m.tokens) for m in members])
-
+    """Renvoie les partitions du voisinage, avec leur ancre DOI, `None` pour une partition sans ancre. Dans une composante à plusieurs ancres, une sous-composante sans ancre rejoint l'ancre désignée par `_bridge_anchor`."""
     partitions: list[tuple[str | None, list[ReconcileMember]]] = []
-    for component in components:
-        comp = [by_id[source_record_id] for source_record_id in component]
+    for comp in _components(members):
         anchors = doi_anchors(m.doi_keys for m in comp)
         if len(anchors) <= 1:
             partitions.append((next(iter(anchors), None), comp))
@@ -129,11 +150,27 @@ def _partitions(
         own_anchors = {m.source_record_id: anchor_of(m.doi_keys, anchors) for m in comp}
         followed = _derived_anchors(comp, own_anchors)
         by_anchor: dict[str, list[ReconcileMember]] = defaultdict(list)
+        unanchored: list[ReconcileMember] = []
         for m in comp:
             anchor = followed.get(m.source_record_id, own_anchors[m.source_record_id])
-            if anchor is not None:
+            if anchor is None:
+                unanchored.append(m)
+            else:
                 by_anchor[anchor].append(m)
+        anchors_by_token: dict[tuple[str, str], set[str]] = defaultdict(set)
+        for anchor, part in by_anchor.items():
+            for m in part:
+                for t in m.tokens:
+                    anchors_by_token[t].add(anchor)
+        bridges = [
+            (_bridge_anchor(bridge, by_anchor, anchors_by_token), bridge)
+            for bridge in _components(unanchored)
+        ]
+        for anchor, bridge in bridges:
+            if anchor is not None:
+                by_anchor[anchor].extend(bridge)
         partitions.extend((anchor, by_anchor[anchor]) for anchor in sorted(by_anchor))
+        partitions.extend((None, bridge) for anchor, bridge in bridges if anchor is None)
     return partitions
 
 
@@ -181,6 +218,67 @@ def _claim(
     return None
 
 
+class _Award(NamedTuple):
+    """Attribution des publications aux partitions."""
+
+    groups: tuple[WorkGroup, ...]
+    unfounded: tuple[int, ...]
+    """Enregistrements sources des partitions privées de publication et incapables d'en fonder une, faute d'année."""
+    awarded: frozenset[int]
+    """Publications existantes attribuées à une partition."""
+    target_of_source_record: dict[int, int | None]
+    """Publication de chaque enregistrement source groupé, `None` pour une création."""
+
+
+def _award(claims: Iterable[_Claim], admitted: list[ReconcileMember]) -> _Award:
+    """Attribue les publications revendiquées : revendications fortes, puis faibles, puis créations. La première à revendiquer une publication la garde. Une partition sans publication en crée une si l'un de ses enregistrements sources a une année."""
+    by_id = {m.source_record_id: m for m in admitted}
+    awarded: set[int] = set()
+    groups: list[WorkGroup] = []
+    unfounded: list[int] = []
+    target_of_source_record: dict[int, int | None] = {}
+    for claim in sorted(
+        claims, key=lambda c: (c.preferred is None, not c.strong, c.source_record_ids[0])
+    ):
+        if claim.preferred is not None and claim.preferred not in awarded:
+            awarded.add(claim.preferred)
+            target: int | None = claim.preferred
+        else:
+            target = None
+            if not any(by_id[i].publication_year for i in claim.source_record_ids):
+                unfounded.extend(claim.source_record_ids)
+                continue
+        groups.append(WorkGroup(target, claim.source_record_ids, claim.doi))
+        target_of_source_record.update(dict.fromkeys(claim.source_record_ids, target))
+    return _Award(tuple(groups), tuple(unfounded), frozenset(awarded), target_of_source_record)
+
+
+def _dissolutions(
+    members: list[ReconcileMember],
+    admitted: list[ReconcileMember],
+    award: _Award,
+    publication_sizes: Mapping[int, int],
+) -> tuple[DissolvedPublication, ...]:
+    """Renvoie les publications dissoutes : ancres d'aucun groupe, sans enregistrement source hors du voisinage (`publication_sizes`). Le successeur est la publication du groupe du plus petit enregistrement source admis. Une publication aux enregistrements sources tous écartés est sans successeur, donc absente."""
+    members_per_publication = Counter(
+        m.publication_id for m in members if m.publication_id is not None
+    )
+    kept = {p for p, n in members_per_publication.items() if publication_sizes.get(p, n) > n}
+    dissolved: list[DissolvedPublication] = []
+    for publication_id in sorted(members_per_publication.keys() - award.awarded - kept):
+        anchor = min(
+            (m for m in admitted if m.publication_id == publication_id),
+            key=lambda m: m.source_record_id,
+            default=None,
+        )
+        if anchor is None:
+            continue
+        successor = award.target_of_source_record.get(anchor.source_record_id)
+        if successor is not None and successor != publication_id:
+            dissolved.append(DissolvedPublication(publication_id, successor))
+    return tuple(dissolved)
+
+
 def plan_reconciliation(
     members: Iterable[ReconcileMember],
     *,
@@ -192,69 +290,22 @@ def plan_reconciliation(
     Une publication existante est l'ancre d'une seule partition : la revendication forte l'emporte, puis le plus petit enregistrement source. Les autres partitions créent une publication. Une publication vidée de ses enregistrements sources est dissoute.
 
     Args:
-        existing_publication_by_doi: publication par DOI en minuscules, pour les publications qui ont un DOI sans membre dans le voisinage.
+        existing_publication_by_doi: publication par DOI, pour les publications qui ont un DOI sans membre dans le voisinage.
         publication_sizes: nombre total d'enregistrements sources par publication ; une publication qui en garde hors du voisinage survit.
     """
     members = list(members)
-    by_doi = existing_publication_by_doi or {}
-    excluded = {m.source_record_id for m in members if not m.matchable}
-    admitted = [m for m in members if m.source_record_id not in excluded]
+    admitted = [m for m in members if m.matchable]
     claims = [
-        c for doi, part in _partitions(admitted) if (c := _claim(doi, part, by_doi)) is not None
+        claim
+        for doi, part in _partitions(admitted)
+        if (claim := _claim(doi, part, existing_publication_by_doi or {})) is not None
     ]
-
-    # Revendications fortes, puis faibles, puis créations. La première à revendiquer une publication la garde.
-    by_id = {m.source_record_id: m for m in admitted}
-    awarded: set[int] = set()
-    groups: list[WorkGroup] = []
-    detached: list[int] = sorted(
+    award = _award(claims, admitted)
+    excluded = sorted(
         m.source_record_id for m in members if not m.matchable and m.publication_id is not None
     )
-    target_of_source_record: dict[int, int | None] = {}
-    for claim in sorted(
-        claims, key=lambda c: (c.preferred is None, not c.strong, c.source_record_ids[0])
-    ):
-        if claim.preferred is not None and claim.preferred not in awarded:
-            awarded.add(claim.preferred)
-            target: int | None = claim.preferred
-        else:
-            # Création demandée, ou publication revendiquée déjà prise : la partition crée une publication.
-            target = None
-            if not any(by_id[i].publication_year for i in claim.source_record_ids):
-                detached.extend(claim.source_record_ids)
-                continue
-        groups.append(WorkGroup(target, claim.source_record_ids, claim.doi))
-        for source_record_id in claim.source_record_ids:
-            target_of_source_record[source_record_id] = target
-
-    # Publication dissoute : ancre d'aucun groupe, sans enregistrement source restant. Son successeur est l'ancre de la partition de son plus petit enregistrement source.
-    assigned = {i for claim in claims for i in claim.source_record_ids} | excluded
-    universe_publication_ids = {m.publication_id for m in members if m.publication_id is not None}
-    residual_publication_ids = {
-        m.publication_id
-        for m in members
-        if m.source_record_id not in assigned and m.publication_id is not None
-    }
-    # Une publication qui garde des enregistrements sources hors du voisinage survit.
-    members_per_publication = Counter(
-        m.publication_id for m in members if m.publication_id is not None
+    return ReconcilePlan(
+        groups=award.groups,
+        dissolved=_dissolutions(members, admitted, award, publication_sizes or {}),
+        detached=(*excluded, *award.unfounded),
     )
-    sizes = publication_sizes or {}
-    residual_publication_ids |= {
-        p for p, n in members_per_publication.items() if sizes.get(p, n) > n
-    }
-    dissolved: list[DissolvedPublication] = []
-    for publication_id in sorted(universe_publication_ids - awarded - residual_publication_ids):
-        # Une publication dont tous les enregistrements sources sont écartés n'a pas de successeur.
-        anchor = min(
-            (m for m in admitted if m.publication_id == publication_id),
-            key=lambda m: m.source_record_id,
-            default=None,
-        )
-        if anchor is None:
-            continue
-        successor = target_of_source_record.get(anchor.source_record_id)
-        if successor is not None and successor != publication_id:
-            dissolved.append(DissolvedPublication(publication_id, successor))
-
-    return ReconcilePlan(groups=tuple(groups), dissolved=tuple(dissolved), detached=tuple(detached))

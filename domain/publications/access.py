@@ -133,7 +133,7 @@ def _doi_target(copy: Copy) -> str | None:
 
 def _from_publisher(copy: Copy, doi: str | None) -> bool:
     """Vrai pour la copie de l'éditeur : la page du DOI de la publication, ou l'URL de résolution de ce DOI."""
-    return copy.arrival == 0 or (doi is not None and _doi_target(copy) == doi.lower())
+    return copy.arrival == 0 or (doi is not None and _doi_target(copy) == doi)
 
 
 def _listed(copy: Copy, doi: str | None) -> bool:
@@ -141,7 +141,7 @@ def _listed(copy: Copy, doi: str | None) -> bool:
     target = _doi_target(copy)
     if target is None or copy.platform_type in ARCHIVE_TYPES:
         return True
-    return copy.platform is not None and target != (doi or "").lower()
+    return copy.platform is not None and target != (doi or "")
 
 
 def _rank(copy: Copy, doi: str | None) -> tuple[bool, bool, bool, bool, int, int]:

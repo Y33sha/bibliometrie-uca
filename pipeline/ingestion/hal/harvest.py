@@ -5,30 +5,19 @@ Une seule requête Solr couvre l'union des collections du périmètre (`fq=collC
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from dataclasses import dataclass
-
 from sqlalchemy import Connection
 
-from domain.types import as_mapping, as_sequence, as_str, at_path
 from infrastructure.read_models.perimeters.queries import get_hal_collections
 from pipeline.ingestion.common.harvester import (
     HarvestConfigError,
     HarvestWindow,
     SourceHarvester,
-    stage_document,
+    stage_pages,
 )
-from pipeline.ingestion.hal.api import HalClient
+from pipeline.ingestion.common.pages import Page
+from pipeline.ingestion.hal.api import HalClient, cursor_page
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import Progress
-
-
-@dataclass(frozen=True)
-class HalHarvestConfig:
-    """Configuration du moissonnage HAL, lue en base."""
-
-    all_collections: Mapping[str, str]
-    """{code → libellé} des collections HAL des structures du périmètre de moissonnage."""
 
 
 def build_query(years: list[int] | None, since: str | None = None) -> str:
@@ -60,86 +49,68 @@ def build_collections_fq(collection_codes: list[str]) -> str:
 
 def harvest_union(
     client: HalClient,
-    config: HalHarvestConfig,
+    collection_codes: list[str],
     conn: Connection,
     progress: Progress,
+    metrics: PhaseMetrics,
     *,
     years: list[int] | None = None,
     since: str | None = None,
-) -> PhaseMetrics:
+) -> None:
     """Moissonne l'union des collections pour un périmètre temporel, page après page jusqu'à stabilisation du marqueur.
 
-    Chaque document est écrit une fois dans `staging` et fait avancer `progress`. Renvoie les compteurs d'écriture.
+    Chaque document est écrit une fois dans `staging`, compté dans `metrics` et fait avancer `progress`.
     """
     query = build_query(years=years, since=since)
-    fq = build_collections_fq(list(config.all_collections))
+    fq = build_collections_fq(collection_codes)
 
-    metrics = PhaseMetrics()
-    cursor = "*"
-    while True:
-        data = client.fetch_page_cursor(query, fq, cursor)
-        docs = [as_mapping(d) for d in as_sequence(at_path(data, "response").get("docs"))]
+    def fetch(cursor: str | None) -> Page:
+        mark = cursor or "*"
+        return cursor_page(client.fetch_page_cursor(query, fq, mark), mark)
 
-        for doc in docs:
-            stage_document(conn, metrics, source="hal", record=doc)
-        conn.commit()
-
-        progress.advance(len(docs))
-
-        # Fin de pagination : Solr renvoie le marqueur reçu une fois l'union épuisée. Une page vide arrête aussi la boucle, en cas d'incohérence du serveur.
-        next_cursor = as_str(data.get("nextCursorMark")) or cursor
-        if next_cursor == cursor or not docs:
-            break
-        cursor = next_cursor
-
-    return metrics
+    stage_pages(conn, metrics, "hal", fetch, progress=progress)
 
 
-class HalHarvester(SourceHarvester[HalHarvestConfig, HalClient]):
+class HalHarvester(SourceHarvester[HalClient]):
     """Moissonnage HAL de l'union des collections du périmètre, année par année ou depuis une date."""
 
     SOURCE = "hal"
 
-    def load_config(self, conn: Connection) -> HalHarvestConfig:
-        collections = get_hal_collections(conn)
+    def _collection_codes(self) -> list[str]:
+        """Renvoie les codes des collections HAL du périmètre d'extraction."""
+        collections = get_hal_collections(self.conn)
         if not collections:
             raise HarvestConfigError(
                 "aucune collection HAL (aucune structure du périmètre d'extraction n'a de hal_collection)"
             )
-        return HalHarvestConfig(all_collections=dict(collections))
+        return list(collections)
 
-    def harvest_all(self, window: HarvestWindow, config: HalHarvestConfig) -> PhaseMetrics:
+    def run(self, window: HarvestWindow) -> PhaseMetrics:
         """Moissonne l'union des collections, périmètre temporel par périmètre.
 
         En mode incrémental, un seul périmètre : les dépôts modifiés depuis la date, dans la plage d'années du mode complet. Sinon une passe par année, pour une reprise ciblée par `--years` : un document a une seule année de publication.
         """
         client = self._client
-        fq = build_collections_fq(list(config.all_collections))
+        codes = self._collection_codes()
+        fq = build_collections_fq(codes)
         years = self._years(window)
 
         if window.since:
+            since = window.since
+
+            def harvest_since(progress: Progress) -> PhaseMetrics:
+                metrics = PhaseMetrics()
+                harvest_union(client, codes, self.conn, progress, metrics, years=years, since=since)
+                return metrics
+
             return self._harvest_at_once(
-                client.count(build_query(years=years, since=window.since), fq),
-                lambda progress: harvest_union(
-                    client,
-                    config,
-                    self.conn,
-                    progress,
-                    years=years,
-                    since=window.since,
-                ),
+                client.count(build_query(years=years, since=since), fq), harvest_since
             )
 
         def count_year(year: int) -> int:
             return client.count(build_query(years=[year]), fq)
 
-        def harvest_step(year: int, progress: Progress) -> PhaseMetrics:
-            return harvest_union(
-                client,
-                config,
-                self.conn,
-                progress,
-                years=[year],
-            )
+        def harvest_step(year: int, progress: Progress, metrics: PhaseMetrics) -> None:
+            harvest_union(client, codes, self.conn, progress, metrics, years=[year])
 
         return self._harvest_by_year(years, count_year, harvest_step)

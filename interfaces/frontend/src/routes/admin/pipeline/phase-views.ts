@@ -190,10 +190,9 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
       { key: "publications", label: "Publications regroupées" },
       { key: "groups", label: "Contributions" },
       { key: "reference", label: "Contributions sources fondatrices d'une contribution" },
-      { key: "name", label: "Liens par le nom" },
-      { key: "identifier", label: "Liens par l'identifiant" },
-      { key: "order", label: "Liens par l'ordre des homonymes" },
-      { key: "model", label: "Liens par le modèle probabiliste" },
+      { key: "name", label: "Liens par une clé de nom unique" },
+      { key: "gap", label: "Liens par la ressemblance des noms dans un trou" },
+      { key: "unordered", label: "Liens par la ressemblance des noms hors de l'ordre" },
     ],
   },
   persons: {

@@ -192,6 +192,35 @@ def delete_orphan_addresses(conn: Connection) -> int:
     ).rowcount
 
 
+_LINK_TABLES = (
+    "source_contribution_addresses",
+    "source_contribution_rors",
+    "source_contribution_hal_structures",
+)
+"""Tables des liens d'une contribution source, réécrits avec elle."""
+
+
+def _payload(v: SourceContributionItem | SourceContributionUpdate) -> dict[str, object]:
+    """Renvoie les colonnes écrites d'une contribution source, informations du contributeur comprises."""
+    return {
+        key: v[key]
+        for key in (
+            "author_position",
+            "last_name_normalized",
+            "first_name_normalized",
+            "is_corresponding",
+            "collective",
+            "roles",
+            "raw_author_name",
+            "raw_last_name",
+            "raw_first_name",
+            "identifiers",
+            "neutralized_identifiers",
+            "content_hash",
+        )
+    }
+
+
 class SourceContributionStore:
     """Écriture par lot des contributions sources."""
 
@@ -205,23 +234,7 @@ class SourceContributionStore:
         """
         if not values:
             return
-        payload = [
-            {
-                "author_position": v["author_position"],
-                "last_name_normalized": v["last_name_normalized"],
-                "first_name_normalized": v["first_name_normalized"],
-                "is_corresponding": v["is_corresponding"],
-                "collective": v["collective"],
-                "roles": v["roles"],
-                "raw_author_name": v["raw_author_name"],
-                "raw_last_name": v["raw_last_name"],
-                "raw_first_name": v["raw_first_name"],
-                "identifiers": v["identifiers"],
-                "neutralized_identifiers": v["neutralized_identifiers"],
-                "content_hash": v["content_hash"],
-            }
-            for v in values
-        ]
+        payload = [_payload(v) for v in values]
         self._insert_missing_contributor_information(payload)
         # Contributions sources, marquées pour le recalcul des pays. `write_source_contributions` supprime puis déduplique par position : l'insertion se passe d'`ON CONFLICT`.
         stmt = text(
@@ -311,24 +324,7 @@ class SourceContributionStore:
         # Une seule instruction : la contrainte `(source_record_id, author_position)`, différable, se vérifie en fin d'instruction. Les permutations de positions passent donc.
         if not values:
             return
-        payload = [
-            {
-                "id": v["id"],
-                "author_position": v["author_position"],
-                "last_name_normalized": v["last_name_normalized"],
-                "first_name_normalized": v["first_name_normalized"],
-                "identifiers": v["identifiers"],
-                "is_corresponding": v["is_corresponding"],
-                "collective": v["collective"],
-                "roles": v["roles"],
-                "raw_author_name": v["raw_author_name"],
-                "raw_last_name": v["raw_last_name"],
-                "raw_first_name": v["raw_first_name"],
-                "neutralized_identifiers": v["neutralized_identifiers"],
-                "content_hash": v["content_hash"],
-            }
-            for v in values
-        ]
+        payload = [{"id": v["id"], **_payload(v)} for v in values]
         self._insert_missing_contributor_information(payload)
         self._conn.execute(
             text(
@@ -395,31 +391,13 @@ class SourceContributionStore:
             {"h": authors_hash, "id": source_record_id},
         )
 
-    def delete_source_contribution_addresses(self, ids: list[int]) -> None:
-        if ids:
+    def delete_links(self, ids: list[int]) -> None:
+        """Supprime les liens des contributions sources `ids` : adresses, ROR et structures HAL."""
+        if not ids:
+            return
+        for table in _LINK_TABLES:
             self._conn.execute(
-                text(
-                    "DELETE FROM source_contribution_addresses WHERE source_contribution_id = ANY(:ids)"
-                ),
-                {"ids": ids},
-            )
-
-    def delete_source_contribution_rors(self, ids: list[int]) -> None:
-        if ids:
-            self._conn.execute(
-                text(
-                    "DELETE FROM source_contribution_rors WHERE source_contribution_id = ANY(:ids)"
-                ),
-                {"ids": ids},
-            )
-
-    def delete_source_contribution_hal_structures(self, ids: list[int]) -> None:
-        if ids:
-            self._conn.execute(
-                text(
-                    "DELETE FROM source_contribution_hal_structures"
-                    " WHERE source_contribution_id = ANY(:ids)"
-                ),
+                text(f"DELETE FROM {table} WHERE source_contribution_id = ANY(:ids)"),  # noqa: S608 — table choisie par le code
                 {"ids": ids},
             )
 

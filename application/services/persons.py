@@ -23,6 +23,7 @@ from domain.persons.identifiers import (
     PUBLIC_PERSON_IDENTIFIER_TYPES,
     AttributionStatus,
     IdentifierOrigin,
+    normalized_identifier_value,
 )
 from domain.persons.merge import merge_direction
 from domain.persons.person import PersonExclusion
@@ -111,7 +112,7 @@ class PersonService:
     def add_identifier(self, person_id: int, id_type: str, id_value: str) -> AddIdentifierResult:
         """Attribue à la main un identifiant (ORCID, idHAL, IdRef) à une personne.
 
-        `PersonRepository.attribute_identifier` normalise la valeur et applique `attribution_outcome`. Le type est restreint à `PUBLIC_PERSON_IDENTIFIER_TYPES`. `hal_person_id` est hors de cette liste : c'est la référence d'un compte HAL, lue par le moissonnage dans le TEI.
+        La valeur saisie prend sa forme normalisée (`normalized_identifier_value`). `PersonRepository.attribute_identifier` applique ensuite `attribution_outcome`. Le type est restreint à `PUBLIC_PERSON_IDENTIFIER_TYPES`. `hal_person_id` est hors de cette liste : c'est la référence d'un compte HAL, lue par le moissonnage dans le TEI.
 
         Raises:
             ValidationError: type hors de `PUBLIC_PERSON_IDENTIFIER_TYPES`, ou valeur mal formée.
@@ -120,9 +121,10 @@ class PersonService:
         """
         if id_type not in PUBLIC_PERSON_IDENTIFIER_TYPES:
             raise ValidationError(f"id_type doit être l'un de {PUBLIC_PERSON_IDENTIFIER_TYPES}")
+        id_value = normalized_identifier_value(id_type, id_value)
         if not self._persons.exists(person_id):
             raise NotFoundError(f"Personne {person_id} introuvable")
-        outcome, id_value, existing = self._persons.attribute_identifier(
+        outcome, existing = self._persons.attribute_identifier(
             person_id, id_type, id_value, source=IdentifierOrigin.MANUAL
         )
         if existing is not None and outcome is AttributionOutcome.HELD_ELSEWHERE:

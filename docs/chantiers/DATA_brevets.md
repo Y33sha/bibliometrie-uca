@@ -2,7 +2,7 @@
 
 ## Contexte
 
-Le pipeline moissonne seulement des publications. Aucune table ne contient de brevet.
+Le type de document `patent` existe. Les brevets en base viennent des dépôts HAL, repris par ScanR : 88 publications au 2026-11-04.
 
 ### API de propriété industrielle de l'INPI
 
@@ -27,42 +27,105 @@ Une famille de brevets réunit les demandes déposées auprès de plusieurs offi
 
 - Le SIREN du déposant est renseigné pour une partie des demandes FR, jamais pour les demandes WO.
 - Les demandes EP et WO abrègent les noms des déposants : `UNIV CLERMONT AUVERGNE`, `CENTRE NAT RECH SCIENT`.
-- L'adresse de l'inventeur est son adresse personnelle.
-- Un brevet nomme ses déposants, jamais le laboratoire. Le CNRS et l'Inserm déposent à leur adresse parisienne. Leurs brevets issus d'un laboratoire de l'UCA, sans l'UCA en co-déposant, se repèrent seulement par les inventeurs.
+- L'adresse de l'inventeur est son adresse personnelle. Les demandes EP donnent seulement son pays.
+- Un brevet nomme ses déposants, jamais le laboratoire.
+- Le quota est de 100 requêtes par heure. La réponse 429 donne le délai d'attente dans `X-Rate-Limit-Retry-After-Seconds`.
 
 ### Open data du ministère de l'Enseignement supérieur et de la Recherche
 
-Le portail `data.enseignementsup-recherche.gouv.fr` publie `deposants-des-brevets`, `demandes-de-brevets` et `fr-esr-familles-brevets`, mis à jour en mai 2026. Tous les offices sont couverts. Les déposants sont résolus en SIREN et en identifiant Paysage. Accès libre, sans compte.
+Le portail `data.enseignementsup-recherche.gouv.fr` publie `deposants-des-brevets`, `demandes-de-brevets` et `fr-esr-familles-brevets`, mis à jour en mai 2026. Ces jeux sont tirés de PATSTAT, la base de l'Office européen des brevets. Ils couvrent les demandes déposées depuis 2010 dont une personne est localisée en France, auprès de tous les offices. Les déposants sont résolus en SIREN et en identifiant Paysage. Les inventeurs sont absents. Accès libre, sans compte.
+
+### ScanR
+
+L'index `scanr-patents` du cluster Elasticsearch de ScanR contient les familles des jeux du ministère. Une famille y réunit :
+
+- les déposants, résolus en identifiants Paysage, SIREN et ROR ;
+- les inventeurs, avec leur IdRef quand ScanR l'a trouvé, sans adresse ;
+- les demandes de chaque office : numéros, dates de dépôt, de publication et de délivrance, lien Espacenet ;
+- les articles cités par le brevet, avec leur DOI et les affiliations de leurs auteurs ;
+- la classification CPC.
+
+### HAL
+
+Le champ `number_s` d'un dépôt HAL de type brevet contient son numéro en texte libre : numéro de publication ou de demande, parfois plusieurs, ou une référence interne. Exemples : `WO/2019/229378`, `N°FR3053353`, `EP 4 235 469 A1`, `DI-RV-22-0027`. Le moissonnage HAL demande ce champ.
+
+### Inventaire du 2026-11-04
+
+Familles dont un établissement du périmètre est déposant : UCA, Université Blaise Pascal, Université d'Auvergne, Clermont Auvergne INP, SIGMA Clermont, IFMA, ENSCCF.
+
+| Source | Familles |
+|---|---|
+| INPI | 231, premier dépôt de 1982 à 2025 |
+| ScanR | 156, premier dépôt depuis 2010 |
+| HAL | 38 |
+
+- Depuis 2010, 153 familles sont présentes à la fois à l'INPI et dans ScanR. 14 des 17 familles présentes seulement à l'INPI sont déposées en 2024 ou 2025.
+- Le CNRS est co-déposant de la moitié des familles de l'INPI.
+- HAL contient 88 brevets. 65 sont présents dans ScanR, dont 27 sans déposant du périmètre. 9 des 23 autres donnent une référence interne d'INRAE à la place d'un numéro de brevet.
+- 90 personnes RH ont le nom et le prénom d'un inventeur des familles de l'INPI domicilié dans le Puy-de-Dôme.
+- Dans ScanR, les identifiants Paysage des déposants du périmètre sélectionnent 154 familles : `K4lR3` et `FvH4k` (UCA), `3itX6` (Université d'Auvergne), `cQN1f` (SIGMA Clermont), `S8ntZ` (Clermont Auvergne INP), `UedNx` (ENSCCF). L'Université Blaise Pascal est absente des déposants.
+- 460 de leurs 903 inventeurs ont un IdRef. Sur 301 IdRef distincts, 181 sont en base : 84 confirmés, 97 en attente.
 
 ## Décisions
+
+- Le chantier couvre les brevets dont un établissement du périmètre est déposant. Le brevet d'un organisme partenaire se rattache au périmètre seulement par ses inventeurs, sans adresse dans ScanR.
+- Source : l'index `scanr-patents`, sous une source `scanr_patents` distincte de ScanR.
+- Unité : la famille.
+- Un brevet est une publication de type `patent`. Il figure dans les listes de publications et a sa propre page de détail.
+- Le moissonnage sélectionne les familles par l'identifiant Paysage de leurs déposants, lu dans `structures.api_ids['scanr_patents']`.
+- Type d'identifiant `patent_number` : office et numéro, sans le code de type. Le code de type désigne l'étape de publication d'une demande : A1 pour la demande publiée avec son rapport de recherche, B1 pour le brevet délivré.
+- Le numéro de brevet est une clé de confirmation à plusieurs valeurs, comme le DOI. Un dépôt HAL de brevet rejoint ainsi sa famille.
+- Un dépôt HAL de brevet sans famille en base cherche sa famille dans ScanR par numéro (`fetch_missing`).
+- Indice de périmètre `patent_applicant` : un déposant de la famille est du périmètre.
+- Rôle de contribution `inventor`, compté comme rôle d'auteur.
+- `source_extras` reçoit les demandes, les déposants et la classification CPC.
 
 ## Phasage
 
 ### Phase 1 — Inventaire
 
-- [ ] Demandes déposées par l'UCA et les établissements fusionnés en elle, par nom de déposant
-- [ ] Comptage par famille, par co-déposant, par année
-- [ ] Comparaison avec les jeux de données du ministère : couverture, présence des inventeurs
-- [ ] Recherche par nom d'inventeur sur un échantillon du personnel, parmi les demandes du CNRS et de l'Inserm : bruit dû aux homonymes
+- [x] Demandes déposées par l'UCA et les établissements fusionnés en elle, par nom de déposant
+- [x] Comptage par famille, par co-déposant, par année
+- [x] Comparaison avec les jeux de données du ministère : couverture, présence des inventeurs
+- [x] Recherche par nom d'inventeur sur le personnel : bruit dû aux homonymes
 
 ### Phase 2 — Modèle
 
-- [ ] Choix de la source, de l'unité et de la place du brevet dans le modèle (questions 1 à 3)
+- [x] Choix de la source, de l'unité et de la place du brevet dans le modèle
 
-### Phase 3 — Moissonnage
+### Phase 3 — Moissonnage et normalisation
 
-### Phase 4 — Rattachement aux structures et aux personnes
+- [ ] Source `scanr_patents` : valeur de `source_type`, profil, adaptateur
+- [ ] Identifiants Paysage des déposants dans `structures.api_ids['scanr_patents']`, sur l'UCA et sur Clermont Auvergne INP
+- [ ] Moissonnage des familles par déposant
+- [ ] Normalisation : enregistrement source de type `patent`, numéros en `patent_number`, inventeurs en contributions sources de rôle `inventor`
+- [ ] Demandes, déposants et classification CPC dans `source_extras`
+- [ ] Rafraîchissement d'une famille par son identifiant (`fetch_stale`)
 
-### Phase 5 — Interface
+### Phase 4 — Rattachement des dépôts HAL
 
-### Phase 6 — Documentation
+- [ ] Numéros de `number_s` lus en `patent_number`
+- [ ] `patent_number` en clé de confirmation à plusieurs valeurs
+- [ ] Recherche dans ScanR des familles absentes, par numéro (`fetch_missing`)
+- [ ] Mesure de l'effet sur les publications, puis relance avec `--rebuild-publications`
+
+### Phase 5 — Périmètre et personnes
+
+- [ ] Indice de périmètre `patent_applicant`
+- [ ] Rôle `inventor`, compté comme rôle d'auteur
+- [ ] Mesure du rattachement des inventeurs par IdRef et par alignement avec les auteurs HAL
+- [ ] Mesure du rattachement par nom des autres inventeurs aux personnes RH
+
+### Phase 6 — Interface
+
+- [ ] Page de détail d'un brevet : demandes par office, déposants, inventeurs, classification CPC
+- [ ] Revue, éditeur, open access et APC masqués pour un brevet
+
+### Phase 7 — Documentation
 
 - [ ] Mise à jour de la documentation des sources et des données
 
 ## Questions ouvertes
 
-1. Source : API de l'INPI, jeux de données du ministère, ou les deux.
-2. Unité : la demande ou la famille.
-3. Place dans le modèle : un type de publication, ou une entité distincte.
-4. Périmètre : demandes d'un déposant du périmètre, demandes d'un inventeur rattaché à une structure du périmètre.
-5. Articles cités par un brevet : relation avec les publications par DOI.
+1. Articles cités par un brevet : relation avec les publications par DOI.
+2. Un numéro FR à 7 chiffres de `number_s` peut désigner une demande ou une publication ancienne. ScanR distingue les deux.

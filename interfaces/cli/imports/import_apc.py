@@ -386,9 +386,7 @@ def import_payments(
     payments = name_payers(conn, payments)
     publication_by_doi = {
         row.doi: row.id
-        for row in conn.execute(
-            text("SELECT lower(doi) AS doi, id FROM publications WHERE doi IS NOT NULL")
-        )
+        for row in conn.execute(text("SELECT doi, id FROM publications WHERE doi IS NOT NULL"))
     }
     in_base = [
         {**p, "source_file": source_file, "publication_id": publication_by_doi[doi]}
@@ -472,7 +470,7 @@ def map_publications(conn: Connection) -> int:
             SET publication_id = p.id
             FROM publications p
             WHERE ap.doi IS NOT NULL
-              AND ap.doi = lower(p.doi)
+              AND ap.doi = p.doi
               AND ap.publication_id IS NULL
         """)
     ).rowcount

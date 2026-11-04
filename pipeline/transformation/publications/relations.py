@@ -15,7 +15,7 @@ from typing import NamedTuple
 from sqlalchemy import Connection, bindparam, text
 
 from domain.documents.doc_types import DocType
-from domain.documents.identifiers import ARXIV_DOI_PREFIX, DOI
+from domain.documents.identifiers import ARXIV_DOI_PREFIX
 from domain.publications.relations import (
     DEPENDENT_DOC_TYPE_RELATIONS,
     RELATION_PAIR_LABELS,
@@ -36,7 +36,7 @@ from domain.types import JsonValue
 from infrastructure.db.doi_targets import doi_or_target_sql
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.db.scalars import scalar_int
-from infrastructure.db.source_record_identifiers import first_of_its_type_sql
+from infrastructure.db.source_record_identifiers import first_of_its_type_sql, non_related_doi_sql
 from infrastructure.sql_fragments import has_source_extra, in_clause
 from pipeline.graph import Task
 from pipeline.runtime.context import PhaseContext
@@ -130,8 +130,7 @@ _SHARED_KEY_PAIRS_SQL = text(f"""
               (i.id_type = '{SourceIdentifierType.HAL_ID}' AND i.removed_by IS NULL)
               OR (i.id_type::text IN {in_clause(_SINGLE_KEY_TYPES)}
                   AND {first_of_its_type_sql("i")})
-              OR (i.id_type = '{SourceIdentifierType.DOI}' AND i.removed_by IS NULL
-                  AND i.role <> '{SourceIdentifierRole.RELATED}'
+              OR ({non_related_doi_sql("i")} AND i.removed_by IS NULL
                   AND i.id_value LIKE '{ARXIV_DOI_PREFIX}%')
           )
     )
@@ -242,7 +241,7 @@ def fetch_publications_by_doi(conn: Connection, dois: list[str]) -> dict[str, Do
         text(f"""
             SELECT d.doi, p.id, p.doc_type::text AS doc_type
             FROM unnest(CAST(:dois AS text[])) AS d (doi)
-            JOIN publications p ON lower(p.doi) = {doi_or_target_sql("d.doi")}
+            JOIN publications p ON p.doi = {doi_or_target_sql("d.doi")}
         """),  # noqa: S608 — fragment rendu depuis un alias de la requête
         {"dois": dois},
     ).all()
@@ -344,7 +343,7 @@ def _insert_edges(conn: Connection, edges: list[RelationEdge]) -> int:
         SELECT e.f, e.t::relation_type, e.d, COALESCE(e.p, p.id), e.s
         FROM jsonb_to_recordset(:payload) AS e(f int, t text, d text, p int, s text)
         LEFT JOIN publications p
-          ON e.p IS NULL AND e.d IS NOT NULL AND lower(p.doi) = {doi_or_target_sql("e.d")}
+          ON e.p IS NULL AND e.d IS NOT NULL AND p.doi = {doi_or_target_sql("e.d")}
         WHERE COALESCE(e.p, p.id) IS NULL OR COALESCE(e.p, p.id) <> e.f
         ON CONFLICT ON CONSTRAINT publication_relations_uq DO NOTHING
     """).bindparams(bindparam("payload", type_=Jsonb))
@@ -478,7 +477,7 @@ def _build_shared_key_edges(
             RelationEdge(
                 from_id,
                 relation.value,
-                DOI.normalize(target_doi) if target_doi else None,
+                target_doi,
                 "shared_key",
                 target_publication_id=target_id,
             )
@@ -494,7 +493,7 @@ def _build_title_match_edges(
         RelationEdge(
             match.child_id,
             relation_type.value,
-            DOI.normalize(match.parent_doi) if match.parent_doi else None,
+            match.parent_doi,
             "title_match",
             target_publication_id=match.parent_id,
         )
@@ -584,7 +583,6 @@ TASKS = (
                 for column in (
                     "source_extras",
                     "corrections",
-                    "doi",
                     "doc_type",
                     "publication_id",
                 )

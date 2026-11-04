@@ -29,8 +29,6 @@ from domain.publications.reconciliation import (
 )
 from domain.source_records.identifiers import (
     SourceIdentifier,
-    SourceIdentifierRole,
-    SourceIdentifierType,
 )
 from domain.source_records.keys import (
     CONFIRMATION_ID_TYPES,
@@ -39,11 +37,12 @@ from domain.source_records.keys import (
     project_confirmation_keys,
 )
 from infrastructure.db.doi_targets import doi_or_target_sql, fetch_doi_targets
-from infrastructure.db.queues import Queue, delete_processed, enqueue, snapshot
+from infrastructure.db.queues import Queue, delete_processed, enqueue, enqueue_ids, snapshot
 from infrastructure.db.scalars import scalar_int
 from infrastructure.db.source_record_identifiers import (
     first_of_its_type_sql,
     identifiers_json_sql,
+    non_related_doi_sql,
     parse_identifiers,
 )
 from infrastructure.sql_fragments import in_clause
@@ -103,10 +102,7 @@ _CONFIRMATION_KEY_SQL = (
 )
 """L'identifiant aliasé `{a}` de `source_record_identifiers` est la clé de confirmation de son type (`confirmation_identifiers`)."""
 
-_DOI_KEY_SQL = (
-    f"{{a}}.id_type = '{SourceIdentifierType.DOI.value}' AND {{a}}.removed_by IS NULL"
-    f" AND {{a}}.role <> '{SourceIdentifierRole.RELATED.value}'"
-)
+_DOI_KEY_SQL = non_related_doi_sql("{a}") + " AND {a}.removed_by IS NULL"
 """L'identifiant aliasé `{a}` de `source_record_identifiers` est une clé DOI : un DOI actif de rôle autre que `related` (`doi_keys`)."""
 
 _UNIVERSE_SQL = text(f"""
@@ -272,14 +268,11 @@ def fetch_reconciliation_universe(conn: Connection) -> list[ReconcileRow]:
 
 
 def fetch_publication_ids_by_doi(conn: Connection) -> dict[str, int]:
-    """Renvoie `lower(doi) → id` des publications à DOI.
+    """Renvoie `doi → id` des publications à DOI.
 
     `plan_reconciliation` peut ainsi ancrer un groupe sur la publication ayant déjà son DOI, même sans enregistrement source du voisinage rattaché à elle. Cas : publication orpheline après un TRUNCATE et un réimport des sources, ou `publications.doi` différent de ses enregistrements sources. Sinon, le groupe créerait une publication en conflit avec la contrainte unique sur le DOI.
     """
-    # Clé sur `lower(doi)` : l'index unique `publications_doi_lower_key` garantit l'unicité, et l'ancre DOI d'une partition, forme normalisée d'un identifiant, est déjà en minuscule.
-    rows = conn.execute(
-        text("SELECT id, lower(doi) AS doi FROM publications WHERE doi IS NOT NULL")
-    ).all()
+    rows = conn.execute(text("SELECT id, doi FROM publications WHERE doi IS NOT NULL")).all()
     return {row.doi: row.id for row in rows}
 
 
@@ -327,12 +320,7 @@ def mark_publications_for_grouping(conn: Connection, publication_ids: list[int])
     """Marque ces publications pour l'alignement des auteurs. Renvoie le nombre de publications marquées."""
     if not publication_ids:
         return 0
-    return enqueue(
-        conn,
-        Queue.PUBLICATION_CONTRIBUTIONS,
-        "SELECT unnest(CAST(:ids AS integer[]))",
-        {"ids": publication_ids},
-    )
+    return enqueue_ids(conn, Queue.PUBLICATION_CONTRIBUTIONS, publication_ids)
 
 
 def _member(row: ReconcileRow, doi_targets: dict[str, str]) -> ReconcileMember:
@@ -462,23 +450,13 @@ def _apply(
     dissolved_ids = {dissolved.publication_id for dissolved in plan.dissolved}
     if plan.detached:
         detach_source_records(conn, list(plan.detached))
-        membership_changed.update(
+        left = {
             p
             for source_record in plan.detached
             if (p := rows_by_source_record[source_record].publication_id) is not None
-        )
-        lifecycle.refresh(
-            conn,
-            sorted(
-                {
-                    p
-                    for source_record in plan.detached
-                    if (p := rows_by_source_record[source_record].publication_id) is not None
-                }
-                - survivors
-                - dissolved_ids
-            ),
-        )
+        }
+        membership_changed.update(left)
+        lifecycle.refresh(conn, sorted(left - survivors - dissolved_ids))
 
     # Dissolutions, avant le recalcul des survivants : la suppression libère le DOI repris par un survivant, refusé sinon par la contrainte unique.
     for dissolved in plan.dissolved:

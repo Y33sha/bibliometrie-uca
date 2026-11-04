@@ -1,6 +1,6 @@
 """Socle des moissonneurs : patron commun et écriture d'un document dans `staging`.
 
-Le patron gère l'en-tête et le bilan du journal, la barre de progression et l'arrêt sur source indisponible. Chaque source hérite de `SourceHarvester` et implémente `load_config()` et `harvest_all()`. La pagination reste propre à chaque source.
+Le patron gère l'en-tête et le bilan du journal, la barre de progression et l'arrêt sur source indisponible. Chaque source hérite de `SourceHarvester` et implémente `run()`. La pagination reste propre à chaque source.
 """
 
 from __future__ import annotations
@@ -17,8 +17,10 @@ from domain.sources.staging import StagingEntryMode
 from domain.types import JsonValue
 from infrastructure import PROJECT_ROOT
 from infrastructure.observability.log import setup_logger
+from infrastructure.read_models.perimeters.queries import get_extraction_api_ids
 from pipeline.http.circuit_breaker import SourceUnavailableError, trip_source
-from pipeline.ingestion.common.staging import StagingStore, UpsertOutcome
+from pipeline.ingestion.common.pages import Page
+from pipeline.ingestion.common.staging import StagingStore
 from pipeline.runtime.config import YearRange, window_years
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.log_format import (
@@ -27,6 +29,7 @@ from pipeline.runtime.observability.log_format import (
     quantity,
     source_branch,
 )
+from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import Progress, track_progress
 from pipeline.runtime.observability.signals import signal_source_unconfigured
@@ -71,22 +74,47 @@ def stage_document(
     entry_mode: StagingEntryMode = StagingEntryMode.BULK,
 ) -> bool:
     """Écrit un document reçu d'une réponse de liste dans `staging` et le compte dans `metrics` : nouveau, mis à jour ou inchangé. Renvoie `False` pour un document sans identifiant, ni écrit ni compté."""
-    match StagingStore(conn).stage(source, record, entry_mode=entry_mode):
-        case None:
-            return False
-        case UpsertOutcome.NEW:
-            metrics.add(new=1)
-        case UpsertOutcome.UPDATED:
-            metrics.add(updated=1)
-        case UpsertOutcome.UNCHANGED:
-            metrics.add(unchanged=1)
+    outcome = StagingStore(conn).stage(source, record, entry_mode=entry_mode)
+    if outcome is None:
+        return False
+    metrics.add(**{outcome.value: 1})
     return True
+
+
+def stage_pages(
+    conn: Connection,
+    metrics: PhaseMetrics,
+    source: str,
+    fetch_page: Callable[[str | None], Page],
+    *,
+    progress: Progress | None = None,
+    keep: Callable[[Mapping[str, JsonValue]], bool] | None = None,
+    entry_mode: StagingEntryMode = StagingEntryMode.BULK,
+) -> int:
+    """Écrit dans `staging` les documents des pages successives, un commit par page, et renvoie le nombre de documents reçus.
+
+    `fetch_page` reçoit le jeton de la page suivante, `None` pour la première. Une page vide ou sans jeton clôt la pagination. `keep` écarte des documents ; `progress` avance d'un pas par document reçu.
+    """
+    received = 0
+    token: str | None = None
+    while True:
+        page = fetch_page(token)
+        for record in page.records:
+            if keep is None or keep(record):
+                stage_document(conn, metrics, source=source, record=record, entry_mode=entry_mode)
+        conn.commit()
+        received += len(page.records)
+        if progress is not None:
+            progress.advance(len(page.records))
+        if not page.records or page.next_token is None:
+            return received
+        token = page.next_token
 
 
 class HarvestConfigError(Exception):
     """Configuration de moissonnage incomplète : un paramètre indispensable à l'API manque (identifiants d'institution, affiliations, PPN).
 
-    `load_config` la lève avant toute requête. La source est alors sautée avec un message explicite.
+    Le moissonneur la lève avant toute requête. La source est alors sautée avec un message explicite.
     """
 
 
@@ -100,15 +128,15 @@ class HarvestWindow:
     """Date de modification minimale du mode incrémental, au format `YYYY-MM-DD`."""
 
 
-class SourceHarvester[ConfigT, ClientT](ABC):
+class SourceHarvester[ClientT](ABC):
     """Patron d'un moissonneur, de l'API de la source vers `staging`.
 
-    `ConfigT` est le type de la configuration propre à la source, renvoyée par `load_config` et reçue par `harvest_all`. `ClientT` est le type du client HTTP de la source, reçu à la construction.
-
-    Une sous-classe définit `SOURCE`, `load_config` et `harvest_all`, et peut définir `setup_logging`.
+    `ClientT` est le type du client HTTP de la source, reçu à la construction. Une sous-classe définit `SOURCE` et `run`.
     """
 
     SOURCE: ClassVar[str] = ""
+    MISSING_API_IDS: ClassVar[str] = ""
+    """Message d'une source sans identifiant dans le périmètre d'extraction : « aucune affiliation »."""
     DOCUMENT: ClassVar[str] = "document"
     """Nom des éléments rapportés par la source, au singulier."""
     FEMININE: ClassVar[bool] = False
@@ -136,31 +164,46 @@ class SourceHarvester[ConfigT, ClientT](ABC):
         self,
         years: list[int],
         count_year: Callable[[int], int],
-        harvest_step: Callable[[int, Progress], PhaseMetrics],
+        harvest_step: Callable[[int, Progress, PhaseMetrics], None],
     ) -> PhaseMetrics:
         """Moissonne les années dans l'ordre sous une seule barre, au libellé réglé sur l'année en cours.
 
-        `count_year` donne le volume d'une année : la barre connaît son total dès le départ. Une coupure laisse sur la barre l'année interrompue, et les précédentes sont terminées.
+        `count_year` donne le volume d'une année : la barre connaît son total dès le départ. `harvest_step` compte ses écritures dans les métriques reçues. Une coupure laisse sur la barre l'année interrompue, et les précédentes sont terminées.
 
-        Une source indisponible (`SourceUnavailableError`) arrête la boucle et coupe la source : les années restantes repartent au prochain run, les métriques des années moissonnées sont gardées.
+        Une erreur sur une année est journalisée, la page en cours est annulée, et la boucle passe à l'année suivante. Une source indisponible (`SourceUnavailableError`) arrête la boucle et coupe la source : les années restantes repartent au prochain run. Les métriques des pages écrites sont gardées.
         """
         metrics = PhaseMetrics()
         if not years:
             return metrics
-        total = sum(count_year(year) for year in years)
+        total = sum(self._count(count_year, year) for year in years)
         with track_progress(total, self._label(str(years[0])), self.logger) as progress:
             for year in years:
                 progress.relabel(self._label(str(year)))
                 try:
-                    metrics.merge(harvest_step(year, progress))
+                    harvest_step(year, progress, metrics)
                 except SourceUnavailableError:
                     trip_source()
                     break
+                except Exception as e:
+                    self.conn.rollback()
+                    scoped_logger(self.logger, self.SOURCE, str(year)).error(
+                        "erreur : %s — passage à l'année suivante", e
+                    )
             else:
                 year_range = f"{years[0]}-{years[-1]}" if len(years) > 1 else str(years[0])
                 progress.relabel(self._label(year_range))
         self._write_summary(metrics)
         return metrics
+
+    @staticmethod
+    def _count(count_year: Callable[[int], int], year: int) -> int:
+        """Renvoie le volume d'une année, 0 sur une erreur : le moissonnage de l'année rencontre la même erreur et la journalise."""
+        try:
+            return count_year(year)
+        except SourceUnavailableError:
+            raise
+        except Exception:
+            return 0
 
     def _harvest_at_once(
         self,
@@ -199,30 +242,28 @@ class SourceHarvester[ConfigT, ClientT](ABC):
             quantity(metrics.unchanged, *unchanged_form),
         )
 
-    @abstractmethod
-    def load_config(self, conn: Connection) -> ConfigT:
-        """Charge depuis la base la configuration propre à la source."""
+    def _api_ids(self) -> list[str]:
+        """Renvoie les identifiants de la source dans le périmètre d'extraction (`api_ids`).
+
+        Raises:
+            HarvestConfigError: le périmètre d'extraction est sans identifiant pour la source.
+        """
+        ids = get_extraction_api_ids(self.conn, self.SOURCE)
+        if not ids:
+            raise HarvestConfigError(
+                f"{self.MISSING_API_IDS} (api_ids->'{self.SOURCE}' vide pour le périmètre d'extraction)"
+            )
+        return ids
 
     @abstractmethod
-    def harvest_all(self, window: HarvestWindow, config: ConfigT) -> PhaseMetrics:
-        """Moissonne la fenêtre et renvoie les métriques."""
-
-    def setup_logging(  # noqa: B027
-        self, window: HarvestWindow, config: ConfigT
-    ) -> None:
-        """Écrit l'en-tête du journal propre à la source : affiliations, collections, années."""
-
     def run(self, window: HarvestWindow) -> PhaseMetrics:
-        """Charge la configuration, écrit l'en-tête du journal, puis moissonne. Les exceptions remontent à l'appelant."""
-        config = self.load_config(self.conn)
-        self.setup_logging(window, config)
-        return self.harvest_all(window, config)
+        """Moissonne la fenêtre et renvoie les métriques. Une source sans configuration lève `HarvestConfigError`."""
 
 
 class Harvester(Protocol):
     """Point d'entrée d'un `SourceHarvester`, seul appelé par les orchestrateurs.
 
-    Le protocole efface les paramètres de type de `SourceHarvester`, la configuration et le client propres à chaque source.
+    Le protocole efface le paramètre de type de `SourceHarvester`, le client propre à chaque source.
     """
 
     def run(self, window: HarvestWindow) -> PhaseMetrics: ...

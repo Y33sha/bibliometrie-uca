@@ -18,7 +18,7 @@ from sqlalchemy import Connection, text
 
 from domain.urls import is_link_header_fragment
 from infrastructure.db.engine import get_sync_engine
-from infrastructure.db.queues import Queue, enqueue
+from infrastructure.db.queues import Queue, enqueue_ids
 from infrastructure.observability.log import setup_logger
 
 log = setup_logger("remove_link_header_urls", os.path.dirname(__file__))
@@ -93,9 +93,7 @@ def remove(conn: Connection, *, dry_run: bool) -> None:
     conn.execute(_INSERT_PDF_LOCATIONS, {"rows": json.dumps(locations)})
     conn.execute(_DELETE_LOCATIONS, {"rows": json.dumps(locations)})
     ids = sorted({r.id for r in records_rows} | {r.source_record_id for r in fragments})
-    marked = enqueue(
-        conn, Queue.SOURCE_RECORD_KEYS, "SELECT unnest(CAST(:ids AS integer[]))", {"ids": ids}
-    )
+    marked = enqueue_ids(conn, Queue.SOURCE_RECORD_KEYS, ids)
     log.info("Marqués pour la réconciliation : %d", marked)
 
 

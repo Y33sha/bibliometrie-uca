@@ -168,6 +168,22 @@ class TestAddIdentifier:
         )
         assert status == "pending"
 
+    def test_saisie_ramenee_a_sa_forme_normalisee(self, sa_sync_conn, service):
+        """Un ORCID saisi sous forme d'URL est enregistré sous sa forme normalisée."""
+        person_id = _person(sa_sync_conn)
+        result = service.add_identifier(person_id, "orcid", "https://orcid.org/0000-0001-2345-678x")
+        assert result.id_value == "0000-0001-2345-678X"
+        stored = _scalar(
+            sa_sync_conn,
+            "SELECT id_value FROM person_identifiers WHERE person_id = :p",
+            p=person_id,
+        )
+        assert stored == "0000-0001-2345-678X"
+
+    def test_refuse_une_valeur_mal_formee(self, sa_sync_conn, service):
+        with pytest.raises(ValidationError, match="ORCID invalide"):
+            service.add_identifier(_person(sa_sync_conn), "orcid", "pas-un-orcid")
+
     def test_reassigns_if_rejected(self, sa_sync_conn, service):
         p1 = _person(sa_sync_conn, last_name="A", first_name="A")
         p2 = _person(sa_sync_conn, last_name="B", first_name="B")

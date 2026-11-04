@@ -103,8 +103,9 @@ def deposit_anchors(keys: Iterable[DoiKeys]) -> frozenset[str]:
 
 
 def anchor_of(keys: DoiKeys, anchors: frozenset[str]) -> str | None:
-    """Renvoie l'ancre rejointe par un enregistrement source : celle de son DOI `primary` ou `derived`, à défaut l'unique ancre parmi ses DOI `secondary`. `None` sans ancre unique."""
-    own = keys.strong & anchors or keys.weak & anchors
+    """Renvoie l'ancre rejointe par un enregistrement source : celle de son DOI `primary` ou `derived`, à défaut l'unique ancre parmi ses DOI `secondary`. `None` sans ancre unique. Ses DOI de dépôt sont écartés, comme dans `doi_anchors`."""
+    candidates = anchors - keys.deposits
+    own = keys.strong & candidates or keys.weak & candidates
     return next(iter(own)) if len(own) == 1 else None
 
 

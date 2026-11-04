@@ -1,6 +1,6 @@
 # DataCite
 
-*À jour le 2026-10-21.*
+*À jour le 2026-11-04.*
 
 https://datacite.org/
 
@@ -24,7 +24,7 @@ Les DOI d'un entrepôt sans affiliation renseignée (NAKALA, notamment) entrent 
 - `https://api.datacite.org/dois/{doi}` : interrogation unitaire (`fetch_stale`).
 
 - Adresse électronique de contact dans le `User-Agent` (`POLITE_POOL_EMAIL`)
-- Pas de quota contractuel. Le pipeline s'en tient à 3 req/s (`MAX_PER_SECOND`, `pipeline/ingestion/api_params.py`) et à 3 requêtes simultanées (`max_concurrent=3`)
+- Pas de quota contractuel. Le pipeline s'en tient à 3 req/s (`MAX_PER_SECOND`, `pipeline/ingestion/api_params.py`) et à 3 requêtes simultanées (`MAX_CONCURRENT`)
 
 **Prefixes API** (`https://api.datacite.org/prefixes/{prefix}`) — identifie l'organisation déposante (*provider*) et l'entrepôt (*client*) d'un préfixe DOI, pour la phase [`publishing`](../pipeline/05-publishing.md) (`resolve_datacite_publishers`), une fois connue l'agence d'enregistrement du préfixe ([`resolve_ra`](../pipeline/05-publishing.md#agences-denregistrement-doi-resolve_ra)).
 

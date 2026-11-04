@@ -6,33 +6,22 @@ La requête à l'index Elasticsearch de ScanR cible les affiliations du périmè
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
 
 from sqlalchemy import Connection
 
-from domain.types import JsonValue, as_mapping, as_sequence, at_path
-from infrastructure.read_models.perimeters.queries import get_extraction_api_ids
+from domain.types import JsonValue
 from pipeline.ingestion.api_params import SCANR_PER_PAGE
 from pipeline.ingestion.common.harvester import (
-    HarvestConfigError,
     HarvestWindow,
     SourceHarvester,
-    stage_document,
+    stage_pages,
 )
-from pipeline.ingestion.scanr.api import ScanrClient
+from pipeline.ingestion.scanr.api import ScanrClient, hits_page, search_after
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import Progress
 
 _COMMIT_EVERY = 500
 """Nombre de documents écrits entre deux commits."""
-
-
-@dataclass(frozen=True)
-class ScanrHarvestConfig:
-    """Configuration du moissonnage ScanR, lue en base."""
-
-    affiliation_ids: list[str]
-    """Identifiants ScanR des structures du périmètre de moissonnage."""
 
 
 def build_query(
@@ -72,52 +61,34 @@ def harvest_year(
     year: int,
     affiliation_ids: list[str],
     progress: Progress,
-) -> PhaseMetrics:
-    """Moissonne les documents d'une année, page après page."""
-    metrics = PhaseMetrics()
-    search_after: list[JsonValue] | None = None
-    seen = 0
-
-    while True:
-        data = client.fetch_page(build_query(year, affiliation_ids, search_after))
-        hits = [as_mapping(h) for h in as_sequence(at_path(data, "hits").get("hits"))]
-        if not hits:
-            break
-
-        for hit in hits:
-            progress.advance()
-            doc = as_mapping(hit.get("_source"))
-            if not stage_document(conn, metrics, source="scanr", record=doc):
-                continue
-            seen += 1
-            if seen % _COMMIT_EVERY == 0:
-                conn.commit()
-
-        search_after = list(as_sequence(hits[-1].get("sort")))
-
-    conn.commit()
-    return metrics
+    metrics: PhaseMetrics,
+) -> None:
+    """Moissonne les documents d'une année, page après page, et compte les écritures dans `metrics`."""
+    stage_pages(
+        conn,
+        metrics,
+        "scanr",
+        lambda token: hits_page(
+            client.fetch_page(build_query(year, affiliation_ids, search_after(token)))
+        ),
+        progress=progress,
+    )
 
 
-class ScanrHarvester(SourceHarvester[ScanrHarvestConfig, ScanrClient]):
+class ScanrHarvester(SourceHarvester[ScanrClient]):
     """Moissonnage ScanR des documents des structures du périmètre, année par année."""
 
     SOURCE = "scanr"
+    MISSING_API_IDS = "aucun affiliation_id"
 
-    def load_config(self, conn: Connection) -> ScanrHarvestConfig:
-        affiliation_ids = get_extraction_api_ids(conn, "scanr")
-        if not affiliation_ids:
-            raise HarvestConfigError(
-                "aucun affiliation_id (api_ids->'scanr' vide pour le périmètre d'extraction)"
-            )
-        return ScanrHarvestConfig(affiliation_ids=affiliation_ids)
-
-    def harvest_all(self, window: HarvestWindow, config: ScanrHarvestConfig) -> PhaseMetrics:
-        ids = config.affiliation_ids
+    def run(self, window: HarvestWindow) -> PhaseMetrics:
+        ids = self._api_ids()
         client = self._client
         years = self._years(window)
         return self._harvest_by_year(
             years,
             lambda year: client.count(build_query(year, ids)),
-            lambda year, progress: harvest_year(client, self.conn, year, ids, progress),
+            lambda year, progress, metrics: harvest_year(
+                client, self.conn, year, ids, progress, metrics
+            ),
         )

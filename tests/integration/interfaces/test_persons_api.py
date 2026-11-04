@@ -322,7 +322,7 @@ class TestUpdateIdentifierStatus:
 
     def test_rejection_marks_contributions_resolved_by_the_identifier(self, auth_client):
         pid = seed_person()
-        idref = uniq("idref", sep="")
+        idref = uniq("idref", sep="").upper()
         publication, contribution = _seed_perimeter_contribution(
             pid, "idref", raw_author_name="Test Author", identifiers={"idref": idref}
         )

@@ -8,13 +8,12 @@ from __future__ import annotations
 from typing import ClassVar
 
 from domain.persons.identifiers import PersonIdentifierType
-from domain.types import as_mapping, as_sequence, as_str, at_path
+from pipeline.ingestion.common.pages import Page
 from pipeline.ingestion.common.person_search import (
     Identifiers,
     PersonSearchHarvester,
-    PersonSearchPage,
 )
-from pipeline.ingestion.hal.api import HalClient
+from pipeline.ingestion.hal.api import HalClient, cursor_page
 from pipeline.ingestion.hal.harvest import build_query
 
 _FIELDS = {
@@ -47,13 +46,9 @@ class HalPersonHarvester(PersonSearchHarvester[HalClient]):
         years: tuple[int, int],
         next_token: str | None,
         label: str,  # noqa: ARG002
-    ) -> PersonSearchPage:
+    ) -> Page:
         cursor = next_token or "*"
         data = self._client.fetch_page_cursor(
             build_query(list(years)), build_identifiers_fq(identifiers), cursor
         )
-        records = [as_mapping(d) for d in as_sequence(at_path(data, "response").get("docs"))]
-        following = as_str(data.get("nextCursorMark"))
-        # Solr renvoie le marqueur reçu une fois les résultats épuisés.
-        done = not records or not following or following == cursor
-        return PersonSearchPage(records=records, next_token=None if done else following)
+        return cursor_page(data, cursor)

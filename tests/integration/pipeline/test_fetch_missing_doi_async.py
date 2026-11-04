@@ -13,36 +13,29 @@ from unittest.mock import MagicMock, patch
 import httpx2
 import pytest
 
+from domain.sources.registry import Source
 from pipeline.http.lookup import UNAVAILABLE
+from pipeline.ingestion.adapters import adapter
 from pipeline.ingestion.api_params import API_BASE_URLS
 from pipeline.ingestion.common import doi_search, lookup
-from pipeline.ingestion.common.doi_search import fetch_missing_doi
+from pipeline.ingestion.common.doi_search import DoiSearch, fetch_missing_doi
 from pipeline.ingestion.common.lookup import LookupBatch
 from pipeline.ingestion.common.staging import StagingStore, UpsertOutcome
 from pipeline.ingestion.complements.doi_org import doi_existence
-from pipeline.ingestion.crossref.fetch_missing import CrossrefDoiSearch
-from pipeline.ingestion.datacite.fetch_missing import DataciteDoiSearch
-from pipeline.ingestion.hal.fetch_missing import HalDoiSearch
-from pipeline.ingestion.openalex.fetch_missing import OpenalexDoiSearch
-from pipeline.ingestion.scanr.fetch_missing import ScanrDoiSearch
-from pipeline.ingestion.wos.fetch_missing import WosDoiSearch
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
 
-def _sans_config[S](cls: type[S], **attributs: object) -> S:
-    """Construit la recherche `cls` sans lire la configuration, avec les attributs donnés."""
-    search = cls.__new__(cls)
-    for nom, valeur in attributs.items():
-        setattr(search, nom, valeur)
+def _search(source: Source) -> DoiSearch:
+    """Renvoie la recherche par DOI de l'adaptateur de `source`."""
+    search = adapter(source).doi_search
+    assert search is not None
     return search
 
 
 class _FakeAdapter:
     """Recherche de test : renvoie un enregistrement source par DOI, sauf les DOI de `absents` ; `inserted_records` retient les écritures."""
 
-    source_key = "openalex"
-    batch_size = 1
-    max_concurrent = 3
+    source = "openalex"
 
     def __init__(
         self,
@@ -87,7 +80,12 @@ async def _run(adapter, dois: list[str], *, recorded: list | None = None, **kw) 
         patch.object(StagingStore, "stage", _stage),
     ):
         return await fetch_missing_doi(
-            MagicMock(), adapter, logging.getLogger("test"), retry_after_days=30, **kw
+            MagicMock(),
+            adapter.source,
+            DoiSearch(adapter.fetch_async),
+            logging.getLogger("test"),
+            retry_after_days=30,
+            **kw,
         )
 
 
@@ -121,7 +119,7 @@ class TestRunAsyncOrchestrator:
             return track_progress(total, label, logger, **kwargs)
 
         adapter = _FakeAdapter(absents=frozenset({"10.1/connu", "10.1/inconnu"}))
-        adapter.source_key = "crossref"
+        adapter.source = "crossref"
 
         async def _existence(client, dois, *, user_agent):  # noqa: ARG001
             return [d for d in dois if d == "10.1/connu"], [d for d in dois if d == "10.1/inconnu"]
@@ -143,10 +141,9 @@ class TestRunAsyncOrchestrator:
 
     @pytest.mark.asyncio
     async def test_worker_pool_caps_concurrent_fetches(self):
-        """Avec `max_concurrent=3`, au plus trois recherches sont en cours à la fois."""
+        """OpenAlex a trois requêtes simultanées (`MAX_CONCURRENT`) : au plus trois recherches sont en cours à la fois."""
         in_flight: list[int] = []
         adapter = _FakeAdapter(record_in_flight=in_flight)
-        adapter.max_concurrent = 3
         await _run(adapter, [f"10.1/{i}" for i in range(10)])
         assert max(in_flight) <= 3
         # Avec dix DOI, les trois workers sont occupés en même temps au moins une fois.
@@ -179,8 +176,8 @@ class TestRunAsyncOrchestrator:
 
 class TestOpenalexFetchAsync:
     @staticmethod
-    def _adapter() -> OpenalexDoiSearch:
-        return _sans_config(OpenalexDoiSearch, base_url="https://api.openalex.org/works")
+    def _adapter() -> DoiSearch:
+        return _search(Source.OPENALEX)
 
     @pytest.mark.asyncio
     async def test_fetch_async_returns_first_result(self, http_mock):
@@ -195,7 +192,7 @@ class TestOpenalexFetchAsync:
             )
         )
         async with httpx2.AsyncClient() as client:
-            result = await self._adapter().fetch_async(client, ["10.1/a"])
+            result = await self._adapter().fetch(client, ["10.1/a"])
         assert len(result.records) == 1
         assert result.records[0]["id"].endswith("W123")
         assert result.absent == []
@@ -207,7 +204,7 @@ class TestOpenalexFetchAsync:
             return_value=httpx2.Response(200, json={"results": []})
         )
         async with httpx2.AsyncClient() as client:
-            result = await self._adapter().fetch_async(client, ["10.1/missing"])
+            result = await self._adapter().fetch(client, ["10.1/missing"])
         assert result == LookupBatch(absent=["10.1/missing"])
 
     @pytest.mark.asyncio
@@ -217,7 +214,7 @@ class TestOpenalexFetchAsync:
             side_effect=httpx2.ConnectError("refused")
         )
         async with httpx2.AsyncClient() as client:
-            result = await self._adapter().fetch_async(client, ["10.1/net-error"])
+            result = await self._adapter().fetch(client, ["10.1/net-error"])
         assert result == UNAVAILABLE
 
     @pytest.mark.asyncio
@@ -225,14 +222,14 @@ class TestOpenalexFetchAsync:
         """Erreur HTTP (4xx, 5xx), y compris 404 de l'endpoint de recherche : ni enregistrement source ni absence."""
         http_mock.get("https://api.openalex.org/works").mock(return_value=httpx2.Response(404))
         async with httpx2.AsyncClient() as client:
-            result = await self._adapter().fetch_async(client, ["10.1/a"])
+            result = await self._adapter().fetch(client, ["10.1/a"])
         assert result == UNAVAILABLE
 
 
 class TestHalFetchAsync:
     @staticmethod
-    def _adapter() -> HalDoiSearch:
-        return HalDoiSearch()
+    def _adapter() -> DoiSearch:
+        return _search(Source.HAL)
 
     @pytest.mark.asyncio
     async def test_fetch_async_returns_first_doc(self, http_mock):
@@ -243,7 +240,7 @@ class TestHalFetchAsync:
             )
         )
         async with httpx2.AsyncClient() as client:
-            result = await self._adapter().fetch_async(client, ["10.1/a"])
+            result = await self._adapter().fetch(client, ["10.1/a"])
         assert [d["halId_s"] for d in result.records] == ["hal-00012345"]
 
     @pytest.mark.asyncio
@@ -253,14 +250,14 @@ class TestHalFetchAsync:
             return_value=httpx2.Response(200, json={"response": {"docs": []}})
         )
         async with httpx2.AsyncClient() as client:
-            result = await self._adapter().fetch_async(client, ["10.1/missing"])
+            result = await self._adapter().fetch(client, ["10.1/missing"])
         assert result == LookupBatch(absent=["10.1/missing"])
 
 
 class TestCrossrefFetchAsync:
     @staticmethod
-    def _adapter() -> CrossrefDoiSearch:
-        return _sans_config(CrossrefDoiSearch, base_url="https://api.crossref.org", headers={})
+    def _adapter() -> DoiSearch:
+        return _search(Source.CROSSREF)
 
     @pytest.mark.asyncio
     async def test_un_doi_principal_rend_son_document(self, http_mock):
@@ -268,7 +265,7 @@ class TestCrossrefFetchAsync:
             return_value=httpx2.Response(200, json={"message": {"DOI": "10.1/A"}})
         )
         async with httpx2.AsyncClient() as client:
-            result = await self._adapter().fetch_async(client, ["10.1/a"])
+            result = await self._adapter().fetch(client, ["10.1/a"])
         assert result == LookupBatch(records=[{"DOI": "10.1/A"}])
 
     @pytest.mark.asyncio
@@ -277,7 +274,7 @@ class TestCrossrefFetchAsync:
             return_value=httpx2.Response(404)
         )
         async with httpx2.AsyncClient() as client:
-            result = await self._adapter().fetch_async(client, ["10.1/x"])
+            result = await self._adapter().fetch(client, ["10.1/x"])
         assert result == LookupBatch(absent=["10.1/x"])
 
     @pytest.mark.asyncio
@@ -290,7 +287,7 @@ class TestCrossrefFetchAsync:
             return_value=httpx2.Response(200, json={"message": {"DOI": "10.1/PRINCIPAL"}})
         )
         async with httpx2.AsyncClient() as client:
-            result = await self._adapter().fetch_async(client, ["10.1/alias"])
+            result = await self._adapter().fetch(client, ["10.1/alias"])
         assert result == LookupBatch(records=[{"DOI": "10.1/PRINCIPAL"}], absent=["10.1/alias"])
 
 
@@ -300,8 +297,8 @@ def _scanr_hit(scanr_id: str, doi: str) -> dict:
 
 class TestScanrFetchAsync:
     @staticmethod
-    def _adapter() -> ScanrDoiSearch:
-        return ScanrDoiSearch()
+    def _adapter() -> DoiSearch:
+        return _search(Source.SCANR)
 
     @pytest.mark.asyncio
     async def test_fetch_async_returns_hits_sources(self, http_mock):
@@ -311,7 +308,7 @@ class TestScanrFetchAsync:
             )
         )
         async with httpx2.AsyncClient() as client:
-            result = await self._adapter().fetch_async(client, ["10.1/a"])
+            result = await self._adapter().fetch(client, ["10.1/a"])
         assert [r["id"] for r in result.records] == ["scanr-1"]
         assert result.absent == []
 
@@ -324,7 +321,7 @@ class TestScanrFetchAsync:
             )
         )
         async with httpx2.AsyncClient() as client:
-            result = await self._adapter().fetch_async(client, ["10.1/a", "10.1/b"])
+            result = await self._adapter().fetch(client, ["10.1/a", "10.1/b"])
         assert [r["id"] for r in result.records] == ["scanr-1"]
         assert result.absent == ["10.1/b"]
 
@@ -333,7 +330,7 @@ class TestScanrFetchAsync:
         """Erreur HTTP (401, 403, 500…) : ni enregistrement source ni absence, sans exception."""
         http_mock.post(API_BASE_URLS["scanr"]).mock(return_value=httpx2.Response(401))
         async with httpx2.AsyncClient() as client:
-            result = await self._adapter().fetch_async(client, ["10.1/a"])
+            result = await self._adapter().fetch(client, ["10.1/a"])
         assert result == UNAVAILABLE
 
 
@@ -358,12 +355,8 @@ class TestDoiOrgExistence:
 
 class TestDataciteFetchAsync:
     @staticmethod
-    def _adapter() -> DataciteDoiSearch:
-        return _sans_config(
-            DataciteDoiSearch,
-            base_url="https://api.datacite.org",
-            headers={"Accept": "application/vnd.api+json"},
-        )
+    def _adapter() -> DoiSearch:
+        return _search(Source.DATACITE)
 
     @pytest.mark.asyncio
     async def test_fetch_async_batch_returns_records(self, http_mock):
@@ -380,7 +373,7 @@ class TestDataciteFetchAsync:
             )
         )
         async with httpx2.AsyncClient() as client:
-            result = await self._adapter().fetch_async(client, ["10.1/a", "10.1/b"])
+            result = await self._adapter().fetch(client, ["10.1/a", "10.1/b"])
         assert result.absent == []
         assert {r["attributes"]["doi"] for r in result.records} == {"10.1/A", "10.1/B"}
 
@@ -393,7 +386,7 @@ class TestDataciteFetchAsync:
             )
         )
         async with httpx2.AsyncClient() as client:
-            result = await self._adapter().fetch_async(client, ["10.1/a", "10.1/b"])
+            result = await self._adapter().fetch(client, ["10.1/a", "10.1/b"])
         assert [r["attributes"]["doi"] for r in result.records] == ["10.1/a"]
         assert result.absent == ["10.1/b"]
 
@@ -404,18 +397,14 @@ class TestDataciteFetchAsync:
             side_effect=httpx2.ConnectError("refused")
         )
         async with httpx2.AsyncClient() as client:
-            result = await self._adapter().fetch_async(client, ["10.1/a"])
+            result = await self._adapter().fetch(client, ["10.1/a"])
         assert result == UNAVAILABLE
 
 
 class TestWosFetchAsync:
     @staticmethod
-    def _adapter() -> WosDoiSearch:
-        return _sans_config(
-            WosDoiSearch,
-            base_url="https://api.clarivate.com/api/wos",
-            headers={"X-ApiKey": "k", "Accept": "application/json"},
-        )
+    def _adapter() -> DoiSearch:
+        return _search(Source.WOS)
 
     @pytest.mark.asyncio
     async def test_fetch_async_single_page(self, http_mock):
@@ -432,7 +421,7 @@ class TestWosFetchAsync:
             )
         )
         async with httpx2.AsyncClient() as client:
-            result = await self._adapter().fetch_async(client, ["10.1/a", "10.1/b"])
+            result = await self._adapter().fetch(client, ["10.1/a", "10.1/b"])
         # Les deux enregistrements sont renvoyés. Ils n'ont pas de DOI lisible, donc les deux DOI demandés sont aussi déclarés absents.
         assert [r["UID"] for r in result.records] == ["WOS:001", "WOS:002"]
         assert set(result.absent) == {"10.1/a", "10.1/b"}
@@ -442,7 +431,7 @@ class TestWosFetchAsync:
         """Une réponse 400 de WoS signifie un lot sans résultat : tout le lot est confirmé absent."""
         http_mock.get("https://api.clarivate.com/api/wos").mock(return_value=httpx2.Response(400))
         async with httpx2.AsyncClient() as client:
-            result = await self._adapter().fetch_async(client, ["10.1/a"])
+            result = await self._adapter().fetch(client, ["10.1/a"])
         assert result == LookupBatch(absent=["10.1/a"])
 
     @pytest.mark.asyncio
@@ -450,7 +439,7 @@ class TestWosFetchAsync:
         """Erreur HTTP autre que 400 (401, 403, 5xx) : aucun DOI déclaré absent, sans exception."""
         http_mock.get("https://api.clarivate.com/api/wos").mock(return_value=httpx2.Response(401))
         async with httpx2.AsyncClient() as client:
-            result = await self._adapter().fetch_async(client, ["10.1/a"])
+            result = await self._adapter().fetch(client, ["10.1/a"])
         assert result == UNAVAILABLE
 
     @pytest.mark.asyncio
@@ -460,7 +449,7 @@ class TestWosFetchAsync:
             side_effect=httpx2.ConnectError("refused")
         )
         async with httpx2.AsyncClient() as client:
-            result = await self._adapter().fetch_async(client, ["10.1/a"])
+            result = await self._adapter().fetch(client, ["10.1/a"])
         assert result == UNAVAILABLE
 
     @pytest.mark.asyncio
@@ -468,7 +457,7 @@ class TestWosFetchAsync:
         """Les DOI de preprints (Zenodo, arXiv, SSRN) sont écartés avant l'appel : un lot fait seulement de preprints ne fait aucun appel HTTP."""
         route = http_mock.get("https://api.clarivate.com/api/wos")
         async with httpx2.AsyncClient() as client:
-            result = await self._adapter().fetch_async(
+            result = await self._adapter().fetch(
                 client, ["10.48550/arxiv.1234", "10.5281/zenodo.1"]
             )
         assert result == LookupBatch()

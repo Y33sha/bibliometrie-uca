@@ -23,7 +23,6 @@ dependencies = [
     "defusedxml==0.7.1",         # lecture du TEI des enregistrements HAL, sans développer les entités XML
     "orjson>=3.13.0",
     "xxhash>=4.0.2",
-    "scipy==1.18.1",             # affectation optimale (algorithme hongrois) des contributions sources aux contributions
 ]
 
 [project.scripts]
@@ -47,9 +46,6 @@ dev = [
     "import-linter==2.15",
     "pyyaml==6.0.3",           # lecture des descriptions de déploiement par les tests
     "tqdm==4.70.1",            # barres de progression du pipeline, importées sous `try` (cf. pipeline/runtime/observability/progression.py)
-    "splink==5.0.0",           # record linkage probabiliste (Fellegi-Sunter) : estimation des poids du modèle de l'alignement des auteurs
-    "duckdb==2.0.0",           # moteur de Splink, et lecture des fichiers Parquet de l'estimation des poids
-    "pyarrow==26.0.0",         # écriture des fichiers Parquet de l'estimation des poids
     "zensical==0.0.73",            # site de la documentation, construit depuis docs/ et zensical.toml
     "mkdocstrings-python==2.0.10", # référence du code dans le site, générée depuis les docstrings
     "playwright==1.64.1",          # captures d'écran du guide utilisateur (interfaces/cli/dev/screenshots.py)
@@ -64,7 +60,7 @@ include = ["application*", "domain*", "infrastructure*", "interfaces*", "pipelin
 # deptry : dépendances manquantes, inutilisées ou transitives.
 [tool.deptry]
 known_first_party = ["application", "domain", "infrastructure", "interfaces", "pipeline"]
-# Code non distribué, dont les imports relèvent des dépendances de développement : outillage du dépôt (`scripts/`, `.claude/`), répertoire de travail local (`data/`), scripts de développement qui importent Splink, DuckDB, pyarrow ou Playwright.
+# Code non distribué, dont les imports relèvent des dépendances de développement : outillage du dépôt (`scripts/`, `.claude/`), répertoire de travail local (`data/`), script de développement qui importe Playwright.
 extend_exclude = [
     "frontend",
     ".venv",
@@ -72,7 +68,6 @@ extend_exclude = [
     "scripts",
     ".claude",
     "data",
-    "interfaces/cli/dev/estimate_residual_weights.py",
     "interfaces/cli/dev/screenshots.py",
 ]
 

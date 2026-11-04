@@ -100,6 +100,12 @@ class TestAnchors:
         assert anchor_of(DoiKeys(frozenset(), frozenset({"b", "x"})), anchors) == "b"
         assert anchor_of(DoiKeys(frozenset(), frozenset({"a", "b"})), anchors) is None
 
+    def test_the_deposit_dois_of_a_member_are_not_its_anchors(self):
+        """Un preprint cite l'article et un DOI Zenodo, ancre par l'enregistrement source d'un dataset : il rejoint l'article."""
+        zenodo, article = "10.5281/zenodo.1", "10.1103/article"
+        preprint = DoiKeys(frozenset(), frozenset({zenodo, article}), doc_type="preprint")
+        assert anchor_of(preprint, frozenset({zenodo, article})) == article
+
 
 class TestIdentifiers:
     def test_one_key_per_type(self):

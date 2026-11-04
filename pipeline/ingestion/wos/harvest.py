@@ -6,14 +6,10 @@ La requête à l'API WoS Expanded cible les affiliations du périmètre (`OG=`),
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass
 
 from sqlalchemy import Connection
 
-from infrastructure.read_models.perimeters.queries import get_extraction_api_ids
-from pipeline.http.circuit_breaker import SourceUnavailableError
 from pipeline.ingestion.common.harvester import (
-    HarvestConfigError,
     HarvestWindow,
     SourceHarvester,
     stage_document,
@@ -32,14 +28,6 @@ _WOS_FIRST_RECORD_LIMIT = 100_000
 """Plafond de l'API : `firstRecord` ne dépasse pas 100 000 sur une requête."""
 
 
-@dataclass(frozen=True)
-class WosHarvestConfig:
-    """Configuration du moissonnage WoS, lue en base."""
-
-    affiliations: list[str]
-    """Variantes d'affiliation (Organization-Enhanced) du périmètre de moissonnage."""
-
-
 def harvest_year(
     client: WosClient,
     conn: Connection,
@@ -47,16 +35,16 @@ def harvest_year(
     affiliations: list[str],
     logger: ScopedOrPlainLogger,
     progress: Progress,
-) -> PhaseMetrics:
+    metrics: PhaseMetrics,
+) -> None:
     """Moissonne les records d'une année, page après page.
 
-    Une page vide est retentée après une pause ; trois pages vides de suite arrêtent l'année.
+    Une page vide est retentée après une pause ; trois pages vides de suite arrêtent l'année. Les écritures sont comptées dans `metrics`.
     """
-    metrics = PhaseMetrics()
     data = client.fetch_page(year, 1, affiliations)
     if not data:
         logger.error("requête impossible")
-        return metrics
+        return
 
     total_count = get_records_found(data)
     first_record = 1
@@ -97,26 +85,18 @@ def harvest_year(
                 time.sleep(_BREATHER_SECS)
             data = client.fetch_page(year, first_record, affiliations)
 
-    return metrics
 
-
-class WosHarvester(SourceHarvester[WosHarvestConfig, WosClient]):
+class WosHarvester(SourceHarvester[WosClient]):
     """Moissonnage WoS des records des affiliations du périmètre, année par année.
 
     Une erreur sur une année est journalisée, et le moissonnage passe à la suivante.
     """
 
     SOURCE = "wos"
+    MISSING_API_IDS = "aucune affiliation"
 
-    def load_config(self, conn: Connection) -> WosHarvestConfig:
-        affiliations = get_extraction_api_ids(conn, "wos")
-        if not affiliations:
-            raise HarvestConfigError(
-                "aucune affiliation (api_ids->'wos' vide pour le périmètre d'extraction)"
-            )
-        return WosHarvestConfig(affiliations=affiliations)
-
-    def setup_logging(self, window: HarvestWindow, config: WosHarvestConfig) -> None:
+    def _log_quota(self) -> None:
+        """Écrit le quota annuel restant de l'API."""
         try:
             remaining = self._client.check_quota()
         except Exception as e:
@@ -125,31 +105,18 @@ class WosHarvester(SourceHarvester[WosHarvestConfig, WosClient]):
         if remaining:
             self.logger.info("Quota annuel restant : %s records", remaining)
 
-    def harvest_all(self, window: HarvestWindow, config: WosHarvestConfig) -> PhaseMetrics:
-        affiliations = config.affiliations
+    def run(self, window: HarvestWindow) -> PhaseMetrics:
+        affiliations = self._api_ids()
+        self._log_quota()
         client = self._client
         years = self._years(window)
 
-        def count_year(year: int) -> int:
-            try:
-                return client.count(year, affiliations)
-            except SourceUnavailableError:
-                raise
-            except Exception:
-                # Le moissonnage de l'année rencontre la même erreur et la signale.
-                return 0
-
-        def harvest_step(year: int, progress: Progress) -> PhaseMetrics:
+        def harvest_step(year: int, progress: Progress, metrics: PhaseMetrics) -> None:
             slog = scoped_logger(self.logger, self.SOURCE, str(year))
-            try:
-                metrics = harvest_year(client, self.conn, year, affiliations, slog, progress)
-            except SourceUnavailableError:
-                raise
-            except Exception as e:
-                slog.error("erreur : %s — passage à la suivante", e)
-                metrics = PhaseMetrics()
+            harvest_year(client, self.conn, year, affiliations, slog, progress, metrics)
             if year != years[-1]:
                 time.sleep(_BETWEEN_YEARS_SECS)
-            return metrics
 
-        return self._harvest_by_year(years, count_year, harvest_step)
+        return self._harvest_by_year(
+            years, lambda year: client.count(year, affiliations), harvest_step
+        )

@@ -1,6 +1,6 @@
 """Recherche de documents dans une source par identifiant : boucle commune des phases `fetch_missing`, `fetch_stale` et `fetch_truncated`.
 
-Un canal (`LookupChannel`) définit la requête d'un lot d'identifiants, l'écriture d'un document trouvé et le traitement d'un identifiant absent de la source. `look_up` interroge les lots en parallèle (`run_fetch_pool`), écrit les documents trouvés, range les absents et compte les issues. Un lot non servi par la source attend le run suivant. Le pool s'arrête quand le circuit-breaker de la source coupe ; l'accès à la source le signale.
+Un canal (`LookupChannel`) définit la requête d'un lot d'identifiants, l'écriture d'un document trouvé et le traitement d'un identifiant absent de la source. `look_up` interroge les lots en parallèle (`run_fetch_pool`), avec la concurrence consentie à la source (`api_params.MAX_CONCURRENT`), écrit les documents trouvés, range les absents et compte les issues. Un lot non servi par la source attend le run suivant. Le pool s'arrête quand le circuit-breaker de la source coupe ; l'accès à la source le signale.
 """
 
 from __future__ import annotations
@@ -18,8 +18,9 @@ from domain.types import JsonValue
 from pipeline.http.circuit_breaker import source_tripped
 from pipeline.http.fetch_pool import run_fetch_pool
 from pipeline.http.lookup import UNAVAILABLE, LookupOutcome, NotFound, Unavailable
-from pipeline.ingestion.adapters import ADAPTERS
+from pipeline.ingestion.api_params import MAX_CONCURRENT
 from pipeline.ingestion.common.staging import StagingStore, UpsertOutcome
+from pipeline.ingestion.payload_readers import payload_reader
 from pipeline.runtime.observability.log_format import source_branch
 from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -85,7 +86,7 @@ def by_native_id(
         if isinstance(result, Unavailable) or not result.records:
             return result
         (source_id,), (record,) = keys, result.records
-        identity = ADAPTERS[Source(source)].identify(record)
+        identity = payload_reader(Source(source)).identify(record)
         if identity is None or identity.source_id == source_id:
             return result
         return LookupBatch(records=result.records, absent=[source_id])
@@ -106,7 +107,6 @@ class LookupChannel:
     absent_metric: str = "not_found"
     """Compteur des identifiants absents."""
     batch_size: int = 1
-    max_concurrent: int = 1
     shown: bool = True
     """Vrai si la recherche a sa barre de progression. `False` : vérification prolongeant une autre recherche, sous la barre de celle-ci."""
 
@@ -156,7 +156,7 @@ async def look_up(
         await run_fetch_pool(
             batches,
             conn,
-            max_concurrent=channel.max_concurrent,
+            max_concurrent=MAX_CONCURRENT[channel.source],
             commit_every=max(1, COMMIT_EVERY // size),
             fetch=_fetch,
             write=_write,
@@ -184,14 +184,9 @@ def _stage(
     """Écrit `records` par `stage`, les compte dans `metrics`, et renvoie le nombre de documents écrits."""
     written = 0
     for record in records:
-        match stage(staging, record):
-            case UpsertOutcome.NEW:
-                metrics.add(new=1)
-            case UpsertOutcome.UPDATED:
-                metrics.add(updated=1)
-            case UpsertOutcome.UNCHANGED:
-                metrics.add(unchanged=1)
-            case None:
-                continue
+        outcome = stage(staging, record)
+        if outcome is None:
+            continue
+        metrics.add(**{outcome.value: 1})
         written += 1
     return written

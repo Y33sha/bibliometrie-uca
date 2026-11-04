@@ -17,6 +17,7 @@ from pipeline.ingestion.common.harvester import HarvestConfigError
 from pipeline.ingestion.common.staging import UpsertOutcome
 from pipeline.ingestion.wos import harvest
 from pipeline.ingestion.wos.harvest import WosHarvester, harvest_year
+from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import Progress
 from tests.helpers.harvesters import arguments_du_run, moissonneur
 
@@ -51,8 +52,10 @@ def _client(reponses: list, *, total: int | None = None) -> MagicMock:
     return client
 
 
-def _extraire(client: MagicMock):
-    return harvest_year(client, MagicMock(), 2024, ["UCA"], _LOGGER, Progress(None, "WoS", None))
+def _extraire(client: MagicMock) -> PhaseMetrics:
+    metrics = PhaseMetrics()
+    harvest_year(client, MagicMock(), 2024, ["UCA"], _LOGGER, Progress(None, "WoS", None), metrics)
+    return metrics
 
 
 def test_pagination_sur_le_premier_record(ecritures):
@@ -97,42 +100,42 @@ def test_plafond_de_l_api_interrompt(ecritures):
 
 
 def test_run_parcourt_les_annees_de_la_configuration(configuration, ecritures):
-    configuration(harvest, annees=[2023, 2024])
+    configuration(annees=[2023, 2024])
     client = _client([_reponse(_records("W1"), total=1), _reponse(_records("W2"), total=1)])
     assert moissonneur(WosHarvester, client).run(arguments_du_run()).new == 2
 
 
 def test_run_isole_l_echec_d_une_annee(configuration, ecritures):
     """Une année en erreur laisse la suivante s'exécuter."""
-    configuration(harvest, annees=[2023, 2024])
+    configuration(annees=[2023, 2024])
     client = _client([RuntimeError("API en panne"), _reponse(_records("W1"), total=1)])
     assert moissonneur(WosHarvester, client).run(arguments_du_run()).new == 1
 
 
 def test_run_survit_a_un_comptage_impossible(configuration, ecritures):
     """Un comptage en erreur vaut zéro pour l'année. Le moissonnage de l'année s'exécute quand même."""
-    configuration(harvest)
+    configuration()
     client = _client([_reponse(_records("W1"), total=1)])
     client.count.side_effect = RuntimeError("API en panne")
     assert moissonneur(WosHarvester, client).run(arguments_du_run()).new == 1
 
 
 def test_run_survit_a_un_quota_illisible(configuration, ecritures):
-    configuration(harvest)
+    configuration()
     client = _client([_reponse([], total=0)])
     client.check_quota.side_effect = RuntimeError("service indisponible")
     assert moissonneur(WosHarvester, client).run(arguments_du_run()).total == 0
 
 
 def test_run_sans_affiliation_refuse(configuration):
-    configuration(harvest, api_ids=[])
+    configuration(api_ids=[])
     with pytest.raises(HarvestConfigError, match="aucune affiliation"):
         moissonneur(WosHarvester, _client([])).run(arguments_du_run())
 
 
 def test_run_s_arrete_quand_la_source_devient_indisponible(configuration, ecritures, pauses):
     """Retries épuisés pendant une année : les années suivantes sont sautées sans pause, les métriques déjà acquises sont gardées."""
-    configuration(harvest, annees=[2023, 2024, 2025])
+    configuration(annees=[2023, 2024, 2025])
     client = _client([_reponse(_records("W1"), total=1), SourceUnavailableError("wos")])
     metrics = moissonneur(WosHarvester, client).run(arguments_du_run())
     assert metrics.new == 1
@@ -142,7 +145,7 @@ def test_run_s_arrete_quand_la_source_devient_indisponible(configuration, ecritu
 
 
 def test_run_s_arrete_quand_le_comptage_trouve_la_source_indisponible(configuration):
-    configuration(harvest, annees=[2023, 2024])
+    configuration(annees=[2023, 2024])
     client = _client([])
     client.count.side_effect = SourceUnavailableError("wos")
     with pytest.raises(SourceUnavailableError):

@@ -24,7 +24,7 @@ from pipeline.graph import Task, in_transaction
 from pipeline.http.polite_pool import default_user_agent
 from pipeline.ingestion.api_params import (
     API_BASE_URLS,
-    SUDOC_MAX_CONCURRENT,
+    MAX_CONCURRENT,
 )
 from pipeline.ingestion.complements.doaj import downloaded_doaj_dump
 from pipeline.ingestion.complements.issn_centre import downloaded_issnl_table
@@ -203,7 +203,7 @@ def _run_check_issns_in_sudoc(
                 fetch_record=lambda client, ppn: fetch_serial_record(
                     client, ppn, base_url=base_url
                 ),
-                max_concurrent=SUDOC_MAX_CONCURRENT,
+                max_concurrent=MAX_CONCURRENT["sudoc"],
                 max_per_run=cap(conn, ConfigKey.SUDOC_MAX_PER_RUN),
             )
         )

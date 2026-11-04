@@ -17,7 +17,7 @@ from collections.abc import Callable, Coroutine, Mapping
 from domain.config import ConfigKey
 from domain.sources.registry import DOI_SEARCHABLE_SOURCES, PROFILES, Source, source_label
 from pipeline.graph import Task, TaskRun
-from pipeline.ingestion.adapters import ADAPTERS
+from pipeline.ingestion.adapters import adapter
 from pipeline.ingestion.common.doi_search import fetch_missing_doi
 from pipeline.ingestion.hal.fetch_missing import fetch_missing_hal_by_id, fetch_missing_hal_by_nnt
 from pipeline.ingestion.scanr.fetch_missing import fetch_missing_scanr_by_hal_id
@@ -61,9 +61,8 @@ def _by_identifier(search: Callable[..., Coroutine[object, object, PhaseMetrics]
 
 
 def _run_fetch_missing_doi(ctx: PhaseContext, target: str) -> PhaseMetrics:
-    doi_search = ADAPTERS[Source(target)].doi_search
-    assert doi_search is not None, f"{target} : source interrogeable par DOI sans recherche"
-    search = doi_search()
+    search = adapter(Source(target)).doi_search
+    assert search is not None, f"{target} : source interrogeable par DOI sans recherche"
     options = ctx.options
     with ctx.open_tx() as conn:
         retry_after_days = delay(conn, ConfigKey.FETCH_MISSING_RETRY_AFTER_DAYS)
@@ -72,6 +71,7 @@ def _run_fetch_missing_doi(ctx: PhaseContext, target: str) -> PhaseMetrics:
         return asyncio.run(
             fetch_missing_doi(
                 conn,
+                target,
                 search,
                 ctx.logger,
                 retry_after_days=retry_after_days,

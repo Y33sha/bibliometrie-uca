@@ -8,48 +8,57 @@ from __future__ import annotations
 import time
 from collections.abc import Mapping, Sequence
 from functools import partial
+from itertools import pairwise
 
 from pipeline.graph import Phase, Task
 from pipeline.runtime.access_source import access_source
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, nothing_to_do, step
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.parallel import RunParallel, run_parallel
+from pipeline.runtime.parallel import run_parallel
 
 
-def execute_tasks(
-    tasks: Sequence[Task], ctx: PhaseContext, *, parallel: RunParallel = run_parallel
-) -> dict[str, PhaseMetrics]:
+def execute_tasks(tasks: Sequence[Task], ctx: PhaseContext) -> dict[str, PhaseMetrics]:
     """Exécute `tasks` dans leur ordre et renvoie les métriques des tâches exécutées, par nom de tâche. Une tâche écartée par sa condition est absente du résultat.
 
-    Les tâches consécutives d'un même groupe parallèle s'exécutent ensemble par `parallel`. Leurs lignes de bilan suivent, dans l'ordre des tâches.
+    Les tâches consécutives d'un même groupe parallèle s'exécutent ensemble (`run_parallel`). Leurs lignes de bilan suivent, dans l'ordre des tâches.
     """
-    results: dict[str, PhaseMetrics] = {}
     selected = [task for task in tasks if task.when is None or task.when(ctx)]
-    start = 0
-    while start < len(selected):
-        end = start + 1
-        group = selected[start].parallel_group
-        while group is not None and end < len(selected) and selected[end].parallel_group == group:
-            end += 1
-        previous_section = selected[start - 1].section if start else None
-        section = selected[start].section
+    next_sections = {task.name: following.section for task, following in pairwise(selected)}
+    results: dict[str, PhaseMetrics] = {}
+    previous_section = None
+    for block in _blocks(selected):
+        section = block[0].section
         if section is not None and section != previous_section:
             step(ctx.logger, section)
-        chunk = selected[start:end]
-        if len(chunk) == 1:
-            results[chunk[0].name] = _execute(chunk[0], ctx)
-        else:
-            results.update(parallel({task.name: partial(_execute, task, ctx) for task in chunk}))
-        for index in range(start, end):
-            task = selected[index]
+        results.update(_execute_block(block, ctx))
+        for task in block:
             ctx.task_durations[task.name] = results[task.name].duration_s or 0.0
-            next_section = selected[index + 1].section if index + 1 < len(selected) else None
+            next_section = next_sections.get(task.name)
             _write_lines(task, results[task.name], next_section, ctx)
             if task.section is not None and task.section != next_section:
                 _close_if_silent([t for t in selected if t.section == task.section], results, ctx)
-        start = end
+        previous_section = block[-1].section
     return results
+
+
+def _blocks(tasks: Sequence[Task]) -> list[list[Task]]:
+    """Découpe `tasks` en blocs exécutés ensemble : une tâche seule, ou les tâches consécutives d'un même groupe parallèle."""
+    blocks: list[list[Task]] = []
+    for task in tasks:
+        group = task.parallel_group
+        if blocks and group is not None and group == blocks[-1][0].parallel_group:
+            blocks[-1].append(task)
+        else:
+            blocks.append([task])
+    return blocks
+
+
+def _execute_block(block: list[Task], ctx: PhaseContext) -> dict[str, PhaseMetrics]:
+    """Exécute un bloc de tâches, en parallèle s'il en compte plusieurs, et renvoie leurs métriques par nom de tâche."""
+    if len(block) == 1:
+        return {block[0].name: _execute(block[0], ctx)}
+    return run_parallel({task.name: partial(_execute, task, ctx) for task in block})
 
 
 def _silent(task: Task, metrics: PhaseMetrics) -> bool:

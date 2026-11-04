@@ -1,10 +1,14 @@
-"""Doublons d'auteur dans la liste d'un enregistrement source : la source répète tout ou partie de la liste à sa suite (A B C A B C), chaque nom à sa place (A A B B…), ou les auteurs dans un autre ordre, en liste des membres d'un collectif (A B C D B X A)."""
+"""Doublons d'auteur dans la liste d'un enregistrement source.
+
+Avant l'alignement, la liste seule les révèle : la source répète tout ou partie de la liste à sa suite (A B C A B C), chaque nom à sa place (A A B B…), ou les auteurs dans un autre ordre, en liste des membres d'un collectif (A B C D B X A). Après l'alignement, un nom répété une fois se révèle par sa contribution restée seule (`unaligned_duplicates`).
+"""
 
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from itertools import pairwise
 
-from domain.contributions.author_grouping import SourceContribution
+from domain.contributions.author_grouping import Contribution, SourceContribution
+from domain.persons.name_matching import is_full_first_name
 
 MIN_DUPLICATED_NAMES = 2
 """Nombre de noms complets répétés qui signale des doublons : au même décalage pour un bloc de la liste, à des décalages quelconques pour une liste de membres."""
@@ -35,6 +39,32 @@ def duplicate_source_contributions(
         | _member_list_duplicates(by_name, len(ordered))
     )
     return {s.id: by_name[_name(p)][0][1].id for p in ordered if (s := p[1]).id in duplicates}
+
+
+def unaligned_duplicates(
+    contributions: Sequence[Contribution], source_contributions: Mapping[int, SourceContribution]
+) -> dict[int, int]:
+    """Renvoie les doublons d'auteur révélés par l'alignement, chacun vers sa jumelle.
+
+    Un doublon est seul dans sa contribution. Sa jumelle appartient au même enregistrement source, a le même nom de famille et le même prénom complet, et s'aligne avec d'autres enregistrements sources. Un prénom réduit à des initiales ne suffit pas : « wang / z » désigne souvent deux auteurs voisins dans l'ordre alphabétique.
+
+    Args:
+        source_contributions: contributions sources alignées, par identifiant.
+    """
+    aligned: dict[tuple[int, str, str], int] = {}
+    for g in contributions:
+        if len(g.members) > 1:
+            for m in g.members:
+                s = source_contributions[m.source_contribution]
+                aligned.setdefault((s.source_record, s.last_name, s.first_name), s.id)
+    duplicates: dict[int, int] = {}
+    for g in contributions:
+        if len(g.members) == 1:
+            s = source_contributions[g.members[0].source_contribution]
+            twin = aligned.get((s.source_record, s.last_name, s.first_name))
+            if twin is not None and s.last_name and is_full_first_name(s.first_name):
+                duplicates[s.id] = twin
+    return duplicates
 
 
 def _block_duplicates(by_name: dict[Name, list[Placed]]) -> set[int]:

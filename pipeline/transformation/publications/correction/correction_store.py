@@ -6,7 +6,7 @@ La phase écrit sur les enregistrements sources les valeurs corrigées par les r
 import json
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import fields
-from typing import NamedTuple
+from typing import NamedTuple, cast
 
 from sqlalchemy import Connection, Row, bindparam, func, text
 
@@ -47,11 +47,12 @@ from domain.source_records.source_extras import SourceExtra
 from domain.sources.registry import DOI_ORG, Source
 from domain.types import JsonValue
 from infrastructure.db.doi_targets import unversioned_doi_sql
-from infrastructure.db.queues import Queue, enqueue
+from infrastructure.db.queues import Queue, enqueue, enqueue_ids
 from infrastructure.db.rows import rows_as
 from infrastructure.db.source_record_identifiers import (
     fetch_identifiers,
     identifiers_json_sql,
+    non_related_doi_sql,
     parse_identifiers,
 )
 from infrastructure.db.tables import source_records
@@ -282,20 +283,19 @@ def _persist_updates(conn: Connection, updates: Sequence[Mapping[str, object]]) 
         {"source_record_id": u["id"], **{k: v for k, v in u.items() if k != "id"}} for u in updates
     ]
     conn.execute(_UPDATE, params)
-    enqueue(
-        conn,
-        Queue.SOURCE_RECORD_KEYS,
-        "SELECT unnest(CAST(:ids AS integer[]))",
-        {"ids": [u["id"] for u in updates]},
-    )
+    enqueue_ids(conn, Queue.SOURCE_RECORD_KEYS, [cast("int", u["id"]) for u in updates])
     return len(updates)
 
+
+_UNRESOLVED_DOIS_SQL = (
+    f"SELECT id_value AS d FROM failed_lookups WHERE source = '{DOI_ORG}' AND id_type = 'doi'"
+)
+"""DOI inconnus de doi.org."""
 
 _RECORD_DOIS_SQL = f"""
     SELECT source_record_id AS id, id_value AS doi, role
     FROM source_record_identifiers
-    WHERE id_type = '{SourceIdentifierType.DOI.value}'
-      AND role <> '{SourceIdentifierRole.RELATED.value}'
+    WHERE {non_related_doi_sql("source_record_identifiers")}
 """
 """DOI de rôle autre que `related` de chaque enregistrement source, quel que soit leur statut."""
 
@@ -434,8 +434,7 @@ class SourceRecordCorrectionStore:
                 WHERE (sr.serial_id IS NULL AND EXISTS (
                           SELECT 1 FROM source_record_identifiers i
                           WHERE i.source_record_id = sr.id
-                            AND i.id_type = '{SourceIdentifierType.DOI.value}'
-                            AND i.role <> '{SourceIdentifierRole.RELATED.value}'
+                            AND {non_related_doi_sql("i")}
                             AND (i.removed_by IS NULL OR i.removed_by = ANY(:removals))))
                    OR {corrected("serial_id")}
             """),
@@ -462,8 +461,7 @@ class SourceRecordCorrectionStore:
         rows = self._conn.execute(
             text(f"""
                 SELECT DISTINCT id_value FROM source_record_identifiers
-                WHERE id_type = '{SourceIdentifierType.DOI.value}'
-                  AND role <> '{SourceIdentifierRole.RELATED.value}'
+                WHERE {non_related_doi_sql("source_record_identifiers")}
                   AND {unversioned_doi_sql("id_value")} IS NOT NULL
             """)
         )
@@ -497,10 +495,7 @@ class SourceRecordCorrectionStore:
                     FROM sr_eff sr JOIN record_dois d ON d.id = sr.id
                     WHERE sr.doc_type = '{DocType.DATASET.value}'
                 ),
-                unresolved_dois AS (
-                    SELECT id_value AS d FROM failed_lookups
-                    WHERE source = '{DOI_ORG}' AND id_type = 'doi'
-                ),
+                unresolved_dois AS ({_UNRESOLVED_DOIS_SQL}),
                 -- Collections figshare typées dataset, une par titre et année : un titre partagé par deux collections n'en désigne aucune.
                 figshare_collections AS (
                     SELECT sr.title_normalized, sr.publication_year, min(d.doi) AS doi
@@ -517,8 +512,7 @@ class SourceRecordCorrectionStore:
                 -- DOI présents en base : DOI de rôle autre que `related` des enregistrements sources, hors retraits de la correction unaire.
                 present_dois AS (
                     SELECT DISTINCT id_value AS d FROM source_record_identifiers
-                    WHERE id_type = '{SourceIdentifierType.DOI.value}'
-                      AND role <> '{SourceIdentifierRole.RELATED.value}'
+                    WHERE {non_related_doi_sql("source_record_identifiers")}
                       AND (removed_by IS NULL OR removed_by IN ({_CLUSTER_CASES_SQL}))
                 ),
                 -- DOI `primary` de chaque enregistrement source DataCite, son DOI propre.
@@ -539,15 +533,15 @@ class SourceRecordCorrectionStore:
                             sr.id AS declarant_id,
                             sr.doc_type,
                             own.doi AS secondary_doi,
-                            lower(rel->>'doi') AS canonical_doi,
+                            rel->>'doi' AS canonical_doi,
                             {_DATACITE_CASE_SQL} AS same_work_case
                         FROM sr_eff sr
                         JOIN datacite_dois own ON own.id = sr.id
                         CROSS JOIN LATERAL jsonb_array_elements({source_extra_json(SourceExtra.RELATED_IDENTIFIERS)}) rel
                         WHERE rel->>'relation_type' IN {_DATACITE_DIRECT_RELATIONS_SQL}
                           AND rel->>'doi' IS NOT NULL
-                          AND lower(rel->>'doi') <> own.doi
-                          AND lower(rel->>'doi') IN (SELECT d FROM present_dois)
+                          AND rel->>'doi' <> own.doi
+                          AND rel->>'doi' IN (SELECT d FROM present_dois)
                         UNION ALL
                         -- Pièce d'un dataset → dataset parent : le parent doit être présent en base
                         -- comme dataset pour absorber ses pièces (`IN dataset_dois`). Ça exclut le
@@ -558,7 +552,7 @@ class SourceRecordCorrectionStore:
                             sr.id AS declarant_id,
                             sr.doc_type,
                             own.doi AS secondary_doi,
-                            lower(rel->>'doi') AS canonical_doi,
+                            rel->>'doi' AS canonical_doi,
                             '{DoiTargetRule.DATACITE_PACKAGE_PIECE.value}' AS same_work_case
                         FROM sr_eff sr
                         JOIN datacite_dois own ON own.id = sr.id
@@ -566,8 +560,8 @@ class SourceRecordCorrectionStore:
                         WHERE sr.doc_type = '{DocType.DATASET.value}'
                           AND rel->>'relation_type' = '{DATACITE_PACKAGE_PIECE_RELATION}'
                           AND rel->>'doi' IS NOT NULL
-                          AND lower(rel->>'doi') <> own.doi
-                          AND lower(rel->>'doi') IN (SELECT d FROM dataset_dois)
+                          AND rel->>'doi' <> own.doi
+                          AND rel->>'doi' IN (SELECT d FROM dataset_dois)
                         UNION ALL
                         -- Fichier complémentaire figshare « Additional file N of T » → collection
                         -- figshare de titre T, sans relation déclarée : la seule collection dataset
@@ -646,10 +640,7 @@ class SourceRecordCorrectionStore:
                     FROM source_records
                 ),
                 record_dois AS ({_RECORD_DOIS_SQL}),
-                unresolved_dois AS (
-                    SELECT id_value AS d FROM failed_lookups
-                    WHERE source = '{DOI_ORG}' AND id_type = 'doi'
-                ),
+                unresolved_dois AS ({_UNRESOLVED_DOIS_SQL}),
                 candidate_dois AS (
                     SELECT d.doi AS d FROM record_dois d JOIN sr_eff sr ON sr.id = d.id
                     WHERE sr.doc_type IN ({_CLUSTER_CANDIDATE_DOC_TYPES_SQL})
@@ -728,8 +719,7 @@ class SourceRecordCorrectionStore:
             Queue.SOURCE_RECORD_KEYS,
             f"""
             SELECT DISTINCT source_record_id FROM source_record_identifiers
-            WHERE id_type = '{SourceIdentifierType.DOI.value}'
-              AND role <> '{SourceIdentifierRole.RELATED.value}' AND id_value = ANY(:dois)
+            WHERE {non_related_doi_sql("source_record_identifiers")} AND id_value = ANY(:dois)
             """,
             {"dois": changed},
         )

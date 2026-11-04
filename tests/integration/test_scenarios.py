@@ -1,4 +1,4 @@
-"""Scénarios d'intégration : DOI insensibles à la casse, consolidation d'une publication, types énumérés PostgreSQL, fusion de personnes."""
+"""Scénarios d'intégration : casse des identifiants, consolidation d'une publication, types énumérés PostgreSQL, fusion de personnes."""
 
 from functools import partial
 
@@ -43,24 +43,93 @@ def publication_repo(sa_sync_conn):
     return PublicationStore(sa_sync_conn)
 
 
-# ── DOI insensibles à la casse ──
+# ── Casse des identifiants de publication ──
 
 
-class TestDoiCaseInsensitive:
-    """La contrainte d'unicité sur le DOI ignore la casse (`lower(doi)`), comme les recherches par DOI."""
-
-    def test_unique_constraint_blocks_case_variant(self, sa_sync_conn):
-        _publication(sa_sync_conn, "Pub A", doi="10.1103/PhysRevC.111.024905")
+def _check_insert(conn, sql: str, params: dict[str, object], *, accepted: bool) -> None:
+    """Exécute l'insertion `sql`, acceptée ou refusée par une contrainte selon `accepted`."""
+    insert = partial(conn.execute, text(sql), params)
+    if accepted:
+        insert()
+    else:
         with pytest.raises(IntegrityError):
-            _publication(sa_sync_conn, "Pub B", doi="10.1103/physrevc.111.024905")
+            insert()
 
-    def test_lookup_finds_case_variant(self, sa_sync_conn):
-        _publication(sa_sync_conn, "Pub A", doi="10.1103/PhysRevC.111.024905")
-        result = sa_sync_conn.execute(
-            text("SELECT id FROM publications WHERE lower(doi) = lower(:doi)"),
-            {"doi": "10.1103/physrevc.111.024905"},
-        ).first()
-        assert result is not None
+
+class TestIdentifierCase:
+    """Un identifiant a la casse de sa forme normalisée : DOI et idHAL en minuscules ; NNT, ORCID et IdRef en majuscules."""
+
+    def test_un_doi_de_publication_en_majuscules_est_refuse(self, sa_sync_conn):
+        with pytest.raises(IntegrityError):
+            _publication(sa_sync_conn, "Pub A", doi="10.1103/PhysRevC.111.024905")
+
+    @pytest.mark.parametrize(
+        ("id_type", "id_value", "accepted"),
+        [
+            ("nnt", "2021UCFAC022", True),
+            ("nnt", "2021ucfac022", False),
+            ("doi", "10.1103/physrevc.111.024905", True),
+            ("doi", "10.1103/PhysRevC.111.024905", False),
+        ],
+    )
+    def test_casse_d_un_identifiant_d_enregistrement_source(
+        self, sa_sync_conn, id_type, id_value, accepted
+    ):
+        _check_insert(
+            sa_sync_conn,
+            """
+                INSERT INTO source_record_identifiers (source_record_id, id_type, id_value, role)
+                VALUES (:record, CAST(:id_type AS source_identifier_type), :id_value, 'secondary')
+            """,
+            {
+                "record": insert_source_record(sa_sync_conn),
+                "id_type": id_type,
+                "id_value": id_value,
+            },
+            accepted=accepted,
+        )
+
+    @pytest.mark.parametrize(
+        ("id_type", "id_value", "accepted"),
+        [
+            ("orcid", "0000-0001-2345-678X", True),
+            ("orcid", "0000-0001-2345-678x", False),
+            ("idref", "05547854X", True),
+            ("idref", "05547854x", False),
+            ("idhal", "jean-dupont", True),
+            ("idhal", "Jean-Dupont", False),
+        ],
+    )
+    def test_casse_d_un_identifiant_de_personne(self, sa_sync_conn, id_type, id_value, accepted):
+        _check_insert(
+            sa_sync_conn,
+            """
+                INSERT INTO person_identifiers (person_id, id_type, id_value, source)
+                VALUES (:person, :id_type, :id_value, 'manual')
+            """,
+            {"person": _person(sa_sync_conn), "id_type": id_type, "id_value": id_value},
+            accepted=accepted,
+        )
+
+    @pytest.mark.parametrize(
+        ("identifiers", "accepted"),
+        [
+            ('{"orcid": "0000-0001-2345-678X", "idhal": "jdupont"}', True),
+            ('{"orcid": "0000-0001-2345-678x"}', False),
+            ('{"idref": "05547854x"}', False),
+            ('{"idhal": "JDupont"}', False),
+        ],
+    )
+    def test_casse_des_identifiants_d_un_contributeur(self, sa_sync_conn, identifiers, accepted):
+        _check_insert(
+            sa_sync_conn,
+            """
+                INSERT INTO contributor_information (last_name_normalized, identifiers)
+                VALUES ('dupont', CAST(:identifiers AS jsonb))
+            """,
+            {"identifiers": identifiers},
+            accepted=accepted,
+        )
 
 
 # ── Consolidation des publications ──

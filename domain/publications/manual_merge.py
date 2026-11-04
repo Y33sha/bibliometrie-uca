@@ -31,7 +31,7 @@ def check_mergeable(publications: Iterable[PublicationDoi]) -> None:
         ValidationError: DOI distincts.
     """
     distinct = sorted(
-        {p.doi.lower() for p in publications if p.doi and not is_deposit_doi(p.doi, p.doc_type)}
+        {p.doi for p in publications if p.doi and not is_deposit_doi(p.doi, p.doc_type)}
     )
     if len(distinct) > 1:
         raise ValidationError(f"Fusion impossible : DOI distincts ({', '.join(distinct)})")

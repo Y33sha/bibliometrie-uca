@@ -28,7 +28,7 @@ from domain.platforms.registry import (
 )
 from domain.source_records.biblio import BiblioKey, JournalKey, with_journal
 from infrastructure.db.engine import get_sync_engine
-from infrastructure.db.queues import Queue, enqueue
+from infrastructure.db.queues import Queue, enqueue_ids
 from infrastructure.observability.log import setup_logger
 
 log = setup_logger("apply_platform_rules", os.path.dirname(__file__))
@@ -136,12 +136,7 @@ def main() -> None:
             log.info("%d copies ouvertes, %d copies ajoutées", len(opened), len(inserted))
             changed = opened | inserted
         if changed:
-            enqueue(
-                conn,
-                Queue.SOURCE_RECORD_KEYS,
-                "SELECT unnest(CAST(:ids AS integer[]))",
-                {"ids": sorted(changed)},
-            )
+            enqueue_ids(conn, Queue.SOURCE_RECORD_KEYS, sorted(changed))
         conn.commit()
         log.info(
             "%d séries retirées, %d enregistrements sources mis en file", len(series), len(changed)

@@ -641,10 +641,8 @@ class TestHalNormalizerClass:
 
     def test_metadonnees_minimales(self):
         norm = _make_normalizer()
-        assert norm.minimal_metadata(staging_row(raw={"title_s": []})) == ("", None)
-        assert norm.minimal_metadata(
-            staging_row(raw={"title_s": ["T"], "producedDateY_i": 2024})
-        ) == ("T", 2024)
+        assert norm.minimal_metadata({"title_s": []}) == ("", None)
+        assert norm.minimal_metadata({"title_s": ["T"], "producedDateY_i": 2024}) == ("T", 2024)
 
     def test_refuse_sans_champ_auteurs(self):
         """Métadonnées minimales présentes, champ auteurs absent : enregistrement source refusé."""

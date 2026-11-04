@@ -1,48 +1,34 @@
 """Phases `metadata_correction` et `publications` du pipeline, jouées dans la transaction d'un test d'idempotence ou de retraitement."""
 
 import logging
+from contextlib import nullcontext
+from unittest.mock import patch
 
 from sqlalchemy import Connection, text
 
-from pipeline.transformation.publications.correction.correct_unary import (
-    compute_update as compute_unary_update,
-)
-from pipeline.transformation.publications.correction.correction_store import (
-    SourceRecordCorrectionStore,
-)
-from pipeline.transformation.publications.correction.doi_targets import compute_doi_targets
-from pipeline.transformation.publications.correction.matchable import (
-    compute_updates as compute_matchable_updates,
-)
-from pipeline.transformation.publications.correction.remove_identifiers import (
-    compute_updates as compute_removal_updates,
-    fetch_candidates,
-)
+from pipeline.phases import PHASES
+from pipeline.runtime.context import PhaseContext, RunOptions
+from pipeline.task_runner import run_phase
 from pipeline.transformation.publications.reconciliation import reconcile
+
+_METADATA_CORRECTION = next(phase for phase in PHASES if phase.name == "metadata_correction")
 
 
 def apply_metadata_corrections(conn: Connection) -> None:
-    """Joue les sous-étapes de `metadata_correction` (correction unaire, cibles des DOI, retraits de DOI, puis `is_matchable`) sur tous les enregistrements sources, sans valider la transaction.
+    """Joue la phase `metadata_correction` du pipeline sur `conn`, sans valider la transaction : les commits par lot sont neutralisés.
 
-    Le `run()` de chaque sous-étape valide la transaction après chaque lot ; ce helper enchaîne donc lecture, calcul et écriture lui-même. À rejouer après chaque normalisation, avant la réconciliation, comme dans le pipeline.
+    À rejouer après chaque normalisation, avant la réconciliation, comme dans le pipeline.
     """
-    queries = SourceRecordCorrectionStore(conn)
-    missing_hal_ids = queries.fetch_missing_hal_ids()
-
-    unary_rows = queries.fetch_for_unary_correction()
-    unary_updates = [
-        u
-        for row in unary_rows
-        if (u := compute_unary_update(row, missing_hal_ids=missing_hal_ids)) is not None
-    ]
-    queries.persist_corrections(unary_updates)
-    queries.delete_missing_hal_locations()
-
-    queries.replace_doi_targets(compute_doi_targets(queries.fetch_secondary_form_declarations()))
-    queries.persist_doi_corrections(compute_removal_updates(fetch_candidates(queries)))
-
-    matchable_updates = compute_matchable_updates(queries.fetch_matchability_rows())
-    queries.persist_matchability(matchable_updates)
+    ctx = PhaseContext(
+        open_tx=lambda: nullcontext(conn),
+        logger=logging.getLogger("apply_metadata_corrections"),
+        options=RunOptions(),
+        maintain=lambda _operation: None,
+        credentials_missing=lambda _source: None,
+        request_budget=lambda _source: None,
+    )
+    with patch.object(conn, "commit"):
+        run_phase(_METADATA_CORRECTION, ctx)
 
 
 def create_all_publications(conn: Connection) -> None:
