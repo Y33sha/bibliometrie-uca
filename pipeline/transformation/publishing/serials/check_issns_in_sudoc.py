@@ -16,7 +16,7 @@ from sqlalchemy import Connection, select, text
 from domain.serials.issn_facts import SudocReading, read_sudoc_record
 from domain.sources.sudoc import SudocSerialRecord
 from infrastructure.db.tables import serial_issns
-from pipeline.http.circuit_breaker import SourceUnavailableError, source_tripped
+from pipeline.http.circuit_breaker import SourceUnavailableError
 from pipeline.http.fetch_pool import run_fetch_pool
 from pipeline.ingestion.api_params import SUDOC_ISSN2PPN_BATCH
 from pipeline.runtime.observability.log_format import BRANCH, inflect, quantity
@@ -189,12 +189,6 @@ async def run_check_issns_in_sudoc(
             write=_write,
         )
 
-    if source_tripped():
-        logger.warning(
-            "⚡ Coupe-circuit Sudoc : vérification interrompue à %d/%d ISSN, reste repris au prochain run.",
-            metrics.updated,
-            len(issns),
-        )
     found = metrics.extras.get("sudoc_found", 0)
     metrics.report = (
         f"{quantity(metrics.updated, 'ISSN vérifié', 'ISSN vérifiés')}, "
