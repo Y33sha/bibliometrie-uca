@@ -41,9 +41,9 @@ Chaque source moissonnée (HAL, OpenAlex, WoS, ScanR, theses.fr, DataCite, Cross
 
 ### Phase 4 — Normalisation et staging
 
-- [ ] `parse` avant `minimal_metadata` ; une seule lecture du payload par ligne.
-- [ ] Effacement des échecs de recherche par identifiant natif déclaré par l'adaptateur, sans branche par source dans `staging.py`.
+- [x] `parse` avant `minimal_metadata` ; une seule lecture du payload par ligne.
+- [x] Effacement des échecs de recherche par identifiant natif, sans branche par source dans `staging.py` : le registre de chaque type d'identifiant (`failed_lookups`) désigne la source qui l'attribue.
 
 ### Phase 5 — Documentation
 
-- [ ] Mise à jour de `docs/architecture/06-pipeline.md` et des pages du moissonnage dans `docs/pipeline/`.
+- [x] Mise à jour de `docs/architecture/06-pipeline.md` et des pages des sources dans `docs/sources/`.
