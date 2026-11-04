@@ -58,11 +58,13 @@ class _HalSimule:
         def record_failed_lookup(conn, source, id_type, id_value):
             self.echecs.append((id_type, id_value))
 
-        def forget_failed_hal_id_lookup(conn, hal_id):
-            self.oublies.append(hal_id)
+        def forget_failed_native_id_lookup(conn, source, source_id):
+            self.oublies.append(source_id)
 
         self.oublies: list[str] = []
-        monkeypatch.setattr(staging, "forget_failed_hal_id_lookup", forget_failed_hal_id_lookup)
+        monkeypatch.setattr(
+            staging, "forget_failed_native_id_lookup", forget_failed_native_id_lookup
+        )
 
         monkeypatch.setattr(
             fetch_missing, "get_missing_hal_ids", lambda conn, *, retry_after_days: list(ids)

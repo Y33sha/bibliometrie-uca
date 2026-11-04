@@ -25,7 +25,7 @@ from infrastructure.raw_store import RawStore, get_raw_store
 from pipeline.ingestion.common.change_detection import change_detection_hash
 from pipeline.ingestion.common.failed_lookups import (
     forget_failed_doi_lookups,
-    forget_failed_hal_id_lookup,
+    forget_failed_native_id_lookup,
 )
 from pipeline.ingestion.common.fingerprint import stable_json_bytes
 from pipeline.ingestion.common.source_records import delete_source_record_of_staging
@@ -205,8 +205,7 @@ class StagingStore:
         forget_failed_doi_lookups(self._conn, source, identity.dois)
         if PROFILES[Source(source)].registration_agency is not None:
             forget_failed_doi_lookups(self._conn, DOI_ORG, identity.dois)
-        if source == Source.HAL:
-            forget_failed_hal_id_lookup(self._conn, identity.source_id)
+        forget_failed_native_id_lookup(self._conn, source, identity.source_id)
         return UpsertOutcome.of(inserted=inserted, changed=changed)
 
     def complete_authors(

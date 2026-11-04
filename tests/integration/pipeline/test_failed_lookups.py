@@ -107,3 +107,17 @@ class TestForgetFailedDoiLookups:
         assert sa_sync_conn.execute(
             text("SELECT id_value FROM failed_lookups")
         ).scalars().all() == ["hal-05524892"]
+
+    def test_une_these_rendue_par_theses_fr_quitte_la_table(self, sa_sync_conn):
+        record_failed_lookup(sa_sync_conn, "theses", "nnt", "2021UCFAC022")
+        record_failed_lookup(sa_sync_conn, "theses", "nnt", "2022UCFAC001")
+        StagingStore(sa_sync_conn).stage("theses", {"nnt": "2021UCFAC022", "titrePrincipal": "T"})
+        assert sa_sync_conn.execute(
+            text("SELECT id_value FROM failed_lookups")
+        ).scalars().all() == ["2022UCFAC001"]
+
+    def test_une_source_sans_registre_garde_les_echecs_de_ses_identifiants(self, sa_sync_conn):
+        """OpenAlex attribue ses identifiants sans tenir de registre interrogé par `fetch_missing` : ses documents laissent la table intacte."""
+        record_failed_lookup(sa_sync_conn, "hal", "hal_id", "hal-03178520")
+        StagingStore(sa_sync_conn).stage("openalex", {"id": "https://openalex.org/W1"})
+        assert _count(sa_sync_conn) == 1
