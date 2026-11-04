@@ -14,7 +14,7 @@ from infrastructure.repositories.merge_steps import (
 from pipeline.transformation.publications import lifecycle
 from pipeline.transformation.publications.store import PublicationStore
 from pipeline.transformation.publishing.publication_counts import (
-    refresh_serial_publication_count,
+    refresh_serial_publication_counts,
 )
 from pipeline.transformation.publishing.serials.requalify_serial import (
     correct_serial_records,
@@ -103,7 +103,7 @@ def merge_serial_into(conn: Connection, target_id: int, source_id: int) -> None:
     conn.execute(text("DELETE FROM serials WHERE id = :s"), {"s": source_id})
     record_redirect(conn, MergedEntity.SERIAL, target_id, source_id)
 
-    refresh_serial_publication_count(conn, target_id)
+    refresh_serial_publication_counts(conn, target_id)
     refresh_serial_publishers(conn, target_id)
 
 
