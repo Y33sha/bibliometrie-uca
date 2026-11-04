@@ -4,6 +4,7 @@ Le retrait des enregistrements sources disparus précède le nettoyage des infor
 """
 
 import dataclasses
+from types import SimpleNamespace
 
 import pytest
 
@@ -11,6 +12,7 @@ from domain.sources.registry import SOURCE_PRIORITY, Source
 from pipeline.ingestion.common import normalize
 from pipeline.ingestion.common.normalizer import NormalizeStats
 from pipeline.phases import PHASES
+from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.task_runner import run_phase
 
 _NORMALIZE = next(phase for phase in PHASES if phase.name == "normalize")
@@ -30,20 +32,25 @@ def lancer(contexte, monkeypatch):
         def appel(nom: str, valeur):
             return lambda *_args: (appels.append(nom), valeur)[1]
 
+        def normaliseur(source, _conn, _logger, *, archive):
+            return SimpleNamespace(run=appel(f"normalize:{source}", bilan))
+
+        monkeypatch.setattr(normalize, "build_normalizer", normaliseur)
         monkeypatch.setattr(
-            normalize,
-            "_normalize_one",
-            lambda _ctx, source: (appels.append(f"normalize:{source}"), bilan)[1],
+            normalize, "delete_disappeared_source_records", appel("prune", disparues)
         )
-        monkeypatch.setattr(normalize, "_run_prune_disappeared", appel("prune", disparues))
-        monkeypatch.setattr(
-            normalize, "_run_cleanup_orphan_contributor_information", appel("cleanup", 0)
-        )
-        monkeypatch.setattr(
-            normalize, "_run_cleanup_orphan_addresses", appel("cleanup_addresses", 0)
+        nettoyages = {
+            "cleanup_orphan_contributor_information": appel("cleanup", PhaseMetrics()),
+            "cleanup_orphan_addresses": appel("cleanup_addresses", PhaseMetrics()),
+        }
+        phase = dataclasses.replace(
+            _NORMALIZE,
+            tasks=tuple(
+                dataclasses.replace(t, run=nettoyages.get(t.name, t.run)) for t in _NORMALIZE.tasks
+            ),
         )
         ctx = contexte(**{"mode": "daily", "sources": {"hal"}, **options})
-        return run_phase(_NORMALIZE, dataclasses.replace(ctx, maintain=appels.append))
+        return run_phase(phase, dataclasses.replace(ctx, maintain=appels.append))
 
     return _lancer
 

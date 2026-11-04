@@ -6,7 +6,7 @@ import logging
 from sqlalchemy import Connection, text
 
 from infrastructure.db.queues import Queue
-from pipeline.ingestion.common.normalize import normalizer_builders
+from pipeline.ingestion.common.normalize import build_normalizer
 from pipeline.ingestion.common.staging import StagingStore
 from tests.integration.helpers.queues import mark
 
@@ -89,7 +89,7 @@ def insert_failed_lookup(
 
 def normalize_pending(conn: Connection, source: str) -> int:
     """Normalise les lignes de `source` en file, avec le normaliseur de la phase, dans la transaction du test, puis les retire de la file. Renvoie le nombre d'enregistrements sources normalisés."""
-    normalizer = normalizer_builders(archive=False)[source](conn, logging.getLogger("test"))
+    normalizer = build_normalizer(source, conn, logging.getLogger("test"), archive=False)
     store = StagingStore(conn)
     ids = store.snapshot_pending(source)
     normalized = sum(1 for row in store.fetch_staging_by_ids(ids) if normalizer.process_work(row))

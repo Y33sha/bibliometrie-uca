@@ -7,7 +7,7 @@ from domain.sources.registry import (
     Source,
 )
 from pipeline.graph import Task, dependencies, order_violations
-from pipeline.ingestion.common.normalize import normalizer_builders
+from pipeline.ingestion.adapters import ADAPTERS
 from pipeline.phases import ALL_TASKS, PHASES
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
@@ -41,7 +41,7 @@ def test_une_tache_de_recherche_par_doi_par_source_interrogeable():
 def test_normalisation_dans_l_ordre_de_priorite_des_sources():
     normalize_tasks = [name for name in _names("normalize") if name in set(SOURCE_PRIORITY)]
     assert normalize_tasks == [s.value for s in SOURCE_PRIORITY]
-    assert set(normalizer_builders(archive=False)) == {s.value for s in SOURCE_PRIORITY}
+    assert set(ADAPTERS) == set(SOURCE_PRIORITY)
 
 
 def test_aucune_tache_ne_lit_une_donnee_ecrite_apres_elle():

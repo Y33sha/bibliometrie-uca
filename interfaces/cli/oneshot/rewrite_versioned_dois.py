@@ -29,7 +29,7 @@ from infrastructure.observability.log import setup_logger
 from infrastructure.raw_store import UnreadablePayloadError, get_raw_store
 from infrastructure.raw_store.base import RawStore
 from pipeline.ingestion.common.adapter import RecordIdentity
-from pipeline.ingestion.common.normalize import normalizer_builders
+from pipeline.ingestion.common.normalize import build_normalizer
 from pipeline.ingestion.common.normalizer import SourceNormalizer
 from pipeline.ingestion.common.source_records import normalized_identifiers
 from pipeline.ingestion.common.staging import StagingRow
@@ -203,7 +203,7 @@ def _rewrite_source(conn: Connection, source: str, *, dry_run: bool) -> None:
         conn,
         source,
         dry_run,
-        normalizer_builders(archive=False)[source](conn, log),
+        build_normalizer(source, conn, log, archive=False),
         get_raw_store(),
         _IDENTIFY.get(source),
     )

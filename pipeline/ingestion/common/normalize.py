@@ -20,11 +20,10 @@ from typing import cast
 
 from sqlalchemy import Connection
 
-from domain.sources.registry import SOURCE_PRIORITY, source_label
+from domain.sources.registry import SOURCE_PRIORITY, Source, source_label
 from infrastructure.raw_store import NullRawStore, get_raw_store
 from pipeline.graph import Task, TaskRun
 from pipeline.ingestion.adapters import ADAPTERS
-from pipeline.ingestion.common.adapter import SourceAdapter
 from pipeline.ingestion.common.embargoes import EmbargoStore
 from pipeline.ingestion.common.locations import LocationStore
 from pipeline.ingestion.common.normalizer import (
@@ -51,18 +50,33 @@ from pipeline.runtime.observability.log_format import (
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
 
-def _normalize_one(ctx: PhaseContext, source: str) -> NormalizeStats:
-    """Normalise une source. Avec `--normalize-full`, marque d'abord tous ses enregistrements sources à resynchroniser. Avec `--raw-store`, archive les payloads."""
-    if ctx.options.normalize_full:
-        _run_mark_source_contributions_to_resync(ctx, source)
-    return _run_normalize(ctx, normalizer_builders(archive=ctx.options.raw_store)[source])
+def build_normalizer(
+    source: str, conn: Connection, logger: logging.Logger, *, archive: bool = True
+) -> SourceNormalizer:
+    """Renvoie le normaliseur de `source`, sur les stores de la phase. Avec `archive`, il archive les payloads dans le raw store."""
+    raw_store = get_raw_store() if archive else NullRawStore()
+    return ADAPTERS[Source(source)].normalizer()(
+        conn,
+        logger,
+        StagingStore(conn, raw_store),
+        SourceRecordStore(conn),
+        contribution_store=SourceContributionStore(conn),
+        location_store=LocationStore(conn),
+        embargo_store=EmbargoStore(conn),
+        subject_store=SourceRecordSubjectStore(conn),
+    )
 
 
 def _normalize(source: str) -> TaskRun:
-    """Renvoie la tâche `normalize.<source>`, qui normalise la source et garde sa ligne de la table d'observabilité."""
+    """Renvoie l'exécution de la normalisation de `source`, avec sa ligne de la table d'observabilité. Avec `--normalize-full`, tous les enregistrements sources de la source sont d'abord marqués à resynchroniser."""
 
     def run(ctx: PhaseContext) -> PhaseMetrics:
-        stats = _normalize_one(ctx, source)
+        if ctx.options.normalize_full:
+            with ctx.open_tx() as conn:
+                mark_source_contributions_to_resync(conn, source)
+        with ctx.open_tx() as conn:
+            normalizer = build_normalizer(source, conn, ctx.logger, archive=ctx.options.raw_store)
+            stats = normalizer.run()
         metrics = PhaseMetrics()
         metrics.report = _report(stats)
         metrics.details["row"] = {
@@ -76,9 +90,20 @@ def _normalize(source: str) -> TaskRun:
     return run
 
 
+def _report(stats: NormalizeStats) -> str | None:
+    """Renvoie la ligne de bilan d'une source : documents normalisés, erreurs. `None` sans document traité, et la ligne affiche « rien à faire »."""
+    parts = []
+    if stats.processed:
+        parts.append(quantity(stats.processed, "document normalisé", "documents normalisés"))
+    if stats.errors:
+        parts.append(quantity(stats.errors, "erreur"))
+    return ", ".join(parts) or None
+
+
 def _prune(ctx: PhaseContext) -> PhaseMetrics:
     """Supprime les enregistrements sources des documents disparus de leur source, et ferme la section de normalisation."""
-    disappeared = _run_prune_disappeared(ctx)
+    with ctx.open_tx() as conn:
+        disappeared = delete_disappeared_source_records(conn)
     if disappeared:
         ctx.logger.info(
             "%s%s (disparus de leur source)",
@@ -90,81 +115,18 @@ def _prune(ctx: PhaseContext) -> PhaseMetrics:
     return PhaseMetrics(extras={"disappeared": disappeared})
 
 
-def _cleanup_contributor_information(ctx: PhaseContext) -> PhaseMetrics:
-    deleted = _run_cleanup_orphan_contributor_information(ctx)
-    metrics = PhaseMetrics()
-    if deleted:
-        metrics.report = f"{quantity(deleted, 'ligne supprimée', 'lignes supprimées')}"
-    return metrics
+def _cleanup(delete: Callable[[Connection], int], deleted_one: str, deleted_many: str) -> TaskRun:
+    """Renvoie l'exécution d'une suppression de lignes orphelines, avec sa ligne de bilan."""
 
+    def run(ctx: PhaseContext) -> PhaseMetrics:
+        with ctx.open_tx() as conn:
+            deleted = delete(conn)
+        metrics = PhaseMetrics()
+        if deleted:
+            metrics.report = quantity(deleted, deleted_one, deleted_many)
+        return metrics
 
-def _cleanup_addresses(ctx: PhaseContext) -> PhaseMetrics:
-    deleted = _run_cleanup_orphan_addresses(ctx)
-    metrics = PhaseMetrics()
-    if deleted:
-        metrics.report = f"{quantity(deleted, 'adresse supprimée', 'adresses supprimées')}"
-    return metrics
-
-
-def _report(stats: NormalizeStats) -> str | None:
-    """Renvoie la ligne de bilan d'une source : documents normalisés, erreurs. `None` sans document traité, et la ligne affiche « rien à faire »."""
-    parts = []
-    if stats.processed:
-        parts.append(quantity(stats.processed, "document normalisé", "documents normalisés"))
-    if stats.errors:
-        parts.append(quantity(stats.errors, "erreur"))
-    return ", ".join(parts) or None
-
-
-type NormalizerFactory = Callable[[Connection, logging.Logger], SourceNormalizer]
-
-
-def _run_mark_source_contributions_to_resync(ctx: PhaseContext, source: str) -> None:
-    with ctx.open_tx() as conn:
-        mark_source_contributions_to_resync(conn, source)
-
-
-def _run_prune_disappeared(ctx: PhaseContext) -> int:
-    with ctx.open_tx() as conn:
-        return delete_disappeared_source_records(conn)
-
-
-def _run_cleanup_orphan_contributor_information(ctx: PhaseContext) -> int:
-    with ctx.open_tx() as conn:
-        return delete_orphan_contributor_information(conn)
-
-
-def _run_cleanup_orphan_addresses(ctx: PhaseContext) -> int:
-    with ctx.open_tx() as conn:
-        return delete_orphan_addresses(conn)
-
-
-def normalizer_builders(*, archive: bool = True) -> dict[str, NormalizerFactory]:
-    """Renvoie le constructeur du normaliseur de chaque source, sur les stores de la phase."""
-
-    raw_store = get_raw_store() if archive else NullRawStore()
-
-    def builder(adapter: SourceAdapter) -> NormalizerFactory:
-        def build(conn: Connection, logger: logging.Logger) -> SourceNormalizer:
-            return adapter.normalizer()(
-                conn,
-                logger,
-                StagingStore(conn, raw_store),
-                SourceRecordStore(conn),
-                contribution_store=SourceContributionStore(conn),
-                location_store=LocationStore(conn),
-                embargo_store=EmbargoStore(conn),
-                subject_store=SourceRecordSubjectStore(conn),
-            )
-
-        return build
-
-    return {source.value: builder(adapter) for source, adapter in ADAPTERS.items()}
-
-
-def _run_normalize(ctx: PhaseContext, build: NormalizerFactory) -> NormalizeStats:
-    with ctx.open_tx() as conn:
-        return build(conn, ctx.logger).run()
+    return run
 
 
 TASKS = (
@@ -266,7 +228,7 @@ TASKS = (
         reads=("source_contributions.contributor_information_id", "contributor_information.id"),
         writes=("contributor_information.id",),
         previous_run=("source_contributions",),
-        run=_cleanup_contributor_information,
+        run=_cleanup(delete_orphan_contributor_information, "ligne supprimée", "lignes supprimées"),
         section="Maintenance des tables",
         label="Informations du contributeur orphelines",
     ),
@@ -277,7 +239,7 @@ TASKS = (
         writes=("addresses.id", "address_structures"),
         # La normalisation vide `staging.raw_data`. `VACUUM FULL` en mode full.
         maintenance=("VACUUM staging",),
-        run=_cleanup_addresses,
+        run=_cleanup(delete_orphan_addresses, "adresse supprimée", "adresses supprimées"),
         section="Maintenance des tables",
         label="Adresses orphelines",
     ),

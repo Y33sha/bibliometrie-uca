@@ -1,4 +1,4 @@
-"""Phase `fetch_truncated` : nouvelle lecture des works OpenAlex à liste d'auteurs peut-être tronquée. Tâche `fetch_truncated.refetch_openalex`.
+"""Phase `fetch_truncated` : nouvelle lecture des works OpenAlex à liste d'auteurs peut-être tronquée.
 
 Une réponse de liste d'OpenAlex plafonne les auteurs d'un work à `BULK_AUTHORSHIPS_CAP`. Le moissonnage marque `staging.authors_truncated` les works au plafond. La phase les relit un par un par `/works/{id}`, avec tous les auteurs.
 
@@ -35,7 +35,7 @@ _SELECT_TRUNCATED_SQL = text(
     ORDER BY id
     """
 )
-"""Le marqueur posé au moissonnage survit à la normalisation, qui vide `raw_data` : la sélection ne dépend ni de l'ordre des phases ni du comptage des auteurs."""
+"""Le marqueur posé au moissonnage survit à la normalisation, qui vide `raw_data`."""
 
 
 def _refetch(ctx: PhaseContext) -> PhaseMetrics:
@@ -92,7 +92,7 @@ TASKS = (
         network="openalex",
         run=_refetch,
         label="Bilan",
-        # La tâche tourne dans tous les modes, si OpenAlex fait partie des sources du run.
-        when=lambda ctx: "openalex" in ctx.options.sources,
+        # La tâche tourne dans tous les modes, si le run interroge OpenAlex.
+        when=lambda ctx: "openalex" in ctx.options.queried_sources,
     ),
 )

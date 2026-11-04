@@ -20,7 +20,7 @@ from domain.sources.registry import SOURCE_PRIORITY
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.raw_store import UnreadablePayloadError, get_raw_store
-from pipeline.ingestion.common.normalize import normalizer_builders
+from pipeline.ingestion.common.normalize import build_normalizer
 from pipeline.ingestion.common.source_records import normalized_identifiers, replace_identifiers
 from pipeline.ingestion.common.staging import StagingRow
 
@@ -51,7 +51,7 @@ def _fill_source(conn: Connection, source: str) -> None:
         log.warning(
             "%s : %d enregistrements sources sans ligne de staging, ignorés", source, unstaged
         )
-    normalizer = normalizer_builders(archive=False)[source](conn, log)
+    normalizer = build_normalizer(source, conn, log, archive=False)
     store = get_raw_store()
     written = missing = refused = seen = 0
     after = 0
