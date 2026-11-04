@@ -23,7 +23,7 @@ from sqlalchemy import Connection
 from domain.sources.registry import SOURCE_PRIORITY, Source, source_label
 from infrastructure.raw_store import NullRawStore, get_raw_store
 from pipeline.graph import Task, TaskRun
-from pipeline.ingestion.adapters import ADAPTERS
+from pipeline.ingestion.adapters import adapter
 from pipeline.ingestion.common.embargoes import EmbargoStore
 from pipeline.ingestion.common.locations import LocationStore
 from pipeline.ingestion.common.normalizer import (
@@ -55,7 +55,7 @@ def build_normalizer(
 ) -> SourceNormalizer:
     """Renvoie le normaliseur de `source`, sur les stores de la phase. Avec `archive`, il archive les payloads dans le raw store."""
     raw_store = get_raw_store() if archive else NullRawStore()
-    return ADAPTERS[Source(source)].normalizer()(
+    return adapter(Source(source)).normalizer(
         conn,
         logger,
         StagingStore(conn, raw_store),

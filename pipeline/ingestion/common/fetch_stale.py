@@ -20,7 +20,7 @@ from collections.abc import Mapping
 from domain.config import ConfigKey
 from domain.sources.registry import Source, source_label
 from pipeline.graph import Task
-from pipeline.ingestion.adapters import ADAPTERS
+from pipeline.ingestion.adapters import adapter
 from pipeline.ingestion.common.stale_refetch import refresh
 from pipeline.runtime.config import delay, window_years
 from pipeline.runtime.context import PhaseContext
@@ -36,7 +36,7 @@ def _years(ctx: PhaseContext) -> list[int] | None:
 
 def _run_fetch_stale(ctx: PhaseContext, target: str, years: list[int] | None) -> PhaseMetrics:
     """Relit les documents anciens d'une source, sur sa propre connexion."""
-    fetch_one = ADAPTERS[Source(target)].fetch_by_native_id
+    fetch_one = adapter(Source(target)).fetch_by_native_id
     with ctx.open_tx() as conn:
         after_days = delay(conn, ConfigKey.FETCH_STALE_AFTER_DAYS)
         return asyncio.run(

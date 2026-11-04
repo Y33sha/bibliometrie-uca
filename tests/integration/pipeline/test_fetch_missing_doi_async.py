@@ -15,7 +15,7 @@ import pytest
 
 from domain.sources.registry import Source
 from pipeline.http.lookup import UNAVAILABLE
-from pipeline.ingestion.adapters import ADAPTERS
+from pipeline.ingestion.adapters import adapter
 from pipeline.ingestion.api_params import API_BASE_URLS
 from pipeline.ingestion.common import doi_search, lookup
 from pipeline.ingestion.common.doi_search import DoiSearch, fetch_missing_doi
@@ -27,9 +27,9 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 
 def _search(source: Source) -> DoiSearch:
     """Renvoie la recherche par DOI de l'adaptateur de `source`."""
-    doi_search = ADAPTERS[source].doi_search
-    assert doi_search is not None
-    return doi_search()
+    search = adapter(source).doi_search
+    assert search is not None
+    return search
 
 
 class _FakeAdapter:

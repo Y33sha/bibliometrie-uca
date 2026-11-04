@@ -33,8 +33,8 @@ from pipeline.ingestion.common.normalize import build_normalizer
 from pipeline.ingestion.common.normalizer import SourceNormalizer
 from pipeline.ingestion.common.source_records import normalized_identifiers
 from pipeline.ingestion.common.staging import StagingRow
-from pipeline.ingestion.crossref import ADAPTER as CROSSREF
-from pipeline.ingestion.datacite import ADAPTER as DATACITE
+from pipeline.ingestion.crossref import READER as CROSSREF
+from pipeline.ingestion.datacite import READER as DATACITE
 
 log = setup_logger("rewrite_versioned_dois", os.path.dirname(__file__))
 

@@ -1,86 +1,25 @@
-"""Source OpenAlex : moissonnage, paramètres de requête, champs des works."""
+"""Source OpenAlex : moissonnage, paramètres de requête, champs des works.
 
-from __future__ import annotations
+Ce module donne la lecture des documents reçus de la source (`READER`). L'adaptateur de la source est dans `adapter.py`.
+"""
 
-import logging
 from collections.abc import Mapping
-from typing import TYPE_CHECKING
 
 from domain.sources.registry import Source
 from domain.types import JsonValue
-from pipeline.ingestion.common.adapter import RecordIdentity, SourceAdapter
-
-if TYPE_CHECKING:
-    import httpx2
-    from sqlalchemy import Connection
-
-    from pipeline.ingestion.common.doi_search import DoiSearch
-    from pipeline.ingestion.common.harvester import Harvester
-    from pipeline.ingestion.common.normalizer import SourceNormalizer
-    from pipeline.ingestion.common.stale_refetch import FetchOutcome
-    from pipeline.ingestion.openalex.api import OpenalexClient
-
-
-def _client() -> OpenalexClient:
-    from pipeline.ingestion.api_params import API_BASE_URLS
-    from pipeline.ingestion.openalex.api import OpenalexClient
-
-    return OpenalexClient(API_BASE_URLS["openalex"])
-
-
-def _harvester(conn: Connection, logger: logging.Logger) -> Harvester:
-    from pipeline.ingestion.openalex.harvest import OpenalexHarvester
-
-    return OpenalexHarvester(conn, logger, _client())
-
-
-def _person_harvester(conn: Connection, logger: logging.Logger) -> Harvester:
-    from pipeline.ingestion.openalex.person_search import OpenalexPersonHarvester
-
-    return OpenalexPersonHarvester(conn, logger, _client())
-
-
-def _doi_search() -> DoiSearch:
-    from pipeline.ingestion.common.doi_search import DoiSearch
-    from pipeline.ingestion.common.lookup import one_at_a_time
-    from pipeline.ingestion.openalex.api import search_doi
-
-    return DoiSearch(one_at_a_time(search_doi))
-
-
-async def _fetch_by_native_id(client: httpx2.AsyncClient, source_id: str) -> FetchOutcome:
-    from pipeline.ingestion.openalex.api import fetch_work
-
-    return await fetch_work(client, source_id)
-
-
-def _normalizer() -> type[SourceNormalizer]:
-    from pipeline.ingestion.openalex.normalize import OpenalexNormalizer
-
-    return OpenalexNormalizer
+from pipeline.ingestion.common.adapter import PayloadReader, RecordIdentity
+from pipeline.ingestion.openalex.fields import extract_doi, extract_openalex_id
+from pipeline.ingestion.openalex.payload import authors_may_be_truncated
 
 
 def _identify(record: Mapping[str, JsonValue]) -> RecordIdentity | None:
-    from pipeline.ingestion.openalex.fields import extract_doi, extract_openalex_id
-
     if not record.get("id"):
         return None
     return RecordIdentity.of(extract_openalex_id(record), extract_doi(record))
 
 
-def _authors_truncated(record: Mapping[str, JsonValue]) -> bool:
-    from pipeline.ingestion.openalex.payload import authors_may_be_truncated
-
-    return authors_may_be_truncated(record)
-
-
-ADAPTER = SourceAdapter(
+READER = PayloadReader(
     source=Source.OPENALEX,
     identify=_identify,
-    fetch_by_native_id=_fetch_by_native_id,
-    normalizer=_normalizer,
-    harvester=_harvester,
-    person_harvester=_person_harvester,
-    doi_search=_doi_search,
-    authors_truncated=_authors_truncated,
+    authors_truncated=authors_may_be_truncated,
 )

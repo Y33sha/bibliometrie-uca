@@ -20,7 +20,6 @@ from domain.sources.registry import PROFILES, Source
 from domain.sources.staging import StagingEntryMode
 from domain.types import JsonValue
 from pipeline.http.circuit_breaker import SourceUnavailableError, trip_source
-from pipeline.ingestion.adapters import ADAPTERS
 from pipeline.ingestion.common.harvester import (
     HarvestConfigError,
     HarvestWindow,
@@ -28,6 +27,7 @@ from pipeline.ingestion.common.harvester import (
     stage_pages,
 )
 from pipeline.ingestion.common.pages import Page
+from pipeline.ingestion.payload_readers import payload_reader
 from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import Progress
@@ -135,7 +135,7 @@ class PersonSearchHarvester[ClientT](SourceHarvester[ClientT]):
         source = Source(self.SOURCE)
 
         def keep(record: Mapping[str, JsonValue]) -> bool:
-            identity = ADAPTERS[source].identify(record)
+            identity = payload_reader(source).identify(record)
             if identity is None or identity.source_id in seen:
                 return False
             seen.add(identity.source_id)

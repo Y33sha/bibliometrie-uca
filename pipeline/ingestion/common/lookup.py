@@ -18,9 +18,9 @@ from domain.types import JsonValue
 from pipeline.http.circuit_breaker import source_tripped
 from pipeline.http.fetch_pool import run_fetch_pool
 from pipeline.http.lookup import UNAVAILABLE, LookupOutcome, NotFound, Unavailable
-from pipeline.ingestion.adapters import ADAPTERS
 from pipeline.ingestion.api_params import MAX_CONCURRENT
 from pipeline.ingestion.common.staging import StagingStore, UpsertOutcome
+from pipeline.ingestion.payload_readers import payload_reader
 from pipeline.runtime.observability.log_format import source_branch
 from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -86,7 +86,7 @@ def by_native_id(
         if isinstance(result, Unavailable) or not result.records:
             return result
         (source_id,), (record,) = keys, result.records
-        identity = ADAPTERS[Source(source)].identify(record)
+        identity = payload_reader(Source(source)).identify(record)
         if identity is None or identity.source_id == source_id:
             return result
         return LookupBatch(records=result.records, absent=[source_id])
