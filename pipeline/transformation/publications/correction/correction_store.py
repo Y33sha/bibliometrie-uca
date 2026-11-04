@@ -6,7 +6,7 @@ La phase écrit sur les enregistrements sources les valeurs corrigées par les r
 import json
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import fields
-from typing import NamedTuple
+from typing import NamedTuple, cast
 
 from sqlalchemy import Connection, Row, bindparam, func, text
 
@@ -47,7 +47,7 @@ from domain.source_records.source_extras import SourceExtra
 from domain.sources.registry import DOI_ORG, Source
 from domain.types import JsonValue
 from infrastructure.db.doi_targets import unversioned_doi_sql
-from infrastructure.db.queues import Queue, enqueue
+from infrastructure.db.queues import Queue, enqueue, enqueue_ids
 from infrastructure.db.rows import rows_as
 from infrastructure.db.source_record_identifiers import (
     fetch_identifiers,
@@ -282,12 +282,7 @@ def _persist_updates(conn: Connection, updates: Sequence[Mapping[str, object]]) 
         {"source_record_id": u["id"], **{k: v for k, v in u.items() if k != "id"}} for u in updates
     ]
     conn.execute(_UPDATE, params)
-    enqueue(
-        conn,
-        Queue.SOURCE_RECORD_KEYS,
-        "SELECT unnest(CAST(:ids AS integer[]))",
-        {"ids": [u["id"] for u in updates]},
-    )
+    enqueue_ids(conn, Queue.SOURCE_RECORD_KEYS, [cast("int", u["id"]) for u in updates])
     return len(updates)
 
 

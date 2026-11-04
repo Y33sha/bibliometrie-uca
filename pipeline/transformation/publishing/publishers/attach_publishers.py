@@ -16,7 +16,7 @@ from domain.publishers.attachment import (
     attach_publishers,
 )
 from domain.publishers.attribution import source_record_has_publisher
-from infrastructure.db.queues import Queue, enqueue
+from infrastructure.db.queues import Queue, enqueue_ids
 from pipeline.runtime.observability.log_format import quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publishing.publishers.store import PublisherStore
@@ -101,12 +101,7 @@ def run_attach_publishers(conn: Connection, logger: logging.Logger) -> PhaseMetr
     ]
     if changed:
         conn.execute(_SET_PUBLISHERS, {"rows": json.dumps(changed)})
-        enqueue(
-            conn,
-            Queue.SOURCE_RECORD_KEYS,
-            "SELECT unnest(CAST(:ids AS integer[]))",
-            {"ids": [row["id"] for row in changed]},
-        )
+        enqueue_ids(conn, Queue.SOURCE_RECORD_KEYS, [row["id"] for row in changed])
     detached = sum(row["publisher_id"] is None for row in changed)
     metrics = PhaseMetrics()
     metrics.add(

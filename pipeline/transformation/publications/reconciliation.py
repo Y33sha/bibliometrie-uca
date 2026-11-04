@@ -39,7 +39,7 @@ from domain.source_records.keys import (
     project_confirmation_keys,
 )
 from infrastructure.db.doi_targets import doi_or_target_sql, fetch_doi_targets
-from infrastructure.db.queues import Queue, delete_processed, enqueue, snapshot
+from infrastructure.db.queues import Queue, delete_processed, enqueue, enqueue_ids, snapshot
 from infrastructure.db.scalars import scalar_int
 from infrastructure.db.source_record_identifiers import (
     first_of_its_type_sql,
@@ -327,12 +327,7 @@ def mark_publications_for_grouping(conn: Connection, publication_ids: list[int])
     """Marque ces publications pour l'alignement des auteurs. Renvoie le nombre de publications marquées."""
     if not publication_ids:
         return 0
-    return enqueue(
-        conn,
-        Queue.PUBLICATION_CONTRIBUTIONS,
-        "SELECT unnest(CAST(:ids AS integer[]))",
-        {"ids": publication_ids},
-    )
+    return enqueue_ids(conn, Queue.PUBLICATION_CONTRIBUTIONS, publication_ids)
 
 
 def _member(row: ReconcileRow, doi_targets: dict[str, str]) -> ReconcileMember:

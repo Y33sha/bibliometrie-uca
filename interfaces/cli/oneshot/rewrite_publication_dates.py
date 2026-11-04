@@ -18,7 +18,7 @@ from sqlalchemy import Connection, text
 
 from domain.sources.registry import SOURCE_PRIORITY
 from infrastructure.db.engine import get_sync_engine
-from infrastructure.db.queues import Queue, enqueue
+from infrastructure.db.queues import Queue, enqueue_ids
 from infrastructure.observability.log import setup_logger
 from infrastructure.raw_store import UnreadablePayloadError, get_raw_store
 from pipeline.ingestion.common.normalize import build_normalizer
@@ -92,12 +92,7 @@ def _rewrite_source(conn: Connection, source: str, *, dry_run: bool) -> None:
         if changed and not dry_run:
             conn.execute(_WRITE, {"rows": json.dumps(changed)})
             if year_changed:
-                enqueue(
-                    conn,
-                    Queue.SOURCE_RECORD_KEYS,
-                    "SELECT unnest(CAST(:ids AS integer[]))",
-                    {"ids": year_changed},
-                )
+                enqueue_ids(conn, Queue.SOURCE_RECORD_KEYS, year_changed)
             conn.commit()
         after = rows[-1].id
         counts["traités"] += len(rows)

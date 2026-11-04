@@ -33,7 +33,7 @@ from domain.serials.containers import SeriesDescription
 from domain.serials.serial import ManualField
 from domain.source_records.biblio import journal_series
 from domain.source_records.corrections import RAW, CorrectionKey
-from infrastructure.db.queues import Queue, enqueue
+from infrastructure.db.queues import Queue, enqueue_ids
 from pipeline.runtime.observability.log_format import quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publishing.serials.serial_merge import merge_serial_into
@@ -390,9 +390,7 @@ def _write_attachment(
                 )
             },
         )
-        enqueue(
-            conn, Queue.SOURCE_RECORD_KEYS, "SELECT unnest(CAST(:ids AS integer[]))", {"ids": ids}
-        )
+        enqueue_ids(conn, Queue.SOURCE_RECORD_KEYS, ids)
     return [m.id for m in changed], received
 
 

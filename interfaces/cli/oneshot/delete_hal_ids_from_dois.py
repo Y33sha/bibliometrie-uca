@@ -16,7 +16,7 @@ from sqlalchemy import Connection, text
 
 from domain.source_records.identifiers import SourceIdentifierType
 from infrastructure.db.engine import get_sync_engine
-from infrastructure.db.queues import Queue, enqueue
+from infrastructure.db.queues import Queue, enqueue_ids
 from infrastructure.observability.log import setup_logger
 
 log = setup_logger("delete_hal_ids_from_dois", os.path.dirname(__file__))
@@ -71,12 +71,7 @@ def main() -> int:
             _DELETE_SQL,
             {"records": [r for r, _ in targets], "values": [v for _, v in targets]},
         ).rowcount
-        marked = enqueue(
-            conn,
-            Queue.SOURCE_RECORD_KEYS,
-            "SELECT unnest(CAST(:ids AS integer[]))",
-            {"ids": records},
-        )
+        marked = enqueue_ids(conn, Queue.SOURCE_RECORD_KEYS, records)
     log.info(
         "Supprimés : %d identifiants HAL ; %d enregistrements sources marqués", deleted, marked
     )

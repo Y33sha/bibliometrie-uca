@@ -25,7 +25,7 @@ from domain.source_records.identifiers import (
     normalize_identifiers,
 )
 from infrastructure.db.engine import get_sync_engine
-from infrastructure.db.queues import Queue, enqueue
+from infrastructure.db.queues import Queue, enqueue_ids
 from infrastructure.observability.log import setup_logger
 from pipeline.ingestion.scanr.payload import scanr_derived_identifier
 
@@ -103,12 +103,7 @@ def restore_identifiers(conn: Connection, *, dry_run: bool = False) -> Counter[s
         )
     if restored and not dry_run:
         conn.execute(_INSERT, {"rows": json.dumps(restored)})
-        enqueue(
-            conn,
-            Queue.SOURCE_RECORD_KEYS,
-            "SELECT unnest(CAST(:ids AS integer[]))",
-            {"ids": [row["source_record_id"] for row in restored]},
-        )
+        enqueue_ids(conn, Queue.SOURCE_RECORD_KEYS, [row["source_record_id"] for row in restored])
     return counts
 
 

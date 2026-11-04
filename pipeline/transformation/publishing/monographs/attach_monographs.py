@@ -11,7 +11,7 @@ from sqlalchemy import Connection, text
 from domain.monographs.attachment import Volume, VolumeRecord, group_volumes
 from domain.normalize import normalize_text
 from domain.source_records.biblio import monograph_volume
-from infrastructure.db.queues import Queue, enqueue
+from infrastructure.db.queues import Queue, enqueue_ids
 from pipeline.runtime.observability.log_format import quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publishing.monographs.monograph_merge import merge_monograph_into
@@ -102,12 +102,7 @@ def run_attach_monographs(conn: Connection, logger: logging.Logger) -> PhaseMetr
     ]
     if changed:
         conn.execute(_SET_MONOGRAPHS, {"rows": json.dumps(changed)})
-        enqueue(
-            conn,
-            Queue.SOURCE_RECORD_KEYS,
-            "SELECT unnest(CAST(:ids AS integer[]))",
-            {"ids": [row["id"] for row in changed]},
-        )
+        enqueue_ids(conn, Queue.SOURCE_RECORD_KEYS, [row["id"] for row in changed])
     detached = sum(row["monograph_id"] is None for row in changed)
     metrics = PhaseMetrics()
     metrics.add(
