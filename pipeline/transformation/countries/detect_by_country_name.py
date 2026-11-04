@@ -8,7 +8,7 @@ import logging
 from sqlalchemy import Connection
 
 from domain.addresses.country_detection import CountryDetectionMethod
-from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, quantity, step
+from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.countries.place_names import load_country_names
 from pipeline.transformation.countries.store import CountryCandidatesStore
@@ -19,7 +19,6 @@ def run(conn: Connection, logger: logging.Logger) -> PhaseMetrics:
 
     `seen` = adresses examinées, `new` = adresses qui reçoivent un candidat, `extras["unmatched"]` = adresses sans nom de pays final.
     """
-    step(logger, "Pays des adresses d'après le nom de pays qui les termine")
     store = CountryCandidatesStore(conn)
     country_names = load_country_names(conn)
 

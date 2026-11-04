@@ -15,11 +15,12 @@ Une contribution source est à recalculer quand elle est dans la file `source_co
 
 import logging
 import time
+from collections.abc import Callable
 
 from sqlalchemy import Connection, text
 
 from infrastructure.db.queues import Queue, delete_processed, snapshot
-from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, quantity, step
+from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, quantity
 from pipeline.runtime.observability.progress import track_progress, waiting
 from pipeline.transformation.countries.resolution import resolve_address_countries
 
@@ -224,9 +225,28 @@ def _refresh_source_contributions_in_batches(
     return updated
 
 
+def _timed_refresh(
+    conn: Connection,
+    logger: logging.Logger,
+    refresh_step: Callable[[Connection], int],
+    *,
+    branch: str,
+    label: str,
+    singular: str,
+    plural: str,
+) -> int:
+    """Joue un recalcul de cache avec sa ligne de journal, en cours puis avec son nombre de lignes modifiées et sa durée. Renvoie ce nombre."""
+    t0 = time.perf_counter()
+    with waiting(f"{branch}{label} : en cours", logger) as line:
+        updated = refresh_step(conn)
+        line.conclude(
+            f"{branch}{quantity(updated, singular, plural)} en {time.perf_counter() - t0:.1f} s"
+        )
+    return updated
+
+
 def refresh(conn: Connection, logger: logging.Logger) -> int:
     """Recalcule les caches pays (source_contributions → source_records → publications) des contributions sources à recalculer, puis supprime les marquages traités. Renvoie le nombre de publications mises à jour. Chaque recalcul a sa ligne de journal, avec son nombre de lignes et sa durée."""
-    step(logger, "Rafraîchissement des pays associés aux publications")
     with waiting(f"{BRANCH}contributions sources à recalculer : en cours", logger) as line:
         total = create_dirty_scope(conn)
         line.conclude(
@@ -240,31 +260,27 @@ def refresh(conn: Connection, logger: logging.Logger) -> int:
         quantity(updated, "contribution source mise à jour", "contributions sources mises à jour"),
         time.perf_counter() - t0,
     )
-    for branch, label, singular, plural, refresh_step in (
-        (
-            BRANCH,
-            "enregistrements sources",
-            "enregistrement source mis à jour",
-            "enregistrements sources mis à jour",
-            refresh_source_record_countries,
-        ),
-        (
-            LAST_BRANCH,
-            "publications",
-            "publication mise à jour",
-            "publications mises à jour",
-            refresh_publication_countries,
-        ),
-    ):
-        t0 = time.perf_counter()
-        with waiting(f"{branch}{label} : en cours", logger) as line:
-            updated = refresh_step(conn)
-            line.conclude(
-                f"{branch}{quantity(updated, singular, plural)} en {time.perf_counter() - t0:.1f} s"
-            )
+    _timed_refresh(
+        conn,
+        logger,
+        refresh_source_record_countries,
+        branch=BRANCH,
+        label="enregistrements sources",
+        singular="enregistrement source mis à jour",
+        plural="enregistrements sources mis à jour",
+    )
+    publications = _timed_refresh(
+        conn,
+        logger,
+        refresh_publication_countries,
+        branch=LAST_BRANCH,
+        label="publications",
+        singular="publication mise à jour",
+        plural="publications mises à jour",
+    )
     delete_processed_marks(conn)
     drop_dirty_scope(conn)
-    return updated
+    return publications
 
 
 class CountryRecompute:
