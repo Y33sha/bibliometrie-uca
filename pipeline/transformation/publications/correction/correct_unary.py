@@ -38,28 +38,21 @@ def compute_updates(
     """
     updates: list[CorrectionUpdate] = []
     for row in rows:
-        origin = (
-            hal_rows.get(hal_id)
-            if row.facts.source == "scanr"
-            and (hal_id := extract_hal_id_from_scanr_id(row.source_id))
-            else None
-        )
+        origin = hal_rows.get(hal_id) if (hal_id := _hal_origin_id(row)) else None
         origin_doc_type = corrected_doc_type(origin.facts, origin.corrections) if origin else None
         if (update := compute_update(row, origin_doc_type, missing_hal_ids)) is not None:
             updates.append(update)
     return updates
 
 
+def _hal_origin_id(row: UnaryCorrectionRow) -> str | None:
+    """Renvoie l'identifiant du dépôt HAL d'origine d'un enregistrement source ScanR, `None` pour une autre source."""
+    return extract_hal_id_from_scanr_id(row.source_id) if row.facts.source == "scanr" else None
+
+
 def hal_origin_ids(rows: list[UnaryCorrectionRow]) -> list[str]:
     """Renvoie les identifiants des dépôts HAL d'origine des enregistrements sources ScanR."""
-    return sorted(
-        {
-            hal_id
-            for row in rows
-            if row.facts.source == "scanr"
-            and (hal_id := extract_hal_id_from_scanr_id(row.source_id))
-        }
-    )
+    return sorted({hal_id for row in rows if (hal_id := _hal_origin_id(row))})
 
 
 def compute_update(
