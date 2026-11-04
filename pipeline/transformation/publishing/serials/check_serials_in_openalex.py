@@ -1,8 +1,8 @@
-"""Sous-étape de la phase `publishing` : lecture des revues dans OpenAlex.
+"""Sous-étape de la phase `publishing` : métadonnées des revues dans OpenAlex.
 
-Sont lues les revues jamais lues, ou lues depuis plus de `serial_openalex_recheck_after_days` jours. Une revue à ISSN prend la source OpenAlex de ses ISSN, celle qui a le plus de works quand ses ISSN en désignent plusieurs. Une revue sans ISSN prend la source la plus fréquente parmi ses enregistrements sources OpenAlex sans ISSN. La lecture pose l'identifiant OpenAlex de la revue et son type s'il est inconnu. Elle réécrit ses appartenances aux listes de `serial_lists`. Une source retenue par plusieurs revues donne son identifiant à celle qui a le plus de publications, et ses listes à toutes.
+Sont cherchées les métadonnées des revues jamais cherchées, ou cherchées depuis plus de `serial_openalex_recheck_after_days` jours. Une revue à ISSN prend la source OpenAlex de ses ISSN, celle qui a le plus de works quand ses ISSN en désignent plusieurs. Une revue sans ISSN prend la source la plus fréquente parmi ses enregistrements sources OpenAlex sans ISSN. La recherche pose l'identifiant OpenAlex de la revue et son type s'il est inconnu. Elle réécrit ses appartenances aux listes de `serial_lists`. Une source retenue par plusieurs revues donne son identifiant à celle qui a le plus de publications, et ses listes à toutes.
 
-Les requêtes à OpenAlex sont injectées (`pipeline/ingestion/openalex/sources.py`). Les revues d'un lot en échec restent à lire, comme celles des lots suivants quand le circuit-breaker de la source coupe.
+Les requêtes à OpenAlex sont injectées (`pipeline/ingestion/openalex/sources.py`). Les revues d'un lot en échec restent à chercher, comme celles des lots suivants quand le circuit-breaker de la source coupe.
 """
 
 import json
@@ -24,7 +24,7 @@ from pipeline.runtime.observability.log_format import BRANCH, quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import Progress, track_progress
 
-LABEL = "Lecture des revues dans OpenAlex"
+LABEL = "Métadonnées des revues dans OpenAlex"
 """Libellé de la sous-étape dans le journal de la phase."""
 
 FetchSources = Callable[[SourceFilter, Sequence[str]], list[OpenAlexSource] | None]
@@ -33,7 +33,7 @@ FetchSources = Callable[[SourceFilter, Sequence[str]], list[OpenAlexSource] | No
 FetchSourceLists = Callable[[], list[OpenAlexSourceList] | None]
 """Listes de revues d'OpenAlex, `None` si la requête échoue."""
 
-_TO_READ = text("""
+_TO_SEARCH = text("""
     SELECT s.id, s.publication_count,
            coalesce(array_agg(i.issn ORDER BY i.issn) FILTER (WHERE i.issn IS NOT NULL), '{}')
                AS issns
@@ -93,7 +93,7 @@ _INSERT_ENTRIES = text("""
     FROM jsonb_to_recordset(CAST(:rows AS jsonb)) AS t(serial_id integer, list_code text)
 """)
 
-_MARK_READ = text("UPDATE serials SET openalex_checked_at = :at WHERE id = ANY(:ids)")
+_MARK_SEARCHED = text("UPDATE serials SET openalex_checked_at = :at WHERE id = ANY(:ids)")
 
 
 @dataclass(frozen=True, slots=True)
@@ -104,8 +104,8 @@ class _Serial:
 
 
 @dataclass(frozen=True, slots=True)
-class _Reading:
-    """Lecture d'une revue dans OpenAlex."""
+class _Search:
+    """Résultat de la recherche des métadonnées d'une revue dans OpenAlex."""
 
     source_id: str | None
     """Identifiant OpenAlex réclamé par la revue."""
@@ -114,7 +114,7 @@ class _Reading:
     listed_in: frozenset[str]
 
 
-_NOT_FOUND = _Reading(None, None, frozenset())
+_NOT_FOUND = _Search(None, None, frozenset())
 
 
 def run_check_serials_in_openalex(
@@ -125,10 +125,10 @@ def run_check_serials_in_openalex(
     fetch_source_lists: FetchSourceLists,
     recheck_after_days: int,
 ) -> PhaseMetrics:
-    """Lit dans OpenAlex les revues à lire, et met à jour l'organisme, l'URL et l'édition des listes de `serial_lists`."""
+    """Cherche dans OpenAlex les métadonnées des revues à chercher, et met à jour l'organisme, l'URL et l'édition des listes de `serial_lists`."""
     serials = [
         _Serial(r.id, r.publication_count, tuple(r.issns))
-        for r in conn.execute(_TO_READ, {"days": recheck_after_days})
+        for r in conn.execute(_TO_SEARCH, {"days": recheck_after_days})
     ]
     metrics = PhaseMetrics()
     if not serials:
@@ -142,41 +142,32 @@ def run_check_serials_in_openalex(
     with track_progress(
         len(issns) + len(voted_ids), f"{BRANCH}{LABEL}", logger, erase=True
     ) as progress:
-        issn_sources, read_issns = _fetch(fetch_sources, "issn", issns, progress)
-        id_sources, read_ids = _fetch(fetch_sources, "openalex", voted_ids, progress)
+        issn_sources, fetched_issns = _fetch(fetch_sources, "issn", issns, progress)
+        id_sources, fetched_ids = _fetch(fetch_sources, "openalex", voted_ids, progress)
 
     by_issn: dict[str, list[OpenAlexSource]] = {}
     for source in issn_sources:
         for issn in source.issns:
             by_issn.setdefault(issn, []).append(source)
     by_id = {s.id: s for s in id_sources}
-    readings: dict[int, _Reading] = {}
+    searches: dict[int, _Search] = {}
     for serial in serials:
         if serial.issns:
-            if set(serial.issns) <= read_issns:
-                readings[serial.id] = _reading_by_issns(serial.issns, by_issn)
+            if set(serial.issns) <= fetched_issns:
+                searches[serial.id] = _search_by_issns(serial.issns, by_issn)
         elif (source_id := votes.get(serial.id)) is None:
-            readings[serial.id] = _NOT_FOUND
-        elif source_id in read_ids:
+            searches[serial.id] = _NOT_FOUND
+        elif source_id in fetched_ids:
             source = by_id.get(source_id)
             listed_in = frozenset(source.listed_in) if source else frozenset()
-            readings[serial.id] = _Reading(source_id, source, listed_in)
+            searches[serial.id] = _Search(source_id, source, listed_in)
 
-    list_codes = set(conn.execute(_LIST_CODES).scalars())
-    _write(conn, serials, readings, list_codes)
-    if source_tripped():
-        logger.warning(
-            "⚡ Coupe-circuit OpenAlex : lecture des revues interrompue à %d/%d, reste repris au prochain run.",
-            len(readings),
-            len(serials),
-        )
-    found = sum(1 for r in readings.values() if r.source is not None)
-    listed = sum(1 for r in readings.values() if r.listed_in & list_codes)
-    metrics.add(updated=len(readings), openalex_found=found, listed=listed)
+    _write(conn, serials, searches, set(conn.execute(_LIST_CODES).scalars()))
+    found = sum(1 for s in searches.values() if s.source is not None)
+    metrics.add(updated=len(searches), openalex_found=found)
     metrics.report = (
-        f"{quantity(len(readings), 'revue lue', 'revues lues')}, "
-        f"{quantity(found, 'présente', 'présentes')} dans OpenAlex, "
-        f"{listed} dans une liste au moins"
+        f"{quantity(len(searches), 'revue cherchée', 'revues cherchées')}, "
+        f"{quantity(found, 'trouvée', 'trouvées')}"
     )
     return metrics
 
@@ -209,9 +200,9 @@ def _record_sources(conn: Connection, serial_ids: list[int]) -> dict[int, str]:
 def _fetch(
     fetch_sources: FetchSources, key: SourceFilter, values: list[str], progress: Progress
 ) -> tuple[list[OpenAlexSource], set[str]]:
-    """Renvoie les sources des lots lus, et les valeurs de ces lots. La lecture s'arrête quand le circuit-breaker coupe."""
+    """Renvoie les sources des lots aboutis, et les valeurs de ces lots. Les requêtes s'arrêtent quand le circuit-breaker coupe."""
     sources: list[OpenAlexSource] = []
-    read: set[str] = set()
+    fetched: set[str] = set()
     for start in range(0, len(values), SOURCES_BATCH):
         if source_tripped():
             break
@@ -220,30 +211,30 @@ def _fetch(
         progress.advance(len(batch))
         if found is not None:
             sources.extend(found)
-            read.update(batch)
-    return sources, read
+            fetched.update(batch)
+    return sources, fetched
 
 
-def _reading_by_issns(issns: tuple[str, ...], by_issn: dict[str, list[OpenAlexSource]]) -> _Reading:
+def _search_by_issns(issns: tuple[str, ...], by_issn: dict[str, list[OpenAlexSource]]) -> _Search:
     found = {s.id: s for issn in issns for s in by_issn.get(issn, ())}
     main = main_source(found.values())
     if main is None:
         return _NOT_FOUND
-    return _Reading(main.id, main, frozenset(c for s in found.values() for c in s.listed_in))
+    return _Search(main.id, main, frozenset(c for s in found.values() for c in s.listed_in))
 
 
 def _write(
-    conn: Connection, serials: list[_Serial], readings: dict[int, _Reading], list_codes: set[str]
+    conn: Connection, serials: list[_Serial], searches: dict[int, _Search], list_codes: set[str]
 ) -> None:
-    """Écrit l'identifiant OpenAlex, le type et les appartenances des revues lues, et la date de leur lecture."""
-    read_ids = sorted(readings)
-    if not read_ids:
+    """Écrit l'identifiant OpenAlex, le type et les appartenances des revues cherchées, et la date de leur recherche."""
+    searched_ids = sorted(searches)
+    if not searched_ids:
         return
     publication_counts = {s.id: s.publication_count for s in serials}
     claims: dict[str, list[Claimant]] = {}
-    for serial_id, reading in readings.items():
-        if reading.source_id is not None:
-            claims.setdefault(reading.source_id, []).append(
+    for serial_id, search in searches.items():
+        if search.source_id is not None:
+            claims.setdefault(search.source_id, []).append(
                 Claimant(serial_id, publication_counts[serial_id])
             )
     holders = {
@@ -255,32 +246,32 @@ def _write(
     for source_id, claimants in claims.items():
         candidates = list(claimants)
         current = holders.get(source_id)
-        if current is not None and current.serial_id not in readings:
+        if current is not None and current.serial_id not in searches:
             candidates.append(current)
         winner = holder(candidates)
-        if winner in readings:
+        if winner in searches:
             assigned[winner] = source_id
-            if current is not None and current.serial_id not in readings:
+            if current is not None and current.serial_id not in searches:
                 dispossessed.append(current.serial_id)
 
     # Les identifiants s'effacent avant d'être réécrits : un identifiant appartient à une seule revue.
-    conn.execute(_CLEAR_IDS, {"ids": read_ids + dispossessed})
+    conn.execute(_CLEAR_IDS, {"ids": searched_ids + dispossessed})
     if assigned:
         rows = [{"id": i, "openalex_id": s} for i, s in sorted(assigned.items())]
         conn.execute(_WRITE_IDS, {"rows": json.dumps(rows)})
     types = [
         {"id": serial_id, "serial_type": serial_type.value}
-        for serial_id, reading in sorted(readings.items())
-        if reading.source and (serial_type := serial_type_of_source(reading.source.type))
+        for serial_id, search in sorted(searches.items())
+        if search.source and (serial_type := serial_type_of_source(search.source.type))
     ]
     if types:
         conn.execute(_WRITE_TYPES, {"rows": json.dumps(types)})
-    conn.execute(_DELETE_ENTRIES, {"ids": read_ids})
+    conn.execute(_DELETE_ENTRIES, {"ids": searched_ids})
     entries = [
         {"serial_id": serial_id, "list_code": code}
-        for serial_id, reading in sorted(readings.items())
-        for code in sorted(reading.listed_in & list_codes)
+        for serial_id, search in sorted(searches.items())
+        for code in sorted(search.listed_in & list_codes)
     ]
     if entries:
         conn.execute(_INSERT_ENTRIES, {"rows": json.dumps(entries)})
-    conn.execute(_MARK_READ, {"at": datetime.now(UTC), "ids": read_ids})
+    conn.execute(_MARK_SEARCHED, {"at": datetime.now(UTC), "ids": searched_ids})

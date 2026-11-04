@@ -1,6 +1,6 @@
 """Import du dump CSV du DOAJ, typage en revue des entrées présentes dans le DOAJ, et classement des revues diamant.
 
-Chaque ligne du dump est rattachée à sa revue par ISSN. La revue reçoit la ligne nettoyée (`doaj_payload`) et la date de l'import. La présence d'une revue dans le DOAJ est son appartenance à la liste `doaj`, lue dans OpenAlex (`check_serials_in_openalex`).
+Chaque ligne du dump est rattachée à sa revue par ISSN. La revue reçoit la ligne nettoyée (`doaj_payload`) et la date de l'import. La présence d'une revue dans le DOAJ est son appartenance à la liste `doaj`, donnée par OpenAlex (`check_serials_in_openalex`).
 
 La commande `import_doaj_csv` lit un fichier local. Le pipeline télécharge le dump quand le dernier import dépasse le délai de rafraîchissement (`run_enrich_serials_from_doaj`).
 """

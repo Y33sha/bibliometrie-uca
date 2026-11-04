@@ -1,4 +1,4 @@
-"""Lecture des revues dans OpenAlex (`check_serials_in_openalex`) : identifiant OpenAlex, type et listes de chaque revue."""
+"""Métadonnées des revues dans OpenAlex (`check_serials_in_openalex`) : identifiant OpenAlex, type et listes de chaque revue."""
 
 import logging
 from collections.abc import Sequence
@@ -70,7 +70,7 @@ def _state(conn, serial_id: int):
     return conn.execute(
         text("""
             SELECT openalex_id, serial_type::text AS serial_type,
-                   openalex_checked_at IS NOT NULL AS read,
+                   openalex_checked_at IS NOT NULL AS searched,
                    ARRAY(SELECT list_code FROM serial_list_entries
                          WHERE serial_id = :id ORDER BY list_code) AS lists
             FROM serials WHERE id = :id
@@ -79,7 +79,7 @@ def _state(conn, serial_id: int):
     ).one()
 
 
-def _mark_read_now(conn, serial_id: int) -> None:
+def _mark_searched_now(conn, serial_id: int) -> None:
     conn.execute(
         text("UPDATE serials SET openalex_checked_at = now() WHERE id = :id"), {"id": serial_id}
     )
@@ -94,7 +94,7 @@ def test_la_revue_recoit_sa_source_son_type_et_ses_listes_retenues(conn):
     nature = _serial(conn, "Nature", "0028-0836")
     _run(conn, _OpenAlex(_NATURE))
     state = _state(conn, nature)
-    assert (state.openalex_id, state.serial_type, state.read) == ("S137773608", "journal", True)
+    assert (state.openalex_id, state.serial_type, state.searched) == ("S137773608", "journal", True)
     assert state.lists == ["cwts-core", "doyens"]
 
 
@@ -110,11 +110,11 @@ def test_l_identifiant_partage_va_a_la_revue_la_plus_publiee_et_les_listes_aux_d
     assert _state(conn, jama).lists == _state(conn, old_title).lists == ["doyens"]
 
 
-def test_une_revue_non_relue_perd_l_identifiant_au_profit_d_une_revue_plus_publiee(conn):
+def test_une_revue_non_cherchee_perd_l_identifiant_au_profit_d_une_revue_plus_publiee(conn):
     old_title = _serial(
         conn, "Journal of the American Medical Association", "0002-9955", openalex_id="S172573765"
     )
-    _mark_read_now(conn, old_title)
+    _mark_searched_now(conn, old_title)
     jama = _serial(conn, "JAMA", "0098-7484", publications=33)
     _run(conn, _OpenAlex(_JAMA))
     assert (_state(conn, jama).openalex_id, _state(conn, old_title).openalex_id) == (
@@ -123,9 +123,9 @@ def test_une_revue_non_relue_perd_l_identifiant_au_profit_d_une_revue_plus_publi
     )
 
 
-def test_une_revue_non_relue_garde_l_identifiant_face_a_une_revue_moins_publiee(conn):
+def test_une_revue_non_cherchee_garde_l_identifiant_face_a_une_revue_moins_publiee(conn):
     jama = _serial(conn, "JAMA", "0098-7484", publications=33, openalex_id="S172573765")
-    _mark_read_now(conn, jama)
+    _mark_searched_now(conn, jama)
     old_title = _serial(conn, "Journal of the American Medical Association", "0002-9955")
     _run(conn, _OpenAlex(_JAMA))
     assert (_state(conn, jama).openalex_id, _state(conn, old_title).openalex_id) == (
@@ -139,26 +139,26 @@ def test_la_revue_absente_d_openalex_perd_son_identifiant(conn):
     serial_id = _serial(conn, "Revue locale", "2999-0008", openalex_id="S1")
     _run(conn, _OpenAlex())
     state = _state(conn, serial_id)
-    assert (state.openalex_id, state.read, state.lists) == (None, True, [])
+    assert (state.openalex_id, state.searched, state.lists) == (None, True, [])
 
 
-def test_un_lot_en_echec_laisse_la_revue_a_lire(conn):
+def test_un_lot_en_echec_laisse_la_revue_a_chercher(conn):
     serial_id = _serial(conn, "Nature", "0028-0836", openalex_id="S137773608")
     _run(conn, _OpenAlex(_NATURE, failing=["0028-0836"]))
     state = _state(conn, serial_id)
-    assert (state.openalex_id, state.read) == ("S137773608", False)
+    assert (state.openalex_id, state.searched) == ("S137773608", False)
 
 
-def test_une_revue_lue_recemment_attend_le_delai(conn):
+def test_une_revue_cherchee_recemment_attend_le_delai(conn):
     serial_id = _serial(conn, "Nature", "0028-0836")
-    _mark_read_now(conn, serial_id)
+    _mark_searched_now(conn, serial_id)
     openalex = _OpenAlex(_NATURE)
     _run(conn, openalex)
     assert openalex.calls == []
     assert _state(conn, serial_id).openalex_id is None
 
 
-def test_la_lecture_reecrit_les_appartenances(conn):
+def test_la_recherche_reecrit_les_appartenances(conn):
     serial_id = _serial(conn, "Nature", "0028-0836")
     conn.execute(
         text("INSERT INTO serial_list_entries (serial_id, list_code) VALUES (:id, 'medline')"),

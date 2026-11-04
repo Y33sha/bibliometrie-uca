@@ -36,7 +36,7 @@ class ConfigKey(StrEnum):
     ISSNL_TABLE_REFRESH_AFTER_DAYS = "issnl_table_refresh_after_days"
     """Délai avant de télécharger de nouveau la table ISSN-L de l'ISSN International Centre."""
     SERIAL_OPENALEX_RECHECK_AFTER_DAYS = "serial_openalex_recheck_after_days"
-    """Délai avant de relire une revue dans OpenAlex : source, type et listes."""
+    """Délai avant de chercher de nouveau les métadonnées d'une revue dans OpenAlex."""
     LABORATORY_TYPES = "laboratory_types"
     """Types de structure traités comme laboratoires."""
     PERIMETER_EXTRACTION = "perimeter_extraction"

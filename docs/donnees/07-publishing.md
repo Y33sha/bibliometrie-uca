@@ -10,7 +10,7 @@ Schéma PostgreSQL `publishing`.
 
 | Table | Contenu | Contrainte |
 |---|---|---|
-| `serials` | Titre, type (`serial_type`), éditeur, modèle open access, fiche DOAJ, nombre de publications, identifiant OpenAlex et date de sa lecture. `manual_fields` : champs saisis à la main, conservés par le pipeline | Identifiant OpenAlex unique |
+| `serials` | Titre, type (`serial_type`), éditeur, modèle open access, fiche DOAJ, nombre de publications, identifiant OpenAlex et date de la recherche des métadonnées dans OpenAlex. `manual_fields` : champs saisis à la main, conservés par le pipeline | Identifiant OpenAlex unique |
 | `serial_issns` | ISSN, ISSN-L d'après la table de l'ISSN International Centre et date de son import, support, statut (actif, annulé, sans notice Sudoc), titre de la notice Sudoc, date de vérification dans le Sudoc. `serial_id` : publication en série de l'ISSN-L | Une ligne par ISSN |
 | `issn_links` | Liens entre ISSN lus dans le Sudoc : titre précédent vers titre suivant, revue principale vers supplément, ISSN annulé vers l'ISSN qui l'annule | Un lien par couple d'ISSN et par type |
 | `serial_title_decisions` | Fusions décidées par l'administration : une série sans ISSN de ce titre normalisé est rattachée à la publication en série | Une décision par titre |
@@ -55,7 +55,7 @@ Seuls les paiements d'un payeur du périmètre sont retenus par les lectures.
 **Pipeline :**
 
 - La phase [`normalize`](../pipeline/03-normalize.md) crée ou reconnaît la monographie, l'éditeur et les plateformes de chaque enregistrement source, et décrit sa série (`biblio.journal`).
-- Les phases [`resolve_ra` et `publishing`](../pipeline/05-publishing.md) résolvent les préfixes DOI, vérifient les ISSN, rattachent les enregistrements sources aux publications en série, lisent les publications en série dans OpenAlex (identifiant, type, listes), typent les publications en série et calculent les espaces de noms DOI.
+- Les phases [`resolve_ra` et `publishing`](../pipeline/05-publishing.md) résolvent les préfixes DOI, vérifient les ISSN, rattachent les enregistrements sources aux publications en série, cherchent les métadonnées des publications en série dans OpenAlex (identifiant, type, listes), typent les publications en série et calculent les espaces de noms DOI.
 - La phase [`finalize`](../pipeline/10-finalize.md) recalcule l'éditeur des publications en série et les nombres de publications, puis supprime les entrées sans usage.
 
 **Administration :**

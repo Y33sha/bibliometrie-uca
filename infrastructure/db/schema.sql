@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict hHd0IJclDaAAADO2zrlacR480Jb1vc5MZXK4aH8eah4nzu6UghF29SHVIOK343X
+\restrict REn5RmVqUREd7RJ8DyCuhUD7uLlM4H31X2MGFVqU2hHzcbRkzUpWj6vb8eSfKF9
 
 -- Dumped from database version 18.4
 -- Dumped by pg_dump version 18.4
@@ -2627,7 +2627,7 @@ CREATE TABLE publishing.serials (
 -- Name: COLUMN serials.openalex_checked_at; Type: COMMENT; Schema: publishing; Owner: -
 --
 
-COMMENT ON COLUMN publishing.serials.openalex_checked_at IS 'Date de la dernière lecture de la revue dans OpenAlex. NULL : jamais lue.';
+COMMENT ON COLUMN publishing.serials.openalex_checked_at IS 'Date de la dernière recherche des métadonnées de la revue dans OpenAlex. NULL : jamais cherchées.';
 
 
 --
@@ -6239,5 +6239,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict hHd0IJclDaAAADO2zrlacR480Jb1vc5MZXK4aH8eah4nzu6UghF29SHVIOK343X
+\unrestrict REn5RmVqUREd7RJ8DyCuhUD7uLlM4H31X2MGFVqU2hHzcbRkzUpWj6vb8eSfKF9
 

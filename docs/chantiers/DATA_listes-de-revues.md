@@ -30,7 +30,7 @@ Hors OpenAlex : la Master Journal List de Clarivate (revues du Web of Science, C
 - Chaque niveau d'un classement est une liste, rattachée à son classement (registre norvégien, FNEGE).
 - Une seule sous-étape pose `openalex_id`. Une revue à ISSN prend la source OpenAlex de ses ISSN (`/sources`). Une revue sans ISSN prend la source la plus fréquente parmi ses enregistrements sources OpenAlex.
 - Une source OpenAlex retrouvée par les ISSN de plusieurs revues donne son identifiant à la revue qui a le plus de publications, et ses listes à toutes.
-- Chaque revue est relue dans OpenAlex au terme d'un délai réglable, 7 jours par défaut (`openalex_checked_at`). La lecture d'une revue remplace son identifiant, son type inconnu et ses appartenances.
+- Les métadonnées de chaque revue sont cherchées de nouveau dans OpenAlex au terme d'un délai réglable, 7 jours par défaut (`openalex_checked_at`). La recherche réécrit l'identifiant de la revue, son type inconnu et ses appartenances.
 - La facette « DOAJ » de la liste des revues devient une facette « Listes ». Elle a un sélecteur à trois états (indifférent, présente, absente) par liste et par classement, combinés par un ET.
 - Sous un classement indifférent ou présent, une case à cocher par niveau restreint la sélection aux niveaux cochés, combinés par un OU.
 
@@ -43,13 +43,13 @@ Hors OpenAlex : la Master Journal List de Clarivate (revues du Web of Science, C
 ### Phase 2 — Source OpenAlex et listes de chaque revue
 
 - [x] Colonne `serials.openalex_checked_at`, délai de relecture dans `ops.config` (9aa3e39f5)
-- [x] Sous-étape de la phase `publishing` : source OpenAlex, type et appartenances des revues à relire (9aa3e39f5)
+- [x] Sous-étape de la phase `publishing` : métadonnées des revues dans OpenAlex (source, type, appartenances) (9aa3e39f5)
 - [x] `openalex_id` posé par cette seule sous-étape : vote retiré d'`attach_serials`, `enrich_serials_from_openalex` supprimée (9aa3e39f5)
 
 ### Phase 3 — DOAJ en liste
 
-- [ ] `is_in_doaj` remplacé par l'appartenance à la liste `doaj`, dump du DOAJ réduit à la fiche DOAJ
-- [ ] Revues du Diamond Discovery Hub classées diamant
+- [x] `is_in_doaj` remplacé par l'appartenance à la liste `doaj`, dump du DOAJ réduit à la fiche DOAJ (291bd1a82)
+- [x] Revues du Diamond Discovery Hub classées diamant (291bd1a82)
 
 ### Phase 4 — Interface
 

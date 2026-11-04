@@ -1,4 +1,4 @@
-"""Listes de revues lues par les règles du code, désignées par leur code OpenAlex (`listed_in`)."""
+"""Listes de revues utilisées par les règles du code, désignées par leur code OpenAlex (`listed_in`)."""
 
 DOAJ = "doaj"
 """Directory of Open Access Journals."""

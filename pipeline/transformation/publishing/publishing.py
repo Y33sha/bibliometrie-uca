@@ -5,7 +5,7 @@ Contraintes d'ordre :
 - Le rattachement des enregistrements sources aux éditeurs suit la résolution des préfixes, qui crée des éditeurs avec leurs formes de nom.
 - La fusion des autres noms des éditeurs suit la résolution des préfixes, qui pose leurs titulaires, et le rattachement des enregistrements sources aux éditeurs.
 - Les ISSN des séries précèdent leur vérification Sudoc et l'import de la table ISSN-L, qui précèdent le rattachement des enregistrements sources aux revues : le rattachement lit l'ISSN-L et le titre Sudoc de chaque ISSN.
-- La lecture des revues dans OpenAlex suit le rattachement, qui donne à chaque revue ses ISSN et ses enregistrements sources. Elle précède le typage en recueil d'actes, qui vise aussi les revues `unknown`.
+- La recherche des métadonnées des revues dans OpenAlex suit le rattachement, qui donne à chaque revue ses ISSN et ses enregistrements sources. Elle précède le typage en recueil d'actes, qui vise aussi les revues `unknown`.
 - Les espaces de noms DOI suivent le rattachement et le typage des revues.
 - Le rattachement des enregistrements sources aux monographies suit la fusion des autres noms des éditeurs : l'éditeur départage les volumes de même titre.
 - Le rattachement des monographies à leur collection suit le rattachement des enregistrements sources. La nature des monographies lit le type de la collection posé par le rattachement.
@@ -429,7 +429,7 @@ TASKS = (
             "serial_list_entries",
             "serial_lists",
         ),
-        # Nombre de publications recalculé par `finalize`, date de lecture posée par la tâche elle-même, revues corrigées par `metadata_correction`, ISSN libérés par `finalize.delete_empty_serials`.
+        # Nombre de publications recalculé par `finalize`, date de recherche posée par la tâche elle-même, revues corrigées par `metadata_correction`, ISSN libérés par `finalize.delete_empty_serials`.
         previous_run=("serials", "source_records.serial_id", "serial_issns"),
         network="openalex",
         run=_run_check_serials_in_openalex,

@@ -56,7 +56,7 @@ def _fill_empty_with_marker(
 
 
 def _recheck_in_openalex(conn: Connection, target_id: int, source_id: int) -> None:
-    """Fait relire la revue conservée dans OpenAlex au run suivant : ses ISSN comprennent ceux de l'absorbée."""
+    """Fait chercher de nouveau les métadonnées de la revue conservée au run suivant : ses ISSN comprennent ceux de l'absorbée."""
     conn.execute(
         text("UPDATE serials SET openalex_checked_at = NULL WHERE id = :t"), {"t": target_id}
     )

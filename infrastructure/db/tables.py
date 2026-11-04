@@ -454,7 +454,10 @@ serials = Table(
     Column(
         "openalex_checked_at",
         DateTime(timezone=True),
-        comment="Date de la dernière lecture de la revue dans OpenAlex. NULL : jamais lue.",
+        comment=(
+            "Date de la dernière recherche des métadonnées de la revue dans OpenAlex. "
+            "NULL : jamais cherchées."
+        ),
     ),
     Column("oa_model", oa_model_enum),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),

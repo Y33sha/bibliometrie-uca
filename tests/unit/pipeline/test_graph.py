@@ -118,8 +118,8 @@ def test_le_rattachement_des_revues_suit_la_verification_sudoc():
     assert {"publishing.sync_issns", "publishing.check_issns_in_sudoc"} <= deps
 
 
-def test_la_lecture_des_revues_dans_openalex_suit_le_rattachement_des_revues():
-    """La lecture des revues dans OpenAlex lit leurs ISSN et leurs enregistrements sources, écrits par le rattachement."""
+def test_la_recherche_des_metadonnees_des_revues_suit_le_rattachement_des_revues():
+    """La recherche des métadonnées des revues dans OpenAlex part de leurs ISSN et de leurs enregistrements sources, écrits par le rattachement."""
     assert (
         "publishing.attach_serials"
         in dependencies(ALL_TASKS)["publishing.check_serials_in_openalex"]
