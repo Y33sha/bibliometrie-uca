@@ -287,6 +287,11 @@ def _persist_updates(conn: Connection, updates: Sequence[Mapping[str, object]]) 
     return len(updates)
 
 
+_UNRESOLVED_DOIS_SQL = (
+    f"SELECT id_value AS d FROM failed_lookups WHERE source = '{DOI_ORG}' AND id_type = 'doi'"
+)
+"""DOI inconnus de doi.org."""
+
 _RECORD_DOIS_SQL = f"""
     SELECT source_record_id AS id, id_value AS doi, role
     FROM source_record_identifiers
@@ -490,10 +495,7 @@ class SourceRecordCorrectionStore:
                     FROM sr_eff sr JOIN record_dois d ON d.id = sr.id
                     WHERE sr.doc_type = '{DocType.DATASET.value}'
                 ),
-                unresolved_dois AS (
-                    SELECT id_value AS d FROM failed_lookups
-                    WHERE source = '{DOI_ORG}' AND id_type = 'doi'
-                ),
+                unresolved_dois AS ({_UNRESOLVED_DOIS_SQL}),
                 -- Collections figshare typées dataset, une par titre et année : un titre partagé par deux collections n'en désigne aucune.
                 figshare_collections AS (
                     SELECT sr.title_normalized, sr.publication_year, min(d.doi) AS doi
@@ -638,10 +640,7 @@ class SourceRecordCorrectionStore:
                     FROM source_records
                 ),
                 record_dois AS ({_RECORD_DOIS_SQL}),
-                unresolved_dois AS (
-                    SELECT id_value AS d FROM failed_lookups
-                    WHERE source = '{DOI_ORG}' AND id_type = 'doi'
-                ),
+                unresolved_dois AS ({_UNRESOLVED_DOIS_SQL}),
                 candidate_dois AS (
                     SELECT d.doi AS d FROM record_dois d JOIN sr_eff sr ON sr.id = d.id
                     WHERE sr.doc_type IN ({_CLUSTER_CANDIDATE_DOC_TYPES_SQL})
