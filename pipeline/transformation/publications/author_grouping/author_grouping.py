@@ -244,17 +244,14 @@ def realign(
 
 
 def build_contributions(
-    conn: Connection,
-    store: AuthorGroupingStore,
-    logger: logging.Logger,
-    *,
-    rebuild: bool = False,
+    conn: Connection, logger: logging.Logger, *, rebuild: bool = False
 ) -> PhaseMetrics:
     """Recalcule les contributions des publications en file, avec un commit par lot. Chaque lot supprime ses marquages traités avant son commit. Rafraîchit ensuite le recouvrement des listes d'auteurs. Les contributions d'une publication supprimée disparaissent avec elle (`ON DELETE CASCADE`).
 
     Args:
         rebuild: marque d'abord toutes les publications et commite le marquage ; un run interrompu reprend les publications restantes.
     """
+    store = AuthorGroupingStore(conn)
     if rebuild:
         marked = store.mark_all()
         conn.commit()
@@ -302,12 +299,7 @@ def build_contributions(
 def _build(ctx: PhaseContext) -> PhaseMetrics:
     """Recalcule les contributions des publications en file."""
     with ctx.open_tx() as conn:
-        return build_contributions(
-            conn,
-            AuthorGroupingStore(conn),
-            ctx.logger,
-            rebuild=ctx.options.rebuild_author_grouping,
-        )
+        return build_contributions(conn, ctx.logger, rebuild=ctx.options.rebuild_author_grouping)
 
 
 def _attributes(ctx: PhaseContext) -> PhaseMetrics:
@@ -324,9 +316,7 @@ def _attributes(ctx: PhaseContext) -> PhaseMetrics:
             f" {quantity(updated, 'mise à jour', 'mises à jour')}"
             f" en {time.perf_counter() - t0:.1f} s"
         )
-    metrics = PhaseMetrics(seen=queued, updated=updated)
-    metrics.report = quantity(updated, "contribution mise à jour", "contributions mises à jour")
-    return metrics
+    return PhaseMetrics(seen=queued, updated=updated)
 
 
 TASKS = (
@@ -336,8 +326,9 @@ TASKS = (
             "publications.id",
             "publication_contributions_queue",
             "source_records.publication_id",
-            "source_records.source_id",
-            "source_records.corrections",
+            # Source classée après les autres (`DEFERRED_SOURCE`) ; nombre de contributions sources, pour la taille des lots.
+            "source_records.source",
+            "source_records.author_count",
             "source_contributions.id",
             "source_contributions.source_record_id",
             "source_contributions.author_position",
@@ -390,6 +381,8 @@ TASKS = (
             "source_contributions.collective",
             "source_contributions.duplicate_of",
             "source_records.publication_id",
+            # Copie scanR d'un dépôt HAL, écartée du vote des listes d'auteurs.
+            "source_records.source",
             "source_records.source_id",
             "contributions.id",
             "contributions.publication_id",
@@ -414,7 +407,6 @@ TASKS = (
             "source_records.publication_id",
         ),
         run=_attributes,
-        label="Attributs des contributions",
     ),
 )
 
