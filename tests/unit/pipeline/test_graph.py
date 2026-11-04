@@ -1,5 +1,8 @@
 """Le graphe de dépendances du pipeline (`pipeline.graph`) est cohérent avec l'ordre d'exécution."""
 
+import re
+from pathlib import Path
+
 from domain.sources.registry import (
     DOI_SEARCHABLE_SOURCES,
     HARVESTED_SOURCES,
@@ -47,6 +50,46 @@ def test_normalisation_dans_l_ordre_de_priorite_des_sources():
 def test_aucune_tache_ne_lit_une_donnee_ecrite_apres_elle():
     """Toute lecture d'une donnée écrite par une tâche placée après est déclarée lue au run précédent."""
     assert order_violations(ALL_TASKS) == []
+
+
+_SCHEMA = Path(__file__).resolve().parents[3] / "infrastructure" / "db" / "schema.sql"
+
+
+def _schema() -> tuple[dict[str, set[str]], set[str]]:
+    """Renvoie les colonnes de chaque table du snapshot du schéma, et les noms des vues."""
+    columns: dict[str, set[str]] = {}
+    views: set[str] = set()
+    current: set[str] | None = None
+    for line in _SCHEMA.read_text().splitlines():
+        if table := re.match(r"CREATE TABLE \w+\.(\w+) \($", line):
+            current = columns.setdefault(table.group(1), set())
+        elif view := re.match(r"CREATE (?:MATERIALIZED )?VIEW \w+\.(\w+) AS", line):
+            views.add(view.group(1))
+        elif current is not None:
+            if line.startswith(")"):
+                current = None
+            elif not line.lstrip().startswith("CONSTRAINT"):
+                current.add(line.split()[0].strip('"'))
+    return columns, views
+
+
+def test_chaque_donnee_declaree_existe_dans_le_schema():
+    """Une table, une vue ou une colonne déclarée lue ou écrite existe dans `infrastructure/db/schema.sql`. `<table>.id` désigne l'existence des lignes, même sans colonne `id`."""
+    columns, views = _schema()
+    unknown = sorted(
+        (task.name, item)
+        for task in ALL_TASKS
+        for item in {*task.reads, *task.writes, *task.previous_run}
+        if not (
+            item in views
+            or item in columns
+            or (
+                (table_column := item.partition("."))[0] in columns
+                and table_column[2] in {*columns[table_column[0]], "id"}
+            )
+        )
+    )
+    assert unknown == []
 
 
 def _task(name: str, **declarations: tuple[str, ...]) -> Task:

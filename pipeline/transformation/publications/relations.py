@@ -584,7 +584,6 @@ TASKS = (
                 for column in (
                     "source_extras",
                     "corrections",
-                    "doi",
                     "doc_type",
                     "publication_id",
                 )
