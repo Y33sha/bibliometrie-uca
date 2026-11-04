@@ -20,7 +20,7 @@ from domain.documents.identifiers import DOI
 from domain.source_records.identifiers import SourceIdentifierType
 from domain.sources.staging import StagingEntryMode
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
-from pipeline.http.lookup import UNAVAILABLE, NotFound, Unavailable
+from pipeline.http.lookup import Unavailable
 from pipeline.ingestion.common.failed_lookups import pending_failed_lookup_sql, record_failed_lookup
 from pipeline.ingestion.common.lookup import LookupBatch, LookupChannel, look_up
 from pipeline.ingestion.scanr.api import search
@@ -46,8 +46,8 @@ async def search_by_external_ids(
         "query": {"terms": {"externalIds.id.keyword": ids}},
     }
     records = await search(client, query, label=f"lot de {len(ids)} {id_type}")
-    if isinstance(records, NotFound | Unavailable):
-        return UNAVAILABLE
+    if isinstance(records, Unavailable):
+        return records
     found = {
         normalize(as_str(fields.get("id")))
         for rec in records

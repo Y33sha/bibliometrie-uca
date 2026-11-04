@@ -42,8 +42,8 @@ class ScanrClient:
 
 async def search(
     client: httpx2.AsyncClient, query: Mapping[str, JsonValue], *, label: str
-) -> LookupOutcome[list[Mapping[str, JsonValue]]]:
-    """Renvoie les documents (`_source`) de la requête Elasticsearch `query`. Une réponse valide sans hit renvoie une liste vide."""
+) -> list[Mapping[str, JsonValue]] | Unavailable:
+    """Renvoie les documents (`_source`) de la requête Elasticsearch `query`, ou l'indisponibilité de l'API. Une réponse valide sans hit renvoie une liste vide."""
     outcome = await lookup_json_async(
         client,
         "POST",
@@ -66,6 +66,6 @@ async def fetch_by_id(
     """Renvoie le document ScanR d'identifiant `source_id`, son absence ou l'indisponibilité de l'API."""
     query: dict[str, JsonValue] = {"size": 1, "query": {"term": {"id.keyword": source_id}}}
     records = await search(client, query, label=f"id {source_id}")
-    if isinstance(records, NotFound | Unavailable):
+    if isinstance(records, Unavailable):
         return records
     return records[0] if records else NOT_FOUND

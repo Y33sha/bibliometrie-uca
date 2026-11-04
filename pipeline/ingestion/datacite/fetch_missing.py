@@ -13,7 +13,7 @@ import httpx2
 
 from domain.documents.identifiers import DOI
 from domain.types import JsonValue
-from pipeline.http.lookup import UNAVAILABLE, NotFound, Unavailable
+from pipeline.http.lookup import Unavailable
 from pipeline.ingestion.common.lookup import LookupBatch
 from pipeline.ingestion.datacite.api import search_dois
 from pipeline.ingestion.datacite.fields import record_doi
@@ -25,8 +25,8 @@ BATCH_SIZE = 10
 async def find_dois(client: httpx2.AsyncClient, dois: list[str]) -> LookupBatch | Unavailable:
     """Cherche un lot de DOI dans DataCite : `GET /dois`."""
     records = await search_dois(client, dois)
-    if isinstance(records, NotFound | Unavailable):
-        return UNAVAILABLE
+    if isinstance(records, Unavailable):
+        return records
     # Les ressources reçues se rattachent aux DOI demandés par comparaison exacte en minuscules, quels que soient leur ordre et leur nombre. Un DOI demandé sans ressource est absent de DataCite.
     found: dict[str, Mapping[str, JsonValue]] = {}
     for record in records:

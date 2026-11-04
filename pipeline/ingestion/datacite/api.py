@@ -94,8 +94,8 @@ class DataciteClient:
 
 async def search_dois(
     client: httpx2.AsyncClient, dois: list[str]
-) -> LookupOutcome[list[Mapping[str, JsonValue]]]:
-    """Renvoie les documents des DOI d'un lot, par `GET /dois?query=doi:"a" OR doi:"b" …`. Un DOI absent de DataCite manque à la liste.
+) -> list[Mapping[str, JsonValue]] | Unavailable:
+    """Renvoie les documents des DOI d'un lot, par `GET /dois?query=doi:"a" OR doi:"b" …`, ou l'indisponibilité de l'API. Un DOI absent de DataCite manque à la liste.
 
     Le champ `doi` est requêté en phrase exacte. La liste suit un ordre quelconque.
     """
