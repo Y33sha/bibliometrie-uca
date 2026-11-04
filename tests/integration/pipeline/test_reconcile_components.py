@@ -554,12 +554,12 @@ class TestEndToEnd:
         assert _source_record_state(conn, source_record_copy) == (article, False)
         assert _source_record_state(conn, source_record_dataset) == (dataset, False)
 
-    def test_publication_of_a_residual_source_record_is_refreshed(self, sa_sync_conn):
-        """L'enregistrement source sans DOI d'une composante à deux DOI reste sur sa publication, recalculée sans le DOI perdu."""
+    def test_publication_of_a_bridge_is_refreshed(self, sa_sync_conn):
+        """L'enregistrement source sans DOI relie les deux DOI d'une composante : il forme sa propre partition, sur sa publication, recalculée sans le DOI perdu."""
         conn = sa_sync_conn
         hal_id = _hal(_SECONDARY, "hal-01234567")
         stale = _seed_publication(conn, doi="10.9/retire")
-        residual = _source_record(conn, stale, source_id="a", identifiers=hal_id)
+        bridge = _source_record(conn, stale, source_id="a", identifiers=hal_id)
         for source_id, doi in (("b", "10.1/x"), ("c", "10.2/y")):
             _source_record(
                 conn,
@@ -578,7 +578,7 @@ class TestEndToEnd:
 
         reconcile(conn, logger)
 
-        assert _source_record_state(conn, residual) == (stale, False)
+        assert _source_record_state(conn, bridge) == (stale, False)
         assert (
             conn.execute(
                 text("SELECT doi FROM publications WHERE id = :id"), {"id": stale}

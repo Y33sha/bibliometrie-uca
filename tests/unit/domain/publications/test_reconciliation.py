@@ -149,8 +149,8 @@ class TestSplit:
         }  # X garde la publication 10 ; Y va à une publication à créer
         assert plan.dissolved == ()  # la publication 10 reste, ancre de X
 
-    def test_residual_no_doi_source_record_stays(self):
-        """Composante à plusieurs DOI : l'enregistrement source sans DOI est résiduel ; il reste sur sa publication, qui est conservée."""
+    def test_bridge_without_doi_forms_its_own_partition(self):
+        """Composante à plusieurs DOI : l'enregistrement source sans DOI relie les deux ancres ; il forme sa propre partition, sur sa publication."""
         plan = plan_reconciliation(
             [
                 _m(
@@ -167,11 +167,10 @@ class TestSplit:
                     doi="10.2/y",
                     tokens=[("hal_id", "h"), ("doi", "10.2/y")],
                 ),
-                _m(3, 30, tokens=[("hal_id", "h")]),  # sans DOI : résiduel
+                _m(3, 30, tokens=[("hal_id", "h")]),
             ]
         )
-        assert _groups(plan) == {10: (1,), 20: (2,)}
-        # La publication 30 garde l'enregistrement source résiduel 3 : elle est conservée.
+        assert _groups(plan) == {10: (1,), 20: (2,), 30: (3,)}
         assert plan.dissolved == ()
 
 
@@ -222,7 +221,7 @@ class TestDoiAnchors:
         )
         assert _groups(plan) == {10: (1, 3), 20: (2,)}
 
-    def test_member_without_a_unique_anchor_stays_on_its_publication(self):
+    def test_member_without_a_unique_anchor_forms_its_own_partition(self):
         """Un enregistrement source OpenAlex cite en DOI secondaires l'article et la communication, deux ancres."""
         plan = plan_reconciliation(
             [
@@ -236,8 +235,76 @@ class TestDoiAnchors:
                 ),
             ]
         )
-        assert _groups(plan) == {10: (1,), 20: (2,)}
+        assert _groups(plan) == {10: (1,), 20: (2,), 30: (3,)}
         assert plan.dissolved == ()
+
+
+_ARXIV = "10.48550/arxiv.1"
+
+
+def _preprint_component(*, doc_type=None):
+    """Composante à deux ancres, l'article et la communication, et un preprint arXiv sur deux publications, 30 et 40. Les enregistrements sources 6 et 7 citent le DOI arXiv à côté de l'article et de la communication."""
+    return [
+        _m(1, 10, doi="10.1/article", tokens=[("doi", "10.1/article")], doc_type="article"),
+        _m(
+            2,
+            20,
+            doi="10.2/communication",
+            tokens=[("doi", "10.2/communication")],
+            doc_type="conference_paper",
+        ),
+        _m(4, 30, weak=(_ARXIV,), tokens=[("doi", _ARXIV)], doc_type=doc_type),
+        _m(5, 40, doi=_ARXIV, tokens=[("doi", _ARXIV)], doc_type=doc_type),
+        _m(
+            6,
+            10,
+            weak=("10.1/article", _ARXIV),
+            tokens=[("doi", "10.1/article"), ("doi", _ARXIV)],
+            doc_type="article",
+        ),
+        _m(
+            7,
+            20,
+            weak=("10.2/communication", _ARXIV),
+            tokens=[("doi", "10.2/communication"), ("doi", _ARXIV)],
+            doc_type="conference_paper",
+        ),
+    ]
+
+
+class TestBridges:
+    """Dans une composante à plusieurs ancres, les enregistrements sources sans ancre forment des sous-composantes."""
+
+    def test_records_of_a_bridge_stay_together(self):
+        """Le preprint relie l'article et la communication : ses deux publications fusionnent, hors des deux ancres."""
+        plan = plan_reconciliation(_preprint_component(doc_type="preprint"))
+
+        assert _groups(plan) == {10: (1, 6), 20: (2, 7), 30: (4, 5)}
+        assert plan.dissolved == (DissolvedPublication(40, 30),)
+
+    def test_a_bridge_joins_the_only_anchor_of_its_doc_type(self):
+        plan = plan_reconciliation(_preprint_component(doc_type="article"))
+
+        assert _groups(plan) == {10: (1, 4, 5, 6), 20: (2, 7)}
+        assert plan.dissolved == (DissolvedPublication(30, 10), DissolvedPublication(40, 10))
+
+    def test_a_subcomponent_linked_to_one_anchor_joins_it(self):
+        """Seul l'enregistrement source 6 cite le DOI arXiv à côté d'une ancre : le preprint rejoint l'article."""
+        members = [m for m in _preprint_component(doc_type="preprint") if m.source_record_id != 7]
+        members.append(
+            _m(
+                3,
+                10,
+                doi="10.1/article",
+                weak=("10.2/communication",),
+                tokens=[("doi", "10.1/article"), ("doi", "10.2/communication")],
+            )
+        )
+
+        plan = plan_reconciliation(members)
+
+        assert _groups(plan) == {10: (1, 3, 4, 5, 6), 20: (2,)}
+        assert plan.dissolved == (DissolvedPublication(30, 10), DissolvedPublication(40, 10))
 
 
 class TestPreprintServerDois:
@@ -656,31 +723,6 @@ class TestCompetingClaims:
 
 
 class TestDissolution:
-    def test_publication_retaining_a_residual_source_record_is_kept(self):
-        """La publication 30 perd l'enregistrement source 1 mais garde l'enregistrement source résiduel 3 : elle n'est pas dissoute."""
-        plan = plan_reconciliation(
-            [
-                _m(1, 30, doi="10.1/x", tokens=[("hal_id", "h"), ("doi", "10.1/x")]),
-                _m(
-                    4,
-                    40,
-                    publication_doi="10.1/x",
-                    doi="10.1/x",
-                    tokens=[("hal_id", "h"), ("doi", "10.1/x")],
-                ),
-                _m(
-                    2,
-                    20,
-                    publication_doi="10.2/y",
-                    doi="10.2/y",
-                    tokens=[("hal_id", "h"), ("doi", "10.2/y")],
-                ),
-                _m(3, 30, tokens=[("hal_id", "h")]),
-            ]
-        )
-        assert _groups(plan) == {40: (1, 4), 20: (2,)}
-        assert plan.dissolved == ()
-
     def test_successor_follows_the_smallest_source_record_of_the_dissolved_publication(self):
         """La publication 50 se répartit entre les publications 70 et 30 : son successeur est celui de son enregistrement source 3."""
         plan = plan_reconciliation(
