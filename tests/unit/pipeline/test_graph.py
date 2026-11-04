@@ -107,6 +107,18 @@ def test_les_decomptes_de_sujets_ne_dependent_pas_des_publications():
     assert "finalize.publications_in_perimeter" not in deps
 
 
+def test_les_vues_des_structures_suivent_la_purge_des_publications():
+    """La purge supprime les contributions des publications purgées : les vues portent sur les contributions restantes."""
+    assert "finalize.purge_publications" in dependencies(ALL_TASKS)["finalize.structures"]
+
+
+def test_les_referentiels_vides_se_suppriment_monographies_puis_revues_puis_editeurs():
+    """Une monographie retient sa collection, une revue son éditeur."""
+    deps = dependencies(ALL_TASKS)
+    assert "finalize.delete_empty_monographs" in deps["finalize.delete_empty_serials"]
+    assert "finalize.delete_empty_serials" in deps["finalize.delete_empty_publishers"]
+
+
 def test_la_normalisation_de_theses_ne_touche_pas_aux_referentiels_de_publication():
     theses = next(n for n in ALL_TASKS if n.name == "normalize.theses")
     assert not any(

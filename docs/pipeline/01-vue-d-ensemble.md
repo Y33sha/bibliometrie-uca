@@ -35,6 +35,6 @@ Les phases s'exécutent dans cet ordre.
 - [`publications`](07-publications.md) regroupe les enregistrements sources qui décrivent le même document en publications.
 - [`author_grouping`](08-author-grouping.md) aligne les contributions sources d'un même auteur dans une contribution.
 - [`persons`](09-persons.md) rattache chaque contribution à une personne.
-- [`finalize`](10-finalize.md) reporte le périmètre sur les publications, rafraîchit les vues des structures, purge et recompte.
+- [`finalize`](10-finalize.md) purge les publications, reporte le périmètre sur les publications restantes, rafraîchit les vues des structures et recompte.
 
 **Enrichissements** ([page](11-enrichissements.md)). `relations`, `subjects`, `countries` et `oa_status` écrivent les relations entre publications, les sujets, les pays et le statut open access. L'option `--no-extras` les omet.

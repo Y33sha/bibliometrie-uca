@@ -356,7 +356,7 @@ TASKS = (
         "sync_issns",
         reads=("source_records.biblio", "serial_issns"),
         writes=("serial_issns",),
-        # Lignes vérifiées par `check_issns_in_sudoc`, revues posées par `attach_serials`, revues supprimées par `finalize.delete_empty_containers`.
+        # Lignes vérifiées par `check_issns_in_sudoc`, revues posées par `attach_serials`, revues supprimées par `finalize.delete_empty_serials`.
         previous_run=("serial_issns",),
         run=in_transaction(attach_serials.run_sync_issns),
         section="Publications en série",
@@ -427,7 +427,7 @@ TASKS = (
             "monographs.serial_id",
             "merge_redirects",
         ),
-        # Revues corrigées par `metadata_correction`, collections posées par `link_monographs_to_collections`, publications recalculées par la phase `publications`.
+        # Revues corrigées par `metadata_correction`, collections posées par `link_monographs_to_collections`, publications recalculées par la phase `publications`, décisions de titre supprimées avec leur revue par `finalize.delete_empty_serials`.
         previous_run=(
             "source_records.serial_id",
             "source_records.corrections",
@@ -435,6 +435,7 @@ TASKS = (
             "serials",
             "monographs.serial_id",
             "publications",
+            "serial_title_decisions",
         ),
         run=in_transaction(attach_serials.run_attach_serials),
         section="Publications en série",

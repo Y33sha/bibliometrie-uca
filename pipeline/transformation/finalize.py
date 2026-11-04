@@ -1,6 +1,6 @@
 """Phase `finalize` : données dérivées des contributions, après la résolution des personnes. Chaque tâche a sa transaction.
 
-La phase recompose le périmètre des publications et les vues matérialisées des structures, supprime les publications sans enregistrement source ou sans contribution, recalcule l'éditeur des revues, supprime les référentiels vides, puis recompte les publications des adresses, revues et éditeurs.
+La phase supprime les publications sans enregistrement source ou sans contribution rattachée à une personne. Elle recompose ensuite le périmètre des publications et les vues matérialisées des structures, sur les publications restantes. Elle recalcule l'éditeur des revues, supprime les référentiels vides, puis recompte les publications des adresses, revues et éditeurs.
 
 Les référentiels vides se suppriment dans l'ordre monographies, revues, éditeurs : une monographie retient sa collection, une revue ou un préfixe DOI son éditeur. Leur suppression suit celle des publications : un référentiel vidé pendant le run disparaît dans le même run.
 
@@ -9,15 +9,14 @@ La phase traite toutes les sources et ignore `--sources` : une contribution chan
 
 from __future__ import annotations
 
-import logging
 import time
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 
 from sqlalchemy import Connection, text
 
 from infrastructure.db.scalars import scalar_int
 from pipeline.graph import Task, in_transaction
-from pipeline.runtime.context import OpenTransaction, PhaseContext
+from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, inflect, quantity, step
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import waiting
@@ -40,6 +39,8 @@ from pipeline.transformation.structures.address_publication_count import (
 )
 
 _PURGE_BATCH_SIZE = 5000
+_SYNC_SECTION = "Synchronisation des tables"
+_EMPTY_CONTAINERS_SECTION = "Référentiels vides"
 
 
 def count_contributions_in_perimeter(conn: Connection) -> int:
@@ -64,6 +65,20 @@ def refresh_publication_rors(conn: Connection) -> None:
     conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY publication_rors"))
 
 
+def _purge(ctx: PhaseContext) -> PhaseMetrics:
+    """Purge les publications par lots, un commit par lot."""
+    purged = 0
+    with ctx.open_tx() as conn:
+        while deleted := purge_publications(conn, limit=_PURGE_BATCH_SIZE):
+            conn.commit()
+            purged += deleted
+    metrics = PhaseMetrics()
+    metrics.details["purged"] = purged
+    if purged:
+        metrics.report = quantity(purged, "publication supprimée", "publications supprimées")
+    return metrics
+
+
 def _publications_in_perimeter(ctx: PhaseContext) -> PhaseMetrics:
     t0 = time.perf_counter()
     with ctx.open_tx() as conn:
@@ -83,12 +98,6 @@ def _structures(ctx: PhaseContext) -> PhaseMetrics:
     return _timed(t0)
 
 
-def _purge(ctx: PhaseContext) -> PhaseMetrics:
-    metrics = PhaseMetrics()
-    metrics.details["purged"] = _purge_publications(ctx.open_tx)
-    return metrics
-
-
 def _serial_publishers(ctx: PhaseContext) -> PhaseMetrics:
     with ctx.open_tx() as conn:
         changed = refresh_serial_publishers(conn)
@@ -99,17 +108,6 @@ def _serial_publishers(ctx: PhaseContext) -> PhaseMetrics:
     return metrics
 
 
-def _empty_containers(ctx: PhaseContext) -> PhaseMetrics:
-    metrics = PhaseMetrics()
-    _delete_empty_containers(_EMPTY_CONTAINERS, metrics, ctx)
-    return metrics
-
-
-def _publication_counts(ctx: PhaseContext) -> PhaseMetrics:
-    _refresh_publication_counts(ctx.open_tx, ctx.logger)
-    return PhaseMetrics()
-
-
 def _timed(t0: float) -> PhaseMetrics:
     """Renvoie les métriques d'une tâche de synchronisation, avec sa durée pour bilan."""
     metrics = PhaseMetrics()
@@ -117,80 +115,64 @@ def _timed(t0: float) -> PhaseMetrics:
     return metrics
 
 
-def _purge_publications(open_tx: OpenTransaction) -> int:
-    """Purge les publications par lots, un commit par lot. Renvoie le nombre de publications supprimées."""
-    n = 0
-    with open_tx() as conn:
-        while True:
-            deleted = purge_publications(conn, limit=_PURGE_BATCH_SIZE)
-            if deleted == 0:
-                break
-            conn.commit()
-            n += deleted
-    return n
-
-
-def _delete_empty_containers(
-    steps: tuple[tuple[str, Callable[[PhaseContext], PhaseMetrics]], ...],
-    metrics: PhaseMetrics,
-    ctx: PhaseContext,
-) -> None:
-    """Supprime les référentiels vides. Chaque suppression écrit sa ligne et reporte ses compteurs à la phase."""
-    if not steps:
-        return
-    step(ctx.logger, "Référentiels vides")
-    for index, (label, run) in enumerate(steps):
-        sub = run(ctx)
-        metrics.merge(sub)
-        branch = LAST_BRANCH if index == len(steps) - 1 else BRANCH
-        ctx.logger.info("%s%s : %s", branch, label, sub.report or "rien à faire")
-
-
-def _refresh_publication_counts(open_tx: OpenTransaction, logger: logging.Logger) -> None:
+def _publication_counts(ctx: PhaseContext) -> PhaseMetrics:
     """Recalcule le nombre de publications de chaque adresse, revue et éditeur.
 
     Les trois décomptes lisent les mêmes publications et contributions sources, stables à ce point du pipeline.
 
     Chaque décompte est long : sa ligne annonce le travail en cours, puis affiche son résultat.
     """
-    step(logger, "Recalcul des décomptes de publications")
+    step(ctx.logger, "Recalcul des décomptes de publications")
 
-    with waiting(f"{BRANCH}par adresse", logger) as line:
-        with open_tx() as conn:
+    with waiting(f"{BRANCH}par adresse", ctx.logger) as line:
+        with ctx.open_tx() as conn:
             addresses = recompute_address_publication_count(conn)
         line.conclude(
             f"{BRANCH}{quantity(addresses, 'adresse')} {inflect(addresses, 'mise à jour', 'mises à jour')}"
         )
 
-    with waiting(f"{BRANCH}par revue", logger) as line:
-        with open_tx() as conn:
+    with waiting(f"{BRANCH}par revue", ctx.logger) as line:
+        with ctx.open_tx() as conn:
             serials = refresh_serial_publication_counts(conn)
         line.conclude(
             f"{BRANCH}{quantity(serials, 'revue')} {inflect(serials, 'mise à jour', 'mises à jour')}"
         )
 
-    with waiting(f"{LAST_BRANCH}par éditeur", logger) as line:
-        with open_tx() as conn:
+    with waiting(f"{LAST_BRANCH}par éditeur", ctx.logger) as line:
+        with ctx.open_tx() as conn:
             publishers = refresh_publisher_publication_counts(conn)
         # « mis à jour » ne varie pas au pluriel, contrairement à « mise à jour ».
         line.conclude(f"{LAST_BRANCH}{quantity(publishers, 'éditeur')} mis à jour")
 
-
-_EMPTY_CONTAINERS: tuple[tuple[str, Callable[[PhaseContext], PhaseMetrics]], ...] = (
-    (
-        delete_empty_monographs.LABEL,
-        in_transaction(delete_empty_monographs.run_delete_empty_monographs),
-    ),
-    (delete_empty_serials.LABEL, in_transaction(delete_empty_serials.run_delete_empty_serials)),
-    (
-        delete_empty_publishers.LABEL,
-        in_transaction(delete_empty_publishers.run_delete_empty_publishers),
-    ),
-)
-"""Suppressions des référentiels vides, dans l'ordre : (libellé, fonction)."""
+    return PhaseMetrics()
 
 
 TASKS = (
+    Task(
+        "purge_publications",
+        reads=(
+            "publications.id",
+            "source_records.publication_id",
+            "contributions.id",
+            "contributions.publication_id",
+            "contributions.person_id",
+        ),
+        # La suppression d'une publication emporte ses contributions, leurs alignements, ses relations, ses sujets et son détail. Elle détache ses enregistrements sources et ses paiements APC.
+        writes=(
+            "publications.id",
+            "contributions.id",
+            "aligned_source_contributions",
+            "contribution_resolution_queue",
+            "publication_relations",
+            "publication_subjects",
+            "publications_detail",
+            "source_records.publication_id",
+            "apc_payments.publication_id",
+        ),
+        run=_purge,
+        section=_SYNC_SECTION,
+        label="Purge des publications",
+    ),
     Task(
         "publications_in_perimeter",
         reads=(
@@ -201,10 +183,8 @@ TASKS = (
             "publications.id",
         ),
         writes=("publications.in_perimeter",),
-        # Lignes supprimées plus loin dans le même run par `finalize.purge_publications`.
-        previous_run=("publications.id",),
         run=_publications_in_perimeter,
-        section="Synchronisation des tables",
+        section=_SYNC_SECTION,
         label="Périmètre des publications",
     ),
     Task(
@@ -223,20 +203,8 @@ TASKS = (
         ),
         writes=("contribution_structures", "publication_structures", "publication_rors"),
         run=_structures,
-        section="Synchronisation des tables",
+        section=_SYNC_SECTION,
         label="Structures des liens",
-    ),
-    Task(
-        "purge_publications",
-        reads=(
-            "publications.id",
-            "source_records.publication_id",
-            "contributions.id",
-            "contributions.publication_id",
-            "contributions.person_id",
-        ),
-        writes=("publications.id",),
-        run=_purge,
     ),
     Task(
         "serial_publishers",
@@ -249,35 +217,72 @@ TASKS = (
             "monographs.serial_id",
         ),
         writes=("serials.publisher_id",),
-        # Les revues et les monographies supprimées ensuite par `delete_empty_containers` n'ont pas de publication : leur suppression ne change aucun éditeur.
+        # Les revues et les monographies supprimées ensuite comme référentiels vides n'ont pas de publication : leur suppression ne change aucun éditeur.
         previous_run=("serials.id", "monographs.serial_id"),
         run=_serial_publishers,
+        section=_SYNC_SECTION,
         label="Éditeur des revues",
     ),
     Task(
-        "delete_empty_containers",
+        "delete_empty_monographs",
         reads=(
             "monographs.id",
-            "monographs.serial_id",
-            "serials.id",
-            "serials.publisher_id",
-            "publishers.id",
-            "source_records.serial_id",
+            "monographs.title",
             "source_records.monograph_id",
-            "source_records.publisher_id",
-            "publications.serial_id",
             "publications.monograph_id",
-            "publications.publisher_id",
-            "apc_payments",
-            "doi_prefixes.publisher_id",
-            "serial_title_decisions",
+        ),
+        writes=("monographs.id",),
+        run=in_transaction(delete_empty_monographs.run_delete_empty_monographs),
+        section=_EMPTY_CONTAINERS_SECTION,
+        label=delete_empty_monographs.LABEL,
+    ),
+    Task(
+        "delete_empty_serials",
+        reads=(
+            "serials.id",
+            "serials.title",
+            "serials.publisher_id",
+            # Nom de l'éditeur de chaque revue supprimée, pour le journal.
+            "publishers.name",
+            "source_records.serial_id",
+            "publications.serial_id",
+            "apc_payments.serial_id",
+            "monographs.serial_id",
             # ISSN cités par la série d'un enregistrement source, ou reliés à un autre titre.
             "serial_issns",
             "source_records.biblio",
             "issn_links",
         ),
-        writes=("monographs.id", "serials.id", "publishers.id", "serial_issns"),
-        run=_empty_containers,
+        # La suppression d'une revue emporte ses espaces de noms DOI et ses décisions de titre. Elle détache ses ISSN.
+        writes=(
+            "serials.id",
+            "serial_doi_namespaces",
+            "serial_title_decisions",
+            "serial_issns.serial_id",
+        ),
+        # Les éditeurs supprimés ensuite comme référentiels vides sont sans revue.
+        previous_run=("publishers.name",),
+        run=in_transaction(delete_empty_serials.run_delete_empty_serials),
+        section=_EMPTY_CONTAINERS_SECTION,
+        label=delete_empty_serials.LABEL,
+    ),
+    Task(
+        "delete_empty_publishers",
+        reads=(
+            "publishers.id",
+            "publishers.name",
+            "serials.publisher_id",
+            "monographs.publisher_id",
+            "doi_prefixes.publisher_id",
+            "apc_payments.publisher_id",
+            "source_records.publisher_id",
+            "publications.publisher_id",
+        ),
+        # La suppression d'un éditeur emporte ses formes de nom.
+        writes=("publishers.id", "publisher_name_forms"),
+        run=in_transaction(delete_empty_publishers.run_delete_empty_publishers),
+        section=_EMPTY_CONTAINERS_SECTION,
+        label=delete_empty_publishers.LABEL,
     ),
     Task(
         "publication_counts",
@@ -306,8 +311,10 @@ TASKS = (
 
 
 def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
-    """Renvoie les métriques de la phase : celles des référentiels vides, et un résumé."""
-    metrics = by_task["delete_empty_containers"]
+    """Renvoie les métriques de la phase : celles des suppressions de référentiels vides, et un résumé."""
+    metrics = PhaseMetrics()
+    for name in ("delete_empty_monographs", "delete_empty_serials", "delete_empty_publishers"):
+        metrics.merge(by_task[name])
     metrics.details["summary"] = {
         "total_in_perimeter": by_task["publications_in_perimeter"].details["in_perimeter"],
         "publications_purged": by_task["purge_publications"].details["purged"],

@@ -398,15 +398,18 @@ TASKS = (
             "contribution_resolution_queue",
             "publication_author_alignment",
         ),
-        # Publications supprimées plus loin dans le même run par `finalize.purge_publications` ; marquages retirés par la tâche elle-même ; personnes, identifiants, neutralisations et personnes des contributions, écrits par la phase `persons`.
         previous_run=(
+            # Publications, contributions et alignements supprimés, enregistrements sources détachés par `finalize.purge_publications`.
             "publications.id",
+            "contributions",
+            "aligned_source_contributions",
+            "source_records.publication_id",
+            # Marquages retirés par la tâche elle-même.
             "publication_contributions_queue",
+            # Personnes, identifiants, neutralisations et personnes des contributions, écrits par la phase `persons`.
             "person_identifiers",
             "persons",
             "source_contributions.neutralized_identifiers",
-            "contributions.person_id",
-            "contributions.resolution_mode",
         ),
         run=_build,
         label="Bilan",
@@ -440,10 +443,11 @@ TASKS = (
             # Une contribution rattachée sans épinglage qui quitte le périmètre est marquée pour la redécision de sa personne.
             "contribution_resolution_queue",
         ),
-        # Personnes des contributions, écrites par la phase `persons`.
+        # Personnes des contributions, écrites par la phase `persons` ; contributions et alignements supprimés, enregistrements sources détachés par `finalize.purge_publications`.
         previous_run=(
-            "contributions.person_id",
-            "contributions.resolution_mode",
+            "contributions",
+            "aligned_source_contributions",
+            "source_records.publication_id",
         ),
         run=_attributes,
         label="Attributs des contributions",

@@ -76,10 +76,11 @@ TASKS = (
             "apc_payments.publication_id",
             "publication_contributions_queue",
         ),
-        # Réponses d'Unpaywall et de doi.org ; publications supprimées par `finalize.purge_publications` ; revues et monographies vides supprimées par `finalize.delete_empty_containers`.
+        # Réponses d'Unpaywall et de doi.org ; publications supprimées et paiements APC détachés par `finalize.purge_publications` ; revues et monographies vides supprimées par `finalize`.
         previous_run=(
             "source_records.countries",
             "publications.id",
+            "apc_payments.publication_id",
             "publications.oa_status",
             "dois.unpaywall_oa_status",
             "dois.registered_url",

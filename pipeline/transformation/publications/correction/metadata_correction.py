@@ -78,7 +78,12 @@ TASKS = (
             "source_records.corrections",
             "source_record_keys_queue",
         ),
-        previous_run=("source_records", "source_record_identifiers.removed_by"),
+        # Espaces de noms des revues vides, supprimés avec elles par `finalize.delete_empty_serials`.
+        previous_run=(
+            "source_records",
+            "source_record_identifiers.removed_by",
+            "serial_doi_namespaces",
+        ),
         run=_serial_by_doi,
     ),
     Task(
