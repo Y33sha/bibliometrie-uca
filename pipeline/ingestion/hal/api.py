@@ -56,6 +56,8 @@ HAL_FIELDS = [
     "collCode_s",
     "nntId_s",
     "pubmedId_s",
+    # Numéro d'un brevet, en texte libre : numéro de publication, de demande, ou référence interne.
+    "number_s",
     "abstract_s",
     # Domaines CCSD : `<code>_FacetSep_<libellé racine>/…/<libellé feuille>`, avec le libellé de chaque niveau. `domain_s` donne seulement les codes.
     "fr_domainAllCodeLabel_fs",
