@@ -2,7 +2,7 @@
 
 ## Contexte
 
-Le pipeline moissonne seulement des publications. Aucune table ne contient de brevet.
+Le type de document `patent` existe. Les brevets en base viennent des dépôts HAL, repris par ScanR : 88 publications au 2026-11-04.
 
 ### API de propriété industrielle de l'INPI
 
