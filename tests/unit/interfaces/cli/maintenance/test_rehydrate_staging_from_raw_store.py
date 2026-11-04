@@ -6,6 +6,7 @@ Par défaut, seules les lignes présentes sont mises à jour ; une clé sans lig
 """
 
 import json
+import logging
 import sys
 from contextlib import contextmanager
 from types import SimpleNamespace
@@ -125,8 +126,6 @@ def test_lignes_presentes_mises_a_jour(lancer):
 
 
 def test_cle_sans_ligne_signalee_et_ignoree(lancer, caplog):
-    import logging
-
     with caplog.at_level(logging.WARNING):
         resultat = lancer({"hal": {"hal-1": {}}}, "--sources", "hal")
 
@@ -150,8 +149,6 @@ def test_mode_complet_recree_les_orphelines(lancer):
 
 def test_mode_complet_met_a_jour_ce_qui_existe_deja(lancer, caplog):
     """En mode complet, la ligne existante d'une clé est mise à jour, sans insertion."""
-    import logging
-
     with caplog.at_level(logging.INFO):
         resultat = lancer({"hal": {"hal-1": {}}}, "--sources", "hal", "--full")
 
@@ -160,8 +157,6 @@ def test_mode_complet_met_a_jour_ce_qui_existe_deja(lancer, caplog):
 
 
 def test_simulation_n_ouvre_pas_la_base(lancer, caplog):
-    import logging
-
     with caplog.at_level(logging.INFO):
         resultat = lancer({"hal": {"hal-1": {}, "hal-2": {}}}, "--sources", "hal", "--dry-run")
 
@@ -182,8 +177,6 @@ def test_transaction_close_par_lots(lancer, monkeypatch):
 
 def test_payload_illisible_signale_sans_interrompre(lancer, caplog):
     """Un payload illisible laisse sa ligne de `staging` inchangée ; les autres clés sont réinjectées."""
-    import logging
-
     with caplog.at_level(logging.WARNING):
         resultat = lancer(
             {"hal": {"hal-1": _ILLISIBLE, "hal-2": {}}},

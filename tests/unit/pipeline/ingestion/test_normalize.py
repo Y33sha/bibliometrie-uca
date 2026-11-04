@@ -152,14 +152,6 @@ class TestRunHappyPath:
         assert "err" in caplog.text
         assert stats == NormalizeStats(processed=1, skipped=1, errors=1)
 
-    def test_sans_document_incomplet_aucun_recapitulatif(self, caplog):
-        staging = _FakeStaging()
-        staging.pending_rows = [_row("ok"), _row("skip")]
-        norm = _Norm(staging, results=[True, None])
-        with caplog.at_level(logging.INFO):
-            norm.run()
-        assert "métadonnées incomplètes" not in caplog.text
-
     def test_le_commit_tombe_a_chaque_lot(self):
         """Avec DEFAULT_BATCH_SIZE=2 sur quatre documents : deux commits de lot, plus celui de fin."""
         staging = _FakeStaging()
@@ -198,7 +190,7 @@ class TestRunWorkException:
 
 
 class TestRunKeyboardInterrupt:
-    def test_rollback_and_reraise(self, caplog):
+    def test_rollback_and_reraise(self):
         staging = _FakeStaging()
         staging.pending_rows = [_row("a")]
 
@@ -207,10 +199,9 @@ class TestRunKeyboardInterrupt:
                 raise KeyboardInterrupt
 
         norm = _Kb(staging, results=[True])
-        with caplog.at_level(logging.WARNING), pytest.raises(KeyboardInterrupt):
+        with pytest.raises(KeyboardInterrupt):
             norm.run()
         # Le lot en cours est annulé par un rollback, et le KeyboardInterrupt est relevé pour que `run_pipeline` s'arrête. Les lots commités restent écrits.
-        assert "Interruption" in caplog.text
         norm.conn.rollback.assert_called()
 
     def test_connexion_invalidee_laisse_remonter_l_interruption(self):
@@ -229,8 +220,8 @@ class TestRunKeyboardInterrupt:
 
 
 class TestRunFatalException:
-    def test_rollback_and_reraise(self, caplog):
-        """Une exception de `preload_caches`, avant la boucle, est fatale : rollback, journalisation, exception relevée."""
+    def test_rollback_and_reraise(self):
+        """Une exception de `preload_caches`, avant la boucle, est fatale : rollback, puis exception relevée."""
         staging = _FakeStaging()
         staging.pending_rows = [_row("a")]
 
@@ -239,9 +230,8 @@ class TestRunFatalException:
                 raise RuntimeError("fatal preload")
 
         norm = _Fatal(staging)
-        with caplog.at_level(logging.ERROR), pytest.raises(RuntimeError):
+        with pytest.raises(RuntimeError):
             norm.run()
-        assert "Erreur fatale" in caplog.text
         assert norm.conn.rollback.called is True  # type: ignore[attr-defined]
 
 

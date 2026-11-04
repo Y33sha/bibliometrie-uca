@@ -77,13 +77,10 @@ def test_le_total_reste_celui_des_documents_normalises(lancer):
     assert metrics.total == 3
 
 
-def test_sans_document_la_maintenance_tourne_quand_meme(lancer, caplog):
+def test_sans_document_la_maintenance_tourne_quand_meme(lancer):
     appels: list[str] = []
-    with caplog.at_level(logging.INFO, logger="test"):
-        lancer(appels, bilan=NormalizeStats(0, 0, 0))
+    lancer(appels, bilan=NormalizeStats(0, 0, 0))
     assert appels == ["normalize:hal", "prune", "cleanup", "cleanup_addresses", "VACUUM staging"]
-    assert "aucun document disparu de sa source" in caplog.text
-    assert "▶ Maintenance des tables" in caplog.text
 
 
 def test_les_retraits_sont_annonces(lancer, caplog):

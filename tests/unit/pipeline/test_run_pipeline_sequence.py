@@ -171,10 +171,12 @@ class TestRunOnePhase:
         def _interrompue(ctx):
             raise KeyboardInterrupt
 
+        recorder = _FakeRecorder()
         with pytest.raises(SystemExit) as sortie, caplog.at_level(logging.INFO):
-            self._executer(_interrompue)
+            self._executer(_interrompue, recorder=recorder)
 
         assert sortie.value.code == 130
+        assert recorder.records[0]["status"] == "warning"
         assert "run_pipeline --from persons" in caplog.text
 
     def test_interruption_masquee_par_le_nettoyage(self):

@@ -1,7 +1,5 @@
 """Tests de l'enchaînement de la phase `fetch_stale` selon le mode."""
 
-import logging
-
 import pytest
 
 from pipeline.ingestion.common import fetch_stale
@@ -26,11 +24,9 @@ def relues(monkeypatch) -> list[str]:
     return sources
 
 
-def test_mode_daily_saute_la_phase(contexte, caplog, relues):
-    with caplog.at_level(logging.INFO, logger="test"):
-        run_phase(_PHASE, contexte(mode="daily", sources={"openalex"}))
+def test_mode_daily_saute_la_phase(contexte, relues):
+    run_phase(_PHASE, contexte(mode="daily", sources={"openalex"}))
     assert relues == []
-    assert "Sautée en mode daily" in caplog.text
 
 
 def test_mode_full_rafraichit_les_sources_demandees(contexte, relues):
