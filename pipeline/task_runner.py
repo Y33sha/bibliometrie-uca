@@ -52,23 +52,26 @@ def execute_tasks(
     return results
 
 
+def _silent(task: Task, metrics: PhaseMetrics) -> bool:
+    """Vrai si la tâche reste silencieuse : `silent_when_empty`, sans élément traité ni signal."""
+    return task.silent_when_empty and metrics.total == 0 and not metrics.signals
+
+
 def _close_if_silent(
     tasks: list[Task], results: Mapping[str, PhaseMetrics], ctx: PhaseContext
 ) -> None:
     """Ferme sur « Rien à faire » la section des tâches `tasks` quand toutes sont silencieuses : le titre a ainsi une ligne sous lui."""
-    if all(
-        task.silent_when_empty and results[task.name].total == 0 and not results[task.name].signals
-        for task in tasks
-    ):
+    if all(_silent(task, results[task.name]) for task in tasks):
         nothing_to_do(ctx.logger)
 
 
 def _write_lines(
     task: Task, metrics: PhaseMetrics, next_section: str | None, ctx: PhaseContext
 ) -> None:
-    """Écrit la ligne de bilan de la tâche, lance sa maintenance et écrit une ligne par opération."""
+    """Écrit la ligne de bilan de la tâche, sauf tâche silencieuse, lance sa maintenance et écrit une ligne par opération."""
+    has_report = task.label is not None and not _silent(task, metrics)
     lines = [
-        *([(task.label, _outcome(metrics))] if task.label is not None else []),
+        *([(task.label, _outcome(metrics))] if has_report else []),
         *_maintain(task, ctx),
     ]
     for rank, (label, outcome) in enumerate(lines):

@@ -1,6 +1,6 @@
 """Modes d'exécution du pipeline : sources moissonnées, années, et opérations coûteuses.
 
-- `daily` : les sources incrémentales (HAL), dépôts modifiés depuis le dernier moissonnage quotidien réussi, sans `fetch_stale` ni `harvest_by_person`.
+- `daily` : les sources incrémentales (HAL), dépôts modifiés depuis le dernier moissonnage quotidien réussi, sans `fetch_stale` ni `harvest_by_person`, ni recherche dans HAL des thèses par NNT.
 - `full` : toutes les sources moissonnées, sur la plage d'années du run.
 """
 
@@ -24,6 +24,8 @@ class ModePolicy:
     """La phase `fetch_stale` réinterroge un à un les enregistrements sources non revus par le moissonnage."""
     harvest_by_person: bool
     """La phase `harvest_by_person` moissonne les sources par l'identifiant des personnes RH."""
+    hal_theses_by_nnt: bool
+    """La phase `fetch_missing` cherche dans HAL, par NNT, les thèses de theses.fr sans document HAL."""
     refresh_hal_structures: bool
     """Le référentiel des structures HAL recharge aussi les structures connues, sinon seulement les absentes."""
 
@@ -35,6 +37,7 @@ MODES: dict[str, ModePolicy] = {
         vacuum_full=False,
         fetch_stale=False,
         harvest_by_person=False,
+        hal_theses_by_nnt=False,
         refresh_hal_structures=False,
     ),
     "full": ModePolicy(
@@ -43,6 +46,7 @@ MODES: dict[str, ModePolicy] = {
         vacuum_full=True,
         fetch_stale=True,
         harvest_by_person=True,
+        hal_theses_by_nnt=True,
         refresh_hal_structures=True,
     ),
 }
