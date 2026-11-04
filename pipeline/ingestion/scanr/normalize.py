@@ -321,8 +321,8 @@ class ScanrNormalizer(SourceNormalizer):
     SOURCE = "scanr"
     DEFAULT_BATCH_SIZE = 100
 
-    def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
-        return get_title(row.raw_data), as_int(row.raw_data.get("year"))
+    def minimal_metadata(self, doc: Document) -> tuple[str | None, int | None]:
+        return get_title(doc), as_int(doc.get("year"))
 
     def publisher(self, doc: Document) -> PublisherFacts | None:
         return get_publisher(doc)

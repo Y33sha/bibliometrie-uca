@@ -438,8 +438,8 @@ class OpenalexNormalizer(SourceNormalizer):
     SOURCE = "openalex"
     DEFAULT_BATCH_SIZE = 500
 
-    def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
-        return get_title(row.raw_data), get_publication_year(row.raw_data)
+    def minimal_metadata(self, doc: Document) -> tuple[str | None, int | None]:
+        return get_title(doc), get_publication_year(doc)
 
     def publisher(self, doc: Document) -> PublisherFacts | None:
         if not names_publisher(parse_primary_location(doc)):

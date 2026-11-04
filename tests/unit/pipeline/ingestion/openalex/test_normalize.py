@@ -32,7 +32,6 @@ from tests.helpers.normalize_doubles import (
     FakeStagingStore,
     identifier_values,
     normalizer_arguments,
-    staging_row,
 )
 
 # ── extract_locations_data ───────────────────────────────────────
@@ -758,7 +757,7 @@ class TestOpenalexNormalizerClass:
     def test_metadonnees_minimales_d_un_work_sans_annee(self):
         """OpenAlex renvoie W3131333980 sans DOI ni année ; les métadonnées minimales donnent son titre et une année vide."""
         work = {"title": "Inequality of Opportunity, Inequality of Income and Economic Growth"}
-        assert _make_normalizer().minimal_metadata(staging_row(raw=work)) == (work["title"], None)
+        assert _make_normalizer().minimal_metadata(work) == (work["title"], None)
 
     def test_editeur_et_conteneur_d_une_revue(self):
         work = {

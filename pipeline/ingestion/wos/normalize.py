@@ -506,9 +506,8 @@ class WosNormalizer(SourceNormalizer):
     SOURCE = "wos"
     DEFAULT_BATCH_SIZE = 500
 
-    def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
-        rec = extract_record(row.raw_data, row.doi)
-        return as_str(rec.get("title")), as_int(rec.get("publication_year"))
+    def minimal_metadata(self, doc: Document) -> tuple[str | None, int | None]:
+        return as_str(doc.get("title")), as_int(doc.get("publication_year"))
 
     def parse(self, row: StagingRow) -> Document:
         """Lit le record dans la forme de l'API ou de l'export. Un record sans UT prend l'identifiant de sa ligne de `staging`."""

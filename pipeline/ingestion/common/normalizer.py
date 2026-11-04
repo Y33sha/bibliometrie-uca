@@ -104,8 +104,8 @@ class SourceNormalizer(ABC):
         self._subject_store = subject_store
 
     @abstractmethod
-    def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
-        """Renvoie le titre et l'année du document, lus dans son payload."""
+    def minimal_metadata(self, doc: Document) -> tuple[str | None, int | None]:
+        """Renvoie le titre et l'année du document."""
 
     def parse(self, row: StagingRow) -> Document | None:
         """Renvoie le document décrit par la ligne, ou `None` pour un document refusé. N'écrit rien."""
@@ -168,14 +168,11 @@ class SourceNormalizer(ABC):
             facts = facts.without_series()
         return determine_container_type(facts)
 
-    def normalize_record(self, row: StagingRow) -> bool:
-        """Normalise un document à métadonnées minimales et marque sa ligne traitée. Renvoie vrai, ou faux sans rien écrire pour un document refusé.
+    def normalize_record(self, row: StagingRow, doc: Document) -> None:
+        """Normalise le document `doc`, lu dans la ligne `row`, à métadonnées minimales, et marque sa ligne traitée.
 
         Écrit dans l'ordre l'enregistrement source, ses localisations, son embargo, ses sujets et ses contributions sources. L'éditeur, la série et le volume décrits par la source s'écrivent dans `biblio` ; l'éditeur, la revue et la monographie se rattachent dans la phase `publishing`.
         """
-        doc = self.parse(row)
-        if doc is None:
-            return False
         publisher = self.publisher(doc)
         series, volume = self.series_and_volume(row, doc)
         record = self.source_record(row, doc, has_series=series is not None)
@@ -203,7 +200,6 @@ class SourceNormalizer(ABC):
             self.author_records,
         )
         self._staging.clear_payload(row)
-        return True
 
     def process_work(self, row: StagingRow) -> bool | None:
         """Traite une ligne de `staging`. Renvoie vrai pour un document normalisé, `None` pour une ligne vide, sautée, et faux pour un document refusé.
@@ -212,15 +208,16 @@ class SourceNormalizer(ABC):
         """
         if not row.raw_data:
             return None
-        title, publication_year = self.minimal_metadata(row)
+        doc = self.parse(row)
+        if doc is None:
+            return self._reject(row)
+        title, publication_year = self.minimal_metadata(doc)
         if not has_minimal_publication_metadata(title, publication_year) or is_overlong_title(
             title
         ):
             return self._reject(row)
-        result = self.normalize_record(row)
-        if result is False:
-            return self._reject(row)
-        return result
+        self.normalize_record(row, doc)
+        return True
 
     def _reject(self, row: StagingRow) -> bool:
         """Écarte un document refusé : son enregistrement source est supprimé, son payload vidé. Renvoie faux, compté comme document incomplet."""

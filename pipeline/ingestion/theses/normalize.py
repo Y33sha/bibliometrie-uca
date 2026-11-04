@@ -205,8 +205,8 @@ class ThesesNormalizer(SourceNormalizer):
     SOURCE = "theses"
     DEFAULT_BATCH_SIZE = 100
 
-    def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
-        return get_title(row.raw_data), get_publication_year(row.raw_data)
+    def minimal_metadata(self, doc: Document) -> tuple[str | None, int | None]:
+        return get_title(doc), get_publication_year(doc)
 
     def source_record(
         self, row: StagingRow, doc: Document, *, has_series: bool

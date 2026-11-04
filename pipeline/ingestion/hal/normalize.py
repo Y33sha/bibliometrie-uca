@@ -552,8 +552,8 @@ class HalNormalizer(SourceNormalizer):
     SOURCE = "hal"
     DEFAULT_BATCH_SIZE = 500
 
-    def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
-        return get_title(row.raw_data), as_int(row.raw_data.get("producedDateY_i"))
+    def minimal_metadata(self, doc: Document) -> tuple[str | None, int | None]:
+        return get_title(doc), as_int(doc.get("producedDateY_i"))
 
     def parse(self, row: StagingRow) -> Document | None:
         """Renvoie le dépôt, ou `None` sans champ auteurs."""
