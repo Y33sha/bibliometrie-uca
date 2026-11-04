@@ -98,6 +98,13 @@
 		if (!iso) return '';
 		return new Date(iso).toLocaleDateString('fr-FR');
 	}
+
+	/** Organisme et édition d'une liste, pour l'info-bulle de son étiquette. */
+	function listTitle(list: { maintainer: string | null; edition: string | null }): string {
+		return [list.maintainer, list.edition ? `édition du ${formatDate(list.edition)}` : null]
+			.filter(Boolean)
+			.join(', ');
+	}
 </script>
 
 <svelte:head>
@@ -164,6 +171,19 @@
 				</EntityMetaItem>
 			{/if}
 		</div>
+		{#if journal.lists.length}
+			<div class="entity-meta">
+				<EntityMetaItem label="Listes">
+					{#each journal.lists as list (list.code)}
+						{#if list.url}
+							<a class="entity-tag" href={list.url} target="_blank" rel="noopener" title={listTitle(list)}>{list.label}</a>
+						{:else}
+							<span class="entity-tag" title={listTitle(list)}>{list.label}</span>
+						{/if}
+					{/each}
+				</EntityMetaItem>
+			</div>
+		{/if}
 	</div>
 
 	<!-- Tabs -->

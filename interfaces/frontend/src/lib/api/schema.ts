@@ -5603,6 +5603,8 @@ export interface components {
             issn_details: components["schemas"]["SerialIssnDetail"][];
             /** Relations */
             relations: components["schemas"]["SerialRelation"][];
+            /** Lists */
+            lists: components["schemas"]["SerialListMembership"][];
             /** Openalex Id */
             openalex_id: string | null;
             /** Is Academic */
@@ -5656,6 +5658,26 @@ export interface components {
             sudoc_checked_at: string | null;
         };
         /**
+         * SerialListFacet
+         * @description Liste ou classement de la facette « Listes ».
+         */
+        SerialListFacet: {
+            /** Code */
+            code: string;
+            /** Label */
+            label: string;
+            /**
+             * Count
+             * @description Revues présentes dans la liste, ou à l'un des niveaux du classement.
+             */
+            count: number;
+            /**
+             * Levels
+             * @description Niveaux d'un classement ; vide pour une liste.
+             */
+            levels: components["schemas"]["SerialListLevelFacet"][];
+        };
+        /**
          * SerialListItem
          * @description Ligne de la liste paginée `/api/serials`, résumé du profil complet (`SerialDetailResponse`).
          */
@@ -5681,6 +5703,37 @@ export interface components {
             publication_count: number;
             /** Doaj Url */
             doaj_url: string | null;
+        };
+        /**
+         * SerialListLevelFacet
+         * @description Niveau d'un classement dans la facette « Listes ».
+         */
+        SerialListLevelFacet: {
+            /** Code */
+            code: string;
+            /** Label */
+            label: string;
+            /** Count */
+            count: number;
+        };
+        /**
+         * SerialListMembership
+         * @description Liste de revues où figure la revue.
+         */
+        SerialListMembership: {
+            /** Code */
+            code: string;
+            /**
+             * Label
+             * @description Libellé de la liste ; pour un niveau, libellé du classement suivi de celui du niveau.
+             */
+            label: string;
+            /** Maintainer */
+            maintainer: string | null;
+            /** Url */
+            url: string | null;
+            /** Edition */
+            edition: string | null;
         };
         /** SerialListResponse */
         SerialListResponse: {
@@ -5770,10 +5823,10 @@ export interface components {
              */
             oa_models: components["schemas"]["FacetOption"][];
             /**
-             * Doaj
-             * @description Libellés `Indexée` et `Non indexée`.
+             * Lists
+             * @description Listes et classements, dans l'ordre d'affichage.
              */
-            doaj: components["schemas"]["FacetOption"][];
+            lists: components["schemas"]["SerialListFacet"][];
             /** @description Revues avec et sans publication. */
             publications: components["schemas"]["YesNoCount"];
         };
@@ -10380,7 +10433,8 @@ export interface operations {
                 search?: string;
                 publisher_id?: number | null;
                 serial_type?: string;
-                is_in_doaj?: boolean | null;
+                list_filter?: string;
+                list_level?: string;
                 oa_model?: string;
                 has_publications?: boolean | null;
             };
@@ -10418,7 +10472,8 @@ export interface operations {
                 search?: string;
                 publisher_id?: number | null;
                 serial_type?: string;
-                is_in_doaj?: boolean | null;
+                list_filter?: string;
+                list_level?: string;
                 oa_model?: string;
                 has_publications?: boolean | null;
             };
@@ -10457,7 +10512,8 @@ export interface operations {
                 search?: string;
                 publisher_id?: number | null;
                 serial_type?: string;
-                is_in_doaj?: boolean | null;
+                list_filter?: string;
+                list_level?: string;
                 oa_model?: string;
                 has_publications?: boolean | null;
             };
@@ -10494,7 +10550,8 @@ export interface operations {
                 search?: string;
                 publisher_id?: number | null;
                 serial_type?: string;
-                is_in_doaj?: boolean | null;
+                list_filter?: string;
+                list_level?: string;
                 oa_model?: string;
                 has_publications?: boolean | null;
             };

@@ -268,4 +268,5 @@ export const filterLabels = {
 	citationTops: 'Top citations',
 	access: 'Accès',
 	sources: 'Sources',
+	lists: 'Listes',
 } as const;

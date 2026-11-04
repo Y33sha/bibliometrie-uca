@@ -1,7 +1,7 @@
 """Modèles de réponse : lectures sur les revues."""
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 
 from application.ports.model import Model
@@ -33,7 +33,10 @@ class SerialFilters:
     publisher_id: int | None = None
     serial_types: list[str] = field(default_factory=list)
     """Multi-valué : une option cochée s'ajoute aux autres."""
-    is_in_doaj: bool | None = None
+    list_states: dict[str, bool] = field(default_factory=dict)
+    """Présence (`True`) ou absence (`False`) exigée dans une liste ou un classement, par code. Les conditions se combinent en ET."""
+    list_levels: list[str] = field(default_factory=list)
+    """Niveaux cochés : pour chaque classement concerné, la revue figure à l'un de ses niveaux cochés."""
     oa_models: list[str] = field(default_factory=list)
     """Multi-valué : une option cochée s'ajoute aux autres."""
     has_publications: bool | None = None
@@ -83,16 +86,47 @@ class SerialListResponse(PaginatedResponse):
     serials: list[SerialListItem]
 
 
+class SerialListMembership(Model):
+    """Liste de revues où figure la revue."""
+
+    code: str
+    label: str
+    """Libellé de la liste ; pour un niveau, libellé du classement suivi de celui du niveau."""
+    maintainer: str | None
+    url: str | None
+    edition: date | None
+
+
 class SerialDetailResponse(SerialListItem):
     """Profil complet de la revue (GET /api/serials/{id}), pour sa page publique et l'édition admin : la ligne de liste et les champs propres au détail."""
 
     issn_details: list[SerialIssnDetail]
     relations: list[SerialRelation]
+    lists: list[SerialListMembership]
     openalex_id: str | None
     is_academic: bool | None
     doaj_payload: dict[str, str] | None
     """Réponse DOAJ brute, renvoyée telle quelle."""
     doaj_imported_at: datetime | None
+
+
+class SerialListLevelFacet(Model):
+    """Niveau d'un classement dans la facette « Listes »."""
+
+    code: str
+    label: str
+    count: int
+
+
+class SerialListFacet(Model):
+    """Liste ou classement de la facette « Listes »."""
+
+    code: str
+    label: str
+    count: int
+    """Revues présentes dans la liste, ou à l'un des niveaux du classement."""
+    levels: list[SerialListLevelFacet]
+    """Niveaux d'un classement ; vide pour une liste."""
 
 
 class SerialsFacetsResponse(Model):
@@ -105,8 +139,8 @@ class SerialsFacetsResponse(Model):
     """Libellés tirés de `SERIAL_TYPE_LABELS_FR`."""
     oa_models: list[FacetOption]
     """Libellés tirés de `OA_MODEL_LABELS_FR`."""
-    doaj: list[FacetOption]
-    """Libellés `Indexée` et `Non indexée`."""
+    lists: list[SerialListFacet]
+    """Listes et classements, dans l'ordre d'affichage."""
     publications: YesNoCount
     """Revues avec et sans publication."""
 

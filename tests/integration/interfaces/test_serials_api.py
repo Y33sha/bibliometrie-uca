@@ -45,6 +45,16 @@ from tests.integration.helpers.seeds import (
 _publication = partial(seed_publication, normalize_title=False)
 
 
+def _add_to_lists(serial_id: int, *codes: str) -> None:
+    """Ajoute la revue aux listes `codes`."""
+    with owner_pool() as cur:
+        for code in codes:
+            cur.execute(
+                "INSERT INTO serial_list_entries (serial_id, list_code) VALUES (%s, %s)",
+                (serial_id, code),
+            )
+
+
 def _set_doaj(cur, serial_id: int, payload: dict[str, str] | None) -> None:
     """Ajoute la revue à la liste `doaj`, avec la fiche DOAJ `payload`."""
     cur.execute(
@@ -147,14 +157,45 @@ class TestListSerials:
         types = {j["serial_type"] for j in r.json()["serials"]}
         assert types == {"proceedings"}
 
-    def test_filter_by_is_in_doaj(self, client):
-        jid = seed_serial()
-        with owner_pool() as cur:
-            _set_doaj(cur, jid, None)
-        r = client.get("/api/serials", params={"is_in_doaj": "true", "per_page": 200})
+    def _ids(self, client, publisher: int, **params: str) -> set[int]:
+        r = client.get(
+            "/api/serials", params={"publisher_id": publisher, "per_page": 200, **params}
+        )
         assert r.status_code == 200
-        flags = {j["is_in_doaj"] for j in r.json()["serials"]}
-        assert flags == {True}
+        return {j["id"] for j in r.json()["serials"]}
+
+    def test_filter_by_list_presence_and_absence(self, client):
+        publisher = seed_publisher()
+        in_doaj = seed_serial(publisher_id=publisher)
+        absent = seed_serial(publisher_id=publisher)
+        _add_to_lists(in_doaj, "doaj")
+        assert self._ids(client, publisher, list_filter="doaj_yes") == {in_doaj}
+        assert self._ids(client, publisher, list_filter="doaj_no") == {absent}
+
+    def test_filter_by_ranking_and_levels(self, client):
+        publisher = seed_publisher()
+        top = seed_serial(publisher_id=publisher)
+        third = seed_serial(publisher_id=publisher)
+        both = seed_serial(publisher_id=publisher)
+        unranked = seed_serial(publisher_id=publisher)
+        _add_to_lists(top, "fnege-1-star")
+        _add_to_lists(third, "fnege-3")
+        _add_to_lists(both, "fnege-1-star", "norway-2")
+        assert self._ids(client, publisher, list_filter="fnege_yes") == {top, third, both}
+        assert self._ids(client, publisher, list_filter="fnege_no") == {unranked}
+        assert self._ids(client, publisher, list_level="fnege-1-star,fnege-3") == {
+            top,
+            third,
+            both,
+        }
+        # Les niveaux de deux classements se combinent en ET.
+        assert self._ids(client, publisher, list_level="fnege-1-star,norway-2") == {both}
+
+    @pytest.mark.parametrize(
+        ("param", "value"), [("list_filter", "inconnue_yes"), ("list_level", "doaj")]
+    )
+    def test_unknown_list_rejected(self, client, param, value):
+        assert client.get("/api/serials", params={param: value}).status_code == 422
 
     def _seed_with_and_without_publications(self) -> None:
         seed_serial("OrphanSerial")
@@ -421,6 +462,17 @@ class TestGetSerial:
         assert body["is_in_doaj"] is True
         assert body["doaj_payload"] == payload
 
+    def test_lists_of_the_serial(self, client):
+        """Le libellé d'un niveau commence par celui de son classement ; les listes suivent l'ordre d'affichage."""
+        jid = seed_serial()
+        _add_to_lists(jid, "norway-2", "doyens")
+        r = client.get(f"/api/serials/{jid}")
+        assert r.status_code == 200
+        assert [(item["code"], item["label"]) for item in r.json()["lists"]] == [
+            ("doyens", "Conférence des doyens de médecine"),
+            ("norway-2", "Registre norvégien, niveau 2"),
+        ]
+
     def test_doaj_url_null_when_no_url_source_in_payload(self, client):
         """Sans `URL in DOAJ` ni `DOAJ id` dans le payload, `doaj_url` est nul : l'interface affiche le DOAJ sans lien."""
         jid = seed_serial()
@@ -631,7 +683,7 @@ class TestSerialsFacets:
         r = client.get("/api/serials/facets")
         assert r.status_code == 200
         body = r.json()
-        assert {"serial_types", "oa_models", "doaj", "publications"} <= set(body)
+        assert {"serial_types", "oa_models", "lists", "publications"} <= set(body)
 
     def test_honours_search_and_publisher(self, client):
         r = client.get("/api/serials/facets", params={"search": "nature", "publisher_id": 1})
@@ -643,11 +695,29 @@ class TestSerialsFacets:
             params={
                 "serial_type": "journal,proceedings",
                 "oa_model": "full_oa",
-                "is_in_doaj": "true",
+                "list_filter": "doaj_yes",
+                "list_level": "norway-2",
                 "has_publications": "true",
             },
         )
         assert r.status_code == 200
+
+    def test_lists_count_rankings_and_levels(self, client):
+        publisher = seed_publisher()
+        top = seed_serial(publisher_id=publisher)
+        third = seed_serial(publisher_id=publisher)
+        seed_serial(publisher_id=publisher)
+        _add_to_lists(top, "fnege-1-star", "doaj")
+        _add_to_lists(third, "fnege-3")
+        r = client.get(
+            "/api/serials/facets", params={"publisher_id": publisher, "list_filter": "doaj_yes"}
+        )
+        assert r.status_code == 200
+        lists = {item["code"]: item for item in r.json()["lists"]}
+        assert (lists["doaj"]["count"], lists["doaj"]["levels"]) == (1, [])
+        assert lists["fnege"]["count"] == 2
+        levels = {level["code"]: level["count"] for level in lists["fnege"]["levels"]}
+        assert (levels["fnege-1-star"], levels["fnege-3"], levels["fnege-4"]) == (1, 1, 0)
 
     def test_publications_counts_ignore_their_own_filter(self, client):
         publisher = seed_publisher()

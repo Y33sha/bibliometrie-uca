@@ -162,6 +162,16 @@ describe('useUrlFilters', () => {
 			});
 		});
 
+		it('restaure des source_states à clé composée d’un tiret', () => {
+			const f = useUrlFilters({
+				basePath: '/p',
+				filters: { listStates: { type: 'source_states', urlKey: 'list_filter' } },
+			});
+			expect(f.restoreFromUrl(new URLSearchParams('list_filter=cwts-core_yes,erih-plus_no'))).toEqual({
+				listStates: { 'cwts-core': 'yes', 'erih-plus': 'no' },
+			});
+		});
+
 		it('restaure une page numérique (défaut 1 si invalide)', () => {
 			const f = useUrlFilters({
 				basePath: '/p',
