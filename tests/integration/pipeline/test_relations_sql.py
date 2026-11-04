@@ -294,9 +294,9 @@ class TestRelationsDeMemeOeuvre:
             ("article", "preprint")
         ]
 
-    def test_publications_retrouvees_par_doi_quelle_que_soit_la_casse(self, sa_sync_conn):
+    def test_publication_retrouvee_par_son_doi(self, sa_sync_conn):
         publication = _publication(
-            sa_sync_conn, doc_type="article", title_normalized="article", doi="10.1007/JHEP.A1"
+            sa_sync_conn, doc_type="article", title_normalized="article", doi="10.1007/jhep.a1"
         )
         assert relations.fetch_publications_by_doi(sa_sync_conn, ["10.1007/jhep.a1"]) == {
             "10.1007/jhep.a1": DoiPublication(publication, "article")

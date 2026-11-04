@@ -936,7 +936,7 @@ class TestExternalDoiCarrier:
         )  # DOI, sans enregistrement source
         sp1 = _source_record(conn, source_id="t1", title_normalized="t", doi="10.70675/abc")
         sp2 = _source_record(conn, source_id="t2", doi="10.70675/abc")
-        # Avec une contribution source du périmètre, ces orphelins créeraient une publication au DOI déjà pris (`publications_doi_lower_key`).
+        # Avec une contribution source du périmètre, ces orphelins créeraient une publication au DOI déjà pris (`publications_doi_key`).
         insert_source_contribution(
             conn, sp1, source="openalex", author_position=None, in_perimeter=True
         )
@@ -947,7 +947,7 @@ class TestExternalDoiCarrier:
         assert _source_record_state(conn, sp1)[0] == orphan_publication
         assert _source_record_state(conn, sp2)[0] == orphan_publication
         n = conn.execute(
-            text("SELECT count(*) FROM publications WHERE lower(doi) = '10.70675/abc'")
+            text("SELECT count(*) FROM publications WHERE doi = '10.70675/abc'")
         ).scalar_one()
         assert n == 1
 

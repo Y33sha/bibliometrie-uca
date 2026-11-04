@@ -56,8 +56,8 @@ def test_le_fichier_depose_est_ferme_jusqu_a_la_fin_de_l_embargo(sa_sync_conn, e
     ],
 )
 def test_l_adresse_enregistree_d_un_pdf_donne_une_copie(sa_sync_conn, registered_url, copy_urls):
-    """Une publication sans enregistrement source à localisation reçoit la copie de son DOI, en majuscules ou non."""
-    publication = insert_publication(sa_sync_conn, doi="10.9/ABC")
+    """Une publication sans enregistrement source à localisation reçoit la copie de son DOI."""
+    publication = insert_publication(sa_sync_conn, doi="10.9/abc")
     sa_sync_conn.execute(
         text(
             "INSERT INTO dois (doi, registered_url, resolved_at) VALUES ('10.9/abc', :url, now())"

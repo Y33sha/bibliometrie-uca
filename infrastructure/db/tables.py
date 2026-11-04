@@ -694,6 +694,19 @@ def publication_date_columns(*, nullable: bool) -> tuple[Column[date], Column[st
     )
 
 
+def _lowercase_doi(table: str, column: str = "doi") -> CheckConstraint:
+    """Renvoie la contrainte d'une colonne de DOI : en minuscules, comme la forme normalisée d'un DOI (`domain.documents.identifiers.DOI`)."""
+    return CheckConstraint(f"{column} = lower({column})", name=f"{table}_{column}_lowercase")
+
+
+def _identifier_case(table: str) -> CheckConstraint:
+    """Renvoie la contrainte d'une colonne `id_value` d'identifiants de publication, typés par `id_type` : casse de leur forme normalisée, en majuscules pour un NNT, en minuscules pour les autres."""
+    return CheckConstraint(
+        "id_value = CASE id_type WHEN 'nnt' THEN upper(id_value) ELSE lower(id_value) END",
+        name=f"{table}_id_value_case",
+    )
+
+
 # ── Adresses ──────────────────────────────────────────────────────
 
 
@@ -1264,6 +1277,8 @@ publications = Table(
         "impact IS NULL OR jsonb_typeof(impact) = 'object'",
         name="publications_impact_is_object",
     ),
+    _lowercase_doi("publications"),
+    UniqueConstraint("doi", name="publications_doi_key"),
     schema="publications",
 )
 
@@ -1441,6 +1456,7 @@ source_record_identifiers = Table(
     PrimaryKeyConstraint(
         "source_record_id", "id_type", "id_value", name="source_record_identifiers_pkey"
     ),
+    _identifier_case("source_record_identifiers"),
     comment="Identifiants d'un enregistrement source, réécrits à chaque normalisation.",
     schema="sources",
 )
@@ -1459,6 +1475,8 @@ doi_targets = Table(
         "target_doi", Text, nullable=False, comment="DOI de l'œuvre principale, présent en base."
     ),
     Column("rule", Text, nullable=False, comment="Règle de correction qui relie les deux DOI."),
+    _lowercase_doi("doi_targets"),
+    _lowercase_doi("doi_targets", "target_doi"),
     comment="Cible du DOI d'une forme secondaire, réécrite par la correction par DOI partagé. La cible tient lieu du DOI pour la réconciliation et la consolidation.",
     schema="sources",
 )
@@ -1582,6 +1600,7 @@ apc_payments = Table(
     UniqueConstraint(
         "doi", "institution", "amount_eur_ht", "open_access_fee", name="apc_payments_payment_key"
     ),
+    _lowercase_doi("apc_payments"),
     schema="publishing",
 )
 
@@ -1652,6 +1671,7 @@ staging = Table(
     # Provenance d'entrée : vocabulaire `StagingEntryMode`.
     Column("entry_mode", Text, nullable=False, server_default=StagingEntryMode.BULK.value),
     UniqueConstraint("source", "source_id", name="staging_source_source_id_key"),
+    _lowercase_doi("staging"),
     CheckConstraint(
         "entry_mode = ANY (ARRAY["
         + ", ".join(f"'{mode.value}'::text" for mode in StagingEntryMode)
@@ -1678,6 +1698,7 @@ failed_lookups = Table(
         "id_type = ANY (ARRAY['doi'::text, 'hal_id'::text, 'nnt'::text])",
         name="failed_lookups_id_type_check",
     ),
+    _identifier_case("failed_lookups"),
     comment=(
         "Identifiants cherchés en vain par la phase fetch_missing, dans une source ou auprès de "
         "doi.org (source doi_org : DOI que doi.org ne connaît pas). L'échec est définitif pour un "
@@ -1722,6 +1743,7 @@ dois = Table(
     CheckConstraint(
         "registered_url IS NULL OR resolved_at IS NOT NULL", name="dois_registered_url_dated"
     ),
+    _lowercase_doi("dois"),
     comment=(
         "Réponses des services externes sur chaque DOI de publication : verdict d'Unpaywall, "
         "URL de résolution chez doi.org."
@@ -1797,6 +1819,7 @@ publication_relations = Table(
         "target_publication_id IS NOT NULL OR target_doi IS NOT NULL",
         name="publication_relations_target_present",
     ),
+    _lowercase_doi("publication_relations", "target_doi"),
     UniqueConstraint(
         "from_publication_id",
         "relation_type",

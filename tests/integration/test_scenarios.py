@@ -1,4 +1,4 @@
-"""Scénarios d'intégration : DOI insensibles à la casse, consolidation d'une publication, types énumérés PostgreSQL, fusion de personnes."""
+"""Scénarios d'intégration : casse des identifiants de publication, consolidation d'une publication, types énumérés PostgreSQL, fusion de personnes."""
 
 from functools import partial
 
@@ -43,24 +43,42 @@ def publication_repo(sa_sync_conn):
     return PublicationStore(sa_sync_conn)
 
 
-# ── DOI insensibles à la casse ──
+# ── Casse des identifiants de publication ──
 
 
-class TestDoiCaseInsensitive:
-    """La contrainte d'unicité sur le DOI ignore la casse (`lower(doi)`), comme les recherches par DOI."""
+class TestIdentifierCase:
+    """Un identifiant de publication a la casse de sa forme normalisée : DOI en minuscules, NNT en majuscules."""
 
-    def test_unique_constraint_blocks_case_variant(self, sa_sync_conn):
-        _publication(sa_sync_conn, "Pub A", doi="10.1103/PhysRevC.111.024905")
+    def test_un_doi_de_publication_en_majuscules_est_refuse(self, sa_sync_conn):
         with pytest.raises(IntegrityError):
-            _publication(sa_sync_conn, "Pub B", doi="10.1103/physrevc.111.024905")
+            _publication(sa_sync_conn, "Pub A", doi="10.1103/PhysRevC.111.024905")
 
-    def test_lookup_finds_case_variant(self, sa_sync_conn):
-        _publication(sa_sync_conn, "Pub A", doi="10.1103/PhysRevC.111.024905")
-        result = sa_sync_conn.execute(
-            text("SELECT id FROM publications WHERE lower(doi) = lower(:doi)"),
-            {"doi": "10.1103/physrevc.111.024905"},
-        ).first()
-        assert result is not None
+    @pytest.mark.parametrize(
+        ("id_type", "id_value", "accepted"),
+        [
+            ("nnt", "2021UCFAC022", True),
+            ("nnt", "2021ucfac022", False),
+            ("doi", "10.1103/physrevc.111.024905", True),
+            ("doi", "10.1103/PhysRevC.111.024905", False),
+        ],
+    )
+    def test_casse_d_un_identifiant_d_enregistrement_source(
+        self, sa_sync_conn, id_type, id_value, accepted
+    ):
+        record = insert_source_record(sa_sync_conn)
+        insert = partial(
+            sa_sync_conn.execute,
+            text("""
+                INSERT INTO source_record_identifiers (source_record_id, id_type, id_value, role)
+                VALUES (:record, CAST(:id_type AS source_identifier_type), :id_value, 'secondary')
+            """),
+            {"record": record, "id_type": id_type, "id_value": id_value},
+        )
+        if accepted:
+            insert()
+        else:
+            with pytest.raises(IntegrityError):
+                insert()
 
 
 # ── Consolidation des publications ──

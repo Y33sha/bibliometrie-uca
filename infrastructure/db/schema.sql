@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict D2VmuphnK38t9TSQYQfVMrrhxVcw4Jop1dr1W9TwbqvjcpOIfhWKVeJgi5BGM8a
+\restrict OKfO4f6sqqhGaZRyXMn7WUeq8JO7H423Y5Snf2ZQPC733Z932BuwNdlHlMJZpLD
 
--- Dumped from database version 18.4
--- Dumped by pg_dump version 18.4
+-- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
+-- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -1760,6 +1760,7 @@ CREATE TABLE publications.publication_relations (
     target_publication_id integer,
     source text NOT NULL,
     id bigint NOT NULL,
+    CONSTRAINT publication_relations_target_doi_lowercase CHECK ((target_doi = lower(target_doi))),
     CONSTRAINT publication_relations_target_present CHECK (((target_publication_id IS NOT NULL) OR (target_doi IS NOT NULL)))
 );
 
@@ -1896,6 +1897,7 @@ CREATE TABLE publications.publications (
     publication_year smallint GENERATED ALWAYS AS ((EXTRACT(year FROM publication_date))::smallint) STORED,
     impact jsonb,
     CONSTRAINT publications_corrections_is_object CHECK ((jsonb_typeof(corrections) = 'object'::text)),
+    CONSTRAINT publications_doi_lowercase CHECK ((doi = lower(doi))),
     CONSTRAINT publications_impact_is_object CHECK (((impact IS NULL) OR (jsonb_typeof(impact) = 'object'::text)))
 );
 
@@ -2135,7 +2137,8 @@ CREATE TABLE publishing.apc_payments (
     created_at timestamp with time zone DEFAULT now(),
     budget_structure_id integer,
     lab_structure_id integer,
-    open_access_fee boolean NOT NULL
+    open_access_fee boolean NOT NULL,
+    CONSTRAINT apc_payments_doi_lowercase CHECK ((doi = lower(doi)))
 );
 
 
@@ -2888,7 +2891,12 @@ CREATE TABLE sources.source_record_identifiers (
     id_type public.source_identifier_type NOT NULL,
     id_value text NOT NULL,
     role public.source_identifier_role NOT NULL,
-    removed_by text
+    removed_by text,
+    CONSTRAINT source_record_identifiers_id_value_case CHECK ((id_value =
+CASE id_type
+    WHEN 'nnt'::public.source_identifier_type THEN upper(id_value)
+    ELSE lower(id_value)
+END))
 );
 
 
@@ -3005,7 +3013,9 @@ ALTER SEQUENCE sources.contributor_information_id_seq OWNED BY sources.contribut
 CREATE TABLE sources.doi_targets (
     doi text NOT NULL,
     target_doi text NOT NULL,
-    rule text NOT NULL
+    rule text NOT NULL,
+    CONSTRAINT doi_targets_doi_lowercase CHECK ((doi = lower(doi))),
+    CONSTRAINT doi_targets_target_doi_lowercase CHECK ((target_doi = lower(target_doi)))
 );
 
 
@@ -3047,6 +3057,7 @@ CREATE TABLE sources.dois (
     unpaywall_checked_at timestamp with time zone,
     registered_url text,
     resolved_at timestamp with time zone,
+    CONSTRAINT dois_doi_lowercase CHECK ((doi = lower(doi))),
     CONSTRAINT dois_registered_url_dated CHECK (((registered_url IS NULL) OR (resolved_at IS NOT NULL))),
     CONSTRAINT dois_unpaywall_dated CHECK (((unpaywall_oa_status IS NULL) OR (unpaywall_checked_at IS NOT NULL)))
 );
@@ -3120,7 +3131,12 @@ CREATE TABLE sources.failed_lookups (
     id_type text NOT NULL,
     id_value text NOT NULL,
     not_found_at timestamp with time zone NOT NULL,
-    CONSTRAINT failed_lookups_id_type_check CHECK ((id_type = ANY (ARRAY['doi'::text, 'hal_id'::text, 'nnt'::text])))
+    CONSTRAINT failed_lookups_id_type_check CHECK ((id_type = ANY (ARRAY['doi'::text, 'hal_id'::text, 'nnt'::text]))),
+    CONSTRAINT failed_lookups_id_value_case CHECK ((id_value =
+CASE id_type
+    WHEN 'nnt'::text THEN upper(id_value)
+    ELSE lower(id_value)
+END))
 );
 
 
@@ -3269,6 +3285,7 @@ CREATE TABLE sources.staging (
     disappeared_at timestamp with time zone,
     authors_truncated boolean DEFAULT false NOT NULL,
     entry_mode text DEFAULT 'bulk'::text NOT NULL,
+    CONSTRAINT staging_doi_lowercase CHECK ((doi = lower(doi))),
     CONSTRAINT staging_entry_mode_check CHECK ((entry_mode = ANY (ARRAY['bulk'::text, 'fetch_missing_doi'::text, 'manual_export'::text, 'person_identifier'::text, 'fetch_missing_hal_id'::text, 'fetch_missing_nnt'::text])))
 );
 
@@ -3962,6 +3979,14 @@ ALTER TABLE ONLY publications.publication_subjects
 
 ALTER TABLE ONLY publications.publications_detail
     ADD CONSTRAINT publications_detail_pkey PRIMARY KEY (publication_id);
+
+
+--
+-- Name: publications publications_doi_key; Type: CONSTRAINT; Schema: publications; Owner: -
+--
+
+ALTER TABLE ONLY publications.publications
+    ADD CONSTRAINT publications_doi_key UNIQUE (doi);
 
 
 --
@@ -4867,13 +4892,6 @@ CREATE INDEX publication_subjects_subject_idx ON publications.publication_subjec
 
 
 --
--- Name: publications_doi_lower_key; Type: INDEX; Schema: publications; Owner: -
---
-
-CREATE UNIQUE INDEX publications_doi_lower_key ON publications.publications USING btree (lower(doi)) WHERE (doi IS NOT NULL);
-
-
---
 -- Name: subject_cooccurrences_b_idx; Type: INDEX; Schema: publications; Owner: -
 --
 
@@ -4934,13 +4952,6 @@ CREATE INDEX subjects_usage_count_idx ON publications.subjects USING btree (usag
 --
 
 CREATE INDEX idx_apc_budget_struct ON publishing.apc_payments USING btree (budget_structure_id) WHERE (budget_structure_id IS NOT NULL);
-
-
---
--- Name: idx_apc_doi; Type: INDEX; Schema: publishing; Owner: -
---
-
-CREATE INDEX idx_apc_doi ON publishing.apc_payments USING btree (lower(doi)) WHERE (doi IS NOT NULL);
 
 
 --
@@ -6112,5 +6123,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict D2VmuphnK38t9TSQYQfVMrrhxVcw4Jop1dr1W9TwbqvjcpOIfhWKVeJgi5BGM8a
+\unrestrict OKfO4f6sqqhGaZRyXMn7WUeq8JO7H423Y5Snf2ZQPC733Z932BuwNdlHlMJZpLD
 
