@@ -75,10 +75,7 @@ _SYNC_SCOPED = text(_sync_sql(scoped=True))
 
 
 def refresh_source_contribution_structures(conn: Connection) -> None:
-    """Rafraîchit la vue matérialisée `source_contribution_structures`, lue par `sync_perimeter_evidence`.
-
-    À appeler après la matérialisation de `perimeter_structures` et la résolution des adresses. À appeler avant le rafraîchissement de `contribution_structures`, dérivée de cette vue.
-    """
+    """Rafraîchit la vue matérialisée `source_contribution_structures`, lue par `sync_perimeter_evidence`."""
     conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY source_contribution_structures"))
 
 

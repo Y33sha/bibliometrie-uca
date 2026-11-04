@@ -124,6 +124,11 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
     summary: [
       { key: "adresses", label: "Adresses traitées" },
       { key: "in_perimeter", label: "Adresses dans le périmètre" },
+      {
+        key: "source_contributions_entered",
+        label: "Contributions sources entrées dans le périmètre",
+      },
+      { key: "source_contributions_left", label: "Contributions sources sorties du périmètre" },
     ],
   },
   publications: {
