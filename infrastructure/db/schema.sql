@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict gGQufxhmr649ikHvOPcdwaSTDe5HVhwWyM3NDla5NxkdWRYLjJPv0dp8ODzyPuF
+\restrict hHd0IJclDaAAADO2zrlacR480Jb1vc5MZXK4aH8eah4nzu6UghF29SHVIOK343X
 
 -- Dumped from database version 18.4
 -- Dumped by pg_dump version 18.4
@@ -2611,7 +2611,6 @@ CREATE TABLE publishing.serials (
     title_normalized text NOT NULL,
     publisher_id integer,
     openalex_id text,
-    is_in_doaj boolean DEFAULT false,
     oa_model public.oa_model,
     created_at timestamp with time zone DEFAULT now(),
     serial_type public.serial_type DEFAULT 'unknown'::public.serial_type,
@@ -6240,5 +6239,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict gGQufxhmr649ikHvOPcdwaSTDe5HVhwWyM3NDla5NxkdWRYLjJPv0dp8ODzyPuF
+\unrestrict hHd0IJclDaAAADO2zrlacR480Jb1vc5MZXK4aH8eah4nzu6UghF29SHVIOK343X
 

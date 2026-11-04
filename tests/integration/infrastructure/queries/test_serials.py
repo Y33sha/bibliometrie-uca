@@ -25,7 +25,6 @@ from pipeline.transformation.publishing.serials.delete_empty_serials import dele
 from pipeline.transformation.publishing.serials.enrich_serials_from_doaj import (
     doaj_last_import_at,
     find_serial_issn_index,
-    reset_is_in_doaj,
 )
 from pipeline.transformation.publishing.serials.learn_serial_doi_namespaces import (
     find_doi_serial_pairs,
@@ -296,19 +295,6 @@ class TestSerialIssnIndex:
 
 
 class TestDoajImport:
-    def test_reset_is_in_doaj_clears_true_flags(self, sa_sync_conn, repo):
-        jid = _serial(sa_sync_conn, issn="3333-3333")
-        sa_sync_conn.execute(
-            text("UPDATE serials SET is_in_doaj = TRUE WHERE id = :id"), {"id": jid}
-        )
-        assert reset_is_in_doaj(sa_sync_conn) >= 1
-        assert (
-            sa_sync_conn.execute(
-                text("SELECT is_in_doaj FROM serials WHERE id = :id"), {"id": jid}
-            ).scalar_one()
-            is False
-        )
-
     def test_last_import_at_returns_a_value_when_imported(self, sa_sync_conn, repo):
         d = datetime.now(UTC) - timedelta(days=3)
         _serial(sa_sync_conn, issn="4444-4444", doaj_imported_at=d)

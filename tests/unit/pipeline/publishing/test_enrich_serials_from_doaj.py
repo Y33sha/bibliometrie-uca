@@ -24,10 +24,7 @@ class _FakeSerialRepo:
     def find_serial_issn_index(self) -> list[tuple[int, str]]:
         return [(1, "0028-0836")]
 
-    def reset_is_in_doaj(self) -> int:
-        return 0
-
-    def update_serial_doaj(self, serial_id, *, payload, imported_at, is_in_doaj) -> None:
+    def update_serial_doaj(self, serial_id, *, payload, imported_at) -> None:
         self.updated.append(serial_id)
 
     def type_doaj_serials_as_journals(self) -> int:
@@ -47,14 +44,13 @@ def _bound(repo):
             "find_serial_issn_index",
             lambda conn, *a, **k: repo.find_serial_issn_index(*a, **k),
         )
-        mp.setattr(step, "reset_is_in_doaj", lambda conn, *a, **k: repo.reset_is_in_doaj(*a, **k))
         mp.setattr(
             step, "update_serial_doaj", lambda conn, *a, **k: repo.update_serial_doaj(*a, **k)
         )
         mp.setattr(
             step, "type_doaj_serials_as_journals", lambda conn: repo.type_doaj_serials_as_journals()
         )
-        mp.setattr(step, "model_doaj_serials_as_diamond", lambda conn: 0)
+        mp.setattr(step, "model_diamond_serials", lambda conn: 0)
         yield
 
 
@@ -127,19 +123,12 @@ def test_dump_without_recognized_serial_is_signaled():
 def test_unavailable_dump_leaves_referential_unchanged():
     """Dump inaccessible : aucune écriture, la source est signalée indisponible et la phase continue."""
 
-    class _Repo(_FakeSerialRepo):
-        resets = 0
-
-        def reset_is_in_doaj(self) -> int:
-            type(self).resets += 1
-            return 0
-
     @contextmanager
     def download_dump():
         raise DumpUnavailableError("HTTP 503")
         yield []
 
-    repo = _Repo(None)
+    repo = _FakeSerialRepo(None)
     with _bound(repo):
         metrics = step.run_enrich_serials_from_doaj(
             MagicMock(),
@@ -147,6 +136,5 @@ def test_unavailable_dump_leaves_referential_unchanged():
             refresh_after_days=30,
             download_dump=download_dump,
         )
-    assert _Repo.resets == 0
     assert repo.updated == []
     assert [s["code"] for s in metrics.signals] == ["source_unavailable"]

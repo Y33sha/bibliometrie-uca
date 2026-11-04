@@ -25,7 +25,6 @@ class _SerialRow(NamedTuple):
     title: str
     publisher_id: int | None
     openalex_id: str | None
-    is_in_doaj: bool
     oa_model: str | None
     serial_type: str | None
     is_academic: bool | None
@@ -42,7 +41,6 @@ def _serial_from_row(row: _SerialRow) -> Serial:
         title=row.title,
         publisher_id=row.publisher_id,
         openalex_id=row.openalex_id,
-        is_in_doaj=row.is_in_doaj,
         oa_model=cast(OaModel | None, row.oa_model),
         serial_type=cast(SerialType, row.serial_type)
         if row.serial_type is not None
@@ -67,7 +65,6 @@ class PgSerialRepository(SerialRepository):
                 serials.c.title,
                 serials.c.publisher_id,
                 serials.c.openalex_id,
-                serials.c.is_in_doaj,
                 serials.c.oa_model,
                 serials.c.serial_type,
                 serials.c.is_academic,
@@ -106,7 +103,7 @@ class PgSerialRepository(SerialRepository):
     def save(self, serial: Serial) -> None:
         """Écrit les champs modifiables par l'API d'une revue chargée. Lève `NotFoundError` si l'id est absent.
 
-        Le titre normalisé se recalcule. Les colonnes tenues par le pipeline (`publisher_id`, `openalex_id`, `is_in_doaj`) restent.
+        Le titre normalisé se recalcule. Les colonnes tenues par le pipeline (`publisher_id`, `openalex_id`) restent.
         """
         result = self._conn.execute(
             update(serials)

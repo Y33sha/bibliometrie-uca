@@ -70,9 +70,14 @@ def owner_pool() -> Iterator[psycopg.Cursor[dict[str, Any]]]:
             yield cur
 
 
-# Contenu posé par les migrations : le schéma `ref`, la version Alembic, les rôles et les réglages par défaut de `ops.config`.
+# Contenu posé par les migrations : le schéma `ref`, la version Alembic, les rôles, les listes de revues et les réglages par défaut de `ops.config`.
 _REFERENCE_SCHEMAS = ("ref",)
-_REFERENCE_TABLES = ("public.alembic_version", "ops.config", "ops.roles")
+_REFERENCE_TABLES = (
+    "public.alembic_version",
+    "ops.config",
+    "ops.roles",
+    "publishing.serial_lists",
+)
 
 type ConfigRow = tuple[str, str, str | None]
 """Réglage de `ops.config` : clé, valeur JSON sérialisée, description."""

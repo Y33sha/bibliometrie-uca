@@ -44,6 +44,19 @@ from tests.integration.helpers.seeds import (
 # Publication sans titre normalisé.
 _publication = partial(seed_publication, normalize_title=False)
 
+
+def _set_doaj(cur, serial_id: int, payload: dict[str, str] | None) -> None:
+    """Ajoute la revue à la liste `doaj`, avec la fiche DOAJ `payload`."""
+    cur.execute(
+        "INSERT INTO serial_list_entries (serial_id, list_code) VALUES (%s, 'doaj')", (serial_id,)
+    )
+    if payload is not None:
+        cur.execute(
+            "UPDATE serials SET doaj_payload = %s::jsonb WHERE id = %s",
+            (json.dumps(payload), serial_id),
+        )
+
+
 # Enregistrement source de titre « Doc », sans année.
 _seed_record = partial(seed_source_record, title="Doc", publication_year=None)
 
@@ -137,7 +150,7 @@ class TestListSerials:
     def test_filter_by_is_in_doaj(self, client):
         jid = seed_serial()
         with owner_pool() as cur:
-            cur.execute("UPDATE serials SET is_in_doaj = TRUE WHERE id = %s", (jid,))
+            _set_doaj(cur, jid, None)
         r = client.get("/api/serials", params={"is_in_doaj": "true", "per_page": 200})
         assert r.status_code == 200
         flags = {j["is_in_doaj"] for j in r.json()["serials"]}
@@ -206,10 +219,7 @@ class TestListSerials:
         jid = seed_serial()
         payload = {"DOAJ id": "abc123"}
         with owner_pool() as cur:
-            cur.execute(
-                "UPDATE serials SET doaj_payload = %s::jsonb, is_in_doaj = TRUE WHERE id = %s",
-                (json.dumps(payload), jid),
-            )
+            _set_doaj(cur, jid, payload)
         r = client.get("/api/serials", params={"per_page": 200})
         assert r.status_code == 200
         mine = next(j for j in r.json()["serials"] if j["id"] == jid)
@@ -404,10 +414,7 @@ class TestGetSerial:
         jid = seed_serial()
         payload = {"License": "CC BY", "Country of publisher": "France"}
         with owner_pool() as cur:
-            cur.execute(
-                "UPDATE serials SET doaj_payload = %s::jsonb, is_in_doaj = TRUE WHERE id = %s",
-                (json.dumps(payload), jid),
-            )
+            _set_doaj(cur, jid, payload)
         r = client.get(f"/api/serials/{jid}")
         assert r.status_code == 200
         body = r.json()
@@ -419,10 +426,7 @@ class TestGetSerial:
         jid = seed_serial()
         payload = {"License": "CC BY"}
         with owner_pool() as cur:
-            cur.execute(
-                "UPDATE serials SET doaj_payload = %s::jsonb, is_in_doaj = TRUE WHERE id = %s",
-                (json.dumps(payload), jid),
-            )
+            _set_doaj(cur, jid, payload)
         r = client.get(f"/api/serials/{jid}")
         assert r.status_code == 200
         assert r.json()["doaj_url"] is None
@@ -431,10 +435,7 @@ class TestGetSerial:
         jid = seed_serial()
         payload = {"DOAJ id": "deadbeef1234"}
         with owner_pool() as cur:
-            cur.execute(
-                "UPDATE serials SET doaj_payload = %s::jsonb, is_in_doaj = TRUE WHERE id = %s",
-                (json.dumps(payload), jid),
-            )
+            _set_doaj(cur, jid, payload)
         r = client.get(f"/api/serials/{jid}")
         assert r.status_code == 200
         assert r.json()["doaj_url"] == "https://doaj.org/toc/deadbeef1234"
@@ -444,10 +445,7 @@ class TestGetSerial:
         jid = seed_serial()
         payload = {"URL in DOAJ": "https://doaj.org/toc/csvurl42"}
         with owner_pool() as cur:
-            cur.execute(
-                "UPDATE serials SET doaj_payload = %s::jsonb, is_in_doaj = TRUE WHERE id = %s",
-                (json.dumps(payload), jid),
-            )
+            _set_doaj(cur, jid, payload)
         r = client.get(f"/api/serials/{jid}")
         assert r.status_code == 200
         assert r.json()["doaj_url"] == "https://doaj.org/toc/csvurl42"
@@ -456,10 +454,7 @@ class TestGetSerial:
         jid = seed_serial()
         payload = {"URL in DOAJ": "https://doaj.org/toc/fromcsv", "DOAJ id": "fromid"}
         with owner_pool() as cur:
-            cur.execute(
-                "UPDATE serials SET doaj_payload = %s::jsonb, is_in_doaj = TRUE WHERE id = %s",
-                (json.dumps(payload), jid),
-            )
+            _set_doaj(cur, jid, payload)
         r = client.get(f"/api/serials/{jid}")
         assert r.status_code == 200
         assert r.json()["doaj_url"] == "https://doaj.org/toc/fromcsv"

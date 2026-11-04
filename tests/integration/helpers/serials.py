@@ -39,12 +39,12 @@ def insert_serial(
     publisher_id: int | None = None,
     openalex_id: str | None = None,
     serial_type: str | None = None,
-    is_in_doaj: bool | None = None,
+    is_in_doaj: bool = False,
     oa_model: str | None = None,
     doaj_imported_at: object = None,
 ) -> int:
-    """Insère une revue et renvoie son `id`. Le titre normalisé vaut par défaut le titre en minuscules. Une colonne facultative laissée à `None` prend la valeur par défaut du schéma."""
-    return insert_row(
+    """Insère une revue et renvoie son `id`. Le titre normalisé vaut par défaut le titre en minuscules. Une colonne facultative laissée à `None` prend la valeur par défaut du schéma. `is_in_doaj` ajoute la revue à la liste `doaj`."""
+    serial_id = insert_row(
         conn,
         "serials",
         {
@@ -53,11 +53,21 @@ def insert_serial(
             "publisher_id": publisher_id,
             "openalex_id": openalex_id,
             "serial_type": serial_type,
-            "is_in_doaj": is_in_doaj,
             "oa_model": oa_model,
             "doaj_imported_at": doaj_imported_at,
         },
         {"serial_type": "serial_type", "oa_model": "oa_model"},
+    )
+    if is_in_doaj:
+        add_to_serial_list(conn, serial_id, "doaj")
+    return serial_id
+
+
+def add_to_serial_list(conn: Connection, serial_id: int, list_code: str) -> None:
+    """Ajoute la revue `serial_id` à la liste `list_code`."""
+    conn.execute(
+        text("INSERT INTO serial_list_entries (serial_id, list_code) VALUES (:s, :c)"),
+        {"s": serial_id, "c": list_code},
     )
 
 

@@ -85,7 +85,7 @@ Stockage : `serial_issns.issnl`, `serial_issns.issnl_checked_at`. Un ISSN absent
 
 https://doaj.org/ — Directory of Open Access Journals
 
-Indique si une revue est certifiée open access par le DOAJ, et à quelles conditions. Consommée par `enrich_serials_from_doaj`, dans la phase [`publishing`](../pipeline/05-publishing.md).
+Donne les conditions de publication des revues du DOAJ : frais, licence, droits d'auteur. Consommée par `enrich_serials_from_doaj`, dans la phase [`publishing`](../pipeline/05-publishing.md). La présence d'une revue dans le DOAJ vient d'[OpenAlex](03-openalex.md) (liste `doaj`).
 
 ### Dump utilisé
 
@@ -95,7 +95,7 @@ Le dump est retéléchargé quand le dernier import date de plus de trente jours
 
 ### Données récupérées
 
-Stockage : `serials.doaj_payload` (JSONB), `serials.doaj_imported_at` (timestamptz), `serials.is_in_doaj` (bool).
+Stockage : `serials.doaj_payload` (JSONB), `serials.doaj_imported_at` (timestamptz).
 
 Le payload garde les colonnes du CSV pour clés.
 

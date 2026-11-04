@@ -151,7 +151,7 @@ Les voies d'open access se nomment par des couleurs, selon le régime de diffusi
 |---|---|
 | **Green** | Publication déposée en archive ouverte (HAL, arXiv…), en général par l'auteur, en plus de sa publication dans une revue. La version déposée peut être un *preprint* ou un *postprint*. |
 | **Gold** | Publication en open access dans une revue entièrement open access, souvent contre des APC. |
-| **Diamond** | Sous-catégorie du *gold* : publication dans une revue sans APC ni autres frais. Une revue est diamant quand elle est marquée comme telle dans le référentiel, ou quand le DOAJ la donne sans frais. [Unpaywall](sources/09-sources-supplementaires.md#unpaywall) ne distingue pas *diamond* de *gold*. |
+| **Diamond** | Sous-catégorie du *gold* : publication dans une revue sans APC ni autres frais. Une revue est diamant quand elle est marquée comme telle dans le référentiel, quand elle figure dans le Diamond Discovery Hub, ou quand le DOAJ la donne sans frais. [Unpaywall](sources/09-sources-supplementaires.md#unpaywall) ne distingue pas *diamond* de *gold*. |
 | **Hybrid** | Publication en open access dans une revue sous abonnement, contre des APC. |
 | **Bronze** | Publication lisible gratuitement sur le site de l'éditeur, sans licence open access explicite ni garantie de pérennité. |
 

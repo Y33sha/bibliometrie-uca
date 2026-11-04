@@ -34,7 +34,7 @@ class OaModel(StrEnum):
     SUBSCRIPTION = "subscription"
     FULL_OA = "full_oa"
     DIAMOND = "diamond"
-    """Revue en open access sans frais de publication : présente dans le DOAJ sans APC ni autres frais, ou marquée à la main."""
+    """Revue en open access sans frais de publication : revue du Diamond Discovery Hub, revue du DOAJ sans APC ni autres frais, ou revue marquée à la main."""
 
 
 OA_MODEL_LABELS_FR: dict[OaModel, str] = {
@@ -68,7 +68,6 @@ class Serial:
     title: str
     publisher_id: int | None = None
     openalex_id: str | None = None
-    is_in_doaj: bool = False
     oa_model: OaModel | None = None
     serial_type: SerialType = SerialType.UNKNOWN
     is_academic: bool = True

@@ -15,6 +15,7 @@ from domain.serials.serial import (
     OaModel,
     SerialType,
 )
+from domain.serials.serial_lists import DOAJ
 from infrastructure.db.source_record_identifiers import serial_doi_sql
 from infrastructure.read_models._common import (
     EntityFacetItem,
@@ -43,12 +44,15 @@ from infrastructure.read_models.serials.models import (
 )
 from infrastructure.read_models.subjects.models import SubjectFrequency
 from infrastructure.read_models.subjects.queries import entity_subjects
-from infrastructure.sql_fragments import active_issns, corrected, has_active_issn
+from infrastructure.sql_fragments import active_issns, corrected, has_active_issn, in_serial_list
+
+_IN_DOAJ = in_serial_list("j.id", DOAJ)
+"""Condition vraie quand la revue `j` est présente dans le DOAJ."""
 
 _SERIAL_LIST_COLUMNS = f"""
     j.id, j.title, {active_issns("j.id")} AS issns,
     j.publisher_id, p.name AS publisher_name,
-    j.is_in_doaj, j.serial_type, j.oa_model, j.publication_count,
+    {_IN_DOAJ} AS is_in_doaj, j.serial_type, j.oa_model, j.publication_count,
     j.doaj_payload->>'DOAJ id' AS doaj_id,
     j.doaj_payload->>'URL in DOAJ' AS doaj_url_csv
 """
@@ -153,7 +157,7 @@ def _build_serial_where(
         parts.append("j.serial_type::text = ANY(:serial_types)")
         binds["serial_types"] = filters.serial_types
     if filters.is_in_doaj is not None and not skip_doaj:
-        parts.append("j.is_in_doaj = :is_in_doaj")
+        parts.append(f"{_IN_DOAJ} = :is_in_doaj")
         binds["is_in_doaj"] = filters.is_in_doaj
     if filters.oa_models and not skip_oa_models:
         parts.append("j.oa_model = ANY(:oa_models)")
@@ -415,10 +419,10 @@ class SerialQueries:
         where_d, binds_d = _build_serial_where(filters, skip_doaj=True)
         doaj_rows = self._conn.execute(
             text(f"""
-                SELECT j.is_in_doaj AS value, COUNT(*) AS n
+                SELECT {_IN_DOAJ} AS value, COUNT(*) AS n
                 FROM serials j
                 WHERE {where_d}
-                GROUP BY j.is_in_doaj
+                GROUP BY 1
             """),
             binds_d,
         ).all()

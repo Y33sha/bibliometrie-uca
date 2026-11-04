@@ -10,7 +10,7 @@ Contraintes d'ordre :
 - Le rattachement des enregistrements sources aux monographies suit la fusion des autres noms des éditeurs : l'éditeur départage les volumes de même titre.
 - Le rattachement des monographies à leur collection suit le rattachement des enregistrements sources. La nature des monographies lit le type de la collection posé par le rattachement.
 
-`import_issnl_table` importe la table ISSN-L de l'ISSN International Centre, qui fait autorité sur `serial_issns.issnl`, quand le dernier import date de plus de `issnl_table_refresh_after_days` jours. `enrich_serials_from_doaj` importe le dump CSV du DOAJ, qui fait autorité sur `is_in_doaj`, quand le dernier import date de plus de `doaj_refresh_after_days` jours. L'enrichissement des éditeurs (pays, ROR, type) se lance à la demande, par `interfaces/cli/maintenance/enrich_publishers.py`.
+`import_issnl_table` importe la table ISSN-L de l'ISSN International Centre, qui fait autorité sur `serial_issns.issnl`, quand le dernier import date de plus de `issnl_table_refresh_after_days` jours. `enrich_serials_from_doaj` importe le dump CSV du DOAJ, qui donne la fiche DOAJ des revues (`doaj_payload`), quand le dernier import date de plus de `doaj_refresh_after_days` jours. L'enrichissement des éditeurs (pays, ROR, type) se lance à la demande, par `interfaces/cli/maintenance/enrich_publishers.py`.
 """
 
 from __future__ import annotations
@@ -493,8 +493,8 @@ TASKS = (
         "enrich_serials_from_doaj",
         reads=(
             "serial_issns",
+            "serial_list_entries",
             "serials.doaj_imported_at",
-            "serials.is_in_doaj",
             "serials.serial_type",
             "serials.oa_model",
             "serials.doaj_payload",
@@ -502,7 +502,6 @@ TASKS = (
             "config",
         ),
         writes=(
-            "serials.is_in_doaj",
             "serials.doaj_payload",
             "serials.doaj_imported_at",
             "serials.serial_type",

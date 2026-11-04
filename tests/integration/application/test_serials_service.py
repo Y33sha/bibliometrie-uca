@@ -115,7 +115,6 @@ class TestSerialFindById:
         assert j.id == jid
         assert j.title == "Nature"
         assert j.publisher_id is None
-        assert j.is_in_doaj is False
 
     def test_hydrates_full(self, sa_sync_conn, repo):
         publication_id = insert_publisher(sa_sync_conn, "PLOS")
@@ -124,7 +123,6 @@ class TestSerialFindById:
             title="PLOS ONE",
             publisher_id=publication_id,
             openalex_id="S202381698",
-            is_in_doaj=True,
             oa_model="full_oa",
             issn="1932-6203",
             eissn="1932-6203",
@@ -135,7 +133,6 @@ class TestSerialFindById:
         assert j.title == "PLOS ONE"
         assert j.publisher_id == publication_id
         assert j.openalex_id == "S202381698"
-        assert j.is_in_doaj is True
         assert j.oa_model == "full_oa"
 
 
@@ -533,12 +530,13 @@ class TestMergeSerials:
         serial_service.merge_serials(target, source)
 
         row = issn_columns(sa_sync_conn, target)
-        row.is_in_doaj = _fetch_one(
-            sa_sync_conn, "SELECT is_in_doaj FROM serials WHERE id = :id", id=target
-        ).is_in_doaj
         assert row.issn == "1234-5678"
         assert row.eissn == "9999-0000"
-        assert row.is_in_doaj is True
+        assert _fetch_one(
+            sa_sync_conn,
+            "SELECT list_code FROM serial_list_entries WHERE serial_id = :id",
+            id=target,
+        ) == ("doaj",)
 
     def test_does_not_overwrite_existing_fields(self, sa_sync_conn, serial_service):
         """Les champs renseignés de la cible gardent leur valeur."""

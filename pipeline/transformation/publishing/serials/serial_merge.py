@@ -62,18 +62,6 @@ def _recheck_in_openalex(conn: Connection, target_id: int, source_id: int) -> No
     )
 
 
-def _merge_is_in_doaj(conn: Connection, target_id: int, source_id: int) -> None:
-    """Marque la revue conservée présente au DOAJ si l'une des deux l'est."""
-    conn.execute(
-        text("""
-            UPDATE serials t SET is_in_doaj = COALESCE(t.is_in_doaj OR s.is_in_doaj, false)
-            FROM serials s
-            WHERE t.id = :t AND s.id = :s
-        """),
-        {"t": target_id, "s": source_id},
-    )
-
-
 MERGE_STEPS: dict[str, MergeStep] = {
     "publications": transfer("publications", "serial_id"),
     "source_records": transfer("source_records", "serial_id"),
@@ -97,7 +85,6 @@ MERGE_STEPS: dict[str, MergeStep] = {
         f"t.serial_type = '{SerialType.UNKNOWN.value}'",
     ),
     "is_academic": untouched("serials", "is_academic"),
-    "is_in_doaj": MergeStep((("serials", "is_in_doaj"),), _merge_is_in_doaj),
     "doaj_record": untouched("serials", "doaj_payload", "doaj_imported_at"),
     "list_entries": transfer_unique("serial_list_entries", "serial_id", "list_code"),
     "publication_count": untouched("serials", "publication_count"),

@@ -24,7 +24,7 @@ Phase à part, juste avant `publishing`. Elle interroge doi.org sur les préfixe
 - **`type_proceedings_serials`** — type en recueil d'actes les revues composées surtout d'articles de congrès, et les revues sans ISSN au titre nommant une édition datée ou des actes (« proceedings »).
 - **`type_journal_serials`** — type en revue les entrées de type inconnu composées en majorité d'articles.
 - **`learn_serial_doi_namespaces`** — calcule les espaces de noms DOI qui désignent une revue (`10.1016/j.physletb.`), d'après les DOI de ses enregistrements sources (`domain/serials/doi_namespaces.py`).
-- **`enrich_serials_from_doaj`** — importe l'export CSV du [DOAJ](../sources/09-sources-supplementaires.md#doaj) : fiche DOAJ et présence dans le DOAJ de chaque revue, rattachée par ISSN. Une entrée de type inconnu présente dans le DOAJ devient une revue.
+- **`enrich_serials_from_doaj`** — importe l'export CSV du [DOAJ](../sources/09-sources-supplementaires.md#doaj) : fiche DOAJ de chaque revue, rattachée par ISSN. Une entrée de type inconnu présente dans le DOAJ devient une revue. Une revue du Diamond Discovery Hub, ou du DOAJ sans APC ni autres frais, est classée diamant.
 
 ## Monographies
 

@@ -25,6 +25,8 @@ Hors OpenAlex : la Master Journal List de Clarivate (revues du Web of Science, C
 - Les listes viennent d'OpenAlex (`listed_in`, `/source-lists`).
 - Listes retenues : `doyens`, `doaj`, `medline`, `cwts-core`, `ddh`, `erih-plus`, `norway-1`, `norway-2`, les cinq rangs du classement FNEGE (`fnege-1-star` à `fnege-4`).
 - Une liste donne l'appartenance actuelle d'une revue, sans historique.
+- L'appartenance au DOAJ vient d'OpenAlex. Le dump du DOAJ donne la fiche DOAJ (`doaj_payload`).
+- Une revue du Diamond Discovery Hub est diamant, comme une revue du DOAJ sans APC ni autres frais.
 - Chaque niveau d'un classement est une liste, rattachée à son classement (registre norvégien, FNEGE).
 - Une seule sous-étape pose `openalex_id`. Une revue à ISSN prend la source OpenAlex de ses ISSN (`/sources`). Une revue sans ISSN prend la source la plus fréquente parmi ses enregistrements sources OpenAlex.
 - Une source OpenAlex retrouvée par les ISSN de plusieurs revues donne son identifiant à la revue qui a le plus de publications, et ses listes à toutes.
@@ -40,13 +42,14 @@ Hors OpenAlex : la Master Journal List de Clarivate (revues du Web of Science, C
 
 ### Phase 2 — Source OpenAlex et listes de chaque revue
 
-- [ ] Colonne `serials.openalex_checked_at`, délai de relecture dans `ops.config`
-- [ ] Sous-étape de la phase `publishing` : source OpenAlex, type et appartenances des revues à relire
-- [ ] `openalex_id` posé par cette seule sous-étape : vote retiré d'`attach_serials`, `enrich_serials_from_openalex` supprimée
+- [x] Colonne `serials.openalex_checked_at`, délai de relecture dans `ops.config` (9aa3e39f5)
+- [x] Sous-étape de la phase `publishing` : source OpenAlex, type et appartenances des revues à relire (9aa3e39f5)
+- [x] `openalex_id` posé par cette seule sous-étape : vote retiré d'`attach_serials`, `enrich_serials_from_openalex` supprimée (9aa3e39f5)
 
 ### Phase 3 — DOAJ en liste
 
-- [ ] `is_in_doaj` lu dans les appartenances (question 1)
+- [ ] `is_in_doaj` remplacé par l'appartenance à la liste `doaj`, dump du DOAJ réduit à la fiche DOAJ
+- [ ] Revues du Diamond Discovery Hub classées diamant
 
 ### Phase 4 — Interface
 
@@ -56,5 +59,4 @@ Hors OpenAlex : la Master Journal List de Clarivate (revues du Web of Science, C
 
 ## Questions ouvertes
 
-1. Dump du DOAJ : il reste nécessaire à `doaj_payload` (classement diamant, page de la revue). Appartenance au DOAJ lue dans le dump ou dans OpenAlex.
-2. Quartiles par catégorie : import de SCImago.
+1. Quartiles par catégorie : import de SCImago.

@@ -1,6 +1,6 @@
 """Téléchargement et lecture du dump CSV public du DOAJ.
 
-Le dump liste toutes les revues du DOAJ (https://doaj.org/csv) et fait autorité sur `serials.doaj_payload` et `is_in_doaj`. La phase `publishing` l'importe (`enrich_serials_from_doaj`), comme la commande `import_doaj_csv` sur fichier local.
+Le dump liste toutes les revues du DOAJ (https://doaj.org/csv) et donne `serials.doaj_payload`. La phase `publishing` l'importe (`enrich_serials_from_doaj`), comme la commande `import_doaj_csv` sur fichier local.
 
 `doaj_payload` garde les clés du dump CSV. Ces clés sont lues par des requêtes SQL, l'interface (`READABLE_DOAJ_FIELDS`) et l'audit des APC (`doaj_payload->>'APC amount'`).
 """
