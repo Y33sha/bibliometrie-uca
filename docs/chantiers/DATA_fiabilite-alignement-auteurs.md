@@ -47,7 +47,10 @@ Exemple : la publication 22307 a quatre auteurs dans chacun de ses cinq enregist
 - [x] Méthodes de `grouping_method` (`reference`, `name`, `gap`, `unordered`) et retrait des colonnes `score` et `margin` de `aligned_source_contributions` : migration.
 - [x] Retrait du modèle : `residual_weights.py`, `interfaces/cli/dev/estimate_residual_weights.py`, dépendances `splink`, `duckdb`, `pyarrow` et `scipy`, champs `score` et `margin` de l'API, compteurs de la phase dans l'administration.
 - [x] Retrait de l'item « Revue des appariements du modèle » de la fiche d'audit de la résolution des personnes.
-- [ ] `--rebuild-author-grouping`.
+- [x] Premier `--rebuild-author-grouping`. Les publications de 2 à 10 auteurs à contributions en trop passent de 757 à 306. Au-delà, l'excès augmente : fautes de frappe sur des mots courts, rattrapées auparavant par le modèle.
+- [x] Dans les trous, similarité de Jaro-Winkler des mots triés supérieure à 0,9.
+- [x] Doublons révélés par l'alignement (publication 172698) : une contribution source restée seule, de même nom et même prénom complet qu'une contribution source de son enregistrement source alignée avec d'autres sources, devient un doublon d'auteur. Au 2026-11-04, 1 276 cas dans 516 publications, avant la garde du prénom complet.
+- [ ] Second `--rebuild-author-grouping`, puis mesure des contributions en trop par tranche.
 
 ### Phase 4 — Documentation
 

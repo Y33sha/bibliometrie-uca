@@ -11,7 +11,7 @@ Les contributions d'une publication se recalculent entièrement, donc le résult
 ## Contributions sources écartées
 
 - Les contributions sources collectives (collaboration, consortium, rédaction…).
-- Les doublons d'auteur : une source répète un bloc de sa liste à la suite, chaque nom à sa place, ou des auteurs dans la liste des membres d'un collectif. Le doublon reçoit `duplicate_of`, vers la première occurrence du nom (`domain/contributions/author_duplicates.py`).
+- Les doublons d'auteur : une source répète un bloc de sa liste à la suite, chaque nom à sa place, ou des auteurs dans la liste des membres d'un collectif. Après l'alignement s'y ajoute une contribution source restée seule, de même nom et même prénom complet qu'une contribution source de son enregistrement source alignée avec d'autres sources. Le doublon reçoit `duplicate_of`, vers la contribution source répétée (`domain/contributions/author_duplicates.py`).
 - Les enregistrements sources DataCite d'une version de concept ou d'une pièce de jeu de données, quand la publication a un autre enregistrement source : leur liste d'auteurs répète celle d'un autre enregistrement source.
 
 Ces contributions sources ne sont dans aucune contribution et n'ont pas de personne.

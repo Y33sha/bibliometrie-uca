@@ -14,7 +14,10 @@ from operator import attrgetter
 
 from sqlalchemy import Connection
 
-from domain.contributions.author_duplicates import duplicate_source_contributions
+from domain.contributions.author_duplicates import (
+    duplicate_source_contributions,
+    unaligned_duplicates,
+)
 from domain.contributions.author_grouping import (
     Contribution,
     SourceContribution,
@@ -84,7 +87,7 @@ def deferred_source_records(rows: Sequence[SourceContributionRow]) -> set[int]:
 def align_publication_contributions(
     rows: Sequence[SourceContributionRow],
 ) -> tuple[list[Contribution], dict[int, int]]:
-    """Renvoie les contributions d'une publication et ses doublons d'auteur (doublon → première occurrence de son nom), parmi les contributions sources à position. Les doublons restent hors des contributions."""
+    """Renvoie les contributions d'une publication et ses doublons d'auteur (doublon → contribution source répétée). Les doublons restent hors des contributions : ceux de la liste d'un enregistrement source avant l'alignement, puis ceux révélés par l'alignement (`unaligned_duplicates`)."""
     source_records = contributions_by_source_record(rows)
     duplicates: dict[int, int] = {}
     for source_contributions in source_records.values():
@@ -94,6 +97,11 @@ def align_publication_contributions(
         for n, record_contributions in source_records.items()
     }
     contributions = align_publication(kept, deferred=deferred_source_records(rows))
+    aligned = unaligned_duplicates(
+        contributions, {s.id: s for record in kept.values() for s in record}
+    )
+    duplicates |= aligned
+    contributions = [g for g in contributions if g.reference.id not in aligned]
     return contributions, duplicates
 
 

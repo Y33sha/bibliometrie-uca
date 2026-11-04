@@ -328,6 +328,28 @@ def test_les_copies_d_une_liste_restent_hors_des_contributions(conn):
     ]
 
 
+def test_un_nom_repete_une_fois_et_reste_seul_sort_des_contributions(conn):
+    publication = insert_publication(conn)
+    hal = _source_record(
+        conn,
+        publication,
+        "hal",
+        "hal-1",
+        [("delabaere", "amelie"), ("leduc", "france"), ("delabaere", "amelie")],
+    )
+    oa = _source_record(
+        conn, publication, "openalex", "W1", [("leduc", "france"), ("delabaere", "amelie")]
+    )
+
+    _run(conn)
+
+    assert _duplicate_of(conn, hal) == {hal[0]: hal[2], hal[1]: None, hal[2]: None}
+    assert sorted(_contributions(conn, publication).values(), key=min) == [
+        {hal[1], oa[0]},
+        {hal[2], oa[1]},
+    ]
+
+
 def test_une_contribution_source_qui_n_est_plus_copiee_perd_son_duplicate_of(conn):
     publication = insert_publication(conn)
     hal = _source_record(

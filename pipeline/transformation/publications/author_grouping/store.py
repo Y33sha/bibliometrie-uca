@@ -162,7 +162,7 @@ class BatchPlan:
     recomposed: list[int]
     """Contributions en base à contributions sources changées, marquées pour la redécision de leur personne par la phase `persons`."""
     duplicates: dict[int, int]
-    """Doublon d'auteur → première occurrence de son nom (`duplicate_of`)."""
+    """Doublon d'auteur → contribution source répétée (`duplicate_of`)."""
 
 
 class AuthorGroupingStore:
