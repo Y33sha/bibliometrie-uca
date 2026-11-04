@@ -60,7 +60,7 @@ _ISSN_ROWS = text("SELECT issn, issnl, serial_id, status FROM serial_issns")
 _REPLACEMENTS = text("SELECT issn, linked_issn FROM issn_links WHERE link_type = 'replaced_by'")
 
 _SERIALS = text("""
-    SELECT s.id, s.title, s.title_normalized, s.publisher_id, s.openalex_id, s.manual_fields,
+    SELECT s.id, s.title, s.title_normalized, s.publisher_id, s.openalex_id,
            EXISTS (SELECT 1 FROM serial_issns i WHERE i.serial_id = s.id) AS has_issn
     FROM serials s
 """)
@@ -142,7 +142,6 @@ class _Serial:
     title_normalized: str
     publisher_id: int | None
     openalex_id: str | None
-    manual_fields: list[str]
     has_issn: bool
 
 
@@ -249,10 +248,7 @@ def _issn_serials(
             serial_of[issnl] = most_frequent(held)
         else:
             title = most_frequent(titles[issnl]) if issnl in titles else issnl
-            conn.execute(
-                text("UPDATE serial_issns SET serial_id = NULL WHERE issn = :i"), {"i": issnl}
-            )
-            serial_of[issnl] = store.serial_for_issnl(issnl, title)
+            serial_of[issnl] = store.create_serial(title)
             created += 1
         claimed.add(serial_of[issnl])
     conn.execute(_ADD_ISSNS, {"issns": sorted(issnl for issnl in serial_of if issnl not in rows)})
@@ -284,7 +280,6 @@ def _attach(
             r.title_normalized,
             r.publisher_id,
             r.openalex_id,
-            r.manual_fields,
             r.has_issn,
         )
         for r in conn.execute(_SERIALS)
@@ -298,7 +293,7 @@ def _attach(
     decisions = {r.title_normalized: r.serial_id for r in conn.execute(_DECISIONS)}
     result = _Attachment()
     # Séries désignées par leur seul titre, sans revue à ISSN de ce titre : titre et titre normalisé.
-    untitled_mentions: list[tuple[_Mention, str, str]] = []
+    title_only_mentions: list[tuple[_Mention, str, str]] = []
     for m in mentions:
         series = m.series
         if series is None:
@@ -326,7 +321,7 @@ def _attach(
             m.publisher_id, by_title.get(title_normalized, [])
         )
         if found is None:
-            untitled_mentions.append((m, str(series.title), title_normalized))
+            title_only_mentions.append((m, str(series.title), title_normalized))
             continue
         result.serial_of[m.id] = found
         result.by_way["title"] += 1
@@ -338,16 +333,16 @@ def _attach(
                 serial_id
             ].title
     store = SerialStore(conn)
-    untitled: dict[str, int] = {}
-    for m, title, title_normalized in untitled_mentions:
+    title_only: dict[str, int] = {}
+    for m, title, title_normalized in title_only_mentions:
         in_publication = (
             publication_serials.get(m.publication_id, {}) if m.publication_id is not None else {}
         )
         found = match_in_publication(title, in_publication)
         if found is None:
-            if title_normalized not in untitled:
-                untitled[title_normalized] = store.serial_for_title(title)
-            found = untitled[title_normalized]
+            if title_normalized not in title_only:
+                title_only[title_normalized] = store.serial_for_title(title)
+            found = title_only[title_normalized]
         result.serial_of[m.id] = found
         result.by_way["title"] += 1
     return result

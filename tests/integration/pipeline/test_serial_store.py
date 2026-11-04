@@ -3,6 +3,7 @@
 import pytest
 from sqlalchemy import text
 
+from domain.normalize import normalize_text
 from pipeline.transformation.publishing.serials.store import SerialStore
 from tests.integration.helpers.serials import insert_publisher
 
@@ -18,15 +19,12 @@ def _fetch_one(conn, sql_text: str, **params):
 
 
 class TestSerialStore:
-    def test_revue_d_un_issn_l_creee_puis_retrouvee(self, sa_sync_conn, gateway):
-        serial_id = gateway.serial_for_issnl("0028-0836", "Nature")
-        assert gateway.serial_for_issnl("0028-0836", "Autre titre") == serial_id
+    def test_revue_creee_avec_son_titre_normalise(self, sa_sync_conn, gateway):
+        serial_id = gateway.create_serial("REVUE & SOCIÉTÉ")
         row = _fetch_one(
-            sa_sync_conn,
-            "SELECT s.title, i.serial_id FROM serials s JOIN serial_issns i ON i.serial_id = s.id "
-            "WHERE i.issn = '0028-0836'",
+            sa_sync_conn, "SELECT title, title_normalized FROM serials WHERE id = :id", id=serial_id
         )
-        assert tuple(row) == ("Nature", serial_id)
+        assert tuple(row) == ("REVUE & SOCIÉTÉ", normalize_text("REVUE & SOCIÉTÉ"))
 
     def test_revue_sans_issn_d_un_titre(self, sa_sync_conn, gateway):
         serial_id = gateway.serial_for_title("REVUE & SOCIÉTÉ")
@@ -41,5 +39,9 @@ class TestSerialStore:
     def test_une_revue_a_issn_n_est_pas_la_revue_sans_issn_de_son_titre(
         self, sa_sync_conn, gateway
     ):
-        with_issn = gateway.serial_for_issnl("0028-0836", "Nature")
+        with_issn = gateway.create_serial("Nature")
+        sa_sync_conn.execute(
+            text("INSERT INTO serial_issns (issn, serial_id) VALUES ('0028-0836', :id)"),
+            {"id": with_issn},
+        )
         assert gateway.serial_for_title("Nature") != with_issn
