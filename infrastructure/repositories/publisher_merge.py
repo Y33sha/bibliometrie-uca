@@ -2,7 +2,7 @@
 
 Les revues homonymes des deux éditeurs sont fusionnées d'abord, par la fusion des revues."""
 
-from sqlalchemy import Connection, text
+from sqlalchemy import Connection
 
 from domain.merge import MergedEntity
 from domain.publishers.publisher import PublisherType
@@ -10,7 +10,7 @@ from infrastructure.repositories.merge_steps import (
     MergeStep,
     fill_empty,
     fill_empty_unique,
-    record_redirect,
+    merge_into,
     transfer,
     untouched,
 )
@@ -34,7 +34,4 @@ MERGE_STEPS: dict[str, MergeStep] = {
 
 def merge_publisher_into(conn: Connection, target_id: int, source_id: int) -> None:
     """Applique chaque étape de `MERGE_STEPS`, supprime l'éditeur absorbé et enregistre sa redirection."""
-    for step in MERGE_STEPS.values():
-        step.apply(conn, target_id, source_id)
-    conn.execute(text("DELETE FROM publishers WHERE id = :s"), {"s": source_id})
-    record_redirect(conn, MergedEntity.PUBLISHER, target_id, source_id)
+    merge_into(conn, MergedEntity.PUBLISHER, "publishers", MERGE_STEPS, target_id, source_id)
