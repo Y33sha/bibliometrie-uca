@@ -24,10 +24,10 @@ Chaque source moissonnée (HAL, OpenAlex, WoS, ScanR, theses.fr, DataCite, Cross
 
 ### Phase 1 — Recherche par identifiant
 
-- [ ] Table de concurrence par source dans `api_params.py` ; suppression des constantes recopiées.
-- [ ] Relecture par identifiant natif et recherche par DOI exposées par l'adaptateur ; suppression des classes `*StaleRefetch` et `*DoiSearch`, de `source_key` et du test de concordance avec l'adaptateur.
-- [ ] HAL, OpenAlex et Crossref passent par les combinateurs de `common/lookup.py`.
-- [ ] Fonctions d'API de ScanR et DataCite typées sans `NotFound`.
+- [x] Table de concurrence par source dans `api_params.py` ; suppression des constantes recopiées.
+- [x] Relecture par identifiant natif et recherche par DOI exposées par l'adaptateur ; suppression des classes `*StaleRefetch` et `*DoiSearch`, de `source_key` et du test de concordance avec l'adaptateur. La recherche par DOI reste une fabrique jusqu'à la phase 3.
+- [x] HAL, OpenAlex et Crossref passent par les combinateurs de `common/lookup.py`.
+- [x] Fonctions d'API de ScanR et DataCite typées sans `NotFound`.
 
 ### Phase 2 — Moissonneur
 
