@@ -20,21 +20,21 @@ def test_un_lot_se_ferme_au_plafond_de_publications(monkeypatch):
 
 
 def test_seules_les_appartenances_changees_sont_reecrites():
-    """1 inchangée ; 2 inchangée au score près, à la précision d'un `real` ; 3 change de groupe ; 4 disparaît ; 5 apparaît."""
+    """1 inchangée ; 2 change de méthode ; 3 change de groupe ; 4 disparaît ; 5 apparaît."""
     stored = {
-        1: MembershipRow(1, 10, 100, "name", None, None),
-        2: MembershipRow(2, 10, 200, "model", 3.1415927, 1.0),
-        3: MembershipRow(3, 11, 100, "reference", None, None),
-        4: MembershipRow(4, 12, 200, "name", None, None),
+        1: MembershipRow(1, 10, 100, "name"),
+        2: MembershipRow(2, 10, 200, "gap"),
+        3: MembershipRow(3, 11, 100, "reference"),
+        4: MembershipRow(4, 12, 200, "name"),
     }
     planned = [
-        MembershipRow(1, 10, 100, "name", None, None),
-        MembershipRow(2, 10, 200, "model", 3.14159265358979, 1.0),
-        MembershipRow(3, 12, 100, "reference", None, None),
-        MembershipRow(5, 13, 300, "reference", None, None),
+        MembershipRow(1, 10, 100, "name"),
+        MembershipRow(2, 10, 200, "name"),
+        MembershipRow(3, 12, 100, "reference"),
+        MembershipRow(5, 13, 300, "reference"),
     ]
 
     removed, inserted = membership_changes(stored, planned)
 
-    assert sorted(removed) == [3, 4, 5]
-    assert [m.source_contribution for m in inserted] == [3, 5]
+    assert sorted(removed) == [2, 3, 4, 5]
+    assert [m.source_contribution for m in inserted] == [2, 3, 5]

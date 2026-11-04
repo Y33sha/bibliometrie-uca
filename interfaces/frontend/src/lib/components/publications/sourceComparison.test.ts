@@ -196,8 +196,6 @@ function contribution(overrides: Partial<SourceContribution>): SourceContributio
 		contribution_id: null,
 		reference_position: null,
 		method: null,
-		score: null,
-		margin: null,
 		...overrides,
 	};
 }

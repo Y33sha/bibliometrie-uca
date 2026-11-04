@@ -18,6 +18,8 @@ from tests.integration.helpers.sources import insert_source_contribution, insert
 
 logger = logging.getLogger("test_author_grouping")
 
+_ORCID = "0000-0002-1825-0097"
+
 
 @pytest.fixture
 def conn(sa_sync_conn, monkeypatch):
@@ -61,21 +63,24 @@ def _run(conn):
     return build_contributions(conn, AuthorGroupingStore(conn), logger)
 
 
-def test_un_identifiant_neutralise_reste_hors_de_l_alignement(conn):
+def test_un_identifiant_neutralise_ne_donne_pas_de_prenom(conn):
     publication = insert_publication(conn)
     source_record = insert_source_record(conn, publication, source="crossref", source_id="c-neutre")
     source_contribution = insert_source_contribution(
         conn,
         source_record,
         source="crossref",
-        author_name_normalized="jean dupont",
-        identifiers={"orcid": "0000-0001-2345-6789", "idref": "123456789"},
-        neutralized_identifiers={"orcid": "shared", "idref": "misplaced"},
+        contributor_information_id=upsert_split_contributor_information(
+            conn, "xu", "z", {"orcid": _ORCID}
+        ),
+        neutralized_identifiers={"orcid": "shared"},
     )
+    person = insert_person(conn, "Xu", first_name="Zehua")
+    insert_person_identifier(conn, person, id_type="orcid", id_value=_ORCID, status="confirmed")
 
     [row] = AuthorGroupingStore(conn).fetch_source_contributions([publication])
 
-    assert (row.id, row.orcid, row.idref) == (source_contribution, "", "")
+    assert (row.id, row.known_first_name) == (source_contribution, "")
 
 
 def test_les_contributions_sources_d_un_meme_auteur_sont_alignees(conn):
@@ -371,9 +376,6 @@ def test_le_jury_sans_position_s_aligne_par_le_nom(conn):
     assert {theses[1], hal[0]} in _contributions(conn, publication).values()
 
 
-_ORCID = "0000-0002-1825-0097"
-
-
 def _homonyms_with_orcid(conn, status):
     """Insère deux homonymes de même initiale dans l'enregistrement source HAL. L'enregistrement source OpenAlex a une contribution source réduite à l'initiale. Son ORCID est rattaché avec `status` à une personne du prénom du second."""
     publication = insert_publication(conn)
@@ -397,11 +399,11 @@ def test_le_prenom_d_un_identifiant_confirme_aligne_les_initiales(conn):
 
 
 def test_le_prenom_d_un_identifiant_en_attente_reste_ignore(conn):
-    publication, hal, oa = _homonyms_with_orcid(conn, "pending")
+    publication, _, oa = _homonyms_with_orcid(conn, "pending")
 
-    _run(conn)
+    rows = AuthorGroupingStore(conn).fetch_source_contributions([publication])
 
-    assert {hal[0], oa} in _contributions(conn, publication).values()
+    assert next(row.known_first_name for row in rows if row.id == oa) == ""
 
 
 def _dirty(conn, publication_id):

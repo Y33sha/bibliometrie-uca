@@ -4,22 +4,19 @@ Les publications de la file `publication_contributions_queue` se recalculent ent
 """
 
 import logging
-import math
 import time
 from collections import Counter
-from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from concurrent.futures import ProcessPoolExecutor
 from contextlib import nullcontext
 from dataclasses import fields
 from operator import attrgetter
 
-from scipy.optimize import linear_sum_assignment
 from sqlalchemy import Connection
 
 from domain.contributions.author_duplicates import duplicate_source_contributions
 from domain.contributions.author_grouping import (
     Contribution,
-    ResidualModel,
     SourceContribution,
     align_publication,
     plan_contribution_ids,
@@ -31,9 +28,6 @@ from pipeline.runtime.cpu import available_cpus
 from pipeline.runtime.observability.log_format import LAST_BRANCH, nothing_to_do, quantity, step
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import track_progress, waiting
-from pipeline.transformation.publications.author_grouping.residual_weights import (
-    RESIDUAL_WEIGHTS,
-)
 from pipeline.transformation.publications.author_grouping.store import (
     AuthorGroupingStore,
     BatchPlan,
@@ -69,15 +63,6 @@ def publication_batches(publications: Sequence[tuple[int, int]]) -> list[list[in
     return batches
 
 
-def assign(matrix: Sequence[Sequence[float]]) -> Iterable[tuple[int, int]]:
-    """Renvoie l'affectation de gain maximal (algorithme hongrois)."""
-    rows, cols = linear_sum_assignment([[-value for value in row] for row in matrix])
-    return zip(rows.tolist(), cols.tolist(), strict=True)
-
-
-_MODEL = ResidualModel(RESIDUAL_WEIGHTS, assign)
-
-
 def contributions_by_source_record(
     rows: Sequence[SourceContributionRow],
 ) -> dict[int, list[SourceContribution]]:
@@ -86,15 +71,7 @@ def contributions_by_source_record(
     for row in rows:
         first_name = with_known_first_name(row.first_name, row.known_first_name)
         source_records.setdefault(row.source_record, []).append(
-            SourceContribution(
-                row.id,
-                row.source_record,
-                row.position,
-                row.last_name,
-                first_name,
-                row.orcid,
-                row.idref,
-            )
+            SourceContribution(row.id, row.source_record, row.position, row.last_name, first_name)
         )
     return source_records
 
@@ -116,39 +93,23 @@ def align_publication_contributions(
         n: [s for s in record_contributions if s.id not in duplicates]
         for n, record_contributions in source_records.items()
     }
-    contributions = align_publication(kept, model=_MODEL, deferred=deferred_source_records(rows))
+    contributions = align_publication(kept, deferred=deferred_source_records(rows))
     return contributions, duplicates
-
-
-def _same_membership(stored: MembershipRow | None, planned: MembershipRow) -> bool:
-    """Vrai si l'appartenance en base vaut l'appartenance calculée. Le score et la marge sont comparés à la précision de leur colonne (`real`)."""
-    if stored is None:
-        return False
-
-    def close(a: float | None, b: float | None) -> bool:
-        return a is None if b is None else a is not None and math.isclose(a, b, rel_tol=1e-6)
-
-    return (
-        (stored.contribution, stored.source_record, stored.method)
-        == (planned.contribution, planned.source_record, planned.method)
-        and close(stored.score, planned.score)
-        and close(stored.margin, planned.margin)
-    )
 
 
 def membership_changes(
     stored: Mapping[int, MembershipRow], planned: Sequence[MembershipRow]
 ) -> tuple[list[int], list[MembershipRow]]:
     """Renvoie les contributions sources à appartenance disparue ou changée, et les appartenances à insérer. Une appartenance inchangée reste en place."""
-    inserted = [m for m in planned if not _same_membership(stored.get(m.source_contribution), m)]
+    inserted = [m for m in planned if stored.get(m.source_contribution) != m]
     kept = {m.source_contribution for m in planned}
     removed = [s for s in stored if s not in kept] + [m.source_contribution for m in inserted]
     return removed, inserted
 
 
-# Contribution source (champs de `SourceContributionRow` dans l'ordre), appartenance (contribution source, enregistrement source, méthode, score, marge) et contribution (contribution source de référence, appartenances), en tuples : la forme la moins coûteuse à faire passer d'un processus à l'autre.
-type SourceContributionTuple = tuple[int, int, str, int, int | None, str, str, str, str, str]
-type MemberTuple = tuple[int, int, str, float | None, float | None]
+# Échanges entre processus, en tuples : contribution source (champs de `SourceContributionRow`), appartenance (contribution source, enregistrement source, méthode), contribution (référence, appartenances).
+type SourceContributionTuple = tuple[int, int, str, int, int | None, str, str, str]
+type MemberTuple = tuple[int, int, str]
 type ContributionTuple = tuple[int, list[MemberTuple]]
 type Aligned = tuple[list[ContributionTuple], dict[int, int]]
 
@@ -163,10 +124,7 @@ def align_rows(rows: Sequence[SourceContributionTuple]) -> Aligned:
     return [
         (
             g.reference.id,
-            [
-                (m.source_contribution, m.source_record, str(m.method), m.score, m.margin)
-                for m in g.members
-            ],
+            [(m.source_contribution, m.source_record, str(m.method)) for m in g.members],
         )
         for g in contributions
     ], duplicates
@@ -243,12 +201,10 @@ def _plan_batch(
         contribution_rows.append(
             ContributionRow(contribution_id, publication_id, positions[reference], existing_id)
         )
-        for source_contribution, source_record, method, score, margin in members:
+        for source_contribution, source_record, method in members:
             methods[method] += 1
             memberships.append(
-                MembershipRow(
-                    source_contribution, contribution_id, source_record, method, score, margin
-                )
+                MembershipRow(source_contribution, contribution_id, source_record, method)
             )
     removed, inserted = membership_changes(stored, memberships)
     return BatchPlan(

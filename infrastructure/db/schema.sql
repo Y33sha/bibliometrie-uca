@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict OKfO4f6sqqhGaZRyXMn7WUeq8JO7H423Y5Snf2ZQPC733Z932BuwNdlHlMJZpLD
+\restrict bLJn4xiWqcox1UFab6UoStKsfBqHuOWsis53aCnXe5jUvJubVZuac0JQdjQofJI
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -196,9 +196,8 @@ CREATE TYPE public.doc_type AS ENUM (
 CREATE TYPE public.grouping_method AS ENUM (
     'reference',
     'name',
-    'identifier',
-    'order',
-    'model'
+    'gap',
+    'unordered'
 );
 
 
@@ -1109,10 +1108,7 @@ CREATE TABLE publications.aligned_source_contributions (
     source_contribution_id integer NOT NULL,
     contribution_id integer NOT NULL,
     source_record_id integer NOT NULL,
-    method public.grouping_method NOT NULL,
-    score real,
-    margin real,
-    CONSTRAINT aligned_source_contributions_score_check CHECK (((method = 'model'::public.grouping_method) OR ((score IS NULL) AND (margin IS NULL))))
+    method public.grouping_method NOT NULL
 );
 ALTER TABLE ONLY publications.aligned_source_contributions ALTER COLUMN source_record_id SET (n_distinct=-0.0135);
 
@@ -1121,7 +1117,7 @@ ALTER TABLE ONLY publications.aligned_source_contributions ALTER COLUMN source_r
 -- Name: TABLE aligned_source_contributions; Type: COMMENT; Schema: publications; Owner: -
 --
 
-COMMENT ON TABLE publications.aligned_source_contributions IS 'Appartenance d''une contribution source à sa contribution. method : origine du lien. score et margin, en bits, pour method = model : poids de Fellegi-Sunter du lien, et écart à la meilleure autre possibilité de l''affectation.';
+COMMENT ON TABLE publications.aligned_source_contributions IS 'Appartenance d''une contribution source à sa contribution. method : origine du lien.';
 
 
 --
@@ -6123,5 +6119,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict OKfO4f6sqqhGaZRyXMn7WUeq8JO7H423Y5Snf2ZQPC733Z932BuwNdlHlMJZpLD
+\unrestrict bLJn4xiWqcox1UFab6UoStKsfBqHuOWsis53aCnXe5jUvJubVZuac0JQdjQofJI
 

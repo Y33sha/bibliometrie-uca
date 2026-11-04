@@ -887,22 +887,12 @@ aligned_source_contributions = Table(
     Column("contribution_id", Integer, nullable=False),
     Column("source_record_id", Integer, nullable=False),
     Column("method", grouping_method_enum, nullable=False),
-    Column("score", REAL),
-    Column("margin", REAL),
     UniqueConstraint(
         "contribution_id",
         "source_record_id",
         name="aligned_source_contributions_contribution_record_uq",
     ),
-    CheckConstraint(
-        "method = 'model' OR (score IS NULL AND margin IS NULL)",
-        name="aligned_source_contributions_score_check",
-    ),
-    comment=(
-        "Appartenance d'une contribution source à sa contribution. method : origine du lien. score et "
-        "margin, en bits, pour method = model : poids de Fellegi-Sunter du lien, et écart à la "
-        "meilleure autre possibilité de l'affectation."
-    ),
+    comment="Appartenance d'une contribution source à sa contribution. method : origine du lien.",
     schema="publications",
 )
 

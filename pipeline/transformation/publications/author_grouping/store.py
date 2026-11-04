@@ -43,8 +43,6 @@ _SOURCE_CONTRIBUTIONS_SQL = text(f"""
            sc.id, sc.author_position AS position,
            ci.last_name_normalized AS last_name,
            coalesce(ci.first_name_normalized, '') AS first_name,
-           coalesce({usable_identifier("'orcid'")}, '') AS orcid,
-           coalesce({usable_identifier("'idref'")}, '') AS idref,
            coalesce({_known_first_name("orcid")}, {_known_first_name("idref")}, '') AS known_first_name
     FROM source_records sr
     JOIN source_contributions sc ON sc.source_record_id = sr.id
@@ -55,7 +53,7 @@ _SOURCE_CONTRIBUTIONS_SQL = text(f"""
 
 _CONTRIBUTIONS_SQL = text("""
     SELECT g.id, g.publication_id, gs.source_contribution_id, gs.source_record_id,
-           gs.method::text AS method, gs.score, gs.margin
+           gs.method::text AS method
     FROM contributions g
     LEFT JOIN aligned_source_contributions gs ON gs.contribution_id = g.id
     WHERE g.publication_id = ANY(:publications)
@@ -107,10 +105,10 @@ _INSERT_CONTRIBUTIONS_SQL = text("""
 
 _INSERT_MEMBERSHIPS_SQL = text("""
     INSERT INTO aligned_source_contributions
-        (source_contribution_id, contribution_id, source_record_id, method, score, margin)
+        (source_contribution_id, contribution_id, source_record_id, method)
     SELECT * FROM unnest(
         CAST(:source_contributions AS integer[]), CAST(:contributions AS integer[]), CAST(:source_records AS integer[]),
-        CAST(:methods AS grouping_method[]), CAST(:scores AS real[]), CAST(:margins AS real[]))
+        CAST(:methods AS grouping_method[]))
 """)
 
 
@@ -125,8 +123,6 @@ class SourceContributionRow:
     position: int | None
     last_name: str
     first_name: str
-    orcid: str
-    idref: str
     known_first_name: str = ""
 
 
@@ -149,8 +145,6 @@ class MembershipRow:
     contribution: int
     source_record: int
     method: str
-    score: float | None
-    margin: float | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -256,8 +250,6 @@ class AuthorGroupingStore:
                     row.id,
                     row.source_record_id,
                     row.method,
-                    row.score,
-                    row.margin,
                 )
         return contributions, memberships
 
@@ -321,8 +313,6 @@ class AuthorGroupingStore:
                     "contributions": [m.contribution for m in memberships],
                     "source_records": [m.source_record for m in memberships],
                     "methods": [m.method for m in memberships],
-                    "scores": [m.score for m in memberships],
-                    "margins": [m.margin for m in memberships],
                 },
             )
         self._conn.execute(

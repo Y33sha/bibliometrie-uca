@@ -30,7 +30,6 @@ Un jeu d'évaluation tiré des verdicts humains existe depuis le 2026-10-19 (`bu
 
 ### Phase 3 — Alignement des listes d'auteurs
 
-- [ ] Revue des appariements du modèle : trois classes selon le score et la marge (lien, non-lien, lien possible). Une file de revue de l'administration confirme ou infirme les liens possibles.
 - [ ] Diagnostic de chaque liste d'auteurs avant l'alignement. Il nomme le défaut, écarte les contributions sources concernées et reste stocké pour la relecture et la mesure. Les signaux viennent de l'enregistrement source seul ; la comparaison avec les autres enregistrements sources de la publication sert de confirmation.
 - [ ] Fusions erronées probables dans l'onglet Fusions suspectes. L'onglet retient une publication dont moins de la moitié des contributions sources ont un correspondant : un enregistrement source étranger minoritaire lui échappe (12 des 20 fusions erronées probables de l'échantillon du 2026-10-18). Critère à ajouter : un enregistrement source dont presque aucune contribution source n'a de correspondant.
 

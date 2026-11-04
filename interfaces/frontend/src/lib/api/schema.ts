@@ -5868,16 +5868,6 @@ export interface components {
              * @description Méthode d'entrée de la contribution source dans sa contribution.
              */
             method: string | null;
-            /**
-             * Score
-             * @description Score de l'entrée, en bits.
-             */
-            score: number | null;
-            /**
-             * Margin
-             * @description Marge de l'entrée, en bits.
-             */
-            margin: number | null;
         };
         /**
          * SourceLink

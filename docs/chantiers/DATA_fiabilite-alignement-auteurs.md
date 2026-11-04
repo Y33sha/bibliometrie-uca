@@ -42,15 +42,15 @@ Exemple : la publication 22307 a quatre auteurs dans chacun de ses cinq enregist
 
 ### Phase 3 — Intégration
 
-- [ ] Variante retenue dans `domain/contributions/author_grouping.py`, avec ses tests.
-- [ ] Méthodes de `grouping_method` et colonnes `score` et `margin` de `aligned_source_contributions` : migration.
-- [ ] Retrait du modèle : `residual_weights.py`, `interfaces/cli/dev/estimate_residual_weights.py`, dépendances `splink` et `scipy`, champs `score` et `margin` de l'API, compteurs de la phase dans l'administration.
-- [ ] Retrait de l'item « Revue des appariements du modèle » de la fiche d'audit de la résolution des personnes.
+- [x] Variante retenue dans `domain/contributions/author_grouping.py`, ressemblance des noms dans `domain/contributions/name_similarity.py`, avec leurs tests. Sur l'échantillon du banc, la phase est deux fois plus rapide.
+- [x] Méthodes de `grouping_method` (`reference`, `name`, `gap`, `unordered`) et retrait des colonnes `score` et `margin` de `aligned_source_contributions` : migration.
+- [x] Retrait du modèle : `residual_weights.py`, `interfaces/cli/dev/estimate_residual_weights.py`, dépendances `splink`, `duckdb`, `pyarrow` et `scipy`, champs `score` et `margin` de l'API, compteurs de la phase dans l'administration.
+- [x] Retrait de l'item « Revue des appariements du modèle » de la fiche d'audit de la résolution des personnes.
 - [ ] `--rebuild-author-grouping`.
 
 ### Phase 4 — Documentation
 
-- [ ] Mise à jour de `docs/pipeline/08-author-grouping.md`.
+- [x] Mise à jour de `docs/pipeline/08-author-grouping.md`.
 
 ## Questions ouvertes
 
