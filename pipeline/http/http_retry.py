@@ -14,7 +14,7 @@ import asyncio
 import json
 import logging
 import time
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass
 from typing import cast
 
@@ -101,19 +101,42 @@ def _classify[T](
         return "JSON invalide"
 
 
-def _log_retry(reason: str, label: str, wait: float, attempt: int, max_retries: int) -> None:
-    logger.warning(
-        "%s %s — attente %ss (tentative %s/%s)", reason, label, wait, attempt + 1, max_retries
-    )
+class _Attempts:
+    """Tentatives d'une requête : rythme de la source, pause du backoff entre deux tentatives, compte au circuit-breaker."""
 
+    def __init__(self, label: str, max_retries: int, initial_backoff: float) -> None:
+        self.breaker, self.label = _source_breaker(label)
+        self._max_retries = max_retries
+        self._initial_backoff = initial_backoff
 
-def _exhausted(
-    breaker: SourceCircuitBreaker, label: str, reason: str, max_retries: int
-) -> SourceUnavailableError:
-    """Compte l'échec au breaker et renvoie l'erreur à lever."""
-    breaker.record_failure()
-    logger.error("Échec après %s tentatives %s : %s", max_retries, label, reason)
-    return SourceUnavailableError(breaker.source)
+    def __iter__(self) -> Iterator[int]:
+        return iter(range(self._max_retries))
+
+    def settle[T](self, outcome: _Success[T] | str, attempt: int) -> _Success[T] | float:
+        """Renvoie l'issue aboutie, comptée au circuit-breaker, ou la pause avant la tentative suivante.
+
+        Raises:
+            SourceUnavailableError: la dernière tentative a échoué ; l'échec est compté au circuit-breaker.
+        """
+        if isinstance(outcome, _Success):
+            self.breaker.record_success()
+            return outcome
+        if attempt == self._max_retries - 1:
+            self.breaker.record_failure()
+            logger.error(
+                "Échec après %s tentatives %s : %s", self._max_retries, self.label, outcome
+            )
+            raise SourceUnavailableError(self.breaker.source)
+        wait = _backoff_delay(self._initial_backoff, attempt)
+        logger.warning(
+            "%s %s — attente %ss (tentative %s/%s)",
+            outcome,
+            self.label,
+            wait,
+            attempt + 1,
+            self._max_retries,
+        )
+        return wait
 
 
 def http_request_with_retry(
@@ -138,11 +161,10 @@ def http_request_with_retry(
         max_retries: à 3, avec le backoff par défaut, donne des pauses de 1 et 2 s.
         label: chaîne courte insérée dans le journal (ex. "year 2024, rec 100").
     """
-    breaker, label = _source_breaker(label)
-    reason = ""
-    for attempt in range(max_retries):
-        if breaker.pace is not None:
-            breaker.pace.wait()
+    attempts = _Attempts(label, max_retries, initial_backoff)
+    for attempt in attempts:
+        if attempts.breaker.pace is not None:
+            attempts.breaker.pace.wait()
         try:
             resp = httpx2.request(
                 method,
@@ -162,15 +184,11 @@ def http_request_with_retry(
             outcome = _classify(e, _json_body, retry_on_empty_body=retry_on_empty_body)
         else:
             outcome = _classify(resp, _json_body, retry_on_empty_body=retry_on_empty_body)
-        if isinstance(outcome, _Success):
-            breaker.record_success()
-            return outcome.value
-        reason = outcome
-        if attempt < max_retries - 1:
-            wait = _backoff_delay(initial_backoff, attempt)
-            _log_retry(reason, label, wait, attempt, max_retries)
-            time.sleep(wait)
-    raise _exhausted(breaker, label, reason, max_retries)
+        settled = attempts.settle(outcome, attempt)
+        if isinstance(settled, _Success):
+            return settled.value
+        time.sleep(settled)
+    raise AssertionError("tentatives sans issue")
 
 
 async def http_request_with_retry_async(
@@ -228,7 +246,7 @@ async def lookup_json_async(
     not_found_statuses: frozenset[int] = frozenset({404}),
     label: str = "",
 ) -> LookupOutcome[JsonValue]:
-    """Interroge une source sur un élément par `http_request_with_retry_async`, et classe la réponse en issue (cf. `pipeline.http.lookup`).
+    """Interroge une source sur un élément, selon la politique du module, et classe la réponse en issue (cf. `pipeline.http.lookup`).
 
     Un statut de `not_found_statuses` donne `NOT_FOUND`. Un autre statut d'erreur, des nouvelles tentatives épuisées ou un circuit-breaker déclenché donnent `UNAVAILABLE`.
 
@@ -236,10 +254,11 @@ async def lookup_json_async(
         not_found_statuses: 404 pour une ressource adressée par son identifiant. Vide pour un endpoint de recherche : un 404 désigne alors l'endpoint, et l'absence de l'élément se lit dans une réponse sans résultat.
     """
     try:
-        return await http_request_with_retry_async(
+        return await _request_with_retry_async(
             client,
             method,
             url,
+            decode=_json_body,
             params=params,
             json_body=json_body,
             headers=headers,
@@ -321,11 +340,10 @@ async def _request_with_retry_async[T](
     Args:
         decode: lit le corps d'une réponse aboutie.
     """
-    breaker, label = _source_breaker(label)
-    reason = ""
-    for attempt in range(max_retries):
-        if breaker.pace is not None:
-            await breaker.pace.wait_async()
+    attempts = _Attempts(label, max_retries, initial_backoff)
+    for attempt in attempts:
+        if attempts.breaker.pace is not None:
+            await attempts.breaker.pace.wait_async()
         try:
             resp = await client.request(
                 method,
@@ -344,12 +362,8 @@ async def _request_with_retry_async[T](
             outcome = _classify(e, decode, retry_on_empty_body=retry_on_empty_body)
         else:
             outcome = _classify(resp, decode, retry_on_empty_body=retry_on_empty_body)
-        if isinstance(outcome, _Success):
-            breaker.record_success()
-            return outcome.value
-        reason = outcome
-        if attempt < max_retries - 1:
-            wait = _backoff_delay(initial_backoff, attempt)
-            _log_retry(reason, label, wait, attempt, max_retries)
-            await asyncio.sleep(wait)
-    raise _exhausted(breaker, label, reason, max_retries)
+        settled = attempts.settle(outcome, attempt)
+        if isinstance(settled, _Success):
+            return settled.value
+        await asyncio.sleep(settled)
+    raise AssertionError("tentatives sans issue")
