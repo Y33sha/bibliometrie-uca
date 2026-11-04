@@ -5,7 +5,6 @@ Le matching par titre relie un erratum (`fetch_erratum_title_matches`, suffixe d
 
 import json
 import logging
-from contextlib import contextmanager
 from functools import partial
 
 from sqlalchemy import text
@@ -15,7 +14,6 @@ from domain.source_records.identifiers import (
     SourceIdentifierRole,
     SourceIdentifierType,
 )
-from pipeline.runtime.context import PhaseContext, RunOptions
 from pipeline.transformation.publications import relations
 from pipeline.transformation.publications.relations import (
     DoiPublication,
@@ -511,20 +509,7 @@ class TestPhaseRelations:
             },
         )
 
-        @contextmanager
-        def open_tx():
-            yield sa_sync_conn
-
-        relations.rebuild(
-            PhaseContext(
-                open_tx=open_tx,
-                logger=logging.getLogger("test"),
-                options=RunOptions(),
-                maintain=lambda operation: None,
-                credentials_missing=lambda _source: None,
-                request_budget=lambda _source: None,
-            )
-        )
+        relations.rebuild(sa_sync_conn, logging.getLogger("test"))
 
         rows = sa_sync_conn.execute(
             text(
