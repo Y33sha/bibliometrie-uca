@@ -112,6 +112,23 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
       {
         source: "table",
         firstColumnLabel: "Sous-étape",
+        rowLabels: {
+          resolve_crossref_publishers: "préfixes DOI Crossref → éditeurs",
+          resolve_datacite_publishers: "préfixes DOI DataCite → éditeurs",
+          attach_publishers: "enregistrements sources rattachés aux éditeurs",
+          merge_duplicate_publishers: "autres noms des éditeurs fusionnés",
+          sync_issns: "ISSN des séries",
+          check_issns_in_sudoc: "ISSN vérifiés dans le Sudoc",
+          import_issnl_table: "ISSN trouvés dans la table ISSN-L",
+          attach_serials: "enregistrements sources rattachés aux revues",
+          enrich_serials_from_openalex: "revues OpenAlex",
+          type_proceedings_serials: "revues typées recueils d'actes",
+          type_journal_serials: "entrées typées revues",
+          learn_serial_doi_namespaces: "DOI → espaces de noms des revues",
+          attach_monographs: "enregistrements sources rattachés aux monographies",
+          link_monographs_to_collections: "monographies rattachées à leur collection",
+          type_proceedings_volumes: "monographies retypées (actes ou livre)",
+        },
         columns: [
           { key: "traités", label: "Traités" },
           { key: "identifiés", label: "Identifiés" },

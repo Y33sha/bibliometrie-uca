@@ -17,10 +17,11 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable, Mapping
+from functools import partial
 
 from domain.config import ConfigKey
 from infrastructure.repositories.publisher_merge import merge_publisher_into
-from pipeline.graph import Task, in_transaction
+from pipeline.graph import Task, TaskRun, in_transaction
 from pipeline.http.polite_pool import default_user_agent
 from pipeline.ingestion.api_params import (
     API_BASE_URLS,
@@ -58,58 +59,24 @@ from pipeline.transformation.publishing.serials import (
     type_proceedings_serials,
 )
 
-_TABLE: tuple[tuple[str, str, Callable[[PhaseMetrics], int]], ...] = (
-    (
-        "resolve_crossref_publishers",
-        "préfixes DOI Crossref → éditeurs",
-        lambda m: m.extras.get("publisher_matched", 0),
-    ),
-    (
-        "resolve_datacite_publishers",
-        "préfixes DOI DataCite → éditeurs",
-        lambda m: m.extras.get("publisher_matched", 0),
-    ),
-    ("attach_publishers", "enregistrements sources rattachés aux éditeurs", lambda m: m.updated),
-    ("sync_issns", "ISSN des séries", lambda m: m.new),
-    (
-        "check_issns_in_sudoc",
-        "ISSN vérifiés dans le Sudoc",
-        lambda m: m.extras.get("sudoc_found", 0),
-    ),
-    ("attach_serials", "enregistrements sources rattachés aux revues", lambda m: m.updated),
-    ("enrich_serials_from_openalex", "revues OpenAlex", lambda m: m.updated),
-    (
-        "type_proceedings_serials",
-        "revues typées recueils d'actes",
-        lambda m: m.extras.get("serials_typed_proceedings", 0),
-    ),
-    (
-        "type_journal_serials",
-        "entrées typées revues",
-        lambda m: m.extras.get("serials_typed_journal", 0),
-    ),
-    (
-        "learn_serial_doi_namespaces",
-        "DOI → espaces de noms des revues",
-        lambda m: m.extras.get("serial_doi_namespaces", 0),
-    ),
-    (
-        "attach_monographs",
-        "enregistrements sources rattachés aux monographies",
-        lambda m: m.updated,
-    ),
-    (
-        "link_monographs_to_collections",
-        "monographies rattachées à leur collection",
-        lambda m: m.extras.get("monographs_linked", 0),
-    ),
-    (
-        "type_proceedings_volumes",
-        "monographies retypées (actes ou livre)",
-        lambda m: m.extras.get("monographs_to_proceedings", 0),
-    ),
-)
-"""Ligne de la table d'observabilité de chaque tâche : son nom, son libellé, et ce qui compte comme identifié."""
+_IDENTIFIED: dict[str, Callable[[PhaseMetrics], int]] = {
+    "resolve_crossref_publishers": lambda m: m.extras.get("publisher_matched", 0),
+    "resolve_datacite_publishers": lambda m: m.extras.get("publisher_matched", 0),
+    "attach_publishers": lambda m: m.updated,
+    "merge_duplicate_publishers": lambda m: m.extras.get("publishers_merged", 0),
+    "sync_issns": lambda m: m.new,
+    "check_issns_in_sudoc": lambda m: m.extras.get("sudoc_found", 0),
+    "import_issnl_table": lambda m: m.extras.get("matched", 0),
+    "attach_serials": lambda m: m.updated,
+    "enrich_serials_from_openalex": lambda m: m.updated,
+    "type_proceedings_serials": lambda m: m.extras.get("serials_typed_proceedings", 0),
+    "type_journal_serials": lambda m: m.extras.get("serials_typed_journal", 0),
+    "learn_serial_doi_namespaces": lambda m: m.extras.get("serial_doi_namespaces", 0),
+    "attach_monographs": lambda m: m.updated,
+    "link_monographs_to_collections": lambda m: m.extras.get("monographs_linked", 0),
+    "type_proceedings_volumes": lambda m: m.extras.get("monographs_to_proceedings", 0),
+}
+"""Tâches de la table d'observabilité, dans l'ordre d'exécution, avec ce qui compte comme identifié pour chacune."""
 
 
 def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
@@ -122,12 +89,12 @@ def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
     metrics.details["table"] = {
         "rows": [
             {
-                "key": key,
+                "key": name,
                 "traités": by_task[name].total,
-                "identifiés": identifies(by_task[name]),
+                "identifiés": identified(by_task[name]),
                 "créés": by_task[name].extras.get("publisher_created", 0),
             }
-            for name, key, identifies in _TABLE
+            for name, identified in _IDENTIFIED.items()
         ]
     }
     # DOAJ : ligne à part (sous-étape conditionnelle, métrique propre).
@@ -137,30 +104,19 @@ def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
     return metrics
 
 
-def _run_resolve_crossref_publishers(
-    ctx: PhaseContext,
-) -> PhaseMetrics:
-    with ctx.open_tx() as conn:
-        return resolve_publishers.run_resolve_crossref_publishers(
-            conn,
-            ctx.logger,
-            prefix_store=DoiPrefixStore(conn),
-            publisher_store=PublisherStore(conn),
-            fetch_prefix_fn=fetch_crossref_prefix,
-        )
+def _resolve_publishers(run: Callable[..., PhaseMetrics]) -> TaskRun:
+    """Renvoie l'exécution d'une résolution des éditeurs par préfixe DOI, sur les stores des préfixes et des éditeurs."""
 
+    def execute(ctx: PhaseContext) -> PhaseMetrics:
+        with ctx.open_tx() as conn:
+            return run(
+                conn,
+                ctx.logger,
+                prefix_store=DoiPrefixStore(conn),
+                publisher_store=PublisherStore(conn),
+            )
 
-def _run_resolve_datacite_publishers(
-    ctx: PhaseContext,
-) -> PhaseMetrics:
-    with ctx.open_tx() as conn:
-        return resolve_publishers.run_resolve_datacite_publishers(
-            conn,
-            ctx.logger,
-            prefix_store=DoiPrefixStore(conn),
-            publisher_store=PublisherStore(conn),
-            fetch_prefix_fn=fetch_datacite_prefix,
-        )
+    return execute
 
 
 def _run_merge_duplicate_publishers(ctx: PhaseContext) -> PhaseMetrics:
@@ -262,7 +218,12 @@ TASKS = (
             "doi_prefixes",
         ),
         network="crossref",
-        run=_run_resolve_crossref_publishers,
+        run=_resolve_publishers(
+            partial(
+                resolve_publishers.run_resolve_crossref_publishers,
+                fetch_prefix_fn=fetch_crossref_prefix,
+            )
+        ),
         section="Éditeurs",
         label=resolve_publishers.LABELS["Crossref"],
     ),
@@ -292,7 +253,12 @@ TASKS = (
         ),
         previous_run=("publishers", "publisher_name_forms"),
         network="datacite",
-        run=_run_resolve_datacite_publishers,
+        run=_resolve_publishers(
+            partial(
+                resolve_publishers.run_resolve_datacite_publishers,
+                fetch_prefix_fn=fetch_datacite_prefix,
+            )
+        ),
         section="Éditeurs",
         label=resolve_publishers.LABELS["DataCite"],
     ),

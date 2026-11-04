@@ -35,6 +35,13 @@ def _run(
     )
 
 
+def test_la_table_d_observabilite_couvre_les_taches_de_la_phase():
+    """Chaque tâche a sa ligne, dans l'ordre d'exécution, sauf l'import du DOAJ, compté à part dans le résumé."""
+    assert list(publishing._IDENTIFIED) == [
+        name for name in _CHAMPS if name != "enrich_serials_from_doaj"
+    ]
+
+
 def test_les_taches_s_enchainent_dans_l_ordre_du_graphe(contexte):
     appels: list[str] = []
     _run(contexte, appels)

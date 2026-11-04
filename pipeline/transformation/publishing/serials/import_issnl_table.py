@@ -99,7 +99,7 @@ def run_import_issnl_table(
         {"rows": json.dumps([{"issn": issn, "issnl": issnl} for issn, issnl in found.items()])},
     )
     changed = sum(1 for issn, issnl in current.items() if found.get(issn) != issnl)
-    metrics = PhaseMetrics(extras={"matched": len(found), "changed": changed})
+    metrics = PhaseMetrics(seen=len(current), extras={"matched": len(found), "changed": changed})
     metrics.report = (
         f"{quantity(len(found), 'ISSN trouvé', 'ISSN trouvés')} dans la table, "
         f"{quantity(changed, 'ISSN-L modifié', 'ISSN-L modifiés')}"
