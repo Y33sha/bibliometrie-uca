@@ -1,4 +1,4 @@
-"""Phase `resolve_ra` : résolution préfixe DOI → Registration Agency, après `affiliations` et avant `publishing`.
+"""Phase `resolve_ra` : résolution préfixe DOI → Registration Agency.
 
 Soumet à `doi.org/ra` les préfixes valides (`DoiPrefix`) de tous les DOI connus absents de `doi_prefixes`, et insère `(prefix, ra)`. Un préfixe inconnu de doi.org est inséré avec `ra='unknown'`. Un préfixe sans réponse, faute de requête aboutie, reste à résoudre.
 
@@ -12,7 +12,7 @@ from collections.abc import Callable, Iterable, Sequence
 
 from domain.documents.identifiers import DoiPrefix
 from pipeline.graph import Task
-from pipeline.http.circuit_breaker import SourceUnavailableError
+from pipeline.http.circuit_breaker import SourceUnavailableError, trip_source
 from pipeline.http.polite_pool import default_user_agent
 from pipeline.ingestion.complements.doi_org import fetch_registration_agencies
 from pipeline.runtime.context import PhaseContext
@@ -24,7 +24,6 @@ from pipeline.runtime.observability.log_format import (
     step,
 )
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.signals import signal_source_unavailable
 from pipeline.transformation.publishing.doi_prefixes import DoiPrefixStore
 
 ResolveRasFn = Callable[[Sequence[str]], Iterable[tuple[str, str | None]]]
@@ -46,22 +45,9 @@ def resolve_prefixes(ctx: PhaseContext) -> PhaseMetrics:
 def resolve(
     log: logging.Logger, prefix_store: DoiPrefixStore, resolve_ras_fn: ResolveRasFn
 ) -> PhaseMetrics:
-    """Résout l'agence des préfixes de `prefix_store` par `resolve_ras_fn`.
+    """Résout l'agence des préfixes absents de `doi_prefixes` par `resolve_ras_fn`, et l'insère.
 
-    Une indisponibilité de doi.org donne des métriques vides, signalées. Les préfixes insérés avant l'indisponibilité restent dans la transaction.
-    """
-    try:
-        return _resolve(log, prefix_store, resolve_ras_fn)
-    except SourceUnavailableError:
-        metrics = PhaseMetrics()
-        signal_source_unavailable(metrics, "doi.org/ra", logger=log)
-        return metrics
-
-
-def _resolve(
-    log: logging.Logger, prefix_store: DoiPrefixStore, resolve_ras_fn: ResolveRasFn
-) -> PhaseMetrics:
-    """Résout l'agence des préfixes absents de `doi_prefixes` (`doi.org/ra`) et l'insère.
+    Une indisponibilité de doi.org coupe la source et arrête la résolution. Les préfixes insérés avant restent dans la transaction, et les métriques les comptent.
 
     Returns:
         Métriques : `total`, préfixes auxquels doi.org a répondu ; `new`, lignes insérées ; `extras`, `resolved` / `unresolved`.
@@ -84,18 +70,21 @@ def _resolve(
         )
 
     new_by_ra: dict[str, int] = {}
-    for prefix, answer in resolve_ras_fn(prefixes):
-        ra = answer or "unknown"
-        if answer:
-            metrics.add(seen=1, resolved=1)
-        else:
-            metrics.add(seen=1, unresolved=1)
-        if prefix_store.insert_ra(prefix=prefix, ra=ra):
-            metrics.add(new=1)
-            new_by_ra[ra] = new_by_ra.get(ra, 0) + 1
-        log.info("     %s → %s", prefix, ra)
+    try:
+        for prefix, answer in resolve_ras_fn(prefixes):
+            ra = answer or "unknown"
+            if answer:
+                metrics.add(seen=1, resolved=1)
+            else:
+                metrics.add(seen=1, unresolved=1)
+            if prefix_store.insert_ra(prefix=prefix, ra=ra):
+                metrics.add(new=1)
+                new_by_ra[ra] = new_by_ra.get(ra, 0) + 1
+            log.info("     %s → %s", prefix, ra)
+    except SourceUnavailableError:
+        trip_source()
 
-    # Synthèse du run et tableau des DOI candidats et des préfixes par Registration Agency (Crossref, DataCite, unknown). La part `unknown` inclut les préfixes inconnus de doi.org et les préfixes malformés (DOI à scheme « doi: » non nettoyé).
+    # Synthèse du run et tableau des DOI candidats et des préfixes par Registration Agency (Crossref, DataCite, unknown).
     metrics.details["summary"] = {
         "new_prefixes": metrics.new,
         "resolved": metrics.extras.get("resolved", 0),

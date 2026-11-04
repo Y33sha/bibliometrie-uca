@@ -3,7 +3,7 @@
 import logging
 from unittest.mock import MagicMock
 
-from pipeline.http.circuit_breaker import SourceUnavailableError
+from pipeline.http.circuit_breaker import SourceUnavailableError, source_circuit_breaker
 from pipeline.transformation.structures.hal_structures import (
     fetch_hal_structures,
     run_refresh_hal_structures,
@@ -107,10 +107,12 @@ def test_source_indisponible_garde_les_lots_enregistres():
     source.by_ids.side_effect = SourceUnavailableError("hal")
     conn = MagicMock()
 
-    metrics = run_refresh_hal_structures(
-        conn, source=source, store=store, logger=_LOG, refresh_stale=False
-    )
+    with source_circuit_breaker("hal") as breaker:
+        metrics = run_refresh_hal_structures(
+            conn, source=source, store=store, logger=_LOG, refresh_stale=False
+        )
 
     conn.rollback.assert_called_once()
     store.rebuild_relations.assert_called_once()
     assert metrics.report
+    assert breaker.tripped

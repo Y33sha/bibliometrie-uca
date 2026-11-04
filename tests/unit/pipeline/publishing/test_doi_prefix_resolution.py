@@ -9,7 +9,7 @@ import logging
 from dataclasses import dataclass, field
 from unittest.mock import MagicMock
 
-from pipeline.http.circuit_breaker import SourceUnavailableError
+from pipeline.http.circuit_breaker import SourceUnavailableError, source_circuit_breaker
 from pipeline.http.lookup import NOT_FOUND, UNAVAILABLE
 from pipeline.transformation.publishing import resolve_ra
 from pipeline.transformation.publishing.doi_prefixes import PendingPublisherPrefix
@@ -268,7 +268,7 @@ def test_resolve_ra_prefix_without_answer_stays_to_resolve():
 
 
 def test_resolve_ra_doi_org_indisponible_garde_les_prefixes_inseres(open_tx, contexte, monkeypatch):
-    """doi.org indisponible en cours de résolution : la phase signale la source et sort normalement de sa transaction, qui commit les préfixes déjà insérés."""
+    """doi.org indisponible en cours de résolution : la tâche coupe la source, compte les préfixes déjà insérés et sort normalement de sa transaction, qui les commite."""
     repo = FakeDoiPrefixRepo(candidates=["10.1038", "10.5194"])
 
     def ras(prefixes, user_agent):  # noqa: ARG001
@@ -277,11 +277,13 @@ def test_resolve_ra_doi_org_indisponible_garde_les_prefixes_inseres(open_tx, con
 
     monkeypatch.setattr(resolve_ra, "DoiPrefixStore", lambda conn: repo)  # noqa: ARG005
     monkeypatch.setattr(resolve_ra, "fetch_registration_agencies", ras)
-    metrics = resolve_ra.resolve_prefixes(contexte())
+    with source_circuit_breaker("doi.org") as breaker:
+        metrics = resolve_ra.resolve_prefixes(contexte())
 
     assert set(repo.rows) == {"10.1038"}
     assert open_tx.transactions == 1
-    assert [s["code"] for s in metrics.signals] == ["source_unavailable"]
+    assert breaker.tripped
+    assert metrics.new == 1
 
 
 # resolve_publishers
