@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-import time
 from collections.abc import Mapping
 
 from pipeline.graph import Task
 from pipeline.runtime.context import PhaseContext
-from pipeline.runtime.observability.log_format import LAST_BRANCH
+from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, inflect, quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import waiting
 from pipeline.transformation.persons.contribution_resolution import resolve_contributions
@@ -30,19 +29,41 @@ def _resolve_contributions(ctx: PhaseContext) -> PhaseMetrics:
 
 
 def _populate(ctx: PhaseContext) -> PhaseMetrics:
-    t0 = time.perf_counter()
     with (
         ctx.open_tx() as conn,
         waiting(f"{LAST_BRANCH}rafraîchissement en cours", ctx.logger) as line,
     ):
         counts = populate(conn)
-        line.conclude(f"{LAST_BRANCH}Terminé en {time.perf_counter() - t0:.1f}s")
+        line.conclude(
+            f"{LAST_BRANCH}{quantity(counts.inserted, 'forme ajoutée', 'formes ajoutées')},"
+            f" {quantity(counts.updated, 'modifiée')}, {quantity(counts.deleted, 'supprimée')}"
+        )
     return PhaseMetrics(extras=counts._asdict())
 
 
 def _purge(ctx: PhaseContext) -> PhaseMetrics:
     with ctx.open_tx() as conn:
         counts = purge(conn)
+    ctx.logger.info(
+        "%s%s à redécider (nom devenu ambigu)",
+        BRANCH,
+        quantity(counts["ambiguous_marked"], "contribution"),
+    )
+    ctx.logger.info(
+        "%s%s",
+        BRANCH,
+        quantity(
+            counts["deleted_attributions"],
+            "attribution d'identifiant supprimée",
+            "attributions d'identifiant supprimées",
+        ),
+    )
+    ctx.logger.info(
+        "%s%s %s",
+        LAST_BRANCH,
+        quantity(counts["deleted_persons"], "personne"),
+        inflect(counts["deleted_persons"], "supprimée"),
+    )
     return PhaseMetrics(extras=dict(counts))
 
 
@@ -79,6 +100,7 @@ TASKS = (
             "source_records.publication_id",
         ),
         run=_arbitrate_identifiers,
+        section="Conflits d'identifiants",
     ),
     Task(
         "resolve_contributions",
@@ -183,6 +205,7 @@ TASKS = (
             "source_records.publication_id",
         ),
         run=_purge,
+        section="Purge des personnes",
     ),
 )
 
