@@ -36,7 +36,7 @@ from domain.types import JsonValue
 from infrastructure.db.doi_targets import doi_or_target_sql
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.db.scalars import scalar_int
-from infrastructure.db.source_record_identifiers import first_of_its_type_sql
+from infrastructure.db.source_record_identifiers import first_of_its_type_sql, non_related_doi_sql
 from infrastructure.sql_fragments import has_source_extra, in_clause
 from pipeline.graph import Task
 from pipeline.runtime.context import PhaseContext
@@ -130,8 +130,7 @@ _SHARED_KEY_PAIRS_SQL = text(f"""
               (i.id_type = '{SourceIdentifierType.HAL_ID}' AND i.removed_by IS NULL)
               OR (i.id_type::text IN {in_clause(_SINGLE_KEY_TYPES)}
                   AND {first_of_its_type_sql("i")})
-              OR (i.id_type = '{SourceIdentifierType.DOI}' AND i.removed_by IS NULL
-                  AND i.role <> '{SourceIdentifierRole.RELATED}'
+              OR ({non_related_doi_sql("i")} AND i.removed_by IS NULL
                   AND i.id_value LIKE '{ARXIV_DOI_PREFIX}%')
           )
     )

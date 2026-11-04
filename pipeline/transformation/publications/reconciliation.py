@@ -29,8 +29,6 @@ from domain.publications.reconciliation import (
 )
 from domain.source_records.identifiers import (
     SourceIdentifier,
-    SourceIdentifierRole,
-    SourceIdentifierType,
 )
 from domain.source_records.keys import (
     CONFIRMATION_ID_TYPES,
@@ -44,6 +42,7 @@ from infrastructure.db.scalars import scalar_int
 from infrastructure.db.source_record_identifiers import (
     first_of_its_type_sql,
     identifiers_json_sql,
+    non_related_doi_sql,
     parse_identifiers,
 )
 from infrastructure.sql_fragments import in_clause
@@ -103,10 +102,7 @@ _CONFIRMATION_KEY_SQL = (
 )
 """L'identifiant aliasé `{a}` de `source_record_identifiers` est la clé de confirmation de son type (`confirmation_identifiers`)."""
 
-_DOI_KEY_SQL = (
-    f"{{a}}.id_type = '{SourceIdentifierType.DOI.value}' AND {{a}}.removed_by IS NULL"
-    f" AND {{a}}.role <> '{SourceIdentifierRole.RELATED.value}'"
-)
+_DOI_KEY_SQL = non_related_doi_sql("{a}") + " AND {a}.removed_by IS NULL"
 """L'identifiant aliasé `{a}` de `source_record_identifiers` est une clé DOI : un DOI actif de rôle autre que `related` (`doi_keys`)."""
 
 _UNIVERSE_SQL = text(f"""

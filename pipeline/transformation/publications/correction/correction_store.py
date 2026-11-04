@@ -52,6 +52,7 @@ from infrastructure.db.rows import rows_as
 from infrastructure.db.source_record_identifiers import (
     fetch_identifiers,
     identifiers_json_sql,
+    non_related_doi_sql,
     parse_identifiers,
 )
 from infrastructure.db.tables import source_records
@@ -289,8 +290,7 @@ def _persist_updates(conn: Connection, updates: Sequence[Mapping[str, object]]) 
 _RECORD_DOIS_SQL = f"""
     SELECT source_record_id AS id, id_value AS doi, role
     FROM source_record_identifiers
-    WHERE id_type = '{SourceIdentifierType.DOI.value}'
-      AND role <> '{SourceIdentifierRole.RELATED.value}'
+    WHERE {non_related_doi_sql("source_record_identifiers")}
 """
 """DOI de rôle autre que `related` de chaque enregistrement source, quel que soit leur statut."""
 
@@ -429,8 +429,7 @@ class SourceRecordCorrectionStore:
                 WHERE (sr.serial_id IS NULL AND EXISTS (
                           SELECT 1 FROM source_record_identifiers i
                           WHERE i.source_record_id = sr.id
-                            AND i.id_type = '{SourceIdentifierType.DOI.value}'
-                            AND i.role <> '{SourceIdentifierRole.RELATED.value}'
+                            AND {non_related_doi_sql("i")}
                             AND (i.removed_by IS NULL OR i.removed_by = ANY(:removals))))
                    OR {corrected("serial_id")}
             """),
@@ -457,8 +456,7 @@ class SourceRecordCorrectionStore:
         rows = self._conn.execute(
             text(f"""
                 SELECT DISTINCT id_value FROM source_record_identifiers
-                WHERE id_type = '{SourceIdentifierType.DOI.value}'
-                  AND role <> '{SourceIdentifierRole.RELATED.value}'
+                WHERE {non_related_doi_sql("source_record_identifiers")}
                   AND {unversioned_doi_sql("id_value")} IS NOT NULL
             """)
         )
@@ -512,8 +510,7 @@ class SourceRecordCorrectionStore:
                 -- DOI présents en base : DOI de rôle autre que `related` des enregistrements sources, hors retraits de la correction unaire.
                 present_dois AS (
                     SELECT DISTINCT id_value AS d FROM source_record_identifiers
-                    WHERE id_type = '{SourceIdentifierType.DOI.value}'
-                      AND role <> '{SourceIdentifierRole.RELATED.value}'
+                    WHERE {non_related_doi_sql("source_record_identifiers")}
                       AND (removed_by IS NULL OR removed_by IN ({_CLUSTER_CASES_SQL}))
                 ),
                 -- DOI `primary` de chaque enregistrement source DataCite, son DOI propre.
@@ -723,8 +720,7 @@ class SourceRecordCorrectionStore:
             Queue.SOURCE_RECORD_KEYS,
             f"""
             SELECT DISTINCT source_record_id FROM source_record_identifiers
-            WHERE id_type = '{SourceIdentifierType.DOI.value}'
-              AND role <> '{SourceIdentifierRole.RELATED.value}' AND id_value = ANY(:dois)
+            WHERE {non_related_doi_sql("source_record_identifiers")} AND id_value = ANY(:dois)
             """,
             {"dois": changed},
         )

@@ -36,6 +36,18 @@ def first_of_its_type_sql(identifier: str) -> str:
     )
 
 
+def non_related_doi_sql(identifier: str) -> str:
+    """Renvoie la condition SQL : l'identifiant `identifier` est un DOI de rôle autre que `related`, quel que soit son statut.
+
+    Args:
+        identifier: alias SQL de l'identifiant, ou nom de la table sans alias.
+    """
+    return (
+        f"{identifier}.id_type = '{SourceIdentifierType.DOI}'"
+        f" AND {identifier}.role <> '{SourceIdentifierRole.RELATED}'"
+    )
+
+
 def source_record_doi_sql(source_record: str) -> str:
     """Renvoie l'expression SQL du DOI affiché de l'enregistrement source, NULL sans DOI.
 
@@ -47,8 +59,7 @@ def source_record_doi_sql(source_record: str) -> str:
     return (
         "(SELECT d.id_value FROM source_record_identifiers d"  # noqa: S608
         f" WHERE d.source_record_id = {source_record}.id"
-        f" AND d.id_type = '{SourceIdentifierType.DOI}'"
-        f" AND d.role <> '{SourceIdentifierRole.RELATED}' AND {first_of_its_type_sql('d')})"
+        f" AND {non_related_doi_sql('d')} AND {first_of_its_type_sql('d')})"
     )
 
 
