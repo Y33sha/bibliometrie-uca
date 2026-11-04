@@ -33,11 +33,11 @@ from domain.serials.containers import SeriesDescription
 from domain.serials.serial import ManualField
 from domain.source_records.biblio import journal_series
 from domain.source_records.corrections import RAW, CorrectionKey
-from infrastructure.db.queues import Queue, enqueue_ids
 from pipeline.runtime.observability.log_format import quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publishing.serials.serial_merge import merge_serial_into
 from pipeline.transformation.publishing.serials.store import SerialStore
+from pipeline.transformation.publishing.source_record_links import write_links
 
 SYNC_LABEL = "ISSN des séries"
 """Libellé de la sous-étape `sync_issns` dans le journal de la phase."""
@@ -380,17 +380,12 @@ def _write_attachment(
         new = attachment.serial_of[m.id]
         if m.serial_id is not None and new is not None:
             received.setdefault(m.serial_id, Counter())[new] += 1
-    if changed:
-        ids = [m.id for m in changed]
-        conn.execute(
-            _SET_RECORD_SERIALS,
-            {
-                "rows": json.dumps(
-                    [{"id": m.id, "serial_id": attachment.serial_of[m.id]} for m in changed]
-                )
-            },
-        )
-        enqueue_ids(conn, Queue.SOURCE_RECORD_KEYS, ids)
+    write_links(
+        conn,
+        "serial_id",
+        {m.id: attachment.serial_of[m.id] for m in changed},
+        update=_SET_RECORD_SERIALS,
+    )
     return [m.id for m in changed], received
 
 

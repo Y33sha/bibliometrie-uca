@@ -3,7 +3,6 @@
 Le rattachement se calcule sur tous les enregistrements sources qui nomment un éditeur (`biblio.publisher`, `biblio.publisher_openalex_id`), selon `domain.publishers.attachment`. Une production hébergée sans être publiée reste sans éditeur (`source_record_has_publisher`), d'après son type de document d'avant correction et la série ou le volume décrits. Les éditeurs nouveaux sont créés avec leurs formes de nom. Un enregistrement source qui change d'éditeur est marqué pour la réconciliation.
 """
 
-import json
 import logging
 
 from sqlalchemy import Connection, text
@@ -16,10 +15,10 @@ from domain.publishers.attachment import (
     attach_publishers,
 )
 from domain.publishers.attribution import source_record_has_publisher
-from infrastructure.db.queues import Queue, enqueue_ids
 from pipeline.runtime.observability.log_format import quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publishing.publishers.store import PublisherStore
+from pipeline.transformation.publishing.source_record_links import changed_links, write_links
 
 LABEL = "Rattachement des enregistrements sources aux éditeurs"
 """Libellé de la sous-étape dans le journal de la phase."""
@@ -43,12 +42,6 @@ _FORMS = text("SELECT form_normalized, publisher_id FROM publisher_name_forms")
 _SET_OPENALEX_ID = text(
     "UPDATE publishers SET openalex_id = :openalex_id WHERE id = :id AND openalex_id IS NULL"
 )
-
-_SET_PUBLISHERS = text("""
-    UPDATE source_records sr SET publisher_id = t.publisher_id
-    FROM jsonb_to_recordset(CAST(:rows AS jsonb)) AS t(id integer, publisher_id integer)
-    WHERE sr.id = t.id
-""")
 
 
 def _publisher_records(conn: Connection) -> tuple[list[PublisherRecord], dict[int, int | None]]:
@@ -94,15 +87,9 @@ def run_attach_publishers(conn: Connection, logger: logging.Logger) -> PhaseMetr
         record_id: resolve(ref) for record_id, ref in sorted(attachment.publisher_of.items())
     }
 
-    changed = [
-        {"id": record_id, "publisher_id": publisher_id}
-        for record_id, publisher_id in desired.items()
-        if publisher_id != current.get(record_id)
-    ]
-    if changed:
-        conn.execute(_SET_PUBLISHERS, {"rows": json.dumps(changed)})
-        enqueue_ids(conn, Queue.SOURCE_RECORD_KEYS, [row["id"] for row in changed])
-    detached = sum(row["publisher_id"] is None for row in changed)
+    changed = changed_links(desired, current)
+    write_links(conn, "publisher_id", changed)
+    detached = sum(publisher_id is None for publisher_id in changed.values())
     metrics = PhaseMetrics()
     metrics.add(
         seen=len(desired),
