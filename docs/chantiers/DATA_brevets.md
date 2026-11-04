@@ -27,23 +27,54 @@ Une famille de brevets réunit les demandes déposées auprès de plusieurs offi
 
 - Le SIREN du déposant est renseigné pour une partie des demandes FR, jamais pour les demandes WO.
 - Les demandes EP et WO abrègent les noms des déposants : `UNIV CLERMONT AUVERGNE`, `CENTRE NAT RECH SCIENT`.
-- L'adresse de l'inventeur est son adresse personnelle.
-- Un brevet nomme ses déposants, jamais le laboratoire. Le CNRS et l'Inserm déposent à leur adresse parisienne. Leurs brevets issus d'un laboratoire de l'UCA, sans l'UCA en co-déposant, se repèrent seulement par les inventeurs.
+- L'adresse de l'inventeur est son adresse personnelle. Les demandes EP donnent seulement son pays.
+- Un brevet nomme ses déposants, jamais le laboratoire.
+- Le quota est de 100 requêtes par heure. La réponse 429 donne le délai d'attente dans `X-Rate-Limit-Retry-After-Seconds`.
 
 ### Open data du ministère de l'Enseignement supérieur et de la Recherche
 
-Le portail `data.enseignementsup-recherche.gouv.fr` publie `deposants-des-brevets`, `demandes-de-brevets` et `fr-esr-familles-brevets`, mis à jour en mai 2026. Tous les offices sont couverts. Les déposants sont résolus en SIREN et en identifiant Paysage. Accès libre, sans compte.
+Le portail `data.enseignementsup-recherche.gouv.fr` publie `deposants-des-brevets`, `demandes-de-brevets` et `fr-esr-familles-brevets`, mis à jour en mai 2026. Ces jeux sont tirés de PATSTAT, la base de l'Office européen des brevets. Ils couvrent les demandes déposées depuis 2010 dont une personne est localisée en France, auprès de tous les offices. Les déposants sont résolus en SIREN et en identifiant Paysage. Les inventeurs sont absents. Accès libre, sans compte.
+
+### ScanR
+
+L'index `scanr-patents` du cluster Elasticsearch de ScanR contient les familles des jeux du ministère. Une famille y réunit :
+
+- les déposants, résolus en identifiants Paysage, SIREN et ROR ;
+- les inventeurs, avec leur IdRef quand ScanR l'a trouvé, sans adresse ;
+- les demandes de chaque office ;
+- les articles cités par le brevet, avec leur DOI et les affiliations de leurs auteurs.
+
+### HAL
+
+Le champ `number_s` d'un dépôt HAL de type brevet contient son numéro en texte libre : numéro de publication ou de demande, parfois plusieurs, ou une référence interne. Le moissonnage HAL demande ce champ.
+
+### Inventaire du 2026-11-04
+
+Familles dont un établissement du périmètre est déposant : UCA, Université Blaise Pascal, Université d'Auvergne, Clermont Auvergne INP, SIGMA Clermont, IFMA, ENSCCF.
+
+| Source | Familles |
+|---|---|
+| INPI | 224, premier dépôt de 1982 à 2025 |
+| ScanR | 156, premier dépôt depuis 2010 |
+| HAL | 38 |
+
+- Depuis 2010, 146 familles sont présentes à la fois à l'INPI et dans ScanR. 14 des 17 familles présentes seulement à l'INPI sont déposées en 2024 ou 2025.
+- Le CNRS est co-déposant de la moitié des familles de l'INPI.
+- HAL contient 88 brevets. 65 sont présents dans ScanR, dont 27 sans déposant du périmètre. 9 des 23 autres donnent une référence interne d'INRAE à la place d'un numéro de brevet.
+- 90 personnes RH ont le nom et le prénom d'un inventeur des familles de l'INPI domicilié dans le Puy-de-Dôme.
 
 ## Décisions
+
+- Le chantier couvre les brevets dont un établissement du périmètre est déposant. Le brevet d'un organisme partenaire se rattache au périmètre seulement par ses inventeurs, sans adresse dans ScanR.
 
 ## Phasage
 
 ### Phase 1 — Inventaire
 
-- [ ] Demandes déposées par l'UCA et les établissements fusionnés en elle, par nom de déposant
-- [ ] Comptage par famille, par co-déposant, par année
-- [ ] Comparaison avec les jeux de données du ministère : couverture, présence des inventeurs
-- [ ] Recherche par nom d'inventeur sur un échantillon du personnel, parmi les demandes du CNRS et de l'Inserm : bruit dû aux homonymes
+- [x] Demandes déposées par l'UCA et les établissements fusionnés en elle, par nom de déposant
+- [x] Comptage par famille, par co-déposant, par année
+- [x] Comparaison avec les jeux de données du ministère : couverture, présence des inventeurs
+- [x] Recherche par nom d'inventeur sur le personnel : bruit dû aux homonymes
 
 ### Phase 2 — Modèle
 
@@ -61,8 +92,7 @@ Le portail `data.enseignementsup-recherche.gouv.fr` publie `deposants-des-brevet
 
 ## Questions ouvertes
 
-1. Source : API de l'INPI, jeux de données du ministère, ou les deux.
+1. Source : API de l'INPI, ScanR, ou les deux, avec les brevets de HAL.
 2. Unité : la demande ou la famille.
 3. Place dans le modèle : un type de publication, ou une entité distincte.
-4. Périmètre : demandes d'un déposant du périmètre, demandes d'un inventeur rattaché à une structure du périmètre.
-5. Articles cités par un brevet : relation avec les publications par DOI.
+4. Articles cités par un brevet : relation avec les publications par DOI.
