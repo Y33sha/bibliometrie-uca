@@ -18,6 +18,7 @@ Chaque source moissonnée (HAL, OpenAlex, WoS, ScanR, theses.fr, DataCite, Cross
 - **Concurrence par source dans `api_params.py`**, à côté du débit (`MAX_PER_SECOND`), lue par la recherche par identifiant.
 - **L'adaptateur expose des fonctions**, sans classe intermédiaire : relecture par identifiant natif, recherche par DOI avec sa taille de lot.
 - **Une boucle de pagination commune**, sur un type de page unique. WoS et theses.fr gardent leur pagination par décalage.
+- **Un document écrit dans `staging` efface l'échec de la recherche de son identifiant natif**, pour toute source qui attribue ses identifiants : hal-id pour HAL, NNT pour theses.fr.
 
 ## Phasage
 
@@ -46,7 +47,3 @@ Chaque source moissonnée (HAL, OpenAlex, WoS, ScanR, theses.fr, DataCite, Cross
 ### Phase 5 — Documentation
 
 - [ ] Mise à jour de `docs/architecture/06-pipeline.md` et des pages du moissonnage dans `docs/pipeline/`.
-
-## Questions ouvertes
-
-- theses.fr attribue lui-même ses NNT, comme HAL ses hal-id. Faut-il aussi effacer l'échec d'une recherche par NNT quand le document apparaît dans `staging` ?
