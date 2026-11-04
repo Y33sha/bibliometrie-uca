@@ -8,7 +8,6 @@ MODULES = [
     "pipeline.ingestion.hal.harvest",
     "pipeline.ingestion.hal.fetch_missing",
     "pipeline.ingestion.openalex.harvest",
-    "pipeline.ingestion.openalex.fetch_missing",
     "pipeline.ingestion.openalex.fetch_truncated",
     "pipeline.ingestion.wos.harvest",
     "pipeline.ingestion.wos.fetch_missing",
