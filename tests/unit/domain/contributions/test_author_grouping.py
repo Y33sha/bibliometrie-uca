@@ -60,6 +60,15 @@ class TestAlignPublication:
         assert _pair(101, 201, GroupingMethod.GAP) in _aligned(contributions)
         assert _pair(102, 202, GroupingMethod.GAP) in _aligned(contributions)
 
+    def test_une_faute_de_frappe_se_lie_dans_son_trou(self):
+        """WoS écrit « thueer » pour « thuer » : les mots triés des deux noms se ressemblent assez."""
+        reference = [("martin", "a"), ("thuer", "susann"), ("durand", "c")]
+        other = [("martin", "a"), ("thueer", "susann"), ("durand", "c")]
+        contributions = align_publication(
+            {1: _source_record(1, reference), 2: _source_record(2, other)}
+        )
+        assert _pair(101, 201, GroupingMethod.GAP) in _aligned(contributions)
+
     def test_un_trou_inegal_lie_le_nom_le_plus_semblable(self):
         reference = [("martin", "a"), ("pelegris", "i"), ("pena martinez", "s"), ("durand", "c")]
         other = [("martin", "a"), ("martinez", "s pena"), ("durand", "c")]

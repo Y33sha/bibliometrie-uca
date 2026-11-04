@@ -9,8 +9,8 @@ from domain.contributions.name_similarity import (
 )
 
 
-def _score(a: tuple[str, str], b: tuple[str, str], *, exact_anchor: bool = False) -> float:
-    return name_similarity(*a, *b, exact_anchor=exact_anchor)[0]
+def _score(a: tuple[str, str], b: tuple[str, str], *, unordered: bool = False) -> float:
+    return name_similarity(*a, *b, unordered=unordered)[0]
 
 
 class TestNameSimilarity:
@@ -52,10 +52,19 @@ class TestNameSimilarity:
     def test_auteurs_differents(self, a, b):
         assert _score(a, b) <= SIMILARITY_THRESHOLD
 
-    def test_mot_identique_exige(self):
+    def test_hors_de_l_ordre_un_mot_identique_est_exige(self):
         a, b = ("beminghoff", "d"), ("berninghoff", "daniel")
         assert _score(a, b) == 1.0
-        assert _score(a, b, exact_anchor=True) == 0.0
+        assert _score(a, b, unordered=True) == 0.0
+
+    def test_des_mots_tries_tres_semblables_designent_le_meme_auteur(self):
+        """Faute de frappe sur un mot court : la similarité des mots triés suffit, sauf hors de l'ordre."""
+        a, b = ("thueer", "susann"), ("thuer", "susann")
+        assert _score(a, b) == 1.0
+        assert _score(a, b, unordered=True) <= SIMILARITY_THRESHOLD
+
+    def test_deux_noms_vides_restent_distincts(self):
+        assert _score(("", ""), ("", "")) == 0.0
 
     def test_les_mots_tries_departagent(self):
         """« dupont / jean » a le score maximal face à « dupont / jean » comme face à « dupont / j » ; la similarité des mots triés préfère le nom identique."""

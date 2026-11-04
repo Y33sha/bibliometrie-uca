@@ -139,11 +139,11 @@ _NAME_KEYS: tuple[Callable[[SourceContribution], Hashable], ...] = (
 
 
 def _similarity(
-    s: SourceContribution, g: Contribution, *, exact_anchor: bool = False
+    s: SourceContribution, g: Contribution, *, unordered: bool = False
 ) -> tuple[float, float]:
     ref = g.reference
     return name_similarity(
-        s.last_name, s.first_name, ref.last_name, ref.first_name, exact_anchor=exact_anchor
+        s.last_name, s.first_name, ref.last_name, ref.first_name, unordered=unordered
     )
 
 
@@ -228,7 +228,7 @@ class _SourceRecordLinks:
             [s for s in self.record_contributions if s.id not in self.links],
             [g for g in self.contributions if g not in self.taken],
             GroupingMethod.UNORDERED,
-            exact_anchor=True,
+            unordered=True,
         )
 
     def best_pairs(
@@ -237,7 +237,7 @@ class _SourceRecordLinks:
         gs: Sequence[Contribution],
         method: GroupingMethod,
         *,
-        exact_anchor: bool = False,
+        unordered: bool = False,
     ) -> None:
         """Lie les paires de noms semblables, de la plus semblable à la moins semblable, chaque élément une fois. Seules se comparent les paires qui partagent les deux premières lettres d'un mot complet."""
         by_prefix: dict[str, list[int]] = defaultdict(list)
@@ -247,7 +247,7 @@ class _SourceRecordLinks:
         candidates = {(i, j) for i, s in enumerate(ss) for p in _prefixes(s) for j in by_prefix[p]}
         scored = []
         for i, j in candidates:
-            score, tie_break = _similarity(ss[i], gs[j], exact_anchor=exact_anchor)
+            score, tie_break = _similarity(ss[i], gs[j], unordered=unordered)
             if score > SIMILARITY_THRESHOLD:
                 scored.append((-score, -tie_break, i, j))
         used_s: set[int] = set()

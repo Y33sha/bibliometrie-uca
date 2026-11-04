@@ -13,6 +13,9 @@ _WORD_THRESHOLD = 0.85
 _WORD_MIN_LENGTH = 5
 """Longueur minimale de deux mots comparés par Jaro-Winkler : « ali » et « alkire » restent distincts."""
 
+_SORTED_WORDS_THRESHOLD = 0.9
+"""Similarité de Jaro-Winkler des mots triés de deux noms complets au-delà de laquelle ils désignent le même auteur, hors comparaison sans ordre."""
+
 _GLUED_MIN_LENGTH = 4
 """Longueur minimale d'un mot comparé à la concaténation de deux mots de l'autre nom."""
 
@@ -127,17 +130,19 @@ def _included_last_name(last_a: str, first_a: str, last_b: str, first_b: str) ->
 
 @lru_cache(maxsize=1_000_000)
 def name_similarity(
-    last_a: str, first_a: str, last_b: str, first_b: str, *, exact_anchor: bool = False
+    last_a: str, first_a: str, last_b: str, first_b: str, *, unordered: bool = False
 ) -> tuple[float, float]:
     """Renvoie le score de deux noms, entre 0 et 1, puis la similarité de Jaro-Winkler de leurs mots triés, qui départage deux scores égaux.
 
-    Le score vaut 1 pour un nom de famille inclus dans l'autre avec des initiales de prénom compatibles. Sinon, c'est la part des mots du nom complet le plus court retrouvés dans l'autre nom complet.
+    Le score vaut 1 pour un nom de famille inclus dans l'autre avec des initiales de prénom compatibles, ou pour des mots triés à plus de `_SORTED_WORDS_THRESHOLD` de similarité (« thueer / susann » et « thuer / susann »). Sinon, c'est la part des mots du nom complet le plus court retrouvés dans l'autre nom complet.
 
     Args:
-        exact_anchor: exige un mot identique des deux côtés, en plus des mots proches.
+        unordered: comparaison hors de l'ordre des listes. Elle exige un mot identique des deux côtés, et la similarité des mots triés ne suffit pas.
     """
     x, y = _words(f"{last_a} {first_a}"), _words(f"{last_b} {first_b}")
     tie_break = jaro_winkler(" ".join(sorted(x)), " ".join(sorted(y)))
     if _included_last_name(last_a, first_a, last_b, first_b):
         return 1.0, tie_break
-    return _word_score(x, y, exact_anchor=exact_anchor), tie_break
+    if not unordered and x and y and tie_break > _SORTED_WORDS_THRESHOLD:
+        return 1.0, tie_break
+    return _word_score(x, y, exact_anchor=unordered), tie_break

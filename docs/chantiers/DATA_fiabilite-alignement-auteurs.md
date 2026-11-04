@@ -23,7 +23,8 @@ Exemple : la publication 22307 a quatre auteurs dans chacun de ses cinq enregist
 - Comparaison des règles 4 à 6, seuil 0,8 :
   - score mot à mot sur le nom complet, quel que soit le découpage entre nom de famille et prénom : part des mots du nom le plus court retrouvés dans l'autre, avec au moins un mot complet commun. Un mot se retrouve à l'identique, par Jaro-Winkler 0,85 ou plus entre mots de 5 lettres ou plus, ou par son initiale ;
   - « ae », « oe », « ue » rabattus sur « a », « o », « u » ; mots collés fusionnés (« vanhulse » et « van hulse ») ;
-  - score de 1 pour un nom de famille inclus dans l'autre avec des initiales de prénom compatibles (« porteboeuf / sarah julie » et « porteboeuf houssais / s »).
+  - score de 1 pour un nom de famille inclus dans l'autre avec des initiales de prénom compatibles (« porteboeuf / sarah julie » et « porteboeuf houssais / s ») ;
+  - dans les trous seulement, score de 1 pour une similarité de Jaro-Winkler supérieure à 0,9 entre les mots triés des deux noms complets (« thueer / susann » et « thuer / susann »).
 - Disparaissent : filtre d'ordre, règles interverties, lien par identifiant, ordre dans les trous, modèle probabiliste et ses poids.
 
 ## Phasage
