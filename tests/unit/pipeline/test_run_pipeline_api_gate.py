@@ -126,5 +126,5 @@ def test_phase_oa_status_runs_with_email():
     metrics, services = _run_oa_status(lambda _source: None)
 
     assert services == [oa_status.DOI_ORG, oa_status.UNPAYWALL]
-    assert metrics.new == 4
+    assert metrics.new == 8  # somme des deux services
     assert metrics.signals == []

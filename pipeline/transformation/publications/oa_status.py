@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections import Counter
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import NamedTuple
@@ -28,7 +29,7 @@ from pipeline.graph import Task
 from pipeline.http.lookup import LookupOutcome, NotFound, Unavailable
 from pipeline.http.polite_pool import default_user_agent, get_polite_pool_email_optional
 from pipeline.http.tls import tls_context
-from pipeline.ingestion.api_params import API_BASE_URLS
+from pipeline.ingestion.api_params import API_BASE_URLS, MAX_CONCURRENT
 from pipeline.ingestion.complements.doi_org import fetch_registered_url
 from pipeline.ingestion.complements.unpaywall import fetch_oa_status
 from pipeline.runtime.config import cap, delay
@@ -39,7 +40,6 @@ from pipeline.runtime.observability.log_format import (
     inflect,
     nothing_to_do,
     quantity,
-    step,
 )
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import track_progress
@@ -49,11 +49,6 @@ type DoiFetcher = Callable[[httpx2.AsyncClient, str], Awaitable[LookupOutcome[st
 """Interrogation d'un service sur un DOI : `(client, doi) → réponse, NotFound ou Unavailable`."""
 
 BATCH_SIZE = 50
-MAX_CONCURRENT = 5
-"""Requêtes simultanées, sous le débit recommandé par Unpaywall (10 par seconde)."""
-
-RESOLVE_TASK = "resolve_dois"
-UNPAYWALL_TASK = "verify_unpaywall"
 
 
 class DoiService(NamedTuple):
@@ -68,6 +63,21 @@ class DoiService(NamedTuple):
 
 UNPAYWALL = DoiService("unpaywall_oa_status", "oa_type", "unpaywall_checked_at", True)
 DOI_ORG = DoiService("registered_url", "text", "resolved_at", False)
+
+
+class _Lookup(NamedTuple):
+    """Bilan d'une tâche, repris par `assemble`."""
+
+    counts: dict[str, int]
+    """DOI à interroger, interrogés, et réponses par issue."""
+    statuses_before: dict[str, int]
+    """Publications par statut OA, avant la tâche."""
+    statuses_after: dict[str, int]
+    """Publications par statut OA, après la tâche."""
+
+
+_LOOKUP = "lookup"
+"""Clé du bilan de la tâche dans `details`."""
 
 
 class PublicationOa(NamedTuple):
@@ -209,8 +219,6 @@ class DoiLookupTask:
 
     service: DoiService
     fetcher: DoiFetcher
-    title: str
-    """Titre de la sous-étape dans le journal."""
     participle: str
     """Participe passé de l'interrogation, au masculin singulier (« vérifié »)."""
     not_found: tuple[str, str]
@@ -219,7 +227,8 @@ class DoiLookupTask:
     """Lit le délai, en jours, au-delà duquel un DOI interrogé l'est de nouveau."""
     max_per_run: Callable[[Connection], int | None]
     """Lit le plafond de DOI interrogés par run ; `None` vaut illimité."""
-    max_concurrent: int = MAX_CONCURRENT
+    max_concurrent: int
+    """Requêtes simultanées."""
     store_factory: Callable[[Connection], OaStatusStore] = OaStatusStore
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
@@ -246,57 +255,65 @@ async def _look_up(
     staleness_days: int,
     max_per_run: int | None,
 ) -> PhaseMetrics:
-    """Interroge le service pour les DOI à interroger, écrit les réponses, recalcule le statut OA des publications de ces DOI, puis renvoie les métriques du run."""
-    metrics = PhaseMetrics()
+    """Interroge le service pour les DOI à interroger, écrit les réponses, recalcule le statut OA des publications de ces DOI, puis renvoie les métriques du run, avec son bilan (`_Lookup`) dans `details`."""
     dois = store.fetch_dois_to_query(task.service, limit=max_per_run, staleness_days=staleness_days)
-    total = len(dois)
     stale_total = store.count_dois_to_query(task.service, staleness_days=staleness_days)
-    before_dist = store.count_publications_by_oa_status()
-
-    progress = {"new": 0, "updated": 0, "unchanged": 0, "not_found": 0, "unavailable": 0}
-
-    def _result() -> PhaseMetrics:
-        # Indicateurs : réponses du run (nouvelles, modifiées, inchangées, non trouvées), puis répartition des publications par statut OA avec le delta du run (avant → après).
-        metrics.add(
-            seen=total,
-            new=progress["new"],
-            updated=progress["updated"],
-            unchanged=progress["unchanged"],
-            not_found=progress["not_found"],
-            errors=progress["unavailable"],
+    statuses_before = store.count_publications_by_oa_status()
+    counts: Counter[str] = Counter()
+    if dois:
+        await _query_service(
+            conn,
+            store,
+            logger,
+            task,
+            dois,
+            counts,
+            stale_total=stale_total,
+            staleness_days=staleness_days,
+            max_per_run=max_per_run,
         )
-        after_dist = store.count_publications_by_oa_status()
-        statuses = sorted(
-            set(before_dist) | set(after_dist),
-            key=lambda s: after_dist.get(s, 0),
-            reverse=True,
-        )
-        metrics.details["summary"] = {
-            "stale": stale_total,
-            "checked": total,
-            "new": progress["new"],
-            "updated": progress["updated"],
-            "unchanged": progress["unchanged"],
-            "not_found": progress["not_found"],
-            "unavailable": progress["unavailable"],
-        }
-        metrics.details["table"] = {
-            "rows": [
-                {
-                    "key": s,
-                    "count": after_dist.get(s, 0),
-                    "delta": after_dist.get(s, 0) - before_dist.get(s, 0),
-                }
-                for s in statuses
-            ]
-        }
-        return metrics
-
-    step(logger, task.title)
-    if not total:
+    else:
         nothing_to_do(logger)
-        return _result()
 
+    metrics = PhaseMetrics()
+    metrics.add(
+        seen=len(dois),
+        new=counts["new"],
+        updated=counts["updated"],
+        unchanged=counts["unchanged"],
+        not_found=counts["not_found"],
+        errors=counts["unavailable"],
+    )
+    metrics.details[_LOOKUP] = _Lookup(
+        counts={
+            "stale": stale_total,
+            "checked": len(dois),
+            **{key: counts[key] for key in _OUTCOMES},
+        },
+        statuses_before=statuses_before,
+        statuses_after=store.count_publications_by_oa_status(),
+    )
+    return metrics
+
+
+_OUTCOMES = ("new", "updated", "unchanged", "not_found", "unavailable")
+"""Issues d'une interrogation : réponse nouvelle, modifiée, inchangée, DOI inconnu du service, service indisponible."""
+
+
+async def _query_service(
+    conn: Connection,
+    store: OaStatusStore,
+    logger: logging.Logger,
+    task: DoiLookupTask,
+    dois: list[str],
+    counts: Counter[str],
+    *,
+    stale_total: int,
+    staleness_days: int,
+    max_per_run: int | None,
+) -> None:
+    """Interroge le service sur `dois`, par paquets, et écrit les réponses de chaque paquet avec un commit. Compte les issues dans `counts`."""
+    total = len(dois)
     logger.info(
         "%s%s %s ou %s depuis plus de %s",
         BRANCH,
@@ -331,45 +348,43 @@ async def _look_up(
                 for doi, outcome in await asyncio.gather(*(fetch(doi) for doi in chunk)):
                     # Service indisponible : rien n'est écrit, le DOI reste dans la file.
                     if isinstance(outcome, Unavailable):
-                        progress["unavailable"] += 1
+                        counts["unavailable"] += 1
                     elif isinstance(outcome, NotFound):
                         answers.append((doi, None))
                     else:
                         answers.append((doi, outcome))
-                await asyncio.to_thread(_apply_answers, store, task.service, answers, progress)
+                await asyncio.to_thread(_apply_answers, store, task.service, answers, counts)
                 await asyncio.to_thread(conn.commit)
                 bar.advance(len(chunk))
 
     summary = [
-        quantity(progress["new"], "nouveau", "nouveaux"),
-        quantity(progress["updated"], "modifié"),
-        quantity(progress["unchanged"], "inchangé"),
-        quantity(progress["not_found"], *task.not_found),
+        quantity(counts["new"], "nouveau", "nouveaux"),
+        quantity(counts["updated"], "modifié"),
+        quantity(counts["unchanged"], "inchangé"),
+        quantity(counts["not_found"], *task.not_found),
     ]
-    if progress["unavailable"]:
-        summary.append(quantity(progress["unavailable"], "reporté"))
+    if counts["unavailable"]:
+        summary.append(quantity(counts["unavailable"], "reporté"))
     logger.info("%s%s", LAST_BRANCH, ", ".join(summary))
-
-    return _result()
 
 
 def _apply_answers(
     store: OaStatusStore,
     service: DoiService,
     answers: list[tuple[str, str | None]],
-    progress: dict[str, int],
+    counts: Counter[str],
 ) -> None:
     """Classe les réponses par rapport à celles en table, les écrit, puis recalcule le statut OA des publications de ces DOI."""
     stored = store.fetch_answers(service, [doi for doi, _ in answers])
     for doi, answer in answers:
         if answer is None:
-            progress["not_found"] += 1
+            counts["not_found"] += 1
         elif doi not in stored:
-            progress["new"] += 1
+            counts["new"] += 1
         elif stored[doi] != answer:
-            progress["updated"] += 1
+            counts["updated"] += 1
         else:
-            progress["unchanged"] += 1
+            counts["unchanged"] += 1
     store.record_answers(service, answers)
     for publication in store.fetch_oa_inputs([doi for doi, _ in answers]):
         status = publication.inputs.status()
@@ -409,11 +424,11 @@ def _resolve_dois(ctx: PhaseContext) -> PhaseMetrics:
     return DoiLookupTask(
         DOI_ORG,
         fetcher,
-        title="URL de résolution des DOI sur doi.org",
         participle="lu",
         not_found=("inconnu de doi.org", "inconnus de doi.org"),
         staleness_days=lambda conn: delay(conn, ConfigKey.DOI_RESOLUTION_RECHECK_AFTER_DAYS),
         max_per_run=lambda conn: cap(conn, ConfigKey.DOI_RESOLUTION_MAX_PER_RUN),
+        max_concurrent=MAX_CONCURRENT["doi_org"],
     ).run(ctx)
 
 
@@ -427,17 +442,17 @@ def _verify_unpaywall(ctx: PhaseContext) -> PhaseMetrics:
     return DoiLookupTask(
         UNPAYWALL,
         fetcher,
-        title="Vérification du statut open access sur Unpaywall",
         participle="vérifié",
         not_found=("non trouvé", "non trouvés"),
         staleness_days=lambda conn: delay(conn, ConfigKey.UNPAYWALL_RECHECK_AFTER_DAYS),
         max_per_run=lambda conn: cap(conn, ConfigKey.UNPAYWALL_MAX_PER_RUN),
+        max_concurrent=MAX_CONCURRENT["unpaywall"],
     ).run(ctx)
 
 
 TASKS = (
     Task(
-        RESOLVE_TASK,
+        "resolve_dois",
         reads=_OA_STATUS_INPUTS,
         writes=(
             "publications.oa_status",
@@ -449,9 +464,10 @@ TASKS = (
         previous_run=("dois.unpaywall_oa_status", "publications.oa_status"),
         network="doi.org",
         run=_resolve_dois,
+        section="URL de résolution des DOI sur doi.org",
     ),
     Task(
-        UNPAYWALL_TASK,
+        "verify_unpaywall",
         reads=(*_OA_STATUS_INPUTS, "doi_prefixes.ra"),
         writes=(
             "publications.oa_status",
@@ -461,10 +477,32 @@ TASKS = (
         ),
         network="unpaywall",
         run=_verify_unpaywall,
+        section="Vérification du statut open access sur Unpaywall",
     ),
 )
 
 
 def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
-    """Renvoie les métriques de la vérification sur Unpaywall."""
-    return by_task[UNPAYWALL_TASK]
+    """Renvoie la somme des métriques des tâches, une ligne par service interrogé (`services`), et la répartition des publications par statut OA (`table`), avec son évolution sur l'ensemble des tâches."""
+    metrics = PhaseMetrics()
+    lookups: dict[str, _Lookup] = {}
+    for name, task_metrics in by_task.items():
+        metrics.merge(task_metrics)
+        if (lookup := metrics.details.pop(_LOOKUP, None)) is not None:
+            assert isinstance(lookup, _Lookup)
+            lookups[name] = lookup
+    if not lookups:
+        return metrics
+    metrics.details["services"] = {
+        "rows": [{"key": name, **lookup.counts} for name, lookup in lookups.items()]
+    }
+    before = next(iter(lookups.values())).statuses_before
+    after = list(lookups.values())[-1].statuses_after
+    statuses = sorted(set(before) | set(after), key=lambda s: after.get(s, 0), reverse=True)
+    metrics.details["table"] = {
+        "rows": [
+            {"key": s, "count": after.get(s, 0), "delta": after.get(s, 0) - before.get(s, 0)}
+            for s in statuses
+        ]
+    }
+    return metrics

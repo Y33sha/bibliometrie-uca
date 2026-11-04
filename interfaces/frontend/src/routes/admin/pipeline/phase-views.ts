@@ -281,15 +281,20 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
     ],
   },
   oa_status: {
-    summary: [
-      { key: "stale", label: "DOI à vérifier" },
-      { key: "checked", label: "Vérifiés" },
-      { key: "new", label: "Nouveaux" },
-      { key: "updated", label: "Modifiés" },
-      { key: "unchanged", label: "Inchangés" },
-      { key: "not_found", label: "Non trouvés" },
-    ],
     tables: [
+      {
+        source: "services",
+        firstColumnLabel: "Service",
+        rowLabels: { resolve_dois: "doi.org", verify_unpaywall: "Unpaywall" },
+        columns: [
+          { key: "stale", label: "DOI à vérifier" },
+          { key: "checked", label: "Vérifiés" },
+          { key: "new", label: "Nouveaux" },
+          { key: "updated", label: "Modifiés" },
+          { key: "unchanged", label: "Inchangés" },
+          { key: "not_found", label: "Non trouvés" },
+        ],
+      },
       {
         source: "table",
         firstColumnLabel: "Statut OA",
