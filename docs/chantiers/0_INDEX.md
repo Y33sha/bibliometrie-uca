@@ -10,6 +10,7 @@
 ### Non commencé
 
 - [Brevets](DATA_brevets.md)
+- [Duplications du frontend](UI_duplications-du-frontend.md)
 - [Fiabilité de l'alignement des auteurs](DATA_fiabilite-alignement-auteurs.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
 - [Plan de rattachement des revues](CODE_plan-de-rattachement-des-revues.md)
