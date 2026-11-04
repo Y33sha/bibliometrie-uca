@@ -21,6 +21,7 @@ from domain.sources.registry import Source
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.raw_store.factory import get_raw_store
+from pipeline.runtime.observability.log_format import quantity
 
 log = setup_logger("delete_raw_store_orphans", os.path.dirname(__file__))
 
@@ -69,7 +70,10 @@ def main() -> int:
             orphans = [key for key in store.iter_keys(source) if key not in keep]
             total_orphans += len(orphans)
             log.info(
-                "  %-9s : %d orphelins (staging : %d référencés)", source, len(orphans), len(keep)
+                "  %-9s : %s (staging : %s)",
+                source,
+                quantity(len(orphans), "orphelin"),
+                quantity(len(keep), "référencé"),
             )
             if args.dry_run:
                 continue
@@ -78,9 +82,16 @@ def main() -> int:
                     total_deleted += 1
 
     if args.dry_run:
-        log.info("DRY-RUN : %d orphelins détectés, aucune suppression.", total_orphans)
+        log.info(
+            "DRY-RUN : %s, aucune suppression.",
+            quantity(total_orphans, "orphelin détecté", "orphelins détectés"),
+        )
     else:
-        log.info("✓ %d orphelins supprimés (%d détectés).", total_deleted, total_orphans)
+        log.info(
+            "✓ %s (%s).",
+            quantity(total_deleted, "orphelin supprimé", "orphelins supprimés"),
+            quantity(total_orphans, "détecté"),
+        )
     return 0
 
 
