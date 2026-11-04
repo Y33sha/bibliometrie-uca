@@ -450,23 +450,13 @@ def _apply(
     dissolved_ids = {dissolved.publication_id for dissolved in plan.dissolved}
     if plan.detached:
         detach_source_records(conn, list(plan.detached))
-        membership_changed.update(
+        left = {
             p
             for source_record in plan.detached
             if (p := rows_by_source_record[source_record].publication_id) is not None
-        )
-        lifecycle.refresh(
-            conn,
-            sorted(
-                {
-                    p
-                    for source_record in plan.detached
-                    if (p := rows_by_source_record[source_record].publication_id) is not None
-                }
-                - survivors
-                - dissolved_ids
-            ),
-        )
+        }
+        membership_changed.update(left)
+        lifecycle.refresh(conn, sorted(left - survivors - dissolved_ids))
 
     # Dissolutions, avant le recalcul des survivants : la suppression libère le DOI repris par un survivant, refusé sinon par la contrainte unique.
     for dissolved in plan.dissolved:
