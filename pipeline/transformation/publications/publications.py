@@ -16,7 +16,7 @@ from pipeline.transformation.publications.reconciliation import reconcile
 
 
 def count_publications(conn: Connection) -> int:
-    """Compte les publications, toutes dans le périmètre : la réconciliation crée une publication seulement pour une partition du périmètre."""
+    """Compte les publications."""
     return int(conn.execute(text("SELECT count(*) FROM publications")).scalar_one())
 
 
@@ -28,16 +28,7 @@ def _reconcile(ctx: PhaseContext) -> PhaseMetrics:
 
     metrics = PhaseMetrics()
     metrics.add(seen=stats.processed, new=stats.created)
-    metrics.details["summary"] = {
-        "processed": stats.processed,
-        "publications": stats.publications,
-        "existing": stats.existing,
-        "created": stats.created,
-        "splits": stats.splits,
-        "merges": stats.merges,
-        "detached": stats.detached,
-        "publication_total": publication_total,
-    }
+    metrics.details["summary"] = {**stats._asdict(), "publication_total": publication_total}
     return metrics
 
 
@@ -68,8 +59,14 @@ TASKS = (
             "doi_prefixes.ra",
             "doi_prefixes.publisher_id",
         ),
+        # La suppression d'une publication emporte ses contributions, leurs alignements, ses relations, ses sujets et son détail. Elle détache ses enregistrements sources et ses paiements APC.
         writes=(
             "publications",
+            "contributions.id",
+            "aligned_source_contributions",
+            "contribution_resolution_queue",
+            "publication_relations",
+            "publication_subjects",
             "publications_detail",
             "source_records.publication_id",
             "source_record_keys_queue",
