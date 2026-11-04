@@ -812,6 +812,9 @@
 	color: var(--text-secondary);
 	font-size: var(--fs-sm);
 }
+a.entity-tag:hover {
+	text-decoration: none;
+}
 .entity-tag-accent {
 	background: var(--accent-light);
 	color: var(--accent);
