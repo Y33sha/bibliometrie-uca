@@ -1,4 +1,4 @@
-"""Phase `fetch_truncated` : nouvelle lecture des works OpenAlex à liste d'auteurs peut-être tronquée. Tâche `fetch_truncated.refetch_openalex`.
+"""Phase `fetch_truncated` : nouvelle lecture des works OpenAlex à liste d'auteurs peut-être tronquée.
 
 Une réponse de liste d'OpenAlex plafonne les auteurs d'un work à `BULK_AUTHORSHIPS_CAP`. Le moissonnage marque `staging.authors_truncated` les works au plafond. La phase les relit un par un par `/works/{id}`, avec tous les auteurs.
 
@@ -14,7 +14,7 @@ from collections.abc import Mapping
 from sqlalchemy import Connection, text
 
 from domain.types import JsonValue, as_sequence
-from pipeline.graph import task
+from pipeline.graph import Task
 from pipeline.ingestion.common.lookup import LookupChannel, by_native_id, look_up
 from pipeline.ingestion.common.staging import StagingStore, UpsertOutcome
 from pipeline.ingestion.openalex.api import fetch_work
@@ -24,10 +24,9 @@ from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.log_format import inflect, quantity, step
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
-# Plafond OpenAlex 10 req/s.
 MAX_CONCURRENT = 3
+"""Plafond OpenAlex 10 req/s."""
 
-# Le marqueur posé au moissonnage survit à la normalisation, qui vide `raw_data` : la sélection ne dépend ni de l'ordre des phases ni du comptage des auteurs.
 _SELECT_TRUNCATED_SQL = text(
     """
     SELECT source_id
@@ -36,6 +35,7 @@ _SELECT_TRUNCATED_SQL = text(
     ORDER BY id
     """
 )
+"""Le marqueur posé au moissonnage survit à la normalisation, qui vide `raw_data`."""
 
 
 def _refetch(ctx: PhaseContext) -> PhaseMetrics:
@@ -84,15 +84,15 @@ async def refetch_openalex(conn: Connection, log: logging.Logger) -> PhaseMetric
 
 
 TASKS = (
-    task(
-        "fetch_truncated.refetch_openalex",
+    Task(
+        "refetch_openalex",
         reads=("staging",),
         writes=("staging", "staging_normalization_queue"),
         previous_run=("staging",),
         network="openalex",
         run=_refetch,
         label="Bilan",
-        # La tâche tourne dans tous les modes, si OpenAlex fait partie des sources du run.
-        when=lambda ctx: "openalex" in ctx.options.sources,
+        # La tâche tourne dans tous les modes, si le run interroge OpenAlex.
+        when=lambda ctx: "openalex" in ctx.options.queried_sources,
     ),
 )

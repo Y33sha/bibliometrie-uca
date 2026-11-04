@@ -47,10 +47,10 @@ _CHUNK = 500
 
 _MONTHS = {m.upper(): i for i, m in enumerate(calendar.month_abbr) if m}
 _ISO = re.compile(r"^(\d{4})(?:-(\d{1,2})(?:-(\d{1,2}))?)?(?:$|T|\s)")
-# Date WoS : mois abrégé facultatif (« OCT », « OCT-NOV », « SPR »), jour facultatif, année facultative.
 _WOS = re.compile(r"^(?:([A-Z]{3})[A-Z-]*)?\s*(\d{1,2})?(?:-\d{1,2})?\s*(\d{4})?$")
-# Date WoS année en tête : « 2026 AUG 31 ».
+"""Date WoS : mois abrégé facultatif (« OCT », « OCT-NOV », « SPR »), jour facultatif, année facultative."""
 _WOS_YEAR_FIRST = re.compile(r"^(\d{4})\s+([A-Z]{3})\s*(\d{1,2})?$")
+"""Date WoS année en tête : « 2026 AUG 31 »."""
 
 
 def _format(year: int | None, month: int | None = None, day: int | None = None) -> str | None:
@@ -250,7 +250,6 @@ def extract(output: Path) -> None:
 
 # --- Analyse ---
 
-# Champ de référence de chaque source pour les comparaisons entre sources, hors WoS (`_wos_reference`).
 _REFERENCE = {
     "hal": ("publicationDate_s",),
     "openalex": ("publication_date",),
@@ -259,8 +258,9 @@ _REFERENCE = {
     "scanr": ("publicationDate",),
     "theses": ("dateSoutenance",),
 }
-# Sources dont le 1er du mois est suspect.
+"""Champ de référence de chaque source pour les comparaisons entre sources, hors WoS (`_wos_reference`)."""
 _FIRST_OF_MONTH_SOURCES = ("openalex", "scanr")
+"""Sources dont le 1er du mois est suspect."""
 
 
 def _precision(value: str) -> str:
@@ -278,7 +278,8 @@ def _pct(n: int, total: int) -> str:
 class SourceRecordDates(NamedTuple):
     id: int
     source: str
-    fields: dict[str, str]  # champ -> date normalisée
+    fields: dict[str, str]
+    """Champ -> date normalisée."""
 
 
 def _load(path: Path) -> tuple[dict[int, SourceRecordDates], dict[int, list[int]], Counter[tuple]]:

@@ -7,8 +7,9 @@ from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 
+from domain.entity_resolution import most_frequent
 from domain.normalize import normalize_text
-from domain.serials.titles import compatible_titles
+from domain.title_comparison import compatible_titles
 
 
 def effective_issnl(
@@ -34,16 +35,10 @@ def openalex_issnls(series: Iterable[tuple[str, Sequence[str]]]) -> dict[str, st
     return {issn: most_frequent(counter) for issn, counter in votes.items()}
 
 
-def most_frequent[T: str | int](counter: Counter[T]) -> T:
-    """Renvoie la valeur la plus fréquente ; à égalité, la plus petite."""
-    best = max(counter.values())
-    return min(value for value, n in counter.items() if n == best)
-
-
 def choose_issnl(title: str | None, candidates: Mapping[str, str]) -> str | None:
     """Renvoie l'ISSN-L de l'enregistrement source parmi `candidates`, ou `None` s'ils restent indiscernables.
 
-    Un seul candidat l'emporte d'office. Parmi plusieurs, l'emporte la seule revue de même titre normalisé que `title`, à défaut la seule de titre compatible (`compatible_titles`) : « INRA productions animales » est compatible avec « INRAE Productions Animales », « INRAE productions animales » est identique.
+    Un seul candidat l'emporte d'office. Parmi plusieurs, l'emporte la seule revue de même titre normalisé que `title`, à défaut la seule de titre compatible (`compatible_titles`). « INRA productions animales » est compatible avec « INRAE Productions Animales », « INRAE productions animales » est identique.
 
     Args:
         candidates: titre de la revue de chaque ISSN-L candidat.

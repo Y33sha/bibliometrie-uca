@@ -58,11 +58,11 @@ _WRITE_BIBLIO = text("""
     WHERE sr.id = t.id
 """)
 
-# Même sélection que la normalisation : tout DOI de l'enregistrement source, sauf un DOI lié.
 _PREPRINT_DOIS = text("""
     SELECT source_record_id, id_value FROM source_record_identifiers
     WHERE id_type = 'doi' AND role <> 'related' AND split_part(id_value, '/', 1) = ANY(:prefixes)
 """)
+"""Même sélection que la normalisation : tout DOI de l'enregistrement source, sauf un DOI lié."""
 
 _OPEN_COPIES = text("""
     UPDATE source_record_locations l SET is_oa = true

@@ -2,8 +2,8 @@
 
 from sqlalchemy import Connection
 
+from domain.documents.dates import PublicationDate
 from domain.normalize import normalize_text
-from domain.publications.dates import PublicationDate
 from infrastructure.db.queues import Queue
 from tests.integration.helpers.queues import mark
 from tests.integration.helpers.rows import PERIMETER_EVIDENCE_CAST, insert_row, perimeter_evidence

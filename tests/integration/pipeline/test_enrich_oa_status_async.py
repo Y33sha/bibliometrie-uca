@@ -16,9 +16,9 @@ from unittest.mock import MagicMock
 import httpx2
 import pytest
 
+from domain.documents.licenses import License
 from domain.platforms.platform import PlatformType
 from domain.publications.access import Copy
-from domain.publications.licenses import License
 from pipeline.http.lookup import LookupOutcome
 from pipeline.ingestion.complements.doi_org import fetch_registered_url
 from pipeline.ingestion.complements.unpaywall import fetch_oa_status
@@ -80,7 +80,6 @@ def _copy(url: str, *, platform_type: PlatformType | None = None) -> Copy:
         known_platform=None,
         platform_type=platform_type,
         license=License.CC_BY,
-        embargoed=False,
         described_by_platform=False,
         arrival=1,
     )
@@ -297,22 +296,6 @@ def test_un_verdict_identique_compte_inchange(logger, http_mock):
     assert queries.answers == [("10.1/same", "gold")]
     assert queries.updates == []
     assert (metrics.new, metrics.unchanged) == (0, 1)
-
-
-def test_le_bilan_du_journal_classe_les_verdicts(logger, http_mock, caplog):
-    publications = [
-        _publication(1, "10.1/n", "closed"),
-        _publication(2, "10.1/m", "closed"),
-        _publication(3, "10.1/x", "closed"),
-    ]
-    _route(http_mock, "10.1/n", status="gold")
-    _route(http_mock, "10.1/m", status="green")
-    _route(http_mock, "10.1/x", http_status=404)
-
-    with caplog.at_level(logging.INFO):
-        _run(_FakeStore(publications, stored={"10.1/m": "closed"}), _make_fetcher(), logger)
-
-    assert "1 nouveau, 1 modifié, 0 inchangé, 1 non trouvé" in caplog.text
 
 
 def test_429_retries_transparently(logger, http_mock):

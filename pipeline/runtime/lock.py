@@ -21,10 +21,9 @@ from infrastructure.db.engine import get_sync_engine
 
 log = logging.getLogger(__name__)
 
-# Clé du verrou, tirée au hasard, propre à ce verrou parmi les verrous consultatifs du projet.
 PIPELINE_LOCK_KEY = 8_014_552_301_774_233_001
+"""Clé du verrou, tirée au hasard, propre à ce verrou parmi les verrous consultatifs du projet."""
 
-# `pg_locks` couvre tout le cluster, un verrou consultatif une seule base : le filtre sur `database` retient la base courante.
 _HOLDER_SQL = text("""
     SELECT a.application_name AS holder,
            to_char(a.backend_start, 'DD/MM/YYYY HH24:MI:SS') AS started_at
@@ -36,6 +35,7 @@ _HOLDER_SQL = text("""
       AND (l.classid::bigint << 32) | (l.objid::bigint & 4294967295) = :key
     LIMIT 1
 """)
+"""`pg_locks` couvre tout le cluster, un verrou consultatif une seule base : le filtre sur `database` retient la base courante."""
 
 
 class PipelineAlreadyRunningError(RuntimeError):

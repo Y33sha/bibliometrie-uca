@@ -18,15 +18,15 @@ from domain.normalize import normalize_text
 from domain.persons.contributor_name import ContributorName
 from domain.persons.creation import allow_person_creation
 from domain.persons.identifiers import PersonIdentifierType
-from domain.persons.matching import (
+from domain.persons.name_forms import compute_person_name_forms, contributor_name_forms
+from domain.persons.name_matching import first_name_initials
+from domain.persons.source_contribution_matching import (
     IdentifiedPerson,
     Namesake,
     compatible_persons,
     decide_match_by_identifier,
     trusted_identifier,
 )
-from domain.persons.name_forms import compute_person_name_forms, contributor_name_forms
-from domain.persons.name_matching import first_name_initials
 from domain.sources.registry import Source
 
 IDENTIFIER_ORDER: tuple[PersonIdentifierType, ...] = (
@@ -55,9 +55,8 @@ class ContributionSkipReason(StrEnum):
     ALL_CANDIDATES_REJECTED = "all_candidates_rejected"
     CREATION_NOT_ALLOWED = "creation_not_allowed"
     OUT_OF_PERIMETER = "out_of_perimeter"
-    # La personne revient à une contribution mieux appuyée de la même publication (`settle_publication`).
-    # La valeur est la clé des métriques enregistrées par les exécutions du pipeline.
     PERSON_IN_OTHER_CONTRIBUTION = "person_in_other_group"
+    """La personne revient à une contribution mieux appuyée de la même publication (`settle_publication`). La valeur est la clé des métriques enregistrées par les exécutions du pipeline."""
 
 
 class ContributionMatchReason(StrEnum):
@@ -71,8 +70,8 @@ class ContributionMatchReason(StrEnum):
     COMPATIBLE_NAME = "compatible_name"
 
 
-# Signaux qui rattachent une contribution à une personne par le nom.
 NAME_MATCH_REASONS = (ContributionMatchReason.NAME, ContributionMatchReason.COMPATIBLE_NAME)
+"""Signaux qui rattachent une contribution à une personne par le nom."""
 
 _REASON_BY_IDENTIFIER: dict[PersonIdentifierType, ContributionMatchReason] = {
     PersonIdentifierType.ORCID: ContributionMatchReason.ORCID,
@@ -85,7 +84,7 @@ MATCH_REASON_PRIORITY: tuple[ContributionMatchReason, ...] = (
     *(_REASON_BY_IDENTIFIER[id_type] for id_type in IDENTIFIER_ORDER),
     *NAME_MATCH_REASONS,
 )
-"""Signaux de rattachement dans l'ordre où la décision les essaie : épinglage, identifiants du plus fiable au moins fiable, nom."""
+"""Signaux de rattachement, dans l'ordre d'examen de la décision : épinglage, identifiants du plus fiable au moins fiable, nom."""
 
 
 def _strength(reason: ContributionMatchReason) -> int:
@@ -316,7 +315,6 @@ def settle_publication(
     return settled
 
 
-# Préséance des sources pour le nom d'une personne créée. HAL vient après les autres agrégateurs : un compte HAL attribué à tort donne le nom d'une autre personne. WoS ferme la marche, pour ses erreurs de reconnaissance de caractères.
 _NAME_SOURCE_PRIORITY: tuple[Source, ...] = (
     Source.THESES,
     Source.CROSSREF,
@@ -326,6 +324,7 @@ _NAME_SOURCE_PRIORITY: tuple[Source, ...] = (
     Source.HAL,
     Source.WOS,
 )
+"""Préséance des sources pour le nom d'une personne créée. HAL vient après les autres agrégateurs : un compte HAL attribué à tort donne le nom d'une autre personne. WoS ferme la marche, pour ses erreurs de reconnaissance de caractères."""
 _NAME_SOURCE_RANK = {source.value: rank for rank, source in enumerate(_NAME_SOURCE_PRIORITY)}
 
 

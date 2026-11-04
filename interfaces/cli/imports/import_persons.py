@@ -38,7 +38,6 @@ from pipeline.transformation.structures.name_recognition import StructureNameMat
 log = setup_logger("import_persons", os.path.dirname(__file__))
 
 
-# Noms reconnus de chaque colonne propre à l'agent, du plus spécifique au plus général.
 SCALAR_COLUMNS: dict[str, tuple[str, ...]] = {
     "siham_id": ("matricule siham", "matricule"),
     "last_name": ("nom usuel - individu", "nom", "last_name", "lastname", "name", "family_name"),
@@ -56,6 +55,7 @@ SCALAR_COLUMNS: dict[str, tuple[str, ...]] = {
     "corps": ("corps", "corps ou statut"),
     "grade": ("grade",),
 }
+"""Noms reconnus de chaque colonne propre à l'agent, du plus spécifique au plus général."""
 
 
 @dataclass(frozen=True)
@@ -327,10 +327,14 @@ class UnitStructures:
 class RhImportOutcome(StrEnum):
     """Issue de l'import d'un agent par `import_agent`."""
 
-    CREATED = "created"  # personne et fiche RH créées
-    BY_SIHAM_ID = "by_siham_id"  # fiche rattachée par le matricule
-    BY_EMAIL = "by_email"  # fiche rattachée par l'email
-    BY_NAME = "by_name"  # fiche ajoutée à l'unique homonyme, sans fiche RH
+    CREATED = "created"
+    """Personne et fiche RH créées."""
+    BY_SIHAM_ID = "by_siham_id"
+    """Fiche rattachée par le matricule."""
+    BY_EMAIL = "by_email"
+    """Fiche rattachée par l'email."""
+    BY_NAME = "by_name"
+    """Fiche ajoutée à l'unique homonyme, sans fiche RH."""
 
 
 _BY_SIHAM_ID = text("SELECT person_id FROM hr_records WHERE siham_id = :siham_id")

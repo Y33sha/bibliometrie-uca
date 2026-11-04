@@ -1,6 +1,6 @@
 """Licence d'un enregistrement source DataCite (`datacite_license`)."""
 
-from domain.publications.licenses import License
+from domain.documents.licenses import License
 from pipeline.ingestion.datacite.normalize import datacite_license
 
 

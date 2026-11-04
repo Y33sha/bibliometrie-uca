@@ -26,10 +26,10 @@ from pipeline.runtime.observability.progress import Progress
 # Pause longue toutes les `_BREATHER_EVERY` pages.
 _BREATHER_EVERY = 10
 _BREATHER_SECS = 15
-# Pause entre deux années.
 _BETWEEN_YEARS_SECS = 30
-# Plafond de l'API : `firstRecord` ne dépasse pas 100 000 sur une requête.
+"""Pause entre deux années."""
 _WOS_FIRST_RECORD_LIMIT = 100_000
+"""Plafond de l'API : `firstRecord` ne dépasse pas 100 000 sur une requête."""
 
 
 @dataclass(frozen=True)

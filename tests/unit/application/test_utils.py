@@ -2,12 +2,12 @@
 
 import pytest
 
+from domain.documents.identifiers import DOI
 from domain.normalize import normalize_text
 from domain.persons.name_matching import (
     names_compatible,
     parse_raw_author_name,
 )
-from domain.publications.identifiers import DOI
 
 
 class TestNormalizeName:

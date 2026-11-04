@@ -8,7 +8,7 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping
 
-from domain.publications.dates import PublicationDate, parse_date_parts
+from domain.documents.dates import PublicationDate, parse_date_parts
 from domain.serials.issns import IssnSupport, SerialIssn, received_issns
 from domain.source_records.source_extras import SourceExtra
 from domain.types import JsonValue, as_mapping, as_sequence, as_str, as_strs
@@ -95,12 +95,12 @@ def extract_crossref_conference(msg: Mapping[str, JsonValue]) -> dict[str, JsonV
 
 
 def extract_crossref_source_extras(msg: Mapping[str, JsonValue]) -> Mapping[str, JsonValue] | None:
-    """Renvoie les champs propres à Crossref gardés dans `source_records.source_extras` : licence, financeurs, relations, congrès, titre de groupe d'un `posted-content`, nombre de références s'il est positif, date d'indexation. Le reste du payload est écarté.
+    """Renvoie les champs propres à Crossref gardés dans `source_records.source_extras` : financeurs, relations, congrès, titre de groupe d'un `posted-content`, nombre de références s'il est positif, date d'indexation. Le reste du payload est écarté.
 
     Les relations servent à la phase `relations`.
     """
     source_extras: dict[str, JsonValue] = {}
-    for key in (SourceExtra.LICENSE, SourceExtra.FUNDER, SourceExtra.RELATION):
+    for key in (SourceExtra.FUNDER, SourceExtra.RELATION):
         val = msg.get(key)
         if val:
             source_extras[key] = val

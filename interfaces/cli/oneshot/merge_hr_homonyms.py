@@ -1,7 +1,7 @@
 # STATUS: oneshot (2026-11-02)
 """Fusionne chaque personne RH avec son unique homonyme sans fiche RH : même nom, même prénom complet, aucun autre homonyme, paire non marquée distincte.
 
-La personne RH est conservée (`merge_roles`). Son nom, en capitales comme dans l'export RH, prend la graphie de la personne absorbée quand celle-ci n'est pas en capitales. Chaque fusion est commitée seule.
+La personne RH est conservée (`merge_direction`). Son nom, en capitales comme dans l'export RH, prend la graphie de la personne absorbée quand celle-ci n'est pas en capitales. Chaque fusion est commitée seule.
 
 Usage :
     uv run python -m interfaces.cli.oneshot.merge_hr_homonyms

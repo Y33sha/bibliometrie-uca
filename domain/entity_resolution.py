@@ -1,5 +1,6 @@
-"""Résolution d'entités : regroupement d'éléments reliés par des clés partagées."""
+"""Résolution d'entités : regroupement d'éléments reliés par des clés partagées, choix de la valeur majoritaire d'un groupe."""
 
+from collections import Counter
 from collections.abc import Iterable
 
 
@@ -43,3 +44,9 @@ def connected_components(
     for record_id in parent:
         groups.setdefault(find(record_id), []).append(record_id)
     return sorted((sorted(group) for group in groups.values()), key=lambda group: group[0])
+
+
+def most_frequent[T: str | int](counter: Counter[T]) -> T:
+    """Renvoie la valeur la plus fréquente ; à égalité, la plus petite."""
+    best = max(counter.values())
+    return min(value for value, n in counter.items() if n == best)

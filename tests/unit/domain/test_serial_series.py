@@ -3,11 +3,10 @@
 import pytest
 
 from domain.serials.series import (
-    ContainerLevel,
     SeriesGroup,
     VolumeTitle,
-    container_level,
     group_series,
+    names_a_volume,
     series_key,
     series_title,
     split_collection_and_volume,
@@ -27,7 +26,7 @@ from domain.serials.series import (
     ],
 )
 def test_titre_de_volume(title):
-    assert container_level(title) is ContainerLevel.VOLUME
+    assert names_a_volume(title)
 
 
 @pytest.mark.parametrize(
@@ -43,7 +42,7 @@ def test_titre_de_volume(title):
     ],
 )
 def test_titre_de_serie(title):
-    assert container_level(title) is ContainerLevel.SERIES
+    assert not names_a_volume(title)
 
 
 def test_volumes_d_une_meme_serie_partagent_la_cle():

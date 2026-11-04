@@ -25,8 +25,8 @@ from pathlib import Path
 
 from sqlalchemy import Connection, text
 
+from domain.addresses.country_detection import CountryDetectionMethod, retained_countries
 from domain.countries import NO_COUNTRY_CODE
-from domain.country_detection import CountryDetectionMethod, retained_countries
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 

@@ -14,7 +14,7 @@ import os
 
 from sqlalchemy import Connection, text
 
-from domain.publications.doc_types import DocType
+from domain.documents.doc_types import DocType
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from pipeline.ingestion.common.source_records import delete_source_records_before

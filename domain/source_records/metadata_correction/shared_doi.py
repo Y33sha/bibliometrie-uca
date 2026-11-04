@@ -10,12 +10,11 @@ from enum import StrEnum
 from itertools import combinations
 from typing import NamedTuple
 
-from domain.publications.doc_types import DocType
-from domain.publications.identifiers import NNT, HALId, doi_version, same_registrant
-from domain.source_records.identifiers import SourceIdentifier, SourceIdentifierType
+from domain.documents.doc_types import DocType
+from domain.documents.identifiers import doi_version, same_registrant
+from domain.source_records.identifiers import STRONG_ROLES, SourceIdentifier, SourceIdentifierType
 from domain.source_records.keys import CONFIRMATION_ID_TYPES
 from domain.sources.registry import AGGREGATOR_SOURCES, Source
-from domain.sources.scanr import extract_hal_id_from_scanr_id
 
 
 class DoiTargetRule(StrEnum):
@@ -42,25 +41,27 @@ class DoiClusterCase(StrEnum):
     """Chapitres de titres différents partageant un DOI : celui de l'ouvrage, absent du groupe. Tous le perdent."""
     ACTES_VS_COMMUNICATION = "ACTES_VS_COMMUNICATION"
     """Volume d'actes et documents d'autres titres partageant son DOI : ces communications perdent le DOI."""
+    NUMERO_VS_ARTICLE = "NUMERO_VS_ARTICLE"
+    """Numéro de revue et documents d'autres titres partageant son DOI : ces articles perdent le DOI."""
     DOI_D_UNE_AUTRE_OEUVRE = "DOI_D_UNE_AUTRE_OEUVRE"
     """Enregistrement source dont le DOI est celui d'une autre œuvre (`_records_of_another_work`) : il le perd."""
     UNRESOLVED_DOI_TO_NULL = "UNRESOLVED_DOI_TO_NULL"
     """DOI inconnu de doi.org (`failed_lookups`, source `doi_org`) : tous les membres le perdent."""
 
 
-# Types de relation DataCite qui désignent l'œuvre principale par son DOI. La requête des candidats en tire son `CASE` et son filtre.
 DATACITE_DIRECT_CONVERGENCE: dict[str, DoiTargetRule] = {
     "IsVersionOf": DoiTargetRule.DATACITE_VERSION_TO_CONCEPT,
     "IsVariantFormOf": DoiTargetRule.DATACITE_VARIANT_TO_PRIMARY,
 }
-# Pièce d'un package : la requête exige en plus que le parent soit un dataset présent en base.
+"""Types de relation DataCite qui désignent l'œuvre principale par son DOI. La requête des candidats en tire son `CASE` et son filtre."""
 DATACITE_PACKAGE_PIECE_RELATION = "IsPartOf"
+"""Pièce d'un package : la requête exige en plus que le parent soit un dataset présent en base."""
 
 # Fichier complémentaire figshare « Additional file [N] of T » : pièce de la collection figshare de titre T.
 FIGSHARE_ITEM_DOI_PATTERN = r"^10\.6084/m9\.figshare\.[0-9]+$"
 FIGSHARE_COLLECTION_DOI_PREFIX = "10.6084/m9.figshare.c."
-# Préfixe du titre normalisé (`normalize_text`) d'un fichier complémentaire figshare.
 FIGSHARE_ADDITIONAL_FILE_TITLE_PATTERN = r"^additional file( [0-9]+)? of "
+"""Préfixe du titre normalisé (`normalize_text`) d'un fichier complémentaire figshare."""
 
 
 def declares_same_work(
@@ -95,10 +96,12 @@ class DoiClusterMember(NamedTuple):
     confirmation_ids: Mapping[SourceIdentifierType, tuple[str, ...]] = {}
     """Valeurs des clés de confirmation (`CONFIRMATION_ID_TYPES`) de ses identifiants, par type."""
     own_ids: Mapping[SourceIdentifierType, tuple[str, ...]] = {}
-    """Identifiants propres de l'enregistrement source, par type : le `hal_id` d'un enregistrement source HAL, le NNT d'un enregistrement source theses.fr."""
+    """Identifiants de rôle `primary` ou `derived`, par type : ils désignent l'enregistrement source lui-même."""
     source: str = ""
     author_names: frozenset[str] = frozenset()
     """Noms de famille normalisés de ses contributions sources individuelles."""
+    owns_doi: bool = False
+    """Le DOI du groupe est parmi `own_ids`. Le membre le garde."""
 
 
 class DoiClusterDecision(NamedTuple):
@@ -117,65 +120,78 @@ class DoiTarget(NamedTuple):
 
 
 class ConfirmationIdRemoval(NamedTuple):
-    """Identifiants retirés d'un membre qui garde le DOI partagé."""
+    """Clés de confirmation retirées d'un membre du groupe."""
 
     id: int
     removed: dict[SourceIdentifierType, list[str]]
-    """Valeurs partagées avec un membre qui perd le DOI, par type."""
+    """Valeurs partagées avec un membre de l'autre œuvre, par type."""
     case: DoiClusterCase
 
 
-# Cas où des œuvres distinctes partagent un DOI : le membre qui le perd est une autre œuvre.
 _DIVERGENCE_CASES: frozenset[DoiClusterCase] = frozenset(
     {
         DoiClusterCase.OUVRAGE_VS_CHAPITRE,
         DoiClusterCase.CHAPITRES_TITRES_DIFFERENTS,
         DoiClusterCase.ACTES_VS_COMMUNICATION,
+        DoiClusterCase.NUMERO_VS_ARTICLE,
         DoiClusterCase.DOI_D_UNE_AUTRE_OEUVRE,
     }
 )
+"""Cas où des œuvres distinctes partagent un DOI : le membre qui le perd est une autre œuvre."""
+
+_CONTAINER_CASES: dict[str, DoiClusterCase] = {
+    DocType.PROCEEDINGS: DoiClusterCase.ACTES_VS_COMMUNICATION,
+    DocType.JOURNAL_ISSUE: DoiClusterCase.NUMERO_VS_ARTICLE,
+}
+"""Types de conteneur, et cas de retrait du DOI aux membres d'un autre titre que le conteneur."""
+
+CLUSTER_CANDIDATE_DOC_TYPES: frozenset[str] = frozenset(
+    {DocType.BOOK, DocType.BOOK_CHAPTER, *_CONTAINER_CASES}
+)
+"""Types dont la présence dans un groupe de même DOI le rend candidat au retrait du DOI."""
+
+
+def _values_by_type(
+    identifiers: Iterable[SourceIdentifier],
+) -> dict[SourceIdentifierType, tuple[str, ...]]:
+    out: dict[SourceIdentifierType, list[str]] = {}
+    for identifier in identifiers:
+        out.setdefault(identifier.id_type, []).append(identifier.value)
+    return {id_type: tuple(values) for id_type, values in out.items()}
 
 
 def confirmation_ids(
     identifiers: Iterable[SourceIdentifier],
 ) -> dict[SourceIdentifierType, tuple[str, ...]]:
     """Renvoie les valeurs des clés de confirmation (`CONFIRMATION_ID_TYPES`) parmi `identifiers`, par type."""
-    out: dict[SourceIdentifierType, list[str]] = {}
-    for identifier in identifiers:
-        if identifier.id_type in CONFIRMATION_ID_TYPES:
-            out.setdefault(identifier.id_type, []).append(identifier.value)
-    return {id_type: tuple(values) for id_type, values in out.items()}
+    return _values_by_type(i for i in identifiers if i.id_type in CONFIRMATION_ID_TYPES)
 
 
-def source_record_own_ids(
-    source: str, source_id: str
-) -> dict[SourceIdentifierType, tuple[str, ...]]:
-    """Renvoie les identifiants propres d'un enregistrement source, par type : le dépôt HAL d'un enregistrement source HAL ou d'un enregistrement source ScanR issu de HAL, le NNT d'un enregistrement source theses.fr."""
-    if source == Source.HAL:
-        parsed = HALId.try_parse(source_id)
-        hal_id = str(parsed) if parsed else None
-    elif source == Source.SCANR:
-        hal_id = extract_hal_id_from_scanr_id(source_id)
-    elif source == Source.THESES:
-        nnt = NNT.try_parse(source_id)
-        return {SourceIdentifierType.NNT: (str(nnt),)} if nnt else {}
-    else:
-        return {}
-    return {SourceIdentifierType.HAL_ID: (hal_id,)} if hal_id else {}
+def own_ids(identifiers: Iterable[SourceIdentifier]) -> dict[SourceIdentifierType, tuple[str, ...]]:
+    """Renvoie les valeurs des identifiants de rôle `primary` ou `derived` parmi `identifiers`, par type."""
+    return _values_by_type(i for i in identifiers if i.role in STRONG_ROLES)
 
 
 def confirmation_id_removals(
     group: list[DoiClusterMember], decisions: list[DoiClusterDecision]
 ) -> list[ConfirmationIdRemoval]:
-    """Calcule les retraits d'identifiants après une divergence (`_DIVERGENCE_CASES`).
+    """Calcule les retraits de clés de confirmation quand des œuvres distinctes partagent un DOI (`_DIVERGENCE_CASES`).
 
-    Une clé de confirmation partagée avec un membre qui perd le DOI appartient à cette autre œuvre : le membre qui garde le DOI la perd. Sans quoi la clé réunirait encore les deux œuvres, par exemple le dépôt HAL d'une communication recopié par l'enregistrement source OpenAlex du volume d'actes.
+    Une clé de confirmation partagée par un membre qui garde le DOI et un membre qui le perd réunirait encore les deux œuvres. Le membre qui ne la détient pas en propre (`own_ids`) la perd :
 
-    Une clé reste en place quand un membre qui garde le DOI la tient en propre (`own_ids`), ou quand ce membre vient d'une source autre qu'un agrégateur (`AGGREGATOR_SOURCES`). Une telle source décrit son propre document : le PMID d'un dépôt HAL est celui de l'article, même recopié par l'enregistrement source ScanR d'un volume de résumés.
+    - le membre qui garde le DOI, par exemple l'enregistrement source OpenAlex du volume d'actes qui recopie le dépôt HAL d'une communication. La clé reste en place quand un membre qui garde le DOI la détient en propre, ou vient d'une source autre qu'un agrégateur (`AGGREGATOR_SOURCES`). Une telle source décrit son propre document : le PMID d'un dépôt HAL est celui de l'article, même recopié par l'enregistrement source ScanR d'un volume de résumés ;
+    - le membre qui perd le DOI, quand un membre qui garde le DOI détient la clé en propre.
     """
     losers = {d.id: d.case for d in decisions if d.case in _DIVERGENCE_CASES}
     if not losers:
         return []
+    owned_by_keepers = {
+        (id_type, value)
+        for m in group
+        if m.id not in losers
+        for id_type, values in m.own_ids.items()
+        for value in values
+    }
     kept: dict[SourceIdentifierType, set[str]] = {}
     for m in group:
         if m.id in losers:
@@ -195,6 +211,19 @@ def confirmation_id_removals(
     removals: list[ConfirmationIdRemoval] = []
     for m in group:
         if m.id in losers:
+            removed = {
+                id_type: copied
+                for id_type, values in m.confirmation_ids.items()
+                if (
+                    copied := [
+                        v
+                        for v in values
+                        if (id_type, v) in owned_by_keepers and v not in m.own_ids.get(id_type, ())
+                    ]
+                )
+            }
+            if removed:
+                removals.append(ConfirmationIdRemoval(m.id, removed, losers[m.id]))
             continue
         removed = {
             id_type: shared
@@ -206,10 +235,10 @@ def confirmation_id_removals(
     return removals
 
 
-# Marqueurs de chapitre, retirés avant comparaison : une source saisit le numéro du chapitre (« chapitre 14 … »), une autre non.
 _CHAPTER_TITLE_MARKERS = re.compile(
     r"\b(chapitre|chapter|chap|ch|section|sec|partie|part|vol|tome|pp|p)\b"
 )
+"""Marqueurs de chapitre, retirés avant comparaison : une source saisit le numéro du chapitre (« chapitre 14 … »), une autre non."""
 
 
 def _clean_title(title_normalized: str | None) -> str:
@@ -230,21 +259,23 @@ def _group_has_distinct_chapters(titles: list[str | None]) -> bool:
     return any(not _same_title(a, b) for a, b in combinations(cleaned, 2))
 
 
-def _volume_communications(group: list[DoiClusterMember]) -> list[DoiClusterMember]:
-    """Renvoie les membres titrés d'un groupe à volume d'actes (`proceedings`) dont le titre diffère de celui de chaque volume. Vide sans volume titré."""
-    volumes = [
+def _container_contents(
+    group: list[DoiClusterMember], references: list[DoiClusterMember], container_type: str
+) -> list[DoiClusterMember]:
+    """Renvoie les membres titrés d'un groupe dont le titre diffère de celui de chaque conteneur de type `container_type`, cherché parmi `references`. Vide sans conteneur titré."""
+    containers = [
         t
-        for m in group
-        if m.doc_type == DocType.PROCEEDINGS and (t := _clean_title(m.title_normalized))
+        for m in references
+        if m.doc_type == container_type and (t := _clean_title(m.title_normalized))
     ]
-    if not volumes:
+    if not containers:
         return []
     return [
         m
         for m in group
-        if m.doc_type != DocType.PROCEEDINGS
+        if m.doc_type != container_type
         and (t := _clean_title(m.title_normalized))
-        and not any(_same_title(t, v) for v in volumes)
+        and not any(_same_title(t, c) for c in containers)
     ]
 
 
@@ -337,12 +368,16 @@ def resolve_cluster_doi_corrections(
 ) -> list[DoiClusterDecision]:
     """Renvoie les membres d'un groupe d'enregistrements sources de même DOI qui perdent ce DOI, avec le cas qui le décide.
 
+    Hors DOI inconnu de doi.org, un membre qui détient le DOI en propre (`owns_doi`) le garde. S'il y en a, seuls ces membres désignent l'ouvrage ou le conteneur.
+
     - **DOI inconnu de doi.org** (`unresolved`) : tous les membres perdent le DOI. Prime sur les cas ci-dessous.
     - **DOI d'une forme secondaire** (`has_target`, cf. `doi_target`) : aucun membre ne perd le DOI. Prime sur les cas ci-dessous, réservés à la famille ouvrage/chapitre.
     - **Ouvrage + chapitre** : les `book_chapter` d'un autre titre que l'ouvrage perdent le DOI, celui de l'ouvrage. Un chapitre au titre de l'ouvrage est la même œuvre, typée autrement par sa source : il garde le DOI.
-    - **Chapitres seuls, de titres différents** : tous les `book_chapter` perdent le DOI, celui de l'ouvrage absent.
+    - **Chapitres seuls, de titres différents, sans membre qui détient le DOI en propre** : tous les `book_chapter` perdent le DOI, celui de l'ouvrage absent.
     - **Volume d'actes + communications** : les membres dont le titre diffère de celui du volume (`proceedings`) perdent le DOI, quel que soit leur type. Les membres au titre du volume le gardent.
+    - **Numéro de revue + articles** : même règle avec le numéro (`journal_issue`).
     - **DOI d'une autre œuvre** (`_records_of_another_work`) : un enregistrement source sans nom d'auteur commun avec l'enregistrement source Crossref du DOI, et de titre éloigné du sien, perd le DOI. S'ajoute aux cas précédents.
+    - **Clé propre d'un membre qui perd le DOI** (`_co_owners_of_lost_keys`) : un membre qui détient aussi cette clé en propre perd le DOI.
     """
     if unresolved:
         return [DoiClusterDecision(m.id, DoiClusterCase.UNRESOLVED_DOI_TO_NULL) for m in group]
@@ -351,22 +386,25 @@ def resolve_cluster_doi_corrections(
 
     decisions = _divergence_decisions(group)
     decided = {d.id for d in decisions}
-    return decisions + [
+    decisions += [
         DoiClusterDecision(m.id, DoiClusterCase.DOI_D_UNE_AUTRE_OEUVRE)
         for m in _records_of_another_work(group)
         if m.id not in decided
     ]
+    owners = {m.id for m in group if m.owns_doi}
+    decisions = [d for d in decisions if d.id not in owners]
+    return decisions + _co_owners_of_lost_keys(group, decisions)
 
 
 def _divergence_decisions(group: list[DoiClusterMember]) -> list[DoiClusterDecision]:
-    """Décide les retraits des familles ouvrage/chapitre et volume d'actes/communication."""
-    book_family = [m for m in group if m.doc_type in (DocType.BOOK, DocType.BOOK_CHAPTER)]
-    chapters = [m for m in book_family if m.doc_type == DocType.BOOK_CHAPTER]
-    has_book = any(m.doc_type == DocType.BOOK for m in book_family)
-    if has_book and chapters:
-        book_titles = [
-            _clean_title(m.title_normalized) for m in book_family if m.doc_type == DocType.BOOK
-        ]
+    """Décide les retraits de la famille ouvrage/chapitre, à défaut ceux des conteneurs (`_CONTAINER_CASES`). Un membre étranger à deux conteneurs prend le cas du premier."""
+    owners = [m for m in group if m.owns_doi]
+    references = owners or group
+    chapters = [m for m in group if m.doc_type == DocType.BOOK_CHAPTER]
+    book_titles = [
+        _clean_title(m.title_normalized) for m in references if m.doc_type == DocType.BOOK
+    ]
+    if book_titles and chapters:
         return [
             DoiClusterDecision(m.id, DoiClusterCase.OUVRAGE_VS_CHAPITRE)
             for m in chapters
@@ -374,13 +412,41 @@ def _divergence_decisions(group: list[DoiClusterMember]) -> list[DoiClusterDecis
         ]
     if (
         chapters
-        and not has_book
+        and not owners
         and _group_has_distinct_chapters([m.title_normalized for m in chapters])
     ):
         return [
             DoiClusterDecision(m.id, DoiClusterCase.CHAPITRES_TITRES_DIFFERENTS) for m in chapters
         ]
+    decisions: dict[int, DoiClusterCase] = {}
+    for container_type, case in _CONTAINER_CASES.items():
+        for m in _container_contents(group, references, container_type):
+            decisions.setdefault(m.id, case)
+    return [DoiClusterDecision(member_id, case) for member_id, case in decisions.items()]
+
+
+def _co_owners_of_lost_keys(
+    group: list[DoiClusterMember], decisions: list[DoiClusterDecision]
+) -> list[DoiClusterDecision]:
+    """Renvoie le retrait du DOI des membres qui le gardent sans le détenir en propre. Chacun détient en propre une clé de confirmation, détenue en propre aussi par un membre qui perd le DOI. Ils décrivent l'œuvre de ce membre : ils perdent le DOI, détenu en `secondary`, plutôt que leur clé."""
+    losers = {d.id: d.case for d in decisions if d.case in _DIVERGENCE_CASES}
+    if not losers:
+        return []
+    lost_own_keys = {
+        (id_type, value)
+        for m in group
+        if m.id in losers
+        for id_type, values in m.own_ids.items()
+        if id_type in CONFIRMATION_ID_TYPES
+        for value in values
+    }
+    case = next(iter(losers.values()))
     return [
-        DoiClusterDecision(m.id, DoiClusterCase.ACTES_VS_COMMUNICATION)
-        for m in _volume_communications(group)
+        DoiClusterDecision(m.id, case)
+        for m in group
+        if m.id not in losers
+        and not m.owns_doi
+        and any(
+            (id_type, v) in lost_own_keys for id_type, values in m.own_ids.items() for v in values
+        )
     ]

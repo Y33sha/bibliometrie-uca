@@ -21,7 +21,7 @@ from sqlalchemy import Connection
 from infrastructure.read_models.perimeters.queries import (
     get_persons_structure_ids_list,
 )
-from pipeline.graph import task
+from pipeline.graph import Task, in_transaction
 from pipeline.http.polite_pool import default_user_agent
 from pipeline.ingestion.complements.ror import ZenodoRorDumpSource
 from pipeline.ingestion.hal.api import HalStructuresClient
@@ -43,11 +43,6 @@ from pipeline.transformation.structures.perimeter_evidence import (
     sync_perimeter_evidence,
 )
 from pipeline.transformation.structures.ror import RorStore, run_refresh_ror
-
-
-def _classify_addresses(ctx: PhaseContext) -> PhaseMetrics:
-    with ctx.open_tx() as conn:
-        return classify_addresses(conn, ctx.logger)
 
 
 def _resolve_addresses(ctx: PhaseContext) -> PhaseMetrics:
@@ -109,8 +104,8 @@ def _refresh_ror(ctx: PhaseContext) -> PhaseMetrics:
 
 
 TASKS = (
-    task(
-        "affiliations.refresh_ror",
+    Task(
+        "refresh_ror",
         reads=("ror_dump_imports", "source_contribution_rors"),
         writes=(
             "ror_organizations",
@@ -123,8 +118,8 @@ TASKS = (
         network="zenodo",
         run=_refresh_ror,
     ),
-    task(
-        "affiliations.refresh_hal_structures",
+    Task(
+        "refresh_hal_structures",
         reads=("source_contribution_hal_structures",),
         writes=(
             "hal_structures",
@@ -137,8 +132,8 @@ TASKS = (
         network="hal",
         run=_refresh_hal_structures,
     ),
-    task(
-        "affiliations.classify_addresses",
+    Task(
+        "classify_addresses",
         reads=(
             "addresses.raw_text",
             "addresses.normalized_text",
@@ -149,11 +144,11 @@ TASKS = (
         ),
         writes=("addresses.origin",),
         previous_run=("addresses.origin",),
-        run=_classify_addresses,
+        run=in_transaction(classify_addresses),
         section="Origine des adresses",
     ),
-    task(
-        "affiliations.resolve_addresses",
+    Task(
+        "resolve_addresses",
         reads=(
             "structure_name_forms",
             "structures",
@@ -166,8 +161,8 @@ TASKS = (
         run=_resolve_addresses,
         section="Identification des structures dans les adresses institutionnelles",
     ),
-    task(
-        "affiliations.resolve_thesis_partners",
+    Task(
+        "resolve_thesis_partners",
         reads=(
             "structure_name_forms",
             "structures",
@@ -178,8 +173,8 @@ TASKS = (
         previous_run=("idref_structures",),
         run=_resolve_thesis_partners,
     ),
-    task(
-        "affiliations.populate",
+    Task(
+        "populate",
         reads=(
             "address_structures",
             "perimeter_structures",
@@ -230,7 +225,7 @@ TASKS = (
 
 def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
     """Renvoie les métriques de la résolution des adresses, avec les détails des deux référentiels."""
-    metrics = by_task["affiliations.resolve_addresses"]
-    metrics.details.update(by_task["affiliations.refresh_ror"].details)
-    metrics.details.update(by_task["affiliations.refresh_hal_structures"].details)
+    metrics = by_task["resolve_addresses"]
+    metrics.details.update(by_task["refresh_ror"].details)
+    metrics.details.update(by_task["refresh_hal_structures"].details)
     return metrics

@@ -6,12 +6,12 @@ from collections.abc import Iterator, Sequence
 
 from sqlalchemy import Connection, Row, text
 
+from domain.contributions.author_positions import AuthorPosition
+from domain.documents.dates import DatePrecision, PublicationDate
+from domain.documents.licenses import license_label
 from domain.normalize import normalize_text, to_plain_text
 from domain.publications.access import access_url
-from domain.publications.author_positions import AuthorPosition
-from domain.publications.dates import DatePrecision, PublicationDate
 from domain.publications.hal_deposit import HAL_DEPOSIT_STATUS_LABELS, HalDepositStatus
-from domain.publications.licenses import license_label
 from domain.source_records.impact import CITATION_TOP_LABELS, CitationTop
 from domain.source_records.source_extras import SourceExtra
 from domain.sources.registry import Source, source_record_url
@@ -39,19 +39,19 @@ from infrastructure.sql_fragments import has_author_role, is_laboratory, source_
 
 logger = logging.getLogger(__name__)
 
-# Positions d'auteur de la personne `:focus_person` dans la publication `p`.
 _FOCUS_AUTHOR_POSITIONS = """(SELECT a.author_positions::text[] FROM contributions a
                      WHERE a.publication_id = p.id AND a.person_id = :focus_person
                      LIMIT 1)"""
+"""Positions d'auteur de la personne `:focus_person` dans la publication `p`."""
 
-# Libellés des statuts thèse pour l'export CSV.
 _THESES_STATUS_LABELS = {"thesis": "Soutenue", "ongoing_thesis": "En cours"}
+"""Libellés des statuts thèse pour l'export CSV."""
 
-# Pivot des identifiants sources (alias `sd` sur `source_records`) : une colonne `<source>_id` par source moissonnée. Partagé par les deux listes à cinq identifiants ; l'export des thèses en donne quatre (sans `wos`) et garde son propre pivot.
 _SOURCE_ID_COLUMNS = ",\n                    ".join(
     f"max(CASE WHEN sr.source = '{source.value}' THEN sr.source_id END) AS {source.value}_id"
     for source in (Source.HAL, Source.OPENALEX, Source.SCANR, Source.WOS, Source.THESES)
 )
+"""Pivot des identifiants sources (alias `sd` sur `source_records`) : une colonne `<source>_id` par source moissonnée. Partagé par les deux listes à cinq identifiants ; l'export des thèses en donne quatre (sans `wos`) et garde son propre pivot."""
 
 
 def _source_links(ids: dict[str, str | None]) -> dict[str, str]:
@@ -95,7 +95,6 @@ def _perimeter_labs(*, person_filter: bool = False, correlated: bool = True) -> 
                    {person_clause}"""
 
 
-# Expression triée par champ de `PublicationSort`, tris par jointure exceptés. Année triée par la date de publication, auteur de thèse par nom puis prénom.
 _SORT_FIELDS = {
     "year": "p.publication_date",
     "title": "p.title",
@@ -104,8 +103,8 @@ _SORT_FIELDS = {
     "inscription": source_extra(SourceExtra.DATE_INSCRIPTION, "p"),
     "author": _thesis_author("ROW(LOWER(pe.last_name), LOWER(pe.first_name))"),
 }
+"""Expression triée par champ de `PublicationSort`, tris par jointure exceptés. Année triée par la date de publication, auteur de thèse par nom puis prénom."""
 
-# Jointure et expression triée des champs lus dans une autre table, sans égard à la casse. Une jointure coûte moins qu'une sous-requête par ligne sur la liste complète.
 _SORT_JOINS = {
     "serial": (
         "LEFT JOIN serials serial_sort ON serial_sort.id = p.serial_id",
@@ -116,6 +115,7 @@ _SORT_JOINS = {
         "LOWER(publisher_sort.name)",
     ),
 }
+"""Jointure et expression triée des champs lus dans une autre table, sans égard à la casse. Une jointure coûte moins qu'une sous-requête par ligne sur la liste complète."""
 
 _SORT_DIRECTIONS = {"asc": "ASC", "desc": "DESC"}
 

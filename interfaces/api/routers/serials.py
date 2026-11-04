@@ -13,9 +13,9 @@ from application.services.serials import SerialService
 from domain.merge import MergedEntity
 from domain.serials.serial import (
     OA_MODEL_LABELS_FR,
-    OA_MODELS,
     SERIAL_TYPE_LABELS_FR,
-    SERIAL_TYPES,
+    OaModel,
+    SerialType,
 )
 from infrastructure.read_models._common import EntityFacetResponse
 from infrastructure.read_models.serials.models import (
@@ -53,18 +53,18 @@ router = APIRouter(prefix="/api/serials", tags=["serials"])
 def list_oa_models() -> list[EnumOption]:
     """Liste les valeurs possibles de `oa_model` avec leur libellé français.
 
-    Les valeurs viennent de `domain.serials.serial.OA_MODELS` et `OA_MODEL_LABELS_FR`. Alimente la facette « Modèle OA » des listes de revues et la liste déroulante de la fenêtre d'édition de l'administration.
+    Les valeurs viennent de `domain.serials.serial.OaModel` et `OA_MODEL_LABELS_FR`. Alimente la facette « Modèle OA » des listes de revues et la liste déroulante de la fenêtre d'édition de l'administration.
     """
-    return [EnumOption(value=v, label_fr=OA_MODEL_LABELS_FR[v]) for v in OA_MODELS]
+    return [EnumOption(value=v, label_fr=OA_MODEL_LABELS_FR[v]) for v in OaModel]
 
 
 @router.get("/types", response_model=list[EnumOption])
 def list_serial_types() -> list[EnumOption]:
     """Liste les valeurs possibles de l'enum `serial_type` avec leur libellé français.
 
-    Les valeurs viennent de `domain.serials.serial.SERIAL_TYPES` et `SERIAL_TYPE_LABELS_FR`. Un test d'intégration vérifie leur accord avec l'enum SQL. Alimente la liste déroulante de la page d'administration des revues et la colonne « Type » des pages publiques.
+    Les valeurs viennent de `domain.serials.serial.SerialType` et `SERIAL_TYPE_LABELS_FR`. Un test d'intégration vérifie leur accord avec l'enum SQL. Alimente la liste déroulante de la page d'administration des revues et la colonne « Type » des pages publiques.
     """
-    return [EnumOption(value=v, label_fr=SERIAL_TYPE_LABELS_FR[v]) for v in SERIAL_TYPES]
+    return [EnumOption(value=v, label_fr=SERIAL_TYPE_LABELS_FR[v]) for v in SerialType]
 
 
 def serial_filters(
@@ -82,9 +82,9 @@ def serial_filters(
     return SerialFilters(
         search=search,
         publisher_id=publisher_id,
-        serial_types=parse_vocabulary_csv(serial_type, allowed=SERIAL_TYPES, param="serial_type"),
+        serial_types=parse_vocabulary_csv(serial_type, allowed=SerialType, param="serial_type"),
         is_in_doaj=is_in_doaj,
-        oa_models=parse_vocabulary_csv(oa_model, allowed=OA_MODELS, param="oa_model"),
+        oa_models=parse_vocabulary_csv(oa_model, allowed=OaModel, param="oa_model"),
         has_publications=has_publications,
     )
 

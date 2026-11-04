@@ -25,20 +25,15 @@ def access_source(
     source: str,
     execute: Callable[[], PhaseMetrics],
     *,
-    phase: str,
     logger: logging.Logger,
     credentials_missing: CredentialsMissing,
     request_budget: RequestBudget,
     threshold: int | None = None,
 ) -> PhaseMetrics:
-    """Exécute `execute` sur `source` : identifiants contrôlés, circuit-breaker posé, indisponibilité signalée.
-
-    Args:
-        phase: situe les avertissements dans le journal.
-    """
+    """Exécute `execute` sur `source` : identifiants contrôlés, circuit-breaker posé, indisponibilité signalée."""
     if reason := credentials_missing(source):
         metrics = PhaseMetrics()
-        signal_source_unconfigured(metrics, source, reason, logger=logger, phase=phase)
+        signal_source_unconfigured(metrics, source, reason, logger=logger)
         return metrics
     with source_circuit_breaker(
         source, threshold=threshold or DEFAULT_THRESHOLD, max_per_second=request_budget(source)
@@ -49,5 +44,5 @@ def access_source(
             metrics = PhaseMetrics()
             breaker.trip()
     if breaker.tripped:
-        signal_source_unavailable(metrics, source, logger=logger, phase=phase)
+        signal_source_unavailable(metrics, source, logger=logger)
     return metrics

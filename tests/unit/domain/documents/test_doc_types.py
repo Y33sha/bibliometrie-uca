@@ -2,7 +2,7 @@
 
 from collections import Counter
 
-from domain.publications.doc_types import DOC_TYPE_FAMILIES, DOC_TYPE_LABELS, DocType
+from domain.documents.doc_types import DOC_TYPE_FAMILIES, DOC_TYPE_LABELS, DocType
 
 
 def test_chaque_type_a_ses_libelles():

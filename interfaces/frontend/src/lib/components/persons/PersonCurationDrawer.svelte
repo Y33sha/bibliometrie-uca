@@ -139,7 +139,7 @@
 				pub = { publication_id: r.publication_id, title: r.title, publication_year: r.publication_year, sources: [], checked: true };
 				byPub.set(r.publication_id, pub);
 			}
-			pub.sources.push({ source: r.source, source_contribution_id: r.source_contribution_id });
+			pub.sources.push(r.source);
 		}
 		detachModal = {
 			personId: id,
@@ -157,10 +157,10 @@
 			detachModal = null;
 			return;
 		}
-		// Une référence de source par publication suffit : le backend détache toutes les sources de la publication.
-		await personsApi.detachContributions(detachModal.personId, {
-			contributions: toDetach.map((p) => p.sources[0]),
-		});
+		await personsApi.detachContributions(
+			detachModal.personId,
+			toDetach.map((p) => p.publication_id),
+		);
 		detachModal = null;
 		await refreshAfterChange();
 	}

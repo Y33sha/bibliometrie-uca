@@ -254,7 +254,7 @@ class TestGetPublicationExternalIdentifiers:
             publication,
             source="openalex",
             source_id="W1",
-            identifiers=secondary_identifiers({"pmid": "123", "arxiv_id": "2401.001"}),
+            identifiers=secondary_identifiers({"pmid": "123"}),
         )
         # Même PMID sur une seconde source : dédupliqué.
         insert_source_record(
@@ -262,7 +262,6 @@ class TestGetPublicationExternalIdentifiers:
         )
 
         ids = get_publication_external_identifiers(sa_sync_conn, publication)
-        # Une seule entrée par valeur ; l'identifiant arXiv désigne une copie, pas une référence.
         assert [(i.type, i.value) for i in ids] == [("pmid", "123")]
 
     def test_nnt_omitted_when_covered_by_theses_source(self, sa_sync_conn):

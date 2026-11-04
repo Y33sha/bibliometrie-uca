@@ -32,8 +32,8 @@ from pathlib import Path
 
 from sqlalchemy import Connection, text
 
-from domain.persons.matching import STRONG_PERSON_IDENTIFIER_TYPES
 from domain.persons.name_matching import names_compatible
+from domain.persons.source_contribution_matching import STRONG_PERSON_IDENTIFIER_TYPES
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 

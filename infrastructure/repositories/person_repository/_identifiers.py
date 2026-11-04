@@ -77,9 +77,6 @@ def update_identifier_status(conn: Connection, ident_id: int, status: str) -> Id
 
 _HAL = PersonIdentifierType.HAL_PERSON_ID.value
 
-# Comptes HAL d'un identifiant : `hal_person_id` des contributions sources HAL des contributions de sa personne qui le contiennent.
-# Lot : identifiants des contributions sources HAL des contributions de la personne sous ces comptes.
-# Un identifiant neutralisé par sa contribution source est exclu des comptes comme du lot.
 _HAL_ACCOUNT_PEERS_SQL = text(f"""
     WITH src AS (
         SELECT id AS src_id, person_id, id_type, id_value
@@ -119,6 +116,7 @@ _HAL_ACCOUNT_PEERS_SQL = text(f"""
     WHERE pi.status = '{AttributionStatus.PENDING.value}'
       AND pi.id <> bundle.src_id
 """)
+"""Comptes HAL d'un identifiant : `hal_person_id` des contributions sources HAL des contributions de sa personne qui le contiennent. Lot : identifiants des contributions sources HAL des contributions de la personne sous ces comptes. Un identifiant neutralisé par sa contribution source est exclu des comptes comme du lot."""
 
 
 def hal_account_peers(conn: Connection, ident_ids: list[int]) -> dict[int, set[int]]:
@@ -140,7 +138,6 @@ def propagate_status_to_hal_accounts(conn: Connection, ident_id: int, status: st
     ).rowcount
 
 
-# Contribution de la personne rattachée par un identifiant rejeté : son mode de résolution est le type de l'identifiant, et l'une de ses contributions sources contient la valeur.
 _MARK_CONTRIBUTIONS_OF_REJECTED_IDENTIFIERS_SQL = text(
     enqueue_sql(
         Queue.CONTRIBUTION_RESOLUTION,
@@ -156,6 +153,7 @@ _MARK_CONTRIBUTIONS_OF_REJECTED_IDENTIFIERS_SQL = text(
         """,
     )
 )
+"""Contribution de la personne rattachée par un identifiant rejeté : son mode de résolution est le type de l'identifiant, et l'une de ses contributions sources contient la valeur."""
 
 
 def mark_contributions_of_rejected_identifiers(conn: Connection, person_id: int) -> int:

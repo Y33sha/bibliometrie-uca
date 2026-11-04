@@ -5,8 +5,8 @@ from typing import Literal
 
 from sqlalchemy import Connection, Row, text
 
+from domain.documents.identifiers import isbn_search_prefix
 from domain.normalize import normalize_text, to_plain_text
-from domain.publications.identifiers import isbn_search_prefix
 from infrastructure.db.scalars import scalar_int
 from infrastructure.read_models._common import (
     EntityFacetItem,

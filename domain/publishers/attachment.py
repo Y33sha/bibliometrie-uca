@@ -8,8 +8,8 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import NamedTuple
 
+from domain.entity_resolution import most_frequent
 from domain.publishers.names import publisher_name_key
-from domain.serials.attachment import most_frequent
 
 
 class PublisherRecord(NamedTuple):
@@ -123,7 +123,7 @@ def _publishers_of_openalex_ids(
 def _free_forms(
     by_openalex: Mapping[str, list[_FormedRecord]], publisher_of_form: Mapping[str, int]
 ) -> dict[str, str]:
-    """Renvoie l'identifiant OpenAlex qui reçoit chaque forme libre : celui qui la porte le plus."""
+    """Renvoie, pour chaque forme libre, l'identifiant OpenAlex le plus fréquent parmi les enregistrements sources de cette forme."""
     claims: dict[str, Counter[str]] = defaultdict(Counter)
     for openalex_id, members in by_openalex.items():
         for _, form in members:

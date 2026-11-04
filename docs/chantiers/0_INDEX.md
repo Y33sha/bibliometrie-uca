@@ -5,7 +5,6 @@
 ### En cours
 
 - [Audit de la qualité de la résolution des personnes](DATA_audit-qualite-resolution-personnes.md)
-- [Exécution du graphe des tâches](CODE_execution-du-graphe-des-taches.md)
 - [Pertinence des sujets](DATA_pertinence-des-sujets.md)
 
 ### Non commencé
@@ -13,13 +12,14 @@
 - [Brevets](DATA_brevets.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
 - [Listes de revues](DATA_listes-de-revues.md)
-- [Premier et dernier auteur](DATA_premier-dernier-auteur.md)
 - [Résolution probabiliste des personnes](DATA_resolution-personnes-probabiliste.md)
 - [Types de document](DATA_types-document.md)
 - [Vérification des affiliations des sources](DATA_verification-affiliations.md)
 
 ## Chantiers archivés
 
+- 2026-11-03 — [Exécution du graphe des tâches](archived/2026-11-03_CODE_execution-du-graphe-des-taches.md)
+- 2026-11-03 — [Premier et dernier auteur](archived/2026-11-03_DATA_premier-dernier-auteur.md)
 - 2026-11-02 — [Ancrage des décisions humaines](archived/2026-11-02_CODE_ancrage-des-decisions-humaines.md)
 - 2026-11-02 — [Signatures institutionnelles : adresses brutes](archived/2026-11-02_METIER_signatures-institutionnelles.md)
 - 2026-11-02 — [Vocabulaires des sujets](archived/2026-11-02_DATA_vocabulaires-des-sujets.md)

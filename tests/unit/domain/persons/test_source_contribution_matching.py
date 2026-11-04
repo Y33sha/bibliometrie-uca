@@ -1,7 +1,7 @@
 """Règles de matching des contributions à des personnes."""
 
 from domain.persons.contributor_name import ContributorName
-from domain.persons.matching import (
+from domain.persons.source_contribution_matching import (
     IdentifiedPerson,
     Namesake,
     _compatible_namesakes,

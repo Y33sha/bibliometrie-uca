@@ -1,14 +1,11 @@
 """Règles de rattachement d'un enregistrement source à sa revue (`domain.serials.attachment`)."""
 
-from collections import Counter
-
 from domain.serials.attachment import (
     TitledSerial,
     choose_issnl,
     effective_issnl,
     match_by_title,
     match_in_publication,
-    most_frequent,
     openalex_issnls,
 )
 
@@ -29,10 +26,6 @@ def test_issn_l_d_openalex_le_plus_frequent():
         ]
     )
     assert issnls == {"0028-0836": "0028-0836", "1476-4687": "0028-0836", "9999-9999": "9999-9999"}
-
-
-def test_valeur_la_plus_frequente_puis_la_plus_petite():
-    assert most_frequent(Counter({"b": 2, "a": 2, "c": 1})) == "a"
 
 
 def test_un_seul_issn_l_l_emporte_d_office():

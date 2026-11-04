@@ -2,9 +2,9 @@
 
 from sqlalchemy import Connection, text
 
+from domain.documents.doc_types import DocType
 from domain.platforms.registry import HAL
 from domain.publications.access import Access, access, access_url
-from domain.publications.doc_types import DocType
 from domain.publications.relations import RelationType, inverse_relation
 from domain.source_records.identifiers import SourceIdentifierType
 from domain.source_records.source_extras import SourceExtra
@@ -106,14 +106,14 @@ def structures_by_id(conn: Connection, ids: set[int]) -> dict[str, StructureInfo
     }
 
 
-# Identifiants de bases référençant la publication, affichés dans la colonne latérale, dans l'ordre d'affichage. Le lien source HAL couvre le `hal_id`, le DOI de la publication ses DOI. arXiv et PMCID désignent des copies, donc des localisations.
 _EXTERNAL_IDENTIFIER_TYPES = (SourceIdentifierType.PMID, SourceIdentifierType.NNT)
+"""Identifiants de bases référençant la publication, affichés dans la colonne latérale, dans l'ordre d'affichage. Le lien source HAL couvre le `hal_id`, le DOI de la publication ses DOI."""
 
-# Sources dont l'enregistrement est la page du DOI, déjà affiché.
 _DOI_SOURCES = frozenset({Source.CROSSREF, Source.DATACITE})
+"""Sources dont l'enregistrement est la page du DOI, déjà affiché."""
 
-# Sources qui sont aussi une plateforme.
 _SOURCE_PLATFORMS: dict[str, str] = {Source.HAL: HAL.name}
+"""Sources qui sont aussi une plateforme."""
 
 
 def _referenced_by(sources: list[SourceRecordOut], access: Access) -> list[SourceRecordOut]:

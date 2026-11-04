@@ -7,10 +7,9 @@ import json
 
 from sqlalchemy import Connection, text
 
-from domain.country_detection import CountryDetectionMethod
+from domain.addresses.country_detection import CountryDetectionMethod
 from infrastructure.db.queues import Queue, enqueue, enqueue_sql
 
-# Insertion des candidats `(adresse, pays)` d'un moyen, depuis un payload JSON ; ouvre la CTE `added(address_id)` des candidats ajoutés.
 _INSERT_PROPOSED = """
     WITH proposed AS (
         SELECT DISTINCT (e->>'id')::int AS address_id, code.value AS country_code
@@ -24,18 +23,19 @@ _INSERT_PROPOSED = """
         ON CONFLICT DO NOTHING
         RETURNING address_id
     )"""
+"""Insertion des candidats `(adresse, pays)` d'un moyen, depuis un payload JSON ; ouvre la CTE `added(address_id)` des candidats ajoutés."""
 
-# Fin des insertions de candidats : compte les adresses de la CTE `added`.
 _COUNT_ADDED = """
     SELECT count(DISTINCT address_id) FROM added
 """
+"""Fin des insertions de candidats : compte les adresses de la CTE `added`."""
 
-# Fin des insertions de candidats : marque les adresses de la CTE `added`, puis les compte.
 _MARK_AND_COUNT_ADDED = (
     f""",
     marked AS ({enqueue_sql(Queue.ADDRESS_CANDIDATES, "SELECT address_id FROM added")})"""
     + _COUNT_ADDED
 )
+"""Fin des insertions de candidats : marque les adresses de la CTE `added`, puis les compte."""
 
 
 def _payload(rows: list[tuple[int, list[str]]]) -> str:

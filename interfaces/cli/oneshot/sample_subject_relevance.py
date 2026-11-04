@@ -44,7 +44,6 @@ _STRATA = (
     ("single_domain", 20),
 )
 
-# Topics OpenAlex de chaque enregistrement source, avec leurs ancêtres, du plus haut score au plus bas.
 _CANDIDATES_SQL = """
     SELECT sr.publication_id, p.serial_id, sr.id AS source_record_id,
            d.label AS domain, f.label AS field, sf.label AS subfield, t.label AS topic, srs.score,
@@ -66,6 +65,7 @@ _CANDIDATES_SQL = """
     WHERE sr.source = 'openalex'
     ORDER BY sr.publication_id, sr.id, srs.score DESC NULLS LAST
 """
+"""Topics OpenAlex de chaque enregistrement source, avec leurs ancêtres, du plus haut score au plus bas."""
 
 _DETAILS_SQL = """
     SELECT p.id, p.title, p.publication_year, p.doi, s.title AS serial,

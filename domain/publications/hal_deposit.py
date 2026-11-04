@@ -16,10 +16,10 @@ class HalDepositStatus(StrEnum):
     """Absente de HAL."""
 
 
-# Libellés d'affichage des statuts, partagés par la facette et l'export.
 HAL_DEPOSIT_STATUS_LABELS: dict[HalDepositStatus, str] = {
     HalDepositStatus.OK: "Texte",
     HalDepositStatus.NOTICE: "Notice",
     HalDepositStatus.OUTSIDE_COLLECTION: "Hors collection",
     HalDepositStatus.OUTSIDE_HAL: "Hors HAL",
 }
+"""Libellés d'affichage des statuts, partagés par la facette et l'export."""

@@ -1,11 +1,10 @@
-"""Identifiants des publications (`domain.publications.identifiers`) : DOI, identifiant HAL, NNT, PMID, PMCID, arXiv, ISSN, ISBN, préfixe DOI."""
+"""Identifiants des publications (`domain.documents.identifiers`) : DOI, identifiant HAL, NNT, PMID, PMCID, arXiv, ISSN, ISBN, préfixe DOI."""
 
 from dataclasses import FrozenInstanceError
 
 import pytest
 
-from domain.errors import ValidationError
-from domain.publications.identifiers import (
+from domain.documents.identifiers import (
     DOI,
     ISBN,
     ISSN,
@@ -16,12 +15,14 @@ from domain.publications.identifiers import (
     DoiPrefix,
     DoiVersion,
     HALId,
+    arxiv_doi,
     doi_version,
     extract_doi_from_url,
     find_isbns,
     is_hal_host,
     issn_search_prefix,
 )
+from domain.errors import ValidationError
 
 
 class TestDOIConstruction:
@@ -386,6 +387,13 @@ class TestPublicationMedArxivVOs:
         assert ArxivId.try_parse(None) is None
         with pytest.raises(ValidationError):
             ArxivId("garbage")
+
+    def test_doi_arxiv(self):
+        assert ArxivId("2401.00123").doi == "10.48550/arxiv.2401.00123"
+        assert (
+            arxiv_doi("https://arxiv.org/pdf/hep-th/9901001v1") == "10.48550/arxiv.hep-th/9901001"
+        )
+        assert arxiv_doi("https://example.com/x") is None
 
 
 class TestISSN:

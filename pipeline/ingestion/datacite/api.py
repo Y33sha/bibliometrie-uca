@@ -17,8 +17,8 @@ from pipeline.http.lookup import UNAVAILABLE, LookupOutcome, NotFound, Unavailab
 from pipeline.http.polite_pool import polite_user_agent
 from pipeline.ingestion.api_params import API_BASE_URLS
 
-# Plafond de l'API DataCite pour la taille d'une page.
 _PAGE_SIZE = 1000
+"""Plafond de l'API DataCite pour la taille d'une page."""
 
 RECORD_PARAMS: dict[str, str] = {"affiliation": "true"}
 """Paramètres de toute requête de rapatriement de documents.

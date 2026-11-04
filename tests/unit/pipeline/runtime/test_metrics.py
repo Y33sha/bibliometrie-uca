@@ -39,7 +39,7 @@ def test_merge_sums_denominator_and_breakdown():
 def test_to_payload():
     metrics = PhaseMetrics(new=3, updated=1)
     metrics.extras["tagged"] = 2
-    assert metrics.to_payload(duration_s=12.5, task_durations_s={"harvest.hal": 10.0}) == {
+    assert metrics.to_payload(duration_s=12.5, task_durations_s={"hal": 10.0}) == {
         "new": 3,
         "updated": 1,
         "unchanged": 0,
@@ -47,5 +47,5 @@ def test_to_payload():
         "errors": 0,
         "extras": {"tagged": 2},
         "duration_s": 12.5,
-        "task_durations_s": {"harvest.hal": 10.0},
+        "task_durations_s": {"hal": 10.0},
     }

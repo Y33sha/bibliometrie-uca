@@ -12,8 +12,8 @@ from sqlalchemy.pool import ConnectionPoolEntry
 
 logger = logging.getLogger(__name__)
 
-# Clé du recensement dans les informations de la connexion du pool, le temps de son emprunt.
 _INFO_KEY = "query_cancellation"
+"""Clé du recensement dans les informations de la connexion du pool, le temps de son emprunt."""
 
 
 class QueryCancellation:

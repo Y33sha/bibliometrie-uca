@@ -11,12 +11,12 @@ from collections import defaultdict
 from collections.abc import Callable, Hashable, Mapping, Sequence
 from dataclasses import dataclass, field
 
-from domain.country_detection import SOURCE_COUNTRY_METHODS
+from domain.addresses.country_detection import SOURCE_COUNTRY_METHODS
+from domain.contributions.contribution_roles import ContributionRole, is_individual_author
 from domain.normalize import normalize_text, to_plain_text
 from domain.persons.collective_names import is_collective_name
 from domain.persons.contributor_name import ContributorName
 from domain.persons.identifiers import compact_identifiers, shared_identifier_neutralizations
-from domain.publications.contribution_roles import ContributionRole, is_individual_author
 from domain.source_records.source_contribution_sync import (
     IncomingSourceContribution,
     StoredSourceContribution,

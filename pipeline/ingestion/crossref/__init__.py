@@ -53,7 +53,7 @@ def _normalizer() -> type[SourceNormalizer]:
 
 def _identify(record: Mapping[str, JsonValue]) -> RecordIdentity | None:
     """Renvoie l'identifiant natif d'une œuvre Crossref : son DOI."""
-    from domain.publications.identifiers import DOI
+    from domain.documents.identifiers import DOI
     from domain.types import as_str
 
     doi = DOI.normalize(as_str(record.get("DOI")))

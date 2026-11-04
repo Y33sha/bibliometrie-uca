@@ -3,8 +3,8 @@
 from sqlalchemy import Connection, text
 
 from domain.persons.identifiers import HUMAN_ATTRIBUTION_STATUSES, AttributionStatus
-from domain.persons.matching import IdentifiedPerson, Namesake
 from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
+from domain.persons.source_contribution_matching import IdentifiedPerson, Namesake
 from infrastructure.sql_fragments import REJECTED_PAIRS, active_name_form, in_clause
 
 

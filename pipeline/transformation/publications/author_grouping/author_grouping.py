@@ -1,6 +1,6 @@
 """Phase `author_grouping` : regroupement, dans chaque publication, des contributions sources d'un même auteur en contributions (`contributions`, `aligned_source_contributions`).
 
-Les publications de la file `publication_contributions_queue` se recalculent entièrement, par lots. `--rebuild-author-grouping` marque toutes les publications. Les publications d'un lot se répartissent entre des processus, un par processeur disponible (`available_cpus`). Les doublons d'auteur d'un enregistrement source (`domain.publications.list_copies`) reçoivent `duplicate_of` et restent hors des contributions. Les autres contributions sources, tous rôles réunis, s'alignent selon `domain.publications.author_grouping`. Chaque contribution reprend l'identifiant de la contribution en base avec laquelle elle partage le plus de contributions sources.
+Les publications de la file `publication_contributions_queue` se recalculent entièrement, par lots. `--rebuild-author-grouping` marque toutes les publications. Les publications d'un lot se répartissent entre des processus, un par processeur disponible (`available_cpus`). Les doublons d'auteur d'un enregistrement source (`domain.contributions.author_duplicates`) reçoivent `duplicate_of` et restent hors des contributions. Les autres contributions sources, tous rôles réunis, s'alignent selon `domain.contributions.author_grouping`. Chaque contribution reprend l'identifiant de la contribution en base avec laquelle elle partage le plus de contributions sources.
 """
 
 import logging
@@ -16,7 +16,8 @@ from operator import attrgetter
 from scipy.optimize import linear_sum_assignment
 from sqlalchemy import Connection
 
-from domain.publications.author_grouping import (
+from domain.contributions.author_duplicates import duplicate_source_contributions
+from domain.contributions.author_grouping import (
     Contribution,
     ResidualModel,
     SourceContribution,
@@ -24,8 +25,7 @@ from domain.publications.author_grouping import (
     plan_contribution_ids,
     with_known_first_name,
 )
-from domain.publications.list_copies import copied_source_contributions
-from pipeline.graph import task
+from pipeline.graph import Task
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.cpu import available_cpus
 from pipeline.runtime.observability.log_format import LAST_BRANCH, nothing_to_do, quantity, step
@@ -45,8 +45,8 @@ from pipeline.transformation.publications.author_grouping.store import (
 # Plafonds d'un lot de publications : nombre de publications, nombre de contributions sources d'auteur chargées en mémoire.
 BATCH_SIZE = 1000
 BATCH_SOURCE_CONTRIBUTIONS = 200_000
-# Source classée après les autres à longueur de liste égale : elle fonde une contribution seulement à défaut d'une autre source.
 DEFERRED_SOURCE = "scanr"
+"""Source classée après les autres à longueur de liste égale : elle fonde une contribution seulement à défaut d'une autre source."""
 
 
 def publication_batches(publications: Sequence[tuple[int, int]]) -> list[list[int]]:
@@ -109,15 +109,15 @@ def align_publication_contributions(
 ) -> tuple[list[Contribution], dict[int, int]]:
     """Renvoie les contributions d'une publication et ses doublons d'auteur (doublon → première occurrence de son nom), parmi les contributions sources à position. Les doublons restent hors des contributions."""
     source_records = contributions_by_source_record(rows)
-    copies: dict[int, int] = {}
+    duplicates: dict[int, int] = {}
     for source_contributions in source_records.values():
-        copies |= copied_source_contributions(source_contributions)
+        duplicates |= duplicate_source_contributions(source_contributions)
     kept = {
-        n: [s for s in record_contributions if s.id not in copies]
+        n: [s for s in record_contributions if s.id not in duplicates]
         for n, record_contributions in source_records.items()
     }
     contributions = align_publication(kept, model=_MODEL, deferred=deferred_source_records(rows))
-    return contributions, copies
+    return contributions, duplicates
 
 
 def _same_membership(stored: MembershipRow | None, planned: MembershipRow) -> bool:
@@ -157,7 +157,7 @@ _SOURCE_CONTRIBUTION_FIELDS = attrgetter(*(f.name for f in fields(SourceContribu
 
 def align_rows(rows: Sequence[SourceContributionTuple]) -> Aligned:
     """Applique `align_publication_contributions` aux contributions sources d'une publication, en tuples à l'entrée comme à la sortie."""
-    contributions, copies = align_publication_contributions(
+    contributions, duplicates = align_publication_contributions(
         [SourceContributionRow(*row) for row in rows]
     )
     return [
@@ -169,7 +169,7 @@ def align_rows(rows: Sequence[SourceContributionTuple]) -> Aligned:
             ],
         )
         for g in contributions
-    ], copies
+    ], duplicates
 
 
 type Mapper = Callable[
@@ -217,12 +217,12 @@ def _plan_batch(
     planned: list[tuple[int, ContributionTuple, int | None]] = []
     unmatched: list[int] = []
     recomposed: list[int] = []
-    copies: dict[int, int] = {}
+    duplicates: dict[int, int] = {}
     results = mapper(align_rows, [rows_by_publication.get(p, []) for p in publication_ids])
-    for publication_id, (contributions, publication_copies) in zip(
+    for publication_id, (contributions, publication_duplicates) in zip(
         publication_ids, results, strict=True
     ):
-        copies |= publication_copies
+        duplicates |= publication_duplicates
         old = {gid: frozenset(members) for gid, members in existing.get(publication_id, {}).items()}
         new = [frozenset(m[0] for m in members) for _, members in contributions]
         ids = plan_contribution_ids(old, new)
@@ -252,7 +252,7 @@ def _plan_batch(
             )
     removed, inserted = membership_changes(stored, memberships)
     return BatchPlan(
-        publication_ids, contribution_rows, removed, inserted, unmatched, recomposed, copies
+        publication_ids, contribution_rows, removed, inserted, unmatched, recomposed, duplicates
     )
 
 
@@ -366,8 +366,8 @@ def _attributes(ctx: PhaseContext) -> PhaseMetrics:
 
 
 TASKS = (
-    task(
-        "author_grouping.build",
+    Task(
+        "build",
         reads=(
             "publications.id",
             "publication_contributions_queue",
@@ -398,21 +398,24 @@ TASKS = (
             "contribution_resolution_queue",
             "publication_author_alignment",
         ),
-        # Publications supprimées plus loin dans le même run par `finalize.purge_publications` ; marquages retirés par la tâche elle-même ; personnes, identifiants, neutralisations et personnes des contributions, écrits par la phase `persons`.
         previous_run=(
+            # Publications, contributions et alignements supprimés, enregistrements sources détachés par `finalize.purge_publications`.
             "publications.id",
+            "contributions",
+            "aligned_source_contributions",
+            "source_records.publication_id",
+            # Marquages retirés par la tâche elle-même.
             "publication_contributions_queue",
+            # Personnes, identifiants, neutralisations et personnes des contributions, écrits par la phase `persons`.
             "person_identifiers",
             "persons",
             "source_contributions.neutralized_identifiers",
-            "contributions.person_id",
-            "contributions.resolution_mode",
         ),
         run=_build,
         label="Bilan",
     ),
-    task(
-        "author_grouping.attributes",
+    Task(
+        "attributes",
         reads=(
             "contribution_attributes_queue",
             "aligned_source_contributions",
@@ -440,10 +443,11 @@ TASKS = (
             # Une contribution rattachée sans épinglage qui quitte le périmètre est marquée pour la redécision de sa personne.
             "contribution_resolution_queue",
         ),
-        # Personnes des contributions, écrites par la phase `persons`.
+        # Personnes des contributions, écrites par la phase `persons` ; contributions et alignements supprimés, enregistrements sources détachés par `finalize.purge_publications`.
         previous_run=(
-            "contributions.person_id",
-            "contributions.resolution_mode",
+            "contributions",
+            "aligned_source_contributions",
+            "source_records.publication_id",
         ),
         run=_attributes,
         label="Attributs des contributions",
@@ -453,6 +457,6 @@ TASKS = (
 
 def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
     """Renvoie les métriques du recalcul des contributions, avec le nombre de contributions aux attributs mis à jour."""
-    metrics = by_task["author_grouping.build"]
-    metrics.details["attributes_updated"] = by_task["author_grouping.attributes"].updated
+    metrics = by_task["build"]
+    metrics.details["attributes_updated"] = by_task["attributes"].updated
     return metrics

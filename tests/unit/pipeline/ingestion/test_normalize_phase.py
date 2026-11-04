@@ -4,7 +4,7 @@ Le retrait des enregistrements sources disparus précède le nettoyage des infor
 """
 
 import dataclasses
-import logging
+from types import SimpleNamespace
 
 import pytest
 
@@ -12,6 +12,7 @@ from domain.sources.registry import SOURCE_PRIORITY, Source
 from pipeline.ingestion.common import normalize
 from pipeline.ingestion.common.normalizer import NormalizeStats
 from pipeline.phases import PHASES
+from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.task_runner import run_phase
 
 _NORMALIZE = next(phase for phase in PHASES if phase.name == "normalize")
@@ -31,20 +32,25 @@ def lancer(contexte, monkeypatch):
         def appel(nom: str, valeur):
             return lambda *_args: (appels.append(nom), valeur)[1]
 
+        def normaliseur(source, _conn, _logger, *, archive):
+            return SimpleNamespace(run=appel(f"normalize:{source}", bilan))
+
+        monkeypatch.setattr(normalize, "build_normalizer", normaliseur)
         monkeypatch.setattr(
-            normalize,
-            "_normalize_one",
-            lambda _ctx, source: (appels.append(f"normalize:{source}"), bilan)[1],
+            normalize, "delete_disappeared_source_records", appel("prune", disparues)
         )
-        monkeypatch.setattr(normalize, "_run_prune_disappeared", appel("prune", disparues))
-        monkeypatch.setattr(
-            normalize, "_run_cleanup_orphan_contributor_information", appel("cleanup", 0)
-        )
-        monkeypatch.setattr(
-            normalize, "_run_cleanup_orphan_addresses", appel("cleanup_addresses", 0)
+        nettoyages = {
+            "cleanup_orphan_contributor_information": appel("cleanup", PhaseMetrics()),
+            "cleanup_orphan_addresses": appel("cleanup_addresses", PhaseMetrics()),
+        }
+        phase = dataclasses.replace(
+            _NORMALIZE,
+            tasks=tuple(
+                dataclasses.replace(t, run=nettoyages.get(t.name, t.run)) for t in _NORMALIZE.tasks
+            ),
         )
         ctx = contexte(**{"mode": "daily", "sources": {"hal"}, **options})
-        return run_phase(_NORMALIZE, dataclasses.replace(ctx, maintain=appels.append))
+        return run_phase(phase, dataclasses.replace(ctx, maintain=appels.append))
 
     return _lancer
 
@@ -77,31 +83,10 @@ def test_le_total_reste_celui_des_documents_normalises(lancer):
     assert metrics.total == 3
 
 
-def test_sans_document_la_maintenance_tourne_quand_meme(lancer, caplog):
+def test_sans_document_la_maintenance_tourne_quand_meme(lancer):
     appels: list[str] = []
-    with caplog.at_level(logging.INFO, logger="test"):
-        lancer(appels, bilan=NormalizeStats(0, 0, 0))
+    lancer(appels, bilan=NormalizeStats(0, 0, 0))
     assert appels == ["normalize:hal", "prune", "cleanup", "cleanup_addresses", "VACUUM staging"]
-    assert "aucun document disparu de sa source" in caplog.text
-    assert "▶ Maintenance des tables" in caplog.text
-
-
-def test_les_retraits_sont_annonces(lancer, caplog):
-    with caplog.at_level(logging.INFO, logger="test"):
-        lancer([], disparues=2)
-    assert "2 documents supprimés (disparus de leur source)" in caplog.text
-
-
-def test_la_ligne_de_la_source_compte_les_documents_normalises_et_les_erreurs(lancer, caplog):
-    with caplog.at_level(logging.INFO, logger="test"):
-        lancer([], bilan=NormalizeStats(3525, 0, 1))
-    assert "HAL : 3525 documents normalisés, 1 erreur" in caplog.text
-
-
-def test_sans_document_la_ligne_de_la_source_dit_rien_a_faire(lancer, caplog):
-    with caplog.at_level(logging.INFO, logger="test"):
-        lancer([], bilan=NormalizeStats(0, 0, 0))
-    assert "HAL : rien à faire" in caplog.text
 
 
 def test_la_table_porte_une_ligne_par_source(lancer):

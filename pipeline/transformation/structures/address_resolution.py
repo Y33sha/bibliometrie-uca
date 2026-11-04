@@ -18,8 +18,8 @@ from pipeline.transformation.structures.detections import (
 )
 from pipeline.transformation.structures.name_recognition import StructureNameMatcher
 
-# Adresses par tranche : la taille borne la mémoire et le nombre d'allers-retours SQL.
 CHUNK_SIZE = 10000
+"""Adresses par tranche : la taille borne la mémoire et le nombre d'allers-retours SQL."""
 
 
 def count_addresses(conn: Connection) -> int:

@@ -11,7 +11,6 @@ La séquence d'écriture commune à toutes les sources est testée avec la class
 
 from __future__ import annotations
 
-import logging
 from typing import Any
 
 from domain.persons.contributor_name import ContributorName
@@ -799,14 +798,6 @@ class TestWosSourceRecord:
 class TestBuildWosAuthorRecords:
     def test_no_authors_returns_empty(self, logger):
         assert build_wos_author_records({"ut": "WOS:1", "authors": []}, logger) == []
-
-    def test_all_authors_filtered_logs_warning(self, logger, caplog):
-        """Des auteurs présents dans la réponse, aucun exploitable : avertissement au journal."""
-        rec = {"ut": "WOS:42", "authors": [], "authors_found": 1}
-        with caplog.at_level(logging.WARNING, logger=logger.name):
-            records = build_wos_author_records(rec, logger)
-        assert records == []
-        assert any("aucun exploitable" in r.getMessage() for r in caplog.records)
 
     def test_extraction_api_ecarte_les_auteurs_sans_daisng(self):
         raw = _make_api_record(

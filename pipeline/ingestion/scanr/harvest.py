@@ -23,8 +23,8 @@ from pipeline.ingestion.scanr.api import ScanrClient
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import Progress
 
-# Nombre de documents écrits entre deux commits.
 _COMMIT_EVERY = 500
+"""Nombre de documents écrits entre deux commits."""
 
 
 @dataclass(frozen=True)

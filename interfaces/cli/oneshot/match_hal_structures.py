@@ -40,12 +40,12 @@ _PERIMETER = """
     WHERE p.code = (SELECT value #>> '{}' FROM config WHERE key = 'perimeter_extraction')
 """
 
-# Structures HAL sans structure interne : ni ROR d'une structure interne, ni `structure_id`.
 _UNMATCHED = """
     h.status IN ('VALID', 'OLD')
     AND NOT EXISTS (SELECT 1 FROM structures r WHERE r.ror_id = h.ror_id)
     AND h.structure_id IS NULL
 """
+"""Structures HAL sans structure interne : ni ROR d'une structure interne, ni `structure_id`."""
 
 _CANDIDATES = text(f"""
     WITH cited AS (

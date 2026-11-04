@@ -11,8 +11,8 @@ Restent hors du vocabulaire, et donnent `None` :
 from collections.abc import Iterator
 from enum import StrEnum
 
-from domain.publications.doc_types import DocType
-from domain.publications.identifiers import DOI
+from domain.documents.doc_types import DocType
+from domain.documents.identifiers import DOI
 from domain.source_records.metadata_correction.shared_doi import (
     DATACITE_DIRECT_CONVERGENCE,
     declares_same_work,
@@ -64,7 +64,6 @@ RELATION_PAIR_LABELS: dict[RelationType, str] = {
 """Libellé commun à un type et à son inverse."""
 
 
-# Types DataCite du vocabulaire.
 _DATACITE_MAP: dict[str, RelationType] = {
     "IsSupplementTo": RelationType.IS_SUPPLEMENT_TO,
     "IsSupplementedBy": RelationType.HAS_SUPPLEMENT,
@@ -75,8 +74,8 @@ _DATACITE_MAP: dict[str, RelationType] = {
     "IsDescribedBy": RelationType.IS_DESCRIBED_BY,
     "IsDocumentedBy": RelationType.IS_DESCRIBED_BY,
 }
+"""Types DataCite du vocabulaire."""
 
-# Clés Crossref du vocabulaire.
 _CROSSREF_MAP: dict[str, RelationType] = {
     CROSSREF_PREPRINT_OF: RelationType.IS_PREPRINT_OF,
     "has-preprint": RelationType.HAS_PREPRINT,
@@ -100,6 +99,7 @@ _CROSSREF_MAP: dict[str, RelationType] = {
     "is-part-of": RelationType.DESCRIBES,
     "has-part": RelationType.IS_DESCRIBED_BY,
 }
+"""Clés Crossref du vocabulaire."""
 
 
 _INVERSE_RELATIONS: dict[RelationType, RelationType] = {
@@ -150,13 +150,12 @@ def extract_datacite_distinct_works(
     ]
 
 
-# Types de document dépendants, sujets d'une relation vers l'œuvre principale : preprint, erratum, jeu de données.
-# Ils typent la relation de deux publications qui partagent une clé (`infer_shared_key_relation`) ou un titre (phase `relations`).
 DEPENDENT_DOC_TYPE_RELATIONS: dict[str, RelationType] = {
     DocType.PREPRINT: RelationType.IS_PREPRINT_OF,
     DocType.ERRATUM: RelationType.IS_CORRECTION_OF,
     DocType.DATASET: RelationType.IS_SUPPLEMENT_TO,
 }
+"""Types de document dépendants, sujets d'une relation vers l'œuvre principale : preprint, erratum, jeu de données. Ils typent la relation de deux publications qui partagent une clé (`infer_shared_key_relation`) ou un titre (phase `relations`)."""
 
 
 def infer_shared_key_relation(

@@ -12,10 +12,10 @@ from domain.persons.name_matching import (
     parse_raw_author_name,
 )
 
-# Mot écrit par une source à la place d'un nom absent : code DataCite de valeur inconnue (« (:unap) », « :unkn »), « None », « null ».
 _PLACEHOLDER_RE = re.compile(
     r"\(?:(?:unac|unal|unap|unas|unav|unkn|none|null|tba)\)?|none|null", re.I
 )
+"""Mot écrit par une source à la place d'un nom absent : code DataCite de valeur inconnue (« (:unap) », « :unkn »), « None », « null »."""
 
 
 def _is_placeholder_name(name: str) -> bool:

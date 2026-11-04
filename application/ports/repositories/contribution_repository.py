@@ -23,15 +23,6 @@ class AlignedSourceContributionRow(TypedDict):
 class ContributionRepository(Protocol):
     """Contrat d'accès aux contributions et aux contributions sources."""
 
-    # ── source_contributions ─────────────
-
-    def find_publication_id_for_source_contribution(
-        self,
-        source_contribution_id: int,
-    ) -> int | None:
-        """Renvoie la publication d'une contribution source, ou `None` si la contribution source est absente ou sans publication."""
-        ...
-
     # ── Contributions ─────────────
 
     def mark_contributions_for_name_form(self, person_id: int, name_form: str) -> int:

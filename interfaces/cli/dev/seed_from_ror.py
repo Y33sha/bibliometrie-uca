@@ -41,23 +41,23 @@ _CHILD_TYPES = {
     "healthcare": StructureType.CHU,
 }
 
-# Une forme de deux caractères (« UL ») désigne trop de choses pour identifier une structure dans une adresse.
 MIN_FORM_LENGTH = 3
+"""Une forme de deux caractères (« UL ») désigne trop de choses pour identifier une structure dans une adresse."""
 
-# Code d'unité de recherche (« UMR 7039 », « EA4432 »), écarté comme nom de structure.
 _UNIT_CODE = re.compile(r"^(?:UMR|UMRS|UR|EA|UPR|FRE|UMS|USR|UAR|IRL)(?:\s|\d)", re.IGNORECASE)
+"""Code d'unité de recherche (« UMR 7039 », « EA4432 »), écarté comme nom de structure."""
 
 # Collection HAL d'une structure : part minimale de ses dépôts contenus dans la collection, et indice de Jaccard minimal entre les dépôts de la structure et ceux de la collection.
 MIN_COLLECTION_COVERAGE = 0.5
 MIN_COLLECTION_JACCARD = 0.15
-# Collections examinées : les plus fréquentes parmi les dépôts de la structure.
 HAL_COLLECTION_CANDIDATES = 25
+"""Collections examinées : les plus fréquentes parmi les dépôts de la structure."""
 
-# Le périmètre de l'établissement sert au moissonnage et à la création des personnes.
 _PERIMETER_DESCRIPTIONS = {
     ConfigKey.PERIMETER_EXTRACTION: "Périmètre pour déterminer les structures à interroger lors de l'extraction",
     ConfigKey.PERIMETER_PERSONS: "Périmètre pour la création des personnes",
 }
+"""Le périmètre de l'établissement sert au moissonnage et à la création des personnes."""
 _SITE_TITLE_DESCRIPTION = (
     "Titre de l'application. Vide : « Bibliométrie » suivi du nom de l'établissement."
 )

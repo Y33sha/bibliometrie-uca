@@ -12,7 +12,6 @@ from domain.source_records.identifiers import SourceIdentifierType
 type Agency = Literal["Crossref", "DataCite"]
 """Agence dont l'API `/prefixes` donne l'éditeur d'un préfixe."""
 
-# Préfixes encore jamais vus par l'agence. Un préfixe d'agence inconnue passe chez DataCite après sa vérification par Crossref.
 _PENDING: dict[Agency, str] = {
     "Crossref": "crossref_checked_at IS NULL AND ra IN ('Crossref', 'unknown')",
     "DataCite": (
@@ -20,6 +19,7 @@ _PENDING: dict[Agency, str] = {
         " AND (ra = 'DataCite' OR (ra = 'unknown' AND crossref_checked_at IS NOT NULL))"
     ),
 }
+"""Préfixes encore jamais vus par l'agence. Un préfixe d'agence inconnue passe chez DataCite après sa vérification par Crossref."""
 
 _CHECKED_COLUMN: dict[Agency, str] = {
     "Crossref": "crossref_checked_at",

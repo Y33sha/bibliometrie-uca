@@ -5,22 +5,21 @@ from typing import Literal
 from application.ports.model import Model
 from domain.persons.identifiers import AttributionStatus, PersonIdentifierType
 from domain.persons.person import PersonExclusion
-from interfaces.api.models.contributions import SourceContributionRef
 
 # ----- Corps des requêtes -----
 
 
 class AddIdentifier(Model):
-    # Le service restreint l'ajout manuel aux types publics (`PUBLIC_PERSON_IDENTIFIER_TYPES`).
     id_type: PersonIdentifierType
+    """Le service restreint l'ajout manuel aux types publics (`PUBLIC_PERSON_IDENTIFIER_TYPES`)."""
     id_value: str
 
 
 class UpdateIdentifierStatus(Model):
-    # `authenticated` est exclu : posé seulement par l'import ORCID, protégé par un trigger.
     status: Literal[
         AttributionStatus.PENDING, AttributionStatus.CONFIRMED, AttributionStatus.REJECTED
     ]
+    """`authenticated` est exclu : posé seulement par l'import ORCID, protégé par un trigger."""
 
 
 class SetPersonExclusion(Model):
@@ -38,7 +37,7 @@ class MarkDistinctPersons(Model):
 
 
 class DetachContributions(Model):
-    contributions: list[SourceContributionRef]
+    publication_ids: list[int]
 
 
 class UpdateNameFormStatus(Model):

@@ -17,7 +17,6 @@ _CREATE = text("""
     RETURNING id
 """)
 
-# La contrainte d'unicité refuse un ISBN déjà attribué à une autre monographie.
 _ENRICH = text("""
     UPDATE monographs m SET
         proceedings = m.proceedings OR :proceedings,
@@ -33,6 +32,7 @@ _ENRICH = text("""
         publisher_id = COALESCE(m.publisher_id, :publisher_id)
     WHERE m.id = :id
 """)
+"""La contrainte d'unicité refuse un ISBN déjà attribué à une autre monographie."""
 
 
 class MonographStore:

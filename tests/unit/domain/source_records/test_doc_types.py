@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from domain.publications.doc_types import DOC_TYPES
+from domain.documents.doc_types import DocType
 from domain.source_records.doc_types import _SOURCE_MAPS, map_doc_type
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
@@ -24,8 +24,8 @@ def _read_pg_doc_type_enum() -> set[str]:
 
 class TestDocTypeEnum:
     def test_doc_types_couvre_exactement_l_enum_pg(self):
-        """`DOC_TYPES` a exactement les valeurs de l'enum PostgreSQL `doc_type`."""
-        assert DOC_TYPES == _read_pg_doc_type_enum()
+        """`DocType` a exactement les valeurs de l'enum PostgreSQL `doc_type`."""
+        assert set(DocType) == _read_pg_doc_type_enum()
 
 
 class TestMapDocType:
@@ -64,6 +64,11 @@ class TestMapDocType:
         """Un mémoire de sage-femme (`MEM_14`) reste un mémoire."""
         assert map_doc_type("MEM_14", source="hal") == "memoir"
         assert map_doc_type("ART_unknown", source="hal") == "article"
+
+    def test_numeros_de_revue_vers_journal_issue(self):
+        assert map_doc_type("ISSUE", source="hal") == "journal_issue"
+        assert map_doc_type("journal-issue", source="crossref") == "journal_issue"
+        assert map_doc_type("Journal Issue", source="datacite") == "journal_issue"
 
     def test_hal_presconf_vers_conference(self):
         assert map_doc_type("PRESCONF", source="hal") == "conference"
@@ -165,7 +170,7 @@ _COMMON_TYPES = {
 class TestNomenclaturesDesSources:
     @pytest.mark.parametrize("source", sorted(_SOURCE_MAPS))
     def test_chaque_traduction_est_un_type_du_referentiel(self, source):
-        assert set(_SOURCE_MAPS[source].values()) <= DOC_TYPES
+        assert set(_SOURCE_MAPS[source].values()) <= set(DocType)
 
     @pytest.mark.parametrize(
         ("source", "raw"),

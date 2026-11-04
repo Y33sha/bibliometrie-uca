@@ -5,11 +5,10 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from urllib.parse import urlsplit
 
+from domain.documents.doc_types import DocType
+from domain.documents.identifiers import DOI, is_hal_host
 from domain.platforms.platform import PlatformType
-from domain.publications.doc_types import DocType
-from domain.publications.identifiers import DOI, is_hal_host
-from domain.serials.titles import compatible_titles, nested_titles
-from domain.source_records.identifiers import SourceIdentifierType
+from domain.title_comparison import compatible_titles, nested_titles
 from domain.urls import is_host, on_site, url_host
 
 
@@ -302,12 +301,6 @@ KNOWN_PLATFORMS: tuple[KnownPlatform, ...] = (
 
 PMC_ARTICLE_URL = "https://www.ncbi.nlm.nih.gov/pmc/articles/{}/"
 """Page d'un article de PubMed Central, à compléter par son PMCID."""
-
-IDENTIFIER_COPIES: dict[SourceIdentifierType, str] = {
-    SourceIdentifierType.ARXIV_ID: "https://arxiv.org/abs/{}",
-    SourceIdentifierType.PMCID: PMC_ARTICLE_URL,
-}
-"""Copie que désigne un identifiant de document : URL à compléter par sa valeur, par type d'identifiant."""
 
 _BY_OPENALEX_ID = {i: p for p in KNOWN_PLATFORMS for i in p.openalex_ids}
 _PUBLISHER_PLATFORM_PREFIXES = frozenset(

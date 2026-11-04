@@ -17,12 +17,12 @@ from pipeline.ingestion.common.person_search import (
 from pipeline.ingestion.hal.api import HalClient
 from pipeline.ingestion.hal.harvest import build_query
 
-# Champ Solr de chaque type d'identifiant.
 _FIELDS = {
     PersonIdentifierType.ORCID: "authORCIDIdExt_s",
     PersonIdentifierType.IDHAL: "authIdHal_s",
     PersonIdentifierType.IDREF: "authIdRefIdExt_s",
 }
+"""Champ Solr de chaque type d'identifiant."""
 
 
 def build_identifiers_fq(identifiers: Identifiers) -> str:

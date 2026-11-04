@@ -2,7 +2,7 @@
 
 import pytest
 
-from domain.publications.licenses import License, normalize_license
+from domain.documents.licenses import License, normalize_license
 
 
 @pytest.mark.parametrize(

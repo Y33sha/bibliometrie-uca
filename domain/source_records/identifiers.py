@@ -4,7 +4,7 @@ from collections.abc import Callable, Iterable, Mapping, Set
 from dataclasses import dataclass, replace
 from enum import StrEnum
 
-from domain.publications.identifiers import DOI, ISBN, NNT, PMCID, PMID, ArxivId, HALId
+from domain.documents.identifiers import DOI, ISBN, NNT, PMID, HALId
 from domain.serials.containers import ContainerRole, container_role
 
 
@@ -15,8 +15,6 @@ class SourceIdentifierType(StrEnum):
     HAL_ID = "hal_id"
     NNT = "nnt"
     PMID = "pmid"
-    PMCID = "pmcid"
-    ARXIV_ID = "arxiv_id"
     ISBN = "isbn"
     EISBN = "eisbn"
 
@@ -31,7 +29,10 @@ class SourceIdentifierRole(StrEnum):
 
 
 SOURCE_IDENTIFIER_ROLE_DEFINITIONS: dict[SourceIdentifierRole, str] = {
-    SourceIdentifierRole.PRIMARY: "identifiant de l'enregistrement dans la source.",
+    SourceIdentifierRole.PRIMARY: (
+        "identifiant de l'enregistrement dans la source. "
+        "Un enregistrement source a au plus un identifiant primaire."
+    ),
     SourceIdentifierRole.DERIVED: (
         "identifiant de l'enregistrement d'une autre source dont l'enregistrement source est "
         "dérivé. Un enregistrement source a au plus un identifiant dérivé."
@@ -40,8 +41,13 @@ SOURCE_IDENTIFIER_ROLE_DEFINITIONS: dict[SourceIdentifierRole, str] = {
     SourceIdentifierRole.RELATED: "identifiant d'un document lié.",
 }
 
-# Rang de chaque rôle, du plus fort au plus faible.
+STRONG_ROLES: frozenset[SourceIdentifierRole] = frozenset(
+    {SourceIdentifierRole.PRIMARY, SourceIdentifierRole.DERIVED}
+)
+"""Rôles d'un identifiant qui désigne l'enregistrement source lui-même, dans sa source ou dans celle dont il est dérivé."""
+
 _ROLE_RANK = {role: rank for rank, role in enumerate(SourceIdentifierRole)}
+"""Rang de chaque rôle, du plus fort au plus faible."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,17 +77,13 @@ def active(identifiers: Iterable[SourceIdentifier]) -> list[SourceIdentifier]:
 
 
 def own_dois(identifiers: Iterable[SourceIdentifier]) -> set[str]:
-    """Renvoie les DOI propres d'un enregistrement source parmi `identifiers` : ses DOI `primary` ou `derived`, à défaut ses DOI `secondary`."""
+    """Renvoie les DOI propres d'un enregistrement source parmi `identifiers` : ses DOI de rôle fort (`STRONG_ROLES`), à défaut ses DOI `secondary`."""
     dois = [
         i
         for i in identifiers
         if i.id_type is SourceIdentifierType.DOI and i.role is not SourceIdentifierRole.RELATED
     ]
-    strong = {
-        i.value
-        for i in dois
-        if i.role in (SourceIdentifierRole.PRIMARY, SourceIdentifierRole.DERIVED)
-    }
+    strong = {i.value for i in dois if i.role in STRONG_ROLES}
     return strong or {i.value for i in dois}
 
 
@@ -115,17 +117,15 @@ def isbn_role(
     )
 
 
-# Normalisation d'une valeur par type ; une valeur vide ou `None` signale une valeur invalide.
 _NORMALIZERS: dict[SourceIdentifierType, Callable[[str], str | None]] = {
     SourceIdentifierType.DOI: DOI.normalize,
     SourceIdentifierType.HAL_ID: HALId.normalize,
     SourceIdentifierType.NNT: NNT.normalize,
     SourceIdentifierType.PMID: PMID.normalize,
-    SourceIdentifierType.PMCID: PMCID.normalize,
-    SourceIdentifierType.ARXIV_ID: ArxivId.normalize,
     SourceIdentifierType.ISBN: ISBN.normalize,
     SourceIdentifierType.EISBN: ISBN.normalize,
 }
+"""Normalisation d'une valeur par type ; une valeur vide ou `None` signale une valeur invalide."""
 
 
 def normalize_identifiers(

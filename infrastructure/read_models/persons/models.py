@@ -253,7 +253,6 @@ class PersonAddressSummary(Model):
 
 class NameFormContributionRef(Model):
     source: str
-    source_contribution_id: int
     publication_id: int
     title: str
     publication_year: int | None

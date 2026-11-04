@@ -5,7 +5,7 @@ from functools import partial
 from sqlalchemy import text
 
 from domain.config import ConfigKey
-from domain.publications.dates import date_from_parts
+from domain.documents.dates import date_from_parts
 from infrastructure.read_models.publications.facets import _PublicationFacetsBuilder
 from infrastructure.read_models.publications.filtering import FilterContext, filter_context
 from infrastructure.read_models.publications.models import PublicationFilters

@@ -20,9 +20,6 @@ class IssnLinkType(StrEnum):
     """ISSN annulé vers l'ISSN de la notice Sudoc qui l'annule."""
 
 
-ISSN_LINK_TYPES = tuple(IssnLinkType)
-
-
 @dataclass(frozen=True, slots=True)
 class IssnFacts:
     """Ligne de `serial_issns` d'après le Sudoc."""

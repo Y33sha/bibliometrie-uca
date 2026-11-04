@@ -65,8 +65,8 @@ PUBLIC_PERSON_IDENTIFIER_TYPES: tuple[PersonIdentifierType, ...] = (
 
 _ORCID_URI_PREFIX = "https://orcid.org/"
 _ORCID_URL_PREFIXES = (_ORCID_URI_PREFIX, "http://orcid.org/", "orcid.org/")
-# Le dernier caractère, clé de contrôle, peut valoir X.
 _ORCID_CANONICAL = re.compile(r"^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$")
+"""Le dernier caractère, clé de contrôle, peut valoir X."""
 
 
 def _normalize_orcid(raw: str | None) -> str | None:
@@ -99,8 +99,8 @@ class ORCID(NormalizedIdentifier):
     normalize = staticmethod(_normalize_orcid)
 
 
-# Un IdHAL est une chaîne sans espace. Sa forme par défaut est `prenom-nom`.
 _IDHAL_CANONICAL = re.compile(r"^\S+$")
+"""Un IdHAL est une chaîne sans espace. Sa forme par défaut est `prenom-nom`."""
 
 
 def _normalize_idhal(raw: str | None) -> str | None:

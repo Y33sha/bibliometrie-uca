@@ -10,11 +10,12 @@ from typing import NamedTuple
 
 from sqlalchemy import Connection, Row, bindparam, func, text
 
-from domain.publications.doc_types import DocType
+from domain.documents.doc_types import DocType
 from domain.publications.scope import MatchabilityFacts
 from domain.serials.doi_namespaces import DoiNamespace
 from domain.source_records.corrections import CORRECTED_BY, RAW, CorrectionKey
 from domain.source_records.identifiers import (
+    STRONG_ROLES,
     SourceIdentifier,
     SourceIdentifierRole,
     SourceIdentifierType,
@@ -30,6 +31,7 @@ from domain.source_records.metadata_correction.serial_by_doi import (
     namespace_dois,
 )
 from domain.source_records.metadata_correction.shared_doi import (
+    CLUSTER_CANDIDATE_DOC_TYPES,
     DATACITE_DIRECT_CONVERGENCE,
     DATACITE_PACKAGE_PIECE_RELATION,
     FIGSHARE_ADDITIONAL_FILE_TITLE_PATTERN,
@@ -40,7 +42,7 @@ from domain.source_records.metadata_correction.shared_doi import (
     DoiTargetRule,
     SecondaryFormDeclaration,
 )
-from domain.source_records.metadata_correction.source_record import UnaryCorrection
+from domain.source_records.metadata_correction.unary import UnaryCorrection
 from domain.source_records.source_extras import SourceExtra
 from domain.sources.registry import DOI_ORG, Source
 from domain.types import JsonValue
@@ -56,6 +58,7 @@ from infrastructure.db.tables import source_records
 from infrastructure.sql_fragments import (
     corrected,
     declares_conference_sql,
+    in_clause,
     self_declared_preprint_sql,
     source_extra,
     source_extra_json,
@@ -141,7 +144,6 @@ class DoiClusterRow(NamedTuple):
     """Vrai si `shared_doi` a une cible dans `doi_targets`."""
     identifiers: tuple[SourceIdentifier, ...] = ()
     source: str = ""
-    source_id: str = ""
     author_names: tuple[str, ...] = ()
     """Noms de famille normalisés des contributions sources individuelles, renseignés pour les groupes où un enregistrement source a un titre éloigné de celui de l'enregistrement source Crossref."""
 
@@ -171,11 +173,13 @@ _DATACITE_CASE_SQL = (
     + " END"
 )
 _CLUSTER_CASES_SQL = ", ".join(f"'{case.value}'" for case in DoiClusterCase)
+_CLUSTER_CANDIDATE_DOC_TYPES_SQL = ", ".join(
+    f"'{doc_type}'" for doc_type in sorted(CLUSTER_CANDIDATE_DOC_TYPES)
+)
 _DATACITE_DIRECT_RELATIONS_SQL = (
     "(" + ", ".join(f"'{relation}'" for relation in DATACITE_DIRECT_CONVERGENCE) + ")"
 )
 
-# Expression SQL de chaque fait de `MetadataForCorrection`, sur l'enregistrement source `sr` et les jointures de `_SELECT`. Les faits de `_DOI_FACTS` se calculent sur les identifiants (`_unary_rows`).
 _FACTS: dict[str, str] = {
     "title": "sr.title",
     "title_normalized": "COALESCE(sr.title_normalized, '')",
@@ -191,6 +195,7 @@ _FACTS: dict[str, str] = {
     "source": "sr.source::text",
     "author_count": "sr.author_count",
 }
+"""Expression SQL de chaque fait de `MetadataForCorrection`, sur l'enregistrement source `sr` et les jointures de `_SELECT`. Les faits de `_DOI_FACTS` se calculent sur les identifiants (`_unary_rows`)."""
 _DOI_FACTS = frozenset({"dois", "registrant_publisher_types"})
 assert set(_FACTS) | _DOI_FACTS == {f.name for f in fields(MetadataForCorrection)}, (
     "projection des faits désynchronisée de MetadataForCorrection"
@@ -223,7 +228,6 @@ def _persist_statuses(
         conn.execute(_UPDATE_STATUSES, {"rows": json.dumps(rows)})
 
 
-# Chaque variante ajoute son `WHERE`.
 _SELECT = f"""
     SELECT sr.id, sr.source_id, sr.corrections,
            {", ".join(f"{expression} AS {name}" for name, expression in _FACTS.items())}
@@ -231,6 +235,7 @@ _SELECT = f"""
     LEFT JOIN serials j ON j.id = sr.serial_id
     LEFT JOIN monographs m ON m.id = sr.monograph_id
 """
+"""Chaque variante ajoute son `WHERE`."""
 
 
 def _unary_row(
@@ -254,12 +259,12 @@ def _unary_row(
     )
 
 
-# Les colonnes du SET sont les clés des paramètres, typées par la table.
 _UPDATE = (
     source_records.update()
     .where(source_records.c.id == bindparam("source_record_id"))
     .values(updated_at=func.clock_timestamp())
 )
+"""Les colonnes du SET sont les clés des paramètres, typées par la table."""
 
 
 def _persist_updates(conn: Connection, updates: Sequence[Mapping[str, object]]) -> int:
@@ -286,13 +291,13 @@ def _persist_updates(conn: Connection, updates: Sequence[Mapping[str, object]]) 
     return len(updates)
 
 
-# DOI de rôle autre que `related` de chaque enregistrement source, quel que soit leur statut.
 _RECORD_DOIS_SQL = f"""
     SELECT source_record_id AS id, id_value AS doi, role
     FROM source_record_identifiers
     WHERE id_type = '{SourceIdentifierType.DOI.value}'
       AND role <> '{SourceIdentifierRole.RELATED.value}'
 """
+"""DOI de rôle autre que `related` de chaque enregistrement source, quel que soit leur statut."""
 
 
 class SourceRecordCorrectionStore:
@@ -373,7 +378,7 @@ class SourceRecordCorrectionStore:
         """Renvoie tous les enregistrements sources, avec leur valeur de `is_matchable` et les faits qui la décident."""
         rows = self._conn.execute(
             text(f"""
-                SELECT id, is_matchable, source::text AS source, source_id, title_normalized,
+                SELECT id, is_matchable, source::text AS source, title_normalized,
                        COALESCE(urls, '{{}}') AS urls,
                        EXISTS (
                            SELECT 1 FROM source_record_identifiers p
@@ -397,7 +402,6 @@ class SourceRecordCorrectionStore:
                 r.is_matchable,
                 MatchabilityFacts(
                     r.source,
-                    r.source_id,
                     r.title_normalized,
                     r.urls,
                     identifiers.get(r.id, ()),
@@ -466,12 +470,12 @@ class SourceRecordCorrectionStore:
         return list(rows.scalars())
 
     def fetch_anchor_dois(self, dois: Iterable[str]) -> frozenset[str]:
-        """Renvoie les DOI de `dois` actifs en rôle `primary` ou `derived` d'un enregistrement source : ancres de la réconciliation."""
+        """Renvoie les DOI de `dois` actifs en rôle fort (`STRONG_ROLES`) d'un enregistrement source : ancres de la réconciliation."""
         rows = self._conn.execute(
             text(f"""
                 SELECT DISTINCT id_value FROM source_record_identifiers
                 WHERE id_type = '{SourceIdentifierType.DOI.value}'
-                  AND role IN ('{SourceIdentifierRole.PRIMARY.value}', '{SourceIdentifierRole.DERIVED.value}')
+                  AND role IN {in_clause(STRONG_ROLES)}
                   AND removed_by IS NULL
                   AND id_value = ANY(:dois)
             """),
@@ -630,7 +634,7 @@ class SourceRecordCorrectionStore:
 
         Un groupe réunit les enregistrements sources ayant son DOI, de rôle autre que `related`, quel que soit son statut. Un groupe est candidat si :
 
-        - il contient un livre, un chapitre ou un volume d'actes ;
+        - il contient un type de `CLUSTER_CANDIDATE_DOC_TYPES` : livre, chapitre, volume d'actes, numéro de revue ;
         - son DOI est inconnu de doi.org ;
         - son DOI est dans `distant_title_dois`, avec les noms d'auteur de chaque membre ;
         - il contient un enregistrement source déjà corrigé, à réévaluer.
@@ -638,7 +642,7 @@ class SourceRecordCorrectionStore:
         rows = self._conn.execute(
             text(f"""
                 WITH sr_eff AS (
-                    SELECT id, source, source_id, doc_type, title_normalized
+                    SELECT id, source, doc_type, title_normalized
                     FROM source_records
                 ),
                 record_dois AS ({_RECORD_DOIS_SQL}),
@@ -648,7 +652,7 @@ class SourceRecordCorrectionStore:
                 ),
                 candidate_dois AS (
                     SELECT d.doi AS d FROM record_dois d JOIN sr_eff sr ON sr.id = d.id
-                    WHERE sr.doc_type IN ('{DocType.BOOK.value}', '{DocType.BOOK_CHAPTER.value}', '{DocType.PROCEEDINGS.value}')
+                    WHERE sr.doc_type IN ({_CLUSTER_CANDIDATE_DOC_TYPES_SQL})
                     UNION
                     SELECT d.doi AS d FROM record_dois d
                     WHERE EXISTS (
@@ -662,7 +666,7 @@ class SourceRecordCorrectionStore:
                     SELECT unnest(CAST(:distant_title_dois AS text[]))
                 )
                 SELECT sr.id, sr.doc_type, sr.title_normalized,
-                       sr.source::text AS source, sr.source_id,
+                       sr.source::text AS source,
                        {identifiers_json_sql("sr.id")} AS identifiers,
                        m.doi AS shared_doi,
                        m.doi IN (SELECT d FROM unresolved_dois) AS unresolved,
@@ -690,7 +694,6 @@ class SourceRecordCorrectionStore:
                 has_target=row.has_target,
                 identifiers=parse_identifiers(row.identifiers),
                 source=row.source,
-                source_id=row.source_id,
                 author_names=tuple(row.author_names),
             )
             for row in rows

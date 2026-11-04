@@ -14,6 +14,7 @@ from dataclasses import dataclass
 
 from domain.platforms.registry import is_deposit_doi
 from domain.source_records.identifiers import (
+    STRONG_ROLES,
     SourceIdentifier,
     SourceIdentifierRole,
     SourceIdentifierType,
@@ -21,20 +22,16 @@ from domain.source_records.identifiers import (
     by_role,
 )
 
-# Types d'identifiants qui sont des clés de confirmation, à côté du DOI et du bloc de métadonnées.
 CONFIRMATION_ID_TYPES = (
     SourceIdentifierType.HAL_ID,
-    SourceIdentifierType.ARXIV_ID,
     SourceIdentifierType.PMID,
     SourceIdentifierType.NNT,
 )
+"""Types d'identifiants qui sont des clés de confirmation, à côté du DOI et du bloc de métadonnées."""
 
 
-# Longueur de titre normalisé, en caractères, en deçà de laquelle un titre est trop générique pour servir de clé.
-# Sert aux clés de confirmation, aux relations et au dédoublonnage HAL ; les requêtes SQL l'interpolent.
 DISCRIMINANT_TITLE_MIN_LENGTH = 30
-
-_STRONG_ROLES = frozenset({SourceIdentifierRole.PRIMARY, SourceIdentifierRole.DERIVED})
+"""Longueur de titre normalisé, en caractères, en deçà de laquelle un titre est trop générique pour servir de clé. Sert aux clés de confirmation, aux relations et au dédoublonnage HAL ; les requêtes SQL l'interpolent."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,7 +71,7 @@ def doi_keys(
     for i in active(identifiers):
         if i.id_type is not SourceIdentifierType.DOI or i.role is SourceIdentifierRole.RELATED:
             continue
-        (strong if i.role in _STRONG_ROLES else weak).add(targets.get(i.value, i.value))
+        (strong if i.role in STRONG_ROLES else weak).add(targets.get(i.value, i.value))
     return DoiKeys(frozenset(strong), frozenset(weak - strong), doc_type)
 
 
@@ -115,23 +112,21 @@ def anchor_of(keys: DoiKeys, anchors: frozenset[str]) -> str | None:
 class Derivation:
     """Identifiants qui relient un enregistrement source dérivé à son parent, l'enregistrement source dont l'identifiant primaire est son identifiant dérivé."""
 
-    primary: frozenset[tuple[str, str]] = frozenset()
-    """Identifiants actifs de rôle `primary`, en couples (type, valeur)."""
+    primary: tuple[str, str] | None = None
+    """Identifiant actif de rôle `primary`, en couple (type, valeur)."""
     derived: tuple[str, str] | None = None
     """Identifiant actif de rôle `derived`, en couple (type, valeur)."""
 
 
 def derivation(identifiers: Iterable[SourceIdentifier]) -> Derivation:
-    """Renvoie les identifiants primaires et l'identifiant dérivé actifs de `identifiers`."""
+    """Renvoie l'identifiant primaire et l'identifiant dérivé actifs de `identifiers`."""
     kept = active(identifiers)
+
+    def first(role: SourceIdentifierRole) -> tuple[str, str] | None:
+        return next(((i.id_type.value, i.value) for i in kept if i.role is role), None)
+
     return Derivation(
-        primary=frozenset(
-            (i.id_type.value, i.value) for i in kept if i.role is SourceIdentifierRole.PRIMARY
-        ),
-        derived=next(
-            ((i.id_type.value, i.value) for i in kept if i.role is SourceIdentifierRole.DERIVED),
-            None,
-        ),
+        primary=first(SourceIdentifierRole.PRIMARY), derived=first(SourceIdentifierRole.DERIVED)
     )
 
 

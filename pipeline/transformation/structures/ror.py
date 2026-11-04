@@ -162,7 +162,7 @@ def run_refresh_ror(
     except DumpUnavailableError as e:
         conn.rollback()
         logger.warning("%sDump ROR inaccessible, référentiel inchangé : %s", LAST_BRANCH, e)
-        signal_source_unavailable(metrics, "ROR", logger=logger, phase="affiliations")
+        signal_source_unavailable(metrics, "ROR", logger=logger)
         metrics.details["ror"] = {"imported": False, "error": str(e)}
         metrics.report = "dump ROR inaccessible, import repris au prochain run"
         return metrics

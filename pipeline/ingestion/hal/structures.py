@@ -9,7 +9,6 @@ from domain.structures.hal_structures import HalStructureStatus
 from domain.structures.identifiers import RorId
 from domain.types import JsonValue, as_sequence, as_str
 
-# Champs de `ref/structure` lus par `parse_hal_structure`.
 HAL_STRUCTURE_FIELDS = (
     "docid",
     "name_s",
@@ -23,6 +22,7 @@ HAL_STRUCTURE_FIELDS = (
     "parentDocid_i",
     "aliasDocid_i",
 )
+"""Champs de `ref/structure` lus par `parse_hal_structure`."""
 
 
 @dataclass(frozen=True, slots=True)

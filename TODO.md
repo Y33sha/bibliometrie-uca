@@ -1,3 +1,8 @@
+uv run python -m interfaces.cli.oneshot.requalify_journal_issues
+run_pipeline --from metadata_correction
+fill_source_record_identifiers => wos TSV
+uv run python -m interfaces.cli.oneshot.remove_link_header_urls
+
 # Pipeline
 ## Extraction
 * [ ] Dimensions?; Sudoc? (liens personnes-thèses plus complets que theses.fr, j'ai l'impression); Cairn, Persée pour augmenter couverture SHS? creuser ISTEX

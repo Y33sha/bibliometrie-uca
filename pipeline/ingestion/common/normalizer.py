@@ -13,9 +13,9 @@ from typing import ClassVar, NamedTuple
 
 from sqlalchemy import Connection
 
+from domain.documents.dates import PublicationDate
 from domain.normalize import to_plain_text
 from domain.platforms.registry import names_platform
-from domain.publications.dates import PublicationDate
 from domain.publications.metadata import has_minimal_publication_metadata, is_overlong_title
 from domain.serials.containers import (
     ContainerDescription,

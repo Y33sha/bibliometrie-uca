@@ -1,6 +1,6 @@
 """Licence de la version éditeur d'un enregistrement source Crossref (`crossref_license`)."""
 
-from domain.publications.licenses import License
+from domain.documents.licenses import License
 from pipeline.ingestion.crossref.normalize import crossref_license
 
 

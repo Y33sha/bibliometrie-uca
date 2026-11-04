@@ -106,11 +106,10 @@ class TestIdentifiers:
         identifiers = [
             SourceIdentifier(T.NNT, "2021CLFAC030", R.PRIMARY),
             SourceIdentifier(T.PMID, "12345", R.SECONDARY),
-            SourceIdentifier(T.ARXIV_ID, "2301.12345", R.DERIVED),
             SourceIdentifier(T.ISBN, "9780306406157", R.SECONDARY),
         ]
         assert _keys(identifiers) == ConfirmationKeys(
-            DoiKeys(), {"nnt": "2021CLFAC030", "pmid": "12345", "arxiv_id": "2301.12345"}
+            DoiKeys(), {"nnt": "2021CLFAC030", "pmid": "12345"}
         )
 
     def test_strongest_role_then_smallest_value(self):
@@ -204,14 +203,18 @@ class TestTokens:
         assert ConfirmationKeys(DoiKeys(), {}).tokens() == frozenset()
 
 
-def test_derivation_lit_les_identifiants_primaires_et_l_identifiant_derive_actifs():
+def test_derivation_lit_l_identifiant_primaire_et_l_identifiant_derive_actifs():
     hal, doi = SourceIdentifierType.HAL_ID, SourceIdentifierType.DOI
     identifiers = [
         SourceIdentifier(hal, "hal-1", SourceIdentifierRole.DERIVED),
         SourceIdentifier(doi, "10.1/x", SourceIdentifierRole.PRIMARY),
-        SourceIdentifier(doi, "10.1/y", SourceIdentifierRole.PRIMARY, removed_by="RULE"),
         SourceIdentifier(doi, "10.1/z", SourceIdentifierRole.SECONDARY),
     ]
-    assert derivation(identifiers) == Derivation(
-        frozenset({("doi", "10.1/x")}), ("hal_id", "hal-1")
+    assert derivation(identifiers) == Derivation(("doi", "10.1/x"), ("hal_id", "hal-1"))
+
+
+def test_derivation_ignore_un_identifiant_primaire_retire():
+    removed = SourceIdentifier(
+        SourceIdentifierType.DOI, "10.1/y", SourceIdentifierRole.PRIMARY, removed_by="RULE"
     )
+    assert derivation([removed]) == Derivation()

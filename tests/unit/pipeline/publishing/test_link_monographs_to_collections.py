@@ -50,7 +50,7 @@ def _run(monkeypatch, logger, repo: _Repo):
     return mod.run_link_monographs_to_collections(None, logger)
 
 
-def test_rattachements_et_conflits_journalises(caplog, monkeypatch):
+def test_rattachements_et_conflits(monkeypatch):
     logger = logging.getLogger("test_collections_des_monographies")
     repo = _Repo(
         [
@@ -59,16 +59,13 @@ def test_rattachements_et_conflits_journalises(caplog, monkeypatch):
             MonographSerialCandidates(14, "Déjà rattachée", None, False, 7, (7,), ()),
         ]
     )
-    with caplog.at_level(logging.INFO, logger=logger.name):
-        metrics = _run(monkeypatch, logger, repo)
+    metrics = _run(monkeypatch, logger, repo)
     assert repo.set == [(12, 7)]
     assert metrics.extras == {
         "monographs_linked": 1,
         "monograph_collection_conflicts": 1,
         "monograph_series": 0,
     }
-    assert "rattachée à 7 (au lieu de 99)" in caplog.text
-    assert "plusieurs rattachements possibles [4, 5]" in caplog.text
 
 
 def test_volumes_d_une_serie_rattaches_a_la_serie(monkeypatch):
@@ -86,10 +83,8 @@ def test_volumes_d_une_serie_rattaches_a_la_serie(monkeypatch):
     assert metrics.extras["monograph_series"] == 1
 
 
-def test_sans_changement_rien_n_est_journalise(caplog, monkeypatch):
+def test_sans_changement_rien_n_est_compte(monkeypatch):
     logger = logging.getLogger("test_collections_des_monographies_aucune")
     repo = _Repo([MonographSerialCandidates(14, "Déjà rattachée", None, False, 7, (7,), ())])
-    with caplog.at_level(logging.INFO, logger=logger.name):
-        metrics = _run(monkeypatch, logger, repo)
+    metrics = _run(monkeypatch, logger, repo)
     assert metrics.total == 0
-    assert caplog.text == ""

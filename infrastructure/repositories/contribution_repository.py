@@ -62,20 +62,6 @@ class PgContributionRepository(ContributionRepository):
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
 
-    # ── source_contributions ─────────────
-
-    def find_publication_id_for_source_contribution(
-        self, source_contribution_id: int
-    ) -> int | None:
-        return self._conn.execute(
-            text("""
-                SELECT d.publication_id FROM source_contributions sc
-                JOIN source_records d ON d.id = sc.source_record_id
-                WHERE sc.id = :aid
-            """),
-            {"aid": source_contribution_id},
-        ).scalar_one_or_none()
-
     # ── Contributions ─────────────
 
     def mark_contributions_for_name_form(self, person_id: int, name_form: str) -> int:

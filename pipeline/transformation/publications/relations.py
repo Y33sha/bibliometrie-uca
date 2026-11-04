@@ -3,7 +3,7 @@
 La phase suit `publications` : les enregistrements sources sont rattachés à leur publication, et un DOI cible se résout en publication quand elle est en base. Les relations viennent de trois signaux :
 
 - **Signal #1, relations déclarées** par DataCite (`related_identifiers`) et Crossref (`relation`), traduites par `domain.publications.relations`. Une relation de même œuvre (`IsVersionOf`, `IsVariantFormOf`) entre deux œuvres distinctes selon `declares_same_work` reçoit son type d'après les types de document des deux publications. Exemple : un preprint arXiv et l'article publié.
-- **Signal #2, clés de confirmation partagées** (hal_id, arXiv, PMID, NNT) par deux publications distinctes : leurs types de document donnent la relation (`infer_shared_key_relation`).
+- **Signal #2, clés de confirmation partagées** (hal_id, PMID, NNT, DOI arXiv) par deux publications distinctes : leurs types de document donnent la relation (`infer_shared_key_relation`).
 - **Signal #3, titre** : un erratum rejoint l'article corrigé (titre de l'article à la suite de « Erratum: »), un preprint sa version publiée (même titre), à condition qu'un seul candidat ait ce titre.
 """
 
@@ -14,8 +14,8 @@ from typing import NamedTuple
 
 from sqlalchemy import Connection, bindparam, text
 
-from domain.publications.doc_types import DocType
-from domain.publications.identifiers import DOI
+from domain.documents.doc_types import DocType
+from domain.documents.identifiers import ARXIV_DOI_PREFIX, DOI
 from domain.publications.relations import (
     DEPENDENT_DOC_TYPE_RELATIONS,
     RELATION_PAIR_LABELS,
@@ -38,7 +38,7 @@ from infrastructure.db.jsonb import Jsonb
 from infrastructure.db.scalars import scalar_int
 from infrastructure.db.source_record_identifiers import first_of_its_type_sql
 from infrastructure.sql_fragments import has_source_extra, in_clause
-from pipeline.graph import task
+from pipeline.graph import Task
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.log_format import (
     LAST_BRANCH,
@@ -112,15 +112,14 @@ class RelationsRebuild(NamedTuple):
     """Arêtes disparues : présentes avant la reconstruction et absentes après."""
 
 
-# Écart d'années toléré entre une œuvre dépendante et son parent, dans les deux sens : un erratum suit son article (parent dans `[année − N … année]`), une version publiée suit son preprint (parent dans `[année … année + N]`).
 _TITLE_MATCH_YEAR_WINDOW = 2
+"""Écart d'années toléré entre une œuvre dépendante et son parent, dans les deux sens : un erratum suit son article (parent dans `[année − N … année]`), une version publiée suit son preprint (parent dans `[année … année + N]`)."""
 
-# Types de clé dont chaque enregistrement source retient une seule valeur (`confirmation_identifiers`).
 _SINGLE_KEY_TYPES = tuple(
     str(t) for t in CONFIRMATION_ID_TYPES if t is not SourceIdentifierType.HAL_ID
 )
+"""Types de clé dont chaque enregistrement source retient une seule valeur (`confirmation_identifiers`)."""
 
-# Paires de publications distinctes partageant une clé de confirmation, héritée par la publication de ses enregistrements sources : tout `hal_id` actif, et pour NNT, PMID et arXiv l'identifiant actif de rôle le plus fort, puis de plus petite valeur. `k1.pid < k2.pid` produit chaque paire une fois ; le `DISTINCT` fusionne les clés multiples.
 _SHARED_KEY_PAIRS_SQL = text(f"""
     WITH pub_keys AS (
         SELECT sr.publication_id AS pid, i.id_type::text AS ktype, i.id_value AS kval
@@ -131,6 +130,9 @@ _SHARED_KEY_PAIRS_SQL = text(f"""
               (i.id_type = '{SourceIdentifierType.HAL_ID}' AND i.removed_by IS NULL)
               OR (i.id_type::text IN {in_clause(_SINGLE_KEY_TYPES)}
                   AND {first_of_its_type_sql("i")})
+              OR (i.id_type = '{SourceIdentifierType.DOI}' AND i.removed_by IS NULL
+                  AND i.role <> '{SourceIdentifierRole.RELATED}'
+                  AND i.id_value LIKE '{ARXIV_DOI_PREFIX}%')
           )
     )
     SELECT DISTINCT
@@ -141,8 +143,8 @@ _SHARED_KEY_PAIRS_SQL = text(f"""
     JOIN publications p1 ON p1.id = k1.pid
     JOIN publications p2 ON p2.id = k2.pid
 """)
+"""Paires de publications distinctes partageant une clé de confirmation, héritée par la publication de ses enregistrements sources : tout `hal_id` actif, pour NNT et PMID l'identifiant actif de rôle le plus fort, puis de plus petite valeur, et tout DOI arXiv actif. Le DOI arXiv, DOI de dépôt, laisse séparées deux versions publiées d'un même preprint. `k1.pid < k2.pid` produit chaque paire une fois ; le `DISTINCT` fusionne les clés multiples."""
 
-# Signal #3, erratum → article corrigé : titre de l'article suffixe du titre de l'erratum, article publié dans [année − 2 … année]. Garde d'ambiguïté : un seul candidat substantiel, sinon aucune relation.
 _ERRATUM_TITLE_MATCHES_SQL = text(f"""
     WITH child AS (
         SELECT id, title_normalized AS t, publication_year AS y
@@ -171,8 +173,8 @@ _ERRATUM_TITLE_MATCHES_SQL = text(f"""
     JOIN substantive_count s ON s.child_id = c.child_id
     WHERE s.n = 1 AND c.substantive
 """)
+"""Signal #3, erratum → article corrigé : titre de l'article suffixe du titre de l'erratum, article publié dans [année − 2 … année]. Garde d'ambiguïté : un seul candidat substantiel, sinon aucune relation."""
 
-# Preprint → version publiée : titre identique, parent publié dans [année … année + 2]. Garde d'ambiguïté : un seul candidat substantiel (hors `dataset`) au même titre.
 _PREPRINT_TITLE_MATCHES_SQL = text(f"""
     WITH child AS (
         SELECT id, title_normalized AS t, publication_year AS y
@@ -199,6 +201,7 @@ _PREPRINT_TITLE_MATCHES_SQL = text(f"""
     JOIN substantive_count s ON s.child_id = c.child_id
     WHERE s.n = 1 AND c.substantive
 """)
+"""Preprint → version publiée : titre identique, parent publié dans [année … année + 2]. Garde d'ambiguïté : un seul candidat substantiel (hors `dataset`) au même titre."""
 
 
 def fetch_declared_relation_sources(conn: Connection) -> list[DeclaredRelationSource]:
@@ -272,8 +275,8 @@ def fetch_preprint_title_matches(conn: Connection) -> list[TitleMatch]:
     return [TitleMatch(r.child_id, r.parent_id, r.parent_doi) for r in rows]
 
 
-# Colonnes de la contrainte d'unicité, qui identifient une arête. Le diff avant/après les compare.
 _IDENTITY_COLUMNS = "from_publication_id, relation_type, target_publication_id, target_doi"
+"""Colonnes de la contrainte d'unicité, qui identifient une arête. Le diff avant/après les compare."""
 
 
 def rebuild_relations(conn: Connection, edges: list[RelationEdge]) -> RelationsRebuild:
@@ -573,8 +576,8 @@ def _count_by_pair_label(added_by_type: list[tuple[str, int]]) -> dict[str, int]
 
 
 TASKS = (
-    task(
-        "relations.rebuild",
+    Task(
+        "rebuild",
         reads=(
             *(
                 f"source_records.{column}"

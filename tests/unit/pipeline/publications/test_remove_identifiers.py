@@ -1,4 +1,4 @@
-"""Tests purs du retrait des DOI par groupe (ouvrage et chapitre, chapitres entre eux, volume d'actes et communication, enregistrement source d'une autre œuvre) et de `compute_updates`."""
+"""Tests purs du retrait des DOI par groupe (ouvrage et chapitre, chapitres entre eux, volume d'actes et communication, numéro de revue et article, enregistrement source d'une autre œuvre) et de `compute_updates`."""
 
 from domain.source_records.identifiers import (
     SourceIdentifier,
@@ -239,6 +239,70 @@ def test_communication_sans_titre_garde_le_doi():
     assert resolve_cluster_doi_corrections(group) == []
 
 
+# Numéro de revue et article
+
+
+def test_articles_d_un_numero_perdent_le_doi():
+    """Le dépôt HAL d'un article d'un numéro thématique contient parfois le DOI du numéro."""
+    group = [
+        _m(1, "journal_issue", "litteratures de genre et strategies litteraires"),
+        _m(2, "other", "litteratures de genre et strategies litteraires"),
+        _m(3, "article", "ce que l auto edition fait aux litteratures de genre"),
+    ]
+    assert resolve_cluster_doi_corrections(group) == [
+        DoiClusterDecision(3, DoiClusterCase.NUMERO_VS_ARTICLE)
+    ]
+
+
+def test_numero_qui_detient_le_doi_le_retire_a_l_article_hal():
+    group = [
+        DoiClusterMember(1, "journal_issue", "litteratures de genre", owns_doi=True),
+        DoiClusterMember(2, "article", "l auto edition"),
+    ]
+    assert resolve_cluster_doi_corrections(group) == [
+        DoiClusterDecision(2, DoiClusterCase.NUMERO_VS_ARTICLE)
+    ]
+
+
+def test_numero_hal_au_doi_d_un_article_ne_retire_rien():
+    """Le dépôt HAL du numéro contient le DOI de l'introduction, détenu en propre par Crossref et OpenAlex."""
+    group = [
+        DoiClusterMember(1, "journal_issue", "aux frontieres de l espece"),
+        DoiClusterMember(2, "article", "note d intention", owns_doi=True),
+        DoiClusterMember(3, "article", "note d intention", owns_doi=True),
+    ]
+    assert resolve_cluster_doi_corrections(group) == []
+
+
+# Membre qui détient le DOI en propre
+
+
+def test_doi_d_un_chapitre_detenu_en_propre_n_est_pas_celui_d_un_ouvrage_absent():
+    """Variante de titre du dépôt HAL : il reste avec le chapitre qui détient le DOI."""
+    group = [
+        DoiClusterMember(1, "book_chapter", "green polymer filaments", owns_doi=True),
+        DoiClusterMember(2, "book_chapter", "green polymers filaments"),
+    ]
+    assert resolve_cluster_doi_corrections(group) == []
+
+
+def test_membre_qui_detient_le_doi_le_garde_quel_que_soit_le_cas():
+    group = [
+        DoiClusterMember(1, "book", "le livre"),
+        DoiClusterMember(2, "book_chapter", "un chapitre", owns_doi=True),
+    ]
+    assert resolve_cluster_doi_corrections(group) == []
+
+
+def test_deux_numeros_de_titres_differents_gardent_le_doi():
+    """Titre traduit ou variante : le dépôt HAL du numéro reste avec l'enregistrement source Crossref."""
+    group = [
+        _m(1, "journal_issue", "les espaces urbains dans les fictions criminelles espagnoles"),
+        _m(2, "journal_issue", "urban spaces in spanish crime fiction"),
+    ]
+    assert resolve_cluster_doi_corrections(group) == []
+
+
 # compute_updates
 
 
@@ -380,11 +444,51 @@ def test_identifiant_propre_d_un_enregistrement_source_qui_garde_le_doi_reste_en
         2,
         "conference_paper",
         "10.1/x",
-        identifiers=_hal("hal-01234567"),
-    )._replace(source="hal", source_id="hal-01234567")
+        identifiers=(
+            SourceIdentifier(
+                SourceIdentifierType.HAL_ID, "hal-01234567", SourceIdentifierRole.PRIMARY
+            ),
+        ),
+        source="hal",
+    )
     chapter = _row(3, "book_chapter", "10.1/x", identifiers=_hal("hal-01234567"))
     updates = {u.id: u for u in compute_updates([book, hal, chapter])}
     assert set(updates) == {3}
+
+
+def test_enregistrement_source_derive_d_un_chapitre_perd_le_doi_de_l_ouvrage_et_garde_sa_cle():
+    """OpenAlex donne le titre de l'ouvrage à l'enregistrement source dérivé du dépôt HAL d'un chapitre. Il détient le dépôt en propre : il suit le chapitre."""
+    derived_hal = SourceIdentifier(
+        SourceIdentifierType.HAL_ID, "hal-9", SourceIdentifierRole.DERIVED
+    )
+    book = _row(
+        1,
+        "book",
+        title="la fabrique du xvie siecle",
+        identifiers=(_doi("10.1/x", role=SourceIdentifierRole.PRIMARY),),
+        shared_doi="10.1/x",
+        source="datacite",
+    )
+    chapter = _row(
+        2,
+        "book_chapter",
+        title="voltaire lecteur de rabelais",
+        identifiers=(
+            _doi("10.1/x"),
+            SourceIdentifier(SourceIdentifierType.HAL_ID, "hal-9", SourceIdentifierRole.PRIMARY),
+        ),
+        source="hal",
+    )
+    openalex = _row(
+        3,
+        "book_chapter",
+        title="la fabrique du xvie siecle",
+        identifiers=(_doi("10.1/x"), derived_hal),
+    )
+    updates = {u.id: u for u in compute_updates([book, chapter, openalex])}
+    assert set(updates) == {2, 3}
+    assert _active(updates[3].identifiers) == {"hal_id": ["hal-9"]}
+    assert _active(updates[2].identifiers) == {"hal_id": ["hal-9"]}
 
 
 def test_cle_d_un_depot_hal_qui_garde_le_doi_reste_en_place():

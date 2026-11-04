@@ -35,11 +35,11 @@ from infrastructure.read_models.persons.models import (
 from infrastructure.read_models.sql_fragments import current_unit, other_name_form_holders
 from infrastructure.sql_fragments import CONTRIBUTIONS_AND_SOURCES, has_author_role
 
-# Avec `lab_id`, chaque dénombrement se limite aux contributions de la personne rattachées à ce laboratoire, comme la liste. Le paramètre `:flt_person_lab_id` vient de `person_in_lab_clause`.
 _LAB_SCOPED_CONTRIBUTIONS = (
     " AND EXISTS (SELECT 1 FROM contribution_structures aus "
     "WHERE aus.contribution_id = a.id AND aus.structure_id = :flt_person_lab_id)"
 )
+"""Avec `lab_id`, chaque dénombrement se limite aux contributions de la personne rattachées à ce laboratoire, comme la liste. Le paramètre `:flt_person_lab_id` vient de `person_in_lab_clause`."""
 
 
 def _contribution_counts_sql(*, lab_scoped: bool) -> str:

@@ -28,7 +28,7 @@ from domain.publications.open_access import is_restricted, publication_oa_status
 from infrastructure.db.scalars import scalar_int
 from infrastructure.read_models.publications.copies import publication_copies
 from infrastructure.sql_fragments import under_active_embargo
-from pipeline.graph import task
+from pipeline.graph import Task
 from pipeline.http.lookup import LookupOutcome, NotFound, Unavailable
 from pipeline.http.polite_pool import default_user_agent, get_polite_pool_email_optional
 from pipeline.http.tls import tls_context
@@ -52,11 +52,11 @@ type DoiFetcher = Callable[[httpx2.AsyncClient, str], Awaitable[LookupOutcome[st
 """Interrogation d'un service sur un DOI : `(client, doi) → réponse, NotFound ou Unavailable`."""
 
 BATCH_SIZE = 50
-# Requêtes simultanées, sous le débit recommandé par Unpaywall (10 par seconde).
 MAX_CONCURRENT = 5
+"""Requêtes simultanées, sous le débit recommandé par Unpaywall (10 par seconde)."""
 
-RESOLVE_TASK = "oa_status.resolve_dois"
-UNPAYWALL_TASK = "oa_status.verify_unpaywall"
+RESOLVE_TASK = "resolve_dois"
+UNPAYWALL_TASK = "verify_unpaywall"
 
 
 class DoiService(NamedTuple):
@@ -416,7 +416,6 @@ def _apply_answers(
             store.update_oa_status(publication.id, status)
 
 
-# Lectures d'une tâche de la phase `oa_status` : DOI à interroger, données du statut des publications.
 _OA_STATUS_INPUTS = (
     "publications.id",
     "publications.doi",
@@ -436,6 +435,7 @@ _OA_STATUS_INPUTS = (
     "embargoes",
     "config",
 )
+"""Lectures d'une tâche de la phase `oa_status` : DOI à interroger, données du statut des publications."""
 
 
 def _resolve_dois(ctx: PhaseContext) -> PhaseMetrics:
@@ -475,7 +475,7 @@ def _verify_unpaywall(ctx: PhaseContext) -> PhaseMetrics:
 
 
 TASKS = (
-    task(
+    Task(
         RESOLVE_TASK,
         reads=_OA_STATUS_INPUTS,
         writes=(
@@ -489,7 +489,7 @@ TASKS = (
         network="doi.org",
         run=_resolve_dois,
     ),
-    task(
+    Task(
         UNPAYWALL_TASK,
         reads=(*_OA_STATUS_INPUTS, "doi_prefixes.ra"),
         writes=(

@@ -2,9 +2,9 @@
 
 import pytest
 
-from domain.country_detection import CountryNames
+from domain.addresses.address_origin import AddressOrigin, OriginReferentials, address_origin
+from domain.addresses.country_detection import CountryNames
 from domain.normalize import normalize_text
-from domain.structures.address_origin import AddressOrigin, OriginReferentials, address_origin
 
 REFERENTIALS = OriginReferentials.from_names(
     (

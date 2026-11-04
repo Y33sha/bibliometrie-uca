@@ -25,7 +25,6 @@ from infrastructure.db.tables import (
 )
 from infrastructure.jsonb_models.structure import StructureApiIds
 
-# Colonnes de `structure_name_forms` renvoyées par create / update / get (RETURNING ou SELECT).
 _NAME_FORM_COLUMNS = (
     structure_name_forms.c.id,
     structure_name_forms.c.structure_id,
@@ -35,9 +34,9 @@ _NAME_FORM_COLUMNS = (
     structure_name_forms.c.requires_context_of,
     structure_name_forms.c.is_excluding,
 )
+"""Colonnes de `structure_name_forms` renvoyées par create / update / get (RETURNING ou SELECT)."""
 
 
-# Colonnes de `structures` renvoyées par l'insertion et la mise à jour (`StructureRow`).
 _STRUCTURE_COLUMNS = (
     structures.c.id,
     structures.c.code,
@@ -49,6 +48,7 @@ _STRUCTURE_COLUMNS = (
     structures.c.hal_collection,
     structures.c.api_ids,
 )
+"""Colonnes de `structures` renvoyées par l'insertion et la mise à jour (`StructureRow`)."""
 
 
 def _normalize_api_ids(raw: dict[str, str | list[str]] | None) -> dict[str, list[str]] | None:

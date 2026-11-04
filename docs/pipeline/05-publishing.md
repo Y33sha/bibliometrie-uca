@@ -6,7 +6,7 @@ La phase `publishing` complète les [référentiels de l'édition](../donnees/07
 
 ## Agences d'enregistrement DOI (`resolve_ra`)
 
-Phase à part, juste avant `publishing`. Elle interroge doi.org sur les préfixes de tous les DOI connus (enregistrements sources, DOI liés, cibles des relations, DOI arXiv) et enregistre leur agence d'enregistrement dans `doi_prefixes` : Crossref, DataCite ou inconnue. La recherche des documents manquants ([fetch_missing](02-harvest.md#documents-absents-dune-source-fetch_missing)) adresse ensuite chaque DOI à l'API de son agence.
+Phase à part, juste avant `publishing`. Elle interroge doi.org sur les préfixes de tous les DOI connus (enregistrements sources, DOI liés, cibles des relations) et enregistre leur agence d'enregistrement dans `doi_prefixes` : Crossref, DataCite ou inconnue. La recherche des documents manquants ([fetch_missing](02-harvest.md#documents-absents-dune-source-fetch_missing)) adresse ensuite chaque DOI à l'API de son agence.
 
 ## Éditeurs
 

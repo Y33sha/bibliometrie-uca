@@ -41,13 +41,6 @@ class TestBuildParams:
         params = build_params(["I1"], years=[2023, 2026, 2024])
         assert params["filter"] == "authorships.institutions.lineage:I1,publication_year:2023-2026"
 
-    def test_combines_years_and_since(self):
-        params = build_params(["I1"], years=[2024, 2026], since="2026-05-01")
-        assert params["filter"] == (
-            "authorships.institutions.lineage:I1,publication_year:2024-2026,"
-            "from_updated_date:2026-05-01"
-        )
-
     def test_lineage_joins_multiple_institutions(self):
         params = build_params(["I1", "I2", "I3"], years=[2024])
         assert params["filter"] == (
@@ -155,25 +148,8 @@ def test_run_parcourt_les_annees_de_la_configuration(configuration, ecritures):
 def test_run_avec_une_annee_demandee_ignore_la_configuration(configuration, ecritures):
     configuration(harvest, annees=[2020, 2021])
     client = _client([_page([_work("W1")])])
-    moissonneur(OpenalexHarvester, client).run(arguments_du_run(year=2024))
+    moissonneur(OpenalexHarvester, client).run(arguments_du_run(years=(2024, 2024)))
     assert client.fetch_page.call_args.kwargs["years"] == [2024]
-
-
-def test_run_incremental_fait_une_seule_passe_sur_la_date(configuration, ecritures):
-    configuration(harvest, annees=[2020, 2021, 2022])
-    client = _client([_page([_work("W1")])])
-    moissonneur(OpenalexHarvester, client).run(arguments_du_run(since="2026-01-01"))
-    assert client.fetch_page.call_count == 1
-    assert client.fetch_page.call_args.kwargs["since"] == "2026-01-01"
-    assert client.count.call_args.kwargs["since"] == "2026-01-01"
-
-
-def test_run_incremental_garde_les_annees_du_mode_complet(configuration, ecritures):
-    configuration(harvest, annees=[2020, 2021, 2022])
-    client = _client([_page([_work("W1")])])
-    moissonneur(OpenalexHarvester, client).run(arguments_du_run(since="2026-01-01"))
-    assert client.fetch_page.call_args.kwargs["years"] == [2020, 2021, 2022]
-    assert client.count.call_args.kwargs["years"] == [2020, 2021, 2022]
 
 
 def test_run_sans_institution_refuse(configuration):

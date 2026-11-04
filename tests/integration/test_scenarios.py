@@ -7,8 +7,8 @@ from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import ENUM as PgEnum
 from sqlalchemy.exc import IntegrityError
 
+from domain.documents.licenses import License
 from domain.errors import ConflictError
-from domain.publications.licenses import License
 from infrastructure.db.tables import metadata
 from interfaces.api.deps import person_service
 from pipeline.ingestion.common.locations import LocationFacts, LocationStore

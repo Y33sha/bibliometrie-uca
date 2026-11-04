@@ -2,8 +2,8 @@
 
 from sqlalchemy import Connection, text
 
+from domain.addresses.country_detection import CountryNames
 from domain.countries import PlaceNameKind
-from domain.country_detection import CountryNames
 
 
 def load_place_forms(conn: Connection, kind: PlaceNameKind) -> dict[str, str]:

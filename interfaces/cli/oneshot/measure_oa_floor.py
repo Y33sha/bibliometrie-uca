@@ -19,9 +19,9 @@ from pathlib import Path
 
 from sqlalchemy import Connection, text
 
+from domain.documents.identifiers import HALId
 from domain.platforms.platform import is_descriptive_page
 from domain.publications.access import Copy
-from domain.publications.identifiers import HALId
 from domain.publications.oa_status import OA_OPEN_STATUSES, OA_RANK, OaStatus
 from domain.publications.open_access import (
     OpenAccessFacts,

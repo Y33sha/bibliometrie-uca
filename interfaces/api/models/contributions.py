@@ -14,11 +14,6 @@ class CreatePersonName(Model):
     first_name: str = ""
 
 
-class SourceContributionRef(Model):
-    source: str
-    source_contribution_id: int
-
-
 class AssignOrphanContribution(Model):
     """Attribution d'une contribution orpheline, désignée par son identifiant. Seule à pouvoir créer la personne au passage."""
 

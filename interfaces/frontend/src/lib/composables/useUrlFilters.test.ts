@@ -68,11 +68,11 @@ describe('useUrlFilters', () => {
 				basePath: '/p',
 				filters: { sourceStates: { type: 'source_states', urlKey: 'sf' } },
 			});
-			f.syncUrl(() => ({ sourceStates: { hal: 'yes', oa: 'no', wos: 'any' } }));
+			f.syncUrl(() => ({ sourceStates: { hal: 'yes', openalex: 'no', wos: 'any' } }));
 			// `any` est ignoré (ni yes ni no)
 			expect(gotoSpy).toHaveBeenCalled();
 			const call = gotoSpy.mock.calls[0][0] as string;
-			expect(call).toContain('sf=hal_yes,oa_no');
+			expect(call).toContain('sf=hal_yes,openalex_no');
 			expect(call).not.toContain('any');
 		});
 
@@ -157,8 +157,8 @@ describe('useUrlFilters', () => {
 				basePath: '/p',
 				filters: { sourceStates: { type: 'source_states', urlKey: 'sf' } },
 			});
-			expect(f.restoreFromUrl(new URLSearchParams('sf=hal_yes,oa_no'))).toEqual({
-				sourceStates: { hal: 'yes', oa: 'no' },
+			expect(f.restoreFromUrl(new URLSearchParams('sf=hal_yes,openalex_no'))).toEqual({
+				sourceStates: { hal: 'yes', openalex: 'no' },
 			});
 		});
 

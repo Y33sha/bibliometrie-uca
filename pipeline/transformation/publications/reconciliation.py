@@ -80,11 +80,9 @@ class ReconcileRow(NamedTuple):
     """Fusions manuelles désignant l'enregistrement source."""
 
 
-# Relevé de la file `source_record_keys_queue`.
 _SNAPSHOT = "source_record_keys_marks"
+"""Relevé de la file `source_record_keys_queue`."""
 
-# Colonnes du voisinage direct : enregistrements sources relevés dans la file (orphelins compris) et enregistrements sources partageant une clé de confirmation avec eux.
-# `publication_doi` sert au choix de l'ancre. `in_perimeter` conditionne la création d'une publication pour une partition d'orphelins.
 _COLS = (
     "{a}.id, " + identifiers_json_sql("{a}.id") + " AS identifiers, {a}.publication_id, "
     "{a}.doc_type, {a}.title_normalized, {a}.publication_year, {a}.is_matchable, "
@@ -95,22 +93,22 @@ _COLS = (
     "WHERE mm.source = {a}.source AND mm.source_id = {a}.source_id "
     "ORDER BY mm.manual_merge_id) AS manual_merge_ids"
 )
+"""Colonnes du voisinage direct : enregistrements sources relevés dans la file (orphelins compris) et enregistrements sources partageant une clé de confirmation avec eux. `publication_doi` sert au choix de l'ancre. `in_perimeter` conditionne la création d'une publication pour une partition d'orphelins."""
 
-# L'identifiant aliasé `{a}` de `source_record_identifiers` est la clé de confirmation de son type (`confirmation_identifiers`).
 _CONFIRMATION_KEY_SQL = (
     "{a}.id_type::text IN "
     + in_clause(CONFIRMATION_ID_TYPES)
     + " AND "
     + first_of_its_type_sql("{a}")
 )
+"""L'identifiant aliasé `{a}` de `source_record_identifiers` est la clé de confirmation de son type (`confirmation_identifiers`)."""
 
-# L'identifiant aliasé `{a}` de `source_record_identifiers` est une clé DOI : un DOI actif de rôle autre que `related` (`doi_keys`).
 _DOI_KEY_SQL = (
     f"{{a}}.id_type = '{SourceIdentifierType.DOI.value}' AND {{a}}.removed_by IS NULL"
     f" AND {{a}}.role <> '{SourceIdentifierRole.RELATED.value}'"
 )
+"""L'identifiant aliasé `{a}` de `source_record_identifiers` est une clé DOI : un DOI actif de rôle autre que `related` (`doi_keys`)."""
 
-# Le voisinage s'unit sur les seuls identifiants : une clé partagée par k enregistrements sources produit k² paires. Les colonnes se calculent ensuite une fois par enregistrement source.
 _UNIVERSE_SQL = text(f"""
     WITH dirty AS (
         SELECT sr.id, sr.source, sr.source_id, sr.doc_type, sr.title_normalized, sr.publication_year
@@ -169,9 +167,9 @@ _UNIVERSE_SQL = text(f"""
     JOIN source_records o ON o.id = n.id
     LEFT JOIN publications p ON p.id = o.publication_id
 """)
+"""Le voisinage s'unit sur les seuls identifiants : une clé partagée par k enregistrements sources produit k² paires. Les colonnes se calculent ensuite une fois par enregistrement source."""
 
 
-# Enregistrements sources hors file rattachés à la même publication qu'un enregistrement source en file (`mark_publication_siblings`).
 _SIBLINGS_SQL = f"""
     SELECT o.id FROM source_records o
     WHERE o.publication_id IN (
@@ -181,6 +179,7 @@ _SIBLINGS_SQL = f"""
     )
       AND NOT EXISTS (SELECT 1 FROM {Queue.SOURCE_RECORD_KEYS} q WHERE q.id = o.id)
 """  # noqa: S608
+"""Enregistrements sources hors file rattachés à la même publication qu'un enregistrement source en file (`mark_publication_siblings`)."""
 
 
 def mark_for_reconciliation(

@@ -26,7 +26,8 @@ from pipeline.runtime.observability.progress import track_progress
 LABEL = "Vérification des ISSN dans le Sudoc"
 """Libellé de la sous-étape dans le journal de la phase."""
 
-COMMIT_EVERY = 10  # lots d'ISSN par commit
+COMMIT_EVERY = 10
+"""Lots d'ISSN par commit."""
 
 FetchPpns = Callable[[httpx2.AsyncClient, Sequence[str]], Awaitable[dict[str, tuple[str, ...]]]]
 """`(client, issns) -> {issn: ppns}` : PPN des notices Sudoc de chaque ISSN connu du Sudoc."""

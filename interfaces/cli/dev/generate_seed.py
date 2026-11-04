@@ -29,8 +29,8 @@ from infrastructure.db.jsonb import Jsonb
 
 _DB_DIR = PROJECT_ROOT / "infrastructure" / "db"
 
-# Colonnes absentes de l'export : l'horodatage d'insertion reprend sa valeur par défaut au chargement.
 EXCLUDED_COLUMNS = frozenset({"created_at"})
+"""Colonnes absentes de l'export : l'horodatage d'insertion reprend sa valeur par défaut au chargement."""
 
 
 type SeedTable = Table[ReadOnlyColumnCollection[str, Column[object]]]

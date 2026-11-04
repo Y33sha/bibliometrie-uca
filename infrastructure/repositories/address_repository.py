@@ -10,7 +10,7 @@ from application.ports.repositories.address_repository import (
     AddressCountryFilter,
     AddressRepository,
 )
-from domain.country_detection import CountryDetectionMethod
+from domain.addresses.country_detection import CountryDetectionMethod
 from domain.errors import NotFoundError
 from infrastructure.db.queues import Queue, enqueue, enqueue_sql
 from infrastructure.db.tables import (
@@ -20,8 +20,8 @@ from infrastructure.db.tables import (
 )
 from infrastructure.sql_fragments import address_country_conditions
 
-# Marque les adresses de la CTE `target(id, countries)`.
 _MARK_TARGET = enqueue_sql(Queue.ADDRESS_CANDIDATES, "SELECT id FROM target")
+"""Marque les adresses de la CTE `target(id, countries)`."""
 
 
 class PgAddressRepository(AddressRepository):

@@ -54,6 +54,7 @@ OpenAlex et ScanR ont 1 468 enregistrements sources `memoir` avec une URL DUMAS.
 - HAL `VIDEO` et DataCite `Audiovisual` donnent `recorded_talk`. Les règles de correction par le titre (interview, fichiers complémentaires) s'appliquent à ce type.
 - HAL `SON` et DataCite `Sound` donnent `media`.
 - Un type `practice_thesis` distingue les thèses d'exercice des mémoires. Il est exclu des publications, comme `memoir`.
+- Un type `journal_issue` désigne le numéro de revue, dirigé ou non. Il est exclu des publications. Un article qui a le DOI de son numéro le perd.
 - `data_paper` rejoint la famille des données et logiciels.
 - Erratum et rétractation quittent les listes de documents. Ils sont rattachés à la publication concernée.
 - Un type `conference_abstract` (« Résumé de conférence »), famille Conférences, désigne le résumé publié d'une communication. Sources : OpenAlex `conference-abstract`, WoS `Meeting Abstract`, recueil de résumés HAL, communication rattachée à une revue, revue au titre en « abstract(s) ».
@@ -72,11 +73,19 @@ OpenAlex et ScanR ont 1 468 enregistrements sources `memoir` avec une URL DUMAS.
 - [x] Palette des couleurs des types et des familles. 574ea0878
 - [x] `data_paper` dans la famille des données et logiciels. 1bae7f9e8
 - [x] Type `practice_thesis` (« Thèse d'exercice »), famille Thèses, exclu des publications comme `memoir`. HAL `MEM` suivi du code de diplôme DUMAS (12, 13, 30, 47, 63). La règle de l'URL DUMAS laisse ce type en l'état.
+- [x] Type `journal_issue` (« Numéro de revue »), exclu des publications. HAL `ISSUE`, Crossref `journal-issue`, DataCite `Journal Issue`. Retrait du DOI du numéro aux enregistrements sources d'un autre titre (`NUMERO_VS_ARTICLE`). Entre œuvres distinctes, le DOI reste à l'enregistrement source qui le détient en `primary` ou `derived`. Oneshot `requalify_journal_issues` sur le stock. Mesures du 2026-11-03 : 152 publications avec un numéro Crossref, 422 avec un dépôt HAL `ISSUE`, dont 91 en commun. Sur 100 dépôts HAL `ISSUE` sans Crossref ni DataCite, 3 sont des articles. Après le run, aucune publication de type numéro. 9a837b4ac, 0ef7eee2f
 
 ### Phase 2 — Errata et rétractations
 
+Mesures du 2026-11-03, base locale, publications du périmètre : 199 errata sur 427 et 12 rétractations sur 14 sans relation. `is_retracted` est vrai pour 14 publications, dont 7 avis de rétractation et 1 erratum : OpenAlex marque aussi les avis. 6 articles rétractés, dont 1 relié à son avis.
+
+- [ ] `update-to` (erratum ou avis) et `updated-by` (article) de Crossref gardés dans `source_extras`. Oneshot depuis le raw store pour le stock. Errata et avis Crossref sans relation : article en base pour 44 errata et 7 avis de rétractation, absent pour 16 errata et 4 avis, surtout antérieurs à 2017.
+- [ ] Phase `relations` : correction, rétractation et avis de préoccupation tirés de `update-to` et `updated-by`, vers un DOI absent de la base compris. Avis absents de la base, connus par `updated-by`, y compris d'après Retraction Watch : 10.1038/s41467-017-00508-5, 10.1016/j.biortech.2018.03.127, 10.1016/j.biortech.2018.11.031.
+- [ ] Errata WoS sans DOI : référence de l'article (« vol 21 283 2020 ») retirée du titre avant le rapprochement. 74 errata trouvent un seul article, 8 plusieurs, 32 aucun.
+- [ ] Avis de rétractation rapprochés par le titre. Cas : avis 210139 et article 15199, avis sans payload Crossref.
+- [ ] « Rétracté » fondé sur les relations et sur OpenAlex, faux pour les avis eux-mêmes. Rétractation sur place par Elsevier : titre « RETRACTED: », `update-to` vers le DOI de l'article lui-même (10.1016/j.indmarman.2022.05.009).
 - [ ] Erratum et rétractation hors des listes de documents, affichés sur la publication concernée.
-- [ ] Relation entre une rétractation et la publication rétractée.
+- [ ] Facette « Rétracté ». Mise en forme de la page d'un article rétracté.
 
 ### Phase 3 — Arbitrage
 
@@ -84,7 +93,9 @@ OpenAlex et ScanR ont 1 468 enregistrements sources `memoir` avec une URL DUMAS.
 
 ### Phase 4 — Cas particuliers
 
-- [ ] 107270 et 869915 « Computing Pivot-Minors » : article typé preprint par OpenAlex. Déduction du DOI depuis l'identifiant arXiv, et inversement.
+- [ ] « Computing Pivot-Minors » (208937 en base locale) : OpenAlex type l'œuvre `article`. Identifiant arXiv converti en DOI du dépôt (`10.48550/arxiv.<identifiant>`). PMCID retiré des identifiants : la page PMC est une localisation. Valeurs `arxiv_id` et `pmcid` retirées de `source_identifier_type`. Base locale : 141 paires de publications séparées par les deux formes d'un même arXiv.
+- [ ] Mesure à refaire sur la prod. Base locale : 14 934 enregistrements sources WoS sur 17 409 sans identifiant, faute de payload au raw store au remplissage de `source_record_identifiers`. Le DOI est dans `staging.doi` pour 13 990. Exemple : 302143, doublon WoS de « Computing Pivot-Minors ».
+- [x] Adresses d'en-tête HTTP `Link` recopiées par OpenAlex comme localisations, écartées : profils ORCID, pages de navigation d'entrepôts. 1 694 enregistrements sources en base locale. a82e4423f
 - [ ] 206476 : communication de congrès déposée en entrepôt, typée `article` par OpenAlex seul.
 * [ ] 165068 type "commmentary"; 86931 type "meeting report" => comment prendre en compte ces types (et empêcher openalex d'imposer le type article)
 * [ ] règle à créer: si DOI de forme ISBN + _n => conference_paper ou chapitre / si forme ISBN: proceedings ou book (trancher selon type du "journal")
@@ -110,3 +121,4 @@ Mesures du 2026-11-03, publications du périmètre : 1 895 communications rattac
 - Pièces d'un corpus Nakala (257102) : publications distinctes, ou éléments d'un jeu de données.
 - Films, bandes-annonces et MOOC en `recorded_talk` par la correspondance de HAL `VIDEO` et DataCite `Audiovisual`.
 - « Meeting report » publié en revue, typé `article` par toutes les sources (176417, 180148, 16340).
+- Article corrigé ou rétracté absent de la base, cible d'un erratum ou d'un avis du périmètre : moissonnage par DOI (`fetch_missing`) ?

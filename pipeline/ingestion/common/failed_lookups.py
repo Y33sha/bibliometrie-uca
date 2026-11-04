@@ -8,14 +8,14 @@ from typing import Literal
 
 from sqlalchemy import Connection, text
 
-from domain.publications.identifiers import DOI
+from domain.documents.identifiers import DOI
 from domain.sources.registry import DOI_ORG, Source
 
 LookupIdType = Literal["doi", "hal_id", "nnt"]
 """Types d'identifiants cherchés par la phase `fetch_missing`, contraints par `failed_lookups_id_type_check`."""
 
-# Registre qui attribue chaque type d'identifiant. Un identifiant absent de son registre n'existe pas : l'échec de sa recherche est définitif.
 _REGISTRIES: dict[LookupIdType, str] = {"doi": DOI_ORG, "hal_id": Source.HAL, "nnt": Source.THESES}
+"""Registre qui attribue chaque type d'identifiant. Un identifiant absent de son registre n'existe pas : l'échec de sa recherche est définitif."""
 
 _RECORD_SQL = text(
     """

@@ -1,6 +1,6 @@
 """Tests de l'entité `Publication`."""
 
-from domain.publications.identifiers import DOI
+from domain.documents.identifiers import DOI
 from domain.publications.publication import Publication
 
 

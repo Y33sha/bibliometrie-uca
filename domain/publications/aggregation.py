@@ -2,13 +2,13 @@
 
 from collections.abc import Iterable, Mapping
 
+from domain.documents.dates import arbitrate_publication_date
+from domain.documents.doc_types import ARTICLE_SUBTYPES, DocType
+from domain.documents.identifiers import DOI
+from domain.documents.licenses import DEPOSIT_LICENSE_SOURCE, publisher_license_sources
 from domain.normalize import normalize_text
 from domain.platforms.registry import is_publisher_platform_prefix
 from domain.publications.conference import arbitrate_conference
-from domain.publications.dates import arbitrate_publication_date
-from domain.publications.doc_types import ARTICLE_SUBTYPES, DocType
-from domain.publications.identifiers import DOI
-from domain.publications.licenses import DEPOSIT_LICENSE_SOURCE, publisher_license_sources
 from domain.publications.publication import Publication
 from domain.publishers.attribution import publication_publisher
 from domain.source_records.keys import anchor_of, deposit_anchors, doi_anchors

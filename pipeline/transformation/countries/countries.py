@@ -10,7 +10,7 @@ from typing import NamedTuple
 
 from sqlalchemy import Connection, text
 
-from pipeline.graph import task
+from pipeline.graph import Task
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.log_format import LAST_BRANCH, quantity, step
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -82,8 +82,8 @@ def _refresh(ctx: PhaseContext) -> PhaseMetrics:
 
 
 TASKS = (
-    task(
-        "countries.detect",
+    Task(
+        "detect",
         reads=(
             "place_name_forms",
             "countries",
@@ -96,8 +96,8 @@ TASKS = (
         previous_run=("address_candidates_queue",),
         run=_detect,
     ),
-    task(
-        "countries.resolve",
+    Task(
+        "resolve",
         reads=(
             "address_country_candidates",
             "addresses.id",
@@ -111,8 +111,8 @@ TASKS = (
         ),
         run=_resolve,
     ),
-    task(
-        "countries.refresh_publication_countries",
+    Task(
+        "refresh_publication_countries",
         reads=(
             "source_contribution_countries_queue",
             "source_contributions.source_record_id",

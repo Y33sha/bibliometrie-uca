@@ -1,6 +1,6 @@
 """Réconciliation des publications : rattachement, fusion et scission, en une seule décision.
 
-Les enregistrements sources du voisinage se répartissent en partitions : composantes connexes de clés de confirmation, coupées par leurs ancres DOI (`doi_anchors`). Une composante à une ancre au plus reste entière. Dans une composante à plusieurs ancres, un enregistrement source rejoint l'ancre de son DOI `primary` ou `derived`, à défaut l'unique ancre parmi ses DOI `secondary` ; sans ancre unique, il reste sur sa publication. Un enregistrement source dérivé suit l'ancre de son parent, l'enregistrement source dont l'identifiant primaire est son identifiant dérivé.
+Les enregistrements sources du voisinage se répartissent en partitions : composantes connexes de clés de confirmation, coupées par leurs ancres DOI (`doi_anchors`). Une composante à une ancre au plus reste entière. Dans une composante à plusieurs ancres, un enregistrement source rejoint l'ancre de son DOI `primary` ou `derived`, à défaut l'unique ancre parmi ses DOI `secondary`. Sans ancre unique, il reste sur sa publication. Un enregistrement source dérivé suit l'ancre de son parent, l'enregistrement source dont l'identifiant primaire est son identifiant dérivé.
 
 Chaque partition aboutit sur une seule publication, son ancre : celle qui a déjà son DOI, sinon celle du plus petit enregistrement source rattaché. L'ancre garde son identifiant, et donc les corrections faites à la main. Une partition d'enregistrements sources orphelins, sans publication, en crée une si l'un d'eux peut la fonder ; sinon, elle reste orpheline. Un enregistrement source écarté (`is_matchable`) quitte sa publication.
 """
@@ -15,8 +15,8 @@ from domain.publications.metadata import has_minimal_publication_metadata
 from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES
 from domain.source_records.keys import Derivation, DoiKeys, anchor_of, doi_anchors
 
-# Nom de clé des jetons de fusion manuelle, valeur de clé = identifiant de la fusion manuelle.
 MANUAL_MERGE_KEY = "manual_merge"
+"""Nom de clé des jetons de fusion manuelle, valeur de clé = identifiant de la fusion manuelle."""
 
 
 def manual_merge_tokens(manual_merge_ids: Iterable[int]) -> frozenset[tuple[str, str]]:
@@ -95,7 +95,7 @@ def _derived_anchors(
     members: list[ReconcileMember], own_anchors: Mapping[int, str | None]
 ) -> dict[int, str]:
     """Renvoie l'ancre suivie par chaque enregistrement source dérivé : celle de son parent. Sans parent parmi `members`, les enregistrements sources de même identifiant dérivé suivent l'unique ancre parmi les leurs."""
-    parents = {key: m for m in members for key in m.derivation.primary}
+    parents = {m.derivation.primary: m for m in members if m.derivation.primary is not None}
     families: dict[tuple[str, str], list[ReconcileMember]] = defaultdict(list)
     for m in members:
         if m.derivation.derived is not None:

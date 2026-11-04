@@ -48,7 +48,6 @@ class SerialTitleIssnRow(NamedTuple):
     has_issn: bool
 
 
-# Type brut de chaque enregistrement source des revues de type inconnu : celui de la source, avant correction.
 _RECORD_TYPES_OF_UNKNOWN_SERIALS = text("""
     SELECT j.id,
            array_agg(s.source::text ORDER BY s.id) AS sources,
@@ -59,6 +58,7 @@ _RECORD_TYPES_OF_UNKNOWN_SERIALS = text("""
     GROUP BY j.id
     ORDER BY j.id
 """)
+"""Type brut de chaque enregistrement source des revues de type inconnu : celui de la source, avant correction."""
 
 
 def find_record_types_of_unknown_serials(conn: Connection) -> list[SerialRecordTypes]:

@@ -33,9 +33,11 @@ export function setExclusion(
 
 export function detachContributions(
 	personId: number,
-	body: Record<string, unknown>
+	publicationIds: number[]
 ): Promise<DetachContributionsResponse> {
-	return post<DetachContributionsResponse>(`/api/persons/${personId}/detach-contributions`, body);
+	return post<DetachContributionsResponse>(`/api/persons/${personId}/detach-contributions`, {
+		publication_ids: publicationIds
+	});
 }
 
 export function updateNameFormStatus(

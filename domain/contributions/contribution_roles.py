@@ -29,7 +29,6 @@ _AUTHOR = (ContributionRole.AUTHOR,)
 _CONTRIBUTOR = (ContributionRole.CONTRIBUTOR,)
 _OTHER = (ContributionRole.OTHER,)
 
-# Codes MARC relator et extensions HAL, repris par ScanR. La position d'un co-premier ou co-dernier auteur est dans `author_position`.
 _MARC_ROLES: dict[str, tuple[ContributionRole, ...]] = {
     "aut": _AUTHOR,
     "crp": _AUTHOR,  # auteur correspondant
@@ -89,9 +88,10 @@ _MARC_ROLES: dict[str, tuple[ContributionRole, ...]] = {
         _OTHER,
     ),  # fmt: skip
 }
+"""Codes MARC relator et extensions HAL, repris par ScanR. La position d'un co-premier ou co-dernier auteur est dans `author_position`."""
 
-# Code de l'auteur correspondant.
 _CORRESPONDING_CODES = frozenset({"crp"})
+"""Code de l'auteur correspondant."""
 
 _WOS_ROLES: dict[str, tuple[ContributionRole, ...]] = {
     "author": _AUTHOR,
@@ -101,7 +101,6 @@ _WOS_ROLES: dict[str, tuple[ContributionRole, ...]] = {
     "anon": _AUTHOR,  # auteur anonyme
 }
 
-# ScanR : codes MARC, et rôles de thèse en français sans accents.
 _SCANR_ROLES: dict[str, tuple[ContributionRole, ...]] = {
     **_MARC_ROLES,
     "author": _AUTHOR,
@@ -110,8 +109,8 @@ _SCANR_ROLES: dict[str, tuple[ContributionRole, ...]] = {
     "membrejury": (ContributionRole.JURY_MEMBER,),
     "presidentjury": (ContributionRole.JURY_PRESIDENT,),
 }
+"""ScanR : codes MARC, et rôles de thèse en français sans accents."""
 
-# theses.fr donne un champ par rôle.
 THESES_FIELD_ROLES: dict[str, tuple[ContributionRole, ...]] = {
     "auteurs": (ContributionRole.AUTHOR,),
     "directeurs": (ContributionRole.THESIS_DIRECTOR,),
@@ -119,8 +118,8 @@ THESES_FIELD_ROLES: dict[str, tuple[ContributionRole, ...]] = {
     "membresJury": (ContributionRole.JURY_MEMBER,),
     "presidentJury": (ContributionRole.JURY_PRESIDENT,),
 }
+"""theses.fr donne un champ par rôle."""
 
-# Rôles de jury de thèse, donnés par theses.fr et ScanR.
 THESIS_JURY_ROLES: frozenset[str] = frozenset(
     {
         ContributionRole.THESIS_DIRECTOR,
@@ -129,9 +128,10 @@ THESIS_JURY_ROLES: frozenset[str] = frozenset(
         ContributionRole.JURY_PRESIDENT,
     }
 )
+"""Rôles de jury de thèse, donnés par theses.fr et ScanR."""
 
-# Rôles de thèse qui impliquent l'appartenance au jury, et rendent `JURY_MEMBER` superflu.
 _THESIS_ROLES_IMPLYING_JURY = THESIS_JURY_ROLES - {ContributionRole.JURY_MEMBER}
+"""Rôles de thèse qui impliquent l'appartenance au jury, et rendent `JURY_MEMBER` superflu."""
 
 _SOURCE_ROLES: dict[str, dict[str, tuple[ContributionRole, ...]]] = {
     "hal": _MARC_ROLES,

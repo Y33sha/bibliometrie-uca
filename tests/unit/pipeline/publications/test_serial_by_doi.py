@@ -1,14 +1,12 @@
 """Tests du rattachement de la revue manquante par l'espace de noms du DOI."""
 
-import logging
-
 from domain.serials.doi_namespaces import DoiNamespace
 from domain.source_records.corrections import stash_entry
 from pipeline.transformation.publications.correction.correction_store import (
     SerialCorrectionRow,
     SerialCorrectionUpdate,
 )
-from pipeline.transformation.publications.correction.serial_by_doi import compute_updates, run
+from pipeline.transformation.publications.correction.serial_by_doi import compute_updates
 
 _NAMESPACES = [
     DoiNamespace("10.64628/aak.", 7, 300, 1.0),
@@ -116,34 +114,3 @@ def test_chapitre_rattache_a_tort_retrouve_sa_revue_brute():
         corrections={"serial_id": _STASH},
     )
     assert compute_updates([row], _NAMESPACES) == [SerialCorrectionUpdate(1, None, {})]
-
-
-class _Queries:
-    def __init__(self, rows: list[SerialCorrectionRow]) -> None:
-        self._rows = rows
-
-    def fetch_serial_doi_namespaces(self):
-        return _NAMESPACES
-
-    def fetch_serial_by_doi_candidates(self):
-        return self._rows
-
-    def persist_serial_corrections(self, updates):
-        return len(updates)
-
-
-class _Conn:
-    def commit(self) -> None: ...
-
-
-def test_le_bilan_compte_les_revues_distinctes(caplog):
-    """Deux enregistrements sources rattachés à la même revue comptent pour une revue."""
-    rows = [
-        _row(id=1, doi="10.64628/aak.1"),
-        _row(id=2, doi="10.64628/aak.2"),
-        _row(id=3, doi="10.5194/acp-3"),
-        _row(id=4, doi="10.1/x", serial_id=7, corrections={"serial_id": _STASH}),
-    ]
-    with caplog.at_level(logging.INFO, logger="test"):
-        run(_Conn(), _Queries(rows), logging.getLogger("test"))  # type: ignore[arg-type]
-    assert "3 enregistrements sources rattachés à 2 revues, 1 rattachement retiré" in caplog.text

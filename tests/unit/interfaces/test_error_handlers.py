@@ -1,6 +1,6 @@
 """Les gestionnaires d'erreur de l'API renvoient le code attendu, et rien d'autre.
 
-Un conflit donne 409. Une erreur imprévue donne seulement un message générique, et sa trace part au journal.
+Un conflit donne 409. Une erreur imprévue donne seulement un message générique.
 
 Les gestionnaires sont testés directement, sur une exception et une requête : leur comportement est indépendant de la route qui a levé l'exception.
 """
@@ -65,7 +65,7 @@ async def test_fusion_editeurs_bloquee_enumere_les_paires():
 
 
 @pytest.mark.asyncio
-async def test_erreur_imprevue_ne_rend_pas_la_trace(caplog):
+async def test_erreur_imprevue_ne_rend_pas_la_trace():
     """Le 500 contient un message fixe, sans le détail de l'échec."""
     reponse = await unhandled_exception_handler(_requete(), RuntimeError("mot de passe = hunter2"))
     assert reponse.status_code == 500

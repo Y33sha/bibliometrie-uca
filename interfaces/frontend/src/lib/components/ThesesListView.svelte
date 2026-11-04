@@ -199,7 +199,7 @@
 			label={filterLabels.sources}
 			items={[
 				{ key: 'hal', label: 'HAL' },
-				{ key: 'oa', label: 'OpenAlex' },
+				{ key: 'openalex', label: 'OpenAlex' },
 				{ key: 'scanr', label: 'ScanR' },
 				{ key: 'theses', label: 'theses.fr' }
 			]}

@@ -11,8 +11,8 @@ from typing import Any
 from sqlalchemy import Connection, text
 
 from domain.countries import NO_COUNTRY_CODE
+from domain.documents.licenses import license_label
 from domain.publications.hal_deposit import HAL_DEPOSIT_STATUS_LABELS, HalDepositStatus
-from domain.publications.licenses import license_label
 from domain.publications.oa_status import OaStatus
 from domain.source_records.impact import CITATION_TOP_LABELS, CitationTop
 from domain.sources.registry import source_label
@@ -31,6 +31,7 @@ from infrastructure.read_models.filters import (
     author_position_predicate,
     author_position_subject,
     hal_status_expression,
+    in_source_sql,
     institution_apc_payment_sql,
     no_lab_clause,
     own_structure_ids,
@@ -49,6 +50,7 @@ from infrastructure.read_models.publications.models import (
     NO_DOI,
     NO_LICENSE,
     OTHER_DOI_AGENCY,
+    SOURCE_FILTER_SOURCES,
     PublicationFilters,
     PublicationsFacetsResponse,
 )
@@ -223,32 +225,19 @@ class _PublicationFacetsBuilder:
         ]
 
     def _facet_source_counts(self) -> dict[str, YesNoCount]:
-        """Renvoie les décomptes oui et non de chaque source, sans aucun filtre de source."""
+        """Renvoie les décomptes oui et non de chaque source de `SOURCE_FILTER_SOURCES`, sans aucun filtre de source."""
         where_sql, binds = self._clauses_skipping("source")
+        counts = ", ".join(
+            f"COUNT(*) FILTER (WHERE {in_source_sql(source)}) AS {source}"
+            for source in SOURCE_FILTER_SOURCES
+        )
         row = self.conn.execute(
-            text(f"""
-                SELECT
-                    COUNT(*) FILTER (WHERE p.sources @> ARRAY['hal'::source_type]) AS hal_yes,
-                    COUNT(*) FILTER (WHERE NOT p.sources @> ARRAY['hal'::source_type]) AS hal_no,
-                    COUNT(*) FILTER (WHERE p.sources @> ARRAY['openalex'::source_type]) AS oa_yes,
-                    COUNT(*) FILTER (WHERE NOT p.sources @> ARRAY['openalex'::source_type]) AS oa_no,
-                    COUNT(*) FILTER (WHERE p.sources @> ARRAY['scanr'::source_type]) AS scanr_yes,
-                    COUNT(*) FILTER (WHERE NOT p.sources @> ARRAY['scanr'::source_type]) AS scanr_no,
-                    COUNT(*) FILTER (WHERE p.sources @> ARRAY['wos'::source_type]) AS wos_yes,
-                    COUNT(*) FILTER (WHERE NOT p.sources @> ARRAY['wos'::source_type]) AS wos_no,
-                    COUNT(*) FILTER (WHERE p.sources @> ARRAY['theses'::source_type]) AS theses_yes,
-                    COUNT(*) FILTER (WHERE NOT p.sources @> ARRAY['theses'::source_type]) AS theses_no
-                FROM publications p
-                WHERE {where_sql}
-            """),
+            text(f"SELECT COUNT(*) AS total, {counts} FROM publications p WHERE {where_sql}"),
             binds,
         ).one()
         return {
-            "hal": YesNoCount(yes=row.hal_yes, no=row.hal_no),
-            "oa": YesNoCount(yes=row.oa_yes, no=row.oa_no),
-            "scanr": YesNoCount(yes=row.scanr_yes, no=row.scanr_no),
-            "wos": YesNoCount(yes=row.wos_yes, no=row.wos_no),
-            "theses": YesNoCount(yes=row.theses_yes, no=row.theses_no),
+            source: YesNoCount(yes=getattr(row, source), no=row.total - getattr(row, source))
+            for source in SOURCE_FILTER_SOURCES
         }
 
     def _facet_apc(self) -> list[FacetOption]:

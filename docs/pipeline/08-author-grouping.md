@@ -11,14 +11,14 @@ Les contributions d'une publication se recalculent entièrement, donc le résult
 ## Contributions sources écartées
 
 - Les contributions sources collectives (collaboration, consortium, rédaction…).
-- Les doublons d'auteur : une source répète un bloc de sa liste à la suite, chaque nom à sa place, ou des auteurs dans la liste des membres d'un collectif. Le doublon reçoit `duplicate_of`, vers la première occurrence du nom (`domain/publications/list_copies.py`).
+- Les doublons d'auteur : une source répète un bloc de sa liste à la suite, chaque nom à sa place, ou des auteurs dans la liste des membres d'un collectif. Le doublon reçoit `duplicate_of`, vers la première occurrence du nom (`domain/contributions/author_duplicates.py`).
 - Les enregistrements sources DataCite d'une version de concept ou d'une pièce de jeu de données, quand la publication a un autre enregistrement source : leur liste d'auteurs répète celle d'un autre enregistrement source.
 
 Ces contributions sources ne sont dans aucune contribution et n'ont pas de personne.
 
 ## Alignement
 
-Les enregistrements sources se traitent de la liste d'auteurs la plus longue à la plus courte, chacun face aux contributions déjà formées. Une contribution source rejoint une contribution par son nom (nom de famille et prénom, ou initiale, sans ambiguïté), par un ORCID ou un IdRef partagé, ou par sa place entre deux contributions sources déjà alignées. Un modèle probabiliste (Fellegi-Sunter) aligne le reste. Les règles sont dans `domain/publications/author_grouping.py`, les poids du modèle dans `pipeline/transformation/publications/author_grouping/residual_weights.py`.
+Les enregistrements sources se traitent de la liste d'auteurs la plus longue à la plus courte, chacun face aux contributions déjà formées. Une contribution source rejoint une contribution par son nom (nom de famille et prénom, ou initiale, sans ambiguïté), par un ORCID ou un IdRef partagé, ou par sa place entre deux contributions sources déjà alignées. Un modèle probabiliste (Fellegi-Sunter) aligne le reste. Les règles sont dans `domain/contributions/author_grouping.py`, les poids du modèle dans `pipeline/transformation/publications/author_grouping/residual_weights.py`.
 
 ## Écritures
 

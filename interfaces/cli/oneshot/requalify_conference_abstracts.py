@@ -16,7 +16,7 @@ from collections import Counter
 
 from sqlalchemy import Connection, text
 
-from domain.publications.doc_types import DocType
+from domain.documents.doc_types import DocType
 from domain.source_records.doc_types import map_doc_type
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.queues import Queue, enqueue
@@ -24,7 +24,6 @@ from infrastructure.observability.log import setup_logger
 
 log = setup_logger("requalify_conference_abstracts", os.path.dirname(__file__))
 
-# Enregistrements sources OpenAlex et WoS de type `conference` avant correction.
 _CANDIDATES = text("""
     SELECT id, source::text AS source, raw_doc_type,
            corrections->'doc_type'->>'corrected_by' AS corrected_by
@@ -32,6 +31,7 @@ _CANDIDATES = text("""
     WHERE source IN ('openalex', 'wos') AND raw_doc_type IS NOT NULL
       AND coalesce(corrections->'doc_type'->>'raw', doc_type::text) = 'conference'
 """)
+"""Enregistrements sources OpenAlex et WoS de type `conference` avant correction."""
 
 _UPDATE_DOC_TYPE = text("""
     UPDATE source_records SET doc_type = 'conference_abstract', updated_at = clock_timestamp()

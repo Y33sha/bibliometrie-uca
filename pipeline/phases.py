@@ -3,9 +3,8 @@
 Les enrichissements (`extra`) viennent en dernier. Chacun est indépendant des autres. Des phases placées avant eux lisent leurs sorties au run suivant : `resolve_ra` et `fetch_missing` lisent les relations, `normalize` et `publications` les pays, `publications` le statut open access.
 """
 
-from sqlalchemy import Connection
+from dataclasses import replace
 
-from domain.config import ConfigKey
 from pipeline.graph import Phase, Task
 from pipeline.ingestion.common import (
     fetch_missing,
@@ -15,8 +14,8 @@ from pipeline.ingestion.common import (
     normalize,
 )
 from pipeline.ingestion.openalex import fetch_truncated
-from pipeline.runtime.config import delay
-from pipeline.runtime.observability.log_format import quantity
+from pipeline.runtime.context import PhaseContext
+from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation import finalize
 from pipeline.transformation.countries import countries
 from pipeline.transformation.persons import persons
@@ -26,12 +25,10 @@ from pipeline.transformation.publications.correction import metadata_correction
 from pipeline.transformation.publications.subjects import subjects
 from pipeline.transformation.publishing import publishing, resolve_ra
 from pipeline.transformation.structures import affiliations
-from pipeline.transformation.structures.perimeter import check_extraction_perimeter
-
-
-def _fetch_stale_fields(conn: Connection) -> dict[str, str]:
-    return {"delai": quantity(delay(conn, ConfigKey.FETCH_STALE_AFTER_DAYS), "jour")}
-
+from pipeline.transformation.structures.perimeter import (
+    check_extraction_perimeter,
+    refresh_perimeter_structures,
+)
 
 PHASES: tuple[Phase, ...] = (
     Phase(
@@ -58,10 +55,9 @@ PHASES: tuple[Phase, ...] = (
     ),
     Phase(
         "fetch_stale",
-        "Recherche des documents non revus depuis {delai}",
+        "Relecture des documents non revus par le moissonnage",
         fetch_stale.TASKS,
         harvesting=True,
-        label_fields=_fetch_stale_fields,
         when=lambda options: options.policy.fetch_stale,
         assemble=fetch_stale.assemble,
     ),
@@ -152,15 +148,34 @@ PHASES: tuple[Phase, ...] = (
     ),
 )
 
+
+def _refresh_perimeter_structures(ctx: PhaseContext) -> PhaseMetrics:
+    with ctx.open_tx() as conn:
+        refresh_perimeter_structures(conn)
+    return PhaseMetrics()
+
+
 PERIMETER_STRUCTURES = Task(
     "perimeter_structures",
-    reads=frozenset({"perimeters", "structure_parents", "structures"}),
-    writes=frozenset({"perimeter_structures"}),
+    reads=("perimeters", "structure_parents", "structures"),
+    writes=("perimeter_structures",),
+    run=_refresh_perimeter_structures,
 )
-"""Matérialisation des structures des périmètres, exécutée par l'orchestrateur avant toute phase (`refresh_perimeter_structures`)."""
+"""Matérialisation des structures des périmètres, exécutée par l'orchestrateur avant toute phase."""
+
+
+def _qualified(phase: str, task: Task) -> Task:
+    """Renvoie la tâche, son nom et son groupe parallèle préfixés du nom de sa phase : `publishing.attach_serials`."""
+    group = task.parallel_group
+    return replace(
+        task,
+        name=f"{phase}.{task.name}",
+        parallel_group=f"{phase}.{group}" if group is not None else None,
+    )
+
 
 ALL_TASKS: tuple[Task, ...] = (
     PERIMETER_STRUCTURES,
-    *(task for phase in PHASES for task in phase.tasks),
+    *(_qualified(phase.name, task) for phase in PHASES for task in phase.tasks),
 )
-"""Tâches du pipeline dans l'ordre d'exécution : celle de l'orchestrateur, puis celles de chaque phase."""
+"""Tâches du pipeline dans l'ordre d'exécution, pour le graphe des dépendances : celle de l'orchestrateur, puis celles de chaque phase, préfixées du nom de leur phase."""

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import httpx2
 
-from domain.publications.identifiers import DOI
+from domain.documents.identifiers import DOI
 from domain.types import as_str
 from pipeline.http.lookup import UNAVAILABLE, NotFound, Unavailable
 from pipeline.ingestion.common.lookup import LookupBatch

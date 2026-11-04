@@ -3,7 +3,7 @@
 Couvre la séquence d'écriture `normalize_record`, le tri de `process_work` sur les métadonnées minimales, et la méthode `run()` :
 - aucun document en attente ;
 - succès, documents ignorés et erreurs mêlés, commit par lot, bilan ;
-- exception dans `process_work` (journalisation, rollback au SAVEPOINT) ;
+- exception dans `process_work` (rollback au SAVEPOINT, document laissé en file) ;
 - `KeyboardInterrupt` (rollback du lot en cours, exception relevée) ;
 - exception fatale hors de la boucle (rollback, exception relevée) ;
 - chargement par sous-lots (`FETCH_SUB_BATCH`).
@@ -11,14 +11,13 @@ Couvre la séquence d'écriture `normalize_record`, le tri de `process_work` sur
 
 from __future__ import annotations
 
-import logging
 from dataclasses import replace
 from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 
-from domain.publications.dates import PublicationDate
+from domain.documents.dates import PublicationDate
 from domain.serials.containers import ContainerDescription
 from domain.serials.issns import SerialIssn
 from pipeline.ingestion.common import normalizer as normalizer_module
@@ -63,7 +62,7 @@ class _FakeStaging:
 class _StubNorm(SourceNormalizer):
     """Normaliseur dont l'analyse d'une ligne est sans objet pour le test."""
 
-    SOURCE = "test"
+    SOURCE = "hal"
 
     def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
         return "Titre", 2024
@@ -86,7 +85,6 @@ class _StubNorm(SourceNormalizer):
 class _Norm(_StubNorm):
     """Normaliseur instrumenté pour observer `run()`."""
 
-    SOURCE = "test"
     DEFAULT_BATCH_SIZE = 2
 
     def __init__(
@@ -121,15 +119,12 @@ class _Norm(_StubNorm):
 
 
 class TestRunNoWork:
-    def test_nothing_to_do(self, caplog):
-        """Une source sans document en attente laisse le journal vide : la barre des autres sources reste lisible."""
+    def test_nothing_to_do(self):
         staging = _FakeStaging()
         norm = _Norm(staging)
-        with caplog.at_level(logging.INFO):
-            norm.run()
+        norm.run()
         # Sans document en attente, le préchargement des caches est sauté.
         assert norm.preload_called is False
-        assert caplog.text == ""
 
 
 class TestRunHappyPath:
@@ -142,24 +137,13 @@ class TestRunHappyPath:
         assert [r.source_id for r in norm.processed_rows] == ["r1", "r2", "r3"]
         assert norm.cleanup_called is True
 
-    def test_mixes_success_skip_error(self, caplog):
-        """`True` → processed, `None` → skipped, `False` → errors, récapitulé par son identifiant."""
+    def test_mixes_success_skip_error(self):
+        """`True` → processed, `None` → skipped, `False` → errors."""
         staging = _FakeStaging()
         staging.pending_rows = [_row("ok"), _row("skip"), _row("err")]
         norm = _Norm(staging, results=[True, None, False])
-        with caplog.at_level(logging.INFO):
-            stats = norm.run()
-        assert "1 document aux métadonnées incomplètes" in caplog.text
-        assert "err" in caplog.text
+        stats = norm.run()
         assert stats == NormalizeStats(processed=1, skipped=1, errors=1)
-
-    def test_sans_document_incomplet_aucun_recapitulatif(self, caplog):
-        staging = _FakeStaging()
-        staging.pending_rows = [_row("ok"), _row("skip")]
-        norm = _Norm(staging, results=[True, None])
-        with caplog.at_level(logging.INFO):
-            norm.run()
-        assert "métadonnées incomplètes" not in caplog.text
 
     def test_le_commit_tombe_a_chaque_lot(self):
         """Avec DEFAULT_BATCH_SIZE=2 sur quatre documents : deux commits de lot, plus celui de fin."""
@@ -170,36 +154,21 @@ class TestRunHappyPath:
         assert norm.conn.commit.call_count == 3
         assert staging.forgotten == [r.id for r in staging.pending_rows]
 
-    def test_un_run_sans_erreur_se_tait(self, caplog):
-        """La barre affiche l'avancement ; le compte des documents ignorés passe par les métriques."""
-        staging = _FakeStaging()
-        staging.pending_rows = [_row("a"), _row("b")]
-        norm = _Norm(staging, results=[True, None])
-        with caplog.at_level(logging.INFO):
-            stats = norm.run()
-        assert caplog.text == ""
-        assert stats.skipped == 1
-
 
 class TestRunWorkException:
-    def test_savepoint_rollback_continues_batch(self, caplog):
+    def test_savepoint_rollback_continues_batch(self):
         staging = _FakeStaging()
         staging.pending_rows = [_row("a"), _row("b")]
         norm = _Norm(staging, results=[True, True], raises_on={"a"})
-        with caplog.at_level(logging.INFO):
-            norm.run()
-        # La boucle journalise le document en échec.
-        assert "Erreur sur a" in caplog.text
+        norm.run()
         # Le deuxième document est traité après le rollback du premier.
         assert "b" in [r.source_id for r in norm.processed_rows]
-        # Une exception est journalisée avec son motif, distincte d'un document incomplet.
-        assert "métadonnées incomplètes" not in caplog.text
         # Le document en échec reste en file pour le run suivant.
         assert staging.forgotten == [_row("b").id]
 
 
 class TestRunKeyboardInterrupt:
-    def test_rollback_and_reraise(self, caplog):
+    def test_rollback_and_reraise(self):
         staging = _FakeStaging()
         staging.pending_rows = [_row("a")]
 
@@ -208,10 +177,9 @@ class TestRunKeyboardInterrupt:
                 raise KeyboardInterrupt
 
         norm = _Kb(staging, results=[True])
-        with caplog.at_level(logging.WARNING), pytest.raises(KeyboardInterrupt):
+        with pytest.raises(KeyboardInterrupt):
             norm.run()
         # Le lot en cours est annulé par un rollback, et le KeyboardInterrupt est relevé pour que `run_pipeline` s'arrête. Les lots commités restent écrits.
-        assert "Interruption" in caplog.text
         norm.conn.rollback.assert_called()
 
     def test_connexion_invalidee_laisse_remonter_l_interruption(self):
@@ -230,8 +198,8 @@ class TestRunKeyboardInterrupt:
 
 
 class TestRunFatalException:
-    def test_rollback_and_reraise(self, caplog):
-        """Une exception de `preload_caches`, avant la boucle, est fatale : rollback, journalisation, exception relevée."""
+    def test_rollback_and_reraise(self):
+        """Une exception de `preload_caches`, avant la boucle, est fatale : rollback, puis exception relevée."""
         staging = _FakeStaging()
         staging.pending_rows = [_row("a")]
 
@@ -240,9 +208,8 @@ class TestRunFatalException:
                 raise RuntimeError("fatal preload")
 
         norm = _Fatal(staging)
-        with caplog.at_level(logging.ERROR), pytest.raises(RuntimeError):
+        with pytest.raises(RuntimeError):
             norm.run()
-        assert "Erreur fatale" in caplog.text
         assert norm.conn.rollback.called is True  # type: ignore[attr-defined]
 
 
@@ -327,7 +294,7 @@ class TestProcessWorkMinimalMetadata:
 
 
 _RECORD = SourceRecordUpsert(
-    source="test",
+    source="hal",
     source_id="a",
     staging_id=1,
     title="T",
@@ -402,11 +369,11 @@ class TestNormalizeRecord:
         norm = _WritingNorm(
             doc={"title": "T"},
             publisher=PublisherFacts("Elsevier", "P1"),
-            facts=ContainerDescription(source="test", raw_doc_type=None, journal_title="Revue"),
+            facts=ContainerDescription(source="hal", raw_doc_type=None, journal_title="Revue"),
         )
         norm._record_store.upsert_source_record.return_value = 42
         assert norm.normalize_record(self.ROW) is True
-        assert writes == [("contributions", "test", 42)]
+        assert writes == [("contributions", "hal", 42)]
         assert norm.series_seen == [True]
         norm._record_store.upsert_source_record.assert_called_once_with(
             replace(
@@ -426,7 +393,7 @@ class TestNormalizeRecord:
         norm = _WritingNorm(doc={"title": "T"})
         norm._record_store.upsert_source_record.return_value = 42
         assert norm.normalize_record(self.ROW) is True
-        assert writes == [("contributions", "test", 42)]
+        assert writes == [("contributions", "hal", 42)]
         assert norm.series_seen == [False]
         norm._record_store.upsert_source_record.assert_called_once_with(_RECORD)
 

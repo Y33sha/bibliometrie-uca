@@ -3,14 +3,14 @@
 from collections.abc import Mapping
 from urllib.parse import urlsplit
 
+from domain.contributions.contribution_roles import map_role, merge_roles
 from domain.countries import normalize_country_code
+from domain.documents.dates import PublicationDate, date_from_parts, parse_iso_date
+from domain.documents.doc_types import DOC_TYPE_FAMILIES
+from domain.documents.identifiers import HALId
+from domain.documents.licenses import normalize_license
 from domain.normalize import drop_flattened_mathml
 from domain.persons.contributor_name import ContributorName
-from domain.publications.contribution_roles import map_role, merge_roles
-from domain.publications.dates import PublicationDate, date_from_parts, parse_iso_date
-from domain.publications.doc_types import DOC_TYPE_FAMILIES
-from domain.publications.identifiers import HALId
-from domain.publications.licenses import normalize_license
 from domain.serials.containers import ContainerDescription
 from domain.serials.issns import source_issns
 from domain.source_records.doc_types import map_doc_type
@@ -20,7 +20,6 @@ from domain.source_records.identifiers import (
     SourceIdentifierType,
 )
 from domain.source_records.impact import Impact
-from domain.source_records.source_extras import SourceExtra
 from domain.structures.identifiers import RorId, parse_ror_ids
 from domain.subjects.subject import SubjectLink
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs
@@ -133,12 +132,12 @@ def get_locations(doc: Mapping[str, JsonValue]) -> list[LocationFacts]:
     return locations
 
 
-# Type d'identifiant de chaque type d'`externalIds` lu.
 _EXTERNAL_ID_TYPES = {
     "doi": SourceIdentifierType.DOI,
     "hal": SourceIdentifierType.HAL_ID,
     "pmid": SourceIdentifierType.PMID,
 }
+"""Type d'identifiant de chaque type d'`externalIds` lu."""
 
 
 def scanr_identifiers(doc: Mapping[str, JsonValue], scanr_id: str) -> tuple[SourceIdentifier, ...]:
@@ -193,7 +192,7 @@ def scanr_source_record(  # noqa: C901
     seen: set[str] = set()
     oa_ev = as_mapping(doc.get("oaEvidence"))
     raw_license = as_str(oa_ev.get("license"))
-    # La licence d'une localisation d'archive (dépôt HAL…) garde sa forme brute dans `source_extras`, sans licence normalisée : HAL donne la licence de ses dépôts.
+    # Seule la licence d'une localisation d'éditeur est celle de l'enregistrement source : HAL donne la licence de ses dépôts.
     publisher_license = raw_license if oa_ev.get("hostType") == "publisher" else None
     addresses = [doc.get(f) for f in ("landingPage", "doiUrl", "pdfUrl")]
     addresses += [oa_ev.get(f) for f in ("landingPageUrl", "url", "pdfUrl")]
@@ -221,7 +220,6 @@ def scanr_source_record(  # noqa: C901
         license=normalize_license(publisher_license),
         urls=urls or None,
         impact=Impact(cited_by_count=cited_by_count).to_json(),
-        source_extras={SourceExtra.LICENSE: raw_license} if raw_license else None,
     )
 
 

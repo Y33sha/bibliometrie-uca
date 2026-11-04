@@ -21,7 +21,6 @@ _NNT_PENDING = pending_failed_lookup_sql(
     source_sql="'theses'", id_type="nnt", value_sql="n.id_value"
 )
 
-# Le NNT d'un enregistrement source est son NNT actif de rôle le plus fort, puis de plus petite valeur.
 _MISSING_NNTS_SQL = text(
     f"""
     SELECT DISTINCT n.id_value AS nnt
@@ -37,6 +36,7 @@ _MISSING_NNTS_SQL = text(
     ORDER BY 1
     """
 )
+"""Le NNT d'un enregistrement source est son NNT actif de rôle le plus fort, puis de plus petite valeur."""
 
 
 def get_missing_nnts(conn: Connection, *, retry_after_days: int) -> list[str]:

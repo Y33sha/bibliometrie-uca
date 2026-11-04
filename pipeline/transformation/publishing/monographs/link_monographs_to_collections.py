@@ -9,9 +9,9 @@ from typing import NamedTuple
 
 from sqlalchemy import Connection, text
 
+from domain.entity_resolution import most_frequent
 from domain.monographs.collection import MonographSerialChoice, choose_monograph_serial
 from domain.normalize import normalize_text
-from domain.serials.attachment import most_frequent
 from domain.serials.serial import SerialType
 from domain.serials.series import VolumeTitle, group_series
 from infrastructure.sql_fragments import has_active_issn

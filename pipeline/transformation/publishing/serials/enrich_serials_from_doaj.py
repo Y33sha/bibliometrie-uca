@@ -15,9 +15,9 @@ from typing import NamedTuple
 from sqlalchemy import Connection, and_, func, not_, select, update
 
 from domain.dates import date_to_french
+from domain.documents.identifiers import ISSN
 from domain.normalize import optional_plain_text
 from domain.pipeline_runs import PhaseStatus
-from domain.publications.identifiers import ISSN
 from domain.serials.serial import OaModel, SerialType
 from domain.types import JsonValue
 from infrastructure.db.scalars import scalar_datetime_or_none
@@ -32,11 +32,11 @@ from pipeline.transformation.publishing.serials.store import OA_MODEL_NOT_MANUAL
 LABEL = "Import du DOAJ"
 """Libellé de la sous-étape dans le journal de la phase."""
 
-# Colonnes ISSN du dump CSV DOAJ.
 ISSN_KEYS = (
     "Journal ISSN (print version)",
     "Journal EISSN (online version)",
 )
+"""Colonnes ISSN du dump CSV DOAJ."""
 
 COMMIT_EVERY = 1000
 
@@ -47,9 +47,12 @@ DownloadDump = Callable[[], AbstractContextManager[Iterable[dict[str, str]]]]
 @dataclass
 class DoajImportStats:
     total_rows: int = 0
-    no_issn_rows: int = 0  # lignes du dump sans ISSN valide
-    orphan_rows: int = 0  # lignes du dump à ISSN inconnu de la base
-    matched: int = 0  # revues mises à is_in_doaj
+    no_issn_rows: int = 0
+    """Lignes du dump sans ISSN valide."""
+    orphan_rows: int = 0
+    """Lignes du dump à ISSN inconnu de la base."""
+    matched: int = 0
+    """Revues mises à is_in_doaj."""
 
 
 class SerialIssnRow(NamedTuple):
@@ -260,7 +263,7 @@ def _import_doaj(
         # Le téléchargement précède toute écriture : le référentiel reste celui du dernier import.
         metrics = PhaseMetrics()
         logger.warning("Dump DOAJ inaccessible, référentiel inchangé : %s", e)
-        signal_source_unavailable(metrics, "DOAJ", logger=logger, phase="publishing")
+        signal_source_unavailable(metrics, "DOAJ", logger=logger)
         metrics.report = "dump inaccessible, import repris au prochain run"
         return metrics
     metrics = PhaseMetrics(extras={"matched": stats.matched})

@@ -16,7 +16,7 @@ from collections.abc import Callable
 import httpx2
 from sqlalchemy import Connection, text
 
-from domain.publications.identifiers import DOI
+from domain.documents.identifiers import DOI
 from domain.source_records.identifiers import SourceIdentifierType
 from domain.sources.staging import StagingEntryMode
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
@@ -27,8 +27,8 @@ from pipeline.ingestion.scanr.api import search
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
 BATCH_SIZE = 50
-# L'API Elasticsearch publique est sans plafond documenté : 5 requêtes simultanées restent courtoises.
 MAX_CONCURRENT = 5
+"""L'API Elasticsearch publique est sans plafond documenté : 5 requêtes simultanées restent courtoises."""
 
 
 async def search_by_external_ids(

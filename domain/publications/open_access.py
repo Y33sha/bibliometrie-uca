@@ -11,10 +11,10 @@ Le verdict d'Unpaywall relève les accès, jamais ne les abaisse.
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, replace
 
+from domain.documents.doc_types import DocType
+from domain.documents.licenses import OPEN_LICENSES
 from domain.platforms.platform import ARCHIVE_TYPES
 from domain.publications.access import Copy, open_copies
-from domain.publications.doc_types import DocType
-from domain.publications.licenses import OPEN_LICENSES
 from domain.publications.oa_status import OaStatus
 from domain.serials.serial import OaModel
 from domain.source_records.source_extras import SourceExtra
@@ -58,7 +58,6 @@ def copies_facts(copies: Iterable[Copy]) -> OpenAccessFacts:
         publisher_open=bool(publisher),
         publisher_licensed=any(c.license in OPEN_LICENSES for c in publisher),
         archive_open=any(c.platform_type in ARCHIVE_TYPES for c in opened),
-        embargoed=any(c.embargoed for c in copies),
         informed=any(c.is_oa is False for c in copies),
     )
 
@@ -87,9 +86,7 @@ def publication_oa_status(
         unpaywall: verdict d'Unpaywall sur le DOI de la publication, `None` sans verdict.
     """
     facts = copies_facts(copies)
-    facts = replace(
-        facts, embargoed=facts.embargoed or embargoed, informed=facts.informed or restricted
-    )
+    facts = replace(facts, embargoed=embargoed, informed=facts.informed or restricted)
     return decide_oa_status(
         facts.raised_by(unpaywall), has_serial=has_serial, serial_oa_model=serial_oa_model
     )

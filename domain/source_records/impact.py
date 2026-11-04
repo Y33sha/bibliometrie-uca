@@ -1,6 +1,6 @@
 """Indicateurs de citation d'un enregistrement source, stockés dans `source_records.impact`.
 
-Chaque source renseigne les indicateurs qu'elle expose. Le nombre de citations vient de toutes les sources qui le comptent. Les indicateurs normalisés viennent d'OpenAlex : le FWCI (Field-Weighted Citation Impact, rapport entre les citations reçues et la moyenne mondiale des publications de même discipline, année et type) et le percentile de citations normalisé, avec ses seuils top 10 % et top 1 %.
+Chaque source renseigne les indicateurs qu'elle expose. Le nombre de citations vient de toutes les sources qui le comptent. Les indicateurs normalisés viennent d'OpenAlex : le FWCI et le percentile de citations normalisé, avec ses seuils top 10 % et top 1 %. Le FWCI (Field-Weighted Citation Impact) rapporte les citations reçues à la moyenne mondiale des publications de même discipline, année et type.
 """
 
 from dataclasses import dataclass, fields

@@ -139,16 +139,13 @@ class TestParHalId:
 
         assert hal.cherches == ["hal-0"]
 
-    async def test_sans_hal_id_a_chercher_rien_n_est_ecrit(self, monkeypatch, caplog):
-        """Sans identifiant à chercher, la recherche n'écrit rien au journal : l'exécuteur des tâches ferme la section."""
+    async def test_sans_hal_id_a_chercher_rien_n_est_cherche(self, monkeypatch):
         hal = _HalSimule(monkeypatch)
 
-        with caplog.at_level(logging.INFO):
-            metrics = await fetch_missing_hal_by_id(_FakeConnection(), _LOG, retry_after_days=30)
+        metrics = await fetch_missing_hal_by_id(_FakeConnection(), _LOG, retry_after_days=30)
 
         assert metrics.seen == 0
         assert hal.cherches == []
-        assert caplog.text == ""
 
 
 class TestParNnt:

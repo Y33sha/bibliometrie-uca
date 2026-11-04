@@ -22,7 +22,6 @@ from interfaces.api.deps import publisher_service
 
 log = setup_logger("merge_publisher_aliases", os.path.dirname(__file__))
 
-# (autre nom, éditeur qui l'absorbe)
 ALIASES: tuple[tuple[str, str], ...] = (
     ("Taylor & Francis", "Informa UK Limited"),
     ("Taylor and Francis", "Informa UK Limited"),
@@ -82,6 +81,7 @@ ALIASES: tuple[tuple[str, str], ...] = (
     ("Centre de recherche interuniversitaire sur la formation et la profession enseignante", "CRIFPE"),
     ("Q15088586", "Magnolia Press"),
 )  # fmt: skip
+"""(autre nom, éditeur qui l'absorbe)"""
 
 
 def publisher_ids(conn: Connection, name: str) -> list[int]:

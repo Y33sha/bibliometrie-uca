@@ -19,7 +19,7 @@ from dataclasses import dataclass
 
 from sqlalchemy import Connection
 
-from domain.publications.identifiers import doi_version
+from domain.documents.identifiers import doi_version
 from domain.source_records.metadata_correction.shared_doi import (
     DoiTarget,
     SecondaryFormDeclaration,

@@ -15,13 +15,13 @@ from pathlib import Path
 
 from sqlalchemy import Connection, Row, text
 
+from domain.contributions.author_positions import AuthorPosition
 from domain.countries import non_international_country_codes
 from domain.dates import today
+from domain.documents.doc_types import DocType
+from domain.documents.licenses import OPEN_LICENSES, license_label
 from domain.platforms.platform import PlatformType
 from domain.platforms.registry import known_platform_of_copy, preprint_servers_of_prefix
-from domain.publications.author_positions import AuthorPosition
-from domain.publications.doc_types import DocType
-from domain.publications.licenses import OPEN_LICENSES, license_label
 from domain.publications.oa_status import OaStatus
 from domain.sources.registry import source_label
 from infrastructure.db.engine import get_sync_engine
@@ -39,10 +39,10 @@ TOP_COUNTRIES = 6
 
 type SqlRow = Row[tuple[object, ...]]
 
-# Types comptés dans le taux d'open access.
 OA_RATE_TYPES = (DocType.ARTICLE, DocType.REVIEW, DocType.LETTER, DocType.CONFERENCE_PAPER)
-# Types parus dans une revue, pour les modèles de revues et les APC.
+"""Types comptés dans le taux d'open access."""
 SERIAL_TYPES = (DocType.ARTICLE, DocType.REVIEW, DocType.LETTER, DocType.EDITORIAL)
+"""Types parus dans une revue, pour les modèles de revues et les APC."""
 CONFERENCE_TYPES = (
     DocType.CONFERENCE,
     DocType.CONFERENCE_ABSTRACT,
@@ -79,13 +79,12 @@ DOC_TYPE_LABELS = {
 
 MODEL_LABELS = {"full_oa": "Open access", "diamond": "Open access", "subscription": "Abonnement"}
 
-# Modèles des revues entièrement en open access.
 OPEN_ACCESS_MODELS = "('full_oa', 'diamond')"
+"""Modèles des revues entièrement en open access."""
 
-# Publications `p` du laboratoire.
 LAB_PUBLICATIONS = f"SELECT p.* FROM publications p WHERE {AUTHORED_PUBLICATION}"
+"""Publications `p` du laboratoire."""
 
-# Fichier déposé dans HAL pour la publication `p`, sous embargo ou non.
 HAL_FULL_TEXT = """
     EXISTS (
         SELECT 1 FROM source_records sr
@@ -93,15 +92,16 @@ HAL_FULL_TEXT = """
         WHERE sr.publication_id = p.id AND sr.source = 'hal' AND l.pdf_url IS NOT NULL
     )
 """
+"""Fichier déposé dans HAL pour la publication `p`, sous embargo ou non."""
 
-# Publication `p` cosignée hors du pays de l'établissement. Le paramètre `:non_international` liste les codes pays non internationaux.
 INTERNATIONAL = "EXISTS (SELECT 1 FROM unnest(p.countries) c WHERE c <> ALL(:non_international))"
+"""Publication `p` cosignée hors du pays de l'établissement. Le paramètre `:non_international` liste les codes pays non internationaux."""
 
-# Contribution `a` d'un auteur correspondant.
 CORRESPONDING = has_author_position(AuthorPosition.CORRESPONDING)
+"""Contribution `a` d'un auteur correspondant."""
 
-# Revue `j` diamant : marquée diamant, ou dans le DOAJ sans APC ni autres frais.
 DIAMOND_JOURNAL = f"COALESCE({diamond_journal_sql('j')}, false)"
+"""Revue `j` diamant : marquée diamant, ou dans le DOAJ sans APC ni autres frais."""
 
 
 def _values(members: Sequence[str]) -> list[str]:

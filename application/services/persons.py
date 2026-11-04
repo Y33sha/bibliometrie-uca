@@ -24,16 +24,8 @@ from domain.persons.identifiers import (
     AttributionStatus,
     IdentifierOrigin,
 )
-from domain.persons.merge import merge_roles
+from domain.persons.merge import merge_direction
 from domain.persons.person import PersonExclusion
-from domain.sources.registry import require_known_source
-
-
-class ContributionRef(TypedDict):
-    """Référence d'une contribution source, en entrée de `detach_contributions`."""
-
-    source: str
-    source_contribution_id: int
 
 
 class DetachResult(TypedDict):
@@ -63,8 +55,8 @@ class IdentifierStatusResult(NamedTuple):
     """Nombre d'identifiants des mêmes comptes HAL ayant reçu le même statut."""
 
 
-# Statuts propagés d'un identifiant aux identifiants de ses comptes HAL.
 _PROPAGATED_STATUSES = frozenset({AttributionStatus.CONFIRMED, AttributionStatus.REJECTED})
+"""Statuts propagés d'un identifiant aux identifiants de ses comptes HAL."""
 
 
 class PersonService:
@@ -195,24 +187,13 @@ class PersonService:
         )
         return row
 
-    def detach_contributions(
-        self, person_id: int, contributions: list[ContributionRef]
-    ) -> DetachResult:
-        """Rejette durablement les paires (publication, personne) des contributions sources sélectionnées. Renvoie le nombre de contributions détachées et de formes supprimées.
+    def detach_contributions(self, person_id: int, publication_ids: list[int]) -> DetachResult:
+        """Rejette durablement les paires (publication, personne) des publications données (`reject_pair`). Renvoie le nombre de contributions détachées et de formes supprimées.
 
-        Le rejet vaut pour la publication entière : `reject_pair` s'applique à chaque publication des contributions sources sélectionnées. Les formes de nom de la personne absentes de ses contributions sources restantes sont ensuite supprimées.
+        Les formes de nom de la personne absentes de ses contributions sources restantes sont ensuite supprimées.
         """
-        publication_ids: set[int] = set()
-        for a in contributions:
-            require_known_source(a["source"])
-            publication_id = self._contributions.find_publication_id_for_source_contribution(
-                a["source_contribution_id"]
-            )
-            if publication_id is not None:
-                publication_ids.add(publication_id)
-
         detached = 0
-        for publication_id in publication_ids:
+        for publication_id in set(publication_ids):
             detached += reject_pair(
                 publication_id,
                 person_id,
@@ -259,7 +240,7 @@ class PersonService:
     def merge_person(self, target_id: int, source_id: int) -> tuple[int, int]:
         """Fusionne deux personnes, et renvoie l'id conservé et l'id absorbé.
 
-        Les rôles demandés sont inversés si seule `source_id` a une fiche RH (`merge_roles`). Le repository reprend ensuite les clés étrangères (`PersonRepository.merge_into`). Émet l'événement d'audit `person.merged`.
+        Le sens demandé est inversé si seule `source_id` a une fiche RH (`merge_direction`). Le repository reprend ensuite les clés étrangères (`PersonRepository.merge_into`). Émet l'événement d'audit `person.merged`.
 
         Raises:
             ValidationError: deux identifiants égaux.
@@ -267,7 +248,7 @@ class PersonService:
             ConflictError: les deux personnes ont une fiche RH.
         """
         check_merge_pair(target_id, source_id, self._persons.exists, label="Personne")
-        target_id, source_id = merge_roles(
+        target_id, source_id = merge_direction(
             target_id, source_id, with_rh=self._persons.ids_with_rh([target_id, source_id])
         )
         self._persons.merge_into(target_id, source_id)

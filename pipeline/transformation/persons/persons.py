@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 from collections.abc import Mapping
 
-from pipeline.graph import task
+from pipeline.graph import Task
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.log_format import LAST_BRANCH
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -47,8 +47,8 @@ def _purge(ctx: PhaseContext) -> PhaseMetrics:
 
 
 TASKS = (
-    task(
-        "persons.arbitrate_identifiers",
+    Task(
+        "arbitrate_identifiers",
         reads=(
             "contributor_information",
             "source_contributions.neutralized_identifiers",
@@ -70,16 +70,18 @@ TASKS = (
             "contribution_resolution_queue",
             "person_identifiers",
         ),
-        # Identifiants attribués par `resolve_contributions` et supprimés par `purge` ; contributions rattachées par `resolve_contributions` et vidées par `purge`.
         previous_run=(
+            # Identifiants attribués par `resolve_contributions` et supprimés par `purge` ; contributions rattachées par `resolve_contributions` et vidées par `purge`.
             "person_identifiers",
-            "contributions.person_id",
-            "contributions.resolution_mode",
+            "contributions",
+            # Contributions et alignements supprimés, enregistrements sources détachés par `finalize.purge_publications`.
+            "aligned_source_contributions",
+            "source_records.publication_id",
         ),
         run=_arbitrate_identifiers,
     ),
-    task(
-        "persons.resolve_contributions",
+    Task(
+        "resolve_contributions",
         reads=(
             "contributions.id",
             "contributions.publication_id",
@@ -109,19 +111,22 @@ TASKS = (
             # Marquages traités, retirés de la file.
             "contribution_resolution_queue",
         ),
-        # Formes de nom régénérées par `populate` ; personnes, identifiants et formes supprimés, contributions vidées et marquées par `purge`.
         previous_run=(
+            # Formes de nom régénérées par `populate` ; personnes, identifiants et formes supprimés, contributions vidées et marquées par `purge`.
             "person_identifiers",
             "person_name_forms",
             "persons",
-            "contributions.person_id",
+            "contributions",
             "contribution_resolution_queue",
+            # Contributions et alignements supprimés, enregistrements sources détachés par `finalize.purge_publications`.
+            "aligned_source_contributions",
+            "source_records.publication_id",
         ),
         run=_resolve_contributions,
         section="Identification des contributions",
     ),
-    task(
-        "persons.populate_person_name_forms",
+    Task(
+        "populate_person_name_forms",
         reads=(
             "persons",
             "contributions.person_id",
@@ -132,13 +137,18 @@ TASKS = (
             "person_name_forms",
         ),
         writes=("person_name_forms",),
-        # Contributions vidées et personnes supprimées par `purge`.
-        previous_run=("persons", "person_name_forms", "contributions.person_id"),
+        # Contributions vidées et personnes supprimées par `purge` ; alignements supprimés par `finalize.purge_publications`.
+        previous_run=(
+            "persons",
+            "person_name_forms",
+            "contributions.person_id",
+            "aligned_source_contributions",
+        ),
         run=_populate,
         section="Rafraîchissement des formes de nom associées aux personnes",
     ),
-    task(
-        "persons.purge",
+    Task(
+        "purge",
         reads=(
             "contributions.publication_id",
             "contributions.person_id",
@@ -166,6 +176,12 @@ TASKS = (
             "persons.id",
             "person_name_forms.id",
         ),
+        # Contributions et alignements supprimés, enregistrements sources détachés par `finalize.purge_publications`.
+        previous_run=(
+            "contributions",
+            "aligned_source_contributions",
+            "source_records.publication_id",
+        ),
         run=_purge,
     ),
 )
@@ -174,8 +190,8 @@ TASKS = (
 def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
     """Renvoie les métriques de la phase, d'après les décomptes de ses tâches."""
     return build_metrics(
-        resolution=by_task["persons.resolve_contributions"].extras,
-        arbitration=by_task["persons.arbitrate_identifiers"].extras,
-        name_forms=by_task["persons.populate_person_name_forms"].extras,
-        purge=by_task["persons.purge"].extras,
+        resolution=by_task["resolve_contributions"].extras,
+        arbitration=by_task["arbitrate_identifiers"].extras,
+        name_forms=by_task["populate_person_name_forms"].extras,
+        purge=by_task["purge"].extras,
     )

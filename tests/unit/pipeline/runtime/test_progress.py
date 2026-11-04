@@ -24,7 +24,7 @@ def avec_terminal(monkeypatch):
 class TestSansTerminal:
     """Sortie capturée : le journal reçoit des jalons, jamais de retour chariot."""
 
-    def test_aucune_barre_n_est_ouverte(self, sans_terminal, caplog):
+    def test_aucune_barre_n_est_ouverte(self, sans_terminal):
         with module.track_progress(10, "hal", logging.getLogger(__name__)) as p:
             assert p._bar is None
 

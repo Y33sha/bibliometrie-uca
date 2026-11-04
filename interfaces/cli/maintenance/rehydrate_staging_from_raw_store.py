@@ -124,8 +124,8 @@ def _doi_for(source: str, raw_data: Mapping[str, JsonValue]) -> str | None:
     return identity.doi if identity else None
 
 
-# Sources dont l'identifiant natif est le DOI : leur clé d'archive commence par un préfixe de DOI.
 _DOI_NATIVE_SOURCES = frozenset({"crossref", "datacite"})
+"""Sources dont l'identifiant natif est le DOI : leur clé d'archive commence par un préfixe de DOI."""
 
 
 def _parse_sources(raw: str) -> list[str]:

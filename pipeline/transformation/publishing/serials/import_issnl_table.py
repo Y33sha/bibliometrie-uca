@@ -12,8 +12,8 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import Connection, text
 
 from domain.dates import date_to_french
+from domain.documents.identifiers import ISSN
 from domain.pipeline_runs import PhaseStatus
-from domain.publications.identifiers import ISSN
 from pipeline.http.dump_download import DumpUnavailableError
 from pipeline.runtime.observability.log_format import BRANCH, quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -76,9 +76,7 @@ def run_import_issnl_table(
     except DumpUnavailableError as e:
         metrics = PhaseMetrics()
         logger.warning("Table ISSN-L inaccessible, ISSN-L inchangés : %s", e)
-        signal_source_unavailable(
-            metrics, "ISSN International Centre", logger=logger, phase="publishing"
-        )
+        signal_source_unavailable(metrics, "ISSN International Centre", logger=logger)
         metrics.report = "table inaccessible, import repris au prochain run"
         return metrics
     if not found:

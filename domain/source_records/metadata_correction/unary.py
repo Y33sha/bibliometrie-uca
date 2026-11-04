@@ -3,7 +3,7 @@
 from collections.abc import Mapping, Sequence, Set
 from typing import NamedTuple
 
-from domain.publications.identifiers import HALId
+from domain.documents.identifiers import HALId
 from domain.source_records.corrections import (
     UNARY_KEYS,
     CorrectionKey,
@@ -40,15 +40,17 @@ class UnaryCorrection(NamedTuple):
 
     columns: CorrectedSourceRecord
     identifiers: tuple[SourceIdentifier, ...]
+    rules: frozenset[str] = frozenset()
+    """Règles de la correction unaire qui s'appliquent à l'enregistrement source."""
 
 
-# Règles de retrait d'identifiants de la correction unaire.
-UNARY_IDENTIFIER_RULES = frozenset(
+_UNARY_IDENTIFIER_RULES = frozenset(
     {
         MetadataCorrectionRule.THESIS_WITH_SERIAL_TO_ARTICLE.value,
         MetadataCorrectionRule.HAL_DEPOSIT_MISSING_TO_REMOVED.value,
     }
 )
+"""Règles de retrait d'identifiants de la correction unaire."""
 
 
 def corrected_doc_type(
@@ -76,7 +78,7 @@ def correct_source_record(
         facts: valeurs courantes, éventuellement corrigées par un passage précédent.
         identifiers: tous les identifiants de l'enregistrement source, avec leur statut courant.
         corrections: colonne `corrections` courante.
-        origin_doc_type: type corrigé du dépôt HAL dont l'enregistrement source ScanR est issu ; il prime sur son type.
+        origin_doc_type: type corrigé du dépôt HAL d'origine de l'enregistrement source ScanR ; il prime sur son type.
         missing_hal_ids: dépôts HAL introuvables dans HAL.
     """
     before = hydrate_raw_view(facts, corrections)
@@ -89,8 +91,10 @@ def correct_source_record(
         doc_type, doc_type_rule = corrected.value, corrected.rule.value
     if origin := origin_doc_type_correction(doc_type, origin_doc_type):
         doc_type, doc_type_rule = origin.value, origin.rule.value
+    rules: set[str] = set()
     if doc_type_rule is not None:
         new_corrections[CorrectionKey.DOC_TYPE] = stash_entry(before.doc_type, doc_type_rule)
+        rules.add(doc_type_rule)
 
     removals: dict[tuple[SourceIdentifierType, str], str] = {}
     thesis_to_article = MetadataCorrectionRule.THESIS_WITH_SERIAL_TO_ARTICLE
@@ -109,8 +113,9 @@ def correct_source_record(
         if len(kept_urls) != len(urls or ()):
             urls = kept_urls or None
             new_corrections[CorrectionKey.URLS] = stash_entry(before.urls, missing_rule)
+            rules.add(missing_rule)
 
-    new_identifiers = with_removals(identifiers, UNARY_IDENTIFIER_RULES, removals)
+    new_identifiers = with_removals(identifiers, _UNARY_IDENTIFIER_RULES, removals)
     columns = CorrectedSourceRecord(doc_type, urls, new_corrections)
     if columns == (
         facts.doc_type,
@@ -118,4 +123,5 @@ def correct_source_record(
         dict(corrections),
     ) and new_identifiers == tuple(identifiers):
         return None
-    return UnaryCorrection(columns, new_identifiers)
+    rules |= {i.removed_by for i in new_identifiers if i.removed_by in _UNARY_IDENTIFIER_RULES}
+    return UnaryCorrection(columns, new_identifiers, frozenset(rules))

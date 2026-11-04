@@ -5,9 +5,9 @@ Couvre les fonctions de lecture d'un work OpenAlex, la lecture des auteurs et le
 
 from __future__ import annotations
 
+from domain.documents.licenses import License
 from domain.persons.contributor_name import ContributorName
 from domain.platforms.platform import PlatformType
-from domain.publications.licenses import License
 from domain.serials.issns import SerialIssn
 from domain.source_records.identifiers import normalize_identifiers
 from domain.subjects.subject import SubjectVocabulary
@@ -62,6 +62,18 @@ class TestExtractLocationsData:
         work = {"locations": [{"landing_page_url": None, "pdf_url": "https://b.com"}]}
         urls, _ = extract_locations_data(work)
         assert urls == ["https://b.com"]
+
+    def test_ecarte_une_adresse_d_en_tete_link(self):
+        work = {
+            "locations": [
+                {
+                    "landing_page_url": "https://orcid.org/0000-0001-8114-7271>,",
+                    "pdf_url": "https://eprints.lse.ac.uk/1/1/x.pdf",
+                }
+            ]
+        }
+        urls, _ = extract_locations_data(work)
+        assert urls == ["https://eprints.lse.ac.uk/1/1/x.pdf"]
 
     def test_collects_all_location_dois(self):
         """Les DOI sont collectés dans les URL doi.org et les location.id `doi:`."""
@@ -127,6 +139,20 @@ class TestOpenalexIdentifiers:
 
 
 class TestGetLocations:
+    def test_une_page_d_en_tete_link_laisse_l_adresse_au_pdf(self):
+        work = {
+            "locations": [
+                {
+                    "landing_page_url": "https://eprints.gla.ac.uk/view/journal_volume/Physics_Letters_B.html>,",
+                    "pdf_url": "https://eprints.gla.ac.uk/1/1/x.pdf",
+                },
+                {"landing_page_url": "https://orcid.org/0000-0001-8114-7271>;"},
+            ]
+        }
+        assert [location.url for location in get_locations(work)] == [
+            "https://eprints.gla.ac.uk/1/1/x.pdf"
+        ]
+
     def test_un_serveur_de_preprints_de_la_liste_prend_son_type(self):
         work = {
             "locations": [

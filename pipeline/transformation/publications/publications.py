@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from sqlalchemy import Connection, text
 
-from pipeline.graph import task
+from pipeline.graph import Task
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publications.reconciliation import reconcile
@@ -42,8 +42,8 @@ def _reconcile(ctx: PhaseContext) -> PhaseMetrics:
 
 
 TASKS = (
-    task(
-        "publications.reconcile",
+    Task(
+        "reconcile",
         reads=(
             "source_records",
             "source_record_identifiers",
@@ -76,10 +76,11 @@ TASKS = (
             "apc_payments.publication_id",
             "publication_contributions_queue",
         ),
-        # Réponses d'Unpaywall et de doi.org ; publications supprimées par `finalize.purge_publications` ; revues et monographies vides supprimées par `finalize.delete_empty_containers`.
+        # Réponses d'Unpaywall et de doi.org ; publications supprimées et paiements APC détachés par `finalize.purge_publications` ; revues et monographies vides supprimées par `finalize`.
         previous_run=(
             "source_records.countries",
             "publications.id",
+            "apc_payments.publication_id",
             "publications.oa_status",
             "dois.unpaywall_oa_status",
             "dois.registered_url",

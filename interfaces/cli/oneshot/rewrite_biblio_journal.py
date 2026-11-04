@@ -20,7 +20,7 @@ from domain.sources.registry import SOURCE_PRIORITY
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.raw_store import UnreadablePayloadError, get_raw_store
-from pipeline.ingestion.common.normalize import normalizer_builders
+from pipeline.ingestion.common.normalize import build_normalizer
 from pipeline.ingestion.common.staging import StagingRow
 
 log = setup_logger("rewrite_biblio_journal", os.path.dirname(__file__))
@@ -48,7 +48,7 @@ _WRITE = text("""
 def _rewrite_source(conn: Connection, source: str) -> None:
     total = conn.execute(_COUNT, {"source": source}).scalar_one()
     log.info("%s : %d enregistrements sources à traiter", source, total)
-    normalizer = normalizer_builders(archive=False)[source](conn, log)
+    normalizer = build_normalizer(source, conn, log, archive=False)
     store = get_raw_store()
     written = missing = refused = seen = 0
     after = 0

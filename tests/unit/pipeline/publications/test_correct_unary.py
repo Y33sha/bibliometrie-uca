@@ -11,7 +11,7 @@ from domain.source_records.identifiers import (
     SourceIdentifierType,
 )
 from domain.source_records.metadata_correction.rules import MetadataForCorrection
-from domain.source_records.metadata_correction.source_record import (
+from domain.source_records.metadata_correction.unary import (
     CorrectedSourceRecord,
     UnaryCorrection,
 )
@@ -52,9 +52,10 @@ def test_tally_corrections_compte_les_regles():
                     {"doc_type": stash_entry("article", "THESIS_WITH_SERIAL_TO_ARTICLE")},
                 ),
                 (),
+                frozenset({"THESIS_WITH_SERIAL_TO_ARTICLE"}),
             ),
         ),
-        # deux champs corrigés sur un même enregistrement source : un enregistrement source, deux déclenchements
+        # deux règles sur un même enregistrement source : un enregistrement source, deux déclenchements
         CorrectionUpdate(
             3,
             UnaryCorrection(
@@ -69,6 +70,7 @@ def test_tally_corrections_compte_les_regles():
                     },
                 ),
                 (),
+                frozenset({"SERIAL_TYPE_MEDIA_TO_MEDIA", "HAL_DEPOSIT_MISSING_TO_REMOVED"}),
             ),
         ),
         # correction défaite : mise à jour sans règle
@@ -298,7 +300,7 @@ def test_preserves_unmanaged_corrections_keys():
     }
 
 
-def test_le_journal_compte_seulement_les_documents_corriges_par_une_regle(caplog):
+def test_le_bilan_compte_seulement_les_documents_corriges_par_une_regle():
     """Une correction défaite donne une mise à jour, sans compter comme une correction."""
     queries = MagicMock()
     queries.fetch_missing_hal_ids.return_value = frozenset()
@@ -313,9 +315,8 @@ def test_le_journal_compte_seulement_les_documents_corriges_par_une_regle(caplog
         ),
         _source_record(id=2, doc_type="article", urls=["https://theses.fr/2020ABCD"]),
     ]
-    with caplog.at_level(logging.INFO, logger="test"):
-        run(MagicMock(), queries, logging.getLogger("test"))
-    assert "  ├─ 1 document à corriger" in caplog.messages
+    stats = run(MagicMock(), queries, logging.getLogger("test"))
+    assert stats.corrected == 1
 
 
 # Dépôts HAL introuvables

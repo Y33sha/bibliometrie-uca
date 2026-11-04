@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from pipeline.graph import task
+from pipeline.graph import Task
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publications.correction.correct_unary import run as run_unary
@@ -26,8 +26,6 @@ from pipeline.transformation.publications.correction.remove_identifiers import (
     run as run_remove_identifiers,
 )
 from pipeline.transformation.publications.correction.serial_by_doi import run as run_serial_by_doi
-
-_PHASE = "metadata_correction"
 
 
 # Chaque tâche écrit sa section du journal et renvoie examinés (`total`), corrigés (`updated`) et décompte par règle (`extras`).
@@ -66,8 +64,8 @@ def _matchable(ctx: PhaseContext) -> PhaseMetrics:
 
 
 TASKS = (
-    task(
-        "metadata_correction.serial_by_doi",
+    Task(
+        "serial_by_doi",
         reads=(
             "serial_doi_namespaces",
             "source_record_identifiers",
@@ -80,11 +78,16 @@ TASKS = (
             "source_records.corrections",
             "source_record_keys_queue",
         ),
-        previous_run=("source_records", "source_record_identifiers.removed_by"),
+        # Espaces de noms des revues vides, supprimés avec elles par `finalize.delete_empty_serials`.
+        previous_run=(
+            "source_records",
+            "source_record_identifiers.removed_by",
+            "serial_doi_namespaces",
+        ),
         run=_serial_by_doi,
     ),
-    task(
-        "metadata_correction.unary",
+    Task(
+        "unary",
         reads=(
             *(
                 f"source_records.{column}"
@@ -135,8 +138,8 @@ TASKS = (
         ),
         run=_unary,
     ),
-    task(
-        "metadata_correction.doi_targets",
+    Task(
+        "doi_targets",
         reads=tuple(
             f"source_records.{column}"
             for column in (
@@ -158,8 +161,8 @@ TASKS = (
         previous_run=("source_records", "source_record_identifiers.removed_by", "doi_targets"),
         run=_doi_targets,
     ),
-    task(
-        "metadata_correction.remove_identifiers",
+    Task(
+        "remove_identifiers",
         reads=tuple(
             f"source_records.{column}"
             for column in (
@@ -189,8 +192,8 @@ TASKS = (
         previous_run=("source_records", "source_record_identifiers.removed_by"),
         run=_remove_identifiers,
     ),
-    task(
-        "metadata_correction.matchable",
+    Task(
+        "matchable",
         reads=(
             *(
                 f"source_records.{column}"
@@ -219,24 +222,22 @@ TASKS = (
 
 def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
     """Renvoie les métriques de la phase : compteurs des tâches, chiffres par tâche, et décompte par règle."""
-    nodes = {name.removeprefix(f"{_PHASE}."): metrics for name, metrics in by_task.items()}
-
     metrics = PhaseMetrics()
-    for node_metrics in nodes.values():
-        metrics.add(seen=node_metrics.total, updated=node_metrics.updated)
+    for task_metrics in by_task.values():
+        metrics.add(seen=task_metrics.total, updated=task_metrics.updated)
     # Chiffres à plat, `{tâche}_{examined,corrected}`, disposés en matrice par l'interface.
     metrics.details["summary"] = {
         f"{name}_{column}": value
-        for name, node_metrics in nodes.items()
+        for name, task_metrics in by_task.items()
         for column, value in (
-            ("examined", node_metrics.total),
-            ("corrected", node_metrics.updated),
+            ("examined", task_metrics.total),
+            ("corrected", task_metrics.updated),
         )
     }
     counts = [
         item
         for name in ("unary", "doi_targets", "remove_identifiers")
-        for item in nodes[name].extras.items()
+        for item in by_task[name].extras.items()
     ]
     counts.sort(key=lambda kc: kc[1], reverse=True)
     metrics.details["table"] = {"rows": [{"key": key, "count": count} for key, count in counts]}

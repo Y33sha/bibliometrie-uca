@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from domain.publications.identifiers import DOI
+from domain.documents.identifiers import DOI
 from domain.types import JsonValue, as_str
 from pipeline.ingestion.openalex.payload import short_openalex_id
 

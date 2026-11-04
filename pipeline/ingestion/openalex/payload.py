@@ -7,12 +7,11 @@ import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from domain.publications.identifiers import (
+from domain.documents.identifiers import (
     NNT,
-    PMCID,
     PMID,
-    ArxivId,
     HALId,
+    arxiv_doi,
     extract_doi_from_url,
     is_hal_host,
 )
@@ -22,10 +21,10 @@ from domain.source_records.identifiers import (
     SourceIdentifierType,
 )
 from domain.types import JsonValue, as_mapping, as_str
-from domain.urls import is_host, url_host
+from domain.urls import is_host, is_link_header_fragment, url_host
 
-# OpenAlex donne ses identifiants en URL (`https://openalex.org/<id>`) pour tous les types d'entité : W works, A auteurs, S sources, I institutions, P éditeurs. La base garde la forme courte (`S20400310`).
 _OPENALEX_ID_PREFIX = "https://openalex.org/"
+"""OpenAlex donne ses identifiants en URL (`https://openalex.org/<id>`) pour tous les types d'entité : W works, A auteurs, S sources, I institutions, P éditeurs. La base garde la forme courte (`S20400310`)."""
 
 
 def short_openalex_id(id_or_url: str) -> str:
@@ -79,6 +78,12 @@ class OpenalexLocation:
     """Ex. la page d'accueil de HAL."""
 
 
+def location_url(loc: Mapping[str, JsonValue], key: str) -> str | None:
+    """Renvoie l'adresse `key` d'une localisation (`landing_page_url`, `pdf_url`). OpenAlex recopie parfois une adresse d'en-tête HTTP `Link` (`is_link_header_fragment`) : elle est écartée."""
+    url = as_str(loc.get(key))
+    return None if url is None or is_link_header_fragment(url) else url
+
+
 def _parse_one_location(loc: JsonValue) -> OpenalexLocation | None:
     loc_fields = as_mapping(loc)
     if not loc_fields:
@@ -86,7 +91,7 @@ def _parse_one_location(loc: JsonValue) -> OpenalexLocation | None:
     src = as_mapping(loc_fields.get("source"))
     return OpenalexLocation(
         location_id=as_str(loc_fields.get("id")),
-        landing_page_url=as_str(loc_fields.get("landing_page_url")),
+        landing_page_url=location_url(loc_fields, "landing_page_url"),
         source_id=as_str(src.get("id")),
         source_type=as_str(src.get("type")),
         source_display_name=as_str(src.get("display_name")),
@@ -142,8 +147,8 @@ def names_serial(loc: OpenalexLocation | None) -> bool:
     return names_publisher(loc) and (loc is None or loc.source_type != "ebook platform")
 
 
-# NNT d'un identifiant PMH : « pmh:{NNT} », hors identifiants OAI (`oai:HAL:…`).
 _PMH_NNT_RE = re.compile(r"^pmh:([A-Za-z0-9]+)$", re.IGNORECASE)
+"""NNT d'un identifiant PMH : « pmh:{NNT} », hors identifiants OAI (`oai:HAL:…`)."""
 _THESES_FR_URL_RE = re.compile(r"theses\.fr/([A-Za-z0-9]+)")
 
 
@@ -161,7 +166,7 @@ def extract_nnt_from_location(loc: OpenalexLocation) -> str | None:
 
 
 def url_identifiers(urls: list[str]) -> list[SourceIdentifier]:
-    """Renvoie les identifiants secondaires exposés dans une liste d'URLs, dans leur ordre : `hal_id` (préfixes `hal-`/`tel-`/`halshs-`…), NNT (URLs `theses.fr/<NNT>`), PMID (PubMed), PMCID et arXiv."""
+    """Renvoie les identifiants secondaires exposés dans une liste d'URLs, dans leur ordre : `hal_id` (préfixes `hal-`/`tel-`/`halshs-`…), NNT (URLs `theses.fr/<NNT>`), PMID (PubMed) et DOI d'un dépôt arXiv."""
     identifiers: list[SourceIdentifier] = []
     for url in urls:
         for id_type, value in (
@@ -171,8 +176,7 @@ def url_identifiers(urls: list[str]) -> list[SourceIdentifier]:
                 m.group(1) if (m := _THESES_FR_URL_RE.search(url)) else None,
             ),
             (SourceIdentifierType.PMID, PMID.normalize(url)),
-            (SourceIdentifierType.PMCID, PMCID.normalize(url)),
-            (SourceIdentifierType.ARXIV_ID, ArxivId.normalize(url)),
+            (SourceIdentifierType.DOI, arxiv_doi(url)),
         ):
             if value:
                 identifiers.append(SourceIdentifier(id_type, value, SourceIdentifierRole.SECONDARY))
@@ -180,7 +184,7 @@ def url_identifiers(urls: list[str]) -> list[SourceIdentifier]:
 
 
 def openalex_derived_identifier(primary: OpenalexLocation | None) -> SourceIdentifier | None:
-    """Renvoie l'identifiant de la localisation principale d'un work : NNT d'une localisation theses.fr, sinon premier `hal_id`, DOI, PMCID, PMID ou identifiant arXiv de sa page ou de son identifiant de localisation."""
+    """Renvoie l'identifiant de la localisation principale d'un work : NNT d'une localisation theses.fr, sinon premier `hal_id`, DOI, PMID ou DOI d'un dépôt arXiv de sa page ou de son identifiant de localisation."""
     if primary is None:
         return None
     if is_theses_fr_location(primary) and (nnt := extract_nnt_from_location(primary)):
@@ -188,9 +192,8 @@ def openalex_derived_identifier(primary: OpenalexLocation | None) -> SourceIdent
     for id_type, extract in (
         (SourceIdentifierType.HAL_ID, HALId.normalize),
         (SourceIdentifierType.DOI, extract_doi_from_url),
-        (SourceIdentifierType.PMCID, PMCID.normalize),
         (SourceIdentifierType.PMID, PMID.normalize),
-        (SourceIdentifierType.ARXIV_ID, ArxivId.normalize),
+        (SourceIdentifierType.DOI, arxiv_doi),
     ):
         for raw in (primary.landing_page_url, primary.location_id):
             if value := extract(raw):

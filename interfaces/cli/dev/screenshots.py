@@ -21,7 +21,6 @@ from infrastructure import PROJECT_ROOT
 OUT_DIR = PROJECT_ROOT / "docs" / "img" / "screenshots"
 VIEWPORT = {"width": 1440, "height": 900}
 
-# Entités montrées en exemple : (route de recherche, clé de la liste, champ comparé, valeur cherchée, champ de l'identifiant).
 SAMPLES = {
     "structure": ("structures", "structures", "acronym", "LMV", "id"),
     # Les pages d'adresses montrent l'établissement : les adresses d'un laboratoire contiennent souvent des courriels personnels.
@@ -30,6 +29,7 @@ SAMPLES = {
     "publisher": ("publishers", "publishers", "name", "Elsevier", "id"),
     "subject": ("subjects", "items", "label", "Volcanologie", "label_normalized"),
 }
+"""Entités montrées en exemple : (route de recherche, clé de la liste, champ comparé, valeur cherchée, champ de l'identifiant)."""
 
 
 @dataclass(frozen=True)

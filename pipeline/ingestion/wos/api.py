@@ -40,8 +40,8 @@ def get_records_found(data: Mapping[str, JsonValue]) -> int:
     return as_int(as_mapping(data.get("QueryResult")).get("RecordsFound")) or 0
 
 
-# Préfixes DOI de preprints et d'entrepôts absents de l'index WoS : leurs DOI restent hors des requêtes de la phase `fetch_missing`.
 _WOS_UNINDEXED_DOI_PREFIXES = ("10.48550/", "10.2139/", "10.21203/", "10.5281/zenodo")
+"""Préfixes DOI de preprints et d'entrepôts absents de l'index WoS : leurs DOI restent hors des requêtes de la phase `fetch_missing`."""
 
 
 def filter_doi_for_wos(doi: str) -> str | None:

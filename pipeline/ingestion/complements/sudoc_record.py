@@ -17,7 +17,7 @@ from dataclasses import dataclass
 
 import defusedxml.ElementTree as ET
 
-from domain.publications.identifiers import ISSN
+from domain.documents.identifiers import ISSN
 from domain.serials.issns import IssnSupport
 from domain.sources.sudoc import SudocSerialRecord
 
@@ -50,8 +50,8 @@ def marc_fields(xml: str) -> list[MarcField]:
     return fields
 
 
-# Le CD-ROM se reconnaît aussi dans le titre de la notice.
 _OTHER_SUPPORT_WORDS = ("cd-rom", "cdrom", "cédérom")
+"""Le CD-ROM se reconnaît aussi dans le titre de la notice."""
 
 
 def _issns(values: Sequence[str]) -> tuple[str, ...]:

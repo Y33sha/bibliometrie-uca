@@ -30,7 +30,6 @@ def _copy(url, *, version=None, is_oa=True, platform=None, described=False, arri
         known_platform=known,
         platform_type=known.platform_type if known else None,
         license=None,
-        embargoed=False,
         described_by_platform=described,
         arrival=arrival,
     )
@@ -234,19 +233,65 @@ def test_le_doi_de_la_publication_chez_un_editeur_reste_hors_des_liens():
 
 
 def test_une_plateforme_du_registre_porte_le_nom_du_registre():
-    copy = Copy(
-        url="https://zenodo.org/records/1",
+    copy = Copy.of_location(
+        "https://zenodo.org/records/1",
         version=None,
-        is_oa=True,
-        platform="Zenodo (CERN European Organization for Nuclear Research)",
-        known_platform=_ZENODO,
-        platform_type=_ZENODO.platform_type,
-        license=None,
-        embargoed=False,
-        described_by_platform=False,
+        declared_oa=True,
         arrival=1,
+        source_platform="Zenodo (CERN European Organization for Nuclear Research)",
     )
+    assert (copy.known_platform, copy.platform_type) == (_ZENODO, _ZENODO.platform_type)
     assert _access([copy]).links == [AccessLink("Zenodo", copy.url, icon=_ZENODO.icon)]
+
+
+def test_une_plateforme_hors_du_registre_garde_le_nom_et_le_type_donnes_par_la_source():
+    copy = Copy.of_location(
+        "https://escholarship.org/uc/item/1",
+        version=None,
+        declared_oa=True,
+        arrival=1,
+        source_platform="eScholarship",
+        source_platform_type=PlatformType.REPOSITORY,
+    )
+    assert (copy.platform, copy.known_platform, copy.platform_type) == (
+        "eScholarship",
+        None,
+        PlatformType.REPOSITORY,
+    )
+
+
+def test_une_copie_sous_embargo_est_fermee():
+    copy = Copy.of_location(
+        "https://hal.science/hal-1/document",
+        version=None,
+        declared_oa=True,
+        arrival=1,
+        embargoed=True,
+    )
+    assert copy.is_oa is False
+
+
+def test_seule_la_copie_hal_d_un_enregistrement_hal_est_decrite_par_sa_plateforme():
+    def described(url, record_source):
+        copy = Copy.of_location(
+            url, version=None, declared_oa=True, arrival=1, record_source=record_source
+        )
+        return copy.described_by_platform
+
+    assert described("https://hal.science/hal-1", "hal")
+    assert not described("https://hal.science/hal-1", "openalex")
+    assert not described("https://arxiv.org/abs/1", "hal")
+
+
+def test_une_copie_garde_le_type_preprint_de_son_enregistrement_source():
+    copy = Copy.of_location(
+        "https://example.org/1",
+        version=None,
+        declared_oa=True,
+        arrival=1,
+        record_doc_type="preprint",
+    )
+    assert copy.of_preprint
 
 
 def test_l_adresse_enregistree_d_un_pdf_donne_une_copie_ouverte_de_l_editeur():

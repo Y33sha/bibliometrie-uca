@@ -26,10 +26,10 @@ class SerialSummary(NamedTuple):
     """ISSN actifs."""
 
 
-# Type modifiable par le pipeline : absent des champs saisis à la main.
 TYPE_NOT_MANUAL = ~(literal(ManualField.SERIAL_TYPE.value) == any_(serials.c.manual_fields))
-# Modèle OA modifiable par le pipeline : absent des champs saisis à la main.
+"""Type modifiable par le pipeline : absent des champs saisis à la main."""
 OA_MODEL_NOT_MANUAL = ~(literal(ManualField.OA_MODEL.value) == any_(serials.c.manual_fields))
+"""Modèle OA modifiable par le pipeline : absent des champs saisis à la main."""
 
 _SERIAL_SUMMARIES = text(f"""
     SELECT j.id, j.title, p.name AS publisher, {active_issns("j.id")} AS issns

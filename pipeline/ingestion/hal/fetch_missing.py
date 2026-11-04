@@ -35,8 +35,8 @@ from pipeline.ingestion.common.lookup import (
 from pipeline.ingestion.hal.api import find_deposit, search_one
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
-# Requêtes simultanées à HAL ; le débit suit le budget de la source (`api_params.MAX_PER_SECOND`).
 HAL_MAX_CONCURRENT = 5
+"""Requêtes simultanées à HAL ; le débit suit le budget de la source (`api_params.MAX_PER_SECOND`)."""
 
 _HAL_ID_PENDING = pending_failed_lookup_sql(
     source_sql="'hal'", id_type="hal_id", value_sql="h.id_value"

@@ -39,7 +39,7 @@ def lancer(monkeypatch, contexte):
         monkeypatch.setattr(
             harvest,
             "run_harvest",
-            lambda ctx, _phase, source, _harvester, window: harvest_one(ctx, source, window),
+            lambda ctx, source, _harvester, window: harvest_one(ctx, source, window),
         )
         monkeypatch.setattr(harvest, "get_last_daily_harvest_date", lambda: last_daily)
         monkeypatch.setattr(
@@ -54,14 +54,14 @@ def lancer(monkeypatch, contexte):
 
 def _non_configuree(ctx, source: str) -> PhaseMetrics:
     metrics = PhaseMetrics()
-    signal_source_unconfigured(metrics, source, "aucune clé", logger=ctx.logger, phase="harvest")
+    signal_source_unconfigured(metrics, source, "aucune clé", logger=ctx.logger)
     return metrics
 
 
 def _indisponible(source: str) -> PhaseMetrics:
     """Renvoie les métriques de l'accès à une source indisponible."""
     metrics = PhaseMetrics()
-    signal_source_unavailable(metrics, source, logger=logging.getLogger("test"), phase="harvest")
+    signal_source_unavailable(metrics, source, logger=logging.getLogger("test"))
     return metrics
 
 
@@ -99,16 +99,16 @@ def test_since_last_hal_non_configure(lancer):
 
 
 def test_toutes_les_sources_suivent_la_fenetre_d_annees(lancer):
-    seen: dict[str, tuple[int | None, int | None]] = {}
+    seen: dict[str, tuple[int, int] | None] = {}
 
     def harvest_one(_ctx, source, window):
-        seen[source] = (window.start_year, window.year)
+        seen[source] = window.years
         return PhaseMetrics()
 
-    lancer(harvest_one, mode="full", sources={"hal", "theses"}, start_year=2020)
+    lancer(harvest_one, mode="full", sources={"hal", "theses"}, years=(2020, 2022))
 
-    assert seen["hal"] == (2020, None)
-    assert seen["theses"] == (2020, None)
+    assert seen["hal"] == (2020, 2022)
+    assert seen["theses"] == (2020, 2022)
 
 
 def test_parallel_skips_unavailable_source(lancer):

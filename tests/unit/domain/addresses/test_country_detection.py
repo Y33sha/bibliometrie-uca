@@ -1,6 +1,10 @@
 """Nom de pays final et préséance entre les pays candidats d'une adresse."""
 
-from domain.country_detection import CountryDetectionMethod as M, CountryNames, retained_countries
+from domain.addresses.country_detection import (
+    CountryDetectionMethod as M,
+    CountryNames,
+    retained_countries,
+)
 
 COUNTRY_NAMES = CountryNames(
     {

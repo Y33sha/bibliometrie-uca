@@ -17,20 +17,20 @@ from infrastructure.read_models.publications.models import PublicationLabItem
 from infrastructure.read_models.sql_fragments import contributor_display_name
 from infrastructure.sql_fragments import case_priority, has_author_role, is_laboratory
 
-# Contribution orpheline, objet de la file de rattachement : contribution du périmètre, sous un rôle d'auteur, sans personne.
 _ORPHAN_BASE = f"g.person_id IS NULL AND g.in_perimeter AND {has_author_role('g')}"
+"""Contribution orpheline, objet de la file de rattachement : contribution du périmètre, sous un rôle d'auteur, sans personne."""
 
 _ORPHANS_FROM = """
     FROM contributions g
     JOIN publications p ON p.id = g.publication_id
 """
 
-# Contributions sources de la contribution `g` : contributions sources `sc_m`.
 _MEMBERS = """
     aligned_source_contributions gm
     JOIN source_contributions sc_m ON sc_m.id = gm.source_contribution_id
     WHERE gm.contribution_id = g.id
 """
+"""Contributions sources de la contribution `g` : contributions sources `sc_m`."""
 
 
 def _displayed_member(columns: str) -> str:
@@ -42,10 +42,9 @@ def _displayed_member(columns: str) -> str:
     """
 
 
-# Membre donnant le nom affiché : jointure latérale `sc`.
 _DISPLAYED_MEMBER = f"CROSS JOIN LATERAL ({_displayed_member('sc_m.*')}) sc"
+"""Membre donnant le nom affiché : jointure latérale `sc`."""
 
-# Laboratoires atteints par les contributions sources de la contribution `g`, chacun une fois : clause `FROM … WHERE` sur `structures s`.
 _CONTRIBUTION_LABS = f"""
     structures s
     WHERE {is_laboratory("s")}
@@ -56,6 +55,7 @@ _CONTRIBUTION_LABS = f"""
           WHERE gm_s.contribution_id = g.id
       )
 """
+"""Laboratoires atteints par les contributions sources de la contribution `g`, chacun une fois : clause `FROM … WHERE` sur `structures s`."""
 
 
 def _orphans_where(filters: OrphanFilters, *, with_labs: bool) -> tuple[str, dict[str, object]]:

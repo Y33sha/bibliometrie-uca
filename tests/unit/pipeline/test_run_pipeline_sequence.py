@@ -13,20 +13,24 @@ import pytest
 from sqlalchemy.exc import OperationalError, PendingRollbackError
 
 from pipeline import run as run_pipeline
-from pipeline.graph import Phase, task
+from pipeline.graph import Phase, Task
 from pipeline.runtime.context import RunOptions
 from pipeline.runtime.observability.metrics import PhaseMetrics
+
+_HAL = RunOptions(sources=frozenset({"hal"}))
 
 
 def _args(**surcharges) -> argparse.Namespace:
     """Renvoie les arguments par défaut de la CLI, sources réduites à HAL, OpenAlex et WoS, puis `surcharges`."""
     base = vars(run_pipeline._build_arg_parser().parse_args([]))
-    return argparse.Namespace(**{**base, "sources": "hal,openalex,wos", **surcharges})
+    return argparse.Namespace(
+        **{**base, "sources": frozenset({"hal", "openalex", "wos"}), **surcharges}
+    )
 
 
-def _phase(run, name: str = "persons", harvesting: bool = False) -> Phase:
+def _phase(run, name: str = "persons") -> Phase:
     """Renvoie la phase `name`, dont l'exécution appelle `run(ctx)`."""
-    return Phase(name, "Libellé", (task(f"{name}.essai", run=run),), harvesting=harvesting)
+    return Phase(name, "Libellé", (Task("essai", run=run),))
 
 
 class _FakeRecorder:
@@ -92,13 +96,40 @@ class TestSelectPhasesToRun:
     def test_liste_de_sources_normalisee(self):
         args = run_pipeline._build_arg_parser().parse_args(["--sources", " hal , wos "])
 
-        assert args.sources == "hal,wos"
+        assert args.sources == {"hal", "wos"}
+
+    def test_sans_annees_le_run_suit_la_configuration(self):
+        assert run_pipeline._build_arg_parser().parse_args([]).years is None
+
+    def test_une_annee_seule(self):
+        args = run_pipeline._build_arg_parser().parse_args(["--years", "2017"])
+
+        assert args.years == (2017, 2017)
+
+    def test_une_plage_d_annees(self):
+        args = run_pipeline._build_arg_parser().parse_args(["--years", "2017", "2020"])
+
+        assert args.years == (2017, 2020)
+
+    @pytest.mark.parametrize("valeurs", [["2017", "2018", "2019"], ["2020", "2017"], ["deux"]])
+    def test_plage_d_annees_invalide_arrete_le_run(self, valeurs):
+        with pytest.raises(SystemExit) as sortie:
+            run_pipeline._build_arg_parser().parse_args(["--years", *valeurs])
+
+        assert sortie.value.code == 2
+
+
+def test_les_arguments_deviennent_les_options_du_run():
+    options = run_pipeline._run_options(_args(mode="daily", years=(2024, 2024)))
+
+    assert (options.mode, options.years) == ("daily", (2024, 2024))
+    assert options.sources == {"hal", "openalex", "wos"}
 
 
 def test_chaque_option_booleenne_arrive_aux_phases():
     """Chaque option booléenne de la CLI renseigne le champ homonyme de `RunOptions`, et chaque champ booléen a son option."""
     flags = {flag.dest for flag in run_pipeline._RUN_FLAGS}
-    options = run_pipeline._run_options(_args(**dict.fromkeys(flags, True)), {"hal"})
+    options = run_pipeline._run_options(_args(**dict.fromkeys(flags, True)))
 
     assert {f.name for f in fields(RunOptions) if f.type == "bool"} == flags
     assert all(getattr(options, flag) is True for flag in flags)
@@ -112,11 +143,9 @@ def _masquant(origine: BaseException) -> PendingRollbackError:
 
 
 class TestRunOnePhase:
-    def _executer(self, run, recorder=None, args=None):
+    def _executer(self, run, recorder=None, options=_HAL):
         recorder = recorder or _FakeRecorder()
-        resultat = run_pipeline._run_one_phase(
-            _phase(run), args=args or _args(), sources={"hal"}, recorder=recorder
-        )
+        resultat = run_pipeline._run_one_phase(_phase(run), options=options, recorder=recorder)
         return resultat, recorder
 
     def test_phase_reussie_consignee(self):
@@ -136,37 +165,18 @@ class TestRunOnePhase:
 
         assert recorder.records[0]["status"] == "warning"
 
-    def test_une_phase_de_moissonnage_se_clot_sur_son_total(self, caplog):
-        with caplog.at_level(logging.INFO):
-            run_pipeline._run_one_phase(
-                _phase(
-                    lambda ctx: PhaseMetrics(new=2, updated=5, extras={"not_found": 3}),
-                    name="harvest",
-                    harvesting=True,
-                ),
-                args=_args(),
-                sources={"hal"},
-                recorder=_FakeRecorder(),
-            )
-
-        assert caplog.messages[-1] == "Total : 2 nouveaux, 5 mis à jour, 3 introuvables"
-
-    def test_une_autre_phase_ne_donne_pas_de_total(self, caplog):
-        with caplog.at_level(logging.INFO):
-            self._executer(lambda ctx: PhaseMetrics(new=3))
-
-        assert not any(m.startswith("Total") for m in caplog.messages)
-
     def test_interruption_utilisateur(self, caplog):
         """L'arrêt demandé est consigné comme un avertissement et dit par où reprendre."""
 
         def _interrompue(ctx):
             raise KeyboardInterrupt
 
+        recorder = _FakeRecorder()
         with pytest.raises(SystemExit) as sortie, caplog.at_level(logging.INFO):
-            self._executer(_interrompue)
+            self._executer(_interrompue, recorder=recorder)
 
         assert sortie.value.code == 130
+        assert recorder.records[0]["status"] == "warning"
         assert "run_pipeline --from persons" in caplog.text
 
     def test_interruption_masquee_par_le_nettoyage(self):
@@ -243,19 +253,15 @@ class TestRunOnePhase:
         assert record["status"] == "error"
         assert "run_pipeline --from persons" in caplog.text
 
-    def test_arguments_du_run_transmis_a_la_phase(self):
+    def test_options_du_run_transmises_a_la_phase(self):
         recus: dict = {}
+        options = RunOptions(mode="daily", years=(2024, 2024), include_wos=True)
 
         self._executer(
-            lambda ctx: recus.update(options=ctx.options) or PhaseMetrics(),
-            args=_args(mode="daily", year=2024, include_wos=True),
+            lambda ctx: recus.update(options=ctx.options) or PhaseMetrics(), options=options
         )
 
-        options = recus["options"]
-        assert options.mode == "daily"
-        assert options.year == 2024
-        assert options.include_wos is True
-        assert options.sources == {"hal"}
+        assert recus["options"] == options
 
 
 class TestExecutePhases:
@@ -269,8 +275,11 @@ class TestExecutePhases:
             return recorder
 
         monkeypatch.setattr(run_pipeline, "start_run", _start_run)
-        monkeypatch.setattr(run_pipeline, "refresh_perimeter_structures", lambda conn: None)
-        monkeypatch.setattr(run_pipeline, "open_tx", nullcontext)
+        monkeypatch.setattr(
+            run_pipeline,
+            "PERIMETER_STRUCTURES",
+            Task("perimeter_structures", run=lambda ctx: PhaseMetrics()),
+        )
         return recorder
 
     def test_chaque_phase_consignee_et_journal_clos(self, run_prepare):
@@ -279,19 +288,21 @@ class TestExecutePhases:
             _phase(lambda ctx: PhaseMetrics(), name="deux"),
         ]
 
-        run_pipeline._execute_phases(_args(), phases)
+        run_pipeline._execute_phases(_HAL, phases)
 
         assert [r["phase"] for r in run_prepare.records] == ["une", "deux"]
         assert run_prepare.closed
 
     def test_wos_ecartee_des_sources_consignees(self, run_prepare):
         """WoS est interrogée seulement sur demande : son crédit d'appels est limité."""
-        run_pipeline._execute_phases(_args(sources="hal,wos"), [])
+        run_pipeline._execute_phases(RunOptions(sources=frozenset({"hal", "wos"})), [])
 
         assert run_prepare.demarrage["sources"] == ["hal"]
 
     def test_wos_consignee_quand_elle_est_demandee(self, run_prepare):
-        run_pipeline._execute_phases(_args(sources="hal,wos", include_wos=True), [])
+        options = RunOptions(sources=frozenset({"hal", "wos"}), include_wos=True)
+
+        run_pipeline._execute_phases(options, [])
 
         assert run_prepare.demarrage["sources"] == ["hal", "wos"]
 
@@ -307,7 +318,7 @@ class TestMain:
         monkeypatch.setattr(
             run_pipeline,
             "_execute_phases",
-            lambda args, phases: executees.append([phase.name for phase in phases]),
+            lambda options, phases: executees.append([phase.name for phase in phases]),
         )
 
         def _lancer(*arguments):
@@ -334,7 +345,6 @@ class TestMain:
         for nom in run_pipeline.PHASE_NAMES:
             ligne = next(line for line in catalogue.splitlines() if f" {nom} " in line)
             assert ligne.split(nom, 1)[1].strip()
-        assert "Recherche des documents non revus depuis <delai>" in catalogue
 
     def test_pipeline_deja_en_cours(self, monkeypatch, capsys):
         """Deux pipelines simultanés se bloqueraient en base : le second refuse de démarrer."""
@@ -358,7 +368,7 @@ class TestMain:
         recues: list = []
         monkeypatch.setattr(run_pipeline, "pipeline_lock", nullcontext)
         monkeypatch.setattr(
-            run_pipeline, "_execute_phases", lambda args, phases: recues.append(args)
+            run_pipeline, "_execute_phases", lambda options, phases: recues.append(options)
         )
         monkeypatch.setattr(
             sys,
@@ -367,8 +377,9 @@ class TestMain:
                 "run_pipeline",
                 "--mode",
                 "daily",
-                "--start-year",
+                "--years",
                 "2020",
+                "2022",
                 "--sources",
                 "hal,openalex",
                 "--include-wos",
@@ -378,12 +389,12 @@ class TestMain:
 
         run_pipeline.main()
 
-        (args,) = recues
-        assert args.mode == "daily"
-        assert args.start_year == 2020
-        assert args.sources == "hal,openalex"
-        assert args.include_wos is True
-        assert args.raw_store is True
+        (options,) = recues
+        assert options.mode == "daily"
+        assert options.years == (2020, 2022)
+        assert options.sources == {"hal", "openalex"}
+        assert options.include_wos is True
+        assert options.raw_store is True
 
 
 def test_arret_demande_par_le_systeme_devient_une_interruption_propre():

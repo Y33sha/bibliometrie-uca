@@ -21,7 +21,7 @@ LABEL = "Rattachement des enregistrements sources aux monographies"
 """Libellé de la sous-étape dans le journal de la phase."""
 
 _RECORDS = text("""
-    SELECT id, monograph_id, publisher_id, biblio->'monograph' AS monograph
+    SELECT id, monograph_id, publisher_id, biblio
     FROM source_records
     WHERE biblio ? 'monograph' OR monograph_id IS NOT NULL
 """)
@@ -39,7 +39,7 @@ def _volume_records(conn: Connection) -> tuple[list[VolumeRecord], dict[int, int
     current: dict[int, int | None] = {}
     for r in conn.execute(_RECORDS):
         current[r.id] = r.monograph_id
-        volume = monograph_volume({"monograph": r.monograph})
+        volume = monograph_volume(r.biblio)
         if volume is not None:
             records.append(
                 VolumeRecord(

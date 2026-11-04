@@ -73,7 +73,7 @@ def configuration(monkeypatch):
         monkeypatch.setattr(
             common_harvest,
             "window_years",
-            lambda conn, *, start_year, year: [year] if year else annees,
+            lambda conn, years: list(range(years[0], years[1] + 1)) if years else annees,
         )
 
     return _poser
@@ -106,7 +106,7 @@ def test_chaque_annee_est_comptee_avant_l_extraction(configuration):
 def test_une_annee_demandee_ignore_la_configuration(configuration):
     configuration({"C": "Coll"}, [2020, 2021])
     client = _client()
-    HalHarvester(MagicMock(), _LOGGER, client).run(arguments_du_run(year=2024))
+    HalHarvester(MagicMock(), _LOGGER, client).run(arguments_du_run(years=(2024, 2024)))
     assert client.fetch_page_cursor.call_args.args[0] == build_query(years=[2024])
 
 

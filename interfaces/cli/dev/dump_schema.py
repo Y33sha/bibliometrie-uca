@@ -22,8 +22,8 @@ from infrastructure.db.engine import get_sync_engine
 from infrastructure.settings import settings
 from interfaces.cli.dev.pg_tools import owner_connection_args, owner_env, resolve_pg_tool
 
-# `parents[3]` remonte interfaces/cli/dev/ → racine du dépôt ; schema.sql est sous infrastructure/db/.
 SCHEMA_PATH = Path(__file__).resolve().parents[3] / "infrastructure" / "db" / "schema.sql"
+"""`parents[3]` remonte interfaces/cli/dev/ → racine du dépôt ; schema.sql est sous infrastructure/db/."""
 
 _LOCAL_SCHEMAS_SQL = text(r"""
     SELECT nspname FROM pg_namespace

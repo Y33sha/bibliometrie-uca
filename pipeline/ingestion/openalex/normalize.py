@@ -4,14 +4,14 @@ from collections import defaultdict
 from collections.abc import Iterable, Mapping
 from urllib.parse import urlsplit
 
+from domain.contributions.contribution_roles import ContributionRole
 from domain.countries import normalize_country_code
+from domain.documents.dates import PublicationDate, date_from_parts, parse_iso_date
+from domain.documents.identifiers import DOI, PMCID, HALId, extract_doi_from_url
+from domain.documents.licenses import normalize_license
 from domain.persons.contributor_name import ContributorName
 from domain.platforms.platform import PlatformType
 from domain.platforms.registry import PMC_ARTICLE_URL, PUBMED_CENTRAL, known_platform_of_source
-from domain.publications.contribution_roles import ContributionRole
-from domain.publications.dates import PublicationDate, date_from_parts, parse_iso_date
-from domain.publications.identifiers import DOI, PMCID, HALId, extract_doi_from_url
-from domain.publications.licenses import normalize_license
 from domain.serials.containers import ContainerDescription
 from domain.serials.issns import source_issns
 from domain.serials.serial import OaModel
@@ -22,7 +22,6 @@ from domain.source_records.identifiers import (
     SourceIdentifierType,
 )
 from domain.source_records.impact import Impact
-from domain.source_records.source_extras import SourceExtra
 from domain.structures.identifiers import RorId, parse_ror_ids
 from domain.subjects.subject import Subject, SubjectLink, SubjectVocabulary
 from domain.types import (
@@ -49,6 +48,7 @@ from pipeline.ingestion.common.source_records import (
 from pipeline.ingestion.common.staging import StagingRow
 from pipeline.ingestion.openalex.payload import (
     OpenalexLocation,
+    location_url,
     names_publisher,
     names_serial,
     openalex_derived_identifier,
@@ -71,7 +71,7 @@ def extract_locations_data(
     for entry in as_sequence(work.get("locations")):
         loc = as_mapping(entry)
         for key in ("landing_page_url", "pdf_url"):
-            url = as_str(loc.get(key))
+            url = location_url(loc, key)
             if url and url not in seen:
                 seen.add(url)
                 urls.append(url)
@@ -111,8 +111,8 @@ def get_locations(work: Mapping[str, JsonValue]) -> list[LocationFacts]:
     locations: list[LocationFacts] = []
     for entry in as_sequence(work.get("locations")):
         loc = as_mapping(entry)
-        pdf_url = as_str(loc.get("pdf_url"))
-        url = as_str(loc.get("landing_page_url")) or pdf_url
+        pdf_url = location_url(loc, "pdf_url")
+        url = location_url(loc, "landing_page_url") or pdf_url
         if not url:
             continue
         location_id = as_str(loc.get("id")) or ""
@@ -300,7 +300,7 @@ def openalex_source_record(  # noqa: C901
     ]
     keywords = [m for m in words if m] or None
 
-    # Licence de la localisation principale seule : HAL et Crossref donnent celles de leurs propres localisations. Une localisation sans éditeur (archive, entrepôt) garde sa forme brute dans `source_extras`, sans licence normalisée.
+    # Licence de la localisation principale seule : HAL et Crossref donnent celles de leurs propres localisations.
     raw_license = as_str(as_mapping(work.get("primary_location")).get("license"))
     publisher_license = raw_license if names_publisher(primary) else None
 
@@ -325,7 +325,6 @@ def openalex_source_record(  # noqa: C901
         urls=urls or None,
         impact=extract_impact(work).to_json(),
         is_retracted=is_retracted,
-        source_extras={SourceExtra.LICENSE: raw_license} if raw_license else None,
     )
 
 

@@ -10,8 +10,8 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable, Iterable, Sequence
 
-from domain.publications.identifiers import DoiPrefix
-from pipeline.graph import task
+from domain.documents.identifiers import DoiPrefix
+from pipeline.graph import Task
 from pipeline.http.circuit_breaker import SourceUnavailableError
 from pipeline.http.polite_pool import default_user_agent
 from pipeline.ingestion.complements.doi_org import fetch_registration_agencies
@@ -54,7 +54,7 @@ def resolve(
         return _resolve(log, prefix_store, resolve_ras_fn)
     except SourceUnavailableError:
         metrics = PhaseMetrics()
-        signal_source_unavailable(metrics, "doi.org/ra", logger=log, phase="resolve_ra")
+        signal_source_unavailable(metrics, "doi.org/ra", logger=log)
         return metrics
 
 
@@ -113,8 +113,8 @@ def _resolve(
 
 
 TASKS = (
-    task(
-        "resolve_ra.resolve_prefixes",
+    Task(
+        "resolve_prefixes",
         reads=(
             "doi_prefixes.id",
             "source_record_identifiers",

@@ -26,7 +26,6 @@ LABEL = "Autres noms des éditeurs"
 MergePublishers = Callable[[int, int], None]
 """`(cible, source)` : fusionne l'éditeur source dans la cible et valide la transaction."""
 
-# Enregistrements sources qui nomment un éditeur sans préfixe DOI, par titulaire du préfixe DOI de leur publication.
 _EVIDENCE = text("""
     SELECT sr.publisher_id AS named_id, dp.publisher_id AS holder_id, dp.prefix, count(*) AS records
     FROM source_records sr
@@ -38,6 +37,7 @@ _EVIDENCE = text("""
       AND NOT EXISTS (SELECT 1 FROM doi_prefixes own WHERE own.publisher_id = sr.publisher_id)
     GROUP BY 1, 2, 3
 """)
+"""Enregistrements sources qui nomment un éditeur sans préfixe DOI, par titulaire du préfixe DOI de leur publication."""
 
 _NAMES = text("SELECT id, name FROM publishers WHERE id = ANY(:ids)")
 

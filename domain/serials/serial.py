@@ -9,17 +9,14 @@ class SerialType(StrEnum):
     """Type de publication en série. Reflet du type PostgreSQL `serial_type`."""
 
     JOURNAL = "journal"
-    # Revue dont les articles décrivent des jeux de données (data papers).
     DATA_JOURNAL = "data_journal"
+    """Revue dont les articles décrivent des jeux de données (data papers)."""
     PROCEEDINGS = "proceedings"
     BOOK_SERIES = "book_series"
     MEDIA = "media"
     UNKNOWN = "unknown"
 
 
-SERIAL_TYPES: tuple[SerialType, ...] = tuple(SerialType)
-
-# Libellés français des types, servis à l'interface par `/api/serials/types`.
 SERIAL_TYPE_LABELS_FR: dict[SerialType, str] = {
     SerialType.JOURNAL: "Revue",
     SerialType.DATA_JOURNAL: "Revue de données",
@@ -28,6 +25,7 @@ SERIAL_TYPE_LABELS_FR: dict[SerialType, str] = {
     SerialType.MEDIA: "Média",
     SerialType.UNKNOWN: "Inconnu",
 }
+"""Libellés français des types, servis à l'interface par `/api/serials/types`."""
 
 
 class OaModel(StrEnum):
@@ -39,14 +37,12 @@ class OaModel(StrEnum):
     """Revue en open access sans frais de publication : présente dans le DOAJ sans APC ni autres frais, ou marquée à la main."""
 
 
-OA_MODELS: tuple[OaModel, ...] = tuple(OaModel)
-
-# Libellés français des modèles, servis à l'interface par `/api/serials/oa-models`.
 OA_MODEL_LABELS_FR: dict[OaModel, str] = {
     OaModel.SUBSCRIPTION: "Abonnement",
     OaModel.FULL_OA: "Full OA (gold)",
     OaModel.DIAMOND: "Diamant",
 }
+"""Libellés français des modèles, servis à l'interface par `/api/serials/oa-models`."""
 
 
 class ManualField(StrEnum):
@@ -79,7 +75,7 @@ class Serial:
     manual_fields: frozenset[ManualField] = frozenset()
 
     def edit(self, **changes: Unpack[SerialEdit]) -> frozenset[ManualField]:
-        """Applique une saisie de l'administration. Renvoie les champs saisis à la main dont elle change la valeur ; ils rejoignent `manual_fields`."""
+        """Applique une saisie de l'administration. Renvoie les champs saisis à la main changés par cette saisie ; ils rejoignent `manual_fields`."""
         before = self._manual_values()
         if "title" in changes:
             self.title = changes["title"]

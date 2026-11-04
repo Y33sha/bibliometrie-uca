@@ -15,9 +15,6 @@ class PublisherType(StrEnum):
     UNKNOWN = "unknown"
 
 
-PUBLISHER_TYPES: tuple[PublisherType, ...] = tuple(PublisherType)
-
-# Libellés français des types d'éditeur, servis à l'interface par `/api/publishers/types`.
 PUBLISHER_TYPE_LABELS_FR: dict[PublisherType, str] = {
     PublisherType.COMMERCIAL: "Éditeur commercial",
     PublisherType.LEARNED_SOCIETY: "Société savante",
@@ -27,3 +24,4 @@ PUBLISHER_TYPE_LABELS_FR: dict[PublisherType, str] = {
     PublisherType.MEDIA: "Média",
     PublisherType.UNKNOWN: "Type inconnu",
 }
+"""Libellés français des types d'éditeur, servis à l'interface par `/api/publishers/types`."""

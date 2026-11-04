@@ -5,15 +5,15 @@ from collections.abc import Iterator
 
 from sqlalchemy import Connection, Row, text
 
+from domain.documents.identifiers import issn_search_prefix
 from domain.normalize import normalize_text
-from domain.publications.identifiers import issn_search_prefix
 from domain.serials.containers import conference_paper_share, holds_mostly_conference_papers
 from domain.serials.doi_namespaces import DoiNamespace, namespace_candidates, resolve_serial
 from domain.serials.serial import (
     OA_MODEL_LABELS_FR,
-    OA_MODELS,
     SERIAL_TYPE_LABELS_FR,
-    SERIAL_TYPES,
+    OaModel,
+    SerialType,
 )
 from infrastructure.db.source_record_identifiers import serial_doi_sql
 from infrastructure.read_models._common import (
@@ -45,7 +45,6 @@ from infrastructure.read_models.subjects.models import SubjectFrequency
 from infrastructure.read_models.subjects.queries import entity_subjects
 from infrastructure.sql_fragments import active_issns, corrected, has_active_issn
 
-# Colonnes de la ligne de liste d'une revue. `doaj_id` et `doaj_url_csv` sont les deux entrées de `resolve_doaj_url` ; `publisher_name` suppose la jointure `publishers p`.
 _SERIAL_LIST_COLUMNS = f"""
     j.id, j.title, {active_issns("j.id")} AS issns,
     j.publisher_id, p.name AS publisher_name,
@@ -53,14 +52,14 @@ _SERIAL_LIST_COLUMNS = f"""
     j.doaj_payload->>'DOAJ id' AS doaj_id,
     j.doaj_payload->>'URL in DOAJ' AS doaj_url_csv
 """
+"""Colonnes de la ligne de liste d'une revue. `doaj_id` et `doaj_url_csv` sont les deux entrées de `resolve_doaj_url` ; `publisher_name` suppose la jointure `publishers p`."""
 
-# Colonnes du profil complet : la ligne de liste plus les champs propres au détail (page publique, édition admin).
 _SERIAL_DETAIL_COLUMNS = f"""
     {_SERIAL_LIST_COLUMNS},
     j.openalex_id, j.is_academic
 """
+"""Colonnes du profil complet : la ligne de liste plus les champs propres au détail (page publique, édition admin)."""
 
-# Revues liées par les liens entre titres et entre revue principale et supplément, lus dans les deux sens. Un ISSN lié sans revue reste nommé par lui-même.
 _RELATIONS = text("""
     WITH own AS (SELECT issn FROM serial_issns WHERE serial_id = :id),
     linked AS (
@@ -81,6 +80,7 @@ _RELATIONS = text("""
     WHERE s.id IS DISTINCT FROM :id
     ORDER BY k.kind, s.title, issn
 """)
+"""Revues liées par les liens entre titres et entre revue principale et supplément, lus dans les deux sens. Un ISSN lié sans revue reste nommé par lui-même."""
 
 
 def _list_sql(where: str, sort: SerialSort) -> str:
@@ -110,11 +110,11 @@ def _serial_list_item(row: Row[tuple[object, ...]]) -> SerialListItem:
     )
 
 
-# Recherche d'un ISSN parmi tous les ISSN d'une revue, quel que soit leur statut. Les séparateurs sont retirés de part et d'autre, et la casse alignée : une valeur mal formée est gardée telle que reçue.
 _ISSN_SEARCH_SQL = """EXISTS (
         SELECT 1 FROM serial_issns i
         WHERE i.serial_id = j.id AND replace(upper(i.issn), '-', '') LIKE :issn_prefix || '%'
     )"""
+"""Recherche d'un ISSN parmi tous les ISSN d'une revue, quel que soit leur statut. Les séparateurs sont retirés de part et d'autre, et la casse alignée : une valeur mal formée est gardée telle que reçue."""
 
 
 def _build_serial_where(
@@ -175,7 +175,6 @@ _SORT_MAP = {
 }
 
 
-# Revues de même titre normalisé, hors paire de deux revues ayant chacune un ISSN. Un titre vidé par la normalisation (alphabet non latin, symboles) reste à l'écart.
 _SAME_TITLE_GROUPS = f"""
     SELECT title_normalized AS value, array_agg(id) AS ids
     FROM serials j
@@ -184,8 +183,8 @@ _SAME_TITLE_GROUPS = f"""
     HAVING count(*) > 2
         OR (count(*) = 2 AND count(*) FILTER (WHERE {has_active_issn("j.id")}) < 2)
 """
+"""Revues de même titre normalisé, hors paire de deux revues ayant chacune un ISSN. Un titre vidé par la normalisation (alphabet non latin, symboles) reste à l'écart."""
 
-# Type brut de chaque enregistrement source des revues typées `journal`, avant correction.
 _SERIAL_RECORD_TYPES = """
     SELECT j.id,
            array_agg(s.source::text ORDER BY s.id) AS sources,
@@ -195,8 +194,8 @@ _SERIAL_RECORD_TYPES = """
     WHERE j.serial_type = 'journal'
     GROUP BY j.id
 """
+"""Type brut de chaque enregistrement source des revues typées `journal`, avant correction."""
 
-# Enregistrements sources à DOI et à revue, un couple par DOI donné par l'enregistrement source avec sa revue, comme pour le calcul des espaces de noms. Une revue posée par l'espace de noms du DOI s'accorde avec lui par construction.
 _RECORDS_WITH_DOI_AND_SERIAL = f"""
     SELECT d.id_value AS doi, s.serial_id, s.source::text AS source
     FROM source_records s
@@ -204,6 +203,7 @@ _RECORDS_WITH_DOI_AND_SERIAL = f"""
     WHERE s.serial_id IS NOT NULL
       AND NOT {corrected("serial_id", "s")}
 """
+"""Enregistrements sources à DOI et à revue, un couple par DOI donné par l'enregistrement source avec sa revue, comme pour le calcul des espaces de noms. Une revue posée par l'espace de noms du DOI s'accorde avec lui par construction."""
 
 
 class SerialQueries:
@@ -389,7 +389,7 @@ class SerialQueries:
                 label=SERIAL_TYPE_LABELS_FR[v],
                 count=jt_counts.get(v, 0),
             )
-            for v in SERIAL_TYPES
+            for v in SerialType
         ]
 
         where_oa, binds_oa = _build_serial_where(filters, skip_oa_models=True)
@@ -409,7 +409,7 @@ class SerialQueries:
                 label=OA_MODEL_LABELS_FR[v],
                 count=oa_counts.get(v, 0),
             )
-            for v in OA_MODELS
+            for v in OaModel
         ]
 
         where_d, binds_d = _build_serial_where(filters, skip_doaj=True)

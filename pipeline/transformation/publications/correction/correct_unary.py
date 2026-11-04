@@ -5,14 +5,13 @@ Les revues sont typées à ce stade : la phase suit `publishing`. La correction 
 
 import logging
 import time
+from collections import Counter
 from collections.abc import Mapping, Set
 from dataclasses import dataclass
 
 from sqlalchemy import Connection
 
-from domain.source_records.corrections import CORRECTED_BY, UNARY_KEYS
-from domain.source_records.metadata_correction.source_record import (
-    UNARY_IDENTIFIER_RULES,
+from domain.source_records.metadata_correction.unary import (
     correct_source_record,
     corrected_doc_type,
 )
@@ -96,25 +95,10 @@ class UnaryCorrectionStats:
 
 
 def tally_corrections(updates: list[CorrectionUpdate]) -> tuple[int, dict[str, int]]:
-    """Compte les enregistrements sources corrigés et les déclenchements par règle, d'après les champs unaires corrigés et les règles de retrait d'identifiants. Une règle qui corrige plusieurs champs d'un enregistrement source compte une fois."""
-    rule_counts: dict[str, int] = {}
-    corrected = 0
-    for update in updates:
-        fired = {
-            i.removed_by
-            for i in update.corrected.identifiers
-            if i.removed_by in UNARY_IDENTIFIER_RULES
-        }
-        for field in UNARY_KEYS:
-            entry = update.corrected.columns.corrections.get(field)
-            rule = entry.get(CORRECTED_BY) if isinstance(entry, dict) else None
-            if isinstance(rule, str):
-                fired.add(rule)
-        for rule in fired:
-            rule_counts[rule] = rule_counts.get(rule, 0) + 1
-        if fired:
-            corrected += 1
-    return corrected, rule_counts
+    """Compte les enregistrements sources corrigés par au moins une règle, et les enregistrements sources corrigés par chaque règle (`UnaryCorrection.rules`)."""
+    rule_counts = Counter(rule for update in updates for rule in update.corrected.rules)
+    corrected = sum(bool(update.corrected.rules) for update in updates)
+    return corrected, dict(rule_counts)
 
 
 def run(

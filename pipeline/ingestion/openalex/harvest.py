@@ -1,6 +1,6 @@
 """Moissonnage OpenAlex : tâche `harvest.openalex`.
 
-La requête `/works` cible la lignée des institutions du périmètre (`authorships.institutions.lineage`), année par année ou depuis une date de modification. La pagination suit un curseur.
+La requête `/works` cible la lignée des institutions du périmètre, année par année. La pagination suit un curseur.
 """
 
 from __future__ import annotations
@@ -39,16 +39,15 @@ def harvest_period(
     progress: Progress,
     *,
     years: list[int],
-    since: str | None = None,
 ) -> PhaseMetrics:
-    """Moissonne les works des années `years`, modifiés depuis `since` s'il est donné, page après page."""
+    """Moissonne les works des années `years`, page après page."""
     metrics = PhaseMetrics()
     cursor = "*"
     total_count: int | None = None
     fetched = 0
 
     while True:
-        data = client.fetch_page(institution_ids, years=years, cursor=cursor, since=since)
+        data = client.fetch_page(institution_ids, years=years, cursor=cursor)
         if total_count is None:
             total_count = as_int(at_path(data, "meta").get("count")) or 0
 
@@ -73,7 +72,7 @@ def harvest_period(
 
 
 class OpenalexHarvester(SourceHarvester[OpenalexHarvestConfig, OpenalexClient]):
-    """Moissonnage OpenAlex des works des institutions du périmètre, année par année ou depuis une date."""
+    """Moissonnage OpenAlex des works des institutions du périmètre, année par année."""
 
     SOURCE = "openalex"
 
@@ -85,41 +84,21 @@ class OpenalexHarvester(SourceHarvester[OpenalexHarvestConfig, OpenalexClient]):
             )
         return OpenalexHarvestConfig(institution_ids=institution_ids)
 
-    def setup_logging(self, window: HarvestWindow, config: OpenalexHarvestConfig) -> None:
-        if window.since:
-            self.logger.info("Mode incrémental : documents modifiés depuis %s", window.since)
-
     def harvest_all(self, window: HarvestWindow, config: OpenalexHarvestConfig) -> PhaseMetrics:
-        """Moissonne les works du périmètre.
-
-        En mode incrémental, un seul périmètre : les works modifiés depuis la date, dans la plage d'années du mode complet. Sinon une passe par année.
-        """
+        """Moissonne les works du périmètre, une passe par année."""
         ids = config.institution_ids
         client = self._client
-        years = self._years(window)
 
-        def harvest_step(
-            progress: Progress, *, years: list[int], since: str | None = None
-        ) -> PhaseMetrics:
-            scope = f"depuis {since}" if since else str(years[0])
+        def harvest_step(year: int, progress: Progress) -> PhaseMetrics:
             return harvest_period(
                 client,
                 self.conn,
                 ids,
-                scoped_logger(self.logger, self.SOURCE, scope),
+                scoped_logger(self.logger, self.SOURCE, str(year)),
                 progress,
-                years=years,
-                since=since,
-            )
-
-        if window.since:
-            return self._harvest_at_once(
-                client.count(ids, years=years, since=window.since),
-                lambda progress: harvest_step(progress, years=years, since=window.since),
+                years=[year],
             )
 
         return self._harvest_by_year(
-            years,
-            lambda year: client.count(ids, years=[year]),
-            lambda year, progress: harvest_step(progress, years=[year]),
+            self._years(window), lambda year: client.count(ids, years=[year]), harvest_step
         )

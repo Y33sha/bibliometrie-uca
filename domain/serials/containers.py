@@ -4,11 +4,11 @@ from collections.abc import Iterable
 from dataclasses import dataclass, replace
 from enum import StrEnum
 
+from domain.documents.doc_types import DocType
 from domain.normalize import normalize_text, optional_plain_text
-from domain.publications.doc_types import DocType
 from domain.serials.issns import SerialIssn, received_issns
 from domain.serials.serial import OaModel
-from domain.serials.series import ContainerLevel, container_level, series_title
+from domain.serials.series import names_a_volume, series_title
 from domain.serials.titles import names_a_dated_event, names_ebook_platform, names_proceedings
 from domain.source_records.doc_types import map_doc_type
 
@@ -182,7 +182,7 @@ def determine_container_type(
 ) -> tuple[SeriesDescription | None, VolumeDescription | None]:
     """Sépare le conteneur d'un document en série et volume, chacun pouvant manquer.
 
-    Un article a sa revue pour série ; sans ISSN, un conteneur qui nomme une édition datée de congrès (« 2021 ICCAS ») est un volume d'actes. Un livre, un chapitre ou un article de congrès a pour volume le livre ou le volume d'actes, et pour série la collection désignée par un ISSN : sans ISSN, sa série se reconnaît seulement entre plusieurs volumes. Un titre de collection qui a la forme d'un volume (« ICORES 2023 ») nomme le volume, à défaut d'autre titre, et sa série prend le titre de série. Un titre de volume identique à celui de la collection, sans marque d'édition, désigne la collection seule : c'est le cas d'un article de congrès paru dans une revue.
+    Un article a sa revue pour série ; sans ISSN, un conteneur qui nomme une édition datée de congrès (« 2021 ICCAS ») est un volume d'actes. Un livre, un chapitre ou un article de congrès a pour volume le livre ou le volume d'actes, et pour série la collection désignée par un ISSN. Sans ISSN, sa série se reconnaît seulement entre plusieurs volumes. Un titre de collection qui a la forme d'un volume (« ICORES 2023 ») nomme le volume, à défaut d'autre titre, et sa série prend le titre de série. Un titre de volume identique à celui de la collection, sans marque d'édition, désigne la collection seule : c'est le cas d'un article de congrès paru dans une revue.
     """
     d = description
     role = container_role(d.raw_doc_type, d.source, declares_conference=d.declares_conference)
@@ -195,7 +195,7 @@ def determine_container_type(
 
     collection_title = d.collection_title
     volume_title = d.document_title if role is ContainerRole.BOOK else d.book_title
-    if collection_title and container_level(collection_title) is ContainerLevel.VOLUME:
+    if collection_title and names_a_volume(collection_title):
         volume_title = volume_title or collection_title
         collection_title = series_title(collection_title)
     series = _series(d, collection_title) if d.has_issn else None

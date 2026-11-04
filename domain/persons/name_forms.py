@@ -29,5 +29,5 @@ def compute_person_name_forms(last_name: str, first_name: str) -> set[str]:
     return {name_form(ln, fn), name_form(ln, initials)}
 
 
-# Source, dans `person_name_forms.sources`, des formes calculées depuis le nom de la personne dans `persons`. Les autres sources sont celles du moissonnage (`hal`, `openalex`…).
 CANONICAL_NAME_FORM_SOURCE = "persons"
+"""Source, dans `person_name_forms.sources`, des formes calculées depuis le nom de la personne dans `persons`. Les autres sources sont celles du moissonnage (`hal`, `openalex`…)."""

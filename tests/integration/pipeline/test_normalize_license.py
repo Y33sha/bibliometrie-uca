@@ -2,8 +2,8 @@
 
 from sqlalchemy import text
 
-from domain.publications.dates import PublicationDate
-from domain.publications.licenses import License
+from domain.documents.dates import PublicationDate
+from domain.documents.licenses import License
 from pipeline.ingestion.common.source_records import (
     SourceRecordStore,
     SourceRecordUpsert,

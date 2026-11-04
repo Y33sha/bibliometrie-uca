@@ -40,7 +40,6 @@ from infrastructure.sql_fragments import (
 
 # ── File de triage : formes de nom ambiguës ──────────────────────
 
-# Formes d'au moins deux personnes au sens de `name_form_holder`, dont au moins une à confirmer (`pending_name_form`).
 _AMBIGUOUS_FORMS_SQL = f"""
     SELECT pnf.name_form
     FROM person_name_forms pnf
@@ -49,14 +48,14 @@ _AMBIGUOUS_FORMS_SQL = f"""
     GROUP BY pnf.name_form
     HAVING count(*) >= 2 AND bool_or({pending_name_form("pnf")})
 """
+"""Formes d'au moins deux personnes au sens de `name_form_holder`, dont au moins une à confirmer (`pending_name_form`)."""
 
 
 # ── Conflits d'identifiant (file de triage) ──────────────────────
 
-# Liste SQL des types d'identifiant à examiner, dérivée du vocabulaire `PersonIdentifierType`.
 _ID_TYPES_ARRAY_SQL = "ARRAY[" + ", ".join(f"'{t.value}'" for t in PersonIdentifierType) + "]"
+"""Liste SQL des types d'identifiant à examiner, dérivée du vocabulaire `PersonIdentifierType`."""
 
-# Paires de personnes non exclues au même identifiant brut, hors identifiants neutralisés par la contribution source et hors paires déjà distinctes. Seules comptent les valeurs à attribution `pending`.
 _IDENTIFIER_CONFLICT_PAIRS = f"""
     WITH pending AS (
         SELECT DISTINCT id_type::text AS id_type, id_value
@@ -96,6 +95,7 @@ _IDENTIFIER_CONFLICT_PAIRS = f"""
     )
     GROUP BY id_a, id_b
 """
+"""Paires de personnes non exclues au même identifiant brut, hors identifiants neutralisés par la contribution source et hors paires déjà distinctes. Seules comptent les valeurs à attribution `pending`."""
 
 
 def _curation_persons(conn: Connection, ids: list[int]) -> dict[int, CurationPersonOut]:
@@ -139,8 +139,6 @@ def _curation_persons(conn: Connection, ids: list[int]) -> dict[int, CurationPer
 
 # ── Doublons par nom (file de triage) ────────────────────────────
 
-# Paires candidates : quatre requêtes larges, resserrées par `names_compatible` (comparaison des mots du nom).
-# Les personnes exclues, les paires distinctes et les paires de deux fiches RH sont écartées.
 _DUP_WHERE = """
     WHERE p1.exclusion IS NULL AND p2.exclusion IS NULL
     AND NOT EXISTS (
@@ -152,6 +150,7 @@ _DUP_WHERE = """
         AND EXISTS (SELECT 1 FROM hr_records WHERE person_id = p2.id)
     )
 """
+"""Paires candidates : quatre requêtes larges, resserrées par `names_compatible` (comparaison des mots du nom). Les personnes exclues, les paires distinctes et les paires de deux fiches RH sont écartées."""
 
 PERSON_DUP_QUERIES = [
     f"""SELECT p1.id AS id_a, p2.id AS id_b,
@@ -226,7 +225,6 @@ PERSON_DUP_QUERIES = [
 ]
 
 
-# Recouvrements de réseau entre deux personnes : chaque dimension renvoie (person_id, valeur) au grain des contributions. Des réseaux disjoints signalent un homonyme, des réseaux communs un doublon. Les sujets sont écartés : un même domaine ne fait pas une même personne.
 _OVERLAP_DIMENSIONS: dict[str, str] = {
     "coauthors": """
         SELECT a1.person_id AS person, a2.person_id AS val
@@ -252,6 +250,7 @@ _OVERLAP_DIMENSIONS: dict[str, str] = {
         WHERE a.person_id = ANY(:ids) AND p.serial_id IS NOT NULL
     """,
 }
+"""Recouvrements de réseau entre deux personnes : chaque dimension renvoie (person_id, valeur) au grain des contributions. Des réseaux disjoints signalent un homonyme, des réseaux communs un doublon. Les sujets sont écartés : un même domaine ne fait pas une même personne."""
 
 
 def _overlap_sets(conn: Connection, sql: str, ids: list[int]) -> dict[int, set[int]]:
@@ -313,8 +312,7 @@ class PersonAdminQueries:
         """Renvoie les contributions sources de la personne sous une forme de nom donnée, et les autres personnes ayant cette forme non rejetée."""
         auth_rows = self._conn.execute(
             text(f"""
-                SELECT sc.source, sc.id AS source_contribution_id,
-                       sr.publication_id, sr.title, sr.publication_year,
+                SELECT sc.source, sr.publication_id, sr.title, sr.publication_year,
                        {source_record_doi_sql("sr")} AS doi
                 FROM {CONTRIBUTIONS_AND_SOURCES}
                 JOIN source_records sr ON sr.id = sc.source_record_id
@@ -339,7 +337,6 @@ class PersonAdminQueries:
             contributions=[
                 NameFormContributionRef(
                     source=r.source,
-                    source_contribution_id=r.source_contribution_id,
                     publication_id=r.publication_id,
                     title=r.title,
                     publication_year=r.publication_year,

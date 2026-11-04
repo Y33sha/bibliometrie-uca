@@ -41,8 +41,8 @@ class NormalizedIdentifier:
 
 
 _IDREF_URL_RE = re.compile(r"idref\.fr/(\d{8}[\dX])(?:/id)?", re.IGNORECASE)
-# PPN : 8 chiffres + 1 caractère de contrôle (chiffre ou X)
 _IDREF_CANONICAL = re.compile(r"^\d{8}[\dX]$")
+"""PPN : 8 chiffres + 1 caractère de contrôle (chiffre ou X)"""
 
 
 def _normalize_idref(raw: str | None) -> str | None:

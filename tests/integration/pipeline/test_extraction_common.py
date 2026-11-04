@@ -5,7 +5,7 @@ from functools import partial
 import pytest
 from sqlalchemy import text
 
-from domain.publications.identifiers import DOI
+from domain.documents.identifiers import DOI
 from domain.source_records.identifiers import (
     SourceIdentifier,
     SourceIdentifierRole,
@@ -243,22 +243,6 @@ class TestGetMissingDois:
         )
         assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30) == []
 
-    def test_includes_arxiv_derived_datacite_doi(self, sa_sync_conn):
-        """L'identifiant arXiv d'un enregistrement source du périmètre, d'une autre source que la cible, est retenu sous la forme du DOI DataCite `10.48550/arxiv.<id>`, en minuscules."""
-        _add_inperim_source_record(
-            sa_sync_conn, "openalex", "W1", identifiers={"arxiv_id": "2605.02321"}
-        )
-        result = get_missing_dois(sa_sync_conn, "hal", retry_after_days=30)
-        assert "10.48550/arxiv.2605.02321" in result
-
-    def test_arxiv_derived_doi_excluded_for_same_source(self, sa_sync_conn):
-        """L'identifiant arXiv d'un enregistrement source de la cible elle-même est exclu."""
-        _add_inperim_source_record(
-            sa_sync_conn, "hal", "H1", identifiers={"arxiv_id": "2605.02321"}
-        )
-        result = get_missing_dois(sa_sync_conn, "hal", retry_after_days=30)
-        assert "10.48550/arxiv.2605.02321" not in result
-
     def test_includes_the_unversioned_form_of_a_versioned_doi(self, sa_sync_conn):
         """La forme sans version, sans source, est cherchée même dans la source qui a la version."""
         insert_doi_prefix(sa_sync_conn, "10.6084", ra="DataCite")
@@ -455,9 +439,9 @@ class TestDisappearedMarking:
 
 
 class TestGetPrefixesToResolve:
-    """Les préfixes à résoudre viennent de la vue `candidate_dois`, comme les DOI de la recherche par DOI : ils couvrent les DOI cibles de relations et les DOI dérivés d'arXiv."""
+    """Les préfixes à résoudre viennent de la vue `candidate_dois`, comme les DOI de la recherche par DOI : ils couvrent les DOI cibles de relations."""
 
-    def test_pool_covers_relation_and_arxiv_prefixes(self, sa_sync_conn):
+    def test_pool_covers_relation_prefixes(self, sa_sync_conn):
         from pipeline.transformation.publishing.doi_prefixes import DoiPrefixStore
 
         # Préfixe présent seulement dans le DOI cible d'une relation, depuis une publication du périmètre.
@@ -469,15 +453,6 @@ class TestGetPrefixesToResolve:
             source="crossref",
             target_doi="10.77777/rel",
         )
-        # Préfixe présent seulement dans le DOI DataCite dérivé de l'identifiant arXiv d'un enregistrement source du périmètre.
-        _source_record(
-            sa_sync_conn,
-            1,
-            source="openalex",
-            source_id="W1",
-            identifiers=secondary_identifiers({"arxiv_id": "2605.02321"}),
-        )
 
         prefixes = DoiPrefixStore(sa_sync_conn).get_prefixes_to_resolve()
-        assert "10.77777" in prefixes  # cible de relation
-        assert "10.48550" in prefixes  # DOI dérivé d'arXiv
+        assert "10.77777" in prefixes

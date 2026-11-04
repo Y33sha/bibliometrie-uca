@@ -3,7 +3,7 @@
 import re
 from enum import StrEnum
 
-from domain.publications.doc_types import DocType
+from domain.documents.doc_types import DocType
 from domain.sources.registry import Source
 
 
@@ -76,23 +76,23 @@ def license_label(value: str | None) -> str:
     return LICENSE_LABELS[License(value)] if value else _NO_LICENSE_LABEL
 
 
-# Sources de la licence de la version éditeur d'une publication, par priorité.
 _PUBLISHER_LICENSE_SOURCES: tuple[Source, ...] = (
     Source.CROSSREF,
     Source.OPENALEX,
     Source.SCANR,
     Source.DATACITE,
 )
-# Pour un jeu de données ou un logiciel, DataCite passe en tête.
+"""Sources de la licence de la version éditeur d'une publication, par priorité."""
 _DATA_LICENSE_SOURCES: tuple[Source, ...] = (
     Source.DATACITE,
     Source.CROSSREF,
     Source.OPENALEX,
     Source.SCANR,
 )
+"""Pour un jeu de données ou un logiciel, DataCite passe en tête."""
 _DATA_DOC_TYPES: frozenset[str] = frozenset({DocType.DATASET, DocType.SOFTWARE})
-# Source de la licence du fichier déposé.
 DEPOSIT_LICENSE_SOURCE = Source.HAL
+"""Source de la licence du fichier déposé."""
 
 
 def publisher_license_sources(doc_type: str | None) -> tuple[Source, ...]:
@@ -100,8 +100,8 @@ def publisher_license_sources(doc_type: str | None) -> tuple[Source, ...]:
     return _DATA_LICENSE_SOURCES if doc_type in _DATA_DOC_TYPES else _PUBLISHER_LICENSE_SOURCES
 
 
-# Éléments d'une licence Creative Commons, dans l'ordre de son code.
 _CC_ELEMENTS = ("by", "nc", "sa", "nd")
+"""Éléments d'une licence Creative Commons, dans l'ordre de son code."""
 _CC_CODES = {
     "by": License.CC_BY,
     "by-sa": License.CC_BY_SA,
@@ -111,7 +111,6 @@ _CC_CODES = {
     "by-nc-nd": License.CC_BY_NC_ND,
 }
 
-# Codes sans URL : vocabulaire OpenAlex et scanR, identifiants SPDX et libellés de DataCite.
 _CODES = {
     "public-domain": License.PUBLIC_DOMAIN,
     "cc-pddc": License.PUBLIC_DOMAIN,
@@ -123,12 +122,12 @@ _CODES = {
     "etalab-1.0": License.LICENCE_OUVERTE,
     "etalab-2.0": License.LICENCE_OUVERTE,
 }
+"""Codes sans URL : vocabulaire OpenAlex et scanR, identifiants SPDX et libellés de DataCite."""
 _OPEN_SOURCE_CODE = re.compile(
     r"^(mit|0bsd|bsd-.+|(l|a)?gpl-.+|apache-.+|cecill.*|afl-.+|mpl-.+|eupl-.+|isc|unlicense)$"
 )
 _CC0_CODE = re.compile(r"^cc0(-\d+(\.\d+)*)?$")
 
-# URL sans schéma ni `www.`, en minuscules : préfixe → licence.
 _URL_PREFIXES = (
     ("creativecommons.org/publicdomain/", License.PUBLIC_DOMAIN),
     ("creativecommons.org/share-your-work/public-domain/", License.PUBLIC_DOMAIN),
@@ -148,6 +147,7 @@ _URL_PREFIXES = (
     ("apache.org/licenses/", License.OPEN_SOURCE),
     ("cecill.info", License.OPEN_SOURCE),
 )
+"""URL sans schéma ni `www.`, en minuscules : préfixe → licence."""
 _ETALAB_URL = re.compile(r"etalab.*licence-ouverte|licence-ouverte.*etalab")
 _CC_URL = re.compile(r"^creativecommons\.org/licenses/([a-z-]+)")
 _SPDX_URL = re.compile(r"^spdx\.org/licenses/([^/]+?)(\.html)?$")

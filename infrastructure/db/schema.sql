@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict 3ScU5c5RbyhMOripCZsggZZaPGpJMmhVwx0lLyEkkaE065nLrDA69v4BuZqeaVP
+\restrict D2VmuphnK38t9TSQYQfVMrrhxVcw4Jop1dr1W9TwbqvjcpOIfhWKVeJgi5BGM8a
 
--- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
--- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
+-- Dumped from database version 18.4
+-- Dumped by pg_dump version 18.4
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -183,6 +183,7 @@ CREATE TYPE public.doc_type AS ENUM (
     'book_review',
     'data_paper',
     'proceedings',
+    'journal_issue',
     'media',
     'physical_object'
 );
@@ -498,8 +499,6 @@ CREATE TYPE public.source_identifier_type AS ENUM (
     'hal_id',
     'nnt',
     'pmid',
-    'pmcid',
-    'arxiv_id',
     'isbn',
     'eisbn'
 );
@@ -1415,7 +1414,7 @@ COMMENT ON COLUMN sources.source_records.publisher_id IS 'Éditeur que nomme la 
 -- Name: COLUMN source_records.is_matchable; Type: COMMENT; Schema: sources; Owner: -
 --
 
-COMMENT ON COLUMN sources.source_records.is_matchable IS 'Faux pour un enregistrement source écarté de la réconciliation : préfixe DOI exclu, titre de paratexte, enregistrement ScanR issu d''un dépôt HAL introuvable, enregistrement d''agrégateur sans DOI, lien ni clé de confirmation.';
+COMMENT ON COLUMN sources.source_records.is_matchable IS 'Faux pour un enregistrement source écarté de la réconciliation.';
 
 
 --
@@ -2911,7 +2910,7 @@ COMMENT ON COLUMN sources.source_record_identifiers.id_value IS 'Forme normalis�
 -- Name: COLUMN source_record_identifiers.role; Type: COMMENT; Schema: sources; Owner: -
 --
 
-COMMENT ON COLUMN sources.source_record_identifiers.role IS 'primary : identifiant de l''enregistrement dans la source. derived : identifiant de l''enregistrement d''une autre source dont l''enregistrement source est dérivé. Un enregistrement source a au plus un identifiant dérivé. secondary : identifiant que la source attribue au même document. related : identifiant d''un document lié.';
+COMMENT ON COLUMN sources.source_record_identifiers.role IS 'primary : identifiant de l''enregistrement dans la source. Un enregistrement source a au plus un identifiant primaire. derived : identifiant de l''enregistrement d''une autre source dont l''enregistrement source est dérivé. Un enregistrement source a au plus un identifiant dérivé. secondary : identifiant que la source attribue au même document. related : identifiant d''un document lié.';
 
 
 --
@@ -2937,37 +2936,14 @@ UNION
     NULL::public.source_type AS source,
     pr.from_publication_id AS publication_id
    FROM publications.publication_relations pr
-  WHERE (pr.target_doi IS NOT NULL)
-UNION
- SELECT ('10.48550/arxiv.'::text || lower(i.id_value)) AS doi,
-    sp.source,
-    sp.publication_id
-   FROM (sources.source_records sp
-     JOIN sources.source_record_identifiers i ON ((i.source_record_id = sp.id)))
-  WHERE ((i.id_type = 'arxiv_id'::public.source_identifier_type) AND (i.removed_by IS NULL) AND (NOT (EXISTS ( SELECT 1
-           FROM sources.source_record_identifiers x
-          WHERE ((x.source_record_id = i.source_record_id) AND (x.id_type = i.id_type) AND (x.removed_by IS NULL) AND (ROW(
-                CASE x.role
-                    WHEN 'primary'::public.source_identifier_role THEN 1
-                    WHEN 'derived'::public.source_identifier_role THEN 2
-                    WHEN 'secondary'::public.source_identifier_role THEN 3
-                    WHEN 'related'::public.source_identifier_role THEN 4
-                    ELSE NULL::integer
-                END, (x.id_value COLLATE "C")) < ROW(
-                CASE i.role
-                    WHEN 'primary'::public.source_identifier_role THEN 1
-                    WHEN 'derived'::public.source_identifier_role THEN 2
-                    WHEN 'secondary'::public.source_identifier_role THEN 3
-                    WHEN 'related'::public.source_identifier_role THEN 4
-                    ELSE NULL::integer
-                END, (i.id_value COLLATE "C"))))))));
+  WHERE (pr.target_doi IS NOT NULL);
 
 
 --
 -- Name: VIEW known_dois; Type: COMMENT; Schema: sources; Owner: -
 --
 
-COMMENT ON VIEW sources.known_dois IS 'Tous les DOI connus : DOI actifs des enregistrements sources, cibles des relations, DOI DataCite déduits des identifiants arXiv. publication_id est la publication de l''enregistrement source, ou la publication d''origine de la relation ; NULL pour un enregistrement source orphelin.';
+COMMENT ON VIEW sources.known_dois IS 'Tous les DOI connus : DOI actifs des enregistrements sources, cibles des relations. publication_id est la publication de l''enregistrement source, ou la publication d''origine de la relation ; NULL pour un enregistrement source orphelin.';
 
 
 --
@@ -5353,6 +5329,13 @@ CREATE UNIQUE INDEX uq_source_record_identifiers_derived ON sources.source_recor
 
 
 --
+-- Name: uq_source_record_identifiers_primary; Type: INDEX; Schema: sources; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_source_record_identifiers_primary ON sources.source_record_identifiers USING btree (source_record_id) WHERE (role = 'primary'::public.source_identifier_role);
+
+
+--
 -- Name: addresses_normalized_text_key; Type: INDEX; Schema: structures; Owner: -
 --
 
@@ -6129,5 +6112,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 3ScU5c5RbyhMOripCZsggZZaPGpJMmhVwx0lLyEkkaE065nLrDA69v4BuZqeaVP
+\unrestrict D2VmuphnK38t9TSQYQfVMrrhxVcw4Jop1dr1W9TwbqvjcpOIfhWKVeJgi5BGM8a
 

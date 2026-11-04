@@ -9,14 +9,14 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
 from application.services.publication_merge import PublicationMergeService
+from domain.documents.doc_types import DOC_TYPE_FAMILIES, DOC_TYPE_LABELS, DocType
+from domain.documents.licenses import LICENSE_LABELS, License
 from domain.merge import MergedEntity
-from domain.publications.doc_types import DOC_TYPE_FAMILIES, DOC_TYPE_LABELS, DOC_TYPES
-from domain.publications.licenses import LICENSE_LABELS, License
 from domain.publications.oa_status import ACCESS_LEVELS
-from domain.sources.registry import SOURCE_FILTER_VALUES
 from infrastructure.read_models._common import EntityFacetResponse, EntityKind
 from infrastructure.read_models.publications.models import (
     EXPORT_COLUMNS,
+    SOURCE_FILTER_VALUES,
     THESIS_EXPORT_COLUMNS,
     MergeCandidateOut,
     PublicationDetailResponse,
@@ -53,7 +53,7 @@ router = APIRouter(prefix="/api/publications", tags=["publications"])
 
 @router.get("/licenses", response_model=list[EnumOption])
 def list_licenses() -> list[EnumOption]:
-    """Liste les licences d'une publication avec leur libellé français, dans l'ordre de `domain.publications.licenses.License`."""
+    """Liste les licences d'une publication avec leur libellé français, dans l'ordre de `domain.documents.licenses.License`."""
     return [EnumOption(value=v, label_fr=LICENSE_LABELS[v]) for v in License]
 
 
@@ -160,7 +160,7 @@ def export_theses_csv(
         source_values=parse_vocabulary_csv(
             source_filter, allowed=SOURCE_FILTER_VALUES, param="source_filter"
         ),
-        doc_types=parse_vocabulary_csv(doc_type, allowed=DOC_TYPES, param="doc_type")
+        doc_types=parse_vocabulary_csv(doc_type, allowed=DocType, param="doc_type")
         or ["thesis", "ongoing_thesis"],
     )
     return csv_response(

@@ -4,21 +4,21 @@ from collections import defaultdict
 from collections.abc import Sequence
 from itertools import pairwise
 
-from domain.publications.author_grouping import SourceContribution
+from domain.contributions.author_grouping import SourceContribution
 
-# Nombre de noms complets répétés qui signale une copie : au même décalage pour un bloc de la liste, à des décalages quelconques pour une liste de membres.
-MIN_COPIED_NAMES = 2
-# Part des auteurs de la liste répétés à distance qui signale une liste de membres.
+MIN_DUPLICATED_NAMES = 2
+"""Nombre de noms complets répétés qui signale des doublons : au même décalage pour un bloc de la liste, à des décalages quelconques pour une liste de membres."""
 MIN_MEMBER_LIST_SHARE = 0.10
-# Nombre de paires côte à côte, de noms différents et à la suite, qui signale une liste où chaque nom est répété à sa place.
+"""Part des auteurs de la liste répétés à distance qui signale une liste de membres."""
 MIN_DOUBLED_PAIRS = 4
+"""Nombre de paires côte à côte, de noms différents et à la suite, qui signale une liste où chaque nom est répété à sa place."""
 
 type Name = tuple[str, str]
 # Rang d'une contribution source dans la liste des auteurs, et la contribution source.
 type Placed = tuple[int, SourceContribution]
 
 
-def copied_source_contributions(
+def duplicate_source_contributions(
     source_contributions: Sequence[SourceContribution],
 ) -> dict[int, int]:
     """Renvoie les doublons d'auteur d'un enregistrement source, chacun vers la première occurrence de son nom complet. Seules les contributions sources qui ont une position et un nom de famille comptent."""
@@ -29,25 +29,25 @@ def copied_source_contributions(
     by_name: dict[Name, list[Placed]] = defaultdict(list)
     for p in ordered:
         by_name[_name(p)].append(p)
-    copies = (
-        _block_copies(by_name)
+    duplicates = (
+        _block_duplicates(by_name)
         | _doubled_in_place(ordered)
-        | _member_list_copies(by_name, len(ordered))
+        | _member_list_duplicates(by_name, len(ordered))
     )
-    return {s.id: by_name[_name(p)][0][1].id for p in ordered if (s := p[1]).id in copies}
+    return {s.id: by_name[_name(p)][0][1].id for p in ordered if (s := p[1]).id in duplicates}
 
 
-def _block_copies(by_name: dict[Name, list[Placed]]) -> set[int]:
+def _block_duplicates(by_name: dict[Name, list[Placed]]) -> set[int]:
     """Renvoie les occurrences qui suivent la précédente du même nom d'un décalage de répétition.
 
-    Le décalage de répétition est supérieur à 1 et commun à au moins `MIN_COPIED_NAMES` noms. Les homonymes d'une liste alphabétique sont côte à côte, au décalage 1.
+    Le décalage de répétition est supérieur à 1 et commun à au moins `MIN_DUPLICATED_NAMES` noms. Les homonymes d'une liste alphabétique sont côte à côte, au décalage 1.
     """
     names_by_offset: dict[int, set[Name]] = defaultdict(set)
     for name, occurrences in by_name.items():
         for (pa, _), (pb, _) in pairwise(occurrences):
             if pb - pa > 1:
                 names_by_offset[pb - pa].add(name)
-    offsets = {d for d, names in names_by_offset.items() if len(names) >= MIN_COPIED_NAMES}
+    offsets = {d for d, names in names_by_offset.items() if len(names) >= MIN_DUPLICATED_NAMES}
     return {
         b.id
         for occurrences in by_name.values()
@@ -56,8 +56,8 @@ def _block_copies(by_name: dict[Name, list[Placed]]) -> set[int]:
     }
 
 
-def _member_list_copies(by_name: dict[Name, list[Placed]], list_size: int) -> set[int]:
-    """Renvoie les occurrences qui suivent la précédente du même nom à distance (décalage supérieur à 1), quand au moins `MIN_COPIED_NAMES` noms et `MIN_MEMBER_LIST_SHARE` des `list_size` auteurs se répètent à distance.
+def _member_list_duplicates(by_name: dict[Name, list[Placed]], list_size: int) -> set[int]:
+    """Renvoie les occurrences qui suivent la précédente du même nom à distance (décalage supérieur à 1), quand au moins `MIN_DUPLICATED_NAMES` noms et `MIN_MEMBER_LIST_SHARE` des `list_size` auteurs se répètent à distance.
 
     La liste des membres d'un collectif reprend des auteurs dans un autre ordre : chaque nom repris a son propre décalage. Les homonymes sont côte à côte, ou moins nombreux.
     """
@@ -66,19 +66,19 @@ def _member_list_copies(by_name: dict[Name, list[Placed]], list_size: int) -> se
         for name, occurrences in by_name.items()
     }
     repeated = [ids for ids in distant.values() if ids]
-    if len(repeated) < max(MIN_COPIED_NAMES, MIN_MEMBER_LIST_SHARE * list_size):
+    if len(repeated) < max(MIN_DUPLICATED_NAMES, MIN_MEMBER_LIST_SHARE * list_size):
         return set()
     return {i for ids in repeated for i in ids}
 
 
 def _doubled_in_place(ordered: Sequence[Placed]) -> set[int]:
     """Renvoie les secondes occurrences des suites d'au moins `MIN_DOUBLED_PAIRS` paires côte à côte (A A B B…), de noms différents."""
-    copies: set[int] = set()
+    duplicates: set[int] = set()
     run: list[Placed] = []
 
     def close() -> None:
         if len(run) >= MIN_DOUBLED_PAIRS:
-            copies.update(s.id for _, s in run)
+            duplicates.update(s.id for _, s in run)
         run.clear()
 
     i = 0
@@ -93,7 +93,7 @@ def _doubled_in_place(ordered: Sequence[Placed]) -> set[int]:
             close()
             i += 1
     close()
-    return copies
+    return duplicates
 
 
 def _name(p: Placed) -> Name:

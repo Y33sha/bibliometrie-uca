@@ -101,7 +101,6 @@ def _merge_exclusion(conn: Connection, target_id: int, source_id: int) -> None:
     )
 
 
-# Ordre d'exécution : les rejets et les confirmations sont transférés avant que le rejet l'emporte (`merge_into`).
 MERGE_STEPS: dict[str, MergeStep] = {
     "contributions": MergeStep((("contributions", "person_id"),), _merge_contributions),
     "rejected_contributions": transfer_unique(
@@ -115,7 +114,7 @@ MERGE_STEPS: dict[str, MergeStep] = {
     ),
     "identifiers": transfer("person_identifiers", "person_id"),
     "name_forms": MergeStep((("person_name_forms", "person_id"),), _merge_name_forms),
-    # L'absorbée n'a jamais de fiche RH : celle qui en a une est conservée (`merge_roles`).
+    # L'absorbée n'a jamais de fiche RH : celle qui en a une est conservée (`merge_direction`).
     "rh_record": untouched("hr_records", "person_id"),
     "rh_periods": untouched("hr_periods", "person_id"),
     # Les formes de nom de l'absorbée restent (`name_forms`).
@@ -125,6 +124,7 @@ MERGE_STEPS: dict[str, MergeStep] = {
     "created_at": untouched("persons", "created_at"),
     "exclusion": MergeStep((("persons", "exclusion"),), _merge_exclusion, decision=True),
 }
+"""Ordre d'exécution : les rejets et les confirmations sont transférés avant que le rejet l'emporte (`merge_into`)."""
 
 
 def merge_into(conn: Connection, target_id: int, source_id: int) -> None:

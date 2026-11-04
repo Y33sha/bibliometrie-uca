@@ -11,7 +11,6 @@ from sqlalchemy import Connection, text
 from domain.normalize import normalize_text, to_plain_text
 from domain.subjects.subject import Subject, SubjectLink
 
-# Une instruction par niveau, de la racine aux feuilles : le parent d'un sujet est écrit par l'instruction du niveau précédent.
 _UPSERT_LEVEL = text("""
     WITH incoming AS (
         SELECT CAST(t.vocabulary AS subject_vocabulary) AS vocabulary, t.code, t.label,
@@ -33,6 +32,7 @@ _UPSERT_LEVEL = text("""
     WHERE (subjects.label, subjects.level, subjects.parent_id)
         IS DISTINCT FROM (EXCLUDED.label, EXCLUDED.level, EXCLUDED.parent_id)
 """)
+"""Une instruction par niveau, de la racine aux feuilles : le parent d'un sujet est écrit par l'instruction du niveau précédent."""
 
 _REPLACE_LINKS = text("""
     WITH incoming AS (

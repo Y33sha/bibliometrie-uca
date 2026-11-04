@@ -12,7 +12,7 @@ import re
 
 import httpx2
 
-from domain.publications.identifiers import DoiPrefix
+from domain.documents.identifiers import DoiPrefix
 from domain.types import JsonValue, as_mapping
 from pipeline.http.lookup import (
     NOT_FOUND,

@@ -2,8 +2,8 @@
 
 from dataclasses import dataclass, field
 
-from domain.publications.dates import PublicationDate
-from domain.publications.identifiers import DOI
+from domain.documents.dates import PublicationDate
+from domain.documents.identifiers import DOI
 from domain.types import JsonValue
 
 

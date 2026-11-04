@@ -36,13 +36,11 @@ class DocType(StrEnum):
     BOOK_REVIEW = "book_review"
     DATA_PAPER = "data_paper"
     PROCEEDINGS = "proceedings"
+    JOURNAL_ISSUE = "journal_issue"
     MEDIA = "media"
     PHYSICAL_OBJECT = "physical_object"
 
 
-DOC_TYPES: frozenset[str] = frozenset(DocType)
-
-# Sous-types d'article, qui l'emportent sur `article` à l'agrégation (`refresh_from_sources`).
 ARTICLE_SUBTYPES: frozenset[str] = frozenset(
     {
         DocType.REVIEW,
@@ -57,6 +55,7 @@ ARTICLE_SUBTYPES: frozenset[str] = frozenset(
         DocType.RETRACTION,
     }
 )
+"""Sous-types d'article, qui l'emportent sur `article` à l'agrégation (`refresh_from_sources`)."""
 
 
 class DocTypeLabel(NamedTuple):
@@ -95,6 +94,7 @@ DOC_TYPE_LABELS: dict[DocType, DocTypeLabel] = {
     DocType.BOOK_REVIEW: DocTypeLabel("Recension", "Recensions"),
     DocType.DATA_PAPER: DocTypeLabel("Data paper", "Data papers"),
     DocType.PROCEEDINGS: DocTypeLabel("Proceedings", "Proceedings"),
+    DocType.JOURNAL_ISSUE: DocTypeLabel("Numéro de revue", "Numéros de revue"),
     DocType.MEDIA: DocTypeLabel("Intervention média", "Interventions média"),
     DocType.PHYSICAL_OBJECT: DocTypeLabel("Objet physique", "Objets physiques"),
 }
@@ -108,7 +108,6 @@ class DocTypeFamily:
     types: tuple[DocType, ...]
 
 
-# Familles dans l'ordre d'affichage, leurs types aussi. Chaque type appartient à une seule famille.
 DOC_TYPE_FAMILIES: dict[str, DocTypeFamily] = {
     "publications": DocTypeFamily(
         "Publications",
@@ -158,7 +157,9 @@ DOC_TYPE_FAMILIES: dict[str, DocTypeFamily] = {
             DocType.LETTER,
             DocType.BOOK_REVIEW,
             DocType.PROCEEDINGS,
+            DocType.JOURNAL_ISSUE,
             DocType.PHYSICAL_OBJECT,
         ),
     ),
 }
+"""Familles dans l'ordre d'affichage, leurs types aussi. Chaque type appartient à une seule famille."""

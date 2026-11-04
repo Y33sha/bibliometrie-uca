@@ -20,9 +20,9 @@ from pathlib import Path
 
 from sqlalchemy import Connection, text
 
+from domain.contributions.author_positions import AuthorPosition
 from domain.dates import today
-from domain.publications.author_positions import AuthorPosition
-from domain.publications.doc_types import DocType
+from domain.documents.doc_types import DocType
 from domain.sources.registry import Source, source_label
 from domain.structures.structure import StructureType
 from infrastructure.db.engine import get_sync_engine
@@ -95,12 +95,12 @@ class Period:
         return list(range(self.first, self.last + 1))
 
 
-# Publication `p` signée par la structure `:structure_id`, d'un type de `:doc_types`, publiée entre `:first_year` et `:last_year`.
 _REPORT_PUBLICATION = f"""
     p.publication_year BETWEEN :first_year AND :last_year
     AND p.doc_type::text = ANY(:doc_types)
     AND {AUTHORED_PUBLICATION}
 """
+"""Publication `p` signée par la structure `:structure_id`, d'un type de `:doc_types`, publiée entre `:first_year` et `:last_year`."""
 
 
 def _key_role_condition(roles: Collection[AuthorPosition]) -> str:
@@ -216,7 +216,6 @@ def top_10_percent_by_year(
     return {r.publication_year: Top10Count(r.top_10, r.with_percentile) for r in rows}
 
 
-# Publication `p` dans le top 10 % des plus citées selon un de ses enregistrements sources OpenAlex.
 _TOP_10_PERCENT = """
     EXISTS (
         SELECT 1 FROM source_records sp
@@ -225,6 +224,7 @@ _TOP_10_PERCENT = """
           AND (sp.impact->>'top_10_percent')::boolean
     )
 """
+"""Publication `p` dans le top 10 % des plus citées selon un de ses enregistrements sources OpenAlex."""
 
 
 ENGLISH = "en"
@@ -458,7 +458,6 @@ def publications_by_source(conn: Connection, structure_id: int, period: Period) 
 _CORRESPONDING = frozenset({AuthorPosition.CORRESPONDING})
 _CORRESPONDING_FIRST_OR_LAST = frozenset(AuthorPosition)
 
-# Rôles d'auteur comptés pour chaque unité, selon l'ordre des auteurs dans ses publications. Une unité absente compte seulement l'auteur correspondant : ordre alphabétique, ou trop peu d'auteurs pour juger.
 KEY_ROLES_BY_STRUCTURE: dict[str, frozenset[AuthorPosition]] = dict.fromkeys(
     [
         "acceppt",
@@ -486,6 +485,7 @@ KEY_ROLES_BY_STRUCTURE: dict[str, frozenset[AuthorPosition]] = dict.fromkeys(
     ],
     _CORRESPONDING_FIRST_OR_LAST,
 )
+"""Rôles d'auteur comptés pour chaque unité, selon l'ordre des auteurs dans ses publications. Une unité absente compte seulement l'auteur correspondant : ordre alphabétique, ou trop peu d'auteurs pour juger."""
 
 _KEY_ROLES_LABELS = {
     _CORRESPONDING: "auteur correspondant",

@@ -14,6 +14,7 @@ from collections import Counter, defaultdict
 
 from sqlalchemy import Connection, text
 
+from domain.contributions.contribution_roles import ContributionRole
 from domain.errors import ValidationError
 from domain.normalize import normalize_text
 from domain.persons.contribution_matching import (
@@ -31,9 +32,8 @@ from domain.persons.contribution_matching import (
 )
 from domain.persons.contributor_name import ContributorName
 from domain.persons.identifiers import HUMAN_ATTRIBUTION_STATUSES, PersonIdentifierType
-from domain.persons.matching import Namesake
 from domain.persons.person import PersonExclusion, validated_name
-from domain.publications.contribution_roles import ContributionRole
+from domain.persons.source_contribution_matching import Namesake
 from infrastructure.db.queues import Queue, delete_processed, snapshot
 from infrastructure.repositories.person_repository import PgPersonRepository
 from infrastructure.sql_fragments import (
@@ -64,14 +64,12 @@ from pipeline.transformation.persons.store import (
     fetch_rejected_person_ids_by_publication,
 )
 
-# Relevé de la file des contributions à redécider (`Queue.CONTRIBUTION_RESOLUTION`), pris en début de tâche.
 _RESOLUTION_SNAPSHOT = "contribution_resolution_snapshot"
+"""Relevé de la file des contributions à redécider (`Queue.CONTRIBUTION_RESOLUTION`), pris en début de tâche."""
 
-# Contributions à décider, matérialisées en début de tâche.
 _CANDIDATES_TABLE = "contribution_resolution_candidates"
+"""Contributions à décider, matérialisées en début de tâche."""
 
-# Attributions confirmées ou authentifiées qui font décider une contribution sans personne, hors périmètre compris.
-# Une personne marquée hors périmètre garde les contributions où elle est déjà rattachée, sans en gagner par la recherche de ses identifiants.
 _SEARCHED_IDENTIFIERS = f"""(
     SELECT pi.person_id, pi.id_type, pi.id_value
     FROM person_identifiers pi
@@ -79,8 +77,8 @@ _SEARCHED_IDENTIFIERS = f"""(
     WHERE p.exclusion IS DISTINCT FROM '{PersonExclusion.OUT_OF_PERIMETER}'
       AND pi.status::text IN {in_clause(HUMAN_ATTRIBUTION_STATUSES)}
 )"""
+"""Attributions confirmées ou authentifiées qui font décider une contribution sans personne, hors périmètre compris. Une personne marquée hors périmètre garde les contributions où elle est déjà rattachée, sans en gagner par la recherche de ses identifiants."""
 
-# `contributions.in_perimeter` réunit les indices de périmètre de ses contributions sources (`propagate_contribution_attributes_sql`).
 _CANDIDATES_SQL = " UNION ".join(
     [
         """
@@ -115,6 +113,7 @@ _CANDIDATES_SQL = " UNION ".join(
         ),
     ]
 )
+"""`contributions.in_perimeter` réunit les indices de périmètre de ses contributions sources (`propagate_contribution_attributes_sql`)."""
 
 _IDENTIFIERS_OBJECT = ", ".join(
     f"'{t.value}', {usable_identifier(repr(t.value), source_contribution='sc')}"
@@ -133,15 +132,14 @@ _MEMBERS_SQL = f"""
     ORDER BY g.id
 """
 
-# Personnes rattachées à une contribution de chaque publication, hors des contributions à décider.
 _TAKEN_SQL = """
     SELECT publication_id, array_agg(person_id) AS person_ids
     FROM contributions
     WHERE person_id IS NOT NULL AND publication_id = ANY(:publications) AND id <> ALL(:contributions)
     GROUP BY publication_id
 """
+"""Personnes rattachées à une contribution de chaque publication, hors des contributions à décider."""
 
-# Seules les contributions dont la personne ou le mode change sont écrites.
 _WRITE_SQL = text("""
     UPDATE contributions g
     SET person_id = u.person_id, resolution_mode = CAST(u.mode AS resolution_mode)
@@ -150,13 +148,14 @@ _WRITE_SQL = text("""
     WHERE g.id = u.id
       AND (g.person_id, g.resolution_mode::text) IS DISTINCT FROM (u.person_id, u.mode)
 """)
+"""Seules les contributions dont la personne ou le mode change sont écrites."""
 
-# Contributions décidées rattachées à une autre personne que celle désignée par leur décision : elles perdent leur personne.
 _RELEASE_SQL = text(f"""
     UPDATE contributions g SET {DETACHED_CONTRIBUTION}
     FROM unnest(CAST(:ids AS integer[]), CAST(:persons AS integer[])) AS u(id, person_id)
     WHERE g.id = u.id AND g.person_id IS NOT NULL AND g.person_id IS DISTINCT FROM u.person_id
 """)
+"""Contributions décidées rattachées à une autre personne que celle désignée par leur décision : elles perdent leur personne."""
 
 
 def load_index(conn: Connection, conflicting: frozenset[int] = frozenset()) -> PersonIndex:
@@ -398,7 +397,6 @@ def apply_pins(conn: Connection) -> int:
     return conn.execute(text(attach)).rowcount
 
 
-# Libellés des modes de rattachement dans le journal.
 _MODE_LABELS: dict[ContributionMatchReason, str] = {
     ContributionMatchReason.MANUAL: "par épinglage",
     ContributionMatchReason.ORCID: "par ORCID",
@@ -407,6 +405,7 @@ _MODE_LABELS: dict[ContributionMatchReason, str] = {
     ContributionMatchReason.NAME: "par nom sans homonymie",
     ContributionMatchReason.COMPATIBLE_NAME: "par initiales compatibles",
 }
+"""Libellés des modes de rattachement dans le journal."""
 
 
 def _log_identified(

@@ -728,23 +728,8 @@ class TestBatchAssignOrphanContributions:
 
 
 class TestDetachContributions:
-    def test_detaches_contribution(self, sa_sync_conn, service):
-        person_id = _person(sa_sync_conn)
-        publication_id = insert_publication(sa_sync_conn)
-        source_record_id = _source_record(sa_sync_conn, publication_id)
-        contribution_id = insert_contribution(sa_sync_conn, publication_id, person_id=person_id)
-        source_contribution_id = _jean_dupont_source_contribution(sa_sync_conn, source_record_id)
-
-        result = service.detach_contributions(
-            person_id,
-            contributions=[{"source": "hal", "source_contribution_id": source_contribution_id}],
-        )
-
-        assert result["detached"] == 1
-        assert _contribution_person(sa_sync_conn, contribution_id) == (None, None)
-
-    def test_detaches_all_sources_of_publication_from_single_ref(self, sa_sync_conn, service):
-        """Le rejet vise la publication entière : sélectionner une seule contribution source détache la contribution de la paire et enregistre le rejet."""
+    def test_detaches_contribution_and_records_rejection(self, sa_sync_conn, service):
+        """Le détachement d'une publication détache la contribution de la personne et enregistre le rejet de la paire."""
         person_id = _person(sa_sync_conn)
         publication_id = insert_publication(sa_sync_conn)
         contribution_id = insert_contribution(sa_sync_conn, publication_id, person_id=person_id)
@@ -752,14 +737,10 @@ class TestDetachContributions:
         source_record_oa = _source_record(
             sa_sync_conn, publication_id, source="openalex", source_id="oa-1"
         )
-        source_contribution_hal = _jean_dupont_source_contribution(sa_sync_conn, source_record_hal)
+        _jean_dupont_source_contribution(sa_sync_conn, source_record_hal)
         _jean_dupont_source_contribution(sa_sync_conn, source_record_oa, source="openalex")
 
-        # Seule la contribution source HAL est sélectionnée.
-        result = service.detach_contributions(
-            person_id,
-            contributions=[{"source": "hal", "source_contribution_id": source_contribution_hal}],
-        )
+        result = service.detach_contributions(person_id, [publication_id])
 
         assert result["detached"] == 1
         assert _contribution_person(sa_sync_conn, contribution_id) == (None, None)
@@ -778,17 +759,14 @@ class TestDetachContributions:
         person_id = _person(sa_sync_conn)
         publication_id = insert_publication(sa_sync_conn)
         source_record_id = _source_record(sa_sync_conn, publication_id)
-        source_contribution_id = _jean_dupont_source_contribution(
+        _jean_dupont_source_contribution(
             sa_sync_conn,
             source_record_id,
             author_name_normalized="dupont jean",
         )
         repo.add_name_form(person_id, "Dupont Jean", source="hal")
 
-        result = service.detach_contributions(
-            person_id,
-            contributions=[{"source": "hal", "source_contribution_id": source_contribution_id}],
-        )
+        result = service.detach_contributions(person_id, [publication_id])
         assert result["cleaned_forms"] == 1
         assert (
             _scalar(
@@ -804,7 +782,7 @@ class TestDetachContributions:
         person_id = _person(sa_sync_conn)
         publication_id = insert_publication(sa_sync_conn)
         source_record_id = _source_record(sa_sync_conn, publication_id)
-        source_contribution_id = _jean_dupont_source_contribution(
+        _jean_dupont_source_contribution(
             sa_sync_conn,
             source_record_id,
             author_name_normalized="dupont jean",
@@ -818,10 +796,7 @@ class TestDetachContributions:
             {"p": person_id},
         )
 
-        result = service.detach_contributions(
-            person_id,
-            contributions=[{"source": "hal", "source_contribution_id": source_contribution_id}],
-        )
+        result = service.detach_contributions(person_id, [publication_id])
         assert result["cleaned_forms"] == 0
         assert (
             _scalar(
@@ -836,7 +811,7 @@ class TestDetachContributions:
         """Les formes dérivées du nom de la personne (source `persons`) restent après le détachement."""
         person_id = repo.create("Dupont", "Jean")
 
-        result = service.detach_contributions(person_id, contributions=[])
+        result = service.detach_contributions(person_id, [])
         assert result["cleaned_forms"] == 0
         assert (
             _scalar(
@@ -854,18 +829,14 @@ class TestDetachContributions:
         pub2 = insert_publication(sa_sync_conn, "P2")
         sp1 = _source_record(sa_sync_conn, pub1)
         sp2 = _source_record(sa_sync_conn, pub2, source_id="hal-2")
-        sa1 = _jean_dupont_source_contribution(
-            sa_sync_conn, sp1, author_name_normalized="dupont jean"
-        )
+        _jean_dupont_source_contribution(sa_sync_conn, sp1, author_name_normalized="dupont jean")
         backing = _jean_dupont_source_contribution(
             sa_sync_conn, sp2, author_name_normalized="dupont jean"
         )
         insert_person_contribution(sa_sync_conn, backing, person_id=person_id)
         repo.add_name_form(person_id, "Dupont Jean", source="hal")
 
-        result = service.detach_contributions(
-            person_id, contributions=[{"source": "hal", "source_contribution_id": sa1}]
-        )
+        result = service.detach_contributions(person_id, [pub1])
         assert result["cleaned_forms"] == 0
         assert (
             _scalar(

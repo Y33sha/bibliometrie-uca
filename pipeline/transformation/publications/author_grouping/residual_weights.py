@@ -1,4 +1,4 @@
-"""Poids en bits du modèle du résidu, par comparaison et par niveau (`domain.publications.author_grouping.comparison_levels`).
+"""Poids en bits du modèle du résidu, par comparaison et par niveau (`domain.contributions.author_grouping.comparison_levels`).
 
 Estimés le 2026-10-18 par Splink, par EM sur les contributions sources laissées sans lien par la règle de noms dans tout le stock, 100 itérations. Les poids d'ORCID et d'IdRef viennent d'un modèle estimé sur toutes les paires de contributions sources des publications de 100 auteurs au plus : sur le résidu, l'EM ne les identifie pas.
 """

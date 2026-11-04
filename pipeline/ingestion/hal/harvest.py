@@ -111,7 +111,7 @@ class HalHarvester(SourceHarvester[HalHarvestConfig, HalClient]):
     def harvest_all(self, window: HarvestWindow, config: HalHarvestConfig) -> PhaseMetrics:
         """Moissonne l'union des collections, périmètre temporel par périmètre.
 
-        En mode incrémental, un seul périmètre : les dépôts modifiés depuis la date, dans la plage d'années du mode complet. Sinon une passe par année, pour une reprise ciblée par `--year` : un document a une seule année de publication.
+        En mode incrémental, un seul périmètre : les dépôts modifiés depuis la date, dans la plage d'années du mode complet. Sinon une passe par année, pour une reprise ciblée par `--years` : un document a une seule année de publication.
         """
         client = self._client
         fq = build_collections_fq(list(config.all_collections))

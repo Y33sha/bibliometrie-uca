@@ -5,7 +5,6 @@ Les publications d'une revue sont celles qui y sont rattachées et celles de ses
 
 from sqlalchemy import Connection, text
 
-# `UNION` compte une seule fois une publication rattachée à la revue de sa monographie.
 _REFRESH = text("""
     WITH serial_publications AS (
         SELECT id, serial_id, publisher_id, publication_year
@@ -46,6 +45,7 @@ _REFRESH = text("""
     WHERE j2.id = j.id AND j.publisher_id IS DISTINCT FROM c.publisher_id
       AND (CAST(:serial_id AS integer) IS NULL OR j2.id = :serial_id)
 """)
+"""`UNION` compte une seule fois une publication rattachée à la revue de sa monographie."""
 
 
 def refresh_serial_publishers(conn: Connection, serial_id: int | None = None) -> int:

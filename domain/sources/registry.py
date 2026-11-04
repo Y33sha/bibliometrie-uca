@@ -4,9 +4,8 @@ from dataclasses import dataclass
 from enum import StrEnum
 from urllib.parse import quote
 
-from domain.errors import ValidationError
+from domain.documents.identifiers import hal_id_url
 from domain.persons.identifiers import PersonIdentifierType
-from domain.publications.identifiers import hal_id_url
 
 
 class Source(StrEnum):
@@ -86,12 +85,23 @@ PROFILES: dict[Source, SourceProfile] = {
     ),
 }
 
-_SOURCE_LABELS: dict[str, str] = {source: profile.label for source, profile in PROFILES.items()}
+DOI_ORG = "doi_org"
+"""Registre des DOI, interrogé pour vérifier qu'un DOI existe. Il figure parmi les sources des recherches infructueuses, sans fournir d'enregistrements sources."""
+LOOKUP_SOURCES: tuple[str, ...] = (*Source, DOI_ORG)
+
+_SOURCE_LABELS: dict[str, str] = {
+    **{source: profile.label for source, profile in PROFILES.items()},
+    DOI_ORG: "doi.org",
+}
 
 
 def source_label(source: str) -> str:
-    """Renvoie le nom lisible d'une source. Une clé inconnue est renvoyée telle quelle."""
-    return _SOURCE_LABELS.get(source, source)
+    """Renvoie le nom affiché d'une source de `LOOKUP_SOURCES`.
+
+    Raises:
+        KeyError: source inconnue.
+    """
+    return _SOURCE_LABELS[source]
 
 
 def source_record_url(source: str, source_id: str) -> str:
@@ -119,20 +129,6 @@ def source_record_url(source: str, source_id: str) -> str:
             return f"https://doi.org/{quote(source_id, safe='/:')}"
 
 
-# Préfixe d'une source dans un filtre de lecture, court parce qu'il figure dans une URL.
-SOURCE_FILTER_PREFIXES: dict[str, Source] = {
-    "hal": Source.HAL,
-    "oa": Source.OPENALEX,
-    "scanr": Source.SCANR,
-    "wos": Source.WOS,
-    "theses": Source.THESES,
-}
-
-# Valeurs du filtre `source_filter` des lectures : un préfixe suivi de la présence attendue. `hal_yes` retient les publications présentes dans HAL, `hal_no` les autres.
-SOURCE_FILTER_VALUES: frozenset[str] = frozenset(
-    f"{prefixe}_{presence}" for prefixe in SOURCE_FILTER_PREFIXES for presence in ("yes", "no")
-)
-
 HARVESTED_SOURCES: tuple[Source, ...] = tuple(s for s, p in PROFILES.items() if p.harvested)
 DOI_SEARCHABLE_SOURCES: tuple[Source, ...] = tuple(
     s for s, p in PROFILES.items() if p.doi_searchable
@@ -142,13 +138,7 @@ PERSON_SEARCHED_SOURCES: tuple[Source, ...] = tuple(
 )
 AGGREGATOR_SOURCES: frozenset[Source] = frozenset(s for s, p in PROFILES.items() if p.aggregator)
 
-# Registre des DOI, interrogé pour vérifier qu'un DOI existe. Il figure parmi les sources des recherches infructueuses, sans fournir d'enregistrements sources.
-DOI_ORG = "doi_org"
-LOOKUP_SOURCES: tuple[str, ...] = (*Source, DOI_ORG)
 
-
-# Ordre d'autorité des sources, pour l'agrégation des métadonnées, la position d'auteur et l'ordre des normaliseurs.
-# theses.fr fait autorité sur les thèses. Crossref et DataCite font chacun autorité sur leurs propres DOI.
 SOURCE_PRIORITY: tuple[Source, ...] = (
     Source.THESES,
     Source.CROSSREF,
@@ -158,9 +148,9 @@ SOURCE_PRIORITY: tuple[Source, ...] = (
     Source.SCANR,
     Source.WOS,
 )
+"""Ordre d'autorité des sources, pour l'agrégation des métadonnées, la position d'auteur et l'ordre des normaliseurs. theses.fr fait autorité sur les thèses. Crossref et DataCite font chacun autorité sur leurs propres DOI."""
 
 
-# Sources admises comme clés de `structures.api_ids` : identifiant d'organisation dans la source, ou chaîne d'affiliation interrogée en texte (WoS, mots-clés DataCite).
 STRUCTURE_API_SOURCES: tuple[Source, ...] = (
     Source.OPENALEX,
     Source.WOS,
@@ -168,15 +158,4 @@ STRUCTURE_API_SOURCES: tuple[Source, ...] = (
     Source.THESES,
     Source.DATACITE,
 )
-
-
-def require_known_source(source: str) -> None:
-    """Vérifie que la source figure au registre.
-
-    Raises:
-        ValidationError: source hors du registre. Le message nomme la source, absente de l'erreur PostgreSQL sur `source_type`.
-    """
-    if source not in Source:
-        raise ValidationError(
-            f"Source inconnue : {source!r}. Sources valides : {', '.join(sorted(Source))}."
-        )
+"""Sources admises comme clés de `structures.api_ids` : identifiant d'organisation dans la source, ou chaîne d'affiliation interrogée en texte (WoS, mots-clés DataCite)."""

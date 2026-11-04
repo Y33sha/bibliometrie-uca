@@ -5,8 +5,8 @@ from functools import partial
 from sqlalchemy import text
 
 from application.ports.repositories.address_repository import AddressCountryFilter
+from domain.addresses.country_detection import CountryDetectionMethod
 from domain.countries import NO_COUNTRY_CODE
-from domain.country_detection import CountryDetectionMethod
 from infrastructure.read_models.addresses.models import (
     AddressListFilters,
     StructurePredicate,

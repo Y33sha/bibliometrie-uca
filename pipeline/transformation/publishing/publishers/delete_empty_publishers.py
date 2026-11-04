@@ -13,7 +13,6 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 LABEL = "Éditeurs vides"
 """Libellé de la sous-étape dans le journal de la phase."""
 
-# Les formes de nom des éditeurs supprimés sont supprimées avec eux (`ON DELETE CASCADE`).
 _DELETE_EMPTY_PUBLISHERS = text("""
     DELETE FROM publishers p
     WHERE NOT EXISTS (SELECT 1 FROM serials j WHERE j.publisher_id = p.id)
@@ -24,6 +23,7 @@ _DELETE_EMPTY_PUBLISHERS = text("""
       AND NOT EXISTS (SELECT 1 FROM publications pu WHERE pu.publisher_id = p.id)
     RETURNING p.id, p.name
 """)
+"""Les formes de nom des éditeurs supprimés sont supprimées avec eux (`ON DELETE CASCADE`)."""
 
 
 def delete_empty_publishers(conn: Connection) -> list[tuple[int, str]]:

@@ -23,7 +23,7 @@ from domain.types import JsonValue
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.raw_store import RawStore, UnreadablePayloadError, get_raw_store
-from pipeline.ingestion.common.normalize import normalizer_builders
+from pipeline.ingestion.common.normalize import build_normalizer
 from pipeline.ingestion.common.normalizer import Document, SourceNormalizer
 from pipeline.ingestion.common.staging import StagingRow
 
@@ -108,7 +108,7 @@ def fill_source(
     conn: Connection, source: str, store: RawStore, *, commit: bool = True
 ) -> FillStats:
     """Complète `biblio` des enregistrements sources de `source`, par lots. `commit` valide chaque lot."""
-    normalizer = normalizer_builders(archive=False)[source](conn, log)
+    normalizer = build_normalizer(source, conn, log, archive=False)
     written = from_links = refused = seen = 0
     after = 0
     while rows := conn.execute(

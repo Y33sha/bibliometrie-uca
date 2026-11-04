@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from domain.publications.dates import PublicationDate
+from domain.documents.dates import PublicationDate
 from domain.source_records.keys import DoiKeys
 from domain.types import JsonValue
 

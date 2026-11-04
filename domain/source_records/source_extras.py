@@ -12,14 +12,12 @@ from domain.types import JsonValue
 class SourceExtra(StrEnum):
     """Clé de `source_extras`."""
 
-    LICENSE = "license"
-    """Licence brute (Crossref, OpenAlex, ScanR)."""
     FUNDER = "funder"
     """Financeurs déclarés (Crossref)."""
     RELATION = "relation"
     """Relations déclarées, par type de relation (Crossref)."""
     CONFERENCE = "conference"
-    """Nom et acronyme du congrès dont l'enregistrement source est issu (Crossref)."""
+    """Nom et acronyme du congrès de l'enregistrement source (Crossref)."""
     GROUP_TITLE = "group_title"
     """Forme de présentation d'un `posted-content` (Crossref : `oral`, `pico`, `display`)."""
     REFERENCES_COUNT = "references_count"
@@ -32,8 +30,6 @@ class SourceExtra(StrEnum):
     """Collections (HAL)."""
     SOURCE_TITLE = "source_title"
     """Titre de la source (HAL)."""
-    LICENCE = "licence"
-    """Licence du dépôt (HAL)."""
     ANNEX_DEPOSIT = "annex_deposit"
     """Dépôt réduit à des annexes, sans fichier principal (HAL)."""
     RELATED_IDENTIFIERS = "related_identifiers"
@@ -63,5 +59,5 @@ CROSSREF_PREPRINT_OF = "is-preprint-of"
 
 
 def declares_conference(source_extras: Mapping[str, JsonValue] | None) -> bool:
-    """Vrai si l'enregistrement source nomme le congrès dont il est issu."""
+    """Vrai si l'enregistrement source nomme son congrès."""
     return SourceExtra.CONFERENCE in (source_extras or {})

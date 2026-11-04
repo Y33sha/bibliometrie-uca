@@ -19,7 +19,7 @@ from infrastructure import PROJECT_ROOT
 from infrastructure.observability.log import setup_logger
 from pipeline.http.circuit_breaker import SourceUnavailableError, trip_source
 from pipeline.ingestion.common.staging import StagingStore, UpsertOutcome
-from pipeline.runtime.config import window_years
+from pipeline.runtime.config import YearRange, window_years
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.log_format import (
     BRANCH_CONTINUATION,
@@ -94,11 +94,10 @@ class HarvestConfigError(Exception):
 class HarvestWindow:
     """Bornes d'un moissonnage."""
 
-    start_year: int | None = None
-    year: int | None = None
-    """Année unique (`--year`). Prime sur `start_year`."""
+    years: YearRange | None = None
+    """Années du run (`--years`). `None` : années par défaut (`get_years`)."""
     since: str | None = None
-    """Date de modification minimale du mode quotidien, au format `YYYY-MM-DD`. Sert au moissonnage incrémental de HAL et d'OpenAlex."""
+    """Date de modification minimale du mode incrémental, au format `YYYY-MM-DD`."""
 
 
 class SourceHarvester[ConfigT, ClientT](ABC):
@@ -126,8 +125,8 @@ class SourceHarvester[ConfigT, ClientT](ABC):
         self._client = client
 
     def _years(self, window: HarvestWindow) -> list[int]:
-        """Renvoie les années de publication à moissonner : `--year`, sinon de `start_year` à l'année courante. Le mode incrémental garde cette plage."""
-        return window_years(self.conn, start_year=window.start_year, year=window.year)
+        """Renvoie les années de publication à moissonner (`window_years`). Le mode incrémental garde ces années."""
+        return window_years(self.conn, window.years)
 
     def _label(self, scope: str | None = None) -> str:
         """Renvoie le libellé de la barre de la source, avec la colonne du périmètre en cours."""
@@ -235,7 +234,6 @@ type HarvesterFactory = Callable[[Connection, logging.Logger], Harvester]
 
 def run_harvest(
     ctx: PhaseContext,
-    phase: str,
     source: str,
     make_harvester: HarvesterFactory,
     window: HarvestWindow,
@@ -250,5 +248,5 @@ def run_harvest(
             return make_harvester(conn, source_log).run(window)
     except HarvestConfigError as exc:
         metrics = PhaseMetrics()
-        signal_source_unconfigured(metrics, source, str(exc), logger=ctx.logger, phase=phase)
+        signal_source_unconfigured(metrics, source, str(exc), logger=ctx.logger)
         return metrics

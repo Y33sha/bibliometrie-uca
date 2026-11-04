@@ -1,8 +1,7 @@
 """Traduction du type de document de chaque source dans le vocabulaire du référentiel, l'enum PostgreSQL `doc_type`."""
 
-from domain.publications.doc_types import DOC_TYPES
+from domain.documents.doc_types import DocType
 
-# Table de chaque source, clés en minuscules.
 _SOURCE_MAPS: dict[str, dict[str, str]] = {
     "hal": {
         # Combinaisons type_sous-type (prioritaires)
@@ -56,7 +55,7 @@ _SOURCE_MAPS: dict[str, dict[str, str]] = {
         "note": "other",
         "blog": "other",
         "notice": "other",
-        "issue": "other",
+        "issue": "journal_issue",
         "proceedings": "conference_paper",
         "trad": "other",
         "reference-entry": "other",
@@ -175,6 +174,7 @@ _SOURCE_MAPS: dict[str, dict[str, str]] = {
         # resourceType (texte libre, valeurs réelles observées sur le corpus UCA)
         "journal article": "article",
         "journal contribution": "article",
+        "journal issue": "journal_issue",
         "article": "article",
         "working paper": "preprint",
         "book chapter": "book_chapter",
@@ -211,18 +211,19 @@ _SOURCE_MAPS: dict[str, dict[str, str]] = {
         "report": "report",
         "report-component": "report",
         "dataset": "dataset",
-        "journal-issue": "other",
+        "journal-issue": "journal_issue",
         "component": "other",
         "grant": "other",
         "standard": "other",
         "other": "other",
     },
 }
+"""Table de chaque source, clés en minuscules."""
 
 
 def _translate(part: str, source_map: dict[str, str]) -> str | None:
     """Traduit un type brut : sa valeur dans la table, sinon le type lui-même s'il est du référentiel. Un type suivi d'un sous-type absent de la table (`MEM_14`) prend la traduction du type."""
-    if translated := source_map.get(part) or (part if part in DOC_TYPES else None):
+    if translated := source_map.get(part) or (part if part in DocType else None):
         return translated
     base, _, subtype = part.partition("_")
     return source_map.get(base) if subtype else None

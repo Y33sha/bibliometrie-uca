@@ -6,8 +6,8 @@ from typing import Annotated
 from fastapi import Query
 from pydantic import AfterValidator
 
-# Nombre de sujets renvoyés par les nuages de mots (éditeur, revue, laboratoire, personne).
 TOP_SUBJECTS_LIMIT = 30
+"""Nombre de sujets renvoyés par les nuages de mots (éditeur, revue, laboratoire, personne)."""
 
 TopSubjectsLimit = Annotated[int, Query(ge=1, le=200)]
 
@@ -41,8 +41,8 @@ Sert les paramètres qui reçoivent du texte sans vocabulaire fermé ni format i
 SearchTerm = Annotated[TextParam, Query(max_length=MAX_SEARCH_LENGTH)]
 """Terme de recherche textuelle, borné en longueur. Sa valeur par défaut appartient à la route, la chaîne vide valant absence de recherche."""
 
-# Taille de page par défaut des listes.
 _DEFAULT_PER_PAGE = 50
+"""Taille de page par défaut des listes."""
 
 
 def requested_offset(query_params: Mapping[str, str]) -> int | None:

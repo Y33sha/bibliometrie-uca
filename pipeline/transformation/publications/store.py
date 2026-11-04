@@ -4,9 +4,9 @@ from collections.abc import Sequence
 
 from sqlalchemy import Connection, RowMapping, bindparam, text
 
+from domain.documents.dates import PublicationDate
+from domain.documents.identifiers import DOI
 from domain.merge import MergedEntity
-from domain.publications.dates import PublicationDate
-from domain.publications.identifiers import DOI
 from domain.publications.publication import Publication
 from domain.types import JsonValue
 from infrastructure.db.jsonb import Jsonb
@@ -16,7 +16,6 @@ from infrastructure.repositories.merge_steps import record_redirect
 
 _MARK_INSERTED = enqueue_sql(Queue.PUBLICATION_CONTRIBUTIONS, "SELECT id FROM inserted")
 
-# Colonnes du lot écrit par `save` (`_save_payload`), lues par `jsonb_to_recordset`.
 _SAVED = """jsonb_to_recordset(:payload) AS t(
     id integer, title text, title_normalized text, doc_type doc_type,
     publication_date date, publication_date_precision date_precision, doi text,
@@ -25,6 +24,7 @@ _SAVED = """jsonb_to_recordset(:payload) AS t(
     language text, is_retracted boolean, countries text[], source_extras jsonb, impact jsonb,
     corrections jsonb, abstract text, keywords text[], biblio jsonb
 )"""
+"""Colonnes du lot écrit par `save` (`_save_payload`), lues par `jsonb_to_recordset`."""
 
 _RELEASE_CHANGED_DOIS_SQL = text(f"""
     UPDATE publications p SET doi = NULL, updated_at = now()
@@ -70,7 +70,6 @@ _SAVE_CHANGED_SQL = text(f"""
            c.sources)
 """).bindparams(bindparam("payload", type_=Jsonb))
 
-# Les colonnes volumineuses (résumé, mots-clés, biblio) vont dans `publications_detail`.
 _SAVE_DETAIL_SQL = text(f"""
     INSERT INTO publications_detail (publication_id, abstract, keywords, biblio)
     SELECT t.id, t.abstract, t.keywords, t.biblio FROM {_SAVED}
@@ -79,6 +78,7 @@ _SAVE_DETAIL_SQL = text(f"""
     WHERE (publications_detail.abstract, publications_detail.keywords, publications_detail.biblio)
           IS DISTINCT FROM (EXCLUDED.abstract, EXCLUDED.keywords, EXCLUDED.biblio)
 """).bindparams(bindparam("payload", type_=Jsonb))
+"""Les colonnes volumineuses (résumé, mots-clés, biblio) vont dans `publications_detail`."""
 
 
 class PublicationStore:

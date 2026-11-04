@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import contextlib
 import sys
 
 import pytest
@@ -14,7 +13,6 @@ from pipeline.public import PHASE_ORDER
 from pipeline.run import (
     PHASE_TITLE_WIDTH,
     _build_arg_parser,
-    _phase_label,
     _phase_title,
     _run_title,
 )
@@ -32,52 +30,24 @@ def sortie_capturee(monkeypatch):
     monkeypatch.setattr(sys.stdout, "isatty", lambda: False, raising=False)
 
 
-@pytest.fixture
-def delai_de_rafraichissement(monkeypatch):
-    """Délai de rafraîchissement lu par les libellés de phase, sans base : 7 jours, modifiable par le test."""
-    delay_days = {"jours": 7}
-    monkeypatch.setattr("pipeline.run.open_tx", contextlib.nullcontext)
-    monkeypatch.setattr("pipeline.phases.delay", lambda conn, key: delay_days["jours"])
-    return delay_days
-
-
-def _label(name: str) -> str:
-    return _phase_label(_PHASES[name])
-
-
 def _titre(name: str) -> list[str]:
-    return _phase_title(name, _label(name))
+    return _phase_title(name, _PHASES[name].label)
 
 
 @pytest.mark.parametrize("phase", PHASE_ORDER)
-def test_les_cadres_ont_tous_la_meme_largeur(
-    phase: str, terminal, delai_de_rafraichissement
-) -> None:
+def test_les_cadres_ont_tous_la_meme_largeur(phase: str, terminal) -> None:
     """Des cadres inégaux se liraient comme des blocs sans rapport."""
     largeurs = {len(line) for line in _titre(phase)}
     assert largeurs == {PHASE_TITLE_WIDTH + 6}
 
 
 @pytest.mark.parametrize("phase", PHASE_ORDER)
-def test_chaque_cadre_porte_le_nom_et_le_libelle(
-    phase: str, terminal, delai_de_rafraichissement
-) -> None:
+def test_chaque_cadre_porte_le_nom_et_le_libelle(phase: str, terminal) -> None:
     lines = _titre(phase)
     text = " ".join(line.strip("║ ") for line in lines)
     assert phase in text
-    for mot in _label(phase).split():
+    for mot in _PHASES[phase].label.split():
         assert mot in text
-
-
-@pytest.mark.parametrize("phase", PHASE_ORDER)
-def test_chaque_libelle_a_tous_ses_champs_remplis(phase: str, delai_de_rafraichissement) -> None:
-    assert "{" not in _label(phase)
-
-
-def test_le_libelle_de_fetch_stale_donne_le_delai(delai_de_rafraichissement) -> None:
-    assert _label("fetch_stale") == "Recherche des documents non revus depuis 7 jours"
-    delai_de_rafraichissement["jours"] = 1
-    assert _label("fetch_stale") == "Recherche des documents non revus depuis 1 jour"
 
 
 def test_un_libelle_long_tient_sur_deux_lignes(terminal) -> None:
@@ -115,7 +85,7 @@ class TestTitreDuRun:
         assert "sources" not in _texte(_run_title(_args(), [])).lower()
 
     def test_une_annee_demandee_parait(self, terminal) -> None:
-        assert "année ···· 2018" in _texte(_run_title(_args(year=2018), []))
+        assert "année ···· 2018" in _texte(_run_title(_args(years=(2018, 2018)), []))
 
     def test_les_phases_paraissent_quand_le_lancement_les_restreint(self, terminal) -> None:
         text = _texte(_run_title(_args(only="persons"), [_phase("persons")]))

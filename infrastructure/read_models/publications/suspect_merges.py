@@ -2,15 +2,15 @@
 
 from sqlalchemy import Connection, text
 
-from domain.publications.contribution_roles import ContributionRole
+from domain.contributions.contribution_roles import ContributionRole
 from infrastructure.read_models.publications.models import (
     SuspectMergeOut,
     SuspectMergeSourceRecordOut,
     SuspectMergesResponse,
 )
 
-# Moins de la moitié des contributions sources d'auteur ont un correspondant dans un autre enregistrement source.
 _SUSPECT = "2 * pa.matched_source_contributions < pa.source_contributions"
+"""Moins de la moitié des contributions sources d'auteur ont un correspondant dans un autre enregistrement source."""
 
 _SOURCE_RECORDS_SQL = text(f"""
     WITH members AS (

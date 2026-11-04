@@ -82,8 +82,8 @@
                 rel="noopener"
               ><PublicationTitle titre={p.title} /></a>
               <span class="detach-sources">
-                {#each p.sources as s}
-                  <span class="tag tag-source">{sourceLabel(s.source)}</span>
+                {#each p.sources as source}
+                  <span class="tag tag-source">{sourceLabel(source)}</span>
                 {/each}
               </span>
             </div>

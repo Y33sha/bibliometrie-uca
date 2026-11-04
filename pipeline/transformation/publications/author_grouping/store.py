@@ -14,19 +14,19 @@ from infrastructure.sql_fragments import (
     usable_identifier,
 )
 
-# Relevé de la file `publication_contributions_queue`, gardé d'un lot à l'autre : une table temporaire survit aux commits.
 _SNAPSHOT = "publication_contributions_marks"
+"""Relevé de la file `publication_contributions_queue`, gardé d'un lot à l'autre : une table temporaire survit aux commits."""
 
-# Relevé de la file `contribution_attributes_queue`.
 _ATTRIBUTES_SNAPSHOT = "contribution_attributes_marks"
+"""Relevé de la file `contribution_attributes_queue`."""
 
-# Marque les contributions des publications `:publications` pour la recomposition de leurs attributs.
 _MARK_CONTRIBUTIONS_OF_PUBLICATIONS_SQL = text(
     enqueue_sql(
         Queue.CONTRIBUTION_ATTRIBUTES,
         "SELECT id FROM contributions WHERE publication_id = ANY(:publications)",
     )
 )
+"""Marque les contributions des publications `:publications` pour la recomposition de leurs attributs."""
 
 
 def _known_first_name(id_type: str) -> str:
@@ -38,7 +38,6 @@ def _known_first_name(id_type: str) -> str:
     )"""
 
 
-# Contributions sources à aligner, hors collectifs.
 _SOURCE_CONTRIBUTIONS_SQL = text(f"""
     SELECT sr.publication_id, sr.id AS source_record, sr.source::text AS source,
            sc.id, sc.author_position AS position,
@@ -52,6 +51,7 @@ _SOURCE_CONTRIBUTIONS_SQL = text(f"""
     JOIN contributor_information ci ON ci.id = sc.contributor_information_id
     WHERE sr.publication_id = ANY(:publications) AND NOT sc.collective
 """)
+"""Contributions sources à aligner, hors collectifs."""
 
 _CONTRIBUTIONS_SQL = text("""
     SELECT g.id, g.publication_id, gs.source_contribution_id, gs.source_record_id,
@@ -67,24 +67,24 @@ _DELETE_MEMBERSHIPS_SQL = text(
 
 _DELETE_CONTRIBUTIONS_SQL = text("DELETE FROM contributions WHERE id = ANY(:ids)")
 
-# Marque les contributions recomposées `:ids` rattachées à une personne, pour la redécision de leur personne.
 _MARK_RECOMPOSED_SQL = text(
     enqueue_sql(
         Queue.CONTRIBUTION_RESOLUTION,
         "SELECT id FROM contributions WHERE id = ANY(:ids) AND person_id IS NOT NULL",
     )
 )
+"""Marque les contributions recomposées `:ids` rattachées à une personne, pour la redécision de leur personne."""
 
-_CLEAR_COPIES_SQL = text("""
+_CLEAR_DUPLICATES_SQL = text("""
     UPDATE source_contributions sc SET duplicate_of = NULL
     FROM source_records sr
     WHERE sc.source_record_id = sr.id AND sr.publication_id = ANY(:publications)
-      AND sc.duplicate_of IS NOT NULL AND sc.id <> ALL(CAST(:copies AS integer[]))
+      AND sc.duplicate_of IS NOT NULL AND sc.id <> ALL(CAST(:duplicates AS integer[]))
 """)
 
-_SET_COPIES_SQL = text("""
+_SET_DUPLICATES_SQL = text("""
     UPDATE source_contributions sc SET duplicate_of = u.original
-    FROM unnest(CAST(:copies AS integer[]), CAST(:originals AS integer[])) AS u(id, original)
+    FROM unnest(CAST(:duplicates AS integer[]), CAST(:originals AS integer[])) AS u(id, original)
     WHERE sc.id = u.id AND sc.duplicate_of IS DISTINCT FROM u.original
 """)
 
@@ -167,7 +167,7 @@ class BatchPlan:
     """Contributions en base sans correspondant, à supprimer."""
     recomposed: list[int]
     """Contributions en base à contributions sources changées, marquées pour la redécision de leur personne par la phase `persons`."""
-    copies: dict[int, int]
+    duplicates: dict[int, int]
     """Doublon d'auteur → première occurrence de son nom (`duplicate_of`)."""
 
 
@@ -277,13 +277,19 @@ class AuthorGroupingStore:
             plan.contributions,
             plan.removed,
         )
-        memberships, unmatched_ids, copies = plan.memberships, plan.unmatched, plan.copies
-        self._conn.execute(
-            _CLEAR_COPIES_SQL, {"publications": list(publication_ids), "copies": list(copies)}
+        memberships, unmatched_ids, duplicates = (
+            plan.memberships,
+            plan.unmatched,
+            plan.duplicates,
         )
-        if copies:
+        self._conn.execute(
+            _CLEAR_DUPLICATES_SQL,
+            {"publications": list(publication_ids), "duplicates": list(duplicates)},
+        )
+        if duplicates:
             self._conn.execute(
-                _SET_COPIES_SQL, {"copies": list(copies), "originals": list(copies.values())}
+                _SET_DUPLICATES_SQL,
+                {"duplicates": list(duplicates), "originals": list(duplicates.values())},
             )
         if removed:
             self._conn.execute(_DELETE_MEMBERSHIPS_SQL, {"source_contributions": list(removed)})

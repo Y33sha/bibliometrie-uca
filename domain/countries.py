@@ -5,8 +5,8 @@ from enum import StrEnum
 
 _COUNTRY_CODE = re.compile(r"^[a-z]{2}$")
 
-# Code « non applicable », posé sur une adresse arbitrée sans pays. Il distingue cette adresse d'une adresse non arbitrée. Les décomptes géographiques l'écartent.
 NO_COUNTRY_CODE = "xx"
+"""Code « non applicable », posé sur une adresse arbitrée sans pays. Il distingue cette adresse d'une adresse non arbitrée. Les décomptes géographiques l'écartent."""
 
 
 def normalize_country_code(raw: str | None) -> str | None:

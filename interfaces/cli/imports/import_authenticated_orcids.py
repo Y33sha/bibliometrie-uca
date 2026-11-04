@@ -105,10 +105,14 @@ def find_reassignments(
 class AuthenticateOrcidOutcome(StrEnum):
     """Issue de l'authentification d'un ORCID par `authenticate_orcid`."""
 
-    INSERTED = "inserted"  # l'ORCID n'existait pas, créé authentifié
-    UPGRADED = "upgraded"  # déjà rattaché à cette personne, statut renforcé
-    REASSIGNED = "reassigned"  # déplacé depuis une autre personne, puis authentifié
-    NOOP = "noop"  # déjà authentifié sur cette personne
+    INSERTED = "inserted"
+    """L'ORCID n'existait pas, créé authentifié."""
+    UPGRADED = "upgraded"
+    """Déjà rattaché à cette personne, statut renforcé."""
+    REASSIGNED = "reassigned"
+    """Déplacé depuis une autre personne, puis authentifié."""
+    NOOP = "noop"
+    """Déjà authentifié sur cette personne."""
 
 
 def rh_emails_to_person_ids(conn: Connection) -> dict[str, list[int]]:

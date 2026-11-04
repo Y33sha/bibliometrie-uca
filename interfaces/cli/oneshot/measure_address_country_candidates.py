@@ -45,8 +45,8 @@ log = setup_logger("measure_address_country_candidates", os.path.dirname(__file_
 
 _DEFAULT_OUTPUT = Path("data/measures/address_country_candidates.csv.gz")
 
-# Taille d'un lot de cibles de la similarité : borne la mémoire de l'automate, comme la phase `countries`.
 _SIMILARITY_BATCH = 50_000
+"""Taille d'un lot de cibles de la similarité : borne la mémoire de l'automate, comme la phase `countries`."""
 
 type Candidate = tuple[int, str]
 

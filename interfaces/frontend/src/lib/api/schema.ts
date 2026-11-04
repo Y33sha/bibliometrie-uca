@@ -161,7 +161,7 @@ export interface paths {
         };
         /**
          * List Licenses
-         * @description Liste les licences d'une publication avec leur libellé français, dans l'ordre de `domain.publications.licenses.License`.
+         * @description Liste les licences d'une publication avec leur libellé français, dans l'ordre de `domain.documents.licenses.License`.
          */
         get: operations["list_licenses_api_publications_licenses_get"];
         put?: never;
@@ -1583,7 +1583,7 @@ export interface paths {
         put?: never;
         /**
          * Detach Contributions
-         * @description Rejette durablement les paires (publication, personne) des contributions sources choisies, et supprime les formes de nom devenues sans objet.
+         * @description Rejette durablement les paires (publication, personne) des publications choisies, et supprime les formes de nom devenues sans objet.
          */
         post: operations["detach_contributions_api_persons__person_id__detach_contributions_post"];
         delete?: never;
@@ -2117,7 +2117,7 @@ export interface paths {
          * List Publisher Types
          * @description Liste les valeurs possibles de l'enum `publisher_type` avec leur libellé français.
          *
-         *     Les valeurs viennent de `domain.publishers.publisher.PUBLISHER_TYPES` et `PUBLISHER_TYPE_LABELS_FR`. Un test d'intégration vérifie leur accord avec l'enum SQL. Alimente la liste déroulante de la page d'administration des éditeurs et la colonne « Type » des pages publiques.
+         *     Les valeurs viennent de `domain.publishers.publisher.PublisherType` et `PUBLISHER_TYPE_LABELS_FR`. Un test d'intégration vérifie leur accord avec l'enum SQL. Alimente la liste déroulante de la page d'administration des éditeurs et la colonne « Type » des pages publiques.
          */
         get: operations["list_publisher_types_api_publishers_types_get"];
         put?: never;
@@ -2299,7 +2299,7 @@ export interface paths {
          * List Oa Models
          * @description Liste les valeurs possibles de `oa_model` avec leur libellé français.
          *
-         *     Les valeurs viennent de `domain.serials.serial.OA_MODELS` et `OA_MODEL_LABELS_FR`. Alimente la facette « Modèle OA » des listes de revues et la liste déroulante de la fenêtre d'édition de l'administration.
+         *     Les valeurs viennent de `domain.serials.serial.OaModel` et `OA_MODEL_LABELS_FR`. Alimente la facette « Modèle OA » des listes de revues et la liste déroulante de la fenêtre d'édition de l'administration.
          */
         get: operations["list_oa_models_api_serials_oa_models_get"];
         put?: never;
@@ -2321,7 +2321,7 @@ export interface paths {
          * List Serial Types
          * @description Liste les valeurs possibles de l'enum `serial_type` avec leur libellé français.
          *
-         *     Les valeurs viennent de `domain.serials.serial.SERIAL_TYPES` et `SERIAL_TYPE_LABELS_FR`. Un test d'intégration vérifie leur accord avec l'enum SQL. Alimente la liste déroulante de la page d'administration des revues et la colonne « Type » des pages publiques.
+         *     Les valeurs viennent de `domain.serials.serial.SerialType` et `SERIAL_TYPE_LABELS_FR`. Un test d'intégration vérifie leur accord avec l'enum SQL. Alimente la liste déroulante de la page d'administration des revues et la colonne « Type » des pages publiques.
          */
         get: operations["list_serial_types_api_serials_types_get"];
         put?: never;
@@ -2923,6 +2923,7 @@ export interface components {
         };
         /** AddIdentifier */
         AddIdentifier: {
+            /** @description Le service restreint l'ajout manuel aux types publics (`PUBLIC_PERSON_IDENTIFIER_TYPES`). */
             id_type: components["schemas"]["PersonIdentifierType"];
             /** Id Value */
             id_value: string;
@@ -3484,8 +3485,8 @@ export interface components {
         };
         /** DetachContributions */
         DetachContributions: {
-            /** Contributions */
-            contributions: components["schemas"]["SourceContributionRef"][];
+            /** Publication Ids */
+            publication_ids: number[];
         };
         /**
          * DetachContributionsResponse
@@ -3642,7 +3643,7 @@ export interface components {
         };
         /**
          * EnumOption
-         * @description Valeur d'enum pour les listes déroulantes de l'interface (publisher_type, serial_type…) : `{value, label_fr}`. L'ordre vient de la constante du domaine (`domain.publishers.PUBLISHER_TYPES`, par exemple).
+         * @description Valeur d'enum pour les listes déroulantes de l'interface (publisher_type, serial_type…) : `{value, label_fr}`. L'ordre vient de l'énumération du domaine (`domain.publishers.publisher.PublisherType`, par exemple).
          */
         EnumOption: {
             /** Value */
@@ -4219,8 +4220,6 @@ export interface components {
         NameFormContributionRef: {
             /** Source */
             source: string;
-            /** Source Contribution Id */
-            source_contribution_id: number;
             /** Publication Id */
             publication_id: number;
             /** Title */
@@ -5880,13 +5879,6 @@ export interface components {
              */
             margin: number | null;
         };
-        /** SourceContributionRef */
-        SourceContributionRef: {
-            /** Source */
-            source: string;
-            /** Source Contribution Id */
-            source_contribution_id: number;
-        };
         /**
          * SourceLink
          * @description Identifiant d'un enregistrement source et son lien vers le portail de la source.
@@ -6534,6 +6526,7 @@ export interface components {
         UpdateIdentifierStatus: {
             /**
              * Status
+             * @description `authenticated` est exclu : posé seulement par l'import ORCID, protégé par un trigger.
              * @enum {string}
              */
             status: "pending" | "confirmed" | "rejected";

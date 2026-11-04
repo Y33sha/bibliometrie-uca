@@ -31,7 +31,7 @@ class BlockingSerial(TypedDict):
 
 
 class PublisherMergeBlockedError(ConflictError):
-    """Fusion d'éditeurs refusée : des paires de revues de même titre ne se fusionnent pas automatiquement, par exemple pour des ISSN divergents."""
+    """Fusion d'éditeurs refusée : des paires de revues de même titre la bloquent (`split_shared_title_pairs`)."""
 
     def __init__(self, blocking_serials: list[BlockingSerial]) -> None:
         self.blocking_serials = blocking_serials
@@ -46,7 +46,8 @@ class RejectedPair(TypedDict):
 
     publication_id: int
     person_id: int
-    rejected_at: str  # ISO 8601
+    rejected_at: str
+    """ISO 8601."""
 
 
 class RejectedPairError(ConflictError):

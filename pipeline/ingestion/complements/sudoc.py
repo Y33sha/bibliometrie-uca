@@ -12,7 +12,7 @@ import defusedxml.ElementTree as ET
 import httpx2
 from defusedxml.common import DefusedXmlException
 
-from domain.publications.identifiers import ISSN
+from domain.documents.identifiers import ISSN
 from domain.sources.sudoc import SudocSerialRecord
 from domain.types import as_mapping, as_sequence, as_str
 from pipeline.http.http_retry import (

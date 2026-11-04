@@ -94,7 +94,7 @@ const sources: PresenceFilter = {
 	items: [
 		{ key: 'hal', label: 'HAL' },
 		{ key: 'wos', label: 'WoS' },
-		{ key: 'oa', label: 'OpenAlex' },
+		{ key: 'openalex', label: 'OpenAlex' },
 	],
 };
 const FILTERS: ListFilter[] = [years, types, labs, perimeter, serial, subjects, sources];

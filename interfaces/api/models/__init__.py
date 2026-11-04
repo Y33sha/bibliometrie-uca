@@ -32,7 +32,6 @@ from interfaces.api.models.contributions import (
     CreatePersonName,
     OrphanAssignResponse,
     OrphanBatchAssignResponse,
-    SourceContributionRef,
 )
 from interfaces.api.models.errors import (
     BlockingSerialItem,
@@ -111,7 +110,6 @@ __all__ = [
     "TutelleCreate",
     "ReviewAction",
     "SetCountry",
-    "SourceContributionRef",
     "StructureTutelleCreateResponse",
     "TotalCountResponse",
     "UpdateIdentifierStatus",

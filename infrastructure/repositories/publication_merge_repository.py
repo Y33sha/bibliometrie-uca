@@ -44,7 +44,6 @@ _CONTRIBUTIONS_SQL = text("""
     WHERE c.publication_id = :publication
 """)
 
-# Seules les contributions dont la personne ou le mode change sont écrites.
 _WRITE_ATTRIBUTIONS_SQL = text("""
     UPDATE contributions c
     SET person_id = u.person_id, resolution_mode = CAST(u.mode AS resolution_mode)
@@ -58,6 +57,7 @@ _WRITE_ATTRIBUTIONS_SQL = text("""
     WHERE c.id = u.id
       AND (c.person_id, c.resolution_mode::text) IS DISTINCT FROM (u.person_id, u.mode)
 """)
+"""Seules les contributions dont la personne ou le mode change sont écrites."""
 
 
 class PgPublicationMergeRepository(PublicationMergeRepository):

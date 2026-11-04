@@ -18,15 +18,15 @@ from dataclasses import dataclass, field
 
 from sqlalchemy import Connection, Row, text
 
+from domain.documents.identifiers import ISSN
+from domain.entity_resolution import most_frequent
 from domain.normalize import normalize_text
-from domain.publications.identifiers import ISSN
 from domain.serials.attachment import (
     TitledSerial,
     choose_issnl,
     effective_issnl,
     match_by_title,
     match_in_publication,
-    most_frequent,
     openalex_issnls,
 )
 from domain.serials.containers import SeriesDescription
@@ -46,7 +46,7 @@ ATTACH_LABEL = "Rattachement des enregistrements sources aux publications en sé
 """Libellé de la sous-étape `attach_serials` dans le journal de la phase."""
 
 _SERIES = text(f"""
-    SELECT id, source, publication_id, publisher_id, biblio->'journal' AS journal,
+    SELECT id, source, publication_id, publisher_id, biblio,
            CASE WHEN corrections ? '{CorrectionKey.SERIAL_ID}'
                 THEN CAST(corrections->'{CorrectionKey.SERIAL_ID}'->>'{RAW}' AS integer)
                 ELSE serial_id END AS serial_id
@@ -72,7 +72,6 @@ _SET_ISSN_SERIALS = text("""
     WHERE i.issn = t.issn AND i.serial_id IS DISTINCT FROM t.serial_id
 """)
 
-# Une revue corrigée garde sa correction : la revue calculée devient sa valeur d'avant correction, que la correction des métadonnées relit.
 _SET_RECORD_SERIALS = text(f"""
     UPDATE source_records s
     SET serial_id = CASE WHEN s.corrections ? '{CorrectionKey.SERIAL_ID}' AND t.serial_id IS NULL
@@ -84,6 +83,7 @@ _SET_RECORD_SERIALS = text(f"""
     FROM jsonb_to_recordset(CAST(:rows AS jsonb)) AS t(id integer, serial_id integer)
     WHERE s.id = t.id
 """)
+"""Une revue corrigée garde sa correction : la revue calculée devient sa valeur d'avant correction, que la correction des métadonnées relit."""
 
 _ADD_ISSNS = text("""
     INSERT INTO serial_issns (issn)
@@ -177,7 +177,7 @@ def _valid(value: str) -> str | None:
 
 
 def _mention(row: Row[tuple[object, ...]]) -> _Mention:
-    series = journal_series({"journal": row.journal}) if row.journal else None
+    series = journal_series(row.biblio)
     issns = tuple(
         dict.fromkeys(
             v for r in (series.issns if series else ()) if not r.malformed and (v := _valid(r.issn))

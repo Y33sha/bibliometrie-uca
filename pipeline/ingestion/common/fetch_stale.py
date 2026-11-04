@@ -19,19 +19,19 @@ from collections.abc import Mapping
 
 from domain.config import ConfigKey
 from domain.sources.registry import Source, source_label
-from pipeline.graph import task
+from pipeline.graph import Task
 from pipeline.ingestion.adapters import ADAPTERS
 from pipeline.ingestion.common.stale_refetch import refresh
 from pipeline.runtime.config import delay, window_years
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.signals import select_targets, skipped
+from pipeline.runtime.observability.signals import assemble_by_source
 
 
 def _years(ctx: PhaseContext) -> list[int] | None:
     """Renvoie les années de la fenêtre du run (`window_years`), ou `None` pour tout l'historique."""
     with ctx.open_tx() as conn:
-        return window_years(conn, start_year=ctx.options.start_year, year=ctx.options.year)
+        return window_years(conn, ctx.options.years)
 
 
 def _run_fetch_stale(ctx: PhaseContext, target: str, years: list[int] | None) -> PhaseMetrics:
@@ -42,46 +42,34 @@ def _run_fetch_stale(ctx: PhaseContext, target: str, years: list[int] | None) ->
         return asyncio.run(refresh(conn, refetch, ctx.logger, after_days=after_days, years=years))
 
 
-def _targets(ctx: PhaseContext) -> set[str]:
-    """Renvoie les sources relues par le run : celles demandées, WoS seulement sur option."""
-    options = ctx.options
-    return set(select_targets(Source, options.sources, include_wos=options.include_wos))
-
-
 TASKS = tuple(
-    task(
-        f"fetch_stale.{source}",
+    Task(
+        str(source),
         reads=("config", "staging", "source_records.publication_year"),
         writes=("staging", "staging_normalization_queue"),
         previous_run=("staging", "source_records"),
         network=source,
-        parallel_group="fetch_stale",
+        parallel_group="sources",
         run=lambda ctx, source=source: _run_fetch_stale(ctx, source, _years(ctx)),
         label=source_label(source),
         progress_bar=True,
-        when=lambda ctx, source=source: source in _targets(ctx),
+        when=lambda ctx, source=source: source in ctx.options.queried_sources,
     )
     for source in Source
 )
 
 
+def _summary(metrics: PhaseMetrics) -> dict[str, float | None]:
+    """Renvoie la ligne « par source » de la table d'observabilité de la phase."""
+    return {
+        "interrogated": metrics.total,
+        "refreshed": metrics.updated,
+        "unchanged": metrics.unchanged,
+        "disappeared": metrics.extras.get("disappeared", 0),
+        "duration_s": metrics.duration_s,
+    }
+
+
 def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
     """Renvoie la somme des métriques des sources, avec la table des sources relues."""
-    metrics = PhaseMetrics()
-    by_source: dict[str, dict[str, float | None]] = {}
-    for name, source_metrics in by_task.items():
-        metrics.merge(source_metrics)
-        if skipped(source_metrics):
-            continue
-        by_source[name.removeprefix("fetch_stale.")] = {
-            "interrogated": source_metrics.total,
-            "refreshed": source_metrics.updated,
-            "unchanged": source_metrics.unchanged,
-            "disappeared": source_metrics.extras.get("disappeared", 0),
-            "duration_s": source_metrics.duration_s,
-        }
-    if by_source:
-        metrics.details["table"] = {
-            "rows": [{"key": source, **summary} for source, summary in by_source.items()]
-        }
-    return metrics
+    return assemble_by_source(by_task, _summary)

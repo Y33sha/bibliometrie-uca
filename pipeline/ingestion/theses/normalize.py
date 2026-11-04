@@ -6,10 +6,10 @@ Une thèse soutenue a pour identifiant son NNT ; une thèse en cours est sans NN
 import re
 from collections.abc import Mapping
 
+from domain.contributions.contribution_roles import THESES_FIELD_ROLES
 from domain.dates import french_date_to_iso
-from domain.publications.contribution_roles import THESES_FIELD_ROLES
-from domain.publications.dates import PublicationDate, parse_iso_date
-from domain.publications.identifiers import DOI, NNT
+from domain.documents.dates import PublicationDate, parse_iso_date
+from domain.documents.identifiers import DOI, NNT
 from domain.source_records.identifiers import (
     SourceIdentifier,
     SourceIdentifierRole,
@@ -122,8 +122,8 @@ def _subject_entries(
     ]
 
 
-# PPN d'une vedette RAMEAU, en fin du champ `query` : `"Analgésie" ET 027219046`.
 _RAMEAU_QUERY_PPN = re.compile(r"(\d{8}[\dX])\s*$", re.IGNORECASE)
+"""PPN d'une vedette RAMEAU, en fin du champ `query` : `"Analgésie" ET 027219046`."""
 
 
 def get_subjects(thesis: Mapping[str, JsonValue]) -> list[SubjectLink]:
