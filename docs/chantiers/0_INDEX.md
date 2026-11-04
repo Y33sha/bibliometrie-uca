@@ -11,6 +11,7 @@
 
 - [Adaptateurs de source](CODE_adaptateurs-de-source.md)
 - [Brevets](DATA_brevets.md)
+- [Fiabilité de l'alignement des auteurs](DATA_fiabilite-alignement-auteurs.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
 - [Listes de revues](DATA_listes-de-revues.md)
 - [Résolution probabiliste des personnes](DATA_resolution-personnes-probabiliste.md)
