@@ -3,6 +3,7 @@
 from sqlalchemy import Connection, text
 
 from domain.monographs.attachment import ExistingMonograph
+from domain.normalize import normalize_text
 from infrastructure.db.scalars import scalar_int
 
 _EXISTING = text("""
@@ -52,20 +53,19 @@ class MonographStore:
         self,
         *,
         title: str,
-        title_normalized: str,
         proceedings: bool,
         year: int | None,
         isbn: str | None,
         eisbn: str | None,
         publisher_id: int | None,
     ) -> int:
-        """Insère une monographie et renvoie son id."""
+        """Insère une monographie, avec son titre normalisé, et renvoie son id."""
         return scalar_int(
             self._conn.execute(
                 _CREATE,
                 {
                     "title": title,
-                    "title_normalized": title_normalized,
+                    "title_normalized": normalize_text(title),
                     "proceedings": proceedings,
                     "year": year,
                     "isbn": isbn,

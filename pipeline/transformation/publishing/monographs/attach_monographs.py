@@ -8,7 +8,6 @@ import logging
 from sqlalchemy import Connection, text
 
 from domain.monographs.attachment import Volume, VolumeRecord, group_volumes
-from domain.normalize import normalize_text
 from domain.source_records.biblio import monograph_volume
 from pipeline.runtime.observability.log_format import quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -66,7 +65,6 @@ def _monograph_of(store: MonographStore, conn: Connection, volume: Volume) -> tu
     assert volume.title, "garanti par `group_volumes`"
     created = store.create_monograph(
         title=volume.title,
-        title_normalized=normalize_text(volume.title),
         proceedings=volume.proceedings,
         year=volume.year,
         isbn=volume.isbn,

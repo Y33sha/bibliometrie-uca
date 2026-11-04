@@ -44,7 +44,7 @@ def _create(repo, title="Livre", *, serial_id: int | None = None, **fields):
         "publisher_id": None,
     }
     defaults.update(fields)
-    monograph_id = repo.create_monograph(title=title, title_normalized=title.lower(), **defaults)
+    monograph_id = repo.create_monograph(title=title, **defaults)
     if serial_id is not None:
         # La collection d'une monographie est posée par le rattachement aux collections.
         repo._conn.execute(

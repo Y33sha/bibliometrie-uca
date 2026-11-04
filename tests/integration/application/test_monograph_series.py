@@ -23,7 +23,6 @@ def _volume(conn, repo, title: str, source_id: str) -> int:
     serial_id = insert_serial(conn, title, serial_type="proceedings")
     monograph_id = repo.create_monograph(
         title=title,
-        title_normalized=title.lower(),
         proceedings=True,
         year=None,
         isbn=None,
