@@ -8,7 +8,7 @@ import pytest
 
 from domain.sources.staging import StagingEntryMode
 from pipeline.ingestion.common.harvester import HarvestConfigError
-from pipeline.ingestion.datacite.api import DatacitePage
+from pipeline.ingestion.common.pages import Page
 from pipeline.ingestion.datacite.person_search import DatacitePersonHarvester, build_orcid_query
 from tests.helpers.harvesters import arguments_du_run, moissonneur
 
@@ -25,7 +25,7 @@ def test_requete_sur_les_orcid_et_la_plage_d_annees():
 def test_un_lot_par_tranche_d_orcid(identifiants_rh, ecritures):
     identifiants_rh([f"0000-0000-0000-{i:04d}" for i in range(_LOT + 1)])
     client = MagicMock()
-    client.fetch_page.return_value = DatacitePage(records=[], next_url=None)
+    client.fetch_page.return_value = Page(records=[], next_token=None)
 
     moissonneur(DatacitePersonHarvester, client).run(arguments_du_run())
 
@@ -38,9 +38,9 @@ def test_document_ramene_par_deux_lots_ecrit_une_fois(identifiants_rh, ecritures
     identifiants_rh([f"0000-0000-0000-{i:04d}" for i in range(_LOT + 1)])
     client = MagicMock()
     client.fetch_page.side_effect = [
-        DatacitePage(records=[{"id": "10.1/a"}, {"id": "10.1/b"}], next_url="https://next/1"),
-        DatacitePage(records=[{"id": "10.1/c"}], next_url=None),
-        DatacitePage(records=[{"id": "10.1/a"}, {"id": ""}], next_url=None),
+        Page(records=[{"id": "10.1/a"}, {"id": "10.1/b"}], next_token="https://next/1"),
+        Page(records=[{"id": "10.1/c"}], next_token=None),
+        Page(records=[{"id": "10.1/a"}, {"id": ""}], next_token=None),
     ]
 
     metrics = moissonneur(DatacitePersonHarvester, client).run(arguments_du_run())

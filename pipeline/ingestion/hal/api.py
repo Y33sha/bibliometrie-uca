@@ -7,7 +7,7 @@ from collections.abc import Collection, Mapping, Sequence
 import httpx2
 
 from domain.sources.registry import source_record_url
-from domain.types import JsonValue, as_int, as_mapping, as_sequence, at_path
+from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, at_path
 from pipeline.http.circuit_breaker import SourceUnavailableError
 from pipeline.http.http_retry import (
     http_get_text_with_retry_async,
@@ -16,6 +16,7 @@ from pipeline.http.http_retry import (
 )
 from pipeline.http.lookup import NOT_FOUND, UNAVAILABLE, LookupOutcome, NotFound, Unavailable
 from pipeline.ingestion.api_params import API_BASE_URLS, HAL_PER_PAGE
+from pipeline.ingestion.common.pages import Page
 from pipeline.ingestion.hal.structures import HAL_STRUCTURE_FIELDS
 
 type SolrParams = dict[str, str | int | float | bool | None]
@@ -172,3 +173,11 @@ class HalStructuresClient:
     def by_aliases(self, ids: Collection[int]) -> Sequence[Mapping[str, JsonValue]]:
         """Renvoie les structures conservées avec l'un des `ids` parmi leurs alias."""
         return self._docs("aliasDocid_i", ids)
+
+
+def cursor_page(data: Mapping[str, JsonValue], cursor: str) -> Page:
+    """Décode une page reçue en pagination `cursorMark` au marqueur `cursor`. Solr renvoie le marqueur reçu une fois les résultats épuisés."""
+    records = [as_mapping(d) for d in as_sequence(at_path(data, "response").get("docs"))]
+    following = as_str(data.get("nextCursorMark"))
+    done = not records or not following or following == cursor
+    return Page(records, None if done else following)

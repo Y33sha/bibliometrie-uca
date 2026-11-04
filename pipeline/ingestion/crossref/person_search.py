@@ -6,10 +6,10 @@ La requête `GET /works` reçoit le filtre `orcid` une fois par ORCID du lot : C
 from __future__ import annotations
 
 from domain.persons.identifiers import PersonIdentifierType
+from pipeline.ingestion.common.pages import Page
 from pipeline.ingestion.common.person_search import (
     Identifiers,
     PersonSearchHarvester,
-    PersonSearchPage,
 )
 from pipeline.ingestion.crossref.api import CrossrefClient
 
@@ -36,6 +36,6 @@ class CrossrefPersonHarvester(PersonSearchHarvester[CrossrefClient]):
         years: tuple[int, int],
         next_token: str | None,
         label: str,
-    ) -> PersonSearchPage:
+    ) -> Page:
         orcids = identifiers[PersonIdentifierType.ORCID]
         return self._client.fetch_page(build_orcid_filter(orcids, *years), next_token, label)

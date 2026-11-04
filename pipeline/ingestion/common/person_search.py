@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from collections.abc import Collection, Mapping
-from dataclasses import dataclass
 from typing import ClassVar
 
 from sqlalchemy import Connection, text
@@ -26,8 +25,9 @@ from pipeline.ingestion.common.harvester import (
     HarvestConfigError,
     HarvestWindow,
     SourceHarvester,
-    stage_document,
+    stage_pages,
 )
+from pipeline.ingestion.common.pages import Page
 from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import Progress
@@ -70,15 +70,6 @@ def merge_identifiers(persons: list[Identifiers]) -> dict[PersonIdentifierType, 
     return merged
 
 
-@dataclass(frozen=True)
-class PersonSearchPage:
-    """Une page de résultats."""
-
-    records: list[Mapping[str, JsonValue]]
-    next_token: str | None
-    """Jeton de la page suivante, `None` en fin de résultats."""
-
-
 class PersonSearchHarvester[ClientT](SourceHarvester[ClientT]):
     """Documents des personnes RH, cherchés par lots de personnes."""
 
@@ -97,7 +88,7 @@ class PersonSearchHarvester[ClientT](SourceHarvester[ClientT]):
         years: tuple[int, int],
         next_token: str | None,
         label: str,
-    ) -> PersonSearchPage:
+    ) -> Page:
         """Renvoie une page des documents d'un des `identifiers`, parus entre les deux années de `years`. Renvoie la première page quand `next_token` est `None`."""
 
     def run(self, window: HarvestWindow) -> PhaseMetrics:
@@ -141,21 +132,20 @@ class PersonSearchHarvester[ClientT](SourceHarvester[ClientT]):
         metrics: PhaseMetrics,
     ) -> None:
         """Écrit les documents d'un lot, page après page. Un document sans identifiant, ou déjà écrit dans le run, est ignoré."""
-        next_token: str | None = None
-        while True:
-            page = self.fetch_page(identifiers, years, next_token, label)
-            for record in page.records:
-                identity = ADAPTERS[Source(self.SOURCE)].identify(record)
-                if identity and identity.source_id not in seen:
-                    seen.add(identity.source_id)
-                    stage_document(
-                        self.conn,
-                        metrics,
-                        source=self.SOURCE,
-                        record=record,
-                        entry_mode=StagingEntryMode.PERSON_IDENTIFIER,
-                    )
-            self.conn.commit()
-            next_token = page.next_token
-            if next_token is None:
-                return
+        source = Source(self.SOURCE)
+
+        def keep(record: Mapping[str, JsonValue]) -> bool:
+            identity = ADAPTERS[source].identify(record)
+            if identity is None or identity.source_id in seen:
+                return False
+            seen.add(identity.source_id)
+            return True
+
+        stage_pages(
+            self.conn,
+            metrics,
+            self.SOURCE,
+            lambda next_token: self.fetch_page(identifiers, years, next_token, label),
+            keep=keep,
+            entry_mode=StagingEntryMode.PERSON_IDENTIFIER,
+        )

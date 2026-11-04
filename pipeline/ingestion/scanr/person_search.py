@@ -5,19 +5,18 @@ La requête à l'index Elasticsearch contient une clause `should` réunissant l'
 
 from __future__ import annotations
 
-import json
 from collections.abc import Mapping
 from typing import ClassVar
 
 from domain.persons.identifiers import PersonIdentifierType
-from domain.types import JsonValue, as_mapping, as_sequence, at_path
+from domain.types import JsonValue
 from pipeline.ingestion.api_params import SCANR_PER_PAGE
+from pipeline.ingestion.common.pages import Page
 from pipeline.ingestion.common.person_search import (
     Identifiers,
     PersonSearchHarvester,
-    PersonSearchPage,
 )
-from pipeline.ingestion.scanr.api import ScanrClient
+from pipeline.ingestion.scanr.api import ScanrClient, hits_page, search_after
 
 
 def build_identifiers_query(
@@ -59,11 +58,6 @@ class ScanrPersonHarvester(PersonSearchHarvester[ScanrClient]):
         years: tuple[int, int],
         next_token: str | None,
         label: str,  # noqa: ARG002
-    ) -> PersonSearchPage:
-        search_after = json.loads(next_token) if next_token else None
-        data = self._client.fetch_page(build_identifiers_query(identifiers, *years, search_after))
-        hits = [as_mapping(h) for h in as_sequence(at_path(data, "hits").get("hits"))]
-        records = [as_mapping(h.get("_source")) for h in hits]
-        # Le jeton de la page suivante est la clé de tri du dernier document, sérialisée.
-        following = json.dumps(hits[-1].get("sort")) if hits else None
-        return PersonSearchPage(records=records, next_token=following)
+    ) -> Page:
+        query = build_identifiers_query(identifiers, *years, search_after(next_token))
+        return hits_page(self._client.fetch_page(query))

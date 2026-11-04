@@ -6,10 +6,10 @@ La requête `GET /dois` cible les ORCID des créateurs (`creators.nameIdentifier
 from __future__ import annotations
 
 from domain.persons.identifiers import PersonIdentifierType, orcid_uri
+from pipeline.ingestion.common.pages import Page
 from pipeline.ingestion.common.person_search import (
     Identifiers,
     PersonSearchHarvester,
-    PersonSearchPage,
 )
 from pipeline.ingestion.datacite.api import DataciteClient
 
@@ -37,11 +37,10 @@ class DatacitePersonHarvester(PersonSearchHarvester[DataciteClient]):
         years: tuple[int, int],
         next_token: str | None,
         label: str,
-    ) -> PersonSearchPage:
-        page = self._client.fetch_page(
+    ) -> Page:
+        return self._client.fetch_page(
             build_orcid_query(identifiers[PersonIdentifierType.ORCID], *years),
             next_token,
             label,
             page_size=_PAGE_SIZE,
         )
-        return PersonSearchPage(records=page.records, next_token=page.next_url)

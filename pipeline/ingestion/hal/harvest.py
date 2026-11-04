@@ -7,15 +7,15 @@ from __future__ import annotations
 
 from sqlalchemy import Connection
 
-from domain.types import as_mapping, as_sequence, as_str, at_path
 from infrastructure.read_models.perimeters.queries import get_hal_collections
 from pipeline.ingestion.common.harvester import (
     HarvestConfigError,
     HarvestWindow,
     SourceHarvester,
-    stage_document,
+    stage_pages,
 )
-from pipeline.ingestion.hal.api import HalClient
+from pipeline.ingestion.common.pages import Page
+from pipeline.ingestion.hal.api import HalClient, cursor_page
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import Progress
 
@@ -64,22 +64,11 @@ def harvest_union(
     query = build_query(years=years, since=since)
     fq = build_collections_fq(collection_codes)
 
-    cursor = "*"
-    while True:
-        data = client.fetch_page_cursor(query, fq, cursor)
-        docs = [as_mapping(d) for d in as_sequence(at_path(data, "response").get("docs"))]
+    def fetch(cursor: str | None) -> Page:
+        mark = cursor or "*"
+        return cursor_page(client.fetch_page_cursor(query, fq, mark), mark)
 
-        for doc in docs:
-            stage_document(conn, metrics, source="hal", record=doc)
-        conn.commit()
-
-        progress.advance(len(docs))
-
-        # Fin de pagination : Solr renvoie le marqueur reçu une fois l'union épuisée. Une page vide arrête aussi la boucle, en cas d'incohérence du serveur.
-        next_cursor = as_str(data.get("nextCursorMark")) or cursor
-        if next_cursor == cursor or not docs:
-            break
-        cursor = next_cursor
+    stage_pages(conn, metrics, "hal", fetch, progress=progress)
 
 
 class HalHarvester(SourceHarvester[HalClient]):

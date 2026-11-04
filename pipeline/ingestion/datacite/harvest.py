@@ -12,7 +12,7 @@ from sqlalchemy import Connection
 from pipeline.ingestion.common.harvester import (
     HarvestWindow,
     SourceHarvester,
-    stage_document,
+    stage_pages,
 )
 from pipeline.ingestion.datacite.api import DataciteClient
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -37,17 +37,14 @@ def harvest_year(
     metrics: PhaseMetrics,
 ) -> None:
     """Moissonne les DOI d'une année, page après page, et les compte dans `metrics`. Une ressource sans DOI est ignorée."""
-    next_url: str | None = None
     query = build_query(year, keywords)
-    while True:
-        page = client.fetch_page(query, next_url, str(year))
-        for record in page.records:
-            stage_document(conn, metrics, source="datacite", record=record)
-        conn.commit()
-        progress.advance(len(page.records))
-        next_url = page.next_url
-        if next_url is None:
-            return
+    stage_pages(
+        conn,
+        metrics,
+        "datacite",
+        lambda next_url: client.fetch_page(query, next_url, str(year)),
+        progress=progress,
+    )
 
 
 class DataciteHarvester(SourceHarvester[DataciteClient]):

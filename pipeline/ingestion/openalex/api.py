@@ -6,11 +6,12 @@ from collections.abc import Mapping
 
 import httpx2
 
-from domain.types import JsonValue, as_int, as_mapping, as_sequence, at_path
+from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, at_path
 from pipeline.http.http_retry import http_request_with_retry, lookup_json_async
 from pipeline.http.lookup import NOT_FOUND, UNAVAILABLE, LookupOutcome, NotFound, Unavailable
 from pipeline.http.polite_pool import get_polite_pool_email_optional
 from pipeline.ingestion.api_params import API_BASE_URLS, OPENALEX_PER_PAGE
+from pipeline.ingestion.common.pages import Page
 from pipeline.ingestion.credentials import get_openalex_api_key
 
 type QueryParams = Mapping[str, str | int | float | bool | None]
@@ -159,3 +160,11 @@ async def search_doi(
         return UNAVAILABLE
     results = as_sequence(as_mapping(outcome).get("results"))
     return as_mapping(results[0]) if results else NOT_FOUND
+
+
+def works_page(data: Mapping[str, JsonValue]) -> Page:
+    """Décode une page de works : works, curseur de la page suivante, nombre de works annoncé."""
+    records = [as_mapping(w) for w in as_sequence(data.get("results"))]
+    meta = at_path(data, "meta")
+    following = as_str(meta.get("next_cursor"))
+    return Page(records, following if records else None, as_int(meta.get("count")))

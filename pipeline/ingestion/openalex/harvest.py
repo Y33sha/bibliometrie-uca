@@ -7,13 +7,13 @@ from __future__ import annotations
 
 from sqlalchemy import Connection
 
-from domain.types import as_int, as_mapping, as_sequence, as_str, at_path
 from pipeline.ingestion.common.harvester import (
     HarvestWindow,
     SourceHarvester,
-    stage_document,
+    stage_pages,
 )
-from pipeline.ingestion.openalex.api import OpenalexClient
+from pipeline.ingestion.common.pages import Page
+from pipeline.ingestion.openalex.api import OpenalexClient, works_page
 from pipeline.runtime.observability.logging_scope import ScopedOrPlainLogger, scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import Progress
@@ -30,30 +30,15 @@ def harvest_period(
     years: list[int],
 ) -> None:
     """Moissonne les works des années `years`, page après page, et compte les écritures dans `metrics`."""
-    cursor = "*"
-    total_count: int | None = None
-    fetched = 0
+    totals: list[int | None] = []
 
-    while True:
-        data = client.fetch_page(institution_ids, years=years, cursor=cursor)
-        if total_count is None:
-            total_count = as_int(at_path(data, "meta").get("count")) or 0
+    def fetch(cursor: str | None) -> Page:
+        page = works_page(client.fetch_page(institution_ids, years=years, cursor=cursor or "*"))
+        totals.append(page.total)
+        return page
 
-        works = [as_mapping(r) for r in as_sequence(data.get("results"))]
-        if not works:
-            break
-
-        for work in works:
-            stage_document(conn, metrics, source="openalex", record=work)
-        conn.commit()
-        fetched += len(works)
-        progress.advance(len(works))
-
-        next_cursor = as_str(at_path(data, "meta").get("next_cursor"))
-        if not next_cursor:
-            break
-        cursor = next_cursor
-
+    fetched = stage_pages(conn, metrics, "openalex", fetch, progress=progress)
+    total_count = totals[0] if totals else None
     if total_count and fetched < total_count:
         logger.warning("%s documents non récupérés sur %s", total_count - fetched, total_count)
 

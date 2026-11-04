@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import urllib.parse
 from collections.abc import Mapping
-from dataclasses import dataclass
 
 import httpx2
 
@@ -16,6 +15,7 @@ from pipeline.http.http_retry import http_request_with_retry, lookup_json_async
 from pipeline.http.lookup import UNAVAILABLE, LookupOutcome, NotFound, Unavailable
 from pipeline.http.polite_pool import polite_user_agent
 from pipeline.ingestion.api_params import API_BASE_URLS
+from pipeline.ingestion.common.pages import Page
 
 _PAGE_SIZE = 1000
 """Plafond de l'API DataCite pour la taille d'une page."""
@@ -33,15 +33,6 @@ def headers() -> dict[str, str]:
         "User-Agent": polite_user_agent(),
         "Accept": "application/vnd.api+json",
     }
-
-
-@dataclass(frozen=True)
-class DatacitePage:
-    """Une page de résultats."""
-
-    records: list[Mapping[str, JsonValue]]
-    next_url: str | None
-    """URL de la page suivante, `None` en fin de résultats."""
 
 
 class DataciteClient:
@@ -76,7 +67,7 @@ class DataciteClient:
 
     def fetch_page(
         self, query: str, next_url: str | None, label: str, *, page_size: int = _PAGE_SIZE
-    ) -> DatacitePage:
+    ) -> Page:
         """Renvoie une page des DOI désignés par `query` : la première quand `next_url` est `None`, sinon la page désignée par `next_url`."""
         if next_url is None:
             data = self._get(
@@ -89,7 +80,7 @@ class DataciteClient:
         records = [as_mapping(r) for r in as_sequence(data.get("data"))]
         following = as_str(as_mapping(data.get("links")).get("next"))
         # Une page vide clôt la pagination, même si l'API annonce encore une suite.
-        return DatacitePage(records=records, next_url=following if records else None)
+        return Page(records, following if records else None)
 
 
 async def search_dois(

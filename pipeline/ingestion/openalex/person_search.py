@@ -10,13 +10,12 @@ from __future__ import annotations
 from typing import ClassVar
 
 from domain.persons.identifiers import PersonIdentifierType
-from domain.types import as_mapping, as_sequence, as_str, at_path
+from pipeline.ingestion.common.pages import Page
 from pipeline.ingestion.common.person_search import (
     Identifiers,
     PersonSearchHarvester,
-    PersonSearchPage,
 )
-from pipeline.ingestion.openalex.api import OpenalexClient
+from pipeline.ingestion.openalex.api import OpenalexClient, works_page
 
 
 def build_orcid_filter(orcids: list[str], first_year: int, last_year: int) -> str:
@@ -37,11 +36,9 @@ class OpenalexPersonHarvester(PersonSearchHarvester[OpenalexClient]):
         years: tuple[int, int],
         next_token: str | None,
         label: str,
-    ) -> PersonSearchPage:
+    ) -> Page:
         orcids = identifiers[PersonIdentifierType.ORCID]
         data = self._client.fetch_filtered_page(
             build_orcid_filter(orcids, *years), next_token or "*", label
         )
-        records = [as_mapping(w) for w in as_sequence(data.get("results"))]
-        following = as_str(at_path(data, "meta").get("next_cursor"))
-        return PersonSearchPage(records=records, next_token=following if records else None)
+        return works_page(data)

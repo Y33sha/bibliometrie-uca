@@ -9,14 +9,14 @@ from collections.abc import Mapping, Sequence
 
 from sqlalchemy import Connection
 
-from domain.types import JsonValue, as_mapping, as_sequence, at_path
+from domain.types import JsonValue
 from pipeline.ingestion.api_params import SCANR_PER_PAGE
 from pipeline.ingestion.common.harvester import (
     HarvestWindow,
     SourceHarvester,
-    stage_document,
+    stage_pages,
 )
-from pipeline.ingestion.scanr.api import ScanrClient
+from pipeline.ingestion.scanr.api import ScanrClient, hits_page, search_after
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import Progress
 
@@ -64,27 +64,15 @@ def harvest_year(
     metrics: PhaseMetrics,
 ) -> None:
     """Moissonne les documents d'une année, page après page, et compte les écritures dans `metrics`."""
-    search_after: list[JsonValue] | None = None
-    seen = 0
-
-    while True:
-        data = client.fetch_page(build_query(year, affiliation_ids, search_after))
-        hits = [as_mapping(h) for h in as_sequence(at_path(data, "hits").get("hits"))]
-        if not hits:
-            break
-
-        for hit in hits:
-            progress.advance()
-            doc = as_mapping(hit.get("_source"))
-            if not stage_document(conn, metrics, source="scanr", record=doc):
-                continue
-            seen += 1
-            if seen % _COMMIT_EVERY == 0:
-                conn.commit()
-
-        search_after = list(as_sequence(hits[-1].get("sort")))
-
-    conn.commit()
+    stage_pages(
+        conn,
+        metrics,
+        "scanr",
+        lambda token: hits_page(
+            client.fetch_page(build_query(year, affiliation_ids, search_after(token)))
+        ),
+        progress=progress,
+    )
 
 
 class ScanrHarvester(SourceHarvester[ScanrClient]):

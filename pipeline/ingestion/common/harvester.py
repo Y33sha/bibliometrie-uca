@@ -19,6 +19,7 @@ from infrastructure import PROJECT_ROOT
 from infrastructure.observability.log import setup_logger
 from infrastructure.read_models.perimeters.queries import get_extraction_api_ids
 from pipeline.http.circuit_breaker import SourceUnavailableError, trip_source
+from pipeline.ingestion.common.pages import Page
 from pipeline.ingestion.common.staging import StagingStore, UpsertOutcome
 from pipeline.runtime.config import YearRange, window_years
 from pipeline.runtime.context import PhaseContext
@@ -83,6 +84,36 @@ def stage_document(
         case UpsertOutcome.UNCHANGED:
             metrics.add(unchanged=1)
     return True
+
+
+def stage_pages(
+    conn: Connection,
+    metrics: PhaseMetrics,
+    source: str,
+    fetch_page: Callable[[str | None], Page],
+    *,
+    progress: Progress | None = None,
+    keep: Callable[[Mapping[str, JsonValue]], bool] | None = None,
+    entry_mode: StagingEntryMode = StagingEntryMode.BULK,
+) -> int:
+    """Écrit dans `staging` les documents des pages successives, un commit par page, et renvoie le nombre de documents reçus.
+
+    `fetch_page` reçoit le jeton de la page suivante, `None` pour la première. Une page vide ou sans jeton clôt la pagination. `keep` écarte des documents ; `progress` avance d'un pas par document reçu.
+    """
+    received = 0
+    token: str | None = None
+    while True:
+        page = fetch_page(token)
+        for record in page.records:
+            if keep is None or keep(record):
+                stage_document(conn, metrics, source=source, record=record, entry_mode=entry_mode)
+        conn.commit()
+        received += len(page.records)
+        if progress is not None:
+            progress.advance(len(page.records))
+        if not page.records or page.next_token is None:
+            return received
+        token = page.next_token
 
 
 class HarvestConfigError(Exception):
