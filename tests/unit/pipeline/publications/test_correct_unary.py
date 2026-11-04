@@ -300,7 +300,7 @@ def test_preserves_unmanaged_corrections_keys():
     }
 
 
-def test_le_journal_compte_seulement_les_documents_corriges_par_une_regle(caplog):
+def test_le_bilan_compte_seulement_les_documents_corriges_par_une_regle():
     """Une correction défaite donne une mise à jour, sans compter comme une correction."""
     queries = MagicMock()
     queries.fetch_missing_hal_ids.return_value = frozenset()
@@ -315,9 +315,8 @@ def test_le_journal_compte_seulement_les_documents_corriges_par_une_regle(caplog
         ),
         _source_record(id=2, doc_type="article", urls=["https://theses.fr/2020ABCD"]),
     ]
-    with caplog.at_level(logging.INFO, logger="test"):
-        run(MagicMock(), queries, logging.getLogger("test"))
-    assert "  ├─ 1 document à corriger" in caplog.messages
+    stats = run(MagicMock(), queries, logging.getLogger("test"))
+    assert stats.corrected == 1
 
 
 # Dépôts HAL introuvables

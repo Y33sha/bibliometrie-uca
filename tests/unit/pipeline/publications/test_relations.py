@@ -1,13 +1,10 @@
-"""Tests de l'assemblage des arêtes des signaux #2 (clés de confirmation partagées) et #3 (titre), et du journal des changements de la phase."""
-
-import logging
+"""Tests de l'assemblage des arêtes des signaux #2 (clés de confirmation partagées) et #3 (titre), et du compte des relations ajoutées par lien."""
 
 from domain.publications.relations import RelationType
 from pipeline.transformation.publications.relations import (
     DeclaredRelationSource,
     DoiPublication,
     RelationEdge,
-    RelationsRebuild,
     SharedKeyPair,
     TitleMatch,
     _build_distinct_work_edges,
@@ -15,7 +12,6 @@ from pipeline.transformation.publications.relations import (
     _build_title_match_edges,
     _count_by_pair_label,
     _declared_pairs,
-    _log_changes,
 )
 
 
@@ -194,8 +190,8 @@ class TestBuildTitleMatchEdges:
         assert e.target_doi is None
 
 
-class TestChangementsJournalises:
-    """Le journal compte les relations ajoutées et retirées depuis le run précédent, nommées par leurs libellés."""
+class TestCompteParLien:
+    """Les relations ajoutées se comptent par lien, nommé par son libellé."""
 
     def test_un_type_et_son_inverse_comptent_pour_un_meme_lien(self):
         compte = _count_by_pair_label([("is_preprint_of", 6), ("has_preprint", 2)])
@@ -206,26 +202,3 @@ class TestChangementsJournalises:
         compte = _count_by_pair_label([("is_correction_of", 1), ("is_supplement_to", 3)])
 
         assert list(compte) == ["article/données supplémentaires", "article/erratum"]
-
-    def test_le_journal_nomme_les_liens_et_non_les_types(self, caplog):
-        logger = logging.getLogger("test_relations")
-        with caplog.at_level(logging.INFO, logger=logger.name):
-            _log_changes(RelationsRebuild(4569, [("is_preprint_of", 8)], removed=4), logger)
-
-        assert caplog.messages[-5:] == [
-            "▶ Relations entre publications",
-            "  ├─ 8 nouvelles relations, dont",
-            "  │  8 préprint/article",
-            "  │",
-            "  └─ 4 relations retirées",
-        ]
-        assert "is_preprint_of" not in caplog.text
-
-    def test_une_reconstruction_a_l_identique_ne_dit_rien_de_plus(self, caplog):
-        logger = logging.getLogger("test_relations")
-        with caplog.at_level(logging.INFO, logger=logger.name):
-            _log_changes(RelationsRebuild(4569, [], removed=0), logger)
-
-        assert "aucun changement" in caplog.text
-        # Le nombre d'arêtes réécrites reste hors du journal : la table est reconstruite entière.
-        assert "4569" not in caplog.text

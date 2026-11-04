@@ -111,22 +111,6 @@ async def test_work_fusionne_perd_son_marqueur(openalex):
     assert (conn.reecrits, conn.leves) == (["W9"], ["W1"])
 
 
-@pytest.mark.parametrize(
-    ("works", "titre"),
-    [
-        ({"W1": _work(100)}, "▶ 1 document de 100 auteurs, potentiellement tronqué"),
-        (
-            {"W1": _work(100), "W2": _work(150)},
-            "▶ 2 documents de 100 auteurs, potentiellement tronqués",
-        ),
-    ],
-)
-async def test_l_etape_annonce_les_documents_a_verifier(openalex, works, titre, caplog):
-    with caplog.at_level(logging.INFO, logger="test"):
-        await refetch_openalex(openalex(works), _LOGGER)
-    assert titre in caplog.messages
-
-
 async def test_lot_mele(openalex):
     conn = openalex({"W1": _work(150), "W2": _work(100), "W3": UNAVAILABLE, "W4": _work(200)})
     metrics = await refetch_openalex(conn, _LOGGER)

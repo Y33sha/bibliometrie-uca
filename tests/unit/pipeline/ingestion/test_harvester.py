@@ -1,6 +1,6 @@
 """Tests unitaires de `pipeline.ingestion.common.harvester.SourceHarvester`.
 
-Couvre la séquence de `run` (`load_config`, `setup_logging`, puis `harvest_all`) et le bilan journalisé.
+Couvre la séquence de `run` (`load_config`, `setup_logging`, puis `harvest_all`) et le bilan.
 
 Sans base ni réseau : un faux moissonneur déterministe et une connexion simulée.
 """
@@ -119,15 +119,9 @@ class TestExtractionParAnnee:
         ext.run(_args())
         assert ext.totaux == [5, 5]
 
-    def test_le_bilan_ventile_les_documents(self, logger, caplog):
-        with caplog.at_level(logging.INFO, logger=logger.name):
-            _ParAnnee(logger, {2023: 2, 2024: 3}).run(_args())
-        assert "5 documents trouvés : 2 nouveaux, 0 mis à jour, 3 inchangés" in caplog.text
-
-    def test_le_bilan_accorde_au_singulier(self, logger, caplog):
-        with caplog.at_level(logging.INFO, logger=logger.name):
-            _ParAnnee(logger, {2024: 1}).run(_args())
-        assert "1 document trouvé : 1 nouveau, 0 mis à jour, 0 inchangé" in caplog.text
+    def test_le_bilan_somme_les_annees(self, logger):
+        metrics = _ParAnnee(logger, {2023: 2, 2024: 3}).run(_args())
+        assert (metrics.new, metrics.unchanged) == (2, 3)
 
     def test_une_source_indisponible_coupe_la_source_et_garde_les_annees_extraites(self, logger):
         with source_circuit_breaker("hal") as breaker:
@@ -136,19 +130,6 @@ class TestExtractionParAnnee:
             )
         assert metrics.total == 2
         assert breaker.tripped
-
-
-class _DUnTenant(_ParAnnee):
-    """Moissonneur d'un seul tenant, dont le bilan nomme le critère de recherche."""
-
-    def harvest_all(self, args, config):  # type: ignore[no-untyped-def]
-        return self._harvest_at_once(2, lambda progress: PhaseMetrics(new=2), by="ORCID, IdRef")
-
-
-def test_le_bilan_nomme_le_critere_de_recherche(logger, caplog):
-    with caplog.at_level(logging.INFO, logger=logger.name):
-        _DUnTenant(logger, {}).run(_args())
-    assert "2 documents trouvés par ORCID, IdRef : 2 nouveaux" in caplog.text
 
 
 class TestRun:

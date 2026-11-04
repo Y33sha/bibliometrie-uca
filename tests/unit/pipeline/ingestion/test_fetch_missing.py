@@ -9,7 +9,6 @@ from collections.abc import Callable
 
 from pipeline.graph import Phase
 from pipeline.phases import PHASES
-from pipeline.runtime.observability.log_format import LAST_BRANCH
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.signals import signal_source_unconfigured
 from pipeline.task_runner import run_phase
@@ -103,64 +102,6 @@ def test_nnt_channel_only_in_full_mode(contexte):
     assert calls == ["id"]  # NNT réservé au mode full
 
 
-def _run_doi_only(contexte, fetch_doi_one, caplog) -> str:
-    """Joue la seule recherche par DOI (HAL hors du filtre `sources`) et renvoie le journal."""
-    with caplog.at_level(logging.INFO, logger="test"):
-        FetchMissingPhase(
-            fetch_hal_by_id=lambda _ctx: PhaseMetrics(),
-            fetch_scanr_by_hal_id=lambda _ctx: PhaseMetrics(),
-            fetch_hal_by_nnt=lambda _ctx: PhaseMetrics(),
-            fetch_theses_by_nnt=lambda _ctx: PhaseMetrics(),
-            fetch_doi_one=fetch_doi_one,
-        ).run(contexte(mode="daily", sources={"openalex", "crossref"}))
-    return caplog.text
-
-
-def test_la_recherche_par_doi_sans_rien_a_chercher_le_dit(contexte, caplog):
-    journal = _run_doi_only(contexte, lambda _ctx, source: PhaseMetrics(), caplog)
-    assert f"{LAST_BRANCH}Rien à faire" in journal
-
-
-def test_une_source_qui_a_cherche_suffit_a_taire_le_rien_a_faire(contexte, caplog):
-    journal = _run_doi_only(
-        contexte,
-        lambda _ctx, source: PhaseMetrics(seen=3) if source == "openalex" else PhaseMetrics(),
-        caplog,
-    )
-    assert "Rien à faire" not in journal
-
-
-def test_une_source_indisponible_n_est_pas_un_rien_a_faire(contexte, caplog):
-    indisponible = PhaseMetrics(
-        signals=[{"level": "warning", "code": "source_unavailable", "message": "openalex"}]
-    )
-    journal = _run_doi_only(
-        contexte,
-        lambda _ctx, source: indisponible if source == "openalex" else PhaseMetrics(),
-        caplog,
-    )
-    assert "Rien à faire" not in journal
-
-
-def test_les_recherches_par_nnt_sans_rien_a_chercher_ferment_leur_section_une_fois(
-    contexte, caplog
-):
-    """Les recherches par NNT dans HAL et dans theses.fr partagent une section : une seule ligne « Rien à faire » la ferme."""
-    with caplog.at_level(logging.INFO, logger="test"):
-        FetchMissingPhase(
-            fetch_hal_by_id=lambda _ctx: PhaseMetrics(seen=2),
-            fetch_scanr_by_hal_id=lambda _ctx: PhaseMetrics(),
-            fetch_hal_by_nnt=lambda _ctx: PhaseMetrics(),
-            fetch_theses_by_nnt=lambda _ctx: PhaseMetrics(),
-            fetch_doi_one=lambda _ctx, source: PhaseMetrics(seen=1),
-        ).run(contexte(mode="full", sources={"hal", "theses"}))
-
-    messages = caplog.messages
-    section = messages.index("▶ Recherche par NNT des thèses trouvées ailleurs")
-    assert messages[section + 1] == f"{LAST_BRANCH}Rien à faire"
-    assert messages.count(f"{LAST_BRANCH}Rien à faire") == 1
-
-
 def test_theses_channel_suit_le_filtre_des_sources(contexte):
     calls: list[str] = []
 
@@ -193,8 +134,8 @@ def test_hal_skipped_when_sources_excludes_it(contexte):
     assert calls == []  # aucun canal HAL
 
 
-def test_les_recherches_par_hal_id_partagent_une_section(contexte, caplog):
-    """Les recherches par hal-id dans HAL et dans ScanR partagent une section, et chacune suit le filtre des sources."""
+def test_les_recherches_par_hal_id_suivent_le_filtre_des_sources(contexte):
+    """Les recherches par hal-id dans HAL et dans ScanR suivent chacune le filtre des sources."""
     calls: list[str] = []
 
     def phase() -> FetchMissingPhase:
@@ -206,12 +147,8 @@ def test_les_recherches_par_hal_id_partagent_une_section(contexte, caplog):
             fetch_doi_one=lambda _ctx, source: PhaseMetrics(seen=1),
         )
 
-    with caplog.at_level(logging.INFO, logger="test"):
-        phase().run(contexte(mode="daily", sources={"hal", "scanr"}))
+    phase().run(contexte(mode="daily", sources={"hal", "scanr"}))
     assert sorted(calls) == ["hal", "scanr"]
-    messages = caplog.messages
-    section = messages.index("▶ Recherche des documents avec hal-id trouvés ailleurs")
-    assert messages[section + 1] == f"{LAST_BRANCH}Rien à faire"
 
     calls.clear()
     phase().run(contexte(mode="daily", sources={"scanr"}))

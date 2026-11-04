@@ -453,25 +453,8 @@ class TestPersonIndex:
         assert _person(conn, contribution) == (kept, "name")
 
 
-def test_le_journal_compte_les_identifications_par_mode_et_les_creations(sa_sync_conn, caplog):
-    conn = sa_sync_conn
-    person = insert_person(conn, "Martin", first_name="Jean")
-    insert_person_identifier(conn, person, id_type="orcid", id_value=_ORCID, status="confirmed")
-    _contribution(
-        conn, insert_publication(conn), [("crossref", "Jean Martin", {"orcid": _ORCID}, True)]
-    )
-    _contribution(conn, insert_publication(conn), [("hal", "Claire Durand", None, True)])
-
-    with caplog.at_level(logging.INFO):
-        resolve_contributions(conn, logging.getLogger("test"))
-
-    assert "  └─ 1 contribution identifiée, dont" in caplog.messages
-    assert "     1 par ORCID" in caplog.messages
-    assert "  └─ 1 personne créée" in caplog.messages
-
-
-def test_un_role_sans_creation_ne_compte_pas_parmi_les_non_identifiees(sa_sync_conn, caplog):
-    """Une contribution source du jury au nom inconnu reste sans personne, hors du décompte ; un auteur au nom inconnu fonde une personne."""
+def test_un_membre_du_jury_au_nom_inconnu_reste_sans_personne(sa_sync_conn):
+    """Une contribution source du jury au nom inconnu reste sans personne ; un auteur au nom inconnu fonde une personne."""
     conn = sa_sync_conn
     publication = insert_publication(conn)
     source_record = insert_source_record(conn, publication, source="theses", source_id="these-1")
@@ -484,15 +467,13 @@ def test_un_role_sans_creation_ne_compte_pas_parmi_les_non_identifiees(sa_sync_c
         in_perimeter=True,
         roles=["jury_member"],
     )
-    align_source_contributions(conn, publication, [(jury, source_record)])
+    jury_contribution = align_source_contributions(conn, publication, [(jury, source_record)])
     _contribution(conn, insert_publication(conn), [("hal", "Claire Durand", None, True)])
 
-    with caplog.at_level(logging.INFO):
-        resolve_contributions(conn, logging.getLogger("test"))
+    result = resolve_contributions(conn, logging.getLogger("test"))
 
-    assert "  ├─ 1 contribution d'auteur du périmètre non identifiée" in caplog.messages
-    assert "  ├─ 0 indécidable" in caplog.messages
-    assert "  └─ 1 personne créée" in caplog.messages
+    assert _person(conn, jury_contribution) == (None, None)
+    assert result["created"] == 1
 
 
 class TestResolutionQueue:

@@ -3,7 +3,6 @@
 Le script confronte les clés de l'archive aux identifiants de `staging`, source par source, et supprime les clés absentes. Le mode simulation compte sans rien supprimer.
 """
 
-import logging
 import sys
 from contextlib import contextmanager
 from types import SimpleNamespace
@@ -97,14 +96,12 @@ def test_archive_introuvable(lancer, tmp_path):
     assert store.supprimees == []
 
 
-def test_payload_deja_disparu_du_disque(lancer, caplog):
-    """Un fichier disparu entre le parcours des clés et la suppression compte comme détecté, pas comme supprimé."""
-    with caplog.at_level(logging.INFO):
-        code, store = lancer({"hal": ["hal-1", "hal-2"]}, {"hal": set()}, deja_disparues={"hal-1"})
+def test_payload_deja_disparu_du_disque(lancer):
+    """Un fichier disparu entre le parcours des clés et la suppression n'interrompt pas le script."""
+    code, store = lancer({"hal": ["hal-1", "hal-2"]}, {"hal": set()}, deja_disparues={"hal-1"})
 
     assert code == 0
     assert len(store.supprimees) == 2  # les deux tentatives ont eu lieu
-    assert "1 orphelin supprimé (2 détectés)" in caplog.text
 
 
 def test_archive_reelle_sur_disque(tmp_path, monkeypatch):

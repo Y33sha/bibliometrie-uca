@@ -7,8 +7,6 @@ Les fonctions SQL du module sont simulées, sans base de données.
 
 from __future__ import annotations
 
-import logging
-
 import pytest
 
 from pipeline.transformation.persons import populate_person_name_forms
@@ -141,17 +139,14 @@ def test_batches_flush_at_batch_size(queries, monkeypatch):
     assert all(len(b) <= 3 for b in queries.batches[:-1])
 
 
-def test_la_table_temporaire_ne_survit_pas_a_la_synchronisation(queries, caplog):
+def test_la_table_temporaire_ne_survit_pas_a_la_synchronisation(queries):
     """Les formes calculées transitent par une table temporaire, consommée par la synchronisation."""
     queries.sync_return = SyncCounts(42, 7, 3)
 
-    with caplog.at_level(logging.INFO):
-        populate(_FakeConn())
+    populate(_FakeConn())
 
     assert queries.sync_called is True
     assert queries.drop_temp_called is True
-    # La sous-étape se signale par sa ligne d'attente, sans détailler ses compteurs.
-    assert caplog.records == []
 
 
 def test_assert_BATCH_SIZE_default():

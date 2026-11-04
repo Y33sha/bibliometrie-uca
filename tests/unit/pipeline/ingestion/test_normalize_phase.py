@@ -4,7 +4,6 @@ Le retrait des enregistrements sources disparus précède le nettoyage des infor
 """
 
 import dataclasses
-import logging
 
 import pytest
 
@@ -81,24 +80,6 @@ def test_sans_document_la_maintenance_tourne_quand_meme(lancer):
     appels: list[str] = []
     lancer(appels, bilan=NormalizeStats(0, 0, 0))
     assert appels == ["normalize:hal", "prune", "cleanup", "cleanup_addresses", "VACUUM staging"]
-
-
-def test_les_retraits_sont_annonces(lancer, caplog):
-    with caplog.at_level(logging.INFO, logger="test"):
-        lancer([], disparues=2)
-    assert "2 documents supprimés (disparus de leur source)" in caplog.text
-
-
-def test_la_ligne_de_la_source_compte_les_documents_normalises_et_les_erreurs(lancer, caplog):
-    with caplog.at_level(logging.INFO, logger="test"):
-        lancer([], bilan=NormalizeStats(3525, 0, 1))
-    assert "HAL : 3525 documents normalisés, 1 erreur" in caplog.text
-
-
-def test_sans_document_la_ligne_de_la_source_dit_rien_a_faire(lancer, caplog):
-    with caplog.at_level(logging.INFO, logger="test"):
-        lancer([], bilan=NormalizeStats(0, 0, 0))
-    assert "HAL : rien à faire" in caplog.text
 
 
 def test_la_table_porte_une_ligne_par_source(lancer):

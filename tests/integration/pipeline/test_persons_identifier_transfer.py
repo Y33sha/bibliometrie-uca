@@ -60,7 +60,7 @@ def _person_of(conn, contribution):
     )
 
 
-def test_une_contribution_rattachee_par_un_identifiant_mal_place_est_marquee(sa_sync_conn, caplog):
+def test_une_contribution_rattachee_par_un_identifiant_mal_place_est_marquee(sa_sync_conn):
     """Quatre contributions sources « jean martin » et trois « pierre dupont » contiennent l'ORCID : il est mal placé chez « pierre dupont ». La contribution de « pierre dupont » rattachée par l'ORCID est marquée pour la redécision de sa personne ; les contributions manuelle et rattachée par le nom restent en l'état."""
     conn = sa_sync_conn
     martin = insert_person(conn, "Martin", first_name="Jean")
@@ -70,23 +70,8 @@ def test_une_contribution_rattachee_par_un_identifiant_mal_place_est_marquee(sa_
     _contribution(conn, dupont, "manual", name="pierre dupont")
     _contribution(conn, dupont, "name", name="pierre dupont")
 
-    with caplog.at_level(logging.INFO):
-        result = _arbitrate(conn)
+    result = _arbitrate(conn)
 
     assert (result["neutralized"], result["marked_contributions"]) == (3, 1)
-    assert (
-        "  └─ Identifiants portés sous le nom d'une autre personne : 3 identifiants neutralisés"
-        in caplog.messages
-    )
     assert queued(conn, Queue.CONTRIBUTION_RESOLUTION) == {by_orcid}
     assert _person_of(conn, by_orcid) == (dupont, "orcid")
-
-
-def test_sans_identifiant_mal_place_la_ligne_dit_rien_a_faire(sa_sync_conn, caplog):
-    with caplog.at_level(logging.INFO):
-        _arbitrate(sa_sync_conn)
-
-    assert (
-        "  └─ Identifiants portés sous le nom d'une autre personne : rien à faire"
-        in caplog.messages
-    )

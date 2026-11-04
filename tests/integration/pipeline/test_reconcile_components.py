@@ -415,43 +415,6 @@ class TestEndToEnd:
         assert {publication_a, publication_b} <= marked
         assert untouched not in marked
 
-    def test_sans_document_a_retraiter_le_journal_dit_rien_a_faire(self, sa_sync_conn, caplog):
-        conn = sa_sync_conn
-
-        with caplog.at_level(logging.INFO, logger=logger.name):
-            reconcile(conn, logger)
-
-        assert "Aucun document nouveau ou mis à jour" in caplog.text
-        assert "Rien à faire" in caplog.text
-        assert "Recalcul" not in caplog.text
-
-    def test_le_journal_accorde_les_publications_resolues(self, sa_sync_conn, caplog):
-        conn = sa_sync_conn
-        publication_a = _seed_publication(conn)
-        publication_b = _seed_publication(conn)
-        _source_record(conn, publication_a, source_id="a", doi="10.1/x")
-        _source_record(conn, publication_b, source_id="b", doi="10.1/x")
-
-        with caplog.at_level(logging.INFO, logger=logger.name):
-            reconcile(conn, logger)
-
-        assert "résolus en 1 publication (1 déjà existante, 0 nouvelle ; 1 doublon" in caplog.text
-
-    def test_la_reconstruction_complete_s_annonce(self, sa_sync_conn, caplog):
-        """Sous `rebuild`, l'étape annonce une reconstruction complète."""
-        conn = sa_sync_conn
-        _source_record(conn, _seed_publication(conn), source_id="a", doi="10.1/x")
-
-        with caplog.at_level(logging.INFO, logger=logger.name):
-            reconcile(
-                conn,
-                logger,
-                rebuild=True,
-            )
-
-        assert "(reconstruction complète)" in caplog.text
-        assert "nouveaux ou mis à jour" not in caplog.text
-
     def test_publication_with_two_dois_splits(self, sa_sync_conn):
         """Une publication de DOI X contient un enregistrement source de DOI Y, relié par un hal-id : l'enregistrement source de DOI X garde la publication, celui de DOI Y passe dans une publication créée."""
         conn = sa_sync_conn

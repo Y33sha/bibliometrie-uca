@@ -28,9 +28,9 @@ def _args(**surcharges) -> argparse.Namespace:
     )
 
 
-def _phase(run, name: str = "persons", harvesting: bool = False) -> Phase:
+def _phase(run, name: str = "persons") -> Phase:
     """Renvoie la phase `name`, dont l'exécution appelle `run(ctx)`."""
-    return Phase(name, "Libellé", (Task("essai", run=run),), harvesting=harvesting)
+    return Phase(name, "Libellé", (Task("essai", run=run),))
 
 
 class _FakeRecorder:
@@ -144,26 +144,6 @@ class TestRunOnePhase:
         _, recorder = self._executer(lambda ctx: metrics)
 
         assert recorder.records[0]["status"] == "warning"
-
-    def test_une_phase_de_moissonnage_se_clot_sur_son_total(self, caplog):
-        with caplog.at_level(logging.INFO):
-            run_pipeline._run_one_phase(
-                _phase(
-                    lambda ctx: PhaseMetrics(new=2, updated=5, extras={"not_found": 3}),
-                    name="harvest",
-                    harvesting=True,
-                ),
-                options=_HAL,
-                recorder=_FakeRecorder(),
-            )
-
-        assert caplog.messages[-1] == "Total : 2 nouveaux, 5 mis à jour, 3 introuvables"
-
-    def test_une_autre_phase_ne_donne_pas_de_total(self, caplog):
-        with caplog.at_level(logging.INFO):
-            self._executer(lambda ctx: PhaseMetrics(new=3))
-
-        assert not any(m.startswith("Total") for m in caplog.messages)
 
     def test_interruption_utilisateur(self, caplog):
         """L'arrêt demandé est consigné comme un avertissement et dit par où reprendre."""

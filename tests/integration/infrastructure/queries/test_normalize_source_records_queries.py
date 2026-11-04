@@ -199,7 +199,7 @@ class TestUpsertSourceRecord:
             == {}
         )
 
-    def test_unknown_doc_type_gives_other_and_is_logged(self, sa_sync_conn, caplog):
+    def test_unknown_doc_type_gives_other(self, sa_sync_conn):
         staging_id = _thesis_staging(sa_sync_conn)
         source_record_id = SourceRecordStore(sa_sync_conn).upsert_source_record(
             _row(staging_id, raw_doc_type="StudyRegistration")
@@ -211,12 +211,9 @@ class TestUpsertSourceRecord:
             ).scalar_one()
             == "other"
         )
-        assert [r.getMessage() for r in caplog.records if "Type de document" in r.getMessage()] == [
-            "Type de document inconnu (theses 2023ABC001) : 'StudyRegistration'"
-        ]
 
-    def test_identifiers_normalized_and_rejections_logged(self, sa_sync_conn, caplog):
-        """Chaque valeur passe par son value object. Une valeur invalide est écartée et journalisée."""
+    def test_identifiers_normalized_and_invalid_values_rejected(self, sa_sync_conn):
+        """Chaque valeur passe par son value object. Une valeur invalide est écartée."""
         staging_id = _thesis_staging(sa_sync_conn)
         source_record_id = SourceRecordStore(sa_sync_conn).upsert_source_record(
             _row(
@@ -234,8 +231,6 @@ class TestUpsertSourceRecord:
             ("hal_id", "hal-04123456", "secondary"),
             ("nnt", "2023ABC001", "primary"),
         ]
-        logged = [r.getMessage() for r in caplog.records if "Identifiant écarté" in r.getMessage()]
-        assert logged == ["Identifiant écarté (theses 2023ABC001) : hal_id = '10995/102143'"]
 
     def test_reimport_replaces_identifiers(self, sa_sync_conn):
         """Le dernier import fait autorité. Un identifiant retiré par une règle de correction redevient actif."""

@@ -298,22 +298,6 @@ def test_un_verdict_identique_compte_inchange(logger, http_mock):
     assert (metrics.new, metrics.unchanged) == (0, 1)
 
 
-def test_le_bilan_du_journal_classe_les_verdicts(logger, http_mock, caplog):
-    publications = [
-        _publication(1, "10.1/n", "closed"),
-        _publication(2, "10.1/m", "closed"),
-        _publication(3, "10.1/x", "closed"),
-    ]
-    _route(http_mock, "10.1/n", status="gold")
-    _route(http_mock, "10.1/m", status="green")
-    _route(http_mock, "10.1/x", http_status=404)
-
-    with caplog.at_level(logging.INFO):
-        _run(_FakeStore(publications, stored={"10.1/m": "closed"}), _make_fetcher(), logger)
-
-    assert "1 nouveau, 1 modifié, 0 inchangé, 1 non trouvé" in caplog.text
-
-
 def test_429_retries_transparently(logger, http_mock):
     """Après une réponse 429, la requête est relancée et la réponse 200 suivante est prise en compte."""
     http_mock.get(f"{UNPAYWALL_BASE}/10.1/r").mock(

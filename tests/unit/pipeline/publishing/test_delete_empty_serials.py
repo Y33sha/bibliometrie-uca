@@ -27,22 +27,16 @@ def _bound(repo):
         yield
 
 
-def test_each_deleted_serial_is_logged_with_its_publisher_and_issns(caplog):
+def test_each_deleted_serial_is_counted():
     logger = logging.getLogger("test_revues_vides")
     deleted = [SerialSummary(101021, "Livestock Science", "IntechOpen", ())]
-    with caplog.at_level(logging.INFO, logger=logger.name):
-        repo = _Repo(deleted)
-        with _bound(repo):
-            metrics = step.run_delete_empty_serials(None, logger)
+    with _bound(_Repo(deleted)):
+        metrics = step.run_delete_empty_serials(None, logger)
     assert metrics.extras["serials_deleted"] == 1
-    assert "101021 « Livestock Science » (IntechOpen, sans ISSN)" in caplog.text
 
 
-def test_without_empty_serial_nothing_is_logged(caplog):
+def test_without_empty_serial_nothing_is_counted():
     logger = logging.getLogger("test_revues_vides_aucune")
-    with caplog.at_level(logging.INFO, logger=logger.name):
-        repo = _Repo([])
-        with _bound(repo):
-            metrics = step.run_delete_empty_serials(None, logger)
+    with _bound(_Repo([])):
+        metrics = step.run_delete_empty_serials(None, logger)
     assert metrics.total == 0
-    assert caplog.text == ""

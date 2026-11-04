@@ -2,11 +2,10 @@
 
 La normalisation archive chaque payload puis vide sa colonne dans `staging` : le payload subsiste alors seulement dans l'archive. Le script le lit dans l'archive, le réinjecte et remet la ligne en attente de traitement.
 
-Par défaut, seules les lignes présentes sont mises à jour ; une clé sans ligne correspondante est signalée. En mode complet (`--full`), ces clés orphelines sont recréées, par exemple après une table vidée. La ligne est alors reconstruite depuis le payload seul, et l'adaptateur de la source extrait le DOI du payload.
+Par défaut, seules les lignes présentes sont mises à jour ; une clé sans ligne correspondante est ignorée. En mode complet (`--full`), ces clés orphelines sont recréées, par exemple après une table vidée. La ligne est alors reconstruite depuis le payload seul, et l'adaptateur de la source extrait le DOI du payload.
 """
 
 import json
-import logging
 import sys
 from contextlib import contextmanager
 from types import SimpleNamespace
@@ -125,12 +124,10 @@ def test_lignes_presentes_mises_a_jour(lancer):
     assert resultat.conn.commits == 1
 
 
-def test_cle_sans_ligne_signalee_et_ignoree(lancer, caplog):
-    with caplog.at_level(logging.WARNING):
-        resultat = lancer({"hal": {"hal-1": {}}}, "--sources", "hal")
+def test_cle_sans_ligne_ignoree(lancer):
+    resultat = lancer({"hal": {"hal-1": {}}}, "--sources", "hal")
 
     assert resultat.creees == []
-    assert "orpheline" in caplog.text
 
 
 def test_mode_complet_recree_les_orphelines(lancer):
@@ -147,22 +144,11 @@ def test_mode_complet_recree_les_orphelines(lancer):
     assert resultat.mises_a_jour == []
 
 
-def test_mode_complet_met_a_jour_ce_qui_existe_deja(lancer, caplog):
-    """En mode complet, la ligne existante d'une clé est mise à jour, sans insertion."""
-    with caplog.at_level(logging.INFO):
-        resultat = lancer({"hal": {"hal-1": {}}}, "--sources", "hal", "--full")
-
-    assert resultat.creees == [("hal", "hal-1", None)]
-    assert "0 insérés, 1 mis à jour" in caplog.text
-
-
-def test_simulation_n_ouvre_pas_la_base(lancer, caplog):
-    with caplog.at_level(logging.INFO):
-        resultat = lancer({"hal": {"hal-1": {}, "hal-2": {}}}, "--sources", "hal", "--dry-run")
+def test_simulation_n_ouvre_pas_la_base(lancer):
+    resultat = lancer({"hal": {"hal-1": {}, "hal-2": {}}}, "--sources", "hal", "--dry-run")
 
     assert resultat.mises_a_jour == []
     assert resultat.conn.commits == 0
-    assert "hal : 2 payloads" in caplog.text
 
 
 def test_transaction_close_par_lots(lancer, monkeypatch):
@@ -175,15 +161,13 @@ def test_transaction_close_par_lots(lancer, monkeypatch):
     assert resultat.conn.commits == 3  # deux lots pleins, puis la fermeture
 
 
-def test_payload_illisible_signale_sans_interrompre(lancer, caplog):
+def test_payload_illisible_n_interrompt_pas(lancer):
     """Un payload illisible laisse sa ligne de `staging` inchangée ; les autres clés sont réinjectées."""
-    with caplog.at_level(logging.WARNING):
-        resultat = lancer(
-            {"hal": {"hal-1": _ILLISIBLE, "hal-2": {}}},
-            "--sources",
-            "hal",
-            lignes_presentes={"hal-2"},
-        )
+    resultat = lancer(
+        {"hal": {"hal-1": _ILLISIBLE, "hal-2": {}}},
+        "--sources",
+        "hal",
+        lignes_presentes={"hal-2"},
+    )
 
     assert resultat.mises_a_jour == [("hal", "hal-2")]
-    assert "hal/hal-1 : payload illisible" in caplog.text

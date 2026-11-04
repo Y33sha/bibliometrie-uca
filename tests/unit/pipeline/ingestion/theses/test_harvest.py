@@ -137,21 +137,11 @@ def test_run_interroge_tous_les_etablissements_d_un_coup(configuration, details)
     assert client.fetch_page.call_args.args[0] == build_query(["PPN1", "PPN2"])
 
 
-def test_run_ecrit_le_bilan_au_feminin(configuration, details, caplog):
-    configuration(harvest, annees=[2020])
-    details[1].add("2020B")
-    client = _client([[_these("2020A"), _these("2020B")]])
-    with caplog.at_level(logging.INFO, logger=_LOGGER.name):
-        moissonneur(ThesesHarvester, client).run(arguments_du_run())
-    assert "2 thèses trouvées : 1 nouvelle, 0 mise à jour, 1 inchangée" in caplog.text
-
-
-def test_run_avec_une_annee_fait_le_bilan_des_theses_retenues(configuration, details, caplog):
+def test_run_avec_une_annee_fait_le_bilan_des_theses_retenues(configuration, details):
     configuration(harvest)
     client = _client([[_these("2020A"), _these("2021A")]])
-    with caplog.at_level(logging.INFO, logger=_LOGGER.name):
-        moissonneur(ThesesHarvester, client).run(arguments_du_run(year=2021))
-    assert "1 thèse trouvée : 1 nouvelle, 0 mise à jour, 0 inchangée" in caplog.text
+    metrics = moissonneur(ThesesHarvester, client).run(arguments_du_run(year=2021))
+    assert metrics.new == 1
 
 
 def test_run_sans_ppn_configure_refuse(configuration):

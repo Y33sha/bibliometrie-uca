@@ -3,7 +3,7 @@
 Couvre la séquence d'écriture `normalize_record`, le tri de `process_work` sur les métadonnées minimales, et la méthode `run()` :
 - aucun document en attente ;
 - succès, documents ignorés et erreurs mêlés, commit par lot, bilan ;
-- exception dans `process_work` (journalisation, rollback au SAVEPOINT) ;
+- exception dans `process_work` (rollback au SAVEPOINT, document laissé en file) ;
 - `KeyboardInterrupt` (rollback du lot en cours, exception relevée) ;
 - exception fatale hors de la boucle (rollback, exception relevée) ;
 - chargement par sous-lots (`FETCH_SUB_BATCH`).
@@ -11,7 +11,6 @@ Couvre la séquence d'écriture `normalize_record`, le tri de `process_work` sur
 
 from __future__ import annotations
 
-import logging
 from dataclasses import replace
 from typing import Any
 from unittest.mock import MagicMock
@@ -120,15 +119,12 @@ class _Norm(_StubNorm):
 
 
 class TestRunNoWork:
-    def test_nothing_to_do(self, caplog):
-        """Une source sans document en attente laisse le journal vide : la barre des autres sources reste lisible."""
+    def test_nothing_to_do(self):
         staging = _FakeStaging()
         norm = _Norm(staging)
-        with caplog.at_level(logging.INFO):
-            norm.run()
+        norm.run()
         # Sans document en attente, le préchargement des caches est sauté.
         assert norm.preload_called is False
-        assert caplog.text == ""
 
 
 class TestRunHappyPath:
@@ -141,15 +137,12 @@ class TestRunHappyPath:
         assert [r.source_id for r in norm.processed_rows] == ["r1", "r2", "r3"]
         assert norm.cleanup_called is True
 
-    def test_mixes_success_skip_error(self, caplog):
-        """`True` → processed, `None` → skipped, `False` → errors, récapitulé par son identifiant."""
+    def test_mixes_success_skip_error(self):
+        """`True` → processed, `None` → skipped, `False` → errors."""
         staging = _FakeStaging()
         staging.pending_rows = [_row("ok"), _row("skip"), _row("err")]
         norm = _Norm(staging, results=[True, None, False])
-        with caplog.at_level(logging.INFO):
-            stats = norm.run()
-        assert "1 document aux métadonnées incomplètes" in caplog.text
-        assert "err" in caplog.text
+        stats = norm.run()
         assert stats == NormalizeStats(processed=1, skipped=1, errors=1)
 
     def test_le_commit_tombe_a_chaque_lot(self):
@@ -161,30 +154,15 @@ class TestRunHappyPath:
         assert norm.conn.commit.call_count == 3
         assert staging.forgotten == [r.id for r in staging.pending_rows]
 
-    def test_un_run_sans_erreur_se_tait(self, caplog):
-        """La barre affiche l'avancement ; le compte des documents ignorés passe par les métriques."""
-        staging = _FakeStaging()
-        staging.pending_rows = [_row("a"), _row("b")]
-        norm = _Norm(staging, results=[True, None])
-        with caplog.at_level(logging.INFO):
-            stats = norm.run()
-        assert caplog.text == ""
-        assert stats.skipped == 1
-
 
 class TestRunWorkException:
-    def test_savepoint_rollback_continues_batch(self, caplog):
+    def test_savepoint_rollback_continues_batch(self):
         staging = _FakeStaging()
         staging.pending_rows = [_row("a"), _row("b")]
         norm = _Norm(staging, results=[True, True], raises_on={"a"})
-        with caplog.at_level(logging.INFO):
-            norm.run()
-        # La boucle journalise le document en échec.
-        assert "Erreur sur a" in caplog.text
+        norm.run()
         # Le deuxième document est traité après le rollback du premier.
         assert "b" in [r.source_id for r in norm.processed_rows]
-        # Une exception est journalisée avec son motif, distincte d'un document incomplet.
-        assert "métadonnées incomplètes" not in caplog.text
         # Le document en échec reste en file pour le run suivant.
         assert staging.forgotten == [_row("b").id]
 

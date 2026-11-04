@@ -170,8 +170,7 @@ class TestRefreshAddressSourceCountries:
         ).scalar_one()
         assert result == ["FR"]
 
-    def test_le_journal_accorde_les_enregistrements_sources_mis_a_jour(self, sa_sync_conn, caplog):
-        """Le journal accorde le participe au masculin : « enregistrement source mis à jour »."""
+    def test_le_recalcul_complet_met_a_jour_l_enregistrement_source(self, sa_sync_conn):
         ensure_country(sa_sync_conn, "FR")
         source_record = insert_source_record(
             sa_sync_conn, insert_publication(sa_sync_conn), source="openalex", source_id="oa-j"
@@ -180,10 +179,11 @@ class TestRefreshAddressSourceCountries:
         addr = insert_address(sa_sync_conn, "Lyon", countries=["FR"], normalized_text="Lyon")
         insert_source_contribution_address(sa_sync_conn, sa, address_id=addr)
 
-        with caplog.at_level(logging.INFO):
-            refresh(sa_sync_conn, logging.getLogger(__name__))
+        refresh(sa_sync_conn, logging.getLogger(__name__))
 
-        assert "1 enregistrement source mis à jour" in caplog.text
+        assert sa_sync_conn.execute(
+            text("SELECT countries FROM source_records WHERE id = :sd"), {"sd": source_record}
+        ).scalar_one() == ["FR"]
 
     def test_noop_without_address_countries(self, sa_sync_conn):
         publication_id = insert_publication(sa_sync_conn)

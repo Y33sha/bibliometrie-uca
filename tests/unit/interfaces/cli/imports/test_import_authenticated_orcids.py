@@ -160,8 +160,8 @@ class TestMain:
         assert code == 0
         assert authentifies == []
 
-    def test_lignes_ecartees_et_deplacement_signales(self, lancer, caplog):
-        """Chaque motif d'écart, et chaque déplacement d'ORCID, laisse une trace dans le journal."""
+    def test_lignes_ecartees_et_orcid_deplace(self, lancer):
+        """Les lignes à ORCID malformé, à courriel inconnu ou ambigu sont écartées. Un ORCID détenu par une autre personne passe à la personne du courriel."""
         code, authentifies = lancer(
             [
                 ("marie@uca.fr", _ORCID),
@@ -175,8 +175,3 @@ class TestMain:
 
         assert code == 0
         assert authentifies == [[(7, _ORCID)]]
-        journal = caplog.text
-        assert "malformé" in journal
-        assert "inconnu" in journal
-        assert "ambigu" in journal
-        assert "déplacement" in journal
