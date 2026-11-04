@@ -77,14 +77,6 @@ export const relationTierRank: Record<RelationTier, number> = {
 	secondary: 3
 };
 
-/** Accès générique pour la fiche détail, sans le jargon OA (gold/green/diamond/…) : on ne dit que « ouvert / fermé / sous embargo ». Retourne `null` si indéterminé (rien à afficher). Le cas « thèse en cours » est porté par le `doc_type`, pas ici. `cls` = classe de pastille colorée. */
-export function accessTag(oaStatus: string | null | undefined): { label: string; cls: string } | null {
-	if (!oaStatus || oaStatus === 'unknown') return null;
-	if (oaStatus === 'closed') return { label: 'Fermé', cls: 'access-closed' };
-	if (oaStatus === 'embargoed') return { label: 'Sous embargo', cls: 'access-embargo' };
-	return { label: 'Ouvert', cls: 'access-open' }; // diamond/gold/hybrid/green/bronze
-}
-
 /** Labels pour les voies OA. */
 export const oaLabelsMap: Record<string, string> = {
 	diamond: 'Diamond',
@@ -115,13 +107,6 @@ export function identifierTypeLabel(idType: string): string {
 	return identifierTypeLabels[idType] ?? idType;
 }
 
-
-/** Classes CSS associées aux statuts d'identifiant personne. */
-export const identifierStatusClasses: Record<string, string> = {
-	confirmed: 'id-confirmed',
-	rejected: 'id-rejected',
-	pending: 'id-pending'
-};
 
 /** Libellés FR des motifs d'exclusion d'une personne — enum PG `person_exclusion`. */
 export const personExclusionLabels: Record<PersonExclusion, string> = {
@@ -159,25 +144,11 @@ export const structDetectionLabels: Record<string, string> = {
 	manual: 'ajouté manuellement'
 };
 
-/** Noms FR des supports d'ISSN — enum PG `issn_support`. */
-export const issnSupportNames: Record<string, string> = {
-	print: 'Papier',
-	electronic: 'En ligne',
-	other: 'Autre support'
-};
-
 /** Désignation d'un ISSN selon son support, pour la fiche d'une revue. */
 const issnPrefixes: Record<string, string> = {
 	print: 'ISSN',
 	electronic: 'eISSN',
 	other: 'ISSN (autre support)'
-};
-
-/** Libellés FR des statuts d'ISSN — enum PG `issn_status`. */
-export const issnStatusLabels: Record<string, string> = {
-	active: 'Actif',
-	cancelled: 'Annulé',
-	unverified: 'Sans notice Sudoc'
 };
 
 /** Libellés FR des relations entre revues — `SerialRelation.kind`. */

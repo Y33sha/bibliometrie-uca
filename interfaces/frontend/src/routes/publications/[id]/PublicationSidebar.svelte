@@ -3,7 +3,6 @@
   import type { AssetPath } from "$app/types";
   import AccessButton from "#lib/components/AccessButton.svelte";
   import SourceTag from "#lib/components/SourceTag.svelte";
-  import { accessTag } from "#lib/labels.js";
   import LicenseBadge from "#lib/components/LicenseBadge.svelte";
   import { sourceLabel, sourceOrder } from "#lib/sources.svelte.js";
   import type { AccessLink, ExternalId, PubDetail, Source } from "./types";
@@ -45,7 +44,7 @@
     orderedSources.filter((s) => !(hasNnt && s.source === "theses")),
   );
 
-  const accessState = $derived(accessTag(pub.oa_status));
+  const oaStatusKnown = $derived(pub.oa_status != null && pub.oa_status !== "unknown");
 
   // Plateforme de la copie donnée par le bouton : une copie listée, ou l'éditeur quand le bouton mène au DOI.
   const accessCopy = $derived(access.find((a) => a.url === accessUrl) ?? null);
@@ -60,9 +59,9 @@
 <aside class="detail-sidebar">
   <AccessButton {accessUrl} oaStatus={pub.oa_status} />
 
-  {#if accessUrl && accessState}
+  {#if accessUrl && oaStatusKnown}
     <div class="access-line">
-      <span class="access-state" data-access={accessState.cls}><span class="access-dot"></span>Accès ouvert</span>
+      <span class="access-state"><span class="access-dot"></span>Accès ouvert</span>
       {#if accessLicense}<span class="access-license">· <LicenseBadge license={accessLicense} /></span>{/if}
       {#if accessCopy || viaPublisher}
         <div class="access-via">via {viaPublisher ? "l'éditeur" : accessCopy?.label}</div>

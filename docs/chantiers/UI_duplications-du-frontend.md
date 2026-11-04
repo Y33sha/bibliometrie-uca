@@ -52,7 +52,7 @@ Une étiquette (tag, badge, pastille, chip) est un court texte sur fond clair, a
 ### Code mort
 
 - **Classes** : `subtitle`, `dash-summary`, `id-badge.id-confirmed`, `wos-label`, `source-tag-label` et ses quatre variantes, `type-badge`, `access-tag` (`accessTag()` écrit son nom dans un attribut `data-access`), `status-chip.ambiguous`.
-- **Déclarations redondantes** : survols répétant la base (`toolbar-action`, `export-btn`, `id-badge`, `structure-tag`), `color: white` des survols de `btn-confirm`, `btn-danger`, `btn-primary`, `btn-merge:disabled`.
+- **Déclarations redondantes** : survols répétant la base (`toolbar-action`, `export-btn`, `id-badge`, `structure-tag`), `color: white` des survols de `btn-confirm`, `btn-danger`, `btn-primary`, taille de police de `btn-sm`.
 - **Composant** : `RelatedPublications.svelte`, importé nulle part.
 - **Exports inutilisés** : `halCollectionUrl` (`structures/types.ts`), `getActiveTab` (`TabNav`), `identifierStatusClasses`, `issnSupportNames`, `issnStatusLabels` (`labels.ts`).
 
