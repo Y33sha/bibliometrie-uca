@@ -98,7 +98,7 @@ class HarvestWindow:
     year: int | None = None
     """Année unique (`--year`). Prime sur `start_year`."""
     since: str | None = None
-    """Date de modification minimale du mode quotidien, au format `YYYY-MM-DD`. Sert au moissonnage incrémental de HAL et d'OpenAlex."""
+    """Date de modification minimale du mode incrémental, au format `YYYY-MM-DD`."""
 
 
 class SourceHarvester[ConfigT, ClientT](ABC):

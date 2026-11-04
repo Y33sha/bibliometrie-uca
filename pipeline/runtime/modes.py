@@ -5,11 +5,8 @@
 """
 
 from dataclasses import dataclass
-from typing import Literal
 
 from domain.sources.registry import HARVESTED_SOURCES, PROFILES
-
-YearSelection = Literal["since_last", "full"]
 
 
 @dataclass(frozen=True)
@@ -18,7 +15,8 @@ class ModePolicy:
 
     harvest_sources: frozenset[str]
     """Sources moissonnées par le mode. Une source sur option s'ajoute seulement avec `--include-wos`."""
-    year_selection: YearSelection
+    incremental: bool
+    """Le moissonnage retient les documents modifiés depuis le dernier moissonnage quotidien réussi."""
     vacuum_full: bool
     fetch_stale: bool
     """La phase `fetch_stale` réinterroge un à un les enregistrements sources non revus par le moissonnage."""
@@ -33,7 +31,7 @@ class ModePolicy:
 MODES: dict[str, ModePolicy] = {
     "daily": ModePolicy(
         harvest_sources=frozenset(s for s in HARVESTED_SOURCES if PROFILES[s].incremental),
-        year_selection="since_last",
+        incremental=True,
         vacuum_full=False,
         fetch_stale=False,
         harvest_by_person=False,
@@ -42,7 +40,7 @@ MODES: dict[str, ModePolicy] = {
     ),
     "full": ModePolicy(
         harvest_sources=frozenset(HARVESTED_SOURCES),
-        year_selection="full",
+        incremental=False,
         vacuum_full=True,
         fetch_stale=True,
         harvest_by_person=True,

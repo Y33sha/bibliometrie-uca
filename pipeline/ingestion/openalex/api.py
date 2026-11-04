@@ -79,11 +79,10 @@ def build_params(
     *,
     years: list[int],
     cursor: str = "*",
-    since: str | None = None,
 ) -> QueryParams:
     """Construit les paramètres d'une requête `/works`.
 
-    `years` borne `publication_year` (une année, ou la plage de la plus petite à la plus grande). `since` (`YYYY-MM-DD`) ajoute `from_updated_date`. Le `lineage:` agrège les institutions par `|` (OR).
+    `years` borne `publication_year` (une année, ou la plage de la plus petite à la plus grande). Le `lineage:` agrège les institutions par `|` (OR).
     """
     lineage_filter = "|".join(institution_ids or [])
     first, last = min(years), max(years)
@@ -91,8 +90,6 @@ def build_params(
         f"publication_year:{first}" if first == last else f"publication_year:{first}-{last}"
     )
     filter_str = f"authorships.institutions.lineage:{lineage_filter},{year_filter}"
-    if since:
-        filter_str += f",from_updated_date:{since}"
     return filter_params(filter_str, cursor=cursor)
 
 
@@ -118,29 +115,22 @@ class OpenalexClient:
             http_request_with_retry("GET", self._url, params=params, timeout=30, label=label)
         )
 
-    def count(
-        self, institution_ids: list[str], *, years: list[int], since: str | None = None
-    ) -> int:
-        """Renvoie le nombre de works des années `years`, modifiés depuis `since` s'il est donné, lu sur une page d'un seul work réduit à son identifiant."""
+    def count(self, institution_ids: list[str], *, years: list[int]) -> int:
+        """Renvoie le nombre de works des années `years`, lu sur une page d'un seul work réduit à son identifiant."""
         params = {
-            **build_params(institution_ids, years=years, since=since),
+            **build_params(institution_ids, years=years),
             "per_page": 1,
             "select": "id",
         }
-        data = self._get(params, f"OpenAlex comptage {since or years[0]}")
+        data = self._get(params, f"OpenAlex comptage {years[0]}")
         return as_int(at_path(data, "meta").get("count")) or 0
 
     def fetch_page(
-        self,
-        institution_ids: list[str],
-        *,
-        years: list[int],
-        cursor: str = "*",
-        since: str | None = None,
+        self, institution_ids: list[str], *, years: list[int], cursor: str = "*"
     ) -> Mapping[str, JsonValue]:
         """Renvoie une page de works ; `cursor` vaut `"*"` au premier appel, puis le `next_cursor` de la page précédente."""
-        params = build_params(institution_ids, years=years, cursor=cursor, since=since)
-        return self._get(params, f"OpenAlex {since or years[0]}")
+        params = build_params(institution_ids, years=years, cursor=cursor)
+        return self._get(params, f"OpenAlex {years[0]}")
 
     def fetch_filtered_page(
         self, filter_str: str, cursor: str, label: str
