@@ -25,7 +25,7 @@ from pipeline.ingestion.theses.fetch_missing import fetch_missing_theses_by_nnt
 from pipeline.runtime.config import cap, delay, window_years
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.signals import skipped
+from pipeline.runtime.observability.signals import assemble_by_source
 
 _HAL_BY_ID = "hal_by_id"
 _SCANR_BY_HAL_ID = "scanr_by_hal_id"
@@ -193,14 +193,4 @@ _CHANNEL_KEYS = {
 
 def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
     """Renvoie la somme des métriques des canaux, avec la table des canaux interrogés."""
-    metrics = PhaseMetrics()
-    by_channel: dict[str, dict[str, float | None]] = {}
-    for name, channel_metrics in by_task.items():
-        metrics.merge(channel_metrics)
-        if not skipped(channel_metrics):
-            by_channel[_CHANNEL_KEYS[name]] = _summary(channel_metrics)
-    if by_channel:
-        metrics.details["table"] = {
-            "rows": [{"key": channel, **summary} for channel, summary in by_channel.items()]
-        }
-    return metrics
+    return assemble_by_source(by_task, _summary, key=_CHANNEL_KEYS.__getitem__)

@@ -25,7 +25,7 @@ from pipeline.ingestion.common.stale_refetch import refresh
 from pipeline.runtime.config import delay, window_years
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.signals import skipped
+from pipeline.runtime.observability.signals import assemble_by_source
 
 
 def _years(ctx: PhaseContext) -> list[int] | None:
@@ -59,23 +59,17 @@ TASKS = tuple(
 )
 
 
+def _summary(metrics: PhaseMetrics) -> dict[str, float | None]:
+    """Renvoie la ligne « par source » de la table d'observabilité de la phase."""
+    return {
+        "interrogated": metrics.total,
+        "refreshed": metrics.updated,
+        "unchanged": metrics.unchanged,
+        "disappeared": metrics.extras.get("disappeared", 0),
+        "duration_s": metrics.duration_s,
+    }
+
+
 def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
     """Renvoie la somme des métriques des sources, avec la table des sources relues."""
-    metrics = PhaseMetrics()
-    by_source: dict[str, dict[str, float | None]] = {}
-    for name, source_metrics in by_task.items():
-        metrics.merge(source_metrics)
-        if skipped(source_metrics):
-            continue
-        by_source[name] = {
-            "interrogated": source_metrics.total,
-            "refreshed": source_metrics.updated,
-            "unchanged": source_metrics.unchanged,
-            "disappeared": source_metrics.extras.get("disappeared", 0),
-            "duration_s": source_metrics.duration_s,
-        }
-    if by_source:
-        metrics.details["table"] = {
-            "rows": [{"key": source, **summary} for source, summary in by_source.items()]
-        }
-    return metrics
+    return assemble_by_source(by_task, _summary)

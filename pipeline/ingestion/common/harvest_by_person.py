@@ -32,6 +32,7 @@ TASKS = tuple(
         str(source),
         reads=("config", "hr_records", "person_identifiers", "staging"),
         writes=("staging", "staging_normalization_queue"),
+        # Identifiants des personnes RH, posés par la phase `persons`.
         previous_run=("staging", "person_identifiers"),
         network=source,
         parallel_group="sources",
@@ -39,8 +40,7 @@ TASKS = tuple(
         label=source_label(source),
         progress_bar=True,
         threshold=5,
-        when=lambda ctx, source=source: source in ctx.options.sources,
+        when=lambda ctx, source=source: source in ctx.options.queried_sources,
     )
     for source in PERSON_SEARCHED_SOURCES
 )
-"""Identifiants des personnes RH, posés par la phase `persons` au run précédent."""

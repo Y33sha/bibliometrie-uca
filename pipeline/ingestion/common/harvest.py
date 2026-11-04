@@ -22,7 +22,7 @@ from pipeline.ingestion.common.harvester import HarvestWindow, run_harvest
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.log_format import BRANCH
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.signals import skipped
+from pipeline.runtime.observability.signals import assemble_by_source
 
 
 def _source_summary(metrics: PhaseMetrics) -> dict[str, float | None]:
@@ -100,19 +100,9 @@ TASKS = tuple(
     )
     for source in HARVESTED_SOURCES
 )
-"""Acquisition : les canaux écrivent la dernière version de chaque document moissonné dans `staging`, dans un ordre indifférent. Leurs lectures de `staging` dédoublonnent et valent quel que soit l'ordre."""
+"""Chaque tâche lit et écrit seulement les lignes de `staging` de sa source : les tâches s'exécutent en parallèle, dans un ordre indifférent."""
 
 
 def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
     """Renvoie la somme des métriques des sources, avec la table des sources moissonnées."""
-    metrics = PhaseMetrics()
-    by_source: dict[str, dict[str, float | None]] = {}
-    for name, source_metrics in by_task.items():
-        metrics.merge(source_metrics)
-        if not skipped(source_metrics):
-            by_source[name] = _source_summary(source_metrics)
-    if by_source:
-        metrics.details["table"] = {
-            "rows": [{"key": source, **summary} for source, summary in by_source.items()]
-        }
-    return metrics
+    return assemble_by_source(by_task, _source_summary)

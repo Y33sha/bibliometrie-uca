@@ -1,6 +1,7 @@
-"""Signaux des phases qui interrogent des sources externes."""
+"""Signaux et bilans des phases qui interrogent des sources externes."""
 
 import logging
+from collections.abc import Callable, Mapping
 
 from domain.pipeline_runs import PhaseStatus
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -50,3 +51,20 @@ def skipped(metrics: PhaseMetrics) -> bool:
     """Indique si l'accès est sauté avant tout traitement : source non configurée, ou indisponible sans élément traité."""
     codes = {s["code"] for s in metrics.signals}
     return "source_unconfigured" in codes or (metrics.total == 0 and "source_unavailable" in codes)
+
+
+def assemble_by_source(
+    by_task: Mapping[str, PhaseMetrics],
+    row: Callable[[PhaseMetrics], Mapping[str, float | None]],
+    key: Callable[[str], str] = str,
+) -> PhaseMetrics:
+    """Renvoie la somme des métriques des tâches, avec la table d'observabilité des accès non sautés : une ligne par tâche, de clé `key(nom de la tâche)` et de colonnes `row(métriques)`."""
+    metrics = PhaseMetrics()
+    rows: list[dict[str, object]] = []
+    for name, task_metrics in by_task.items():
+        metrics.merge(task_metrics)
+        if not skipped(task_metrics):
+            rows.append({"key": key(name), **row(task_metrics)})
+    if rows:
+        metrics.details["table"] = {"rows": rows}
+    return metrics
