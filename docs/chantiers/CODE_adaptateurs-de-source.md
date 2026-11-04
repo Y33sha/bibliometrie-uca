@@ -36,8 +36,8 @@ Chaque source moissonnée (HAL, OpenAlex, WoS, ScanR, theses.fr, DataCite, Cross
 
 ### Phase 3 — Import des sources
 
-- [ ] Cycle d'import entre `common/` et les sources supprimé ; suppression des fabriques d'import différé des `__init__.py`.
-- [ ] Clients des sources sans URL ni identifiants au constructeur.
+- [x] Cycle d'import entre `common/` et les sources supprimé ; suppression des fabriques d'import différé des `__init__.py`. Le paquet de chaque source déclare son lecteur de document, son module `adapter.py` son adaptateur ; un chargeur à la demande par registre garde le code d'une source écartée du run non chargé.
+- [x] Clients des sources sans URL ni identifiants au constructeur.
 
 ### Phase 4 — Normalisation et staging
 
