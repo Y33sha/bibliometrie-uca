@@ -195,15 +195,7 @@ def write_source_contributions(
             for source_contribution_id, key in plan.updates
         ],
     )
-    store.delete_source_contribution_addresses(
-        [source_contribution_id for source_contribution_id, _ in plan.updates]
-    )
-    store.delete_source_contribution_rors(
-        [source_contribution_id for source_contribution_id, _ in plan.updates]
-    )
-    store.delete_source_contribution_hal_structures(
-        [source_contribution_id for source_contribution_id, _ in plan.updates]
-    )
+    store.delete_links([source_contribution_id for source_contribution_id, _ in plan.updates])
     store.upsert_source_contributions_batch([items[key] for key in plan.inserts])
 
     source_contribution_id_by_key = {
