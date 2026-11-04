@@ -28,22 +28,21 @@ def signal_source_unconfigured(
 
 
 def signal_source_unavailable(
-    metrics: PhaseMetrics, source: str, *, logger: logging.Logger
+    metrics: PhaseMetrics, source: str, *, logger: logging.Logger, reason: str | None = None
 ) -> None:
-    """Marque comme indisponible une source coupée en cours de tâche.
+    """Marque comme indisponible une source coupée en cours de tâche, ou un dump inaccessible.
 
     La phase se termine avec les sources abouties, en avertissement. Le run suivant reprend les éléments non traités.
+
+    Args:
+        reason: motif écrit au journal et dans le signal. Par défaut, la coupure de la source après une série de requêtes en échec.
     """
-    logger.warning(
-        "Source %s coupée après une série de requêtes en échec, items reportés au prochain run",
-        source,
+    message = reason or (
+        f"Source {source} coupée après une série de requêtes en échec, items reportés au prochain run"
     )
+    logger.warning("%s", message)
     metrics.signals.append(
-        {
-            "level": PhaseStatus.WARNING,
-            "code": "source_unavailable",
-            "message": f"{source} coupée après une série de requêtes en échec, items reportés au prochain run",
-        }
+        {"level": PhaseStatus.WARNING, "code": "source_unavailable", "message": message}
     )
 
 

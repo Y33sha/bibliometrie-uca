@@ -75,8 +75,12 @@ def run_import_issnl_table(
                 }
     except DumpUnavailableError as e:
         metrics = PhaseMetrics()
-        logger.warning("Table ISSN-L inaccessible, ISSN-L inchangés : %s", e)
-        signal_source_unavailable(metrics, "ISSN International Centre", logger=logger)
+        signal_source_unavailable(
+            metrics,
+            "ISSN International Centre",
+            logger=logger,
+            reason=f"Table ISSN-L inaccessible, ISSN-L inchangés : {e}",
+        )
         metrics.report = "table inaccessible, import repris au prochain run"
         return metrics
     if not found:
