@@ -18,7 +18,7 @@ from domain.serials.containers import (
     is_proceedings_title_without_issn,
 )
 from domain.serials.issns import IssnStatus
-from domain.serials.serial import SerialType
+from domain.serials.serial import ManualField, SerialType
 from infrastructure.db.tables import serial_issns, serials
 from pipeline.runtime.observability.log_format import quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -48,13 +48,14 @@ class SerialTitleIssnRow(NamedTuple):
     has_issn: bool
 
 
-_RECORD_TYPES_OF_UNKNOWN_SERIALS = text("""
+_RECORD_TYPES_OF_UNKNOWN_SERIALS = text(f"""
     SELECT j.id,
            array_agg(s.source::text ORDER BY s.id) AS sources,
            array_agg(s.raw_doc_type ORDER BY s.id) AS raw_types
     FROM serials j
     JOIN source_records s ON s.serial_id = j.id
-    WHERE j.serial_type = 'unknown' AND NOT 'serial_type' = ANY(j.manual_fields)
+    WHERE j.serial_type = '{SerialType.UNKNOWN.value}'
+      AND NOT '{ManualField.SERIAL_TYPE.value}' = ANY(j.manual_fields)
     GROUP BY j.id
     ORDER BY j.id
 """)

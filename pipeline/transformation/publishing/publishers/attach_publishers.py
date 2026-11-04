@@ -15,6 +15,8 @@ from domain.publishers.attachment import (
     attach_publishers,
 )
 from domain.publishers.attribution import source_record_has_publisher
+from domain.source_records.corrections import CorrectionKey
+from infrastructure.sql_fragments import stashed_raw
 from pipeline.runtime.observability.log_format import quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publishing.publishers.store import PublisherStore
@@ -23,9 +25,10 @@ from pipeline.transformation.publishing.source_record_links import changed_links
 LABEL = "Rattachement des enregistrements sources aux éditeurs"
 """Libellé de la sous-étape dans le journal de la phase."""
 
-_RECORDS = text("""
+_RECORDS = text(f"""
     SELECT id, source, publisher_id,
-           COALESCE(corrections->'doc_type'->>'raw', doc_type::text) AS doc_type,
+           COALESCE({stashed_raw(CorrectionKey.DOC_TYPE, "source_records")}, doc_type::text)
+               AS doc_type,
            biblio->>'publisher' AS name,
            biblio->>'publisher_openalex_id' AS openalex_id,
            COALESCE(biblio ? 'journal' OR biblio ? 'monograph', false) AS has_container

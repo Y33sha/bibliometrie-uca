@@ -33,6 +33,7 @@ from domain.serials.containers import SeriesDescription
 from domain.serials.serial import ManualField
 from domain.source_records.biblio import journal_series
 from domain.source_records.corrections import RAW, CorrectionKey
+from infrastructure.sql_fragments import corrected, stashed_raw
 from pipeline.runtime.observability.log_format import quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publishing.serials.serial_merge import merge_serial_into
@@ -47,8 +48,8 @@ ATTACH_LABEL = "Rattachement des enregistrements sources aux publications en sé
 
 _SERIES = text(f"""
     SELECT id, source, publication_id, publisher_id, biblio,
-           CASE WHEN corrections ? '{CorrectionKey.SERIAL_ID}'
-                THEN CAST(corrections->'{CorrectionKey.SERIAL_ID}'->>'{RAW}' AS integer)
+           CASE WHEN {corrected(CorrectionKey.SERIAL_ID, "source_records")}
+                THEN CAST({stashed_raw(CorrectionKey.SERIAL_ID, "source_records")} AS integer)
                 ELSE serial_id END AS serial_id
     FROM source_records
     WHERE biblio ? 'journal' OR serial_id IS NOT NULL
@@ -74,9 +75,9 @@ _SET_ISSN_SERIALS = text("""
 
 _SET_RECORD_SERIALS = text(f"""
     UPDATE source_records s
-    SET serial_id = CASE WHEN s.corrections ? '{CorrectionKey.SERIAL_ID}' AND t.serial_id IS NULL
+    SET serial_id = CASE WHEN {corrected(CorrectionKey.SERIAL_ID, "s")} AND t.serial_id IS NULL
                          THEN s.serial_id ELSE t.serial_id END,
-        corrections = CASE WHEN s.corrections ? '{CorrectionKey.SERIAL_ID}'
+        corrections = CASE WHEN {corrected(CorrectionKey.SERIAL_ID, "s")}
                            THEN jsonb_set(s.corrections, '{{{CorrectionKey.SERIAL_ID},{RAW}}}',
                                           coalesce(to_jsonb(t.serial_id), 'null'::jsonb))
                            ELSE s.corrections END
