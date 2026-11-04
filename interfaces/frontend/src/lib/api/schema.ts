@@ -5730,8 +5730,6 @@ export interface components {
             label: string;
             /** Maintainer */
             maintainer: string | null;
-            /** Url */
-            url: string | null;
             /** Edition */
             edition: string | null;
         };

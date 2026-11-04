@@ -801,7 +801,6 @@
 	background: var(--surface);
 	color: var(--text-secondary);
 	font-size: var(--fs-sm);
-	text-decoration: none;
 }
 .entity-tag-accent {
 	background: var(--accent-light);

@@ -147,7 +147,7 @@ _LIST_FACET = """
 
 _SERIAL_LISTS = text("""
     SELECT c.code, coalesce(r.label || ', ' || c.label, c.label) AS label,
-           c.maintainer, c.url, c.edition
+           c.maintainer, c.edition
     FROM serial_list_entries e
     JOIN serial_lists c ON c.code = e.list_code
     LEFT JOIN serial_lists r ON r.code = c.ranking_code
@@ -567,7 +567,6 @@ class SerialQueries:
                     code=r.code,
                     label=r.label,
                     maintainer=r.maintainer,
-                    url=r.url,
                     edition=r.edition,
                 )
                 for r in self._conn.execute(_SERIAL_LISTS, {"id": serial_id})

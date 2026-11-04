@@ -175,11 +175,7 @@
 			<div class="entity-meta">
 				<EntityMetaItem label="Listes">
 					{#each journal.lists as list (list.code)}
-						{#if list.url}
-							<a class="entity-tag" href={list.url} target="_blank" rel="noopener" title={listTitle(list)}>{list.label}</a>
-						{:else}
-							<span class="entity-tag" title={listTitle(list)}>{list.label}</span>
-						{/if}
+						<span class="entity-tag" title={listTitle(list)}>{list.label}</span>
 					{/each}
 				</EntityMetaItem>
 			</div>

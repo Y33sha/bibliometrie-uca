@@ -93,7 +93,6 @@ class SerialListMembership(Model):
     label: str
     """Libellé de la liste ; pour un niveau, libellé du classement suivi de celui du niveau."""
     maintainer: str | None
-    url: str | None
     edition: date | None
 
 

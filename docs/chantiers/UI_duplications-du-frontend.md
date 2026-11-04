@@ -86,8 +86,8 @@ Une étiquette (tag, badge, pastille, chip) est un court texte sur fond clair, a
 
 ### Phase 1 — Code mort
 
-- [ ] Classes mortes et déclarations redondantes de `shared.css`
-- [ ] `RelatedPublications.svelte` et exports inutilisés
+- [x] Classes mortes et déclarations redondantes de `shared.css` (d081f66ce)
+- [x] `RelatedPublications.svelte` et exports inutilisés (d081f66ce)
 
 ### Phase 2 — Variables
 
