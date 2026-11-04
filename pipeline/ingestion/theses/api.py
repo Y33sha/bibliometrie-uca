@@ -16,8 +16,8 @@ from pipeline.ingestion.api_params import API_BASE_URLS, THESES_PER_PAGE
 class ThesesClient:
     """Client de la recherche theses.fr."""
 
-    def __init__(self, base_url: str) -> None:
-        self._url = base_url
+    def __init__(self) -> None:
+        self._url = API_BASE_URLS["theses"]
 
     def fetch_page(self, query: str, *, start: int) -> Mapping[str, JsonValue]:
         """Renvoie une page de `THESES_PER_PAGE` thèses, à partir du rang `start`."""

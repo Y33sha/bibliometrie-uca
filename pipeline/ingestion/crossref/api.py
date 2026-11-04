@@ -32,8 +32,8 @@ def headers() -> dict[str, str]:
 class CrossrefClient:
     """Client de `GET /works`."""
 
-    def __init__(self, base_url: str) -> None:
-        self._url = f"{base_url}/works"
+    def __init__(self) -> None:
+        self._url = f"{API_BASE_URLS['crossref']}/works"
         self._headers = headers()
 
     def fetch_page(self, filters: str, cursor: str | None, label: str) -> Page:

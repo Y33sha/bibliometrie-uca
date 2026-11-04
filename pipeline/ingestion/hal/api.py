@@ -71,8 +71,8 @@ HAL_FIELDS_STR = ",".join(HAL_FIELDS)
 class HalClient:
     """Client de l'API de recherche HAL (Solr)."""
 
-    def __init__(self, base_url: str) -> None:
-        self._url = f"{base_url.rstrip('/')}/"
+    def __init__(self) -> None:
+        self._url = f"{API_BASE_URLS['hal'].rstrip('/')}/"
 
     def _get(self, params: SolrParams, label: str) -> Mapping[str, JsonValue]:
         return as_mapping(
@@ -149,8 +149,8 @@ HAL_STRUCTURES_BATCH = 100
 class HalStructuresClient:
     """Client de `ref/structure`."""
 
-    def __init__(self, base_url: str = API_BASE_URLS["hal_structures"]) -> None:
-        self._url = base_url
+    def __init__(self) -> None:
+        self._url = API_BASE_URLS["hal_structures"]
 
     def _docs(self, field: str, ids: Collection[int]) -> Sequence[Mapping[str, JsonValue]]:
         params: dict[str, str | int] = {

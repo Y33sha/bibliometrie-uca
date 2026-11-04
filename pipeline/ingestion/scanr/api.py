@@ -18,9 +18,9 @@ from pipeline.ingestion.credentials import get_scanr_credentials
 class ScanrClient:
     """Client de l'index ScanR (`_search`, authentification basique)."""
 
-    def __init__(self, base_url: str, credentials: tuple[str, str]) -> None:
-        self._url = base_url
-        self._auth = credentials
+    def __init__(self) -> None:
+        self._url = API_BASE_URLS["scanr"]
+        self._auth = get_scanr_credentials()
 
     def fetch_page(self, query: Mapping[str, JsonValue]) -> Mapping[str, JsonValue]:
         """Exécute une requête Elasticsearch."""

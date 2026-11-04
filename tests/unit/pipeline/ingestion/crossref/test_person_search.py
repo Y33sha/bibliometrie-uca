@@ -5,7 +5,6 @@ from __future__ import annotations
 import httpx2
 
 from domain.sources.staging import StagingEntryMode
-from pipeline.ingestion.api_params import API_BASE_URLS
 from pipeline.ingestion.crossref import api as crossref_api
 from pipeline.ingestion.crossref.api import CrossrefClient
 from pipeline.ingestion.crossref.person_search import (
@@ -38,7 +37,7 @@ def test_suit_le_curseur_jusqu_a_la_page_incomplete(
     route = http_mock.get(_WORKS).mock(
         side_effect=[_page(["10.1/A", "10.1/b"], "c1"), _page(["10.1/c"], "c2")]
     )
-    client = CrossrefClient(API_BASE_URLS["crossref"])
+    client = CrossrefClient()
 
     metrics = moissonneur(CrossrefPersonHarvester, client).run(arguments_du_run())
 

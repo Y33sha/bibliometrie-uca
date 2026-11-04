@@ -38,8 +38,8 @@ def headers() -> dict[str, str]:
 class DataciteClient:
     """Client de `GET /dois`."""
 
-    def __init__(self, base_url: str) -> None:
-        self._url = f"{base_url}/dois"
+    def __init__(self) -> None:
+        self._url = f"{API_BASE_URLS['datacite']}/dois"
         self._headers = headers()
 
     def _get(

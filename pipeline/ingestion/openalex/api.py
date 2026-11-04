@@ -108,8 +108,8 @@ def filter_params(filter_str: str, *, cursor: str = "*") -> QueryParams:
 class OpenalexClient:
     """Client de `/works`."""
 
-    def __init__(self, base_url: str) -> None:
-        self._url = base_url
+    def __init__(self) -> None:
+        self._url = API_BASE_URLS["openalex"]
 
     def _get(self, params: QueryParams, label: str) -> Mapping[str, JsonValue]:
         return as_mapping(

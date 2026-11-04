@@ -64,9 +64,9 @@ class WosClient:
     Le backoff est plus long qu'aux autres sources (`initial_backoff=2.0`) : WoS renvoie plus volontiers des 429.
     """
 
-    def __init__(self, base_url: str, api_key: str) -> None:
-        self._url = base_url
-        self._headers = headers(api_key)
+    def __init__(self) -> None:
+        self._url = API_BASE_URLS["wos"]
+        self._headers = headers(get_wos_api_key())
 
     def _get(self, params: QueryParams, label: str) -> Mapping[str, JsonValue]:
         return as_mapping(
