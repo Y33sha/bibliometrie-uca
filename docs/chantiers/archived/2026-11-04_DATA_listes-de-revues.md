@@ -53,9 +53,9 @@ Hors OpenAlex : la Master Journal List de Clarivate (revues du Web of Science, C
 
 ### Phase 4 — Interface
 
-- [ ] Cases à cocher des niveaux d'une ligne dans le sélecteur à trois états (`PresenceFilterToggle`)
-- [ ] Facette « Listes » de la liste des revues
-- [ ] Listes d'une revue sur sa page
+- [x] Cases à cocher des niveaux d'une ligne dans le sélecteur à trois états (`PresenceFilterToggle`) (f6e716113)
+- [x] Facette « Listes » de la liste des revues (f6e716113)
+- [x] Listes d'une revue sur sa page (f6e716113)
 
 ## Questions ouvertes
 
