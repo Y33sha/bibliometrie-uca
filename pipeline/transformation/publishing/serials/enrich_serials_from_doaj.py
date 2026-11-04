@@ -28,7 +28,6 @@ from sqlalchemy import (
 from domain.dates import date_to_french
 from domain.documents.identifiers import ISSN
 from domain.normalize import optional_plain_text
-from domain.pipeline_runs import PhaseStatus
 from domain.serials.serial import OaModel, SerialType
 from domain.serials.serial_lists import DIAMOND_DISCOVERY_HUB, DOAJ
 from domain.types import JsonValue
@@ -39,7 +38,10 @@ from pipeline.http.dump_download import DumpUnavailableError
 from pipeline.runtime.observability.log_format import BRANCH, quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import waiting
-from pipeline.runtime.observability.signals import signal_source_unavailable
+from pipeline.runtime.observability.signals import (
+    signal_dump_unrecognized,
+    signal_source_unavailable,
+)
 from pipeline.transformation.publishing.serials.store import OA_MODEL_NOT_MANUAL, TYPE_NOT_MANUAL
 
 LABEL = "Import du DOAJ"
@@ -179,7 +181,6 @@ def _extract_issns(row: dict[str, str]) -> list[str]:
 
 def run_import_doaj_dump(
     conn: Connection,
-    logger: logging.Logger,
     *,
     rows: Iterable[dict[str, str]],
     dry_run: bool = False,
@@ -267,7 +268,7 @@ def _import_doaj(
         with waiting(f"{BRANCH}{LABEL}", logger) as line:
             line.erase()
             with download_dump() as rows:
-                stats = run_import_doaj_dump(conn, logger, rows=rows)
+                stats = run_import_doaj_dump(conn, rows=rows)
     except DumpUnavailableError as e:
         # Le téléchargement précède toute écriture : le référentiel reste celui du dernier import.
         metrics = PhaseMetrics()
@@ -281,10 +282,10 @@ def _import_doaj(
         return metrics
     metrics = PhaseMetrics(extras={"matched": stats.matched})
     if stats.matched == 0:
-        message = f"DOAJ : aucune revue reconnue parmi {stats.total_rows} lignes de l'export, revues inchangées"
-        logger.warning(message)
-        metrics.signals.append(
-            {"level": PhaseStatus.WARNING, "code": "dump_unrecognized", "message": message}
+        signal_dump_unrecognized(
+            metrics,
+            f"DOAJ : aucune revue reconnue parmi {stats.total_rows} lignes de l'export, revues inchangées",
+            logger=logger,
         )
         metrics.report = "aucune revue reconnue, revues inchangées"
         return metrics

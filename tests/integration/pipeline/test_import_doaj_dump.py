@@ -1,7 +1,5 @@
 """Import du dump DOAJ (`run_import_doaj_dump`), typage en revue des entrées présentes dans le DOAJ, classement des revues diamant."""
 
-import logging
-
 from sqlalchemy import text
 
 from pipeline.transformation.publishing.serials.enrich_serials_from_doaj import (
@@ -37,7 +35,6 @@ def _run(conn, rows, *, dry_run=False):
     # Sans validation : la fixture `sa_sync_conn` est une transaction annulée en fin de test.
     return run_import_doaj_dump(
         conn,
-        logging.getLogger("test"),
         rows=rows,
         dry_run=dry_run,
         commit=False,

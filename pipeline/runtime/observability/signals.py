@@ -46,6 +46,16 @@ def signal_source_unavailable(
     )
 
 
+def signal_dump_unrecognized(
+    metrics: PhaseMetrics, message: str, *, logger: logging.Logger
+) -> None:
+    """Marque un dump téléchargé sans entrée reconnue, signe d'un changement de son format. Le référentiel reste en l'état, et la phase se termine en avertissement."""
+    logger.warning("%s", message)
+    metrics.signals.append(
+        {"level": PhaseStatus.WARNING, "code": "dump_unrecognized", "message": message}
+    )
+
+
 def skipped(metrics: PhaseMetrics) -> bool:
     """Indique si l'accès est sauté avant tout traitement : source non configurée, ou indisponible sans élément traité."""
     codes = {s["code"] for s in metrics.signals}
