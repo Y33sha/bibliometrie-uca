@@ -11,7 +11,6 @@ from dataclasses import dataclass
 from sqlalchemy import Connection
 
 from infrastructure.read_models.perimeters.queries import get_extraction_api_ids
-from pipeline.http.circuit_breaker import SourceUnavailableError
 from pipeline.ingestion.common.harvester import (
     HarvestConfigError,
     HarvestWindow,
@@ -47,16 +46,16 @@ def harvest_year(
     affiliations: list[str],
     logger: ScopedOrPlainLogger,
     progress: Progress,
-) -> PhaseMetrics:
+    metrics: PhaseMetrics,
+) -> None:
     """Moissonne les records d'une année, page après page.
 
-    Une page vide est retentée après une pause ; trois pages vides de suite arrêtent l'année.
+    Une page vide est retentée après une pause ; trois pages vides de suite arrêtent l'année. Les écritures sont comptées dans `metrics`.
     """
-    metrics = PhaseMetrics()
     data = client.fetch_page(year, 1, affiliations)
     if not data:
         logger.error("requête impossible")
-        return metrics
+        return
 
     total_count = get_records_found(data)
     first_record = 1
@@ -97,8 +96,6 @@ def harvest_year(
                 time.sleep(_BREATHER_SECS)
             data = client.fetch_page(year, first_record, affiliations)
 
-    return metrics
-
 
 class WosHarvester(SourceHarvester[WosHarvestConfig, WosClient]):
     """Moissonnage WoS des records des affiliations du périmètre, année par année.
@@ -130,26 +127,12 @@ class WosHarvester(SourceHarvester[WosHarvestConfig, WosClient]):
         client = self._client
         years = self._years(window)
 
-        def count_year(year: int) -> int:
-            try:
-                return client.count(year, affiliations)
-            except SourceUnavailableError:
-                raise
-            except Exception:
-                # Le moissonnage de l'année rencontre la même erreur et la signale.
-                return 0
-
-        def harvest_step(year: int, progress: Progress) -> PhaseMetrics:
+        def harvest_step(year: int, progress: Progress, metrics: PhaseMetrics) -> None:
             slog = scoped_logger(self.logger, self.SOURCE, str(year))
-            try:
-                metrics = harvest_year(client, self.conn, year, affiliations, slog, progress)
-            except SourceUnavailableError:
-                raise
-            except Exception as e:
-                slog.error("erreur : %s — passage à la suivante", e)
-                metrics = PhaseMetrics()
+            harvest_year(client, self.conn, year, affiliations, slog, progress, metrics)
             if year != years[-1]:
                 time.sleep(_BETWEEN_YEARS_SECS)
-            return metrics
 
-        return self._harvest_by_year(years, count_year, harvest_step)
+        return self._harvest_by_year(
+            years, lambda year: client.count(year, affiliations), harvest_step
+        )

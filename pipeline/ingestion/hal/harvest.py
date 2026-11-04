@@ -63,18 +63,18 @@ def harvest_union(
     config: HalHarvestConfig,
     conn: Connection,
     progress: Progress,
+    metrics: PhaseMetrics,
     *,
     years: list[int] | None = None,
     since: str | None = None,
-) -> PhaseMetrics:
+) -> None:
     """Moissonne l'union des collections pour un périmètre temporel, page après page jusqu'à stabilisation du marqueur.
 
-    Chaque document est écrit une fois dans `staging` et fait avancer `progress`. Renvoie les compteurs d'écriture.
+    Chaque document est écrit une fois dans `staging`, compté dans `metrics` et fait avancer `progress`.
     """
     query = build_query(years=years, since=since)
     fq = build_collections_fq(list(config.all_collections))
 
-    metrics = PhaseMetrics()
     cursor = "*"
     while True:
         data = client.fetch_page_cursor(query, fq, cursor)
@@ -91,8 +91,6 @@ def harvest_union(
         if next_cursor == cursor or not docs:
             break
         cursor = next_cursor
-
-    return metrics
 
 
 class HalHarvester(SourceHarvester[HalHarvestConfig, HalClient]):
@@ -118,28 +116,23 @@ class HalHarvester(SourceHarvester[HalHarvestConfig, HalClient]):
         years = self._years(window)
 
         if window.since:
+            since = window.since
+
+            def harvest_since(progress: Progress) -> PhaseMetrics:
+                metrics = PhaseMetrics()
+                harvest_union(
+                    client, config, self.conn, progress, metrics, years=years, since=since
+                )
+                return metrics
+
             return self._harvest_at_once(
-                client.count(build_query(years=years, since=window.since), fq),
-                lambda progress: harvest_union(
-                    client,
-                    config,
-                    self.conn,
-                    progress,
-                    years=years,
-                    since=window.since,
-                ),
+                client.count(build_query(years=years, since=since), fq), harvest_since
             )
 
         def count_year(year: int) -> int:
             return client.count(build_query(years=[year]), fq)
 
-        def harvest_step(year: int, progress: Progress) -> PhaseMetrics:
-            return harvest_union(
-                client,
-                config,
-                self.conn,
-                progress,
-                years=[year],
-            )
+        def harvest_step(year: int, progress: Progress, metrics: PhaseMetrics) -> None:
+            harvest_union(client, config, self.conn, progress, metrics, years=[year])
 
         return self._harvest_by_year(years, count_year, harvest_step)

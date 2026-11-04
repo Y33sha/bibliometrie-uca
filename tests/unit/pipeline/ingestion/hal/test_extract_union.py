@@ -9,6 +9,7 @@ from unittest.mock import MagicMock
 
 from pipeline.ingestion.common.staging import UpsertOutcome
 from pipeline.ingestion.hal.harvest import HalHarvestConfig, harvest_union
+from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import Progress
 
 _CONFIG = HalHarvestConfig(all_collections={"C": "Coll"})
@@ -29,15 +30,18 @@ def _client(pages: list[dict]) -> MagicMock:
     return client
 
 
-def _extrait(client: MagicMock, **options):
-    return harvest_union(
+def _extrait(client: MagicMock, **options) -> PhaseMetrics:
+    metrics = PhaseMetrics()
+    harvest_union(
         client,
         _CONFIG,
         MagicMock(),
         Progress(None, "HAL", None),
+        metrics,
         years=[2025],
         **options,
     )
+    return metrics
 
 
 class TestCursorPagination:

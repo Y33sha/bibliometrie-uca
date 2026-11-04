@@ -67,16 +67,22 @@ def conn():
 
 
 class _ParAnnee(SourceHarvester):
-    """Moissonneur rapportant, pour chaque année, un document inséré et des documents inchangés selon `volumes`. La source est indisponible à partir de l'année `unavailable_from`."""
+    """Moissonneur rapportant, pour chaque année, un document inséré et des documents inchangés selon `volumes`. La source est indisponible à partir de l'année `unavailable_from`. L'année `failing` échoue après avoir écrit son document inséré."""
 
     SOURCE = "hal"
 
     def __init__(
-        self, logger, volumes: dict[int, int], *, unavailable_from: int | None = None
+        self,
+        logger,
+        volumes: dict[int, int],
+        *,
+        unavailable_from: int | None = None,
+        failing: int | None = None,
     ) -> None:
         super().__init__(MagicMock(), logger, MagicMock())
         self.volumes = volumes
         self.unavailable_from = unavailable_from
+        self.failing = failing
         self.log_format: list[str] = []
         self.totaux: list[int | None] = []
         self.progress = None
@@ -85,13 +91,16 @@ class _ParAnnee(SourceHarvester):
         return None
 
     def harvest_all(self, args, config):  # type: ignore[no-untyped-def]
-        def harvest_step(year, progress):
+        def harvest_step(year, progress, metrics):
             self.progress = progress
             self.log_format.append(progress._label)
             self.totaux.append(progress._total)
             if self.unavailable_from is not None and year >= self.unavailable_from:
                 raise SourceUnavailableError(self.SOURCE)
-            return PhaseMetrics(new=1, unchanged=self.volumes[year] - 1)
+            metrics.add(new=1)
+            if year == self.failing:
+                raise ValueError("réponse illisible")
+            metrics.add(unchanged=self.volumes[year] - 1)
 
         return self._harvest_by_year(list(self.volumes), self.volumes.__getitem__, harvest_step)
 
@@ -130,6 +139,25 @@ class TestExtractionParAnnee:
             )
         assert metrics.total == 2
         assert breaker.tripped
+
+    def test_une_erreur_sur_une_annee_passe_a_la_suivante(self, logger, caplog):
+        """L'erreur est journalisée, la page en cours annulée, et les écritures déjà comptées restent dans le bilan."""
+        ext = _ParAnnee(logger, {2023: 2, 2024: 3, 2025: 1}, failing=2024)
+        with caplog.at_level(logging.ERROR):
+            metrics = ext.run(_args())
+        assert (metrics.new, metrics.unchanged) == (3, 1)
+        ext.conn.rollback.assert_called_once()
+        assert "réponse illisible" in caplog.text
+
+    def test_une_erreur_de_decompte_compte_l_annee_pour_zero(self, logger):
+        ext = _ParAnnee(logger, {2023: 2, 2024: 3})
+
+        def count_year(year: int) -> int:
+            if year == 2024:
+                raise ValueError("réponse illisible")
+            return ext.volumes[year]
+
+        assert sum(ext._count(count_year, year) for year in ext.volumes) == 2
 
 
 class TestRun:

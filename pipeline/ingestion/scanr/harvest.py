@@ -72,9 +72,9 @@ def harvest_year(
     year: int,
     affiliation_ids: list[str],
     progress: Progress,
-) -> PhaseMetrics:
-    """Moissonne les documents d'une année, page après page."""
-    metrics = PhaseMetrics()
+    metrics: PhaseMetrics,
+) -> None:
+    """Moissonne les documents d'une année, page après page, et compte les écritures dans `metrics`."""
     search_after: list[JsonValue] | None = None
     seen = 0
 
@@ -96,7 +96,6 @@ def harvest_year(
         search_after = list(as_sequence(hits[-1].get("sort")))
 
     conn.commit()
-    return metrics
 
 
 class ScanrHarvester(SourceHarvester[ScanrHarvestConfig, ScanrClient]):
@@ -119,5 +118,7 @@ class ScanrHarvester(SourceHarvester[ScanrHarvestConfig, ScanrClient]):
         return self._harvest_by_year(
             years,
             lambda year: client.count(build_query(year, ids)),
-            lambda year, progress: harvest_year(client, self.conn, year, ids, progress),
+            lambda year, progress, metrics: harvest_year(
+                client, self.conn, year, ids, progress, metrics
+            ),
         )

@@ -12,7 +12,6 @@ from dataclasses import dataclass
 from sqlalchemy import Connection
 
 from infrastructure.read_models.perimeters.queries import get_extraction_api_ids
-from pipeline.http.circuit_breaker import SourceUnavailableError
 from pipeline.ingestion.common.harvester import (
     HarvestConfigError,
     HarvestWindow,
@@ -20,7 +19,6 @@ from pipeline.ingestion.common.harvester import (
     stage_document,
 )
 from pipeline.ingestion.datacite.api import DataciteClient
-from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import Progress
 
@@ -85,26 +83,10 @@ class DataciteHarvester(SourceHarvester[DataciteHarvestConfig, DataciteClient]):
         client = self._client
         years = self._years(window)
 
-        def count_year(year: int) -> int:
-            try:
-                return client.count(build_query(year, keywords), str(year))
-            except SourceUnavailableError:
-                raise
-            except Exception:
-                # Le moissonnage de l'année rencontre la même erreur et la signale.
-                return 0
-
-        def harvest_step(year: int, progress: Progress) -> PhaseMetrics:
-            # Une erreur garde les métriques des pages déjà écrites.
-            metrics = PhaseMetrics()
-            try:
-                harvest_year(client, self.conn, year, keywords, progress, metrics)
-            except SourceUnavailableError:
-                raise
-            except Exception as e:
-                scoped_logger(self.logger, self.SOURCE, str(year)).error(
-                    "erreur : %s — passage à la suivante", e
-                )
-            return metrics
-
-        return self._harvest_by_year(years, count_year, harvest_step)
+        return self._harvest_by_year(
+            years,
+            lambda year: client.count(build_query(year, keywords), str(year)),
+            lambda year, progress, metrics: harvest_year(
+                client, self.conn, year, keywords, progress, metrics
+            ),
+        )

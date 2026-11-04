@@ -27,6 +27,7 @@ from pipeline.runtime.observability.log_format import (
     quantity,
     source_branch,
 )
+from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import Progress, track_progress
 from pipeline.runtime.observability.signals import signal_source_unconfigured
@@ -136,31 +137,46 @@ class SourceHarvester[ConfigT, ClientT](ABC):
         self,
         years: list[int],
         count_year: Callable[[int], int],
-        harvest_step: Callable[[int, Progress], PhaseMetrics],
+        harvest_step: Callable[[int, Progress, PhaseMetrics], None],
     ) -> PhaseMetrics:
         """Moissonne les années dans l'ordre sous une seule barre, au libellé réglé sur l'année en cours.
 
-        `count_year` donne le volume d'une année : la barre connaît son total dès le départ. Une coupure laisse sur la barre l'année interrompue, et les précédentes sont terminées.
+        `count_year` donne le volume d'une année : la barre connaît son total dès le départ. `harvest_step` compte ses écritures dans les métriques reçues. Une coupure laisse sur la barre l'année interrompue, et les précédentes sont terminées.
 
-        Une source indisponible (`SourceUnavailableError`) arrête la boucle et coupe la source : les années restantes repartent au prochain run, les métriques des années moissonnées sont gardées.
+        Une erreur sur une année est journalisée, la page en cours est annulée, et la boucle passe à l'année suivante. Une source indisponible (`SourceUnavailableError`) arrête la boucle et coupe la source : les années restantes repartent au prochain run. Les métriques des pages écrites sont gardées.
         """
         metrics = PhaseMetrics()
         if not years:
             return metrics
-        total = sum(count_year(year) for year in years)
+        total = sum(self._count(count_year, year) for year in years)
         with track_progress(total, self._label(str(years[0])), self.logger) as progress:
             for year in years:
                 progress.relabel(self._label(str(year)))
                 try:
-                    metrics.merge(harvest_step(year, progress))
+                    harvest_step(year, progress, metrics)
                 except SourceUnavailableError:
                     trip_source()
                     break
+                except Exception as e:
+                    self.conn.rollback()
+                    scoped_logger(self.logger, self.SOURCE, str(year)).error(
+                        "erreur : %s — passage à l'année suivante", e
+                    )
             else:
                 year_range = f"{years[0]}-{years[-1]}" if len(years) > 1 else str(years[0])
                 progress.relabel(self._label(year_range))
         self._write_summary(metrics)
         return metrics
+
+    @staticmethod
+    def _count(count_year: Callable[[int], int], year: int) -> int:
+        """Renvoie le volume d'une année, 0 sur une erreur : le moissonnage de l'année rencontre la même erreur et la journalise."""
+        try:
+            return count_year(year)
+        except SourceUnavailableError:
+            raise
+        except Exception:
+            return 0
 
     def _harvest_at_once(
         self,

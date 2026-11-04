@@ -37,11 +37,11 @@ def harvest_period(
     institution_ids: list[str],
     logger: ScopedOrPlainLogger,
     progress: Progress,
+    metrics: PhaseMetrics,
     *,
     years: list[int],
-) -> PhaseMetrics:
-    """Moissonne les works des années `years`, page après page."""
-    metrics = PhaseMetrics()
+) -> None:
+    """Moissonne les works des années `years`, page après page, et compte les écritures dans `metrics`."""
     cursor = "*"
     total_count: int | None = None
     fetched = 0
@@ -68,7 +68,6 @@ def harvest_period(
 
     if total_count and fetched < total_count:
         logger.warning("%s documents non récupérés sur %s", total_count - fetched, total_count)
-    return metrics
 
 
 class OpenalexHarvester(SourceHarvester[OpenalexHarvestConfig, OpenalexClient]):
@@ -89,13 +88,14 @@ class OpenalexHarvester(SourceHarvester[OpenalexHarvestConfig, OpenalexClient]):
         ids = config.institution_ids
         client = self._client
 
-        def harvest_step(year: int, progress: Progress) -> PhaseMetrics:
-            return harvest_period(
+        def harvest_step(year: int, progress: Progress, metrics: PhaseMetrics) -> None:
+            harvest_period(
                 client,
                 self.conn,
                 ids,
                 scoped_logger(self.logger, self.SOURCE, str(year)),
                 progress,
+                metrics,
                 years=[year],
             )
 
