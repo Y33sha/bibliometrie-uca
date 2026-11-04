@@ -347,8 +347,8 @@ def test_thesis_with_serial_corrected_and_deconflated(sa_sync_conn):
 
 def _apply_cluster(conn) -> int:
     """Joue les sous-étapes `doi_targets` puis `remove_identifiers`. Renvoie le nombre d'enregistrements sources corrigés."""
+    run_doi_targets(conn, logging.getLogger("test"))
     store = SourceRecordCorrectionStore(conn)
-    run_doi_targets(conn, store, logging.getLogger("test"))
     return store.persist_doi_corrections(compute_updates(fetch_candidates(store)))
 
 

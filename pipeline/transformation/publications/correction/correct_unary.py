@@ -7,7 +7,6 @@ import logging
 import time
 from collections import Counter
 from collections.abc import Mapping, Set
-from dataclasses import dataclass
 
 from sqlalchemy import Connection
 
@@ -16,7 +15,8 @@ from domain.source_records.metadata_correction.unary import (
     corrected_doc_type,
 )
 from domain.sources.scanr import extract_hal_id_from_scanr_id
-from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, inflect, quantity, step
+from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, inflect, quantity
+from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publications.correction.correction_batches import persist_in_batches
 from pipeline.transformation.publications.correction.correction_store import (
     CorrectionUpdate,
@@ -75,32 +75,14 @@ def compute_update(
     return CorrectionUpdate(row.id, corrected) if corrected is not None else None
 
 
-@dataclass
-class UnaryCorrectionStats:
-    """Bilan de la passe unaire."""
-
-    examined: int
-    """Enregistrements sources examinés."""
-    corrected: int
-    """Enregistrements sources corrigés par au moins une règle."""
-    rule_counts: dict[str, int]
-    """Déclenchements par règle."""
+def tally_corrections(updates: list[CorrectionUpdate]) -> dict[str, int]:
+    """Compte les enregistrements sources corrigés par chaque règle (`UnaryCorrection.rules`)."""
+    return Counter(rule for update in updates for rule in update.corrected.rules)
 
 
-def tally_corrections(updates: list[CorrectionUpdate]) -> tuple[int, dict[str, int]]:
-    """Compte les enregistrements sources corrigés par au moins une règle, et les enregistrements sources corrigés par chaque règle (`UnaryCorrection.rules`)."""
-    rule_counts = Counter(rule for update in updates for rule in update.corrected.rules)
-    corrected = sum(bool(update.corrected.rules) for update in updates)
-    return corrected, dict(rule_counts)
-
-
-def run(
-    conn: Connection,
-    store: SourceRecordCorrectionStore,
-    logger: logging.Logger,
-) -> UnaryCorrectionStats:
-    """Corrige tous les enregistrements sources et écrit les mises à jour."""
-    step(logger, "Corrections de métadonnées par document")
+def run(conn: Connection, logger: logging.Logger) -> PhaseMetrics:
+    """Corrige tous les enregistrements sources et écrit les mises à jour. Renvoie les enregistrements sources examinés, mis à jour, et le décompte par règle."""
+    store = SourceRecordCorrectionStore(conn)
     t0 = time.perf_counter()
     rows = store.fetch_for_unary_correction()
     logger.info("%s%s %s", BRANCH, quantity(len(rows), "document"), inflect(len(rows), "examiné"))
@@ -108,10 +90,9 @@ def run(
     hal_rows = {row.source_id: row for row in rows if row.facts.source == "hal"}
     missing_hal_ids = store.fetch_missing_hal_ids()
     updates = compute_updates(rows, hal_rows, missing_hal_ids)
-    corrected, rule_counts = tally_corrections(updates)
-    logger.info("%s%s à corriger", BRANCH, quantity(corrected, "document"))
+    logger.info("%s%s à corriger", BRANCH, quantity(len(updates), "document"))
 
-    persist_in_batches(conn, updates, store.persist_corrections)
+    written = persist_in_batches(conn, updates, store.persist_corrections)
     removed = store.delete_missing_hal_locations()
     logger.info(
         "%s%s de dépôts HAL introuvables %s",
@@ -120,4 +101,4 @@ def run(
         inflect(removed, "retirée"),
     )
     logger.info("%sTerminé en %.1fs", LAST_BRANCH, time.perf_counter() - t0)
-    return UnaryCorrectionStats(len(rows), corrected, rule_counts)
+    return PhaseMetrics(seen=len(rows), updated=written, extras=tally_corrections(updates))

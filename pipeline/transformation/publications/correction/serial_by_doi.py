@@ -2,13 +2,13 @@
 
 import logging
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
 
 from sqlalchemy import Connection
 
 from domain.serials.doi_namespaces import DoiNamespace
 from domain.source_records.metadata_correction.serial_by_doi import attach_serial_by_doi
-from pipeline.runtime.observability.log_format import LAST_BRANCH, inflect, quantity, step
+from pipeline.runtime.observability.log_format import LAST_BRANCH, inflect, quantity
+from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publications.correction.correction_batches import persist_in_batches
 from pipeline.transformation.publications.correction.correction_store import (
     SerialCorrectionRow,
@@ -37,20 +37,9 @@ def compute_updates(
     return [u for row in rows if (u := _compute_update(row, by_namespace)) is not None]
 
 
-@dataclass
-class SerialByDoiStats:
-    """Bilan de la sous-étape, en nombre d'enregistrements sources."""
-
-    examined: int
-    attached: int
-    """Enregistrements sources rattachés à une revue."""
-
-
-def run(
-    conn: Connection, store: SourceRecordCorrectionStore, logger: logging.Logger
-) -> SerialByDoiStats:
-    """Rattache à leur revue les enregistrements sources sans revue à DOI relevant d'un espace de noms, et réévalue les rattachements existants."""
-    step(logger, "Revues non renseignées, identifiables par le DOI du document")
+def run(conn: Connection, logger: logging.Logger) -> PhaseMetrics:
+    """Rattache à leur revue les enregistrements sources sans revue à DOI relevant d'un espace de noms, et réévalue les rattachements existants. Renvoie les enregistrements sources examinés et mis à jour."""
+    store = SourceRecordCorrectionStore(conn)
     namespaces = store.fetch_serial_doi_namespaces()
     rows = store.fetch_serial_by_doi_candidates()
 
@@ -58,7 +47,7 @@ def run(
     serials = [u.serial_id for u in updates if u.serial_id is not None]
     detached = len(updates) - len(serials)
 
-    persist_in_batches(conn, updates, store.persist_serial_corrections)
+    written = persist_in_batches(conn, updates, store.persist_serial_corrections)
     logger.info(
         "%s%s %s à %s%s",
         LAST_BRANCH,
@@ -67,4 +56,4 @@ def run(
         quantity(len(set(serials)), "revue"),
         f", {quantity(detached, 'rattachement')} {inflect(detached, 'retiré')}" if detached else "",
     )
-    return SerialByDoiStats(len(rows), len(serials))
+    return PhaseMetrics(seen=len(rows), updated=written)

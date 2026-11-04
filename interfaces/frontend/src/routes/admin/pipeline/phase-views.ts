@@ -177,8 +177,8 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
   metadata_correction: {
     matrix: {
       columns: [
-        { key: "examined", label: "source_records examinées" },
-        { key: "corrected", label: "corrigées" },
+        { key: "examined", label: "Examinés" },
+        { key: "corrected", label: "Mis à jour" },
       ],
       rows: [
         { key: "serial_by_doi", label: "Rattachement à la publication en série (par DOI)" },

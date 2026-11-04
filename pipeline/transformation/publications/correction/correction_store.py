@@ -485,21 +485,17 @@ class SourceRecordCorrectionStore:
         """Renvoie les déclarations de forme secondaire, une par enregistrement source : DOI déclaré forme secondaire d'une œuvre principale présente en base. Un DOI inconnu de doi.org, déclaré ou cible, est écarté."""
         rows = self._conn.execute(
             text(f"""
-                WITH sr_eff AS (
-                    SELECT id, source, doc_type, title_normalized, publication_year, source_extras
-                    FROM source_records
-                ),
-                record_dois AS ({_RECORD_DOIS_SQL}),
+                WITH record_dois AS ({_RECORD_DOIS_SQL}),
                 dataset_dois AS (
                     SELECT DISTINCT d.doi AS d
-                    FROM sr_eff sr JOIN record_dois d ON d.id = sr.id
+                    FROM source_records sr JOIN record_dois d ON d.id = sr.id
                     WHERE sr.doc_type = '{DocType.DATASET.value}'
                 ),
                 unresolved_dois AS ({_UNRESOLVED_DOIS_SQL}),
                 -- Collections figshare typées dataset, une par titre et année : un titre partagé par deux collections n'en désigne aucune.
                 figshare_collections AS (
                     SELECT sr.title_normalized, sr.publication_year, min(d.doi) AS doi
-                    FROM sr_eff sr JOIN record_dois d ON d.id = sr.id
+                    FROM source_records sr JOIN record_dois d ON d.id = sr.id
                     WHERE sr.doc_type = '{DocType.DATASET.value}'
                       AND starts_with(d.doi, '{FIGSHARE_COLLECTION_DOI_PREFIX}')
                     GROUP BY sr.title_normalized, sr.publication_year
@@ -518,7 +514,7 @@ class SourceRecordCorrectionStore:
                 -- DOI `primary` de chaque enregistrement source DataCite, son DOI propre.
                 datacite_dois AS (
                     SELECT d.id, d.doi FROM record_dois d
-                    JOIN sr_eff sr ON sr.id = d.id
+                    JOIN source_records sr ON sr.id = d.id
                     WHERE sr.source = '{Source.DATACITE.value}'
                       AND d.role = '{SourceIdentifierRole.PRIMARY.value}'
                 ),
@@ -535,7 +531,7 @@ class SourceRecordCorrectionStore:
                             own.doi AS secondary_doi,
                             rel->>'doi' AS canonical_doi,
                             {_DATACITE_CASE_SQL} AS same_work_case
-                        FROM sr_eff sr
+                        FROM source_records sr
                         JOIN datacite_dois own ON own.id = sr.id
                         CROSS JOIN LATERAL jsonb_array_elements({source_extra_json(SourceExtra.RELATED_IDENTIFIERS)}) rel
                         WHERE rel->>'relation_type' IN {_DATACITE_DIRECT_RELATIONS_SQL}
@@ -554,7 +550,7 @@ class SourceRecordCorrectionStore:
                             own.doi AS secondary_doi,
                             rel->>'doi' AS canonical_doi,
                             '{DoiTargetRule.DATACITE_PACKAGE_PIECE.value}' AS same_work_case
-                        FROM sr_eff sr
+                        FROM source_records sr
                         JOIN datacite_dois own ON own.id = sr.id
                         CROSS JOIN LATERAL jsonb_array_elements({source_extra_json(SourceExtra.RELATED_IDENTIFIERS)}) rel
                         WHERE sr.doc_type = '{DocType.DATASET.value}'
@@ -573,7 +569,7 @@ class SourceRecordCorrectionStore:
                             piece.doi AS secondary_doi,
                             c.doi AS canonical_doi,
                             '{DoiTargetRule.DATACITE_PACKAGE_PIECE.value}' AS same_work_case
-                        FROM sr_eff sr
+                        FROM source_records sr
                         JOIN figshare_items piece ON piece.id = sr.id
                         JOIN figshare_collections c
                           ON c.title_normalized = regexp_replace(
@@ -635,14 +631,10 @@ class SourceRecordCorrectionStore:
         """
         rows = self._conn.execute(
             text(f"""
-                WITH sr_eff AS (
-                    SELECT id, source, doc_type, title_normalized
-                    FROM source_records
-                ),
-                record_dois AS ({_RECORD_DOIS_SQL}),
+                WITH record_dois AS ({_RECORD_DOIS_SQL}),
                 unresolved_dois AS ({_UNRESOLVED_DOIS_SQL}),
                 candidate_dois AS (
-                    SELECT d.doi AS d FROM record_dois d JOIN sr_eff sr ON sr.id = d.id
+                    SELECT d.doi AS d FROM record_dois d JOIN source_records sr ON sr.id = d.id
                     WHERE sr.doc_type IN ({_CLUSTER_CANDIDATE_DOC_TYPES_SQL})
                     UNION
                     SELECT d.doi AS d FROM record_dois d
@@ -671,7 +663,7 @@ class SourceRecordCorrectionStore:
                        ) ELSE ARRAY[]::text[] END AS author_names
                 FROM candidate_dois c
                 JOIN record_dois m ON m.doi = c.d
-                JOIN sr_eff sr ON sr.id = m.id
+                JOIN source_records sr ON sr.id = m.id
             """),
             {"distant_title_dois": sorted(distant_title_dois)},
         ).all()

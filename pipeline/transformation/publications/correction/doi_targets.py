@@ -13,9 +13,8 @@ La table `doi_targets` est réécrite à chaque passage : une relation disparue,
 
 import logging
 import time
-from collections import defaultdict
+from collections import Counter, defaultdict
 from collections.abc import Iterable, Set
-from dataclasses import dataclass
 
 from sqlalchemy import Connection
 
@@ -26,7 +25,8 @@ from domain.source_records.metadata_correction.shared_doi import (
     doi_target,
     version_targets,
 )
-from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, inflect, quantity, step
+from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, inflect, quantity
+from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publications.correction.correction_store import (
     SecondaryFormRow,
     SourceRecordCorrectionStore,
@@ -57,23 +57,9 @@ def compute_doi_targets(
     ]
 
 
-@dataclass
-class DoiTargetStats:
-    """Bilan de la sous-étape."""
-
-    examined: int
-    """Déclarations et DOI à suffixe de version examinés."""
-    changed: int
-    """DOI à cible changée."""
-    rule_counts: dict[str, int]
-    """Cibles par règle."""
-
-
-def run(
-    conn: Connection, store: SourceRecordCorrectionStore, logger: logging.Logger
-) -> DoiTargetStats:
-    """Réécrit `doi_targets`."""
-    step(logger, "Cibles des DOI de formes secondaires")
+def run(conn: Connection, logger: logging.Logger) -> PhaseMetrics:
+    """Réécrit `doi_targets`. Renvoie les déclarations et DOI à suffixe de version examinés, les DOI à cible changée, et les cibles par règle."""
+    store = SourceRecordCorrectionStore(conn)
     t0 = time.perf_counter()
     rows = store.fetch_secondary_form_declarations()
     versioned = store.fetch_versioned_dois()
@@ -94,9 +80,9 @@ def run(
         quantity(len(targets), "cible"),
         quantity(changed, "modifiée", "modifiées"),
     )
-    rule_counts: dict[str, int] = {}
-    for target in targets:
-        rule_counts[target.rule.value] = rule_counts.get(target.rule.value, 0) + 1
-
     logger.info("%sTerminé en %.1fs", LAST_BRANCH, time.perf_counter() - t0)
-    return DoiTargetStats(len(rows) + len(versioned), changed, rule_counts)
+    return PhaseMetrics(
+        seen=len(rows) + len(versioned),
+        updated=changed,
+        extras=Counter(target.rule.value for target in targets),
+    )

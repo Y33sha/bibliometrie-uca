@@ -1,8 +1,5 @@
 """Tests purs de `compute_update` : correction unaire idempotente."""
 
-import logging
-from unittest.mock import MagicMock
-
 from domain.normalize import normalize_text
 from domain.source_records.corrections import stash_entry
 from domain.source_records.identifiers import (
@@ -19,7 +16,6 @@ from pipeline.transformation.publications.correction.correct_unary import (
     compute_update,
     compute_updates,
     hal_origin_ids,
-    run,
     tally_corrections,
 )
 from pipeline.transformation.publications.correction.correction_store import (
@@ -55,7 +51,7 @@ def test_tally_corrections_compte_les_regles():
                 frozenset({"THESIS_WITH_SERIAL_TO_ARTICLE"}),
             ),
         ),
-        # deux règles sur un même enregistrement source : un enregistrement source, deux déclenchements
+        # deux règles sur un même enregistrement source : un déclenchement par règle
         CorrectionUpdate(
             3,
             UnaryCorrection(
@@ -73,12 +69,10 @@ def test_tally_corrections_compte_les_regles():
                 frozenset({"SERIAL_TYPE_MEDIA_TO_MEDIA", "HAL_DEPOSIT_MISSING_TO_REMOVED"}),
             ),
         ),
-        # correction défaite : mise à jour sans règle
+        # correction défaite : mise à jour sans règle, absente du décompte
         CorrectionUpdate(4, UnaryCorrection(CorrectedSourceRecord("article", None, {}), ())),
     ]
-    corrected, rule_counts = tally_corrections(updates)
-    assert corrected == 2
-    assert rule_counts == {
+    assert tally_corrections(updates) == {
         "THESIS_WITH_SERIAL_TO_ARTICLE": 1,
         "SERIAL_TYPE_MEDIA_TO_MEDIA": 1,
         "HAL_DEPOSIT_MISSING_TO_REMOVED": 1,
@@ -203,7 +197,7 @@ def test_thesis_to_article_strips_dissertation_keys():
         "hal-99": None,
         "123": None,
     }
-    assert tally_corrections([upd]) == (1, {"THESIS_WITH_SERIAL_TO_ARTICLE": 1})
+    assert tally_corrections([upd]) == {"THESIS_WITH_SERIAL_TO_ARTICLE": 1}
 
 
 def test_thesis_to_article_without_dissertation_keys_leaves_identifiers():
@@ -300,25 +294,6 @@ def test_preserves_unmanaged_corrections_keys():
     }
 
 
-def test_le_bilan_compte_seulement_les_documents_corriges_par_une_regle():
-    """Une correction défaite donne une mise à jour, sans compter comme une correction."""
-    queries = MagicMock()
-    queries.fetch_missing_hal_ids.return_value = frozenset()
-    queries.delete_missing_hal_locations.return_value = 0
-    queries.fetch_for_unary_correction.return_value = [
-        _source_record(
-            id=1,
-            doc_type="media",
-            corrections={
-                "doc_type": {"raw": "article", "corrected_by": "SERIAL_TYPE_MEDIA_TO_MEDIA"}
-            },
-        ),
-        _source_record(id=2, doc_type="article", urls=["https://theses.fr/2020ABCD"]),
-    ]
-    stats = run(MagicMock(), queries, logging.getLogger("test"))
-    assert stats.corrected == 1
-
-
 # Dépôts HAL introuvables
 
 
@@ -338,7 +313,7 @@ def test_depot_hal_introuvable_retire_des_identifiants_et_des_liens():
     assert upd.corrected.columns.corrections["urls"] == stash_entry(
         row.facts.urls, "HAL_DEPOSIT_MISSING_TO_REMOVED"
     )
-    assert tally_corrections([upd]) == (1, {"HAL_DEPOSIT_MISSING_TO_REMOVED": 1})
+    assert tally_corrections([upd]) == {"HAL_DEPOSIT_MISSING_TO_REMOVED": 1}
 
     corrected = _source_record(
         identifiers=upd.corrected.identifiers,
