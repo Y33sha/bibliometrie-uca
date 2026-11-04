@@ -1,5 +1,7 @@
 """Exécuteur des tâches d'une phase (`pipeline.task_runner`)."""
 
+import logging
+
 import pytest
 
 from pipeline.graph import Phase, Task
@@ -21,6 +23,48 @@ def test_l_executeur_mesure_la_duree_des_seules_taches_executees(contexte):
     assert by_task["une"].duration_s is not None
     assert "ecartee" not in by_task
     assert set(ctx.task_durations) == {"une", "deux"}
+
+
+def test_l_executeur_ecrit_le_bilan_de_chaque_section_dans_l_ordre_des_taches(contexte, caplog):
+    """Un groupe parallèle écrit ses lignes dans l'ordre des tâches. La dernière ligne d'une section la ferme. Une section aux tâches toutes silencieuses se ferme sur « Rien à faire »."""
+    tasks = (
+        Task(
+            "issn",
+            run=lambda _ctx: PhaseMetrics(report="a"),
+            section="Revues",
+            label="ISSN",
+            parallel_group="g",
+        ),
+        Task(
+            "titres",
+            run=lambda _ctx: PhaseMetrics(report="b"),
+            section="Revues",
+            label="Titres",
+            parallel_group="g",
+        ),
+        Task("types", run=lambda _ctx: PhaseMetrics(report="c"), section="Revues", label="Types"),
+        Task(
+            "editeurs",
+            run=lambda _ctx: PhaseMetrics(),
+            section="Éditeurs",
+            label="Éditeurs",
+            silent_when_empty=True,
+        ),
+    )
+
+    with caplog.at_level(logging.INFO, logger="test"):
+        execute_tasks(tasks, contexte())
+
+    assert [record.getMessage() for record in caplog.records] == [
+        "",
+        "▶ Revues",
+        "  ├─ ISSN : a",
+        "  ├─ Titres : b",
+        "  └─ Types : c",
+        "",
+        "▶ Éditeurs",
+        "  └─ Rien à faire",
+    ]
 
 
 _TACHES = (
