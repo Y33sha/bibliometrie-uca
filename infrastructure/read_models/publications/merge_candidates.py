@@ -31,7 +31,7 @@ def _candidates_sql(similarity: str, condition: str, *, ranked: bool = False) ->
         FROM publications c
         JOIN publications p ON p.id = :publication
         WHERE c.id <> p.id
-          AND (c.doi IS NULL OR p.doi IS NULL OR lower(c.doi) = lower(p.doi))
+          AND (c.doi IS NULL OR p.doi IS NULL OR c.doi = p.doi)
           AND {condition}
         {order}
     """  # noqa: S608
@@ -52,7 +52,7 @@ _BY_WORDS_SQL = text(
 
 _BY_ID_SQL = text(_candidates_sql(_TITLE_SIMILARITY, "c.id = :id"))
 
-_BY_DOI_SQL = text(_candidates_sql(_TITLE_SIMILARITY, "lower(c.doi) = :doi"))
+_BY_DOI_SQL = text(_candidates_sql(_TITLE_SIMILARITY, "c.doi = :doi"))
 
 _OWN_TITLE_SQL = text("SELECT title_normalized FROM publications WHERE id = :publication")
 

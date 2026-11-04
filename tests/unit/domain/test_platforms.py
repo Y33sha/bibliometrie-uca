@@ -56,7 +56,7 @@ class TestKnownPlatforms:
 
     def test_serveurs_de_preprints_d_un_doi(self):
         """Le préfixe 10.1101 couvre aussi les revues de Cold Spring Harbor (`10.1101/gad.…`)."""
-        biorxiv = "https://doi.org/10.1101/2020.01.01.123456"
+        biorxiv = "10.1101/2020.01.01.123456"
         assert [p.name for p in preprint_servers_of_doi(biorxiv)] == ["bioRxiv", "medRxiv"]
         assert preprint_servers_of_doi("10.1101/gad.1") == ()
         assert preprint_servers_of_doi("10.3917/rfg.1") == ()

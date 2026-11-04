@@ -49,7 +49,7 @@ def publication_copies(conn: Connection, publication_ids: Sequence[int]) -> dict
     registered = conn.execute(
         text("""
             SELECT p.id, d.registered_url
-            FROM publications p JOIN dois d ON d.doi = lower(p.doi)
+            FROM publications p JOIN dois d ON d.doi = p.doi
             WHERE p.id = ANY(:ids) AND d.registered_url IS NOT NULL
         """),
         {"ids": list(publication_ids)},

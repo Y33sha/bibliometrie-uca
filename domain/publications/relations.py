@@ -115,12 +115,12 @@ def inverse_relation(relation: RelationType) -> RelationType:
 
 
 def _datacite_related(source_extras: dict[str, JsonValue] | None) -> Iterator[tuple[str, str]]:
-    """Renvoie les relations déclarées par un enregistrement source DataCite : `(relationType, DOI cible)`. Les entrées sans DOI sont ignorées."""
+    """Renvoie les relations déclarées par un enregistrement source DataCite : `(relationType, DOI cible)`, DOI normalisé à l'ingestion. Les entrées sans DOI sont ignorées."""
     related = (source_extras or {}).get(SourceExtra.RELATED_IDENTIFIERS)
     if not isinstance(related, list):
         return
     for item in related:
-        if isinstance(item, dict) and (target := DOI.normalize(as_str(item.get("doi")))):
+        if isinstance(item, dict) and (target := as_str(item.get("doi"))):
             yield as_str(item.get("relation_type")) or "", target
 
 

@@ -533,15 +533,15 @@ class SourceRecordCorrectionStore:
                             sr.id AS declarant_id,
                             sr.doc_type,
                             own.doi AS secondary_doi,
-                            lower(rel->>'doi') AS canonical_doi,
+                            rel->>'doi' AS canonical_doi,
                             {_DATACITE_CASE_SQL} AS same_work_case
                         FROM sr_eff sr
                         JOIN datacite_dois own ON own.id = sr.id
                         CROSS JOIN LATERAL jsonb_array_elements({source_extra_json(SourceExtra.RELATED_IDENTIFIERS)}) rel
                         WHERE rel->>'relation_type' IN {_DATACITE_DIRECT_RELATIONS_SQL}
                           AND rel->>'doi' IS NOT NULL
-                          AND lower(rel->>'doi') <> own.doi
-                          AND lower(rel->>'doi') IN (SELECT d FROM present_dois)
+                          AND rel->>'doi' <> own.doi
+                          AND rel->>'doi' IN (SELECT d FROM present_dois)
                         UNION ALL
                         -- Pièce d'un dataset → dataset parent : le parent doit être présent en base
                         -- comme dataset pour absorber ses pièces (`IN dataset_dois`). Ça exclut le
@@ -552,7 +552,7 @@ class SourceRecordCorrectionStore:
                             sr.id AS declarant_id,
                             sr.doc_type,
                             own.doi AS secondary_doi,
-                            lower(rel->>'doi') AS canonical_doi,
+                            rel->>'doi' AS canonical_doi,
                             '{DoiTargetRule.DATACITE_PACKAGE_PIECE.value}' AS same_work_case
                         FROM sr_eff sr
                         JOIN datacite_dois own ON own.id = sr.id
@@ -560,8 +560,8 @@ class SourceRecordCorrectionStore:
                         WHERE sr.doc_type = '{DocType.DATASET.value}'
                           AND rel->>'relation_type' = '{DATACITE_PACKAGE_PIECE_RELATION}'
                           AND rel->>'doi' IS NOT NULL
-                          AND lower(rel->>'doi') <> own.doi
-                          AND lower(rel->>'doi') IN (SELECT d FROM dataset_dois)
+                          AND rel->>'doi' <> own.doi
+                          AND rel->>'doi' IN (SELECT d FROM dataset_dois)
                         UNION ALL
                         -- Fichier complémentaire figshare « Additional file N of T » → collection
                         -- figshare de titre T, sans relation déclarée : la seule collection dataset

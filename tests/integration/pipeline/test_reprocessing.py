@@ -121,7 +121,7 @@ class TestHalReprocessingUpdatesOaStatus:
         sa_sync_conn.execute(
             text("""
                 INSERT INTO dois (doi, unpaywall_oa_status, unpaywall_checked_at)
-                SELECT lower(doi), 'closed', now() FROM publications
+                SELECT doi, 'closed', now() FROM publications
                 WHERE id = (
                     SELECT publication_id FROM source_records
                     WHERE source = 'hal' AND source_id = :hid

@@ -322,7 +322,7 @@ def known_platform_of_source(openalex_id: str) -> KnownPlatform | None:
 
 
 def _platforms_of_doi(doi: str) -> list[KnownPlatform]:
-    """Renvoie les plateformes de la liste dont `doi`, nettoyé, a la forme : préfixe, et début de suffixe s'il est fixé."""
+    """Renvoie les plateformes de la liste dont le DOI normalisé `doi` a la forme : préfixe, et début de suffixe s'il est fixé."""
     prefix, _, suffix = doi.partition("/")
     return [
         p
@@ -339,23 +339,17 @@ def _platforms_of_doi_url(url: str) -> list[KnownPlatform]:
 
 
 def preprint_servers_of_doi(doi: str) -> tuple[KnownPlatform, ...]:
-    """Renvoie les serveurs de preprints de la liste qui ont la forme du DOI : bioRxiv et medRxiv pour `10.1101/2020.…`, aucun pour `10.1101/gad.…`."""
-    cleaned = DOI.normalize(doi)
-    if not cleaned:
-        return ()
+    """Renvoie les serveurs de preprints de la liste qui ont la forme du DOI normalisé `doi` : bioRxiv et medRxiv pour `10.1101/2020.…`, aucun pour `10.1101/gad.…`."""
     return tuple(
-        p for p in _platforms_of_doi(cleaned) if p.platform_type is PlatformType.PREPRINT_SERVER
+        p for p in _platforms_of_doi(doi) if p.platform_type is PlatformType.PREPRINT_SERVER
     )
 
 
 def is_deposit_doi(doi: str, doc_type: str | None) -> bool:
-    """Vrai pour un DOI de dépôt : DOI attribué par une plateforme de la liste à un document de type `doc_type`, dont l'œuvre peut avoir un autre DOI. Serveur de preprints, archive de copies (DESY), dépôt de texte sur Zenodo."""
-    cleaned = DOI.normalize(doi)
-    if not cleaned:
-        return False
+    """Vrai pour un DOI de dépôt : DOI normalisé attribué par une plateforme de la liste à un document de type `doc_type`, dont l'œuvre peut avoir un autre DOI. Serveur de preprints, archive de copies (DESY), dépôt de texte sur Zenodo."""
     return any(
         p.deposit_doc_types is None or doc_type in p.deposit_doc_types
-        for p in _platforms_of_doi(cleaned)
+        for p in _platforms_of_doi(doi)
     )
 
 
@@ -368,9 +362,8 @@ def is_fully_open(url: str) -> bool:
 
 
 def preprint_copy_url(doi: str) -> str | None:
-    """Renvoie l'adresse de la copie désignée par le DOI d'un serveur de preprints de la liste, ou `None` pour un autre DOI."""
-    cleaned = DOI.normalize(doi)
-    return f"https://doi.org/{cleaned}" if cleaned and preprint_servers_of_doi(cleaned) else None
+    """Renvoie l'adresse de la copie désignée par le DOI normalisé d'un serveur de preprints de la liste, ou `None` pour un autre DOI."""
+    return f"https://doi.org/{doi}" if preprint_servers_of_doi(doi) else None
 
 
 def _known_platform_of_url(url: str) -> KnownPlatform | None:

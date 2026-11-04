@@ -25,7 +25,7 @@ def test_distinct_dois_are_not_mergeable():
 
 
 def test_one_doi_and_a_publication_without_doi_are_mergeable():
-    check_mergeable(_articles("10.1/X", None, "10.1/x"))
+    check_mergeable(_articles("10.1/x", None, "10.1/x"))
 
 
 def test_a_deposit_doi_stays_out_of_the_count():

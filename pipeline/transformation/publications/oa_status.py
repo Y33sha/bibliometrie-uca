@@ -93,7 +93,7 @@ def _stale_dois(service: DoiService) -> str:
     )
     return f"""
         SELECT d.doi, x.{service.date_column} AS answered_at
-        FROM (SELECT DISTINCT lower(doi) AS doi FROM publications WHERE doi IS NOT NULL) d
+        FROM (SELECT DISTINCT doi FROM publications WHERE doi IS NOT NULL) d
         LEFT JOIN dois x ON x.doi = d.doi
         {datacite} (x.{service.date_column} IS NULL
                     OR x.{service.date_column} < now() - make_interval(days => :stale))
@@ -160,7 +160,7 @@ class OaStatusStore:
 
     def fetch_oa_inputs(self, dois: Sequence[str]) -> list[PublicationOa]:
         """Renvoie les publications de ces DOI, avec les données du calcul de leur statut OA."""
-        return self._fetch_oa_inputs("lower(p.doi) = ANY(:keys)", list(dois))
+        return self._fetch_oa_inputs("p.doi = ANY(:keys)", list(dois))
 
     def fetch_oa_inputs_of(self, publication_ids: Sequence[int]) -> list[PublicationOa]:
         """Renvoie ces publications, avec les données du calcul de leur statut OA."""
@@ -169,7 +169,7 @@ class OaStatusStore:
     def _fetch_oa_inputs(self, where: str, keys: list[str] | list[int]) -> list[PublicationOa]:
         rows = self._conn.execute(
             text(f"""
-                SELECT p.id, lower(p.doi) AS doi, p.oa_status::text AS oa_status,
+                SELECT p.id, p.doi, p.oa_status::text AS oa_status,
                        p.serial_id, p.doc_type::text AS doc_type, p.source_extras
                 FROM publications p
                 WHERE {where}

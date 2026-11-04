@@ -268,14 +268,11 @@ def fetch_reconciliation_universe(conn: Connection) -> list[ReconcileRow]:
 
 
 def fetch_publication_ids_by_doi(conn: Connection) -> dict[str, int]:
-    """Renvoie `lower(doi) → id` des publications à DOI.
+    """Renvoie `doi → id` des publications à DOI.
 
     `plan_reconciliation` peut ainsi ancrer un groupe sur la publication ayant déjà son DOI, même sans enregistrement source du voisinage rattaché à elle. Cas : publication orpheline après un TRUNCATE et un réimport des sources, ou `publications.doi` différent de ses enregistrements sources. Sinon, le groupe créerait une publication en conflit avec la contrainte unique sur le DOI.
     """
-    # Clé sur `lower(doi)` : l'index unique `publications_doi_lower_key` garantit l'unicité, et l'ancre DOI d'une partition, forme normalisée d'un identifiant, est déjà en minuscule.
-    rows = conn.execute(
-        text("SELECT id, lower(doi) AS doi FROM publications WHERE doi IS NOT NULL")
-    ).all()
+    rows = conn.execute(text("SELECT id, doi FROM publications WHERE doi IS NOT NULL")).all()
     return {row.doi: row.id for row in rows}
 
 
