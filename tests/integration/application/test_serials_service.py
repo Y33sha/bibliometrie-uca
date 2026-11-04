@@ -451,6 +451,24 @@ class TestMergeSerials:
             == target
         )
 
+    def test_unites_list_entries(self, sa_sync_conn, serial_service):
+        target = _serial(sa_sync_conn, title="Target")
+        source = _serial(sa_sync_conn, title="Source")
+        sa_sync_conn.execute(
+            text("""
+                INSERT INTO serial_list_entries (serial_id, list_code) VALUES
+                    (:t, 'doaj'), (:s, 'doaj'), (:s, 'medline')
+            """),
+            {"t": target, "s": source},
+        )
+
+        serial_service.merge_serials(target, source)
+
+        rows = sa_sync_conn.execute(
+            text("SELECT serial_id, list_code FROM serial_list_entries ORDER BY list_code")
+        ).all()
+        assert [tuple(r) for r in rows] == [(target, "doaj"), (target, "medline")]
+
     def test_type_repris_garde_son_marqueur(self, sa_sync_conn, serial_service):
         target = _serial(sa_sync_conn, title="Target")
         source = _serial(sa_sync_conn, title="Source", serial_type="media")

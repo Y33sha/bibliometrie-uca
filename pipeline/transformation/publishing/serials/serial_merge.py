@@ -9,6 +9,7 @@ from infrastructure.repositories.merge_steps import (
     fill_empty_unique,
     merge_into,
     transfer,
+    transfer_unique,
     untouched,
 )
 from pipeline.transformation.publications import lifecycle
@@ -90,6 +91,7 @@ MERGE_STEPS: dict[str, MergeStep] = {
     "is_academic": untouched("serials", "is_academic"),
     "is_in_doaj": MergeStep((("serials", "is_in_doaj"),), _merge_is_in_doaj),
     "doaj_record": untouched("serials", "doaj_payload", "doaj_imported_at"),
+    "list_entries": transfer_unique("serial_list_entries", "serial_id", "list_code"),
     "publication_count": untouched("serials", "publication_count"),
     # Un champ repris de l'absorbée ajoute son marqueur à `manual_fields` (`_fill_empty_with_marker`).
     "manual_fields": untouched("serials", "manual_fields"),
