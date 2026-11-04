@@ -938,6 +938,13 @@ contributor_information = Table(
         name="contributor_information_key",
         postgresql_nulls_not_distinct=True,
     ),
+    # Casse de la forme normalisée des identifiants de personne (`domain.persons.identifiers`) : idHAL en minuscules, ORCID et IdRef en majuscules.
+    CheckConstraint(
+        "identifiers->>'orcid' = upper(identifiers->>'orcid')"
+        " AND identifiers->>'idref' = upper(identifiers->>'idref')"
+        " AND identifiers->>'idhal' = lower(identifiers->>'idhal')",
+        name="contributor_information_identifiers_case",
+    ),
     schema="sources",
 )
 
@@ -1172,6 +1179,11 @@ person_identifiers = Table(
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("status", identifier_status_enum, nullable=False, server_default="pending"),
     UniqueConstraint("id_type", "id_value", name="person_identifiers_id_type_id_value_key"),
+    # Casse de la forme normalisée (`domain.persons.identifiers`) : idHAL en minuscules, ORCID et IdRef en majuscules.
+    CheckConstraint(
+        "id_value = CASE id_type WHEN 'idhal' THEN lower(id_value) ELSE upper(id_value) END",
+        name="person_identifiers_id_value_case",
+    ),
     schema="persons",
 )
 

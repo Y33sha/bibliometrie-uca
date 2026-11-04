@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict bLJn4xiWqcox1UFab6UoStKsfBqHuOWsis53aCnXe5jUvJubVZuac0JQdjQofJI
+\restrict nBHDlwrnlllQZyH2VSfp2hQu7IDyg1qz1CzxXnsCXR9Us3tCGgeR3ESfTNBpfcT
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -962,7 +962,12 @@ CREATE TABLE persons.person_identifiers (
     id_value text NOT NULL,
     source public.identifier_origin NOT NULL,
     created_at timestamp with time zone DEFAULT now(),
-    status public.identifier_status DEFAULT 'pending'::public.identifier_status NOT NULL
+    status public.identifier_status DEFAULT 'pending'::public.identifier_status NOT NULL,
+    CONSTRAINT person_identifiers_id_value_case CHECK ((id_value =
+CASE id_type
+    WHEN 'idhal'::text THEN lower(id_value)
+    ELSE upper(id_value)
+END))
 );
 
 
@@ -2978,7 +2983,8 @@ CASE
     WHEN (last_name_normalized = ''::text) THEN first_name_normalized
     ELSE ((first_name_normalized || ' '::text) || last_name_normalized)
 END) STORED,
-    key_hash text GENERATED ALWAYS AS (md5(((((COALESCE(last_name_normalized, ''::text) || ''::text) || COALESCE(first_name_normalized, ''::text)) || ''::text) || COALESCE((identifiers)::text, ''::text)))) STORED
+    key_hash text GENERATED ALWAYS AS (md5(((((COALESCE(last_name_normalized, ''::text) || ''::text) || COALESCE(first_name_normalized, ''::text)) || ''::text) || COALESCE((identifiers)::text, ''::text)))) STORED,
+    CONSTRAINT contributor_information_identifiers_case CHECK ((((identifiers ->> 'orcid'::text) = upper((identifiers ->> 'orcid'::text))) AND ((identifiers ->> 'idref'::text) = upper((identifiers ->> 'idref'::text))) AND ((identifiers ->> 'idhal'::text) = lower((identifiers ->> 'idhal'::text)))))
 );
 
 
@@ -6119,5 +6125,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict bLJn4xiWqcox1UFab6UoStKsfBqHuOWsis53aCnXe5jUvJubVZuac0JQdjQofJI
+\unrestrict nBHDlwrnlllQZyH2VSfp2hQu7IDyg1qz1CzxXnsCXR9Us3tCGgeR3ESfTNBpfcT
 
