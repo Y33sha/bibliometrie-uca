@@ -15,6 +15,7 @@ from pipeline.task_runner import run_phase
 from pipeline.transformation.structures import affiliations as phase, perimeter
 from pipeline.transformation.structures.address_resolution import ResolutionStats
 from pipeline.transformation.structures.perimeter import EmptyExtractionPerimeterError
+from pipeline.transformation.structures.perimeter_evidence import InPerimeterSyncCounts
 
 PERIMETRE = [10, 20]
 
@@ -59,7 +60,9 @@ def _run(contexte, *, processed=7, in_perimeter=3):
         patch.object(
             phase,
             "populate",
-            side_effect=lambda conn, logger, ids: vus.__setitem__("populate", ids),
+            side_effect=lambda conn, logger, ids: (
+                vus.__setitem__("populate", ids) or InPerimeterSyncCounts(added=4, removed=1)
+            ),
         ),
     ):
         metrics = run_phase(_phase(), contexte())
@@ -70,7 +73,12 @@ def test_assemble_les_metriques_de_la_resolution(contexte):
     metrics, _ = _run(contexte, processed=7, in_perimeter=3)
 
     assert metrics.total == 7
-    assert metrics.details["summary"] == {"adresses": 7, "in_perimeter": 3}
+    assert metrics.details["summary"] == {
+        "adresses": 7,
+        "in_perimeter": 3,
+        "source_contributions_entered": 4,
+        "source_contributions_left": 1,
+    }
 
 
 def test_chaque_sous_etape_dans_sa_transaction(open_tx, contexte):

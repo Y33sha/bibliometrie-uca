@@ -116,7 +116,7 @@ export function useUrlFilters(config: UrlFiltersConfig) {
 				case 'source_states': {
 					const states: Record<string, string> = {};
 					for (const v of raw.split(',')) {
-						const m = v.match(/^(\w+)_(yes|no)$/);
+						const m = v.match(/^([\w-]+)_(yes|no)$/);
 						if (m) states[m[1]] = m[2];
 					}
 					result[key] = states;

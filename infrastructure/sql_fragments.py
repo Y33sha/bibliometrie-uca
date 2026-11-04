@@ -550,3 +550,11 @@ def address_country_conditions(
 def has_active_issn(serial: str) -> str:
     """Renvoie la condition vraie quand la revue `serial` a un ISSN actif."""
     return f"EXISTS (SELECT 1 FROM serial_issns i WHERE i.serial_id = {serial} AND i.status = 'active')"
+
+
+def in_serial_list(serial: str, code: str) -> str:
+    """Renvoie la condition vraie quand la revue `serial` appartient à la liste `code` (`domain.serials.serial_lists`)."""
+    return (
+        "EXISTS (SELECT 1 FROM serial_list_entries e "
+        f"WHERE e.serial_id = {serial} AND e.list_code = '{code}')"
+    )

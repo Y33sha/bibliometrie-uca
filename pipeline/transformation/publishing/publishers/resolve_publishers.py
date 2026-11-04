@@ -16,10 +16,9 @@ import httpx2
 from sqlalchemy import Connection
 
 from domain.normalize import normalize_text, to_plain_text
-from domain.publishers.names import publisher_name_key
-from pipeline.http.circuit_breaker import source_tripped
 from pipeline.http.fetch_pool import run_fetch_pool
 from pipeline.http.lookup import UNAVAILABLE, LookupOutcome, NotFound, Unavailable
+from pipeline.ingestion.api_params import MAX_CONCURRENT
 from pipeline.runtime.observability.log_format import BRANCH, quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import track_progress
@@ -35,19 +34,6 @@ LABELS: dict[Agency, str] = {
     "DataCite": "Éditeurs des préfixes DOI DataCite",
 }
 """Libellé de chaque étape dans le journal de la phase."""
-
-MAX_CONCURRENT = 3
-"""Requêtes `/prefixes` simultanées, sous les plafonds des pools polis Crossref et DataCite."""
-
-
-def match_or_create_publisher(name: str, *, repo: PublisherStore) -> tuple[int, bool] | None:
-    """Trouve par sa clé de nom, ou crée, l'éditeur désigné par `name`. Renvoie `(id, created)`, ou `None` si le nom est vide une fois normalisé."""
-    name_normalized = normalize_text(name)
-    name_key = publisher_name_key(name)
-    if not name_normalized or not name_key:
-        return None
-    return repo.match_or_create_by_name_form(name, name_normalized, name_key)
-
 
 COMMIT_EVERY = 50
 
@@ -145,20 +131,39 @@ def _resolve(
     rows = prefix_store.get_prefixes_pending_publisher(agency)
     if not rows:
         return metrics
+
+    def attach(
+        row: PendingPublisherPrefix, name_raw: str | None, name_normalized: str | None
+    ) -> None:
+        """Rattache l'éditeur nommé, le crée au besoin, et marque le préfixe vu par l'agence."""
+        metrics.add(seen=1)
+        matched = (
+            publisher_store.match_or_create(name_raw)
+            if name_raw and name_normalized is not None
+            else None
+        )
+        if matched is not None:
+            publisher_id, created = matched
+            prefix_store.update_publisher_id(row.prefix, publisher_id)
+            metrics.add(**{"publisher_created" if created else "publisher_matched": 1})
+            # Ligne de détail : le terminal la masque, le journal la garde.
+            log.info(
+                "%s → “%s”%s",
+                row.prefix,
+                name_raw,
+                " (nouveau)" if created else "",
+                extra={"detail": True},
+            )
+        else:
+            metrics.add(no_publisher=1)
+            log.info("%s → éditeur inconnu de %s", row.prefix, agency, extra={"detail": True})
+        prefix_store.mark_checked(row.prefix, agency)
+
     with track_progress(len(rows), f"{BRANCH}{LABELS[agency]}", log, erase=True) as progress:
         # Nom déjà stocké : rattachement direct, sans requête.
         for row in rows:
             if row.publisher_name_normalized is not None:
-                _attach(
-                    row,
-                    agency,
-                    row.publisher_name_raw,
-                    row.publisher_name_normalized,
-                    metrics,
-                    log,
-                    prefix_store,
-                    publisher_store,
-                )
+                attach(row, row.publisher_name_raw, row.publisher_name_normalized)
                 progress.advance()
         to_fetch = [row for row in rows if row.publisher_name_normalized is None]
 
@@ -176,32 +181,20 @@ def _resolve(
                 )
             else:
                 name_raw, name_normalized = _store_publisher_metadata(row, answer, prefix_store)
-                _attach(
-                    row,
-                    agency,
-                    name_raw,
-                    name_normalized,
-                    metrics,
-                    log,
-                    prefix_store,
-                    publisher_store,
-                )
+                attach(row, name_raw, name_normalized)
             progress.advance()
 
         asyncio.run(
             run_fetch_pool(
                 to_fetch,
                 conn,
-                max_concurrent=MAX_CONCURRENT,
+                max_concurrent=MAX_CONCURRENT[agency.lower()],
                 commit_every=COMMIT_EVERY,
                 fetch=ask,
                 write=_write,
                 prepare=prepare,
             )
         )
-    if source_tripped():
-        log.warning("resolve_publishers : circuit-breaker %s coupé, arrêt", agency)
-
     metrics.report = (
         f"{quantity(metrics.total, 'préfixe')} : "
         f"{quantity(metrics.extras.get('publisher_matched', 0), 'éditeur reconnu', 'éditeurs reconnus')}, "
@@ -248,39 +241,3 @@ def _store_publisher_metadata(
         datacite_client_symbol=datacite_client_symbol,
     )
     return publisher_name_raw, publisher_name_normalized
-
-
-def _attach(
-    row: PendingPublisherPrefix,
-    agency: Agency,
-    name_raw: str | None,
-    name_normalized: str | None,
-    metrics: PhaseMetrics,
-    log: logging.Logger,
-    prefix_store: DoiPrefixStore,
-    publisher_store: PublisherStore,
-) -> None:
-    """Rattache l'éditeur nommé, le crée au besoin, et marque le préfixe vu par l'agence."""
-    metrics.add(seen=1)
-    matched = (
-        match_or_create_publisher(name_raw, repo=publisher_store)
-        if name_raw and name_normalized is not None
-        else None
-    )
-    if matched is not None:
-        publisher_id, created = matched
-        prefix_store.update_publisher_id(row.prefix, publisher_id)
-        metrics.add(**{"publisher_created" if created else "publisher_matched": 1})
-        # Ligne de détail : le terminal la masque, le journal la garde.
-        log.info(
-            "%s → “%s”%s",
-            row.prefix,
-            name_raw,
-            " (nouveau)" if created else "",
-            extra={"detail": True},
-        )
-    else:
-        metrics.add(no_publisher=1)
-        log.info("%s → éditeur inconnu de %s", row.prefix, agency, extra={"detail": True})
-
-    prefix_store.mark_checked(row.prefix, agency)

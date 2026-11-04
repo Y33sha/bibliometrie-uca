@@ -38,15 +38,8 @@ from infrastructure.db.jsonb import Jsonb
 from infrastructure.db.scalars import scalar_int
 from infrastructure.db.source_record_identifiers import first_of_its_type_sql, non_related_doi_sql
 from infrastructure.sql_fragments import has_source_extra, in_clause
-from pipeline.graph import Task
-from pipeline.runtime.context import PhaseContext
-from pipeline.runtime.observability.log_format import (
-    LAST_BRANCH,
-    breakdown,
-    inflect,
-    quantity,
-    step,
-)
+from pipeline.graph import Task, in_transaction
+from pipeline.runtime.observability.log_format import LAST_BRANCH, breakdown, inflect, quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
 
@@ -289,9 +282,9 @@ def rebuild_relations(conn: Connection, edges: list[RelationEdge]) -> RelationsR
     )
     conn.execute(text("DELETE FROM publication_relations"))
     written = 0 if not edges else _insert_edges(conn, edges)
-    rebuild = RelationsRebuild(written, _count_added(conn), _count_removed(conn))
+    changes = RelationsRebuild(written, _count_added(conn), _count_removed(conn))
     conn.execute(text("DROP TABLE relations_before"))
-    return rebuild
+    return changes
 
 
 def _count_added(conn: Connection) -> list[tuple[str, int]]:
@@ -365,9 +358,9 @@ def count_by_relation_type(conn: Connection) -> list[tuple[str, int]]:
 def _build_declared_edges(sources: list[DeclaredRelationSource]) -> list[RelationEdge]:
     edges: list[RelationEdge] = []
     for source_record in sources:
-        if source_record.source == "datacite":
+        if source_record.source == Source.DATACITE:
             relations = extract_datacite_relations(source_record.source_extras)
-        elif source_record.source == "crossref":
+        elif source_record.source == Source.CROSSREF:
             relations = extract_crossref_relations(source_record.source_extras)
         else:
             continue
@@ -386,7 +379,7 @@ def _distinct_work_targets(sources: list[DeclaredRelationSource]) -> list[str]:
         {
             doi
             for source_record in sources
-            if source_record.source == "datacite"
+            if source_record.source == Source.DATACITE
             for doi in extract_datacite_distinct_works(
                 source_record.source_extras, source_record.doi, source_record.source_record_doc_type
             )
@@ -403,7 +396,7 @@ def _build_distinct_work_edges(
     """
     edges: list[RelationEdge] = []
     for source_record in sources:
-        if source_record.source != "datacite":
+        if source_record.source != Source.DATACITE:
             continue
         for target_doi in extract_datacite_distinct_works(
             source_record.source_extras, source_record.doi, source_record.source_record_doc_type
@@ -423,14 +416,17 @@ def _build_distinct_work_edges(
                         target.id,
                         relation.value,
                         source_record.doi,
-                        "datacite",
+                        Source.DATACITE.value,
                         target_publication_id=source_record.publication_id,
                     )
                 )
             else:
                 edges.append(
                     RelationEdge(
-                        source_record.publication_id, relation.value, target_doi, "datacite"
+                        source_record.publication_id,
+                        relation.value,
+                        target_doi,
+                        Source.DATACITE.value,
                     )
                 )
     return edges
@@ -501,65 +497,62 @@ def _build_title_match_edges(
     ]
 
 
-def rebuild(ctx: PhaseContext) -> PhaseMetrics:
-    """Reconstruit `publication_relations` depuis les trois signaux, en une transaction, et renvoie les compteurs de la phase (répartition par type de relation dans `details`)."""
-    with ctx.open_tx() as conn:
-        sources = fetch_declared_relation_sources(conn)
-        declared_edges = _build_declared_edges(sources)
-        publications_by_doi = fetch_publications_by_doi(
-            conn,
-            sorted(
-                {
-                    *_distinct_work_targets(sources),
-                    *(edge.target_doi for edge in declared_edges if edge.target_doi),
-                }
-            ),
-        )
-        declared_edges += _build_distinct_work_edges(sources, publications_by_doi)
+def rebuild(conn: Connection, logger: logging.Logger) -> PhaseMetrics:
+    """Reconstruit `publication_relations` depuis les trois signaux, et renvoie les compteurs de la phase (répartition par type de relation dans `details`)."""
+    sources = fetch_declared_relation_sources(conn)
+    declared_edges = _build_declared_edges(sources)
+    publications_by_doi = fetch_publications_by_doi(
+        conn,
+        sorted(
+            {
+                *_distinct_work_targets(sources),
+                *(edge.target_doi for edge in declared_edges if edge.target_doi),
+            }
+        ),
+    )
+    declared_edges += _build_distinct_work_edges(sources, publications_by_doi)
 
-        pairs = fetch_shared_key_pairs(conn)
-        shared_edges = _build_shared_key_edges(
-            pairs, _declared_pairs(declared_edges, publications_by_doi)
-        )
+    pairs = fetch_shared_key_pairs(conn)
+    shared_edges = _build_shared_key_edges(
+        pairs, _declared_pairs(declared_edges, publications_by_doi)
+    )
 
-        erratum_matches = fetch_erratum_title_matches(conn)
-        preprint_matches = fetch_preprint_title_matches(conn)
-        title_edges = _build_title_match_edges(
-            erratum_matches, DEPENDENT_DOC_TYPE_RELATIONS["erratum"]
-        ) + _build_title_match_edges(preprint_matches, DEPENDENT_DOC_TYPE_RELATIONS["preprint"])
+    erratum_matches = fetch_erratum_title_matches(conn)
+    preprint_matches = fetch_preprint_title_matches(conn)
+    title_edges = _build_title_match_edges(
+        erratum_matches, DEPENDENT_DOC_TYPE_RELATIONS["erratum"]
+    ) + _build_title_match_edges(preprint_matches, DEPENDENT_DOC_TYPE_RELATIONS["preprint"])
 
-        # L'ordre déclarées → clés partagées → titre fixe la priorité de dédoublonnage (`ON CONFLICT`).
-        rebuild = rebuild_relations(conn, declared_edges + shared_edges + title_edges)
-        by_type = count_by_relation_type(conn)
-
-    _log_changes(rebuild, ctx.logger)
+    # L'ordre déclarées → clés partagées → titre fixe la priorité de dédoublonnage (`ON CONFLICT`).
+    changes = rebuild_relations(conn, declared_edges + shared_edges + title_edges)
+    by_type = count_by_relation_type(conn)
+    _log_changes(changes, logger)
 
     metrics = PhaseMetrics()
-    metrics.add(new=sum(count for _, count in rebuild.added_by_type))
+    metrics.add(new=sum(count for _, count in changes.added_by_type))
     metrics.details["table"] = {
         "rows": [{"key": relation_type, "count": count} for relation_type, count in by_type]
     }
     return metrics
 
 
-def _log_changes(rebuild: RelationsRebuild, logger: logging.Logger) -> None:
+def _log_changes(changes: RelationsRebuild, logger: logging.Logger) -> None:
     """Journalise les changements de la reconstruction : relations ajoutées par nature du lien, puis relations disparues."""
-    added = _count_by_pair_label(rebuild.added_by_type)
+    added = _count_by_pair_label(changes.added_by_type)
     total = sum(added.values())
-    step(logger, "Relations entre publications")
     if total:
         breakdown(
             logger,
             f"{quantity(total, 'nouvelle relation', 'nouvelles relations')}, dont",
             ((count, label) for label, count in added.items()),
-            last=not rebuild.removed,
+            last=not changes.removed,
         )
-    if rebuild.removed:
+    if changes.removed:
         logger.info(
             "%s%s %s",
             LAST_BRANCH,
-            quantity(rebuild.removed, "relation"),
-            inflect(rebuild.removed, "retirée"),
+            quantity(changes.removed, "relation"),
+            inflect(changes.removed, "retirée"),
         )
     elif not total:
         logger.info("%saucun changement", LAST_BRANCH)
@@ -581,13 +574,15 @@ TASKS = (
             *(
                 f"source_records.{column}"
                 for column in (
+                    "source",
                     "source_extras",
-                    "corrections",
                     "doc_type",
                     "publication_id",
                 )
             ),
             "source_record_identifiers",
+            # Cible d'un DOI de forme secondaire, qui désigne la publication de la cible.
+            "doi_targets",
             "publications.id",
             "publications.doc_type",
             "publications.doi",
@@ -598,6 +593,7 @@ TASKS = (
         writes=("publication_relations",),
         # Lecture de la table avant sa reconstruction, pour compter les arêtes ajoutées et disparues.
         previous_run=("publication_relations",),
-        run=rebuild,
+        run=in_transaction(rebuild),
+        section="Relations entre publications",
     ),
 )

@@ -13,8 +13,8 @@ La phase s'arrête en échec si le périmètre d'extraction ne contient aucune s
 from __future__ import annotations
 
 import logging
-import time
 from collections.abc import Mapping
+from typing import cast
 
 from sqlalchemy import Connection
 
@@ -26,7 +26,7 @@ from pipeline.http.polite_pool import default_user_agent
 from pipeline.ingestion.complements.ror import ZenodoRorDumpSource
 from pipeline.ingestion.hal.api import HalStructuresClient
 from pipeline.runtime.context import PhaseContext
-from pipeline.runtime.observability.log_format import LAST_BRANCH
+from pipeline.runtime.observability.log_format import LAST_BRANCH, inflect, quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import waiting
 from pipeline.transformation.structures.address_origin import classify_addresses
@@ -39,6 +39,7 @@ from pipeline.transformation.structures.hal_structures import (
 )
 from pipeline.transformation.structures.idref_resolution import resolve_thesis_partners
 from pipeline.transformation.structures.perimeter_evidence import (
+    InPerimeterSyncCounts,
     refresh_source_contribution_structures,
     sync_perimeter_evidence,
 )
@@ -61,29 +62,38 @@ def _resolve_addresses(ctx: PhaseContext) -> PhaseMetrics:
 def _resolve_thesis_partners(ctx: PhaseContext) -> PhaseMetrics:
     with ctx.open_tx() as conn:
         resolve_thesis_partners(conn, ctx.logger)
-        conn.commit()
     return PhaseMetrics()
 
 
 def _populate(ctx: PhaseContext) -> PhaseMetrics:
     with ctx.open_tx() as conn:
         perimeter_ids = set(get_persons_structure_ids_list(conn))
-        populate(conn, ctx.logger, perimeter_ids)
-    return PhaseMetrics()
+        counts = populate(conn, ctx.logger, perimeter_ids)
+    metrics = PhaseMetrics()
+    metrics.details["summary"] = {
+        "source_contributions_entered": counts.added,
+        "source_contributions_left": counts.removed,
+    }
+    return metrics
 
 
-def populate(conn: Connection, logger: logging.Logger, perimeter_ids: set[int]) -> None:
-    """Pose sur les contributions sources les indices de leur entrée dans le périmètre. L'appelant commite."""
-    t0 = time.perf_counter()
+def populate(
+    conn: Connection, logger: logging.Logger, perimeter_ids: set[int]
+) -> InPerimeterSyncCounts:
+    """Pose sur les contributions sources les indices de leur entrée dans le périmètre. Renvoie le nombre d'entrées et de sorties du périmètre. L'appelant commite."""
     with waiting(f"{LAST_BRANCH}rattachement en cours", logger) as line:
         refresh_source_contribution_structures(conn)
-        sync_perimeter_evidence(conn, perimeter_ids=list(perimeter_ids))
-        line.conclude(f"{LAST_BRANCH}Terminé en {time.perf_counter() - t0:.1f}s")
+        counts = sync_perimeter_evidence(conn, perimeter_ids=list(perimeter_ids))
+        entered = quantity(
+            counts.added, "contribution source entrée", "contributions sources entrées"
+        )
+        left = f"{counts.removed} {inflect(counts.removed, 'sortie')}"
+        line.conclude(f"{LAST_BRANCH}{entered} dans le périmètre, {left}")
+    return counts
 
 
 def _refresh_hal_structures(ctx: PhaseContext) -> PhaseMetrics:
-    """Charge le référentiel des structures HAL, sur sa propre connexion."""
-
+    """Charge le référentiel des structures HAL."""
     with ctx.open_tx() as conn:
         return run_refresh_hal_structures(
             conn,
@@ -95,8 +105,7 @@ def _refresh_hal_structures(ctx: PhaseContext) -> PhaseMetrics:
 
 
 def _refresh_ror(ctx: PhaseContext) -> PhaseMetrics:
-    """Rafraîchit le référentiel ROR depuis le dump publié sur Zenodo, sur sa propre connexion."""
-
+    """Rafraîchit le référentiel ROR depuis le dump publié sur Zenodo."""
     # Le dump est public : l'adresse du polite pool est facultative.
     source = ZenodoRorDumpSource(user_agent=default_user_agent(), logger=ctx.logger)
     with ctx.open_tx() as conn:
@@ -224,8 +233,12 @@ TASKS = (
 
 
 def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
-    """Renvoie les métriques de la résolution des adresses, avec les détails des deux référentiels."""
+    """Renvoie les métriques de la résolution des adresses, avec les détails des deux référentiels, et les entrées et sorties du périmètre."""
     metrics = by_task["resolve_addresses"]
     metrics.details.update(by_task["refresh_ror"].details)
     metrics.details.update(by_task["refresh_hal_structures"].details)
+    metrics.details["summary"] = {
+        **cast("dict[str, int]", metrics.details["summary"]),
+        **cast("dict[str, int]", by_task["populate"].details["summary"]),
+    }
     return metrics

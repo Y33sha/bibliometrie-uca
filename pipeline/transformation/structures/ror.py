@@ -145,24 +145,30 @@ def run_refresh_ror(
 ) -> PhaseMetrics:
     """Importe la dernière version du dump ROR, si elle reste à importer."""
     metrics = PhaseMetrics()
+
+    def already_imported(version: str) -> PhaseMetrics:
+        logger.info("%sVersion %s déjà importée", LAST_BRANCH, version)
+        metrics.details["ror"] = {"version": version, "imported": False}
+        return metrics
+
     step(logger, "Référentiel ROR")
     last = store.last_imported_version()
     published = source.published_version()
     if last and published and dump_version(last) == published:
-        logger.info("%sVersion %s déjà importée", LAST_BRANCH, last)
-        metrics.details["ror"] = {"version": last, "imported": False}
-        return metrics
+        return already_imported(last)
     try:
         latest = source.latest_version()
         if latest == last:
-            logger.info("%sVersion %s déjà importée", LAST_BRANCH, latest)
-            metrics.details["ror"] = {"version": latest, "imported": False}
-            return metrics
+            return already_imported(latest)
         stats = import_ror_dump(conn, source.organizations(latest), version=latest, store=store)
     except DumpUnavailableError as e:
         conn.rollback()
-        logger.warning("%sDump ROR inaccessible, référentiel inchangé : %s", LAST_BRANCH, e)
-        signal_source_unavailable(metrics, "ROR", logger=logger)
+        signal_source_unavailable(
+            metrics,
+            "ROR",
+            logger=logger,
+            reason=f"Dump ROR inaccessible, référentiel inchangé : {e}",
+        )
         metrics.details["ror"] = {"imported": False, "error": str(e)}
         metrics.report = "dump ROR inaccessible, import repris au prochain run"
         return metrics

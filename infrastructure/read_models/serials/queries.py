@@ -15,6 +15,7 @@ from domain.serials.serial import (
     OaModel,
     SerialType,
 )
+from domain.serials.serial_lists import DOAJ
 from infrastructure.db.source_record_identifiers import serial_doi_sql
 from infrastructure.read_models._common import (
     EntityFacetItem,
@@ -35,7 +36,10 @@ from infrastructure.read_models.serials.models import (
     SerialDuplicatesResponse,
     SerialFilters,
     SerialIssnDetail,
+    SerialListFacet,
     SerialListItem,
+    SerialListLevelFacet,
+    SerialListMembership,
     SerialListResponse,
     SerialRelation,
     SerialsFacetsResponse,
@@ -43,12 +47,15 @@ from infrastructure.read_models.serials.models import (
 )
 from infrastructure.read_models.subjects.models import SubjectFrequency
 from infrastructure.read_models.subjects.queries import entity_subjects
-from infrastructure.sql_fragments import active_issns, corrected, has_active_issn
+from infrastructure.sql_fragments import active_issns, corrected, has_active_issn, in_serial_list
+
+_IN_DOAJ = in_serial_list("j.id", DOAJ)
+"""Condition vraie quand la revue `j` est présente dans le DOAJ."""
 
 _SERIAL_LIST_COLUMNS = f"""
     j.id, j.title, {active_issns("j.id")} AS issns,
     j.publisher_id, p.name AS publisher_name,
-    j.is_in_doaj, j.serial_type, j.oa_model, j.publication_count,
+    {_IN_DOAJ} AS is_in_doaj, j.serial_type, j.oa_model, j.publication_count,
     j.doaj_payload->>'DOAJ id' AS doaj_id,
     j.doaj_payload->>'URL in DOAJ' AS doaj_url_csv
 """
@@ -110,6 +117,44 @@ def _serial_list_item(row: Row[tuple[object, ...]]) -> SerialListItem:
     )
 
 
+_IN_LIST_OR_LEVELS = """EXISTS (
+        SELECT 1 FROM serial_list_entries e JOIN serial_lists l ON l.code = e.list_code
+        WHERE e.serial_id = j.id AND (l.code = :{param} OR l.ranking_code = :{param})
+    )"""
+"""Condition vraie quand la revue `j` figure dans la liste `:{param}`, ou à l'un des niveaux du classement `:{param}`."""
+
+_IN_CHECKED_LEVELS = """NOT EXISTS (
+        SELECT 1 FROM serial_lists r
+        WHERE r.code IN (SELECT ranking_code FROM serial_lists WHERE code = ANY(:list_levels))
+          AND NOT EXISTS (
+              SELECT 1 FROM serial_list_entries e JOIN serial_lists c ON c.code = e.list_code
+              WHERE e.serial_id = j.id AND c.ranking_code = r.code AND c.code = ANY(:list_levels)
+          )
+    )"""
+"""Condition vraie quand la revue `j` figure, pour chaque classement à niveaux cochés, à l'un de ces niveaux."""
+
+_LIST_FACET = """
+    WITH kept AS (SELECT j.id FROM serials j WHERE {where})
+    SELECT l.code, l.label, l.ranking_code, count(DISTINCT e.serial_id) AS n
+    FROM serial_lists l
+    LEFT JOIN serial_lists c ON c.code = l.code OR c.ranking_code = l.code
+    LEFT JOIN serial_list_entries e
+        ON e.list_code = c.code AND e.serial_id IN (SELECT id FROM kept)
+    GROUP BY l.code, l.label, l.ranking_code, l.display_order
+    ORDER BY l.display_order
+"""
+"""Revues retenues par liste, par classement (tous niveaux) et par niveau."""
+
+_SERIAL_LISTS = text("""
+    SELECT c.code, coalesce(r.label || ', ' || c.label, c.label) AS label,
+           c.maintainer, c.edition
+    FROM serial_list_entries e
+    JOIN serial_lists c ON c.code = e.list_code
+    LEFT JOIN serial_lists r ON r.code = c.ranking_code
+    WHERE e.serial_id = :id
+    ORDER BY c.display_order
+""")
+
 _ISSN_SEARCH_SQL = """EXISTS (
         SELECT 1 FROM serial_issns i
         WHERE i.serial_id = j.id AND replace(upper(i.issn), '-', '') LIKE :issn_prefix || '%'
@@ -122,7 +167,7 @@ def _build_serial_where(
     *,
     skip_publisher: bool = False,
     skip_serial_types: bool = False,
-    skip_doaj: bool = False,
+    skip_lists: bool = False,
     skip_oa_models: bool = False,
     skip_publications: bool = False,
 ) -> tuple[str, dict[str, object]]:
@@ -152,9 +197,14 @@ def _build_serial_where(
         # `serial_type` est une enum PostgreSQL, convertie en texte pour la comparer à un `text[]`.
         parts.append("j.serial_type::text = ANY(:serial_types)")
         binds["serial_types"] = filters.serial_types
-    if filters.is_in_doaj is not None and not skip_doaj:
-        parts.append("j.is_in_doaj = :is_in_doaj")
-        binds["is_in_doaj"] = filters.is_in_doaj
+    if not skip_lists:
+        for i, (code, present) in enumerate(sorted(filters.list_states.items())):
+            in_list = _IN_LIST_OR_LEVELS.format(param=f"list_{i}")
+            parts.append(in_list if present else f"NOT {in_list}")
+            binds[f"list_{i}"] = code
+        if filters.list_levels:
+            parts.append(_IN_CHECKED_LEVELS)
+            binds["list_levels"] = filters.list_levels
     if filters.oa_models and not skip_oa_models:
         parts.append("j.oa_model = ANY(:oa_models)")
         binds["oa_models"] = filters.oa_models
@@ -412,20 +462,21 @@ class SerialQueries:
             for v in OaModel
         ]
 
-        where_d, binds_d = _build_serial_where(filters, skip_doaj=True)
-        doaj_rows = self._conn.execute(
-            text(f"""
-                SELECT j.is_in_doaj AS value, COUNT(*) AS n
-                FROM serials j
-                WHERE {where_d}
-                GROUP BY j.is_in_doaj
-            """),
-            binds_d,
-        ).all()
-        doaj_counts = {bool(r.value): r.n for r in doaj_rows}
-        doaj_facet = [
-            FacetOption(value="true", label="Indexée", count=doaj_counts.get(True, 0)),
-            FacetOption(value="false", label="Non indexée", count=doaj_counts.get(False, 0)),
+        where_l, binds_l = _build_serial_where(filters, skip_lists=True)
+        list_rows = self._conn.execute(text(_LIST_FACET.format(where=where_l)), binds_l).all()
+        lists_facet = [
+            SerialListFacet(
+                code=r.code,
+                label=r.label,
+                count=r.n,
+                levels=[
+                    SerialListLevelFacet(code=level.code, label=level.label, count=level.n)
+                    for level in list_rows
+                    if level.ranking_code == r.code
+                ],
+            )
+            for r in list_rows
+            if r.ranking_code is None
         ]
 
         where_p, binds_p = _build_serial_where(filters, skip_publications=True)
@@ -442,8 +493,16 @@ class SerialQueries:
         return SerialsFacetsResponse(
             serial_types=serial_types_facet,
             oa_models=oa_models_facet,
-            doaj=doaj_facet,
+            lists=lists_facet,
             publications=YesNoCount(yes=publications_row.yes, no=publications_row.no),
+        )
+
+    def serial_list_codes(self) -> tuple[frozenset[str], frozenset[str]]:
+        """Renvoie les codes des listes et des classements, puis ceux des niveaux."""
+        rows = self._conn.execute(text("SELECT code, ranking_code FROM serial_lists")).all()
+        return (
+            frozenset(r.code for r in rows if r.ranking_code is None),
+            frozenset(r.code for r in rows if r.ranking_code is not None),
         )
 
     def serials_publisher_facet(
@@ -502,6 +561,15 @@ class SerialQueries:
             relations=[
                 SerialRelation(kind=r.kind, serial_id=r.serial_id, title=r.title, issn=r.issn)
                 for r in self._conn.execute(_RELATIONS, {"id": serial_id})
+            ],
+            lists=[
+                SerialListMembership(
+                    code=r.code,
+                    label=r.label,
+                    maintainer=r.maintainer,
+                    edition=r.edition,
+                )
+                for r in self._conn.execute(_SERIAL_LISTS, {"id": serial_id})
             ],
             openalex_id=row.openalex_id,
             is_academic=row.is_academic,

@@ -60,7 +60,7 @@ def _contributions(conn, publication_id):
 
 
 def _run(conn):
-    return build_contributions(conn, AuthorGroupingStore(conn), logger)
+    return build_contributions(conn, logger)
 
 
 def test_un_identifiant_neutralise_ne_donne_pas_de_prenom(conn):
@@ -189,7 +189,7 @@ def test_la_reconstruction_realigne_les_publications_non_marquees(conn):
     _run(conn)
     conn.execute(text("DELETE FROM contributions WHERE publication_id = :p"), {"p": publication})
 
-    metrics = build_contributions(conn, AuthorGroupingStore(conn), logger, rebuild=True)
+    metrics = build_contributions(conn, logger, rebuild=True)
 
     assert metrics.details["summary"]["publications"] >= 1
     assert len(_contributions(conn, publication)) == 2

@@ -109,6 +109,11 @@ GRANT UPDATE ON
     publishing.serial_issns
 TO bibliometrie_app;
 
+-- Les listes d'une revue absorbée par une fusion rejoignent celles de la revue conservée.
+GRANT UPDATE, DELETE ON
+    publishing.serial_list_entries
+TO bibliometrie_app;
+
 GRANT INSERT ON
     ops.audit_log
 TO bibliometrie_app;

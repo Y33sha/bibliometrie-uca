@@ -9,7 +9,7 @@ from sqlalchemy import Connection
 
 from domain.addresses.country_detection import CountryDetectionMethod
 from domain.countries import PlaceNameKind
-from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, quantity, step
+from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.countries.place_name_detector import PlaceNameDetector
 from pipeline.transformation.countries.place_names import load_place_forms
@@ -27,7 +27,6 @@ def run(conn: Connection, logger: logging.Logger) -> PhaseMetrics:
 
     `seen` = adresses examinées, `new` = adresses qui reçoivent un candidat.
     """
-    step(logger, "Pays des adresses d'après les noms de villes et d'institutions")
     store = CountryCandidatesStore(conn)
     rows = store.queued_addresses()
     added = 0

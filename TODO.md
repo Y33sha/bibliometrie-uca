@@ -10,13 +10,12 @@
 * [ ] conserver l'historique des structures
 * [ ] financements (projets ANR, projets européens)
 * [ ] publications fermées, sans localisation éditeur, avec revue OA: chercher des moyens de retrouver les localisations éditeur (URL des revues)
+* [ ] revue dans une liste officielle, avec type autre que "revue": auditer
 # UI
 ## Admin
-* [ ] créer des catégories de personnes (personnel UCA, chercheurs associés, anciens doctorants, méga-collab de physique des particules) => et pouvoir configurer la visibilité des groupes dans l'UI publique (beaucoup d'adresses UCA dans les collaborations ALICE/ATLAS sont décalées dans les sources, ce qui pourrit la base avec des milliers de fausses "personnes UCA")
 * [ ] fusionner structures
 * [ ] bloquer les opérations destructrices côté admin lorsque le pipeline est actif (recenser les actions qui peuvent poser problème)
 ## Publique
-* [ ] auteur premier, dernier, correspondant: sur les facettes et les stats
 * [ ] stats en compte fractionnaire vs compte entier?
 * [ ] quand on détache une publi d'un auteur: mettre à jour le décompte et la pagination
 * [ ] page publisher: pas de tab monographies si count=0

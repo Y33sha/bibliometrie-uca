@@ -264,38 +264,32 @@ class AuthorGroupingStore:
 
         Une contribution déjà en base garde son identifiant, sa personne et son mode de résolution. Une contribution à contributions sources changées est marquée pour la redécision de sa personne (`Queue.CONTRIBUTION_RESOLUTION`). Les autres contributions sources des publications du lot perdent leur `duplicate_of`.
         """
-        publication_ids, contributions, removed = (
-            plan.publication_ids,
-            plan.contributions,
-            plan.removed,
-        )
-        memberships, unmatched_ids, duplicates = (
-            plan.memberships,
-            plan.unmatched,
-            plan.duplicates,
-        )
+        publication_ids = list(plan.publication_ids)
         self._conn.execute(
             _CLEAR_DUPLICATES_SQL,
-            {"publications": list(publication_ids), "duplicates": list(duplicates)},
+            {"publications": publication_ids, "duplicates": list(plan.duplicates)},
         )
-        if duplicates:
+        if plan.duplicates:
             self._conn.execute(
                 _SET_DUPLICATES_SQL,
-                {"duplicates": list(duplicates), "originals": list(duplicates.values())},
+                {
+                    "duplicates": list(plan.duplicates),
+                    "originals": list(plan.duplicates.values()),
+                },
             )
-        if removed:
-            self._conn.execute(_DELETE_MEMBERSHIPS_SQL, {"source_contributions": list(removed)})
-        if unmatched_ids:
-            self._conn.execute(_DELETE_CONTRIBUTIONS_SQL, {"ids": list(unmatched_ids)})
+        if plan.removed:
+            self._conn.execute(_DELETE_MEMBERSHIPS_SQL, {"source_contributions": plan.removed})
+        if plan.unmatched:
+            self._conn.execute(_DELETE_CONTRIBUTIONS_SQL, {"ids": plan.unmatched})
         if plan.recomposed:
-            self._conn.execute(_MARK_RECOMPOSED_SQL, {"ids": list(plan.recomposed)})
-        kept = [g for g in contributions if g.existing]
+            self._conn.execute(_MARK_RECOMPOSED_SQL, {"ids": plan.recomposed})
+        kept = [g for g in plan.contributions if g.existing]
         if kept:
             self._conn.execute(
                 _UPDATE_POSITIONS_SQL,
                 {"ids": [g.id for g in kept], "positions": [g.reference_position for g in kept]},
             )
-        created = [g for g in contributions if not g.existing]
+        created = [g for g in plan.contributions if not g.existing]
         if created:
             self._conn.execute(
                 _INSERT_CONTRIBUTIONS_SQL,
@@ -305,16 +299,16 @@ class AuthorGroupingStore:
                     "positions": [g.reference_position for g in created],
                 },
             )
-        if memberships:
+        if plan.memberships:
             self._conn.execute(
                 _INSERT_MEMBERSHIPS_SQL,
                 {
-                    "source_contributions": [m.source_contribution for m in memberships],
-                    "contributions": [m.contribution for m in memberships],
-                    "source_records": [m.source_record for m in memberships],
-                    "methods": [m.method for m in memberships],
+                    "source_contributions": [m.source_contribution for m in plan.memberships],
+                    "contributions": [m.contribution for m in plan.memberships],
+                    "source_records": [m.source_record for m in plan.memberships],
+                    "methods": [m.method for m in plan.memberships],
                 },
             )
         self._conn.execute(
-            _MARK_CONTRIBUTIONS_OF_PUBLICATIONS_SQL, {"publications": list(publication_ids)}
+            _MARK_CONTRIBUTIONS_OF_PUBLICATIONS_SQL, {"publications": publication_ids}
         )

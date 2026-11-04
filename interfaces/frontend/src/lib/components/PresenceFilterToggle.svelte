@@ -4,15 +4,24 @@
 
 	type ToggleState = 'all' | 'yes' | 'no';
 
+	interface Level {
+		key: string;
+		label: string;
+	}
+
 	interface Item {
 		key: string;
 		label: string;
+		/** Niveaux de l'élément, cochés un à un et combinés en OU. Cachés quand l'élément est exclu. */
+		levels?: Level[];
 	}
 
 	interface Props {
 		label: string;
 		items: Item[];
 		states?: Record<string, ToggleState>;
+		/** Clés des niveaux cochés, tous éléments confondus. */
+		checkedLevels?: string[];
 		counts?: Record<string, { yes: number; no: number }>;
 		/** Si true (défaut), affiche toujours le décompte des « présents » (counts.yes) quel que soit l'état du toggle. Garde une référence stable pendant que l'utilisateur cycle ses filtres. Passer false pour faire suivre le décompte (yes → présents, no → absents, all → total). */
 		staticPresentCount?: boolean;
@@ -23,6 +32,7 @@
 		label,
 		items,
 		states = $bindable({}),
+		checkedLevels = $bindable([]),
 		counts = {},
 		staticPresentCount = true,
 		onchange,
@@ -31,22 +41,35 @@
 	const panel = useFacetPanel();
 	const facetRoot = panel.root;
 
-	const activeCount = $derived(Object.keys(states).length);
+	const activeCount = $derived(Object.keys(states).length + checkedLevels.length);
 
-	function cycle(key: string) {
-		const current = states[key] || 'all';
+	function cycle(item: Item) {
+		const current = states[item.key] || 'all';
 		const next: ToggleState = current === 'all' ? 'yes' : current === 'yes' ? 'no' : 'all';
 		if (next === 'all') {
-			const { [key]: _, ...rest } = states;
+			const { [item.key]: _, ...rest } = states;
 			states = rest;
 		} else {
-			states = { ...states, [key]: next };
+			states = { ...states, [item.key]: next };
 		}
+		// Un élément exclu perd ses niveaux cochés.
+		if (next === 'no' && item.levels) {
+			const own = new Set(item.levels.map((l) => l.key));
+			checkedLevels = checkedLevels.filter((k) => !own.has(k));
+		}
+		onchange?.(states);
+	}
+
+	function toggleLevel(key: string) {
+		checkedLevels = checkedLevels.includes(key)
+			? checkedLevels.filter((k) => k !== key)
+			: [...checkedLevels, key];
 		onchange?.(states);
 	}
 
 	function clear() {
 		states = {};
+		checkedLevels = [];
 		onchange?.(states);
 	}
 
@@ -104,7 +127,7 @@
 					type="button"
 					class="item-row"
 					title={tooltip(item.label, state)}
-					onclick={() => cycle(item.key)}
+					onclick={() => cycle(item)}
 				>
 					<span
 						class="state-icon"
@@ -118,6 +141,24 @@
 						<span class="item-count">{c.toLocaleString('fr-FR')}</span>
 					{/if}
 				</button>
+				{#if item.levels?.length && state !== 'no'}
+					<div class="levels">
+						{#each item.levels as level (level.key)}
+							{@const lc = counts[level.key]?.yes}
+							<label class="level-row">
+								<input
+									type="checkbox"
+									checked={checkedLevels.includes(level.key)}
+									onchange={() => toggleLevel(level.key)}
+								/>
+								<span class="level-label">{level.label}</span>
+								{#if lc != null}
+									<span class="item-count">{lc.toLocaleString('fr-FR')}</span>
+								{/if}
+							</label>
+						{/each}
+					</div>
+				{/if}
 			{/each}
 		</div>
 	{/if}
@@ -171,5 +212,22 @@
 		font-size: var(--fs-sm);
 		color: var(--muted);
 		margin-left: auto;
+	}
+	.levels {
+		padding: 0 12px 4px 40px;
+	}
+	.level-row {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		padding: 2px 0;
+		font-size: var(--fs-sm);
+		cursor: pointer;
+	}
+	.level-row input {
+		margin: 0;
+	}
+	.level-label {
+		flex: 1;
 	}
 </style>

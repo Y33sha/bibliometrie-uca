@@ -10,6 +10,7 @@
 	import EntityFilter from '#lib/components/EntityFilter.svelte';
 	import FacetDropdown from '#lib/components/FacetDropdown.svelte';
 	import IconButton from '#lib/components/IconButton.svelte';
+	import PresenceFilterToggle from '#lib/components/PresenceFilterToggle.svelte';
 	import SerialDrawer from '#lib/components/serials/SerialDrawer.svelte';
 	import IssnBadge from '#lib/components/serials/IssnBadge.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
@@ -22,9 +23,11 @@
 	import { nextSort, sortDirection } from '#lib/sort.js';
 	import { withBase } from '#lib/paths.js';
 	import { paramsToQuery } from '#lib/utils.js';
+	import { encodePresence, type PresenceStates } from '#lib/filterRegistry.js';
 	import type { components } from '#lib/api/schema.js';
 
 	type Serial = components['schemas']['SerialListItem'];
+	type SerialListFacet = components['schemas']['SerialListFacet'];
 
 	// Composant de liste de publications en série réutilisable. Utilisé par :
 	// - `/journals` (mode autonome avec sync URL)
@@ -63,7 +66,11 @@
 	let selectedPublisher: string[] = $state([]); // 0 ou 1 identifiant d'éditeur
 	let selectedSerialTypes: string[] = $state([]);
 	let selectedOaModels: string[] = $state([]);
-	let selectedDoaj: string[] = $state([]); // 'true' / 'false'
+	// Facette « Listes » : présence exigée par liste ou classement, et niveaux cochés des classements.
+	let listStates: PresenceStates = $state({});
+	let checkedListLevels: string[] = $state([]);
+	let listItems: { key: string; label: string; levels: { key: string; label: string }[] }[] = $state([]);
+	let listCounts: Record<string, { yes: number; no: number }> = $state({});
 	// Publications en série avec ou sans publication. Par défaut, celles qui en ont ; seule la session admin change ce réglage, sur `/journals`.
 	let selectedPublications: string[] = $state(['yes']);
 
@@ -77,8 +84,9 @@
 		if (publisherId) params.set('publisher_id', publisherId);
 		if (selectedSerialTypes.length) params.set('serial_type', selectedSerialTypes.join(','));
 		if (selectedOaModels.length) params.set('oa_model', selectedOaModels.join(','));
-		// DOAJ : un seul ['true'] / ['false'] est interprétable côté API (bool unique). Les autres cas (vide, ou les 2) = pas de filtre.
-		if (selectedDoaj.length === 1) params.set('is_in_doaj', selectedDoaj[0]);
+		const listFilter = encodePresence(listStates);
+		if (listFilter) params.set('list_filter', listFilter);
+		if (checkedListLevels.length) params.set('list_level', checkedListLevels.join(','));
 		if (selectedPublications.length === 1) params.set('has_publications', selectedPublications[0]);
 		const q = search.trim();
 		if (q) params.set('search', q);
@@ -111,8 +119,21 @@
 		facets: {
 			serialTypes: { type: 'labeled', apiKey: 'serial_types' },
 			oaModels: { type: 'labeled', apiKey: 'oa_models' },
-			doaj: { type: 'labeled', apiKey: 'doaj' },
 			publications: { type: 'boolean', apiKey: 'publications', yesLabel: 'Avec', noLabel: 'Sans' },
+		},
+		afterLoad(data) {
+			const lists = (data.lists ?? []) as SerialListFacet[];
+			listItems = lists.map((l) => ({
+				key: l.code,
+				label: l.label,
+				levels: l.levels.map((level) => ({ key: level.code, label: level.label })),
+			}));
+			listCounts = Object.fromEntries(
+				lists.flatMap((l) => [
+					[l.code, { yes: l.count, no: 0 }],
+					...l.levels.map((level) => [level.code, { yes: level.count, no: 0 }]),
+				]),
+			);
 		},
 	});
 
@@ -122,7 +143,8 @@
 			selectedPublisher: { type: 'string_array', urlKey: 'publisher_id' },
 			selectedSerialTypes: { type: 'string_array', urlKey: 'serial_type' },
 			selectedOaModels: { type: 'string_array', urlKey: 'oa_model' },
-			selectedDoaj: { type: 'string_array', urlKey: 'is_in_doaj' },
+			listStates: { type: 'source_states', urlKey: 'list_filter' },
+			checkedListLevels: { type: 'string_array', urlKey: 'list_level' },
 			hasPublications: { type: 'single', urlKey: 'has_publications', defaultValue: 'yes' },
 			search: { type: 'single', urlKey: 'search' },
 			currentSort: { type: 'single', urlKey: 'sort', defaultValue: 'publications_desc' },
@@ -137,7 +159,8 @@
 			selectedPublisher,
 			selectedSerialTypes,
 			selectedOaModels,
-			selectedDoaj,
+			listStates,
+			checkedListLevels,
 			hasPublications: selectedPublications.length === 1 ? selectedPublications[0] : 'all',
 			search,
 			currentSort,
@@ -178,7 +201,8 @@
 			if (restored.selectedPublisher) selectedPublisher = restored.selectedPublisher as string[];
 			if (restored.selectedSerialTypes) selectedSerialTypes = restored.selectedSerialTypes as string[];
 			if (restored.selectedOaModels) selectedOaModels = restored.selectedOaModels as string[];
-			if (restored.selectedDoaj) selectedDoaj = restored.selectedDoaj as string[];
+			if (restored.listStates) listStates = restored.listStates as PresenceStates;
+			if (restored.checkedListLevels) checkedListLevels = restored.checkedListLevels as string[];
 			if (restored.hasPublications != null && isAdmin()) {
 				const value = restored.hasPublications as string;
 				selectedPublications = value === 'all' ? [] : [value];
@@ -210,10 +234,12 @@
 			bind:selected={selectedSerialTypes}
 			onchange={onFilterChange}
 		/>
-		<FacetDropdown
-			label="DOAJ"
-			options={facets.options.doaj}
-			bind:selected={selectedDoaj}
+		<PresenceFilterToggle
+			label={filterLabels.lists}
+			items={listItems}
+			bind:states={listStates}
+			bind:checkedLevels={checkedListLevels}
+			counts={listCounts}
 			onchange={onFilterChange}
 		/>
 		<FacetDropdown

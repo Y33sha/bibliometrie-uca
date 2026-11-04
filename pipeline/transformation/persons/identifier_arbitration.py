@@ -23,7 +23,7 @@ from infrastructure.sql_fragments import (
     person_source_contribution,
     trusted_identifier_sql,
 )
-from pipeline.runtime.observability.log_format import LAST_BRANCH, inflect, quantity, step
+from pipeline.runtime.observability.log_format import LAST_BRANCH, inflect, quantity
 from pipeline.runtime.observability.progress import waiting
 
 _MARK_MODIFIED_PUBLICATIONS = enqueue_sql(
@@ -255,7 +255,6 @@ def arbitrate_identifier_conflicts(conn: Connection, logger: logging.Logger) -> 
 
     Renvoie `{neutralized, marked_contributions}`. L'appelant commite.
     """
-    step(logger, "Conflits d'identifiants")
     with waiting(LAST_BRANCH, logger) as line:
         requalified = requalify_misplaced_identifiers(conn, compute_identifier_consensus(conn))
         neutralized = requalified["neutralized"]

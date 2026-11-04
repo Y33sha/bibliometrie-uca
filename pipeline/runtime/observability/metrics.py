@@ -52,6 +52,7 @@ EXTRA_LABELS: dict[str, str | tuple[str, str]] = {
     ),
     "no_publisher": ("sans éditeur", "sans éditeur"),
     "not_found": "introuvable",
+    "openalex_found": ("revue trouvée dans OpenAlex", "revues trouvées dans OpenAlex"),
     "publisher_created": ("éditeur créé", "éditeurs créés"),
     "publisher_matched": ("éditeur retrouvé", "éditeurs retrouvés"),
     "publishers_deleted": ("éditeur vide supprimé", "éditeurs vides supprimés"),

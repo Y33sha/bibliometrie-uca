@@ -9,6 +9,7 @@ from infrastructure.repositories.merge_steps import (
     fill_empty_unique,
     merge_into,
     transfer,
+    transfer_unique,
     untouched,
 )
 from pipeline.transformation.publications import lifecycle
@@ -54,15 +55,10 @@ def _fill_empty_with_marker(
     return MergeStep(tuple(("serials", c) for c in columns), apply)
 
 
-def _merge_is_in_doaj(conn: Connection, target_id: int, source_id: int) -> None:
-    """Marque la revue conservée présente au DOAJ si l'une des deux l'est."""
+def _recheck_in_openalex(conn: Connection, target_id: int, source_id: int) -> None:
+    """Fait chercher de nouveau les métadonnées de la revue conservée au run suivant : ses ISSN comprennent ceux de l'absorbée."""
     conn.execute(
-        text("""
-            UPDATE serials t SET is_in_doaj = COALESCE(t.is_in_doaj OR s.is_in_doaj, false)
-            FROM serials s
-            WHERE t.id = :t AND s.id = :s
-        """),
-        {"t": target_id, "s": source_id},
+        text("UPDATE serials SET openalex_checked_at = NULL WHERE id = :t"), {"t": target_id}
     )
 
 
@@ -81,6 +77,7 @@ MERGE_STEPS: dict[str, MergeStep] = {
     # Éditeur calculé d'après les publications, recalculé après la fusion.
     "publisher": untouched("serials", "publisher_id"),
     "openalex_id": fill_empty_unique("serials", "openalex_id"),
+    "openalex_checked_at": MergeStep((("serials", "openalex_checked_at"),), _recheck_in_openalex),
     "oa_model": _fill_empty_with_marker(ManualField.OA_MODEL, ("oa_model",), "t.oa_model IS NULL"),
     "serial_type": _fill_empty_with_marker(
         ManualField.SERIAL_TYPE,
@@ -88,8 +85,8 @@ MERGE_STEPS: dict[str, MergeStep] = {
         f"t.serial_type = '{SerialType.UNKNOWN.value}'",
     ),
     "is_academic": untouched("serials", "is_academic"),
-    "is_in_doaj": MergeStep((("serials", "is_in_doaj"),), _merge_is_in_doaj),
     "doaj_record": untouched("serials", "doaj_payload", "doaj_imported_at"),
+    "list_entries": transfer_unique("serial_list_entries", "serial_id", "list_code"),
     "publication_count": untouched("serials", "publication_count"),
     # Un champ repris de l'absorbée ajoute son marqueur à `manual_fields` (`_fill_empty_with_marker`).
     "manual_fields": untouched("serials", "manual_fields"),

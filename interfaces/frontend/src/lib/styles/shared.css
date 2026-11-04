@@ -183,7 +183,6 @@
 	margin-bottom: 12px;
 }
 
-.toolbar input[type='text'],
 .toolbar input[type='text' i],
 .toolbar input[type='number'] {
 	padding: 6px 10px;
@@ -269,7 +268,6 @@
 }
 .toolbar-action:hover {
 	background: color-mix(in srgb, var(--accent), black 20%);
-	text-decoration: none;
 }
 
 /* ── Chevron (menus, facettes, en-têtes triés) : `.up` le retourne, pour un panneau ouvert ou un tri croissant ── */
@@ -477,7 +475,6 @@
 
 .export-btn:hover {
 	background: var(--hover);
-	text-decoration: none;
 }
 
 /* ── Data table ── */
@@ -713,13 +710,6 @@
 	color: var(--danger);
 }
 
-/* ── Subtitle ── */
-.subtitle {
-	font-size: var(--fs-md);
-	color: var(--muted);
-	margin: -10px 0 16px;
-}
-
 /* ── Champs de formulaire dans une modale (composant Modal) ── */
 .modal-content label {
 	display: block;
@@ -911,18 +901,6 @@
 
 a.id-badge:hover {
 	background: color-mix(in srgb, var(--accent) 20%, white);
-	color: var(--accent);
-	text-decoration: none;
-}
-
-.id-badge.id-confirmed {
-	background: var(--success-light);
-	color: var(--success);
-}
-
-a.id-badge.id-confirmed:hover {
-	background: color-mix(in srgb, var(--success) 20%, white);
-	color: var(--success);
 }
 
 /* ── ID icons (round, ORCID/idHAL/IdRef) ── */
@@ -999,8 +977,7 @@ a.id-badge.id-confirmed:hover {
 	transform: scale(1.15);
 }
 
-.source-tag img,
-.source-tag :is(svg) {
+.source-tag img {
 	width: 14px;
 	height: 14px;
 	display: block;
@@ -1047,13 +1024,6 @@ a.id-badge.id-confirmed:hover {
 	background: #d8c8f4;
 }
 
-.wos-label {
-	font-size: var(--fs-sm);
-	font-weight: 700;
-	color: #5a3d8a;
-	line-height: 14px;
-}
-
 .source-crossref {
 	background: #f3ead2;
 }
@@ -1081,36 +1051,6 @@ a.id-badge.id-confirmed:hover {
 
 .links-cell {
 	white-space: nowrap;
-}
-
-/* ── Source label tags (inline text) ── */
-.source-tag-label {
-	display: inline-block;
-	padding: 1px 5px;
-	border-radius: var(--radius);
-	font-size: var(--fs-sm);
-	font-weight: 600;
-	margin-right: 2px;
-}
-
-.source-hal-label {
-	background: var(--accent-light);
-	color: var(--accent);
-}
-
-.source-openalex-label {
-	background: #fef3e0;
-	color: var(--bronze-text);
-}
-
-.source-wos-label {
-	background: #e8e0f8;
-	color: #5a3d8a;
-}
-
-.source-scanr-label {
-	background: #e0edf5;
-	color: #1b4f72;
 }
 
 /* ── Lab tag (pill) ── */
@@ -1143,7 +1083,6 @@ a.lab-tag:hover {
 }
 a.structure-tag:hover {
 	background: color-mix(in srgb, var(--accent) 20%, white);
-	text-decoration: none;
 }
 
 /* ── Tutelle tag (neutral) ── */
@@ -1201,14 +1140,6 @@ a.structure-tag:hover {
 	padding-bottom: 6px;
 	border-bottom: 1px solid color-mix(in srgb, var(--accent) 20%, white);
 }
-/* Part d'une modalité, sous un graphique en anneau. */
-.dash-summary {
-	text-align: center;
-	font-size: var(--fs-md);
-	color: var(--muted);
-	margin-top: 8px;
-}
-
 /* ── Files de triage (administration des référentiels) ── */
 .triage-intro {
 	font-size: var(--fs-sm);
@@ -1301,11 +1232,6 @@ a.badge-doaj:hover {
 	font-weight: 500;
 }
 
-.type-badge {
-	background: var(--accent-light);
-	color: var(--accent);
-}
-
 /* ── OA tags ── */
 .oa-tag {
 	display: inline-block;
@@ -1348,27 +1274,6 @@ a.badge-doaj:hover {
 .oa-closed {
 	background: #e0e0e0;
 	color: #555;
-}
-
-/* ── Pastille d'accès générique (fiche détail) ── */
-.access-tag {
-	display: inline-block;
-	font-size: var(--fs-sm);
-	padding: 2px 8px;
-	border-radius: var(--radius);
-	font-weight: 600;
-}
-.access-open {
-	background: var(--success-light);
-	color: var(--success);
-}
-.access-embargo {
-	background: #fff3cd;
-	color: #856404;
-}
-.access-closed {
-	background: #e8e8e8;
-	color: #666;
 }
 
 /* ── APC tag ── */
@@ -1455,7 +1360,6 @@ a.badge-doaj:hover {
 
 .btn-sm {
 	padding: 3px 8px;
-	font-size: var(--fs-sm);
 }
 
 /* Boutons pleins (gros boutons à texte) */
@@ -1467,7 +1371,6 @@ a.badge-doaj:hover {
 
 .btn-confirm:hover {
 	background: color-mix(in srgb, var(--success), black 20%);
-	color: white;
 	border-color: color-mix(in srgb, var(--success), black 20%);
 }
 
@@ -1479,7 +1382,6 @@ a.badge-doaj:hover {
 
 .btn-danger:hover {
 	background: color-mix(in srgb, var(--danger), black 20%);
-	color: white;
 	border-color: color-mix(in srgb, var(--danger), black 20%);
 }
 
@@ -1491,7 +1393,6 @@ a.badge-doaj:hover {
 
 .btn-primary:hover {
 	background: color-mix(in srgb, var(--accent), black 20%);
-	color: white;
 	border-color: color-mix(in srgb, var(--accent), black 20%);
 }
 
@@ -1700,11 +1601,6 @@ button.entity-link {
 	color: var(--danger);
 	opacity: 0.7;
 	text-decoration: line-through;
-}
-.status-chip.ambiguous {
-	background: var(--attention-light);
-	border-color: color-mix(in srgb, var(--warning) 40%, white);
-	color: var(--warning-text);
 }
 button.status-chip {
 	font: inherit;

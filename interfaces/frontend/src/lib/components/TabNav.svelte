@@ -35,10 +35,6 @@
 		if (afterNavigate) nav.then(afterNavigate);
 		onswitch?.(tab);
 	}
-
-	export function getActiveTab(): string {
-		return activeTab;
-	}
 </script>
 
 <div class="tabs" use:horizontalOverflow>

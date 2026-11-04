@@ -43,7 +43,7 @@ const HOTES_AFFICHABLES = new Set([
 /* Expressions admises dans un attribut `href`. Les fonctions de composition écrivent l'hôte ;
  * les valeurs internes désignent une route de l'application. */
 const COMPOSITION =
-	/^(halPersonUrl|halUrl|halCollectionUrl|rorFullUrl|crossrefMemberUrl|issnPortalUrl|exportCsvUrl|relHref)\(/;
+	/^(halPersonUrl|halUrl|rorFullUrl|crossrefMemberUrl|issnPortalUrl|exportCsvUrl|relHref)\(/;
 const INTERNE = /^(pubsUrl|statsUrl)$/;
 /* `resolve` compose un chemin de l'application sous le préfixe de déploiement, `withBase` un
  * chemin de l'API ; `loginUrl` y ajoute la page de retour après connexion. */

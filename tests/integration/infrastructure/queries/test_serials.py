@@ -25,10 +25,6 @@ from pipeline.transformation.publishing.serials.delete_empty_serials import dele
 from pipeline.transformation.publishing.serials.enrich_serials_from_doaj import (
     doaj_last_import_at,
     find_serial_issn_index,
-    reset_is_in_doaj,
-)
-from pipeline.transformation.publishing.serials.enrich_serials_from_openalex import (
-    find_serials_of_unknown_type,
 )
 from pipeline.transformation.publishing.serials.learn_serial_doi_namespaces import (
     find_doi_serial_pairs,
@@ -158,38 +154,6 @@ class TestSudocCheck:
             None,
             ("2999-0008",),
         )
-
-
-class TestFindSerialsOfUnknownType:
-    def test_returns_id_and_openalex_id(self, sa_sync_conn, repo):
-        _serial(sa_sync_conn, openalex_id="S1")  # serial_type 'unknown' par défaut
-        rows = find_serials_of_unknown_type(sa_sync_conn)
-        assert rows
-        for serial_id, oa_id in rows:
-            assert isinstance(serial_id, int)
-            assert isinstance(oa_id, str)
-
-    def test_returns_only_unknown_type_with_openalex(self, sa_sync_conn, repo):
-        needs = _serial(sa_sync_conn, openalex_id="S1")
-        typed = _serial(sa_sync_conn, openalex_id="S2")
-        sa_sync_conn.execute(
-            text("UPDATE serials SET serial_type = 'journal' WHERE id = :id"), {"id": typed}
-        )
-        _serial(sa_sync_conn)  # pas d'openalex_id
-
-        ids = [jid for jid, _ in find_serials_of_unknown_type(sa_sync_conn)]
-        assert needs in ids
-        assert typed not in ids  # déjà typé → sorti de la file
-
-    def test_respects_limit(self, sa_sync_conn, repo):
-        for i in range(3):
-            _serial(sa_sync_conn, openalex_id=f"S{i}")
-        assert len(find_serials_of_unknown_type(sa_sync_conn, limit=2)) == 2
-
-    def test_limit_zero_is_unlimited(self, sa_sync_conn, repo):
-        for i in range(2):
-            _serial(sa_sync_conn, openalex_id=f"S{i}")
-        assert len(find_serials_of_unknown_type(sa_sync_conn, limit=0)) >= 2
 
 
 class TestTitlesOfNonProceedingsSerials:
@@ -331,19 +295,6 @@ class TestSerialIssnIndex:
 
 
 class TestDoajImport:
-    def test_reset_is_in_doaj_clears_true_flags(self, sa_sync_conn, repo):
-        jid = _serial(sa_sync_conn, issn="3333-3333")
-        sa_sync_conn.execute(
-            text("UPDATE serials SET is_in_doaj = TRUE WHERE id = :id"), {"id": jid}
-        )
-        assert reset_is_in_doaj(sa_sync_conn) >= 1
-        assert (
-            sa_sync_conn.execute(
-                text("SELECT is_in_doaj FROM serials WHERE id = :id"), {"id": jid}
-            ).scalar_one()
-            is False
-        )
-
     def test_last_import_at_returns_a_value_when_imported(self, sa_sync_conn, repo):
         d = datetime.now(UTC) - timedelta(days=3)
         _serial(sa_sync_conn, issn="4444-4444", doaj_imported_at=d)

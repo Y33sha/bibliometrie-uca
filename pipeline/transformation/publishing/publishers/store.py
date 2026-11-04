@@ -6,6 +6,8 @@ L'édition, la fusion et l'enrichissement pays sont dans `infrastructure/reposit
 from sqlalchemy import Connection, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
+from domain.normalize import normalize_text
+from domain.publishers.names import publisher_name_key
 from infrastructure.db.scalars import scalar_int
 from infrastructure.db.tables import publisher_name_forms, publishers
 
@@ -25,17 +27,16 @@ class PublisherStore:
         )
         self._conn.execute(stmt)
 
-    def match_or_create_by_name_form(
-        self, name_raw: str, name_normalized: str, name_key: str
-    ) -> tuple[int, bool]:
-        """Trouve l'éditeur de forme de nom `name_key`, ou le crée avec cette forme. Renvoie `(id, created)`."""
-        existing = self.find_publisher_by_name_form(name_key)
+    def match_or_create(self, name: str) -> tuple[int, bool] | None:
+        """Trouve par sa clé de nom, ou crée avec cette forme de nom, l'éditeur désigné par `name`. Renvoie `(id, created)`, ou `None` si le nom est vide une fois normalisé."""
+        key = publisher_name_key(name)
+        if not normalize_text(name) or not key:
+            return None
+        existing = self.find_publisher_by_name_form(key)
         if existing is not None:
             return existing, False
-        new_id = self.create_publisher(
-            name=name_raw, name_normalized=name_normalized, openalex_id=None
-        )
-        self.add_publisher_name_form(new_id, name_key)
+        new_id = self.create_publisher(name=name, openalex_id=None)
+        self.add_publisher_name_form(new_id, key)
         return new_id, True
 
     def find_publisher_by_name_form(self, form_normalized: str) -> int | None:
@@ -45,16 +46,11 @@ class PublisherStore:
             .limit(1)
         ).scalar_one_or_none()
 
-    def create_publisher(
-        self,
-        *,
-        name: str,
-        name_normalized: str,
-        openalex_id: str | None,
-    ) -> int:
+    def create_publisher(self, *, name: str, openalex_id: str | None) -> int:
+        """Crée l'éditeur `name`, avec son nom normalisé, et renvoie son identifiant."""
         stmt = (
             publishers.insert()
-            .values(name=name, name_normalized=name_normalized, openalex_id=openalex_id)
+            .values(name=name, name_normalized=normalize_text(name), openalex_id=openalex_id)
             .returning(publishers.c.id)
         )
         return scalar_int(self._conn.execute(stmt))

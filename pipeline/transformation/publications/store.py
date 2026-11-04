@@ -54,7 +54,7 @@ _SAVE_CHANGED_SQL = text(f"""
         container_title = c.container_title, language = c.language,
         is_retracted = c.is_retracted, countries = c.countries,
         source_extras = c.source_extras, impact = c.impact, corrections = c.corrections,
-        sources = c.sources, subjects_ingested_at = NULL, updated_at = now()
+        sources = c.sources, updated_at = now()
     FROM computed c
     WHERE p.id = c.id
       AND (p.title, p.title_normalized, p.doc_type, p.publication_date,
@@ -214,7 +214,7 @@ class PublicationStore:
         )
 
     def delete(self, publication_ids: Sequence[int]) -> None:
-        """Supprime des publications, avec leurs `contributions` et leurs `publication_subjects`. `apc_payments.publication_id` et `source_records.publication_id` passent à NULL."""
+        """Supprime des publications, avec leurs contributions, leurs relations, leurs sujets et leur détail. `apc_payments.publication_id` et `source_records.publication_id` passent à NULL."""
         if not publication_ids:
             return
         self._conn.execute(

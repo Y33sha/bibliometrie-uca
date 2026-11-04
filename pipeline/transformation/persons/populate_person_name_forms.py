@@ -153,9 +153,7 @@ def populate(conn: Connection) -> SyncCounts:
     create_temp_raw_forms_table(conn)
     batch: list[RawFormBatchItem] = []
     for r in fetch_persons_names(conn):
-        fn = (r.first_name or "").strip()
-        ln = r.last_name.strip()
-        for form in compute_person_name_forms(ln, fn):
+        for form in compute_person_name_forms(r.last_name, r.first_name or ""):
             batch.append(
                 {"name_form": form, "person_id": r.id, "source": CANONICAL_NAME_FORM_SOURCE}
             )

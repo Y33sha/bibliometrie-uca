@@ -10,9 +10,9 @@ from typing import NamedTuple
 
 from sqlalchemy import Connection, text
 
-from pipeline.graph import Task
+from pipeline.graph import Task, in_transaction
 from pipeline.runtime.context import PhaseContext
-from pipeline.runtime.observability.log_format import LAST_BRANCH, quantity, step
+from pipeline.runtime.observability.log_format import LAST_BRANCH, quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.countries import (
     detect_by_country_name,
@@ -47,21 +47,17 @@ _STATUS_BEFORE = "address_status_before"
 _STATUS_AFTER = "address_status_after"
 
 
-def _detect(ctx: PhaseContext) -> PhaseMetrics:
-    """Relève l'état pays des adresses, puis cherche les pays candidats par nom de pays et par nom de lieu."""
-    metrics = PhaseMetrics()
+def _detect_by_country_name(ctx: PhaseContext) -> PhaseMetrics:
+    """Relève l'état pays des adresses, puis cherche les pays candidats par nom de pays."""
     with ctx.open_tx() as conn:
         before = count_address_country_status(conn)
-        metrics.merge(detect_by_country_name.run(conn, ctx.logger))
-    with ctx.open_tx() as conn:
-        metrics.merge(detect_by_place_name.run(conn, ctx.logger))
+        metrics = detect_by_country_name.run(conn, ctx.logger)
     metrics.details[_STATUS_BEFORE] = before
     return metrics
 
 
 def _resolve(ctx: PhaseContext) -> PhaseMetrics:
     """Choisit le pays des adresses parmi les pays candidats, puis relève l'état pays des adresses."""
-    step(ctx.logger, "Choix du pays des adresses parmi les pays trouvés")
     with ctx.open_tx() as conn:
         changed = resolve_queued_addresses(conn)
         after = count_address_country_status(conn)
@@ -81,20 +77,34 @@ def _refresh(ctx: PhaseContext) -> PhaseMetrics:
     return PhaseMetrics()
 
 
+_DETECTION_READS = (
+    "place_name_forms",
+    "countries",
+    "addresses.id",
+    "addresses.normalized_text",
+    "address_candidates_queue",
+)
+"""Lectures des deux détections : noms de lieux et adresses en file."""
+
 TASKS = (
     Task(
-        "detect",
-        reads=(
-            "place_name_forms",
-            "countries",
-            "addresses.id",
-            "addresses.normalized_text",
-            "address_candidates_queue",
-        ),
+        "detect_by_country_name",
+        # État pays des adresses citées par une publication, relevé avant la détection.
+        reads=(*_DETECTION_READS, "addresses.countries", "addresses.publication_count"),
+        writes=("address_country_candidates",),
+        # Adresses marquées depuis la dernière résolution, retirées de la file par `countries.resolve` ; pays des adresses écrits par `countries.resolve`.
+        previous_run=("address_candidates_queue", "addresses.countries"),
+        run=_detect_by_country_name,
+        section="Pays des adresses d'après le nom de pays qui les termine",
+    ),
+    Task(
+        "detect_by_place_name",
+        reads=_DETECTION_READS,
         writes=("address_country_candidates",),
         # Adresses marquées depuis la dernière résolution, retirées de la file par `countries.resolve`.
         previous_run=("address_candidates_queue",),
-        run=_detect,
+        run=in_transaction(detect_by_place_name.run),
+        section="Pays des adresses d'après les noms de villes et d'institutions",
     ),
     Task(
         "resolve",
@@ -102,6 +112,7 @@ TASKS = (
             "address_country_candidates",
             "addresses.id",
             "addresses.countries",
+            "addresses.publication_count",
             "address_candidates_queue",
         ),
         writes=(
@@ -110,6 +121,7 @@ TASKS = (
             "address_candidates_queue",
         ),
         run=_resolve,
+        section="Choix du pays des adresses parmi les pays trouvés",
     ),
     Task(
         "refresh_publication_countries",
@@ -137,6 +149,7 @@ TASKS = (
             "address_countries_queue",
         ),
         run=_refresh,
+        section="Rafraîchissement des pays associés aux publications",
     ),
 )
 

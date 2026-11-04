@@ -5,22 +5,23 @@ Contraintes d'ordre :
 - Le rattachement des enregistrements sources aux éditeurs suit la résolution des préfixes, qui crée des éditeurs avec leurs formes de nom.
 - La fusion des autres noms des éditeurs suit la résolution des préfixes, qui pose leurs titulaires, et le rattachement des enregistrements sources aux éditeurs.
 - Les ISSN des séries précèdent leur vérification Sudoc et l'import de la table ISSN-L, qui précèdent le rattachement des enregistrements sources aux revues : le rattachement lit l'ISSN-L et le titre Sudoc de chaque ISSN.
-- Le typage OpenAlex des revues `unknown` suit le rattachement, qui pose leur identifiant OpenAlex, et précède le typage en recueil d'actes, qui vise aussi les revues `unknown`.
+- La recherche des métadonnées des revues dans OpenAlex suit le rattachement, qui donne à chaque revue ses ISSN et ses enregistrements sources. Elle précède le typage en recueil d'actes, qui vise aussi les revues `unknown`.
 - Les espaces de noms DOI suivent le rattachement et le typage des revues.
 - Le rattachement des enregistrements sources aux monographies suit la fusion des autres noms des éditeurs : l'éditeur départage les volumes de même titre.
 - Le rattachement des monographies à leur collection suit le rattachement des enregistrements sources. La nature des monographies lit le type de la collection posé par le rattachement.
 
-`import_issnl_table` importe la table ISSN-L de l'ISSN International Centre, qui fait autorité sur `serial_issns.issnl`, quand le dernier import date de plus de `issnl_table_refresh_after_days` jours. `enrich_serials_from_doaj` importe le dump CSV du DOAJ, qui fait autorité sur `is_in_doaj`, quand le dernier import date de plus de `doaj_refresh_after_days` jours. L'enrichissement des éditeurs (pays, ROR, type) se lance à la demande, par `interfaces/cli/maintenance/enrich_publishers.py`.
+`import_issnl_table` importe la table ISSN-L de l'ISSN International Centre, qui fait autorité sur `serial_issns.issnl`, quand le dernier import date de plus de `issnl_table_refresh_after_days` jours. `enrich_serials_from_doaj` importe le dump CSV du DOAJ, qui donne la fiche DOAJ des revues (`doaj_payload`), quand le dernier import date de plus de `doaj_refresh_after_days` jours. L'enrichissement des éditeurs (pays, ROR, type) se lance à la demande, par `interfaces/cli/maintenance/enrich_publishers.py`.
 """
 
 from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable, Mapping
+from functools import partial
 
 from domain.config import ConfigKey
 from infrastructure.repositories.publisher_merge import merge_publisher_into
-from pipeline.graph import Task, in_transaction
+from pipeline.graph import Task, TaskRun, in_transaction
 from pipeline.http.polite_pool import default_user_agent
 from pipeline.ingestion.api_params import (
     API_BASE_URLS,
@@ -31,7 +32,7 @@ from pipeline.ingestion.complements.issn_centre import downloaded_issnl_table
 from pipeline.ingestion.complements.sudoc import fetch_ppns, fetch_serial_record
 from pipeline.ingestion.crossref.prefixes import fetch_crossref_prefix
 from pipeline.ingestion.datacite.prefixes import fetch_datacite_prefix
-from pipeline.ingestion.openalex.serial_enrichment import fetch_sources_batch
+from pipeline.ingestion.openalex.sources import fetch_source_lists, fetch_sources
 from pipeline.runtime.config import cap, delay
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -50,66 +51,32 @@ from pipeline.transformation.publishing.publishers.store import PublisherStore
 from pipeline.transformation.publishing.serials import (
     attach_serials,
     check_issns_in_sudoc,
+    check_serials_in_openalex,
     enrich_serials_from_doaj,
-    enrich_serials_from_openalex,
     import_issnl_table,
     learn_serial_doi_namespaces,
     type_journal_serials,
     type_proceedings_serials,
 )
 
-_TABLE: tuple[tuple[str, str, Callable[[PhaseMetrics], int]], ...] = (
-    (
-        "resolve_crossref_publishers",
-        "préfixes DOI Crossref → éditeurs",
-        lambda m: m.extras.get("publisher_matched", 0),
-    ),
-    (
-        "resolve_datacite_publishers",
-        "préfixes DOI DataCite → éditeurs",
-        lambda m: m.extras.get("publisher_matched", 0),
-    ),
-    ("attach_publishers", "enregistrements sources rattachés aux éditeurs", lambda m: m.updated),
-    ("sync_issns", "ISSN des séries", lambda m: m.new),
-    (
-        "check_issns_in_sudoc",
-        "ISSN vérifiés dans le Sudoc",
-        lambda m: m.extras.get("sudoc_found", 0),
-    ),
-    ("attach_serials", "enregistrements sources rattachés aux revues", lambda m: m.updated),
-    ("enrich_serials_from_openalex", "revues OpenAlex", lambda m: m.updated),
-    (
-        "type_proceedings_serials",
-        "revues typées recueils d'actes",
-        lambda m: m.extras.get("serials_typed_proceedings", 0),
-    ),
-    (
-        "type_journal_serials",
-        "entrées typées revues",
-        lambda m: m.extras.get("serials_typed_journal", 0),
-    ),
-    (
-        "learn_serial_doi_namespaces",
-        "DOI → espaces de noms des revues",
-        lambda m: m.extras.get("serial_doi_namespaces", 0),
-    ),
-    (
-        "attach_monographs",
-        "enregistrements sources rattachés aux monographies",
-        lambda m: m.updated,
-    ),
-    (
-        "link_monographs_to_collections",
-        "monographies rattachées à leur collection",
-        lambda m: m.extras.get("monographs_linked", 0),
-    ),
-    (
-        "type_proceedings_volumes",
-        "monographies retypées (actes ou livre)",
-        lambda m: m.extras.get("monographs_to_proceedings", 0),
-    ),
-)
-"""Ligne de la table d'observabilité de chaque tâche : son nom, son libellé, et ce qui compte comme identifié."""
+_IDENTIFIED: dict[str, Callable[[PhaseMetrics], int]] = {
+    "resolve_crossref_publishers": lambda m: m.extras.get("publisher_matched", 0),
+    "resolve_datacite_publishers": lambda m: m.extras.get("publisher_matched", 0),
+    "attach_publishers": lambda m: m.updated,
+    "merge_duplicate_publishers": lambda m: m.extras.get("publishers_merged", 0),
+    "sync_issns": lambda m: m.new,
+    "check_issns_in_sudoc": lambda m: m.extras.get("sudoc_found", 0),
+    "import_issnl_table": lambda m: m.extras.get("matched", 0),
+    "attach_serials": lambda m: m.updated,
+    "check_serials_in_openalex": lambda m: m.extras.get("openalex_found", 0),
+    "type_proceedings_serials": lambda m: m.extras.get("serials_typed_proceedings", 0),
+    "type_journal_serials": lambda m: m.extras.get("serials_typed_journal", 0),
+    "learn_serial_doi_namespaces": lambda m: m.extras.get("serial_doi_namespaces", 0),
+    "attach_monographs": lambda m: m.updated,
+    "link_monographs_to_collections": lambda m: m.extras.get("monographs_linked", 0),
+    "type_proceedings_volumes": lambda m: m.extras.get("monographs_to_proceedings", 0),
+}
+"""Tâches de la table d'observabilité, dans l'ordre d'exécution, avec ce qui compte comme identifié pour chacune."""
 
 
 def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
@@ -122,12 +89,12 @@ def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
     metrics.details["table"] = {
         "rows": [
             {
-                "key": key,
+                "key": name,
                 "traités": by_task[name].total,
-                "identifiés": identifies(by_task[name]),
+                "identifiés": identified(by_task[name]),
                 "créés": by_task[name].extras.get("publisher_created", 0),
             }
-            for name, key, identifies in _TABLE
+            for name, identified in _IDENTIFIED.items()
         ]
     }
     # DOAJ : ligne à part (sous-étape conditionnelle, métrique propre).
@@ -137,30 +104,19 @@ def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
     return metrics
 
 
-def _run_resolve_crossref_publishers(
-    ctx: PhaseContext,
-) -> PhaseMetrics:
-    with ctx.open_tx() as conn:
-        return resolve_publishers.run_resolve_crossref_publishers(
-            conn,
-            ctx.logger,
-            prefix_store=DoiPrefixStore(conn),
-            publisher_store=PublisherStore(conn),
-            fetch_prefix_fn=fetch_crossref_prefix,
-        )
+def _resolve_publishers(run: Callable[..., PhaseMetrics]) -> TaskRun:
+    """Renvoie l'exécution d'une résolution des éditeurs par préfixe DOI, sur les stores des préfixes et des éditeurs."""
 
+    def execute(ctx: PhaseContext) -> PhaseMetrics:
+        with ctx.open_tx() as conn:
+            return run(
+                conn,
+                ctx.logger,
+                prefix_store=DoiPrefixStore(conn),
+                publisher_store=PublisherStore(conn),
+            )
 
-def _run_resolve_datacite_publishers(
-    ctx: PhaseContext,
-) -> PhaseMetrics:
-    with ctx.open_tx() as conn:
-        return resolve_publishers.run_resolve_datacite_publishers(
-            conn,
-            ctx.logger,
-            prefix_store=DoiPrefixStore(conn),
-            publisher_store=PublisherStore(conn),
-            fetch_prefix_fn=fetch_datacite_prefix,
-        )
+    return execute
 
 
 def _run_merge_duplicate_publishers(ctx: PhaseContext) -> PhaseMetrics:
@@ -175,17 +131,16 @@ def _run_merge_duplicate_publishers(ctx: PhaseContext) -> PhaseMetrics:
         )
 
 
-def _run_enrich_serials_from_openalex(
-    ctx: PhaseContext,
-) -> PhaseMetrics:
+def _run_check_serials_in_openalex(ctx: PhaseContext) -> PhaseMetrics:
     sources_api = API_BASE_URLS["openalex_sources"]
+    source_lists_api = API_BASE_URLS["openalex_source_lists"]
     with ctx.open_tx() as conn:
-        return enrich_serials_from_openalex.run_enrich_serials_from_openalex(
+        return check_serials_in_openalex.run_check_serials_in_openalex(
             conn,
             ctx.logger,
-            fetch_batch=lambda oa_ids: fetch_sources_batch(
-                oa_ids, openalex_sources_api=sources_api
-            ),
+            fetch_sources=lambda key, values: fetch_sources(key, values, sources_api=sources_api),
+            fetch_source_lists=lambda: fetch_source_lists(source_lists_api=source_lists_api),
+            recheck_after_days=delay(conn, ConfigKey.SERIAL_OPENALEX_RECHECK_AFTER_DAYS),
         )
 
 
@@ -262,7 +217,12 @@ TASKS = (
             "doi_prefixes",
         ),
         network="crossref",
-        run=_run_resolve_crossref_publishers,
+        run=_resolve_publishers(
+            partial(
+                resolve_publishers.run_resolve_crossref_publishers,
+                fetch_prefix_fn=fetch_crossref_prefix,
+            )
+        ),
         section="Éditeurs",
         label=resolve_publishers.LABELS["Crossref"],
     ),
@@ -292,7 +252,12 @@ TASKS = (
         ),
         previous_run=("publishers", "publisher_name_forms"),
         network="datacite",
-        run=_run_resolve_datacite_publishers,
+        run=_resolve_publishers(
+            partial(
+                resolve_publishers.run_resolve_datacite_publishers,
+                fetch_prefix_fn=fetch_datacite_prefix,
+            )
+        ),
         section="Éditeurs",
         label=resolve_publishers.LABELS["DataCite"],
     ),
@@ -442,19 +407,34 @@ TASKS = (
         label=attach_serials.ATTACH_LABEL,
     ),
     Task(
-        "enrich_serials_from_openalex",
+        "check_serials_in_openalex",
         reads=(
             "serials.id",
             "serials.openalex_id",
+            "serials.openalex_checked_at",
+            "serials.publication_count",
             "serials.serial_type",
             "serials.manual_fields",
+            "serial_issns",
+            "source_records.source",
+            "source_records.biblio",
+            "source_records.serial_id",
+            "serial_lists",
+            "config",
         ),
-        writes=("serials.serial_type",),
-        previous_run=("serials",),
+        writes=(
+            "serials.openalex_id",
+            "serials.openalex_checked_at",
+            "serials.serial_type",
+            "serial_list_entries",
+            "serial_lists",
+        ),
+        # Nombre de publications recalculé par `finalize`, date de recherche posée par la tâche elle-même, revues corrigées par `metadata_correction`, ISSN libérés par `finalize.delete_empty_serials`.
+        previous_run=("serials", "source_records.serial_id", "serial_issns"),
         network="openalex",
-        run=_run_enrich_serials_from_openalex,
+        run=_run_check_serials_in_openalex,
         section="Publications en série",
-        label=enrich_serials_from_openalex.LABEL,
+        label=check_serials_in_openalex.LABEL,
         # Trois lots consécutifs en 429 signalent l'épuisement du quota OpenAlex du jour. Le reste attend le run suivant.
         threshold=3,
     ),
@@ -513,8 +493,8 @@ TASKS = (
         "enrich_serials_from_doaj",
         reads=(
             "serial_issns",
+            "serial_list_entries",
             "serials.doaj_imported_at",
-            "serials.is_in_doaj",
             "serials.serial_type",
             "serials.oa_model",
             "serials.doaj_payload",
@@ -522,7 +502,6 @@ TASKS = (
             "config",
         ),
         writes=(
-            "serials.is_in_doaj",
             "serials.doaj_payload",
             "serials.doaj_imported_at",
             "serials.serial_type",

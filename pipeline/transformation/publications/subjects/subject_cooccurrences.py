@@ -9,20 +9,20 @@ Idempotent : le résultat dépend seulement de l'état courant de `publication_s
 
 import logging
 
-from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, quantity, step
+from sqlalchemy import Connection
+
+from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, quantity
+from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import waiting
 from pipeline.transformation.publications.subjects.subject_store import SubjectStore
 
 
-def run(
-    store: SubjectStore,
-    logger: logging.Logger,
-) -> dict[str, int]:
-    """Recalcule `subjects.usage_count`, puis rafraîchit `subject_labels` et `subject_cooccurrences`. Renvoie les compteurs du recalcul.
+def run(conn: Connection, logger: logging.Logger) -> PhaseMetrics:
+    """Recalcule `subjects.usage_count`, puis rafraîchit `subject_labels` et `subject_cooccurrences`. Renvoie des métriques vides : les décomptes vont au journal.
 
     Les trois recalculs parcourent tous les liens publication-sujet. Chaque ligne du journal affiche le travail en cours, puis son résultat.
     """
-    step(logger, "Rafraîchissement des décomptes")
+    store = SubjectStore(conn)
     with waiting(f"{BRANCH}publications par sujet", logger) as line:
         n_updated = store.recompute_usage_counts()
         # « mis à jour » ne varie pas au pluriel.
@@ -34,6 +34,6 @@ def run(
 
     with waiting(f"{LAST_BRANCH}co-occurrences entre libellés", logger) as line:
         n_pairs = store.refresh_cooccurrences()
-        line.conclude(f"{LAST_BRANCH}co-occurrences entre libellés : décomptes rafraîchis")
+        line.conclude(f"{LAST_BRANCH}co-occurrences entre libellés : {quantity(n_pairs, 'paire')}")
 
-    return {"usage_counts_updated": n_updated, "labels": n_labels, "cooccurrence_pairs": n_pairs}
+    return PhaseMetrics()

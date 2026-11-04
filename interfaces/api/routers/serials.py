@@ -33,7 +33,7 @@ from infrastructure.read_models.subjects.models import SubjectFrequency
 from interfaces.api.csv_export import csv_response
 from interfaces.api.deps import entity_detail, serial_queries, serial_service
 from interfaces.api.entity_detail import EntityDetail
-from interfaces.api.filters import parse_vocabulary_csv
+from interfaces.api.filters import TOGGLE_VALUES, parse_vocabulary_csv
 from interfaces.api.models import (
     EnumOption,
     MergeRequest,
@@ -71,19 +71,30 @@ def serial_filters(
     search: SearchTerm = "",
     publisher_id: int | None = Query(None),
     serial_type: str = Query(""),
-    is_in_doaj: bool | None = Query(None),
+    list_filter: str = Query(""),
+    list_level: str = Query(""),
     oa_model: str = Query(""),
     has_publications: bool | None = Query(None),
+    queries: SerialQueries = Depends(serial_queries),
 ) -> SerialFilters:
     """Lit les filtres communs à la liste des revues et à ses facettes.
 
-    `serial_type` et `oa_model` acceptent plusieurs valeurs séparées par des virgules, prises dans les énumérations du domaine ; une valeur inconnue renvoie 422. `search` vise le titre et les ISSN de la revue, à partir de deux caractères.
+    `serial_type`, `oa_model`, `list_filter` et `list_level` acceptent plusieurs valeurs séparées par des virgules ; une valeur inconnue renvoie 422. `list_filter` exige la présence (`doyens_yes`) ou l'absence (`norway_no`) dans une liste ou un classement. `list_level` coche des niveaux de classement (`fnege-1-star`). `search` vise le titre et les ISSN de la revue, à partir de deux caractères.
     """
+    list_codes, level_codes = queries.serial_list_codes()
+    states = parse_vocabulary_csv(
+        list_filter,
+        allowed={f"{code}_{state}" for code in list_codes for state in TOGGLE_VALUES},
+        param="list_filter",
+    )
     return SerialFilters(
         search=search,
         publisher_id=publisher_id,
         serial_types=parse_vocabulary_csv(serial_type, allowed=SerialType, param="serial_type"),
-        is_in_doaj=is_in_doaj,
+        list_states={
+            code: state == "yes" for code, state in (value.rsplit("_", 1) for value in states)
+        },
+        list_levels=parse_vocabulary_csv(list_level, allowed=level_codes, param="list_level"),
         oa_models=parse_vocabulary_csv(oa_model, allowed=OaModel, param="oa_model"),
         has_publications=has_publications,
     )

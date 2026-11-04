@@ -13,12 +13,14 @@ from sqlalchemy import Connection, text
 
 from domain.dates import date_to_french
 from domain.documents.identifiers import ISSN
-from domain.pipeline_runs import PhaseStatus
 from pipeline.http.dump_download import DumpUnavailableError
 from pipeline.runtime.observability.log_format import BRANCH, quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import waiting
-from pipeline.runtime.observability.signals import signal_source_unavailable
+from pipeline.runtime.observability.signals import (
+    signal_dump_unrecognized,
+    signal_source_unavailable,
+)
 
 LABEL = "Import de la table ISSN-L"
 """Libellé de la sous-étape dans le journal de la phase."""
@@ -75,16 +77,20 @@ def run_import_issnl_table(
                 }
     except DumpUnavailableError as e:
         metrics = PhaseMetrics()
-        logger.warning("Table ISSN-L inaccessible, ISSN-L inchangés : %s", e)
-        signal_source_unavailable(metrics, "ISSN International Centre", logger=logger)
+        signal_source_unavailable(
+            metrics,
+            "ISSN International Centre",
+            logger=logger,
+            reason=f"Table ISSN-L inaccessible, ISSN-L inchangés : {e}",
+        )
         metrics.report = "table inaccessible, import repris au prochain run"
         return metrics
     if not found:
-        message = "Table ISSN-L : aucun ISSN de la base reconnu, ISSN-L inchangés"
-        logger.warning(message)
         metrics = PhaseMetrics()
-        metrics.signals.append(
-            {"level": PhaseStatus.WARNING, "code": "dump_unrecognized", "message": message}
+        signal_dump_unrecognized(
+            metrics,
+            "Table ISSN-L : aucun ISSN de la base reconnu, ISSN-L inchangés",
+            logger=logger,
         )
         metrics.report = "aucun ISSN reconnu, ISSN-L inchangés"
         return metrics
@@ -95,7 +101,7 @@ def run_import_issnl_table(
         {"rows": json.dumps([{"issn": issn, "issnl": issnl} for issn, issnl in found.items()])},
     )
     changed = sum(1 for issn, issnl in current.items() if found.get(issn) != issnl)
-    metrics = PhaseMetrics(extras={"matched": len(found), "changed": changed})
+    metrics = PhaseMetrics(seen=len(current), extras={"matched": len(found), "changed": changed})
     metrics.report = (
         f"{quantity(len(found), 'ISSN trouvé', 'ISSN trouvés')} dans la table, "
         f"{quantity(changed, 'ISSN-L modifié', 'ISSN-L modifiés')}"

@@ -65,6 +65,8 @@
 | `ror_relations` | `ref` | [Référentiels externes](08-ref-et-ops.md) |
 | `serial_doi_namespaces` | `publishing` | [Édition](07-publishing.md#publications-en-série) |
 | `serial_issns` | `publishing` | [Édition](07-publishing.md#publications-en-série) |
+| `serial_list_entries` | `publishing` | [Édition](07-publishing.md#publications-en-série) |
+| `serial_lists` | `publishing` | [Édition](07-publishing.md#publications-en-série) |
 | `serial_title_decisions` | `publishing` | [Édition](07-publishing.md#publications-en-série) |
 | `serials` | `publishing` | [Édition](07-publishing.md#publications-en-série) |
 | `source_contribution_addresses` | `sources` | [Enregistrements sources](02-sources.md) |

@@ -9,9 +9,8 @@ Les types lus sont ceux corrigés par la sous-étape unaire. Chaque passage repa
 
 import logging
 import time
-from collections import defaultdict
+from collections import Counter, defaultdict
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
 
 from sqlalchemy import Connection
 
@@ -31,7 +30,8 @@ from domain.source_records.metadata_correction.shared_doi import (
     own_ids,
     resolve_cluster_doi_corrections,
 )
-from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, inflect, quantity, step
+from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, inflect, quantity
+from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publications.correction.correction_batches import persist_in_batches
 from pipeline.transformation.publications.correction.correction_store import (
     DoiClusterRow,
@@ -133,33 +133,22 @@ def compute_updates(rows: list[DoiClusterRow]) -> list[DoiCorrectionUpdate]:
     ]
 
 
-@dataclass
-class IdentifierRemovalStats:
-    """Bilan de la sous-étape."""
-
-    examined: int
-    """Enregistrements sources examinés."""
-    corrected: int
-    """Enregistrements sources mis à jour."""
-    case_counts: dict[str, int]
-    """DOI retirés par cas (`DoiClusterCase`)."""
-
-
 def tally_doi_corrections(updates: list[DoiCorrectionUpdate]) -> dict[str, int]:
     """Compte les DOI retirés par cas, dans les identifiants des enregistrements sources mis à jour."""
-    case_counts: dict[str, int] = {}
-    for update in updates:
-        for i in update.identifiers:
-            if i.id_type is SourceIdentifierType.DOI and i.removed_by in CLUSTER_IDENTIFIER_RULES:
-                case_counts[i.removed_by] = case_counts.get(i.removed_by, 0) + 1
-    return case_counts
+    return Counter(
+        i.removed_by
+        for update in updates
+        for i in update.identifiers
+        if i.id_type is SourceIdentifierType.DOI and i.removed_by in CLUSTER_IDENTIFIER_RULES
+    )
 
 
-def run(
-    conn: Connection, store: SourceRecordCorrectionStore, logger: logging.Logger
-) -> IdentifierRemovalStats:
-    """Retire le DOI des chapitres qui ont celui de l'ouvrage, des communications qui ont celui du volume d'actes, des articles qui ont celui du numéro de revue, des enregistrements sources qui ont celui d'une autre œuvre, et le DOI inconnu de doi.org."""
-    step(logger, "Retraits de DOI par confrontation de documents")
+def run(conn: Connection, logger: logging.Logger) -> PhaseMetrics:
+    """Retire le DOI des chapitres qui ont celui de l'ouvrage, des communications qui ont celui du volume d'actes, des articles qui ont celui du numéro de revue, des enregistrements sources qui ont celui d'une autre œuvre, et le DOI inconnu de doi.org.
+
+    Renvoie les enregistrements sources examinés, mis à jour, et les DOI retirés par cas.
+    """
+    store = SourceRecordCorrectionStore(conn)
     t0 = time.perf_counter()
     rows = fetch_candidates(store)
     examined = len({row.id for row in rows})
@@ -180,8 +169,7 @@ def run(
         BRANCH,
         quantity(removals, "enregistrement source", "enregistrements sources"),
     )
-    case_counts = tally_doi_corrections(updates)
 
-    persist_in_batches(conn, updates, store.persist_doi_corrections)
+    written = persist_in_batches(conn, updates, store.persist_doi_corrections)
     logger.info("%sTerminé en %.1fs", LAST_BRANCH, time.perf_counter() - t0)
-    return IdentifierRemovalStats(examined, len(updates), case_counts)
+    return PhaseMetrics(seen=examined, updated=written, extras=tally_doi_corrections(updates))

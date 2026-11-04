@@ -36,7 +36,6 @@ def main() -> None:
     try:
         stats = run_import_doaj_dump(
             conn,
-            log,
             rows=read_doaj_dump_rows(args.csv_file),
             dry_run=args.dry_run,
         )

@@ -3,15 +3,21 @@
 La phase relève deux bilans, avant la détection et après le choix du pays, et en tire un résumé : adresses sans pays au départ, adresses dotées d'un pays par la passe, adresses restantes. Les sous-étapes ont leurs propres tests.
 """
 
+import dataclasses
 from unittest.mock import patch
 
 import pytest
 
+from pipeline.graph import in_transaction
 from pipeline.phases import PHASES
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.task_runner import run_phase
 from pipeline.transformation.countries import countries as phase
 from pipeline.transformation.countries.countries import AddressCountryStatus
+
+_PHASE = next(p for p in PHASES if p.name == "countries")
+_PLACE_NAMES = in_transaction(lambda conn, logger: PhaseMetrics(new=6))
+"""Détection par nom de lieu remplacée, dans sa transaction."""
 
 
 class _FakeCountryQueries:
@@ -32,7 +38,11 @@ class _FakeCountryQueries:
 
 
 def _run(contexte) -> PhaseMetrics:
-    return run_phase(next(p for p in PHASES if p.name == "countries"), contexte(mode="daily"))
+    tasks = tuple(
+        dataclasses.replace(t, run=_PLACE_NAMES) if t.name == "detect_by_place_name" else t
+        for t in _PHASE.tasks
+    )
+    return run_phase(dataclasses.replace(_PHASE, tasks=tasks), contexte(mode="daily"))
 
 
 def _bilan(total: int, with_country: int) -> AddressCountryStatus:
@@ -45,7 +55,6 @@ def sous_etapes():
     appels: dict[str, object] = {}
     with (
         patch.object(phase.detect_by_country_name, "run", return_value=PhaseMetrics(new=4)),
-        patch.object(phase.detect_by_place_name, "run", return_value=PhaseMetrics(new=6)),
         patch.object(
             phase.refresh_publication_countries,
             "refresh",

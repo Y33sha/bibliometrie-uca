@@ -20,6 +20,7 @@ from domain.documents.licenses import License
 from domain.platforms.platform import PlatformType
 from domain.publications.access import Copy
 from pipeline.http.lookup import LookupOutcome
+from pipeline.ingestion.api_params import MAX_CONCURRENT
 from pipeline.ingestion.complements.doi_org import fetch_registered_url
 from pipeline.ingestion.complements.unpaywall import fetch_oa_status
 from pipeline.phases import PHASES
@@ -30,7 +31,6 @@ from pipeline.transformation.publications import oa_status
 from pipeline.transformation.publications.oa_inputs import OaInputs
 from pipeline.transformation.publications.oa_status import (
     DOI_ORG,
-    MAX_CONCURRENT,
     UNPAYWALL,
     DoiFetcher,
     DoiLookupTask,
@@ -54,6 +54,15 @@ def _make_fetcher():
 
 async def _doi_org_fetcher(client: httpx2.AsyncClient, doi: str) -> LookupOutcome[str]:
     return await fetch_registered_url(client, doi, user_agent="test")
+
+
+def _answering(answer: str) -> DoiFetcher:
+    """Renvoie une requête simulée, qui donne la même réponse pour tout DOI."""
+
+    async def fetcher(client: httpx2.AsyncClient, doi: str) -> LookupOutcome[str]:  # noqa: ARG001
+        return answer
+
+    return fetcher
 
 
 def _handle_route(http_mock, doi: str, *, values: list | None = None, http_status: int = 200):
@@ -106,7 +115,10 @@ def _publication(
 
 
 class _FakeStore:
-    """DOI à interroger, publications de ces DOI, et capture des écritures (`record_answers`, `update_oa_status`). Une publication lue après l'écriture d'un verdict d'Unpaywall contient ce verdict."""
+    """DOI à interroger, publications de ces DOI, et capture des écritures (`record_answers`, `update_oa_status`). Une publication lue après l'écriture d'un verdict d'Unpaywall contient ce verdict.
+
+    Le premier décompte des publications par statut OA renvoie `oa_distribution`, les suivants `oa_distribution_after` s'il est donné.
+    """
 
     def __init__(
         self,
@@ -114,12 +126,14 @@ class _FakeStore:
         *,
         stale_total: int | None = None,
         oa_distribution: dict[str, int] | None = None,
+        oa_distribution_after: dict[str, int] | None = None,
         stored: dict[str, str | None] | None = None,
     ) -> None:
         self._publications = publications
         self._dois = list(dict.fromkeys(p.doi for p in publications))
         self._stale_total = stale_total if stale_total is not None else len(self._dois)
         self._oa_distribution = oa_distribution or {}
+        self._oa_distribution_after = oa_distribution_after
         self._stored = stored or {}
         self.answers: list[tuple[str, str | None]] = []
         self.services: set[DoiService] = set()
@@ -135,7 +149,10 @@ class _FakeStore:
         return self._stale_total
 
     def count_publications_by_oa_status(self) -> dict[str, int]:
-        return dict(self._oa_distribution)
+        distribution = self._oa_distribution
+        if self._oa_distribution_after is not None:
+            self._oa_distribution = self._oa_distribution_after
+        return dict(distribution)
 
     def record_answers(self, service, answers) -> None:
         self.services.add(service)
@@ -168,13 +185,12 @@ def _task(
     fetcher: DoiFetcher,
     *,
     service: DoiService = UNPAYWALL,
-    max_concurrent: int = MAX_CONCURRENT,
+    max_concurrent: int = MAX_CONCURRENT["unpaywall"],
 ) -> DoiLookupTask:
     """Construit une tâche sans plafond par run, sur le store simulé."""
     return DoiLookupTask(
         service,
         fetcher,
-        title="Vérification",
         participle="vérifié",
         not_found=("non trouvé", "non trouvés"),
         staleness_days=lambda conn: 15,  # noqa: ARG005
@@ -205,7 +221,7 @@ def _run(
     logger: logging.Logger,
     *,
     service: DoiService = UNPAYWALL,
-    max_concurrent: int = MAX_CONCURRENT,
+    max_concurrent: int = MAX_CONCURRENT["unpaywall"],
 ) -> PhaseMetrics:
     """Exécute une tâche sur une transaction inerte."""
     task = _task(queries, fetcher, service=service, max_concurrent=max_concurrent)
@@ -228,7 +244,7 @@ def test_happy_path_updates_each_publication(logger, http_mock):
         oa_distribution={"gold": 7, "closed": 3},
         stored={"10.1/b": "closed", "10.1/c": "bronze"},
     )
-    metrics = _run(queries, _make_fetcher(), logger)
+    metrics = oa_status.assemble({"verify_unpaywall": _run(queries, _make_fetcher(), logger)})
 
     assert sorted(queries.answers) == [
         ("10.1/a", "gold"),
@@ -240,12 +256,50 @@ def test_happy_path_updates_each_publication(logger, http_mock):
     assert (metrics.total, metrics.new, metrics.updated, metrics.unchanged) == (3, 1, 1, 1)
     assert metrics.extras["not_found"] == 0
     assert "stale" not in metrics.extras
-    summary = metrics.details["summary"]
-    assert summary["stale"] == 42
-    assert summary["checked"] == 3
-    assert (summary["new"], summary["updated"], summary["unchanged"]) == (1, 1, 1)
+    [service] = metrics.details["services"]["rows"]
+    assert service["key"] == "verify_unpaywall"
+    assert (service["stale"], service["checked"]) == (42, 3)
+    assert (service["new"], service["updated"], service["unchanged"]) == (1, 1, 1)
     # Le store simulé renvoie la même distribution avant et après : écart nul, lignes triées par effectif.
     assert metrics.details["table"]["rows"][0] == {"key": "gold", "count": 7, "delta": 0}
+
+
+def test_l_evolution_des_statuts_couvre_les_deux_services(logger):
+    """La répartition par statut OA donne le décompte final, avec son évolution sur les deux tâches : la résolution doi.org recalcule aussi le statut des publications."""
+    resolution_store = _FakeStore(
+        [_publication(1, "10.1/a", "closed")],
+        oa_distribution={"closed": 3},
+        oa_distribution_after={"closed": 2, "gold": 1},
+    )
+    unpaywall_store = _FakeStore(
+        [_publication(2, "10.1/b", "closed")],
+        oa_distribution={"closed": 2, "gold": 1},
+        oa_distribution_after={"closed": 1, "gold": 2},
+    )
+    resolution, unpaywall = oa_status.TASKS
+    phase = dataclasses.replace(
+        next(p for p in PHASES if p.name == "oa_status"),
+        tasks=(
+            dataclasses.replace(
+                resolution,
+                run=_task(
+                    resolution_store, _answering("https://example.org/a"), service=DOI_ORG
+                ).run,
+            ),
+            dataclasses.replace(unpaywall, run=_task(unpaywall_store, _answering("gold")).run),
+        ),
+    )
+
+    metrics = run_phase(phase, _context(logger))
+
+    assert [row["key"] for row in metrics.details["services"]["rows"]] == [
+        "resolve_dois",
+        "verify_unpaywall",
+    ]
+    assert metrics.details["table"]["rows"] == [
+        {"key": "gold", "count": 2, "delta": 2},
+        {"key": "closed", "count": 1, "delta": -2},
+    ]
 
 
 def test_404_ecrit_un_verdict_nul_et_le_statut_suit_les_copies(logger, http_mock):

@@ -13,13 +13,12 @@ from sqlalchemy import Connection, text
 
 from domain.types import JsonValue
 from infrastructure.db.queues import Queue, enqueue
-from pipeline.http.circuit_breaker import SourceUnavailableError
+from pipeline.http.circuit_breaker import SourceUnavailableError, trip_source
 from pipeline.ingestion.hal.api import HAL_STRUCTURES_BATCH
 from pipeline.ingestion.hal.structures import HalStructure, parse_hal_structure
 from pipeline.runtime.observability.log_format import LAST_BRANCH, step
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import Progress, track_progress
-from pipeline.runtime.observability.signals import signal_source_unavailable
 
 STALE_AFTER_DAYS = 30
 
@@ -275,7 +274,7 @@ def run_refresh_hal_structures(
         conn.rollback()
         store.rebuild_relations()
         conn.commit()
-        signal_source_unavailable(metrics, "hal", logger=logger)
+        trip_source()
         metrics.report = "référentiel HAL inaccessible, chargement repris au prochain run"
         return metrics
     store.rebuild_relations()

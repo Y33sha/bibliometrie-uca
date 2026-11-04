@@ -149,6 +149,7 @@
     { key: "doi_resolution_recheck_after_days", label: "URL des DOI (doi.org)" },
     { key: "doaj_refresh_after_days", label: "Fichier du DOAJ" },
     { key: "issnl_table_refresh_after_days", label: "Table ISSN-L (ISSN International Centre)" },
+    { key: "serial_openalex_recheck_after_days", label: "Métadonnées des revues (OpenAlex)" },
   ];
 
   const activeTab = $derived(page.url.searchParams.get("tab") === "display" ? "display" : "pipeline");

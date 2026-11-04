@@ -7,7 +7,6 @@ import logging
 
 from sqlalchemy import Connection, text
 
-from domain.normalize import normalize_text
 from domain.publishers.attachment import (
     NewPublisher,
     PublisherRecord,
@@ -76,9 +75,7 @@ def run_attach_publishers(conn: Connection, logger: logging.Logger) -> PhaseMetr
         if isinstance(ref, int):
             return ref
         if ref not in created:
-            created[ref] = store.create_publisher(
-                name=ref.name, name_normalized=normalize_text(ref.name), openalex_id=ref.openalex_id
-            )
+            created[ref] = store.create_publisher(name=ref.name, openalex_id=ref.openalex_id)
         return created[ref]
 
     for publisher_id, openalex_id in sorted(attachment.openalex_ids.items()):

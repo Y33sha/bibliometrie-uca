@@ -115,7 +115,6 @@ class TestSerialFindById:
         assert j.id == jid
         assert j.title == "Nature"
         assert j.publisher_id is None
-        assert j.is_in_doaj is False
 
     def test_hydrates_full(self, sa_sync_conn, repo):
         publication_id = insert_publisher(sa_sync_conn, "PLOS")
@@ -124,7 +123,6 @@ class TestSerialFindById:
             title="PLOS ONE",
             publisher_id=publication_id,
             openalex_id="S202381698",
-            is_in_doaj=True,
             oa_model="full_oa",
             issn="1932-6203",
             eissn="1932-6203",
@@ -135,7 +133,6 @@ class TestSerialFindById:
         assert j.title == "PLOS ONE"
         assert j.publisher_id == publication_id
         assert j.openalex_id == "S202381698"
-        assert j.is_in_doaj is True
         assert j.oa_model == "full_oa"
 
 
@@ -451,6 +448,24 @@ class TestMergeSerials:
             == target
         )
 
+    def test_unites_list_entries(self, sa_sync_conn, serial_service):
+        target = _serial(sa_sync_conn, title="Target")
+        source = _serial(sa_sync_conn, title="Source")
+        sa_sync_conn.execute(
+            text("""
+                INSERT INTO serial_list_entries (serial_id, list_code) VALUES
+                    (:t, 'doaj'), (:s, 'doaj'), (:s, 'medline')
+            """),
+            {"t": target, "s": source},
+        )
+
+        serial_service.merge_serials(target, source)
+
+        rows = sa_sync_conn.execute(
+            text("SELECT serial_id, list_code FROM serial_list_entries ORDER BY list_code")
+        ).all()
+        assert [tuple(r) for r in rows] == [(target, "doaj"), (target, "medline")]
+
     def test_type_repris_garde_son_marqueur(self, sa_sync_conn, serial_service):
         target = _serial(sa_sync_conn, title="Target")
         source = _serial(sa_sync_conn, title="Source", serial_type="media")
@@ -515,12 +530,13 @@ class TestMergeSerials:
         serial_service.merge_serials(target, source)
 
         row = issn_columns(sa_sync_conn, target)
-        row.is_in_doaj = _fetch_one(
-            sa_sync_conn, "SELECT is_in_doaj FROM serials WHERE id = :id", id=target
-        ).is_in_doaj
         assert row.issn == "1234-5678"
         assert row.eissn == "9999-0000"
-        assert row.is_in_doaj is True
+        assert _fetch_one(
+            sa_sync_conn,
+            "SELECT list_code FROM serial_list_entries WHERE serial_id = :id",
+            id=target,
+        ) == ("doaj",)
 
     def test_does_not_overwrite_existing_fields(self, sa_sync_conn, serial_service):
         """Les champs renseignés de la cible gardent leur valeur."""

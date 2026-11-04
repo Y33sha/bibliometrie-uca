@@ -451,7 +451,14 @@ serials = Table(
     Column("title_normalized", Text, nullable=False),
     Column("publisher_id", Integer),
     Column("openalex_id", Text),
-    Column("is_in_doaj", Boolean, server_default="false"),
+    Column(
+        "openalex_checked_at",
+        DateTime(timezone=True),
+        comment=(
+            "Date de la dernière recherche des métadonnées de la revue dans OpenAlex. "
+            "NULL : jamais cherchées."
+        ),
+    ),
     Column("oa_model", oa_model_enum),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("serial_type", serial_type_enum, server_default="unknown"),
@@ -552,6 +559,39 @@ serial_doi_namespaces = Table(
     Column("serial_id", Integer, nullable=False),
     Column("dois", Integer, nullable=False),
     Column("share", Float, nullable=False),
+    schema="publishing",
+)
+
+
+serial_lists = Table(
+    "serial_lists",
+    metadata,
+    Column(
+        "code",
+        Text,
+        primary_key=True,
+        comment="Code de la liste dans OpenAlex (`listed_in`), ou code du classement.",
+    ),
+    Column("ranking_code", Text, comment="Classement du niveau."),
+    Column("label", Text, nullable=False),
+    Column("display_order", Integer, nullable=False),
+    Column("maintainer", Text, comment="Organisme qui publie la liste, d'après OpenAlex."),
+    Column("url", Text),
+    Column("edition", Date, comment="Date de l'édition de la liste chargée par OpenAlex."),
+    comment=(
+        "Listes de revues. Un classement à niveaux est une ligne sans appartenances, parente de "
+        "ses niveaux."
+    ),
+    schema="publishing",
+)
+
+
+serial_list_entries = Table(
+    "serial_list_entries",
+    metadata,
+    Column("serial_id", Integer, primary_key=True),
+    Column("list_code", Text, primary_key=True),
+    comment="Appartenance d'une publication en série à une liste, d'après OpenAlex.",
     schema="publishing",
 )
 

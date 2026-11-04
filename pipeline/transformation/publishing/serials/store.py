@@ -1,4 +1,4 @@
-"""Store des revues : revue d'un ISSN-L, revue sans ISSN d'un titre ou d'un titre et d'un éditeur, type de la table `serials`, pour le pipeline.
+"""Store des revues : création, revue sans ISSN d'un titre ou d'un titre et d'un éditeur, type de la table `serials`, pour le pipeline.
 
 L'édition dans l'administration passe par `infrastructure/repositories/serial_repository.py`, la fusion par `serial_merge`.
 """
@@ -7,7 +7,6 @@ from collections.abc import Sequence
 from typing import NamedTuple
 
 from sqlalchemy import ColumnElement, Connection, any_, exists, literal, select, text, update
-from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from domain.normalize import normalize_text
 from domain.serials.serial import ManualField, SerialType
@@ -43,24 +42,6 @@ class SerialStore:
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
-
-    def serial_for_issnl(self, issnl: str, title: str) -> int:
-        """Renvoie la revue de l'ISSN-L `issnl`, créée avec le titre `title` si elle manque. L'ISSN-L reçoit sa ligne de `serial_issns` au besoin."""
-        self._conn.execute(
-            pg_insert(serial_issns)
-            .values(issn=issnl)
-            .on_conflict_do_nothing(index_elements=["issn"])
-        )
-        serial_id: int | None = self._conn.execute(
-            select(serial_issns.c.serial_id).where(serial_issns.c.issn == issnl)
-        ).scalar_one()
-        if serial_id is not None:
-            return serial_id
-        created = self._create_serial(title)
-        self._conn.execute(
-            update(serial_issns).where(serial_issns.c.issn == issnl).values(serial_id=created)
-        )
-        return created
 
     def serial_for_title(self, title: str) -> int:
         """Renvoie la revue sans ISSN de ce titre normalisé, créée si elle manque. Le plus petit identifiant départage deux revues."""
@@ -98,9 +79,10 @@ class SerialStore:
         ).scalar_one_or_none()
         if found is not None:
             return found
-        return self._create_serial(title, publisher_id=publisher_id)
+        return self.create_serial(title, publisher_id=publisher_id)
 
-    def _create_serial(self, title: str, *, publisher_id: int | None = None) -> int:
+    def create_serial(self, title: str, *, publisher_id: int | None = None) -> int:
+        """Crée la revue `title`, avec son titre normalisé, et renvoie son identifiant."""
         return scalar_int(
             self._conn.execute(
                 serials.insert()

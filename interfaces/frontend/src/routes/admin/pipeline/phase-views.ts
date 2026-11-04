@@ -112,6 +112,23 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
       {
         source: "table",
         firstColumnLabel: "Sous-étape",
+        rowLabels: {
+          resolve_crossref_publishers: "préfixes DOI Crossref → éditeurs",
+          resolve_datacite_publishers: "préfixes DOI DataCite → éditeurs",
+          attach_publishers: "enregistrements sources rattachés aux éditeurs",
+          merge_duplicate_publishers: "autres noms des éditeurs fusionnés",
+          sync_issns: "ISSN des séries",
+          check_issns_in_sudoc: "ISSN vérifiés dans le Sudoc",
+          import_issnl_table: "ISSN trouvés dans la table ISSN-L",
+          attach_serials: "enregistrements sources rattachés aux revues",
+          check_serials_in_openalex: "revues cherchées dans OpenAlex",
+          type_proceedings_serials: "revues typées recueils d'actes",
+          type_journal_serials: "entrées typées revues",
+          learn_serial_doi_namespaces: "DOI → espaces de noms des revues",
+          attach_monographs: "enregistrements sources rattachés aux monographies",
+          link_monographs_to_collections: "monographies rattachées à leur collection",
+          type_proceedings_volumes: "monographies retypées (actes ou livre)",
+        },
         columns: [
           { key: "traités", label: "Traités" },
           { key: "identifiés", label: "Identifiés" },
@@ -124,13 +141,19 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
     summary: [
       { key: "adresses", label: "Adresses traitées" },
       { key: "in_perimeter", label: "Adresses dans le périmètre" },
+      {
+        key: "source_contributions_entered",
+        label: "Contributions sources entrées dans le périmètre",
+      },
+      { key: "source_contributions_left", label: "Contributions sources sorties du périmètre" },
     ],
   },
   publications: {
     lines: [
-      "{processed} source_records examinées, résolues en {publications} publications (dont {existing} déjà existantes)",
+      "{processed} documents examinés, résolus en {publications} publications (dont {existing} déjà existantes)",
       "{created} nouvelles publications, dont {splits} par scission",
       "{merges} doublons fusionnés",
+      "{detached} documents retirés de leur publication",
       "nouveau total : {publication_total} publications",
     ],
   },
@@ -155,8 +178,8 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
   metadata_correction: {
     matrix: {
       columns: [
-        { key: "examined", label: "source_records examinées" },
-        { key: "corrected", label: "corrigées" },
+        { key: "examined", label: "Examinés" },
+        { key: "corrected", label: "Mis à jour" },
       ],
       rows: [
         { key: "serial_by_doi", label: "Rattachement à la publication en série (par DOI)" },
@@ -258,15 +281,20 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
     ],
   },
   oa_status: {
-    summary: [
-      { key: "stale", label: "DOI à vérifier" },
-      { key: "checked", label: "Vérifiés" },
-      { key: "new", label: "Nouveaux" },
-      { key: "updated", label: "Modifiés" },
-      { key: "unchanged", label: "Inchangés" },
-      { key: "not_found", label: "Non trouvés" },
-    ],
     tables: [
+      {
+        source: "services",
+        firstColumnLabel: "Service",
+        rowLabels: { resolve_dois: "doi.org", verify_unpaywall: "Unpaywall" },
+        columns: [
+          { key: "stale", label: "DOI à vérifier" },
+          { key: "checked", label: "Vérifiés" },
+          { key: "new", label: "Nouveaux" },
+          { key: "updated", label: "Modifiés" },
+          { key: "unchanged", label: "Inchangés" },
+          { key: "not_found", label: "Non trouvés" },
+        ],
+      },
       {
         source: "table",
         firstColumnLabel: "Statut OA",
