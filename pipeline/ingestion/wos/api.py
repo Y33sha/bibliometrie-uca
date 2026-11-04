@@ -8,7 +8,7 @@ import httpx2
 
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, at_path
 from pipeline.http.http_retry import http_request_with_retry, lookup_json_async
-from pipeline.http.lookup import UNAVAILABLE, LookupOutcome, NotFound, Unavailable
+from pipeline.http.lookup import NOT_FOUND, UNAVAILABLE, LookupOutcome, NotFound, Unavailable
 from pipeline.http.tls import tls_context
 from pipeline.ingestion.api_params import API_BASE_URLS, WOS_PER_PAGE
 from pipeline.ingestion.credentials import get_wos_api_key
@@ -160,3 +160,14 @@ async def search(
         return outcome
     data = as_mapping(outcome)
     return data if data else UNAVAILABLE
+
+
+async def fetch_by_ut(
+    client: httpx2.AsyncClient, ut: str
+) -> LookupOutcome[Mapping[str, JsonValue]]:
+    """Renvoie le record WoS d'identifiant `ut`, son absence ou l'indisponibilité de l'API."""
+    data = await search(client, f"UT=({ut})", count=1, label=f"UT {ut}")
+    if isinstance(data, NotFound | Unavailable):
+        return data
+    records = get_records(data)
+    return records[0] if records else NOT_FOUND

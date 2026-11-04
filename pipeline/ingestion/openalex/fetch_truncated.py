@@ -24,7 +24,6 @@ from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.log_format import inflect, quantity, step
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
-MAX_CONCURRENT = 3
 """Plafond OpenAlex 10 req/s."""
 
 _SELECT_TRUNCATED_SQL = text(
@@ -77,7 +76,6 @@ async def refetch_openalex(conn: Connection, log: logging.Logger) -> PhaseMetric
                 "openalex", openalex_id
             ),
             stage=_complete,
-            max_concurrent=MAX_CONCURRENT,
         ),
         truncated,
     )

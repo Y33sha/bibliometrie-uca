@@ -52,8 +52,24 @@ THESES_PER_PAGE = 500
 DOI_ORG_RA_BATCH = 100
 """doi.org/ra — aucune limite documentée ; 200 préfixes par requête passent préfixes par requête."""
 
-SUDOC_MAX_CONCURRENT = 4
-"""Sudoc — aucune limite documentée."""
+MAX_CONCURRENT: dict[str, int] = {
+    # API Solr publique sans plafond documenté.
+    "hal": 5,
+    "openalex": 3,
+    # API instable.
+    "wos": 2,
+    # Elasticsearch public sans plafond documenté.
+    "scanr": 5,
+    # API fragile : une requête à la fois.
+    "theses": 1,
+    # Polite pool : 3 requêtes simultanées au plus.
+    "crossref": 3,
+    "datacite": 3,
+    "doi_org": 3,
+    # Aucune limite documentée.
+    "sudoc": 4,
+}
+"""Requêtes simultanées consenties à chaque accès, sous son plafond."""
 
 
 MAX_PER_SECOND: dict[str, float] = {

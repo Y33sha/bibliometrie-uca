@@ -2,23 +2,24 @@
 
 - `fetch_missing_hal_by_id` (tâche `fetch_missing.hal_by_id`) : hal-id des documents OpenAlex et ScanR, absents du staging HAL ; lecture par `find_deposit`. Un doublon absorbé donne le dépôt conservé, et rejoint les hal-id introuvables.
 - `fetch_missing_hal_by_nnt` (tâche `fetch_missing.hal_by_nnt`) : NNT de thèses soutenues sans document HAL ; requête Solr `nntId_s`. Réservé au mode `full`.
-- `HalDoiSearch` (tâche `fetch_missing.doi.hal`) : recherche par DOI, pilotée par `pipeline.ingestion.common.doi_search`.
+- `search_doi` (tâche `fetch_missing.doi.hal`) : recherche par DOI, pilotée par `pipeline.ingestion.common.doi_search`.
 
-Les deux premières passent par la boucle commune (`pipeline.ingestion.common.lookup`), avec au plus `HAL_MAX_CONCURRENT` requêtes simultanées.
+Les deux premières passent par la boucle commune (`pipeline.ingestion.common.lookup`).
 """
 
 from __future__ import annotations
 
 import logging
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 import httpx2
 from sqlalchemy import Connection, text
 
 from domain.source_records.identifiers import SourceIdentifierType
 from domain.sources.staging import StagingEntryMode
+from domain.types import JsonValue
 from infrastructure.db.source_record_identifiers import first_of_its_type_sql
-from pipeline.http.lookup import UNAVAILABLE, NotFound, Unavailable
+from pipeline.http.lookup import LookupOutcome
 from pipeline.ingestion.common.failed_lookups import (
     LookupIdType,
     pending_failed_lookup_sql,
@@ -26,7 +27,6 @@ from pipeline.ingestion.common.failed_lookups import (
 )
 from pipeline.ingestion.common.lookup import (
     Fetch,
-    LookupBatch,
     LookupChannel,
     by_native_id,
     look_up,
@@ -34,9 +34,6 @@ from pipeline.ingestion.common.lookup import (
 )
 from pipeline.ingestion.hal.api import find_deposit, search_one
 from pipeline.runtime.observability.metrics import PhaseMetrics
-
-HAL_MAX_CONCURRENT = 5
-"""Requêtes simultanées à HAL ; le débit suit le budget de la source (`api_params.MAX_PER_SECOND`)."""
 
 _HAL_ID_PENDING = pending_failed_lookup_sql(
     source_sql="'hal'", id_type="hal_id", value_sql="h.id_value"
@@ -135,7 +132,6 @@ async def _fetch_ids(
                 conn, "hal", id_type, identifier
             ),
             stage=lambda staging, doc: staging.stage("hal", doc, entry_mode=entry_mode),
-            max_concurrent=HAL_MAX_CONCURRENT,
         ),
         ids,
     )
@@ -169,21 +165,8 @@ async def fetch_missing_hal_by_nnt(
     )
 
 
-class HalDoiSearch:
-    """Recherche par DOI dans HAL (`DoiSearch`) : requête Solr `doiId_s`, un appel par DOI."""
-
-    source_key = "hal"
-    batch_size = 1
-    # API Solr publique sans rate-limit documenté : 5 requêtes simultanées restent courtoises.
-    max_concurrent = 5
-
-    async def fetch_async(
-        self, client: httpx2.AsyncClient, dois: list[str]
-    ) -> LookupBatch | Unavailable:
-        doi = dois[0]
-        outcome = await search_one(client, f'doiId_s:"{doi}"', label=f"DOI {doi}")
-        if isinstance(outcome, NotFound):
-            return LookupBatch(absent=[doi])
-        if isinstance(outcome, Unavailable):
-            return UNAVAILABLE
-        return LookupBatch(records=[outcome])
+async def search_doi(
+    client: httpx2.AsyncClient, doi: str
+) -> LookupOutcome[Mapping[str, JsonValue]]:
+    """Cherche le dépôt HAL d'un DOI : requête Solr `doiId_s`."""
+    return await search_one(client, f'doiId_s:"{doi}"', label=f"DOI {doi}")

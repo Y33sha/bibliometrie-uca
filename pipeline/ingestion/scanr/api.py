@@ -8,7 +8,7 @@ import httpx2
 
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, at_path
 from pipeline.http.http_retry import http_request_with_retry, lookup_json_async
-from pipeline.http.lookup import UNAVAILABLE, LookupOutcome, NotFound, Unavailable
+from pipeline.http.lookup import NOT_FOUND, UNAVAILABLE, LookupOutcome, NotFound, Unavailable
 from pipeline.ingestion.api_params import API_BASE_URLS
 from pipeline.ingestion.credentials import get_scanr_credentials
 
@@ -58,3 +58,14 @@ async def search(
         return UNAVAILABLE
     hits = as_sequence(as_mapping(as_mapping(outcome).get("hits")).get("hits"))
     return [as_mapping(as_mapping(hit).get("_source")) for hit in hits]
+
+
+async def fetch_by_id(
+    client: httpx2.AsyncClient, source_id: str
+) -> LookupOutcome[Mapping[str, JsonValue]]:
+    """Renvoie le document ScanR d'identifiant `source_id`, son absence ou l'indisponibilité de l'API."""
+    query: dict[str, JsonValue] = {"size": 1, "query": {"term": {"id.keyword": source_id}}}
+    records = await search(client, query, label=f"id {source_id}")
+    if isinstance(records, NotFound | Unavailable):
+        return records
+    return records[0] if records else NOT_FOUND

@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from pipeline.ingestion.common.doi_search import DoiSearch
     from pipeline.ingestion.common.harvester import HarvesterFactory
     from pipeline.ingestion.common.normalizer import SourceNormalizer
-    from pipeline.ingestion.common.stale_refetch import StaleRefetch
+    from pipeline.ingestion.common.stale_refetch import FetchOne
 
 type StripVolatile = Callable[[Mapping[str, JsonValue]], Mapping[str, JsonValue]]
 """Copie d'un payload sans son bruit volatil, sur laquelle se calcule l'empreinte de détection de changement."""
@@ -49,8 +49,8 @@ class SourceAdapter:
     source: Source
     identify: Callable[[Mapping[str, JsonValue]], RecordIdentity | None]
     """Renvoie l'identifiant natif et les DOI d'un document reçu de la source, ou `None` pour un document sans identifiant."""
-    stale_refetch: Callable[[], StaleRefetch]
-    """Nouvelle lecture des documents par identifiant natif (phase `fetch_stale`)."""
+    fetch_by_native_id: FetchOne
+    """Lecture d'un document par son identifiant natif (phase `fetch_stale`)."""
     normalizer: Callable[[], type[SourceNormalizer]]
     """Classe du normaliseur, construite par la phase `normalize` sur ses stores."""
     harvester: HarvesterFactory | None = None

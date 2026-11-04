@@ -72,6 +72,7 @@ def _run_fetch_missing_doi(ctx: PhaseContext, target: str) -> PhaseMetrics:
         return asyncio.run(
             fetch_missing_doi(
                 conn,
+                target,
                 search,
                 ctx.logger,
                 retry_after_days=retry_after_days,

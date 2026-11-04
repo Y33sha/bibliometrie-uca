@@ -11,12 +11,13 @@ from domain.types import JsonValue
 from pipeline.ingestion.common.adapter import RecordIdentity, SourceAdapter
 
 if TYPE_CHECKING:
+    import httpx2
     from sqlalchemy import Connection
 
     from pipeline.ingestion.common.doi_search import DoiSearch
     from pipeline.ingestion.common.harvester import Harvester
     from pipeline.ingestion.common.normalizer import SourceNormalizer
-    from pipeline.ingestion.common.stale_refetch import StaleRefetch
+    from pipeline.ingestion.common.stale_refetch import FetchOutcome
     from pipeline.ingestion.wos.api import WosClient
 
 
@@ -35,15 +36,16 @@ def _harvester(conn: Connection, logger: logging.Logger) -> Harvester:
 
 
 def _doi_search() -> DoiSearch:
-    from pipeline.ingestion.wos.fetch_missing import WosDoiSearch
+    from pipeline.ingestion.common.doi_search import DoiSearch
+    from pipeline.ingestion.wos.fetch_missing import BATCH_SIZE, search_dois
 
-    return WosDoiSearch()
+    return DoiSearch(search_dois, BATCH_SIZE)
 
 
-def _stale_refetch() -> StaleRefetch:
-    from pipeline.ingestion.wos.fetch_stale import WosStaleRefetch
+async def _fetch_by_native_id(client: httpx2.AsyncClient, source_id: str) -> FetchOutcome:
+    from pipeline.ingestion.wos.api import fetch_by_ut
 
-    return WosStaleRefetch()
+    return await fetch_by_ut(client, source_id)
 
 
 def _normalizer() -> type[SourceNormalizer]:
@@ -68,7 +70,7 @@ def _identify(record: Mapping[str, JsonValue]) -> RecordIdentity | None:
 ADAPTER = SourceAdapter(
     source=Source.WOS,
     identify=_identify,
-    stale_refetch=_stale_refetch,
+    fetch_by_native_id=_fetch_by_native_id,
     normalizer=_normalizer,
     harvester=_harvester,
     doi_search=_doi_search,

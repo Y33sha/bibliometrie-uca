@@ -1,13 +1,12 @@
 """Nouvelle lecture des documents d'une source par leur identifiant natif (`staging.source_id`).
 
-Chaque source implémente `StaleRefetch` (`pipeline/ingestion/<source>/fetch_stale.py`) : seule la requête par identifiant natif lui est propre. `refresh` sélectionne les documents et les relit par la boucle commune (`pipeline.ingestion.common.lookup`).
+L'adaptateur de chaque source fournit sa requête par identifiant natif (`FetchOne`). `refresh` sélectionne les documents et les relit par la boucle commune (`pipeline.ingestion.common.lookup`).
 """
 
 from __future__ import annotations
 
 import logging
-from abc import ABC, abstractmethod
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping
 
 import httpx2
 from sqlalchemy import Connection, text
@@ -23,20 +22,8 @@ type FetchOutcome = LookupOutcome[Mapping[str, JsonValue]]
 """Document relu dans la source, ou son absence, ou l'indisponibilité de la source."""
 
 
-class StaleRefetch(ABC):
-    """Nouvelle lecture d'un document d'une source par son identifiant natif.
-
-    Les sous-classes fixent `source_key` et `max_concurrent`, et implémentent `fetch_by_native_id`. Le débit suit le budget de la source (`api_params.MAX_PER_SECOND`).
-    """
-
-    source_key: str
-    max_concurrent: int
-    """Plafond de requêtes simultanées, sous le rate-limit de l'API."""
-
-    @abstractmethod
-    async def fetch_by_native_id(
-        self, client: httpx2.AsyncClient, source_id: str
-    ) -> FetchOutcome: ...
+type FetchOne = Callable[[httpx2.AsyncClient, str], Awaitable[FetchOutcome]]
+"""Lit un document de la source par son identifiant natif."""
 
 
 _STALE_ROWS_SQL_TEMPLATE = """
@@ -90,7 +77,8 @@ def set_disappeared(conn: Connection, source: str, source_id: str) -> None:
 
 async def refresh(
     conn: Connection,
-    refetch: StaleRefetch,
+    source: str,
+    fetch_one: FetchOne,
     log: logging.Logger,
     *,
     after_days: int,
@@ -102,18 +90,16 @@ async def refresh(
 
     Renvoie les compteurs de `look_up` : documents réécrits (`updated`), identiques (`unchanged`), lots non servis (`errors`), absences confirmées (`disappeared`).
     """
-    source = refetch.source_key
     return await look_up(
         conn,
         log,
         LookupChannel(
             source=source,
-            fetch=by_native_id(source, refetch.fetch_by_native_id),
+            fetch=by_native_id(source, fetch_one),
             on_absent=lambda conn, source_id: set_disappeared(conn, source, source_id),
             # La lecture par identifiant natif renvoie le document entier : aucun plafond d'auteurs.
             stage=lambda staging, record: staging.stage(source, record, listed=False),
             absent_metric="disappeared",
-            max_concurrent=refetch.max_concurrent,
         ),
         get_stale_source_ids(conn, source, years, after_days=after_days),
     )

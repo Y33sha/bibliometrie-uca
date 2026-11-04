@@ -27,8 +27,6 @@ from pipeline.ingestion.scanr.api import search
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
 BATCH_SIZE = 50
-MAX_CONCURRENT = 5
-"""L'API Elasticsearch publique est sans plafond documenté : 5 requêtes simultanées restent courtoises."""
 
 
 async def search_by_external_ids(
@@ -59,18 +57,10 @@ async def search_by_external_ids(
     return LookupBatch(records=records, absent=[i for i in ids if i not in found])
 
 
-class ScanrDoiSearch:
-    """Recherche par DOI dans ScanR (`DoiSearch`), par lots (`search_by_external_ids`)."""
-
-    source_key = "scanr"
-    batch_size = BATCH_SIZE
-    max_concurrent = MAX_CONCURRENT
-
-    async def fetch_async(
-        self, client: httpx2.AsyncClient, dois: list[str]
-    ) -> LookupBatch | Unavailable:
-        # Comparaison sur DOI nettoyé, cohérente avec les DOI en minuscules de `get_missing_dois`.
-        return await search_by_external_ids(client, dois, id_type="doi", normalize=DOI.normalize)
+async def search_dois(client: httpx2.AsyncClient, dois: list[str]) -> LookupBatch | Unavailable:
+    """Cherche un lot de DOI dans ScanR (`search_by_external_ids`)."""
+    # Comparaison sur DOI nettoyé, cohérente avec les DOI en minuscules de `get_missing_dois`.
+    return await search_by_external_ids(client, dois, id_type="doi", normalize=DOI.normalize)
 
 
 _HAL_ID_PENDING = pending_failed_lookup_sql(
@@ -141,7 +131,6 @@ async def fetch_missing_scanr_by_hal_id(
                 "scanr", doc, entry_mode=StagingEntryMode.FETCH_MISSING_HAL_ID
             ),
             batch_size=BATCH_SIZE,
-            max_concurrent=MAX_CONCURRENT,
         ),
         get_missing_hal_ids(conn, retry_after_days=retry_after_days),
     )

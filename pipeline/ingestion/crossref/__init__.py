@@ -11,12 +11,13 @@ from domain.types import JsonValue
 from pipeline.ingestion.common.adapter import RecordIdentity, SourceAdapter
 
 if TYPE_CHECKING:
+    import httpx2
     from sqlalchemy import Connection
 
     from pipeline.ingestion.common.doi_search import DoiSearch
     from pipeline.ingestion.common.harvester import Harvester
     from pipeline.ingestion.common.normalizer import SourceNormalizer
-    from pipeline.ingestion.common.stale_refetch import StaleRefetch
+    from pipeline.ingestion.common.stale_refetch import FetchOutcome
     from pipeline.ingestion.crossref.api import CrossrefClient
 
 
@@ -34,15 +35,17 @@ def _person_harvester(conn: Connection, logger: logging.Logger) -> Harvester:
 
 
 def _doi_search() -> DoiSearch:
-    from pipeline.ingestion.crossref.fetch_missing import CrossrefDoiSearch
+    from pipeline.ingestion.common.doi_search import DoiSearch
+    from pipeline.ingestion.common.lookup import by_native_id
 
-    return CrossrefDoiSearch()
+    # Un DOI alias renvoie le document de son DOI principal : le DOI cherché rejoint les absents.
+    return DoiSearch(by_native_id(Source.CROSSREF, _fetch_by_native_id))
 
 
-def _stale_refetch() -> StaleRefetch:
-    from pipeline.ingestion.crossref.fetch_stale import CrossrefStaleRefetch
+async def _fetch_by_native_id(client: httpx2.AsyncClient, source_id: str) -> FetchOutcome:
+    from pipeline.ingestion.crossref.api import fetch_work
 
-    return CrossrefStaleRefetch()
+    return await fetch_work(client, source_id)
 
 
 def _normalizer() -> type[SourceNormalizer]:
@@ -63,7 +66,7 @@ def _identify(record: Mapping[str, JsonValue]) -> RecordIdentity | None:
 ADAPTER = SourceAdapter(
     source=Source.CROSSREF,
     identify=_identify,
-    stale_refetch=_stale_refetch,
+    fetch_by_native_id=_fetch_by_native_id,
     normalizer=_normalizer,
     person_harvester=_person_harvester,
     doi_search=_doi_search,

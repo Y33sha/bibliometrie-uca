@@ -11,12 +11,13 @@ from domain.types import JsonValue
 from pipeline.ingestion.common.adapter import RecordIdentity, SourceAdapter
 
 if TYPE_CHECKING:
+    import httpx2
     from sqlalchemy import Connection
 
     from pipeline.ingestion.common.doi_search import DoiSearch
     from pipeline.ingestion.common.harvester import Harvester
     from pipeline.ingestion.common.normalizer import SourceNormalizer
-    from pipeline.ingestion.common.stale_refetch import StaleRefetch
+    from pipeline.ingestion.common.stale_refetch import FetchOutcome
     from pipeline.ingestion.openalex.api import OpenalexClient
 
 
@@ -40,15 +41,17 @@ def _person_harvester(conn: Connection, logger: logging.Logger) -> Harvester:
 
 
 def _doi_search() -> DoiSearch:
-    from pipeline.ingestion.openalex.fetch_missing import OpenalexDoiSearch
+    from pipeline.ingestion.common.doi_search import DoiSearch
+    from pipeline.ingestion.common.lookup import one_at_a_time
+    from pipeline.ingestion.openalex.api import search_doi
 
-    return OpenalexDoiSearch()
+    return DoiSearch(one_at_a_time(search_doi))
 
 
-def _stale_refetch() -> StaleRefetch:
-    from pipeline.ingestion.openalex.fetch_stale import OpenalexStaleRefetch
+async def _fetch_by_native_id(client: httpx2.AsyncClient, source_id: str) -> FetchOutcome:
+    from pipeline.ingestion.openalex.api import fetch_work
 
-    return OpenalexStaleRefetch()
+    return await fetch_work(client, source_id)
 
 
 def _normalizer() -> type[SourceNormalizer]:
@@ -74,7 +77,7 @@ def _authors_truncated(record: Mapping[str, JsonValue]) -> bool:
 ADAPTER = SourceAdapter(
     source=Source.OPENALEX,
     identify=_identify,
-    stale_refetch=_stale_refetch,
+    fetch_by_native_id=_fetch_by_native_id,
     normalizer=_normalizer,
     harvester=_harvester,
     person_harvester=_person_harvester,

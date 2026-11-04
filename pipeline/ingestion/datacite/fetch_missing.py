@@ -18,26 +18,21 @@ from pipeline.ingestion.common.lookup import LookupBatch
 from pipeline.ingestion.datacite.api import search_dois
 from pipeline.ingestion.datacite.fields import record_doi
 
+BATCH_SIZE = 10
+"""DOI par requête."""
 
-class DataciteDoiSearch:
-    """Recherche par DOI dans DataCite (`DoiSearch`) : `GET /dois`, par lots."""
 
-    source_key = "datacite"
-    batch_size = 10
-    max_concurrent = 3
-
-    async def fetch_async(
-        self, client: httpx2.AsyncClient, dois: list[str]
-    ) -> LookupBatch | Unavailable:
-        records = await search_dois(client, dois)
-        if isinstance(records, NotFound | Unavailable):
-            return UNAVAILABLE
-        # Les ressources reçues se rattachent aux DOI demandés par comparaison exacte en minuscules, quels que soient leur ordre et leur nombre. Un DOI demandé sans ressource est absent de DataCite.
-        found: dict[str, Mapping[str, JsonValue]] = {}
-        for record in records:
-            if doi := record_doi(record):
-                found[doi] = record
-        return LookupBatch(
-            records=list(found.values()),
-            absent=[d for d in dois if DOI.normalize(d) not in found],
-        )
+async def find_dois(client: httpx2.AsyncClient, dois: list[str]) -> LookupBatch | Unavailable:
+    """Cherche un lot de DOI dans DataCite : `GET /dois`."""
+    records = await search_dois(client, dois)
+    if isinstance(records, NotFound | Unavailable):
+        return UNAVAILABLE
+    # Les ressources reçues se rattachent aux DOI demandés par comparaison exacte en minuscules, quels que soient leur ordre et leur nombre. Un DOI demandé sans ressource est absent de DataCite.
+    found: dict[str, Mapping[str, JsonValue]] = {}
+    for record in records:
+        if doi := record_doi(record):
+            found[doi] = record
+    return LookupBatch(
+        records=list(found.values()),
+        absent=[d for d in dois if DOI.normalize(d) not in found],
+    )
