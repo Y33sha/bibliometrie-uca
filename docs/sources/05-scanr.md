@@ -13,7 +13,7 @@ https://scanr.enseignementsup-recherche.gouv.fr/docs/overview
 - Identifiant et mot de passe nécessaires, accordés gratuitement sur demande : https://scanr.enseignementsup-recherche.gouv.fr/about/contact
 - Requête : année + affiliation par identifiant SIREN
 - [Moissonnage par personne](../pipeline/02-harvest.md#moissonnage-par-personne-harvest_by_person) : clause réunissant l'IdRef (`authors.person`, sous la forme `idref<IdRef>`) et l'ORCID (`authors.denormalized.orcid`) d'un lot de personnes RH
-- Pagination par `search_after` sur `id.keyword`, 1 000 résultats par page, à 5 req/s (`MAX_PER_SECOND`, `pipeline/ingestion/api_params.py`)
+- Pagination par `search_after` sur `id.keyword`. Taille de page et débit : `pipeline/ingestion/api_params.py`
 
 ## Données récupérées
 

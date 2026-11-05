@@ -9,7 +9,7 @@ https://developer.clarivate.com/apis/wos
 **Expanded API** (`https://api.clarivate.com/api/wos`) — moissonnage des publications.
 - Clé API nécessaire, obtenue sur demande après enregistrement de l'application (compter plusieurs jours de délai).
 - Requête par champ OG (Organization) + année de publication
-- Pagination par offset (`firstRecord`), 10 résultats/page, à 2 req/s (`MAX_PER_SECOND`, `pipeline/ingestion/api_params.py`)
+- Pagination par offset (`firstRecord`). Taille de page et débit : `pipeline/ingestion/api_params.py`
 - Quota annuel fixé par le contrat, vérifié au démarrage.
 
 ## Données récupérées

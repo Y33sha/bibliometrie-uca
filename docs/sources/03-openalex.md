@@ -12,7 +12,7 @@ https://developers.openalex.org/
 - Nécessite une adresse électronique de contact ou une clé API (création via un compte gratuit)
 - Requête par institution (filtre `lineage`) + année de publication
 - [Moissonnage par personne](../pipeline/02-harvest.md#moissonnage-par-personne-harvest_by_person) : filtre sur l'ORCID déposé (`raw_orcid`) d'un lot de 50 personnes RH
-- Pagination par cursor, 200 résultats/page, à 8 req/s (`MAX_PER_SECOND`, `pipeline/ingestion/api_params.py`)
+- Pagination par cursor. Taille de page et débit : `pipeline/ingestion/api_params.py`
 
 **Sources API** (https://api.openalex.org/sources) — interrogée par ISSN, ou par identifiant OpenAlex pour une revue sans ISSN, par `check_serials_in_openalex` dans la phase [`publishing`](../pipeline/05-publishing.md). Donne l'identifiant OpenAlex, le type et les listes de revues (`listed_in`) de chaque revue.
 
