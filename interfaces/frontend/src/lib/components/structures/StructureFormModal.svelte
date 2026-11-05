@@ -1,6 +1,6 @@
 <script lang="ts">
   import Modal from "#lib/components/Modal.svelte";
-  import { API_SOURCES, API_SOURCE_LABELS } from "./types";
+  import { loadStructureIdSources, structureIdSourceOptions } from "#lib/sources.svelte.js";
   import { STRUCTURE_TYPES } from "#lib/structureTypes.js";
 
   let {
@@ -26,6 +26,8 @@
     onclose: () => void;
     onsubmit: () => void | Promise<void>;
   } = $props();
+
+  loadStructureIdSources();
 </script>
 
 <Modal
@@ -46,8 +48,8 @@
     <label>Collection HAL <input placeholder="ex: INSTITUT_PASCAL" bind:value={hal} /></label>
     <details class="api-ids-section">
       <summary>Identifiants API par source</summary>
-      {#each API_SOURCES as src}
-        <label class="api-id-label">{API_SOURCE_LABELS[src]} <input placeholder="ex: id1, id2" bind:value={apiIds[src]} /></label>
+      {#each structureIdSourceOptions() as src (src.value)}
+        <label class="api-id-label">{src.label_fr} <input placeholder="ex: id1, id2" bind:value={apiIds[src.value]} /></label>
       {/each}
     </details>
     {#snippet actions()}

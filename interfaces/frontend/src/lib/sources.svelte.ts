@@ -43,6 +43,27 @@ export function sourceOrder(): string[] {
 	return sources.order;
 }
 
+const structureIdSources = $state({ options: [] as EnumOption[] });
+
+let structureIdsLoading: Promise<void> | null = null;
+
+/** Charge une seule fois les sources des identifiants de structure (`structures.api_ids`) et le libellé de ces identifiants. Un échec laisse la liste vide, et l'appel suivant réessaie. */
+export function loadStructureIdSources(): Promise<void> {
+	structureIdsLoading ??= api<EnumOption[]>('/api/sources/structure-ids')
+		.then((options) => {
+			structureIdSources.options = options;
+		})
+		.catch(() => {
+			structureIdsLoading = null;
+		});
+	return structureIdsLoading;
+}
+
+/** Sources des identifiants de structure, dans l'ordre d'affichage. */
+export function structureIdSourceOptions(): EnumOption[] {
+	return structureIdSources.options;
+}
+
 /** Chemin du logo local d'une source (`undefined` si aucun). */
 export function sourceIcon(source: string): string | undefined {
 	return ICONS[source];

@@ -26,7 +26,7 @@
 	import StructureDrawer from '#lib/components/structures/StructureDrawer.svelte';
 	import StructureFormModal from '#lib/components/structures/StructureFormModal.svelte';
 	import StructureTypeTag from '#lib/components/structures/StructureTypeTag.svelte';
-	import { API_SOURCES, ROR_FORMAT_ERROR, buildApiIds, normalizeRorId } from '#lib/components/structures/types.js';
+	import { ROR_FORMAT_ERROR, buildApiIds, normalizeRorId } from '#lib/components/structures/types.js';
 
 	import type { components } from '#lib/api/schema.js';
 	type Structure = components['schemas']['StructureListItem'];
@@ -152,7 +152,6 @@
 		mRor = '';
 		mHal = '';
 		mApiIds = {};
-		for (const src of API_SOURCES) mApiIds[src] = '';
 		createModalOpen = true;
 	}
 
