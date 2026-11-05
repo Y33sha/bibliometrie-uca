@@ -100,13 +100,13 @@ Familles dont un établissement du périmètre est déposant : UCA, Université 
 
 ### Phase 3 — Moissonnage et normalisation
 
-- [ ] Source `scanr_patents` : valeur de `source_type`, profil, adaptateur
+- [x] Source `scanr_patents` : valeur de `source_type`, profil, adaptateur
 - [ ] Identifiants Paysage des déposants dans `structures.api_ids['scanr_patents']`, sur l'UCA et sur Clermont Auvergne INP
 - [x] Client ScanR paramétré par l'index, partagé par `scanr` et `scanr_patents`
-- [ ] Moissonnage des familles par déposant
-- [ ] Normalisation : enregistrement source de type `patent`, numéros en `patent_publication_number` et `patent_application_number`, inventeurs en contributions sources de rôle `inventor`
-- [ ] Demandes, déposants et classification CPC dans `source_extras`
-- [ ] Rafraîchissement d'une famille par son identifiant (`fetch_stale`)
+- [x] Moissonnage des familles par déposant
+- [x] Normalisation : enregistrement source de type `patent`, numéros en `patent_publication_number` et `patent_application_number`, inventeurs en contributions sources de rôle `inventor`
+- [x] Demandes, déposants et classification CPC dans `source_extras`
+- [x] Rafraîchissement d'une famille par son identifiant (`fetch_stale`)
 
 ### Phase 4 — Rattachement des dépôts HAL
 
