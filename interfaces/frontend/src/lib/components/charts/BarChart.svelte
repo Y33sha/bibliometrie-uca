@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { cssColor } from '#lib/components/charts/cssVar.js';
+	import { cssColor, fontSize } from '#lib/components/charts/cssVar.js';
 	import { Chart } from '#lib/components/charts/chart.js';
 
 	let {
@@ -11,7 +11,8 @@
 		height = 280,
 		max,
 		barLabel,
-		tooltipLabel
+		tooltipLabel,
+		prominentLabels = false
 	}: {
 		labels: string[];
 		values: number[];
@@ -27,6 +28,8 @@
 		barLabel?: (value: number, index: number) => string;
 		/** Texte de l'infobulle de la barre `index` ; défaut = « libellé du jeu de données : valeur ». */
 		tooltipLabel?: (value: number, index: number) => string;
+		/** Libellés des catégories et texte au bout des barres en taille `--fs-md`, couleur `--text`. */
+		prominentLabels?: boolean;
 	} = $props();
 
 	let canvas = $state<HTMLCanvasElement | undefined>();
@@ -44,7 +47,8 @@
 			max,
 			ticks: { precision: 0 }
 		};
-		const categoryScale = { grid: { display: false } };
+		const labelStyle: { font?: { size: number }; color?: string } = prominentLabels ? { font: { size: fontSize('md') }, color: cssColor('text') } : {};
+		const categoryScale = { grid: { display: false }, ticks: labelStyle };
 
 		chart = new Chart(canvas, {
 			type: 'bar',
@@ -63,7 +67,8 @@
 					datalabels: {
 						anchor: 'end',
 						align: 'end',
-						font: { weight: 600 },
+						...labelStyle,
+						font: { weight: 600, ...labelStyle.font },
 						...(barLabel && {
 							formatter: (v: number, ctx: { dataIndex: number }) => barLabel(v, ctx.dataIndex)
 						})
@@ -91,6 +96,7 @@
 		void max;
 		void barLabel;
 		void tooltipLabel;
+		void prominentLabels;
 		void canvas;
 		render();
 		return () => {
