@@ -2,6 +2,7 @@
 ## Extraction
 * [ ] Dimensions?; Sudoc? (liens personnes-thèses plus complets que theses.fr, j'ai l'impression); Cairn, Persée pour augmenter couverture SHS? creuser ISTEX
 * [ ] payloads bruts: ne plus faire transiter par la base?
+* [ ] openalex: chercher par ROR plutôt que par i***?
 ## Suite du traitement
 * [ ] normalisation en parallèle de l'extraction?
 * [ ] déduplication par métadonnées: ajouter condition journal_id pour les articles? container title pour les chapitres?
