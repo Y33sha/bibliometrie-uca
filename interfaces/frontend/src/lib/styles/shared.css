@@ -154,6 +154,25 @@
 	--radius-pill: 999px;
 }
 
+/* ── Base du document ── */
+html {
+	font-size: var(--fs-base);
+}
+body {
+	margin: 0;
+	font-family: var(--font);
+	font-variant-numeric: tabular-nums;
+	font-size: var(--fs-base);
+	line-height: 1.5;
+	color: var(--text);
+	background: var(--bg);
+}
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
 /* ── Texte lu par les lecteurs d'écran, hors de l'affichage ── */
 .visually-hidden {
 	position: absolute;

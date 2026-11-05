@@ -333,7 +333,7 @@
 								<IconButton icon="panel" label="Ouvrir le volet" onclick={() => drawer.open(o.publication_id)} />
 								<a href={resolve(`publications/${o.publication_id}`)} class="publication-link">
 									<span class="publication-year">{o.publication_year ?? '?'} —</span>
-									<span class="publication-title"><PublicationTitle titre={o.publication_title} /></span>
+									<span class="publication-title title-truncated"><PublicationTitle titre={o.publication_title} /></span>
 								</a>
 							</div>
 						</td>
@@ -451,7 +451,7 @@
 	.publication-link { display: flex; gap: 0.3em; min-width: 0; color: var(--accent); text-decoration: none; font-size: var(--fs-sm); }
 	.publication-link:hover { text-decoration: underline; }
 	.publication-year { flex: none; }
-	.publication-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+	.title-truncated { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 	.assign-panel { position: relative; }
 	.assign-row { display: flex; gap: 4px; align-items: center; }
 	.assign-row input { flex: 1; min-width: 0; }

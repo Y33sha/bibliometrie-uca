@@ -168,21 +168,6 @@
 <DialogHost />
 
 <style>
-  :global(html) {
-    font-size: var(--fs-base);
-  }
-  :global(body) {
-    margin: 0;
-    font-family: var(--font);
-    font-variant-numeric: tabular-nums;
-    font-size: var(--fs-base);
-    line-height: 1.5;
-    color: var(--text);
-    background: var(--bg);
-  }
-  :global(*, *::before, *::after) {
-    box-sizing: border-box;
-  }
   .site-brand {
     display: flex;
     align-items: center;
