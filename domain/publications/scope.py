@@ -42,6 +42,7 @@ _PARATEXT_TITLES = frozenset(
     normalized_title(title)
     for title in (
         "Auteurs",
+        "Acknowledgments",
         "Bibliographie",
         "Bibliographie sélective",
         "Contributors",
@@ -57,6 +58,7 @@ _PARATEXT_TITLES = frozenset(
         "Notes on Contributors",
         "README.txt",
         "References",
+        "Remerciements",
         "Sommaire",
         "Table des matières",
         "Table of Contents",
