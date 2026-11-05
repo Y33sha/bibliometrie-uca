@@ -12,7 +12,8 @@
 		max,
 		barLabel,
 		tooltipLabel,
-		prominentLabels = false
+		prominentLabels = false,
+		categoryAxisWidth
 	}: {
 		labels: string[];
 		values: number[];
@@ -30,6 +31,8 @@
 		tooltipLabel?: (value: number, index: number) => string;
 		/** Libellés des catégories et texte au bout des barres en taille `--fs-md`, couleur `--text`. */
 		prominentLabels?: boolean;
+		/** Largeur fixe en pixels de l'axe des catégories, libellés compris ; défaut = ajustée aux libellés. */
+		categoryAxisWidth?: number;
 	} = $props();
 
 	let canvas = $state<HTMLCanvasElement | undefined>();
@@ -48,7 +51,15 @@
 			ticks: { precision: 0 }
 		};
 		const labelStyle: { font?: { size: number }; color?: string } = prominentLabels ? { font: { size: fontSize('md') }, color: cssColor('text') } : {};
-		const categoryScale = { grid: { display: false }, ticks: labelStyle };
+		const categoryScale = {
+			grid: { display: false },
+			ticks: labelStyle,
+			...(categoryAxisWidth !== undefined && {
+				afterFit: (scale: { width: number }) => {
+					scale.width = categoryAxisWidth;
+				}
+			})
+		};
 
 		chart = new Chart(canvas, {
 			type: 'bar',
@@ -97,6 +108,7 @@
 		void barLabel;
 		void tooltipLabel;
 		void prominentLabels;
+		void categoryAxisWidth;
 		void canvas;
 		render();
 		return () => {

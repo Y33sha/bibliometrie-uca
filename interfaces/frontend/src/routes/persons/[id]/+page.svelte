@@ -14,6 +14,7 @@
 	import SubjectsCloud from '#lib/components/SubjectsCloud.svelte';
 	import IdentifiersCell from '#lib/components/IdentifiersCell.svelte';
 	import TabNav from '#lib/components/TabNav.svelte';
+	import { activeTabId, type TabDef } from '#lib/tabs.js';
 	import ListStatus from '#lib/components/ListStatus.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import PublicationsListView from '#lib/components/PublicationsListView.svelte';
@@ -51,13 +52,14 @@
 	let thesesCount = $state(0);
 	let error = $state(false);
 
-	const activeTab = $derived(
-		(() => {
-			const t = page.url.searchParams.get('tab');
-			// L'onglet « Adresses » est réservé à la session admin.
-			return t === 'publications' || t === 'theses' || (t === 'addresses' && isAdmin()) ? t : 'dashboard';
-		})()
-	);
+	// L'onglet « Adresses » est réservé à la session admin.
+	const tabs: TabDef[] = $derived([
+		{ id: 'dashboard', label: 'Dashboard' },
+		{ id: 'publications', label: 'Publications' },
+		...(thesesCount > 0 ? [{ id: 'theses', label: 'Thèses' }] : []),
+		...(isAdmin() ? [{ id: 'addresses', label: 'Adresses' }] : []),
+	]);
+	const activeTab = $derived(activeTabId(tabs, page.url.searchParams));
 
 	// Theses tab
 	let thesesSections: ThesisSection[] = $state([]);
@@ -83,6 +85,8 @@
 	const addrShare = (publications: number) =>
 		`${Math.round((100 * publications) / (addrSummary?.publications_with_address || 1))} %`;
 	const publicationCount = (n: number) => formatCount(n, 'publication');
+	// Largeur réservée aux libellés des structures, à gauche de l'axe du graphique.
+	const ADDR_AXIS_WIDTH = 120;
 	let expandedAddrId = $state<number | null>(null);
 	let addrPublications = $state<AddressPublication[]>([]);
 	let addrPublicationsLoading = $state(false);
@@ -231,15 +235,7 @@
 	</div>
 
 	<!-- Tabs -->
-	<TabNav
-		tabs={[
-			{ id: 'dashboard', label: 'Dashboard' },
-			{ id: 'publications', label: 'Publications' },
-			...(thesesCount > 0 ? [{ id: 'theses', label: 'Thèses' }] : []),
-			...(isAdmin() ? [{ id: 'addresses', label: 'Adresses' }] : []),
-		]}
-		onswitch={onTabSwitch}
-	/>
+	<TabNav {tabs} onswitch={onTabSwitch} />
 
 	<!-- Tab: Dashboard -->
 	{#if activeTab === 'dashboard'}
@@ -330,25 +326,29 @@
 				<div class="addr-year">
 					<div class="addr-year-label">Année <strong>{addrYear}</strong></div>
 					<YearSlider min={addrYearMin} max={addrYearMax} bind:value={addrYear} onchange={loadAddressTab} />
-					{#if addrSummary}
-						<p class="addr-total">
-							{publicationCount(addrSummary.publications)}, dont {addrSummary.publications_with_address.toLocaleString('fr-FR')} avec adresse
-						</p>
-					{/if}
 				</div>
 				<h2>Structures reconnues dans les adresses</h2>
+				{#if addrSummary}
+					<p class="addr-total">
+						{publicationCount(addrSummary.publications)}, dont {addrSummary.publications_with_address.toLocaleString('fr-FR')} avec adresse
+					</p>
+				{/if}
 				{#if addrStructures.length}
-					<BarChart
-						labels={addrStructures.map((s) => structureLabel(s))}
-						values={addrStructures.map((s) => s.publications)}
-						datasetLabel="Publications avec adresse"
-						barLabel={addrShare}
-						tooltipLabel={publicationCount}
-						max={addrSummary?.publications_with_address}
-						horizontal
-						prominentLabels
-						height={32 * addrStructures.length + 40}
-					/>
+					<!-- Axe des structures aligné sur le bord gauche du curseur, libellés en débord. -->
+					<div class="addr-chart" style:--axis-width="{ADDR_AXIS_WIDTH}px">
+						<BarChart
+							labels={addrStructures.map((s) => structureLabel(s))}
+							values={addrStructures.map((s) => s.publications)}
+							datasetLabel="Publications avec adresse"
+							barLabel={addrShare}
+							tooltipLabel={publicationCount}
+							max={addrSummary?.publications_with_address}
+							horizontal
+							prominentLabels
+							categoryAxisWidth={ADDR_AXIS_WIDTH}
+							height={32 * addrStructures.length + 40}
+						/>
+					</div>
 				{:else if addrSummary}
 					<p class="addr-counts">Aucune structure reconnue.</p>
 				{/if}
@@ -437,7 +437,11 @@
 		margin-bottom: 20px;
 	}
 	.addr-year-label { font-size: var(--fs-md); }
-	.addr-total { font-size: var(--fs-md); margin: 8px 0 0; }
+	.addr-total { font-size: var(--fs-md); margin: 0 0 8px; }
+	.addr-chart {
+		width: calc(100% + var(--axis-width));
+		margin-left: calc(-1 * var(--axis-width));
+	}
 	.addr-counts { font-size: var(--fs-sm); color: var(--text-secondary); margin: 0; }
 	.addr-cell { font-size: var(--fs-sm); color: var(--muted); word-break: break-all; }
 	.addr-publications { padding: 0 12px 12px 24px; }
