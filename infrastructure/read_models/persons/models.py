@@ -237,8 +237,8 @@ class PersonAddressSummary(Model):
 
     first_year: int | None
     """Année de la plus ancienne publication de la personne."""
-    last_year: int | None
-    """Année de la plus récente publication de la personne."""
+    last_year_with_address: int | None
+    """Année de la plus récente publication de la personne dont une contribution source porte une adresse."""
     publications: int
     """Nombre de publications de la personne."""
     publications_with_address: int

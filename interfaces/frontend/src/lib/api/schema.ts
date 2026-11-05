@@ -4630,10 +4630,10 @@ export interface components {
              */
             first_year: number | null;
             /**
-             * Last Year
-             * @description Année de la plus récente publication de la personne.
+             * Last Year With Address
+             * @description Année de la plus récente publication de la personne dont une contribution source porte une adresse.
              */
-            last_year: number | null;
+            last_year_with_address: number | null;
             /**
              * Publications
              * @description Nombre de publications de la personne.

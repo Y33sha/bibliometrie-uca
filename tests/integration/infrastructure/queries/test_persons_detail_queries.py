@@ -213,12 +213,21 @@ class TestAddressesByYear:
 
         summary = PersonsQueries(sa_sync_conn).person_address_summary(person, year=2024)
 
-        assert (summary.first_year, summary.last_year) == (2023, 2024)
         assert (summary.publications, summary.publications_with_address) == (3, 2)
         assert [(s.id, s.publications) for s in summary.structures] == [
             (structures["chu"], 2),
             (structures["uca"], 1),
         ]
+
+    def test_summary_years(self, sa_sync_conn):
+        """Première année : toutes publications confondues. Dernière année : publications avec adresse, quelle que soit l'année demandée ; la publication de 2025 sans adresse est ignorée."""
+        person, _, _, _, _ = self._setup(sa_sync_conn)
+        publication = insert_publication(sa_sync_conn, publication_year=2025)
+        insert_contribution(sa_sync_conn, publication, person_id=person, roles=["author"])
+
+        summary = PersonsQueries(sa_sync_conn).person_address_summary(person, year=2023)
+
+        assert (summary.first_year, summary.last_year_with_address) == (2023, 2024)
 
     def test_address_publications_restricted_to_person_and_year(self, sa_sync_conn):
         person, publications, _, chu_address, _ = self._setup(sa_sync_conn)

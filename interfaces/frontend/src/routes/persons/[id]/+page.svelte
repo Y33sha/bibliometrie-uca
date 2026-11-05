@@ -72,7 +72,7 @@
 	let addrYear = $state(currentYear);
 	let addrSummary = $state<AddressSummary | null>(null);
 	const addrYearMin = $derived(Math.min(addrSummary?.first_year ?? currentYear, currentYear));
-	const addrYearMax = $derived(Math.max(addrSummary?.last_year ?? currentYear, currentYear));
+	const addrYearMax = $derived(Math.min(addrSummary?.last_year_with_address ?? currentYear, currentYear));
 	const addresses = usePaginatedFetch<Address>({
 		endpoint: () => `/api/persons/${personId}/addresses`,
 		itemsKey: 'addresses',
@@ -103,6 +103,17 @@
 		addresses.page = 1;
 		loadAddressSummary();
 		addresses.load();
+	}
+
+	// Ouverture de l'onglet : bornes du curseur lues, puis année la plus récente du curseur.
+	async function openAddressTab() {
+		await loadAddressSummary();
+		if (addrYear === addrYearMax) {
+			addresses.load();
+			return;
+		}
+		addrYear = addrYearMax;
+		loadAddressTab();
 	}
 
 	async function toggleAddressPublications(addrId: number) {
@@ -150,7 +161,7 @@
 	function onTabSwitch(tab: string) {
 		// L'onglet "publications" est géré par <PublicationsListView> qui charge ses données dans son propre onMount à chaque (re)montage.
 		if (tab === 'theses' && !thesesLoaded) loadTheses();
-		if (tab === 'addresses' && !addresses.loaded) loadAddressTab();
+		if (tab === 'addresses' && !addresses.loaded) openAddressTab();
 	}
 
 	async function loadProfile(id: string) {
@@ -163,7 +174,7 @@
 			error = true;
 			return;
 		}
-		if (activeTab === 'addresses') loadAddressTab();
+		if (activeTab === 'addresses') openAddressTab();
 		else if (activeTab === 'theses') loadTheses();
 		// publications : géré par <PublicationsListView> qui charge tout seul.
 	}
