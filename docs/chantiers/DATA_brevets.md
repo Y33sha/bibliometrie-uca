@@ -110,8 +110,8 @@ Familles dont un établissement du périmètre est déposant : UCA, Université 
 
 ### Phase 4 — Rattachement des dépôts HAL
 
-- [ ] Numéros de `number_s` lus en numéros de publication ou de demande
-- [ ] `patent_publication_number` en clé de confirmation à plusieurs valeurs
+- [x] Numéros de `number_s` lus en numéros de publication ou de demande
+- [x] `patent_publication_number` en clé de confirmation à plusieurs valeurs
 - [ ] Usage de `patent_application_number` dans le rattachement, après mesure des recoupements
 - [ ] Recherche dans ScanR des familles absentes, par numéro (`fetch_missing`)
 - [ ] Mesure de l'effet sur les publications, puis relance avec `--rebuild-publications`
