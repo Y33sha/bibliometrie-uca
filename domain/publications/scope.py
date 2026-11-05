@@ -12,7 +12,7 @@ from domain.source_records.identifiers import (
     active,
     own_dois,
 )
-from domain.source_records.keys import CONFIRMATION_ID_TYPES
+from domain.source_records.keys import CONFIRMATION_ID_TYPES, is_multi_valued_key
 from domain.sources.registry import AGGREGATOR_SOURCES, Source
 
 OUT_OF_SCOPE_DOC_TYPES = frozenset(
@@ -98,6 +98,7 @@ def is_matchable(facts: MatchabilityFacts) -> bool:
     if facts.source in AGGREGATOR_SOURCES:
         return bool(facts.urls) or any(
             i.id_type in CONFIRMATION_ID_TYPES
+            or is_multi_valued_key(i)
             or (
                 i.id_type is SourceIdentifierType.DOI and i.role is not SourceIdentifierRole.RELATED
             )

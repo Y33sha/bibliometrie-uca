@@ -2,6 +2,7 @@
 
 - DOI : tous ses DOI actifs de rôle autre que `related`, chacun remplacé par sa cible quand c'est le DOI d'une forme secondaire (`DoiKeys`).
 - Identifiants : l'identifiant actif de rôle le plus fort de chaque type de `CONFIRMATION_ID_TYPES`.
+- Identifiants à plusieurs valeurs : tous les identifiants actifs de rôle autre que `related` des types de `MULTI_VALUED_CONFIRMATION_ID_TYPES`.
 - Bloc de métadonnées : `<type de document>|<titre normalisé>|<année>`, pour un titre assez long. Le type de document dans la clé impose l'égalité des types.
 
 Les valeurs sont celles de l'enregistrement source corrigé (phase `metadata_correction`). Le voisinage SQL de la réconciliation (`_UNIVERSE_SQL`) réécrit ces clés, et `TestUniverseMatchesPythonTokens` vérifie que les deux concordent. Un type d'identifiant de plus demande son entrée dans `CONFIRMATION_ID_TYPES`. Une clé composite demande aussi sa branche dans `_UNIVERSE_SQL`.
@@ -27,7 +28,19 @@ CONFIRMATION_ID_TYPES = (
     SourceIdentifierType.PMID,
     SourceIdentifierType.NNT,
 )
-"""Types d'identifiants qui sont des clés de confirmation, à côté du DOI et du bloc de métadonnées."""
+"""Types d'identifiants dont l'identifiant de rôle le plus fort est une clé de confirmation, à côté du DOI et du bloc de métadonnées."""
+
+MULTI_VALUED_CONFIRMATION_ID_TYPES = (SourceIdentifierType.PATENT_PUBLICATION_NUMBER,)
+"""Types d'identifiants dont chaque valeur est une clé de confirmation. Une famille de brevets a un numéro de publication par office."""
+
+
+def is_multi_valued_key(identifier: SourceIdentifier) -> bool:
+    """Indique si l'identifiant est une clé de `MULTI_VALUED_CONFIRMATION_ID_TYPES` : actif, de rôle autre que `related`."""
+    return (
+        identifier.id_type in MULTI_VALUED_CONFIRMATION_ID_TYPES
+        and identifier.removed_by is None
+        and identifier.role is not SourceIdentifierRole.RELATED
+    )
 
 
 DISCRIMINANT_TITLE_MIN_LENGTH = 30
@@ -138,10 +151,14 @@ class ConfirmationKeys:
     doi: DoiKeys
     single_valued: Mapping[str, str]
     """Clés présentes à une seule valeur, par nom de clé : identifiants de `CONFIRMATION_ID_TYPES` et bloc de métadonnées (`metadata_block`)."""
+    multi_valued: frozenset[tuple[str, str]] = frozenset()
+    """Identifiants de `MULTI_VALUED_CONFIRMATION_ID_TYPES`, en couples (type, valeur)."""
 
     def tokens(self) -> frozenset[tuple[str, str]]:
         """Renvoie les clés présentes, en jetons `(nom de la clé, valeur)` : un DOI `x` et un NNT `x` restent distincts. Deux enregistrements sources qui partagent un jeton sont reliés dans le graphe des composantes."""
-        return frozenset({*self.single_valued.items(), *(("doi", d) for d in self.doi.all)})
+        return frozenset(
+            {*self.single_valued.items(), *self.multi_valued, *(("doi", d) for d in self.doi.all)}
+        )
 
 
 def confirmation_identifiers(identifiers: Iterable[SourceIdentifier]) -> dict[str, str]:
@@ -175,4 +192,9 @@ def project_confirmation_keys(
         and publication_year is not None
     ):
         single_valued["metadata_block"] = f"{doc_type}|{title_normalized}|{publication_year}"
-    return ConfirmationKeys(doi_keys(identifiers, doi_targets, doc_type), single_valued)
+    multi_valued = frozenset(
+        (i.id_type.value, i.value) for i in identifiers if is_multi_valued_key(i)
+    )
+    return ConfirmationKeys(
+        doi_keys(identifiers, doi_targets, doc_type), single_valued, multi_valued
+    )

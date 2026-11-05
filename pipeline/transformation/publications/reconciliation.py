@@ -29,10 +29,12 @@ from domain.publications.reconciliation import (
 )
 from domain.source_records.identifiers import (
     SourceIdentifier,
+    SourceIdentifierRole,
 )
 from domain.source_records.keys import (
     CONFIRMATION_ID_TYPES,
     DISCRIMINANT_TITLE_MIN_LENGTH,
+    MULTI_VALUED_CONFIRMATION_ID_TYPES,
     derivation,
     project_confirmation_keys,
 )
@@ -102,6 +104,13 @@ _CONFIRMATION_KEY_SQL = (
 )
 """L'identifiant aliasé `{a}` de `source_record_identifiers` est la clé de confirmation de son type (`confirmation_identifiers`)."""
 
+_MULTI_VALUED_KEY_SQL = (
+    "{a}.id_type::text IN "
+    + in_clause(MULTI_VALUED_CONFIRMATION_ID_TYPES)
+    + f" AND {{a}}.removed_by IS NULL AND {{a}}.role <> '{SourceIdentifierRole.RELATED}'"
+)
+"""L'identifiant aliasé `{a}` de `source_record_identifiers` est une clé à plusieurs valeurs (`is_multi_valued_key`)."""
+
 _DOI_KEY_SQL = non_related_doi_sql("{a}") + " AND {a}.removed_by IS NULL"
 """L'identifiant aliasé `{a}` de `source_record_identifiers` est une clé DOI : un DOI actif de rôle autre que `related` (`doi_keys`)."""
 
@@ -139,6 +148,15 @@ _UNIVERSE_SQL = text(f"""
         JOIN source_record_identifiers oi
           ON oi.id_type = di.id_type AND oi.id_value = di.id_value
              AND {_CONFIRMATION_KEY_SQL.format(a="oi")}
+        UNION
+        -- Identifiants à plusieurs valeurs : même type et même valeur, clé de part et d'autre.
+        SELECT oi.source_record_id
+        FROM dirty d
+        JOIN source_record_identifiers di
+          ON di.source_record_id = d.id AND {_MULTI_VALUED_KEY_SQL.format(a="di")}
+        JOIN source_record_identifiers oi
+          ON oi.id_type = di.id_type AND oi.id_value = di.id_value
+             AND {_MULTI_VALUED_KEY_SQL.format(a="oi")}
         UNION
         -- Token metadata_block : même doc_type + titre + année, pour tout doc_type, titre assez long.
         SELECT o.id
@@ -247,7 +265,7 @@ def delete_processed_marks(conn: Connection) -> None:
 def fetch_reconciliation_universe(conn: Connection) -> list[ReconcileRow]:
     """Renvoie le voisinage direct, univers de `connected_components`.
 
-    Le voisinage réunit les enregistrements sources relevés dans la file (orphelins compris) et les enregistrements sources, rattachés ou orphelins, partageant avec eux une clé de confirmation ou une fusion manuelle. Les clés de confirmation sont le DOI, les identifiants de `CONFIRMATION_ID_TYPES` et le token métadonnée (`doc_type`, `title_normalized`, `publication_year`).
+    Le voisinage réunit les enregistrements sources relevés dans la file (orphelins compris) et les enregistrements sources, rattachés ou orphelins, partageant avec eux une clé de confirmation ou une fusion manuelle. Les clés de confirmation sont le DOI, les identifiants de `CONFIRMATION_ID_TYPES` et de `MULTI_VALUED_CONFIRMATION_ID_TYPES`, et le token métadonnée (`doc_type`, `title_normalized`, `publication_year`).
     """
     rows = conn.execute(_UNIVERSE_SQL).all()
     return [
