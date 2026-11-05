@@ -230,10 +230,6 @@
   .graph-wrapper.loading-overlay {
     opacity: 0.6;
   }
-  .empty {
-    color: var(--muted);
-    font-style: italic;
-  }
   .graph-legend {
     margin: 0 0 8px;
     font-size: var(--fs-sm);
@@ -258,9 +254,6 @@
   }
   .muted-num {
     color: var(--text-secondary);
-  }
-  .loading {
-    color: var(--muted);
   }
   .error {
     color: var(--danger);

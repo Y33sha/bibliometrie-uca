@@ -5,6 +5,7 @@
 	import { confirmDialog, toast } from '#lib/dialogs.svelte.js';
 	import type { components } from '#lib/api/schema.js';
 	import { formatCount } from '#lib/plural.js';
+	import ListStatus from '#lib/components/ListStatus.svelte';
 
 	type Response = components['schemas']['LikelyProceedingsResponse'];
 	type Item = components['schemas']['LikelyProceedingsItem'];
@@ -61,11 +62,7 @@
 	}
 </script>
 
-{#if loading}
-	<p class="muted">Chargement…</p>
-{:else if items.length === 0}
-	<p class="muted">Aucune publication en série.</p>
-{:else}
+<ListStatus list={{ loading, error: null, items }} emptyText="Aucune publication en série.">
 	<p class="muted intro">
 		Publications en série typées « revue » dont la majorité des documents sont des articles de congrès, d'après le type donné par chaque source. Les publications en série sans ISSN viennent en tête.
 	</p>
@@ -101,7 +98,7 @@
 			{/each}
 		</tbody>
 	</table>
-{/if}
+</ListStatus>
 
 <style>
 	.intro { margin: 0 0 12px; }

@@ -455,7 +455,7 @@
   {/snippet}
 
   {#if !detail}
-    <p class="loading">Chargement…</p>
+    <p class="muted">Chargement…</p>
   {:else}
     {@const s = detail.structure}
     <div class="structure-meta">
@@ -542,9 +542,6 @@
 {/if}
 
 <style>
-  .loading {
-    color: var(--muted);
-  }
   .drawer-acronym {
     font-weight: 600;
     margin-right: 6px;

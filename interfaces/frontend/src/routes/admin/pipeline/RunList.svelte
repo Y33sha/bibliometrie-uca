@@ -136,8 +136,4 @@
   .ribbon-wrap {
     pointer-events: none;
   }
-  .empty {
-    color: var(--muted);
-    font-size: var(--fs-md);
-  }
 </style>

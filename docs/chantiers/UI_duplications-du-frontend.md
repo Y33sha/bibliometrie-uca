@@ -112,7 +112,7 @@ Une étiquette (tag, badge, pastille, chip) est un court texte sur fond clair, a
 ### Phase 5 — Utilitaires
 
 - [x] Classe de texte secondaire
-- [ ] Chargement et liste vide sur `ListStatus`
+- [x] Chargement et liste vide sur `ListStatus`
 - [ ] Encarts d'information, d'avertissement et de danger
 - [ ] Styles de base de `+layout.svelte` dans `shared.css` ; collisions de noms
 
@@ -121,7 +121,7 @@ Une étiquette (tag, badge, pastille, chip) est un court texte sur fond clair, a
 - [ ] Vues de liste sur une base commune (question 1)
 - [ ] Volets sur une base commune (question 2)
 - [ ] Listes de tri sur leurs composants génériques ; pages Problèmes HAL et d'administration sur `useUrlFilters`
-- [ ] Pages d'entité : en-tête, onglet actif, carte des sujets
+- [ ] Pages d'entité : en-tête, onglet actif, carte des sujets, états « introuvable » et « Chargement… » (marge de 20 ou 40 px selon la page)
 - [ ] Balisages recopiés en composants : pastille DOAJ, liens d'éditeur et de revue, nom de personne, en-tête triable
 
 ### Phase 7 — Fonctions, libellés et icônes
