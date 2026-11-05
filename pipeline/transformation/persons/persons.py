@@ -24,7 +24,7 @@ def _arbitrate_identifiers(ctx: PhaseContext) -> PhaseMetrics:
 
 def _resolve_contributions(ctx: PhaseContext) -> PhaseMetrics:
     with ctx.open_tx() as conn:
-        counts = resolve_contributions(conn, ctx.logger)
+        counts = resolve_contributions(conn, ctx.logger, rebuild=ctx.options.rebuild_persons)
     return PhaseMetrics(extras=counts)
 
 

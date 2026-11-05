@@ -7,10 +7,12 @@ Sont décidées :
 - les contributions sans personne ayant une contribution source du périmètre, une contribution source épinglée, ou une contribution source à identifiant fiable d'attribution confirmée ou authentifiée, à une personne non marquée hors périmètre ;
 - les contributions non manuelles de la file.
 
-Une contribution de la file garde sa personne si sa décision la désigne encore, et la perd sinon. Les contributions du périmètre au nom inconnu sont traitées ensuite, une à une, contre l'index tenu à jour. Chacune rejoint une personne créée dans le même passage, ou fonde la sienne (`create_persons`).
+Une contribution de la file garde sa personne si sa décision la désigne encore, et la perd sinon. `--rebuild-persons` met en file toutes les contributions rattachées hors épinglage. Les contributions se décident par lots de publications, contre l'index chargé en début de tâche. Les contributions du périmètre au nom inconnu sont traitées ensuite, une à une, contre l'index tenu à jour. Chacune rejoint une personne créée dans le même passage, ou fonde la sienne (`create_persons`).
 """
 
 from collections import Counter, defaultdict
+from collections.abc import Iterator, Sequence
+from itertools import batched
 
 from sqlalchemy import Connection, text
 
@@ -34,7 +36,7 @@ from domain.persons.contributor_name import ContributorName
 from domain.persons.identifiers import HUMAN_ATTRIBUTION_STATUSES, PersonIdentifierType
 from domain.persons.person import PersonExclusion, validated_name
 from domain.persons.source_contribution_matching import Namesake
-from infrastructure.db.queues import Queue, delete_processed, snapshot
+from infrastructure.db.queues import Queue, delete_processed, enqueue, snapshot
 from infrastructure.repositories.person_repository import PgPersonRepository
 from infrastructure.sql_fragments import (
     CONTRIBUTIONS_AND_SOURCES,
@@ -68,7 +70,10 @@ _RESOLUTION_SNAPSHOT = "contribution_resolution_snapshot"
 """Relevé de la file des contributions à redécider (`Queue.CONTRIBUTION_RESOLUTION`), pris en début de tâche."""
 
 _CANDIDATES_TABLE = "contribution_resolution_candidates"
-"""Contributions à décider, matérialisées en début de tâche."""
+"""Contributions à décider et leur publication, matérialisées en début de tâche."""
+
+_BATCH_PUBLICATIONS = 4000
+"""Publications par lot de décision. Seules les contributions sources d'un lot sont en mémoire."""
 
 _SEARCHED_IDENTIFIERS = f"""(
     SELECT pi.person_id, pi.id_type, pi.id_value
@@ -129,8 +134,15 @@ _MEMBERS_SQL = f"""
             WHERE ca.source_contribution_id = sc.id) AS pinned_person_id
     FROM {CONTRIBUTIONS_AND_SOURCES}
     JOIN {_CANDIDATES_TABLE} c ON c.contribution_id = g.id
+    WHERE c.publication_id = ANY(:publications)
     ORDER BY g.id
 """
+
+_MARK_ALL_SQL = f"""
+    SELECT id FROM contributions
+    WHERE person_id IS NOT NULL AND resolution_mode IS DISTINCT FROM '{ContributionMatchReason.MANUAL}'
+"""
+"""Contributions rattachées hors épinglage, mises en file par `--rebuild-persons`."""
 
 _TAKEN_SQL = """
     SELECT publication_id, array_agg(person_id) AS person_ids
@@ -177,24 +189,51 @@ def load_index(conn: Connection, conflicting: frozenset[int] = frozenset()) -> P
     )
 
 
-def load_candidate_contributions(
-    conn: Connection,
-) -> dict[int, dict[int, list[AlignedSourceContribution]]]:
-    """Renvoie les contributions sources des contributions à décider, par publication puis par contribution.
+def mark_all_for_resolution(conn: Connection) -> int:
+    """Met en file de redécision (`Queue.CONTRIBUTION_RESOLUTION`) les contributions rattachées hors épinglage. Renvoie le nombre de contributions marquées."""
+    return enqueue(conn, Queue.CONTRIBUTION_RESOLUTION, _MARK_ALL_SQL, {})
+
+
+def prepare_candidates(conn: Connection) -> list[int]:
+    """Matérialise les contributions à décider et renvoie leurs publications, triées.
 
     Les contributions à décider sont les contributions sans personne et les contributions non manuelles de la file. La file est relevée (`snapshot`). `resolve_contributions` supprime ensuite de la file les marquages relevés.
 
-    Les contributions à décider sont matérialisées dans une table temporaire analysée : l'estimation de leur nombre guide la jointure avec leurs contributions sources.
+    La table temporaire est analysée : l'estimation du nombre de contributions guide la jointure avec leurs contributions sources.
     """
     snapshot(conn, Queue.CONTRIBUTION_RESOLUTION, _RESOLUTION_SNAPSHOT)
     conn.execute(text(f"DROP TABLE IF EXISTS pg_temp.{_CANDIDATES_TABLE}"))
-    conn.execute(text(f"CREATE TEMP TABLE {_CANDIDATES_TABLE} AS {_CANDIDATES_SQL}"))
+    conn.execute(
+        text(f"""
+            CREATE TEMP TABLE {_CANDIDATES_TABLE} AS
+            SELECT c.contribution_id, g.publication_id
+            FROM ({_CANDIDATES_SQL}) c
+            JOIN contributions g ON g.id = c.contribution_id
+        """)
+    )
     conn.execute(text(f"ALTER TABLE {_CANDIDATES_TABLE} ADD PRIMARY KEY (contribution_id)"))
+    conn.execute(text(f"CREATE INDEX ON {_CANDIDATES_TABLE} (publication_id)"))
     conn.execute(text(f"ANALYZE {_CANDIDATES_TABLE}"))
+    return list(
+        conn.execute(
+            text(f"SELECT DISTINCT publication_id FROM {_CANDIDATES_TABLE} ORDER BY 1")
+        ).scalars()
+    )
+
+
+def candidate_batches(publication_ids: list[int]) -> Iterator[tuple[int, ...]]:
+    """Découpe les publications des contributions à décider en lots de `_BATCH_PUBLICATIONS`."""
+    return batched(publication_ids, _BATCH_PUBLICATIONS, strict=False)
+
+
+def load_candidate_contributions(
+    conn: Connection, publication_ids: Sequence[int]
+) -> dict[int, dict[int, list[AlignedSourceContribution]]]:
+    """Renvoie les contributions sources des contributions à décider des publications `publication_ids`, par publication puis par contribution. Suit `prepare_candidates`."""
     candidates: dict[int, dict[int, list[AlignedSourceContribution]]] = defaultdict(
         lambda: defaultdict(list)
     )
-    for r in conn.execute(text(_MEMBERS_SQL)):
+    for r in conn.execute(text(_MEMBERS_SQL), {"publications": list(publication_ids)}):
         candidates[r.publication_id][r.contribution_id].append(
             AlignedSourceContribution(
                 source=r.source,
@@ -441,18 +480,22 @@ def unidentified_orphans(
     ]
 
 
-def resolve_contributions(conn: Connection, logger: ScopedOrPlainLogger) -> dict[str, int]:
+def resolve_contributions(
+    conn: Connection, logger: ScopedOrPlainLogger, *, rebuild: bool = False
+) -> dict[str, int]:
     """Rattache les contributions aux personnes et crée les personnes manquantes. Renvoie les compteurs par issue et par motif.
 
     Étapes, dans l'ordre :
 
+    - avec `rebuild`, mise en file des contributions rattachées hors épinglage (`mark_all_for_resolution`) ;
     - application des épinglages ;
     - complétion des prénoms réduits (`complete_reduced_first_names`) ;
-    - décision des contributions sans personne et des contributions en file ;
-    - retrait des personnes non désignées par la décision (`release_contributions`) ;
-    - écriture des rattachements ;
+    - par lot de publications : décision des contributions sans personne et des contributions en file, retrait des personnes non désignées par la décision (`release_contributions`), écriture des rattachements ;
     - création des personnes des contributions du périmètre au nom inconnu (`create_persons`).
     """
+    if rebuild:
+        marked = mark_all_for_resolution(conn)
+        logger.info("%s%s à redécider", BRANCH, quantity(marked, "contribution"))
     pinned = apply_pins(conn)
     completion = complete_reduced_first_names(conn, repo=PgPersonRepository(conn))
     logger.info(
@@ -461,24 +504,40 @@ def resolve_contributions(conn: Connection, logger: ScopedOrPlainLogger) -> dict
         quantity(completion.completed, "prénom complété", "prénoms complétés"),
     )
     # Le chargement est long : une ligne d'attente le signale.
-    with waiting(f"{BRANCH}chargement des contributions", logger) as line:
-        candidates = load_candidate_contributions(conn)
+    with waiting(f"{BRANCH}chargement des personnes", logger) as line:
+        publication_ids = prepare_candidates(conn)
         index = load_index(conn, completion.conflicting)
         rejected = fetch_rejected_person_ids_by_publication(conn)
-        taken = taken_persons(conn, candidates)
-        total = sum(len(by_contribution) for by_contribution in candidates.values())
+        total = conn.execute(text(f"SELECT count(*) FROM {_CANDIDATES_TABLE}")).scalar_one()
         line.conclude(f"{BRANCH}{quantity(total, 'contribution')} à examiner")
+    decisions: dict[int, ContributionDecision] = {}
+    unidentified: list[ContributionDecision] = []
+    # Publications à décision de création : leurs contributions et les personnes rattachées hors des contributions à décider.
+    to_create: dict[int, dict[int, list[AlignedSourceContribution]]] = {}
+    taken_to_create: dict[int, frozenset[int]] = {}
+    released = written = 0
     with track_progress(total, BRANCH.rstrip(), logger, count_kept=True) as progress:
-        decisions = decide_contributions(candidates, index, rejected, taken, progress)
-    released = release_contributions(conn, decisions)
-    written = write_decisions(conn, decisions)
-    attribute_identifiers(conn, candidates, decisions)
+        for batch in candidate_batches(publication_ids):
+            candidates = load_candidate_contributions(conn, batch)
+            taken = taken_persons(conn, candidates)
+            batch_decisions = decide_contributions(candidates, index, rejected, taken, progress)
+            released += release_contributions(conn, batch_decisions)
+            written += write_decisions(conn, batch_decisions)
+            attribute_identifiers(conn, candidates, batch_decisions)
+            unidentified += unidentified_orphans(candidates, batch_decisions)
+            for publication_id, by_contribution in candidates.items():
+                if any(
+                    batch_decisions[contribution_id].outcome == ContributionOutcome.CREATE
+                    for contribution_id in by_contribution
+                ):
+                    to_create[publication_id] = by_contribution
+                    taken_to_create[publication_id] = taken.get(publication_id, frozenset())
+            decisions |= batch_decisions
     _log_identified(logger, decisions, pinned)
 
     step(logger, "Création de nouvelles personnes")
-    unidentified = unidentified_orphans(candidates, decisions)
     undecidable = sum(1 for d in unidentified if d.outcome == ContributionOutcome.SKIP)
-    to_create = sum(1 for d in decisions.values() if d.outcome == ContributionOutcome.CREATE)
+    creations = sum(1 for d in decisions.values() if d.outcome == ContributionOutcome.CREATE)
     logger.info(
         "%s%s d'auteur du périmètre %s",
         BRANCH,
@@ -486,8 +545,10 @@ def resolve_contributions(conn: Connection, logger: ScopedOrPlainLogger) -> dict
         inflect(len(unidentified), "non identifiée"),
     )
     logger.info("%s%s", BRANCH, quantity(undecidable, "indécidable"))
-    with track_progress(to_create, BRANCH.rstrip(), logger, count_kept=True) as progress:
-        created = create_persons(conn, candidates, decisions, index, rejected, taken, progress)
+    with track_progress(creations, BRANCH.rstrip(), logger, count_kept=True) as progress:
+        created = create_persons(
+            conn, to_create, decisions, index, rejected, taken_to_create, progress
+        )
     logger.info("%s%s %s", LAST_BRANCH, quantity(created, "personne"), inflect(created, "créée"))
     delete_processed(conn, Queue.CONTRIBUTION_RESOLUTION, _RESOLUTION_SNAPSHOT)
     counts: Counter[str] = Counter(
