@@ -16,9 +16,9 @@
 </script>
 
 {#if structIsLabo(structures, sid)}
-  <a href={resolve(`structures/${sid}${tab ? `?tab=${tab}` : ''}`)} class="structure-tag"
+  <a href={resolve(`structures/${sid}${tab ? `?tab=${tab}` : ''}`)} class="tag tag-accent"
     >{structLabelById(structures, sid)}</a
   >
 {:else}
-  <span class="structure-tag">{structLabelById(structures, sid)}</span>
+  <span class="tag tag-accent">{structLabelById(structures, sid)}</span>
 {/if}

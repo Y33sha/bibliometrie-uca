@@ -36,7 +36,7 @@
     <SectionLabel icon="person" text="Personnes liées" />
     <div class="detail-tags">
       {#each persons as a (a.person_id)}
-        <a href={resolve(`persons/${a.person_id}`)}>
+        <a href={resolve(`persons/${a.person_id}`)} class="tag">
           {personName(a)}
           {#if a.has_rh}<RhCheck />{/if}
           {#if correspondingIds.has(a.person_id)}<CorrespondingMark />{/if}

@@ -140,9 +140,9 @@
 							<td>
 								<a href={resolve(`publications/${pub.id}`)} class="publication-title"><PublicationTitle titre={pub.title} /></a>
 								<div class="publication-meta-line">
-									{#if pub.publication_year}<span class="meta-badge">{pub.publication_year}</span>{/if}
+									{#if pub.publication_year}<span class="tag">{pub.publication_year}</span>{/if}
 									{#if pub.doc_type}<DocTypePill docType={pub.doc_type} />{/if}
-									{#if pub.doi}<span class="meta-badge">DOI</span>{/if}
+									{#if pub.doi}<span class="tag">DOI</span>{/if}
 								</div>
 								<div class="hal-list">
 									{#each pub.hal_docs as hd (hd.halid)}{@render halDoc(hd)}{/each}
@@ -163,7 +163,7 @@
 <!-- Un dépôt HAL : son identifiant, puis l'année, le type et le nombre d'auteurs que HAL lui donne. -->
 {#snippet halDoc(hd: HalDoc)}
 	<div class="hal-row">
-		<a href={hd.record_url} target="_blank" rel="noopener" class="id-badge">{hd.halid}</a>
+		<a href={hd.record_url} target="_blank" rel="noopener" class="tag id-badge">{hd.halid}</a>
 		<span class="hal-details">{[hd.hal_publication_year, hd.hal_doc_type ? docTypeLabel(hd.hal_doc_type) : null, formatCount(hd.author_count, 'auteur')].filter(Boolean).join(' · ')}</span>
 	</div>
 {/snippet}

@@ -39,7 +39,7 @@
     </span>
     {#if nf.publication_count > 0}
       <button
-        class="status-chip"
+        class="tag status-chip"
         class:confirmed={nf.status === "confirmed" || isCanonical(nf)}
         class:rejected={nf.status === "rejected"}
         title="Voir les {nf.publication_count} publication(s) liée(s)"
@@ -49,7 +49,7 @@
       </button>
     {:else}
       <span
-        class="status-chip"
+        class="tag status-chip"
         class:confirmed={nf.status === "confirmed" || isCanonical(nf)}
         class:rejected={nf.status === "rejected"}
       >

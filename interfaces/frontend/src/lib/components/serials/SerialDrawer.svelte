@@ -175,7 +175,7 @@
   {:else}
     <div class="drawer-meta">
       <span>{serial.publication_count.toLocaleString("fr-FR")} publications</span>
-      {#if serial.is_in_doaj}<span class="badge-doaj">DOAJ</span>{/if}
+      {#if serial.is_in_doaj}<span class="tag tag-success badge-doaj">DOAJ</span>{/if}
     </div>
 
     <dl class="drawer-section drawer-fields">

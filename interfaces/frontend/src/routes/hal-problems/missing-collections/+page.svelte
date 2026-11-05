@@ -114,9 +114,9 @@
 							<td>{#if pub.doi}<DoiLink doi={pub.doi} />{/if}</td>
 							<td><a href={resolve(`publications/${pub.id}`)} class="publication-title"><PublicationTitle titre={pub.title} /></a></td>
 							<td>
-								<div class="id-list">
+								<div class="tag-list">
 									{#each pub.hal_links as link (link.source_id)}
-										<a href={link.record_url} target="_blank" rel="noopener" class="id-badge">{link.source_id}</a>
+										<a href={link.record_url} target="_blank" rel="noopener" class="tag id-badge">{link.source_id}</a>
 									{/each}
 								</div>
 							</td>						</tr>

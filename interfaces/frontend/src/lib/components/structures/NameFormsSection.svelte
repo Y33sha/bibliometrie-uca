@@ -2,6 +2,7 @@
   import HelpTip from "#lib/components/HelpTip.svelte";
   import IconButton from "#lib/components/IconButton.svelte";
   import Picker from "#lib/components/Picker.svelte";
+  import StructureTypeTag from "./StructureTypeTag.svelte";
   import type { NameForm, Structure } from "./types";
   import { SHORT_FORM_MAX_LENGTH } from "./types";
 
@@ -210,7 +211,7 @@
         </div>
       {/snippet}
       {#snippet item(cs)}
-        <span class="structure-type structure-type-{cs.type}" style="font-size: var(--fs-sm);padding:0 5px">{cs.type}</span>
+        <StructureTypeTag type={cs.type} />
         {cs.acronym ? cs.acronym + " — " : ""}{cs.name}
       {/snippet}
     </Picker>

@@ -64,7 +64,7 @@
             <div class="hal-accounts">
             {#each p.hal_accounts as ha}
               <div class="hal-account">
-                <a href={halPersonUrl(ha.hal_person_id)} target="_blank" rel="noopener" class="id-badge">
+                <a href={halPersonUrl(ha.hal_person_id)} target="_blank" rel="noopener" class="tag id-badge">
                   {ha.hal_person_id}
                 </a>
                 <span class="hal-name">{ha.full_name}</span>

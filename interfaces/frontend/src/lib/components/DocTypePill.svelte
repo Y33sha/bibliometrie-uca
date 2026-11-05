@@ -5,4 +5,4 @@
 	let { docType }: { docType: string } = $props();
 </script>
 
-<span class="type-pill" style="--type-color: var(--{docTypeColorVar(docType)})">{docTypeLabel(docType)}</span>
+<span class="tag tag-pill" style="--tag-color: var(--{docTypeColorVar(docType)})">{docTypeLabel(docType)}</span>

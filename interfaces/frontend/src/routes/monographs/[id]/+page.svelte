@@ -40,15 +40,15 @@
 	<div class="entity-header">
 		<h1 class="entity-title"><PublicationTitle titre={monograph.title} /></h1>
 		<div class="entity-meta">
-			<span class="entity-tag">{monograph.proceedings ? "Volume d'actes" : 'Livre'}</span>
+			<span class="tag">{monograph.proceedings ? "Volume d'actes" : 'Livre'}</span>
 			{#if monograph.year}
 				<EntityMetaItem label="Année"><span>{monograph.year}</span></EntityMetaItem>
 			{/if}
 			{#if monograph.isbn}
-				<EntityMetaItem label="ISBN"><span class="id-badge">{monograph.isbn}</span></EntityMetaItem>
+				<EntityMetaItem label="ISBN"><span class="tag id-badge">{monograph.isbn}</span></EntityMetaItem>
 			{/if}
 			{#if monograph.eisbn}
-				<EntityMetaItem label="ISBN électronique"><span class="id-badge">{monograph.eisbn}</span></EntityMetaItem>
+				<EntityMetaItem label="ISBN électronique"><span class="tag id-badge">{monograph.eisbn}</span></EntityMetaItem>
 			{/if}
 		</div>
 		<div class="entity-meta">

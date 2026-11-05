@@ -340,7 +340,7 @@
 						<td>
 							<div class="labs">
 								{#each o.labs as lab (lab.id)}
-									<a href={resolve(`structures/${lab.id}`)} class="lab-tag">{lab.label}</a>
+									<a href={resolve(`structures/${lab.id}`)} class="structure-link">{lab.label}</a>
 								{/each}
 							</div>
 						</td>

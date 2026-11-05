@@ -190,7 +190,7 @@
 				{#if col('labs')}
 					<td class="col-labs">
 						{#each t.lab_items || [] as lab}
-							<a href={resolve(`structures/${lab.id}?tab=theses`)} class="lab-tag">{lab.label}</a>
+							<a href={resolve(`structures/${lab.id}?tab=theses`)} class="structure-link">{lab.label}</a>
 						{/each}
 					</td>
 				{/if}

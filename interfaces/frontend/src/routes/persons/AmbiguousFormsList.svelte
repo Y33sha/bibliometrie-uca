@@ -69,7 +69,7 @@
           {#each form.persons as p (p.person_id)}
             <div class="person-row" class:incompatible={!p.compatible}>
               {#if p.canonical}
-                <span class="canonical-tag" title="Forme dérivée du nom de la personne, confirmée d'office"
+                <span class="tag" title="Forme dérivée du nom de la personne, confirmée d'office"
                   >nom</span
                 >
               {:else}

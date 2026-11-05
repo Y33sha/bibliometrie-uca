@@ -20,7 +20,7 @@
     <SectionLabel icon="tag" text="Sujets" />
     <div class="detail-tags">
       {#each subjects as s (s.id)}
-        <a href={resolve(`subjects/${s.label_normalized}`)} title={tooltip(s)}>{s.label}</a>
+        <a href={resolve(`subjects/${s.label_normalized}`)} class="tag" title={tooltip(s)}>{s.label}</a>
       {/each}
     </div>
   </div>
@@ -30,7 +30,7 @@
     <SectionLabel icon="tag" text="Mots-clés libres" />
     <div class="detail-tags">
       {#each shownKeywords as kw (kw)}
-        <span class="detail-tag free-keyword">{kw}</span>
+        <span class="tag free-keyword">{kw}</span>
       {/each}
       {#if keywords.length > KEYWORD_CAP}
         <button type="button" class="btn-add" onclick={() => (showAllKeywords = !showAllKeywords)}>

@@ -343,7 +343,7 @@
 					</td>{/if}
 					{#if !isLab && col('labs')}<td>
 						{#each p.lab_items || [] as lab}
-							<a href={resolve(`structures/${lab.id}`)} class="lab-tag">{lab.label}</a>
+							<a href={resolve(`structures/${lab.id}`)} class="structure-link">{lab.label}</a>
 						{/each}
 					</td>{/if}
 					{#if isPerson && col('corr')}<td class="corr-cell">
@@ -354,12 +354,12 @@
 							{@const ucaApc = p.apc.filter(a => a.in_perimeter)}
 							{@const isPersonNonCorr = isPerson && !isCorresponding(p)}
 							{#if ucaApc.length > 0}
-								<span class="apc-tag" class:apc-other={isPersonNonCorr}
+								<span class="tag" class:tag-success={!isPersonNonCorr}
 									title={ucaApc.map(a => `${a.amount?.toLocaleString('fr-FR')} € (${a.lab_acronym || institution.name})`).join('\n') + (isPersonNonCorr ? '\nAuteur non correspondant' : '')}>
 									{Math.round(ucaApc.reduce((s, a) => s + (a.amount || 0), 0)).toLocaleString('fr-FR')} €
 								</span>
 							{:else}
-								<span class="apc-tag apc-other" title={p.apc.map(a => `${a.amount?.toLocaleString('fr-FR')} € (${a.institution || '?'})`).join('\n')}>
+								<span class="tag" title={p.apc.map(a => `${a.amount?.toLocaleString('fr-FR')} € (${a.institution || '?'})`).join('\n')}>
 									{Math.round(p.apc.reduce((s, a) => s + (a.amount || 0), 0)).toLocaleString('fr-FR')} €
 								</span>
 							{/if}
@@ -367,7 +367,7 @@
 					</td>{/if}
 					{#if col('oa_status')}<td>
 						{#if p.oa_status && p.oa_status !== 'unknown'}
-							<span class="oa-tag oa-{p.oa_status}">{oaStatusLabel(p.oa_status)}</span>
+							<span class="tag" style="--tag-color: var(--{p.oa_status})">{oaStatusLabel(p.oa_status)}</span>
 						{/if}
 					</td>{/if}
 					{#if col('license')}<td class="license-cell">{#if p.license}<LicenseBadge license={p.license} />{/if}</td>{/if}

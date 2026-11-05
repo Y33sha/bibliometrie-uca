@@ -95,22 +95,22 @@
 		</TitleRow>
 		<div class="entity-meta">
 			<EntityMetaItem label="Type">
-				<span class="entity-tag">
+				<span class="tag">
 					{publisherTypeLabels[publisher.publisher_type] ?? publisher.publisher_type}
 				</span>
 			</EntityMetaItem>
 			{#if publisher.country}
-				<EntityMetaItem label="Pays"><span class="entity-tag">{publisher.country.toUpperCase()}</span></EntityMetaItem>
+				<EntityMetaItem label="Pays"><span class="tag">{publisher.country.toUpperCase()}</span></EntityMetaItem>
 			{/if}
 			{#if publisher.openalex_id}
-				<EntityMetaItem label="OpenAlex"><span class="id-badge">{publisher.openalex_id}</span></EntityMetaItem>
+				<EntityMetaItem label="OpenAlex"><span class="tag id-badge">{publisher.openalex_id}</span></EntityMetaItem>
 			{/if}
 		</div>
 		{#if publisher.doi_prefixes.length > 0}
 			<div class="entity-meta">
 				<EntityMetaItem label="Préfixes DOI">
 					{#each publisher.doi_prefixes as p (p.prefix)}
-						<span class="id-badge" title="RA: {p.ra}">{p.prefix}</span>
+						<span class="tag id-badge" title="RA: {p.ra}">{p.prefix}</span>
 					{/each}
 				</EntityMetaItem>
 			</div>

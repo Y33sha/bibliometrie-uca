@@ -237,9 +237,9 @@
 				<td class="muted">{publisherTypeLabel(p.publisher_type)}</td>
 				<td class="muted">{p.country?.toUpperCase() ?? ''}</td>
 				<td>
-					<div class="id-list">
+					<div class="tag-list">
 						{#each p.doi_prefixes as dp (dp.prefix)}
-							<span class="id-badge" title="RA : {dp.ra}{dp.crossref_member_id ? ` / member ${dp.crossref_member_id}` : ''}">{dp.prefix}</span>
+							<span class="tag id-badge" title="RA : {dp.ra}{dp.crossref_member_id ? ` / member ${dp.crossref_member_id}` : ''}">{dp.prefix}</span>
 						{/each}
 					</div>
 				</td>

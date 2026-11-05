@@ -83,9 +83,7 @@
 	--gold: #ffd700;
 	--hybrid: #b366f2;
 	--bronze: #cd7f32;
-	--bronze-text: #9a5a1e; /* assombri, lisible en texte sur fond clair */
 	--green: #5ec62c;
-	--green-text: #3f7a28;  /* assombri, lisible en texte sur fond clair */
 
 	/* Graphiques : couleurs des séries sans couleur propre, dans l'ordre d'attribution (`chartColor()`). */
 	--chart-1: #4e79a7;
@@ -110,6 +108,16 @@
 	--doctype-theses: #c0665f;
 	--doctype-data: #4f93a3;
 	--doctype-misc: #cfd3d6;
+
+	/* Types de structure, par valeur de `structures.type` (`StructureTypeTag`). */
+	--structure-universite: #6b2e8a;
+	--structure-onr: #2e6b8a;
+	--structure-chu: #8a2e2e;
+	--structure-ecole: #8a6b2e;
+	--structure-labo: var(--accent);
+	--structure-site: var(--success);
+	--structure-equipe: #2e8a7d;
+	--structure-admin: #3d5266;
 
 	/* Classes de citation : top 1 % foncé, top 10 % clair, gris hors top 10 %. */
 	--citation-top_1_percent: var(--accent);
@@ -639,17 +647,6 @@
 	border-color: var(--warning);
 }
 
-/* Liens de structure dans un tableau : texte simple, les pastilles étant réservées aux valeurs codées par couleur. */
-.data-table .lab-tag {
-	padding: 0;
-	margin-right: 6px;
-	background: none;
-}
-.data-table a.lab-tag:hover {
-	background: none;
-	text-decoration: underline;
-}
-
 .num {
 	text-align: right;
 	font-variant-numeric: tabular-nums;
@@ -806,25 +803,6 @@
 	letter-spacing: var(--tracking-caps);
 	color: var(--muted);
 }
-.entity-tag {
-	display: inline-block;
-	padding: 3px 9px;
-	border-radius: var(--radius-pill);
-	background: var(--surface);
-	color: var(--text-secondary);
-	font-size: var(--fs-sm);
-}
-.entity-tag-accent {
-	background: var(--accent-light);
-	color: var(--accent);
-	font-weight: 500;
-}
-.entity-meta .id-badge {
-	padding: 3px 9px;
-	border-radius: var(--radius-pill);
-	font-size: var(--fs-sm);
-	font-weight: 500;
-}
 
 /* ── Onglets (TabNav, HubTabs) ── */
 .tabs {
@@ -891,28 +869,60 @@
 	width: 180px;
 }
 
-/* ── Identifiant (ISSN, ISBN, DOI, ROR, HAL…) : seul style d'identifiant, sur les listes comme dans les en-têtes d'entité ── */
-.id-badge {
+/* ── Étiquette : court texte sur fond pâle ── */
+/* `--tag-color` donne la teinte, gris par défaut. Le fond, le texte et le survol en dérivent à luminosité fixe, donc le texte garde un contraste de 4,5:1 au moins sur toute teinte. */
+.tag {
 	display: inline-block;
 	padding: 2px 7px;
-	background: var(--accent-light);
 	border-radius: var(--radius);
-	font-family: var(--mono);
+	background: oklch(from var(--tag-color, var(--muted)) 0.955 calc(c * 0.25) h);
+	color: oklch(from var(--tag-color, var(--muted)) min(l, 0.45) c h);
 	font-size: var(--fs-sm);
-	color: var(--accent);
-	text-decoration: none;
+	font-weight: 500;
+	line-height: 1.35;
 	white-space: nowrap;
+	text-decoration: none;
+}
+a.tag:hover,
+button.tag:hover {
+	background: oklch(from var(--tag-color, var(--muted)) 0.91 calc(c * 0.4) h);
+}
+button.tag {
+	border: none;
+	font-family: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+.tag-pill {
+	border-radius: var(--radius-pill);
+}
+/* En-tête d'une entité, page d'une publication : étiquette plus grande, en pilule. */
+.entity-meta .tag,
+.detail-tags .tag {
+	padding: 3px 10px;
+	border-radius: var(--radius-pill);
+}
+.tag-accent {
+	--tag-color: var(--accent);
+}
+.tag-success {
+	--tag-color: var(--success);
+}
+.tag-danger {
+	--tag-color: var(--danger);
 }
 
-/* Plusieurs identifiants dans une cellule ou une ligne. */
-.id-list {
+/* Plusieurs étiquettes dans une cellule ou une ligne. */
+.tag-list {
 	display: flex;
 	flex-wrap: wrap;
 	gap: 4px;
 }
 
-a.id-badge:hover {
-	background: color-mix(in srgb, var(--accent) 20%, white);
+/* Identifiant (ISSN, ISBN, DOI, ROR, HAL…) */
+.id-badge {
+	--tag-color: var(--accent);
+	font-family: var(--mono);
 }
 
 /* ── ID icons (round, ORCID/idHAL/IdRef) ── */
@@ -1065,69 +1075,12 @@ a.id-badge:hover {
 	white-space: nowrap;
 }
 
-/* ── Lab tag (pill) ── */
-.lab-tag {
-	display: inline-block;
+/* ── Lien de structure dans un tableau ── */
+.structure-link {
+	margin-right: 6px;
 	font-size: var(--fs-sm);
-	padding: 1px 7px;
-	border-radius: var(--radius-pill);
-	background: var(--accent-light);
-	color: var(--accent);
 	font-weight: 500;
-	text-decoration: none;
 }
-
-a.lab-tag:hover {
-	background: color-mix(in srgb, var(--accent) 20%, white);
-}
-
-/* ── Pastille de structure (lien vers la page de la structure) ── */
-.structure-tag {
-	display: inline-block;
-	padding: 1px 6px;
-	background: var(--accent-light);
-	border-radius: var(--radius);
-	font-size: var(--fs-sm);
-	color: var(--accent);
-	font-weight: 500;
-	margin: 1px 3px 1px 0;
-	text-decoration: none;
-}
-a.structure-tag:hover {
-	background: color-mix(in srgb, var(--accent) 20%, white);
-}
-
-/* ── Tutelle tag (neutral) ── */
-.tutelle-tag {
-	display: inline-block;
-	padding: 2px 7px;
-	background: var(--border-subtle);
-	border-radius: var(--radius);
-	font-size: var(--fs-sm);
-	color: var(--muted);
-	white-space: nowrap;
-}
-
-/* ── Pastille de type de structure (`structure-type structure-type-{type}`) ── */
-.structure-type {
-	font-size: var(--fs-xs);
-	padding: 1px 6px;
-	border-radius: var(--radius);
-	font-weight: 600;
-	text-transform: uppercase;
-	letter-spacing: var(--tracking-caps);
-	white-space: nowrap;
-	background: #f0f0f0;
-	color: #555;
-}
-.structure-type-universite { background: #e8d4f0; color: #6b2e8a; }
-.structure-type-onr { background: #d4e8f0; color: #2e6b8a; }
-.structure-type-chu { background: #f0d4d4; color: #8a2e2e; }
-.structure-type-ecole { background: #f0e8d4; color: #8a6b2e; }
-.structure-type-labo { background: var(--accent-light); color: var(--accent); }
-.structure-type-site { background: var(--success-light); color: var(--success); }
-.structure-type-equipe { background: #d4f0ec; color: #2e8a7d; }
-.structure-type-admin { background: #dde3ea; color: #3d5266; }
 
 /* ── Dashboard d'une entité (structure, personne, revue, éditeur) ── */
 .dash-grid {
@@ -1187,32 +1140,10 @@ a.structure-tag:hover {
 	font-weight: 600;
 }
 
-/* Forme de nom dérivée du nom canonique de la personne. */
-.canonical-tag {
-	font-size: var(--fs-sm);
-	color: var(--muted);
-	background: var(--surface);
-	border-radius: var(--radius);
-	padding: 0 6px;
-}
-
-
-/* ── Pastille DOAJ d'une revue ── */
+/* ── Étiquette DOAJ, après le titre d'une revue ── */
 .badge-doaj {
-	font-size: var(--fs-sm);
-	padding: 1px 6px;
-	background: color-mix(in srgb, var(--success) 10%, white);
-	color: color-mix(in srgb, var(--success) 70%, white);
-	border-radius: var(--radius);
 	margin-left: 6px;
 	vertical-align: middle;
-	font-weight: 500;
-	letter-spacing: var(--tracking-caps);
-	text-decoration: none;
-}
-a.badge-doaj:hover {
-	background: color-mix(in srgb, var(--success) 20%, white);
-	color: var(--success);
 }
 
 /* ── Titre de carte et libellé de métadonnée : petites capitales en couleur d'accent ── */
@@ -1233,94 +1164,8 @@ a.badge-doaj:hover {
 	margin: 24px 0 10px;
 }
 
-/* ── Meta badge (detail pages) ── */
-.meta-badge {
-	display: inline-block;
-	padding: 2px 8px;
-	background: var(--border-subtle);
-	border-radius: var(--radius);
-	font-size: var(--fs-sm);
-	color: var(--muted);
-	font-weight: 500;
-}
-
-/* ── OA tags ── */
-.oa-tag {
-	display: inline-block;
-	font-size: var(--fs-sm);
-	padding: 1px 6px;
-	border-radius: var(--radius);
-	font-weight: 600;
-}
-
-.oa-gold {
-	background: #fef3e0;
-	color: #d4a017;
-}
-
-.oa-diamond {
-	background: #e0f2f7;
-	color: var(--diamond-text);
-}
-
-.oa-hybrid {
-	background: #f3eef9;
-	color: #8e6bbf;
-}
-
-.oa-green {
-	background: var(--success-light);
-	color: var(--green-text);
-}
-
-.oa-bronze {
-	background: #fdf0e6;
-	color: var(--bronze-text);
-}
-
-.oa-embargoed {
-	background: #fff3cd;
-	color: #856404;
-}
-
-.oa-closed {
-	background: #e0e0e0;
-	color: #555;
-}
-
-/* ── APC tag ── */
-.apc-tag {
-	display: inline-block;
-	font-size: var(--fs-sm);
-	padding: 1px 5px;
-	border-radius: var(--radius);
-	background: var(--success-light);
-	color: var(--success);
-	font-weight: 500;
-	cursor: default;
-}
-
-.apc-other {
-	background: var(--surface);
-	color: var(--muted);
-}
-
 .apc-cell {
 	text-align: right;
-	white-space: nowrap;
-}
-
-/* ── Type label ── */
-/* Pastille de type de document, teintée par `--type-color` (`docTypeColor()`). */
-.type-pill {
-	display: inline-block;
-	padding: 2px 8px;
-	border-radius: var(--radius-pill);
-	background: color-mix(in srgb, var(--type-color) 16%, white);
-	/* 50 % de noir : contraste de 4,5:1 au moins, y compris pour les types les plus clairs (preprints, autres). */
-	color: color-mix(in srgb, var(--type-color), black 50%);
-	font-size: var(--fs-sm);
-	font-weight: 600;
 	white-space: nowrap;
 }
 
@@ -1557,23 +1402,8 @@ button.entity-link {
 	flex-wrap: wrap;
 	gap: 6px;
 }
-.detail-tags a,
-.detail-tags span.detail-tag {
-	display: inline-flex;
-	align-items: center;
-	gap: 5px;
-	padding: 3px 10px;
-	border-radius: var(--radius-pill);
-	font-size: var(--fs-sm);
-	line-height: 1.35;
-	white-space: nowrap;
-	background: var(--surface);
-	color: var(--text);
-	text-decoration: none;
-}
-.detail-tags a:hover {
-	background: var(--accent-light);
-	color: var(--accent);
+.detail-tags a.tag:hover {
+	--tag-color: var(--accent);
 }
 /* Sous-titre d'une section (ex. « Mots-clés libres », type de relation) : même teal que le titre, plus petit, subordonné. */
 .detail-sublabel {
@@ -1583,51 +1413,20 @@ button.entity-link {
 	margin: 12px 0 7px;
 }
 
-/* ── Puces de statut partagées (identifiants, formes de nom) ──
-   Rectangulaire, colorée selon le statut ; boutons de bascule ✓/✗ unifiés. */
-/* Puce suivie de ses commandes et annotations, sur une ligne. */
+/* ── Étiquette de statut (identifiant, forme de nom), teintée selon le statut ── */
+/* Étiquette suivie de ses commandes et annotations, sur une ligne. */
 .chip-row {
 	display: inline-flex;
 	align-items: center;
 	gap: 4px;
 }
-.status-chip {
-	display: inline-flex;
-	align-items: center;
-	gap: 3px;
-	border: 1px solid var(--border);
-	background: var(--surface);
-	border-radius: var(--radius);
-	padding: 2px 7px;
-	font-size: var(--fs-sm);
-	text-align: left;
-}
 .status-chip.confirmed {
-	background: var(--success-light);
-	border-color: var(--success);
-	color: var(--success);
+	--tag-color: var(--success);
 }
 .status-chip.rejected {
-	background: var(--danger-light);
-	border-color: color-mix(in srgb, var(--danger) 40%, white);
-	color: var(--danger);
+	--tag-color: var(--danger);
 	opacity: 0.7;
 	text-decoration: line-through;
-}
-button.status-chip {
-	font: inherit;
-	font-size: var(--fs-sm);
-	cursor: pointer;
-	transition: background 0.15s;
-}
-button.status-chip:hover {
-	background: var(--hover);
-}
-button.status-chip.confirmed:hover {
-	background: color-mix(in srgb, var(--success) 20%, white);
-}
-button.status-chip.rejected:hover {
-	background: color-mix(in srgb, var(--danger) 20%, white);
 }
 /* Bouton d'ajout discret (« + Ajouter ») : texte en couleur d'accent, fond au survol. */
 .btn-add {

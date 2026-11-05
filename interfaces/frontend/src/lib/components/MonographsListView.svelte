@@ -203,7 +203,7 @@
 					<td><a href={resolve(`monographs/${m.id}`)}><PublicationTitle titre={m.title} /></a></td>
 					<td class="muted">{m.proceedings ? 'Actes' : 'Livre'}</td>
 					<td class="num">{m.year ?? ''}</td>
-					<td><div class="id-list">{#each [m.isbn, m.eisbn].filter(Boolean) as isbn (isbn)}<span class="id-badge">{isbn}</span>{/each}</div></td>
+					<td><div class="tag-list">{#each [m.isbn, m.eisbn].filter(Boolean) as isbn (isbn)}<span class="tag id-badge">{isbn}</span>{/each}</div></td>
 					{#if !publisherFixed}
 						<td>
 							{#if m.publisher_id}<a href={resolve(`publishers/${m.publisher_id}`)}>{m.publisher_name}</a>{/if}
