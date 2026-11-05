@@ -54,6 +54,8 @@ EXPORT_COLUMNS: frozenset[str] = frozenset(
         "doi",
         "oa_status",
         "license",
+        "citations",
+        "fwci",
         "citation_top",
         "hal_status",
         "sources",
