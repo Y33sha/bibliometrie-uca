@@ -114,7 +114,7 @@ Une étiquette (tag, badge, pastille, chip) est un court texte sur fond clair, a
 - [x] Classe de texte secondaire
 - [x] Chargement et liste vide sur `ListStatus`
 - [x] Encarts d'information, d'avertissement et de danger
-- [ ] Styles de base de `+layout.svelte` dans `shared.css` ; collisions de noms
+- [x] Styles de base de `+layout.svelte` dans `shared.css` ; collisions de noms
 
 ### Phase 6 — Composants
 
