@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Breadcrumb from '#lib/components/Breadcrumb.svelte';
+	import EntityStatus from '#lib/components/EntityStatus.svelte';
 	import { pageTitle } from '#lib/institution.svelte.js';
 	import { columnLabels, staffCategoryLabels } from '#lib/labels.js';
 	import { page } from '$app/state';
@@ -71,7 +72,7 @@
 	const currentYear = new Date().getFullYear();
 	let addrYear = $state(currentYear);
 	let addrSummary = $state<AddressSummary | null>(null);
-	const addrYearMin = $derived(Math.min(addrSummary?.first_year ?? currentYear, currentYear));
+	const addrYearMin = $derived(Math.min(addrSummary?.first_year_with_address ?? currentYear, currentYear));
 	const addrYearMax = $derived(Math.min(addrSummary?.last_year_with_address ?? currentYear, currentYear));
 	const addresses = usePaginatedFetch<Address>({
 		endpoint: () => `/api/persons/${personId}/addresses`,
@@ -191,10 +192,8 @@
 
 <Breadcrumb trail={[{ label: 'Chercheurs', path: 'persons' }]} current={displayName} />
 
-{#if error}
-	<div class="no-results">Personne introuvable</div>
-{:else if !profile}
-	<div class="loading">Chargement…</div>
+{#if error || !profile}
+	<EntityStatus {error} notFound="Personne introuvable" />
 {:else}
 	<!-- Profile header -->
 	<div class="entity-header">
