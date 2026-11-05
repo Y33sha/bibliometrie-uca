@@ -229,7 +229,7 @@
     color: var(--danger);
   }
   .tier-danger:hover {
-    background: color-mix(in srgb, var(--danger) 14%, white);
+    background: color-mix(in srgb, var(--danger) 20%, white);
   }
   .tier-warning {
     background: var(--warning-light);
@@ -251,7 +251,7 @@
     color: var(--accent);
   }
   .tier-parent:hover {
-    background: color-mix(in srgb, var(--accent) 14%, white);
+    background: color-mix(in srgb, var(--accent) 20%, white);
   }
   .tier-secondary {
     background: var(--surface);

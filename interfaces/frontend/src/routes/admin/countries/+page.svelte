@@ -289,7 +289,7 @@
 		border: 1px dashed var(--warning); border-radius: var(--radius); cursor: pointer;
 		font-size: var(--fs-sm); font-weight: 500; white-space: nowrap;
 	}
-	.proposal-tag:hover { background: color-mix(in srgb, var(--warning) 25%, white); }
+	.proposal-tag:hover { background: color-mix(in srgb, var(--warning) 20%, white); }
 	.proposal-methods { font-weight: 400; opacity: 0.8; }
 	.addr-table { table-layout: fixed; min-width: 640px; }
 	.addr-table td { font-size: var(--fs-md); vertical-align: middle; }

@@ -189,7 +189,7 @@
     text-decoration: none;
   }
   .source-row:hover {
-    background: color-mix(in srgb, var(--accent-light) 60%, white);
+    background: var(--card);
     text-decoration: none;
   }
   /* La pastille garde sa largeur, icône ou non : les libellés restent alignés. */

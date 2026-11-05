@@ -259,7 +259,7 @@
     background: var(--attention-light);
   }
   .forms-table tr.excluding:hover td {
-    background: color-mix(in srgb, var(--attention-light), var(--attention) 6%);
+    background: color-mix(in srgb, var(--attention) 20%, white);
   }
   .form-text {
     font-family: var(--mono);

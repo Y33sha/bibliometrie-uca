@@ -25,6 +25,6 @@
 	}
 	.publication-count-tag:hover,
 	.publication-count-tag[aria-expanded='true'] {
-		background: color-mix(in srgb, var(--accent) 20%, var(--accent-light));
+		background: color-mix(in srgb, var(--accent) 20%, white);
 	}
 </style>
