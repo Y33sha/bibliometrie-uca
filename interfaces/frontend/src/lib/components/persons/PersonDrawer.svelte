@@ -243,7 +243,7 @@
                   onclick={() => absorb(sp.person_id)}>Absorber</button
                 >
               {/if}
-              <button class="sharing-name" onclick={() => onopenPerson(sp.person_id)}>
+              <button class="triage-person" onclick={() => onopenPerson(sp.person_id)}>
                 <span class="person-last">{titleCase(sp.last_name)}</span>
                 {titleCase(sp.first_name)}
               </button>
@@ -268,7 +268,7 @@
                 title="Annuler la décision : les files de triage peuvent de nouveau présenter la paire"
                 onclick={() => unmarkDistinct(dp.person_id)}>Annuler</button
               >
-              <button class="sharing-name" onclick={() => onopenPerson(dp.person_id)}>
+              <button class="triage-person" onclick={() => onopenPerson(dp.person_id)}>
                 <span class="person-last">{titleCase(dp.last_name)}</span>
                 {titleCase(dp.first_name)}
               </button>
@@ -359,20 +359,6 @@
     display: inline-flex;
     align-items: center;
     gap: 8px;
-  }
-  .sharing-name {
-    font-size: var(--fs-md);
-    background: none;
-    border: none;
-    padding: 0;
-    cursor: pointer;
-    font-family: inherit;
-    color: inherit;
-    text-align: left;
-  }
-  .sharing-name:hover {
-    color: var(--accent);
-    text-decoration: underline;
   }
   .sharing-forms {
     font-size: var(--fs-sm);

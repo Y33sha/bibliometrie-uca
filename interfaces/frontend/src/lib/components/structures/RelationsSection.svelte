@@ -52,8 +52,8 @@
     {:else}
       {#each related as r (r.tutelle_id)}
         <span class="tag-removable">
-          <span class="tag tag-pill tag-accent relation-tag">
-            <button class="tag-name" onclick={() => onselect(r.id)}>{structureLabel(r)}</button>
+          <span class="tag tag-pill tag-accent">
+            <button class="triage-person" onclick={() => onselect(r.id)}>{structureLabel(r)}</button>
           </span>
           <IconButton icon="reject" label="Retirer {structureLabel(r)}" onclick={() => ondeleteTutelle(r.tutelle_id)} />
         </span>
@@ -97,17 +97,6 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 8px;
-  }
-  .relation-tag .tag-name {
-    padding: 0;
-    border: none;
-    background: none;
-    font: inherit;
-    color: inherit;
-    cursor: pointer;
-  }
-  .relation-tag .tag-name:hover {
-    text-decoration: underline;
   }
   .none-text {
     color: var(--muted);

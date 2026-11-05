@@ -72,7 +72,7 @@
 				<span class="active-filter-remove" aria-hidden="true">✕</span>
 			</button>
 		{/each}
-		<button type="button" class="clear-all" onclick={onclearall}>Supprimer les filtres</button>
+		<button type="button" class="btn-text" onclick={onclearall}>Supprimer les filtres</button>
 	</div>
 {/if}
 
@@ -120,15 +120,5 @@
 	}
 	.active-filter:hover .active-filter-remove {
 		color: var(--danger);
-	}
-	.clear-all {
-		padding: 3px 4px;
-		border: none;
-		background: none;
-		font: inherit;
-		font-size: var(--fs-sm);
-		color: var(--accent);
-		text-decoration: underline;
-		cursor: pointer;
 	}
 </style>

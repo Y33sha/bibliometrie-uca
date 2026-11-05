@@ -231,7 +231,7 @@
 									{/if}
 								{/each}
 							</dl>
-							<button class="toggle-raw" onclick={() => (showRawDoaj = !showRawDoaj)}>
+							<button class="btn-text" onclick={() => (showRawDoaj = !showRawDoaj)}>
 								{showRawDoaj ? 'Masquer' : 'Voir'} le payload DOAJ brut <span class="chevron" class:up={showRawDoaj} aria-hidden="true"></span>
 							</button>
 							{#if showRawDoaj}
@@ -281,11 +281,6 @@
 	}
 	.doaj-fields dt { font-weight: 600; color: var(--muted); font-size: var(--fs-sm); }
 	.doaj-fields dd { margin: 0; font-size: var(--fs-md); }
-	.toggle-raw {
-		background: none; border: none; color: var(--accent);
-		font-size: var(--fs-sm); cursor: pointer; padding: 4px 0;
-	}
-	.toggle-raw:hover { text-decoration: underline; }
 	.raw-payload {
 		background: var(--surface); padding: 12px; border-radius: var(--radius);
 		font-size: var(--fs-sm); max-height: 400px; overflow: auto;

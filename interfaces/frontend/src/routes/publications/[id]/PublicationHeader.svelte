@@ -107,7 +107,7 @@
         </a>
       {/each}
       {#if sortedRelations.length > RELATION_CAP}
-        <button type="button" class="rel-toggle" onclick={() => (showAllRelations = !showAllRelations)}>
+        <button type="button" class="btn-text rel-toggle" onclick={() => (showAllRelations = !showAllRelations)}>
           {showAllRelations
             ? "Afficher moins"
             : `Afficher les ${sortedRelations.length - RELATION_CAP} autres`}
@@ -207,17 +207,6 @@
   .rel-toggle {
     align-self: flex-start;
     margin-top: 2px;
-    padding: 4px 6px;
-    background: none;
-    border: none;
-    color: var(--muted);
-    font-size: var(--fs-sm);
-    font-weight: 600;
-    cursor: pointer;
-  }
-  .rel-toggle:hover {
-    color: var(--text);
-    text-decoration: underline;
   }
   /* Niveaux : la couleur porte sur le filet, l'icône et le libellé ; le titre reste lisible. */
   .tier-danger {

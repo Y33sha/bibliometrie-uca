@@ -1230,6 +1230,21 @@ a:hover > .logo-idref {
 	border-color: var(--warning);
 }
 
+/* Bouton présenté comme un lien : texte en couleur d'accent, souligné au survol. */
+.btn-text {
+	padding: 4px 0;
+	border: none;
+	background: none;
+	font: inherit;
+	font-size: var(--fs-sm);
+	color: var(--accent);
+	cursor: pointer;
+}
+
+.btn-text:hover {
+	text-decoration: underline;
+}
+
 /* Sélecteur segmenté : boutons accolés, le bouton enfoncé (`aria-pressed`) en fond plein. */
 .segmented {
 	display: inline-flex;

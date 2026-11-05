@@ -39,7 +39,7 @@
 		{@render children()}
 	</div>
 	{#if overflows || open}
-		<button type="button" class="read-more" onclick={toggle}>
+		<button type="button" class="btn-text read-more" onclick={toggle}>
 			{open ? lessLabel : moreLabel}
 		</button>
 	{/if}
@@ -60,15 +60,5 @@
 	.read-more {
 		display: block;
 		margin-top: 6px;
-		padding: 4px 0;
-		border: none;
-		background: none;
-		font: inherit;
-		font-weight: 600;
-		color: var(--accent);
-		cursor: pointer;
-	}
-	.read-more:hover {
-		text-decoration: underline;
 	}
 </style>
