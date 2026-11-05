@@ -22,12 +22,14 @@ from domain.documents.identifiers import ISSN
 from domain.entity_resolution import most_frequent
 from domain.normalize import normalize_text
 from domain.serials.attachment import (
+    KnownIssn,
+    NewSerial,
     TitledSerial,
     choose_issnl,
-    effective_issnl,
     match_by_title,
     match_in_publication,
     openalex_issnls,
+    plan_issnl_serials,
 )
 from domain.serials.containers import SeriesDescription
 from domain.serials.serial import ManualField
@@ -200,57 +202,20 @@ def _issn_serials(
     conn: Connection, mentions: list[_Mention], oa_issnls: dict[str, str]
 ) -> tuple[dict[str, str], dict[str, int], int]:
     """Renvoie l'ISSN-L de chaque ISSN, la revue de chaque ISSN-L, et le nombre de revues créées. Écrit la revue de chaque ISSN."""
-    rows = {r.issn: r for r in conn.execute(_ISSN_ROWS)}
-    replacement_of = {r.issn: r.linked_issn for r in conn.execute(_REPLACEMENTS)}
-
-    def own_issnl(issn: str) -> str:
-        row = rows.get(issn)
-        return effective_issnl(issn, row.issnl if row else None, oa_issnls)
-
-    issnl_of = {
-        issn: effective_issnl(
-            issn,
-            r.issnl,
-            oa_issnls,
-            own_issnl(replacement_of[issn]) if issn in replacement_of else None,
-        )
-        for issn, r in rows.items()
-    }
-    groups: dict[str, list[str]] = {}
-    for issn, issnl in issnl_of.items():
-        groups.setdefault(issnl, []).append(issn)
-    titles: dict[str, Counter[str]] = {}
-    for m in mentions:
-        if m.series and m.series.title:
-            for issnl in {issnl_of[i] for i in m.issns if i in issnl_of}:
-                titles.setdefault(issnl, Counter())[m.series.title] += 1
-    used = set(titles) | {
-        issnl for issnl, members in groups.items() if any(rows[i].serial_id for i in members)
-    }
-
-    serial_of: dict[str, int] = {}
-    claimed: set[int] = set()
-    # Une revue va d'abord à l'ISSN-L dont la ligne la désigne, puis au plus fréquent parmi ses ISSN.
-    for issnl in sorted(used):
-        own = rows[issnl].serial_id if issnl in rows else None
-        if own is not None and own not in claimed:
-            serial_of[issnl] = own
-            claimed.add(own)
+    rows = {r.issn: KnownIssn(r.issnl, r.serial_id) for r in conn.execute(_ISSN_ROWS)}
+    plan = plan_issnl_serials(
+        rows,
+        {r.issn: r.linked_issn for r in conn.execute(_REPLACEMENTS)},
+        oa_issnls,
+        ((m.issns, m.series.title) for m in mentions if m.series),
+    )
+    issnl_of = plan.issnl_of
     store = SerialStore(conn)
-    created = 0
-    for issnl in sorted(used - set(serial_of)):
-        held = Counter(
-            rows[i].serial_id
-            for i in groups.get(issnl, [])
-            if rows[i].serial_id is not None and rows[i].serial_id not in claimed
-        )
-        if held:
-            serial_of[issnl] = most_frequent(held)
-        else:
-            title = most_frequent(titles[issnl]) if issnl in titles else issnl
-            serial_of[issnl] = store.create_serial(title)
-            created += 1
-        claimed.add(serial_of[issnl])
+    serial_of = {
+        issnl: ref if isinstance(ref, int) else store.create_serial(ref.title)
+        for issnl, ref in plan.serial_of.items()
+    }
+    created = sum(1 for ref in plan.serial_of.values() if isinstance(ref, NewSerial))
     conn.execute(_ADD_ISSNS, {"issns": sorted(issnl for issnl in serial_of if issnl not in rows)})
     conn.execute(
         _SET_ISSN_SERIALS,
