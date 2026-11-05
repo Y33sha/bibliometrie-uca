@@ -61,7 +61,7 @@ Une étiquette (tag, badge, pastille, chip) est un court texte sur fond clair, a
 - **Vues de liste** (six composants, plus les pages Labos et Sujets) : chacune écrit `buildFilterParams`, `exportCsvUrl`, la synchronisation de l'URL, sa restauration et la pagination. `filterRegistry` décrit filtres, paramètres et URL de façon déclarative ; seules les publications et les statistiques s'en servent. `ThesesListView` interroge les mêmes routes que les publications, mais recopie l'option « Aucun labo », l'encodage de présence et la liste des sources.
 - **Volets** (cinq) : rechargement au changement d'identifiant (6 copies), en-tête avec lien public et renommage (3), fonction `update()` identique dans les volets revue et éditeur, section de fusion avec `Picker` (3) ; `PublicationMergeSection` fait la même chose sans `Picker`.
 - **Modales** : boutons « Annuler » et action recopiés 7 fois. L'état de `StructureFormModal` est déclaré deux fois (page Labos, `StructureDrawer`). `DetachNameFormModal` et `PersonDrawer` affichent la même liste de personnes.
-- **Listes de tri** : `LikelyProceedingsList` recopie `SerialGroupsList` ; `AmbiguousFormsList` et `SuspectMergesList` recopient `PersonPairsList`. Les quatre pages Problèmes HAL et quatre pages d'administration synchronisent leur URL à la main, à côté de `useUrlFilters`. Trois compteurs de file recopiés.
+- **Listes de tri** : les quatre pages Problèmes HAL et quatre pages d'administration synchronisent leur URL à la main, à côté de `useUrlFilters`. Trois compteurs de file recopiés.
 - **Pages d'entité** (sept) : titre, fil d'Ariane, « introuvable » et « Chargement… » recopiés 7 fois. Onglet actif recalculé 6 fois, alors que `TabNav` le calcule. Carte « Sujets principaux » et chargement des sujets recopiés 4 fois.
 - **Balisages recopiés** :
   - pastille DOAJ (3), lien d'éditeur ou texte (7), lien de revue ou texte (4), nom de personne (10) ;
@@ -120,7 +120,7 @@ Une étiquette (tag, badge, pastille, chip) est un court texte sur fond clair, a
 
 - [ ] Vues de liste sur une base commune (question 1)
 - [ ] Volets sur une base commune (question 2)
-- [ ] Listes de tri sur leurs composants génériques ; pages Problèmes HAL et d'administration sur `useUrlFilters`
+- [x] Pages Problèmes HAL et d'administration sur `useUrlFilters` (d932adc14)
 - [ ] Pages d'entité : en-tête, onglet actif, carte des sujets, états « introuvable » et « Chargement… » (marge de 20 ou 40 px selon la page)
 - [ ] Balisages recopiés en composants : pastille DOAJ, liens d'éditeur et de revue, nom de personne, en-tête triable
 
