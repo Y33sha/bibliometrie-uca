@@ -35,7 +35,7 @@
 		<p class="login-subtitle">Accès administration</p>
 
 		{#if error}
-			<div class="login-error">{error}</div>
+			<div class="info-box info-box-danger">{error}</div>
 		{/if}
 
 		<label>
@@ -80,15 +80,6 @@
 		color: var(--muted);
 		font-size: var(--fs-md);
 		margin: 0 0 20px;
-	}
-	.login-error {
-		background: var(--danger-light);
-		color: var(--danger);
-		padding: 8px 12px;
-		border-radius: var(--radius);
-		font-size: var(--fs-md);
-		margin-bottom: 12px;
-		text-align: center;
 	}
 	label {
 		display: block;

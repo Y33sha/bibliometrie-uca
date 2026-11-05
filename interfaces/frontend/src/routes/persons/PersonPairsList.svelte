@@ -86,7 +86,7 @@
 
 <p class="triage-intro">{@render intro()}</p>
 
-{#if error}<p class="error">{error}</p>{/if}
+{#if error}<p class="info-box info-box-danger">{error}</p>{/if}
 
 <ListStatus {list} {emptyText}>
   <div class="triage-list">
@@ -177,12 +177,5 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
-  }
-  .error {
-    color: var(--danger);
-    background: var(--danger-light);
-    padding: 6px 10px;
-    border-radius: var(--radius);
-    margin-bottom: 10px;
   }
 </style>

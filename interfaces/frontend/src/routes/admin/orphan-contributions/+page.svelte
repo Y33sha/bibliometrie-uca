@@ -460,11 +460,6 @@
 		padding: 6px 0; min-width: 250px;
 	}
 	.result-hint { font-size: var(--fs-sm); color: var(--muted); margin-left: 4px; }
-	.batch-bar {
-		display: flex; align-items: center; gap: 10px;
-		padding: 10px 14px; margin-bottom: 10px;
-		background: var(--accent-light); border: 1px solid color-mix(in srgb, var(--accent) 25%, white); border-radius: var(--radius);
-	}
 	.batch-bar input { width: 220px; }
 	.batch-results {
 		display: flex; flex-direction: column; gap: 2px;

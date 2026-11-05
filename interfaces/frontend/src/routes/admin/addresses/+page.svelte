@@ -533,13 +533,13 @@
 
 	<!-- Batch action bar -->
 	{#if selectedCount > 0}
-		<div class="batch-bar">
+		<div class="batch-bar batch-bar-addresses">
 			<span>{formatCount(selectedCount, 'sélectionnée')}</span>
 			<div class="batch-actions">
-				<button onclick={() => batchReview(false)}>Rejeter</button>
-				<button onclick={() => batchReview(true)}>Relier</button>
-				<button onclick={() => batchReview(null)}>Réinitialiser</button>
-				<button onclick={clearSelection}>Annuler</button>
+				<button class="btn btn-sm" onclick={() => batchReview(false)}>Rejeter <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg></button>
+				<button class="btn btn-sm" onclick={() => batchReview(true)}>Relier <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg></button>
+				<button class="btn btn-sm" onclick={() => batchReview(null)}>Réinitialiser</button>
+				<button class="btn btn-sm" onclick={clearSelection}>Annuler</button>
 			</div>
 		</div>
 	{/if}
@@ -748,33 +748,12 @@
 		border-top: 1px solid var(--border);
 	}
 
-	/* Batch bar */
-	.batch-bar {
-		background: var(--accent);
-		color: var(--text-inverse);
-		padding: 8px 16px;
-		border-radius: var(--radius);
-		margin-bottom: 10px;
-		display: flex;
-		align-items: center;
+	.batch-bar-addresses {
 		justify-content: space-between;
 	}
 	.batch-actions {
 		display: flex;
 		gap: 6px;
-	}
-	.batch-bar button {
-		padding: 4px 12px;
-		border-radius: var(--radius);
-		border: 1px solid rgba(255, 255, 255, 0.3);
-		background: transparent;
-		color: var(--text-inverse);
-		font-size: var(--fs-sm);
-		cursor: pointer;
-		font-family: inherit;
-	}
-	.batch-bar button:hover {
-		background: rgba(255, 255, 255, 0.15);
 	}
 
 </style>

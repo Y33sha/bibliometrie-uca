@@ -278,11 +278,6 @@
 
 <style>
 	.toolbar input[type="search"] { width: 300px; }
-	.batch-bar {
-		display: flex; align-items: center; gap: 8px;
-		padding: 8px 12px; margin-bottom: 10px;
-		background: var(--accent-light); border-radius: var(--radius); font-size: var(--fs-md);
-	}
 	.batch-result { font-size: var(--fs-sm); color: var(--success); font-weight: 500; }
 	/* Pays proposé par la détection : contour en pointillés. */
 	.proposal-tag { outline: 1px dashed var(--warning); outline-offset: -1px; }

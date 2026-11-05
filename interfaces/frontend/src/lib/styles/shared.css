@@ -421,6 +421,14 @@ input[type='search']::-webkit-search-cancel-button {
 	position: sticky;
 	top: calc(var(--header-height) + var(--list-toolbar-height, 0px));
 	z-index: 30;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 12px;
+	margin-bottom: 10px;
+	background: var(--accent-light);
+	border-radius: var(--radius);
+	font-size: var(--fs-md);
 }
 
 /* Conteneur d'un tableau (composant TableScroll). Quand le tableau tient dans la page, son en-tête se colle sous le menu supérieur, sous la barre d'outils quand elle est affichée et sous la barre d'actions (`--list-toolbar-height` et `--batch-bar-height`, publiées par l'action `stickyHeight`). Le filet inférieur passe par une ombre, qu'un en-tête collant garde, là où la bordure d'un tableau en `border-collapse` disparaît. */
@@ -1187,6 +1195,14 @@ a:hover > .logo-idref {
 	padding: 3px 8px;
 }
 
+/* Icône à droite du libellé. */
+.btn svg {
+	width: 14px;
+	height: 14px;
+	margin-left: 4px;
+	vertical-align: -2px;
+}
+
 /* Boutons pleins (gros boutons à texte), teintés par `--btn-color`. */
 .btn-confirm {
 	--btn-color: var(--success);
@@ -1322,16 +1338,28 @@ button.entity-link {
 	text-decoration: underline;
 }
 
-/* ── Encart d'information ── */
+/* ── Encart : fond pâle et bordure adoucie d'une teinte, l'accent par défaut ── */
 .info-box {
-	background: var(--accent-light);
-	border: 1px solid color-mix(in srgb, var(--accent) 25%, white);
+	--box-color: var(--accent);
+	--box-bg: var(--accent-light);
+	background: var(--box-bg);
+	border: 1px solid color-mix(in srgb, var(--box-color) 25%, white);
 	border-radius: var(--radius);
 	padding: 8px 14px;
 	font-size: var(--fs-md);
 	color: var(--text);
 	margin-bottom: 12px;
 	line-height: 1.5;
+}
+.info-box-warning {
+	--box-color: var(--warning);
+	--box-bg: var(--warning-light);
+}
+/* Erreur : le texte prend la teinte de l'encart. */
+.info-box-danger {
+	--box-color: var(--danger);
+	--box-bg: var(--danger-light);
+	color: var(--danger);
 }
 
 /* ── Modal ── */
