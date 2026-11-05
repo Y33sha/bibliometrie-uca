@@ -22,14 +22,15 @@ from domain.documents.identifiers import ISSN
 from domain.entity_resolution import most_frequent
 from domain.normalize import normalize_text
 from domain.serials.attachment import (
+    IssnlPlan,
     KnownIssn,
+    KnownSerial,
     NewSerial,
-    TitledSerial,
-    choose_issnl,
-    match_by_title,
-    match_in_publication,
+    SerialRef,
+    SeriesMention,
     openalex_issnls,
     plan_issnl_serials,
+    plan_record_serials,
 )
 from domain.serials.containers import SeriesDescription
 from domain.serials.serial import ManualField
@@ -61,11 +62,7 @@ _ISSN_ROWS = text("SELECT issn, issnl, serial_id, status FROM serial_issns")
 
 _REPLACEMENTS = text("SELECT issn, linked_issn FROM issn_links WHERE link_type = 'replaced_by'")
 
-_SERIALS = text("""
-    SELECT s.id, s.title, s.title_normalized, s.publisher_id, s.openalex_id,
-           EXISTS (SELECT 1 FROM serial_issns i WHERE i.serial_id = s.id) AS has_issn
-    FROM serials s
-""")
+_SERIALS = text("SELECT id, title, title_normalized, publisher_id, openalex_id FROM serials")
 
 _DECISIONS = text("SELECT title_normalized, serial_id FROM serial_title_decisions")
 
@@ -135,16 +132,6 @@ class _Mention:
     """ISSN valides."""
     openalex_issnl: str | None
     """ISSN-L donné par OpenAlex."""
-
-
-@dataclass(slots=True)
-class _Serial:
-    id: int
-    title: str
-    title_normalized: str
-    publisher_id: int | None
-    openalex_id: str | None
-    has_issn: bool
 
 
 @dataclass(slots=True)
@@ -239,77 +226,40 @@ def _attach(
     serial_of_issnl: dict[str, int],
 ) -> _Attachment:
     serials = {
-        r.id: _Serial(
-            r.id,
-            r.title,
-            r.title_normalized,
-            r.publisher_id,
-            r.openalex_id,
-            r.has_issn,
-        )
+        r.id: KnownSerial(r.title, r.title_normalized, r.publisher_id, r.openalex_id)
         for r in conn.execute(_SERIALS)
     }
-    with_issn = {s.id for s in serials.values() if s.has_issn} | set(serial_of_issnl.values())
-    by_openalex = {s.openalex_id: s.id for s in serials.values() if s.openalex_id}
-    by_title: dict[str, list[TitledSerial]] = {}
-    for s in serials.values():
-        if s.id in with_issn:
-            by_title.setdefault(s.title_normalized, []).append(TitledSerial(s.id, s.publisher_id))
-    decisions = {r.title_normalized: r.serial_id for r in conn.execute(_DECISIONS)}
-    result = _Attachment()
-    # Séries désignées par leur seul titre, sans revue à ISSN de ce titre : titre et titre normalisé.
-    title_only_mentions: list[tuple[_Mention, str, str]] = []
-    for m in mentions:
-        series = m.series
-        if series is None:
-            result.serial_of[m.id] = None
-            continue
-        candidates = {
-            issnl: serials[serial_of_issnl[issnl]].title
-            for issnl in {issnl_of.get(i, i) for i in m.issns}
-            if issnl in serial_of_issnl
-        }
-        if candidates and (issnl := choose_issnl(series.title, candidates)) is not None:
-            result.serial_of[m.id] = serial_of_issnl[issnl]
-            result.by_way["issn"] += 1
-            continue
-        if series.openalex_id and series.openalex_id in by_openalex:
-            result.serial_of[m.id] = by_openalex[series.openalex_id]
-            result.by_way["openalex"] += 1
-            continue
-        title_normalized = normalize_text(series.title or "")
-        if not title_normalized:
-            result.serial_of[m.id] = None
-            result.by_way["unattached"] += 1
-            continue
-        found = decisions.get(title_normalized) or match_by_title(
-            m.publisher_id, by_title.get(title_normalized, [])
-        )
-        if found is None:
-            title_only_mentions.append((m, str(series.title), title_normalized))
-            continue
-        result.serial_of[m.id] = found
-        result.by_way["title"] += 1
-    publication_serials: dict[int, dict[int, str]] = {}
-    for m in mentions:
-        serial_id = result.serial_of.get(m.id)
-        if m.publication_id is not None and serial_id in with_issn:
-            publication_serials.setdefault(m.publication_id, {})[serial_id] = serials[
-                serial_id
-            ].title
+    issnl_serials: dict[str, SerialRef] = dict(serial_of_issnl)
+    plan = plan_record_serials(
+        [
+            SeriesMention(
+                m.id,
+                m.publication_id,
+                m.publisher_id,
+                m.series.title,
+                m.series.openalex_id,
+                m.issns,
+            )
+            for m in mentions
+            if m.series
+        ],
+        IssnlPlan(issnl_of, issnl_serials),
+        serials,
+        {r.title_normalized: r.serial_id for r in conn.execute(_DECISIONS)},
+    )
     store = SerialStore(conn)
-    title_only: dict[str, int] = {}
-    for m, title, title_normalized in title_only_mentions:
-        in_publication = (
-            publication_serials.get(m.publication_id, {}) if m.publication_id is not None else {}
-        )
-        found = match_in_publication(title, in_publication)
-        if found is None:
-            if title_normalized not in title_only:
-                title_only[title_normalized] = store.serial_for_title(title)
-            found = title_only[title_normalized]
-        result.serial_of[m.id] = found
-        result.by_way["title"] += 1
+    created: dict[NewSerial, int] = {}
+
+    def resolve(serial: SerialRef | None) -> int | None:
+        if not isinstance(serial, NewSerial):
+            return serial
+        if serial not in created:
+            created[serial] = store.create_serial(serial.title)
+        return created[serial]
+
+    result = _Attachment(by_way=plan.by_way)
+    for m in mentions:
+        result.serial_of[m.id] = resolve(plan.serial_of[m.id]) if m.series else None
     return result
 
 
