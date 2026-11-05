@@ -11,7 +11,6 @@
 
 - [Brevets](DATA_brevets.md)
 - [Duplications du frontend](UI_duplications-du-frontend.md)
-- [Fiabilité de l'alignement des auteurs](DATA_fiabilite-alignement-auteurs.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
 - [Résolution probabiliste des personnes](DATA_resolution-personnes-probabiliste.md)
 - [Types de document](DATA_types-document.md)
@@ -19,6 +18,7 @@
 
 ## Chantiers archivés
 
+- 2026-11-05 — [Fiabilité de l'alignement des auteurs](archived/2026-11-05_DATA_fiabilite-alignement-auteurs.md)
 - 2026-11-05 — [Plan de rattachement des revues](archived/2026-11-05_CODE_plan-de-rattachement-des-revues.md)
 - 2026-11-04 — [Listes de revues](archived/2026-11-04_DATA_listes-de-revues.md)
 - 2026-11-04 — [Adaptateurs de source](archived/2026-11-04_CODE_adaptateurs-de-source.md)
