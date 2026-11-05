@@ -64,9 +64,17 @@ export function structureIdSourceOptions(): EnumOption[] {
 	return structureIdSources.options;
 }
 
+/** Source dont une autre source reprend le logo : ScanR brevets est un index de ScanR. */
+const LOGO_SOURCES: Record<string, string> = { scanr_patents: 'scanr' };
+
+/** Source dont `source` affiche le logo (icône et classe `logo-…`). */
+export function logoSource(source: string): string {
+	return LOGO_SOURCES[source] ?? source;
+}
+
 /** Chemin du logo local d'une source (`undefined` si aucun). */
 export function sourceIcon(source: string): string | undefined {
-	return ICONS[source];
+	return ICONS[logoSource(source)];
 }
 
 /** Rapport de participation d'un membre Crossref : le compte sous lequel un éditeur dépose ses DOI. */
