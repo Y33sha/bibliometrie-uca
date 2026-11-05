@@ -5,6 +5,7 @@ from dataclasses import dataclass, replace
 from enum import StrEnum
 
 from domain.documents.identifiers import DOI, ISBN, NNT, PMID, HALId, PatentNumber
+from domain.documents.patent_numbers import PatentNumberKind
 from domain.serials.containers import ContainerRole, container_role
 
 
@@ -20,6 +21,13 @@ class SourceIdentifierType(StrEnum):
     PATENT_PUBLICATION_NUMBER = "patent_publication_number"
     PATENT_APPLICATION_NUMBER = "patent_application_number"
     """Numéro de demande de brevet. Pour l'office WO, il recoupe les numéros de publication d'autres familles."""
+
+
+PATENT_NUMBER_TYPES: dict[PatentNumberKind, SourceIdentifierType] = {
+    PatentNumberKind.PUBLICATION: SourceIdentifierType.PATENT_PUBLICATION_NUMBER,
+    PatentNumberKind.APPLICATION: SourceIdentifierType.PATENT_APPLICATION_NUMBER,
+}
+"""Type d'identifiant d'un numéro de brevet lu dans un texte libre."""
 
 
 class SourceIdentifierRole(StrEnum):

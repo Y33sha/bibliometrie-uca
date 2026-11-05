@@ -15,6 +15,7 @@ from domain.documents.dates import PublicationDate, date_from_parts, parse_iso_d
 from domain.documents.doc_types import DocType
 from domain.documents.identifiers import DOI, NNT, PMCID, PMID, arxiv_doi, find_isbns
 from domain.documents.licenses import normalize_license
+from domain.documents.patent_numbers import ReadPatentNumber, read_patent_numbers
 from domain.persons.contributor_name import ContributorName
 from domain.platforms.registry import PMC_ARTICLE_URL, is_fully_open
 from domain.serials.containers import ContainerDescription
@@ -22,6 +23,7 @@ from domain.serials.issns import source_issns
 from domain.source_records.biblio import PageRange, compact_biblio, parse_pages
 from domain.source_records.doc_types import map_doc_type
 from domain.source_records.identifiers import (
+    PATENT_NUMBER_TYPES,
     SourceIdentifier,
     SourceIdentifierRole,
     SourceIdentifierType,
@@ -162,7 +164,7 @@ def build_hal_identifiers(
 ) -> tuple[SourceIdentifier, ...]:
     """Renvoie les identifiants d'un dépôt HAL. Le `hal_id` est primaire, les autres sont secondaires, sauf l'ISBN de l'ouvrage contenant le document (`isbn_role`).
 
-    Le PMID vient de `pubmedId_s`, le DOI d'un dépôt arXiv des liens externes (`linkExtUrl_s`).
+    Le PMID vient de `pubmedId_s`, le DOI d'un dépôt arXiv des liens externes (`linkExtUrl_s`), les numéros d'un brevet de `number_s`.
     """
     secondary = SourceIdentifierRole.SECONDARY
     identifiers = [
@@ -184,7 +186,21 @@ def build_hal_identifiers(
         for url in _external_links(doc)
         if (doi := arxiv_doi(url))
     )
+    if map_doc_type(get_doc_type(doc) or "", "hal") == DocType.PATENT:
+        identifiers += (
+            SourceIdentifier(PATENT_NUMBER_TYPES[n.kind], n.value, secondary)
+            for n in _patent_numbers(doc)
+        )
     return tuple(identifiers)
+
+
+def _patent_numbers(doc: Mapping[str, JsonValue]) -> list[ReadPatentNumber]:
+    """Renvoie les numéros de brevet lus dans `number_s`, texte libre."""
+    publication_date = get_publication_date(doc)
+    return read_patent_numbers(
+        " ".join(as_strs(doc.get("number_s"))),
+        publication_date.year if publication_date else None,
+    )
 
 
 def hal_source_record(
