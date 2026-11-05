@@ -1017,7 +1017,9 @@ button.tag {
 	transition: transform 0.1s;
 }
 
-.source-tag:hover {
+/* Une icône dans un lien réagit au survol du lien entier. */
+.source-tag:hover,
+a:hover > .source-tag {
 	transform: scale(1.15);
 }
 
@@ -1031,7 +1033,8 @@ button.tag {
 	background: var(--accent-light);
 }
 
-.source-hal:hover {
+.source-hal:hover,
+a:hover > .source-hal {
 	background: #d0e3f4;
 }
 
@@ -1039,7 +1042,8 @@ button.tag {
 	background: #fef3e0;
 }
 
-.source-openalex:hover {
+.source-openalex:hover,
+a:hover > .source-openalex {
 	background: #fde8c8;
 }
 
@@ -1047,7 +1051,8 @@ button.tag {
 	background: #e8f5e9;
 }
 
-.source-theses:hover {
+.source-theses:hover,
+a:hover > .source-theses {
 	background: #d0eadb;
 }
 
@@ -1064,7 +1069,8 @@ button.tag {
 	background: #e8e0f8;
 }
 
-.source-wos:hover {
+.source-wos:hover,
+a:hover > .source-wos {
 	background: #d8c8f4;
 }
 
@@ -1072,7 +1078,8 @@ button.tag {
 	background: #f3ead2;
 }
 
-.source-crossref:hover {
+.source-crossref:hover,
+a:hover > .source-crossref {
 	background: #ebdcb8;
 }
 
@@ -1080,7 +1087,8 @@ button.tag {
 	background: #d9f1ec;
 }
 
-.source-datacite:hover {
+.source-datacite:hover,
+a:hover > .source-datacite {
 	background: #c6e8e0;
 }
 

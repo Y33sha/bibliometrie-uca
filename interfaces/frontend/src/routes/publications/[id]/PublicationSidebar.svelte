@@ -196,10 +196,6 @@
   .source-row :global(.source-tag) {
     flex-shrink: 0;
   }
-  /* Le lien couvre toute la ligne : l'icône grossit au survol de la ligne entière, pas seulement de l'icône. */
-  .source-row:hover :global(.source-tag) {
-    transform: scale(1.15);
-  }
   .row-label {
     font-size: var(--fs-md);
     color: var(--text);
