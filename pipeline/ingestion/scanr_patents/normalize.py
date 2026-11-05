@@ -89,7 +89,7 @@ def publication_number(office: str, raw: str | None) -> str | None:
     return office + (kind.group(1) if kind else number)
 
 
-def _identifiers(family: Mapping[str, JsonValue]) -> list[SourceIdentifier]:
+def family_identifiers(family: Mapping[str, JsonValue]) -> list[SourceIdentifier]:
     """Renvoie les numéros de publication et de demande de chaque demande de la famille. `normalize_identifiers` retire les doublons."""
     identifiers: list[SourceIdentifier] = []
     for application in _applications(family):
@@ -179,7 +179,7 @@ def scanr_patents_source_record(
         source="scanr_patents",
         source_id=source_id,
         staging_id=staging_id,
-        identifiers=tuple(_identifiers(family)),
+        identifiers=tuple(family_identifiers(family)),
         title=title or "",
         raw_doc_type=as_str(family.get("productionType")),
         container_title=None,

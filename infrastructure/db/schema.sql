@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict A8mFcDxhHgsAhJXwMpFgI61jW7dFbOGvtKP8yFhdO3ZQJWtL648LKKNV8z67mx3
+\restrict ztb2I2GuESd2nOoco4j1X2wlhSH8A4ib4nXGJou1JS8yEgszvDKPINSF5rQG4Oa
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -3211,7 +3211,7 @@ CREATE TABLE sources.failed_lookups (
     id_type text NOT NULL,
     id_value text NOT NULL,
     not_found_at timestamp with time zone NOT NULL,
-    CONSTRAINT failed_lookups_id_type_check CHECK ((id_type = ANY (ARRAY['doi'::text, 'hal_id'::text, 'nnt'::text]))),
+    CONSTRAINT failed_lookups_id_type_check CHECK ((id_type = ANY (ARRAY['doi'::text, 'hal_id'::text, 'nnt'::text, 'patent_publication_number'::text, 'patent_application_number'::text]))),
     CONSTRAINT failed_lookups_id_value_case CHECK ((id_value =
 CASE
     WHEN (id_type = ANY (ARRAY['nnt'::text, 'patent_publication_number'::text, 'patent_application_number'::text])) THEN upper(id_value)
@@ -3366,7 +3366,7 @@ CREATE TABLE sources.staging (
     authors_truncated boolean DEFAULT false NOT NULL,
     entry_mode text DEFAULT 'bulk'::text NOT NULL,
     CONSTRAINT staging_doi_lowercase CHECK ((doi = lower(doi))),
-    CONSTRAINT staging_entry_mode_check CHECK ((entry_mode = ANY (ARRAY['bulk'::text, 'fetch_missing_doi'::text, 'manual_export'::text, 'person_identifier'::text, 'fetch_missing_hal_id'::text, 'fetch_missing_nnt'::text])))
+    CONSTRAINT staging_entry_mode_check CHECK ((entry_mode = ANY (ARRAY['bulk'::text, 'fetch_missing_doi'::text, 'manual_export'::text, 'person_identifier'::text, 'fetch_missing_hal_id'::text, 'fetch_missing_nnt'::text, 'fetch_missing_patent_number'::text])))
 );
 
 
@@ -6243,5 +6243,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict A8mFcDxhHgsAhJXwMpFgI61jW7dFbOGvtKP8yFhdO3ZQJWtL648LKKNV8z67mx3
+\unrestrict ztb2I2GuESd2nOoco4j1X2wlhSH8A4ib4nXGJou1JS8yEgszvDKPINSF5rQG4Oa
 

@@ -115,7 +115,7 @@ Familles dont un établissement du périmètre est déposant : UCA, Université 
 - [x] `patent_publication_number` en clé de confirmation à plusieurs valeurs
 - [x] Usage de `patent_application_number` dans le rattachement, après mesure des recoupements
 - [ ] Recherche dans ScanR des familles absentes, par numéro (`fetch_missing`)
-- [ ] Mesure de l'effet sur les publications, puis relance avec `--rebuild-publications`
+- [ ] Mesure de l'effet sur les publications. La normalisation marque pour la réconciliation les brevets HAL et les familles écrites.
 
 ### Phase 5 — Périmètre et personnes
 

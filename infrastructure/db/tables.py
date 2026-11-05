@@ -66,6 +66,7 @@ from domain.source_records.identifiers import (
     SourceIdentifierRole,
     SourceIdentifierType,
 )
+from domain.sources.lookups import LOOKUP_ID_TYPES
 from domain.sources.registry import LOOKUP_SOURCES, Source
 from domain.sources.staging import StagingEntryMode
 from domain.structures.hal_structures import HalStructureStatus
@@ -1746,7 +1747,9 @@ failed_lookups = Table(
     Column("not_found_at", DateTime(timezone=True), nullable=False),
     PrimaryKeyConstraint("source", "id_type", "id_value"),
     CheckConstraint(
-        "id_type = ANY (ARRAY['doi'::text, 'hal_id'::text, 'nnt'::text])",
+        "id_type = ANY (ARRAY["
+        + ", ".join(f"'{id_type.value}'::text" for id_type in LOOKUP_ID_TYPES)
+        + "])",
         name="failed_lookups_id_type_check",
     ),
     _identifier_case("failed_lookups"),
