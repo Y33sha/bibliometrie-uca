@@ -62,6 +62,8 @@ MAX_CONCURRENT: dict[str, int] = {
     "wos": 2,
     # Elasticsearch public sans plafond documenté.
     "scanr": 5,
+    # Même cluster que ScanR, pour quelques centaines de familles.
+    "scanr_patents": 2,
     # API fragile : une requête à la fois.
     "theses": 1,
     # Polite pool : 3 requêtes simultanées au plus.
@@ -84,6 +86,8 @@ MAX_PER_SECOND: dict[str, float] = {
     "wos": 2,
     # Aucun seuil publié.
     "scanr": 5,
+    # Même cluster que ScanR.
+    "scanr_patents": 2,
     # Aucun seuil publié.
     "theses": 3,
     # Seuil publié du polite pool : 10 req/s, 3 requêtes simultanées.

@@ -739,10 +739,19 @@ def _lowercase_doi(table: str, column: str = "doi") -> CheckConstraint:
     return CheckConstraint(f"{column} = lower({column})", name=f"{table}_{column}_lowercase")
 
 
+_UPPERCASE_IDENTIFIER_TYPES = (
+    SourceIdentifierType.NNT,
+    SourceIdentifierType.PATENT_PUBLICATION_NUMBER,
+    SourceIdentifierType.PATENT_APPLICATION_NUMBER,
+)
+
+
 def _identifier_case(table: str) -> CheckConstraint:
-    """Renvoie la contrainte d'une colonne `id_value` d'identifiants de publication, typés par `id_type` : casse de leur forme normalisée, en majuscules pour un NNT, en minuscules pour les autres."""
+    """Renvoie la contrainte d'une colonne `id_value` d'identifiants de publication, typés par `id_type` : casse de leur forme normalisée, en majuscules pour un NNT et un numéro de brevet, en minuscules pour les autres."""
+    uppercase = ", ".join(f"'{t.value}'" for t in _UPPERCASE_IDENTIFIER_TYPES)
     return CheckConstraint(
-        "id_value = CASE id_type WHEN 'nnt' THEN upper(id_value) ELSE lower(id_value) END",
+        f"id_value = CASE WHEN id_type::text IN ({uppercase}) "
+        "THEN upper(id_value) ELSE lower(id_value) END",
         name=f"{table}_id_value_case",
     )
 

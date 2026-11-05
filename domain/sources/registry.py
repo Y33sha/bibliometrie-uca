@@ -15,6 +15,7 @@ class Source(StrEnum):
     OPENALEX = "openalex"
     WOS = "wos"
     SCANR = "scanr"
+    SCANR_PATENTS = "scanr_patents"
     THESES = "theses"
     CROSSREF = "crossref"
     DATACITE = "datacite"
@@ -67,6 +68,8 @@ PROFILES: dict[Source, SourceProfile] = {
         person_identifiers=frozenset({PersonIdentifierType.ORCID, PersonIdentifierType.IDREF}),
         aggregator=True,
     ),
+    # Familles de brevets de l'index `scanr-patents`.
+    Source.SCANR_PATENTS: SourceProfile(label="ScanR brevets", harvested=True),
     # Son API se requête par NNT.
     Source.THESES: SourceProfile(label="theses.fr", harvested=True),
     # Interrogé par DOI et par personne, sans moissonnage.
@@ -123,6 +126,8 @@ def source_record_url(source: str, source_id: str) -> str:
         case Source.SCANR:
             # Un identifiant ScanR peut contenir des `/` (`doi/10.1234/…`) : ils sont encodés aussi.
             return f"https://scanr.enseignementsup-recherche.gouv.fr/publications/{quote(source_id, safe='')}"
+        case Source.SCANR_PATENTS:
+            return f"https://scanr.enseignementsup-recherche.gouv.fr/patents/{path}"
         case Source.THESES:
             return f"https://theses.fr/{path}"
         case Source.CROSSREF | Source.DATACITE:
@@ -141,6 +146,7 @@ AGGREGATOR_SOURCES: frozenset[Source] = frozenset(s for s, p in PROFILES.items()
 
 SOURCE_PRIORITY: tuple[Source, ...] = (
     Source.THESES,
+    Source.SCANR_PATENTS,
     Source.CROSSREF,
     Source.DATACITE,
     Source.HAL,
@@ -148,13 +154,14 @@ SOURCE_PRIORITY: tuple[Source, ...] = (
     Source.SCANR,
     Source.WOS,
 )
-"""Ordre d'autorité des sources, pour l'agrégation des métadonnées, la position d'auteur et l'ordre des normaliseurs. theses.fr fait autorité sur les thèses. Crossref et DataCite font chacun autorité sur leurs propres DOI."""
+"""Ordre d'autorité des sources, pour l'agrégation des métadonnées, la position d'auteur et l'ordre des normaliseurs. theses.fr fait autorité sur les thèses, ScanR brevets sur les brevets. Crossref et DataCite font chacun autorité sur leurs propres DOI."""
 
 
 STRUCTURE_API_SOURCES: tuple[Source, ...] = (
     Source.OPENALEX,
     Source.WOS,
     Source.SCANR,
+    Source.SCANR_PATENTS,
     Source.THESES,
     Source.DATACITE,
 )

@@ -1,4 +1,4 @@
-"""Identifiants de publication : DOI et son préfixe, identifiant HAL, NNT, PMID, PMCID, identifiant arXiv, ISSN, ISBN."""
+"""Identifiants de publication : DOI et son préfixe, identifiant HAL, NNT, numéro de brevet, PMID, PMCID, identifiant arXiv, ISSN, ISBN."""
 
 import re
 from typing import NamedTuple
@@ -194,6 +194,26 @@ class NNT(NormalizedIdentifier):
 
     label = "NNT"
     normalize = staticmethod(_normalize_nnt)
+
+
+_PATENT_NUMBER_RE = re.compile(r"[A-Z]{2}[A-Z0-9]*\d[A-Z0-9]*")
+"""Numéro de brevet normalisé : code de l'office sur deux lettres, puis le numéro, avec au moins un chiffre. Certains offices font précéder le numéro d'une lettre (HU `E040212`, AR `P150103392`)."""
+_PATENT_SEPARATORS_RE = re.compile(r"[\s/.,-]")
+
+
+def _normalize_patent_number(raw: str | None) -> str | None:
+    """Renvoie le numéro en majuscules, sans espaces ni séparateurs (`WO/2019/229378` → `WO2019229378`). `None` sans code d'office ou sans chiffre."""
+    if not raw:
+        return None
+    s = _PATENT_SEPARATORS_RE.sub("", raw.upper())
+    return s if _PATENT_NUMBER_RE.fullmatch(s) else None
+
+
+class PatentNumber(NormalizedIdentifier):
+    """Numéro de demande ou de publication de brevet : code de l'office, puis le numéro, sans code de type (`FR2957077`, `WO2011107710`)."""
+
+    label = "numéro de brevet"
+    normalize = staticmethod(_normalize_patent_number)
 
 
 _PMID_URL_RE = re.compile(r"pubmed\.ncbi\.nlm\.nih\.gov/(\d+)")

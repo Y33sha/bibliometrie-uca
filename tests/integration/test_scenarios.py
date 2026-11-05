@@ -68,6 +68,10 @@ class TestIdentifierCase:
         [
             ("nnt", "2021UCFAC022", True),
             ("nnt", "2021ucfac022", False),
+            ("patent_publication_number", "WO2011107710", True),
+            ("patent_publication_number", "wo2011107710", False),
+            ("patent_application_number", "SG11201701523V", True),
+            ("patent_application_number", "sg11201701523v", False),
             ("doi", "10.1103/physrevc.111.024905", True),
             ("doi", "10.1103/PhysRevC.111.024905", False),
         ],

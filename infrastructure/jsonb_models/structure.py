@@ -18,12 +18,16 @@ class StructureApiIds(JsonbModel):
     openalex: list[str] | None = None
     wos: list[str] | None = None
     scanr: list[str] | None = None
+    scanr_patents: list[str] | None = None
+    """Identifiants Paysage des déposants."""
     theses: list[str] | None = None
     """PPN IdRef des établissements."""
     datacite: list[str] | None = None
     """Mots-clés cherchés dans les affiliations des créateurs."""
 
-    @field_validator("openalex", "wos", "scanr", "theses", "datacite", mode="before")
+    @field_validator(
+        "openalex", "wos", "scanr", "scanr_patents", "theses", "datacite", mode="before"
+    )
     @classmethod
     def _ensure_list(cls, v: str | list[str] | None) -> list[str] | None:
         """Met en liste une chaîne seule."""

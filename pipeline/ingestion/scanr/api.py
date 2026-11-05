@@ -80,10 +80,20 @@ async def search(
 
 
 async def fetch_by_id(
-    client: httpx2.AsyncClient, source_id: str, *, index: ScanrIndex
+    client: httpx2.AsyncClient,
+    source_id: str,
+    *,
+    index: ScanrIndex,
+    excludes: Sequence[str] = (),
 ) -> LookupOutcome[Mapping[str, JsonValue]]:
-    """Renvoie le document d'identifiant `source_id` dans `index`, son absence ou l'indisponibilité de l'API."""
+    """Renvoie le document d'identifiant `source_id` dans `index`, son absence ou l'indisponibilité de l'API.
+
+    Args:
+        excludes: champs retirés du document (`_source.excludes`), comme au moissonnage.
+    """
     query: dict[str, JsonValue] = {"size": 1, "query": {"term": {"id.keyword": source_id}}}
+    if excludes:
+        query["_source"] = {"excludes": list(excludes)}
     records = await search(client, query, index=index, label=f"id {source_id}")
     if isinstance(records, Unavailable):
         return records

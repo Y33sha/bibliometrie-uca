@@ -22,6 +22,8 @@ class ContributionRole(StrEnum):
     JURY_MEMBER = "jury_member"
     """Membre du jury de thèse sans autre rôle : examinateur."""
     JURY_PRESIDENT = "jury_president"
+    INVENTOR = "inventor"
+    """Inventeur d'un brevet."""
     OTHER = "other"
 
 
