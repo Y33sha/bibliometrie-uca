@@ -20,7 +20,6 @@
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
 	import AddressPublications from '#lib/components/AddressPublications.svelte';
 	import PublicationCountButton from '#lib/components/PublicationCountButton.svelte';
-	import BarChart from '#lib/components/charts/BarChart.svelte';
 	import YearSlider from '#lib/components/YearSlider.svelte';
 	import { confirmDialog } from '#lib/dialogs.svelte.js';
 	import TitleRow from '#lib/components/TitleRow.svelte';
@@ -327,6 +326,19 @@
 	{#if activeTab === 'addresses'}
 		<div class="tab-content">
 			<div class="addr-overview">
+				<h2>Structures reconnues dans les adresses</h2>
+				{#if addrStructures.length}
+					<ul class="addr-structures">
+						{#each addrStructures as s (s.id)}
+							<li>
+								<span>{structureLabel(s)}</span>
+								<span class="addr-share" title={publicationCount(s.publications)}>{addrShare(s.publications)}</span>
+							</li>
+						{/each}
+					</ul>
+				{:else if addrSummary}
+					<p class="addr-counts">Aucune structure reconnue.</p>
+				{/if}
 				<div class="addr-year">
 					<div class="addr-year-label">Année <strong>{addrYear}</strong></div>
 					<YearSlider min={addrYearMin} max={addrYearMax} bind:value={addrYear} onchange={loadAddressTab} />
@@ -334,23 +346,6 @@
 						<p class="addr-total">
 							{publicationCount(addrSummary.publications)}, dont {addrSummary.publications_with_address.toLocaleString('fr-FR')} avec adresse
 						</p>
-					{/if}
-				</div>
-				<div class="addr-chart">
-					<h2>Structures reconnues dans les adresses</h2>
-					{#if addrStructures.length}
-						<BarChart
-							labels={addrStructures.map((s) => structureLabel(s))}
-							values={addrStructures.map((s) => s.publications)}
-							datasetLabel="Publications avec adresse"
-							barLabel={addrShare}
-							tooltipLabel={publicationCount}
-							max={addrSummary?.publications_with_address}
-							horizontal
-							height={28 * addrStructures.length + 40}
-						/>
-					{:else if addrSummary}
-						<p class="addr-counts">Aucune structure reconnue.</p>
 					{/if}
 				</div>
 			</div>
@@ -427,22 +422,31 @@
 
 	/* Addresses tab */
 	.addr-overview {
-		display: flex;
-		gap: 24px;
-		align-items: flex-start;
-		margin-bottom: 16px;
+		width: 300px;
+		margin: 0 auto 16px;
 	}
+	.addr-overview h2 { font-size: var(--fs-base); font-weight: 600; margin: 0 0 8px; }
+	.addr-structures {
+		list-style: none;
+		margin: 0 0 20px;
+		padding: 0;
+		font-size: var(--fs-md);
+	}
+	.addr-structures li {
+		display: flex;
+		justify-content: space-between;
+		gap: 12px;
+		padding: 2px 0;
+	}
+	.addr-share { font-variant-numeric: tabular-nums; }
 	.addr-year {
-		flex: 0 0 280px;
 		display: flex;
 		flex-direction: column;
 		gap: 4px;
 	}
 	.addr-year-label { font-size: var(--fs-md); }
 	.addr-total { font-size: var(--fs-md); margin: 8px 0 0; }
-	.addr-counts { font-size: var(--fs-sm); color: var(--text-secondary); margin: 8px 0 0; }
-	.addr-chart { flex: 1; min-width: 0; }
-	.addr-chart h2 { font-size: var(--fs-base); font-weight: 600; margin: 0 0 8px; }
+	.addr-counts { font-size: var(--fs-sm); color: var(--text-secondary); margin: 0 0 20px; }
 	.addr-cell { font-size: var(--fs-sm); color: var(--muted); word-break: break-all; }
 	.addr-publications { padding: 0 12px 12px 24px; }
 </style>
