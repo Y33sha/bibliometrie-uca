@@ -107,6 +107,7 @@
     </select>
     <input
       type="text"
+      class="input-sm"
       placeholder={form.id_type === "orcid"
         ? "0000-0000-0000-0000"
         : form.id_type === "idhal"
@@ -178,11 +179,6 @@
   }
   .id-form input {
     width: 180px;
-    padding: 3px 6px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    font-size: var(--fs-sm);
-    font-family: inherit;
   }
   .id-error {
     font-size: var(--fs-sm);

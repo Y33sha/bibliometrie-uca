@@ -311,7 +311,7 @@
 <!-- Éditeur inline partagé par toutes les valeurs de configuration scalaires : focus + sélection à l'ouverture, Entrée valide, Échap annule. -->
 {#snippet inlineEdit(key: string)}
   {@const bornes = numericBounds(key)}
-  <input class="config-editor-inline" class:text={TEXT_KEYS.has(key)} bind:value={editValue} use:autofocus={{ select: true }}
+  <input class="input-sm config-editor-inline" class:text={TEXT_KEYS.has(key)} bind:value={editValue} use:autofocus={{ select: true }}
     type={bornes ? "number" : "text"} min={bornes?.min} max={bornes?.max} step={bornes ? 1 : undefined}
     onkeydown={(e) => editKeydown(e, key)} />
   <span class="config-actions-inline">
@@ -642,10 +642,6 @@
   .config-editor-inline {
     width: 100px;
     font-family: var(--mono);
-    font-size: var(--fs-sm);
-    padding: 3px 6px;
-    border: 1px solid var(--accent);
-    border-radius: var(--radius);
   }
   .config-editor-inline.text {
     width: 320px;

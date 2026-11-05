@@ -150,6 +150,7 @@
 <!-- Add form row -->
 <div class="add-row">
   <input
+    class="input-sm"
     placeholder="Nouvelle forme"
     bind:value={addFormText}
     onkeydown={(e) => {
@@ -280,12 +281,6 @@
   }
   .add-row input:not([type]) {
     flex: 1 1 260px;
-    height: 34px;
-    padding: 0 10px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--card);
-    font-size: var(--fs-sm);
     font-family: var(--mono);
   }
   .checkbox-label {

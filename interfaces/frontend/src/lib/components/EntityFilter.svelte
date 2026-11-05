@@ -124,7 +124,7 @@
 
 	{#if panel.open}
 		<div class="facet-panel" use:anchored>
-			<input type="text" class="facet-search" placeholder="Rechercher" bind:value={query} oninput={onInput} />
+			<input type="text" class="facet-search input-sm" placeholder="Rechercher" bind:value={query} oninput={onInput} />
 			{#if selected.length}
 				<button type="button" class="facet-clear" onclick={() => pick(null)}>Effacer</button>
 			{/if}

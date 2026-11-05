@@ -285,7 +285,7 @@
 {#if selectedIds.size > 0}
 	<div class="batch-bar" use:stickyHeight={{ variable: '--batch-bar-height' }}>
 		<span>{formatCount(selectedIds.size, 'sélectionnée')}</span>
-		<input type="search" placeholder="Attribuer à une personne existante" value={batchSearch.query}
+		<input type="search" class="input-sm" placeholder="Attribuer à une personne existante" value={batchSearch.query}
 			onkeydown={(e) => { if (e.key === 'Escape') { batchSearch.setQuery(''); } }}
 			oninput={(e) => batchSearch.setQuery((e.target as HTMLInputElement).value)} autocomplete="off" />
 		<button class="btn btn-sm btn-create" onclick={openCreateModal}>Créer une personne</button>
@@ -349,7 +349,7 @@
 								{#if activeAssignIdx === i}
 									<div class="assign-panel">
 										<div class="assign-row">
-											<input type="search" placeholder="Nom de la personne" value={assignSearch.query}
+											<input type="search" class="input-sm" placeholder="Nom de la personne" value={assignSearch.query}
 													use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { closeAssign(); } }}
 												oninput={(e) => assignSearch.setQuery((e.target as HTMLInputElement).value)} />
 											<IconButton icon="reject" label="Fermer" onclick={closeAssign} />
@@ -454,7 +454,7 @@
 	.publication-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 	.assign-panel { position: relative; }
 	.assign-row { display: flex; gap: 4px; align-items: center; }
-	.assign-row input { flex: 1; min-width: 0; padding: 4px 8px; border: 1px solid var(--border); border-radius: var(--radius); font-size: var(--fs-sm); }
+	.assign-row input { flex: 1; min-width: 0; }
 	.assign-results {
 		display: flex; flex-direction: column; gap: 2px;
 		background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
@@ -472,7 +472,7 @@
 		padding: 10px 14px; margin-bottom: 10px;
 		background: var(--accent-light); border: 1px solid color-mix(in srgb, var(--accent) 25%, white); border-radius: var(--radius);
 	}
-	.batch-bar input { padding: 5px 10px; border: 1px solid color-mix(in srgb, var(--accent) 25%, white); border-radius: var(--radius); font-size: var(--fs-sm); width: 220px; }
+	.batch-bar input { width: 220px; }
 	.batch-results {
 		display: flex; flex-direction: column; gap: 2px;
 		background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
@@ -481,7 +481,6 @@
 	}
 	.create-form { display: flex; flex-direction: column; gap: 10px; margin: 12px 0; }
 	.create-form label { display: flex; flex-direction: column; gap: 3px; font-size: var(--fs-sm); font-weight: 500; }
-	.create-form input { padding: 6px 8px; border: 1px solid var(--border); border-radius: var(--radius); font-size: var(--fs-md); }
 	.reject-detail { font-weight: 600; margin: 8px 0; }
 	.reject-muted { color: var(--muted); font-size: var(--fs-sm); }
 	.reject-list { margin: 10px 0; padding-left: 18px; font-size: var(--fs-sm); }

@@ -103,17 +103,6 @@
 	}
 	input {
 		width: 100%;
-		padding: 8px 10px;
-		border: 1px solid var(--border);
-		border-radius: var(--radius);
-		font-size: var(--fs-base);
-		font-family: inherit;
-		background: var(--card);
-	}
-	input:focus {
-		outline: none;
-		border-color: var(--accent-mid);
-		box-shadow: var(--focus-ring);
 	}
 	button {
 		width: 100%;

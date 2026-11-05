@@ -74,7 +74,7 @@
   {#if header}{@render header()}{/if}
   {#if floating}
     <div class="picker-row">
-      <input type="search" {placeholder} bind:value={search} oninput={() => onsearch?.(search)} use:autofocus autocomplete="off" />
+      <input type="search" class="input-sm" {placeholder} bind:value={search} oninput={() => onsearch?.(search)} use:autofocus autocomplete="off" />
       <button class="btn btn-sm" onclick={onclose}>Annuler</button>
     </div>
     {#if showResults}
@@ -124,11 +124,6 @@
   }
   .picker-row input {
     width: 200px;
-    padding: 3px 6px;
-    font-size: var(--fs-sm);
-    border: 1px solid var(--accent);
-    border-radius: var(--radius);
-    font-family: inherit;
   }
   .picker-results {
     max-height: 200px;

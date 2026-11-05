@@ -78,7 +78,7 @@
 			{#if searchable}
 				<input
 					type="text"
-					class="facet-search"
+					class="facet-search input-sm"
 					placeholder="Filtrer"
 					bind:value={filterText}
 				/>

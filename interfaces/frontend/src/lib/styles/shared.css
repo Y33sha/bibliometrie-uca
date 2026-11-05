@@ -203,13 +203,34 @@
 	margin-bottom: 12px;
 }
 
-.toolbar input[type='text' i],
-.toolbar input[type='number'] {
+/* ── Champs de saisie ── */
+/* Socle des champs texte. `:where()` lui donne une spécificité nulle : toute règle de contexte l'emporte. L'apparence native des champs `type="search"` (forme arrondie, bouton d'effacement) est retirée. */
+:where(input:not([type]), input[type='text'], input[type='search'], input[type='number'], input[type='password'], textarea) {
+	appearance: none;
 	padding: 6px 10px;
 	border: 1px solid var(--border);
 	border-radius: var(--radius);
+	background: var(--card);
+	font: inherit;
 	font-size: var(--fs-md);
-	font-family: inherit;
+	color: inherit;
+}
+:where(input:not([type]), input[type='text'], input[type='search'], input[type='number'], input[type='password'], textarea):focus {
+	outline: none;
+	border-color: var(--accent-mid);
+	box-shadow: var(--focus-ring);
+}
+:where(input:not([type]), input[type='text'], input[type='search'], input[type='number'], input[type='password'], textarea):disabled {
+	background: var(--surface);
+	color: var(--muted);
+}
+input[type='search']::-webkit-search-cancel-button {
+	appearance: none;
+}
+/* Champ compact : filtre d'un panneau, saisie dans une ligne. */
+.input-sm {
+	padding: 5px 8px;
+	font-size: var(--fs-sm);
 }
 
 /* Champ de recherche d'une barre d'outils, loupe à gauche. */
@@ -346,10 +367,6 @@
 	display: block;
 	width: calc(100% - 12px);
 	margin: 2px 6px 6px;
-	padding: 5px 8px;
-	border: 1px solid var(--border);
-	border-radius: var(--radius);
-	font-size: var(--fs-sm);
 }
 /* Retire la sélection d'une facette, en tête du panneau. */
 .facet-clear {
@@ -556,10 +573,6 @@
 }
 .drawer-edit input {
 	width: 280px;
-	padding: 4px 6px;
-	border: 1px solid var(--border);
-	border-radius: var(--radius);
-	font-size: var(--fs-md);
 }
 /* Libellés et valeurs d'un volet, sur deux colonnes. */
 .drawer-fields {
@@ -700,11 +713,6 @@
 .modal-content select,
 .modal-content textarea {
 	width: 100%;
-	padding: 6px 8px;
-	border: 1px solid var(--border);
-	border-radius: var(--radius);
-	font-size: var(--fs-md);
-	font-family: inherit;
 }
 
 .modal-content textarea {

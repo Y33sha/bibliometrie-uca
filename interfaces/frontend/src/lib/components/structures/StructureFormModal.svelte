@@ -37,7 +37,7 @@
     <label>Code (unique) <input placeholder="ex: lpc, chu_clermont, site_cezeaux" bind:value={code} disabled={editMode} /></label>
     <label>Nom complet <input placeholder="ex: Laboratoire de Physique de Clermont" bind:value={name} /></label>
     <label>Acronyme <input placeholder="ex: LPC" bind:value={acronym} /></label>
-    <label>Type <select bind:value={type}>
+    <label>Type <select class="select" bind:value={type}>
       {#each STRUCTURE_TYPES as t (t.value)}
         <option value={t.value}>{t.label}</option>
       {/each}
