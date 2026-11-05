@@ -299,9 +299,9 @@
 
     <div class="toolbar-sep"></div>
 
-    <div class="tab-group">
-      <button class="tab-btn" class:active={currentTab === "fn"} onclick={() => switchTab("fn")}> Faux négatifs </button>
-      <button class="tab-btn" class:active={currentTab === "fp"} onclick={() => switchTab("fp")}> Faux positifs </button>
+    <div class="segmented" role="group" aria-label="Erreurs">
+      <button aria-pressed={currentTab === "fn"} onclick={() => switchTab("fn")}> Faux négatifs </button>
+      <button aria-pressed={currentTab === "fp"} onclick={() => switchTab("fp")}> Faux positifs </button>
     </div>
     <input type="search" placeholder="Rechercher dans les adresses" bind:value={search} onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
     <ResultCount {list} one="adresse" many="adresses" />
@@ -412,33 +412,8 @@
     margin: 0 4px;
   }
 
-  .tab-group {
-    display: flex;
-    gap: 0;
+  .segmented {
     margin-right: 4px;
-  }
-
-  .tab-btn {
-    padding: 6px 14px;
-    border: 1px solid var(--border);
-    background: var(--card);
-    font-size: var(--fs-md);
-    cursor: pointer;
-    font-family: inherit;
-  }
-  .tab-btn:first-child {
-    border-radius: var(--radius) 0 0 var(--radius);
-  }
-  .tab-btn:last-child {
-    border-radius: 0 var(--radius) var(--radius) 0;
-  }
-  .tab-btn:not(:first-child) {
-    border-left: none;
-  }
-  .tab-btn.active {
-    background: var(--accent);
-    color: var(--text-inverse);
-    border-color: var(--accent);
   }
 
   .toolbar input[type="search"] {

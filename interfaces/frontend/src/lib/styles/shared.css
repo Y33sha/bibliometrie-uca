@@ -1230,6 +1230,38 @@ a:hover > .logo-idref {
 	border-color: var(--warning);
 }
 
+/* Sélecteur segmenté : boutons accolés, le bouton enfoncé (`aria-pressed`) en fond plein. */
+.segmented {
+	display: inline-flex;
+}
+
+.segmented button {
+	padding: 6px 14px;
+	border: 1px solid var(--border);
+	background: var(--card);
+	font-size: var(--fs-md);
+	cursor: pointer;
+	font-family: inherit;
+}
+
+.segmented button:first-child {
+	border-radius: var(--radius) 0 0 var(--radius);
+}
+
+.segmented button:last-child {
+	border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+.segmented button:not(:first-child) {
+	border-left: none;
+}
+
+.segmented button[aria-pressed='true'] {
+	background: var(--accent);
+	color: var(--text-inverse);
+	border-color: var(--accent);
+}
+
 /* ── Publication title link ── */
 /* Lien vers la page d'une entité (titre, nom) : couleur d'accent, en semi-gras. */
 .publication-title,
