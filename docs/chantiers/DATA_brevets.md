@@ -100,7 +100,7 @@ Familles dont un établissement du périmètre est déposant : UCA, Université 
 
 - [ ] Source `scanr_patents` : valeur de `source_type`, profil, adaptateur
 - [ ] Identifiants Paysage des déposants dans `structures.api_ids['scanr_patents']`, sur l'UCA et sur Clermont Auvergne INP
-- [ ] Client ScanR paramétré par l'index, partagé par `scanr` et `scanr_patents`
+- [x] Client ScanR paramétré par l'index, partagé par `scanr` et `scanr_patents`
 - [ ] Moissonnage des familles par déposant
 - [ ] Normalisation : enregistrement source de type `patent`, numéros en `patent_number`, inventeurs en contributions sources de rôle `inventor`
 - [ ] Demandes, déposants et classification CPC dans `source_extras`
