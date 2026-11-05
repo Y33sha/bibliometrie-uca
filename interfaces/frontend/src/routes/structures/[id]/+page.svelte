@@ -1,6 +1,7 @@
 <script lang="ts">
 	import EntityMetaItem from '#lib/components/EntityMetaItem.svelte';
 	import Breadcrumb from '#lib/components/Breadcrumb.svelte';
+	import EntityStatus from '#lib/components/EntityStatus.svelte';
 	import { pageTitle } from '#lib/institution.svelte.js';
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
@@ -146,10 +147,8 @@
 
 <Breadcrumb trail={[{ label: 'Labos', path: 'structures' }]} current={lab?.acronym || lab?.name} />
 
-{#if error}
-	<div class="no-results">Structure introuvable</div>
-{:else if !lab}
-	<div class="loading">Chargement…</div>
+{#if error || !lab}
+	<EntityStatus {error} notFound="Structure introuvable" />
 {:else}
 	<!-- Header -->
 	<div class="entity-header">

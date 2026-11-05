@@ -1,6 +1,7 @@
 <script lang="ts">
 	import EntityMetaItem from '#lib/components/EntityMetaItem.svelte';
 	import Breadcrumb from '#lib/components/Breadcrumb.svelte';
+	import EntityStatus from '#lib/components/EntityStatus.svelte';
 	import { pageTitle } from '#lib/institution.svelte.js';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
@@ -32,10 +33,8 @@
 
 	<Breadcrumb trail={[{ label: 'Monographies', path: 'monographs' }]} current={titleText(monograph?.title)} />
 
-{#if error}
-	<div class="no-results">Monographie introuvable</div>
-{:else if !monograph}
-	<div class="loading">Chargement…</div>
+{#if error || !monograph}
+	<EntityStatus {error} notFound="Monographie introuvable" />
 {:else}
 	<div class="entity-header">
 		<h1 class="entity-title"><PublicationTitle titre={monograph.title} /></h1>
@@ -77,5 +76,4 @@
 
 <style>
 	.m-publications { margin-top: 28px; }
-	.loading, .no-results { padding: 20px; color: var(--muted); }
 </style>

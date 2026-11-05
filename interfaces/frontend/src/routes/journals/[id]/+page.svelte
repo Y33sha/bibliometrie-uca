@@ -1,6 +1,7 @@
 <script lang="ts">
 	import EntityMetaItem from '#lib/components/EntityMetaItem.svelte';
 	import Breadcrumb from '#lib/components/Breadcrumb.svelte';
+	import EntityStatus from '#lib/components/EntityStatus.svelte';
 	import { pageTitle } from '#lib/institution.svelte.js';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
@@ -97,10 +98,8 @@
 
 	<Breadcrumb trail={[{ label: 'Publications en série', path: 'journals' }]} current={journal?.title} />
 
-{#if error}
-	<div class="no-results">Publication en série introuvable</div>
-{:else if !journal}
-	<div class="loading">Chargement…</div>
+{#if error || !journal}
+	<EntityStatus {error} notFound="Publication en série introuvable" />
 {:else}
 	<!-- Header -->
 	<div class="entity-header">
@@ -237,7 +236,6 @@
 
 <style>
 
-	.loading, .no-results { padding: 20px; color: var(--muted); }
 	.doaj-grid { margin-top: 24px; }
 	.small { font-size: var(--fs-sm); font-weight: 400; }
 

@@ -1,6 +1,7 @@
 <script lang="ts">
   import TableScroll from '#lib/components/TableScroll.svelte';
   import Breadcrumb from "#lib/components/Breadcrumb.svelte";
+  import EntityStatus from "#lib/components/EntityStatus.svelte";
   import { pageTitle } from "#lib/institution.svelte.js";
   import { page } from "$app/state";
   import { resolve } from "$app/paths";
@@ -78,10 +79,8 @@
 
 <Breadcrumb trail={[{ label: "Sujets", path: "subjects" }]} current={data?.subject.label} />
 
-  {#if error}
-    <div class="error">Sujet introuvable.</div>
-  {:else if !data}
-    <p class="loading">Chargement…</p>
+  {#if error || !data}
+    <EntityStatus {error} notFound="Sujet introuvable" />
   {:else}
     <div class="entity-header">
       <h1 class="entity-title">{data.subject.label}</h1>
@@ -251,9 +250,5 @@
   }
   .muted-num {
     color: var(--text-secondary);
-  }
-  .error {
-    color: var(--danger);
-    font-style: italic;
   }
 </style>
