@@ -3,8 +3,7 @@
 	import { onMount } from 'svelte';
 	import PageHeader from '#lib/components/PageHeader.svelte';
 	import ResultCount from '#lib/components/ResultCount.svelte';
-	import { resolve } from '$app/paths';
-	import { replaceQuery } from '#lib/url.js';
+	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
 	import { stickyHeight } from '#lib/actions/stickyHeight.js';
 	import { addresses as addressesApi, api, errorMessage } from '#lib/api/index.js';
 	import Pagination from '#lib/components/Pagination.svelte';
@@ -57,7 +56,6 @@
 	// Option « Aucun » de la facette Pays : adresses sans pays retenu.
 	const NONE = 'none';
 	const withoutCountry = $derived(selectedCountry.length === 1 && selectedCountry[0] === NONE);
-	let debounceTimer: ReturnType<typeof setTimeout>;
 
 	// Batch
 	let selectedIds: Set<number> = $state(new Set());
@@ -93,12 +91,21 @@
 		if (data?.without_country != null) withoutCountryCount = data.without_country;
 	});
 
+	const url = useUrlFilters({
+		basePath: '/admin/countries',
+		filters: {
+			page: { type: 'page', urlKey: 'page' },
+			search: { type: 'single', urlKey: 'search' },
+			country: { type: 'single', urlKey: 'country' },
+		},
+	});
+
 	function syncUrl() {
-		const p = new URLSearchParams();
-		if (list.page > 1) p.set('page', String(list.page));
-		if (search.trim()) p.set('search', search.trim());
-		if (selectedCountry.length === 1) p.set('country', selectedCountry[0]);
-		void replaceQuery(resolve('admin/countries'), p);
+		url.syncUrl(() => ({
+			page: list.page,
+			search: search.trim(),
+			country: selectedCountry.length === 1 ? selectedCountry[0] : null,
+		}));
 	}
 
 	function onFilterChange() {
@@ -108,10 +115,7 @@
 		list.load();
 	}
 
-	function onSearchInput() {
-		clearTimeout(debounceTimer);
-		debounceTimer = setTimeout(onFilterChange, 400);
-	}
+	const onSearchInput = url.debouncedSearch(onFilterChange);
 
 	function countryLabel(code: string): string {
 		return `${countryMap[code] || code} (${code.toUpperCase()})`;
@@ -184,10 +188,10 @@
 	}
 
 	onMount(() => {
-		const params = new URLSearchParams(window.location.search);
-		if (params.get('page')) list.page = parseInt(params.get('page')!) || 1;
-		if (params.get('search')) search = params.get('search')!;
-		if (params.get('country')) selectedCountry = [params.get('country')!];
+		const restored = url.restoreFromUrl(new URLSearchParams(window.location.search));
+		if (restored.page) list.page = restored.page as number;
+		if (restored.search) search = restored.search as string;
+		if (restored.country) selectedCountry = [restored.country as string];
 		loadCountries();
 		list.load();
 	});

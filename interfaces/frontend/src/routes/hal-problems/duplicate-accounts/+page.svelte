@@ -4,7 +4,7 @@
   import { withBase } from "#lib/paths.js";
   import PageHeader from "#lib/components/PageHeader.svelte";
   import { resolve } from "$app/paths";
-  import { replaceQuery } from "#lib/url.js";
+  import { useUrlFilters } from "#lib/composables/useUrlFilters.svelte.js";
   import { page } from "$app/state";
   import { onMount } from "svelte";
   import { usePaginatedFetch } from "#lib/composables/usePaginatedFetch.svelte.js";
@@ -23,15 +23,18 @@
     buildParams: () => new URLSearchParams(),
   });
 
+  const url = useUrlFilters({
+    basePath: "/hal-problems/duplicate-accounts",
+    filters: { page: { type: "page", urlKey: "page" } },
+  });
+
   function syncUrl() {
-    const p = new URLSearchParams();
-    if (list.page > 1) p.set("page", String(list.page));
-    void replaceQuery(resolve('hal-problems/duplicate-accounts'), p);
+    url.syncUrl(() => ({ page: list.page }));
   }
 
   onMount(() => {
-    const urlParams = new URLSearchParams(page.url.search);
-    if (urlParams.get("page")) list.page = parseInt(urlParams.get("page")!) || 1;
+    const restored = url.restoreFromUrl(page.url.searchParams);
+    if (restored.page) list.page = restored.page as number;
     list.load();
   });
 </script>

@@ -7,7 +7,7 @@
 	import ListToolbar from '#lib/components/ListToolbar.svelte';
 	import { withBase } from '#lib/paths.js';
 	import { resolve } from '$app/paths';
-	import { replaceQuery } from '#lib/url.js';
+	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
@@ -31,16 +31,19 @@
 
 	const drawer = useDrawerParam('publication');
 
+	const url = useUrlFilters({
+		basePath: '/hal-problems/affiliation-conflicts',
+		filters: { page: { type: 'page', urlKey: 'page' } },
+	});
+
 	function syncUrl() {
-		const p = new URLSearchParams();
-		if (list.page > 1) p.set('page', String(list.page));
-		void replaceQuery(resolve('hal-problems/affiliation-conflicts'), p);
+		url.syncUrl(() => ({ page: list.page }));
 	}
 
 
 	onMount(() => {
-		const urlParams = new URLSearchParams(page.url.search);
-		if (urlParams.get('page')) list.page = parseInt(urlParams.get('page')!) || 1;
+		const restored = url.restoreFromUrl(page.url.searchParams);
+		if (restored.page) list.page = restored.page as number;
 		list.load();
 	});
 </script>

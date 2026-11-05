@@ -8,7 +8,7 @@
 	import ListToolbar from '#lib/components/ListToolbar.svelte';
 	import { withBase } from '#lib/paths.js';
 	import { resolve } from '$app/paths';
-	import { replaceQuery } from '#lib/url.js';
+	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 	import { api } from '#lib/api/index.js';
@@ -42,11 +42,16 @@
 
 	const drawer = useDrawerParam('publication');
 
+	const url = useUrlFilters({
+		basePath: '/hal-problems/missing-collections',
+		filters: {
+			labId: { type: 'single', urlKey: 'lab_id' },
+			page: { type: 'page', urlKey: 'page' },
+		},
+	});
+
 	function syncUrl() {
-		const p = new URLSearchParams();
-		if (selectedLabId) p.set('lab_id', String(selectedLabId));
-		if (list.page > 1) p.set('page', String(list.page));
-		void replaceQuery(resolve('hal-problems/missing-collections'), p);
+		url.syncUrl(() => ({ labId: selectedLabId, page: list.page }));
 	}
 
 	async function loadLabs() {
@@ -68,9 +73,9 @@
 
 
 	onMount(() => {
-		const urlParams = new URLSearchParams(page.url.search);
-		if (urlParams.get('lab_id')) selectedLabId = parseInt(urlParams.get('lab_id')!);
-		if (urlParams.get('page')) list.page = parseInt(urlParams.get('page')!) || 1;
+		const restored = url.restoreFromUrl(page.url.searchParams);
+		if (restored.labId) selectedLabId = parseInt(restored.labId as string);
+		if (restored.page) list.page = restored.page as number;
 		loadLabs();
 	});
 </script>

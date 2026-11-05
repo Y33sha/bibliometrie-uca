@@ -6,7 +6,7 @@
 	import { onMount, tick } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import { replaceQuery } from '#lib/url.js';
+	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
 	import { addresses as addressesApi, api, errorMessage, structures as structuresApi } from '#lib/api/index.js';
 	import AddressPublications from '#lib/components/AddressPublications.svelte';
 	import PublicationCountButton from '#lib/components/PublicationCountButton.svelte';
@@ -65,42 +65,42 @@
 		return { operator, structureIds: ids };
 	}
 
-	function readUrlParams(): {
-		detected: string;
-		validation: string;
-		textPredicates: TextPredicate[];
-		structurePredicates: StructurePredicate[];
-		p: number;
-		structureId: number | null;
-	} {
-		const sp = page.url.searchParams;
-		return {
-			detected: sp.get('detected') || 'yes',
-			validation: sp.get('validation') || 'pending',
-			textPredicates: sp.getAll('text').map(parseTextParam).filter((p): p is TextPredicate => p !== null),
-			structurePredicates: sp
-				.getAll('struct')
-				.map(parseStructParam)
-				.filter((p): p is StructurePredicate => p !== null),
-			p: parseInt(sp.get('page') || '1') || 1,
-			structureId: sp.has('structure_id') ? parseInt(sp.get('structure_id')!) || null : null,
-		};
+	const url = useUrlFilters({
+		basePath: '/admin/addresses',
+		filters: {
+			structureId: { type: 'single', urlKey: 'structure_id' },
+			detected: { type: 'single', urlKey: 'detected', defaultValue: 'yes' },
+			validation: { type: 'single', urlKey: 'validation', defaultValue: 'pending' },
+			text: { type: 'repeated', urlKey: 'text' },
+			struct: { type: 'repeated', urlKey: 'struct' },
+			page: { type: 'page', urlKey: 'page' },
+		},
+	});
+
+	function textParams(): string[] {
+		return textPredicates.filter((t) => t.term).map((t) => `${t.mode}:${t.term}`);
+	}
+
+	function structParams(): string[] {
+		return structurePredicates
+			.filter((s) => s.structureIds.length)
+			.map((s) => `${s.operator}:${s.structureIds.join(',')}`);
 	}
 
 	function serializePredicateParams(sp: URLSearchParams): void {
-		for (const t of textPredicates) if (t.term) sp.append('text', `${t.mode}:${t.term}`);
-		for (const s of structurePredicates)
-			if (s.structureIds.length) sp.append('struct', `${s.operator}:${s.structureIds.join(',')}`);
+		for (const v of textParams()) sp.append('text', v);
+		for (const v of structParams()) sp.append('struct', v);
 	}
 
 	function syncUrl(): void {
-		const sp = new URLSearchParams();
-		if (currentStructureId) sp.set('structure_id', String(currentStructureId));
-		if (currentDetected !== 'yes') sp.set('detected', currentDetected);
-		if (currentValidation !== 'pending') sp.set('validation', currentValidation);
-		serializePredicateParams(sp);
-		if (list.page > 1) sp.set('page', String(list.page));
-		void replaceQuery(window.location.pathname, sp);
+		url.syncUrl(() => ({
+			structureId: currentStructureId,
+			detected: currentDetected,
+			validation: currentValidation,
+			text: textParams(),
+			struct: structParams(),
+			page: list.page,
+		}));
 	}
 
 	// ---- Reactive state ----
@@ -141,7 +141,6 @@
 	let publications = $state<Publication[]>([]);
 	let pubsLoading = $state(false);
 
-	let searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
 	const selectedCount = $derived(selectedIds.size);
 
@@ -309,10 +308,11 @@
 		if (textPredicates[i].term) reload();
 	}
 
+	const debouncedReload = url.debouncedSearch(reload);
+
 	function onTextTermInput(i: number, value: string): void {
 		textPredicates = textPredicates.map((t, j) => (j === i ? { ...t, term: value } : t));
-		if (searchTimeout) clearTimeout(searchTimeout);
-		searchTimeout = setTimeout(reload, 400);
+		debouncedReload();
 	}
 
 	function setStructureOperator(i: number, operator: string): void {
@@ -382,12 +382,17 @@
 	// ---- Init ----
 
 	onMount(() => {
-		const url = readUrlParams();
-		currentDetected = url.detected;
-		currentValidation = url.validation;
-		textPredicates = url.textPredicates.length ? url.textPredicates : [newTextPredicate()];
-		structurePredicates = url.structurePredicates;
-		list.page = url.p;
+		const restored = url.restoreFromUrl(page.url.searchParams);
+		currentDetected = (restored.detected as string | undefined) || 'yes';
+		currentValidation = (restored.validation as string | undefined) || 'pending';
+		const restoredText = ((restored.text as string[] | undefined) ?? [])
+			.map(parseTextParam)
+			.filter((p): p is TextPredicate => p !== null);
+		textPredicates = restoredText.length ? restoredText : [newTextPredicate()];
+		structurePredicates = ((restored.struct as string[] | undefined) ?? [])
+			.map(parseStructParam)
+			.filter((p): p is StructurePredicate => p !== null);
+		list.page = (restored.page as number | undefined) ?? 1;
 
 		Promise.all([loadStructures(), loadInstitution()]).then(() => {
 			resolveScopeStructure();

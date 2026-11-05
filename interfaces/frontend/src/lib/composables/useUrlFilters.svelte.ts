@@ -30,12 +30,23 @@ interface SourceStatesFilter {
 	urlKey: string;
 }
 
+/** Une valeur par occurrence du paramètre (`?text=a&text=b`). */
+interface RepeatedFilter {
+	type: 'repeated';
+	urlKey: string;
+}
+
 interface PageFilter {
 	type: 'page';
 	urlKey: string;
 }
 
-export type FilterDef = StringArrayFilter | SingleValueFilter | SourceStatesFilter | PageFilter;
+export type FilterDef =
+	| StringArrayFilter
+	| SingleValueFilter
+	| SourceStatesFilter
+	| RepeatedFilter
+	| PageFilter;
 
 interface UrlFiltersConfig {
 	/** Chemin de la page propriétaire. Accepte un getter `() => ...` quand il dérive d'un prop/route réactif (ex. `/persons/${personId}`) : il est alors relu à chaque `syncUrl` au lieu d'être capturé au montage. */
@@ -90,6 +101,9 @@ export function useUrlFilters(config: UrlFiltersConfig) {
 					}
 					break;
 				}
+				case 'repeated':
+					if (Array.isArray(val)) for (const v of val) p.append(def.urlKey, String(v));
+					break;
 				case 'page':
 					if (typeof val === 'number' && val > 1) p.set(def.urlKey, String(val));
 					break;
@@ -99,10 +113,15 @@ export function useUrlFilters(config: UrlFiltersConfig) {
 		void replaceQuery(withBase(typeof config.basePath === 'function' ? config.basePath() : config.basePath), p);
 	}
 
-	function restoreFromUrl(urlParams: Pick<URLSearchParams, 'get'>): Record<string, unknown> {
+	function restoreFromUrl(urlParams: Pick<URLSearchParams, 'get' | 'getAll'>): Record<string, unknown> {
 		const result: Record<string, unknown> = {};
 
 		for (const [key, def] of Object.entries(config.filters)) {
+			if (def.type === 'repeated') {
+				const values = urlParams.getAll(def.urlKey);
+				if (values.length) result[key] = values;
+				continue;
+			}
 			const raw = urlParams.get(def.urlKey);
 			if (raw == null) continue;
 

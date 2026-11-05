@@ -4,7 +4,7 @@
   import PageHeader from '#lib/components/PageHeader.svelte';
   import KeyFigures from '#lib/components/KeyFigures.svelte';
   import { onMount } from "svelte";
-  import { replaceQuery } from "#lib/url.js";
+  import { useUrlFilters } from "#lib/composables/useUrlFilters.svelte.js";
   import { api, nameForms, structures as structuresApi, errorMessage } from "#lib/api/index.js";
   import { deriveStructDetectionStatus } from "#lib/utils.js";
   import { structureLabel } from "#lib/structureLabels.js";
@@ -35,25 +35,18 @@
 
   // ---------- URL params helpers ----------
 
-  function readUrlParams(): { tab: Tab; search: string; p: number; structureId: number | null } {
-    const sp = new URLSearchParams(window.location.search);
-    const tab = sp.get("tab") === "fp" ? "fp" : "fn";
-    return {
-      tab,
-      search: sp.get("search") || "",
-      p: parseInt(sp.get("page") || "1") || 1,
-      structureId: sp.has("structure_id") ? parseInt(sp.get("structure_id")!) || null : null,
-    };
-  }
+  const url = useUrlFilters({
+    basePath: "/admin/feedback",
+    filters: {
+      structureId: { type: "single", urlKey: "structure_id" },
+      tab: { type: "single", urlKey: "tab", defaultValue: "fn" },
+      search: { type: "single", urlKey: "search" },
+      page: { type: "page", urlKey: "page" },
+    },
+  });
 
   function syncUrl(): void {
-    const sp = new URLSearchParams();
-    if (drawer.id !== null) sp.set(DRAWER_PARAM, String(drawer.id));
-    if (currentStructureId) sp.set("structure_id", String(currentStructureId));
-    if (currentTab !== "fn") sp.set("tab", currentTab);
-    if (search) sp.set("search", search);
-    if (list.page > 1) sp.set("page", String(list.page));
-    void replaceQuery(window.location.pathname, sp);
+    url.syncUrl(() => ({ structureId: currentStructureId, tab: currentTab, search, page: list.page }));
   }
 
   // ---------- State ----------
@@ -70,7 +63,6 @@
   let stats: FeedbackStats | null = $state(null);
   let currentTab: Tab = $state("fn");
   let search = $state("");
-  let searchTimeout: ReturnType<typeof setTimeout> | null = $state(null);
   const list = usePaginatedFetch<FeedbackAddress>({
     endpoint: () =>
       currentTab === "fn" ? "/api/feedback/false-negatives" : "/api/feedback/false-positives",
@@ -133,13 +125,10 @@
     loadTable();
   }
 
-  function onSearchInput() {
-    if (searchTimeout) clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(() => {
-      list.page = 1;
-      loadTable();
-    }, 400);
-  }
+  const onSearchInput = url.debouncedSearch(() => {
+    list.page = 1;
+    loadTable();
+  });
 
   function onPageChange(p: number) {
     list.goToPage(p);
@@ -236,14 +225,15 @@
   // ---------- Init ----------
 
   onMount(async () => {
-    const url = readUrlParams();
-    currentTab = url.tab;
-    search = url.search;
-    list.page = url.p;
+    const restored = url.restoreFromUrl(new URLSearchParams(window.location.search));
+    currentTab = restored.tab === "fp" ? "fp" : "fn";
+    search = (restored.search as string | undefined) ?? "";
+    list.page = (restored.page as number | undefined) ?? 1;
+    const urlStructureId = parseInt(restored.structureId as string) || null;
 
     await loadStructures();
-    if (url.structureId) {
-      currentStructureId = url.structureId;
+    if (urlStructureId) {
+      currentStructureId = urlStructureId;
     } else {
       const saved = localStorage.getItem('admin_structure_id');
       if (saved) currentStructureId = parseInt(saved);

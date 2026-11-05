@@ -8,7 +8,7 @@
 	import { institution } from '#lib/institution.svelte.js';
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
-	import { replaceQuery } from '#lib/url.js';
+	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
 	import { api, ApiError, errorMessage, orphanContributions } from '#lib/api/index.js';
 	import { toast } from '#lib/dialogs.svelte.js';
 	import { useDebouncedSearch } from '#lib/composables/useDebouncedSearch.svelte.js';
@@ -239,26 +239,26 @@
 		});
 	}
 
+	const url = useUrlFilters({
+		basePath: '/admin/orphan-contributions',
+		filters: {
+			page: { type: 'page', urlKey: 'page' },
+			search: { type: 'single', urlKey: 'search' },
+			labs: { type: 'string_array', urlKey: 'lab' },
+		},
+	});
+
 	function syncUrl() {
-		const p = new URLSearchParams();
-		if (list.page > 1) p.set('page', String(list.page));
-		if (search.trim()) p.set('search', search.trim());
-		if (selectedLabs.length) p.set('lab', selectedLabs.join(','));
-		if (drawer.id !== null) p.set('publication', String(drawer.id));
-		void replaceQuery(resolve('admin/orphan-contributions'), p);
+		url.syncUrl(() => ({ page: list.page, search: search.trim(), labs: selectedLabs }));
 	}
 
-	let debounceTimer: ReturnType<typeof setTimeout>;
-	function onSearchInput() {
-		clearTimeout(debounceTimer);
-		debounceTimer = setTimeout(() => { list.page = 1; syncUrl(); list.load(); loadFacets(); }, 400);
-	}
+	const onSearchInput = url.debouncedSearch(() => { list.page = 1; syncUrl(); list.load(); loadFacets(); });
 
 	onMount(() => {
-		const params = new URLSearchParams(window.location.search);
-		if (params.get('page')) list.page = parseInt(params.get('page')!) || 1;
-		if (params.get('search')) search = params.get('search')!;
-		if (params.get('lab')) selectedLabs = params.get('lab')!.split(',');
+		const restored = url.restoreFromUrl(new URLSearchParams(window.location.search));
+		if (restored.page) list.page = restored.page as number;
+		if (restored.search) search = restored.search as string;
+		if (restored.labs) selectedLabs = restored.labs as string[];
 		list.load();
 		loadFacets();
 	});
