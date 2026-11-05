@@ -17,7 +17,7 @@ Consultée par DOI pour le statut open access des publications. Les DOI DataCite
 **v2** (`https://api.unpaywall.org/v2/{doi}`) — interrogation unitaire par DOI.
 
 - Adresse électronique de contact dans le paramètre `email` (`POLITE_POOL_EMAIL`).
-- Limites Unpaywall : 100 000 requêtes/jour, ~10 req/s recommandé. Le pipeline s'en tient à 8 req/s (`MAX_PER_SECOND`, `pipeline/ingestion/api_params.py`) et à 5 requêtes simultanées (`MAX_CONCURRENT`).
+- Limites Unpaywall : 100 000 requêtes/jour, aucun seuil par seconde publié. Le pipeline s'en tient à 20 req/s (`MAX_PER_SECOND`, `pipeline/ingestion/api_params.py`) et à 5 requêtes simultanées (`MAX_CONCURRENT`).
 
 ### Données récupérées
 

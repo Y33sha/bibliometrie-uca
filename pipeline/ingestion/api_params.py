@@ -69,7 +69,7 @@ MAX_CONCURRENT: dict[str, int] = {
     "doi_org": 3,
     # Aucune limite documentée.
     "sudoc": 4,
-    # Débit recommandé : 10 req/s.
+    # Aucune limite documentée.
     "unpaywall": 5,
 }
 """Requêtes simultanées consenties à chaque accès, sous son plafond."""
@@ -91,8 +91,8 @@ MAX_PER_SECOND: dict[str, float] = {
     "datacite": 3,
     # Aucun seuil publié.
     "sudoc": 5,
-    # Débit recommandé : 10 req/s.
-    "unpaywall": 8,
+    # Seuil publié : 100 000 requêtes par jour, aucun seuil par seconde.
+    "unpaywall": 20,
 }
 """Débit consenti à chaque accès, en requêtes par seconde, toutes requêtes confondues. Un accès absent de la table est sans plafond."""
 
