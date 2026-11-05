@@ -14,6 +14,7 @@ from dataclasses import dataclass
 
 import httpx2
 
+from domain.countries import normalize_country_code
 from domain.errors import ValidationError
 from domain.structures.identifiers import RorId
 from domain.structures.ror import RorOrganization, RorStatus, RorType
@@ -140,10 +141,12 @@ def read_ror_dump(archive_path: str) -> Iterator[RorOrganization]:
 def parse_ror_row(row: Mapping[str, str]) -> RorOrganization:
     """Lit l'organisation d'une ligne du CSV du dump (schéma v2)."""
     relations = _parse_relationships(row["relationships"])
+    raw_country = row["locations.geonames_details.country_code"].split(";")[0]
     return RorOrganization(
         ror_id=RorId(row["id"]),
         name=row["names.types.ror_display"].strip(),
-        country_code=row["locations.geonames_details.country_code"].split(";")[0].strip().lower(),
+        # Un code illisible passe tel quel : `RorOrganization` le refuse en le citant.
+        country_code=normalize_country_code(raw_country) or raw_country.strip(),
         types=frozenset(RorType(t.strip()) for t in row["types"].split(";") if t.strip()),
         status=RorStatus(row["status"]),
         parent_ids=relations.get("parent", frozenset()),

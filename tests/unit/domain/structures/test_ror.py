@@ -22,8 +22,8 @@ def _org(ror_id, *, parents=(), children=(), country="fr"):
 
 
 class TestRorOrganization:
-    @pytest.mark.parametrize("country", ["FR", "fra", ""])
-    def test_refuse_un_code_pays_hors_iso_minuscules(self, country):
+    @pytest.mark.parametrize("country", ["FR", "fra", "", "gp"])
+    def test_refuse_un_code_pays_non_normalise(self, country):
         with pytest.raises(ValidationError, match="Code pays"):
             _org(UNIV, country=country)
 
