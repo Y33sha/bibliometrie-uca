@@ -97,8 +97,8 @@ Une étiquette (tag, badge, pastille, chip) est un court texte sur fond clair, a
 
 ### Phase 3 — Étiquettes
 
-- [x] Classe d'étiquette à variantes de teinte, de taille et de forme ; couleurs des étiquettes en variables
-- [ ] Étiquettes partagées et locales sur cette classe
+- [x] Classe d'étiquette à variantes de teinte, de taille et de forme ; couleurs des étiquettes en variables (97b683111)
+- [x] Étiquettes partagées et locales sur cette classe
 - [ ] Icône ronde unique pour les identifiants et les sources
 
 ### Phase 4 — Boutons et contrôles

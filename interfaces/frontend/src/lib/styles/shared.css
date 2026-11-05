@@ -884,7 +884,8 @@
 	text-decoration: none;
 }
 a.tag:hover,
-button.tag:hover {
+button.tag:hover,
+button.tag[aria-expanded='true'] {
 	background: oklch(from var(--tag-color, var(--muted)) 0.91 calc(c * 0.4) h);
 }
 button.tag {
@@ -910,6 +911,27 @@ button.tag {
 }
 .tag-danger {
 	--tag-color: var(--danger);
+}
+.tag-warning {
+	--tag-color: var(--warning);
+}
+.tag-attention {
+	--tag-color: var(--attention);
+}
+/* Fond plein, texte blanc. */
+.tag-filled {
+	background: oklch(from var(--tag-color, var(--muted)) min(l, 0.45) c h);
+	color: var(--text-inverse);
+}
+/* Valeur rejetée. */
+.tag-struck {
+	text-decoration: line-through;
+}
+/* Étiquette suivie d'un bouton de retrait. */
+.tag-removable {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
 }
 
 /* Plusieurs étiquettes dans une cellule ou une ligne. */

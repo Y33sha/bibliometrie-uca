@@ -372,10 +372,10 @@
 					</td>{/if}
 					{#if col('license')}<td class="license-cell">{#if p.license}<LicenseBadge license={p.license} />{/if}</td>{/if}
 					{#if col('citation_top')}<td>
-						{#if p.citation_top}<span class="citation-top citation-{p.citation_top}">{citationTopLabels[p.citation_top]}</span>{/if}
+						{#if p.citation_top}<span class="tag tag-accent" class:tag-filled={p.citation_top === 'top_1_percent'}>{citationTopLabels[p.citation_top]}</span>{/if}
 					</td>{/if}
 					{#if isLab && col('hal_status')}
-						<td>{#if p.hal_status}<span class="hal-badge hal-{p.hal_status}">{halStatusLabel(p.hal_status)}</span>{/if}</td>
+						<td>{#if p.hal_status}<span class="tag hal-{p.hal_status}">{halStatusLabel(p.hal_status)}</span>{/if}</td>
 					{/if}
 					{#if col('sources')}<td class="links-cell">
 						<SourceLinks ids={[['hal', p.hal_id], ['openalex', p.openalex_id], ['scanr', p.scanr_id], ['wos', p.wos_id]]} urls={p.record_urls} />
@@ -411,34 +411,12 @@
 	.access-cell { white-space: nowrap; }
 
 	/* Statut HAL (lab) */
-	.hal-badge {
-		display: inline-block;
-		padding: 2px 7px;
-		border-radius: var(--radius);
-		font-size: var(--fs-sm);
-		font-weight: 500;
-		white-space: nowrap;
-	}
-	.hal-ok              { background: var(--success-light); color: var(--success); }
-	.hal-notice          { background: var(--warning-light); color: var(--warning-text); }
-	.hal-hors_collection { background: var(--attention-light); color: var(--attention); }
-	.hal-hors_hal        { background: var(--danger-light); color: var(--danger); }
-
-	/* Seuil de citation */
-	.citation-top {
-		display: inline-block;
-		padding: 2px 7px;
-		border-radius: var(--radius);
-		font-size: var(--fs-sm);
-		font-weight: 500;
-		white-space: nowrap;
-	}
-	.citation-top_1_percent  { background: var(--accent); color: var(--accent-light); }
-	.citation-top_10_percent { background: var(--accent-light); color: var(--accent); }
+	.hal-ok              { --tag-color: var(--success); }
+	.hal-notice          { --tag-color: var(--warning); }
+	.hal-hors_collection { --tag-color: var(--attention); }
+	.hal-hors_hal        { --tag-color: var(--danger); }
 
 	/* Auteur correspondant (person) */
 	.corr-cell { text-align: center; }
 	.corr-cell :global(.corresponding-mark) { margin-left: 0; }
-
-	/* Bouton exclure (admin, person) */
 </style>

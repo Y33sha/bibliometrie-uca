@@ -182,9 +182,9 @@
 				</td>
 				{#if col('status')}<td class="col-status">
 					{#if t.doc_type === 'thesis'}
-						<span class="status-badge soutenue">Soutenue</span>
+						<span class="tag tag-success">Soutenue</span>
 					{:else if t.doc_type === 'ongoing_thesis'}
-						<span class="status-badge en-cours">En cours</span>
+						<span class="tag tag-attention">En cours</span>
 					{/if}
 				</td>{/if}
 				{#if col('labs')}
@@ -250,18 +250,5 @@
 	.col-access {
 		width: 120px;
 		white-space: nowrap;
-	}
-	.status-badge {
-		font-size: var(--fs-sm);
-		padding: 2px 6px;
-		border-radius: var(--radius);
-	}
-	.status-badge.soutenue {
-		background: var(--success-light);
-		color: var(--success);
-	}
-	.status-badge.en-cours {
-		background: var(--attention-light);
-		color: var(--attention);
 	}
 </style>

@@ -128,12 +128,12 @@ export const subjectVocabularyLabels: Record<SubjectVocabulary, string> = {
 	theses_discipline: 'Disciplines de thèse'
 };
 
-/** Classes CSS associées aux statuts de détection d'une structure dans le tableau de bord feedback. Le statut est dérivé de `is_confirmed` + `is_detected` via `deriveStructDetectionStatus`. */
+/** Classes CSS des statuts de détection d'une structure, dérivés de `is_confirmed` et `is_detected` par `deriveStructDetectionStatus`. */
 export const structDetectionClasses: Record<string, string> = {
-	confirmed: 'struct-tag struct-confirmed',
-	rejected: 'struct-tag struct-rejected',
-	detected: 'struct-tag struct-detected',
-	manual: 'struct-tag struct-manual'
+	confirmed: 'tag tag-pill tag-success',
+	rejected: 'tag tag-pill tag-struck',
+	detected: 'tag tag-pill tag-warning',
+	manual: 'tag tag-pill tag-accent struct-manual'
 };
 
 /** Libellés courts des statuts de détection d'une structure (tooltip des badges feedback). */

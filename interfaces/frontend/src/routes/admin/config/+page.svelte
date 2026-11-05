@@ -551,7 +551,7 @@
     <label for="perim-struct-search">Structures racines</label>
     <div class="perimeter-rules" style="margin: 4px 0 8px;">
       {#each perimModal.structures as struct (struct.id)}
-        <span class="tag tag-pill removable">
+        <span class="tag tag-pill tag-removable">
           {structureLabel(struct)}
           <button class="remove" onclick={() => perimRemoveStruct(struct.id)}>x</button>
         </span>
@@ -696,11 +696,6 @@
     flex-wrap: wrap;
     gap: 4px;
     margin: 6px 0;
-  }
-  .removable {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
   }
 
   .remove {

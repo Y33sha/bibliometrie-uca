@@ -50,7 +50,7 @@
       <span class="none-text">{emptyText}</span>
     {:else}
       {#each related as r (r.tutelle_id)}
-        <span class="tag tag-pill tag-accent relation-tag">
+        <span class="tag tag-pill tag-accent tag-removable relation-tag">
           <button class="tag-name" onclick={() => onselect(r.id)}>{structureLabel(r)}</button>
           <button
             class="remove"
@@ -101,9 +101,6 @@
     gap: 8px;
   }
   .relation-tag {
-    display: inline-flex;
-    align-items: center;
-    gap: 2px;
     padding: 2px 3px 2px 10px;
   }
   .relation-tag .tag-name {
