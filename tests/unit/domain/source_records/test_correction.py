@@ -402,6 +402,51 @@ class TestDoiRegistrantMediaRule:
         assert doc_type_correction(view) is None
 
 
+class TestDoiIsbnChapterRule:
+    WILEY = "10.1002/9781119507284.ch1"
+
+    def test_chapitre_wiley_type_autre_devient_chapitre(self):
+        corrected = doc_type_correction(_view(doc_type="other", doi=self.WILEY))
+        assert corrected is not None
+        assert corrected.value == "book_chapter"
+        assert corrected.rule == MetadataCorrectionRule.DOI_ISBN_CHAPTER_TO_BOOK_CHAPTER
+
+    def test_isbn_a_tirets(self):
+        view = _view(doc_type="other", doi="10.4018/978-1-5225-3168-5.ch007")
+        assert doc_type_correction(view).value == "book_chapter"
+
+    @pytest.mark.parametrize(
+        "doi",
+        [
+            "10.1002/9781119507284.ch1234",
+            "10.1002/9781119132318.ch1b",
+            "10.1002/9781119507284",
+            "10.1002/9781444338386.wbeah24019.pub2",
+        ],
+    )
+    def test_autre_forme_de_doi_sans_effet(self, doi: str):
+        assert doc_type_correction(_view(doc_type="other", doi=doi)) is None
+
+    def test_article_reste_article(self):
+        assert doc_type_correction(_view(doc_type="article", doi=self.WILEY)) is None
+
+    def test_prime_sur_le_titre_de_volume(self):
+        view = _view(
+            source="crossref",
+            author_count=0,
+            doc_type="other",
+            doi=self.WILEY,
+            title="Conference Report",
+        )
+        corrected = doc_type_correction(view)
+        assert corrected is not None
+        assert corrected.rule == MetadataCorrectionRule.DOI_ISBN_CHAPTER_TO_BOOK_CHAPTER
+
+    def test_rejouee_sur_la_publication(self):
+        corrected = doc_type_correction(_publication(doc_type="other", doi=self.WILEY))
+        assert corrected is not None and corrected.value == "book_chapter"
+
+
 class TestConferenceDeclaredRule:
     def test_chapitre_issu_d_un_congres_devient_article_de_congres(self):
         corrected = doc_type_correction(_view(doc_type="book_chapter", declares_conference=True))
