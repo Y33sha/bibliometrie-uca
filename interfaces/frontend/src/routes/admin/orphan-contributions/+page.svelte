@@ -322,10 +322,12 @@
 				{#each orphans as o, i (o.contribution_id)}
 					<tr class:active-row={o.publication_id === drawer.id}>
 						<td><input type="checkbox" aria-label="Sélectionner la contribution de {o.full_name}" checked={selectedIds.has(o.contribution_id)} onchange={() => toggleSelect(o)} /></td>
-						<td class="links-cell">
-							{#each o.sources as source (source)}
-								<SourceTag {source} />
-							{/each}
+						<td>
+							<span class="tag-logos">
+								{#each o.sources as source (source)}
+									<SourceTag {source} />
+								{/each}
+							</span>
 						</td>
 						<td class="fit">{o.full_name}</td>
 						<td class="publication-cell">

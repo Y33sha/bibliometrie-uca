@@ -377,7 +377,7 @@
 					{#if isLab && col('hal_status')}
 						<td>{#if p.hal_status}<span class="tag hal-{p.hal_status}">{halStatusLabel(p.hal_status)}</span>{/if}</td>
 					{/if}
-					{#if col('sources')}<td class="links-cell">
+					{#if col('sources')}<td>
 						<SourceLinks ids={[['hal', p.hal_id], ['openalex', p.openalex_id], ['scanr', p.scanr_id], ['wos', p.wos_id]]} urls={p.record_urls} />
 					</td>{/if}
 					<td class="access-cell"><AccessButton accessUrl={p.access_url} oaStatus={p.oa_status} compact /></td>

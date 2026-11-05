@@ -16,6 +16,9 @@ const ICONS: Record<string, string> = {
 	datacite: asset('icons/datacite.ico')
 };
 
+/** Sources à logo rond. */
+const ROUND_ICONS = new Set(['scanr']);
+
 const sources = $state({ order: [] as string[], labels: {} as Record<string, string> });
 
 let loading: Promise<void> | null = null;
@@ -46,6 +49,11 @@ export function sourceOrder(): string[] {
 /** Chemin du logo local d'une source (`undefined` si aucun). */
 export function sourceIcon(source: string): string | undefined {
 	return ICONS[source];
+}
+
+/** Vrai si le logo de la source est rond. */
+export function sourceIconIsRound(source: string): boolean {
+	return ROUND_ICONS.has(source);
 }
 
 /** Rapport de participation d'un membre Crossref : le compte sous lequel un éditeur dépose ses DOI. */

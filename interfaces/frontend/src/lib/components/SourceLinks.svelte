@@ -12,10 +12,12 @@
 	} = $props();
 </script>
 
-{#each ids as [source, id] (source)}
-	{#if id}
-		<SourceTag {source} {id} href={urls[source]} />
-	{:else}
-		<span class="source-tag source-placeholder"></span>
-	{/if}
-{/each}
+<span class="tag-logos">
+	{#each ids as [source, id] (source)}
+		{#if id}
+			<SourceTag {source} {id} href={urls[source]} />
+		{:else}
+			<span class="tag tag-logo tag-placeholder"></span>
+		{/if}
+	{/each}
+</span>

@@ -109,7 +109,7 @@
               n°&nbsp;{c.publication_id}{#if c.publication_year} · {c.publication_year}{/if}
               {#if c.doi} · {c.doi}{/if}
             </span>
-            {#each c.sources as source (source)}<SourceTag {source} />{/each}
+            <span class="tag-logos">{#each c.sources as source (source)}<SourceTag {source} />{/each}</span>
           </span>
         </li>
       {/each}
