@@ -243,23 +243,17 @@ class PersonDetailQueries:
         )
 
     def person_address_summary(self, person_id: int, *, year: int | None) -> PersonAddressSummary:
-        """Compte les publications de la personne, puis, par structure, celles dont une adresse brute est rattachée à la structure. `year` restreint aux publications de l'année."""
+        """Compte les publications avec adresse de la personne, puis, par structure, celles dont une adresse brute est rattachée à la structure. `year` restreint les comptes aux publications de l'année."""
         cte = _person_address_publications_cte(year)
         binds = {"pid": person_id, "year": year}
         counts = self._conn.execute(
             text(f"""
                 {cte}
-                SELECT MIN(p.publication_year) AS first_year,
-                       (SELECT MAX(publication_year)
-                        FROM person_address_publications_all_years) AS last_year_with_address,
-                       COUNT(DISTINCT p.id) FILTER (
-                           WHERE CAST(:year AS integer) IS NULL OR p.publication_year = :year
-                       ) AS publications,
+                SELECT MIN(publication_year) AS first_year_with_address,
+                       MAX(publication_year) AS last_year_with_address,
                        (SELECT COUNT(DISTINCT publication_id)
                         FROM person_address_publications) AS publications_with_address
-                FROM contributions g
-                JOIN publications p ON p.id = g.publication_id
-                WHERE g.person_id = :pid
+                FROM person_address_publications_all_years
             """),
             binds,
         ).one()
@@ -278,9 +272,8 @@ class PersonDetailQueries:
             binds,
         ).all()
         return PersonAddressSummary(
-            first_year=counts.first_year,
+            first_year_with_address=counts.first_year_with_address,
             last_year_with_address=counts.last_year_with_address,
-            publications=counts.publications,
             publications_with_address=counts.publications_with_address,
             structures=[
                 PersonAddressStructureCount(

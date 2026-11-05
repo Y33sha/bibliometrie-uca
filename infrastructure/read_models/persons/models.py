@@ -235,12 +235,10 @@ class PersonAddressStructureCount(PersonAddressStruct):
 class PersonAddressSummary(Model):
     """Structures reconnues dans les adresses de la personne, comptées en publications."""
 
-    first_year: int | None
-    """Année de la plus ancienne publication de la personne."""
+    first_year_with_address: int | None
+    """Année de la plus ancienne publication de la personne dont une contribution source porte une adresse."""
     last_year_with_address: int | None
     """Année de la plus récente publication de la personne dont une contribution source porte une adresse."""
-    publications: int
-    """Nombre de publications de la personne."""
     publications_with_address: int
     """Nombre de publications de la personne dont une contribution source porte une adresse."""
     structures: list[PersonAddressStructureCount]

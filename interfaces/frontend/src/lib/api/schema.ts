@@ -4625,20 +4625,15 @@ export interface components {
          */
         PersonAddressSummary: {
             /**
-             * First Year
-             * @description Année de la plus ancienne publication de la personne.
+             * First Year With Address
+             * @description Année de la plus ancienne publication de la personne dont une contribution source porte une adresse.
              */
-            first_year: number | null;
+            first_year_with_address: number | null;
             /**
              * Last Year With Address
              * @description Année de la plus récente publication de la personne dont une contribution source porte une adresse.
              */
             last_year_with_address: number | null;
-            /**
-             * Publications
-             * @description Nombre de publications de la personne.
-             */
-            publications: number;
             /**
              * Publications With Address
              * @description Nombre de publications de la personne dont une contribution source porte une adresse.

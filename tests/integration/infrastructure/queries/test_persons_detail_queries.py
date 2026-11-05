@@ -155,7 +155,7 @@ class TestMemberReads:
         summary = queries.person_address_summary(person, year=None)
 
         assert [address.id for address in response.addresses] == [raw_address]
-        assert (summary.publications, summary.publications_with_address) == (2, 1)
+        assert summary.publications_with_address == 1
 
 
 class TestAddressesByYear:
@@ -208,26 +208,27 @@ class TestAddressesByYear:
         ]
 
     def test_summary_counts_publications_per_structure(self, sa_sync_conn):
-        """Le dénominateur compte les publications ; le lien rejeté n'est pas compté ; le CHU, présent dans les deux adresses de la publication a, compte une fois pour elle."""
+        """Le dénominateur compte les publications avec adresse ; le lien rejeté n'est pas compté ; le CHU, présent dans les deux adresses de la publication a, compte une fois pour elle."""
         person, _, structures, _, _ = self._setup(sa_sync_conn)
 
         summary = PersonsQueries(sa_sync_conn).person_address_summary(person, year=2024)
 
-        assert (summary.publications, summary.publications_with_address) == (3, 2)
+        assert summary.publications_with_address == 2
         assert [(s.id, s.publications) for s in summary.structures] == [
             (structures["chu"], 2),
             (structures["uca"], 1),
         ]
 
     def test_summary_years(self, sa_sync_conn):
-        """Première année : toutes publications confondues. Dernière année : publications avec adresse, quelle que soit l'année demandée ; la publication de 2025 sans adresse est ignorée."""
+        """Première et dernière années des publications avec adresse, quelle que soit l'année demandée ; les publications de 2022 et 2025 sans adresse sont ignorées."""
         person, _, _, _, _ = self._setup(sa_sync_conn)
-        publication = insert_publication(sa_sync_conn, publication_year=2025)
-        insert_contribution(sa_sync_conn, publication, person_id=person, roles=["author"])
+        for year in (2022, 2025):
+            publication = insert_publication(sa_sync_conn, publication_year=year)
+            insert_contribution(sa_sync_conn, publication, person_id=person, roles=["author"])
 
         summary = PersonsQueries(sa_sync_conn).person_address_summary(person, year=2023)
 
-        assert (summary.first_year, summary.last_year_with_address) == (2023, 2024)
+        assert (summary.first_year_with_address, summary.last_year_with_address) == (2023, 2024)
 
     def test_address_publications_restricted_to_person_and_year(self, sa_sync_conn):
         person, publications, _, chu_address, _ = self._setup(sa_sync_conn)
