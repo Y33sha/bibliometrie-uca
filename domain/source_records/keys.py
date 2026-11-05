@@ -30,8 +30,11 @@ CONFIRMATION_ID_TYPES = (
 )
 """Types d'identifiants dont l'identifiant de rôle le plus fort est une clé de confirmation, à côté du DOI et du bloc de métadonnées."""
 
-MULTI_VALUED_CONFIRMATION_ID_TYPES = (SourceIdentifierType.PATENT_PUBLICATION_NUMBER,)
-"""Types d'identifiants dont chaque valeur est une clé de confirmation. Une famille de brevets a un numéro de publication par office."""
+MULTI_VALUED_CONFIRMATION_ID_TYPES = (
+    SourceIdentifierType.PATENT_PUBLICATION_NUMBER,
+    SourceIdentifierType.PATENT_APPLICATION_NUMBER,
+)
+"""Types d'identifiants dont chaque valeur est une clé de confirmation. Une famille de brevets a un numéro de demande et un numéro de publication par office. Chaque type a ses jetons : un numéro de demande WO égal au numéro de publication d'une autre famille relie rien."""
 
 
 def is_multi_valued_key(identifier: SourceIdentifier) -> bool:

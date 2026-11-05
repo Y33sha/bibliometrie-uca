@@ -75,7 +75,8 @@ Familles dont un établissement du périmètre est déposant : UCA, Université 
 - Le moissonnage sélectionne les familles par l'identifiant Paysage de leurs déposants, lu dans `structures.api_ids['scanr_patents']`.
 - Types d'identifiant `patent_publication_number` et `patent_application_number` : office et numéro, sans le code de type. Le code de type désigne l'étape de publication d'une demande : A1 pour la demande publiée avec son rapport de recherche, B1 pour le brevet délivré.
 - ScanR écrit une demande internationale `PCT/FR2011/050432` sous l'office WO, sans `PCT/` ni office de dépôt. Ses numéros de demande WO recoupent donc les numéros de publication WO d'autres familles.
-- Le numéro de publication est une clé de confirmation à plusieurs valeurs, comme le DOI. Un dépôt HAL de brevet rejoint ainsi sa famille.
+- Les numéros de publication et de demande sont des clés de confirmation à plusieurs valeurs, comme le DOI. Un dépôt HAL de brevet rejoint ainsi sa famille. Un numéro relie seulement un numéro de même type.
+- Un numéro français de sept chiffres de `number_s` est une publication s'il commence par 3, ou par une année postérieure à la date du dépôt HAL. Sinon, c'est une demande.
 - La date de publication d'un brevet est la date du premier dépôt de la famille. Les autres dates vont dans `source_extras`.
 - Un dépôt HAL de brevet sans famille en base cherche sa famille dans ScanR par numéro (`fetch_missing`).
 - Le moissonnage écarte les articles cités et les champs dérivés des autres champs : `denormalized_structures`, `co_*`, `title_abs_text`.
@@ -112,7 +113,7 @@ Familles dont un établissement du périmètre est déposant : UCA, Université 
 
 - [x] Numéros de `number_s` lus en numéros de publication ou de demande
 - [x] `patent_publication_number` en clé de confirmation à plusieurs valeurs
-- [ ] Usage de `patent_application_number` dans le rattachement, après mesure des recoupements
+- [x] Usage de `patent_application_number` dans le rattachement, après mesure des recoupements
 - [ ] Recherche dans ScanR des familles absentes, par numéro (`fetch_missing`)
 - [ ] Mesure de l'effet sur les publications, puis relance avec `--rebuild-publications`
 
@@ -136,4 +137,3 @@ Familles dont un établissement du périmètre est déposant : UCA, Université 
 ## Questions ouvertes
 
 1. Articles cités par un brevet : relation avec les publications par DOI.
-2. Un numéro FR à 7 chiffres de `number_s` peut désigner une demande ou une publication ancienne. ScanR distingue les deux.
