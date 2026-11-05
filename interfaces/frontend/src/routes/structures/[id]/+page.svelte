@@ -13,6 +13,7 @@
 	import PersonsListView from '#lib/components/PersonsListView.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import TabNav from '#lib/components/TabNav.svelte';
+	import { activeTabId, type TabDef } from '#lib/tabs.js';
 	import TableStatusRow from '#lib/components/TableStatusRow.svelte';
 	import ThesesListView from '#lib/components/ThesesListView.svelte';
 	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
@@ -45,13 +46,15 @@
 	let error = $state(false);
 
 	// L'onglet « Adresses » est réservé à la session admin.
-	const validTabs = ['dashboard', 'publications', 'theses', 'persons', 'collaborations', ...(isAdmin() ? ['addresses'] : [])];
-	const activeTab = $derived(
-		(() => {
-			const t = page.url.searchParams.get('tab');
-			return t && validTabs.includes(t) ? t : 'dashboard';
-		})()
-	);
+	const tabs: TabDef[] = $derived([
+		{ id: 'dashboard', label: 'Dashboard' },
+		{ id: 'publications', label: 'Publications' },
+		...(thesesCount > 0 ? [{ id: 'theses', label: 'Thèses' }] : []),
+		{ id: 'persons', label: 'Personnes' },
+		{ id: 'collaborations', label: 'Collaborations' },
+		...(isAdmin() ? [{ id: 'addresses', label: 'Adresses' }] : []),
+	]);
+	const activeTab = $derived(activeTabId(tabs, page.url.searchParams));
 
 	// Addresses tab
 	const addresses = usePaginatedFetch<LabAddress>({
@@ -199,14 +202,7 @@
 
 	<!-- Tabs -->
 	<TabNav
-		tabs={[
-			{ id: 'dashboard', label: 'Dashboard' },
-			{ id: 'publications', label: 'Publications' },
-			...(thesesCount > 0 ? [{ id: 'theses', label: 'Thèses' }] : []),
-			{ id: 'persons', label: 'Personnes' },
-			{ id: 'collaborations', label: 'Collaborations' },
-			...(isAdmin() ? [{ id: 'addresses', label: 'Adresses' }] : []),
-		]}
+		{tabs}
 		onswitch={onTabSwitch}
 		afterNavigate={syncUrl}
 	/>

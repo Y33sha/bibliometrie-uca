@@ -6,6 +6,7 @@
 	import { onMount, tick } from 'svelte';
 	import { api, apiDetail } from '#lib/api/index.js';
 	import TabNav from '#lib/components/TabNav.svelte';
+	import { activeTabId, type TabDef } from '#lib/tabs.js';
 	import PublicationsListView from '#lib/components/PublicationsListView.svelte';
 	import SerialsListView from '#lib/components/SerialsListView.svelte';
 	import MonographsListView from '#lib/components/MonographsListView.svelte';
@@ -26,13 +27,13 @@
 	// Volet d'édition de l'éditeur, en session admin : ouvert tant que `?publisher=<id>` figure dans l'URL.
 	const drawer = useDrawerParam('publisher', isAdmin);
 
-	const validTabs = ['dashboard', 'serials', 'monographs', 'publications'];
-	const activeTab = $derived(
-		(() => {
-			const t = page.url.searchParams.get('tab');
-			return t && validTabs.includes(t) ? t : 'dashboard';
-		})()
-	);
+	const tabs: TabDef[] = [
+		{ id: 'dashboard', label: 'Dashboard' },
+		{ id: 'serials', label: 'Publications en série' },
+		{ id: 'monographs', label: 'Monographies' },
+		{ id: 'publications', label: 'Publications' },
+	];
+	const activeTab = $derived(activeTabId(tabs, page.url.searchParams));
 
 	let publisher = $state<PublisherDetail | null>(null);
 	let error = $state(false);
@@ -118,15 +119,7 @@
 	</div>
 
 	<!-- Tabs -->
-	<TabNav
-		tabs={[
-			{ id: 'dashboard', label: 'Dashboard' },
-			{ id: 'serials', label: 'Publications en série' },
-			{ id: 'monographs', label: 'Monographies' },
-			{ id: 'publications', label: 'Publications' }
-		]}
-		onswitch={onTabSwitch}
-	/>
+	<TabNav {tabs} onswitch={onTabSwitch} />
 
 	<!-- Tab: Dashboard -->
 	{#if activeTab === 'dashboard'}

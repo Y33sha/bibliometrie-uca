@@ -10,6 +10,7 @@
   import { specificity, specificityPercent } from "./specificity";
   import PublicationsListView from "#lib/components/PublicationsListView.svelte";
   import TabNav from "#lib/components/TabNav.svelte";
+  import { activeTabId, type TabDef } from "#lib/tabs.js";
   import SortChevron from "#lib/components/SortChevron.svelte";
   import ClampedBlock from "#lib/components/ClampedBlock.svelte";
   import { subjectVocabularyLabels } from "#lib/labels.js";
@@ -19,10 +20,11 @@
   // Libellé normalisé du sujet : il l'identifie, tous vocabulaires confondus.
   const subjectKey = $derived(page.params.id ?? "");
 
-  // Onglet actif synchronisé avec `?tab=...` (graphe par défaut). TabNav gère lui-même la lecture de l'URL et la navigation via goto.
-  const activeTab = $derived(
-    page.url.searchParams.get("tab") === "publications" ? "publications" : "graph",
-  );
+  const tabs: TabDef[] = [
+    { id: "graph", label: "Sujets associés" },
+    { id: "publications", label: "Publications" },
+  ];
+  const activeTab = $derived(activeTabId(tabs, page.url.searchParams));
 
   const NEIGHBORS_LIMIT = 15;
   const MIN_COOCCURRENCE = 3;
@@ -120,12 +122,7 @@
       {/each}
     </div>
 
-    <TabNav
-      tabs={[
-        { id: "graph", label: "Sujets associés" },
-        { id: "publications", label: "Publications" },
-      ]}
-    />
+    <TabNav {tabs} />
 
     {#if activeTab === "graph"}
       <div class="graph-wrapper" class:loading-overlay={loading}>

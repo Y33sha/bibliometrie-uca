@@ -8,6 +8,7 @@
 	import { api, apiDetail } from '#lib/api/index.js';
 	import { issnLabel, serialRelationLabels } from '#lib/labels.js';
 	import TabNav from '#lib/components/TabNav.svelte';
+	import { activeTabId, type TabDef } from '#lib/tabs.js';
 	import PublicationsListView from '#lib/components/PublicationsListView.svelte';
 	import MonographsListView from '#lib/components/MonographsListView.svelte';
 	import PublicationsDashboard from '#lib/components/PublicationsDashboard.svelte';
@@ -27,18 +28,17 @@
 
 	// Volet d'édition de la publication en série, en session admin : ouvert tant que `?serial=<id>` figure dans l'URL.
 	const drawer = useDrawerParam('serial', isAdmin);
-	const activeTab = $derived(
-		(() => {
-			const t = page.url.searchParams.get('tab');
-			return t === 'publications' || t === 'monographs' ? t : 'dashboard';
-		})()
-	);
-
 	let journal = $state<SerialDetail | null>(null);
 
 	// Onglet des monographies, selon le type de la revue : volumes d'une série d'actes, livres d'une collection.
 	const MONOGRAPHS_TAB_LABELS: Record<string, string> = { proceedings: 'Volumes', book_series: 'Livres' };
 	const monographsTabLabel = $derived(journal?.serial_type ? MONOGRAPHS_TAB_LABELS[journal.serial_type] : undefined);
+	const tabs: TabDef[] = $derived([
+		{ id: 'dashboard', label: 'Dashboard' },
+		...(monographsTabLabel ? [{ id: 'monographs', label: monographsTabLabel }] : []),
+		{ id: 'publications', label: 'Publications' },
+	]);
+	const activeTab = $derived(activeTabId(tabs, page.url.searchParams));
 	let error = $state(false);
 	let subjectList = $state<SubjectFrequency[]>([]);
 	let dashboardLoaded = $state(false);
@@ -183,14 +183,7 @@
 	</div>
 
 	<!-- Tabs -->
-	<TabNav
-		tabs={[
-			{ id: 'dashboard', label: 'Dashboard' },
-			...(monographsTabLabel ? [{ id: 'monographs', label: monographsTabLabel }] : []),
-			{ id: 'publications', label: 'Publications' }
-		]}
-		onswitch={onTabSwitch}
-	/>
+	<TabNav {tabs} onswitch={onTabSwitch} />
 
 	<!-- Tab: Dashboard -->
 	{#if activeTab === 'dashboard'}
@@ -244,7 +237,7 @@
 	{/if}
 
 	<!-- Tab: Monographies -->
-	{#if activeTab === 'monographs' && monographsTabLabel}
+	{#if activeTab === 'monographs'}
 		<div class="tab-content">
 			<MonographsListView apiKey={`journal-${serialId}-monographs`} externalFilters={{ serialId }} />
 		</div>

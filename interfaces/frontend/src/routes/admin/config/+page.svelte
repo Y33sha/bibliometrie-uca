@@ -3,6 +3,7 @@
   import IconButton from "#lib/components/IconButton.svelte";
   import PageHeader from "#lib/components/PageHeader.svelte";
   import TabNav from "#lib/components/TabNav.svelte";
+  import { activeTabId, type TabDef } from "#lib/tabs.js";
   import { page } from "$app/state";
   import { onMount } from "svelte";
   import { api, errorMessage, latestRequest, config as configApi, perimeters as perimetersApi } from "#lib/api/index.js";
@@ -152,7 +153,11 @@
     { key: "serial_openalex_recheck_after_days", label: "Métadonnées des revues (OpenAlex)" },
   ];
 
-  const activeTab = $derived(page.url.searchParams.get("tab") === "display" ? "display" : "pipeline");
+  const tabs: TabDef[] = [
+    { id: "pipeline", label: "Pipeline" },
+    { id: "display", label: "Affichage" },
+  ];
+  const activeTab = $derived(activeTabId(tabs, page.url.searchParams));
 
   const SITE_TITLE_KEY = "site_title";
   /** Clés dont la valeur est un texte libre, enregistré tel quel. */
@@ -321,12 +326,7 @@
 {/snippet}
 
 <div class="config-page">
-  <TabNav
-    tabs={[
-      { id: "pipeline", label: "Pipeline" },
-      { id: "display", label: "Affichage" },
-    ]}
-  />
+  <TabNav {tabs} />
 
   {#if activeTab === "pipeline"}
   <!-- ═══ ANNÉES ═══ -->

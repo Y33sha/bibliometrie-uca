@@ -2,13 +2,7 @@
 	import { page } from '$app/state';
 	import { setQueryParam } from '#lib/url.js';
 	import { horizontalOverflow } from '#lib/actions/horizontalOverflow.js';
-
-	export interface TabDef {
-		id: string;
-		label: string;
-		/** Nombre d'éléments de l'onglet, affiché à côté du libellé. */
-		count?: number;
-	}
+	import { activeTabId, type TabDef } from '#lib/tabs.js';
 
 	interface Props {
 		tabs: TabDef[];
@@ -22,12 +16,7 @@
 
 	const defaultTab = $derived(tabs[0]?.id ?? '');
 
-	const activeTab = $derived(
-		(() => {
-			const t = page.url.searchParams.get('tab');
-			return t && tabs.some((tab) => tab.id === t) ? t : defaultTab;
-		})()
-	);
+	const activeTab = $derived(activeTabId(tabs, page.url.searchParams));
 
 	function switchTab(tab: string) {
 		if (tab === activeTab) return;
