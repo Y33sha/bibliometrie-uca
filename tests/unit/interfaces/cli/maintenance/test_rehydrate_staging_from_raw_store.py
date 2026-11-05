@@ -144,6 +144,25 @@ def test_mode_complet_recree_les_orphelines(lancer):
     assert resultat.mises_a_jour == []
 
 
+def test_filtre_par_type_de_document(lancer, monkeypatch):
+    """`--doc-type` garde les clés des enregistrements sources en base de ce type."""
+    monkeypatch.setattr(
+        module,
+        "source_ids_of_type",
+        lambda conn, source, doc_type: {"hal-2"} if doc_type == "patent" else set(),
+    )
+    resultat = lancer(
+        {"hal": {"hal-1": {}, "hal-2": {}}},
+        "--sources",
+        "hal",
+        "--doc-type",
+        "patent",
+        lignes_presentes={"hal-1", "hal-2"},
+    )
+
+    assert resultat.mises_a_jour == [("hal", "hal-2")]
+
+
 def test_simulation_n_ouvre_pas_la_base(lancer):
     resultat = lancer({"hal": {"hal-1": {}, "hal-2": {}}}, "--sources", "hal", "--dry-run")
 
