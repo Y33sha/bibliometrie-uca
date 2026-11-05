@@ -30,8 +30,8 @@
     nnt: { label: "Thèses.fr", icon: asset('icons/theses.ico'), url: (v) => `https://theses.fr/${v}` },
   };
 
-  // Teinte des logos blancs, posés sur un fond plein.
-  const WHITE_LOGO_COLORS: Record<string, string> = { Zenodo: "var(--logo-zenodo)" };
+  // Pastilles colorées des icônes claires.
+  const PLATFORM_TAG_CLASSES: Record<string, string> = { Zenodo: "tag-zenodo" };
 
   const orderedSources = $derived([
     ...sourceOrder().flatMap((src) => referencedBy.filter((s) => s.source === src)),
@@ -71,11 +71,7 @@
 
   {#snippet copyRow(copy: AccessLink)}
     <a href={copy.url} target="_blank" rel="noopener noreferrer" class="source-row" title={copy.url}>
-      <span
-        class="tag tag-logo"
-        class:tag-filled={copy.label in WHITE_LOGO_COLORS}
-        style:--tag-color={WHITE_LOGO_COLORS[copy.label]}
-      >
+      <span class="source-tag {PLATFORM_TAG_CLASSES[copy.label] ?? ''}">
         <img src={asset(`icons/${copy.icon}` as AssetPath)} alt={copy.label} />
       </span>
       <span class="row-label">{copy.label}</span>
@@ -119,7 +115,7 @@
             class="source-row"
             title={e.value}
           >
-            <span class="tag tag-logo">
+            <span class="source-tag">
               {#if EXT_META[e.type]?.icon}
                 <img src={EXT_META[e.type].icon} alt={EXT_META[e.type]?.label} />
               {/if}
@@ -196,8 +192,12 @@
     background: var(--card);
     text-decoration: none;
   }
+  /* La pastille garde sa largeur, icône ou non : les libellés restent alignés. */
+  .source-row :global(.source-tag) {
+    flex-shrink: 0;
+  }
   /* Le lien couvre toute la ligne : l'icône grossit au survol de la ligne entière, pas seulement de l'icône. */
-  .source-row:hover :global(.tag-logo) {
+  .source-row:hover :global(.source-tag) {
     transform: scale(1.15);
   }
   .row-label {

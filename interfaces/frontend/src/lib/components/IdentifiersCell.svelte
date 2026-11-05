@@ -24,7 +24,7 @@
 	const types = ['orcid', 'idhal', 'idref'] as const;
 </script>
 
-<span class="tag-logos">
+<span class="id-cell">
 	{#each types as type (type)}
 		{@const values = grouped(type)}
 		{#if values.length}
@@ -32,7 +32,16 @@
 				<IdentifierLink id_type={type} id_value={id.value} confirmed={id.confirmed} />
 			{/each}
 		{:else}
-			<span class="tag tag-logo tag-placeholder"></span>
+			<span class="id-icon id-placeholder"></span>
 		{/if}
 	{/each}
 </span>
+
+<style>
+	.id-cell {
+		display: inline-flex;
+		gap: 4px;
+		align-items: center;
+		white-space: nowrap;
+	}
+</style>

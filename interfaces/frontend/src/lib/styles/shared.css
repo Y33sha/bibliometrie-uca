@@ -119,19 +119,6 @@
 	--structure-equipe: #2e8a7d;
 	--structure-admin: #3d5266;
 
-	/* Logos des sources et des identifiants : teinte de leur pastille ronde (`.tag-logo`), par nom de source ou type d'identifiant. */
-	--logo-hal: var(--accent);
-	--logo-openalex: oklch(0.6 0.111 82);
-	--logo-theses: oklch(0.6 0.084 148);
-	--logo-wos: oklch(0.6 0.133 301);
-	--logo-crossref: oklch(0.6 0.132 90);
-	--logo-datacite: oklch(0.6 0.104 182);
-	--logo-orcid: oklch(0.6 0.124 121);
-	--logo-idhal: var(--logo-hal);
-	--logo-hal_person_id: var(--logo-hal);
-	--logo-idref: oklch(0.6 0.088 35);
-	--logo-zenodo: #0047a8;
-
 	/* Classes de citation : top 1 % foncé, top 10 % clair, gris hors top 10 %. */
 	--citation-top_1_percent: var(--accent);
 	--citation-top_10_percent: oklch(0.76 0.065 var(--brand-hue));
@@ -911,7 +898,7 @@ button.tag {
 	border-radius: var(--radius-pill);
 }
 /* En-tête d'une entité, page d'une publication : étiquette plus grande, en pilule. */
-.entity-meta .tag:not(.tag-logo),
+.entity-meta .tag,
 .detail-tags .tag {
 	padding: 3px 10px;
 	border-radius: var(--radius-pill);
@@ -947,63 +934,167 @@ button.tag {
 	gap: 4px;
 }
 
-/* Valeur non confirmée. */
-.tag-faded {
-	opacity: 0.5;
-}
-/* Case vide qui garde l'alignement des colonnes d'une ligne à l'autre. */
-.tag-placeholder {
-	visibility: hidden;
-}
-
-/* Logo d'une source ou d'un identifiant, dans une pastille ronde. */
-.tag-logo {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	flex-shrink: 0;
-	width: 22px;
-	height: 22px;
-	padding: 0;
-	border-radius: 50%;
-	vertical-align: middle;
-	transition: transform 0.1s;
-}
-a.tag-logo:hover {
-	transform: scale(1.15);
-}
-.tag-logo img {
-	display: block;
-	width: 14px;
-	height: 14px;
-}
-/* Logo déjà rond : il couvre la pastille. */
-.tag-logo-full {
-	background: none;
-}
-.tag-logo-full img {
-	width: 100%;
-	height: 100%;
-}
-
 /* Plusieurs étiquettes dans une cellule ou une ligne. */
 .tag-list {
 	display: flex;
 	flex-wrap: wrap;
 	gap: 4px;
 }
-/* Suite de logos, sur une ligne. */
-.tag-logos {
-	display: inline-flex;
-	align-items: center;
-	gap: 4px;
-	white-space: nowrap;
-}
 
 /* Identifiant (ISSN, ISBN, DOI, ROR, HAL…) */
 .id-badge {
 	--tag-color: var(--accent);
 	font-family: var(--mono);
+}
+
+/* ── ID icons (round, ORCID/idHAL/IdRef) ── */
+.id-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 22px;
+	height: 22px;
+	border-radius: 50%;
+	text-decoration: none;
+	vertical-align: middle;
+	transition: transform 0.1s;
+	flex-shrink: 0;
+}
+
+.id-icon:hover {
+	transform: scale(1.15);
+}
+
+.id-icon img {
+	width: 14px;
+	height: 14px;
+	display: block;
+}
+
+.id-orcid {
+	background: #f0f7e0;
+}
+
+.id-orcid:hover {
+	background: #e3ecc8;
+}
+
+.id-hal {
+	background: var(--accent-light);
+}
+
+.id-hal:hover {
+	background: #d0e3f4;
+}
+
+.id-idref {
+	background: #fdeae5;
+}
+
+.id-idref:hover {
+	background: #f9d4ca;
+}
+
+.id-icon:not(.id-confirmed) {
+	opacity: 0.5;
+}
+
+.id-placeholder {
+	visibility: hidden;
+}
+
+/* ── Source icon tags (round) ── */
+.source-tag {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 22px;
+	height: 22px;
+	border-radius: 50%;
+	text-decoration: none;
+	margin-right: 3px;
+	vertical-align: middle;
+	transition: transform 0.1s;
+}
+
+.source-tag:hover {
+	transform: scale(1.15);
+}
+
+.source-tag img {
+	width: 14px;
+	height: 14px;
+	display: block;
+}
+
+.source-hal {
+	background: var(--accent-light);
+}
+
+.source-hal:hover {
+	background: #d0e3f4;
+}
+
+.source-openalex {
+	background: #fef3e0;
+}
+
+.source-openalex:hover {
+	background: #fde8c8;
+}
+
+.source-theses {
+	background: #e8f5e9;
+}
+
+.source-theses:hover {
+	background: #d0eadb;
+}
+
+.source-scanr {
+	background: transparent;
+}
+
+.source-scanr img {
+	width: 22px;
+	height: 22px;
+}
+
+.source-wos {
+	background: #e8e0f8;
+}
+
+.source-wos:hover {
+	background: #d8c8f4;
+}
+
+.source-crossref {
+	background: #f3ead2;
+}
+
+.source-crossref:hover {
+	background: #ebdcb8;
+}
+
+.source-datacite {
+	background: #d9f1ec;
+}
+
+.source-datacite:hover {
+	background: #c6e8e0;
+}
+
+/* Le logo de Zenodo est blanc : sa pastille prend le bleu de Zenodo. */
+.tag-zenodo {
+	background: #0047a8;
+}
+
+.source-placeholder {
+	visibility: hidden;
+}
+
+.links-cell {
+	white-space: nowrap;
 }
 
 /* ── Lien de structure dans un tableau ── */

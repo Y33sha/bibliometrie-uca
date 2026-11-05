@@ -194,7 +194,7 @@
 						{/each}
 					</td>
 				{/if}
-				{#if col('sources')}<td>
+				{#if col('sources')}<td class="links-cell">
 					<SourceLinks ids={[['hal', t.hal_id], ['openalex', t.openalex_id], ['scanr', t.scanr_id], ['theses', t.theses_id]]} urls={t.record_urls} />
 				</td>{/if}
 				<td class="col-access"><AccessButton accessUrl={t.access_url} oaStatus={t.oa_status} compact /></td>
