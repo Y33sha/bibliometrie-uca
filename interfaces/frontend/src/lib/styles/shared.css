@@ -873,7 +873,8 @@ input[type='search']::-webkit-search-cancel-button {
 }
 a.tag:hover,
 button.tag:hover,
-button.tag[aria-expanded='true'] {
+button.tag[aria-expanded='true'],
+.tag:has(> .tag-action:hover) {
 	background: oklch(from var(--tag-color, var(--muted)) 0.91 calc(c * 0.4) h);
 }
 button.tag {
@@ -915,11 +916,21 @@ button.tag {
 .tag-struck {
 	text-decoration: line-through;
 }
-/* Étiquette suivie d'un bouton de retrait. */
+/* Étiquette terminée par son bouton de retrait (IconButton compact). */
 .tag-removable {
 	display: inline-flex;
 	align-items: center;
-	gap: 4px;
+	gap: 2px;
+	padding-right: 2px;
+}
+/* Libellé cliquable dans une étiquette : le fond de l'étiquette fonce au survol. */
+.tag-action {
+	padding: 0;
+	border: none;
+	background: none;
+	font: inherit;
+	color: inherit;
+	cursor: pointer;
 }
 
 /* Plusieurs étiquettes dans une cellule ou une ligne. */
@@ -1517,6 +1528,18 @@ button.entity-link {
 .icon-btn-success[aria-pressed='true'] {
 	background: var(--icon-btn-bg);
 	color: var(--icon-btn-color);
+}
+/* Bouton-icône compact, logé dans une étiquette : seule l'icône change de couleur au survol. */
+.icon-btn-sm {
+	width: 18px;
+	height: 18px;
+}
+.icon-btn-sm svg {
+	width: 12px;
+	height: 12px;
+}
+.icon-btn-sm:hover:not(:disabled) {
+	background: none;
 }
 
 /* Colonne de contrôles (bascules confirmer et rejeter, ou tag « nom ») à gauche d'une puce, largeur fixe pour aligner verticalement les puces entre les lignes. */

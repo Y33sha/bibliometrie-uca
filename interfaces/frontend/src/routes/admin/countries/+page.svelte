@@ -244,9 +244,9 @@
 						<div class="country-cell">
 						{#each a.countries ?? [] as c}
 							{@const found = a.found_countries.find(f => f.country_code === c)}
-							<span class="tag-removable">
-								<span class="tag tag-success" title={found ? `Trouvé par : ${methodsLabel(found.methods)}` : undefined}>{countryLabel(c)}</span>
-								<IconButton icon="reject" label="Retirer {countryLabel(c)}" onclick={() => removeCountry(a.id, c)} />
+							<span class="tag tag-success tag-removable" title={found ? `Trouvé par : ${methodsLabel(found.methods)}` : undefined}>
+								{countryLabel(c)}
+								<IconButton icon="reject" small label="Retirer {countryLabel(c)}" onclick={() => removeCountry(a.id, c)} />
 							</span>
 						{/each}
 						<span class="country-actions">

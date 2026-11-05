@@ -495,9 +495,9 @@
 				</select>
 				<div class="struct-tags">
 					{#each sp.structureIds as sid (sid)}
-						<span class="tag-removable">
-							<span class="tag tag-pill tag-accent">{structureLabelById.get(sid) || `#${sid}`}</span>
-							<IconButton icon="reject" label="Retirer {structureLabelById.get(sid) || `#${sid}`}" onclick={() => removeStructureFromPredicate(i, sid)} />
+						<span class="tag tag-pill tag-accent tag-removable">
+							{structureLabelById.get(sid) || `#${sid}`}
+							<IconButton icon="reject" small label="Retirer {structureLabelById.get(sid) || `#${sid}`}" onclick={() => removeStructureFromPredicate(i, sid)} />
 						</span>
 					{/each}
 					<select

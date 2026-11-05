@@ -5,7 +5,8 @@
 		label,
 		onclick,
 		disabled = false,
-		pressed
+		pressed,
+		small = false
 	}: {
 		icon: 'edit' | 'delete' | 'panel' | 'reject' | 'confirm' | 'reset';
 		label: string;
@@ -13,6 +14,8 @@
 		disabled?: boolean;
 		/** Fait du bouton une bascule : enfoncé, il garde la couleur de son action. */
 		pressed?: boolean;
+		/** Version compacte, logée dans une étiquette. */
+		small?: boolean;
 	} = $props();
 </script>
 
@@ -21,6 +24,7 @@
 	class="icon-btn"
 	class:icon-btn-danger={icon === 'delete' || icon === 'reject'}
 	class:icon-btn-success={icon === 'confirm'}
+	class:icon-btn-sm={small}
 	title={label}
 	aria-label={label}
 	aria-pressed={pressed}

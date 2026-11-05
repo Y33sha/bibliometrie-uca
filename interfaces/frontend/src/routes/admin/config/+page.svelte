@@ -551,9 +551,9 @@
     <label for="perim-struct-search">Structures racines</label>
     <div class="perimeter-rules" style="margin: 4px 0 8px;">
       {#each perimModal.structures as struct (struct.id)}
-        <span class="tag-removable">
-          <span class="tag tag-pill">{structureLabel(struct)}</span>
-          <IconButton icon="reject" label="Retirer {structureLabel(struct)}" onclick={() => perimRemoveStruct(struct.id)} />
+        <span class="tag tag-pill tag-removable">
+          {structureLabel(struct)}
+          <IconButton icon="reject" small label="Retirer {structureLabel(struct)}" onclick={() => perimRemoveStruct(struct.id)} />
         </span>
       {/each}
     </div>

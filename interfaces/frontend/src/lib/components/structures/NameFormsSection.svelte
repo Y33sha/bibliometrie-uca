@@ -126,9 +126,9 @@
               <span class="muted">—</span>
             {:else if f.requires_context_of?.length}
               {#each f.requires_context_of as x}
-                <span class="tag-removable">
-                  <span class="tag tag-warning">{ctxLabel(x)}</span>
-                  <IconButton icon="reject" label="Retirer ce contexte" onclick={() => onremoveCtx(f.id, x)} />
+                <span class="tag tag-warning tag-removable">
+                  {ctxLabel(x)}
+                  <IconButton icon="reject" small label="Retirer ce contexte" onclick={() => onremoveCtx(f.id, x)} />
                 </span>
               {/each}
               {@render ctxAdd(f.id)}
@@ -184,9 +184,9 @@
   <div class="new-form-ctx">
     <span class="muted">Contexte :</span>
     {#each newFormCtx as x}
-      <span class="tag-removable">
-        <span class="tag tag-warning">{ctxLabel(x)}</span>
-        <IconButton icon="reject" label="Retirer ce contexte" onclick={() => onremoveNewCtx(x)} />
+      <span class="tag tag-warning tag-removable">
+        {ctxLabel(x)}
+        <IconButton icon="reject" small label="Retirer ce contexte" onclick={() => onremoveNewCtx(x)} />
       </span>
     {/each}
     {@render ctxAdd(null)}

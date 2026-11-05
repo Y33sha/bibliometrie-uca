@@ -51,11 +51,9 @@
       <span class="muted">{emptyText}</span>
     {:else}
       {#each related as r (r.tutelle_id)}
-        <span class="tag-removable">
-          <span class="tag tag-pill tag-accent">
-            <button class="triage-person" onclick={() => onselect(r.id)}>{structureLabel(r)}</button>
-          </span>
-          <IconButton icon="reject" label="Retirer {structureLabel(r)}" onclick={() => ondeleteTutelle(r.tutelle_id)} />
+        <span class="tag tag-pill tag-accent tag-removable">
+          <button class="tag-action" onclick={() => onselect(r.id)}>{structureLabel(r)}</button>
+          <IconButton icon="reject" small label="Retirer {structureLabel(r)}" onclick={() => ondeleteTutelle(r.tutelle_id)} />
         </span>
       {/each}
     {/if}
