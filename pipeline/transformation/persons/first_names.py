@@ -9,7 +9,7 @@ from sqlalchemy import Connection, text
 
 from domain.persons.contributor_name import ContributorName
 from domain.persons.name_matching import first_name_initials
-from domain.persons.source_contribution_matching import attested_full_first_names
+from domain.persons.source_contribution_matching import Namesake, attested_full_first_names
 from infrastructure.repositories.person_repository import PgPersonRepository
 from infrastructure.sql_fragments import CONTRIBUTIONS_AND_SOURCES
 from pipeline.transformation.persons.store import fetch_namesakes
@@ -46,25 +46,44 @@ class FirstNameCompletion(NamedTuple):
     """Personnes à plusieurs prénoms pleins concurrents."""
 
 
-def complete_reduced_first_names(
-    conn: Connection, *, repo: PgPersonRepository
-) -> FirstNameCompletion:
-    """Donne à chaque personne au prénom réduit le prénom plein, s'il est seul donné par les contributions sources de ses contributions. Le prénom d'une personne à fiche RH vient du SI RH et reste tel quel."""
+def _attested_first_names(conn: Connection) -> dict[Namesake, list[str]]:
+    """Renvoie les prénoms pleins donnés par les contributions sources de leurs contributions, pour chaque personne au prénom réduit sans fiche RH qui en a."""
     reduced = {}
     for namesake in fetch_namesakes(conn):
         initials = first_name_initials(namesake.first_name)
         if initials is not None and not namesake.hr_record:
             reduced[namesake.person_id] = (namesake, initials)
     names = fetch_linked_contributor_names(conn, sorted(reduced))
+    return {
+        namesake: list(attested.values())
+        for person_id, (namesake, initials) in reduced.items()
+        if (
+            attested := attested_full_first_names(
+                namesake.last_name, initials, names.get(person_id, ())
+            )
+        )
+    }
 
+
+def complete_reduced_first_names(
+    conn: Connection, *, repo: PgPersonRepository
+) -> FirstNameCompletion:
+    """Donne à chaque personne au prénom réduit le prénom plein, s'il est seul donné par les contributions sources de ses contributions. Le prénom d'une personne à fiche RH vient du SI RH et reste tel quel."""
     completed = 0
     conflicting: set[int] = set()
-    for person_id, (namesake, initials) in reduced.items():
-        attested = attested_full_first_names(namesake.last_name, initials, names.get(person_id, ()))
-        if len(attested) == 1:
-            (first_name,) = attested.values()
-            repo.rename(person_id, namesake.last_name, first_name)
+    for namesake, first_names in _attested_first_names(conn).items():
+        if len(first_names) == 1:
+            repo.rename(namesake.person_id, namesake.last_name, first_names[0])
             completed += 1
-        elif attested:
-            conflicting.add(person_id)
+        else:
+            conflicting.add(namesake.person_id)
     return FirstNameCompletion(completed, frozenset(conflicting))
+
+
+def conflicting_reduced_first_names(conn: Connection) -> frozenset[int]:
+    """Renvoie les personnes au prénom réduit à plusieurs prénoms pleins concurrents (`FirstNameCompletion.conflicting`), sans compléter de prénom."""
+    return frozenset(
+        namesake.person_id
+        for namesake, first_names in _attested_first_names(conn).items()
+        if len(first_names) > 1
+    )

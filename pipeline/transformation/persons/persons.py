@@ -179,6 +179,8 @@ TASKS = (
             "aligned_source_contributions",
             "source_contributions.contributor_information_id",
             "source_contributions.neutralized_identifiers",
+            "source_contributions.in_perimeter",
+            "source_contributions.roles",
             "source_records.publication_id",
             "contributor_information",
             "person_name_forms",
@@ -189,7 +191,7 @@ TASKS = (
             "rejected_contributions",
             "distinct_persons",
         ),
-        # La suppression d'une personne emporte ses formes de nom et vide ses contributions ; une contribution à forme de nom ambiguë est marquée pour la redécision de sa personne.
+        # La suppression d'une personne emporte ses formes de nom et vide ses contributions ; une contribution rattachée par le nom dont la décision change est marquée pour la redécision de sa personne.
         writes=(
             "contributions.person_id",
             "contributions.resolution_mode",

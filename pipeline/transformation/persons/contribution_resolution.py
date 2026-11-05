@@ -11,10 +11,10 @@ Une contribution de la file garde sa personne si sa décision la désigne encore
 """
 
 from collections import Counter, defaultdict
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterable, Iterator, Sequence
 from itertools import batched
 
-from sqlalchemy import Connection, text
+from sqlalchemy import Connection, Row, text
 
 from domain.contributions.contribution_roles import ContributionRole
 from domain.errors import ValidationError
@@ -125,18 +125,28 @@ _IDENTIFIERS_OBJECT = ", ".join(
     for t in PersonIdentifierType
 )
 
-_MEMBERS_SQL = f"""
-    SELECT g.id AS contribution_id, g.publication_id, sc.source::text AS source,
-           sc.raw_author_name, sc.raw_last_name, sc.raw_first_name,
-           jsonb_strip_nulls(jsonb_build_object({_IDENTIFIERS_OBJECT})) AS identifiers,
-           sc.in_perimeter, sc.roles,
-           (SELECT ca.person_id FROM confirmed_source_contributions ca
-            WHERE ca.source_contribution_id = sc.id) AS pinned_person_id
-    FROM {CONTRIBUTIONS_AND_SOURCES}
+
+def _members_sql(restriction: str) -> str:
+    """Renvoie la requête des contributions sources des contributions retenues par `restriction` (jointures et clause `WHERE` sur `g`)."""
+    return f"""
+        SELECT g.id AS contribution_id, g.publication_id, sc.source::text AS source,
+               sc.raw_author_name, sc.raw_last_name, sc.raw_first_name,
+               jsonb_strip_nulls(jsonb_build_object({_IDENTIFIERS_OBJECT})) AS identifiers,
+               sc.in_perimeter, sc.roles,
+               (SELECT ca.person_id FROM confirmed_source_contributions ca
+                WHERE ca.source_contribution_id = sc.id) AS pinned_person_id
+        FROM {CONTRIBUTIONS_AND_SOURCES}
+        {restriction}
+        ORDER BY g.id
+    """
+
+
+_CANDIDATE_MEMBERS_SQL = _members_sql(f"""
     JOIN {_CANDIDATES_TABLE} c ON c.contribution_id = g.id
     WHERE c.publication_id = ANY(:publications)
-    ORDER BY g.id
-"""
+""")
+
+_CONTRIBUTION_MEMBERS_SQL = _members_sql("WHERE g.id = ANY(:contributions)")
 
 _MARK_ALL_SQL = f"""
     SELECT id FROM contributions
@@ -230,10 +240,27 @@ def load_candidate_contributions(
     conn: Connection, publication_ids: Sequence[int]
 ) -> dict[int, dict[int, list[AlignedSourceContribution]]]:
     """Renvoie les contributions sources des contributions à décider des publications `publication_ids`, par publication puis par contribution. Suit `prepare_candidates`."""
+    return _aligned_members(
+        conn.execute(text(_CANDIDATE_MEMBERS_SQL), {"publications": list(publication_ids)})
+    )
+
+
+def load_contributions(
+    conn: Connection, contribution_ids: Sequence[int]
+) -> dict[int, dict[int, list[AlignedSourceContribution]]]:
+    """Renvoie les contributions sources des contributions `contribution_ids`, par publication puis par contribution."""
+    return _aligned_members(
+        conn.execute(text(_CONTRIBUTION_MEMBERS_SQL), {"contributions": list(contribution_ids)})
+    )
+
+
+def _aligned_members(
+    rows: Iterable[Row[tuple[object, ...]]],
+) -> dict[int, dict[int, list[AlignedSourceContribution]]]:
     candidates: dict[int, dict[int, list[AlignedSourceContribution]]] = defaultdict(
         lambda: defaultdict(list)
     )
-    for r in conn.execute(text(_MEMBERS_SQL), {"publications": list(publication_ids)}):
+    for r in rows:
         candidates[r.publication_id][r.contribution_id].append(
             AlignedSourceContribution(
                 source=r.source,
