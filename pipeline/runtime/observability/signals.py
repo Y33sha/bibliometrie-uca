@@ -4,7 +4,13 @@ import logging
 from collections.abc import Callable, Mapping
 
 from domain.pipeline_runs import PhaseStatus
+from domain.sources.registry import LOOKUP_SOURCES, source_label
 from pipeline.runtime.observability.metrics import PhaseMetrics
+
+
+def _display_name(source: str) -> str:
+    """Renvoie le nom affiché de l'accès : celui d'une source du registre, sinon `source` tel quel."""
+    return source_label(source) if source in LOOKUP_SOURCES else source
 
 
 def signal_source_unconfigured(
@@ -17,12 +23,13 @@ def signal_source_unconfigured(
     Args:
         reason: motif du saut.
     """
-    logger.warning("Source %s non configurée — sautée : %s", source, reason)
+    name = _display_name(source)
+    logger.warning("Source %s non configurée — sautée : %s", name, reason)
     metrics.signals.append(
         {
             "level": PhaseStatus.WARNING,
             "code": "source_unconfigured",
-            "message": f"{source} non configurée — sautée : {reason}",
+            "message": f"{name} non configurée — sautée : {reason}",
         }
     )
 
@@ -38,7 +45,8 @@ def signal_source_unavailable(
         reason: motif écrit au journal et dans le signal. Par défaut, la coupure de la source après une série de requêtes en échec.
     """
     message = reason or (
-        f"Source {source} coupée après une série de requêtes en échec, items reportés au prochain run"
+        f"Source {_display_name(source)} coupée après une série de requêtes en échec,"
+        " items reportés au prochain run"
     )
     logger.warning("%s", message)
     metrics.signals.append(

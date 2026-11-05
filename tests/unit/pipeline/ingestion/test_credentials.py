@@ -8,6 +8,7 @@ from unittest.mock import patch
 import pytest
 from pydantic import SecretStr
 
+from domain.sources.registry import DOI_ORG
 from infrastructure.settings import settings
 from pipeline.ingestion import credentials
 from pipeline.ingestion.credentials import (
@@ -54,7 +55,7 @@ def test_public_apis_never_missing(source):
     assert _detect(source) is None
 
 
-@pytest.mark.parametrize("source", ["doi.org", "doaj"])
+@pytest.mark.parametrize("source", [DOI_ORG, "doaj"])
 def test_sources_sans_credential_connu(source):
     """Une API publique absente de la liste de la fonction ne réclame aucun identifiant."""
     assert _detect(source) is None

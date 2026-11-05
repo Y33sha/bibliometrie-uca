@@ -11,6 +11,7 @@ import logging
 from collections.abc import Callable, Iterable, Sequence
 
 from domain.documents.identifiers import DoiPrefix
+from domain.sources.registry import DOI_ORG
 from pipeline.graph import Task
 from pipeline.http.circuit_breaker import SourceUnavailableError, trip_source
 from pipeline.http.polite_pool import default_user_agent
@@ -111,7 +112,7 @@ TASKS = (
         ),
         writes=("doi_prefixes.id", "doi_prefixes.ra"),
         previous_run=("source_records", "source_record_identifiers", "publication_relations"),
-        network="doi.org",
+        network=DOI_ORG,
         run=resolve_prefixes,
         label="Bilan",
     ),

@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from unittest.mock import MagicMock
 
 from domain.publishers.names import publisher_name_key
+from domain.sources.registry import DOI_ORG
 from pipeline.http.circuit_breaker import SourceUnavailableError, source_circuit_breaker
 from pipeline.http.lookup import NOT_FOUND, UNAVAILABLE
 from pipeline.transformation.publishing import resolve_ra
@@ -277,7 +278,7 @@ def test_resolve_ra_doi_org_indisponible_garde_les_prefixes_inseres(open_tx, con
 
     monkeypatch.setattr(resolve_ra, "DoiPrefixStore", lambda conn: repo)  # noqa: ARG005
     monkeypatch.setattr(resolve_ra, "fetch_registration_agencies", ras)
-    with source_circuit_breaker("doi.org") as breaker:
+    with source_circuit_breaker(DOI_ORG) as breaker:
         metrics = resolve_ra.resolve_prefixes(contexte())
 
     assert set(repo.rows) == {"10.1038"}
