@@ -76,7 +76,10 @@ Familles dont un établissement du périmètre est déposant : UCA, Université 
 - Type d'identifiant `patent_number` : office et numéro, sans le code de type. Le code de type désigne l'étape de publication d'une demande : A1 pour la demande publiée avec son rapport de recherche, B1 pour le brevet délivré.
 - Le numéro de brevet est une clé de confirmation à plusieurs valeurs, comme le DOI. Un dépôt HAL de brevet rejoint ainsi sa famille.
 - Un dépôt HAL de brevet sans famille en base cherche sa famille dans ScanR par numéro (`fetch_missing`).
-- Indice de périmètre `patent_applicant` : un déposant de la famille est du périmètre.
+- Le moissonnage écarte les articles cités et les champs dérivés des autres champs : `denormalized_structures`, `co_*`, `title_abs_text`.
+- Un brevet entre dans le périmètre quand un de ses déposants est une structure du périmètre : indice de publication `patent_applicant`.
+- Un inventeur entre dans le périmètre seulement par l'indice `hr_record`.
+- La purge des publications épargne une publication qui a un indice de publication, même sans contribution rattachée à une personne.
 - Rôle de contribution `inventor`, compté comme rôle d'auteur.
 - `source_extras` reçoit les demandes, les déposants et la classification CPC.
 
@@ -97,6 +100,7 @@ Familles dont un établissement du périmètre est déposant : UCA, Université 
 
 - [ ] Source `scanr_patents` : valeur de `source_type`, profil, adaptateur
 - [ ] Identifiants Paysage des déposants dans `structures.api_ids['scanr_patents']`, sur l'UCA et sur Clermont Auvergne INP
+- [ ] Client ScanR paramétré par l'index, partagé par `scanr` et `scanr_patents`
 - [ ] Moissonnage des familles par déposant
 - [ ] Normalisation : enregistrement source de type `patent`, numéros en `patent_number`, inventeurs en contributions sources de rôle `inventor`
 - [ ] Demandes, déposants et classification CPC dans `source_extras`
@@ -112,6 +116,7 @@ Familles dont un établissement du périmètre est déposant : UCA, Université 
 ### Phase 5 — Périmètre et personnes
 
 - [ ] Indice de périmètre `patent_applicant`
+- [ ] Exception à la purge des publications, après mesure de l'effet sur les thèses
 - [ ] Rôle `inventor`, compté comme rôle d'auteur
 - [ ] Mesure du rattachement des inventeurs par IdRef et par alignement avec les auteurs HAL
 - [ ] Mesure du rattachement par nom des autres inventeurs aux personnes RH
