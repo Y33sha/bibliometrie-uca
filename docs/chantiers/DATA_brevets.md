@@ -63,7 +63,7 @@ Familles dont un établissement du périmètre est déposant : UCA, Université 
 - Le CNRS est co-déposant de la moitié des familles de l'INPI.
 - HAL contient 88 brevets. 65 sont présents dans ScanR, dont 27 sans déposant du périmètre. 9 des 23 autres donnent une référence interne d'INRAE à la place d'un numéro de brevet.
 - 90 personnes RH ont le nom et le prénom d'un inventeur des familles de l'INPI domicilié dans le Puy-de-Dôme.
-- Dans ScanR, les identifiants Paysage des déposants du périmètre sélectionnent 154 familles : `K4lR3` et `FvH4k` (UCA), `3itX6` (Université d'Auvergne), `cQN1f` (SIGMA Clermont), `S8ntZ` (Clermont Auvergne INP), `UedNx` (ENSCCF). L'Université Blaise Pascal est absente des déposants.
+- Dans ScanR, les identifiants Paysage des déposants du périmètre sélectionnent 154 familles : `K4lR3` et `FvH4k` (UCA), `n1E6T` (Université Blaise Pascal), `3itX6` (Université d'Auvergne), `cQN1f` (SIGMA Clermont), `S8ntZ` (Clermont Auvergne INP), `UedNx` (ENSCCF).
 - 460 de leurs 903 inventeurs ont un IdRef. Sur 301 IdRef distincts, 181 sont en base : 84 confirmés, 97 en attente.
 
 ## Décisions
@@ -101,7 +101,7 @@ Familles dont un établissement du périmètre est déposant : UCA, Université 
 ### Phase 3 — Moissonnage et normalisation
 
 - [x] Source `scanr_patents` : valeur de `source_type`, profil, adaptateur
-- [ ] Identifiants Paysage des déposants dans `structures.api_ids['scanr_patents']`, sur l'UCA et sur Clermont Auvergne INP
+- [x] Identifiants Paysage des déposants dans `structures.api_ids['scanr_patents']`, sur l'UCA et sur Clermont Auvergne INP
 - [x] Client ScanR paramétré par l'index, partagé par `scanr` et `scanr_patents`
 - [x] Moissonnage des familles par déposant
 - [x] Normalisation : enregistrement source de type `patent`, numéros en `patent_publication_number` et `patent_application_number`, inventeurs en contributions sources de rôle `inventor`
