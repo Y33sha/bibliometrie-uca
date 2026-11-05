@@ -204,7 +204,7 @@
     // Le chemin du clic est figé à sa production : un clic sur un résultat que le rendu retire ensuite compte bien comme intérieur.
     const path = event.composedPath();
     const picker = document.getElementById("form-ctx-picker");
-    const onTrigger = path.some((n) => n instanceof HTMLElement && n.classList.contains("form-action"));
+    const onTrigger = path.some((n) => n instanceof HTMLElement && n.hasAttribute("data-ctx-trigger"));
     if (picker && !path.includes(picker) && !onTrigger) {
       closeCtxPicker();
     }
@@ -350,8 +350,8 @@
                           (ctx: {formatCtx(f.requires_context_of)})
                         </span>
                       {/if}
-                      <button class="form-action" title="Ajouter un contexte contraignant" onclick={(e) => openCtxPicker(f.form_id, e)}> + ctx </button>
-                      <button class="form-action danger" title="Supprimer cette forme" onclick={() => deleteForm(f.form_id)}> suppr. </button>
+                      <button class="btn btn-sm" data-ctx-trigger title="Ajouter un contexte contraignant" onclick={(e) => openCtxPicker(f.form_id, e)}> + ctx </button>
+                      <button class="btn btn-sm btn-danger" title="Supprimer cette forme" onclick={() => deleteForm(f.form_id)}> suppr. </button>
                     </div>
                   {/each}
                 {:else}
@@ -462,26 +462,6 @@
   }
   .form-ctx {
     color: var(--muted);
-  }
-  .form-action {
-    padding: 1px 6px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--card);
-    font-size: var(--fs-sm);
-    cursor: pointer;
-    font-weight: 500;
-    font-family: inherit;
-  }
-  .form-action:hover {
-    background: var(--accent-light);
-  }
-  .form-action.danger {
-    border-color: var(--danger);
-    color: var(--danger);
-  }
-  .form-action.danger:hover {
-    background: var(--danger-light);
   }
 
   /* Context picker */

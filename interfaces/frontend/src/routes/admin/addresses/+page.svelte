@@ -526,8 +526,8 @@
 
 		<!-- Ajout de prédicats -->
 		<div class="filters-row add-row">
-			<button class="add-btn" onclick={addTextPredicate}>+ Texte</button>
-			<button class="add-btn" onclick={addStructurePredicate}>+ Structure reconnue</button>
+			<button class="btn-add" onclick={addTextPredicate}>+ Texte</button>
+			<button class="btn-add" onclick={addStructurePredicate}>+ Structure reconnue</button>
 		</div>
 	</div>
 
@@ -703,20 +703,6 @@
 	}
 	.add-row {
 		gap: 6px;
-	}
-	.add-btn {
-		border: 1px dashed var(--border);
-		background: var(--card);
-		color: var(--accent);
-		border-radius: var(--radius);
-		cursor: pointer;
-		padding: 3px 10px;
-		font-size: var(--fs-sm);
-		font-family: inherit;
-	}
-	.add-btn:hover {
-		border-color: var(--accent);
-		background: var(--accent-light);
 	}
 	.select-all-row {
 		padding: 4px 12px 6px 15px;

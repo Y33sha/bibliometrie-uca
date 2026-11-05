@@ -124,7 +124,7 @@
         }
       }}
     />
-    <button class="btn btn-link" onclick={() => onadd(person.id)}>OK</button>
+    <button class="btn btn-create" onclick={() => onadd(person.id)}>OK</button>
     <button class="btn" onclick={() => ontoggleForm(person.id)}>&times;</button>
     {#if form.error}
       <span class="id-error">{form.error}</span>
@@ -132,7 +132,7 @@
   </div>
 {:else}
   <button
-    class="btn btn-add-id"
+    class="btn-add btn-add-id"
     title="Ajouter un identifiant"
     onclick={() => ontoggleForm(person.id)}>+ Identifiant</button
   >
@@ -166,27 +166,7 @@
     color: var(--success);
   }
   .btn-add-id {
-    padding: 2px 8px;
-    border: 1px dashed var(--border);
-    border-radius: var(--radius);
-    background: none;
-    font-size: var(--fs-sm);
-    cursor: pointer;
-    color: var(--accent);
     margin-top: 4px;
-    font-family: inherit;
-  }
-  .btn-add-id:hover {
-    background: var(--accent-light);
-    border-style: solid;
-  }
-  .btn-link {
-    border-color: var(--success);
-    color: var(--success);
-  }
-  .btn-link:hover {
-    background: var(--success);
-    color: var(--text-inverse);
   }
   .id-form {
     display: flex;

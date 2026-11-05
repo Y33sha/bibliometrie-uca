@@ -29,7 +29,7 @@
 </script>
 
 <div class="year-slider">
-	<button type="button" class="year-arrow" aria-label="Année précédente" disabled={value <= min} onclick={() => step(-1)}>‹</button>
+	<button type="button" class="icon-btn year-arrow" aria-label="Année précédente" disabled={value <= min} onclick={() => step(-1)}>‹</button>
 	<div class="year-track">
 		<input
 			type="range"
@@ -48,7 +48,7 @@
 			{/each}
 		</div>
 	</div>
-	<button type="button" class="year-arrow" aria-label="Année suivante" disabled={value >= max} onclick={() => step(1)}>›</button>
+	<button type="button" class="icon-btn year-arrow" aria-label="Année suivante" disabled={value >= max} onclick={() => step(1)}>›</button>
 </div>
 
 <style>
@@ -60,24 +60,6 @@
 	}
 	.year-arrow {
 		flex: none;
-		width: 24px;
-		height: 24px;
-		padding: 0;
-		border: 1px solid var(--border);
-		border-radius: var(--radius);
-		background: var(--card);
-		color: var(--text);
-		font-size: var(--fs-md);
-		line-height: 1;
-		cursor: pointer;
-	}
-	.year-arrow:hover:not(:disabled) {
-		border-color: var(--accent);
-		color: var(--accent);
-	}
-	.year-arrow:disabled {
-		color: var(--border);
-		cursor: default;
 	}
 	.year-track {
 		flex: 1;

@@ -61,7 +61,7 @@
 	{#each sections.primary as f (f.key)}
 		{#if isShown(f, optionCount)}{@render filterControl(f)}{/if}
 	{/each}
-	<button type="button" class="more-filters-btn" class:open={showMoreFilters} aria-expanded={showMoreFilters} onclick={() => (showMoreFilters = !showMoreFilters)}>
+	<button type="button" class="facet-btn more-filters-btn" class:open={showMoreFilters} aria-expanded={showMoreFilters} onclick={() => (showMoreFilters = !showMoreFilters)}>
 		{showMoreFilters ? 'Cacher les filtres' : 'Plus de filtres'}
 		{#if moreFiltersActive > 0}<span class="facet-badge">{moreFiltersActive}</span>{/if}
 		<span class="chevron" class:up={showMoreFilters} aria-hidden="true"></span>
@@ -99,22 +99,6 @@
 		color: var(--muted);
 		white-space: nowrap;
 	}
-	.more-filters-btn {
-		display: inline-flex;
-		align-items: center;
-		gap: 4px;
-		height: 34px;
-		padding: 0 10px;
-		border: none;
-		border-radius: var(--radius);
-		background: none;
-		font: inherit;
-		font-size: var(--fs-md);
-		color: var(--text-secondary);
-		white-space: nowrap;
-		cursor: pointer;
-	}
-	.more-filters-btn:hover,
 	.more-filters-btn.open { background: var(--hover); }
 	/* Facettes optionnelles sur une ligne, rubriques séparées par un filet vertical. */
 	.more-filters {

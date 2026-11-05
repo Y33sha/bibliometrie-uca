@@ -48,7 +48,7 @@
 			<input type="password" bind:value={password} autocomplete="current-password" required />
 		</label>
 
-		<button type="submit" disabled={loading}>
+		<button type="submit" class="btn btn-primary" disabled={loading}>
 			{loading ? 'Connexion...' : 'Se connecter'}
 		</button>
 	</form>
@@ -117,17 +117,6 @@
 	}
 	button {
 		width: 100%;
-		padding: 10px;
-		background: var(--accent);
-		color: var(--text-inverse);
-		border: none;
-		border-radius: var(--radius);
-		font-size: var(--fs-base);
-		font-weight: 500;
-		cursor: pointer;
-		font-family: inherit;
 		margin-top: 4px;
 	}
-	button:hover { background: color-mix(in srgb, var(--accent), black 20%); }
-	button:disabled { opacity: 0.6; cursor: not-allowed; }
 </style>

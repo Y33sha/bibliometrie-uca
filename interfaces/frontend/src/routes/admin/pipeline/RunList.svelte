@@ -64,7 +64,7 @@
       </button>
     {/each}
     {#if hasMore}
-      <button class="load-more" onclick={onLoadMore} disabled={loadingMore}>
+      <button class="btn btn-sm load-more" onclick={onLoadMore} disabled={loadingMore}>
         {loadingMore ? "Chargement…" : "Charger les runs plus anciens"}
       </button>
     {/if}
@@ -77,23 +77,7 @@
     flex-direction: column;
   }
   .load-more {
-    padding: 8px 12px;
     margin-top: 8px;
-    border: 1px dashed var(--border);
-    border-radius: var(--radius);
-    background: transparent;
-    color: var(--muted);
-    cursor: pointer;
-    font: inherit;
-    font-size: var(--fs-sm);
-  }
-  .load-more:hover:not(:disabled) {
-    background: var(--hover);
-    color: inherit;
-  }
-  .load-more:disabled {
-    cursor: default;
-    opacity: 0.6;
   }
   .run-item {
     display: flex;

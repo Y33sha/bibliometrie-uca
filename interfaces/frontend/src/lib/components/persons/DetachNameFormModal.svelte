@@ -47,7 +47,7 @@
                   {#if op.has_rh}<span class="tag tag-pill tag-accent">RH</span>{/if}
                 </span>
                 {#if !op.has_rh}
-                  <button class="btn btn-sm btn-merge-modal" onclick={() => onmerge(op.person_id)}>
+                  <button class="btn btn-sm btn-primary" onclick={() => onmerge(op.person_id)}>
                     ← Fusionner
                   </button>
                 {/if}
@@ -183,15 +183,5 @@
   .other-person-dept {
     color: var(--muted);
     font-size: var(--fs-sm);
-  }
-  .btn-merge-modal {
-    background: var(--accent);
-    color: var(--text-inverse);
-    border: none;
-    border-radius: var(--radius);
-    cursor: pointer;
-  }
-  .btn-merge-modal:hover {
-    background: color-mix(in srgb, var(--accent), black 20%);
   }
 </style>

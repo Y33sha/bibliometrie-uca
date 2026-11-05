@@ -21,7 +21,7 @@
 <div class="col-menu-inner">
 	<span class="col-menu-label">{label}</span>
 	<div class="column-menu-wrapper" use:dismissable={() => showMenu && onClose()}>
-		<button class="column-menu-btn" onclick={onOpen} title="Colonnes affichées" aria-label="Colonnes affichées" aria-expanded={showMenu}>⋯</button>
+		<button class="btn btn-sm" onclick={onOpen} title="Colonnes affichées" aria-label="Colonnes affichées" aria-expanded={showMenu}>⋯</button>
 		{#if showMenu}
 			<div class="column-menu" use:anchored={{ align: 'end' }}>
 				{#each columns as c}
@@ -41,11 +41,6 @@
 	.col-menu-inner { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
 	.col-menu-label { white-space: nowrap; }
 	.column-menu-wrapper { position: relative; }
-	.column-menu-btn {
-		background: none; border: 1px solid var(--border); border-radius: var(--radius);
-		padding: 2px 8px; font-size: var(--fs-lg); cursor: pointer; color: var(--muted);
-	}
-	.column-menu-btn:hover { background: var(--hover); color: var(--text); }
 	.column-menu {
 		background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
 		box-shadow: var(--shadow-md); padding: 6px 0;
