@@ -12,6 +12,7 @@
 * [ ] financements (projets ANR, projets européens)
 * [ ] publications fermées, sans localisation éditeur, avec revue OA: chercher des moyens de retrouver les localisations éditeur (URL des revues)
 * [ ] revue dans une liste officielle, avec type autre que "revue": auditer
+* [ ] personnes: stocker les dates min et max des contributions dans le périmètre, pour filtrer les auteurs par période d'activité
 # UI
 ## Admin
 * [ ] fusionner structures
