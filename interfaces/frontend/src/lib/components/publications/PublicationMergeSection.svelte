@@ -100,7 +100,7 @@
     <ul class="candidates">
       {#each candidates as c (c.publication_id)}
         <li>
-          <button class="btn-merge" disabled={merging} onclick={() => mergeWith(c)}>Fusionner</button>
+          <button class="btn btn-sm btn-create" disabled={merging} onclick={() => mergeWith(c)}>Fusionner</button>
           <span class="candidate">
             <a href={resolve(`publications/${c.publication_id}`)} target="_blank" rel="noopener"
               ><PublicationTitle titre={c.title} /></a

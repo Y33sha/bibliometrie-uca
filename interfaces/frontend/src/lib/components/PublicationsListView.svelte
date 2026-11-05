@@ -258,7 +258,7 @@
 
 <ListToolbar bind:search placeholder="Rechercher par titre ou sujet" onsearch={onSearchInput} list={listing} one="publication" many="publications" exportUrl={exportCsvUrl()}>
 	{#snippet actions()}
-		{#if showStatsLink}<a href={statsUrl} class="toolbar-action">Statistiques &rarr;</a>{/if}
+		{#if showStatsLink}<a href={statsUrl} class="btn btn-primary">Statistiques &rarr;</a>{/if}
 	{/snippet}
 	<PublicationFilterBar filters={FILTERS} bind:values options={facets.options} sourceCounts={facets.sourceCounts} buildParams={buildFilterParams} onchange={onFilterChange} />
 	{#snippet activeFilters()}

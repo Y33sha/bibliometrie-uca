@@ -103,7 +103,7 @@ Une étiquette (tag, badge, pastille, chip) est un court texte sur fond clair, a
 
 ### Phase 4 — Boutons et contrôles
 
-- [ ] Boutons sans bordure, pleins, à contour et en pointillés ; un seul état désactivé
+- [x] Boutons sans bordure, pleins, à contour et en pointillés ; un seul état désactivé
 - [ ] Boutons locaux sur les classes partagées, dont `AccessButton` et sa variante compacte ; retrait « × » sur `IconButton`
 - [ ] Champs, menus déroulants, panneaux flottants et lignes d'options
 

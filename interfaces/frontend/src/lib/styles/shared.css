@@ -219,22 +219,34 @@
 	background: var(--card) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-3.5-3.5'/%3E%3C/svg%3E") no-repeat 11px center;
 }
 
-/* Menu déroulant natif au gabarit des boutons de filtre : sans bordure, flèche dessinée, fond au survol. */
+/* Boutons sans bordure : texte en couleur d'accent, fond au survol. */
+.export-btn,
+.facet-btn,
+.btn-add,
+.toolbar select {
+	border: none;
+	border-radius: var(--radius);
+	background-color: transparent;
+	font: inherit;
+	font-weight: 500;
+	color: var(--accent);
+	cursor: pointer;
+	white-space: nowrap;
+}
+.export-btn:hover,
+.facet-btn:hover,
+.btn-add:hover,
+.toolbar select:hover {
+	background-color: var(--hover);
+}
+
+/* Menu déroulant natif au gabarit des boutons de filtre, flèche dessinée. */
 .toolbar select {
 	appearance: none;
 	height: 34px;
 	padding: 0 26px 0 10px;
-	border: none;
-	border-radius: var(--radius);
 	background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%236b7280' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 9px center;
-	font: inherit;
 	font-size: var(--fs-md);
-	font-weight: 500;
-	color: var(--text);
-	cursor: pointer;
-}
-.toolbar select:hover {
-	background-color: var(--hover);
 }
 
 /* Menu déroulant natif hors barre d'outils : champ bordé, flèche dessinée. */
@@ -271,25 +283,6 @@
 	border-bottom: 1px solid var(--border);
 }
 
-/* Action principale d'une barre d'outils (lien vers une autre vue) */
-.toolbar-action {
-	display: inline-flex;
-	align-items: center;
-	gap: 4px;
-	height: 36px;
-	padding: 0 14px;
-	border-radius: var(--radius);
-	background: var(--accent);
-	color: var(--text-inverse);
-	font-size: var(--fs-md);
-	font-weight: 600;
-	text-decoration: none;
-	white-space: nowrap;
-}
-.toolbar-action:hover {
-	background: color-mix(in srgb, var(--accent), black 20%);
-}
-
 /* ── Chevron (menus, facettes, en-têtes triés) : `.up` le retourne, pour un panneau ouvert ou un tri croissant ── */
 .chevron {
 	display: inline-block;
@@ -318,22 +311,10 @@
 	gap: 4px;
 	height: 34px;
 	padding: 0 10px;
-	border: none;
-	border-radius: var(--radius);
-	background: transparent;
 	font-size: var(--fs-md);
-	cursor: pointer;
-	color: var(--text);
-	white-space: nowrap;
-	font-family: inherit;
-}
-.facet-btn:hover {
-	background: var(--hover);
 }
 .facet-btn.has-selection {
 	background: var(--accent-light);
-	color: var(--accent);
-	font-weight: 500;
 }
 /* Nombre de valeurs sélectionnées, sur le bouton. */
 .facet-badge {
@@ -479,22 +460,10 @@
 .export-btn {
 	display: inline-flex;
 	align-items: center;
-	height: 36px;
+	height: 34px;
 	padding: 0 12px;
-	border: none;
-	border-radius: var(--radius);
-	background: transparent;
-	font: inherit;
 	font-size: var(--fs-md);
-	font-weight: 500;
-	color: var(--accent);
 	text-decoration: none;
-	cursor: pointer;
-	white-space: nowrap;
-}
-
-.export-btn:hover {
-	background: var(--hover);
 }
 
 /* ── Data table ── */
@@ -628,23 +597,6 @@
 	letter-spacing: var(--tracking-caps);
 	color: var(--muted);
 	margin: 0 0 8px;
-}
-
-/* Bouton « Fusionner… » d'un volet, qui ouvre la recherche de l'entité à absorber. */
-.btn-merge-inline {
-	padding: 2px 8px;
-	border: 1px dashed var(--border);
-	border-radius: var(--radius);
-	background: none;
-	font-size: var(--fs-sm);
-	cursor: pointer;
-	color: var(--muted);
-	font-family: inherit;
-}
-.btn-merge-inline:hover {
-	background: var(--warning-light);
-	color: var(--warning);
-	border-color: var(--warning);
 }
 
 .num {
@@ -1211,10 +1163,14 @@ a:hover > .logo-idref {
 	background: var(--hover);
 }
 
-.btn:disabled {
+.btn:disabled,
+.export-btn:disabled,
+.facet-btn:disabled,
+.btn-add:disabled,
+.icon-btn:disabled {
 	opacity: 0.5;
 	cursor: default;
-	/* Neutralise les `:hover` par variante (.btn-danger:hover, …) sur un bouton désactivé. */
+	/* Neutralise les `:hover` de chaque variante. */
 	pointer-events: none;
 }
 
@@ -1261,24 +1217,17 @@ a:hover > .logo-idref {
 	color: var(--text-inverse);
 }
 
-.btn-merge {
-	font-size: var(--fs-sm);
-	color: var(--success);
-	font-weight: 500;
+/* Contour en pointillés : bouton « Fusionner… » d'un volet, qui ouvre la recherche de l'entité à absorber. */
+.btn-dashed {
+	border-style: dashed;
 	background: none;
-	border: 1px solid var(--success);
-	border-radius: var(--radius);
-	cursor: pointer;
-	padding: 2px 8px;
+	color: var(--muted);
 }
 
-.btn-merge:hover:not(:disabled) {
-	background: var(--success-light);
-}
-
-.btn-merge:disabled {
-	opacity: 0.5;
-	cursor: default;
+.btn-dashed:hover {
+	background: var(--warning-light);
+	color: var(--warning);
+	border-color: var(--warning);
 }
 
 /* ── Publication title link ── */
@@ -1425,22 +1374,11 @@ button.entity-link {
 	opacity: 0.7;
 	text-decoration: line-through;
 }
-/* Bouton d'ajout discret (« + Ajouter ») : texte en couleur d'accent, fond au survol. */
+/* Bouton d'ajout discret (« + Ajouter »). */
 .btn-add {
 	height: 28px;
 	padding: 0 10px;
-	border: none;
-	border-radius: var(--radius-pill);
-	background: none;
-	font: inherit;
 	font-size: var(--fs-sm);
-	font-weight: 500;
-	color: var(--accent);
-	cursor: pointer;
-	white-space: nowrap;
-}
-.btn-add:hover {
-	background: var(--hover);
 }
 
 /* Bouton réduit à son icône (composant IconButton) : sans bordure, fond au survol, rouge au survol pour une suppression. */
@@ -1476,10 +1414,6 @@ button.entity-link {
 .icon-btn-success[aria-pressed='true'] {
 	background: var(--icon-btn-bg);
 	color: var(--icon-btn-color);
-}
-.icon-btn:disabled {
-	opacity: 0.4;
-	cursor: default;
 }
 
 /* Colonne de contrôles (bascules confirmer et rejeter, ou tag « nom ») à gauche d'une puce, largeur fixe pour aligner verticalement les puces entre les lignes. */

@@ -495,7 +495,7 @@
 			</button>
 		{/if}
 	{/if}
-	<a class="toolbar-action pubs-link" href={pubsUrl}>Voir les publications &rarr;</a>
+	<a class="btn btn-primary pubs-link" href={pubsUrl}>Voir les publications &rarr;</a>
 </div>
 <!-- Ligne 2 : filtres, ceux de la liste des publications. -->
 <div class="stats-filters">

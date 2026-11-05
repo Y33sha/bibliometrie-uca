@@ -301,7 +301,7 @@
           {/snippet}
         </Picker>
       {:else}
-        <button class="btn btn-merge-inline" onclick={() => onmergeOpen(person.id)}>Fusionner…</button>
+        <button class="btn btn-sm btn-dashed" onclick={() => onmergeOpen(person.id)}>Fusionner…</button>
       {/if}
     </section>
 </Drawer>
