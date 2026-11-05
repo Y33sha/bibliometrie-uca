@@ -1222,38 +1222,32 @@ a:hover > .logo-idref {
 	padding: 3px 8px;
 }
 
-/* Boutons pleins (gros boutons à texte) */
+/* Boutons pleins (gros boutons à texte), teintés par `--btn-color`. */
 .btn-confirm {
-	background: var(--success);
-	color: var(--text-inverse);
-	border-color: var(--success);
-}
-
-.btn-confirm:hover {
-	background: color-mix(in srgb, var(--success), black 20%);
-	border-color: color-mix(in srgb, var(--success), black 20%);
+	--btn-color: var(--success);
 }
 
 .btn-danger {
-	background: var(--danger);
-	color: var(--text-inverse);
-	border-color: var(--danger);
-}
-
-.btn-danger:hover {
-	background: color-mix(in srgb, var(--danger), black 20%);
-	border-color: color-mix(in srgb, var(--danger), black 20%);
+	--btn-color: var(--danger);
 }
 
 .btn-primary {
-	background: var(--accent);
-	color: var(--text-inverse);
-	border-color: var(--accent);
+	--btn-color: var(--accent);
 }
 
+.btn-confirm,
+.btn-danger,
+.btn-primary {
+	background: var(--btn-color);
+	color: var(--text-inverse);
+	border-color: var(--btn-color);
+}
+
+.btn-confirm:hover,
+.btn-danger:hover,
 .btn-primary:hover {
-	background: color-mix(in srgb, var(--accent), black 20%);
-	border-color: color-mix(in srgb, var(--accent), black 20%);
+	background: color-mix(in srgb, var(--btn-color), black 20%);
+	border-color: color-mix(in srgb, var(--btn-color), black 20%);
 }
 
 .btn-create {
@@ -1468,15 +1462,20 @@ button.entity-link {
 	background: var(--hover);
 	color: var(--accent);
 }
-.icon-btn-danger:hover:not(:disabled),
-.icon-btn-danger[aria-pressed='true'] {
-	background: var(--danger-light);
-	color: var(--danger);
+.icon-btn-danger {
+	--icon-btn-color: var(--danger);
+	--icon-btn-bg: var(--danger-light);
 }
+.icon-btn-success {
+	--icon-btn-color: var(--success);
+	--icon-btn-bg: var(--success-light);
+}
+.icon-btn-danger:hover:not(:disabled),
+.icon-btn-danger[aria-pressed='true'],
 .icon-btn-success:hover:not(:disabled),
 .icon-btn-success[aria-pressed='true'] {
-	background: var(--success-light);
-	color: var(--success);
+	background: var(--icon-btn-bg);
+	color: var(--icon-btn-color);
 }
 .icon-btn:disabled {
 	opacity: 0.4;
