@@ -14,6 +14,7 @@ Un enregistrement source qui change de revue est marqué pour la réconciliation
 import json
 import logging
 from collections import Counter
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 
 from sqlalchemy import Connection, Row, text
@@ -26,6 +27,7 @@ from domain.serials.attachment import (
     KnownIssn,
     KnownSerial,
     NewSerial,
+    SerialAttachment,
     SerialRef,
     SeriesMention,
     openalex_issnls,
@@ -185,52 +187,20 @@ def run_sync_issns(conn: Connection, logger: logging.Logger) -> PhaseMetrics:  #
     return metrics
 
 
-def _issn_serials(
-    conn: Connection, mentions: list[_Mention], oa_issnls: dict[str, str]
-) -> tuple[dict[str, str], dict[str, int], int]:
-    """Renvoie l'ISSN-L de chaque ISSN, la revue de chaque ISSN-L, et le nombre de revues créées. Écrit la revue de chaque ISSN."""
-    rows = {r.issn: KnownIssn(r.issnl, r.serial_id) for r in conn.execute(_ISSN_ROWS)}
-    plan = plan_issnl_serials(
-        rows,
+def _plan(
+    conn: Connection, mentions: list[_Mention], issns: Mapping[str, KnownIssn]
+) -> tuple[IssnlPlan, SerialAttachment]:
+    """Renvoie la revue de chaque ISSN-L et celle de chaque enregistrement source, d'après les faits en base, sans rien écrire."""
+    oa_issnls = openalex_issnls(
+        (m.openalex_issnl, m.issns) for m in mentions if m.openalex_issnl is not None
+    )
+    issnl_plan = plan_issnl_serials(
+        issns,
         {r.issn: r.linked_issn for r in conn.execute(_REPLACEMENTS)},
         oa_issnls,
         ((m.issns, m.series.title) for m in mentions if m.series),
     )
-    issnl_of = plan.issnl_of
-    store = SerialStore(conn)
-    serial_of = {
-        issnl: ref if isinstance(ref, int) else store.create_serial(ref.title)
-        for issnl, ref in plan.serial_of.items()
-    }
-    created = sum(1 for ref in plan.serial_of.values() if isinstance(ref, NewSerial))
-    conn.execute(_ADD_ISSNS, {"issns": sorted(issnl for issnl in serial_of if issnl not in rows)})
-    conn.execute(
-        _SET_ISSN_SERIALS,
-        {
-            "rows": json.dumps(
-                [
-                    {"issn": issn, "serial_id": serial_of.get(issnl)}
-                    for issn, issnl in [*issnl_of.items(), *((i, i) for i in serial_of)]
-                    if issnl in serial_of
-                ]
-            )
-        },
-    )
-    return issnl_of, serial_of, created
-
-
-def _attach(
-    conn: Connection,
-    mentions: list[_Mention],
-    issnl_of: dict[str, str],
-    serial_of_issnl: dict[str, int],
-) -> _Attachment:
-    serials = {
-        r.id: KnownSerial(r.title, r.title_normalized, r.publisher_id, r.openalex_id)
-        for r in conn.execute(_SERIALS)
-    }
-    issnl_serials: dict[str, SerialRef] = dict(serial_of_issnl)
-    plan = plan_record_serials(
+    record_plan = plan_record_serials(
         [
             SeriesMention(
                 m.id,
@@ -243,24 +213,38 @@ def _attach(
             for m in mentions
             if m.series
         ],
-        IssnlPlan(issnl_of, issnl_serials),
-        serials,
+        issnl_plan,
+        {
+            r.id: KnownSerial(r.title, r.title_normalized, r.publisher_id, r.openalex_id)
+            for r in conn.execute(_SERIALS)
+        },
         {r.title_normalized: r.serial_id for r in conn.execute(_DECISIONS)},
     )
-    store = SerialStore(conn)
-    created: dict[NewSerial, int] = {}
+    return issnl_plan, record_plan
 
-    def resolve(serial: SerialRef | None) -> int | None:
-        if not isinstance(serial, NewSerial):
-            return serial
-        if serial not in created:
-            created[serial] = store.create_serial(serial.title)
-        return created[serial]
 
-    result = _Attachment(by_way=plan.by_way)
-    for m in mentions:
-        result.serial_of[m.id] = resolve(plan.serial_of[m.id]) if m.series else None
-    return result
+def _write_issn_serials(
+    conn: Connection,
+    issns: Mapping[str, KnownIssn],
+    issnl_of: Mapping[str, str],
+    serial_of_issnl: Mapping[str, int],
+) -> None:
+    """Écrit la revue de chaque ISSN, celle de son ISSN-L. Un ISSN-L absent des ISSN connus reçoit sa ligne."""
+    conn.execute(
+        _ADD_ISSNS, {"issns": sorted(issnl for issnl in serial_of_issnl if issnl not in issns)}
+    )
+    conn.execute(
+        _SET_ISSN_SERIALS,
+        {
+            "rows": json.dumps(
+                [
+                    {"issn": issn, "serial_id": serial_of_issnl[issnl]}
+                    for issn, issnl in [*issnl_of.items(), *((i, i) for i in serial_of_issnl)]
+                    if issnl in serial_of_issnl
+                ]
+            )
+        },
+    )
 
 
 def _write_attachment(
@@ -344,13 +328,31 @@ def _refresh_attributes(
 
 
 def run_attach_serials(conn: Connection, logger: logging.Logger) -> PhaseMetrics:  # noqa: ARG001
-    """Rattache chaque enregistrement source à sa revue, absorbe les revues vidées et écrit les attributs des revues."""
+    """Rattache chaque enregistrement source à sa revue, absorbe les revues vidées et écrit les attributs des revues.
+
+    Le plan se calcule d'abord sur les faits en base. Les revues à créer du plan sont créées ensuite, puis les liens écrits.
+    """
     mentions = _load_mentions(conn)
-    oa_issnls = openalex_issnls(
-        (m.openalex_issnl, m.issns) for m in mentions if m.openalex_issnl is not None
-    )
-    issnl_of, serial_of_issnl, created = _issn_serials(conn, mentions, oa_issnls)
-    attachment = _attach(conn, mentions, issnl_of, serial_of_issnl)
+    issns = {r.issn: KnownIssn(r.issnl, r.serial_id) for r in conn.execute(_ISSN_ROWS)}
+    issnl_plan, record_plan = _plan(conn, mentions, issns)
+
+    store = SerialStore(conn)
+    created: dict[NewSerial, int] = {}
+
+    def resolve(serial: SerialRef) -> int:
+        if not isinstance(serial, NewSerial):
+            return serial
+        if serial not in created:
+            created[serial] = store.create_serial(serial.title)
+        return created[serial]
+
+    issnl_of = issnl_plan.issnl_of
+    serial_of_issnl = {issnl: resolve(serial) for issnl, serial in issnl_plan.serial_of.items()}
+    _write_issn_serials(conn, issns, issnl_of, serial_of_issnl)
+    attachment = _Attachment(by_way=record_plan.by_way)
+    for m in mentions:
+        serial = record_plan.serial_of[m.id] if m.series else None
+        attachment.serial_of[m.id] = resolve(serial) if serial is not None else None
     changed, received = _write_attachment(conn, mentions, attachment)
     absorbed = _absorb(conn, received)
     _refresh_attributes(conn, mentions, attachment, issnl_of, serial_of_issnl)
@@ -358,7 +360,7 @@ def run_attach_serials(conn: Connection, logger: logging.Logger) -> PhaseMetrics
     metrics.add(
         seen=len(mentions),
         updated=len(changed),
-        new=created,
+        new=len(created),
         serials_absorbed=absorbed,
         attached_by_issn=attachment.by_way["issn"],
         attached_by_openalex=attachment.by_way["openalex"],
