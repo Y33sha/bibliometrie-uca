@@ -41,7 +41,7 @@
               <div class="other-person-row">
                 <span class="other-person-name">
                   {op.first_name} <strong>{op.last_name}</strong>
-                  {#if op.current_unit}<span class="other-person-dept"
+                  {#if op.current_unit}<span class="muted-small"
                       >({op.current_unit})</span
                     >{/if}
                   {#if op.has_rh}<span class="tag tag-pill tag-accent">RH</span>{/if}
@@ -179,9 +179,5 @@
   }
   .other-person-name {
     font-size: var(--fs-md);
-  }
-  .other-person-dept {
-    color: var(--muted);
-    font-size: var(--fs-sm);
   }
 </style>

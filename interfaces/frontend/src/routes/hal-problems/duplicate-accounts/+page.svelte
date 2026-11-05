@@ -70,13 +70,13 @@
                 <span class="hal-name">{ha.full_name}</span>
                 <span class="tag">{formatCount(ha.publication_count, "publication")}</span>
                 {#if ha.idhal}
-                  <span class="hal-secondary-id">idHAL: {ha.idhal}</span>
+                  <span class="muted-small">idHAL: {ha.idhal}</span>
                 {/if}
                 {#if ha.orcid}
-                  <span class="hal-secondary-id">ORCID: {ha.orcid}</span>
+                  <span class="muted-small">ORCID: {ha.orcid}</span>
                 {/if}
                 {#if ha.idref}
-                  <span class="hal-secondary-id">IdRef: {ha.idref}</span>
+                  <span class="muted-small">IdRef: {ha.idref}</span>
                 {/if}
               </div>
             {/each}
@@ -115,9 +115,5 @@
   }
   .hal-name {
     font-weight: 500;
-  }
-  .hal-secondary-id {
-    font-size: var(--fs-sm);
-    color: var(--muted);
   }
 </style>

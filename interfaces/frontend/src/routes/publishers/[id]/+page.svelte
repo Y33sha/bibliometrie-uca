@@ -190,6 +190,4 @@
 <style>
 
 	.loading, .no-results { padding: 20px; color: var(--muted); }
-
-	.muted { color: var(--muted); }
 </style>

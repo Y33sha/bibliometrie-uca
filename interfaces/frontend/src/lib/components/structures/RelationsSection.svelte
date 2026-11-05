@@ -48,7 +48,7 @@
   <span class="relation-label">{label}</span>
   <div class="relation-values">
     {#if related.length === 0}
-      <span class="none-text">{emptyText}</span>
+      <span class="muted">{emptyText}</span>
     {:else}
       {#each related as r (r.tutelle_id)}
         <span class="tag-removable">
@@ -97,8 +97,5 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 8px;
-  }
-  .none-text {
-    color: var(--muted);
   }
 </style>

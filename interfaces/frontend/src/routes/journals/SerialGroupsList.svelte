@@ -119,5 +119,4 @@
 	.col-publications { width: 9%; }
 	.col-action { width: 13%; }
 	.group-head th { font-weight: normal; }
-	.muted { color: var(--muted); }
 </style>

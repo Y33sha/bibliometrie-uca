@@ -110,5 +110,4 @@
 	.col-issn { width: 14%; }
 	.col-share { width: 11%; }
 	.col-action { width: 13%; }
-	.muted { color: var(--muted); }
 </style>

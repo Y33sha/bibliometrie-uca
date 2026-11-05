@@ -97,7 +97,7 @@
             <span class="lineage">
               {#each v.ancestors as a (a.label_normalized)}
                 <a class="entity-link" href={resolve(`subjects/${a.label_normalized}`)}>{a.label}</a>
-                <span class="separator">›</span>
+                <span class="muted">›</span>
               {/each}
               <span class="current">{data.subject.label}</span>
             </span>
@@ -220,9 +220,6 @@
     flex-wrap: wrap;
     align-items: baseline;
     gap: 4px 6px;
-  }
-  .separator {
-    color: var(--muted);
   }
   .current {
     font-weight: 600;

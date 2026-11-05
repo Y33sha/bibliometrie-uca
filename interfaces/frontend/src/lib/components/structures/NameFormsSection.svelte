@@ -123,7 +123,7 @@
           <td class="form-text">{f.form_text}</td>
           <td>
             {#if f.is_excluding}
-              <span class="none-label">—</span>
+              <span class="muted">—</span>
             {:else if f.requires_context_of?.length}
               {#each f.requires_context_of as x}
                 <span class="tag-removable">
@@ -133,7 +133,7 @@
               {/each}
               {@render ctxAdd(f.id)}
             {:else}
-              <span class="none-label">—</span>
+              <span class="muted">—</span>
               {@render ctxAdd(f.id)}
             {/if}
           </td>
@@ -182,7 +182,7 @@
 <!-- New form context tags (masqué si excluante) -->
 {#if !addFormExcluding}
   <div class="new-form-ctx">
-    <span class="ctx-label-text">Contexte :</span>
+    <span class="muted">Contexte :</span>
     {#each newFormCtx as x}
       <span class="tag-removable">
         <span class="tag tag-warning">{ctxLabel(x)}</span>
@@ -265,9 +265,6 @@
     white-space: nowrap;
     padding-right: 0 !important;
   }
-  .none-label {
-    color: var(--muted);
-  }
   /* Formulaire d'ajout sous le tableau, sur un fond léger. */
   .add-row {
     display: flex;
@@ -295,9 +292,6 @@
   .new-form-ctx {
     margin-top: 4px;
     font-size: var(--fs-sm);
-  }
-  .ctx-label-text {
-    color: var(--muted);
   }
   .ctx-picker-shortcuts {
     padding: 6px 10px;

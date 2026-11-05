@@ -262,7 +262,4 @@
 </Drawer>
 
 <style>
-  .muted {
-    color: var(--muted);
-  }
 </style>

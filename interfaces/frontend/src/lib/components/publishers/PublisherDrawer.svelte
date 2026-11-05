@@ -284,9 +284,6 @@
 </Drawer>
 
 <style>
-  .muted {
-    color: var(--muted);
-  }
   .forms-table {
     width: 100%;
   }

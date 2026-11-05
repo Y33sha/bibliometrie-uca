@@ -341,7 +341,7 @@
             {@render inlineEdit(key)}
           {:else}
             {#if item.value === null}
-              <span class="config-value-inline default-value">
+              <span class="config-value-inline muted">
                 {item.value_if_null} (par défaut)
               </span>
             {:else}
@@ -500,7 +500,7 @@
           {#if siteTitleItem.value}
             <span class="config-value-inline">{siteTitleItem.value}</span>
           {:else}
-            <span class="config-value-inline default-value">{defaultSiteTitle()} (par défaut)</span>
+            <span class="config-value-inline muted">{defaultSiteTitle()} (par défaut)</span>
           {/if}
           <IconButton icon="edit" label="Modifier" onclick={() => startEdit(SITE_TITLE_KEY)} />
         {/if}
@@ -646,9 +646,6 @@
   .config-editor-inline.text {
     width: 320px;
     font-family: inherit;
-  }
-  .default-value {
-    color: var(--muted);
   }
   .config-actions-inline {
     display: flex;

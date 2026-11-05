@@ -290,7 +290,7 @@
 			oninput={(e) => batchSearch.setQuery((e.target as HTMLInputElement).value)} autocomplete="off" />
 		<button class="btn btn-sm btn-create" onclick={openCreateModal}>Créer une personne</button>
 		{#if batchSearch.loading}
-			<span class="loading-text">…</span>
+			<span class="muted-small">…</span>
 		{:else if batchSearch.results.length}
 			<div class="batch-results popover" use:anchored>
 				{#each batchSearch.results as r (r.id)}
@@ -355,7 +355,7 @@
 											<IconButton icon="reject" label="Fermer" onclick={closeAssign} />
 										</div>
 										{#if assignSearch.loading}
-											<span class="loading-text">…</span>
+											<span class="muted-small">…</span>
 										{:else if assignSearch.results.length}
 											<div class="assign-results popover" use:anchored>
 												{#each assignSearch.results as r (r.id)}
@@ -368,7 +368,7 @@
 											</div>
 										{:else if assignSearch.query.length >= 2}
 											<div class="assign-results popover" use:anchored>
-												<span class="loading-text">Aucun résultat</span>
+												<span class="muted-small">Aucun résultat</span>
 												<button class="btn btn-sm btn-create" onclick={() => createAndAssign(o)}>Créer « {o.full_name} »</button>
 											</div>
 										{/if}
@@ -418,7 +418,7 @@
 {#if rejectModal}
 	<Modal title="Réassignation déjà rejetée" onclose={() => { rejectModal = null; }}>
 			<p class="reject-detail">{rejectModal.detail}</p>
-			<p class="reject-muted">
+			<p class="muted-small">
 				Cette personne a été détachée de {plural(rejectModal.pairs.length, 'cette publication', 'ces publications')} manuellement.
 				Confirmer lèvera le rejet et recréera le lien.
 			</p>
@@ -428,7 +428,7 @@
 						<a href={resolve(`publications/${p.publication_id}`)} target="_blank" rel="noopener">
 							Publication #{p.publication_id}
 						</a>
-						<span class="reject-muted">— rejetée le {new Date(p.rejected_at).toLocaleDateString('fr-FR')}</span>
+						<span class="muted-small">— rejetée le {new Date(p.rejected_at).toLocaleDateString('fr-FR')}</span>
 					</li>
 				{/each}
 			</ul>
@@ -460,7 +460,6 @@
 		padding: 6px 0; min-width: 250px;
 	}
 	.result-hint { font-size: var(--fs-sm); color: var(--muted); margin-left: 4px; }
-	.loading-text { font-size: var(--fs-sm); color: var(--muted); }
 	.batch-bar {
 		display: flex; align-items: center; gap: 10px;
 		padding: 10px 14px; margin-bottom: 10px;
@@ -475,6 +474,5 @@
 	.create-form { display: flex; flex-direction: column; gap: 10px; margin: 12px 0; }
 	.create-form label { display: flex; flex-direction: column; gap: 3px; font-size: var(--fs-sm); font-weight: 500; }
 	.reject-detail { font-weight: 600; margin: 8px 0; }
-	.reject-muted { color: var(--muted); font-size: var(--fs-sm); }
 	.reject-list { margin: 10px 0; padding-left: 18px; font-size: var(--fs-sm); }
 </style>

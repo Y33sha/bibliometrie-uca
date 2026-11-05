@@ -1480,3 +1480,12 @@ button.entity-link {
 	min-width: 58px;
 	flex-shrink: 0;
 }
+
+/* ── Texte secondaire ── */
+.muted {
+	color: var(--muted);
+}
+.muted-small {
+	color: var(--muted);
+	font-size: var(--fs-sm);
+}

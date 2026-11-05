@@ -64,7 +64,7 @@
       <span class="access-state"><span class="access-dot"></span>Accès ouvert</span>
       {#if accessLicense}<span class="access-license">· <LicenseBadge license={accessLicense} /></span>{/if}
       {#if accessCopy || viaPublisher}
-        <div class="access-via">via {viaPublisher ? "l'éditeur" : accessCopy?.label}</div>
+        <div class="muted">via {viaPublisher ? "l'éditeur" : accessCopy?.label}</div>
       {/if}
     </div>
   {/if}
@@ -158,9 +158,6 @@
   }
   .access-state {
     color: var(--open-text);
-  }
-  .access-via {
-    color: var(--muted);
   }
   .sidebar-block {
     margin-top: 22px;

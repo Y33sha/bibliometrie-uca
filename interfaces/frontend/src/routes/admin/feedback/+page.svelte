@@ -343,10 +343,10 @@
                 {#if a.matched_forms && a.matched_forms.length > 0}
                   {#each uniqueForms(a.matched_forms) as f (f.form_id)}
                     <div class="form-info">
-                      <span class="form-struct">{structureLabel(f.structure)} &rarr;</span>
+                      <span class="muted">{structureLabel(f.structure)} &rarr;</span>
                       <span class="form-text">{f.form_text}</span>
                       {#if f.requires_context_of && f.requires_context_of.length}
-                        <span class="form-ctx">
+                        <span class="muted">
                           (ctx: {formatCtx(f.requires_context_of)})
                         </span>
                       {/if}
@@ -377,7 +377,7 @@
       <div class="picker-results">
         {#each ctxFilteredStructures as s (s.id)}
           <button class="option-row" onclick={() => addCtxToForm(s.id)}>
-            <span class="picker-type">{s.type}</span>
+            <span class="muted-small">{s.type}</span>
             {s.acronym ? s.acronym + " \u2014 " : ""}{s.name}
           </button>
         {/each}
@@ -428,10 +428,6 @@
     word-break: break-word;
     max-width: 600px;
   }
-  .muted-small {
-    color: var(--muted);
-    font-size: var(--fs-sm);
-  }
 
   /* Structure ajoutée à la main : contour en pointillés. */
   .struct-manual {
@@ -452,16 +448,10 @@
     gap: 6px;
     flex-wrap: wrap;
   }
-  .form-struct {
-    color: var(--muted);
-  }
   .form-text {
     font-family: var(--mono);
     font-weight: 600;
     color: var(--warning-text);
-  }
-  .form-ctx {
-    color: var(--muted);
   }
 
   /* Context picker */
@@ -473,10 +463,6 @@
   .picker-results {
     max-height: 180px;
     overflow-y: auto;
-  }
-  .picker-type {
-    font-size: var(--fs-sm);
-    color: var(--muted);
   }
   .picker-item-empty {
     padding: 5px 10px;

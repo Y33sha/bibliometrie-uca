@@ -52,7 +52,7 @@
           <button class="triage-person title" onclick={() => drawer.open(item.publication_id)}>
             <PublicationTitle titre={item.title} />
           </button>
-          <span class="meta">
+          <span class="muted-small">
             {docTypeLabel(item.doc_type)}{#if item.publication_year} · {item.publication_year}{/if} ·
             <a href={resolve(`publications/${item.publication_id}`)} target="_blank" rel="noopener"
               >listes d'auteurs</a
@@ -106,10 +106,6 @@
   .title {
     min-width: 0;
     overflow-wrap: anywhere;
-  }
-  .meta {
-    font-size: var(--fs-sm);
-    color: var(--muted);
   }
   .stats {
     display: flex;

@@ -237,5 +237,4 @@
 
 <style>
 	.monographs-table { min-width: 720px; }
-	.muted { color: var(--muted); }
 </style>

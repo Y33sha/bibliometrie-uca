@@ -271,8 +271,6 @@
 
 	.loading, .no-results { padding: 20px; color: var(--muted); }
 	.doaj-grid { margin-top: 24px; }
-
-	.muted { color: var(--muted); }
 	.small { font-size: var(--fs-sm); font-weight: 400; }
 
 	.doaj-fields {

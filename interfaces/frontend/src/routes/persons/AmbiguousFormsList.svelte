@@ -63,7 +63,7 @@
       <div class="triage-item">
         <div class="form-head">
           <span class="form-name">{form.name_form}</span>
-          <span class="form-count">{form.persons.length} personnes</span>
+          <span class="muted-small">{form.persons.length} personnes</span>
         </div>
         <div class="form-persons">
           {#each form.persons as p (p.person_id)}
@@ -107,10 +107,6 @@
   .form-name {
     font-weight: 600;
     font-family: var(--mono);
-  }
-  .form-count {
-    font-size: var(--fs-sm);
-    color: var(--muted);
   }
   .form-persons {
     display: flex;

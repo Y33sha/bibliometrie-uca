@@ -358,5 +358,4 @@
 	.journals-table td.num { color: var(--muted); }
 	.diamond-col { width: 1.5rem; padding-right: 0; }
 	.diamond { display: inline-flex; color: var(--diamond-text); vertical-align: middle; }
-	.muted { color: var(--muted); }
 </style>

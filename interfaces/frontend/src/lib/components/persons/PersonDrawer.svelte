@@ -224,7 +224,7 @@
     <section class="drawer-section">
       <h3>Formes de nom</h3>
       {#if nameForms === null}
-        <span class="forms-loading">Chargement…</span>
+        <span class="muted-small">Chargement…</span>
       {:else}
         <NameFormsList personId={person.id} {nameForms} onopenDetail={onopenDetach} onsetStatus={onsetFormStatus} />
       {/if}
@@ -248,7 +248,7 @@
                 {titleCase(sp.first_name)}
               </button>
               {#if sp.has_rh}<RhCheck />{/if}
-              <span class="sharing-forms" title={sp.shared_forms.join(", ")}>
+              <span class="muted-small" title={sp.shared_forms.join(", ")}>
                 {formatCount(sp.shared_forms.length, "forme")}
               </span>
             </div>
@@ -346,10 +346,6 @@
   .rh-info dd {
     margin: 0;
   }
-  .forms-loading {
-    font-size: var(--fs-sm);
-    color: var(--muted);
-  }
   .sharing-list {
     display: flex;
     flex-direction: column;
@@ -359,9 +355,5 @@
     display: inline-flex;
     align-items: center;
     gap: 8px;
-  }
-  .sharing-forms {
-    font-size: var(--fs-sm);
-    color: var(--muted);
   }
 </style>

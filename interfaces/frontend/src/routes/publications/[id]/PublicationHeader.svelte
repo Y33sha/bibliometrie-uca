@@ -68,7 +68,7 @@
       {#if pub.publisher_name}
         <!-- Le tiret passe à la ligne avec l'éditeur. -->
         <span class="publisher">
-          <span class="publisher-sep">—</span>
+          <span class="muted-small">—</span>
           {#if pub.publisher_id}
             <a href={resolve(`publishers/${pub.publisher_id}`)} class="publisher-name">{pub.publisher_name}</a>
           {:else}
@@ -283,9 +283,5 @@
     display: inline-flex;
     gap: 10px;
     align-items: center;
-  }
-  .publisher-sep {
-    font-size: var(--fs-sm);
-    color: var(--muted);
   }
 </style>

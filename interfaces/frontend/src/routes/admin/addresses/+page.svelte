@@ -434,7 +434,7 @@
 		<!-- Ligne fixe : détection/validation de la structure étudiée -->
 		<div class="filters-row scope-row">
 			<span class="filters-title">Filtres</span>
-			<span class="scope-echo">Structure étudiée : <strong>{currentStructureName}</strong></span>
+			<span class="muted-small">Structure étudiée : <strong>{currentStructureName}</strong></span>
 			<label class="scope-field">
 				Détection
 				<select
@@ -660,10 +660,6 @@
 		text-transform: uppercase;
 		font-size: var(--fs-xs);
 		letter-spacing: var(--tracking-caps);
-	}
-	.scope-echo {
-		font-size: var(--fs-sm);
-		color: var(--muted);
 	}
 	.scope-field {
 		font-size: var(--fs-sm);

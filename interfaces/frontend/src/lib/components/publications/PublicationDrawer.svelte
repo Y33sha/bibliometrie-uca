@@ -78,7 +78,7 @@
   {/snippet}
 
   {#if failure}
-    <p class="failure">{failure}</p>
+    <p class="muted">{failure}</p>
   {:else if data}
     <table class="comparison">
       <thead>
@@ -298,9 +298,6 @@
   .uncorrected {
     color: var(--muted);
     margin-right: 4px;
-  }
-  .failure {
-    color: var(--muted);
   }
   .section-row th,
   .section-row td {
