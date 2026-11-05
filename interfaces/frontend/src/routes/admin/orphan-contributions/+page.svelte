@@ -352,7 +352,7 @@
 											<input type="search" placeholder="Nom de la personne" value={assignSearch.query}
 													use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { closeAssign(); } }}
 												oninput={(e) => assignSearch.setQuery((e.target as HTMLInputElement).value)} />
-											<button class="btn btn-sm" onclick={closeAssign}>&times;</button>
+											<IconButton icon="reject" label="Fermer" onclick={closeAssign} />
 										</div>
 										{#if assignSearch.loading}
 											<span class="loading-text">…</span>

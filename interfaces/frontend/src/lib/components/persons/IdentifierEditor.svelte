@@ -5,6 +5,7 @@
   import { autofocus } from "#lib/actions/focus.js";
   import { identifierTypeLabel } from "#lib/labels.js";
   import type { IdFormState, Person, PersonIdentifier } from "./types";
+  import IconButton from "#lib/components/IconButton.svelte";
 
   let {
     person,
@@ -125,7 +126,7 @@
       }}
     />
     <button class="btn btn-create" onclick={() => onadd(person.id)}>OK</button>
-    <button class="btn" onclick={() => ontoggleForm(person.id)}>&times;</button>
+    <IconButton icon="reject" label="Annuler" onclick={() => ontoggleForm(person.id)} />
     {#if form.error}
       <span class="id-error">{form.error}</span>
     {/if}

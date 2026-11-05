@@ -126,9 +126,9 @@
               <span class="none-label">—</span>
             {:else if f.requires_context_of?.length}
               {#each f.requires_context_of as x}
-                <span class="tag tag-warning tag-removable">
-                  {ctxLabel(x)}
-                  <button class="ctx-remove" onclick={() => onremoveCtx(f.id, x)} title="Retirer ce contexte" aria-label="Retirer ce contexte">×</button>
+                <span class="tag-removable">
+                  <span class="tag tag-warning">{ctxLabel(x)}</span>
+                  <IconButton icon="reject" label="Retirer ce contexte" onclick={() => onremoveCtx(f.id, x)} />
                 </span>
               {/each}
               {@render ctxAdd(f.id)}
@@ -183,9 +183,9 @@
   <div class="new-form-ctx">
     <span class="ctx-label-text">Contexte :</span>
     {#each newFormCtx as x}
-      <span class="tag tag-warning tag-removable">
-        {ctxLabel(x)}
-        <button class="ctx-remove" onclick={() => onremoveNewCtx(x)} title="Retirer ce contexte" aria-label="Retirer ce contexte">×</button>
+      <span class="tag-removable">
+        <span class="tag tag-warning">{ctxLabel(x)}</span>
+        <IconButton icon="reject" label="Retirer ce contexte" onclick={() => onremoveNewCtx(x)} />
       </span>
     {/each}
     {@render ctxAdd(null)}
@@ -263,20 +263,6 @@
     width: 1px;
     white-space: nowrap;
     padding-right: 0 !important;
-  }
-  .ctx-remove {
-    cursor: pointer;
-    color: var(--danger);
-    font-weight: bold;
-    font-size: var(--fs-sm);
-    line-height: 1;
-    background: none;
-    border: none;
-    padding: 0;
-    font-family: inherit;
-  }
-  .ctx-remove:hover {
-    color: var(--danger);
   }
   .none-label {
     color: var(--muted);

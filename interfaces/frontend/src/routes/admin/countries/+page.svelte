@@ -16,6 +16,7 @@
 
 	import type { components } from '#lib/api/schema.js';
 	import { formatCount } from '#lib/plural.js';
+	import IconButton from '#lib/components/IconButton.svelte';
 	type Address = components['schemas']['AddressForCountryAttribution'];
 	type Country = components['schemas']['CountryOut'];
 	type Method = components['schemas']['CountryDetectionMethod'];
@@ -243,9 +244,9 @@
 						<div class="country-cell">
 						{#each a.countries ?? [] as c}
 							{@const found = a.found_countries.find(f => f.country_code === c)}
-							<span class="tag tag-success tag-removable" title={found ? `Trouvé par : ${methodsLabel(found.methods)}` : undefined}>
-								{countryLabel(c)}
-								<button class="tag-remove" aria-label="Retirer {countryLabel(c)}" title="Retirer {countryLabel(c)}" onclick={() => removeCountry(a.id, c)}>×</button>
+							<span class="tag-removable">
+								<span class="tag tag-success" title={found ? `Trouvé par : ${methodsLabel(found.methods)}` : undefined}>{countryLabel(c)}</span>
+								<IconButton icon="reject" label="Retirer {countryLabel(c)}" onclick={() => removeCountry(a.id, c)} />
 							</span>
 						{/each}
 						<span class="country-actions">
@@ -292,10 +293,5 @@
 	.num-cell { text-align: center; color: var(--muted); font-size: var(--fs-sm); }
 	.country-cell { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
 	.country-actions { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; justify-content: flex-end; margin-left: auto; }
-	.tag-remove {
-		background: none; border: none; cursor: pointer;
-		color: var(--muted); font-size: var(--fs-sm); padding: 0 1px; line-height: 1;
-	}
-	.tag-remove:hover { color: var(--danger); }
 	.add-country { width: 7rem; height: 26px; font-size: var(--fs-sm); color: var(--muted); }
 </style>
