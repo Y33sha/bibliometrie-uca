@@ -68,4 +68,15 @@ export function fitsInBar(ctx: DataLabelsContext, text: string, font: Partial<Fo
 	return length >= along + 2 * BAR_LABEL_PADDING && thickness >= across;
 }
 
+/** `text` tronqué et terminé par une ellipse pour tenir en `maxWidth` pixels dans la police `font` ; `text` entier s'il tient. */
+export function truncateToWidth(canvas: CanvasRenderingContext2D, text: string, font: Partial<FontSpec>, maxWidth: number): string {
+	canvas.save();
+	canvas.font = toFont(font).string;
+	let length = text.length;
+	const candidate = () => (length === text.length ? text : `${text.slice(0, length).trimEnd()}…`);
+	while (length > 0 && canvas.measureText(candidate()).width > maxWidth) length--;
+	canvas.restore();
+	return candidate();
+}
+
 export { Chart };

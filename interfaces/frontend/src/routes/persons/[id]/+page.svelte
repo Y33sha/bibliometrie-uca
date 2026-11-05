@@ -21,8 +21,8 @@
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
 	import AddressPublications from '#lib/components/AddressPublications.svelte';
 	import PublicationCountButton from '#lib/components/PublicationCountButton.svelte';
-	import BarChart from '#lib/components/charts/BarChart.svelte';
-	import YearSlider from '#lib/components/YearSlider.svelte';
+	import BarChart, { BAR_LABEL_SPACE } from '#lib/components/charts/BarChart.svelte';
+	import YearSlider, { YEAR_TRACK_INSET } from '#lib/components/YearSlider.svelte';
 	import { confirmDialog } from '#lib/dialogs.svelte.js';
 	import TitleRow from '#lib/components/TitleRow.svelte';
 	import PersonCurationDrawer from '#lib/components/persons/PersonCurationDrawer.svelte';
@@ -334,8 +334,11 @@
 					</p>
 				{/if}
 				{#if addrStructures.length}
-					<!-- Axe des structures aligné sur le bord gauche du curseur, libellés en débord. -->
-					<div class="addr-chart" style:--axis-width="{ADDR_AXIS_WIDTH}px">
+					<!-- Axe des valeurs aligné sur la piste du curseur ; libellés des structures et pourcentages en débord. -->
+					<div
+						style:margin-left="{YEAR_TRACK_INSET - ADDR_AXIS_WIDTH}px"
+						style:width="calc(100% + {ADDR_AXIS_WIDTH + BAR_LABEL_SPACE - 2 * YEAR_TRACK_INSET}px)"
+					>
 						<BarChart
 							labels={addrStructures.map((s) => structureLabel(s))}
 							values={addrStructures.map((s) => s.publications)}
@@ -438,10 +441,6 @@
 	}
 	.addr-year-label { font-size: var(--fs-md); }
 	.addr-total { font-size: var(--fs-md); margin: 0 0 8px; }
-	.addr-chart {
-		width: calc(100% + var(--axis-width));
-		margin-left: calc(-1 * var(--axis-width));
-	}
 	.addr-counts { font-size: var(--fs-sm); color: var(--text-secondary); margin: 0; }
 	.addr-cell { font-size: var(--fs-sm); color: var(--muted); word-break: break-all; }
 	.addr-publications { padding: 0 12px 12px 24px; }

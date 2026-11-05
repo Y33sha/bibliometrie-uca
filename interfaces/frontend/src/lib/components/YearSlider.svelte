@@ -1,3 +1,10 @@
+<script module lang="ts">
+	const ARROW_WIDTH = 28;
+	const ARROW_GAP = 6;
+	/** Distance en pixels entre chaque bord du composant et la piste du curseur. */
+	export const YEAR_TRACK_INSET = ARROW_WIDTH + ARROW_GAP;
+</script>
+
 <script lang="ts">
 	/** Choix d'une année : curseur gradué, une graduation par année, et flèches pour l'année précédente ou suivante. */
 	let {
@@ -28,7 +35,7 @@
 	}
 </script>
 
-<div class="year-slider">
+<div class="year-slider" style:--arrow-width="{ARROW_WIDTH}px" style:gap="{ARROW_GAP}px">
 	<button type="button" class="icon-btn year-arrow" aria-label="Année précédente" disabled={value <= min} onclick={() => step(-1)}>‹</button>
 	<div class="year-track">
 		<input
@@ -56,10 +63,10 @@
 		--thumb: 14px;
 		display: flex;
 		align-items: flex-start;
-		gap: 6px;
 	}
 	.year-arrow {
 		flex: none;
+		width: var(--arrow-width);
 	}
 	.year-track {
 		flex: 1;
