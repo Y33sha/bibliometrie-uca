@@ -9,7 +9,7 @@ from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_record, secondary_identifiers
 from tests.integration.helpers.staging import insert_failed_lookup, insert_staging
 
-PUB, APP = "patent_publication_number", "patent_application_number"
+PUBLICATION_NUMBER, APPLICATION_NUMBER = "patent_publication_number", "patent_application_number"
 
 
 def _record(conn, source, source_id, identifiers, *, publication_id=None, in_perimeter=True) -> int:
@@ -39,36 +39,52 @@ class TestGetMissingNumbers:
             sa_sync_conn,
             "hal",
             "hal-1",
-            {PUB: ["FR3053353", "WO2017050584"], APP: ["FR1851441", "WO2017050584"]},
+            {
+                PUBLICATION_NUMBER: ["FR3053353", "WO2017050584"],
+                APPLICATION_NUMBER: ["FR1851441", "WO2017050584"],
+            },
         )
         assert _missing(sa_sync_conn) == {
-            "FR1851441": {APP},
-            "FR3053353": {PUB},
-            "WO2017050584": {PUB, APP},
+            "FR1851441": {APPLICATION_NUMBER},
+            "FR3053353": {PUBLICATION_NUMBER},
+            "WO2017050584": {PUBLICATION_NUMBER, APPLICATION_NUMBER},
         }
 
     def test_publication_hors_perimetre_ignoree(self, sa_sync_conn):
-        _record(sa_sync_conn, "hal", "hal-1", {PUB: ["FR3053353"]}, in_perimeter=False)
+        _record(
+            sa_sync_conn, "hal", "hal-1", {PUBLICATION_NUMBER: ["FR3053353"]}, in_perimeter=False
+        )
         assert _missing(sa_sync_conn) == {}
 
     def test_publication_avec_famille_ignoree(self, sa_sync_conn):
         """Le dépôt HAL cite une demande de priorité absente de la liste des demandes de sa famille."""
-        publication_id = _record(sa_sync_conn, "hal", "hal-1", {APP: ["EP22306008"]})
+        publication_id = _record(sa_sync_conn, "hal", "hal-1", {APPLICATION_NUMBER: ["EP22306008"]})
         _record(sa_sync_conn, "scanr_patents", "1", {}, publication_id=publication_id)
         assert _missing(sa_sync_conn) == {}
 
     def test_numero_d_une_famille_en_base_ignore(self, sa_sync_conn):
-        _record(sa_sync_conn, "hal", "hal-1", {PUB: ["FR3053353"]})
-        _record(sa_sync_conn, "scanr_patents", "1", {PUB: ["FR3053353"]})
+        _record(sa_sync_conn, "hal", "hal-1", {PUBLICATION_NUMBER: ["FR3053353"]})
+        _record(sa_sync_conn, "scanr_patents", "1", {PUBLICATION_NUMBER: ["FR3053353"]})
         assert _missing(sa_sync_conn) == {}
 
     def test_numero_cherche_en_vain_puis_de_nouveau_apres_le_delai(self, sa_sync_conn):
-        _record(sa_sync_conn, "hal", "hal-1", {PUB: ["FR3053353"], APP: ["FR1851441"]})
-        insert_failed_lookup(sa_sync_conn, "scanr_patents", id_type=PUB, id_value="FR3053353")
-        insert_failed_lookup(
-            sa_sync_conn, "scanr_patents", id_type=APP, id_value="FR1851441", not_found_days_ago=60
+        _record(
+            sa_sync_conn,
+            "hal",
+            "hal-1",
+            {PUBLICATION_NUMBER: ["FR3053353"], APPLICATION_NUMBER: ["FR1851441"]},
         )
-        assert _missing(sa_sync_conn) == {"FR1851441": {APP}}
+        insert_failed_lookup(
+            sa_sync_conn, "scanr_patents", id_type=PUBLICATION_NUMBER, id_value="FR3053353"
+        )
+        insert_failed_lookup(
+            sa_sync_conn,
+            "scanr_patents",
+            id_type=APPLICATION_NUMBER,
+            id_value="FR1851441",
+            not_found_days_ago=60,
+        )
+        assert _missing(sa_sync_conn) == {"FR1851441": {APPLICATION_NUMBER}}
 
 
 def _family(family_id: str, *applications: tuple[str, str, str]) -> dict:
@@ -99,7 +115,11 @@ class TestSearchNumbers:
         )
         async with httpx2.AsyncClient() as client:
             batch = await search_numbers(
-                client, {"FR3053353": frozenset({PUB}), "WO2018002556": frozenset({PUB})}
+                client,
+                {
+                    "FR3053353": frozenset({PUBLICATION_NUMBER}),
+                    "WO2018002556": frozenset({PUBLICATION_NUMBER}),
+                },
             )
         assert [f["id"] for f in batch.records] == ["1"]
         assert batch.absent == ["WO2018002556"]
@@ -113,7 +133,7 @@ class TestSearchNumbers:
             )
         )
         async with httpx2.AsyncClient() as client:
-            batch = await search_numbers(client, {"FR1851441": frozenset({APP})})
+            batch = await search_numbers(client, {"FR1851441": frozenset({APPLICATION_NUMBER})})
         assert batch.records == []
         assert batch.absent == ["FR1851441"]
 
@@ -138,9 +158,9 @@ class TestSearchNumbers:
             batch = await search_numbers(
                 client,
                 {
-                    "FR3053353": frozenset({PUB}),
-                    "FR1851441": frozenset({APP}),
-                    "WO2017050584": frozenset({PUB}),
+                    "FR3053353": frozenset({PUBLICATION_NUMBER}),
+                    "FR1851441": frozenset({APPLICATION_NUMBER}),
+                    "WO2017050584": frozenset({PUBLICATION_NUMBER}),
                 },
             )
         assert route.call_count == 1
