@@ -82,6 +82,8 @@ Une étiquette (tag, badge, pastille, chip) est un court texte sur fond clair, a
 
 - Le code mort et les déclarations redondantes sont supprimés.
 - Étiquettes : une seule classe, teintée par la propriété `--tag-color`. Le fond, le texte et le survol en dérivent en OKLCH relatif, à luminosité fixe. Les couleurs des graphiques restent inchangées.
+- Un écart entre copies suit l'usage majoritaire. Tout changement d'apparence est validé sur planches avant et après.
+- Un design volontairement différent garde ses règles locales, par exemple `AccessButton`.
 
 ## Phasage
 
@@ -104,7 +106,7 @@ Une étiquette (tag, badge, pastille, chip) est un court texte sur fond clair, a
 ### Phase 4 — Boutons et contrôles
 
 - [x] Boutons sans bordure, pleins, à contour et en pointillés ; un seul état désactivé
-- [ ] Boutons locaux sur les classes partagées, dont `AccessButton` et sa variante compacte ; retrait « × » sur `IconButton`
+- [x] Boutons locaux sur les classes partagées ; retrait « × » sur `IconButton`
 - [ ] Champs, menus déroulants, panneaux flottants et lignes d'options
 
 ### Phase 5 — Utilitaires

@@ -495,9 +495,9 @@
 				</select>
 				<div class="struct-tags">
 					{#each sp.structureIds as sid (sid)}
-						<span class="tag tag-pill tag-accent tag-removable struct-chip">
-							{structureLabelById.get(sid) || `#${sid}`}
-							<button title="Retirer" aria-label="Retirer {structureLabelById.get(sid) || `#${sid}`}" onclick={() => removeStructureFromPredicate(i, sid)}>&#x2717;</button>
+						<span class="tag-removable">
+							<span class="tag tag-pill tag-accent">{structureLabelById.get(sid) || `#${sid}`}</span>
+							<IconButton icon="reject" label="Retirer {structureLabelById.get(sid) || `#${sid}`}" onclick={() => removeStructureFromPredicate(i, sid)} />
 						</span>
 					{/each}
 					<select
@@ -688,18 +688,6 @@
 		gap: 4px;
 		flex-wrap: wrap;
 		flex: 1;
-	}
-	.struct-chip button {
-		border: none;
-		background: none;
-		color: inherit;
-		cursor: pointer;
-		font-size: var(--fs-sm);
-		padding: 0 2px;
-		line-height: 1;
-	}
-	.struct-chip button:hover {
-		color: var(--danger);
 	}
 	.add-row {
 		gap: 6px;
