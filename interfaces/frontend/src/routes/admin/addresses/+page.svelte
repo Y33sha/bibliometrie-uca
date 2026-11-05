@@ -684,7 +684,7 @@
 		color: var(--muted);
 		text-transform: uppercase;
 		font-size: var(--fs-xs);
-		letter-spacing: 0.5px;
+		letter-spacing: var(--tracking-caps);
 	}
 	.scope-echo {
 		font-size: var(--fs-sm);
@@ -837,7 +837,7 @@
 	/* Batch bar */
 	.batch-bar {
 		background: var(--accent);
-		color: white;
+		color: var(--text-inverse);
 		padding: 8px 16px;
 		border-radius: var(--radius);
 		margin-bottom: 10px;
@@ -854,7 +854,7 @@
 		border-radius: var(--radius);
 		border: 1px solid rgba(255, 255, 255, 0.3);
 		background: transparent;
-		color: white;
+		color: var(--text-inverse);
 		font-size: var(--fs-sm);
 		cursor: pointer;
 		font-family: inherit;

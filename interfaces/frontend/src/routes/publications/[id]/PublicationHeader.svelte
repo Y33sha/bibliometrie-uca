@@ -130,7 +130,7 @@
     font-size: var(--fs-3xl);
     font-weight: 700;
     line-height: 1.25;
-    letter-spacing: -0.015em;
+    letter-spacing: var(--tracking-tight);
   }
   .publication-meta {
     display: flex;
@@ -155,7 +155,7 @@
   .doi-label {
     font-size: var(--fs-sm);
     font-weight: 600;
-    letter-spacing: 0.06em;
+    letter-spacing: var(--tracking-caps);
     color: var(--muted);
   }
 
@@ -191,7 +191,7 @@
     text-transform: uppercase;
     font-size: var(--fs-xs);
     font-weight: 700;
-    letter-spacing: 0.05em;
+    letter-spacing: var(--tracking-caps);
     white-space: nowrap;
   }
   .rel-title {

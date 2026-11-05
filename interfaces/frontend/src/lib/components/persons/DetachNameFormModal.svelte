@@ -186,7 +186,7 @@
   }
   .btn-merge-modal {
     background: var(--accent);
-    color: white;
+    color: var(--text-inverse);
     border: none;
     border-radius: var(--radius);
     cursor: pointer;

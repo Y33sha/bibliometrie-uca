@@ -126,7 +126,7 @@
   .merge h3 {
     font-size: var(--fs-sm);
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: var(--tracking-caps);
     color: var(--muted);
     margin: 0 0 8px;
   }

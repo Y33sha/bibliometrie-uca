@@ -44,12 +44,11 @@
 	.column-menu-btn {
 		background: none; border: 1px solid var(--border); border-radius: var(--radius);
 		padding: 2px 8px; font-size: var(--fs-lg); cursor: pointer; color: var(--muted);
-		letter-spacing: 2px;
 	}
 	.column-menu-btn:hover { background: var(--hover); color: var(--text); }
 	.column-menu {
 		background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
-		box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 6px 0;
+		box-shadow: var(--shadow-md); padding: 6px 0;
 		min-width: 150px;
 	}
 	.column-menu label {

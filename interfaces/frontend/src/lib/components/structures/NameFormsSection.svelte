@@ -287,7 +287,7 @@
   }
   .match-badge.excluding {
     background: var(--attention);
-    color: white;
+    color: var(--text-inverse);
   }
   .ctx-tag {
     font-size: var(--fs-sm);

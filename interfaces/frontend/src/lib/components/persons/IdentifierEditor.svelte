@@ -187,7 +187,7 @@
   }
   .btn-link:hover {
     background: var(--success);
-    color: white;
+    color: var(--text-inverse);
   }
   .id-form {
     display: flex;

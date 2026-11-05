@@ -38,7 +38,7 @@
 		font-size: var(--fs-2xl);
 		line-height: 1.2;
 		font-weight: 700;
-		letter-spacing: -0.01em;
+		letter-spacing: var(--tracking-tight);
 	}
 	.page-description {
 		margin: 6px 0 0;

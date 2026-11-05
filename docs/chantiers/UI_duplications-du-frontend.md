@@ -91,7 +91,7 @@ Une étiquette (tag, badge, pastille, chip) est un court texte sur fond clair, a
 
 ### Phase 2 — Variables
 
-- [ ] Ombres, fond d'overlay, anneau de focus, texte sur accent, espacements de lettres
+- [x] Ombres, fond d'overlay, anneau de focus, texte sur accent, espacements de lettres
 - [ ] Teintes de survol en deux formules
 - [ ] Étiquettes OA et couleurs en dur de `shared.css` sur les variables
 

@@ -269,7 +269,7 @@
     font-size: var(--fs-sm);
     color: var(--muted);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: var(--tracking-caps);
   }
   .meta-value {
     font-size: var(--fs-md);
@@ -400,7 +400,7 @@
     color: var(--muted);
     text-transform: uppercase;
     font-size: var(--fs-xs);
-    letter-spacing: 0.05em;
+    letter-spacing: var(--tracking-caps);
     font-family: var(--mono);
   }
   .signals {

@@ -74,7 +74,7 @@
 	}
 	button.active {
 		background: var(--accent);
-		color: white;
+		color: var(--text-inverse);
 		font-weight: 600;
 	}
 	.page-info {

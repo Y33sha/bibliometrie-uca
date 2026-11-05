@@ -437,7 +437,7 @@
   }
   .tab-btn.active {
     background: var(--accent);
-    color: white;
+    color: var(--text-inverse);
     border-color: var(--accent);
   }
 
@@ -538,7 +538,7 @@
     background: var(--card);
     border: 1px solid var(--accent);
     border-radius: var(--radius);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+    box-shadow: var(--shadow-md);
     width: 320px;
   }
   .ctx-picker-inline input {
