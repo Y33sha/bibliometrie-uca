@@ -1,7 +1,6 @@
 <script lang="ts">
-	import Breadcrumb from '#lib/components/Breadcrumb.svelte';
+	import EntityBreadcrumb from '#lib/components/EntityBreadcrumb.svelte';
 	import EntityStatus from '#lib/components/EntityStatus.svelte';
-	import { pageTitle } from '#lib/institution.svelte.js';
 	import { columnLabels, staffCategoryLabels } from '#lib/labels.js';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
@@ -186,11 +185,7 @@
 
 </script>
 
-<svelte:head>
-	<title>{pageTitle(displayName || 'Personne')}</title>
-</svelte:head>
-
-<Breadcrumb trail={[{ label: 'Chercheurs', path: 'persons' }]} current={displayName} />
+<EntityBreadcrumb section={{ label: 'Chercheurs', path: 'persons' }} name={displayName} fallback="Personne" />
 
 {#if error || !profile}
 	<EntityStatus {error} notFound="Personne introuvable" />

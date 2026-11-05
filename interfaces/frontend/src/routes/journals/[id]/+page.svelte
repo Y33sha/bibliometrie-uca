@@ -1,8 +1,7 @@
 <script lang="ts">
 	import EntityMetaItem from '#lib/components/EntityMetaItem.svelte';
-	import Breadcrumb from '#lib/components/Breadcrumb.svelte';
+	import EntityBreadcrumb from '#lib/components/EntityBreadcrumb.svelte';
 	import EntityStatus from '#lib/components/EntityStatus.svelte';
-	import { pageTitle } from '#lib/institution.svelte.js';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import { onMount, tick } from 'svelte';
@@ -92,11 +91,7 @@
 	}
 </script>
 
-<svelte:head>
-	<title>{pageTitle(journal?.title ?? 'Publication en série')}</title>
-</svelte:head>
-
-	<Breadcrumb trail={[{ label: 'Publications en série', path: 'journals' }]} current={journal?.title} />
+<EntityBreadcrumb section={{ label: 'Publications en série', path: 'journals' }} name={journal?.title} fallback="Publication en série" />
 
 {#if error || !journal}
 	<EntityStatus {error} notFound="Publication en série introuvable" />

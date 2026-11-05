@@ -1,8 +1,7 @@
 <script lang="ts">
   import TableScroll from '#lib/components/TableScroll.svelte';
-  import Breadcrumb from "#lib/components/Breadcrumb.svelte";
+  import EntityBreadcrumb from "#lib/components/EntityBreadcrumb.svelte";
   import EntityStatus from "#lib/components/EntityStatus.svelte";
-  import { pageTitle } from "#lib/institution.svelte.js";
   import { page } from "$app/state";
   import { resolve } from "$app/paths";
   import { latestRequest } from "#lib/api/index.js";
@@ -73,11 +72,7 @@
 
 </script>
 
-<svelte:head>
-  <title>{pageTitle(data?.subject.label ?? "Sujet")}</title>
-</svelte:head>
-
-<Breadcrumb trail={[{ label: "Sujets", path: "subjects" }]} current={data?.subject.label} />
+<EntityBreadcrumb section={{ label: "Sujets", path: "subjects" }} name={data?.subject.label} fallback="Sujet" />
 
   {#if error || !data}
     <EntityStatus {error} notFound="Sujet introuvable" />

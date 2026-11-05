@@ -1,8 +1,7 @@
 <script lang="ts">
 	import EntityMetaItem from '#lib/components/EntityMetaItem.svelte';
-	import Breadcrumb from '#lib/components/Breadcrumb.svelte';
+	import EntityBreadcrumb from '#lib/components/EntityBreadcrumb.svelte';
 	import EntityStatus from '#lib/components/EntityStatus.svelte';
-	import { pageTitle } from '#lib/institution.svelte.js';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import { onMount } from 'svelte';
@@ -27,11 +26,7 @@
 	});
 </script>
 
-<svelte:head>
-	<title>{pageTitle(titleText(monograph?.title) || 'Monographie')}</title>
-</svelte:head>
-
-	<Breadcrumb trail={[{ label: 'Monographies', path: 'monographs' }]} current={titleText(monograph?.title)} />
+<EntityBreadcrumb section={{ label: 'Monographies', path: 'monographs' }} name={titleText(monograph?.title)} fallback="Monographie" />
 
 {#if error || !monograph}
 	<EntityStatus {error} notFound="Monographie introuvable" />

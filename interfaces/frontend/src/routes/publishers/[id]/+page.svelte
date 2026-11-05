@@ -1,8 +1,7 @@
 <script lang="ts">
 	import EntityMetaItem from '#lib/components/EntityMetaItem.svelte';
-	import Breadcrumb from '#lib/components/Breadcrumb.svelte';
+	import EntityBreadcrumb from '#lib/components/EntityBreadcrumb.svelte';
 	import EntityStatus from '#lib/components/EntityStatus.svelte';
-	import { pageTitle } from '#lib/institution.svelte.js';
 	import { page } from '$app/state';
 	import { onMount, tick } from 'svelte';
 	import { api, apiDetail } from '#lib/api/index.js';
@@ -61,11 +60,7 @@
 
 </script>
 
-<svelte:head>
-	<title>{pageTitle(publisher?.name ?? 'Éditeur')}</title>
-</svelte:head>
-
-	<Breadcrumb trail={[{ label: 'Éditeurs', path: 'publishers' }]} current={publisher?.name} />
+<EntityBreadcrumb section={{ label: 'Éditeurs', path: 'publishers' }} name={publisher?.name} fallback="Éditeur" />
 
 {#if error || !publisher}
 	<EntityStatus {error} notFound="Éditeur introuvable" />

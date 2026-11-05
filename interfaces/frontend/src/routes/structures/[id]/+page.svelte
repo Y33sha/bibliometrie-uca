@@ -1,8 +1,7 @@
 <script lang="ts">
 	import EntityMetaItem from '#lib/components/EntityMetaItem.svelte';
-	import Breadcrumb from '#lib/components/Breadcrumb.svelte';
+	import EntityBreadcrumb from '#lib/components/EntityBreadcrumb.svelte';
 	import EntityStatus from '#lib/components/EntityStatus.svelte';
-	import { pageTitle } from '#lib/institution.svelte.js';
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 	import { api } from '#lib/api/index.js';
@@ -141,11 +140,12 @@
 	});
 </script>
 
-<svelte:head>
-	<title>{pageTitle(lab ? structureLabel(lab) : 'Structure')}</title>
-</svelte:head>
-
-<Breadcrumb trail={[{ label: 'Labos', path: 'structures' }]} current={lab?.acronym || lab?.name} />
+<EntityBreadcrumb
+	section={{ label: 'Labos', path: 'structures' }}
+	name={lab?.acronym || lab?.name}
+	title={lab ? structureLabel(lab) : null}
+	fallback="Structure"
+/>
 
 {#if error || !lab}
 	<EntityStatus {error} notFound="Structure introuvable" />
