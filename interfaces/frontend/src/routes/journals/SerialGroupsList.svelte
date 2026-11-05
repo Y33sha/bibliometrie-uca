@@ -5,6 +5,7 @@
 	import { confirmDialog, toast } from '#lib/dialogs.svelte.js';
 	import type { components } from '#lib/api/schema.js';
 	import { mergeSerial } from '#lib/components/serials/mergeSerial.js';
+	import ListStatus from '#lib/components/ListStatus.svelte';
 
 	type Serial = components['schemas']['SerialListItem'];
 
@@ -71,11 +72,7 @@
 	}
 </script>
 
-{#if loading}
-	<p class="muted">Chargement…</p>
-{:else if groups.length === 0}
-	<p class="muted">{emptyText}</p>
-{:else}
+<ListStatus list={{ loading, error: null, items: groups }} {emptyText}>
 	{#if intro}<p class="muted intro">{@render intro()}</p>{/if}
 	<table class="data-table triage-table">
 		<colgroup>
@@ -109,7 +106,7 @@
 			</tbody>
 		{/each}
 	</table>
-{/if}
+</ListStatus>
 
 <style>
 	.intro { margin: 0 0 12px; }
@@ -119,5 +116,4 @@
 	.col-publications { width: 9%; }
 	.col-action { width: 13%; }
 	.group-head th { font-weight: normal; }
-	.muted { color: var(--muted); }
 </style>

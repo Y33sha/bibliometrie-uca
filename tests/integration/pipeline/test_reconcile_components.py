@@ -863,6 +863,45 @@ class TestUniverseMatchesPythonTokens:
                 marked=False,
                 identifiers=_ids(SourceIdentifierType.NNT, _PRIMARY, "2024UCA01"),
             ),
+            # Numéros de brevet : chaque numéro relie, quel que soit son rang, seulement à un numéro de même type.
+            _source_record(
+                conn,
+                source_id="famille",
+                marked=False,
+                identifiers=[
+                    *_ids(
+                        SourceIdentifierType.PATENT_PUBLICATION_NUMBER,
+                        _SECONDARY,
+                        "EP4037770",
+                        "WO2021064186",
+                    ),
+                    *_ids(SourceIdentifierType.PATENT_APPLICATION_NUMBER, _SECONDARY, "FR1851441"),
+                ],
+            ),
+            _source_record(
+                conn,
+                source_id="depot",
+                marked=False,
+                identifiers=_ids(
+                    SourceIdentifierType.PATENT_PUBLICATION_NUMBER, _SECONDARY, "WO2021064186"
+                ),
+            ),
+            _source_record(
+                conn,
+                source_id="demande",
+                marked=False,
+                identifiers=_ids(
+                    SourceIdentifierType.PATENT_APPLICATION_NUMBER, _SECONDARY, "FR1851441"
+                ),
+            ),
+            _source_record(
+                conn,
+                source_id="autre_famille",
+                marked=False,
+                identifiers=_ids(
+                    SourceIdentifierType.PATENT_APPLICATION_NUMBER, _SECONDARY, "WO2021064186"
+                ),
+            ),
             _source_record(
                 conn,
                 source_id="mb1",

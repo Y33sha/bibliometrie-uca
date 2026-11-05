@@ -1,6 +1,12 @@
+<script module lang="ts">
+	/** Place réservée au texte au bout des barres horizontales, à droite de la borne haute de l'axe des valeurs, en pixels. */
+	export const BAR_LABEL_SPACE = 48;
+</script>
+
 <script lang="ts">
-	import { cssColor } from '#lib/components/charts/cssVar.js';
-	import { Chart } from '#lib/components/charts/chart.js';
+	import type { CartesianScaleOptions, Plugin, Scale } from 'chart.js';
+	import { cssColor, fontSize } from '#lib/components/charts/cssVar.js';
+	import { Chart, truncateToWidth } from '#lib/components/charts/chart.js';
 
 	let {
 		labels,
@@ -11,7 +17,9 @@
 		height = 280,
 		max,
 		barLabel,
-		tooltipLabel
+		tooltipLabel,
+		prominentLabels = false,
+		categoryAxisWidth
 	}: {
 		labels: string[];
 		values: number[];
@@ -27,10 +35,26 @@
 		barLabel?: (value: number, index: number) => string;
 		/** Texte de l'infobulle de la barre `index` ; défaut = « libellé du jeu de données : valeur ». */
 		tooltipLabel?: (value: number, index: number) => string;
+		/** Libellés des catégories et texte au bout des barres en taille `--fs-md`, couleur `--text`. */
+		prominentLabels?: boolean;
+		/** Barres horizontales : largeur fixe en pixels de l'axe des catégories, libellés compris ; libellé trop long tronqué, entier au survol. Défaut = ajustée aux libellés. */
+		categoryAxisWidth?: number;
 	} = $props();
 
 	let canvas = $state<HTMLCanvasElement | undefined>();
 	let chart: Chart | null = null;
+
+	/** Libellé entier de la catégorie survolée à gauche de l'axe des barres horizontales, s'il est tronqué. */
+	const fullLabelOnHover: Plugin<'bar'> = {
+		id: 'fullLabelOnHover',
+		afterEvent(c, { event }) {
+			const scale = c.scales.y;
+			const onAxis = event.x !== null && event.y !== null && event.x < c.chartArea.left;
+			const index = onAxis ? Number(scale.getValueForPixel(event.y!)) : -1;
+			const label = labels[index];
+			c.canvas.title = label !== undefined && scale.ticks[index]?.label !== label ? label : '';
+		}
+	};
 
 	function render() {
 		if (chart) {
@@ -44,7 +68,26 @@
 			max,
 			ticks: { precision: 0 }
 		};
-		const categoryScale = { grid: { display: false } };
+		const labelStyle: { font?: { size: number }; color?: string } = prominentLabels ? { font: { size: fontSize('md') }, color: cssColor('text') } : {};
+		const fixedAxisWidth = horizontal ? categoryAxisWidth : undefined;
+		const categoryScale = {
+			grid: { display: false },
+			ticks: {
+				...labelStyle,
+				...(fixedAxisWidth !== undefined && {
+					callback(this: Scale, _value: unknown, index: number) {
+						const { ticks, grid } = (this as Scale<CartesianScaleOptions>).options;
+						const labelSpace = fixedAxisWidth - ticks.padding - (grid.tickLength ?? 0);
+						return truncateToWidth(this.ctx, labels[index], labelStyle.font ?? {}, labelSpace);
+					}
+				})
+			},
+			...(fixedAxisWidth !== undefined && {
+				afterFit: (scale: { width: number }) => {
+					scale.width = fixedAxisWidth;
+				}
+			})
+		};
 
 		chart = new Chart(canvas, {
 			type: 'bar',
@@ -57,13 +100,14 @@
 				responsive: true,
 				maintainAspectRatio: false,
 				// Place pour les valeurs affichées au bout des barres.
-				layout: { padding: horizontal ? { right: 48 } : { top: 20 } },
+				layout: { padding: horizontal ? { right: BAR_LABEL_SPACE } : { top: 20 } },
 				plugins: {
 					legend: { display: false },
 					datalabels: {
 						anchor: 'end',
 						align: 'end',
-						font: { weight: 600 },
+						...labelStyle,
+						font: { weight: 600, ...labelStyle.font },
 						...(barLabel && {
 							formatter: (v: number, ctx: { dataIndex: number }) => barLabel(v, ctx.dataIndex)
 						})
@@ -79,7 +123,8 @@
 				scales: horizontal
 					? { x: valueScale, y: categoryScale }
 					: { y: valueScale, x: categoryScale }
-			}
+			},
+			plugins: fixedAxisWidth !== undefined ? [fullLabelOnHover] : []
 		});
 	}
 
@@ -91,6 +136,8 @@
 		void max;
 		void barLabel;
 		void tooltipLabel;
+		void prominentLabels;
+		void categoryAxisWidth;
 		void canvas;
 		render();
 		return () => {

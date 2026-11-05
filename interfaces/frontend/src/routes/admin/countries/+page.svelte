@@ -3,8 +3,7 @@
 	import { onMount } from 'svelte';
 	import PageHeader from '#lib/components/PageHeader.svelte';
 	import ResultCount from '#lib/components/ResultCount.svelte';
-	import { resolve } from '$app/paths';
-	import { replaceQuery } from '#lib/url.js';
+	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
 	import { stickyHeight } from '#lib/actions/stickyHeight.js';
 	import { addresses as addressesApi, api, errorMessage } from '#lib/api/index.js';
 	import Pagination from '#lib/components/Pagination.svelte';
@@ -16,6 +15,7 @@
 
 	import type { components } from '#lib/api/schema.js';
 	import { formatCount } from '#lib/plural.js';
+	import IconButton from '#lib/components/IconButton.svelte';
 	type Address = components['schemas']['AddressForCountryAttribution'];
 	type Country = components['schemas']['CountryOut'];
 	type Method = components['schemas']['CountryDetectionMethod'];
@@ -56,7 +56,6 @@
 	// Option « Aucun » de la facette Pays : adresses sans pays retenu.
 	const NONE = 'none';
 	const withoutCountry = $derived(selectedCountry.length === 1 && selectedCountry[0] === NONE);
-	let debounceTimer: ReturnType<typeof setTimeout>;
 
 	// Batch
 	let selectedIds: Set<number> = $state(new Set());
@@ -92,12 +91,21 @@
 		if (data?.without_country != null) withoutCountryCount = data.without_country;
 	});
 
+	const url = useUrlFilters({
+		basePath: '/admin/countries',
+		filters: {
+			page: { type: 'page', urlKey: 'page' },
+			search: { type: 'single', urlKey: 'search' },
+			country: { type: 'single', urlKey: 'country' },
+		},
+	});
+
 	function syncUrl() {
-		const p = new URLSearchParams();
-		if (list.page > 1) p.set('page', String(list.page));
-		if (search.trim()) p.set('search', search.trim());
-		if (selectedCountry.length === 1) p.set('country', selectedCountry[0]);
-		void replaceQuery(resolve('admin/countries'), p);
+		url.syncUrl(() => ({
+			page: list.page,
+			search: search.trim(),
+			country: selectedCountry.length === 1 ? selectedCountry[0] : null,
+		}));
 	}
 
 	function onFilterChange() {
@@ -107,10 +115,7 @@
 		list.load();
 	}
 
-	function onSearchInput() {
-		clearTimeout(debounceTimer);
-		debounceTimer = setTimeout(onFilterChange, 400);
-	}
+	const onSearchInput = url.debouncedSearch(onFilterChange);
 
 	function countryLabel(code: string): string {
 		return `${countryMap[code] || code} (${code.toUpperCase()})`;
@@ -183,10 +188,10 @@
 	}
 
 	onMount(() => {
-		const params = new URLSearchParams(window.location.search);
-		if (params.get('page')) list.page = parseInt(params.get('page')!) || 1;
-		if (params.get('search')) search = params.get('search')!;
-		if (params.get('country')) selectedCountry = [params.get('country')!];
+		const restored = url.restoreFromUrl(new URLSearchParams(window.location.search));
+		if (restored.page) list.page = restored.page as number;
+		if (restored.search) search = restored.search as string;
+		if (restored.country) selectedCountry = [restored.country as string];
 		loadCountries();
 		list.load();
 	});
@@ -245,7 +250,7 @@
 							{@const found = a.found_countries.find(f => f.country_code === c)}
 							<span class="tag tag-success tag-removable" title={found ? `Trouvé par : ${methodsLabel(found.methods)}` : undefined}>
 								{countryLabel(c)}
-								<button class="tag-remove" aria-label="Retirer {countryLabel(c)}" title="Retirer {countryLabel(c)}" onclick={() => removeCountry(a.id, c)}>×</button>
+								<IconButton icon="reject" small label="Retirer {countryLabel(c)}" onclick={() => removeCountry(a.id, c)} />
 							</span>
 						{/each}
 						<span class="country-actions">
@@ -277,11 +282,6 @@
 
 <style>
 	.toolbar input[type="search"] { width: 300px; }
-	.batch-bar {
-		display: flex; align-items: center; gap: 8px;
-		padding: 8px 12px; margin-bottom: 10px;
-		background: var(--accent-light); border-radius: var(--radius); font-size: var(--fs-md);
-	}
 	.batch-result { font-size: var(--fs-sm); color: var(--success); font-weight: 500; }
 	/* Pays proposé par la détection : contour en pointillés. */
 	.proposal-tag { outline: 1px dashed var(--warning); outline-offset: -1px; }
@@ -292,10 +292,5 @@
 	.num-cell { text-align: center; color: var(--muted); font-size: var(--fs-sm); }
 	.country-cell { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
 	.country-actions { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; justify-content: flex-end; margin-left: auto; }
-	.tag-remove {
-		background: none; border: none; cursor: pointer;
-		color: var(--muted); font-size: var(--fs-sm); padding: 0 1px; line-height: 1;
-	}
-	.tag-remove:hover { color: var(--danger); }
 	.add-country { width: 7rem; height: 26px; font-size: var(--fs-sm); color: var(--muted); }
 </style>

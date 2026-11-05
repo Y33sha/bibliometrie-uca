@@ -35,7 +35,7 @@
 		<p class="login-subtitle">Accès administration</p>
 
 		{#if error}
-			<div class="login-error">{error}</div>
+			<div class="info-box info-box-danger">{error}</div>
 		{/if}
 
 		<label>
@@ -48,7 +48,7 @@
 			<input type="password" bind:value={password} autocomplete="current-password" required />
 		</label>
 
-		<button type="submit" disabled={loading}>
+		<button type="submit" class="btn btn-primary" disabled={loading}>
 			{loading ? 'Connexion...' : 'Se connecter'}
 		</button>
 	</form>
@@ -81,15 +81,6 @@
 		font-size: var(--fs-md);
 		margin: 0 0 20px;
 	}
-	.login-error {
-		background: var(--danger-light);
-		color: var(--danger);
-		padding: 8px 12px;
-		border-radius: var(--radius);
-		font-size: var(--fs-md);
-		margin-bottom: 12px;
-		text-align: center;
-	}
 	label {
 		display: block;
 		margin-bottom: 14px;
@@ -103,31 +94,9 @@
 	}
 	input {
 		width: 100%;
-		padding: 8px 10px;
-		border: 1px solid var(--border);
-		border-radius: var(--radius);
-		font-size: var(--fs-base);
-		font-family: inherit;
-		background: var(--card);
-	}
-	input:focus {
-		outline: none;
-		border-color: var(--accent-mid);
-		box-shadow: var(--focus-ring);
 	}
 	button {
 		width: 100%;
-		padding: 10px;
-		background: var(--accent);
-		color: var(--text-inverse);
-		border: none;
-		border-radius: var(--radius);
-		font-size: var(--fs-base);
-		font-weight: 500;
-		cursor: pointer;
-		font-family: inherit;
 		margin-top: 4px;
 	}
-	button:hover { background: color-mix(in srgb, var(--accent), black 20%); }
-	button:disabled { opacity: 0.6; cursor: not-allowed; }
 </style>

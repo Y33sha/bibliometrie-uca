@@ -490,12 +490,12 @@
 			</select>
 		</label>
 		{#if chartSort}
-			<button type="button" class="sort-dir" title="Sens du tri" onclick={() => { chartSortDir = chartSortDir === 'desc' ? 'asc' : 'desc'; chartPage = 1; syncUrl(); renderChart(); }}>
+			<button type="button" class="facet-btn" title="Sens du tri" onclick={() => { chartSortDir = chartSortDir === 'desc' ? 'asc' : 'desc'; chartPage = 1; syncUrl(); renderChart(); }}>
 				{chartSortDir === 'desc' ? '↓' : '↑'}
 			</button>
 		{/if}
 	{/if}
-	<a class="toolbar-action pubs-link" href={pubsUrl}>Voir les publications &rarr;</a>
+	<a class="btn btn-primary pubs-link" href={pubsUrl}>Voir les publications &rarr;</a>
 </div>
 <!-- Ligne 2 : filtres, ceux de la liste des publications. -->
 <div class="stats-filters">
@@ -581,21 +581,6 @@
 		.sep {
 			display: none;
 		}
-	}
-	.sort-dir {
-		font-family: inherit;
-		font-size: var(--fs-base);
-		line-height: 1;
-		height: 34px;
-		padding: 0 10px;
-		border: none;
-		border-radius: var(--radius);
-		background: transparent;
-		color: var(--text-secondary);
-		cursor: pointer;
-	}
-	.sort-dir:hover {
-		background: var(--hover);
 	}
 	/* Ligne au-dessus du graphique : légende à gauche, export à droite. */
 	.chart-header {

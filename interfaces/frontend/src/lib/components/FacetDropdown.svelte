@@ -46,7 +46,7 @@
 </script>
 
 {#snippet optionRow(opt: FacetOption)}
-	<label>
+	<label class="option-row">
 		<input type="checkbox" checked={selected.includes(opt.value)} onchange={() => toggle(opt.value)} />
 		<span class="facet-option-text" title={opt.text}>{opt.text}</span>{#if opt.count != null}<span class="facet-count">{opt.count}</span>{/if}
 	</label>
@@ -74,17 +74,17 @@
 	</Tooltip>
 
 	{#if panel.open}
-		<div class="facet-panel" use:anchored>
+		<div class="facet-panel popover" use:anchored>
 			{#if searchable}
 				<input
 					type="text"
-					class="facet-search"
+					class="panel-search input-sm"
 					placeholder="Filtrer"
 					bind:value={filterText}
 				/>
 			{/if}
 			{#if selected.length}
-				<button type="button" class="facet-clear" onclick={clear}>Effacer</button>
+				<button type="button" class="option-row facet-clear" onclick={clear}>Effacer</button>
 			{/if}
 			<div class="facet-options">
 				{#if groups}

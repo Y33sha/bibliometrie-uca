@@ -42,18 +42,23 @@ _THESIS_ROLE_LABELS = {
 
 
 def _person_address_publications_cte(year: int | None) -> str:
-    """Renvoie la CTE `person_address_publications` : couples (publication, adresse brute) des contributions sources des contributions de la personne `:pid`. Avec `year`, seules les publications de l'année `:year` figurent."""
-    year_filter = "AND p.publication_year = :year" if year is not None else ""
+    """Renvoie les CTE `person_address_publications_all_years` : triplets (publication, adresse brute, année) des contributions sources des contributions de la personne `:pid` ; et `person_address_publications` : couples (publication, adresse brute) restreints aux publications de l'année `:year` si `year` est donnée."""
+    year_filter = "WHERE publication_year = :year" if year is not None else ""
     return f"""
-        WITH person_address_publications AS (
-            SELECT DISTINCT g.publication_id, sca.address_id
+        WITH person_address_publications_all_years AS (
+            SELECT DISTINCT g.publication_id, sca.address_id, p.publication_year
             FROM contributions g
             JOIN aligned_source_contributions m ON m.contribution_id = g.id
             JOIN source_contribution_addresses sca
               ON sca.source_contribution_id = m.source_contribution_id
             JOIN addresses a ON a.id = sca.address_id
             JOIN publications p ON p.id = g.publication_id
-            WHERE g.person_id = :pid AND {is_raw_address("a")} {year_filter}
+            WHERE g.person_id = :pid AND {is_raw_address("a")}
+        ),
+        person_address_publications AS (
+            SELECT publication_id, address_id
+            FROM person_address_publications_all_years
+            {year_filter}
         )
     """
 
@@ -238,22 +243,17 @@ class PersonDetailQueries:
         )
 
     def person_address_summary(self, person_id: int, *, year: int | None) -> PersonAddressSummary:
-        """Compte les publications de la personne, puis, par structure, celles dont une adresse brute est rattachée à la structure. `year` restreint aux publications de l'année."""
+        """Compte les publications avec adresse de la personne, puis, par structure, celles dont une adresse brute est rattachée à la structure. `year` restreint les comptes aux publications de l'année."""
         cte = _person_address_publications_cte(year)
         binds = {"pid": person_id, "year": year}
         counts = self._conn.execute(
             text(f"""
                 {cte}
-                SELECT MIN(p.publication_year) AS first_year,
-                       MAX(p.publication_year) AS last_year,
-                       COUNT(DISTINCT p.id) FILTER (
-                           WHERE CAST(:year AS integer) IS NULL OR p.publication_year = :year
-                       ) AS publications,
+                SELECT MIN(publication_year) AS first_year_with_address,
+                       MAX(publication_year) AS last_year_with_address,
                        (SELECT COUNT(DISTINCT publication_id)
                         FROM person_address_publications) AS publications_with_address
-                FROM contributions g
-                JOIN publications p ON p.id = g.publication_id
-                WHERE g.person_id = :pid
+                FROM person_address_publications_all_years
             """),
             binds,
         ).one()
@@ -272,9 +272,8 @@ class PersonDetailQueries:
             binds,
         ).all()
         return PersonAddressSummary(
-            first_year=counts.first_year,
-            last_year=counts.last_year,
-            publications=counts.publications,
+            first_year_with_address=counts.first_year_with_address,
+            last_year_with_address=counts.last_year_with_address,
             publications_with_address=counts.publications_with_address,
             structures=[
                 PersonAddressStructureCount(

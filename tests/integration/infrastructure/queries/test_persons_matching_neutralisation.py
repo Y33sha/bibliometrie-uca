@@ -3,7 +3,10 @@
 from sqlalchemy import text
 
 from infrastructure.db.queues import Queue
-from pipeline.transformation.persons.contribution_resolution import load_candidate_contributions
+from pipeline.transformation.persons.contribution_resolution import (
+    load_candidate_contributions,
+    prepare_candidates,
+)
 from pipeline.transformation.persons.identifier_arbitration import (
     fetch_identifier_votes,
     write_misplaced_neutralizations,
@@ -47,7 +50,7 @@ def _orcid_projete(conn):
     recompose_contribution_attributes(conn)
     [member] = [
         m
-        for by_contribution in load_candidate_contributions(conn).values()
+        for by_contribution in load_candidate_contributions(conn, prepare_candidates(conn)).values()
         for members in by_contribution.values()
         for m in members
         if m.name.display() == "Jean Neutralisation"

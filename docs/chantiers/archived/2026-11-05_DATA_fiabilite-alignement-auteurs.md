@@ -50,7 +50,11 @@ Exemple : la publication 22307 a quatre auteurs dans chacun de ses cinq enregist
 - [x] Premier `--rebuild-author-grouping`. Les publications de 2 à 10 auteurs à contributions en trop passent de 757 à 306. Au-delà, l'excès augmente : fautes de frappe sur des mots courts, rattrapées auparavant par le modèle.
 - [x] Dans les trous, similarité de Jaro-Winkler des mots triés supérieure à 0,9.
 - [x] Doublons révélés par l'alignement (publication 172698) : une contribution source restée seule, de même nom et même prénom complet qu'une contribution source de son enregistrement source alignée avec d'autres sources, devient un doublon d'auteur. Au 2026-11-04, 1 276 cas dans 516 publications, avant la garde du prénom complet.
-- [ ] Second `--rebuild-author-grouping`, puis mesure des contributions en trop par tranche.
+- [x] Second `--rebuild-author-grouping`. Publications à contributions en trop, avec le modèle puis après ce rebuild :
+  - de 2 à 10 auteurs, 757 → 265 (910 → 364 contributions en trop) ;
+  - de 11 à 100, 273 → 204 (677 → 585) ;
+  - de 101 à 1 000, 199 → 182 (1 827 → 1 828) ;
+  - au-delà, 1 306 → 1 424 (58 639 → 62 880), surtout des homonymes à initiales.
 
 ### Phase 4 — Documentation
 

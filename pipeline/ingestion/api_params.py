@@ -9,6 +9,7 @@ API_BASE_URLS: dict[str, str] = {
     "openalex": "https://api.openalex.org/works",
     "wos": "https://api.clarivate.com/api/wos",
     "scanr": "https://cluster-production.elasticsearch.dataesr.ovh/scanr-publications/_search",
+    "scanr_patents": "https://cluster-production.elasticsearch.dataesr.ovh/scanr-patents/_search",
     "theses": "https://theses.fr/api/v1/theses/recherche/",
     # theses.fr : détail d'une thèse ; l'adaptateur compose `<identifiant>`.
     "theses_detail": "https://theses.fr/api/v1/theses/these/",
@@ -61,6 +62,8 @@ MAX_CONCURRENT: dict[str, int] = {
     "wos": 2,
     # Elasticsearch public sans plafond documenté.
     "scanr": 5,
+    # Même cluster que ScanR, pour quelques centaines de familles.
+    "scanr_patents": 2,
     # API fragile : une requête à la fois.
     "theses": 1,
     # Polite pool : 3 requêtes simultanées au plus.
@@ -69,7 +72,7 @@ MAX_CONCURRENT: dict[str, int] = {
     "doi_org": 3,
     # Aucune limite documentée.
     "sudoc": 4,
-    # Débit recommandé : 10 req/s.
+    # Aucune limite documentée.
     "unpaywall": 5,
 }
 """Requêtes simultanées consenties à chaque accès, sous son plafond."""
@@ -83,6 +86,8 @@ MAX_PER_SECOND: dict[str, float] = {
     "wos": 2,
     # Aucun seuil publié.
     "scanr": 5,
+    # Même cluster que ScanR.
+    "scanr_patents": 2,
     # Aucun seuil publié.
     "theses": 3,
     # Seuil publié du polite pool : 10 req/s, 3 requêtes simultanées.
@@ -91,8 +96,8 @@ MAX_PER_SECOND: dict[str, float] = {
     "datacite": 3,
     # Aucun seuil publié.
     "sudoc": 5,
-    # Débit recommandé : 10 req/s.
-    "unpaywall": 8,
+    # Seuil publié : 100 000 requêtes par jour, aucun seuil par seconde.
+    "unpaywall": 20,
 }
 """Débit consenti à chaque accès, en requêtes par seconde, toutes requêtes confondues. Un accès absent de la table est sans plafond."""
 

@@ -13,7 +13,7 @@ Modes :
 La normalisation se lance ensuite, avec les phases qui la suivent :
     run_pipeline --from normalize --sources <sources>
 
-`--doi-prefix` limite une source à identifiant natif DOI (crossref, datacite) aux DOI d'un préfixe. `--id-prefix` limite toute source aux identifiants d'un préfixe. La normalisation traite ensuite seulement ces lignes.
+`--doi-prefix` limite une source à identifiant natif DOI (crossref, datacite) aux DOI d'un préfixe. `--id-prefix` limite toute source aux identifiants d'un préfixe. `--doc-type` limite toute source aux enregistrements sources en base d'un type de document. La normalisation traite ensuite seulement ces lignes.
 
 Usage :
     uv run python -m interfaces.cli.maintenance.rehydrate_staging_from_raw_store \
@@ -22,6 +22,8 @@ Usage :
         --sources crossref --doi-prefix 10.70675
     uv run python -m interfaces.cli.maintenance.rehydrate_staging_from_raw_store \
         --sources scanr --id-prefix nnt
+    uv run python -m interfaces.cli.maintenance.rehydrate_staging_from_raw_store \
+        --sources hal --doc-type patent
 """
 
 from __future__ import annotations
@@ -33,6 +35,7 @@ from collections.abc import Iterator, Mapping
 
 from sqlalchemy import Connection, bindparam, text
 
+from domain.documents.doc_types import DocType
 from domain.sources.registry import Source
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.jsonb import Jsonb
@@ -128,6 +131,18 @@ _DOI_NATIVE_SOURCES = frozenset({"crossref", "datacite"})
 """Sources dont l'identifiant natif est le DOI : leur clé d'archive commence par un préfixe de DOI."""
 
 
+def source_ids_of_type(conn: Connection, source: str, doc_type: str) -> set[str]:
+    """Renvoie les identifiants des enregistrements sources de `source` au type de document `doc_type`."""
+    return set(
+        conn.execute(
+            text(
+                "SELECT source_id FROM source_records WHERE source = :source AND doc_type = :doc_type"
+            ),
+            {"source": source, "doc_type": doc_type},
+        ).scalars()
+    )
+
+
 def _parse_sources(raw: str) -> list[str]:
     sources = [s.strip() for s in raw.split(",") if s.strip()]
     unknown = [s for s in sources if s not in Source]
@@ -160,6 +175,11 @@ def main() -> None:
         help="Limite la réhydratation aux identifiants source de ce préfixe (ex: nnt pour les thèses scanR).",
     )
     parser.add_argument(
+        "--doc-type",
+        choices=sorted(DocType),
+        help="Limite la réhydratation aux enregistrements sources en base de ce type de document (ex: patent).",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Compte les clés présentes au raw store sans rien écrire.",
@@ -172,10 +192,18 @@ def main() -> None:
         raise SystemExit("--doi-prefix et --id-prefix s'excluent.")
 
     store = get_raw_store()
+    engine = get_sync_engine()
     prefix = f"{args.doi_prefix}/" if args.doi_prefix else args.id_prefix or ""
+    selected: dict[str, set[str]] = {}
+    if args.doc_type:
+        with engine.connect() as conn:
+            selected = {s: source_ids_of_type(conn, s, args.doc_type) for s in sources}
 
     def keys(source: str) -> Iterator[str]:
-        return (k for k in store.iter_keys(source) if k.startswith(prefix))
+        ids = selected.get(source)
+        return (
+            k for k in store.iter_keys(source) if k.startswith(prefix) and (ids is None or k in ids)
+        )
 
     if args.dry_run:
         for source in sources:
@@ -184,7 +212,6 @@ def main() -> None:
         log.info("Dry-run, rien écrit.")
         return
 
-    engine = get_sync_engine()
     with engine.connect() as conn:
         for source in sources:
             inserted = 0

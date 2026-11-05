@@ -11,11 +11,13 @@ from sqlalchemy import Connection, text
 from domain.documents.identifiers import DOI
 from domain.sources.registry import DOI_ORG, Source
 
-LookupIdType = Literal["doi", "hal_id", "nnt"]
-"""Types d'identifiants cherchés par la phase `fetch_missing`, contraints par `failed_lookups_id_type_check`."""
+LookupIdType = Literal[
+    "doi", "hal_id", "nnt", "patent_publication_number", "patent_application_number"
+]
+"""Types d'identifiants cherchés par la phase `fetch_missing` (`LOOKUP_ID_TYPES`)."""
 
 _REGISTRIES: dict[LookupIdType, str] = {"doi": DOI_ORG, "hal_id": Source.HAL, "nnt": Source.THESES}
-"""Registre qui attribue chaque type d'identifiant. Un identifiant absent de son registre n'existe pas : l'échec de sa recherche est définitif."""
+"""Registre qui attribue chaque type d'identifiant. Un identifiant absent de son registre n'existe pas : l'échec de sa recherche est définitif. Les offices de brevets sont hors des sources interrogées."""
 
 _RECORD_SQL = text(
     """
@@ -67,11 +69,13 @@ def pending_failed_lookup_sql(*, source_sql: str, id_type: LookupIdType, value_s
 
     Source et identifiant sont des expressions SQL : paramètre lié, littéral ou colonne. Les sélections de la phase `fetch_missing` l'emploient sous `NOT`.
     """
+    recent = "fl.not_found_at > now() - make_interval(days => :retry_after_days)"
+    if registry := _REGISTRIES.get(id_type):
+        recent = f"({recent} OR fl.source::text = '{registry}')"
     return (
         "EXISTS (SELECT 1 FROM failed_lookups fl"
         f" WHERE fl.source = CAST(CAST({source_sql} AS text) AS lookup_source)"
         f" AND fl.id_type = '{id_type}'"
         f" AND fl.id_value = {value_sql}"
-        " AND (fl.not_found_at > now() - make_interval(days => :retry_after_days)"
-        f" OR fl.source::text = '{_REGISTRIES[id_type]}'))"
+        f" AND {recent})"
     )

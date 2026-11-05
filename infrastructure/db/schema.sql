@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict REn5RmVqUREd7RJ8DyCuhUD7uLlM4H31X2MGFVqU2hHzcbRkzUpWj6vb8eSfKF9
+\restrict ztb2I2GuESd2nOoco4j1X2wlhSH8A4ib4nXGJou1JS8yEgszvDKPINSF5rQG4Oa
 
--- Dumped from database version 18.4
--- Dumped by pg_dump version 18.4
+-- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
+-- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -298,6 +298,7 @@ CREATE TYPE public.lookup_source AS ENUM (
     'openalex',
     'wos',
     'scanr',
+    'scanr_patents',
     'theses',
     'crossref',
     'datacite',
@@ -499,7 +500,9 @@ CREATE TYPE public.source_identifier_type AS ENUM (
     'nnt',
     'pmid',
     'isbn',
-    'eisbn'
+    'eisbn',
+    'patent_publication_number',
+    'patent_application_number'
 );
 
 
@@ -512,6 +515,7 @@ CREATE TYPE public.source_type AS ENUM (
     'openalex',
     'wos',
     'scanr',
+    'scanr_patents',
     'theses',
     'crossref',
     'datacite'
@@ -2968,8 +2972,8 @@ CREATE TABLE sources.source_record_identifiers (
     role public.source_identifier_role NOT NULL,
     removed_by text,
     CONSTRAINT source_record_identifiers_id_value_case CHECK ((id_value =
-CASE id_type
-    WHEN 'nnt'::public.source_identifier_type THEN upper(id_value)
+CASE
+    WHEN ((id_type)::text = ANY (ARRAY['nnt'::text, 'patent_publication_number'::text, 'patent_application_number'::text])) THEN upper(id_value)
     ELSE lower(id_value)
 END))
 );
@@ -3207,10 +3211,10 @@ CREATE TABLE sources.failed_lookups (
     id_type text NOT NULL,
     id_value text NOT NULL,
     not_found_at timestamp with time zone NOT NULL,
-    CONSTRAINT failed_lookups_id_type_check CHECK ((id_type = ANY (ARRAY['doi'::text, 'hal_id'::text, 'nnt'::text]))),
+    CONSTRAINT failed_lookups_id_type_check CHECK ((id_type = ANY (ARRAY['doi'::text, 'hal_id'::text, 'nnt'::text, 'patent_publication_number'::text, 'patent_application_number'::text]))),
     CONSTRAINT failed_lookups_id_value_case CHECK ((id_value =
-CASE id_type
-    WHEN 'nnt'::text THEN upper(id_value)
+CASE
+    WHEN (id_type = ANY (ARRAY['nnt'::text, 'patent_publication_number'::text, 'patent_application_number'::text])) THEN upper(id_value)
     ELSE lower(id_value)
 END))
 );
@@ -3362,7 +3366,7 @@ CREATE TABLE sources.staging (
     authors_truncated boolean DEFAULT false NOT NULL,
     entry_mode text DEFAULT 'bulk'::text NOT NULL,
     CONSTRAINT staging_doi_lowercase CHECK ((doi = lower(doi))),
-    CONSTRAINT staging_entry_mode_check CHECK ((entry_mode = ANY (ARRAY['bulk'::text, 'fetch_missing_doi'::text, 'manual_export'::text, 'person_identifier'::text, 'fetch_missing_hal_id'::text, 'fetch_missing_nnt'::text])))
+    CONSTRAINT staging_entry_mode_check CHECK ((entry_mode = ANY (ARRAY['bulk'::text, 'fetch_missing_doi'::text, 'manual_export'::text, 'person_identifier'::text, 'fetch_missing_hal_id'::text, 'fetch_missing_nnt'::text, 'fetch_missing_patent_number'::text])))
 );
 
 
@@ -6239,5 +6243,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict REn5RmVqUREd7RJ8DyCuhUD7uLlM4H31X2MGFVqU2hHzcbRkzUpWj6vb8eSfKF9
+\unrestrict ztb2I2GuESd2nOoco4j1X2wlhSH8A4ib4nXGJou1JS8yEgszvDKPINSF5rQG4Oa
 

@@ -49,10 +49,10 @@
     {#each list.items as item (item.publication_id)}
       <div class="triage-item" class:active={item.publication_id === drawer.id}>
         <div class="head">
-          <button class="title" onclick={() => drawer.open(item.publication_id)}>
+          <button class="triage-person title" onclick={() => drawer.open(item.publication_id)}>
             <PublicationTitle titre={item.title} />
           </button>
-          <span class="meta">
+          <span class="muted-small">
             {docTypeLabel(item.doc_type)}{#if item.publication_year} · {item.publication_year}{/if} ·
             <a href={resolve(`publications/${item.publication_id}`)} target="_blank" rel="noopener"
               >listes d'auteurs</a
@@ -104,24 +104,8 @@
     justify-content: space-between;
   }
   .title {
-    background: none;
-    border: none;
-    padding: 0;
-    cursor: pointer;
-    font: inherit;
-    font-weight: 600;
-    color: inherit;
-    text-align: left;
     min-width: 0;
     overflow-wrap: anywhere;
-  }
-  .title:hover {
-    color: var(--accent);
-    text-decoration: underline;
-  }
-  .meta {
-    font-size: var(--fs-sm);
-    color: var(--muted);
   }
   .stats {
     display: flex;

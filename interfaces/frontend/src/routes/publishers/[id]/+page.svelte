@@ -1,16 +1,17 @@
 <script lang="ts">
 	import EntityMetaItem from '#lib/components/EntityMetaItem.svelte';
-	import Breadcrumb from '#lib/components/Breadcrumb.svelte';
-	import { pageTitle } from '#lib/institution.svelte.js';
+	import EntityBreadcrumb from '#lib/components/EntityBreadcrumb.svelte';
+	import EntityStatus from '#lib/components/EntityStatus.svelte';
 	import { page } from '$app/state';
 	import { onMount, tick } from 'svelte';
 	import { api, apiDetail } from '#lib/api/index.js';
 	import TabNav from '#lib/components/TabNav.svelte';
+	import { activeTabId, type TabDef } from '#lib/tabs.js';
 	import PublicationsListView from '#lib/components/PublicationsListView.svelte';
 	import SerialsListView from '#lib/components/SerialsListView.svelte';
 	import MonographsListView from '#lib/components/MonographsListView.svelte';
 	import PublicationsDashboard from '#lib/components/PublicationsDashboard.svelte';
-	import SubjectsCloud from '#lib/components/SubjectsCloud.svelte';
+	import SubjectsCard from '#lib/components/SubjectsCard.svelte';
 	import TitleRow from '#lib/components/TitleRow.svelte';
 	import PublisherDrawer from '#lib/components/publishers/PublisherDrawer.svelte';
 	import { useDrawerParam } from '#lib/composables/useDrawerParam.svelte.js';
@@ -18,7 +19,6 @@
 	import type { components } from '#lib/api/schema.js';
 
 	type PublisherDetail = components['schemas']['Publisher'];
-	type SubjectFrequency = components['schemas']['SubjectFrequency'];
 	type EnumOption = components['schemas']['EnumOption'];
 
 	const publisherId = $derived(Number(page.params.id));
@@ -26,18 +26,16 @@
 	// Volet d'édition de l'éditeur, en session admin : ouvert tant que `?publisher=<id>` figure dans l'URL.
 	const drawer = useDrawerParam('publisher', isAdmin);
 
-	const validTabs = ['dashboard', 'serials', 'monographs', 'publications'];
-	const activeTab = $derived(
-		(() => {
-			const t = page.url.searchParams.get('tab');
-			return t && validTabs.includes(t) ? t : 'dashboard';
-		})()
-	);
+	const tabs: TabDef[] = [
+		{ id: 'dashboard', label: 'Dashboard' },
+		{ id: 'serials', label: 'Publications en série' },
+		{ id: 'monographs', label: 'Monographies' },
+		{ id: 'publications', label: 'Publications' },
+	];
+	const activeTab = $derived(activeTabId(tabs, page.url.searchParams));
 
 	let publisher = $state<PublisherDetail | null>(null);
 	let error = $state(false);
-	let subjectList = $state<SubjectFrequency[]>([]);
-	let dashboardLoaded = $state(false);
 
 	// Label FR du publisher_type, affiché dans l'en-tête de la page.
 	let publisherTypeLabels: Record<string, string> = $state({});
@@ -55,36 +53,17 @@
 		publisherTypeLabels = Object.fromEntries(publicationOptions.map((o) => [o.value, o.label_fr]));
 	}
 
-	async function loadDashboard() {
-		if (dashboardLoaded) return;
-		subjectList = await api<SubjectFrequency[]>(`/api/publishers/${publisherId}/subjects?limit=20`, {
-			key: 'p-subjects'
-		});
-		dashboardLoaded = true;
-	}
-
-	function onTabSwitch(tab: string) {
-		if (tab === 'dashboard') loadDashboard();
-	}
-
 	onMount(async () => {
 		await Promise.all([loadPublisher(), loadTypeLabels()]);
-		if (activeTab === 'dashboard') loadDashboard();
 		await tick();
 	});
 
 </script>
 
-<svelte:head>
-	<title>{pageTitle(publisher?.name ?? 'Éditeur')}</title>
-</svelte:head>
+<EntityBreadcrumb section={{ label: 'Éditeurs', path: 'publishers' }} name={publisher?.name} fallback="Éditeur" />
 
-	<Breadcrumb trail={[{ label: 'Éditeurs', path: 'publishers' }]} current={publisher?.name} />
-
-{#if error}
-	<div class="no-results">Éditeur introuvable</div>
-{:else if !publisher}
-	<div class="loading">Chargement…</div>
+{#if error || !publisher}
+	<EntityStatus {error} notFound="Éditeur introuvable" />
 {:else}
 	<!-- Header -->
 	<div class="entity-header">
@@ -118,15 +97,7 @@
 	</div>
 
 	<!-- Tabs -->
-	<TabNav
-		tabs={[
-			{ id: 'dashboard', label: 'Dashboard' },
-			{ id: 'serials', label: 'Publications en série' },
-			{ id: 'monographs', label: 'Monographies' },
-			{ id: 'publications', label: 'Publications' }
-		]}
-		onswitch={onTabSwitch}
-	/>
+	<TabNav {tabs} />
 
 	<!-- Tab: Dashboard -->
 	{#if activeTab === 'dashboard'}
@@ -138,16 +109,7 @@
 				oaBreakdown="oa_voie"
 			>
 				{#snippet subjects()}
-					<div class="dash-card">
-						<h2>Sujets principaux</h2>
-						{#if !dashboardLoaded}
-							<div class="loading">Chargement…</div>
-						{:else if subjectList.length === 0}
-							<p class="muted">Aucun sujet (les sujets génériques sont exclus du top).</p>
-						{:else}
-							<SubjectsCloud subjects={subjectList} />
-						{/if}
-					</div>
+					<SubjectsCard endpoint="/api/publishers/{publisherId}/subjects" />
 				{/snippet}
 			</PublicationsDashboard>
 		</div>
@@ -189,7 +151,4 @@
 
 <style>
 
-	.loading, .no-results { padding: 20px; color: var(--muted); }
-
-	.muted { color: var(--muted); }
 </style>

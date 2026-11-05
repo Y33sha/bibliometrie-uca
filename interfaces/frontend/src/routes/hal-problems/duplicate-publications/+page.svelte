@@ -7,7 +7,7 @@
 	import DocTypePill from '#lib/components/DocTypePill.svelte';
 	import DoiLink from '#lib/components/DoiLink.svelte';
 	import { resolve } from '$app/paths';
-	import { replaceQuery } from '#lib/url.js';
+	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
@@ -41,12 +41,17 @@
 		buildParams: () => new URLSearchParams(),
 	});
 
+	const url = useUrlFilters({
+		basePath: '/hal-problems/duplicate-publications',
+		filters: {
+			tab: { type: 'single', urlKey: 'tab', defaultValue: 'doi' },
+			doiPage: { type: 'page', urlKey: 'doi_page' },
+			metaPage: { type: 'page', urlKey: 'meta_page' },
+		},
+	});
+
 	function syncUrl() {
-		const p = new URLSearchParams();
-		if (activeTab !== 'doi') p.set('tab', activeTab);
-		if (doi.page > 1) p.set('doi_page', String(doi.page));
-		if (meta.page > 1) p.set('meta_page', String(meta.page));
-		void replaceQuery(resolve('hal-problems/duplicate-publications'), p);
+		url.syncUrl(() => ({ tab: activeTab, doiPage: doi.page, metaPage: meta.page }));
 	}
 
 	function switchTab(tab: 'doi' | 'meta') {
@@ -58,10 +63,10 @@
 
 
 	onMount(() => {
-		const urlParams = new URLSearchParams(page.url.search);
-		if (urlParams.get('tab')) activeTab = urlParams.get('tab') as 'doi' | 'meta';
-		if (urlParams.get('doi_page')) doi.page = parseInt(urlParams.get('doi_page')!) || 1;
-		if (urlParams.get('meta_page')) meta.page = parseInt(urlParams.get('meta_page')!) || 1;
+		const restored = url.restoreFromUrl(page.url.searchParams);
+		if (restored.tab) activeTab = restored.tab as 'doi' | 'meta';
+		if (restored.doiPage) doi.page = restored.doiPage as number;
+		if (restored.metaPage) meta.page = restored.metaPage as number;
 		if (activeTab === 'meta') meta.load();
 		doi.load();
 	});

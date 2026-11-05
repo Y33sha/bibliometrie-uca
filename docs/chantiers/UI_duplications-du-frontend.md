@@ -61,7 +61,7 @@ Une étiquette (tag, badge, pastille, chip) est un court texte sur fond clair, a
 - **Vues de liste** (six composants, plus les pages Labos et Sujets) : chacune écrit `buildFilterParams`, `exportCsvUrl`, la synchronisation de l'URL, sa restauration et la pagination. `filterRegistry` décrit filtres, paramètres et URL de façon déclarative ; seules les publications et les statistiques s'en servent. `ThesesListView` interroge les mêmes routes que les publications, mais recopie l'option « Aucun labo », l'encodage de présence et la liste des sources.
 - **Volets** (cinq) : rechargement au changement d'identifiant (6 copies), en-tête avec lien public et renommage (3), fonction `update()` identique dans les volets revue et éditeur, section de fusion avec `Picker` (3) ; `PublicationMergeSection` fait la même chose sans `Picker`.
 - **Modales** : boutons « Annuler » et action recopiés 7 fois. L'état de `StructureFormModal` est déclaré deux fois (page Labos, `StructureDrawer`). `DetachNameFormModal` et `PersonDrawer` affichent la même liste de personnes.
-- **Listes de tri** : `LikelyProceedingsList` recopie `SerialGroupsList` ; `AmbiguousFormsList` et `SuspectMergesList` recopient `PersonPairsList`. Les quatre pages Problèmes HAL et quatre pages d'administration synchronisent leur URL à la main, à côté de `useUrlFilters`. Trois compteurs de file recopiés.
+- **Listes de tri** : les quatre pages Problèmes HAL et quatre pages d'administration synchronisent leur URL à la main, à côté de `useUrlFilters`. Trois compteurs de file recopiés.
 - **Pages d'entité** (sept) : titre, fil d'Ariane, « introuvable » et « Chargement… » recopiés 7 fois. Onglet actif recalculé 6 fois, alors que `TabNav` le calcule. Carte « Sujets principaux » et chargement des sujets recopiés 4 fois.
 - **Balisages recopiés** :
   - pastille DOAJ (3), lien d'éditeur ou texte (7), lien de revue ou texte (4), nom de personne (10) ;
@@ -82,6 +82,8 @@ Une étiquette (tag, badge, pastille, chip) est un court texte sur fond clair, a
 
 - Le code mort et les déclarations redondantes sont supprimés.
 - Étiquettes : une seule classe, teintée par la propriété `--tag-color`. Le fond, le texte et le survol en dérivent en OKLCH relatif, à luminosité fixe. Les couleurs des graphiques restent inchangées.
+- Un écart entre copies suit l'usage majoritaire. Tout changement d'apparence est validé sur planches avant et après.
+- Un design volontairement différent garde ses règles locales, par exemple `AccessButton`.
 
 ## Phasage
 
@@ -99,27 +101,27 @@ Une étiquette (tag, badge, pastille, chip) est un court texte sur fond clair, a
 
 - [x] Classe d'étiquette à variantes de teinte, de taille et de forme ; couleurs des étiquettes en variables (97b683111)
 - [x] Étiquettes partagées et locales sur cette classe
-- [ ] Icône ronde unique pour les identifiants et les sources
+- [x] Icône ronde unique pour les identifiants et les sources
 
 ### Phase 4 — Boutons et contrôles
 
-- [ ] Boutons sans bordure, pleins, à contour et en pointillés ; un seul état désactivé
-- [ ] Boutons locaux sur les classes partagées, dont `AccessButton` et sa variante compacte ; retrait « × » sur `IconButton`
-- [ ] Champs, menus déroulants, panneaux flottants et lignes d'options
+- [x] Boutons sans bordure, pleins, à contour et en pointillés ; un seul état désactivé
+- [x] Boutons locaux sur les classes partagées ; retrait « × » sur `IconButton`
+- [x] Champs, menus déroulants, panneaux flottants et lignes d'options
 
 ### Phase 5 — Utilitaires
 
-- [ ] Classe de texte secondaire
-- [ ] Chargement et liste vide sur `ListStatus`
-- [ ] Encarts d'information, d'avertissement et de danger
-- [ ] Styles de base de `+layout.svelte` dans `shared.css` ; collisions de noms
+- [x] Classe de texte secondaire
+- [x] Chargement et liste vide sur `ListStatus`
+- [x] Encarts d'information, d'avertissement et de danger
+- [x] Styles de base de `+layout.svelte` dans `shared.css` ; collisions de noms
 
 ### Phase 6 — Composants
 
 - [ ] Vues de liste sur une base commune (question 1)
 - [ ] Volets sur une base commune (question 2)
-- [ ] Listes de tri sur leurs composants génériques ; pages Problèmes HAL et d'administration sur `useUrlFilters`
-- [ ] Pages d'entité : en-tête, onglet actif, carte des sujets
+- [x] Pages Problèmes HAL et d'administration sur `useUrlFilters` (d932adc14)
+- [x] Pages d'entité : titre d'onglet et fil d'Ariane (d84a7b2e9), onglet actif (d7ed0eacb), carte des sujets (c0fde1cd3), états « introuvable » et « Chargement… » (87d9cfd08)
 - [ ] Balisages recopiés en composants : pastille DOAJ, liens d'éditeur et de revue, nom de personne, en-tête triable
 
 ### Phase 7 — Fonctions, libellés et icônes

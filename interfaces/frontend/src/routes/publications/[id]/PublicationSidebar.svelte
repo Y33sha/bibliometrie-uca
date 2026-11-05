@@ -31,7 +31,7 @@
   };
 
   // Pastilles colorées des icônes claires.
-  const PLATFORM_TAG_CLASSES: Record<string, string> = { Zenodo: "tag-zenodo" };
+  const PLATFORM_LOGO_CLASSES: Record<string, string> = { Zenodo: "logo-zenodo" };
 
   const orderedSources = $derived([
     ...sourceOrder().flatMap((src) => referencedBy.filter((s) => s.source === src)),
@@ -64,14 +64,14 @@
       <span class="access-state"><span class="access-dot"></span>Accès ouvert</span>
       {#if accessLicense}<span class="access-license">· <LicenseBadge license={accessLicense} /></span>{/if}
       {#if accessCopy || viaPublisher}
-        <div class="access-via">via {viaPublisher ? "l'éditeur" : accessCopy?.label}</div>
+        <div class="muted">via {viaPublisher ? "l'éditeur" : accessCopy?.label}</div>
       {/if}
     </div>
   {/if}
 
   {#snippet copyRow(copy: AccessLink)}
     <a href={copy.url} target="_blank" rel="noopener noreferrer" class="source-row" title={copy.url}>
-      <span class="source-tag {PLATFORM_TAG_CLASSES[copy.label] ?? ''}">
+      <span class="logo-icon logo-source {PLATFORM_LOGO_CLASSES[copy.label] ?? ''}">
         <img src={asset(`icons/${copy.icon}` as AssetPath)} alt={copy.label} />
       </span>
       <span class="row-label">{copy.label}</span>
@@ -115,7 +115,7 @@
             class="source-row"
             title={e.value}
           >
-            <span class="source-tag">
+            <span class="logo-icon logo-source">
               {#if EXT_META[e.type]?.icon}
                 <img src={EXT_META[e.type].icon} alt={EXT_META[e.type]?.label} />
               {/if}
@@ -159,9 +159,6 @@
   .access-state {
     color: var(--open-text);
   }
-  .access-via {
-    color: var(--muted);
-  }
   .sidebar-block {
     margin-top: 22px;
   }
@@ -193,12 +190,8 @@
     text-decoration: none;
   }
   /* La pastille garde sa largeur, icône ou non : les libellés restent alignés. */
-  .source-row :global(.source-tag) {
+  .source-row :global(.logo-icon) {
     flex-shrink: 0;
-  }
-  /* Le lien couvre toute la ligne : l'icône grossit au survol de la ligne entière, pas seulement de l'icône. */
-  .source-row:hover :global(.source-tag) {
-    transform: scale(1.15);
   }
   .row-label {
     font-size: var(--fs-md);

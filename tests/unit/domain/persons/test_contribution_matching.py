@@ -104,6 +104,32 @@ def test_deux_identifiants_de_deux_personnes_laissent_le_groupe_sans_personne():
     assert decide_contribution(members, index).reason == ContributionSkipReason.IDENTIFIER_CONFLICT
 
 
+def test_deux_identifiants_d_une_contribution_source_sont_deux_candidats():
+    """Une contribution source à l'ORCID de Jean et à l'IdRef de Jeanne, une autre à l'IdRef de Jean : l'intersection désigne Jean."""
+    index = _index(
+        [(1, "Martin", "Jean"), (2, "Martin", "Jeanne")],
+        orcid={_ORCID: 1},
+        idref={_IDREF: 2, "987654321": 1},
+    )
+    members = [
+        _member("J. Martin", "hal", {"orcid": _ORCID, "idref": _IDREF}),
+        _member("Jean Martin", "scanr", {"idref": "987654321"}),
+    ]
+
+    decision = decide_contribution(members, index)
+
+    assert (decision.person_id, decision.reason) == (1, ContributionMatchReason.ORCID)
+
+
+def test_deux_identifiants_d_une_seule_contribution_source_sans_autre_appui():
+    index = _index(
+        [(1, "Martin", "Jean"), (2, "Martin", "Jeanne")], orcid={_ORCID: 1}, idref={_IDREF: 2}
+    )
+    members = [_member("J. Martin", "hal", {"orcid": _ORCID, "idref": _IDREF})]
+
+    assert decide_contribution(members, index).reason == ContributionSkipReason.IDENTIFIER_CONFLICT
+
+
 def test_l_orcid_d_une_source_sans_depot_par_l_auteur_est_ignore():
     index = _index([(1, "Martin", "Jean")], orcid={_ORCID: 1})
     members = [_member("Jean Martin", "wos", {"orcid": _ORCID}, in_perimeter=False)]
@@ -185,6 +211,21 @@ def test_deux_membres_qui_designent_deux_personnes_laissent_le_groupe_sans_perso
     members = [_member("Jean Martin"), _member("Jacques Martin", "openalex")]
 
     assert decide_contribution(members, index).reason == ContributionSkipReason.NAME_CONFLICT
+
+
+def test_un_nom_univoque_hors_des_candidats_d_un_nom_ambigu_laisse_le_groupe_sans_personne():
+    """« Christian Boyer » désigne Christian, « B. Boyer » Bertrand et Baptiste : l'intersection est vide."""
+    index = _index([(1, "Boyer", "Christian"), (2, "Boyer", "Bertrand"), (3, "Boyer", "Baptiste")])
+    members = [_member("Christian Boyer"), _member("B. Boyer", "openalex")]
+
+    assert decide_contribution(members, index).reason == ContributionSkipReason.NAME_CONFLICT
+
+
+def test_deux_noms_ambigus_d_intersection_multiple():
+    index = _index([(1, "Martin", "Jean"), (2, "Martin", "Jacques")])
+    members = [_member("J. Martin"), _member("J. Martin", "openalex")]
+
+    assert decide_contribution(members, index).reason == ContributionSkipReason.AMBIGUOUS_NAME_FORM
 
 
 def test_un_nom_ambigu_ne_cree_pas_de_personne():

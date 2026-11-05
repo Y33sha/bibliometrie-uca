@@ -153,6 +153,13 @@ _RUN_FLAGS = (
         "alignement des auteurs reconstruit",
     ),
     _RunFlag(
+        "--rebuild-persons",
+        "À la phase persons, redécide toutes les contributions rattachées hors épinglage, contre "
+        "les personnes existantes, pour appliquer une évolution des règles de rattachement sur "
+        "tout le stock.",
+        "rattachements des personnes redécidés",
+    ),
+    _RunFlag(
         "--rebuild-subjects",
         "À la phase subjects, marque toutes les publications à ingérer, pour propager "
         "une évolution des règles d'ingestion sur tout le stock.",

@@ -3,6 +3,7 @@
   import IconButton from "#lib/components/IconButton.svelte";
   import PageHeader from "#lib/components/PageHeader.svelte";
   import TabNav from "#lib/components/TabNav.svelte";
+  import { activeTabId, type TabDef } from "#lib/tabs.js";
   import { page } from "$app/state";
   import { onMount } from "svelte";
   import { api, errorMessage, latestRequest, config as configApi, perimeters as perimetersApi } from "#lib/api/index.js";
@@ -152,7 +153,11 @@
     { key: "serial_openalex_recheck_after_days", label: "Métadonnées des revues (OpenAlex)" },
   ];
 
-  const activeTab = $derived(page.url.searchParams.get("tab") === "display" ? "display" : "pipeline");
+  const tabs: TabDef[] = [
+    { id: "pipeline", label: "Pipeline" },
+    { id: "display", label: "Affichage" },
+  ];
+  const activeTab = $derived(activeTabId(tabs, page.url.searchParams));
 
   const SITE_TITLE_KEY = "site_title";
   /** Clés dont la valeur est un texte libre, enregistré tel quel. */
@@ -311,7 +316,7 @@
 <!-- Éditeur inline partagé par toutes les valeurs de configuration scalaires : focus + sélection à l'ouverture, Entrée valide, Échap annule. -->
 {#snippet inlineEdit(key: string)}
   {@const bornes = numericBounds(key)}
-  <input class="config-editor-inline" class:text={TEXT_KEYS.has(key)} bind:value={editValue} use:autofocus={{ select: true }}
+  <input class="input-sm config-editor-inline" class:text={TEXT_KEYS.has(key)} bind:value={editValue} use:autofocus={{ select: true }}
     type={bornes ? "number" : "text"} min={bornes?.min} max={bornes?.max} step={bornes ? 1 : undefined}
     onkeydown={(e) => editKeydown(e, key)} />
   <span class="config-actions-inline">
@@ -321,12 +326,7 @@
 {/snippet}
 
 <div class="config-page">
-  <TabNav
-    tabs={[
-      { id: "pipeline", label: "Pipeline" },
-      { id: "display", label: "Affichage" },
-    ]}
-  />
+  <TabNav {tabs} />
 
   {#if activeTab === "pipeline"}
   <!-- ═══ ANNÉES ═══ -->
@@ -341,7 +341,7 @@
             {@render inlineEdit(key)}
           {:else}
             {#if item.value === null}
-              <span class="config-value-inline default-value">
+              <span class="config-value-inline muted">
                 {item.value_if_null} (par défaut)
               </span>
             {:else}
@@ -500,7 +500,7 @@
           {#if siteTitleItem.value}
             <span class="config-value-inline">{siteTitleItem.value}</span>
           {:else}
-            <span class="config-value-inline default-value">{defaultSiteTitle()} (par défaut)</span>
+            <span class="config-value-inline muted">{defaultSiteTitle()} (par défaut)</span>
           {/if}
           <IconButton icon="edit" label="Modifier" onclick={() => startEdit(SITE_TITLE_KEY)} />
         {/if}
@@ -553,7 +553,7 @@
       {#each perimModal.structures as struct (struct.id)}
         <span class="tag tag-pill tag-removable">
           {structureLabel(struct)}
-          <button class="remove" onclick={() => perimRemoveStruct(struct.id)}>x</button>
+          <IconButton icon="reject" small label="Retirer {structureLabel(struct)}" onclick={() => perimRemoveStruct(struct.id)} />
         </span>
       {/each}
     </div>
@@ -561,7 +561,7 @@
     {#if perimModal.structResults.length > 0}
       <div class="perim-search-results">
         {#each perimModal.structResults.slice(0, 8) as s (s.id)}
-          <button class="picker-item" onclick={() => perimAddStruct(s)}>
+          <button class="option-row" onclick={() => perimAddStruct(s)}>
             {s.acronym ? s.acronym + " — " : ""}{s.name}
           </button>
         {/each}
@@ -642,17 +642,10 @@
   .config-editor-inline {
     width: 100px;
     font-family: var(--mono);
-    font-size: var(--fs-sm);
-    padding: 3px 6px;
-    border: 1px solid var(--accent);
-    border-radius: var(--radius);
   }
   .config-editor-inline.text {
     width: 320px;
     font-family: inherit;
-  }
-  .default-value {
-    color: var(--muted);
   }
   .config-actions-inline {
     display: flex;
@@ -698,15 +691,6 @@
     margin: 6px 0;
   }
 
-  .remove {
-    cursor: pointer;
-    color: var(--danger);
-    font-weight: bold;
-    background: none;
-    border: none;
-    padding: 0;
-    font-family: inherit;
-  }
   .perim-search-results {
     border: 1px solid var(--border);
     border-radius: var(--radius);
@@ -714,20 +698,6 @@
     max-height: 200px;
     overflow-y: auto;
     background: var(--card);
-  }
-  .picker-item {
-    display: block;
-    width: 100%;
-    padding: 6px 10px;
-    font-size: var(--fs-md);
-    cursor: pointer;
-    background: none;
-    border: none;
-    text-align: left;
-    font-family: inherit;
-  }
-  .picker-item:hover {
-    background: var(--accent-light);
   }
   /* Libellé de phase : le pointillé + le curseur d'aide signalent l'infobulle de description. */
   .role-phase {

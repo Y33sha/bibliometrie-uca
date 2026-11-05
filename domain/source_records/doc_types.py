@@ -138,6 +138,7 @@ _SOURCE_MAPS: dict[str, dict[str, str]] = {
         "preprint": "preprint",
         "other": "other",
     },
+    "scanr_patents": {"patent": "patent"},
     "theses": {
         "thesis": "thesis",
         "ongoing_thesis": "ongoing_thesis",

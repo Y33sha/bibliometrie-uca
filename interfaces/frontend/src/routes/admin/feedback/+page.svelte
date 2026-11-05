@@ -4,7 +4,7 @@
   import PageHeader from '#lib/components/PageHeader.svelte';
   import KeyFigures from '#lib/components/KeyFigures.svelte';
   import { onMount } from "svelte";
-  import { replaceQuery } from "#lib/url.js";
+  import { useUrlFilters } from "#lib/composables/useUrlFilters.svelte.js";
   import { api, nameForms, structures as structuresApi, errorMessage } from "#lib/api/index.js";
   import { deriveStructDetectionStatus } from "#lib/utils.js";
   import { structureLabel } from "#lib/structureLabels.js";
@@ -35,25 +35,18 @@
 
   // ---------- URL params helpers ----------
 
-  function readUrlParams(): { tab: Tab; search: string; p: number; structureId: number | null } {
-    const sp = new URLSearchParams(window.location.search);
-    const tab = sp.get("tab") === "fp" ? "fp" : "fn";
-    return {
-      tab,
-      search: sp.get("search") || "",
-      p: parseInt(sp.get("page") || "1") || 1,
-      structureId: sp.has("structure_id") ? parseInt(sp.get("structure_id")!) || null : null,
-    };
-  }
+  const url = useUrlFilters({
+    basePath: "/admin/feedback",
+    filters: {
+      structureId: { type: "single", urlKey: "structure_id" },
+      tab: { type: "single", urlKey: "tab", defaultValue: "fn" },
+      search: { type: "single", urlKey: "search" },
+      page: { type: "page", urlKey: "page" },
+    },
+  });
 
   function syncUrl(): void {
-    const sp = new URLSearchParams();
-    if (drawer.id !== null) sp.set(DRAWER_PARAM, String(drawer.id));
-    if (currentStructureId) sp.set("structure_id", String(currentStructureId));
-    if (currentTab !== "fn") sp.set("tab", currentTab);
-    if (search) sp.set("search", search);
-    if (list.page > 1) sp.set("page", String(list.page));
-    void replaceQuery(window.location.pathname, sp);
+    url.syncUrl(() => ({ structureId: currentStructureId, tab: currentTab, search, page: list.page }));
   }
 
   // ---------- State ----------
@@ -70,7 +63,6 @@
   let stats: FeedbackStats | null = $state(null);
   let currentTab: Tab = $state("fn");
   let search = $state("");
-  let searchTimeout: ReturnType<typeof setTimeout> | null = $state(null);
   const list = usePaginatedFetch<FeedbackAddress>({
     endpoint: () =>
       currentTab === "fn" ? "/api/feedback/false-negatives" : "/api/feedback/false-positives",
@@ -133,13 +125,10 @@
     loadTable();
   }
 
-  function onSearchInput() {
-    if (searchTimeout) clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(() => {
-      list.page = 1;
-      loadTable();
-    }, 400);
-  }
+  const onSearchInput = url.debouncedSearch(() => {
+    list.page = 1;
+    loadTable();
+  });
 
   function onPageChange(p: number) {
     list.goToPage(p);
@@ -204,7 +193,7 @@
     // Le chemin du clic est figé à sa production : un clic sur un résultat que le rendu retire ensuite compte bien comme intérieur.
     const path = event.composedPath();
     const picker = document.getElementById("form-ctx-picker");
-    const onTrigger = path.some((n) => n instanceof HTMLElement && n.classList.contains("form-action"));
+    const onTrigger = path.some((n) => n instanceof HTMLElement && n.hasAttribute("data-ctx-trigger"));
     if (picker && !path.includes(picker) && !onTrigger) {
       closeCtxPicker();
     }
@@ -236,14 +225,15 @@
   // ---------- Init ----------
 
   onMount(async () => {
-    const url = readUrlParams();
-    currentTab = url.tab;
-    search = url.search;
-    list.page = url.p;
+    const restored = url.restoreFromUrl(new URLSearchParams(window.location.search));
+    currentTab = restored.tab === "fp" ? "fp" : "fn";
+    search = (restored.search as string | undefined) ?? "";
+    list.page = (restored.page as number | undefined) ?? 1;
+    const urlStructureId = parseInt(restored.structureId as string) || null;
 
     await loadStructures();
-    if (url.structureId) {
-      currentStructureId = url.structureId;
+    if (urlStructureId) {
+      currentStructureId = urlStructureId;
     } else {
       const saved = localStorage.getItem('admin_structure_id');
       if (saved) currentStructureId = parseInt(saved);
@@ -299,9 +289,9 @@
 
     <div class="toolbar-sep"></div>
 
-    <div class="tab-group">
-      <button class="tab-btn" class:active={currentTab === "fn"} onclick={() => switchTab("fn")}> Faux négatifs </button>
-      <button class="tab-btn" class:active={currentTab === "fp"} onclick={() => switchTab("fp")}> Faux positifs </button>
+    <div class="segmented" role="group" aria-label="Erreurs">
+      <button aria-pressed={currentTab === "fn"} onclick={() => switchTab("fn")}> Faux négatifs </button>
+      <button aria-pressed={currentTab === "fp"} onclick={() => switchTab("fp")}> Faux positifs </button>
     </div>
     <input type="search" placeholder="Rechercher dans les adresses" bind:value={search} onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
     <ResultCount {list} one="adresse" many="adresses" />
@@ -343,15 +333,15 @@
                 {#if a.matched_forms && a.matched_forms.length > 0}
                   {#each uniqueForms(a.matched_forms) as f (f.form_id)}
                     <div class="form-info">
-                      <span class="form-struct">{structureLabel(f.structure)} &rarr;</span>
+                      <span class="muted">{structureLabel(f.structure)} &rarr;</span>
                       <span class="form-text">{f.form_text}</span>
                       {#if f.requires_context_of && f.requires_context_of.length}
-                        <span class="form-ctx">
+                        <span class="muted">
                           (ctx: {formatCtx(f.requires_context_of)})
                         </span>
                       {/if}
-                      <button class="form-action" title="Ajouter un contexte contraignant" onclick={(e) => openCtxPicker(f.form_id, e)}> + ctx </button>
-                      <button class="form-action danger" title="Supprimer cette forme" onclick={() => deleteForm(f.form_id)}> suppr. </button>
+                      <button class="btn btn-sm" data-ctx-trigger title="Ajouter un contexte contraignant" onclick={(e) => openCtxPicker(f.form_id, e)}> + ctx </button>
+                      <button class="btn btn-sm btn-danger" title="Supprimer cette forme" onclick={() => deleteForm(f.form_id)}> suppr. </button>
                     </div>
                   {/each}
                 {:else}
@@ -369,15 +359,15 @@
 
   <!-- Context picker -->
   {#if ctxPicker}
-    <div class="ctx-picker-inline" id="form-ctx-picker" style="top:{ctxPicker.y}px;left:{ctxPicker.x}px" onkeydown={(e) => { if (e.key === 'Escape') { e.preventDefault(); closeCtxPicker(); } }} role="dialog" aria-label="Contexte contraignant" tabindex="-1">
+    <div class="ctx-picker-inline popover" id="form-ctx-picker" style="top:{ctxPicker.y}px;left:{ctxPicker.x}px" onkeydown={(e) => { if (e.key === 'Escape') { e.preventDefault(); closeCtxPicker(); } }} role="dialog" aria-label="Contexte contraignant" tabindex="-1">
       <div class="picker-shortcuts">
         <button onclick={() => addCtxToForm("tutelles")}>{"\uD83D\uDD17"} tutelles</button>
       </div>
-      <input type="text" placeholder="Rechercher une structure" bind:value={ctxSearch} use:autofocus />
+      <input type="text" class="panel-search input-sm" placeholder="Rechercher une structure" bind:value={ctxSearch} use:autofocus />
       <div class="picker-results">
         {#each ctxFilteredStructures as s (s.id)}
-          <button class="picker-item" onclick={() => addCtxToForm(s.id)}>
-            <span class="picker-type">{s.type}</span>
+          <button class="option-row" onclick={() => addCtxToForm(s.id)}>
+            <span class="muted-small">{s.type}</span>
             {s.acronym ? s.acronym + " \u2014 " : ""}{s.name}
           </button>
         {/each}
@@ -412,33 +402,8 @@
     margin: 0 4px;
   }
 
-  .tab-group {
-    display: flex;
-    gap: 0;
+  .segmented {
     margin-right: 4px;
-  }
-
-  .tab-btn {
-    padding: 6px 14px;
-    border: 1px solid var(--border);
-    background: var(--card);
-    font-size: var(--fs-md);
-    cursor: pointer;
-    font-family: inherit;
-  }
-  .tab-btn:first-child {
-    border-radius: var(--radius) 0 0 var(--radius);
-  }
-  .tab-btn:last-child {
-    border-radius: 0 var(--radius) var(--radius) 0;
-  }
-  .tab-btn:not(:first-child) {
-    border-left: none;
-  }
-  .tab-btn.active {
-    background: var(--accent);
-    color: var(--text-inverse);
-    border-color: var(--accent);
   }
 
   .toolbar input[type="search"] {
@@ -452,10 +417,6 @@
     line-height: 1.4;
     word-break: break-word;
     max-width: 600px;
-  }
-  .muted-small {
-    color: var(--muted);
-    font-size: var(--fs-sm);
   }
 
   /* Structure ajoutée à la main : contour en pointillés. */
@@ -477,82 +438,21 @@
     gap: 6px;
     flex-wrap: wrap;
   }
-  .form-struct {
-    color: var(--muted);
-  }
   .form-text {
     font-family: var(--mono);
     font-weight: 600;
     color: var(--warning-text);
-  }
-  .form-ctx {
-    color: var(--muted);
-  }
-  .form-action {
-    padding: 1px 6px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--card);
-    font-size: var(--fs-sm);
-    cursor: pointer;
-    font-weight: 500;
-    font-family: inherit;
-  }
-  .form-action:hover {
-    background: var(--accent-light);
-  }
-  .form-action.danger {
-    border-color: var(--danger);
-    color: var(--danger);
-  }
-  .form-action.danger:hover {
-    background: var(--danger-light);
   }
 
   /* Context picker */
   .ctx-picker-inline {
     position: fixed;
     z-index: 100;
-    background: var(--card);
-    border: 1px solid var(--accent);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow-md);
     width: 320px;
-  }
-  .ctx-picker-inline input {
-    width: 100%;
-    padding: 6px 10px;
-    border: none;
-    border-bottom: 1px solid var(--border);
-    border-radius: 0;
-    font-size: var(--fs-sm);
-    outline: none;
   }
   .picker-results {
     max-height: 180px;
     overflow-y: auto;
-  }
-  .picker-item {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 5px 10px;
-    font-size: var(--fs-sm);
-    cursor: pointer;
-    background: none;
-    border: none;
-    width: 100%;
-    text-align: left;
-    font-family: inherit;
-  }
-  .picker-item:hover,
-  .picker-item:focus-visible {
-    background: var(--accent-light);
-    outline: none;
-  }
-  .picker-type {
-    font-size: var(--fs-sm);
-    color: var(--muted);
   }
   .picker-item-empty {
     padding: 5px 10px;

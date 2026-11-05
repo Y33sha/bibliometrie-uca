@@ -32,7 +32,7 @@
 				<IdentifierLink id_type={type} id_value={id.value} confirmed={id.confirmed} />
 			{/each}
 		{:else}
-			<span class="id-icon id-placeholder"></span>
+			<span class="logo-icon logo-identifier logo-placeholder"></span>
 		{/if}
 	{/each}
 </span>

@@ -1,7 +1,7 @@
 <script lang="ts">
   import TableScroll from '#lib/components/TableScroll.svelte';
-  import Breadcrumb from "#lib/components/Breadcrumb.svelte";
-  import { pageTitle } from "#lib/institution.svelte.js";
+  import EntityBreadcrumb from "#lib/components/EntityBreadcrumb.svelte";
+  import EntityStatus from "#lib/components/EntityStatus.svelte";
   import { page } from "$app/state";
   import { resolve } from "$app/paths";
   import { latestRequest } from "#lib/api/index.js";
@@ -10,6 +10,7 @@
   import { specificity, specificityPercent } from "./specificity";
   import PublicationsListView from "#lib/components/PublicationsListView.svelte";
   import TabNav from "#lib/components/TabNav.svelte";
+  import { activeTabId, type TabDef } from "#lib/tabs.js";
   import SortChevron from "#lib/components/SortChevron.svelte";
   import ClampedBlock from "#lib/components/ClampedBlock.svelte";
   import { subjectVocabularyLabels } from "#lib/labels.js";
@@ -19,10 +20,11 @@
   // Libellé normalisé du sujet : il l'identifie, tous vocabulaires confondus.
   const subjectKey = $derived(page.params.id ?? "");
 
-  // Onglet actif synchronisé avec `?tab=...` (graphe par défaut). TabNav gère lui-même la lecture de l'URL et la navigation via goto.
-  const activeTab = $derived(
-    page.url.searchParams.get("tab") === "publications" ? "publications" : "graph",
-  );
+  const tabs: TabDef[] = [
+    { id: "graph", label: "Sujets associés" },
+    { id: "publications", label: "Publications" },
+  ];
+  const activeTab = $derived(activeTabId(tabs, page.url.searchParams));
 
   const NEIGHBORS_LIMIT = 15;
   const MIN_COOCCURRENCE = 3;
@@ -70,16 +72,10 @@
 
 </script>
 
-<svelte:head>
-  <title>{pageTitle(data?.subject.label ?? "Sujet")}</title>
-</svelte:head>
+<EntityBreadcrumb section={{ label: "Sujets", path: "subjects" }} name={data?.subject.label} fallback="Sujet" />
 
-<Breadcrumb trail={[{ label: "Sujets", path: "subjects" }]} current={data?.subject.label} />
-
-  {#if error}
-    <div class="error">Sujet introuvable.</div>
-  {:else if !data}
-    <p class="loading">Chargement…</p>
+  {#if error || !data}
+    <EntityStatus {error} notFound="Sujet introuvable" />
   {:else}
     <div class="entity-header">
       <h1 class="entity-title">{data.subject.label}</h1>
@@ -97,7 +93,7 @@
             <span class="lineage">
               {#each v.ancestors as a (a.label_normalized)}
                 <a class="entity-link" href={resolve(`subjects/${a.label_normalized}`)}>{a.label}</a>
-                <span class="separator">›</span>
+                <span class="muted">›</span>
               {/each}
               <span class="current">{data.subject.label}</span>
             </span>
@@ -120,12 +116,7 @@
       {/each}
     </div>
 
-    <TabNav
-      tabs={[
-        { id: "graph", label: "Sujets associés" },
-        { id: "publications", label: "Publications" },
-      ]}
-    />
+    <TabNav {tabs} />
 
     {#if activeTab === "graph"}
       <div class="graph-wrapper" class:loading-overlay={loading}>
@@ -221,9 +212,6 @@
     align-items: baseline;
     gap: 4px 6px;
   }
-  .separator {
-    color: var(--muted);
-  }
   .current {
     font-weight: 600;
   }
@@ -232,10 +220,6 @@
   }
   .graph-wrapper.loading-overlay {
     opacity: 0.6;
-  }
-  .empty {
-    color: var(--muted);
-    font-style: italic;
   }
   .graph-legend {
     margin: 0 0 8px;
@@ -261,12 +245,5 @@
   }
   .muted-num {
     color: var(--text-secondary);
-  }
-  .loading {
-    color: var(--muted);
-  }
-  .error {
-    color: var(--danger);
-    font-style: italic;
   }
 </style>

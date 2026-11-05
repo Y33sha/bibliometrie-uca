@@ -119,6 +119,7 @@ source_modules = [
     "pipeline.ingestion.hal",
     "pipeline.ingestion.openalex",
     "pipeline.ingestion.scanr",
+    "pipeline.ingestion.scanr_patents",
     "pipeline.ingestion.theses",
     "pipeline.ingestion.wos",
 ]

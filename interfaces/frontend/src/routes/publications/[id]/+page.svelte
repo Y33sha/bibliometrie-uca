@@ -1,6 +1,6 @@
 <script lang="ts">
-  import Breadcrumb from "#lib/components/Breadcrumb.svelte";
-  import { pageTitle } from "#lib/institution.svelte.js";
+  import EntityBreadcrumb from "#lib/components/EntityBreadcrumb.svelte";
+  import EntityStatus from "#lib/components/EntityStatus.svelte";
   import { goto } from "$app/navigation";
   import { resolve } from "$app/paths";
   import { page } from "$app/state";
@@ -78,16 +78,15 @@
 
 </script>
 
-<svelte:head>
-  <title>{pageTitle(titleText(pub?.title).slice(0, 80) || "Publication")}</title>
-</svelte:head>
+<EntityBreadcrumb
+  section={{ label: "Publications", path: "publications" }}
+  name={titleText(pub?.title)}
+  title={titleText(pub?.title).slice(0, 80)}
+  fallback="Publication"
+/>
 
-<Breadcrumb trail={[{ label: "Publications", path: "publications" }]} current={titleText(pub?.title)} />
-
-{#if error}
-  <div class="no-results">Publication introuvable</div>
-{:else if !pub}
-  <div class="loading">Chargement…</div>
+{#if error || !pub}
+  <EntityStatus {error} notFound="Publication introuvable" />
 {:else}
   <div class="detail-layout">
     <div class="detail-main">

@@ -1,6 +1,7 @@
 <script lang="ts">
   // Volet droit : il se ferme par Échap, par le fond et par son bouton.
   import type { Snippet } from "svelte";
+  import IconButton from "#lib/components/IconButton.svelte";
 
   let {
     width = "480px",
@@ -41,7 +42,7 @@
 <aside class="drawer" style:width={`min(${width}, 92vw)`}>
   <header class="drawer-head">
     <div class="drawer-head-content">{@render head()}</div>
-    <button class="drawer-close" title="Fermer" aria-label="Fermer" onclick={onclose}>&times;</button>
+    <IconButton icon="reject" label="Fermer" onclick={onclose} />
   </header>
   <div class="drawer-body">{@render children()}</div>
 </aside>
@@ -81,18 +82,6 @@
   .drawer-head-content {
     flex: 1;
     min-width: 0;
-  }
-  .drawer-close {
-    background: none;
-    border: none;
-    font-size: var(--fs-2xl);
-    line-height: 1;
-    cursor: pointer;
-    color: var(--muted);
-    padding: 0 4px;
-  }
-  .drawer-close:hover {
-    color: var(--text);
   }
   /* Les marges intérieures sont des variables : un contenu figé aux bords du volet les compense. */
   .drawer-body {

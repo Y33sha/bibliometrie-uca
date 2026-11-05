@@ -112,6 +112,22 @@ class TestBuildHalIdentifiers:
         doc = {"linkExtUrl_s": ["https://arxiv.org/abs/2401.00123"]}
         assert ("doi", "10.48550/arxiv.2401.00123", "secondary") in _ids(doc)
 
+    def test_numeros_d_un_brevet(self):
+        doc = {
+            "docType_s": "PATENT",
+            "number_s": ["N°WO2018002556 A1 N°FR1851441"],
+            "producedDateY_i": 2018,
+        }
+        assert _ids(doc) == {
+            ("hal_id", "hal-1", "primary"),
+            ("patent_publication_number", "WO2018002556", "secondary"),
+            ("patent_application_number", "FR1851441", "secondary"),
+        }
+
+    def test_numero_hors_brevet_ignore(self):
+        doc = {"docType_s": "REPORT", "number_s": ["FR3053353"]}
+        assert _ids(doc) == {("hal_id", "hal-1", "primary")}
+
     def test_non_id_link_ignored(self):
         doc = {"linkExtUrl_s": "https://example.com/openaccess"}
         assert _ids(doc) == {("hal_id", "hal-1", "primary")}

@@ -17,7 +17,7 @@ Consultée par DOI pour le statut open access des publications. Les DOI DataCite
 **v2** (`https://api.unpaywall.org/v2/{doi}`) — interrogation unitaire par DOI.
 
 - Adresse électronique de contact dans le paramètre `email` (`POLITE_POOL_EMAIL`).
-- Limites Unpaywall : 100 000 requêtes/jour, ~10 req/s recommandé. Le pipeline s'en tient à 8 req/s (`MAX_PER_SECOND`, `pipeline/ingestion/api_params.py`) et à 5 requêtes simultanées (`MAX_CONCURRENT`).
+- Limites Unpaywall : 100 000 requêtes/jour, aucun seuil par seconde publié. Débit et requêtes simultanées du pipeline : `pipeline/ingestion/api_params.py`.
 
 ### Données récupérées
 
@@ -59,7 +59,7 @@ Source des titres des revues et des liens entre leurs ISSN. Consommée par `chec
 - `https://www.sudoc.fr/services/issn2ppn/<ISSN>,<ISSN>&format=text/json` : PPN de la notice Sudoc de chaque ISSN, par lots de 20 ISSN.
 - `https://www.sudoc.fr/<ppn>.xml` : notice Sudoc en MARCXML.
 
-Aucun identifiant d'accès n'est requis. Aucune limite de débit n'est documentée : le pipeline s'en tient à 5 requêtes par seconde, 4 lots d'ISSN à la fois (`MAX_PER_SECOND`, `MAX_CONCURRENT`, `pipeline/ingestion/api_params.py`). Licence ouverte Etalab.
+Aucun identifiant d'accès n'est requis. Aucune limite de débit n'est documentée. Débit et requêtes simultanées du pipeline : `pipeline/ingestion/api_params.py`. Licence ouverte Etalab.
 
 ### Données récupérées
 

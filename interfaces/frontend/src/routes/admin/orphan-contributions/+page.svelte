@@ -8,7 +8,7 @@
 	import { institution } from '#lib/institution.svelte.js';
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
-	import { replaceQuery } from '#lib/url.js';
+	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
 	import { api, ApiError, errorMessage, orphanContributions } from '#lib/api/index.js';
 	import { toast } from '#lib/dialogs.svelte.js';
 	import { useDebouncedSearch } from '#lib/composables/useDebouncedSearch.svelte.js';
@@ -239,26 +239,26 @@
 		});
 	}
 
+	const url = useUrlFilters({
+		basePath: '/admin/orphan-contributions',
+		filters: {
+			page: { type: 'page', urlKey: 'page' },
+			search: { type: 'single', urlKey: 'search' },
+			labs: { type: 'string_array', urlKey: 'lab' },
+		},
+	});
+
 	function syncUrl() {
-		const p = new URLSearchParams();
-		if (list.page > 1) p.set('page', String(list.page));
-		if (search.trim()) p.set('search', search.trim());
-		if (selectedLabs.length) p.set('lab', selectedLabs.join(','));
-		if (drawer.id !== null) p.set('publication', String(drawer.id));
-		void replaceQuery(resolve('admin/orphan-contributions'), p);
+		url.syncUrl(() => ({ page: list.page, search: search.trim(), labs: selectedLabs }));
 	}
 
-	let debounceTimer: ReturnType<typeof setTimeout>;
-	function onSearchInput() {
-		clearTimeout(debounceTimer);
-		debounceTimer = setTimeout(() => { list.page = 1; syncUrl(); list.load(); loadFacets(); }, 400);
-	}
+	const onSearchInput = url.debouncedSearch(() => { list.page = 1; syncUrl(); list.load(); loadFacets(); });
 
 	onMount(() => {
-		const params = new URLSearchParams(window.location.search);
-		if (params.get('page')) list.page = parseInt(params.get('page')!) || 1;
-		if (params.get('search')) search = params.get('search')!;
-		if (params.get('lab')) selectedLabs = params.get('lab')!.split(',');
+		const restored = url.restoreFromUrl(new URLSearchParams(window.location.search));
+		if (restored.page) list.page = restored.page as number;
+		if (restored.search) search = restored.search as string;
+		if (restored.labs) selectedLabs = restored.labs as string[];
 		list.load();
 		loadFacets();
 	});
@@ -285,16 +285,16 @@
 {#if selectedIds.size > 0}
 	<div class="batch-bar" use:stickyHeight={{ variable: '--batch-bar-height' }}>
 		<span>{formatCount(selectedIds.size, 'sélectionnée')}</span>
-		<input type="search" placeholder="Attribuer à une personne existante" value={batchSearch.query}
+		<input type="search" class="input-sm" placeholder="Attribuer à une personne existante" value={batchSearch.query}
 			onkeydown={(e) => { if (e.key === 'Escape') { batchSearch.setQuery(''); } }}
 			oninput={(e) => batchSearch.setQuery((e.target as HTMLInputElement).value)} autocomplete="off" />
 		<button class="btn btn-sm btn-create" onclick={openCreateModal}>Créer une personne</button>
 		{#if batchSearch.loading}
-			<span class="loading-text">…</span>
+			<span class="muted-small">…</span>
 		{:else if batchSearch.results.length}
-			<div class="batch-results" use:anchored>
+			<div class="batch-results popover" use:anchored>
 				{#each batchSearch.results as r (r.id)}
-					<button class="result-btn" onclick={() => batchAssign(r.id)}>
+					<button class="option-row" onclick={() => batchAssign(r.id)}>
 						<strong>{titleCase(r.last_name)}</strong> {titleCase(r.first_name)}
 						{#if r.has_rh}<RhCheck />{/if}
 						<span class="result-hint">{r.current_unit || `#${r.id}`}</span>
@@ -333,7 +333,7 @@
 								<IconButton icon="panel" label="Ouvrir le volet" onclick={() => drawer.open(o.publication_id)} />
 								<a href={resolve(`publications/${o.publication_id}`)} class="publication-link">
 									<span class="publication-year">{o.publication_year ?? '?'} —</span>
-									<span class="publication-title"><PublicationTitle titre={o.publication_title} /></span>
+									<span class="publication-title title-truncated"><PublicationTitle titre={o.publication_title} /></span>
 								</a>
 							</div>
 						</td>
@@ -349,17 +349,17 @@
 								{#if activeAssignIdx === i}
 									<div class="assign-panel">
 										<div class="assign-row">
-											<input type="search" placeholder="Nom de la personne" value={assignSearch.query}
+											<input type="search" class="input-sm" placeholder="Nom de la personne" value={assignSearch.query}
 													use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { closeAssign(); } }}
 												oninput={(e) => assignSearch.setQuery((e.target as HTMLInputElement).value)} />
-											<button class="btn btn-sm" onclick={closeAssign}>&times;</button>
+											<IconButton icon="reject" label="Fermer" onclick={closeAssign} />
 										</div>
 										{#if assignSearch.loading}
-											<span class="loading-text">…</span>
+											<span class="muted-small">…</span>
 										{:else if assignSearch.results.length}
-											<div class="assign-results" use:anchored>
+											<div class="assign-results popover" use:anchored>
 												{#each assignSearch.results as r (r.id)}
-													<button class="result-btn" onclick={() => assign(o, r.id)}>
+													<button class="option-row" onclick={() => assign(o, r.id)}>
 														<strong>{titleCase(r.last_name)}</strong> {titleCase(r.first_name)}
 														{#if r.has_rh}<RhCheck />{/if}
 														<span class="result-hint">{r.current_unit || `#${r.id}`}</span>
@@ -367,8 +367,8 @@
 												{/each}
 											</div>
 										{:else if assignSearch.query.length >= 2}
-											<div class="assign-results" use:anchored>
-												<span class="loading-text">Aucun résultat</span>
+											<div class="assign-results popover" use:anchored>
+												<span class="muted-small">Aucun résultat</span>
 												<button class="btn btn-sm btn-create" onclick={() => createAndAssign(o)}>Créer « {o.full_name} »</button>
 											</div>
 										{/if}
@@ -418,7 +418,7 @@
 {#if rejectModal}
 	<Modal title="Réassignation déjà rejetée" onclose={() => { rejectModal = null; }}>
 			<p class="reject-detail">{rejectModal.detail}</p>
-			<p class="reject-muted">
+			<p class="muted-small">
 				Cette personne a été détachée de {plural(rejectModal.pairs.length, 'cette publication', 'ces publications')} manuellement.
 				Confirmer lèvera le rejet et recréera le lien.
 			</p>
@@ -428,7 +428,7 @@
 						<a href={resolve(`publications/${p.publication_id}`)} target="_blank" rel="noopener">
 							Publication #{p.publication_id}
 						</a>
-						<span class="reject-muted">— rejetée le {new Date(p.rejected_at).toLocaleDateString('fr-FR')}</span>
+						<span class="muted-small">— rejetée le {new Date(p.rejected_at).toLocaleDateString('fr-FR')}</span>
 					</li>
 				{/each}
 			</ul>
@@ -451,38 +451,23 @@
 	.publication-link { display: flex; gap: 0.3em; min-width: 0; color: var(--accent); text-decoration: none; font-size: var(--fs-sm); }
 	.publication-link:hover { text-decoration: underline; }
 	.publication-year { flex: none; }
-	.publication-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+	.title-truncated { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 	.assign-panel { position: relative; }
 	.assign-row { display: flex; gap: 4px; align-items: center; }
-	.assign-row input { flex: 1; min-width: 0; padding: 4px 8px; border: 1px solid var(--border); border-radius: var(--radius); font-size: var(--fs-sm); }
+	.assign-row input { flex: 1; min-width: 0; }
 	.assign-results {
 		display: flex; flex-direction: column; gap: 2px;
-		background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
-		box-shadow: var(--shadow-md); padding: 4px; min-width: 250px;
+		padding: 6px 0; min-width: 250px;
 	}
-	.result-btn {
-		display: block; width: 100%; text-align: left; padding: 4px 8px;
-		border: none; background: var(--surface); cursor: pointer; border-radius: var(--radius); font-size: var(--fs-sm);
-	}
-	.result-btn:hover { background: var(--hover); }
 	.result-hint { font-size: var(--fs-sm); color: var(--muted); margin-left: 4px; }
-	.loading-text { font-size: var(--fs-sm); color: var(--muted); }
-	.batch-bar {
-		display: flex; align-items: center; gap: 10px;
-		padding: 10px 14px; margin-bottom: 10px;
-		background: var(--accent-light); border: 1px solid color-mix(in srgb, var(--accent) 25%, white); border-radius: var(--radius);
-	}
-	.batch-bar input { padding: 5px 10px; border: 1px solid color-mix(in srgb, var(--accent) 25%, white); border-radius: var(--radius); font-size: var(--fs-sm); width: 220px; }
+	.batch-bar input { width: 220px; }
 	.batch-results {
 		display: flex; flex-direction: column; gap: 2px;
-		background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
-		box-shadow: var(--shadow-md); padding: 4px; min-width: 280px;
+		padding: 6px 0; min-width: 280px;
 		margin-top: 4px;
 	}
 	.create-form { display: flex; flex-direction: column; gap: 10px; margin: 12px 0; }
 	.create-form label { display: flex; flex-direction: column; gap: 3px; font-size: var(--fs-sm); font-weight: 500; }
-	.create-form input { padding: 6px 8px; border: 1px solid var(--border); border-radius: var(--radius); font-size: var(--fs-md); }
 	.reject-detail { font-weight: 600; margin: 8px 0; }
-	.reject-muted { color: var(--muted); font-size: var(--fs-sm); }
 	.reject-list { margin: 10px 0; padding-left: 18px; font-size: var(--fs-sm); }
 </style>

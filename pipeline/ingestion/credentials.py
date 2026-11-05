@@ -35,7 +35,7 @@ def source_credentials_missing(source: str) -> str | None:
         return "ni clé d'API ni adresse polite pool (OPENALEX_API_KEY / POLITE_POOL_EMAIL)"
     if source == "wos":
         return None if get_wos_api_key() else "clé d'API absente (WOS_API_KEY)"
-    if source == "scanr":
+    if source in ("scanr", "scanr_patents"):
         user, password = get_scanr_credentials()
         if user and password:
             return None

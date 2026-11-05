@@ -52,6 +52,16 @@ class SourceExtra(StrEnum):
     """Partenaires de recherche (theses.fr)."""
     INTRANET_ONLY = "intranet_only"
     """Thèse réservée à l'intranet de son établissement, cas de diffusion STAR 5 et 6 (theses.fr)."""
+    PATENT_APPLICATIONS = "patent_applications"
+    """Demandes de la famille de brevets, avec leurs numéros, leurs dates et leur lien Espacenet (ScanR brevets)."""
+    PATENT_APPLICANTS = "patent_applicants"
+    """Déposants de la famille de brevets, avec leurs identifiants Paysage, SIREN, ROR et IdRef (ScanR brevets)."""
+    PATENT_FIRST_PUBLICATION_DATE = "patent_first_publication_date"
+    """Date de la première publication d'une demande de la famille (ScanR brevets)."""
+    PATENT_GRANT_DATE = "patent_grant_date"
+    """Date de la première délivrance d'un brevet de la famille (ScanR brevets)."""
+    CPC = "cpc"
+    """Codes de la classification coopérative des brevets (CPC), au niveau du groupe, avec leur libellé (ScanR brevets)."""
 
 
 CROSSREF_PREPRINT_OF = "is-preprint-of"

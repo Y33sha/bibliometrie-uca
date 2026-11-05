@@ -41,13 +41,13 @@
               <div class="other-person-row">
                 <span class="other-person-name">
                   {op.first_name} <strong>{op.last_name}</strong>
-                  {#if op.current_unit}<span class="other-person-dept"
+                  {#if op.current_unit}<span class="muted-small"
                       >({op.current_unit})</span
                     >{/if}
                   {#if op.has_rh}<span class="tag tag-pill tag-accent">RH</span>{/if}
                 </span>
                 {#if !op.has_rh}
-                  <button class="btn btn-sm btn-merge-modal" onclick={() => onmerge(op.person_id)}>
+                  <button class="btn btn-sm btn-primary" onclick={() => onmerge(op.person_id)}>
                     ← Fusionner
                   </button>
                 {/if}
@@ -179,19 +179,5 @@
   }
   .other-person-name {
     font-size: var(--fs-md);
-  }
-  .other-person-dept {
-    color: var(--muted);
-    font-size: var(--fs-sm);
-  }
-  .btn-merge-modal {
-    background: var(--accent);
-    color: var(--text-inverse);
-    border: none;
-    border-radius: var(--radius);
-    cursor: pointer;
-  }
-  .btn-merge-modal:hover {
-    background: color-mix(in srgb, var(--accent), black 20%);
   }
 </style>

@@ -23,7 +23,7 @@ from domain.types import JsonValue, as_mapping, as_sequence, as_str
 from pipeline.http.lookup import Unavailable
 from pipeline.ingestion.common.failed_lookups import pending_failed_lookup_sql, record_failed_lookup
 from pipeline.ingestion.common.lookup import LookupBatch, LookupChannel, look_up
-from pipeline.ingestion.scanr.api import search
+from pipeline.ingestion.scanr.api import ScanrIndex, search
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
 BATCH_SIZE = 50
@@ -45,7 +45,9 @@ async def search_by_external_ids(
         "size": 2 * len(ids),
         "query": {"terms": {"externalIds.id.keyword": ids}},
     }
-    records = await search(client, query, label=f"lot de {len(ids)} {id_type}")
+    records = await search(
+        client, query, index=ScanrIndex.PUBLICATIONS, label=f"lot de {len(ids)} {id_type}"
+    )
     if isinstance(records, Unavailable):
         return records
     found = {

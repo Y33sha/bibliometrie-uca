@@ -86,7 +86,7 @@
 
 <p class="triage-intro">{@render intro()}</p>
 
-{#if error}<p class="error">{error}</p>{/if}
+{#if error}<p class="info-box info-box-danger">{error}</p>{/if}
 
 <ListStatus {list} {emptyText}>
   <div class="triage-list">
@@ -98,7 +98,7 @@
           <div class="actions">
             {#if !pair.person_b.has_rh}
               <button
-                class="act keep"
+                class="btn btn-sm"
                 disabled={acting}
                 title="Garder la personne de gauche, absorber celle de droite"
                 onclick={() => merge(pair.person_a.person_id, pair.person_b.person_id)}
@@ -106,7 +106,7 @@
               >
             {/if}
             <button
-              class="act distinct"
+              class="btn btn-sm"
               disabled={acting}
               title={distinctTitle}
               onclick={() => markDistinct(pair.person_a.person_id, pair.person_b.person_id)}
@@ -114,7 +114,7 @@
             >
             {#if !pair.person_a.has_rh}
               <button
-                class="act keep"
+                class="btn btn-sm"
                 disabled={acting}
                 title="Garder la personne de droite, absorber celle de gauche"
                 onclick={() => merge(pair.person_b.person_id, pair.person_a.person_id)}
@@ -177,34 +177,5 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
-  }
-  .act {
-    padding: 4px 10px;
-    font-size: var(--fs-sm);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--card);
-    cursor: pointer;
-    white-space: nowrap;
-    font-family: inherit;
-  }
-  .act:disabled {
-    opacity: 0.5;
-    cursor: default;
-  }
-  .act.keep:hover:not(:disabled) {
-    background: var(--success-light);
-    border-color: var(--success);
-  }
-  .act.distinct:hover:not(:disabled) {
-    background: var(--warning-light);
-    border-color: var(--warning);
-  }
-  .error {
-    color: var(--danger);
-    background: var(--danger-light);
-    padding: 6px 10px;
-    border-radius: var(--radius);
-    margin-bottom: 10px;
   }
 </style>

@@ -1,4 +1,4 @@
-"""Identifiants des publications (`domain.documents.identifiers`) : DOI, identifiant HAL, NNT, PMID, PMCID, arXiv, ISSN, ISBN, préfixe DOI."""
+"""Identifiants des publications (`domain.documents.identifiers`) : DOI, identifiant HAL, NNT, numéro de brevet, PMID, PMCID, arXiv, ISSN, ISBN, préfixe DOI."""
 
 from dataclasses import FrozenInstanceError
 
@@ -15,6 +15,7 @@ from domain.documents.identifiers import (
     DoiPrefix,
     DoiVersion,
     HALId,
+    PatentNumber,
     arxiv_doi,
     doi_version,
     extract_doi_from_url,
@@ -316,6 +317,34 @@ class TestNNT:
 
     def test_try_parse_invalid(self):
         assert NNT.try_parse("") is None
+
+
+class TestPatentNumber:
+    @pytest.mark.parametrize(
+        ("raw", "expected"),
+        [
+            ("FR2957077", "FR2957077"),
+            ("wo2011107710", "WO2011107710"),  # majuscules
+            ("WO/2019/229378", "WO2019229378"),  # séparateurs retirés
+            ("EP 4 235 469", "EP4235469"),
+            ("HUE040212", "HUE040212"),  # numéro précédé d'une lettre
+            ("SG11201701523V", "SG11201701523V"),
+        ],
+    )
+    def test_normalizes(self, raw, expected):
+        assert PatentNumber(raw).value == expected
+
+    @pytest.mark.parametrize(
+        "raw",
+        [
+            "",
+            "2957077",  # sans code d'office
+            "FR",  # sans numéro
+        ],
+    )
+    def test_raises_on_invalid(self, raw):
+        with pytest.raises(ValidationError):
+            PatentNumber(raw)
 
 
 class TestNormalizeIdHelpers:

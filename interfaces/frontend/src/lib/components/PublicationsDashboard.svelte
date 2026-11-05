@@ -220,7 +220,7 @@
 			<div class="dash-card">
 				<div class="scatter-head">
 					<h2>{scatterValue === 'citations' ? 'Citations' : 'FWCI'} par publication</h2>
-					<div class="scatter-toggle" role="group" aria-label="Valeur">
+					<div class="segmented" role="group" aria-label="Valeur">
 						<button type="button" aria-pressed={scatterValue === 'fwci'} onclick={() => (scatterValue = 'fwci')}>FWCI</button>
 						<button type="button" aria-pressed={scatterValue === 'citations'} onclick={() => (scatterValue = 'citations')}>Citations</button>
 					</div>
@@ -253,25 +253,5 @@
 		align-items: baseline;
 		justify-content: space-between;
 		gap: 12px;
-	}
-	.scatter-toggle {
-		display: inline-flex;
-		border: 1px solid var(--border);
-		border-radius: var(--radius);
-		overflow: hidden;
-	}
-	.scatter-toggle button {
-		padding: 2px 10px;
-		border: none;
-		background: var(--surface);
-		font: inherit;
-		font-size: var(--fs-sm);
-		color: var(--text-secondary);
-		cursor: pointer;
-	}
-	.scatter-toggle button[aria-pressed='true'] {
-		background: var(--accent-light);
-		color: var(--accent);
-		font-weight: 600;
 	}
 </style>

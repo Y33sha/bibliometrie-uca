@@ -1,7 +1,7 @@
 # STATUS: recurring (reporting)
 """Rapports bibliométriques par unité de recherche, au format Markdown : un fichier `<code>.md` par unité, accompagné de `<code>.csv`, la liste des publications comptées.
 
-Une publication compte pour une unité quand au moins un de ses auteurs du périmètre signe avec cette unité. Les types de documents retenus sont les articles, les articles de synthèse, les ouvrages, les chapitres et les conference papers. La période va par défaut de 2020 à la dernière année complète. Les revues Q1 viennent du classement SCImago, par défaut le plus récent de `data/imports/scimago`.
+Une publication compte pour une unité quand au moins un de ses auteurs du périmètre signe avec cette unité. Les types de documents retenus sont les articles, les articles de synthèse, les ouvrages, les chapitres et les conference papers. La période va par défaut de 2020 à la dernière année complète. Les indicateurs de citation viennent de `publications.impact`. Les revues Q1 viennent du classement SCImago, par défaut le plus récent de `data/imports/scimago`.
 
 Usage :
     uv run python -m interfaces.cli.reporting.structure_report [--structure CODE ...] [--from-year 2020] [--to-year AAAA] [--output-dir data/reports/bibliometrie/AAAA-MM-JJ] [--scimago FICHIER]
@@ -23,17 +23,23 @@ from sqlalchemy import Connection, text
 from domain.contributions.author_positions import AuthorPosition
 from domain.dates import today
 from domain.documents.doc_types import DocType
+from domain.source_records.impact import CitationTop
 from domain.sources.registry import Source, source_label
 from domain.structures.structure import StructureType
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.read_models.filters import WhereClause
+from infrastructure.read_models.filters import HAS_CITATION_TOPS_SQL, WhereClause
 from infrastructure.read_models.publications.list import publications_csv
 from infrastructure.read_models.structures.queries import (
     AUTHOR_SOURCE_CONTRIBUTION,
     AUTHORED_PUBLICATION,
 )
-from infrastructure.sql_fragments import has_author_position
+from infrastructure.sql_fragments import (
+    cited_by_count,
+    fwci,
+    has_author_position,
+    reaches_citation_top,
+)
 from interfaces.cli.reporting.scimago import (
     SCIMAGO_DIR,
     ScimagoRanking,
@@ -49,7 +55,18 @@ REPORTS_DIR = Path("data/reports/bibliometrie")
 
 TOP_JOURNALS = 10
 
-CSV_COLUMNS = ["type", "year", "doi", "title", "serial", "citation_top", "sources", "access"]
+CSV_COLUMNS = [
+    "type",
+    "year",
+    "doi",
+    "title",
+    "serial",
+    "citations",
+    "fwci",
+    "citation_top",
+    "sources",
+    "access",
+]
 """Colonnes de la liste des publications, par leurs clés dans l'export des publications. L'année donne aussi la colonne de la date."""
 
 
@@ -193,21 +210,13 @@ class Top10Count:
 def top_10_percent_by_year(
     conn: Connection, structure_id: int, period: Period
 ) -> dict[int, Top10Count]:
-    """Publications signées par la structure dans le top 10 % des plus citées, par année, et publications dont le percentile est connu. Le percentile vient des enregistrements sources OpenAlex de la publication."""
+    """Publications signées par la structure dans le top 10 % des plus citées, par année, et publications dont le percentile est connu."""
     rows = conn.execute(
         text(f"""
             SELECT p.publication_year,
-                   count(*) FILTER (WHERE oa.top_10) AS top_10,
-                   count(*) AS with_percentile
+                   count(*) FILTER (WHERE {_TOP_10_PERCENT}) AS top_10,
+                   count(*) FILTER (WHERE {HAS_CITATION_TOPS_SQL}) AS with_percentile
             FROM publications p
-            JOIN LATERAL (
-                SELECT bool_or((sp.impact->>'top_10_percent')::boolean) AS top_10
-                FROM source_records sp
-                WHERE sp.publication_id = p.id
-                  AND sp.source = 'openalex'
-                  AND sp.impact ? 'top_10_percent'
-                HAVING count(*) > 0
-            ) oa ON TRUE
             WHERE {_REPORT_PUBLICATION}
             GROUP BY 1
         """),  # noqa: S608 — fragments SQL constants
@@ -216,15 +225,8 @@ def top_10_percent_by_year(
     return {r.publication_year: Top10Count(r.top_10, r.with_percentile) for r in rows}
 
 
-_TOP_10_PERCENT = """
-    EXISTS (
-        SELECT 1 FROM source_records sp
-        WHERE sp.publication_id = p.id
-          AND sp.source = 'openalex'
-          AND (sp.impact->>'top_10_percent')::boolean
-    )
-"""
-"""Publication `p` dans le top 10 % des plus citées selon un de ses enregistrements sources OpenAlex."""
+_TOP_10_PERCENT = reaches_citation_top(CitationTop.TOP_10_PERCENT)
+"""Publication `p` dans le top 10 % des plus citées."""
 
 
 ENGLISH = "en"
@@ -269,9 +271,7 @@ class PublicationImpact:
     doc_type: DocType
     language: str | None
     citations: int | None
-    """Maximum des nombres de citations des enregistrements sources."""
     fwci: float | None
-    """Maximum des FWCI des enregistrements sources OpenAlex."""
     top_10: bool
     key_role: bool
     """Un auteur de la structure tient un des rôles demandés."""
@@ -318,16 +318,11 @@ def publication_impacts(
     """Indicateurs d'impact de chaque publication signée par la structure."""
     rows = conn.execute(
         text(f"""
-            SELECT p.publication_year, p.doc_type, p.language, i.citations, i.fwci,
+            SELECT p.publication_year, p.doc_type, p.language,
+                   {cited_by_count()} AS citations, {fwci()} AS fwci,
                    {_TOP_10_PERCENT} AS top_10,
                    {_key_role_condition(roles)} AS key_role
             FROM publications p
-            JOIN LATERAL (
-                SELECT max((sp.impact->>'cited_by_count')::int) AS citations,
-                       max((sp.impact->>'fwci')::float) FILTER (WHERE sp.source = 'openalex') AS fwci
-                FROM source_records sp
-                WHERE sp.publication_id = p.id
-            ) i ON TRUE
             WHERE {_REPORT_PUBLICATION}
         """),  # noqa: S608 — fragments SQL constants
         _params(structure_id, period),

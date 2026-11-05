@@ -244,14 +244,6 @@ REJECTED_PAIRS = f"SELECT sr_rej.publication_id, rej.person_id FROM {_REJECTIONS
 """Paires (publication, personne) rejetées : une publication est rejetée pour une personne dès qu'un de ses enregistrements sources l'est."""
 
 
-def publication_rejected_for(publication_id: str, person_id: str) -> str:
-    """Renvoie la condition vraie quand la publication `publication_id` est rejetée pour la personne `person_id` (expressions SQL) : un de ses enregistrements sources l'est."""
-    return (
-        f"EXISTS (SELECT 1 FROM {_REJECTIONS}"
-        f" WHERE sr_rej.publication_id = {publication_id} AND rej.person_id = {person_id})"
-    )
-
-
 NO_PERIMETER_EVIDENCE = "'{}'::perimeter_evidence[]"
 """Tableau d'indices vide : hors du périmètre."""
 

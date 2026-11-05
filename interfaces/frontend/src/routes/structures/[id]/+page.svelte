@@ -1,7 +1,7 @@
 <script lang="ts">
 	import EntityMetaItem from '#lib/components/EntityMetaItem.svelte';
-	import Breadcrumb from '#lib/components/Breadcrumb.svelte';
-	import { pageTitle } from '#lib/institution.svelte.js';
+	import EntityBreadcrumb from '#lib/components/EntityBreadcrumb.svelte';
+	import EntityStatus from '#lib/components/EntityStatus.svelte';
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 	import { api } from '#lib/api/index.js';
@@ -9,10 +9,11 @@
 	import { rorShortId, rorFullUrl } from '#lib/utils.js';
 	import { structureLabel } from '#lib/structureLabels.js';
 	import PublicationsDashboard from '#lib/components/PublicationsDashboard.svelte';
-	import SubjectsCloud from '#lib/components/SubjectsCloud.svelte';
+	import SubjectsCard from '#lib/components/SubjectsCard.svelte';
 	import PersonsListView from '#lib/components/PersonsListView.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import TabNav from '#lib/components/TabNav.svelte';
+	import { activeTabId, type TabDef } from '#lib/tabs.js';
 	import TableStatusRow from '#lib/components/TableStatusRow.svelte';
 	import ThesesListView from '#lib/components/ThesesListView.svelte';
 	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
@@ -45,13 +46,15 @@
 	let error = $state(false);
 
 	// L'onglet « Adresses » est réservé à la session admin.
-	const validTabs = ['dashboard', 'publications', 'theses', 'persons', 'collaborations', ...(isAdmin() ? ['addresses'] : [])];
-	const activeTab = $derived(
-		(() => {
-			const t = page.url.searchParams.get('tab');
-			return t && validTabs.includes(t) ? t : 'dashboard';
-		})()
-	);
+	const tabs: TabDef[] = $derived([
+		{ id: 'dashboard', label: 'Dashboard' },
+		{ id: 'publications', label: 'Publications' },
+		...(thesesCount > 0 ? [{ id: 'theses', label: 'Thèses' }] : []),
+		{ id: 'persons', label: 'Personnes' },
+		{ id: 'collaborations', label: 'Collaborations' },
+		...(isAdmin() ? [{ id: 'addresses', label: 'Adresses' }] : []),
+	]);
+	const activeTab = $derived(activeTabId(tabs, page.url.searchParams));
 
 	// Addresses tab
 	const addresses = usePaginatedFetch<LabAddress>({
@@ -66,8 +69,6 @@
 	let dashboardLoaded = $state(false);
 	let ongoingThesesCount = $state(0);
 	let personsCount = $state(0);
-	type SubjectFrequency = components['schemas']['SubjectFrequency'];
-	let dashSubjects: SubjectFrequency[] = $state([]);
 
 	const tutelles = $derived(parents);
 
@@ -94,16 +95,12 @@
 		// Le décompte des thèses en cours reprend le filtre « En cours » de l'onglet Thèses.
 		const ongoingTheses = new URLSearchParams({ lab_id: String(labId), doc_type: 'ongoing_thesis', per_page: '1' });
 		const persons = new URLSearchParams({ laboratory: String(labId), exclusion: 'none', per_page: '1' });
-		const [ongoingThesesPage, personsPage, subjects] = await Promise.all([
+		const [ongoingThesesPage, personsPage] = await Promise.all([
 			api<{ total: number }>(`/api/publications?${ongoingTheses}`, { key: 'lab-ongoing-theses' }),
 			api<{ total: number }>(`/api/persons?${persons}`, { key: 'lab-persons' }),
-			api<SubjectFrequency[]>(`/api/structures/${labId}/subjects?limit=30`, {
-				key: 'lab-subjects',
-			}),
 		]);
 		ongoingThesesCount = ongoingThesesPage.total;
 		personsCount = personsPage.total;
-		dashSubjects = subjects;
 		dashboardLoaded = true;
 	}
 
@@ -143,16 +140,15 @@
 	});
 </script>
 
-<svelte:head>
-	<title>{pageTitle(lab ? structureLabel(lab) : 'Structure')}</title>
-</svelte:head>
+<EntityBreadcrumb
+	section={{ label: 'Labos', path: 'structures' }}
+	name={lab?.acronym || lab?.name}
+	title={lab ? structureLabel(lab) : null}
+	fallback="Structure"
+/>
 
-<Breadcrumb trail={[{ label: 'Labos', path: 'structures' }]} current={lab?.acronym || lab?.name} />
-
-{#if error}
-	<div class="no-results">Structure introuvable</div>
-{:else if !lab}
-	<div class="loading">Chargement…</div>
+{#if error || !lab}
+	<EntityStatus {error} notFound="Structure introuvable" />
 {:else}
 	<!-- Header -->
 	<div class="entity-header">
@@ -199,14 +195,7 @@
 
 	<!-- Tabs -->
 	<TabNav
-		tabs={[
-			{ id: 'dashboard', label: 'Dashboard' },
-			{ id: 'publications', label: 'Publications' },
-			...(thesesCount > 0 ? [{ id: 'theses', label: 'Thèses' }] : []),
-			{ id: 'persons', label: 'Personnes' },
-			{ id: 'collaborations', label: 'Collaborations' },
-			...(isAdmin() ? [{ id: 'addresses', label: 'Adresses' }] : []),
-		]}
+		{tabs}
 		onswitch={onTabSwitch}
 		afterNavigate={syncUrl}
 	/>
@@ -238,10 +227,7 @@
 						: []}
 				>
 					{#snippet subjects()}
-						<div class="dash-card">
-							<h2>Sujets principaux</h2>
-							<SubjectsCloud subjects={dashSubjects} />
-						</div>
+						<SubjectsCard endpoint="/api/structures/{labId}/subjects" />
 					{/snippet}
 				</PublicationsDashboard>
 			{/if}

@@ -1,6 +1,6 @@
 <script lang="ts">
-	import Breadcrumb from '#lib/components/Breadcrumb.svelte';
-	import { pageTitle } from '#lib/institution.svelte.js';
+	import EntityBreadcrumb from '#lib/components/EntityBreadcrumb.svelte';
+	import EntityStatus from '#lib/components/EntityStatus.svelte';
 	import { columnLabels, staffCategoryLabels } from '#lib/labels.js';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
@@ -11,17 +11,18 @@
 	import { titleCase, formatDate } from '#lib/utils.js';
 	import { structureLabel } from '#lib/structureLabels.js';
 	import PublicationsDashboard from '#lib/components/PublicationsDashboard.svelte';
-	import SubjectsCloud from '#lib/components/SubjectsCloud.svelte';
+	import SubjectsCard from '#lib/components/SubjectsCard.svelte';
 	import IdentifiersCell from '#lib/components/IdentifiersCell.svelte';
 	import TabNav from '#lib/components/TabNav.svelte';
+	import { activeTabId, type TabDef } from '#lib/tabs.js';
 	import ListStatus from '#lib/components/ListStatus.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import PublicationsListView from '#lib/components/PublicationsListView.svelte';
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
 	import AddressPublications from '#lib/components/AddressPublications.svelte';
 	import PublicationCountButton from '#lib/components/PublicationCountButton.svelte';
-	import BarChart from '#lib/components/charts/BarChart.svelte';
-	import YearSlider from '#lib/components/YearSlider.svelte';
+	import BarChart, { BAR_LABEL_SPACE } from '#lib/components/charts/BarChart.svelte';
+	import YearSlider, { YEAR_TRACK_INSET } from '#lib/components/YearSlider.svelte';
 	import { confirmDialog } from '#lib/dialogs.svelte.js';
 	import TitleRow from '#lib/components/TitleRow.svelte';
 	import PersonCurationDrawer from '#lib/components/persons/PersonCurationDrawer.svelte';
@@ -51,13 +52,14 @@
 	let thesesCount = $state(0);
 	let error = $state(false);
 
-	const activeTab = $derived(
-		(() => {
-			const t = page.url.searchParams.get('tab');
-			// L'onglet « Adresses » est réservé à la session admin.
-			return t === 'publications' || t === 'theses' || (t === 'addresses' && isAdmin()) ? t : 'dashboard';
-		})()
-	);
+	// L'onglet « Adresses » est réservé à la session admin.
+	const tabs: TabDef[] = $derived([
+		{ id: 'dashboard', label: 'Dashboard' },
+		{ id: 'publications', label: 'Publications' },
+		...(thesesCount > 0 ? [{ id: 'theses', label: 'Thèses' }] : []),
+		...(isAdmin() ? [{ id: 'addresses', label: 'Adresses' }] : []),
+	]);
+	const activeTab = $derived(activeTabId(tabs, page.url.searchParams));
 
 	// Theses tab
 	let thesesSections: ThesisSection[] = $state([]);
@@ -69,8 +71,8 @@
 	const currentYear = new Date().getFullYear();
 	let addrYear = $state(currentYear);
 	let addrSummary = $state<AddressSummary | null>(null);
-	const addrYearMin = $derived(Math.min(addrSummary?.first_year ?? currentYear, currentYear));
-	const addrYearMax = $derived(Math.max(addrSummary?.last_year ?? currentYear, currentYear));
+	const addrYearMin = $derived(Math.min(addrSummary?.first_year_with_address ?? currentYear, currentYear));
+	const addrYearMax = $derived(Math.min(addrSummary?.last_year_with_address ?? currentYear, currentYear));
 	const addresses = usePaginatedFetch<Address>({
 		endpoint: () => `/api/persons/${personId}/addresses`,
 		itemsKey: 'addresses',
@@ -83,6 +85,8 @@
 	const addrShare = (publications: number) =>
 		`${Math.round((100 * publications) / (addrSummary?.publications_with_address || 1))} %`;
 	const publicationCount = (n: number) => formatCount(n, 'publication');
+	// Largeur réservée aux libellés des structures, à gauche de l'axe du graphique.
+	const ADDR_AXIS_WIDTH = 120;
 	let expandedAddrId = $state<number | null>(null);
 	let addrPublications = $state<AddressPublication[]>([]);
 	let addrPublicationsLoading = $state(false);
@@ -99,6 +103,17 @@
 		addresses.page = 1;
 		loadAddressSummary();
 		addresses.load();
+	}
+
+	// Ouverture de l'onglet : bornes du curseur lues, puis année la plus récente du curseur.
+	async function openAddressTab() {
+		await loadAddressSummary();
+		if (addrYear === addrYearMax) {
+			addresses.load();
+			return;
+		}
+		addrYear = addrYearMax;
+		loadAddressTab();
 	}
 
 	async function toggleAddressPublications(addrId: number) {
@@ -118,9 +133,6 @@
 	}
 
 	// Dashboard tab : les publications passent par `PublicationsDashboard` ; la page ajoute les thèses dirigées ou jugées et les sujets.
-	type SubjectFrequency = components['schemas']['SubjectFrequency'];
-	let dashboardLoaded = $state(false);
-	let dashSubjects: SubjectFrequency[] = $state([]);
 
 	const displayName = $derived(
 		profile
@@ -138,13 +150,6 @@
 		thesesLoaded = true;
 	}
 
-	async function loadDashboard() {
-		dashSubjects = await api<SubjectFrequency[]>(`/api/persons/${personId}/subjects?limit=30`, {
-			key: 'person-detail-subjects',
-		});
-		dashboardLoaded = true;
-	}
-
 	async function excludeContribution(contributionId: number) {
 		if (!(await confirmDialog({ message: 'Exclure ce lien auteur–publication ? Il ne sera pas recréé automatiquement.', danger: true }))) {
 			return false;
@@ -155,9 +160,8 @@
 
 	function onTabSwitch(tab: string) {
 		// L'onglet "publications" est géré par <PublicationsListView> qui charge ses données dans son propre onMount à chaque (re)montage.
-		if (tab === 'dashboard' && !dashboardLoaded) loadDashboard();
 		if (tab === 'theses' && !thesesLoaded) loadTheses();
-		if (tab === 'addresses' && !addresses.loaded) loadAddressTab();
+		if (tab === 'addresses' && !addresses.loaded) openAddressTab();
 	}
 
 	async function loadProfile(id: string) {
@@ -170,8 +174,7 @@
 			error = true;
 			return;
 		}
-		if (activeTab === 'dashboard') loadDashboard();
-		else if (activeTab === 'addresses') loadAddressTab();
+		if (activeTab === 'addresses') openAddressTab();
 		else if (activeTab === 'theses') loadTheses();
 		// publications : géré par <PublicationsListView> qui charge tout seul.
 	}
@@ -182,16 +185,10 @@
 
 </script>
 
-<svelte:head>
-	<title>{pageTitle(displayName || 'Personne')}</title>
-</svelte:head>
+<EntityBreadcrumb section={{ label: 'Chercheurs', path: 'persons' }} name={displayName} fallback="Personne" />
 
-<Breadcrumb trail={[{ label: 'Chercheurs', path: 'persons' }]} current={displayName} />
-
-{#if error}
-	<div class="no-results">Personne introuvable</div>
-{:else if !profile}
-	<div class="loading">Chargement…</div>
+{#if error || !profile}
+	<EntityStatus {error} notFound="Personne introuvable" />
 {:else}
 	<!-- Profile header -->
 	<div class="entity-header">
@@ -231,15 +228,7 @@
 	</div>
 
 	<!-- Tabs -->
-	<TabNav
-		tabs={[
-			{ id: 'dashboard', label: 'Dashboard' },
-			{ id: 'publications', label: 'Publications' },
-			...(thesesCount > 0 ? [{ id: 'theses', label: 'Thèses' }] : []),
-			...(isAdmin() ? [{ id: 'addresses', label: 'Adresses' }] : []),
-		]}
-		onswitch={onTabSwitch}
-	/>
+	<TabNav {tabs} onswitch={onTabSwitch} />
 
 	<!-- Tab: Dashboard -->
 	{#if activeTab === 'dashboard'}
@@ -262,12 +251,7 @@
 						: []}
 				>
 					{#snippet subjects()}
-						{#if dashboardLoaded}
-							<div class="dash-card">
-								<h2>Sujets principaux</h2>
-								<SubjectsCloud subjects={dashSubjects} />
-							</div>
-						{/if}
+						<SubjectsCard endpoint="/api/persons/{personId}/subjects" />
 					{/snippet}
 				</PublicationsDashboard>
 			{/if}
@@ -327,18 +311,17 @@
 	{#if activeTab === 'addresses'}
 		<div class="tab-content">
 			<div class="addr-overview">
+				<h2>Structures reconnues dans les adresses</h2>
 				<div class="addr-year">
 					<div class="addr-year-label">Année <strong>{addrYear}</strong></div>
 					<YearSlider min={addrYearMin} max={addrYearMax} bind:value={addrYear} onchange={loadAddressTab} />
-					{#if addrSummary}
-						<p class="addr-total">
-							{publicationCount(addrSummary.publications)}, dont {addrSummary.publications_with_address.toLocaleString('fr-FR')} avec adresse
-						</p>
-					{/if}
 				</div>
-				<div class="addr-chart">
-					<h2>Structures reconnues dans les adresses</h2>
-					{#if addrStructures.length}
+				{#if addrStructures.length}
+					<!-- Axe des valeurs aligné sur la piste du curseur ; libellés des structures et pourcentages en débord. -->
+					<div
+						style:margin-left="{YEAR_TRACK_INSET - ADDR_AXIS_WIDTH}px"
+						style:width="calc(100% + {ADDR_AXIS_WIDTH + BAR_LABEL_SPACE - 2 * YEAR_TRACK_INSET}px)"
+					>
 						<BarChart
 							labels={addrStructures.map((s) => structureLabel(s))}
 							values={addrStructures.map((s) => s.publications)}
@@ -347,12 +330,14 @@
 							tooltipLabel={publicationCount}
 							max={addrSummary?.publications_with_address}
 							horizontal
-							height={28 * addrStructures.length + 40}
+							prominentLabels
+							categoryAxisWidth={ADDR_AXIS_WIDTH}
+							height={32 * addrStructures.length + 40}
 						/>
-					{:else if addrSummary}
-						<p class="addr-counts">Aucune structure reconnue.</p>
-					{/if}
-				</div>
+					</div>
+				{:else if addrSummary}
+					<p class="addr-counts">Aucune structure reconnue.</p>
+				{/if}
 			</div>
 			<ListStatus list={addresses} emptyText="Aucune adresse">
 				<table class="data-table">
@@ -427,22 +412,18 @@
 
 	/* Addresses tab */
 	.addr-overview {
-		display: flex;
-		gap: 24px;
-		align-items: flex-start;
-		margin-bottom: 16px;
+		width: 300px;
+		margin: 0 auto 16px;
 	}
+	.addr-overview h2 { font-size: var(--fs-base); font-weight: 600; margin: 0 0 8px; }
 	.addr-year {
-		flex: 0 0 280px;
 		display: flex;
 		flex-direction: column;
 		gap: 4px;
+		margin-bottom: 20px;
 	}
 	.addr-year-label { font-size: var(--fs-md); }
-	.addr-total { font-size: var(--fs-md); margin: 8px 0 0; }
-	.addr-counts { font-size: var(--fs-sm); color: var(--text-secondary); margin: 8px 0 0; }
-	.addr-chart { flex: 1; min-width: 0; }
-	.addr-chart h2 { font-size: var(--fs-base); font-weight: 600; margin: 0 0 8px; }
+	.addr-counts { font-size: var(--fs-sm); color: var(--text-secondary); margin: 0; }
 	.addr-cell { font-size: var(--fs-sm); color: var(--muted); word-break: break-all; }
 	.addr-publications { padding: 0 12px 12px 24px; }
 </style>

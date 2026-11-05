@@ -94,6 +94,15 @@ describe('useUrlFilters', () => {
 			expect(gotoSpy).toHaveBeenCalledWith('/bibliometrie/p?page=3', GOTO_OPTS);
 		});
 
+		it('répète le paramètre pour chaque valeur d\'un repeated', () => {
+			const f = useUrlFilters({
+				basePath: '/p',
+				filters: { terms: { type: 'repeated', urlKey: 'text' } },
+			});
+			f.syncUrl(() => ({ terms: ['contains:a', 'starts:b'] }));
+			expect(gotoSpy).toHaveBeenCalledWith('/bibliometrie/p?text=contains%3Aa&text=starts%3Ab', GOTO_OPTS);
+		});
+
 		it('préserve les keys URL non gérées par cette instance', () => {
 			const f = useUrlFilters({
 				basePath: '/p',
@@ -170,6 +179,14 @@ describe('useUrlFilters', () => {
 			expect(f.restoreFromUrl(new URLSearchParams('list_filter=cwts-core_yes,erih-plus_no'))).toEqual({
 				listStates: { 'cwts-core': 'yes', 'erih-plus': 'no' },
 			});
+		});
+
+		it('restaure toutes les occurrences d\'un repeated', () => {
+			const f = useUrlFilters({
+				basePath: '/p',
+				filters: { terms: { type: 'repeated', urlKey: 'text' } },
+			});
+			expect(f.restoreFromUrl(new URLSearchParams('text=a&text=b'))).toEqual({ terms: ['a', 'b'] });
 		});
 
 		it('restaure une page numérique (défaut 1 si invalide)', () => {

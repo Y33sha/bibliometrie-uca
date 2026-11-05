@@ -116,16 +116,16 @@
 	</button>
 
 	{#if panel.open}
-		<div class="facet-panel" use:anchored>
+		<div class="facet-panel popover" use:anchored>
 			{#if activeCount > 0}
-				<button type="button" class="facet-clear" onclick={clear}>Effacer</button>
+				<button type="button" class="option-row facet-clear" onclick={clear}>Effacer</button>
 			{/if}
 			{#each items as item (item.key)}
 				{@const state = stateOf(item.key)}
 				{@const c = countFor(item.key, state)}
 				<button
 					type="button"
-					class="item-row"
+					class="option-row"
 					title={tooltip(item.label, state)}
 					onclick={() => cycle(item)}
 				>
@@ -166,23 +166,6 @@
 
 <style>
 	/* Bouton et panneau : styles communs des facettes, dans shared.css. */
-	.item-row {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		width: 100%;
-		padding: 6px 12px;
-		border: none;
-		background: none;
-		font-size: var(--fs-md);
-		cursor: pointer;
-		font-family: inherit;
-		color: var(--text);
-		text-align: left;
-	}
-	.item-row:hover {
-		background: var(--hover);
-	}
 	.state-icon {
 		display: inline-flex;
 		align-items: center;

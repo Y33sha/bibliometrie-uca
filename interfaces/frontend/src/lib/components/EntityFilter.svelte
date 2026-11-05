@@ -123,14 +123,14 @@
 	</button>
 
 	{#if panel.open}
-		<div class="facet-panel" use:anchored>
-			<input type="text" class="facet-search" placeholder="Rechercher" bind:value={query} oninput={onInput} />
+		<div class="facet-panel popover" use:anchored>
+			<input type="text" class="panel-search input-sm" placeholder="Rechercher" bind:value={query} oninput={onInput} />
 			{#if selected.length}
-				<button type="button" class="facet-clear" onclick={() => pick(null)}>Effacer</button>
+				<button type="button" class="option-row facet-clear" onclick={() => pick(null)}>Effacer</button>
 			{/if}
 			<div class="facet-options">
 				{#each selectedOutside as id (id)}
-					<label>
+					<label class="option-row">
 						<input
 							type={multiple ? 'checkbox' : 'radio'}
 							checked
@@ -140,7 +140,7 @@
 					</label>
 				{/each}
 				{#each orderedResults as e (e.value)}
-					<label>
+					<label class="option-row">
 						<input type={multiple ? 'checkbox' : 'radio'} checked={selected.includes(e.value)} onchange={() => pick(e)} />
 						<span class="facet-option-text"title={e.text}>{e.text}</span><span class="facet-count">{e.count}</span>
 					</label>

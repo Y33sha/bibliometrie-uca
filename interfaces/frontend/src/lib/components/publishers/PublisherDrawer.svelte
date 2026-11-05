@@ -221,7 +221,7 @@
     <section class="drawer-section">
       <h3>Fusion</h3>
       {#if blocking}
-        <div class="blocking" role="alert">
+        <div class="info-box info-box-warning" role="alert">
           <p><strong>Fusion impossible.</strong> {blocking.detail}</p>
           <p class="muted">Fusionner d'abord ces paires de publications en série, puis relancer la fusion des éditeurs.</p>
           <ul>
@@ -254,7 +254,7 @@
           {/snippet}
         </Picker>
       {:else}
-        <button class="btn-merge-inline" onclick={openMerge}>Fusionner…</button>
+        <button class="btn btn-sm btn-dashed" onclick={openMerge}>Fusionner…</button>
       {/if}
     </section>
 
@@ -284,27 +284,16 @@
 </Drawer>
 
 <style>
-  .muted {
-    color: var(--muted);
-  }
   .forms-table {
     width: 100%;
   }
   .forms-table td.zero {
     color: var(--text-faint);
   }
-  .blocking {
-    background: var(--warning-light);
-    border: 1px solid var(--warning);
-    border-radius: var(--radius);
-    padding: 8px 12px;
-    margin-bottom: 10px;
-    font-size: var(--fs-sm);
-  }
-  .blocking p {
+  .info-box p {
     margin: 0 0 6px;
   }
-  .blocking ul {
+  .info-box ul {
     margin: 0;
     padding-left: 18px;
   }

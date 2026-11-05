@@ -113,7 +113,7 @@
           <div>
             {specificityPercent(hovered.neighbor)}&nbsp;% des publications de ce sujet portent aussi « {subject.label} »
           </div>
-          <div class="tip-muted">{hovered.neighbor.usage_count.toLocaleString("fr-FR")} publications au total</div>
+          <div class="muted">{hovered.neighbor.usage_count.toLocaleString("fr-FR")} publications au total</div>
         </div>
       {/if}
     </div>
@@ -199,8 +199,5 @@
     margin-bottom: 4px;
     font-weight: 700;
     color: var(--text);
-  }
-  .tip-muted {
-    color: var(--muted);
   }
 </style>

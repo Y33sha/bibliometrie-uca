@@ -1,25 +1,38 @@
-"""Accès à l'index Elasticsearch de ScanR : moissonnage et recherche de documents, en authentification basique."""
+"""Accès aux index Elasticsearch de ScanR : moissonnage et recherche de documents, en authentification basique."""
 
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
+from enum import StrEnum
 
 import httpx2
 
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, at_path
 from pipeline.http.http_retry import http_request_with_retry, lookup_json_async
 from pipeline.http.lookup import NOT_FOUND, UNAVAILABLE, LookupOutcome, NotFound, Unavailable
-from pipeline.ingestion.api_params import API_BASE_URLS
+from pipeline.ingestion.api_params import API_BASE_URLS, SCANR_PER_PAGE
 from pipeline.ingestion.common.pages import Page
 from pipeline.ingestion.credentials import get_scanr_credentials
 
 
-class ScanrClient:
-    """Client de l'index ScanR (`_search`, authentification basique)."""
+class ScanrIndex(StrEnum):
+    """Index du cluster ScanR, sous sa clé dans `API_BASE_URLS`. Tous les index partagent les identifiants de connexion."""
 
-    def __init__(self) -> None:
-        self._url = API_BASE_URLS["scanr"]
+    PUBLICATIONS = "scanr"
+    PATENTS = "scanr_patents"
+
+    @property
+    def url(self) -> str:
+        """URL de recherche (`_search`) de l'index."""
+        return API_BASE_URLS[self.value]
+
+
+class ScanrClient:
+    """Client d'un index ScanR (`_search`, authentification basique)."""
+
+    def __init__(self, index: ScanrIndex) -> None:
+        self._url = index.url
         self._auth = get_scanr_credentials()
 
     def fetch_page(self, query: Mapping[str, JsonValue]) -> Mapping[str, JsonValue]:
@@ -43,13 +56,17 @@ class ScanrClient:
 
 
 async def search(
-    client: httpx2.AsyncClient, query: Mapping[str, JsonValue], *, label: str
+    client: httpx2.AsyncClient,
+    query: Mapping[str, JsonValue],
+    *,
+    index: ScanrIndex,
+    label: str,
 ) -> list[Mapping[str, JsonValue]] | Unavailable:
     """Renvoie les documents (`_source`) de la requête Elasticsearch `query`, ou l'indisponibilité de l'API. Une réponse valide sans hit renvoie une liste vide."""
     outcome = await lookup_json_async(
         client,
         "POST",
-        API_BASE_URLS["scanr"],
+        index.url,
         json_body=query,
         auth=get_scanr_credentials(),
         timeout=30,
@@ -63,14 +80,51 @@ async def search(
 
 
 async def fetch_by_id(
-    client: httpx2.AsyncClient, source_id: str
+    client: httpx2.AsyncClient,
+    source_id: str,
+    *,
+    index: ScanrIndex,
+    excludes: Sequence[str] = (),
 ) -> LookupOutcome[Mapping[str, JsonValue]]:
-    """Renvoie le document ScanR d'identifiant `source_id`, son absence ou l'indisponibilité de l'API."""
+    """Renvoie le document d'identifiant `source_id` dans `index`, son absence ou l'indisponibilité de l'API.
+
+    Args:
+        excludes: champs retirés du document (`_source.excludes`), comme au moissonnage.
+    """
     query: dict[str, JsonValue] = {"size": 1, "query": {"term": {"id.keyword": source_id}}}
-    records = await search(client, query, label=f"id {source_id}")
+    if excludes:
+        query["_source"] = {"excludes": list(excludes)}
+    records = await search(client, query, index=index, label=f"id {source_id}")
     if isinstance(records, Unavailable):
         return records
     return records[0] if records else NOT_FOUND
+
+
+def page_query(
+    filters: Sequence[JsonValue],
+    after: Sequence[JsonValue] | None = None,
+    *,
+    excludes: Sequence[str] = (),
+) -> dict[str, JsonValue]:
+    """Construit la requête Elasticsearch d'une page de documents.
+
+    Les clauses sont en contexte `filter`. Ce contexte se passe de `_score`, et le cluster le met en cache : il répond neuf fois plus vite que l'équivalent `must`/`should` (1 s contre 9,5 s pour une page de 200). Le tri sur `id.keyword` sert la pagination `search_after`. Le comptage exact (`track_total_hits`) est coupé, sinon Elasticsearch recompterait tous les résultats à chaque page. `ScanrClient.count` le rétablit.
+
+    Args:
+        after: clé de tri du dernier document de la page précédente (`search_after`).
+        excludes: champs retirés des documents renvoyés (`_source.excludes`).
+    """
+    query: dict[str, JsonValue] = {
+        "size": SCANR_PER_PAGE,
+        "track_total_hits": False,
+        "query": {"bool": {"filter": list(filters)}},
+        "sort": [{"id.keyword": "asc"}],
+    }
+    if excludes:
+        query["_source"] = {"excludes": list(excludes)}
+    if after:
+        query["search_after"] = list(after)
+    return query
 
 
 def hits_page(data: Mapping[str, JsonValue]) -> Page:

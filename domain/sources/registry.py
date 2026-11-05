@@ -15,6 +15,7 @@ class Source(StrEnum):
     OPENALEX = "openalex"
     WOS = "wos"
     SCANR = "scanr"
+    SCANR_PATENTS = "scanr_patents"
     THESES = "theses"
     CROSSREF = "crossref"
     DATACITE = "datacite"
@@ -40,6 +41,8 @@ class SourceProfile:
     """Moissonnée par le mode quotidien, depuis le dernier moissonnage quotidien réussi."""
     aggregator: bool = False
     """Compile les enregistrements d'autres sources (dépôts HAL, Crossref, PubMed). Un enregistrement source de cette source vaut par les liens et les identifiants cités."""
+    structure_ids: str | None = None
+    """Nature des identifiants de structure de la source, affichée par le formulaire des structures (servi par `/api/sources/structure-ids`). Seules les sources qui la déclarent ont une clé dans `structures.api_ids`."""
 
 
 PROFILES: dict[Source, SourceProfile] = {
@@ -58,17 +61,29 @@ PROFILES: dict[Source, SourceProfile] = {
         doi_searchable=True,
         person_identifiers=frozenset({PersonIdentifierType.ORCID}),
         aggregator=True,
+        structure_ids="institution lineage IDs",
     ),
-    Source.WOS: SourceProfile(label="WoS", harvested=True, doi_searchable=True, opt_in=True),
+    Source.WOS: SourceProfile(
+        label="WoS",
+        harvested=True,
+        doi_searchable=True,
+        opt_in=True,
+        structure_ids="Organization-Enhanced",
+    ),
     Source.SCANR: SourceProfile(
         label="ScanR",
         harvested=True,
         doi_searchable=True,
         person_identifiers=frozenset({PersonIdentifierType.ORCID, PersonIdentifierType.IDREF}),
         aggregator=True,
+        structure_ids="SIREN",
+    ),
+    # Familles de brevets de l'index `scanr-patents`.
+    Source.SCANR_PATENTS: SourceProfile(
+        label="ScanR brevets", harvested=True, structure_ids="Paysage des déposants"
     ),
     # Son API se requête par NNT.
-    Source.THESES: SourceProfile(label="theses.fr", harvested=True),
+    Source.THESES: SourceProfile(label="theses.fr", harvested=True, structure_ids="PPN IdRef"),
     # Interrogé par DOI et par personne, sans moissonnage.
     Source.CROSSREF: SourceProfile(
         label="Crossref",
@@ -82,6 +97,7 @@ PROFILES: dict[Source, SourceProfile] = {
         doi_searchable=True,
         person_identifiers=frozenset({PersonIdentifierType.ORCID}),
         registration_agency="DataCite",
+        structure_ids="mots-clés d'affiliation",
     ),
 }
 
@@ -123,6 +139,8 @@ def source_record_url(source: str, source_id: str) -> str:
         case Source.SCANR:
             # Un identifiant ScanR peut contenir des `/` (`doi/10.1234/…`) : ils sont encodés aussi.
             return f"https://scanr.enseignementsup-recherche.gouv.fr/publications/{quote(source_id, safe='')}"
+        case Source.SCANR_PATENTS:
+            return f"https://scanr.enseignementsup-recherche.gouv.fr/patents/{path}"
         case Source.THESES:
             return f"https://theses.fr/{path}"
         case Source.CROSSREF | Source.DATACITE:
@@ -141,6 +159,7 @@ AGGREGATOR_SOURCES: frozenset[Source] = frozenset(s for s, p in PROFILES.items()
 
 SOURCE_PRIORITY: tuple[Source, ...] = (
     Source.THESES,
+    Source.SCANR_PATENTS,
     Source.CROSSREF,
     Source.DATACITE,
     Source.HAL,
@@ -148,14 +167,14 @@ SOURCE_PRIORITY: tuple[Source, ...] = (
     Source.SCANR,
     Source.WOS,
 )
-"""Ordre d'autorité des sources, pour l'agrégation des métadonnées, la position d'auteur et l'ordre des normaliseurs. theses.fr fait autorité sur les thèses. Crossref et DataCite font chacun autorité sur leurs propres DOI."""
+"""Ordre d'autorité des sources, pour l'agrégation des métadonnées, la position d'auteur et l'ordre des normaliseurs. theses.fr fait autorité sur les thèses, ScanR brevets sur les brevets. Crossref et DataCite font chacun autorité sur leurs propres DOI."""
 
 
-STRUCTURE_API_SOURCES: tuple[Source, ...] = (
-    Source.OPENALEX,
-    Source.WOS,
-    Source.SCANR,
-    Source.THESES,
-    Source.DATACITE,
-)
+STRUCTURE_API_SOURCES: tuple[Source, ...] = tuple(s for s, p in PROFILES.items() if p.structure_ids)
 """Sources admises comme clés de `structures.api_ids` : identifiant d'organisation dans la source, ou chaîne d'affiliation interrogée en texte (WoS, mots-clés DataCite)."""
+
+
+def structure_ids_label(source: Source) -> str:
+    """Renvoie le libellé des identifiants de structure d'une source de `STRUCTURE_API_SOURCES` : « theses.fr (PPN IdRef) »."""
+    profile = PROFILES[source]
+    return f"{profile.label} ({profile.structure_ids})"

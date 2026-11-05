@@ -1,16 +1,20 @@
-"""Purge de la phase personnes : marquage des contributions à forme de nom ambiguë, suppression des attributions d'identifiant sans appui, puis suppression des personnes sans contribution du périmètre.
+"""Purge de la phase personnes : marquage des contributions rattachées par le nom dont la décision change, suppression des attributions d'identifiant sans appui, puis suppression des personnes sans contribution du périmètre.
 
-La purge suit `populate_person_name_forms`, qui régénère les formes dérivées du nom des personnes. Une forme réduite (« j martin ») devient ambiguë quand elle désigne à la fois une personne au prénom réduit et une personne au prénom plein. Les contributions rattachées par cette forme sont marquées pour la redécision de leur personne : au run suivant, le rattachement des contributions les laisse sans personne. La personne réduite, sans autre contribution du périmètre, est alors supprimée avec ses formes de nom, et la forme réduite redevient univoque. La contribution rejoint la personne au prénom plein au run d'après.
+La purge suit `populate_person_name_forms`, qui régénère les formes dérivées du nom des personnes. Une forme réduite (« j martin ») devient ambiguë quand elle désigne à la fois une personne au prénom réduit et une personne au prénom plein. La purge redécide les contributions rattachées par le nom avec la règle du rattachement (`decide_contribution`). Celles dont la décision change sont marquées pour la redécision de leur personne : au run suivant, le rattachement des contributions les laisse sans personne. La personne réduite, sans autre contribution du périmètre, est alors supprimée avec ses formes de nom, et la forme réduite redevient univoque. La contribution rejoint la personne au prénom plein au run d'après.
 """
 
 from sqlalchemy import Connection, text
 
-from domain.persons.contribution_matching import NAME_MATCH_REASONS
+from domain.persons.contribution_matching import (
+    NAME_MATCH_REASONS,
+    ContributionOutcome,
+    decide_contribution,
+)
 from domain.persons.identifiers import (
     AttributionStatus,
     IdentifierOrigin,
 )
-from infrastructure.db.queues import Queue
+from infrastructure.db.queues import Queue, enqueue_ids
 from infrastructure.repositories.person_repository import person_without_decision_sql
 from infrastructure.sql_fragments import (
     CONTRIBUTIONS_AND_SOURCES,
@@ -18,43 +22,42 @@ from infrastructure.sql_fragments import (
     active_name_form,
     identifier_neutralized,
     in_clause,
-    publication_rejected_for,
 )
+from pipeline.transformation.persons.contribution_resolution import load_contributions, load_index
+from pipeline.transformation.persons.first_names import conflicting_reduced_first_names
+from pipeline.transformation.persons.store import fetch_rejected_person_ids_by_publication
+
+_CONTESTED_NOMINAL_SQL = text(f"""
+    SELECT DISTINCT g.id, g.person_id
+    FROM {CONTRIBUTIONS_AND_SOURCES}
+    JOIN person_name_forms pnf
+      ON pnf.name_form = ci.author_name_normalized AND {active_name_form("pnf")}
+    WHERE g.resolution_mode IN {in_clause(NAME_MATCH_REASONS)} AND pnf.person_id <> g.person_id
+""")
+"""Contributions rattachées par le nom dont une contribution source a une forme de nom active d'une autre personne, avec leur personne."""
 
 
 def mark_ambiguous_nominal(conn: Connection) -> int:
-    """Marque pour la redécision de leur personne (`Queue.CONTRIBUTION_RESOLUTION`) les contributions rattachées par le nom (`NAME_MATCH_REASONS`) et à forme de nom ambiguë. Renvoie le nombre de contributions marquées.
+    """Marque pour la redécision de leur personne (`Queue.CONTRIBUTION_RESOLUTION`) les contributions rattachées par le nom dont la décision (`decide_contribution`) désigne une autre personne ou aucune. Renvoie le nombre de contributions marquées.
 
-    La forme de nom d'une contribution source est ambiguë quand elle désigne au moins deux personnes (formes actives, `active_name_form`). Le décompte écarte les personnes rejetées pour la publication de la contribution, comme la résolution. Un rejet laissant un seul candidat rend donc la forme univoque pour cette contribution.
+    Seules sont décidées les contributions dont une contribution source a une forme de nom d'une autre personne. La décision suit le rattachement : même index des personnes, mêmes rejets pour la publication.
     """
-    # Les candidats (contributions nominales à forme ambiguë) sont matérialisés d'abord : le décompte par publication se limite à eux.
-    return conn.execute(
-        text(f"""
-            WITH candidates AS MATERIALIZED (
-                SELECT DISTINCT g.id, g.publication_id, ci.author_name_normalized AS name_form
-                FROM {CONTRIBUTIONS_AND_SOURCES}
-                WHERE g.resolution_mode IN {in_clause(NAME_MATCH_REASONS)}
-                  AND ci.author_name_normalized IN (
-                      SELECT name_form
-                      FROM person_name_forms
-                      WHERE {active_name_form("person_name_forms")}
-                      GROUP BY name_form
-                      HAVING count(DISTINCT person_id) >= 2
-                  )
-            )
-            INSERT INTO {Queue.CONTRIBUTION_RESOLUTION} (id)
-            SELECT DISTINCT c.id
-            FROM candidates c
-            WHERE (
-                SELECT count(DISTINCT pnf.person_id)
-                FROM person_name_forms pnf
-                WHERE pnf.name_form = c.name_form
-                  AND {active_name_form("pnf")}
-                  AND NOT {publication_rejected_for("c.publication_id", "pnf.person_id")}
-            ) >= 2
-            ON CONFLICT (id) DO UPDATE SET seq = DEFAULT
-        """)
-    ).rowcount
+    person_of = {r.id: r.person_id for r in conn.execute(_CONTESTED_NOMINAL_SQL)}
+    if not person_of:
+        return 0
+    index = load_index(conn, conflicting_reduced_first_names(conn))
+    rejected = fetch_rejected_person_ids_by_publication(conn)
+    changed = []
+    for publication_id, by_contribution in load_contributions(conn, list(person_of)).items():
+        rejected_here = rejected.get(publication_id, frozenset())
+        for contribution_id, members in by_contribution.items():
+            decision = decide_contribution(members, index, rejected_here)
+            if (decision.outcome, decision.person_id) != (
+                ContributionOutcome.MATCH,
+                person_of[contribution_id],
+            ):
+                changed.append(contribution_id)
+    return enqueue_ids(conn, Queue.CONTRIBUTION_RESOLUTION, changed)
 
 
 def delete_unsupported_identifier_attributions(conn: Connection) -> int:
@@ -103,7 +106,7 @@ def delete_persons_out_of_perimeter(conn: Connection) -> int:
 
 
 def purge(conn: Connection) -> dict[str, int]:
-    """Marque pour la redécision les contributions nominales à forme ambiguë, supprime les attributions d'identifiant sans appui, puis les personnes sans contribution du périmètre.
+    """Marque pour la redécision les contributions rattachées par le nom dont la décision change, supprime les attributions d'identifiant sans appui, puis les personnes sans contribution du périmètre.
 
     Renvoie les compteurs `{ambiguous_marked, deleted_attributions, deleted_persons}`. L'appelant commite.
     """

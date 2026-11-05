@@ -7,7 +7,7 @@ Une contribution réunit les contributions sources d'un même auteur dans une pu
 3. forme de nom, seulement pour une contribution du périmètre ;
 4. création d'une personne, pour une contribution du périmètre au nom inconnu.
 
-Deux personnes désignées au même niveau laissent la contribution sans personne. Les personnes rejetées pour la publication sont écartées des candidats à chaque niveau. Dans une publication, une personne revient à une seule contribution (`settle_publication`).
+À chaque niveau, les candidats de la contribution sont l'intersection des candidats non vides de ses contributions sources. Les candidats d'une contribution source par identifiant réunissent les personnes désignées par chacun de ses identifiants. Une intersection vide ou de plusieurs personnes laisse la contribution sans personne. Les personnes rejetées pour la publication sont écartées des candidats à chaque niveau. Dans une publication, une personne revient à une seule contribution (`settle_publication`).
 """
 
 from collections.abc import Mapping, MutableMapping, Sequence
@@ -189,38 +189,18 @@ def decide_contribution(
         )
 
     in_perimeter = any(m.in_perimeter for m in members)
-    # Personne désignée par chaque identifiant fiable, avec le plus fiable des types qui la désignent.
-    identified: dict[int, PersonIdentifierType] = {}
     refused: list[tuple[str, str]] = []
-    for id_type in IDENTIFIER_ORDER:
-        identifier_map = index.identifiers.get(id_type, {})
-        for m in members:
-            value = m.trusted_identifiers.get(id_type)
-            if not value:
-                continue
-            if not in_perimeter and not (
-                value in identifier_map and identifier_map[value].human_attribution
-            ):
-                continue
-            match = decide_match_by_identifier(
-                value, identifier_map, m.name, m.name_forms, index.name_form_status
-            )
-            if match.person_id is not None and match.person_id not in rejected_person_ids:
-                identified.setdefault(match.person_id, id_type)
-            elif match.rejected:
-                refused.append((id_type, value))
+    identified = [
+        candidates
+        for m in members
+        if (candidates := _identified_persons(m, index, rejected_person_ids, in_perimeter, refused))
+    ]
     if identified:
-        if (person_id := _single(set(identified))) is not None:
-            return ContributionDecision(
-                ContributionOutcome.MATCH,
-                person_id,
-                _REASON_BY_IDENTIFIER[identified[person_id]],
-                tuple(refused),
-            )
-        return ContributionDecision(
-            ContributionOutcome.SKIP,
-            reason=ContributionSkipReason.IDENTIFIER_CONFLICT,
-            refused=tuple(refused),
+        return _intersect(
+            identified,
+            tuple(refused),
+            conflict=ContributionSkipReason.IDENTIFIER_CONFLICT,
+            ambiguity=ContributionSkipReason.IDENTIFIER_CONFLICT,
         )
 
     if not in_perimeter:
@@ -232,19 +212,66 @@ def decide_contribution(
     return _decide_by_name(members, index, rejected_person_ids, tuple(refused))
 
 
+def _identified_persons(
+    member: AlignedSourceContribution,
+    index: PersonIndex,
+    rejected_person_ids: frozenset[int],
+    in_perimeter: bool,
+    refused: list[tuple[str, str]],
+) -> dict[int, ContributionMatchReason]:
+    """Renvoie les personnes désignées par les identifiants fiables d'une contribution source, avec le plus fiable des types qui désignent chacune. Ajoute à `refused` les identifiants refusés faute de nom compatible."""
+    identified: dict[int, ContributionMatchReason] = {}
+    for id_type in IDENTIFIER_ORDER:
+        value = member.trusted_identifiers.get(id_type)
+        if not value:
+            continue
+        identifier_map = index.identifiers.get(id_type, {})
+        if not in_perimeter and not (
+            value in identifier_map and identifier_map[value].human_attribution
+        ):
+            continue
+        match = decide_match_by_identifier(
+            value, identifier_map, member.name, member.name_forms, index.name_form_status
+        )
+        if match.person_id is not None and match.person_id not in rejected_person_ids:
+            identified.setdefault(match.person_id, _REASON_BY_IDENTIFIER[id_type])
+        elif match.rejected:
+            refused.append((id_type, value))
+    return identified
+
+
+def _intersect(
+    candidates: Sequence[Mapping[int, ContributionMatchReason]],
+    refused: tuple[tuple[str, str], ...],
+    *,
+    conflict: ContributionSkipReason,
+    ambiguity: ContributionSkipReason,
+) -> ContributionDecision:
+    """Rattache la contribution à la seule personne commune aux candidats de ses contributions sources, avec le mieux classé des signaux qui la désignent (`MATCH_REASON_PRIORITY`).
+
+    Args:
+        candidates: candidats non vides de chaque contribution source, avec leur signal.
+        conflict: motif d'une intersection vide.
+        ambiguity: motif d'une intersection de plusieurs personnes.
+    """
+    common = set.intersection(*(set(c) for c in candidates))
+    if (person_id := _single(common)) is not None:
+        reason = min((c[person_id] for c in candidates), key=MATCH_REASON_PRIORITY.index)
+        return ContributionDecision(ContributionOutcome.MATCH, person_id, reason, refused)
+    return ContributionDecision(
+        ContributionOutcome.SKIP, reason=ambiguity if common else conflict, refused=refused
+    )
+
+
 def _decide_by_name(
     members: Sequence[AlignedSourceContribution],
     index: PersonIndex,
     rejected_person_ids: frozenset[int],
     refused: tuple[tuple[str, str], ...],
 ) -> ContributionDecision:
-    """Décide par le nom des contributions sources. La forme de nom exacte désigne ses personnes ; à défaut, les initiales compatibles (`compatible_persons`) désignent les leurs. Les personnes rejetées pour la publication sont écartées.
-
-    Une contribution source qui désigne une seule personne l'emporte sur une contribution source au nom ambigu. Deux contributions sources qui désignent deux personnes laissent la contribution sans personne.
-    """
-    allow_create = any(allow_person_creation(list(m.roles)) for m in members)
-    matched: dict[int, ContributionMatchReason] = {}
-    undecidable: ContributionSkipReason | None = None
+    """Décide par le nom des contributions sources. La forme de nom exacte désigne ses personnes ; à défaut, les initiales compatibles (`compatible_persons`) désignent les leurs. Les personnes rejetées pour la publication sont écartées."""
+    named: list[dict[int, ContributionMatchReason]] = []
+    rejected_only = False
     for m in members:
         reason = ContributionMatchReason.NAME
         person_ids = next(
@@ -253,26 +280,24 @@ def _decide_by_name(
         if person_ids is None:
             person_ids = compatible_persons(m.name, index.namesakes)
             reason = ContributionMatchReason.COMPATIBLE_NAME
-        candidates = [pid for pid in person_ids if pid not in rejected_person_ids]
-        if len(candidates) == 1:
-            # Une forme exacte prime sur des initiales compatibles pour la même personne.
-            if matched.get(candidates[0]) != ContributionMatchReason.NAME:
-                matched[candidates[0]] = reason
-        elif candidates:
-            undecidable = ContributionSkipReason.AMBIGUOUS_NAME_FORM
-        elif person_ids and undecidable is None:
-            undecidable = ContributionSkipReason.ALL_CANDIDATES_REJECTED
-    if matched:
-        if (person_id := _single(set(matched))) is not None:
-            return ContributionDecision(
-                ContributionOutcome.MATCH, person_id, matched[person_id], refused
-            )
-        return ContributionDecision(
-            ContributionOutcome.SKIP, reason=ContributionSkipReason.NAME_CONFLICT, refused=refused
+        if candidates := {pid: reason for pid in person_ids if pid not in rejected_person_ids}:
+            named.append(candidates)
+        elif person_ids:
+            rejected_only = True
+    if named:
+        return _intersect(
+            named,
+            refused,
+            conflict=ContributionSkipReason.NAME_CONFLICT,
+            ambiguity=ContributionSkipReason.AMBIGUOUS_NAME_FORM,
         )
-    if undecidable is not None:
-        return ContributionDecision(ContributionOutcome.SKIP, reason=undecidable, refused=refused)
-    if allow_create:
+    if rejected_only:
+        return ContributionDecision(
+            ContributionOutcome.SKIP,
+            reason=ContributionSkipReason.ALL_CANDIDATES_REJECTED,
+            refused=refused,
+        )
+    if any(allow_person_creation(list(m.roles)) for m in members):
         return ContributionDecision(ContributionOutcome.CREATE, refused=refused)
     return ContributionDecision(
         ContributionOutcome.SKIP,

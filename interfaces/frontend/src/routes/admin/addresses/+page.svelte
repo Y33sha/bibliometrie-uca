@@ -6,7 +6,7 @@
 	import { onMount, tick } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import { replaceQuery } from '#lib/url.js';
+	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
 	import { addresses as addressesApi, api, errorMessage, structures as structuresApi } from '#lib/api/index.js';
 	import AddressPublications from '#lib/components/AddressPublications.svelte';
 	import PublicationCountButton from '#lib/components/PublicationCountButton.svelte';
@@ -65,42 +65,42 @@
 		return { operator, structureIds: ids };
 	}
 
-	function readUrlParams(): {
-		detected: string;
-		validation: string;
-		textPredicates: TextPredicate[];
-		structurePredicates: StructurePredicate[];
-		p: number;
-		structureId: number | null;
-	} {
-		const sp = page.url.searchParams;
-		return {
-			detected: sp.get('detected') || 'yes',
-			validation: sp.get('validation') || 'pending',
-			textPredicates: sp.getAll('text').map(parseTextParam).filter((p): p is TextPredicate => p !== null),
-			structurePredicates: sp
-				.getAll('struct')
-				.map(parseStructParam)
-				.filter((p): p is StructurePredicate => p !== null),
-			p: parseInt(sp.get('page') || '1') || 1,
-			structureId: sp.has('structure_id') ? parseInt(sp.get('structure_id')!) || null : null,
-		};
+	const url = useUrlFilters({
+		basePath: '/admin/addresses',
+		filters: {
+			structureId: { type: 'single', urlKey: 'structure_id' },
+			detected: { type: 'single', urlKey: 'detected', defaultValue: 'yes' },
+			validation: { type: 'single', urlKey: 'validation', defaultValue: 'pending' },
+			text: { type: 'repeated', urlKey: 'text' },
+			struct: { type: 'repeated', urlKey: 'struct' },
+			page: { type: 'page', urlKey: 'page' },
+		},
+	});
+
+	function textParams(): string[] {
+		return textPredicates.filter((t) => t.term).map((t) => `${t.mode}:${t.term}`);
+	}
+
+	function structParams(): string[] {
+		return structurePredicates
+			.filter((s) => s.structureIds.length)
+			.map((s) => `${s.operator}:${s.structureIds.join(',')}`);
 	}
 
 	function serializePredicateParams(sp: URLSearchParams): void {
-		for (const t of textPredicates) if (t.term) sp.append('text', `${t.mode}:${t.term}`);
-		for (const s of structurePredicates)
-			if (s.structureIds.length) sp.append('struct', `${s.operator}:${s.structureIds.join(',')}`);
+		for (const v of textParams()) sp.append('text', v);
+		for (const v of structParams()) sp.append('struct', v);
 	}
 
 	function syncUrl(): void {
-		const sp = new URLSearchParams();
-		if (currentStructureId) sp.set('structure_id', String(currentStructureId));
-		if (currentDetected !== 'yes') sp.set('detected', currentDetected);
-		if (currentValidation !== 'pending') sp.set('validation', currentValidation);
-		serializePredicateParams(sp);
-		if (list.page > 1) sp.set('page', String(list.page));
-		void replaceQuery(window.location.pathname, sp);
+		url.syncUrl(() => ({
+			structureId: currentStructureId,
+			detected: currentDetected,
+			validation: currentValidation,
+			text: textParams(),
+			struct: structParams(),
+			page: list.page,
+		}));
 	}
 
 	// ---- Reactive state ----
@@ -141,7 +141,6 @@
 	let publications = $state<Publication[]>([]);
 	let pubsLoading = $state(false);
 
-	let searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
 	const selectedCount = $derived(selectedIds.size);
 
@@ -309,10 +308,11 @@
 		if (textPredicates[i].term) reload();
 	}
 
+	const debouncedReload = url.debouncedSearch(reload);
+
 	function onTextTermInput(i: number, value: string): void {
 		textPredicates = textPredicates.map((t, j) => (j === i ? { ...t, term: value } : t));
-		if (searchTimeout) clearTimeout(searchTimeout);
-		searchTimeout = setTimeout(reload, 400);
+		debouncedReload();
 	}
 
 	function setStructureOperator(i: number, operator: string): void {
@@ -382,12 +382,17 @@
 	// ---- Init ----
 
 	onMount(() => {
-		const url = readUrlParams();
-		currentDetected = url.detected;
-		currentValidation = url.validation;
-		textPredicates = url.textPredicates.length ? url.textPredicates : [newTextPredicate()];
-		structurePredicates = url.structurePredicates;
-		list.page = url.p;
+		const restored = url.restoreFromUrl(page.url.searchParams);
+		currentDetected = (restored.detected as string | undefined) || 'yes';
+		currentValidation = (restored.validation as string | undefined) || 'pending';
+		const restoredText = ((restored.text as string[] | undefined) ?? [])
+			.map(parseTextParam)
+			.filter((p): p is TextPredicate => p !== null);
+		textPredicates = restoredText.length ? restoredText : [newTextPredicate()];
+		structurePredicates = ((restored.struct as string[] | undefined) ?? [])
+			.map(parseStructParam)
+			.filter((p): p is StructurePredicate => p !== null);
+		list.page = (restored.page as number | undefined) ?? 1;
 
 		Promise.all([loadStructures(), loadInstitution()]).then(() => {
 			resolveScopeStructure();
@@ -434,7 +439,7 @@
 		<!-- Ligne fixe : détection/validation de la structure étudiée -->
 		<div class="filters-row scope-row">
 			<span class="filters-title">Filtres</span>
-			<span class="scope-echo">Structure étudiée : <strong>{currentStructureName}</strong></span>
+			<span class="muted-small">Structure étudiée : <strong>{currentStructureName}</strong></span>
 			<label class="scope-field">
 				Détection
 				<select
@@ -495,9 +500,9 @@
 				</select>
 				<div class="struct-tags">
 					{#each sp.structureIds as sid (sid)}
-						<span class="tag tag-pill tag-accent tag-removable struct-chip">
+						<span class="tag tag-pill tag-accent tag-removable">
 							{structureLabelById.get(sid) || `#${sid}`}
-							<button title="Retirer" aria-label="Retirer {structureLabelById.get(sid) || `#${sid}`}" onclick={() => removeStructureFromPredicate(i, sid)}>&#x2717;</button>
+							<IconButton icon="reject" small label="Retirer {structureLabelById.get(sid) || `#${sid}`}" onclick={() => removeStructureFromPredicate(i, sid)} />
 						</span>
 					{/each}
 					<select
@@ -526,20 +531,20 @@
 
 		<!-- Ajout de prédicats -->
 		<div class="filters-row add-row">
-			<button class="add-btn" onclick={addTextPredicate}>+ Texte</button>
-			<button class="add-btn" onclick={addStructurePredicate}>+ Structure reconnue</button>
+			<button class="btn-add" onclick={addTextPredicate}>+ Texte</button>
+			<button class="btn-add" onclick={addStructurePredicate}>+ Structure reconnue</button>
 		</div>
 	</div>
 
 	<!-- Batch action bar -->
 	{#if selectedCount > 0}
-		<div class="batch-bar">
+		<div class="batch-bar batch-bar-addresses">
 			<span>{formatCount(selectedCount, 'sélectionnée')}</span>
 			<div class="batch-actions">
-				<button onclick={() => batchReview(false)}>Rejeter</button>
-				<button onclick={() => batchReview(true)}>Relier</button>
-				<button onclick={() => batchReview(null)}>Réinitialiser</button>
-				<button onclick={clearSelection}>Annuler</button>
+				<button class="btn btn-sm" onclick={() => batchReview(false)}>Rejeter <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg></button>
+				<button class="btn btn-sm" onclick={() => batchReview(true)}>Relier <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg></button>
+				<button class="btn btn-sm" onclick={() => batchReview(null)}>Réinitialiser</button>
+				<button class="btn btn-sm" onclick={clearSelection}>Annuler</button>
 			</div>
 		</div>
 	{/if}
@@ -661,10 +666,6 @@
 		font-size: var(--fs-xs);
 		letter-spacing: var(--tracking-caps);
 	}
-	.scope-echo {
-		font-size: var(--fs-sm);
-		color: var(--muted);
-	}
 	.scope-field {
 		font-size: var(--fs-sm);
 		color: var(--muted);
@@ -689,34 +690,8 @@
 		flex-wrap: wrap;
 		flex: 1;
 	}
-	.struct-chip button {
-		border: none;
-		background: none;
-		color: inherit;
-		cursor: pointer;
-		font-size: var(--fs-sm);
-		padding: 0 2px;
-		line-height: 1;
-	}
-	.struct-chip button:hover {
-		color: var(--danger);
-	}
 	.add-row {
 		gap: 6px;
-	}
-	.add-btn {
-		border: 1px dashed var(--border);
-		background: var(--card);
-		color: var(--accent);
-		border-radius: var(--radius);
-		cursor: pointer;
-		padding: 3px 10px;
-		font-size: var(--fs-sm);
-		font-family: inherit;
-	}
-	.add-btn:hover {
-		border-color: var(--accent);
-		background: var(--accent-light);
 	}
 	.select-all-row {
 		padding: 4px 12px 6px 15px;
@@ -778,33 +753,12 @@
 		border-top: 1px solid var(--border);
 	}
 
-	/* Batch bar */
-	.batch-bar {
-		background: var(--accent);
-		color: var(--text-inverse);
-		padding: 8px 16px;
-		border-radius: var(--radius);
-		margin-bottom: 10px;
-		display: flex;
-		align-items: center;
+	.batch-bar-addresses {
 		justify-content: space-between;
 	}
 	.batch-actions {
 		display: flex;
 		gap: 6px;
-	}
-	.batch-bar button {
-		padding: 4px 12px;
-		border-radius: var(--radius);
-		border: 1px solid rgba(255, 255, 255, 0.3);
-		background: transparent;
-		color: var(--text-inverse);
-		font-size: var(--fs-sm);
-		cursor: pointer;
-		font-family: inherit;
-	}
-	.batch-bar button:hover {
-		background: rgba(255, 255, 255, 0.15);
 	}
 
 </style>

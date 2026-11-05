@@ -3,6 +3,7 @@
   import { structureLabel } from "#lib/structureLabels.js";
   import StructureTypeTag from "./StructureTypeTag.svelte";
   import type { RelatedStructure, Structure } from "./types";
+  import IconButton from "#lib/components/IconButton.svelte";
 
   let {
     structureId,
@@ -47,17 +48,12 @@
   <span class="relation-label">{label}</span>
   <div class="relation-values">
     {#if related.length === 0}
-      <span class="none-text">{emptyText}</span>
+      <span class="muted">{emptyText}</span>
     {:else}
       {#each related as r (r.tutelle_id)}
-        <span class="tag tag-pill tag-accent tag-removable relation-tag">
-          <button class="tag-name" onclick={() => onselect(r.id)}>{structureLabel(r)}</button>
-          <button
-            class="remove"
-            onclick={() => ondeleteTutelle(r.tutelle_id)}
-            title="Retirer {structureLabel(r)}"
-            aria-label="Retirer {structureLabel(r)}">×</button
-          >
+        <span class="tag tag-pill tag-accent tag-removable">
+          <button class="tag-action" onclick={() => onselect(r.id)}>{structureLabel(r)}</button>
+          <IconButton icon="reject" small label="Retirer {structureLabel(r)}" onclick={() => ondeleteTutelle(r.tutelle_id)} />
         </span>
       {/each}
     {/if}
@@ -99,39 +95,5 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 8px;
-  }
-  .relation-tag {
-    padding: 2px 3px 2px 10px;
-  }
-  .relation-tag .tag-name {
-    padding: 0;
-    border: none;
-    background: none;
-    font: inherit;
-    color: inherit;
-    cursor: pointer;
-  }
-  .relation-tag .tag-name:hover {
-    text-decoration: underline;
-  }
-  /* Croix grise, rouge au survol. */
-  .relation-tag .remove {
-    width: 20px;
-    height: 20px;
-    padding: 0;
-    border: none;
-    border-radius: var(--radius-pill);
-    background: none;
-    font: inherit;
-    line-height: 1;
-    color: var(--muted);
-    cursor: pointer;
-  }
-  .relation-tag .remove:hover {
-    background: var(--danger-light);
-    color: var(--danger);
-  }
-  .none-text {
-    color: var(--muted);
   }
 </style>

@@ -123,17 +123,17 @@
           <td class="form-text">{f.form_text}</td>
           <td>
             {#if f.is_excluding}
-              <span class="none-label">—</span>
+              <span class="muted">—</span>
             {:else if f.requires_context_of?.length}
               {#each f.requires_context_of as x}
                 <span class="tag tag-warning tag-removable">
                   {ctxLabel(x)}
-                  <button class="ctx-remove" onclick={() => onremoveCtx(f.id, x)} title="Retirer ce contexte" aria-label="Retirer ce contexte">×</button>
+                  <IconButton icon="reject" small label="Retirer ce contexte" onclick={() => onremoveCtx(f.id, x)} />
                 </span>
               {/each}
               {@render ctxAdd(f.id)}
             {:else}
-              <span class="none-label">—</span>
+              <span class="muted">—</span>
               {@render ctxAdd(f.id)}
             {/if}
           </td>
@@ -150,6 +150,7 @@
 <!-- Add form row -->
 <div class="add-row">
   <input
+    class="input-sm"
     placeholder="Nouvelle forme"
     bind:value={addFormText}
     onkeydown={(e) => {
@@ -181,11 +182,11 @@
 <!-- New form context tags (masqué si excluante) -->
 {#if !addFormExcluding}
   <div class="new-form-ctx">
-    <span class="ctx-label-text">Contexte :</span>
+    <span class="muted">Contexte :</span>
     {#each newFormCtx as x}
       <span class="tag tag-warning tag-removable">
         {ctxLabel(x)}
-        <button class="ctx-remove" onclick={() => onremoveNewCtx(x)} title="Retirer ce contexte" aria-label="Retirer ce contexte">×</button>
+        <IconButton icon="reject" small label="Retirer ce contexte" onclick={() => onremoveNewCtx(x)} />
       </span>
     {/each}
     {@render ctxAdd(null)}
@@ -264,23 +265,6 @@
     white-space: nowrap;
     padding-right: 0 !important;
   }
-  .ctx-remove {
-    cursor: pointer;
-    color: var(--danger);
-    font-weight: bold;
-    font-size: var(--fs-sm);
-    line-height: 1;
-    background: none;
-    border: none;
-    padding: 0;
-    font-family: inherit;
-  }
-  .ctx-remove:hover {
-    color: var(--danger);
-  }
-  .none-label {
-    color: var(--muted);
-  }
   /* Formulaire d'ajout sous le tableau, sur un fond léger. */
   .add-row {
     display: flex;
@@ -294,12 +278,6 @@
   }
   .add-row input:not([type]) {
     flex: 1 1 260px;
-    height: 34px;
-    padding: 0 10px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--card);
-    font-size: var(--fs-sm);
     font-family: var(--mono);
   }
   .checkbox-label {
@@ -314,9 +292,6 @@
   .new-form-ctx {
     margin-top: 4px;
     font-size: var(--fs-sm);
-  }
-  .ctx-label-text {
-    color: var(--muted);
   }
   .ctx-picker-shortcuts {
     padding: 6px 10px;

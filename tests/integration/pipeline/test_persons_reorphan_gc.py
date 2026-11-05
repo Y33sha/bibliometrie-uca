@@ -1,4 +1,4 @@
-"""Purge de la phase `persons` : marquage des contributions à forme de nom ambiguë, suppression des personnes sans contribution du périmètre."""
+"""Purge de la phase `persons` : marquage des contributions rattachées par le nom dont la décision change, suppression des personnes sans contribution du périmètre."""
 
 from sqlalchemy import text
 
@@ -7,7 +7,11 @@ from pipeline.transformation.persons.purge import (
     delete_persons_out_of_perimeter,
     mark_ambiguous_nominal,
 )
-from tests.integration.helpers.alignment import contribution_person, insert_person_contribution
+from tests.integration.helpers.alignment import (
+    add_aligned_source_contribution,
+    contribution_person,
+    insert_person_contribution,
+)
 from tests.integration.helpers.contributions import insert_confirmed_source_contribution
 from tests.integration.helpers.persons import (
     insert_hr_record,
@@ -41,6 +45,34 @@ def _contribution(conn, *, form, person_id, mode="name", in_perimeter=True):
     return insert_person_contribution(
         conn, source_contribution, person_id=person_id, mode=mode, in_perimeter=in_perimeter
     )
+
+
+def _aligned_contribution(conn, *, forms, person_id):
+    """Insère une contribution rattachée par le nom à la personne `person_id`, qui aligne une contribution source de chaque forme de `forms`, chacune dans son enregistrement source. Renvoie l'`id` de la contribution."""
+    publication = insert_publication(conn, "t")
+    source_contributions = []
+    for rank, (source, form) in enumerate(zip(("hal", "openalex"), forms, strict=False)):
+        source_record = insert_source_record(
+            conn, publication, source=source, source_id=f"{source}-{publication}-{rank}", title="t"
+        )
+        source_contributions.append(
+            (
+                insert_source_contribution(
+                    conn,
+                    source_record,
+                    source=source,
+                    raw_author_name=form,
+                    author_name_normalized=form,
+                    in_perimeter=True,
+                ),
+                source_record,
+            )
+        )
+    (first, _), *others = source_contributions
+    contribution = insert_person_contribution(conn, first, person_id=person_id)
+    for source_contribution, source_record in others:
+        add_aligned_source_contribution(conn, contribution, source_contribution, source_record)
+    return contribution
 
 
 def _person_exists(conn, person_id):
@@ -108,6 +140,33 @@ def test_un_rejet_pour_la_publication_leve_l_ambiguite(sa_sync_conn):
 
     # Un seul candidat pour la publication de la contribution avec rejet ; deux pour l'autre : forme ambiguë.
     assert queued(conn, Queue.CONTRIBUTION_RESOLUTION) == {sans_rejet}
+
+
+def test_un_nom_univoque_tranche_la_forme_ambigue_d_une_autre_contribution_source(sa_sync_conn):
+    """« z xu » désigne deux personnes, « zehua xu » une seule : comme le rattachement, la purge garde la personne."""
+    conn = sa_sync_conn
+    zehua = insert_person(conn, "Xu", first_name="Zehua")
+    zhihao = insert_person(conn, "Xu", first_name="Zhihao")
+    insert_person_name_form(conn, zehua, name_form="zehua xu")
+    insert_person_name_form(conn, zehua, name_form="z xu")
+    insert_person_name_form(conn, zhihao, name_form="z xu")
+    _aligned_contribution(conn, forms=("zehua xu", "z xu"), person_id=zehua)
+
+    assert mark_ambiguous_nominal(conn) == 0
+
+
+def test_deux_noms_univoques_de_deux_personnes_sont_marques(sa_sync_conn):
+    conn = sa_sync_conn
+    jean = insert_person(conn, "Martin", first_name="Jean")
+    jacques = insert_person(conn, "Martin", first_name="Jacques")
+    insert_person_name_form(conn, jean, name_form="jean martin")
+    insert_person_name_form(conn, jacques, name_form="jacques martin")
+    contribution = _aligned_contribution(
+        conn, forms=("jean martin", "jacques martin"), person_id=jean
+    )
+
+    assert mark_ambiguous_nominal(conn) == 1
+    assert queued(conn, Queue.CONTRIBUTION_RESOLUTION) == {contribution}
 
 
 def test_une_personne_sans_contribution_du_perimetre_est_supprimee(sa_sync_conn):

@@ -14,7 +14,7 @@ theses.fr est le portail [ABES](../glossaire.md#abes) qui agrège les thèses fr
 
 - Sans identifiants d'accès
 - Requête : `q=etabSoutenancePpn:(<PPN>)`, pagination par `debut` / `nombre`
-- 500 résultats par page (max accepté par l'API), à 3 req/s (`MAX_PER_SECOND`, `pipeline/ingestion/api_params.py`)
+- Taille de page et débit : `pipeline/ingestion/api_params.py`
 - L'API ne filtre pas par année : le moissonnage retient les thèses soutenues dans la fenêtre d'années du run, et toutes les thèses en cours
 
 **API de détail** (`https://theses.fr/api/v1/theses/these/<identifiant>`) — une thèse par son identifiant.

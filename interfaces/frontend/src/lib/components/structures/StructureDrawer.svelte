@@ -7,7 +7,6 @@
   import { api, errorMessage, nameForms, structures as structuresApi } from "#lib/api/index.js";
   import { confirmDialog, toast } from "#lib/dialogs.svelte.js";
   import {
-    API_SOURCES,
     ROR_FORMAT_ERROR,
     SHORT_FORM_MAX_LENGTH,
     buildApiIds,
@@ -366,10 +365,9 @@
     mType = s.type || "labo";
     mRor = s.ror_id || "";
     mHal = s.hal_collection || "";
-    mApiIds = {};
-    for (const src of API_SOURCES) {
-      mApiIds[src] = (s.api_ids?.[src] || []).join(", ");
-    }
+    mApiIds = Object.fromEntries(
+      Object.entries(s.api_ids ?? {}).map(([src, ids]) => [src, (ids ?? []).join(", ")]),
+    );
     editModalOpen = true;
   }
 
@@ -455,7 +453,7 @@
   {/snippet}
 
   {#if !detail}
-    <p class="loading">Chargement…</p>
+    <p class="muted">Chargement…</p>
   {:else}
     {@const s = detail.structure}
     <div class="structure-meta">
@@ -542,9 +540,6 @@
 {/if}
 
 <style>
-  .loading {
-    color: var(--muted);
-  }
   .drawer-acronym {
     font-weight: 600;
     margin-right: 6px;

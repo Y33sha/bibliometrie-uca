@@ -35,7 +35,13 @@ from infrastructure.read_models.publications.models import (
     PublicationListItem,
     PublicationListResponse,
 )
-from infrastructure.sql_fragments import has_author_role, is_laboratory, source_extra
+from infrastructure.sql_fragments import (
+    cited_by_count,
+    fwci,
+    has_author_role,
+    is_laboratory,
+    source_extra,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -185,6 +191,8 @@ def _publication_lines(
             "APC (€)": round(row.apc_total) if row.apc_total else "",
             "Voie OA": row.oa_status or "",
             "Licence": license_label(row.license) if row.license else "",
+            "Citations": "" if row.citations is None else row.citations,
+            "FWCI": "" if row.fwci is None else f"{row.fwci:.2f}",
             "Top citations": CITATION_TOP_LABELS[CitationTop(row.citation_top)]
             if row.citation_top
             else "",
@@ -266,6 +274,7 @@ def publications_csv(
                 p.publication_date, p.publication_date_precision::text AS precision,
                 p.oa_status::text AS oa_status, p.best_copy_url,
                 p.license::text AS license,
+                {cited_by_count()} AS citations, {fwci()} AS fwci,
                 {CITATION_TOP_SQL} AS citation_top,
                 j.title AS journal_title,
                 pub.name AS publisher_name,
@@ -322,6 +331,8 @@ def publications_csv(
         ("apc", "APC (€)"),
         ("oa_status", "Voie OA"),
         ("license", "Licence"),
+        ("citations", "Citations"),
+        ("fwci", "FWCI"),
         ("citation_top", "Top citations"),
         ("hal_status", "Statut HAL"),
         ("sources", "Sources"),

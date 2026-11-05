@@ -224,7 +224,7 @@
     <section class="drawer-section">
       <h3>Formes de nom</h3>
       {#if nameForms === null}
-        <span class="forms-loading">Chargement…</span>
+        <span class="muted-small">Chargement…</span>
       {:else}
         <NameFormsList personId={person.id} {nameForms} onopenDetail={onopenDetach} onsetStatus={onsetFormStatus} />
       {/if}
@@ -243,12 +243,12 @@
                   onclick={() => absorb(sp.person_id)}>Absorber</button
                 >
               {/if}
-              <button class="sharing-name" onclick={() => onopenPerson(sp.person_id)}>
+              <button class="triage-person" onclick={() => onopenPerson(sp.person_id)}>
                 <span class="person-last">{titleCase(sp.last_name)}</span>
                 {titleCase(sp.first_name)}
               </button>
               {#if sp.has_rh}<RhCheck />{/if}
-              <span class="sharing-forms" title={sp.shared_forms.join(", ")}>
+              <span class="muted-small" title={sp.shared_forms.join(", ")}>
                 {formatCount(sp.shared_forms.length, "forme")}
               </span>
             </div>
@@ -268,7 +268,7 @@
                 title="Annuler la décision : les files de triage peuvent de nouveau présenter la paire"
                 onclick={() => unmarkDistinct(dp.person_id)}>Annuler</button
               >
-              <button class="sharing-name" onclick={() => onopenPerson(dp.person_id)}>
+              <button class="triage-person" onclick={() => onopenPerson(dp.person_id)}>
                 <span class="person-last">{titleCase(dp.last_name)}</span>
                 {titleCase(dp.first_name)}
               </button>
@@ -301,7 +301,7 @@
           {/snippet}
         </Picker>
       {:else}
-        <button class="btn btn-merge-inline" onclick={() => onmergeOpen(person.id)}>Fusionner…</button>
+        <button class="btn btn-sm btn-dashed" onclick={() => onmergeOpen(person.id)}>Fusionner…</button>
       {/if}
     </section>
 </Drawer>
@@ -346,10 +346,6 @@
   .rh-info dd {
     margin: 0;
   }
-  .forms-loading {
-    font-size: var(--fs-sm);
-    color: var(--muted);
-  }
   .sharing-list {
     display: flex;
     flex-direction: column;
@@ -359,23 +355,5 @@
     display: inline-flex;
     align-items: center;
     gap: 8px;
-  }
-  .sharing-name {
-    font-size: var(--fs-md);
-    background: none;
-    border: none;
-    padding: 0;
-    cursor: pointer;
-    font-family: inherit;
-    color: inherit;
-    text-align: left;
-  }
-  .sharing-name:hover {
-    color: var(--accent);
-    text-decoration: underline;
-  }
-  .sharing-forms {
-    font-size: var(--fs-sm);
-    color: var(--muted);
   }
 </style>

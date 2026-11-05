@@ -1,17 +1,18 @@
 <script lang="ts">
 	import EntityMetaItem from '#lib/components/EntityMetaItem.svelte';
-	import Breadcrumb from '#lib/components/Breadcrumb.svelte';
-	import { pageTitle } from '#lib/institution.svelte.js';
+	import EntityBreadcrumb from '#lib/components/EntityBreadcrumb.svelte';
+	import EntityStatus from '#lib/components/EntityStatus.svelte';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import { onMount, tick } from 'svelte';
 	import { api, apiDetail } from '#lib/api/index.js';
 	import { issnLabel, serialRelationLabels } from '#lib/labels.js';
 	import TabNav from '#lib/components/TabNav.svelte';
+	import { activeTabId, type TabDef } from '#lib/tabs.js';
 	import PublicationsListView from '#lib/components/PublicationsListView.svelte';
 	import MonographsListView from '#lib/components/MonographsListView.svelte';
 	import PublicationsDashboard from '#lib/components/PublicationsDashboard.svelte';
-	import SubjectsCloud from '#lib/components/SubjectsCloud.svelte';
+	import SubjectsCard from '#lib/components/SubjectsCard.svelte';
 	import TitleRow from '#lib/components/TitleRow.svelte';
 	import SerialDrawer from '#lib/components/serials/SerialDrawer.svelte';
 	import IssnBadge from '#lib/components/serials/IssnBadge.svelte';
@@ -20,28 +21,24 @@
 	import type { components } from '#lib/api/schema.js';
 
 	type SerialDetail = components['schemas']['SerialDetailResponse'];
-	type SubjectFrequency = components['schemas']['SubjectFrequency'];
 	type EnumOption = components['schemas']['EnumOption'];
 
 	const serialId = $derived(Number(page.params.id));
 
 	// Volet d'édition de la publication en série, en session admin : ouvert tant que `?serial=<id>` figure dans l'URL.
 	const drawer = useDrawerParam('serial', isAdmin);
-	const activeTab = $derived(
-		(() => {
-			const t = page.url.searchParams.get('tab');
-			return t === 'publications' || t === 'monographs' ? t : 'dashboard';
-		})()
-	);
-
 	let journal = $state<SerialDetail | null>(null);
 
 	// Onglet des monographies, selon le type de la revue : volumes d'une série d'actes, livres d'une collection.
 	const MONOGRAPHS_TAB_LABELS: Record<string, string> = { proceedings: 'Volumes', book_series: 'Livres' };
 	const monographsTabLabel = $derived(journal?.serial_type ? MONOGRAPHS_TAB_LABELS[journal.serial_type] : undefined);
+	const tabs: TabDef[] = $derived([
+		{ id: 'dashboard', label: 'Dashboard' },
+		...(monographsTabLabel ? [{ id: 'monographs', label: monographsTabLabel }] : []),
+		{ id: 'publications', label: 'Publications' },
+	]);
+	const activeTab = $derived(activeTabId(tabs, page.url.searchParams));
 	let error = $state(false);
-	let subjectList = $state<SubjectFrequency[]>([]);
-	let dashboardLoaded = $state(false);
 
 	let showRawDoaj = $state(false);
 
@@ -69,18 +66,6 @@
 		}
 	}
 
-	async function loadDashboard() {
-		if (dashboardLoaded) return;
-		subjectList = await api<SubjectFrequency[]>(`/api/serials/${serialId}/subjects?limit=20`, {
-			key: 'j-subjects'
-		});
-		dashboardLoaded = true;
-	}
-
-	function onTabSwitch(tab: string) {
-		if (tab === 'dashboard') loadDashboard();
-	}
-
 	onMount(async () => {
 		const labelMap = (opts: EnumOption[]) => Object.fromEntries(opts.map((o) => [o.value, o.label_fr]));
 		const typeLabelsP = api<EnumOption[]>('/api/serials/types').then((opts) => {
@@ -90,7 +75,6 @@
 			oaModelLabels = labelMap(opts);
 		});
 		await Promise.all([loadSerial(), typeLabelsP, oaModelLabelsP]);
-		if (activeTab === 'dashboard') loadDashboard();
 		await tick();
 	});
 
@@ -107,16 +91,10 @@
 	}
 </script>
 
-<svelte:head>
-	<title>{pageTitle(journal?.title ?? 'Publication en série')}</title>
-</svelte:head>
+<EntityBreadcrumb section={{ label: 'Publications en série', path: 'journals' }} name={journal?.title} fallback="Publication en série" />
 
-	<Breadcrumb trail={[{ label: 'Publications en série', path: 'journals' }]} current={journal?.title} />
-
-{#if error}
-	<div class="no-results">Publication en série introuvable</div>
-{:else if !journal}
-	<div class="loading">Chargement…</div>
+{#if error || !journal}
+	<EntityStatus {error} notFound="Publication en série introuvable" />
 {:else}
 	<!-- Header -->
 	<div class="entity-header">
@@ -183,14 +161,7 @@
 	</div>
 
 	<!-- Tabs -->
-	<TabNav
-		tabs={[
-			{ id: 'dashboard', label: 'Dashboard' },
-			...(monographsTabLabel ? [{ id: 'monographs', label: monographsTabLabel }] : []),
-			{ id: 'publications', label: 'Publications' }
-		]}
-		onswitch={onTabSwitch}
-	/>
+	<TabNav {tabs} />
 
 	<!-- Tab: Dashboard -->
 	{#if activeTab === 'dashboard'}
@@ -202,16 +173,7 @@
 				oaBreakdown="oa_voie"
 			>
 				{#snippet subjects()}
-					<div class="dash-card">
-						<h2>Sujets principaux</h2>
-						{#if !dashboardLoaded}
-							<div class="loading">Chargement…</div>
-						{:else if subjectList.length === 0}
-							<p class="muted">Aucun sujet (les sujets génériques sont exclus du top).</p>
-						{:else}
-							<SubjectsCloud subjects={subjectList} />
-						{/if}
-					</div>
+					<SubjectsCard endpoint="/api/serials/{serialId}/subjects" />
 				{/snippet}
 			</PublicationsDashboard>
 			{#if journal.doaj_payload}
@@ -231,7 +193,7 @@
 									{/if}
 								{/each}
 							</dl>
-							<button class="toggle-raw" onclick={() => (showRawDoaj = !showRawDoaj)}>
+							<button class="btn-text" onclick={() => (showRawDoaj = !showRawDoaj)}>
 								{showRawDoaj ? 'Masquer' : 'Voir'} le payload DOAJ brut <span class="chevron" class:up={showRawDoaj} aria-hidden="true"></span>
 							</button>
 							{#if showRawDoaj}
@@ -244,7 +206,7 @@
 	{/if}
 
 	<!-- Tab: Monographies -->
-	{#if activeTab === 'monographs' && monographsTabLabel}
+	{#if activeTab === 'monographs'}
 		<div class="tab-content">
 			<MonographsListView apiKey={`journal-${serialId}-monographs`} externalFilters={{ serialId }} />
 		</div>
@@ -269,10 +231,7 @@
 
 <style>
 
-	.loading, .no-results { padding: 20px; color: var(--muted); }
 	.doaj-grid { margin-top: 24px; }
-
-	.muted { color: var(--muted); }
 	.small { font-size: var(--fs-sm); font-weight: 400; }
 
 	.doaj-fields {
@@ -281,11 +240,6 @@
 	}
 	.doaj-fields dt { font-weight: 600; color: var(--muted); font-size: var(--fs-sm); }
 	.doaj-fields dd { margin: 0; font-size: var(--fs-md); }
-	.toggle-raw {
-		background: none; border: none; color: var(--accent);
-		font-size: var(--fs-sm); cursor: pointer; padding: 4px 0;
-	}
-	.toggle-raw:hover { text-decoration: underline; }
 	.raw-payload {
 		background: var(--surface); padding: 12px; border-radius: var(--radius);
 		font-size: var(--fs-sm); max-height: 400px; overflow: auto;

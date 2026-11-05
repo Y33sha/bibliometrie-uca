@@ -1,6 +1,6 @@
 """Client Unpaywall : statut open access d'un DOI.
 
-L'API (`https://api.unpaywall.org/v2/{doi}?email=…`) accepte 100 000 requêtes par jour, et recommande une dizaine par seconde. Les requêtes passent par `lookup_json_async`, avec nouvelles tentatives et backoff, sur un client partagé par toute la boucle d'enrichissement.
+L'API (`https://api.unpaywall.org/v2/{doi}?email=…`) accepte 100 000 requêtes par jour. Les requêtes passent par `lookup_json_async`, avec nouvelles tentatives et backoff, sur un client partagé par toute la boucle d'enrichissement.
 """
 
 from __future__ import annotations

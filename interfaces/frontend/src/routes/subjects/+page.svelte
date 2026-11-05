@@ -113,7 +113,4 @@
 </ListStatus>
 
 <style>
-  .muted {
-    color: var(--muted);
-  }
 </style>

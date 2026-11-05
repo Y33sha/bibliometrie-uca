@@ -6,6 +6,7 @@ from sqlalchemy import text
 
 from infrastructure.db.queues import Queue
 from infrastructure.repositories import person_repository
+from pipeline.transformation.persons import contribution_resolution
 from pipeline.transformation.persons.contribution_resolution import resolve_contributions
 from tests.integration.helpers.alignment import (
     align_source_contributions,
@@ -559,3 +560,50 @@ class TestResolutionQueue:
         resolve_contributions(conn, logging.getLogger("test"))
 
         assert _person(conn, contribution) == (person, "manual")
+
+
+class TestRebuild:
+    """`--rebuild-persons` redécide toutes les contributions rattachées hors épinglage."""
+
+    def test_un_rattachement_par_le_nom_a_une_personne_rejetee_est_retire(self, sa_sync_conn):
+        conn = sa_sync_conn
+        person = person_repository(conn).create("Rouquette", "Sébastien")
+        publication = insert_publication(conn)
+        contribution = _contribution(
+            conn, publication, [("hal", "Sébastien Rouquette", None, True)]
+        )
+        _attach(conn, contribution, person, "name")
+        insert_rejected_contribution(conn, publication, person_id=person, ignore_conflict=True)
+
+        resolve_contributions(conn, logging.getLogger("test"))
+        assert _person(conn, contribution) == (person, "name")
+
+        resolve_contributions(conn, logging.getLogger("test"), rebuild=True)
+        assert _person(conn, contribution) == (None, None)
+
+    def test_un_rattachement_manuel_reste(self, sa_sync_conn):
+        conn = sa_sync_conn
+        person = insert_person(conn, "Martin", first_name="Jean")
+        contribution = _contribution(
+            conn, insert_publication(conn), [("hal", "Claire Durand", None, False)]
+        )
+        _attach(conn, contribution, person, "manual")
+
+        resolve_contributions(conn, logging.getLogger("test"), rebuild=True)
+
+        assert _person(conn, contribution) == (person, "manual")
+
+
+def test_les_lots_de_publications_partagent_les_personnes_creees(sa_sync_conn, monkeypatch):
+    """Une publication par lot : le même nom inconnu, dans deux publications, fonde une seule personne."""
+    monkeypatch.setattr(contribution_resolution, "_BATCH_PUBLICATIONS", 1)
+    conn = sa_sync_conn
+    first = _contribution(conn, insert_publication(conn), [("hal", "Claire Durand", None, True)])
+    second = _contribution(
+        conn, insert_publication(conn), [("openalex", "Claire Durand", None, True)]
+    )
+
+    counts = resolve_contributions(conn, logging.getLogger("test"))
+
+    assert counts["created"] == 1
+    assert _person(conn, first)[0] == _person(conn, second)[0] is not None

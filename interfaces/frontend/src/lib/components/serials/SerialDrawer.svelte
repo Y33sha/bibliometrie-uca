@@ -255,14 +255,11 @@
           {/snippet}
         </Picker>
       {:else}
-        <button class="btn-merge-inline" onclick={openMerge}>Fusionner…</button>
+        <button class="btn btn-sm btn-dashed" onclick={openMerge}>Fusionner…</button>
       {/if}
     </section>
   {/if}
 </Drawer>
 
 <style>
-  .muted {
-    color: var(--muted);
-  }
 </style>

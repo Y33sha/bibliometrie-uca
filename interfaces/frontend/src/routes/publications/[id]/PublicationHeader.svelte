@@ -68,7 +68,7 @@
       {#if pub.publisher_name}
         <!-- Le tiret passe à la ligne avec l'éditeur. -->
         <span class="publisher">
-          <span class="publisher-sep">—</span>
+          <span class="muted-small">—</span>
           {#if pub.publisher_id}
             <a href={resolve(`publishers/${pub.publisher_id}`)} class="publisher-name">{pub.publisher_name}</a>
           {:else}
@@ -107,7 +107,7 @@
         </a>
       {/each}
       {#if sortedRelations.length > RELATION_CAP}
-        <button type="button" class="rel-toggle" onclick={() => (showAllRelations = !showAllRelations)}>
+        <button type="button" class="btn-text rel-toggle" onclick={() => (showAllRelations = !showAllRelations)}>
           {showAllRelations
             ? "Afficher moins"
             : `Afficher les ${sortedRelations.length - RELATION_CAP} autres`}
@@ -207,17 +207,6 @@
   .rel-toggle {
     align-self: flex-start;
     margin-top: 2px;
-    padding: 4px 6px;
-    background: none;
-    border: none;
-    color: var(--muted);
-    font-size: var(--fs-sm);
-    font-weight: 600;
-    cursor: pointer;
-  }
-  .rel-toggle:hover {
-    color: var(--text);
-    text-decoration: underline;
   }
   /* Niveaux : la couleur porte sur le filet, l'icône et le libellé ; le titre reste lisible. */
   .tier-danger {
@@ -294,9 +283,5 @@
     display: inline-flex;
     gap: 10px;
     align-items: center;
-  }
-  .publisher-sep {
-    font-size: var(--fs-sm);
-    color: var(--muted);
   }
 </style>

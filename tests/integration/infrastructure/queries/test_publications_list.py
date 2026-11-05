@@ -873,6 +873,31 @@ class TestCitationTop:
         assert "Top 10 %" in csv
 
 
+def test_l_export_donne_les_citations_et_le_fwci_de_publications_impact(sa_sync_conn):
+    lab = _lab(sa_sync_conn)
+    cited = insert_publication(sa_sync_conn, "Cited", in_perimeter=True)
+    unknown = insert_publication(sa_sync_conn, "Unknown", in_perimeter=True)
+    sa_sync_conn.execute(
+        text(
+            """UPDATE publications SET impact = '{"cited_by_count": 12, "fwci": 1.236}'::jsonb WHERE id = :id"""
+        ),
+        {"id": cited},
+    )
+    for publication in (cited, unknown):
+        _attach(sa_sync_conn, publication, lab)
+
+    csv = "".join(
+        publications_queries(sa_sync_conn).export_publications_csv(
+            filters=PublicationFilters(lab_ids=[lab]),
+            sort="year_desc",
+            columns=["citations", "fwci"],
+        )
+    )
+
+    rows = {line.split(",")[0]: line.split(",")[1:3] for line in csv.splitlines()[1:]}
+    assert rows == {"Cited": ["12", "1.24"], "Unknown": ["", ""]}
+
+
 def test_le_lien_d_acces_suit_la_meilleure_copie_et_le_statut(sa_sync_conn):
     lab = _lab(sa_sync_conn)
     deposited = insert_publication(sa_sync_conn, "Deposited", oa_status="green")

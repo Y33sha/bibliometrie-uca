@@ -74,7 +74,7 @@
   </div>
   <div class="col-detail">
     {#if runLoading}
-      <p class="empty">Chargement…</p>
+      <p class="loading">Chargement…</p>
     {:else if !runDetail}
       <p class="empty">Sélectionner un run dans la liste.</p>
     {:else}
@@ -111,9 +111,5 @@
       position: static;
       max-height: 40vh;
     }
-  }
-  .empty {
-    color: var(--muted);
-    font-size: var(--fs-md);
   }
 </style>

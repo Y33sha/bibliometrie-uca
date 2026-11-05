@@ -4,7 +4,7 @@
   import { withBase } from "#lib/paths.js";
   import PageHeader from "#lib/components/PageHeader.svelte";
   import { resolve } from "$app/paths";
-  import { replaceQuery } from "#lib/url.js";
+  import { useUrlFilters } from "#lib/composables/useUrlFilters.svelte.js";
   import { page } from "$app/state";
   import { onMount } from "svelte";
   import { usePaginatedFetch } from "#lib/composables/usePaginatedFetch.svelte.js";
@@ -23,15 +23,18 @@
     buildParams: () => new URLSearchParams(),
   });
 
+  const url = useUrlFilters({
+    basePath: "/hal-problems/duplicate-accounts",
+    filters: { page: { type: "page", urlKey: "page" } },
+  });
+
   function syncUrl() {
-    const p = new URLSearchParams();
-    if (list.page > 1) p.set("page", String(list.page));
-    void replaceQuery(resolve('hal-problems/duplicate-accounts'), p);
+    url.syncUrl(() => ({ page: list.page }));
   }
 
   onMount(() => {
-    const urlParams = new URLSearchParams(page.url.search);
-    if (urlParams.get("page")) list.page = parseInt(urlParams.get("page")!) || 1;
+    const restored = url.restoreFromUrl(page.url.searchParams);
+    if (restored.page) list.page = restored.page as number;
     list.load();
   });
 </script>
@@ -70,13 +73,13 @@
                 <span class="hal-name">{ha.full_name}</span>
                 <span class="tag">{formatCount(ha.publication_count, "publication")}</span>
                 {#if ha.idhal}
-                  <span class="hal-secondary-id">idHAL: {ha.idhal}</span>
+                  <span class="muted-small">idHAL: {ha.idhal}</span>
                 {/if}
                 {#if ha.orcid}
-                  <span class="hal-secondary-id">ORCID: {ha.orcid}</span>
+                  <span class="muted-small">ORCID: {ha.orcid}</span>
                 {/if}
                 {#if ha.idref}
-                  <span class="hal-secondary-id">IdRef: {ha.idref}</span>
+                  <span class="muted-small">IdRef: {ha.idref}</span>
                 {/if}
               </div>
             {/each}
@@ -115,9 +118,5 @@
   }
   .hal-name {
     font-weight: 500;
-  }
-  .hal-secondary-id {
-    font-size: var(--fs-sm);
-    color: var(--muted);
   }
 </style>

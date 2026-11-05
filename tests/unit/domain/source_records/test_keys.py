@@ -137,6 +137,21 @@ class TestIdentifiers:
         ]
         assert _keys(identifiers).single_valued["hal_id"] == "hal-00000001"
 
+    def test_every_patent_number_is_a_key(self):
+        """Chaque numéro de publication ou de demande actif, de rôle autre que `related`, est une clé, sous le jeton de son type."""
+        identifiers = [
+            SourceIdentifier(T.PATENT_PUBLICATION_NUMBER, "FR3053353", R.SECONDARY),
+            SourceIdentifier(T.PATENT_PUBLICATION_NUMBER, "WO2018002556", R.SECONDARY),
+            SourceIdentifier(T.PATENT_PUBLICATION_NUMBER, "EP1", R.RELATED),
+            SourceIdentifier(T.PATENT_PUBLICATION_NUMBER, "EP2", R.SECONDARY, "REGLE"),
+            SourceIdentifier(T.PATENT_APPLICATION_NUMBER, "WO2018002556", R.SECONDARY),
+        ]
+        assert _keys(identifiers).tokens() == {
+            ("patent_publication_number", "FR3053353"),
+            ("patent_publication_number", "WO2018002556"),
+            ("patent_application_number", "WO2018002556"),
+        }
+
 
 class TestMetadataBlock:
     LONG = "une communication scientifique au titre assez long"  # > 30 caractères
