@@ -32,7 +32,7 @@
   {#snippet pairHeader(pair: Pair)}
     <div class="shared-row">
       {#each pair.shared_identifiers as s (s.id_type + s.id_value)}
-        <span class="ident-chip"><span class="it">{identifierTypeLabel(s.id_type)}</span>{s.id_value}</span>
+        <span class="tag id-badge"><span class="id-type">{identifierTypeLabel(s.id_type)}</span>{s.id_value}</span>
       {/each}
     </div>
   {/snippet}
@@ -45,18 +45,8 @@
     gap: 6px;
     margin-bottom: 8px;
   }
-  .ident-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    font-size: var(--fs-sm);
-    background: var(--accent-light);
-    border: 1px solid color-mix(in srgb, var(--accent) 25%, white);
-    border-radius: var(--radius);
-    padding: 1px 7px;
-    font-family: var(--mono);
-  }
-  .ident-chip .it {
+  .id-type {
+    margin-right: 5px;
     text-transform: uppercase;
     font-size: var(--fs-xs);
     font-weight: 700;

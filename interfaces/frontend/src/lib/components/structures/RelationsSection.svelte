@@ -1,6 +1,7 @@
 <script lang="ts">
   import Picker from "#lib/components/Picker.svelte";
   import { structureLabel } from "#lib/structureLabels.js";
+  import StructureTypeTag from "./StructureTypeTag.svelte";
   import type { RelatedStructure, Structure } from "./types";
 
   let {
@@ -49,7 +50,7 @@
       <span class="none-text">{emptyText}</span>
     {:else}
       {#each related as r (r.tutelle_id)}
-        <span class="tag">
+        <span class="tag tag-pill tag-accent tag-removable relation-tag">
           <button class="tag-name" onclick={() => onselect(r.id)}>{structureLabel(r)}</button>
           <button
             class="remove"
@@ -71,7 +72,7 @@
         placeholder="Rechercher une structure"
       >
         {#snippet item(rs)}
-          <span class="structure-type structure-type-{rs.type}" style="font-size: var(--fs-sm);padding:0 5px">{rs.type}</span>
+          <StructureTypeTag type={rs.type} />
           {rs.acronym ? rs.acronym + " — " : ""}{rs.name}
         {/snippet}
       </Picker>
@@ -99,17 +100,10 @@
     align-items: center;
     gap: 8px;
   }
-  .tag {
-    display: inline-flex;
-    align-items: center;
-    gap: 2px;
+  .relation-tag {
     padding: 2px 3px 2px 10px;
-    border-radius: var(--radius-pill);
-    background: var(--accent-light);
-    color: var(--accent);
-    font-weight: 500;
   }
-  .tag .tag-name {
+  .relation-tag .tag-name {
     padding: 0;
     border: none;
     background: none;
@@ -117,11 +111,11 @@
     color: inherit;
     cursor: pointer;
   }
-  .tag .tag-name:hover {
+  .relation-tag .tag-name:hover {
     text-decoration: underline;
   }
   /* Croix grise, rouge au survol. */
-  .tag .remove {
+  .relation-tag .remove {
     width: 20px;
     height: 20px;
     padding: 0;
@@ -133,7 +127,7 @@
     color: var(--muted);
     cursor: pointer;
   }
-  .tag .remove:hover {
+  .relation-tag .remove:hover {
     background: var(--danger-light);
     color: var(--danger);
   }

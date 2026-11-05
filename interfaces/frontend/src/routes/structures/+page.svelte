@@ -25,6 +25,7 @@
 	import { useDrawerParam } from '#lib/composables/useDrawerParam.svelte.js';
 	import StructureDrawer from '#lib/components/structures/StructureDrawer.svelte';
 	import StructureFormModal from '#lib/components/structures/StructureFormModal.svelte';
+	import StructureTypeTag from '#lib/components/structures/StructureTypeTag.svelte';
 	import { API_SOURCES, ROR_FORMAT_ERROR, buildApiIds, normalizeRorId } from '#lib/components/structures/types.js';
 
 	import type { components } from '#lib/api/schema.js';
@@ -259,7 +260,7 @@
 					</td>
 				{/if}
 				{#if showTypeColumn}
-					<td><span class="structure-type structure-type-{s.type}">{s.type}</span></td>
+					<td><StructureTypeTag type={s.type} /></td>
 				{/if}
 				<td class="acronym-cell">
 					{#if s.acronym}<a href={resolve(`structures/${s.id}`)} class="entity-link">{s.acronym}</a>{/if}
@@ -270,20 +271,20 @@
 				<td class="tutelles-col">
 					<div class="tutelles">
 						{#each s.tutelles || [] as t (t.id)}
-							<span class="tutelle-tag">{structureLabel(t)}</span>
+							<span class="tag">{structureLabel(t)}</span>
 						{/each}
 					</div>
 				</td>
 				<td>
 					{#if s.ror_id}
-						<a href={rorFullUrl(s.ror_id)} target="_blank" rel="noopener" class="id-badge">
+						<a href={rorFullUrl(s.ror_id)} target="_blank" rel="noopener" class="tag id-badge">
 							{rorShortId(s.ror_id)}
 						</a>
 					{/if}
 				</td>
 				<td>
 					{#if s.hal_collection}
-						<a href="https://hal.science/{s.hal_collection}" target="_blank" rel="noopener" class="id-badge">
+						<a href="https://hal.science/{s.hal_collection}" target="_blank" rel="noopener" class="tag id-badge">
 							{s.hal_collection}
 						</a>
 					{/if}

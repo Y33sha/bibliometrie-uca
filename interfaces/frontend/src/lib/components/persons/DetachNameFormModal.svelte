@@ -44,7 +44,7 @@
                   {#if op.current_unit}<span class="other-person-dept"
                       >({op.current_unit})</span
                     >{/if}
-                  {#if op.has_rh}<span class="tag tag-rh">RH</span>{/if}
+                  {#if op.has_rh}<span class="tag tag-pill tag-accent">RH</span>{/if}
                 </span>
                 {#if !op.has_rh}
                   <button class="btn btn-sm btn-merge-modal" onclick={() => onmerge(op.person_id)}>
@@ -83,7 +83,7 @@
               ><PublicationTitle titre={p.title} /></a>
               <span class="detach-sources">
                 {#each p.sources as source}
-                  <span class="tag tag-source">{sourceLabel(source)}</span>
+                  <span class="tag tag-pill">{sourceLabel(source)}</span>
                 {/each}
               </span>
             </div>
@@ -186,25 +186,12 @@
   }
   .btn-merge-modal {
     background: var(--accent);
-    color: white;
+    color: var(--text-inverse);
     border: none;
     border-radius: var(--radius);
     cursor: pointer;
   }
   .btn-merge-modal:hover {
     background: color-mix(in srgb, var(--accent), black 20%);
-  }
-  .tag {
-    display: inline-block;
-    font-size: var(--fs-sm);
-    padding: 1px 7px;
-    border-radius: var(--radius-pill);
-    font-weight: 500;
-    margin: 1px 2px;
-  }
-  .tag-source {
-    background: var(--surface);
-    color: var(--muted);
-    font-size: var(--fs-sm);
   }
 </style>

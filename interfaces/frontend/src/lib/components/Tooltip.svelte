@@ -66,7 +66,7 @@
 		position: fixed;
 		transform: translateY(calc(-100% - 8px));
 		background: var(--tooltip-bg);
-		color: white;
+		color: var(--text-inverse);
 		font-size: var(--fs-sm);
 		line-height: 1.4;
 		/* Typographie propre : l'infobulle n'hérite pas de son contexte (en-tête de colonne en capitales, gras…). */
@@ -81,7 +81,7 @@
 		word-wrap: break-word;
 		z-index: 9999;
 		pointer-events: none;
-		box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+		box-shadow: var(--shadow-sm);
 	}
 	.tooltip-box::after {
 		content: '';

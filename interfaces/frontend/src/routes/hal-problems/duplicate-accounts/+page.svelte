@@ -64,11 +64,11 @@
             <div class="hal-accounts">
             {#each p.hal_accounts as ha}
               <div class="hal-account">
-                <a href={halPersonUrl(ha.hal_person_id)} target="_blank" rel="noopener" class="id-badge">
+                <a href={halPersonUrl(ha.hal_person_id)} target="_blank" rel="noopener" class="tag id-badge">
                   {ha.hal_person_id}
                 </a>
                 <span class="hal-name">{ha.full_name}</span>
-                <span class="hal-publications">{formatCount(ha.publication_count, "publication")}</span>
+                <span class="tag">{formatCount(ha.publication_count, "publication")}</span>
                 {#if ha.idhal}
                   <span class="hal-secondary-id">idHAL: {ha.idhal}</span>
                 {/if}
@@ -115,13 +115,6 @@
   }
   .hal-name {
     font-weight: 500;
-  }
-  .hal-publications {
-    font-size: var(--fs-sm);
-    color: var(--muted);
-    background: var(--border-subtle);
-    padding: 1px 6px;
-    border-radius: var(--radius);
   }
   .hal-secondary-id {
     font-size: var(--fs-sm);

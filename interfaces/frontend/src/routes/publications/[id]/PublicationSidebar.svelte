@@ -171,7 +171,7 @@
     border-bottom: 1px solid color-mix(in srgb, var(--accent) 15%, white);
     font-size: var(--fs-xs);
     font-weight: 700;
-    letter-spacing: 0.08em;
+    letter-spacing: var(--tracking-caps);
     text-transform: uppercase;
     color: var(--text-secondary);
   }
@@ -189,7 +189,7 @@
     text-decoration: none;
   }
   .source-row:hover {
-    background: color-mix(in srgb, var(--accent-light) 60%, white);
+    background: var(--card);
     text-decoration: none;
   }
   /* La pastille garde sa largeur, icône ou non : les libellés restent alignés. */

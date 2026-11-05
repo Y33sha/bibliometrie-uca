@@ -81,6 +81,7 @@ Une étiquette (tag, badge, pastille, chip) est un court texte sur fond clair, a
 ## Décisions
 
 - Le code mort et les déclarations redondantes sont supprimés.
+- Étiquettes : une seule classe, teintée par la propriété `--tag-color`. Le fond, le texte et le survol en dérivent en OKLCH relatif, à luminosité fixe. Les couleurs des graphiques restent inchangées.
 
 ## Phasage
 
@@ -91,20 +92,19 @@ Une étiquette (tag, badge, pastille, chip) est un court texte sur fond clair, a
 
 ### Phase 2 — Variables
 
-- [ ] Ombres, fond d'overlay, anneau de focus, texte sur accent, espacements de lettres
-- [ ] Teintes de survol en deux formules
-- [ ] Étiquettes OA et couleurs en dur de `shared.css` sur les variables
+- [x] Ombres, fond d'overlay, anneau de focus, texte sur accent, espacements de lettres (1daca0c32)
+- [x] Teintes de survol en deux formules (373241bc7)
 
 ### Phase 3 — Étiquettes
 
-- [ ] Classe d'étiquette à variantes de teinte, de taille et de forme (question 1)
-- [ ] Étiquettes partagées et locales sur cette classe
+- [x] Classe d'étiquette à variantes de teinte, de taille et de forme ; couleurs des étiquettes en variables (97b683111)
+- [x] Étiquettes partagées et locales sur cette classe
 - [ ] Icône ronde unique pour les identifiants et les sources
 
 ### Phase 4 — Boutons et contrôles
 
 - [ ] Boutons sans bordure, pleins, à contour et en pointillés ; un seul état désactivé
-- [ ] Boutons locaux sur les classes partagées ; retrait « × » sur `IconButton`
+- [ ] Boutons locaux sur les classes partagées, dont `AccessButton` et sa variante compacte ; retrait « × » sur `IconButton`
 - [ ] Champs, menus déroulants, panneaux flottants et lignes d'options
 
 ### Phase 5 — Utilitaires
@@ -116,8 +116,8 @@ Une étiquette (tag, badge, pastille, chip) est un court texte sur fond clair, a
 
 ### Phase 6 — Composants
 
-- [ ] Vues de liste sur une base commune (question 2)
-- [ ] Volets sur une base commune (question 3)
+- [ ] Vues de liste sur une base commune (question 1)
+- [ ] Volets sur une base commune (question 2)
 - [ ] Listes de tri sur leurs composants génériques ; pages Problèmes HAL et d'administration sur `useUrlFilters`
 - [ ] Pages d'entité : en-tête, onglet actif, carte des sujets
 - [ ] Balisages recopiés en composants : pastille DOAJ, liens d'éditeur et de revue, nom de personne, en-tête triable
@@ -127,11 +127,10 @@ Une étiquette (tag, badge, pastille, chip) est un court texte sur fond clair, a
 - [ ] Dates, nombres, pourcentages et pluriels sur `utils.ts` et `plural.ts`
 - [ ] Énumérations chargées une fois ; signalement d'erreur unique
 - [ ] Libellés sur `labels.ts` ; un nom par section
-- [ ] Un mécanisme d'icônes (question 4)
+- [ ] Un mécanisme d'icônes (question 3)
 
 ## Questions ouvertes
 
-1. Étiquettes : une classe à modificateurs (`tag tag-accent tag-sm`), ou une classe dont les couleurs viennent d'une propriété personnalisée, comme `type-pill` (`--tag-color`).
-2. Vues de liste : toutes sur `filterRegistry`, ou un composable de liste qui l'englobe.
-3. Volets : un composant de base (en-tête, renommage, fusion), ou des composables partagés.
-4. Icônes : un composant `Icon` en SVG, ou la police Flaticon partout.
+1. Vues de liste : toutes sur `filterRegistry`, ou un composable de liste qui l'englobe.
+2. Volets : un composant de base (en-tête, renommage, fusion), ou des composables partagés.
+3. Icônes : un composant `Icon` en SVG, ou la police Flaticon partout.

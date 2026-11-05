@@ -437,7 +437,7 @@
   }
   .tab-btn.active {
     background: var(--accent);
-    color: white;
+    color: var(--text-inverse);
     border-color: var(--accent);
   }
 
@@ -458,32 +458,10 @@
     font-size: var(--fs-sm);
   }
 
-  /* Structure tags */
-  .struct-tag {
-    display: inline-block;
-    font-size: var(--fs-sm);
-    padding: 1px 7px;
-    border-radius: var(--radius-pill);
-    font-weight: 500;
-    margin: 1px 2px;
-  }
-  .struct-confirmed {
-    background: var(--success-light);
-    color: var(--success);
-  }
-  .struct-detected {
-    background: var(--warning-light);
-    color: var(--warning-text);
-  }
+  /* Structure ajoutée à la main : contour en pointillés. */
   .struct-manual {
-    background: var(--accent-light);
-    color: var(--accent);
-    border: 1px dashed color-mix(in srgb, var(--accent) 40%, white);
-  }
-  .struct-rejected {
-    background: var(--surface);
-    color: var(--muted);
-    text-decoration: line-through;
+    outline: 1px dashed color-mix(in srgb, var(--accent) 40%, white);
+    outline-offset: -1px;
   }
 
   /* Form info (FP tab) */
@@ -538,7 +516,7 @@
     background: var(--card);
     border: 1px solid var(--accent);
     border-radius: var(--radius);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+    box-shadow: var(--shadow-md);
     width: 320px;
   }
   .ctx-picker-inline input {

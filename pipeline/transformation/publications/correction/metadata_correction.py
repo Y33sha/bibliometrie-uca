@@ -3,7 +3,7 @@
 Tâches (`pipeline.graph`), dans l'ordre du graphe :
 
 - **serial_by_doi** rattache la revue manquante désignée par l'espace de noms du DOI. Elle passe en premier : la correction unaire lit le type de la revue rattachée, et requalifie l'enregistrement source au même run.
-- **unary** applique à chaque enregistrement source les règles de correction (`correct_source_record`), et retire les dépôts HAL introuvables.
+- **unary** applique à chaque enregistrement source les règles de correction (`correct_source_record`), et retire les identifiants et les liens des dépôts HAL introuvables.
 - **doi_targets** donne une cible au DOI des formes secondaires DataCite d'une œuvre présente en base.
 - **remove_identifiers** retire le DOI partagé par des œuvres distinctes (ouvrage et chapitre, volume d'actes et communication, enregistrement source d'une autre œuvre), et le DOI inconnu de doi.org.
 - **matchable** écarte de la réconciliation des enregistrements sources (`is_matchable`), d'après les valeurs corrigées.
@@ -87,7 +87,7 @@ TASKS = (
             "source_record_locations",
             "source_record_keys_queue",
         ),
-        # Les référentiels vides, supprimés plus loin, ne sont référencés par aucun enregistrement source : la correction ne les atteint pas.
+        # Revues, monographies et éditeurs vides, supprimés par `finalize`.
         previous_run=(
             "source_records",
             "source_record_identifiers.removed_by",
@@ -102,22 +102,24 @@ TASKS = (
     ),
     Task(
         "doi_targets",
-        reads=tuple(
-            f"source_records.{column}"
-            for column in (
-                "id",
-                "source",
-                "doc_type",
-                "title_normalized",
-                "publication_year",
-                "corrections",
-                "source_extras",
-            )
-        )
-        # DOI présents en base.
-        + ("source_record_identifiers",)
-        # DOI inconnus de doi.org.
-        + ("failed_lookups",),
+        reads=(
+            *(
+                f"source_records.{column}"
+                for column in (
+                    "id",
+                    "source",
+                    "doc_type",
+                    "title_normalized",
+                    "publication_year",
+                    "corrections",
+                    "source_extras",
+                )
+            ),
+            # DOI présents en base.
+            "source_record_identifiers",
+            # DOI inconnus de doi.org.
+            "failed_lookups",
+        ),
         writes=("doi_targets", "source_record_keys_queue"),
         previous_run=("source_records", "source_record_identifiers.removed_by", "doi_targets"),
         section="Cibles des DOI de formes secondaires",
@@ -125,22 +127,23 @@ TASKS = (
     ),
     Task(
         "remove_identifiers",
-        reads=tuple(
-            f"source_records.{column}"
-            for column in (
-                "id",
-                "source",
-                "doc_type",
-                "title_normalized",
-                "corrections",
-                "source_id",
-            )
-        )
-        + ("source_record_identifiers", "doi_targets")
-        # DOI inconnus de doi.org.
-        + ("failed_lookups",)
-        # Noms des auteurs d'un dépôt HAL et de l'enregistrement source Crossref de son DOI.
-        + (
+        reads=(
+            *(
+                f"source_records.{column}"
+                for column in (
+                    "id",
+                    "source",
+                    "doc_type",
+                    "title_normalized",
+                    "corrections",
+                    "source_id",
+                )
+            ),
+            "source_record_identifiers",
+            "doi_targets",
+            # DOI inconnus de doi.org.
+            "failed_lookups",
+            # Noms des auteurs d'un dépôt HAL et de l'enregistrement source Crossref de son DOI.
             "source_contributions.source_record_id",
             "source_contributions.contributor_information_id",
             "source_contributions.collective",

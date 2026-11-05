@@ -2,6 +2,7 @@
   import HelpTip from "#lib/components/HelpTip.svelte";
   import IconButton from "#lib/components/IconButton.svelte";
   import Picker from "#lib/components/Picker.svelte";
+  import StructureTypeTag from "./StructureTypeTag.svelte";
   import type { NameForm, Structure } from "./types";
   import { SHORT_FORM_MAX_LENGTH } from "./types";
 
@@ -60,7 +61,7 @@
 <h3 class="section-title">Identification dans les publications</h3>
 
 <h3>
-  Formes de noms <span class="count-pill">{forms.length}</span>
+  Formes de noms <span class="tag tag-pill">{forms.length}</span>
   <button
     class="btn-help-icon"
     onclick={() => {
@@ -109,14 +110,14 @@
       {#each forms as f (f.id)}
         <tr class:excluding={f.is_excluding}>
           <td class="col-badge">
-            {#if f.is_excluding}<span class="match-badge excluding" title="Excluante"
+            {#if f.is_excluding}<span class="tag tag-attention tag-filled" title="Excluante"
                 >excluante</span
               >
             {:else if f.is_word_boundary || f.form_text.length <= SHORT_FORM_MAX_LENGTH}<span
-                class="match-badge word"
+                class="tag tag-success"
                 title="Mot entier">mot entier</span
               >
-            {:else}<span class="match-badge substr" title="Sous-chaîne">sous-chaîne</span>
+            {:else}<span class="tag" title="Sous-chaîne">sous-chaîne</span>
             {/if}
           </td>
           <td class="form-text">{f.form_text}</td>
@@ -125,7 +126,7 @@
               <span class="none-label">—</span>
             {:else if f.requires_context_of?.length}
               {#each f.requires_context_of as x}
-                <span class="ctx-tag">
+                <span class="tag tag-warning tag-removable">
                   {ctxLabel(x)}
                   <button class="ctx-remove" onclick={() => onremoveCtx(f.id, x)} title="Retirer ce contexte" aria-label="Retirer ce contexte">×</button>
                 </span>
@@ -182,7 +183,7 @@
   <div class="new-form-ctx">
     <span class="ctx-label-text">Contexte :</span>
     {#each newFormCtx as x}
-      <span class="ctx-tag">
+      <span class="tag tag-warning tag-removable">
         {ctxLabel(x)}
         <button class="ctx-remove" onclick={() => onremoveNewCtx(x)} title="Retirer ce contexte" aria-label="Retirer ce contexte">×</button>
       </span>
@@ -210,7 +211,7 @@
         </div>
       {/snippet}
       {#snippet item(cs)}
-        <span class="structure-type structure-type-{cs.type}" style="font-size: var(--fs-sm);padding:0 5px">{cs.type}</span>
+        <StructureTypeTag type={cs.type} />
         {cs.acronym ? cs.acronym + " — " : ""}{cs.name}
       {/snippet}
     </Picker>
@@ -227,13 +228,6 @@
     margin: 16px 0 8px;
     font-size: var(--fs-md);
     font-weight: 600;
-  }
-  .count-pill {
-    padding: 1px 8px;
-    border-radius: var(--radius-pill);
-    background: var(--surface);
-    font-size: var(--fs-sm);
-    color: var(--text-secondary);
   }
   .btn-help-icon {
     background: none;
@@ -259,7 +253,7 @@
     background: var(--attention-light);
   }
   .forms-table tr.excluding:hover td {
-    background: color-mix(in srgb, var(--attention-light), var(--attention) 6%);
+    background: color-mix(in srgb, var(--attention) 20%, white);
   }
   .form-text {
     font-family: var(--mono);
@@ -269,35 +263,6 @@
     width: 1px;
     white-space: nowrap;
     padding-right: 0 !important;
-  }
-  .match-badge {
-    font-size: var(--fs-sm);
-    padding: 1px 5px;
-    border-radius: var(--radius);
-    font-weight: 500;
-    white-space: nowrap;
-  }
-  .match-badge.word {
-    background: var(--success-light);
-    color: var(--success);
-  }
-  .match-badge.substr {
-    background: var(--border-subtle);
-    color: var(--muted);
-  }
-  .match-badge.excluding {
-    background: var(--attention);
-    color: white;
-  }
-  .ctx-tag {
-    font-size: var(--fs-sm);
-    padding: 1px 5px;
-    border-radius: var(--radius);
-    background: var(--warning-light);
-    color: var(--warning-text);
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
   }
   .ctx-remove {
     cursor: pointer;

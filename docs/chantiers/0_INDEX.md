@@ -13,13 +13,13 @@
 - [Duplications du frontend](UI_duplications-du-frontend.md)
 - [Fiabilité de l'alignement des auteurs](DATA_fiabilite-alignement-auteurs.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
-- [Plan de rattachement des revues](CODE_plan-de-rattachement-des-revues.md)
 - [Résolution probabiliste des personnes](DATA_resolution-personnes-probabiliste.md)
 - [Types de document](DATA_types-document.md)
 - [Vérification des affiliations des sources](DATA_verification-affiliations.md)
 
 ## Chantiers archivés
 
+- 2026-11-05 — [Plan de rattachement des revues](archived/2026-11-05_CODE_plan-de-rattachement-des-revues.md)
 - 2026-11-04 — [Listes de revues](archived/2026-11-04_DATA_listes-de-revues.md)
 - 2026-11-04 — [Adaptateurs de source](archived/2026-11-04_CODE_adaptateurs-de-source.md)
 - 2026-11-03 — [Exécution du graphe des tâches](archived/2026-11-03_CODE_execution-du-graphe-des-taches.md)

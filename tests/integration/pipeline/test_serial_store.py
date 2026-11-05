@@ -26,10 +26,6 @@ class TestSerialStore:
         )
         assert tuple(row) == ("REVUE & SOCIÉTÉ", normalize_text("REVUE & SOCIÉTÉ"))
 
-    def test_revue_sans_issn_d_un_titre(self, sa_sync_conn, gateway):
-        serial_id = gateway.serial_for_title("REVUE & SOCIÉTÉ")
-        assert gateway.serial_for_title("Revue & Société") == serial_id
-
     def test_revue_sans_issn_d_un_titre_et_d_un_editeur(self, sa_sync_conn, gateway):
         elsevier = insert_publisher(sa_sync_conn, "Elsevier")
         serial_id = gateway.serial_for_title_and_publisher("REVUE & SOCIÉTÉ", elsevier)
@@ -44,4 +40,4 @@ class TestSerialStore:
             text("INSERT INTO serial_issns (issn, serial_id) VALUES ('0028-0836', :id)"),
             {"id": with_issn},
         )
-        assert gateway.serial_for_title("Nature") != with_issn
+        assert gateway.serial_for_title_and_publisher("Nature", None) != with_issn

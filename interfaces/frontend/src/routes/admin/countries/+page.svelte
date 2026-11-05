@@ -243,14 +243,14 @@
 						<div class="country-cell">
 						{#each a.countries ?? [] as c}
 							{@const found = a.found_countries.find(f => f.country_code === c)}
-							<span class="country-tag" title={found ? `Trouvé par : ${methodsLabel(found.methods)}` : undefined}>
+							<span class="tag tag-success tag-removable" title={found ? `Trouvé par : ${methodsLabel(found.methods)}` : undefined}>
 								{countryLabel(c)}
 								<button class="tag-remove" aria-label="Retirer {countryLabel(c)}" title="Retirer {countryLabel(c)}" onclick={() => removeCountry(a.id, c)}>×</button>
 							</span>
 						{/each}
 						<span class="country-actions">
 							{#each a.found_countries.filter(f => !a.countries?.includes(f.country_code)) as p}
-								<button class="proposal-tag" title="Ajouter ce pays" onclick={() => addCountry(a.id, p.country_code)}>
+								<button class="tag tag-warning proposal-tag" title="Ajouter ce pays" onclick={() => addCountry(a.id, p.country_code)}>
 									{countryLabel(p.country_code)} ?
 									<span class="proposal-methods">{methodsLabel(p.methods)}</span>
 								</button>
@@ -283,13 +283,8 @@
 		background: var(--accent-light); border-radius: var(--radius); font-size: var(--fs-md);
 	}
 	.batch-result { font-size: var(--fs-sm); color: var(--success); font-weight: 500; }
-	.proposal-tag {
-		display: inline-flex; align-items: center; gap: 4px;
-		padding: 2px 8px; background: var(--warning-light); color: var(--warning-text);
-		border: 1px dashed var(--warning); border-radius: var(--radius); cursor: pointer;
-		font-size: var(--fs-sm); font-weight: 500; white-space: nowrap;
-	}
-	.proposal-tag:hover { background: color-mix(in srgb, var(--warning) 25%, white); }
+	/* Pays proposé par la détection : contour en pointillés. */
+	.proposal-tag { outline: 1px dashed var(--warning); outline-offset: -1px; }
 	.proposal-methods { font-weight: 400; opacity: 0.8; }
 	.addr-table { table-layout: fixed; min-width: 640px; }
 	.addr-table td { font-size: var(--fs-md); vertical-align: middle; }
@@ -297,11 +292,6 @@
 	.num-cell { text-align: center; color: var(--muted); font-size: var(--fs-sm); }
 	.country-cell { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
 	.country-actions { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; justify-content: flex-end; margin-left: auto; }
-	.country-tag {
-		display: inline-flex; align-items: center; gap: 2px;
-		padding: 2px 6px; background: var(--success-light);
-		border-radius: var(--radius); font-size: var(--fs-sm); color: var(--success); white-space: nowrap;
-	}
 	.tag-remove {
 		background: none; border: none; cursor: pointer;
 		color: var(--muted); font-size: var(--fs-sm); padding: 0 1px; line-height: 1;

@@ -5,4 +5,4 @@
 	let { issn }: { issn: string } = $props();
 </script>
 
-<a class="id-badge" href={issnPortalUrl(issn)} target="_blank" rel="noopener" title="Portail ISSN (nouvel onglet)">{issn}</a>
+<a class="tag id-badge" href={issnPortalUrl(issn)} target="_blank" rel="noopener" title="Portail ISSN (nouvel onglet)">{issn}</a>

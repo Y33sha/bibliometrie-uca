@@ -48,7 +48,7 @@
 		height: 44px;
 		border-radius: var(--radius);
 		background: var(--accent);
-		color: white;
+		color: var(--text-inverse);
 		font-weight: 700;
 		font-size: var(--fs-base);
 		text-decoration: none;

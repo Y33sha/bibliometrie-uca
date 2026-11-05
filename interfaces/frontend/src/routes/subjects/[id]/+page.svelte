@@ -110,7 +110,7 @@
               <ClampedBlock maxHeight="4.5rem" moreLabel={`Voir les ${v.children.length} sous-sujets`}>
                 <div class="detail-tags">
                   {#each v.children as c (c.label_normalized)}
-                    <a href={resolve(`subjects/${c.label_normalized}`)}>{c.label} <span class="muted-num">{c.usage_count.toLocaleString("fr-FR")}</span></a>
+                    <a href={resolve(`subjects/${c.label_normalized}`)} class="tag">{c.label} <span class="muted-num">{c.usage_count.toLocaleString("fr-FR")}</span></a>
                   {/each}
                 </div>
               </ClampedBlock>

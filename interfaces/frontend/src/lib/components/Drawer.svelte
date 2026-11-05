@@ -53,7 +53,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.25);
+    background: var(--overlay);
     border: none;
     padding: 0;
     cursor: pointer;
@@ -65,7 +65,7 @@
     right: 0;
     height: calc(100vh - var(--header-height));
     background: var(--card);
-    box-shadow: -4px 0 16px rgba(0, 0, 0, 0.15);
+    box-shadow: var(--shadow-lg);
     z-index: 91;
     display: flex;
     flex-direction: column;

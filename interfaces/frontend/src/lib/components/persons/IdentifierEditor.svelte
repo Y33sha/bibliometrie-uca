@@ -75,7 +75,7 @@
       </span>
     {/if}
     <span
-      class="status-chip identifier-chip"
+      class="tag status-chip identifier-chip"
       class:confirmed={ident.status === "confirmed" || ident.status === "authenticated"}
       class:rejected={ident.status === "rejected"}
       title={identifierTitle(ident)}
@@ -157,7 +157,6 @@
   }
   .identifier-chip {
     font-family: var(--mono);
-    font-size: var(--fs-sm);
   }
   /* Identifiant authentifié par le chercheur : statut protégé, aucune action — le bouclier remplace les boutons confirmer/rejeter. */
   .authenticated-badge {
@@ -187,7 +186,7 @@
   }
   .btn-link:hover {
     background: var(--success);
-    color: white;
+    color: var(--text-inverse);
   }
   .id-form {
     display: flex;

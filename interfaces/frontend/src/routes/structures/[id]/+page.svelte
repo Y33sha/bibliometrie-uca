@@ -167,13 +167,13 @@
 		<div class="entity-meta">
 			{#if lab.ror_id}
 				<EntityMetaItem label="ROR">
-					<a href={rorFullUrl(lab.ror_id)} target="_blank" rel="noopener" class="id-badge">
+					<a href={rorFullUrl(lab.ror_id)} target="_blank" rel="noopener" class="tag id-badge">
 						{rorShortId(lab.ror_id)}
 					</a>
 				</EntityMetaItem>
 			{/if}
 			{#if lab.rnsr_id}
-				<EntityMetaItem label="RNSR"><span class="id-badge">{lab.rnsr_id}</span></EntityMetaItem>
+				<EntityMetaItem label="RNSR"><span class="tag id-badge">{lab.rnsr_id}</span></EntityMetaItem>
 			{/if}
 			{#if lab.hal_collection}
 				<EntityMetaItem label="HAL">
@@ -181,7 +181,7 @@
 						href="https://hal.science/{lab.hal_collection}"
 						target="_blank"
 						rel="noopener"
-						class="id-badge"
+						class="tag id-badge"
 					>
 						{lab.hal_collection}
 					</a>
@@ -190,7 +190,7 @@
 			{#if tutelles.length}
 				<EntityMetaItem label="Tutelles">
 					{#each tutelles as t (t.id)}
-						<span class="entity-tag entity-tag-accent">{structureLabel(t)}</span>
+						<span class="tag tag-accent">{structureLabel(t)}</span>
 					{/each}
 				</EntityMetaItem>
 			{/if}
@@ -304,9 +304,9 @@
 								<td class="addr-cell">{a.raw_text}</td>
 								<td>
 									{#if a.is_confirmed === true}
-										<span class="status-tag confirmed">Confirmée</span>
+										<span class="tag tag-success">Confirmée</span>
 									{:else}
-										<span class="status-tag pending">En attente</span>
+										<span class="tag">En attente</span>
 									{/if}
 								</td>
 							</tr>
@@ -335,13 +335,4 @@
 
 	/* Addresses tab */
 	.addr-cell { font-size: var(--fs-sm); color: var(--muted); word-break: break-all; }
-	.status-tag {
-		display: inline-block;
-		padding: 2px 7px;
-		border-radius: var(--radius);
-		font-size: var(--fs-sm);
-		font-weight: 500;
-	}
-	.status-tag.confirmed { background: var(--success-light); color: var(--success); }
-	.status-tag.pending { background: var(--border-subtle); color: var(--muted); }
 </style>

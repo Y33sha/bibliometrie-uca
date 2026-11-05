@@ -340,7 +340,7 @@
 						<td>
 							<div class="labs">
 								{#each o.labs as lab (lab.id)}
-									<a href={resolve(`structures/${lab.id}`)} class="lab-tag">{lab.label}</a>
+									<a href={resolve(`structures/${lab.id}`)} class="structure-link">{lab.label}</a>
 								{/each}
 							</div>
 						</td>
@@ -458,7 +458,7 @@
 	.assign-results {
 		display: flex; flex-direction: column; gap: 2px;
 		background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
-		box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 4px; min-width: 250px;
+		box-shadow: var(--shadow-md); padding: 4px; min-width: 250px;
 	}
 	.result-btn {
 		display: block; width: 100%; text-align: left; padding: 4px 8px;
@@ -476,7 +476,7 @@
 	.batch-results {
 		display: flex; flex-direction: column; gap: 2px;
 		background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
-		box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 4px; min-width: 280px;
+		box-shadow: var(--shadow-md); padding: 4px; min-width: 280px;
 		margin-top: 4px;
 	}
 	.create-form { display: flex; flex-direction: column; gap: 10px; margin: 12px 0; }

@@ -188,7 +188,8 @@
     padding: 10px 12px;
     border-radius: var(--radius);
     background: var(--card);
-    box-shadow: 0 6px 20px rgba(16, 24, 40, 0.14), 0 0 0 1px rgba(16, 24, 40, 0.06);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-md);
     font-size: var(--fs-sm);
     line-height: 1.45;
     color: var(--text-secondary);

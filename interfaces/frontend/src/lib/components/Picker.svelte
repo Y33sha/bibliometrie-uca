@@ -95,7 +95,7 @@
     background: var(--card);
     border: 1px solid var(--accent);
     border-radius: var(--radius);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+    box-shadow: var(--shadow-md);
     max-width: 380px;
     z-index: 50;
   }
@@ -140,7 +140,7 @@
     background: var(--card);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+    box-shadow: var(--shadow-md);
   }
   .picker-item {
     display: flex;

@@ -14,6 +14,7 @@ Un enregistrement source qui change de revue est marqué pour la réconciliation
 import json
 import logging
 from collections import Counter
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 
 from sqlalchemy import Connection, Row, text
@@ -22,12 +23,16 @@ from domain.documents.identifiers import ISSN
 from domain.entity_resolution import most_frequent
 from domain.normalize import normalize_text
 from domain.serials.attachment import (
-    TitledSerial,
-    choose_issnl,
-    effective_issnl,
-    match_by_title,
-    match_in_publication,
+    IssnlPlan,
+    KnownIssn,
+    KnownSerial,
+    NewSerial,
+    SerialAttachment,
+    SerialRef,
+    SeriesMention,
     openalex_issnls,
+    plan_issnl_serials,
+    plan_record_serials,
 )
 from domain.serials.containers import SeriesDescription
 from domain.serials.serial import ManualField
@@ -59,11 +64,7 @@ _ISSN_ROWS = text("SELECT issn, issnl, serial_id, status FROM serial_issns")
 
 _REPLACEMENTS = text("SELECT issn, linked_issn FROM issn_links WHERE link_type = 'replaced_by'")
 
-_SERIALS = text("""
-    SELECT s.id, s.title, s.title_normalized, s.publisher_id, s.openalex_id,
-           EXISTS (SELECT 1 FROM serial_issns i WHERE i.serial_id = s.id) AS has_issn
-    FROM serials s
-""")
+_SERIALS = text("SELECT id, title, title_normalized, publisher_id, openalex_id FROM serials")
 
 _DECISIONS = text("SELECT title_normalized, serial_id FROM serial_title_decisions")
 
@@ -136,16 +137,6 @@ class _Mention:
 
 
 @dataclass(slots=True)
-class _Serial:
-    id: int
-    title: str
-    title_normalized: str
-    publisher_id: int | None
-    openalex_id: str | None
-    has_issn: bool
-
-
-@dataclass(slots=True)
 class _Attachment:
     """Revue de chaque enregistrement source, et compte des rattachements par voie."""
 
@@ -196,156 +187,64 @@ def run_sync_issns(conn: Connection, logger: logging.Logger) -> PhaseMetrics:  #
     return metrics
 
 
-def _issn_serials(
-    conn: Connection, mentions: list[_Mention], oa_issnls: dict[str, str]
-) -> tuple[dict[str, str], dict[str, int], int]:
-    """Renvoie l'ISSN-L de chaque ISSN, la revue de chaque ISSN-L, et le nombre de revues créées. Écrit la revue de chaque ISSN."""
-    rows = {r.issn: r for r in conn.execute(_ISSN_ROWS)}
-    replacement_of = {r.issn: r.linked_issn for r in conn.execute(_REPLACEMENTS)}
+def _plan(
+    conn: Connection, mentions: list[_Mention], issns: Mapping[str, KnownIssn]
+) -> tuple[IssnlPlan, SerialAttachment]:
+    """Renvoie la revue de chaque ISSN-L et celle de chaque enregistrement source, d'après les faits en base, sans rien écrire."""
+    oa_issnls = openalex_issnls(
+        (m.openalex_issnl, m.issns) for m in mentions if m.openalex_issnl is not None
+    )
+    issnl_plan = plan_issnl_serials(
+        issns,
+        {r.issn: r.linked_issn for r in conn.execute(_REPLACEMENTS)},
+        oa_issnls,
+        ((m.issns, m.series.title) for m in mentions if m.series),
+    )
+    record_plan = plan_record_serials(
+        [
+            SeriesMention(
+                m.id,
+                m.publication_id,
+                m.publisher_id,
+                m.series.title,
+                m.series.openalex_id,
+                m.issns,
+            )
+            for m in mentions
+            if m.series
+        ],
+        issnl_plan,
+        {
+            r.id: KnownSerial(r.title, r.title_normalized, r.publisher_id, r.openalex_id)
+            for r in conn.execute(_SERIALS)
+        },
+        {r.title_normalized: r.serial_id for r in conn.execute(_DECISIONS)},
+    )
+    return issnl_plan, record_plan
 
-    def own_issnl(issn: str) -> str:
-        row = rows.get(issn)
-        return effective_issnl(issn, row.issnl if row else None, oa_issnls)
 
-    issnl_of = {
-        issn: effective_issnl(
-            issn,
-            r.issnl,
-            oa_issnls,
-            own_issnl(replacement_of[issn]) if issn in replacement_of else None,
-        )
-        for issn, r in rows.items()
-    }
-    groups: dict[str, list[str]] = {}
-    for issn, issnl in issnl_of.items():
-        groups.setdefault(issnl, []).append(issn)
-    titles: dict[str, Counter[str]] = {}
-    for m in mentions:
-        if m.series and m.series.title:
-            for issnl in {issnl_of[i] for i in m.issns if i in issnl_of}:
-                titles.setdefault(issnl, Counter())[m.series.title] += 1
-    used = set(titles) | {
-        issnl for issnl, members in groups.items() if any(rows[i].serial_id for i in members)
-    }
-
-    serial_of: dict[str, int] = {}
-    claimed: set[int] = set()
-    # Une revue va d'abord à l'ISSN-L dont la ligne la désigne, puis au plus fréquent parmi ses ISSN.
-    for issnl in sorted(used):
-        own = rows[issnl].serial_id if issnl in rows else None
-        if own is not None and own not in claimed:
-            serial_of[issnl] = own
-            claimed.add(own)
-    store = SerialStore(conn)
-    created = 0
-    for issnl in sorted(used - set(serial_of)):
-        held = Counter(
-            rows[i].serial_id
-            for i in groups.get(issnl, [])
-            if rows[i].serial_id is not None and rows[i].serial_id not in claimed
-        )
-        if held:
-            serial_of[issnl] = most_frequent(held)
-        else:
-            title = most_frequent(titles[issnl]) if issnl in titles else issnl
-            serial_of[issnl] = store.create_serial(title)
-            created += 1
-        claimed.add(serial_of[issnl])
-    conn.execute(_ADD_ISSNS, {"issns": sorted(issnl for issnl in serial_of if issnl not in rows)})
+def _write_issn_serials(
+    conn: Connection,
+    issns: Mapping[str, KnownIssn],
+    issnl_of: Mapping[str, str],
+    serial_of_issnl: Mapping[str, int],
+) -> None:
+    """Écrit la revue de chaque ISSN, celle de son ISSN-L. Un ISSN-L absent des ISSN connus reçoit sa ligne."""
+    conn.execute(
+        _ADD_ISSNS, {"issns": sorted(issnl for issnl in serial_of_issnl if issnl not in issns)}
+    )
     conn.execute(
         _SET_ISSN_SERIALS,
         {
             "rows": json.dumps(
                 [
-                    {"issn": issn, "serial_id": serial_of.get(issnl)}
-                    for issn, issnl in [*issnl_of.items(), *((i, i) for i in serial_of)]
-                    if issnl in serial_of
+                    {"issn": issn, "serial_id": serial_of_issnl[issnl]}
+                    for issn, issnl in [*issnl_of.items(), *((i, i) for i in serial_of_issnl)]
+                    if issnl in serial_of_issnl
                 ]
             )
         },
     )
-    return issnl_of, serial_of, created
-
-
-def _attach(
-    conn: Connection,
-    mentions: list[_Mention],
-    issnl_of: dict[str, str],
-    serial_of_issnl: dict[str, int],
-) -> _Attachment:
-    serials = {
-        r.id: _Serial(
-            r.id,
-            r.title,
-            r.title_normalized,
-            r.publisher_id,
-            r.openalex_id,
-            r.has_issn,
-        )
-        for r in conn.execute(_SERIALS)
-    }
-    with_issn = {s.id for s in serials.values() if s.has_issn} | set(serial_of_issnl.values())
-    by_openalex = {s.openalex_id: s.id for s in serials.values() if s.openalex_id}
-    by_title: dict[str, list[TitledSerial]] = {}
-    for s in serials.values():
-        if s.id in with_issn:
-            by_title.setdefault(s.title_normalized, []).append(TitledSerial(s.id, s.publisher_id))
-    decisions = {r.title_normalized: r.serial_id for r in conn.execute(_DECISIONS)}
-    result = _Attachment()
-    # Séries désignées par leur seul titre, sans revue à ISSN de ce titre : titre et titre normalisé.
-    title_only_mentions: list[tuple[_Mention, str, str]] = []
-    for m in mentions:
-        series = m.series
-        if series is None:
-            result.serial_of[m.id] = None
-            continue
-        candidates = {
-            issnl: serials[serial_of_issnl[issnl]].title
-            for issnl in {issnl_of.get(i, i) for i in m.issns}
-            if issnl in serial_of_issnl
-        }
-        if candidates and (issnl := choose_issnl(series.title, candidates)) is not None:
-            result.serial_of[m.id] = serial_of_issnl[issnl]
-            result.by_way["issn"] += 1
-            continue
-        if series.openalex_id and series.openalex_id in by_openalex:
-            result.serial_of[m.id] = by_openalex[series.openalex_id]
-            result.by_way["openalex"] += 1
-            continue
-        title_normalized = normalize_text(series.title or "")
-        if not title_normalized:
-            result.serial_of[m.id] = None
-            result.by_way["unattached"] += 1
-            continue
-        found = decisions.get(title_normalized) or match_by_title(
-            m.publisher_id, by_title.get(title_normalized, [])
-        )
-        if found is None:
-            title_only_mentions.append((m, str(series.title), title_normalized))
-            continue
-        result.serial_of[m.id] = found
-        result.by_way["title"] += 1
-    publication_serials: dict[int, dict[int, str]] = {}
-    for m in mentions:
-        serial_id = result.serial_of.get(m.id)
-        if m.publication_id is not None and serial_id in with_issn:
-            publication_serials.setdefault(m.publication_id, {})[serial_id] = serials[
-                serial_id
-            ].title
-    store = SerialStore(conn)
-    title_only: dict[str, int] = {}
-    for m, title, title_normalized in title_only_mentions:
-        in_publication = (
-            publication_serials.get(m.publication_id, {}) if m.publication_id is not None else {}
-        )
-        found = match_in_publication(title, in_publication)
-        if found is None:
-            if title_normalized not in title_only:
-                title_only[title_normalized] = store.serial_for_title(title)
-            found = title_only[title_normalized]
-        result.serial_of[m.id] = found
-        result.by_way["title"] += 1
-    return result
 
 
 def _write_attachment(
@@ -429,13 +328,31 @@ def _refresh_attributes(
 
 
 def run_attach_serials(conn: Connection, logger: logging.Logger) -> PhaseMetrics:  # noqa: ARG001
-    """Rattache chaque enregistrement source à sa revue, absorbe les revues vidées et écrit les attributs des revues."""
+    """Rattache chaque enregistrement source à sa revue, absorbe les revues vidées et écrit les attributs des revues.
+
+    Le plan se calcule d'abord sur les faits en base. Les revues à créer du plan sont créées ensuite, puis les liens écrits.
+    """
     mentions = _load_mentions(conn)
-    oa_issnls = openalex_issnls(
-        (m.openalex_issnl, m.issns) for m in mentions if m.openalex_issnl is not None
-    )
-    issnl_of, serial_of_issnl, created = _issn_serials(conn, mentions, oa_issnls)
-    attachment = _attach(conn, mentions, issnl_of, serial_of_issnl)
+    issns = {r.issn: KnownIssn(r.issnl, r.serial_id) for r in conn.execute(_ISSN_ROWS)}
+    issnl_plan, record_plan = _plan(conn, mentions, issns)
+
+    store = SerialStore(conn)
+    created: dict[NewSerial, int] = {}
+
+    def resolve(serial: SerialRef) -> int:
+        if not isinstance(serial, NewSerial):
+            return serial
+        if serial not in created:
+            created[serial] = store.create_serial(serial.title)
+        return created[serial]
+
+    issnl_of = issnl_plan.issnl_of
+    serial_of_issnl = {issnl: resolve(serial) for issnl, serial in issnl_plan.serial_of.items()}
+    _write_issn_serials(conn, issns, issnl_of, serial_of_issnl)
+    attachment = _Attachment(by_way=record_plan.by_way)
+    for m in mentions:
+        serial = record_plan.serial_of[m.id] if m.series else None
+        attachment.serial_of[m.id] = resolve(serial) if serial is not None else None
     changed, received = _write_attachment(conn, mentions, attachment)
     absorbed = _absorb(conn, received)
     _refresh_attributes(conn, mentions, attachment, issnl_of, serial_of_issnl)
@@ -443,7 +360,7 @@ def run_attach_serials(conn: Connection, logger: logging.Logger) -> PhaseMetrics
     metrics.add(
         seen=len(mentions),
         updated=len(changed),
-        new=created,
+        new=len(created),
         serials_absorbed=absorbed,
         attached_by_issn=attachment.by_way["issn"],
         attached_by_openalex=attachment.by_way["openalex"],

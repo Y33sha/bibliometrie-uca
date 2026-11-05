@@ -130,7 +130,7 @@
     font-size: var(--fs-3xl);
     font-weight: 700;
     line-height: 1.25;
-    letter-spacing: -0.015em;
+    letter-spacing: var(--tracking-tight);
   }
   .publication-meta {
     display: flex;
@@ -155,7 +155,7 @@
   .doi-label {
     font-size: var(--fs-sm);
     font-weight: 600;
-    letter-spacing: 0.06em;
+    letter-spacing: var(--tracking-caps);
     color: var(--muted);
   }
 
@@ -191,7 +191,7 @@
     text-transform: uppercase;
     font-size: var(--fs-xs);
     font-weight: 700;
-    letter-spacing: 0.05em;
+    letter-spacing: var(--tracking-caps);
     white-space: nowrap;
   }
   .rel-title {
@@ -229,7 +229,7 @@
     color: var(--danger);
   }
   .tier-danger:hover {
-    background: color-mix(in srgb, var(--danger) 14%, white);
+    background: color-mix(in srgb, var(--danger) 20%, white);
   }
   .tier-warning {
     background: var(--warning-light);
@@ -251,7 +251,7 @@
     color: var(--accent);
   }
   .tier-parent:hover {
-    background: color-mix(in srgb, var(--accent) 14%, white);
+    background: color-mix(in srgb, var(--accent) 20%, white);
   }
   .tier-secondary {
     background: var(--surface);

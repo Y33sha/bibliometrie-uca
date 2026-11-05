@@ -142,6 +142,6 @@
 		transition: background 0.15s;
 	}
 	.orphan-link:hover {
-		background: color-mix(in srgb, var(--attention) 25%, white);
+		background: color-mix(in srgb, var(--attention) 20%, white);
 	}
 </style>

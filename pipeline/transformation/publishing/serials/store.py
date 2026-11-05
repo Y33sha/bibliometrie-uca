@@ -1,4 +1,4 @@
-"""Store des revues : création, revue sans ISSN d'un titre ou d'un titre et d'un éditeur, type de la table `serials`, pour le pipeline.
+"""Store des revues : création, revue sans ISSN d'un titre et d'un éditeur, type de la table `serials`, pour le pipeline.
 
 L'édition dans l'administration passe par `infrastructure/repositories/serial_repository.py`, la fusion par `serial_merge`.
 """
@@ -6,7 +6,7 @@ L'édition dans l'administration passe par `infrastructure/repositories/serial_r
 from collections.abc import Sequence
 from typing import NamedTuple
 
-from sqlalchemy import ColumnElement, Connection, any_, exists, literal, select, text, update
+from sqlalchemy import Connection, any_, exists, literal, select, text, update
 
 from domain.normalize import normalize_text
 from domain.serials.serial import ManualField, SerialType
@@ -43,15 +43,21 @@ class SerialStore:
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
 
-    def serial_for_title(self, title: str) -> int:
-        """Renvoie la revue sans ISSN de ce titre normalisé, créée si elle manque. Le plus petit identifiant départage deux revues."""
-        return self._serial_without_issn(title, None)
-
     def serial_for_title_and_publisher(self, title: str, publisher_id: int | None) -> int:
-        """Renvoie la revue sans ISSN de ce titre normalisé et de cet éditeur, créée si elle manque. Le plus petit identifiant départage deux revues."""
-        return self._serial_without_issn(
-            title, publisher_id, serials.c.publisher_id.is_not_distinct_from(publisher_id)
-        )
+        """Renvoie la plus ancienne revue sans ISSN de ce titre normalisé et de cet éditeur, créée avec cet éditeur si elle manque."""
+        found: int | None = self._conn.execute(
+            select(serials.c.id)
+            .where(
+                serials.c.title_normalized == normalize_text(title),
+                ~exists().where(serial_issns.c.serial_id == serials.c.id),
+                serials.c.publisher_id.is_not_distinct_from(publisher_id),
+            )
+            .order_by(serials.c.id)
+            .limit(1)
+        ).scalar_one_or_none()
+        if found is not None:
+            return found
+        return self.create_serial(title, publisher_id=publisher_id)
 
     def titles_without_issn(self, serial_ids: Sequence[int]) -> dict[int, str]:
         """Renvoie le titre normalisé de chaque revue sans ISSN parmi `serial_ids`."""
@@ -62,24 +68,6 @@ class SerialStore:
             )
         )
         return {r.id: r.title_normalized for r in rows}
-
-    def _serial_without_issn(
-        self, title: str, publisher_id: int | None, *conditions: ColumnElement[bool]
-    ) -> int:
-        """Renvoie la plus ancienne revue sans ISSN de ce titre normalisé qui remplit `conditions`, créée avec l'éditeur `publisher_id` si elle manque."""
-        found: int | None = self._conn.execute(
-            select(serials.c.id)
-            .where(
-                serials.c.title_normalized == normalize_text(title),
-                ~exists().where(serial_issns.c.serial_id == serials.c.id),
-                *conditions,
-            )
-            .order_by(serials.c.id)
-            .limit(1)
-        ).scalar_one_or_none()
-        if found is not None:
-            return found
-        return self.create_serial(title, publisher_id=publisher_id)
 
     def create_serial(self, title: str, *, publisher_id: int | None = None) -> int:
         """Crée la revue `title`, avec son titre normalisé, et renvoie son identifiant."""

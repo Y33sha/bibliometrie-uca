@@ -203,10 +203,10 @@
 		</TitleRow>
 		<div class="entity-meta">
 			{#if profile.corps}
-				<span class="entity-tag">{profile.corps}</span>
+				<span class="tag">{profile.corps}</span>
 			{/if}
 			{#if profile.staff_category}
-				<span class="entity-tag">{staffCategoryLabels[profile.staff_category] ?? profile.staff_category}</span>
+				<span class="tag">{staffCategoryLabels[profile.staff_category] ?? profile.staff_category}</span>
 			{/if}
 			<IdentifiersCell {identifiers} />
 		</div>
@@ -312,7 +312,7 @@
 								<tr>
 									<td>{#if t.author_person_id}<a href={resolve(`persons/${t.author_person_id}`)}>{titleCase(t.author_name)}</a>{:else}{t.author_name ? titleCase(t.author_name) : ''}{/if}</td>
 									<td><a href={resolve(`publications/${t.id}`)}><PublicationTitle titre={t.title} /></a></td>
-									<td>{#each t.structure_ids as sid}<a href={resolve(`structures/${sid}`)} class="structure-tag">{thesesStructures[String(sid)]?.acronym || thesesStructures[String(sid)]?.name || `#${sid}`}</a>{/each}</td>
+									<td>{#each t.structure_ids as sid}<a href={resolve(`structures/${sid}`)} class="structure-link">{thesesStructures[String(sid)]?.acronym || thesesStructures[String(sid)]?.name || `#${sid}`}</a>{/each}</td>
 									<td>{t.publication_year ?? ''}</td>
 								</tr>
 							{/each}
@@ -370,7 +370,7 @@
 								<td>
 									{#if a.structures?.length}
 										{#each a.structures as s (s.id)}
-											<span class="structure-tag">{structureLabel(s)}</span>
+											<span class="tag tag-accent">{structureLabel(s)}</span>
 										{/each}
 									{/if}
 								</td>

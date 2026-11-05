@@ -67,7 +67,7 @@
 		border-radius: var(--radius);
 		padding: 32px 36px;
 		width: 340px;
-		box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+		box-shadow: var(--shadow-sm);
 	}
 	.login-card h1 {
 		font-family: var(--font-brand);
@@ -112,14 +112,14 @@
 	}
 	input:focus {
 		outline: none;
-		border-color: var(--accent);
-		box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-mid) 25%, transparent);
+		border-color: var(--accent-mid);
+		box-shadow: var(--focus-ring);
 	}
 	button {
 		width: 100%;
 		padding: 10px;
 		background: var(--accent);
-		color: white;
+		color: var(--text-inverse);
 		border: none;
 		border-radius: var(--radius);
 		font-size: var(--fs-base);

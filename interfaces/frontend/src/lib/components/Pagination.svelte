@@ -66,7 +66,7 @@
 		background: var(--hover);
 	}
 	button.active:hover {
-		background: color-mix(in srgb, var(--accent) 85%, black);
+		background: color-mix(in srgb, var(--accent), black 20%);
 	}
 	button:disabled {
 		opacity: 0.4;
@@ -74,7 +74,7 @@
 	}
 	button.active {
 		background: var(--accent);
-		color: white;
+		color: var(--text-inverse);
 		font-weight: 600;
 	}
 	.page-info {

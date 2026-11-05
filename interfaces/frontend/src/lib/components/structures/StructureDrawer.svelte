@@ -22,6 +22,7 @@
   import NameFormsSection from "./NameFormsSection.svelte";
   import EditFormModal from "./EditFormModal.svelte";
   import StructureFormModal from "./StructureFormModal.svelte";
+  import StructureTypeTag from "./StructureTypeTag.svelte";
 
   type StructureDeletionImpact = components["schemas"]["StructureDeletionImpact"];
 
@@ -458,7 +459,7 @@
   {:else}
     {@const s = detail.structure}
     <div class="structure-meta">
-      <span class="structure-type structure-type-{s.type}">{s.type}</span>
+      <StructureTypeTag type={s.type} />
       <span><span class="field-label">Code</span> {s.code}</span>
     </div>
     {#if s.api_ids && Object.keys(s.api_ids).length}

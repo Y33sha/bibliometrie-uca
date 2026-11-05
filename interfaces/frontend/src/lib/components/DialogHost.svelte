@@ -58,8 +58,8 @@
 		font-family: inherit;
 		text-align: left;
 		font-size: var(--fs-md);
-		color: white;
-		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+		color: var(--text-inverse);
+		box-shadow: var(--shadow-md);
 		cursor: pointer;
 		white-space: pre-line;
 	}

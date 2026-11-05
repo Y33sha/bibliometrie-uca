@@ -75,14 +75,14 @@
 							{#each pub.authors as author, i (i)}
 								<div class="conflict-author">
 									{#if author.person_id}<a href={resolve(`persons/${author.person_id}`)}>{author.name}</a>{:else}{author.name}{/if}
-									{#each author.structures as structure (structure.name)}<span class="lab-tag" title={structure.name}>{structureLabel(structure)}</span>{/each}
+									{#each author.structures as structure (structure.name)}<span class="author-structure" title={structure.name}>{structureLabel(structure)}</span>{/each}
 								</div>
 							{/each}
 						</td>
 						<td>
-							<div class="id-list">
+							<div class="tag-list">
 								{#each pub.hal_links as link (link.source_id)}
-									<a href={link.record_url} target="_blank" rel="noopener" class="id-badge">{link.source_id}</a>
+									<a href={link.record_url} target="_blank" rel="noopener" class="tag id-badge">{link.source_id}</a>
 								{/each}
 							</div>
 						</td>
@@ -105,11 +105,12 @@
 	.conflict-author + .conflict-author {
 		margin-top: 0.25rem;
 	}
-	.conflict-author .lab-tag {
+	.author-structure {
+		margin-right: 6px;
+		font-size: var(--fs-sm);
 		color: var(--text-secondary);
-		font-weight: 400;
 	}
-	.conflict-author .lab-tag:first-of-type {
+	.author-structure:first-of-type {
 		margin-left: 0.5rem;
 	}
 </style>

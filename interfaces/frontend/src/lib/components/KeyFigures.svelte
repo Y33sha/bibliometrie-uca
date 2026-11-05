@@ -62,7 +62,7 @@
 		font-size: var(--fs-3xl);
 		font-weight: 700;
 		line-height: var(--value-line);
-		letter-spacing: -0.02em;
+		letter-spacing: var(--tracking-tight);
 	}
 	.open .key-figure-icon,
 	.open .key-figure-value {

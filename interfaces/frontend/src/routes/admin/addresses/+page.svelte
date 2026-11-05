@@ -16,6 +16,7 @@
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
 	import { structureLabel } from '#lib/structureLabels.js';
 	import { groupStructuresByType, structureGroupLabel } from '#lib/structureTypes.js';
+	import { structDetectionClasses } from '#lib/labels.js';
 
 	// ---- Type definitions ----
 
@@ -373,9 +374,9 @@
 	}
 
 	function structTagClass(s: AddressStructure): string {
-		if (s.is_confirmed === true) return 'struct-tag struct-confirmed';
-		if (s.is_confirmed === false) return 'struct-tag struct-rejected';
-		return 'struct-tag struct-pending';
+		if (s.is_confirmed === true) return structDetectionClasses.confirmed;
+		if (s.is_confirmed === false) return structDetectionClasses.rejected;
+		return structDetectionClasses.detected;
 	}
 
 	// ---- Init ----
@@ -417,11 +418,11 @@
 			{/each}
 		</select>
 		<div class="stats-bar">
-			<span class="stat-badge stat-total">{stats.total.toLocaleString('fr-FR')} adresses</span>
-			<span class="stat-badge stat-detected">Détectées&nbsp;: {stats.detected.toLocaleString('fr-FR')}</span>
-			<span class="stat-badge stat-pending">Non validées&nbsp;: {stats.pending.toLocaleString('fr-FR')}</span>
-			<span class="stat-badge stat-confirmed">Reliées&nbsp;: {stats.confirmed.toLocaleString('fr-FR')}</span>
-			<span class="stat-badge stat-rejected">Rejetées&nbsp;: {stats.rejected.toLocaleString('fr-FR')}</span>
+			<span class="tag tag-pill">{stats.total.toLocaleString('fr-FR')} adresses</span>
+			<span class="tag tag-pill tag-accent">Détectées&nbsp;: {stats.detected.toLocaleString('fr-FR')}</span>
+			<span class="tag tag-pill tag-warning">Non validées&nbsp;: {stats.pending.toLocaleString('fr-FR')}</span>
+			<span class="tag tag-pill tag-success">Reliées&nbsp;: {stats.confirmed.toLocaleString('fr-FR')}</span>
+			<span class="tag tag-pill tag-danger">Rejetées&nbsp;: {stats.rejected.toLocaleString('fr-FR')}</span>
 		</div>
 		{#if currentStructureId}
 			<a href={resolve(`admin/feedback?structure_id=${currentStructureId}`)} class="btn btn-sm feedback-btn">Qualité de la détection</a>
@@ -494,7 +495,7 @@
 				</select>
 				<div class="struct-tags">
 					{#each sp.structureIds as sid (sid)}
-						<span class="struct-chip">
+						<span class="tag tag-pill tag-accent tag-removable struct-chip">
 							{structureLabelById.get(sid) || `#${sid}`}
 							<button title="Retirer" aria-label="Retirer {structureLabelById.get(sid) || `#${sid}`}" onclick={() => removeStructureFromPredicate(i, sid)}>&#x2717;</button>
 						</span>
@@ -631,32 +632,6 @@
 		margin-left: auto;
 		white-space: nowrap;
 	}
-	.stat-badge {
-		padding: 3px 10px;
-		border-radius: var(--radius-pill);
-		font-weight: 500;
-		white-space: nowrap;
-	}
-	.stat-total {
-		background: var(--surface);
-		color: var(--muted);
-	}
-	.stat-detected {
-		background: var(--accent-light);
-		color: var(--accent);
-	}
-	.stat-pending {
-		background: var(--warning-light);
-		color: var(--warning-text);
-	}
-	.stat-rejected {
-		background: var(--danger-light);
-		color: var(--danger);
-	}
-	.stat-confirmed {
-		background: var(--success-light);
-		color: var(--success);
-	}
 
 	/* Filtres composables */
 	.filters-zone {
@@ -684,7 +659,7 @@
 		color: var(--muted);
 		text-transform: uppercase;
 		font-size: var(--fs-xs);
-		letter-spacing: 0.5px;
+		letter-spacing: var(--tracking-caps);
 	}
 	.scope-echo {
 		font-size: var(--fs-sm);
@@ -713,17 +688,6 @@
 		gap: 4px;
 		flex-wrap: wrap;
 		flex: 1;
-	}
-	.struct-chip {
-		display: inline-flex;
-		align-items: center;
-		gap: 4px;
-		font-size: var(--fs-sm);
-		padding: 2px 4px 2px 8px;
-		border-radius: var(--radius-pill);
-		background: var(--accent-light);
-		color: var(--accent);
-		font-weight: 500;
 	}
 	.struct-chip button {
 		border: none;
@@ -801,26 +765,6 @@
 		color: var(--muted);
 		flex-wrap: wrap;
 	}
-	.struct-tag {
-		display: inline-block;
-		font-size: var(--fs-sm);
-		padding: 1px 7px;
-		border-radius: var(--radius-pill);
-		font-weight: 500;
-	}
-	.struct-confirmed {
-		background: var(--success-light);
-		color: var(--success);
-	}
-	.struct-pending {
-		background: var(--warning-light);
-		color: var(--warning-text);
-	}
-	.struct-rejected {
-		background: var(--surface);
-		color: var(--muted);
-		text-decoration: line-through;
-	}
 
 	.addr-actions {
 		display: flex;
@@ -837,7 +781,7 @@
 	/* Batch bar */
 	.batch-bar {
 		background: var(--accent);
-		color: white;
+		color: var(--text-inverse);
 		padding: 8px 16px;
 		border-radius: var(--radius);
 		margin-bottom: 10px;
@@ -854,7 +798,7 @@
 		border-radius: var(--radius);
 		border: 1px solid rgba(255, 255, 255, 0.3);
 		background: transparent;
-		color: white;
+		color: var(--text-inverse);
 		font-size: var(--fs-sm);
 		cursor: pointer;
 		font-family: inherit;

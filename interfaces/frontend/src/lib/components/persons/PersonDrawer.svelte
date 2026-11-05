@@ -187,7 +187,7 @@
     <div class="drawer-meta">
       <span>{person.contribution_count ?? 0} publications</span>
       <span>{person.in_perimeter_contribution_count ?? 0} dans le périmètre</span>
-      {#if person.exclusion}<span class="tag tag-excluded">{personExclusionLabels[person.exclusion]}</span>{/if}
+      {#if person.exclusion}<span class="tag tag-pill tag-danger">{personExclusionLabels[person.exclusion]}</span>{/if}
     </div>
 
     {#if person.has_rh}
@@ -377,16 +377,5 @@
   .sharing-forms {
     font-size: var(--fs-sm);
     color: var(--muted);
-  }
-  .tag {
-    display: inline-block;
-    font-size: var(--fs-sm);
-    padding: 1px 7px;
-    border-radius: var(--radius-pill);
-    font-weight: 500;
-  }
-  .tag-excluded {
-    background: var(--danger-light);
-    color: var(--danger);
   }
 </style>

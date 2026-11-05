@@ -198,7 +198,7 @@
   :global(:where(input[type="search"]):focus) {
     outline: none;
     border-color: var(--accent-mid);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-mid) 20%, transparent);
+    box-shadow: var(--focus-ring);
   }
   :global(input[type="search"]::-webkit-search-cancel-button) {
     -webkit-appearance: none;
@@ -217,7 +217,7 @@
   .site-header {
     --nav-bg: var(--nav-public);
     --nav-menu-bg: var(--nav-public-menu);
-    --nav-fg: white;
+    --nav-fg: var(--text-inverse);
     --nav-fg-soft: rgba(255, 255, 255, 0.85);
     --nav-hover: rgba(255, 255, 255, 0.1);
     --nav-active: rgba(255, 255, 255, 0.14);
@@ -329,7 +329,7 @@
     background: var(--nav-menu-bg);
     border-radius: 0 0 var(--radius) var(--radius);
     min-width: 170px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    box-shadow: var(--shadow-md);
     z-index: 100;
   }
   .nav-dropdown-menu a {
@@ -358,7 +358,7 @@
     color: var(--nav-fg-soft);
     font-size: var(--fs-xs);
     font-weight: 600;
-    letter-spacing: 1px;
+    letter-spacing: var(--tracking-caps);
     text-transform: uppercase;
   }
   /* Une rubrique qui suit des entrées en est séparée par un filet. */
@@ -404,7 +404,7 @@
     color: var(--accent);
     font-weight: 600;
     border-radius: var(--radius);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    box-shadow: var(--shadow-sm);
   }
   .skip-link:focus {
     top: 8px;
@@ -437,7 +437,7 @@
       height: auto;
       padding: 4px 0;
       background: var(--nav-bg);
-      box-shadow: 0 6px 14px rgba(0, 0, 0, 0.25);
+      box-shadow: var(--shadow-md);
       z-index: 200;
     }
     .site-nav.open {

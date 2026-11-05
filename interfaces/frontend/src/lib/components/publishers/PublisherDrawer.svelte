@@ -210,9 +210,9 @@
     {#if publisher.doi_prefixes.length}
       <section class="drawer-section">
         <h3>Préfixes DOI</h3>
-        <div class="id-list">
+        <div class="tag-list">
           {#each publisher.doi_prefixes as p (p.prefix)}
-            <span class="id-badge" title="RA : {p.ra}{p.crossref_member_id ? ` / membre Crossref ${p.crossref_member_id}` : ''}">{p.prefix}</span>
+            <span class="tag id-badge" title="RA : {p.ra}{p.crossref_member_id ? ` / membre Crossref ${p.crossref_member_id}` : ''}">{p.prefix}</span>
           {/each}
         </div>
       </section>

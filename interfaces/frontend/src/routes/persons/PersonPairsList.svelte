@@ -141,7 +141,7 @@
     <div class="meta">{formatCount(p.contribution_count, "publication")}</div>
     {#if p.labs.length}
       <div class="labs">
-        {#each p.labs as lab (lab)}<span class="lab-badge">{lab}</span>{/each}
+        {#each p.labs as lab (lab)}<span class="tag tag-pill tag-accent">{lab}</span>{/each}
       </div>
     {/if}
   </div>
@@ -172,13 +172,6 @@
     flex-wrap: wrap;
     gap: 4px;
     margin-top: 4px;
-  }
-  .lab-badge {
-    font-size: var(--fs-sm);
-    background: var(--accent-light);
-    color: var(--accent);
-    border-radius: var(--radius-pill);
-    padding: 1px 7px;
   }
   .actions {
     display: flex;

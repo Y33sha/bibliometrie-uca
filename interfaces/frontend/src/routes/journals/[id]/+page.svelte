@@ -125,9 +125,9 @@
 				{journal.title}
 				{#if journal.is_in_doaj}
 					{#if journal.doaj_url}
-						<a class="badge-doaj" href={journal.doaj_url} target="_blank" rel="noopener" title="Fiche DOAJ (nouvel onglet)">DOAJ</a>
+						<a class="tag tag-success badge-doaj" href={journal.doaj_url} target="_blank" rel="noopener" title="Fiche DOAJ (nouvel onglet)">DOAJ</a>
 					{:else}
-						<span class="badge-doaj" title="Indexée dans DOAJ">DOAJ</span>
+						<span class="tag tag-success badge-doaj" title="Indexée dans DOAJ">DOAJ</span>
 					{/if}
 				{/if}
 			</h1>
@@ -162,12 +162,12 @@
 			{/if}
 			{#if journal.serial_type}
 				<EntityMetaItem label="Type">
-					<span class="entity-tag">{serialTypeLabels[journal.serial_type] ?? journal.serial_type}</span>
+					<span class="tag">{serialTypeLabels[journal.serial_type] ?? journal.serial_type}</span>
 				</EntityMetaItem>
 			{/if}
 			{#if journal.oa_model}
 				<EntityMetaItem label="Open access">
-					<span class="entity-tag">{oaModelLabels[journal.oa_model] ?? journal.oa_model}</span>
+					<span class="tag">{oaModelLabels[journal.oa_model] ?? journal.oa_model}</span>
 				</EntityMetaItem>
 			{/if}
 		</div>
@@ -175,7 +175,7 @@
 			<div class="entity-meta">
 				<EntityMetaItem label="Listes">
 					{#each journal.lists as list (list.code)}
-						<span class="entity-tag" title={listTitle(list)}>{list.label}</span>
+						<span class="tag" title={listTitle(list)}>{list.label}</span>
 					{/each}
 				</EntityMetaItem>
 			</div>

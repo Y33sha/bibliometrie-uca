@@ -24,6 +24,7 @@ from sqlalchemy import Connection, text
 
 from domain.config import ConfigKey
 from domain.publications.oa_status import OaStatus
+from domain.sources import registry
 from infrastructure.db.scalars import scalar_int
 from pipeline.graph import Task
 from pipeline.http.lookup import LookupOutcome, NotFound, Unavailable
@@ -462,7 +463,7 @@ TASKS = (
         ),
         # Verdicts d'Unpaywall et statut des publications, lus par le recalcul de ce statut.
         previous_run=("dois.unpaywall_oa_status", "publications.oa_status"),
-        network="doi.org",
+        network=registry.DOI_ORG,
         run=_resolve_dois,
         section="URL de résolution des DOI sur doi.org",
     ),

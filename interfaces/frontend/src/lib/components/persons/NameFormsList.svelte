@@ -39,7 +39,7 @@
     </span>
     {#if nf.publication_count > 0}
       <button
-        class="status-chip"
+        class="tag status-chip"
         class:confirmed={nf.status === "confirmed" || isCanonical(nf)}
         class:rejected={nf.status === "rejected"}
         title="Voir les {nf.publication_count} publication(s) liée(s)"
@@ -49,7 +49,7 @@
       </button>
     {:else}
       <span
-        class="status-chip"
+        class="tag status-chip"
         class:confirmed={nf.status === "confirmed" || isCanonical(nf)}
         class:rejected={nf.status === "rejected"}
       >
@@ -77,7 +77,7 @@
     {/each}
   </div>
 {:else}
-  <span class="empty">aucune</span>
+  <span class="tag tag-pill tag-warning">aucune</span>
 {/if}
 
 {#if rejectedForms.length}
@@ -109,12 +109,5 @@
     font-size: var(--fs-sm);
     color: var(--warning-text);
     white-space: nowrap;
-  }
-  .empty {
-    font-size: var(--fs-sm);
-    color: var(--warning-text);
-    background: var(--warning-light);
-    padding: 1px 7px;
-    border-radius: var(--radius-pill);
   }
 </style>
