@@ -121,7 +121,7 @@ Une étiquette (tag, badge, pastille, chip) est un court texte sur fond clair, a
 - [ ] Vues de liste sur une base commune (question 1)
 - [ ] Volets sur une base commune (question 2)
 - [x] Pages Problèmes HAL et d'administration sur `useUrlFilters` (d932adc14)
-- [ ] Pages d'entité : en-tête, onglet actif, carte des sujets, états « introuvable » et « Chargement… » (marge de 20 ou 40 px selon la page)
+- [x] Pages d'entité : titre d'onglet et fil d'Ariane (d84a7b2e9), onglet actif (d7ed0eacb), carte des sujets (c0fde1cd3), états « introuvable » et « Chargement… » (87d9cfd08)
 - [ ] Balisages recopiés en composants : pastille DOAJ, liens d'éditeur et de revue, nom de personne, en-tête triable
 
 ### Phase 7 — Fonctions, libellés et icônes
