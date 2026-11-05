@@ -3,7 +3,7 @@
 	import { onMount, tick } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { api, latestRequest } from '#lib/api/index.js';
-	import { Chart, fitsInBar } from '#lib/components/charts/chart.js';
+	import { Chart, fitsInBar, pieSegmentOptions, stackedSegmentOptions } from '#lib/components/charts/chart.js';
 	import { cssColor, fontSize } from '#lib/components/charts/cssVar.js';
 	import { readableOn } from '#lib/components/charts/contrast.js';
 	import Pagination from '#lib/components/Pagination.svelte';
@@ -206,6 +206,7 @@
 
 		// Tri par part d'une série : n'a de sens que sur un axe entité à forte cardinalité (labo, éditeur, revue) avec un empilement. L'axe année reste chronologique, les axes à faible cardinalité gardent leur ordre métier. Le sélecteur n'apparaît que dans ce cas, et une clé devenue caduque (changement d'empilement ou d'axe) est réinitialisée.
 		const highCard = dimCard(xDim) === 'high';
+		const segment = stackDim ? stackedSegmentOptions(chartCanvas, highCard) : {};
 		const canSort = highCard && !!stackDim;
 		sortableSeries = canSort ? stackValues.map((sv) => ({ value: sv, label: dimLabel(stackDim, sv) })) : [];
 		if (chartSort && (!canSort || !stackValues.includes(chartSort))) chartSort = '';
@@ -236,6 +237,7 @@
 			label: stackDim ? dimLabel(stackDim, sv) : (indicatorDef?.label ?? ''),
 			data: cats.map((cv) => cell(cv, sv)),
 			backgroundColor: stackDim ? pivotValueColor(stackDim, sv, i) : cssColor('accent'),
+			...segment,
 			barPercentage: 0.85,
 			categoryPercentage: 0.7
 		}));
@@ -255,7 +257,7 @@
 			yearChart = new Chart(chartCanvas, {
 				type: 'pie',
 				plugins: [whiteBgPlugin],
-				data: { labels, datasets: [{ data: values, backgroundColor: colors, borderColor: cssColor('card'), borderWidth: 1 }] },
+				data: { labels, datasets: [{ data: values, backgroundColor: colors, ...pieSegmentOptions(chartCanvas) }] },
 				options: {
 					responsive: true,
 					maintainAspectRatio: false,

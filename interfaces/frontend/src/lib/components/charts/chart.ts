@@ -68,6 +68,33 @@ export function fitsInBar(ctx: DataLabelsContext, text: string, font: Partial<Fo
 	return length >= along + 2 * BAR_LABEL_PADDING && thickness >= across;
 }
 
+/** Espace entre deux segments voisins d'une barre empilée ou d'un secteur, en pixels. */
+const SEGMENT_GAP = 2;
+
+/** Couleur du fond sur lequel `canvas` est posé : le premier fond non transparent de ses ancêtres, `--bg` à défaut. */
+export function backdropColor(canvas: HTMLCanvasElement): string {
+	for (let el = canvas.parentElement; el; el = el.parentElement) {
+		const color = getComputedStyle(el).backgroundColor;
+		if (color && color !== 'transparent' && !/^rgba\(.*,\s*0\)$/.test(color)) return color;
+	}
+	return cssColor('bg');
+}
+
+/**
+ * Options d'un jeu de données de barres empilées dessinées dans `canvas` : un liseré de la couleur du fond, au bout de chaque segment, le sépare du suivant. `horizontal` : barres horizontales.
+ */
+export function stackedSegmentOptions(canvas: HTMLCanvasElement, horizontal = false) {
+	return {
+		borderColor: backdropColor(canvas),
+		borderWidth: horizontal ? { right: SEGMENT_GAP } : { top: SEGMENT_GAP },
+	};
+}
+
+/** Options d'un jeu de données de secteurs dessinés dans `canvas` : un liseré de la couleur du fond sépare les secteurs. */
+export function pieSegmentOptions(canvas: HTMLCanvasElement) {
+	return { borderColor: backdropColor(canvas), borderWidth: SEGMENT_GAP };
+}
+
 /** `text` tronqué et terminé par une ellipse pour tenir en `maxWidth` pixels dans la police `font` ; `text` entier s'il tient. */
 export function truncateToWidth(canvas: CanvasRenderingContext2D, text: string, font: Partial<FontSpec>, maxWidth: number): string {
 	canvas.save();

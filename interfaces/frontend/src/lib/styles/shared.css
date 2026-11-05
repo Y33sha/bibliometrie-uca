@@ -72,18 +72,18 @@
 	/* Infobulles */
 	--tooltip-bg: #333;
 
-	/* Open access. Une variable nommée d'après une valeur de `oa_status` est lue par `oaStatusColor()`. */
-	--open: #50c84a;       /* ouvert, toutes voies confondues */
-	--open-text: #22743c;  /* assombri, lisible en texte sur fond clair */
-	--embargoed: #d29a1e;
-	--closed: #4b5260;
-	--unknown: #c9ced6;
-	--diamond: #d0d4fb;
-	--diamond-text: #0288a8; /* lisible en texte sur fond clair */
-	--gold: #ffd700;
-	--hybrid: #b366f2;
-	--bronze: #cd7f32;
-	--green: #5ec62c;
+	/* Open access. Une variable nommée d'après une valeur de `oa_status` est lue par `oaStatusColor()`. Les couleurs se distinguent deux à deux, daltonisme compris : une couleur se change avec les autres. */
+	--open: #219576;       /* ouvert, toutes voies confondues */
+	--open-text: #1b735b;  /* assombri, lisible en texte sur fond clair */
+	--embargoed: #e48da8;
+	--closed: #464d5b;
+	--unknown: #d1d4db;
+	--diamond: #8592dc;
+	--diamond-text: #505ba7; /* lisible en texte sur fond clair */
+	--gold: #d9ae36;
+	--hybrid: #894d97;
+	--bronze: #9f5526;
+	--green: #36a558;
 
 	/* Graphiques : couleurs des séries sans couleur propre, dans l'ordre d'attribution (`chartColor()`). */
 	--chart-1: #4e79a7;
