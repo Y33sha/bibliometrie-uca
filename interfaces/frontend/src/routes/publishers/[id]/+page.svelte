@@ -11,7 +11,7 @@
 	import SerialsListView from '#lib/components/SerialsListView.svelte';
 	import MonographsListView from '#lib/components/MonographsListView.svelte';
 	import PublicationsDashboard from '#lib/components/PublicationsDashboard.svelte';
-	import SubjectsCloud from '#lib/components/SubjectsCloud.svelte';
+	import SubjectsCard from '#lib/components/SubjectsCard.svelte';
 	import TitleRow from '#lib/components/TitleRow.svelte';
 	import PublisherDrawer from '#lib/components/publishers/PublisherDrawer.svelte';
 	import { useDrawerParam } from '#lib/composables/useDrawerParam.svelte.js';
@@ -19,7 +19,6 @@
 	import type { components } from '#lib/api/schema.js';
 
 	type PublisherDetail = components['schemas']['Publisher'];
-	type SubjectFrequency = components['schemas']['SubjectFrequency'];
 	type EnumOption = components['schemas']['EnumOption'];
 
 	const publisherId = $derived(Number(page.params.id));
@@ -37,8 +36,6 @@
 
 	let publisher = $state<PublisherDetail | null>(null);
 	let error = $state(false);
-	let subjectList = $state<SubjectFrequency[]>([]);
-	let dashboardLoaded = $state(false);
 
 	// Label FR du publisher_type, affiché dans l'en-tête de la page.
 	let publisherTypeLabels: Record<string, string> = $state({});
@@ -56,21 +53,8 @@
 		publisherTypeLabels = Object.fromEntries(publicationOptions.map((o) => [o.value, o.label_fr]));
 	}
 
-	async function loadDashboard() {
-		if (dashboardLoaded) return;
-		subjectList = await api<SubjectFrequency[]>(`/api/publishers/${publisherId}/subjects?limit=20`, {
-			key: 'p-subjects'
-		});
-		dashboardLoaded = true;
-	}
-
-	function onTabSwitch(tab: string) {
-		if (tab === 'dashboard') loadDashboard();
-	}
-
 	onMount(async () => {
 		await Promise.all([loadPublisher(), loadTypeLabels()]);
-		if (activeTab === 'dashboard') loadDashboard();
 		await tick();
 	});
 
@@ -119,7 +103,7 @@
 	</div>
 
 	<!-- Tabs -->
-	<TabNav {tabs} onswitch={onTabSwitch} />
+	<TabNav {tabs} />
 
 	<!-- Tab: Dashboard -->
 	{#if activeTab === 'dashboard'}
@@ -131,16 +115,7 @@
 				oaBreakdown="oa_voie"
 			>
 				{#snippet subjects()}
-					<div class="dash-card">
-						<h2>Sujets principaux</h2>
-						{#if !dashboardLoaded}
-							<div class="loading">Chargement…</div>
-						{:else if subjectList.length === 0}
-							<p class="muted">Aucun sujet (les sujets génériques sont exclus du top).</p>
-						{:else}
-							<SubjectsCloud subjects={subjectList} />
-						{/if}
-					</div>
+					<SubjectsCard endpoint="/api/publishers/{publisherId}/subjects" />
 				{/snippet}
 			</PublicationsDashboard>
 		</div>

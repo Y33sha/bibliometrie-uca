@@ -9,7 +9,7 @@
 	import { rorShortId, rorFullUrl } from '#lib/utils.js';
 	import { structureLabel } from '#lib/structureLabels.js';
 	import PublicationsDashboard from '#lib/components/PublicationsDashboard.svelte';
-	import SubjectsCloud from '#lib/components/SubjectsCloud.svelte';
+	import SubjectsCard from '#lib/components/SubjectsCard.svelte';
 	import PersonsListView from '#lib/components/PersonsListView.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import TabNav from '#lib/components/TabNav.svelte';
@@ -69,8 +69,6 @@
 	let dashboardLoaded = $state(false);
 	let ongoingThesesCount = $state(0);
 	let personsCount = $state(0);
-	type SubjectFrequency = components['schemas']['SubjectFrequency'];
-	let dashSubjects: SubjectFrequency[] = $state([]);
 
 	const tutelles = $derived(parents);
 
@@ -97,16 +95,12 @@
 		// Le décompte des thèses en cours reprend le filtre « En cours » de l'onglet Thèses.
 		const ongoingTheses = new URLSearchParams({ lab_id: String(labId), doc_type: 'ongoing_thesis', per_page: '1' });
 		const persons = new URLSearchParams({ laboratory: String(labId), exclusion: 'none', per_page: '1' });
-		const [ongoingThesesPage, personsPage, subjects] = await Promise.all([
+		const [ongoingThesesPage, personsPage] = await Promise.all([
 			api<{ total: number }>(`/api/publications?${ongoingTheses}`, { key: 'lab-ongoing-theses' }),
 			api<{ total: number }>(`/api/persons?${persons}`, { key: 'lab-persons' }),
-			api<SubjectFrequency[]>(`/api/structures/${labId}/subjects?limit=30`, {
-				key: 'lab-subjects',
-			}),
 		]);
 		ongoingThesesCount = ongoingThesesPage.total;
 		personsCount = personsPage.total;
-		dashSubjects = subjects;
 		dashboardLoaded = true;
 	}
 
@@ -234,10 +228,7 @@
 						: []}
 				>
 					{#snippet subjects()}
-						<div class="dash-card">
-							<h2>Sujets principaux</h2>
-							<SubjectsCloud subjects={dashSubjects} />
-						</div>
+						<SubjectsCard endpoint="/api/structures/{labId}/subjects" />
 					{/snippet}
 				</PublicationsDashboard>
 			{/if}

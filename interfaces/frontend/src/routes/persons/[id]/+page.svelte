@@ -11,7 +11,7 @@
 	import { titleCase, formatDate } from '#lib/utils.js';
 	import { structureLabel } from '#lib/structureLabels.js';
 	import PublicationsDashboard from '#lib/components/PublicationsDashboard.svelte';
-	import SubjectsCloud from '#lib/components/SubjectsCloud.svelte';
+	import SubjectsCard from '#lib/components/SubjectsCard.svelte';
 	import IdentifiersCell from '#lib/components/IdentifiersCell.svelte';
 	import TabNav from '#lib/components/TabNav.svelte';
 	import { activeTabId, type TabDef } from '#lib/tabs.js';
@@ -122,9 +122,6 @@
 	}
 
 	// Dashboard tab : les publications passent par `PublicationsDashboard` ; la page ajoute les thèses dirigées ou jugées et les sujets.
-	type SubjectFrequency = components['schemas']['SubjectFrequency'];
-	let dashboardLoaded = $state(false);
-	let dashSubjects: SubjectFrequency[] = $state([]);
 
 	const displayName = $derived(
 		profile
@@ -142,13 +139,6 @@
 		thesesLoaded = true;
 	}
 
-	async function loadDashboard() {
-		dashSubjects = await api<SubjectFrequency[]>(`/api/persons/${personId}/subjects?limit=30`, {
-			key: 'person-detail-subjects',
-		});
-		dashboardLoaded = true;
-	}
-
 	async function excludeContribution(contributionId: number) {
 		if (!(await confirmDialog({ message: 'Exclure ce lien auteur–publication ? Il ne sera pas recréé automatiquement.', danger: true }))) {
 			return false;
@@ -159,7 +149,6 @@
 
 	function onTabSwitch(tab: string) {
 		// L'onglet "publications" est géré par <PublicationsListView> qui charge ses données dans son propre onMount à chaque (re)montage.
-		if (tab === 'dashboard' && !dashboardLoaded) loadDashboard();
 		if (tab === 'theses' && !thesesLoaded) loadTheses();
 		if (tab === 'addresses' && !addresses.loaded) loadAddressTab();
 	}
@@ -174,8 +163,7 @@
 			error = true;
 			return;
 		}
-		if (activeTab === 'dashboard') loadDashboard();
-		else if (activeTab === 'addresses') loadAddressTab();
+		if (activeTab === 'addresses') loadAddressTab();
 		else if (activeTab === 'theses') loadTheses();
 		// publications : géré par <PublicationsListView> qui charge tout seul.
 	}
@@ -258,12 +246,7 @@
 						: []}
 				>
 					{#snippet subjects()}
-						{#if dashboardLoaded}
-							<div class="dash-card">
-								<h2>Sujets principaux</h2>
-								<SubjectsCloud subjects={dashSubjects} />
-							</div>
-						{/if}
+						<SubjectsCard endpoint="/api/persons/{personId}/subjects" />
 					{/snippet}
 				</PublicationsDashboard>
 			{/if}
@@ -323,16 +306,11 @@
 	{#if activeTab === 'addresses'}
 		<div class="tab-content">
 			<div class="addr-overview">
+				<h2>Structures reconnues dans les adresses</h2>
 				<div class="addr-year">
 					<div class="addr-year-label">Année <strong>{addrYear}</strong></div>
 					<YearSlider min={addrYearMin} max={addrYearMax} bind:value={addrYear} onchange={loadAddressTab} />
 				</div>
-				<h2>Structures reconnues dans les adresses</h2>
-				{#if addrSummary}
-					<p class="addr-total">
-						{publicationCount(addrSummary.publications)}, dont {addrSummary.publications_with_address.toLocaleString('fr-FR')} avec adresse
-					</p>
-				{/if}
 				{#if addrStructures.length}
 					<!-- Axe des valeurs aligné sur la piste du curseur ; libellés des structures et pourcentages en débord. -->
 					<div
@@ -440,7 +418,6 @@
 		margin-bottom: 20px;
 	}
 	.addr-year-label { font-size: var(--fs-md); }
-	.addr-total { font-size: var(--fs-md); margin: 0 0 8px; }
 	.addr-counts { font-size: var(--fs-sm); color: var(--text-secondary); margin: 0; }
 	.addr-cell { font-size: var(--fs-sm); color: var(--muted); word-break: break-all; }
 	.addr-publications { padding: 0 12px 12px 24px; }

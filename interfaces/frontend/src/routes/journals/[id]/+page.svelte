@@ -12,7 +12,7 @@
 	import PublicationsListView from '#lib/components/PublicationsListView.svelte';
 	import MonographsListView from '#lib/components/MonographsListView.svelte';
 	import PublicationsDashboard from '#lib/components/PublicationsDashboard.svelte';
-	import SubjectsCloud from '#lib/components/SubjectsCloud.svelte';
+	import SubjectsCard from '#lib/components/SubjectsCard.svelte';
 	import TitleRow from '#lib/components/TitleRow.svelte';
 	import SerialDrawer from '#lib/components/serials/SerialDrawer.svelte';
 	import IssnBadge from '#lib/components/serials/IssnBadge.svelte';
@@ -21,7 +21,6 @@
 	import type { components } from '#lib/api/schema.js';
 
 	type SerialDetail = components['schemas']['SerialDetailResponse'];
-	type SubjectFrequency = components['schemas']['SubjectFrequency'];
 	type EnumOption = components['schemas']['EnumOption'];
 
 	const serialId = $derived(Number(page.params.id));
@@ -40,8 +39,6 @@
 	]);
 	const activeTab = $derived(activeTabId(tabs, page.url.searchParams));
 	let error = $state(false);
-	let subjectList = $state<SubjectFrequency[]>([]);
-	let dashboardLoaded = $state(false);
 
 	let showRawDoaj = $state(false);
 
@@ -69,18 +66,6 @@
 		}
 	}
 
-	async function loadDashboard() {
-		if (dashboardLoaded) return;
-		subjectList = await api<SubjectFrequency[]>(`/api/serials/${serialId}/subjects?limit=20`, {
-			key: 'j-subjects'
-		});
-		dashboardLoaded = true;
-	}
-
-	function onTabSwitch(tab: string) {
-		if (tab === 'dashboard') loadDashboard();
-	}
-
 	onMount(async () => {
 		const labelMap = (opts: EnumOption[]) => Object.fromEntries(opts.map((o) => [o.value, o.label_fr]));
 		const typeLabelsP = api<EnumOption[]>('/api/serials/types').then((opts) => {
@@ -90,7 +75,6 @@
 			oaModelLabels = labelMap(opts);
 		});
 		await Promise.all([loadSerial(), typeLabelsP, oaModelLabelsP]);
-		if (activeTab === 'dashboard') loadDashboard();
 		await tick();
 	});
 
@@ -183,7 +167,7 @@
 	</div>
 
 	<!-- Tabs -->
-	<TabNav {tabs} onswitch={onTabSwitch} />
+	<TabNav {tabs} />
 
 	<!-- Tab: Dashboard -->
 	{#if activeTab === 'dashboard'}
@@ -195,16 +179,7 @@
 				oaBreakdown="oa_voie"
 			>
 				{#snippet subjects()}
-					<div class="dash-card">
-						<h2>Sujets principaux</h2>
-						{#if !dashboardLoaded}
-							<div class="loading">Chargement…</div>
-						{:else if subjectList.length === 0}
-							<p class="muted">Aucun sujet (les sujets génériques sont exclus du top).</p>
-						{:else}
-							<SubjectsCloud subjects={subjectList} />
-						{/if}
-					</div>
+					<SubjectsCard endpoint="/api/serials/{serialId}/subjects" />
 				{/snippet}
 			</PublicationsDashboard>
 			{#if journal.doaj_payload}
