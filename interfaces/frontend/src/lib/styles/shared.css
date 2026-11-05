@@ -234,7 +234,7 @@ input[type='search']::-webkit-search-cancel-button {
 }
 
 /* Champ de recherche d'une barre d'outils, loupe à gauche. */
-.toolbar input[type='search']:not(.facet-search) {
+.toolbar input[type='search']:not(.panel-search) {
 	height: 36px;
 	padding: 0 12px 0 34px;
 	background: var(--card) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-3.5-3.5'/%3E%3C/svg%3E") no-repeat 11px center;
@@ -352,48 +352,49 @@ input[type='search']::-webkit-search-cancel-button {
 	font-size: var(--fs-sm);
 	font-weight: 600;
 }
+/* ── Panneau flottant : facette, menu, résultats d'une recherche ── */
+.popover {
+	background: var(--card);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	box-shadow: var(--shadow-md);
+}
+/* Champ de recherche en tête d'un panneau. */
+.panel-search {
+	display: block;
+	width: calc(100% - 12px);
+	margin: 2px 6px 6px;
+}
+/* Ligne d'option d'un panneau : case, résultat ou action. L'option atteinte au clavier prend le fond du survol. */
+.option-row {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	width: 100%;
+	padding: 4px 12px;
+	border: none;
+	background: none;
+	font: inherit;
+	font-size: var(--fs-md);
+	color: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+.option-row:hover,
+.option-row:focus-visible {
+	background: var(--hover);
+	outline: none;
+}
 .facet-panel {
 	min-width: 220px;
 	max-width: 360px;
 	max-height: 320px;
 	overflow-y: auto;
 	padding: 6px 0;
-	background: var(--card);
-	border: 1px solid var(--border);
-	border-radius: var(--radius);
-	box-shadow: var(--shadow-md);
-}
-.facet-search {
-	display: block;
-	width: calc(100% - 12px);
-	margin: 2px 6px 6px;
 }
 /* Retire la sélection d'une facette, en tête du panneau. */
 .facet-clear {
-	display: block;
-	width: 100%;
-	padding: 4px 12px;
-	border: none;
-	background: none;
-	font: inherit;
-	font-size: var(--fs-sm);
 	color: var(--accent);
-	text-align: left;
-	cursor: pointer;
-}
-.facet-clear:hover {
-	background: var(--hover);
-}
-.facet-options label {
-	display: flex;
-	align-items: center;
-	gap: 6px;
-	padding: 4px 12px;
-	font-size: var(--fs-md);
-	cursor: pointer;
-}
-.facet-options label:hover {
-	background: var(--hover);
 }
 .facet-options input[type='checkbox'],
 .facet-options input[type='radio'] {

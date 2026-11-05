@@ -292,9 +292,9 @@
 		{#if batchSearch.loading}
 			<span class="loading-text">…</span>
 		{:else if batchSearch.results.length}
-			<div class="batch-results" use:anchored>
+			<div class="batch-results popover" use:anchored>
 				{#each batchSearch.results as r (r.id)}
-					<button class="result-btn" onclick={() => batchAssign(r.id)}>
+					<button class="option-row" onclick={() => batchAssign(r.id)}>
 						<strong>{titleCase(r.last_name)}</strong> {titleCase(r.first_name)}
 						{#if r.has_rh}<RhCheck />{/if}
 						<span class="result-hint">{r.current_unit || `#${r.id}`}</span>
@@ -357,9 +357,9 @@
 										{#if assignSearch.loading}
 											<span class="loading-text">…</span>
 										{:else if assignSearch.results.length}
-											<div class="assign-results" use:anchored>
+											<div class="assign-results popover" use:anchored>
 												{#each assignSearch.results as r (r.id)}
-													<button class="result-btn" onclick={() => assign(o, r.id)}>
+													<button class="option-row" onclick={() => assign(o, r.id)}>
 														<strong>{titleCase(r.last_name)}</strong> {titleCase(r.first_name)}
 														{#if r.has_rh}<RhCheck />{/if}
 														<span class="result-hint">{r.current_unit || `#${r.id}`}</span>
@@ -367,7 +367,7 @@
 												{/each}
 											</div>
 										{:else if assignSearch.query.length >= 2}
-											<div class="assign-results" use:anchored>
+											<div class="assign-results popover" use:anchored>
 												<span class="loading-text">Aucun résultat</span>
 												<button class="btn btn-sm btn-create" onclick={() => createAndAssign(o)}>Créer « {o.full_name} »</button>
 											</div>
@@ -457,14 +457,8 @@
 	.assign-row input { flex: 1; min-width: 0; }
 	.assign-results {
 		display: flex; flex-direction: column; gap: 2px;
-		background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
-		box-shadow: var(--shadow-md); padding: 4px; min-width: 250px;
+		padding: 6px 0; min-width: 250px;
 	}
-	.result-btn {
-		display: block; width: 100%; text-align: left; padding: 4px 8px;
-		border: none; background: var(--surface); cursor: pointer; border-radius: var(--radius); font-size: var(--fs-sm);
-	}
-	.result-btn:hover { background: var(--hover); }
 	.result-hint { font-size: var(--fs-sm); color: var(--muted); margin-left: 4px; }
 	.loading-text { font-size: var(--fs-sm); color: var(--muted); }
 	.batch-bar {
@@ -475,8 +469,7 @@
 	.batch-bar input { width: 220px; }
 	.batch-results {
 		display: flex; flex-direction: column; gap: 2px;
-		background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
-		box-shadow: var(--shadow-md); padding: 4px; min-width: 280px;
+		padding: 6px 0; min-width: 280px;
 		margin-top: 4px;
 	}
 	.create-form { display: flex; flex-direction: column; gap: 10px; margin: 12px 0; }

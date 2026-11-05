@@ -57,12 +57,12 @@
 
 {#snippet list()}
   {#if loading}
-    <div class="picker-item disabled">Recherche…</div>
+    <div class="option-row disabled">Recherche…</div>
   {:else if results.length === 0}
-    <div class="picker-item disabled">{emptyText}</div>
+    <div class="option-row disabled">{emptyText}</div>
   {:else}
     {#each results as result, i (i)}
-      <button class="picker-item" onclick={() => onpick(result)}>
+      <button class="option-row" onclick={() => onpick(result)}>
         {@render item(result)}
       </button>
     {/each}
@@ -70,7 +70,7 @@
 {/snippet}
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="picker-container" class:floating bind:this={element} {onkeydown} onclick={(e) => e.stopPropagation()}>
+<div class="picker-container" class:popover={!floating} class:floating bind:this={element} {onkeydown} onclick={(e) => e.stopPropagation()}>
   {#if header}{@render header()}{/if}
   {#if floating}
     <div class="picker-row">
@@ -78,10 +78,10 @@
       <button class="btn btn-sm" onclick={onclose}>Annuler</button>
     </div>
     {#if showResults}
-      <div class="picker-results picker-panel" use:anchored={{ align, offset: 2 }}>{@render list()}</div>
+      <div class="picker-results picker-panel popover" use:anchored={{ align, offset: 2 }}>{@render list()}</div>
     {/if}
   {:else}
-    <input type="search" {placeholder} bind:value={search} oninput={() => onsearch?.(search)} use:autofocus autocomplete="off" />
+    <input type="search" class="panel-search input-sm" {placeholder} bind:value={search} oninput={() => onsearch?.(search)} use:autofocus autocomplete="off" />
     {#if showResults}
       <div class="picker-results">{@render list()}</div>
     {/if}
@@ -92,29 +92,14 @@
   .picker-container {
     position: relative;
     margin: 8px 0;
-    background: var(--card);
-    border: 1px solid var(--accent);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow-md);
+    padding-top: 4px;
     max-width: 380px;
     z-index: 50;
-  }
-  .picker-container > input {
-    width: 100%;
-    padding: 7px 10px;
-    border: none;
-    border-bottom: 1px solid var(--border);
-    border-radius: var(--radius) var(--radius) 0 0;
-    font-size: var(--fs-md);
-    outline: none;
-    font-family: inherit;
   }
   .picker-container.floating {
     display: inline-block;
     margin: 0;
-    background: none;
-    border: none;
-    box-shadow: none;
+    padding-top: 0;
     max-width: none;
   }
   .picker-row {
@@ -132,26 +117,8 @@
   .picker-panel {
     min-width: 350px;
     max-width: 600px;
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow-md);
   }
-  .picker-item {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    width: 100%;
-    padding: 6px 10px;
-    font-size: var(--fs-md);
-    cursor: pointer;
-    background: none;
-    border: none;
-    text-align: left;
-    font-family: inherit;
-    color: inherit;
-  }
-  .picker-panel .picker-item {
+  .picker-panel .option-row {
     display: block;
     padding: 5px 8px;
     font-size: var(--fs-sm);
@@ -159,15 +126,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .picker-item:hover {
-    background: var(--accent-light);
-  }
-  /* Option atteinte au Tab : même fond bleu pâle que le survol (le cadre bleu par défaut est peu lisible, voire invisible quand il n'y a qu'un résultat). */
-  .picker-item:focus-visible {
-    background: var(--accent-light);
-    outline: none;
-  }
-  .picker-item.disabled {
+  .option-row.disabled {
     color: var(--muted);
     cursor: default;
   }

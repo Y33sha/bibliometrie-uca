@@ -23,9 +23,9 @@
 	<div class="column-menu-wrapper" use:dismissable={() => showMenu && onClose()}>
 		<button class="btn btn-sm" onclick={onOpen} title="Colonnes affichées" aria-label="Colonnes affichées" aria-expanded={showMenu}>⋯</button>
 		{#if showMenu}
-			<div class="column-menu" use:anchored={{ align: 'end' }}>
+			<div class="column-menu popover" use:anchored={{ align: 'end' }}>
 				{#each columns as c}
-					<label class:disabled={c.fixed}>
+					<label class="option-row" class:disabled={c.fixed}>
 						<input type="checkbox" checked={visibleColumns.includes(c.key)}
 							disabled={c.fixed}
 							onchange={() => onToggle(c.key)} />
@@ -42,14 +42,9 @@
 	.col-menu-label { white-space: nowrap; }
 	.column-menu-wrapper { position: relative; }
 	.column-menu {
-		background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
-		box-shadow: var(--shadow-md); padding: 6px 0;
+		padding: 6px 0;
 		min-width: 150px;
 	}
-	.column-menu label {
-		display: flex; align-items: center; gap: 6px;
-		padding: 4px 12px; font-size: var(--fs-sm); cursor: pointer; white-space: nowrap;
-	}
-	.column-menu label:hover { background: var(--hover); }
+	.column-menu label { white-space: nowrap; }
 	.column-menu label.disabled { opacity: 0.5; cursor: default; }
 </style>

@@ -369,14 +369,14 @@
 
   <!-- Context picker -->
   {#if ctxPicker}
-    <div class="ctx-picker-inline" id="form-ctx-picker" style="top:{ctxPicker.y}px;left:{ctxPicker.x}px" onkeydown={(e) => { if (e.key === 'Escape') { e.preventDefault(); closeCtxPicker(); } }} role="dialog" aria-label="Contexte contraignant" tabindex="-1">
+    <div class="ctx-picker-inline popover" id="form-ctx-picker" style="top:{ctxPicker.y}px;left:{ctxPicker.x}px" onkeydown={(e) => { if (e.key === 'Escape') { e.preventDefault(); closeCtxPicker(); } }} role="dialog" aria-label="Contexte contraignant" tabindex="-1">
       <div class="picker-shortcuts">
         <button onclick={() => addCtxToForm("tutelles")}>{"\uD83D\uDD17"} tutelles</button>
       </div>
-      <input type="text" placeholder="Rechercher une structure" bind:value={ctxSearch} use:autofocus />
+      <input type="text" class="panel-search input-sm" placeholder="Rechercher une structure" bind:value={ctxSearch} use:autofocus />
       <div class="picker-results">
         {#each ctxFilteredStructures as s (s.id)}
-          <button class="picker-item" onclick={() => addCtxToForm(s.id)}>
+          <button class="option-row" onclick={() => addCtxToForm(s.id)}>
             <span class="picker-type">{s.type}</span>
             {s.acronym ? s.acronym + " \u2014 " : ""}{s.name}
           </button>
@@ -468,42 +468,11 @@
   .ctx-picker-inline {
     position: fixed;
     z-index: 100;
-    background: var(--card);
-    border: 1px solid var(--accent);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow-md);
     width: 320px;
-  }
-  .ctx-picker-inline input {
-    width: 100%;
-    padding: 6px 10px;
-    border: none;
-    border-bottom: 1px solid var(--border);
-    border-radius: 0;
-    font-size: var(--fs-sm);
-    outline: none;
   }
   .picker-results {
     max-height: 180px;
     overflow-y: auto;
-  }
-  .picker-item {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 5px 10px;
-    font-size: var(--fs-sm);
-    cursor: pointer;
-    background: none;
-    border: none;
-    width: 100%;
-    text-align: left;
-    font-family: inherit;
-  }
-  .picker-item:hover,
-  .picker-item:focus-visible {
-    background: var(--accent-light);
-    outline: none;
   }
   .picker-type {
     font-size: var(--fs-sm);

@@ -561,7 +561,7 @@
     {#if perimModal.structResults.length > 0}
       <div class="perim-search-results">
         {#each perimModal.structResults.slice(0, 8) as s (s.id)}
-          <button class="picker-item" onclick={() => perimAddStruct(s)}>
+          <button class="option-row" onclick={() => perimAddStruct(s)}>
             {s.acronym ? s.acronym + " — " : ""}{s.name}
           </button>
         {/each}
@@ -701,20 +701,6 @@
     max-height: 200px;
     overflow-y: auto;
     background: var(--card);
-  }
-  .picker-item {
-    display: block;
-    width: 100%;
-    padding: 6px 10px;
-    font-size: var(--fs-md);
-    cursor: pointer;
-    background: none;
-    border: none;
-    text-align: left;
-    font-family: inherit;
-  }
-  .picker-item:hover {
-    background: var(--accent-light);
   }
   /* Libellé de phase : le pointillé + le curseur d'aide signalent l'infobulle de description. */
   .role-phase {
