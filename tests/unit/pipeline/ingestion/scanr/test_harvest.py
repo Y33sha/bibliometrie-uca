@@ -28,16 +28,13 @@ class TestBuildQuery:
             {"terms": {"affiliations.id.keyword": ["A1", "A2"]}},
         ]
         assert q["sort"] == [{"id.keyword": "asc"}]
+        assert q["track_total_hits"] is False
+        assert "_source" not in q
 
     def test_search_after_only_when_provided(self):
         assert "search_after" not in build_query(year=2024, affiliation_ids=["A1"])
         q = build_query(year=2024, affiliation_ids=["A1"], search_after=["last-id-123"])
         assert q["search_after"] == ["last-id-123"]
-
-    def test_track_total_only_when_requested(self):
-        assert build_query(year=2024, affiliation_ids=["A1"])["track_total_hits"] is False
-        q = build_query(year=2024, affiliation_ids=["A1"], track_total=True)
-        assert q["track_total_hits"] is True
 
 
 class TestFields:

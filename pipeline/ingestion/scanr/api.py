@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from enum import StrEnum
 
 import httpx2
@@ -11,7 +11,7 @@ import httpx2
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, at_path
 from pipeline.http.http_retry import http_request_with_retry, lookup_json_async
 from pipeline.http.lookup import NOT_FOUND, UNAVAILABLE, LookupOutcome, NotFound, Unavailable
-from pipeline.ingestion.api_params import API_BASE_URLS
+from pipeline.ingestion.api_params import API_BASE_URLS, SCANR_PER_PAGE
 from pipeline.ingestion.common.pages import Page
 from pipeline.ingestion.credentials import get_scanr_credentials
 
@@ -88,6 +88,33 @@ async def fetch_by_id(
     if isinstance(records, Unavailable):
         return records
     return records[0] if records else NOT_FOUND
+
+
+def page_query(
+    filters: Sequence[JsonValue],
+    after: Sequence[JsonValue] | None = None,
+    *,
+    excludes: Sequence[str] = (),
+) -> dict[str, JsonValue]:
+    """Construit la requête Elasticsearch d'une page de documents.
+
+    Les clauses sont en contexte `filter`. Ce contexte se passe de `_score`, et le cluster le met en cache : il répond neuf fois plus vite que l'équivalent `must`/`should` (1 s contre 9,5 s pour une page de 200). Le tri sur `id.keyword` sert la pagination `search_after`. Le comptage exact (`track_total_hits`) est coupé, sinon Elasticsearch recompterait tous les résultats à chaque page. `ScanrClient.count` le rétablit.
+
+    Args:
+        after: clé de tri du dernier document de la page précédente (`search_after`).
+        excludes: champs retirés des documents renvoyés (`_source.excludes`).
+    """
+    query: dict[str, JsonValue] = {
+        "size": SCANR_PER_PAGE,
+        "track_total_hits": False,
+        "query": {"bool": {"filter": list(filters)}},
+        "sort": [{"id.keyword": "asc"}],
+    }
+    if excludes:
+        query["_source"] = {"excludes": list(excludes)}
+    if after:
+        query["search_after"] = list(after)
+    return query
 
 
 def hits_page(data: Mapping[str, JsonValue]) -> Page:

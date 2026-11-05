@@ -10,13 +10,12 @@ from typing import ClassVar
 
 from domain.persons.identifiers import PersonIdentifierType
 from domain.types import JsonValue
-from pipeline.ingestion.api_params import SCANR_PER_PAGE
 from pipeline.ingestion.common.pages import Page
 from pipeline.ingestion.common.person_search import (
     Identifiers,
     PersonSearchHarvester,
 )
-from pipeline.ingestion.scanr.api import ScanrClient, hits_page, search_after
+from pipeline.ingestion.scanr.api import ScanrClient, hits_page, page_query, search_after
 
 
 def build_identifiers_query(
@@ -28,22 +27,13 @@ def build_identifiers_query(
         should.append({"terms": {"authors.person.keyword": [f"idref{v}" for v in idrefs]}})
     if orcids := identifiers.get(PersonIdentifierType.ORCID):
         should.append({"terms": {"authors.denormalized.orcid.keyword": list(orcids)}})
-    query: dict[str, JsonValue] = {
-        "size": SCANR_PER_PAGE,
-        "track_total_hits": False,
-        "query": {
-            "bool": {
-                "filter": [
-                    {"range": {"year": {"gte": first_year, "lte": last_year}}},
-                    {"bool": {"should": should, "minimum_should_match": 1}},
-                ]
-            }
-        },
-        "sort": [{"id.keyword": "asc"}],
-    }
-    if search_after:
-        query["search_after"] = search_after
-    return query
+    return page_query(
+        [
+            {"range": {"year": {"gte": first_year, "lte": last_year}}},
+            {"bool": {"should": should, "minimum_should_match": 1}},
+        ],
+        search_after,
+    )
 
 
 class ScanrPersonHarvester(PersonSearchHarvester[ScanrClient]):
