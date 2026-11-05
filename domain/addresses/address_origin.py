@@ -94,8 +94,7 @@ def _is_hal_precision(content: str, referentials: OriginReferentials) -> bool:
     places = [part for p in content.split(",") if (part := normalize_text(p))]
     if places and all(referentials.is_place(p) for p in places):
         return True
-    normalized = normalize_text(content)
-    return bool(normalized) and normalized in referentials.structure_names
+    return normalize_text(content) in referentials.structure_names
 
 
 def _is_name_and_country(text: str, referentials: OriginReferentials) -> bool:

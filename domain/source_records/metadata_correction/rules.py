@@ -86,6 +86,7 @@ class MetadataCorrectionRule(StrEnum):
     PRESENTATION_ORAL_TO_CONFERENCE = "PRESENTATION_ORAL_TO_CONFERENCE"
     PRESENTATION_DISPLAY_TO_POSTER = "PRESENTATION_DISPLAY_TO_POSTER"
     DOI_REGISTRANT_MEDIA_TO_MEDIA = "DOI_REGISTRANT_MEDIA_TO_MEDIA"
+    DOI_ISBN_CHAPTER_TO_BOOK_CHAPTER = "DOI_ISBN_CHAPTER_TO_BOOK_CHAPTER"
     CROSSREF_AUTHORLESS_VOLUME_TITLE_TO_PROCEEDINGS = (
         "CROSSREF_AUTHORLESS_VOLUME_TITLE_TO_PROCEEDINGS"
     )
@@ -174,6 +175,9 @@ _VOLUME_TITLE_PREFIX_PATTERN = re.compile(
 _ABSTRACTS_SERIAL_TITLE_PATTERN = re.compile(r"\babstracts?\b", re.IGNORECASE)
 """Titre de revue ou de collection d'un recueil de résumés : « Goldschmidt Abstracts », « Abstracts with programs »."""
 
+_ISBN_CHAPTER_DOI_PATTERN = re.compile(r"/97[89](?:-?\d){10}\.ch\d{1,3}$")
+"""DOI de chapitre : ISBN-13 de l'ouvrage, puis `.ch` et le numéro du chapitre (`10.1002/9781119507284.ch1`, `10.4018/978-1-5225-3168-5.ch007`)."""
+
 _THESIS_REGISTRY_DOI_PREFIXES = ("10.70675",)
 """Préfixes DOI des registres de thèses, dont le DOI est celui de la thèse elle-même : `10.70675` (ABES). Les thèses des archives institutionnelles ont des préfixes variés, absents de la liste."""
 
@@ -255,6 +259,12 @@ _RULES: dict[MetadataCorrectionRule, _Rule] = {
     # DOI déposé par un éditeur de presse ⇒ `media`, quel que soit le `doc_type`. The Conversation dépose ses articles sans titre de revue.
     MetadataCorrectionRule.DOI_REGISTRANT_MEDIA_TO_MEDIA: _Rule(
         None, lambda f: PublisherType.MEDIA in f.registrant_publisher_types, DocType.MEDIA
+    ),
+    # DOI de chapitre + doc_type `other` ⇒ `book_chapter`. Crossref, OpenAlex et ScanR typent `other` les chapitres de Wiley. Évaluée avant les règles de titre de volume.
+    MetadataCorrectionRule.DOI_ISBN_CHAPTER_TO_BOOK_CHAPTER: _Rule(
+        frozenset({DocType.OTHER}),
+        lambda f: any(_ISBN_CHAPTER_DOI_PATTERN.search(doi) for doi in f.dois),
+        DocType.BOOK_CHAPTER,
     ),
     # Enregistrement source Crossref sans auteur dont le titre nomme un volume d'actes ou un recueil de résumés ⇒ `proceedings`.
     MetadataCorrectionRule.CROSSREF_AUTHORLESS_VOLUME_TITLE_TO_PROCEEDINGS: _Rule(

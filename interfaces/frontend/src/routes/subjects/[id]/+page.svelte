@@ -84,7 +84,7 @@
       </div>
     </div>
 
-    <!-- Place du sujet dans chaque vocabulaire : ancêtres, nombre de publications, sous-sujets. -->
+    <!-- Place du sujet dans chaque vocabulaire : ancêtres, nombre de publications quand le sujet figure dans plusieurs vocabulaires, sous-sujets. -->
     <div class="vocabularies">
       {#each data.vocabulary_subjects as v (`${v.vocabulary}:${v.code}`)}
         <div class="vocabulary">
@@ -97,7 +97,9 @@
               {/each}
               <span class="current">{data.subject.label}</span>
             </span>
-            <span class="muted-num">{v.usage_count.toLocaleString("fr-FR")} publications</span>
+            {#if data.vocabulary_subjects.length > 1}
+              <span class="muted-num">{v.usage_count.toLocaleString("fr-FR")} publications</span>
+            {/if}
           </div>
           {#if v.children.length > 0}
             <div class="detail-sublabel">Sous-sujets</div>

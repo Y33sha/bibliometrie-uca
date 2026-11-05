@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Chart } from '#lib/components/charts/chart.js';
+	import { Chart, stackedSegmentOptions } from '#lib/components/charts/chart.js';
 
 	// Barres verticales empilées : une série par segment, la légende sous le graphique.
 	let {
@@ -22,11 +22,12 @@
 			chart = null;
 		}
 		if (!canvas || labels.length === 0) return;
+		const segment = stackedSegmentOptions(canvas);
 		chart = new Chart(canvas, {
 			type: 'bar',
 			data: {
 				labels,
-				datasets: series.map((s) => ({ label: s.label, data: s.values, backgroundColor: s.color })),
+				datasets: series.map((s) => ({ label: s.label, data: s.values, backgroundColor: s.color, ...segment })),
 			},
 			options: {
 				responsive: true,

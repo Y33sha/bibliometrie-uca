@@ -8,6 +8,7 @@ import zipfile
 import httpx2
 import pytest
 
+from domain.errors import ValidationError
 from domain.structures.identifiers import RorId
 from domain.structures.ror import RorStatus, RorType
 from pipeline.http.dump_download import DumpDownloadError, DumpUnavailableError
@@ -55,6 +56,14 @@ class TestParseRorRow:
         assert org.status is RorStatus.ACTIVE
         assert org.parent_ids == {RorId("04kdfz702")}
         assert org.child_ids == {RorId("03gz4y884"), RorId("02vnq7240")}
+
+    def test_ramene_un_code_de_l_outre_mer_a_la_france(self):
+        org = parse_ror_row({**_ROW, "locations.geonames_details.country_code": "GP"})
+        assert org.country_code == "fr"
+
+    def test_refuse_un_code_pays_illisible(self):
+        with pytest.raises(ValidationError, match="Code pays"):
+            parse_ror_row({**_ROW, "locations.geonames_details.country_code": "FRA"})
 
     def test_lit_une_ligne_sans_relation(self):
         org = parse_ror_row({**_ROW, "relationships": ""})

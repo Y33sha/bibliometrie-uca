@@ -23,8 +23,8 @@ INSERT INTO config (key, value, description) VALUES ('sudoc_max_per_run', '10000
 INSERT INTO config (key, value, description) VALUES ('unpaywall_max_per_run', '10000', 'Nombre maximum de DOI vérifiés auprès d''Unpaywall par run. 0 = illimité.') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, description = EXCLUDED.description;
 INSERT INTO config (key, value, description) VALUES ('unpaywall_recheck_after_days', '15', 'Délai, en jours, avant de vérifier de nouveau le statut open access d''une publication auprès d''Unpaywall.') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, description = EXCLUDED.description;
 
--- countries (246 lignes)
-DELETE FROM countries WHERE (code) NOT IN (('ad'), ('ae'), ('af'), ('ag'), ('ai'), ('al'), ('am'), ('ao'), ('aq'), ('ar'), ('as'), ('at'), ('au'), ('aw'), ('ax'), ('az'), ('ba'), ('bb'), ('bd'), ('be'), ('bf'), ('bg'), ('bh'), ('bi'), ('bj'), ('bl'), ('bm'), ('bn'), ('bo'), ('bq'), ('br'), ('bs'), ('bt'), ('bv'), ('bw'), ('by'), ('bz'), ('ca'), ('cc'), ('cd'), ('cf'), ('cg'), ('ch'), ('ci'), ('ck'), ('cl'), ('cm'), ('cn'), ('co'), ('cr'), ('cu'), ('cv'), ('cw'), ('cx'), ('cy'), ('cz'), ('de'), ('dj'), ('dk'), ('dm'), ('do'), ('dz'), ('ec'), ('ee'), ('eg'), ('eh'), ('er'), ('es'), ('et'), ('fi'), ('fj'), ('fk'), ('fm'), ('fo'), ('fr'), ('ga'), ('gb'), ('gd'), ('ge'), ('gg'), ('gh'), ('gi'), ('gl'), ('gm'), ('gn'), ('gq'), ('gr'), ('gs'), ('gt'), ('gu'), ('gw'), ('gy'), ('hk'), ('hm'), ('hn'), ('hr'), ('ht'), ('hu'), ('id'), ('ie'), ('il'), ('im'), ('in'), ('io'), ('iq'), ('ir'), ('is'), ('it'), ('je'), ('jm'), ('jo'), ('jp'), ('ke'), ('kg'), ('kh'), ('ki'), ('km'), ('kn'), ('kp'), ('kr'), ('kw'), ('ky'), ('kz'), ('la'), ('lb'), ('lc'), ('li'), ('lk'), ('lr'), ('ls'), ('lt'), ('lu'), ('lv'), ('ly'), ('ma'), ('mc'), ('md'), ('me'), ('mf'), ('mg'), ('mh'), ('mk'), ('ml'), ('mm'), ('mn'), ('mo'), ('mp'), ('mr'), ('ms'), ('mt'), ('mu'), ('mv'), ('mw'), ('mx'), ('my'), ('mz'), ('na'), ('nc'), ('ne'), ('nf'), ('ng'), ('ni'), ('nl'), ('no'), ('np'), ('nr'), ('nu'), ('nz'), ('om'), ('pa'), ('pe'), ('pf'), ('pg'), ('ph'), ('pk'), ('pl'), ('pm'), ('pn'), ('pr'), ('ps'), ('pt'), ('pw'), ('py'), ('qa'), ('ro'), ('rs'), ('ru'), ('rw'), ('sa'), ('sb'), ('sc'), ('sd'), ('se'), ('sg'), ('sh'), ('si'), ('sj'), ('sk'), ('sl'), ('sm'), ('sn'), ('so'), ('sr'), ('ss'), ('st'), ('sv'), ('sx'), ('sy'), ('sz'), ('tc'), ('td'), ('tf'), ('tg'), ('th'), ('tj'), ('tk'), ('tl'), ('tm'), ('tn'), ('to'), ('tr'), ('tt'), ('tv'), ('tw'), ('tz'), ('ua'), ('ug'), ('um'), ('us'), ('uy'), ('uz'), ('va'), ('vc'), ('ve'), ('vg'), ('vi'), ('vn'), ('vu'), ('wf'), ('ws'), ('xk'), ('xx'), ('ye'), ('za'), ('zm'), ('zw'));
+-- countries (239 lignes)
+DELETE FROM countries WHERE (code) NOT IN (('ad'), ('ae'), ('af'), ('ag'), ('ai'), ('al'), ('am'), ('ao'), ('aq'), ('ar'), ('as'), ('at'), ('au'), ('aw'), ('ax'), ('az'), ('ba'), ('bb'), ('bd'), ('be'), ('bf'), ('bg'), ('bh'), ('bi'), ('bj'), ('bm'), ('bn'), ('bo'), ('bq'), ('br'), ('bs'), ('bt'), ('bv'), ('bw'), ('by'), ('bz'), ('ca'), ('cc'), ('cd'), ('cf'), ('cg'), ('ch'), ('ci'), ('ck'), ('cl'), ('cm'), ('cn'), ('co'), ('cr'), ('cu'), ('cv'), ('cw'), ('cx'), ('cy'), ('cz'), ('de'), ('dj'), ('dk'), ('dm'), ('do'), ('dz'), ('ec'), ('ee'), ('eg'), ('eh'), ('er'), ('es'), ('et'), ('fi'), ('fj'), ('fk'), ('fm'), ('fo'), ('fr'), ('ga'), ('gb'), ('gd'), ('ge'), ('gg'), ('gh'), ('gi'), ('gl'), ('gm'), ('gn'), ('gq'), ('gr'), ('gs'), ('gt'), ('gu'), ('gw'), ('gy'), ('hk'), ('hm'), ('hn'), ('hr'), ('ht'), ('hu'), ('id'), ('ie'), ('il'), ('im'), ('in'), ('io'), ('iq'), ('ir'), ('is'), ('it'), ('je'), ('jm'), ('jo'), ('jp'), ('ke'), ('kg'), ('kh'), ('ki'), ('km'), ('kn'), ('kp'), ('kr'), ('kw'), ('ky'), ('kz'), ('la'), ('lb'), ('lc'), ('li'), ('lk'), ('lr'), ('ls'), ('lt'), ('lu'), ('lv'), ('ly'), ('ma'), ('mc'), ('md'), ('me'), ('mg'), ('mh'), ('mk'), ('ml'), ('mm'), ('mn'), ('mo'), ('mp'), ('mr'), ('ms'), ('mt'), ('mu'), ('mv'), ('mw'), ('mx'), ('my'), ('mz'), ('na'), ('ne'), ('nf'), ('ng'), ('ni'), ('nl'), ('no'), ('np'), ('nr'), ('nu'), ('nz'), ('om'), ('pa'), ('pe'), ('pg'), ('ph'), ('pk'), ('pl'), ('pn'), ('pr'), ('ps'), ('pt'), ('pw'), ('py'), ('qa'), ('ro'), ('rs'), ('ru'), ('rw'), ('sa'), ('sb'), ('sc'), ('sd'), ('se'), ('sg'), ('sh'), ('si'), ('sj'), ('sk'), ('sl'), ('sm'), ('sn'), ('so'), ('sr'), ('ss'), ('st'), ('sv'), ('sx'), ('sy'), ('sz'), ('tc'), ('td'), ('tg'), ('th'), ('tj'), ('tk'), ('tl'), ('tm'), ('tn'), ('to'), ('tr'), ('tt'), ('tv'), ('tw'), ('tz'), ('ua'), ('ug'), ('um'), ('us'), ('uy'), ('uz'), ('va'), ('vc'), ('ve'), ('vg'), ('vi'), ('vn'), ('vu'), ('ws'), ('xk'), ('xx'), ('ye'), ('za'), ('zm'), ('zw'));
 INSERT INTO countries (code, name) VALUES ('ad', 'Andorre') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
 INSERT INTO countries (code, name) VALUES ('ae', 'Émirats arabes unis') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
 INSERT INTO countries (code, name) VALUES ('af', 'Afghanistan') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
@@ -50,7 +50,6 @@ INSERT INTO countries (code, name) VALUES ('bg', 'Bulgarie') ON CONFLICT (code) 
 INSERT INTO countries (code, name) VALUES ('bh', 'Bahreïn') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
 INSERT INTO countries (code, name) VALUES ('bi', 'Burundi') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
 INSERT INTO countries (code, name) VALUES ('bj', 'Bénin') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
-INSERT INTO countries (code, name) VALUES ('bl', 'Saint-Barthélemy') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
 INSERT INTO countries (code, name) VALUES ('bm', 'Bermudes') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
 INSERT INTO countries (code, name) VALUES ('bn', 'Brunei') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
 INSERT INTO countries (code, name) VALUES ('bo', 'Bolivie') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
@@ -163,7 +162,6 @@ INSERT INTO countries (code, name) VALUES ('ma', 'Maroc') ON CONFLICT (code) DO 
 INSERT INTO countries (code, name) VALUES ('mc', 'Monaco') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
 INSERT INTO countries (code, name) VALUES ('md', 'Moldavie') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
 INSERT INTO countries (code, name) VALUES ('me', 'Monténégro') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
-INSERT INTO countries (code, name) VALUES ('mf', 'Saint-Martin') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
 INSERT INTO countries (code, name) VALUES ('mg', 'Madagascar') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
 INSERT INTO countries (code, name) VALUES ('mh', 'Îles Marshall') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
 INSERT INTO countries (code, name) VALUES ('mk', 'Macédoine du Nord') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
@@ -182,7 +180,6 @@ INSERT INTO countries (code, name) VALUES ('mx', 'Mexique') ON CONFLICT (code) D
 INSERT INTO countries (code, name) VALUES ('my', 'Malaisie') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
 INSERT INTO countries (code, name) VALUES ('mz', 'Mozambique') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
 INSERT INTO countries (code, name) VALUES ('na', 'Namibie') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
-INSERT INTO countries (code, name) VALUES ('nc', 'Nouvelle-Calédonie') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
 INSERT INTO countries (code, name) VALUES ('ne', 'Niger') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
 INSERT INTO countries (code, name) VALUES ('nf', 'Île Norfolk') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
 INSERT INTO countries (code, name) VALUES ('ng', 'Nigeria') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
@@ -196,12 +193,10 @@ INSERT INTO countries (code, name) VALUES ('nz', 'Nouvelle-Zélande') ON CONFLIC
 INSERT INTO countries (code, name) VALUES ('om', 'Oman') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
 INSERT INTO countries (code, name) VALUES ('pa', 'Panama') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
 INSERT INTO countries (code, name) VALUES ('pe', 'Pérou') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
-INSERT INTO countries (code, name) VALUES ('pf', 'Polynésie française') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
 INSERT INTO countries (code, name) VALUES ('pg', 'Papouasie-Nouvelle-Guinée') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
 INSERT INTO countries (code, name) VALUES ('ph', 'Philippines') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
 INSERT INTO countries (code, name) VALUES ('pk', 'Pakistan') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
 INSERT INTO countries (code, name) VALUES ('pl', 'Pologne') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
-INSERT INTO countries (code, name) VALUES ('pm', 'Saint-Pierre-et-Miquelon') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
 INSERT INTO countries (code, name) VALUES ('pn', 'Îles Pitcairn') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
 INSERT INTO countries (code, name) VALUES ('pr', 'Porto Rico') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
 INSERT INTO countries (code, name) VALUES ('ps', 'Palestine') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
@@ -236,7 +231,6 @@ INSERT INTO countries (code, name) VALUES ('sy', 'Syrie') ON CONFLICT (code) DO 
 INSERT INTO countries (code, name) VALUES ('sz', 'Eswatini') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
 INSERT INTO countries (code, name) VALUES ('tc', 'Îles Turques-et-Caïques') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
 INSERT INTO countries (code, name) VALUES ('td', 'Tchad') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
-INSERT INTO countries (code, name) VALUES ('tf', 'Terres australes et antarctiques françaises') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
 INSERT INTO countries (code, name) VALUES ('tg', 'Togo') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
 INSERT INTO countries (code, name) VALUES ('th', 'Thaïlande') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
 INSERT INTO countries (code, name) VALUES ('tj', 'Tadjikistan') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
@@ -263,7 +257,6 @@ INSERT INTO countries (code, name) VALUES ('vg', 'Îles Vierges britanniques') O
 INSERT INTO countries (code, name) VALUES ('vi', 'Îles Vierges des États-Unis') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
 INSERT INTO countries (code, name) VALUES ('vn', 'Viêt Nam') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
 INSERT INTO countries (code, name) VALUES ('vu', 'Vanuatu') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
-INSERT INTO countries (code, name) VALUES ('wf', 'Wallis-et-Futuna') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
 INSERT INTO countries (code, name) VALUES ('ws', 'Samoa') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
 INSERT INTO countries (code, name) VALUES ('xk', 'Kosovo') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
 INSERT INTO countries (code, name) VALUES ('xx', 'Non applicable') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
@@ -1162,7 +1155,7 @@ INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('cy', 'ch
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('fr', 'clermont ferrand', 'city') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('cc', 'cocos islands', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('cc', 'cocos keeling islands', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
-INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('mf', 'collectivite de saint martin', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
+INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('fr', 'collectivite de saint martin', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('us', 'college park', 'city') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('co', 'colombia', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('co', 'colombie', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
@@ -1234,8 +1227,8 @@ INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('fr', 'fr
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('fr', 'francia', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('de', 'freiburg', 'city') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('fr', 'french guiana', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
-INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('pf', 'french polynesia', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
-INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('tf', 'french southern territories', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
+INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('fr', 'french polynesia', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
+INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('fr', 'french southern territories', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('ga', 'gabon', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('us', 'gainesville', 'city') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('us', 'ga usa', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
@@ -1415,7 +1408,7 @@ INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('np', 'ne
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('nl', 'netherlands', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('us', 'newark', 'city') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('us', 'new brunswick', 'city') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
-INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('nc', 'new caledonia', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
+INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('fr', 'new caledonia', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('in', 'new delhi', 'city') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('us', 'new haven', 'city') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('us', 'new mexico', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
@@ -1439,8 +1432,8 @@ INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('mk', 'no
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('no', 'norvege', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('no', 'norway', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('gb', 'norwich', 'city') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
-INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('nc', 'nouvelle caledonie', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
-INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('nc', 'nouvelle-caledonie', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
+INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('fr', 'nouvelle caledonie', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
+INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('fr', 'nouvelle-caledonie', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('nz', 'nouvelle zelande', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('nz', 'nouvelle-zelande', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('fr', 'nouzilly', 'city') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
@@ -1482,7 +1475,7 @@ INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('fr', 'po
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('pl', 'poland', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('pl', 'pologne', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('pl', 'polska', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
-INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('pf', 'polynesie francaise', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
+INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('fr', 'polynesie francaise', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('us', 'portland', 'city') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('pr', 'porto rico', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('pt', 'portugal', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
@@ -1521,7 +1514,7 @@ INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('ru', 'ru
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('rw', 'rwanda', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('de', 'saarbrucken', 'city') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('eh', 'sahara occidental', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
-INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('bl', 'saint barthelemy', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
+INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('fr', 'saint barthelemy', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('kn', 'saint christophe et nieves', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('lc', 'sainte lucie', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('fr', 'saint etienne', 'city') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
@@ -1531,9 +1524,9 @@ INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('kn', 'sa
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('lc', 'saint lucia', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('sm', 'saint marin', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('fr', 'saint martin d heres', 'city') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
-INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('mf', 'saint martin partie francaise', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
-INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('pm', 'saint pierre and miquelon', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
-INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('pm', 'saint pierre et miquelon', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
+INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('fr', 'saint martin partie francaise', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
+INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('fr', 'saint pierre and miquelon', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
+INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('fr', 'saint pierre et miquelon', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('va', 'saint siege', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('vc', 'saint vincent and the grenadines', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('vc', 'saint vincent et les grenadines', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
@@ -1586,7 +1579,7 @@ INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('se', 'sw
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('ch', 'switzerland', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('sy', 'syria', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('sy', 'syrie', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
-INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('pf', 'tahiti', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
+INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('fr', 'tahiti', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('tw', 'taipei taiwan', 'city') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('tw', 'taiwan', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('us', 'tallahassee', 'city') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
@@ -1658,8 +1651,8 @@ INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('fr', 'vi
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('lt', 'vilnius', 'city') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('nl', 'wageningen', 'city') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('gb', 'wales', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
-INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('wf', 'wallis and futuna', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
-INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('wf', 'wallis et futuna', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
+INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('fr', 'wallis and futuna', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
+INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('fr', 'wallis et futuna', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('ca', 'waterloo', 'city') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('us', 'wa usa', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;
 INSERT INTO place_name_forms (iso_code, form_normalized, kind) VALUES ('eh', 'western sahara', 'country') ON CONFLICT (form_normalized) DO UPDATE SET iso_code = EXCLUDED.iso_code, kind = EXCLUDED.kind;

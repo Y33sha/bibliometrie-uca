@@ -89,18 +89,12 @@ Mesures du 2026-11-03, base locale, publications du périmètre : 199 errata sur
 
 ### Phase 3 — Arbitrage
 
-- [ ] `other` d'une source prioritaire face au type précis d'une autre source, compte tenu du type `article` qu'OpenAlex attribue par défaut. Cas : 87 working papers typés `other` par DataCite et `preprint` par HAL, dont 72 à DOI OSF (`10.17605`) (14691, 255632).
+- [ ] `other` d'une source prioritaire face au type précis d'une autre source, compte tenu du type `article` qu'OpenAlex attribue par défaut. Cas : 87 working papers typés `other` par DataCite et `preprint` par HAL, dont 72 à DOI OSF (`10.17605`) (14691, 255632). 58 chapitres à DOI construit sur un ISBN, typés `book_chapter` par HAL ou une autre source (167674).
 
 ### Phase 4 — Cas particuliers
 
-- [ ] « Computing Pivot-Minors » (208937 en base locale) : OpenAlex type l'œuvre `article`. Identifiant arXiv converti en DOI du dépôt (`10.48550/arxiv.<identifiant>`). PMCID retiré des identifiants : la page PMC est une localisation. Valeurs `arxiv_id` et `pmcid` retirées de `source_identifier_type`. Base locale : 141 paires de publications séparées par les deux formes d'un même arXiv.
-- [ ] Mesure à refaire sur la prod. Base locale : 14 934 enregistrements sources WoS sur 17 409 sans identifiant, faute de payload au raw store au remplissage de `source_record_identifiers`. Le DOI est dans `staging.doi` pour 13 990. Exemple : 302143, doublon WoS de « Computing Pivot-Minors ».
 - [x] Adresses d'en-tête HTTP `Link` recopiées par OpenAlex comme localisations, écartées : profils ORCID, pages de navigation d'entrepôts. 1 694 enregistrements sources en base locale. a82e4423f
-- [ ] 206476 : communication de congrès déposée en entrepôt, typée `article` par OpenAlex seul.
-* [ ] 165068 type "commmentary"; 86931 type "meeting report" => comment prendre en compte ces types (et empêcher openalex d'imposer le type article)
-* [ ] règle à créer: si DOI de forme ISBN + _n => conference_paper ou chapitre / si forme ISBN: proceedings ou book (trancher selon type du "journal")
-* [ ] doc_types souvent suspects, à investiguer: "preprint", "autre" (voir aussi si le type "article" peut être affiné selon des critères objectifs: ie la revue)
-* "(No longer) Hiking hypothetical trails in one direction: How unidirectional comparisons hinder theoretical progress in social psychology, and how reversing the direction of comparisons can advance it" => openalex type "article"
+- [x] Règle `DOI_ISBN_CHAPTER_TO_BOOK_CHAPTER` : un enregistrement source `other` à DOI de chapitre (ISBN, `.ch`, un à trois chiffres) devient `book_chapter`. Base locale : 81 publications, chapitres de Wiley. 4af130011
 
 ### Phase 5 — Résumés de conférence
 
@@ -120,5 +114,5 @@ Mesures du 2026-11-03, publications du périmètre : 1 895 communications rattac
 
 - Pièces d'un corpus Nakala (257102) : publications distinctes, ou éléments d'un jeu de données.
 - Films, bandes-annonces et MOOC en `recorded_talk` par la correspondance de HAL `VIDEO` et DataCite `Audiovisual`.
-- « Meeting report » publié en revue, typé `article` par toutes les sources (176417, 180148, 16340).
+- « Meeting report » publié en revue, typé `article` par toutes les sources (176417, 180148, 16340) : quel signal pour le typer `conference_abstract` ?
 - Article corrigé ou rétracté absent de la base, cible d'un erratum ou d'un avis du périmètre : moissonnage par DOI (`fetch_missing`) ?
