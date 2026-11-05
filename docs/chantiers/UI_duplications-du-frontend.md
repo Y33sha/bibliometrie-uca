@@ -107,7 +107,7 @@ Une étiquette (tag, badge, pastille, chip) est un court texte sur fond clair, a
 
 - [x] Boutons sans bordure, pleins, à contour et en pointillés ; un seul état désactivé
 - [x] Boutons locaux sur les classes partagées ; retrait « × » sur `IconButton`
-- [ ] Champs, menus déroulants, panneaux flottants et lignes d'options
+- [x] Champs, menus déroulants, panneaux flottants et lignes d'options
 
 ### Phase 5 — Utilitaires
 
