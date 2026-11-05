@@ -13,11 +13,11 @@
 </script>
 
 {#if href}
-	<a {href} target="_blank" rel="noopener" class="source-tag source-{source}" {title}>
+	<a {href} target="_blank" rel="noopener" class="logo-icon logo-source logo-{source}" {title}>
 		{#if icon}<img src={icon} alt={label} />{:else}{label}{/if}
 	</a>
 {:else}
-	<span class="source-tag source-{source}" {title}>
+	<span class="logo-icon logo-source logo-{source}" {title}>
 		{#if icon}<img src={icon} alt={label} />{:else}{label}{/if}
 	</span>
 {/if}

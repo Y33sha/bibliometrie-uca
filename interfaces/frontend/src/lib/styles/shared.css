@@ -947,8 +947,8 @@ button.tag {
 	font-family: var(--mono);
 }
 
-/* ── ID icons (round, ORCID/idHAL/IdRef) ── */
-.id-icon {
+/* ── Logo rond d'une source ou d'un identifiant de personne ── */
+.logo-icon {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -956,149 +956,122 @@ button.tag {
 	height: 22px;
 	border-radius: 50%;
 	text-decoration: none;
-	vertical-align: middle;
-	transition: transform 0.1s;
-	flex-shrink: 0;
-}
-
-.id-icon:hover {
-	transform: scale(1.15);
-}
-
-.id-icon img {
-	width: 14px;
-	height: 14px;
-	display: block;
-}
-
-.id-orcid {
-	background: #f0f7e0;
-}
-
-.id-orcid:hover {
-	background: #e3ecc8;
-}
-
-.id-hal {
-	background: var(--accent-light);
-}
-
-.id-hal:hover {
-	background: #d0e3f4;
-}
-
-.id-idref {
-	background: #fdeae5;
-}
-
-.id-idref:hover {
-	background: #f9d4ca;
-}
-
-.id-icon:not(.id-confirmed) {
-	opacity: 0.5;
-}
-
-.id-placeholder {
-	visibility: hidden;
-}
-
-/* ── Source icon tags (round) ── */
-.source-tag {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	width: 22px;
-	height: 22px;
-	border-radius: 50%;
-	text-decoration: none;
-	margin-right: 3px;
 	vertical-align: middle;
 	transition: transform 0.1s;
 }
 
 /* Une icône dans un lien réagit au survol du lien entier. */
-.source-tag:hover,
-a:hover > .source-tag {
+.logo-icon:hover,
+a:hover > .logo-icon {
 	transform: scale(1.15);
 }
 
-.source-tag img {
+.logo-icon img {
 	width: 14px;
 	height: 14px;
 	display: block;
 }
 
-.source-hal {
+.logo-source {
+	margin-right: 3px;
+}
+
+.logo-identifier {
+	flex-shrink: 0;
+}
+
+.logo-unconfirmed {
+	opacity: 0.5;
+}
+
+.logo-placeholder {
+	visibility: hidden;
+}
+
+.logo-hal {
 	background: var(--accent-light);
 }
 
-.source-hal:hover,
-a:hover > .source-hal {
+.logo-hal:hover,
+a:hover > .logo-hal {
 	background: #d0e3f4;
 }
 
-.source-openalex {
+.logo-openalex {
 	background: #fef3e0;
 }
 
-.source-openalex:hover,
-a:hover > .source-openalex {
+.logo-openalex:hover,
+a:hover > .logo-openalex {
 	background: #fde8c8;
 }
 
-.source-theses {
+.logo-theses {
 	background: #e8f5e9;
 }
 
-.source-theses:hover,
-a:hover > .source-theses {
+.logo-theses:hover,
+a:hover > .logo-theses {
 	background: #d0eadb;
 }
 
-.source-scanr {
+.logo-scanr {
 	background: transparent;
 }
 
-.source-scanr img {
+.logo-scanr img {
 	width: 22px;
 	height: 22px;
 }
 
-.source-wos {
+.logo-wos {
 	background: #e8e0f8;
 }
 
-.source-wos:hover,
-a:hover > .source-wos {
+.logo-wos:hover,
+a:hover > .logo-wos {
 	background: #d8c8f4;
 }
 
-.source-crossref {
+.logo-crossref {
 	background: #f3ead2;
 }
 
-.source-crossref:hover,
-a:hover > .source-crossref {
+.logo-crossref:hover,
+a:hover > .logo-crossref {
 	background: #ebdcb8;
 }
 
-.source-datacite {
+.logo-datacite {
 	background: #d9f1ec;
 }
 
-.source-datacite:hover,
-a:hover > .source-datacite {
+.logo-datacite:hover,
+a:hover > .logo-datacite {
 	background: #c6e8e0;
 }
 
 /* Le logo de Zenodo est blanc : sa pastille prend le bleu de Zenodo. */
-.tag-zenodo {
+.logo-zenodo {
 	background: #0047a8;
 }
 
-.source-placeholder {
-	visibility: hidden;
+.logo-orcid {
+	background: #f0f7e0;
+}
+
+.logo-orcid:hover,
+a:hover > .logo-orcid {
+	background: #e3ecc8;
+}
+
+.logo-idref {
+	background: #fdeae5;
+}
+
+.logo-idref:hover,
+a:hover > .logo-idref {
+	background: #f9d4ca;
 }
 
 .links-cell {

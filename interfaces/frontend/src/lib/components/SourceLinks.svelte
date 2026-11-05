@@ -16,6 +16,6 @@
 	{#if id}
 		<SourceTag {source} {id} href={urls[source]} />
 	{:else}
-		<span class="source-tag source-placeholder"></span>
+		<span class="logo-icon logo-source logo-placeholder"></span>
 	{/if}
 {/each}

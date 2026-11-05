@@ -31,7 +31,7 @@
   };
 
   // Pastilles colorées des icônes claires.
-  const PLATFORM_TAG_CLASSES: Record<string, string> = { Zenodo: "tag-zenodo" };
+  const PLATFORM_LOGO_CLASSES: Record<string, string> = { Zenodo: "logo-zenodo" };
 
   const orderedSources = $derived([
     ...sourceOrder().flatMap((src) => referencedBy.filter((s) => s.source === src)),
@@ -71,7 +71,7 @@
 
   {#snippet copyRow(copy: AccessLink)}
     <a href={copy.url} target="_blank" rel="noopener noreferrer" class="source-row" title={copy.url}>
-      <span class="source-tag {PLATFORM_TAG_CLASSES[copy.label] ?? ''}">
+      <span class="logo-icon logo-source {PLATFORM_LOGO_CLASSES[copy.label] ?? ''}">
         <img src={asset(`icons/${copy.icon}` as AssetPath)} alt={copy.label} />
       </span>
       <span class="row-label">{copy.label}</span>
@@ -115,7 +115,7 @@
             class="source-row"
             title={e.value}
           >
-            <span class="source-tag">
+            <span class="logo-icon logo-source">
               {#if EXT_META[e.type]?.icon}
                 <img src={EXT_META[e.type].icon} alt={EXT_META[e.type]?.label} />
               {/if}
@@ -193,7 +193,7 @@
     text-decoration: none;
   }
   /* La pastille garde sa largeur, icône ou non : les libellés restent alignés. */
-  .source-row :global(.source-tag) {
+  .source-row :global(.logo-icon) {
     flex-shrink: 0;
   }
   .row-label {
