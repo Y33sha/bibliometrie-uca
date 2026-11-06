@@ -1,7 +1,7 @@
 /**
  * Registre des filtres des publications, partagé par la liste des publications et la page Statistiques.
  *
- * Le contexte fixe le filtre de son entité. Il active les filtres propres à l'entité : le statut HAL pour un laboratoire, le périmètre pour une personne, la position d'auteur pour l'un et l'autre.
+ * Le contexte fixe le filtre de son entité. Il active les filtres propres à l'entité : le statut HAL pour un laboratoire, la position d'auteur pour un laboratoire ou une personne.
  */
 import { ALL_TOKEN, explicitSelectionUrl, type FilterGroup, type ListFilter } from '#lib/filterRegistry.js';
 import { SOURCE_ITEMS } from '#lib/filterItems.js';
@@ -11,12 +11,12 @@ import { contextEntityId, type PublicationListContext } from '#lib/publicationLi
 
 /** Rubriques du panneau des filtres des publications, dans l'ordre d'affichage. */
 export const PUBLICATION_FILTER_GROUPS: readonly FilterGroup[] = [
-	{ key: 'publication', label: 'Publication' },
-	{ key: 'access', label: 'Accès ouvert' },
-	{ key: 'affiliations', label: 'Affiliations' },
+	{ key: 'document', label: 'Document' },
 	{ key: 'venue', label: 'Revue et éditeur' },
 	{ key: 'authors', label: 'Auteurs' },
 	{ key: 'content', label: 'Sujets et citations' },
+	{ key: 'access', label: 'Accès' },
+	{ key: 'collaborations', label: 'Collaborations' },
 	{ key: 'sources', label: 'Sources' },
 ];
 
@@ -31,7 +31,7 @@ export function publicationFilters(
 			control: 'checkbox',
 			label: filterLabels.types,
 			param: 'doc_type',
-			group: 'publication',
+			group: 'document',
 			facet: { type: 'label_map', apiKey: 'doc_types', labels: docTypePluralLabels() },
 			groups: docTypeFamilies().map((f) => ({ label: f.label, values: f.types })),
 			showColumns: ['type'],
@@ -42,7 +42,7 @@ export function publicationFilters(
 			control: 'checkbox',
 			label: filterLabels.years,
 			param: 'year',
-			group: 'publication',
+			group: 'document',
 			facet: { type: 'simple', apiKey: 'years' },
 			range: true,
 			// Un lien vers la page Statistiques écrit `all` : elle applique alors ses années par défaut seulement à l'ouverture sans paramètre `year`.
@@ -53,7 +53,7 @@ export function publicationFilters(
 			control: 'checkbox',
 			label: 'Langues',
 			param: 'language',
-			group: 'publication',
+			group: 'document',
 			facet: { type: 'labeled', apiKey: 'languages' },
 			searchable: true,
 		},
@@ -62,72 +62,9 @@ export function publicationFilters(
 			control: 'checkbox',
 			label: 'DOI',
 			param: 'doi_agency',
-			group: 'publication',
+			group: 'document',
 			facet: { type: 'labeled', apiKey: 'doi_agencies' },
 			tooltip: "Agence d'enregistrement du DOI",
-		},
-		{
-			key: 'access',
-			control: 'checkbox',
-			label: filterLabels.access,
-			param: 'access',
-			group: 'access',
-			facet: { type: 'labeled', apiKey: 'access' },
-		},
-		{
-			key: 'oa',
-			control: 'checkbox',
-			label: filterLabels.oaStatuses,
-			param: 'oa_status',
-			group: 'access',
-			facet: { type: 'label_map', apiKey: 'oa_statuses', labels: oaLabelsMap },
-			showColumns: ['oa_status'],
-		},
-		{
-			key: 'license',
-			control: 'checkbox',
-			label: filterLabels.licenses,
-			param: 'license',
-			group: 'access',
-			facet: { type: 'labeled', apiKey: 'licenses' },
-			tooltip: 'Licence de la version éditeur',
-			showColumns: ['license'],
-		},
-		{
-			key: 'labs',
-			control: 'checkbox',
-			label: filterLabels.labs,
-			param: 'lab_id',
-			group: 'affiliations',
-			facet: { type: 'labeled', apiKey: 'labs' },
-			searchable: true,
-			fixed: () => contextEntityId(context, 'lab'),
-			// « Aucun labo » ne se combine pas avec un laboratoire.
-			normalize: (selected) =>
-				selected.includes('none') && selected.length > 1
-					? selected.filter((v) => v !== 'none')
-					: selected,
-		},
-		{
-			key: 'partner',
-			control: 'entity',
-			label: filterLabels.partner,
-			param: 'partner_ror',
-			group: 'affiliations',
-			entity: 'partner',
-		},
-		{
-			key: 'countries',
-			control: 'checkbox',
-			label: filterLabels.countries,
-			param: 'country',
-			group: 'affiliations',
-			facet: {
-				type: 'labeled',
-				apiKey: 'countries',
-				transform: (c) => ({ value: c.value, text: `${c.label} (${c.value.toUpperCase()})`, count: c.count }),
-			},
-			searchable: true,
 		},
 		{
 			key: 'serial',
@@ -158,6 +95,21 @@ export function publicationFilters(
 			entity: 'person',
 		},
 		{
+			key: 'labs',
+			control: 'checkbox',
+			label: filterLabels.labs,
+			param: 'lab_id',
+			group: 'authors',
+			facet: { type: 'labeled', apiKey: 'labs' },
+			searchable: true,
+			fixed: () => contextEntityId(context, 'lab'),
+			// « Aucun labo » ne se combine pas avec un laboratoire.
+			normalize: (selected) =>
+				selected.includes('none') && selected.length > 1
+					? selected.filter((v) => v !== 'none')
+					: selected,
+		},
+		{
 			key: 'authorPosition',
 			control: 'checkbox',
 			label: 'Position auteur',
@@ -175,15 +127,6 @@ export function publicationFilters(
 			},
 			enabled: () => context.kind === 'person' || context.kind === 'lab',
 			showColumns: ['corr'],
-		},
-		{
-			key: 'perimeter',
-			control: 'checkbox',
-			label: 'Affiliations',
-			param: 'in_perimeter',
-			group: 'authors',
-			facet: { type: 'labeled', apiKey: 'in_perimeter' },
-			enabled: () => context.kind === 'person',
 		},
 		{
 			key: 'subjects',
@@ -204,6 +147,54 @@ export function publicationFilters(
 			facet: { type: 'labeled', apiKey: 'citation_tops' },
 			tooltip: "D'après OpenAlex. Le top 10 % comprend le top 1 %",
 			showColumns: ['citation_top'],
+		},
+		{
+			key: 'access',
+			control: 'checkbox',
+			label: filterLabels.access,
+			param: 'access',
+			group: 'access',
+			facet: { type: 'labeled', apiKey: 'access' },
+		},
+		{
+			key: 'oa',
+			control: 'checkbox',
+			label: filterLabels.oaStatuses,
+			param: 'oa_status',
+			group: 'access',
+			facet: { type: 'label_map', apiKey: 'oa_statuses', labels: oaLabelsMap },
+			showColumns: ['oa_status'],
+		},
+		{
+			key: 'license',
+			control: 'checkbox',
+			label: filterLabels.licenses,
+			param: 'license',
+			group: 'access',
+			facet: { type: 'labeled', apiKey: 'licenses' },
+			tooltip: 'Licence de la version éditeur',
+			showColumns: ['license'],
+		},
+		{
+			key: 'partner',
+			control: 'entity',
+			label: filterLabels.partner,
+			param: 'partner_ror',
+			group: 'collaborations',
+			entity: 'partner',
+		},
+		{
+			key: 'countries',
+			control: 'checkbox',
+			label: filterLabels.countries,
+			param: 'country',
+			group: 'collaborations',
+			facet: {
+				type: 'labeled',
+				apiKey: 'countries',
+				transform: (c) => ({ value: c.value, text: `${c.label} (${c.value.toUpperCase()})`, count: c.count }),
+			},
+			searchable: true,
 		},
 		{
 			key: 'sources',
