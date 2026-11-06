@@ -4,7 +4,7 @@
 	import CollaborationMap from '#lib/components/stats/CollaborationMap.svelte';
 	import { CHART_PAGE_SIZE, type PivotChart } from '#lib/composables/usePivotChart.svelte.js';
 
-	// Graphique des statistiques : légende et export PNG, graphique, pagination de l'axe à forte cardinalité ; ou carte des collaborations internationales. Le graphique occupe la hauteur laissée par la page, dans une colonne flexible.
+	// Graphique des statistiques : légende, graphique, pagination de l'axe à forte cardinalité ; ou carte des collaborations internationales. Le graphique occupe la hauteur laissée par la page, dans une colonne flexible.
 	let { chart }: { chart: PivotChart } = $props();
 
 	let canvas: HTMLCanvasElement | undefined = $state();
@@ -24,7 +24,6 @@
 		{#if chart.legendItems.length > 1}
 			<ChartLegend items={chart.legendItems} />
 		{/if}
-		<button type="button" class="export-btn chart-export" onclick={chart.exportPng}>Export PNG</button>
 	</div>
 	<div class="chart-area">
 		<!-- Le graphique est dessiné dans un canvas : les lecteurs d'écran lisent le tableau des données. -->
@@ -60,16 +59,12 @@
 		flex-direction: column;
 		min-height: 0;
 	}
-	/* Ligne au-dessus du graphique : légende à gauche, export à droite. */
+	/* Légende, au-dessus du graphique. */
 	.chart-header {
 		display: flex;
 		align-items: center;
 		gap: 16px;
 		margin-bottom: 8px;
-	}
-	.chart-export {
-		flex: none;
-		margin-left: auto;
 	}
 	.chart-area {
 		margin-bottom: 16px;

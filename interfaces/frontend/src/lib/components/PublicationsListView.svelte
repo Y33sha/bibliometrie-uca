@@ -44,7 +44,7 @@
 	import { useColumnVisibility } from '#lib/composables/useColumnVisibility.svelte.js';
 	import ColumnMenu from '#lib/components/ColumnMenu.svelte';
 	import { paramsToQuery } from '#lib/utils.js';
-	import { nextSort, sortDirection } from '#lib/sort.js';
+	import { nextSort, sortDirection, type SortDirection } from '#lib/sort.js';
 	import IconButton from '#lib/components/IconButton.svelte';
 	import ListStatus from '#lib/components/ListStatus.svelte';
 	import { contextEntityId, type PublicationListContext } from '#lib/publicationListContext.js';
@@ -128,25 +128,14 @@
 	const VIEWS: readonly View[] = ['notices', 'table', 'stats'];
 	let view = $state<View>('notices');
 
-	// Tris proposés en vue Notices, où les en-têtes de colonne manquent. Ils couvrent les tris du tableau.
-	const sortOptions = [
-		{ value: 'year_desc', label: "Année, récentes d'abord" },
-		{ value: 'year_asc', label: "Année, anciennes d'abord" },
-		{ value: 'title_asc', label: 'Titre, de A à Z' },
-		{ value: 'title_desc', label: 'Titre, de Z à A' },
-		{ value: 'serial_asc', label: 'Revue, de A à Z' },
-		{ value: 'serial_desc', label: 'Revue, de Z à A' },
-		{ value: 'publisher_asc', label: 'Éditeur, de A à Z' },
-		{ value: 'publisher_desc', label: 'Éditeur, de Z à A' },
-		...(isLab
-			? []
-			: [
-					{ value: 'labs_asc', label: 'Laboratoire, de A à Z' },
-					{ value: 'labs_desc', label: 'Laboratoire, de Z à A' },
-				]),
-		{ value: 'apc_desc', label: 'APC, montant décroissant' },
-		{ value: 'apc_asc', label: 'APC, montant croissant' },
+	// Tris de la vue Notices, où les en-têtes de colonne manquent : année, des plus récentes aux plus anciennes, ou titre, de A à Z. Un bouton inverse le sens. Un tri choisi dans le tableau sur une autre colonne reste proposé.
+	type SortField = { field: string; label: string; first: SortDirection };
+	const NOTICE_SORTS: SortField[] = [
+		{ field: 'year', label: columnLabels.year, first: 'desc' },
+		{ field: 'title', label: columnLabels.title, first: 'asc' },
 	];
+	/** Colonnes triées par ordre alphabétique : leur sens s'affiche « A→Z ». Les autres (année, montant) s'affichent par une flèche. */
+	const ALPHABETICAL_SORTS = new Set(['title', 'serial', 'publisher', 'labs']);
 
 	// --- Filtres ---
 	let search = $state('');
@@ -164,6 +153,36 @@
 	const serialSort = $derived(sortDirection(currentSort, 'serial'));
 	const publisherSort = $derived(sortDirection(currentSort, 'publisher'));
 	const labsSort = $derived(sortDirection(currentSort, 'labs'));
+
+	// Tri courant, décomposé pour la vue Notices.
+	const sortField = $derived(currentSort.replace(/_(asc|desc)$/, ''));
+	const sortDir = $derived<SortDirection>(currentSort.endsWith('_asc') ? 'asc' : 'desc');
+	const noticeSorts = $derived(
+		NOTICE_SORTS.some((s) => s.field === sortField)
+			? NOTICE_SORTS
+			: [...NOTICE_SORTS, { field: sortField, label: columnLabels[sortField as keyof typeof columnLabels] ?? sortField, first: sortDir }],
+	);
+	const sortDirLabel = $derived(
+		ALPHABETICAL_SORTS.has(sortField) ? (sortDir === 'asc' ? 'A→Z' : 'Z→A') : sortDir === 'desc' ? '↓' : '↑',
+	);
+	const sortDirTitle = $derived(
+		sortField === 'year'
+			? sortDir === 'desc' ? "Plus récentes d'abord" : "Plus anciennes d'abord"
+			: ALPHABETICAL_SORTS.has(sortField)
+				? sortDir === 'asc' ? 'De A à Z' : 'De Z à A'
+				: sortDir === 'desc' ? 'Décroissant' : 'Croissant',
+	);
+
+	function setSortField(field: string) {
+		const first = noticeSorts.find((s) => s.field === field)?.first ?? 'asc';
+		currentSort = `${field}_${first}`;
+		onFilterChange();
+	}
+
+	function toggleSortDir() {
+		currentSort = `${sortField}_${sortDir === 'asc' ? 'desc' : 'asc'}`;
+		onFilterChange();
+	}
 
 	// --- Shared filter params builder ---
 	function buildFilterParams(): URLSearchParams {
@@ -309,17 +328,23 @@
 </script>
 
 
-<ListToolbar bind:search placeholder="Rechercher par titre ou sujet" onsearch={onSearchInput} list={listing} one="publication" many="publications" exportUrl={view === 'stats' ? undefined : exportCsvUrl()}>
+<ListToolbar bind:search placeholder="Rechercher par titre ou sujet" onsearch={onSearchInput} list={listing} one="publication" many="publications" exportUrl={view === 'stats' ? undefined : exportCsvUrl()} countBelow>
 	{#snippet leading()}
 		<FilterPanelToggle bind:open={filterPanel.open} active={activeCount(FILTERS, values)} />
 	{/snippet}
+	{#snippet exportAction()}
+		{#if view === 'stats' && !pivot.isCollab}<button type="button" class="export-btn" onclick={pivot.exportPng}>Export PNG</button>{/if}
+	{/snippet}
 	{#snippet actions()}
 		{#if view === 'notices'}
-			<label class="sort-select">Trier par
-				<select bind:value={currentSort} onchange={onFilterChange}>
-					{#each sortOptions as o (o.value)}<option value={o.value}>{o.label}</option>{/each}
-				</select>
-			</label>
+			<span class="sort-select">
+				<label>Trier par
+					<select value={sortField} onchange={(e) => setSortField(e.currentTarget.value)}>
+						{#each noticeSorts as s (s.field)}<option value={s.field}>{s.label}</option>{/each}
+					</select>
+				</label>
+				<button type="button" class="facet-btn sort-dir" title={sortDirTitle} aria-label="Sens du tri : {sortDirTitle}" onclick={toggleSortDir}>{sortDirLabel}</button>
+			</span>
 		{/if}
 		<div class="segmented" role="group" aria-label="Affichage">
 			<button type="button" aria-pressed={view === 'notices'} onclick={() => setView('notices')}>Notices</button>
@@ -371,7 +396,7 @@
 					</div>
 					</div>
 				</div>
-				<div class="notice-access"><AccessButton accessUrl={p.access_url} oaStatus={p.oa_status} compact /></div>
+				<div class="notice-access"><AccessButton accessUrl={p.access_url} oaStatus={p.oa_status} docType={p.doc_type} compact /></div>
 			</li>
 		{/each}
 	</ul>
@@ -491,7 +516,7 @@
 					{#if col('sources')}<td class="links-cell">
 						<SourceLinks ids={[['hal', p.hal_id], ['openalex', p.openalex_id], ['scanr', p.scanr_id], ['wos', p.wos_id]]} urls={p.record_urls} />
 					</td>{/if}
-					<td class="access-cell"><AccessButton accessUrl={p.access_url} oaStatus={p.oa_status} compact /></td>
+					<td class="access-cell"><AccessButton accessUrl={p.access_url} oaStatus={p.oa_status} docType={p.doc_type} compact /></td>
 				</tr>
 			{/each}
 		{/if}
@@ -539,9 +564,19 @@
 	.sort-select {
 		display: inline-flex;
 		align-items: center;
-		gap: 4px;
+		gap: 2px;
 		font-size: var(--fs-sm);
 		color: var(--muted);
+	}
+	.sort-select label {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+	}
+	/* Sens du tri : « A→Z » ou flèche, collé à la liste du tri. */
+	.sort-dir {
+		padding: 0 4px;
+		margin-left: -6px;
 	}
 	/* Vue Statistiques : réglages, puis graphique dans une colonne flexible. Sa hauteur suit la fenêtre, moins le menu et la barre d'outils de la liste à sa place ; elle ignore le glissement de la barre au défilement, qui la ferait varier. */
 	.stats-view {

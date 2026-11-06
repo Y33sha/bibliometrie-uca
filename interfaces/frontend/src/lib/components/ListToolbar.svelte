@@ -3,7 +3,7 @@
 	import ResultCount from '#lib/components/ResultCount.svelte';
 	import { stickyHeight } from '#lib/actions/stickyHeight.js';
 
-	// Barre d'outils d'une liste. Première ligne : contrôle de tête (bouton du panneau des filtres), recherche, nombre de résultats, export CSV et actions. Deuxième ligne : filtres. Le contenu enfant et les filtres actifs suivent.
+	// Barre d'outils d'une liste. Première ligne : contrôle de tête (bouton du panneau des filtres), recherche, nombre de résultats, export CSV et actions. Deuxième ligne : filtres. Le contenu enfant et les filtres actifs suivent. Avec `countBelow`, le nombre de résultats passe sous la première ligne, devant les filtres actifs, et l'export au bout de cette ligne.
 	// Depuis le haut de la page, la barre suit la page en descente jusqu'à quitter l'écran. Elle glisse ensuite d'un bloc : elle réapparaît sous le menu supérieur dès que la page remonte, et repart dès que la page redescend. L'en-tête du tableau qui suit se colle sous sa part visible.
 	let {
 		search = $bindable(),
@@ -13,11 +13,13 @@
 		one,
 		many,
 		exportUrl,
+		exportAction,
 		leading,
 		actions,
 		filters,
 		filtersLabel = 'Filtrer par',
 		activeFilters,
+		countBelow = false,
 		children,
 	}: {
 		/** Terme de recherche. Sans valeur, la barre n'affiche aucun champ de recherche. */
@@ -33,6 +35,8 @@
 		many: string;
 		/** Adresse de l'export CSV de la liste filtrée. */
 		exportUrl?: string;
+		/** Commande d'export autre que le lien CSV, placée au même endroit (ex. image d'un graphique). */
+		exportAction?: Snippet;
 		/** Contrôle placé devant la recherche. */
 		leading?: Snippet;
 		actions?: Snippet;
@@ -41,6 +45,8 @@
 		filtersLabel?: string;
 		/** Filtres actifs, au bas de la barre. */
 		activeFilters?: Snippet;
+		/** Nombre de résultats sous la première ligne, suivi des filtres actifs, plutôt que sur la première ligne. */
+		countBelow?: boolean;
 		children?: Snippet;
 	} = $props();
 
@@ -108,6 +114,11 @@
 
 <svelte:window {onscroll} onwheel={markGesture} ontouchmove={markGesture} onkeydown={onScrollKey} />
 
+{#snippet exportControls()}
+	{#if exportUrl}<a href={exportUrl} class="export-btn" download>Export CSV</a>{/if}
+	{@render exportAction?.()}
+{/snippet}
+
 <div class="list-toolbar-anchor" bind:this={anchor}></div>
 <!-- La barre glisse par sa position collante (`top`). Une transformation ferait d'elle le repère des panneaux en position fixe qu'elle contient (facettes), décalés d'autant. -->
 <div class="list-toolbar" class:hidden class:detached bind:this={bar} style:top={offset ? `calc(var(--header-height) - ${offset}px)` : undefined} use:stickyHeight={{ variable: '--list-toolbar-height', hidden: offset }}>
@@ -117,8 +128,10 @@
 			{#if search !== undefined}
 				<input type="search" class="list-search" {placeholder} aria-label={placeholder} bind:value={search} oninput={onsearch} {onkeydown} />
 			{/if}
-			<ResultCount {list} {one} {many} />
-			{#if exportUrl}<a href={exportUrl} class="export-btn" download>Export CSV</a>{/if}
+			{#if !countBelow}
+				<ResultCount {list} {one} {many} />
+				{@render exportControls()}
+			{/if}
 			{@render actions?.()}
 		</div>
 		{#if filters}
@@ -127,9 +140,16 @@
 				{@render filters()}
 			</div>
 		{/if}
+		{#if countBelow}
+			<div class="toolbar-summary">
+				<ResultCount {list} {one} {many} />
+				{@render activeFilters?.()}
+				<span class="summary-export">{@render exportControls()}</span>
+			</div>
+		{/if}
 		{@render children?.()}
 	</div>
-	{@render activeFilters?.()}
+	{#if !countBelow}{@render activeFilters?.()}{/if}
 </div>
 
 <style>
@@ -162,6 +182,23 @@
 	.list-search {
 		flex: 1;
 		min-width: 220px;
+	}
+	/* Ligne du nombre de résultats, suivi des filtres actifs, alignée à gauche sous la recherche. */
+	.toolbar-summary {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 6px 12px;
+		min-height: 28px;
+	}
+	.toolbar-summary :global(.count) {
+		margin-left: 0;
+	}
+	/* Export en bout de ligne, à droite. */
+	.summary-export {
+		display: inline-flex;
+		gap: 4px;
+		margin-left: auto;
 	}
 	/* Écran étroit : la recherche occupe toute la ligne, le compteur et les actions passent dessous. */
 	@media (max-width: 600px) {

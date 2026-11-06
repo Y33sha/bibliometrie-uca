@@ -12,7 +12,7 @@
 		type ListFilter,
 	} from '#lib/filterRegistry.js';
 
-	/** Barre des filtres actifs : une pastille par filtre, qui retire ce filtre, et un bouton qui les retire tous. Les valeurs fixées par la page n'y figurent pas. */
+	/** Barre des filtres actifs : une pastille par filtre, qui retire ce filtre, et, à partir de deux filtres, un bouton qui les retire tous. Les valeurs fixées par la page n'y figurent pas. */
 	interface Props {
 		filters: ListFilter[];
 		values: FilterValues;
@@ -63,7 +63,6 @@
 
 {#if active.length}
 	<div class="active-filters">
-		<span class="active-filters-label">Filtres actifs&nbsp;:</span>
 		{#each active as f (f.key)}
 			{@const text = summary(f)}
 			<button type="button" class="active-filter" title="Retirer ce filtre ({f.label} : {text})" onclick={() => onclear(f)}>
@@ -72,7 +71,7 @@
 				<span class="active-filter-remove" aria-hidden="true">✕</span>
 			</button>
 		{/each}
-		<button type="button" class="btn-text" onclick={onclearall}>Supprimer les filtres</button>
+		{#if active.length > 1}<button type="button" class="btn-text" onclick={onclearall}>Supprimer les filtres</button>{/if}
 	</div>
 {/if}
 
@@ -83,11 +82,6 @@
 		gap: 6px;
 		flex-wrap: wrap;
 		padding: 6px 0;
-	}
-	.active-filters-label {
-		font-size: var(--fs-md);
-		color: var(--muted);
-		white-space: nowrap;
 	}
 	.active-filter {
 		display: inline-flex;
