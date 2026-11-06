@@ -45,19 +45,23 @@ const HOTES_AFFICHABLES = new Set([
 const COMPOSITION =
 	/^(halPersonUrl|halUrl|rorFullUrl|crossrefMemberUrl|issnPortalUrl|exportCsvUrl|relHref)\(/;
 const INTERNE = /^(pubsUrl|statsUrl)$/;
+/* Liens de la page d'accueil vers une vue des publications, et résultats de la recherche
+ * transverse : routes de l'application, composées par `resolve`. */
+const ROUTE_COMPOSEE = /^(questionUrl\(|r\.href$)/;
 /* `resolve` compose un chemin de l'application sous le préfixe de déploiement, `withBase` un
  * chemin de l'API ; `loginUrl` y ajoute la page de retour après connexion. */
 const ROUTE = /^(resolve|withBase|loginUrl)\(/;
 const TABLE_IDENTIFIANTS = /^(EXT_META\[|meta\.url\()/;
 /* Fiche DOAJ servie par l'API, dont l'hôte est vérifié côté serveur. Liens vers le portail d'une
- * source, composés par l'API : l'hôte y est écrit dans le code et l'identifiant encodé
- * (`domain/sources/registry.py`, `source_record_url`). */
-const VERIFIE_COTE_SERVEUR = /^[a-z]+\.(doaj_url|record_url|record_urls(\.[a-z]+)?)$/;
+ * source ou d'une plateforme, composés par l'API : l'hôte y est écrit dans le code et
+ * l'identifiant encodé (`domain/sources/registry.py`, `source_record_url` ;
+ * `domain/platforms/registry.py`, `espacenet_url`). */
+const VERIFIE_COTE_SERVEUR = /^[a-z]+\.(doaj_url|espacenet_url|record_url|record_urls(\.[a-z]+)?)$/;
 /* Copie ouverte d'une publication, et bouton d'accès qui y mène à défaut du DOI : l'hôte vient
  * des données, le serveur vérifie seulement le schéma `http` ou `https`
  * (`domain/publications/access.py`). */
 const COPIE_OUVERTE = /^(copy\.url|accessUrl)$/;
-const REGLES = [COMPOSITION, INTERNE, ROUTE, TABLE_IDENTIFIANTS, VERIFIE_COTE_SERVEUR, COPIE_OUVERTE];
+const REGLES = [COMPOSITION, INTERNE, ROUTE_COMPOSEE, ROUTE, TABLE_IDENTIFIANTS, VERIFIE_COTE_SERVEUR, COPIE_OUVERTE];
 
 const URL_LITTERALE = /https?:\/\/([A-Za-z0-9._-]+)/g;
 // Attribut `href`, sous sa forme longue `href={…}` ou raccourcie `{href}`.

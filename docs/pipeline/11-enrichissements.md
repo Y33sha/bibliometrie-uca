@@ -50,6 +50,8 @@ Lit chez doi.org l'URL de résolution de chaque DOI, interroge [Unpaywall](../gl
 
 Le verdict d'Unpaywall relève ces accès, sans les abaisser : `gold`, `hybrid` ou `diamond` vaut une copie ouverte chez l'éditeur sous licence, `bronze` sans licence, `green` une copie d'archive ouverte.
 
+Un brevet a le statut `unknown`.
+
 Incrémentale : chaque service reçoit seulement les DOI sans réponse de sa part, ou à réponse plus ancienne que son délai, dans la limite de son plafond par exécution. Ces réglages se modifient dans `admin/config`.
 
 | Service | Plafond | Délai | DOI écartés |

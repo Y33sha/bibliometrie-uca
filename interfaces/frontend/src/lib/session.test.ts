@@ -14,17 +14,17 @@ describe('returnPath', () => {
 		);
 	});
 
-	it('renvoie la page Statistiques sans redirection', () => {
-		expect(returnPath(null, ORIGIN)).toBe('/bibliometrie/stats');
+	it("renvoie la page d'accueil sans redirection", () => {
+		expect(returnPath(null, ORIGIN)).toBe('/bibliometrie/');
 	});
 
 	it.each([
-		'https://ailleurs.fr/bibliometrie/stats',
-		'//ailleurs.fr/bibliometrie/stats',
-		'/\\ailleurs.fr/bibliometrie/stats',
+		'https://ailleurs.fr/bibliometrie/publications',
+		'//ailleurs.fr/bibliometrie/publications',
+		'/\\ailleurs.fr/bibliometrie/publications',
 		'/autre-site',
-	])('renvoie la page Statistiques pour %s, hors du site', (redirect) => {
-		expect(returnPath(redirect, ORIGIN)).toBe('/bibliometrie/stats');
+	])("renvoie la page d'accueil pour %s, hors du site", (redirect) => {
+		expect(returnPath(redirect, ORIGIN)).toBe('/bibliometrie/');
 	});
 });
 

@@ -2,20 +2,21 @@ import { describe, it, expect, beforeEach } from 'vitest';
 
 import {
 	activeColumns,
+	activeCount,
 	appendFilterParams,
 	checkboxSummary,
 	clearValue,
+	coreRange,
 	encodePresence,
-	explicitSelectionUrl,
 	facetDefs,
-	filterSections,
+	filterGroups,
 	initialValues,
 	isShown,
 	presenceSummary,
+	rangeBounds,
+	rangeSelection,
 	restoreValues,
 	summarizeParts,
-	ignoredFilters,
-	transferParams,
 	urlFilterDefs,
 	urlState,
 	type CheckboxFilter,
@@ -32,6 +33,7 @@ const years: CheckboxFilter = {
 	control: 'checkbox',
 	label: 'Années',
 	param: 'year',
+	group: 'publication',
 	facet: { type: 'simple', apiKey: 'years' },
 };
 const types: CheckboxFilter = {
@@ -39,13 +41,9 @@ const types: CheckboxFilter = {
 	control: 'checkbox',
 	label: 'Types',
 	param: 'doc_type',
+	group: 'publication',
 	facet: { type: 'simple', apiKey: 'doc_types' },
 	groups: [{ label: 'Publications', values: ['article', 'book'] }],
-	url: {
-		encode: (selected) => (selected.length ? selected.join(',') : 'all'),
-		decode: (raw) => (raw === 'all' ? [] : raw.split(',')),
-		defaultValue: 'article',
-	},
 	showColumns: ['type'],
 };
 const labs: CheckboxFilter = {
@@ -53,6 +51,7 @@ const labs: CheckboxFilter = {
 	control: 'checkbox',
 	label: 'Laboratoires',
 	param: 'lab_id',
+	group: 'affiliations',
 	facet: { type: 'labeled', apiKey: 'labs' },
 	fixed: () => fixedLab,
 };
@@ -62,9 +61,8 @@ const perimeter: CheckboxFilter = {
 	label: 'Périmètre',
 	param: 'in_perimeter',
 	facet: { type: 'labeled', apiKey: 'in_perimeter' },
-	group: 'Auteurs',
+	group: 'authors',
 	enabled: () => perimeterEnabled,
-	hideWhenEmpty: true,
 	showColumns: ['corr'],
 };
 const serial: EntityChoiceFilter = {
@@ -73,7 +71,7 @@ const serial: EntityChoiceFilter = {
 	label: 'Revue',
 	param: 'serial_id',
 	entity: 'serial',
-	group: 'Revue et éditeur',
+	group: 'venue',
 	showColumns: ['serial'],
 };
 const subjects: EntityChoiceFilter = {
@@ -83,14 +81,14 @@ const subjects: EntityChoiceFilter = {
 	param: 'subject',
 	entity: 'subject',
 	multiple: true,
-	group: 'Sujets',
+	group: 'content',
 };
 const sources: PresenceFilter = {
 	key: 'sources',
 	control: 'presence',
 	label: 'Sources',
 	param: 'source_filter',
-	group: 'Auteurs',
+	group: 'sources',
 	items: [
 		{ key: 'hal', label: 'HAL' },
 		{ key: 'wos', label: 'WoS' },
@@ -128,7 +126,7 @@ describe('filterRegistry', () => {
 		const params = new URLSearchParams();
 		appendFilterParams(FILTERS, values, params);
 		expect(params.get('lab_id')).toBe('7');
-		expect(isShown(labs, () => 1)).toBe(false);
+		expect(isShown(labs, values, () => 1, {})).toBe(false);
 	});
 
 	it("n'écrit pas dans la requête un filtre que la page ne propose pas", () => {
@@ -140,69 +138,95 @@ describe('filterRegistry', () => {
 		expect(params.has('in_perimeter')).toBe(false);
 	});
 
-	it("transmet à une autre page la valeur fixée comme une sélection, et la forme d'URL explicite", () => {
-		fixedLab = '7';
+	it('masque un filtre que la page ne propose pas, ou sans option de décompte non nul, sauf actif', () => {
 		const values = initialValues(FILTERS);
-		values.checkbox.years = ['2024'];
-		values.presence.sources = { hal: 'yes' };
-		expect(Object.fromEntries(transferParams(FILTERS, values))).toEqual({
-			year: '2024',
-			doc_type: 'all',
-			lab_id: '7',
-			source_filter: 'hal_yes',
-		});
-	});
-
-	it('écrit une sélection explicite, `all` pour une sélection vide', () => {
-		const url = explicitSelectionUrl('all');
-		expect(url.encode([])).toBe('all');
-		expect(url.encode(['2023', '2024'])).toBe('2023,2024');
-		expect(url.decode('all')).toEqual([]);
-		expect(url.decode('2023,2024')).toEqual(['2023', '2024']);
-	});
-
-	it('signale les filtres sélectionnés que la page ne propose pas', () => {
-		const values = initialValues(FILTERS);
-		values.checkbox.years = ['2024'];
+		expect(isShown(perimeter, values, () => 0, {})).toBe(false);
+		expect(isShown(perimeter, values, () => 2, {})).toBe(true);
 		values.checkbox.perimeter = ['yes'];
-		expect(ignoredFilters(FILTERS, values)).toEqual([]);
+		expect(isShown(perimeter, values, () => 0, {})).toBe(true);
 		perimeterEnabled = false;
-		expect(ignoredFilters(FILTERS, values).map((f) => f.key)).toEqual(['perimeter']);
+		expect(isShown(perimeter, values, () => 2, {})).toBe(false);
 	});
 
-	it('masque un contrôle que la page ne propose pas, ou qui attend des options', () => {
-		expect(isShown(perimeter, () => 0)).toBe(false);
-		expect(isShown(perimeter, () => 2)).toBe(true);
-		perimeterEnabled = false;
-		expect(isShown(perimeter, () => 2)).toBe(false);
+	it('masque un filtre de présence dont aucun élément ne départage les publications', () => {
+		const values = initialValues(FILTERS);
+		const none = { hal: { yes: 10, no: 0 }, wos: { yes: 0, no: 10 }, openalex: { yes: 10, no: 0 } };
+		expect(isShown(sources, values, () => 0, none)).toBe(false);
+		expect(isShown(sources, values, () => 0, { ...none, wos: { yes: 3, no: 7 } })).toBe(true);
+		values.presence.sources = { hal: 'yes' };
+		expect(isShown(sources, values, () => 0, none)).toBe(true);
 	});
 
-	it('range les contrôles sans rubrique dans la barre principale, les autres par rubrique', () => {
-		const { primary, groups } = filterSections(FILTERS);
-		expect(primary.map((f) => f.key)).toEqual(['years', 'types', 'labs']);
-		expect(groups.map((g) => [g.label, g.filters.map((f) => f.key)])).toEqual([
-			['Auteurs', ['perimeter', 'sources']],
-			['Revue et éditeur', ['serial']],
-			['Sujets', ['subjects']],
+	it('borne la plage aux valeurs qui concentrent les décomptes', () => {
+		const counts: [number, number][] = [[1976, 1], [2000, 5], [2016, 100], [2017, 7000], [2018, 7000], [2026, 5800], [2027, 50]];
+		expect(coreRange(counts)).toEqual([2017, 2026]);
+		expect(coreRange([[2020, 3]])).toEqual([2020, 2020]);
+		expect(coreRange([[2020, 1], [2021, 1]])).toEqual([2020, 2021]);
+	});
+
+	it('résume un intervalle par ses bornes', () => {
+		const range: CheckboxFilter = { ...years, range: true };
+		expect(checkboxSummary(range, ['2023', '2021', '2022'], [])).toBe('2021–2023');
+		expect(checkboxSummary(range, ['2024'], [])).toBe('2024');
+		const options = ['1990', '2021', '2022', '2023', '2024'].map((v) => ({ value: v, text: v, count: 5 }));
+		expect(checkboxSummary(range, rangeSelection(1990, 2022), options)).toBe("Jusqu'à 2022");
+		expect(checkboxSummary(range, ['2022', '2023', '2024'], options)).toBe('Depuis 2022');
+		expect(checkboxSummary(range, ['2022', '2023'], options)).toBe('2022–2023');
+		expect(rangeBounds(['2021', '2023'])).toBeNull();
+		expect(rangeSelection(2021, 2023)).toEqual(['2021', '2022', '2023']);
+	});
+
+	it("range les filtres par rubrique, dans l'ordre des rubriques, sans rubrique vide", () => {
+		const groups = [
+			{ key: 'publication', label: 'Publication' },
+			{ key: 'access', label: 'Accès' },
+			{ key: 'affiliations', label: 'Affiliations' },
+			{ key: 'venue', label: 'Revue et éditeur' },
+			{ key: 'authors', label: 'Auteurs' },
+			{ key: 'content', label: 'Sujets' },
+			{ key: 'sources', label: 'Sources' },
+		];
+		expect(filterGroups(FILTERS, groups).map((g) => [g.group.key, g.filters.map((f) => f.key)])).toEqual([
+			['publication', ['years', 'types']],
+			['affiliations', ['labs']],
+			['venue', ['serial']],
+			['authors', ['perimeter']],
+			['content', ['subjects']],
+			['sources', ['sources']],
 		]);
 	});
 
-	it("écrit la sélection dans l'URL sous sa forme propre, et la relit", () => {
+	it("refuse un filtre dont la rubrique n'est pas déclarée", () => {
+		expect(() => filterGroups(FILTERS, [{ key: 'publication', label: 'Publication' }])).toThrow(/labs/);
+	});
+
+	it('compte les filtres actifs proposés dans la page', () => {
+		const values = initialValues(FILTERS);
+		values.checkbox.years = ['2024'];
+		values.presence.sources = { hal: 'all' };
+		values.checkbox.perimeter = ['yes'];
+		expect(activeCount(FILTERS, values)).toBe(2);
+		perimeterEnabled = false;
+		expect(activeCount(FILTERS, values)).toBe(1);
+	});
+
+	it("écrit la sélection dans l'URL, et la relit", () => {
 		const defs = urlFilterDefs(FILTERS);
-		expect(defs.types).toEqual({ type: 'single', urlKey: 'doc_type', defaultValue: 'article' });
+		expect(defs.types).toEqual({ type: 'string_array', urlKey: 'doc_type' });
 		expect(defs.years).toEqual({ type: 'string_array', urlKey: 'year' });
 		expect(defs.serial).toEqual({ type: 'string_array', urlKey: 'serial_id' });
 		expect(defs.sources).toEqual({ type: 'source_states', urlKey: 'source_filter' });
 
 		const values = initialValues(FILTERS);
-		expect(urlState(FILTERS, values).types).toBe('all');
+		values.checkbox.types = ['article'];
+		expect(urlState(FILTERS, values).types).toEqual(['article']);
 
 		restoreValues(
 			FILTERS,
-			{ types: 'all', years: ['2024'], serial: ['12'], subjects: ['3', '5'], sources: { hal: 'no' } },
+			{ types: ['book'], years: ['2024'], serial: ['12'], subjects: ['3', '5'], sources: { hal: 'no' } },
 			values,
 		);
-		expect(values.checkbox.types).toEqual([]);
+		expect(values.checkbox.types).toEqual(['book']);
 		expect(values.checkbox.years).toEqual(['2024']);
 		expect(values.entity.serial).toEqual(['12']);
 		expect(values.entity.subjects).toEqual(['3', '5']);
@@ -254,5 +278,105 @@ describe('filterRegistry', () => {
 
 	it('résume un filtre de présence', () => {
 		expect(presenceSummary(sources, { hal: 'yes', wos: 'no', oa: 'all' })).toBe('avec HAL, sans WoS');
+	});
+
+	describe('sélection par défaut', () => {
+		const rh: CheckboxFilter = {
+			key: 'rh',
+			control: 'checkbox',
+			label: 'Base RH',
+			param: 'has_rh',
+			group: 'people',
+			facet: { type: 'boolean', apiKey: 'rh', yesLabel: 'Oui', noLabel: 'Non' },
+			defaultSelection: () => ['yes'],
+			serialize: (selected) => (selected.length === 1 ? selected[0] : null),
+		};
+
+		it("part de la sélection par défaut, que l'URL omet, et écrit `all` une sélection vidée", () => {
+			const values = initialValues([rh]);
+			expect(values.checkbox.rh).toEqual(['yes']);
+			expect(urlFilterDefs([rh]).rh).toEqual({ type: 'single', urlKey: 'has_rh', defaultValue: 'yes' });
+			expect(urlState([rh], values).rh).toBe('yes');
+			values.checkbox.rh = [];
+			expect(urlState([rh], values).rh).toBe('all');
+			restoreValues([rh], { rh: 'all' }, values);
+			expect(values.checkbox.rh).toEqual([]);
+			restoreValues([rh], { rh: 'no' }, values);
+			expect(values.checkbox.rh).toEqual(['no']);
+		});
+
+		it('écrit dans la requête la valeur choisie par `serialize`', () => {
+			const values = initialValues([rh]);
+			const params = new URLSearchParams();
+			appendFilterParams([rh], values, params);
+			expect(params.get('has_rh')).toBe('yes');
+			values.checkbox.rh = ['yes', 'no'];
+			const both = new URLSearchParams();
+			appendFilterParams([rh], values, both);
+			expect(both.has('has_rh')).toBe(false);
+		});
+	});
+
+	it('écrit un paramètre par élément filtré pour un filtre de présence à `itemParams`', () => {
+		const ids: PresenceFilter = {
+			key: 'ids',
+			control: 'presence',
+			label: 'Identifiants',
+			param: 'id_filter',
+			group: 'people',
+			items: [
+				{ key: 'orcid', label: 'ORCID' },
+				{ key: 'idhal', label: 'idHAL' },
+			],
+			itemParams: { orcid: 'has_orcid', idhal: 'has_idhal' },
+		};
+		const values = initialValues([ids]);
+		values.presence.ids = { orcid: 'yes', idhal: 'no' };
+		const params = new URLSearchParams();
+		appendFilterParams([ids], values, params);
+		expect(Object.fromEntries(params)).toEqual({ has_orcid: 'yes', has_idhal: 'no' });
+	});
+
+	describe('filtre de présence à niveaux', () => {
+		const lists: PresenceFilter = {
+			key: 'lists',
+			control: 'presence',
+			label: 'Listes',
+			param: 'list_filter',
+			levelsParam: 'list_level',
+			group: 'serial',
+			items: [
+				{ key: 'doaj', label: 'DOAJ' },
+				{ key: 'fnege', label: 'FNEGE', levels: [{ key: 'fnege-1', label: 'rang 1' }, { key: 'fnege-2', label: 'rang 2' }] },
+			],
+		};
+
+		it('est actif dès un niveau coché, et `clearValue` vide ses niveaux', () => {
+			const values = initialValues([lists]);
+			values.levels.lists = ['fnege-1'];
+			expect(activeCount([lists], values)).toBe(1);
+			clearValue(lists, values);
+			expect(values.levels.lists).toEqual([]);
+			expect(activeCount([lists], values)).toBe(0);
+		});
+
+		it('écrit les niveaux cochés dans `levelsParam`, et les relit depuis l’URL', () => {
+			const values = initialValues([lists]);
+			values.presence.lists = { doaj: 'yes' };
+			values.levels.lists = ['fnege-1', 'fnege-2'];
+			const params = new URLSearchParams();
+			appendFilterParams([lists], values, params);
+			expect(Object.fromEntries(params)).toEqual({ list_filter: 'doaj_yes', list_level: 'fnege-1,fnege-2' });
+
+			const restored = initialValues([lists]);
+			restoreValues([lists], urlState([lists], values), restored);
+			expect(restored.levels.lists).toEqual(['fnege-1', 'fnege-2']);
+			expect(urlFilterDefs([lists])['lists.levels']).toEqual({ type: 'string_array', urlKey: 'list_level' });
+		});
+
+		it('résume un élément à niveaux cochés par ses niveaux', () => {
+			expect(presenceSummary(lists, { doaj: 'no', fnege: 'yes' }, ['fnege-1', 'fnege-2'])).toBe('sans DOAJ, FNEGE rang 1 ou rang 2');
+			expect(presenceSummary(lists, { fnege: 'yes' }, [])).toBe('avec FNEGE');
+		});
 	});
 });

@@ -45,7 +45,7 @@ from interfaces.api.models import (
     TotalCountResponse,
 )
 from interfaces.api.params import SearchTerm
-from interfaces.api.publication_filters import ListFilters
+from interfaces.api.publication_filters import PublicationQueryFilters
 from interfaces.api.rate_limit import ExportSlot, export_rate_limit, export_slot
 
 router = APIRouter(prefix="/api/publications", tags=["publications"])
@@ -79,7 +79,7 @@ def list_doc_types() -> list[DocTypeFamilyOut]:
 
 @router.get("/facets", response_model=PublicationsFacetsResponse)
 def publications_facets(
-    filters: ListFilters,
+    filters: PublicationQueryFilters,
     queries: PublicationsQueries = Depends(publications_queries),
 ) -> PublicationsFacetsResponse:
     """Renvoie les décomptes par option des facettes de la liste des publications.
@@ -91,7 +91,7 @@ def publications_facets(
 
 @router.get("/facets/entities", response_model=EntityFacetResponse)
 def publications_entity_facet(
-    filters: ListFilters,
+    filters: PublicationQueryFilters,
     kind: EntityKind = Query(...),
     entity_search: SearchTerm = "",
     queries: PublicationsQueries = Depends(publications_queries),
@@ -109,7 +109,7 @@ def publications_entity_facet(
 
 @router.get("/export.csv")
 def export_publications_csv(
-    filters: ListFilters,
+    filters: PublicationQueryFilters,
     sort: PublicationSort = Query("year_desc"),
     columns: str = Query(""),
     queries: PublicationsQueries = Depends(publications_queries),
@@ -258,7 +258,7 @@ def merge(
 
 @router.get("", response_model=PublicationListResponse)
 def list_publications(
-    filters: ListFilters,
+    filters: PublicationQueryFilters,
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
     sort: PublicationSort = Query("year_desc"),

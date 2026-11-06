@@ -124,6 +124,8 @@ class SerialListFacet(Model):
     label: str
     count: int
     """Revues présentes dans la liste, ou à l'un des niveaux du classement."""
+    absent_count: int
+    """Revues absentes de la liste, ou de tous les niveaux du classement."""
     levels: list[SerialListLevelFacet]
     """Niveaux d'un classement ; vide pour une liste."""
 

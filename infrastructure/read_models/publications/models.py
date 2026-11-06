@@ -387,6 +387,52 @@ class ThesisMeta(Model):
     date_inscription: str | None
 
 
+class PatentApplication(Model):
+    """Demande d'une famille de brevets auprès d'un office (`source_extras.patent_applications`)."""
+
+    office: str | None = None
+    """Code de l'office : FR, EP, WO, US…"""
+    application_number: str | None = None
+    application_date: str | None = None
+    publication_number: str | None = None
+    """Numéro de publication, avec son code de type (A1, B1…)."""
+    publication_date: str | None = None
+    priority: bool = False
+    """Demande prioritaire de la famille."""
+    granted: bool = False
+    espacenet_url: str | None = None
+    """Recherche Espacenet de la demande publiée."""
+
+
+class PatentApplicant(Model):
+    """Déposant d'une famille de brevets (`source_extras.patent_applicants`)."""
+
+    name: str | None
+    type: str | None
+    """`organisation` ou `person`."""
+    country: str | None
+    structure_id: int | None
+    """Structure en base, reconnue par son ROR ou par son identifiant Paysage (`api_ids.scanr_patents`)."""
+
+
+class CpcCode(Model):
+    """Code de la classification coopérative des brevets (CPC)."""
+
+    code: str
+    label: str | None = None
+
+
+class PatentMeta(Model):
+    """Métadonnées d'une famille de brevets, d'après ScanR brevets."""
+
+    applications: list[PatentApplication]
+    """Demandes, par date de dépôt."""
+    applicants: list[PatentApplicant]
+    cpc: list[CpcCode]
+    grant_date: str | None
+    """Date de la première délivrance d'un brevet de la famille."""
+
+
 class StructureInfo(Model):
     acronym: str | None
     name: str
@@ -418,6 +464,7 @@ class PublicationDetailResponse(Model):
     contributions: list[ConsolidatedContributionOut]
     theses_contributions: list[ThesesContributionOut]
     thesis_meta: ThesisMeta | None
+    patent_meta: PatentMeta | None
     structures: dict[str, StructureInfo]
     subjects: list[SubjectOut]
     keywords: list[str]

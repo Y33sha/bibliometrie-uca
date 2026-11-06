@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict ztb2I2GuESd2nOoco4j1X2wlhSH8A4ib4nXGJou1JS8yEgszvDKPINSF5rQG4Oa
+\restrict cr2TAzztUJcGdj2EHRerPyIfnmoJTC5cepHO4Vq1xCufOkxfggI8vTp26z2FjJH
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -356,7 +356,8 @@ CREATE TYPE public.perimeter_evidence AS ENUM (
     'hal_structure',
     'ror',
     'thesis_institution',
-    'thesis_partner'
+    'thesis_partner',
+    'patent_applicant'
 );
 
 
@@ -549,6 +550,15 @@ CREATE TYPE public.subject_vocabulary AS ENUM (
     'rameau',
     'theses_discipline'
 );
+
+
+--
+-- Name: is_author_role(text[]); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.is_author_role(roles text[]) RETURNS boolean
+    LANGUAGE sql IMMUTABLE PARALLEL SAFE
+    RETURN (roles && ARRAY['author'::text, 'inventor'::text]);
 
 
 --
@@ -1384,7 +1394,7 @@ COMMENT ON COLUMN sources.source_records.authors_hash IS 'Empreinte de la partie
 -- Name: COLUMN source_records.author_count; Type: COMMENT; Schema: sources; Owner: -
 --
 
-COMMENT ON COLUMN sources.source_records.author_count IS 'Contributions sources de l''enregistrement source qui ont le rôle author et ne sont pas collectives, telles que la source les donne.';
+COMMENT ON COLUMN sources.source_records.author_count IS 'Contributions sources de l''enregistrement source qui ont un rôle d''auteur (is_author_role) et ne sont pas collectives, telles que la source les donne.';
 
 
 --
@@ -1601,9 +1611,9 @@ UNION
    FROM (sources.source_contribution_rors sar
      JOIN structures.structures s ON ((s.ror_id = sar.ror_id)))
   WHERE ((s.id IN ( SELECT perimeter.structure_id
-           FROM perimeter)) AND ((sar.address_id IS NULL) AND (NOT (EXISTS ( SELECT 1
+           FROM perimeter)) AND (sar.address_id IS NULL) AND (NOT (EXISTS ( SELECT 1
            FROM sources.source_contribution_addresses saa
-          WHERE (saa.source_contribution_id = sar.source_contribution_id))))))
+          WHERE (saa.source_contribution_id = sar.source_contribution_id)))))
 UNION
  SELECT l.source_contribution_id,
     r.structure_id,
@@ -1628,6 +1638,17 @@ UNION
      JOIN structures.idref_structures ist ON ((ist.idref_ppn = (partner.value ->> 'ppn'::text))))
      JOIN sources.source_contributions sa ON (((sa.source_record_id = sp.id) AND (sa.roles && ARRAY['author'::text]))))
   WHERE ((sp.source = 'theses'::public.source_type) AND (ist.is_confirmed IS DISTINCT FROM false) AND ((ist.matched_form_id IS NOT NULL) OR ist.is_confirmed) AND (ist.structure_id IN ( SELECT perimeter.structure_id
+           FROM perimeter)))
+UNION
+ SELECT sa.id AS source_contribution_id,
+    s.id AS structure_id,
+    'patent_applicant'::public.perimeter_evidence AS evidence
+   FROM ((((sources.source_records sp
+     CROSS JOIN LATERAL jsonb_array_elements((sp.source_extras -> 'patent_applicants'::text)) applicant(value))
+     CROSS JOIN LATERAL jsonb_array_elements_text(((applicant.value -> 'ids'::text) -> 'paysage'::text)) paysage(id))
+     JOIN structures.structures s ON (((s.api_ids -> 'scanr_patents'::text) ? paysage.id)))
+     JOIN sources.source_contributions sa ON ((sa.source_record_id = sp.id)))
+  WHERE ((sp.source = 'scanr_patents'::public.source_type) AND (s.id IN ( SELECT perimeter.structure_id
            FROM perimeter)))
   WITH NO DATA;
 
@@ -1793,7 +1814,7 @@ CREATE MATERIALIZED VIEW publications.publication_structures AS
     gs.structure_id
    FROM (publications.contributions g
      JOIN publications.contribution_structures gs ON ((gs.contribution_id = g.id)))
-  WHERE (g.roles && ARRAY['author'::text])
+  WHERE public.is_author_role(g.roles)
   WITH NO DATA;
 
 
@@ -1827,7 +1848,7 @@ CREATE MATERIALIZED VIEW publications.publication_rors AS
              JOIN publications.aligned_source_contributions m ON ((m.contribution_id = c.id)))
              JOIN sources.source_contribution_rors r ON ((r.source_contribution_id = m.source_contribution_id)))
              LEFT JOIN persons.persons pe ON ((pe.id = c.person_id)))
-          WHERE ((c.roles && ARRAY['author'::text]) AND (pe.exclusion IS DISTINCT FROM 'not_a_person'::public.person_exclusion))
+          WHERE (public.is_author_role(c.roles) AND (pe.exclusion IS DISTINCT FROM 'not_a_person'::public.person_exclusion))
         UNION
          SELECT ps.publication_id,
             s.ror_id
@@ -6243,5 +6264,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ztb2I2GuESd2nOoco4j1X2wlhSH8A4ib4nXGJou1JS8yEgszvDKPINSF5rQG4Oa
+\unrestrict cr2TAzztUJcGdj2EHRerPyIfnmoJTC5cepHO4Vq1xCufOkxfggI8vTp26z2FjJH
 

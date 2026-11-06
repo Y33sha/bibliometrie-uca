@@ -12,6 +12,7 @@ export type Contribution = components["schemas"]["ConsolidatedContributionOut"];
 export type { StructInfo } from "#lib/structureLabels.js";
 export type ThesisContribution = components["schemas"]["ThesesContributionOut"];
 export type ThesisMeta = components["schemas"]["ThesisMeta"];
+export type PatentMeta = components["schemas"]["PatentMeta"];
 export type Subject = components["schemas"]["SubjectOut"];
 export type RelatedPublication = components["schemas"]["RelatedPublicationOut"];
 export type ExternalId = components["schemas"]["ExternalIdentifierOut"];

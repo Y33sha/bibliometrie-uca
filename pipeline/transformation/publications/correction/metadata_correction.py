@@ -178,7 +178,8 @@ TASKS = (
             "failed_lookups",
         ),
         writes=("source_records.is_matchable", "source_record_keys_queue"),
-        previous_run=("source_records.is_matchable",),
+        # Retraits de DOI de la réconciliation, que `is_matchable` ignore (`reconsidered`).
+        previous_run=("source_records.is_matchable", "source_record_identifiers.removed_by"),
         section="Enregistrements sources écartés de la réconciliation",
         run=in_transaction(matchable.run),
     ),

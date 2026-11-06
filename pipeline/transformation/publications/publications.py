@@ -69,6 +69,8 @@ TASKS = (
             "publication_subjects",
             "publications_detail",
             "source_records.publication_id",
+            # DOI d'une autre partition, retirés par la réconciliation.
+            "source_record_identifiers.removed_by",
             "source_record_keys_queue",
             "apc_payments.publication_id",
             "publication_contributions_queue",

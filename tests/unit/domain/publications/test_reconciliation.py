@@ -3,6 +3,8 @@
 Un enregistrement source sans publication (`publication_id=None`) est orphelin.
 """
 
+from dataclasses import replace
+
 from domain.publications.reconciliation import (
     DissolvedPublication,
     ReconcileMember,
@@ -27,6 +29,7 @@ def _m(
     matchable=True,
     primary=None,
     derived=None,
+    work_id=None,
 ):
     """Construit un membre du voisinage.
 
@@ -35,6 +38,7 @@ def _m(
         weak: DOI secondaires.
         primary: identifiant primaire, en couple (type, valeur).
         derived: identifiant dérivé, en couple (type, valeur).
+        work_id: clé d'un enregistrement source d'œuvre, comme une famille de brevets.
     """
     return ReconcileMember(
         source_record_id=source_record_id,
@@ -43,6 +47,7 @@ def _m(
         doi_keys=DoiKeys(frozenset({doi} if doi else ()), frozenset(weak)),
         tokens=frozenset(tokens),
         derivation=Derivation(primary, derived),
+        work_id=work_id,
         in_perimeter=in_perimeter,
         title_normalized=tn,
         publication_year=year,
@@ -305,6 +310,55 @@ class TestBridges:
 
         assert _groups(plan) == {10: (1, 3, 4, 5, 6), 20: (2,)}
         assert plan.dissolved == (DissolvedPublication(30, 10), DissolvedPublication(40, 10))
+
+
+_BLOCK = ("metadata_block", "patent|dispositif d eclairage de securite|2022")
+"""Bloc de métadonnées commun à deux familles de brevets déposées le même jour sous le même titre."""
+
+
+def _family(source_record_id, publication_id, family, *tokens):
+    return _m(
+        source_record_id,
+        publication_id,
+        tokens=[_BLOCK, *tokens],
+        doc_type="patent",
+        work_id=f"scanr_patents:{family}",
+    )
+
+
+class TestWorkAnchors:
+    """Un enregistrement source d'œuvre, comme une famille de brevets, est une ancre."""
+
+    def test_two_works_with_the_same_metadata_split(self):
+        """Deux familles au même bloc de métadonnées : la seconde crée sa publication."""
+        plan = plan_reconciliation([_family(1, 10, "A"), _family(2, 10, "B")])
+
+        assert _groups(plan) == {10: (1,), None: (2,)}
+
+    def test_a_record_linked_to_one_work_joins_it(self):
+        """Le dépôt HAL partage un numéro de publication avec la seule famille A."""
+        number = ("patent_publication_number", "FR3143101")
+        deposit = _m(3, 30, tokens=[number], doc_type="patent")
+
+        plan = plan_reconciliation([_family(1, 10, "A", number), _family(2, 10, "B"), deposit])
+
+        assert _groups(plan) == {10: (1, 3), None: (2,)}
+        assert plan.dissolved == (DissolvedPublication(30, 10),)
+
+    def test_a_record_linked_to_two_works_forms_its_own_partition(self):
+        """Le dépôt HAL a le bloc de métadonnées des deux familles."""
+        deposit = _m(3, 30, tokens=[_BLOCK], doc_type="patent")
+
+        plan = plan_reconciliation([_family(1, 10, "A"), _family(2, 10, "B"), deposit])
+
+        assert _groups(plan) == {10: (1,), 30: (3,), None: (2,)}
+
+    def test_a_single_work_keeps_its_component(self):
+        deposit = _m(3, 30, tokens=[_BLOCK], doc_type="patent")
+
+        plan = plan_reconciliation([_family(1, 10, "A"), deposit])
+
+        assert _groups(plan) == {10: (1, 3)}
 
 
 class TestPreprintServerDois:
@@ -758,3 +812,96 @@ class TestWorkGroupShape:
             ]
         )
         assert plan.groups == (WorkGroup(10, (2, 7), "10.1/x"),)
+
+
+_DATASET = "10.5281/zenodo.1"
+"""DOI Zenodo d'un jeu de données : DOI de dépôt pour un preprint (`is_deposit_doi`)."""
+
+
+def _dois_of_groups(members, plan):
+    """Renvoie les DOI actifs de chaque groupe, après les retraits du plan."""
+    removed = set(plan.doi_removals)
+    by_id = {m.source_record_id: m for m in members}
+    return [
+        {
+            doi
+            for source_record_id in g.source_record_ids
+            for doi in by_id[source_record_id].doi_keys.all
+            if (source_record_id, doi) not in removed
+        }
+        for g in plan.groups
+    ]
+
+
+class TestUniqueDois:
+    """Un DOI appartient à une seule partition."""
+
+    def _preprint_with_a_dataset_doi(self):
+        """Un article, un jeu de données Zenodo et deux enregistrements sources du preprint de l'article. L'enregistrement source 3 porte à tort le DOI du jeu de données, DOI de dépôt pour un preprint."""
+        return [
+            _m(
+                1,
+                10,
+                doi="10.1/article",
+                tokens=[("doi", "10.1/article"), ("pmid", "1")],
+                doc_type="article",
+            ),
+            replace(
+                _m(2, 20, tokens=[("doi", _DATASET)], doc_type="dataset"),
+                doi_keys=DoiKeys(frozenset({_DATASET}), frozenset(), "dataset"),
+            ),
+            replace(
+                _m(3, 20, tokens=[("doi", _DATASET), ("hal_id", "hal-1")], doc_type="preprint"),
+                doi_keys=DoiKeys(frozenset(), frozenset({_DATASET}), "preprint"),
+            ),
+            _m(4, 20, tokens=[("hal_id", "hal-1"), ("pmid", "1")], doc_type="preprint"),
+        ]
+
+    def test_le_doi_reste_a_la_partition_ou_il_est_fort(self):
+        """Le preprint, relié à l'article et au jeu de données, forme un pont sans ancre de son type. Il perd le DOI du jeu de données, puis rejoint l'article, seule ancre qui lui reste reliée."""
+        members = self._preprint_with_a_dataset_doi()
+        plan = plan_reconciliation(members)
+
+        assert plan.doi_removals == ((3, _DATASET),)
+        assert _groups(plan) == {10: (1, 3, 4), 20: (2,)}
+
+    def test_un_doi_fort_nulle_part_est_retire_de_toutes_les_partitions(self):
+        """Deux enregistrements sources, chacun ancré par son propre DOI, citent le même DOI d'archive en secondaire."""
+        plan = plan_reconciliation(
+            [
+                _m(
+                    1,
+                    10,
+                    doi="10.1/a",
+                    weak=("10.9/copie",),
+                    tokens=[("doi", "10.1/a"), ("doi", "10.9/copie")],
+                ),
+                _m(
+                    2,
+                    20,
+                    doi="10.2/b",
+                    weak=("10.9/copie",),
+                    tokens=[("doi", "10.2/b"), ("doi", "10.9/copie")],
+                ),
+            ]
+        )
+        assert plan.doi_removals == ((1, "10.9/copie"), (2, "10.9/copie"))
+        assert _groups(plan) == {10: (1,), 20: (2,)}
+
+    def test_aucun_doi_dans_deux_groupes(self):
+        for members in (
+            self._preprint_with_a_dataset_doi(),
+            _preprint_component(doc_type="preprint"),
+        ):
+            plan = plan_reconciliation(members)
+            dois = _dois_of_groups(members, plan)
+            assert all(not (a & b) for i, a in enumerate(dois) for b in dois[i + 1 :])
+
+    def test_sans_doi_partage_aucun_retrait(self):
+        plan = plan_reconciliation(
+            [
+                _m(1, 10, doi="10.1/x", tokens=[("doi", "10.1/x")]),
+                _m(2, 10, weak=("10.1/x",), tokens=[("doi", "10.1/x")]),
+            ]
+        )
+        assert plan.doi_removals == ()

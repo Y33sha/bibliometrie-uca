@@ -1,24 +1,22 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import ListToolbar from '#lib/components/ListToolbar.svelte';
-	import { page } from '$app/state';
-	import FacetDropdown, { type FacetOption } from '#lib/components/FacetDropdown.svelte';
-	import PresenceFilterToggle from '#lib/components/PresenceFilterToggle.svelte';
-	import { IDENTIFIER_ITEMS, PENDING_ITEMS } from '#lib/filterItems.js';
-	import { personExclusionLabels, staffCategoryLabels } from '#lib/labels.js';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import PersonsTable from '#lib/components/PersonsTable.svelte';
 	import type { PersonRow } from '#lib/components/PersonsTable.svelte';
-	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
-	import { useFacets } from '#lib/composables/useFacets.svelte.js';
-	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
+	import ActiveFilterBar from '#lib/components/ActiveFilterBar.svelte';
+	import FilterLayout from '#lib/components/filters/FilterLayout.svelte';
+	import FilterPanel from '#lib/components/filters/FilterPanel.svelte';
+	import FilterPanelToggle from '#lib/components/filters/FilterPanelToggle.svelte';
+	import { useFacets, type FacetDef } from '#lib/composables/useFacets.svelte.js';
+	import { useFilteredList } from '#lib/composables/useFilteredList.svelte.js';
+	import { facetDefs, type PresenceCounts } from '#lib/filterRegistry.js';
+	import { PERSON_FILTER_GROUPS, PERSON_PRESENCE_FACETS, personFilters } from '#lib/personFilters.js';
 	import { isAdmin } from '#lib/session.svelte.js';
 	import { useDrawerParam } from '#lib/composables/useDrawerParam.svelte.js';
 	import PersonCurationDrawer from '#lib/components/persons/PersonCurationDrawer.svelte';
 	import { withBase } from '#lib/paths.js';
 	import { paramsToQuery } from '#lib/utils.js';
-
-	type IdState = 'all' | 'yes' | 'no';
 
 	// Vue-liste des personnes réutilisable. Utilisée par :
 	// - `/persons` (annuaire autonome avec sync URL)
@@ -51,245 +49,84 @@
 	// Incrémenté après chaque écriture du volet : la liste et ses facettes se rechargent.
 	let listVersion = $state(0);
 
-	// `none` désigne les personnes retenues, comme dans le paramètre `exclusion` de l'API.
-	const exclusionOptions: FacetOption[] = [
-		{ value: 'none', text: 'Retenue' },
-		...Object.entries(personExclusionLabels).map(([value, text]) => ({ value, text })),
-	];
-
-	let search = $state('');
-	let selectedCategories: string[] = $state([]);
 	// svelte-ignore state_referenced_locally
-	let selectedLabs: string[] = $state(labId != null ? [String(labId)] : []);
-	let selectedCorps: string[] = $state([]);
-	let idStates = $state<Record<string, IdState>>({});
-	let selectedRh: string[] = $state(['yes']);
-	let currentSort = $state('name_asc');
-	// Restriction de l'annuaire aux personnes retenues. Seule la session admin change ce réglage.
-	let selectedExclusions: string[] = $state(['none']);
-	let pendingStates = $state<Record<string, IdState>>({});
+	const FILTERS = personFilters(labId);
 
-	const idQueryKey: Record<string, string> = {
-		orcid: 'has_orcid',
-		idhal: 'has_idhal',
-		idref: 'has_idref'
-	};
-	const pendingQueryKey: Record<string, string> = {
-		pending_forms: 'has_pending_forms',
-		pending_identifiers: 'has_pending_identifiers',
-	};
+	// Décomptes des cases à cocher, et des éléments des filtres de présence (identifiants, éléments à confirmer), servis en deux options « avec » et « sans ».
+	const presenceFacets = Object.fromEntries(
+		PERSON_PRESENCE_FACETS.map((key) => [key, { type: 'boolean', apiKey: key, yesLabel: 'Avec', noLabel: 'Sans' } satisfies FacetDef]),
+	);
 
-	function buildFilterParams(): URLSearchParams {
-		const params = new URLSearchParams();
-		if (selectedExclusions.length) params.set('exclusion', selectedExclusions.join(','));
-		// L'annuaire public écarte les personnes sans contribution ni fiche RH, conservées pour leurs décisions.
-		if (!isAdmin()) params.set('active', 'yes');
-		if (selectedCategories.length) params.set('category', selectedCategories.join(','));
-		if (selectedLabs.length) params.set('laboratory', selectedLabs.join(','));
-		if (selectedCorps.length) params.set('corps', selectedCorps.join(','));
-		for (const [key, qk] of Object.entries(idQueryKey)) {
-			const v = idStates[key];
-			if (v === 'yes' || v === 'no') params.set(qk, v);
-		}
-		for (const [key, qk] of Object.entries(pendingQueryKey)) {
-			const v = pendingStates[key];
-			if (v === 'yes' || v === 'no') params.set(qk, v);
-		}
-		if (selectedRh.length === 1) params.set('has_rh', selectedRh[0]);
-		if (labId != null) params.set('lab_id', String(labId));
-		return params;
-	}
-
-	function exportCsvUrl(): string {
-		const params = buildFilterParams();
-		const q = search.trim();
-		if (q) params.set('search', q);
-		params.set('sort', currentSort);
-		return withBase(`/api/persons/export.csv?${paramsToQuery(params)}`);
-	}
-
-	const dir = usePaginatedFetch<PersonRow>({
+	const list = useFilteredList<PersonRow, ReturnType<typeof useFacets>>({
+		filters: FILTERS,
+		baseParams() {
+			const params = new URLSearchParams();
+			// L'annuaire public écarte les personnes sans contribution ni fiche RH, conservées pour leurs décisions.
+			if (!isAdmin()) params.set('active', 'yes');
+			if (labId != null) params.set('lab_id', String(labId));
+			return params;
+		},
 		endpoint: '/api/persons',
 		itemsKey: 'persons',
 		// svelte-ignore state_referenced_locally
 		perPage,
 		apiKey: () => `${apiKey}-${listVersion}`,
-		buildParams() {
-			const params = buildFilterParams();
-			const q = search.trim();
-			if (q) params.set('search', q);
-			params.set('sort', currentSort);
-			return params;
-		}
-	});
-
-	const facets = useFacets({
-		endpoint: '/api/persons/facets',
-		apiKey: () => `${apiKey}-${listVersion}-facets`,
-		// Inclut le terme de recherche pour que les comptes de facettes suivent le champ de recherche (comme l'annuaire).
-		buildParams() {
-			const params = buildFilterParams();
-			const q = search.trim();
-			if (q) params.set('search', q);
-			return params;
-		},
-		facets: {
-			categories: { type: 'label_map', apiKey: 'categories', labels: staffCategoryLabels },
-			labs: { type: 'labeled', apiKey: 'laboratories' },
-			corps: { type: 'simple', apiKey: 'corps' },
-			orcid: { type: 'boolean', apiKey: 'orcid', yesLabel: 'Avec', noLabel: 'Sans' },
-			idhal: { type: 'boolean', apiKey: 'idhal', yesLabel: 'Avec', noLabel: 'Sans' },
-			idref: { type: 'boolean', apiKey: 'idref', yesLabel: 'Avec', noLabel: 'Sans' },
-			rh: { type: 'boolean', apiKey: 'rh', yesLabel: 'Oui', noLabel: 'Non' },
-			pending_forms: { type: 'boolean', apiKey: 'pending_forms', yesLabel: 'Avec', noLabel: 'Sans' },
-			pending_identifiers: { type: 'boolean', apiKey: 'pending_identifiers', yesLabel: 'Avec', noLabel: 'Sans' },
-		}
-	});
-
-	function yesNoFromFacet(key: string): { yes: number; no: number } {
-		const opts = facets.options[key as keyof typeof facets.options] || [];
-		return {
-			yes: opts.find((o) => o.value === 'yes')?.count ?? 0,
-			no: opts.find((o) => o.value === 'no')?.count ?? 0
-		};
-	}
-
-	const idCounts = $derived({
-		orcid: yesNoFromFacet('orcid'),
-		idhal: yesNoFromFacet('idhal'),
-		idref: yesNoFromFacet('idref')
-	});
-	const pendingCounts = $derived({
-		pending_forms: yesNoFromFacet('pending_forms'),
-		pending_identifiers: yesNoFromFacet('pending_identifiers'),
-	});
-
-	const url = useUrlFilters({
+		defaultSort: 'name_asc',
+		urlSync: () => urlSync,
 		basePath: () => basePath,
 		debounceMs: 300,
-		filters: {
-			selectedCategories: { type: 'string_array', urlKey: 'category' },
-			selectedLabs: { type: 'string_array', urlKey: 'laboratory' },
-			selectedCorps: { type: 'string_array', urlKey: 'corps' },
-			idStates: { type: 'source_states', urlKey: 'id_filter' },
-			hasRh: { type: 'single', urlKey: 'has_rh', defaultValue: 'yes' },
-			exclusion: { type: 'single', urlKey: 'exclusion', defaultValue: 'none' },
-			pendingStates: { type: 'source_states', urlKey: 'pending_filter' },
-			search: { type: 'single', urlKey: 'search' },
-			currentSort: { type: 'single', urlKey: 'sort', defaultValue: 'name_asc' },
-			currentPage: { type: 'page', urlKey: 'page' }
-		}
+		facets: (buildParams) =>
+			useFacets({
+				endpoint: '/api/persons/facets',
+				apiKey: () => `${apiKey}-${listVersion}-facets`,
+				buildParams,
+				facets: { ...facetDefs(FILTERS), ...presenceFacets },
+			}),
 	});
 
-	function syncUrl() {
-		if (!urlSync) return;
-		url.syncUrl(() => ({
-			selectedCategories,
-			selectedLabs,
-			selectedCorps,
-			idStates,
-			hasRh: selectedRh.length === 1 ? selectedRh[0] : 'all',
-			exclusion: selectedExclusions.length ? selectedExclusions.join(',') : 'all',
-			pendingStates,
-			search,
-			currentSort,
-			currentPage: dir.page
-		}));
+	const presenceCounts = $derived<PresenceCounts>(
+		Object.fromEntries(
+			PERSON_PRESENCE_FACETS.map((key) => {
+				const options = list.facets.options[key] ?? [];
+				return [key, { yes: options.find((o) => o.value === 'yes')?.count ?? 0, no: options.find((o) => o.value === 'no')?.count ?? 0 }];
+			}),
+		),
+	);
+
+	function exportCsvUrl(): string {
+		const params = list.filterParams();
+		params.set('sort', list.sort);
+		return withBase(`/api/persons/export.csv?${paramsToQuery(params)}`);
 	}
 
-	function onFilterChange() {
-		dir.page = 1;
-		syncUrl();
-		dir.load();
-		facets.load();
-	}
-
-	function onSortChange(newSort: string) {
-		currentSort = newSort;
-		dir.page = 1;
-		syncUrl();
-		dir.load();
-	}
-
-	const onSearchInput = url.debouncedSearch(() => {
-		dir.page = 1;
-		syncUrl();
-		dir.load();
-		facets.load();
-	});
-
-	onMount(async () => {
-		if (urlSync) {
-			const restored = url.restoreFromUrl(page.url.searchParams);
-			if (restored.selectedCategories) selectedCategories = restored.selectedCategories as string[];
-			if (restored.selectedLabs) selectedLabs = restored.selectedLabs as string[];
-			if (restored.selectedCorps) selectedCorps = restored.selectedCorps as string[];
-			if (restored.idStates) idStates = restored.idStates as Record<string, IdState>;
-			if (restored.hasRh != null) {
-				const rh = restored.hasRh as string;
-				selectedRh = rh === 'all' ? [] : [rh];
-			}
-			if (isAdmin()) {
-				if (restored.exclusion != null) {
-					const value = restored.exclusion as string;
-					selectedExclusions = value === 'all' ? [] : value.split(',');
-				}
-				if (restored.pendingStates) pendingStates = restored.pendingStates as Record<string, IdState>;
-			}
-			if (restored.search) search = restored.search as string;
-			if (restored.currentSort) currentSort = restored.currentSort as string;
-			if (restored.currentPage) dir.page = restored.currentPage as number;
-		}
-		await facets.load();
-		dir.load();
-	});
+	onMount(list.restore);
 </script>
 
-<ListToolbar bind:search placeholder="Rechercher par nom" onsearch={onSearchInput} list={dir} one="personne" many="personnes" exportUrl={exportCsvUrl()}>
-	{#snippet filters()}
-		<PresenceFilterToggle
-			label="Identifiants"
-			items={IDENTIFIER_ITEMS}
-			bind:states={idStates}
-			counts={idCounts}
-			onchange={onFilterChange}
-		/>
-		<FacetDropdown label="Catégories" options={facets.options.categories} bind:selected={selectedCategories} onchange={onFilterChange} />
-		<FacetDropdown label="Laboratoires" options={facets.options.labs} searchable bind:selected={selectedLabs} onchange={onFilterChange} />
-		<FacetDropdown label="Corps" options={facets.options.corps} searchable bind:selected={selectedCorps} onchange={onFilterChange} />
-		<FacetDropdown label="Base RH" options={facets.options.rh} bind:selected={selectedRh} onchange={onFilterChange} />
-		{#if isAdmin()}
-			<PresenceFilterToggle
-				label="À confirmer"
-				items={PENDING_ITEMS}
-				bind:states={pendingStates}
-				counts={pendingCounts}
-				onchange={onFilterChange}
-			/>
-			<FacetDropdown label="Exclusions"options={exclusionOptions} bind:selected={selectedExclusions} onchange={onFilterChange} />
-		{/if}
+<ListToolbar bind:search={list.search} placeholder="Rechercher par nom" onsearch={list.onSearchInput} list={list.listing} one="personne" many="personnes" exportUrl={exportCsvUrl()} countBelow>
+	{#snippet leading()}
+		<FilterPanelToggle bind:open={list.panel.open} active={list.activeCount} />
+	{/snippet}
+	{#snippet activeFilters()}
+		<ActiveFilterBar filters={FILTERS} bind:values={list.values} options={list.facets.options} onchange={list.onFilterChange} />
 	{/snippet}
 </ListToolbar>
 
-<PersonsTable
-	persons={dir.items}
-	loading={dir.loading}
-	error={dir.error}
-	sort={currentSort}
-	{onSortChange}
-	perimeterCount={isAdmin() && labId == null}
-	onopen={ownDrawer ? drawer.open : onopen}
-	activeId={ownDrawer ? drawer.id : activeId}
-/>
-
-<Pagination
-	page={dir.page}
-	pages={dir.pages}
-	onchange={(p) => {
-		dir.goToPage(p);
-		syncUrl();
-	}}
-/>
+<FilterLayout bind:open={list.panel.open}>
+	{#snippet panel()}
+		<FilterPanel filters={FILTERS} groups={PERSON_FILTER_GROUPS} bind:values={list.values} options={list.facets.options} {presenceCounts} loaded={list.facets.loaded} entityEndpoint="/api/persons/facets" buildParams={list.filterParams} panel={list.panel} onchange={list.onFilterChange} />
+	{/snippet}
+	<PersonsTable
+		persons={list.listing.items}
+		loading={list.listing.loading}
+		error={list.listing.error}
+		sort={list.sort}
+		onSortChange={list.setSort}
+		perimeterCount={isAdmin() && labId == null}
+		onopen={ownDrawer ? drawer.open : onopen}
+		activeId={ownDrawer ? drawer.id : activeId}
+	/>
+	<Pagination page={list.listing.page} pages={list.listing.pages} onchange={list.goToPage} />
+</FilterLayout>
 
 {#if drawer.id !== null}
 	<PersonCurationDrawer

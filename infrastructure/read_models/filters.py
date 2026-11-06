@@ -289,7 +289,7 @@ def source_clause(source_values: list[str]) -> WhereClause | None:
 
 
 def _authored_by(person_id: int, bind: str) -> WhereClause:
-    """Renvoie le filtre : la personne est auteur (rôle 'author') de la publication. Son id est lié sous `:bind`."""
+    """Renvoie le filtre : la personne tient un rôle d'auteur de la publication (`has_author_role`). Son id est lié sous `:bind`."""
     return WhereClause(
         f"""EXISTS (SELECT 1 FROM contributions a
                 WHERE a.publication_id = p.id AND a.person_id = :{bind}
@@ -299,7 +299,7 @@ def _authored_by(person_id: int, bind: str) -> WhereClause:
 
 
 def person_clause(person_id: int) -> WhereClause:
-    """Renvoie le filtre : la personne donnée est auteur (rôle 'author') de la publication."""
+    """Renvoie le filtre : la personne donnée tient un rôle d'auteur de la publication."""
     return _authored_by(person_id, "flt_person_id")
 
 

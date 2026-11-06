@@ -9,6 +9,7 @@ import type { FacetOption } from '#lib/components/FacetDropdown.svelte';
  *   - label_map  : { value, count }[]         → text = labels[value] || value
  *   - labeled    : { value, label, count }[]  → text = label (transform optionnel)
  *   - boolean    : { value, count }[]         → deux options yes/no
+ *   - fixed      : options déclarées, sans appel à l'API
  */
 
 // --- Facet definition types ---
@@ -23,6 +24,8 @@ interface LabelMapFacet {
 	type: 'label_map';
 	apiKey: string;
 	labels: Record<string, string>;
+	/** Retient seulement les valeurs de `labels`. */
+	onlyLabeled?: boolean;
 }
 
 interface LabeledFacet {
@@ -38,7 +41,13 @@ interface BooleanFacet {
 	noLabel: string;
 }
 
-export type FacetDef = SimpleFacet | LabelMapFacet | LabeledFacet | BooleanFacet;
+/** Options fixes, sans décompte de l'API. */
+interface FixedFacet {
+	type: 'fixed';
+	options: FacetOption[];
+}
+
+export type FacetDef = SimpleFacet | LabelMapFacet | LabeledFacet | BooleanFacet | FixedFacet;
 
 interface FacetsConfig<K extends string> {
 	endpoint: string;
@@ -52,11 +61,13 @@ interface FacetsConfig<K extends string> {
 
 export function useFacets<K extends string>(config: FacetsConfig<K>) {
 	const initialOptions = {} as Record<K, FacetOption[]>;
-	for (const key of Object.keys(config.facets) as K[]) {
-		initialOptions[key] = [];
+	for (const [key, def] of Object.entries(config.facets) as [K, FacetDef][]) {
+		initialOptions[key] = def.type === 'fixed' ? def.options : [];
 	}
 	let options: Record<K, FacetOption[]> = $state(initialOptions);
 	let sourceCounts: Record<string, { yes: number; no: number }> = $state({});
+	// Vrai dès le premier chargement des décomptes.
+	let loaded = $state(false);
 
 	const currentKey = (): string =>
 		typeof config.apiKey === 'function' ? config.apiKey() : config.apiKey;
@@ -79,6 +90,7 @@ export function useFacets<K extends string>(config: FacetsConfig<K>) {
 		const newOpts = {} as Record<K, FacetOption[]>;
 
 		for (const [key, def] of Object.entries(config.facets) as [K, FacetDef][]) {
+			if (def.type === 'fixed') { newOpts[key] = def.options; continue; }
 			const raw = data[def.apiKey];
 			if (!raw) { newOpts[key] = []; continue; }
 
@@ -91,7 +103,9 @@ export function useFacets<K extends string>(config: FacetsConfig<K>) {
 					}));
 					break;
 				case 'label_map':
-					newOpts[key] = (raw as { value: string; count: number }[]).map((item) => ({
+					newOpts[key] = (raw as { value: string; count: number }[])
+						.filter((item) => !def.onlyLabeled || item.value in def.labels)
+						.map((item) => ({
 						value: String(item.value),
 						text: def.labels[item.value] || String(item.value),
 						count: item.count,
@@ -124,11 +138,14 @@ export function useFacets<K extends string>(config: FacetsConfig<K>) {
 
 		config.afterLoad?.(data, newOpts);
 		options = newOpts;
+		loaded = true;
 	}
 
 	return {
 		get options() { return options; },
 		get sourceCounts() { return sourceCounts; },
+		/** Décomptes chargés au moins une fois. */
+		get loaded() { return loaded; },
 		load,
 	};
 }

@@ -1,6 +1,6 @@
 """Cycle de vie d'une publication : création, suppression après recalcul, dissolution, purge.
 
-Une publication existe si elle a au moins un enregistrement source, un type admissible et au moins une contribution rattachée à une personne. `refresh` vérifie les deux premières conditions après le recalcul des publications. `purge_publications` vérifie la première et la dernière sur toute la table, une fois les personnes résolues.
+Une publication existe si elle a au moins un enregistrement source, un type admissible, et au moins une contribution rattachée à une personne ou un indice d'appartenance au périmètre lié au document (`DOCUMENT_EVIDENCE`). `refresh` vérifie les deux premières conditions après le recalcul des publications. `purge_publications` vérifie la première et la dernière sur toute la table, une fois les personnes résolues.
 """
 
 from collections.abc import Callable, Sequence
@@ -9,6 +9,7 @@ from itertools import batched
 from sqlalchemy import Connection, text
 
 from domain.publications.oa_status import OaStatus
+from infrastructure.sql_fragments import has_document_evidence
 from pipeline.transformation.publications.consolidation import RefreshVerdict, consolidate
 from pipeline.transformation.publications.store import PublicationStore
 
@@ -81,7 +82,7 @@ def dissolve(conn: Connection, publication_id: int, successor_id: int) -> None:
 
 
 def purge_publications(conn: Connection, *, limit: int | None = None) -> int:
-    """Supprime les publications sans enregistrement source ou sans contribution rattachée à une personne, `limit` au plus. Renvoie le nombre de publications supprimées.
+    """Supprime les publications sans enregistrement source, ou sans contribution rattachée à une personne ni indice d'appartenance au périmètre lié au document (`DOCUMENT_EVIDENCE`), `limit` au plus. Renvoie le nombre de publications supprimées.
 
     Une publication perd son dernier enregistrement source quand la phase `normalize` retire un enregistrement source disparu de sa source. Elle perd sa dernière contribution rattachée à une personne par un rejet, une forme de nom rejetée ou une personne supprimée. Ses sujets sont supprimés avec elle (`ON DELETE CASCADE`).
     """
@@ -92,9 +93,12 @@ def purge_publications(conn: Connection, *, limit: int | None = None) -> int:
             WHERE id IN (
                 SELECT p.id FROM publications p
                 WHERE NOT EXISTS (SELECT 1 FROM source_records sr WHERE sr.publication_id = p.id)
-                   OR NOT EXISTS (
-                       SELECT 1 FROM contributions g
-                       WHERE g.publication_id = p.id AND g.person_id IS NOT NULL
+                   OR (
+                       NOT EXISTS (
+                           SELECT 1 FROM contributions g
+                           WHERE g.publication_id = p.id AND g.person_id IS NOT NULL
+                       )
+                       AND NOT {has_document_evidence("p.id")}
                    )
                 {limit_clause}
             )

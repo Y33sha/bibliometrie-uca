@@ -163,6 +163,17 @@ def merge_roles(role_lists: list[list[ContributionRole]]) -> list[ContributionRo
     return sorted(all_roles)
 
 
+AUTHOR_ROLES: frozenset[ContributionRole] = frozenset(
+    {ContributionRole.AUTHOR, ContributionRole.INVENTOR}
+)
+"""Rôles d'auteur : l'auteur d'un document, l'inventeur d'un brevet. La fonction SQL `is_author_role` reprend cette liste."""
+
+
+def is_author_role(roles: Sequence[str] | None) -> bool:
+    """Vrai si l'un des rôles est un rôle d'auteur (`AUTHOR_ROLES`)."""
+    return not AUTHOR_ROLES.isdisjoint(roles or ())
+
+
 def is_individual_author(roles: Sequence[str] | None, collective: bool) -> bool:
-    """Vrai si la contribution source compte dans la liste d'auteurs de son enregistrement source : elle a le rôle `AUTHOR` et n'est pas collective."""
-    return not collective and ContributionRole.AUTHOR in (roles or ())
+    """Vrai si la contribution source compte dans la liste d'auteurs de son enregistrement source : elle a un rôle d'auteur (`AUTHOR_ROLES`) et n'est pas collective."""
+    return not collective and is_author_role(roles)

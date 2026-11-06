@@ -714,8 +714,9 @@ class TestSerialsFacets:
         )
         assert r.status_code == 200
         lists = {item["code"]: item for item in r.json()["lists"]}
-        assert (lists["doaj"]["count"], lists["doaj"]["levels"]) == (1, [])
-        assert lists["fnege"]["count"] == 2
+        assert (lists["doaj"]["count"], lists["doaj"]["absent_count"]) == (1, 2)
+        assert lists["doaj"]["levels"] == []
+        assert (lists["fnege"]["count"], lists["fnege"]["absent_count"]) == (2, 1)
         levels = {level["code"]: level["count"] for level in lists["fnege"]["levels"]}
         assert (levels["fnege-1-star"], levels["fnege-3"], levels["fnege-4"]) == (1, 1, 0)
 

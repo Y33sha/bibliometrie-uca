@@ -135,7 +135,8 @@ _IN_CHECKED_LEVELS = """NOT EXISTS (
 
 _LIST_FACET = """
     WITH kept AS (SELECT j.id FROM serials j WHERE {where})
-    SELECT l.code, l.label, l.ranking_code, count(DISTINCT e.serial_id) AS n
+    SELECT l.code, l.label, l.ranking_code, count(DISTINCT e.serial_id) AS n,
+           (SELECT count(*) FROM kept) AS total
     FROM serial_lists l
     LEFT JOIN serial_lists c ON c.code = l.code OR c.ranking_code = l.code
     LEFT JOIN serial_list_entries e
@@ -143,7 +144,7 @@ _LIST_FACET = """
     GROUP BY l.code, l.label, l.ranking_code, l.display_order
     ORDER BY l.display_order
 """
-"""Revues retenues par liste, par classement (tous niveaux) et par niveau."""
+"""Revues retenues par liste, par classement (tous niveaux) et par niveau, avec le total des revues retenues."""
 
 _SERIAL_LISTS = text("""
     SELECT c.code, coalesce(r.label || ', ' || c.label, c.label) AS label,
@@ -469,6 +470,7 @@ class SerialQueries:
                 code=r.code,
                 label=r.label,
                 count=r.n,
+                absent_count=r.total - r.n,
                 levels=[
                     SerialListLevelFacet(code=level.code, label=level.label, count=level.n)
                     for level in list_rows

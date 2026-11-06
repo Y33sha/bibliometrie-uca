@@ -1,4 +1,4 @@
-"""Branches `ror`, `hal_structure` et thèse de la vue `source_contribution_structures`."""
+"""Branches `ror`, `hal_structure`, thèse et brevet de la vue `source_contribution_structures`."""
 
 import json
 import logging
@@ -195,3 +195,37 @@ def test_structures_d_une_these(sa_sync_conn):
         (jury, univ, "thesis_institution"),
         (doctorant, lab, "thesis_partner"),
     }
+
+
+def test_deposant_d_un_brevet(sa_sync_conn):
+    """Un déposant reconnu par son identifiant Paysage rattache tous les inventeurs ; un déposant hors du périmètre, aucun."""
+    univ, _ = _perimeter(sa_sync_conn)
+    sa_sync_conn.execute(
+        text("UPDATE structures SET api_ids = CAST(:ids AS jsonb) WHERE id = :id"),
+        {"ids": json.dumps({"scanr_patents": ["K4lR3"]}), "id": univ},
+    )
+
+    def family(source_id: str, paysage: str) -> int:
+        record = insert_source_record(sa_sync_conn, source="scanr_patents", source_id=source_id)
+        applicants = [{"name": "Déposant", "ids": {"paysage": [paysage], "siren": ["1"]}}]
+        sa_sync_conn.execute(
+            text(
+                "UPDATE source_records SET source_extras = CAST(:source_extras AS jsonb) WHERE id = :id"
+            ),
+            {"source_extras": json.dumps({"patent_applicants": applicants}), "id": record},
+        )
+        return record
+
+    own = family("1", "K4lR3")
+    partner = family("2", "autre")
+    inventors = [
+        insert_source_contribution(
+            sa_sync_conn, own, source="scanr_patents", author_position=p, roles=["inventor"]
+        )
+        for p in (1, 2)
+    ]
+    insert_source_contribution(
+        sa_sync_conn, partner, source="scanr_patents", author_position=1, roles=["inventor"]
+    )
+
+    assert _reached(sa_sync_conn) == {(i, univ, "patent_applicant") for i in inventors}

@@ -10,14 +10,14 @@ from infrastructure.read_models.stats.models import (
 )
 from infrastructure.read_models.stats.queries import StatsQueries
 from interfaces.api.deps import stats_queries
-from interfaces.api.publication_filters import StatsFilters
+from interfaces.api.publication_filters import PublicationQueryFilters
 
 router = APIRouter(prefix="/api/stats", tags=["stats"])
 
 
 @router.get("/collaborations", response_model=CollaborationsResponse)
 def collaborations(
-    filters: StatsFilters,
+    filters: PublicationQueryFilters,
     queries: StatsQueries = Depends(stats_queries),
 ) -> CollaborationsResponse:
     """Compte les publications co-affiliées à chaque pays étranger (collaborations internationales), sous les filtres actifs.
@@ -29,7 +29,7 @@ def collaborations(
 
 @router.get("/citation-points", response_model=CitationPointsResponse)
 def citation_points(
-    filters: StatsFilters,
+    filters: PublicationQueryFilters,
     queries: StatsQueries = Depends(stats_queries),
 ) -> CitationPointsResponse:
     """Renvoie un point par publication pourvue d'un nombre de citations, sous les filtres actifs : année, nombre de citations, FWCI."""
@@ -46,7 +46,7 @@ def pivot_schema(
 
 @router.get("/pivot", response_model=PivotResponse)
 def pivot(
-    filters: StatsFilters,
+    filters: PublicationQueryFilters,
     indicator: str = Query("doc_type_grouped"),
     compare: str = Query(""),
     queries: StatsQueries = Depends(stats_queries),

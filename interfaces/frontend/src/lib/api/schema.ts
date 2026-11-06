@@ -3447,6 +3447,16 @@ export interface components {
             /** Name */
             name: string;
         };
+        /**
+         * CpcCode
+         * @description Code de la classification coopérative des brevets (CPC).
+         */
+        CpcCode: {
+            /** Code */
+            code: string;
+            /** Label */
+            label?: string | null;
+        };
         /** CreatePersonName */
         CreatePersonName: {
             /** Last Name */
@@ -4511,6 +4521,84 @@ export interface components {
             count: number;
         };
         /**
+         * PatentApplicant
+         * @description Déposant d'une famille de brevets (`source_extras.patent_applicants`).
+         */
+        PatentApplicant: {
+            /** Name */
+            name: string | null;
+            /**
+             * Type
+             * @description `organisation` ou `person`.
+             */
+            type: string | null;
+            /** Country */
+            country: string | null;
+            /**
+             * Structure Id
+             * @description Structure en base, reconnue par son ROR ou par son identifiant Paysage (`api_ids.scanr_patents`).
+             */
+            structure_id: number | null;
+        };
+        /**
+         * PatentApplication
+         * @description Demande d'une famille de brevets auprès d'un office (`source_extras.patent_applications`).
+         */
+        PatentApplication: {
+            /**
+             * Office
+             * @description Code de l'office : FR, EP, WO, US…
+             */
+            office?: string | null;
+            /** Application Number */
+            application_number?: string | null;
+            /** Application Date */
+            application_date?: string | null;
+            /**
+             * Publication Number
+             * @description Numéro de publication, avec son code de type (A1, B1…).
+             */
+            publication_number?: string | null;
+            /** Publication Date */
+            publication_date?: string | null;
+            /**
+             * Priority
+             * @description Demande prioritaire de la famille.
+             * @default false
+             */
+            priority: boolean;
+            /**
+             * Granted
+             * @default false
+             */
+            granted: boolean;
+            /**
+             * Espacenet Url
+             * @description Recherche Espacenet de la demande publiée.
+             */
+            espacenet_url?: string | null;
+        };
+        /**
+         * PatentMeta
+         * @description Métadonnées d'une famille de brevets, d'après ScanR brevets.
+         */
+        PatentMeta: {
+            /**
+             * Applications
+             * @description Demandes, par date de dépôt.
+             */
+            applications: components["schemas"]["PatentApplication"][];
+            /** Applicants */
+            applicants: components["schemas"]["PatentApplicant"][];
+            /** Cpc */
+            cpc: components["schemas"]["CpcCode"][];
+            /**
+             * Grant Date
+             * @description Date de la première délivrance d'un brevet de la famille.
+             */
+            grant_date: string | null;
+        };
+        /**
          * PerimeterCountryOut
          * @description Pays d'organisations ROR des structures du périmètre des personnes.
          */
@@ -5114,6 +5202,7 @@ export interface components {
             /** Theses Contributions */
             theses_contributions: components["schemas"]["ThesesContributionOut"][];
             thesis_meta: components["schemas"]["ThesisMeta"] | null;
+            patent_meta: components["schemas"]["PatentMeta"] | null;
             /** Structures */
             structures: {
                 [key: string]: components["schemas"]["StructureInfo"];
@@ -5686,6 +5775,11 @@ export interface components {
              * @description Revues présentes dans la liste, ou à l'un des niveaux du classement.
              */
             count: number;
+            /**
+             * Absent Count
+             * @description Revues absentes de la liste, ou de tous les niveaux du classement.
+             */
+            absent_count: number;
             /**
              * Levels
              * @description Niveaux d'un classement ; vide pour une liste.
@@ -6757,6 +6851,9 @@ export interface operations {
                 country?: string;
                 language?: string;
                 partner_ror?: string;
+                author_position?: string;
+                hal_status?: string;
+                in_perimeter?: string;
             };
             header?: never;
             path?: never;
@@ -6809,6 +6906,9 @@ export interface operations {
                 country?: string;
                 language?: string;
                 partner_ror?: string;
+                author_position?: string;
+                hal_status?: string;
+                in_perimeter?: string;
             };
             header?: never;
             path?: never;
@@ -6883,6 +6983,9 @@ export interface operations {
                 country?: string;
                 language?: string;
                 partner_ror?: string;
+                author_position?: string;
+                hal_status?: string;
+                in_perimeter?: string;
             };
             header?: never;
             path?: never;

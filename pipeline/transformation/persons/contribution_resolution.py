@@ -496,7 +496,7 @@ def unidentified_orphans(
     candidates: dict[int, dict[int, list[AlignedSourceContribution]]],
     decisions: dict[int, ContributionDecision],
 ) -> list[ContributionDecision]:
-    """Décisions des contributions laissées sans personne parmi les contributions orphelines : contributions du périmètre, sous un rôle d'auteur."""
+    """Décisions des contributions laissées sans personne parmi les contributions orphelines : contributions du périmètre, sous le rôle `author`."""
     return [
         decisions[contribution_id]
         for by_contribution in candidates.values()

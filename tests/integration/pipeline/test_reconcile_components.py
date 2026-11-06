@@ -8,6 +8,7 @@ from sqlalchemy import bindparam, text
 from domain.merge import MergedEntity
 from domain.publications.reconciliation import manual_merge_tokens
 from domain.source_records.identifiers import (
+    DOI_OF_ANOTHER_PUBLICATION,
     SourceIdentifier,
     SourceIdentifierRole,
     SourceIdentifierType,
@@ -991,6 +992,31 @@ class TestExternalDoiCarrier:
         assert n == 1
 
 
+class TestWorkAnchors:
+    def test_two_patent_families_with_the_same_metadata_split(self, sa_sync_conn):
+        """Deux familles ScanR brevets du même jour, au même titre, sont deux publications."""
+        conn = sa_sync_conn
+        publication_id = _seed_publication(conn)
+        title = "dispositif d eclairage de securite pour batiment"
+        families = [
+            _source_record(
+                conn,
+                publication_id,
+                source="scanr_patents",
+                source_id=family,
+                title_normalized=title,
+                doc_type="patent",
+            )
+            for family in ("86329653", "86329914")
+        ]
+
+        reconcile(conn, logger)
+
+        publications = {_source_record_state(conn, f)[0] for f in families}
+        assert len(publications) == 2
+        assert publication_id in publications
+
+
 def _distinct_dois(conn, publication_id) -> set[str]:
     return set(
         conn.execute(
@@ -1087,3 +1113,80 @@ class TestFirstHalIdKey:
 
         assert _source_record_state(conn, bridge)[0] == _source_record_state(conn, first)[0]
         assert _source_record_state(conn, second)[0] != _source_record_state(conn, first)[0]
+
+
+_ZENODO = "10.5281/zenodo.1"
+
+
+def _doi_removal(conn, source_record_id, doi) -> str | None:
+    return conn.execute(
+        text(
+            "SELECT removed_by FROM source_record_identifiers"
+            " WHERE source_record_id = :id AND id_type = 'doi' AND id_value = :doi"
+        ),
+        {"id": source_record_id, "doi": doi},
+    ).scalar_one()
+
+
+class TestUniqueDois:
+    """Un preprint porte à tort le DOI Zenodo d'un jeu de données. Il rejoint l'article par son dépôt HAL, et perd le DOI du jeu de données."""
+
+    def _seed(self, conn):
+        article_publication = _seed_publication(conn, doi="10.1/article")
+        mixed = _seed_publication(conn, doi=_ZENODO)
+        article = _source_record(
+            conn,
+            article_publication,
+            source="crossref",
+            source_id="10.1/article",
+            doi="10.1/article",
+        )
+        dataset = _source_record(
+            conn, mixed, source="datacite", source_id=_ZENODO, doi=_ZENODO, doc_type="dataset"
+        )
+        deposit = _source_record(
+            conn,
+            mixed,
+            source="hal",
+            source_id="hal-1",
+            doc_type="preprint",
+            identifiers=[
+                *_hal(_PRIMARY, "hal-1"),
+                *_ids(SourceIdentifierType.DOI, _SECONDARY, "10.1/article"),
+            ],
+        )
+        preprint = _source_record(
+            conn,
+            mixed,
+            source_id="W1",
+            doc_type="preprint",
+            identifiers=[
+                *_hal(_SECONDARY, "hal-1"),
+                *_ids(SourceIdentifierType.DOI, _SECONDARY, _ZENODO),
+            ],
+        )
+        return article_publication, mixed, article, dataset, deposit, preprint
+
+    def test_le_preprint_perd_le_doi_du_jeu_de_donnees(self, sa_sync_conn):
+        conn = sa_sync_conn
+        article_publication, mixed, _, dataset, deposit, preprint = self._seed(conn)
+
+        reconcile(conn, logger)
+
+        assert _source_record_state(conn, deposit)[0] == article_publication
+        assert _source_record_state(conn, preprint)[0] == article_publication
+        assert _source_record_state(conn, dataset)[0] == mixed
+        assert _doi_removal(conn, preprint, _ZENODO) == DOI_OF_ANOTHER_PUBLICATION
+
+    def test_le_doi_redevient_actif_quand_le_conflit_disparait(self, sa_sync_conn):
+        conn = sa_sync_conn
+        *_, dataset, _, preprint = self._seed(conn)
+        reconcile(conn, logger)
+
+        conn.execute(
+            text("UPDATE source_records SET is_matchable = false WHERE id = :id"), {"id": dataset}
+        )
+        mark(conn, Queue.SOURCE_RECORD_KEYS, [preprint])
+        reconcile(conn, logger)
+
+        assert _doi_removal(conn, preprint, _ZENODO) is None

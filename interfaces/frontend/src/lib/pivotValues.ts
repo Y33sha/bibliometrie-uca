@@ -64,16 +64,16 @@ export function pivotValueColor(dim: string, value: string, idx: number): string
 
 /** Valeurs de `dim` présentes dans `rows`, dans leur ordre d'affichage. Sans ordre propre, par total décroissant. */
 export function orderedPivotValues(dim: string, rows: Record<string, unknown>[]): string[] {
-	const present = rows.map((r) => String(r[dim]));
-	if (dim === 'year') return [...new Set(present)].sort((a, b) => Number(a) - Number(b));
-	if (dim === 'oa_access') return OA_ACCESS_ORDER.filter((v) => present.includes(v));
-	if (dim === 'oa_voie') return OA_VOIE_ORDER.filter((v) => present.includes(v));
-	if (dim === 'license') return licenseOrder.filter((v) => present.includes(v));
-	if (dim === 'citation_class') return CITATION_CLASS_ORDER.filter((v) => present.includes(v));
+	const present = new Set(rows.map((r) => String(r[dim])));
+	if (dim === 'year') return [...present].sort((a, b) => Number(a) - Number(b));
+	if (dim === 'oa_access') return OA_ACCESS_ORDER.filter((v) => present.has(v));
+	if (dim === 'oa_voie') return OA_VOIE_ORDER.filter((v) => present.has(v));
+	if (dim === 'license') return licenseOrder.filter((v) => present.has(v));
+	if (dim === 'citation_class') return CITATION_CLASS_ORDER.filter((v) => present.has(v));
 	if (dim === 'doc_type_grouped') {
 		// Famille « publications » éclatée en types fins, autres familles agrégées sous leur clé.
 		const order = docTypeFamilies().flatMap((f) => (f.key === 'publications' ? f.types : [f.key]));
-		return order.filter((k) => present.includes(k));
+		return order.filter((k) => present.has(k));
 	}
 	const totals = new Map<string, number>();
 	for (const r of rows) {

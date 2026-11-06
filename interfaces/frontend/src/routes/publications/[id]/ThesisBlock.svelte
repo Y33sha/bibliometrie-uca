@@ -1,6 +1,7 @@
 <script lang="ts">
   import { resolve } from "$app/paths";
   import { CONTRIBUTION_ROLE_ORDER, contributionRoleLabels } from "#lib/labels.js";
+  import DetailTable from "./DetailTable.svelte";
   import StructureTag from "./StructureTag.svelte";
   import { type StructInfo, type ThesisContribution, type ThesisMeta } from "./types";
 
@@ -18,9 +19,7 @@
 
 </script>
 
-<div class="section thesis-section">
-  <h2 class="section-title">Thèse</h2>
-  <dl class="thesis-dl">
+<DetailTable title="Thèse">
     {#each CONTRIBUTION_ROLE_ORDER as role}
       {@const people = thesesAuth.filter((a) => a.roles?.includes(role))}
       {#if people.length}
@@ -86,37 +85,4 @@
         {/each}
       </dd>
     {/if}
-  </dl>
-</div>
-
-<style>
-  .section {
-    margin-bottom: 16px;
-  }
-  .section-title {
-    margin-top: 0;
-  }
-  .thesis-dl {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    font-size: var(--fs-md);
-    margin: 0;
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    overflow: hidden;
-  }
-  .thesis-dl dt,
-  .thesis-dl dd {
-    padding: 7px 12px;
-    border-bottom: 1px solid var(--border-subtle);
-    margin: 0;
-  }
-  .thesis-dl dt {
-    font-weight: 600;
-    color: var(--muted);
-    white-space: nowrap;
-    background: var(--surface-hover);
-    font-size: var(--fs-sm);
-  }
-</style>
+</DetailTable>

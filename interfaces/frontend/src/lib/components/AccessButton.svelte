@@ -1,15 +1,25 @@
 <script lang="ts">
-	// Lien d'accès au texte intégral d'une publication : bouton plein, ou, en format de liste, cadenas open access et lien. Sans lien, un bloc du même format signale l'embargo, ou la fermeture hors liste.
+	// Lien d'accès au texte intégral d'une publication, libellé selon son type de document : bouton plein, ou, en format de liste, cadenas open access et lien. Sans lien, un bloc du même format signale l'embargo, ou la fermeture hors liste.
 	let {
 		accessUrl,
 		oaStatus,
+		docType = null,
 		compact = false,
 	}: {
 		accessUrl: string | null | undefined;
 		oaStatus: string | null | undefined;
+		/** Type de document : il choisit le libellé du lien. */
+		docType?: string | null;
 		/** Format de liste et de tableau : libellés courts ; l'accès fermé n'est pas signalé. */
 		compact?: boolean;
 	} = $props();
+
+	// Libellés du lien par type de document, au format bouton et au format de liste.
+	const LABELS: Record<string, { full: string; compact: string }> = {
+		patent: { full: 'Consulter le brevet', compact: 'Brevet' },
+	};
+	const DEFAULT_LABEL = { full: 'Lire le texte intégral', compact: 'Texte intégral' };
+	const label = $derived((docType && LABELS[docType]) || DEFAULT_LABEL);
 </script>
 
 {#if accessUrl && compact}
@@ -19,14 +29,14 @@
 			<circle cx="20" cy="41" r="13" fill="none" stroke="currentColor" stroke-width="6" />
 			<circle cx="20" cy="41" r="4.5" fill="currentColor" />
 		</svg>
-		Texte intégral
+		{label.compact}
 		<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 			<path d="M7 17L17 7M17 7H8M17 7v9" />
 		</svg>
 	</a>
 {:else if accessUrl}
 	<a class="access-btn" href={accessUrl} target="_blank" rel="noopener">
-		Lire le texte intégral
+		{label.full}
 		<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 			<path d="M7 17L17 7M17 7H8M17 7v9" />
 		</svg>

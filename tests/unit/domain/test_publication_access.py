@@ -5,7 +5,7 @@ from dataclasses import replace
 import pytest
 
 from domain.platforms.platform import ARCHIVE_TYPES, PlatformType
-from domain.platforms.registry import HAL, KNOWN_PLATFORMS
+from domain.platforms.registry import ESPACENET, HAL, KNOWN_PLATFORMS, espacenet_url
 from domain.publications.access import (
     Access,
     AccessLink,
@@ -346,6 +346,17 @@ def test_le_lien_d_acces_d_une_publication_ouverte_sans_copie_mene_au_doi():
 
 def test_une_publication_de_statut_inconnu_sans_copie_n_a_pas_de_lien_d_acces():
     assert access_url(None, oa_status="unknown", doi=_DOI) is None
+
+
+def test_la_copie_espacenet_d_un_brevet_donne_le_lien_d_acces():
+    espacenet = Copy.of_location(
+        espacenet_url("FR", "2980802A1"), version="publishedVersion", declared_oa=True, arrival=2
+    )
+    hal = _copy("https://hal.science/hal-1", platform="HAL", described=True, arrival=1)
+    result = access([hal, espacenet], doi=None)
+    assert result.url == espacenet.url
+    assert result.links[0] == AccessLink("Espacenet", espacenet.url, ESPACENET.icon)
+    assert access_url(result.url, oa_status="unknown", doi=None) == espacenet.url
 
 
 def test_une_publication_fermee_ou_sous_embargo_n_a_pas_de_lien_d_acces():

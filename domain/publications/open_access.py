@@ -5,7 +5,7 @@
 3. Sinon, copie ouverte chez l'éditeur sans licence ouverte : `bronze`.
 4. Sinon : `embargoed` sous embargo ; `closed` avec une copie déclarée fermée, un verdict, ou pour une publication fermée par nature (`is_restricted`) ; `unknown` sans aucune information.
 
-Le verdict d'Unpaywall relève les accès, jamais ne les abaisse.
+Le verdict d'Unpaywall relève les accès, jamais ne les abaisse. Un brevet a le statut `unknown` (`has_oa_status`).
 """
 
 from collections.abc import Iterable, Mapping
@@ -69,9 +69,15 @@ def is_restricted(doc_type: str | None, source_extras: Mapping[str, JsonValue] |
     )
 
 
+def has_oa_status(doc_type: str | None) -> bool:
+    """Vrai si le statut open access s'applique au type de document : tous les types sauf le brevet."""
+    return doc_type != DocType.PATENT
+
+
 def publication_oa_status(
     copies: Iterable[Copy],
     *,
+    applicable: bool,
     embargoed: bool,
     restricted: bool,
     unpaywall: str | None,
@@ -81,10 +87,13 @@ def publication_oa_status(
     """Renvoie le statut open access d'une publication (`decide_oa_status`) : accès constatés sur ses copies, embargo, fermeture par nature, le tout relevé par le verdict d'Unpaywall.
 
     Args:
+        applicable: le statut s'applique au type de la publication (`has_oa_status`). Sinon, le statut est `unknown`.
         embargoed: un enregistrement source de la publication est sous embargo actif (`embargoes`).
         restricted: la publication est fermée par nature (`is_restricted`).
         unpaywall: verdict d'Unpaywall sur le DOI de la publication, `None` sans verdict.
     """
+    if not applicable:
+        return OaStatus.UNKNOWN
     facts = copies_facts(copies)
     facts = replace(facts, embargoed=embargoed, informed=facts.informed or restricted)
     return decide_oa_status(

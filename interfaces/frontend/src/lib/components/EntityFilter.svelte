@@ -1,110 +1,32 @@
 <script lang="ts">
 	import { anchored } from '#lib/actions/anchored.js';
 	import { useFacetPanel } from '#lib/composables/useFacetPanel.svelte.js';
-	import { api } from '#lib/api/index.js';
-	import type { components } from '#lib/api/schema.js';
-	import { displayEntityLabel, entityLabel, rememberEntityLabel, type EntityKind } from '#lib/entityLabels.js';
+	import { useEntityLabels } from '#lib/composables/useEntityLabels.svelte.js';
+	import type { EntityKind } from '#lib/entityLabels.js';
+	import EntityOptions from '#lib/components/filters/EntityOptions.svelte';
 
-	type EntityFacetResponse = components['schemas']['EntityFacetResponse'];
-
-	/** Facette d'entité à forte cardinalité (éditeur, revue, auteur, sujet) : recherche serveur **contextuelle**. Le parent fournit `buildParams` (les filtres actifs) ; le composant y ajoute le `kind` et le terme de recherche pour lister les N premières entités sous ces filtres, avec décompte.
-	 *
-	 * Le parent tient la sélection sous forme d'**ids** : un au plus en choix simple, plusieurs avec `multiple`. Les libellés sont de la donnée dérivée, gérée ici : connus d'emblée quand l'utilisateur choisit une option, sinon résolus par `/api/entity-labels` quand un id est restauré depuis l'URL sans son nom. Un libellé ne dépend d'aucun filtre, là où les options proposées en dépendent. */
+	/** Liste déroulante d'un filtre d'entité (éditeur, revue, auteur, sujet). En choix simple, le bouton affiche le nom de l'entité choisie. Les options : `EntityOptions`. */
 	interface Props {
 		label: string;
-		/** Base de la facette contextuelle (ex. /api/publications/facets) : `${endpoint}/entities` liste les premières entités sous les filtres actifs. */
+		/** Base de la facette contextuelle (ex. /api/publications/facets). */
 		endpoint: string;
 		kind: EntityKind;
-		/** Filtres actifs du contexte (l'endpoint saute de lui-même celui de `kind`). */
+		/** Filtres actifs du contexte. */
 		buildParams: () => URLSearchParams;
 		/** Ids des entités sélectionnées. */
 		selected?: string[];
-		/** Cases à cocher : plusieurs entités, retenues si l'une au moins porte la publication. Sinon, un seul choix. */
+		/** Cases à cocher : plusieurs entités. Sinon, un seul choix. */
 		multiple?: boolean;
 		onchange?: (ids: string[]) => void;
 	}
 
 	let { label, endpoint, kind, buildParams, selected = [], multiple = false, onchange }: Props = $props();
 
-	interface Result {
-		value: string;
-		text: string;
-		count: number;
-	}
-
 	const panel = useFacetPanel();
 	const facetRoot = panel.root;
-	let query = $state('');
-	let results = $state<Result[]>([]);
-	let loading = $state(false);
-	// Libellés des entités sélectionnées, par id.
-	let labels = $state<Record<string, string>>({});
-	let debounce: ReturnType<typeof setTimeout>;
+	const names = useEntityLabels(() => kind, () => selected);
 
-	// Résout le libellé des ids sélectionnés dont le nom est inconnu (restaurés de l'URL). `entityLabel` mémorise les réponses.
-	$effect(() => {
-		for (const id of selected) {
-			if (id in labels) continue;
-			entityLabel(kind, id)
-				.then((l) => {
-					labels[id] = l ?? id;
-				})
-				.catch(() => {});
-		}
-	});
-
-	const buttonText = $derived(!multiple && selected.length ? (labels[selected[0]] ?? label) : label);
-	// Sélection absente des résultats (hors des premières entités, ou écartée par la recherche) : affichée en tête, pour rester visible et décochable.
-	const selectedOutside = $derived(selected.filter((id) => !results.some((r) => r.value === id)));
-	// En choix multiple, les entités cochées passent en tête.
-	const orderedResults = $derived(
-		multiple
-			? [...results.filter((r) => selected.includes(r.value)), ...results.filter((r) => !selected.includes(r.value))]
-			: results,
-	);
-
-	async function search() {
-		loading = true;
-		const p = buildParams();
-		p.set('kind', kind);
-		if (query.trim().length >= 2) p.set('entity_search', query.trim());
-		try {
-			const data = await api<EntityFacetResponse>(`${endpoint}/entities?` + p);
-			results = data.entities.map((e) => ({ value: String(e.id), text: displayEntityLabel(kind, e.label), count: e.count }));
-		} catch {
-			results = [];
-		}
-		loading = false;
-	}
-
-	function onInput() {
-		clearTimeout(debounce);
-		debounce = setTimeout(search, 250);
-	}
-
-	function pick(r: Result | null) {
-		if (r) {
-			// Le libellé de l'option choisie est déjà connu : on l'adopte sans relecture.
-			rememberEntityLabel(kind, r.value, r.text);
-			labels[r.value] = r.text;
-		}
-		if (!multiple) {
-			onchange?.(r ? [r.value] : []);
-			panel.open = false;
-		} else if (!r) {
-			onchange?.([]);
-		} else {
-			onchange?.(selected.includes(r.value) ? selected.filter((v) => v !== r.value) : [...selected, r.value]);
-		}
-	}
-
-	function togglePanel() {
-		if (!panel.open) {
-			query = '';
-			search();
-		}
-		panel.toggle();
-	}
+	const buttonText = $derived(!multiple && selected.length ? (names.labels[selected[0]] ?? label) : label);
 </script>
 
 <div class="facet" use:facetRoot>
@@ -113,7 +35,7 @@
 		class="facet-btn"
 		class:has-selection={selected.length > 0}
 		aria-expanded={panel.open}
-		onclick={togglePanel}
+		onclick={panel.toggle}
 	>
 		<span class="facet-label">{buttonText}</span>
 		{#if multiple && selected.length}
@@ -124,31 +46,7 @@
 
 	{#if panel.open}
 		<div class="facet-panel popover" use:anchored>
-			<input type="text" class="panel-search input-sm" placeholder="Rechercher" bind:value={query} oninput={onInput} />
-			{#if selected.length}
-				<button type="button" class="option-row facet-clear" onclick={() => pick(null)}>Effacer</button>
-			{/if}
-			<div class="facet-options">
-				{#each selectedOutside as id (id)}
-					<label class="option-row">
-						<input
-							type={multiple ? 'checkbox' : 'radio'}
-							checked
-							onchange={() => (multiple ? pick({ value: id, text: labels[id] ?? id, count: 0 }) : (panel.open = false))}
-						/>
-						<span class="facet-option-text"title={labels[id] ?? id}>{labels[id] ?? id}</span>
-					</label>
-				{/each}
-				{#each orderedResults as e (e.value)}
-					<label class="option-row">
-						<input type={multiple ? 'checkbox' : 'radio'} checked={selected.includes(e.value)} onchange={() => pick(e)} />
-						<span class="facet-option-text"title={e.text}>{e.text}</span><span class="facet-count">{e.count}</span>
-					</label>
-				{/each}
-				{#if !loading && results.length === 0}
-					<div class="facet-empty">Aucun résultat</div>
-				{/if}
-			</div>
+			<EntityOptions {endpoint} {kind} {buildParams} {selected} {multiple} {onchange} onchosen={() => (panel.open = false)} />
 		</div>
 	{/if}
 </div>
@@ -165,10 +63,5 @@
 	}
 	.facet-panel {
 		min-width: 260px;
-	}
-	.facet-empty {
-		padding: 6px 12px;
-		font-size: var(--fs-sm);
-		color: var(--muted);
 	}
 </style>

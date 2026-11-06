@@ -2,7 +2,7 @@
 
 *À jour le 2026-10-30.*
 
-Un enregistrement source est la description d'un document par une source : HAL, OpenAlex, Web of Science, ScanR, theses.fr, Crossref ou DataCite. Une contribution source est une personne nommée par la source dans un enregistrement source, avec son rôle. Ces tables conservent les données de chaque source, avant tout regroupement. Toutes les sources partagent les mêmes tables, et la colonne `source` les distingue.
+Un enregistrement source est la description d'un document par une source : HAL, OpenAlex, Web of Science, ScanR, ScanR brevets, theses.fr, Crossref ou DataCite. Une contribution source est une personne nommée par la source dans un enregistrement source, avec son rôle. Ces tables conservent les données de chaque source, avant tout regroupement. Toutes les sources partagent les mêmes tables, et la colonne `source` les distingue.
 
 Seul le pipeline écrit ces tables. Une métadonnée fausse se corrige par une règle de [correction](../pipeline/06-metadata-correction.md), qui garde la valeur d'origine.
 

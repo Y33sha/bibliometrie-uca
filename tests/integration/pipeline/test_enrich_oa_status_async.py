@@ -104,6 +104,7 @@ def _publication(
         doi,
         current,
         OaInputs(
+            applicable=True,
             has_serial=True,
             serial_oa_model="full_oa",
             embargoed=False,

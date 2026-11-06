@@ -11,6 +11,7 @@ from domain.contributions.contribution_roles import ContributionRole
 from domain.source_records.source_extras import SourceExtra
 from pipeline.ingestion.scanr_patents.normalize import (
     build_inventor_records,
+    espacenet_locations,
     get_publication_date,
     get_title,
     publication_number,
@@ -97,6 +98,27 @@ class TestExtractors:
         assert publication_number("FR", "") is None
 
 
+class TestEspacenet:
+    def test_copie_de_la_demande_prioritaire(self):
+        [location] = espacenet_locations(_family())
+        assert (
+            location.url == "https://worldwide.espacenet.com/patent/search?q=pn%3D%22FR2957077A1%22"
+        )
+        assert (location.version, location.is_oa) == ("publishedVersion", True)
+
+    def test_sans_priorite_la_premiere_demande_publiee(self):
+        patents = [
+            {"office": "US", "publicationNumber": "2015045290A1", "applicationDate": "2012-10-03"},
+            {"office": "CN", "publicationNumber": "104114710A ", "applicationDate": "2011-10-03"},
+            {"office": "EP", "applicationNumber": "12779108", "applicationDate": "2010-01-01"},
+        ]
+        [location] = espacenet_locations(_family(patents=patents))
+        assert location.url.endswith("pn%3D%22CN104114710A%22")
+
+    def test_sans_demande_publiee(self):
+        assert espacenet_locations(_family(patents=[{"office": "FR"}])) == []
+
+
 class TestSourceRecord:
     def test_numeros_de_publication_et_de_demande(self):
         record = scanr_patents_source_record(_family(), 1, "42635118")
@@ -130,6 +152,15 @@ class TestSourceRecord:
         first = extras[SourceExtra.PATENT_APPLICATIONS][0]
         assert first["publication_number"] == "2957077A1"
         assert (first["application_date"], first["priority"]) == ("2010-03-02", True)
+
+    def test_demande_sans_lien_espacenet(self):
+        extras = scanr_patents_source_record(_family(), 1, "42635118").source_extras
+        assert "espacenet_url" not in extras[SourceExtra.PATENT_APPLICATIONS][0]
+
+    def test_code_cpc_sans_libelle(self):
+        cpc = {"groupe": [{"code": "C12P21/04", "label": "non disponible"}]}
+        extras = scanr_patents_source_record(_family(cpc=cpc), 1, "1").source_extras
+        assert extras[SourceExtra.CPC] == [{"code": "C12P21/04", "label": None}]
 
     def test_famille_sans_delivrance(self):
         extras = scanr_patents_source_record(_family(grantedDate=None), 1, "1").source_extras

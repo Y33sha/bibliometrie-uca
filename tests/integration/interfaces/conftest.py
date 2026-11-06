@@ -10,14 +10,18 @@ from tests.integration.helpers.db import database_url
 
 
 def _build_test_sync_engine(identity: str = "pipeline") -> Engine:
-    """Construit un engine SQLAlchemy synchrone sur bibliometrie_test, avec les garde-fous de l'engine de production.
+    """Construit un engine SQLAlchemy synchrone sur bibliometrie_test, avec les réglages de session et les garde-fous de l'engine de production.
 
     `identity` choisit le rôle de connexion : celui de l'API pour l'application, celui du pipeline ou du propriétaire du schéma pour les jeux de données. Les tests exercent donc les droits de production.
     """
-    from infrastructure.db.engine import install_engine_guards
+    from infrastructure.db.engine import SESSION_CONNECT_ARGS, install_engine_guards
 
     engine = create_engine(
-        database_url(identity=identity), pool_size=1, max_overflow=2, pool_pre_ping=True
+        database_url(identity=identity),
+        pool_size=1,
+        max_overflow=2,
+        pool_pre_ping=True,
+        connect_args=SESSION_CONNECT_ARGS,
     )
     install_engine_guards(engine)
     return engine

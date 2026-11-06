@@ -57,7 +57,7 @@
 </script>
 
 <aside class="detail-sidebar">
-  <AccessButton {accessUrl} oaStatus={pub.oa_status} />
+  <AccessButton {accessUrl} oaStatus={pub.oa_status} docType={pub.doc_type} />
 
   {#if accessUrl && oaStatusKnown}
     <div class="access-line">

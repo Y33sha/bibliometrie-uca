@@ -28,6 +28,19 @@ describe('useFacets', () => {
 		expect(opts).toEqual({ key: 'publication-facets' });
 	});
 
+	it('signale le premier chargement des décomptes', async () => {
+		apiResponse = { years: [] };
+		const f = useFacets({
+			endpoint: '/x',
+			apiKey: 'k',
+			buildParams: () => new URLSearchParams(),
+			facets: { years: { type: 'simple', apiKey: 'years' } },
+		});
+		expect(f.loaded).toBe(false);
+		await f.load();
+		expect(f.loaded).toBe(true);
+	});
+
 	it('mappe le type "simple" : value/count → text = value', async () => {
 		apiResponse = { years: [{ value: 2024, count: 12 }, { value: 2023, count: 8 }] };
 		const f = useFacets({
@@ -79,6 +92,36 @@ describe('useFacets', () => {
 			// Fallback à la valeur brute quand la clé est absente du label_map.
 			{ value: 'unknown_type', text: 'unknown_type', count: 3 },
 		]);
+	});
+
+	it('garde les options fixes, avant comme après le chargement', async () => {
+		apiResponse = {};
+		const fixed = [{ value: 'none', text: 'Retenue' }];
+		const f = useFacets({
+			endpoint: '/x',
+			apiKey: 'k',
+			buildParams: () => new URLSearchParams(),
+			facets: { exclusion: { type: 'fixed', options: fixed } },
+		});
+		expect(f.options.exclusion).toEqual(fixed);
+		await f.load();
+		expect(f.options.exclusion).toEqual(fixed);
+	});
+
+	it('retient seulement les valeurs nommées du type "label_map" avec onlyLabeled', async () => {
+		apiResponse = {
+			doc_types: [{ value: 'thesis', count: 50 }, { value: 'article', count: 3 }],
+		};
+		const f = useFacets({
+			endpoint: '/x',
+			apiKey: 'k',
+			buildParams: () => new URLSearchParams(),
+			facets: {
+				status: { type: 'label_map', apiKey: 'doc_types', labels: { thesis: 'Soutenues' }, onlyLabeled: true },
+			},
+		});
+		await f.load();
+		expect(f.options.status).toEqual([{ value: 'thesis', text: 'Soutenues', count: 50 }]);
 	});
 
 	it('mappe le type "labeled" (avec label inclus dans la réponse)', async () => {

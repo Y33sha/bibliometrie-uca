@@ -12,6 +12,7 @@
   import PublicationHeader from "./PublicationHeader.svelte";
   import PublicationSidebar from "./PublicationSidebar.svelte";
   import ThesisBlock from "./ThesisBlock.svelte";
+  import PatentBlock from "./PatentBlock.svelte";
   import StructuresBlock from "./StructuresBlock.svelte";
   import PersonsBlock from "./PersonsBlock.svelte";
   import SubjectsBlock from "./SubjectsBlock.svelte";
@@ -103,6 +104,10 @@
           {thesisAuthorStructures}
           structures={data!.structures}
         />
+      {/if}
+
+      {#if data!.patent_meta}
+        <PatentBlock patentMeta={data!.patent_meta} structures={data!.structures} />
       {/if}
 
       <div class="detail-body">

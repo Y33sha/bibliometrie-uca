@@ -11,6 +11,7 @@ from domain.source_records.identifiers import (
     SourceIdentifierType,
     active,
     own_dois,
+    reconsidered,
 )
 from domain.source_records.keys import CONFIRMATION_ID_TYPES, is_multi_valued_key
 from domain.sources.registry import AGGREGATOR_SOURCES, Source
@@ -87,6 +88,8 @@ def is_matchable(facts: MatchabilityFacts) -> bool:
     - il vient de DataCite et la cible de son DOI `primary` est le DOI `primary` d'un autre enregistrement source : il est une forme secondaire d'une œuvre représentée par cet enregistrement source ;
     - son titre normalisé est dans `_PARATEXT_TITLES` ;
     - il vient d'une source de `AGGREGATOR_SOURCES` et il n'a aucun DOI actif de rôle autre que `related`, aucune URL de copie et aucune clé de confirmation active.
+
+    Un DOI retiré par la réconciliation (`reconsidered`) compte comme actif : la réconciliation redécide de ce retrait à chaque passe.
     """
     own = own_dois(facts.identifiers)
     if own and all(doi.split("/", 1)[0] in _EXCLUDED_DOI_PREFIXES for doi in own):
@@ -102,6 +105,6 @@ def is_matchable(facts: MatchabilityFacts) -> bool:
             or (
                 i.id_type is SourceIdentifierType.DOI and i.role is not SourceIdentifierRole.RELATED
             )
-            for i in active(facts.identifiers)
+            for i in active(reconsidered(facts.identifiers))
         )
     return True

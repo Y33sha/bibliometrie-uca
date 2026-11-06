@@ -9,7 +9,6 @@ from application.ports.repositories.address_repository import AddressCountryFilt
 from domain.addresses.address_origin import AddressOrigin
 from domain.config import ConfigKey
 from domain.contributions.author_positions import SCANR_TRUNCATED_LENGTHS, AuthorPosition
-from domain.contributions.contribution_roles import ContributionRole
 from domain.persons.contribution_matching import ContributionMatchReason
 from domain.persons.identifiers import (
     HUMAN_ATTRIBUTION_STATUSES,
@@ -25,7 +24,7 @@ from domain.serials.serial import OaModel
 from domain.source_records.corrections import CORRECTED_BY, RAW
 from domain.source_records.impact import CitationTop
 from domain.source_records.source_extras import CROSSREF_PREPRINT_OF, SourceExtra
-from domain.structures.perimeter_evidence import PerimeterEvidence
+from domain.structures.perimeter_evidence import DOCUMENT_EVIDENCE, PerimeterEvidence
 from infrastructure.db.queues import Queue, enqueue_sql
 
 
@@ -105,8 +104,8 @@ def is_raw_address(address: str = "a") -> str:
 
 
 def has_author_role(source_contribution: str = "sc") -> str:
-    """Renvoie la condition vraie quand la contribution source ou la contribution aliasée `source_contribution` tient le rôle d'auteur."""
-    return f"{source_contribution}.roles && ARRAY['{ContributionRole.AUTHOR.value}']::text[]"
+    """Renvoie la condition vraie quand la contribution source ou la contribution aliasée `source_contribution` tient un rôle d'auteur (fonction SQL `is_author_role`, `AUTHOR_ROLES`)."""
+    return f"is_author_role({source_contribution}.roles)"
 
 
 def has_author_position(position: AuthorPosition, contribution: str = "a") -> str:
@@ -246,6 +245,22 @@ REJECTED_PAIRS = f"SELECT sr_rej.publication_id, rej.person_id FROM {_REJECTIONS
 
 NO_PERIMETER_EVIDENCE = "'{}'::perimeter_evidence[]"
 """Tableau d'indices vide : hors du périmètre."""
+
+DOCUMENT_EVIDENCE_SQL = (
+    "ARRAY[" + ", ".join(f"'{e}'" for e in sorted(DOCUMENT_EVIDENCE)) + "]::perimeter_evidence[]"
+)
+"""Indices d'appartenance au périmètre liés au document (`DOCUMENT_EVIDENCE`), en tableau SQL."""
+
+
+def has_document_evidence(publication: str) -> str:
+    """Renvoie la condition vraie quand la publication `publication` (expression SQL de son id) a un indice d'appartenance au périmètre lié au document (`DOCUMENT_EVIDENCE`)."""
+    return f"""EXISTS (
+        SELECT 1 FROM source_records sr_doc
+        JOIN source_contributions sc_doc ON sc_doc.source_record_id = sr_doc.id
+        WHERE sr_doc.publication_id = {publication}
+          AND sc_doc.perimeter_evidence && {DOCUMENT_EVIDENCE_SQL}
+    )"""
+
 
 NO_AUTHOR_POSITION = "'{}'::author_position[]"
 """Tableau de positions d'auteur vide."""

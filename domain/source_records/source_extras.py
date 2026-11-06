@@ -53,7 +53,7 @@ class SourceExtra(StrEnum):
     INTRANET_ONLY = "intranet_only"
     """Thèse réservée à l'intranet de son établissement, cas de diffusion STAR 5 et 6 (theses.fr)."""
     PATENT_APPLICATIONS = "patent_applications"
-    """Demandes de la famille de brevets, avec leurs numéros, leurs dates et leur lien Espacenet (ScanR brevets)."""
+    """Demandes de la famille de brevets, avec leurs numéros et leurs dates (ScanR brevets)."""
     PATENT_APPLICANTS = "patent_applicants"
     """Déposants de la famille de brevets, avec leurs identifiants Paysage, SIREN, ROR et IdRef (ScanR brevets)."""
     PATENT_FIRST_PUBLICATION_DATE = "patent_first_publication_date"

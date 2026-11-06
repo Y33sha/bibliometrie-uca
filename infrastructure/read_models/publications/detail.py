@@ -1,21 +1,28 @@
 """Détail d'une publication."""
 
+from collections.abc import Mapping
+
 from sqlalchemy import Connection, text
 
 from domain.documents.doc_types import DocType
-from domain.platforms.registry import HAL
+from domain.platforms.registry import HAL, espacenet_url
 from domain.publications.access import Access, access, access_url
 from domain.publications.relations import RelationType, inverse_relation
 from domain.source_records.identifiers import SourceIdentifierType
 from domain.source_records.source_extras import SourceExtra
 from domain.sources.registry import Source
 from domain.subjects.subject import SubjectVocabulary
+from domain.types import JsonValue, as_mapping, as_sequence, as_str
 from infrastructure.db.source_record_identifiers import source_record_doi_sql
 from infrastructure.read_models.publications.copies import publication_copies
 from infrastructure.read_models.publications.models import (
     AccessLinkOut,
     ConsolidatedContributionOut,
+    CpcCode,
     ExternalIdentifierOut,
+    PatentApplicant,
+    PatentApplication,
+    PatentMeta,
     PublicationDetailCore,
     PublicationDetailResponse,
     RelatedPublicationOut,
@@ -126,6 +133,84 @@ def _referenced_by(sources: list[SourceRecordOut], access: Access) -> list[Sourc
     return list(first_by_source.values())
 
 
+def _applicant_structures(
+    conn: Connection, rors: list[str], paysage_ids: list[str]
+) -> dict[tuple[str, str], int]:
+    """Renvoie les structures en base reconnues par ces ROR ou ces identifiants Paysage (`api_ids.scanr_patents`), par `("ror", valeur)` ou `("paysage", valeur)`."""
+    rows = conn.execute(
+        text(f"""
+            SELECT 'ror' AS id_type, s.ror_id AS value, s.id
+            FROM structures s WHERE s.ror_id = ANY(:rors)
+            UNION ALL
+            SELECT 'paysage', p.value, s.id
+            FROM structures s
+            CROSS JOIN LATERAL jsonb_array_elements_text(s.api_ids -> '{Source.SCANR_PATENTS.value}') p(value)
+            WHERE p.value = ANY(:paysage)
+        """),  # noqa: S608 — source choisie par le code
+        {"rors": rors, "paysage": paysage_ids},
+    ).all()
+    return {(r.id_type, r.value): r.id for r in rows}
+
+
+def _patent_application(extra: Mapping[str, JsonValue]) -> PatentApplication:
+    """Renvoie une demande de `source_extras.patent_applications`, avec sa recherche Espacenet quand elle est publiée."""
+    application = PatentApplication.model_validate(extra)
+    if application.office and application.publication_number:
+        application.espacenet_url = espacenet_url(
+            application.office, application.publication_number
+        )
+    return application
+
+
+def get_patent_meta(conn: Connection, source_extras: dict[str, JsonValue]) -> PatentMeta:
+    """Renvoie les demandes, les déposants et la classification CPC d'un brevet, d'après le `source_extras` de sa publication. Un déposant est rattaché à une structure en base par son ROR, à défaut par son identifiant Paysage."""
+    applicants = [
+        as_mapping(a) for a in as_sequence(source_extras.get(SourceExtra.PATENT_APPLICANTS))
+    ]
+    ids = [as_mapping(a.get("ids")) for a in applicants]
+    rors = sorted({v for i in ids for v in as_sequence(i.get("ror")) if isinstance(v, str)})
+    paysage_ids = sorted(
+        {v for i in ids for v in as_sequence(i.get("paysage")) if isinstance(v, str)}
+    )
+    known = _applicant_structures(conn, rors, paysage_ids) if rors or paysage_ids else {}
+
+    def structure_id(applicant_ids: Mapping[str, JsonValue]) -> int | None:
+        for id_type in ("ror", "paysage"):
+            for value in as_sequence(applicant_ids.get(id_type)):
+                if isinstance(value, str) and (id_type, value) in known:
+                    return known[(id_type, value)]
+        return None
+
+    # ScanR répète un déposant, avec et sans pays : une seule entrée par structure, à défaut par nom.
+    unique: dict[object, PatentApplicant] = {}
+    for a, applicant_ids in zip(applicants, ids, strict=True):
+        applicant = PatentApplicant(
+            name=as_str(a.get("name")),
+            type=as_str(a.get("type")),
+            country=as_str(a.get("country")),
+            structure_id=structure_id(applicant_ids),
+        )
+        key = applicant.structure_id or (applicant.name or "").casefold()
+        if key not in unique or (unique[key].country is None and applicant.country):
+            unique[key] = applicant
+
+    applications = [
+        _patent_application(as_mapping(a))
+        for a in as_sequence(source_extras.get(SourceExtra.PATENT_APPLICATIONS))
+    ]
+    return PatentMeta(
+        applications=sorted(
+            applications, key=lambda a: (a.application_date or "", a.publication_date or "")
+        ),
+        applicants=list(unique.values()),
+        cpc=[
+            CpcCode.model_validate(as_mapping(c))
+            for c in as_sequence(source_extras.get(SourceExtra.CPC))
+        ],
+        grant_date=as_str(source_extras.get(SourceExtra.PATENT_GRANT_DATE)),
+    )
+
+
 def get_publication_external_identifiers(
     conn: Connection, publication_id: int
 ) -> list[ExternalIdentifierOut]:
@@ -195,7 +280,7 @@ class PublicationDetailQueries:
                        p.oa_status::text AS oa_status,
                        p.license::text AS license, p.deposit_license::text AS deposit_license,
                        p.best_copy_url,
-                       p.language, p.container_title, d.abstract, d.keywords,
+                       p.language, p.container_title, p.source_extras, d.abstract, d.keywords,
                        j.id AS serial_id, j.title AS journal_title,
                        CASE WHEN j.id IS NOT NULL THEN {active_issns("j.id")} END AS serial_issns,
                        j.oa_model,
@@ -338,6 +423,12 @@ class PublicationDetailQueries:
                     or publication_extras.get(SourceExtra.DATE_INSCRIPTION),
                 )
 
+        patent_meta = (
+            get_patent_meta(self._conn, publication_row.source_extras or {})
+            if publication_row.doc_type == DocType.PATENT
+            else None
+        )
+
         subjects = get_publication_subjects(self._conn, publication_id)
         relations = get_publication_relations(self._conn, publication_id)
         external_identifiers = get_publication_external_identifiers(self._conn, publication_id)
@@ -346,9 +437,12 @@ class PublicationDetailQueries:
             doi=publication_row.doi,
         )
 
-        structures = structures_by_id(
-            self._conn, {sid for a in contributions for sid in a.structure_ids or []}
-        )
+        structure_ids = {sid for a in contributions for sid in a.structure_ids or []}
+        if patent_meta:
+            structure_ids |= {
+                a.structure_id for a in patent_meta.applicants if a.structure_id is not None
+            }
+        structures = structures_by_id(self._conn, structure_ids)
 
         return PublicationDetailResponse(
             publication=PublicationDetailCore(
@@ -378,6 +472,7 @@ class PublicationDetailQueries:
             contributions=contributions,
             theses_contributions=theses_contributions,
             thesis_meta=thesis_meta,
+            patent_meta=patent_meta,
             structures=structures,
             subjects=subjects,
             keywords=keywords,

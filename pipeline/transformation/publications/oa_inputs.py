@@ -10,7 +10,11 @@ from sqlalchemy import Connection, text
 
 from domain.publications.access import Copy
 from domain.publications.oa_status import OaStatus
-from domain.publications.open_access import is_restricted, publication_oa_status
+from domain.publications.open_access import (
+    has_oa_status,
+    is_restricted,
+    publication_oa_status,
+)
 from domain.types import JsonValue
 from infrastructure.read_models.publications.copies import publication_copies
 from infrastructure.sql_fragments import under_active_embargo
@@ -30,6 +34,8 @@ class OaFacts(NamedTuple):
 class OaInputs(NamedTuple):
     """Données du calcul du statut open access d'une publication."""
 
+    applicable: bool
+    """Le statut open access s'applique au type de la publication (`has_oa_status`)."""
     has_serial: bool
     serial_oa_model: str | None
     embargoed: bool
@@ -44,6 +50,7 @@ class OaInputs(NamedTuple):
         """Renvoie le statut open access déduit de ces données (`publication_oa_status`)."""
         return publication_oa_status(
             self.copies,
+            applicable=self.applicable,
             embargoed=self.embargoed,
             restricted=self.restricted,
             unpaywall=self.unpaywall,
@@ -63,6 +70,7 @@ def oa_inputs(conn: Connection, publications: Sequence[OaFacts]) -> dict[int, Oa
     copies = publication_copies(conn, ids)
     return {
         p.id: OaInputs(
+            applicable=has_oa_status(p.doc_type),
             has_serial=p.serial_id is not None,
             serial_oa_model=oa_models.get(p.serial_id) if p.serial_id is not None else None,
             embargoed=p.id in embargoed,

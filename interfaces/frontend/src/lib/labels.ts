@@ -245,7 +245,6 @@ export const filterLabels = {
 	author: 'Auteurs',
 	partner: 'Organisations partenaires',
 	countries: 'Pays',
-	apc: 'APC',
 	oaStatuses: 'Voies OA',
 	licenses: 'Licences',
 	citationTops: 'Top citations',
