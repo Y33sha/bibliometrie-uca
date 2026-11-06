@@ -3,7 +3,7 @@
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 
 from domain.documents.doc_types import DocType
 from domain.documents.identifiers import DOI, is_hal_host
@@ -133,9 +133,25 @@ PUBMED_CENTRAL = _repository(
 )
 """L'archive de PubMed Central, que désigne aussi l'identifiant PMCID d'un document. La source OpenAlex de son miroir Europe PMC donne surtout des adresses de PubMed Central."""
 
+ESPACENET = KnownPlatform(
+    "Espacenet",
+    PlatformType.PUBLISHER_PLATFORM,
+    hosts=("worldwide.espacenet.com",),
+    fully_open=True,
+    icon="espacenet.svg",
+)
+"""Base de l'Office européen des brevets : les demandes de brevet publiées par les offices du monde entier."""
+
+
+def espacenet_url(office: str, publication_number: str) -> str:
+    """Renvoie la recherche Espacenet d'une demande publiée : code de l'office, puis numéro de publication avec son code de type (`FR`, `2980802A1`)."""
+    return f"https://worldwide.espacenet.com/patent/search?q={quote(f'pn="{office}{publication_number}"')}"
+
+
 KNOWN_PLATFORMS: tuple[KnownPlatform, ...] = (
     HAL,
     PUBMED_CENTRAL,
+    ESPACENET,
     # L'archive ouverte Zenodo, du CERN.
     _repository(
         "Zenodo",

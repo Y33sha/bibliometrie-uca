@@ -10,6 +10,7 @@ from domain.contributions.contribution_roles import ContributionRole
 from domain.documents.dates import PublicationDate, parse_iso_date
 from domain.normalize import normalize_text
 from domain.persons.contributor_name import ContributorName
+from domain.platforms.registry import espacenet_url
 from domain.source_records.identifiers import (
     SourceIdentifier,
     SourceIdentifierRole,
@@ -17,6 +18,7 @@ from domain.source_records.identifiers import (
 )
 from domain.source_records.source_extras import SourceExtra
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
+from pipeline.ingestion.common.locations import LocationFacts
 from pipeline.ingestion.common.normalizer import Document, SourceNormalizer
 from pipeline.ingestion.common.source_contributions import (
     AuthorBlock,
@@ -113,6 +115,28 @@ def family_identifiers(family: Mapping[str, JsonValue]) -> list[SourceIdentifier
                 )
             )
     return identifiers
+
+
+def espacenet_locations(family: Mapping[str, JsonValue]) -> list[LocationFacts]:
+    """Renvoie la copie Espacenet de la famille : la demande prioritaire publiée, à défaut la première demande publiée par date de dépôt."""
+    published = [
+        (office, number, a)
+        for a in _applications(family)
+        if (office := (as_str(a.get("office")) or "").strip().upper())
+        and (number := (as_str(a.get("publicationNumber")) or "").strip())
+    ]
+    if not published:
+        return []
+    office, number, _ = min(
+        published,
+        key=lambda p: (
+            p[2].get("isPriority") is not True,
+            as_str(p[2].get("applicationDate")) or "",
+        ),
+    )
+    return [
+        LocationFacts(url=espacenet_url(office, number), version="publishedVersion", is_oa=True)
+    ]
 
 
 def _application_extra(application: Mapping[str, JsonValue]) -> dict[str, JsonValue]:
@@ -255,6 +279,9 @@ class ScanrPatentsNormalizer(SourceNormalizer):
 
     def publication_date(self, doc: Document) -> PublicationDate | None:
         return get_publication_date(doc)
+
+    def locations(self, doc: Document) -> list[LocationFacts]:
+        return espacenet_locations(doc)
 
     def author_block(self, doc: Document) -> AuthorBlock:
         return {"inventors": doc.get("inventors")}
