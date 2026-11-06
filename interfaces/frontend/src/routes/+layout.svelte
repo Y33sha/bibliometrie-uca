@@ -133,10 +133,10 @@
 <a class="skip-link" href="#contenu">Aller au contenu</a>
 
 <header class="site-header" class:admin={adminLook()}>
-  <div class="site-brand">
+  <a class="site-brand" href={resolve('')}>
     <img src={asset(adminLook() ?"connectome.svg" : "favicon-menu.svg")} alt="" class="site-icon" />
     <span class="site-title">{siteTitle()}</span>
-  </div>
+  </a>
   <nav id="site-nav" class="site-nav" class:open={mobileNavOpen} aria-label="Navigation principale">
     <a href={resolve('publications')} class="nav-link" class:active={isActive("/publications")}><i class="fi fi-rr-book-open-cover nav-icon" aria-hidden="true"></i>Publications</a>
     <a href={resolve('structures')} class="nav-link" class:active={isActive("/structures")}><i class="fi fi-rr-school nav-icon" aria-hidden="true"></i>Labos</a>
@@ -167,9 +167,12 @@
 <DialogHost />
 
 <style>
+  /* Logo et nom du site : lien vers l'accueil, sans soulignement. */
   .site-brand {
     display: flex;
     align-items: center;
+    color: inherit;
+    text-decoration: none;
   }
   .site-icon {
     height: 32px;
