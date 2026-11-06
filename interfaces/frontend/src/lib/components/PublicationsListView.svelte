@@ -40,6 +40,7 @@
 	import { paramsToQuery } from '#lib/utils.js';
 	import { nextSort, sortDirection } from '#lib/sort.js';
 	import IconButton from '#lib/components/IconButton.svelte';
+	import ListStatus from '#lib/components/ListStatus.svelte';
 	import { contextEntityId, type PublicationListContext } from '#lib/publicationListContext.js';
 
 	import type { components } from '#lib/api/schema.js';
@@ -115,6 +116,31 @@
 	const cv = useColumnVisibility('publication-table-columns', columnDefs, initialHidden);
 	const col = cv.col;
 
+	// --- Vue ---
+	// Notices : titre, puis type, année, revue, éditeur, DOI et laboratoires, accès à droite. Tableau : une colonne par champ, colonnes au choix.
+	type View = 'notices' | 'table';
+	let view = $state<View>('notices');
+
+	// Tris proposés en vue Notices, où les en-têtes de colonne manquent. Ils couvrent les tris du tableau.
+	const sortOptions = [
+		{ value: 'year_desc', label: "Année, récentes d'abord" },
+		{ value: 'year_asc', label: "Année, anciennes d'abord" },
+		{ value: 'title_asc', label: 'Titre, de A à Z' },
+		{ value: 'title_desc', label: 'Titre, de Z à A' },
+		{ value: 'serial_asc', label: 'Revue, de A à Z' },
+		{ value: 'serial_desc', label: 'Revue, de Z à A' },
+		{ value: 'publisher_asc', label: 'Éditeur, de A à Z' },
+		{ value: 'publisher_desc', label: 'Éditeur, de Z à A' },
+		...(isLab
+			? []
+			: [
+					{ value: 'labs_asc', label: 'Laboratoire, de A à Z' },
+					{ value: 'labs_desc', label: 'Laboratoire, de Z à A' },
+				]),
+		{ value: 'apc_desc', label: 'APC, montant décroissant' },
+		{ value: 'apc_asc', label: 'APC, montant croissant' },
+	];
+
 	// --- Filtres ---
 	let search = $state('');
 	let currentSort = $state('year_desc');
@@ -187,6 +213,7 @@
 			search:      { type: 'single', urlKey: 'search' },
 			currentSort: { type: 'single', urlKey: 'sort', defaultValue: 'year_desc' },
 			currentPage: { type: 'page',   urlKey: 'page' },
+			view:        { type: 'single', urlKey: 'view', defaultValue: 'notices' },
 		},
 	});
 
@@ -198,7 +225,13 @@
 			search,
 			currentSort,
 			currentPage: listing.page,
+			view,
 		}));
+	}
+
+	function setView(next: View) {
+		view = next;
+		syncUrl();
 	}
 
 	function onFilterChange() {
@@ -245,6 +278,7 @@
 			if (restored.search) search = restored.search as string;
 			if (restored.currentSort) currentSort = restored.currentSort as string;
 			if (restored.currentPage) listing.page = restored.currentPage as number;
+			if (restored.view === 'table') view = 'table';
 		}
 
 		// Forcer l'affichage des colonnes liées aux filtres actifs
@@ -259,6 +293,17 @@
 
 <ListToolbar bind:search placeholder="Rechercher par titre ou sujet" onsearch={onSearchInput} list={listing} one="publication" many="publications" exportUrl={exportCsvUrl()}>
 	{#snippet actions()}
+		{#if view === 'notices'}
+			<label class="sort-select">Trier par
+				<select bind:value={currentSort} onchange={onFilterChange}>
+					{#each sortOptions as o (o.value)}<option value={o.value}>{o.label}</option>{/each}
+				</select>
+			</label>
+		{/if}
+		<div class="segmented" role="group" aria-label="Affichage">
+			<button type="button" aria-pressed={view === 'notices'} onclick={() => setView('notices')}>Notices</button>
+			<button type="button" aria-pressed={view === 'table'} onclick={() => setView('table')}>Tableau</button>
+		</div>
 		{#if showStatsLink}<a href={statsUrl} class="btn btn-primary">Statistiques &rarr;</a>{/if}
 	{/snippet}
 	<PublicationFilterBar filters={FILTERS} bind:values options={facets.options} sourceCounts={facets.sourceCounts} buildParams={buildFilterParams} onchange={onFilterChange} />
@@ -267,6 +312,36 @@
 	{/snippet}
 </ListToolbar>
 
+{#if view === 'notices'}
+<ListStatus list={listing} emptyText="Aucune publication trouvée">
+	<ul class="notices">
+		{#each listing.items as p (p.id)}
+			<li class="notice" class:active-row={p.id === drawer.id}>
+				<div class="notice-actions">
+					<IconButton icon="panel" label="Ouvrir le volet" onclick={() => drawer.open(p.id)} />
+					{#if showAdminExclude && p.contribution_id != null}
+						<IconButton icon="reject" label="Exclure ce lien auteur–publication" onclick={() => onExcludeClick(p)} />
+					{/if}
+				</div>
+				<div>
+					<a href={resolve(`publications/${p.id}`)} class="publication-title"><PublicationTitle titre={p.title} /></a>
+					<div class="notice-meta">
+						{#if p.doc_type}<span><DocTypePill docType={p.doc_type} /></span>{/if}
+						{#if p.publication_year}<span class="notice-year">{p.publication_year}</span>{/if}
+						{#if p.serial}<span class="notice-serial">{#if p.serial_id}<a href={resolve(`journals/${p.serial_id}`)}>{p.serial}</a>{:else}{p.serial}{/if}</span>{/if}
+						{#if p.publisher}<span>{#if p.publisher_id}<a href={resolve(`publishers/${p.publisher_id}`)}>{p.publisher}</a>{:else}{p.publisher}{/if}</span>{/if}
+						{#if p.doi}<span><DoiLink doi={p.doi} text /></span>{/if}
+						{#if !isLab && p.lab_items?.length}
+							<span class="notice-labs">{#each p.lab_items as lab, i (lab.id)}{#if i > 0}, {/if}<a href={resolve(`structures/${lab.id}`)}>{lab.label}</a>{/each}</span>
+						{/if}
+					</div>
+				</div>
+				<div class="notice-access"><AccessButton accessUrl={p.access_url} oaStatus={p.oa_status} compact /></div>
+			</li>
+		{/each}
+	</ul>
+</ListStatus>
+{:else}
 <TableScroll>
 <table class="data-table publication-table">
 	<thead>
@@ -388,6 +463,7 @@
 	</tbody>
 </table>
 </TableScroll>
+{/if}
 
 <Pagination page={listing.page} pages={listing.pages} onchange={(p) => { listing.goToPage(p); syncUrl(); }} />
 
@@ -420,4 +496,78 @@
 	/* Auteur correspondant (person) */
 	.corr-cell { text-align: center; }
 	.corr-cell :global(.corresponding-mark) { margin-left: 0; }
+
+	/* Vue Notices : actions, notice, accès ; l'accès passe sous la notice sur un écran étroit. */
+	.sort-select {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		font-size: var(--fs-sm);
+		color: var(--muted);
+	}
+	.notices {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+	}
+	.notice {
+		display: grid;
+		grid-template-columns: auto minmax(0, 1fr) auto;
+		gap: 0 12px;
+		padding: 10px 8px;
+		border-bottom: 1px solid var(--border-subtle);
+	}
+	.notice:hover {
+		background: var(--surface-hover);
+	}
+	.notice.active-row {
+		background: var(--accent-light);
+	}
+	.notice-actions {
+		display: flex;
+		gap: 2px;
+		align-items: flex-start;
+	}
+	.notice-meta {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		row-gap: 2px;
+		margin-top: 3px;
+		font-size: var(--fs-sm);
+		color: var(--muted);
+	}
+	/* Le point séparateur précède l'élément suivant et passe à la ligne avec lui. */
+	.notice-meta > * + *::before {
+		content: '·';
+		margin: 0 6px;
+		color: var(--text-faint);
+	}
+	.notice-meta a {
+		color: inherit;
+		text-decoration: none;
+	}
+	.notice-meta a:hover {
+		text-decoration: underline;
+	}
+	.notice-year,
+	.notice-labs {
+		font-weight: 600;
+		color: var(--text-secondary);
+	}
+	.notice-serial {
+		font-style: italic;
+	}
+	.notice-access {
+		padding-top: 2px;
+	}
+	@media (max-width: 640px) {
+		.notice {
+			grid-template-columns: auto minmax(0, 1fr);
+		}
+		.notice-access {
+			grid-column: 2;
+			padding-top: 4px;
+		}
+	}
 </style>

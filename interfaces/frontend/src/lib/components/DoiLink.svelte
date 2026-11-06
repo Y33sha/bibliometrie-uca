@@ -1,13 +1,17 @@
 <script lang="ts">
 	import { asset } from '$app/paths';
 
-	// Logo DOI vers la page du DOI, qui grossit au survol.
-	let { doi }: { doi: string } = $props();
+	// Lien vers la page du DOI : logo qui grossit au survol, ou mot « DOI ».
+	let { doi, text = false }: { doi: string; text?: boolean } = $props();
 </script>
 
-<a href="https://doi.org/{doi}" target="_blank" rel="noopener" class="doi-link" title={doi}>
-	<img src={asset('icons/doi.svg')} alt="DOI" />
-</a>
+{#if text}
+	<a href="https://doi.org/{doi}" target="_blank" rel="noopener" class="doi-text" title={doi}>DOI</a>
+{:else}
+	<a href="https://doi.org/{doi}" target="_blank" rel="noopener" class="doi-link" title={doi}>
+		<img src={asset('icons/doi.svg')} alt="DOI" />
+	</a>
+{/if}
 
 <style>
 	.doi-link {
@@ -22,5 +26,9 @@
 		display: block;
 		width: 20px;
 		height: 20px;
+	}
+	.doi-text {
+		font-weight: 600;
+		color: var(--accent);
 	}
 </style>
