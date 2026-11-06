@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 4qCv87PlTkeaDdAN5p5jr231eDdP0Nm4D61F2Msq1TMG13BtgHEUBnI5dmJTCY2
+\restrict cr2TAzztUJcGdj2EHRerPyIfnmoJTC5cepHO4Vq1xCufOkxfggI8vTp26z2FjJH
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -1394,7 +1394,7 @@ COMMENT ON COLUMN sources.source_records.authors_hash IS 'Empreinte de la partie
 -- Name: COLUMN source_records.author_count; Type: COMMENT; Schema: sources; Owner: -
 --
 
-COMMENT ON COLUMN sources.source_records.author_count IS 'Contributions sources de l''enregistrement source qui ont le rôle author et ne sont pas collectives, telles que la source les donne.';
+COMMENT ON COLUMN sources.source_records.author_count IS 'Contributions sources de l''enregistrement source qui ont un rôle d''auteur (is_author_role) et ne sont pas collectives, telles que la source les donne.';
 
 
 --
@@ -6264,5 +6264,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 4qCv87PlTkeaDdAN5p5jr231eDdP0Nm4D61F2Msq1TMG13BtgHEUBnI5dmJTCY2
+\unrestrict cr2TAzztUJcGdj2EHRerPyIfnmoJTC5cepHO4Vq1xCufOkxfggI8vTp26z2FjJH
 

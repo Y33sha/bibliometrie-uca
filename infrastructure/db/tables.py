@@ -1444,8 +1444,8 @@ source_records = Table(
         nullable=False,
         server_default="0",
         comment=(
-            "Contributions sources de l'enregistrement source qui ont le rôle author et ne sont pas "
-            "collectives, telles que la source les donne."
+            "Contributions sources de l'enregistrement source qui ont un rôle d'auteur "
+            "(is_author_role) et ne sont pas collectives, telles que la source les donne."
         ),
     ),
     Column(
