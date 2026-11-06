@@ -53,6 +53,10 @@
 		limit === undefined || showAll ? orderedResults : orderedResults.filter((r, i) => i < limit || selected.includes(r.value)),
 	);
 	const hiddenCount = $derived(orderedResults.length - shownResults.length);
+	/** Nombre de résultats au-delà duquel une liste sans limite propose la recherche. */
+	const SEARCH_THRESHOLD = 10;
+	// La recherche sert quand des résultats sont masqués, ou que la liste est longue, ou qu'une recherche est en cours. L'API renvoie les premières entités seulement : une liste pleine en cache d'autres.
+	const showSearch = $derived(query.trim() !== '' || results.length > (limit ?? SEARCH_THRESHOLD));
 
 	const filterKey = $derived(buildParams().toString());
 	$effect(() => {
@@ -94,7 +98,9 @@
 	}
 </script>
 
-<input type="text" class="panel-search input-sm" placeholder="Rechercher" aria-label="Rechercher" bind:value={query} oninput={onInput} />
+{#if showSearch}
+	<input type="text" class="panel-search input-sm" placeholder="Rechercher" aria-label="Rechercher" bind:value={query} oninput={onInput} />
+{/if}
 {#if selected.length}
 	<button type="button" class="option-row facet-clear" onclick={() => pick(null)}>Effacer</button>
 {/if}

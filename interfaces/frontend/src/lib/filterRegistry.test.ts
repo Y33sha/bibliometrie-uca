@@ -6,6 +6,7 @@ import {
 	appendFilterParams,
 	checkboxSummary,
 	clearValue,
+	coreRange,
 	encodePresence,
 	explicitSelectionUrl,
 	facetDefs,
@@ -194,10 +195,21 @@ describe('filterRegistry', () => {
 		expect(isShown(sources, values, () => 0, none)).toBe(true);
 	});
 
+	it('borne la plage aux valeurs qui concentrent les décomptes', () => {
+		const counts: [number, number][] = [[1976, 1], [2000, 5], [2016, 100], [2017, 7000], [2018, 7000], [2026, 5800], [2027, 50]];
+		expect(coreRange(counts)).toEqual([2017, 2026]);
+		expect(coreRange([[2020, 3]])).toEqual([2020, 2020]);
+		expect(coreRange([[2020, 1], [2021, 1]])).toEqual([2020, 2021]);
+	});
+
 	it('résume un intervalle par ses bornes', () => {
 		const range: CheckboxFilter = { ...years, range: true };
 		expect(checkboxSummary(range, ['2023', '2021', '2022'], [])).toBe('2021–2023');
 		expect(checkboxSummary(range, ['2024'], [])).toBe('2024');
+		const options = ['1990', '2021', '2022', '2023', '2024'].map((v) => ({ value: v, text: v, count: 5 }));
+		expect(checkboxSummary(range, rangeSelection(1990, 2022), options)).toBe("Jusqu'à 2022");
+		expect(checkboxSummary(range, ['2022', '2023', '2024'], options)).toBe('Depuis 2022');
+		expect(checkboxSummary(range, ['2022', '2023'], options)).toBe('2022–2023');
 		expect(rangeBounds(['2021', '2023'])).toBeNull();
 		expect(rangeSelection(2021, 2023)).toEqual(['2021', '2022', '2023']);
 	});

@@ -15,7 +15,7 @@
 	} from '#lib/filterRegistry.js';
 	import type { useFilterPanel } from '#lib/composables/useFilterPanel.svelte.js';
 
-	// Panneau des filtres d'une liste : les filtres du registre, par rubrique, chacun dépliable. Les décomptes suivent les filtres actifs.
+	// Panneau des filtres d'une liste : les filtres du registre, par rubrique, chacun dépliable. Un filet sépare les rubriques. Les décomptes suivent les filtres actifs.
 	let {
 		filters,
 		groups,
@@ -74,9 +74,8 @@
 		{@const shown = s.filters.filter((f) => isShown(f, values, nonZeroOptions, sourceCounts))}
 		{#if shown.length}
 			<section class="filter-group" aria-label={s.group.label}>
-				<h2 class="filter-group-label">{s.group.label}</h2>
 				{#each shown as f (f.key)}
-					{@const open = panel.isExpanded(f.key, f.expanded ?? false)}
+					{@const open = panel.isExpanded(f.key)}
 					{@const count = selectionCount(f)}
 					<div class="filter-block">
 						<button type="button" class="filter-head" aria-expanded={open} title={f.tooltip} onclick={() => panel.setExpanded(f.key, !open)}>
@@ -122,17 +121,11 @@
 		font-weight: 600;
 		font-size: var(--fs-md);
 	}
-	.filter-group {
-		padding-top: 8px;
-	}
+	/* Rubriques séparées par un filet, sans titre. */
 	.filter-group + .filter-group {
+		margin-top: 4px;
+		padding-top: 4px;
 		border-top: 1px solid var(--border-subtle);
-	}
-	.filter-group-label {
-		margin: 2px 0 2px;
-		font-size: var(--fs-sm);
-		font-weight: 600;
-		color: var(--muted);
 	}
 	.filter-head {
 		display: flex;

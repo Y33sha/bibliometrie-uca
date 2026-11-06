@@ -32,7 +32,6 @@ export function publicationFilters(
 			label: filterLabels.types,
 			param: 'doc_type',
 			group: 'publication',
-			expanded: true,
 			facet: { type: 'label_map', apiKey: 'doc_types', labels: docTypePluralLabels() },
 			groups: docTypeFamilies().map((f) => ({ label: f.label, values: f.types })),
 			showColumns: ['type'],
@@ -44,7 +43,6 @@ export function publicationFilters(
 			label: filterLabels.years,
 			param: 'year',
 			group: 'publication',
-			expanded: true,
 			facet: { type: 'simple', apiKey: 'years' },
 			range: true,
 			// Un lien vers la page Statistiques écrit `all` : elle applique alors ses années par défaut seulement à l'ouverture sans paramètre `year`.
@@ -74,7 +72,6 @@ export function publicationFilters(
 			label: filterLabels.access,
 			param: 'access',
 			group: 'access',
-			expanded: true,
 			facet: { type: 'labeled', apiKey: 'access' },
 		},
 		{
@@ -102,7 +99,6 @@ export function publicationFilters(
 			label: filterLabels.labs,
 			param: 'lab_id',
 			group: 'affiliations',
-			expanded: true,
 			facet: { type: 'labeled', apiKey: 'labs' },
 			searchable: true,
 			fixed: () => contextEntityId(context, 'lab'),

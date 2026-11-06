@@ -17,8 +17,6 @@ interface BaseFilter {
 	param: string;
 	/** Clé de la rubrique du filtre dans le panneau des filtres (`FilterGroup`). */
 	group: string;
-	/** Filtre déplié dans le panneau tant que l'utilisateur ne l'a pas replié. */
-	expanded?: boolean;
 	/** Texte d'aide, au survol du nom du filtre. */
 	tooltip?: string;
 	/** Valeur imposée par la page : elle remplace la sélection dans la requête, et le contrôle disparaît. */
@@ -178,15 +176,38 @@ export function rangeBounds(selected: string[]): [number, number] | null {
 	return last - first + 1 === new Set(years).size ? [first, last] : null;
 }
 
+/**
+ * Bornes de la plage qui concentre les décomptes. À chaque bout, les valeurs qui réunissent ensemble moins de `share` du total sont écartées.
+ *
+ * `counts` : paires (valeur, décompte), triées par valeur croissante, non vides.
+ */
+export function coreRange(counts: [number, number][], share = 0.01): [number, number] {
+	const threshold = share * counts.reduce((sum, [, c]) => sum + c, 0);
+	let lo = 0;
+	for (let cumulated = counts[0][1]; cumulated < threshold && lo < counts.length - 1; cumulated += counts[++lo][1]);
+	let hi = counts.length - 1;
+	for (let cumulated = counts[hi][1]; cumulated < threshold && hi > lo; cumulated += counts[--hi][1]);
+	return [counts[lo][0], counts[hi][0]];
+}
+
 /** Entiers de `from` à `to`, bornes comprises, en sélection. */
 export function rangeSelection(from: number, to: number): string[] {
 	return Array.from({ length: to - from + 1 }, (_, i) => String(from + i));
 }
 
-/** Résumé d'une sélection de cases à cocher. Un groupe entièrement coché est nommé par son libellé ; un intervalle, par ses bornes. */
+/** Résumé d'un intervalle : « Jusqu'à 2025 » quand il part de la première valeur des options, « Depuis 2021 » quand il va jusqu'à la dernière, sinon ses bornes. */
+export function rangeSummary([from, to]: [number, number], options: FacetOption[]): string {
+	const values = options.filter((o) => o.count).map((o) => Number(o.value));
+	if (from === to) return String(from);
+	if (values.length && from <= Math.min(...values)) return `Jusqu'à ${to}`;
+	if (values.length && to >= Math.max(...values)) return `Depuis ${from}`;
+	return `${from}–${to}`;
+}
+
+/** Résumé d'une sélection de cases à cocher. Un groupe entièrement coché est nommé par son libellé ; un intervalle, par `rangeSummary`. */
 export function checkboxSummary(filter: CheckboxFilter, selected: string[], options: FacetOption[]): string {
 	const bounds = filter.range ? rangeBounds(selected) : null;
-	if (bounds) return bounds[0] === bounds[1] ? String(bounds[0]) : `${bounds[0]}–${bounds[1]}`;
+	if (bounds) return rangeSummary(bounds, options);
 	const text = new Map(options.map((o) => [o.value, o.text]));
 	const parts: string[] = [];
 	let rest = selected;

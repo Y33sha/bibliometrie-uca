@@ -1,5 +1,5 @@
 /**
- * État du panneau des filtres : ouvert ou fermé, et filtres dépliés. Le navigateur le retient, pour toutes les listes.
+ * État du panneau des filtres : ouvert ou fermé, et filtres dépliés. Un filtre est replié tant que l'utilisateur ne l'a pas déplié. Le navigateur retient cet état, pour toutes les listes.
  *
  * Le stockage est reçu en paramètre : l'application passe celui du navigateur, un test en passe un autre. `null` désactive la persistance.
  */
@@ -48,9 +48,8 @@ export function useFilterPanel(storage: PanelStorage | null = browserStorage(), 
 			open = value;
 			if (wide) storage?.setItem(OPEN_KEY, value ? '1' : '0');
 		},
-		/** Filtre déplié : choix de l'utilisateur, sinon `byDefault`. */
-		isExpanded(key: string, byDefault: boolean): boolean {
-			return expanded[key] ?? byDefault;
+		isExpanded(key: string): boolean {
+			return expanded[key] ?? false;
 		},
 		setExpanded(key: string, value: boolean) {
 			expanded = { ...expanded, [key]: value };
