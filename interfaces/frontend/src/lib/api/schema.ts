@@ -5687,6 +5687,11 @@ export interface components {
              */
             count: number;
             /**
+             * Absent Count
+             * @description Revues absentes de la liste, ou de tous les niveaux du classement.
+             */
+            absent_count: number;
+            /**
              * Levels
              * @description Niveaux d'un classement ; vide pour une liste.
              */

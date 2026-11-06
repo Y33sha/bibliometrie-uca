@@ -129,10 +129,13 @@
 				levels: l.levels.map((level) => ({ key: level.code, label: level.label })),
 			}));
 			listCounts = Object.fromEntries(
-				lists.flatMap((l) => [
-					[l.code, { yes: l.count, no: 0 }],
-					...l.levels.map((level) => [level.code, { yes: level.count, no: 0 }]),
-				]),
+				lists.flatMap((l) => {
+					const total = l.count + l.absent_count;
+					return [
+						[l.code, { yes: l.count, no: l.absent_count }],
+						...l.levels.map((level) => [level.code, { yes: level.count, no: total - level.count }]),
+					];
+				}),
 			);
 		},
 	});
