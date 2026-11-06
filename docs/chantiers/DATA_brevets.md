@@ -124,7 +124,7 @@ Familles dont un établissement du périmètre est déposant : UCA, Université 
 - [x] Indice de périmètre `patent_applicant` : les 97 familles ont leur publication
 - [x] Exception à la purge des publications : les 2 626 thèses à indice `thesis_institution` ont toutes une contribution rattachée à une personne
 - [x] Indices des publications liés au document repris des contributions sources, sans relecture du PPN de l'établissement
-- [ ] Rôle `inventor`, compté comme rôle d'auteur : 41 brevets sans dépôt HAL sont sans structure liée
+- [x] Rôle `inventor`, compté comme rôle d'auteur : les brevets sans dépôt HAL ont tous une structure liée
 - [x] Mesure du rattachement des inventeurs : 364 sur 521 rattachés à une personne, dont 271 par IdRef, ORCID ou identifiant HAL
 - [x] Mesure du rattachement par nom : 93 inventeurs, dont 26 sur des familles sans dépôt HAL ; échantillon cohérent avec les structures des personnes
 
