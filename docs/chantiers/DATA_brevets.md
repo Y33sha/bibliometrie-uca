@@ -131,7 +131,7 @@ Familles dont un établissement du périmètre est déposant : UCA, Université 
 ### Phase 6 — Interface
 
 - [ ] Page de détail d'un brevet : demandes par office, déposants, inventeurs, classification CPC
-- [ ] Revue, éditeur, open access et APC masqués pour un brevet
+- [x] Revue, éditeur, open access et APC masqués pour un brevet : statut open access `unknown`
 
 ### Phase 7 — Documentation
 
