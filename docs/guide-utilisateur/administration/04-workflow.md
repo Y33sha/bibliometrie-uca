@@ -14,6 +14,7 @@ Le moissonnage nécessite des **structures** :
     * identifiant [OpenAlex](../../glossaire.md#openalex), de forme `I198244214` ;
     * theses.fr : PPN de l'établissement (ex. : `252404955`) ;
     * numéro SIREN pour [ScanR](../../glossaire.md#scanr) (ex. : `130028061`) ;
+    * identifiants Paysage des déposants pour ScanR brevets ;
     * forme de nom standardisée [WoS](../../glossaire.md#web-of-science-wos) (ex. : `Univ Clermont Auvergne`) ;
     * code de [collection HAL](../../glossaire.md#collection-hal) (ex. : `PRES_CLERMONT`) ;
     * mots-clés cherchés dans les affiliations DataCite (ex. : `Clermont, Auvergne`).
