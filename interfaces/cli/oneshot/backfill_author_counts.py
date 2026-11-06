@@ -1,10 +1,10 @@
-# STATUS: oneshot (2026-10-18)
-"""Calcule `author_count` et `distinct_author_count` des enregistrements sources du stock d'après leurs contributions sources en base, comme la normalisation (`is_individual_author`).
+# STATUS: oneshot (2026-11-06)
+"""Calcule `author_count` et `distinct_author_count` des enregistrements sources de brevet d'après leurs contributions sources en base, comme la normalisation (`is_individual_author`). Les inventeurs comptent comme auteurs.
 
-Les enregistrements sources se traitent par lots d'identifiants, un commit par lot. Seules les valeurs qui changent s'écrivent. Idempotent.
+Seules les valeurs qui changent s'écrivent. Idempotent.
 
 Usage :
-    uv run python -m interfaces.cli.oneshot.backfill_author_counts [--dry-run] [--batch 50000]
+    uv run python -m interfaces.cli.oneshot.backfill_author_counts [--dry-run]
 """
 
 from __future__ import annotations
@@ -14,13 +14,14 @@ import os
 
 from sqlalchemy import Connection, text
 
-from domain.contributions.contribution_roles import ContributionRole
+from domain.documents.doc_types import DocType
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
+from infrastructure.sql_fragments import has_author_role
 
 log = setup_logger("backfill_author_counts", os.path.dirname(__file__))
 
-_AUTHOR = f"NOT sc.collective AND '{ContributionRole.AUTHOR.value}' = ANY(sc.roles)"
+_AUTHOR = f"NOT sc.collective AND {has_author_role('sc')}"
 """Contribution source d'auteur individuelle, comme `is_individual_author`."""
 
 
@@ -47,9 +48,9 @@ def _update_counts(conn: Connection, source_records: str, params: dict[str, obje
     ).rowcount
 
 
-def backfill_batch(conn: Connection, lo: int, hi: int) -> int:
-    """Écrit les décomptes modifiés des enregistrements sources `[lo, hi]`. Renvoie le nombre d'enregistrements sources modifiés."""
-    return _update_counts(conn, "sr.id BETWEEN :lo AND :hi", {"lo": lo, "hi": hi})
+def backfill_patents(conn: Connection) -> int:
+    """Écrit les décomptes modifiés des enregistrements sources de brevet. Renvoie le nombre d'enregistrements sources modifiés."""
+    return _update_counts(conn, "sr.doc_type = :doc_type", {"doc_type": DocType.PATENT.value})
 
 
 def backfill_source_records(conn: Connection, source_record_ids: list[int]) -> int:
@@ -60,24 +61,14 @@ def backfill_source_records(conn: Connection, source_record_ids: list[int]) -> i
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dry-run", action="store_true", help="compte sans écrire")
-    parser.add_argument(
-        "--batch", type=int, default=50_000, help="largeur d'un lot, en identifiants"
-    )
     args = parser.parse_args()
 
     with get_sync_engine().connect() as conn:
-        min_id, max_id = conn.execute(text("SELECT min(id), max(id) FROM source_records")).one()
-        conn.commit()
-        if min_id is None:
-            log.info("aucun enregistrement source")
-            return 0
-        changed = 0
-        for lo in range(min_id, max_id + 1, args.batch):
-            changed += backfill_batch(conn, lo, lo + args.batch - 1)
-            if args.dry_run:
-                conn.rollback()
-            else:
-                conn.commit()
+        changed = backfill_patents(conn)
+        if args.dry_run:
+            conn.rollback()
+        else:
+            conn.commit()
         log.info(
             "enregistrements sources %s : %d", "à modifier" if args.dry_run else "modifiés", changed
         )
