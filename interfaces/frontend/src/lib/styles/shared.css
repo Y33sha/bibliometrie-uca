@@ -4,6 +4,13 @@
    Importé globalement dans +layout.svelte.
    ============================================================ */
 
+/* Couleur du curseur d'une barre de défilement : déclarée comme couleur pour s'animer en fondu. */
+@property --scroll-thumb {
+	syntax: '<color>';
+	inherits: true;
+	initial-value: transparent;
+}
+
 /* ── Variables ── */
 :root {
 	/* Échelle des tailles de police : toute taille de texte en est tirée. */

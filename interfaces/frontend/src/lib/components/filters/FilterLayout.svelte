@@ -40,6 +40,15 @@
 		/* La barre de défilement ne recouvre pas les décomptes. */
 		padding-right: 6px;
 		scrollbar-width: thin;
+		/* Barre de défilement invisible au repos, qui apparaît en fondu au survol du panneau. Chromium remplace un curseur entièrement transparent par la barre par défaut : au repos, le curseur garde 1 % d'opacité. */
+		--scroll-thumb: color-mix(in srgb, var(--text-faint) 1%, transparent);
+		scrollbar-color: var(--scroll-thumb) transparent;
+		transition: --scroll-thumb 0.3s;
+	}
+	/* Au clavier, la barre apparaît tant que le focus est dans le panneau. Un clic laisse le focus sur le bouton cliqué : seul le focus clavier compte. */
+	.filter-layout-panel:hover,
+	.filter-layout-panel:has(:focus-visible) {
+		--scroll-thumb: var(--text-faint);
 	}
 	.filter-layout-backdrop {
 		display: none;
