@@ -41,8 +41,6 @@ class PersonFilters:
     """Catégories de personnel. Multi-valué : une option cochée s'ajoute aux autres."""
     laboratories: list[int] = field(default_factory=list)
     """Structures des périodes de présence actuelles. Multi-valué."""
-    corps: list[str] = field(default_factory=list)
-    """Multi-valué : une option cochée s'ajoute aux autres."""
     has_orcid: bool | None = None
     has_idhal: bool | None = None
     has_idref: bool | None = None
@@ -144,7 +142,6 @@ class PersonsFacetsResponse(Model):
 
     categories: list[FacetOption]
     laboratories: list[FacetOption]
-    corps: list[FacetOption]
     orcid: YesNoCount
     idhal: YesNoCount
     idref: YesNoCount

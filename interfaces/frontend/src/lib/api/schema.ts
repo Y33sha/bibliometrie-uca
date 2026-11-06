@@ -4946,8 +4946,6 @@ export interface components {
             categories: components["schemas"]["FacetOption"][];
             /** Laboratories */
             laboratories: components["schemas"]["FacetOption"][];
-            /** Corps */
-            corps: components["schemas"]["FacetOption"][];
             orcid: components["schemas"]["YesNoCount"];
             idhal: components["schemas"]["YesNoCount"];
             idref: components["schemas"]["YesNoCount"];
@@ -8586,7 +8584,6 @@ export interface operations {
                 search?: string;
                 category?: string;
                 laboratory?: string;
-                corps?: string;
                 has_orcid?: boolean | null;
                 has_idhal?: boolean | null;
                 has_idref?: boolean | null;
@@ -8630,7 +8627,6 @@ export interface operations {
                 search?: string;
                 category?: string;
                 laboratory?: string;
-                corps?: string;
                 has_orcid?: boolean | null;
                 has_idhal?: boolean | null;
                 has_idref?: boolean | null;
@@ -8673,7 +8669,6 @@ export interface operations {
                 search?: string;
                 category?: string;
                 laboratory?: string;
-                corps?: string;
                 has_orcid?: boolean | null;
                 has_idhal?: boolean | null;
                 has_idref?: boolean | null;

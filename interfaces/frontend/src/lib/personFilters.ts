@@ -24,14 +24,15 @@ const PENDING_PARAMS: Record<string, string> = {
 export function personFilters(labId?: number): ListFilter[] {
 	return [
 		{
-			key: 'labs',
+			key: 'rh',
 			control: 'checkbox',
-			label: 'Laboratoires',
-			param: 'laboratory',
+			label: 'Base RH',
+			param: 'has_rh',
 			group: 'affiliation',
-			facet: { type: 'labeled', apiKey: 'laboratories' },
-			searchable: true,
-			...(labId == null ? {} : { defaultSelection: () => [String(labId)] }),
+			facet: { type: 'boolean', apiKey: 'rh', yesLabel: 'Oui', noLabel: 'Non' },
+			defaultSelection: () => ['yes'],
+			// Une seule valeur filtre ; les deux cochées retiennent tout le monde.
+			serialize: (selected) => (selected.length === 1 ? selected[0] : null),
 		},
 		{
 			key: 'categories',
@@ -42,24 +43,14 @@ export function personFilters(labId?: number): ListFilter[] {
 			facet: { type: 'label_map', apiKey: 'categories', labels: staffCategoryLabels },
 		},
 		{
-			key: 'corps',
+			key: 'labs',
 			control: 'checkbox',
-			label: 'Corps',
-			param: 'corps',
+			label: 'Laboratoires',
+			param: 'laboratory',
 			group: 'affiliation',
-			facet: { type: 'simple', apiKey: 'corps' },
+			facet: { type: 'labeled', apiKey: 'laboratories' },
 			searchable: true,
-		},
-		{
-			key: 'rh',
-			control: 'checkbox',
-			label: 'Base RH',
-			param: 'has_rh',
-			group: 'affiliation',
-			facet: { type: 'boolean', apiKey: 'rh', yesLabel: 'Oui', noLabel: 'Non' },
-			defaultSelection: () => ['yes'],
-			// Une seule valeur filtre ; les deux cochées retiennent tout le monde.
-			serialize: (selected) => (selected.length === 1 ? selected[0] : null),
+			...(labId == null ? {} : { defaultSelection: () => [String(labId)] }),
 		},
 		{
 			key: 'identifiers',

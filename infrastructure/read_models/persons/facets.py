@@ -1,4 +1,4 @@
-"""Facettes de la liste des personnes : catégories de personnel, laboratoires actuels, corps, identifiants, fiche RH, éléments à confirmer."""
+"""Facettes de la liste des personnes : catégories de personnel, laboratoires actuels, identifiants, fiche RH, éléments à confirmer."""
 
 from sqlalchemy import Connection, text
 
@@ -10,7 +10,6 @@ from infrastructure.read_models.filters import (
     assemble_where,
     person_active_clause,
     person_category_clause,
-    person_corps_clause,
     person_exclusion_clause,
     person_has_identifier_clause,
     person_has_identifier_sql,
@@ -56,8 +55,6 @@ class PersonFacetQueries:
                 out.append(person_category_clause(filters.categories))
             if skip != "laboratory":
                 out.append(person_laboratory_clause(filters.laboratories))
-            if skip != "corps":
-                out.append(person_corps_clause(filters.corps))
             if skip != "ids":
                 out.append(person_has_identifier_clause("orcid", filters.has_orcid))
                 out.append(person_has_identifier_clause("idhal", filters.has_idhal))
@@ -138,7 +135,6 @@ class PersonFacetQueries:
         return PersonsFacetsResponse(
             categories=hr_record_facet("staff_category", "category"),
             laboratories=lab_facets,
-            corps=hr_record_facet("corps", "corps"),
             orcid=YesNoCount(yes=ids.orcid_yes, no=ids.orcid_no),
             idhal=YesNoCount(yes=ids.idhal_yes, no=ids.idhal_no),
             idref=YesNoCount(yes=ids.idref_yes, no=ids.idref_no),

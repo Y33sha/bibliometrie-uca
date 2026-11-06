@@ -1,4 +1,4 @@
-"""La liste des personnes filtre sur plusieurs catégories, corps ou laboratoires actuels, comme ses facettes, et affiche le laboratoire de chaque personne."""
+"""La liste des personnes filtre sur plusieurs catégories ou laboratoires actuels, comme ses facettes, et affiche le laboratoire de chaque personne."""
 
 import datetime
 
@@ -12,13 +12,13 @@ from tests.integration.helpers.structures import insert_structure
 D = datetime.date
 
 
-def _create_person(conn, last, *, category=None, corps=None):
+def _create_person(conn, last, *, category=None):
     """Insère une personne et sa fiche RH."""
     person_id = insert_person(conn, last)
     insert_hr_record(conn, person_id, email=f"{last.lower()}@uca.fr")
     conn.execute(
-        text("UPDATE hr_records SET staff_category = :c, corps = :k WHERE person_id = :p"),
-        {"c": category, "k": corps, "p": person_id},
+        text("UPDATE hr_records SET staff_category = :c WHERE person_id = :p"),
+        {"c": category, "p": person_id},
     )
     return person_id
 
@@ -44,16 +44,6 @@ class TestListMultiValueFilters:
         assert {ens, biatss} <= listed
         assert other not in listed
 
-    def test_filters_on_several_corps(self, sa_sync_conn):
-        pr = _create_person(sa_sync_conn, "Proffy", corps="PROF UNIV")
-        mcf = _create_person(sa_sync_conn, "Emcefy", corps="MCF")
-        ige = _create_person(sa_sync_conn, "Igey", corps="IGE RF")
-
-        listed = _listed(sa_sync_conn, corps=["PROF UNIV", "MCF"])
-
-        assert {pr, mcf} <= listed
-        assert ige not in listed
-
     def test_filters_on_current_laboratory(self, sa_sync_conn):
         lab = insert_structure(sa_sync_conn, "LAB-CUR", acronym="LABCUR")
         present = _create_person(sa_sync_conn, "Presenty")
@@ -70,7 +60,7 @@ class TestListMultiValueFilters:
 
     def test_empty_selection_filters_nothing(self, sa_sync_conn):
         someone = _create_person(sa_sync_conn, "Nobodyy", category="ENSEIG")
-        assert someone in _listed(sa_sync_conn, categories=[], corps=[], laboratories=[])
+        assert someone in _listed(sa_sync_conn, categories=[], laboratories=[])
 
 
 class TestLaboratoryDisplay:

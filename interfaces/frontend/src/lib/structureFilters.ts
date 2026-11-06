@@ -8,14 +8,22 @@ import { isAdmin } from '#lib/session.svelte.js';
 import { STRUCTURE_TYPES } from '#lib/structureTypes.js';
 
 /** Rubriques du panneau des filtres des structures, dans l'ordre d'affichage. */
-export const STRUCTURE_FILTER_GROUPS: readonly FilterGroup[] = [
-	{ key: 'structure', label: 'Structure' },
-	{ key: 'curation', label: 'Curation' },
-];
+export const STRUCTURE_FILTER_GROUPS: readonly FilterGroup[] = [{ key: 'structure', label: 'Structure' }];
 
 /** Filtres de la liste. `defaults` : sélection à l'ouverture de la page. */
 export function structureFilters(defaults: LabListDefaults): ListFilter[] {
 	return [
+		{
+			key: 'perimeters',
+			control: 'checkbox',
+			label: 'Périmètres',
+			param: 'perimeter_id',
+			group: 'structure',
+			// `none` désigne les structures hors de tout périmètre, comme dans le paramètre `perimeter_id` de l'API.
+			facet: { type: 'labeled', apiKey: 'perimeters' },
+			defaultSelection: () => defaults.perimeters,
+			fixed: () => (isAdmin() ? null : defaults.perimeters.join(',') || null),
+		},
 		{
 			key: 'types',
 			control: 'checkbox',
@@ -33,17 +41,6 @@ export function structureFilters(defaults: LabListDefaults): ListFilter[] {
 			group: 'structure',
 			facet: { type: 'labeled', apiKey: 'tutelles' },
 			searchable: true,
-		},
-		{
-			key: 'perimeters',
-			control: 'checkbox',
-			label: 'Périmètres',
-			param: 'perimeter_id',
-			group: 'curation',
-			// `none` désigne les structures hors de tout périmètre, comme dans le paramètre `perimeter_id` de l'API.
-			facet: { type: 'labeled', apiKey: 'perimeters' },
-			defaultSelection: () => defaults.perimeters,
-			fixed: () => (isAdmin() ? null : defaults.perimeters.join(',') || null),
 		},
 	];
 }

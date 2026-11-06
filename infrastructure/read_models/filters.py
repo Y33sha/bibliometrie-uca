@@ -551,13 +551,6 @@ def person_category_clause(categories: list[str]) -> WhereClause | None:
     return WhereClause("prh.staff_category = ANY(:flt_categories)", {"flt_categories": categories})
 
 
-def person_corps_clause(corps: list[str]) -> WhereClause | None:
-    """Renvoie le filtre : la personne appartient à l'un des corps donnés (alias `prh`)."""
-    if not corps:
-        return None
-    return WhereClause("prh.corps = ANY(:flt_corps)", {"flt_corps": corps})
-
-
 def person_laboratory_clause(structure_ids: list[int]) -> WhereClause | None:
     """Renvoie le filtre : la personne (alias `p`) a une période de présence actuelle dans l'une des structures données."""
     if not structure_ids:
