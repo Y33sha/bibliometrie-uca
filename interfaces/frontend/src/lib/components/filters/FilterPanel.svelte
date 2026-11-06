@@ -127,13 +127,15 @@
 		padding-top: 4px;
 		border-top: 1px solid var(--border-subtle);
 	}
+	/* Nom du filtre, en bouton : fond teinté d'accent et texte assombri au survol. Le nom et les options gardent 6 px de marge intérieure, où le fond de survol déborde. */
 	.filter-head {
 		display: flex;
 		align-items: center;
 		gap: 6px;
 		width: 100%;
-		padding: 5px 0;
+		padding: 5px 6px;
 		border: none;
+		border-radius: var(--radius);
 		background: none;
 		font: inherit;
 		font-size: var(--fs-md);
@@ -141,8 +143,10 @@
 		color: var(--accent);
 		text-align: left;
 		cursor: pointer;
+		transition: background-color 0.1s;
 	}
 	.filter-head:hover {
+		background: var(--accent-light);
 		color: color-mix(in srgb, var(--accent), black 20%);
 	}
 	.filter-head .chevron {
@@ -150,10 +154,13 @@
 	}
 	.filter-body {
 		margin: 0 0 6px;
+		padding: 0 6px;
 	}
-	/* Les options s'alignent sur le nom du filtre. */
 	.filter-body :global(.option-row) {
-		padding: 3px 0;
+		width: calc(100% + 12px);
+		margin: 0 -6px;
+		padding: 3px 6px;
+		border-radius: var(--radius);
 	}
 	.filter-body :global(.panel-search) {
 		width: 100%;
