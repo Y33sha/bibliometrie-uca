@@ -121,7 +121,7 @@
 	const col = cv.col;
 
 	// --- Vue ---
-	// Notices : titre, puis type, année, revue, éditeur, DOI et laboratoires, accès à droite. Tableau : une colonne par champ, colonnes au choix.
+	// Notices : type et DOI, puis titre, puis année, revue, éditeur et laboratoires ; accès à droite. Tableau : une colonne par champ, colonnes au choix.
 	type View = 'notices' | 'table';
 	let view = $state<View>('notices');
 
@@ -335,16 +335,22 @@
 					{/if}
 				</div>
 				<div>
-					<a href={resolve(`publications/${p.id}`)} class="publication-title"><PublicationTitle titre={p.title} /></a>
+					{#if p.doc_type || p.doi}
+						<div class="notice-head">
+							{#if p.doc_type}<DocTypePill docType={p.doc_type} />{/if}
+							{#if p.doi}<span class="notice-doi"><DoiLink doi={p.doi} text /></span>{/if}
+						</div>
+					{/if}
+					<div class="notice-body">
+					<a href={resolve(`publications/${p.id}`)} class="publication-title notice-title"><PublicationTitle titre={p.title} /></a>
 					<div class="notice-meta">
-						{#if p.doc_type}<span><DocTypePill docType={p.doc_type} /></span>{/if}
 						{#if p.publication_year}<span class="notice-year">{p.publication_year}</span>{/if}
 						{#if p.serial}<span class="notice-serial">{#if p.serial_id}<a href={resolve(`journals/${p.serial_id}`)}>{p.serial}</a>{:else}{p.serial}{/if}</span>{/if}
 						{#if p.publisher}<span>{#if p.publisher_id}<a href={resolve(`publishers/${p.publisher_id}`)}>{p.publisher}</a>{:else}{p.publisher}{/if}</span>{/if}
-						{#if p.doi}<span><DoiLink doi={p.doi} text /></span>{/if}
 						{#if !isLab && p.lab_items?.length}
 							<span class="notice-labs">{#each p.lab_items as lab, i (lab.id)}{#if i > 0}{', '}{/if}<a href={resolve(`structures/${lab.id}`)}>{lab.label}</a>{/each}</span>
 						{/if}
+					</div>
 					</div>
 				</div>
 				<div class="notice-access"><AccessButton accessUrl={p.access_url} oaStatus={p.oa_status} compact /></div>
@@ -522,9 +528,10 @@
 		margin: 0;
 		padding: 0;
 	}
+	/* La colonne de l'accès a la même largeur dans toutes les notices, lien présent ou non : les titres passent à la ligne au même endroit. Elle contient le lien le plus large, « Texte intégral ». */
 	.notice {
 		display: grid;
-		grid-template-columns: auto minmax(0, 1fr) auto;
+		grid-template-columns: auto minmax(0, 1fr) 7.5rem;
 		gap: 0 12px;
 		padding: 10px 8px;
 		border-bottom: 1px solid var(--border-subtle);
@@ -539,6 +546,24 @@
 		display: flex;
 		gap: 2px;
 		align-items: flex-start;
+	}
+	.notice-head {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 2px 10px;
+		margin-bottom: 6px;
+		font-size: var(--fs-sm);
+	}
+	.notice-doi {
+		min-width: 0;
+	}
+	/* Titre et ligne de métadonnées en léger retrait : le type de document ressort en tête de notice. */
+	.notice-body {
+		padding-left: 10px;
+	}
+	.notice-title {
+		font-size: 1.1rem;
 	}
 	.notice-meta {
 		display: flex;
@@ -571,6 +596,7 @@
 		font-style: italic;
 	}
 	.notice-access {
+		justify-self: end;
 		padding-top: 2px;
 	}
 	@media (max-width: 640px) {
@@ -579,6 +605,7 @@
 		}
 		.notice-access {
 			grid-column: 2;
+			justify-self: start;
 			padding-top: 4px;
 		}
 	}
