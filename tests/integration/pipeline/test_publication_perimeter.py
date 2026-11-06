@@ -1,20 +1,16 @@
-"""Indices d'une publication : ceux de ses auteurs, et la soutenance d'une thèse dans l'établissement."""
+"""Indices d'appartenance au périmètre d'une publication : ceux de ses auteurs, et ceux liés au document."""
 
-import json
-
+import pytest
 from sqlalchemy import text
 
 from pipeline.transformation.publications.publication_perimeter import (
     refresh_publications_perimeter_evidence,
 )
-from pipeline.transformation.structures.perimeter import refresh_perimeter_structures
 from tests.integration.helpers.contributions import insert_contribution
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
-from tests.integration.helpers.sources import insert_source_record
+from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 from tests.integration.helpers.structures import insert_persons_perimeter
-
-_PPN = "196200032"
 
 
 def _evidence(conn, publication_id: int) -> list[str]:
@@ -42,24 +38,29 @@ def test_seuls_les_auteurs_font_entrer_une_publication(sa_sync_conn):
     assert _evidence(sa_sync_conn, article) == ["address"]
 
 
-def test_these_soutenue_dans_l_etablissement(sa_sync_conn):
-    universite = insert_persons_perimeter(sa_sync_conn)
-    sa_sync_conn.execute(
-        text("UPDATE structures SET api_ids = CAST(:ids AS jsonb) WHERE id = :id"),
-        {"ids": json.dumps({"theses": [_PPN]}), "id": universite},
-    )
-    refresh_perimeter_structures(sa_sync_conn)
-    thesis = insert_publication(sa_sync_conn, "Thèse soutenue ici", doc_type="thesis")
-    source_record = insert_source_record(
-        sa_sync_conn, thesis, source="theses", source_id="2021CLFAC001"
+@pytest.mark.parametrize(
+    ("source", "doc_type", "role", "evidence"),
+    [
+        ("theses", "thesis", "jury_member", "thesis_institution"),
+        ("scanr_patents", "patent", "inventor", "patent_applicant"),
+    ],
+)
+def test_indice_lie_au_document(sa_sync_conn, source, doc_type, role, evidence):
+    """Un indice d'appartenance au périmètre lié au document passe à la publication, depuis une contribution source de tout rôle, sans personne."""
+    insert_persons_perimeter(sa_sync_conn)
+    publication = insert_publication(sa_sync_conn, "Document", doc_type=doc_type)
+    source_record = insert_source_record(sa_sync_conn, publication, source=source, source_id="1")
+    source_contribution = insert_source_contribution(
+        sa_sync_conn, source_record, source=source, author_position=None, roles=[role]
     )
     sa_sync_conn.execute(
         text(
-            "UPDATE source_records SET source_extras = CAST(:source_extras AS jsonb) WHERE id = :id"
+            "UPDATE source_contributions SET perimeter_evidence = CAST(:e AS perimeter_evidence[])"
+            " WHERE id = :id"
         ),
-        {"source_extras": json.dumps({"etablissement_ppn": _PPN}), "id": source_record},
+        {"e": [evidence], "id": source_contribution},
     )
 
     refresh_publications_perimeter_evidence(sa_sync_conn)
 
-    assert _evidence(sa_sync_conn, thesis) == ["thesis_institution"]
+    assert _evidence(sa_sync_conn, publication) == [evidence]
