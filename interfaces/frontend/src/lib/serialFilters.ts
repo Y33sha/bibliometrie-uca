@@ -4,7 +4,7 @@
 import type { PresenceItem } from '#lib/components/filters/PresenceOptions.svelte';
 import type { FilterGroup, ListFilter } from '#lib/filterRegistry.js';
 import { filterLabels } from '#lib/labels.js';
-import { hasPublicationsFilter } from '#lib/publishingFilters.js';
+import { hasPublicationsFilter } from '#lib/sharedFilters.js';
 import { isAdmin } from '#lib/session.svelte.js';
 
 /** Rubriques du panneau des filtres des publications en série, dans l'ordre d'affichage. */

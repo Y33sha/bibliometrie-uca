@@ -1,9 +1,23 @@
 /**
- * Filtres communs aux listes des référentiels de l'édition (éditeurs, publications en série).
+ * Filtres communs à plusieurs listes.
  */
 import type { CheckboxFilter } from '#lib/filterRegistry.js';
+import { filterLabels } from '#lib/labels.js';
 
-/** Filtre des entrées avec ou sans publication. Par défaut, celles qui en ont ; hors `editable`, la liste les retient seules. */
+/** Filtre des années, choisies par un intervalle. */
+export function yearsFilter(group: string): CheckboxFilter {
+	return {
+		key: 'years',
+		control: 'checkbox',
+		label: filterLabels.years,
+		param: 'year',
+		group,
+		facet: { type: 'simple', apiKey: 'years' },
+		range: true,
+	};
+}
+
+/** Filtre des entrées avec ou sans publication (éditeurs, publications en série). Par défaut, celles qui en ont ; hors `editable`, la liste les retient seules. */
 export function hasPublicationsFilter(group: string, editable: () => boolean): CheckboxFilter {
 	return {
 		key: 'publications',

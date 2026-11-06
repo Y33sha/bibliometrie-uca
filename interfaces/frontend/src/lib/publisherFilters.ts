@@ -3,7 +3,7 @@
  */
 import type { FilterGroup, ListFilter } from '#lib/filterRegistry.js';
 import { filterLabels } from '#lib/labels.js';
-import { hasPublicationsFilter } from '#lib/publishingFilters.js';
+import { hasPublicationsFilter } from '#lib/sharedFilters.js';
 import { isAdmin } from '#lib/session.svelte.js';
 
 /** Rubriques du panneau des filtres des éditeurs, dans l'ordre d'affichage. */

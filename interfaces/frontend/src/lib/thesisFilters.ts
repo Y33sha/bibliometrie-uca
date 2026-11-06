@@ -4,6 +4,7 @@
 import type { FilterGroup, ListFilter } from '#lib/filterRegistry.js';
 import { filterLabels } from '#lib/labels.js';
 import { labsFilter } from '#lib/publicationFilters.js';
+import { yearsFilter } from '#lib/sharedFilters.js';
 
 /** Types de document des thèses, soutenues ou en cours. Sans filtre de statut, la liste retient les deux. */
 export const THESIS_DOC_TYPES = 'thesis,ongoing_thesis';
@@ -32,15 +33,7 @@ export function thesisFilters(labId?: number): ListFilter[] {
 				onlyLabeled: true,
 			},
 		},
-		{
-			key: 'years',
-			control: 'checkbox',
-			label: filterLabels.years,
-			param: 'year',
-			group: 'document',
-			facet: { type: 'simple', apiKey: 'years' },
-			range: true,
-		},
+		yearsFilter('document'),
 		labsFilter('affiliations', () => (labId == null ? null : String(labId))),
 		{
 			key: 'access',

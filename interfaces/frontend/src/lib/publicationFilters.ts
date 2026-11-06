@@ -8,6 +8,7 @@ import { SOURCE_ITEMS } from '#lib/filterItems.js';
 import { docTypeFamilies, docTypePluralLabels } from '#lib/docTypes.svelte.js';
 import { filterLabels, oaLabelsMap } from '#lib/labels.js';
 import { contextEntityId, type PublicationListContext } from '#lib/publicationListContext.js';
+import { yearsFilter } from '#lib/sharedFilters.js';
 
 /** Rubriques du panneau des filtres des publications, dans l'ordre d'affichage. */
 export const PUBLICATION_FILTER_GROUPS: readonly FilterGroup[] = [
@@ -52,15 +53,7 @@ export function publicationFilters(context: PublicationListContext): ListFilter[
 			groups: docTypeFamilies().map((f) => ({ label: f.label, values: f.types })),
 			showColumns: ['type'],
 		},
-		{
-			key: 'years',
-			control: 'checkbox',
-			label: filterLabels.years,
-			param: 'year',
-			group: 'document',
-			facet: { type: 'simple', apiKey: 'years' },
-			range: true,
-		},
+		yearsFilter('document'),
 		{
 			key: 'languages',
 			control: 'checkbox',
