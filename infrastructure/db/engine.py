@@ -16,6 +16,9 @@ _sync_engine: Engine | None = None
 
 DbIdentity = Literal["owner", "app", "pipeline"]
 
+SESSION_CONNECT_ARGS = {"options": "-c plan_cache_mode=force_custom_plan"}
+"""Réglages de session de toute connexion du projet. `plan_cache_mode=force_custom_plan` planifie chaque exécution d'une requête préparée selon ses paramètres. Psycopg prépare une requête côté serveur après 5 exécutions. PostgreSQL adopte un plan générique après 5 autres. Ce plan multiplie la durée de certaines requêtes par cent ou plus."""
+
 
 def db_url(identity: DbIdentity = "pipeline") -> URL:
     """Renvoie l'URL de connexion PostgreSQL, construite depuis les réglages. Alembic l'utilise aussi.
@@ -50,9 +53,7 @@ def db_url(identity: DbIdentity = "pipeline") -> URL:
 def build_sync_engine(identity: DbIdentity = "pipeline") -> Engine:
     """Construit l'engine synchrone pour le rôle `identity` (cf. `db_url`).
 
-    Pool : `db_pool_min` connexions persistantes, jusqu'à `db_pool_max` sous charge ; `pool_pre_ping` écarte les connexions perdues.
-
-    Plans : `plan_cache_mode=force_custom_plan` planifie chaque exécution d'une requête préparée selon ses paramètres. Psycopg prépare une requête côté serveur après 5 exécutions. PostgreSQL adopte un plan générique après 5 autres. Ce plan multiplie la durée de certaines requêtes par cent ou plus.
+    Pool : `db_pool_min` connexions persistantes, jusqu'à `db_pool_max` sous charge ; `pool_pre_ping` écarte les connexions perdues. Session : `SESSION_CONNECT_ARGS`.
 
     Sous pytest, refuse toute base sans suffixe `_test`. Le conftest redirige l'engine vers la base de test ; ce contrôle protège la base de production si la redirection échoue.
     """
@@ -66,7 +67,7 @@ def build_sync_engine(identity: DbIdentity = "pipeline") -> Engine:
         pool_size=settings.db_pool_min,
         max_overflow=settings.db_pool_max - settings.db_pool_min,
         pool_pre_ping=True,
-        connect_args={"options": "-c plan_cache_mode=force_custom_plan"},
+        connect_args=SESSION_CONNECT_ARGS,
     )
     install_engine_guards(engine)
     return engine
