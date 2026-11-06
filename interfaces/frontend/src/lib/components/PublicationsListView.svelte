@@ -338,7 +338,7 @@
 {/snippet}
 {#if view === 'stats'}
 <div class="stats-view">
-	<div class="toolbar stats-controls"><PivotControls chart={pivot} /></div>
+	<div class="stats-controls"><PivotControls chart={pivot} /></div>
 	<PivotChart chart={pivot} />
 </div>
 {:else if view === 'notices'}
@@ -543,12 +543,11 @@
 		font-size: var(--fs-sm);
 		color: var(--muted);
 	}
-	/* Vue Statistiques : réglages, puis graphique dans une colonne flexible de hauteur fixe, sous la barre d'outils. */
+	/* Vue Statistiques : réglages, puis graphique dans une colonne flexible. Sa hauteur suit la fenêtre, moins le menu et la barre d'outils de la liste à sa place ; elle ignore le glissement de la barre au défilement, qui la ferait varier. */
 	.stats-view {
 		display: flex;
 		flex-direction: column;
-		height: calc(100vh - var(--header-height) - var(--list-toolbar-height, 0px) - 32px);
-		min-height: 480px;
+		height: max(480px, calc(100vh - var(--header-height) - 180px));
 	}
 	.stats-controls {
 		margin-bottom: 12px;
