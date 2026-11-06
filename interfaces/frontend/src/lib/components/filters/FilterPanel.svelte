@@ -64,11 +64,11 @@
 	// Une option sans décompte (liste fixe) compte comme disponible.
 	const nonZeroOptions = (key: string): number => options[key]?.filter((o) => o.count !== 0).length ?? 0;
 
-	/** Nombre affiché sur le nom d'un filtre actif : valeurs cochées, entités choisies, éléments filtrés ; un pour un intervalle. */
+	/** Nombre affiché sur le nom d'un filtre actif : valeurs cochées, entités choisies, éléments filtrés et niveaux cochés ; un pour un intervalle. */
 	function selectionCount(f: ListFilter): number {
 		if (f.control === 'checkbox') return f.range ? 1 : (values.checkbox[f.key] ?? []).length;
 		if (f.control === 'entity') return (values.entity[f.key] ?? []).length;
-		return Object.keys(values.presence[f.key] ?? {}).length;
+		return Object.keys(values.presence[f.key] ?? {}).length + (values.levels[f.key] ?? []).length;
 	}
 
 	function onCheckboxChange(filter: CheckboxFilter, selected: string[]) {
@@ -143,7 +143,7 @@
 								{:else if f.control === 'entity'}
 									<EntityOptions endpoint={entityEndpoint} kind={f.entity} multiple={f.multiple} limit={OPTION_LIMIT} clearable={false} {buildParams} selected={values.entity[f.key]} onchange={(ids) => { values.entity[f.key] = ids; onchange(); }} />
 								{:else}
-									<PresenceOptions items={f.items} bind:states={values.presence[f.key]} counts={presenceCounts} clearable={false} {onchange} />
+									<PresenceOptions items={f.items} bind:states={values.presence[f.key]} bind:checkedLevels={values.levels[f.key]} counts={presenceCounts} clearable={false} {onchange} />
 								{/if}
 							</div>
 						{/if}

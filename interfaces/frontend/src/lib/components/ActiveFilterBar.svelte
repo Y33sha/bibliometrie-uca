@@ -55,7 +55,7 @@
 
 	function summary(f: ListFilter): string {
 		if (f.control === 'checkbox') return checkboxSummary(f, values.checkbox[f.key] ?? [], options[f.key] ?? []);
-		if (f.control === 'presence') return presenceSummary(f, values.presence[f.key] ?? {});
+		if (f.control === 'presence') return presenceSummary(f, values.presence[f.key] ?? {}, values.levels[f.key]);
 		const ids = values.entity[f.key] ?? [];
 		return summarizeParts(ids.map((id) => entityLabels[`${f.entity}:${id}`] ?? '…'));
 	}

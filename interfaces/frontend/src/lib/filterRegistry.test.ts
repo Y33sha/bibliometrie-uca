@@ -336,4 +336,47 @@ describe('filterRegistry', () => {
 		appendFilterParams([ids], values, params);
 		expect(Object.fromEntries(params)).toEqual({ has_orcid: 'yes', has_idhal: 'no' });
 	});
+
+	describe('filtre de présence à niveaux', () => {
+		const lists: PresenceFilter = {
+			key: 'lists',
+			control: 'presence',
+			label: 'Listes',
+			param: 'list_filter',
+			levelsParam: 'list_level',
+			group: 'serial',
+			items: [
+				{ key: 'doaj', label: 'DOAJ' },
+				{ key: 'fnege', label: 'FNEGE', levels: [{ key: 'fnege-1', label: 'rang 1' }, { key: 'fnege-2', label: 'rang 2' }] },
+			],
+		};
+
+		it('est actif dès un niveau coché, et `clearValue` vide ses niveaux', () => {
+			const values = initialValues([lists]);
+			values.levels.lists = ['fnege-1'];
+			expect(activeCount([lists], values)).toBe(1);
+			clearValue(lists, values);
+			expect(values.levels.lists).toEqual([]);
+			expect(activeCount([lists], values)).toBe(0);
+		});
+
+		it('écrit les niveaux cochés dans `levelsParam`, et les relit depuis l’URL', () => {
+			const values = initialValues([lists]);
+			values.presence.lists = { doaj: 'yes' };
+			values.levels.lists = ['fnege-1', 'fnege-2'];
+			const params = new URLSearchParams();
+			appendFilterParams([lists], values, params);
+			expect(Object.fromEntries(params)).toEqual({ list_filter: 'doaj_yes', list_level: 'fnege-1,fnege-2' });
+
+			const restored = initialValues([lists]);
+			restoreValues([lists], urlState([lists], values), restored);
+			expect(restored.levels.lists).toEqual(['fnege-1', 'fnege-2']);
+			expect(urlFilterDefs([lists])['lists.levels']).toEqual({ type: 'string_array', urlKey: 'list_level' });
+		});
+
+		it('résume un élément à niveaux cochés par ses niveaux', () => {
+			expect(presenceSummary(lists, { doaj: 'no', fnege: 'yes' }, ['fnege-1', 'fnege-2'])).toBe('sans DOAJ, FNEGE rang 1 ou rang 2');
+			expect(presenceSummary(lists, { fnege: 'yes' }, [])).toBe('avec FNEGE');
+		});
+	});
 });

@@ -2,6 +2,7 @@
  * Registre des filtres d'une liste. Chaque filtre se déclare une fois ; le registre en dérive l'état initial, les paramètres de la requête, la synchronisation avec l'URL, la configuration des décomptes, les colonnes à afficher et la rubrique du filtre dans le panneau des filtres.
  */
 import type { FacetOption } from '#lib/components/FacetDropdown.svelte';
+import type { PresenceItem } from '#lib/components/filters/PresenceOptions.svelte';
 import type { FacetDef } from '#lib/composables/useFacets.svelte.js';
 import type { FilterDef as UrlFilterDef } from '#lib/composables/useUrlFilters.svelte.js';
 import type { EntityKind } from '#lib/entityLabels.js';
@@ -51,9 +52,12 @@ export interface EntityChoiceFilter extends BaseFilter {
 
 export interface PresenceFilter extends BaseFilter {
 	control: 'presence';
-	items: { key: string; label: string }[];
+	/** Éléments du filtre. Des éléments servis par l'API se déclarent par un getter. */
+	items: PresenceItem[];
 	/** Un paramètre de requête par élément (`has_orcid=yes`), au lieu du paramètre commun `param` (`hal_yes,wos_no`). `param` reste la clé d'URL. */
 	itemParams?: Record<string, string>;
+	/** Paramètre des niveaux cochés des éléments (`fnege-1,norway-2`), repris comme clé d'URL. */
+	levelsParam?: string;
 }
 
 /** Jeton d'URL d'une sélection vidée, pour un filtre qui a une sélection par défaut. */
@@ -72,18 +76,23 @@ export interface FilterValues {
 	checkbox: Record<string, string[]>;
 	entity: Record<string, string[]>;
 	presence: Record<string, PresenceStates>;
+	/** Niveaux cochés d'un filtre de présence, tous éléments confondus. */
+	levels: Record<string, string[]>;
 }
 
 /** Vide la sélection d'un filtre. */
 export function clearValue(filter: ListFilter, values: FilterValues): void {
 	if (filter.control === 'checkbox') values.checkbox[filter.key] = [];
 	else if (filter.control === 'entity') values.entity[filter.key] = [];
-	else values.presence[filter.key] = {};
+	else {
+		values.presence[filter.key] = {};
+		values.levels[filter.key] = [];
+	}
 }
 
 /** Valeurs à l'ouverture de la page : la sélection par défaut de chaque filtre, sinon une sélection vide. */
 export function initialValues(filters: ListFilter[]): FilterValues {
-	const values: FilterValues = { checkbox: {}, entity: {}, presence: {} };
+	const values: FilterValues = { checkbox: {}, entity: {}, presence: {}, levels: {} };
 	for (const f of filters) {
 		clearValue(f, values);
 		if (f.control === 'checkbox' && f.defaultSelection) values.checkbox[f.key] = f.defaultSelection();
@@ -151,7 +160,7 @@ export function encodePresence(states: PresenceStates): string {
 export function isActive(filter: ListFilter, values: FilterValues): boolean {
 	if (filter.control === 'checkbox') return (values.checkbox[filter.key] ?? []).length > 0;
 	if (filter.control === 'entity') return (values.entity[filter.key] ?? []).length > 0;
-	return encodePresence(values.presence[filter.key] ?? {}) !== '';
+	return encodePresence(values.presence[filter.key] ?? {}) !== '' || (values.levels[filter.key] ?? []).length > 0;
 }
 
 /** Nombre maximal d'éléments nommés dans le résumé d'une sélection ; au-delà, le dernier devient un décompte. */
@@ -217,12 +226,15 @@ export function checkboxSummary(filter: CheckboxFilter, selected: string[], opti
 	return summarizeParts(parts);
 }
 
-/** Résumé d'un filtre de présence, sous la forme « avec HAL, sans WoS ». */
-export function presenceSummary(filter: PresenceFilter, states: PresenceStates): string {
-	return filter.items
-		.filter((i) => states[i.key] === 'yes' || states[i.key] === 'no')
-		.map((i) => `${states[i.key] === 'yes' ? 'avec' : 'sans'} ${i.label}`)
-		.join(', ');
+/** Résumé d'un filtre de présence, sous la forme « avec HAL, sans WoS ». Un élément à niveaux cochés se résume par ses niveaux, sous la forme « FNEGE rang 1 ou rang 2 ». */
+export function presenceSummary(filter: PresenceFilter, states: PresenceStates, levels: string[] = []): string {
+	const parts: string[] = [];
+	for (const i of filter.items) {
+		const checked = (i.levels ?? []).filter((l) => levels.includes(l.key));
+		if (checked.length) parts.push(`${i.label} ${checked.map((l) => l.label).join(' ou ')}`);
+		else if (states[i.key] === 'yes' || states[i.key] === 'no') parts.push(`${states[i.key] === 'yes' ? 'avec' : 'sans'} ${i.label}`);
+	}
+	return parts.join(', ');
 }
 
 /** Valeur d'un filtre dans la requête, ou `null` quand il ne filtre rien ou n'est pas proposé dans la page. */
@@ -238,13 +250,17 @@ function paramValue(filter: ListFilter, values: FilterValues): string | null {
 	return encodePresence(values.presence[filter.key] ?? {}) || null;
 }
 
-/** Écrit dans `params` les filtres qui filtrent. Un filtre de présence à `itemParams` écrit un paramètre par élément filtré. */
+/** Écrit dans `params` les filtres qui filtrent. Un filtre de présence à `itemParams` écrit un paramètre par élément filtré ; à `levelsParam`, un paramètre pour ses niveaux cochés. */
 export function appendFilterParams(
 	filters: ListFilter[],
 	values: FilterValues,
 	params: URLSearchParams,
 ): void {
 	for (const f of filters) {
+		if (f.control === 'presence' && f.levelsParam && isAvailable(f)) {
+			const levels = values.levels[f.key] ?? [];
+			if (levels.length) params.set(f.levelsParam, levels.join(','));
+		}
 		if (f.control === 'presence' && f.itemParams) {
 			if (!isAvailable(f)) continue;
 			for (const [item, state] of Object.entries(values.presence[f.key] ?? {})) {
@@ -265,12 +281,16 @@ export function facetDefs(filters: ListFilter[]): Record<string, FacetDef> {
 	return defs;
 }
 
+/** Clé, dans l'état de l'URL, des niveaux cochés d'un filtre de présence. */
+const levelsKey = (filter: PresenceFilter): string => `${filter.key}.levels`;
+
 /** Configuration de l'URL pour `useUrlFilters`, par clé de filtre. */
 export function urlFilterDefs(filters: ListFilter[]): Record<string, UrlFilterDef> {
 	const defs: Record<string, UrlFilterDef> = {};
 	for (const f of filters) {
 		if (f.control === 'presence') {
 			defs[f.key] = { type: 'source_states', urlKey: f.param };
+			if (f.levelsParam) defs[levelsKey(f)] = { type: 'string_array', urlKey: f.levelsParam };
 		} else if (f.control === 'checkbox' && f.defaultSelection) {
 			defs[f.key] = { type: 'single', urlKey: f.param, defaultValue: f.defaultSelection().join(',') };
 		} else {
@@ -292,6 +312,7 @@ export function urlState(filters: ListFilter[], values: FilterValues): Record<st
 			state[f.key] = values.entity[f.key] ?? [];
 		} else {
 			state[f.key] = values.presence[f.key] ?? {};
+			if (f.levelsParam) state[levelsKey(f)] = values.levels[f.key] ?? [];
 		}
 	}
 	return state;
@@ -304,6 +325,10 @@ export function restoreValues(
 	values: FilterValues,
 ): void {
 	for (const f of filters) {
+		if (f.control === 'presence' && f.levelsParam) {
+			const levels = restored[levelsKey(f)];
+			if (Array.isArray(levels) && levels.length) values.levels[f.key] = levels as string[];
+		}
 		const raw = restored[f.key];
 		if (raw == null || raw === '') continue;
 		if (f.control === 'checkbox' && f.defaultSelection) {
