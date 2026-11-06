@@ -6,7 +6,7 @@
 import { tick } from 'svelte';
 import { api, latestRequest } from '#lib/api/index.js';
 import type { components } from '#lib/api/schema.js';
-import { Chart, fitsInBar, pieSegmentOptions, stackedSegmentOptions } from '#lib/components/charts/chart.js';
+import { Chart, fitsInBar, stackedSegmentOptions } from '#lib/components/charts/chart.js';
 import { cssColor, fontSize } from '#lib/components/charts/cssVar.js';
 import { readableOn } from '#lib/components/charts/contrast.js';
 import { orderedPivotValues, pivotValueColor, pivotValueDescription, pivotValueLabel } from '#lib/pivotValues.js';
@@ -241,67 +241,28 @@ export function usePivotChart(config: {
 			rows: labels.map((label, ci) => ({ label, values: datasets.map((d) => formatValue(d.data[ci] as number)) })),
 		};
 
-		// Mode « part » sans comparaison : un camembert des parts de chaque catégorie du groupement primaire (l'empilement à 100 % d'une barre unique, déroulé en secteurs lisibles).
-		if (chartMode === 'part' && !stackDim) {
-			const values = datasets[0].data as number[];
-			const colors = cats.map((cv, i) => pivotValueColor(xDim, cv, i));
-			const sliceDescriptions = cats.map((cv) => pivotValueDescription(xDim, cv));
-			legendItems = cats.map((cv, i) => ({ label: dimLabel(xDim, cv), color: colors[i], description: sliceDescriptions[i] }));
-			const sliceTotal = (ctx: { dataset: { data: unknown[] } }) =>
-				(ctx.dataset.data as number[]).reduce((s, v) => s + (v || 0), 0);
-			chart = new Chart(canvas, {
-				type: 'pie',
-				plugins: [whiteBgPlugin],
-				data: { labels, datasets: [{ data: values, backgroundColor: colors, ...pieSegmentOptions(canvas) }] },
-				options: {
-					responsive: true,
-					maintainAspectRatio: false,
-					plugins: {
-						legend: { display: false },
-						tooltip: {
-							bodyFont: { size: fontSize('md') },
-							callbacks: {
-								label: (ctx) => {
-									const val = ctx.raw as number;
-									const total = sliceTotal(ctx);
-									const pct = total ? ((val / total) * 100).toFixed(1) : '0.0';
-									return `${ctx.label} : ${formatValue(val)} (${pct}%)`;
-								},
-								afterLabel: (ctx) => sliceDescriptions[ctx.dataIndex] ?? '',
-							},
-						},
-						datalabels: {
-							color: (ctx) => readableOn(colors[ctx.dataIndex], cssColor('text')),
-							font: { weight: 'bold' },
-							formatter: (val: number, ctx) => {
-								const total = sliceTotal(ctx);
-								const pct = total ? (val / total) * 100 : 0;
-								return pct >= 5 ? Math.round(pct) + '%' : '';
-							},
-							anchor: 'center' as const,
-							align: 'center' as const,
-							listeners: {},
-						},
-					},
-				},
-			});
-			return;
-		}
+		// Base de la part d'une valeur : la barre qui la contient, avec comparaison (segments empilés) ; la somme des barres, sans comparaison (barres simples). `columns` : les valeurs de chaque jeu de données.
+		const shareBase = (columns: unknown[][], index: number) =>
+			stackDim
+				? columns.reduce((s, data) => s + ((data[index] as number) || 0), 0)
+				: (columns[0] as number[]).reduce((s, v) => s + (v || 0), 0);
+		const shareOf = (c: Chart, datasetIndex: number, index: number) => {
+			const base = shareBase(c.data.datasets.map((ds) => ds.data), index);
+			return base ? (((c.data.datasets[datasetIndex].data[index] as number) || 0) / base) * 100 : 0;
+		};
 
-		// Mode « part » avec comparaison : aplatir chaque colonne (abscisse) à 100 % en remplaçant les comptes par leur proportion.
-		const part = chartMode === 'part' && !!stackDim;
+		// Mode « part » : chaque valeur devient sa part, en pourcentage. Avec comparaison, chaque barre monte à 100 % ; sans comparaison, les barres totalisent 100 %.
+		const part = chartMode === 'part';
 		if (part) {
-			const totals = labels.map((_, ci) => datasets.reduce((s, d) => s + ((d.data[ci] as number) || 0), 0));
-			for (const d of datasets) d.data = d.data.map((c, ci) => (totals[ci] ? ((c as number) / totals[ci]) * 100 : 0));
+			const bases = labels.map((_, ci) => shareBase(datasets.map((d) => d.data), ci));
+			for (const d of datasets) d.data = d.data.map((c, ci) => (bases[ci] ? ((c as number) / bases[ci]) * 100 : 0));
 		}
 
-		// Étiquette d'un segment : sa part dans la barre, affichée seulement si elle tient dans le segment.
+		// Étiquette d'une barre ou d'un segment : sa part, affichée seulement si elle tient dans la barre.
 		const BAR_LABEL_FONT = { weight: 'bold' as const };
 		const barShareLabel = (ctx: { chart: Chart; dataIndex: number; datasetIndex: number }) => {
-			const all = ctx.chart.data.datasets;
-			const total = all.reduce((s, ds) => s + ((ds.data[ctx.dataIndex] as number) || 0), 0);
-			const val = (all[ctx.datasetIndex].data[ctx.dataIndex] as number) || 0;
-			return total ? Math.round((val / total) * 100) + '%' : '';
+			const share = shareOf(ctx.chart, ctx.datasetIndex, ctx.dataIndex);
+			return share ? Math.round(share) + '%' : '';
 		};
 
 		chart = new Chart(canvas, {
@@ -318,16 +279,13 @@ export function usePivotChart(config: {
 						bodyFont: { size: fontSize('md') },
 						callbacks: {
 							label: (ctx) => {
-								const val = ctx.raw as number;
-								const total = ctx.chart.data.datasets.reduce((s, ds) => s + ((ds.data[ctx.dataIndex] as number) || 0), 0);
-								const pct = total ? ((val / total) * 100).toFixed(1) : '0.0';
-								return part ? `${ctx.dataset.label} : ${pct}%` : `${ctx.dataset.label} : ${formatValue(val)} (${pct}%)`;
+								const pct = shareOf(ctx.chart, ctx.datasetIndex, ctx.dataIndex).toFixed(1);
+								return part ? `${ctx.dataset.label} : ${pct}%` : `${ctx.dataset.label} : ${formatValue(ctx.raw as number)} (${pct}%)`;
 							},
 							afterLabel: (ctx) => descriptions[ctx.datasetIndex] ?? '',
-							afterBody: (items) => {
-								const total = items[0].chart.data.datasets.reduce((s, ds) => s + ((ds.data[items[0].dataIndex] as number) || 0), 0);
-								return part ? [] : `Total : ${formatValue(total)}`;
-							},
+							// Total de la barre, pour un segment empilé : une barre simple porte déjà sa valeur.
+							afterBody: (items) =>
+								part || !stackDim ? [] : `Total : ${formatValue(shareBase(items[0].chart.data.datasets.map((ds) => ds.data), items[0].dataIndex))}`,
 						},
 					},
 					datalabels: {
