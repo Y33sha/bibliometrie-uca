@@ -1,19 +1,21 @@
 <script lang="ts">
 	import TableScroll from '#lib/components/TableScroll.svelte';
 	import SortChevron from '#lib/components/SortChevron.svelte';
-	import { columnLabels, filterLabels } from '#lib/labels.js';
+	import { columnLabels } from '#lib/labels.js';
 	import ListToolbar from '#lib/components/ListToolbar.svelte';
 	import { onMount } from 'svelte';
-	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
-	import EntityFilter from '#lib/components/EntityFilter.svelte';
-	import FacetDropdown from '#lib/components/FacetDropdown.svelte';
+	import ActiveFilterBar from '#lib/components/ActiveFilterBar.svelte';
+	import FilterLayout from '#lib/components/filters/FilterLayout.svelte';
+	import FilterPanel from '#lib/components/filters/FilterPanel.svelte';
+	import FilterPanelToggle from '#lib/components/filters/FilterPanelToggle.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
 	import TableStatusRow from '#lib/components/TableStatusRow.svelte';
-	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
 	import { useFacets } from '#lib/composables/useFacets.svelte.js';
-	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
+	import { useFilteredList } from '#lib/composables/useFilteredList.svelte.js';
+	import { facetDefs } from '#lib/filterRegistry.js';
+	import { MONOGRAPH_FILTER_GROUPS, monographFilters } from '#lib/monographFilters.js';
 	import { nextSort, sortDirection } from '#lib/sort.js';
 	import { withBase } from '#lib/paths.js';
 	import { paramsToQuery } from '#lib/utils.js';
@@ -48,157 +50,69 @@
 	const serialFixed = $derived(externalFilters?.serialId != null);
 	const columnCount = $derived(7 - Number(publisherFixed) - Number(serialFixed));
 
-	const KIND_LABELS: Record<string, string> = { book: 'Livres', proceedings: "Volumes d'actes" };
+	// svelte-ignore state_referenced_locally
+	const FILTERS = monographFilters(externalFilters?.publisherId, externalFilters?.serialId);
 
-	let search = $state('');
-	let selectedKinds: string[] = $state([]);
-	let selectedYears: string[] = $state([]);
-	let selectedPublisher: string[] = $state([]); // 0 ou 1 identifiant d'éditeur
-	let selectedSerial: string[] = $state([]); // 0 ou 1 identifiant de collection
-	let currentSort = $state('publications_desc');
-
-	// Paramètres partagés par la liste et ses facettes : les décomptes suivent la recherche.
-	function buildFilterParams(): URLSearchParams {
-		const params = new URLSearchParams();
-		const publisherId = externalFilters?.publisherId != null ? String(externalFilters.publisherId) : selectedPublisher[0];
-		if (publisherId) params.set('publisher_id', publisherId);
-		const serialId = externalFilters?.serialId != null ? String(externalFilters.serialId) : selectedSerial[0];
-		if (serialId) params.set('serial_id', serialId);
-		if (selectedKinds.length) params.set('type', selectedKinds.join(','));
-		if (selectedYears.length) params.set('year', selectedYears.join(','));
-		const q = search.trim();
-		if (q) params.set('search', q);
-		return params;
-	}
-
-	function exportCsvUrl(): string {
-		const params = buildFilterParams();
-		params.set('sort', currentSort);
-		return withBase(`/api/monographs/export.csv?${paramsToQuery(params)}`);
-	}
-
-	const monographs = usePaginatedFetch<Monograph>({
+	const list = useFilteredList<Monograph, ReturnType<typeof useFacets>>({
+		filters: FILTERS,
 		endpoint: '/api/monographs',
 		itemsKey: 'monographs',
 		perPage: 50,
 		apiKey: () => apiKey,
-		buildParams() {
-			const params = buildFilterParams();
-			params.set('sort', currentSort);
-			return params;
-		},
-	});
-
-	const facets = useFacets({
-		endpoint: '/api/monographs/facets',
-		apiKey: () => `${apiKey}-facets`,
-		buildParams: buildFilterParams,
-		facets: {
-			kinds: { type: 'label_map', apiKey: 'kinds', labels: KIND_LABELS },
-			years: { type: 'simple', apiKey: 'years' },
-		},
-	});
-
-	const url = useUrlFilters({
+		defaultSort: 'publications_desc',
+		urlSync: () => urlSync,
 		basePath: () => basePath,
-		filters: {
-			selectedKinds: { type: 'string_array', urlKey: 'type' },
-			selectedYears: { type: 'string_array', urlKey: 'year' },
-			selectedPublisher: { type: 'string_array', urlKey: 'publisher_id' },
-			selectedSerial: { type: 'string_array', urlKey: 'serial_id' },
-			search: { type: 'single', urlKey: 'search' },
-			currentSort: { type: 'single', urlKey: 'sort', defaultValue: 'publications_desc' },
-			currentPage: { type: 'page', urlKey: 'page' },
-		},
+		facets: (buildParams) =>
+			useFacets({
+				endpoint: '/api/monographs/facets',
+				apiKey: () => `${apiKey}-facets`,
+				buildParams,
+				facets: facetDefs(FILTERS),
+			}),
 	});
 
-	function syncUrl() {
-		if (!urlSync) return;
-		url.syncUrl(() => ({
-			selectedKinds,
-			selectedYears,
-			selectedPublisher,
-			selectedSerial,
-			search,
-			currentSort,
-			currentPage: monographs.page,
-		}));
+	function exportCsvUrl(): string {
+		const params = list.filterParams();
+		params.set('sort', list.sort);
+		return withBase(`/api/monographs/export.csv?${paramsToQuery(params)}`);
 	}
-
-	function onFilterChange() {
-		monographs.page = 1;
-		syncUrl();
-		monographs.load();
-		facets.load();
-	}
-
-	const onSearchInput = url.debouncedSearch(onFilterChange);
 
 	function setSort(column: 'title' | 'year' | 'publications') {
-		currentSort = nextSort(currentSort, column, column === 'title' ? 'asc' : 'desc');
-		monographs.page = 1;
-		syncUrl();
-		monographs.load();
+		list.setSort(nextSort(list.sort, column, column === 'title' ? 'asc' : 'desc'));
 	}
 
-	onMount(() => {
-		if (urlSync) {
-			const restored = url.restoreFromUrl(page.url.searchParams);
-			if (restored.selectedKinds) selectedKinds = restored.selectedKinds as string[];
-			if (restored.selectedYears) selectedYears = restored.selectedYears as string[];
-			if (restored.selectedPublisher) selectedPublisher = restored.selectedPublisher as string[];
-			if (restored.selectedSerial) selectedSerial = restored.selectedSerial as string[];
-			if (restored.search) search = restored.search as string;
-			if (restored.currentSort) currentSort = restored.currentSort as string;
-			if (restored.currentPage) monographs.page = restored.currentPage as number;
-		}
-		facets.load();
-		monographs.load();
-	});
+	onMount(list.restore);
 </script>
 
-<ListToolbar bind:search placeholder="Rechercher par titre ou ISBN" onsearch={onSearchInput} list={monographs} one="monographie" many="monographies" exportUrl={exportCsvUrl()}>
-	{#snippet filters()}
-		<FacetDropdown label={filterLabels.types} options={facets.options.kinds} bind:selected={selectedKinds} onchange={onFilterChange} />
-		<FacetDropdown label={filterLabels.years} options={facets.options.years} searchable bind:selected={selectedYears} onchange={onFilterChange} />
-		{#if !publisherFixed}
-			<EntityFilter
-				label={filterLabels.publisher}
-				endpoint="/api/monographs/facets"
-				kind="publisher"
-				buildParams={buildFilterParams}
-				selected={selectedPublisher}
-				onchange={(ids) => { selectedPublisher = ids; onFilterChange(); }}
-			/>
-		{/if}
-		{#if !serialFixed}
-			<EntityFilter
-				label="Collections"
-				endpoint="/api/monographs/facets"
-				kind="serial"
-				buildParams={buildFilterParams}
-				selected={selectedSerial}
-				onchange={(ids) => { selectedSerial = ids; onFilterChange(); }}
-			/>
-		{/if}
+<ListToolbar bind:search={list.search} placeholder="Rechercher par titre ou ISBN" onsearch={list.onSearchInput} list={list.listing} one="monographie" many="monographies" exportUrl={exportCsvUrl()} countBelow>
+	{#snippet leading()}
+		<FilterPanelToggle bind:open={list.panel.open} active={list.activeCount} />
+	{/snippet}
+	{#snippet activeFilters()}
+		<ActiveFilterBar filters={FILTERS} bind:values={list.values} options={list.facets.options} onchange={list.onFilterChange} />
 	{/snippet}
 </ListToolbar>
+
+<FilterLayout bind:open={list.panel.open}>
+	{#snippet panel()}
+		<FilterPanel filters={FILTERS} groups={MONOGRAPH_FILTER_GROUPS} bind:values={list.values} options={list.facets.options} presenceCounts={{}} loaded={list.facets.loaded} entityEndpoint="/api/monographs/facets" buildParams={list.filterParams} panel={list.panel} onchange={list.onFilterChange} />
+	{/snippet}
 
 <TableScroll>
 	<table class="data-table monographs-table">
 		<thead>
 			<tr>
-				<th class="sortable" onclick={() => setSort('title')}>{columnLabels.title} <SortChevron direction={sortDirection(currentSort, 'title')} /></th>
+				<th class="sortable" onclick={() => setSort('title')}>{columnLabels.title} <SortChevron direction={sortDirection(list.sort, 'title')} /></th>
 				<th>{columnLabels.type}</th>
-				<th class="num sortable" onclick={() => setSort('year')}>{columnLabels.year} <SortChevron direction={sortDirection(currentSort, 'year')} /></th>
+				<th class="num sortable" onclick={() => setSort('year')}>{columnLabels.year} <SortChevron direction={sortDirection(list.sort, 'year')} /></th>
 				<th>ISBN</th>
 				{#if !publisherFixed}<th>{columnLabels.publisher}</th>{/if}
 				{#if !serialFixed}<th>Collection</th>{/if}
-				<th class="num sortable" onclick={() => setSort('publications')}>{columnLabels.publications} <SortChevron direction={sortDirection(currentSort, 'publications')} /></th>
+				<th class="num sortable" onclick={() => setSort('publications')}>{columnLabels.publications} <SortChevron direction={sortDirection(list.sort, 'publications')} /></th>
 			</tr>
 		</thead>
 		<tbody>
-			{#each monographs.items as m (m.id)}
+			{#each list.listing.items as m (m.id)}
 				<tr>
 					<td><a href={resolve(`monographs/${m.id}`)}><PublicationTitle titre={m.title} /></a></td>
 					<td class="muted">{m.proceedings ? 'Actes' : 'Livre'}</td>
@@ -217,23 +131,15 @@
 					<td class="num">{m.publication_count.toLocaleString('fr-FR')}</td>
 				</tr>
 			{/each}
-			{#if monographs.items.length === 0}
-				<TableStatusRow loading={monographs.loading} error={monographs.error} colspan={columnCount} emptyText="Aucune monographie ne correspond aux filtres." />
+			{#if list.listing.items.length === 0}
+				<TableStatusRow loading={list.listing.loading} error={list.listing.error} colspan={columnCount} emptyText="Aucune monographie ne correspond aux filtres." />
 			{/if}
 		</tbody>
 	</table>
 </TableScroll>
 
-<Pagination
-	page={monographs.page}
-	pages={monographs.pages}
-	onchange={(p) => {
-		monographs.page = p;
-		syncUrl();
-		monographs.load();
-	}}
-/>
-
+<Pagination page={list.listing.page} pages={list.listing.pages} onchange={list.goToPage} />
+</FilterLayout>
 
 <style>
 	.monographs-table { min-width: 720px; }
