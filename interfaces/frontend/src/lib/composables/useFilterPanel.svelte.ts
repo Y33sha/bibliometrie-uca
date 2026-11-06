@@ -1,5 +1,7 @@
 /**
- * État du panneau des filtres : ouvert ou fermé, et filtres dépliés. Un filtre est replié tant que l'utilisateur ne l'a pas déplié. Le navigateur retient cet état, pour toutes les listes.
+ * État du panneau des filtres : ouvert ou fermé, et filtres dépliés.
+ *
+ * Le navigateur retient l'ouverture du panneau, pour toutes les listes. Le dépliage des filtres dure le temps de la page : un filtre est déplié quand il est actif, ou quand l'utilisateur l'a déplié.
  *
  * Le stockage est reçu en paramètre : l'application passe celui du navigateur, un test en passe un autre. `null` désactive la persistance.
  */
@@ -11,7 +13,6 @@ export interface PanelStorage {
 }
 
 const OPEN_KEY = 'filter-panel-open';
-const EXPANDED_KEY = 'filter-panel-expanded';
 
 /** Largeur d'écran à partir de laquelle le panneau s'ouvre par défaut. En dessous, il recouvre la page. Les feuilles de style de `FilterLayout` et `FilterPanel` reprennent ce seuil. */
 export const WIDE_SCREEN_QUERY = '(min-width: 1100px)';
@@ -24,21 +25,12 @@ function wideScreen(): boolean {
 	return typeof matchMedia !== 'undefined' && matchMedia(WIDE_SCREEN_QUERY).matches;
 }
 
-function readExpanded(storage: PanelStorage | null): Record<string, boolean> {
-	try {
-		const raw = storage?.getItem(EXPANDED_KEY);
-		if (raw) return JSON.parse(raw) as Record<string, boolean>;
-	} catch {
-		/* valeur illisible : état par défaut */
-	}
-	return {};
-}
-
 export function useFilterPanel(storage: PanelStorage | null = browserStorage(), wide: boolean = wideScreen()) {
 	// Sur écran étroit, le panneau recouvre la page : il s'ouvre seulement à la demande.
 	const stored = storage?.getItem(OPEN_KEY);
 	let open = $state(wide && stored !== '0');
-	let expanded = $state(readExpanded(storage));
+	// Choix de l'utilisateur, par filtre.
+	let expanded = $state<Record<string, boolean>>({});
 
 	return {
 		get open() {
@@ -48,12 +40,12 @@ export function useFilterPanel(storage: PanelStorage | null = browserStorage(), 
 			open = value;
 			if (wide) storage?.setItem(OPEN_KEY, value ? '1' : '0');
 		},
-		isExpanded(key: string): boolean {
-			return expanded[key] ?? false;
+		/** Filtre déplié : choix de l'utilisateur, sinon `active`. */
+		isExpanded(key: string, active: boolean): boolean {
+			return expanded[key] ?? active;
 		},
 		setExpanded(key: string, value: boolean) {
 			expanded = { ...expanded, [key]: value };
-			storage?.setItem(EXPANDED_KEY, JSON.stringify(expanded));
 		},
 	};
 }

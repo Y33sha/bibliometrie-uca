@@ -114,8 +114,8 @@
 		{#if shown.length}
 			<section class="filter-group" aria-label={s.group.label}>
 				{#each shown as f (f.key)}
-					{@const open = panel.isExpanded(f.key)}
 					{@const active = isActive(f, values)}
+					{@const open = panel.isExpanded(f.key, active)}
 					<div class="filter-block">
 						<div class="filter-head-row">
 							<button type="button" class="filter-head" class:with-clear={active} aria-expanded={open} title={f.tooltip} onclick={() => panel.setExpanded(f.key, !open)}>

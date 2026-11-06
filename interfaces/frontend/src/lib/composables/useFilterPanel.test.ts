@@ -30,13 +30,16 @@ describe('useFilterPanel', () => {
 		expect(useFilterPanel(storage, true).open).toBe(true);
 	});
 
-	it("replie les filtres par défaut, et retient le choix de l'utilisateur", () => {
+	it("déplie les filtres actifs, puis suit le choix de l'utilisateur, le temps de la page", () => {
 		const storage = memoryStorage();
 		const panel = useFilterPanel(storage, true);
-		expect(panel.isExpanded('years')).toBe(false);
+		expect(panel.isExpanded('years', false)).toBe(false);
+		expect(panel.isExpanded('labs', true)).toBe(true);
 		panel.setExpanded('years', true);
-		const reloaded = useFilterPanel(storage, true);
-		expect(reloaded.isExpanded('years')).toBe(true);
-		expect(reloaded.isExpanded('languages')).toBe(false);
+		panel.setExpanded('labs', false);
+		expect(panel.isExpanded('years', false)).toBe(true);
+		expect(panel.isExpanded('labs', true)).toBe(false);
+		const nextPage = useFilterPanel(storage, true);
+		expect(nextPage.isExpanded('years', false)).toBe(false);
 	});
 });
