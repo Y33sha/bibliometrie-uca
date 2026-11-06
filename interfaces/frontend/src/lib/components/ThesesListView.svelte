@@ -147,7 +147,7 @@
 
 <FilterLayout bind:open={filterPanel.open}>
 	{#snippet panel()}
-		<FilterPanel filters={FILTERS} groups={THESIS_FILTER_GROUPS} bind:values options={facets.options} sourceCounts={facets.sourceCounts} loaded={facets.loaded} entityEndpoint={PUBLICATION_FACETS_ENDPOINT} buildParams={buildFilterParams} panel={filterPanel} onchange={onFilterChange} />
+		<FilterPanel filters={FILTERS} groups={THESIS_FILTER_GROUPS} bind:values options={facets.options} presenceCounts={facets.sourceCounts} loaded={facets.loaded} entityEndpoint={PUBLICATION_FACETS_ENDPOINT} buildParams={buildFilterParams} panel={filterPanel} onchange={onFilterChange} />
 	{/snippet}
 	<ThesesTable items={listing.items} loading={listing.loading} error={listing.error} sort={currentSort} onToggleSort={toggleSort} {columns} onopen={drawer.open} activeId={drawer.id} />
 	<Pagination

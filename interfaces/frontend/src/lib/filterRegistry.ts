@@ -36,6 +36,10 @@ export interface CheckboxFilter extends BaseFilter {
 	range?: boolean;
 	/** Corrige une sélection qui vient de changer. */
 	normalize?: (selected: string[]) => string[];
+	/** Sélection à l'ouverture de la page. L'URL omet cette sélection ; une sélection vidée s'y écrit `all`. */
+	defaultSelection?: () => string[];
+	/** Valeur du paramètre de la requête pour une sélection, quand elle diffère des valeurs jointes par des virgules ; `null` pour ne pas filtrer. */
+	serialize?: (selected: string[]) => string | null;
 }
 
 export interface EntityChoiceFilter extends BaseFilter {
@@ -48,7 +52,12 @@ export interface EntityChoiceFilter extends BaseFilter {
 export interface PresenceFilter extends BaseFilter {
 	control: 'presence';
 	items: { key: string; label: string }[];
+	/** Un paramètre de requête par élément (`has_orcid=yes`), au lieu du paramètre commun `param` (`hal_yes,wos_no`). `param` reste la clé d'URL. */
+	itemParams?: Record<string, string>;
 }
+
+/** Jeton d'URL d'une sélection vidée, pour un filtre qui a une sélection par défaut. */
+export const ALL_TOKEN = 'all';
 
 export type ListFilter = CheckboxFilter | EntityChoiceFilter | PresenceFilter;
 
@@ -72,9 +81,13 @@ export function clearValue(filter: ListFilter, values: FilterValues): void {
 	else values.presence[filter.key] = {};
 }
 
+/** Valeurs à l'ouverture de la page : la sélection par défaut de chaque filtre, sinon une sélection vide. */
 export function initialValues(filters: ListFilter[]): FilterValues {
 	const values: FilterValues = { checkbox: {}, entity: {}, presence: {} };
-	for (const f of filters) clearValue(f, values);
+	for (const f of filters) {
+		clearValue(f, values);
+		if (f.control === 'checkbox' && f.defaultSelection) values.checkbox[f.key] = f.defaultSelection();
+	}
 	return values;
 }
 
@@ -217,17 +230,29 @@ function paramValue(filter: ListFilter, values: FilterValues): string | null {
 	if (!(filter.enabled?.() ?? true)) return null;
 	const fixed = filter.fixed?.() ?? null;
 	if (fixed !== null) return fixed;
-	if (filter.control === 'checkbox') return (values.checkbox[filter.key] ?? []).join(',') || null;
+	if (filter.control === 'checkbox') {
+		const selected = values.checkbox[filter.key] ?? [];
+		return filter.serialize ? filter.serialize(selected) : selected.join(',') || null;
+	}
 	if (filter.control === 'entity') return (values.entity[filter.key] ?? []).join(',') || null;
 	return encodePresence(values.presence[filter.key] ?? {}) || null;
 }
 
+/** Écrit dans `params` les filtres qui filtrent. Un filtre de présence à `itemParams` écrit un paramètre par élément filtré. */
 export function appendFilterParams(
 	filters: ListFilter[],
 	values: FilterValues,
 	params: URLSearchParams,
 ): void {
 	for (const f of filters) {
+		if (f.control === 'presence' && f.itemParams) {
+			if (!isAvailable(f)) continue;
+			for (const [item, state] of Object.entries(values.presence[f.key] ?? {})) {
+				const param = f.itemParams[item];
+				if (param && (state === 'yes' || state === 'no')) params.set(param, state);
+			}
+			continue;
+		}
 		const value = paramValue(f, values);
 		if (value !== null) params.set(f.param, value);
 	}
@@ -246,6 +271,8 @@ export function urlFilterDefs(filters: ListFilter[]): Record<string, UrlFilterDe
 	for (const f of filters) {
 		if (f.control === 'presence') {
 			defs[f.key] = { type: 'source_states', urlKey: f.param };
+		} else if (f.control === 'checkbox' && f.defaultSelection) {
+			defs[f.key] = { type: 'single', urlKey: f.param, defaultValue: f.defaultSelection().join(',') };
 		} else {
 			defs[f.key] = { type: 'string_array', urlKey: f.param };
 		}
@@ -258,7 +285,9 @@ export function urlState(filters: ListFilter[], values: FilterValues): Record<st
 	const state: Record<string, unknown> = {};
 	for (const f of filters) {
 		if (f.control === 'checkbox') {
-			state[f.key] = values.checkbox[f.key] ?? [];
+			const selected = values.checkbox[f.key] ?? [];
+			// Avec une sélection par défaut, la sélection s'écrit en un texte ; vidée, elle s'écrit `all`.
+			state[f.key] = f.defaultSelection ? selected.join(',') || ALL_TOKEN : selected;
 		} else if (f.control === 'entity') {
 			state[f.key] = values.entity[f.key] ?? [];
 		} else {
@@ -277,7 +306,9 @@ export function restoreValues(
 	for (const f of filters) {
 		const raw = restored[f.key];
 		if (raw == null || raw === '') continue;
-		if (f.control === 'checkbox') {
+		if (f.control === 'checkbox' && f.defaultSelection) {
+			values.checkbox[f.key] = raw === ALL_TOKEN ? [] : String(raw).split(',');
+		} else if (f.control === 'checkbox') {
 			values.checkbox[f.key] = raw as string[];
 		} else if (f.control === 'entity') {
 			values.entity[f.key] = raw as string[];

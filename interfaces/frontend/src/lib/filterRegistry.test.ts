@@ -279,4 +279,61 @@ describe('filterRegistry', () => {
 	it('résume un filtre de présence', () => {
 		expect(presenceSummary(sources, { hal: 'yes', wos: 'no', oa: 'all' })).toBe('avec HAL, sans WoS');
 	});
+
+	describe('sélection par défaut', () => {
+		const rh: CheckboxFilter = {
+			key: 'rh',
+			control: 'checkbox',
+			label: 'Base RH',
+			param: 'has_rh',
+			group: 'people',
+			facet: { type: 'boolean', apiKey: 'rh', yesLabel: 'Oui', noLabel: 'Non' },
+			defaultSelection: () => ['yes'],
+			serialize: (selected) => (selected.length === 1 ? selected[0] : null),
+		};
+
+		it("part de la sélection par défaut, que l'URL omet, et écrit `all` une sélection vidée", () => {
+			const values = initialValues([rh]);
+			expect(values.checkbox.rh).toEqual(['yes']);
+			expect(urlFilterDefs([rh]).rh).toEqual({ type: 'single', urlKey: 'has_rh', defaultValue: 'yes' });
+			expect(urlState([rh], values).rh).toBe('yes');
+			values.checkbox.rh = [];
+			expect(urlState([rh], values).rh).toBe('all');
+			restoreValues([rh], { rh: 'all' }, values);
+			expect(values.checkbox.rh).toEqual([]);
+			restoreValues([rh], { rh: 'no' }, values);
+			expect(values.checkbox.rh).toEqual(['no']);
+		});
+
+		it('écrit dans la requête la valeur choisie par `serialize`', () => {
+			const values = initialValues([rh]);
+			const params = new URLSearchParams();
+			appendFilterParams([rh], values, params);
+			expect(params.get('has_rh')).toBe('yes');
+			values.checkbox.rh = ['yes', 'no'];
+			const both = new URLSearchParams();
+			appendFilterParams([rh], values, both);
+			expect(both.has('has_rh')).toBe(false);
+		});
+	});
+
+	it('écrit un paramètre par élément filtré pour un filtre de présence à `itemParams`', () => {
+		const ids: PresenceFilter = {
+			key: 'ids',
+			control: 'presence',
+			label: 'Identifiants',
+			param: 'id_filter',
+			group: 'people',
+			items: [
+				{ key: 'orcid', label: 'ORCID' },
+				{ key: 'idhal', label: 'idHAL' },
+			],
+			itemParams: { orcid: 'has_orcid', idhal: 'has_idhal' },
+		};
+		const values = initialValues([ids]);
+		values.presence.ids = { orcid: 'yes', idhal: 'no' };
+		const params = new URLSearchParams();
+		appendFilterParams([ids], values, params);
+		expect(Object.fromEntries(params)).toEqual({ has_orcid: 'yes', has_idhal: 'no' });
+	});
 });

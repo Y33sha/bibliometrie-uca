@@ -9,6 +9,7 @@ import type { FacetOption } from '#lib/components/FacetDropdown.svelte';
  *   - label_map  : { value, count }[]         → text = labels[value] || value
  *   - labeled    : { value, label, count }[]  → text = label (transform optionnel)
  *   - boolean    : { value, count }[]         → deux options yes/no
+ *   - fixed      : options déclarées, sans appel à l'API
  */
 
 // --- Facet definition types ---
@@ -40,7 +41,13 @@ interface BooleanFacet {
 	noLabel: string;
 }
 
-export type FacetDef = SimpleFacet | LabelMapFacet | LabeledFacet | BooleanFacet;
+/** Options fixes, sans décompte de l'API. */
+interface FixedFacet {
+	type: 'fixed';
+	options: FacetOption[];
+}
+
+export type FacetDef = SimpleFacet | LabelMapFacet | LabeledFacet | BooleanFacet | FixedFacet;
 
 interface FacetsConfig<K extends string> {
 	endpoint: string;
@@ -54,8 +61,8 @@ interface FacetsConfig<K extends string> {
 
 export function useFacets<K extends string>(config: FacetsConfig<K>) {
 	const initialOptions = {} as Record<K, FacetOption[]>;
-	for (const key of Object.keys(config.facets) as K[]) {
-		initialOptions[key] = [];
+	for (const [key, def] of Object.entries(config.facets) as [K, FacetDef][]) {
+		initialOptions[key] = def.type === 'fixed' ? def.options : [];
 	}
 	let options: Record<K, FacetOption[]> = $state(initialOptions);
 	let sourceCounts: Record<string, { yes: number; no: number }> = $state({});
@@ -83,6 +90,7 @@ export function useFacets<K extends string>(config: FacetsConfig<K>) {
 		const newOpts = {} as Record<K, FacetOption[]>;
 
 		for (const [key, def] of Object.entries(config.facets) as [K, FacetDef][]) {
+			if (def.type === 'fixed') { newOpts[key] = def.options; continue; }
 			const raw = data[def.apiKey];
 			if (!raw) { newOpts[key] = []; continue; }
 

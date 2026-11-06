@@ -15,6 +15,7 @@
 		type FilterGroup,
 		type FilterValues,
 		type ListFilter,
+		type PresenceCounts,
 	} from '#lib/filterRegistry.js';
 	import type { useFilterPanel } from '#lib/composables/useFilterPanel.svelte.js';
 
@@ -25,7 +26,7 @@
 		groups,
 		values = $bindable(),
 		options,
-		sourceCounts,
+		presenceCounts,
 		loaded,
 		collapsed = false,
 		entityEndpoint,
@@ -39,8 +40,8 @@
 		values: FilterValues;
 		/** Options des cases à cocher, par clé de filtre. */
 		options: Record<string, FacetOption[]>;
-		/** Décomptes du filtre de présence des sources. */
-		sourceCounts: Record<string, { yes: number; no: number }>;
+		/** Décomptes des éléments des filtres de présence, par clé d'élément. */
+		presenceCounts: PresenceCounts;
 		/** Décomptes chargés au moins une fois. Avant, tous les filtres proposés par la page s'affichent. */
 		loaded: boolean;
 		/** Filtres repliés à l'ouverture de la page, sauf les filtres actifs. Sans cette option, tous les filtres sont dépliés. */
@@ -60,7 +61,8 @@
 
 	// svelte-ignore state_referenced_locally
 	const sections = filterGroups(filters, groups);
-	const nonZeroOptions = (key: string): number => options[key]?.filter((o) => o.count).length ?? 0;
+	// Une option sans décompte (liste fixe) compte comme disponible.
+	const nonZeroOptions = (key: string): number => options[key]?.filter((o) => o.count !== 0).length ?? 0;
 
 	/** Nombre affiché sur le nom d'un filtre actif : valeurs cochées, entités choisies, éléments filtrés ; un pour un intervalle. */
 	function selectionCount(f: ListFilter): number {
@@ -82,7 +84,7 @@
 	// Avant le premier chargement des décomptes, tous les filtres proposés s'affichent d'un coup : l'utilité d'un filtre se juge sur ses décomptes. Ensuite, un filtre affiché reste affiché, même sans option de décompte non nul.
 	const everShown = new SvelteSet<string>();
 	const visible = (f: ListFilter): boolean =>
-		isAvailable(f) && (!loaded || everShown.has(f.key) || isShown(f, values, nonZeroOptions, sourceCounts));
+		isAvailable(f) && (!loaded || everShown.has(f.key) || isShown(f, values, nonZeroOptions, presenceCounts));
 	$effect(() => {
 		if (!loaded) return;
 		for (const f of filters) if (visible(f)) everShown.add(f.key);
@@ -141,7 +143,7 @@
 								{:else if f.control === 'entity'}
 									<EntityOptions endpoint={entityEndpoint} kind={f.entity} multiple={f.multiple} limit={OPTION_LIMIT} clearable={false} {buildParams} selected={values.entity[f.key]} onchange={(ids) => { values.entity[f.key] = ids; onchange(); }} />
 								{:else}
-									<PresenceOptions items={f.items} bind:states={values.presence[f.key]} counts={sourceCounts} clearable={false} {onchange} />
+									<PresenceOptions items={f.items} bind:states={values.presence[f.key]} counts={presenceCounts} clearable={false} {onchange} />
 								{/if}
 							</div>
 						{/if}

@@ -94,6 +94,20 @@ describe('useFacets', () => {
 		]);
 	});
 
+	it('garde les options fixes, avant comme après le chargement', async () => {
+		apiResponse = {};
+		const fixed = [{ value: 'none', text: 'Retenue' }];
+		const f = useFacets({
+			endpoint: '/x',
+			apiKey: 'k',
+			buildParams: () => new URLSearchParams(),
+			facets: { exclusion: { type: 'fixed', options: fixed } },
+		});
+		expect(f.options.exclusion).toEqual(fixed);
+		await f.load();
+		expect(f.options.exclusion).toEqual(fixed);
+	});
+
 	it('retient seulement les valeurs nommées du type "label_map" avec onlyLabeled', async () => {
 		apiResponse = {
 			doc_types: [{ value: 'thesis', count: 50 }, { value: 'article', count: 3 }],
