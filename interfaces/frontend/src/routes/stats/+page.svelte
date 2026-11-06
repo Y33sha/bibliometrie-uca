@@ -6,12 +6,13 @@
 	import { Chart, fitsInBar, pieSegmentOptions, stackedSegmentOptions } from '#lib/components/charts/chart.js';
 	import { cssColor, fontSize } from '#lib/components/charts/cssVar.js';
 	import { readableOn } from '#lib/components/charts/contrast.js';
+	import ChartLegend from '#lib/components/charts/ChartLegend.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import PublicationFilterBar from '#lib/components/PublicationFilterBar.svelte';
 	import ActiveFilterBar from '#lib/components/ActiveFilterBar.svelte';
 	import CollaborationMap from './CollaborationMap.svelte';
 	import { defaultYears } from '#lib/defaultYears.js';
-	import { orderedPivotValues, pivotValueColor, pivotValueLabel } from '#lib/pivotValues.js';
+	import { orderedPivotValues, pivotValueColor, pivotValueDescription, pivotValueLabel } from '#lib/pivotValues.js';
 	import { paramsToQuery } from '#lib/utils.js';
 	import { publicationsDocTypes } from '#lib/docTypes.svelte.js';
 	import { toast } from '#lib/dialogs.svelte.js';
@@ -57,7 +58,7 @@
 	// Séries proposées au sélecteur de tri, dérivées de l'empilement courant (mises à jour au tracé).
 	let sortableSeries = $state<{ value: string; label: string }[]>([]);
 	const CHART_PAGE_SIZE = 10;
-	let legendItems: { label: string; color: string }[] = $state([]);
+	let legendItems: { label: string; color: string; description?: string }[] = $state([]);
 	// Données du graphique pour les lecteurs d'écran : une ligne par catégorie de l'abscisse, une colonne par série, en valeurs absolues.
 	let chartTable = $state<{ columns: string[]; rows: { label: string; values: string[] }[] } | null>(null);
 	const indicatorDef = $derived(pivotSchema?.indicators.find((i) => i.key === indicator));
@@ -241,7 +242,8 @@
 			barPercentage: 0.85,
 			categoryPercentage: 0.7
 		}));
-		legendItems = datasets.map((d) => ({ label: d.label, color: d.backgroundColor }));
+		const descriptions = series.map((sv) => (stackDim ? pivotValueDescription(stackDim, sv) : undefined));
+		legendItems = datasets.map((d, i) => ({ label: d.label, color: d.backgroundColor, description: descriptions[i] }));
 		chartTable = {
 			columns: datasets.map((d) => d.label),
 			rows: labels.map((label, ci) => ({ label, values: datasets.map((d) => formatValue(d.data[ci] as number)) })),
@@ -251,7 +253,8 @@
 		if (chartMode === 'part' && !stackDim) {
 			const values = datasets[0].data as number[];
 			const colors = cats.map((cv, i) => pivotValueColor(xDim, cv, i));
-			legendItems = cats.map((cv, i) => ({ label: dimLabel(xDim, cv), color: colors[i] }));
+			const sliceDescriptions = cats.map((cv) => pivotValueDescription(xDim, cv));
+			legendItems = cats.map((cv, i) => ({ label: dimLabel(xDim, cv), color: colors[i], description: sliceDescriptions[i] }));
 			const sliceTotal = (ctx: { dataset: { data: unknown[] } }) =>
 				(ctx.dataset.data as number[]).reduce((s, v) => s + (v || 0), 0);
 			yearChart = new Chart(chartCanvas, {
@@ -271,7 +274,8 @@
 									const total = sliceTotal(ctx);
 									const pct = total ? ((val / total) * 100).toFixed(1) : '0.0';
 									return `${ctx.label} : ${formatValue(val)} (${pct}%)`;
-								}
+								},
+								afterLabel: (ctx) => sliceDescriptions[ctx.dataIndex] ?? ''
 							}
 						},
 						datalabels: {
@@ -332,6 +336,7 @@
 											? `${ctx.dataset.label} : ${pct}%`
 											: `${ctx.dataset.label} : ${formatValue(val)} (${pct}%)`;
 									},
+									afterLabel: (ctx) => descriptions[ctx.datasetIndex] ?? '',
 									afterBody: (items) => {
 										const total = items[0].chart.data.datasets.reduce((s, ds) => s + ((ds.data[items[0].dataIndex] as number) || 0), 0);
 										return part ? [] : `Total : ${formatValue(total)}`;
@@ -514,11 +519,7 @@
 <!-- Histogramme du pivot -->
 <div class="chart-header">
 	{#if legendItems.length > 1}
-		<div class="legend">
-			{#each legendItems as item (item.label)}
-				<span><span class="legend-dot" style="background:{item.color}"></span>{item.label}</span>
-			{/each}
-		</div>
+		<ChartLegend items={legendItems} />
 	{/if}
 	<button type="button" class="export-btn chart-export" onclick={exportChartPng}>Export PNG</button>
 </div>
@@ -590,22 +591,6 @@
 		align-items: center;
 		gap: 16px;
 		margin-bottom: 8px;
-	}
-	.legend {
-		flex: 1 1 auto;
-		display: flex;
-		flex-wrap: wrap;
-		gap: 6px 18px;
-		font-size: var(--fs-sm);
-		color: var(--text-secondary);
-	}
-	.legend-dot {
-		display: inline-block;
-		width: 10px;
-		height: 10px;
-		border-radius: 3px;
-		margin-right: 6px;
-		vertical-align: -1px;
 	}
 
 	/* Colonne pleine hauteur : barres d'outils, légende et pagination gardent leur hauteur naturelle, le diagramme occupe l'espace restant du viewport. Hauteur = viewport moins l'en-tête fixe et le padding vertical du conteneur. */

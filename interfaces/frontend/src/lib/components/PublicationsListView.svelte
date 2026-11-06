@@ -28,7 +28,8 @@
 	} from '#lib/filterRegistry.js';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import LicenseBadge from '#lib/components/LicenseBadge.svelte';
-	import { citationTopLabels, columnLabels, oaStatusLabel } from '#lib/labels.js';
+	import { citationTopLabels, columnLabels, oaStatusDescriptions, oaStatusLabel } from '#lib/labels.js';
+	import Tooltip from '#lib/components/Tooltip.svelte';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
 	import TableStatusRow from '#lib/components/TableStatusRow.svelte';
 	import { usePublicationFacets } from '#lib/composables/usePublicationFacets.svelte.js';
@@ -367,7 +368,7 @@
 					</td>{/if}
 					{#if col('oa_status')}<td>
 						{#if p.oa_status && p.oa_status !== 'unknown'}
-							<span class="tag" style="--tag-color: var(--{p.oa_status})">{oaStatusLabel(p.oa_status)}</span>
+							<Tooltip text={oaStatusDescriptions[p.oa_status] ?? ''}><span class="tag" style="--tag-color: var(--{p.oa_status})">{oaStatusLabel(p.oa_status)}</span></Tooltip>
 						{/if}
 					</td>{/if}
 					{#if col('license')}<td class="license-cell">{#if p.license}<LicenseBadge license={p.license} />{/if}</td>{/if}
