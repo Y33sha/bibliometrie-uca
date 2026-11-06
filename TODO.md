@@ -28,3 +28,4 @@
 
 # Cas particuliers, bizarreries à élucider
 * "How Self-Location Predicts the Degree and Quality of the Felt Sense of Connection" => preprint de ... (DOI non résolu) + lien open access renvoie sur la v1
+* 102835 langue: letton
