@@ -8,19 +8,19 @@ Le chantier [alignement des auteurs](archived/2026-10-24_DATA_alignement-auteurs
 
 ## Décisions
 
-- Un groupe dont certaines contributions sources donnent un indice de périmètre et d'autres une affiliation hors périmètre est un cas conflictuel. Une file d'administration le présente pour décision.
+- Une contribution dont certaines contributions sources donnent un indice de périmètre et d'autres une affiliation hors périmètre est un cas conflictuel. Une file d'administration la présente pour décision.
 
 ## Phasage
 
 ### Phase 1 — Mesure
 
 - [x] Contributions sources OpenAlex du périmètre dont les adresses donnent la France et un autre pays, le 2026-10-19 (`measure_openalex_two_countries.sql`) : 11 624, dans 6 160 publications. OpenAlex réunit souvent dans une contribution source les affiliations de deux auteurs.
-  - Autres contributions sources du groupe : France ou indice de périmètre dans 8 850 cas, autres pays seulement dans 1 650, aucun pays dans 1 001. OpenAlex est seul dans le groupe dans 123 cas.
+  - Autres contributions sources de la contribution : France ou indice de périmètre dans 8 850 cas, autres pays seulement dans 1 650, aucun pays dans 1 001. OpenAlex est seul dans la contribution dans 123 cas.
   - 565 personnes hors RH ont pour seul appui au périmètre des contributions sources de ce type, sans confirmation. Le périmètre compte 15 024 personnes hors RH.
   - Les enregistrements sources de plus de 500 auteurs contiennent 1 780 des 2 774 contributions sources sans confirmation. 244 des 565 personnes signent ainsi dans un enregistrement source de 10 auteurs au plus.
   - Exemple g5296946 : une université chinoise et un laboratoire du périmètre. La contribution source HAL du dépôt in2p3, de 54 auteurs, donne aussi ce laboratoire.
   - Relecture de 65 de ces 565 personnes, le 2026-10-19 (`build_multicountry_review.py`) : 57 fausses personnes du périmètre, 3 doubles affiliations réelles, 5 cas indéterminables. Par plus petit enregistrement source concerné : 18 fausses sur 25 jusqu'à 10 auteurs, 19 sur 20 de 11 à 500 auteurs, 20 sur 20 au-delà. L'adresse française appartient à un autre auteur, ou l'adresse est fausse.
-- [x] Personnes hors RH dont aucune contribution source du périmètre n'est confirmée par une autre source de son groupe, le 2026-10-19 (`measure_unconfirmed_perimeter.sql`) : 5 794 sur 15 024. Une contribution source est confirmée quand une contribution source d'une autre source du même groupe est aussi du périmètre.
+- [x] Personnes hors RH dont aucune contribution source du périmètre n'est confirmée par une autre source de sa contribution, le 2026-10-19 (`measure_unconfirmed_perimeter.sql`) : 5 794 sur 15 024. Une contribution source est confirmée quand une contribution source d'une autre source de la même contribution est aussi du périmètre.
 
   | Source des indices | Personnes | Dont autre affiliation dans une autre source |
   |---|---|---|
@@ -56,13 +56,41 @@ Le chantier [alignement des auteurs](archived/2026-10-24_DATA_alignement-auteurs
 
 ### Phase 2 — INSPIRE-HEP
 
-- [ ] Couverture d'INSPIRE-HEP sur les publications de physique des hautes énergies du stock, selon le nombre d'auteurs.
-- [ ] Affiliations d'INSPIRE-HEP confrontées à celles d'OpenAlex, de HAL et de scanR, sur les contributions sources du périmètre.
+- [x] Couverture d'INSPIRE-HEP sur les publications de physique des hautes énergies du stock, selon le nombre d'auteurs, le 2026-11-06 sur la base locale (`inspire_coverage.py`). Publications du périmètre depuis 2017, classées en physique des hautes énergies par HAL ou OpenAlex, cherchées dans INSPIRE par leur DOI :
+
+  | Auteurs | Avec DOI | Dans INSPIRE |
+  |---|---|---|
+  | 1 à 10 | 318 | 170 (53 %) |
+  | 11 à 50 | 140 | 107 (76 %) |
+  | 51 à 500 | 230 | 192 (83 %) |
+  | plus de 500 | 2 139 | 1 962 (92 %) |
+
+  - INSPIRE affilie 2 608 articles depuis 2017 à une institution clermontoise. 264 sont sans DOI et 15 sont absents du stock. Les autres sont tous du périmètre.
+  - Pour 90 publications du tableau, INSPIRE affilie tous les auteurs hors de Clermont. 64 sont des actes de Nuclear Physics A (Quark Matter 2017 et 2018). INSPIRE garde seulement l'orateur, WoS donne toute la collaboration. Pour 63 de ces actes, l'indice de périmètre vient seulement de WoS.
+- [x] Affiliations d'INSPIRE-HEP confrontées à celles des sources, le 2026-11-06 sur la base locale (`inspire_affiliations.py`). L'échantillon compte 567 publications : celles de 500 auteurs au plus présentes dans INSPIRE, et 100 tirées au hasard au-delà. 96 % des contributions du périmètre sont rattachées à un auteur d'INSPIRE, par ORCID ou par nom de famille et initiale du prénom.
+  - Personnes RH en poste à la date de la publication : INSPIRE affilie à Clermont 496 contributions sur 504. Il affilie 6 autres contributions au CERN ou à Cincinnati, et 2 sont sans affiliation.
+  - Indices de périmètre confirmés par INSPIRE, selon la source : HAL 1 904 sur 1 921, WoS 1 786 sur 1 812, scanR 265 sur 280, OpenAlex 1 830 sur 2 164.
+
+  | Source des indices | Autres sources | INSPIRE Clermont | INSPIRE ailleurs |
+  |---|---|---|---|
+  | plusieurs sources | aucune affiliation | 1 763 | 10 |
+  | plusieurs sources | autre affiliation | 217 | 5 |
+  | OpenAlex | autre affiliation | 2 | 278 |
+  | OpenAlex | aucune affiliation | 11 | 30 |
+  | HAL | autre affiliation | 13 | 15 |
+  | HAL | aucune affiliation | 28 | 0 |
+  | WoS | autre affiliation | 4 | 15 |
+  | WoS | aucune affiliation | 1 | 1 |
+  | scanR | toutes | 0 | 13 |
+
+  - INSPIRE affilie à Clermont 28 auteurs absents du périmètre, tous dans des publications de plus de 500 auteurs.
+  - INSPIRE omet parfois la part clermontoise d'une double affiliation. Son affiliation brute contredit parfois l'institution liée. Les rapports techniques du CERN sont sans affiliations.
+- [ ] Relecture à la main de 35 indices de périmètre contredits par INSPIRE, donnés par plusieurs sources ou par OpenAlex seul (`build_inspire_review.py`).
 
 ### Phase 3 — Règles
 
 - [ ] Règles de confirmation des indices de périmètre, choisies d'après les phases 1 et 2.
-- [ ] File d'administration des groupes aux affiliations conflictuelles. Elle dépend du chantier [résolution des personnes par groupe](archived/2026-10-24_DATA_resolution-personnes.md).
+- [ ] File d'administration des contributions aux affiliations conflictuelles. Elle dépend du chantier [résolution des personnes](archived/2026-10-24_DATA_resolution-personnes.md).
 
 ### Phase 4 — Fin de chantier
 
@@ -70,5 +98,7 @@ Le chantier [alignement des auteurs](archived/2026-10-24_DATA_alignement-auteurs
 
 ## Questions ouvertes
 
-- Une adresse OpenAlex à plusieurs pays, que les autres sources du groupe ne confirment pas, cesse-t-elle d'être un indice de périmètre ? Sur les 60 cas jugés de la relecture du 2026-10-19, la règle perd 3 doubles affiliations réelles.
+- Une adresse OpenAlex à plusieurs pays, que les autres sources de la contribution ne confirment pas, cesse-t-elle d'être un indice de périmètre ? Sur les 60 cas jugés de la relecture du 2026-10-19, la règle perd 3 doubles affiliations réelles.
 - Les affiliations décalées ou fausses qui ne donnent pas plusieurs pays.
+- Un acte publié au nom d'une collaboration est-il une publication du périmètre, quand WoS donne toute la liste d'auteurs et INSPIRE seulement l'orateur ?
+- INSPIRE peut-il être la seule source des contributions sources des publications couvertes par INSPIRE, ou seulement des contributions sources hors périmètre ? Cela réduit le stockage et la durée de l'alignement des auteurs.
