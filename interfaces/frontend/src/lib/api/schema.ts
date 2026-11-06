@@ -6762,6 +6762,9 @@ export interface operations {
                 country?: string;
                 language?: string;
                 partner_ror?: string;
+                author_position?: string;
+                hal_status?: string;
+                in_perimeter?: string;
             };
             header?: never;
             path?: never;
@@ -6814,6 +6817,9 @@ export interface operations {
                 country?: string;
                 language?: string;
                 partner_ror?: string;
+                author_position?: string;
+                hal_status?: string;
+                in_perimeter?: string;
             };
             header?: never;
             path?: never;
@@ -6888,6 +6894,9 @@ export interface operations {
                 country?: string;
                 language?: string;
                 partner_ror?: string;
+                author_position?: string;
+                hal_status?: string;
+                in_perimeter?: string;
             };
             header?: never;
             path?: never;

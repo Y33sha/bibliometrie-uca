@@ -3,7 +3,7 @@
 La liste des publications, ses facettes, son export et les statistiques lisent ces paramètres.
 """
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from typing import Annotated
 
 from fastapi import Depends, Query
@@ -32,9 +32,9 @@ from interfaces.api.params import SearchTerm
 
 @dataclass(frozen=True, slots=True)
 class PublicationFilterParams:
-    """Filtres communs à la liste des publications et aux statistiques.
+    """Filtres de la liste des publications, de ses facettes, de son export et des statistiques.
 
-    Les valeurs multiples se séparent par des virgules. `lab_id` accepte la sentinelle `none`, qui retient les publications sans laboratoire, et se combine aux identifiants.
+    Les valeurs multiples se séparent par des virgules. `lab_id` accepte la sentinelle `none`, qui retient les publications sans laboratoire, et se combine aux identifiants. Le statut HAL suppose un seul laboratoire, le périmètre une personne, la position d'auteur l'un ou l'autre.
     """
 
     search: SearchTerm = ""
@@ -58,6 +58,9 @@ class PublicationFilterParams:
     country: Annotated[str, Query()] = ""
     language: Annotated[str, Query()] = ""
     partner_ror: Annotated[str, Query()] = ""
+    author_position: Annotated[str, Query()] = ""
+    hal_status: Annotated[str, Query()] = ""
+    in_perimeter: Annotated[str, Query()] = ""
 
     def to_filters(self) -> PublicationFilters:
         """Traduit la query string en filtres de la lecture."""
@@ -95,21 +98,6 @@ class PublicationFilterParams:
             country_values=parse_str_csv(self.country),
             language_codes=parse_str_csv(self.language),
             partner_rors=parse_ror_csv(self.partner_ror, param="partner_ror"),
-        )
-
-
-@dataclass(frozen=True, slots=True)
-class PublicationListFilterParams(PublicationFilterParams):
-    """Filtres de la liste des publications : les filtres communs, plus ceux qui supposent un seul laboratoire (statut HAL), une personne (périmètre), ou l'un ou l'autre (position d'auteur)."""
-
-    author_position: Annotated[str, Query()] = ""
-    hal_status: Annotated[str, Query()] = ""
-    in_perimeter: Annotated[str, Query()] = ""
-
-    def to_filters(self) -> PublicationFilters:
-        """Traduit la query string en filtres de la lecture."""
-        return replace(
-            PublicationFilterParams.to_filters(self),
             author_position=parse_vocabulary_csv(
                 self.author_position, allowed=AUTHOR_POSITION_FILTER_VALUES, param="author_position"
             ),
@@ -122,5 +110,4 @@ class PublicationListFilterParams(PublicationFilterParams):
         )
 
 
-StatsFilters = Annotated[PublicationFilterParams, Depends()]
-ListFilters = Annotated[PublicationListFilterParams, Depends()]
+PublicationQueryFilters = Annotated[PublicationFilterParams, Depends()]

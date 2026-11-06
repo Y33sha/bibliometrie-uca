@@ -45,7 +45,7 @@ class TestPivot:
 
 
 class TestStatsAcceptListFilters:
-    """Les statistiques lisent les filtres de la liste, sauf ceux qui supposent un seul laboratoire ou une personne."""
+    """Les statistiques lisent tous les filtres de la liste, y compris ceux qui supposent un seul laboratoire ou une personne."""
 
     @pytest.mark.parametrize(
         ("param", "value"),
@@ -60,9 +60,17 @@ class TestStatsAcceptListFilters:
         assert client.get("/api/stats/pivot", params=params).status_code == 200
 
     @pytest.mark.parametrize("param", ["hal_status", "author_position", "in_perimeter"])
-    def test_ignores_context_filters(self, client, param):
+    def test_reads_context_filters(self, client, param):
         r = client.get("/api/stats/pivot", params={param: "inconnu"})
-        assert r.status_code == 200
+        assert r.status_code == 422
+
+    def test_accepts_hal_status_of_a_lab_and_author_position_of_a_person(self, client):
+        assert (
+            client.get("/api/stats/pivot", params={"lab_id": "1", "hal_status": "ok"}).status_code
+            == 200
+        )
+        params = {"person_id": "1", "author_position": "corresponding"}
+        assert client.get("/api/stats/pivot", params=params).status_code == 200
 
 
 class TestStatsClosedVocabularyFilters:
