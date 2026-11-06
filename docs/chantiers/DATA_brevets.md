@@ -135,7 +135,7 @@ Familles dont un établissement du périmètre est déposant : UCA, Université 
 
 ### Phase 7 — Documentation
 
-- [ ] Mise à jour de la documentation des sources et des données
+- [x] Mise à jour de la documentation des sources et des données
 
 ## Questions ouvertes
 
