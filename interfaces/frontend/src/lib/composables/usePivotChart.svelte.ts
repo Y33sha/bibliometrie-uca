@@ -211,15 +211,20 @@ export function usePivotChart(config: {
 		const cats = highCard ? allCats.slice((chartPage - 1) * CHART_PAGE_SIZE, chartPage * CHART_PAGE_SIZE) : allCats;
 		const labels = cats.map((c) => dimLabel(xDim, c));
 
-		const cell = (cv: string, sv: string) => {
-			const row = rows.find((r) => String(r[xDim]) === cv && (!stackDim || String(r[stackDim]) === sv));
-			return row ? Number(row.value) : 0;
-		};
+		// Valeur de chaque cellule (abscisse, série), indexée une fois : un axe à forte cardinalité compte des milliers de catégories.
+		const cells = new Map<string, number>();
+		const catTotals = new Map<string, number>();
+		for (const r of rows) {
+			const cv = String(r[xDim]);
+			const value = Number(r.value);
+			cells.set(stackDim ? `${cv}\u0000${String(r[stackDim])}` : cv, value);
+			catTotals.set(cv, (catTotals.get(cv) ?? 0) + value);
+		}
+		const cell = (cv: string, sv: string) => cells.get(stackDim ? `${cv}\u0000${sv}` : cv) ?? 0;
 		const series = stackDim ? stackValues : ['__all__'];
 
 		// Échelle partagée entre pages : le maximum de l'axe des valeurs couvre toutes les catégories (pas seulement la page affichée), afin que l'échelle reste stable d'une page à l'autre et que les exports PNG soient comparables. `suggestedMax` laisse Chart.js arrondir les graduations ; comme ce maximum domine celui de chaque page, l'arrondi est identique partout.
-		const catSum = (cv: string) => series.reduce((s, sv) => s + cell(cv, sv), 0);
-		const valueMax = Math.max(0, ...allCats.map(catSum));
+		const valueMax = allCats.reduce((max, cv) => Math.max(max, catTotals.get(cv) ?? 0), 0);
 
 		const datasets = series.map((sv, i) => ({
 			label: stackDim ? dimLabel(stackDim, sv) : (indicatorDef?.label ?? ''),
