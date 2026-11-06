@@ -9,6 +9,7 @@ from domain.publications.open_access import (
     OpenAccessFacts,
     copies_facts,
     decide_oa_status,
+    has_oa_status,
     is_restricted,
     publication_oa_status,
 )
@@ -95,9 +96,10 @@ def test_acces_constates_sur_les_copies():
     )
 
 
-def _status(copies, unpaywall=None, *, embargoed=False, restricted=False):
+def _status(copies, unpaywall=None, *, applicable=True, embargoed=False, restricted=False):
     return publication_oa_status(
         copies,
+        applicable=applicable,
         embargoed=embargoed,
         restricted=restricted,
         unpaywall=unpaywall,
@@ -131,6 +133,15 @@ def test_une_publication_fermee_par_nature():
 )
 def test_fermeture_par_nature(doc_type, source_extras, expected):
     assert is_restricted(doc_type, source_extras) is expected
+
+
+def test_un_brevet_a_le_statut_inconnu():
+    assert has_oa_status("patent") is False
+    assert has_oa_status("article") is True
+    closed = _copy("https://hal.science/hal-01607327", is_oa=False)
+    opened = _copy("https://hal.science/hal-01607328", platform_type=PlatformType.REPOSITORY)
+    assert _status([closed], "closed", applicable=False) == "unknown"
+    assert _status([opened], applicable=False) == "unknown"
 
 
 def test_un_embargo_sans_copie_ouverte():
