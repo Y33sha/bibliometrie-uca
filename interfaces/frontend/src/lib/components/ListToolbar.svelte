@@ -166,10 +166,10 @@
 	}
 	/* Détachée, la barre glisse d'un bloc. Masquée, elle quitte le parcours au clavier à la fin du glissement. */
 	.list-toolbar.detached {
-		transition: top 0.2s ease, visibility 0s;
+		transition: top var(--list-toolbar-slide) ease, visibility 0s;
 	}
 	.list-toolbar.detached.hidden {
-		transition: top 0.2s ease, visibility 0s linear 0.2s;
+		transition: top var(--list-toolbar-slide) ease, visibility 0s linear var(--list-toolbar-slide);
 	}
 	.toolbar-card {
 		display: flex;

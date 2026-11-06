@@ -157,6 +157,7 @@
 
 	/* Gabarit */
 	--header-height: 46px; /* hauteur du menu supérieur fixe */
+	--list-toolbar-slide: 0.2s; /* durée du glissement de la barre d'outils d'une liste */
 	--page-gutter: 24px; /* marge latérale du contenu de la page */
 	--radius: 8px;
 	--radius-pill: 999px;
@@ -489,7 +490,7 @@ input[type='search']::-webkit-search-cancel-button {
 /* Barre d'outils détachée (`ListToolbar`) : la barre d'actions et l'en-tête glissent au même rythme qu'elle. */
 :root[data-list-toolbar='detached'] .batch-bar,
 :root[data-list-toolbar='detached'] .table-scroll thead th {
-	transition: top 0.2s ease;
+	transition: top var(--list-toolbar-slide) ease;
 }
 
 /* Tableau plus large que son conteneur (classe posée par l'action `horizontalOverflow`) : il défile horizontalement dans le conteneur, et son en-tête défile avec la page. */
