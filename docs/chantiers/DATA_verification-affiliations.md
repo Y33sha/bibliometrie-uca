@@ -85,7 +85,10 @@ Le chantier [alignement des auteurs](archived/2026-10-24_DATA_alignement-auteurs
 
   - INSPIRE affilie à Clermont 28 auteurs absents du périmètre, tous dans des publications de plus de 500 auteurs.
   - INSPIRE omet parfois la part clermontoise d'une double affiliation. Son affiliation brute contredit parfois l'institution liée. Les rapports techniques du CERN sont sans affiliations.
-- [ ] Relecture à la main de 35 indices de périmètre contredits par INSPIRE, donnés par plusieurs sources ou par OpenAlex seul (`build_inspire_review.py`).
+- [x] Relecture à la main de 35 indices de périmètre contredits par INSPIRE, donnés par plusieurs sources ou par OpenAlex seul, le 2026-11-06 (`build_inspire_review.py`).
+  - OpenAlex seul : INSPIRE a raison dans les 20 cas.
+  - Plusieurs sources : INSPIRE a raison dans 7 cas sur 15. Dans 2 de ces cas, l'auteur est passé par Clermont à une autre période. INSPIRE a tort dans 3 cas, 2 pour des personnes RH. 5 cas sont indéterminables.
+  - WoS, et parfois OpenAlex, attribue à un auteur les affiliations de ses homonymes de même initiale (Z. Xu, M. Zhang). Une double affiliation Chine et Clermont signale ce cas.
 
 ### Phase 3 — Règles
 
