@@ -2,12 +2,12 @@
 
 from sqlalchemy import Connection, text
 
-from domain.contributions.contribution_roles import ContributionRole
 from infrastructure.read_models.publications.models import (
     SuspectMergeOut,
     SuspectMergeSourceRecordOut,
     SuspectMergesResponse,
 )
+from infrastructure.sql_fragments import has_author_role
 
 _SUSPECT = "2 * pa.matched_source_contributions < pa.source_contributions"
 """Moins de la moitié des contributions sources d'auteur ont un correspondant dans un autre enregistrement source."""
@@ -20,7 +20,7 @@ _SOURCE_RECORDS_SQL = text(f"""
         JOIN aligned_source_contributions gs ON gs.contribution_id = g.id
         JOIN source_contributions sc ON sc.id = gs.source_contribution_id
         WHERE g.publication_id = ANY(:publications)
-          AND (sc.roles IS NULL OR '{ContributionRole.AUTHOR.value}' = ANY(sc.roles))
+          AND (sc.roles IS NULL OR {has_author_role("sc")})
     )
     SELECT m.publication_id, sr.source::text AS source, sr.source_id,
            count(*) AS source_contributions, count(*) FILTER (WHERE m.group_size >= 2) AS matched_source_contributions

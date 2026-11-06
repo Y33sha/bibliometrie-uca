@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict WgfBs5ibB7ggEfNXdYcXoQutf7tWeKrE6lOeqUGwOAfT2z6cYNnSHhlJB3jb8Bc
+\restrict 4qCv87PlTkeaDdAN5p5jr231eDdP0Nm4D61F2Msq1TMG13BtgHEUBnI5dmJTCY2
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -550,6 +550,15 @@ CREATE TYPE public.subject_vocabulary AS ENUM (
     'rameau',
     'theses_discipline'
 );
+
+
+--
+-- Name: is_author_role(text[]); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.is_author_role(roles text[]) RETURNS boolean
+    LANGUAGE sql IMMUTABLE PARALLEL SAFE
+    RETURN (roles && ARRAY['author'::text, 'inventor'::text]);
 
 
 --
@@ -1805,7 +1814,7 @@ CREATE MATERIALIZED VIEW publications.publication_structures AS
     gs.structure_id
    FROM (publications.contributions g
      JOIN publications.contribution_structures gs ON ((gs.contribution_id = g.id)))
-  WHERE (g.roles && ARRAY['author'::text])
+  WHERE public.is_author_role(g.roles)
   WITH NO DATA;
 
 
@@ -1839,7 +1848,7 @@ CREATE MATERIALIZED VIEW publications.publication_rors AS
              JOIN publications.aligned_source_contributions m ON ((m.contribution_id = c.id)))
              JOIN sources.source_contribution_rors r ON ((r.source_contribution_id = m.source_contribution_id)))
              LEFT JOIN persons.persons pe ON ((pe.id = c.person_id)))
-          WHERE ((c.roles && ARRAY['author'::text]) AND (pe.exclusion IS DISTINCT FROM 'not_a_person'::public.person_exclusion))
+          WHERE (public.is_author_role(c.roles) AND (pe.exclusion IS DISTINCT FROM 'not_a_person'::public.person_exclusion))
         UNION
          SELECT ps.publication_id,
             s.ror_id
@@ -6255,5 +6264,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict WgfBs5ibB7ggEfNXdYcXoQutf7tWeKrE6lOeqUGwOAfT2z6cYNnSHhlJB3jb8Bc
+\unrestrict 4qCv87PlTkeaDdAN5p5jr231eDdP0Nm4D61F2Msq1TMG13BtgHEUBnI5dmJTCY2
 

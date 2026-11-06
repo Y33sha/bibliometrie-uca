@@ -9,7 +9,6 @@ from application.ports.repositories.address_repository import AddressCountryFilt
 from domain.addresses.address_origin import AddressOrigin
 from domain.config import ConfigKey
 from domain.contributions.author_positions import SCANR_TRUNCATED_LENGTHS, AuthorPosition
-from domain.contributions.contribution_roles import ContributionRole
 from domain.persons.contribution_matching import ContributionMatchReason
 from domain.persons.identifiers import (
     HUMAN_ATTRIBUTION_STATUSES,
@@ -105,8 +104,8 @@ def is_raw_address(address: str = "a") -> str:
 
 
 def has_author_role(source_contribution: str = "sc") -> str:
-    """Renvoie la condition vraie quand la contribution source ou la contribution aliasée `source_contribution` tient le rôle d'auteur."""
-    return f"{source_contribution}.roles && ARRAY['{ContributionRole.AUTHOR.value}']::text[]"
+    """Renvoie la condition vraie quand la contribution source ou la contribution aliasée `source_contribution` tient un rôle d'auteur (fonction SQL `is_author_role`, `AUTHOR_ROLES`)."""
+    return f"is_author_role({source_contribution}.roles)"
 
 
 def has_author_position(position: AuthorPosition, contribution: str = "a") -> str:

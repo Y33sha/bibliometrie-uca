@@ -1,6 +1,11 @@
-"""Tests de `domain.contributions.contribution_roles` : traduction des rôles des sources, union des rôles d'une contribution."""
+"""Tests de `domain.contributions.contribution_roles` : traduction des rôles des sources, union des rôles d'une contribution, rôles d'auteur."""
 
-from domain.contributions.contribution_roles import map_role, merge_roles
+from domain.contributions.contribution_roles import (
+    is_author_role,
+    is_individual_author,
+    map_role,
+    merge_roles,
+)
 
 
 class TestMapRole:
@@ -76,3 +81,15 @@ class TestMergeRoles:
     def test_empty(self):
         assert merge_roles([[]]) == []
         assert merge_roles([]) == []
+
+
+class TestAuthorRoles:
+    def test_author_and_inventor_are_author_roles(self):
+        assert is_author_role(["author"])
+        assert is_author_role(["inventor"])
+        assert not is_author_role(["jury_member"])
+        assert not is_author_role(None)
+
+    def test_individual_author_excludes_collective(self):
+        assert is_individual_author(["inventor"], collective=False)
+        assert not is_individual_author(["author"], collective=True)
