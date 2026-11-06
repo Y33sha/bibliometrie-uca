@@ -955,9 +955,29 @@ export interface paths {
          * Get Structure Partners
          * @description Liste les organisations partenaires de la structure, classées par nombre de copublications.
          *
-         *     Ce sont les ROR des auteurs de ses publications, ancêtres compris, hors ceux de la structure et de ses tutelles. Filtres par année de publication, pays et type d'organisation ROR, valeurs séparées par des virgules.
+         *     Ce sont les ROR des auteurs de ses publications, ancêtres compris, hors ceux de la structure et de ses tutelles.
          */
         get: operations["get_structure_partners_api_structures__structure_id__partners_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/structures/{structure_id}/partners/facets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Structure Partners Facets
+         * @description Renvoie les facettes des organisations partenaires de la structure : années, pays et types d'organisation.
+         */
+        get: operations["get_structure_partners_facets_api_structures__structure_id__partners_facets_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4511,15 +4531,6 @@ export interface components {
         } & {
             [key: string]: unknown;
         };
-        /** PartnerFacetOption */
-        PartnerFacetOption: {
-            /** Value */
-            value: string;
-            /** Label */
-            label: string;
-            /** Count */
-            count: number;
-        };
         /**
          * PatentApplicant
          * @description Déposant d'une famille de brevets (`source_extras.patent_applicants`).
@@ -6342,8 +6353,29 @@ export interface components {
             publications: number;
         };
         /**
+         * StructurePartnersFacetsResponse
+         * @description Facettes des organisations partenaires d'une structure. Chaque décompte écarte le filtre de sa propre facette.
+         */
+        StructurePartnersFacetsResponse: {
+            /**
+             * Years
+             * @description Années des copublications, chacune avec son nombre de publications.
+             */
+            years: components["schemas"]["FacetOption"][];
+            /**
+             * Countries
+             * @description Pays, chacun avec son nombre d'organisations.
+             */
+            countries: components["schemas"]["FacetOption"][];
+            /**
+             * Types
+             * @description Types d'organisation ROR, chacun avec son nombre d'organisations.
+             */
+            types: components["schemas"]["FacetOption"][];
+        };
+        /**
          * StructurePartnersResponse
-         * @description Organisations partenaires d'une structure, les plus fréquentes en tête, et les options de leurs filtres.
+         * @description Organisations partenaires d'une structure, les plus fréquentes en tête.
          */
         StructurePartnersResponse: {
             /** Total */
@@ -6354,15 +6386,6 @@ export interface components {
             per_page: number;
             /** Partners */
             partners: components["schemas"]["StructurePartner"][];
-            /**
-             * Years
-             * @description Années des copublications, chacune avec son nombre de publications.
-             */
-            years: components["schemas"]["PartnerFacetOption"][];
-            /** Countries */
-            countries: components["schemas"]["PartnerFacetOption"][];
-            /** Types */
-            types: components["schemas"]["PartnerFacetOption"][];
             /** Pages */
             readonly pages: number;
         };
@@ -8445,11 +8468,11 @@ export interface operations {
     get_structure_partners_api_structures__structure_id__partners_get: {
         parameters: {
             query?: {
+                page?: number;
+                per_page?: number;
                 year?: string;
                 country?: string;
                 type?: string;
-                page?: number;
-                per_page?: number;
             };
             header?: never;
             path: {
@@ -8466,6 +8489,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StructurePartnersResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_structure_partners_facets_api_structures__structure_id__partners_facets_get: {
+        parameters: {
+            query?: {
+                year?: string;
+                country?: string;
+                type?: string;
+            };
+            header?: never;
+            path: {
+                structure_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StructurePartnersFacetsResponse"];
                 };
             };
             /** @description Validation Error */

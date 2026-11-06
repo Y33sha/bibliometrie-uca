@@ -28,6 +28,8 @@ from infrastructure.read_models.structures.models import (
     StructureListItem,
     StructureListResponse,
     StructureOut,
+    StructurePartnerFilters,
+    StructurePartnersFacetsResponse,
     StructurePartnersResponse,
     StructuresFacetsResponse,
     StructureSort,
@@ -72,6 +74,19 @@ def structure_filters(
         tutelle_ids=parse_int_csv(tutelle_id, param="tutelle_id"),
         perimeter_ids=perimeter_ids,
         perimeter_none=perimeter_none,
+    )
+
+
+def partner_filters(
+    year: str = Query(""),
+    country: str = Query(""),
+    type: str = Query(""),  # noqa: A002 — nom du paramètre de requête
+) -> StructurePartnerFilters:
+    """Lit les filtres communs aux organisations partenaires d'une structure et à leurs facettes : année de publication, pays et type d'organisation ROR, valeurs séparées par des virgules."""
+    return StructurePartnerFilters(
+        years=parse_int_csv(year, param="year"),
+        countries=[c.lower() for c in parse_str_csv(country)],
+        types=parse_vocabulary_csv(type, allowed=tuple(RorType), param="type"),
     )
 
 
@@ -240,25 +255,28 @@ def get_structure_addresses(
 @router.get("/{structure_id}/partners", response_model=StructurePartnersResponse)
 def get_structure_partners(
     structure_id: int,
-    year: str = Query(""),
-    country: str = Query(""),
-    type: str = Query(""),  # noqa: A002 — nom du paramètre de requête
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
+    filters: StructurePartnerFilters = Depends(partner_filters),
     queries: StructuresQueries = Depends(structures_queries),
 ) -> StructurePartnersResponse:
     """Liste les organisations partenaires de la structure, classées par nombre de copublications.
 
-    Ce sont les ROR des auteurs de ses publications, ancêtres compris, hors ceux de la structure et de ses tutelles. Filtres par année de publication, pays et type d'organisation ROR, valeurs séparées par des virgules.
+    Ce sont les ROR des auteurs de ses publications, ancêtres compris, hors ceux de la structure et de ses tutelles.
     """
     return queries.get_structure_partners(
-        structure_id,
-        years=parse_int_csv(year, param="year"),
-        countries=[c.lower() for c in parse_str_csv(country)],
-        types=parse_vocabulary_csv(type, allowed=tuple(RorType), param="type"),
-        page=page,
-        per_page=per_page,
+        structure_id, filters=filters, page=page, per_page=per_page
     )
+
+
+@router.get("/{structure_id}/partners/facets", response_model=StructurePartnersFacetsResponse)
+def get_structure_partners_facets(
+    structure_id: int,
+    filters: StructurePartnerFilters = Depends(partner_filters),
+    queries: StructuresQueries = Depends(structures_queries),
+) -> StructurePartnersFacetsResponse:
+    """Renvoie les facettes des organisations partenaires de la structure : années, pays et types d'organisation."""
+    return queries.get_structure_partners_facets(structure_id, filters=filters)
 
 
 @router.get("/{structure_id}/subjects", response_model=list[SubjectFrequency])

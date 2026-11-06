@@ -139,20 +139,33 @@ class StructurePartner(Model):
     """Nombre de copublications."""
 
 
-class PartnerFacetOption(Model):
-    value: str
-    label: str
-    count: int
+@dataclass(frozen=True, slots=True)
+class StructurePartnerFilters:
+    """Filtres des organisations partenaires d'une structure et de leurs facettes. Une liste vide ne filtre pas."""
+
+    years: list[int] = field(default_factory=list)
+    """Années de publication des copublications."""
+    countries: list[str] = field(default_factory=list)
+    """Codes pays, en minuscules."""
+    types: list[str] = field(default_factory=list)
+    """Types d'organisation ROR."""
 
 
 class StructurePartnersResponse(PaginatedResponse):
-    """Organisations partenaires d'une structure, les plus fréquentes en tête, et les options de leurs filtres."""
+    """Organisations partenaires d'une structure, les plus fréquentes en tête."""
 
     partners: list[StructurePartner]
-    years: list[PartnerFacetOption]
+
+
+class StructurePartnersFacetsResponse(Model):
+    """Facettes des organisations partenaires d'une structure. Chaque décompte écarte le filtre de sa propre facette."""
+
+    years: list[FacetOption]
     """Années des copublications, chacune avec son nombre de publications."""
-    countries: list[PartnerFacetOption]
-    types: list[PartnerFacetOption]
+    countries: list[FacetOption]
+    """Pays, chacun avec son nombre d'organisations."""
+    types: list[FacetOption]
+    """Types d'organisation ROR, chacun avec son nombre d'organisations."""
 
 
 class StructureDeletionImpact(Model):
