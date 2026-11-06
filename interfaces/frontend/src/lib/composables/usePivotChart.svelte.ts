@@ -10,6 +10,7 @@ import { Chart, fitsInBar, pieSegmentOptions, stackedSegmentOptions } from '#lib
 import { cssColor, fontSize } from '#lib/components/charts/cssVar.js';
 import { readableOn } from '#lib/components/charts/contrast.js';
 import { orderedPivotValues, pivotValueColor, pivotValueDescription, pivotValueLabel } from '#lib/pivotValues.js';
+import { coreRange } from '#lib/filterRegistry.js';
 
 type PivotSchema = components['schemas']['PivotSchemaResponse'];
 
@@ -135,6 +136,18 @@ export function usePivotChart(config: {
 		return [...den.keys()].sort((a, b) => sign * (share(a) - share(b)));
 	}
 
+	// Années de `years` comprises dans la plage qui concentre les valeurs des lignes du pivot.
+	function coreYears(years: string[]): string[] {
+		const totals = new Map<number, number>();
+		for (const r of rows) {
+			const year = Number(r.year);
+			if (Number.isInteger(year)) totals.set(year, (totals.get(year) ?? 0) + Number(r.value ?? 0));
+		}
+		if (!totals.size) return years;
+		const [lo, hi] = coreRange([...totals].sort(([a], [b]) => a - b));
+		return years.filter((y) => Number(y) >= lo && Number(y) <= hi);
+	}
+
 	/** Charge le vocabulaire du pivot : indicateurs et dimensions proposés aux sélecteurs. */
 	async function loadSchema() {
 		try {
@@ -190,8 +203,10 @@ export function usePivotChart(config: {
 		const chartSort = settings.chartSort;
 
 		// Abscisse : à forte cardinalité, on pagine les valeurs plutôt que de les tronquer — l'axe reste lisible, le détail reste atteignable. Ordre par défaut : total décroissant ; si une clé de tri est choisie, on classe par la part de la série correspondante.
-		const allCats =
+		const ordered =
 			chartSort && canSort ? orderBySeriesShare(xDim, stackDim, chartSort, chartSortDir, rows) : orderedPivotValues(xDim, rows);
+		// Axe des années, sans filtre d'années : seules les années qui concentrent les valeurs s'affichent (`coreRange`). Aux deux bouts, les années qui réunissent ensemble moins de 1 % du total sont écartées.
+		const allCats = xDim === 'year' && !config.buildParams().has('year') ? coreYears(ordered) : ordered;
 		catTotal = highCard ? allCats.length : 0;
 		if (highCard && (settings.chartPage - 1) * CHART_PAGE_SIZE >= allCats.length) settings.chartPage = 1;
 		const chartPage = settings.chartPage;
