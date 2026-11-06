@@ -334,7 +334,7 @@
 
 <FilterLayout bind:open={filterPanel.open}>
 {#snippet panel()}
-	<FilterPanel filters={FILTERS} groups={PUBLICATION_FILTER_GROUPS} bind:values options={facets.options} sourceCounts={facets.sourceCounts} entityEndpoint={PUBLICATION_FACETS_ENDPOINT} buildParams={buildFilterParams} panel={filterPanel} onchange={onFilterChange} />
+	<FilterPanel filters={FILTERS} groups={PUBLICATION_FILTER_GROUPS} bind:values options={facets.options} sourceCounts={facets.sourceCounts} loaded={facets.loaded} entityEndpoint={PUBLICATION_FACETS_ENDPOINT} buildParams={buildFilterParams} panel={filterPanel} onchange={onFilterChange} />
 {/snippet}
 {#if view === 'stats'}
 <div class="stats-view">

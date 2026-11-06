@@ -57,6 +57,8 @@ export function useFacets<K extends string>(config: FacetsConfig<K>) {
 	}
 	let options: Record<K, FacetOption[]> = $state(initialOptions);
 	let sourceCounts: Record<string, { yes: number; no: number }> = $state({});
+	// Vrai dès le premier chargement des décomptes.
+	let loaded = $state(false);
 
 	const currentKey = (): string =>
 		typeof config.apiKey === 'function' ? config.apiKey() : config.apiKey;
@@ -124,11 +126,14 @@ export function useFacets<K extends string>(config: FacetsConfig<K>) {
 
 		config.afterLoad?.(data, newOpts);
 		options = newOpts;
+		loaded = true;
 	}
 
 	return {
 		get options() { return options; },
 		get sourceCounts() { return sourceCounts; },
+		/** Décomptes chargés au moins une fois. */
+		get loaded() { return loaded; },
 		load,
 	};
 }

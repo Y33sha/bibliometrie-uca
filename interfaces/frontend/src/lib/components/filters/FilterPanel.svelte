@@ -26,6 +26,7 @@
 		values = $bindable(),
 		options,
 		sourceCounts,
+		loaded,
 		entityEndpoint,
 		buildParams,
 		panel,
@@ -39,6 +40,8 @@
 		options: Record<string, FacetOption[]>;
 		/** Décomptes du filtre de présence des sources. */
 		sourceCounts: Record<string, { yes: number; no: number }>;
+		/** Décomptes chargés au moins une fois. Avant, tous les filtres proposés par la page s'affichent. */
+		loaded: boolean;
 		/** Base de la facette contextuelle des filtres d'entité. */
 		entityEndpoint: string;
 		/** Paramètres des filtres actifs, pour la facette contextuelle des entités. */
@@ -73,11 +76,12 @@
 		onchange();
 	}
 
-	// Filtres déjà affichés : ils restent affichés, même sans option de décompte non nul.
+	// Avant le premier chargement des décomptes, tous les filtres proposés s'affichent d'un coup : l'utilité d'un filtre se juge sur ses décomptes. Ensuite, un filtre affiché reste affiché, même sans option de décompte non nul.
 	const everShown = new SvelteSet<string>();
 	const visible = (f: ListFilter): boolean =>
-		isAvailable(f) && (everShown.has(f.key) || isShown(f, values, nonZeroOptions, sourceCounts));
+		isAvailable(f) && (!loaded || everShown.has(f.key) || isShown(f, values, nonZeroOptions, sourceCounts));
 	$effect(() => {
+		if (!loaded) return;
 		for (const f of filters) if (visible(f)) everShown.add(f.key);
 	});
 

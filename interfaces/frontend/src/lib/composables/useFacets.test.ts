@@ -28,6 +28,19 @@ describe('useFacets', () => {
 		expect(opts).toEqual({ key: 'publication-facets' });
 	});
 
+	it('signale le premier chargement des décomptes', async () => {
+		apiResponse = { years: [] };
+		const f = useFacets({
+			endpoint: '/x',
+			apiKey: 'k',
+			buildParams: () => new URLSearchParams(),
+			facets: { years: { type: 'simple', apiKey: 'years' } },
+		});
+		expect(f.loaded).toBe(false);
+		await f.load();
+		expect(f.loaded).toBe(true);
+	});
+
 	it('mappe le type "simple" : value/count → text = value', async () => {
 		apiResponse = { years: [{ value: 2024, count: 12 }, { value: 2023, count: 8 }] };
 		const f = useFacets({
