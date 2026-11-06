@@ -300,14 +300,19 @@ export function urlFilterDefs(filters: ListFilter[]): Record<string, UrlFilterDe
 	return defs;
 }
 
+/** Texte d'URL d'une sélection, pour un filtre qui a une sélection par défaut. Une sélection qui reprend les valeurs par défaut, dans n'importe quel ordre, s'écrit comme elle, donc l'URL l'omet. Une sélection vidée s'écrit `all`. */
+function selectionToken(selected: string[], defaults: string[]): string {
+	if (selected.length === defaults.length && selected.every((v) => defaults.includes(v))) return defaults.join(',');
+	return selected.join(',') || ALL_TOKEN;
+}
+
 /** État à écrire dans l'URL, dans la forme qu'attend `useUrlFilters`. */
 export function urlState(filters: ListFilter[], values: FilterValues): Record<string, unknown> {
 	const state: Record<string, unknown> = {};
 	for (const f of filters) {
 		if (f.control === 'checkbox') {
 			const selected = values.checkbox[f.key] ?? [];
-			// Avec une sélection par défaut, la sélection s'écrit en un texte ; vidée, elle s'écrit `all`.
-			state[f.key] = f.defaultSelection ? selected.join(',') || ALL_TOKEN : selected;
+			state[f.key] = f.defaultSelection ? selectionToken(selected, f.defaultSelection()) : selected;
 		} else if (f.control === 'entity') {
 			state[f.key] = values.entity[f.key] ?? [];
 		} else {
