@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import ListToolbar from '#lib/components/ListToolbar.svelte';
-	import { page } from '$app/state';
 	import { withBase } from '#lib/paths.js';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import ThesesTable, { useThesisColumns } from '#lib/components/ThesesTable.svelte';
@@ -11,11 +10,8 @@
 	import FilterPanel from '#lib/components/filters/FilterPanel.svelte';
 	import FilterPanelToggle from '#lib/components/filters/FilterPanelToggle.svelte';
 	import { nextSort } from '#lib/sort.js';
-	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
+	import { useFilteredList } from '#lib/composables/useFilteredList.svelte.js';
 	import { PUBLICATION_FACETS_ENDPOINT, usePublicationFacets } from '#lib/composables/usePublicationFacets.svelte.js';
-	import { useFilterPanel } from '#lib/composables/useFilterPanel.svelte.js';
-	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
-	import { activeCount, appendFilterParams, initialValues, restoreValues, urlFilterDefs, urlState } from '#lib/filterRegistry.js';
 	import { THESIS_DOC_TYPES, THESIS_FILTER_GROUPS, thesisFilters } from '#lib/thesisFilters.js';
 	import { paramsToQuery } from '#lib/utils.js';
 	import { useDrawerParam } from '#lib/composables/useDrawerParam.svelte.js';
@@ -47,118 +43,52 @@
 
 	// svelte-ignore state_referenced_locally
 	const FILTERS = thesisFilters(labId);
-	let values = $state(initialValues(FILTERS));
-	const filterPanel = useFilterPanel();
-	let search = $state('');
-	let currentSort: PublicationSort = $state('soutenance_desc');
-
-	// Filtres et terme de recherche. Sans filtre de statut, les thèses soutenues et en cours.
-	function buildFilterParams(): URLSearchParams {
-		const params = new URLSearchParams({ doc_type: THESIS_DOC_TYPES });
-		appendFilterParams(FILTERS, values, params);
-		const q = search.trim();
-		if (q) params.set('search', q);
-		return params;
-	}
-
-	const listing = usePaginatedFetch<ThesisRow>({
+	const list = useFilteredList<ThesisRow, ReturnType<typeof usePublicationFacets>>({
+		filters: FILTERS,
+		// Sans filtre de statut, les thèses soutenues et en cours.
+		baseParams: () => new URLSearchParams({ doc_type: THESIS_DOC_TYPES }),
 		endpoint: '/api/publications',
 		itemsKey: 'publications',
 		// svelte-ignore state_referenced_locally
 		perPage,
 		apiKey: () => apiKey,
-		buildParams() {
-			const params = buildFilterParams();
-			params.set('sort', currentSort);
-			return params;
-		}
-	});
-
-	const facets = usePublicationFacets({
-		filters: FILTERS,
-		apiKey: () => `${apiKey}-facets`,
-		buildParams: buildFilterParams
-	});
-
-	const url = useUrlFilters({
+		defaultSort: 'soutenance_desc',
+		urlSync: () => urlSync,
 		basePath: () => basePath,
-		filters: {
-			...urlFilterDefs(FILTERS),
-			search: { type: 'single', urlKey: 'search' },
-			currentSort: { type: 'single', urlKey: 'sort', defaultValue: 'soutenance_desc' },
-			currentPage: { type: 'page', urlKey: 'page' }
-		}
+		facets: (buildParams) => usePublicationFacets({ filters: FILTERS, apiKey: () => `${apiKey}-facets`, buildParams }),
 	});
-
-	function syncUrl() {
-		if (!urlSync) return;
-		url.syncUrl(() => ({
-			...urlState(FILTERS, values),
-			search,
-			currentSort,
-			currentPage: listing.page
-		}));
-	}
-
-	function onFilterChange() {
-		listing.page = 1;
-		syncUrl();
-		listing.load();
-		facets.load();
-	}
-
-	const onSearchInput = url.debouncedSearch(onFilterChange);
 
 	function toggleSort(column: ThesisSortColumn) {
 		const dates: ThesisSortColumn[] = ['inscription', 'soutenance'];
-		currentSort = nextSort(currentSort, column, dates.includes(column) ? 'desc' : 'asc');
-		onFilterChange();
+		list.setSort(nextSort(list.sort, column, dates.includes(column) ? 'desc' : 'asc'));
 	}
 
 	function exportCsvUrl(): string {
-		const params = buildFilterParams();
-		params.set('sort', currentSort);
+		const params = list.filterParams();
+		params.set('sort', list.sort);
 		// Colonnes visibles → le CSV reflète le tableau affiché.
 		params.set('columns', columns.visibleColumns.join(','));
 		return withBase(`/api/publications/export-theses.csv?${paramsToQuery(params)}`);
 	}
 
-	onMount(async () => {
-		if (urlSync) {
-			const restored = url.restoreFromUrl(page.url.searchParams);
-			restoreValues(FILTERS, restored, values);
-			if (restored.search) search = restored.search as string;
-			if (restored.currentSort) currentSort = restored.currentSort as PublicationSort;
-			if (restored.currentPage) listing.page = restored.currentPage as number;
-		}
-		await facets.load();
-		listing.load();
-	});
+	onMount(list.restore);
 </script>
 
-<ListToolbar bind:search placeholder="Rechercher par titre ou sujet" onsearch={onSearchInput} list={listing} one="thèse" many="thèses" exportUrl={exportCsvUrl()} countBelow>
+<ListToolbar bind:search={list.search} placeholder="Rechercher par titre ou sujet" onsearch={list.onSearchInput} list={list.listing} one="thèse" many="thèses" exportUrl={exportCsvUrl()} countBelow>
 	{#snippet leading()}
-		<FilterPanelToggle bind:open={filterPanel.open} active={activeCount(FILTERS, values)} />
+		<FilterPanelToggle bind:open={list.panel.open} active={list.activeCount} />
 	{/snippet}
 	{#snippet activeFilters()}
-		<ActiveFilterBar filters={FILTERS} bind:values options={facets.options} onchange={onFilterChange} />
+		<ActiveFilterBar filters={FILTERS} bind:values={list.values} options={list.facets.options} onchange={list.onFilterChange} />
 	{/snippet}
 </ListToolbar>
 
-<FilterLayout bind:open={filterPanel.open}>
+<FilterLayout bind:open={list.panel.open}>
 	{#snippet panel()}
-		<FilterPanel filters={FILTERS} groups={THESIS_FILTER_GROUPS} bind:values options={facets.options} presenceCounts={facets.sourceCounts} loaded={facets.loaded} entityEndpoint={PUBLICATION_FACETS_ENDPOINT} buildParams={buildFilterParams} panel={filterPanel} onchange={onFilterChange} />
+		<FilterPanel filters={FILTERS} groups={THESIS_FILTER_GROUPS} bind:values={list.values} options={list.facets.options} presenceCounts={list.facets.sourceCounts} loaded={list.facets.loaded} entityEndpoint={PUBLICATION_FACETS_ENDPOINT} buildParams={list.filterParams} panel={list.panel} onchange={list.onFilterChange} />
 	{/snippet}
-	<ThesesTable items={listing.items} loading={listing.loading} error={listing.error} sort={currentSort} onToggleSort={toggleSort} {columns} onopen={drawer.open} activeId={drawer.id} />
-	<Pagination
-		page={listing.page}
-		pages={listing.pages}
-		onchange={(p: number) => {
-			listing.page = p;
-			syncUrl();
-			listing.load();
-		}}
-	/>
+	<ThesesTable items={list.listing.items} loading={list.listing.loading} error={list.listing.error} sort={list.sort as PublicationSort} onToggleSort={toggleSort} {columns} onopen={drawer.open} activeId={drawer.id} />
+	<Pagination page={list.listing.page} pages={list.listing.pages} onchange={list.goToPage} />
 </FilterLayout>
 
 {#if drawer.id !== null}
@@ -167,8 +97,8 @@
 		onclose={() => drawer.open(null)}
 		onopen={drawer.open}
 		onchange={() => {
-			listing.load();
-			facets.load();
+			list.listing.load();
+			list.facets.load();
 		}}
 	/>
 {/if}
