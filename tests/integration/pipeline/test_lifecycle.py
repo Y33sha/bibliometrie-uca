@@ -16,7 +16,7 @@ from tests.integration.helpers.contributions import insert_contribution
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_apc_payment, insert_publication
 from tests.integration.helpers.redirects import redirect_of
-from tests.integration.helpers.sources import insert_source_record
+from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 from tests.integration.helpers.subjects import insert_publication_subject, insert_subject
 
 _source_record = partial(
@@ -98,6 +98,30 @@ class TestPurge:
         assert not _publication_exists(conn, sans_source)
         assert not _publication_exists(conn, sans_contribution)
         assert _publication_exists(conn, complete)
+
+    def test_indice_lie_au_document_retient_la_publication(self, sa_sync_conn):
+        """Un brevet déposé par une structure du périmètre reste, sans inventeur rattaché à une personne. Un autre indice ne suffit pas."""
+        conn = sa_sync_conn
+        kept, purged = (self._publication(conn, source=True, contribution=False) for _ in range(2))
+        for pid, evidence in ((kept, "patent_applicant"), (purged, "address")):
+            source_record = conn.execute(
+                text("SELECT id FROM source_records WHERE publication_id = :p"), {"p": pid}
+            ).scalar_one()
+            source_contribution = insert_source_contribution(
+                conn, source_record, roles=["inventor"]
+            )
+            conn.execute(
+                text(
+                    "UPDATE source_contributions"
+                    " SET perimeter_evidence = CAST(:e AS perimeter_evidence[]) WHERE id = :id"
+                ),
+                {"e": [evidence], "id": source_contribution},
+            )
+
+        purge_publications(conn)
+
+        assert _publication_exists(conn, kept)
+        assert not _publication_exists(conn, purged)
 
     def test_groupe_sans_personne_ne_retient_pas_la_publication(self, sa_sync_conn):
         conn = sa_sync_conn

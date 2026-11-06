@@ -1,4 +1,4 @@
-"""Indices de l'entrée d'une contribution source ou d'une publication dans le périmètre."""
+"""Indices d'appartenance au périmètre d'une contribution source ou d'une publication."""
 
 from enum import StrEnum
 
@@ -18,3 +18,11 @@ class PerimeterEvidence(StrEnum):
     """Indice d'une publication : la thèse est soutenue dans un établissement du périmètre (PPN de l'établissement de soutenance parmi les `api_ids.theses`)."""
     THESIS_PARTNER = "thesis_partner"
     """Un laboratoire partenaire de la thèse, reconnu par son PPN IdRef, est une structure du périmètre. Rattache la contribution source du doctorant."""
+    PATENT_APPLICANT = "patent_applicant"
+    """Un déposant de la famille de brevets, reconnu par son identifiant Paysage parmi les `api_ids.scanr_patents`, est une structure du périmètre. Rattache toutes les contributions sources de la famille."""
+
+
+DOCUMENT_EVIDENCE: frozenset[PerimeterEvidence] = frozenset(
+    {PerimeterEvidence.THESIS_INSTITUTION, PerimeterEvidence.PATENT_APPLICANT}
+)
+"""Indices d'appartenance au périmètre liés au document : thèse soutenue ou brevet déposé par une structure du périmètre. Les autres indices sont liés à une contribution. Un indice lié au document va à toutes les contributions sources de l'enregistrement source, quel que soit leur rôle. La publication entre dans le périmètre, même sans contribution rattachée à une personne."""

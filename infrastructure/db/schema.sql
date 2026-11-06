@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict ztb2I2GuESd2nOoco4j1X2wlhSH8A4ib4nXGJou1JS8yEgszvDKPINSF5rQG4Oa
+\restrict WgfBs5ibB7ggEfNXdYcXoQutf7tWeKrE6lOeqUGwOAfT2z6cYNnSHhlJB3jb8Bc
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -356,7 +356,8 @@ CREATE TYPE public.perimeter_evidence AS ENUM (
     'hal_structure',
     'ror',
     'thesis_institution',
-    'thesis_partner'
+    'thesis_partner',
+    'patent_applicant'
 );
 
 
@@ -1601,9 +1602,9 @@ UNION
    FROM (sources.source_contribution_rors sar
      JOIN structures.structures s ON ((s.ror_id = sar.ror_id)))
   WHERE ((s.id IN ( SELECT perimeter.structure_id
-           FROM perimeter)) AND ((sar.address_id IS NULL) AND (NOT (EXISTS ( SELECT 1
+           FROM perimeter)) AND (sar.address_id IS NULL) AND (NOT (EXISTS ( SELECT 1
            FROM sources.source_contribution_addresses saa
-          WHERE (saa.source_contribution_id = sar.source_contribution_id))))))
+          WHERE (saa.source_contribution_id = sar.source_contribution_id)))))
 UNION
  SELECT l.source_contribution_id,
     r.structure_id,
@@ -1628,6 +1629,17 @@ UNION
      JOIN structures.idref_structures ist ON ((ist.idref_ppn = (partner.value ->> 'ppn'::text))))
      JOIN sources.source_contributions sa ON (((sa.source_record_id = sp.id) AND (sa.roles && ARRAY['author'::text]))))
   WHERE ((sp.source = 'theses'::public.source_type) AND (ist.is_confirmed IS DISTINCT FROM false) AND ((ist.matched_form_id IS NOT NULL) OR ist.is_confirmed) AND (ist.structure_id IN ( SELECT perimeter.structure_id
+           FROM perimeter)))
+UNION
+ SELECT sa.id AS source_contribution_id,
+    s.id AS structure_id,
+    'patent_applicant'::public.perimeter_evidence AS evidence
+   FROM ((((sources.source_records sp
+     CROSS JOIN LATERAL jsonb_array_elements((sp.source_extras -> 'patent_applicants'::text)) applicant(value))
+     CROSS JOIN LATERAL jsonb_array_elements_text(((applicant.value -> 'ids'::text) -> 'paysage'::text)) paysage(id))
+     JOIN structures.structures s ON (((s.api_ids -> 'scanr_patents'::text) ? paysage.id)))
+     JOIN sources.source_contributions sa ON ((sa.source_record_id = sp.id)))
+  WHERE ((sp.source = 'scanr_patents'::public.source_type) AND (s.id IN ( SELECT perimeter.structure_id
            FROM perimeter)))
   WITH NO DATA;
 
@@ -6243,5 +6255,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ztb2I2GuESd2nOoco4j1X2wlhSH8A4ib4nXGJou1JS8yEgszvDKPINSF5rQG4Oa
+\unrestrict WgfBs5ibB7ggEfNXdYcXoQutf7tWeKrE6lOeqUGwOAfT2z6cYNnSHhlJB3jb8Bc
 

@@ -25,7 +25,7 @@ from domain.serials.serial import OaModel
 from domain.source_records.corrections import CORRECTED_BY, RAW
 from domain.source_records.impact import CitationTop
 from domain.source_records.source_extras import CROSSREF_PREPRINT_OF, SourceExtra
-from domain.structures.perimeter_evidence import PerimeterEvidence
+from domain.structures.perimeter_evidence import DOCUMENT_EVIDENCE, PerimeterEvidence
 from infrastructure.db.queues import Queue, enqueue_sql
 
 
@@ -246,6 +246,22 @@ REJECTED_PAIRS = f"SELECT sr_rej.publication_id, rej.person_id FROM {_REJECTIONS
 
 NO_PERIMETER_EVIDENCE = "'{}'::perimeter_evidence[]"
 """Tableau d'indices vide : hors du périmètre."""
+
+DOCUMENT_EVIDENCE_SQL = (
+    "ARRAY[" + ", ".join(f"'{e}'" for e in sorted(DOCUMENT_EVIDENCE)) + "]::perimeter_evidence[]"
+)
+"""Indices d'appartenance au périmètre liés au document (`DOCUMENT_EVIDENCE`), en tableau SQL."""
+
+
+def has_document_evidence(publication: str) -> str:
+    """Renvoie la condition vraie quand la publication `publication` (expression SQL de son id) a un indice d'appartenance au périmètre lié au document (`DOCUMENT_EVIDENCE`)."""
+    return f"""EXISTS (
+        SELECT 1 FROM source_records sr_doc
+        JOIN source_contributions sc_doc ON sc_doc.source_record_id = sr_doc.id
+        WHERE sr_doc.publication_id = {publication}
+          AND sc_doc.perimeter_evidence && {DOCUMENT_EVIDENCE_SQL}
+    )"""
+
 
 NO_AUTHOR_POSITION = "'{}'::author_position[]"
 """Tableau de positions d'auteur vide."""

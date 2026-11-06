@@ -21,6 +21,10 @@ class TestAllowPersonCreation:
         ):
             assert allow_person_creation(roles) is False
 
+    def test_inventor_role_blocks_creation(self):
+        """Un inventeur est rattaché à une personne existante, ou à aucune."""
+        assert allow_person_creation(["inventor"]) is False
+
     def test_other_roles_allow_creation(self):
         for roles in (["editor"], ["contributor"], ["translator"], ["other"]):
             assert allow_person_creation(roles) is True

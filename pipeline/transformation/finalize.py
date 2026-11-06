@@ -1,6 +1,6 @@
 """Phase `finalize` : données dérivées des contributions, après la résolution des personnes. Chaque tâche a sa transaction.
 
-La phase supprime les publications sans enregistrement source ou sans contribution rattachée à une personne. Elle recompose ensuite le périmètre des publications et les vues matérialisées des structures, sur les publications restantes. Elle recalcule l'éditeur des revues, supprime les référentiels vides, puis recompte les publications des adresses, revues et éditeurs.
+La phase supprime les publications sans enregistrement source, ou sans contribution rattachée à une personne ni indice d'appartenance au périmètre lié au document (`DOCUMENT_EVIDENCE`). Elle recompose ensuite le périmètre des publications et les vues matérialisées des structures, sur les publications restantes. Elle recalcule l'éditeur des revues, supprime les référentiels vides, puis recompte les publications des adresses, revues et éditeurs.
 
 Les référentiels vides se suppriment dans l'ordre monographies, revues, éditeurs : une monographie retient sa collection, une revue ou un préfixe DOI son éditeur. Leur suppression suit celle des publications : un référentiel vidé pendant le run disparaît dans le même run.
 
@@ -156,6 +156,7 @@ TASKS = (
             "contributions.id",
             "contributions.publication_id",
             "contributions.person_id",
+            "source_contributions.perimeter_evidence",
         ),
         # La suppression d'une publication emporte ses contributions, leurs alignements, ses relations, ses sujets et son détail. Elle détache ses enregistrements sources et ses paiements APC.
         writes=(
@@ -181,6 +182,8 @@ TASKS = (
             "contributions.roles",
             "persons.exclusion",
             "publications.id",
+            "source_records.publication_id",
+            "source_contributions.perimeter_evidence",
         ),
         writes=("publications.in_perimeter",),
         run=_publications_in_perimeter,
