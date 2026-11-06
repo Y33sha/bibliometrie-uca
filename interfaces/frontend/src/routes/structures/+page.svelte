@@ -9,7 +9,8 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
-	import { api, structures as structuresApi, errorMessage } from '#lib/api/index.js';
+	import { structures as structuresApi, errorMessage } from '#lib/api/index.js';
+	import { labListDefaults } from '#lib/labListDefaults.js';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
 	import { useFacets } from '#lib/composables/useFacets.svelte.js';
 	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
@@ -30,8 +31,6 @@
 
 	import type { components } from '#lib/api/schema.js';
 	type Structure = components['schemas']['StructureListItem'];
-	type Perimeter = components['schemas']['PerimeterOut'];
-	type ConfigItem = components['schemas']['ConfigItem'];
 
 	const TYPE_LABELS = Object.fromEntries(STRUCTURE_TYPES.map((t) => [t.value, t.label]));
 
@@ -186,13 +185,7 @@
 	}
 
 	onMount(async () => {
-		const [config, perimeterList] = await Promise.all([
-			api<ConfigItem[]>('/api/config'),
-			api<Perimeter[]>('/api/perimeters'),
-		]);
-		defaultTypes = (config.find((c) => c.key === 'laboratory_types')?.value ?? ['labo']) as string[];
-		const persons = perimeterList.find((p) => p.is_persons);
-		defaultPerimeters = persons ? [String(persons.id)] : [];
+		({ types: defaultTypes, perimeters: defaultPerimeters } = await labListDefaults());
 
 		const restored = url.restoreFromUrl(page.url.searchParams);
 		selectedTypes = restored.types ? selectionFromToken(restored.types as string) : defaultTypes;
