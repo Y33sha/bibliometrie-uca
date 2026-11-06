@@ -132,7 +132,7 @@ Familles dont un établissement du périmètre est déposant : UCA, Université 
 
 - [x] Page de détail d'un brevet : demandes par office, déposants, inventeurs, classification CPC
 - [x] Revue, éditeur, open access et APC masqués pour un brevet : statut open access `unknown`
-- [ ] Copie Espacenet de la demande prioritaire en lien d'accès, libellé « Consulter le brevet »
+- [x] Copie Espacenet de la demande prioritaire en lien d'accès, libellé « Consulter le brevet »
 
 ### Phase 7 — Documentation
 
