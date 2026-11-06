@@ -81,9 +81,9 @@ Familles dont un établissement du périmètre est déposant : UCA, Université 
 - La date de publication d'un brevet est la date du premier dépôt de la famille. Les autres dates vont dans `source_extras`.
 - Un dépôt HAL de brevet sans famille en base cherche sa famille dans ScanR par numéro (`fetch_missing`).
 - Le moissonnage écarte les articles cités et les champs dérivés des autres champs : `denormalized_structures`, `co_*`, `title_abs_text`.
-- Un brevet entre dans le périmètre quand un de ses déposants est une structure du périmètre : indice de publication `patent_applicant`.
-- Un inventeur entre dans le périmètre seulement par l'indice `hr_record`.
-- La purge des publications épargne une publication qui a un indice de publication, même sans contribution rattachée à une personne.
+- Un brevet entre dans le périmètre quand un de ses déposants est une structure du périmètre : indice d'appartenance au périmètre `patent_applicant`, lié au document comme `thesis_institution`. La vue `source_contribution_structures` donne l'indice à tous les inventeurs de la famille.
+- Un inventeur se rattache seulement à une personne existante, par identifiant ou par nom, comme un membre de jury.
+- La purge des publications épargne une publication à indice lié au document, même sans contribution rattachée à une personne.
 - Rôle de contribution `inventor`, compté comme rôle d'auteur.
 - `source_extras` reçoit les demandes, les déposants et la classification CPC.
 
@@ -121,11 +121,12 @@ Familles dont un établissement du périmètre est déposant : UCA, Université 
 
 ### Phase 5 — Périmètre et personnes
 
-- [ ] Indice de périmètre `patent_applicant`
-- [ ] Exception à la purge des publications, après mesure de l'effet sur les thèses
-- [ ] Rôle `inventor`, compté comme rôle d'auteur
-- [ ] Mesure du rattachement des inventeurs par IdRef et par alignement avec les auteurs HAL
-- [ ] Mesure du rattachement par nom des autres inventeurs aux personnes RH
+- [x] Indice de périmètre `patent_applicant` : les 97 familles ont leur publication
+- [x] Exception à la purge des publications : les 2 626 thèses à indice `thesis_institution` ont toutes une contribution rattachée à une personne
+- [x] Indices des publications liés au document repris des contributions sources, sans relecture du PPN de l'établissement
+- [ ] Rôle `inventor`, compté comme rôle d'auteur : 41 brevets sans dépôt HAL sont sans structure liée
+- [x] Mesure du rattachement des inventeurs : 364 sur 521 rattachés à une personne, dont 271 par IdRef, ORCID ou identifiant HAL
+- [x] Mesure du rattachement par nom : 93 inventeurs, dont 26 sur des familles sans dépôt HAL ; échantillon cohérent avec les structures des personnes
 
 ### Phase 6 — Interface
 
