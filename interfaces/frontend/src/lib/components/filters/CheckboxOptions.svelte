@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { SvelteSet } from 'svelte/reactivity';
 	import type { FacetOption } from '#lib/components/FacetDropdown.svelte';
+	import { revealTruncated } from '#lib/actions/revealTruncated.js';
 
 	// Options d'un filtre à cases à cocher : recherche, « Effacer », options avec leur décompte. Une option de décompte nul est omise, sauf cochée ou déjà affichée : une option affichée reste à sa place, grisée, quand son décompte tombe à zéro, pour que la liste ne change pas de hauteur sous le pointeur. Partagé par la liste déroulante d'un filtre et le panneau des filtres.
 	interface Props {
@@ -81,7 +82,7 @@
 			{@const empty = opt.count === 0 && !selected.includes(opt.value)}
 			<label class="option-row" class:empty>
 				<input type="checkbox" checked={selected.includes(opt.value)} disabled={empty} onchange={() => toggle(opt.value)} />
-				<span class="facet-option-text" title={opt.text}>{opt.text}</span>{#if opt.count != null}<span class="facet-count">{opt.count.toLocaleString('fr-FR')}</span>{/if}
+				<span class="facet-option-text" use:revealTruncated>{opt.text}</span>{#if opt.count != null}<span class="facet-count">{opt.count.toLocaleString('fr-FR')}</span>{/if}
 			</label>
 		{/each}
 	{/each}

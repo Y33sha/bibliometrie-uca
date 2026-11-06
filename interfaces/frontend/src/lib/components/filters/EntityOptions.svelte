@@ -4,6 +4,7 @@
 	import type { components } from '#lib/api/schema.js';
 	import { displayEntityLabel, type EntityKind } from '#lib/entityLabels.js';
 	import { useEntityLabels } from '#lib/composables/useEntityLabels.svelte.js';
+	import { revealTruncated } from '#lib/actions/revealTruncated.js';
 
 	type EntityFacetResponse = components['schemas']['EntityFacetResponse'];
 
@@ -110,13 +111,13 @@
 	{#each selectedOutside as id (id)}
 		<label class="option-row">
 			<input type={multiple ? 'checkbox' : 'radio'} checked onchange={() => pickOutside(id)} />
-			<span class="facet-option-text" title={names.labels[id] ?? id}>{names.labels[id] ?? id}</span>
+			<span class="facet-option-text" use:revealTruncated>{names.labels[id] ?? id}</span>
 		</label>
 	{/each}
 	{#each shownResults as e (e.value)}
 		<label class="option-row">
 			<input type={multiple ? 'checkbox' : 'radio'} checked={selected.includes(e.value)} onchange={() => pick(e)} />
-			<span class="facet-option-text" title={e.text}>{e.text}</span><span class="facet-count">{e.count}</span>
+			<span class="facet-option-text" use:revealTruncated>{e.text}</span><span class="facet-count">{e.count}</span>
 		</label>
 	{/each}
 	{#if !loading && results.length === 0}
