@@ -29,11 +29,6 @@
     }
   }
 
-  // Recherche du numéro de publication sur Espacenet, préfixé du code de l'office.
-  function espacenetUrl(office: string, publicationNumber: string): string {
-    return `https://worldwide.espacenet.com/patent/search?q=${encodeURIComponent(`pn="${office}${publicationNumber}"`)}`;
-  }
-
   const organisations = $derived(patentMeta.applicants.filter((a) => a.type !== "person"));
   const persons = $derived(patentMeta.applicants.filter((a) => a.type === "person"));
 </script>
@@ -80,9 +75,9 @@
             <tr>
               <td>{application.office ? officeLabel(application.office) : ""}</td>
               <td class="number">
-                {#if application.office && application.publication_number}
+                {#if application.espacenet_url}
                   <a
-                    href={espacenetUrl(application.office, application.publication_number)}
+                    href={application.espacenet_url}
                     target="_blank"
                     rel="noopener noreferrer"
                     >{application.office}&#8239;{application.publication_number}</a

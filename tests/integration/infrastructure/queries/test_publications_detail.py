@@ -399,6 +399,9 @@ class TestPatentMeta:
         detail = publications_queries(sa_sync_conn).get_publication_detail(publication)
         assert detail is not None and detail.patent_meta is not None
         assert [a.office for a in detail.patent_meta.applications] == ["FR", "WO"]
+        assert detail.patent_meta.applications[0].espacenet_url == (
+            "https://worldwide.espacenet.com/patent/search?q=pn%3D%22FR2980802A1%22"
+        )
         assert detail.patent_meta.cpc[0].label is None
 
     def test_absent_hors_brevet(self, sa_sync_conn):

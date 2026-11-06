@@ -400,6 +400,8 @@ class PatentApplication(Model):
     priority: bool = False
     """Demande prioritaire de la famille."""
     granted: bool = False
+    espacenet_url: str | None = None
+    """Recherche Espacenet de la demande publiée."""
 
 
 class PatentApplicant(Model):

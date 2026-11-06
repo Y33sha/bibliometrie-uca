@@ -5,7 +5,7 @@ from collections.abc import Mapping
 from sqlalchemy import Connection, text
 
 from domain.documents.doc_types import DocType
-from domain.platforms.registry import HAL
+from domain.platforms.registry import HAL, espacenet_url
 from domain.publications.access import Access, access, access_url
 from domain.publications.relations import RelationType, inverse_relation
 from domain.source_records.identifiers import SourceIdentifierType
@@ -152,6 +152,16 @@ def _applicant_structures(
     return {(r.id_type, r.value): r.id for r in rows}
 
 
+def _patent_application(extra: Mapping[str, JsonValue]) -> PatentApplication:
+    """Renvoie une demande de `source_extras.patent_applications`, avec sa recherche Espacenet quand elle est publiée."""
+    application = PatentApplication.model_validate(extra)
+    if application.office and application.publication_number:
+        application.espacenet_url = espacenet_url(
+            application.office, application.publication_number
+        )
+    return application
+
+
 def get_patent_meta(conn: Connection, source_extras: dict[str, JsonValue]) -> PatentMeta:
     """Renvoie les demandes, les déposants et la classification CPC d'un brevet, d'après le `source_extras` de sa publication. Un déposant est rattaché à une structure en base par son ROR, à défaut par son identifiant Paysage."""
     applicants = [
@@ -185,7 +195,7 @@ def get_patent_meta(conn: Connection, source_extras: dict[str, JsonValue]) -> Pa
             unique[key] = applicant
 
     applications = [
-        PatentApplication.model_validate(as_mapping(a))
+        _patent_application(as_mapping(a))
         for a in as_sequence(source_extras.get(SourceExtra.PATENT_APPLICATIONS))
     ]
     return PatentMeta(

@@ -4572,6 +4572,11 @@ export interface components {
              * @default false
              */
             granted: boolean;
+            /**
+             * Espacenet Url
+             * @description Recherche Espacenet de la demande publiée.
+             */
+            espacenet_url?: string | null;
         };
         /**
          * PatentMeta
