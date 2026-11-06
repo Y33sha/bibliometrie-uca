@@ -10,6 +10,7 @@ from infrastructure.db.queues import Queue
 from pipeline.ingestion.common.fingerprint import fingerprint
 from pipeline.ingestion.common.harvester import stage_document
 from pipeline.ingestion.common.staging import StagingStore
+from pipeline.ingestion.openalex import fetch_truncated
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from tests.integration.helpers.queues import clear, queued
 from tests.integration.helpers.staging import insert_staging
@@ -187,3 +188,16 @@ class TestAuthorsTruncatedFlag:
         _seed_refetched(sa_sync_conn, source_id="W202", full_work=full, bulk_payload=bulk)
         insert_batch(sa_sync_conn, [bulk])  # même hash : marque inchangée
         assert _get_staging(sa_sync_conn, "W202").authors_truncated is False
+
+    def test_disappeared_work_is_reread_when_listed_again(self, sa_sync_conn):
+        """Un work marqué disparu garde son marqueur : `fetch_truncated` le laisse de côté, puis le relit s'il revient dans une réponse de liste."""
+        work = _make_work("W203", 100)
+        insert_batch(sa_sync_conn, [work])
+        StagingStore(sa_sync_conn).mark_disappeared("openalex", "W203")
+        assert "W203" not in _selected_for_reading(sa_sync_conn)
+        insert_batch(sa_sync_conn, [work])  # même hash : la marque reste
+        assert "W203" in _selected_for_reading(sa_sync_conn)
+
+
+def _selected_for_reading(conn):
+    return list(conn.execute(fetch_truncated._SELECT_TRUNCATED_SQL).scalars())

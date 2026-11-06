@@ -39,10 +39,10 @@ class OaModel(StrEnum):
 
 OA_MODEL_LABELS_FR: dict[OaModel, str] = {
     OaModel.SUBSCRIPTION: "Abonnement",
-    OaModel.FULL_OA: "Full OA (gold)",
-    OaModel.DIAMOND: "Diamant",
+    OaModel.FULL_OA: "Gold",
+    OaModel.DIAMOND: "Diamond",
 }
-"""Libellés français des modèles, servis à l'interface par `/api/serials/oa-models`."""
+"""Libellés des modèles, servis à l'interface par `/api/serials/oa-models` : terme d'usage anglais pour les modèles ouverts, comme les voies open access des publications."""
 
 
 class ManualField(StrEnum):

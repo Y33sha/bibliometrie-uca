@@ -6,7 +6,7 @@
 import { cssColor, oaStatusColor } from '#lib/components/charts/cssVar.js';
 import { chartColor } from '#lib/components/charts/palette.js';
 import { docTypeFamilies, docTypeGroupColorVar, docTypePluralLabels } from '#lib/docTypes.svelte.js';
-import { licenseOrder, oaStatusLabel } from '#lib/labels.js';
+import { licenseOrder, oaStatusDescriptions, oaStatusLabel } from '#lib/labels.js';
 
 const OA_VOIE_ORDER = ['diamond', 'gold', 'hybrid', 'bronze', 'green', 'embargoed', 'closed', 'unknown'];
 const OA_ACCESS_ORDER = ['ouvert', 'embargo', 'ferme', 'indetermine'];
@@ -44,6 +44,12 @@ export function pivotValueLabel(
 	if (dim === 'license') return licenseLabel?.(value) ?? value;
 	if (dim === 'citation_class') return CITATION_CLASS_LABELS[value] ?? value;
 	return value;
+}
+
+/** Explication d'une valeur, affichée au survol de la légende et des segments ; `undefined` si la valeur n'en a pas. */
+export function pivotValueDescription(dim: string, value: string): string | undefined {
+	if (dim === 'oa_voie') return oaStatusDescriptions[value];
+	return undefined;
 }
 
 /** Couleur d'une valeur, `idx` étant son rang dans la série. */

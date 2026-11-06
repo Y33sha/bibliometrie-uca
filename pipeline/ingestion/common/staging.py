@@ -161,9 +161,17 @@ _CLEAR_TRUNCATED_SQL = text(
 )
 """La marque de troncature se pose seulement sur un payload nouveau : sa levée met la ligne en file."""
 
+_MARK_DISAPPEARED_SQL = text(
+    """
+    UPDATE staging SET disappeared_at = now()
+    WHERE source = CAST(:source AS source_type) AND source_id = :source_id
+      AND disappeared_at IS NULL
+    """
+)
+
 
 class StagingStore:
-    """Écritures des documents renvoyés par les sources, lecture de la file de normalisation et vidage des payloads normalisés.
+    """Écritures des documents renvoyés par les sources et de leurs marqueurs, lecture de la file de normalisation et vidage des payloads normalisés.
 
     Le raw store reçoit chaque payload juste avant son effacement de la base par `clear_payload`. Par défaut, le raw store est celui de `get_raw_store()`, lu au premier `clear_payload`.
     """
@@ -227,6 +235,10 @@ class StagingStore:
     def clear_truncated(self, source: str, source_id: str) -> None:
         """Lève le marqueur de troncature d'un document, sans toucher son contenu."""
         self._conn.execute(_CLEAR_TRUNCATED_SQL, {"source": source, "source_id": source_id})
+
+    def mark_disappeared(self, source: str, source_id: str) -> None:
+        """Marque disparu un document absent de sa source, ou renvoyé par la source sous un autre identifiant. La normalisation supprime son enregistrement source."""
+        self._conn.execute(_MARK_DISAPPEARED_SQL, {"source": source, "source_id": source_id})
 
     def upsert(
         self,

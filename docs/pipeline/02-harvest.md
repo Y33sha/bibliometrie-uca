@@ -57,4 +57,4 @@ La sélection se borne aux années de la fenêtre courante, lues sur `source_rec
 
 L'[API OpenAlex](../sources/03-openalex.md) plafonne la liste des auteurs à 100 par réponse ; au-delà, les auteurs surnuméraires sont absents du payload moissonné.
 
-Le moissonnage et la recherche par DOI de `fetch_missing` marquent `staging.authors_truncated` sur les documents de 100 auteurs. Cette phase retélécharge un par un les documents marqués, récupère la liste complète des auteurs et retire la marque. Un document absent d'OpenAlex perd aussi sa marque. Quand OpenAlex est indisponible, la marque reste et le document est repris au run suivant.
+Le moissonnage et la recherche par DOI de `fetch_missing` marquent `staging.authors_truncated` sur les documents de 100 auteurs. Cette phase retélécharge un par un les documents marqués, récupère la liste complète des auteurs et retire la marque. Un document absent d'OpenAlex, ou renvoyé sous un autre identifiant (work fusionné), reçoit `disappeared_at`, comme dans `fetch_stale`. Quand OpenAlex est indisponible, la marque reste et le document est repris au run suivant.

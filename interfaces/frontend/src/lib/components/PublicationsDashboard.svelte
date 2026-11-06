@@ -10,7 +10,7 @@
 	import { countryName } from '#lib/countryNames.js';
 	import { defaultYears } from '#lib/defaultYears.js';
 	import { publicationsDocTypes } from '#lib/docTypes.svelte.js';
-	import { orderedPivotValues, pivotValueColor, pivotValueLabel } from '#lib/pivotValues.js';
+	import { orderedPivotValues, pivotValueColor, pivotValueDescription, pivotValueLabel } from '#lib/pivotValues.js';
 	import { contextParams, type PublicationListContext } from '#lib/publicationListContext.js';
 	import { plural } from '#lib/plural.js';
 	import { paramsToQuery } from '#lib/utils.js';
@@ -176,6 +176,7 @@
 		orderedPivotValues(oaBreakdown, chartRows).map((value, i) => ({
 			label: pivotValueLabel(oaBreakdown, value),
 			color: pivotValueColor(oaBreakdown, value, i),
+			description: pivotValueDescription(oaBreakdown, value),
 			values: years.map((y) => sum(chartRows.filter((r) => r.year === y && r[oaBreakdown] === value))),
 		})),
 	);

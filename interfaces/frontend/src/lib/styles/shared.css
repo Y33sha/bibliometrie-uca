@@ -84,6 +84,7 @@
 	--hybrid: #894d97;
 	--bronze: #9f5526;
 	--green: #36a558;
+	--open-access-logo: #f68212; /* cadenas ouvert du logo open access */
 
 	/* Graphiques : couleurs des séries sans couleur propre, dans l'ordre d'attribution (`chartColor()`). */
 	--chart-1: #4e79a7;

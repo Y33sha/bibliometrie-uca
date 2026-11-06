@@ -14,7 +14,8 @@ from domain.source_records.identifiers import (
 from pipeline.ingestion.common.change_detection import change_detection_hash
 from pipeline.ingestion.common.doi_search import get_missing_dois
 from pipeline.ingestion.common.fingerprint import fingerprint
-from pipeline.ingestion.common.stale_refetch import get_stale_source_ids, set_disappeared
+from pipeline.ingestion.common.staging import StagingStore
+from pipeline.ingestion.common.stale_refetch import get_stale_source_ids
 from pipeline.ingestion.hal.hash_normalize import strip_volatile_for_hash
 from tests.integration.helpers.publications import insert_publication, insert_publication_relation
 from tests.integration.helpers.serials import insert_doi_prefix
@@ -427,9 +428,9 @@ class TestGetStaleSourceIds:
 
 
 class TestDisappearedMarking:
-    def test_set_disappeared(self, sa_sync_conn):
+    def test_mark_disappeared(self, sa_sync_conn):
         insert_staging(sa_sync_conn, "openalex", source_id="W1", seen_days_ago=100)
-        set_disappeared(sa_sync_conn, "openalex", "W1")
+        StagingStore(sa_sync_conn).mark_disappeared("openalex", "W1")
         marked = sa_sync_conn.execute(
             text(
                 "SELECT disappeared_at IS NOT NULL FROM staging WHERE source='openalex' AND source_id='W1'"

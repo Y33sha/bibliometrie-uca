@@ -77,7 +77,7 @@ export const relationTierRank: Record<RelationTier, number> = {
 	secondary: 3
 };
 
-/** Labels pour les voies OA. */
+/** Libellés des voies OA : terme d'usage anglais pour les voies ouvertes, français pour l'embargo, la fermeture et l'absence d'information. */
 export const oaLabelsMap: Record<string, string> = {
 	diamond: 'Diamond',
 	gold: 'Gold',
@@ -85,8 +85,20 @@ export const oaLabelsMap: Record<string, string> = {
 	bronze: 'Bronze',
 	green: 'Green',
 	embargoed: 'Sous embargo',
-	closed: 'Closed',
+	closed: 'Fermé',
 	unknown: 'Indéterminé'
+};
+
+/** Explication de chaque voie OA, affichée au survol de son libellé. */
+export const oaStatusDescriptions: Record<string, string> = {
+	diamond: 'Revue ouverte, sans frais de publication',
+	gold: 'Revue ouverte, avec frais de publication',
+	hybrid: 'Article sous licence ouverte dans une revue sur abonnement',
+	bronze: "Lecture libre chez l'éditeur, sans licence ouverte",
+	green: 'Copie en archive ouverte ou sur un serveur de preprints',
+	embargoed: 'Copie sous embargo',
+	closed: 'Aucune copie ouverte',
+	unknown: "Aucune information sur l'accès"
 };
 
 /** Libellé d'un statut OA, sinon la valeur brute. */

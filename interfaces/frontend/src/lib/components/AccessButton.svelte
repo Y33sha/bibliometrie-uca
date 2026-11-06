@@ -1,5 +1,5 @@
 <script lang="ts">
-	// Bouton vers le lien d'accès d'une publication. Sans lien, un bloc du même format signale l'embargo, ou la fermeture hors tableau.
+	// Lien d'accès au texte intégral d'une publication : bouton plein, ou, en format de liste, cadenas open access et lien. Sans lien, un bloc du même format signale l'embargo, ou la fermeture hors liste.
 	let {
 		accessUrl,
 		oaStatus,
@@ -7,14 +7,26 @@
 	}: {
 		accessUrl: string | null | undefined;
 		oaStatus: string | null | undefined;
-		/** Format de tableau : libellés courts ; l'accès fermé n'est pas signalé. */
+		/** Format de liste et de tableau : libellés courts ; l'accès fermé n'est pas signalé. */
 		compact?: boolean;
 	} = $props();
 </script>
 
-{#if accessUrl}
-	<a class="access-btn" class:compact href={accessUrl} target="_blank" rel="noopener">
-		{compact ? 'Texte intégral' : 'Lire le texte intégral'}
+{#if accessUrl && compact}
+	<a class="access-link" href={accessUrl} target="_blank" rel="noopener">
+		<svg class="oa-logo" viewBox="0 0 40 60" aria-hidden="true">
+			<path d="M10 31V16a10 10 0 0 1 20 0v4" fill="none" stroke="currentColor" stroke-width="6" />
+			<circle cx="20" cy="41" r="13" fill="none" stroke="currentColor" stroke-width="6" />
+			<circle cx="20" cy="41" r="4.5" fill="currentColor" />
+		</svg>
+		Texte intégral
+		<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+			<path d="M7 17L17 7M17 7H8M17 7v9" />
+		</svg>
+	</a>
+{:else if accessUrl}
+	<a class="access-btn" href={accessUrl} target="_blank" rel="noopener">
+		Lire le texte intégral
 		<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 			<path d="M7 17L17 7M17 7H8M17 7v9" />
 		</svg>
@@ -74,13 +86,29 @@
 		width: 12px;
 		height: 12px;
 	}
-	/* Dans un tableau : teal intermédiaire, un peu plus soutenu au survol. */
-	a.access-btn.compact {
-		background: color-mix(in srgb, var(--accent-mid) 25%, white);
-		color: var(--accent);
+	/* Dans une liste : lien en texte, précédé du cadenas open access. */
+	.access-link {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+		font-size: var(--fs-sm);
+		font-weight: 600;
+		color: var(--text-secondary);
+		text-decoration: none;
+		white-space: nowrap;
 	}
-	a.access-btn.compact:hover {
-		background: color-mix(in srgb, var(--accent-mid) 35%, white);
+	.access-link:hover {
+		color: var(--accent);
+		text-decoration: underline;
+	}
+	.access-link svg {
+		width: 12px;
+		height: 12px;
+	}
+	.access-link .oa-logo {
+		width: 10px;
+		height: 15px;
+		color: var(--open-access-logo);
 	}
 	/* Sans lien d'accès : un état, écrit en texte avec son icône, et non un bouton. */
 	.access-unavailable {

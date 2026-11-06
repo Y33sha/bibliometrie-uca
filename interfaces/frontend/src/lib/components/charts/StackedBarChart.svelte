@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { Chart, stackedSegmentOptions } from '#lib/components/charts/chart.js';
+	import ChartLegend from '#lib/components/charts/ChartLegend.svelte';
 
 	// Barres verticales empilées : une série par segment, la légende sous le graphique.
 	let {
@@ -8,8 +9,8 @@
 		height = 280,
 	}: {
 		labels: string[];
-		/** Un segment de chaque barre : `values` suit `labels`. */
-		series: { label: string; values: number[]; color: string }[];
+		/** Un segment de chaque barre : `values` suit `labels`. `description` s'affiche au survol de la légende et du segment. */
+		series: { label: string; values: number[]; color: string; description?: string }[];
 		height?: number;
 	} = $props();
 
@@ -33,7 +34,8 @@
 				responsive: true,
 				maintainAspectRatio: false,
 				plugins: {
-					legend: { position: 'bottom', labels: { boxWidth: 12 } },
+					legend: { display: false },
+					tooltip: { callbacks: { afterLabel: (ctx) => series[ctx.datasetIndex]?.description ?? '' } },
 					datalabels: { display: false },
 				},
 				scales: {
@@ -62,6 +64,7 @@
 <div class="chart-wrap" style="height: {height}px">
 	<canvas bind:this={canvas} aria-hidden="true"></canvas>
 </div>
+<ChartLegend items={series} centered />
 <div class="visually-hidden">
 	<table>
 		<thead>
