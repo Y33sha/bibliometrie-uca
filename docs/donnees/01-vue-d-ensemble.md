@@ -52,4 +52,4 @@ flowchart TB
 - [Données dérivées](09-donnees-derivees.md) : vues matérialisées, colonnes dérivées, files de recalcul
 - [Index des tables](10-index-des-tables.md)
 
-Chaque domaine a son schéma PostgreSQL. Le `search_path` de la base liste ces schémas, et les requêtes nomment les tables sans leur schéma.
+Chaque domaine a son schéma PostgreSQL. Le `search_path` de la base liste ces schémas, et les requêtes nomment les tables sans leur schéma. L'API refuse de démarrer si un schéma manque au `search_path`.
