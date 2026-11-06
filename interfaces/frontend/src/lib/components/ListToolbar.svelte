@@ -3,7 +3,7 @@
 	import ResultCount from '#lib/components/ResultCount.svelte';
 	import { stickyHeight } from '#lib/actions/stickyHeight.js';
 
-	// Barre d'outils d'une liste. Première ligne : recherche, nombre de résultats, export CSV et actions. Deuxième ligne : filtres. Le contenu enfant et les filtres actifs suivent.
+	// Barre d'outils d'une liste. Première ligne : contrôle de tête (bouton du panneau des filtres), recherche, nombre de résultats, export CSV et actions. Deuxième ligne : filtres. Le contenu enfant et les filtres actifs suivent.
 	// Depuis le haut de la page, la barre suit la page en descente jusqu'à quitter l'écran. Elle glisse ensuite d'un bloc : elle réapparaît sous le menu supérieur dès que la page remonte, et repart dès que la page redescend. L'en-tête du tableau qui suit se colle sous sa part visible.
 	let {
 		search = $bindable(),
@@ -13,6 +13,7 @@
 		one,
 		many,
 		exportUrl,
+		leading,
 		actions,
 		filters,
 		filtersLabel = 'Filtrer par',
@@ -32,6 +33,8 @@
 		many: string;
 		/** Adresse de l'export CSV de la liste filtrée. */
 		exportUrl?: string;
+		/** Contrôle placé devant la recherche. */
+		leading?: Snippet;
 		actions?: Snippet;
 		filters?: Snippet;
 		/** Libellé placé devant les filtres. */
@@ -110,6 +113,7 @@
 <div class="list-toolbar" class:hidden class:detached bind:this={bar} style:top={offset ? `calc(var(--header-height) - ${offset}px)` : undefined} use:stickyHeight={{ variable: '--list-toolbar-height', hidden: offset }}>
 	<div class="toolbar-card">
 		<div class="toolbar">
+			{@render leading?.()}
 			{#if search !== undefined}
 				<input type="search" class="list-search" {placeholder} aria-label={placeholder} bind:value={search} oninput={onsearch} {onkeydown} />
 			{/if}

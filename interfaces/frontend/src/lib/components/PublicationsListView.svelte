@@ -13,12 +13,16 @@
 	import { resolve } from '$app/paths';
 	import { withBase } from '#lib/paths.js';
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
-	import PublicationFilterBar from '#lib/components/PublicationFilterBar.svelte';
+	import FilterPanel from '#lib/components/filters/FilterPanel.svelte';
+	import FilterLayout from '#lib/components/filters/FilterLayout.svelte';
+	import FilterPanelToggle from '#lib/components/filters/FilterPanelToggle.svelte';
+	import { useFilterPanel } from '#lib/composables/useFilterPanel.svelte.js';
 	import PublicationDrawer from '#lib/components/publications/PublicationDrawer.svelte';
 	import { useDrawerParam } from '#lib/composables/useDrawerParam.svelte.js';
 	import ActiveFilterBar from '#lib/components/ActiveFilterBar.svelte';
 	import {
 		activeColumns,
+		activeCount,
 		appendFilterParams,
 		initialValues,
 		restoreValues,
@@ -32,8 +36,8 @@
 	import Tooltip from '#lib/components/Tooltip.svelte';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
 	import TableStatusRow from '#lib/components/TableStatusRow.svelte';
-	import { usePublicationFacets } from '#lib/composables/usePublicationFacets.svelte.js';
-	import { publicationFilters } from '#lib/publicationFilters.js';
+	import { PUBLICATION_FACETS_ENDPOINT, usePublicationFacets } from '#lib/composables/usePublicationFacets.svelte.js';
+	import { PUBLICATION_FILTER_GROUPS, publicationFilters } from '#lib/publicationFilters.js';
 	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
 	import { useColumnVisibility } from '#lib/composables/useColumnVisibility.svelte.js';
 	import ColumnMenu from '#lib/components/ColumnMenu.svelte';
@@ -148,6 +152,7 @@
 	// svelte-ignore state_referenced_locally
 	const FILTERS = publicationFilters(context);
 	let values = $state(initialValues(FILTERS));
+	const filterPanel = useFilterPanel();
 
 	// Lien vers les statistiques, pendant inverse du bouton « Voir les publications » : il transmet les filtres et la recherche. Masqué quand le contexte est une personne ou une monographie, que la page Statistiques ne représente pas.
 	const showStatsLink = $derived(!['person', 'monograph'].includes(context.kind));
@@ -292,6 +297,9 @@
 
 
 <ListToolbar bind:search placeholder="Rechercher par titre ou sujet" onsearch={onSearchInput} list={listing} one="publication" many="publications" exportUrl={exportCsvUrl()}>
+	{#snippet leading()}
+		<FilterPanelToggle bind:open={filterPanel.open} active={activeCount(FILTERS, values)} />
+	{/snippet}
 	{#snippet actions()}
 		{#if view === 'notices'}
 			<label class="sort-select">Trier par
@@ -306,12 +314,15 @@
 		</div>
 		{#if showStatsLink}<a href={statsUrl} class="btn btn-primary">Statistiques &rarr;</a>{/if}
 	{/snippet}
-	<PublicationFilterBar filters={FILTERS} bind:values options={facets.options} sourceCounts={facets.sourceCounts} buildParams={buildFilterParams} onchange={onFilterChange} />
 	{#snippet activeFilters()}
 		<ActiveFilterBar filters={FILTERS} bind:values options={facets.options} onchange={onFilterChange} />
 	{/snippet}
 </ListToolbar>
 
+<FilterLayout bind:open={filterPanel.open}>
+{#snippet panel()}
+	<FilterPanel filters={FILTERS} groups={PUBLICATION_FILTER_GROUPS} bind:values options={facets.options} sourceCounts={facets.sourceCounts} entityEndpoint={PUBLICATION_FACETS_ENDPOINT} buildParams={buildFilterParams} panel={filterPanel} onchange={onFilterChange} />
+{/snippet}
 {#if view === 'notices'}
 <ListStatus list={listing} emptyText="Aucune publication trouvée">
 	<ul class="notices">
@@ -466,6 +477,7 @@
 {/if}
 
 <Pagination page={listing.page} pages={listing.pages} onchange={(p) => { listing.goToPage(p); syncUrl(); }} />
+</FilterLayout>
 
 {#if drawer.id !== null}
 	<PublicationDrawer

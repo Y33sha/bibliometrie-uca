@@ -1,5 +1,5 @@
 /**
- * Registre des filtres d'une liste. Chaque filtre se déclare une fois ; le registre en dérive l'état initial, les paramètres de la requête, la synchronisation avec l'URL, la configuration des décomptes, les colonnes à afficher et la place du contrôle dans la page.
+ * Registre des filtres d'une liste. Chaque filtre se déclare une fois ; le registre en dérive l'état initial, les paramètres de la requête, la synchronisation avec l'URL, la configuration des décomptes, les colonnes à afficher et la rubrique du filtre dans le panneau des filtres.
  */
 import type { FacetOption } from '#lib/components/FacetDropdown.svelte';
 import type { FacetDef } from '#lib/composables/useFacets.svelte.js';
@@ -15,8 +15,12 @@ interface BaseFilter {
 	label: string;
 	/** Paramètre de la requête, repris comme clé d'URL. */
 	param: string;
-	/** Rubrique du panneau « Plus de filtres ». Sans rubrique, le contrôle figure dans la barre principale. */
-	group?: string;
+	/** Clé de la rubrique du filtre dans le panneau des filtres (`FilterGroup`). */
+	group: string;
+	/** Filtre déplié dans le panneau tant que l'utilisateur ne l'a pas replié. */
+	expanded?: boolean;
+	/** Texte d'aide, au survol du nom du filtre. */
+	tooltip?: string;
 	/** Valeur imposée par la page : elle remplace la sélection dans la requête, et le contrôle disparaît. */
 	fixed?: () => string | null;
 	/** Filtre proposé dans cette page. Vrai par défaut. */
@@ -29,7 +33,6 @@ export interface CheckboxFilter extends BaseFilter {
 	control: 'checkbox';
 	facet: FacetDef;
 	searchable?: boolean;
-	tooltip?: string;
 	groups?: { label: string; values: string[] }[];
 	/** Masque le contrôle tant que sa facette ne propose aucune option. */
 	hideWhenEmpty?: boolean;
@@ -52,6 +55,12 @@ export interface PresenceFilter extends BaseFilter {
 }
 
 export type ListFilter = CheckboxFilter | EntityChoiceFilter | PresenceFilter;
+
+/** Rubrique du panneau des filtres. Une rubrique rassemble les filtres qui portent sur une même entité : la publication, ses affiliations, sa revue, ses auteurs… */
+export interface FilterGroup {
+	key: string;
+	label: string;
+}
 
 /** Jeton d'URL d'une sélection vide, qui retient toutes les valeurs. */
 export const ALL_TOKEN = 'all';
@@ -100,18 +109,22 @@ export function isShown(filter: ListFilter, optionCount: (key: string) => number
 	return !(filter.control === 'checkbox' && filter.hideWhenEmpty && optionCount(filter.key) === 0);
 }
 
-/** Contrôles de la barre principale, puis rubriques du panneau « Plus de filtres », dans l'ordre de déclaration. */
-export function filterSections(filters: ListFilter[]): {
-	primary: ListFilter[];
-	groups: { label: string; filters: ListFilter[] }[];
-} {
-	const primary: ListFilter[] = [];
-	const groups = new Map<string, ListFilter[]>();
+/** Filtres de chaque rubrique, dans l'ordre des rubriques puis dans l'ordre de déclaration des filtres. Une rubrique sans filtre est omise. Un filtre dont la rubrique est inconnue lève une erreur. */
+export function filterGroups(
+	filters: ListFilter[],
+	groups: readonly FilterGroup[],
+): { group: FilterGroup; filters: ListFilter[] }[] {
 	for (const f of filters) {
-		if (f.group) groups.set(f.group, [...(groups.get(f.group) ?? []), f]);
-		else primary.push(f);
+		if (!groups.some((g) => g.key === f.group)) throw new Error(`Rubrique inconnue pour le filtre ${f.key} : ${f.group}`);
 	}
-	return { primary, groups: [...groups].map(([label, members]) => ({ label, filters: members })) };
+	return groups
+		.map((group) => ({ group, filters: filters.filter((f) => f.group === group.key) }))
+		.filter((g) => g.filters.length);
+}
+
+/** Nombre de filtres actifs proposés dans la page. */
+export function activeCount(filters: ListFilter[], values: FilterValues): number {
+	return filters.filter((f) => isAvailable(f) && isActive(f, values)).length;
 }
 
 /** Sélection d'un filtre de présence sous la forme `hal_yes,wos_no`. */

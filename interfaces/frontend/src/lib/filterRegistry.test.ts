@@ -2,13 +2,14 @@ import { describe, it, expect, beforeEach } from 'vitest';
 
 import {
 	activeColumns,
+	activeCount,
 	appendFilterParams,
 	checkboxSummary,
 	clearValue,
 	encodePresence,
 	explicitSelectionUrl,
 	facetDefs,
-	filterSections,
+	filterGroups,
 	initialValues,
 	isShown,
 	presenceSummary,
@@ -32,6 +33,7 @@ const years: CheckboxFilter = {
 	control: 'checkbox',
 	label: 'Années',
 	param: 'year',
+	group: 'publication',
 	facet: { type: 'simple', apiKey: 'years' },
 };
 const types: CheckboxFilter = {
@@ -39,6 +41,7 @@ const types: CheckboxFilter = {
 	control: 'checkbox',
 	label: 'Types',
 	param: 'doc_type',
+	group: 'publication',
 	facet: { type: 'simple', apiKey: 'doc_types' },
 	groups: [{ label: 'Publications', values: ['article', 'book'] }],
 	url: {
@@ -53,6 +56,7 @@ const labs: CheckboxFilter = {
 	control: 'checkbox',
 	label: 'Laboratoires',
 	param: 'lab_id',
+	group: 'affiliations',
 	facet: { type: 'labeled', apiKey: 'labs' },
 	fixed: () => fixedLab,
 };
@@ -62,7 +66,7 @@ const perimeter: CheckboxFilter = {
 	label: 'Périmètre',
 	param: 'in_perimeter',
 	facet: { type: 'labeled', apiKey: 'in_perimeter' },
-	group: 'Auteurs',
+	group: 'authors',
 	enabled: () => perimeterEnabled,
 	hideWhenEmpty: true,
 	showColumns: ['corr'],
@@ -73,7 +77,7 @@ const serial: EntityChoiceFilter = {
 	label: 'Revue',
 	param: 'serial_id',
 	entity: 'serial',
-	group: 'Revue et éditeur',
+	group: 'venue',
 	showColumns: ['serial'],
 };
 const subjects: EntityChoiceFilter = {
@@ -83,14 +87,14 @@ const subjects: EntityChoiceFilter = {
 	param: 'subject',
 	entity: 'subject',
 	multiple: true,
-	group: 'Sujets',
+	group: 'content',
 };
 const sources: PresenceFilter = {
 	key: 'sources',
 	control: 'presence',
 	label: 'Sources',
 	param: 'source_filter',
-	group: 'Auteurs',
+	group: 'sources',
 	items: [
 		{ key: 'hal', label: 'HAL' },
 		{ key: 'wos', label: 'WoS' },
@@ -177,14 +181,38 @@ describe('filterRegistry', () => {
 		expect(isShown(perimeter, () => 2)).toBe(false);
 	});
 
-	it('range les contrôles sans rubrique dans la barre principale, les autres par rubrique', () => {
-		const { primary, groups } = filterSections(FILTERS);
-		expect(primary.map((f) => f.key)).toEqual(['years', 'types', 'labs']);
-		expect(groups.map((g) => [g.label, g.filters.map((f) => f.key)])).toEqual([
-			['Auteurs', ['perimeter', 'sources']],
-			['Revue et éditeur', ['serial']],
-			['Sujets', ['subjects']],
+	it("range les filtres par rubrique, dans l'ordre des rubriques, sans rubrique vide", () => {
+		const groups = [
+			{ key: 'publication', label: 'Publication' },
+			{ key: 'access', label: 'Accès' },
+			{ key: 'affiliations', label: 'Affiliations' },
+			{ key: 'venue', label: 'Revue et éditeur' },
+			{ key: 'authors', label: 'Auteurs' },
+			{ key: 'content', label: 'Sujets' },
+			{ key: 'sources', label: 'Sources' },
+		];
+		expect(filterGroups(FILTERS, groups).map((g) => [g.group.key, g.filters.map((f) => f.key)])).toEqual([
+			['publication', ['years', 'types']],
+			['affiliations', ['labs']],
+			['venue', ['serial']],
+			['authors', ['perimeter']],
+			['content', ['subjects']],
+			['sources', ['sources']],
 		]);
+	});
+
+	it("refuse un filtre dont la rubrique n'est pas déclarée", () => {
+		expect(() => filterGroups(FILTERS, [{ key: 'publication', label: 'Publication' }])).toThrow(/labs/);
+	});
+
+	it('compte les filtres actifs proposés dans la page', () => {
+		const values = initialValues(FILTERS);
+		values.checkbox.years = ['2024'];
+		values.presence.sources = { hal: 'all' };
+		values.checkbox.perimeter = ['yes'];
+		expect(activeCount(FILTERS, values)).toBe(2);
+		perimeterEnabled = false;
+		expect(activeCount(FILTERS, values)).toBe(1);
 	});
 
 	it("écrit la sélection dans l'URL sous sa forme propre, et la relit", () => {

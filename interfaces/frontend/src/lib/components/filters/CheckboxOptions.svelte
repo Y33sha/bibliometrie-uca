@@ -46,7 +46,7 @@
 {#snippet optionRow(opt: FacetOption)}
 	<label class="option-row" class:with-bar={bars}>
 		<input type="checkbox" checked={selected.includes(opt.value)} onchange={() => toggle(opt.value)} />
-		<span class="facet-option-text" title={opt.text}>{opt.text}</span>{#if opt.count != null}<span class="facet-count">{opt.count}</span>{/if}
+		<span class="facet-option-text" title={opt.text}>{opt.text}</span>{#if opt.count != null}<span class="facet-count">{opt.count.toLocaleString('fr-FR')}</span>{/if}
 		{#if bars && opt.count != null}<span class="option-bar" class:checked={selected.includes(opt.value)} style:width="{(opt.count / maxCount) * 100}%" aria-hidden="true"></span>{/if}
 	</label>
 {/snippet}

@@ -8,8 +8,11 @@
 	import { readableOn } from '#lib/components/charts/contrast.js';
 	import ChartLegend from '#lib/components/charts/ChartLegend.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
-	import PublicationFilterBar from '#lib/components/PublicationFilterBar.svelte';
 	import ActiveFilterBar from '#lib/components/ActiveFilterBar.svelte';
+	import FilterPanel from '#lib/components/filters/FilterPanel.svelte';
+	import FilterLayout from '#lib/components/filters/FilterLayout.svelte';
+	import FilterPanelToggle from '#lib/components/filters/FilterPanelToggle.svelte';
+	import { useFilterPanel } from '#lib/composables/useFilterPanel.svelte.js';
 	import CollaborationMap from './CollaborationMap.svelte';
 	import { defaultYears } from '#lib/defaultYears.js';
 	import { orderedPivotValues, pivotValueColor, pivotValueDescription, pivotValueLabel } from '#lib/pivotValues.js';
@@ -17,6 +20,7 @@
 	import { publicationsDocTypes } from '#lib/docTypes.svelte.js';
 	import { toast } from '#lib/dialogs.svelte.js';
 	import {
+		activeCount,
 		appendFilterParams,
 		clearValue,
 		ignoredFilters,
@@ -26,8 +30,8 @@
 		urlFilterDefs,
 		urlState,
 	} from '#lib/filterRegistry.js';
-	import { publicationFilters } from '#lib/publicationFilters.js';
-	import { usePublicationFacets } from '#lib/composables/usePublicationFacets.svelte.js';
+	import { PUBLICATION_FILTER_GROUPS, publicationFilters } from '#lib/publicationFilters.js';
+	import { PUBLICATION_FACETS_ENDPOINT, usePublicationFacets } from '#lib/composables/usePublicationFacets.svelte.js';
 	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
 
 	// Chaque changement de filtre relance le graphe : la requête précédente, encore en vol, est annulée.
@@ -39,6 +43,7 @@
 	// Filtres de la liste des publications, hors contexte. La famille « Publications » est présélectionnée (cf. onMount).
 	const FILTERS = publicationFilters({ kind: 'all' }, publicationsDocTypes());
 	let values = $state(initialValues(FILTERS));
+	const filterPanel = useFilterPanel();
 
 	let chartCanvas: HTMLCanvasElement | undefined = $state();
 	let yearChart: Chart | null = null;
@@ -455,6 +460,8 @@
 <div class="stats-page">
 <!-- Ligne 1 : contrôles du pivot + onglets -->
 <div class="toolbar controls-row">
+	<FilterPanelToggle bind:open={filterPanel.open} active={activeCount(FILTERS, values)} />
+	<span class="sep" aria-hidden="true"></span>
 	{#if pivotSchema}
 		<label class="groupby">
 			Indicateur&nbsp;:
@@ -504,11 +511,15 @@
 	{/if}
 	<a class="btn btn-primary pubs-link" href={pubsUrl}>Voir les publications &rarr;</a>
 </div>
-<!-- Ligne 2 : filtres, ceux de la liste des publications. -->
+<!-- Ligne 2 : filtres actifs, ceux de la liste des publications. -->
 <div class="stats-filters">
-	<PublicationFilterBar filters={FILTERS} bind:values options={facets.options} sourceCounts={facets.sourceCounts} buildParams={chartParams} onchange={onFilterChange} />
 	<ActiveFilterBar filters={FILTERS} bind:values options={facets.options} onchange={onFilterChange} />
 </div>
+
+<FilterLayout bind:open={filterPanel.open} fill>
+{#snippet panel()}
+	<FilterPanel filters={FILTERS} groups={PUBLICATION_FILTER_GROUPS} bind:values options={facets.options} sourceCounts={facets.sourceCounts} entityEndpoint={PUBLICATION_FACETS_ENDPOINT} buildParams={chartParams} panel={filterPanel} onchange={onFilterChange} />
+{/snippet}
 
 {#if isCollab}
 <!-- Carte des collaborations internationales -->
@@ -549,6 +560,7 @@
 	/>
 {/if}
 {/if}
+</FilterLayout>
 </div>
 
 
