@@ -36,6 +36,7 @@
 		top: calc(var(--header-height) + var(--list-toolbar-height, 0px) + 8px);
 		max-height: calc(100vh - var(--header-height) - var(--list-toolbar-height, 0px) - 16px);
 		overflow-y: auto;
+		overflow-x: hidden;
 		/* La barre de défilement ne recouvre pas les décomptes. */
 		padding-right: 6px;
 		scrollbar-width: thin;

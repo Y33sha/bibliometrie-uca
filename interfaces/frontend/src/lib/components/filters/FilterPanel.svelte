@@ -3,6 +3,7 @@
 	import CheckboxOptions from '#lib/components/filters/CheckboxOptions.svelte';
 	import EntityOptions from '#lib/components/filters/EntityOptions.svelte';
 	import PresenceOptions from '#lib/components/filters/PresenceOptions.svelte';
+	import RangeOptions from '#lib/components/filters/RangeOptions.svelte';
 	import {
 		filterGroups,
 		isActive,
@@ -49,10 +50,11 @@
 
 	// svelte-ignore state_referenced_locally
 	const sections = filterGroups(filters, groups);
-	const optionCount = (key: string): number => options[key]?.length ?? 0;
+	const nonZeroOptions = (key: string): number => options[key]?.filter((o) => o.count).length ?? 0;
 
+	/** Nombre affiché sur le nom d'un filtre actif : valeurs cochées, entités choisies, éléments filtrés ; un pour un intervalle. */
 	function selectionCount(f: ListFilter): number {
-		if (f.control === 'checkbox') return (values.checkbox[f.key] ?? []).length;
+		if (f.control === 'checkbox') return f.range ? 1 : (values.checkbox[f.key] ?? []).length;
 		if (f.control === 'entity') return (values.entity[f.key] ?? []).length;
 		return Object.keys(values.presence[f.key] ?? {}).length;
 	}
@@ -69,7 +71,7 @@
 		<button type="button" class="btn-text filter-panel-close" onclick={() => (panel.open = false)}>Fermer</button>
 	</div>
 	{#each sections as s (s.group.key)}
-		{@const shown = s.filters.filter((f) => isShown(f, optionCount))}
+		{@const shown = s.filters.filter((f) => isShown(f, values, nonZeroOptions, sourceCounts))}
 		{#if shown.length}
 			<section class="filter-group" aria-label={s.group.label}>
 				<h2 class="filter-group-label">{s.group.label}</h2>
@@ -83,11 +85,13 @@
 							<span class="chevron" class:up={open} aria-hidden="true"></span>
 						</button>
 						{#if open}
-							<div class="filter-body" class:scrolling={f.control === 'entity'}>
-								{#if f.control === 'checkbox'}
+							<div class="filter-body">
+								{#if f.control === 'checkbox' && f.range}
+									<RangeOptions options={options[f.key] ?? []} bind:selected={values.checkbox[f.key]} onchange={(selected) => onCheckboxChange(f, selected)} />
+								{:else if f.control === 'checkbox'}
 									<CheckboxOptions options={options[f.key] ?? []} searchable={f.searchable} groups={f.groups} limit={OPTION_LIMIT} bars bind:selected={values.checkbox[f.key]} onchange={(selected) => onCheckboxChange(f, selected)} />
 								{:else if f.control === 'entity'}
-									<EntityOptions endpoint={entityEndpoint} kind={f.entity} multiple={f.multiple} {buildParams} selected={values.entity[f.key]} onchange={(ids) => { values.entity[f.key] = ids; onchange(); }} />
+									<EntityOptions endpoint={entityEndpoint} kind={f.entity} multiple={f.multiple} limit={OPTION_LIMIT} {buildParams} selected={values.entity[f.key]} onchange={(ids) => { values.entity[f.key] = ids; onchange(); }} />
 								{:else}
 									<PresenceOptions items={f.items} bind:states={values.presence[f.key]} counts={sourceCounts} {onchange} />
 								{/if}
@@ -141,25 +145,22 @@
 		font: inherit;
 		font-size: var(--fs-md);
 		font-weight: 600;
-		color: var(--text);
+		color: var(--accent);
 		text-align: left;
 		cursor: pointer;
 	}
-	.filter-head:hover .filter-name {
-		color: var(--accent);
+	.filter-head:hover {
+		color: color-mix(in srgb, var(--accent), black 20%);
 	}
 	.filter-head .chevron {
 		margin-left: auto;
-		color: var(--muted);
 	}
 	.filter-body {
 		margin: 0 0 6px;
 	}
-	/* Les options s'alignent sur le nom du filtre ; le fond de survol déborde de 4 px. */
+	/* Les options s'alignent sur le nom du filtre. */
 	.filter-body :global(.option-row) {
-		width: calc(100% + 8px);
-		margin: 0 -4px;
-		padding: 3px 4px;
+		padding: 3px 0;
 	}
 	.filter-body :global(.panel-search) {
 		width: 100%;
@@ -170,11 +171,6 @@
 		padding: 4px 0 1px;
 		border-top: none;
 		font-weight: 400;
-	}
-	/* Liste d'entités : hauteur bornée, défilement interne. */
-	.filter-body.scrolling :global(.facet-options) {
-		max-height: 240px;
-		overflow-y: auto;
 	}
 	@media not all and (min-width: 1100px) {
 		.filter-panel-head {

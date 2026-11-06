@@ -13,6 +13,8 @@ import {
 	initialValues,
 	isShown,
 	presenceSummary,
+	rangeBounds,
+	rangeSelection,
 	restoreValues,
 	summarizeParts,
 	ignoredFilters,
@@ -68,7 +70,6 @@ const perimeter: CheckboxFilter = {
 	facet: { type: 'labeled', apiKey: 'in_perimeter' },
 	group: 'authors',
 	enabled: () => perimeterEnabled,
-	hideWhenEmpty: true,
 	showColumns: ['corr'],
 };
 const serial: EntityChoiceFilter = {
@@ -132,7 +133,7 @@ describe('filterRegistry', () => {
 		const params = new URLSearchParams();
 		appendFilterParams(FILTERS, values, params);
 		expect(params.get('lab_id')).toBe('7');
-		expect(isShown(labs, () => 1)).toBe(false);
+		expect(isShown(labs, values, () => 1, {})).toBe(false);
 	});
 
 	it("n'écrit pas dans la requête un filtre que la page ne propose pas", () => {
@@ -174,11 +175,31 @@ describe('filterRegistry', () => {
 		expect(ignoredFilters(FILTERS, values).map((f) => f.key)).toEqual(['perimeter']);
 	});
 
-	it('masque un contrôle que la page ne propose pas, ou qui attend des options', () => {
-		expect(isShown(perimeter, () => 0)).toBe(false);
-		expect(isShown(perimeter, () => 2)).toBe(true);
+	it('masque un filtre que la page ne propose pas, ou sans option de décompte non nul, sauf actif', () => {
+		const values = initialValues(FILTERS);
+		expect(isShown(perimeter, values, () => 0, {})).toBe(false);
+		expect(isShown(perimeter, values, () => 2, {})).toBe(true);
+		values.checkbox.perimeter = ['yes'];
+		expect(isShown(perimeter, values, () => 0, {})).toBe(true);
 		perimeterEnabled = false;
-		expect(isShown(perimeter, () => 2)).toBe(false);
+		expect(isShown(perimeter, values, () => 2, {})).toBe(false);
+	});
+
+	it('masque un filtre de présence dont aucun élément ne départage les publications', () => {
+		const values = initialValues(FILTERS);
+		const none = { hal: { yes: 10, no: 0 }, wos: { yes: 0, no: 10 }, openalex: { yes: 10, no: 0 } };
+		expect(isShown(sources, values, () => 0, none)).toBe(false);
+		expect(isShown(sources, values, () => 0, { ...none, wos: { yes: 3, no: 7 } })).toBe(true);
+		values.presence.sources = { hal: 'yes' };
+		expect(isShown(sources, values, () => 0, none)).toBe(true);
+	});
+
+	it('résume un intervalle par ses bornes', () => {
+		const range: CheckboxFilter = { ...years, range: true };
+		expect(checkboxSummary(range, ['2023', '2021', '2022'], [])).toBe('2021–2023');
+		expect(checkboxSummary(range, ['2024'], [])).toBe('2024');
+		expect(rangeBounds(['2021', '2023'])).toBeNull();
+		expect(rangeSelection(2021, 2023)).toEqual(['2021', '2022', '2023']);
 	});
 
 	it("range les filtres par rubrique, dans l'ordre des rubriques, sans rubrique vide", () => {

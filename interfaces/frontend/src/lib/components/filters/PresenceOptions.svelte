@@ -1,5 +1,7 @@
 <script lang="ts">
-	// Options d'un filtre de présence : chaque élément passe de « tous » à « présents », puis « absents ». Partagé par la liste déroulante d'un filtre et le panneau des filtres.
+	// Options d'un filtre de présence : chaque élément passe de « tous » à « présents », puis « absents ». Un élément présent partout, ou nulle part, est omis, sauf filtré. Partagé par la liste déroulante d'un filtre et le panneau des filtres.
+	import { discriminates } from '#lib/filterRegistry.js';
+
 	export type ToggleState = 'all' | 'yes' | 'no';
 
 	export interface PresenceItem {
@@ -30,6 +32,7 @@
 	}: Props = $props();
 
 	const activeCount = $derived(Object.keys(states).length + checkedLevels.length);
+	const shownItems = $derived(items.filter((i) => states[i.key] || discriminates(counts[i.key])));
 
 	function cycle(item: PresenceItem) {
 		const current = states[item.key] || 'all';
@@ -90,7 +93,7 @@
 {#if activeCount > 0}
 	<button type="button" class="option-row facet-clear" onclick={clear}>Effacer</button>
 {/if}
-{#each items as item (item.key)}
+{#each shownItems as item (item.key)}
 	{@const state = stateOf(item.key)}
 	{@const c = countFor(item.key, state)}
 	<button

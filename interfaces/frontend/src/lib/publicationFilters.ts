@@ -46,6 +46,7 @@ export function publicationFilters(
 			group: 'publication',
 			expanded: true,
 			facet: { type: 'simple', apiKey: 'years' },
+			range: true,
 			// Un lien vers la page Statistiques écrit `all` : elle applique alors ses années par défaut seulement à l'ouverture sans paramètre `year`.
 			url: explicitSelectionUrl(ALL_TOKEN),
 		},
@@ -187,7 +188,6 @@ export function publicationFilters(
 				},
 			},
 			enabled: () => context.kind === 'person' || context.kind === 'lab',
-			hideWhenEmpty: true,
 			showColumns: ['corr'],
 		},
 		{
@@ -198,7 +198,6 @@ export function publicationFilters(
 			group: 'authors',
 			facet: { type: 'labeled', apiKey: 'in_perimeter' },
 			enabled: () => context.kind === 'person',
-			hideWhenEmpty: true,
 		},
 		{
 			key: 'subjects',

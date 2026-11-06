@@ -34,8 +34,8 @@ export interface CheckboxFilter extends BaseFilter {
 	facet: FacetDef;
 	searchable?: boolean;
 	groups?: { label: string; values: string[] }[];
-	/** Masque le contrôle tant que sa facette ne propose aucune option. */
-	hideWhenEmpty?: boolean;
+	/** Valeurs entières ordonnées (années) : la sélection est un intervalle, choisi par ses bornes. */
+	range?: boolean;
 	/** Écriture de la sélection dans l'URL, quand elle diffère de la liste des valeurs. `defaultValue` n'est pas écrite. */
 	url?: { encode: (selected: string[]) => string; decode: (raw: string) => string[]; defaultValue: string };
 	/** Corrige une sélection qui vient de changer. */
@@ -103,10 +103,30 @@ export function isAvailable(filter: ListFilter): boolean {
 	return (filter.enabled?.() ?? true) && (filter.fixed?.() ?? null) === null;
 }
 
-/** Contrôle à afficher : filtre disponible, avec des options quand le filtre l'exige. */
-export function isShown(filter: ListFilter, optionCount: (key: string) => number): boolean {
+/** Décomptes d'un élément de filtre de présence. */
+export type PresenceCounts = Record<string, { yes: number; no: number }>;
+
+/** Élément de présence qui départage les publications : présent dans certaines, absent d'autres. Sans décompte connu, l'élément est réputé départager. */
+export function discriminates(counts: { yes: number; no: number } | undefined): boolean {
+	return !counts || (counts.yes > 0 && counts.no > 0);
+}
+
+/**
+ * Filtre à afficher : filtre disponible et utile. Une case à cocher est utile quand une option au moins a un décompte non nul ; un filtre de présence, quand un de ses éléments départage les publications. Un filtre actif reste affiché, pour être retiré.
+ *
+ * `nonZeroOptions` renvoie le nombre d'options de décompte non nul d'une case à cocher.
+ */
+export function isShown(
+	filter: ListFilter,
+	values: FilterValues,
+	nonZeroOptions: (key: string) => number,
+	presenceCounts: PresenceCounts,
+): boolean {
 	if (!isAvailable(filter)) return false;
-	return !(filter.control === 'checkbox' && filter.hideWhenEmpty && optionCount(filter.key) === 0);
+	if (isActive(filter, values)) return true;
+	if (filter.control === 'checkbox') return nonZeroOptions(filter.key) > 0;
+	if (filter.control === 'presence') return filter.items.some((i) => discriminates(presenceCounts[i.key]));
+	return true;
 }
 
 /** Filtres de chaque rubrique, dans l'ordre des rubriques puis dans l'ordre de déclaration des filtres. Une rubrique sans filtre est omise. Un filtre dont la rubrique est inconnue lève une erreur. */
@@ -150,8 +170,23 @@ export function summarizeParts(parts: string[]): string {
 	return `${parts.slice(0, SUMMARY_PARTS - 1).join(', ')} +${parts.length - SUMMARY_PARTS + 1}`;
 }
 
-/** Résumé d'une sélection de cases à cocher. Un groupe entièrement coché est nommé par son libellé. */
+/** Bornes d'une sélection d'entiers consécutifs, ou `null` quand la sélection n'est pas un intervalle. */
+export function rangeBounds(selected: string[]): [number, number] | null {
+	const years = selected.map(Number).sort((a, b) => a - b);
+	if (!years.length || years.some((y) => !Number.isInteger(y))) return null;
+	const [first, last] = [years[0], years[years.length - 1]];
+	return last - first + 1 === new Set(years).size ? [first, last] : null;
+}
+
+/** Entiers de `from` à `to`, bornes comprises, en sélection. */
+export function rangeSelection(from: number, to: number): string[] {
+	return Array.from({ length: to - from + 1 }, (_, i) => String(from + i));
+}
+
+/** Résumé d'une sélection de cases à cocher. Un groupe entièrement coché est nommé par son libellé ; un intervalle, par ses bornes. */
 export function checkboxSummary(filter: CheckboxFilter, selected: string[], options: FacetOption[]): string {
+	const bounds = filter.range ? rangeBounds(selected) : null;
+	if (bounds) return bounds[0] === bounds[1] ? String(bounds[0]) : `${bounds[0]}–${bounds[1]}`;
 	const text = new Map(options.map((o) => [o.value, o.text]));
 	const parts: string[] = [];
 	let rest = selected;

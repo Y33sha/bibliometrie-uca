@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { FacetOption } from '#lib/components/FacetDropdown.svelte';
 
-	// Options d'un filtre à cases à cocher : recherche, « Effacer », options avec leur décompte. Partagé par la liste déroulante d'un filtre et le panneau des filtres.
+	// Options d'un filtre à cases à cocher : recherche, « Effacer », options avec leur décompte. Une option de décompte nul est omise, sauf cochée. Partagé par la liste déroulante d'un filtre et le panneau des filtres.
 	interface Props {
 		options: FacetOption[];
 		searchable?: boolean;
@@ -18,11 +18,17 @@
 
 	let { options, searchable = false, selected = $bindable([]), groups, limit, bars = false, onchange }: Props = $props();
 
+	/** Nombre d'options au-delà duquel une liste sans limite propose la recherche. */
+	const SEARCH_THRESHOLD = 10;
+
 	let filterText = $state('');
 	let showAll = $state(false);
 
+	const available = $derived(options.filter((o) => o.count !== 0 || selected.includes(o.value)));
+	// La recherche sert quand des options sont masquées, ou quand la liste est longue.
+	const showSearch = $derived(searchable && available.length > (limit ?? SEARCH_THRESHOLD));
 	const matching = $derived(
-		filterText ? options.filter((o) => o.text.toLowerCase().includes(filterText.toLowerCase())) : options,
+		filterText ? available.filter((o) => o.text.toLowerCase().includes(filterText.toLowerCase())) : available,
 	);
 	const truncated = $derived(limit !== undefined && !showAll && !filterText && matching.length > limit);
 	const shown = $derived(
@@ -51,7 +57,7 @@
 	</label>
 {/snippet}
 
-{#if searchable}
+{#if showSearch}
 	<input type="text" class="panel-search input-sm" placeholder="Filtrer" aria-label="Filtrer les options" bind:value={filterText} />
 {/if}
 {#if selected.length}
@@ -84,9 +90,6 @@
 		font-weight: 600;
 		color: var(--muted);
 	}
-	.facet-options label {
-		white-space: nowrap;
-	}
 	/* Barre de décompte : une deuxième ligne de la grille, sous le libellé. */
 	.option-row.with-bar {
 		display: grid;
@@ -102,9 +105,5 @@
 	}
 	.option-bar.checked {
 		background: var(--accent-mid);
-	}
-	.facet-more {
-		color: var(--accent);
-		font-size: var(--fs-sm);
 	}
 </style>

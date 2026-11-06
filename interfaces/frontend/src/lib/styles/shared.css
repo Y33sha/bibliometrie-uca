@@ -416,6 +416,11 @@ input[type='search']::-webkit-search-cancel-button {
 .facet-clear {
 	color: var(--accent);
 }
+/* Affiche les options masquées d'une facette, ou les masque à nouveau. */
+.facet-more {
+	color: var(--accent);
+	font-size: var(--fs-sm);
+}
 .facet-options input[type='checkbox'],
 .facet-options input[type='radio'] {
 	margin: 0;

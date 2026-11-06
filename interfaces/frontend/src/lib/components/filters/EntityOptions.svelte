@@ -21,9 +21,13 @@
 		onchange?: (ids: string[]) => void;
 		/** Appelé après un choix, en choix simple. */
 		onchosen?: () => void;
+		/** Nombre de résultats affichés avant le bouton qui affiche les autres. Sans valeur, tous les résultats s'affichent. */
+		limit?: number;
 	}
 
-	let { endpoint, kind, buildParams, selected = [], multiple = false, onchange, onchosen }: Props = $props();
+	let { endpoint, kind, buildParams, selected = [], multiple = false, onchange, onchosen, limit }: Props = $props();
+
+	let showAll = $state(false);
 
 	interface Result {
 		value: string;
@@ -45,6 +49,10 @@
 			? [...results.filter((r) => selected.includes(r.value)), ...results.filter((r) => !selected.includes(r.value))]
 			: results,
 	);
+	const shownResults = $derived(
+		limit === undefined || showAll ? orderedResults : orderedResults.filter((r, i) => i < limit || selected.includes(r.value)),
+	);
+	const hiddenCount = $derived(orderedResults.length - shownResults.length);
 
 	const filterKey = $derived(buildParams().toString());
 	$effect(() => {
@@ -97,7 +105,7 @@
 			<span class="facet-option-text" title={names.labels[id] ?? id}>{names.labels[id] ?? id}</span>
 		</label>
 	{/each}
-	{#each orderedResults as e (e.value)}
+	{#each shownResults as e (e.value)}
 		<label class="option-row">
 			<input type={multiple ? 'checkbox' : 'radio'} checked={selected.includes(e.value)} onchange={() => pick(e)} />
 			<span class="facet-option-text" title={e.text}>{e.text}</span><span class="facet-count">{e.count}</span>
@@ -107,6 +115,11 @@
 		<div class="facet-empty">Aucun résultat</div>
 	{/if}
 </div>
+{#if hiddenCount > 0}
+	<button type="button" class="option-row facet-more" onclick={() => (showAll = true)}>{hiddenCount.toLocaleString('fr-FR')} autres</button>
+{:else if showAll}
+	<button type="button" class="option-row facet-more" onclick={() => (showAll = false)}>Réduire</button>
+{/if}
 
 <style>
 	.facet-empty {
