@@ -64,18 +64,12 @@
 		selected = next;
 		onchange?.(selected);
 	}
-
-	function clear() {
-		selected = [];
-		onchange?.(selected);
-	}
 </script>
 
 {#if n}
 	<div class="range" style:--n={n}>
 		<div class="range-head">
 			<span class="range-value" class:filtered aria-live="polite">{summary}</span>
-			{#if selected.length}<button type="button" class="btn-text facet-clear" onclick={clear}>Effacer</button>{/if}
 		</div>
 		<div class="histogram" aria-hidden="true">
 			{#each span as year, i (year)}
@@ -101,9 +95,6 @@
 		padding-top: 2px;
 	}
 	.range-head {
-		display: flex;
-		align-items: baseline;
-		justify-content: space-between;
 		font-size: var(--fs-sm);
 	}
 	.range-value {

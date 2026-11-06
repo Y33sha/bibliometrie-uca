@@ -23,9 +23,11 @@
 		onchosen?: () => void;
 		/** Nombre de résultats affichés avant le bouton qui affiche les autres. Sans valeur, tous les résultats s'affichent. */
 		limit?: number;
+		/** Bouton « Effacer » en tête des options. Le panneau des filtres le place sur la ligne du nom du filtre. */
+		clearable?: boolean;
 	}
 
-	let { endpoint, kind, buildParams, selected = [], multiple = false, onchange, onchosen, limit }: Props = $props();
+	let { endpoint, kind, buildParams, selected = [], multiple = false, onchange, onchosen, limit, clearable = true }: Props = $props();
 
 	let showAll = $state(false);
 
@@ -101,7 +103,7 @@
 {#if showSearch}
 	<input type="text" class="panel-search input-sm" placeholder="Rechercher" aria-label="Rechercher" bind:value={query} oninput={onInput} />
 {/if}
-{#if selected.length}
+{#if clearable && selected.length}
 	<button type="button" class="option-row facet-clear" onclick={() => pick(null)}>Effacer</button>
 {/if}
 <div class="facet-options">

@@ -1,12 +1,15 @@
 <script lang="ts">
+	import { SvelteSet } from 'svelte/reactivity';
 	import type { FacetOption } from '#lib/components/FacetDropdown.svelte';
 	import CheckboxOptions from '#lib/components/filters/CheckboxOptions.svelte';
 	import EntityOptions from '#lib/components/filters/EntityOptions.svelte';
 	import PresenceOptions from '#lib/components/filters/PresenceOptions.svelte';
 	import RangeOptions from '#lib/components/filters/RangeOptions.svelte';
 	import {
+		clearValue,
 		filterGroups,
 		isActive,
+		isAvailable,
 		isShown,
 		type CheckboxFilter,
 		type FilterGroup,
@@ -16,6 +19,7 @@
 	import type { useFilterPanel } from '#lib/composables/useFilterPanel.svelte.js';
 
 	// Panneau des filtres d'une liste : les filtres du registre, par rubrique, chacun dépliable. Un filet sépare les rubriques. Les décomptes suivent les filtres actifs.
+	// Le contenu reste en place sous le pointeur : « Effacer » figure sur la ligne du nom du filtre, un filtre affiché reste affiché, et le panneau défile d'autant quand le contenu situé au-dessus du dernier filtre manipulé change de hauteur.
 	let {
 		filters,
 		groups,
@@ -63,36 +67,74 @@
 		values.checkbox[filter.key] = filter.normalize ? filter.normalize(selected) : selected;
 		onchange();
 	}
+
+	function clear(filter: ListFilter) {
+		clearValue(filter, values);
+		onchange();
+	}
+
+	// Filtres déjà affichés : ils restent affichés, même sans option de décompte non nul.
+	const everShown = new SvelteSet<string>();
+	const visible = (f: ListFilter): boolean =>
+		isAvailable(f) && (everShown.has(f.key) || isShown(f, values, nonZeroOptions, sourceCounts));
+	$effect(() => {
+		for (const f of filters) if (visible(f)) everShown.add(f.key);
+	});
+
+	// Ancrage : le filtre manipulé en dernier et sa position à l'écran. Quand le panneau change de hauteur, il défile d'autant que le filtre s'est déplacé. L'ancrage expire après le rechargement des décomptes, ou dès que l'utilisateur fait défiler le panneau.
+	const ANCHOR_MS = 3000;
+	let aside: HTMLElement | undefined = $state();
+	let anchor: { el: Element; top: number; until: number } | null = null;
+
+	function setAnchor(e: Event) {
+		const block = (e.target as Element).closest('.filter-block');
+		anchor = block ? { el: block, top: block.getBoundingClientRect().top, until: performance.now() + ANCHOR_MS } : null;
+	}
+
+	$effect(() => {
+		const scroller = aside?.parentElement;
+		if (!aside || !scroller) return;
+		const observer = new ResizeObserver(() => {
+			if (!anchor || performance.now() > anchor.until || !anchor.el.isConnected) return;
+			const delta = anchor.el.getBoundingClientRect().top - anchor.top;
+			if (delta) scroller.scrollTop += delta;
+		});
+		observer.observe(aside);
+		return () => observer.disconnect();
+	});
 </script>
 
-<aside id="filter-panel" class="filter-panel" aria-label="Filtres">
+<aside id="filter-panel" class="filter-panel" aria-label="Filtres" bind:this={aside} onpointerdowncapture={setAnchor} onkeydowncapture={setAnchor} onwheel={() => (anchor = null)} ontouchmove={() => (anchor = null)}>
 	<div class="filter-panel-head">
 		<span class="filter-panel-title">Filtres</span>
 		<button type="button" class="btn-text filter-panel-close" onclick={() => (panel.open = false)}>Fermer</button>
 	</div>
 	{#each sections as s (s.group.key)}
-		{@const shown = s.filters.filter((f) => isShown(f, values, nonZeroOptions, sourceCounts))}
+		{@const shown = s.filters.filter(visible)}
 		{#if shown.length}
 			<section class="filter-group" aria-label={s.group.label}>
 				{#each shown as f (f.key)}
 					{@const open = panel.isExpanded(f.key)}
-					{@const count = selectionCount(f)}
+					{@const active = isActive(f, values)}
 					<div class="filter-block">
-						<button type="button" class="filter-head" aria-expanded={open} title={f.tooltip} onclick={() => panel.setExpanded(f.key, !open)}>
-							<span class="filter-name">{f.label}</span>
-							{#if count && isActive(f, values)}<span class="facet-badge">{count}</span>{/if}
-							<span class="chevron" class:up={open} aria-hidden="true"></span>
-						</button>
+						<div class="filter-head-row">
+							<button type="button" class="filter-head" class:with-clear={active} aria-expanded={open} title={f.tooltip} onclick={() => panel.setExpanded(f.key, !open)}>
+								<span class="filter-name">{f.label}</span>
+								{#if active}<span class="facet-badge">{selectionCount(f)}</span>{/if}
+								<span class="chevron" class:up={open} aria-hidden="true"></span>
+							</button>
+							{#if active}<button type="button" class="btn-text filter-clear" aria-label="Effacer le filtre {f.label}" onclick={() => clear(f)}>Effacer</button>{/if}
+						</div>
 						{#if open}
 							<div class="filter-body">
 								{#if f.control === 'checkbox' && f.range}
 									<RangeOptions options={options[f.key] ?? []} bind:selected={values.checkbox[f.key]} onchange={(selected) => onCheckboxChange(f, selected)} />
 								{:else if f.control === 'checkbox'}
-									<CheckboxOptions options={options[f.key] ?? []} searchable={f.searchable} groups={f.groups} groupSeparators limit={OPTION_LIMIT} bind:selected={values.checkbox[f.key]} onchange={(selected) => onCheckboxChange(f, selected)} />
+									<CheckboxOptions options={options[f.key] ?? []} searchable={f.searchable} groups={f.groups} groupSeparators limit={OPTION_LIMIT} clearable={false} bind:selected={values.checkbox[f.key]} onchange={(selected) => onCheckboxChange(f, selected)} />
 								{:else if f.control === 'entity'}
-									<EntityOptions endpoint={entityEndpoint} kind={f.entity} multiple={f.multiple} limit={OPTION_LIMIT} {buildParams} selected={values.entity[f.key]} onchange={(ids) => { values.entity[f.key] = ids; onchange(); }} />
+									<EntityOptions endpoint={entityEndpoint} kind={f.entity} multiple={f.multiple} limit={OPTION_LIMIT} clearable={false} {buildParams} selected={values.entity[f.key]} onchange={(ids) => { values.entity[f.key] = ids; onchange(); }} />
 								{:else}
-									<PresenceOptions items={f.items} bind:states={values.presence[f.key]} counts={sourceCounts} {onchange} />
+									<PresenceOptions items={f.items} bind:states={values.presence[f.key]} counts={sourceCounts} clearable={false} {onchange} />
 								{/if}
 							</div>
 						{/if}
@@ -151,6 +193,24 @@
 	}
 	.filter-head .chevron {
 		margin-left: auto;
+	}
+	/* « Effacer » se pose sur la ligne du nom, devant le chevron, sans ajouter de ligne. */
+	.filter-head-row {
+		position: relative;
+	}
+	.filter-head.with-clear {
+		padding-right: 76px;
+	}
+	.filter-head.with-clear .chevron {
+		position: absolute;
+		right: 6px;
+	}
+	.filter-clear {
+		position: absolute;
+		top: 50%;
+		right: 26px;
+		transform: translateY(-50%);
+		font-size: var(--fs-sm);
 	}
 	.filter-body {
 		margin: 0 0 6px;

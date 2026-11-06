@@ -1,7 +1,8 @@
 <script lang="ts">
+	import { SvelteSet } from 'svelte/reactivity';
 	import type { FacetOption } from '#lib/components/FacetDropdown.svelte';
 
-	// Options d'un filtre à cases à cocher : recherche, « Effacer », options avec leur décompte. Une option de décompte nul est omise, sauf cochée. Partagé par la liste déroulante d'un filtre et le panneau des filtres.
+	// Options d'un filtre à cases à cocher : recherche, « Effacer », options avec leur décompte. Une option de décompte nul est omise, sauf cochée ou déjà affichée : une option affichée reste à sa place, grisée, quand son décompte tombe à zéro, pour que la liste ne change pas de hauteur sous le pointeur. Partagé par la liste déroulante d'un filtre et le panneau des filtres.
 	interface Props {
 		options: FacetOption[];
 		searchable?: boolean;
@@ -13,10 +14,15 @@
 		groupSeparators?: boolean;
 		/** Nombre d'options affichées avant le bouton qui affiche les autres. Les options cochées restent toujours affichées. Sans valeur, toutes les options s'affichent. */
 		limit?: number;
+		/** Bouton « Effacer » en tête des options. Le panneau des filtres le place sur la ligne du nom du filtre. */
+		clearable?: boolean;
 		onchange?: (selected: string[]) => void;
 	}
 
-	let { options, searchable = false, selected = $bindable([]), groups, groupSeparators = false, limit, onchange }: Props = $props();
+	let { options, searchable = false, selected = $bindable([]), groups, groupSeparators = false, limit, clearable = true, onchange }: Props = $props();
+
+	// Options déjà affichées.
+	const seen = new SvelteSet<string>();
 
 	/** Nombre d'options au-delà duquel une liste sans limite propose la recherche. */
 	const SEARCH_THRESHOLD = 10;
@@ -24,7 +30,7 @@
 	let filterText = $state('');
 	let showAll = $state(false);
 
-	const available = $derived(options.filter((o) => o.count !== 0 || selected.includes(o.value)));
+	const available = $derived(options.filter((o) => o.count !== 0 || selected.includes(o.value) || seen.has(o.value)));
 	// La recherche sert quand des options sont masquées, ou quand la liste est longue.
 	const showSearch = $derived(searchable && available.length > (limit ?? SEARCH_THRESHOLD));
 	const matching = $derived(
@@ -43,6 +49,10 @@
 		return [...grouped, { label: '', options: rest }].filter((s) => s.options.length);
 	});
 
+	$effect(() => {
+		for (const o of shown) seen.add(o.value);
+	});
+
 	function toggle(value: string) {
 		selected = selected.includes(value) ? selected.filter((v) => v !== value) : [...selected, value];
 		onchange?.(selected);
@@ -57,7 +67,7 @@
 {#if showSearch}
 	<input type="text" class="panel-search input-sm" placeholder="Filtrer" aria-label="Filtrer les options" bind:value={filterText} />
 {/if}
-{#if selected.length}
+{#if clearable && selected.length}
 	<button type="button" class="option-row facet-clear" onclick={clear}>Effacer</button>
 {/if}
 <div class="facet-options">
@@ -68,8 +78,9 @@
 			<div class="facet-group-label">{s.label}</div>
 		{/if}
 		{#each s.options as opt (opt.value)}
-			<label class="option-row">
-				<input type="checkbox" checked={selected.includes(opt.value)} onchange={() => toggle(opt.value)} />
+			{@const empty = opt.count === 0 && !selected.includes(opt.value)}
+			<label class="option-row" class:empty>
+				<input type="checkbox" checked={selected.includes(opt.value)} disabled={empty} onchange={() => toggle(opt.value)} />
 				<span class="facet-option-text" title={opt.text}>{opt.text}</span>{#if opt.count != null}<span class="facet-count">{opt.count.toLocaleString('fr-FR')}</span>{/if}
 			</label>
 		{/each}
@@ -89,6 +100,11 @@
 		font-size: var(--fs-sm);
 		font-weight: 600;
 		color: var(--muted);
+	}
+	/* Option restée affichée dont le décompte est tombé à zéro. */
+	.option-row.empty {
+		color: var(--text-faint);
+		cursor: default;
 	}
 	.facet-group-separator {
 		margin: 3px 0;

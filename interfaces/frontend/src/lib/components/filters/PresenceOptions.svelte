@@ -19,6 +19,8 @@
 		counts?: Record<string, { yes: number; no: number }>;
 		/** Si true (défaut), affiche toujours le décompte des « présents » (counts.yes) quel que soit l'état du toggle. Garde une référence stable pendant que l'utilisateur cycle ses filtres. Passer false pour faire suivre le décompte (yes → présents, no → absents, all → total). */
 		staticPresentCount?: boolean;
+		/** Bouton « Effacer » en tête des options. Le panneau des filtres le place sur la ligne du nom du filtre. */
+		clearable?: boolean;
 		onchange?: (states: Record<string, ToggleState>) => void;
 	}
 
@@ -28,6 +30,7 @@
 		checkedLevels = $bindable([]),
 		counts = {},
 		staticPresentCount = true,
+		clearable = true,
 		onchange,
 	}: Props = $props();
 
@@ -90,7 +93,7 @@
 	}
 </script>
 
-{#if activeCount > 0}
+{#if clearable && activeCount > 0}
 	<button type="button" class="option-row facet-clear" onclick={clear}>Effacer</button>
 {/if}
 {#each shownItems as item (item.key)}

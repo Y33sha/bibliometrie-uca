@@ -47,7 +47,7 @@
 	}
 	/* Au clavier, la barre apparaît tant que le focus est dans le panneau. Un clic laisse le focus sur le bouton cliqué : seul le focus clavier compte. */
 	.filter-layout-panel:hover,
-	.filter-layout-panel:has(:focus-visible) {
+	.filter-layout-panel:has(:global(:focus-visible)) {
 		--scroll-thumb: var(--text-faint);
 	}
 	.filter-layout-backdrop {
