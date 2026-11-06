@@ -579,9 +579,16 @@
 		gap: 4px;
 	}
 	/* Sens du tri : « A→Z » ou flèche, collé à la liste du tri. */
+	/* Même largeur pour la flèche et pour « A→Z », contenu calé à gauche, près de la liste du tri. Au survol, seule la couleur change. */
 	.sort-dir {
+		width: 3em;
+		justify-content: flex-start;
 		padding: 0 4px;
-		margin-left: -6px;
+		margin-left: 2px;
+	}
+	.sort-dir:hover {
+		background: none;
+		color: color-mix(in srgb, var(--accent), black 25%);
 	}
 	/* Flèche haute, vers le bas pour un ordre décroissant, retournée pour un ordre croissant. */
 	.sort-dir-icon.up {
