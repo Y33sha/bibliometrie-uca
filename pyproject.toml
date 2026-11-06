@@ -307,6 +307,8 @@ testpaths = ["tests"]
 addopts = "-q --import-mode=importlib"
 # Les tests `async def` sont reconnus sans décorateur.
 asyncio_mode = "auto"
+# Chaque fixture asynchrone a sa propre boucle d'événements.
+asyncio_default_fixture_loop_scope = "function"
 
 [tool.coverage.run]
 branch = true
