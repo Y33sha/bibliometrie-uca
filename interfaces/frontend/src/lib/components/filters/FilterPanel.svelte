@@ -27,6 +27,7 @@
 		options,
 		sourceCounts,
 		loaded,
+		collapsed = false,
 		entityEndpoint,
 		buildParams,
 		panel,
@@ -42,6 +43,8 @@
 		sourceCounts: Record<string, { yes: number; no: number }>;
 		/** Décomptes chargés au moins une fois. Avant, tous les filtres proposés par la page s'affichent. */
 		loaded: boolean;
+		/** Filtres repliés à l'ouverture de la page, sauf les filtres actifs. Sans cette option, tous les filtres sont dépliés. */
+		collapsed?: boolean;
 		/** Base de la facette contextuelle des filtres d'entité. */
 		entityEndpoint: string;
 		/** Paramètres des filtres actifs, pour la facette contextuelle des entités. */
@@ -119,7 +122,7 @@
 			<section class="filter-group" aria-label={s.group.label}>
 				{#each shown as f (f.key)}
 					{@const active = isActive(f, values)}
-					{@const open = panel.isExpanded(f.key, active)}
+					{@const open = panel.isExpanded(f.key, active || !collapsed)}
 					<div class="filter-block">
 						<div class="filter-head-row">
 							<button type="button" class="filter-head" class:with-clear={active} aria-expanded={open} title={f.tooltip} onclick={() => panel.setExpanded(f.key, !open)}>

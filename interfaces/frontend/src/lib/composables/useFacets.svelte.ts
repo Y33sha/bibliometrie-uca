@@ -23,6 +23,8 @@ interface LabelMapFacet {
 	type: 'label_map';
 	apiKey: string;
 	labels: Record<string, string>;
+	/** Retient seulement les valeurs de `labels`. */
+	onlyLabeled?: boolean;
 }
 
 interface LabeledFacet {
@@ -93,7 +95,9 @@ export function useFacets<K extends string>(config: FacetsConfig<K>) {
 					}));
 					break;
 				case 'label_map':
-					newOpts[key] = (raw as { value: string; count: number }[]).map((item) => ({
+					newOpts[key] = (raw as { value: string; count: number }[])
+						.filter((item) => !def.onlyLabeled || item.value in def.labels)
+						.map((item) => ({
 						value: String(item.value),
 						text: def.labels[item.value] || String(item.value),
 						count: item.count,

@@ -20,6 +20,25 @@ export const PUBLICATION_FILTER_GROUPS: readonly FilterGroup[] = [
 	{ key: 'sources', label: 'Sources' },
 ];
 
+/**
+ * Filtre des laboratoires des publications, avec l'option « Aucun labo » (`none`, ajoutée aux décomptes par `usePublicationFacets`). `fixed` renvoie le laboratoire imposé par la page.
+ *
+ * « Aucun labo » exclut les laboratoires : la cocher décoche les laboratoires, cocher un laboratoire la décoche. Une case cochée s'ajoute à la fin de la sélection : la dernière valeur est celle qui vient d'être cochée.
+ */
+export function labsFilter(group: string, fixed: () => string | null): ListFilter {
+	return {
+		key: 'labs',
+		control: 'checkbox',
+		label: filterLabels.labs,
+		param: 'lab_id',
+		group,
+		facet: { type: 'labeled', apiKey: 'labs' },
+		searchable: true,
+		fixed,
+		normalize: (selected) => (selected.at(-1) === 'none' ? ['none'] : selected.filter((v) => v !== 'none')),
+	};
+}
+
 /** Filtres des publications dans le contexte, dans l'ordre d'affichage au sein de chaque rubrique. */
 export function publicationFilters(context: PublicationListContext): ListFilter[] {
 	return [
@@ -88,21 +107,7 @@ export function publicationFilters(context: PublicationListContext): ListFilter[
 			group: 'authors',
 			entity: 'person',
 		},
-		{
-			key: 'labs',
-			control: 'checkbox',
-			label: filterLabels.labs,
-			param: 'lab_id',
-			group: 'authors',
-			facet: { type: 'labeled', apiKey: 'labs' },
-			searchable: true,
-			fixed: () => contextEntityId(context, 'lab'),
-			// « Aucun labo » ne se combine pas avec un laboratoire.
-			normalize: (selected) =>
-				selected.includes('none') && selected.length > 1
-					? selected.filter((v) => v !== 'none')
-					: selected,
-		},
+		labsFilter('authors', () => contextEntityId(context, 'lab')),
 		{
 			key: 'authorPosition',
 			control: 'checkbox',

@@ -94,6 +94,22 @@ describe('useFacets', () => {
 		]);
 	});
 
+	it('retient seulement les valeurs nommées du type "label_map" avec onlyLabeled', async () => {
+		apiResponse = {
+			doc_types: [{ value: 'thesis', count: 50 }, { value: 'article', count: 3 }],
+		};
+		const f = useFacets({
+			endpoint: '/x',
+			apiKey: 'k',
+			buildParams: () => new URLSearchParams(),
+			facets: {
+				status: { type: 'label_map', apiKey: 'doc_types', labels: { thesis: 'Soutenues' }, onlyLabeled: true },
+			},
+		});
+		await f.load();
+		expect(f.options.status).toEqual([{ value: 'thesis', text: 'Soutenues', count: 50 }]);
+	});
+
 	it('mappe le type "labeled" (avec label inclus dans la réponse)', async () => {
 		apiResponse = { labs: [{ value: 42, label: 'Mon Labo', count: 100 }] };
 		const f = useFacets({
