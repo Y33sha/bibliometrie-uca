@@ -8,17 +8,17 @@ version = "0.1.0"
 requires-python = ">=3.14"
 dependencies = [
     "httpx2==2.16.0",            # client HTTP unique du projet
-    "psycopg[binary]==3.3.6",    # driver PostgreSQL de SQLAlchemy
+    "psycopg[binary]==3.3.7",    # driver PostgreSQL de SQLAlchemy
     "sqlalchemy==2.1.6",         # query builder Core
     "alembic==1.20.1",           # migrations DB
     "fastapi==0.162.0",
     "starlette==1.10.0",          # importé directement (Response, Scope, RequestResponseEndpoint)
-    "anyio==4.15.1",             # importé directement : taille du threadpool posée au démarrage de l'API
+    "anyio==4.16.0",             # importé directement : taille du threadpool posée au démarrage de l'API
     "uvicorn==0.54.0",           # serveur ASGI ; lancé en ligne de commande, jamais importé
     "bcrypt==5.0.0",
     "python-dotenv==1.2.4",      # requis par pydantic-settings pour env_file ; jamais importé
-    "pydantic==2.14.1",          # requis par pydantic-settings et utilisé directement
-    "pydantic-settings==2.16.1",
+    "pydantic==2.14.2",          # requis par pydantic-settings et utilisé directement
+    "pydantic-settings==2.16.2",
     "pyahocorasick==2.3.1",      # automate Aho-Corasick : matching multi-formes des adresses (phase affiliations)
     "defusedxml==0.7.1",         # lecture du TEI des enregistrements HAL, sans développer les entités XML
     "orjson>=3.13.0",
@@ -34,7 +34,7 @@ migrate_all = "interfaces.cli.dev.migrate_all:main"
 # Outils de développement et de test. `uv sync` les installe par défaut ; `--no-dev` les écarte.
 [dependency-groups]
 dev = [
-    "pytest==9.1.1",
+    "pytest==9.2.0",
     "pytest-asyncio==1.4.1.post1",   # tests des moissonnages HTTP async du pipeline
     "pytest-cov==7.1.0",
     "ruff==0.17.3",
@@ -46,7 +46,7 @@ dev = [
     "import-linter==2.15",
     "pyyaml==6.0.3",           # lecture des descriptions de déploiement par les tests
     "tqdm==4.70.1",            # barres de progression du pipeline, importées sous `try` (cf. pipeline/runtime/observability/progression.py)
-    "zensical==0.0.73",            # site de la documentation, construit depuis docs/ et zensical.toml
+    "zensical==0.0.74",            # site de la documentation, construit depuis docs/ et zensical.toml
     "mkdocstrings-python==2.0.10", # référence du code dans le site, générée depuis les docstrings
     "playwright==1.64.1",          # captures d'écran du guide utilisateur (interfaces/cli/dev/screenshots.py)
 ]
