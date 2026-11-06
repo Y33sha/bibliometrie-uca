@@ -327,3 +327,82 @@ class TestGetPublicationSubjects:
         assert detail.subjects[0].sources == ["wos"]
         # Les mots-clés libres, hors du référentiel `subjects`, sont renvoyés à part.
         assert detail.keywords == []
+
+
+class TestPatentMeta:
+    def _patent(self, conn) -> tuple[int, int, int]:
+        uca = insert_structure(
+            conn, "UCA", structure_type="universite", api_ids={"scanr_patents": ["K4lR3"]}
+        )
+        chu = insert_structure(conn, "CHU", structure_type="chu")
+        conn.execute(text("UPDATE structures SET ror_id = '02tcf7a68' WHERE id = :id"), {"id": chu})
+        extras = {
+            "patent_applicants": [
+                {
+                    "name": "Université Clermont Auvergne",
+                    "type": "organisation",
+                    "country": "FR",
+                    "ids": {"paysage": ["K4lR3"]},
+                },
+                {
+                    "name": "CHU de Clermont-Ferrand",
+                    "type": "organisation",
+                    "country": None,
+                    "ids": {"ror": ["02tcf7a68"]},
+                },
+                {
+                    "name": "CHU de Clermont-Ferrand",
+                    "type": "organisation",
+                    "country": "FR",
+                    "ids": {"ror": ["02tcf7a68"]},
+                },
+                {"name": "Dupont Jean", "type": "person", "country": "FR", "ids": {}},
+            ],
+            "patent_applications": [
+                {
+                    "office": "WO",
+                    "publication_number": "2013050700A2",
+                    "application_date": "2012-10-03",
+                    "priority": False,
+                    "granted": False,
+                },
+                {
+                    "office": "FR",
+                    "publication_number": "2980802A1",
+                    "application_date": "2011-10-03",
+                    "priority": True,
+                    "granted": True,
+                },
+            ],
+            "cpc": [{"code": "C12P21/04", "label": None}],
+        }
+        publication = insert_publication(conn, doc_type="patent")
+        conn.execute(
+            text("UPDATE publications SET source_extras = CAST(:e AS jsonb) WHERE id = :id"),
+            {"e": json.dumps(extras), "id": publication},
+        )
+        return publication, uca, chu
+
+    def test_deposants_rattaches_aux_structures_sans_doublon(self, sa_sync_conn):
+        publication, uca, chu = self._patent(sa_sync_conn)
+        detail = publications_queries(sa_sync_conn).get_publication_detail(publication)
+        assert detail is not None and detail.patent_meta is not None
+        assert [(a.name, a.country, a.structure_id) for a in detail.patent_meta.applicants] == [
+            ("Université Clermont Auvergne", "FR", uca),
+            ("CHU de Clermont-Ferrand", "FR", chu),
+            ("Dupont Jean", "FR", None),
+        ]
+        assert {str(uca), str(chu)} <= set(detail.structures)
+
+    def test_demandes_par_date_de_depot(self, sa_sync_conn):
+        publication, _, _ = self._patent(sa_sync_conn)
+        detail = publications_queries(sa_sync_conn).get_publication_detail(publication)
+        assert detail is not None and detail.patent_meta is not None
+        assert [a.office for a in detail.patent_meta.applications] == ["FR", "WO"]
+        assert detail.patent_meta.cpc[0].label is None
+
+    def test_absent_hors_brevet(self, sa_sync_conn):
+        detail = publications_queries(sa_sync_conn).get_publication_detail(
+            insert_publication(sa_sync_conn)
+        )
+        assert detail is not None and detail.patent_meta is None
