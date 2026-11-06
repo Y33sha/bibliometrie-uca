@@ -126,7 +126,6 @@ def _application_extra(application: Mapping[str, JsonValue]) -> dict[str, JsonVa
         "priority": application.get("isPriority") is True,
         "granted": application.get("isGranted") is True,
         "ip_type": as_str(application.get("ipType")),
-        "espacenet_url": as_str(application.get("espacenetUrl")),
     }
 
 
@@ -148,13 +147,23 @@ def _applicant_extra(applicant: Mapping[str, JsonValue]) -> dict[str, JsonValue]
 
 
 def _cpc(family: Mapping[str, JsonValue]) -> list[dict[str, JsonValue]]:
-    """Renvoie les codes CPC de la famille au niveau du groupe, avec leur libellé."""
+    """Renvoie les codes CPC de la famille au niveau du groupe, avec leur libellé ou `None`."""
     groups = [as_mapping(g) for g in as_sequence(as_mapping(family.get("cpc")).get("groupe"))]
     return [
-        {"code": code, "label": as_str(g.get("label"))}
+        {"code": code, "label": _cpc_label(g.get("label"))}
         for g in groups
         if (code := as_str(g.get("code")))
     ]
+
+
+_MISSING_CPC_LABEL = "non disponible"
+"""Libellé CPC de ScanR pour un code sans libellé."""
+
+
+def _cpc_label(value: JsonValue) -> str | None:
+    """Renvoie le libellé d'un code CPC, `None` s'il est absent."""
+    label = as_str(value)
+    return None if label == _MISSING_CPC_LABEL else label
 
 
 def _source_extras(family: Mapping[str, JsonValue]) -> dict[str, JsonValue] | None:

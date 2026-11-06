@@ -131,6 +131,15 @@ class TestSourceRecord:
         assert first["publication_number"] == "2957077A1"
         assert (first["application_date"], first["priority"]) == ("2010-03-02", True)
 
+    def test_demande_sans_lien_espacenet(self):
+        extras = scanr_patents_source_record(_family(), 1, "42635118").source_extras
+        assert "espacenet_url" not in extras[SourceExtra.PATENT_APPLICATIONS][0]
+
+    def test_code_cpc_sans_libelle(self):
+        cpc = {"groupe": [{"code": "C12P21/04", "label": "non disponible"}]}
+        extras = scanr_patents_source_record(_family(cpc=cpc), 1, "1").source_extras
+        assert extras[SourceExtra.CPC] == [{"code": "C12P21/04", "label": None}]
+
     def test_famille_sans_delivrance(self):
         extras = scanr_patents_source_record(_family(grantedDate=None), 1, "1").source_extras
         assert SourceExtra.PATENT_GRANT_DATE not in extras
