@@ -76,6 +76,7 @@ Familles dont un établissement du périmètre est déposant : UCA, Université 
 - Types d'identifiant `patent_publication_number` et `patent_application_number` : office et numéro, sans le code de type. Le code de type désigne l'étape de publication d'une demande : A1 pour la demande publiée avec son rapport de recherche, B1 pour le brevet délivré.
 - ScanR écrit une demande internationale `PCT/FR2011/050432` sous l'office WO, sans `PCT/` ni office de dépôt. Ses numéros de demande WO recoupent donc les numéros de publication WO d'autres familles.
 - Les numéros de publication et de demande sont des clés de confirmation à plusieurs valeurs, comme le DOI. Un dépôt HAL de brevet rejoint ainsi sa famille. Un numéro relie seulement un numéro de même type.
+- Une famille est une ancre de la réconciliation, comme un DOI. Deux familles déposées le même jour sous le même titre restent deux publications.
 - Un numéro français de sept chiffres de `number_s` est une publication s'il commence par 3, ou par une année postérieure à la date du dépôt HAL. Sinon, c'est une demande.
 - La date de publication d'un brevet est la date du premier dépôt de la famille. Les autres dates vont dans `source_extras`.
 - Un dépôt HAL de brevet sans famille en base cherche sa famille dans ScanR par numéro (`fetch_missing`).
@@ -114,8 +115,9 @@ Familles dont un établissement du périmètre est déposant : UCA, Université 
 - [x] Numéros de `number_s` lus en numéros de publication ou de demande
 - [x] `patent_publication_number` en clé de confirmation à plusieurs valeurs
 - [x] Usage de `patent_application_number` dans le rattachement, après mesure des recoupements
-- [ ] Recherche dans ScanR des familles absentes, par numéro (`fetch_missing`)
-- [ ] Mesure de l'effet sur les publications. La normalisation marque pour la réconciliation les brevets HAL et les familles écrites.
+- [x] Recherche dans ScanR des familles absentes, par numéro (`fetch_missing`)
+- [x] Mesure de l'effet sur les publications : 62 dépôts HAL sur 97 rattachés à une famille, 73 familles sur 97 rattachées à une publication
+- [x] Famille en ancre de la réconciliation
 
 ### Phase 5 — Périmètre et personnes
 
