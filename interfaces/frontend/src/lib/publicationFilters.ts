@@ -1,9 +1,9 @@
 /**
- * Registre des filtres des publications, partagé par la liste des publications et la page Statistiques.
+ * Registre des filtres des publications, partagé par les vues de la liste des publications (notices, tableau, statistiques).
  *
  * Le contexte fixe le filtre de son entité. Il active les filtres propres à l'entité : le statut HAL pour un laboratoire, la position d'auteur pour un laboratoire ou une personne.
  */
-import { ALL_TOKEN, explicitSelectionUrl, type FilterGroup, type ListFilter } from '#lib/filterRegistry.js';
+import type { FilterGroup, ListFilter } from '#lib/filterRegistry.js';
 import { SOURCE_ITEMS } from '#lib/filterItems.js';
 import { docTypeFamilies, docTypePluralLabels } from '#lib/docTypes.svelte.js';
 import { filterLabels, oaLabelsMap } from '#lib/labels.js';
@@ -20,11 +20,8 @@ export const PUBLICATION_FILTER_GROUPS: readonly FilterGroup[] = [
 	{ key: 'sources', label: 'Sources' },
 ];
 
-/** Filtres des publications dans le contexte, dans l'ordre d'affichage au sein de chaque rubrique. `defaultDocTypes` : types que la page sélectionne quand l'URL ne fixe pas les types, et que son URL omet. */
-export function publicationFilters(
-	context: PublicationListContext,
-	defaultDocTypes: readonly string[] = [],
-): ListFilter[] {
+/** Filtres des publications dans le contexte, dans l'ordre d'affichage au sein de chaque rubrique. */
+export function publicationFilters(context: PublicationListContext): ListFilter[] {
 	return [
 		{
 			key: 'docTypes',
@@ -35,7 +32,6 @@ export function publicationFilters(
 			facet: { type: 'label_map', apiKey: 'doc_types', labels: docTypePluralLabels() },
 			groups: docTypeFamilies().map((f) => ({ label: f.label, values: f.types })),
 			showColumns: ['type'],
-			url: explicitSelectionUrl(defaultDocTypes.length ? defaultDocTypes.join(',') : ALL_TOKEN),
 		},
 		{
 			key: 'years',
@@ -45,8 +41,6 @@ export function publicationFilters(
 			group: 'document',
 			facet: { type: 'simple', apiKey: 'years' },
 			range: true,
-			// Un lien vers la page Statistiques écrit `all` : elle applique alors ses années par défaut seulement à l'ouverture sans paramètre `year`.
-			url: explicitSelectionUrl(ALL_TOKEN),
 		},
 		{
 			key: 'languages',

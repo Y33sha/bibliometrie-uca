@@ -34,8 +34,6 @@ export interface CheckboxFilter extends BaseFilter {
 	groups?: { label: string; values: string[] }[];
 	/** Valeurs entières ordonnées (années) : la sélection est un intervalle, choisi par ses bornes. */
 	range?: boolean;
-	/** Écriture de la sélection dans l'URL, quand elle diffère de la liste des valeurs. `defaultValue` n'est pas écrite. */
-	url?: { encode: (selected: string[]) => string; decode: (raw: string) => string[]; defaultValue: string };
 	/** Corrige une sélection qui vient de changer. */
 	normalize?: (selected: string[]) => string[];
 }
@@ -58,22 +56,6 @@ export type ListFilter = CheckboxFilter | EntityChoiceFilter | PresenceFilter;
 export interface FilterGroup {
 	key: string;
 	label: string;
-}
-
-/** Jeton d'URL d'une sélection vide, qui retient toutes les valeurs. */
-export const ALL_TOKEN = 'all';
-
-/**
- * Forme d'URL d'une sélection explicite : les valeurs séparées par des virgules, ou `all` pour une sélection vide.
- *
- * Une page distingue ainsi « toutes les valeurs » de l'absence du paramètre, qui lui laisse appliquer sa sélection par défaut. `defaultValue` est la forme que l'URL de la page omet.
- */
-export function explicitSelectionUrl(defaultValue: string): NonNullable<CheckboxFilter['url']> {
-	return {
-		encode: (selected) => (selected.length ? selected.join(',') : ALL_TOKEN),
-		decode: (raw) => (raw === ALL_TOKEN ? [] : raw.split(',')),
-		defaultValue,
-	};
 }
 
 /** Valeurs des filtres, par type de contrôle et par clé. Un filtre d'entité porte des ids : un au plus en choix simple. */
@@ -240,24 +222,6 @@ function paramValue(filter: ListFilter, values: FilterValues): string | null {
 	return encodePresence(values.presence[filter.key] ?? {}) || null;
 }
 
-/**
- * Filtres de la page, écrits pour l'URL d'une autre page qui partage le registre.
- *
- * La valeur fixée par la page devient une sélection ordinaire. Une sélection dont l'URL a une forme propre est toujours écrite : la page cible n'applique donc pas sa sélection par défaut.
- */
-export function transferParams(filters: ListFilter[], values: FilterValues): URLSearchParams {
-	const params = new URLSearchParams();
-	for (const f of filters) {
-		if (f.control === 'checkbox' && f.url && (f.fixed?.() ?? null) === null) {
-			params.set(f.param, f.url.encode(values.checkbox[f.key] ?? []));
-			continue;
-		}
-		const value = paramValue(f, values);
-		if (value !== null) params.set(f.param, value);
-	}
-	return params;
-}
-
 export function appendFilterParams(
 	filters: ListFilter[],
 	values: FilterValues,
@@ -267,11 +231,6 @@ export function appendFilterParams(
 		const value = paramValue(f, values);
 		if (value !== null) params.set(f.param, value);
 	}
-}
-
-/** Filtres sélectionnés que la page ne propose pas, par exemple lus dans l'URL d'un lien venu d'une autre page. La requête les ignore. */
-export function ignoredFilters(filters: ListFilter[], values: FilterValues): ListFilter[] {
-	return filters.filter((f) => !(f.enabled?.() ?? true) && isActive(f, values));
 }
 
 /** Configuration des décomptes pour `useFacets`, par clé de filtre. */
@@ -285,9 +244,7 @@ export function facetDefs(filters: ListFilter[]): Record<string, FacetDef> {
 export function urlFilterDefs(filters: ListFilter[]): Record<string, UrlFilterDef> {
 	const defs: Record<string, UrlFilterDef> = {};
 	for (const f of filters) {
-		if (f.control === 'checkbox' && f.url) {
-			defs[f.key] = { type: 'single', urlKey: f.param, defaultValue: f.url.defaultValue };
-		} else if (f.control === 'presence') {
+		if (f.control === 'presence') {
 			defs[f.key] = { type: 'source_states', urlKey: f.param };
 		} else {
 			defs[f.key] = { type: 'string_array', urlKey: f.param };
@@ -301,8 +258,7 @@ export function urlState(filters: ListFilter[], values: FilterValues): Record<st
 	const state: Record<string, unknown> = {};
 	for (const f of filters) {
 		if (f.control === 'checkbox') {
-			const selected = values.checkbox[f.key] ?? [];
-			state[f.key] = f.url ? f.url.encode(selected) : selected;
+			state[f.key] = values.checkbox[f.key] ?? [];
 		} else if (f.control === 'entity') {
 			state[f.key] = values.entity[f.key] ?? [];
 		} else {
@@ -322,7 +278,7 @@ export function restoreValues(
 		const raw = restored[f.key];
 		if (raw == null || raw === '') continue;
 		if (f.control === 'checkbox') {
-			values.checkbox[f.key] = f.url ? f.url.decode(raw as string) : (raw as string[]);
+			values.checkbox[f.key] = raw as string[];
 		} else if (f.control === 'entity') {
 			values.entity[f.key] = raw as string[];
 		} else {

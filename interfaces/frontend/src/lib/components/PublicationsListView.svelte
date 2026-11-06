@@ -19,7 +19,7 @@
 	import { useFilterPanel } from '#lib/composables/useFilterPanel.svelte.js';
 	import PivotControls from '#lib/components/stats/PivotControls.svelte';
 	import PivotChart from '#lib/components/stats/PivotChart.svelte';
-	import { pivotSettingsFromUrl, pivotUrlFilters, usePivotChart } from '#lib/composables/usePivotChart.svelte.js';
+	import { PIVOT_URL_FILTERS, pivotSettingsFromUrl, usePivotChart } from '#lib/composables/usePivotChart.svelte.js';
 	import PublicationDrawer from '#lib/components/publications/PublicationDrawer.svelte';
 	import { useDrawerParam } from '#lib/composables/useDrawerParam.svelte.js';
 	import ActiveFilterBar from '#lib/components/ActiveFilterBar.svelte';
@@ -227,8 +227,7 @@
 			currentSort: { type: 'single', urlKey: 'sort', defaultValue: 'year_desc' },
 			currentPage: { type: 'page',   urlKey: 'page' },
 			view:        { type: 'single', urlKey: 'view', defaultValue: 'notices' },
-			// Réglages du graphique. Le tri du graphique prend `chart_sort` : `sort` est celui de la liste.
-			...pivotUrlFilters({ sort: 'chart_sort', sortDir: 'chart_sort_dir' }),
+			...PIVOT_URL_FILTERS,
 		},
 	});
 

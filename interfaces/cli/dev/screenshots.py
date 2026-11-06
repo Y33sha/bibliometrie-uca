@@ -46,7 +46,7 @@ class Shot:
 
 
 SHOTS = [
-    Shot("stats", "stats"),
+    Shot("stats", "publications?view=stats"),
     Shot("publications", "publications"),
     Shot("theses", "theses"),
     Shot("persons", "persons"),

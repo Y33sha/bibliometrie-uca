@@ -8,7 +8,6 @@ import {
 	clearValue,
 	coreRange,
 	encodePresence,
-	explicitSelectionUrl,
 	facetDefs,
 	filterGroups,
 	initialValues,
@@ -18,8 +17,6 @@ import {
 	rangeSelection,
 	restoreValues,
 	summarizeParts,
-	ignoredFilters,
-	transferParams,
 	urlFilterDefs,
 	urlState,
 	type CheckboxFilter,
@@ -47,11 +44,6 @@ const types: CheckboxFilter = {
 	group: 'publication',
 	facet: { type: 'simple', apiKey: 'doc_types' },
 	groups: [{ label: 'Publications', values: ['article', 'book'] }],
-	url: {
-		encode: (selected) => (selected.length ? selected.join(',') : 'all'),
-		decode: (raw) => (raw === 'all' ? [] : raw.split(',')),
-		defaultValue: 'article',
-	},
 	showColumns: ['type'],
 };
 const labs: CheckboxFilter = {
@@ -146,36 +138,6 @@ describe('filterRegistry', () => {
 		expect(params.has('in_perimeter')).toBe(false);
 	});
 
-	it("transmet à une autre page la valeur fixée comme une sélection, et la forme d'URL explicite", () => {
-		fixedLab = '7';
-		const values = initialValues(FILTERS);
-		values.checkbox.years = ['2024'];
-		values.presence.sources = { hal: 'yes' };
-		expect(Object.fromEntries(transferParams(FILTERS, values))).toEqual({
-			year: '2024',
-			doc_type: 'all',
-			lab_id: '7',
-			source_filter: 'hal_yes',
-		});
-	});
-
-	it('écrit une sélection explicite, `all` pour une sélection vide', () => {
-		const url = explicitSelectionUrl('all');
-		expect(url.encode([])).toBe('all');
-		expect(url.encode(['2023', '2024'])).toBe('2023,2024');
-		expect(url.decode('all')).toEqual([]);
-		expect(url.decode('2023,2024')).toEqual(['2023', '2024']);
-	});
-
-	it('signale les filtres sélectionnés que la page ne propose pas', () => {
-		const values = initialValues(FILTERS);
-		values.checkbox.years = ['2024'];
-		values.checkbox.perimeter = ['yes'];
-		expect(ignoredFilters(FILTERS, values)).toEqual([]);
-		perimeterEnabled = false;
-		expect(ignoredFilters(FILTERS, values).map((f) => f.key)).toEqual(['perimeter']);
-	});
-
 	it('masque un filtre que la page ne propose pas, ou sans option de décompte non nul, sauf actif', () => {
 		const values = initialValues(FILTERS);
 		expect(isShown(perimeter, values, () => 0, {})).toBe(false);
@@ -248,22 +210,23 @@ describe('filterRegistry', () => {
 		expect(activeCount(FILTERS, values)).toBe(1);
 	});
 
-	it("écrit la sélection dans l'URL sous sa forme propre, et la relit", () => {
+	it("écrit la sélection dans l'URL, et la relit", () => {
 		const defs = urlFilterDefs(FILTERS);
-		expect(defs.types).toEqual({ type: 'single', urlKey: 'doc_type', defaultValue: 'article' });
+		expect(defs.types).toEqual({ type: 'string_array', urlKey: 'doc_type' });
 		expect(defs.years).toEqual({ type: 'string_array', urlKey: 'year' });
 		expect(defs.serial).toEqual({ type: 'string_array', urlKey: 'serial_id' });
 		expect(defs.sources).toEqual({ type: 'source_states', urlKey: 'source_filter' });
 
 		const values = initialValues(FILTERS);
-		expect(urlState(FILTERS, values).types).toBe('all');
+		values.checkbox.types = ['article'];
+		expect(urlState(FILTERS, values).types).toEqual(['article']);
 
 		restoreValues(
 			FILTERS,
-			{ types: 'all', years: ['2024'], serial: ['12'], subjects: ['3', '5'], sources: { hal: 'no' } },
+			{ types: ['book'], years: ['2024'], serial: ['12'], subjects: ['3', '5'], sources: { hal: 'no' } },
 			values,
 		);
-		expect(values.checkbox.types).toEqual([]);
+		expect(values.checkbox.types).toEqual(['book']);
 		expect(values.checkbox.years).toEqual(['2024']);
 		expect(values.entity.serial).toEqual(['12']);
 		expect(values.entity.subjects).toEqual(['3', '5']);

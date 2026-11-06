@@ -63,7 +63,7 @@ export function loginUrl(returnTo: Pick<URL, 'pathname' | 'search'>): string {
 	return `${resolve('login')}?redirect=${encodeURIComponent(returnTo.pathname + returnTo.search)}`;
 }
 
-/** Chemin de retour après connexion : `redirect` s'il désigne une page du site, la page Statistiques sinon. */
+/** Chemin de retour après connexion : `redirect` s'il désigne une page du site, la page d'accueil sinon. */
 export function returnPath(redirect: string | null, origin: string): string {
 	if (redirect) {
 		const target = new URL(redirect, origin);
@@ -71,5 +71,5 @@ export function returnPath(redirect: string | null, origin: string): string {
 			return target.pathname + target.search;
 		}
 	}
-	return resolve('stats');
+	return resolve('');
 }
