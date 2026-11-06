@@ -89,7 +89,7 @@
 								{#if f.control === 'checkbox' && f.range}
 									<RangeOptions options={options[f.key] ?? []} bind:selected={values.checkbox[f.key]} onchange={(selected) => onCheckboxChange(f, selected)} />
 								{:else if f.control === 'checkbox'}
-									<CheckboxOptions options={options[f.key] ?? []} searchable={f.searchable} groups={f.groups} limit={OPTION_LIMIT} bars bind:selected={values.checkbox[f.key]} onchange={(selected) => onCheckboxChange(f, selected)} />
+									<CheckboxOptions options={options[f.key] ?? []} searchable={f.searchable} groups={f.groups} groupSeparators limit={OPTION_LIMIT} bind:selected={values.checkbox[f.key]} onchange={(selected) => onCheckboxChange(f, selected)} />
 								{:else if f.control === 'entity'}
 									<EntityOptions endpoint={entityEndpoint} kind={f.entity} multiple={f.multiple} limit={OPTION_LIMIT} {buildParams} selected={values.entity[f.key]} onchange={(ids) => { values.entity[f.key] = ids; onchange(); }} />
 								{:else}
@@ -165,12 +165,6 @@
 	.filter-body :global(.panel-search) {
 		width: 100%;
 		margin: 2px 0 6px;
-	}
-	.filter-body :global(.facet-group-label) {
-		margin-top: 2px;
-		padding: 4px 0 1px;
-		border-top: none;
-		font-weight: 400;
 	}
 	@media not all and (min-width: 1100px) {
 		.filter-panel-head {

@@ -97,16 +97,6 @@ export function publicationFilters(
 			showColumns: ['license'],
 		},
 		{
-			key: 'apc',
-			control: 'checkbox',
-			label: filterLabels.apc,
-			param: 'has_apc',
-			group: 'access',
-			facet: { type: 'labeled', apiKey: 'apc' },
-			tooltip: "Pas d'info après 2024\nSans APC = ou APC non documentés",
-			showColumns: ['apc'],
-		},
-		{
 			key: 'labs',
 			control: 'checkbox',
 			label: filterLabels.labs,

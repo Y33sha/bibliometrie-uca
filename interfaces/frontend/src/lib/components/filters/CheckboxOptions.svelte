@@ -7,16 +7,16 @@
 		searchable?: boolean;
 		/** Valeurs cochées. Une sélection vide ne filtre rien. */
 		selected?: string[];
-		/** En-têtes des options regroupées (ex. familles de types de document). Les options hors groupe suivent, sans en-tête. Le regroupement est seulement visuel. */
+		/** Options regroupées (ex. familles de types de document). Les options hors groupe suivent. Le regroupement est seulement visuel. */
 		groups?: { label: string; values: string[] }[];
+		/** Groupes séparés par un filet seul, sans leur nom. */
+		groupSeparators?: boolean;
 		/** Nombre d'options affichées avant le bouton qui affiche les autres. Les options cochées restent toujours affichées. Sans valeur, toutes les options s'affichent. */
 		limit?: number;
-		/** Barre sous chaque option, de longueur proportionnelle à son décompte. */
-		bars?: boolean;
 		onchange?: (selected: string[]) => void;
 	}
 
-	let { options, searchable = false, selected = $bindable([]), groups, limit, bars = false, onchange }: Props = $props();
+	let { options, searchable = false, selected = $bindable([]), groups, groupSeparators = false, limit, onchange }: Props = $props();
 
 	/** Nombre d'options au-delà duquel une liste sans limite propose la recherche. */
 	const SEARCH_THRESHOLD = 10;
@@ -35,8 +35,13 @@
 		truncated ? matching.filter((o, i) => i < limit! || selected.includes(o.value)) : matching,
 	);
 	const hiddenCount = $derived(matching.length - shown.length);
-	const maxCount = $derived(Math.max(1, ...options.map((o) => o.count ?? 0)));
-	const ungrouped = $derived(groups ? shown.filter((o) => !groups.some((g) => g.values.includes(o.value))) : shown);
+	// Options de chaque groupe affiché, puis options hors groupe.
+	const sections = $derived.by(() => {
+		if (!groups) return [{ label: '', options: shown }];
+		const grouped = groups.map((g) => ({ label: g.label, options: shown.filter((o) => g.values.includes(o.value)) }));
+		const rest = shown.filter((o) => !groups.some((g) => g.values.includes(o.value)));
+		return [...grouped, { label: '', options: rest }].filter((s) => s.options.length);
+	});
 
 	function toggle(value: string) {
 		selected = selected.includes(value) ? selected.filter((v) => v !== value) : [...selected, value];
@@ -49,14 +54,6 @@
 	}
 </script>
 
-{#snippet optionRow(opt: FacetOption)}
-	<label class="option-row" class:with-bar={bars}>
-		<input type="checkbox" checked={selected.includes(opt.value)} onchange={() => toggle(opt.value)} />
-		<span class="facet-option-text" title={opt.text}>{opt.text}</span>{#if opt.count != null}<span class="facet-count">{opt.count.toLocaleString('fr-FR')}</span>{/if}
-		{#if bars && opt.count != null}<span class="option-bar" class:checked={selected.includes(opt.value)} style:width="{(opt.count / maxCount) * 100}%" aria-hidden="true"></span>{/if}
-	</label>
-{/snippet}
-
 {#if showSearch}
 	<input type="text" class="panel-search input-sm" placeholder="Filtrer" aria-label="Filtrer les options" bind:value={filterText} />
 {/if}
@@ -64,16 +61,19 @@
 	<button type="button" class="option-row facet-clear" onclick={clear}>Effacer</button>
 {/if}
 <div class="facet-options">
-	{#if groups}
-		{#each groups as g (g.label)}
-			{@const opts = shown.filter((o) => g.values.includes(o.value))}
-			{#if opts.length}
-				<div class="facet-group-label">{g.label}</div>
-				{#each opts as opt (opt.value)}{@render optionRow(opt)}{/each}
-			{/if}
+	{#each sections as s, i (s.label)}
+		{#if groupSeparators}
+			{#if i > 0}<div class="facet-group-separator" role="separator"></div>{/if}
+		{:else if s.label}
+			<div class="facet-group-label">{s.label}</div>
+		{/if}
+		{#each s.options as opt (opt.value)}
+			<label class="option-row">
+				<input type="checkbox" checked={selected.includes(opt.value)} onchange={() => toggle(opt.value)} />
+				<span class="facet-option-text" title={opt.text}>{opt.text}</span>{#if opt.count != null}<span class="facet-count">{opt.count.toLocaleString('fr-FR')}</span>{/if}
+			</label>
 		{/each}
-	{/if}
-	{#each ungrouped as opt (opt.value)}{@render optionRow(opt)}{/each}
+	{/each}
 </div>
 {#if truncated && hiddenCount > 0}
 	<button type="button" class="option-row facet-more" onclick={() => (showAll = true)}>{hiddenCount.toLocaleString('fr-FR')} autres</button>
@@ -90,20 +90,8 @@
 		font-weight: 600;
 		color: var(--muted);
 	}
-	/* Barre de décompte : une deuxième ligne de la grille, sous le libellé. */
-	.option-row.with-bar {
-		display: grid;
-		grid-template-columns: auto minmax(0, 1fr) auto;
-		column-gap: 6px;
-		row-gap: 1px;
-	}
-	.option-bar {
-		grid-column: 2;
-		height: 2px;
-		border-radius: 1px;
-		background: var(--border);
-	}
-	.option-bar.checked {
-		background: var(--accent-mid);
+	.facet-group-separator {
+		margin: 3px 0;
+		border-top: 1px solid var(--border-subtle);
 	}
 </style>
