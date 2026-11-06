@@ -1,21 +1,24 @@
 <script lang="ts">
 	import TableScroll from '#lib/components/TableScroll.svelte';
 	import SortChevron from '#lib/components/SortChevron.svelte';
-	import { columnLabels, filterLabels } from '#lib/labels.js';
+	import { columnLabels } from '#lib/labels.js';
 	import ListToolbar from '#lib/components/ListToolbar.svelte';
 	import { onMount } from 'svelte';
-	import { page } from '$app/state';
 	import { asset, resolve } from '$app/paths';
 
-	import FacetDropdown from '#lib/components/FacetDropdown.svelte';
+	import ActiveFilterBar from '#lib/components/ActiveFilterBar.svelte';
+	import FilterLayout from '#lib/components/filters/FilterLayout.svelte';
+	import FilterPanel from '#lib/components/filters/FilterPanel.svelte';
+	import FilterPanelToggle from '#lib/components/filters/FilterPanelToggle.svelte';
 	import IconButton from '#lib/components/IconButton.svelte';
 	import PublisherDrawer from '#lib/components/publishers/PublisherDrawer.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import TableStatusRow from '#lib/components/TableStatusRow.svelte';
-	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
 	import { useFacets } from '#lib/composables/useFacets.svelte.js';
-	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
+	import { useFilteredList } from '#lib/composables/useFilteredList.svelte.js';
 	import { useDrawerParam } from '#lib/composables/useDrawerParam.svelte.js';
+	import { facetDefs } from '#lib/filterRegistry.js';
+	import { PUBLISHER_FILTER_GROUPS, PUBLISHER_FILTERS } from '#lib/publisherFilters.js';
 	import { crossrefMemberIds, crossrefMemberUrl } from '#lib/sources.svelte.js';
 	import { isAdmin } from '#lib/session.svelte.js';
 	import { nextSort, sortDirection } from '#lib/sort.js';
@@ -41,179 +44,79 @@
 	// Volet d'édition d'un éditeur, en session admin : ouvert tant que `?publisher=<id>` figure dans l'URL.
 	const drawer = useDrawerParam('publisher', isAdmin);
 
-	// --- Filter state ---
-	let search = $state('');
-	let currentSort = $state('publications_desc');
-	let selectedPublisherTypes: string[] = $state([]);
-	let selectedCountries: string[] = $state([]);
-	// Éditeurs avec ou sans publication du périmètre. Par défaut, ceux qui en ont ; seule la session admin change ce réglage.
-	let selectedPublications: string[] = $state(['yes']);
-
-	function buildFilterParams(): URLSearchParams {
-		const params = new URLSearchParams();
-		if (selectedPublisherTypes.length) params.set('publisher_type', selectedPublisherTypes.join(','));
-		if (selectedCountries.length) params.set('country', selectedCountries.join(','));
-		if (selectedPublications.length === 1) params.set('has_publications', selectedPublications[0]);
-		return params;
-	}
-
-	const publishers = usePaginatedFetch<Publisher>({
+	const list = useFilteredList<Publisher, ReturnType<typeof useFacets>>({
+		filters: PUBLISHER_FILTERS,
 		endpoint: '/api/publishers',
 		itemsKey: 'publishers',
 		// svelte-ignore state_referenced_locally
 		perPage,
 		apiKey: () => apiKey,
-		buildParams() {
-			const params = buildFilterParams();
-			params.set('sort', currentSort);
-			const q = search.trim();
-			if (q) params.set('search', q);
-			return params;
-		},
-	});
-
-	const facets = useFacets({
-		endpoint: '/api/publishers/facets',
-		apiKey: () => `${apiKey}-facets`,
-		// Inclut le terme de recherche pour que les comptes de facettes suivent le champ de recherche (comme la liste).
-		buildParams() {
-			const params = buildFilterParams();
-			const q = search.trim();
-			if (q) params.set('search', q);
-			return params;
-		},
-		facets: {
-			publisherTypes: { type: 'labeled', apiKey: 'publisher_types' },
-			countries: { type: 'labeled', apiKey: 'countries' },
-			publications: { type: 'boolean', apiKey: 'publications', yesLabel: 'Avec', noLabel: 'Sans' },
-		},
-	});
-
-	const url = useUrlFilters({
+		defaultSort: 'publications_desc',
+		urlSync: () => urlSync,
 		basePath: () => basePath,
-		filters: {
-			selectedPublisherTypes: { type: 'string_array', urlKey: 'publisher_type' },
-			selectedCountries: { type: 'string_array', urlKey: 'country' },
-			hasPublications: { type: 'single', urlKey: 'has_publications', defaultValue: 'yes' },
-			search: { type: 'single', urlKey: 'search' },
-			currentSort: { type: 'single', urlKey: 'sort', defaultValue: 'publications_desc' },
-			currentPage: { type: 'page', urlKey: 'page' },
-		},
-	});
-
-	function syncUrl() {
-		if (!urlSync) return;
-		url.syncUrl(() => ({
-			selectedPublisherTypes,
-			selectedCountries,
-			hasPublications: selectedPublications.length === 1 ? selectedPublications[0] : 'all',
-			search,
-			currentSort,
-			currentPage: publishers.page,
-		}));
-	}
-
-	function onFilterChange() {
-		publishers.page = 1;
-		syncUrl();
-		publishers.load();
-		facets.load();
-	}
-
-	const onSearchInput = url.debouncedSearch(() => {
-		publishers.page = 1;
-		syncUrl();
-		publishers.load();
-		facets.load();
+		facets: (buildParams) =>
+			useFacets({
+				endpoint: '/api/publishers/facets',
+				apiKey: () => `${apiKey}-facets`,
+				buildParams,
+				facets: facetDefs(PUBLISHER_FILTERS),
+			}),
 	});
 
 	function setSort(column: 'name' | 'serials' | 'publications') {
-		currentSort = nextSort(currentSort, column, column === 'name' ? 'asc' : 'desc');
-		publishers.page = 1;
-		syncUrl();
-		publishers.load();
+		list.setSort(nextSort(list.sort, column, column === 'name' ? 'asc' : 'desc'));
 	}
 
 	function exportCsvUrl(): string {
-		const params = buildFilterParams();
-		params.set('sort', currentSort);
-		const q = search.trim();
-		if (q) params.set('search', q);
+		const params = list.filterParams();
+		params.set('sort', list.sort);
 		return withBase(`/api/publishers/export.csv?${paramsToQuery(params)}`);
 	}
 
 	// Un type inconnu est une valeur absente : la cellule reste vide.
 	function publisherTypeLabel(value: string | null): string {
 		if (!value || value === 'unknown') return '';
-		const opt = facets.options.publisherTypes.find((o) => o.value === value);
+		const opt = list.facets.options.publisherTypes?.find((o) => o.value === value);
 		return opt ? opt.text : value;
 	}
 
-	onMount(async () => {
-		if (urlSync) {
-			const restored = url.restoreFromUrl(page.url.searchParams);
-			if (restored.selectedPublisherTypes) selectedPublisherTypes = restored.selectedPublisherTypes as string[];
-			if (restored.selectedCountries) selectedCountries = restored.selectedCountries as string[];
-			if (restored.hasPublications != null && isAdmin()) {
-				const value = restored.hasPublications as string;
-				selectedPublications = value === 'all' ? [] : [value];
-			}
-			if (restored.search) search = restored.search as string;
-			if (restored.currentSort) currentSort = restored.currentSort as string;
-			if (restored.currentPage) publishers.page = restored.currentPage as number;
-		}
-		await facets.load();
-		publishers.load();
-	});
+	onMount(list.restore);
 </script>
 
-<ListToolbar bind:search placeholder="Rechercher dans les noms" onsearch={onSearchInput} list={publishers} one="éditeur" many="éditeurs" exportUrl={exportCsvUrl()}>
-	{#snippet filters()}
-		<FacetDropdown
-			label={filterLabels.types}
-			options={facets.options.publisherTypes}
-			bind:selected={selectedPublisherTypes}
-			onchange={onFilterChange}
-		/>
-		<FacetDropdown
-			label={filterLabels.countries}
-			options={facets.options.countries}
-			searchable
-			bind:selected={selectedCountries}
-			onchange={onFilterChange}
-		/>
-		{#if isAdmin()}
-			<FacetDropdown
-				label="Publications"
-				options={facets.options.publications}
-				bind:selected={selectedPublications}
-				onchange={onFilterChange}
-			/>
-		{/if}
+<ListToolbar bind:search={list.search} placeholder="Rechercher dans les noms" onsearch={list.onSearchInput} list={list.listing} one="éditeur" many="éditeurs" exportUrl={exportCsvUrl()} countBelow>
+	{#snippet leading()}
+		<FilterPanelToggle bind:open={list.panel.open} active={list.activeCount} />
+	{/snippet}
+	{#snippet activeFilters()}
+		<ActiveFilterBar filters={PUBLISHER_FILTERS} bind:values={list.values} options={list.facets.options} onchange={list.onFilterChange} />
 	{/snippet}
 </ListToolbar>
 
+<FilterLayout bind:open={list.panel.open}>
+	{#snippet panel()}
+		<FilterPanel filters={PUBLISHER_FILTERS} groups={PUBLISHER_FILTER_GROUPS} bind:values={list.values} options={list.facets.options} presenceCounts={{}} loaded={list.facets.loaded} entityEndpoint="/api/publishers/facets" buildParams={list.filterParams} panel={list.panel} onchange={list.onFilterChange} />
+	{/snippet}
 <TableScroll>
 <table class="data-table publishers-table">
 	<thead>
 		<tr>
 			{#if isAdmin()}<th class="row-actions"></th>{/if}
 			<th class="sortable" onclick={() => setSort('name')}>
-				Nom <SortChevron direction={sortDirection(currentSort, 'name')} />
+				Nom <SortChevron direction={sortDirection(list.sort, 'name')} />
 			</th>
 			<th>{columnLabels.type}</th>
 			<th>{columnLabels.country}</th>
 			<th>Préfixes DOI</th>
 			<th class="num sortable" onclick={() => setSort('serials')}>
-				Publications en série <SortChevron direction={sortDirection(currentSort, 'serials')} />
+				Publications en série <SortChevron direction={sortDirection(list.sort, 'serials')} />
 			</th>
 			<th class="num sortable" onclick={() => setSort('publications')}>
-				{columnLabels.publications} <SortChevron direction={sortDirection(currentSort, 'publications')} />
+				{columnLabels.publications} <SortChevron direction={sortDirection(list.sort, 'publications')} />
 			</th>
 		</tr>
 	</thead>
 	<tbody>
-		{#each publishers.items as p (p.id)}
+		{#each list.listing.items as p (p.id)}
 			<tr class:active-row={p.id === drawer.id}>
 				{#if isAdmin()}
 					<td class="row-actions">
@@ -247,30 +150,23 @@
 				<td class="num">{p.publication_count.toLocaleString('fr-FR')}</td>
 			</tr>
 		{/each}
-		{#if publishers.items.length === 0}
-			<TableStatusRow loading={publishers.loading} error={publishers.error} colspan={isAdmin() ? 7 : 6} emptyText="Aucun éditeur ne correspond aux filtres." />
+		{#if list.listing.items.length === 0}
+			<TableStatusRow loading={list.listing.loading} error={list.listing.error} colspan={isAdmin() ? 7 : 6} emptyText="Aucun éditeur ne correspond aux filtres." />
 		{/if}
 	</tbody>
 </table>
 </TableScroll>
 
-<Pagination
-	page={publishers.page}
-	pages={publishers.pages}
-	onchange={(p) => {
-		publishers.page = p;
-		syncUrl();
-		publishers.load();
-	}}
-/>
+<Pagination page={list.listing.page} pages={list.listing.pages} onchange={list.goToPage} />
+</FilterLayout>
 
 {#if drawer.id !== null}
 	<PublisherDrawer
 		id={drawer.id}
 		onclose={() => drawer.open(null)}
 		onchange={() => {
-			publishers.load();
-			facets.load();
+			list.listing.load();
+			list.facets.load();
 		}}
 	/>
 {/if}

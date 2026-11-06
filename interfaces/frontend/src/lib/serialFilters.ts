@@ -4,6 +4,7 @@
 import type { PresenceItem } from '#lib/components/filters/PresenceOptions.svelte';
 import type { FilterGroup, ListFilter } from '#lib/filterRegistry.js';
 import { filterLabels } from '#lib/labels.js';
+import { hasPublicationsFilter } from '#lib/publishingFilters.js';
 import { isAdmin } from '#lib/session.svelte.js';
 
 /** Rubriques du panneau des filtres des publications en série, dans l'ordre d'affichage. */
@@ -45,18 +46,7 @@ export function serialFilters(publisherId: number | undefined, lists: () => Pres
 			group: 'serial',
 			facet: { type: 'labeled', apiKey: 'serial_types' },
 		},
-		{
-			key: 'publications',
-			control: 'checkbox',
-			label: 'Publications',
-			param: 'has_publications',
-			group: 'curation',
-			facet: { type: 'boolean', apiKey: 'publications', yesLabel: 'Avec', noLabel: 'Sans' },
-			defaultSelection: () => ['yes'],
-			// Une seule valeur filtre ; les deux cochées retiennent toutes les publications en série.
-			serialize: (selected) => (selected.length === 1 ? selected[0] : null),
-			fixed: () => (isAdmin() && publisherId == null ? null : 'yes'),
-		},
+		hasPublicationsFilter('curation', () => isAdmin() && publisherId == null),
 		{
 			key: 'lists',
 			control: 'presence',
