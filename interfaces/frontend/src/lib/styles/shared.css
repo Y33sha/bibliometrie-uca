@@ -557,14 +557,14 @@ input[type='search']::-webkit-search-cancel-button {
 	white-space: nowrap;
 }
 
-/* Icônes d'action d'une ligne (modifier, supprimer, exclure, ouvrir le volet) : estompées au repos, en pleine couleur au survol de la ligne ou au focus clavier, sur les écrans à pointeur. Les boutons à libellé restent lisibles. */
+/* Icônes d'action d'une ligne de tableau ou d'une notice (modifier, supprimer, exclure, ouvrir le volet) : estompées au repos, en pleine couleur au survol de la ligne ou au focus clavier, sur les écrans à pointeur. Les boutons à libellé restent lisibles. */
 @media (hover: hover) {
-	.data-table .row-actions > .icon-btn {
+	.row-actions > .icon-btn {
 		opacity: 0.4;
 		transition: opacity 0.1s;
 	}
-	.data-table tr:hover .row-actions > .icon-btn,
-	.data-table .row-actions:focus-within > .icon-btn {
+	:is(tr, li):hover .row-actions > .icon-btn,
+	.row-actions:focus-within > .icon-btn {
 		opacity: 1;
 	}
 }

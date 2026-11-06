@@ -317,7 +317,7 @@
 	<ul class="notices">
 		{#each listing.items as p (p.id)}
 			<li class="notice" class:active-row={p.id === drawer.id}>
-				<div class="notice-actions">
+				<div class="notice-actions row-actions">
 					<IconButton icon="panel" label="Ouvrir le volet" onclick={() => drawer.open(p.id)} />
 					{#if showAdminExclude && p.contribution_id != null}
 						<IconButton icon="reject" label="Exclure ce lien auteur–publication" onclick={() => onExcludeClick(p)} />
@@ -332,7 +332,7 @@
 						{#if p.publisher}<span>{#if p.publisher_id}<a href={resolve(`publishers/${p.publisher_id}`)}>{p.publisher}</a>{:else}{p.publisher}{/if}</span>{/if}
 						{#if p.doi}<span><DoiLink doi={p.doi} text /></span>{/if}
 						{#if !isLab && p.lab_items?.length}
-							<span class="notice-labs">{#each p.lab_items as lab, i (lab.id)}{#if i > 0}, {/if}<a href={resolve(`structures/${lab.id}`)}>{lab.label}</a>{/each}</span>
+							<span class="notice-labs">{#each p.lab_items as lab, i (lab.id)}{#if i > 0}{', '}{/if}<a href={resolve(`structures/${lab.id}`)}>{lab.label}</a>{/each}</span>
 						{/if}
 					</div>
 				</div>
