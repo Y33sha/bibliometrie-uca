@@ -1,6 +1,6 @@
 """Réconciliation des publications : rattachement, fusion et scission, en une seule décision.
 
-Les enregistrements sources du voisinage se répartissent en partitions : composantes connexes de clés de confirmation, coupées par leurs ancres DOI (`doi_anchors`). Une composante à une ancre au plus reste entière. Dans une composante à plusieurs ancres, un enregistrement source rejoint l'ancre de son DOI `primary` ou `derived`, à défaut l'unique ancre parmi ses DOI `secondary`. Un enregistrement source dérivé suit l'ancre de son parent, l'enregistrement source dont l'identifiant primaire est son identifiant dérivé. Les enregistrements sources restants forment des sous-composantes par leurs clés partagées. Une sous-composante reliée à une seule ancre la rejoint. Une sous-composante reliée à plusieurs ancres fait le pont entre elles : elle rejoint l'unique ancre de même type de document, à défaut elle forme sa propre partition.
+Les enregistrements sources du voisinage se répartissent en partitions : composantes connexes de clés de confirmation, coupées par leurs ancres. Une ancre est un DOI (`doi_anchors`) ou une œuvre : un enregistrement source d'une source à œuvres distinctes (`DISTINCT_WORK_SOURCES`), comme une famille de brevets ScanR. Une composante à une ancre au plus reste entière. Dans une composante à plusieurs ancres, un enregistrement source d'œuvre est sa propre ancre. Un autre enregistrement source rejoint l'ancre de son DOI `primary` ou `derived`, à défaut l'unique ancre parmi ses DOI `secondary`. Un enregistrement source dérivé suit l'ancre de son parent, l'enregistrement source dont l'identifiant primaire est son identifiant dérivé. Les enregistrements sources restants forment des sous-composantes par leurs clés partagées. Une sous-composante reliée à une seule ancre la rejoint. Une sous-composante reliée à plusieurs ancres fait le pont entre elles : elle rejoint l'unique ancre de même type de document, à défaut elle forme sa propre partition.
 
 Chaque partition aboutit sur une seule publication, son ancre : celle qui a déjà son DOI, sinon celle du plus petit enregistrement source rattaché. L'ancre garde son identifiant, et donc les corrections faites à la main. Une partition d'enregistrements sources orphelins, sans publication, en crée une si l'un d'eux peut la fonder ; sinon, elle reste orpheline. Un enregistrement source écarté (`is_matchable`) quitte sa publication.
 """
@@ -14,9 +14,27 @@ from domain.entity_resolution import connected_components
 from domain.publications.metadata import has_minimal_publication_metadata
 from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES
 from domain.source_records.keys import Derivation, DoiKeys, anchor_of, doi_anchors
+from domain.sources.registry import DISTINCT_WORK_SOURCES
 
 MANUAL_MERGE_KEY = "manual_merge"
 """Nom de clé des jetons de fusion manuelle, valeur de clé = identifiant de la fusion manuelle."""
+
+
+class Anchor(NamedTuple):
+    """Ancre d'une partition : un DOI, ou l'enregistrement source d'une œuvre."""
+
+    kind: str
+    """`doi` ou `work`."""
+    value: str
+    """DOI, ou clé de l'enregistrement source d'œuvre (`work_id`)."""
+
+
+_DOI, _WORK = "doi", "work"
+
+
+def work_id(source: str, source_id: str) -> str | None:
+    """Renvoie la clé `source:identifiant` d'un enregistrement source d'une source à œuvres distinctes (`DISTINCT_WORK_SOURCES`), `None` pour une autre source."""
+    return f"{source}:{source_id}" if source in DISTINCT_WORK_SOURCES else None
 
 
 def manual_merge_tokens(manual_merge_ids: Iterable[int]) -> frozenset[tuple[str, str]]:
@@ -44,6 +62,8 @@ class ReconcileMember:
     """Clés de confirmation et jetons de fusion manuelle."""
     derivation: Derivation = Derivation()
     """Identifiants primaires et identifiant dérivé, qui relient un enregistrement source dérivé à son parent."""
+    work_id: str | None = None
+    """Clé `source:identifiant` d'un enregistrement source d'œuvre (`work_id`), `None` pour un autre."""
     in_perimeter: bool = False
     title_normalized: str | None = None
     publication_year: int | None = None
@@ -92,15 +112,15 @@ class ReconcilePlan:
 
 
 def _derived_anchors(
-    members: list[ReconcileMember], own_anchors: Mapping[int, str | None]
-) -> dict[int, str]:
+    members: list[ReconcileMember], own_anchors: Mapping[int, Anchor | None]
+) -> dict[int, Anchor]:
     """Renvoie l'ancre suivie par chaque enregistrement source dérivé : celle de son parent. Sans parent parmi `members`, les enregistrements sources de même identifiant dérivé suivent l'unique ancre parmi les leurs."""
     parents = {m.derivation.primary: m for m in members if m.derivation.primary is not None}
     families: dict[tuple[str, str], list[ReconcileMember]] = defaultdict(list)
     for m in members:
         if m.derivation.derived is not None:
             families[m.derivation.derived].append(m)
-    followed: dict[int, str] = {}
+    followed: dict[int, Anchor] = {}
     for key, family in families.items():
         if (parent := parents.get(key)) is not None:
             anchor = own_anchors[parent.source_record_id]
@@ -125,9 +145,9 @@ def _doc_types(members: Iterable[ReconcileMember]) -> set[str]:
 
 def _bridge_anchor(
     bridge: list[ReconcileMember],
-    by_anchor: Mapping[str, list[ReconcileMember]],
-    anchors_by_token: Mapping[tuple[str, str], set[str]],
-) -> str | None:
+    by_anchor: Mapping[Anchor, list[ReconcileMember]],
+    anchors_by_token: Mapping[tuple[str, str], set[Anchor]],
+) -> Anchor | None:
     """Renvoie l'ancre rejointe par une sous-composante sans ancre : l'unique ancre reliée à elle par une clé, à défaut l'unique ancre reliée qui partage un type de document avec elle. `None` sans ancre unique."""
     linked = {a for m in bridge for t in m.tokens for a in anchors_by_token.get(t, ())}
     if len(linked) == 1:
@@ -137,19 +157,30 @@ def _bridge_anchor(
     return next(iter(same_type)) if len(same_type) == 1 else None
 
 
+def _own_anchor(member: ReconcileMember, dois: frozenset[str]) -> Anchor | None:
+    """Renvoie l'ancre d'un enregistrement source : son œuvre, à défaut l'ancre DOI rejointe (`anchor_of`)."""
+    if member.work_id is not None:
+        return Anchor(_WORK, member.work_id)
+    doi = anchor_of(member.doi_keys, dois)
+    return Anchor(_DOI, doi) if doi is not None else None
+
+
 def _partitions(
     members: list[ReconcileMember],
-) -> list[tuple[str | None, list[ReconcileMember]]]:
-    """Renvoie les partitions du voisinage, avec leur ancre DOI, `None` pour une partition sans ancre. Dans une composante à plusieurs ancres, une sous-composante sans ancre rejoint l'ancre désignée par `_bridge_anchor`."""
-    partitions: list[tuple[str | None, list[ReconcileMember]]] = []
+) -> list[tuple[Anchor | None, list[ReconcileMember]]]:
+    """Renvoie les partitions du voisinage, avec leur ancre, `None` pour une partition sans ancre. Dans une composante à plusieurs ancres, une sous-composante sans ancre rejoint l'ancre désignée par `_bridge_anchor`."""
+    partitions: list[tuple[Anchor | None, list[ReconcileMember]]] = []
     for comp in _components(members):
-        anchors = doi_anchors(m.doi_keys for m in comp)
+        dois = doi_anchors(m.doi_keys for m in comp)
+        anchors = {Anchor(_DOI, d) for d in dois} | {
+            Anchor(_WORK, m.work_id) for m in comp if m.work_id is not None
+        }
         if len(anchors) <= 1:
             partitions.append((next(iter(anchors), None), comp))
             continue
-        own_anchors = {m.source_record_id: anchor_of(m.doi_keys, anchors) for m in comp}
+        own_anchors = {m.source_record_id: _own_anchor(m, dois) for m in comp}
         followed = _derived_anchors(comp, own_anchors)
-        by_anchor: dict[str, list[ReconcileMember]] = defaultdict(list)
+        by_anchor: dict[Anchor, list[ReconcileMember]] = defaultdict(list)
         unanchored: list[ReconcileMember] = []
         for m in comp:
             anchor = followed.get(m.source_record_id, own_anchors[m.source_record_id])
@@ -157,7 +188,7 @@ def _partitions(
                 unanchored.append(m)
             else:
                 by_anchor[anchor].append(m)
-        anchors_by_token: dict[tuple[str, str], set[str]] = defaultdict(set)
+        anchors_by_token: dict[tuple[str, str], set[Anchor]] = defaultdict(set)
         for anchor, part in by_anchor.items():
             for m in part:
                 for t in m.tokens:
@@ -172,6 +203,11 @@ def _partitions(
         partitions.extend((anchor, by_anchor[anchor]) for anchor in sorted(by_anchor))
         partitions.extend((None, bridge) for anchor, bridge in bridges if anchor is None)
     return partitions
+
+
+def _doi_of(anchor: Anchor | None) -> str | None:
+    """Renvoie le DOI d'une ancre DOI, `None` pour une ancre d'œuvre ou une partition sans ancre."""
+    return anchor.value if anchor is not None and anchor.kind == _DOI else None
 
 
 class _Claim(NamedTuple):
@@ -297,8 +333,8 @@ def plan_reconciliation(
     admitted = [m for m in members if m.matchable]
     claims = [
         claim
-        for doi, part in _partitions(admitted)
-        if (claim := _claim(doi, part, existing_publication_by_doi or {})) is not None
+        for anchor, part in _partitions(admitted)
+        if (claim := _claim(_doi_of(anchor), part, existing_publication_by_doi or {})) is not None
     ]
     award = _award(claims, admitted)
     excluded = sorted(

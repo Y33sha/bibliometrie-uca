@@ -27,6 +27,7 @@ def _m(
     matchable=True,
     primary=None,
     derived=None,
+    work_id=None,
 ):
     """Construit un membre du voisinage.
 
@@ -35,6 +36,7 @@ def _m(
         weak: DOI secondaires.
         primary: identifiant primaire, en couple (type, valeur).
         derived: identifiant dérivé, en couple (type, valeur).
+        work_id: clé d'un enregistrement source d'œuvre, comme une famille de brevets.
     """
     return ReconcileMember(
         source_record_id=source_record_id,
@@ -43,6 +45,7 @@ def _m(
         doi_keys=DoiKeys(frozenset({doi} if doi else ()), frozenset(weak)),
         tokens=frozenset(tokens),
         derivation=Derivation(primary, derived),
+        work_id=work_id,
         in_perimeter=in_perimeter,
         title_normalized=tn,
         publication_year=year,
@@ -305,6 +308,55 @@ class TestBridges:
 
         assert _groups(plan) == {10: (1, 3, 4, 5, 6), 20: (2,)}
         assert plan.dissolved == (DissolvedPublication(30, 10), DissolvedPublication(40, 10))
+
+
+_BLOCK = ("metadata_block", "patent|dispositif d eclairage de securite|2022")
+"""Bloc de métadonnées commun à deux familles de brevets déposées le même jour sous le même titre."""
+
+
+def _family(source_record_id, publication_id, family, *tokens):
+    return _m(
+        source_record_id,
+        publication_id,
+        tokens=[_BLOCK, *tokens],
+        doc_type="patent",
+        work_id=f"scanr_patents:{family}",
+    )
+
+
+class TestWorkAnchors:
+    """Un enregistrement source d'œuvre, comme une famille de brevets, est une ancre."""
+
+    def test_two_works_with_the_same_metadata_split(self):
+        """Deux familles au même bloc de métadonnées : la seconde crée sa publication."""
+        plan = plan_reconciliation([_family(1, 10, "A"), _family(2, 10, "B")])
+
+        assert _groups(plan) == {10: (1,), None: (2,)}
+
+    def test_a_record_linked_to_one_work_joins_it(self):
+        """Le dépôt HAL partage un numéro de publication avec la seule famille A."""
+        number = ("patent_publication_number", "FR3143101")
+        deposit = _m(3, 30, tokens=[number], doc_type="patent")
+
+        plan = plan_reconciliation([_family(1, 10, "A", number), _family(2, 10, "B"), deposit])
+
+        assert _groups(plan) == {10: (1, 3), None: (2,)}
+        assert plan.dissolved == (DissolvedPublication(30, 10),)
+
+    def test_a_record_linked_to_two_works_forms_its_own_partition(self):
+        """Le dépôt HAL a le bloc de métadonnées des deux familles."""
+        deposit = _m(3, 30, tokens=[_BLOCK], doc_type="patent")
+
+        plan = plan_reconciliation([_family(1, 10, "A"), _family(2, 10, "B"), deposit])
+
+        assert _groups(plan) == {10: (1,), 30: (3,), None: (2,)}
+
+    def test_a_single_work_keeps_its_component(self):
+        deposit = _m(3, 30, tokens=[_BLOCK], doc_type="patent")
+
+        plan = plan_reconciliation([_family(1, 10, "A"), deposit])
+
+        assert _groups(plan) == {10: (1, 3)}
 
 
 class TestPreprintServerDois:

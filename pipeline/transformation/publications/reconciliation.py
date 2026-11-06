@@ -26,6 +26,7 @@ from domain.publications.reconciliation import (
     WorkGroup,
     manual_merge_tokens,
     plan_reconciliation,
+    work_id,
 )
 from domain.source_records.identifiers import (
     SourceIdentifier,
@@ -64,6 +65,8 @@ class ReconcileRow(NamedTuple):
     """Enregistrement source du voisinage : clés et publication courante."""
 
     id: int
+    source: str
+    source_id: str
     identifiers: tuple[SourceIdentifier, ...]
     publication_id: int | None
     """`None` si l'enregistrement source est orphelin."""
@@ -85,7 +88,9 @@ _SNAPSHOT = "source_record_keys_marks"
 """Relevé de la file `source_record_keys_queue`."""
 
 _COLS = (
-    "{a}.id, " + identifiers_json_sql("{a}.id") + " AS identifiers, {a}.publication_id, "
+    "{a}.id, {a}.source::text AS source, {a}.source_id, "
+    + identifiers_json_sql("{a}.id")
+    + " AS identifiers, {a}.publication_id, "
     "{a}.doc_type, {a}.title_normalized, {a}.publication_year, {a}.is_matchable, "
     "p.doi AS publication_doi, "
     "EXISTS (SELECT 1 FROM source_contributions sc "
@@ -271,6 +276,8 @@ def fetch_reconciliation_universe(conn: Connection) -> list[ReconcileRow]:
     return [
         ReconcileRow(
             r.id,
+            r.source,
+            r.source_id,
             parse_identifiers(r.identifiers),
             r.publication_id,
             r.doc_type,
@@ -352,6 +359,7 @@ def _member(row: ReconcileRow, doi_targets: dict[str, str]) -> ReconcileMember:
         doi_keys=keys.doi,
         tokens=keys.tokens() | manual_merge_tokens(row.manual_merge_ids),
         derivation=derivation(row.identifiers),
+        work_id=work_id(row.source, row.source_id),
         in_perimeter=row.in_perimeter,
         title_normalized=row.title_normalized,
         publication_year=row.publication_year,

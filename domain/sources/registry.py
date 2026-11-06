@@ -41,6 +41,8 @@ class SourceProfile:
     """Moissonnée par le mode quotidien, depuis le dernier moissonnage quotidien réussi."""
     aggregator: bool = False
     """Compile les enregistrements d'autres sources (dépôts HAL, Crossref, PubMed). Un enregistrement source de cette source vaut par les liens et les identifiants cités."""
+    distinct_works: bool = False
+    """Deux enregistrements sources de la source désignent deux œuvres distinctes : une famille de brevets ScanR par invention. Chacun est une ancre de la réconciliation, comme un DOI."""
     structure_ids: str | None = None
     """Nature des identifiants de structure de la source, affichée par le formulaire des structures (servi par `/api/sources/structure-ids`). Seules les sources qui la déclarent ont une clé dans `structures.api_ids`."""
 
@@ -80,7 +82,10 @@ PROFILES: dict[Source, SourceProfile] = {
     ),
     # Familles de brevets de l'index `scanr-patents`.
     Source.SCANR_PATENTS: SourceProfile(
-        label="ScanR brevets", harvested=True, structure_ids="Paysage des déposants"
+        label="ScanR brevets",
+        harvested=True,
+        distinct_works=True,
+        structure_ids="Paysage des déposants",
     ),
     # Son API se requête par NNT.
     Source.THESES: SourceProfile(label="theses.fr", harvested=True, structure_ids="PPN IdRef"),
@@ -155,6 +160,11 @@ PERSON_SEARCHED_SOURCES: tuple[Source, ...] = tuple(
     s for s, p in PROFILES.items() if p.person_identifiers
 )
 AGGREGATOR_SOURCES: frozenset[Source] = frozenset(s for s, p in PROFILES.items() if p.aggregator)
+
+DISTINCT_WORK_SOURCES: frozenset[Source] = frozenset(
+    s for s, p in PROFILES.items() if p.distinct_works
+)
+"""Sources dont chaque enregistrement source est une œuvre distincte (`SourceProfile.distinct_works`)."""
 
 
 SOURCE_PRIORITY: tuple[Source, ...] = (

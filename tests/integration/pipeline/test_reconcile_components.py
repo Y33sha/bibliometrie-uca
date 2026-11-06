@@ -991,6 +991,31 @@ class TestExternalDoiCarrier:
         assert n == 1
 
 
+class TestWorkAnchors:
+    def test_two_patent_families_with_the_same_metadata_split(self, sa_sync_conn):
+        """Deux familles ScanR brevets du même jour, au même titre, sont deux publications."""
+        conn = sa_sync_conn
+        publication_id = _seed_publication(conn)
+        title = "dispositif d eclairage de securite pour batiment"
+        families = [
+            _source_record(
+                conn,
+                publication_id,
+                source="scanr_patents",
+                source_id=family,
+                title_normalized=title,
+                doc_type="patent",
+            )
+            for family in ("86329653", "86329914")
+        ]
+
+        reconcile(conn, logger)
+
+        publications = {_source_record_state(conn, f)[0] for f in families}
+        assert len(publications) == 2
+        assert publication_id in publications
+
+
 def _distinct_dois(conn, publication_id) -> set[str]:
     return set(
         conn.execute(
