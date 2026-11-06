@@ -87,6 +87,18 @@ def active(identifiers: Iterable[SourceIdentifier]) -> list[SourceIdentifier]:
     return [i for i in identifiers if i.removed_by is None]
 
 
+DOI_OF_ANOTHER_PUBLICATION = "DOI_D_UNE_AUTRE_PUBLICATION"
+"""Motif du retrait d'un DOI par la réconciliation des publications : le DOI appartient à une autre partition. Le retrait tient au voisinage de l'enregistrement source."""
+
+
+def reconsidered(identifiers: Iterable[SourceIdentifier]) -> list[SourceIdentifier]:
+    """Renvoie les identifiants, avec les DOI retirés par la réconciliation (`DOI_OF_ANOTHER_PUBLICATION`) rendus actifs. La réconciliation redécide de ces retraits à chaque passe. Le choix des enregistrements sources réconciliables les ignore."""
+    return [
+        replace(i, removed_by=None) if i.removed_by == DOI_OF_ANOTHER_PUBLICATION else i
+        for i in identifiers
+    ]
+
+
 def own_dois(identifiers: Iterable[SourceIdentifier]) -> set[str]:
     """Renvoie les DOI propres d'un enregistrement source parmi `identifiers` : ses DOI de rôle fort (`STRONG_ROLES`), à défaut ses DOI `secondary`."""
     dois = [

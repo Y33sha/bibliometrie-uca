@@ -3,6 +3,7 @@
 from domain.publications.metadata import normalized_title
 from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES, MatchabilityFacts, is_matchable
 from domain.source_records.identifiers import (
+    DOI_OF_ANOTHER_PUBLICATION,
     SourceIdentifier,
     SourceIdentifierRole,
     SourceIdentifierType,
@@ -131,6 +132,11 @@ class TestIsMatchable:
 
     def test_removed_doi_does_not_keep_an_aggregator_record(self):
         assert not is_matchable(_facts("openalex", removed_doi="10.1/x"))
+
+    def test_doi_removed_by_the_reconciliation_keeps_an_aggregator_record(self):
+        """La réconciliation redécide de ses retraits à chaque passe : l'enregistrement source reste réconciliable."""
+        removed = _id(SourceIdentifierType.DOI, "10.5281/zenodo.1", DOI_OF_ANOTHER_PUBLICATION)
+        assert is_matchable(_facts("openalex", identifiers=[removed]))
 
     def test_removed_key_does_not_keep_an_aggregator_record(self):
         removed = _id(SourceIdentifierType.HAL_ID, "hal-03178520", "HAL_DEPOSIT_MISSING_TO_REMOVED")

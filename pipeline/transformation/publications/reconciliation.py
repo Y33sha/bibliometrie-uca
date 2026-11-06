@@ -29,8 +29,11 @@ from domain.publications.reconciliation import (
     work_id,
 )
 from domain.source_records.identifiers import (
+    DOI_OF_ANOTHER_PUBLICATION,
     SourceIdentifier,
     SourceIdentifierRole,
+    SourceIdentifierType,
+    reconsidered,
 )
 from domain.source_records.keys import (
     CONFIRMATION_ID_TYPES,
@@ -116,8 +119,11 @@ _MULTI_VALUED_KEY_SQL = (
 )
 """L'identifiant aliasé `{a}` de `source_record_identifiers` est une clé à plusieurs valeurs (`is_multi_valued_key`)."""
 
-_DOI_KEY_SQL = non_related_doi_sql("{a}") + " AND {a}.removed_by IS NULL"
-"""L'identifiant aliasé `{a}` de `source_record_identifiers` est une clé DOI : un DOI actif de rôle autre que `related` (`doi_keys`)."""
+_DOI_KEY_SQL = (
+    non_related_doi_sql("{a}")
+    + f" AND ({{a}}.removed_by IS NULL OR {{a}}.removed_by = '{DOI_OF_ANOTHER_PUBLICATION}')"
+)
+"""L'identifiant aliasé `{a}` de `source_record_identifiers` est une clé DOI de la réconciliation : un DOI de rôle autre que `related`, actif ou retiré par la réconciliation elle-même (`reconsidered`)."""
 
 _UNIVERSE_SQL = text(f"""
     WITH dirty AS (
@@ -341,6 +347,52 @@ def detach_source_records(conn: Connection, source_record_ids: list[int]) -> Non
     )
 
 
+def write_doi_removals(
+    conn: Connection,
+    rows: Sequence[ReconcileRow],
+    doi_targets: Mapping[str, str],
+    removals: Sequence[tuple[int, str]],
+) -> int:
+    """Retire les DOI du plan (`ReconcilePlan.doi_removals`) des enregistrements sources du voisinage, sous le motif `DOI_OF_ANOTHER_PUBLICATION`, et rend actifs les DOI retirés sous ce motif que le plan garde. Renvoie le nombre d'identifiants modifiés.
+
+    Args:
+        removals: couples (enregistrement source, DOI cible appliquée) ; un DOI retiré l'est sous toutes ses formes secondaires.
+    """
+    removed = set(removals)
+    changes = [
+        (row.id, i.value, wanted)
+        for row in rows
+        for i in row.identifiers
+        if i.id_type is SourceIdentifierType.DOI
+        and i.role is not SourceIdentifierRole.RELATED
+        and i.removed_by in (None, DOI_OF_ANOTHER_PUBLICATION)
+        and (
+            wanted := DOI_OF_ANOTHER_PUBLICATION
+            if (row.id, doi_targets.get(i.value, i.value)) in removed
+            else None
+        )
+        != i.removed_by
+    ]
+    if not changes:
+        return 0
+    conn.execute(
+        text(f"""
+            UPDATE source_record_identifiers i SET removed_by = c.removed_by
+            FROM unnest(
+                CAST(:ids AS integer[]), CAST(:values AS text[]), CAST(:removed_by AS text[])
+            ) AS c(source_record_id, id_value, removed_by)
+            WHERE i.source_record_id = c.source_record_id
+              AND i.id_type = '{SourceIdentifierType.DOI}' AND i.id_value = c.id_value
+        """),  # noqa: S608 — type d'identifiant venu du code
+        {
+            "ids": [c[0] for c in changes],
+            "values": [c[1] for c in changes],
+            "removed_by": [c[2] for c in changes],
+        },
+    )
+    return len(changes)
+
+
 def mark_publications_for_grouping(conn: Connection, publication_ids: list[int]) -> int:
     """Marque ces publications pour l'alignement des auteurs. Renvoie le nombre de publications marquées."""
     if not publication_ids:
@@ -349,8 +401,9 @@ def mark_publications_for_grouping(conn: Connection, publication_ids: list[int])
 
 
 def _member(row: ReconcileRow, doi_targets: dict[str, str]) -> ReconcileMember:
+    identifiers = reconsidered(row.identifiers)
     keys = project_confirmation_keys(
-        row.identifiers, row.doc_type, row.title_normalized, row.publication_year, doi_targets
+        identifiers, row.doc_type, row.title_normalized, row.publication_year, doi_targets
     )
     return ReconcileMember(
         source_record_id=row.id,
@@ -358,7 +411,7 @@ def _member(row: ReconcileRow, doi_targets: dict[str, str]) -> ReconcileMember:
         publication_doi=row.publication_doi,
         doi_keys=keys.doi,
         tokens=keys.tokens() | manual_merge_tokens(row.manual_merge_ids),
-        derivation=derivation(row.identifiers),
+        derivation=derivation(identifiers),
         work_id=work_id(row.source, row.source_id),
         in_perimeter=row.in_perimeter,
         title_normalized=row.title_normalized,
@@ -424,8 +477,17 @@ class AppliedReconciliation(NamedTuple):
     """Publications créées par une scission, parmi `created`."""
 
 
-def _plan(conn: Connection) -> tuple[ReconcilePlan, dict[int, ReconcileRow]]:
-    """Planifie la réconciliation du voisinage des enregistrements sources relevés. Renvoie le plan et les lignes du voisinage par enregistrement source."""
+class _Planned(NamedTuple):
+    """Plan de réconciliation et voisinage qui l'a produit."""
+
+    plan: ReconcilePlan
+    rows_by_source_record: dict[int, ReconcileRow]
+    doi_targets: dict[str, str]
+    """Cible du DOI de chaque forme secondaire du voisinage."""
+
+
+def _plan(conn: Connection) -> _Planned:
+    """Planifie la réconciliation du voisinage des enregistrements sources relevés."""
     rows = fetch_reconciliation_universe(conn)
     publication_sizes = fetch_publication_sizes(
         conn, sorted({row.publication_id for row in rows if row.publication_id is not None})
@@ -436,13 +498,15 @@ def _plan(conn: Connection) -> tuple[ReconcilePlan, dict[int, ReconcileRow]]:
         existing_publication_by_doi=fetch_publication_ids_by_doi(conn),
         publication_sizes=publication_sizes,
     )
-    return plan, {row.id: row for row in rows}
+    return _Planned(plan, {row.id: row for row in rows}, doi_targets)
 
 
-def _apply(
-    conn: Connection, plan: ReconcilePlan, rows_by_source_record: dict[int, ReconcileRow]
-) -> AppliedReconciliation:
-    """Applique le plan : rattachements, détachements, dissolutions. Les publications conservées restent à rafraîchir."""
+def _apply(conn: Connection, planned: _Planned) -> AppliedReconciliation:
+    """Applique le plan : retraits de DOI, rattachements, détachements, dissolutions. Les publications conservées restent à rafraîchir."""
+    plan, rows_by_source_record = planned.plan, planned.rows_by_source_record
+    write_doi_removals(
+        conn, list(rows_by_source_record.values()), planned.doi_targets, plan.doi_removals
+    )
     survivors: set[int] = set()
     # Publications qui gagnent ou perdent un enregistrement source.
     membership_changed: set[int] = set()
@@ -539,7 +603,8 @@ def reconcile(conn: Connection, logger: logging.Logger, *, rebuild: bool = False
         "reconstruction complète" if rebuild else "nouveaux ou mis à jour",
     )
     with waiting(BRANCH, logger) as line:
-        plan, rows_by_source_record = _plan(conn)
+        planned = _plan(conn)
+        plan = planned.plan
         # Le plan sépare déjà les publications à créer des publications rejointes par un groupe.
         to_create = sum(1 for g in plan.groups if g.target_publication_id is None)
         existing = len(plan.groups) - to_create
@@ -552,7 +617,7 @@ def reconcile(conn: Connection, logger: logging.Logger, *, rebuild: bool = False
     before = _snapshot_publications(conn)
     t0 = time.perf_counter()
     with waiting(f"{LAST_BRANCH}application", logger) as line:
-        applied = _apply(conn, plan, rows_by_source_record)
+        applied = _apply(conn, planned)
         line.conclude(f"{LAST_BRANCH}Terminé en {time.perf_counter() - t0:.1f}s")
 
     # Recalcul des métadonnées consolidées depuis les enregistrements sources.
@@ -583,10 +648,10 @@ def reconcile_source_records(
     Les publications qui gagnent ou perdent un enregistrement source sont marquées pour l'alignement des auteurs.
     """
     snapshot_source_records(conn, source_record_ids)
-    plan, rows_by_source_record = _plan(conn)
+    planned = _plan(conn)
     before = _snapshot_publications(conn)
-    applied = _apply(conn, plan, rows_by_source_record)
-    lifecycle.refresh(conn, _publications_to_refresh(conn, plan, applied, before))
+    applied = _apply(conn, planned)
+    lifecycle.refresh(conn, _publications_to_refresh(conn, planned.plan, applied, before))
     mark_publications_for_grouping(conn, sorted(applied.changed))
     conn.execute(text(f"DROP TABLE {_SNAPSHOT}"))
     return applied
