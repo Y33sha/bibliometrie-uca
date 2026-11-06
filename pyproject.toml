@@ -35,7 +35,7 @@ migrate_all = "interfaces.cli.dev.migrate_all:main"
 [dependency-groups]
 dev = [
     "pytest==9.1.1",
-    "pytest-asyncio==1.4.1",   # tests des moissonnages HTTP async du pipeline
+    "pytest-asyncio==1.4.1.post1",   # tests des moissonnages HTTP async du pipeline
     "pytest-cov==7.1.0",
     "ruff==0.17.3",
     "pyrefly==1.4.0",
