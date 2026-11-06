@@ -9,7 +9,7 @@
 	import PivotControls from '#lib/components/stats/PivotControls.svelte';
 	import PivotChart from '#lib/components/stats/PivotChart.svelte';
 	import { useFilterPanel } from '#lib/composables/useFilterPanel.svelte.js';
-	import { usePivotChart, type ChartMode, type PivotSettings } from '#lib/composables/usePivotChart.svelte.js';
+	import { pivotSettingsFromUrl, pivotUrlFilters, usePivotChart } from '#lib/composables/usePivotChart.svelte.js';
 	import { defaultYears } from '#lib/defaultYears.js';
 	import { paramsToQuery } from '#lib/utils.js';
 	import { publicationsDocTypes } from '#lib/docTypes.svelte.js';
@@ -63,12 +63,7 @@
 			...urlFilterDefs(FILTERS),
 			// La page a ses années par défaut : « toutes les années » s'écrit donc dans l'URL.
 			years: { type: 'single', urlKey: 'year', defaultValue: '' },
-			indicator: { type: 'single', urlKey: 'indicator', defaultValue: 'doc_type_grouped' },
-			groupBy: { type: 'single', urlKey: 'group_by', defaultValue: 'year' },
-			chartMode: { type: 'single', urlKey: 'mode', defaultValue: 'absolu' },
-			chartPage: { type: 'page', urlKey: 'chart_page' },
-			chartSort: { type: 'single', urlKey: 'sort', defaultValue: '' },
-			chartSortDir: { type: 'single', urlKey: 'sort_dir', defaultValue: 'desc' },
+			...pivotUrlFilters({ sort: 'sort', sortDir: 'sort_dir' }),
 		},
 	});
 
@@ -98,14 +93,7 @@
 		const u = new URLSearchParams(window.location.search);
 		const restored = urlFilters.restoreFromUrl(u);
 		restoreValues(FILTERS, restored, values);
-		const settings: Partial<PivotSettings> = {};
-		if (restored.indicator !== undefined) settings.indicator = restored.indicator as string;
-		if (restored.groupBy !== undefined) settings.groupBy = restored.groupBy as string;
-		if (restored.chartMode !== undefined) settings.chartMode = restored.chartMode as ChartMode;
-		if (restored.chartPage) settings.chartPage = restored.chartPage as number;
-		if (restored.chartSort !== undefined) settings.chartSort = restored.chartSort as string;
-		if (restored.chartSortDir !== undefined) settings.chartSortDir = restored.chartSortDir as 'desc' | 'asc';
-		pivot.restore(settings);
+		pivot.restore(pivotSettingsFromUrl(restored));
 
 		// Un lien venu de la liste peut contenir une recherche, ou un filtre propre à un laboratoire ou à une personne : ils sont annoncés, puis retirés.
 		const ignored = ignoredFilters(FILTERS, values);

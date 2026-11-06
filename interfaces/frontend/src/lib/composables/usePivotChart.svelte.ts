@@ -40,6 +40,30 @@ export const DEFAULT_PIVOT_SETTINGS: PivotSettings = {
 	chartSortDir: 'desc',
 };
 
+/** Déclaration des réglages du graphique pour `useUrlFilters`. `sortKeys` nomme les clés d'URL du tri, que la page peut réserver à un autre usage. */
+export function pivotUrlFilters(sortKeys: { sort: string; sortDir: string }) {
+	return {
+		indicator: { type: 'single', urlKey: 'indicator', defaultValue: DEFAULT_PIVOT_SETTINGS.indicator },
+		groupBy: { type: 'single', urlKey: 'group_by', defaultValue: DEFAULT_PIVOT_SETTINGS.groupBy },
+		chartMode: { type: 'single', urlKey: 'mode', defaultValue: DEFAULT_PIVOT_SETTINGS.chartMode },
+		chartPage: { type: 'page', urlKey: 'chart_page' },
+		chartSort: { type: 'single', urlKey: sortKeys.sort, defaultValue: DEFAULT_PIVOT_SETTINGS.chartSort },
+		chartSortDir: { type: 'single', urlKey: sortKeys.sortDir, defaultValue: DEFAULT_PIVOT_SETTINGS.chartSortDir },
+	} as const;
+}
+
+/** Réglages du graphique lus par `useUrlFilters`, déclarés par `pivotUrlFilters`. Un réglage absent de l'URL est omis. */
+export function pivotSettingsFromUrl(restored: Record<string, unknown>): Partial<PivotSettings> {
+	const settings: Partial<PivotSettings> = {};
+	if (restored.indicator !== undefined) settings.indicator = restored.indicator as string;
+	if (restored.groupBy !== undefined) settings.groupBy = restored.groupBy as string;
+	if (restored.chartMode !== undefined) settings.chartMode = restored.chartMode as ChartMode;
+	if (restored.chartPage) settings.chartPage = restored.chartPage as number;
+	if (restored.chartSort !== undefined) settings.chartSort = restored.chartSort as string;
+	if (restored.chartSortDir !== undefined) settings.chartSortDir = restored.chartSortDir as 'desc' | 'asc';
+	return settings;
+}
+
 export type PivotChart = ReturnType<typeof usePivotChart>;
 
 export function usePivotChart(config: {

@@ -17,6 +17,9 @@
 	import FilterLayout from '#lib/components/filters/FilterLayout.svelte';
 	import FilterPanelToggle from '#lib/components/filters/FilterPanelToggle.svelte';
 	import { useFilterPanel } from '#lib/composables/useFilterPanel.svelte.js';
+	import PivotControls from '#lib/components/stats/PivotControls.svelte';
+	import PivotChart from '#lib/components/stats/PivotChart.svelte';
+	import { pivotSettingsFromUrl, pivotUrlFilters, usePivotChart } from '#lib/composables/usePivotChart.svelte.js';
 	import PublicationDrawer from '#lib/components/publications/PublicationDrawer.svelte';
 	import { useDrawerParam } from '#lib/composables/useDrawerParam.svelte.js';
 	import ActiveFilterBar from '#lib/components/ActiveFilterBar.svelte';
@@ -26,7 +29,6 @@
 		appendFilterParams,
 		initialValues,
 		restoreValues,
-		transferParams,
 		urlFilterDefs,
 		urlState,
 	} from '#lib/filterRegistry.js';
@@ -121,8 +123,9 @@
 	const col = cv.col;
 
 	// --- Vue ---
-	// Notices : type et DOI, puis titre, puis année, revue, éditeur et laboratoires ; accès à droite. Tableau : une colonne par champ, colonnes au choix.
-	type View = 'notices' | 'table';
+	// Notices : type et DOI, puis titre, puis année, revue, éditeur et laboratoires ; accès à droite. Tableau : une colonne par champ, colonnes au choix. Statistiques : graphique des publications filtrées.
+	type View = 'notices' | 'table' | 'stats';
+	const VIEWS: readonly View[] = ['notices', 'table', 'stats'];
 	let view = $state<View>('notices');
 
 	// Tris proposés en vue Notices, où les en-têtes de colonne manquent. Ils couvrent les tris du tableau.
@@ -154,15 +157,6 @@
 	let values = $state(initialValues(FILTERS));
 	const filterPanel = useFilterPanel();
 
-	// Lien vers les statistiques, pendant inverse du bouton « Voir les publications » : il transmet les filtres et la recherche. Masqué quand le contexte est une personne ou une monographie, que la page Statistiques ne représente pas.
-	const showStatsLink = $derived(!['person', 'monograph'].includes(context.kind));
-	const statsUrl = $derived.by(() => {
-		const p = transferParams(FILTERS, values);
-		const q = search.trim();
-		if (q) p.set('search', q);
-		return resolve('stats') + '?' + paramsToQuery(p);
-	});
-
 	// Sort display
 	const yearSort = $derived(sortDirection(currentSort, 'year'));
 	const titleSort = $derived(sortDirection(currentSort, 'title'));
@@ -183,6 +177,14 @@
 		return params;
 	}
 
+	// Filtres et terme de recherche : la liste, les décomptes des filtres et le graphique portent sur les mêmes publications.
+	function searchParams(): URLSearchParams {
+		const params = buildFilterParams();
+		const q = search.trim();
+		if (q) params.set('search', q);
+		return params;
+	}
+
 	// --- Composables ---
 	const listing = usePaginatedFetch<Publication>({
 		endpoint: '/api/publications',
@@ -191,10 +193,8 @@
 		perPage,
 		apiKey: () => apiKey,
 		buildParams() {
-			const params = buildFilterParams();
+			const params = searchParams();
 			params.set('sort', currentSort);
-			const q = search.trim();
-			if (q) params.set('search', q);
 			return params;
 		},
 	});
@@ -202,14 +202,22 @@
 	const facets = usePublicationFacets({
 		filters: FILTERS,
 		apiKey: () => `${apiKey}-facets`,
-		// Inclut le terme de recherche pour que les comptes de facettes suivent le champ de recherche (comme la liste), pas seulement les autres filtres.
-		buildParams() {
-			const params = buildFilterParams();
-			const q = search.trim();
-			if (q) params.set('search', q);
-			return params;
-		},
+		buildParams: searchParams,
 	});
+
+	// Graphique de la vue Statistiques.
+	const pivot = usePivotChart({
+		buildParams: searchParams,
+		// Libellés servis par la facette, y compris celui des publications sans licence.
+		licenseLabel: (value) => facets.options.license?.find((o) => o.value === value)?.text,
+		onsettingchange: () => syncUrl(),
+	});
+
+	// Charge le graphique, et d'abord son vocabulaire à la première ouverture de la vue.
+	async function loadChart() {
+		if (!pivot.schema) await pivot.loadSchema();
+		await pivot.load();
+	}
 
 	const url = useUrlFilters({
 		basePath: () => basePath,
@@ -219,6 +227,8 @@
 			currentSort: { type: 'single', urlKey: 'sort', defaultValue: 'year_desc' },
 			currentPage: { type: 'page',   urlKey: 'page' },
 			view:        { type: 'single', urlKey: 'view', defaultValue: 'notices' },
+			// Réglages du graphique. Le tri du graphique prend `chart_sort` : `sort` est celui de la liste.
+			...pivotUrlFilters({ sort: 'chart_sort', sortDir: 'chart_sort_dir' }),
 		},
 	});
 
@@ -231,12 +241,14 @@
 			currentSort,
 			currentPage: listing.page,
 			view,
+			...pivot.settings,
 		}));
 	}
 
 	function setView(next: View) {
 		view = next;
 		syncUrl();
+		if (view === 'stats') loadChart();
 	}
 
 	function onFilterChange() {
@@ -244,6 +256,7 @@
 		syncUrl();
 		listing.load();
 		facets.load();
+		if (view === 'stats') pivot.load();
 	}
 
 	const onSearchInput = url.debouncedSearch(() => {
@@ -251,6 +264,7 @@
 		syncUrl();
 		listing.load();
 		facets.load();
+		if (view === 'stats') pivot.load();
 	});
 
 	function toggleSort(column: 'year' | 'title' | 'serial' | 'publisher' | 'labs' | 'apc') {
@@ -259,10 +273,8 @@
 	}
 
 	function exportCsvUrl(): string {
-		const params = buildFilterParams();
+		const params = searchParams();
 		params.set('sort', currentSort);
-		const q = search.trim();
-		if (q) params.set('search', q);
 		// Colonnes visibles → le CSV reflète le tableau affiché.
 		params.set('columns', cv.visibleColumns.join(','));
 		return withBase(`/api/publications/export.csv?${paramsToQuery(params)}`);
@@ -283,7 +295,8 @@
 			if (restored.search) search = restored.search as string;
 			if (restored.currentSort) currentSort = restored.currentSort as string;
 			if (restored.currentPage) listing.page = restored.currentPage as number;
-			if (restored.view === 'table') view = 'table';
+			if (VIEWS.includes(restored.view as View)) view = restored.view as View;
+			pivot.restore(pivotSettingsFromUrl(restored));
 		}
 
 		// Forcer l'affichage des colonnes liées aux filtres actifs
@@ -292,11 +305,12 @@
 
 		await facets.load();
 		listing.load();
+		if (view === 'stats') loadChart();
 	});
 </script>
 
 
-<ListToolbar bind:search placeholder="Rechercher par titre ou sujet" onsearch={onSearchInput} list={listing} one="publication" many="publications" exportUrl={exportCsvUrl()}>
+<ListToolbar bind:search placeholder="Rechercher par titre ou sujet" onsearch={onSearchInput} list={listing} one="publication" many="publications" exportUrl={view === 'stats' ? undefined : exportCsvUrl()}>
 	{#snippet leading()}
 		<FilterPanelToggle bind:open={filterPanel.open} active={activeCount(FILTERS, values)} />
 	{/snippet}
@@ -311,8 +325,8 @@
 		<div class="segmented" role="group" aria-label="Affichage">
 			<button type="button" aria-pressed={view === 'notices'} onclick={() => setView('notices')}>Notices</button>
 			<button type="button" aria-pressed={view === 'table'} onclick={() => setView('table')}>Tableau</button>
+			<button type="button" aria-pressed={view === 'stats'} onclick={() => setView('stats')}>Statistiques</button>
 		</div>
-		{#if showStatsLink}<a href={statsUrl} class="btn btn-primary">Statistiques &rarr;</a>{/if}
 	{/snippet}
 	{#snippet activeFilters()}
 		<ActiveFilterBar filters={FILTERS} bind:values options={facets.options} onchange={onFilterChange} />
@@ -323,7 +337,12 @@
 {#snippet panel()}
 	<FilterPanel filters={FILTERS} groups={PUBLICATION_FILTER_GROUPS} bind:values options={facets.options} sourceCounts={facets.sourceCounts} entityEndpoint={PUBLICATION_FACETS_ENDPOINT} buildParams={buildFilterParams} panel={filterPanel} onchange={onFilterChange} />
 {/snippet}
-{#if view === 'notices'}
+{#if view === 'stats'}
+<div class="stats-view">
+	<div class="toolbar stats-controls"><PivotControls chart={pivot} /></div>
+	<PivotChart chart={pivot} />
+</div>
+{:else if view === 'notices'}
 <ListStatus list={listing} emptyText="Aucune publication trouvée">
 	<ul class="notices">
 		{#each listing.items as p (p.id)}
@@ -482,7 +501,9 @@
 </TableScroll>
 {/if}
 
+{#if view !== 'stats'}
 <Pagination page={listing.page} pages={listing.pages} onchange={(p) => { listing.goToPage(p); syncUrl(); }} />
+{/if}
 </FilterLayout>
 
 {#if drawer.id !== null}
@@ -522,6 +543,16 @@
 		gap: 4px;
 		font-size: var(--fs-sm);
 		color: var(--muted);
+	}
+	/* Vue Statistiques : réglages, puis graphique dans une colonne flexible de hauteur fixe, sous la barre d'outils. */
+	.stats-view {
+		display: flex;
+		flex-direction: column;
+		height: calc(100vh - var(--header-height) - var(--list-toolbar-height, 0px) - 32px);
+		min-height: 480px;
+	}
+	.stats-controls {
+		margin-bottom: 12px;
 	}
 	.notices {
 		list-style: none;
