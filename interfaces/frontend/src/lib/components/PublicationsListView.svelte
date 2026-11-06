@@ -162,8 +162,9 @@
 			? NOTICE_SORTS
 			: [...NOTICE_SORTS, { field: sortField, label: columnLabels[sortField as keyof typeof columnLabels] ?? sortField, first: sortDir }],
 	);
+	// Texte du sens d'un tri alphabétique ; les autres tris s'affichent par une flèche dessinée.
 	const sortDirLabel = $derived(
-		ALPHABETICAL_SORTS.has(sortField) ? (sortDir === 'asc' ? 'A→Z' : 'Z→A') : sortDir === 'desc' ? '↓' : '↑',
+		ALPHABETICAL_SORTS.has(sortField) ? (sortDir === 'asc' ? 'A→Z' : 'Z→A') : null,
 	);
 	const sortDirTitle = $derived(
 		sortField === 'year'
@@ -343,7 +344,11 @@
 						{#each noticeSorts as s (s.field)}<option value={s.field}>{s.label}</option>{/each}
 					</select>
 				</label>
-				<button type="button" class="facet-btn sort-dir" title={sortDirTitle} aria-label="Sens du tri : {sortDirTitle}" onclick={toggleSortDir}>{sortDirLabel}</button>
+				<button type="button" class="facet-btn sort-dir" title={sortDirTitle} aria-label="Sens du tri : {sortDirTitle}" onclick={toggleSortDir}>
+					{#if sortDirLabel}{sortDirLabel}{:else}
+						<svg class="sort-dir-icon" class:up={sortDir === 'asc'} width="10" height="18" viewBox="0 0 10 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 1.5v15M1.5 13l3.5 3.5L8.5 13" /></svg>
+					{/if}
+				</button>
 			</span>
 		{/if}
 		<div class="segmented" role="group" aria-label="Affichage">
@@ -577,6 +582,10 @@
 	.sort-dir {
 		padding: 0 4px;
 		margin-left: -6px;
+	}
+	/* Flèche haute, vers le bas pour un ordre décroissant, retournée pour un ordre croissant. */
+	.sort-dir-icon.up {
+		transform: rotate(180deg);
 	}
 	/* Vue Statistiques : réglages, puis graphique dans une colonne flexible. Sa hauteur suit la fenêtre, moins le menu et la barre d'outils de la liste à sa place ; elle ignore le glissement de la barre au défilement, qui la ferait varier. */
 	.stats-view {
