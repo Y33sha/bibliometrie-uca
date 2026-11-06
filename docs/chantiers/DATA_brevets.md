@@ -132,10 +132,20 @@ Familles dont un établissement du périmètre est déposant : UCA, Université 
 
 - [x] Page de détail d'un brevet : demandes par office, déposants, inventeurs, classification CPC
 - [x] Revue, éditeur, open access et APC masqués pour un brevet : statut open access `unknown`
+- [ ] Copie Espacenet de la demande prioritaire en lien d'accès, libellé « Consulter le brevet »
 
 ### Phase 7 — Documentation
 
 - [x] Mise à jour de la documentation des sources et des données
+
+### Phase 8 — Brevets absents de ScanR brevets
+
+29 brevets sont sans famille ScanR brevets au 2026-11-06.
+
+- [ ] Brevet américain délivré (3) : HAL donne le numéro de délivrance, absent de ScanR. Deux familles sont en base.
+- [ ] Même titre qu'une famille en base (2) : demande prioritaire absente de la famille ScanR, ou date HAL postérieure d'un an au premier dépôt.
+- [ ] Sans numéro de brevet (9) : références internes d'INRAE, souches.
+- [ ] Numéro FR, EP ou WO absent de ScanR (15) : 9 demandes déposées en 2024 ou 2025, 6 plus anciennes.
 
 ## Questions ouvertes
 
