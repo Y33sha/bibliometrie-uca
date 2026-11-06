@@ -16,6 +16,7 @@ from domain.sources.registry import Source
 from domain.types import JsonValue
 from pipeline.http.lookup import LookupOutcome
 from pipeline.ingestion.common.lookup import LookupChannel, by_native_id, look_up
+from pipeline.ingestion.common.staging import StagingStore
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
 type FetchOutcome = LookupOutcome[Mapping[str, JsonValue]]
@@ -38,14 +39,6 @@ _STALE_ROWS_SQL_TEMPLATE = """
     ORDER BY s.id
 """
 """Filtre sur l'année (`{year_clause}`) : `publication_year` vient de `source_records`. Un document sans enregistrement source reste sélectionné."""
-
-_SET_DISAPPEARED_SQL = text(
-    """
-    UPDATE staging SET disappeared_at = now()
-    WHERE source = CAST(:source AS source_type) AND source_id = :source_id
-      AND disappeared_at IS NULL
-    """
-)
 
 
 def get_stale_source_ids(
@@ -70,11 +63,6 @@ def get_stale_source_ids(
     return list(conn.execute(sql, params).scalars())
 
 
-def set_disappeared(conn: Connection, source: str, source_id: str) -> None:
-    """Marque disparu un document absent de la source. L'appelant commite."""
-    conn.execute(_SET_DISAPPEARED_SQL, {"source": source, "source_id": source_id})
-
-
 async def refresh(
     conn: Connection,
     source: str,
@@ -96,7 +84,9 @@ async def refresh(
         LookupChannel(
             source=source,
             fetch=by_native_id(source, fetch_one),
-            on_absent=lambda conn, source_id: set_disappeared(conn, source, source_id),
+            on_absent=lambda conn, source_id: StagingStore(conn).mark_disappeared(
+                source, source_id
+            ),
             # La lecture par identifiant natif renvoie le document entier : aucun plafond d'auteurs.
             stage=lambda staging, record: staging.stage(source, record, listed=False),
             absent_metric="disappeared",

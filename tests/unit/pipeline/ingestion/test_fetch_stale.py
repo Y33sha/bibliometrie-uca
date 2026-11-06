@@ -47,9 +47,9 @@ def lancer(monkeypatch):
         )
         monkeypatch.setattr(StagingStore, "upsert", _upsert)
         monkeypatch.setattr(
-            stale_refetch,
-            "set_disappeared",
-            lambda conn, source, source_id: base.disparus.append(source_id),
+            StagingStore,
+            "mark_disappeared",
+            lambda _store, source, source_id: base.disparus.append(source_id),
         )
 
         async def _fetch_one(_client, source_id):

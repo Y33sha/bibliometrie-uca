@@ -3,7 +3,7 @@
 Pas de réseau ni de base : la lecture d'un work est simulée, et une connexion simulée renvoie les works marqués et retient les écritures. Les tests vérifient le triage :
 - un work à plus de cent auteurs est réécrit ;
 - un work à cent auteurs exactement perd son marqueur sans réécriture ;
-- un work absent d'OpenAlex, ou fusionné dans un autre work, perd son marqueur ;
+- un work absent d'OpenAlex, ou fusionné dans un autre work, est marqué disparu et garde son marqueur ;
 - un work lu pendant une indisponibilité d'OpenAlex garde son marqueur pour le run suivant.
 """
 
@@ -29,12 +29,13 @@ def _work(nb_auteurs: int) -> dict:
 
 
 class _Connexion:
-    """Connexion simulée : renvoie les works marqués, retient les réécritures et les marqueurs levés."""
+    """Connexion simulée : renvoie les works marqués, retient les réécritures, les marqueurs levés et les works marqués disparus."""
 
     def __init__(self, openalex_ids) -> None:
         self._ids = list(openalex_ids)
         self.reecrits: list[str] = []
         self.leves: list[str] = []
+        self.disparus: list[str] = []
 
     def execute(self, sql, params=None):
         if sql is fetch_truncated._SELECT_TRUNCATED_SQL:
@@ -43,6 +44,8 @@ class _Connexion:
             self.reecrits.append(params["source_id"])
         elif sql is staging._CLEAR_TRUNCATED_SQL:
             self.leves.append(params["source_id"])
+        elif sql is staging._MARK_DISAPPEARED_SQL:
+            self.disparus.append(params["source_id"])
         return None
 
     def commit(self) -> None:
@@ -95,20 +98,20 @@ async def test_openalex_indisponible_garde_le_marqueur(openalex):
     assert (conn.reecrits, conn.leves) == ([], [])
 
 
-async def test_work_inconnu_d_openalex_perd_son_marqueur(openalex):
-    """Work supprimé dans OpenAlex : le marqueur s'efface, donc le run suivant ignore le work."""
+async def test_work_inconnu_d_openalex_est_marque_disparu(openalex):
+    """Work supprimé dans OpenAlex : marqué disparu, il garde son marqueur."""
     conn = openalex({"W1": NOT_FOUND})
     metrics = await refetch_openalex(conn, _LOGGER)
-    assert metrics.extras.get("not_found") == 1
-    assert (conn.reecrits, conn.leves) == ([], ["W1"])
+    assert metrics.extras.get("disappeared") == 1
+    assert (conn.reecrits, conn.leves, conn.disparus) == ([], [], ["W1"])
 
 
-async def test_work_fusionne_perd_son_marqueur(openalex):
-    """Work fusionné : OpenAlex renvoie le work absorbant, écrit sous son identifiant ; le work demandé perd son marqueur."""
+async def test_work_fusionne_est_marque_disparu(openalex):
+    """Work fusionné : OpenAlex renvoie le work absorbant, écrit sous son identifiant ; le work demandé est marqué disparu."""
     conn = openalex({"W1": {"id": "https://openalex.org/W9", **_work(150)}})
     metrics = await refetch_openalex(conn, _LOGGER)
-    assert metrics.extras.get("not_found") == 1
-    assert (conn.reecrits, conn.leves) == (["W9"], ["W1"])
+    assert metrics.extras.get("disappeared") == 1
+    assert (conn.reecrits, conn.leves, conn.disparus) == (["W9"], [], ["W1"])
 
 
 async def test_lot_mele(openalex):
