@@ -8,6 +8,6 @@ L'indicateur choisit ce que montre chaque barre :
 - montant des APC payées par l'établissement, par voie *open access* ;
 - nombre de publications par collaboration : internationale, nationale ou sans collaboration.
 
-Les barres se comparent par année, laboratoire, éditeur, revue ou [organisation partenaire](../../glossaire.md#organisation-partenaire), en nombre ou en part. Les filtres sont ceux de la [liste des publications](02-publications.md#liste-publications).
+Les barres se comparent par année, laboratoire, éditeur, revue, [organisation partenaire](../../glossaire.md#organisation-partenaire) ou pays partenaire, en nombre ou en part. Les filtres sont ceux de la [liste des publications](02-publications.md#liste-publications).
 
 ![Stats](../../img/screenshots/stats.png)

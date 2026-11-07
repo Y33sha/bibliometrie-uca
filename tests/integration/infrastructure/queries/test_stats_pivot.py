@@ -4,6 +4,7 @@ from sqlalchemy import text
 
 from infrastructure.read_models.publications.models import PublicationFilters
 from infrastructure.read_models.stats.queries import StatsQueries
+from tests.integration.helpers.addresses import ensure_country
 from tests.integration.helpers.publications import insert_apc_payment, insert_publication
 from tests.integration.helpers.rors import insert_author, insert_ror_tree, refresh_publication_rors
 from tests.integration.helpers.structures import (
@@ -282,3 +283,20 @@ class TestCollaboration:
         )
         insert_tutelle(conn, tutelle, child_id=university)
         assert collaborations() == {"international": 1, "none": 3}
+
+
+class TestCountry:
+    def test_publication_counts_in_each_foreign_country(self, sa_sync_conn):
+        """Le pays de l'établissement et l'absence de pays (`xx`) sont écartés ; un pays absent du référentiel garde son code."""
+        conn = sa_sync_conn
+        ensure_country(conn, "de")
+        conn.execute(text("UPDATE countries SET name = 'Allemagne' WHERE code = 'de'"))
+        conn.execute(text("DELETE FROM countries WHERE code = 'zz'"))
+        insert_publication(conn, in_perimeter=True, countries=["fr", "de", "zz"])
+        insert_publication(conn, in_perimeter=True, countries=["fr", "de"])
+        insert_publication(conn, in_perimeter=True, countries=["fr", "xx"])
+
+        res = StatsQueries(conn).pivot(
+            measure="publication_count", groups=["country"], filters=PublicationFilters()
+        )
+        assert {r["country"]: r["value"] for r in res.rows} == {"Allemagne": 2, "zz": 1}

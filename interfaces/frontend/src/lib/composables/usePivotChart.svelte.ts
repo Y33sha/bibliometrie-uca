@@ -91,7 +91,7 @@ export function usePivotChart(config: {
 	const indicatorDef = $derived(schema?.indicators.find((i) => i.key === settings.indicator));
 	// Dimension empilée dans chaque barre, imposée par l'indicateur.
 	const breakdown = $derived(indicatorDef?.breakdown ?? '');
-	// Comparaison : les dimensions déclarées `comparable` (l'année et les entités à forte cardinalité : laboratoire, éditeur, revue, organisation partenaire).
+	// Comparaison : les dimensions déclarées `comparable` (l'année et les dimensions à forte cardinalité).
 	const comparableDims = $derived(schema ? schema.dimensions.filter((d) => d.comparable) : []);
 
 	function dimCard(dim: string): string {
@@ -179,7 +179,7 @@ export function usePivotChart(config: {
 
 		const stackValues = stackDim ? orderedPivotValues(stackDim, rows) : [];
 
-		// Tri par part d'une série : n'a de sens que sur un axe entité à forte cardinalité (labo, éditeur, revue) avec un empilement. L'axe année reste chronologique, les axes à faible cardinalité gardent leur ordre métier. Le sélecteur n'apparaît que dans ce cas, et une clé devenue caduque (changement d'empilement ou d'axe) est réinitialisée.
+		// Tri par part d'une série : n'a de sens que sur un axe à forte cardinalité avec un empilement. L'axe année reste chronologique, les axes à faible cardinalité gardent leur ordre métier. Le sélecteur n'apparaît que dans ce cas, et une clé devenue caduque (changement d'empilement ou d'axe) est réinitialisée.
 		const highCard = dimCard(xDim) === 'high';
 		const segment = stackDim ? stackedSegmentOptions(canvas, highCard) : {};
 		const canSort = highCard && !!stackDim;

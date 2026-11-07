@@ -58,13 +58,13 @@ class Dimension:
     cardinality: Cardinality
     ordinal: bool
     comparable: bool
-    """Vrai si la dimension sert aussi d'axe de comparaison (abscisse) : l'année, les laboratoires, les éditeurs, les revues."""
+    """Vrai si la dimension sert aussi d'axe de comparaison (abscisse)."""
     group_sql: str
     """Expression de groupement sur la publication `p` et la revue `j`."""
     join_sql: str = ""
     """Jointure demandée par `group_sql`."""
     where_sql: str = ""
-    """Condition sur la publication `p`, qui restreint le groupement aux publications pourvues d'une valeur."""
+    """Condition qui restreint le groupement aux publications pourvues d'une valeur."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,13 +102,13 @@ def doc_type_grouped_sql(column: str = "p.doc_type") -> str:
 
 COLLABORATION_SQL = f"""CASE
     WHEN EXISTS (
-        SELECT 1 FROM unnest(p.countries) cc WHERE cc <> ALL(:collaboration_non_international)
+        SELECT 1 FROM unnest(p.countries) cc WHERE cc <> ALL(:non_international_countries)
     ) THEN 'international'
     WHEN EXISTS (
         SELECT 1 FROM publication_rors cpr
         JOIN ror_organizations cro ON cro.ror_id = cpr.ror_id
         WHERE cpr.publication_id = p.id
-          AND cro.country_code = :collaboration_country
+          AND cro.country_code = :institution_country
           AND cpr.ror_id NOT IN ({own_rors_sql("collaboration_structure_ids", descendants=True)})
     ) THEN 'national'
     ELSE 'none'
@@ -202,6 +202,20 @@ DIMENSIONS: dict[str, Dimension] = {
                 f"AND ppr.ror_id NOT IN ({OWN_RORS_SQL}) "
                 "JOIN ror_organizations pro ON pro.ror_id = ppr.ror_id"
             ),
+        ),
+        # Forte cardinalité : comparaison paginée. Une publication compte dans chacun des pays de ses affiliations, hors le pays de l'établissement et l'absence de pays.
+        Dimension(
+            "country",
+            "Pays partenaire",
+            "high",
+            ordinal=False,
+            comparable=True,
+            group_sql="COALESCE(pcn.name, pcc.code)",
+            join_sql=(
+                "CROSS JOIN LATERAL unnest(p.countries) AS pcc(code) "
+                "LEFT JOIN countries pcn ON pcn.code = pcc.code"
+            ),
+            where_sql="pcc.code <> ALL(:non_international_countries)",
         ),
         # Licence de la version éditeur.
         Dimension(
@@ -395,10 +409,8 @@ class StatsPivotQueries:
                 "measure_apc_root_ids": perimeter_structure_ids,
                 "own_structure_ids": own_structure_ids(filters.lab_ids, perimeter_structure_ids),
                 "collaboration_structure_ids": perimeter_structure_ids,
-                "collaboration_country": institution_country,
-                "collaboration_non_international": non_international_country_codes(
-                    institution_country
-                ),
+                "institution_country": institution_country,
+                "non_international_countries": non_international_country_codes(institution_country),
             },
         ).all()
         return PivotResponse(
