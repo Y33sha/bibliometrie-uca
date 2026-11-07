@@ -1,6 +1,6 @@
 """Moissonnage d'INSPIRE-HEP : tâche `harvest.inspire`.
 
-La recherche cible, année par année, les fiches dont un auteur est affilié à une institution du périmètre de moissonnage. Une valeur numérique d'`api_ids` est un numéro d'institution INSPIRE (`affid`), une autre valeur un nom d'affiliation cherché en texte (`aff`). Le filtre `date` retient une fiche quand l'une de ses dates tombe dans l'année : publication, impression ou prépublication. La phase `affiliations` détermine ensuite les contributions sources du périmètre.
+La recherche cible, année par année, les fiches dont un auteur est affilié à une institution du périmètre de moissonnage. Une valeur numérique d'`api_ids` est un numéro d'institution INSPIRE (`affid`), une autre valeur un nom d'affiliation cherché en texte (`aff`). Le filtre `date` retient une fiche quand l'une de ses dates tombe dans l'année : publication, impression ou prépublication. Une fiche datée de plusieurs années de la fenêtre revient seulement dans la première. La phase `affiliations` détermine ensuite les contributions sources du périmètre.
 """
 
 from __future__ import annotations
@@ -29,21 +29,21 @@ def affiliation_clause(api_ids: list[str]) -> str:
     return " or ".join(clauses)
 
 
-def build_query(year: int, api_ids: list[str]) -> str:
-    """Construit la requête INSPIRE : fiches d'un auteur affilié à l'une des institutions, datées de l'année `year`."""
-    return f"({affiliation_clause(api_ids)}) and date {year}"
+def build_query(year: int, api_ids: list[str], first_year: int) -> str:
+    """Construit la requête INSPIRE : fiches d'un auteur affilié à l'une des institutions, datées de l'année `year` et d'aucune année antérieure de la fenêtre, ouverte en `first_year`."""
+    query = f"({affiliation_clause(api_ids)}) and date {year}"
+    return f"{query} and not date {first_year}->{year - 1}" if year > first_year else query
 
 
 def harvest_year(
     client: InspireClient,
     conn: Connection,
+    query: str,
     year: int,
-    api_ids: list[str],
     progress: Progress,
     metrics: PhaseMetrics,
 ) -> None:
     """Moissonne les fiches d'une année, page après page, et les compte dans `metrics`."""
-    query = build_query(year, api_ids)
     stage_pages(
         conn,
         metrics,
@@ -68,11 +68,12 @@ class InspireHarvester(SourceHarvester[InspireClient]):
         api_ids = self._api_ids()
         client = self._client
         years = self._years(window)
+        first_year = min(years, default=0)
 
         return self._harvest_by_year(
             years,
-            lambda year: client.count(build_query(year, api_ids), str(year)),
+            lambda year: client.count(build_query(year, api_ids, first_year), str(year)),
             lambda year, progress, metrics: harvest_year(
-                client, self.conn, year, api_ids, progress, metrics
+                client, self.conn, build_query(year, api_ids, first_year), year, progress, metrics
             ),
         )

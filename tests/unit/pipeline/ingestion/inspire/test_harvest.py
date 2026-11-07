@@ -24,9 +24,15 @@ class TestRequetes:
             'affid:902740 or aff:"LPC, \\"Clermont\\""'
         )
 
-    def test_annee(self):
-        assert build_query(2024, ["902740", "2093671"]) == (
-            "(affid:902740 or affid:2093671) and date 2024"
+    def test_premiere_annee_de_la_fenetre(self):
+        assert build_query(2017, ["902740", "2093671"], 2017) == (
+            "(affid:902740 or affid:2093671) and date 2017"
+        )
+
+    def test_annee_suivante_sans_les_fiches_des_annees_precedentes(self):
+        """Une fiche prépubliée en 2023 et publiée en 2024 revient seulement en 2023."""
+        assert build_query(2024, ["902740"], 2017) == (
+            "(affid:902740) and date 2024 and not date 2017->2023"
         )
 
     def test_orcid_et_plage_d_annees(self):
@@ -59,7 +65,10 @@ class TestMoissonnageParInstitution:
             ("inspire", "2", "10.1103/x"),
         ]
         requetes = [appel.args[0] for appel in client.count.call_args_list]
-        assert requetes == ["(affid:902740) and date 2023", "(affid:902740) and date 2024"]
+        assert requetes == [
+            "(affid:902740) and date 2023",
+            "(affid:902740) and date 2024 and not date 2023->2023",
+        ]
         assert client.fetch_page.call_args_list[1].args[1] == (
             "https://inspirehep.net/api/literature/?page=2"
         )

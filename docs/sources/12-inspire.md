@@ -12,7 +12,7 @@ Le pipeline interroge INSPIRE-HEP de deux façons :
 - [moissonnage](../pipeline/02-harvest.md#moissonnage-par-affiliation-harvest), par année : les fiches dont un auteur est affilié à une institution du périmètre (champ INSPIRE-HEP des identifiants de structure). Un numéro d'institution INSPIRE est cherché par `affid`, un nom d'affiliation par `aff` ;
 - [moissonnage par personne](../pipeline/02-harvest.md#moissonnage-par-personne-harvest_by_person) : les fiches dont un auteur a l'ORCID d'une personne RH (`authors.ids.value`).
 
-Le filtre d'année `date` retient une fiche quand l'une de ses dates tombe dans l'année : publication, impression ou prépublication.
+Le filtre d'année `date` retient une fiche quand l'une de ses dates tombe dans l'année : publication, impression ou prépublication. Une fiche datée de plusieurs années de la fenêtre revient seulement dans la première.
 
 ## API utilisée
 
