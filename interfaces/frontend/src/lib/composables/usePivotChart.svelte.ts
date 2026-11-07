@@ -248,9 +248,13 @@ export function usePivotChart(config: {
 			for (const d of datasets) d.data = d.data.map((c, ci) => (bases[ci] ? ((c as number) / bases[ci]) * 100 : 0));
 		}
 
-		// Étiquette d'une barre ou d'un segment : sa part, affichée seulement si elle tient dans la barre.
+		// Étiquette d'une barre ou d'un segment : sa part en mode « part », sa valeur sinon. Elle s'affiche seulement si elle tient dans la barre.
 		const BAR_LABEL_FONT = { weight: 'bold' as const };
-		const barShareLabel = (ctx: { chart: Chart; dataIndex: number; datasetIndex: number }) => {
+		const barLabel = (ctx: { chart: Chart; dataIndex: number; datasetIndex: number }) => {
+			if (!part) {
+				const value = (ctx.chart.data.datasets[ctx.datasetIndex].data[ctx.dataIndex] as number) || 0;
+				return value ? formatValue(value) : '';
+			}
 			const share = shareOf(ctx.chart, ctx.datasetIndex, ctx.dataIndex);
 			return share ? Math.round(share) + '%' : '';
 		};
@@ -282,8 +286,8 @@ export function usePivotChart(config: {
 					datalabels: {
 						color: (ctx) => readableOn(barColors?.[ctx.dataIndex] ?? seriesColors[ctx.datasetIndex], cssColor('text')),
 						font: BAR_LABEL_FONT,
-						display: (ctx) => fitsInBar(ctx, barShareLabel(ctx), BAR_LABEL_FONT),
-						formatter: (_val: number, ctx) => barShareLabel(ctx),
+						display: (ctx) => fitsInBar(ctx, barLabel(ctx), BAR_LABEL_FONT),
+						formatter: (_val: number, ctx) => barLabel(ctx),
 						anchor: 'center' as const,
 						align: 'center' as const,
 						listeners: {},
