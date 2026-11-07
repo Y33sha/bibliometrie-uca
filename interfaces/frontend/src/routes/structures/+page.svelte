@@ -21,7 +21,7 @@
 	import { withBase } from '#lib/paths.js';
 	import { isAdmin } from '#lib/session.svelte.js';
 	import { nextSort, sortDirection } from '#lib/sort.js';
-	import { paramsToQuery, rorShortId, rorFullUrl } from '#lib/utils.js';
+	import { halCollectionUrl, paramsToQuery, rorShortId, rorFullUrl } from '#lib/utils.js';
 	import { structureLabel } from '#lib/structureLabels.js';
 	import IconButton from '#lib/components/IconButton.svelte';
 	import { useDrawerParam } from '#lib/composables/useDrawerParam.svelte.js';
@@ -206,7 +206,7 @@
 				</td>
 				<td>
 					{#if s.hal_collection}
-						<a href="https://hal.science/{s.hal_collection}" target="_blank" rel="noopener" class="tag id-badge">
+						<a href={halCollectionUrl(s.hal_collection)} target="_blank" rel="noopener" class="tag id-badge">
 							{s.hal_collection}
 						</a>
 					{/if}

@@ -1088,6 +1088,21 @@ a:hover > .logo-datacite {
 	background: #0047a8;
 }
 
+/* Le logo du ROR est plus large que haut. */
+.logo-ror {
+	background: #e3f4ef;
+}
+
+.logo-ror:hover,
+a:hover > .logo-ror {
+	background: #cdebe2;
+}
+
+.logo-ror img {
+	width: 17px;
+	height: auto;
+}
+
 .logo-orcid {
 	background: #f0f7e0;
 }

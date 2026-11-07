@@ -17,6 +17,7 @@
     type StructureDetail,
   } from "./types";
   import type { components } from "#lib/api/schema.js";
+  import { halCollectionUrl, rorFullUrl, rorShortId } from "#lib/utils.js";
   import RelationsSection from "./RelationsSection.svelte";
   import NameFormsSection from "./NameFormsSection.svelte";
   import EditFormModal from "./EditFormModal.svelte";
@@ -460,6 +461,19 @@
       <StructureTypeTag type={s.type} />
       <span><span class="field-label">Code</span> {s.code}</span>
     </div>
+    {#if s.ror_id || s.rnsr_id || s.hal_collection}
+      <div class="structure-meta">
+        {#if s.ror_id}
+          <span><span class="field-label">ROR</span> <a href={rorFullUrl(s.ror_id)} target="_blank" rel="noopener">{rorShortId(s.ror_id)}</a></span>
+        {/if}
+        {#if s.rnsr_id}
+          <span><span class="field-label">RNSR</span> {s.rnsr_id}</span>
+        {/if}
+        {#if s.hal_collection}
+          <span><span class="field-label">Collection HAL</span> <a href={halCollectionUrl(s.hal_collection)} target="_blank" rel="noopener">{s.hal_collection}</a></span>
+        {/if}
+      </div>
+    {/if}
     {#if s.api_ids && Object.keys(s.api_ids).length}
       <div class="api-ids-display">
         <span class="field-label">Paramètres requête API&nbsp;:</span>

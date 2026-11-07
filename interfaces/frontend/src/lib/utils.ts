@@ -275,6 +275,11 @@ export function halPersonUrl(halPersonId: string | number): string {
 	return `https://hal.science/search/index/?qa%5BauthIdHal_i%5D%5B%5D=${halPersonId}`;
 }
 
+/** Portail HAL d'une collection. */
+export function halCollectionUrl(collection: string): string {
+	return `https://hal.science/${encodeURIComponent(collection)}`;
+}
+
 /** Identifiant ROR court (sans le préfixe https://ror.org/). */
 export function rorShortId(rorId: string): string {
 	return rorId.replace('https://ror.org/', '');

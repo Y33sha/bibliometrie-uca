@@ -43,7 +43,7 @@ const HOTES_AFFICHABLES = new Set([
 /* Expressions admises dans un attribut `href`. Les fonctions de composition écrivent l'hôte ;
  * les valeurs internes désignent une route de l'application. */
 const COMPOSITION =
-	/^(halPersonUrl|halUrl|rorFullUrl|crossrefMemberUrl|issnPortalUrl|exportCsvUrl|relHref)\(/;
+	/^(halPersonUrl|halCollectionUrl|halUrl|rorFullUrl|crossrefMemberUrl|issnPortalUrl|exportCsvUrl|relHref)\(/;
 const INTERNE = /^(pubsUrl|statsUrl)$/;
 /* Liens de la page d'accueil vers une vue des publications, et résultats de la recherche
  * transverse : routes de l'application, composées par `resolve`. */
