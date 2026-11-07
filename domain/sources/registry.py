@@ -19,6 +19,7 @@ class Source(StrEnum):
     THESES = "theses"
     CROSSREF = "crossref"
     DATACITE = "datacite"
+    INSPIRE = "inspire"
 
 
 @dataclass(frozen=True, slots=True)
@@ -104,6 +105,13 @@ PROFILES: dict[Source, SourceProfile] = {
         registration_agency="DataCite",
         structure_ids="mots-clés d'affiliation",
     ),
+    # Base disciplinaire de la physique des hautes énergies, moissonnée par institution et par personne, sans recherche par DOI.
+    Source.INSPIRE: SourceProfile(
+        label="INSPIRE-HEP",
+        harvested=True,
+        person_identifiers=frozenset({PersonIdentifierType.ORCID}),
+        structure_ids="numéros d'institution, à défaut noms d'affiliation",
+    ),
 }
 
 DOI_ORG = "doi_org"
@@ -150,6 +158,8 @@ def source_record_url(source: str, source_id: str) -> str:
             return f"https://theses.fr/{path}"
         case Source.CROSSREF | Source.DATACITE:
             return f"https://doi.org/{quote(source_id, safe='/:')}"
+        case Source.INSPIRE:
+            return f"https://inspirehep.net/literature/{path}"
 
 
 HARVESTED_SOURCES: tuple[Source, ...] = tuple(s for s, p in PROFILES.items() if p.harvested)
@@ -173,11 +183,12 @@ SOURCE_PRIORITY: tuple[Source, ...] = (
     Source.CROSSREF,
     Source.DATACITE,
     Source.HAL,
+    Source.INSPIRE,
     Source.OPENALEX,
     Source.SCANR,
     Source.WOS,
 )
-"""Ordre d'autorité des sources, pour l'agrégation des métadonnées, la position d'auteur et l'ordre des normaliseurs. theses.fr fait autorité sur les thèses, ScanR brevets sur les brevets. Crossref et DataCite font chacun autorité sur leurs propres DOI."""
+"""Ordre d'autorité des sources, pour l'agrégation des métadonnées, la position d'auteur et l'ordre des normaliseurs. theses.fr fait autorité sur les thèses, ScanR brevets sur les brevets. Crossref et DataCite font chacun autorité sur leurs propres DOI. INSPIRE-HEP passe avant OpenAlex : ses listes d'auteurs sont complètes et vérifiées."""
 
 
 STRUCTURE_API_SOURCES: tuple[Source, ...] = tuple(s for s, p in PROFILES.items() if p.structure_ids)

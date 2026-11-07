@@ -8,7 +8,7 @@ La phase `publications` maintient les [publications](../donnees/03-publications.
 
 Deux enregistrements sources désignent la même publication s'ils partagent une **clé de confirmation**.
 
-- **Identifiants** : DOI, NNT (numéro national de thèse), identifiant HAL, PMID (PubMed). Égalité directe. Un identifiant arXiv devient à la normalisation le DOI du dépôt (`10.48550/arxiv.<identifiant>`). Seuls comptent les identifiants actifs ; un DOI `related` désigne une autre œuvre et reste hors des clés. Le DOI d'une forme secondaire (version, variante) cède la place à sa cible (`doi_targets`).
+- **Identifiants** : DOI, NNT (numéro national de thèse), identifiant HAL, PMID (PubMed), numéro de fiche du CERN Document Server. Égalité directe. Un identifiant arXiv devient à la normalisation le DOI du dépôt (`10.48550/arxiv.<identifiant>`). Seuls comptent les identifiants actifs ; un DOI `related` désigne une autre œuvre et reste hors des clés. Le DOI d'une forme secondaire (version, variante) cède la place à sa cible (`doi_targets`).
 - **Bloc de métadonnées** : le triplet `type de document | titre normalisé | année`. Deux documents de même type, même titre et même année sont tenus pour identiques. Une longueur minimale de titre écarte les collisions de titres trop génériques.
 
 `domain/source_records/keys.py` calcule ces clés, à partir des métadonnées et des identifiants laissés actifs par la phase `metadata_correction`.

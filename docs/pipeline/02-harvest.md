@@ -20,7 +20,7 @@ En mode `daily`, seul HAL est moissonné : les dépôts de la même plage d'ann�
 
 Une publication sans affiliation au périmètre échappe au moissonnage par affiliation. Cette phase, jouée en mode `full`, interroge chaque source sur les identifiants des personnes RH, confirmés ou authentifiés, sur la même plage d'années.
 
-- **Identifiants par source** : ORCID dans HAL, OpenAlex, ScanR, Crossref et DataCite ; idHAL dans HAL ; IdRef dans HAL et ScanR (profil de chaque source, `domain/sources/registry.py`).
+- **Identifiants par source** : ORCID dans HAL, OpenAlex, ScanR, Crossref, DataCite et INSPIRE-HEP ; idHAL dans HAL ; IdRef dans HAL et ScanR (profil de chaque source, `domain/sources/registry.py`).
 - **Lots de personnes** : une requête réunit tous les identifiants d'un lot de personnes. Un document que plusieurs lots ramènent est écrit une fois.
 - **Provenance** : les lignes créées ont le mode d'entrée `person_identifier`.
 

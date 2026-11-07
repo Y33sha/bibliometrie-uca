@@ -1,8 +1,8 @@
 # Vue d'ensemble
 
-*À jour le 2026-10-13.*
+*À jour le 2026-11-07.*
 
-Le système intègre 7 sources bibliographiques, des sources complémentaires et des imports manuels.
+Le système intègre 9 sources bibliographiques, des sources complémentaires et des imports manuels.
 
 ## Sources bibliographiques
 
@@ -16,6 +16,7 @@ Le système intègre 7 sources bibliographiques, des sources complémentaires et
 | [theses.fr](08-theses.md) | Portail officiel des thèses françaises | Thèses soutenues et en cours | REST | aucun |
 | [Crossref](06-crossref.md) | Agence d'enregistrement de DOI | Publications dotées d'un [DOI](../glossaire.md#doi) Crossref. Sert aussi à trouver l'éditeur d'un préfixe DOI. | REST (works, prefixes, members) | adresse électronique de contact |
 | [DataCite](07-datacite.md) | Agence d'enregistrement de DOI | Publications dotées d'un [DOI](../glossaire.md#doi) DataCite : jeux de données, logiciels, *preprints*, dépôts d'entrepôts (Zenodo, figshare, recherche-data-gouv…). Sert aussi à trouver l'entrepôt d'un préfixe DOI. | REST (dois, prefixes) | adresse électronique de contact |
+| [INSPIRE-HEP](12-inspire.md) | Base disciplinaire | Physique des hautes énergies, avec les institutions des auteurs | REST (literature) | aucun |
 
 Un [exemple de publication](11-exemple-de-publication.md) compare les métadonnées de cinq sources.
 
@@ -31,6 +32,7 @@ Un [exemple de publication](11-exemple-de-publication.md) compare les métadonn�
 | theses.fr | PPN d'établissement + année de soutenance | — | NNT |
 | Crossref | — | ORCID | DOI |
 | DataCite | mot-clé d'affiliation + année | ORCID | DOI |
+| INSPIRE-HEP | numéro d'institution, à défaut nom d'affiliation + année | ORCID | — |
 
 Le moissonnage par personne interroge les identifiants des personnes RH, confirmés ou authentifiés.
 

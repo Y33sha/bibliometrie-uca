@@ -17,6 +17,8 @@ API_BASE_URLS: dict[str, str] = {
     "crossref": "https://api.crossref.org",
     # DataCite : racine ; l'adaptateur compose `/dois` (requête par lot) ou `/dois/<doi>`.
     "datacite": "https://api.datacite.org",
+    # INSPIRE-HEP : recherche dans la littérature ; l'adaptateur compose `/<numéro de fiche>` pour une fiche.
+    "inspire": "https://inspirehep.net/api/literature",
     # doi.org : agence d'enregistrement ; l'adaptateur compose `/<préfixe>,<préfixe>,…`.
     "doi_org": "https://doi.org/ra",
     # doi.org : registre des DOI ; l'adaptateur compose `/<doi>`. Un DOI inconnu répond 404.
@@ -69,6 +71,8 @@ MAX_CONCURRENT: dict[str, int] = {
     # Polite pool : 3 requêtes simultanées au plus.
     "crossref": 3,
     "datacite": 3,
+    # Fiches des grandes collaborations : jusqu'à 2 Mo par fiche.
+    "inspire": 2,
     "doi_org": 3,
     # Aucune limite documentée.
     "sudoc": 4,
@@ -94,6 +98,8 @@ MAX_PER_SECOND: dict[str, float] = {
     "crossref": 5,
     # Seuil publié du tier identifié (User-Agent avec mailto) : 1 000 requêtes par 5 minutes.
     "datacite": 3,
+    # Aucun seuil dans les en-têtes de réponse.
+    "inspire": 2,
     # Aucun seuil publié.
     "sudoc": 5,
     # Seuil publié : 100 000 requêtes par jour, aucun seuil par seconde.

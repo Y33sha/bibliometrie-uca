@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from domain.documents.identifiers import (
     NNT,
     PMID,
+    CdsId,
     HALId,
     arxiv_doi,
     extract_doi_from_url,
@@ -166,7 +167,7 @@ def extract_nnt_from_location(loc: OpenalexLocation) -> str | None:
 
 
 def url_identifiers(urls: list[str]) -> list[SourceIdentifier]:
-    """Renvoie les identifiants secondaires exposés dans une liste d'URLs, dans leur ordre : `hal_id` (préfixes `hal-`/`tel-`/`halshs-`…), NNT (URLs `theses.fr/<NNT>`), PMID (PubMed) et DOI d'un dépôt arXiv."""
+    """Renvoie les identifiants secondaires exposés dans une liste d'URLs, dans leur ordre : `hal_id` (préfixes `hal-`/`tel-`/`halshs-`…), NNT (URLs `theses.fr/<NNT>`), PMID (PubMed), DOI d'un dépôt arXiv et numéro de fiche du CERN Document Server."""
     identifiers: list[SourceIdentifier] = []
     for url in urls:
         for id_type, value in (
@@ -177,6 +178,7 @@ def url_identifiers(urls: list[str]) -> list[SourceIdentifier]:
             ),
             (SourceIdentifierType.PMID, PMID.normalize(url)),
             (SourceIdentifierType.DOI, arxiv_doi(url)),
+            (SourceIdentifierType.CDS, CdsId.normalize(url)),
         ):
             if value:
                 identifiers.append(SourceIdentifier(id_type, value, SourceIdentifierRole.SECONDARY))

@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict cr2TAzztUJcGdj2EHRerPyIfnmoJTC5cepHO4Vq1xCufOkxfggI8vTp26z2FjJH
+\restrict V8JUEhKomi9OalKvlJGxzIPjq0lr6GladkcLfm3tXfewOq13ppmRt5nIXje3Jle
 
--- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
--- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
+-- Dumped from database version 18.4
+-- Dumped by pg_dump version 18.4
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -302,6 +302,7 @@ CREATE TYPE public.lookup_source AS ENUM (
     'theses',
     'crossref',
     'datacite',
+    'inspire',
     'doi_org'
 );
 
@@ -503,7 +504,8 @@ CREATE TYPE public.source_identifier_type AS ENUM (
     'isbn',
     'eisbn',
     'patent_publication_number',
-    'patent_application_number'
+    'patent_application_number',
+    'cds'
 );
 
 
@@ -519,7 +521,8 @@ CREATE TYPE public.source_type AS ENUM (
     'scanr_patents',
     'theses',
     'crossref',
-    'datacite'
+    'datacite',
+    'inspire'
 );
 
 
@@ -6264,5 +6267,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict cr2TAzztUJcGdj2EHRerPyIfnmoJTC5cepHO4Vq1xCufOkxfggI8vTp26z2FjJH
+\unrestrict V8JUEhKomi9OalKvlJGxzIPjq0lr6GladkcLfm3tXfewOq13ppmRt5nIXje3Jle
 

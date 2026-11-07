@@ -4,7 +4,7 @@ from collections.abc import Callable, Iterable, Mapping, Set
 from dataclasses import dataclass, replace
 from enum import StrEnum
 
-from domain.documents.identifiers import DOI, ISBN, NNT, PMID, HALId, PatentNumber
+from domain.documents.identifiers import DOI, ISBN, NNT, PMID, CdsId, HALId, PatentNumber
 from domain.documents.patent_numbers import PatentNumberKind
 from domain.serials.containers import ContainerRole, container_role
 
@@ -21,6 +21,8 @@ class SourceIdentifierType(StrEnum):
     PATENT_PUBLICATION_NUMBER = "patent_publication_number"
     PATENT_APPLICATION_NUMBER = "patent_application_number"
     """Numéro de demande de brevet. Pour l'office WO, il recoupe les numéros de publication d'autres familles."""
+    CDS = "cds"
+    """Numéro de fiche du CERN Document Server."""
 
 
 PATENT_NUMBER_TYPES: dict[PatentNumberKind, SourceIdentifierType] = {
@@ -149,6 +151,7 @@ _NORMALIZERS: dict[SourceIdentifierType, Callable[[str], str | None]] = {
     SourceIdentifierType.EISBN: ISBN.normalize,
     SourceIdentifierType.PATENT_PUBLICATION_NUMBER: PatentNumber.normalize,
     SourceIdentifierType.PATENT_APPLICATION_NUMBER: PatentNumber.normalize,
+    SourceIdentifierType.CDS: CdsId.normalize,
 }
 """Normalisation d'une valeur par type ; une valeur vide ou `None` signale une valeur invalide."""
 

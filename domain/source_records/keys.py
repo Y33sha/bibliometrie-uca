@@ -27,6 +27,7 @@ CONFIRMATION_ID_TYPES = (
     SourceIdentifierType.HAL_ID,
     SourceIdentifierType.PMID,
     SourceIdentifierType.NNT,
+    SourceIdentifierType.CDS,
 )
 """Types d'identifiants dont l'identifiant de rôle le plus fort est une clé de confirmation, à côté du DOI et du bloc de métadonnées."""
 

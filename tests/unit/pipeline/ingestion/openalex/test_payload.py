@@ -60,6 +60,9 @@ class TestUrlIdentifiers:
     def test_doi_arxiv(self):
         assert _url_ids(["http://arxiv.org/abs/1210.6893"]) == [("doi", "10.48550/arxiv.1210.6893")]
 
+    def test_fiche_cds(self):
+        assert _url_ids(["https://cds.cern.ch/record/2803447"]) == [("cds", "2803447")]
+
     def test_collecte_chaque_identifiant_distinct_dans_l_ordre(self):
         """Une version HAL ne fait pas un dépôt distinct."""
         urls = [

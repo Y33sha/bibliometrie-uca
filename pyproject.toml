@@ -117,6 +117,7 @@ source_modules = [
     "pipeline.ingestion.crossref",
     "pipeline.ingestion.datacite",
     "pipeline.ingestion.hal",
+    "pipeline.ingestion.inspire",
     "pipeline.ingestion.openalex",
     "pipeline.ingestion.scanr",
     "pipeline.ingestion.scanr_patents",

@@ -41,7 +41,7 @@ class SourceRecordUpsert:
     source: str
     """Clé de l'enregistrement source."""
     source_id: str
-    """Identifiant natif de la source : hal-id, id OpenAlex, UT WoS, id ScanR, id de famille de brevets ScanR, id theses.fr ou NNT, DOI pour crossref et datacite."""
+    """Identifiant natif de la source : hal-id, id OpenAlex, UT WoS, id ScanR, id de famille de brevets ScanR, id theses.fr ou NNT, DOI pour crossref et datacite, numéro de fiche INSPIRE-HEP."""
     staging_id: int
 
     # Rattachement
