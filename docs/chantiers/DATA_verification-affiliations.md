@@ -9,7 +9,8 @@ Le chantier [alignement des auteurs](archived/2026-10-24_DATA_alignement-auteurs
 ## Décisions
 
 - Une contribution dont certaines contributions sources donnent un indice de périmètre et d'autres une affiliation hors périmètre est un cas conflictuel. Une file d'administration la présente pour décision.
-- INSPIRE-HEP est moissonné par institution (numéro d'institution INSPIRE, à défaut chaîne d'affiliation) et par ORCID des personnes. La phase `fetch_missing` l'ignore, tant que le premier moissonnage ne révèle pas de manques importants.
+- INSPIRE-HEP est moissonné seulement par institution (numéro d'institution INSPIRE, à défaut chaîne d'affiliation). La phase `fetch_missing` l'ignore, tant que le premier moissonnage ne révèle pas de manques importants.
+- L'ORCID d'INSPIRE-HEP sert au rattachement des personnes et à l'indice de fiche RH (`ORCID_MATCH_SOURCES`).
 - Le moissonnage demande seulement les champs utiles : ni nombre de citations, ni références.
 - L'adresse d'une contribution source INSPIRE est le nom de l'institution rattachée par INSPIRE, avec son ROR quand INSPIRE le donne. L'affiliation brute est écartée : elle reproduit les décalages d'affiliations de l'éditeur. 0,2 % des auteurs ont une affiliation brute sans institution.
 - L'identifiant CDS est un type d'identifiant d'enregistrement source et une clé de confirmation de la réconciliation. La normalisation d'OpenAlex le reprend des URL de localisation.
@@ -128,16 +129,18 @@ Le chantier [alignement des auteurs](archived/2026-10-24_DATA_alignement-auteurs
 - [x] Migration : source `inspire`, type d'identifiant `cds`. 8763385ca
 - [x] Profil de la source, adaptateur, client de l'API, moissonnage par institution. 8763385ca
 - [x] Normalisation : enregistrement source (DOI, DOI arXiv, identifiant CDS), contributions sources (nom, ORCID, institution). 8763385ca
-- [x] Moissonnage par ORCID, relecture par numéro de fiche (`fetch_stale`). 8763385ca
+- [x] Relecture par numéro de fiche (`fetch_stale`). 8763385ca
 - [ ] Numéros d'institution INSPIRE dans `api_ids` et noms d'institution INSPIRE dans les formes de nom des structures du périmètre.
 - [x] Documentation de la source. 8763385ca
 - [x] Publications du périmètre absentes du moissonnage d'INSPIRE, le 2026-11-07 sur la base locale (`inspire_missing.py`). Le moissonnage par institution ramène 2 717 fiches, la recherche par ORCID 216 autres.
-  - Recherche par ORCID (`inspire_orcid_rh.py`) : 211 des 217 contributions sources de personnes RH datent d'avant l'arrivée de la personne, dont 203 pour une seule personne. Les 6 autres sont sans institution. Aucune n'entre dans le périmètre : l'ORCID d'INSPIRE est hors des sources de confiance (`ORCID_MATCH_SOURCES`).
+  - Recherche par ORCID (`inspire_orcid_rh.py`) : 211 des 217 contributions sources de personnes RH datent d'avant l'arrivée de la personne, dont 203 pour une seule personne. Les 6 autres sont sans institution.
   - ORCID d'INSPIRE (`inspire_orcid_agreement.py`) : 1 531 051 contributions sources ont le même ORCID qu'une source de confiance de leur contribution, 8 135 un autre. Les écarts relus viennent de l'alignement d'homonymes de même initiale, ou de l'ORCID d'un homonyme dans HAL, sur une liste d'auteurs de collaboration.
   - Publications HEP du périmètre trouvées dans INSPIRE par DOI : 164 sur 2 436 sont sans enregistrement INSPIRE. 75 ont une fiche moissonnée, rattachée à une autre publication : 69 sont des errata, et la fiche est rattachée à l'article. Pour 63 des 89 autres, le périmètre vient de WoS seul : des actes de Quark Matter 2018, avec la collaboration ALICE entière dans WoS et l'orateur seul dans INSPIRE.
   - 135 publications du périmètre ont une localisation OpenAlex vers CDS (130) ou INSPIRE (5), sans enregistrement INSPIRE. 50 sont du périmètre par OpenAlex seul.
   - 23 fiches ont plusieurs DOI propres. 4 forment avec la prépublication arXiv une publication à côté de celle de l'article. La correction des natures de DOI (c4a452c20) en laisse 9, dont 4 errata sans nature dans INSPIRE.
   - 5 fiches de la fenêtre ont pour seule institution clermontoise l'université Blaise Pascal (1306651).
+- [x] Recherche par ORCID retirée, ORCID d'INSPIRE de confiance. Script ponctuel de suppression des 216 fiches ramenées par ORCID (`delete_inspire_person_harvest`). 66a807c47
+  - Effet mesuré le 2026-11-07 (`inspire_hr_gain_contributions.py`) : 131 contributions sources INSPIRE entrent dans le périmètre par la fiche RH, toutes dans des publications du périmètre. Pour 86, la contribution est déjà du périmètre par l'ORCID d'une autre source. Les 45 autres contributions entrent dans le périmètre : elles sont de deux personnes RH, affiliées par INSPIRE au CERN et à l'université de Cincinnati.
 - [ ] Enregistrements sources OpenAlex rattachés à un enregistrement source INSPIRE par un identifiant : normalisation sans contributions sources. L'arrivée d'un enregistrement source INSPIRE supprime les contributions sources des enregistrements OpenAlex rattachés. Script ponctuel pour le stock.
 
 ### Phase 4 — Règles
