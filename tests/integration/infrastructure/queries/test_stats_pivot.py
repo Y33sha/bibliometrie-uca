@@ -242,3 +242,42 @@ class TestPartner:
         )
         insert_tutelle(sa_sync_conn, tutelle, child_id=lab)
         assert partners() == {}
+
+
+class TestCollaboration:
+    def test_international_national_or_none(self, sa_sync_conn):
+        """Internationale : un pays étranger. Nationale : un ROR français étranger au périmètre. Les descendants ROR d'une structure du périmètre et les tutelles du périmètre n'en font pas une."""
+        conn = sa_sync_conn
+        insert_ror_tree(conn)
+        conn.execute(
+            text(
+                "INSERT INTO ror_organizations (ror_id, name, country_code, types, status) "
+                "VALUES ('0oth00001', 'Autre', 'fr', '{education}', 'active')"
+            )
+        )
+        university = insert_persons_perimeter(conn, materialize=True)
+        conn.execute(
+            text("UPDATE structures SET ror_id = '0univ0001' WHERE id = :id"), {"id": university}
+        )
+        insert_publication(conn, in_perimeter=True, countries=["fr", "de"])
+        national = insert_publication(conn, in_perimeter=True, countries=["fr"])
+        insert_author(conn, national, "W1", "0oth00001")
+        # `0lab00001` descend de l'université dans le ROR, hors de la table des structures.
+        internal = insert_publication(conn, in_perimeter=True, countries=["fr"])
+        insert_author(conn, internal, "W2", "0lab00001")
+        insert_publication(conn, in_perimeter=True, countries=["fr"])
+        refresh_publication_rors(conn)
+
+        def collaborations() -> dict[str, int]:
+            res = StatsQueries(conn).pivot(
+                measure="publication_count", groups=["collaboration"], filters=PublicationFilters()
+            )
+            return {r["collaboration"]: r["value"] for r in res.rows}
+
+        assert collaborations() == {"international": 1, "national": 1, "none": 2}
+        tutelle = insert_structure(conn, "TUT", name="Tutelle")
+        conn.execute(
+            text("UPDATE structures SET ror_id = '0oth00001' WHERE id = :id"), {"id": tutelle}
+        )
+        insert_tutelle(conn, tutelle, child_id=university)
+        assert collaborations() == {"international": 1, "none": 3}

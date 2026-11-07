@@ -20,6 +20,7 @@ from typing import Literal
 
 from sqlalchemy import Connection, text
 
+from domain.countries import non_international_country_codes
 from domain.documents.doc_types import DOC_TYPE_FAMILIES
 from domain.errors import ValidationError
 from domain.publications.oa_status import OaStatus
@@ -28,8 +29,10 @@ from infrastructure.read_models.filters import (
     HAS_CITATION_TOPS_SQL,
     OA_OPEN_SQL,
     OWN_RORS_SQL,
+    own_rors_sql,
     own_structure_ids,
 )
+from infrastructure.read_models.perimeters.queries import get_institution_country
 from infrastructure.read_models.publications.filtering import (
     filter_context,
     publication_filter_where,
@@ -92,6 +95,22 @@ def doc_type_grouped_sql(column: str = "p.doc_type") -> str:
         if key != "publications"
     ]
     return f"CASE {' '.join(whens)} ELSE 'misc' END"
+
+
+COLLABORATION_SQL = f"""CASE
+    WHEN EXISTS (
+        SELECT 1 FROM unnest(p.countries) cc WHERE cc <> ALL(:collaboration_non_international)
+    ) THEN 'international'
+    WHEN EXISTS (
+        SELECT 1 FROM publication_rors cpr
+        JOIN ror_organizations cro ON cro.ror_id = cpr.ror_id
+        WHERE cpr.publication_id = p.id
+          AND cro.country_code = :collaboration_country
+          AND cpr.ror_id NOT IN ({own_rors_sql("collaboration_structure_ids", descendants=True)})
+    ) THEN 'national'
+    ELSE 'none'
+END"""
+"""Collaboration d'une publication. Internationale : un pays étranger dans les affiliations. Nationale : un ROR des auteurs, ancêtres compris, situé dans le pays de l'établissement et étranger au périmètre. Le périmètre couvre ses structures, leurs tutelles et leurs ancêtres ROR, et les descendants ROR de ses structures. Une copublication entre structures du périmètre est sans collaboration."""
 
 
 DIMENSIONS: dict[str, Dimension] = {
@@ -199,6 +218,14 @@ DIMENSIONS: dict[str, Dimension] = {
             group_sql=CITATION_CLASS_SQL,
             where_sql=HAS_CITATION_TOPS_SQL,
         ),
+        Dimension(
+            "collaboration",
+            "Collaboration",
+            "low",
+            ordinal=False,
+            comparable=False,
+            group_sql=COLLABORATION_SQL,
+        ),
     )
 }
 
@@ -243,6 +270,7 @@ INDICATORS: dict[str, Indicator] = {
         Indicator("license", "Licence", "publication_count", "license"),
         Indicator("citation_class", "Top citations", "publication_count", "citation_class"),
         Indicator("apc_amount", "Montant des APC", "apc_amount", "oa_voie"),
+        Indicator("collaboration", "Collaborations", "publication_count", "collaboration"),
     )
 }
 """L'ordre du registre est celui du sélecteur de l'interface."""
@@ -353,6 +381,7 @@ class StatsPivotQueries:
         if dims:
             sql += f" GROUP BY {', '.join(keys)} ORDER BY {_order_by(dims)}"
 
+        institution_country = get_institution_country(self._conn)
         self._conn.execute(text("SET LOCAL jit = off"))
         rows = self._conn.execute(
             text(sql),
@@ -360,6 +389,11 @@ class StatsPivotQueries:
                 **binds,
                 "measure_apc_root_ids": perimeter_structure_ids,
                 "own_structure_ids": own_structure_ids(filters.lab_ids, perimeter_structure_ids),
+                "collaboration_structure_ids": perimeter_structure_ids,
+                "collaboration_country": institution_country,
+                "collaboration_non_international": non_international_country_codes(
+                    institution_country
+                ),
             },
         ).all()
         return PivotResponse(

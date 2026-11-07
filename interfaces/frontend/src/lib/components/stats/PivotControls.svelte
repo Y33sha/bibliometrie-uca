@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { COLLAB_VIEW, type ChartMode, type PivotChart } from '#lib/composables/usePivotChart.svelte.js';
+	import type { ChartMode, PivotChart } from '#lib/composables/usePivotChart.svelte.js';
 
 	// Réglages du graphique des statistiques, en une phrase : « Afficher <indicateur> <comparaison> en <valeur absolue | pourcentage>, classés par <tri> ». Chaque mot réglable est une liste déroulante.
 	let { chart }: { chart: PivotChart } = $props();
@@ -14,7 +14,7 @@
 		license: 'les licences',
 		citation_class: 'les publications les plus citées',
 		apc_amount: 'le montant des APC',
-		[COLLAB_VIEW]: 'les collaborations internationales',
+		collaboration: 'les collaborations',
 	};
 
 	function indicatorPhrase(key: string, label: string): string {
@@ -29,33 +29,30 @@
 			{#each chart.schema.indicators as i (i.key)}
 				<option value={i.key}>{indicatorPhrase(i.key, i.label)}</option>
 			{/each}
-			<option value={COLLAB_VIEW}>{INDICATOR_PHRASES[COLLAB_VIEW]}</option>
 		</select>
-		{#if !chart.isCollab}
-			<select class="sentence-select" aria-label="Comparaison" value={s.groupBy} onchange={(e) => chart.set('groupBy', e.currentTarget.value)}>
-				{#each chart.comparableDims as d (d.key)}
-					<option value={d.key}>par {d.label.toLowerCase()}</option>
+		<select class="sentence-select" aria-label="Comparaison" value={s.groupBy} onchange={(e) => chart.set('groupBy', e.currentTarget.value)}>
+			{#each chart.comparableDims as d (d.key)}
+				<option value={d.key}>par {d.label.toLowerCase()}</option>
+			{/each}
+			<option value="">au total</option>
+		</select>
+		<span>en</span>
+		<select class="sentence-select" aria-label="Mode" value={s.chartMode} onchange={(e) => chart.set('chartMode', e.currentTarget.value as ChartMode)}>
+			<option value="absolu">valeur absolue</option>
+			<option value="part">pourcentage</option>
+		</select>
+		{#if chart.sortableSeries.length}
+			<span class="after-control">, classés par</span>
+			<select class="sentence-select" aria-label="Tri" value={s.chartSort} onchange={(e) => chart.set('chartSort', e.currentTarget.value)}>
+				<option value="">le total</option>
+				{#each chart.sortableSeries as series (series.value)}
+					<option value={series.value}>la part {series.label}</option>
 				{/each}
-				<option value="">au total</option>
 			</select>
-			<span>en</span>
-			<select class="sentence-select" aria-label="Mode" value={s.chartMode} onchange={(e) => chart.set('chartMode', e.currentTarget.value as ChartMode)}>
-				<option value="absolu">valeur absolue</option>
-				<option value="part">pourcentage</option>
-			</select>
-			{#if chart.sortableSeries.length}
-				<span class="after-control">, classés par</span>
-				<select class="sentence-select" aria-label="Tri" value={s.chartSort} onchange={(e) => chart.set('chartSort', e.currentTarget.value)}>
-					<option value="">le total</option>
-					{#each chart.sortableSeries as series (series.value)}
-						<option value={series.value}>la part {series.label}</option>
-					{/each}
-				</select>
-				{#if s.chartSort}
-					<button type="button" class="sort-dir" title={s.chartSortDir === 'desc' ? 'Ordre décroissant' : 'Ordre croissant'} aria-label="Sens du tri" onclick={() => chart.set('chartSortDir', s.chartSortDir === 'desc' ? 'asc' : 'desc')}>
-						{s.chartSortDir === 'desc' ? '↓' : '↑'}
-					</button>
-				{/if}
+			{#if s.chartSort}
+				<button type="button" class="sort-dir" title={s.chartSortDir === 'desc' ? 'Ordre décroissant' : 'Ordre croissant'} aria-label="Sens du tri" onclick={() => chart.set('chartSortDir', s.chartSortDir === 'desc' ? 'asc' : 'desc')}>
+					{s.chartSortDir === 'desc' ? '↓' : '↑'}
+				</button>
 			{/if}
 		{/if}
 	</p>

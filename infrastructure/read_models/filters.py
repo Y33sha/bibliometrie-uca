@@ -98,9 +98,18 @@ def lab_clause(lab_ids: list[int]) -> WhereClause | None:
     )
 
 
-OWN_RORS_SQL = """
+def own_rors_sql(structure_ids_param: str, *, descendants: bool = False) -> str:
+    """Renvoie la requête des ROR propres aux structures du paramètre `structure_ids_param` : ceux des structures et de leurs tutelles (`structure_parents`, récursivement), avec leurs ancêtres ROR. Avec `descendants`, les descendants ROR des structures s'y ajoutent, sans ceux des tutelles."""
+    descendant_rors = f""",
+    descendant_rors AS (
+        SELECT s.ror_id FROM structures s
+        WHERE s.id = ANY(CAST(:{structure_ids_param} AS integer[])) AND s.ror_id IS NOT NULL
+        UNION
+        SELECT rr.child_ror_id FROM ror_relations rr JOIN descendant_rors d ON rr.parent_ror_id = d.ror_id
+    )"""
+    return f"""
     WITH RECURSIVE own_structures AS (
-        SELECT unnest(CAST(:own_structure_ids AS integer[])) AS id
+        SELECT unnest(CAST(:{structure_ids_param} AS integer[])) AS id
         UNION
         SELECT sp.parent_id FROM structure_parents sp JOIN own_structures o ON sp.child_id = o.id
     ),
@@ -109,10 +118,13 @@ OWN_RORS_SQL = """
         WHERE s.ror_id IS NOT NULL
         UNION
         SELECT rr.parent_ror_id FROM ror_relations rr JOIN own_rors r ON rr.child_ror_id = r.ror_id
-    )
-    SELECT ror_id FROM own_rors
+    ){descendant_rors if descendants else ""}
+    SELECT ror_id FROM own_rors{" UNION SELECT ror_id FROM descendant_rors" if descendants else ""}
 """
-"""ROR propres aux structures `:own_structure_ids` : ceux des structures et de leurs tutelles (`structure_parents`), avec leurs ancêtres ROR. Les organisations partenaires les excluent."""
+
+
+OWN_RORS_SQL = own_rors_sql("own_structure_ids")
+"""ROR propres aux structures `:own_structure_ids`. Les organisations partenaires les excluent."""
 
 
 def own_structure_ids(lab_ids: list[int], perimeter_structure_ids: list[int]) -> list[int]:

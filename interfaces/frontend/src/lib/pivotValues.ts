@@ -23,6 +23,17 @@ const CITATION_CLASS_LABELS: Record<string, string> = {
 	top_10_percent: 'Top 10 % hors top 1 %',
 	below: 'Hors top 10 %',
 };
+const COLLABORATION_ORDER = ['international', 'national', 'none'];
+const COLLABORATION_LABELS: Record<string, string> = {
+	international: 'Internationale',
+	national: 'Nationale',
+	none: 'Sans collaboration',
+};
+const COLLABORATION_DESCRIPTIONS: Record<string, string> = {
+	international: 'Au moins une affiliation dans un autre pays.',
+	national: "Une organisation partenaire du même pays, hors de l'établissement, d'après les ROR des auteurs.",
+	none: 'Ni affiliation dans un autre pays, ni organisation partenaire du même pays.',
+};
 // Statut OA dont un niveau d'accès reprend la couleur.
 const OA_ACCESS_STATUS: Record<string, string> = {
 	ouvert: 'open',
@@ -43,12 +54,14 @@ export function pivotValueLabel(
 		return docTypePluralLabels()[value] ?? docTypeFamilies().find((f) => f.key === value)?.label ?? value;
 	if (dim === 'license') return licenseLabel?.(value) ?? value;
 	if (dim === 'citation_class') return CITATION_CLASS_LABELS[value] ?? value;
+	if (dim === 'collaboration') return COLLABORATION_LABELS[value] ?? value;
 	return value;
 }
 
 /** Explication d'une valeur, affichée au survol de la légende et des segments ; `undefined` si la valeur n'en a pas. */
 export function pivotValueDescription(dim: string, value: string): string | undefined {
 	if (dim === 'oa_voie') return oaStatusDescriptions[value];
+	if (dim === 'collaboration') return COLLABORATION_DESCRIPTIONS[value];
 	return undefined;
 }
 
@@ -70,6 +83,7 @@ export function orderedPivotValues(dim: string, rows: Record<string, unknown>[])
 	if (dim === 'oa_voie') return OA_VOIE_ORDER.filter((v) => present.has(v));
 	if (dim === 'license') return licenseOrder.filter((v) => present.has(v));
 	if (dim === 'citation_class') return CITATION_CLASS_ORDER.filter((v) => present.has(v));
+	if (dim === 'collaboration') return COLLABORATION_ORDER.filter((v) => present.has(v));
 	if (dim === 'doc_type_grouped') {
 		// Famille « publications » éclatée en types fins, autres familles agrégées sous leur clé.
 		const order = docTypeFamilies().flatMap((f) => (f.key === 'publications' ? f.types : [f.key]));

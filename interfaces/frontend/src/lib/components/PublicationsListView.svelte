@@ -258,7 +258,7 @@
 		<FilterPanelToggle bind:open={list.panel.open} active={list.activeCount} />
 	{/snippet}
 	{#snippet exportAction()}
-		{#if view === 'stats' && !pivot.isCollab}<button type="button" class="export-btn" onclick={pivot.exportPng}>Export PNG</button>{/if}
+		{#if view === 'stats'}<button type="button" class="export-btn" onclick={pivot.exportPng}>Export PNG</button>{/if}
 	{/snippet}
 	{#snippet actions()}
 		{#if view === 'notices'}

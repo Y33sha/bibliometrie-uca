@@ -14,9 +14,6 @@ import { coreRange } from '#lib/filterRegistry.js';
 
 type PivotSchema = components['schemas']['PivotSchemaResponse'];
 
-/** Entrée du sélecteur d'indicateur qui remplace l'histogramme par la carte des collaborations internationales. Ce n'est pas une dimension du pivot. */
-export const COLLAB_VIEW = 'collaborations';
-
 /** Catégories affichées par page sur un axe à forte cardinalité. */
 export const CHART_PAGE_SIZE = 10;
 
@@ -94,7 +91,6 @@ export function usePivotChart(config: {
 	const indicatorDef = $derived(schema?.indicators.find((i) => i.key === settings.indicator));
 	// Dimension empilée dans chaque barre, imposée par l'indicateur.
 	const breakdown = $derived(indicatorDef?.breakdown ?? '');
-	const isCollab = $derived(settings.indicator === COLLAB_VIEW);
 	// Comparaison : les dimensions déclarées `comparable` (l'année et les entités à forte cardinalité : laboratoire, éditeur, revue, organisation partenaire).
 	const comparableDims = $derived(schema ? schema.dimensions.filter((d) => d.comparable) : []);
 
@@ -157,15 +153,6 @@ export function usePivotChart(config: {
 
 	// Récupère les lignes du pivot depuis l'API, puis délègue le tracé. La requête dépend seulement des filtres, de l'indicateur et de la comparaison ; les réglages d'affichage (mode, tri, page) re-tracent depuis ce cache sans nouvel appel réseau (voir `render`).
 	async function load() {
-		// Vue Collaborations : la carte se dessine seule (composant dédié). L'histogramme éventuel est détruit, le pivot n'est pas interrogé (`collaborations` n'est pas une dimension valide).
-		if (isCollab) {
-			if (chart) {
-				chart.destroy();
-				chart = null;
-			}
-			legendItems = [];
-			return;
-		}
 		const p = config.buildParams();
 		p.set('indicator', settings.indicator);
 		if (settings.groupBy) p.set('compare', settings.groupBy);
@@ -282,7 +269,8 @@ export function usePivotChart(config: {
 								const pct = shareOf(ctx.chart, ctx.datasetIndex, ctx.dataIndex).toFixed(1);
 								return part ? `${ctx.dataset.label} : ${pct}%` : `${ctx.dataset.label} : ${formatValue(ctx.raw as number)} (${pct}%)`;
 							},
-							afterLabel: (ctx) => descriptions[ctx.datasetIndex] ?? '',
+							// Explication de la série empilée ; sans empilement, de la catégorie, que nomme l'axe.
+							afterLabel: (ctx) => (stackDim ? descriptions[ctx.datasetIndex] : pivotValueDescription(xDim, cats[ctx.dataIndex])) ?? '',
 							// Total de la barre, pour un segment empilé : une barre simple porte déjà sa valeur.
 							afterBody: (items) =>
 								part || !stackDim ? [] : `Total : ${formatValue(shareBase(items[0].chart.data.datasets.map((ds) => ds.data), items[0].dataIndex))}`,
@@ -380,9 +368,6 @@ export function usePivotChart(config: {
 		get indicatorDef() {
 			return indicatorDef;
 		},
-		get isCollab() {
-			return isCollab;
-		},
 		get comparableDims() {
 			return comparableDims;
 		},
@@ -397,10 +382,6 @@ export function usePivotChart(config: {
 		},
 		get catTotal() {
 			return catTotal;
-		},
-		/** Filtres actifs sérialisés : pilotent la carte des collaborations, qui suit les mêmes filtres que le graphique mais ignore l'axe, le mode et la pagination. */
-		get filterKey() {
-			return config.buildParams().toString();
 		},
 		/** Canvas du graphique, confié par `PivotChart`. */
 		attach(el: HTMLCanvasElement | undefined) {
