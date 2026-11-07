@@ -14,6 +14,7 @@
 	import TitleRow from '#lib/components/TitleRow.svelte';
 	import IdentifierLink from '#lib/components/IdentifierLink.svelte';
 	import { countryName } from '#lib/countryNames.js';
+	import { crossrefMemberIds } from '#lib/sources.svelte.js';
 	import PublisherDrawer from '#lib/components/publishers/PublisherDrawer.svelte';
 	import { useDrawerParam } from '#lib/composables/useDrawerParam.svelte.js';
 	import { isAdmin } from '#lib/session.svelte.js';
@@ -74,6 +75,7 @@
 			<h1 class="entity-title">{publisher.name}</h1>
 			{#snippet identifierLinks()}
 				{#if publisher!.openalex_id}<IdentifierLink id_type="openalex" id_value={publisher!.openalex_id} />{/if}
+				{#each crossrefMemberIds(publisher!.doi_prefixes) as member (member)}<IdentifierLink id_type="crossref_member" id_value={String(member)} />{/each}
 			{/snippet}
 		</TitleRow>
 		{#if knownType || publisher.country}

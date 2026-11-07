@@ -113,7 +113,8 @@ export const identifierTypeLabels: Record<string, string> = {
 	idref: 'IdRef',
 	hal_person_id: 'Compte HAL',
 	ror: 'ROR',
-	openalex: 'OpenAlex'
+	openalex: 'OpenAlex',
+	crossref_member: 'Membre Crossref'
 };
 
 /** Libellé d'un type d'identifiant, sinon la valeur brute. */
