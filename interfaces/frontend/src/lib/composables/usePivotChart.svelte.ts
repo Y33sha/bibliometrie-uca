@@ -213,16 +213,19 @@ export function usePivotChart(config: {
 		// Échelle partagée entre pages : le maximum de l'axe des valeurs couvre toutes les catégories (pas seulement la page affichée), afin que l'échelle reste stable d'une page à l'autre et que les exports PNG soient comparables. `suggestedMax` laisse Chart.js arrondir les graduations ; comme ce maximum domine celui de chaque page, l'arrondi est identique partout.
 		const valueMax = allCats.reduce((max, cv) => Math.max(max, catTotals.get(cv) ?? 0), 0);
 
+		// Couleur d'un segment : celle de sa série. Sans empilement, chaque barre prend la couleur de sa catégorie.
+		const seriesColors = series.map((sv, i) => (stackDim ? pivotValueColor(stackDim, sv, i) : cssColor('accent')));
+		const barColors = stackDim ? null : cats.map((cv, ci) => pivotValueColor(xDim, cv, ci));
 		const datasets = series.map((sv, i) => ({
 			label: stackDim ? dimLabel(stackDim, sv) : (indicatorDef?.label ?? ''),
 			data: cats.map((cv) => cell(cv, sv)),
-			backgroundColor: stackDim ? pivotValueColor(stackDim, sv, i) : cssColor('accent'),
+			backgroundColor: barColors ?? seriesColors[i],
 			...segment,
 			barPercentage: 0.85,
 			categoryPercentage: 0.7,
 		}));
 		const descriptions = series.map((sv) => (stackDim ? pivotValueDescription(stackDim, sv) : undefined));
-		legendItems = datasets.map((d, i) => ({ label: d.label, color: d.backgroundColor, description: descriptions[i] }));
+		legendItems = datasets.map((d, i) => ({ label: d.label, color: seriesColors[i], description: descriptions[i] }));
 		table = {
 			columns: datasets.map((d) => d.label),
 			rows: labels.map((label, ci) => ({ label, values: datasets.map((d) => formatValue(d.data[ci] as number)) })),
@@ -277,7 +280,7 @@ export function usePivotChart(config: {
 						},
 					},
 					datalabels: {
-						color: (ctx) => readableOn(String(ctx.dataset.backgroundColor), cssColor('text')),
+						color: (ctx) => readableOn(barColors?.[ctx.dataIndex] ?? seriesColors[ctx.datasetIndex], cssColor('text')),
 						font: BAR_LABEL_FONT,
 						display: (ctx) => fitsInBar(ctx, barShareLabel(ctx), BAR_LABEL_FONT),
 						formatter: (_val: number, ctx) => barShareLabel(ctx),

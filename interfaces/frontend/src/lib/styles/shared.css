@@ -132,6 +132,11 @@
 	--citation-top_10_percent: oklch(0.76 0.065 var(--brand-hue));
 	--citation-below: var(--border);
 
+	/* Collaborations : une teinte, de la plus foncée (internationale) à la plus claire (sans collaboration), à pas de clarté égaux. */
+	--collaboration-international: var(--accent);
+	--collaboration-national: oklch(0.645 0.075 var(--brand-hue));
+	--collaboration-none: oklch(0.845 0.04 var(--brand-hue));
+
 	/* Licences : domaine public (bleu), puis du plus ouvert (vert) au moins ouvert (jaune, orange), puis les autorisations sans licence ouverte et l'absence de licence (gris sombre). */
 	--license-public-domain: #2e669e;
 	--license-cc-by: #2e9e4a;

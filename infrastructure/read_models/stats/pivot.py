@@ -80,18 +80,21 @@ class Measure:
     """Unité affichée, vide pour un nombre de publications."""
 
 
+def _doc_type_in_family_sql(column: str, family: str) -> str:
+    """Renvoie la condition vraie quand la colonne `doc_type` relève de la famille de types `family`."""
+    types = ", ".join(f"{t.value!r}" for t in DOC_TYPE_FAMILIES[family].types)
+    return f"{column}::text IN ({types})"
+
+
 def doc_type_grouped_sql(column: str = "p.doc_type") -> str:
     """Renvoie l'expression `CASE` projetant une colonne `doc_type` sur la clé de groupement du pivot.
 
     Les types de la famille « publications » (article, communication, chapitre…) gardent leur grain fin. Les autres familles se regroupent sous leur clé de famille. Un type non listé tombe dans `misc`.
     """
-    expanded = DOC_TYPE_FAMILIES["publications"].types
-    whens = [
-        f"WHEN {column}::text IN ({', '.join(f'{t.value!r}' for t in expanded)}) THEN {column}::text"
-    ]
+    whens = [f"WHEN {_doc_type_in_family_sql(column, 'publications')} THEN {column}::text"]
     whens += [
-        f"WHEN {column}::text IN ({', '.join(f'{t.value!r}' for t in family.types)}) THEN {key!r}"
-        for key, family in DOC_TYPE_FAMILIES.items()
+        f"WHEN {_doc_type_in_family_sql(column, key)} THEN {key!r}"
+        for key in DOC_TYPE_FAMILIES
         if key != "publications"
     ]
     return f"CASE {' '.join(whens)} ELSE 'misc' END"
@@ -218,6 +221,7 @@ DIMENSIONS: dict[str, Dimension] = {
             group_sql=CITATION_CLASS_SQL,
             where_sql=HAS_CITATION_TOPS_SQL,
         ),
+        # Les seules publications au sens strict (articles, communications, livres, chapitres).
         Dimension(
             "collaboration",
             "Collaboration",
@@ -225,6 +229,7 @@ DIMENSIONS: dict[str, Dimension] = {
             ordinal=False,
             comparable=False,
             group_sql=COLLABORATION_SQL,
+            where_sql=_doc_type_in_family_sql("p.doc_type", "publications"),
         ),
     )
 }

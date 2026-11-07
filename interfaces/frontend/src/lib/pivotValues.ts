@@ -72,6 +72,7 @@ export function pivotValueColor(dim: string, value: string, idx: number): string
 	if (dim === 'doc_type_grouped') return cssColor(docTypeGroupColorVar(value));
 	if (dim === 'license') return cssColor(`license-${value}`) || chartColor(idx);
 	if (dim === 'citation_class') return cssColor(`citation-${value}`) || chartColor(idx);
+	if (dim === 'collaboration') return cssColor(`collaboration-${value}`) || chartColor(idx);
 	return chartColor(idx);
 }
 

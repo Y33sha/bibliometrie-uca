@@ -246,7 +246,7 @@ class TestPartner:
 
 class TestCollaboration:
     def test_international_national_or_none(self, sa_sync_conn):
-        """Internationale : un pays étranger. Nationale : un ROR français étranger au périmètre. Les descendants ROR d'une structure du périmètre et les tutelles du périmètre n'en font pas une."""
+        """Internationale : un pays étranger. Nationale : un ROR français étranger au périmètre. Les descendants ROR d'une structure du périmètre et les tutelles du périmètre n'en font pas une. Seules les publications au sens strict comptent."""
         conn = sa_sync_conn
         insert_ror_tree(conn)
         conn.execute(
@@ -260,6 +260,7 @@ class TestCollaboration:
             text("UPDATE structures SET ror_id = '0univ0001' WHERE id = :id"), {"id": university}
         )
         insert_publication(conn, in_perimeter=True, countries=["fr", "de"])
+        insert_publication(conn, in_perimeter=True, countries=["fr", "de"], doc_type="preprint")
         national = insert_publication(conn, in_perimeter=True, countries=["fr"])
         insert_author(conn, national, "W1", "0oth00001")
         # `0lab00001` descend de l'université dans le ROR, hors de la table des structures.
