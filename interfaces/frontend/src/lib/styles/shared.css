@@ -1099,6 +1099,16 @@ a:hover > .logo-datacite {
 	background: #0047a8;
 }
 
+/* Le logo d'INSPIRE-HEP est un « i » blanc sur un carré bleu nuit : sa pastille prend ce bleu. */
+.logo-inspire {
+	background: #001529;
+}
+
+.logo-inspire:hover,
+a:hover > .logo-inspire {
+	background: #172a3c;
+}
+
 /* Le logo du ROR est plus large que haut. */
 .logo-ror {
 	background: #e3f4ef;
