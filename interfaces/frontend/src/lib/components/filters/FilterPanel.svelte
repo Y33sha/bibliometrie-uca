@@ -1,5 +1,7 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
+	import { loadEntityFacet } from '#lib/entityFacets.js';
 	import type { FacetOption } from '#lib/components/FacetDropdown.svelte';
 	import CheckboxOptions from '#lib/components/filters/CheckboxOptions.svelte';
 	import EntityOptions from '#lib/components/filters/EntityOptions.svelte';
@@ -12,6 +14,7 @@
 		isAvailable,
 		isShown,
 		type CheckboxFilter,
+		type EntityChoiceFilter,
 		type FilterGroup,
 		type FilterValues,
 		type ListFilter,
@@ -88,6 +91,30 @@
 	$effect(() => {
 		if (!loaded) return;
 		for (const f of filters) if (visible(f)) everShown.add(f.key);
+	});
+
+	/** Pause après un changement de filtre, avant le chargement d'avance des options des filtres d'entité : la liste et ses décomptes passent d'abord. */
+	const PREFETCH_DELAY_MS = 800;
+
+	// Options des filtres d'entité chargées d'avance, une requête à la fois, une fois les décomptes chargés : un filtre déplié lit ses options en cache.
+	const prefetchKey = $derived(buildParams().toString());
+	$effect(() => {
+		void prefetchKey;
+		if (!loaded) return;
+		const kinds = untrack(() =>
+			filters.filter((f): f is EntityChoiceFilter => f.control === 'entity' && visible(f)).map((f) => f.entity),
+		);
+		let cancelled = false;
+		const timer = setTimeout(async () => {
+			for (const kind of kinds) {
+				if (cancelled) return;
+				await loadEntityFacet(entityEndpoint, buildParams, kind).catch(() => {});
+			}
+		}, PREFETCH_DELAY_MS);
+		return () => {
+			cancelled = true;
+			clearTimeout(timer);
+		};
 	});
 
 	// Ancrage : le filtre manipulé en dernier et sa position à l'écran. Quand le panneau change de hauteur, il défile d'autant que le filtre s'est déplacé. L'ancrage expire après le rechargement des décomptes, ou dès que l'utilisateur fait défiler le panneau.
