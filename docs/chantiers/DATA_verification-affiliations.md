@@ -12,7 +12,7 @@ Le chantier [alignement des auteurs](archived/2026-10-24_DATA_alignement-auteurs
 - INSPIRE-HEP est moissonné par institution (numéro d'institution INSPIRE, à défaut chaîne d'affiliation) et par ORCID des personnes. La phase `fetch_missing` l'ignore, tant que le premier moissonnage ne révèle pas de manques importants.
 - Le moissonnage demande seulement les champs utiles : ni nombre de citations, ni références.
 - L'adresse d'une contribution source INSPIRE est le nom de l'institution rattachée par INSPIRE, avec son ROR quand INSPIRE le donne. L'affiliation brute est écartée : elle reproduit les décalages d'affiliations de l'éditeur. 0,2 % des auteurs ont une affiliation brute sans institution.
-- L'identifiant CDS est un type d'identifiant d'enregistrement source.
+- L'identifiant CDS est un type d'identifiant d'enregistrement source et une clé de confirmation de la réconciliation. La normalisation d'OpenAlex le reprend des URL de localisation.
 - Un enregistrement source OpenAlex est sans contributions sources quand il partage un DOI, un DOI arXiv ou un identifiant CDS (CERN Document Server) avec un enregistrement source INSPIRE. La condition se décide sur les identifiants des enregistrements sources, connus dès la normalisation.
 
 ## Phasage
@@ -125,12 +125,12 @@ Le chantier [alignement des auteurs](archived/2026-10-24_DATA_alignement-auteurs
 
 ### Phase 3 — Moissonnage d'INSPIRE-HEP
 
-- [ ] Migration : source `inspire`, type d'identifiant `cds`.
-- [ ] Profil de la source, adaptateur, client de l'API, moissonnage par institution.
-- [ ] Normalisation : enregistrement source (DOI, DOI arXiv, identifiant CDS), contributions sources (nom, ORCID, institution).
-- [ ] Moissonnage par ORCID, relecture par numéro de fiche (`fetch_stale`).
+- [x] Migration : source `inspire`, type d'identifiant `cds`. 8763385ca
+- [x] Profil de la source, adaptateur, client de l'API, moissonnage par institution. 8763385ca
+- [x] Normalisation : enregistrement source (DOI, DOI arXiv, identifiant CDS), contributions sources (nom, ORCID, institution). 8763385ca
+- [x] Moissonnage par ORCID, relecture par numéro de fiche (`fetch_stale`). 8763385ca
 - [ ] Numéros d'institution INSPIRE dans `api_ids` et noms d'institution INSPIRE dans les formes de nom des structures du périmètre.
-- [ ] Documentation de la source.
+- [x] Documentation de la source. 8763385ca
 - [ ] Publications du périmètre absentes du moissonnage d'INSPIRE, mesurées après le premier moissonnage.
 - [ ] Enregistrements sources OpenAlex rattachés à un enregistrement source INSPIRE par un identifiant : normalisation sans contributions sources. L'arrivée d'un enregistrement source INSPIRE supprime les contributions sources des enregistrements OpenAlex rattachés. Script ponctuel pour le stock.
 
