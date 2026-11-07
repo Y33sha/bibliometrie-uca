@@ -12,7 +12,7 @@ Les critères sont interrogés dans l'ordre, du plus fiable au moins fiable. Le 
 
 - **Épinglage** : une contribution source alignée est épinglée à une personne par l'administration.
 
-- **ORCID déposé par l'auteur** : ORCID présent dans les métadonnées Crossref, DataCite ou INSPIRE-HEP de la publication, dans le `raw_orcid` d'OpenAlex, ou dans le TEI HAL (`label_xml`). Les ORCID attribués par algorithme (OpenAlex `author.orcid`, WoS) sont écartés.
+- **ORCID** : ORCID présent dans les métadonnées Crossref, DataCite ou INSPIRE-HEP de la publication, dans le `raw_orcid` d'OpenAlex, ou dans le TEI HAL (`label_xml`). Les ORCID attribués par algorithme (OpenAlex `author.orcid`, WoS, ScanR) sont écartés.
 
 - **Compte HAL** : `hal_person_id`, attaché à la contribution source dans le TEI.
 

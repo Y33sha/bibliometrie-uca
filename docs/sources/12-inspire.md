@@ -8,16 +8,14 @@ Documentation API : https://github.com/inspirehep/rest-api-doc
 
 INSPIRE-HEP est la base disciplinaire de la physique des hautes énergies, tenue par le CERN, DESY, Fermilab, l'IHEP et SLAC. Elle couvre la discipline quel que soit le laboratoire. Ses équipes rattachent chaque auteur à des fiches d'institutions et à son profil d'auteur.
 
-Le pipeline interroge INSPIRE-HEP de deux façons :
-- [moissonnage](../pipeline/02-harvest.md#moissonnage-par-affiliation-harvest), par année : les fiches dont un auteur est affilié à une institution du périmètre (champ INSPIRE-HEP des identifiants de structure). Un numéro d'institution INSPIRE est cherché par `affid`, un nom d'affiliation par `aff` ;
-- [moissonnage par personne](../pipeline/02-harvest.md#moissonnage-par-personne-harvest_by_person) : les fiches dont un auteur a l'ORCID d'une personne RH (`authors.ids.value`).
+Le [moissonnage](../pipeline/02-harvest.md#moissonnage-par-affiliation-harvest) d'INSPIRE-HEP cherche, année par année, les fiches dont un auteur est affilié à une institution du périmètre (champ INSPIRE-HEP des identifiants de structure). Un numéro d'institution INSPIRE est cherché par `affid`, un nom d'affiliation par `aff`.
 
 Le filtre d'année `date` retient une fiche quand l'une de ses dates tombe dans l'année : publication, impression ou prépublication. Une fiche datée de plusieurs années de la fenêtre revient seulement dans la première.
 
 ## API utilisée
 
 **Literature API** :
-- `https://inspirehep.net/api/literature?q=…` : recherche paginée (moissonnages) ;
+- `https://inspirehep.net/api/literature?q=…` : recherche paginée (moissonnage) ;
 - `https://inspirehep.net/api/literature/{numéro}` : interrogation unitaire (`fetch_stale`).
 
 Chaque requête demande les mêmes champs (paramètre `fields`), sans nombre de citations, sans références et sans affiliations brutes. `staging` garde le seul `metadata` d'une fiche.
@@ -75,6 +73,10 @@ Le type est le premier de `document_type`. Un article sans revue (`publication_i
 ### Date de publication
 
 L'année est celle de la première publication (`publication_info.year`), hors erratum et addendum. La date d'impression (`imprints.date`) la précise quand elle a la même année. Sans publication, la date est celle de l'impression, à défaut celle de la prépublication (`preprint_date`), puis la plus ancienne date connue (`earliest_date`).
+
+### ORCID
+
+L'ORCID d'un auteur sert au [rattachement des personnes](../pipeline/09-persons.md#rattacher-une-contribution-à-une-personne) (`ORCID_MATCH_SOURCES`).
 
 ### Identifiants
 

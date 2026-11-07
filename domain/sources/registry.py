@@ -105,11 +105,10 @@ PROFILES: dict[Source, SourceProfile] = {
         registration_agency="DataCite",
         structure_ids="mots-clés d'affiliation",
     ),
-    # Base disciplinaire de la physique des hautes énergies, moissonnée par institution et par personne, sans recherche par DOI.
+    # Base disciplinaire de la physique des hautes énergies, moissonnée par institution.
     Source.INSPIRE: SourceProfile(
         label="INSPIRE-HEP",
         harvested=True,
-        person_identifiers=frozenset({PersonIdentifierType.ORCID}),
         structure_ids="numéros d'institution, à défaut noms d'affiliation",
     ),
 }

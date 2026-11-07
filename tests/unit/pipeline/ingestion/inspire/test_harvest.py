@@ -1,6 +1,6 @@
-"""Moissonnage d'INSPIRE-HEP (`pipeline.ingestion.inspire.harvest`, `person_search`, `api`).
+"""Moissonnage d'INSPIRE-HEP (`pipeline.ingestion.inspire.harvest`, `api`).
 
-Requêtes : fonctions pures. Pilotage : années de la configuration, institutions du périmètre, refus d'une configuration incomplète, fiches écrites une fois par run. Un faux client sert des pages scriptées, la configuration et l'écriture dans `staging` sont remplacées.
+Requêtes : fonctions pures. Pilotage : années de la configuration, institutions du périmètre, refus d'une configuration incomplète. Un faux client sert des pages scriptées, la configuration et l'écriture dans `staging` sont remplacées.
 """
 
 from __future__ import annotations
@@ -9,12 +9,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from domain.sources.staging import StagingEntryMode
 from pipeline.ingestion.common.harvester import HarvestConfigError
 from pipeline.ingestion.common.pages import Page
 from pipeline.ingestion.inspire import api
 from pipeline.ingestion.inspire.harvest import InspireHarvester, affiliation_clause, build_query
-from pipeline.ingestion.inspire.person_search import InspirePersonHarvester, build_orcid_query
 from tests.helpers.harvesters import arguments_du_run, moissonneur
 
 
@@ -33,12 +31,6 @@ class TestRequetes:
         """Une fiche prépubliée en 2023 et publiée en 2024 revient seulement en 2023."""
         assert build_query(2024, ["902740"], 2017) == (
             "(affid:902740) and date 2024 and not date 2017->2023"
-        )
-
-    def test_orcid_et_plage_d_annees(self):
-        assert build_orcid_query(["0000-0001-2345-6789", "0000-0002-0000-000X"], 2017, 2026) == (
-            '(authors.ids.value:"0000-0001-2345-6789" or authors.ids.value:"0000-0002-0000-000X")'
-            " and date 2017->2026"
         )
 
 
@@ -77,22 +69,6 @@ class TestMoissonnageParInstitution:
         configuration(api_ids=[])
         with pytest.raises(HarvestConfigError, match="aucune institution"):
             moissonneur(InspireHarvester, _client([])).run(arguments_du_run())
-
-
-def test_fiche_ramenee_par_deux_lots_ecrite_une_fois(identifiants_rh, ecritures):
-    lot = InspirePersonHarvester.BATCH_SIZE
-    identifiants_rh([f"0000-0000-0000-{i:04d}" for i in range(lot + 1)])
-    client = MagicMock()
-    client.fetch_page.side_effect = [
-        Page([{"control_number": 1}, {"control_number": 2}], None),
-        Page([{"control_number": 1}, {}], None),
-    ]
-
-    metrics = moissonneur(InspirePersonHarvester, client).run(arguments_du_run())
-
-    assert [e.source_id for e in ecritures] == ["1", "2"]
-    assert {e.entry_mode for e in ecritures} == {StagingEntryMode.PERSON_IDENTIFIER}
-    assert metrics.new == 2
 
 
 def test_page_reduite_aux_metadonnees_des_fiches(monkeypatch):

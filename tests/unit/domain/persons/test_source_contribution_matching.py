@@ -26,6 +26,7 @@ def _contributions(*raws: str) -> list[ContributorName]:
 class TestTrustedIdentifier:
     def test_un_orcid_vaut_signal_selon_sa_source(self):
         assert trusted_identifier("orcid", "crossref")
+        assert trusted_identifier("orcid", "inspire")
         assert not trusted_identifier("orcid", "wos")
         assert not trusted_identifier("orcid", "scanr")
 

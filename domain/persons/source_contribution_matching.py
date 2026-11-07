@@ -26,8 +26,8 @@ class IdentifiedPerson(NamedTuple):
     """L'attribution est confirmée par l'administration ou authentifiée par le chercheur (`HUMAN_ATTRIBUTION_STATUSES`)."""
 
 
-ORCID_MATCH_SOURCES = frozenset({"crossref", "datacite", "openalex", "hal"})
-"""Sources dont l'ORCID est déposé par l'auteur : auprès de l'éditeur (Crossref, et OpenAlex qui le recopie), de DataCite ou de HAL. Dans WoS et ScanR, l'ORCID résulte d'un matching automatique."""
+ORCID_MATCH_SOURCES = frozenset({"crossref", "datacite", "openalex", "hal", "inspire"})
+"""Sources dont l'ORCID sert au rattachement. L'auteur le dépose auprès de l'éditeur (Crossref, et OpenAlex qui le recopie), de DataCite ou de HAL. Les équipes d'INSPIRE-HEP vérifient ses listes d'auteurs. Dans WoS et ScanR, l'ORCID résulte d'un matching automatique."""
 
 STRONG_PERSON_IDENTIFIER_TYPES: tuple[PersonIdentifierType, ...] = (
     PersonIdentifierType.ORCID,

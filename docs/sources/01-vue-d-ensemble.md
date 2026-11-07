@@ -32,7 +32,7 @@ Un [exemple de publication](11-exemple-de-publication.md) compare les métadonn�
 | theses.fr | PPN d'établissement + année de soutenance | — | NNT |
 | Crossref | — | ORCID | DOI |
 | DataCite | mot-clé d'affiliation + année | ORCID | DOI |
-| INSPIRE-HEP | numéro d'institution, à défaut nom d'affiliation + année | ORCID | — |
+| INSPIRE-HEP | numéro d'institution, à défaut nom d'affiliation + année | — | — |
 
 Le moissonnage par personne interroge les identifiants des personnes RH, confirmés ou authentifiés.
 
