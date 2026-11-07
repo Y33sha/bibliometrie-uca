@@ -801,6 +801,17 @@ input[type='search']::-webkit-search-cancel-button {
 	letter-spacing: 0;
 	color: var(--muted);
 }
+/* Identifiants en texte (ISSN, ISBN) à la suite du titre d'une fiche, chacun précédé de son support en retrait. */
+.title-identifier-text {
+	display: inline-flex;
+	flex-wrap: wrap;
+	gap: 4px 14px;
+	font-size: var(--fs-sm);
+	color: var(--text-secondary);
+}
+.title-identifier-text .identifier-label {
+	color: var(--muted);
+}
 /* Ligne de métadonnées : suites de libellé + valeurs. */
 .entity-meta {
 	display: flex;

@@ -102,9 +102,9 @@
 		<TitleRow onopen={isAdmin() ? () => drawer.open(serialId) : undefined}>
 			<h1 class="entity-title">{journal.title}</h1>
 			{#snippet identifierLinks()}
-				<span class="serial-issns">
+				<span class="title-identifier-text">
 					{#each journal!.issn_details.filter((i) => i.status === 'active' || i.linking) as issn (issn.issn)}
-						<span><span class="issn-label">{issnLabel(issn)}</span> <a href={issnPortalUrl(issn.issn)} target="_blank" rel="noopener" title="Portail ISSN (nouvel onglet)">{issn.issn}</a></span>
+						<span><span class="identifier-label">{issnLabel(issn)}</span> <a href={issnPortalUrl(issn.issn)} target="_blank" rel="noopener" title="Portail ISSN (nouvel onglet)">{issn.issn}</a></span>
 					{/each}
 				</span>
 			{/snippet}
@@ -218,17 +218,6 @@
 {/if}
 
 <style>
-	/* ISSN de la revue, à la suite du titre : texte discret, libellé du support en retrait. */
-	.serial-issns {
-		display: inline-flex;
-		flex-wrap: wrap;
-		gap: 4px 14px;
-		font-size: var(--fs-sm);
-		color: var(--text-secondary);
-	}
-	.issn-label {
-		color: var(--muted);
-	}
 	/* Listes de la revue : liens texte discrets, séparés par un point médian. */
 	.list-link {
 		color: var(--text-secondary);
