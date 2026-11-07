@@ -15,7 +15,7 @@
 	import SubjectsCard from '#lib/components/SubjectsCard.svelte';
 	import TitleRow from '#lib/components/TitleRow.svelte';
 	import SerialDrawer from '#lib/components/serials/SerialDrawer.svelte';
-	import IssnBadge from '#lib/components/serials/IssnBadge.svelte';
+	import { issnPortalUrl } from '#lib/utils.js';
 	import { useDrawerParam } from '#lib/composables/useDrawerParam.svelte.js';
 	import { isAdmin } from '#lib/session.svelte.js';
 	import type { components } from '#lib/api/schema.js';
@@ -42,7 +42,6 @@
 
 	let showRawDoaj = $state(false);
 
-	let serialTypeLabels: Record<string, string> = $state({});
 	let oaModelLabels: Record<string, string> = $state({});
 
 	// Sélection des champs DOAJ « lisibles ». Le payload complet est exposé via le toggle (« Voir payload brut ») pour permettre l'exploration au-delà de cette sélection.
@@ -68,13 +67,10 @@
 
 	onMount(async () => {
 		const labelMap = (opts: EnumOption[]) => Object.fromEntries(opts.map((o) => [o.value, o.label_fr]));
-		const typeLabelsP = api<EnumOption[]>('/api/serials/types').then((opts) => {
-			serialTypeLabels = labelMap(opts);
-		});
 		const oaModelLabelsP = api<EnumOption[]>('/api/serials/oa-models').then((opts) => {
 			oaModelLabels = labelMap(opts);
 		});
-		await Promise.all([loadSerial(), typeLabelsP, oaModelLabelsP]);
+		await Promise.all([loadSerial(), oaModelLabelsP]);
 		await tick();
 	});
 
@@ -83,7 +79,12 @@
 		return new Date(iso).toLocaleDateString('fr-FR');
 	}
 
-	/** Organisme et édition d'une liste, pour l'info-bulle de son étiquette. */
+	/** Filtre de la liste des revues qui retient les revues d'une liste, ou d'un niveau de classement. */
+	function listQuery(list: { code: string; is_level: boolean }): string {
+		return list.is_level ? `list_level=${list.code}` : `list_filter=${list.code}_yes`;
+	}
+
+	/** Organisme et édition d'une liste, pour l'info-bulle de son lien. */
 	function listTitle(list: { maintainer: string | null; edition: string | null }): string {
 		return [list.maintainer, list.edition ? `édition du ${formatDate(list.edition)}` : null]
 			.filter(Boolean)
@@ -99,22 +100,27 @@
 	<!-- Header -->
 	<div class="entity-header">
 		<TitleRow onopen={isAdmin() ? () => drawer.open(serialId) : undefined}>
-			<h1 class="entity-title">
-				{journal.title}
-				{#if journal.is_in_doaj}
-					{#if journal.doaj_url}
-						<a class="tag tag-success badge-doaj" href={journal.doaj_url} target="_blank" rel="noopener" title="Fiche DOAJ (nouvel onglet)">DOAJ</a>
-					{:else}
-						<span class="tag tag-success badge-doaj" title="Indexée dans DOAJ">DOAJ</span>
-					{/if}
-				{/if}
-			</h1>
+			<h1 class="entity-title">{journal.title}</h1>
+			{#snippet identifierLinks()}
+				<span class="serial-issns">
+					{#each journal!.issn_details.filter((i) => i.status === 'active' || i.linking) as issn (issn.issn)}
+						<span><span class="issn-label">{issnLabel(issn)}</span> <a href={issnPortalUrl(issn.issn)} target="_blank" rel="noopener" title="Portail ISSN (nouvel onglet)">{issn.issn}</a></span>
+					{/each}
+				</span>
+			{/snippet}
 		</TitleRow>
-		<div class="entity-meta">
-			{#each journal.issn_details.filter((i) => i.status === 'active' || i.linking) as issn (issn.issn)}
-				<EntityMetaItem label={issnLabel(issn)}><IssnBadge issn={issn.issn} /></EntityMetaItem>
-			{/each}
-		</div>
+		{#if journal.publisher_name || journal.oa_model}
+			<div class="entity-meta">
+				{#if journal.publisher_id}
+					<a href={resolve(`publishers/${journal.publisher_id}`)}>{journal.publisher_name}</a>
+				{:else if journal.publisher_name}
+					<span>{journal.publisher_name}</span>
+				{/if}
+				{#if journal.oa_model}
+					<span>Modèle {oaModelLabels[journal.oa_model] ?? journal.oa_model}</span>
+				{/if}
+			</div>
+		{/if}
 		{#if journal.relations.length}
 			<div class="entity-meta">
 				{#each journal.relations as relation (`${relation.kind}-${relation.serial_id ?? relation.issn}`)}
@@ -122,38 +128,17 @@
 						{#if relation.serial_id}
 							<a href={resolve(`journals/${relation.serial_id}`)}>{relation.title}</a>
 						{:else if relation.issn}
-							<IssnBadge issn={relation.issn} />
+							<a href={issnPortalUrl(relation.issn)} target="_blank" rel="noopener" title="Portail ISSN (nouvel onglet)">{relation.issn}</a>
 						{/if}
 					</EntityMetaItem>
 				{/each}
 			</div>
 		{/if}
-		<div class="entity-meta">
-			{#if journal.publisher_name}
-				<EntityMetaItem label="Éditeur">
-					{#if journal.publisher_id}
-						<a href={resolve(`publishers/${journal.publisher_id}`)} class="publisher-link">{journal.publisher_name}</a>
-					{:else}
-						<span class="publisher-link">{journal.publisher_name}</span>
-					{/if}
-				</EntityMetaItem>
-			{/if}
-			{#if journal.serial_type}
-				<EntityMetaItem label="Type">
-					<span class="tag">{serialTypeLabels[journal.serial_type] ?? journal.serial_type}</span>
-				</EntityMetaItem>
-			{/if}
-			{#if journal.oa_model}
-				<EntityMetaItem label="Open access">
-					<span class="tag">{oaModelLabels[journal.oa_model] ?? journal.oa_model}</span>
-				</EntityMetaItem>
-			{/if}
-		</div>
 		{#if journal.lists.length}
 			<div class="entity-meta">
 				<EntityMetaItem label="Listes">
 					{#each journal.lists as list (list.code)}
-						<span class="tag" title={listTitle(list)}>{list.label}</span>
+						<a class="list-link" href={resolve(`journals?${listQuery(list)}`)} title={listTitle(list)}>{list.label}</a>
 					{/each}
 				</EntityMetaItem>
 			</div>
@@ -183,6 +168,9 @@
 								Données DOAJ
 								{#if journal.doaj_imported_at}
 									<span class="muted small">(import {formatDate(journal.doaj_imported_at)})</span>
+								{/if}
+								{#if journal.doaj_url}
+									<a class="small" href={journal.doaj_url} target="_blank" rel="noopener">Fiche DOAJ</a>
 								{/if}
 							</h2>
 							<dl class="doaj-fields">
@@ -230,6 +218,28 @@
 {/if}
 
 <style>
+	/* ISSN de la revue, à la suite du titre : texte discret, libellé du support en retrait. */
+	.serial-issns {
+		display: inline-flex;
+		flex-wrap: wrap;
+		gap: 4px 14px;
+		font-size: var(--fs-sm);
+		color: var(--text-secondary);
+	}
+	.issn-label {
+		color: var(--muted);
+	}
+	/* Listes de la revue : liens texte discrets, séparés par un point médian. */
+	.list-link {
+		color: var(--text-secondary);
+	}
+	/* En bloc en ligne, le point échappe au soulignement du lien survolé. */
+	.list-link + .list-link::before {
+		content: '·';
+		display: inline-block;
+		margin-right: 8px;
+		color: var(--muted);
+	}
 
 	.doaj-grid { margin-top: 24px; }
 	.small { font-size: var(--fs-sm); font-weight: 400; }

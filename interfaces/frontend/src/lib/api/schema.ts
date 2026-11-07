@@ -5846,6 +5846,11 @@ export interface components {
              * @description Libellé de la liste ; pour un niveau, libellé du classement suivi de celui du niveau.
              */
             label: string;
+            /**
+             * Is Level
+             * @description Niveau d'un classement : la liste des revues le filtre par `list_level`, une liste par `list_filter`.
+             */
+            is_level: boolean;
             /** Maintainer */
             maintainer: string | null;
             /** Edition */

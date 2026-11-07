@@ -468,9 +468,9 @@ class TestGetSerial:
         _add_to_lists(jid, "norway-2", "doyens")
         r = client.get(f"/api/serials/{jid}")
         assert r.status_code == 200
-        assert [(item["code"], item["label"]) for item in r.json()["lists"]] == [
-            ("doyens", "Conférence des doyens de médecine"),
-            ("norway-2", "Registre norvégien, niveau 2"),
+        assert [(item["code"], item["label"], item["is_level"]) for item in r.json()["lists"]] == [
+            ("doyens", "Conférence des doyens de médecine", False),
+            ("norway-2", "Registre norvégien, niveau 2", True),
         ]
 
     def test_doaj_url_null_when_no_url_source_in_payload(self, client):

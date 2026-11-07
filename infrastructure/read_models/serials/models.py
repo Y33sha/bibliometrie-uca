@@ -92,6 +92,8 @@ class SerialListMembership(Model):
     code: str
     label: str
     """Libellé de la liste ; pour un niveau, libellé du classement suivi de celui du niveau."""
+    is_level: bool
+    """Niveau d'un classement : la liste des revues le filtre par `list_level`, une liste par `list_filter`."""
     maintainer: str | None
     edition: date | None
 
