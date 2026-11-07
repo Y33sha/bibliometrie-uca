@@ -166,7 +166,7 @@
 								{#if f.control === 'checkbox' && f.range}
 									<RangeOptions options={options[f.key] ?? []} bind:selected={values.checkbox[f.key]} onchange={(selected) => onCheckboxChange(f, selected)} />
 								{:else if f.control === 'checkbox'}
-									<CheckboxOptions options={options[f.key] ?? []} searchable={f.searchable} groups={f.groups} groupSeparators limit={OPTION_LIMIT} clearable={false} bind:selected={values.checkbox[f.key]} onchange={(selected) => onCheckboxChange(f, selected)} />
+									<CheckboxOptions options={options[f.key] ?? []} searchable={f.searchable} single={f.single} groups={f.groups} groupSeparators limit={OPTION_LIMIT} clearable={false} bind:selected={values.checkbox[f.key]} onchange={(selected) => onCheckboxChange(f, selected)} />
 								{:else if f.control === 'entity'}
 									<EntityOptions endpoint={entityEndpoint} kind={f.entity} multiple={f.multiple} limit={OPTION_LIMIT} clearable={false} {buildParams} selected={values.entity[f.key]} onchange={(ids) => { values.entity[f.key] = ids; onchange(); }} />
 								{:else}

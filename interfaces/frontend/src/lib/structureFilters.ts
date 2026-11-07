@@ -21,6 +21,7 @@ export function structureFilters(defaults: LabListDefaults): ListFilter[] {
 			group: 'structure',
 			// `none` désigne les structures hors de tout périmètre, comme dans le paramètre `perimeter_id` de l'API.
 			facet: { type: 'labeled', apiKey: 'perimeters' },
+			single: true,
 			defaultSelection: () => defaults.perimeters,
 			fixed: () => (isAdmin() ? null : defaults.perimeters.join(',') || null),
 		},

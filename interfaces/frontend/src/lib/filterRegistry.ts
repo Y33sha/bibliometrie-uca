@@ -32,6 +32,8 @@ export interface CheckboxFilter extends BaseFilter {
 	control: 'checkbox';
 	facet: FacetDef;
 	searchable?: boolean;
+	/** Un seul choix, en boutons radio. */
+	single?: boolean;
 	groups?: { label: string; values: string[] }[];
 	/** Valeurs entières ordonnées (années) : la sélection est un intervalle, choisi par ses bornes. */
 	range?: boolean;

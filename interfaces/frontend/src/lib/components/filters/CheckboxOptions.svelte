@@ -17,10 +17,12 @@
 		limit?: number;
 		/** Bouton « Effacer » en tête des options. Le panneau des filtres le place sur la ligne du nom du filtre. */
 		clearable?: boolean;
+		/** Un seul choix, en boutons radio. */
+		single?: boolean;
 		onchange?: (selected: string[]) => void;
 	}
 
-	let { options, searchable = false, selected = $bindable([]), groups, groupSeparators = false, limit, clearable = true, onchange }: Props = $props();
+	let { options, searchable = false, selected = $bindable([]), groups, groupSeparators = false, limit, clearable = true, single = false, onchange }: Props = $props();
 
 	// Options déjà affichées.
 	const seen = new SvelteSet<string>();
@@ -55,7 +57,8 @@
 	});
 
 	function toggle(value: string) {
-		selected = selected.includes(value) ? selected.filter((v) => v !== value) : [...selected, value];
+		if (single) selected = [value];
+		else selected = selected.includes(value) ? selected.filter((v) => v !== value) : [...selected, value];
 		onchange?.(selected);
 	}
 
@@ -81,7 +84,7 @@
 		{#each s.options as opt (opt.value)}
 			{@const empty = opt.count === 0 && !selected.includes(opt.value)}
 			<label class="option-row" class:empty>
-				<input type="checkbox" checked={selected.includes(opt.value)} disabled={empty} onchange={() => toggle(opt.value)} />
+				<input type={single ? 'radio' : 'checkbox'} checked={selected.includes(opt.value)} disabled={empty} onchange={() => toggle(opt.value)} />
 				<span class="facet-option-text" use:revealTruncated>{opt.text}</span>{#if opt.count != null}<span class="facet-count">{opt.count.toLocaleString('fr-FR')}</span>{/if}
 			</label>
 		{/each}
