@@ -3,6 +3,7 @@
 La normalisation d'OpenAlex écrit sans contributions sources un enregistrement source du même document qu'un enregistrement source INSPIRE-HEP (`fetch_author_list_keys`). Après la normalisation des sources, `withhold_covered_source_contributions` retire leurs contributions sources aux enregistrements sources OpenAlex normalisés avant l'arrivée de l'enregistrement source INSPIRE-HEP.
 """
 
+import logging
 from itertools import batched
 
 from sqlalchemy import Connection, text
@@ -16,6 +17,8 @@ from domain.source_records.inspire_author_lists import (
 )
 from infrastructure.sql_fragments import in_clause
 from pipeline.ingestion.common.source_contribution_store import SourceContributionStore
+from pipeline.runtime.observability.log_format import BRANCH
+from pipeline.runtime.observability.progress import track_progress
 
 
 def _document_identifier(identifier: str) -> str:
@@ -60,11 +63,21 @@ def fetch_author_list_keys(conn: Connection) -> frozenset[DocumentKey]:
     )
 
 
-def withhold_covered_source_contributions(conn: Connection) -> int:
-    """Supprime les contributions sources des enregistrements sources OpenAlex du même document qu'un enregistrement source INSPIRE-HEP, et renvoie leur nombre."""
+def withhold_covered_source_contributions(conn: Connection, logger: logging.Logger) -> int:
+    """Supprime les contributions sources des enregistrements sources OpenAlex du même document qu'un enregistrement source INSPIRE-HEP, et renvoie leur nombre.
+
+    Chaque lot de `_WITHHOLD_BATCH` enregistrements sources est commité : une interruption garde les lots traités. Une barre d'avancement compte les enregistrements sources.
+    """
     covered = list(conn.execute(_COVERED_SQL).scalars())
+    if not covered:
+        return 0
     store = SourceContributionStore(conn)
-    return sum(
-        store.withhold_source_contributions(list(ids))
-        for ids in batched(covered, _WITHHOLD_BATCH, strict=False)
-    )
+    withheld = 0
+    with track_progress(
+        len(covered), f"{BRANCH}enregistrements sources OpenAlex", logger, erase=True
+    ) as progress:
+        for ids in batched(covered, _WITHHOLD_BATCH, strict=False):
+            withheld += store.withhold_source_contributions(list(ids))
+            conn.commit()
+            progress.advance(len(ids))
+    return withheld

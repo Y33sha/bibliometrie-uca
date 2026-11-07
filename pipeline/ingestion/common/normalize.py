@@ -107,7 +107,7 @@ def _report(stats: NormalizeStats) -> str | None:
 def _withhold_authors(ctx: PhaseContext) -> PhaseMetrics:
     """Supprime les contributions sources des enregistrements sources OpenAlex du même document qu'un enregistrement source INSPIRE-HEP."""
     with ctx.open_tx() as conn:
-        withheld = withhold_covered_source_contributions(conn)
+        withheld = withhold_covered_source_contributions(conn, ctx.logger)
     if withheld:
         ctx.logger.info(
             "%s%s (listes d'auteurs d'INSPIRE-HEP)",

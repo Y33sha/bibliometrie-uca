@@ -1,4 +1,6 @@
-"""Enregistrements sources OpenAlex sans contributions sources, à la place desquelles valent celles d'INSPIRE-HEP (`pipeline.ingestion.common.inspire_author_lists`)."""
+"""Enregistrements sources OpenAlex sans contributions sources, à la place desquelles valent celles d'INSPIRE-HEP (`pipeline.ingestion.common.inspire_author_lists`). Les commits par lot sont neutralisés."""
+
+import logging
 
 from sqlalchemy import text
 
@@ -83,8 +85,12 @@ def test_identifiants_des_enregistrements_sources_inspire_hors_identifiants_lies
     assert fetch_author_list_keys(conn) == {(_DOI, _ARTICLE_DOI), (_CDS, "2838028")}
 
 
-def test_enregistrements_openalex_du_meme_document_sans_contributions_sources(sa_sync_conn):
+def test_enregistrements_openalex_du_meme_document_sans_contributions_sources(
+    sa_sync_conn, monkeypatch
+):
     conn = sa_sync_conn
+    monkeypatch.setattr(conn, "commit", lambda: None)
+    log = logging.getLogger("test")
     _inspire(conn)
     publication = insert_publication(conn)
     article = _openalex(
@@ -97,11 +103,11 @@ def test_enregistrements_openalex_du_meme_document_sans_contributions_sources(sa
     other = _openalex(conn, "W4", SourceIdentifier(_HAL_ID, "hal-04174615", _SECONDARY))
     clear(conn, Queue.PUBLICATION_CONTRIBUTIONS)
 
-    assert withhold_covered_source_contributions(conn) == 4
+    assert withhold_covered_source_contributions(conn, log) == 4
 
     assert _authors(conn, article) == (None, 0, 0)
     assert _authors(conn, cds_copy) == (None, 0, 0)
     assert _authors(conn, erratum) == ("h", 2, 2)
     assert _authors(conn, other) == ("h", 2, 2)
     assert queued(conn, Queue.PUBLICATION_CONTRIBUTIONS) == {publication}
-    assert withhold_covered_source_contributions(conn) == 0
+    assert withhold_covered_source_contributions(conn, log) == 0
