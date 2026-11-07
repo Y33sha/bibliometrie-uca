@@ -130,7 +130,19 @@ Le chantier [alignement des auteurs](archived/2026-10-24_DATA_alignement-auteurs
 - [x] Profil de la source, adaptateur, client de l'API, moissonnage par institution. 8763385ca
 - [x] Normalisation : enregistrement source (DOI, DOI arXiv, identifiant CDS), contributions sources (nom, ORCID, institution). 8763385ca
 - [x] Relecture par numéro de fiche (`fetch_stale`). 8763385ca
-- [ ] Numéros d'institution INSPIRE dans `api_ids` et noms d'institution INSPIRE dans les formes de nom des structures du périmètre.
+- [x] Numéros d'institution INSPIRE dans `api_ids` et noms d'institution INSPIRE dans les formes de nom des structures du périmètre, le 2026-11-07 sur la base locale. À reproduire sur la base de prod.
+
+  | Structure | Numéros d'institution INSPIRE (nom INSPIRE) |
+  |---|---|
+  | UCA | 1598522 (U. Clermont Auvergne), 1306651 (université Blaise Pascal) |
+  | IP | 1691275 (Institut Pascal, Clermont-Ferrand) |
+  | LIMOS | 2676525 (LIMOS, Clermont-Ferrand) |
+  | LPCA | 902740 (Clermont-Ferrand U.), 2093671 (LPC, Clermont-Ferrand) |
+  | LMV | 1595893 (LMV, Clermont-Ferrand) |
+  | OPGC | 1692893 (OPGC, Clermont-Ferrand) |
+  | ISIMA | 912510 (ISIMA, Aubiere) |
+
+  Formes de nom de l'UCA : `clermont ferrand u` (mot entier), `u clermont auvergne`, `u blaise pascal` (mot entier), `iut montlucon`. Les formes de nom des autres structures reconnaissent leur nom INSPIRE.
 - [x] Documentation de la source. 8763385ca
 - [x] Publications du périmètre absentes du moissonnage d'INSPIRE, le 2026-11-07 sur la base locale (`inspire_missing.py`). Le moissonnage par institution ramène 2 717 fiches, la recherche par ORCID 216 autres.
   - Recherche par ORCID (`inspire_orcid_rh.py`) : 211 des 217 contributions sources de personnes RH datent d'avant l'arrivée de la personne, dont 203 pour une seule personne. Les 6 autres sont sans institution.
