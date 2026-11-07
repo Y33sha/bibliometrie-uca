@@ -20,8 +20,10 @@ from domain.source_records.identifiers import (
     SourceIdentifier,
     SourceIdentifierRole,
     SourceIdentifierType,
+    normalize_identifiers,
 )
 from domain.source_records.impact import Impact
+from domain.source_records.inspire_author_lists import DocumentKey, document_keys
 from domain.structures.identifiers import RorId, parse_ror_ids
 from domain.subjects.subject import Subject, SubjectLink, SubjectVocabulary
 from domain.types import (
@@ -34,6 +36,7 @@ from domain.types import (
     as_str,
     as_strs,
 )
+from pipeline.ingestion.common.inspire_author_lists import fetch_author_list_keys
 from pipeline.ingestion.common.locations import LocationFacts, PlatformFacts
 from pipeline.ingestion.common.normalizer import Document, PublisherFacts, SourceNormalizer
 from pipeline.ingestion.common.source_contributions import (
@@ -472,3 +475,17 @@ class OpenalexNormalizer(SourceNormalizer):
 
     def author_records(self, block: AuthorBlock) -> list[AuthorRecord]:
         return build_openalex_author_records(block)
+
+    _author_list_keys: frozenset[DocumentKey] = frozenset()
+    """Identifiants des enregistrements sources INSPIRE-HEP qui désignent leur document."""
+
+    def preload_caches(self) -> None:
+        self._author_list_keys = fetch_author_list_keys(self.conn)
+
+    def withholds_authors(self, record: SourceRecordUpsert) -> bool:
+        """Vrai pour un enregistrement source du même document qu'un enregistrement source INSPIRE-HEP (`domain.source_records.inspire_author_lists`)."""
+        identifiers, _ = normalize_identifiers(record.identifiers)
+        return not self._author_list_keys.isdisjoint(document_keys(identifiers))
+
+    def cleanup(self) -> None:
+        self._author_list_keys = frozenset()

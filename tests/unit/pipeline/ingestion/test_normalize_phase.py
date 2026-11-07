@@ -1,6 +1,6 @@
 """Séquence de la phase `normalize`, exécutée tâche par tâche.
 
-Le retrait des enregistrements sources disparus précède le nettoyage des informations du contributeur et des adresses : les lignes ainsi orphelines sont supprimées par le nettoyage. L'exécuteur lance enfin le `VACUUM` du staging, maintenance de la tâche de nettoyage.
+Le retrait des contributions sources OpenAlex au profit d'INSPIRE-HEP, puis celui des enregistrements sources disparus, précèdent le nettoyage des informations du contributeur et des adresses : les lignes ainsi orphelines sont supprimées par le nettoyage. L'exécuteur lance enfin le `VACUUM` du staging, maintenance de la tâche de nettoyage.
 """
 
 import dataclasses
@@ -37,6 +37,9 @@ def lancer(contexte, monkeypatch):
 
         monkeypatch.setattr(normalize, "build_normalizer", normaliseur)
         monkeypatch.setattr(
+            normalize, "withhold_covered_source_contributions", appel("withhold", 0)
+        )
+        monkeypatch.setattr(
             normalize, "delete_disappeared_source_records", appel("prune", disparues)
         )
         nettoyages = {
@@ -58,7 +61,14 @@ def lancer(contexte, monkeypatch):
 def test_le_retrait_precede_le_nettoyage_des_identites_et_des_adresses(lancer):
     appels: list[str] = []
     lancer(appels)
-    assert appels == ["normalize:hal", "prune", "cleanup", "cleanup_addresses", "VACUUM staging"]
+    assert appels == [
+        "normalize:hal",
+        "withhold",
+        "prune",
+        "cleanup",
+        "cleanup_addresses",
+        "VACUUM staging",
+    ]
 
 
 def test_toutes_les_sources_sont_normalisees_dans_l_ordre(lancer):
@@ -86,7 +96,14 @@ def test_le_total_reste_celui_des_documents_normalises(lancer):
 def test_sans_document_la_maintenance_tourne_quand_meme(lancer):
     appels: list[str] = []
     lancer(appels, bilan=NormalizeStats(0, 0, 0))
-    assert appels == ["normalize:hal", "prune", "cleanup", "cleanup_addresses", "VACUUM staging"]
+    assert appels == [
+        "normalize:hal",
+        "withhold",
+        "prune",
+        "cleanup",
+        "cleanup_addresses",
+        "VACUUM staging",
+    ]
 
 
 def test_la_table_porte_une_ligne_par_source(lancer):

@@ -389,6 +389,18 @@ class TestNormalizeRecord:
         assert norm.series_seen == [False]
         norm._record_store.upsert_source_record.assert_called_once_with(_RECORD)
 
+    def test_enregistrement_retenu_sans_contributions_sources(self, writes):
+        class _WithholdingNorm(_WritingNorm):
+            def withholds_authors(self, record: SourceRecordUpsert) -> bool:
+                return True
+
+        norm = _WithholdingNorm(doc={"title": "T"})
+        norm._record_store.upsert_source_record.return_value = 42
+        norm.normalize_record(self.ROW, {"title": "T"})
+        assert writes == []
+        norm._contribution_store.withhold_source_contributions.assert_called_once_with([42])
+        norm._staging.clear_payload.assert_called_once_with(self.ROW)
+
 
 class TestSeriesAndVolume:
     def _series(self, doi: str | None, title: str):

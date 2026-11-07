@@ -9,7 +9,7 @@ from domain.documents.licenses import License
 from domain.persons.contributor_name import ContributorName
 from domain.platforms.platform import PlatformType
 from domain.serials.issns import SerialIssn
-from domain.source_records.identifiers import normalize_identifiers
+from domain.source_records.identifiers import SourceIdentifierType, normalize_identifiers
 from domain.subjects.subject import SubjectVocabulary
 from pipeline.ingestion.common.locations import LocationFacts, PlatformFacts
 from pipeline.ingestion.common.normalizer import PublisherFacts
@@ -789,3 +789,16 @@ class TestOpenalexNormalizerClass:
         norm = _make_normalizer()
         assert norm.publisher(work) is None
         assert norm.container_facts(work) is None
+
+    def test_work_du_meme_document_qu_une_fiche_inspire_sans_contributions_sources(self):
+        norm = _make_normalizer()
+        norm._author_list_keys = frozenset(
+            {(SourceIdentifierType.DOI, "10.1103/physrevd.108.012021")}
+        )
+
+        def withheld(doi: str) -> bool:
+            work = {"title": "T", "publication_year": 2023, "doi": f"https://doi.org/{doi}"}
+            return norm.withholds_authors(openalex_source_record(work, 1, has_series=False))
+
+        assert withheld("10.1103/PhysRevD.108.012021")
+        assert not withheld("10.1103/PhysRevD.110.019901")

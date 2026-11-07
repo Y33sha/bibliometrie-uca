@@ -74,9 +74,11 @@ Le type est le premier de `document_type`. Un article sans revue (`publication_i
 
 L'année est celle de la première publication (`publication_info.year`), hors erratum et addendum. La date d'impression (`imprints.date`) la précise quand elle a la même année. Sans publication, la date est celle de l'impression, à défaut celle de la prépublication (`preprint_date`), puis la plus ancienne date connue (`earliest_date`).
 
-### ORCID
+### Auteurs
 
 L'ORCID d'un auteur sert au [rattachement des personnes](../pipeline/09-persons.md#rattacher-une-contribution-à-une-personne) (`ORCID_MATCH_SOURCES`).
+
+Un enregistrement source OpenAlex du même document qu'une fiche est sans contributions sources ([listes d'auteurs d'INSPIRE-HEP](../pipeline/03-normalize.md#listes-dauteurs-dinspire-hep)).
 
 ### Identifiants
 
