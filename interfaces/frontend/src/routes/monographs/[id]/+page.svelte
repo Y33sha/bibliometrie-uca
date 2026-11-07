@@ -42,7 +42,7 @@
 			{/snippet}
 		</TitleRow>
 		<div class="entity-meta">
-			<span>{monograph.proceedings ? "Volume d'actes" : 'Livre'}{#if monograph.year}, {monograph.year}{/if}</span>
+			{#if monograph.year}<span>{monograph.year}</span>{/if}
 			{#if monograph.publisher_id}
 				<a href={resolve(`publishers/${monograph.publisher_id}`)}>{monograph.publisher_name}</a>
 			{/if}
