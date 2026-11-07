@@ -14,7 +14,7 @@ Le chantier [alignement des auteurs](archived/2026-10-24_DATA_alignement-auteurs
 - Le moissonnage demande seulement les champs utiles : ni nombre de citations, ni références.
 - L'adresse d'une contribution source INSPIRE est le nom de l'institution rattachée par INSPIRE, avec son ROR quand INSPIRE le donne. L'affiliation brute est écartée : elle reproduit les décalages d'affiliations de l'éditeur. 0,2 % des auteurs ont une affiliation brute sans institution.
 - L'identifiant CDS est un type d'identifiant d'enregistrement source et une clé de confirmation de la réconciliation. La normalisation d'OpenAlex le reprend des URL de localisation.
-- Un enregistrement source OpenAlex est sans contributions sources quand il partage un DOI, un DOI arXiv ou un identifiant CDS (CERN Document Server) avec un enregistrement source INSPIRE. La condition se décide sur les identifiants des enregistrements sources, connus dès la normalisation.
+- Un enregistrement source OpenAlex est sans contributions sources quand il partage un DOI, un DOI arXiv, un hal-id ou un identifiant CDS (CERN Document Server) avec un enregistrement source INSPIRE. La condition se décide sur les identifiants des enregistrements sources, connus dès la normalisation, de rôle autre que `related`, quel que soit leur statut.
 
 ## Phasage
 
@@ -153,7 +153,8 @@ Le chantier [alignement des auteurs](archived/2026-10-24_DATA_alignement-auteurs
   - 5 fiches de la fenêtre ont pour seule institution clermontoise l'université Blaise Pascal (1306651).
 - [x] Recherche par ORCID retirée, ORCID d'INSPIRE de confiance. Script ponctuel de suppression des 216 fiches ramenées par ORCID (`delete_inspire_person_harvest`). 66a807c47
   - Effet mesuré le 2026-11-07 (`inspire_hr_gain_contributions.py`) : 131 contributions sources INSPIRE entrent dans le périmètre par la fiche RH, toutes dans des publications du périmètre. Pour 86, la contribution est déjà du périmètre par l'ORCID d'une autre source. Les 45 autres contributions entrent dans le périmètre : elles sont de deux personnes RH, affiliées par INSPIRE au CERN et à l'université de Cincinnati.
-- [ ] Enregistrements sources OpenAlex rattachés à un enregistrement source INSPIRE par un identifiant : normalisation sans contributions sources. L'arrivée d'un enregistrement source INSPIRE supprime les contributions sources des enregistrements OpenAlex rattachés. Script ponctuel pour le stock.
+- [x] Enregistrements sources OpenAlex du même document qu'un enregistrement source INSPIRE : normalisation sans contributions sources, empreinte du bloc auteurs vide. La tâche `normalize.withhold_openalex_authors` supprime les contributions sources des enregistrements OpenAlex normalisés avant l'arrivée de l'enregistrement INSPIRE, stock compris. 0d1e64f82
+  - Mesure à blanc le 2026-11-07 sur la base locale (`withhold_dry_run.py`) : 3 674 enregistrements OpenAlex, 4 911 163 contributions sources, 2 692 publications, 217 épinglages.
 
 ### Phase 4 — Règles
 
