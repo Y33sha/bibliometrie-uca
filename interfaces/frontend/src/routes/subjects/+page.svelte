@@ -41,11 +41,11 @@
       }),
   });
 
-  const exportUrl = $derived.by(() => {
+  function exportCsvUrl(): string {
     const params = list.filterParams();
     params.set("sort", list.sort);
     return withBase(`/api/subjects/export.csv?${paramsToQuery(params)}`);
-  });
+  }
 
   function setSort(column: "label" | "publications") {
     list.setSort(nextSort(list.sort, column, column === "label" ? "asc" : "desc"));
@@ -56,7 +56,7 @@
 
 <PageHeader title="Sujets" hidden />
 
-<ListToolbar bind:search={list.search} placeholder="Rechercher dans les libellés" onsearch={list.onSearchInput} list={list.listing} one="sujet" many="sujets" {exportUrl} countBelow>
+<ListToolbar bind:search={list.search} placeholder="Rechercher dans les libellés" onsearch={list.onSearchInput} list={list.listing} one="sujet" many="sujets" exportUrl={exportCsvUrl()} countBelow>
   {#snippet leading()}
     <FilterPanelToggle bind:open={list.panel.open} active={list.activeCount} />
   {/snippet}
