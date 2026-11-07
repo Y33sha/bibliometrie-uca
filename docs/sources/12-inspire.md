@@ -78,7 +78,7 @@ L'année est celle de la première publication (`publication_info.year`), hors e
 
 ### Identifiants
 
-Le DOI d'un erratum ou d'un addendum est lié. L'identifiant arXiv devient le DOI de son dépôt (`10.48550/arxiv.<identifiant>`). Le hal-id et le numéro de fiche CDS sont des clés de confirmation de la [réconciliation](../pipeline/07-publications.md) : la fiche rejoint ainsi le dépôt HAL et la copie CDS du même article.
+Le DOI d'un autre document (erratum, addendum, jeu de données) est lié dès qu'une de ses mentions le marque ainsi. L'identifiant arXiv devient le DOI de son dépôt (`10.48550/arxiv.<identifiant>`). Le hal-id et le numéro de fiche CDS sont des clés de confirmation de la [réconciliation](../pipeline/07-publications.md) : la fiche rejoint ainsi le dépôt HAL et la copie CDS du même article.
 
 ### Revue
 

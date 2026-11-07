@@ -14,7 +14,7 @@ from domain.source_records.identifiers import (
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_text
 
 _RELATED_DOI_MATERIALS = frozenset(
-    {"erratum", "addendum", "reprint", "translation", "editorial note"}
+    {"erratum", "addendum", "reprint", "translation", "editorial note", "data"}
 )
 """Natures (`material`) d'un DOI ou d'une publication qui désignent un autre document que la fiche."""
 
@@ -37,19 +37,20 @@ def _publication_infos(record: Mapping[str, JsonValue]) -> list[Mapping[str, Jso
     ]
 
 
-def _doi_entries(record: Mapping[str, JsonValue]) -> list[tuple[str, bool]]:
-    """Renvoie les DOI de la fiche, nettoyés, chacun avec vrai s'il désigne un autre document (erratum, addendum)."""
-    entries: list[tuple[str, bool]] = []
+def _doi_entries(record: Mapping[str, JsonValue]) -> dict[str, bool]:
+    """Renvoie les DOI de la fiche, nettoyés, dans leur ordre, chacun avec vrai s'il désigne un autre document (erratum, jeu de données). Une seule mention de cette nature suffit."""
+    entries: dict[str, bool] = {}
     for entry in as_sequence(record.get("dois")):
         item = as_mapping(entry)
         if doi := DOI.normalize(as_str(item.get("value"))):
-            entries.append((doi, as_str(item.get("material")) in _RELATED_DOI_MATERIALS))
+            related = as_str(item.get("material")) in _RELATED_DOI_MATERIALS
+            entries[doi] = entries.get(doi, False) or related
     return entries
 
 
 def record_dois(record: Mapping[str, JsonValue]) -> list[str]:
-    """Renvoie les DOI de la fiche elle-même, sans doublon, dans leur ordre."""
-    return list(dict.fromkeys(doi for doi, related in _doi_entries(record) if not related))
+    """Renvoie les DOI de la fiche elle-même, dans leur ordre."""
+    return [doi for doi, related in _doi_entries(record).items() if not related]
 
 
 def _external_ids(record: Mapping[str, JsonValue], schema: str) -> list[str]:
@@ -63,11 +64,11 @@ def _external_ids(record: Mapping[str, JsonValue], schema: str) -> list[str]:
 
 
 def record_identifiers(record: Mapping[str, JsonValue]) -> tuple[SourceIdentifier, ...]:
-    """Renvoie les identifiants de la fiche, secondaires : DOI, DOI arXiv, hal-id et identifiant CDS. Le DOI d'un erratum ou d'un addendum est lié."""
+    """Renvoie les identifiants de la fiche, secondaires : DOI, DOI arXiv, hal-id et identifiant CDS. Le DOI d'un autre document (erratum, jeu de données) est lié."""
     secondary, related = SourceIdentifierRole.SECONDARY, SourceIdentifierRole.RELATED
     identifiers = [
         SourceIdentifier(SourceIdentifierType.DOI, doi, related if is_related else secondary)
-        for doi, is_related in _doi_entries(record)
+        for doi, is_related in _doi_entries(record).items()
     ]
     identifiers += [
         SourceIdentifier(SourceIdentifierType.DOI, doi, secondary)

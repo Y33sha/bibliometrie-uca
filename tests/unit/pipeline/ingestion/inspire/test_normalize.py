@@ -60,6 +60,30 @@ class TestIdentifiants:
     def test_doi_de_la_fiche_sans_l_erratum(self):
         assert record_dois(_ARTICLE) == ["10.1103/physrevd.108.012021"]
 
+    def test_doi_lie_des_qu_une_mention_le_marque(self):
+        """INSPIRE cite le DOI d'un erratum sans nature, puis comme erratum (fiche 1728111)."""
+        fiche = {
+            "dois": [
+                {"source": "Springer", "value": "10.1140/epjc/s10052-021-09284-5"},
+                {"value": "10.1140/epjc/s10052-019-7506-9", "material": "publication"},
+                {"value": "10.1140/epjc/s10052-021-09284-5", "material": "erratum"},
+            ]
+        }
+        assert record_dois(fiche) == ["10.1140/epjc/s10052-019-7506-9"]
+        assert {(i.value, i.role) for i in record_identifiers(fiche)} == {
+            ("10.1140/epjc/s10052-021-09284-5", SourceIdentifierRole.RELATED),
+            ("10.1140/epjc/s10052-019-7506-9", SourceIdentifierRole.SECONDARY),
+        }
+
+    def test_doi_d_un_jeu_de_donnees_lie(self):
+        fiche = {
+            "dois": [
+                {"value": "10.1088/1475-7516/2025/09/020", "material": "publication"},
+                {"value": "10.5281/zenodo.15671861", "material": "data"},
+            ]
+        }
+        assert record_dois(fiche) == ["10.1088/1475-7516/2025/09/020"]
+
 
 class TestTypeDeDocument:
     def test_article_publie(self):
