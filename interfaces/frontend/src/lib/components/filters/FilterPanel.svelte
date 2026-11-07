@@ -60,7 +60,7 @@
 	} = $props();
 
 	/** Options affichées d'un filtre à cases à cocher avant le bouton qui affiche les autres. */
-	const OPTION_LIMIT = 6;
+	const OPTION_LIMIT = 5;
 
 	// svelte-ignore state_referenced_locally
 	const sections = filterGroups(filters, groups);

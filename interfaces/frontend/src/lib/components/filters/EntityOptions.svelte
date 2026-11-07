@@ -93,7 +93,7 @@
 	}
 
 	/** Lignes réservées aux options pendant le premier chargement. */
-	const PLACEHOLDER_ROWS = 6;
+	const PLACEHOLDER_ROWS = 5;
 	const placeholders = $derived(loading && results.length === 0 ? Array.from({ length: limit ?? PLACEHOLDER_ROWS }, (_, i) => i) : []);
 
 	function onInput() {
