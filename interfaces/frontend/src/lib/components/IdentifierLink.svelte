@@ -41,6 +41,11 @@
       icon: "icons/ror.svg",
       cls: "logo-ror",
     },
+    openalex: {
+      url: (v) => `https://openalex.org/${encodeURIComponent(v)}`,
+      icon: "icons/openalex.png",
+      cls: "logo-openalex",
+    },
   };
 
   const meta = $derived(META[id_type] ? { ...META[id_type], label: identifierTypeLabel(id_type) } : null);

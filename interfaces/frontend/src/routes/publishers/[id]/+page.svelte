@@ -1,5 +1,4 @@
 <script lang="ts">
-	import EntityMetaItem from '#lib/components/EntityMetaItem.svelte';
 	import EntityBreadcrumb from '#lib/components/EntityBreadcrumb.svelte';
 	import EntityStatus from '#lib/components/EntityStatus.svelte';
 	import { page } from '$app/state';
@@ -13,6 +12,8 @@
 	import PublicationsDashboard from '#lib/components/PublicationsDashboard.svelte';
 	import SubjectsCard from '#lib/components/SubjectsCard.svelte';
 	import TitleRow from '#lib/components/TitleRow.svelte';
+	import IdentifierLink from '#lib/components/IdentifierLink.svelte';
+	import { countryName } from '#lib/countryNames.js';
 	import PublisherDrawer from '#lib/components/publishers/PublisherDrawer.svelte';
 	import { useDrawerParam } from '#lib/composables/useDrawerParam.svelte.js';
 	import { isAdmin } from '#lib/session.svelte.js';
@@ -39,6 +40,8 @@
 
 	// Label FR du publisher_type, affiché dans l'en-tête de la page.
 	let publisherTypeLabels: Record<string, string> = $state({});
+	// Un type inconnu ne dit rien au visiteur : l'en-tête l'omet.
+	const knownType = $derived(publisher !== null && publisher.publisher_type !== 'unknown');
 
 	async function loadPublisher() {
 		try {
@@ -68,30 +71,15 @@
 	<!-- Header -->
 	<div class="entity-header">
 		<TitleRow onopen={isAdmin() ? () => drawer.open(publisherId) : undefined}>
-			<h1 class="entity-title">
-				{publisher.name}
-			</h1>
+			<h1 class="entity-title">{publisher.name}</h1>
+			{#snippet identifierLinks()}
+				{#if publisher!.openalex_id}<IdentifierLink id_type="openalex" id_value={publisher!.openalex_id} />{/if}
+			{/snippet}
 		</TitleRow>
-		<div class="entity-meta">
-			<EntityMetaItem label="Type">
-				<span class="tag">
-					{publisherTypeLabels[publisher.publisher_type] ?? publisher.publisher_type}
-				</span>
-			</EntityMetaItem>
-			{#if publisher.country}
-				<EntityMetaItem label="Pays"><span class="tag">{publisher.country.toUpperCase()}</span></EntityMetaItem>
-			{/if}
-			{#if publisher.openalex_id}
-				<EntityMetaItem label="OpenAlex"><span class="tag id-badge">{publisher.openalex_id}</span></EntityMetaItem>
-			{/if}
-		</div>
-		{#if publisher.doi_prefixes.length > 0}
+		{#if knownType || publisher.country}
 			<div class="entity-meta">
-				<EntityMetaItem label="Préfixes DOI">
-					{#each publisher.doi_prefixes as p (p.prefix)}
-						<span class="tag id-badge" title="RA: {p.ra}">{p.prefix}</span>
-					{/each}
-				</EntityMetaItem>
+				{#if knownType}<span>{publisherTypeLabels[publisher.publisher_type] ?? publisher.publisher_type}</span>{/if}
+				{#if publisher.country}<span>{countryName(publisher.country) ?? publisher.country.toUpperCase()}</span>{/if}
 			</div>
 		{/if}
 	</div>
