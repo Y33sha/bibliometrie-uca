@@ -178,13 +178,7 @@
 				</td>
 				<td>
 					<a href={resolve(`journals/${j.id}`)} class="entity-link">{j.title}</a>
-					{#if j.is_in_doaj}
-						{#if j.doaj_url}
-							<a class="tag tag-success badge-doaj" href={j.doaj_url} target="_blank" rel="noopener" title="Fiche DOAJ (nouvel onglet)">DOAJ</a>
-						{:else}
-							<span class="tag tag-success badge-doaj" title="Indexée dans DOAJ">DOAJ</span>
-						{/if}
-					{/if}				</td>
+				</td>
 				<td><div class="tag-list">{#each j.issns as issn (issn)}<IssnBadge {issn} />{/each}</div></td>
 				{#if !publisherFixed}
 					<td class="muted">
