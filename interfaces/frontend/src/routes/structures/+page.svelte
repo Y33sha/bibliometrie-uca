@@ -21,7 +21,8 @@
 	import { withBase } from '#lib/paths.js';
 	import { isAdmin } from '#lib/session.svelte.js';
 	import { nextSort, sortDirection } from '#lib/sort.js';
-	import { halCollectionUrl, paramsToQuery, rorShortId, rorFullUrl } from '#lib/utils.js';
+	import { halCollectionUrl, paramsToQuery } from '#lib/utils.js';
+	import IdentifierLink from '#lib/components/IdentifierLink.svelte';
 	import { structureLabel } from '#lib/structureLabels.js';
 	import IconButton from '#lib/components/IconButton.svelte';
 	import { useDrawerParam } from '#lib/composables/useDrawerParam.svelte.js';
@@ -198,11 +199,7 @@
 					</div>
 				</td>
 				<td>
-					{#if s.ror_id}
-						<a href={rorFullUrl(s.ror_id)} target="_blank" rel="noopener" class="tag id-badge">
-							{rorShortId(s.ror_id)}
-						</a>
-					{/if}
+					{#if s.ror_id}<IdentifierLink id_type="ror" id_value={s.ror_id} />{/if}
 				</td>
 				<td>
 					{#if s.hal_collection}
