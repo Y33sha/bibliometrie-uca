@@ -131,7 +131,13 @@ Le chantier [alignement des auteurs](archived/2026-10-24_DATA_alignement-auteurs
 - [x] Moissonnage par ORCID, relecture par numéro de fiche (`fetch_stale`). 8763385ca
 - [ ] Numéros d'institution INSPIRE dans `api_ids` et noms d'institution INSPIRE dans les formes de nom des structures du périmètre.
 - [x] Documentation de la source. 8763385ca
-- [ ] Publications du périmètre absentes du moissonnage d'INSPIRE, mesurées après le premier moissonnage.
+- [x] Publications du périmètre absentes du moissonnage d'INSPIRE, le 2026-11-07 sur la base locale (`inspire_missing.py`). Le moissonnage par institution ramène 2 717 fiches, la recherche par ORCID 216 autres.
+  - Recherche par ORCID (`inspire_orcid_rh.py`) : 211 des 217 contributions sources de personnes RH datent d'avant l'arrivée de la personne, dont 203 pour une seule personne. Les 6 autres sont sans institution. Aucune n'entre dans le périmètre : l'ORCID d'INSPIRE est hors des sources de confiance (`ORCID_MATCH_SOURCES`).
+  - ORCID d'INSPIRE (`inspire_orcid_agreement.py`) : 1 531 051 contributions sources ont le même ORCID qu'une source de confiance de leur contribution, 8 135 un autre. Les écarts relus viennent de l'alignement d'homonymes de même initiale, ou de l'ORCID d'un homonyme dans HAL, sur une liste d'auteurs de collaboration.
+  - Publications HEP du périmètre trouvées dans INSPIRE par DOI : 164 sur 2 436 sont sans enregistrement INSPIRE. 75 ont une fiche moissonnée, rattachée à une autre publication : 69 sont des errata, et la fiche est rattachée à l'article. Pour 63 des 89 autres, le périmètre vient de WoS seul : des actes de Quark Matter 2018, avec la collaboration ALICE entière dans WoS et l'orateur seul dans INSPIRE.
+  - 135 publications du périmètre ont une localisation OpenAlex vers CDS (130) ou INSPIRE (5), sans enregistrement INSPIRE. 50 sont du périmètre par OpenAlex seul.
+  - 23 fiches ont plusieurs DOI propres. 4 forment avec la prépublication arXiv une publication à côté de celle de l'article. La correction des natures de DOI (c4a452c20) en laisse 9, dont 4 errata sans nature dans INSPIRE.
+  - 5 fiches de la fenêtre ont pour seule institution clermontoise l'université Blaise Pascal (1306651).
 - [ ] Enregistrements sources OpenAlex rattachés à un enregistrement source INSPIRE par un identifiant : normalisation sans contributions sources. L'arrivée d'un enregistrement source INSPIRE supprime les contributions sources des enregistrements OpenAlex rattachés. Script ponctuel pour le stock.
 
 ### Phase 4 — Règles
