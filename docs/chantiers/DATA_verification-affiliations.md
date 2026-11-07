@@ -9,6 +9,8 @@ Le chantier [alignement des auteurs](archived/2026-10-24_DATA_alignement-auteurs
 ## Décisions
 
 - Une contribution dont certaines contributions sources donnent un indice de périmètre et d'autres une affiliation hors périmètre est un cas conflictuel. Une file d'administration la présente pour décision.
+- INSPIRE-HEP est moissonné.
+- Un enregistrement source OpenAlex est sans contributions sources quand il partage un DOI, un DOI arXiv ou un identifiant CDS (CERN Document Server) avec un enregistrement source INSPIRE. La condition se décide sur les identifiants des enregistrements sources, connus dès la normalisation.
 
 ## Phasage
 
@@ -109,6 +111,8 @@ Le chantier [alignement des auteurs](archived/2026-10-24_DATA_alignement-auteurs
   - ORCID des contributions sources OpenAlex (`inspire_openalex_orcids.py`) : 14 941 sur 15 285 sont aussi dans une autre source de la contribution du périmètre, Crossref surtout. Hors périmètre, la part est de 1 813 104 sur 1 857 619. Dans les publications de l'échantillon, INSPIRE donne 609 des 615 autres.
   - Personnes (`inspire_without_openalex_persons.py`) : 880 personnes hors RH sur 16 547 sortent du périmètre, et 341 perdent une partie de leurs contributions. L'échantillon juge 156 des 880 personnes sorties : 154 sont fausses. Aucune personne RH ne sort. 12 personnes RH perdent 14 contributions, et INSPIRE en affilie 13 à Clermont. Les contributions sources de ces 14 contributions sont toutes sans ORCID.
   - Périmètre entier : 4 263 publications sur 75 065 sont du périmètre par OpenAlex seul. Pour 5 200 publications, OpenAlex est la seule source à donner des affiliations.
+  - Rattachement direct à la fiche INSPIRE (`direct_link.py`, `inspire_identifier_check.py`) : l'enregistrement OpenAlex contient le DOI de la publication pour 3 525 des 5 117 contributions, un DOI arXiv pour 1 065 autres, un identifiant CDS pour 87. INSPIRE donne les 108 identifiants arXiv vérifiés, et 9 identifiants CDS sur 10. Les 440 dernières viennent d'enregistrements OpenAlex de dépôt (RWTH, GSI, DESY), rattachés à la publication par le titre.
+  - Ces publications contiennent 5,4 millions de contributions sources OpenAlex, soit 76 % de celles d'OpenAlex. Elles contiennent 110 339 contributions sources scanR. 95 contributions du périmètre reposent sur scanR seul ; l'échantillon en juge 13, toutes fausses.
 - [x] Relecture à la main de 35 indices de périmètre contredits par INSPIRE, donnés par plusieurs sources ou par OpenAlex seul, le 2026-11-06 (`build_inspire_review.py`).
   - OpenAlex seul : INSPIRE a raison dans les 20 cas.
   - Plusieurs sources : INSPIRE a raison dans 7 cas sur 15. Dans 2 de ces cas, l'auteur est passé par Clermont à une autre période. INSPIRE a tort dans 3 cas, 2 pour des personnes RH. 5 cas sont indéterminables.
@@ -116,12 +120,17 @@ Le chantier [alignement des auteurs](archived/2026-10-24_DATA_alignement-auteurs
   - Les 121 contributions du périmètre de Zhihao Xu (UCAS, Pékin) sont fausses, le 2026-11-07. 114 reprennent l'adresse d'un homonyme de même initiale. Pour 6, l'éditeur APS décale les affiliations entre les homonymes. 1 vient d'une erreur d'alignement.
   - Sur les 199 915 contributions du périmètre, 185 réunissent des prénoms complets différents de même initiale. Ce sont presque tous des variantes d'orthographe.
 
-### Phase 3 — Règles
+### Phase 3 — Moissonnage d'INSPIRE-HEP
+
+- [ ] Moissonnage d'INSPIRE-HEP, normalisation de ses enregistrements sources et de leurs contributions sources.
+- [ ] Enregistrements sources OpenAlex rattachés à un enregistrement source INSPIRE par un identifiant : normalisation sans contributions sources. L'arrivée d'un enregistrement source INSPIRE supprime les contributions sources des enregistrements OpenAlex rattachés. Script ponctuel pour le stock.
+
+### Phase 4 — Règles
 
 - [ ] Règles de confirmation des indices de périmètre, choisies d'après les phases 1 et 2.
 - [ ] File d'administration des contributions aux affiliations conflictuelles. Elle dépend du chantier [résolution des personnes](archived/2026-10-24_DATA_resolution-personnes.md).
 
-### Phase 4 — Fin de chantier
+### Phase 5 — Fin de chantier
 
 - [ ] Mise à jour de la documentation.
 
@@ -130,4 +139,5 @@ Le chantier [alignement des auteurs](archived/2026-10-24_DATA_alignement-auteurs
 - Une adresse OpenAlex à plusieurs pays, que les autres sources de la contribution ne confirment pas, cesse-t-elle d'être un indice de périmètre ? Sur les 60 cas jugés de la relecture du 2026-10-19, la règle perd 3 doubles affiliations réelles.
 - Les affiliations décalées ou fausses qui ne donnent pas plusieurs pays.
 - Un acte publié au nom d'une collaboration est-il une publication du périmètre, quand WoS donne toute la liste d'auteurs et INSPIRE seulement l'orateur ?
-- INSPIRE peut-il être la seule source des contributions sources des publications couvertes par INSPIRE, ou seulement des contributions sources hors périmètre ? Cela réduit le stockage et la durée de l'alignement des auteurs.
+- Les enregistrements sources scanR rattachés à un enregistrement source INSPIRE sont-ils aussi sans contributions sources ? Et ceux des autres sources (HAL, WoS, Crossref, DataCite) ? Cela réduit le stockage et la durée de l'alignement des auteurs.
+- Les enregistrements OpenAlex de dépôt, rattachés à la publication par le titre seul, échappent à la condition sur les identifiants.
