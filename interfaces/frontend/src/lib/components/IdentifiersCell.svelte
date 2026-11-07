@@ -4,7 +4,14 @@
 
 	type Identifier = components['schemas']['PersonIdentifierOut'];
 
-	let { identifiers = [] }: { identifiers?: Identifier[] } = $props();
+	let {
+		identifiers = [],
+		aligned = true,
+	}: {
+		identifiers?: Identifier[];
+		/** Emplacement vide pour un type absent : les identifiants de même type s'alignent d'une ligne à l'autre d'un tableau. */
+		aligned?: boolean;
+	} = $props();
 
 	/**
 	 * Identifiants d'un type, regroupés par valeur : une même valeur peut être attribuée par plusieurs sources, et la valeur est confirmée dès que l'une de ses attributions l'est. Les attributions que la curation a rejetées ne s'affichent pas.
@@ -31,7 +38,7 @@
 			{#each values as id (id.value)}
 				<IdentifierLink id_type={type} id_value={id.value} confirmed={id.confirmed} />
 			{/each}
-		{:else}
+		{:else if aligned}
 			<span class="logo-icon logo-identifier logo-placeholder"></span>
 		{/if}
 	{/each}

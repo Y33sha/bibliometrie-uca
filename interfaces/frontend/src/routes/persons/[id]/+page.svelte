@@ -1,7 +1,7 @@
 <script lang="ts">
 	import EntityBreadcrumb from '#lib/components/EntityBreadcrumb.svelte';
 	import EntityStatus from '#lib/components/EntityStatus.svelte';
-	import { columnLabels, staffCategoryLabels } from '#lib/labels.js';
+	import { columnLabels } from '#lib/labels.js';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import { onMount } from 'svelte';
@@ -197,16 +197,10 @@
 				{titleCase(profile.first_name)}
 				<span>{titleCase(profile.last_name)}</span>
 			</h1>
+			{#snippet identifierLinks()}
+				<IdentifiersCell {identifiers} aligned={false} />
+			{/snippet}
 		</TitleRow>
-		<div class="entity-meta">
-			{#if profile.corps}
-				<span class="tag">{profile.corps}</span>
-			{/if}
-			{#if profile.staff_category}
-				<span class="tag">{staffCategoryLabels[profile.staff_category] ?? profile.staff_category}</span>
-			{/if}
-			<IdentifiersCell {identifiers} />
-		</div>
 		{#if profile.periods.length}
 			<ul class="hr-periods">
 				{#each profile.periods as period, i (i)}
@@ -393,7 +387,7 @@
 {/if}
 
 <style>
-	.hr-periods { list-style: none; margin: 8px 0 0; padding: 0; font-size: var(--fs-md); }
+	.hr-periods { list-style: none; margin: 0; padding: 0; font-size: var(--fs-md); }
 	.hr-periods li { margin: 2px 0; }
 	.past-period { color: var(--text-faint); }
 	.past-period .entity-link { color: inherit; }
