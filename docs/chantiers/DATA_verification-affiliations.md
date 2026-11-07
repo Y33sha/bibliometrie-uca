@@ -104,6 +104,9 @@ Le chantier [alignement des auteurs](archived/2026-10-24_DATA_alignement-auteurs
 
   - INSPIRE affilie à Clermont 28 auteurs absents du périmètre, tous dans des publications de plus de 500 auteurs.
   - INSPIRE omet parfois la part clermontoise d'une double affiliation. Pour 21 auteurs de l'échantillon, l'affiliation brute contredit l'institution rattachée. Les rapports techniques du CERN sont sans affiliations.
+- [x] Contributions sources OpenAlex écartées des publications présentes dans INSPIRE, simulé le 2026-11-07 sur la base locale (`inspire_without_openalex.py`). Dans ces 2 431 publications, 5 117 contributions du périmètre reposent sur OpenAlex seul. D'après l'échantillon, environ 5 026 sont fausses et 92 justes. Au-delà de 500 auteurs, le taux vient de 100 publications tirées au hasard.
+  - 6 de ces publications sont du périmètre par OpenAlex seul. INSPIRE en affilie 5 à Clermont.
+  - Périmètre entier : 4 263 publications sur 75 065 sont du périmètre par OpenAlex seul. Pour 5 200 publications, OpenAlex est la seule source à donner des affiliations.
 - [x] Relecture à la main de 35 indices de périmètre contredits par INSPIRE, donnés par plusieurs sources ou par OpenAlex seul, le 2026-11-06 (`build_inspire_review.py`).
   - OpenAlex seul : INSPIRE a raison dans les 20 cas.
   - Plusieurs sources : INSPIRE a raison dans 7 cas sur 15. Dans 2 de ces cas, l'auteur est passé par Clermont à une autre période. INSPIRE a tort dans 3 cas, 2 pour des personnes RH. 5 cas sont indéterminables.
