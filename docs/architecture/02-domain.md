@@ -21,7 +21,7 @@ Les tables de chaque entité et leurs écritures sont décrites dans le [modèle
 
 Les value objects sont immuables, et égaux quand leur contenu est égal.
 
-- Identifiants de publication : `DOI`, `HALId`, `NNT`, `PMID`, `PMCID`, `ArxivId`
+- Identifiants de publication : `DOI`, `HALId`, `NNT`, `PMID`, `PMCID`, `CdsId`, `ArxivId`
 - Identifiants de personne : `ORCID`, `IdHAL`, `IdRef`, `HalPersonId`
 - Identifiants de structure : `RorId`, `HalCollection`
 - Formes de nom : `PersonNameForm`, `StructureNameForm`

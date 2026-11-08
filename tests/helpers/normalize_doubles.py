@@ -69,13 +69,18 @@ class FakeStagingStore:
 class FakeSourceContributionStore:
     """`SourceContributionStore` : retient les contributions sources insérées, et les renvoie comme contributions sources en base.
 
-    `synced_for` retient les enregistrements sources aux contributions sources synchronisées. Les adresses sont ignorées : leurs lectures renvoient des tables vides.
+    `synced_for` retient les enregistrements sources aux contributions sources synchronisées, `withheld_for` ceux écrits sans contributions sources. Les adresses sont ignorées : leurs lectures renvoient des tables vides.
     """
 
     def __init__(self) -> None:
         self.synced_for: list[int] = []
+        self.withheld_for: list[int] = []
         self.upserted_batches: list[list] = []
         self._rows: list[StoredSourceContributionRow] = []
+
+    def withhold_source_contributions(self, source_record_ids) -> int:
+        self.withheld_for.extend(source_record_ids)
+        return 0
 
     def fetch_stored_source_contributions(self, source_record_id: int) -> list:
         return list(self._rows)

@@ -139,6 +139,21 @@ _SOURCE_MAPS: dict[str, dict[str, str]] = {
         "other": "other",
     },
     "scanr_patents": {"patent": "patent"},
+    "inspire": {
+        "article": "article",
+        # Article sans publication dans une revue (`publication_info.journal_title`).
+        "article_preprint": "preprint",
+        "conference paper": "conference_paper",
+        "proceedings": "proceedings",
+        "thesis": "thesis",
+        "book": "book",
+        "book chapter": "book_chapter",
+        "review": "review",
+        "report": "report",
+        "activity report": "report",
+        "note": "other",
+        "lectures": "other",
+    },
     "theses": {
         "thesis": "thesis",
         "ongoing_thesis": "ongoing_thesis",

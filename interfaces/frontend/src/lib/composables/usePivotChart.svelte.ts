@@ -6,16 +6,13 @@
 import { tick } from 'svelte';
 import { api, latestRequest } from '#lib/api/index.js';
 import type { components } from '#lib/api/schema.js';
-import { Chart, fitsInBar, pieSegmentOptions, stackedSegmentOptions } from '#lib/components/charts/chart.js';
+import { Chart, fitsInBar, stackedSegmentOptions } from '#lib/components/charts/chart.js';
 import { cssColor, fontSize } from '#lib/components/charts/cssVar.js';
 import { readableOn } from '#lib/components/charts/contrast.js';
 import { orderedPivotValues, pivotValueColor, pivotValueDescription, pivotValueLabel } from '#lib/pivotValues.js';
 import { coreRange } from '#lib/filterRegistry.js';
 
 type PivotSchema = components['schemas']['PivotSchemaResponse'];
-
-/** Entrée du sélecteur d'indicateur qui remplace l'histogramme par la carte des collaborations internationales. Ce n'est pas une dimension du pivot. */
-export const COLLAB_VIEW = 'collaborations';
 
 /** Catégories affichées par page sur un axe à forte cardinalité. */
 export const CHART_PAGE_SIZE = 10;
@@ -94,8 +91,7 @@ export function usePivotChart(config: {
 	const indicatorDef = $derived(schema?.indicators.find((i) => i.key === settings.indicator));
 	// Dimension empilée dans chaque barre, imposée par l'indicateur.
 	const breakdown = $derived(indicatorDef?.breakdown ?? '');
-	const isCollab = $derived(settings.indicator === COLLAB_VIEW);
-	// Comparaison : les dimensions déclarées `comparable` (l'année et les entités à forte cardinalité : laboratoire, éditeur, revue, organisation partenaire).
+	// Comparaison : les dimensions déclarées `comparable` (l'année et les dimensions à forte cardinalité).
 	const comparableDims = $derived(schema ? schema.dimensions.filter((d) => d.comparable) : []);
 
 	function dimCard(dim: string): string {
@@ -157,15 +153,6 @@ export function usePivotChart(config: {
 
 	// Récupère les lignes du pivot depuis l'API, puis délègue le tracé. La requête dépend seulement des filtres, de l'indicateur et de la comparaison ; les réglages d'affichage (mode, tri, page) re-tracent depuis ce cache sans nouvel appel réseau (voir `render`).
 	async function load() {
-		// Vue Collaborations : la carte se dessine seule (composant dédié). L'histogramme éventuel est détruit, le pivot n'est pas interrogé (`collaborations` n'est pas une dimension valide).
-		if (isCollab) {
-			if (chart) {
-				chart.destroy();
-				chart = null;
-			}
-			legendItems = [];
-			return;
-		}
 		const p = config.buildParams();
 		p.set('indicator', settings.indicator);
 		if (settings.groupBy) p.set('compare', settings.groupBy);
@@ -192,7 +179,7 @@ export function usePivotChart(config: {
 
 		const stackValues = stackDim ? orderedPivotValues(stackDim, rows) : [];
 
-		// Tri par part d'une série : n'a de sens que sur un axe entité à forte cardinalité (labo, éditeur, revue) avec un empilement. L'axe année reste chronologique, les axes à faible cardinalité gardent leur ordre métier. Le sélecteur n'apparaît que dans ce cas, et une clé devenue caduque (changement d'empilement ou d'axe) est réinitialisée.
+		// Tri par part d'une série : n'a de sens que sur un axe à forte cardinalité avec un empilement. L'axe année reste chronologique, les axes à faible cardinalité gardent leur ordre métier. Le sélecteur n'apparaît que dans ce cas, et une clé devenue caduque (changement d'empilement ou d'axe) est réinitialisée.
 		const highCard = dimCard(xDim) === 'high';
 		const segment = stackDim ? stackedSegmentOptions(canvas, highCard) : {};
 		const canSort = highCard && !!stackDim;
@@ -226,82 +213,50 @@ export function usePivotChart(config: {
 		// Échelle partagée entre pages : le maximum de l'axe des valeurs couvre toutes les catégories (pas seulement la page affichée), afin que l'échelle reste stable d'une page à l'autre et que les exports PNG soient comparables. `suggestedMax` laisse Chart.js arrondir les graduations ; comme ce maximum domine celui de chaque page, l'arrondi est identique partout.
 		const valueMax = allCats.reduce((max, cv) => Math.max(max, catTotals.get(cv) ?? 0), 0);
 
+		// Couleur d'un segment : celle de sa série. Sans empilement, chaque barre prend la couleur de sa catégorie.
+		const seriesColors = series.map((sv, i) => (stackDim ? pivotValueColor(stackDim, sv, i) : cssColor('accent')));
+		const barColors = stackDim ? null : cats.map((cv, ci) => pivotValueColor(xDim, cv, ci));
 		const datasets = series.map((sv, i) => ({
 			label: stackDim ? dimLabel(stackDim, sv) : (indicatorDef?.label ?? ''),
 			data: cats.map((cv) => cell(cv, sv)),
-			backgroundColor: stackDim ? pivotValueColor(stackDim, sv, i) : cssColor('accent'),
+			backgroundColor: barColors ?? seriesColors[i],
 			...segment,
 			barPercentage: 0.85,
 			categoryPercentage: 0.7,
 		}));
 		const descriptions = series.map((sv) => (stackDim ? pivotValueDescription(stackDim, sv) : undefined));
-		legendItems = datasets.map((d, i) => ({ label: d.label, color: d.backgroundColor, description: descriptions[i] }));
+		legendItems = datasets.map((d, i) => ({ label: d.label, color: seriesColors[i], description: descriptions[i] }));
 		table = {
 			columns: datasets.map((d) => d.label),
 			rows: labels.map((label, ci) => ({ label, values: datasets.map((d) => formatValue(d.data[ci] as number)) })),
 		};
 
-		// Mode « part » sans comparaison : un camembert des parts de chaque catégorie du groupement primaire (l'empilement à 100 % d'une barre unique, déroulé en secteurs lisibles).
-		if (chartMode === 'part' && !stackDim) {
-			const values = datasets[0].data as number[];
-			const colors = cats.map((cv, i) => pivotValueColor(xDim, cv, i));
-			const sliceDescriptions = cats.map((cv) => pivotValueDescription(xDim, cv));
-			legendItems = cats.map((cv, i) => ({ label: dimLabel(xDim, cv), color: colors[i], description: sliceDescriptions[i] }));
-			const sliceTotal = (ctx: { dataset: { data: unknown[] } }) =>
-				(ctx.dataset.data as number[]).reduce((s, v) => s + (v || 0), 0);
-			chart = new Chart(canvas, {
-				type: 'pie',
-				plugins: [whiteBgPlugin],
-				data: { labels, datasets: [{ data: values, backgroundColor: colors, ...pieSegmentOptions(canvas) }] },
-				options: {
-					responsive: true,
-					maintainAspectRatio: false,
-					plugins: {
-						legend: { display: false },
-						tooltip: {
-							bodyFont: { size: fontSize('md') },
-							callbacks: {
-								label: (ctx) => {
-									const val = ctx.raw as number;
-									const total = sliceTotal(ctx);
-									const pct = total ? ((val / total) * 100).toFixed(1) : '0.0';
-									return `${ctx.label} : ${formatValue(val)} (${pct}%)`;
-								},
-								afterLabel: (ctx) => sliceDescriptions[ctx.dataIndex] ?? '',
-							},
-						},
-						datalabels: {
-							color: (ctx) => readableOn(colors[ctx.dataIndex], cssColor('text')),
-							font: { weight: 'bold' },
-							formatter: (val: number, ctx) => {
-								const total = sliceTotal(ctx);
-								const pct = total ? (val / total) * 100 : 0;
-								return pct >= 5 ? Math.round(pct) + '%' : '';
-							},
-							anchor: 'center' as const,
-							align: 'center' as const,
-							listeners: {},
-						},
-					},
-				},
-			});
-			return;
-		}
+		// Base de la part d'une valeur : la barre qui la contient, avec comparaison (segments empilés) ; la somme des barres, sans comparaison (barres simples). `columns` : les valeurs de chaque jeu de données.
+		const shareBase = (columns: unknown[][], index: number) =>
+			stackDim
+				? columns.reduce((s, data) => s + ((data[index] as number) || 0), 0)
+				: (columns[0] as number[]).reduce((s, v) => s + (v || 0), 0);
+		const shareOf = (c: Chart, datasetIndex: number, index: number) => {
+			const base = shareBase(c.data.datasets.map((ds) => ds.data), index);
+			return base ? (((c.data.datasets[datasetIndex].data[index] as number) || 0) / base) * 100 : 0;
+		};
 
-		// Mode « part » avec comparaison : aplatir chaque colonne (abscisse) à 100 % en remplaçant les comptes par leur proportion.
-		const part = chartMode === 'part' && !!stackDim;
+		// Mode « part » : chaque valeur devient sa part, en pourcentage. Avec comparaison, chaque barre monte à 100 % ; sans comparaison, les barres totalisent 100 %.
+		const part = chartMode === 'part';
 		if (part) {
-			const totals = labels.map((_, ci) => datasets.reduce((s, d) => s + ((d.data[ci] as number) || 0), 0));
-			for (const d of datasets) d.data = d.data.map((c, ci) => (totals[ci] ? ((c as number) / totals[ci]) * 100 : 0));
+			const bases = labels.map((_, ci) => shareBase(datasets.map((d) => d.data), ci));
+			for (const d of datasets) d.data = d.data.map((c, ci) => (bases[ci] ? ((c as number) / bases[ci]) * 100 : 0));
 		}
 
-		// Étiquette d'un segment : sa part dans la barre, affichée seulement si elle tient dans le segment.
+		// Étiquette d'une barre ou d'un segment : sa part en mode « part », sa valeur sinon. Elle s'affiche seulement si elle tient dans la barre.
 		const BAR_LABEL_FONT = { weight: 'bold' as const };
-		const barShareLabel = (ctx: { chart: Chart; dataIndex: number; datasetIndex: number }) => {
-			const all = ctx.chart.data.datasets;
-			const total = all.reduce((s, ds) => s + ((ds.data[ctx.dataIndex] as number) || 0), 0);
-			const val = (all[ctx.datasetIndex].data[ctx.dataIndex] as number) || 0;
-			return total ? Math.round((val / total) * 100) + '%' : '';
+		const barLabel = (ctx: { chart: Chart; dataIndex: number; datasetIndex: number }) => {
+			if (!part) {
+				const value = (ctx.chart.data.datasets[ctx.datasetIndex].data[ctx.dataIndex] as number) || 0;
+				return value ? formatValue(value) : '';
+			}
+			const share = shareOf(ctx.chart, ctx.datasetIndex, ctx.dataIndex);
+			return share ? Math.round(share) + '%' : '';
 		};
 
 		chart = new Chart(canvas, {
@@ -318,23 +273,21 @@ export function usePivotChart(config: {
 						bodyFont: { size: fontSize('md') },
 						callbacks: {
 							label: (ctx) => {
-								const val = ctx.raw as number;
-								const total = ctx.chart.data.datasets.reduce((s, ds) => s + ((ds.data[ctx.dataIndex] as number) || 0), 0);
-								const pct = total ? ((val / total) * 100).toFixed(1) : '0.0';
-								return part ? `${ctx.dataset.label} : ${pct}%` : `${ctx.dataset.label} : ${formatValue(val)} (${pct}%)`;
+								const pct = shareOf(ctx.chart, ctx.datasetIndex, ctx.dataIndex).toFixed(1);
+								return part ? `${ctx.dataset.label} : ${pct}%` : `${ctx.dataset.label} : ${formatValue(ctx.raw as number)} (${pct}%)`;
 							},
-							afterLabel: (ctx) => descriptions[ctx.datasetIndex] ?? '',
-							afterBody: (items) => {
-								const total = items[0].chart.data.datasets.reduce((s, ds) => s + ((ds.data[items[0].dataIndex] as number) || 0), 0);
-								return part ? [] : `Total : ${formatValue(total)}`;
-							},
+							// Explication de la série empilée ; sans empilement, de la catégorie, que nomme l'axe.
+							afterLabel: (ctx) => (stackDim ? descriptions[ctx.datasetIndex] : pivotValueDescription(xDim, cats[ctx.dataIndex])) ?? '',
+							// Total de la barre, pour un segment empilé : une barre simple porte déjà sa valeur.
+							afterBody: (items) =>
+								part || !stackDim ? [] : `Total : ${formatValue(shareBase(items[0].chart.data.datasets.map((ds) => ds.data), items[0].dataIndex))}`,
 						},
 					},
 					datalabels: {
-						color: (ctx) => readableOn(String(ctx.dataset.backgroundColor), cssColor('text')),
+						color: (ctx) => readableOn(barColors?.[ctx.dataIndex] ?? seriesColors[ctx.datasetIndex], cssColor('text')),
 						font: BAR_LABEL_FONT,
-						display: (ctx) => fitsInBar(ctx, barShareLabel(ctx), BAR_LABEL_FONT),
-						formatter: (_val: number, ctx) => barShareLabel(ctx),
+						display: (ctx) => fitsInBar(ctx, barLabel(ctx), BAR_LABEL_FONT),
+						formatter: (_val: number, ctx) => barLabel(ctx),
 						anchor: 'center' as const,
 						align: 'center' as const,
 						listeners: {},
@@ -422,9 +375,6 @@ export function usePivotChart(config: {
 		get indicatorDef() {
 			return indicatorDef;
 		},
-		get isCollab() {
-			return isCollab;
-		},
 		get comparableDims() {
 			return comparableDims;
 		},
@@ -439,10 +389,6 @@ export function usePivotChart(config: {
 		},
 		get catTotal() {
 			return catTotal;
-		},
-		/** Filtres actifs sérialisés : pilotent la carte des collaborations, qui suit les mêmes filtres que le graphique mais ignore l'axe, le mode et la pagination. */
-		get filterKey() {
-			return config.buildParams().toString();
 		},
 		/** Canvas du graphique, confié par `PivotChart`. */
 		attach(el: HTMLCanvasElement | undefined) {

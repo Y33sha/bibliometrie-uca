@@ -30,6 +30,7 @@ from domain.errors import (
 )
 from infrastructure.db.engine import build_sync_engine, set_sync_engine
 from infrastructure.db.read_only_guard import read_request
+from infrastructure.db.search_path import check_search_path
 from infrastructure.observability.log import configure_root_logging
 from infrastructure.settings import settings
 from interfaces.api.deps import READ_ONLY_METHODS, ensure_admin_user, load_session_user
@@ -82,6 +83,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     anyio.to_thread.current_default_thread_limiter().total_tokens = settings.api_threadpool_size
     sync_engine = build_sync_engine("app")
     set_sync_engine(sync_engine)
+    await anyio.to_thread.run_sync(check_search_path, sync_engine)
     await anyio.to_thread.run_sync(ensure_admin_user)
     try:
         yield

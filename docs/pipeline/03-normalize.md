@@ -26,6 +26,12 @@ Une contribution source retrouvée avec d'autres informations du contributeur (i
 
 Un enregistrement source garde ses contributions sources en l'état si la partie auteurs de son payload est inchangée depuis la dernière normalisation. L'option `--normalize-full` vide l'empreinte de cette partie pour tous les enregistrements sources des sources normalisées : leurs contributions sources se resynchronisent à leur prochaine normalisation.
 
+## Listes d'auteurs d'INSPIRE-HEP
+
+Un enregistrement source OpenAlex du même document qu'un enregistrement source INSPIRE-HEP est sans contributions sources. Les affiliations d'OpenAlex sont souvent fausses, et [INSPIRE-HEP](../sources/12-inspire.md) vérifie ses listes d'auteurs. Les deux enregistrements sources partagent un DOI, un DOI arXiv, un hal-id ou un numéro de fiche CDS, de rôle autre que `related`.
+
+La normalisation d'OpenAlex applique la règle. Après la normalisation des sources, la tâche `withhold_openalex_authors` l'applique aux enregistrements OpenAlex normalisés avant l'arrivée de l'enregistrement INSPIRE-HEP. L'empreinte de leur partie auteurs reste vide : leur normalisation suivante décide de nouveau.
+
 ## Archivage du payload brut
 
 Avant de vider `raw_data`, la normalisation dépose le payload hors base, dans le raw store (`infrastructure/raw_store/`) : un fichier `data/raw_store/{source}/{source_id}.json.gz` par document. L'option [`--raw-store`](../exploitation/03-pipeline.md#divers) déclenche cet archivage : sans elle, le payload est perdu à la vidange.

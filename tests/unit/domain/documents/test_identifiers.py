@@ -1,4 +1,4 @@
-"""Identifiants des publications (`domain.documents.identifiers`) : DOI, identifiant HAL, NNT, numéro de brevet, PMID, PMCID, arXiv, ISSN, ISBN, préfixe DOI."""
+"""Identifiants des publications (`domain.documents.identifiers`) : DOI, identifiant HAL, NNT, numéro de brevet, PMID, PMCID, identifiant CDS, arXiv, ISSN, ISBN, préfixe DOI."""
 
 from dataclasses import FrozenInstanceError
 
@@ -12,6 +12,7 @@ from domain.documents.identifiers import (
     PMCID,
     PMID,
     ArxivId,
+    CdsId,
     DoiPrefix,
     DoiVersion,
     HALId,
@@ -353,6 +354,13 @@ class TestNormalizeIdHelpers:
         assert PMID.normalize("28973220") == "28973220"
         assert PMID.normalize(None) is None
         assert PMID.normalize("not-a-pmid") is None
+
+    def test_cds_id_from_url_and_raw(self):
+        assert CdsId.normalize("https://cds.cern.ch/record/2838028") == "2838028"
+        assert CdsId.normalize("http://cds.cern.ch/record/2268733/files/x.pdf") == "2268733"
+        assert CdsId.normalize("2838028") == "2838028"
+        assert CdsId.normalize("https://inspirehep.net/literature/2683002") is None
+        assert CdsId.normalize(None) is None
 
     def test_pmcid_with_without_prefix_and_url(self):
         assert (

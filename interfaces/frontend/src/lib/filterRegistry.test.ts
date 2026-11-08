@@ -305,6 +305,15 @@ describe('filterRegistry', () => {
 			expect(values.checkbox.rh).toEqual(['no']);
 		});
 
+		it("omet de l'URL la sélection par défaut retrouvée dans un autre ordre, et une sélection par défaut vide", () => {
+			const types: CheckboxFilter = { ...rh, key: 'types', param: 'type', defaultSelection: () => ['labo', 'team'], serialize: undefined };
+			const values = initialValues([types]);
+			values.checkbox.types = ['team', 'labo'];
+			expect(urlState([types], values).types).toBe('labo,team');
+			const none: CheckboxFilter = { ...types, defaultSelection: () => [] };
+			expect(urlState([none], initialValues([none])).types).toBe('');
+		});
+
 		it('écrit dans la requête la valeur choisie par `serialize`', () => {
 			const values = initialValues([rh]);
 			const params = new URLSearchParams();

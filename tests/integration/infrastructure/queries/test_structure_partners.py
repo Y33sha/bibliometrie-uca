@@ -4,6 +4,7 @@ from sqlalchemy import text
 
 from infrastructure.read_models.entity_labels.queries import EntityLabelQueries
 from infrastructure.read_models.publications.models import PublicationFilters
+from infrastructure.read_models.structures.models import StructurePartnerFilters
 from infrastructure.read_models.structures.queries import StructuresQueries
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
@@ -29,8 +30,15 @@ def _copublication(conn) -> tuple[int, int]:
 
 
 def _partners(conn, structure: int, **filters):
-    params = {"years": [], "countries": [], "types": [], **filters}
-    return StructuresQueries(conn).get_structure_partners(structure, page=1, per_page=50, **params)
+    return StructuresQueries(conn).get_structure_partners(
+        structure, filters=StructurePartnerFilters(**filters), page=1, per_page=50
+    )
+
+
+def _facets(conn, structure: int, **filters):
+    return StructuresQueries(conn).get_structure_partners_facets(
+        structure, filters=StructurePartnerFilters(**filters)
+    )
 
 
 def test_les_partenaires_excluent_la_structure_et_ses_ancetres(sa_sync_conn):
@@ -39,7 +47,7 @@ def test_les_partenaires_excluent_la_structure_et_ses_ancetres(sa_sync_conn):
     assert [(p.ror_id, p.country_code, p.publications) for p in result.partners] == [
         ("0ger00001", "de", 1)
     ]
-    assert [(o.value, o.count) for o in result.types] == [("facility", 1)]
+    assert [(o.value, o.count) for o in _facets(sa_sync_conn, structure).types] == [("facility", 1)]
 
 
 def test_filtre_par_pays_et_par_annee(sa_sync_conn):
@@ -47,7 +55,7 @@ def test_filtre_par_pays_et_par_annee(sa_sync_conn):
     assert _partners(sa_sync_conn, structure, countries=["fr"]).total == 0
     assert _partners(sa_sync_conn, structure, years=[2023]).total == 0
     assert _partners(sa_sync_conn, structure, years=[2024]).total == 1
-    assert [(o.value, o.count) for o in _partners(sa_sync_conn, structure, years=[2023]).years] == [
+    assert [(o.value, o.count) for o in _facets(sa_sync_conn, structure, years=[2023]).years] == [
         ("2024", 1)
     ]
 

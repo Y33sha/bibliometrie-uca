@@ -1,12 +1,11 @@
 <script lang="ts">
-	import EntityMetaItem from '#lib/components/EntityMetaItem.svelte';
 	import EntityBreadcrumb from '#lib/components/EntityBreadcrumb.svelte';
 	import EntityStatus from '#lib/components/EntityStatus.svelte';
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 	import { api } from '#lib/api/index.js';
 	import { plural } from '#lib/plural.js';
-	import { rorShortId, rorFullUrl } from '#lib/utils.js';
+	import IdentifierLink from '#lib/components/IdentifierLink.svelte';
 	import { structureLabel } from '#lib/structureLabels.js';
 	import PublicationsDashboard from '#lib/components/PublicationsDashboard.svelte';
 	import SubjectsCard from '#lib/components/SubjectsCard.svelte';
@@ -31,7 +30,6 @@
 	// --- Types ---
 	import type { components } from '#lib/api/schema.js';
 	type Structure = components['schemas']['StructureOut'];
-	type RelatedStructure = components['schemas']['RelatedStructureOut'];
 	type LabProfile = components['schemas']['StructureDetailResponse'];
 	type LabAddress = components['schemas']['StructureAddressOut'];
 
@@ -40,8 +38,6 @@
 
 	// --- State ---
 	let lab: Structure | null = $state(null);
-	let parents: RelatedStructure[] = $state([]);
-	let children: RelatedStructure[] = $state([]);
 	let thesesCount = $state(0);
 	let error = $state(false);
 
@@ -69,9 +65,6 @@
 	let dashboardLoaded = $state(false);
 	let ongoingThesesCount = $state(0);
 	let personsCount = $state(0);
-
-	const tutelles = $derived(parents);
-
 
 	// `useUrlFilters` ne gère ici que les keys cross-onglets (tab, addresses). Les filtres publications/thèses/personnes sont gérés par leurs ListView.
 	const url = useUrlFilters({
@@ -104,13 +97,11 @@
 		dashboardLoaded = true;
 	}
 
-	// En-tête de la fiche : la structure, ses tutelles et son nombre de thèses.
+	// En-tête de la fiche : la structure et son nombre de thèses.
 	async function loadProfile(): Promise<boolean> {
 		try {
 			const profileData = await api<LabProfile>(`/api/structures/${labId}`);
 			lab = profileData.structure;
-			parents = profileData.parents;
-			children = profileData.children;
 			thesesCount = profileData.theses_count;
 			return true;
 		} catch {
@@ -159,38 +150,10 @@
 					<span class="entity-acronym">{lab.acronym}</span>
 				{/if}
 			</h1>
+			{#snippet identifierLinks()}
+				{#if lab!.ror_id}<IdentifierLink id_type="ror" id_value={lab!.ror_id} />{/if}
+			{/snippet}
 		</TitleRow>
-		<div class="entity-meta">
-			{#if lab.ror_id}
-				<EntityMetaItem label="ROR">
-					<a href={rorFullUrl(lab.ror_id)} target="_blank" rel="noopener" class="tag id-badge">
-						{rorShortId(lab.ror_id)}
-					</a>
-				</EntityMetaItem>
-			{/if}
-			{#if lab.rnsr_id}
-				<EntityMetaItem label="RNSR"><span class="tag id-badge">{lab.rnsr_id}</span></EntityMetaItem>
-			{/if}
-			{#if lab.hal_collection}
-				<EntityMetaItem label="HAL">
-					<a
-						href="https://hal.science/{lab.hal_collection}"
-						target="_blank"
-						rel="noopener"
-						class="tag id-badge"
-					>
-						{lab.hal_collection}
-					</a>
-				</EntityMetaItem>
-			{/if}
-			{#if tutelles.length}
-				<EntityMetaItem label="Tutelles">
-					{#each tutelles as t (t.id)}
-						<span class="tag tag-accent">{structureLabel(t)}</span>
-					{/each}
-				</EntityMetaItem>
-			{/if}
-		</div>
 	</div>
 
 	<!-- Tabs -->

@@ -13,6 +13,7 @@ from domain.addresses.country_detection import CountryDetectionMethod
 from domain.types import JsonValue
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.db.queues import Queue, enqueue, enqueue_sql
+from infrastructure.db.scalars import scalar_int
 from pipeline.transformation.countries.store import CountryCandidatesStore
 
 
@@ -138,6 +139,31 @@ _MARK_RESOLUTION_OF_UPDATED = enqueue_sql(
     """,
 )
 """Marque pour la redécision de leur personne les contributions rattachées dont une contribution source de la CTE `updated` change d'informations du contributeur."""
+
+
+_WITHHOLD_SQL = text(
+    """
+    WITH deleted AS (
+        DELETE FROM source_contributions WHERE source_record_id = ANY(:ids)
+        RETURNING source_record_id
+    ), marked AS ("""
+    + enqueue_sql(
+        Queue.PUBLICATION_CONTRIBUTIONS,
+        """
+        SELECT sr.publication_id FROM source_records sr
+        WHERE sr.id IN (SELECT source_record_id FROM deleted) AND sr.publication_id IS NOT NULL
+        """,
+    )
+    + """), reset AS (
+        UPDATE source_records
+        SET authors_hash = NULL, author_count = 0, distinct_author_count = 0
+        WHERE id = ANY(:ids)
+          AND (authors_hash IS NOT NULL OR author_count <> 0 OR distinct_author_count <> 0)
+    )
+    SELECT count(*) FROM deleted
+    """
+)
+"""Suppression des contributions sources des enregistrements sources `:ids` (`SourceContributionStore.withhold_source_contributions`)."""
 
 
 def mark_source_contributions_to_resync(conn: Connection, source: str) -> int:
@@ -390,6 +416,15 @@ class SourceContributionStore:
             text("UPDATE source_records SET authors_hash = :h WHERE id = :id"),
             {"h": authors_hash, "id": source_record_id},
         )
+
+    def withhold_source_contributions(self, source_record_ids: list[int]) -> int:
+        """Supprime les contributions sources des enregistrements sources donnés, et renvoie leur nombre.
+
+        L'enregistrement source perd son empreinte de bloc auteurs : sa prochaine normalisation synchronise ses contributions sources. Ses nombres d'auteurs passent à zéro. Sa publication est marquée pour le groupement des auteurs.
+        """
+        if not source_record_ids:
+            return 0
+        return scalar_int(self._conn.execute(_WITHHOLD_SQL, {"ids": list(source_record_ids)}))
 
     def delete_links(self, ids: list[int]) -> None:
         """Supprime les liens des contributions sources `ids` : adresses, ROR et structures HAL."""

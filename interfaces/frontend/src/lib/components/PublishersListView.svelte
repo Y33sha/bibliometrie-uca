@@ -4,7 +4,7 @@
 	import { columnLabels } from '#lib/labels.js';
 	import ListToolbar from '#lib/components/ListToolbar.svelte';
 	import { onMount } from 'svelte';
-	import { asset, resolve } from '$app/paths';
+	import { resolve } from '$app/paths';
 
 	import ActiveFilterBar from '#lib/components/ActiveFilterBar.svelte';
 	import FilterLayout from '#lib/components/filters/FilterLayout.svelte';
@@ -19,7 +19,8 @@
 	import { useDrawerParam } from '#lib/composables/useDrawerParam.svelte.js';
 	import { facetDefs } from '#lib/filterRegistry.js';
 	import { PUBLISHER_FILTER_GROUPS, PUBLISHER_FILTERS } from '#lib/publisherFilters.js';
-	import { crossrefMemberIds, crossrefMemberUrl } from '#lib/sources.svelte.js';
+	import { crossrefMemberIds } from '#lib/sources.svelte.js';
+	import IdentifierLink from '#lib/components/IdentifierLink.svelte';
 	import { isAdmin } from '#lib/session.svelte.js';
 	import { nextSort, sortDirection } from '#lib/sort.js';
 	import { withBase } from '#lib/paths.js';
@@ -104,6 +105,7 @@
 			<th class="sortable" onclick={() => setSort('name')}>
 				Nom <SortChevron direction={sortDirection(list.sort, 'name')} />
 			</th>
+			<th>Identifiants</th>
 			<th>{columnLabels.type}</th>
 			<th>{columnLabels.country}</th>
 			<th>Préfixes DOI</th>
@@ -125,17 +127,13 @@
 				{/if}
 				<td>
 					<a href={resolve(`publishers/${p.id}`)} class="entity-link">{p.name}</a>
-					{#each crossrefMemberIds(p.doi_prefixes) as member (member)}
-						<a
-							class="crossref-link"
-							href={crossrefMemberUrl(member)}
-							target="_blank"
-							rel="noopener"
-							title="Membre Crossref {member} (nouvel onglet)"
-						>
-							<img src={asset('icons/crossref.ico')} alt="Crossref" width="14" height="14" />
-						</a>
-					{/each}
+				</td>
+				<!-- Un emplacement vide aligne les membres Crossref d'une ligne à l'autre. -->
+				<td>
+					<span class="publisher-ids">
+						{#if p.openalex_id}<IdentifierLink id_type="openalex" id_value={p.openalex_id} />{:else}<span class="logo-icon logo-identifier logo-placeholder"></span>{/if}
+						{#each crossrefMemberIds(p.doi_prefixes) as member (member)}<IdentifierLink id_type="crossref_member" id_value={String(member)} />{/each}
+					</span>
 				</td>
 				<td class="muted">{publisherTypeLabel(p.publisher_type)}</td>
 				<td class="muted">{p.country?.toUpperCase() ?? ''}</td>
@@ -151,7 +149,7 @@
 			</tr>
 		{/each}
 		{#if list.listing.items.length === 0}
-			<TableStatusRow loading={list.listing.loading} error={list.listing.error} colspan={isAdmin() ? 7 : 6} emptyText="Aucun éditeur ne correspond aux filtres." />
+			<TableStatusRow loading={list.listing.loading} error={list.listing.error} colspan={isAdmin() ? 8 : 7} emptyText="Aucun éditeur ne correspond aux filtres." />
 		{/if}
 	</tbody>
 </table>
@@ -175,5 +173,5 @@
 	.publishers-table { min-width: 620px; }
 	.publishers-table td.num { color: var(--muted); }
 
-	.crossref-link { text-decoration: none; margin-left: 5px; vertical-align: text-bottom; }
+	.publisher-ids { display: inline-flex; gap: 4px; align-items: center; white-space: nowrap; }
 </style>

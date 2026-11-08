@@ -25,9 +25,9 @@ def get_scanr_credentials() -> tuple[str, str]:
 def source_credentials_missing(source: str) -> str | None:
     """Renvoie le motif de l'absence des identifiants d'API d'une source, ou `None` si la source est utilisable.
 
-    `access_source` appelle cette fonction avant tout appel à une API tierce. Un accès avec motif est sauté, avec un avertissement. HAL, theses.fr, doi.org et DOAJ sont des API publiques. L'adresse polite pool compte comme un identifiant : Crossref, DataCite et Unpaywall l'exigent, OpenAlex l'accepte à défaut de clé d'API.
+    `access_source` appelle cette fonction avant tout appel à une API tierce. Un accès avec motif est sauté, avec un avertissement. HAL, theses.fr, INSPIRE-HEP, doi.org et DOAJ sont des API publiques. L'adresse polite pool compte comme un identifiant : Crossref, DataCite et Unpaywall l'exigent, OpenAlex l'accepte à défaut de clé d'API.
     """
-    if source in ("hal", "theses"):
+    if source in ("hal", "theses", "inspire"):
         return None
     if source == "openalex":
         if get_openalex_api_key() or get_polite_pool_email_optional():

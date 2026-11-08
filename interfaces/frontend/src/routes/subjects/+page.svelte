@@ -1,15 +1,20 @@
 <script lang="ts">
   import PageHeader from "#lib/components/PageHeader.svelte";
   import ListToolbar from "#lib/components/ListToolbar.svelte";
-  import FacetDropdown from "#lib/components/FacetDropdown.svelte";
   import SortChevron from "#lib/components/SortChevron.svelte";
+  import ActiveFilterBar from "#lib/components/ActiveFilterBar.svelte";
+  import FilterLayout from "#lib/components/filters/FilterLayout.svelte";
+  import FilterPanel from "#lib/components/filters/FilterPanel.svelte";
+  import FilterPanelToggle from "#lib/components/filters/FilterPanelToggle.svelte";
   import { onMount } from "svelte";
   import { resolve } from "$app/paths";
   import { useFacets } from "#lib/composables/useFacets.svelte.js";
-  import { usePaginatedFetch } from "#lib/composables/usePaginatedFetch.svelte.js";
+  import { useFilteredList } from "#lib/composables/useFilteredList.svelte.js";
+  import { facetDefs } from "#lib/filterRegistry.js";
   import { subjectVocabularyLabels } from "#lib/labels.js";
   import { withBase } from "#lib/paths.js";
   import { nextSort, sortDirection } from "#lib/sort.js";
+  import { SUBJECT_FILTER_GROUPS, SUBJECT_FILTERS } from "#lib/subjectFilters.js";
   import { paramsToQuery } from "#lib/utils.js";
   import ListStatus from "#lib/components/ListStatus.svelte";
   import Pagination from "#lib/components/Pagination.svelte";
@@ -17,100 +22,76 @@
 
   type SubjectListItem = components["schemas"]["SubjectListItem"];
 
-  let search = $state("");
-  let selectedVocabularies: string[] = $state([]);
-  let currentSort = $state("publications_desc");
-  let searchTimer: ReturnType<typeof setTimeout> | undefined;
-
-  // Paramètres partagés par la liste, son export et ses facettes : les décomptes suivent la recherche.
-  function buildFilterParams(): URLSearchParams {
-    const params = new URLSearchParams();
-    const q = search.trim();
-    if (q) params.set("search", q);
-    if (selectedVocabularies.length) params.set("vocabulary", selectedVocabularies.join(","));
-    return params;
-  }
-
-  function buildParams(): URLSearchParams {
-    const params = buildFilterParams();
-    params.set("sort", currentSort);
-    return params;
-  }
-
-  const list = usePaginatedFetch<SubjectListItem>({
+  const list = useFilteredList<SubjectListItem, ReturnType<typeof useFacets>>({
+    filters: SUBJECT_FILTERS,
     endpoint: "/api/subjects",
     itemsKey: "items",
-    apiKey: "subjects",
-    pageParam: null,
-    buildParams,
+    perPage: 50,
+    apiKey: () => "subjects",
+    defaultSort: "publications_desc",
+    urlSync: () => true,
+    basePath: () => "/subjects",
+    debounceMs: 300,
+    facets: (buildParams) =>
+      useFacets({
+        endpoint: "/api/subjects/facets",
+        apiKey: "subjects-facets",
+        buildParams,
+        facets: facetDefs(SUBJECT_FILTERS),
+      }),
   });
 
-  const facets = useFacets({
-    endpoint: "/api/subjects/facets",
-    apiKey: "subjects-facets",
-    buildParams: buildFilterParams,
-    facets: {
-      vocabularies: { type: "label_map", apiKey: "vocabularies", labels: subjectVocabularyLabels },
-    },
-  });
-
-  const exportUrl = $derived(withBase(`/api/subjects/export.csv?${paramsToQuery(buildParams())}`));
-
-  function onFilterChange() {
-    list.page = 1;
-    list.load();
-    facets.load();
-  }
-
-  function onSearchInput() {
-    if (searchTimer) clearTimeout(searchTimer);
-    searchTimer = setTimeout(onFilterChange, 300);
+  function exportCsvUrl(): string {
+    const params = list.filterParams();
+    params.set("sort", list.sort);
+    return withBase(`/api/subjects/export.csv?${paramsToQuery(params)}`);
   }
 
   function setSort(column: "label" | "publications") {
-    currentSort = nextSort(currentSort, column, column === "label" ? "asc" : "desc");
-    list.page = 1;
-    list.load();
+    list.setSort(nextSort(list.sort, column, column === "label" ? "asc" : "desc"));
   }
 
-  onMount(() => {
-    list.load();
-    facets.load();
-  });
+  onMount(list.restore);
 </script>
 
 <PageHeader title="Sujets" hidden />
 
-<ListToolbar bind:search placeholder="Rechercher dans les libellés" onsearch={onSearchInput} {list} one="sujet" many="sujets" {exportUrl}>
-  {#snippet filters()}
-    <FacetDropdown label="Vocabulaires" options={facets.options.vocabularies} bind:selected={selectedVocabularies} onchange={onFilterChange} />
+<ListToolbar bind:search={list.search} placeholder="Rechercher dans les libellés" onsearch={list.onSearchInput} list={list.listing} one="sujet" many="sujets" exportUrl={exportCsvUrl()} countBelow>
+  {#snippet leading()}
+    <FilterPanelToggle bind:open={list.panel.open} active={list.activeCount} />
+  {/snippet}
+  {#snippet activeFilters()}
+    <ActiveFilterBar filters={SUBJECT_FILTERS} bind:values={list.values} options={list.facets.options} onchange={list.onFilterChange} />
   {/snippet}
 </ListToolbar>
 
-<ListStatus {list} emptyText="Aucun sujet ne correspond à ces critères.">
-  <table class="data-table">
-    <thead>
-      <tr>
-        <th class="sortable" onclick={() => setSort("label")}>Libellé <SortChevron direction={sortDirection(currentSort, "label")} /></th>
-        <th>Vocabulaires</th>
-        <th class="num sortable" onclick={() => setSort("publications")}>Occurrences <SortChevron direction={sortDirection(currentSort, "publications")} /></th>
-      </tr>
-    </thead>
-    <tbody>
-      {#each list.items as s (s.label_normalized)}
+<FilterLayout bind:open={list.panel.open}>
+  {#snippet panel()}
+    <FilterPanel filters={SUBJECT_FILTERS} groups={SUBJECT_FILTER_GROUPS} bind:values={list.values} options={list.facets.options} presenceCounts={{}} loaded={list.facets.loaded} entityEndpoint="/api/subjects/facets" buildParams={list.filterParams} panel={list.panel} onchange={list.onFilterChange} />
+  {/snippet}
+
+  <ListStatus list={list.listing} emptyText="Aucun sujet ne correspond à ces critères.">
+    <table class="data-table">
+      <thead>
         <tr>
-          <td>
-            <a href={resolve(`subjects/${s.label_normalized}`)}>{s.label}</a>
-          </td>
-          <td class="muted">{s.vocabularies.map((v) => subjectVocabularyLabels[v]).join(", ")}</td>
-          <td class="num">{s.usage_count.toLocaleString("fr-FR")}</td>
+          <th class="sortable" onclick={() => setSort("label")}>Libellé <SortChevron direction={sortDirection(list.sort, "label")} /></th>
+          <th>Vocabulaires</th>
+          <th class="num sortable" onclick={() => setSort("publications")}>Occurrences <SortChevron direction={sortDirection(list.sort, "publications")} /></th>
         </tr>
-      {/each}
-    </tbody>
-  </table>
+      </thead>
+      <tbody>
+        {#each list.listing.items as s (s.label_normalized)}
+          <tr>
+            <td>
+              <a href={resolve(`subjects/${s.label_normalized}`)}>{s.label}</a>
+            </td>
+            <td class="muted">{s.vocabularies.map((v) => subjectVocabularyLabels[v]).join(", ")}</td>
+            <td class="num">{s.usage_count.toLocaleString("fr-FR")}</td>
+          </tr>
+        {/each}
+      </tbody>
+    </table>
 
-  <Pagination page={list.page} pages={list.pages} onchange={list.goToPage} />
-</ListStatus>
-
-<style>
-</style>
+    <Pagination page={list.listing.page} pages={list.listing.pages} onchange={list.goToPage} />
+  </ListStatus>
+</FilterLayout>

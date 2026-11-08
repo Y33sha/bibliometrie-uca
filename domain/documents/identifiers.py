@@ -260,6 +260,27 @@ class PMCID(NormalizedIdentifier):
     normalize = staticmethod(_normalize_pmcid)
 
 
+_CDS_URL_RE = re.compile(r"cds\.cern\.ch/record/(\d+)", re.IGNORECASE)
+
+
+def _normalize_cds_id(raw: str | None) -> str | None:
+    """Extrait le numéro de fiche du CERN Document Server d'une URL `cds.cern.ch/record/<n>` ou d'un identifiant brut (suite de chiffres)."""
+    if not raw:
+        return None
+    s = raw.strip()
+    m = _CDS_URL_RE.search(s)
+    if m:
+        return m.group(1)
+    return s if s.isdigit() else None
+
+
+class CdsId(NormalizedIdentifier):
+    """Numéro de fiche du CERN Document Server (CDS). Accepte une URL de fiche CDS."""
+
+    label = "identifiant CDS"
+    normalize = staticmethod(_normalize_cds_id)
+
+
 _ARXIV_URL_RE = re.compile(
     r"arxiv\.org/(?:abs|pdf)/(\d{4}\.\d{4,5}|[a-z.\-]+/\d{7})",
     re.IGNORECASE,

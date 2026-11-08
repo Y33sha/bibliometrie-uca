@@ -132,6 +132,11 @@
 	--citation-top_10_percent: oklch(0.76 0.065 var(--brand-hue));
 	--citation-below: var(--border);
 
+	/* Collaborations : une teinte, de la plus foncée (internationale) à la plus claire (sans collaboration), à pas de clarté égaux. */
+	--collaboration-international: var(--accent);
+	--collaboration-national: oklch(0.645 0.075 var(--brand-hue));
+	--collaboration-none: oklch(0.845 0.04 var(--brand-hue));
+
 	/* Licences : domaine public (bleu), puis du plus ouvert (vert) au moins ouvert (jaune, orange), puis les autorisations sans licence ouverte et l'absence de licence (gris sombre). */
 	--license-public-domain: #2e669e;
 	--license-cc-by: #2e9e4a;
@@ -157,6 +162,7 @@
 
 	/* Gabarit */
 	--header-height: 46px; /* hauteur du menu supérieur fixe */
+	--list-toolbar-slide: 0.2s; /* durée du glissement de la barre d'outils d'une liste */
 	--page-gutter: 24px; /* marge latérale du contenu de la page */
 	--radius: 8px;
 	--radius-pill: 999px;
@@ -489,7 +495,7 @@ input[type='search']::-webkit-search-cancel-button {
 /* Barre d'outils détachée (`ListToolbar`) : la barre d'actions et l'en-tête glissent au même rythme qu'elle. */
 :root[data-list-toolbar='detached'] .batch-bar,
 :root[data-list-toolbar='detached'] .table-scroll thead th {
-	transition: top 0.2s ease;
+	transition: top var(--list-toolbar-slide) ease;
 }
 
 /* Tableau plus large que son conteneur (classe posée par l'action `horizontalOverflow`) : il défile horizontalement dans le conteneur, et son en-tête défile avec la page. */
@@ -795,6 +801,17 @@ input[type='search']::-webkit-search-cancel-button {
 	letter-spacing: 0;
 	color: var(--muted);
 }
+/* Identifiants en texte (ISSN, ISBN) à la suite du titre d'une fiche, chacun précédé de son support en retrait. */
+.title-identifier-text {
+	display: inline-flex;
+	flex-wrap: wrap;
+	gap: 4px 14px;
+	font-size: var(--fs-sm);
+	color: var(--text-secondary);
+}
+.title-identifier-text .identifier-label {
+	color: var(--muted);
+}
 /* Ligne de métadonnées : suites de libellé + valeurs. */
 .entity-meta {
 	display: flex;
@@ -1080,6 +1097,31 @@ a:hover > .logo-datacite {
 /* Le logo de Zenodo est blanc : sa pastille prend le bleu de Zenodo. */
 .logo-zenodo {
 	background: #0047a8;
+}
+
+/* Le logo d'INSPIRE-HEP est un « i » blanc sur un carré bleu nuit : sa pastille prend ce bleu. */
+.logo-inspire {
+	background: #001529;
+}
+
+.logo-inspire:hover,
+a:hover > .logo-inspire {
+	background: #172a3c;
+}
+
+/* Le logo du ROR est plus large que haut. */
+.logo-ror {
+	background: #e3f4ef;
+}
+
+.logo-ror:hover,
+a:hover > .logo-ror {
+	background: #cdebe2;
+}
+
+.logo-ror img {
+	width: 17px;
+	height: auto;
 }
 
 .logo-orcid {

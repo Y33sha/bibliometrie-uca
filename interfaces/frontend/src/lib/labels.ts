@@ -106,15 +106,18 @@ export function oaStatusLabel(oaStatus: string): string {
 	return oaLabelsMap[oaStatus] ?? oaStatus;
 }
 
-/** Libellés des types d'identifiant d'une personne. */
+/** Libellés des types d'identifiant d'une personne ou d'une organisation. */
 export const identifierTypeLabels: Record<string, string> = {
 	orcid: 'ORCID',
 	idhal: 'idHAL',
 	idref: 'IdRef',
-	hal_person_id: 'Compte HAL'
+	hal_person_id: 'Compte HAL',
+	ror: 'ROR',
+	openalex: 'OpenAlex',
+	crossref_member: 'Membre Crossref'
 };
 
-/** Libellé d'un type d'identifiant d'une personne, sinon la valeur brute. */
+/** Libellé d'un type d'identifiant, sinon la valeur brute. */
 export function identifierTypeLabel(idType: string): string {
 	return identifierTypeLabels[idType] ?? idType;
 }

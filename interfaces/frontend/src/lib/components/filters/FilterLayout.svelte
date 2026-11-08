@@ -92,6 +92,10 @@
 		scrollbar-color: var(--scroll-thumb) transparent;
 		transition: --scroll-thumb 0.3s;
 	}
+	/* Barre d'outils détachée (`ListToolbar`) : le panneau glisse au même rythme qu'elle. */
+	:global(:root[data-list-toolbar='detached']) .filter-layout-panel {
+		transition: --scroll-thumb 0.3s, top var(--list-toolbar-slide) ease;
+	}
 	/* Au clavier, la barre apparaît tant que le focus est dans le panneau. Un clic laisse le focus sur le bouton cliqué : seul le focus clavier compte. */
 	.filter-layout-panel:hover,
 	.filter-layout-panel:has(:global(:focus-visible)) {

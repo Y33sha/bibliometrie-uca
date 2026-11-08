@@ -24,6 +24,7 @@ HOTES_DECLARES = frozenset(
         "api.unpaywall.org",
         "doaj.org",
         "doi.org",
+        "inspirehep.net",
         "theses.fr",
         "portal.issn.org",
         "cluster-production.elasticsearch.dataesr.ovh",

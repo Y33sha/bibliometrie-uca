@@ -13,7 +13,8 @@ const ICONS: Record<string, string> = {
 	wos: asset('icons/wos.ico'),
 	theses: asset('icons/theses.ico'),
 	crossref: asset('icons/crossref.ico'),
-	datacite: asset('icons/datacite.ico')
+	datacite: asset('icons/datacite.ico'),
+	inspire: asset('icons/inspire.ico')
 };
 
 const sources = $state({ order: [] as string[], labels: {} as Record<string, string> });

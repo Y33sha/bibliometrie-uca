@@ -11,7 +11,6 @@ from infrastructure.read_models.csv_export import csv_chunks, fetch_export_rows
 from infrastructure.read_models.filters import OWN_RORS_SQL
 from infrastructure.read_models.structures.models import (
     NameFormOut,
-    PartnerFacetOption,
     RelatedStructureOut,
     StructureAddressesResponse,
     StructureAddressOut,
@@ -22,6 +21,8 @@ from infrastructure.read_models.structures.models import (
     StructureListResponse,
     StructureOut,
     StructurePartner,
+    StructurePartnerFilters,
+    StructurePartnersFacetsResponse,
     StructurePartnersResponse,
     StructuresFacetsResponse,
     StructureSort,
@@ -55,6 +56,18 @@ _PARTNER_COUNTRY = "(CAST(:countries AS text[]) = '{}' OR ro.country_code = ANY(
 _PARTNER_TYPE = (
     "(CAST(:types AS text[]) = '{}' OR CAST(ro.types AS text[]) && CAST(:types AS text[]))"
 )
+
+
+def _partner_binds(structure_id: int, filters: StructurePartnerFilters) -> dict[str, object]:
+    """Renvoie les paramètres des liens publication–ROR de la structure (`_PARTNER_LINKS`) et des filtres des partenaires."""
+    return {
+        "structure_id": structure_id,
+        "own_structure_ids": [structure_id],
+        "years": filters.years,
+        "countries": filters.countries,
+        "types": filters.types,
+    }
+
 
 AUTHOR_SOURCE_CONTRIBUTION = f"""
     a.in_perimeter = TRUE
@@ -453,19 +466,13 @@ class StructuresQueries:
         self,
         structure_id: int,
         *,
-        years: list[int],
-        countries: list[str],
-        types: list[str],
+        filters: StructurePartnerFilters,
         page: int,
         per_page: int,
     ) -> StructurePartnersResponse:
-        """Renvoie les organisations partenaires de la structure, les plus fréquentes en tête. Le décompte des options de pays et de types suit les autres filtres."""
+        """Renvoie les organisations partenaires de la structure, les plus fréquentes en tête."""
         binds = {
-            "structure_id": structure_id,
-            "own_structure_ids": [structure_id],
-            "years": years,
-            "countries": countries,
-            "types": types,
+            **_partner_binds(structure_id, filters),
             "lim": per_page,
             "off": (page - 1) * per_page,
         }
@@ -484,6 +491,28 @@ class StructuresQueries:
             """),  # noqa: S608 — fragments du module, sans entrée externe
             binds,
         ).all()
+        return StructurePartnersResponse(
+            total=rows[0].total if rows else 0,
+            page=page,
+            per_page=per_page,
+            partners=[
+                StructurePartner(
+                    ror_id=r.ror_id,
+                    name=r.name,
+                    country_code=r.country_code,
+                    country_name=r.country_name,
+                    types=list(r.types),
+                    publications=r.n,
+                )
+                for r in rows
+            ],
+        )
+
+    def get_structure_partners_facets(
+        self, structure_id: int, *, filters: StructurePartnerFilters
+    ) -> StructurePartnersFacetsResponse:
+        """Renvoie les facettes des organisations partenaires de la structure. Chaque décompte écarte le filtre de sa propre facette."""
+        binds = _partner_binds(structure_id, filters)
         countries_rows = self._conn.execute(
             text(f"""{_PARTNER_LINKS}
                 SELECT ro.country_code AS value, COALESCE(c.name, ro.country_code) AS label,
@@ -521,27 +550,13 @@ class StructuresQueries:
             """),  # noqa: S608
             binds,
         ).all()
-        return StructurePartnersResponse(
-            total=rows[0].total if rows else 0,
-            page=page,
-            per_page=per_page,
-            partners=[
-                StructurePartner(
-                    ror_id=r.ror_id,
-                    name=r.name,
-                    country_code=r.country_code,
-                    country_name=r.country_name,
-                    types=list(r.types),
-                    publications=r.n,
-                )
-                for r in rows
-            ],
-            years=[PartnerFacetOption(value=r.value, label=r.value, count=r.n) for r in years_rows],
+        return StructurePartnersFacetsResponse(
+            years=[FacetOption(value=r.value, count=r.n) for r in years_rows],
             countries=[
-                PartnerFacetOption(value=r.value, label=r.label, count=r.n) for r in countries_rows
+                FacetOption(value=r.value, label=r.label, count=r.n) for r in countries_rows
             ],
             types=[
-                PartnerFacetOption(value=r.value, label=_ror_type_label(r.value), count=r.n)
+                FacetOption(value=r.value, label=_ror_type_label(r.value), count=r.n)
                 for r in types_rows
             ],
         )

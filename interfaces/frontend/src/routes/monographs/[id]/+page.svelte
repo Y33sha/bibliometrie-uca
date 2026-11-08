@@ -1,5 +1,4 @@
 <script lang="ts">
-	import EntityMetaItem from '#lib/components/EntityMetaItem.svelte';
 	import EntityBreadcrumb from '#lib/components/EntityBreadcrumb.svelte';
 	import EntityStatus from '#lib/components/EntityStatus.svelte';
 	import { page } from '$app/state';
@@ -8,6 +7,7 @@
 	import { apiDetail } from '#lib/api/index.js';
 	import PublicationsListView from '#lib/components/PublicationsListView.svelte';
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
+	import TitleRow from '#lib/components/TitleRow.svelte';
 	import { titleText } from '#lib/utils.js';
 	import type { components } from '#lib/api/schema.js';
 
@@ -32,29 +32,22 @@
 	<EntityStatus {error} notFound="Monographie introuvable" />
 {:else}
 	<div class="entity-header">
-		<h1 class="entity-title"><PublicationTitle titre={monograph.title} /></h1>
+		<TitleRow>
+			<h1 class="entity-title"><PublicationTitle titre={monograph.title} /></h1>
+			{#snippet identifierLinks()}
+				<span class="title-identifier-text">
+					{#if monograph!.isbn}<span><span class="identifier-label">ISBN</span> {monograph!.isbn}</span>{/if}
+					{#if monograph!.eisbn}<span><span class="identifier-label">eISBN</span> {monograph!.eisbn}</span>{/if}
+				</span>
+			{/snippet}
+		</TitleRow>
 		<div class="entity-meta">
-			<span class="tag">{monograph.proceedings ? "Volume d'actes" : 'Livre'}</span>
-			{#if monograph.year}
-				<EntityMetaItem label="Année"><span>{monograph.year}</span></EntityMetaItem>
-			{/if}
-			{#if monograph.isbn}
-				<EntityMetaItem label="ISBN"><span class="tag id-badge">{monograph.isbn}</span></EntityMetaItem>
-			{/if}
-			{#if monograph.eisbn}
-				<EntityMetaItem label="ISBN électronique"><span class="tag id-badge">{monograph.eisbn}</span></EntityMetaItem>
-			{/if}
-		</div>
-		<div class="entity-meta">
+			{#if monograph.year}<span>{monograph.year}</span>{/if}
 			{#if monograph.publisher_id}
-				<EntityMetaItem label="Éditeur">
-					<a href={resolve(`publishers/${monograph.publisher_id}`)}>{monograph.publisher_name}</a>
-				</EntityMetaItem>
+				<a href={resolve(`publishers/${monograph.publisher_id}`)}>{monograph.publisher_name}</a>
 			{/if}
 			{#if monograph.serial_id}
-				<EntityMetaItem label="Collection">
-					<a href={resolve(`journals/${monograph.serial_id}`)}>{monograph.journal_title}</a>
-				</EntityMetaItem>
+				<a href={resolve(`journals/${monograph.serial_id}`)}>{monograph.journal_title}</a>
 			{/if}
 		</div>
 	</div>

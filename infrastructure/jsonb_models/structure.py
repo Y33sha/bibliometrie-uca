@@ -24,9 +24,11 @@ class StructureApiIds(JsonbModel):
     """PPN IdRef des établissements."""
     datacite: list[str] | None = None
     """Mots-clés cherchés dans les affiliations des créateurs."""
+    inspire: list[str] | None = None
+    """Numéros d'institution INSPIRE-HEP, à défaut noms d'affiliation cherchés en texte."""
 
     @field_validator(
-        "openalex", "wos", "scanr", "scanr_patents", "theses", "datacite", mode="before"
+        "openalex", "wos", "scanr", "scanr_patents", "theses", "datacite", "inspire", mode="before"
     )
     @classmethod
     def _ensure_list(cls, v: str | list[str] | None) -> list[str] | None:

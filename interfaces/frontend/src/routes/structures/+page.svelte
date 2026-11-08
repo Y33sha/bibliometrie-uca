@@ -5,23 +5,25 @@
 	import SortChevron from '#lib/components/SortChevron.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import TableStatusRow from '#lib/components/TableStatusRow.svelte';
-	import { columnLabels, filterLabels } from '#lib/labels.js';
+	import ActiveFilterBar from '#lib/components/ActiveFilterBar.svelte';
+	import FilterLayout from '#lib/components/filters/FilterLayout.svelte';
+	import FilterPanel from '#lib/components/filters/FilterPanel.svelte';
+	import FilterPanelToggle from '#lib/components/filters/FilterPanelToggle.svelte';
+	import { columnLabels } from '#lib/labels.js';
 	import { onMount } from 'svelte';
-	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import { structures as structuresApi, errorMessage } from '#lib/api/index.js';
-	import { labListDefaults } from '#lib/labListDefaults.js';
-	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
 	import { useFacets } from '#lib/composables/useFacets.svelte.js';
-	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
+	import { useFilteredList } from '#lib/composables/useFilteredList.svelte.js';
+	import { facetDefs } from '#lib/filterRegistry.js';
+	import { STRUCTURE_FILTER_GROUPS, structureFilters } from '#lib/structureFilters.js';
 	import { toast } from '#lib/dialogs.svelte.js';
 	import { withBase } from '#lib/paths.js';
 	import { isAdmin } from '#lib/session.svelte.js';
 	import { nextSort, sortDirection } from '#lib/sort.js';
-	import { paramsToQuery, rorShortId, rorFullUrl } from '#lib/utils.js';
+	import { halCollectionUrl, paramsToQuery } from '#lib/utils.js';
+	import IdentifierLink from '#lib/components/IdentifierLink.svelte';
 	import { structureLabel } from '#lib/structureLabels.js';
-	import { STRUCTURE_TYPES } from '#lib/structureTypes.js';
-	import FacetDropdown from '#lib/components/FacetDropdown.svelte';
 	import IconButton from '#lib/components/IconButton.svelte';
 	import { useDrawerParam } from '#lib/composables/useDrawerParam.svelte.js';
 	import StructureDrawer from '#lib/components/structures/StructureDrawer.svelte';
@@ -30,93 +32,35 @@
 	import { ROR_FORMAT_ERROR, buildApiIds, normalizeRorId } from '#lib/components/structures/types.js';
 
 	import type { components } from '#lib/api/schema.js';
+	import type { PageData } from './$types';
 	type Structure = components['schemas']['StructureListItem'];
 
-	const TYPE_LABELS = Object.fromEntries(STRUCTURE_TYPES.map((t) => [t.value, t.label]));
+	let { data }: { data: PageData } = $props();
 
-	let search = $state('');
-	let currentSort = $state('acronym_asc');
-	let selectedTypes = $state<string[]>([]);
-	let selectedTutelles = $state<string[]>([]);
-	// Identifiants de périmètre en chaîne, ou `none` pour les structures hors de tout périmètre. Seule la session admin change ce réglage.
-	let selectedPerimeters = $state<string[]>([]);
-	// Réglages par défaut : les types de la configuration, le périmètre des personnes. L'URL écrit seulement un écart à ces réglages ; `all` y désigne une sélection vide.
-	let defaultTypes: string[] = [];
-	let defaultPerimeters: string[] = [];
+	// svelte-ignore state_referenced_locally
+	const FILTERS = structureFilters(data.labDefaults);
 
-	const sameSelection = (a: string[], b: string[]) => a.length === b.length && a.every((v) => b.includes(v));
-	const selectionToken = (selected: string[], defaults: string[]) =>
-		sameSelection(selected, defaults) ? '' : selected.join(',') || 'all';
-	const selectionFromToken = (token: string) => (token === 'all' ? [] : token.split(','));
-
-	function buildFilterParams(): URLSearchParams {
-		const params = new URLSearchParams();
-		const q = search.trim();
-		if (q) params.set('search', q);
-		if (selectedTypes.length) params.set('structure_type', selectedTypes.join(','));
-		if (selectedTutelles.length) params.set('tutelle_id', selectedTutelles.join(','));
-		if (selectedPerimeters.length) params.set('perimeter_id', selectedPerimeters.join(','));
-		return params;
-	}
-
-	const list = usePaginatedFetch<Structure>({
+	const list = useFilteredList<Structure, ReturnType<typeof useFacets>>({
+		filters: FILTERS,
 		endpoint: '/api/structures',
 		itemsKey: 'structures',
 		perPage: 100,
-		apiKey: 'structures-list',
-		buildParams() {
-			const params = buildFilterParams();
-			params.set('sort', currentSort);
-			return params;
-		},
-	});
-
-	const facets = useFacets({
-		endpoint: '/api/structures/facets',
-		apiKey: 'structures-facets',
-		buildParams: buildFilterParams,
-		facets: {
-			types: { type: 'label_map', apiKey: 'types', labels: TYPE_LABELS },
-			tutelles: { type: 'labeled', apiKey: 'tutelles' },
-			perimeters: { type: 'labeled', apiKey: 'perimeters' },
-		},
-	});
-
-	const url = useUrlFilters({
+		apiKey: () => 'structures-list',
+		defaultSort: 'acronym_asc',
+		urlSync: () => true,
 		basePath: () => '/structures',
-		filters: {
-			types: { type: 'single', urlKey: 'structure_type' },
-			selectedTutelles: { type: 'string_array', urlKey: 'tutelle_id' },
-			perimeters: { type: 'single', urlKey: 'perimeter_id' },
-			search: { type: 'single', urlKey: 'search' },
-			currentSort: { type: 'single', urlKey: 'sort', defaultValue: 'acronym_asc' },
-			currentPage: { type: 'page', urlKey: 'page' },
-		},
+		facets: (buildParams) =>
+			useFacets({
+				endpoint: '/api/structures/facets',
+				apiKey: 'structures-facets',
+				buildParams,
+				facets: facetDefs(FILTERS),
+			}),
 	});
-
-	function syncUrl() {
-		url.syncUrl(() => ({
-			types: selectionToken(selectedTypes, defaultTypes),
-			selectedTutelles,
-			perimeters: selectionToken(selectedPerimeters, defaultPerimeters),
-			search,
-			currentSort,
-			currentPage: list.page,
-		}));
-	}
-
-	function onFilterChange() {
-		list.page = 1;
-		syncUrl();
-		list.load();
-		facets.load();
-	}
-
-	const onSearchInput = url.debouncedSearch(onFilterChange);
 
 	function exportCsvUrl(): string {
-		const params = buildFilterParams();
-		params.set('sort', currentSort);
+		const params = list.filterParams();
+		params.set('sort', list.sort);
 		return withBase(`/api/structures/export.csv?${paramsToQuery(params)}`);
 	}
 
@@ -124,13 +68,10 @@
 	const drawer = useDrawerParam('structure', isAdmin);
 
 	// Le type s'affiche dès que la liste mêle plusieurs types.
-	const showTypeColumn = $derived(selectedTypes.length !== 1);
+	const showTypeColumn = $derived(list.values.checkbox.types.length !== 1);
 
 	function toggleSort(column: 'acronym' | 'name' | 'tutelles') {
-		currentSort = nextSort(currentSort, column, 'asc');
-		list.page = 1;
-		syncUrl();
-		list.load();
+		list.setSort(nextSort(list.sort, column, 'asc'));
 	}
 
 	// Création d'une structure (session admin)
@@ -177,46 +118,36 @@
 		try {
 			const created = (await structuresApi.create(data)) as { id: number };
 			createModalOpen = false;
-			list.load();
+			list.listing.load();
 			drawer.open(created.id);
 		} catch (e) {
 			toast('Erreur: ' + errorMessage(e), 'error');
 		}
 	}
 
-	onMount(async () => {
-		({ types: defaultTypes, perimeters: defaultPerimeters } = await labListDefaults());
-
-		const restored = url.restoreFromUrl(page.url.searchParams);
-		selectedTypes = restored.types ? selectionFromToken(restored.types as string) : defaultTypes;
-		selectedPerimeters =
-			restored.perimeters && isAdmin() ? selectionFromToken(restored.perimeters as string) : defaultPerimeters;
-		if (restored.selectedTutelles) selectedTutelles = restored.selectedTutelles as string[];
-		if (restored.search) search = restored.search as string;
-		if (restored.currentSort) currentSort = restored.currentSort as string;
-		if (restored.currentPage) list.page = restored.currentPage as number;
-
-		await facets.load();
-		list.load();
-	});
+	onMount(list.restore);
 </script>
 
 <PageHeader title="Labos" hidden />
 
-<ListToolbar bind:search placeholder="Rechercher par nom ou acronyme" onsearch={onSearchInput} {list} one="structure" many="structures" exportUrl={exportCsvUrl()}>
+<ListToolbar bind:search={list.search} placeholder="Rechercher par nom ou acronyme" onsearch={list.onSearchInput} list={list.listing} one="structure" many="structures" exportUrl={exportCsvUrl()} countBelow>
+	{#snippet leading()}
+		<FilterPanelToggle bind:open={list.panel.open} active={list.activeCount} />
+	{/snippet}
 	{#snippet actions()}
 		{#if isAdmin()}
 			<button class="btn btn-primary btn-sm" onclick={openCreateModal}>+ Nouvelle</button>
 		{/if}
 	{/snippet}
-	{#snippet filters()}
-		<FacetDropdown label={filterLabels.types} options={facets.options.types} bind:selected={selectedTypes} onchange={onFilterChange} />
-		<FacetDropdown label="Tutelles" options={facets.options.tutelles} searchable bind:selected={selectedTutelles} onchange={onFilterChange} />
-		{#if isAdmin()}
-			<FacetDropdown label="Périmètres"options={facets.options.perimeters} bind:selected={selectedPerimeters} onchange={onFilterChange} />
-		{/if}
+	{#snippet activeFilters()}
+		<ActiveFilterBar filters={FILTERS} bind:values={list.values} options={list.facets.options} onchange={list.onFilterChange} />
 	{/snippet}
 </ListToolbar>
+
+<FilterLayout bind:open={list.panel.open}>
+	{#snippet panel()}
+		<FilterPanel filters={FILTERS} groups={STRUCTURE_FILTER_GROUPS} bind:values={list.values} options={list.facets.options} presenceCounts={{}} loaded={list.facets.loaded} entityEndpoint="/api/structures/facets" buildParams={list.filterParams} panel={list.panel} onchange={list.onFilterChange} />
+	{/snippet}
 
 <TableScroll>
 <table class="data-table">
@@ -224,27 +155,27 @@
 		<tr>
 			{#if isAdmin()}<th class="row-actions"></th>{/if}
 			{#if showTypeColumn}<th>{columnLabels.type}</th>{/if}
-			<th class="sortable" class:active={sortDirection(currentSort, 'acronym') !== null} onclick={() => toggleSort('acronym')}>
+			<th class="sortable" class:active={sortDirection(list.sort,'acronym') !== null} onclick={() => toggleSort('acronym')}>
 				Acronyme
-				<SortChevron direction={sortDirection(currentSort, 'acronym')} />
+				<SortChevron direction={sortDirection(list.sort,'acronym')} />
 			</th>
-			<th class="sortable" class:active={sortDirection(currentSort, 'name') !== null} onclick={() => toggleSort('name')}>
+			<th class="sortable" class:active={sortDirection(list.sort,'name') !== null} onclick={() => toggleSort('name')}>
 				Nom
-				<SortChevron direction={sortDirection(currentSort, 'name')} />
+				<SortChevron direction={sortDirection(list.sort,'name')} />
 			</th>
-			<th class="sortable tutelles-col" class:active={sortDirection(currentSort, 'tutelles') !== null} onclick={() => toggleSort('tutelles')}>
+			<th class="sortable tutelles-col" class:active={sortDirection(list.sort,'tutelles') !== null} onclick={() => toggleSort('tutelles')}>
 				Tutelles
-				<SortChevron direction={sortDirection(currentSort, 'tutelles')} />
+				<SortChevron direction={sortDirection(list.sort,'tutelles')} />
 			</th>
 			<th>ROR</th>
 			<th>Collection HAL</th>
 		</tr>
 	</thead>
 	<tbody>
-		{#if list.items.length === 0}
-			<TableStatusRow loading={list.loading} error={list.error} colspan={5 + (showTypeColumn ? 1 : 0) + (isAdmin() ? 1 : 0)} emptyText="Aucune structure ne correspond aux filtres." />
+		{#if list.listing.items.length === 0}
+			<TableStatusRow loading={list.listing.loading} error={list.listing.error} colspan={5 + (showTypeColumn ? 1 : 0) + (isAdmin() ? 1 : 0)} emptyText="Aucune structure ne correspond aux filtres." />
 		{/if}
-		{#each list.items as s (s.id)}
+		{#each list.listing.items as s (s.id)}
 			<tr class:active-row={s.id === drawer.id}>
 				{#if isAdmin()}
 					<td class="row-actions">
@@ -268,15 +199,11 @@
 					</div>
 				</td>
 				<td>
-					{#if s.ror_id}
-						<a href={rorFullUrl(s.ror_id)} target="_blank" rel="noopener" class="tag id-badge">
-							{rorShortId(s.ror_id)}
-						</a>
-					{/if}
+					{#if s.ror_id}<IdentifierLink id_type="ror" id_value={s.ror_id} />{/if}
 				</td>
 				<td>
 					{#if s.hal_collection}
-						<a href="https://hal.science/{s.hal_collection}" target="_blank" rel="noopener" class="tag id-badge">
+						<a href={halCollectionUrl(s.hal_collection)} target="_blank" rel="noopener" class="tag id-badge">
 							{s.hal_collection}
 						</a>
 					{/if}
@@ -287,10 +214,11 @@
 </table>
 </TableScroll>
 
-<Pagination page={list.page} pages={list.pages} onchange={(p) => { list.goToPage(p); syncUrl(); }} />
+<Pagination page={list.listing.page} pages={list.listing.pages} onchange={list.goToPage} />
+</FilterLayout>
 
 {#if drawer.id !== null}
-	<StructureDrawer id={drawer.id} onclose={() => drawer.open(null)} onchange={() => list.load()} onopenStructure={drawer.open} />
+	<StructureDrawer id={drawer.id} onclose={() => drawer.open(null)} onchange={() => list.listing.load()} onopenStructure={drawer.open} />
 {/if}
 
 {#if createModalOpen}

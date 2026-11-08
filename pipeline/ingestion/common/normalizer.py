@@ -75,7 +75,7 @@ class NormalizeStats(NamedTuple):
 class SourceNormalizer(ABC):
     """Normalisation d'une source : la sous-classe analyse une ligne de `staging`, le patron écrit.
 
-    Une sous-classe définit `SOURCE`, `minimal_metadata`, `source_record`, `author_block` et `author_records`. `parse`, `publisher`, `container_facts`, `locations`, `embargo`, `subjects`, `preload_caches` et `cleanup` ont un comportement par défaut.
+    Une sous-classe définit `SOURCE`, `minimal_metadata`, `source_record`, `author_block` et `author_records`. `parse`, `publisher`, `container_facts`, `locations`, `embargo`, `subjects`, `withholds_authors`, `preload_caches` et `cleanup` ont un comportement par défaut.
     """
 
     SOURCE: ClassVar[str] = ""
@@ -131,6 +131,10 @@ class SourceNormalizer(ABC):
         """Renvoie les sujets donnés par la source."""
         return []
 
+    def withholds_authors(self, record: SourceRecordUpsert) -> bool:  # noqa: ARG002
+        """Vrai si l'enregistrement source s'écrit sans contributions sources."""
+        return False
+
     @abstractmethod
     def publication_date(self, doc: Document) -> PublicationDate | None:
         """Renvoie la date de publication du document, avec sa précision, ou `None` sans année."""
@@ -171,7 +175,7 @@ class SourceNormalizer(ABC):
     def normalize_record(self, row: StagingRow, doc: Document) -> None:
         """Normalise le document `doc`, lu dans la ligne `row`, à métadonnées minimales, et marque sa ligne traitée.
 
-        Écrit dans l'ordre l'enregistrement source, ses localisations, son embargo, ses sujets et ses contributions sources. L'éditeur, la série et le volume décrits par la source s'écrivent dans `biblio` ; l'éditeur, la revue et la monographie se rattachent dans la phase `publishing`.
+        Écrit dans l'ordre l'enregistrement source, ses localisations, son embargo, ses sujets et ses contributions sources. L'éditeur, la série et le volume décrits par la source s'écrivent dans `biblio` ; l'éditeur, la revue et la monographie se rattachent dans la phase `publishing`. Un enregistrement source retenu par `withholds_authors` perd ses contributions sources.
         """
         publisher = self.publisher(doc)
         series, volume = self.series_and_volume(row, doc)
@@ -192,13 +196,16 @@ class SourceNormalizer(ABC):
         )
         self._embargo_store.replace_embargo(source_record_id, self.embargo(doc))
         self._subject_store.replace_subjects(source_record_id, self.subjects(doc))
-        sync_source_contributions(
-            self._contribution_store,
-            self.SOURCE,
-            source_record_id,
-            self.author_block(doc),
-            self.author_records,
-        )
+        if self.withholds_authors(record):
+            self._contribution_store.withhold_source_contributions([source_record_id])
+        else:
+            sync_source_contributions(
+                self._contribution_store,
+                self.SOURCE,
+                source_record_id,
+                self.author_block(doc),
+                self.author_records,
+            )
         self._staging.clear_payload(row)
 
     def process_work(self, row: StagingRow) -> bool | None:

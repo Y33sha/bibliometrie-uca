@@ -11,7 +11,7 @@ const faded = new WeakSet<Element>();
 const wrapped = new WeakSet<Element>();
 
 /**
- * Atténue les éléments (barres, points, secteurs) dont le libellé commence par l'année en cours : `data.labels[i]` désigne l'élément `i` de chaque jeu de données.
+ * Atténue les éléments (barres, points) dont le libellé commence par l'année en cours : `data.labels[i]` désigne l'élément `i` de chaque jeu de données.
  */
 const currentYearPlugin: Plugin = {
 	id: 'currentYear',
@@ -68,7 +68,7 @@ export function fitsInBar(ctx: DataLabelsContext, text: string, font: Partial<Fo
 	return length >= along + 2 * BAR_LABEL_PADDING && thickness >= across;
 }
 
-/** Espace entre deux segments voisins d'une barre empilée ou d'un secteur, en pixels. */
+/** Espace entre deux segments voisins d'une barre empilée, en pixels. */
 const SEGMENT_GAP = 2;
 
 /** Couleur du fond sur lequel `canvas` est posé : le premier fond non transparent de ses ancêtres, `--bg` à défaut. */
@@ -88,11 +88,6 @@ export function stackedSegmentOptions(canvas: HTMLCanvasElement, horizontal = fa
 		borderColor: backdropColor(canvas),
 		borderWidth: horizontal ? { right: SEGMENT_GAP } : { top: SEGMENT_GAP },
 	};
-}
-
-/** Options d'un jeu de données de secteurs dessinés dans `canvas` : un liseré de la couleur du fond sépare les secteurs. */
-export function pieSegmentOptions(canvas: HTMLCanvasElement) {
-	return { borderColor: backdropColor(canvas), borderWidth: SEGMENT_GAP };
 }
 
 /** `text` tronqué et terminé par une ellipse pour tenir en `maxWidth` pixels dans la police `font` ; `text` entier s'il tient. */

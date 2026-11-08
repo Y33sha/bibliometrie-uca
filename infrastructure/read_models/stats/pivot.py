@@ -20,6 +20,7 @@ from typing import Literal
 
 from sqlalchemy import Connection, text
 
+from domain.countries import non_international_country_codes
 from domain.documents.doc_types import DOC_TYPE_FAMILIES
 from domain.errors import ValidationError
 from domain.publications.oa_status import OaStatus
@@ -28,8 +29,10 @@ from infrastructure.read_models.filters import (
     HAS_CITATION_TOPS_SQL,
     OA_OPEN_SQL,
     OWN_RORS_SQL,
+    own_rors_sql,
     own_structure_ids,
 )
+from infrastructure.read_models.perimeters.queries import get_institution_country
 from infrastructure.read_models.publications.filtering import (
     filter_context,
     publication_filter_where,
@@ -55,13 +58,13 @@ class Dimension:
     cardinality: Cardinality
     ordinal: bool
     comparable: bool
-    """Vrai si la dimension sert aussi d'axe de comparaison (abscisse) : l'année, les laboratoires, les éditeurs, les revues."""
+    """Vrai si la dimension sert aussi d'axe de comparaison (abscisse)."""
     group_sql: str
     """Expression de groupement sur la publication `p` et la revue `j`."""
     join_sql: str = ""
     """Jointure demandée par `group_sql`."""
     where_sql: str = ""
-    """Condition sur la publication `p`, qui restreint le groupement aux publications pourvues d'une valeur."""
+    """Condition qui restreint le groupement aux publications pourvues d'une valeur."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,21 +80,40 @@ class Measure:
     """Unité affichée, vide pour un nombre de publications."""
 
 
+def _doc_type_in_family_sql(column: str, family: str) -> str:
+    """Renvoie la condition vraie quand la colonne `doc_type` relève de la famille de types `family`."""
+    types = ", ".join(f"{t.value!r}" for t in DOC_TYPE_FAMILIES[family].types)
+    return f"{column}::text IN ({types})"
+
+
 def doc_type_grouped_sql(column: str = "p.doc_type") -> str:
     """Renvoie l'expression `CASE` projetant une colonne `doc_type` sur la clé de groupement du pivot.
 
     Les types de la famille « publications » (article, communication, chapitre…) gardent leur grain fin. Les autres familles se regroupent sous leur clé de famille. Un type non listé tombe dans `misc`.
     """
-    expanded = DOC_TYPE_FAMILIES["publications"].types
-    whens = [
-        f"WHEN {column}::text IN ({', '.join(f'{t.value!r}' for t in expanded)}) THEN {column}::text"
-    ]
+    whens = [f"WHEN {_doc_type_in_family_sql(column, 'publications')} THEN {column}::text"]
     whens += [
-        f"WHEN {column}::text IN ({', '.join(f'{t.value!r}' for t in family.types)}) THEN {key!r}"
-        for key, family in DOC_TYPE_FAMILIES.items()
+        f"WHEN {_doc_type_in_family_sql(column, key)} THEN {key!r}"
+        for key in DOC_TYPE_FAMILIES
         if key != "publications"
     ]
     return f"CASE {' '.join(whens)} ELSE 'misc' END"
+
+
+COLLABORATION_SQL = f"""CASE
+    WHEN EXISTS (
+        SELECT 1 FROM unnest(p.countries) cc WHERE cc <> ALL(:non_international_countries)
+    ) THEN 'international'
+    WHEN EXISTS (
+        SELECT 1 FROM publication_rors cpr
+        JOIN ror_organizations cro ON cro.ror_id = cpr.ror_id
+        WHERE cpr.publication_id = p.id
+          AND cro.country_code = :institution_country
+          AND cpr.ror_id NOT IN ({own_rors_sql("collaboration_structure_ids", descendants=True)})
+    ) THEN 'national'
+    ELSE 'none'
+END"""
+"""Collaboration d'une publication. Internationale : un pays étranger dans les affiliations. Nationale : un ROR des auteurs, ancêtres compris, situé dans le pays de l'établissement et étranger au périmètre. Le périmètre couvre ses structures, leurs tutelles et leurs ancêtres ROR, et les descendants ROR de ses structures. Une copublication entre structures du périmètre est sans collaboration."""
 
 
 DIMENSIONS: dict[str, Dimension] = {
@@ -181,6 +203,20 @@ DIMENSIONS: dict[str, Dimension] = {
                 "JOIN ror_organizations pro ON pro.ror_id = ppr.ror_id"
             ),
         ),
+        # Forte cardinalité : comparaison paginée. Une publication compte dans chacun des pays de ses affiliations, hors le pays de l'établissement et l'absence de pays.
+        Dimension(
+            "country",
+            "Pays partenaire",
+            "high",
+            ordinal=False,
+            comparable=True,
+            group_sql="COALESCE(pcn.name, pcc.code)",
+            join_sql=(
+                "CROSS JOIN LATERAL unnest(p.countries) AS pcc(code) "
+                "LEFT JOIN countries pcn ON pcn.code = pcc.code"
+            ),
+            where_sql="pcc.code <> ALL(:non_international_countries)",
+        ),
         # Licence de la version éditeur.
         Dimension(
             "license",
@@ -198,6 +234,16 @@ DIMENSIONS: dict[str, Dimension] = {
             comparable=False,
             group_sql=CITATION_CLASS_SQL,
             where_sql=HAS_CITATION_TOPS_SQL,
+        ),
+        # Les seules publications au sens strict (articles, communications, livres, chapitres).
+        Dimension(
+            "collaboration",
+            "Collaboration",
+            "low",
+            ordinal=False,
+            comparable=False,
+            group_sql=COLLABORATION_SQL,
+            where_sql=_doc_type_in_family_sql("p.doc_type", "publications"),
         ),
     )
 }
@@ -243,6 +289,7 @@ INDICATORS: dict[str, Indicator] = {
         Indicator("license", "Licence", "publication_count", "license"),
         Indicator("citation_class", "Top citations", "publication_count", "citation_class"),
         Indicator("apc_amount", "Montant des APC", "apc_amount", "oa_voie"),
+        Indicator("collaboration", "Collaborations", "publication_count", "collaboration"),
     )
 }
 """L'ordre du registre est celui du sélecteur de l'interface."""
@@ -353,6 +400,7 @@ class StatsPivotQueries:
         if dims:
             sql += f" GROUP BY {', '.join(keys)} ORDER BY {_order_by(dims)}"
 
+        institution_country = get_institution_country(self._conn)
         self._conn.execute(text("SET LOCAL jit = off"))
         rows = self._conn.execute(
             text(sql),
@@ -360,6 +408,9 @@ class StatsPivotQueries:
                 **binds,
                 "measure_apc_root_ids": perimeter_structure_ids,
                 "own_structure_ids": own_structure_ids(filters.lab_ids, perimeter_structure_ids),
+                "collaboration_structure_ids": perimeter_structure_ids,
+                "institution_country": institution_country,
+                "non_international_countries": non_international_country_codes(institution_country),
             },
         ).all()
         return PivotResponse(

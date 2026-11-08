@@ -5,9 +5,10 @@ Les enregistrements sources sont écrits sans publication. La phase `publication
 Tâches de la phase, dans l'ordre (`pipeline.graph`) :
 
 1. la normalisation de chaque source retenue, dans l'ordre de `SOURCE_PRIORITY` ;
-2. la suppression des enregistrements sources des documents disparus de leur source ;
-3. la suppression des informations du contributeur sans contribution source : la normalisation réassigne des contributions sources, et l'étape précédente supprime des contributions sources ;
-4. la suppression des adresses orphelines, pour la même raison.
+2. la suppression des contributions sources des enregistrements sources OpenAlex du même document qu'un enregistrement source INSPIRE-HEP (`domain.source_records.inspire_author_lists`) ;
+3. la suppression des enregistrements sources des documents disparus de leur source ;
+4. la suppression des informations du contributeur sans contribution source : la normalisation réassigne des contributions sources, et les étapes précédentes suppriment des contributions sources ;
+5. la suppression des adresses orphelines, pour la même raison.
 
 L'exécuteur lance ensuite le `VACUUM` de `staging`, vidé de ses payloads : `VACUUM FULL` en mode full, simple dans les autres modes.
 """
@@ -20,11 +21,13 @@ from typing import cast
 
 from sqlalchemy import Connection
 
+from domain.source_records.inspire_author_lists import WITHHELD_AUTHORS_SOURCE
 from domain.sources.registry import SOURCE_PRIORITY, Source, source_label
 from infrastructure.raw_store import NullRawStore, get_raw_store
 from pipeline.graph import Task, TaskRun
 from pipeline.ingestion.adapters import adapter
 from pipeline.ingestion.common.embargoes import EmbargoStore
+from pipeline.ingestion.common.inspire_author_lists import withhold_covered_source_contributions
 from pipeline.ingestion.common.locations import LocationStore
 from pipeline.ingestion.common.normalizer import (
     NormalizeStats,
@@ -44,6 +47,7 @@ from pipeline.ingestion.common.staging import StagingStore
 from pipeline.ingestion.common.subjects import SourceRecordSubjectStore
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.log_format import (
+    BRANCH,
     LAST_BRANCH,
     quantity,
 )
@@ -100,6 +104,23 @@ def _report(stats: NormalizeStats) -> str | None:
     return ", ".join(parts) or None
 
 
+def _withhold_authors(ctx: PhaseContext) -> PhaseMetrics:
+    """Supprime les contributions sources des enregistrements sources OpenAlex du même document qu'un enregistrement source INSPIRE-HEP."""
+    with ctx.open_tx() as conn:
+        withheld = withhold_covered_source_contributions(conn, ctx.logger)
+    if withheld:
+        ctx.logger.info(
+            "%s%s (listes d'auteurs d'INSPIRE-HEP)",
+            BRANCH,
+            quantity(
+                withheld,
+                "contribution source OpenAlex supprimée",
+                "contributions sources OpenAlex supprimées",
+            ),
+        )
+    return PhaseMetrics(extras={"withheld": withheld})
+
+
 def _prune(ctx: PhaseContext) -> PhaseMetrics:
     """Supprime les enregistrements sources des documents disparus de leur source, et ferme la section de normalisation."""
     with ctx.open_tx() as conn:
@@ -150,6 +171,8 @@ TASKS = (
                 "subjects",
                 # Contributions des contributions sources à rôles ou statut de correspondant modifiés.
                 "aligned_source_contributions",
+                # Identifiants des enregistrements sources INSPIRE-HEP, pour la normalisation d'OpenAlex.
+                *(("source_record_identifiers",) if source == WITHHELD_AUTHORS_SOURCE else ()),
             ),
             writes=(
                 "staging_normalization_queue",
@@ -188,6 +211,7 @@ TASKS = (
                 "contributor_information",
                 "addresses",
                 "aligned_source_contributions",
+                *(("source_record_identifiers",) if source == WITHHELD_AUTHORS_SOURCE else ()),
             ),
             run=_normalize(source),
             label=source_label(source),
@@ -195,6 +219,32 @@ TASKS = (
             when=lambda ctx, source=source: source in ctx.options.sources,
         )
         for source in SOURCE_PRIORITY
+    ),
+    Task(
+        "withhold_openalex_authors",
+        reads=(
+            "source_records.id",
+            "source_records.source",
+            "source_records.authors_hash",
+            "source_records.publication_id",
+            "source_record_identifiers",
+            "source_contributions.source_record_id",
+        ),
+        # La suppression d'une contribution source emporte ses adresses, ROR et structures HAL, son alignement et son épinglage.
+        writes=(
+            "source_contributions.id",
+            "source_contribution_addresses",
+            "source_contribution_rors",
+            "source_contribution_hal_structures",
+            "aligned_source_contributions",
+            "confirmed_source_contributions",
+            "source_records.authors_hash",
+            "source_records.author_count",
+            "source_records.distinct_author_count",
+            "publication_contributions_queue",
+        ),
+        previous_run=("source_records", "source_record_identifiers", "source_contributions"),
+        run=_withhold_authors,
     ),
     Task(
         "prune_disappeared",

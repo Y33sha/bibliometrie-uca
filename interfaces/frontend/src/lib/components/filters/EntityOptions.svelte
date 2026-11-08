@@ -1,12 +1,9 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
-	import { api } from '#lib/api/index.js';
-	import type { components } from '#lib/api/schema.js';
 	import { displayEntityLabel, type EntityKind } from '#lib/entityLabels.js';
+	import { cachedEntityFacet, loadEntityFacet, type EntityFacetEntity } from '#lib/entityFacets.js';
 	import { useEntityLabels } from '#lib/composables/useEntityLabels.svelte.js';
 	import { revealTruncated } from '#lib/actions/revealTruncated.js';
-
-	type EntityFacetResponse = components['schemas']['EntityFacetResponse'];
 
 	/** Options d'un filtre d'entité à forte cardinalité (éditeur, revue, auteur, sujet) : recherche serveur contextuelle. `buildParams` fournit les filtres actifs ; le composant y ajoute le `kind` et le terme de recherche, et liste les premières entités sous ces filtres, avec leur décompte. La liste se recharge quand les filtres actifs changent. Partagé par la liste déroulante d'un filtre et le panneau des filtres. */
 	interface Props {
@@ -38,10 +35,18 @@
 		count: number;
 	}
 
+	const toResults = (entities: EntityFacetEntity[]): Result[] =>
+		entities.map((e) => ({ value: String(e.id), text: displayEntityLabel(kind, e.label), count: e.count }));
+
+	// Options chargées d'avance (panneau des filtres) : affichées dès la création du composant.
+	// svelte-ignore state_referenced_locally
+	const initial = cachedEntityFacet(endpoint, buildParams, kind);
 	let query = $state('');
-	let results = $state<Result[]>([]);
-	let loading = $state(false);
+	let results = $state<Result[]>(initial ? toResults(initial) : []);
+	let loading = $state(!initial);
 	let debounce: ReturnType<typeof setTimeout>;
+	// Rang de la dernière requête : une réponse arrivée après une requête plus récente est ignorée.
+	let searchSeq = 0;
 	const names = useEntityLabels(() => kind, () => selected);
 
 	// Sélection absente des résultats (hors des premières entités, ou écartée par la recherche) : affichée en tête, pour rester visible et décochable.
@@ -68,18 +73,28 @@
 	});
 
 	async function search() {
-		loading = true;
-		const p = buildParams();
-		p.set('kind', kind);
-		if (query.trim().length >= 2) p.set('entity_search', query.trim());
-		try {
-			const data = await api<EntityFacetResponse>(`${endpoint}/entities?` + p);
-			results = data.entities.map((e) => ({ value: String(e.id), text: displayEntityLabel(kind, e.label), count: e.count }));
-		} catch {
-			results = [];
+		const seq = ++searchSeq;
+		const cached = cachedEntityFacet(endpoint, buildParams, kind, query);
+		if (cached) {
+			results = toResults(cached);
+			loading = false;
+			return;
 		}
+		loading = true;
+		let next: Result[];
+		try {
+			next = toResults(await loadEntityFacet(endpoint, buildParams, kind, query));
+		} catch {
+			next = [];
+		}
+		if (seq !== searchSeq) return;
+		results = next;
 		loading = false;
 	}
+
+	/** Lignes réservées aux options pendant le premier chargement. */
+	const PLACEHOLDER_ROWS = 5;
+	const placeholders = $derived(loading && results.length === 0 ? Array.from({ length: limit ?? PLACEHOLDER_ROWS }, (_, i) => i) : []);
 
 	function onInput() {
 		clearTimeout(debounce);
@@ -107,7 +122,10 @@
 {#if clearable && selected.length}
 	<button type="button" class="option-row facet-clear" onclick={() => pick(null)}>Effacer</button>
 {/if}
-<div class="facet-options">
+<div class="facet-options" aria-busy={loading}>
+	{#each placeholders as i (i)}
+		<div class="option-row option-placeholder" aria-hidden="true"><span class="placeholder-bar" style:width="{55 + ((i * 17) % 35)}%"></span></div>
+	{/each}
 	{#each selectedOutside as id (id)}
 		<label class="option-row">
 			<input type={multiple ? 'checkbox' : 'radio'} checked onchange={() => pickOutside(id)} />
@@ -131,6 +149,28 @@
 {/if}
 
 <style>
+	/* Ligne réservée à une option en cours de chargement : une barre grise, de largeur variable d'une ligne à l'autre, qui pulse. */
+	.option-placeholder {
+		display: flex;
+		align-items: center;
+		min-height: 1.6em;
+	}
+	.placeholder-bar {
+		height: 0.7em;
+		border-radius: var(--radius);
+		background: var(--border-subtle);
+		animation: placeholder-pulse 1.2s ease-in-out infinite alternate;
+	}
+	@keyframes placeholder-pulse {
+		to {
+			opacity: 0.4;
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.placeholder-bar {
+			animation: none;
+		}
+	}
 	.facet-empty {
 		padding: 6px 12px;
 		font-size: var(--fs-sm);

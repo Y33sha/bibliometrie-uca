@@ -85,6 +85,7 @@ Mesures du 2026-11-03, base locale, publications du périmètre : 199 errata sur
 - [ ] Avis de rétractation rapprochés par le titre. Cas : avis 210139 et article 15199, avis sans payload Crossref.
 - [ ] « Rétracté » fondé sur les relations et sur OpenAlex, faux pour les avis eux-mêmes. Rétractation sur place par Elsevier : titre « RETRACTED: », `update-to` vers le DOI de l'article lui-même (10.1016/j.indmarman.2022.05.009).
 - [ ] Erratum et rétractation hors des listes de documents, affichés sur la publication concernée.
+- [ ] Erratum et rétractation sans contributions : `author_grouping` les saute, donc ni alignement ni personne. Leurs contributions sources restent en base, comme pour `OUT_OF_SCOPE_DOC_TYPES`. Mesure préalable : publications typées erratum ou rétractation sans titre de correction.
 - [ ] Facette « Rétracté ». Mise en forme de la page d'un article rétracté.
 
 ### Phase 3 — Arbitrage

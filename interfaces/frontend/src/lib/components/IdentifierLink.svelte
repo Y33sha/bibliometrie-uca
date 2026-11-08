@@ -2,7 +2,8 @@
   import { asset } from "$app/paths";
   import type { AssetPath } from "$app/types";
   import { identifierTypeLabel } from "#lib/labels.js";
-  import { halPersonUrl } from "#lib/utils.js";
+  import { halPersonUrl, rorFullUrl } from "#lib/utils.js";
+  import { crossrefMemberUrl } from "#lib/sources.svelte.js";
 
   let {
     id_type,
@@ -35,6 +36,21 @@
       url: halPersonUrl,
       icon: "icons/hal.ico",
       cls: "logo-hal",
+    },
+    ror: {
+      url: rorFullUrl,
+      icon: "icons/ror.svg",
+      cls: "logo-ror",
+    },
+    openalex: {
+      url: (v) => `https://openalex.org/${encodeURIComponent(v)}`,
+      icon: "icons/openalex.png",
+      cls: "logo-openalex",
+    },
+    crossref_member: {
+      url: (v) => crossrefMemberUrl(Number(v)),
+      icon: "icons/crossref.ico",
+      cls: "logo-crossref",
     },
   };
 
