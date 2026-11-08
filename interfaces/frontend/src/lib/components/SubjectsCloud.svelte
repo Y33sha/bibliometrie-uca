@@ -1,17 +1,25 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
-	import cloud from 'd3-cloud';
+	import CloudLayout from 'd3-cloud';
 	import { cssColor } from '#lib/components/charts/cssVar.js';
 	import { mixColors } from '#lib/components/charts/contrast.js';
 	import type { components } from '#lib/api/schema.js';
 
 	type SubjectFrequency = components['schemas']['SubjectFrequency'];
 
-	interface CloudWord extends cloud.Word {
+	interface CloudWord {
+		text: string;
+		size: number;
 		/** Libellé normalisé du sujet : identifiant de sa page. */
 		key: string;
 		color: string;
+	}
+
+	/** Mot placé, aux coordonnées centrées sur le milieu du nuage. */
+	interface PlacedWord extends CloudWord {
+		x: number;
+		y: number;
 	}
 
 	// Nuage des sujets les plus fréquents : la taille et la teinte d'un mot croissent avec le nombre de publications, sur une échelle logarithmique. Chaque mot mène à la fiche du sujet.
@@ -19,12 +27,12 @@
 
 	const MIN_SIZE = 11;
 	const MAX_SIZE = 32;
+	const FONT = 'system-ui, sans-serif';
 
 	let container: HTMLDivElement | undefined = $state();
 	let width = $state(0);
 	let height = $state(0);
-	let placedWords = $state<CloudWord[]>([]);
-	let layoutDone = $state(false);
+	let placedWords = $state<PlacedWord[]>([]);
 
 	// Rang d'un sujet entre le moins et le plus fréquent, de 0 à 1.
 	function weightFor(count: number, minCount: number, maxCount: number): number {
@@ -46,10 +54,10 @@
 		};
 	}
 
+	// Place les mots du plus grand au plus petit. Un mot sans place dans le cadre est omis.
 	function buildLayout(list: SubjectFrequency[], w: number, h: number) {
 		if (!list.length) {
 			placedWords = [];
-			layoutDone = true;
 			return;
 		}
 		const counts = list.map((s) => s.count);
@@ -58,32 +66,37 @@
 		// Teinte : de la plus claire (sujet le moins fréquent) au bleu-vert du site (le plus fréquent).
 		const light = cssColor('accent-soft');
 		const dark = cssColor('accent');
-		const words: CloudWord[] = list.map((s) => {
-			const weight = weightFor(s.count, minCount, maxCount);
-			return {
-				text: s.label,
-				size: MIN_SIZE + weight * (MAX_SIZE - MIN_SIZE),
-				key: s.label_normalized,
-				color: mixColors(light, dark, 0.45 + weight * 0.55),
-			};
-		});
-
-		layoutDone = false;
-		cloud<CloudWord>()
-			.size([w, h])
-			.words(words)
-			.padding(3)
-			// Texte horizontal uniquement, plus lisible.
-			.rotate(() => 0)
-			.font('system-ui, sans-serif')
-			.fontSize((d) => d.size!)
-			.spiral('archimedean')
-			.random(seededRandom(1))
-			.on('end', (placed: CloudWord[]) => {
-				placedWords = placed;
-				layoutDone = true;
+		const words: CloudWord[] = list
+			.map((s) => {
+				const weight = weightFor(s.count, minCount, maxCount);
+				return {
+					text: s.label,
+					size: MIN_SIZE + weight * (MAX_SIZE - MIN_SIZE),
+					key: s.label_normalized,
+					color: mixColors(light, dark, 0.45 + weight * 0.55),
+				};
 			})
-			.start();
+			.sort((a, b) => b.size - a.size);
+
+		const layout = new CloudLayout()
+			.size([w, h])
+			.overflow(false)
+			.strategy('archimedean')
+			.random(seededRandom(1));
+		const placed: PlacedWord[] = [];
+		for (const word of words) {
+			// Texte horizontal uniquement, plus lisible.
+			const sprite = layout.getSprite(word.text, {
+				font: FONT,
+				size: word.size,
+				rotate: 0,
+				padding: 3,
+			});
+			const result = sprite && layout.place(sprite);
+			// La taille du mot placé est entière : celle de son masque.
+			if (result) placed.push({ ...word, size: result.size, x: result.x, y: result.y });
+		}
+		placedWords = placed;
 	}
 
 	// Dimensions du nuage, suivies par le conteneur. Tous les mots sont horizontaux : une hauteur compacte suffit.
@@ -118,10 +131,10 @@
 					<a href={resolve(`subjects/${w.key}`)}>
 						<text
 							text-anchor="middle"
-							font-family="system-ui, sans-serif"
+							font-family={FONT}
 							font-size={w.size}
 							style:fill={w.color}
-							transform={`translate(${w.x ?? 0}, ${w.y ?? 0})`}
+							transform={`translate(${w.x}, ${w.y})`}
 						>
 							{w.text}
 						</text>
@@ -129,9 +142,6 @@
 				{/each}
 			</g>
 		</svg>
-		{#if !layoutDone}
-			<p class="layout-loading">Mise en page…</p>
-		{/if}
 	{/if}
 </div>
 
@@ -157,8 +167,7 @@
 	text:hover {
 		opacity: 0.7;
 	}
-	.empty,
-	.layout-loading {
+	.empty {
 		color: var(--muted);
 		font-style: italic;
 		font-size: var(--fs-md);
