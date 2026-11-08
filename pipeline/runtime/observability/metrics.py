@@ -67,6 +67,10 @@ EXTRA_LABELS: dict[str, str | tuple[str, str]] = {
     "unknown_to_doi_org": ("DOI inconnu de doi.org", "DOI inconnus de doi.org"),
     "unmatched": "non retrouvé",
     "unresolved": "non résolu",
+    "withheld": (
+        "contribution source OpenAlex supprimée",
+        "contributions sources OpenAlex supprimées",
+    ),
 }
 """Libellés des compteurs propres à une phase, au singulier. Un couple (singulier, pluriel) sert quand le pluriel ne se forme pas par un `s` final."""
 

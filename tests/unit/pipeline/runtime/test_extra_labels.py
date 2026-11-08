@@ -52,5 +52,5 @@ def test_chaque_compteur_sur_mesure_a_son_libelle() -> None:
     sans_libelle = {c: sorted(f) for c, f in cles.items() if c not in EXTRA_LABELS}
     assert not sans_libelle, (
         "compteurs affichés sous leur clé technique dans le bilan de phase — "
-        f"à ajouter à LIBELLES_EXTRAS : {sans_libelle}"
+        f"à ajouter à EXTRA_LABELS : {sans_libelle}"
     )
