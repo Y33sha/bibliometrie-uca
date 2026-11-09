@@ -29,7 +29,9 @@ Deux valeurs de la publication sont calculées à deux endroits. La consolidatio
 - [x] Prototype sur `publishing` : préfixes DOI, éditeurs, revues (ISSN, rattachement, qualification, espaces de noms DOI), monographies
 - [x] Arborescence affichée par `interfaces/cli/dev/pipeline_tree.py`, avec la phrase de chaque étape et, sur option, ses tables lues et écrites
 - [x] `affiliations` : structures (référentiels, adresses, partenaires de thèse), pays, périmètre
-- [ ] Autres phases
+- [x] `finalize` : purge, périmètre des publications, vues des structures, référentiels de l'édition, compteurs
+- [x] `fetch_missing` : recherche par hal-id, par NNT, par numéro de brevet, par DOI
+- [x] `normalize` : normalisation par source, retraits, nettoyage
 - [ ] `Task.section` retiré, une fois toutes les phases en étapes
 
 ### Phase 2 — Valeurs de la publication calculées par la seule consolidation
