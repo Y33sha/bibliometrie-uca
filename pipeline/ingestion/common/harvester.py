@@ -81,6 +81,22 @@ def stage_document(
     return True
 
 
+def stage_page(
+    conn: Connection,
+    metrics: PhaseMetrics,
+    source: str,
+    page: Page,
+    *,
+    keep: Callable[[Mapping[str, JsonValue]], bool] | None = None,
+    entry_mode: StagingEntryMode = StagingEntryMode.BULK,
+) -> None:
+    """Écrit dans `staging` les documents d'une page, puis commite. `keep` écarte des documents."""
+    for record in page.records:
+        if keep is None or keep(record):
+            stage_document(conn, metrics, source=source, record=record, entry_mode=entry_mode)
+    conn.commit()
+
+
 def stage_pages(
     conn: Connection,
     metrics: PhaseMetrics,
@@ -99,10 +115,7 @@ def stage_pages(
     token: str | None = None
     while True:
         page = fetch_page(token)
-        for record in page.records:
-            if keep is None or keep(record):
-                stage_document(conn, metrics, source=source, record=record, entry_mode=entry_mode)
-        conn.commit()
+        stage_page(conn, metrics, source, page, keep=keep, entry_mode=entry_mode)
         received += len(page.records)
         if progress is not None:
             progress.advance(len(page.records))

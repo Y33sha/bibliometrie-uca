@@ -36,18 +36,24 @@ def test_un_lot_par_tranche_d_orcid(identifiants_rh, ecritures):
 
 def test_document_ramene_par_deux_lots_ecrit_une_fois(identifiants_rh, ecritures):
     identifiants_rh([f"0000-0000-0000-{i:04d}" for i in range(_LOT + 1)])
+    dernier_orcid = f"0000-0000-0000-{_LOT:04d}"
+
+    def fetch_page(query: str, next_url: str | None, label: str, page_size: int) -> Page:
+        if dernier_orcid in query:
+            return Page(records=[{"id": "10.1/a"}, {"id": ""}], next_token=None)
+        if next_url is None:
+            return Page(records=[{"id": "10.1/a"}, {"id": "10.1/b"}], next_token="https://next/1")
+        assert next_url == "https://next/1"
+        return Page(records=[{"id": "10.1/c"}], next_token=None)
+
     client = MagicMock()
-    client.fetch_page.side_effect = [
-        Page(records=[{"id": "10.1/a"}, {"id": "10.1/b"}], next_token="https://next/1"),
-        Page(records=[{"id": "10.1/c"}], next_token=None),
-        Page(records=[{"id": "10.1/a"}, {"id": ""}], next_token=None),
-    ]
+    client.fetch_page.side_effect = fetch_page
 
     metrics = moissonneur(DatacitePersonHarvester, client).run(arguments_du_run())
 
-    assert [e.source_id for e in ecritures] == ["10.1/a", "10.1/b", "10.1/c"]
+    assert sorted(e.source_id for e in ecritures) == ["10.1/a", "10.1/b", "10.1/c"]
     assert {e.entry_mode for e in ecritures} == {StagingEntryMode.PERSON_IDENTIFIER}
-    assert client.fetch_page.call_args_list[1].args[1] == "https://next/1"
+    assert client.fetch_page.call_count == 3
     assert metrics.new == 3
 
 

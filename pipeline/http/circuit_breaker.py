@@ -2,11 +2,12 @@
 
 `source_circuit_breaker` pose dans une `ContextVar` le compteur des échecs consécutifs de la source, partagé par les requêtes de la tâche. Une requête en échec après ses nouvelles tentatives l'incrémente, un succès le remet à zéro. Au seuil, le breaker coupe : les clients HTTP lèvent `SourceUnavailableError` pour les requêtes suivantes, et le run suivant reprend les éléments non traités.
 
-Le seuil de 10 absorbe une série ponctuelle d'échecs de requêtes concurrentes. `record_success` et `record_failure` sont sans `await`, donc atomiques entre les coroutines qui partagent le compteur.
+Le seuil de 10 absorbe une série ponctuelle d'échecs de requêtes concurrentes. Un verrou protège le compteur, partagé par des coroutines ou par des threads.
 """
 
 from __future__ import annotations
 
+import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -50,16 +51,19 @@ class SourceCircuitBreaker:
         self.pace = pace
         """Rythme des requêtes, ou `None` sans plafond."""
         self._consecutive = 0
+        self._lock = threading.Lock()
         self.tripped = False
         """Vrai dès `threshold` échecs consécutifs, ou après `trip()`."""
 
     def record_success(self) -> None:
-        self._consecutive = 0
+        with self._lock:
+            self._consecutive = 0
 
     def record_failure(self) -> None:
-        self._consecutive += 1
-        if self._consecutive >= self.threshold:
-            self.tripped = True
+        with self._lock:
+            self._consecutive += 1
+            if self._consecutive >= self.threshold:
+                self.tripped = True
 
     def trip(self) -> None:
         """Coupe la source. Sert à une boucle qui abandonne la source après une requête en échec."""

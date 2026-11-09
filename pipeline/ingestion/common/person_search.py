@@ -1,12 +1,13 @@
 """Moissonnage d'une source par l'identifiant des personnes RH, identifiant confirmé ou authentifié : socle commun des tâches `harvest_by_person`.
 
-Chaque source est interrogée par lots de personnes, page après page, sur la plage d'années du moissonnage. Les lots réunissent les personnes qui copublient (`person_batches`). Une requête réunit tous les identifiants des personnes du lot, dans les types acceptés par la source (`PERSON_SEARCH_IDENTIFIERS`). Un document ramené par plusieurs lots est écrit une fois par run. Une erreur sur un lot est journalisée, et le moissonnage passe au suivant.
+Chaque source est interrogée par lots de personnes, page après page, sur la plage d'années du moissonnage. Les lots réunissent les personnes qui copublient (`person_batches`). Une requête réunit tous les identifiants des personnes du lot, dans les types acceptés par la source (`PERSON_SEARCH_IDENTIFIERS`). Les lots partent en parallèle, dans la limite de requêtes simultanées de la source (`MAX_CONCURRENT`). Un document ramené par plusieurs lots est écrit une fois par run. Une erreur sur un lot est journalisée, et le moissonnage passe au suivant.
 """
 
 from __future__ import annotations
 
 from abc import abstractmethod
 from collections.abc import Collection, Mapping
+from dataclasses import dataclass
 from typing import ClassVar
 
 from sqlalchemy import Connection, text
@@ -20,11 +21,13 @@ from domain.sources.registry import PROFILES, Source
 from domain.sources.staging import StagingEntryMode
 from domain.types import JsonValue
 from pipeline.http.circuit_breaker import SourceUnavailableError, trip_source
+from pipeline.ingestion.api_params import MAX_CONCURRENT
+from pipeline.ingestion.common.concurrent_pages import paginate_concurrently
 from pipeline.ingestion.common.harvester import (
     HarvestConfigError,
     HarvestWindow,
     SourceHarvester,
-    stage_pages,
+    stage_page,
 )
 from pipeline.ingestion.common.pages import Page
 from pipeline.ingestion.common.person_batches import compose_batches, read_batching_inputs
@@ -99,25 +102,61 @@ class PersonSearchHarvester[ClientT](SourceHarvester[ClientT]):
         all_years = self._years(window)
         years = (min(all_years), max(all_years))
         publications, units = read_batching_inputs(self.conn, persons, years)
-        batches = compose_batches(persons, publications, units, self.BATCH_SIZE)
+        batches = [
+            _Batch(f"lot {i + 1}", len(batch), merge_identifiers([persons[p] for p in batch]))
+            for i, batch in enumerate(
+                compose_batches(persons, publications, units, self.BATCH_SIZE)
+            )
+        ]
+        reader = payload_reader(Source(self.SOURCE))
         seen: set[str] = set()
+
+        def keep(record: Mapping[str, JsonValue]) -> bool:
+            """Écarte un document sans identifiant, ou déjà écrit dans le run."""
+            identity = reader.identify(record)
+            if identity is None or identity.source_id in seen:
+                return False
+            seen.add(identity.source_id)
+            return True
 
         def harvest_step(progress: Progress) -> PhaseMetrics:
             metrics = PhaseMetrics()
-            for i, batch in enumerate(batches):
-                label = f"lot {i + 1}"
+
+            def on_page(batch: _Batch, page: Page) -> None:
                 try:
-                    self._extract_batch(
-                        merge_identifiers([persons[p] for p in batch]), years, label, seen, metrics
+                    stage_page(
+                        self.conn,
+                        metrics,
+                        self.SOURCE,
+                        page,
+                        keep=keep,
+                        entry_mode=StagingEntryMode.PERSON_IDENTIFIER,
                     )
-                except SourceUnavailableError:
-                    trip_source()
-                    break
                 except Exception as e:
-                    scoped_logger(self.logger, self.SOURCE, label).error(
-                        "erreur : %s — passage au suivant", e
+                    self.conn.rollback()
+                    scoped_logger(self.logger, self.SOURCE, batch.label).error(
+                        "erreur d'écriture : %s — page sautée", e
                     )
-                progress.advance(len(batch))
+
+            def on_end(batch: _Batch, error: Exception | None) -> None:
+                if error is not None and not isinstance(error, SourceUnavailableError):
+                    scoped_logger(self.logger, self.SOURCE, batch.label).error(
+                        "erreur : %s — passage au suivant", error
+                    )
+                progress.advance(batch.persons)
+
+            try:
+                paginate_concurrently(
+                    batches,
+                    lambda batch, token: self.fetch_page(
+                        batch.identifiers, years, token, batch.label
+                    ),
+                    max_concurrent=MAX_CONCURRENT[self.SOURCE],
+                    on_page=on_page,
+                    on_end=on_end,
+                )
+            except SourceUnavailableError:
+                trip_source()
             return metrics
 
         labels = ", ".join(
@@ -125,29 +164,12 @@ class PersonSearchHarvester[ClientT](SourceHarvester[ClientT]):
         )
         return self._harvest_at_once(len(persons), harvest_step, by=labels)
 
-    def _extract_batch(
-        self,
-        identifiers: Identifiers,
-        years: tuple[int, int],
-        label: str,
-        seen: set[str],
-        metrics: PhaseMetrics,
-    ) -> None:
-        """Écrit les documents d'un lot, page après page. Un document sans identifiant, ou déjà écrit dans le run, est ignoré."""
-        source = Source(self.SOURCE)
 
-        def keep(record: Mapping[str, JsonValue]) -> bool:
-            identity = payload_reader(source).identify(record)
-            if identity is None or identity.source_id in seen:
-                return False
-            seen.add(identity.source_id)
-            return True
+@dataclass(frozen=True, slots=True)
+class _Batch:
+    """Lot de personnes interrogé en une requête paginée."""
 
-        stage_pages(
-            self.conn,
-            metrics,
-            self.SOURCE,
-            lambda next_token: self.fetch_page(identifiers, years, next_token, label),
-            keep=keep,
-            entry_mode=StagingEntryMode.PERSON_IDENTIFIER,
-        )
+    label: str
+    persons: int
+    """Nombre de personnes du lot."""
+    identifiers: Identifiers
