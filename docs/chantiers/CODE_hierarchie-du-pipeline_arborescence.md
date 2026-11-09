@@ -37,7 +37,7 @@ Annexe de la fiche [Hiérarchie du pipeline](CODE_hierarchie-du-pipeline.md). L'
    1. **Purges** : personnes et publications hors du périmètre
    2. **Périmètre des publications**
    3. **Vues des structures**
-   4. **Référentiels de l'édition** : éditeur des revues, suppression des entrées vides
+   4. **Nettoyage des référentiels de l'édition** : éditeur des revues, suppression des entrées vides
    5. **Compteurs** : publications des adresses, des revues, des éditeurs
 5. **Enrichissements** : publications → relations, sujets, statut open access
    - **Relations** (`relations`) : enregistrements sources, publications → relations entre publications

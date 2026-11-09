@@ -330,7 +330,7 @@ STEPS = (
     _PUBLICATIONS_IN_PERIMETER,
     _STRUCTURES,
     Step(
-        "publishing_referentials",
+        "publishing_cleanup",
         "publications → éditeur de chaque revue, référentiels de l'édition sans entrée vide",
         (
             _SERIAL_PUBLISHERS,
