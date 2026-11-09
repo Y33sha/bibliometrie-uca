@@ -18,10 +18,10 @@ Annexe de la fiche [Hiérarchie du pipeline](CODE_hierarchie-du-pipeline.md). L'
       - normalisation par source
       - retraits : contributions sources OpenAlex doublées par INSPIRE-HEP, enregistrements sources des documents disparus
       - nettoyage : informations du contributeur et adresses sans contribution source
-   2. **Affiliations** (`affiliations`, `countries`) : adresses et identifiants de structure des contributions sources → structures, pays et indices de périmètre des contributions sources
+   2. **Affiliations** (`affiliations`) : adresses et identifiants de structure des contributions sources → structures, pays et indices de périmètre des contributions sources
       1. **Référentiels de structures** : dump ROR, structures HAL citées → référentiels ROR et HAL à jour
       2. **Structures** : adresses, partenaires de thèse → structures des contributions sources
-      3. **Pays** : adresses → pays des adresses, des contributions sources et des enregistrements sources
+      3. **Pays** : adresses → pays des adresses, des contributions sources et des enregistrements sources ; publications des enregistrements sources modifiés mises en file de consolidation
       4. **Périmètre** (`populate`) : structures atteintes, identifiants des personnes RH → indices de périmètre des contributions sources
    3. **Édition** (`resolve_ra`, `publishing`) : DOI, noms d'éditeur, ISSN, ISBN et titres → éditeur, revue et monographie de chaque enregistrement source
       1. **Préfixes DOI** : DOI connus → agence et éditeur titulaire de chaque préfixe
@@ -31,6 +31,8 @@ Annexe de la fiche [Hiérarchie du pipeline](CODE_hierarchie-du-pipeline.md). L'
    4. **Correction** (`metadata_correction`) : enregistrements sources rattachés → enregistrements sources corrigés, admis ou écartés de la réconciliation
 3. **Entités** : enregistrements sources corrigés → publications, contributions, personnes
    1. **Publications** (`publications`) : enregistrements sources → publications, métadonnées consolidées
+      - réconciliation (`reconcile`) : enregistrements sources → publications, dont les publications touchées sont consolidées aussitôt
+      - consolidation (`consolidate`) : publications de la file `publications_queue` → métadonnées consolidées
    2. **Contributions** (`author_grouping`) : contributions sources d'une publication → contributions et leurs attributs
    3. **Personnes** (`persons`) : contributions, identifiants → personne de chaque contribution, formes de nom
 4. **Données dérivées** (`finalize`, `persons.purge`) : entités → périmètre des publications, purges, vues, compteurs
@@ -54,11 +56,14 @@ Annexe de la fiche [Hiérarchie du pipeline](CODE_hierarchie-du-pipeline.md). L'
 
 ### Écritures dans un autre élément
 
-- **Pays et statut open access.** Les phases `countries` et `oa_status` écrivent `publications.countries` et `publications.oa_status`, calculés aussi par la consolidation des publications. Décision prise : la consolidation est seule à les calculer.
+- **Statut open access.** La phase `oa_status` écrit `publications.oa_status`, calculé aussi par la consolidation des publications. Décision : la consolidation est seule à le calculer, par la file `publications_queue`, comme les pays.
 - **Agence des préfixes DOI.** `resolve_ra` pose l'agence. `resolve_crossref_publishers` et `resolve_datacite_publishers` la corrigent. Les trois tâches rejoignent l'étape « Préfixes DOI ».
 
 ### Responsabilités éclatées
 
 - **Référentiels de l'édition.** Le rattachement relève de « Édition », la suppression des entrées vides et les compteurs relèvent de « Données dérivées ». Le module de chaque référentiel garde ces deux points d'entrée.
-- **doi.org.** L'agence d'un préfixe relève de « Édition », l'URL de résolution d'un DOI relève de « Statut open access ». Une étape « DOI » pourrait réunir les faits obtenus sur les DOI : agence, URL de résolution, réponse d'Unpaywall.
+- **doi.org.** Trois tâches interrogent doi.org :
+  - `resolve_ra` demande l'agence de chaque préfixe ;
+  - `fetch_missing` demande à l'API des handles si un DOI absent de Crossref ou de DataCite existe. Un DOI inexistant entre dans `failed_lookups`, lu par `metadata_correction` ;
+  - `oa_status.resolve_dois` demande à la même API des handles l'URL de résolution de chaque DOI des publications. Un DOI inconnu reçoit une URL nulle.
 - **Rattachement aux revues par DOI.** `serial_by_doi` rattache une revue d'après les espaces de noms DOI. La tâche relève de « Correction », car elle remplit un champ vide de l'enregistrement source.
