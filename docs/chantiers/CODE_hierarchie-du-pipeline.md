@@ -24,9 +24,10 @@ Deux valeurs de la publication sont calculées à deux endroits. La consolidatio
 
 ### Phase 1 — Arborescence récursive
 
-- [ ] Type récursif dans `pipeline/graph.py`, à la place de `Task.section`
-- [ ] Prototype sur `publishing` : préfixes DOI, éditeurs, ISSN, revues, monographies
-- [ ] Arborescence affichée depuis `PHASES`, avec la phrase de chaque élément
+- [x] Type récursif `Step` dans `pipeline/graph.py`. Le titre d'une étape de premier niveau sert de section au journal.
+- [x] Prototype sur `publishing` : préfixes DOI, éditeurs, revues (ISSN, rattachement, qualification, espaces de noms DOI), monographies
+- [x] Arborescence affichée par `interfaces/cli/dev/pipeline_tree.py`, avec la phrase de chaque étape et, sur option, ses tables lues et écrites
+- [ ] `Task.section` retiré, une fois toutes les phases en étapes
 - [ ] Autres phases
 
 ### Phase 2 — Valeurs de la publication calculées par la seule consolidation
