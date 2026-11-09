@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict V8JUEhKomi9OalKvlJGxzIPjq0lr6GladkcLfm3tXfewOq13ppmRt5nIXje3Jle
+\restrict xhh7Rlpgx73aXyVWIKvCbXyPo438Y5BCrFpV1f0JsqyQ1BOF277MaLSz60n6pHH
 
--- Dumped from database version 18.4
--- Dumped by pg_dump version 18.4
+-- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
+-- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -2799,6 +2799,30 @@ ALTER TABLE queues.publication_contributions_queue ALTER COLUMN seq ADD GENERATE
 
 
 --
+-- Name: publications_queue; Type: TABLE; Schema: queues; Owner: -
+--
+
+CREATE TABLE queues.publications_queue (
+    id integer NOT NULL,
+    seq bigint NOT NULL
+);
+
+
+--
+-- Name: publications_queue_seq_seq; Type: SEQUENCE; Schema: queues; Owner: -
+--
+
+ALTER TABLE queues.publications_queue ALTER COLUMN seq ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME queues.publications_queue_seq_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
 -- Name: source_contribution_countries_queue; Type: TABLE; Schema: queues; Owner: -
 --
 
@@ -4331,6 +4355,14 @@ ALTER TABLE ONLY queues.contribution_resolution_queue
 
 ALTER TABLE ONLY queues.publication_contributions_queue
     ADD CONSTRAINT publication_contributions_queue_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: publications_queue publications_queue_pkey; Type: CONSTRAINT; Schema: queues; Owner: -
+--
+
+ALTER TABLE ONLY queues.publications_queue
+    ADD CONSTRAINT publications_queue_pkey PRIMARY KEY (id);
 
 
 --
@@ -6267,5 +6299,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict V8JUEhKomi9OalKvlJGxzIPjq0lr6GladkcLfm3tXfewOq13ppmRt5nIXje3Jle
+\unrestrict xhh7Rlpgx73aXyVWIKvCbXyPo438Y5BCrFpV1f0JsqyQ1BOF277MaLSz60n6pHH
 

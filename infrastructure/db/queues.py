@@ -24,6 +24,8 @@ class Queue(StrEnum):
     """Publications dont les contributions sont à recalculer : un enregistrement source a rejoint ou quitté la publication, ou ses contributions sources ont changé."""
     SOURCE_RECORD_KEYS = "source_record_keys_queue"
     """Enregistrements sources à réconcilier : écrits, corrigés, entrés dans le périmètre, ou voisins d'un enregistrement source supprimé."""
+    PUBLICATIONS = "publications_queue"
+    """Publications dont les métadonnées consolidées sont à recalculer : un enregistrement source a changé de pays."""
     CONTRIBUTION_ATTRIBUTES = "contribution_attributes_queue"
     """Contributions dont les attributs sont à recomposer : une contribution source a changé de rôles, de statut de correspondant ou d'indices de périmètre, ou le groupement a changé les contributions sources."""
     CONTRIBUTION_RESOLUTION = "contribution_resolution_queue"
