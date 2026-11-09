@@ -68,7 +68,7 @@ def test_l_executeur_ecrit_le_bilan_de_chaque_section_dans_l_ordre_des_taches(co
 
 
 def test_une_etape_de_premier_niveau_donne_le_titre_de_section_de_ses_taches(contexte, caplog):
-    """Les tâches d'une étape placée dans une autre écrivent sous le titre de l'étape englobante. Une tâche hors étape garde sa `section`."""
+    """Les tâches d'une étape placée dans une autre écrivent sous le titre de l'étape englobante. Une tâche hors étape, ou dans une étape sans titre, garde sa `section`."""
 
     def tache(name: str, **kwargs) -> Task:
         return Task(name, run=lambda _ctx: PhaseMetrics(report=name), label=name, **kwargs)
@@ -76,14 +76,11 @@ def test_une_etape_de_premier_niveau_donne_le_titre_de_section_de_ses_taches(con
     children = (
         Step(
             "revues",
-            "Revues",
             "ISSN → revues",
-            (
-                Step("issn", "ISSN", "ISSN → ISSN-L", (tache("sync"), tache("sudoc"))),
-                tache("attach"),
-            ),
+            (Step("issn", "ISSN → ISSN-L", (tache("sync"), tache("sudoc"))), tache("attach")),
+            label="Revues",
         ),
-        tache("editeurs", section="Éditeurs"),
+        Step("editeurs", "noms → éditeurs", (tache("editeurs", section="Éditeurs"),)),
     )
 
     with caplog.at_level(logging.INFO, logger="test"):

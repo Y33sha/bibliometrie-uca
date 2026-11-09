@@ -47,10 +47,9 @@ def _sections(children: Sequence[Step | Task]) -> dict[str, str | None]:
     """Renvoie le titre de section de chaque tâche, par nom de tâche : celui de l'étape de premier niveau qui la contient, à défaut sa `section`."""
     sections: dict[str, str | None] = {}
     for child in children:
-        if isinstance(child, Step):
-            sections.update(dict.fromkeys((task.name for task in child.tasks), child.label))
-        else:
-            sections[child.name] = child.section
+        label = child.label if isinstance(child, Step) else None
+        for task in leaves((child,)):
+            sections[task.name] = label if label is not None else task.section
     return sections
 
 

@@ -121,11 +121,11 @@ class Step:
     """Étape d'une phase : tâches et étapes exécutées dans l'ordre."""
 
     name: str
-    label: str
-    """Titre de l'étape au journal. Une étape placée dans une autre écrit sous le titre de l'étape englobante."""
     summary: str
     """Entrées → sorties de l'étape."""
     children: tuple[Step | Task, ...]
+    label: str | None = None
+    """Titre de section au journal des tâches d'une étape de premier niveau. `None` : chaque tâche écrit sous sa `section` ou sous son propre titre."""
 
     @property
     def tasks(self) -> tuple[Task, ...]:

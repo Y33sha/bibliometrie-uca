@@ -592,31 +592,28 @@ _TYPE_PROCEEDINGS_VOLUMES = Task(
 STEPS = (
     Step(
         "doi_prefixes",
-        "Préfixes DOI",
         "préfixes DOI → éditeur titulaire de chaque préfixe, agence du préfixe inconnu de doi.org",
         (_RESOLVE_CROSSREF_PUBLISHERS, _RESOLVE_DATACITE_PUBLISHERS),
+        label="Préfixes DOI",
     ),
     Step(
         "publishers",
-        "Éditeurs",
         "noms d'éditeur des enregistrements sources → éditeur de chaque enregistrement source, sans doublon",
         (_ATTACH_PUBLISHERS, _MERGE_DUPLICATE_PUBLISHERS),
+        label="Éditeurs",
     ),
     Step(
         "serials",
-        "Publications en série",
         "ISSN, titres et identifiants OpenAlex des enregistrements sources → revue de chaque enregistrement source, typée et qualifiée",
         (
             Step(
                 "issns",
-                "ISSN",
                 "ISSN des enregistrements sources → ISSN-L, titre Sudoc et liens de chaque ISSN",
                 (_SYNC_ISSNS, _CHECK_ISSNS_IN_SUDOC, _IMPORT_ISSNL_TABLE),
             ),
             _ATTACH_SERIALS,
             Step(
                 "qualification",
-                "Qualification des revues",
                 "revues → identifiant OpenAlex, listes de revues, type, fiche DOAJ",
                 (
                     _CHECK_SERIALS_IN_OPENALEX,
@@ -627,11 +624,12 @@ STEPS = (
             ),
             _LEARN_SERIAL_DOI_NAMESPACES,
         ),
+        label="Publications en série",
     ),
     Step(
         "monographs",
-        "Monographies",
         "ISBN et titres des enregistrements sources → monographie de chaque enregistrement source, rattachée à sa collection, typée",
         (_ATTACH_MONOGRAPHS, _LINK_MONOGRAPHS_TO_COLLECTIONS, _TYPE_PROCEEDINGS_VOLUMES),
+        label="Monographies",
     ),
 )

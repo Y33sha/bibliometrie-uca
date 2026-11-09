@@ -25,13 +25,13 @@ def test_noms_uniques():
     assert len(names) == len(set(names))
 
 
-def test_une_tache_placee_dans_une_etape_ecrit_sous_le_titre_de_l_etape():
-    """La `section` d'une tâche placée dans une étape serait ignorée par l'exécuteur."""
+def test_une_tache_placee_dans_une_etape_titree_ecrit_sous_le_titre_de_l_etape():
+    """La `section` d'une tâche placée dans une étape titrée serait ignorée par l'exécuteur."""
     in_steps = [
         task.name
         for phase in PHASES
         for child in phase.children
-        if isinstance(child, Step)
+        if isinstance(child, Step) and child.label is not None
         for task in child.tasks
         if task.section is not None
     ]
@@ -46,7 +46,6 @@ def test_l_interface_d_une_etape_omet_les_lectures_de_ses_propres_ecritures():
 
     etape = Step(
         "revues",
-        "Revues",
         "ISSN → revues",
         (
             tache("sync", ("source_records.biblio",), ("serial_issns",)),
