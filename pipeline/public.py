@@ -32,7 +32,6 @@ PHASE_ORDER: tuple[str, ...] = (
     "finalize",
     "relations",
     "subjects",
-    "countries",
     "oa_status",
 )
 """Noms des phases, dans l'ordre d'exécution de `pipeline.phases.PHASES`."""

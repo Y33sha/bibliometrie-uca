@@ -1,6 +1,6 @@
 """Phases du pipeline, dans l'ordre d'exécution, avec leur libellé et leurs attributs.
 
-Les enrichissements (`extra`) viennent en dernier. Chacun est indépendant des autres. Des phases placées avant eux lisent leurs sorties au run suivant : `resolve_ra` et `fetch_missing` lisent les relations, `publications` les pays et le statut open access.
+Les enrichissements (`extra`) viennent en dernier. Chacun est indépendant des autres. Des phases placées avant eux lisent leurs sorties au run suivant : `resolve_ra` et `fetch_missing` lisent les relations, `publications` le statut open access.
 """
 
 from dataclasses import replace
@@ -17,7 +17,6 @@ from pipeline.ingestion.openalex import fetch_truncated
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation import finalize
-from pipeline.transformation.countries import countries
 from pipeline.transformation.persons import persons
 from pipeline.transformation.publications import oa_status, publications, relations
 from pipeline.transformation.publications.author_grouping import author_grouping
@@ -75,8 +74,8 @@ PHASES: tuple[Phase, ...] = (
     ),
     Phase(
         "affiliations",
-        "Résolution des affiliations par contribution source",
-        affiliations.TASKS,
+        "Structures, pays et périmètre des contributions sources",
+        affiliations.STEPS,
         check=check_extraction_perimeter,
         assemble=affiliations.assemble,
     ),
@@ -131,13 +130,6 @@ PHASES: tuple[Phase, ...] = (
         "Sujets des publications",
         subjects.TASKS,
         extra=True,
-    ),
-    Phase(
-        "countries",
-        "Pays associés aux contributions sources",
-        countries.TASKS,
-        extra=True,
-        assemble=countries.assemble,
     ),
     Phase(
         "oa_status",

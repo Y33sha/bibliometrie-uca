@@ -1,7 +1,4 @@
-"""Phase `countries` : pays candidats des adresses en file, pays retenus, puis pays des contributions sources, des enregistrements sources et des publications. Chaque tâche a sa transaction.
-
-L'état pays des adresses, relevé avant la détection et après le choix du pays, donne l'entonnoir de la phase : manque initial, pays rattachés par le run, reste.
-"""
+"""Étape des pays de la phase `affiliations` : pays candidats des adresses en file, pays retenus, puis pays des contributions sources, des enregistrements sources et des publications. Chaque tâche a sa transaction."""
 
 from __future__ import annotations
 
@@ -10,7 +7,7 @@ from typing import NamedTuple
 
 from sqlalchemy import Connection, text
 
-from pipeline.graph import Task, in_transaction
+from pipeline.graph import Step, Task, in_transaction
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.log_format import LAST_BRANCH, quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -86,89 +83,106 @@ _DETECTION_READS = (
 )
 """Lectures des deux détections : noms de lieux et adresses en file."""
 
-TASKS = (
-    Task(
-        "detect_by_country_name",
-        # État pays des adresses citées par une publication, relevé avant la détection.
-        reads=(*_DETECTION_READS, "addresses.countries", "addresses.publication_count"),
-        writes=("address_country_candidates",),
-        # Adresses marquées depuis la dernière résolution, retirées de la file par `countries.resolve` ; pays des adresses écrits par `countries.resolve`.
-        previous_run=("address_candidates_queue", "addresses.countries"),
-        run=_detect_by_country_name,
-        section="Pays des adresses d'après le nom de pays qui les termine",
+
+_DETECT_BY_COUNTRY_NAME = Task(
+    "detect_by_country_name",
+    # État pays des adresses citées par une publication, relevé avant la détection.
+    reads=(*_DETECTION_READS, "addresses.countries", "addresses.publication_count"),
+    writes=("address_country_candidates",),
+    # Adresses marquées depuis la dernière résolution, retirées de la file par `resolve_countries` ; pays des adresses écrits par `resolve_countries` ; nombre de publications des adresses, recompté par `finalize`.
+    previous_run=("address_candidates_queue", "addresses.countries", "addresses.publication_count"),
+    run=_detect_by_country_name,
+    section="Pays des adresses d'après le nom de pays qui les termine",
+)
+
+
+_DETECT_BY_PLACE_NAME = Task(
+    "detect_by_place_name",
+    reads=_DETECTION_READS,
+    writes=("address_country_candidates",),
+    # Adresses marquées depuis la dernière résolution, retirées de la file par `resolve_countries`.
+    previous_run=("address_candidates_queue",),
+    run=in_transaction(detect_by_place_name.run),
+    section="Pays des adresses d'après les noms de villes et d'institutions",
+)
+
+
+_RESOLVE_COUNTRIES = Task(
+    "resolve_countries",
+    reads=(
+        "address_country_candidates",
+        "addresses.id",
+        "addresses.countries",
+        "addresses.publication_count",
+        "address_candidates_queue",
     ),
-    Task(
-        "detect_by_place_name",
-        reads=_DETECTION_READS,
-        writes=("address_country_candidates",),
-        # Adresses marquées depuis la dernière résolution, retirées de la file par `countries.resolve`.
-        previous_run=("address_candidates_queue",),
-        run=in_transaction(detect_by_place_name.run),
-        section="Pays des adresses d'après les noms de villes et d'institutions",
+    writes=(
+        "addresses.countries",
+        "address_countries_queue",
+        "address_candidates_queue",
     ),
-    Task(
-        "resolve",
-        reads=(
-            "address_country_candidates",
-            "addresses.id",
-            "addresses.countries",
-            "addresses.publication_count",
-            "address_candidates_queue",
-        ),
-        writes=(
-            "addresses.countries",
-            "address_countries_queue",
-            "address_candidates_queue",
-        ),
-        run=_resolve,
-        section="Choix du pays des adresses parmi les pays trouvés",
+    # Nombre de publications des adresses, recompté par `finalize`.
+    previous_run=("addresses.publication_count",),
+    run=_resolve,
+    section="Choix du pays des adresses parmi les pays trouvés",
+)
+
+
+_REFRESH_PUBLICATION_COUNTRIES = Task(
+    "refresh_publication_countries",
+    reads=(
+        "source_contribution_countries_queue",
+        "source_contributions.source_record_id",
+        "source_contributions.countries",
+        "source_contribution_addresses",
+        "source_contribution_rors",
+        "source_contribution_hal_structures",
+        "ror_organizations",
+        "hal_structures",
+        "hal_structure_aliases",
+        "addresses.countries",
+        "address_countries_queue",
+        "source_records.publication_id",
+        "source_records.countries",
+        "publications.id",
     ),
-    Task(
-        "refresh_publication_countries",
-        reads=(
-            "source_contribution_countries_queue",
-            "source_contributions.source_record_id",
-            "source_contributions.countries",
-            "source_contribution_addresses",
-            "source_contribution_rors",
-            "source_contribution_hal_structures",
-            "ror_organizations",
-            "hal_structures",
-            "hal_structure_aliases",
-            "addresses.countries",
-            "address_countries_queue",
-            "source_records.publication_id",
-            "source_records.countries",
-            "publications.id",
-        ),
-        writes=(
-            "source_contributions.countries",
-            "source_records.countries",
-            "publications.countries",
-            "source_contribution_countries_queue",
-            "address_countries_queue",
-        ),
-        run=_refresh,
-        section="Rafraîchissement des pays associés aux publications",
+    writes=(
+        "source_contributions.countries",
+        "source_records.countries",
+        "publications.countries",
+        "source_contribution_countries_queue",
+        "address_countries_queue",
+    ),
+    # Publications et rattachements des enregistrements sources, écrits par `publications.reconcile` et `finalize.purge_publications`.
+    previous_run=("publications.id", "source_records.publication_id"),
+    run=_refresh,
+    section="Rafraîchissement des pays associés aux publications",
+)
+
+
+STEP = Step(
+    "countries",
+    "adresses → pays des adresses, des contributions sources, des enregistrements sources et des publications",
+    (
+        _DETECT_BY_COUNTRY_NAME,
+        _DETECT_BY_PLACE_NAME,
+        _RESOLVE_COUNTRIES,
+        _REFRESH_PUBLICATION_COUNTRIES,
     ),
 )
 
 
-def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
-    """Renvoie la somme des métriques des tâches, avec l'entonnoir tiré des deux relevés de l'état pays des adresses."""
-    metrics = PhaseMetrics()
-    for task_metrics in by_task.values():
-        metrics.merge(task_metrics)
-    initial = metrics.details.pop(_STATUS_BEFORE)
-    final = metrics.details.pop(_STATUS_AFTER)
+def funnel(by_task: Mapping[str, PhaseMetrics]) -> dict[str, float]:
+    """Renvoie l'entonnoir des pays des adresses citées, tiré des relevés pris avant la détection et après le choix du pays : manque initial, pays rattachés par le run, reste."""
+    initial = by_task[_DETECT_BY_COUNTRY_NAME.name].details[_STATUS_BEFORE]
+    final = by_task[_RESOLVE_COUNTRIES.name].details[_STATUS_AFTER]
     assert isinstance(initial, AddressCountryStatus) and isinstance(final, AddressCountryStatus)
     total = final.total
     without_initial = total - initial.with_country
-    metrics.details["summary"] = {
-        "total": total,
-        "without_initial": without_initial,
-        "without_pct": round(100 * without_initial / total, 1) if total else 0,
-        "newly_attached": final.with_country - initial.with_country,
-        "remaining": total - final.with_country,
+    return {
+        "cited_addresses": total,
+        "without_country_initial": without_initial,
+        "without_country_pct": round(100 * without_initial / total, 1) if total else 0,
+        "country_newly_attached": final.with_country - initial.with_country,
+        "without_country_remaining": total - final.with_country,
     }
-    return metrics
