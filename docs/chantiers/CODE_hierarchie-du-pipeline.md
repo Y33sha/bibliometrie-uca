@@ -38,10 +38,11 @@ Deux valeurs de la publication sont calculées à deux endroits. La consolidatio
 - [x] Pays dans la phase `affiliations`, avant la réconciliation
 - [x] Consolidation ciblée des publications, sans réconciliation, par la file `publications_queue` (tâche `publications.consolidate`)
 - [x] Étape des pays : un changement de pays d'un enregistrement source met en file sa publication. Le recalcul de l'API consolide aussitôt.
-- [ ] `oa_status` : un changement de réponse d'Unpaywall met en attente la consolidation des publications du DOI
+- [x] `oa_status` : un changement de réponse de doi.org ou d'Unpaywall met en file les publications du DOI
 - [x] Écriture de `publications.countries` retirée de l'étape des pays
-- [ ] Écriture de `publications.oa_status` retirée de la phase `oa_status`
-- [ ] `oa_status` dans les référentiels, sur les DOI des enregistrements sources, après la résolution des agences
+- [x] Écriture de `publications.oa_status` retirée de la phase `oa_status`
+- [x] `oa_status` après la correction, sur les DOI candidats des enregistrements sources (règle des ancres, hors DOI qui ont une cible) : +21 % de DOI interrogés
+- [ ] Source unique pour « DOI inexistant » : `fetch_missing` et la correction lisent `dois` au lieu d'interroger doi.org et de lire `failed_lookups`
 
 ### Phase 3 — Premier niveau
 
@@ -57,4 +58,5 @@ Deux valeurs de la publication sont calculées à deux endroits. La consolidatio
 - [ ] `docs/pipeline/04-affiliations.md` et `docs/pipeline/11-enrichissements.md` : pays dans la phase `affiliations`
 - [ ] `docs/pipeline/05-publishing.md` : `merge_duplicate_monographs` absent des tâches, `attach_publishers` et `attach_monographs` absents de la page
 - [ ] `docs/pipeline/07-publications.md` : file de consolidation et tâche `consolidate`
+- [ ] `docs/pipeline/11-enrichissements.md` et page d'`oa_status` : phase avant `publications`, DOI candidats, mise en file
 - [ ] `CLAUDE.md` : liste des phases

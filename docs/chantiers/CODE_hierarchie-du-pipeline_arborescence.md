@@ -58,7 +58,6 @@ Annexe de la fiche [Hiérarchie du pipeline](CODE_hierarchie-du-pipeline.md). L'
 
 ### Écritures dans un autre élément
 
-- **Statut open access.** La phase `oa_status` écrit `publications.oa_status`, calculé aussi par la consolidation des publications. Décision : la consolidation est seule à le calculer, par la file `publications_queue`, comme les pays.
 - **Agence des préfixes DOI.** `resolve_ra` pose l'agence. `resolve_crossref_publishers` et `resolve_datacite_publishers` la corrigent. Les trois tâches rejoignent l'étape « Préfixes DOI ».
 
 ### Responsabilités éclatées
