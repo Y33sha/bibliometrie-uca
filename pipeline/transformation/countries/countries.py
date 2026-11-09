@@ -14,7 +14,7 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.countries import (
     detect_by_country_name,
     detect_by_place_name,
-    refresh_publication_countries,
+    refresh_source_record_countries,
 )
 from pipeline.transformation.countries.resolution import resolve_queued_addresses
 
@@ -70,7 +70,7 @@ def _resolve(ctx: PhaseContext) -> PhaseMetrics:
 
 def _refresh(ctx: PhaseContext) -> PhaseMetrics:
     with ctx.open_tx() as conn:
-        refresh_publication_countries.refresh(conn, ctx.logger)
+        refresh_source_record_countries.refresh(conn, ctx.logger)
     return PhaseMetrics()
 
 
@@ -128,8 +128,8 @@ _RESOLVE_COUNTRIES = Task(
 )
 
 
-_REFRESH_PUBLICATION_COUNTRIES = Task(
-    "refresh_publication_countries",
+_REFRESH_SOURCE_RECORD_COUNTRIES = Task(
+    "refresh_source_record_countries",
     reads=(
         "source_contribution_countries_queue",
         "source_contributions.source_record_id",
@@ -144,30 +144,29 @@ _REFRESH_PUBLICATION_COUNTRIES = Task(
         "address_countries_queue",
         "source_records.publication_id",
         "source_records.countries",
-        "publications.id",
     ),
     writes=(
         "source_contributions.countries",
         "source_records.countries",
-        "publications.countries",
         "source_contribution_countries_queue",
         "address_countries_queue",
+        "publications_queue",
     ),
-    # Publications et rattachements des enregistrements sources, écrits par `publications.reconcile` et `finalize.purge_publications`.
-    previous_run=("publications.id", "source_records.publication_id"),
+    # Rattachements des enregistrements sources, écrits par `publications.reconcile` et `finalize.purge_publications`.
+    previous_run=("source_records.publication_id",),
     run=_refresh,
-    section="Rafraîchissement des pays associés aux publications",
+    section="Rafraîchissement des pays des enregistrements sources",
 )
 
 
 STEP = Step(
     "countries",
-    "adresses → pays des adresses, des contributions sources, des enregistrements sources et des publications",
+    "adresses → pays des adresses, des contributions sources et des enregistrements sources ; publications à recalculer",
     (
         _DETECT_BY_COUNTRY_NAME,
         _DETECT_BY_PLACE_NAME,
         _RESOLVE_COUNTRIES,
-        _REFRESH_PUBLICATION_COUNTRIES,
+        _REFRESH_SOURCE_RECORD_COUNTRIES,
     ),
 )
 

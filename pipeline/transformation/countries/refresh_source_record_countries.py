@@ -1,11 +1,13 @@
-"""Recalcul des pays des contributions sources, des enregistrements sources et des publications à partir de `addresses.countries`.
+"""Recalcul des pays des contributions sources et des enregistrements sources à partir de `addresses.countries`.
 
-Trois caches dénormalisés, en cascade :
+Deux caches dénormalisés, en cascade :
   1. `source_contributions.countries` — pays retenus des adresses de la contribution source, à défaut pays de ses organisations ROR sans adresse ; pays de ses structures HAL.
   2. `source_records.countries` — union des `source_contributions.countries` de l'enregistrement source.
-  3. `publications.countries` — union des `source_records.countries` de même publication_id.
 
-Deux portées partagent l'agrégation : les contributions sources à recalculer (`refresh`, tâche `countries.refresh_publication_countries`), ou les contributions sources d'un lot d'adresses (`CountryRecompute`, appelé par l'API après une saisie manuelle).
+La consolidation des publications calcule `publications.countries`. Deux portées partagent l'agrégation :
+
+- les contributions sources à recalculer (`refresh`, tâche `affiliations.refresh_source_record_countries`). Les publications des enregistrements sources modifiés entrent dans la file `publications_queue`.
+- les contributions sources d'un lot d'adresses (`CountryRecompute`, appelé par l'API après une saisie manuelle). Les publications sont recalculées aussitôt.
 
 Une contribution source est à recalculer quand elle est dans la file `source_contribution_countries_queue`, ou liée à une adresse de la file `address_countries_queue`. `create_dirty_scope` relève les deux files, puis ces contributions sources, dans des tables temporaires lues par les trois étapes :
 
@@ -15,14 +17,15 @@ Une contribution source est à recalculer quand elle est dans la file `source_co
 
 import logging
 import time
-from collections.abc import Callable
+from typing import NamedTuple
 
 from sqlalchemy import Connection, text
 
-from infrastructure.db.queues import Queue, delete_processed, snapshot
+from infrastructure.db.queues import Queue, delete_processed, enqueue_sql, snapshot
 from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, quantity
 from pipeline.runtime.observability.progress import track_progress, waiting
 from pipeline.transformation.countries.resolution import resolve_address_countries
+from pipeline.transformation.publications import lifecycle
 
 BATCH_SIZE = 50_000
 """Nombre de contributions sources recalculées par requête."""
@@ -98,7 +101,7 @@ _SOURCE_CONTRIBUTION_COUNTRIES_FROM_SCOPE = """,
 """
 """Recalcul de `source_contributions.countries` sur la CTE amont `scoped_sa(id)`."""
 
-_SOURCE_RECORD_COUNTRIES_FROM_SCOPE = """,
+_SOURCE_RECORD_COUNTRIES_AGG = """,
     agg AS (
         SELECT sc.source_record_id AS source_record_id,
                array_agg(DISTINCT c ORDER BY c) AS new_countries
@@ -106,7 +109,10 @@ _SOURCE_RECORD_COUNTRIES_FROM_SCOPE = """,
         JOIN scoped_sp ss ON ss.source_record_id = sc.source_record_id
         CROSS JOIN LATERAL unnest(sc.countries) AS c
         GROUP BY sc.source_record_id
-    )
+    )"""
+"""Union des pays des contributions sources de chaque enregistrement source de la CTE amont `scoped_sp(source_record_id)`."""
+
+_SOURCE_RECORD_COUNTRIES_UPDATE = """
     UPDATE source_records sr
     SET countries = agg.new_countries
     FROM scoped_sp ss
@@ -114,26 +120,7 @@ _SOURCE_RECORD_COUNTRIES_FROM_SCOPE = """,
     WHERE sr.id = ss.source_record_id
       AND sr.countries IS DISTINCT FROM agg.new_countries
 """
-"""Recalcul de `source_records.countries` sur la CTE amont `scoped_sp(source_record_id)` : union des pays des contributions sources."""
-
-_PUBLICATION_COUNTRIES_FROM_SCOPE = """,
-    agg AS (
-        SELECT sr.publication_id AS publication_id,
-               array_agg(DISTINCT c::text ORDER BY c::text) AS new_countries
-        FROM source_records sr
-        JOIN scoped_publications scp ON scp.publication_id = sr.publication_id
-        CROSS JOIN LATERAL unnest(sr.countries) AS c
-        WHERE sr.countries IS NOT NULL
-        GROUP BY sr.publication_id
-    )
-    UPDATE publications p
-    SET countries = agg.new_countries
-    FROM scoped_publications scp
-    LEFT JOIN agg ON agg.publication_id = scp.publication_id
-    WHERE p.id = scp.publication_id
-      AND p.countries IS DISTINCT FROM agg.new_countries
-"""
-"""Recalcul de `publications.countries` sur la CTE amont `scoped_publications(publication_id)` : union des `source_records.countries` de la publication ; seules les lignes qui changent sont écrites."""
+"""Écriture de `source_records.countries` d'après la CTE `agg`. Seules les lignes qui changent sont écrites."""
 
 
 def create_dirty_scope(conn: Connection) -> int:
@@ -180,36 +167,32 @@ def refresh_source_contribution_countries(
     return conn.execute(text(scope + _SOURCE_CONTRIBUTION_COUNTRIES_FROM_SCOPE), params).rowcount
 
 
-def refresh_source_record_countries(conn: Connection) -> int:
-    """Recalcule `source_records.countries` des enregistrements sources de `countries_dirty_scope`. Renvoie le nombre de lignes modifiées."""
-    return conn.execute(
+class SourceRecordCountriesRefresh(NamedTuple):
+    """Bilan du recalcul des pays des enregistrements sources."""
+
+    source_records: int
+    """Enregistrements sources aux pays modifiés."""
+    publications: int
+    """Publications de ces enregistrements sources, mises en file de consolidation."""
+
+
+def refresh_source_record_countries(conn: Connection) -> SourceRecordCountriesRefresh:
+    """Recalcule `source_records.countries` des enregistrements sources de `countries_dirty_scope`, et met en file de consolidation les publications des enregistrements sources modifiés."""
+    row = conn.execute(
         text(
-            """
+            f"""
             WITH scoped_sp AS (
                 SELECT DISTINCT source_record_id FROM countries_dirty_scope
                 WHERE source_record_id IS NOT NULL
-            )
-            """
-            + _SOURCE_RECORD_COUNTRIES_FROM_SCOPE
+            ){_SOURCE_RECORD_COUNTRIES_AGG},
+            updated AS ({_SOURCE_RECORD_COUNTRIES_UPDATE} RETURNING sr.publication_id),
+            marked AS ({enqueue_sql(Queue.PUBLICATIONS, "SELECT publication_id FROM updated WHERE publication_id IS NOT NULL")})
+            SELECT count(*) AS source_records, count(DISTINCT publication_id) AS publications
+            FROM updated
+            """  # noqa: S608
         )
-    ).rowcount
-
-
-def refresh_publication_countries(conn: Connection) -> int:
-    """Recalcule `publications.countries` des publications des enregistrements sources de `countries_dirty_scope`. Renvoie le nombre de lignes modifiées."""
-    return conn.execute(
-        text(
-            """
-            WITH scoped_publications AS (
-                SELECT DISTINCT sr.publication_id AS publication_id
-                FROM (SELECT DISTINCT source_record_id FROM countries_dirty_scope) d
-                JOIN source_records sr ON sr.id = d.source_record_id
-                WHERE sr.publication_id IS NOT NULL
-            )
-            """
-            + _PUBLICATION_COUNTRIES_FROM_SCOPE
-        )
-    ).rowcount
+    ).one()
+    return SourceRecordCountriesRefresh(row.source_records, row.publications)
 
 
 def _refresh_source_contributions_in_batches(
@@ -225,28 +208,8 @@ def _refresh_source_contributions_in_batches(
     return updated
 
 
-def _timed_refresh(
-    conn: Connection,
-    logger: logging.Logger,
-    refresh_step: Callable[[Connection], int],
-    *,
-    branch: str,
-    label: str,
-    singular: str,
-    plural: str,
-) -> int:
-    """Joue un recalcul de cache avec sa ligne de journal, en cours puis avec son nombre de lignes modifiées et sa durée. Renvoie ce nombre."""
-    t0 = time.perf_counter()
-    with waiting(f"{branch}{label} : en cours", logger) as line:
-        updated = refresh_step(conn)
-        line.conclude(
-            f"{branch}{quantity(updated, singular, plural)} en {time.perf_counter() - t0:.1f} s"
-        )
-    return updated
-
-
 def refresh(conn: Connection, logger: logging.Logger) -> int:
-    """Recalcule les caches pays (source_contributions → source_records → publications) des contributions sources à recalculer, puis supprime les marquages traités. Renvoie le nombre de publications mises à jour. Chaque recalcul a sa ligne de journal, avec son nombre de lignes et sa durée."""
+    """Recalcule les pays des contributions sources à recalculer, puis de leurs enregistrements sources, met en file de consolidation les publications des enregistrements sources modifiés, et supprime les marquages traités. Renvoie le nombre de publications mises en file. Chaque recalcul a sa ligne de journal, avec son nombre de lignes et sa durée."""
     with waiting(f"{BRANCH}contributions sources à recalculer : en cours", logger) as line:
         total = create_dirty_scope(conn)
         line.conclude(
@@ -260,27 +223,21 @@ def refresh(conn: Connection, logger: logging.Logger) -> int:
         quantity(updated, "contribution source mise à jour", "contributions sources mises à jour"),
         time.perf_counter() - t0,
     )
-    _timed_refresh(
-        conn,
-        logger,
-        refresh_source_record_countries,
-        branch=BRANCH,
-        label="enregistrements sources",
-        singular="enregistrement source mis à jour",
-        plural="enregistrements sources mis à jour",
-    )
-    publications = _timed_refresh(
-        conn,
-        logger,
-        refresh_publication_countries,
-        branch=LAST_BRANCH,
-        label="publications",
-        singular="publication mise à jour",
-        plural="publications mises à jour",
-    )
+    t0 = time.perf_counter()
+    with waiting(f"{LAST_BRANCH}enregistrements sources : en cours", logger) as line:
+        counts = refresh_source_record_countries(conn)
+        records = quantity(
+            counts.source_records,
+            "enregistrement source mis à jour",
+            "enregistrements sources mis à jour",
+        )
+        publications = quantity(
+            counts.publications, "publication à recalculer", "publications à recalculer"
+        )
+        line.conclude(f"{LAST_BRANCH}{records} en {time.perf_counter() - t0:.1f} s, {publications}")
     delete_processed_marks(conn)
     drop_dirty_scope(conn)
-    return publications
+    return counts.publications
 
 
 class CountryRecompute:
@@ -319,27 +276,28 @@ class CountryRecompute:
                       AND sc.source_record_id IS NOT NULL
                 )
                 """
-                + _SOURCE_RECORD_COUNTRIES_FROM_SCOPE
+                + _SOURCE_RECORD_COUNTRIES_AGG
+                + _SOURCE_RECORD_COUNTRIES_UPDATE
             ),
             {"ids": address_ids},
         ).rowcount
 
-    def refresh_publications_countries_for_addresses(self, address_ids: list[int]) -> int:
-        """Recalcule `publications.countries` (union des `source_records.countries`) pour les publications rattachées à l'une des `address_ids`. Idempotent. Renvoie le nombre de publications mises à jour."""
+    def refresh_publications_for_addresses(self, address_ids: list[int]) -> int:
+        """Recalcule les métadonnées consolidées des publications rattachées à l'une des `address_ids`. Renvoie le nombre de publications recalculées."""
         if not address_ids:
             return 0
-        return self._conn.execute(
-            text(
-                """
-                WITH scoped_publications AS (
-                    SELECT DISTINCT sr.publication_id AS publication_id
+        publication_ids = list(
+            self._conn.execute(
+                text("""
+                    SELECT DISTINCT sr.publication_id
                     FROM source_contribution_addresses sca
                     JOIN source_contributions sc ON sc.id = sca.source_contribution_id
                     JOIN source_records sr ON sr.id = sc.source_record_id
                     WHERE sca.address_id = ANY(:ids) AND sr.publication_id IS NOT NULL
-                )
-                """
-                + _PUBLICATION_COUNTRIES_FROM_SCOPE
-            ),
-            {"ids": address_ids},
-        ).rowcount
+                    ORDER BY sr.publication_id
+                """),
+                {"ids": address_ids},
+            ).scalars()
+        )
+        lifecycle.refresh(self._conn, publication_ids)
+        return len(publication_ids)

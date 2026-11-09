@@ -1,4 +1,4 @@
-"""Tests d'intégration du SQL de la phase `countries` : candidats, résolution, recopie en cascade."""
+"""Tests d'intégration du SQL de l'étape des pays : candidats, résolution, recopie en cascade, mise en file de consolidation."""
 
 import logging
 
@@ -6,12 +6,11 @@ from sqlalchemy import text
 
 from domain.addresses.country_detection import CountryDetectionMethod
 from infrastructure.db.queues import Queue
-from pipeline.transformation.countries.refresh_publication_countries import (
+from pipeline.transformation.countries.refresh_source_record_countries import (
     create_dirty_scope,
     delete_processed_marks,
     drop_dirty_scope,
     refresh,
-    refresh_publication_countries,
     refresh_source_contribution_countries,
     refresh_source_record_countries,
 )
@@ -162,7 +161,7 @@ class TestRefreshAddressSourceCountries:
         _, updated = _refresh(
             sa_sync_conn, refresh_source_contribution_countries, refresh_source_record_countries
         )
-        assert updated == 1
+        assert updated.source_records == 1
 
         result = sa_sync_conn.execute(
             text("SELECT countries FROM source_records WHERE id = :sd"),
@@ -195,57 +194,52 @@ class TestRefreshAddressSourceCountries:
         insert_source_contribution_address(sa_sync_conn, sa, address_id=addr)
 
         (updated,) = _refresh(sa_sync_conn, refresh_source_record_countries)
-        assert updated == 0
+        assert updated.source_records == 0
 
 
-class TestRefreshPublicationCountries:
-    def test_unions_all_source_countries(self, sa_sync_conn):
-        publication_id = insert_publication(sa_sync_conn)
-        sd1 = insert_source_record(
-            sa_sync_conn, publication_id, source="hal", source_id="hal-1", countries=["FR"]
-        )
-        sd2 = insert_source_record(
-            sa_sync_conn,
-            publication_id,
-            source="openalex",
-            source_id="oa-1",
-            countries=["US", "FR"],
-        )
-        # Une contribution source, marquée à l'insertion, met la publication dans la portée du recalcul.
-        insert_source_contribution(sa_sync_conn, sd1, source="hal")
-        insert_source_contribution(sa_sync_conn, sd2, source="openalex")
+class TestPublicationsQueuedForConsolidation:
+    """Les publications des enregistrements sources aux pays modifiés entrent dans la file de consolidation."""
 
-        (updated,) = _refresh(sa_sync_conn, refresh_publication_countries)
-        assert updated == 1
-
-        result = sa_sync_conn.execute(
-            text("SELECT countries FROM publications WHERE id = :pid"),
-            {"pid": publication_id},
-        ).scalar_one()
-        assert result == ["FR", "US"]
-
-    def test_ignores_source_records_without_publication_id(self, sa_sync_conn):
-        insert_source_record(
-            sa_sync_conn, None, source="hal", source_id="hal-orphan", countries=["FR"]
-        )
-        (updated,) = _refresh(sa_sync_conn, refresh_publication_countries)
-        assert updated == 0
-
-    def test_noop_when_already_up_to_date(self, sa_sync_conn):
-        publication_id = insert_publication(sa_sync_conn)
+    def _source_record_in_scope(self, conn, publication_id, countries):
+        ensure_country(conn, "FR")
         source_record = insert_source_record(
-            sa_sync_conn, publication_id, source="hal", source_id="hal-1", countries=["FR"]
+            conn, publication_id, source="openalex", source_id="oa-q", countries=countries
         )
-        insert_source_contribution(
-            sa_sync_conn, source_record, source="hal"
-        )  # marquée → publication dans la portée
-        sa_sync_conn.execute(
-            text("UPDATE publications SET countries = ARRAY['FR'] WHERE id = :pid"),
-            {"pid": publication_id},
+        # La contribution source, marquée à l'insertion, met l'enregistrement source dans la portée du recalcul.
+        sa = insert_source_contribution(conn, source_record, source="openalex")
+        addr = insert_address(conn, "Lyon", countries=["FR"], normalized_text="Lyon")
+        insert_source_contribution_address(conn, sa, address_id=addr)
+
+    def test_un_changement_de_pays_met_la_publication_en_file(self, sa_sync_conn):
+        publication_id = insert_publication(sa_sync_conn)
+        self._source_record_in_scope(sa_sync_conn, publication_id, countries=None)
+
+        _, updated = _refresh(
+            sa_sync_conn, refresh_source_contribution_countries, refresh_source_record_countries
         )
 
-        (updated,) = _refresh(sa_sync_conn, refresh_publication_countries)
-        assert updated == 0
+        assert updated.publications == 1
+        assert queued(sa_sync_conn, Queue.PUBLICATIONS) == {publication_id}
+
+    def test_des_pays_inchanges_laissent_la_publication_hors_file(self, sa_sync_conn):
+        publication_id = insert_publication(sa_sync_conn)
+        self._source_record_in_scope(sa_sync_conn, publication_id, countries=["FR"])
+
+        _refresh(
+            sa_sync_conn, refresh_source_contribution_countries, refresh_source_record_countries
+        )
+
+        assert queued(sa_sync_conn, Queue.PUBLICATIONS) == set()
+
+    def test_un_enregistrement_source_sans_publication_ne_met_rien_en_file(self, sa_sync_conn):
+        self._source_record_in_scope(sa_sync_conn, None, countries=None)
+
+        _, updated = _refresh(
+            sa_sync_conn, refresh_source_contribution_countries, refresh_source_record_countries
+        )
+
+        assert updated.source_records == 1
+        assert queued(sa_sync_conn, Queue.PUBLICATIONS) == set()
 
 
 def _source_record_countries(conn, source_record_id):

@@ -52,7 +52,7 @@ def sous_etapes():
     with (
         patch.object(step.detect_by_country_name, "run", return_value=PhaseMetrics(new=4)),
         patch.object(
-            step.refresh_publication_countries,
+            step.refresh_source_record_countries,
             "refresh",
             side_effect=lambda conn, log: appels.__setitem__("refresh", True),
         ),

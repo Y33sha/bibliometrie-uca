@@ -9,6 +9,7 @@ from itertools import batched
 from sqlalchemy import Connection, text
 
 from domain.publications.oa_status import OaStatus
+from infrastructure.db.queues import Queue, delete_processed, snapshot
 from infrastructure.sql_fragments import has_document_evidence
 from pipeline.transformation.publications.consolidation import RefreshVerdict, consolidate
 from pipeline.transformation.publications.store import PublicationStore
@@ -64,6 +65,23 @@ def refresh(
         if on_batch is not None:
             on_batch(len(batch))
     return verdicts
+
+
+_QUEUED = "publications_queue_marks"
+"""Relevé de la file `publications_queue` par `refresh_queued`."""
+
+
+def refresh_queued(conn: Connection, *, on_batch: Callable[[int], None] | None = None) -> int:
+    """Recalcule les publications de la file `publications_queue` encore en base, puis supprime les marquages traités. Renvoie le nombre de publications recalculées."""
+    snapshot(conn, Queue.PUBLICATIONS, _QUEUED)
+    publication_ids = list(
+        conn.execute(
+            text(f"SELECT p.id FROM {_QUEUED} m JOIN publications p ON p.id = m.id ORDER BY p.id")  # noqa: S608
+        ).scalars()
+    )
+    refresh(conn, publication_ids, on_batch=on_batch)
+    delete_processed(conn, Queue.PUBLICATIONS, _QUEUED)
+    return len(publication_ids)
 
 
 def dissolve(conn: Connection, publication_id: int, successor_id: int) -> None:
