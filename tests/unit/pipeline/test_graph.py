@@ -9,7 +9,7 @@ from domain.sources.registry import (
     SOURCE_PRIORITY,
     Source,
 )
-from pipeline.graph import Step, Task, dependencies, order_violations
+from pipeline.graph import Step, Task, dependencies, interface, order_violations
 from pipeline.phases import ALL_TASKS, PHASES
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
@@ -36,6 +36,28 @@ def test_une_tache_placee_dans_une_etape_ecrit_sous_le_titre_de_l_etape():
         if task.section is not None
     ]
     assert in_steps == []
+
+
+def test_l_interface_d_une_etape_omet_les_lectures_de_ses_propres_ecritures():
+    """Une donnée écrite par une tâche de l'étape, puis lue par une tâche suivante, reste interne à l'étape."""
+
+    def tache(name: str, reads: tuple[str, ...], writes: tuple[str, ...]) -> Task:
+        return Task(name, run=lambda _ctx: PhaseMetrics(), reads=reads, writes=writes)
+
+    etape = Step(
+        "revues",
+        "Revues",
+        "ISSN → revues",
+        (
+            tache("sync", ("source_records.biblio",), ("serial_issns",)),
+            tache("attach", ("serial_issns", "serials"), ("source_records.serial_id",)),
+        ),
+    )
+
+    reads, writes = interface(etape.children)
+
+    assert reads == {"source_records.biblio", "serials"}
+    assert writes == {"serial_issns", "source_records.serial_id"}
 
 
 def test_une_tache_d_extraction_par_source_moissonnee():

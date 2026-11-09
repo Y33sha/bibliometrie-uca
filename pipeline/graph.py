@@ -141,6 +141,16 @@ def leaves(children: Iterable[Step | Task]) -> tuple[Task, ...]:
     )
 
 
+def interface(children: Iterable[Step | Task]) -> tuple[frozenset[str], frozenset[str]]:
+    """Renvoie les données lues par `children` hors de ses propres écritures précédentes, et les données écrites par `children`."""
+    reads: set[str] = set()
+    writes: list[str] = []
+    for task in leaves(children):
+        reads.update(r for r in task.reads if not any(_affected_by(r, w) for w in writes))
+        writes.extend(task.writes)
+    return frozenset(reads), frozenset(writes)
+
+
 @dataclass(frozen=True)
 class Phase:
     """Phase du pipeline : étapes et tâches consécutives, avec leur libellé et leurs attributs."""
