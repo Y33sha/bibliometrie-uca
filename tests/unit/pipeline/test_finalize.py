@@ -70,7 +70,7 @@ def _finalize(appels: list[str], suppressions: dict[str, int] | None = None) -> 
 
     return dataclasses.replace(
         _FINALIZE,
-        tasks=tuple(
+        children=tuple(
             dataclasses.replace(t, run=run(_SUPPRESSIONS[t.name])) if t.name in _SUPPRESSIONS else t
             for t in _FINALIZE.tasks
         ),

@@ -8,7 +8,7 @@ from pipeline.task_runner import run_phase
 from pipeline.transformation.publishing import publishing
 
 _PHASE = next(phase for phase in PHASES if phase.name == "publishing")
-_CHAMPS = tuple(task.name for task in publishing.TASKS)
+_CHAMPS = tuple(task.name for task in _PHASE.tasks)
 
 
 def _run(
@@ -30,7 +30,7 @@ def _run(
 
     tasks = tuple(dataclasses.replace(task, run=runner(task.name)) for task in _PHASE.tasks)
     return run_phase(
-        dataclasses.replace(_PHASE, tasks=tasks),
+        dataclasses.replace(_PHASE, children=tasks),
         contexte(credentials_missing=lambda _source: credentials_missing),
     )
 

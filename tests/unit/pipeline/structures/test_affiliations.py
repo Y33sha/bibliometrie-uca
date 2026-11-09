@@ -40,7 +40,7 @@ def _phase(ror: PhaseMetrics | None = None) -> Phase:
     affiliations = next(p for p in PHASES if p.name == "affiliations")
     return dataclasses.replace(
         affiliations,
-        tasks=tuple(
+        children=tuple(
             dataclasses.replace(t, run=remplacees.get(t.name, t.run)) for t in affiliations.tasks
         ),
     )

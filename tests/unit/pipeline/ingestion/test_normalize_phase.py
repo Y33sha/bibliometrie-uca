@@ -48,7 +48,7 @@ def lancer(contexte, monkeypatch):
         }
         phase = dataclasses.replace(
             _NORMALIZE,
-            tasks=tuple(
+            children=tuple(
                 dataclasses.replace(t, run=nettoyages.get(t.name, t.run)) for t in _NORMALIZE.tasks
             ),
         )

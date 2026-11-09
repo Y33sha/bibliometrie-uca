@@ -42,7 +42,7 @@ def _run(contexte) -> PhaseMetrics:
         dataclasses.replace(t, run=_PLACE_NAMES) if t.name == "detect_by_place_name" else t
         for t in _PHASE.tasks
     )
-    return run_phase(dataclasses.replace(_PHASE, tasks=tasks), contexte(mode="daily"))
+    return run_phase(dataclasses.replace(_PHASE, children=tasks), contexte(mode="daily"))
 
 
 def _bilan(total: int, with_country: int) -> AddressCountryStatus:

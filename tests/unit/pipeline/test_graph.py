@@ -9,7 +9,7 @@ from domain.sources.registry import (
     SOURCE_PRIORITY,
     Source,
 )
-from pipeline.graph import Task, dependencies, order_violations
+from pipeline.graph import Step, Task, dependencies, order_violations
 from pipeline.phases import ALL_TASKS, PHASES
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
@@ -23,6 +23,19 @@ def _names(phase: str) -> list[str]:
 def test_noms_uniques():
     names = [n.name for n in ALL_TASKS]
     assert len(names) == len(set(names))
+
+
+def test_une_tache_placee_dans_une_etape_ecrit_sous_le_titre_de_l_etape():
+    """La `section` d'une tâche placée dans une étape serait ignorée par l'exécuteur."""
+    in_steps = [
+        task.name
+        for phase in PHASES
+        for child in phase.children
+        if isinstance(child, Step)
+        for task in child.tasks
+        if task.section is not None
+    ]
+    assert in_steps == []
 
 
 def test_une_tache_d_extraction_par_source_moissonnee():

@@ -88,7 +88,7 @@ PHASES: tuple[Phase, ...] = (
     Phase(
         "publishing",
         "Référentiels de l'édition",
-        publishing.TASKS,
+        publishing.STEPS,
         assemble=publishing.assemble,
     ),
     Phase(

@@ -4,7 +4,7 @@ import logging
 
 import pytest
 
-from pipeline.graph import Phase, Task
+from pipeline.graph import Phase, Step, Task
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.task_runner import execute_tasks, run_phase
 
@@ -64,6 +64,40 @@ def test_l_executeur_ecrit_le_bilan_de_chaque_section_dans_l_ordre_des_taches(co
         "",
         "▶ Éditeurs",
         "  └─ Rien à faire",
+    ]
+
+
+def test_une_etape_de_premier_niveau_donne_le_titre_de_section_de_ses_taches(contexte, caplog):
+    """Les tâches d'une étape placée dans une autre écrivent sous le titre de l'étape englobante. Une tâche hors étape garde sa `section`."""
+
+    def tache(name: str, **kwargs) -> Task:
+        return Task(name, run=lambda _ctx: PhaseMetrics(report=name), label=name, **kwargs)
+
+    children = (
+        Step(
+            "revues",
+            "Revues",
+            "ISSN → revues",
+            (
+                Step("issn", "ISSN", "ISSN → ISSN-L", (tache("sync"), tache("sudoc"))),
+                tache("attach"),
+            ),
+        ),
+        tache("editeurs", section="Éditeurs"),
+    )
+
+    with caplog.at_level(logging.INFO, logger="test"):
+        execute_tasks(children, contexte())
+
+    assert [record.getMessage() for record in caplog.records] == [
+        "",
+        "▶ Revues",
+        "  ├─ sync : sync",
+        "  ├─ sudoc : sudoc",
+        "  └─ attach : attach",
+        "",
+        "▶ Éditeurs",
+        "  └─ editeurs : editeurs",
     ]
 
 

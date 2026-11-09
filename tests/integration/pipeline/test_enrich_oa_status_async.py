@@ -280,7 +280,7 @@ def test_l_evolution_des_statuts_couvre_les_deux_services(logger):
     resolution, unpaywall = oa_status.TASKS
     phase = dataclasses.replace(
         next(p for p in PHASES if p.name == "oa_status"),
-        tasks=(
+        children=(
             dataclasses.replace(
                 resolution,
                 run=_task(
@@ -398,7 +398,7 @@ def test_skips_without_unpaywall_configuration(logger):
     resolution, unpaywall = oa_status.TASKS
     phase = dataclasses.replace(
         next(p for p in PHASES if p.name == "oa_status"),
-        tasks=(
+        children=(
             dataclasses.replace(
                 resolution, run=_task(queries, _doi_org_fetcher, service=DOI_ORG).run
             ),

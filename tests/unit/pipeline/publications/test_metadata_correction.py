@@ -22,7 +22,7 @@ def _run(contexte, **by_task: PhaseMetrics):
         return lambda _ctx: ordre.append(name) or by_task.get(name, PhaseMetrics())
 
     phase = dataclasses.replace(
-        _PHASE, tasks=tuple(dataclasses.replace(t, run=run(t.name)) for t in _PHASE.tasks)
+        _PHASE, children=tuple(dataclasses.replace(t, run=run(t.name)) for t in _PHASE.tasks)
     )
     return run_phase(phase, contexte()), ordre
 

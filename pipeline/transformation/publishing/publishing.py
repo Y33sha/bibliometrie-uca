@@ -1,4 +1,4 @@
-"""Phase `publishing` : référentiels des éditeurs, des revues et des monographies. Chaque sous-étape est une tâche du graphe (`pipeline.graph`).
+"""Phase `publishing` : référentiels des éditeurs, des revues et des monographies, en étapes (`STEPS`) et tâches du graphe (`pipeline.graph`).
 
 Contraintes d'ordre :
 
@@ -21,7 +21,7 @@ from functools import partial
 
 from domain.config import ConfigKey
 from infrastructure.repositories.publisher_merge import merge_publisher_into
-from pipeline.graph import Task, TaskRun, in_transaction
+from pipeline.graph import Step, Task, TaskRun, in_transaction
 from pipeline.http.polite_pool import default_user_agent
 from pipeline.ingestion.api_params import (
     API_BASE_URLS,
@@ -186,392 +186,452 @@ def _run_enrich_serials_from_doaj(ctx: PhaseContext) -> PhaseMetrics:
         )
 
 
-TASKS = (
-    Task(
-        "resolve_crossref_publishers",
-        reads=(
-            "doi_prefixes.id",
-            "doi_prefixes.ra",
-            "doi_prefixes.publisher_id",
-            "doi_prefixes.publisher_name_normalized",
-            "doi_prefixes.crossref_checked_at",
-            "source_record_identifiers",
-            "publishers.id",
-            "publisher_name_forms",
-        ),
-        writes=(
-            "doi_prefixes.ra",
-            "doi_prefixes.publisher_id",
-            "doi_prefixes.publisher_name_raw",
-            "doi_prefixes.publisher_name_normalized",
-            "doi_prefixes.crossref_member_id",
-            "doi_prefixes.crossref_checked_at",
-            "publishers.id",
-            "publisher_name_forms",
-        ),
-        # L'agence et l'éditeur posés par `resolve_datacite_publishers` retirent un préfixe de la sélection.
-        previous_run=(
-            "source_record_identifiers",
-            "publishers",
-            "publisher_name_forms",
-            "doi_prefixes",
-        ),
-        network="crossref",
-        run=_resolve_publishers(
-            partial(
-                resolve_publishers.run_resolve_crossref_publishers,
-                fetch_prefix_fn=fetch_crossref_prefix,
-            )
-        ),
-        section="Éditeurs",
-        label=resolve_publishers.LABELS["Crossref"],
+_RESOLVE_CROSSREF_PUBLISHERS = Task(
+    "resolve_crossref_publishers",
+    reads=(
+        "doi_prefixes.id",
+        "doi_prefixes.ra",
+        "doi_prefixes.publisher_id",
+        "doi_prefixes.publisher_name_normalized",
+        "doi_prefixes.crossref_checked_at",
+        "source_record_identifiers",
+        "publishers.id",
+        "publisher_name_forms",
     ),
-    Task(
-        "resolve_datacite_publishers",
-        reads=(
-            "doi_prefixes.id",
-            "doi_prefixes.ra",
-            "doi_prefixes.publisher_id",
-            "doi_prefixes.publisher_name_normalized",
-            "doi_prefixes.crossref_checked_at",
-            "doi_prefixes.datacite_checked_at",
-            "publishers.id",
-            "publisher_name_forms",
-        ),
-        writes=(
-            "doi_prefixes.ra",
-            "doi_prefixes.publisher_id",
-            "doi_prefixes.publisher_name_raw",
-            "doi_prefixes.publisher_name_normalized",
-            "doi_prefixes.client_name_raw",
-            "doi_prefixes.client_name_normalized",
-            "doi_prefixes.datacite_client_symbol",
-            "doi_prefixes.datacite_checked_at",
-            "publishers.id",
-            "publisher_name_forms",
-        ),
-        previous_run=("publishers", "publisher_name_forms"),
-        network="datacite",
-        run=_resolve_publishers(
-            partial(
-                resolve_publishers.run_resolve_datacite_publishers,
-                fetch_prefix_fn=fetch_datacite_prefix,
-            )
-        ),
-        section="Éditeurs",
-        label=resolve_publishers.LABELS["DataCite"],
+    writes=(
+        "doi_prefixes.ra",
+        "doi_prefixes.publisher_id",
+        "doi_prefixes.publisher_name_raw",
+        "doi_prefixes.publisher_name_normalized",
+        "doi_prefixes.crossref_member_id",
+        "doi_prefixes.crossref_checked_at",
+        "publishers.id",
+        "publisher_name_forms",
     ),
-    Task(
-        "attach_publishers",
-        reads=(
-            "source_records.source",
-            "source_records.doc_type",
-            "source_records.corrections",
-            "source_records.biblio",
-            "source_records.publisher_id",
-            "publishers.openalex_id",
-            "publisher_name_forms",
-        ),
-        writes=(
-            "publishers.id",
-            "publishers.openalex_id",
-            "publisher_name_forms",
-            "source_records.publisher_id",
-            "source_record_keys_queue",
-        ),
-        # Éditeurs et formes de nom des runs précédents ; types corrigés par `metadata_correction`, lus sous leur valeur d'avant correction.
-        previous_run=(
-            "publishers",
-            "publisher_name_forms",
-            "source_records.publisher_id",
-            "source_records.corrections",
-            "source_records.doc_type",
-        ),
-        run=in_transaction(attach_publishers.run_attach_publishers),
-        section="Éditeurs",
-        label=attach_publishers.LABEL,
+    # L'agence et l'éditeur posés par `resolve_datacite_publishers` retirent un préfixe de la sélection.
+    previous_run=(
+        "source_record_identifiers",
+        "publishers",
+        "publisher_name_forms",
+        "doi_prefixes",
     ),
-    Task(
-        "merge_duplicate_publishers",
-        reads=(
-            "source_records.publisher_id",
-            "source_records.publication_id",
-            "publications.doi_prefix",
-            "doi_prefixes.publisher_id",
-            "publishers.id",
-            "publishers.name",
-        ),
-        writes=(
-            "publishers.id",
-            "source_records.publisher_id",
-            "publications.publisher_id",
-            "serials.publisher_id",
-            "monographs.publisher_id",
-            "apc_payments.publisher_id",
-            "publisher_name_forms",
-            "merge_redirects",
-        ),
-        # Un autre nom ne détient aucun préfixe DOI : la fusion laisse `doi_prefixes` en l'état.
-        previous_run=("source_records", "publications", "publishers"),
-        run=_run_merge_duplicate_publishers,
-        section="Éditeurs",
-        label=merge_duplicate_publishers.LABEL,
+    network="crossref",
+    run=_resolve_publishers(
+        partial(
+            resolve_publishers.run_resolve_crossref_publishers,
+            fetch_prefix_fn=fetch_crossref_prefix,
+        )
     ),
-    Task(
-        "sync_issns",
-        reads=("source_records.biblio", "serial_issns"),
-        writes=("serial_issns",),
-        # Lignes vérifiées par `check_issns_in_sudoc`, revues posées par `attach_serials`, revues supprimées par `finalize.delete_empty_serials`.
-        previous_run=("serial_issns",),
-        run=in_transaction(attach_serials.run_sync_issns),
-        section="Publications en série",
-        label=attach_serials.SYNC_LABEL,
+    label=resolve_publishers.LABELS["Crossref"],
+)
+
+
+_RESOLVE_DATACITE_PUBLISHERS = Task(
+    "resolve_datacite_publishers",
+    reads=(
+        "doi_prefixes.id",
+        "doi_prefixes.ra",
+        "doi_prefixes.publisher_id",
+        "doi_prefixes.publisher_name_normalized",
+        "doi_prefixes.crossref_checked_at",
+        "doi_prefixes.datacite_checked_at",
+        "publishers.id",
+        "publisher_name_forms",
     ),
-    Task(
-        "check_issns_in_sudoc",
-        reads=(
-            "serial_issns",
-            "serials.id",
-            "serials.title",
-            "serials.manual_fields",
-            "config",
-        ),
-        writes=(
-            "serial_issns",
-            "issn_links",
-            "serials.id",
-            "serials.title",
-            "serials.title_normalized",
-        ),
-        previous_run=("serial_issns", "serials"),
-        network="sudoc",
-        run=_run_check_issns_in_sudoc,
-        section="Publications en série",
-        label=check_issns_in_sudoc.LABEL,
-        threshold=3,
+    writes=(
+        "doi_prefixes.ra",
+        "doi_prefixes.publisher_id",
+        "doi_prefixes.publisher_name_raw",
+        "doi_prefixes.publisher_name_normalized",
+        "doi_prefixes.client_name_raw",
+        "doi_prefixes.client_name_normalized",
+        "doi_prefixes.datacite_client_symbol",
+        "doi_prefixes.datacite_checked_at",
+        "publishers.id",
+        "publisher_name_forms",
     ),
-    Task(
-        "import_issnl_table",
-        reads=("serial_issns", "config"),
-        writes=("serial_issns.issnl", "serial_issns.issnl_checked_at"),
-        # Date du dernier import, posée par la tâche elle-même.
-        previous_run=("serial_issns",),
-        network="issn",
-        run=_run_import_issnl_table,
-        section="Publications en série",
-        label=import_issnl_table.LABEL,
+    previous_run=("publishers", "publisher_name_forms"),
+    network="datacite",
+    run=_resolve_publishers(
+        partial(
+            resolve_publishers.run_resolve_datacite_publishers,
+            fetch_prefix_fn=fetch_datacite_prefix,
+        )
     ),
-    Task(
-        "attach_serials",
-        reads=(
-            "source_records.source",
-            "source_records.biblio",
-            "source_records.serial_id",
-            "source_records.publisher_id",
-            "source_records.corrections",
-            "serial_issns",
-            # ISSN qui annule chaque ISSN annulé.
-            "issn_links",
-            "serials",
-            "serial_title_decisions",
-            "monographs.serial_id",
-            # Nombre de publications et éditeur des revues qui en absorbent une autre.
-            "publications.serial_id",
-            "publications.publisher_id",
-            "publications.publication_year",
-            "publications.in_perimeter",
-        ),
-        writes=(
-            "source_records.serial_id",
-            "source_records.corrections",
-            "source_record_keys_queue",
-            "serial_issns",
-            "serials",
-            "publications.serial_id",
-            "apc_payments.serial_id",
-            "monographs.serial_id",
-            "merge_redirects",
-        ),
-        # Revues corrigées par `metadata_correction`, collections posées par `link_monographs_to_collections`, publications recalculées par la phase `publications`, décisions de titre supprimées avec leur revue par `finalize.delete_empty_serials`.
-        previous_run=(
-            "source_records.serial_id",
-            "source_records.corrections",
-            "serial_issns",
-            "serials",
-            "monographs.serial_id",
-            "publications",
-            "serial_title_decisions",
-        ),
-        run=in_transaction(attach_serials.run_attach_serials),
-        section="Publications en série",
-        label=attach_serials.ATTACH_LABEL,
+    label=resolve_publishers.LABELS["DataCite"],
+)
+
+
+_ATTACH_PUBLISHERS = Task(
+    "attach_publishers",
+    reads=(
+        "source_records.source",
+        "source_records.doc_type",
+        "source_records.corrections",
+        "source_records.biblio",
+        "source_records.publisher_id",
+        "publishers.openalex_id",
+        "publisher_name_forms",
     ),
-    Task(
-        "check_serials_in_openalex",
-        reads=(
-            "serials.id",
-            "serials.openalex_id",
-            "serials.openalex_checked_at",
-            "serials.publication_count",
-            "serials.serial_type",
-            "serials.manual_fields",
-            "serial_issns",
-            "source_records.source",
-            "source_records.biblio",
-            "source_records.serial_id",
-            "serial_lists",
-            "config",
-        ),
-        writes=(
-            "serials.openalex_id",
-            "serials.openalex_checked_at",
-            "serials.serial_type",
-            "serial_list_entries",
-            "serial_lists",
-        ),
-        # Nombre de publications recalculé par `finalize`, date de recherche posée par la tâche elle-même, revues corrigées par `metadata_correction`, ISSN libérés par `finalize.delete_empty_serials`.
-        previous_run=("serials", "source_records.serial_id", "serial_issns"),
-        network="openalex",
-        run=_run_check_serials_in_openalex,
-        section="Publications en série",
-        label=check_serials_in_openalex.LABEL,
-        # Trois lots consécutifs en 429 signalent l'épuisement du quota OpenAlex du jour. Le reste attend le run suivant.
-        threshold=3,
+    writes=(
+        "publishers.id",
+        "publishers.openalex_id",
+        "publisher_name_forms",
+        "source_records.publisher_id",
+        "source_record_keys_queue",
     ),
-    Task(
-        "type_proceedings_serials",
-        reads=(
-            "serials.id",
-            "serials.title",
-            "serials.serial_type",
-            "serials.manual_fields",
-            "serial_issns",
-            "source_records.source",
-            "source_records.raw_doc_type",
-            "source_records.serial_id",
-        ),
-        writes=("serials.serial_type",),
-        previous_run=("serials", "serial_issns", "source_records.serial_id"),
-        run=in_transaction(type_proceedings_serials.run_type_proceedings_serials),
-        section="Publications en série",
-        label=type_proceedings_serials.LABEL,
+    # Éditeurs et formes de nom des runs précédents ; types corrigés par `metadata_correction`, lus sous leur valeur d'avant correction.
+    previous_run=(
+        "publishers",
+        "publisher_name_forms",
+        "source_records.publisher_id",
+        "source_records.corrections",
+        "source_records.doc_type",
     ),
-    Task(
-        "type_journal_serials",
-        reads=(
-            "serials.id",
-            "serials.title",
-            "serials.serial_type",
-            "serials.manual_fields",
-            "serial_issns",
-            "source_records.source",
-            "source_records.raw_doc_type",
-            "source_records.serial_id",
-        ),
-        writes=("serials.serial_type",),
-        previous_run=("serials", "serial_issns", "source_records.serial_id"),
-        run=in_transaction(type_journal_serials.run_type_journal_serials),
-        section="Publications en série",
-        label=type_journal_serials.LABEL,
+    run=in_transaction(attach_publishers.run_attach_publishers),
+    label=attach_publishers.LABEL,
+)
+
+
+_MERGE_DUPLICATE_PUBLISHERS = Task(
+    "merge_duplicate_publishers",
+    reads=(
+        "source_records.publisher_id",
+        "source_records.publication_id",
+        "publications.doi_prefix",
+        "doi_prefixes.publisher_id",
+        "publishers.id",
+        "publishers.name",
     ),
-    Task(
-        "learn_serial_doi_namespaces",
-        reads=(
-            "source_record_identifiers",
-            "source_records.serial_id",
-            "source_records.corrections",
-            "serials.serial_type",
-        ),
-        writes=("serial_doi_namespaces",),
-        # Statuts posés par la correction de `metadata_correction`.
-        previous_run=("source_records", "serials", "source_record_identifiers.removed_by"),
-        run=in_transaction(learn_serial_doi_namespaces.run_learn_serial_doi_namespaces),
-        section="Publications en série",
-        label=learn_serial_doi_namespaces.LABEL,
+    writes=(
+        "publishers.id",
+        "source_records.publisher_id",
+        "publications.publisher_id",
+        "serials.publisher_id",
+        "monographs.publisher_id",
+        "apc_payments.publisher_id",
+        "publisher_name_forms",
+        "merge_redirects",
     ),
-    Task(
-        "enrich_serials_from_doaj",
-        reads=(
-            "serial_issns",
-            "serial_list_entries",
-            "serials.doaj_imported_at",
-            "serials.serial_type",
-            "serials.oa_model",
-            "serials.doaj_payload",
-            "serials.manual_fields",
-            "config",
-        ),
-        writes=(
-            "serials.doaj_payload",
-            "serials.doaj_imported_at",
-            "serials.serial_type",
-            "serials.oa_model",
-        ),
-        previous_run=("serial_issns", "serials"),
-        network="doaj",
-        run=_run_enrich_serials_from_doaj,
-        section="Publications en série",
-        label=enrich_serials_from_doaj.LABEL,
+    # Un autre nom ne détient aucun préfixe DOI : la fusion laisse `doi_prefixes` en l'état.
+    previous_run=("source_records", "publications", "publishers"),
+    run=_run_merge_duplicate_publishers,
+    label=merge_duplicate_publishers.LABEL,
+)
+
+
+_SYNC_ISSNS = Task(
+    "sync_issns",
+    reads=("source_records.biblio", "serial_issns"),
+    writes=("serial_issns",),
+    # Lignes vérifiées par `check_issns_in_sudoc`, revues posées par `attach_serials`, revues supprimées par `finalize.delete_empty_serials`.
+    previous_run=("serial_issns",),
+    run=in_transaction(attach_serials.run_sync_issns),
+    label=attach_serials.SYNC_LABEL,
+)
+
+
+_CHECK_ISSNS_IN_SUDOC = Task(
+    "check_issns_in_sudoc",
+    reads=(
+        "serial_issns",
+        "serials.id",
+        "serials.title",
+        "serials.manual_fields",
+        "config",
     ),
-    Task(
-        "attach_monographs",
-        reads=(
-            "source_records.biblio",
-            "source_records.monograph_id",
-            "source_records.publisher_id",
-            "monographs",
-        ),
-        writes=(
-            "monographs",
-            "source_records.monograph_id",
-            "publications.monograph_id",
-            "source_record_keys_queue",
-            "merge_redirects",
-        ),
-        # Monographies créées ou fusionnées aux runs précédents, reprises par les volumes.
-        previous_run=("monographs", "source_records.monograph_id"),
-        run=in_transaction(attach_monographs.run_attach_monographs),
-        section="Monographies",
-        label=attach_monographs.LABEL,
+    writes=(
+        "serial_issns",
+        "issn_links",
+        "serials.id",
+        "serials.title",
+        "serials.title_normalized",
     ),
-    Task(
-        "link_monographs_to_collections",
-        reads=(
-            "monographs",
-            "source_records.monograph_id",
-            "source_records.serial_id",
-            "serial_issns",
-            "serials.title_normalized",
-            "serials.publisher_id",
-            "serials.manual_fields",
-        ),
-        writes=(
-            "serials.id",
-            "serials.title",
-            "serials.title_normalized",
-            "serials.serial_type",
-            "monographs.serial_id",
-        ),
-        previous_run=("monographs", "source_records.serial_id", "serial_issns", "serials"),
-        run=in_transaction(link_monographs_to_collections.run_link_monographs_to_collections),
-        section="Monographies",
-        label=link_monographs_to_collections.LABEL,
+    previous_run=("serial_issns", "serials"),
+    network="sudoc",
+    run=_run_check_issns_in_sudoc,
+    label=check_issns_in_sudoc.LABEL,
+    threshold=3,
+)
+
+
+_IMPORT_ISSNL_TABLE = Task(
+    "import_issnl_table",
+    reads=("serial_issns", "config"),
+    writes=("serial_issns.issnl", "serial_issns.issnl_checked_at"),
+    # Date du dernier import, posée par la tâche elle-même.
+    previous_run=("serial_issns",),
+    network="issn",
+    run=_run_import_issnl_table,
+    label=import_issnl_table.LABEL,
+)
+
+
+_ATTACH_SERIALS = Task(
+    "attach_serials",
+    reads=(
+        "source_records.source",
+        "source_records.biblio",
+        "source_records.serial_id",
+        "source_records.publisher_id",
+        "source_records.corrections",
+        "serial_issns",
+        # ISSN qui annule chaque ISSN annulé.
+        "issn_links",
+        "serials",
+        "serial_title_decisions",
+        "monographs.serial_id",
+        # Nombre de publications et éditeur des revues qui en absorbent une autre.
+        "publications.serial_id",
+        "publications.publisher_id",
+        "publications.publication_year",
+        "publications.in_perimeter",
     ),
-    Task(
-        "type_proceedings_volumes",
-        reads=(
-            "monographs.id",
-            "monographs.serial_id",
-            "serials.serial_type",
-            "source_records.source",
-            "source_records.raw_doc_type",
-            "source_records.source_extras",
-            "source_records.monograph_id",
+    writes=(
+        "source_records.serial_id",
+        "source_records.corrections",
+        "source_record_keys_queue",
+        "serial_issns",
+        "serials",
+        "publications.serial_id",
+        "apc_payments.serial_id",
+        "monographs.serial_id",
+        "merge_redirects",
+    ),
+    # Revues corrigées par `metadata_correction`, collections posées par `link_monographs_to_collections`, publications recalculées par la phase `publications`, décisions de titre supprimées avec leur revue par `finalize.delete_empty_serials`.
+    previous_run=(
+        "source_records.serial_id",
+        "source_records.corrections",
+        "serial_issns",
+        "serials",
+        "monographs.serial_id",
+        "publications",
+        "serial_title_decisions",
+    ),
+    run=in_transaction(attach_serials.run_attach_serials),
+    label=attach_serials.ATTACH_LABEL,
+)
+
+
+_CHECK_SERIALS_IN_OPENALEX = Task(
+    "check_serials_in_openalex",
+    reads=(
+        "serials.id",
+        "serials.openalex_id",
+        "serials.openalex_checked_at",
+        "serials.publication_count",
+        "serials.serial_type",
+        "serials.manual_fields",
+        "serial_issns",
+        "source_records.source",
+        "source_records.biblio",
+        "source_records.serial_id",
+        "serial_lists",
+        "config",
+    ),
+    writes=(
+        "serials.openalex_id",
+        "serials.openalex_checked_at",
+        "serials.serial_type",
+        "serial_list_entries",
+        "serial_lists",
+    ),
+    # Nombre de publications recalculé par `finalize`, date de recherche posée par la tâche elle-même, revues corrigées par `metadata_correction`, ISSN libérés par `finalize.delete_empty_serials`.
+    previous_run=("serials", "source_records.serial_id", "serial_issns"),
+    network="openalex",
+    run=_run_check_serials_in_openalex,
+    label=check_serials_in_openalex.LABEL,
+    # Trois lots consécutifs en 429 signalent l'épuisement du quota OpenAlex du jour. Le reste attend le run suivant.
+    threshold=3,
+)
+
+
+_TYPE_PROCEEDINGS_SERIALS = Task(
+    "type_proceedings_serials",
+    reads=(
+        "serials.id",
+        "serials.title",
+        "serials.serial_type",
+        "serials.manual_fields",
+        "serial_issns",
+        "source_records.source",
+        "source_records.raw_doc_type",
+        "source_records.serial_id",
+    ),
+    writes=("serials.serial_type",),
+    previous_run=("serials", "serial_issns", "source_records.serial_id"),
+    run=in_transaction(type_proceedings_serials.run_type_proceedings_serials),
+    label=type_proceedings_serials.LABEL,
+)
+
+
+_TYPE_JOURNAL_SERIALS = Task(
+    "type_journal_serials",
+    reads=(
+        "serials.id",
+        "serials.title",
+        "serials.serial_type",
+        "serials.manual_fields",
+        "serial_issns",
+        "source_records.source",
+        "source_records.raw_doc_type",
+        "source_records.serial_id",
+    ),
+    writes=("serials.serial_type",),
+    previous_run=("serials", "serial_issns", "source_records.serial_id"),
+    run=in_transaction(type_journal_serials.run_type_journal_serials),
+    label=type_journal_serials.LABEL,
+)
+
+
+_LEARN_SERIAL_DOI_NAMESPACES = Task(
+    "learn_serial_doi_namespaces",
+    reads=(
+        "source_record_identifiers",
+        "source_records.serial_id",
+        "source_records.corrections",
+        "serials.serial_type",
+    ),
+    writes=("serial_doi_namespaces",),
+    # Statuts posés par la correction de `metadata_correction`.
+    previous_run=("source_records", "serials", "source_record_identifiers.removed_by"),
+    run=in_transaction(learn_serial_doi_namespaces.run_learn_serial_doi_namespaces),
+    label=learn_serial_doi_namespaces.LABEL,
+)
+
+
+_ENRICH_SERIALS_FROM_DOAJ = Task(
+    "enrich_serials_from_doaj",
+    reads=(
+        "serial_issns",
+        "serial_list_entries",
+        "serials.doaj_imported_at",
+        "serials.serial_type",
+        "serials.oa_model",
+        "serials.doaj_payload",
+        "serials.manual_fields",
+        "config",
+    ),
+    writes=(
+        "serials.doaj_payload",
+        "serials.doaj_imported_at",
+        "serials.serial_type",
+        "serials.oa_model",
+    ),
+    previous_run=("serial_issns", "serials"),
+    network="doaj",
+    run=_run_enrich_serials_from_doaj,
+    label=enrich_serials_from_doaj.LABEL,
+)
+
+
+_ATTACH_MONOGRAPHS = Task(
+    "attach_monographs",
+    reads=(
+        "source_records.biblio",
+        "source_records.monograph_id",
+        "source_records.publisher_id",
+        "monographs",
+    ),
+    writes=(
+        "monographs",
+        "source_records.monograph_id",
+        "publications.monograph_id",
+        "source_record_keys_queue",
+        "merge_redirects",
+    ),
+    # Monographies créées ou fusionnées aux runs précédents, reprises par les volumes.
+    previous_run=("monographs", "source_records.monograph_id"),
+    run=in_transaction(attach_monographs.run_attach_monographs),
+    label=attach_monographs.LABEL,
+)
+
+
+_LINK_MONOGRAPHS_TO_COLLECTIONS = Task(
+    "link_monographs_to_collections",
+    reads=(
+        "monographs",
+        "source_records.monograph_id",
+        "source_records.serial_id",
+        "serial_issns",
+        "serials.title_normalized",
+        "serials.publisher_id",
+        "serials.manual_fields",
+    ),
+    writes=(
+        "serials.id",
+        "serials.title",
+        "serials.title_normalized",
+        "serials.serial_type",
+        "monographs.serial_id",
+    ),
+    previous_run=("monographs", "source_records.serial_id", "serial_issns", "serials"),
+    run=in_transaction(link_monographs_to_collections.run_link_monographs_to_collections),
+    label=link_monographs_to_collections.LABEL,
+)
+
+
+_TYPE_PROCEEDINGS_VOLUMES = Task(
+    "type_proceedings_volumes",
+    reads=(
+        "monographs.id",
+        "monographs.serial_id",
+        "serials.serial_type",
+        "source_records.source",
+        "source_records.raw_doc_type",
+        "source_records.source_extras",
+        "source_records.monograph_id",
+    ),
+    writes=("monographs.proceedings",),
+    previous_run=("monographs", "serials"),
+    run=in_transaction(type_proceedings_volumes.run_type_proceedings_volumes),
+    label=type_proceedings_volumes.LABEL,
+)
+
+
+STEPS = (
+    Step(
+        "doi_prefixes",
+        "Préfixes DOI",
+        "préfixes DOI → éditeur titulaire de chaque préfixe, agence du préfixe inconnu de doi.org",
+        (_RESOLVE_CROSSREF_PUBLISHERS, _RESOLVE_DATACITE_PUBLISHERS),
+    ),
+    Step(
+        "publishers",
+        "Éditeurs",
+        "noms d'éditeur des enregistrements sources → éditeur de chaque enregistrement source, sans doublon",
+        (_ATTACH_PUBLISHERS, _MERGE_DUPLICATE_PUBLISHERS),
+    ),
+    Step(
+        "serials",
+        "Publications en série",
+        "ISSN, titres et identifiants OpenAlex des enregistrements sources → revue de chaque enregistrement source, typée et qualifiée",
+        (
+            Step(
+                "issns",
+                "ISSN",
+                "ISSN des enregistrements sources → ISSN-L, titre Sudoc et liens de chaque ISSN",
+                (_SYNC_ISSNS, _CHECK_ISSNS_IN_SUDOC, _IMPORT_ISSNL_TABLE),
+            ),
+            _ATTACH_SERIALS,
+            Step(
+                "qualification",
+                "Qualification des revues",
+                "revues → identifiant OpenAlex, listes de revues, type, fiche DOAJ",
+                (
+                    _CHECK_SERIALS_IN_OPENALEX,
+                    _TYPE_PROCEEDINGS_SERIALS,
+                    _TYPE_JOURNAL_SERIALS,
+                    _ENRICH_SERIALS_FROM_DOAJ,
+                ),
+            ),
+            _LEARN_SERIAL_DOI_NAMESPACES,
         ),
-        writes=("monographs.proceedings",),
-        previous_run=("monographs", "serials"),
-        run=in_transaction(type_proceedings_volumes.run_type_proceedings_volumes),
-        section="Monographies",
-        label=type_proceedings_volumes.LABEL,
+    ),
+    Step(
+        "monographs",
+        "Monographies",
+        "ISBN et titres des enregistrements sources → monographie de chaque enregistrement source, rattachée à sa collection, typée",
+        (_ATTACH_MONOGRAPHS, _LINK_MONOGRAPHS_TO_COLLECTIONS, _TYPE_PROCEEDINGS_VOLUMES),
     ),
 )
