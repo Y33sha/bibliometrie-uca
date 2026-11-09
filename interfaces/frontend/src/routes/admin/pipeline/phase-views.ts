@@ -141,6 +141,11 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
     summary: [
       { key: "adresses", label: "Adresses traitées" },
       { key: "in_perimeter", label: "Adresses dans le périmètre" },
+      { key: "cited_addresses", label: "Adresses citées par une publication" },
+      { key: "without_country_initial", label: "Adresses citées sans pays avant le run" },
+      { key: "without_country_pct", label: "Part des adresses citées sans pays avant le run (%)" },
+      { key: "country_newly_attached", label: "Adresses dotées d'un pays par le run" },
+      { key: "without_country_remaining", label: "Adresses citées sans pays après le run" },
       {
         key: "source_contributions_entered",
         label: "Contributions sources entrées dans le périmètre",
