@@ -18,6 +18,7 @@ Deux valeurs de la publication sont calculées à deux endroits. La consolidatio
 - Un seul type récursif décrit l'arborescence : un élément a un nom, sa phrase et ses enfants ; la tâche est la feuille. « Phase » désigne seulement le premier niveau, unité du run dans l'administration et dans `pipeline_phase_executions`.
 - L'arborescence donne l'ordre d'exécution. Les tests vérifient sa compatibilité avec les dépendances déclarées par les tâches.
 - Le premier niveau se réduit. Les phases d'une seule tâche rejoignent une phase voisine. `finalize` recalcule les données dérivées des entités : périmètre des publications, purges, vues, compteurs.
+- `countries` rejoint `affiliations` : structures, pays, puis indices de périmètre des contributions sources.
 - La consolidation de la publication est seule à calculer les champs de la publication. Les phases `countries` et `oa_status` produisent les faits : pays des adresses, réponses d'Unpaywall. Un changement de pays d'une adresse déclenche la consolidation des publications liées à cette adresse. Un changement de réponse d'Unpaywall déclenche la consolidation des publications du DOI.
 
 ## Phasage
@@ -40,7 +41,7 @@ Deux valeurs de la publication sont calculées à deux endroits. La consolidatio
 
 ### Phase 3 — Premier niveau
 
-- [ ] Liste des phases et de leur phrase, soumise avant le code
+- [ ] Arborescence cible ([annexe](CODE_hierarchie-du-pipeline_arborescence.md)), puis arbitrage de chaque écart avec l'exécution : réviser l'arborescence ou la logique
 - [ ] `resolve_ra` dans l'étape des préfixes DOI de `publishing` ; agence du préfixe posée à un seul endroit
 - [ ] `fetch_truncated` dans la collecte
 - [ ] `finalize` : recalcul des données dérivées
