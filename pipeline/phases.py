@@ -1,6 +1,6 @@
 """Phases du pipeline, dans l'ordre d'exécution, avec leur libellé et leurs attributs.
 
-Les enrichissements (`extra`) viennent en dernier. Chacun est indépendant des autres. Des phases placées avant eux lisent leurs sorties au run suivant : `resolve_ra` et `fetch_missing` lisent les relations, `normalize` et `publications` les pays, `publications` le statut open access.
+Les enrichissements (`extra`) viennent en dernier. Chacun est indépendant des autres. Des phases placées avant eux lisent leurs sorties au run suivant : `resolve_ra` et `fetch_missing` lisent les relations, `publications` les pays et le statut open access.
 """
 
 from dataclasses import replace
