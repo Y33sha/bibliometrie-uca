@@ -94,8 +94,8 @@ MAX_PER_SECOND: dict[str, float] = {
     "scanr_patents": 2,
     # Aucun seuil publié.
     "theses": 3,
-    # Seuil publié du polite pool : 10 req/s, 3 requêtes simultanées.
-    "crossref": 5,
+    # Seuil annoncé par les en-têtes du polite pool (`x-rate-limit-limit`) : 3 req/s.
+    "crossref": 3,
     # Seuil publié du tier identifié (User-Agent avec mailto) : 1 000 requêtes par 5 minutes.
     "datacite": 3,
     # Aucun seuil dans les en-têtes de réponse.
