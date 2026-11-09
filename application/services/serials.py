@@ -86,10 +86,10 @@ class SerialService:
     def merge_serials(self, target_id: int, source_id: int) -> None:
         """Fusionne la revue source dans la revue cible par le pipeline, qui requalifie les publications absorbées.
 
-        Deux ISSN-L désignent deux revues, donc une des deux revues est sans ISSN actif. Un ISSN `unverified`, absent du Sudoc, passe à la cible avec les autres ISSN. Une revue source sans ISSN actif laisse une décision de rattachement par titre, relue par le rattachement des enregistrements sources.
+        La revue source est sans ISSN : deux ISSN-L désignent deux revues. La fusion est gardée comme décision de rattachement par titre, relue par le rattachement des enregistrements sources.
 
         Raises:
-            ValidationError: deux identifiants égaux, ou deux revues à ISSN actif.
+            ValidationError: deux identifiants égaux, ou revue source à ISSN-L quand la cible en a un.
             NotFoundError: revue introuvable.
         """
         check_merge_pair(

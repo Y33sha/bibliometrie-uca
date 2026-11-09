@@ -518,10 +518,10 @@ def pinned_contributions_sql(contribution_ids: str) -> tuple[str, str]:
 
 
 def serial_issnl(serial: str) -> str:
-    """Renvoie l'expression SQL de l'ISSN-L de la revue `serial` d'après ses ISSN actifs, `NULL` pour une revue sans ISSN actif. Un ISSN égal à son ISSN-L l'emporte."""
+    """Renvoie l'expression SQL de l'ISSN-L de la revue `serial`, `NULL` pour une revue sans ISSN. Un ISSN égal à son ISSN-L l'emporte."""
     return f"""(
         SELECT coalesce(i.issnl, i.issn) FROM serial_issns i
-        WHERE i.serial_id = {serial} AND i.status = 'active'
+        WHERE i.serial_id = {serial}
         ORDER BY i.issn = i.issnl DESC NULLS LAST, i.issn
         LIMIT 1
     )"""

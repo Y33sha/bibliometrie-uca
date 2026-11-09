@@ -24,7 +24,7 @@ class SerialRepository(Protocol):
         ...
 
     def issnl_of(self, serial_id: int) -> str | None:
-        """Renvoie l'ISSN-L de la revue d'après ses ISSN actifs, ou `None` pour une revue sans ISSN actif."""
+        """Renvoie l'ISSN-L de la revue, ou `None` pour une revue sans ISSN."""
         ...
 
     def record_title_decision(self, source_id: int, target_id: int) -> None:
