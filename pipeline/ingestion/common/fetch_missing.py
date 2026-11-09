@@ -17,7 +17,7 @@ from collections.abc import Callable, Coroutine, Mapping
 
 from domain.config import ConfigKey
 from domain.sources.registry import DOI_SEARCHABLE_SOURCES, PROFILES, Source, source_label
-from pipeline.graph import Task, TaskRun
+from pipeline.graph import Step, Task, TaskRun
 from pipeline.ingestion.adapters import adapter
 from pipeline.ingestion.common.doi_search import fetch_missing_doi
 from pipeline.ingestion.hal.fetch_missing import fetch_missing_hal_by_id, fetch_missing_hal_by_nnt
@@ -34,8 +34,6 @@ _SCANR_BY_HAL_ID = "scanr_by_hal_id"
 _HAL_BY_NNT = "hal_by_nnt"
 _THESES_BY_NNT = "theses_by_nnt"
 _SCANR_PATENTS_BY_NUMBER = "scanr_patents_by_number"
-_HAL_ID_SECTION = "Recherche des documents avec hal-id trouvés ailleurs"
-_NNT_SECTION = "Recherche par NNT des thèses trouvées ailleurs"
 
 
 def _doi_task(target: str) -> str:
@@ -92,7 +90,6 @@ def _channel(
     network: str,
     parallel_group: str,
     run: TaskRun,
-    section: str,
     when: Callable[[PhaseContext], bool] | None = None,
 ) -> Task:
     """Renvoie la tâche d'un canal de recherche, exécutée quand le run interroge sa source et que `when` est remplie.
@@ -123,7 +120,6 @@ def _channel(
         network=network,
         parallel_group=parallel_group,
         run=run,
-        section=section,
         label=source_label(network),
         progress_bar=True,
         when=lambda ctx: network in ctx.options.queried_sources and (when is None or when(ctx)),
@@ -131,63 +127,83 @@ def _channel(
     )
 
 
-TASKS = (
-    _channel(
-        _HAL_BY_ID,
-        network="hal",
-        parallel_group="hal_id",
-        run=_by_identifier(fetch_missing_hal_by_id),
-        section=_HAL_ID_SECTION,
-    ),
-    _channel(
-        _SCANR_BY_HAL_ID,
-        reads=("source_records.source_id",),
-        network="scanr",
-        parallel_group="hal_id",
-        run=_by_identifier(fetch_missing_scanr_by_hal_id),
-        section=_HAL_ID_SECTION,
-    ),
-    _channel(
-        _HAL_BY_NNT,
-        reads=("publications.doc_type",),
-        previous_run=("publications.doc_type",),
-        network="hal",
-        parallel_group="nnt",
-        run=_by_identifier(fetch_missing_hal_by_nnt),
-        section=_NNT_SECTION,
-        when=lambda ctx: ctx.options.policy.hal_theses_by_nnt,
-    ),
-    _channel(
-        _THESES_BY_NNT,
-        network="theses",
-        parallel_group="nnt",
-        run=_by_identifier(fetch_missing_theses_by_nnt),
-        section=_NNT_SECTION,
-    ),
-    _channel(
-        _SCANR_PATENTS_BY_NUMBER,
-        network="scanr_patents",
-        parallel_group="patent_number",
-        run=_by_identifier(fetch_missing_scanr_patents_by_number),
-        section="Recherche par numéro des brevets trouvés ailleurs",
-    ),
-    *(
-        _channel(
-            _doi_task(target),
-            # DOI candidats de la vue `candidate_dois`, bornés à la fenêtre d'années du run par les enregistrements sources de leur publication, et agence d'enregistrement pour Crossref et DataCite.
-            reads=(
-                "source_record_identifiers",
-                "source_records.publication_year",
-                "publication_relations",
-                *(("doi_prefixes.ra",) if PROFILES[target].registration_agency else ()),
+STEPS = (
+    Step(
+        "by_hal_id",
+        "hal-id trouvés dans une autre source → documents absents de HAL ou de ScanR",
+        (
+            _channel(
+                _HAL_BY_ID,
+                network="hal",
+                parallel_group="hal_id",
+                run=_by_identifier(fetch_missing_hal_by_id),
             ),
-            previous_run=("doi_prefixes", "publication_relations"),
-            network=target,
-            parallel_group="doi",
-            run=lambda ctx, target=target: _run_fetch_missing_doi(ctx, target),
-            section="Recherche par DOI des documents manquants dans chaque source",
-        )
-        for target in DOI_SEARCHABLE_SOURCES
+            _channel(
+                _SCANR_BY_HAL_ID,
+                reads=("source_records.source_id",),
+                network="scanr",
+                parallel_group="hal_id",
+                run=_by_identifier(fetch_missing_scanr_by_hal_id),
+            ),
+        ),
+        label="Recherche des documents avec hal-id trouvés ailleurs",
+    ),
+    Step(
+        "by_nnt",
+        "NNT trouvés dans une autre source → thèses absentes de HAL ou de theses.fr",
+        (
+            _channel(
+                _HAL_BY_NNT,
+                reads=("publications.doc_type",),
+                previous_run=("publications.doc_type",),
+                network="hal",
+                parallel_group="nnt",
+                run=_by_identifier(fetch_missing_hal_by_nnt),
+                when=lambda ctx: ctx.options.policy.hal_theses_by_nnt,
+            ),
+            _channel(
+                _THESES_BY_NNT,
+                network="theses",
+                parallel_group="nnt",
+                run=_by_identifier(fetch_missing_theses_by_nnt),
+            ),
+        ),
+        label="Recherche par NNT des thèses trouvées ailleurs",
+    ),
+    Step(
+        "by_patent_number",
+        "numéros de brevet trouvés dans une autre source → familles de brevets absentes de ScanR brevets",
+        (
+            _channel(
+                _SCANR_PATENTS_BY_NUMBER,
+                network="scanr_patents",
+                parallel_group="patent_number",
+                run=_by_identifier(fetch_missing_scanr_patents_by_number),
+            ),
+        ),
+        label="Recherche par numéro des brevets trouvés ailleurs",
+    ),
+    Step(
+        "by_doi",
+        "DOI trouvés dans une autre source → documents absents de chaque source",
+        tuple(
+            _channel(
+                _doi_task(target),
+                # DOI candidats de la vue `candidate_dois`, bornés à la fenêtre d'années du run par les enregistrements sources de leur publication, et agence d'enregistrement pour Crossref et DataCite.
+                reads=(
+                    "source_record_identifiers",
+                    "source_records.publication_year",
+                    "publication_relations",
+                    *(("doi_prefixes.ra",) if PROFILES[target].registration_agency else ()),
+                ),
+                previous_run=("doi_prefixes", "publication_relations"),
+                network=target,
+                parallel_group="doi",
+                run=lambda ctx, target=target: _run_fetch_missing_doi(ctx, target),
+            )
+            for target in DOI_SEARCHABLE_SOURCES
+        ),
+        label="Recherche par DOI des documents manquants dans chaque source",
     ),
 )
 

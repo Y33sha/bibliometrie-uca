@@ -48,7 +48,7 @@ PHASES: tuple[Phase, ...] = (
     Phase(
         "fetch_missing",
         "Recherche dans chaque source des documents trouvés dans les autres",
-        fetch_missing.TASKS,
+        fetch_missing.STEPS,
         harvesting=True,
         assemble=fetch_missing.assemble,
     ),
@@ -69,7 +69,7 @@ PHASES: tuple[Phase, ...] = (
     Phase(
         "normalize",
         "Normalisation des données brutes",
-        normalize.TASKS,
+        normalize.STEPS,
         assemble=normalize.assemble,
     ),
     Phase(
