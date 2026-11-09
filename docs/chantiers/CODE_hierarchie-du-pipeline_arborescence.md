@@ -55,7 +55,6 @@ Annexe de la fiche [Hiérarchie du pipeline](CODE_hierarchie-du-pipeline.md). L'
 ### Écritures dans un autre élément
 
 - **Pays et statut open access.** Les phases `countries` et `oa_status` écrivent `publications.countries` et `publications.oa_status`, calculés aussi par la consolidation des publications. Décision prise : la consolidation est seule à les calculer.
-- **Édition.** `merge_duplicate_publishers`, `attach_serials` et `attach_monographs` écrivent dans `publications`. Il reste à vérifier s'il s'agit de reports de références après fusion.
 - **Agence des préfixes DOI.** `resolve_ra` pose l'agence. `resolve_crossref_publishers` et `resolve_datacite_publishers` la corrigent. Les trois tâches rejoignent l'étape « Préfixes DOI ».
 
 ### Responsabilités éclatées
