@@ -116,7 +116,7 @@ PHASES: tuple[Phase, ...] = (
     Phase(
         "finalize",
         "Finalisation : périmètre des publications, vues des structures, purges et compteurs",
-        finalize.TASKS,
+        finalize.STEPS,
         assemble=finalize.assemble,
     ),
     Phase(
