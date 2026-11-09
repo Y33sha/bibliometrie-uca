@@ -49,7 +49,7 @@ Annexe de la fiche [Hiérarchie du pipeline](CODE_hierarchie-du-pipeline.md). L'
 ### Lectures du run précédent
 
 - **Découverte.** `fetch_missing` cherche les identifiants des enregistrements sources des publications du périmètre. `harvest_by_person` lit les personnes et leurs contributions. Ces deux tâches lisent les entités du run précédent. Un document découvert au run N élargit la recherche du run N+1.
-- **Relations.** `resolve_ra` et `fetch_missing` lisent les DOI cibles des relations du run précédent.
+- **Agence des DOI.** `fetch_missing` cherche dans Crossref et DataCite les DOI dont l'agence est connue, trouvée par `resolve_ra` au run précédent. `resolve_ra` interroge doi.org sur les DOI des enregistrements sources et sur les DOI cibles des relations du run précédent. Un DOI apparu dans un enregistrement source au run N est cherché au run N+1. Un DOI cible d'une relation au run N est cherché au run N+2.
 - **Édition.** `attach_serials` lit le périmètre et le nombre de publications des revues, calculés au run précédent.
 
 ### Écritures dans un autre élément
