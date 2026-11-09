@@ -28,16 +28,18 @@ Deux valeurs de la publication sont calculées à deux endroits. La consolidatio
 - [x] Type récursif `Step` dans `pipeline/graph.py`. Le titre d'une étape de premier niveau sert de section au journal.
 - [x] Prototype sur `publishing` : préfixes DOI, éditeurs, revues (ISSN, rattachement, qualification, espaces de noms DOI), monographies
 - [x] Arborescence affichée par `interfaces/cli/dev/pipeline_tree.py`, avec la phrase de chaque étape et, sur option, ses tables lues et écrites
-- [ ] `Task.section` retiré, une fois toutes les phases en étapes
+- [x] `affiliations` : structures (référentiels, adresses, partenaires de thèse), pays, périmètre
 - [ ] Autres phases
+- [ ] `Task.section` retiré, une fois toutes les phases en étapes
 
 ### Phase 2 — Valeurs de la publication calculées par la seule consolidation
 
+- [x] Pays dans la phase `affiliations`, avant la réconciliation
 - [ ] Consolidation ciblée des publications, sans réconciliation
-- [ ] `countries` : un changement de pays d'une adresse met en attente la consolidation de ses publications
+- [ ] Étape des pays : un changement de pays d'une adresse met en attente la consolidation de ses publications
 - [ ] `oa_status` : un changement de réponse d'Unpaywall met en attente la consolidation des publications du DOI
-- [ ] Écritures de `publications.countries` et `publications.oa_status` retirées des phases `countries` et `oa_status`
-- [ ] Place des phases `countries` et `oa_status` dans le run
+- [ ] Écritures de `publications.countries` et `publications.oa_status` retirées de l'étape des pays et de la phase `oa_status`
+- [ ] Place de `oa_status` dans le run
 
 ### Phase 3 — Premier niveau
 
@@ -45,14 +47,15 @@ Deux valeurs de la publication sont calculées à deux endroits. La consolidatio
 - [ ] `resolve_ra` dans l'étape des préfixes DOI de `publishing` ; agence du préfixe posée à un seul endroit
 - [ ] `fetch_truncated` dans la collecte
 - [ ] `finalize` : recalcul des données dérivées
-- [ ] Relations lues au run suivant par `resolve_ra` et `fetch_missing`
+- [x] Relations lues au run suivant par `resolve_ra` et `fetch_missing` : délai accepté
 
 ### Phase 4 — Documentation
 
 - [ ] `docs/pipeline/01-vue-d-ensemble.md` : arborescence du pipeline
+- [ ] `docs/pipeline/04-affiliations.md` et `docs/pipeline/11-enrichissements.md` : pays dans la phase `affiliations`
 - [ ] `docs/pipeline/05-publishing.md` : `merge_duplicate_monographs` absent des tâches, `attach_publishers` et `attach_monographs` absents de la page
+- [ ] `CLAUDE.md` : liste des phases
 
 ## Questions ouvertes
 
 - Consolidation ciblée : file dédiée, ou `source_record_keys_queue`, qui déclenche aussi la réconciliation.
-- `relations` : avancer la phase, ou afficher la lecture au run suivant dans l'arborescence.
