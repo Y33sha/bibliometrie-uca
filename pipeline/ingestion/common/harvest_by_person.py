@@ -30,10 +30,27 @@ def _search(source: str) -> TaskRun:
 TASKS = tuple(
     Task(
         str(source),
-        reads=("config", "hr_records", "person_identifiers", "staging"),
+        reads=(
+            "config",
+            "contributions",
+            "hr_periods",
+            "hr_records",
+            "person_identifiers",
+            "persons",
+            "publications",
+            "staging",
+            "structures",
+        ),
         writes=("staging", "staging_normalization_queue"),
-        # Identifiants des personnes RH, posés par la phase `persons`.
-        previous_run=("staging", "person_identifiers"),
+        # Identifiants des personnes RH et publications qui composent les lots, posés par les phases suivantes.
+        previous_run=(
+            "contributions",
+            "person_identifiers",
+            "persons",
+            "publications",
+            "staging",
+            "structures",
+        ),
         network=source,
         parallel_group="sources",
         run=_search(source),

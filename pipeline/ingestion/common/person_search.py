@@ -1,6 +1,6 @@
 """Moissonnage d'une source par l'identifiant des personnes RH, identifiant confirmé ou authentifié : socle commun des tâches `harvest_by_person`.
 
-Chaque source est interrogée par lots de personnes, page après page, sur la plage d'années du moissonnage. Une requête réunit tous les identifiants des personnes du lot, dans les types acceptés par la source (`PERSON_SEARCH_IDENTIFIERS`). Un document ramené par plusieurs lots est écrit une fois par run. Une erreur sur un lot est journalisée, et le moissonnage passe au suivant.
+Chaque source est interrogée par lots de personnes, page après page, sur la plage d'années du moissonnage. Les lots réunissent les personnes qui copublient (`person_batches`). Une requête réunit tous les identifiants des personnes du lot, dans les types acceptés par la source (`PERSON_SEARCH_IDENTIFIERS`). Un document ramené par plusieurs lots est écrit une fois par run. Une erreur sur un lot est journalisée, et le moissonnage passe au suivant.
 """
 
 from __future__ import annotations
@@ -27,6 +27,7 @@ from pipeline.ingestion.common.harvester import (
     stage_pages,
 )
 from pipeline.ingestion.common.pages import Page
+from pipeline.ingestion.common.person_batches import compose_batches, read_batching_inputs
 from pipeline.ingestion.payload_readers import payload_reader
 from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -38,8 +39,8 @@ type Identifiers = Mapping[PersonIdentifierType, list[str]]
 
 def searched_persons(
     conn: Connection, id_types: Collection[PersonIdentifierType]
-) -> list[Identifiers]:
-    """Renvoie, par personne RH, ses identifiants des types `id_types` aux statuts `HUMAN_ATTRIBUTION_STATUSES`. Une personne sans identifiant de ces types est absente."""
+) -> dict[int, Identifiers]:
+    """Renvoie, par identifiant de personne RH, ses identifiants des types `id_types` aux statuts `HUMAN_ATTRIBUTION_STATUSES`. Une personne sans identifiant de ces types est absente."""
     rows = conn.execute(
         text("""
             SELECT pi.person_id, pi.id_type::text AS id_type, pi.id_value
@@ -56,7 +57,7 @@ def searched_persons(
         persons.setdefault(r.person_id, {}).setdefault(PersonIdentifierType(r.id_type), []).append(
             r.id_value
         )
-    return list(persons.values())
+    return dict(persons)
 
 
 def merge_identifiers(persons: list[Identifiers]) -> dict[PersonIdentifierType, list[str]]:
@@ -97,9 +98,8 @@ class PersonSearchHarvester[ClientT](SourceHarvester[ClientT]):
             raise HarvestConfigError("aucune personne RH à identifiant confirmé ou authentifié")
         all_years = self._years(window)
         years = (min(all_years), max(all_years))
-        batches = [
-            persons[i : i + self.BATCH_SIZE] for i in range(0, len(persons), self.BATCH_SIZE)
-        ]
+        publications, units = read_batching_inputs(self.conn, persons, years)
+        batches = compose_batches(persons, publications, units, self.BATCH_SIZE)
         seen: set[str] = set()
 
         def harvest_step(progress: Progress) -> PhaseMetrics:
@@ -107,7 +107,9 @@ class PersonSearchHarvester[ClientT](SourceHarvester[ClientT]):
             for i, batch in enumerate(batches):
                 label = f"lot {i + 1}"
                 try:
-                    self._extract_batch(merge_identifiers(batch), years, label, seen, metrics)
+                    self._extract_batch(
+                        merge_identifiers([persons[p] for p in batch]), years, label, seen, metrics
+                    )
                 except SourceUnavailableError:
                     trip_source()
                     break
