@@ -70,6 +70,32 @@ class TestFetchPpns:
         }
 
     @pytest.mark.asyncio
+    async def test_reads_records_without_holding(self, monkeypatch):
+        """Une notice sans exemplaire en bibliothèque est rangée sous `resultNoHolding`."""
+        monkeypatch.setattr(
+            client,
+            "http_request_with_retry_async",
+            _answer(
+                {
+                    "sudoc": [
+                        {"query": {"issn": "1574-4280", "resultNoHolding": {"ppn": "116175109"}}},
+                        {
+                            "query": {
+                                "issn": "0028-0836",
+                                "result": {"ppn": "038758717"},
+                                "resultNoHolding": [{"ppn": "123456789"}],
+                            }
+                        },
+                    ]
+                }
+            ),
+        )
+        assert await client.fetch_ppns(None, ["1574-4280", "0028-0836"], base_url=_BASE) == {
+            "1574-4280": ("116175109",),
+            "0028-0836": ("038758717", "123456789"),
+        }
+
+    @pytest.mark.asyncio
     async def test_batch_without_any_record(self, monkeypatch):
         async def fake(http_client, method, url, **kwargs):
             raise _not_found(url)
@@ -105,8 +131,16 @@ class TestMarcFields:
 class TestFetchSerialRecord:
     @pytest.mark.asyncio
     async def test_parses_the_record(self, monkeypatch):
-        monkeypatch.setattr(client, "http_get_text_with_retry_async", _answer(_SOURCE_RECORD))
+        urls = []
+
+        async def fake(http_client, url, **kwargs):
+            urls.append(url)
+            return _SOURCE_RECORD
+
+        monkeypatch.setattr(client, "http_get_text_with_retry_async", fake)
         record = await client.fetch_serial_record(None, "068267983", base_url=_BASE)
+        # L'export `.abes.xml` sert aussi les notices sans exemplaire en bibliothèque.
+        assert urls == [f"{_BASE}/068267983.abes.xml"]
         assert record is not None
         assert record.issn == "1476-4687"
         assert record.support is IssnSupport.ELECTRONIC
@@ -118,6 +152,13 @@ class TestFetchSerialRecord:
 
         monkeypatch.setattr(client, "http_get_text_with_retry_async", fake)
         assert await client.fetch_serial_record(None, "000000000", base_url=_BASE) is None
+
+    @pytest.mark.asyncio
+    async def test_error_document_is_unreadable(self, monkeypatch):
+        """Le Sudoc répond par un document `<error>` quand la notice est indisponible dans ce format."""
+        xml = '<?xml version="1.0" encoding="UTF-8"?><error>Les données bibliographiques sont indéfinies <ppn>116175109</ppn></error>'
+        monkeypatch.setattr(client, "http_get_text_with_retry_async", _answer(xml))
+        assert await client.fetch_serial_record(None, "116175109", base_url=_BASE) is None
 
     @pytest.mark.asyncio
     async def test_entity_declaration_is_refused(self, monkeypatch):
