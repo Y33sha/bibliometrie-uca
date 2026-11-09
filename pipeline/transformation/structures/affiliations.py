@@ -216,6 +216,7 @@ TASKS = (
         ),
         writes=(
             "source_contribution_structures",
+            "source_contributions.perimeter_evidence",
             "source_contributions.in_perimeter",
             "source_record_keys_queue",
             "contribution_attributes_queue",
