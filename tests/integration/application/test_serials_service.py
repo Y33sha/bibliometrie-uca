@@ -37,6 +37,7 @@ from tests.integration.helpers.serials import (
     insert_doi_prefix,
     insert_monograph,
     insert_publisher,
+    insert_serial_issn,
     insert_serial_with_issns,
     issn_columns,
 )
@@ -508,6 +509,28 @@ class TestMergeSerials:
         source = _serial(sa_sync_conn, title="BMC Family Practice", eissn="1471-2296")
         with pytest.raises(ValidationError, match="ISSN-L"):
             serial_service.merge_serials(target, source)
+
+    def test_absorbe_une_revue_a_issn_absent_du_sudoc(self, sa_sync_conn, serial_service, repo):
+        """Cas réel : 1475-7508, absent du Sudoc, passe au « Journal of cosmology and astroparticle physics »."""
+        target = _serial(
+            sa_sync_conn,
+            title="Journal of cosmology and astroparticle physics",
+            eissn="1475-7516",
+            issnl="1475-7516",
+        )
+        source = _serial(sa_sync_conn, title="Journal of Cosmology and Astroparticle Physics")
+        insert_serial_issn(
+            sa_sync_conn, source, issn="1475-7508", issnl="1475-7508", status="unverified"
+        )
+
+        serial_service.merge_serials(target, source)
+
+        owner = _fetch_one(
+            sa_sync_conn, "SELECT serial_id FROM serial_issns WHERE issn = '1475-7508'"
+        )
+        assert owner.serial_id == target
+        # L'ISSN-L de la cible vient de ses ISSN actifs.
+        assert repo.issnl_of(target) == "1475-7516"
 
     def test_revue_sans_issn_absorbee_garde_une_decision(self, sa_sync_conn, serial_service):
         """La fusion d'une revue sans ISSN se garde comme décision de rattachement par son titre."""
