@@ -12,6 +12,7 @@
 - [Brevets](DATA_brevets.md)
 - [Duplications du frontend](UI_duplications-du-frontend.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
+- [Hiérarchie du pipeline](CODE_hierarchie-du-pipeline.md)
 - [Résolution probabiliste des personnes](DATA_resolution-personnes-probabiliste.md)
 - [Types de document](DATA_types-document.md)
 - [Vérification des affiliations des sources](DATA_verification-affiliations.md)
