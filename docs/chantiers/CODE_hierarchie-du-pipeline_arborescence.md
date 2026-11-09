@@ -24,11 +24,14 @@ Annexe de la fiche [Hiérarchie du pipeline](CODE_hierarchie-du-pipeline.md). L'
       3. **Pays** : adresses → pays des adresses, des contributions sources et des enregistrements sources ; publications des enregistrements sources modifiés mises en file de consolidation
       4. **Périmètre** (`populate`) : structures atteintes, identifiants des personnes RH → indices de périmètre des contributions sources
    3. **Édition** (`resolve_ra`, `publishing`) : DOI, noms d'éditeur, ISSN, ISBN et titres → éditeur, revue et monographie de chaque enregistrement source
-      1. **Préfixes DOI** : DOI connus → agence et éditeur titulaire de chaque préfixe
+      1. **Préfixes DOI** (`resolve_ra`, `resolve_crossref_publishers`, `resolve_datacite_publishers`) : DOI connus → agence et éditeur titulaire de chaque préfixe
       2. **Éditeurs** : noms d'éditeur → éditeur de chaque enregistrement source, sans doublon
       3. **Revues** : ISSN, titres, identifiants OpenAlex → revue de chaque enregistrement source, typée et qualifiée
       4. **Monographies** : ISBN, titres → monographie de chaque enregistrement source, rattachée à sa collection, typée
    4. **Correction** (`metadata_correction`) : enregistrements sources rattachés → enregistrements sources corrigés, admis ou écartés de la réconciliation
+   5. **DOI** (`oa_status`) : DOI `primary` et `derived` des enregistrements sources rattachés à une publication ou du périmètre, hors DOI qui ont une cible → URL de résolution et réponse d'Unpaywall de chaque DOI ; publications des DOI dont une réponse change mises en file de consolidation
+      - URL de résolution (`resolve_dois`) : API des handles de doi.org
+      - statut open access (`verify_unpaywall`) : Unpaywall, hors DOI DataCite
 3. **Entités** : enregistrements sources corrigés → publications, contributions, personnes
    1. **Publications** (`publications`) : enregistrements sources → publications, métadonnées consolidées
       - réconciliation (`reconcile`) : enregistrements sources → publications, dont les publications touchées sont consolidées aussitôt
@@ -41,10 +44,9 @@ Annexe de la fiche [Hiérarchie du pipeline](CODE_hierarchie-du-pipeline.md). L'
    3. **Vues des structures**
    4. **Nettoyage des référentiels de l'édition** : éditeur des revues, suppression des entrées vides
    5. **Compteurs** : publications des adresses, des revues, des éditeurs
-5. **Enrichissements** : publications → relations, sujets, statut open access
+5. **Enrichissements** : publications → relations, sujets
    - **Relations** (`relations`) : enregistrements sources, publications → relations entre publications
    - **Sujets** (`subjects`) : sujets des enregistrements sources → sujets des publications, usage, cooccurrences
-   - **Statut open access** (`oa_status`) : DOI des publications → URL de résolution, réponse d'Unpaywall, statut open access
 
 ## Écarts avec l'exécution actuelle
 
