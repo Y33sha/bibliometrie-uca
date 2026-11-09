@@ -26,13 +26,13 @@ PHASE_ORDER: tuple[str, ...] = (
     "resolve_ra",
     "publishing",
     "metadata_correction",
+    "oa_status",
     "publications",
     "author_grouping",
     "persons",
     "finalize",
     "relations",
     "subjects",
-    "oa_status",
 )
 """Noms des phases, dans l'ordre d'exécution de `pipeline.phases.PHASES`."""
 

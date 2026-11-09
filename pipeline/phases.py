@@ -1,6 +1,6 @@
 """Phases du pipeline, dans l'ordre d'exécution, avec leur libellé et leurs attributs.
 
-Les enrichissements (`extra`) viennent en dernier. Chacun est indépendant des autres. Des phases placées avant eux lisent leurs sorties au run suivant : `resolve_ra` et `fetch_missing` lisent les relations, `publications` le statut open access.
+Les enrichissements (`extra`) viennent en dernier. Chacun est indépendant des autres. `resolve_ra` et `fetch_missing`, placées avant eux, lisent les relations au run suivant.
 """
 
 from dataclasses import replace
@@ -97,6 +97,12 @@ PHASES: tuple[Phase, ...] = (
         assemble=metadata_correction.assemble,
     ),
     Phase(
+        "oa_status",
+        "URL de résolution et statut open access des DOI",
+        oa_status.TASKS,
+        assemble=oa_status.assemble,
+    ),
+    Phase(
         "publications",
         "Dédoublonnage des publications",
         publications.TASKS,
@@ -130,13 +136,6 @@ PHASES: tuple[Phase, ...] = (
         "Sujets des publications",
         subjects.TASKS,
         extra=True,
-    ),
-    Phase(
-        "oa_status",
-        "Statut open access des publications",
-        oa_status.TASKS,
-        extra=True,
-        assemble=oa_status.assemble,
     ),
 )
 

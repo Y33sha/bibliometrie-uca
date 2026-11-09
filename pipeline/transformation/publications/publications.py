@@ -1,6 +1,6 @@
 """Phase `publications` : rattachement des enregistrements sources aux publications (`reconciliation`), idempotent, puis recalcul des publications de la file de consolidation.
 
-Les enregistrements sources modifiés et leurs voisins se regroupent par leurs clés de confirmation (`domain.source_records.keys`), corrigées par la phase `metadata_correction`. Rattacher un enregistrement source, fusionner deux publications ou en scinder une relèvent de la même décision. La réconciliation recalcule les publications touchées. La file `publications_queue` contient les autres publications à recalculer : un enregistrement source a changé de pays.
+Les enregistrements sources modifiés et leurs voisins se regroupent par leurs clés de confirmation (`domain.source_records.keys`), corrigées par la phase `metadata_correction`. Rattacher un enregistrement source, fusionner deux publications ou en scinder une relèvent de la même décision. La réconciliation recalcule les publications touchées. La file `publications_queue` contient les autres publications à recalculer : un enregistrement source a changé de pays, ou la réponse de doi.org ou d'Unpaywall sur leur DOI a changé.
 
 `--rebuild-publications` marque tout le stock : la réconciliation applique alors une évolution des règles de clés à toutes les publications.
 """
@@ -83,13 +83,10 @@ _CONSOLIDATION_PREVIOUS_RUN = (
     "publications.id",
     "source_records.publication_id",
     "apc_payments.publication_id",
-    "publications.oa_status",
-    "dois.unpaywall_oa_status",
-    "dois.registered_url",
     "serials",
     "monographs",
 )
-"""Lectures du run précédent de la consolidation : réponses d'Unpaywall et de doi.org ; publications supprimées, enregistrements sources et paiements APC détachés par `finalize.purge_publications` ; revues et monographies vides supprimées par `finalize`."""
+"""Lectures du run précédent de la consolidation : publications supprimées, enregistrements sources et paiements APC détachés par `finalize.purge_publications` ; revues et monographies vides supprimées par `finalize`."""
 
 TASKS = (
     Task(
@@ -117,7 +114,7 @@ TASKS = (
         writes=(*_CONSOLIDATION_WRITES, "publications_queue"),
         previous_run=_CONSOLIDATION_PREVIOUS_RUN,
         run=_consolidate,
-        section="Recalcul des publications dont un enregistrement source a changé de pays",
+        section="Recalcul des publications dont un pays ou une réponse sur le DOI a changé",
         label="Publications en file",
         silent_when_empty=True,
     ),
