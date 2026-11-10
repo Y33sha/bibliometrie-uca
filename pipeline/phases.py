@@ -54,7 +54,7 @@ PHASES: tuple[Phase, ...] = (
     ),
     Phase(
         "fetch_stale",
-        "Relecture des documents non revus par le moissonnage",
+        "Recherche des documents non revus par le moissonnage",
         fetch_stale.TASKS,
         harvesting=True,
         when=lambda options: options.policy.fetch_stale,

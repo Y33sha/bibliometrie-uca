@@ -127,7 +127,7 @@ async def find_deposit(
 ) -> LookupOutcome[Mapping[str, JsonValue]]:
     """Renvoie le dépôt HAL `hal_id`, ou le dépôt conservé qui l'a absorbé comme doublon (`halIdSameAs_s`).
 
-    Un dépôt supprimé sort de l'index de recherche. Une recherche vide se confirme donc sur la page du dépôt : `NOT_FOUND` pour une page absente (404). Une page présente donne `UNAVAILABLE` : le dépôt est relu plus tard.
+    Un dépôt supprimé sort de l'index de recherche. Une recherche vide se confirme donc sur la page du dépôt : `NOT_FOUND` pour une page absente (404). Une page présente donne `UNAVAILABLE` : le dépôt est cherché de nouveau plus tard.
     """
     label = f"halId {hal_id}"
     doc = await search_one(client, f"halId_s:{hal_id} OR halIdSameAs_s:{hal_id}", label=label)

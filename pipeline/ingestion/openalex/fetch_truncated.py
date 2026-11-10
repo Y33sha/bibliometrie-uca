@@ -1,8 +1,8 @@
-"""Phase `fetch_truncated` : nouvelle lecture des works OpenAlex à liste d'auteurs peut-être tronquée.
+"""Phase `fetch_truncated` : nouvelle recherche des works OpenAlex à liste d'auteurs peut-être tronquée.
 
-Une réponse de liste d'OpenAlex plafonne les auteurs d'un work à `BULK_AUTHORSHIPS_CAP`. Le moissonnage marque `staging.authors_truncated` les works au plafond. La phase les relit un par un par `/works/{id}`, avec tous les auteurs.
+Une réponse de liste d'OpenAlex plafonne les auteurs d'un work à `BULK_AUTHORSHIPS_CAP`. Le moissonnage marque `staging.authors_truncated` les works au plafond. La phase les cherche un par un par `/works/{id}`, avec tous les auteurs.
 
-La nouvelle lecture garde l'empreinte du work moissonné (`StagingStore.complete_authors`). Tant que le moissonnage renvoie le même work tronqué, son empreinte égale celle en base, et l'écriture laisse les auteurs complets en place. Un work modifié dans OpenAlex écrase le contenu par sa version tronquée, de nouveau marquée : la phase la relit au même run.
+Le work complet garde l'empreinte du work moissonné (`StagingStore.complete_authors`). Tant que le moissonnage renvoie le même work tronqué, son empreinte égale celle en base, et l'écriture laisse les auteurs complets en place. Un work modifié dans OpenAlex écrase le contenu par sa version tronquée, de nouveau marquée : la phase le cherche de nouveau au même run.
 
 Comme dans `fetch_stale`, un work supprimé dans OpenAlex, ou renvoyé sous un autre identifiant (work fusionné), est marqué disparu.
 """
@@ -36,11 +36,11 @@ _SELECT_TRUNCATED_SQL = text(
     ORDER BY id
     """
 )
-"""Le marqueur posé au moissonnage survit à la normalisation, qui vide `raw_data`. Un work disparu garde son marqueur : s'il revient dans une réponse de liste, la phase le relit."""
+"""Le marqueur posé au moissonnage survit à la normalisation, qui vide `raw_data`. Un work disparu garde son marqueur : s'il revient dans une réponse de liste, la phase le cherche de nouveau."""
 
 
 def _refetch(ctx: PhaseContext) -> PhaseMetrics:
-    """Relit les works tronqués dans une transaction."""
+    """Cherche de nouveau les works tronqués dans une transaction."""
     with ctx.open_tx() as conn:
         return asyncio.run(refetch_openalex(conn, ctx.logger))
 
@@ -54,7 +54,7 @@ def _complete(staging: StagingStore, work: Mapping[str, JsonValue]) -> UpsertOut
 
 
 async def refetch_openalex(conn: Connection, log: logging.Logger) -> PhaseMetrics:
-    """Relit les works OpenAlex marqués tronqués (`staging.authors_truncated`).
+    """Cherche de nouveau les works OpenAlex marqués tronqués (`staging.authors_truncated`).
 
     Renvoie les compteurs de `look_up` : works réécrits (`updated`), works à exactement le plafond d'auteurs (`unchanged`), works marqués disparus (`disappeared`), lots non servis (`errors`).
     """
