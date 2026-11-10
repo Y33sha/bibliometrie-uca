@@ -6,14 +6,14 @@ Un désaccord lève une erreur nommant l'écart : colonnes inattendues, champs s
 """
 
 import inspect
-from collections.abc import Iterable, Sequence
-from typing import Protocol
+from collections.abc import Callable, Iterable, Iterator, Sequence
+from typing import Protocol, SupportsIndex
 
 from sqlalchemy import RowMapping
 
 
 class FetchedRow(Protocol):
-    """Ligne de relevé : le nom de ses colonnes et leurs valeurs.
+    """Ligne de relevé : le nom de ses colonnes et leurs valeurs, par nom ou par position.
 
     Un `Row` SQLAlchemy la satisfait, quel que soit son tuple de types.
     """
@@ -23,6 +23,10 @@ class FetchedRow(Protocol):
 
     @property
     def _mapping(self) -> RowMapping: ...
+
+    def __iter__(self) -> Iterator[object]: ...
+
+    def __getitem__(self, index: SupportsIndex, /) -> object: ...
 
 
 class RowsResult(Protocol):
@@ -66,13 +70,29 @@ def check_fields_match(cls: type, columns: Iterable[str]) -> None:
     raise TypeError(f"Le relevé ne s'accorde pas à {cls.__name__} — {' ; '.join(details)}.")
 
 
+def _builder[T](cls: type[T], columns: Sequence[str]) -> Callable[[FetchedRow], T]:
+    """Renvoie la construction en `cls` d'une ligne aux colonnes `columns`, après contrôle de l'accord.
+
+    La ligne se construit par position, colonnes remises dans l'ordre des champs, plusieurs fois plus vite que par noms. Elle se construit par noms pour un type à champs nommés seulement (modèle Pydantic), ou quand un champ facultatif sans colonne précède un champ alimenté.
+    """
+    check_fields_match(cls, columns)
+    parameters = list(inspect.signature(cls).parameters.values())
+    names = [p.name for p in parameters if p.name in columns]
+    positional = all(p.kind is inspect.Parameter.POSITIONAL_OR_KEYWORD for p in parameters)
+    if not positional or names != [p.name for p in parameters[: len(names)]]:
+        return lambda row: cls(**row._mapping)
+    if names == list(columns):
+        return lambda row: cls(*row)
+    indices = [list(columns).index(name) for name in names]
+    return lambda row: cls(*(row[i] for i in indices))
+
+
 def row_as[T](cls: type[T], row: FetchedRow) -> T:
     """Renvoie la ligne `row` construite en `cls`, chaque champ prenant la colonne de même nom."""
-    check_fields_match(cls, row._fields)
-    return cls(**row._mapping)
+    return _builder(cls, row._fields)(row)
 
 
 def rows_as[T](cls: type[T], result: RowsResult) -> list[T]:
     """Renvoie les lignes de `result` construites en `cls`, après contrôle de ses colonnes."""
-    check_fields_match(cls, (str(column) for column in result.keys()))
-    return [cls(**row._mapping) for row in result.all()]
+    build = _builder(cls, [str(column) for column in result.keys()])
+    return [build(row) for row in result.all()]
