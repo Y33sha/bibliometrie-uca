@@ -15,9 +15,10 @@ Deux valeurs de la publication sont calculées à deux endroits. La consolidatio
 ## Décisions
 
 - Chaque élément de l'arborescence a une phrase d'entrées → sorties, écrite dans le code.
-- Un seul type récursif décrit l'arborescence : un élément a un nom, sa phrase et ses enfants ; la tâche est la feuille. « Phase » désigne seulement le premier niveau, unité du run dans l'administration et dans `pipeline_phase_executions`.
+- Un seul type récursif décrit l'arborescence : un élément a un nom, sa phrase et ses enfants ; la tâche est la feuille. La phase est l'unité du run dans l'administration, dans `pipeline_phase_executions`, et pour `--from` et `--only`.
+- Les phases restent au deuxième niveau de l'arborescence cible. Les cinq blocs du premier niveau (collecte, enregistrements sources, entités, données dérivées, enrichissements) regroupent les phases à l'affichage, sans effet sur l'exécution.
 - L'arborescence donne l'ordre d'exécution. Les tests vérifient sa compatibilité avec les dépendances déclarées par les tâches.
-- Le premier niveau se réduit. Les phases d'une seule tâche rejoignent une phase voisine. `finalize` recalcule les données dérivées des entités : périmètre des publications, purges, vues, compteurs.
+- Les phases d'une seule tâche rejoignent une phase voisine. `finalize` recalcule les données dérivées des entités : périmètre des publications, purges, vues, compteurs.
 - `countries` rejoint `affiliations` : structures, pays, puis indices de périmètre des contributions sources.
 - La consolidation de la publication est seule à calculer les champs de la publication. Les phases `countries` et `oa_status` produisent les faits : pays des adresses, réponses d'Unpaywall. Un changement de pays d'une adresse déclenche la consolidation des publications liées à cette adresse. Un changement de réponse d'Unpaywall déclenche la consolidation des publications du DOI.
 

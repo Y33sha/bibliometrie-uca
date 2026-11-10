@@ -11,7 +11,7 @@ Annexe de la fiche [Hiérarchie du pipeline](CODE_hierarchie-du-pipeline.md). L'
       - par affiliation (`harvest`) : une tâche par source
       - par personne (`harvest_by_person`) : une tâche par source
       - par identifiant trouvé dans une autre source (`fetch_missing`) : hal-id, NNT, numéro de brevet, DOI
-   2. **Relecture** (`fetch_stale`) : documents non revus depuis un délai → documents rafraîchis, documents disparus marqués
+   2. **Recherche des documents non revus** (`fetch_stale`) : documents non revus depuis un délai → documents rafraîchis, documents disparus marqués
    3. **Complétion** (`fetch_truncated`) : documents OpenAlex au plafond d'auteurs → listes d'auteurs complètes
 2. **Enregistrements sources** : documents bruts → enregistrements sources normalisés, rattachés aux référentiels, corrigés
    1. **Normalisation** (`normalize`) : documents bruts → enregistrements sources, contributions sources, adresses
