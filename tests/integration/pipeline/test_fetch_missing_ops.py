@@ -6,8 +6,10 @@ from pathlib import Path
 import httpx2
 import pytest
 
-from pipeline.http.lookup import NotFound
+from pipeline.http.lookup import NotFound, Unavailable
+from pipeline.http.pace import Pace
 from pipeline.ingestion.api_params import API_BASE_URLS
+from pipeline.ingestion.ops import api as ops_api
 from pipeline.ingestion.ops.fetch_missing import fetch_by_number, get_missing_numbers
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_record, secondary_identifiers
@@ -17,6 +19,7 @@ PUBLICATION_NUMBER, APPLICATION_NUMBER = "patent_publication_number", "patent_ap
 _OPS = API_BASE_URLS["ops"]
 _SEARCH = f"{_OPS}/rest-services/published-data/search/biblio"
 _FAMILY_PATH = f"{_OPS}/rest-services/family/publication/epodoc"
+_APPLICATION_PATH = f"{_OPS}/rest-services/family/application/docdb"
 _FAMILY = json.loads(
     (Path(__file__).parents[2] / "unit/pipeline/ingestion/ops/family_FR1658141.json").read_text()
 )
@@ -116,10 +119,11 @@ def _search_result(publication: str) -> dict:
 
 class TestFetchByNumber:
     @pytest.fixture(autouse=True)
-    def _token(self, http_mock):
+    def _token_and_pace(self, http_mock, monkeypatch):
         http_mock.post(f"{_OPS}/auth/accesstoken").mock(
             return_value=httpx2.Response(200, json={"access_token": "t", "expires_in": "1199"})
         )
+        monkeypatch.setattr(ops_api, "_SEARCH_PACE", Pace(1000))
 
     @pytest.mark.asyncio
     async def test_famille_d_un_numero_de_publication(self, http_mock):
@@ -132,24 +136,38 @@ class TestFetchByNumber:
         assert found["id"] == "FR1658141"
 
     @pytest.mark.asyncio
-    async def test_numero_de_demande_cherche_puis_comme_priorite(self, http_mock):
-        """Une priorité jamais publiée est absente des demandes (`ap`) et trouvée parmi les priorités (`pr`)."""
+    async def test_famille_d_un_numero_de_demande_sans_recherche(self, http_mock):
+        http_mock.get(f"{_APPLICATION_PATH}/FR.1658141/biblio").mock(
+            return_value=httpx2.Response(200, json=_FAMILY)
+        )
+        search = http_mock.get(_SEARCH)
+        async with httpx2.AsyncClient() as client:
+            found = await fetch_by_number(client, "FR1658141", frozenset({APPLICATION_NUMBER}))
+        assert not isinstance(found, NotFound) and found["id"] == "FR1658141"
+        assert search.call_count == 0
+
+    @pytest.mark.asyncio
+    async def test_priorite_jamais_publiee_trouvee_par_la_recherche(self, http_mock):
+        """Une priorité jamais publiée est absente des demandes et trouvée parmi les priorités (`pr`)."""
+        http_mock.get(f"{_APPLICATION_PATH}/FR.1658141/biblio").mock(
+            return_value=httpx2.Response(404, text="SERVER.EntityNotFound")
+        )
         search = http_mock.get(_SEARCH).mock(
-            side_effect=[
-                httpx2.Response(404, text="SERVER.EntityNotFound"),
-                httpx2.Response(200, json=_search_result("WO2018041749")),
-            ]
+            return_value=httpx2.Response(200, json=_search_result("WO2018041749"))
         )
         http_mock.get(f"{_FAMILY_PATH}/WO2018041749/biblio").mock(
             return_value=httpx2.Response(200, json=_FAMILY)
         )
         async with httpx2.AsyncClient() as client:
             found = await fetch_by_number(client, "FR1658141", frozenset({APPLICATION_NUMBER}))
-        assert search.call_count == 2
+        assert search.call_count == 1
         assert not isinstance(found, NotFound) and found["id"] == "FR1658141"
 
     @pytest.mark.asyncio
     async def test_famille_sans_le_numero_cherche_ecartee(self, http_mock):
+        http_mock.get(f"{_APPLICATION_PATH}/FR.9999999/biblio").mock(
+            return_value=httpx2.Response(404, text="SERVER.EntityNotFound")
+        )
         http_mock.get(_SEARCH).mock(
             return_value=httpx2.Response(200, json=_search_result("WO2018041749"))
         )
@@ -159,3 +177,21 @@ class TestFetchByNumber:
         async with httpx2.AsyncClient() as client:
             found = await fetch_by_number(client, "FR9999999", frozenset({APPLICATION_NUMBER}))
         assert isinstance(found, NotFound)
+
+    @pytest.mark.asyncio
+    async def test_recherche_saturee_abandonnee_sans_attente(self, http_mock):
+        """Feu noir sur la recherche : le numéro attend le run suivant, sans pause."""
+        http_mock.get(f"{_APPLICATION_PATH}/FR.1658141/biblio").mock(
+            return_value=httpx2.Response(404, text="SERVER.EntityNotFound")
+        )
+        search = http_mock.get(_SEARCH).mock(
+            return_value=httpx2.Response(
+                403,
+                text="<code>CLIENT.RobotDetected</code>",
+                headers={"X-Throttling-Control": "overloaded (search=black:0)"},
+            )
+        )
+        async with httpx2.AsyncClient() as client:
+            found = await fetch_by_number(client, "FR1658141", frozenset({APPLICATION_NUMBER}))
+        assert isinstance(found, Unavailable)
+        assert search.call_count == 1

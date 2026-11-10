@@ -1,6 +1,7 @@
 """Requêtes HTTP avec nouvelles tentatives, backoff exponentiel et circuit-breaker, en versions synchrone et asynchrone.
 
 - 429, 5xx, erreur réseau, corps vide (si `retry_on_empty_body`) ou corps illisible : pause de `initial_backoff * 2^attempt`, puis nouvelle tentative, jusqu'à `max_retries` tentatives. L'épuisement compte un échec au circuit-breaker et lève `SourceUnavailableError`.
+- Refus temporaire reconnu par la règle de la source (`temporary_refusal`) : pause donnée par la règle, puis nouvelle tentative, sur le même budget de `max_retries` tentatives.
 - Autre 4xx (404…) : `httpx2.HTTPStatusError` immédiate, réponse définitive de la source.
 
 Une redirection est suivie seulement pour une requête GET, vers le même hôte, et une fois : Crossref redirige ainsi un DOI alias vers son DOI principal. Toute autre redirection est une erreur : l'hôte joint reste celui qu'`api_params` désigne, et les en-têtes d'authentification ne quittent pas leur destinataire.
@@ -34,10 +35,24 @@ logger = logging.getLogger(__name__)
 
 type QueryParams = Mapping[str, str | int | float | bool | None]
 
+type Auth = tuple[str, str] | httpx2.Auth
+"""Authentification basique, ou flux d'authentification de la source (jeton renouvelé, par exemple)."""
+
+type TemporaryRefusal = Callable[[httpx2.Response], tuple[float, str] | None]
+"""Règle d'une source : pause en secondes et motif d'un refus temporaire, ou `None` pour une autre réponse."""
+
 
 @dataclass(frozen=True, slots=True)
 class _Success[T]:
     value: T
+
+
+@dataclass(frozen=True, slots=True)
+class _Refusal:
+    """Refus temporaire : nouvelle tentative après la pause demandée par la source."""
+
+    reason: str
+    pause: float
 
 
 def _describe(error: Exception) -> str:
@@ -83,13 +98,17 @@ def _classify[T](
     decode: Callable[[httpx2.Response], T],
     *,
     retry_on_empty_body: bool,
-) -> _Success[T] | str:
-    """Renvoie l'issue d'une tentative : la valeur décodée, ou le motif d'une nouvelle tentative.
+    temporary_refusal: TemporaryRefusal | None = None,
+) -> _Success[T] | _Refusal | str:
+    """Renvoie l'issue d'une tentative : la valeur décodée, le refus temporaire, ou le motif d'une nouvelle tentative après backoff.
 
     Lève `httpx2.HTTPStatusError` sur un statut d'erreur définitif.
     """
     if isinstance(result, httpx2.RequestError):
         return f"erreur réseau ({_describe(result)})"
+    if temporary_refusal is not None and (refusal := temporary_refusal(result)) is not None:
+        pause, reason = refusal
+        return _Refusal(reason, pause)
     if result.status_code == 429 or 500 <= result.status_code < 600:
         return f"HTTP {result.status_code}"
     raise_for_status(result)
@@ -112,7 +131,7 @@ class _Attempts:
     def __iter__(self) -> Iterator[int]:
         return iter(range(self._max_retries))
 
-    def settle[T](self, outcome: _Success[T] | str, attempt: int) -> _Success[T] | float:
+    def settle[T](self, outcome: _Success[T] | _Refusal | str, attempt: int) -> _Success[T] | float:
         """Renvoie l'issue aboutie, comptée au circuit-breaker, ou la pause avant la tentative suivante.
 
         Raises:
@@ -121,16 +140,19 @@ class _Attempts:
         if isinstance(outcome, _Success):
             self.breaker.record_success()
             return outcome
+        reason = outcome.reason if isinstance(outcome, _Refusal) else outcome
         if attempt == self._max_retries - 1:
             self.breaker.record_failure()
-            logger.error(
-                "Échec après %s tentatives %s : %s", self._max_retries, self.label, outcome
-            )
+            logger.error("Échec après %s tentatives %s : %s", self._max_retries, self.label, reason)
             raise SourceUnavailableError(self.breaker.source)
-        wait = _backoff_delay(self._initial_backoff, attempt)
+        wait = (
+            outcome.pause
+            if isinstance(outcome, _Refusal)
+            else _backoff_delay(self._initial_backoff, attempt)
+        )
         logger.warning(
             "%s %s — attente %ss (tentative %s/%s)",
-            outcome,
+            reason,
             self.label,
             wait,
             attempt + 1,
@@ -146,11 +168,12 @@ def http_request_with_retry(
     params: QueryParams | None = None,
     json_body: Mapping[str, JsonValue] | None = None,
     headers: Mapping[str, str] | None = None,
-    auth: tuple[str, str] | None = None,
+    auth: Auth | None = None,
     timeout: int = 30,
     max_retries: int = 3,
     initial_backoff: float = 1.0,
     retry_on_empty_body: bool = False,
+    temporary_refusal: TemporaryRefusal | None = None,
     label: str = "",
 ) -> JsonValue:
     """Envoie une requête HTTP synchrone, selon la politique du module.
@@ -159,6 +182,7 @@ def http_request_with_retry(
 
     Args:
         max_retries: à 3, avec le backoff par défaut, donne des pauses de 1 et 2 s.
+        temporary_refusal: règle de la source pour un refus temporaire, retenté après la pause qu'elle donne.
         label: chaîne courte insérée dans le journal (ex. "year 2024, rec 100").
     """
     attempts = _Attempts(label, max_retries, initial_backoff)
@@ -183,7 +207,12 @@ def http_request_with_retry(
         except httpx2.RequestError as e:
             outcome = _classify(e, _json_body, retry_on_empty_body=retry_on_empty_body)
         else:
-            outcome = _classify(resp, _json_body, retry_on_empty_body=retry_on_empty_body)
+            outcome = _classify(
+                resp,
+                _json_body,
+                retry_on_empty_body=retry_on_empty_body,
+                temporary_refusal=temporary_refusal,
+            )
         settled = attempts.settle(outcome, attempt)
         if isinstance(settled, _Success):
             return settled.value
@@ -199,7 +228,7 @@ async def http_request_with_retry_async(
     params: QueryParams | None = None,
     json_body: Mapping[str, JsonValue] | None = None,
     headers: Mapping[str, str] | None = None,
-    auth: tuple[str, str] | None = None,
+    auth: Auth | None = None,
     timeout: float = 30.0,  # noqa: ASYNC109 — wrapper httpx2, le timeout est passé au client
     max_retries: int = 3,
     initial_backoff: float = 1.0,
@@ -238,11 +267,12 @@ async def lookup_json_async(
     params: QueryParams | None = None,
     json_body: Mapping[str, JsonValue] | None = None,
     headers: Mapping[str, str] | None = None,
-    auth: tuple[str, str] | None = None,
+    auth: Auth | None = None,
     timeout: float = 30.0,  # noqa: ASYNC109 — wrapper httpx2, le timeout est passé au client
     max_retries: int = 3,
     initial_backoff: float = 1.0,
     retry_on_empty_body: bool = False,
+    temporary_refusal: TemporaryRefusal | None = None,
     not_found_statuses: frozenset[int] = frozenset({404}),
     label: str = "",
 ) -> LookupOutcome[JsonValue]:
@@ -267,6 +297,7 @@ async def lookup_json_async(
             max_retries=max_retries,
             initial_backoff=initial_backoff,
             retry_on_empty_body=retry_on_empty_body,
+            temporary_refusal=temporary_refusal,
             label=label,
         )
     except httpx2.HTTPStatusError as e:
@@ -328,12 +359,13 @@ async def _request_with_retry_async[T](
     params: QueryParams | None,
     json_body: Mapping[str, JsonValue] | None,
     headers: Mapping[str, str] | None,
-    auth: tuple[str, str] | None,
+    auth: Auth | None,
     timeout: float,  # noqa: ASYNC109 — wrapper httpx2, le timeout est passé au client
     max_retries: int,
     initial_backoff: float,
     retry_on_empty_body: bool,
     label: str,
+    temporary_refusal: TemporaryRefusal | None = None,
 ) -> T:
     """Exécute la boucle commune des nouvelles tentatives asynchrones.
 
@@ -361,7 +393,12 @@ async def _request_with_retry_async[T](
         except httpx2.RequestError as e:
             outcome = _classify(e, decode, retry_on_empty_body=retry_on_empty_body)
         else:
-            outcome = _classify(resp, decode, retry_on_empty_body=retry_on_empty_body)
+            outcome = _classify(
+                resp,
+                decode,
+                retry_on_empty_body=retry_on_empty_body,
+                temporary_refusal=temporary_refusal,
+            )
         settled = attempts.settle(outcome, attempt)
         if isinstance(settled, _Success):
             return settled.value

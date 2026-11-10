@@ -95,6 +95,24 @@ def test_success_returns_json():
         assert http_retry.http_request_with_retry("GET", "http://x", label="t") == {}
 
 
+def test_refus_temporaire_retente_apres_la_pause_de_la_source():
+    """Un 403 reconnu par la règle de la source est retenté après la pause qu'elle donne, sur le budget commun."""
+
+    def refusal(response):
+        return (70.0, "service saturé") if response.status_code == 403 else None
+
+    with (
+        patch.object(http_retry.httpx2, "request", side_effect=[_resp(403), _resp(200)]) as req,
+        patch.object(http_retry.time, "sleep") as sleep,
+    ):
+        result = http_retry.http_request_with_retry(
+            "GET", "http://x", label="t", temporary_refusal=refusal
+        )
+    assert result == {}
+    assert req.call_count == 2
+    sleep.assert_called_once_with(70.0)
+
+
 # Variante asynchrone
 
 

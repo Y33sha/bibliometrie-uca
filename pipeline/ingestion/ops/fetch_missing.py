@@ -1,6 +1,6 @@
 """Recherche dans OPS par numéro de brevet : phase `fetch_missing` (tâche `fetch_missing.ops_by_number`) et rafraîchissement d'une famille (`fetch_stale`).
 
-Les numéros cherchés sont ceux des publications du périmètre sans famille OPS, absents de toute famille en base. Un numéro de publication donne directement sa famille. Un numéro de demande est cherché comme demande (`ap`), puis comme priorité (`pr`) : une priorité jamais publiée elle-même figure seulement dans les demandes qui la revendiquent. Une famille trouvée est gardée si ses numéros contiennent le numéro cherché.
+Les numéros cherchés sont ceux des publications du périmètre sans famille OPS, absents de toute famille en base. Un numéro de publication donne directement sa famille, comme un numéro de demande autre qu'international. À défaut, un numéro de demande est cherché comme priorité (`pr`) : une priorité jamais publiée elle-même figure seulement dans les demandes qui la revendiquent. Une famille trouvée est gardée si ses numéros contiennent le numéro cherché.
 """
 
 from __future__ import annotations
@@ -23,6 +23,7 @@ from pipeline.ingestion.common.failed_lookups import (
 from pipeline.ingestion.common.lookup import LookupBatch, LookupChannel, look_up
 from pipeline.ingestion.ops.api import (
     SEARCH_PATH,
+    application_family_path,
     family_path,
     get_json_async,
     search_page,
@@ -79,48 +80,48 @@ def get_missing_numbers(
 
 
 async def _family(
-    client: httpx2.AsyncClient, publication: str
+    client: httpx2.AsyncClient, path: str, label: str
 ) -> LookupOutcome[Mapping[str, JsonValue]]:
-    """Renvoie le document de la famille d'un numéro de publication, son absence ou l'indisponibilité d'OPS."""
-    body = await get_json_async(client, family_path(publication), label=f"famille {publication}")
+    """Renvoie le document de la famille servie à `path`, son absence ou l'indisponibilité d'OPS."""
+    body = await get_json_async(client, path, label=label)
     if isinstance(body, NotFound | Unavailable):
         return body
     key = family_key(family_members(body if isinstance(body, Mapping) else {}))
     return family_document(body, key) if key else NOT_FOUND
 
 
-async def _search_first(client: httpx2.AsyncClient, query: str) -> LookupOutcome[str]:
-    """Renvoie le numéro de la première publication trouvée par une recherche CQL."""
+async def _family_by_priority(
+    client: httpx2.AsyncClient, number: str
+) -> LookupOutcome[Mapping[str, JsonValue]]:
+    """Renvoie la famille de la première publication qui revendique la priorité `number`. Une recherche refusée pour surcharge donne `UNAVAILABLE` sans attente : le numéro attend le run suivant."""
     body = await get_json_async(
-        client, SEARCH_PATH, search_params(query, 1), label=f"recherche {query}"
+        client,
+        SEARCH_PATH,
+        search_params(f"pr={number}", 1),
+        wait_on_overload=False,
+        label=f"recherche pr={number}",
     )
     if isinstance(body, NotFound | Unavailable):
         return body
     _, hits = search_page(body)
-    return hits[0].publication if hits else NOT_FOUND
+    if not hits:
+        return NOT_FOUND
+    return await _family(client, family_path(hits[0].publication), f"famille {hits[0].publication}")
 
 
 async def fetch_by_number(
     client: httpx2.AsyncClient, number: str, types: frozenset[LookupIdType]
 ) -> LookupOutcome[Mapping[str, JsonValue]]:
     """Renvoie la famille qui contient `number` sous l'un de ses types, son absence ou l'indisponibilité d'OPS."""
-    queries: list[str | None] = []
+    lookups = []
     if _PUBLICATION in types:
-        queries.append(None)
+        lookups.append(lambda: _family(client, family_path(number), f"famille {number}"))
     if _APPLICATION in types:
-        queries += [f"ap={number}", f"pr={number}"]
-    for query in queries:
-        if query is None:
-            found = await _family(client, number)
-        else:
-            publication = await _search_first(client, query)
-            if isinstance(publication, Unavailable):
-                return publication
-            found = (
-                NOT_FOUND
-                if isinstance(publication, NotFound)
-                else await _family(client, publication)
-            )
+        if (path := application_family_path(number)) is not None:
+            lookups.append(lambda: _family(client, path, f"famille de la demande {number}"))
+        lookups.append(lambda: _family_by_priority(client, number))
+    for lookup in lookups:
+        found = await lookup()
         if isinstance(found, Unavailable):
             return found
         if isinstance(found, NotFound):

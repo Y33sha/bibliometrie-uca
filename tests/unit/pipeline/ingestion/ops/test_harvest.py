@@ -2,7 +2,14 @@
 
 import httpx2
 
-from pipeline.ingestion.ops.api import OVERLOAD_PAUSE, SearchHit, _classify, _Retry, search_page
+from pipeline.ingestion.ops.api import (
+    OVERLOAD_PAUSE,
+    OpsAuth,
+    SearchHit,
+    application_family_path,
+    overload_refusal,
+    search_page,
+)
 from pipeline.ingestion.ops.harvest import kept_hit, search_forms
 
 _FORMS = frozenset(
@@ -76,19 +83,31 @@ def _response(
     )
 
 
-def test_surcharge_attendue_puis_retentee():
-    outcome = _classify(
-        _response(
-            403,
-            "<code>CLIENT.RobotDetected</code>",
-            {"X-Throttling-Control": "overloaded (search=black:0)"},
-        ),
-        0,
+def test_refus_pour_surcharge_reconnu():
+    overloaded = _response(
+        403,
+        "<code>CLIENT.RobotDetected</code>",
+        {"X-Throttling-Control": "overloaded (search=black:0)"},
     )
-    assert isinstance(outcome, _Retry) and outcome.overload and outcome.pause == OVERLOAD_PAUSE
+    assert overload_refusal(overloaded) == (OVERLOAD_PAUSE, "service saturé (feu noir)")
+    assert overload_refusal(_response(403, "<code>CLIENT.InvalidQuery</code>")) is None
+    assert overload_refusal(_response(404, "SERVER.EntityNotFound")) is None
 
 
-def test_absence_et_jeton_expire():
-    assert _classify(_response(404, "SERVER.EntityNotFound"), 0) is None
-    outcome = _classify(_response(401, "invalid_access_token"), 0)
-    assert isinstance(outcome, _Retry) and not outcome.overload
+def test_jeton_demande_joint_puis_renouvele_sur_refus_401():
+    auth = OpsAuth()
+    request = httpx2.Request("GET", "https://ops.epo.org/3.2/rest-services/x")
+    flow = auth.auth_flow(request)
+    assert next(flow).url.path == "/3.2/auth/accesstoken"
+    token = httpx2.Response(200, json={"access_token": "t1", "expires_in": "1199"})
+    assert flow.send(token).headers["Authorization"] == "Bearer t1"
+    assert flow.send(_response(401)).url.path == "/3.2/auth/accesstoken"
+    renewed = httpx2.Response(200, json={"access_token": "t2", "expires_in": "1199"})
+    assert flow.send(renewed).headers["Authorization"] == "Bearer t2"
+
+
+def test_famille_d_une_demande_au_format_docdb():
+    assert application_family_path("EP20166388") == (
+        "/rest-services/family/application/docdb/EP.20166388/biblio"
+    )
+    assert application_family_path("WO2017071490") is None
