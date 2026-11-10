@@ -169,8 +169,9 @@
 }
 
 /* ── Base du document ── */
+/* Taille de référence des unités rem, relative à la taille de police réglée dans le navigateur. */
 html {
-	font-size: var(--fs-base);
+	font-size: 110%;
 }
 body {
 	margin: 0;
