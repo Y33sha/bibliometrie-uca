@@ -41,6 +41,8 @@ const neighbors = LABELS.map((label, i) => ({
 const [linkedA, linkedB] = [neighbors[3].label_normalized, neighbors[10].label_normalized];
 const links = [{ label_a: linkedA, label_b: linkedB, cooccurrence_count: 150 }];
 
+const sizes = { label: 13.6, center: 15.2 };
+
 function overlaps(a: Box, b: Box): boolean {
 	return Math.min(a.x1, b.x1) > Math.max(a.x0, b.x0) && Math.min(a.y1, b.y1) > Math.max(a.y0, b.y0);
 }
@@ -54,7 +56,7 @@ function expectNoOverlap(layout: ReturnType<ReturnType<typeof subjectGraphLayout
 }
 
 describe('subjectGraphLayout', () => {
-	const layoutFor = subjectGraphLayout(subject, neighbors, links);
+	const layoutFor = subjectGraphLayout(subject, neighbors, links, sizes);
 	const layout = layoutFor(Infinity);
 
 	it('donne des coordonnées finies', () => {
@@ -96,7 +98,7 @@ describe('subjectGraphLayout', () => {
 			usage_count: 50 + i * 10,
 			cooccurrence_count: 50 + i * 10
 		}));
-		expectNoOverlap(subjectGraphLayout(subject, tied, [])(Infinity));
+		expectNoOverlap(subjectGraphLayout(subject, tied, [], sizes)(Infinity));
 	});
 
 	it('donne le placement le plus étroit quand aucun ne tient', () => {

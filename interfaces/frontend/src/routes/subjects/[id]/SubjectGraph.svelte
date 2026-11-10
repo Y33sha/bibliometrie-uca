@@ -1,16 +1,8 @@
 <script lang="ts">
   import { resolve } from "$app/paths";
   import type { components } from "#lib/api/schema.js";
-  import {
-    CENTER_LABEL_SIZE,
-    CX,
-    CY,
-    LABEL_FLOOR,
-    LABEL_SIZE,
-    LINE_HEIGHT,
-    subjectGraphLayout,
-    type GraphNode,
-  } from "./subjectGraphLayout";
+  import { fontSize } from "#lib/components/charts/cssVar.js";
+  import { CX, CY, subjectGraphLayout, type GraphNode } from "./subjectGraphLayout";
   import { specificityPercent } from "./specificity";
 
   type SubjectListItem = components["schemas"]["SubjectListItem"];
@@ -28,12 +20,17 @@
     links: SubjectNeighborLink[];
   } = $props();
 
-  const layoutFor = $derived(subjectGraphLayout(subject, neighbors, links));
+  // Tailles de police de l'échelle typographique. Le repère du graphe vaut un pixel à sa largeur maximale.
+  const sizes = { label: fontSize("sm"), center: fontSize("md") };
+  // Taille minimale des libellés à l'écran : le graphe rétrécit au plus jusqu'à elle.
+  const labelFloor = fontSize("xs");
+
+  const layoutFor = $derived(subjectGraphLayout(subject, neighbors, links, sizes));
   // Largeur disponible dans la page, connue une fois le conteneur affiché.
   let width = $state(0);
   const layout = $derived(width > 0 ? layoutFor(width) : null);
   // En deçà de cette largeur, les libellés passeraient sous la taille minimale : le graphe défile horizontalement.
-  const minWidth = $derived(layout ? (layout.box.width * LABEL_FLOOR) / LABEL_SIZE : 0);
+  const minWidth = $derived(layout ? (layout.box.width * labelFloor) / sizes.label : 0);
   const overflowing = $derived(minWidth > width);
 
   let scroller = $state<HTMLDivElement>();
@@ -85,10 +82,10 @@
             <text
               y={n.y}
               class="label"
-              font-size={LABEL_SIZE}
+              font-size={sizes.label}
               text-anchor={right ? "start" : "end"}
               dominant-baseline="middle"
-              >{#each n.lines as line, i (i)}<tspan x={labelX} dy={i === 0 ? (-(n.lines.length - 1) * LINE_HEIGHT) / 2 : LINE_HEIGHT}>{line}</tspan>{/each}</text
+              >{#each n.lines as line, i (i)}<tspan x={labelX} dy={i === 0 ? (-(n.lines.length - 1) * layout.lineHeight) / 2 : layout.lineHeight}>{line}</tspan>{/each}</text
             >
           </a>
         {/each}
@@ -98,7 +95,7 @@
           x={CX}
           y={CY + layout.centerR + 18}
           class="label center-label"
-          font-size={CENTER_LABEL_SIZE}
+          font-size={sizes.center}
           text-anchor="middle">{subject.label}</text
         >
       </svg>
