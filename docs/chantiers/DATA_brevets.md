@@ -97,7 +97,7 @@ Familles dont un établissement du périmètre est déposant : UCA, Université 
 ## Décisions
 
 - Le chantier couvre les brevets dont un établissement du périmètre est déposant. Le brevet d'un organisme partenaire se rattache au périmètre seulement par ses inventeurs, sans adresse dans ScanR.
-- Source : l'index `scanr-patents`, sous une source `scanr_patents` distincte de ScanR.
+- Source : l'API OPS de l'Office européen des brevets, en remplacement de l'index `scanr-patents` (phase 9).
 - Unité : la famille.
 - Un brevet est une publication de type `patent`. Il figure dans les listes de publications et a sa propre page de détail.
 - Le moissonnage sélectionne les familles par l'identifiant Paysage de leurs déposants, lu dans `structures.api_ids['scanr_patents']`.
@@ -175,9 +175,24 @@ Familles dont un établissement du périmètre est déposant : UCA, Université 
 - [ ] Sans numéro de brevet (9) : références internes d'INRAE, souches.
 - [x] Numéro FR, EP ou WO absent de ScanR (15) : les 9 demandes déposées en 2024 ou 2025 sont dans OPS. Parmi les 6 plus anciennes, EP23306459 est inconnu d'OPS ; les autres sont hors périmètre ou fusionnées.
 - [x] Comparaison des sources : HAL, ScanR brevets, OPS, INPI
-- [ ] Choix des sources de brevets
+- [x] Choix des sources de brevets : OPS remplace ScanR brevets
+
+### Phase 9 — Remplacement de ScanR brevets par OPS
+
+- [ ] Source OPS : valeur de `source_type`, profil, identifiants d'accès (`EPO_OPS_KEY`, `EPO_OPS_SECRET`), débit réglé sur l'en-tête `X-Throttling-Control`
+- [ ] Unité et identifiant source de la famille OPS
+- [ ] Périmètre : déposants du périmètre reconnus par leur nom
+- [ ] Moissonnage : publications cherchées par nom de déposant, puis famille de chaque publication
+- [ ] Normalisation : numéros, dates par office, déposants, inventeurs, titres, résumé, classification CPC
+- [ ] Recherche des familles absentes par numéro (`fetch_missing`) : numéro de publication, de demande, puis de priorité
+- [ ] Rafraîchissement d'une famille (`fetch_stale`)
+- [ ] Page de détail : déposants et classification CPC
+- [ ] Dépôts HAL de type brevet sans famille OPS
+- [ ] Retrait de la source `scanr_patents` : code, enregistrements sources, `structures.api_ids['scanr_patents']`
+- [ ] Mesure avant et après : familles du périmètre, inventeurs rattachés à une personne
+- [ ] Mise à jour de la documentation
 
 ## Questions ouvertes
 
 1. Articles cités par un brevet : relation avec les publications par DOI.
-2. Sources de brevets : OPS couvre les familles ScanR brevets du périmètre et les dépôts postérieurs au printemps 2025. ScanR brevets apporte en plus les identifiants des déposants et l'IdRef de la moitié des inventeurs, utilisés par le périmètre et par le rattachement des inventeurs aux personnes.
+2. Dépôts HAL de type brevet sans famille OPS : déclarations d'invention d'INRAE (`DI-RV-…`), enveloppes Soleau, numéros faux, demandes pas encore publiées.
