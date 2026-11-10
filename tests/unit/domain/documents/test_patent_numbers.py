@@ -2,7 +2,12 @@
 
 import pytest
 
-from domain.documents.patent_numbers import PatentNumberKind, ReadPatentNumber, read_patent_numbers
+from domain.documents.patent_numbers import (
+    PatentNumberKind,
+    ReadPatentNumber,
+    is_disclosure,
+    read_patent_numbers,
+)
 
 PUBLICATION = PatentNumberKind.PUBLICATION
 APPLICATION = PatentNumberKind.APPLICATION
@@ -84,3 +89,21 @@ def test_doublons_retires():
     assert read_patent_numbers("FR1908401 FR 1908401", 2019) == [
         ReadPatentNumber(APPLICATION, "FR1908401")
     ]
+
+
+@pytest.mark.parametrize(
+    ("number", "title", "expected"),
+    [
+        ("DI-RV-22-0027", "Composition probiotique", True),
+        (None, "Déclaration d’Invention et de Résultats Valorisables DI-RV-20-0104 (2020)", True),
+        (
+            "DSO2021006565",
+            "Dépôt en ligne auprès de l'INPI d’une enveloppe Soleau électronique",
+            True,
+        ),
+        ("21 08274", "Certificat d’utilité n° 21 08274 (2021) : Support de flacon", False),
+        ("FR3055549 (A1)", "Méthode de détection", False),
+    ],
+)
+def test_declaration_d_invention_ou_enveloppe_soleau(number, title, expected):
+    assert is_disclosure(number, title) is expected

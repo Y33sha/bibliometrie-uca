@@ -1,0 +1,1458 @@
+{
+ "ops:world-patent-data": {
+  "@xmlns": {
+   "ops": "http://ops.epo.org",
+   "$": "http://www.epo.org/exchange",
+   "xlink": "http://www.w3.org/1999/xlink"
+  },
+  "ops:patent-family": {
+   "@legal": "false",
+   "@total-result-count": "3",
+   "ops:publication-reference": {
+    "document-id": {
+     "@document-id-type": "epodoc",
+     "doc-number": {
+      "$": "FR3055338"
+     }
+    }
+   },
+   "ops:family-member": [
+    {
+     "@family-id": "57137175",
+     "publication-reference": {
+      "document-id": [
+       {
+        "@document-id-type": "docdb",
+        "country": {
+         "$": "FR"
+        },
+        "doc-number": {
+         "$": "3055338"
+        },
+        "kind": {
+         "$": "A1"
+        },
+        "date": {
+         "$": "20180302"
+        }
+       },
+       {
+        "@document-id-type": "epodoc",
+        "doc-number": {
+         "$": "FR3055338"
+        },
+        "date": {
+         "$": "20180302"
+        }
+       }
+      ]
+     },
+     "application-reference": {
+      "@doc-id": "470762430",
+      "@is-representative": "YES",
+      "document-id": {
+       "@document-id-type": "docdb",
+       "country": {
+        "$": "FR"
+       },
+       "doc-number": {
+        "$": "1658141"
+       },
+       "kind": {
+        "$": "A"
+       },
+       "date": {
+        "$": "20160901"
+       }
+      }
+     },
+     "priority-claim": {
+      "@sequence": "1",
+      "@kind": "national",
+      "document-id": {
+       "@document-id-type": "docdb",
+       "country": {
+        "$": "FR"
+       },
+       "doc-number": {
+        "$": "1658141"
+       },
+       "kind": {
+        "$": "A"
+       },
+       "date": {
+        "$": "20160901"
+       }
+      },
+      "priority-active-indicator": {
+       "$": "YES"
+      }
+     },
+     "exchange-document": {
+      "@system": "ops.epo.org",
+      "@family-id": "57137175",
+      "@country": "FR",
+      "@doc-number": "3055338",
+      "@kind": "A1",
+      "bibliographic-data": {
+       "publication-reference": {
+        "document-id": [
+         {
+          "@document-id-type": "docdb",
+          "country": {
+           "$": "FR"
+          },
+          "doc-number": {
+           "$": "3055338"
+          },
+          "kind": {
+           "$": "A1"
+          },
+          "date": {
+           "$": "20180302"
+          }
+         },
+         {
+          "@document-id-type": "epodoc",
+          "doc-number": {
+           "$": "FR3055338"
+          },
+          "date": {
+           "$": "20180302"
+          }
+         }
+        ]
+       },
+       "patent-classifications": {
+        "patent-classification": [
+         {
+          "@sequence": "1",
+          "classification-scheme": {
+           "@office": "EP",
+           "@scheme": "CPCI"
+          },
+          "section": {
+           "$": "C"
+          },
+          "class": {
+           "$": "12"
+          },
+          "subclass": {
+           "$": "Q"
+          },
+          "main-group": {
+           "$": "1"
+          },
+          "subgroup": {
+           "$": "6806"
+          },
+          "classification-value": {
+           "$": "I"
+          },
+          "generating-office": {
+           "$": "EP"
+          }
+         },
+         {
+          "@sequence": "2",
+          "classification-scheme": {
+           "@office": "EP",
+           "@scheme": "CPCI"
+          },
+          "section": {
+           "$": "C"
+          },
+          "class": {
+           "$": "12"
+          },
+          "subclass": {
+           "$": "Q"
+          },
+          "main-group": {
+           "$": "1"
+          },
+          "subgroup": {
+           "$": "689"
+          },
+          "classification-value": {
+           "$": "I"
+          },
+          "generating-office": {
+           "$": "EP"
+          }
+         }
+        ],
+        "combination-set": {
+         "@sequence": "1",
+         "group-number": {
+          "$": "1"
+         },
+         "combination-rank": [
+          {
+           "rank-number": {
+            "$": "1"
+           },
+           "patent-classification": {
+            "classification-scheme": {
+             "@office": "EP",
+             "@scheme": "CPCI"
+            },
+            "classification-symbol": {
+             "$": "C12Q1/6806"
+            },
+            "classification-value": {
+             "$": "I"
+            },
+            "generating-office": {
+             "$": "EP"
+            }
+           }
+          },
+          {
+           "rank-number": {
+            "$": "2"
+           },
+           "patent-classification": {
+            "classification-scheme": {
+             "@office": "EP",
+             "@scheme": "CPCI"
+            },
+            "classification-symbol": {
+             "$": "C12Q2525/204"
+            },
+            "classification-value": {
+             "$": "I"
+            },
+            "generating-office": {
+             "$": "EP"
+            }
+           }
+          },
+          {
+           "rank-number": {
+            "$": "3"
+           },
+           "patent-classification": {
+            "classification-scheme": {
+             "@office": "EP",
+             "@scheme": "CPCI"
+            },
+            "classification-symbol": {
+             "$": "C12Q2535/122"
+            },
+            "classification-value": {
+             "$": "I"
+            },
+            "generating-office": {
+             "$": "EP"
+            }
+           }
+          }
+         ]
+        }
+       },
+       "application-reference": {
+        "@doc-id": "470762430",
+        "document-id": [
+         {
+          "@document-id-type": "docdb",
+          "country": {
+           "$": "FR"
+          },
+          "doc-number": {
+           "$": "1658141"
+          },
+          "kind": {
+           "$": "A"
+          },
+          "date": {
+           "$": "20160901"
+          }
+         },
+         {
+          "@document-id-type": "epodoc",
+          "doc-number": {
+           "$": "FR20160058141"
+          },
+          "date": {
+           "$": "20160901"
+          }
+         },
+         {
+          "@document-id-type": "original",
+          "doc-number": {
+           "$": "1658141"
+          }
+         }
+        ]
+       },
+       "priority-claims": {
+        "priority-claim": {
+         "@sequence": "1",
+         "@kind": "national",
+         "document-id": [
+          {
+           "@document-id-type": "docdb",
+           "country": {
+            "$": "FR"
+           },
+           "doc-number": {
+            "$": "1658141"
+           },
+           "kind": {
+            "$": "A"
+           },
+           "date": {
+            "$": "20160901"
+           }
+          },
+          {
+           "@document-id-type": "epodoc",
+           "doc-number": {
+            "$": "FR20160058141"
+           },
+           "date": {
+            "$": "20160901"
+           }
+          },
+          {
+           "@document-id-type": "original",
+           "doc-number": {
+            "$": "1658141"
+           }
+          }
+         ]
+        }
+       },
+       "parties": {
+        "applicants": {
+         "applicant": [
+          {
+           "@sequence": "1",
+           "@data-format": "epodoc",
+           "applicant-name": {
+            "name": {
+             "$": "UNIV DAUVERGNE CLERMONT I [FR]"
+            }
+           }
+          },
+          {
+           "@sequence": "2",
+           "@data-format": "epodoc",
+           "applicant-name": {
+            "name": {
+             "$": "UNIV BLAISE PASCAL CLERMONT FERRAND II [FR]"
+            }
+           }
+          },
+          {
+           "@sequence": "3",
+           "@data-format": "epodoc",
+           "applicant-name": {
+            "name": {
+             "$": "CENTRE NAT RECH SCIENT [FR]"
+            }
+           }
+          },
+          {
+           "@sequence": "1",
+           "@data-format": "original",
+           "applicant-name": {
+            "name": {
+             "$": "UNIVERSITE D'AUVERGNE - CLERMONT I"
+            }
+           }
+          },
+          {
+           "@sequence": "2",
+           "@data-format": "original",
+           "applicant-name": {
+            "name": {
+             "$": "UNIVERSITE BLAISE PASCAL - CLERMONT-FERRAND II"
+            }
+           }
+          },
+          {
+           "@sequence": "3",
+           "@data-format": "original",
+           "applicant-name": {
+            "name": {
+             "$": "CENTRE NATIONAL DE LA RECHERCHE SCIENTIFIQUE"
+            }
+           }
+          }
+         ]
+        },
+        "inventors": {
+         "inventor": [
+          {
+           "@sequence": "1",
+           "@data-format": "epodoc",
+           "inventor-name": {
+            "name": {
+             "$": "GASC CYRIELLE [FR]"
+            }
+           }
+          },
+          {
+           "@sequence": "2",
+           "@data-format": "epodoc",
+           "inventor-name": {
+            "name": {
+             "$": "DENONFOUX JEREMIE [FR]"
+            }
+           }
+          },
+          {
+           "@sequence": "3",
+           "@data-format": "epodoc",
+           "inventor-name": {
+            "name": {
+             "$": "PEYRETAILLADE ERIC [FR]"
+            }
+           }
+          },
+          {
+           "@sequence": "4",
+           "@data-format": "epodoc",
+           "inventor-name": {
+            "name": {
+             "$": "PEYRET PIERRE [FR]"
+            }
+           }
+          },
+          {
+           "@sequence": "1",
+           "@data-format": "original",
+           "inventor-name": {
+            "name": {
+             "$": "GASC CYRIELLE"
+            }
+           }
+          },
+          {
+           "@sequence": "2",
+           "@data-format": "original",
+           "inventor-name": {
+            "name": {
+             "$": "DENONFOUX JEREMIE"
+            }
+           }
+          },
+          {
+           "@sequence": "3",
+           "@data-format": "original",
+           "inventor-name": {
+            "name": {
+             "$": "PEYRETAILLADE ERIC"
+            }
+           }
+          },
+          {
+           "@sequence": "4",
+           "@data-format": "original",
+           "inventor-name": {
+            "name": {
+             "$": "PEYRET PIERRE"
+            }
+           }
+          },
+          {
+           "@sequence": "5",
+           "@data-format": "original",
+           "inventor-name": {
+            "name": {
+             "$": "GASC, CYRIELLE"
+            }
+           }
+          },
+          {
+           "@sequence": "6",
+           "@data-format": "original",
+           "inventor-name": {
+            "name": {
+             "$": "DENONFOUX, JEREMIE"
+            }
+           }
+          },
+          {
+           "@sequence": "7",
+           "@data-format": "original",
+           "inventor-name": {
+            "name": {
+             "$": "PEYRETAILLADE, ERIC"
+            }
+           }
+          },
+          {
+           "@sequence": "8",
+           "@data-format": "original",
+           "inventor-name": {
+            "name": {
+             "$": "PEYRET, PIERRE"
+            }
+           }
+          }
+         ]
+        }
+       },
+       "invention-title": {
+        "$": "METHODE DE DETECTION ET D'IDENTIFICATION IN VITRO D'UN OU PLUSIEURS MICRO-ORGANISMES IMPLIQUES DANS LE PROCESSUS DE DEGRADATION, DE MODIFICATION OU DE SEQUESTRATION D'UN OU PLUSIEURS CONTAMINANTS PRESENTS DANS UN ECHANTILLON BIOLOGIQUE",
+        "@lang": "fr"
+       }
+      },
+      "abstract": {
+       "@lang": "fr",
+       "p": {
+        "$": "La présente invention concerne une méthode de détection et d'identification in vitro d'un ou plusieurs micro-organismes impliqués dans le processus de dégradation, modification ou séquestration d'un ou plusieurs contaminants présents dans un échantillon biologique, mettant en œuvre une méthode de capture de gènes couplée à du séquençage haut-débit , la méthode de capture de gènes permettant la capture de fragments d'ADN ayant une longueur d'au moins 6 000 paires de bases."
+       }
+      }
+     }
+    },
+    {
+     "@family-id": "57137175",
+     "publication-reference": {
+      "document-id": [
+       {
+        "@document-id-type": "docdb",
+        "country": {
+         "$": "FR"
+        },
+        "doc-number": {
+         "$": "3055338"
+        },
+        "kind": {
+         "$": "B1"
+        },
+        "date": {
+         "$": "20200529"
+        }
+       },
+       {
+        "@document-id-type": "epodoc",
+        "doc-number": {
+         "$": "FR3055338"
+        },
+        "date": {
+         "$": "20200529"
+        }
+       }
+      ]
+     },
+     "application-reference": {
+      "@doc-id": "470762430",
+      "@is-representative": "YES",
+      "document-id": {
+       "@document-id-type": "docdb",
+       "country": {
+        "$": "FR"
+       },
+       "doc-number": {
+        "$": "1658141"
+       },
+       "kind": {
+        "$": "A"
+       },
+       "date": {
+        "$": "20160901"
+       }
+      }
+     },
+     "priority-claim": {
+      "@sequence": "1",
+      "@kind": "national",
+      "document-id": {
+       "@document-id-type": "docdb",
+       "country": {
+        "$": "FR"
+       },
+       "doc-number": {
+        "$": "1658141"
+       },
+       "kind": {
+        "$": "A"
+       },
+       "date": {
+        "$": "20160901"
+       }
+      },
+      "priority-active-indicator": {
+       "$": "YES"
+      }
+     },
+     "exchange-document": {
+      "@system": "ops.epo.org",
+      "@family-id": "57137175",
+      "@country": "FR",
+      "@doc-number": "3055338",
+      "@kind": "B1",
+      "bibliographic-data": {
+       "publication-reference": {
+        "document-id": [
+         {
+          "@document-id-type": "docdb",
+          "country": {
+           "$": "FR"
+          },
+          "doc-number": {
+           "$": "3055338"
+          },
+          "kind": {
+           "$": "B1"
+          },
+          "date": {
+           "$": "20200529"
+          }
+         },
+         {
+          "@document-id-type": "epodoc",
+          "doc-number": {
+           "$": "FR3055338"
+          },
+          "date": {
+           "$": "20200529"
+          }
+         }
+        ]
+       },
+       "patent-classifications": {
+        "patent-classification": [
+         {
+          "@sequence": "1",
+          "classification-scheme": {
+           "@office": "EP",
+           "@scheme": "CPCI"
+          },
+          "section": {
+           "$": "C"
+          },
+          "class": {
+           "$": "12"
+          },
+          "subclass": {
+           "$": "Q"
+          },
+          "main-group": {
+           "$": "1"
+          },
+          "subgroup": {
+           "$": "6806"
+          },
+          "classification-value": {
+           "$": "I"
+          },
+          "generating-office": {
+           "$": "EP"
+          }
+         },
+         {
+          "@sequence": "2",
+          "classification-scheme": {
+           "@office": "EP",
+           "@scheme": "CPCI"
+          },
+          "section": {
+           "$": "C"
+          },
+          "class": {
+           "$": "12"
+          },
+          "subclass": {
+           "$": "Q"
+          },
+          "main-group": {
+           "$": "1"
+          },
+          "subgroup": {
+           "$": "689"
+          },
+          "classification-value": {
+           "$": "I"
+          },
+          "generating-office": {
+           "$": "EP"
+          }
+         }
+        ],
+        "combination-set": {
+         "@sequence": "1",
+         "group-number": {
+          "$": "1"
+         },
+         "combination-rank": [
+          {
+           "rank-number": {
+            "$": "1"
+           },
+           "patent-classification": {
+            "classification-scheme": {
+             "@office": "EP",
+             "@scheme": "CPCI"
+            },
+            "classification-symbol": {
+             "$": "C12Q1/6806"
+            },
+            "classification-value": {
+             "$": "I"
+            },
+            "generating-office": {
+             "$": "EP"
+            }
+           }
+          },
+          {
+           "rank-number": {
+            "$": "2"
+           },
+           "patent-classification": {
+            "classification-scheme": {
+             "@office": "EP",
+             "@scheme": "CPCI"
+            },
+            "classification-symbol": {
+             "$": "C12Q2525/204"
+            },
+            "classification-value": {
+             "$": "I"
+            },
+            "generating-office": {
+             "$": "EP"
+            }
+           }
+          },
+          {
+           "rank-number": {
+            "$": "3"
+           },
+           "patent-classification": {
+            "classification-scheme": {
+             "@office": "EP",
+             "@scheme": "CPCI"
+            },
+            "classification-symbol": {
+             "$": "C12Q2535/122"
+            },
+            "classification-value": {
+             "$": "I"
+            },
+            "generating-office": {
+             "$": "EP"
+            }
+           }
+          }
+         ]
+        }
+       },
+       "application-reference": {
+        "@doc-id": "470762430",
+        "document-id": [
+         {
+          "@document-id-type": "docdb",
+          "country": {
+           "$": "FR"
+          },
+          "doc-number": {
+           "$": "1658141"
+          },
+          "kind": {
+           "$": "A"
+          },
+          "date": {
+           "$": "20160901"
+          }
+         },
+         {
+          "@document-id-type": "epodoc",
+          "doc-number": {
+           "$": "FR20160058141"
+          },
+          "date": {
+           "$": "20160901"
+          }
+         },
+         {
+          "@document-id-type": "original",
+          "doc-number": {
+           "$": "1658141"
+          }
+         }
+        ]
+       },
+       "priority-claims": {
+        "priority-claim": {
+         "@sequence": "1",
+         "@kind": "national",
+         "document-id": [
+          {
+           "@document-id-type": "docdb",
+           "country": {
+            "$": "FR"
+           },
+           "doc-number": {
+            "$": "1658141"
+           },
+           "kind": {
+            "$": "A"
+           },
+           "date": {
+            "$": "20160901"
+           }
+          },
+          {
+           "@document-id-type": "epodoc",
+           "doc-number": {
+            "$": "FR20160058141"
+           },
+           "date": {
+            "$": "20160901"
+           }
+          },
+          {
+           "@document-id-type": "original",
+           "doc-number": {
+            "$": "1658141"
+           }
+          }
+         ]
+        }
+       },
+       "parties": {
+        "applicants": {
+         "applicant": [
+          {
+           "@sequence": "1",
+           "@data-format": "epodoc",
+           "applicant-name": {
+            "name": {
+             "$": "UNIV DAUVERGNE CLERMONT I [FR]"
+            }
+           }
+          },
+          {
+           "@sequence": "2",
+           "@data-format": "epodoc",
+           "applicant-name": {
+            "name": {
+             "$": "UNIV BLAISE PASCAL CLERMONT FERRAND II [FR]"
+            }
+           }
+          },
+          {
+           "@sequence": "3",
+           "@data-format": "epodoc",
+           "applicant-name": {
+            "name": {
+             "$": "CENTRE NAT RECH SCIENT [FR]"
+            }
+           }
+          },
+          {
+           "@sequence": "1",
+           "@data-format": "original",
+           "applicant-name": {
+            "name": {
+             "$": "UNIVERSITE D'AUVERGNE - CLERMONT I"
+            }
+           }
+          },
+          {
+           "@sequence": "2",
+           "@data-format": "original",
+           "applicant-name": {
+            "name": {
+             "$": "UNIVERSITE BLAISE PASCAL - CLERMONT-FERRAND II"
+            }
+           }
+          },
+          {
+           "@sequence": "3",
+           "@data-format": "original",
+           "applicant-name": {
+            "name": {
+             "$": "CENTRE NATIONAL DE LA RECHERCHE SCIENTIFIQUE"
+            }
+           }
+          }
+         ]
+        },
+        "inventors": {
+         "inventor": [
+          {
+           "@sequence": "1",
+           "@data-format": "epodoc",
+           "inventor-name": {
+            "name": {
+             "$": "GASC CYRIELLE [FR]"
+            }
+           }
+          },
+          {
+           "@sequence": "2",
+           "@data-format": "epodoc",
+           "inventor-name": {
+            "name": {
+             "$": "DENONFOUX JEREMIE [FR]"
+            }
+           }
+          },
+          {
+           "@sequence": "3",
+           "@data-format": "epodoc",
+           "inventor-name": {
+            "name": {
+             "$": "PEYRETAILLADE ERIC [FR]"
+            }
+           }
+          },
+          {
+           "@sequence": "4",
+           "@data-format": "epodoc",
+           "inventor-name": {
+            "name": {
+             "$": "PEYRET PIERRE [FR]"
+            }
+           }
+          },
+          {
+           "@sequence": "1",
+           "@data-format": "original",
+           "inventor-name": {
+            "name": {
+             "$": "GASC CYRIELLE"
+            }
+           }
+          },
+          {
+           "@sequence": "2",
+           "@data-format": "original",
+           "inventor-name": {
+            "name": {
+             "$": "DENONFOUX JEREMIE"
+            }
+           }
+          },
+          {
+           "@sequence": "3",
+           "@data-format": "original",
+           "inventor-name": {
+            "name": {
+             "$": "PEYRETAILLADE ERIC"
+            }
+           }
+          },
+          {
+           "@sequence": "4",
+           "@data-format": "original",
+           "inventor-name": {
+            "name": {
+             "$": "PEYRET PIERRE"
+            }
+           }
+          },
+          {
+           "@sequence": "5",
+           "@data-format": "original",
+           "inventor-name": {
+            "name": {
+             "$": "GASC, CYRIELLE"
+            }
+           }
+          },
+          {
+           "@sequence": "6",
+           "@data-format": "original",
+           "inventor-name": {
+            "name": {
+             "$": "DENONFOUX, JEREMIE"
+            }
+           }
+          },
+          {
+           "@sequence": "7",
+           "@data-format": "original",
+           "inventor-name": {
+            "name": {
+             "$": "PEYRETAILLADE, ERIC"
+            }
+           }
+          },
+          {
+           "@sequence": "8",
+           "@data-format": "original",
+           "inventor-name": {
+            "name": {
+             "$": "PEYRET, PIERRE"
+            }
+           }
+          }
+         ]
+        }
+       },
+       "invention-title": {
+        "$": "METHODE DE DETECTION ET D'IDENTIFICATION IN VITRO D'UN OU PLUSIEURS MICRO-ORGANISMES IMPLIQUES DANS LE PROCESSUS DE DEGRADATION, DE MODIFICATION OU DE SEQUESTRATION D'UN OU PLUSIEURS CONTAMINANTS PRESENTS DANS UN ECHANTILLON BIOLOGIQUE",
+        "@lang": "fr"
+       }
+      },
+      "abstract": {
+       "@lang": "fr",
+       "p": {
+        "$": "La présente invention concerne une méthode de détection et d'identification in vitro d'un ou plusieurs micro-organismes impliqués dans le processus de dégradation, modification ou séquestration d'un ou plusieurs contaminants présents dans un échantillon biologique, mettant en œuvre une méthode de capture de gènes couplée à du séquençage haut-débit , la méthode de capture de gènes permettant la capture de fragments d'ADN ayant une longueur d'au moins 6 000 paires de bases."
+       }
+      }
+     }
+    },
+    {
+     "@family-id": "57137175",
+     "publication-reference": {
+      "document-id": [
+       {
+        "@document-id-type": "docdb",
+        "country": {
+         "$": "WO"
+        },
+        "doc-number": {
+         "$": "2018041749"
+        },
+        "kind": {
+         "$": "A1"
+        },
+        "date": {
+         "$": "20180308"
+        }
+       },
+       {
+        "@document-id-type": "epodoc",
+        "doc-number": {
+         "$": "WO2018041749"
+        },
+        "date": {
+         "$": "20180308"
+        }
+       }
+      ]
+     },
+     "application-reference": {
+      "@doc-id": "482973192",
+      "document-id": {
+       "@document-id-type": "docdb",
+       "country": {
+        "$": "EP"
+       },
+       "doc-number": {
+        "$": "2017071490"
+       },
+       "kind": {
+        "$": "W"
+       },
+       "date": {
+        "$": "20170828"
+       }
+      }
+     },
+     "priority-claim": {
+      "@sequence": "1",
+      "@kind": "national",
+      "document-id": {
+       "@document-id-type": "docdb",
+       "country": {
+        "$": "FR"
+       },
+       "doc-number": {
+        "$": "1658141"
+       },
+       "kind": {
+        "$": "A"
+       },
+       "date": {
+        "$": "20160901"
+       }
+      },
+      "priority-active-indicator": {
+       "$": "YES"
+      }
+     },
+     "exchange-document": {
+      "@system": "ops.epo.org",
+      "@family-id": "57137175",
+      "@country": "WO",
+      "@doc-number": "2018041749",
+      "@kind": "A1",
+      "bibliographic-data": {
+       "publication-reference": {
+        "document-id": [
+         {
+          "@document-id-type": "docdb",
+          "country": {
+           "$": "WO"
+          },
+          "doc-number": {
+           "$": "2018041749"
+          },
+          "kind": {
+           "$": "A1"
+          },
+          "date": {
+           "$": "20180308"
+          }
+         },
+         {
+          "@document-id-type": "epodoc",
+          "doc-number": {
+           "$": "WO2018041749"
+          },
+          "date": {
+           "$": "20180308"
+          }
+         }
+        ]
+       },
+       "patent-classifications": {
+        "patent-classification": [
+         {
+          "@sequence": "1",
+          "classification-scheme": {
+           "@office": "EP",
+           "@scheme": "CPCI"
+          },
+          "section": {
+           "$": "C"
+          },
+          "class": {
+           "$": "12"
+          },
+          "subclass": {
+           "$": "Q"
+          },
+          "main-group": {
+           "$": "1"
+          },
+          "subgroup": {
+           "$": "6806"
+          },
+          "classification-value": {
+           "$": "I"
+          },
+          "generating-office": {
+           "$": "EP"
+          }
+         },
+         {
+          "@sequence": "2",
+          "classification-scheme": {
+           "@office": "EP",
+           "@scheme": "CPCI"
+          },
+          "section": {
+           "$": "C"
+          },
+          "class": {
+           "$": "12"
+          },
+          "subclass": {
+           "$": "Q"
+          },
+          "main-group": {
+           "$": "1"
+          },
+          "subgroup": {
+           "$": "689"
+          },
+          "classification-value": {
+           "$": "I"
+          },
+          "generating-office": {
+           "$": "EP"
+          }
+         }
+        ],
+        "combination-set": {
+         "@sequence": "1",
+         "group-number": {
+          "$": "1"
+         },
+         "combination-rank": [
+          {
+           "rank-number": {
+            "$": "1"
+           },
+           "patent-classification": {
+            "classification-scheme": {
+             "@office": "EP",
+             "@scheme": "CPCI"
+            },
+            "classification-symbol": {
+             "$": "C12Q1/6806"
+            },
+            "classification-value": {
+             "$": "I"
+            },
+            "generating-office": {
+             "$": "EP"
+            }
+           }
+          },
+          {
+           "rank-number": {
+            "$": "2"
+           },
+           "patent-classification": {
+            "classification-scheme": {
+             "@office": "EP",
+             "@scheme": "CPCI"
+            },
+            "classification-symbol": {
+             "$": "C12Q2525/204"
+            },
+            "classification-value": {
+             "$": "I"
+            },
+            "generating-office": {
+             "$": "EP"
+            }
+           }
+          },
+          {
+           "rank-number": {
+            "$": "3"
+           },
+           "patent-classification": {
+            "classification-scheme": {
+             "@office": "EP",
+             "@scheme": "CPCI"
+            },
+            "classification-symbol": {
+             "$": "C12Q2535/122"
+            },
+            "classification-value": {
+             "$": "I"
+            },
+            "generating-office": {
+             "$": "EP"
+            }
+           }
+          }
+         ]
+        }
+       },
+       "application-reference": {
+        "@doc-id": "482973192",
+        "document-id": [
+         {
+          "@document-id-type": "docdb",
+          "country": {
+           "$": "EP"
+          },
+          "doc-number": {
+           "$": "2017071490"
+          },
+          "kind": {
+           "$": "W"
+          },
+          "date": {
+           "$": "20170828"
+          }
+         },
+         {
+          "@document-id-type": "epodoc",
+          "doc-number": {
+           "$": "WO2017EP71490"
+          },
+          "date": {
+           "$": "20170828"
+          }
+         },
+         {
+          "@document-id-type": "original",
+          "doc-number": {
+           "$": "EP2017/071490"
+          }
+         }
+        ]
+       },
+       "priority-claims": {
+        "priority-claim": {
+         "@sequence": "1",
+         "@kind": "national",
+         "document-id": [
+          {
+           "@document-id-type": "docdb",
+           "country": {
+            "$": "FR"
+           },
+           "doc-number": {
+            "$": "1658141"
+           },
+           "kind": {
+            "$": "A"
+           },
+           "date": {
+            "$": "20160901"
+           }
+          },
+          {
+           "@document-id-type": "epodoc",
+           "doc-number": {
+            "$": "FR20160058141"
+           },
+           "date": {
+            "$": "20160901"
+           }
+          },
+          {
+           "@document-id-type": "original",
+           "doc-number": {
+            "$": "1658141"
+           }
+          }
+         ]
+        }
+       },
+       "parties": {
+        "applicants": {
+         "applicant": [
+          {
+           "@sequence": "1",
+           "@data-format": "epodoc",
+           "applicant-name": {
+            "name": {
+             "$": "UNIV CLERMONT AUVERGNE [FR]"
+            }
+           }
+          },
+          {
+           "@sequence": "2",
+           "@data-format": "epodoc",
+           "applicant-name": {
+            "name": {
+             "$": "CENTRE NAT RECH SCIENT [FR]"
+            }
+           }
+          },
+          {
+           "@sequence": "1",
+           "@data-format": "original",
+           "applicant-name": {
+            "name": {
+             "$": "UNIVERSITE CLERMONT AUVERGNE"
+            }
+           }
+          },
+          {
+           "@sequence": "2",
+           "@data-format": "original",
+           "applicant-name": {
+            "name": {
+             "$": "CENTRE NATIONAL DE LA RECHERCHE SCIENTIFIQUE"
+            }
+           }
+          }
+         ]
+        },
+        "inventors": {
+         "inventor": [
+          {
+           "@sequence": "1",
+           "@data-format": "epodoc",
+           "inventor-name": {
+            "name": {
+             "$": "PEYRET PIERRE [FR]"
+            }
+           }
+          },
+          {
+           "@sequence": "2",
+           "@data-format": "epodoc",
+           "inventor-name": {
+            "name": {
+             "$": "PEYRETAILLADE ERIC [FR]"
+            }
+           }
+          },
+          {
+           "@sequence": "3",
+           "@data-format": "epodoc",
+           "inventor-name": {
+            "name": {
+             "$": "DENONFOUX JÉRÉMIE [FR]"
+            }
+           }
+          },
+          {
+           "@sequence": "4",
+           "@data-format": "epodoc",
+           "inventor-name": {
+            "name": {
+             "$": "GASC CYRIELLE [FR]"
+            }
+           }
+          },
+          {
+           "@sequence": "1",
+           "@data-format": "original",
+           "inventor-name": {
+            "name": {
+             "$": "PEYRET, Pierre"
+            }
+           }
+          },
+          {
+           "@sequence": "2",
+           "@data-format": "original",
+           "inventor-name": {
+            "name": {
+             "$": "PEYRETAILLADE, Eric"
+            }
+           }
+          },
+          {
+           "@sequence": "3",
+           "@data-format": "original",
+           "inventor-name": {
+            "name": {
+             "$": "DENONFOUX, Jérémie"
+            }
+           }
+          },
+          {
+           "@sequence": "4",
+           "@data-format": "original",
+           "inventor-name": {
+            "name": {
+             "$": "GASC, Cyrielle"
+            }
+           }
+          }
+         ]
+        }
+       },
+       "invention-title": [
+        {
+         "$": "METHODE DE DETECTION ET D'IDENTIFICATION IN VITRO D'UN OU PLUSIEURS MICRO-ORGANISMES IMPLIQUES DANS LE PROCESSUS DE DEGRADATION, DE MODIFICATION OU DE SEQUESTRATION D'UN OU PLUSIEURS CONTAMINANTS PRESENTS DANS UN ECHANTILLON BIOLOGIQUE",
+         "@lang": "fr"
+        },
+        {
+         "$": "METHOD FOR THE IN VITRO DETECTION AND IDENTIFICATION OF AT LEAST ONE MICROORGANISM INVOLVED IN THE PROCESS OF DEGRADATION, MODIFICATION OR SEQUESTRATION OF AT LEAST ONE CONTAMINANT PRESENT IN A BIOLOGICAL SAMPLE",
+         "@lang": "en"
+        }
+       ]
+      },
+      "abstract": [
+       {
+        "@lang": "en",
+        "p": {
+         "$": "The invention relates to a method for the in vitro detection and identification of at least one microorganism involved in the process of degradation, modification or sequestration of at least one contaminant present in a biological sample, implementing a method of gene capturing coupled with high-throughput sequencing, the gene-capturing method allowing the capture of DNA fragments having a length of at least 6000 pairs of bases."
+        }
+       },
+       {
+        "@lang": "fr",
+        "p": {
+         "$": "La présente invention concerne une méthode de détection et d'identification in vitro d'un ou plusieurs micro-organismes impliqués dans le processus de dégradation, modification ou séquestration d'un ou plusieurs contaminants présents dans un échantillon biologique, mettant en œuvre une méthode de capture de gènes couplée à du séquençage haut-débit, la méthode de capture de gènes permettant la capture de fragments d'ADN ayant une longueur d'au moins 6 000 paires de bases."
+        }
+       }
+      ]
+     }
+    }
+   ]
+  }
+ }
+}

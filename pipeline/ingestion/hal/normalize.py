@@ -15,7 +15,7 @@ from domain.documents.dates import PublicationDate, date_from_parts, parse_iso_d
 from domain.documents.doc_types import DocType
 from domain.documents.identifiers import DOI, NNT, PMCID, PMID, arxiv_doi, find_isbns
 from domain.documents.licenses import normalize_license
-from domain.documents.patent_numbers import ReadPatentNumber, read_patent_numbers
+from domain.documents.patent_numbers import ReadPatentNumber, is_disclosure, read_patent_numbers
 from domain.persons.contributor_name import ContributorName
 from domain.platforms.registry import PMC_ARTICLE_URL, is_fully_open
 from domain.serials.containers import ContainerDescription
@@ -102,11 +102,15 @@ def get_container_facts(doc: Mapping[str, JsonValue]) -> ContainerDescription:
 
 
 def get_doc_type(doc: Mapping[str, JsonValue]) -> str | None:
-    """Renvoie le type brut HAL : `docType_s`, suivi de `docSubType_s` quand HAL en donne un (ex. `ART_review-article`). Un mémoire est suivi du code de son diplôme DUMAS (ex. `MEM_12`)."""
+    """Renvoie le type brut HAL : `docType_s`, suivi de `docSubType_s` quand HAL en donne un (ex. `ART_review-article`). Un mémoire est suivi du code de son diplôme DUMAS (ex. `MEM_12`). Un brevet qui désigne une déclaration d'invention ou une enveloppe Soleau devient `PATENT_disclosure`."""
     raw_type = hal_text_field(doc.get("docType_s")) or ""
     raw_sub = hal_text_field(doc.get("docSubType_s")) or ""
     if not raw_sub and raw_type == "MEM":
         raw_sub = parse_tei_degree(hal_text_field(doc.get("label_xml"))) or ""
+    if raw_type == "PATENT" and is_disclosure(
+        " ".join(as_strs(doc.get("number_s"))), get_title(doc)
+    ):
+        raw_sub = "disclosure"
     return f"{raw_type}_{raw_sub}" if raw_sub else raw_type or None
 
 

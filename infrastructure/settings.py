@@ -84,6 +84,9 @@ class Settings(BaseSettings):
     wos_api_key: SecretStr = SecretStr("")
     scanr_username: str = ""
     scanr_password: SecretStr = SecretStr("")
+    epo_ops_key: SecretStr = SecretStr("")
+    """Clé de l'application déclarée sur le portail des développeurs de l'Office européen des brevets, pour l'API OPS."""
+    epo_ops_secret: SecretStr = SecretStr("")
     polite_pool_email: str = ""
     """Adresse annoncée aux API à polite pool : exigée par Crossref, DataCite et Unpaywall ; pour OpenAlex, à défaut de clé d'API."""
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { logoSource, sourceIcon, sourceLabel } from '#lib/sources.svelte.js';
+	import { sourceIcon, sourceLabel } from '#lib/sources.svelte.js';
 
 	let {
 		source,
@@ -9,16 +9,15 @@
 
 	const label = $derived(sourceLabel(source));
 	const icon = $derived(sourceIcon(source));
-	const logo = $derived(logoSource(source));
 	const title = $derived(id != null ? `${label} : ${id}` : label);
 </script>
 
 {#if href}
-	<a {href} target="_blank" rel="noopener" class="logo-icon logo-source logo-{logo}" {title}>
+	<a {href} target="_blank" rel="noopener" class="logo-icon logo-source logo-{source}" {title}>
 		{#if icon}<img src={icon} alt={label} />{:else}{label}{/if}
 	</a>
 {:else}
-	<span class="logo-icon logo-source logo-{logo}" {title}>
+	<span class="logo-icon logo-source logo-{source}" {title}>
 		{#if icon}<img src={icon} alt={label} />{:else}{label}{/if}
 	</span>
 {/if}

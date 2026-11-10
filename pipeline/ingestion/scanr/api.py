@@ -1,4 +1,4 @@
-"""Accès aux index Elasticsearch de ScanR : moissonnage et recherche de documents, en authentification basique."""
+"""Accès à l'index Elasticsearch des publications de ScanR : moissonnage et recherche de documents, en authentification basique."""
 
 from __future__ import annotations
 
@@ -17,10 +17,9 @@ from pipeline.ingestion.credentials import get_scanr_credentials
 
 
 class ScanrIndex(StrEnum):
-    """Index du cluster ScanR, sous sa clé dans `API_BASE_URLS`. Tous les index partagent les identifiants de connexion."""
+    """Index du cluster ScanR, sous sa clé dans `API_BASE_URLS`."""
 
     PUBLICATIONS = "scanr"
-    PATENTS = "scanr_patents"
 
     @property
     def url(self) -> str:

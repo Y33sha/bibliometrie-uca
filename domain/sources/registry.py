@@ -15,7 +15,7 @@ class Source(StrEnum):
     OPENALEX = "openalex"
     WOS = "wos"
     SCANR = "scanr"
-    SCANR_PATENTS = "scanr_patents"
+    OPS = "ops"
     THESES = "theses"
     CROSSREF = "crossref"
     DATACITE = "datacite"
@@ -43,7 +43,7 @@ class SourceProfile:
     aggregator: bool = False
     """Compile les enregistrements d'autres sources (dépôts HAL, Crossref, PubMed). Un enregistrement source de cette source vaut par les liens et les identifiants cités."""
     distinct_works: bool = False
-    """Deux enregistrements sources de la source désignent deux œuvres distinctes : une famille de brevets ScanR par invention. Chacun est une ancre de la réconciliation, comme un DOI."""
+    """Deux enregistrements sources de la source désignent deux œuvres distinctes : une famille de brevets OPS par invention. Chacun est une ancre de la réconciliation, comme un DOI."""
     structure_ids: str | None = None
     """Nature des identifiants de structure de la source, affichée par le formulaire des structures (servi par `/api/sources/structure-ids`). Seules les sources qui la déclarent ont une clé dans `structures.api_ids`."""
 
@@ -81,12 +81,12 @@ PROFILES: dict[Source, SourceProfile] = {
         aggregator=True,
         structure_ids="SIREN",
     ),
-    # Familles de brevets de l'index `scanr-patents`.
-    Source.SCANR_PATENTS: SourceProfile(
-        label="ScanR brevets",
+    # Familles de brevets INPADOC de l'API OPS de l'Office européen des brevets.
+    Source.OPS: SourceProfile(
+        label="OPS",
         harvested=True,
         distinct_works=True,
-        structure_ids="Paysage des déposants",
+        structure_ids="noms des déposants",
     ),
     # Son API se requête par NNT.
     Source.THESES: SourceProfile(label="theses.fr", harvested=True, structure_ids="PPN IdRef"),
@@ -151,8 +151,9 @@ def source_record_url(source: str, source_id: str) -> str:
         case Source.SCANR:
             # Un identifiant ScanR peut contenir des `/` (`doi/10.1234/…`) : ils sont encodés aussi.
             return f"https://scanr.enseignementsup-recherche.gouv.fr/publications/{quote(source_id, safe='')}"
-        case Source.SCANR_PATENTS:
-            return f"https://scanr.enseignementsup-recherche.gouv.fr/patents/{path}"
+        case Source.OPS:
+            # Identifiant : numéro de la priorité la plus ancienne de la famille.
+            return f"https://worldwide.espacenet.com/patent/search?q={quote(f'pr="{source_id}"', safe='')}"
         case Source.THESES:
             return f"https://theses.fr/{path}"
         case Source.CROSSREF | Source.DATACITE:
@@ -178,7 +179,7 @@ DISTINCT_WORK_SOURCES: frozenset[Source] = frozenset(
 
 SOURCE_PRIORITY: tuple[Source, ...] = (
     Source.THESES,
-    Source.SCANR_PATENTS,
+    Source.OPS,
     Source.CROSSREF,
     Source.DATACITE,
     Source.HAL,
@@ -187,7 +188,7 @@ SOURCE_PRIORITY: tuple[Source, ...] = (
     Source.SCANR,
     Source.WOS,
 )
-"""Ordre d'autorité des sources, pour l'agrégation des métadonnées, la position d'auteur et l'ordre des normaliseurs. theses.fr fait autorité sur les thèses, ScanR brevets sur les brevets. Crossref et DataCite font chacun autorité sur leurs propres DOI. INSPIRE-HEP passe avant OpenAlex : ses listes d'auteurs sont complètes et vérifiées."""
+"""Ordre d'autorité des sources, pour l'agrégation des métadonnées, la position d'auteur et l'ordre des normaliseurs. theses.fr fait autorité sur les thèses, OPS sur les brevets. Crossref et DataCite font chacun autorité sur leurs propres DOI. INSPIRE-HEP passe avant OpenAlex : ses listes d'auteurs sont complètes et vérifiées."""
 
 
 STRUCTURE_API_SOURCES: tuple[Source, ...] = tuple(s for s, p in PROFILES.items() if p.structure_ids)

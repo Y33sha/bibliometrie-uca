@@ -5,6 +5,7 @@ from collections.abc import Mapping
 from sqlalchemy import Connection, text
 
 from domain.documents.doc_types import DocType
+from domain.normalize import normalize_text
 from domain.platforms.registry import HAL, espacenet_url
 from domain.publications.access import Access, access, access_url
 from domain.publications.relations import RelationType, inverse_relation
@@ -133,23 +134,18 @@ def _referenced_by(sources: list[SourceRecordOut], access: Access) -> list[Sourc
     return list(first_by_source.values())
 
 
-def _applicant_structures(
-    conn: Connection, rors: list[str], paysage_ids: list[str]
-) -> dict[tuple[str, str], int]:
-    """Renvoie les structures en base reconnues par ces ROR ou ces identifiants Paysage (`api_ids.scanr_patents`), par `("ror", valeur)` ou `("paysage", valeur)`."""
+def _applicant_structures(conn: Connection, forms: list[str]) -> dict[str, int]:
+    """Renvoie les structures en base reconnues par ces formes de comparaison de nom de déposant (`api_ids.ops`), par forme."""
     rows = conn.execute(
         text(f"""
-            SELECT 'ror' AS id_type, s.ror_id AS value, s.id
-            FROM structures s WHERE s.ror_id = ANY(:rors)
-            UNION ALL
-            SELECT 'paysage', p.value, s.id
+            SELECT f.value AS form, s.id
             FROM structures s
-            CROSS JOIN LATERAL jsonb_array_elements_text(s.api_ids -> '{Source.SCANR_PATENTS.value}') p(value)
-            WHERE p.value = ANY(:paysage)
+            CROSS JOIN LATERAL jsonb_array_elements_text(s.api_ids -> '{Source.OPS.value}') f(value)
+            WHERE f.value = ANY(:forms)
         """),  # noqa: S608 — source choisie par le code
-        {"rors": rors, "paysage": paysage_ids},
+        {"forms": forms},
     ).all()
-    return {(r.id_type, r.value): r.id for r in rows}
+    return {r.form: r.id for r in rows}
 
 
 def _patent_application(extra: Mapping[str, JsonValue]) -> PatentApplication:
@@ -163,36 +159,21 @@ def _patent_application(extra: Mapping[str, JsonValue]) -> PatentApplication:
 
 
 def get_patent_meta(conn: Connection, source_extras: dict[str, JsonValue]) -> PatentMeta:
-    """Renvoie les demandes, les déposants et la classification CPC d'un brevet, d'après le `source_extras` de sa publication. Un déposant est rattaché à une structure en base par son ROR, à défaut par son identifiant Paysage."""
-    applicants = [
-        as_mapping(a) for a in as_sequence(source_extras.get(SourceExtra.PATENT_APPLICANTS))
+    """Renvoie les demandes, les déposants et la classification CPC d'un brevet, d'après le `source_extras` de sa publication. Un déposant est rattaché à une structure en base par la forme de comparaison de son nom (`api_ids.ops`)."""
+    names = [
+        name
+        for a in as_sequence(source_extras.get(SourceExtra.PATENT_APPLICANTS))
+        if (name := as_str(as_mapping(a).get("name")))
     ]
-    ids = [as_mapping(a.get("ids")) for a in applicants]
-    rors = sorted({v for i in ids for v in as_sequence(i.get("ror")) if isinstance(v, str)})
-    paysage_ids = sorted(
-        {v for i in ids for v in as_sequence(i.get("paysage")) if isinstance(v, str)}
-    )
-    known = _applicant_structures(conn, rors, paysage_ids) if rors or paysage_ids else {}
+    known = _applicant_structures(conn, [normalize_text(n) for n in names]) if names else {}
 
-    def structure_id(applicant_ids: Mapping[str, JsonValue]) -> int | None:
-        for id_type in ("ror", "paysage"):
-            for value in as_sequence(applicant_ids.get(id_type)):
-                if isinstance(value, str) and (id_type, value) in known:
-                    return known[(id_type, value)]
-        return None
-
-    # ScanR répète un déposant, avec et sans pays : une seule entrée par structure, à défaut par nom.
+    # Une structure sous plusieurs graphies n'a qu'une entrée.
     unique: dict[object, PatentApplicant] = {}
-    for a, applicant_ids in zip(applicants, ids, strict=True):
+    for name in names:
         applicant = PatentApplicant(
-            name=as_str(a.get("name")),
-            type=as_str(a.get("type")),
-            country=as_str(a.get("country")),
-            structure_id=structure_id(applicant_ids),
+            name=name, type=None, country=None, structure_id=known.get(normalize_text(name))
         )
-        key = applicant.structure_id or (applicant.name or "").casefold()
-        if key not in unique or (unique[key].country is None and applicant.country):
-            unique[key] = applicant
+        unique.setdefault(applicant.structure_id or name.casefold(), applicant)
 
     applications = [
         _patent_application(as_mapping(a))

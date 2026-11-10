@@ -27,6 +27,6 @@ def test_les_sources_des_identifiants_de_structure_et_leur_libelle():
     assert reponse.status_code == 200
     assert [o["value"] for o in reponse.json()] == list(STRUCTURE_API_SOURCES)
     assert {
-        "value": "scanr_patents",
-        "label_fr": "ScanR brevets (Paysage des déposants)",
+        "value": "ops",
+        "label_fr": "OPS (noms des déposants)",
     } in reponse.json()

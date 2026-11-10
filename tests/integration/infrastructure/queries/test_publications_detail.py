@@ -332,31 +332,20 @@ class TestGetPublicationSubjects:
 class TestPatentMeta:
     def _patent(self, conn) -> tuple[int, int, int]:
         uca = insert_structure(
-            conn, "UCA", structure_type="universite", api_ids={"scanr_patents": ["K4lR3"]}
+            conn,
+            "UCA",
+            structure_type="universite",
+            api_ids={"ops": ["universite clermont auvergne", "univ clermont auvergne"]},
         )
-        chu = insert_structure(conn, "CHU", structure_type="chu")
-        conn.execute(text("UPDATE structures SET ror_id = '02tcf7a68' WHERE id = :id"), {"id": chu})
+        chu = insert_structure(
+            conn, "CHU", structure_type="chu", api_ids={"ops": ["chu de clermont ferrand"]}
+        )
         extras = {
             "patent_applicants": [
-                {
-                    "name": "Université Clermont Auvergne",
-                    "type": "organisation",
-                    "country": "FR",
-                    "ids": {"paysage": ["K4lR3"]},
-                },
-                {
-                    "name": "CHU de Clermont-Ferrand",
-                    "type": "organisation",
-                    "country": None,
-                    "ids": {"ror": ["02tcf7a68"]},
-                },
-                {
-                    "name": "CHU de Clermont-Ferrand",
-                    "type": "organisation",
-                    "country": "FR",
-                    "ids": {"ror": ["02tcf7a68"]},
-                },
-                {"name": "Dupont Jean", "type": "person", "country": "FR", "ids": {}},
+                {"name": "Université Clermont Auvergne"},
+                {"name": "CHU de Clermont-Ferrand"},
+                {"name": "UNIV CLERMONT AUVERGNE"},
+                {"name": "Dupont Jean"},
             ],
             "patent_applications": [
                 {
@@ -387,10 +376,10 @@ class TestPatentMeta:
         publication, uca, chu = self._patent(sa_sync_conn)
         detail = publications_queries(sa_sync_conn).get_publication_detail(publication)
         assert detail is not None and detail.patent_meta is not None
-        assert [(a.name, a.country, a.structure_id) for a in detail.patent_meta.applicants] == [
-            ("Université Clermont Auvergne", "FR", uca),
-            ("CHU de Clermont-Ferrand", "FR", chu),
-            ("Dupont Jean", "FR", None),
+        assert [(a.name, a.structure_id) for a in detail.patent_meta.applicants] == [
+            ("Université Clermont Auvergne", uca),
+            ("CHU de Clermont-Ferrand", chu),
+            ("Dupont Jean", None),
         ]
         assert {str(uca), str(chu)} <= set(detail.structures)
 

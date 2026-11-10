@@ -52,6 +52,8 @@ _SOURCE_MAPS: dict[str, dict[str, str]] = {
         "map": "other",
         "software": "software",
         "patent": "patent",
+        # Dépôt de type brevet qui désigne une déclaration d'invention ou une enveloppe Soleau (`get_doc_type`).
+        "patent_disclosure": "other",
         "note": "other",
         "blog": "other",
         "notice": "other",
@@ -138,7 +140,7 @@ _SOURCE_MAPS: dict[str, dict[str, str]] = {
         "preprint": "preprint",
         "other": "other",
     },
-    "scanr_patents": {"patent": "patent"},
+    "ops": {"patent": "patent"},
     "inspire": {
         "article": "article",
         # Article sans publication dans une revue (`publication_info.journal_title`).

@@ -322,7 +322,7 @@ def _family(source_record_id, publication_id, family, *tokens):
         publication_id,
         tokens=[_BLOCK, *tokens],
         doc_type="patent",
-        work_id=f"scanr_patents:{family}",
+        work_id=f"ops:{family}",
     )
 
 

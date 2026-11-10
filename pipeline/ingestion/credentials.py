@@ -22,6 +22,17 @@ def get_scanr_credentials() -> tuple[str, str]:
     return "", ""
 
 
+def get_ops_credentials() -> tuple[str, str]:
+    """Renvoie la clé et le secret de l'API OPS, ou `("", "")` si l'un des deux manque."""
+    key, secret = (
+        settings.epo_ops_key.get_secret_value(),
+        settings.epo_ops_secret.get_secret_value(),
+    )
+    if key and secret:
+        return key, secret
+    return "", ""
+
+
 def source_credentials_missing(source: str) -> str | None:
     """Renvoie le motif de l'absence des identifiants d'API d'une source, ou `None` si la source est utilisable.
 
@@ -35,11 +46,16 @@ def source_credentials_missing(source: str) -> str | None:
         return "ni clé d'API ni adresse polite pool (OPENALEX_API_KEY / POLITE_POOL_EMAIL)"
     if source == "wos":
         return None if get_wos_api_key() else "clé d'API absente (WOS_API_KEY)"
-    if source in ("scanr", "scanr_patents"):
+    if source == "scanr":
         user, password = get_scanr_credentials()
         if user and password:
             return None
         return "identifiants absents (SCANR_USERNAME / SCANR_PASSWORD)"
+    if source == "ops":
+        key, secret = get_ops_credentials()
+        if key and secret:
+            return None
+        return "identifiants absents (EPO_OPS_KEY / EPO_OPS_SECRET)"
     if source in ("crossref", "datacite", "unpaywall"):
         if get_polite_pool_email_optional():
             return None

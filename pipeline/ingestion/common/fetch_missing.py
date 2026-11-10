@@ -2,7 +2,7 @@
 
 1. **Recherche par hal-id** : dans HAL, les hal-id repérés dans OpenAlex et ScanR (`pipeline.ingestion.hal.fetch_missing`) ; dans ScanR, les hal-id repérés dans HAL et OpenAlex (`pipeline.ingestion.scanr.fetch_missing`). Les deux tâches forment un groupe parallèle.
 2. **Recherche par NNT** : dans HAL, en mode `full`, les thèses de theses.fr sans document HAL (`pipeline.ingestion.hal.fetch_missing`) ; dans theses.fr, les NNT repérés dans une autre source (`pipeline.ingestion.theses.fetch_missing`). Les deux tâches forment un groupe parallèle.
-3. **Recherche par numéro de brevet** : dans ScanR brevets, les familles des numéros repérés dans une autre source (`pipeline.ingestion.scanr_patents.fetch_missing`).
+3. **Recherche par numéro de brevet** : dans OPS, les familles des numéros repérés dans une autre source (`pipeline.ingestion.ops.fetch_missing`).
 4. **Recherche par DOI** : pour chaque source cible, les DOI vus ailleurs et absents de la cible. Les tâches `doi.<source>` forment un groupe parallèle.
 
 Une section sans identifiant à chercher se ferme sur « Rien à faire ».
@@ -21,8 +21,8 @@ from pipeline.graph import Step, Task, TaskRun
 from pipeline.ingestion.adapters import adapter
 from pipeline.ingestion.common.doi_search import fetch_missing_doi
 from pipeline.ingestion.hal.fetch_missing import fetch_missing_hal_by_id, fetch_missing_hal_by_nnt
+from pipeline.ingestion.ops.fetch_missing import fetch_missing_ops_by_number
 from pipeline.ingestion.scanr.fetch_missing import fetch_missing_scanr_by_hal_id
-from pipeline.ingestion.scanr_patents.fetch_missing import fetch_missing_scanr_patents_by_number
 from pipeline.ingestion.theses.fetch_missing import fetch_missing_theses_by_nnt
 from pipeline.runtime.config import cap, delay, window_years
 from pipeline.runtime.context import PhaseContext
@@ -33,7 +33,7 @@ _HAL_BY_ID = "hal_by_id"
 _SCANR_BY_HAL_ID = "scanr_by_hal_id"
 _HAL_BY_NNT = "hal_by_nnt"
 _THESES_BY_NNT = "theses_by_nnt"
-_SCANR_PATENTS_BY_NUMBER = "scanr_patents_by_number"
+_OPS_BY_NUMBER = "ops_by_number"
 
 
 def _doi_task(target: str) -> str:
@@ -172,13 +172,13 @@ STEPS = (
     ),
     Step(
         "by_patent_number",
-        "numéros de brevet trouvés dans une autre source → familles de brevets absentes de ScanR brevets",
+        "numéros de brevet trouvés dans une autre source → familles de brevets absentes d'OPS",
         (
             _channel(
-                _SCANR_PATENTS_BY_NUMBER,
-                network="scanr_patents",
+                _OPS_BY_NUMBER,
+                network="ops",
                 parallel_group="patent_number",
-                run=_by_identifier(fetch_missing_scanr_patents_by_number),
+                run=_by_identifier(fetch_missing_ops_by_number),
             ),
         ),
         label="Recherche par numéro des brevets trouvés ailleurs",
@@ -212,7 +212,7 @@ _CHANNEL_KEYS = {
     _SCANR_BY_HAL_ID: "hal-id ScanR",
     _HAL_BY_NNT: "NNT",
     _THESES_BY_NNT: "NNT theses.fr",
-    _SCANR_PATENTS_BY_NUMBER: "numéro de brevet ScanR",
+    _OPS_BY_NUMBER: "numéro de brevet OPS",
     **{_doi_task(target): target for target in DOI_SEARCHABLE_SOURCES},
 }
 """Clé de chaque canal dans la table d'observabilité de la phase."""

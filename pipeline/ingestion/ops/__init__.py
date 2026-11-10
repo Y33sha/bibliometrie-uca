@@ -1,4 +1,4 @@
-"""Source ScanR brevets : familles de brevets de l'index `scanr-patents`.
+"""Source OPS : familles de brevets INPADOC de l'API de l'Office européen des brevets.
 
 Ce module donne la lecture des documents reçus de la source (`READER`). L'adaptateur de la source est dans `adapter.py`.
 """
@@ -16,6 +16,6 @@ def _identify(family: Mapping[str, JsonValue]) -> RecordIdentity | None:
 
 
 READER = PayloadReader(
-    source=Source.SCANR_PATENTS,
+    source=Source.OPS,
     identify=_identify,
 )

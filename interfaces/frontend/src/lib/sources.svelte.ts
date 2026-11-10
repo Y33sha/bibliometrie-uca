@@ -10,6 +10,7 @@ const ICONS: Record<string, string> = {
 	hal: asset('icons/hal.ico'),
 	openalex: asset('icons/openalex.png'),
 	scanr: asset('scanr-icon.svg'),
+	ops: asset('icons/espacenet.svg'),
 	wos: asset('icons/wos.ico'),
 	theses: asset('icons/theses.ico'),
 	crossref: asset('icons/crossref.ico'),
@@ -65,17 +66,9 @@ export function structureIdSourceOptions(): EnumOption[] {
 	return structureIdSources.options;
 }
 
-/** Source dont une autre source reprend le logo : ScanR brevets est un index de ScanR. */
-const LOGO_SOURCES: Record<string, string> = { scanr_patents: 'scanr' };
-
-/** Source dont `source` affiche le logo (icône et classe `logo-…`). */
-export function logoSource(source: string): string {
-	return LOGO_SOURCES[source] ?? source;
-}
-
 /** Chemin du logo local d'une source (`undefined` si aucun). */
 export function sourceIcon(source: string): string | undefined {
-	return ICONS[logoSource(source)];
+	return ICONS[source];
 }
 
 /** Rapport de participation d'un membre Crossref : le compte sous lequel un éditeur dépose ses DOI. */

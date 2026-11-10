@@ -412,7 +412,7 @@ class PatentApplicant(Model):
     """`organisation` ou `person`."""
     country: str | None
     structure_id: int | None
-    """Structure en base, reconnue par son ROR ou par son identifiant Paysage (`api_ids.scanr_patents`)."""
+    """Structure en base, reconnue par la forme de comparaison du nom parmi ses graphies (`api_ids.ops`)."""
 
 
 class CpcCode(Model):
@@ -423,7 +423,7 @@ class CpcCode(Model):
 
 
 class PatentMeta(Model):
-    """Métadonnées d'une famille de brevets, d'après ScanR brevets."""
+    """Métadonnées d'une famille de brevets, d'après OPS."""
 
     applications: list[PatentApplication]
     """Demandes, par date de dépôt."""
