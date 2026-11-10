@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import CloudLayout from 'd3-cloud';
-	import { cssColor, fontSize } from '#lib/components/charts/cssVar.js';
+	import { cssColor, cssVar, fontSize } from '#lib/components/charts/cssVar.js';
 	import { mixColors } from '#lib/components/charts/contrast.js';
 	import type { components } from '#lib/api/schema.js';
 
@@ -27,7 +27,7 @@
 
 	const MIN_SIZE = fontSize('sm');
 	const MAX_SIZE = fontSize('3xl');
-	const FONT = 'system-ui, sans-serif';
+	const FONT = cssVar('font');
 
 	let container: HTMLDivElement | undefined = $state();
 	let width = $state(0);
