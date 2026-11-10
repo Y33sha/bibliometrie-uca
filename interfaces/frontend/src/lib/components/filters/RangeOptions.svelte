@@ -27,9 +27,9 @@
 	const sumCounts = (keep: (year: number) => boolean) => pairs.reduce((sum, [y, c]) => (keep(y) ? sum + c : sum), 0);
 	// Barres de l'histogramme : une par année de la plage, une année sans décompte comprise ; les années écartées de la plage, regroupées de chaque côté.
 	const bars = $derived([
-		...(before ? [{ key: 'before', title: `Avant ${lo}`, count: sumCounts((y) => y < lo) }] : []),
-		...(core ? rangeSelection(lo, hi) : []).map((y) => ({ key: y, title: y, count: counts.get(Number(y)) ?? 0 })),
-		...(after ? [{ key: 'after', title: `Après ${hi}`, count: sumCounts((y) => y > hi) }] : []),
+		...(before ? [{ key: 'before', label: `Avant ${lo}`, count: sumCounts((y) => y < lo) }] : []),
+		...(core ? rangeSelection(lo, hi) : []).map((y) => ({ key: y, label: y, count: counts.get(Number(y)) ?? 0 })),
+		...(after ? [{ key: 'after', label: `Après ${hi}`, count: sumCounts((y) => y > hi) }] : []),
 	]);
 	const m = $derived(bars.length);
 	const offset = $derived(before ? 1 : 0);
@@ -93,7 +93,7 @@
 		</div>
 		<div class="histogram" aria-hidden="true">
 			{#each bars as bar, i (bar.key)}
-				<span class="bar-slot" title="{bar.title} : {bar.count.toLocaleString('fr-FR')}">
+				<span class="bar-slot" title="{bar.label} :{bar.count.toLocaleString('fr-FR')}">
 					<span class="bar" class:in-range={i >= start && i < end} style:height="{bar.count ? Math.max(4, (bar.count / maxCount) * 100) : 0}%"></span>
 				</span>
 			{/each}
