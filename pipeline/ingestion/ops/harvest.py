@@ -22,7 +22,7 @@ from pipeline.ingestion.ops.api import (
 )
 from pipeline.ingestion.ops.family import family_key, family_members, first_priority
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.progress import Progress
+from pipeline.runtime.observability.progress import Progress, track_progress
 
 
 def family_document(body: JsonValue, key: str) -> dict[str, JsonValue]:
@@ -61,10 +61,13 @@ class OpsHarvester(SourceHarvester[None]):
         forms = frozenset(normalize_text(f) for f in self._api_ids())
         years = frozenset(self._years(window))
         publications: dict[str, str] = {}
-        for form in search_forms(forms):
-            for hit in self._search(form):
-                if kept_hit(hit, forms, years):
-                    publications.setdefault(hit.family_id, hit.publication)
+        searched = search_forms(forms)
+        with track_progress(len(searched), self._label("recherche"), self.logger) as progress:
+            for form in searched:
+                for hit in self._search(form):
+                    if kept_hit(hit, forms, years):
+                        publications.setdefault(hit.family_id, hit.publication)
+                progress.advance()
         return self._harvest_at_once(
             len(publications), lambda progress: self._stage_families(publications, years, progress)
         )
