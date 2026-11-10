@@ -142,8 +142,16 @@ async def get_json_async(
 
 
 def family_path(publication: str) -> str:
-    """Chemin de la famille INPADOC d'un numéro de publication epodoc (`FR3053353`), avec la bibliographie de chaque membre."""
-    return f"/rest-services/family/publication/epodoc/{publication}/biblio"
+    """Chemin de la famille INPADOC d'un numéro de publication sans code de type (`FR3053353` → `FR.3053353`, au format docdb), avec la bibliographie de chaque membre."""
+    return f"/rest-services/family/publication/docdb/{publication[:2]}.{publication[2:]}/biblio"
+
+
+def publication_forms(publication: str) -> list[str]:
+    """Renvoie les écritures OPS possibles d'un numéro de publication. Une demande américaine publiée s'écrit avec ou sans le zéro qui suit l'année, selon l'année (`US2024211607` → `US20240211607`, puis `US2024211607`)."""
+    digits = publication[2:]
+    if publication.startswith("US") and len(digits) == 10 and digits.startswith("20"):
+        return [f"US{digits[:4]}0{digits[4:]}", publication]
+    return [publication]
 
 
 def application_family_path(application: str) -> str | None:

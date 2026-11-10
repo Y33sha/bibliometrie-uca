@@ -1,12 +1,12 @@
 """Recherche dans OPS par numéro de brevet : phase `fetch_missing` (tâche `fetch_missing.ops_by_number`) et rafraîchissement d'une famille (`fetch_stale`).
 
-Les numéros cherchés sont ceux des publications du périmètre sans famille OPS, absents de toute famille en base. Un numéro de publication donne directement sa famille, comme un numéro de demande autre qu'international. À défaut, un numéro de demande est cherché comme priorité (`pr`) : une priorité jamais publiée elle-même figure seulement dans les demandes qui la revendiquent. Une famille trouvée est gardée si ses numéros contiennent le numéro cherché.
+Les numéros cherchés sont ceux des publications du périmètre sans famille OPS, absents de toute famille en base. Un numéro de publication donne directement sa famille, comme un numéro de demande autre qu'international. À défaut, un numéro de demande est cherché comme priorité (`pr`) : une priorité jamais publiée elle-même figure seulement dans les demandes qui la revendiquent. Une demande internationale, écrite sans son office de dépôt, est cherchée comme numéro quelconque (`num`). Une famille trouvée est gardée si ses numéros contiennent le numéro cherché.
 """
 
 from __future__ import annotations
 
 import logging
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping
 
 import httpx2
 from sqlalchemy import Connection, text
@@ -26,6 +26,7 @@ from pipeline.ingestion.ops.api import (
     application_family_path,
     family_path,
     get_json_async,
+    publication_forms,
     search_page,
     search_params,
 )
@@ -90,16 +91,17 @@ async def _family(
     return family_document(body, key) if key else NOT_FOUND
 
 
-async def _family_by_priority(
+async def _family_by_search(
     client: httpx2.AsyncClient, number: str
 ) -> LookupOutcome[Mapping[str, JsonValue]]:
-    """Renvoie la famille de la première publication qui revendique la priorité `number`. Une recherche refusée pour surcharge donne `UNAVAILABLE` sans attente : le numéro attend le run suivant."""
+    """Renvoie la famille de la première publication trouvée par la recherche d'un numéro de demande : comme priorité (`pr`), ou, pour une demande internationale écrite sans son office de dépôt, comme numéro quelconque (`num`). Une recherche refusée pour surcharge donne `UNAVAILABLE` sans attente : le numéro attend le run suivant."""
+    query = f"num={number}" if number.startswith("WO") else f"pr={number}"
     body = await get_json_async(
         client,
         SEARCH_PATH,
-        search_params(f"pr={number}", 1),
+        search_params(query, 1),
         wait_on_overload=False,
-        label=f"recherche pr={number}",
+        label=f"recherche {query}",
     )
     if isinstance(body, NotFound | Unavailable):
         return body
@@ -113,13 +115,16 @@ async def fetch_by_number(
     client: httpx2.AsyncClient, number: str, types: frozenset[LookupIdType]
 ) -> LookupOutcome[Mapping[str, JsonValue]]:
     """Renvoie la famille qui contient `number` sous l'un de ses types, son absence ou l'indisponibilité d'OPS."""
-    lookups = []
+    lookups: list[Callable[[], Awaitable[LookupOutcome[Mapping[str, JsonValue]]]]] = []
     if _PUBLICATION in types:
-        lookups.append(lambda: _family(client, family_path(number), f"famille {number}"))
+        lookups += [
+            lambda form=form: _family(client, family_path(form), f"famille {form}")
+            for form in publication_forms(number)
+        ]
     if _APPLICATION in types:
         if (path := application_family_path(number)) is not None:
             lookups.append(lambda: _family(client, path, f"famille de la demande {number}"))
-        lookups.append(lambda: _family_by_priority(client, number))
+        lookups.append(lambda: _family_by_search(client, number))
     for lookup in lookups:
         found = await lookup()
         if isinstance(found, Unavailable):

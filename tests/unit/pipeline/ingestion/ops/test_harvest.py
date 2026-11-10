@@ -7,7 +7,9 @@ from pipeline.ingestion.ops.api import (
     OpsAuth,
     SearchHit,
     application_family_path,
+    family_path,
     overload_refusal,
+    publication_forms,
     search_page,
 )
 from pipeline.ingestion.ops.harvest import kept_hit, search_forms
@@ -104,6 +106,12 @@ def test_jeton_demande_joint_puis_renouvele_sur_refus_401():
     assert flow.send(_response(401)).url.path == "/3.2/auth/accesstoken"
     renewed = httpx2.Response(200, json={"access_token": "t2", "expires_in": "1199"})
     assert flow.send(renewed).headers["Authorization"] == "Bearer t2"
+
+
+def test_famille_d_une_publication_au_format_docdb():
+    assert family_path("ES2880413") == "/rest-services/family/publication/docdb/ES.2880413/biblio"
+    assert publication_forms("US2024211607") == ["US20240211607", "US2024211607"]
+    assert publication_forms("US11198814") == ["US11198814"]
 
 
 def test_famille_d_une_demande_au_format_docdb():

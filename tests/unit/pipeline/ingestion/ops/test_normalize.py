@@ -105,6 +105,13 @@ def test_demande_internationale_sous_l_office_wo():
     assert DocId("EP", "17745411", "A", None).identifier == "EP17745411"
 
 
+def test_demande_americaine_publiee_sans_le_zero_qui_suit_l_annee():
+    """OPS écrit `20240211607` depuis 2023 et `2020208181` avant : les deux formes donnent le même numéro."""
+    assert DocId("US", "20240211607", "A1", None).identifier == "US2024211607"
+    assert DocId("US", "2020208181", "A1", None).identifier == "US2020208181"
+    assert DocId("US", "11198814", "B2", None).identifier == "US11198814"
+
+
 def test_graphie_nom_virgule_prenom_preferee():
     parties = [
         Party("DENONFOUX JEREMIE", True),

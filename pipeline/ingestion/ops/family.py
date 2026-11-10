@@ -56,12 +56,17 @@ class DocId:
 
     @property
     def identifier(self) -> str:
-        """Numéro sans code de type, sous l'office WO pour une demande internationale."""
-        return (
-            f"WO{self.number}"
-            if self.is_international_application
-            else f"{self.country}{self.number}"
-        )
+        """Numéro sans code de type, sous l'office WO pour une demande internationale. Une demande américaine publiée s'écrit sans le zéro qui suit l'année (`20240211607` → `US2024211607`), comme la lit `domain.documents.patent_numbers`."""
+        if self.is_international_application:
+            return f"WO{self.number}"
+        if (
+            self.country == "US"
+            and len(self.number) == 11
+            and self.number.startswith("20")
+            and self.number[4] == "0"
+        ):
+            return f"US{self.number[:4]}{self.number[5:]}"
+        return f"{self.country}{self.number}"
 
 
 def _docdb(ids: JsonValue) -> DocId | None:
