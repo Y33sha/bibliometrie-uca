@@ -51,6 +51,7 @@ Deux valeurs de la publication sont calculées à deux endroits. La consolidatio
 - [ ] `resolve_ra` dans l'étape des préfixes DOI de `publishing` ; agence du préfixe posée à un seul endroit
 - [ ] `fetch_truncated` dans la collecte
 - [ ] `finalize` : recalcul des données dérivées
+- [ ] `fetch_missing` : étapes par source, menées en parallèle, chacune avec ses recherches par hal-id, NNT, numéro de brevet ou DOI
 - [x] Relations lues au run suivant par `resolve_ra` et `fetch_missing` : délai accepté
 
 ### Phase 4 — Documentation
