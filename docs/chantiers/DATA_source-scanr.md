@@ -8,7 +8,7 @@ ScanR agrège HAL, Crossref, theses.fr et des affiliations extraites du texte in
 - des affiliations d'auteurs, tirées de HAL ou du texte intégral ;
 - l'IdRef des auteurs, trouvé par matching.
 
-Chacun de ces apports produit des erreurs. Chaque correction serait une règle propre à ScanR. Le bilan mesure, au 2026-11-10, les pertes et les corrections dues au retrait de la source `scanr`. La source `scanr_patents` relève du chantier [brevets](DATA_brevets.md), qui la remplace par OPS.
+Chacun de ces apports produit des erreurs. Chaque correction serait une règle propre à ScanR. Le bilan mesure, au 2026-11-10, les pertes et les corrections dues au retrait de la source `scanr`. La source `scanr_patents` est remplacée par OPS (chantier [brevets](archived/2026-11-10_DATA_brevets.md)).
 
 ## Bilan
 
@@ -92,8 +92,7 @@ Règles propres à ScanR hors de `pipeline/ingestion/scanr/` :
 - correction du type d'un enregistrement source ScanR issu d'un dépôt HAL (`SCANR_FROM_HAL_TO_HAL_TYPE`) ;
 - alignement des auteurs : listes d'auteurs tronquées (`SCANR_TRUNCATED_LENGTHS`), copie d'un dépôt HAL écartée du vote des listes d'auteurs (`DEFERRED_SOURCE`) ;
 - `fetch_missing` : recherche dans ScanR par identifiant HAL ;
-- rôles, types de document, licences, détection des pays, identifiant ScanR dans la liste et la fiche des publications ;
-- client Elasticsearch partagé avec `scanr_patents`.
+- rôles, types de document, licences, détection des pays, identifiant ScanR dans la liste et la fiche des publications.
 
 ## Questions ouvertes
 

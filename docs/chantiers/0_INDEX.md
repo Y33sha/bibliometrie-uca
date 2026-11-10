@@ -9,7 +9,6 @@
 
 ### Non commencé
 
-- [Brevets](DATA_brevets.md)
 - [Duplications du frontend](UI_duplications-du-frontend.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
 - [Hiérarchie du pipeline](CODE_hierarchie-du-pipeline.md)
@@ -19,6 +18,7 @@
 
 ## Chantiers archivés
 
+- 2026-11-10 — [Brevets](archived/2026-11-10_DATA_brevets.md)
 - 2026-11-05 — [Fiabilité de l'alignement des auteurs](archived/2026-11-05_DATA_fiabilite-alignement-auteurs.md)
 - 2026-11-05 — [Plan de rattachement des revues](archived/2026-11-05_CODE_plan-de-rattachement-des-revues.md)
 - 2026-11-04 — [Listes de revues](archived/2026-11-04_DATA_listes-de-revues.md)

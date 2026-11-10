@@ -18,7 +18,7 @@ Le type de document `patent` existe. Les brevets en base viennent des dépôts H
 - Base : `https://ops.epo.org/3.2/rest-services/`. Connexion OAuth par compte (`EPO_OPS_KEY`, `EPO_OPS_SECRET`). Quota hebdomadaire.
 - Couverture : demandes et publications de tous les offices.
 - Recherche (`published-data/search/biblio`) en syntaxe CQL : déposant (`pa`), numéro de demande (`ap`), numéro de priorité (`pr`), date de publication (`pd`). 100 résultats par requête. Le service de recherche limite le débit selon sa charge, jusqu'à 5 requêtes par minute. L'en-tête `X-Throttling-Control` donne l'état du service.
-- Famille (`family/publication/epodoc/{numéro}/biblio`) : famille INPADOC, avec pour chaque membre la demande, la publication et son code de type, les priorités, les déposants, les inventeurs et les titres.
+- Famille (`family/publication/docdb/{office}.{numéro}/biblio`, `family/application/docdb/{office}.{numéro}/biblio`) : famille INPADOC, avec pour chaque membre la demande, la publication et son code de type, les priorités, les déposants, les inventeurs et les titres.
 - Les noms des déposants et des inventeurs existent au format original et au format epodoc (`UNIV CLERMONT AUVERGNE [FR]`). Le format original sépare le plus souvent le nom du prénom par une virgule.
 - Une priorité jamais publiée se trouve par son numéro de priorité (`pr`).
 
@@ -172,7 +172,7 @@ Familles dont un établissement du périmètre est déposant : UCA, Université 
 
 - [x] Brevet américain délivré (3) : HAL donne le numéro de délivrance, absent de ScanR. Deux dépôts HAL fusionnés à la main avec leur famille. Le troisième brevet n'a pas de déposant du périmètre.
 - [x] Même titre qu'une famille en base (2) : demande prioritaire absente de la famille ScanR, ou date HAL postérieure d'un an au premier dépôt. Fusionnés à la main.
-- [ ] Sans numéro de brevet (9) : références internes d'INRAE, souches.
+- [x] Sans numéro de brevet (9) : références internes d'INRAE, souches. Les déclarations d'invention passent en `other` (phase 9). Les autres relèvent de la question ouverte 2.
 - [x] Numéro FR, EP ou WO absent de ScanR (15) : les 9 demandes déposées en 2024 ou 2025 sont dans OPS. Parmi les 6 plus anciennes, EP23306459 est inconnu d'OPS ; les autres sont hors périmètre ou fusionnées.
 - [x] Comparaison des sources : HAL, ScanR brevets, OPS, INPI
 - [x] Choix des sources de brevets : OPS remplace ScanR brevets
@@ -189,9 +189,10 @@ Familles dont un établissement du périmètre est déposant : UCA, Université 
 - [x] Page de détail : déposants rattachés aux structures par leur nom
 - [x] Dépôts HAL de type brevet sans famille OPS : déclarations d'invention et enveloppes Soleau en `other`
 - [x] Retrait de la source `scanr_patents` : code, enregistrements sources, `structures.api_ids['scanr_patents']`, valeur renommée `ops` dans `source_type` et `lookup_source`
-- [ ] Migration appliquée, schéma régénéré, tests d'intégration
-- [ ] Mesure avant et après : familles du périmètre, inventeurs rattachés à une personne
-- [ ] Mise à jour de la documentation
+- [x] Migration appliquée, schéma régénéré, tests d'intégration
+- [x] Mesure des familles : 116 familles OPS, contre 97 familles ScanR brevets. 121 brevets dans le périmètre. 72 des 77 brevets avec dépôt HAL ont leur famille OPS. Parmi les 5 autres, 3 numéros sont absents d'OPS. Un brevet est sans famille OPS correspondante. Un dépôt sans numéro est peut-être la famille FR2106084, sous une autre date.
+- [ ] Mesure du rattachement des inventeurs à une personne, après la phase `persons`
+- [x] Mise à jour de la documentation : page de la source OPS, sources, exploitation, guide d'administration
 
 ## Questions ouvertes
 
