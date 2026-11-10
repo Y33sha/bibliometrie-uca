@@ -13,6 +13,15 @@ Le type de document `patent` existe. Les brevets en base viennent des dépôts H
 - Résultat de recherche : numéro de publication, titre, dates de dépôt et de publication, CIB, inventeurs, déposants.
 - Détail d'une demande en XML (`GET notice/{numéro}`) : déposants et titulaires avec SIREN et adresse, inventeurs avec ville et code postal, identifiant de famille DOCDB, statut juridique, articles cités avec leur DOI.
 
+### API OPS de l'Office européen des brevets
+
+- Base : `https://ops.epo.org/3.2/rest-services/`. Connexion OAuth par compte (`EPO_OPS_KEY`, `EPO_OPS_SECRET`). Quota hebdomadaire.
+- Couverture : demandes et publications de tous les offices.
+- Recherche (`published-data/search/biblio`) en syntaxe CQL : déposant (`pa`), numéro de demande (`ap`), numéro de priorité (`pr`), date de publication (`pd`). 100 résultats par requête. Le service de recherche limite le débit selon sa charge, jusqu'à 5 requêtes par minute. L'en-tête `X-Throttling-Control` donne l'état du service.
+- Famille (`family/publication/epodoc/{numéro}/biblio`) : famille INPADOC, avec pour chaque membre la demande, la publication et son code de type, les priorités, les déposants, les inventeurs et les titres.
+- Les noms des déposants et des inventeurs existent au format original et au format epodoc (`UNIV CLERMONT AUVERGNE [FR]`). Le format original sépare le plus souvent le nom du prénom par une virgule.
+- Une priorité jamais publiée se trouve par son numéro de priorité (`pr`).
+
 Une famille de brevets réunit les demandes déposées auprès de plusieurs offices (FR, EP, WO, US…) pour une même invention. La famille DOCDB de l'Office européen des brevets réunit les demandes de priorités identiques.
 
 ### Sondages du 2026-11-02
@@ -65,6 +74,25 @@ Familles dont un établissement du périmètre est déposant : UCA, Université 
 - 90 personnes RH ont le nom et le prénom d'un inventeur des familles de l'INPI domicilié dans le Puy-de-Dôme.
 - Dans ScanR, les identifiants Paysage des déposants du périmètre sélectionnent 154 familles : `K4lR3` et `FvH4k` (UCA), `n1E6T` (Université Blaise Pascal), `3itX6` (Université d'Auvergne), `cQN1f` (SIGMA Clermont), `S8ntZ` (Clermont Auvergne INP), `UedNx` (ENSCCF).
 - 460 de leurs 903 inventeurs ont un IdRef. Sur 301 IdRef distincts, 181 sont en base : 84 confirmés, 97 en attente.
+
+### Sondages du 2026-11-10
+
+- L'index `scanr-patents` compte 1 854 familles de premier dépôt en 2024 et 3 en 2025, contre environ 16 000 par an jusqu'en 2023.
+- La recherche OPS sur les noms des établissements du périmètre trouve 246 familles. Elle retrouve les 78 familles ScanR brevets en base dont un déposant est du périmètre. Elle trouve 14 familles déposées en 2024 ou 2025, absentes de ScanR brevets.
+- Les 59 demandes FR de l'INPI déposées depuis 2017 par un établissement du périmètre sont présentes dans OPS, sauf le second dépôt FR d'une famille ScanR en base.
+- Les inventeurs rattachés par nom à une personne de la base donnent un laboratoire à 13 des 14 familles trouvées dans OPS et absentes de la base : unité du SI RH, à défaut laboratoire de leurs publications.
+
+### Comparaison des sources
+
+| | HAL | ScanR brevets | OPS | INPI |
+|---|---|---|---|---|
+| Offices couverts | Ceux déclarés par les laboratoires | Tous | Tous | FR, EP, WO |
+| Années couvertes | Selon les dépôts des laboratoires | Jusqu'au printemps 2025 | Jusqu'à 18 mois avant la recherche | Jusqu'à 18 mois avant la recherche |
+| Familles | Non | Oui | Oui | Non |
+| Laboratoire | Oui | Non | Non | Non |
+| Déposants | Noms | Identifiants Paysage, SIREN, ROR | Noms | Noms ; SIREN sur une partie des demandes FR |
+| Inventeurs | Auteurs du dépôt | Noms ; IdRef pour la moitié | Noms | Noms |
+| Défauts constatés | Doublons, numéros faux, souches et références internes, dépôts inégaux selon les laboratoires | Priorités FR manquantes ; une même priorité répartie sur plusieurs familles | Graphies multiples des noms | Demandes non regroupées en familles |
 
 ## Décisions
 
@@ -142,11 +170,14 @@ Familles dont un établissement du périmètre est déposant : UCA, Université 
 
 29 brevets sont sans famille ScanR brevets au 2026-11-06.
 
-- [ ] Brevet américain délivré (3) : HAL donne le numéro de délivrance, absent de ScanR. Deux familles sont en base.
-- [ ] Même titre qu'une famille en base (2) : demande prioritaire absente de la famille ScanR, ou date HAL postérieure d'un an au premier dépôt.
+- [x] Brevet américain délivré (3) : HAL donne le numéro de délivrance, absent de ScanR. Deux dépôts HAL fusionnés à la main avec leur famille. Le troisième brevet n'a pas de déposant du périmètre.
+- [x] Même titre qu'une famille en base (2) : demande prioritaire absente de la famille ScanR, ou date HAL postérieure d'un an au premier dépôt. Fusionnés à la main.
 - [ ] Sans numéro de brevet (9) : références internes d'INRAE, souches.
-- [ ] Numéro FR, EP ou WO absent de ScanR (15) : 9 demandes déposées en 2024 ou 2025, 6 plus anciennes.
+- [x] Numéro FR, EP ou WO absent de ScanR (15) : les 9 demandes déposées en 2024 ou 2025 sont dans OPS. Parmi les 6 plus anciennes, EP23306459 est inconnu d'OPS ; les autres sont hors périmètre ou fusionnées.
+- [x] Comparaison des sources : HAL, ScanR brevets, OPS, INPI
+- [ ] Choix des sources de brevets
 
 ## Questions ouvertes
 
 1. Articles cités par un brevet : relation avec les publications par DOI.
+2. Sources de brevets : OPS couvre les familles ScanR brevets du périmètre et les dépôts postérieurs au printemps 2025. ScanR brevets apporte en plus les identifiants des déposants et l'IdRef de la moitié des inventeurs, utilisés par le périmètre et par le rattachement des inventeurs aux personnes.
