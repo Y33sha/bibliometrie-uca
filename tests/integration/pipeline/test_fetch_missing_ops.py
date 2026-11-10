@@ -1,7 +1,6 @@
 """Recherche dans OPS par numéro de la phase `fetch_missing` : sélection des numéros, famille trouvée par numéro de publication ou de demande (`pipeline.ingestion.ops.fetch_missing`)."""
 
 import json
-import re
 from pathlib import Path
 
 import httpx2
@@ -16,6 +15,8 @@ from tests.integration.helpers.staging import insert_failed_lookup, insert_stagi
 
 PUBLICATION_NUMBER, APPLICATION_NUMBER = "patent_publication_number", "patent_application_number"
 _OPS = API_BASE_URLS["ops"]
+_SEARCH = f"{_OPS}/rest-services/published-data/search/biblio"
+_FAMILY_PATH = f"{_OPS}/rest-services/family/publication/epodoc"
 _FAMILY = json.loads(
     (Path(__file__).parents[2] / "unit/pipeline/ingestion/ops/family_FR1658141.json").read_text()
 )
@@ -122,11 +123,9 @@ class TestFetchByNumber:
 
     @pytest.mark.asyncio
     async def test_famille_d_un_numero_de_publication(self, http_mock):
-        http_mock.get(
-            re.compile(
-                rf"{re.escape(_OPS)}/rest-services/family/publication/epodoc/FR3055338/biblio"
-            )
-        ).mock(return_value=httpx2.Response(200, json=_FAMILY))
+        http_mock.get(f"{_FAMILY_PATH}/FR3055338/biblio").mock(
+            return_value=httpx2.Response(200, json=_FAMILY)
+        )
         async with httpx2.AsyncClient() as client:
             found = await fetch_by_number(client, "FR3055338", frozenset({PUBLICATION_NUMBER}))
         assert not isinstance(found, NotFound)
@@ -135,19 +134,15 @@ class TestFetchByNumber:
     @pytest.mark.asyncio
     async def test_numero_de_demande_cherche_puis_comme_priorite(self, http_mock):
         """Une priorité jamais publiée est absente des demandes (`ap`) et trouvée parmi les priorités (`pr`)."""
-        search = http_mock.get(
-            re.compile(rf"{re.escape(_OPS)}/rest-services/published-data/search/biblio.*")
-        ).mock(
+        search = http_mock.get(_SEARCH).mock(
             side_effect=[
                 httpx2.Response(404, text="SERVER.EntityNotFound"),
                 httpx2.Response(200, json=_search_result("WO2018041749")),
             ]
         )
-        http_mock.get(
-            re.compile(
-                rf"{re.escape(_OPS)}/rest-services/family/publication/epodoc/WO2018041749/biblio"
-            )
-        ).mock(return_value=httpx2.Response(200, json=_FAMILY))
+        http_mock.get(f"{_FAMILY_PATH}/WO2018041749/biblio").mock(
+            return_value=httpx2.Response(200, json=_FAMILY)
+        )
         async with httpx2.AsyncClient() as client:
             found = await fetch_by_number(client, "FR1658141", frozenset({APPLICATION_NUMBER}))
         assert search.call_count == 2
@@ -155,14 +150,12 @@ class TestFetchByNumber:
 
     @pytest.mark.asyncio
     async def test_famille_sans_le_numero_cherche_ecartee(self, http_mock):
-        http_mock.get(
-            re.compile(rf"{re.escape(_OPS)}/rest-services/published-data/search/biblio.*")
-        ).mock(return_value=httpx2.Response(200, json=_search_result("WO2018041749")))
-        http_mock.get(
-            re.compile(
-                rf"{re.escape(_OPS)}/rest-services/family/publication/epodoc/WO2018041749/biblio"
-            )
-        ).mock(return_value=httpx2.Response(200, json=_FAMILY))
+        http_mock.get(_SEARCH).mock(
+            return_value=httpx2.Response(200, json=_search_result("WO2018041749"))
+        )
+        http_mock.get(f"{_FAMILY_PATH}/WO2018041749/biblio").mock(
+            return_value=httpx2.Response(200, json=_FAMILY)
+        )
         async with httpx2.AsyncClient() as client:
             found = await fetch_by_number(client, "FR9999999", frozenset({APPLICATION_NUMBER}))
         assert isinstance(found, NotFound)

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict xhh7Rlpgx73aXyVWIKvCbXyPo438Y5BCrFpV1f0JsqyQ1BOF277MaLSz60n6pHH
+\restrict 8euHfavb3NbrPRg7hYamzHe0GUD9pT64nz1DupcUcNm4ghp8TnN3tde8uDrRvmS
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -298,7 +298,7 @@ CREATE TYPE public.lookup_source AS ENUM (
     'openalex',
     'wos',
     'scanr',
-    'scanr_patents',
+    'ops',
     'theses',
     'crossref',
     'datacite',
@@ -518,7 +518,7 @@ CREATE TYPE public.source_type AS ENUM (
     'openalex',
     'wos',
     'scanr',
-    'scanr_patents',
+    'ops',
     'theses',
     'crossref',
     'datacite',
@@ -1646,12 +1646,11 @@ UNION
  SELECT sa.id AS source_contribution_id,
     s.id AS structure_id,
     'patent_applicant'::public.perimeter_evidence AS evidence
-   FROM ((((sources.source_records sp
-     CROSS JOIN LATERAL jsonb_array_elements((sp.source_extras -> 'patent_applicants'::text)) applicant(value))
-     CROSS JOIN LATERAL jsonb_array_elements_text(((applicant.value -> 'ids'::text) -> 'paysage'::text)) paysage(id))
-     JOIN structures.structures s ON (((s.api_ids -> 'scanr_patents'::text) ? paysage.id)))
+   FROM (((sources.source_records sp
+     CROSS JOIN LATERAL jsonb_array_elements_text((sp.source_extras -> 'patent_applicant_forms'::text)) form(value))
+     JOIN structures.structures s ON (((s.api_ids -> 'ops'::text) ? form.value)))
      JOIN sources.source_contributions sa ON ((sa.source_record_id = sp.id)))
-  WHERE ((sp.source = 'scanr_patents'::public.source_type) AND (s.id IN ( SELECT perimeter.structure_id
+  WHERE ((sp.source = 'ops'::public.source_type) AND (s.id IN ( SELECT perimeter.structure_id
            FROM perimeter)))
   WITH NO DATA;
 
@@ -6299,5 +6298,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict xhh7Rlpgx73aXyVWIKvCbXyPo438Y5BCrFpV1f0JsqyQ1BOF277MaLSz60n6pHH
+\unrestrict 8euHfavb3NbrPRg7hYamzHe0GUD9pT64nz1DupcUcNm4ghp8TnN3tde8uDrRvmS
 
