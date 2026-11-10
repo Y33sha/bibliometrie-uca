@@ -107,10 +107,6 @@ Document `doi10.1001/jama.2021.7683` (2 auteurs JAMA). Réduit aux champs lus pa
 }
 ```
 
-## Brevets
-
-L'index `scanr-patents` forme la source `scanr_patents`. Un enregistrement source y est une famille de brevets : les demandes déposées auprès de plusieurs offices pour une même invention. Le moissonnage sélectionne les familles par l'identifiant Paysage de leurs déposants, renseigné dans les `api_ids` de la structure. Les inventeurs sont des contributions sources de rôle `inventor`. Les numéros de publication et de demande rattachent un dépôt HAL de brevet à sa famille.
-
 ## Particularités
 
 ### Identifiants ScanR

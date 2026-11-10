@@ -1,6 +1,6 @@
 # Vue d'ensemble
 
-*À jour le 2026-11-07.*
+*À jour le 2026-11-10.*
 
 Le système intègre 9 sources bibliographiques, des sources complémentaires et des imports manuels.
 
@@ -12,7 +12,7 @@ Le système intègre 9 sources bibliographiques, des sources complémentaires et
 | [OpenAlex](03-openalex.md) | Base bibliométrique ouverte | Vise l'exhaustivité sur le plan mondial | REST (works, sources, publishers) | clé API gratuite, ou adresse électronique de contact |
 | [Web of Science](04-wos.md) | Base bibliométrique commerciale | Publications indexées WoS | REST (Expanded API, quota annuel) | clé API sur demande (selon contrat établissement) |
 | [ScanR](05-scanr.md) | Portail du ministère de l'Enseignement supérieur et de la Recherche | Publications de l'écosystème français de la recherche | Elasticsearch (DataESR) | login et mot de passe sur demande, par le [formulaire de contact](https://scanr.enseignementsup-recherche.gouv.fr/about/contact) |
-| [ScanR brevets](05-scanr.md#brevets) | Index des brevets de ScanR | Familles de brevets déposées depuis 2010, avec une personne localisée en France | Elasticsearch (DataESR) | ceux de ScanR |
+| [OPS](13-ops.md) | API de l'Office européen des brevets | Brevets de tous les offices | REST (search, family) | clé et secret d'application, gratuits sur inscription |
 | [theses.fr](08-theses.md) | Portail officiel des thèses françaises | Thèses soutenues et en cours | REST | aucun |
 | [Crossref](06-crossref.md) | Agence d'enregistrement de DOI | Publications dotées d'un [DOI](../glossaire.md#doi) Crossref. Sert aussi à trouver l'éditeur d'un préfixe DOI. | REST (works, prefixes, members) | adresse électronique de contact |
 | [DataCite](07-datacite.md) | Agence d'enregistrement de DOI | Publications dotées d'un [DOI](../glossaire.md#doi) DataCite : jeux de données, logiciels, *preprints*, dépôts d'entrepôts (Zenodo, figshare, recherche-data-gouv…). Sert aussi à trouver l'entrepôt d'un préfixe DOI. | REST (dois, prefixes) | adresse électronique de contact |
@@ -28,7 +28,7 @@ Un [exemple de publication](11-exemple-de-publication.md) compare les métadonn�
 | OpenAlex | institution (filtre `lineage`) + année | ORCID | DOI |
 | Web of Science | champ OG (Organization) + année | — | DOI |
 | ScanR | identifiant SIREN + année | ORCID, IdRef | DOI |
-| ScanR brevets | identifiant Paysage du déposant + année | — | numéro de publication ou de demande |
+| OPS | nom du déposant + année de priorité | — | numéro de publication ou de demande |
 | theses.fr | PPN d'établissement + année de soutenance | — | NNT |
 | Crossref | — | ORCID | DOI |
 | DataCite | mot-clé d'affiliation + année | ORCID | DOI |
