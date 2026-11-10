@@ -96,21 +96,21 @@ Familles dont un établissement du périmètre est déposant : UCA, Université 
 
 ## Décisions
 
-- Le chantier couvre les brevets dont un établissement du périmètre est déposant. Le brevet d'un organisme partenaire se rattache au périmètre seulement par ses inventeurs, sans adresse dans ScanR.
-- Source : l'API OPS de l'Office européen des brevets, en remplacement de l'index `scanr-patents` (phase 9).
-- Unité : la famille.
+- Le chantier couvre les brevets dont un établissement du périmètre est déposant. Le brevet d'un organisme partenaire se rattache au périmètre seulement par ses inventeurs, sans adresse dans OPS.
+- Source : l'API OPS de l'Office européen des brevets, sous la source `ops`.
+- Unité : la famille INPADOC, qui réunit les demandes liées par leurs priorités. Identifiant source : le numéro de la priorité la plus ancienne.
 - Un brevet est une publication de type `patent`. Il figure dans les listes de publications et a sa propre page de détail.
-- Le moissonnage sélectionne les familles par l'identifiant Paysage de leurs déposants, lu dans `structures.api_ids['scanr_patents']`.
-- Types d'identifiant `patent_publication_number` et `patent_application_number` : office et numéro, sans le code de type. Le code de type désigne l'étape de publication d'une demande : A1 pour la demande publiée avec son rapport de recherche, B1 pour le brevet délivré.
-- ScanR écrit une demande internationale `PCT/FR2011/050432` sous l'office WO, sans `PCT/` ni office de dépôt. Ses numéros de demande WO recoupent donc les numéros de publication WO d'autres familles.
+- Le moissonnage cherche les publications par les graphies des déposants du périmètre, lues dans `structures.api_ids['ops']` sous leur forme de comparaison (`normalize_text`). Une publication est gardée si un déposant a exactement l'une de ces graphies.
+- Types d'identifiant `patent_publication_number` et `patent_application_number` : office et numéro au format docdb, sans le code de type. Le code de type désigne l'étape de publication d'une demande : A1 pour la demande publiée avec son rapport de recherche, B1 pour le brevet délivré.
+- Une demande internationale `PCT/FR2011/050432` s'écrit sous l'office WO, sans `PCT/` ni office de dépôt. Ses numéros de demande WO recoupent donc les numéros de publication WO d'autres familles.
 - Les numéros de publication et de demande sont des clés de confirmation à plusieurs valeurs, comme le DOI. Un dépôt HAL de brevet rejoint ainsi sa famille. Un numéro relie seulement un numéro de même type.
 - Une famille est une ancre de la réconciliation, comme un DOI. Deux familles déposées le même jour sous le même titre restent deux publications.
 - Un numéro français de sept chiffres de `number_s` est une publication s'il commence par 3, ou par une année postérieure à la date du dépôt HAL. Sinon, c'est une demande.
-- La date de publication d'un brevet est la date du premier dépôt de la famille. Les autres dates vont dans `source_extras`.
-- Un dépôt HAL de brevet sans famille en base cherche sa famille dans ScanR par numéro (`fetch_missing`).
-- Le moissonnage écarte les articles cités et les champs dérivés des autres champs : `denormalized_structures`, `co_*`, `title_abs_text`.
-- Un brevet entre dans le périmètre quand un de ses déposants est une structure du périmètre : indice d'appartenance au périmètre `patent_applicant`, lié au document comme `thesis_institution`. La vue `source_contribution_structures` donne l'indice à tous les inventeurs de la famille.
-- Un inventeur se rattache seulement à une personne existante, par identifiant ou par nom, comme un membre de jury.
+- La date de publication d'un brevet est la date de la priorité la plus ancienne de la famille. Les autres dates vont dans `source_extras`.
+- Un dépôt HAL de brevet sans famille en base cherche sa famille dans OPS par numéro (`fetch_missing`) : numéro de publication, puis numéro de demande, puis numéro de priorité.
+- Un dépôt HAL de type brevet qui désigne une déclaration d'invention (`DI-RV-…`) ou une enveloppe Soleau est de type `other`.
+- Un brevet entre dans le périmètre quand un de ses déposants est une structure du périmètre : indice d'appartenance au périmètre `patent_applicant`, lié au document comme `thesis_institution`. La vue `source_contribution_structures` compare les formes de comparaison des noms des déposants (`source_extras.patent_applicant_forms`) aux graphies de `api_ids['ops']`, et donne l'indice à tous les inventeurs de la famille.
+- Un inventeur se rattache seulement à une personne existante, par nom, comme un membre de jury.
 - La purge des publications épargne une publication à indice lié au document, même sans contribution rattachée à une personne.
 - Rôle de contribution `inventor`, compté comme rôle d'auteur.
 - `source_extras` reçoit les demandes, les déposants et la classification CPC.
@@ -179,16 +179,17 @@ Familles dont un établissement du périmètre est déposant : UCA, Université 
 
 ### Phase 9 — Remplacement de ScanR brevets par OPS
 
-- [ ] Source OPS : valeur de `source_type`, profil, identifiants d'accès (`EPO_OPS_KEY`, `EPO_OPS_SECRET`), débit réglé sur l'en-tête `X-Throttling-Control`
-- [ ] Unité et identifiant source de la famille OPS
-- [ ] Périmètre : déposants du périmètre reconnus par leur nom
-- [ ] Moissonnage : publications cherchées par nom de déposant, puis famille de chaque publication
-- [ ] Normalisation : numéros, dates par office, déposants, inventeurs, titres, résumé, classification CPC
-- [ ] Recherche des familles absentes par numéro (`fetch_missing`) : numéro de publication, de demande, puis de priorité
-- [ ] Rafraîchissement d'une famille (`fetch_stale`)
-- [ ] Page de détail : déposants et classification CPC
-- [ ] Dépôts HAL de type brevet sans famille OPS
-- [ ] Retrait de la source `scanr_patents` : code, enregistrements sources, `structures.api_ids['scanr_patents']`
+- [x] Source OPS : valeur de `source_type`, profil, identifiants d'accès (`EPO_OPS_KEY`, `EPO_OPS_SECRET`), refus pour surcharge attendus puis retentés
+- [x] Unité et identifiant source de la famille OPS
+- [x] Périmètre : déposants du périmètre reconnus par leur nom
+- [x] Moissonnage : publications cherchées par nom de déposant, puis famille de chaque publication
+- [x] Normalisation : numéros, dates par office, déposants, inventeurs, titres, résumé, classification CPC sans libellé
+- [x] Recherche des familles absentes par numéro (`fetch_missing`) : numéro de publication, de demande, puis de priorité
+- [x] Rafraîchissement d'une famille (`fetch_stale`)
+- [x] Page de détail : déposants rattachés aux structures par leur nom
+- [x] Dépôts HAL de type brevet sans famille OPS : déclarations d'invention et enveloppes Soleau en `other`
+- [x] Retrait de la source `scanr_patents` : code, enregistrements sources, `structures.api_ids['scanr_patents']`, valeur renommée `ops` dans `source_type` et `lookup_source`
+- [ ] Migration appliquée, schéma régénéré, tests d'intégration
 - [ ] Mesure avant et après : familles du périmètre, inventeurs rattachés à une personne
 - [ ] Mise à jour de la documentation
 
