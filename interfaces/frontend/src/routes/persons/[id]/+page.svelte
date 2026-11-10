@@ -21,7 +21,7 @@
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
 	import AddressPublications from '#lib/components/AddressPublications.svelte';
 	import PublicationCountButton from '#lib/components/PublicationCountButton.svelte';
-	import BarChart, { BAR_LABEL_SPACE } from '#lib/components/charts/BarChart.svelte';
+	import BarChart, { barLabelSpace } from '#lib/components/charts/BarChart.svelte';
 	import YearSlider, { YEAR_TRACK_INSET } from '#lib/components/YearSlider.svelte';
 	import { confirmDialog } from '#lib/dialogs.svelte.js';
 	import TitleRow from '#lib/components/TitleRow.svelte';
@@ -87,6 +87,8 @@
 	const publicationCount = (n: number) => formatCount(n, 'publication');
 	// Largeur réservée aux libellés des structures, à gauche de l'axe du graphique.
 	const ADDR_AXIS_WIDTH = 120;
+	// Place des pourcentages, à droite de l'axe du graphique.
+	const ADDR_LABEL_SPACE = barLabelSpace(true);
 	let expandedAddrId = $state<number | null>(null);
 	let addrPublications = $state<AddressPublication[]>([]);
 	let addrPublicationsLoading = $state(false);
@@ -314,7 +316,7 @@
 					<!-- Axe des valeurs aligné sur la piste du curseur ; libellés des structures et pourcentages en débord. -->
 					<div
 						style:margin-left="{YEAR_TRACK_INSET - ADDR_AXIS_WIDTH}px"
-						style:width="calc(100% + {ADDR_AXIS_WIDTH + BAR_LABEL_SPACE - 2 * YEAR_TRACK_INSET}px)"
+						style:width="calc(100% + {ADDR_AXIS_WIDTH + ADDR_LABEL_SPACE - 2 * YEAR_TRACK_INSET}px)"
 					>
 						<BarChart
 							labels={addrStructures.map((s) => structureLabel(s))}
