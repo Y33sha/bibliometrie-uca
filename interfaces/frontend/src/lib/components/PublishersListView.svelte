@@ -144,8 +144,9 @@
 						{/each}
 					</div>
 				</td>
-				<td class="num">{p.serial_count.toLocaleString('fr-FR')}</td>
-				<td class="num">{p.publication_count.toLocaleString('fr-FR')}</td>
+				<!-- Un décompte non nul mène à l'onglet correspondant de la fiche. -->
+				<td class="num">{#if p.serial_count}<a href={resolve(`publishers/${p.id}?tab=serials`)}>{p.serial_count.toLocaleString('fr-FR')}</a>{:else}0{/if}</td>
+				<td class="num">{#if p.publication_count}<a href={resolve(`publishers/${p.id}?tab=publications`)}>{p.publication_count.toLocaleString('fr-FR')}</a>{:else}0{/if}</td>
 			</tr>
 		{/each}
 		{#if list.listing.items.length === 0}
