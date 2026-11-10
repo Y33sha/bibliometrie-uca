@@ -288,7 +288,7 @@
 
 <FilterLayout bind:open={list.panel.open}>
 {#snippet panel()}
-	<FilterPanel filters={FILTERS} groups={PUBLICATION_FILTER_GROUPS} bind:values={list.values} options={facets.options} presenceCounts={facets.sourceCounts} loaded={facets.loaded} collapsed entityEndpoint={PUBLICATION_FACETS_ENDPOINT} buildParams={list.filterParams} panel={list.panel} onchange={list.onFilterChange} />
+	<FilterPanel filters={FILTERS} groups={PUBLICATION_FILTER_GROUPS} bind:values={list.values} options={facets.options} presenceCounts={facets.sourceCounts} loaded={facets.loaded} expanded={['docTypes', 'years']} entityEndpoint={PUBLICATION_FACETS_ENDPOINT} buildParams={list.filterParams} panel={list.panel} onchange={list.onFilterChange} />
 {/snippet}
 {#if view === 'stats'}
 <div class="stats-view">

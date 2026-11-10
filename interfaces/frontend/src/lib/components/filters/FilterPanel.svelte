@@ -31,7 +31,7 @@
 		options,
 		presenceCounts,
 		loaded,
-		collapsed = false,
+		expanded,
 		entityEndpoint,
 		buildParams,
 		panel,
@@ -47,8 +47,8 @@
 		presenceCounts: PresenceCounts;
 		/** Décomptes chargés au moins une fois. Avant, tous les filtres proposés par la page s'affichent. */
 		loaded: boolean;
-		/** Filtres repliés à l'ouverture de la page, sauf les filtres actifs. Sans cette option, tous les filtres sont dépliés. */
-		collapsed?: boolean;
+		/** Clés des filtres dépliés à l'ouverture de la page, avec les filtres actifs. Les autres sont repliés. Sans cette option, tous les filtres sont dépliés. */
+		expanded?: readonly string[];
 		/** Base de la facette contextuelle des filtres d'entité. */
 		entityEndpoint: string;
 		/** Paramètres des filtres actifs, pour la facette contextuelle des entités. */
@@ -151,7 +151,7 @@
 			<section class="filter-group" aria-label={s.group.label}>
 				{#each shown as f (f.key)}
 					{@const active = isActive(f, values)}
-					{@const open = panel.isExpanded(f.key, active || !collapsed)}
+					{@const open = panel.isExpanded(f.key, active || !expanded || expanded.includes(f.key))}
 					<div class="filter-block">
 						<div class="filter-head-row">
 							<button type="button" class="filter-head" class:with-clear={active} aria-expanded={open} title={f.tooltip} onclick={() => panel.setExpanded(f.key, !open)}>
