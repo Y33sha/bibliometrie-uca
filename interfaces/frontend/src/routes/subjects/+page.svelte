@@ -86,7 +86,8 @@
               <a href={resolve(`subjects/${s.label_normalized}`)}>{s.label}</a>
             </td>
             <td class="muted">{s.vocabularies.map((v) => subjectVocabularyLabels[v]).join(", ")}</td>
-            <td class="num">{s.usage_count.toLocaleString("fr-FR")}</td>
+            <!-- Un décompte non nul mène à l'onglet Publications de la fiche. -->
+            <td class="num">{#if s.usage_count}<a href={resolve(`subjects/${s.label_normalized}?tab=publications`)}>{s.usage_count.toLocaleString("fr-FR")}</a>{:else}0{/if}</td>
           </tr>
         {/each}
       </tbody>
