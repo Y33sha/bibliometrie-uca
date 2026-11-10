@@ -1,6 +1,6 @@
 """Phases du pipeline, dans l'ordre d'exécution, avec leur libellé et leurs attributs.
 
-Les enrichissements (`extra`) viennent en dernier. Chacun est indépendant des autres. Des phases placées avant eux lisent leurs sorties au run suivant : `resolve_ra` et `fetch_missing` lisent les relations, `normalize` et `publications` les pays, `publications` le statut open access.
+Les enrichissements (`extra`) viennent en dernier. Chacun est indépendant des autres. `resolve_ra` et `fetch_missing`, placées avant eux, lisent les relations au run suivant.
 """
 
 from dataclasses import replace
@@ -17,7 +17,6 @@ from pipeline.ingestion.openalex import fetch_truncated
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation import finalize
-from pipeline.transformation.countries import countries
 from pipeline.transformation.persons import persons
 from pipeline.transformation.publications import oa_status, publications, relations
 from pipeline.transformation.publications.author_grouping import author_grouping
@@ -49,13 +48,13 @@ PHASES: tuple[Phase, ...] = (
     Phase(
         "fetch_missing",
         "Recherche dans chaque source des documents trouvés dans les autres",
-        fetch_missing.TASKS,
+        fetch_missing.STEPS,
         harvesting=True,
         assemble=fetch_missing.assemble,
     ),
     Phase(
         "fetch_stale",
-        "Relecture des documents non revus par le moissonnage",
+        "Recherche des documents non revus par le moissonnage",
         fetch_stale.TASKS,
         harvesting=True,
         when=lambda options: options.policy.fetch_stale,
@@ -70,13 +69,13 @@ PHASES: tuple[Phase, ...] = (
     Phase(
         "normalize",
         "Normalisation des données brutes",
-        normalize.TASKS,
+        normalize.STEPS,
         assemble=normalize.assemble,
     ),
     Phase(
         "affiliations",
-        "Résolution des affiliations par contribution source",
-        affiliations.TASKS,
+        "Structures, pays et périmètre des contributions sources",
+        affiliations.STEPS,
         check=check_extraction_perimeter,
         assemble=affiliations.assemble,
     ),
@@ -88,7 +87,7 @@ PHASES: tuple[Phase, ...] = (
     Phase(
         "publishing",
         "Référentiels de l'édition",
-        publishing.TASKS,
+        publishing.STEPS,
         assemble=publishing.assemble,
     ),
     Phase(
@@ -96,6 +95,12 @@ PHASES: tuple[Phase, ...] = (
         "Correction des métadonnées de publication",
         metadata_correction.TASKS,
         assemble=metadata_correction.assemble,
+    ),
+    Phase(
+        "oa_status",
+        "URL de résolution et statut open access des DOI",
+        oa_status.TASKS,
+        assemble=oa_status.assemble,
     ),
     Phase(
         "publications",
@@ -117,7 +122,7 @@ PHASES: tuple[Phase, ...] = (
     Phase(
         "finalize",
         "Finalisation : périmètre des publications, vues des structures, purges et compteurs",
-        finalize.TASKS,
+        finalize.STEPS,
         assemble=finalize.assemble,
     ),
     Phase(
@@ -131,20 +136,6 @@ PHASES: tuple[Phase, ...] = (
         "Sujets des publications",
         subjects.TASKS,
         extra=True,
-    ),
-    Phase(
-        "countries",
-        "Pays associés aux contributions sources",
-        countries.TASKS,
-        extra=True,
-        assemble=countries.assemble,
-    ),
-    Phase(
-        "oa_status",
-        "Statut open access des publications",
-        oa_status.TASKS,
-        extra=True,
-        assemble=oa_status.assemble,
     ),
 )
 

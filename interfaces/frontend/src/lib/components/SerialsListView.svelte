@@ -32,7 +32,7 @@
 
 	// Composant de liste de publications en série réutilisable. Utilisé par :
 	// - `/journals` (mode autonome avec sync URL)
-	// - `/publishers/[id]?tab=journals` (filtre `publisherId` fixe)
+	// - `/publishers/[id]?tab=serials` (filtre `publisherId` fixe)
 	// La session admin gagne, en tête de ligne, l'icône du volet d'édition de la publication en série ; sur `/journals`, elle gagne aussi la facette « Publications ».
 	interface ExternalFilters {
 		publisherId?: number;
@@ -192,7 +192,8 @@
 					</td>
 				{/if}
 				<td class="muted">{serialTypeLabel(j.serial_type)}</td>
-				<td class="num">{j.publication_count.toLocaleString('fr-FR')}</td>
+				<!-- Un décompte non nul mène à l'onglet Publications de la fiche. -->
+				<td class="num">{#if j.publication_count}<a href={resolve(`journals/${j.id}?tab=publications`)}>{j.publication_count.toLocaleString('fr-FR')}</a>{:else}0{/if}</td>
 			</tr>
 		{/each}
 		{#if list.listing.items.length === 0}

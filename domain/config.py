@@ -30,7 +30,7 @@ class ConfigKey(StrEnum):
     UNPAYWALL_RECHECK_AFTER_DAYS = "unpaywall_recheck_after_days"
     """Délai avant de vérifier de nouveau le statut open access d'une publication auprès d'Unpaywall."""
     DOI_RESOLUTION_RECHECK_AFTER_DAYS = "doi_resolution_recheck_after_days"
-    """Délai avant de relire chez doi.org l'URL de résolution d'un DOI."""
+    """Délai avant de chercher de nouveau chez doi.org l'URL de résolution d'un DOI."""
     DOAJ_REFRESH_AFTER_DAYS = "doaj_refresh_after_days"
     """Délai avant de télécharger de nouveau le fichier du DOAJ."""
     ISSNL_TABLE_REFRESH_AFTER_DAYS = "issnl_table_refresh_after_days"

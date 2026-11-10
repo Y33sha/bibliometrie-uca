@@ -192,7 +192,8 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--no-extras",
         action="store_true",
-        help="Omettre les enrichissements terminaux (relations, subjects, countries, oa_status)",
+        help="Omettre les enrichissements terminaux "
+        f"({', '.join(phase.name for phase in PHASES if phase.extra)})",
     )
     parser.add_argument(
         "--mode", choices=list(MODE_NAMES), default="full", help="Mode d'exécution (défaut: full)"

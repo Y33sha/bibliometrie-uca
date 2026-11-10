@@ -13,6 +13,15 @@ Le type de document `patent` existe. Les brevets en base viennent des dépôts H
 - Résultat de recherche : numéro de publication, titre, dates de dépôt et de publication, CIB, inventeurs, déposants.
 - Détail d'une demande en XML (`GET notice/{numéro}`) : déposants et titulaires avec SIREN et adresse, inventeurs avec ville et code postal, identifiant de famille DOCDB, statut juridique, articles cités avec leur DOI.
 
+### API OPS de l'Office européen des brevets
+
+- Base : `https://ops.epo.org/3.2/rest-services/`. Connexion OAuth par compte (`EPO_OPS_KEY`, `EPO_OPS_SECRET`). Quota hebdomadaire.
+- Couverture : demandes et publications de tous les offices.
+- Recherche (`published-data/search/biblio`) en syntaxe CQL : déposant (`pa`), numéro de demande (`ap`), numéro de priorité (`pr`), date de publication (`pd`). 100 résultats par requête. Le service de recherche limite le débit selon sa charge, jusqu'à 5 requêtes par minute. L'en-tête `X-Throttling-Control` donne l'état du service.
+- Famille (`family/publication/docdb/{office}.{numéro}/biblio`, `family/application/docdb/{office}.{numéro}/biblio`) : famille INPADOC, avec pour chaque membre la demande, la publication et son code de type, les priorités, les déposants, les inventeurs et les titres.
+- Les noms des déposants et des inventeurs existent au format original et au format epodoc (`UNIV CLERMONT AUVERGNE [FR]`). Le format original sépare le plus souvent le nom du prénom par une virgule.
+- Une priorité jamais publiée se trouve par son numéro de priorité (`pr`).
+
 Une famille de brevets réunit les demandes déposées auprès de plusieurs offices (FR, EP, WO, US…) pour une même invention. La famille DOCDB de l'Office européen des brevets réunit les demandes de priorités identiques.
 
 ### Sondages du 2026-11-02
@@ -66,23 +75,42 @@ Familles dont un établissement du périmètre est déposant : UCA, Université 
 - Dans ScanR, les identifiants Paysage des déposants du périmètre sélectionnent 154 familles : `K4lR3` et `FvH4k` (UCA), `n1E6T` (Université Blaise Pascal), `3itX6` (Université d'Auvergne), `cQN1f` (SIGMA Clermont), `S8ntZ` (Clermont Auvergne INP), `UedNx` (ENSCCF).
 - 460 de leurs 903 inventeurs ont un IdRef. Sur 301 IdRef distincts, 181 sont en base : 84 confirmés, 97 en attente.
 
+### Sondages du 2026-11-10
+
+- L'index `scanr-patents` compte 1 854 familles de premier dépôt en 2024 et 3 en 2025, contre environ 16 000 par an jusqu'en 2023.
+- La recherche OPS sur les noms des établissements du périmètre trouve 246 familles. Elle retrouve les 78 familles ScanR brevets en base dont un déposant est du périmètre. Elle trouve 14 familles déposées en 2024 ou 2025, absentes de ScanR brevets.
+- Les 59 demandes FR de l'INPI déposées depuis 2017 par un établissement du périmètre sont présentes dans OPS, sauf le second dépôt FR d'une famille ScanR en base.
+- Les inventeurs rattachés par nom à une personne de la base donnent un laboratoire à 13 des 14 familles trouvées dans OPS et absentes de la base : unité du SI RH, à défaut laboratoire de leurs publications.
+
+### Comparaison des sources
+
+| | HAL | ScanR brevets | OPS | INPI |
+|---|---|---|---|---|
+| Offices couverts | Ceux déclarés par les laboratoires | Tous | Tous | FR, EP, WO |
+| Années couvertes | Selon les dépôts des laboratoires | Jusqu'au printemps 2025 | Jusqu'à 18 mois avant la recherche | Jusqu'à 18 mois avant la recherche |
+| Familles | Non | Oui | Oui | Non |
+| Laboratoire | Oui | Non | Non | Non |
+| Déposants | Noms | Identifiants Paysage, SIREN, ROR | Noms | Noms ; SIREN sur une partie des demandes FR |
+| Inventeurs | Auteurs du dépôt | Noms ; IdRef pour la moitié | Noms | Noms |
+| Défauts constatés | Doublons, numéros faux, souches et références internes, dépôts inégaux selon les laboratoires | Priorités FR manquantes ; une même priorité répartie sur plusieurs familles | Graphies multiples des noms | Demandes non regroupées en familles |
+
 ## Décisions
 
-- Le chantier couvre les brevets dont un établissement du périmètre est déposant. Le brevet d'un organisme partenaire se rattache au périmètre seulement par ses inventeurs, sans adresse dans ScanR.
-- Source : l'index `scanr-patents`, sous une source `scanr_patents` distincte de ScanR.
-- Unité : la famille.
+- Le chantier couvre les brevets dont un établissement du périmètre est déposant. Le brevet d'un organisme partenaire se rattache au périmètre seulement par ses inventeurs, sans adresse dans OPS.
+- Source : l'API OPS de l'Office européen des brevets, sous la source `ops`.
+- Unité : la famille INPADOC, qui réunit les demandes liées par leurs priorités. Identifiant source : le numéro de la priorité la plus ancienne.
 - Un brevet est une publication de type `patent`. Il figure dans les listes de publications et a sa propre page de détail.
-- Le moissonnage sélectionne les familles par l'identifiant Paysage de leurs déposants, lu dans `structures.api_ids['scanr_patents']`.
-- Types d'identifiant `patent_publication_number` et `patent_application_number` : office et numéro, sans le code de type. Le code de type désigne l'étape de publication d'une demande : A1 pour la demande publiée avec son rapport de recherche, B1 pour le brevet délivré.
-- ScanR écrit une demande internationale `PCT/FR2011/050432` sous l'office WO, sans `PCT/` ni office de dépôt. Ses numéros de demande WO recoupent donc les numéros de publication WO d'autres familles.
+- Le moissonnage cherche les publications par les graphies des déposants du périmètre, lues dans `structures.api_ids['ops']` sous leur forme de comparaison (`normalize_text`). Une publication est gardée si un déposant a exactement l'une de ces graphies.
+- Types d'identifiant `patent_publication_number` et `patent_application_number` : office et numéro au format docdb, sans le code de type. Le code de type désigne l'étape de publication d'une demande : A1 pour la demande publiée avec son rapport de recherche, B1 pour le brevet délivré.
+- Une demande internationale `PCT/FR2011/050432` s'écrit sous l'office WO, sans `PCT/` ni office de dépôt. Ses numéros de demande WO recoupent donc les numéros de publication WO d'autres familles.
 - Les numéros de publication et de demande sont des clés de confirmation à plusieurs valeurs, comme le DOI. Un dépôt HAL de brevet rejoint ainsi sa famille. Un numéro relie seulement un numéro de même type.
 - Une famille est une ancre de la réconciliation, comme un DOI. Deux familles déposées le même jour sous le même titre restent deux publications.
 - Un numéro français de sept chiffres de `number_s` est une publication s'il commence par 3, ou par une année postérieure à la date du dépôt HAL. Sinon, c'est une demande.
-- La date de publication d'un brevet est la date du premier dépôt de la famille. Les autres dates vont dans `source_extras`.
-- Un dépôt HAL de brevet sans famille en base cherche sa famille dans ScanR par numéro (`fetch_missing`).
-- Le moissonnage écarte les articles cités et les champs dérivés des autres champs : `denormalized_structures`, `co_*`, `title_abs_text`.
-- Un brevet entre dans le périmètre quand un de ses déposants est une structure du périmètre : indice d'appartenance au périmètre `patent_applicant`, lié au document comme `thesis_institution`. La vue `source_contribution_structures` donne l'indice à tous les inventeurs de la famille.
-- Un inventeur se rattache seulement à une personne existante, par identifiant ou par nom, comme un membre de jury.
+- La date de publication d'un brevet est la date de la priorité la plus ancienne de la famille. Les autres dates vont dans `source_extras`.
+- Un dépôt HAL de brevet sans famille en base cherche sa famille dans OPS par numéro (`fetch_missing`) : numéro de publication, puis numéro de demande, puis numéro de priorité.
+- Un dépôt HAL de type brevet qui désigne une déclaration d'invention (`DI-RV-…`) ou une enveloppe Soleau est de type `other`.
+- Un brevet entre dans le périmètre quand un de ses déposants est une structure du périmètre : indice d'appartenance au périmètre `patent_applicant`, lié au document comme `thesis_institution`. La vue `source_contribution_structures` compare les formes de comparaison des noms des déposants (`source_extras.patent_applicant_forms`) aux graphies de `api_ids['ops']`, et donne l'indice à tous les inventeurs de la famille.
+- Un inventeur se rattache seulement à une personne existante, par nom, comme un membre de jury.
 - La purge des publications épargne une publication à indice lié au document, même sans contribution rattachée à une personne.
 - Rôle de contribution `inventor`, compté comme rôle d'auteur.
 - `source_extras` reçoit les demandes, les déposants et la classification CPC.
@@ -142,11 +170,31 @@ Familles dont un établissement du périmètre est déposant : UCA, Université 
 
 29 brevets sont sans famille ScanR brevets au 2026-11-06.
 
-- [ ] Brevet américain délivré (3) : HAL donne le numéro de délivrance, absent de ScanR. Deux familles sont en base.
-- [ ] Même titre qu'une famille en base (2) : demande prioritaire absente de la famille ScanR, ou date HAL postérieure d'un an au premier dépôt.
-- [ ] Sans numéro de brevet (9) : références internes d'INRAE, souches.
-- [ ] Numéro FR, EP ou WO absent de ScanR (15) : 9 demandes déposées en 2024 ou 2025, 6 plus anciennes.
+- [x] Brevet américain délivré (3) : HAL donne le numéro de délivrance, absent de ScanR. Deux dépôts HAL fusionnés à la main avec leur famille. Le troisième brevet n'a pas de déposant du périmètre.
+- [x] Même titre qu'une famille en base (2) : demande prioritaire absente de la famille ScanR, ou date HAL postérieure d'un an au premier dépôt. Fusionnés à la main.
+- [x] Sans numéro de brevet (9) : références internes d'INRAE, souches. Les déclarations d'invention passent en `other` (phase 9). Les autres relèvent de la question ouverte 2.
+- [x] Numéro FR, EP ou WO absent de ScanR (15) : les 9 demandes déposées en 2024 ou 2025 sont dans OPS. Parmi les 6 plus anciennes, EP23306459 est inconnu d'OPS ; les autres sont hors périmètre ou fusionnées.
+- [x] Comparaison des sources : HAL, ScanR brevets, OPS, INPI
+- [x] Choix des sources de brevets : OPS remplace ScanR brevets
+
+### Phase 9 — Remplacement de ScanR brevets par OPS
+
+- [x] Source OPS : valeur de `source_type`, profil, identifiants d'accès (`EPO_OPS_KEY`, `EPO_OPS_SECRET`), refus pour surcharge attendus puis retentés
+- [x] Unité et identifiant source de la famille OPS
+- [x] Périmètre : déposants du périmètre reconnus par leur nom
+- [x] Moissonnage : publications cherchées par nom de déposant, puis famille de chaque publication
+- [x] Normalisation : numéros, dates par office, déposants, inventeurs, titres, résumé, classification CPC sans libellé
+- [x] Recherche des familles absentes par numéro (`fetch_missing`) : numéro de publication, de demande, puis de priorité
+- [x] Rafraîchissement d'une famille (`fetch_stale`)
+- [x] Page de détail : déposants rattachés aux structures par leur nom
+- [x] Dépôts HAL de type brevet sans famille OPS : déclarations d'invention et enveloppes Soleau en `other`
+- [x] Retrait de la source `scanr_patents` : code, enregistrements sources, `structures.api_ids['scanr_patents']`, valeur renommée `ops` dans `source_type` et `lookup_source`
+- [x] Migration appliquée, schéma régénéré, tests d'intégration
+- [x] Mesure des familles : 116 familles OPS, contre 97 familles ScanR brevets. 121 brevets dans le périmètre. 72 des 77 brevets avec dépôt HAL ont leur famille OPS. Parmi les 5 autres, 3 numéros sont absents d'OPS. Un brevet est sans famille OPS correspondante. Un dépôt sans numéro est peut-être la famille FR2106084, sous une autre date.
+- [ ] Mesure du rattachement des inventeurs à une personne, après la phase `persons`
+- [x] Mise à jour de la documentation : page de la source OPS, sources, exploitation, guide d'administration
 
 ## Questions ouvertes
 
 1. Articles cités par un brevet : relation avec les publications par DOI.
+2. Dépôts HAL de type brevet sans famille OPS : déclarations d'invention d'INRAE (`DI-RV-…`), enveloppes Soleau, numéros faux, demandes pas encore publiées.

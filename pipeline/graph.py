@@ -1,6 +1,6 @@
-"""Tâches et phases du pipeline, et graphe de dépendances des tâches d'après leurs lectures et leurs écritures.
+"""Tâches, étapes et phases du pipeline, et graphe de dépendances des tâches d'après leurs lectures et leurs écritures.
 
-Le module de chaque phase déclare ses tâches. `pipeline.phases` liste les phases, et donc les tâches, dans l'ordre d'exécution.
+Le module de chaque phase déclare ses étapes et ses tâches. `pipeline.phases` liste les phases dans l'ordre d'exécution. L'ordre des tâches est celui d'un parcours en profondeur des phases et de leurs étapes.
 
 Une donnée se désigne par sa table (`"serials"`) ou par une colonne (`"serials.serial_type"`). `"serials.id"` désigne l'existence des lignes, créées et supprimées par les écrivains. Une table et l'une de ses colonnes se recouvrent.
 
@@ -43,7 +43,7 @@ class Task:
     parallel_group: str | None = None
     """Groupe de tâches consécutives exécutées en parallèle, nommé dans sa phase."""
     section: str | None = None
-    """Titre de la sous-étape ouverte par la tâche. `None` : la tâche écrit sous le titre courant."""
+    """Titre de la sous-étape ouverte par une tâche placée hors d'une étape. `None` : la tâche écrit sous le titre courant."""
     label: str | None = None
     """Libellé de la ligne de bilan. `None` : la tâche écrit elle-même ses lignes."""
     progress_bar: bool = False
@@ -117,13 +117,48 @@ def order_violations(tasks: Sequence[Task]) -> list[tuple[str, str, str]]:
 
 
 @dataclass(frozen=True)
+class Step:
+    """Étape d'une phase : tâches et étapes exécutées dans l'ordre."""
+
+    name: str
+    summary: str
+    """Entrées → sorties de l'étape."""
+    children: tuple[Step | Task, ...]
+    label: str | None = None
+    """Titre de section au journal des tâches d'une étape de premier niveau. `None` : chaque tâche écrit sous sa `section` ou sous son propre titre."""
+
+    @property
+    def tasks(self) -> tuple[Task, ...]:
+        return leaves(self.children)
+
+
+def leaves(children: Iterable[Step | Task]) -> tuple[Task, ...]:
+    """Renvoie les tâches de `children`, dans l'ordre d'exécution."""
+    return tuple(
+        task
+        for child in children
+        for task in (child.tasks if isinstance(child, Step) else (child,))
+    )
+
+
+def interface(children: Iterable[Step | Task]) -> tuple[frozenset[str], frozenset[str]]:
+    """Renvoie les données lues par `children` hors de ses propres écritures précédentes, et les données écrites par `children`."""
+    reads: set[str] = set()
+    writes: list[str] = []
+    for task in leaves(children):
+        reads.update(r for r in task.reads if not any(_affected_by(r, w) for w in writes))
+        writes.extend(task.writes)
+    return frozenset(reads), frozenset(writes)
+
+
+@dataclass(frozen=True)
 class Phase:
-    """Phase du pipeline : tâches consécutives, avec leur libellé et leurs attributs."""
+    """Phase du pipeline : étapes et tâches consécutives, avec leur libellé et leurs attributs."""
 
     name: str
     label: str
     """Libellé lisible sans connaître le schéma."""
-    tasks: tuple[Task, ...]
+    children: tuple[Step | Task, ...]
     extra: bool = False
     """Enrichissement, hors résolution d'entités : `--no-extras` l'omet."""
     harvesting: bool = False
@@ -134,3 +169,7 @@ class Phase:
     """Précondition, vérifiée avant les tâches : lève une exception si elle n'est pas remplie."""
     assemble: Callable[[Mapping[str, PhaseMetrics]], PhaseMetrics] | None = None
     """Métriques de la phase, d'après celles de ses tâches exécutées, par nom de tâche. `None` : leur somme."""
+
+    @property
+    def tasks(self) -> tuple[Task, ...]:
+        return leaves(self.children)

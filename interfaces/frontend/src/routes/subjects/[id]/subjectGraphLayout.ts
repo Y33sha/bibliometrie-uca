@@ -22,12 +22,13 @@ const STRETCHES = [1.6, 1.4, 1.2, 1, 0.8, 0.6];
 /** Distance au centre des voisins les plus spécifiques, et écart jusqu'aux moins spécifiques, avant agrandissement du graphe faute de place. */
 const INNER_RING = 60;
 const RING_SPAN = 140;
-/** Tailles de police, en pixels : libellés des voisins, titre du sujet central. */
-export const LABEL_SIZE = 13.6;
-export const CENTER_LABEL_SIZE = 15.2;
-/** Taille minimale des libellés à l'écran : le graphe rétrécit au plus jusqu'à elle. */
-export const LABEL_FLOOR = 12;
-export const LINE_HEIGHT = LABEL_SIZE * 1.2;
+/** Tailles de police, en unités du repère : libellés des voisins, titre du sujet central. */
+export interface LabelSizes {
+  label: number;
+  center: number;
+}
+/** Interligne des libellés sur deux lignes, en proportion de la taille de police. */
+const LINE_SPACING = 1.2;
 /** Longueur au-delà de laquelle un libellé passe sur deux lignes. */
 const MAX_LINE_LENGTH = 22;
 /** Largeur approximative d'un libellé, en unités du repère, pour une taille de police donnée. */
@@ -40,6 +41,8 @@ export interface GraphNode {
   lines: string[];
   /** Largeur de la plus longue ligne. */
   labelWidth: number;
+  /** Demi-hauteur du libellé. */
+  labelHalfHeight: number;
   /** Distance au centre, mesurée sur l'ellipse. */
   distance: number;
   x: number;
@@ -71,7 +74,7 @@ function labelLines(label: string): string[] {
 
 /** Emprise d'un voisin : son cercle et son libellé, placé du côté extérieur du graphe. */
 export function nodeBox(n: GraphNode): Box {
-  const half = Math.max(n.r, LABEL_SIZE * 0.7 + ((n.lines.length - 1) * LINE_HEIGHT) / 2);
+  const half = Math.max(n.r, n.labelHalfHeight);
   return n.x >= CX
     ? { x0: n.x - n.r, x1: n.x + n.r + 6 + n.labelWidth, y0: n.y - half, y1: n.y + half }
     : { x0: n.x - n.r - 6 - n.labelWidth, x1: n.x + n.r, y0: n.y - half, y1: n.y + half };
@@ -128,7 +131,9 @@ export function subjectGraphLayout(
   subject: SubjectListItem,
   neighbors: SubjectNeighbor[],
   links: SubjectNeighborLink[],
+  sizes: LabelSizes,
 ) {
+  const lineHeight = sizes.label * LINE_SPACING;
   const maxUsage = Math.max(subject.usage_count, ...neighbors.map((n) => n.usage_count), 1);
   const maxCooc = Math.max(...neighbors.map((n) => n.cooccurrence_count), 1);
   const specs = neighbors.map(specificity);
@@ -145,7 +150,8 @@ export function subjectGraphLayout(
       neighbor: n,
       r: radius(n.usage_count, maxUsage),
       lines,
-      labelWidth: Math.max(...lines.map((line) => labelWidth(line, LABEL_SIZE))),
+      labelWidth: Math.max(...lines.map((line) => labelWidth(line, sizes.label))),
+      labelHalfHeight: sizes.label * 0.7 + ((lines.length - 1) * lineHeight) / 2,
       distance: distanceOf(specs[i]),
       x: CX,
       y: CY,
@@ -169,7 +175,7 @@ export function subjectGraphLayout(
 
   // Le sujet central et son titre, placé dessous, forment une emprise fixe que les voisins contournent.
   const centerR = radius(subject.usage_count, maxUsage) + 4;
-  const centerLabelHalf = labelWidth(subject.label, CENTER_LABEL_SIZE) / 2;
+  const centerLabelHalf = labelWidth(subject.label, sizes.center) / 2;
   const centerBox: Box = {
     x0: CX - Math.max(centerLabelHalf, centerR),
     x1: CX + Math.max(centerLabelHalf, centerR),
@@ -237,7 +243,7 @@ export function subjectGraphLayout(
     const pad = 12;
     const box = { x: minX - pad, y: minY - pad, width: maxX - minX + 2 * pad, height: maxY - minY + 2 * pad };
 
-    return { nodes: placed, box, centerBox, centerR, strokeWidth };
+    return { nodes: placed, box, centerBox, centerR, strokeWidth, lineHeight };
   }
 
   const placements = new Map<number, ReturnType<typeof place>>();

@@ -19,7 +19,7 @@ class PerimeterEvidence(StrEnum):
     THESIS_PARTNER = "thesis_partner"
     """Un laboratoire partenaire de la thèse, reconnu par son PPN IdRef, est une structure du périmètre. Rattache la contribution source du doctorant."""
     PATENT_APPLICANT = "patent_applicant"
-    """Un déposant de la famille de brevets, reconnu par son identifiant Paysage parmi les `api_ids.scanr_patents`, est une structure du périmètre. Rattache toutes les contributions sources de la famille."""
+    """Un déposant de la famille de brevets, reconnu par la forme de comparaison de son nom parmi les graphies de `api_ids.ops`, est une structure du périmètre. Rattache toutes les contributions sources de la famille."""
 
 
 DOCUMENT_EVIDENCE: frozenset[PerimeterEvidence] = frozenset(

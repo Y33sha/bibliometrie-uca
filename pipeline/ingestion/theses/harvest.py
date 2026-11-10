@@ -2,7 +2,7 @@
 
 La recherche liste en une seule requête les thèses de l'ensemble des PPN d'établissement du périmètre, avec une pagination par `debut`. La requête ramène tout l'historique theses.fr de ces établissements. Le moissonnage retient les thèses soutenues dans la fenêtre d'années du run, et toutes les thèses en cours.
 
-Le détail d'une thèse retenue est lu seulement si elle est absente de `staging`, ou disparue de theses.fr. La tâche `fetch_stale.theses` relit le détail des autres thèses.
+Le détail d'une thèse retenue est cherché seulement si elle est absente de `staging`, ou disparue de theses.fr. La tâche `fetch_stale.theses` cherche de nouveau le détail des autres thèses.
 """
 
 from __future__ import annotations

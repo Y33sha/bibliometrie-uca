@@ -1,6 +1,6 @@
 """Port : résolution, par le pipeline, des pays d'un lot d'adresses, puis recalcul des pays de leurs enregistrements sources et publications, après une saisie manuelle.
 
-Implémenté par `pipeline.transformation.countries.refresh_publication_countries.CountryRecompute`.
+Implémenté par `pipeline.transformation.countries.refresh_source_record_countries.CountryRecompute`.
 """
 
 from typing import Protocol
@@ -17,6 +17,6 @@ class CountryRecompute(Protocol):
         """Recalcule les pays des enregistrements sources rattachés à ces adresses : union des pays des adresses de leurs contributions sources. Renvoie le nombre d'enregistrements sources modifiés."""
         ...
 
-    def refresh_publications_countries_for_addresses(self, address_ids: list[int]) -> int:
-        """Recalcule les pays des publications rattachées à ces adresses : union des pays de leurs enregistrements sources. Renvoie le nombre de publications modifiées."""
+    def refresh_publications_for_addresses(self, address_ids: list[int]) -> int:
+        """Recalcule les métadonnées consolidées des publications rattachées à ces adresses, pays compris. Renvoie le nombre de publications recalculées."""
         ...

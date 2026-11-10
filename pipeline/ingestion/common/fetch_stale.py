@@ -1,6 +1,6 @@
-"""Phase `fetch_stale` : nouvelle lecture des documents de `staging` non revus par le moissonnage depuis `fetch_stale_after_days` jours. Une tâche par source, en parallèle.
+"""Phase `fetch_stale` : nouvelle recherche des documents de `staging` non revus par le moissonnage depuis `fetch_stale_after_days` jours. Une tâche par source, en parallèle.
 
-Chaque document est relu par son identifiant natif :
+Chaque document est cherché par son identifiant natif :
 
 - document trouvé → écriture dans `staging` ;
 - document renvoyé sous un autre identifiant natif (work fusionné, DOI alias) → écriture dans `staging` du document renvoyé, document cherché marqué disparu (`disappeared_at`) ;
@@ -9,7 +9,7 @@ Chaque document est relu par son identifiant natif :
 
 Le délai étale la charge : chaque passe reprend seulement les documents qui viennent de le franchir.
 
-La relecture se borne aux années moissonnées par le run ; une thèse en cours est relue quelle que soit la fenêtre. La phase est sautée dans un mode dont la policy l'exclut (`daily`). WoS est opt-in (`--include-wos`).
+La recherche se borne aux années moissonnées par le run. Une thèse en cours est cherchée quelle que soit la fenêtre. La phase est sautée dans un mode dont la policy l'exclut (`daily`). WoS est opt-in (`--include-wos`).
 """
 
 from __future__ import annotations
@@ -35,7 +35,7 @@ def _years(ctx: PhaseContext) -> list[int] | None:
 
 
 def _run_fetch_stale(ctx: PhaseContext, target: str, years: list[int] | None) -> PhaseMetrics:
-    """Relit les documents anciens d'une source, sur sa propre connexion."""
+    """Cherche de nouveau les documents anciens d'une source, sur sa propre connexion."""
     fetch_one = adapter(Source(target)).fetch_by_native_id
     with ctx.open_tx() as conn:
         after_days = delay(conn, ConfigKey.FETCH_STALE_AFTER_DAYS)
@@ -73,5 +73,5 @@ def _summary(metrics: PhaseMetrics) -> dict[str, float | None]:
 
 
 def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
-    """Renvoie la somme des métriques des sources, avec la table des sources relues."""
+    """Renvoie la somme des métriques des sources, avec la table des sources interrogées."""
     return assemble_by_source(by_task, _summary)

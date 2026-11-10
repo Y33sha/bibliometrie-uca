@@ -12,6 +12,7 @@ from pipeline.graph import Phase, in_transaction
 from pipeline.phases import PHASES
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.task_runner import run_phase
+from pipeline.transformation.countries import countries
 from pipeline.transformation.structures import affiliations as phase, perimeter
 from pipeline.transformation.structures.address_resolution import ResolutionStats
 from pipeline.transformation.structures.perimeter import EmptyExtractionPerimeterError
@@ -31,16 +32,17 @@ def perimetre(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[int]]:
 
 
 def _phase(ror: PhaseMetrics | None = None) -> Phase:
-    """Renvoie la phase `affiliations`, ses deux référentiels remplacés par des tâches sans réseau ni transaction, l'origine des adresses par une transaction vide."""
+    """Renvoie la phase `affiliations`, ses deux référentiels et ses tâches des pays remplacés par des tâches sans réseau ni transaction, l'origine des adresses par une transaction vide."""
     remplacees = {
         "refresh_ror": lambda _ctx: ror or PhaseMetrics(),
         "refresh_hal_structures": lambda _ctx: PhaseMetrics(),
         "classify_addresses": in_transaction(lambda _conn, _logger: PhaseMetrics()),
+        **{task.name: lambda _ctx: PhaseMetrics() for task in countries.STEP.tasks},
     }
     affiliations = next(p for p in PHASES if p.name == "affiliations")
     return dataclasses.replace(
         affiliations,
-        tasks=tuple(
+        children=tuple(
             dataclasses.replace(t, run=remplacees.get(t.name, t.run)) for t in affiliations.tasks
         ),
     )
@@ -64,18 +66,20 @@ def _run(contexte, *, processed=7, in_perimeter=3):
                 vus.__setitem__("populate", ids) or InPerimeterSyncCounts(added=4, removed=1)
             ),
         ),
+        patch.object(countries, "funnel", return_value={"cited_addresses": 9}),
     ):
         metrics = run_phase(_phase(), contexte())
     return metrics, vus
 
 
-def test_assemble_les_metriques_de_la_resolution(contexte):
+def test_assemble_les_metriques_de_la_resolution_des_pays_et_du_perimetre(contexte):
     metrics, _ = _run(contexte, processed=7, in_perimeter=3)
 
     assert metrics.total == 7
     assert metrics.details["summary"] == {
         "adresses": 7,
         "in_perimeter": 3,
+        "cited_addresses": 9,
         "source_contributions_entered": 4,
         "source_contributions_left": 1,
     }
@@ -115,6 +119,7 @@ def test_rafraichit_le_referentiel_ror_et_reprend_ses_metriques(contexte):
             return_value=ResolutionStats(processed=0, in_perimeter=0, affiliations=0),
         ),
         patch.object(phase, "populate"),
+        patch.object(countries, "funnel", return_value={}),
     ):
         metrics = run_phase(_phase(ror), contexte())
 

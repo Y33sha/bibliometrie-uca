@@ -1,11 +1,21 @@
 <script module lang="ts">
-	/** Place réservée au texte au bout des barres horizontales, à droite de la borne haute de l'axe des valeurs, en pixels. */
-	export const BAR_LABEL_SPACE = 48;
+	import { fontSize } from '#lib/components/charts/cssVar.js';
+
+	/** Écart entre le bout d'une barre et le cadre de son texte, et marge intérieure de ce cadre, en pixels. */
+	const LABEL_OFFSET = 4;
+	const LABEL_PADDING = 4;
+	/** Largeur maximale du texte au bout d'une barre, en multiples de sa taille de police : « 100 % » ou « 12 345 » en gras. */
+	const LABEL_EMS = 3;
+
+	/** Place réservée au texte au bout des barres horizontales, à droite de la borne haute de l'axe des valeurs, en pixels. Elle suit la taille de police du texte. */
+	export function barLabelSpace(prominentLabels = false): number {
+		return LABEL_OFFSET + LABEL_PADDING + Math.ceil(LABEL_EMS * fontSize(prominentLabels ? 'md' : 'sm'));
+	}
 </script>
 
 <script lang="ts">
 	import type { CartesianScaleOptions, Plugin, Scale } from 'chart.js';
-	import { cssColor, fontSize } from '#lib/components/charts/cssVar.js';
+	import { cssColor } from '#lib/components/charts/cssVar.js';
 	import { Chart, truncateToWidth } from '#lib/components/charts/chart.js';
 
 	let {
@@ -100,12 +110,14 @@
 				responsive: true,
 				maintainAspectRatio: false,
 				// Place pour les valeurs affichées au bout des barres.
-				layout: { padding: horizontal ? { right: BAR_LABEL_SPACE } : { top: 20 } },
+				layout: { padding: horizontal ? { right: barLabelSpace(prominentLabels) } : { top: 20 } },
 				plugins: {
 					legend: { display: false },
 					datalabels: {
 						anchor: 'end',
 						align: 'end',
+						offset: LABEL_OFFSET,
+						padding: LABEL_PADDING,
 						...labelStyle,
 						font: { weight: 600, ...labelStyle.font },
 						...(barLabel && {

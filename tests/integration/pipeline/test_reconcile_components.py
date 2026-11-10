@@ -1002,12 +1002,12 @@ class TestWorkAnchors:
             _source_record(
                 conn,
                 publication_id,
-                source="scanr_patents",
+                source="ops",
                 source_id=family,
                 title_normalized=title,
                 doc_type="patent",
             )
-            for family in ("86329653", "86329914")
+            for family in ("FR2213162", "FR2213182")
         ]
 
         reconcile(conn, logger)

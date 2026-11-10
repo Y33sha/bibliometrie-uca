@@ -34,9 +34,16 @@ class MarcField:
         return [value for c, value in self.subfields if c == code]
 
 
+class NotMarcRecordError(ValueError):
+    """Le document XML est autre chose qu'une notice `<record>`, par exemple un message d'erreur du Sudoc."""
+
+
 def marc_fields(xml: str) -> list[MarcField]:
-    """Lit les zones de données d'une notice MARCXML, dans l'ordre de la notice."""
+    """Lit les zones de données d'une notice MARCXML, dans l'ordre de la notice. Lève `NotMarcRecordError` si la racine est autre chose que `<record>`."""
     root = ET.fromstring(xml)
+    root_name = root.tag.rsplit("}", 1)[-1]
+    if root_name != "record":
+        raise NotMarcRecordError(f"racine <{root_name}>")
     fields: list[MarcField] = []
     for element in root.iter():
         if element.tag.rsplit("}", 1)[-1] != "datafield":

@@ -54,7 +54,7 @@ allowed-tools: Read, Edit, Bash, Grep, Glob
   - « agrégat » au sens du DDD → « entité ». Au sens SQL (`COUNT`, `SUM`), le mot reste ;
   - « rapprocher », « rapprochement », « apparier » → « rattacher » (enregistrement source à une publication, à une revue, à un éditeur ; contribution à une personne), « fusionner » (deux entités en une) ;
   - « enrichissement » désigne seulement les phases qui suivent la résolution des entités, dans une description du pipeline ;
-  - « lire », « lecture » pour la recherche d'une entité dans une source externe → « chercher », « recherche » : « métadonnées des revues cherchées dans OpenAlex », « revues cherchées, trouvées ».
+  - « lire », « lecture », « relire », « relecture » pour la recherche d'une entité dans une source externe → « chercher », « recherche », « chercher de nouveau » : « métadonnées des revues cherchées dans OpenAlex », « revues cherchées, trouvées », « documents non revus cherchés de nouveau ».
 - **Simplicité et précision.** Remplacer les mots vagues par des équivalents précis ("la source atteste d'un document" => "le document est présent dans la source"; "la source ignore le document" => "le document est absent de la source").
 
 ## Alimentation

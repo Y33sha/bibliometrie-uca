@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import CloudLayout from 'd3-cloud';
-	import { cssColor } from '#lib/components/charts/cssVar.js';
+	import { cssColor, cssVar, fontSize } from '#lib/components/charts/cssVar.js';
 	import { mixColors } from '#lib/components/charts/contrast.js';
 	import type { components } from '#lib/api/schema.js';
 
@@ -25,9 +25,9 @@
 	// Nuage des sujets les plus fréquents : la taille et la teinte d'un mot croissent avec le nombre de publications, sur une échelle logarithmique. Chaque mot mène à la fiche du sujet.
 	let { subjects }: { subjects: SubjectFrequency[] } = $props();
 
-	const MIN_SIZE = 11;
-	const MAX_SIZE = 32;
-	const FONT = 'system-ui, sans-serif';
+	const MIN_SIZE = fontSize('sm');
+	const MAX_SIZE = fontSize('3xl');
+	const FONT = cssVar('font');
 
 	let container: HTMLDivElement | undefined = $state();
 	let width = $state(0);

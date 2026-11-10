@@ -1,6 +1,6 @@
 """Lecture des numéros de brevet d'un texte libre, comme le champ `number_s` d'un dépôt HAL.
 
-Un numéro lu est un numéro de publication ou de demande, sous la forme de `PatentNumber` : code de l'office, puis le numéro, sans code de type. La forme d'un numéro de demande suit celle de ScanR :
+Un numéro lu est un numéro de publication ou de demande, sous la forme de `PatentNumber` : code de l'office, puis le numéro, sans code de type. La forme d'un numéro de demande suit le format docdb de l'Office européen des brevets, lu par la source OPS :
 
 - demande internationale : `WO`, l'année sur quatre chiffres, puis le numéro sur six chiffres, sans l'office de dépôt (`PCT/FR2025/050875` → `WO2025050875`) ;
 - demande européenne : `EP`, puis huit chiffres, sans le chiffre de contrôle (`EP21306403.3` → `EP21306403`) ;
@@ -127,6 +127,15 @@ def _read(office: str | None, number: str, year: int | None) -> ReadPatentNumber
     if len(digits) < _OTHER_OFFICE_MIN_DIGITS:
         return None
     return ReadPatentNumber(PatentNumberKind.PUBLICATION, f"{office}{digits}")
+
+
+_DISCLOSURE_RE = re.compile(r"DI-?RV|D[ée]claration d.invention|SOLEAU|\bDSO\d", re.IGNORECASE)
+"""Déclaration d'invention d'INRAE (`DI-RV-22-0027`, « Déclaration d'Invention et de Résultats Valorisables ») ou enveloppe Soleau (`DSO2021006565`)."""
+
+
+def is_disclosure(number: str | None, title: str | None) -> bool:
+    """Indique si un dépôt de type brevet désigne une déclaration d'invention ou une enveloppe Soleau, d'après son numéro ou son titre."""
+    return bool(_DISCLOSURE_RE.search(f"{number or ''} {title or ''}"))
 
 
 def read_patent_numbers(text: str | None, year: int | None = None) -> list[ReadPatentNumber]:

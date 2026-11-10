@@ -128,7 +128,8 @@
 							{#if m.serial_id}<a href={resolve(`journals/${m.serial_id}`)}>{m.journal_title}</a>{/if}
 						</td>
 					{/if}
-					<td class="num">{m.publication_count.toLocaleString('fr-FR')}</td>
+					<!-- Un décompte non nul mène à la fiche, qui liste les publications. -->
+					<td class="num">{#if m.publication_count}<a href={resolve(`monographs/${m.id}`)}>{m.publication_count.toLocaleString('fr-FR')}</a>{:else}0{/if}</td>
 				</tr>
 			{/each}
 			{#if list.listing.items.length === 0}

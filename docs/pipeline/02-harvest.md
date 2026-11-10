@@ -21,7 +21,7 @@ En mode `daily`, seul HAL est moissonné : les dépôts de la même plage d'ann�
 Une publication sans affiliation au périmètre échappe au moissonnage par affiliation. Cette phase, jouée en mode `full`, interroge chaque source sur les identifiants des personnes RH, confirmés ou authentifiés, sur la même plage d'années.
 
 - **Identifiants par source** : ORCID dans HAL, OpenAlex, ScanR, Crossref et DataCite ; idHAL dans HAL ; IdRef dans HAL et ScanR (profil de chaque source, `domain/sources/registry.py`).
-- **Lots de personnes** : une requête réunit tous les identifiants d'un lot de personnes. Un document que plusieurs lots ramènent est écrit une fois.
+- **Lots de personnes** : une requête réunit tous les identifiants d'un lot de personnes. Un lot réunit des coauteurs. Les lots partent en parallèle. Un document que plusieurs lots ramènent est écrit une fois.
 - **Provenance** : les lignes créées ont le mode d'entrée `person_identifier`.
 
 ## Documents absents d'une source (`fetch_missing`)
@@ -33,6 +33,9 @@ Dans HAL, les documents absents de `staging`, avec un hal-id présent dans OpenA
 
 **`fetch_missing.hal_by_nnt` et `fetch_missing.theses_by_nnt` : thèses manquantes, par NNT.**
 Dans HAL, en mode full, les thèses de theses.fr sans document HAL. Dans theses.fr, les thèses absentes de `staging`, avec un NNT présent dans une autre source, par exemple une thèse soutenue dans un autre établissement.
+
+**`fetch_missing.ops_by_number` : brevets manquants, par numéro.**
+Dans OPS, les familles des brevets du périmètre sans famille OPS, par numéro de publication, puis de demande, puis de priorité.
 
 **`fetch_missing.doi.<source>` : DOI manquants par source.**
 Pour chacune des six sources interrogeables par DOI — HAL, OpenAlex, WoS, ScanR, Crossref, DataCite —, recherche les documents présents dans les autres sources et non trouvés dans celle-ci par le moissonnage initial. Les DOI cherchés sont ceux des publications de la fenêtre d'années du run : l'un des enregistrements sources de la publication a son année dans la fenêtre. Un DOI à suffixe de version (`.v2`, `/v2`) ajoute sa forme sans version, cherchée dans toutes les sources. Crossref, non interrogeable par affiliation, est seulement interrogé ici et par personne.

@@ -300,7 +300,7 @@ export function usePivotChart(config: {
 						stacked: true,
 						grid: { display: false },
 						ticks: {
-							font: { size: highCard ? 12 : 14 },
+							font: { size: fontSize(highCard ? 'xs' : 'sm') },
 							callback: (_v: string | number, i: number) => {
 								const l = labels[i] ?? '';
 								return l.length > 45 ? l.slice(0, 45) + '…' : l;

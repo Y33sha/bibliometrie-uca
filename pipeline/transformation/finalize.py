@@ -15,7 +15,7 @@ from collections.abc import Mapping
 from sqlalchemy import Connection, text
 
 from infrastructure.db.scalars import scalar_int
-from pipeline.graph import Task, in_transaction
+from pipeline.graph import Step, Task, in_transaction
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, inflect, quantity, step
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -147,169 +147,199 @@ def _publication_counts(ctx: PhaseContext) -> PhaseMetrics:
     return PhaseMetrics()
 
 
-TASKS = (
-    Task(
-        "purge_publications",
-        reads=(
-            "publications.id",
-            "source_records.publication_id",
-            "contributions.id",
-            "contributions.publication_id",
-            "contributions.person_id",
-            "source_contributions.perimeter_evidence",
-        ),
-        # La suppression d'une publication emporte ses contributions, leurs alignements, ses relations, ses sujets et son détail. Elle détache ses enregistrements sources et ses paiements APC.
-        writes=(
-            "publications.id",
-            "contributions.id",
-            "aligned_source_contributions",
-            "contribution_resolution_queue",
-            "publication_relations",
-            "publication_subjects",
-            "publications_detail",
-            "source_records.publication_id",
-            "apc_payments.publication_id",
-        ),
-        run=_purge,
-        section=_SYNC_SECTION,
-        label="Purge des publications",
+_PURGE_PUBLICATIONS = Task(
+    "purge_publications",
+    reads=(
+        "publications.id",
+        "source_records.publication_id",
+        "contributions.id",
+        "contributions.publication_id",
+        "contributions.person_id",
+        "source_contributions.perimeter_evidence",
     ),
-    Task(
-        "publications_in_perimeter",
-        reads=(
-            "contributions.person_id",
-            "contributions.perimeter_evidence",
-            "contributions.roles",
-            "persons.exclusion",
-            "publications.id",
-            "source_records.publication_id",
-            "source_contributions.perimeter_evidence",
-        ),
-        writes=("publications.in_perimeter",),
-        run=_publications_in_perimeter,
-        section=_SYNC_SECTION,
-        label="Périmètre des publications",
+    # La suppression d'une publication emporte ses contributions, leurs alignements, ses relations, ses sujets et son détail. Elle détache ses enregistrements sources et ses paiements APC.
+    writes=(
+        "publications.id",
+        "contributions.id",
+        "aligned_source_contributions",
+        "contribution_resolution_queue",
+        "publication_relations",
+        "publication_subjects",
+        "publications_detail",
+        "source_records.publication_id",
+        "apc_payments.publication_id",
     ),
-    Task(
-        "structures",
-        reads=(
-            "source_contribution_structures",
-            "contributions.id",
-            "contributions.publication_id",
-            "contributions.person_id",
-            "contributions.roles",
-            "aligned_source_contributions",
-            "persons.exclusion",
-            "source_contribution_rors",
-            "ror_relations",
-            "structures.ror_id",
-        ),
-        writes=("contribution_structures", "publication_structures", "publication_rors"),
-        run=_structures,
-        section=_SYNC_SECTION,
-        label="Structures des liens",
+    run=_purge,
+    section=_SYNC_SECTION,
+    label="Purge des publications",
+)
+
+
+_PUBLICATIONS_IN_PERIMETER = Task(
+    "publications_in_perimeter",
+    reads=(
+        "contributions.person_id",
+        "contributions.perimeter_evidence",
+        "contributions.roles",
+        "persons.exclusion",
+        "publications.id",
+        "source_records.publication_id",
+        "source_contributions.perimeter_evidence",
     ),
-    Task(
-        "serial_publishers",
-        reads=(
-            "serials.id",
-            "publications.serial_id",
-            "publications.monograph_id",
-            "publications.publisher_id",
-            "publications.publication_year",
-            "monographs.serial_id",
-        ),
-        writes=("serials.publisher_id",),
-        # Les revues et les monographies supprimées ensuite comme référentiels vides n'ont pas de publication : leur suppression ne change aucun éditeur.
-        previous_run=("serials.id", "monographs.serial_id"),
-        run=_serial_publishers,
-        section=_SYNC_SECTION,
-        label="Éditeur des revues",
+    writes=("publications.in_perimeter",),
+    run=_publications_in_perimeter,
+    section=_SYNC_SECTION,
+    label="Périmètre des publications",
+)
+
+
+_STRUCTURES = Task(
+    "structures",
+    reads=(
+        "source_contribution_structures",
+        "contributions.id",
+        "contributions.publication_id",
+        "contributions.person_id",
+        "contributions.roles",
+        "aligned_source_contributions",
+        "persons.exclusion",
+        "source_contribution_rors",
+        "ror_relations",
+        "structures.ror_id",
     ),
-    Task(
-        "delete_empty_monographs",
-        reads=(
-            "monographs.id",
-            "monographs.title",
-            "source_records.monograph_id",
-            "publications.monograph_id",
-        ),
-        writes=("monographs.id",),
-        run=in_transaction(delete_empty_monographs.run_delete_empty_monographs),
-        section=_EMPTY_CONTAINERS_SECTION,
-        label=delete_empty_monographs.LABEL,
+    writes=("contribution_structures", "publication_structures", "publication_rors"),
+    run=_structures,
+    section=_SYNC_SECTION,
+    label="Structures des liens",
+)
+
+
+_SERIAL_PUBLISHERS = Task(
+    "serial_publishers",
+    reads=(
+        "serials.id",
+        "publications.serial_id",
+        "publications.monograph_id",
+        "publications.publisher_id",
+        "publications.publication_year",
+        "monographs.serial_id",
     ),
-    Task(
-        "delete_empty_serials",
-        reads=(
-            "serials.id",
-            "serials.title",
-            "serials.publisher_id",
-            # Nom de l'éditeur de chaque revue supprimée, pour le journal.
-            "publishers.name",
-            "source_records.serial_id",
-            "publications.serial_id",
-            "apc_payments.serial_id",
-            "monographs.serial_id",
-            # ISSN cités par la série d'un enregistrement source, ou reliés à un autre titre.
-            "serial_issns",
-            "source_records.biblio",
-            "issn_links",
-        ),
-        # La suppression d'une revue emporte ses espaces de noms DOI et ses décisions de titre. Elle détache ses ISSN.
-        writes=(
-            "serials.id",
-            "serial_doi_namespaces",
-            "serial_title_decisions",
-            "serial_issns.serial_id",
-        ),
-        # Les éditeurs supprimés ensuite comme référentiels vides sont sans revue.
-        previous_run=("publishers.name",),
-        run=in_transaction(delete_empty_serials.run_delete_empty_serials),
-        section=_EMPTY_CONTAINERS_SECTION,
-        label=delete_empty_serials.LABEL,
+    writes=("serials.publisher_id",),
+    # Les revues et les monographies supprimées ensuite comme référentiels vides n'ont pas de publication : leur suppression ne change aucun éditeur.
+    previous_run=("serials.id", "monographs.serial_id"),
+    run=_serial_publishers,
+    section=_SYNC_SECTION,
+    label="Éditeur des revues",
+)
+
+
+_DELETE_EMPTY_MONOGRAPHS = Task(
+    "delete_empty_monographs",
+    reads=(
+        "monographs.id",
+        "monographs.title",
+        "source_records.monograph_id",
+        "publications.monograph_id",
     ),
-    Task(
-        "delete_empty_publishers",
-        reads=(
-            "publishers.id",
-            "publishers.name",
-            "serials.publisher_id",
-            "monographs.publisher_id",
-            "doi_prefixes.publisher_id",
-            "apc_payments.publisher_id",
-            "source_records.publisher_id",
-            "publications.publisher_id",
-        ),
-        # La suppression d'un éditeur emporte ses formes de nom.
-        writes=("publishers.id", "publisher_name_forms"),
-        run=in_transaction(delete_empty_publishers.run_delete_empty_publishers),
-        section=_EMPTY_CONTAINERS_SECTION,
-        label=delete_empty_publishers.LABEL,
+    writes=("monographs.id",),
+    run=in_transaction(delete_empty_monographs.run_delete_empty_monographs),
+    section=_EMPTY_CONTAINERS_SECTION,
+    label=delete_empty_monographs.LABEL,
+)
+
+
+_DELETE_EMPTY_SERIALS = Task(
+    "delete_empty_serials",
+    reads=(
+        "serials.id",
+        "serials.title",
+        "serials.publisher_id",
+        # Nom de l'éditeur de chaque revue supprimée, pour le journal.
+        "publishers.name",
+        "source_records.serial_id",
+        "publications.serial_id",
+        "apc_payments.serial_id",
+        "monographs.serial_id",
+        # ISSN cités par la série d'un enregistrement source, ou reliés à un autre titre.
+        "serial_issns",
+        "source_records.biblio",
+        "issn_links",
     ),
-    Task(
-        "publication_counts",
-        reads=(
-            "addresses.id",
-            "source_contribution_addresses",
-            "source_contributions.source_record_id",
-            "source_records.publication_id",
-            "source_records.serial_id",
-            "serials.id",
-            "publishers.id",
-            "publications.id",
-            "publications.in_perimeter",
-            "publications.serial_id",
-            "publications.publisher_id",
-        ),
-        writes=(
-            "addresses.publication_count",
-            "serials.publication_count",
-            "publishers.publication_count",
-        ),
-        previous_run=("addresses",),
-        run=_publication_counts,
+    # La suppression d'une revue emporte ses espaces de noms DOI et ses décisions de titre. Elle détache ses ISSN.
+    writes=(
+        "serials.id",
+        "serial_doi_namespaces",
+        "serial_title_decisions",
+        "serial_issns.serial_id",
     ),
+    # Les éditeurs supprimés ensuite comme référentiels vides sont sans revue.
+    previous_run=("publishers.name",),
+    run=in_transaction(delete_empty_serials.run_delete_empty_serials),
+    section=_EMPTY_CONTAINERS_SECTION,
+    label=delete_empty_serials.LABEL,
+)
+
+
+_DELETE_EMPTY_PUBLISHERS = Task(
+    "delete_empty_publishers",
+    reads=(
+        "publishers.id",
+        "publishers.name",
+        "serials.publisher_id",
+        "monographs.publisher_id",
+        "doi_prefixes.publisher_id",
+        "apc_payments.publisher_id",
+        "source_records.publisher_id",
+        "publications.publisher_id",
+    ),
+    # La suppression d'un éditeur emporte ses formes de nom.
+    writes=("publishers.id", "publisher_name_forms"),
+    run=in_transaction(delete_empty_publishers.run_delete_empty_publishers),
+    section=_EMPTY_CONTAINERS_SECTION,
+    label=delete_empty_publishers.LABEL,
+)
+
+
+_PUBLICATION_COUNTS = Task(
+    "publication_counts",
+    reads=(
+        "addresses.id",
+        "source_contribution_addresses",
+        "source_contributions.source_record_id",
+        "source_records.publication_id",
+        "source_records.serial_id",
+        "serials.id",
+        "publishers.id",
+        "publications.id",
+        "publications.in_perimeter",
+        "publications.serial_id",
+        "publications.publisher_id",
+    ),
+    writes=(
+        "addresses.publication_count",
+        "serials.publication_count",
+        "publishers.publication_count",
+    ),
+    previous_run=("addresses",),
+    run=_publication_counts,
+)
+
+
+STEPS = (
+    _PURGE_PUBLICATIONS,
+    _PUBLICATIONS_IN_PERIMETER,
+    _STRUCTURES,
+    Step(
+        "publishing_cleanup",
+        "publications → éditeur de chaque revue, référentiels de l'édition sans entrée vide",
+        (
+            _SERIAL_PUBLISHERS,
+            _DELETE_EMPTY_MONOGRAPHS,
+            _DELETE_EMPTY_SERIALS,
+            _DELETE_EMPTY_PUBLISHERS,
+        ),
+    ),
+    _PUBLICATION_COUNTS,
 )
 
 

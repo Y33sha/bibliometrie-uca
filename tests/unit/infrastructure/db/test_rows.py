@@ -3,7 +3,9 @@
 Les vérificateurs de types ignorent le désaccord entre les colonnes d'un relevé et les champs d'un type : la requête SQL est une chaîne de caractères. Un contrôle détecte ce désaccord à l'exécution ; son message nomme le type, les champs sans colonne et les colonnes en trop.
 """
 
-from typing import NamedTuple
+from collections.abc import Iterator
+from dataclasses import dataclass
+from typing import NamedTuple, SupportsIndex
 
 import pytest
 from pydantic import BaseModel
@@ -36,10 +38,33 @@ class _FausseLigne:
     def _mapping(self) -> dict[str, object]:
         return self._colonnes
 
+    def __iter__(self) -> Iterator[object]:
+        return iter(self._colonnes.values())
+
+    def __getitem__(self, index: SupportsIndex, /) -> object:
+        return list(self._colonnes.values())[index]
+
 
 def test_les_colonnes_alimentent_les_champs_de_meme_nom():
     ligne = row_as(_Ligne, _FausseLigne(id=1, titre="Titre", annee=2020))  # type: ignore[arg-type]
     assert ligne == _Ligne(id=1, titre="Titre", annee=2020)
+
+
+def test_des_colonnes_dans_un_autre_ordre_alimentent_les_champs_de_meme_nom():
+    ligne = row_as(_Ligne, _FausseLigne(annee=2020, titre="Titre", id=1))  # type: ignore[arg-type]
+    assert ligne == _Ligne(id=1, titre="Titre", annee=2020)
+
+
+@dataclass(frozen=True, slots=True)
+class _Enregistrement:
+    id: int
+    resume: str = ""
+    titre: str = ""
+
+
+def test_un_champ_facultatif_sans_colonne_avant_un_champ_alimente_garde_sa_valeur_par_defaut():
+    ligne = row_as(_Enregistrement, _FausseLigne(titre="Titre", id=1))  # type: ignore[arg-type]
+    assert ligne == _Enregistrement(id=1, titre="Titre")
 
 
 def test_une_colonne_absente_laisse_le_champ_a_sa_valeur_par_defaut():

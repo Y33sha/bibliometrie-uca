@@ -92,15 +92,19 @@ def ecritures(monkeypatch) -> list[Ecriture]:
 def identifiants_rh(monkeypatch, configuration):
     """Pose les personnes interrogées par le moissonnage par personne, sur les années 2024 et 2025.
 
-    Une chaîne désigne une personne à un seul ORCID ; un dictionnaire, les identifiants d'une personne par type.
+    Une chaîne désigne une personne à un seul ORCID ; un dictionnaire, les identifiants d'une personne par type. Les personnes sont sans publication en base, donc les lots suivent l'ordre de la liste.
     """
     configuration(annees=[2024, 2025])
 
     def _poser(personnes: list) -> None:
-        identifiants = [
-            p if isinstance(p, dict) else {PersonIdentifierType.ORCID: [p]} for p in personnes
-        ]
+        identifiants = {
+            i: p if isinstance(p, dict) else {PersonIdentifierType.ORCID: [p]}
+            for i, p in enumerate(personnes)
+        }
         monkeypatch.setattr(person_search, "searched_persons", lambda conn, id_types: identifiants)
+        monkeypatch.setattr(
+            person_search, "read_batching_inputs", lambda conn, person_ids, years: ({}, {})
+        )
 
     return _poser
 

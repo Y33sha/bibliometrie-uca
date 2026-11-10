@@ -1,6 +1,6 @@
 """Tâches asynchrones de la phase `oa_status` (`pipeline.transformation.publications.oa_status`), avec les requêtes d'Unpaywall et de doi.org (`pipeline.ingestion.complements`).
 
-Les règles du statut sont testées dans `tests/unit/domain/publications/test_open_access.py` (`publication_oa_status`). Ce module teste les réponses écrites par DOI, le recalcul des publications de ces DOI, le DOI absent, le service indisponible, la réponse 429 et le plafond de concurrence.
+Ce module teste les réponses écrites par DOI, la mise en file de consolidation des publications des DOI dont la réponse change, le DOI absent, le service indisponible, la réponse 429 et le plafond de concurrence. Les règles du statut open access sont testées dans `tests/unit/domain/publications/test_open_access.py`.
 
 Le store est simulé et capture les écritures. Les réponses HTTP viennent de la fixture `http_mock`.
 """
@@ -16,9 +16,6 @@ from unittest.mock import MagicMock
 import httpx2
 import pytest
 
-from domain.documents.licenses import License
-from domain.platforms.platform import PlatformType
-from domain.publications.access import Copy
 from pipeline.http.lookup import LookupOutcome
 from pipeline.ingestion.api_params import MAX_CONCURRENT
 from pipeline.ingestion.complements.doi_org import fetch_registered_url
@@ -28,14 +25,12 @@ from pipeline.runtime.context import PhaseContext, RunOptions
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.task_runner import run_phase
 from pipeline.transformation.publications import oa_status
-from pipeline.transformation.publications.oa_inputs import OaInputs
 from pipeline.transformation.publications.oa_status import (
     DOI_ORG,
     UNPAYWALL,
     DoiFetcher,
     DoiLookupTask,
     DoiService,
-    PublicationOa,
 )
 
 UNPAYWALL_BASE = "https://api.unpaywall.org/v2"
@@ -80,65 +75,22 @@ def _route(http_mock, doi: str, *, status: str | None = None, http_status: int =
     )
 
 
-def _copy(url: str, *, platform_type: PlatformType | None = None) -> Copy:
-    """Construit une copie ouverte sous licence CC BY."""
-    return Copy(
-        url=url,
-        version=None,
-        is_oa=True,
-        platform=None,
-        known_platform=None,
-        platform_type=platform_type,
-        license=License.CC_BY,
-        described_by_platform=False,
-        arrival=1,
-    )
-
-
-def _publication(
-    publication_id: int, doi: str, current: str | None, *copies: Copy
-) -> PublicationOa:
-    """Construit la publication d'un DOI, de statut `current`, dans une revue `full_oa`, sans embargo, avec ses `copies`."""
-    return PublicationOa(
-        publication_id,
-        doi,
-        current,
-        OaInputs(
-            applicable=True,
-            has_serial=True,
-            serial_oa_model="full_oa",
-            embargoed=False,
-            restricted=False,
-            unpaywall=None,
-            copies=list(copies),
-        ),
-    )
-
-
 class _FakeStore:
-    """DOI à interroger, publications de ces DOI, et capture des écritures (`record_answers`, `update_oa_status`). Une publication lue après l'écriture d'un verdict d'Unpaywall contient ce verdict.
-
-    Le premier décompte des publications par statut OA renvoie `oa_distribution`, les suivants `oa_distribution_after` s'il est donné.
-    """
+    """DOI à interroger, réponses en table, et capture des écritures (`record_answers`) et des mises en file (`enqueue_publications`). Chaque DOI a une publication."""
 
     def __init__(
         self,
-        publications: list[PublicationOa],
+        dois: list[str],
         *,
         stale_total: int | None = None,
-        oa_distribution: dict[str, int] | None = None,
-        oa_distribution_after: dict[str, int] | None = None,
         stored: dict[str, str | None] | None = None,
     ) -> None:
-        self._publications = publications
-        self._dois = list(dict.fromkeys(p.doi for p in publications))
-        self._stale_total = stale_total if stale_total is not None else len(self._dois)
-        self._oa_distribution = oa_distribution or {}
-        self._oa_distribution_after = oa_distribution_after
+        self._dois = dois
+        self._stale_total = stale_total if stale_total is not None else len(dois)
         self._stored = stored or {}
         self.answers: list[tuple[str, str | None]] = []
         self.services: set[DoiService] = set()
-        self.updates: list[tuple[int, str]] = []
+        self.enqueued: list[str] = []
 
     def fetch_answers(self, service, dois) -> dict[str, str | None]:  # noqa: ARG002
         return {d: s for d, s in self._stored.items() if d in set(dois)}
@@ -149,26 +101,13 @@ class _FakeStore:
     def count_dois_to_query(self, service, *, staleness_days) -> int:  # noqa: ARG002
         return self._stale_total
 
-    def count_publications_by_oa_status(self) -> dict[str, int]:
-        distribution = self._oa_distribution
-        if self._oa_distribution_after is not None:
-            self._oa_distribution = self._oa_distribution_after
-        return dict(distribution)
-
     def record_answers(self, service, answers) -> None:
         self.services.add(service)
         self.answers.extend(answers)
 
-    def fetch_oa_inputs(self, dois) -> list[PublicationOa]:
-        verdicts = dict(self.answers) if UNPAYWALL in self.services else {}
-        return [
-            p._replace(inputs=p.inputs._replace(unpaywall=verdicts.get(p.doi, p.inputs.unpaywall)))
-            for p in self._publications
-            if p.doi in set(dois)
-        ]
-
-    def update_oa_status(self, publication_id: int, status: str) -> None:
-        self.updates.append((publication_id, status))
+    def enqueue_publications(self, dois) -> int:
+        self.enqueued.extend(dois)
+        return len(dois)
 
 
 @pytest.fixture
@@ -229,20 +168,14 @@ def _run(
     return task.run(_context(logger))
 
 
-def test_happy_path_updates_each_publication(logger, http_mock):
-    publications = [
-        _publication(1, "10.1/a", "closed"),
-        _publication(2, "10.1/b", None),
-        _publication(3, "10.1/c", "bronze"),
-    ]
+def test_les_reponses_changees_mettent_leurs_publications_en_file(logger, http_mock):
     _route(http_mock, "10.1/a", status="gold")
     _route(http_mock, "10.1/b", status="green")
     _route(http_mock, "10.1/c", status="bronze")
 
     queries = _FakeStore(
-        publications,
+        ["10.1/a", "10.1/b", "10.1/c"],
         stale_total=42,
-        oa_distribution={"gold": 7, "closed": 3},
         stored={"10.1/b": "closed", "10.1/c": "bronze"},
     )
     metrics = oa_status.assemble({"verify_unpaywall": _run(queries, _make_fetcher(), logger)})
@@ -252,42 +185,30 @@ def test_happy_path_updates_each_publication(logger, http_mock):
         ("10.1/b", "green"),
         ("10.1/c", "bronze"),
     ]
-    assert sorted(queries.updates) == [(1, "gold"), (2, "green")]
-    # Verdicts : 10.1/a nouveau, 10.1/b modifié, 10.1/c inchangé.
+    # 10.1/a nouveau et 10.1/b modifié entrent en file ; 10.1/c inchangé reste hors file.
+    assert sorted(queries.enqueued) == ["10.1/a", "10.1/b"]
     assert (metrics.total, metrics.new, metrics.updated, metrics.unchanged) == (3, 1, 1, 1)
     assert metrics.extras["not_found"] == 0
-    assert "stale" not in metrics.extras
     [service] = metrics.details["services"]["rows"]
     assert service["key"] == "verify_unpaywall"
     assert (service["stale"], service["checked"]) == (42, 3)
     assert (service["new"], service["updated"], service["unchanged"]) == (1, 1, 1)
-    # Le store simulé renvoie la même distribution avant et après : écart nul, lignes triées par effectif.
-    assert metrics.details["table"]["rows"][0] == {"key": "gold", "count": 7, "delta": 0}
 
 
-def test_l_evolution_des_statuts_couvre_les_deux_services(logger):
-    """La répartition par statut OA donne le décompte final, avec son évolution sur les deux tâches : la résolution doi.org recalcule aussi le statut des publications."""
-    resolution_store = _FakeStore(
-        [_publication(1, "10.1/a", "closed")],
-        oa_distribution={"closed": 3},
-        oa_distribution_after={"closed": 2, "gold": 1},
-    )
-    unpaywall_store = _FakeStore(
-        [_publication(2, "10.1/b", "closed")],
-        oa_distribution={"closed": 2, "gold": 1},
-        oa_distribution_after={"closed": 1, "gold": 2},
-    )
+def test_les_deux_services_ont_chacun_leur_ligne(logger):
     resolution, unpaywall = oa_status.TASKS
     phase = dataclasses.replace(
         next(p for p in PHASES if p.name == "oa_status"),
-        tasks=(
+        children=(
             dataclasses.replace(
                 resolution,
                 run=_task(
-                    resolution_store, _answering("https://example.org/a"), service=DOI_ORG
+                    _FakeStore(["10.1/a"]), _answering("https://example.org/a"), service=DOI_ORG
                 ).run,
             ),
-            dataclasses.replace(unpaywall, run=_task(unpaywall_store, _answering("gold")).run),
+            dataclasses.replace(
+                unpaywall, run=_task(_FakeStore(["10.1/b"]), _answering("gold")).run
+            ),
         ),
     )
 
@@ -297,62 +218,37 @@ def test_l_evolution_des_statuts_couvre_les_deux_services(logger):
         "resolve_dois",
         "verify_unpaywall",
     ]
-    assert metrics.details["table"]["rows"] == [
-        {"key": "gold", "count": 2, "delta": 2},
-        {"key": "closed", "count": 1, "delta": -2},
-    ]
 
 
-def test_404_ecrit_un_verdict_nul_et_le_statut_suit_les_copies(logger, http_mock):
-    publications = [_publication(1, "10.1/x", "closed", _copy("https://doi.org/10.1/x"))]
+def test_404_ecrit_un_verdict_nul_et_met_la_publication_en_file(logger, http_mock):
     _route(http_mock, "10.1/x", http_status=404)
 
-    queries = _FakeStore(publications, stored={"10.1/x": "closed"})
+    queries = _FakeStore(["10.1/x"], stored={"10.1/x": "closed"})
     metrics = _run(queries, _make_fetcher(), logger)
     assert queries.answers == [("10.1/x", None)]
-    assert queries.updates == [(1, "gold")]
+    assert queries.enqueued == ["10.1/x"]
     assert (metrics.extras["not_found"], metrics.updated) == (1, 0)
 
 
 def test_unavailable_leaves_doi_unchecked(logger, http_mock):
-    """Unpaywall indisponible : aucun verdict, le DOI reste dans la file."""
-    publications = [_publication(1, "10.1/x", "closed")]
+    """Unpaywall indisponible : aucun verdict, le DOI reste à interroger, rien n'entre en file."""
     _route(http_mock, "10.1/x", http_status=403)
 
-    queries = _FakeStore(publications)
+    queries = _FakeStore(["10.1/x"])
     metrics = _run(queries, _make_fetcher(), logger)
     assert queries.answers == []
-    assert queries.updates == []
+    assert queries.enqueued == []
     assert metrics.errors == 1
     assert metrics.extras["not_found"] == 0
 
 
-def test_le_verdict_n_abaisse_pas_le_statut_des_copies(logger, http_mock):
-    """Une copie d'archive ouverte l'emporte sur le statut `closed` d'Unpaywall : la publication reste `green`."""
-    publications = [
-        _publication(
-            1,
-            "10.1/deposit",
-            "green",
-            _copy("https://hal.science/hal-01607327", platform_type=PlatformType.REPOSITORY),
-        )
-    ]
-    _route(http_mock, "10.1/deposit", status="closed")
-
-    queries = _FakeStore(publications)
-    _run(queries, _make_fetcher(), logger)
-    assert queries.answers == [("10.1/deposit", "closed")]
-    assert queries.updates == []
-
-
 def test_un_verdict_identique_compte_inchange(logger, http_mock):
-    publications = [_publication(1, "10.1/same", "gold")]
     _route(http_mock, "10.1/same", status="gold")
 
-    queries = _FakeStore(publications, stored={"10.1/same": "gold"})
+    queries = _FakeStore(["10.1/same"], stored={"10.1/same": "gold"})
     metrics = _run(queries, _make_fetcher(), logger)
     assert queries.answers == [("10.1/same", "gold")]
-    assert queries.updates == []
+    assert queries.enqueued == []
     assert (metrics.new, metrics.unchanged) == (0, 1)
 
 
@@ -365,9 +261,9 @@ def test_429_retries_transparently(logger, http_mock):
         ]
     )
 
-    queries = _FakeStore([_publication(1, "10.1/r", "closed")])
+    queries = _FakeStore(["10.1/r"])
     _run(queries, _make_fetcher(), logger)
-    assert queries.updates == [(1, "green")]
+    assert queries.answers == [("10.1/r", "green")]
 
 
 def test_semaphore_caps_concurrent_fetches(logger):
@@ -385,22 +281,20 @@ def test_semaphore_caps_concurrent_fetches(logger):
         finally:
             in_flight -= 1
 
-    publications = [_publication(i, f"10.1/{i}", "closed") for i in range(10)]
-    _run(_FakeStore(publications), tracked_fetcher, logger, max_concurrent=3)
+    _run(_FakeStore([f"10.1/{i}" for i in range(10)]), tracked_fetcher, logger, max_concurrent=3)
     assert peak[0] == 3
 
 
 def test_skips_without_unpaywall_configuration(logger):
     """Sans configuration Unpaywall, l'accès à la source signale son absence et la tâche s'arrête avant toute transaction."""
-    queries = _FakeStore([])
-    unconfigured = _FakeStore([_publication(1, "10.1/a", "closed")])
+    unconfigured = _FakeStore(["10.1/a"])
     open_tx = MagicMock(side_effect=_open_tx)
     resolution, unpaywall = oa_status.TASKS
     phase = dataclasses.replace(
         next(p for p in PHASES if p.name == "oa_status"),
-        tasks=(
+        children=(
             dataclasses.replace(
-                resolution, run=_task(queries, _doi_org_fetcher, service=DOI_ORG).run
+                resolution, run=_task(_FakeStore([]), _doi_org_fetcher, service=DOI_ORG).run
             ),
             dataclasses.replace(unpaywall, run=_task(unconfigured, _make_fetcher()).run),
         ),
@@ -424,11 +318,6 @@ def test_skips_without_unpaywall_configuration(logger):
 
 def test_adresse_enregistree_lue_chez_doi_org(logger, http_mock):
     """La valeur `URL` du handle est écrite ; un DOI inconnu et un handle sans URL reçoivent une URL nulle."""
-    publications = [
-        _publication(1, "10.1/u", None),
-        _publication(2, "10.1/x", None),
-        _publication(3, "10.1/e", None),
-    ]
     _handle_route(
         http_mock,
         "10.1/u",
@@ -443,7 +332,7 @@ def test_adresse_enregistree_lue_chez_doi_org(logger, http_mock):
     _handle_route(http_mock, "10.1/x", http_status=404)
     _handle_route(http_mock, "10.1/e", values=[])
 
-    queries = _FakeStore(publications)
+    queries = _FakeStore(["10.1/u", "10.1/x", "10.1/e"])
     metrics = _run(queries, _doi_org_fetcher, logger, service=DOI_ORG)
 
     assert queries.services == {DOI_ORG}

@@ -49,7 +49,7 @@ class FetchMissingPhase:
 
         self.phase: Phase = dataclasses.replace(
             _FETCH_MISSING,
-            tasks=tuple(dataclasses.replace(t, run=run(t.name)) for t in _FETCH_MISSING.tasks),
+            children=tuple(dataclasses.replace(t, run=run(t.name)) for t in _FETCH_MISSING.tasks),
         )
 
     def run(self, ctx) -> PhaseMetrics:

@@ -42,7 +42,7 @@ def test_seuls_les_auteurs_font_entrer_une_publication(sa_sync_conn):
     ("source", "doc_type", "role", "evidence"),
     [
         ("theses", "thesis", "jury_member", "thesis_institution"),
-        ("scanr_patents", "patent", "inventor", "patent_applicant"),
+        ("ops", "patent", "inventor", "patent_applicant"),
     ],
 )
 def test_indice_lie_au_document(sa_sync_conn, source, doc_type, role, evidence):

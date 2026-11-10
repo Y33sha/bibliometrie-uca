@@ -9,7 +9,8 @@ API_BASE_URLS: dict[str, str] = {
     "openalex": "https://api.openalex.org/works",
     "wos": "https://api.clarivate.com/api/wos",
     "scanr": "https://cluster-production.elasticsearch.dataesr.ovh/scanr-publications/_search",
-    "scanr_patents": "https://cluster-production.elasticsearch.dataesr.ovh/scanr-patents/_search",
+    # OPS, Office européen des brevets : racine ; l'adaptateur compose `/auth/accesstoken` et `/rest-services/…`.
+    "ops": "https://ops.epo.org/3.2",
     "theses": "https://theses.fr/api/v1/theses/recherche/",
     # theses.fr : détail d'une thèse ; l'adaptateur compose `<identifiant>`.
     "theses_detail": "https://theses.fr/api/v1/theses/these/",
@@ -64,8 +65,8 @@ MAX_CONCURRENT: dict[str, int] = {
     "wos": 2,
     # Elasticsearch public sans plafond documenté.
     "scanr": 5,
-    # Même cluster que ScanR, pour quelques centaines de familles.
-    "scanr_patents": 2,
+    # Débit réglé par l'API selon sa charge (`X-Throttling-Control`) : une requête à la fois.
+    "ops": 1,
     # API fragile : une requête à la fois.
     "theses": 1,
     # Polite pool : 3 requêtes simultanées au plus.
@@ -90,12 +91,12 @@ MAX_PER_SECOND: dict[str, float] = {
     "wos": 2,
     # Aucun seuil publié.
     "scanr": 5,
-    # Même cluster que ScanR.
-    "scanr_patents": 2,
+    # Seuils variables selon la charge : 5 à 30 recherches et 50 à 200 lectures par minute.
+    "ops": 0.5,
     # Aucun seuil publié.
     "theses": 3,
-    # Seuil publié du polite pool : 10 req/s, 3 requêtes simultanées.
-    "crossref": 5,
+    # Seuil annoncé par les en-têtes du polite pool (`x-rate-limit-limit`) : 3 req/s.
+    "crossref": 3,
     # Seuil publié du tier identifié (User-Agent avec mailto) : 1 000 requêtes par 5 minutes.
     "datacite": 3,
     # Aucun seuil dans les en-têtes de réponse.

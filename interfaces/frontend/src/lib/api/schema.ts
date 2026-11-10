@@ -4547,7 +4547,7 @@ export interface components {
             country: string | null;
             /**
              * Structure Id
-             * @description Structure en base, reconnue par son ROR ou par son identifiant Paysage (`api_ids.scanr_patents`).
+             * @description Structure en base, reconnue par la forme de comparaison du nom parmi ses graphies (`api_ids.ops`).
              */
             structure_id: number | null;
         };
@@ -4591,7 +4591,7 @@ export interface components {
         };
         /**
          * PatentMeta
-         * @description Métadonnées d'une famille de brevets, d'après ScanR brevets.
+         * @description Métadonnées d'une famille de brevets, d'après OPS.
          */
         PatentMeta: {
             /**

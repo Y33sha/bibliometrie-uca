@@ -1,11 +1,11 @@
-"""Phase `oa_status` : réponses des services externes sur les DOI des publications (`sources.dois`), et statut open access dérivé (`publications.oa_status`).
+"""Phase `oa_status` : réponses des services externes sur les DOI des enregistrements sources (`sources.dois`).
 
-Deux tâches interrogent chacune un service sur les DOI jamais interrogés ou périmés, et écrivent chaque réponse :
+Les DOI interrogés sont les DOI candidats au DOI d'une publication (`_CANDIDATE_DOIS`). Deux tâches interrogent chacune un service sur ces DOI, jamais interrogés ou périmés, et écrivent chaque réponse :
 
 - `oa_status.resolve_dois` lit chez doi.org l'URL de résolution de chaque DOI. Un DOI inconnu de doi.org reçoit une URL nulle.
 - `oa_status.verify_unpaywall` demande à Unpaywall le statut open access de chaque DOI, hors DOI DataCite. Un DOI absent d'Unpaywall reçoit un verdict nul.
 
-Quand le service est indisponible, le DOI est reporté au run suivant. Le statut des publications des DOI interrogés est ensuite recalculé par `publication_oa_status`, à partir de leurs copies, de leurs embargos, de leur type, de leur revue et du verdict d'Unpaywall.
+Quand le service est indisponible, le DOI est reporté au run suivant. Les publications d'un DOI dont la réponse change entrent dans la file `publications_queue` : leur consolidation recalcule leur statut open access.
 
 Un délai de péremption et un plafond par run bornent chaque tâche. Les DOI au-delà du plafond sont traités aux runs suivants. L'accès à Unpaywall exige l'adresse du polite pool.
 """
@@ -17,14 +17,14 @@ import logging
 from collections import Counter
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import NamedTuple
+from typing import NamedTuple, cast
 
 import httpx2
 from sqlalchemy import Connection, text
 
 from domain.config import ConfigKey
-from domain.publications.oa_status import OaStatus
 from domain.sources import registry
+from infrastructure.db.queues import Queue, enqueue
 from infrastructure.db.scalars import scalar_int
 from pipeline.graph import Task
 from pipeline.http.lookup import LookupOutcome, NotFound, Unavailable
@@ -44,7 +44,6 @@ from pipeline.runtime.observability.log_format import (
 )
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import track_progress
-from pipeline.transformation.publications.oa_inputs import OaFacts, OaInputs, oa_inputs
 
 type DoiFetcher = Callable[[httpx2.AsyncClient, str], Awaitable[LookupOutcome[str]]]
 """Interrogation d'un service sur un DOI : `(client, doi) → réponse, NotFound ou Unavailable`."""
@@ -53,7 +52,7 @@ BATCH_SIZE = 50
 
 
 class DoiService(NamedTuple):
-    """Service externe interrogé sur les DOI des publications, et colonnes de `dois` gardant sa réponse."""
+    """Service externe interrogé sur les DOI, et colonnes de `dois` gardant sa réponse."""
 
     answer_column: str
     answer_type: str
@@ -66,34 +65,29 @@ UNPAYWALL = DoiService("unpaywall_oa_status", "oa_type", "unpaywall_checked_at",
 DOI_ORG = DoiService("registered_url", "text", "resolved_at", False)
 
 
-class _Lookup(NamedTuple):
-    """Bilan d'une tâche, repris par `assemble`."""
-
-    counts: dict[str, int]
-    """DOI à interroger, interrogés, et réponses par issue."""
-    statuses_before: dict[str, int]
-    """Publications par statut OA, avant la tâche."""
-    statuses_after: dict[str, int]
-    """Publications par statut OA, après la tâche."""
-
-
 _LOOKUP = "lookup"
-"""Clé du bilan de la tâche dans `details`."""
+"""Clé du bilan de la tâche dans `details` : DOI à interroger, interrogés, et réponses par issue."""
 
-
-class PublicationOa(NamedTuple):
-    """Statut open access d'une publication, enregistré et à recalculer."""
-
-    id: int
-    doi: str | None
-    oa_status: str | None
-    """Statut enregistré."""
-    inputs: OaInputs
-    """Données du recalcul."""
+_CANDIDATE_DOIS = """
+    SELECT DISTINCT d.doi
+    FROM (
+        SELECT sri.id_value AS doi, sri.role, sri.source_record_id,
+               count(*) OVER (PARTITION BY sri.source_record_id) AS record_dois
+        FROM source_record_identifiers sri
+        WHERE sri.id_type = 'doi' AND sri.removed_by IS NULL
+    ) d
+    JOIN source_records sr ON sr.id = d.source_record_id
+    WHERE (d.role IN ('primary', 'derived') OR d.record_dois = 1)
+      AND (sr.publication_id IS NOT NULL
+           OR EXISTS (SELECT 1 FROM source_contributions sc
+                      WHERE sc.source_record_id = sr.id AND sc.in_perimeter))
+      AND NOT EXISTS (SELECT 1 FROM doi_targets t WHERE t.doi = d.doi)
+"""
+"""DOI candidats au DOI d'une publication, selon la règle des ancres (`domain.source_records.keys.doi_anchors`) : DOI actifs de rôle `primary` ou `derived`, ou seul DOI actif de leur enregistrement source. L'enregistrement source est rattaché à une publication ou doté d'une contribution source du périmètre. Les DOI qui ont une cible sont écartés."""
 
 
 def _stale_dois(service: DoiService) -> str:
-    """Renvoie la requête des DOI de publication sans réponse du service, ou à réponse de plus de `:stale` jours."""
+    """Renvoie la requête des DOI candidats sans réponse du service, ou à réponse de plus de `:stale` jours."""
     datacite = (
         """
         LEFT JOIN doi_prefixes dp ON dp.prefix = split_part(d.doi, '/', 1)
@@ -104,7 +98,7 @@ def _stale_dois(service: DoiService) -> str:
     )
     return f"""
         SELECT d.doi, x.{service.date_column} AS answered_at
-        FROM (SELECT DISTINCT doi FROM publications WHERE doi IS NOT NULL) d
+        FROM ({_CANDIDATE_DOIS}) d
         LEFT JOIN dois x ON x.doi = d.doi
         {datacite} (x.{service.date_column} IS NULL
                     OR x.{service.date_column} < now() - make_interval(days => :stale))
@@ -112,7 +106,7 @@ def _stale_dois(service: DoiService) -> str:
 
 
 class OaStatusStore:
-    """DOI à interroger, réponses reçues, statut OA des publications."""
+    """DOI à interroger, réponses reçues, publications à recalculer."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
@@ -169,49 +163,14 @@ class OaStatusStore:
             {"dois": [d for d, _ in answers], "answers": [a for _, a in answers]},
         )
 
-    def fetch_oa_inputs(self, dois: Sequence[str]) -> list[PublicationOa]:
-        """Renvoie les publications de ces DOI, avec les données du calcul de leur statut OA."""
-        return self._fetch_oa_inputs("p.doi = ANY(:keys)", list(dois))
-
-    def fetch_oa_inputs_of(self, publication_ids: Sequence[int]) -> list[PublicationOa]:
-        """Renvoie ces publications, avec les données du calcul de leur statut OA."""
-        return self._fetch_oa_inputs("p.id = ANY(:keys)", list(publication_ids))
-
-    def _fetch_oa_inputs(self, where: str, keys: list[str] | list[int]) -> list[PublicationOa]:
-        rows = self._conn.execute(
-            text(f"""
-                SELECT p.id, p.doi, p.oa_status::text AS oa_status,
-                       p.serial_id, p.doc_type::text AS doc_type, p.source_extras
-                FROM publications p
-                WHERE {where}
-            """),  # noqa: S608 — condition choisie par le code
-            {"keys": keys},
-        ).all()
-        inputs = oa_inputs(
+    def enqueue_publications(self, dois: Sequence[str]) -> int:
+        """Met en file de consolidation les publications de ces DOI. Renvoie le nombre de publications mises en file."""
+        return enqueue(
             self._conn,
-            [OaFacts(r.id, r.doi, r.serial_id, r.doc_type, r.source_extras) for r in rows],
+            Queue.PUBLICATIONS,
+            "SELECT id FROM publications WHERE doi = ANY(:dois)",
+            {"dois": list(dois)},
         )
-        return [PublicationOa(r.id, r.doi, r.oa_status, inputs[r.id]) for r in rows]
-
-    def update_oa_status(self, publication_id: int, oa_status: str) -> None:
-        """Écrit le statut OA d'une publication."""
-        self._conn.execute(
-            text(
-                "UPDATE publications SET oa_status = CAST(:os AS oa_type), updated_at = now()"
-                " WHERE id = :id"
-            ),
-            {"os": oa_status, "id": publication_id},
-        )
-
-    def count_publications_by_oa_status(self) -> dict[str, int]:
-        """Compte les publications par statut OA (`oa_status` → nombre)."""
-        rows = self._conn.execute(
-            text(
-                f"SELECT COALESCE(oa_status::text, '{OaStatus.UNKNOWN.value}') AS status, count(*) AS n "
-                f"FROM publications GROUP BY COALESCE(oa_status::text, '{OaStatus.UNKNOWN.value}')"
-            )
-        ).all()
-        return {r.status: int(r.n) for r in rows}
 
 
 @dataclass(frozen=True)
@@ -256,10 +215,9 @@ async def _look_up(
     staleness_days: int,
     max_per_run: int | None,
 ) -> PhaseMetrics:
-    """Interroge le service pour les DOI à interroger, écrit les réponses, recalcule le statut OA des publications de ces DOI, puis renvoie les métriques du run, avec son bilan (`_Lookup`) dans `details`."""
+    """Interroge le service pour les DOI à interroger, écrit les réponses, met en file de consolidation les publications des DOI dont la réponse change, puis renvoie les métriques du run, avec son bilan dans `details`."""
     dois = store.fetch_dois_to_query(task.service, limit=max_per_run, staleness_days=staleness_days)
     stale_total = store.count_dois_to_query(task.service, staleness_days=staleness_days)
-    statuses_before = store.count_publications_by_oa_status()
     counts: Counter[str] = Counter()
     if dois:
         await _query_service(
@@ -285,15 +243,11 @@ async def _look_up(
         not_found=counts["not_found"],
         errors=counts["unavailable"],
     )
-    metrics.details[_LOOKUP] = _Lookup(
-        counts={
-            "stale": stale_total,
-            "checked": len(dois),
-            **{key: counts[key] for key in _OUTCOMES},
-        },
-        statuses_before=statuses_before,
-        statuses_after=store.count_publications_by_oa_status(),
-    )
+    metrics.details[_LOOKUP] = {
+        "stale": stale_total,
+        "checked": len(dois),
+        **{key: counts[key] for key in _OUTCOMES},
+    }
     return metrics
 
 
@@ -366,6 +320,9 @@ async def _query_service(
     ]
     if counts["unavailable"]:
         summary.append(quantity(counts["unavailable"], "reporté"))
+    summary.append(
+        quantity(counts["queued"], "publication à recalculer", "publications à recalculer")
+    )
     logger.info("%s%s", LAST_BRANCH, ", ".join(summary))
 
 
@@ -375,7 +332,7 @@ def _apply_answers(
     answers: list[tuple[str, str | None]],
     counts: Counter[str],
 ) -> None:
-    """Classe les réponses par rapport à celles en table, les écrit, puis recalcule le statut OA des publications de ces DOI."""
+    """Classe les réponses par rapport à celles en table, les écrit, puis met en file de consolidation les publications des DOI dont la réponse change."""
     stored = store.fetch_answers(service, [doi for doi, _ in answers])
     for doi, answer in answers:
         if answer is None:
@@ -387,32 +344,30 @@ def _apply_answers(
         else:
             counts["unchanged"] += 1
     store.record_answers(service, answers)
-    for publication in store.fetch_oa_inputs([doi for doi, _ in answers]):
-        status = publication.inputs.status()
-        if status != publication.oa_status:
-            store.update_oa_status(publication.id, status)
+    changed = [doi for doi, answer in answers if doi not in stored or stored[doi] != answer]
+    if changed:
+        counts["queued"] += store.enqueue_publications(changed)
 
 
-_OA_STATUS_INPUTS = (
-    "publications.id",
-    "publications.doi",
-    "publications.oa_status",
-    "publications.serial_id",
-    "publications.doc_type",
-    "publications.source_extras",
-    "serials.oa_model",
-    "dois",
+_LOOKUP_READS = (
+    "source_record_identifiers",
     "source_records.publication_id",
-    "source_records.source",
-    # Copies des publications, dont le statut se déduit.
-    "source_record_locations",
-    "platforms.name",
-    "platforms.openalex_id",
-    "platforms.platform_type",
-    "embargoes",
+    "source_contributions.in_perimeter",
+    "doi_targets",
+    "dois.doi",
+    # Publications des DOI dont la réponse change.
+    "publications.doi",
     "config",
 )
-"""Lectures d'une tâche de la phase `oa_status` : DOI à interroger, données du statut des publications."""
+"""Lectures d'une tâche de la phase `oa_status` : DOI candidats, DOI en table, publications à mettre en file."""
+
+_LOOKUP_PREVIOUS_RUN = (
+    "source_records.publication_id",
+    "source_record_identifiers.removed_by",
+    "publications.doi",
+    "dois.doi",
+)
+"""Rattachements, DOI retirés et DOI des publications, écrits par la réconciliation et la purge des publications ; lignes de `dois` créées par l'autre service."""
 
 
 def _resolve_dois(ctx: PhaseContext) -> PhaseMetrics:
@@ -454,28 +409,28 @@ def _verify_unpaywall(ctx: PhaseContext) -> PhaseMetrics:
 TASKS = (
     Task(
         "resolve_dois",
-        reads=_OA_STATUS_INPUTS,
-        writes=(
-            "publications.oa_status",
-            "dois.doi",
-            "dois.registered_url",
-            "dois.resolved_at",
-        ),
-        # Verdicts d'Unpaywall et statut des publications, lus par le recalcul de ce statut.
-        previous_run=("dois.unpaywall_oa_status", "publications.oa_status"),
+        reads=(*_LOOKUP_READS, "dois.registered_url", "dois.resolved_at"),
+        writes=("dois.doi", "dois.registered_url", "dois.resolved_at", "publications_queue"),
+        previous_run=_LOOKUP_PREVIOUS_RUN,
         network=registry.DOI_ORG,
         run=_resolve_dois,
         section="URL de résolution des DOI sur doi.org",
     ),
     Task(
         "verify_unpaywall",
-        reads=(*_OA_STATUS_INPUTS, "doi_prefixes.ra"),
+        reads=(
+            *_LOOKUP_READS,
+            "dois.unpaywall_oa_status",
+            "dois.unpaywall_checked_at",
+            "doi_prefixes.ra",
+        ),
         writes=(
-            "publications.oa_status",
             "dois.doi",
             "dois.unpaywall_oa_status",
             "dois.unpaywall_checked_at",
+            "publications_queue",
         ),
+        previous_run=_LOOKUP_PREVIOUS_RUN,
         network="unpaywall",
         run=_verify_unpaywall,
         section="Vérification du statut open access sur Unpaywall",
@@ -484,26 +439,15 @@ TASKS = (
 
 
 def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
-    """Renvoie la somme des métriques des tâches, une ligne par service interrogé (`services`), et la répartition des publications par statut OA (`table`), avec son évolution sur l'ensemble des tâches."""
+    """Renvoie la somme des métriques des tâches, avec une ligne par service interrogé (`services`)."""
     metrics = PhaseMetrics()
-    lookups: dict[str, _Lookup] = {}
+    lookups: dict[str, Mapping[str, int]] = {}
     for name, task_metrics in by_task.items():
         metrics.merge(task_metrics)
         if (lookup := metrics.details.pop(_LOOKUP, None)) is not None:
-            assert isinstance(lookup, _Lookup)
-            lookups[name] = lookup
-    if not lookups:
-        return metrics
-    metrics.details["services"] = {
-        "rows": [{"key": name, **lookup.counts} for name, lookup in lookups.items()]
-    }
-    before = next(iter(lookups.values())).statuses_before
-    after = list(lookups.values())[-1].statuses_after
-    statuses = sorted(set(before) | set(after), key=lambda s: after.get(s, 0), reverse=True)
-    metrics.details["table"] = {
-        "rows": [
-            {"key": s, "count": after.get(s, 0), "delta": after.get(s, 0) - before.get(s, 0)}
-            for s in statuses
-        ]
-    }
+            lookups[name] = cast("Mapping[str, int]", lookup)
+    if lookups:
+        metrics.details["services"] = {
+            "rows": [{"key": name, **counts} for name, counts in lookups.items()]
+        }
     return metrics

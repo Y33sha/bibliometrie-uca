@@ -230,9 +230,7 @@ class AddressService:
             return
 
         docs = self._country_recompute.refresh_source_records_countries_for_addresses(address_ids)
-        publications = self._country_recompute.refresh_publications_countries_for_addresses(
-            address_ids
-        )
+        publications = self._country_recompute.refresh_publications_for_addresses(address_ids)
 
         if docs or publications:
             logger.info("Propagation pays : %s docs source, %s publications", docs, publications)

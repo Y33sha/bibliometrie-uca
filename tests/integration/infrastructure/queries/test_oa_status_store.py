@@ -1,13 +1,47 @@
-"""Tests d'intégration pour `pipeline.transformation.publications.oa_status` : DOI à soumettre à Unpaywall et à doi.org, réponses, publications de ces DOI."""
+"""Tests d'intégration pour `pipeline.transformation.publications.oa_status` : DOI à soumettre à Unpaywall et à doi.org, réponses, publications mises en file."""
+
+from itertools import count
 
 from sqlalchemy import text
 
+from domain.source_records.identifiers import (
+    SourceIdentifier,
+    SourceIdentifierRole,
+    SourceIdentifierType,
+)
+from infrastructure.db.queues import Queue
 from pipeline.transformation.publications.oa_status import DOI_ORG, UNPAYWALL, OaStatusStore
 from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.queues import queued
 from tests.integration.helpers.serials import insert_doi_prefix
-from tests.integration.helpers.sources import insert_source_record
+from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 
 STALENESS = 30  # seuil de péremption arbitraire pour ces tests
+
+_ids = count()
+
+
+def _candidate(conn, doi: str) -> int:
+    """Insère une publication et son enregistrement source Crossref, de DOI `primary` `doi`. Renvoie la publication."""
+    publication = insert_publication(conn, doi=doi)
+    insert_source_record(
+        conn, publication, source="crossref", source_id=f"cr-{next(_ids)}", doi=doi
+    )
+    return publication
+
+
+def _record_with_dois(conn, publication: int | None, *dois: str) -> int:
+    """Insère un enregistrement source HAL aux DOI `secondary` `dois`. Renvoie l'enregistrement source."""
+    return insert_source_record(
+        conn,
+        publication,
+        source="hal",
+        source_id=f"hal-{next(_ids)}",
+        identifiers=[
+            SourceIdentifier(SourceIdentifierType.DOI, doi, SourceIdentifierRole.SECONDARY)
+            for doi in dois
+        ],
+    )
 
 
 def _verdict(conn, doi, oa_status, *, days_ago):
@@ -30,12 +64,52 @@ def _resolved_only(conn, doi, *, days_ago=0):
     )
 
 
+def _to_query(conn, service=DOI_ORG) -> set[str]:
+    return set(OaStatusStore(conn).fetch_dois_to_query(service, staleness_days=STALENESS))
+
+
+class TestCandidateDois:
+    """Les DOI interrogés suivent la règle des ancres : DOI `primary` ou `derived`, ou seul DOI de l'enregistrement source."""
+
+    def test_le_seul_doi_d_un_enregistrement_source_est_candidat(self, sa_sync_conn):
+        _record_with_dois(sa_sync_conn, insert_publication(sa_sync_conn), "10.1/seul")
+
+        assert "10.1/seul" in _to_query(sa_sync_conn)
+
+    def test_un_doi_secondaire_parmi_d_autres_est_ecarte(self, sa_sync_conn):
+        _record_with_dois(sa_sync_conn, insert_publication(sa_sync_conn), "10.1/a", "10.1/b")
+
+        assert not {"10.1/a", "10.1/b"} & _to_query(sa_sync_conn)
+
+    def test_un_doi_qui_a_une_cible_est_ecarte(self, sa_sync_conn):
+        _candidate(sa_sync_conn, "10.5281/zenodo.2")
+        sa_sync_conn.execute(
+            text(
+                "INSERT INTO doi_targets (doi, target_doi, rule)"
+                " VALUES ('10.5281/zenodo.2', '10.5281/zenodo.1', 'concept')"
+            )
+        )
+
+        assert "10.5281/zenodo.2" not in _to_query(sa_sync_conn)
+
+    def test_un_enregistrement_source_orphelin_compte_seulement_dans_le_perimetre(
+        self, sa_sync_conn
+    ):
+        _record_with_dois(sa_sync_conn, None, "10.1/hors")
+        in_perimeter = _record_with_dois(sa_sync_conn, None, "10.1/dans")
+        insert_source_contribution(sa_sync_conn, in_perimeter, source="hal", in_perimeter=True)
+
+        dois = _to_query(sa_sync_conn)
+
+        assert "10.1/dans" in dois
+        assert "10.1/hors" not in dois
+
+
 class TestDoisToQuery:
     def test_seuls_les_doi_sans_verdict_ou_perimes(self, sa_sync_conn):
         """La péremption regarde seulement la date du verdict, nul compris."""
         for doi in ("10.1/n", "10.1/s", "10.1/f", "10.1/absent"):
-            insert_publication(sa_sync_conn, doi=doi)
-        insert_publication(sa_sync_conn, doi=None)
+            _candidate(sa_sync_conn, doi)
         _verdict(sa_sync_conn, "10.1/s", "gold", days_ago=999)
         _verdict(sa_sync_conn, "10.1/f", "gold", days_ago=1)
         _verdict(sa_sync_conn, "10.1/absent", None, days_ago=1)
@@ -48,8 +122,8 @@ class TestDoisToQuery:
         assert store.count_dois_to_query(UNPAYWALL, staleness_days=STALENESS) == len(dois)
 
     def test_jamais_verifies_d_abord(self, sa_sync_conn):
-        insert_publication(sa_sync_conn, doi="10.1/a")
-        insert_publication(sa_sync_conn, doi="10.1/b")
+        _candidate(sa_sync_conn, "10.1/a")
+        _candidate(sa_sync_conn, "10.1/b")
         _verdict(sa_sync_conn, "10.1/a", "closed", days_ago=999)
 
         dois = [
@@ -64,16 +138,14 @@ class TestDoisToQuery:
 
     def test_chaque_service_a_sa_file(self, sa_sync_conn):
         """Une adresse lue laisse le DOI dans la file d'Unpaywall ; un verdict le laisse dans celle de doi.org."""
-        insert_publication(sa_sync_conn, doi="10.1/r")
-        insert_publication(sa_sync_conn, doi="10.1/v")
-        insert_publication(sa_sync_conn, doi="10.1/old")
+        for doi in ("10.1/r", "10.1/v", "10.1/old"):
+            _candidate(sa_sync_conn, doi)
         _resolved_only(sa_sync_conn, "10.1/r")
         _verdict(sa_sync_conn, "10.1/v", "gold", days_ago=1)
         _resolved_only(sa_sync_conn, "10.1/old", days_ago=999)
-        store = OaStatusStore(sa_sync_conn)
 
-        unpaywall = set(store.fetch_dois_to_query(UNPAYWALL, staleness_days=STALENESS))
-        doi_org = set(store.fetch_dois_to_query(DOI_ORG, staleness_days=STALENESS))
+        unpaywall = _to_query(sa_sync_conn, UNPAYWALL)
+        doi_org = _to_query(sa_sync_conn, DOI_ORG)
 
         assert {"10.1/r", "10.1/old"} <= unpaywall
         assert "10.1/v" not in unpaywall
@@ -85,11 +157,10 @@ class TestDoisToQuery:
         insert_doi_prefix(sa_sync_conn, "10.9001", ra="DataCite")
         insert_doi_prefix(sa_sync_conn, "10.9002", ra="mEDRA")
         for doi in ("10.9001/x", "10.9002/y", "10.9003/z"):
-            insert_publication(sa_sync_conn, doi=doi)
-        store = OaStatusStore(sa_sync_conn)
+            _candidate(sa_sync_conn, doi)
 
-        unpaywall = set(store.fetch_dois_to_query(UNPAYWALL, staleness_days=STALENESS))
-        doi_org = set(store.fetch_dois_to_query(DOI_ORG, staleness_days=STALENESS))
+        unpaywall = _to_query(sa_sync_conn, UNPAYWALL)
+        doi_org = _to_query(sa_sync_conn, DOI_ORG)
 
         assert {"10.9002/y", "10.9003/z"} <= unpaywall
         assert "10.9001/x" not in unpaywall
@@ -97,7 +168,7 @@ class TestDoisToQuery:
 
     def test_respecte_le_plafond(self, sa_sync_conn):
         for i in range(3):
-            insert_publication(sa_sync_conn, doi=f"10.1/{i}")
+            _candidate(sa_sync_conn, f"10.1/{i}")
         dois = OaStatusStore(sa_sync_conn).fetch_dois_to_query(
             DOI_ORG, limit=2, staleness_days=STALENESS
         )
@@ -134,32 +205,12 @@ class TestAnswers:
         ]
 
 
-class TestPublicationsOfDois:
-    def test_donnees_du_statut(self, sa_sync_conn):
-        publication = insert_publication(
-            sa_sync_conn, doi="10.1/p", oa_status="closed", doc_type="ongoing_thesis"
-        )
-        record = insert_source_record(sa_sync_conn, publication, source="hal", source_id="hal-oa")
-        sa_sync_conn.execute(
-            text("INSERT INTO embargoes (source_record_id, until) VALUES (:id, NULL)"),
-            {"id": record},
-        )
-        _verdict(sa_sync_conn, "10.1/p", "green", days_ago=1)
+class TestEnqueuePublications:
+    def test_les_publications_de_ces_doi_entrent_en_file(self, sa_sync_conn):
+        concerned = insert_publication(sa_sync_conn, doi="10.1/p")
+        insert_publication(sa_sync_conn, doi="10.1/autre")
 
-        [read] = OaStatusStore(sa_sync_conn).fetch_oa_inputs(["10.1/p"])
+        queued_count = OaStatusStore(sa_sync_conn).enqueue_publications(["10.1/p", "10.1/z"])
 
-        assert (read.id, read.doi, read.oa_status) == (publication, "10.1/p", "closed")
-        inputs = read.inputs
-        assert (inputs.embargoed, inputs.restricted, inputs.copies) == (True, True, [])
-        assert inputs.unpaywall == "green"
-
-
-class TestCounters:
-    def test_count_publications_by_oa_status_groups_the_stock(self, sa_sync_conn):
-        insert_publication(sa_sync_conn, doi="10.1/a", oa_status="gold")
-        insert_publication(sa_sync_conn, doi="10.1/b", oa_status="gold")
-        insert_publication(sa_sync_conn, doi="10.1/c", oa_status="closed")
-        assert OaStatusStore(sa_sync_conn).count_publications_by_oa_status() == {
-            "gold": 2,
-            "closed": 1,
-        }
+        assert queued_count == 1
+        assert queued(sa_sync_conn, Queue.PUBLICATIONS) == {concerned}

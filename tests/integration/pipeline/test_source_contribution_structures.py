@@ -198,34 +198,33 @@ def test_structures_d_une_these(sa_sync_conn):
 
 
 def test_deposant_d_un_brevet(sa_sync_conn):
-    """Un déposant reconnu par son identifiant Paysage rattache tous les inventeurs ; un déposant hors du périmètre, aucun."""
+    """Un déposant reconnu par la forme de comparaison de son nom rattache tous les inventeurs ; un déposant hors du périmètre, aucun."""
     univ, _ = _perimeter(sa_sync_conn)
     sa_sync_conn.execute(
         text("UPDATE structures SET api_ids = CAST(:ids AS jsonb) WHERE id = :id"),
-        {"ids": json.dumps({"scanr_patents": ["K4lR3"]}), "id": univ},
+        {"ids": json.dumps({"ops": ["univ clermont auvergne"]}), "id": univ},
     )
 
-    def family(source_id: str, paysage: str) -> int:
-        record = insert_source_record(sa_sync_conn, source="scanr_patents", source_id=source_id)
-        applicants = [{"name": "Déposant", "ids": {"paysage": [paysage], "siren": ["1"]}}]
+    def family(source_id: str, form: str) -> int:
+        record = insert_source_record(sa_sync_conn, source="ops", source_id=source_id)
         sa_sync_conn.execute(
             text(
                 "UPDATE source_records SET source_extras = CAST(:source_extras AS jsonb) WHERE id = :id"
             ),
-            {"source_extras": json.dumps({"patent_applicants": applicants}), "id": record},
+            {"source_extras": json.dumps({"patent_applicant_forms": [form, "cnrs"]}), "id": record},
         )
         return record
 
-    own = family("1", "K4lR3")
-    partner = family("2", "autre")
+    own = family("FR1", "univ clermont auvergne")
+    partner = family("FR2", "univ grenoble alpes")
     inventors = [
         insert_source_contribution(
-            sa_sync_conn, own, source="scanr_patents", author_position=p, roles=["inventor"]
+            sa_sync_conn, own, source="ops", author_position=p, roles=["inventor"]
         )
         for p in (1, 2)
     ]
     insert_source_contribution(
-        sa_sync_conn, partner, source="scanr_patents", author_position=1, roles=["inventor"]
+        sa_sync_conn, partner, source="ops", author_position=1, roles=["inventor"]
     )
 
     assert _reached(sa_sync_conn) == {(i, univ, "patent_applicant") for i in inventors}

@@ -1,7 +1,7 @@
-"""Recalcul des pays depuis `addresses.countries` (`pipeline.transformation.countries.refresh_publication_countries`) :
+"""Recalcul des pays depuis `addresses.countries` (`pipeline.transformation.countries.refresh_source_record_countries`), puis consolidation des publications en file :
 
 1. `source_records.countries` : union des pays des adresses des contributions sources de l'enregistrement source.
-2. `publications.countries` : union des pays des enregistrements sources de la publication.
+2. `publications.countries` : union des pays des enregistrements sources de la publication, posée par la consolidation.
 """
 
 from __future__ import annotations
@@ -13,7 +13,8 @@ import pytest
 from sqlalchemy import text
 
 from domain.normalize import normalize_text
-from pipeline.transformation.countries.refresh_publication_countries import refresh
+from pipeline.transformation.countries.refresh_source_record_countries import refresh
+from pipeline.transformation.publications import lifecycle
 from tests.integration.helpers.addresses import insert_address
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.rors import insert_ror_tree
@@ -62,7 +63,14 @@ def _get_source_record_countries(conn, source_record_id: int) -> list[str] | Non
 
 @pytest.fixture
 def log() -> logging.Logger:
-    return logging.getLogger("test_refresh_publication_countries")
+    return logging.getLogger("test_refresh_source_record_countries")
+
+
+def _refresh_and_consolidate(conn, log: logging.Logger) -> int:
+    """Recalcule les pays, puis consolide les publications mises en file. Renvoie le nombre de publications mises en file."""
+    queued = refresh(conn, log)
+    lifecycle.refresh_queued(conn)
+    return queued
 
 
 class TestCascade:
@@ -73,7 +81,7 @@ class TestCascade:
         addr = insert_address(sa_sync_conn, "1 rue X, Paris, FR", countries=["fr"])
         insert_source_contribution_address(sa_sync_conn, sa, address_id=addr)
 
-        updated = refresh(sa_sync_conn, log)
+        updated = _refresh_and_consolidate(sa_sync_conn, log)
 
         assert updated == 1
         assert _get_source_record_countries(sa_sync_conn, source_record) == ["fr"]
@@ -89,7 +97,7 @@ class TestCascade:
         insert_source_contribution_address(sa_sync_conn, sa, address_id=a1)
         insert_source_contribution_address(sa_sync_conn, sa, address_id=a2)
 
-        refresh(sa_sync_conn, log)
+        _refresh_and_consolidate(sa_sync_conn, log)
 
         assert _get_source_record_countries(sa_sync_conn, source_record) == ["fr", "us"]
         assert _get_publication_countries(sa_sync_conn, publication) == ["fr", "us"]
@@ -112,7 +120,7 @@ class TestCascade:
         insert_source_contribution_address(sa_sync_conn, source_contribution_oa, address_id=a_fr)
         insert_source_contribution_address(sa_sync_conn, source_contribution_hal, address_id=a_de)
 
-        refresh(sa_sync_conn, log)
+        _refresh_and_consolidate(sa_sync_conn, log)
 
         assert _get_publication_countries(sa_sync_conn, publication) == ["de", "fr"]
 
@@ -122,7 +130,7 @@ class TestCascade:
         source_record = _source_record(sa_sync_conn, publication, source_id="W1")
         _insert_source_contribution(sa_sync_conn, source_record)
 
-        updated = refresh(sa_sync_conn, log)
+        updated = _refresh_and_consolidate(sa_sync_conn, log)
 
         assert updated == 0
         assert _get_publication_countries(sa_sync_conn, publication) is None
@@ -154,21 +162,21 @@ class TestRorWithoutAddress:
     def test_les_pays_des_adresses_l_emportent(self, sa_sync_conn, log):
         source_record, _ = self._contribution(sa_sync_conn, ["fr"])
 
-        refresh(sa_sync_conn, log)
+        _refresh_and_consolidate(sa_sync_conn, log)
 
         assert _get_source_record_countries(sa_sync_conn, source_record) == ["fr"]
 
     def test_le_ror_donne_le_pays_d_une_adresse_sans_pays(self, sa_sync_conn, log):
         source_record, _ = self._contribution(sa_sync_conn, [])
 
-        refresh(sa_sync_conn, log)
+        _refresh_and_consolidate(sa_sync_conn, log)
 
         assert _get_source_record_countries(sa_sync_conn, source_record) == ["de"]
 
     def test_le_ror_donne_le_pays_d_une_contribution_source_sans_adresse(self, sa_sync_conn, log):
         source_record, _ = self._contribution(sa_sync_conn, None)
 
-        refresh(sa_sync_conn, log)
+        _refresh_and_consolidate(sa_sync_conn, log)
 
         assert _get_source_record_countries(sa_sync_conn, source_record) == ["de"]
 
@@ -182,8 +190,8 @@ class TestIdempotence:
         addr = insert_address(sa_sync_conn, "addr", countries=["fr"])
         insert_source_contribution_address(sa_sync_conn, sa, address_id=addr)
 
-        first = refresh(sa_sync_conn, log)
-        second = refresh(sa_sync_conn, log)
+        first = _refresh_and_consolidate(sa_sync_conn, log)
+        second = _refresh_and_consolidate(sa_sync_conn, log)
 
         assert first == 1
         assert second == 0
@@ -203,6 +211,6 @@ class TestCleanup:
         addr = insert_address(sa_sync_conn, "addr no country")
         insert_source_contribution_address(sa_sync_conn, sa, address_id=addr)
 
-        refresh(sa_sync_conn, log)
+        _refresh_and_consolidate(sa_sync_conn, log)
 
         assert _get_source_record_countries(sa_sync_conn, source_record) is None

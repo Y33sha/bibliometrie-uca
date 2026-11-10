@@ -1,6 +1,6 @@
-"""Nouvelle lecture des documents d'une source par leur identifiant natif (`staging.source_id`).
+"""Nouvelle recherche des documents d'une source par leur identifiant natif (`staging.source_id`).
 
-L'adaptateur de chaque source fournit sa requête par identifiant natif (`FetchOne`). `refresh` sélectionne les documents et les relit par la boucle commune (`pipeline.ingestion.common.lookup`).
+L'adaptateur de chaque source fournit sa requête par identifiant natif (`FetchOne`). `refresh` sélectionne les documents et les cherche par la boucle commune (`pipeline.ingestion.common.lookup`).
 """
 
 from __future__ import annotations
@@ -20,11 +20,11 @@ from pipeline.ingestion.common.staging import StagingStore
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
 type FetchOutcome = LookupOutcome[Mapping[str, JsonValue]]
-"""Document relu dans la source, ou son absence, ou l'indisponibilité de la source."""
+"""Document trouvé dans la source, ou son absence, ou l'indisponibilité de la source."""
 
 
 type FetchOne = Callable[[httpx2.AsyncClient, str], Awaitable[FetchOutcome]]
-"""Lit un document de la source par son identifiant natif."""
+"""Cherche un document de la source par son identifiant natif."""
 
 
 _STALE_ROWS_SQL_TEMPLATE = """
@@ -53,7 +53,7 @@ def get_stale_source_ids(
     params: dict[str, object] = {"source": source, "days": after_days}
     year_clause = ""
     if years is not None:
-        # Une thèse en cours est sans année de soutenance : elle est relue quelle que soit la fenêtre.
+        # Une thèse en cours est sans année de soutenance : elle est cherchée quelle que soit la fenêtre.
         year_clause = (
             "AND (sr.publication_year IS NULL OR sr.publication_year = ANY(:years)"
             f" OR sr.doc_type = '{DocType.ONGOING_THESIS}')"
@@ -72,7 +72,7 @@ async def refresh(
     after_days: int,
     years: list[int] | None = None,
 ) -> PhaseMetrics:
-    """Relit par identifiant natif les documents de la source non revus par le moissonnage depuis `after_days` jours.
+    """Cherche de nouveau par identifiant natif les documents de la source non revus par le moissonnage depuis `after_days` jours.
 
     Un document absent de la source, ou renvoyé sous un autre identifiant natif, est marqué disparu. `years` borne la sélection (`get_stale_source_ids`).
 

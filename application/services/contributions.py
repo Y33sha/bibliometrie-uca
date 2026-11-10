@@ -2,7 +2,7 @@
 
 Opérations : rejet d'une contribution, et attribution à une personne des contributions orphelines, contributions du périmètre sans personne.
 
-Le pipeline construit le stock en SQL ensembliste. Les phases `normalize`, `affiliations`, `countries` et `persons` alimentent les contributions sources. La phase `author_grouping` forme les contributions, et la phase `persons` les rattache aux personnes.
+Le pipeline construit le stock en SQL ensembliste. Les phases `normalize`, `affiliations` et `persons` alimentent les contributions sources. La phase `author_grouping` forme les contributions, et la phase `persons` les rattache aux personnes.
 """
 
 import logging
