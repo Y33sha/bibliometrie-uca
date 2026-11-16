@@ -1514,6 +1514,11 @@ source_record_identifiers = Table(
         Text,
         comment="Règle de correction qui retire l'identifiant. NULL : identifiant actif.",
     ),
+    Column(
+        "added_by",
+        Text,
+        comment="Règle de correction qui ajoute l'identifiant. NULL : identifiant donné par la source.",
+    ),
     PrimaryKeyConstraint(
         "source_record_id", "id_type", "id_value", name="source_record_identifiers_pkey"
     ),

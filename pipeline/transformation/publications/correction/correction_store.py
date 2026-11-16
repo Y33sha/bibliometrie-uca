@@ -213,6 +213,32 @@ _UPDATE_STATUSES = text("""
 """)
 
 
+_ADDED_ROWS = """jsonb_to_recordset(CAST(:rows AS jsonb))
+    AS a(source_record_id integer, id_type text, id_value text, role text, added_by text)"""
+
+_DELETE_STALE_ADDED = text(f"""
+    DELETE FROM source_record_identifiers i
+    WHERE i.source_record_id = ANY(:ids) AND i.added_by IS NOT NULL
+      AND NOT EXISTS (
+          SELECT 1 FROM {_ADDED_ROWS}
+          WHERE a.source_record_id = i.source_record_id
+            AND a.id_type = i.id_type::text AND a.id_value = i.id_value
+      )
+""")
+"""Supprime les identifiants ajoutés par la correction qui ne le sont plus."""
+
+_INSERT_ADDED = text(f"""
+    INSERT INTO source_record_identifiers (source_record_id, id_type, id_value, role, added_by)
+    SELECT a.source_record_id, CAST(a.id_type AS source_identifier_type), a.id_value,
+           CAST(a.role AS source_identifier_role), a.added_by
+    FROM {_ADDED_ROWS}
+    ON CONFLICT ON CONSTRAINT source_record_identifiers_pkey DO NOTHING
+""")
+"""Insère les identifiants ajoutés par la correction. Un identifiant déjà présent reste tel quel."""
+
+_NOTICE_DOC_TYPES = frozenset({DocType.ERRATUM, DocType.RETRACTION})
+
+
 def _persist_statuses(
     conn: Connection, identifiers_by_source_record: Mapping[int, Iterable[SourceIdentifier]]
 ) -> None:
@@ -634,7 +660,7 @@ class SourceRecordCorrectionStore:
 
         Un groupe réunit les enregistrements sources ayant son DOI, de rôle autre que `related`, quel que soit son statut. Un groupe est candidat si :
 
-        - il contient un type de `CLUSTER_CANDIDATE_DOC_TYPES` : livre, chapitre, volume d'actes, numéro de revue ;
+        - il contient un type de `CLUSTER_CANDIDATE_DOC_TYPES` : livre, chapitre, volume d'actes, numéro de revue, erratum, avis de rétractation ;
         - son DOI est inconnu de doi.org ;
         - son DOI est dans `distant_title_dois`, avec les noms d'auteur de chaque membre ;
         - il contient un enregistrement source déjà corrigé, à réévaluer.
@@ -651,7 +677,8 @@ class SourceRecordCorrectionStore:
                     WHERE EXISTS (
                         SELECT 1 FROM source_record_identifiers i
                         WHERE i.source_record_id = d.id
-                          AND i.removed_by IN ({_CLUSTER_CASES_SQL})
+                          AND (i.removed_by IN ({_CLUSTER_CASES_SQL})
+                               OR i.added_by IN ({_CLUSTER_CASES_SQL}))
                     )
                     UNION
                     SELECT d FROM unresolved_dois
@@ -727,7 +754,39 @@ class SourceRecordCorrectionStore:
         )
         return len(changed)
 
+    def fetch_crossref_notice_extras(self, dois: list[str]) -> dict[str, dict[str, JsonValue]]:
+        """Renvoie les champs propres des enregistrements sources Crossref d'erratum ou d'avis de ces DOI, par DOI."""
+        if not dois:
+            return {}
+        rows = self._conn.execute(
+            text(f"""
+                SELECT source_id, source_extras FROM source_records
+                WHERE source = 'crossref' AND source_id = ANY(:dois)
+                  AND doc_type::text IN {in_clause(sorted(_NOTICE_DOC_TYPES))}
+                  AND source_extras IS NOT NULL
+            """),  # noqa: S608 — liste construite depuis l'énumération des types
+            {"dois": dois},
+        ).all()
+        return {r.source_id: r.source_extras for r in rows}
+
     def persist_doi_corrections(self, updates: list[DoiCorrectionUpdate]) -> int:
-        """Écrit en lot les statuts des identifiants. Marque les enregistrements sources pour la réconciliation : leurs identifiants sont des clés. Renvoie le nombre de lignes."""
+        """Écrit en lot les statuts des identifiants et les identifiants ajoutés par la correction (`added_by`). Un identifiant ajouté absent de la mise à jour est supprimé. Marque les enregistrements sources pour la réconciliation : leurs identifiants sont des clés. Renvoie le nombre de lignes."""
         _persist_statuses(self._conn, {u.id: u.identifiers for u in updates})
+        added = [
+            {
+                "source_record_id": u.id,
+                "id_type": i.id_type.value,
+                "id_value": i.value,
+                "role": i.role.value,
+                "added_by": i.added_by,
+            }
+            for u in updates
+            for i in u.identifiers
+            if i.added_by is not None
+        ]
+        self._conn.execute(
+            _DELETE_STALE_ADDED, {"ids": [u.id for u in updates], "rows": json.dumps(added)}
+        )
+        if added:
+            self._conn.execute(_INSERT_ADDED, {"rows": json.dumps(added)})
         return _persist_updates(self._conn, [{"id": u.id} for u in updates])

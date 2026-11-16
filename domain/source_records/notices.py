@@ -5,10 +5,12 @@
 """
 
 import re
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from typing import NamedTuple
 
 from domain.documents.doc_types import DocType
+from domain.source_records.source_extras import SourceExtra
+from domain.types import JsonValue, as_mapping, as_sequence, as_str
 
 CROSSREF_CORRECTION_UPDATES = frozenset({"correction", "erratum", "corrigendum", "addendum"})
 """Types de mise à jour Crossref d'une correction. `clarification` relie un commentaire et sa réponse (Royal Society of Chemistry) : il reste hors des corrections."""
@@ -21,6 +23,21 @@ CROSSREF_WITHDRAWAL_UPDATE = "withdrawal"
 
 CROSSREF_CONCERN_UPDATE = "expression_of_concern"
 """Type de mise à jour Crossref d'un avis de préoccupation de l'éditeur."""
+
+_NOTICE_UPDATES = CROSSREF_CORRECTION_UPDATES | {CROSSREF_RETRACTION_UPDATE}
+"""Types de mise à jour d'un erratum ou d'un avis de rétractation."""
+
+
+def corrected_work_doi(source_extras: Mapping[str, JsonValue] | None, own_doi: str) -> str | None:
+    """Renvoie le DOI de l'œuvre corrigée ou rétractée, déclaré par un avis Crossref dans `update-to`. `None` sans déclaration, ou pour plusieurs œuvres déclarées."""
+    declared = {
+        doi
+        for entry in as_sequence((source_extras or {}).get(SourceExtra.UPDATE_TO))
+        if (as_str(as_mapping(entry).get("type")) or "") in _NOTICE_UPDATES
+        and (doi := as_str(as_mapping(entry).get("doi")))
+        and doi != own_doi
+    }
+    return next(iter(declared)) if len(declared) == 1 else None
 
 
 def notice_doc_type(update_types: Iterable[str]) -> DocType | None:

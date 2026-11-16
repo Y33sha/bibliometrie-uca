@@ -1,6 +1,37 @@
 """Signaux d'avis propres à un enregistrement source : mises à jour Crossref, référence en fin de titre WoS."""
 
-from domain.source_records.notices import CorrectedArticle, notice_doc_type, wos_corrected_article
+from domain.source_records.notices import (
+    CorrectedArticle,
+    corrected_work_doi,
+    notice_doc_type,
+    wos_corrected_article,
+)
+
+
+class TestCorrectedWorkDoi:
+    def test_single_declared_work(self):
+        extras = {
+            "update_to": [
+                {"doi": "10.1/article", "type": "addendum", "source": "publisher"},
+                {"doi": "10.1/article", "type": "retraction", "source": "retraction-watch"},
+                {"doi": "10.1/notice", "type": "retraction", "source": "publisher"},
+            ]
+        }
+        assert corrected_work_doi(extras, "10.1/notice") == "10.1/article"
+
+    def test_several_declared_works(self):
+        extras = {
+            "update_to": [
+                {"doi": "10.1/a", "type": "erratum", "source": "publisher"},
+                {"doi": "10.1/b", "type": "erratum", "source": "publisher"},
+            ]
+        }
+        assert corrected_work_doi(extras, "10.1/notice") is None
+
+    def test_other_updates(self):
+        extras = {"update_to": [{"doi": "10.1/a", "type": "new_version", "source": "publisher"}]}
+        assert corrected_work_doi(extras, "10.1/notice") is None
+        assert corrected_work_doi(None, "10.1/notice") is None
 
 
 class TestNoticeDocType:

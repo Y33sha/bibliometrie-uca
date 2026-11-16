@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict SxoBbmNuaCWO7uN0CYT2hFvA4pu7lSsC1MdhsMo3qzcgjBZW9PEZBhw1UL3FuJy
+\restrict MeadtDJugwpZPrpG4FYqaVStQtX8FE8JzrVlrhYiXoiod9UrmSyq0b1LvFz1Sk7
 
 -- Dumped from database version 18.7 (Ubuntu 18.7-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.7 (Ubuntu 18.7-1.pgdg22.04+2)
@@ -3050,6 +3050,7 @@ CREATE TABLE sources.source_record_identifiers (
     id_value text NOT NULL,
     role public.source_identifier_role NOT NULL,
     removed_by text,
+    added_by text,
     CONSTRAINT source_record_identifiers_id_value_case CHECK ((id_value =
 CASE
     WHEN ((id_type)::text = ANY (ARRAY['nnt'::text, 'patent_publication_number'::text, 'patent_application_number'::text])) THEN upper(id_value)
@@ -3084,6 +3085,13 @@ COMMENT ON COLUMN sources.source_record_identifiers.role IS 'primary : identifia
 --
 
 COMMENT ON COLUMN sources.source_record_identifiers.removed_by IS 'Règle de correction qui retire l''identifiant. NULL : identifiant actif.';
+
+
+--
+-- Name: COLUMN source_record_identifiers.added_by; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON COLUMN sources.source_record_identifiers.added_by IS 'Règle de correction qui ajoute l''identifiant. NULL : identifiant donné par la source.';
 
 
 --
@@ -6316,5 +6324,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict SxoBbmNuaCWO7uN0CYT2hFvA4pu7lSsC1MdhsMo3qzcgjBZW9PEZBhw1UL3FuJy
+\unrestrict MeadtDJugwpZPrpG4FYqaVStQtX8FE8JzrVlrhYiXoiod9UrmSyq0b1LvFz1Sk7
 
