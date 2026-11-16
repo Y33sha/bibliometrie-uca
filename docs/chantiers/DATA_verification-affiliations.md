@@ -176,7 +176,7 @@ Le chantier [alignement des auteurs](archived/2026-10-24_DATA_alignement-auteurs
   - Dans 3 des 5 publications sortantes, un coauteur clermontois existe probablement, sans indice dans aucune source : un article d'ATLAS sans affiliations dans l'enregistrement éditeur, un article de l'ICCF déposé dans HAL, un jeu de données Zenodo.
   - Le rattachement des personnes lit le périmètre de la contribution (`contributions.in_perimeter`), seul calcul de ce périmètre. Une publication dont le DOI change met ses contributions en file de recomposition.
   - La variante qui écarte toujours les enregistrements OpenAlex non éditeurs ferait sortir 2 877 contributions dans 1 107 publications, surtout des prépublications sans enregistrement éditeur.
-- [ ] Recomposition des contributions du stock concernées par la règle de l'enregistrement OpenAlex éditeur.
+- [x] Recomposition des contributions du stock concernées par la règle de l'enregistrement OpenAlex éditeur (`requeue_openalex_preprint_evidence`), le 2026-11-16. Le run applique aussi la règle des adresses concaténées : 687 contributions sources sortent du périmètre, 350 personnes sont supprimées, 71 publications sont purgées, dont les 5 annoncées par la simulation. Les résidus des deux règles sont nuls après le run.
 - [ ] File d'administration des contributions aux affiliations conflictuelles. Elle dépend du chantier [résolution des personnes](archived/2026-10-24_DATA_resolution-personnes.md).
 
 ### Phase 5 — Fin de chantier
