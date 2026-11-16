@@ -9,10 +9,13 @@ from domain.source_records.identifiers import (
     SourceIdentifierType,
 )
 from domain.source_records.metadata_correction.rules import (
+    Correction,
     MetadataCorrectionRule,
     MetadataForCorrection,
+    NoticeOfDoi,
     doc_type_correction,
     is_dissertation_identifier,
+    notice_doi_correction,
 )
 
 
@@ -1011,6 +1014,34 @@ class TestWosReferenceTitleRule:
     def test_other_source_keeps_its_type(self):
         view = _view(doc_type="other", title="Some title (vol 4, pg 815, 2023)", source="hal")
         assert doc_type_correction(view) is None
+
+
+class TestNoticeDoiCorrection:
+    _NOTICE = NoticeOfDoi("erratum", "erratum test of lepton universality")
+
+    def test_copy_with_the_notice_title(self):
+        view = _view(
+            doc_type="article",
+            title="Erratum: Test of lepton universality",
+            source="openalex",
+        )
+        corrected = notice_doi_correction("article", view, self._NOTICE)
+        assert corrected == Correction("erratum", MetadataCorrectionRule.NOTICE_DOI_TO_NOTICE_TYPE)
+
+    def test_wos_record_with_the_article_title(self):
+        """WoS indexe l'avis sous son DOI, avec le titre de l'article corrigé."""
+        view = _view(doc_type="other", title="Test of lepton universality", source="wos")
+        corrected = notice_doi_correction("other", view, self._NOTICE)
+        assert corrected is not None and corrected.value == "erratum"
+
+    def test_article_with_the_notice_doi_keeps_its_type(self):
+        """Un dépôt HAL de l'article porte le DOI de l'avis : il garde son type, et perd ce DOI (`AVIS_VS_ARTICLE`)."""
+        view = _view(doc_type="article", title="Test of lepton universality", source="hal")
+        assert notice_doi_correction("article", view, self._NOTICE) is None
+
+    def test_without_notice(self):
+        view = _view(doc_type="article", title="Test", source="wos")
+        assert notice_doi_correction("article", view, None) is None
 
 
 class TestRetractedTitleRule:

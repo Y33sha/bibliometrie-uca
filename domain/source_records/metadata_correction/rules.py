@@ -104,6 +104,7 @@ class MetadataCorrectionRule(StrEnum):
     CROSSREF_CORRECTION_UPDATE_TO_ERRATUM = "CROSSREF_CORRECTION_UPDATE_TO_ERRATUM"
     WOS_REFERENCE_TITLE_TO_ERRATUM = "WOS_REFERENCE_TITLE_TO_ERRATUM"
     RETRACTED_TITLE_TO_ARTICLE = "RETRACTED_TITLE_TO_ARTICLE"
+    NOTICE_DOI_TO_NOTICE_TYPE = "NOTICE_DOI_TO_NOTICE_TYPE"
     TITLE_EDITORIAL_PREFIX_TO_EDITORIAL = "TITLE_EDITORIAL_PREFIX_TO_EDITORIAL"
     TITLE_LETTER_PREFIX_TO_LETTER = "TITLE_LETTER_PREFIX_TO_LETTER"
     TITLE_SYSTEMATIC_REVIEW_TO_REVIEW = "TITLE_SYSTEMATIC_REVIEW_TO_REVIEW"
@@ -521,3 +522,28 @@ def origin_doc_type_correction(
     if origin_doc_type is None or origin_doc_type == doc_type:
         return None
     return Correction(origin_doc_type, MetadataCorrectionRule.SCANR_FROM_HAL_TO_HAL_TYPE)
+
+
+class NoticeOfDoi(NamedTuple):
+    """Erratum ou avis de rétractation Crossref d'un DOI : son type corrigé et son titre normalisé."""
+
+    doc_type: str
+    title_normalized: str | None
+
+
+def notice_doi_correction(
+    doc_type: str | None, facts: MetadataForCorrection, notice: NoticeOfDoi | None
+) -> Correction | None:
+    """Renvoie la correction de type d'un enregistrement source au DOI d'un avis Crossref : il prend le type de l'avis s'il en est une copie, de même titre, ou s'il vient de WoS. WoS indexe l'avis sous son DOI, avec le titre de l'article corrigé.
+
+    Un autre enregistrement source, d'un autre titre, est l'article corrigé : il garde son type.
+
+    Args:
+        doc_type: type de l'enregistrement source après les autres règles.
+        notice: avis Crossref de l'un des DOI propres de l'enregistrement source.
+    """
+    if notice is None or facts.source == "crossref" or doc_type not in _NOTICE_CANDIDATE_TYPES:
+        return None
+    if facts.source == "wos" or facts.title_normalized == notice.title_normalized:
+        return Correction(notice.doc_type, MetadataCorrectionRule.NOTICE_DOI_TO_NOTICE_TYPE)
+    return None

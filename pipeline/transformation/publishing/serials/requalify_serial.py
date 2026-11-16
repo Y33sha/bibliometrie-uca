@@ -6,6 +6,7 @@ from pipeline.transformation.publications import lifecycle
 from pipeline.transformation.publications.correction.correct_unary import (
     compute_updates,
     hal_origin_ids,
+    own_dois,
 )
 from pipeline.transformation.publications.correction.correction_store import (
     SourceRecordCorrectionStore,
@@ -21,7 +22,8 @@ def correct_serial_records(conn: Connection, serial_id: int) -> int:
         row.source_id: row
         for row in store.fetch_for_unary_correction_by_hal_ids(hal_origin_ids(rows))
     }
-    updates = compute_updates(rows, hal_rows, store.fetch_missing_hal_ids())
+    crossref_rows = store.fetch_for_unary_correction_by_crossref_dois(own_dois(rows))
+    updates = compute_updates(rows, hal_rows, store.fetch_missing_hal_ids(), crossref_rows)
     return store.persist_corrections(updates)
 
 

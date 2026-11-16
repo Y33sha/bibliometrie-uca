@@ -325,6 +325,16 @@ class SourceRecordCorrectionStore:
             _SELECT + " WHERE sr.source = 'hal' AND sr.source_id = ANY(:ids)", {"ids": hal_ids}
         )
 
+    def fetch_for_unary_correction_by_crossref_dois(
+        self, dois: list[str]
+    ) -> list[UnaryCorrectionRow]:
+        """Renvoie les enregistrements sources Crossref de ces DOI : errata et avis éventuels des enregistrements sources d'une correction ciblée."""
+        if not dois:
+            return []
+        return self._unary_rows(
+            _SELECT + " WHERE sr.source = 'crossref' AND sr.source_id = ANY(:dois)", {"dois": dois}
+        )
+
     def _unary_rows(
         self, query: str, params: Mapping[str, object], *, whole_table: bool = False
     ) -> list[UnaryCorrectionRow]:

@@ -264,6 +264,25 @@ def test_numero_qui_detient_le_doi_le_retire_a_l_article_hal():
     ]
 
 
+def test_l_article_au_doi_d_un_avis_le_perd():
+    """Cas réel : le dépôt HAL de l'article porte le DOI de l'addendum (10.1038/s41567-023-02095-3). Le titre de l'avis contient celui de l'article."""
+    group = [
+        DoiClusterMember(
+            1,
+            "erratum",
+            "addendum test of lepton universality in beauty quark decays",
+            owns_doi=True,
+        ),
+        DoiClusterMember(
+            2, "erratum", "addendum test of lepton universality in beauty quark decays"
+        ),
+        DoiClusterMember(3, "article", "test of lepton universality in beauty quark decays"),
+    ]
+    assert resolve_cluster_doi_corrections(group) == [
+        DoiClusterDecision(3, DoiClusterCase.AVIS_VS_ARTICLE)
+    ]
+
+
 def test_numero_hal_au_doi_d_un_article_ne_retire_rien():
     """Le dépôt HAL du numéro contient le DOI de l'introduction, détenu en propre par Crossref et OpenAlex."""
     group = [
