@@ -44,9 +44,9 @@ Deux valeurs de la publication sont calculées à deux endroits. La consolidatio
 - [x] Écriture de `publications.countries` retirée de l'étape des pays
 - [x] Écriture de `publications.oa_status` retirée de la phase `oa_status`
 - [x] `oa_status` après la correction, sur les DOI candidats des enregistrements sources (règle des ancres, hors DOI qui ont une cible) : +21 % de DOI interrogés
-- [ ] Migration : `dois.registered` (DOI connu ou inconnu de doi.org), DOI inconnus repris de `failed_lookups`
-- [ ] Étape DOI avant la correction : agence des préfixes (`resolve_ra`), existence et URL de tous les DOI connus, verdict d'Unpaywall des DOI candidats
-- [ ] `fetch_missing` et la correction lisent `dois.registered`. `fetch_missing` cesse d'interroger doi.org.
+- [x] Migration : `dois.registered` (DOI connu ou inconnu de doi.org), DOI inconnus repris de `failed_lookups`
+- [x] Phase `dois` après `affiliations`, à la place de `resolve_ra` et `oa_status` : agence des préfixes, existence et URL de tous les DOI connus (vue `known_dois` et formes sans version, 98 639 DOI), verdict d'Unpaywall des DOI candidats
+- [x] `fetch_missing` et la correction lisent `dois.registered`. `fetch_missing` cesse d'interroger doi.org.
 
 ### Phase 3 — Premier niveau
 
