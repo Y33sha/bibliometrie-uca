@@ -1,4 +1,4 @@
-"""Relations entre publications distinctes : types, traduction des vocabulaires de DataCite (`relationType`) et de Crossref (clés de `relation`, types de mise à jour), référence de l'article corrigé dans le titre d'un erratum WoS.
+"""Relations entre publications distinctes : types, traduction des vocabulaires de DataCite (`relationType`) et de Crossref (clés de `relation`, types de mise à jour).
 
 Restent hors du vocabulaire, et donnent `None` :
 
@@ -8,16 +8,19 @@ Restent hors du vocabulaire, et donnent `None` :
 - les dérivations vagues (`IsDerivedFrom`, `is-related-material`…).
 """
 
-import re
 from collections.abc import Iterator
 from enum import StrEnum
-from typing import NamedTuple
 
 from domain.documents.doc_types import DocType
 from domain.documents.identifiers import DOI
 from domain.source_records.metadata_correction.shared_doi import (
     DATACITE_DIRECT_CONVERGENCE,
     declares_same_work,
+)
+from domain.source_records.notices import (
+    CROSSREF_CONCERN_UPDATE,
+    CROSSREF_CORRECTION_UPDATES,
+    CROSSREF_RETRACTION_UPDATE,
 )
 from domain.source_records.source_extras import CROSSREF_PREPRINT_OF, SourceExtra
 from domain.types import JsonValue, as_str
@@ -103,20 +106,10 @@ _CROSSREF_MAP: dict[str, RelationType] = {
 }
 """Clés Crossref du vocabulaire."""
 
-CROSSREF_RETRACTION_UPDATE = "retraction"
-"""Type de mise à jour Crossref d'un avis de rétractation. Vers le DOI de l'enregistrement source lui-même, il signale une rétractation sur place."""
-
-CROSSREF_WITHDRAWAL_UPDATE = "withdrawal"
-"""Type de mise à jour Crossref d'un retrait. Elsevier le déclare sur l'enregistrement source retiré, doublon accidentel d'un article déjà publié, vers cet article."""
-
 _CROSSREF_UPDATE_MAP: dict[str, RelationType] = {
-    "correction": RelationType.IS_CORRECTION_OF,
-    "erratum": RelationType.IS_CORRECTION_OF,
-    "corrigendum": RelationType.IS_CORRECTION_OF,
-    "addendum": RelationType.IS_CORRECTION_OF,
-    "clarification": RelationType.IS_CORRECTION_OF,
+    **dict.fromkeys(CROSSREF_CORRECTION_UPDATES, RelationType.IS_CORRECTION_OF),
     CROSSREF_RETRACTION_UPDATE: RelationType.IS_RETRACTION_OF,
-    "expression_of_concern": RelationType.IS_CONCERN_ABOUT,
+    CROSSREF_CONCERN_UPDATE: RelationType.IS_CONCERN_ABOUT,
 }
 """Types de mise à jour Crossref du vocabulaire, vus depuis l'erratum ou l'avis. Restent hors du vocabulaire les nouvelles versions et éditions, formes d'une même œuvre, et les retraits (`CROSSREF_WITHDRAWAL_UPDATE`)."""
 
@@ -264,22 +257,3 @@ def notice_relation(
     if relation is RelationType.HAS_CORRECTION and object_doc_type == DocType.RETRACTION:
         return RelationType.HAS_RETRACTION
     return relation
-
-
-_WOS_ERRATUM_REFERENCE = re.compile(r"\s*\(vol\.?\s+[^()]*?\b(\d{4})\s*\)\s*$", re.IGNORECASE)
-"""Référence de l'article corrigé en fin de titre d'un erratum WoS : `(vol 22, pg 385, 2020)`, `(vol 845, 138110, 2023)`. Le dernier nombre est l'année de l'article."""
-
-
-class CorrectedArticle(NamedTuple):
-    """Article corrigé, désigné par le titre d'un erratum WoS."""
-
-    title: str
-    year: int
-
-
-def wos_corrected_article(erratum_title: str) -> CorrectedArticle | None:
-    """Renvoie le titre et l'année de l'article corrigé, lus dans le titre d'un erratum WoS : titre de l'article suivi de sa référence. `None` sans référence."""
-    match = _WOS_ERRATUM_REFERENCE.search(erratum_title)
-    if match is None or not (title := erratum_title[: match.start()].strip()):
-        return None
-    return CorrectedArticle(title, int(match.group(1)))

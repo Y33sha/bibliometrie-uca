@@ -367,6 +367,15 @@ def self_declared_preprint_sql(alias: str = "sr") -> str:
     return f"COALESCE(jsonb_exists({source_extra_json(SourceExtra.RELATION, alias)}, '{CROSSREF_PREPRINT_OF}'), false)"
 
 
+def crossref_update_types_sql(alias: str = "sr") -> str:
+    """Renvoie le tableau des types des mises à jour déclarées par l'enregistrement source aliasé `alias` vers une autre œuvre (Crossref `update-to`). Le `source_id` d'un enregistrement source Crossref est son DOI."""
+    return (
+        f"ARRAY(SELECT DISTINCT u ->> 'type' FROM jsonb_array_elements("
+        f"COALESCE({source_extra_json(SourceExtra.UPDATE_TO, alias)}, '[]')) u "
+        f"WHERE u ->> 'doi' <> {alias}.source_id)"
+    )
+
+
 def openalex_publisher_records(publication_ids: str) -> str:
     """Renvoie la requête des enregistrements OpenAlex éditeurs des publications de la requête `publication_ids` : un de leurs DOI, de rôle autre que `related`, est celui de leur publication. Colonne `id`."""
     # Le planificateur sous-estime le nombre d'enregistrements éditeurs. Un filtre sur une CTE volumineuse le mène à la reparcourir pour chaque enregistrement trouvé.

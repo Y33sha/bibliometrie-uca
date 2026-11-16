@@ -58,6 +58,7 @@ from infrastructure.db.source_record_identifiers import (
 from infrastructure.db.tables import source_records
 from infrastructure.sql_fragments import (
     corrected,
+    crossref_update_types_sql,
     declares_conference_sql,
     in_clause,
     self_declared_preprint_sql,
@@ -195,6 +196,7 @@ _FACTS: dict[str, str] = {
     "group_title": source_extra(SourceExtra.GROUP_TITLE),
     "source": "sr.source::text",
     "author_count": "sr.author_count",
+    "crossref_update_types": crossref_update_types_sql(),
 }
 """Expression SQL de chaque fait de `MetadataForCorrection`, sur l'enregistrement source `sr` et les jointures de `_SELECT`. Les faits de `_DOI_FACTS` se calculent sur les identifiants (`_unary_rows`)."""
 _DOI_FACTS = frozenset({"dois", "registrant_publisher_types"})

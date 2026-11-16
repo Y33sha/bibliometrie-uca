@@ -16,11 +16,8 @@ import logging
 
 from sqlalchemy import Connection, text
 
-from domain.publications.relations import (
-    CROSSREF_RETRACTION_UPDATE,
-    CROSSREF_WITHDRAWAL_UPDATE,
-    RelationType,
-)
+from domain.publications.relations import RelationType
+from domain.source_records.notices import CROSSREF_RETRACTION_UPDATE, CROSSREF_WITHDRAWAL_UPDATE
 from domain.source_records.source_extras import SourceExtra
 from domain.sources.registry import Source
 from pipeline.graph import Task, in_transaction

@@ -842,6 +842,42 @@ class TestTitleErratumPrefixRule:
         corrected = doc_type_correction(view)
         assert corrected is not None and corrected.value == "media"
 
+    @pytest.mark.parametrize(
+        "title",
+        [
+            "Correction: Geoconservation in France: History, Key Policies, and Current Tools",
+            "Correction to: Global Diplomacy",
+            "Corrections to “A Novel Computational Approach for Global Alignment”",
+            "Correction for Louf et al., Universal poroelastic mechanism for hydraulic signals",
+            "Publisher’s note: Deep-learning-driven automation of object segmentation",
+            "Addendum: Test of lepton universality in beauty-quark decays",
+            "Correction",
+            "Department of Error",
+            "WITHDRAWN: Corrigendum to ‘Identification of low fluoride areas’",
+        ],
+    )
+    def test_erratum_titles(self, title):
+        """Cas réels de Crossref, ScanR, HAL et OpenAlex."""
+        corrected = doc_type_correction(_view(doc_type="article", title=title))
+        assert corrected is not None and corrected.value == "erratum"
+
+    @pytest.mark.parametrize(
+        "title",
+        [
+            "Correction of hallux valgus in adolescents",
+            "Correction for multiple testing in genome-wide studies",
+            "Corrections and corrupt officials",
+        ],
+    )
+    def test_article_titles(self, title):
+        assert doc_type_correction(_view(doc_type="article", title=title)) is None
+
+    def test_chapter_correction(self):
+        """Springer type `book_chapter` la correction d'un chapitre."""
+        view = _view(doc_type="book_chapter", title="Correction to: Global Diplomacy")
+        corrected = doc_type_correction(view)
+        assert corrected is not None and corrected.value == "erratum"
+
 
 class TestTitleRetractionPrefixRule:
     def test_retraction_notice_prefix_on_article_corrects(self):
@@ -892,6 +928,103 @@ class TestTitleRetractionPrefixRule:
 
     def test_match_requires_prefix_not_substring(self):
         view = _view(doc_type="article", title="An analysis of the retraction notice policy")
+        assert doc_type_correction(view) is None
+
+    def test_wos_retraction_title(self):
+        view = _view(
+            doc_type="other",
+            title="RETRACTION: Liver X receptors constrain tumor development (Retraction of Vol 8, art no 445, 2017)",
+        )
+        corrected = doc_type_correction(view)
+        assert corrected is not None and corrected.value == "retraction"
+
+
+class TestCrossrefUpdateRules:
+    def test_correction_update_corrects_to_erratum(self):
+        """Cas réel : Wiley titre l'avis de correction comme l'article corrigé."""
+        view = _view(
+            doc_type="article",
+            title="A Lagrangian heuristic for minimising risk using multiple heterogeneous metrology tools",
+            source="crossref",
+            crossref_update_types=["correction"],
+        )
+        corrected = doc_type_correction(view)
+        assert corrected is not None
+        assert corrected.value == "erratum"
+        assert corrected.rule == MetadataCorrectionRule.CROSSREF_CORRECTION_UPDATE_TO_ERRATUM
+
+    def test_retraction_update_corrects_to_retraction(self):
+        view = _view(
+            doc_type="article",
+            title="Retraction Note: Liver X receptors constrain tumor development",
+            source="crossref",
+            crossref_update_types=["retraction"],
+        )
+        corrected = doc_type_correction(view)
+        assert corrected is not None and corrected.value == "retraction"
+
+    def test_retraction_title_wins_over_erratum_update(self):
+        """Cas réel : Elsevier déclare l'avis de rétractation 10.1016/j.joca.2026.08.003 comme un erratum."""
+        view = _view(
+            doc_type="article",
+            title="Retraction notice to “LB-104 evaluating a novel target in the treatment of osteoarthritis pain”",
+            source="crossref",
+            crossref_update_types=["erratum"],
+        )
+        corrected = doc_type_correction(view)
+        assert corrected is not None and corrected.value == "retraction"
+
+    def test_other_updates_leave_the_type(self):
+        """Un commentaire et sa réponse sont reliés par une clarification ; un doublon retiré déclare un retrait."""
+        for update_types in (["clarification"], ["withdrawal"], ["new_version"]):
+            view = _view(
+                doc_type="article",
+                title="Comment on a study",
+                source="crossref",
+                crossref_update_types=update_types,
+            )
+            assert doc_type_correction(view) is None
+
+
+class TestWosReferenceTitleRule:
+    def test_other_with_reference_corrects_to_erratum(self):
+        view = _view(
+            doc_type="other",
+            title="Non-perennial segments in river networks (vol 4, pg 815, 2023)",
+            source="wos",
+        )
+        corrected = doc_type_correction(view)
+        assert corrected is not None
+        assert corrected.value == "erratum"
+        assert corrected.rule == MetadataCorrectionRule.WOS_REFERENCE_TITLE_TO_ERRATUM
+
+    def test_letter_with_reference_keeps_its_type(self):
+        view = _view(
+            doc_type="letter",
+            title="Effect of the 1-h bundle on mortality (vol 49, pg 1, 2023)",
+            source="wos",
+        )
+        assert doc_type_correction(view) is None
+
+    def test_other_source_keeps_its_type(self):
+        view = _view(doc_type="other", title="Some title (vol 4, pg 815, 2023)", source="hal")
+        assert doc_type_correction(view) is None
+
+
+class TestRetractedTitleRule:
+    def test_retracted_article_typed_retraction(self):
+        """Cas réel : OpenAlex type `retraction` l'article rétracté sur place 10.1016/j.crphar.2022.100140."""
+        view = _view(
+            doc_type="retraction",
+            title="WITHDRAWN: Myoinositol supplementation for the prevention of gestational diabetes",
+        )
+        corrected = doc_type_correction(view)
+        assert corrected is not None
+        assert corrected.value == "article"
+        assert corrected.rule == MetadataCorrectionRule.RETRACTED_TITLE_TO_ARTICLE
+
+    def test_retraction_notice_keeps_its_type(self):
+        view = _view(doc_type="retraction", title="Retraction Note: Efficacy of vitamin C")
         assert doc_type_correction(view) is None
 
 

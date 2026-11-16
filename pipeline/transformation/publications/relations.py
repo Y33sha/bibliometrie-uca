@@ -27,13 +27,13 @@ from domain.publications.relations import (
     extract_datacite_relations,
     infer_shared_key_relation,
     notice_relation,
-    wos_corrected_article,
 )
 from domain.source_records.identifiers import SourceIdentifierRole, SourceIdentifierType
 from domain.source_records.keys import (
     CONFIRMATION_ID_TYPES,
     DISCRIMINANT_TITLE_MIN_LENGTH,
 )
+from domain.source_records.notices import wos_corrected_article
 from domain.source_records.source_extras import SourceExtra
 from domain.sources.registry import Source
 from domain.types import JsonValue
