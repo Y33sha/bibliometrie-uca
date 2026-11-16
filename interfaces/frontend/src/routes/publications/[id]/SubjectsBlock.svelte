@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tooltip as tooltipAction } from "#lib/actions/tooltip.svelte.js";
   import { resolve } from "$app/paths";
   import SectionLabel from "./SectionLabel.svelte";
   import type { Subject } from "./types";
@@ -20,7 +21,7 @@
     <SectionLabel icon="tag" text="Sujets" />
     <div class="detail-tags">
       {#each subjects as s (s.id)}
-        <a href={resolve(`subjects/${s.label_normalized}`)} class="tag" title={tooltip(s)}>{s.label}</a>
+        <a href={resolve(`subjects/${s.label_normalized}`)} class="tag" use:tooltipAction={tooltip(s)}>{s.label}</a>
       {/each}
     </div>
   </div>

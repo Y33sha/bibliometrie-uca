@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tooltip } from "#lib/actions/tooltip.svelte.js";
   import { CELL_BG, CELL_COLOR, STATUS_LABEL, type Status } from "./helpers";
 
   let {
@@ -20,7 +21,7 @@
     {@const st = (statuses[phase] ?? "ghost") as Status | "ghost"}
     <span
       class="cell"
-      title="{phase} — {st === 'ghost' ? 'non jouée' : STATUS_LABEL[st]}"
+      use:tooltip={`${phase} — ${st === 'ghost' ? 'non jouée' : STATUS_LABEL[st]}`}
       style="background:{CELL_BG[st]}; border-color:{CELL_COLOR[st]};"
     ></span>
   {/each}

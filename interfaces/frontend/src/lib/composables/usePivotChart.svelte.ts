@@ -271,7 +271,6 @@ export function usePivotChart(config: {
 				plugins: {
 					legend: { display: false },
 					tooltip: {
-						bodyFont: { size: fontSize('md') },
 						callbacks: {
 							label: (ctx) => {
 								const pct = formatPercent(shareOf(ctx.chart, ctx.datasetIndex, ctx.dataIndex) / 100, 1);

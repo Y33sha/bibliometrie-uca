@@ -10,6 +10,7 @@
 </script>
 
 <script lang="ts">
+	import { tooltip } from '#lib/actions/tooltip.svelte.js';
 	// Bouton d'action réduit à son icône : crayon pour modifier, corbeille pour supprimer, panneau latéral pour ouvrir un volet, croix pour rejeter, coche pour valider, flèche circulaire pour réinitialiser. Le libellé sert d'infobulle et de nom accessible.
 	let {
 		icon,
@@ -38,7 +39,7 @@
 	class:icon-btn-danger={icon === 'delete' || icon === 'reject'}
 	class:icon-btn-success={icon === 'confirm'}
 	class:icon-btn-sm={small}
-	title={label}
+	use:tooltip={label}
 	aria-label={label}
 	aria-pressed={pressed}
 	{disabled}

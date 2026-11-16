@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tooltip } from "#lib/actions/tooltip.svelte.js";
   import IconButton from "#lib/components/IconButton.svelte";
   import RhCheck from "#lib/components/RhCheck.svelte";
   import { resolve } from "$app/paths";
@@ -143,7 +144,7 @@
           href={resolve(`persons/${person.id}`)}
           target="_blank"
           rel="noopener"
-          title="Voir la fiche publique"
+          use:tooltip={'Voir la fiche publique'}
         >
           <span class="drawer-last">{titleCase(person.last_name)}</span>
           {titleCase(person.first_name)}
@@ -155,7 +156,7 @@
         <select
           class="select exclusion-select"
           class:excluded={!!person.exclusion}
-          title="Exclusion de la personne"
+          use:tooltip={'Exclusion de la personne'}
           aria-label="Exclusion de la personne"
           value={person.exclusion ?? ""}
           onchange={(e) =>
@@ -229,7 +230,7 @@
               {#if !sp.has_rh}
                 <button
                   class="btn btn-sm"
-                  title="Fusionner cette personne dans celle-ci"
+                  use:tooltip={'Fusionner cette personne dans celle-ci'}
                   onclick={() => absorb(sp.person_id)}>Absorber</button
                 >
               {/if}
@@ -238,7 +239,7 @@
                 {titleCase(sp.first_name)}
               </button>
               {#if sp.has_rh}<RhCheck />{/if}
-              <span class="muted-small" title={sp.shared_forms.join(", ")}>
+              <span class="muted-small" use:tooltip={sp.shared_forms.join(", ")}>
                 {formatCount(sp.shared_forms.length, "forme")}
               </span>
             </div>
@@ -255,7 +256,7 @@
             <div class="sharing-row">
               <button
                 class="btn btn-sm"
-                title="Annuler la décision : les files de triage peuvent de nouveau présenter la paire"
+                use:tooltip={'Annuler la décision : les files de triage peuvent de nouveau présenter la paire'}
                 onclick={() => unmarkDistinct(dp.person_id)}>Annuler</button
               >
               <button class="triage-person" onclick={() => onopenPerson(dp.person_id)}>

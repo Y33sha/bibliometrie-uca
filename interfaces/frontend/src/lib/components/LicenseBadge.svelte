@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tooltip } from '#lib/actions/tooltip.svelte.js';
 	import { onMount } from 'svelte';
 	import { CREATIVE_COMMONS_ICONS } from '#lib/creativeCommonsIcons.js';
 	import { LICENSE_ICONS, licenseLabels } from '#lib/licenses.js';
@@ -18,11 +19,11 @@
 </script>
 
 {#if icon && 'glyphs' in icon}
-	<span class="license-icons" title={label} role="img" aria-label={label}>
+	<span class="license-icons" use:tooltip={label} role="img" aria-label={label}>
 		{#each icon.glyphs as glyph (glyph)}<svg viewBox={CREATIVE_COMMONS_ICONS[glyph].viewBox} aria-hidden="true"><path d={CREATIVE_COMMONS_ICONS[glyph].d} /></svg>{/each}
 	</span>
 {:else if icon}
-	<img class="license-image" src={icon.image} alt={label} title={label} />
+	<img class="license-image" src={icon.image} alt={label} use:tooltip={label} />
 {:else}
 	{label}
 {/if}

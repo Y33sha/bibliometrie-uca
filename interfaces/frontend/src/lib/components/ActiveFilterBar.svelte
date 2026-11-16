@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tooltip } from '#lib/actions/tooltip.svelte.js';
 	import type { FacetOption } from '#lib/components/FacetDropdown.svelte';
 	import { entityLabel } from '#lib/entityLabels.js';
 	import {
@@ -65,7 +66,7 @@
 	<div class="active-filters">
 		{#each active as f (f.key)}
 			{@const text = summary(f)}
-			<button type="button" class="active-filter" title="Retirer ce filtre ({f.label} : {text})" onclick={() => onclear(f)}>
+			<button type="button" class="active-filter" use:tooltip={`Retirer ce filtre (${f.label} : ${text})`} onclick={() => onclear(f)}>
 				<span class="active-filter-name">{f.label}&nbsp;:</span>
 				<span class="active-filter-value">{text}</span>
 				<span class="active-filter-remove" aria-hidden="true">✕</span>

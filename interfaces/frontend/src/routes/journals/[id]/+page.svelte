@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tooltip } from '#lib/actions/tooltip.svelte.js';
 	import EntityMetaItem from '#lib/components/EntityMetaItem.svelte';
 	import EntityBreadcrumb from '#lib/components/EntityBreadcrumb.svelte';
 	import EntityStatus from '#lib/components/EntityStatus.svelte';
@@ -99,7 +100,7 @@
 			{#snippet identifierLinks()}
 				<span class="title-identifier-text">
 					{#each journal!.issn_details.filter((i) => i.status === 'active' || i.linking) as issn (issn.issn)}
-						<span><span class="identifier-label">{issnLabel(issn)}</span> <a href={issnPortalUrl(issn.issn)} target="_blank" rel="noopener" title="Portail ISSN (nouvel onglet)">{issn.issn}</a></span>
+						<span><span class="identifier-label">{issnLabel(issn)}</span> <a href={issnPortalUrl(issn.issn)} target="_blank" rel="noopener" use:tooltip={'Portail ISSN (nouvel onglet)'}>{issn.issn}</a></span>
 					{/each}
 				</span>
 			{/snippet}
@@ -123,7 +124,7 @@
 						{#if relation.serial_id}
 							<a href={resolve(`journals/${relation.serial_id}`)}>{relation.title}</a>
 						{:else if relation.issn}
-							<a href={issnPortalUrl(relation.issn)} target="_blank" rel="noopener" title="Portail ISSN (nouvel onglet)">{relation.issn}</a>
+							<a href={issnPortalUrl(relation.issn)} target="_blank" rel="noopener" use:tooltip={'Portail ISSN (nouvel onglet)'}>{relation.issn}</a>
 						{/if}
 					</EntityMetaItem>
 				{/each}
@@ -133,7 +134,7 @@
 			<div class="entity-meta">
 				<EntityMetaItem label="Listes">
 					{#each journal.lists as list (list.code)}
-						<a class="list-link" href={resolve(`journals?${listQuery(list)}`)} title={listTitle(list)}>{list.label}</a>
+						<a class="list-link" href={resolve(`journals?${listQuery(list)}`)} use:tooltip={listTitle(list)}>{list.label}</a>
 					{/each}
 				</EntityMetaItem>
 			</div>

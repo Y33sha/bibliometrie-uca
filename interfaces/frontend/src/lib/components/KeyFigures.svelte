@@ -6,6 +6,7 @@
 </script>
 
 <script lang="ts">
+	import { tooltip } from '#lib/actions/tooltip.svelte.js';
 	// Rangée de chiffres clés en tête d'un dashboard : icône facultative à gauche, gros chiffre, libellé discret dessous.
 	let {
 		items,
@@ -20,7 +21,7 @@
 <div class="key-figures">
 	{#if period}<div class="key-figures-period">{period}</div>{/if}
 	{#each items as item (item.label)}
-		<div class="key-figure" class:open={item.tone === 'open'} title={item.tooltip}>
+		<div class="key-figure" class:open={item.tone === 'open'} use:tooltip={item.tooltip}>
 			{#if item.icon}<span class="key-figure-icon"><item.icon size="1em" /></span>{/if}
 			<div>
 				<div class="key-figure-value">{item.value}</div>

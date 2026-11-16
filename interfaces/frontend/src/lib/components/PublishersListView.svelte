@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tooltip } from '#lib/actions/tooltip.svelte.js';
 	import { formatNumber } from '#lib/utils.js';
 	import TableScroll from '#lib/components/TableScroll.svelte';
 	import SortChevron from '#lib/components/SortChevron.svelte';
@@ -133,7 +134,7 @@
 				<td>
 					<div class="tag-list">
 						{#each p.doi_prefixes as dp (dp.prefix)}
-							<span class="tag id-badge" title="RA : {dp.ra}{dp.crossref_member_id ? ` / member ${dp.crossref_member_id}` : ''}">{dp.prefix}</span>
+							<span class="tag id-badge" use:tooltip={`RA : ${dp.ra}${dp.crossref_member_id ? ` / member ${dp.crossref_member_id}` : ''}`}>{dp.prefix}</span>
 						{/each}
 					</div>
 				</td>

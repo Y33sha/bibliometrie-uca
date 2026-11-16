@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tooltip } from '#lib/actions/tooltip.svelte.js';
 	import Gem from '@lucide/svelte/icons/gem';
 	import { formatNumber } from '#lib/utils.js';
 	import TableScroll from '#lib/components/TableScroll.svelte';
@@ -161,7 +162,7 @@
 				{/if}
 				<td class="diamond-col">
 					{#if j.oa_model === 'diamond'}
-						<span class="diamond" title="Revue diamant&nbsp;: open access sans frais de publication" aria-label="Revue diamant">
+						<span class="diamond" use:tooltip={'Revue diamant : open access sans frais de publication'} aria-label="Revue diamant">
 							<Gem size={15} />
 						</span>
 					{/if}

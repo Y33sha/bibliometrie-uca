@@ -1,104 +1,15 @@
 <script lang="ts">
+	// Infobulle autour d'un contenu, pour les cas où aucun élément ne porte déjà l'action `tooltip`.
 	import type { Snippet } from 'svelte';
-	import { tick } from 'svelte';
+	import { tooltip } from '#lib/actions/tooltip.svelte.js';
 
-	interface Props {
-		text: string;
-		children: Snippet;
-	}
-
-	let { text, children }: Props = $props();
-	let show = $state(false);
-	let wrapEl: HTMLSpanElement;
-	let boxEl: HTMLDivElement | undefined = $state();
-	let anchorX = $state(0); // centre horizontal de l'élément déclencheur
-	let y = $state(0);
-	let below = $state(false);
-	let left = $state(0); // bord gauche de l'infobulle (après recadrage)
-	let arrowLeft = $state(0); // position de la flèche dans l'infobulle
-
-	const MARGIN = 8; // marge minimale avec le bord de la fenêtre
-
-	async function onEnter() {
-		if (!text) return;
-		const rect = wrapEl.getBoundingClientRect();
-		anchorX = rect.left + rect.width / 2;
-		// Si pas assez de place au-dessus (< 80px), afficher en dessous
-		below = rect.top < 80;
-		y = below ? rect.bottom : rect.top;
-		show = true;
-		// Recadrage horizontal une fois l'infobulle rendue (largeur connue)
-		await tick();
-		position();
-	}
-
-	function position() {
-		if (!boxEl) return;
-		const width = boxEl.offsetWidth;
-		const maxLeft = window.innerWidth - MARGIN - width;
-		// Idéalement centrée sur l'élément, sinon plaquée contre le bord
-		left = Math.max(MARGIN, Math.min(anchorX - width / 2, maxLeft));
-		// La flèche reste alignée sur l'élément déclencheur
-		arrowLeft = Math.max(MARGIN, Math.min(anchorX - left, width - MARGIN));
-	}
+	let { text, children }: { text: string; children: Snippet } = $props();
 </script>
 
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<span class="tooltip-wrap" bind:this={wrapEl}
-	onmouseenter={onEnter}
-	onmouseleave={() => { show = false; }}
->
-	{@render children()}
-</span>
-
-{#if show && text}
-	<div class="tooltip-box" class:tooltip-below={below} bind:this={boxEl}
-		style="left:{left}px; top:{y}px; --arrow-left:{arrowLeft}px;">
-		{text}
-	</div>
-{/if}
+<span class="tooltip-wrap" use:tooltip={text}>{@render children()}</span>
 
 <style>
 	.tooltip-wrap {
 		display: inline;
-	}
-	.tooltip-box {
-		position: fixed;
-		transform: translateY(calc(-100% - 8px));
-		background: var(--tooltip-bg);
-		color: var(--text-inverse);
-		font-size: var(--fs-sm);
-		line-height: 1.4;
-		/* Typographie propre : l'infobulle n'hérite pas de son contexte (en-tête de colonne en capitales, gras…). */
-		font-weight: 400;
-		text-transform: none;
-		letter-spacing: normal;
-		text-align: left;
-		padding: 6px 10px;
-		border-radius: var(--radius);
-		max-width: 500px;
-		white-space: pre-line;
-		word-wrap: break-word;
-		z-index: 9999;
-		pointer-events: none;
-		box-shadow: var(--shadow-sm);
-	}
-	.tooltip-box::after {
-		content: '';
-		position: absolute;
-		top: 100%;
-		left: var(--arrow-left);
-		transform: translateX(-50%);
-		border: 5px solid transparent;
-		border-top-color: var(--tooltip-bg);
-	}
-	.tooltip-below {
-		transform: translateY(8px);
-	}
-	.tooltip-below::after {
-		top: auto;
-		bottom: 100%;
-		border-top-color: transparent;
-		border-bottom-color: var(--tooltip-bg);
 	}
 </style>

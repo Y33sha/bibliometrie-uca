@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tooltip } from '#lib/actions/tooltip.svelte.js';
 	import type { ColumnDef } from '#lib/composables/useColumnVisibility.svelte.js';
 	import { anchored } from '#lib/actions/anchored.js';
 	import { dismissable } from '#lib/actions/dismissable.js';
@@ -21,7 +22,7 @@
 <div class="col-menu-inner">
 	<span class="col-menu-label">{label}</span>
 	<div class="column-menu-wrapper" use:dismissable={() => showMenu && onClose()}>
-		<button class="btn btn-sm" onclick={onOpen} title="Colonnes affichées" aria-label="Colonnes affichées" aria-expanded={showMenu}>⋯</button>
+		<button class="btn btn-sm" onclick={onOpen} use:tooltip={'Colonnes affichées'} aria-label="Colonnes affichées" aria-expanded={showMenu}>⋯</button>
 		{#if showMenu}
 			<div class="column-menu popover" use:anchored={{ align: 'end' }}>
 				{#each columns as c}

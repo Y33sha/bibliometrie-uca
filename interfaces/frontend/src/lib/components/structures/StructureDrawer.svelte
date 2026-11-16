@@ -1,5 +1,6 @@
 <script lang="ts">
   // Volet d'édition d'une structure, réservé à la session admin : identifiants, tutelles et formes de nom.
+  import { tooltip } from "#lib/actions/tooltip.svelte.js";
   import Drawer from "#lib/components/Drawer.svelte";
   import IconButton from "#lib/components/IconButton.svelte";
   import { useDrawerEntity } from "#lib/composables/useDrawerEntity.svelte.js";
@@ -432,7 +433,7 @@
     {#if detail}
       {@const s = detail.structure}
       <div class="drawer-head-row">
-        <a class="drawer-name-link" href={resolve(`structures/${s.id}`)} target="_blank" rel="noopener" title="Voir la fiche publique">
+        <a class="drawer-name-link" href={resolve(`structures/${s.id}`)} target="_blank" rel="noopener" use:tooltip={'Voir la fiche publique'}>
           {#if s.acronym}<span class="drawer-acronym">{s.acronym}</span>{/if}
           {s.name}
         </a>

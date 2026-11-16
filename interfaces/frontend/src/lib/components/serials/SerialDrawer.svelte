@@ -1,5 +1,6 @@
 <script lang="ts">
   // Volet d'édition d'une publication en série, réservé à la session admin : titre, type, modèle OA, caractère académique et fusion.
+  import { tooltip } from "#lib/actions/tooltip.svelte.js";
   import { onMount } from "svelte";
   import { resolve } from "$app/paths";
   import { api, apiOnce, serials as serialsApi } from "#lib/api/index.js";
@@ -153,7 +154,7 @@
             <button type="button" class="btn btn-sm" onclick={() => (editing = false)}>Annuler</button>
           </form>
         {:else}
-          <a class="drawer-name-link" href={resolve(`journals/${serial.id}`)} target="_blank" rel="noopener" title="Voir la fiche publique">
+          <a class="drawer-name-link" href={resolve(`journals/${serial.id}`)} target="_blank" rel="noopener" use:tooltip={'Voir la fiche publique'}>
             {serial.title}
           </a>
           <div class="drawer-head-actions">

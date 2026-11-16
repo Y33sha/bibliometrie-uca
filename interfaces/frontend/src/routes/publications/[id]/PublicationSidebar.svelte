@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tooltip } from "#lib/actions/tooltip.svelte.js";
   import { asset } from "$app/paths";
   import type { AssetPath } from "$app/types";
   import AccessButton from "#lib/components/AccessButton.svelte";
@@ -70,7 +71,7 @@
   {/if}
 
   {#snippet copyRow(copy: AccessLink)}
-    <a href={copy.url} target="_blank" rel="noopener noreferrer" class="source-row" title={copy.url}>
+    <a href={copy.url} target="_blank" rel="noopener noreferrer" class="source-row" use:tooltip={copy.url}>
       <span class="logo-icon logo-source {PLATFORM_LOGO_CLASSES[copy.label] ?? ''}">
         <img src={asset(`icons/${copy.icon}` as AssetPath)} alt={copy.label} />
       </span>
@@ -93,7 +94,7 @@
       target="_blank"
       rel="noopener"
       class="source-row"
-      title={s.source_id}
+      use:tooltip={s.source_id}
     >
       <SourceTag source={s.source} />
       <span class="row-label">{sourceLabel(s.source)}</span>
@@ -113,7 +114,7 @@
             target="_blank"
             rel="noopener"
             class="source-row"
-            title={e.value}
+            use:tooltip={e.value}
           >
             <span class="logo-icon logo-source">
               {#if EXT_META[e.type]?.icon}

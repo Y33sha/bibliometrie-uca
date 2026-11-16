@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tooltip } from "#lib/actions/tooltip.svelte.js";
   import { formatNumber } from "#lib/utils.js";
   import { formatCount } from "#lib/plural.js";
   import TableScroll from '#lib/components/TableScroll.svelte';
@@ -153,7 +154,7 @@
                     class="num sortable"
                     class:active={neighborSort === "specificity"}
                     onclick={() => (neighborSort = "specificity")}
-                    title="Part des publications du sujet associé qui portent aussi « {data.subject.label} »"
+                    use:tooltip={`Part des publications du sujet associé qui portent aussi « ${data.subject.label} »`}
                   >
                     Spécificité <SortChevron direction={neighborSort === "specificity" ? "desc" : null} />
                   </th>

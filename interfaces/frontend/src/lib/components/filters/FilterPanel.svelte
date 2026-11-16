@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tooltip } from '#lib/actions/tooltip.svelte.js';
 	import { untrack } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { loadEntityFacet } from '#lib/entityFacets.js';
@@ -154,7 +155,7 @@
 					{@const open = panel.isExpanded(f.key, active || !expanded || expanded.includes(f.key))}
 					<div class="filter-block">
 						<div class="filter-head-row">
-							<button type="button" class="filter-head" class:with-clear={active} aria-expanded={open} title={f.tooltip} onclick={() => panel.setExpanded(f.key, !open)}>
+							<button type="button" class="filter-head" class:with-clear={active} aria-expanded={open} use:tooltip={f.tooltip} onclick={() => panel.setExpanded(f.key, !open)}>
 								<span class="filter-name">{f.label}</span>
 								{#if active}<span class="facet-badge">{selectionCount(f)}</span>{/if}
 								<span class="chevron" class:up={open} aria-hidden="true"></span>

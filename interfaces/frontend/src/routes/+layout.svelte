@@ -12,6 +12,7 @@
   import type { Snippet } from "svelte";
   import { auth } from "#lib/api/index.js";
   import DialogHost from "#lib/components/DialogHost.svelte";
+  import TooltipHost from "#lib/components/TooltipHost.svelte";
   import { loadInstitution, siteTitle } from "#lib/institution.svelte.js";
   import { adminLook, isAdmin, loadSession, loginUrl, session } from "#lib/session.svelte.js";
   import { loadSources } from "#lib/sources.svelte.js";
@@ -169,6 +170,7 @@
 </main>
 
 <DialogHost />
+<TooltipHost />
 
 <style>
   /* Logo et nom du site : lien vers l'accueil, sans soulignement. */

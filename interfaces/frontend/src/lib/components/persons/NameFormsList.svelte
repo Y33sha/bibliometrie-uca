@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tooltip } from "#lib/actions/tooltip.svelte.js";
   import StatusToggles from "#lib/components/StatusToggles.svelte";
   import RejectedFold from "./RejectedFold.svelte";
   import type { NameForm } from "./types";
@@ -42,7 +43,7 @@
         class="tag status-chip"
         class:confirmed={nf.status === "confirmed" || isCanonical(nf)}
         class:rejected={nf.status === "rejected"}
-        title="Voir les {nf.publication_count} publication(s) liée(s)"
+        use:tooltip={`Voir les ${nf.publication_count} publication(s) liée(s)`}
         onclick={() => onopenDetail(personId, nf.name_form)}
       >
         {nf.name_form}
@@ -62,7 +63,7 @@
     {#if nf.shared_count > 0}
       <span
         class="shared"
-        title="Aussi portée par {nf.shared_count} autre(s) personne(s)"
+        use:tooltip={`Aussi portée par ${nf.shared_count} autre(s) personne(s)`}
       >
         &#9094; {nf.shared_count}
       </span>

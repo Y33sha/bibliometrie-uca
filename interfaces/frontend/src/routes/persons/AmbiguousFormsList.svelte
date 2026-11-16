@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tooltip } from "#lib/actions/tooltip.svelte.js";
   import RhCheck from "#lib/components/RhCheck.svelte";
   import StatusToggles from "#lib/components/StatusToggles.svelte";
   import { untrack } from "svelte";
@@ -70,7 +71,7 @@
           {#each form.persons as p (p.person_id)}
             <div class="person-row" class:incompatible={!p.compatible}>
               {#if p.canonical}
-                <span class="tag" title="Forme dérivée du nom de la personne, confirmée d'office"
+                <span class="tag" use:tooltip={"Forme dérivée du nom de la personne, confirmée d'office"}
                   >nom</span
                 >
               {:else}
@@ -84,7 +85,7 @@
               </button>
               {#if p.has_rh}<RhCheck />{/if}
               {#if !p.compatible}
-                <span class="incompat-tag" title="Nom canonique incompatible avec la forme">
+                <span class="incompat-tag" use:tooltip={'Nom canonique incompatible avec la forme'}>
                   incompatible
                 </span>
               {/if}

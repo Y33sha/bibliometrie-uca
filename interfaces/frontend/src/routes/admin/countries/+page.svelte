@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tooltip } from '#lib/actions/tooltip.svelte.js';
 	import { formatNumber } from '#lib/utils.js';
 	import TableScroll from '#lib/components/TableScroll.svelte';
 	import { onMount } from 'svelte';
@@ -253,14 +254,14 @@
 						<div class="country-cell">
 						{#each a.countries ?? [] as c}
 							{@const found = a.found_countries.find(f => f.country_code === c)}
-							<span class="tag tag-success tag-removable" title={found ? `Trouvé par : ${methodsLabel(found.methods)}` : undefined}>
+							<span class="tag tag-success tag-removable" use:tooltip={found ? `Trouvé par : ${methodsLabel(found.methods)}` : undefined}>
 								{countryLabel(c)}
 								<IconButton icon="reject" small label="Retirer {countryLabel(c)}" onclick={() => removeCountry(a.id, c)} />
 							</span>
 						{/each}
 						<span class="country-actions">
 							{#each a.found_countries.filter(f => !a.countries?.includes(f.country_code)) as p}
-								<button class="tag tag-warning proposal-tag" title="Ajouter ce pays" onclick={() => addCountry(a.id, p.country_code)}>
+								<button class="tag tag-warning proposal-tag" use:tooltip={'Ajouter ce pays'} onclick={() => addCountry(a.id, p.country_code)}>
 									{countryLabel(p.country_code)} ?
 									<span class="proposal-methods">{methodsLabel(p.methods)}</span>
 								</button>

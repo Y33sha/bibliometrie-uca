@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tooltip } from "#lib/actions/tooltip.svelte.js";
   import CircleQuestionMark from "@lucide/svelte/icons/circle-question-mark";
   import HelpTip from "#lib/components/HelpTip.svelte";
   import IconButton from "#lib/components/IconButton.svelte";
@@ -68,7 +69,7 @@
     onclick={() => {
       formsHelpOpen = !formsHelpOpen;
     }}
-    title="Aide"
+    use:tooltip={'Aide'}
     ><CircleQuestionMark size={14} /></button
   >
 </h3>
@@ -95,14 +96,14 @@
       {#each forms as f (f.id)}
         <tr class:excluding={f.is_excluding}>
           <td class="col-badge">
-            {#if f.is_excluding}<span class="tag tag-attention tag-filled" title="Excluante"
+            {#if f.is_excluding}<span class="tag tag-attention tag-filled" use:tooltip={'Excluante'}
                 >excluante</span
               >
             {:else if f.is_word_boundary || f.form_text.length <= SHORT_FORM_MAX_LENGTH}<span
                 class="tag tag-success"
-                title="Mot entier">mot entier</span
+                use:tooltip={'Mot entier'}>mot entier</span
               >
-            {:else}<span class="tag" title="Sous-chaîne">sous-chaîne</span>
+            {:else}<span class="tag" use:tooltip={'Sous-chaîne'}>sous-chaîne</span>
             {/if}
           </td>
           <td class="form-text">{f.form_text}</td>

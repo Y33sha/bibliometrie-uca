@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tooltip } from "#lib/actions/tooltip.svelte.js";
   import ShieldCheck from "@lucide/svelte/icons/shield-check";
   import IdentifierLink from "#lib/components/IdentifierLink.svelte";
   import StatusToggles from "#lib/components/StatusToggles.svelte";
@@ -45,7 +46,7 @@
       <span class="chip-controls">
         <span
           class="authenticated-badge"
-          title="Authentifié par le chercheur — statut protégé, non modifiable"
+          use:tooltip={'Authentifié par le chercheur — statut protégé, non modifiable'}
           aria-label="Authentifié par le chercheur"
         >
           <ShieldCheck size={15} />
@@ -60,7 +61,7 @@
       class="tag status-chip identifier-chip"
       class:confirmed={ident.status === "confirmed" || ident.status === "authenticated"}
       class:rejected={ident.status === "rejected"}
-      title={identifierTitle(ident)}
+      use:tooltip={identifierTitle(ident)}
     >
       {ident.id_value}
     </span>
@@ -116,7 +117,7 @@
 {:else}
   <button
     class="btn-add btn-add-id"
-    title="Ajouter un identifiant"
+    use:tooltip={'Ajouter un identifiant'}
     onclick={() => ontoggleForm(person.id)}>+ Identifiant</button
   >
 {/if}

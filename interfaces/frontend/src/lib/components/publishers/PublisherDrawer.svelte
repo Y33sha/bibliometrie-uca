@@ -1,5 +1,6 @@
 <script lang="ts">
   // Volet d'édition d'un éditeur, réservé à la session admin : nom, type, pays, formes de nom et fusion.
+  import { tooltip } from "#lib/actions/tooltip.svelte.js";
   import { formatNumber } from "#lib/utils.js";
   import { formatCount } from "#lib/plural.js";
   import { onMount } from "svelte";
@@ -154,7 +155,7 @@
             <button type="button" class="btn btn-sm" onclick={() => (editing = false)}>Annuler</button>
           </form>
         {:else}
-          <a class="drawer-name-link" href={resolve(`publishers/${publisher.id}`)} target="_blank" rel="noopener" title="Voir la fiche publique">
+          <a class="drawer-name-link" href={resolve(`publishers/${publisher.id}`)} target="_blank" rel="noopener" use:tooltip={'Voir la fiche publique'}>
             {publisher.name}
           </a>
           <div class="drawer-head-actions">
@@ -208,7 +209,7 @@
         <h3>Préfixes DOI</h3>
         <div class="tag-list">
           {#each publisher.doi_prefixes as p (p.prefix)}
-            <span class="tag id-badge" title="RA : {p.ra}{p.crossref_member_id ? ` / membre Crossref ${p.crossref_member_id}` : ''}">{p.prefix}</span>
+            <span class="tag id-badge" use:tooltip={`RA : ${p.ra}${p.crossref_member_id ? ` / membre Crossref ${p.crossref_member_id}` : ''}`}>{p.prefix}</span>
           {/each}
         </div>
       </section>

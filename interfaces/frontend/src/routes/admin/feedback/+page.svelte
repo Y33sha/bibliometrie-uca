@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tooltip } from "#lib/actions/tooltip.svelte.js";
   import Breadcrumb from '#lib/components/Breadcrumb.svelte';
   import ResultCount from '#lib/components/ResultCount.svelte';
   import PageHeader from '#lib/components/PageHeader.svelte';
@@ -318,7 +319,7 @@
             <td>
               {#if a.structures && a.structures.length > 0}
                 {#each a.structures as l}
-                  <span class={structDetectionClasses[structDetectionStatus(l)]} title={structTagTitle(l)}>
+                  <span class={structDetectionClasses[structDetectionStatus(l)]} use:tooltip={structTagTitle(l)}>
                     {structureLabel(l)}
                   </span>
                 {/each}
@@ -340,8 +341,8 @@
                           (ctx: {formatCtx(f.requires_context_of)})
                         </span>
                       {/if}
-                      <button class="btn btn-sm" data-ctx-trigger title="Ajouter un contexte contraignant" onclick={(e) => openCtxPicker(f.form_id, e)}> + ctx </button>
-                      <button class="btn btn-sm btn-danger" title="Supprimer cette forme" onclick={() => deleteForm(f.form_id)}> suppr. </button>
+                      <button class="btn btn-sm" data-ctx-trigger use:tooltip={'Ajouter un contexte contraignant'} onclick={(e) => openCtxPicker(f.form_id, e)}> + ctx </button>
+                      <button class="btn btn-sm btn-danger" use:tooltip={'Supprimer cette forme'} onclick={() => deleteForm(f.form_id)}> suppr. </button>
                     </div>
                   {/each}
                 {:else}

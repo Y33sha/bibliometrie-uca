@@ -40,12 +40,21 @@ const currentYearPlugin: Plugin = {
 };
 
 /**
- * Chart.js enregistré une fois pour toute l'application : composants standard, étiquettes de valeurs, atténuation de l'année en cours, police, taille et couleur de texte lues dans les variables CSS.
+ * Chart.js enregistré une fois pour toute l'application : composants standard, étiquettes de valeurs, atténuation de l'année en cours, police, taille et couleur de texte lues dans les variables CSS, infobulles à l'aspect de `TooltipHost`.
  */
 Chart.register(...registerables, ChartDataLabels, currentYearPlugin);
 Chart.defaults.font.family = cssVar('font');
 Chart.defaults.font.size = fontSize('sm');
 Chart.defaults.color = cssColor('text-secondary');
+const tooltip = Chart.defaults.plugins.tooltip;
+tooltip.backgroundColor = cssColor('tooltip-bg');
+tooltip.titleColor = tooltip.bodyColor = tooltip.footerColor = cssColor('text-inverse');
+tooltip.titleFont = { size: fontSize('sm'), weight: 'bold' };
+tooltip.bodyFont = { size: fontSize('sm') };
+tooltip.padding = { x: 10, y: 6 };
+tooltip.cornerRadius = parseFloat(cssVar('radius'));
+tooltip.caretSize = 5;
+tooltip.boxPadding = 4;
 
 /** Marge intérieure minimale autour d'une étiquette de valeur dans son segment de barre, en pixels. */
 const BAR_LABEL_PADDING = 4;

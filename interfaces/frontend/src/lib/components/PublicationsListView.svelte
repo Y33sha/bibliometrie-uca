@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tooltip } from '#lib/actions/tooltip.svelte.js';
 	import { formatNumber } from '#lib/utils.js';
 	import TableScroll from '#lib/components/TableScroll.svelte';
 	import SourceLinks from '#lib/components/SourceLinks.svelte';
@@ -259,7 +260,7 @@
 						{#each noticeSorts as s (s.field)}<option value={s.field}>{s.label}</option>{/each}
 					</select>
 				</label>
-				<button type="button" class="facet-btn sort-dir" title={sortDirTitle} aria-label="Sens du tri : {sortDirTitle}" onclick={toggleSortDir}>
+				<button type="button" class="facet-btn sort-dir" use:tooltip={sortDirTitle} aria-label="Sens du tri : {sortDirTitle}" onclick={toggleSortDir}>
 					{#if sortDirLabel}{sortDirLabel}{:else}
 						<svg class="sort-dir-icon" class:up={sortDir === 'asc'} width="10" height="18" viewBox="0 0 10 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 1.5v15M1.5 13l3.5 3.5L8.5 13" /></svg>
 					{/if}
@@ -344,7 +345,7 @@
 			{#if !isLab && col('labs')}<th style="width:80px" class="sortable" class:active={labsSort !== null} onclick={() => toggleSort('labs')}>
 				{columnLabels.labs} <SortChevron direction={labsSort} />
 			</th>{/if}
-			{#if isPerson && col('corr')}<th style="width:30px" title="Auteur correspondant">&#9993;</th>{/if}
+			{#if isPerson && col('corr')}<th style="width:30px" use:tooltip={'Auteur correspondant'}>&#9993;</th>{/if}
 			{#if col('apc')}<th style="width:60px" class="sortable" class:active={apcSort !== null} onclick={() => toggleSort('apc')}>
 				{columnLabels.apc} <SortChevron direction={apcSort} />
 			</th>{/if}
@@ -411,11 +412,11 @@
 							{@const isPersonNonCorr = isPerson && !isCorresponding(p)}
 							{#if ucaApc.length > 0}
 								<span class="tag" class:tag-success={!isPersonNonCorr}
-									title={ucaApc.map(a => `${a.amount == null ? '?' : formatNumber(a.amount)} € (${a.lab_acronym || institution.name})`).join('\n') + (isPersonNonCorr ? '\nAuteur non correspondant' : '')}>
+									use:tooltip={ucaApc.map(a => `${a.amount == null ? '?' : formatNumber(a.amount)} € (${a.lab_acronym || institution.name})`).join('\n') + (isPersonNonCorr ? '\nAuteur non correspondant' : '')}>
 									{formatNumber(Math.round(ucaApc.reduce((s, a) => s + (a.amount || 0), 0)))} €
 								</span>
 							{:else}
-								<span class="tag" title={p.apc.map(a => `${a.amount == null ? '?' : formatNumber(a.amount)} € (${a.institution || '?'})`).join('\n')}>
+								<span class="tag" use:tooltip={p.apc.map(a => `${a.amount == null ? '?' : formatNumber(a.amount)} € (${a.institution || '?'})`).join('\n')}>
 									{formatNumber(Math.round(p.apc.reduce((s, a) => s + (a.amount || 0), 0)))} €
 								</span>
 							{/if}

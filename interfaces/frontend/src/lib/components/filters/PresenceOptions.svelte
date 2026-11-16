@@ -1,5 +1,6 @@
 <script lang="ts">
 	// Options d'un filtre de présence : chaque élément passe de « tous » à « présents », puis « absents ». Un élément présent partout, ou nulle part, est omis, sauf filtré. Partagé par la liste déroulante d'un filtre et le panneau des filtres.
+	import { tooltip as tooltipAction } from '#lib/actions/tooltip.svelte.js';
 	import { formatNumber } from '#lib/utils.js';
 	import { discriminates } from '#lib/filterRegistry.js';
 
@@ -103,7 +104,7 @@
 	<button
 		type="button"
 		class="option-row"
-		title={tooltip(item.label, state)}
+		use:tooltipAction={tooltip(item.label, state)}
 		onclick={() => cycle(item)}
 	>
 		<span
