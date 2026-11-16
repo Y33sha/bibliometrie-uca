@@ -1,4 +1,6 @@
 <script lang="ts">
+	import GraduationCap from '@lucide/svelte/icons/graduation-cap';
+	import User from '@lucide/svelte/icons/user';
 	import { sectionLabels } from '#lib/labels.js';
 	import { formatNumber } from '#lib/utils.js';
 	import EntityBreadcrumb from '#lib/components/EntityBreadcrumb.svelte';
@@ -181,12 +183,12 @@
 											{
 												value: formatNumber(ongoingThesesCount),
 												label: plural(ongoingThesesCount, 'thèse en cours', 'thèses en cours'),
-												icon: 'graduation-cap',
+												icon: GraduationCap,
 											},
 										]
 									: []),
 								...(personsCount > 0
-									? [{ value: formatNumber(personsCount), label: plural(personsCount, 'personne'), icon: 'user' }]
+									? [{ value: formatNumber(personsCount), label: plural(personsCount, 'personne'), icon: User }]
 									: []),
 							]
 						: []}

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import GraduationCap from '@lucide/svelte/icons/graduation-cap';
 	import EntityBreadcrumb from '#lib/components/EntityBreadcrumb.svelte';
 	import EntityStatus from '#lib/components/EntityStatus.svelte';
 	import { columnLabels, sectionLabels } from '#lib/labels.js';
@@ -240,7 +241,7 @@
 								{
 									value: formatNumber(thesesCount),
 									label: plural(thesesCount, 'thèse liée', 'thèses liées'),
-									icon: 'graduation-cap',
+									icon: GraduationCap,
 								},
 							]
 						: []}

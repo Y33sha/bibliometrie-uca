@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Gem from '@lucide/svelte/icons/gem';
 	import { formatNumber } from '#lib/utils.js';
 	import TableScroll from '#lib/components/TableScroll.svelte';
 	import SortChevron from '#lib/components/SortChevron.svelte';
@@ -161,11 +162,7 @@
 				<td class="diamond-col">
 					{#if j.oa_model === 'diamond'}
 						<span class="diamond" title="Revue diamant&nbsp;: open access sans frais de publication" aria-label="Revue diamant">
-							<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-								<path d="M6 3h12l4 6-10 13L2 9Z" />
-								<path d="M11 3 8 9l4 13 4-13-3-6" />
-								<path d="M2 9h20" />
-							</svg>
+							<Gem size={15} />
 						</span>
 					{/if}
 				</td>

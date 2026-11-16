@@ -1,4 +1,9 @@
 <script lang="ts">
+	import BookOpen from '@lucide/svelte/icons/book-open';
+	import Globe from '@lucide/svelte/icons/globe';
+	import GraduationCap from '@lucide/svelte/icons/graduation-cap';
+	import LockOpen from '@lucide/svelte/icons/lock-open';
+	import Star from '@lucide/svelte/icons/star';
 	import type { Snippet } from 'svelte';
 	import { api } from '#lib/api/index.js';
 	import type { components } from '#lib/api/schema.js';
@@ -137,16 +142,16 @@
 	const withCitationClass = $derived(sum(citationClasses));
 
 	const keyFigures = $derived<KeyFigure[]>([
-		{ value: formatNumber(total), label: plural(total, 'publication'), icon: 'book-open-cover' },
+		{ value: formatNumber(total), label: plural(total, 'publication'), icon: BookOpen },
 		...(total > 0
-			? [{ value: percent(openAccess, total), label: 'en open access', tone: 'open' as const, icon: 'unlock' }]
+			? [{ value: percent(openAccess, total), label: 'en open access', tone: 'open' as const, icon: LockOpen }]
 			: []),
 		...(withCitationClass > 0
 			? [
 					{
 						value: percent(topCited, withCitationClass),
 						label: 'dans le top 10 % des plus citées',
-						icon: 'star',
+						icon: Star,
 						tooltip: `D'après OpenAlex, sur les ${formatNumber(withCitationClass)} publications pourvues de l'indicateur (${percent(withCitationClass, total)} du corpus)`,
 					},
 				]
@@ -156,12 +161,12 @@
 					{
 						value: percent(collab.international_count, collab.total_count),
 						label: 'en collaboration internationale',
-						icon: 'globe',
+						icon: Globe,
 					},
 				]
 			: []),
 		...(thesesFigure && theses > 0
-			? [{ value: formatNumber(theses), label: plural(theses, 'thèse'), icon: 'graduation-cap' }]
+			? [{ value: formatNumber(theses), label: plural(theses, 'thèse'), icon: GraduationCap }]
 			: []),
 		...figures,
 	]);

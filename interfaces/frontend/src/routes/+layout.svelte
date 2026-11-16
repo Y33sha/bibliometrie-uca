@@ -1,8 +1,11 @@
 <script lang="ts">
+  import BookOpen from "@lucide/svelte/icons/book-open";
+  import School from "@lucide/svelte/icons/school";
+  import User from "@lucide/svelte/icons/user";
+  import Users from "@lucide/svelte/icons/users";
   import { sectionLabels } from "#lib/labels.js";
   import "#lib/styles/shared.css";
   import "katex/dist/katex.min.css";
-  import "@flaticon/flaticon-uicons/css/regular/rounded.css";
   import { page } from "$app/state";
   import { goto, afterNavigate } from "$app/navigation";
   import { asset, resolve } from "$app/paths";
@@ -126,7 +129,7 @@
   <a href={resolve('admin/addresses')} class:active={isActive("/admin/addresses")}>{sectionLabels['admin/addresses']}</a>
   <a href={resolve('admin/countries')} class:active={isActive("/admin/countries")}>{sectionLabels['admin/countries']}</a>
 {/snippet}
-{#snippet accountLabel()}<i class="fi fi-rr-user nav-icon" aria-hidden="true"></i>{session.login}{/snippet}
+{#snippet accountLabel()}<User class="nav-icon" size="1em" />{session.login}{/snippet}
 {#snippet accountItems()}
   <button class="nav-dropdown-action" onclick={logout}>Déconnexion</button>
 {/snippet}
@@ -139,9 +142,9 @@
     <span class="site-title">{siteTitle()}</span>
   </a>
   <nav id="site-nav" class="site-nav" class:open={mobileNavOpen} aria-label="Navigation principale">
-    <a href={resolve('publications')} class="nav-link" class:active={isActive("/publications")}><i class="fi fi-rr-book-open-cover nav-icon" aria-hidden="true"></i>{sectionLabels.publications}</a>
-    <a href={resolve('structures')} class="nav-link" class:active={isActive("/structures")}><i class="fi fi-rr-school nav-icon" aria-hidden="true"></i>{sectionLabels.structures}</a>
-    <a href={resolve('persons')} class="nav-link" class:active={isActive("/persons")}><i class="fi fi-rr-users nav-icon" aria-hidden="true"></i>{sectionLabels.persons}</a>
+    <a href={resolve('publications')} class="nav-link" class:active={isActive("/publications")}><BookOpen class="nav-icon" size="1em" />{sectionLabels.publications}</a>
+    <a href={resolve('structures')} class="nav-link" class:active={isActive("/structures")}><School class="nav-icon" size="1em" />{sectionLabels.structures}</a>
+    <a href={resolve('persons')} class="nav-link" class:active={isActive("/persons")}><Users class="nav-icon" size="1em" />{sectionLabels.persons}</a>
     {@render dropdown("referentiels", referentielsLabel, referentielsItems, { active: isPublicReferentiels })}
     {@render dropdown("hal-problems", halProblemsLabel, halProblemsItems, { active: isHalProblems, right: true })}
     {#if isAdmin()}
@@ -257,7 +260,7 @@
     color: var(--nav-fg);
     background: var(--nav-hover);
   }
-  .nav-icon {
+  .site-nav :global(.nav-icon) {
     display: inline-flex;
     margin-right: 7px;
     font-size: var(--fs-sm);
@@ -379,7 +382,7 @@
 
   /* ── Largeur intermédiaire : rubriques sans icône, plus serrées, pour tenir sur une ligne ── */
   @media (max-width: 1100px) {
-    .nav-icon {
+    .site-nav :global(.nav-icon) {
       display: none;
     }
     .nav-link {

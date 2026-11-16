@@ -1,4 +1,6 @@
 <script lang="ts">
+	import Check from '@lucide/svelte/icons/check';
+	import X from '@lucide/svelte/icons/x';
 	import { formatNumber } from '#lib/utils.js';
 	import { institution, loadInstitution } from '#lib/institution.svelte.js';
 	import PageHeader from '#lib/components/PageHeader.svelte';
@@ -542,8 +544,8 @@
 		<div class="batch-bar batch-bar-addresses">
 			<span>{formatCount(selectedCount, 'sélectionnée')}</span>
 			<div class="batch-actions">
-				<button class="btn btn-sm" onclick={() => batchReview(false)}>Rejeter <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg></button>
-				<button class="btn btn-sm" onclick={() => batchReview(true)}>Relier <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg></button>
+				<button class="btn btn-sm" onclick={() => batchReview(false)}>Rejeter <X /></button>
+				<button class="btn btn-sm" onclick={() => batchReview(true)}>Relier <Check /></button>
 				<button class="btn btn-sm" onclick={() => batchReview(null)}>Réinitialiser</button>
 				<button class="btn btn-sm" onclick={clearSelection}>Annuler</button>
 			</div>

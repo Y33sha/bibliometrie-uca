@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Link2 from "@lucide/svelte/icons/link-2";
+  import TriangleExclamationPoint from "@lucide/svelte/icons/triangle-exclamation-point";
   import { resolve } from "$app/paths";
   import DocTypePill from "#lib/components/DocTypePill.svelte";
   import PublicationTitle from "#lib/components/PublicationTitle.svelte";
@@ -91,15 +93,9 @@
         >
           <span class="rel-label">
             {#if tier === "danger" || tier === "warning"}
-              <svg class="rel-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                <line x1="12" y1="9" x2="12" y2="13" />
-                <line x1="12" y1="17" x2="12.01" y2="17" />
-              </svg>
+              <TriangleExclamationPoint class="rel-icon" strokeWidth={2.2} />
             {:else}
-              <svg class="rel-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M9 17H7A5 5 0 0 1 7 7h2M15 7h2a5 5 0 0 1 0 10h-2M8 12h8" />
-              </svg>
+              <Link2 class="rel-icon" strokeWidth={2.2} />
             {/if}
             <span class="rel-kind">{relationTypeLabel[r.relation_type] ?? r.relation_type}</span>
           </span>
@@ -182,7 +178,7 @@
     gap: 10px;
     flex: none;
   }
-  .rel-icon {
+  .rel-label :global(.rel-icon) {
     width: 16px;
     height: 16px;
     flex: none;
@@ -213,7 +209,7 @@
     background: var(--danger-light);
     border-left-color: var(--danger);
   }
-  .tier-danger .rel-icon,
+  .tier-danger :global(.rel-icon),
   .tier-danger .rel-kind {
     color: var(--danger);
   }
@@ -224,7 +220,7 @@
     background: var(--warning-light);
     border-left-color: var(--warning);
   }
-  .tier-warning .rel-icon,
+  .tier-warning :global(.rel-icon),
   .tier-warning .rel-kind {
     color: var(--warning-text);
   }
@@ -235,7 +231,7 @@
     background: var(--accent-light);
     border-left-color: var(--accent);
   }
-  .tier-parent .rel-icon,
+  .tier-parent :global(.rel-icon),
   .tier-parent .rel-kind {
     color: var(--accent);
   }
@@ -246,7 +242,7 @@
     background: var(--surface);
     border-left-color: var(--text-faint);
   }
-  .tier-secondary .rel-icon,
+  .tier-secondary :global(.rel-icon),
   .tier-secondary .rel-kind {
     color: var(--muted);
   }
