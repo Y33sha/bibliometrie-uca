@@ -60,7 +60,8 @@ def test_l_adresse_enregistree_d_un_pdf_donne_une_copie(sa_sync_conn, registered
     publication = insert_publication(sa_sync_conn, doi="10.9/abc")
     sa_sync_conn.execute(
         text(
-            "INSERT INTO dois (doi, registered_url, resolved_at) VALUES ('10.9/abc', :url, now())"
+            "INSERT INTO dois (doi, registered, registered_url, resolved_at)"
+            " VALUES ('10.9/abc', true, :url, now())"
         ),
         {"url": registered_url},
     )
