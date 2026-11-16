@@ -90,9 +90,12 @@ def to_plain_text(text: str | None) -> str:
             for ch in plain
             if ch.isspace() or unicodedata.category(ch) not in _INVISIBLE_CATEGORIES
         )
-    if not unicodedata.is_normalized("NFC", plain):
-        plain = unicodedata.normalize("NFC", plain)
-    return " ".join(plain.split())
+    return " ".join(_composed(plain).split())
+
+
+def _composed(text: str) -> str:
+    """Compose chaque diacritique combinant avec sa lettre (NFC)."""
+    return text if unicodedata.is_normalized("NFC", text) else unicodedata.normalize("NFC", text)
 
 
 def optional_plain_text(text: str | None) -> str | None:
@@ -369,7 +372,7 @@ def _undouble_backslashes(text: str) -> str:
 
 def _clean_source_text(text: str) -> str:
     """Nettoyage commun aux titres et aux résumés, hors espacement (`clean_title`)."""
-    return _decode_prose_latex_accents(_undouble_backslashes(_unescape_html(text)))
+    return _composed(_decode_prose_latex_accents(_undouble_backslashes(_unescape_html(text))))
 
 
 _ASCII_SPACES_RE = re.compile(r"[ \t\n\r\f\v]+")
@@ -377,7 +380,7 @@ _ASCII_SPACES_RE = re.compile(r"[ \t\n\r\f\v]+")
 
 
 def clean_title(title: str | None) -> str | None:
-    """Nettoie un titre à son écriture, en gardant balises et formules : entités HTML décodées, barres obliques multipliées par un échappement répété ramenées à une, accents LaTeX hors formule convertis en caractères (`Th\\'eorie` → Théorie). Les suites d'espaces ASCII se réduisent à un espace, les espaces de bordure sont retirés. Les espaces insécables restent."""
+    """Nettoie un titre à son écriture, en gardant balises et formules : entités HTML décodées, barres obliques multipliées par un échappement répété ramenées à une, accents LaTeX hors formule convertis en caractères (`Th\\'eorie` → Théorie), diacritiques combinants composés (NFC). Les suites d'espaces ASCII se réduisent à un espace, les espaces de bordure sont retirés. Les espaces insécables restent."""
     if not title:
         return title
     return _ASCII_SPACES_RE.sub(" ", _clean_source_text(title)).strip()
