@@ -42,6 +42,7 @@ __all__ = [
     "SourceHarvester",
     "run_harvest",
     "stage_document",
+    "year_range",
 ]
 
 
@@ -63,6 +64,13 @@ _SUMMARY_FORMS: dict[bool, tuple[Forms, Forms, Forms, Forms]] = {
     ),
 }
 """Mots du bilan d'une source, au masculin puis au féminin."""
+
+
+def year_range(years: list[int]) -> str:
+    """Renvoie le libellé d'une liste d'années triée : « 2020-2025 », l'année seule, ou une chaîne vide."""
+    if len(years) > 1:
+        return f"{years[0]}-{years[-1]}"
+    return str(years[0]) if years else ""
 
 
 def stage_document(
@@ -203,8 +211,7 @@ class SourceHarvester[ClientT](ABC):
                         "erreur : %s — passage à l'année suivante", e
                     )
             else:
-                year_range = f"{years[0]}-{years[-1]}" if len(years) > 1 else str(years[0])
-                progress.relabel(self._label(year_range))
+                progress.relabel(self._label(year_range(years)))
         self._write_summary(metrics)
         return metrics
 
@@ -223,10 +230,11 @@ class SourceHarvester[ClientT](ABC):
         total: int,
         harvest_step: Callable[[Progress], PhaseMetrics],
         *,
+        scope: str | None = None,
         by: str | None = None,
     ) -> PhaseMetrics:
-        """Moissonne un périmètre d'un seul tenant sous la barre de la source, puis écrit le bilan."""
-        with track_progress(total, self._label(), self.logger) as progress:
+        """Moissonne un périmètre d'un seul tenant sous la barre de la source, puis écrit le bilan. `scope` remplit la colonne du périmètre."""
+        with track_progress(total, self._label(scope), self.logger) as progress:
             metrics = harvest_step(progress)
         self._write_summary(metrics, by=by)
         return metrics

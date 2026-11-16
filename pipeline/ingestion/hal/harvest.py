@@ -13,6 +13,7 @@ from pipeline.ingestion.common.harvester import (
     HarvestWindow,
     SourceHarvester,
     stage_pages,
+    year_range,
 )
 from pipeline.ingestion.common.pages import Page
 from pipeline.ingestion.hal.api import HalClient, cursor_page
@@ -104,7 +105,9 @@ class HalHarvester(SourceHarvester[HalClient]):
                 return metrics
 
             return self._harvest_at_once(
-                client.count(build_query(years=years, since=since), fq), harvest_since
+                client.count(build_query(years=years, since=since), fq),
+                harvest_since,
+                scope=year_range(years),
             )
 
         def count_year(year: int) -> int:

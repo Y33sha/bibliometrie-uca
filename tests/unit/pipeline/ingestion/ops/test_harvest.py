@@ -1,9 +1,14 @@
 """Moissonnage OPS (`pipeline.ingestion.ops.harvest`) et décodage des réponses (`pipeline.ingestion.ops.api`)."""
 
+import logging
+
 import httpx2
 
+from pipeline.ingestion.ops import harvest as ops_harvest
 from pipeline.ingestion.ops.api import (
     OVERLOAD_PAUSE,
+    SEARCH_MAX,
+    SEARCH_PAGE,
     OpsAuth,
     SearchHit,
     application_family_path,
@@ -22,6 +27,19 @@ _FORMS = frozenset(
 def test_graphies_minimales_seules_cherchees():
     """« the univ of clermont auvergne » contient tous les mots de « univ clermont auvergne »."""
     assert search_forms(_FORMS) == ["univ clermont auvergne", "universite clermont auvergne"]
+
+
+def test_depassement_du_plafond_de_recherche_journalise(monkeypatch, caplog):
+    """OPS refuse les rangs au-delà de `SEARCH_MAX` : le total réel est signalé."""
+    monkeypatch.setattr(ops_harvest, "get_json", lambda *a, **k: {})
+    monkeypatch.setattr(ops_harvest, "search_page", lambda body: (SEARCH_MAX + 1, [_hit(())]))
+    harvester = ops_harvest.OpsHarvester(None, logging.getLogger("test_ops"), None)  # type: ignore[arg-type]
+    with caplog.at_level(logging.WARNING):
+        hits = harvester._search("univ clermont auvergne")
+    assert len(hits) == SEARCH_MAX // SEARCH_PAGE
+    assert [r.getMessage() for r in caplog.records] == [
+        f"[OPS · univ clermont auvergne] {SEARCH_MAX + 1} résultats, seuls les {SEARCH_MAX} premiers sont accessibles"
+    ]
 
 
 def _hit(applicants: tuple[str, ...], dates: tuple[str, ...] = ("20210302",)) -> SearchHit:
