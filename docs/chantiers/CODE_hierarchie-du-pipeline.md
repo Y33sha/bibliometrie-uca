@@ -51,10 +51,9 @@ Deux valeurs de la publication sont calculées à deux endroits. La consolidatio
 ### Phase 3 — Premier niveau
 
 - [ ] Arborescence cible ([annexe](CODE_hierarchie-du-pipeline_arborescence.md)), puis arbitrage de chaque écart avec l'exécution : réviser l'arborescence ou la logique
-- [ ] `fetch_truncated` dans la collecte
 - [x] Intitulés des phases dans les mots de l'arborescence, lisibles sans connaître le schéma ; `finalize` s'intitule « Données dérivées »
 - [x] Bloc de chaque phase (`Block`), affiché par l'aide de `run_pipeline` et par `pipeline_tree`
-- [ ] `fetch_missing` : étapes par source, menées en parallèle, chacune avec ses recherches par hal-id, NNT, numéro de brevet ou DOI
+- [x] `fetch_missing` : étapes par source, menées en parallèle, chacune avec ses recherches par hal-id, NNT, numéro de brevet ou DOI. Dans un groupe parallèle, les tâches d'une même source s'enchaînent dans une file.
 - [x] Relations lues au run suivant par `resolve_ra` et `fetch_missing` : délai accepté
 
 ### Phase 4 — Documentation
