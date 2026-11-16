@@ -162,7 +162,7 @@ Le chantier [alignement des auteurs](archived/2026-10-24_DATA_alignement-auteurs
 ### Phase 4 — Règles
 
 - [ ] Règles de confirmation des indices de périmètre, choisies d'après les phases 1 et 2.
-- [ ] Adresse concaténée sans indice de périmètre. Simulation le 2026-11-16 (`concat_rule.py`) : 365 contributions de 29 publications sortent du périmètre, et aucune publication.
+- [x] Adresse concaténée sans indice de périmètre : colonne `addresses.is_concatenated`, tâche `affiliations.detect_concatenated_addresses`. 0dd031ae5. Simulation le 2026-11-16 (`concat_rule.py`) : 365 contributions de 29 publications sortent du périmètre, et aucune publication.
   - 301 personnes hors RH sortent du périmètre. L'adresse place les initiales de 189 d'entre elles dans une affiliation hors périmètre. Les initiales des 112 autres sont absentes de l'adresse, tronquée par la source à 500 ou 1 000 caractères.
   - Une personne RH perd une contribution : celle d'une homonyme toulousaine.
   - 5 contributions justes sortent. 3 sont sans personne. Les 2 autres personnes restent du périmètre par d'autres contributions.
