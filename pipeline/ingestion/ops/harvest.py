@@ -73,6 +73,7 @@ class OpsHarvester(SourceHarvester[None]):
         )
 
     def _search(self, form: str) -> list[SearchHit]:
+        """Renvoie les `SEARCH_MAX` premiers résultats de la recherche de `form`, toutes dates confondues. OPS refuse les rangs suivants, donc leurs résultats sont absents du moissonnage."""
         hits: list[SearchHit] = []
         start = 1
         while start <= SEARCH_MAX:
