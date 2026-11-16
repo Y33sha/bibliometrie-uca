@@ -5,6 +5,7 @@
 	import { confirmDialog, toastError } from '#lib/dialogs.svelte.js';
 	import type { components } from '#lib/api/schema.js';
 	import { formatCount } from '#lib/plural.js';
+	import { columnLabels } from '#lib/labels.js';
 	import ListStatus from '#lib/components/ListStatus.svelte';
 
 	type Response = components['schemas']['LikelyProceedingsResponse'];
@@ -76,7 +77,7 @@
 		</colgroup>
 		<thead>
 			<tr>
-				<th>Publication en série</th><th>Éditeur</th><th>ISSN</th><th class="num">Articles de congrès</th><th></th>
+				<th>Publication en série</th><th>{columnLabels.publisher}</th><th>ISSN</th><th class="num">Articles de congrès</th><th></th>
 			</tr>
 		</thead>
 		<tbody>

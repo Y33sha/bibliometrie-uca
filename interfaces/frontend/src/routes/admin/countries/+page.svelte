@@ -16,6 +16,7 @@
 
 	import type { components } from '#lib/api/schema.js';
 	import { formatCount } from '#lib/plural.js';
+	import { sourceLabel } from '#lib/sources.svelte.js';
 	import IconButton from '#lib/components/IconButton.svelte';
 	type Address = components['schemas']['AddressForCountryAttribution'];
 	type Country = components['schemas']['CountryOut'];
@@ -23,17 +24,20 @@
 	type Facet = { value: string; count: number };
 	type AddressesResponse = { country_facets?: Facet[]; without_country?: number };
 
-	const METHOD_LABELS: Record<Method, string> = {
+	// Une méthode `source_<source>` reprend le pays donné par la source : elle porte le nom de la source.
+	const METHOD_LABELS: Record<Exclude<Method, `source_${string}`>, string> = {
 		manual: 'saisie',
 		country_name: 'nom de pays',
-		source_openalex: 'OpenAlex',
 		institution: 'institution',
 		city: 'ville',
-		source_scanr: 'ScanR',
 	};
 
+	function methodLabel(method: Method): string {
+		return method.startsWith('source_') ? sourceLabel(method.slice('source_'.length)) : METHOD_LABELS[method as keyof typeof METHOD_LABELS];
+	}
+
 	function methodsLabel(methods: Method[]): string {
-		return methods.map(m => METHOD_LABELS[m]).join(', ');
+		return methods.map(methodLabel).join(', ');
 	}
 
 	let countries: Country[] = $state([]);

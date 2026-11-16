@@ -3,7 +3,7 @@
  */
 import type { FilterGroup, ListFilter } from '#lib/filterRegistry.js';
 import { IDENTIFIER_ITEMS, PENDING_ITEMS } from '#lib/filterItems.js';
-import { personExclusionLabels, staffCategoryLabels } from '#lib/labels.js';
+import { filterLabels, personExclusionLabels, staffCategoryLabels } from '#lib/labels.js';
 import { isAdmin } from '#lib/session.svelte.js';
 
 /** Rubriques du panneau des filtres des personnes, dans l'ordre d'affichage. */
@@ -45,7 +45,7 @@ export function personFilters(labId?: number): ListFilter[] {
 		{
 			key: 'labs',
 			control: 'checkbox',
-			label: 'Laboratoires',
+			label: filterLabels.labs,
 			param: 'laboratory',
 			group: 'affiliation',
 			facet: { type: 'labeled', apiKey: 'laboratories' },

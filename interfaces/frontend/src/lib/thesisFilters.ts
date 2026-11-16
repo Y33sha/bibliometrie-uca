@@ -1,6 +1,7 @@
 /**
  * Registre des filtres de la liste des thèses. Les thèses sont des publications : elles se filtrent et se décomptent par les routes des publications.
  */
+import { THESIS_SOURCE_ITEMS } from '#lib/filterItems.js';
 import type { FilterGroup, ListFilter } from '#lib/filterRegistry.js';
 import { filterLabels } from '#lib/labels.js';
 import { labsFilter } from '#lib/publicationFilters.js';
@@ -49,12 +50,7 @@ export function thesisFilters(labId?: number): ListFilter[] {
 			label: filterLabels.sources,
 			param: 'source_filter',
 			group: 'sources',
-			items: [
-				{ key: 'hal', label: 'HAL' },
-				{ key: 'openalex', label: 'OpenAlex' },
-				{ key: 'scanr', label: 'ScanR' },
-				{ key: 'theses', label: 'theses.fr' },
-			],
+			items: THESIS_SOURCE_ITEMS,
 		},
 	];
 }
