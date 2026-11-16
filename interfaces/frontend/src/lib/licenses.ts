@@ -1,20 +1,14 @@
 import { asset } from '$app/paths';
-import { api } from '#lib/api/index.js';
+import { apiOnce } from '#lib/api/index.js';
 import type { components } from '#lib/api/schema.js';
 
 type EnumOption = components['schemas']['EnumOption'];
 
-let pending: Promise<Record<string, string>> | null = null;
-
-/** Libellés des licences, servis par `GET /api/publications/licenses` et chargés une fois par session. Un échec de chargement autorise un nouvel essai. */
+/** Libellés des licences, servis par `GET /api/publications/licenses`. */
 export function licenseLabels(): Promise<Record<string, string>> {
-	pending ??= api<EnumOption[]>('/api/publications/licenses')
-		.then((options) => Object.fromEntries(options.map((o) => [o.value, o.label_fr])))
-		.catch((e) => {
-			pending = null;
-			throw e;
-		});
-	return pending;
+	return apiOnce<EnumOption[]>('/api/publications/licenses').then((options) =>
+		Object.fromEntries(options.map((o) => [o.value, o.label_fr])),
+	);
 }
 
 /** Pictogramme d'une licence : suffixes des classes `fi-brands-*` de la police d'icônes (`glyphs`), ou logo local (`image`). Les autres licences s'affichent par leur libellé. */

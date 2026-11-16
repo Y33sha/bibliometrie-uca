@@ -1,5 +1,5 @@
 // Types de document : libellés et familles servis par l'API, couleurs locales.
-import { api } from '#lib/api/index.js';
+import { apiOnce } from '#lib/api/index.js';
 import type { components } from '#lib/api/schema.js';
 
 type DocTypeFamilyOut = components['schemas']['DocTypeFamilyOut'];
@@ -15,25 +15,22 @@ const docTypes = $state({
 	familyOf: {} as Record<string, string>,
 });
 
-let loading: Promise<void> | null = null;
-
-/** Charge les types de document une seule fois. Un échec laisse les clés brutes à l'affichage, et l'appel suivant réessaie. */
+/** Charge les types de document. Un échec laisse les clés brutes à l'affichage, et l'appel suivant réessaie. */
 export function loadDocTypes(): Promise<void> {
-	loading ??= api<DocTypeFamilyOut[]>('/api/publications/doc-types')
-		.then((families) => {
-			const types = families.flatMap((f) => f.types.map((t) => ({ ...t, family: f.key })));
-			docTypes.families = families.map((f) => ({ key: f.key, label: f.label, types: f.types.map((t) => t.value) }));
-			docTypes.singular = Object.fromEntries(types.map((t) => [t.value, t.label]));
-			docTypes.plural = Object.fromEntries(types.map((t) => [t.value, t.plural_label]));
-			docTypes.familyOf = Object.fromEntries(types.map((t) => [t.value, t.family]));
-		})
-		.catch(() => {
-			loading = null;
-		})
+	return apiOnce<DocTypeFamilyOut[]>('/api/publications/doc-types')
+		.then(
+			(families) => {
+				const types = families.flatMap((f) => f.types.map((t) => ({ ...t, family: f.key })));
+				docTypes.families = families.map((f) => ({ key: f.key, label: f.label, types: f.types.map((t) => t.value) }));
+				docTypes.singular = Object.fromEntries(types.map((t) => [t.value, t.label]));
+				docTypes.plural = Object.fromEntries(types.map((t) => [t.value, t.plural_label]));
+				docTypes.familyOf = Object.fromEntries(types.map((t) => [t.value, t.family]));
+			},
+			() => {},
+		)
 		.finally(() => {
 			docTypes.loaded = true;
 		});
-	return loading;
 }
 
 /** Le premier chargement est terminé, réussi ou non. */

@@ -2,7 +2,7 @@
   // Volet d'édition d'une publication en série, réservé à la session admin : titre, type, modèle OA, caractère académique et fusion.
   import { onMount } from "svelte";
   import { resolve } from "$app/paths";
-  import { api, errorMessage, serials as serialsApi } from "#lib/api/index.js";
+  import { api, apiOnce, errorMessage, serials as serialsApi } from "#lib/api/index.js";
   import { autofocus } from "#lib/actions/focus.js";
   import { useDebouncedSearch } from "#lib/composables/useDebouncedSearch.svelte.js";
   import { useDrawerEntity } from "#lib/composables/useDrawerEntity.svelte.js";
@@ -63,8 +63,8 @@
 
   onMount(async () => {
     [serialTypes, oaModels] = await Promise.all([
-      api<EnumOption[]>("/api/serials/types"),
-      api<EnumOption[]>("/api/serials/oa-models"),
+      apiOnce<EnumOption[]>("/api/serials/types"),
+      apiOnce<EnumOption[]>("/api/serials/oa-models"),
     ]);
   });
 

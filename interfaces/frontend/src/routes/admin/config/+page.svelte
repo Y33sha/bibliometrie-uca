@@ -7,7 +7,7 @@
   import { activeTabId, type TabDef } from "#lib/tabs.js";
   import { page } from "$app/state";
   import { onMount } from "svelte";
-  import { api, errorMessage, latestRequest, config as configApi, perimeters as perimetersApi } from "#lib/api/index.js";
+  import { api, apiOnce, errorMessage, latestRequest, config as configApi, perimeters as perimetersApi } from "#lib/api/index.js";
   import { STRUCTURE_TYPES } from "#lib/structureTypes.js";
   import { structureLabel } from "#lib/structureLabels.js";
   import { confirmDialog, toast } from "#lib/dialogs.svelte.js";
@@ -226,7 +226,7 @@
   async function loadCountries() {
     [perimeterCountries, countries] = await Promise.all([
       api<PerimeterCountry[]>("/api/perimeters/countries"),
-      api<Country[]>("/api/countries"),
+      apiOnce<Country[]>("/api/countries"),
     ]);
   }
 

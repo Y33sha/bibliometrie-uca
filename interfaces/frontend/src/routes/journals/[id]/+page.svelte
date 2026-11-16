@@ -5,7 +5,7 @@
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import { onMount, tick } from 'svelte';
-	import { api, apiDetail } from '#lib/api/index.js';
+	import { apiDetail, apiOnce } from '#lib/api/index.js';
 	import { issnLabel, serialRelationLabels } from '#lib/labels.js';
 	import TabNav from '#lib/components/TabNav.svelte';
 	import { activeTabId, type TabDef } from '#lib/tabs.js';
@@ -67,7 +67,7 @@
 
 	onMount(async () => {
 		const labelMap = (opts: EnumOption[]) => Object.fromEntries(opts.map((o) => [o.value, o.label_fr]));
-		const oaModelLabelsP = api<EnumOption[]>('/api/serials/oa-models').then((opts) => {
+		const oaModelLabelsP = apiOnce<EnumOption[]>('/api/serials/oa-models').then((opts) => {
 			oaModelLabels = labelMap(opts);
 		});
 		await Promise.all([loadSerial(), oaModelLabelsP]);

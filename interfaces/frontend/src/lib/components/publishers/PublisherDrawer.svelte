@@ -4,7 +4,7 @@
   import { formatCount } from "#lib/plural.js";
   import { onMount } from "svelte";
   import { resolve } from "$app/paths";
-  import { api, ApiError, errorMessage, publishers as publishersApi } from "#lib/api/index.js";
+  import { api, apiOnce, ApiError, errorMessage, publishers as publishersApi } from "#lib/api/index.js";
   import { autofocus } from "#lib/actions/focus.js";
   import { useDebouncedSearch } from "#lib/composables/useDebouncedSearch.svelte.js";
   import { useDrawerEntity } from "#lib/composables/useDrawerEntity.svelte.js";
@@ -74,8 +74,8 @@
 
   onMount(async () => {
     [publisherTypes, countries] = await Promise.all([
-      api<EnumOption[]>("/api/publishers/types"),
-      api<Country[]>("/api/countries"),
+      apiOnce<EnumOption[]>("/api/publishers/types"),
+      apiOnce<Country[]>("/api/countries"),
     ]);
   });
 

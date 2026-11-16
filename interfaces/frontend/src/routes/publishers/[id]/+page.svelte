@@ -3,7 +3,7 @@
 	import EntityStatus from '#lib/components/EntityStatus.svelte';
 	import { page } from '$app/state';
 	import { onMount, tick } from 'svelte';
-	import { api, apiDetail } from '#lib/api/index.js';
+	import { apiDetail, apiOnce } from '#lib/api/index.js';
 	import TabNav from '#lib/components/TabNav.svelte';
 	import { activeTabId, type TabDef } from '#lib/tabs.js';
 	import PublicationsListView from '#lib/components/PublicationsListView.svelte';
@@ -53,7 +53,7 @@
 	}
 
 	async function loadTypeLabels() {
-		const publicationOptions = await api<EnumOption[]>('/api/publishers/types');
+		const publicationOptions = await apiOnce<EnumOption[]>('/api/publishers/types');
 		publisherTypeLabels = Object.fromEntries(publicationOptions.map((o) => [o.value, o.label_fr]));
 	}
 

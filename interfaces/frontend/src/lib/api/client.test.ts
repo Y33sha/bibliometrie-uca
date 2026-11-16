@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ApiError, api, apiDetail, errorMessage, latestRequest, post, put, patch, del } from './client';
+import { ApiError, api, apiDetail, apiOnce, errorMessage, latestRequest, post, put, patch, del } from './client';
 
 type RequeteEnVol = {
 	url: string;
@@ -276,5 +276,29 @@ describe('apiDetail', () => {
 		await toursDeBoucle();
 		enVol[0].resoudre(reponseJson({ id: 7 }));
 		expect(await promesse).toEqual({ id: 7 });
+	});
+});
+
+describe('apiOnce', () => {
+	it('envoie une seule requête par URL et partage sa réponse', async () => {
+		const premier = apiOnce('/api/once/partage');
+		const second = apiOnce('/api/once/partage');
+		await toursDeBoucle();
+		expect(enVol).toHaveLength(1);
+		enVol[0].resoudre(reponseJson([1, 2]));
+		expect(await premier).toEqual([1, 2]);
+		expect(await second).toEqual([1, 2]);
+	});
+
+	it('envoie une nouvelle requête après un échec', async () => {
+		const echec = apiOnce('/api/once/echec');
+		await toursDeBoucle();
+		enVol[0].resoudre(reponseJson({ detail: 'erreur' }, 500));
+		await expect(echec).rejects.toBeInstanceOf(ApiError);
+		const reprise = apiOnce('/api/once/echec');
+		await toursDeBoucle();
+		expect(enVol).toHaveLength(2);
+		enVol[1].resoudre(reponseJson('ok'));
+		expect(await reprise).toBe('ok');
 	});
 });
