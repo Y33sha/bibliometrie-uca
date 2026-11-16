@@ -81,7 +81,7 @@ Mesures du 2026-11-03, base locale, publications du périmètre : 199 errata sur
 
 - [x] `update-to` (erratum ou avis) et `updated-by` (article) de Crossref gardés dans `source_extras`. Oneshot `write_crossref_updates` depuis le raw store pour le stock : 896 enregistrements sources, 451 sans payload au raw store. Errata et avis Crossref sans relation : article en base pour 44 errata et 7 avis de rétractation, absent pour 16 errata et 4 avis, surtout antérieurs à 2017. 7d90f4e20, 140fc212d
 - [x] Phase `relations` : correction, rétractation et avis de préoccupation tirés de `update-to` et `updated-by`, vers un DOI absent de la base compris. Avis absents de la base, connus par `updated-by`, y compris d'après Retraction Watch : 10.1038/s41467-017-00508-5, 10.1016/j.biortech.2018.03.127, 10.1016/j.biortech.2018.11.031. d434701c3
-- [ ] Errata WoS sans DOI : référence de l'article (« vol 21 283 2020 ») retirée du titre avant le rapprochement. 74 errata trouvent un seul article, 8 plusieurs, 32 aucun.
+- [x] Errata WoS : titre WoS sans la référence de l'article (« (vol 21, pg 283, 2020) ») comparé au titre des publications, année de l'article lue dans la référence. Base locale : 169 errata reliés, dont 37 sans relation auparavant. 28 errata sans relation corrigent un article absent de la base. 074342de7
 - [ ] Avis de rétractation rapprochés par le titre. Cas : avis 210139 et article 15199, avis sans payload Crossref.
 - [ ] « Rétracté » fondé sur les relations et sur OpenAlex, faux pour les avis eux-mêmes. Rétractation sur place par Elsevier : titre « RETRACTED: », `update-to` vers le DOI de l'article lui-même (10.1016/j.indmarman.2022.05.009).
 - [ ] Erratum et rétractation hors des listes de documents, affichés sur la publication concernée.
