@@ -1,6 +1,6 @@
 # Hiérarchie du pipeline — arborescence cible
 
-Annexe de la fiche [Hiérarchie du pipeline](CODE_hierarchie-du-pipeline.md). L'arborescence vise seulement la lisibilité. Chaque élément a sa phrase d'entrées → sorties. Les noms entre parenthèses désignent les phases et les tâches actuelles.
+Annexe de la fiche [Hiérarchie du pipeline](2026-11-16_CODE_hierarchie-du-pipeline.md). L'arborescence vise seulement la lisibilité. Chaque élément a sa phrase d'entrées → sorties. Les noms entre parenthèses désignent les phases et les tâches actuelles.
 
 ## Arborescence
 
