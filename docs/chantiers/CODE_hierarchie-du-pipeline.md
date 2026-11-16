@@ -50,7 +50,7 @@ Deux valeurs de la publication sont calculées à deux endroits. La consolidatio
 
 ### Phase 3 — Premier niveau
 
-- [ ] Arborescence cible ([annexe](CODE_hierarchie-du-pipeline_arborescence.md)), puis arbitrage de chaque écart avec l'exécution : réviser l'arborescence ou la logique
+- [x] Arborescence cible ([annexe](CODE_hierarchie-du-pipeline_arborescence.md)), puis arbitrage de chaque écart avec l'exécution : réviser l'arborescence ou la logique
 - [x] Intitulés des phases dans les mots de l'arborescence, lisibles sans connaître le schéma ; `finalize` s'intitule « Données dérivées »
 - [x] Bloc de chaque phase (`Block`), affiché par l'aide de `run_pipeline` et par `pipeline_tree`
 - [x] `fetch_missing` : étapes par source, menées en parallèle, chacune avec ses recherches par hal-id, NNT, numéro de brevet ou DOI. Dans un groupe parallèle, les tâches d'une même source s'enchaînent dans une file.
@@ -58,9 +58,9 @@ Deux valeurs de la publication sont calculées à deux endroits. La consolidatio
 
 ### Phase 4 — Documentation
 
-- [ ] `docs/pipeline/01-vue-d-ensemble.md` : arborescence du pipeline
-- [ ] `docs/pipeline/04-affiliations.md` et `docs/pipeline/11-enrichissements.md` : pays dans la phase `affiliations`
-- [ ] `docs/pipeline/05-publishing.md` : `merge_duplicate_monographs` absent des tâches, `attach_publishers` et `attach_monographs` absents de la page
-- [ ] `docs/pipeline/07-publications.md` : file de consolidation et tâche `consolidate`
-- [ ] `docs/pipeline/11-enrichissements.md` et page d'`oa_status` : phase avant `publications`, DOI candidats, mise en file
-- [ ] `CLAUDE.md` : liste des phases
+- [x] `docs/pipeline/01-vue-d-ensemble.md` : arborescence du pipeline
+- [x] `docs/pipeline/04-affiliations.md` et `docs/pipeline/11-enrichissements.md` : pays dans la phase `affiliations`
+- [x] `docs/pipeline/05-publishing.md` : phase `dois`, étapes de `publishing`
+- [x] `docs/pipeline/07-publications.md` : file de consolidation, tâche `consolidate`, statut open access
+- [x] `docs/sources`, `docs/donnees` : renvois aux phases `dois` et `affiliations`
+- [x] `CLAUDE.md` : liste des phases
