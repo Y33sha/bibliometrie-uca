@@ -76,8 +76,10 @@ Le chantier [alignement des auteurs](archived/2026-10-24_DATA_alignement-auteurs
   | seul l'enregistrement éditeur compte | 71 | 0 |
   | les deux règles | 89 | 0 |
   | OpenAlex jamais seul | 309 | 12 |
-- [ ] Enregistrements sources OpenAlex dont toutes les contributions sources ont les mêmes affiliations, confrontés aux autres sources de la publication.
-- [ ] Adresses issues d'une erreur de parsing (publication 106296).
+- [x] Enregistrements sources OpenAlex dont toutes les contributions sources ont les mêmes adresses, le 2026-11-16 (`openalex_same_addresses.sql`). Sur 63 502 enregistrements OpenAlex de plusieurs auteurs, 3 670 donnent à tous la même adresse et 1 216 le même ensemble de plusieurs adresses. Ils ont presque tous 10 auteurs au plus. Une autre source de la contribution confirme leurs indices de périmètre dans 89 % et 92 % des cas, contre 90 % pour les autres enregistrements OpenAlex. Ce motif est sans lien avec les erreurs d'affiliation.
+- [x] Adresses concaténées par une erreur de parsing, le 2026-11-16 (`concatenated_addresses.sql`). Dans la publication 106296, l'adresse OpenAlex est la note d'affiliations entière, avec les initiales des auteurs (« (D.S., P.C.) »). Elle met 28 auteurs dans le périmètre. Une adresse à au moins deux groupes d'initiales est concaténée : 178 adresses, dans Crossref, OpenAlex et scanR.
+  - Dans 420 contributions de 30 publications, une contribution source est du périmètre par une adresse concaténée seule. Une autre source, sans adresse concaténée, en confirme 142.
+  - 278 contributions restent sans confirmation. Elles sont le seul appui au périmètre de 234 personnes hors RH. Les 30 publications sont du périmètre par d'autres indices.
 
 ### Phase 2 — INSPIRE-HEP
 
@@ -130,7 +132,7 @@ Le chantier [alignement des auteurs](archived/2026-10-24_DATA_alignement-auteurs
 - [x] Profil de la source, adaptateur, client de l'API, moissonnage par institution. 8763385ca
 - [x] Normalisation : enregistrement source (DOI, DOI arXiv, identifiant CDS), contributions sources (nom, ORCID, institution). 8763385ca
 - [x] Relecture par numéro de fiche (`fetch_stale`). 8763385ca
-- [x] Numéros d'institution INSPIRE dans `api_ids` et noms d'institution INSPIRE dans les formes de nom des structures du périmètre, le 2026-11-07 sur la base locale. À reproduire sur la base de prod.
+- [x] Numéros d'institution INSPIRE dans `api_ids` et noms d'institution INSPIRE dans les formes de nom des structures du périmètre.
 
   | Structure | Numéros d'institution INSPIRE (nom INSPIRE) |
   |---|---|
