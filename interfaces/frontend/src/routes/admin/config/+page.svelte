@@ -7,10 +7,10 @@
   import { activeTabId, type TabDef } from "#lib/tabs.js";
   import { page } from "$app/state";
   import { onMount } from "svelte";
-  import { api, apiOnce, errorMessage, latestRequest, config as configApi, perimeters as perimetersApi } from "#lib/api/index.js";
+  import { api, apiOnce, latestRequest, config as configApi, perimeters as perimetersApi } from "#lib/api/index.js";
   import { STRUCTURE_TYPES } from "#lib/structureTypes.js";
   import { structureLabel } from "#lib/structureLabels.js";
-  import { confirmDialog, toast } from "#lib/dialogs.svelte.js";
+  import { confirmDialog, toastError } from "#lib/dialogs.svelte.js";
   import Modal from "#lib/components/Modal.svelte";
   import Tooltip from "#lib/components/Tooltip.svelte";
   import { autofocus } from "#lib/actions/focus.js";
@@ -95,7 +95,7 @@
       perimModal = null;
       await load();
     } catch (e) {
-      toast(errorMessage(e), "error");
+      toastError(e);
     }
   }
 
@@ -105,7 +105,7 @@
       await perimetersApi.remove(id);
       await load();
     } catch (e) {
-      toast(errorMessage(e), "error");
+      toastError(e);
     }
   }
 
@@ -207,7 +207,7 @@
       applyBrandHue(saved.value as number);
       await load();
     } catch (e) {
-      toast("Erreur : " + errorMessage(e), "error");
+      toastError(e);
       if (institution.brandHue !== null) previewBrandHue(institution.brandHue);
     }
     hueDraft = null;
@@ -235,7 +235,7 @@
       await configApi.setValue(INSTITUTION_COUNTRY_KEY, code);
       await load();
     } catch (e) {
-      toast("Erreur : " + errorMessage(e), "error");
+      toastError(e);
     }
   }
 
@@ -244,7 +244,7 @@
     try {
       await configApi.setValue(LABORATORY_TYPES_KEY, next);
     } catch (e) {
-      toast("Erreur : " + errorMessage(e), "error");
+      toastError(e);
     }
     await load();
   }
@@ -301,7 +301,7 @@
       editingKey = null;
       await load();
     } catch (e) {
-      toast("Erreur : " + errorMessage(e), "error");
+      toastError(e);
     }
     saving = false;
   }

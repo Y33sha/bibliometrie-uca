@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { api, errorMessage, persons as personsApi } from '#lib/api/index.js';
-	import { toast } from '#lib/dialogs.svelte.js';
+	import { toast, toastError } from '#lib/dialogs.svelte.js';
 	import { useDebouncedSearch } from '#lib/composables/useDebouncedSearch.svelte.js';
 	import { useDrawerEntity } from '#lib/composables/useDrawerEntity.svelte.js';
 	import type { components } from '#lib/api/schema.js';
@@ -106,7 +106,7 @@
 		try {
 			await personsApi.rename(id, lastName, firstName);
 		} catch (e) {
-			toast(errorMessage(e), 'error');
+			toastError(e);
 			return false;
 		}
 		await refreshAfterChange();
@@ -189,7 +189,7 @@
 		try {
 			await personsApi.merge(personId, otherId);
 		} catch (e) {
-			toast(`Fusion impossible : ${errorMessage(e)}`, 'error');
+			toastError(e, 'Fusion impossible');
 			return;
 		}
 		await refreshAfterChange();

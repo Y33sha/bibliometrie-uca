@@ -9,8 +9,8 @@
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
-	import { api, ApiError, errorMessage, orphanContributions } from '#lib/api/index.js';
-	import { toast } from '#lib/dialogs.svelte.js';
+	import { api, ApiError, orphanContributions } from '#lib/api/index.js';
+	import { toast, toastError } from '#lib/dialogs.svelte.js';
 	import { useDebouncedSearch } from '#lib/composables/useDebouncedSearch.svelte.js';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
 	import { formatDate, titleCase } from '#lib/utils.js';
@@ -100,7 +100,7 @@
 		try {
 			await run();
 		} catch (e) {
-			toast(`Attribution refusée : ${errorMessage(e)}`, 'error', 8000);
+			toastError(e, 'Attribution refusée', 8000);
 		}
 	}
 

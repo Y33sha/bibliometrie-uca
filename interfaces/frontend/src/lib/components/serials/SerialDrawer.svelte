@@ -2,11 +2,11 @@
   // Volet d'édition d'une publication en série, réservé à la session admin : titre, type, modèle OA, caractère académique et fusion.
   import { onMount } from "svelte";
   import { resolve } from "$app/paths";
-  import { api, apiOnce, errorMessage, serials as serialsApi } from "#lib/api/index.js";
+  import { api, apiOnce, serials as serialsApi } from "#lib/api/index.js";
   import { autofocus } from "#lib/actions/focus.js";
   import { useDebouncedSearch } from "#lib/composables/useDebouncedSearch.svelte.js";
   import { useDrawerEntity } from "#lib/composables/useDrawerEntity.svelte.js";
-  import { confirmDialog, toast } from "#lib/dialogs.svelte.js";
+  import { confirmDialog, toastError } from "#lib/dialogs.svelte.js";
   import { issnLabel } from "#lib/labels.js";
   import Drawer from "#lib/components/Drawer.svelte";
   import IconButton from "#lib/components/IconButton.svelte";
@@ -72,7 +72,7 @@
     try {
       await serialsApi.update(id, body);
     } catch (e) {
-      toast(errorMessage(e), "error");
+      toastError(e);
       return false;
     }
     await entity.reload();
@@ -106,7 +106,7 @@
         }
       }
     } catch (e) {
-      toast("Erreur lors du calcul d'impact : " + errorMessage(e), "error");
+      toastError(e, "Calcul d'impact impossible");
       select.value = previous;
       return;
     }

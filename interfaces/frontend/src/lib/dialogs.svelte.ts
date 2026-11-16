@@ -4,7 +4,10 @@
  * Usage :
  *   if (!(await confirmDialog({ message: '…', danger: true }))) return;
  *   toast('Enregistré', 'success');
+ *   toastError(e, 'Fusion impossible');
  */
+
+import { errorMessage } from '#lib/api/client.js';
 
 interface ConfirmOptions {
 	message: string;
@@ -56,6 +59,12 @@ export function toast(message: string, type: ToastType = 'info', ttlMs = 3500): 
 	const id = nextId++;
 	toasts = [...toasts, { id, message, type }];
 	setTimeout(() => dismissToast(id), ttlMs);
+}
+
+/** Signale une erreur. `action` nomme l'opération en échec, devant le message : « Fusion impossible : … ». */
+export function toastError(e: unknown, action?: string, ttlMs?: number): void {
+	const message = errorMessage(e);
+	toast(action ? `${action} : ${message}` : message, 'error', ttlMs);
 }
 
 export function dismissToast(id: number): void {

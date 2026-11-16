@@ -1,8 +1,8 @@
 <script lang="ts" generics="Group">
 	import { untrack, type Snippet } from 'svelte';
 	import { resolve } from '$app/paths';
-	import { errorMessage } from '#lib/api/index.js';
-	import { confirmDialog, toast } from '#lib/dialogs.svelte.js';
+	import {  } from '#lib/api/index.js';
+	import { confirmDialog, toastError } from '#lib/dialogs.svelte.js';
 	import type { components } from '#lib/api/schema.js';
 	import { mergeSerial } from '#lib/components/serials/mergeSerial.js';
 	import ListStatus from '#lib/components/ListStatus.svelte';
@@ -39,7 +39,7 @@
 		try {
 			groups = await fetchGroups();
 		} catch (e) {
-			toast('Erreur lors du chargement de la file : ' + errorMessage(e), 'error');
+			toastError(e, "Chargement de la file impossible");
 		} finally {
 			loading = false;
 		}

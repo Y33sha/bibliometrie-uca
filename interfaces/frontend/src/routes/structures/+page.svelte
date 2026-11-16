@@ -12,12 +12,12 @@
 	import { columnLabels } from '#lib/labels.js';
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
-	import { structures as structuresApi, errorMessage } from '#lib/api/index.js';
+	import { structures as structuresApi } from '#lib/api/index.js';
 	import { useFacets } from '#lib/composables/useFacets.svelte.js';
 	import { useFilteredList } from '#lib/composables/useFilteredList.svelte.js';
 	import { facetDefs } from '#lib/filterRegistry.js';
 	import { STRUCTURE_FILTER_GROUPS, structureFilters } from '#lib/structureFilters.js';
-	import { toast } from '#lib/dialogs.svelte.js';
+	import { toast, toastError } from '#lib/dialogs.svelte.js';
 	import { isAdmin } from '#lib/session.svelte.js';
 	import { nextSort, sortDirection } from '#lib/sort.js';
 	import { halCollectionUrl } from '#lib/utils.js';
@@ -114,7 +114,7 @@
 			list.listing.load();
 			drawer.open(created.id);
 		} catch (e) {
-			toast('Erreur: ' + errorMessage(e), 'error');
+			toastError(e);
 		}
 	}
 

@@ -5,7 +5,7 @@
   import KeyFigures from '#lib/components/KeyFigures.svelte';
   import { onMount } from "svelte";
   import { useUrlFilters } from "#lib/composables/useUrlFilters.svelte.js";
-  import { api, nameForms, structures as structuresApi, errorMessage } from "#lib/api/index.js";
+  import { api, nameForms, structures as structuresApi } from "#lib/api/index.js";
   import { deriveStructDetectionStatus, formatNumber, formatPercent } from "#lib/utils.js";
   import { structureLabel } from "#lib/structureLabels.js";
   import { groupStructuresByType, structureGroupLabel } from "#lib/structureTypes.js";
@@ -14,7 +14,7 @@
   import Pagination from "#lib/components/Pagination.svelte";
   import { usePaginatedFetch } from "#lib/composables/usePaginatedFetch.svelte.js";
   import { autofocus } from "#lib/actions/focus.js";
-  import { confirmDialog, toast } from '#lib/dialogs.svelte.js';
+  import { confirmDialog, toastError } from '#lib/dialogs.svelte.js';
   import IconButton from "#lib/components/IconButton.svelte";
   import StructureDrawer from "#lib/components/structures/StructureDrawer.svelte";
   import { useDrawerParam } from "#lib/composables/useDrawerParam.svelte.js";
@@ -151,7 +151,7 @@
       await nameForms.remove(formId);
       loadTable();
     } catch (e) {
-      toast("Erreur : " + errorMessage(e), 'error');
+      toastError(e);
     }
   }
 
@@ -184,7 +184,7 @@
       await nameForms.update(formId, { requires_context_of: ctx });
       loadTable();
     } catch (e) {
-      toast("Erreur : " + errorMessage(e), 'error');
+      toastError(e);
     }
   }
 

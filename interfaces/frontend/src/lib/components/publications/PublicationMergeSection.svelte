@@ -1,12 +1,12 @@
 <script lang="ts">
   import { untrack } from "svelte";
   import { resolve } from "$app/paths";
-  import { errorMessage, publications as publicationsApi } from "#lib/api/index.js";
+  import { publications as publicationsApi } from "#lib/api/index.js";
   import type { MergeCandidate } from "#lib/api/publications.js";
   import PublicationTitle from "#lib/components/PublicationTitle.svelte";
   import SourceTag from "#lib/components/SourceTag.svelte";
   import { useDebouncedSearch } from "#lib/composables/useDebouncedSearch.svelte.js";
-  import { confirmDialog, toast } from "#lib/dialogs.svelte.js";
+  import { confirmDialog, toast, toastError } from "#lib/dialogs.svelte.js";
 
   // `onmerged` reçoit la publication conservée, qui peut être l'autre publication.
   let {
@@ -72,7 +72,7 @@
       toast("Publications fusionnées", "success");
       onmerged(result.publication_id);
     } catch (e) {
-      toast(`Fusion impossible : ${errorMessage(e)}`, "error");
+      toastError(e, "Fusion impossible");
     } finally {
       merging = false;
     }

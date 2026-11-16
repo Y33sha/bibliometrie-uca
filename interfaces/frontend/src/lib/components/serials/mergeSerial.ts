@@ -1,5 +1,5 @@
-import { errorMessage, serials as serialsApi } from '#lib/api/index.js';
-import { confirmDialog, toast } from '#lib/dialogs.svelte.js';
+import { serials as serialsApi } from '#lib/api/index.js';
+import { confirmDialog, toastError } from '#lib/dialogs.svelte.js';
 import { formatCount } from '#lib/plural.js';
 
 /**
@@ -18,14 +18,14 @@ export async function mergeSerial(
 			if (!(await confirmDialog({ message: msg, danger: true }))) return false;
 		}
 	} catch (e) {
-		toast("Erreur lors du calcul d'impact : " + errorMessage(e), 'error');
+		toastError(e, "Calcul d'impact impossible");
 		return false;
 	}
 	try {
 		await serialsApi.merge(target.id, sourceId);
 		return true;
 	} catch (e) {
-		toast(errorMessage(e), 'error');
+		toastError(e);
 		return false;
 	}
 }

@@ -5,8 +5,8 @@
   import { useDrawerEntity } from "#lib/composables/useDrawerEntity.svelte.js";
   import { onMount, onDestroy } from "svelte";
   import { resolve } from "$app/paths";
-  import { api, errorMessage, nameForms, structures as structuresApi } from "#lib/api/index.js";
-  import { confirmDialog, toast } from "#lib/dialogs.svelte.js";
+  import { api, nameForms, structures as structuresApi } from "#lib/api/index.js";
+  import { confirmDialog, toast, toastError } from "#lib/dialogs.svelte.js";
   import {
     ROR_FORMAT_ERROR,
     SHORT_FORM_MAX_LENGTH,
@@ -207,7 +207,7 @@
         requires_context_of: ctx,
       });
     } catch (e) {
-      toast(errorMessage(e), "error");
+      toastError(e);
       return;
     }
     addFormText = "";
@@ -222,7 +222,7 @@
     try {
       await nameForms.remove(formId);
     } catch (e) {
-      toast("Erreur suppression: " + errorMessage(e), "error");
+      toastError(e, "Suppression impossible");
       return;
     }
     await reloadAfterFormChange();
@@ -382,7 +382,7 @@
       refreshCache();
       onchange();
     } catch (e) {
-      toast("Erreur: " + errorMessage(e), "error");
+      toastError(e);
     }
   }
 

@@ -8,10 +8,10 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
-	import { addresses as addressesApi, api, errorMessage, structures as structuresApi } from '#lib/api/index.js';
+	import { addresses as addressesApi, api, structures as structuresApi } from '#lib/api/index.js';
 	import AddressPublications from '#lib/components/AddressPublications.svelte';
 	import PublicationCountButton from '#lib/components/PublicationCountButton.svelte';
-	import { toast } from '#lib/dialogs.svelte.js';
+	import { toastError } from '#lib/dialogs.svelte.js';
 	import ListStatus from '#lib/components/ListStatus.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
@@ -237,7 +237,7 @@
 			if (!keep) list.total--;
 			loadStats();
 		} catch (e) {
-			toast(`Erreur : ${errorMessage(e)}`, 'error');
+			toastError(e);
 		}
 	}
 

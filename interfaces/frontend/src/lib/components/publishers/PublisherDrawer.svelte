@@ -4,11 +4,11 @@
   import { formatCount } from "#lib/plural.js";
   import { onMount } from "svelte";
   import { resolve } from "$app/paths";
-  import { api, apiOnce, ApiError, errorMessage, publishers as publishersApi } from "#lib/api/index.js";
+  import { api, apiOnce, ApiError, publishers as publishersApi } from "#lib/api/index.js";
   import { autofocus } from "#lib/actions/focus.js";
   import { useDebouncedSearch } from "#lib/composables/useDebouncedSearch.svelte.js";
   import { useDrawerEntity } from "#lib/composables/useDrawerEntity.svelte.js";
-  import { confirmDialog, toast } from "#lib/dialogs.svelte.js";
+  import { confirmDialog, toastError } from "#lib/dialogs.svelte.js";
   import Drawer from "#lib/components/Drawer.svelte";
   import IconButton from "#lib/components/IconButton.svelte";
   import Picker from "#lib/components/Picker.svelte";
@@ -83,7 +83,7 @@
     try {
       await publishersApi.update(id, body);
     } catch (e) {
-      toast(errorMessage(e), "error");
+      toastError(e);
       return false;
     }
     await entity.reload();
@@ -127,7 +127,7 @@
         closeMerge();
         blocking = { detail: body.detail ?? "", serials: body.blocking_serials };
       } else {
-        toast(errorMessage(e), "error");
+        toastError(e);
       }
       return;
     }
