@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { sectionLabels } from '#lib/labels.js';
 	import { formatNumber } from '#lib/utils.js';
 	import EntityBreadcrumb from '#lib/components/EntityBreadcrumb.svelte';
 	import EntityStatus from '#lib/components/EntityStatus.svelte';
@@ -133,7 +134,7 @@
 </script>
 
 <EntityBreadcrumb
-	section={{ label: 'Labos', path: 'structures' }}
+	section={{ label: sectionLabels.structures, path: 'structures' }}
 	name={lab?.acronym || lab?.name}
 	title={lab ? structureLabel(lab) : null}
 	fallback="Structure"

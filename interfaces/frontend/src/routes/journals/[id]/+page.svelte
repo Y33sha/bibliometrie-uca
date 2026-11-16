@@ -6,7 +6,7 @@
 	import { resolve } from '$app/paths';
 	import { onMount, tick } from 'svelte';
 	import { apiDetail, apiOnce } from '#lib/api/index.js';
-	import { issnLabel, serialRelationLabels } from '#lib/labels.js';
+	import { issnLabel, serialRelationLabels, sectionLabels } from '#lib/labels.js';
 	import TabNav from '#lib/components/TabNav.svelte';
 	import { activeTabId, type TabDef } from '#lib/tabs.js';
 	import PublicationsListView from '#lib/components/PublicationsListView.svelte';
@@ -87,7 +87,7 @@
 	}
 </script>
 
-<EntityBreadcrumb section={{ label: 'Publications en série', path: 'journals' }} name={journal?.title} fallback="Publication en série" />
+<EntityBreadcrumb section={{ label: sectionLabels.journals, path: 'journals' }} name={journal?.title} fallback="Publication en série" />
 
 {#if error || !journal}
 	<EntityStatus {error} notFound="Publication en série introuvable" />

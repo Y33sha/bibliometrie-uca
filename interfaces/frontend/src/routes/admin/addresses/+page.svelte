@@ -17,7 +17,7 @@
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
 	import { structureLabel } from '#lib/structureLabels.js';
 	import { groupStructuresByType, structureGroupLabel } from '#lib/structureTypes.js';
-	import { structDetectionClasses } from '#lib/labels.js';
+	import { structDetectionClasses, sectionLabels } from '#lib/labels.js';
 
 	// ---- Type definitions ----
 
@@ -403,7 +403,7 @@
 	});
 </script>
 
-<PageHeader title="Affiliations" hidden />
+<PageHeader title={sectionLabels['admin/addresses']} hidden />
 
 <div class="page-addresses">
 	<!-- Structure selection + feedback button -->

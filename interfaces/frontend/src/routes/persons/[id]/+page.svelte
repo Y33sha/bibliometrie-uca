@@ -1,7 +1,7 @@
 <script lang="ts">
 	import EntityBreadcrumb from '#lib/components/EntityBreadcrumb.svelte';
 	import EntityStatus from '#lib/components/EntityStatus.svelte';
-	import { columnLabels } from '#lib/labels.js';
+	import { columnLabels, sectionLabels } from '#lib/labels.js';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import { onMount } from 'svelte';
@@ -186,7 +186,7 @@
 
 </script>
 
-<EntityBreadcrumb section={{ label: 'Chercheurs', path: 'persons' }} name={displayName} fallback="Personne" />
+<EntityBreadcrumb section={{ label: sectionLabels.persons, path: 'persons' }} name={displayName} fallback="Personne" />
 
 {#if error || !profile}
 	<EntityStatus {error} notFound="Personne introuvable" />

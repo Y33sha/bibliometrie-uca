@@ -12,7 +12,7 @@
   import { useFacets } from "#lib/composables/useFacets.svelte.js";
   import { useFilteredList } from "#lib/composables/useFilteredList.svelte.js";
   import { facetDefs } from "#lib/filterRegistry.js";
-  import { subjectVocabularyLabels } from "#lib/labels.js";
+  import { subjectVocabularyLabels, sectionLabels } from "#lib/labels.js";
   import { nextSort, sortDirection } from "#lib/sort.js";
   import { SUBJECT_FILTER_GROUPS, SUBJECT_FILTERS } from "#lib/subjectFilters.js";
   import ListStatus from "#lib/components/ListStatus.svelte";
@@ -47,7 +47,7 @@
   onMount(list.restore);
 </script>
 
-<PageHeader title="Sujets" hidden />
+<PageHeader title={sectionLabels.subjects} hidden />
 
 <ListToolbar bind:search={list.search} placeholder="Rechercher dans les libellés" onsearch={list.onSearchInput} list={list.listing} one="sujet" many="sujets" exportUrl={list.exportUrl("/api/subjects/export.csv")} countBelow>
   {#snippet leading()}

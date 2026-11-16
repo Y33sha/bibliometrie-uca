@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { sectionLabels } from '#lib/labels.js';
 	import PageHeader from '#lib/components/PageHeader.svelte';
 	import HubTabs from '#lib/components/HubTabs.svelte';
 	import PublicationsListView from '#lib/components/PublicationsListView.svelte';
@@ -23,7 +24,7 @@
 	});
 </script>
 
-<PageHeader title="Publications" hidden />
+<PageHeader title={sectionLabels.publications} hidden />
 
 {#if isAdmin()}
 	<HubTabs

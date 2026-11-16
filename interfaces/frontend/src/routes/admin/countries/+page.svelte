@@ -11,7 +11,7 @@
 	import TableStatusRow from '#lib/components/TableStatusRow.svelte';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
 	import FacetDropdown from '#lib/components/FacetDropdown.svelte';
-	import { columnLabels, filterLabels } from '#lib/labels.js';
+	import { columnLabels, filterLabels, sectionLabels } from '#lib/labels.js';
 	import type { FacetOption } from '#lib/components/FacetDropdown.svelte';
 
 	import type { components } from '#lib/api/schema.js';
@@ -202,7 +202,7 @@
 	});
 </script>
 
-<PageHeader title="Pays" hidden />
+<PageHeader title={sectionLabels['admin/countries']} hidden />
 
 <div class="toolbar">
 	<input type="search" placeholder="Rechercher dans les adresses" bind:value={search} onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />

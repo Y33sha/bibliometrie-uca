@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { sectionLabels } from '#lib/labels.js';
 	import { formatNumber } from '#lib/utils.js';
 	import PageHeader from '#lib/components/PageHeader.svelte';
 	import { institution } from '#lib/institution.svelte.js';
@@ -81,7 +82,7 @@
 	});
 </script>
 
-<PageHeader title="Chercheurs" hidden />
+<PageHeader title={sectionLabels.persons} hidden />
 
 {#if isAdmin()}
 	<HubTabs

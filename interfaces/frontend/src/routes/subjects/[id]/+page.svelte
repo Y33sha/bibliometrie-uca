@@ -15,7 +15,7 @@
   import { activeTabId, type TabDef } from "#lib/tabs.js";
   import SortChevron from "#lib/components/SortChevron.svelte";
   import ClampedBlock from "#lib/components/ClampedBlock.svelte";
-  import { subjectVocabularyLabels } from "#lib/labels.js";
+  import { subjectVocabularyLabels, sectionLabels } from "#lib/labels.js";
 
   type SubjectDetailResponse = components["schemas"]["SubjectDetailResponse"];
 
@@ -74,7 +74,7 @@
 
 </script>
 
-<EntityBreadcrumb section={{ label: "Sujets", path: "subjects" }} name={data?.subject.label} fallback="Sujet" />
+<EntityBreadcrumb section={{ label: sectionLabels.subjects, path: "subjects" }} name={data?.subject.label} fallback="Sujet" />
 
   {#if error || !data}
     <EntityStatus {error} notFound="Sujet introuvable" />

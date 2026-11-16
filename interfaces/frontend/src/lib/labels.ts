@@ -211,6 +211,22 @@ export const contributionRoleLabels: Record<string, string> = {
 	other: 'Autre rôle',
 };
 
+/** Nom de chaque section du site, par chemin : lien de la navigation, en-tête de page et fil d'Ariane. */
+export const sectionLabels = {
+	publications: 'Publications',
+	structures: 'Labos',
+	persons: 'Chercheurs',
+	theses: 'Thèses',
+	publishers: 'Éditeurs',
+	journals: 'Publications en série',
+	monographs: 'Monographies',
+	subjects: 'Sujets',
+	'admin/config': 'Configuration',
+	'admin/pipeline': 'Pipeline',
+	'admin/addresses': 'Affiliations',
+	'admin/countries': 'Pays',
+} as const;
+
 /** En-têtes des colonnes communes à plusieurs listes. */
 export const columnLabels = {
 	type: 'Type',

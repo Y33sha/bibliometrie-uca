@@ -9,7 +9,7 @@
 	import FilterLayout from '#lib/components/filters/FilterLayout.svelte';
 	import FilterPanel from '#lib/components/filters/FilterPanel.svelte';
 	import FilterPanelToggle from '#lib/components/filters/FilterPanelToggle.svelte';
-	import { columnLabels } from '#lib/labels.js';
+	import { columnLabels, sectionLabels } from '#lib/labels.js';
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { structures as structuresApi } from '#lib/api/index.js';
@@ -121,7 +121,7 @@
 	onMount(list.restore);
 </script>
 
-<PageHeader title="Labos" hidden />
+<PageHeader title={sectionLabels.structures} hidden />
 
 <ListToolbar bind:search={list.search} placeholder="Rechercher par nom ou acronyme" onsearch={list.onSearchInput} list={list.listing} one="structure" many="structures" exportUrl={list.exportUrl('/api/structures/export.csv')} countBelow>
 	{#snippet leading()}

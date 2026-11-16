@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { sectionLabels } from '#lib/labels.js';
 	import EntityBreadcrumb from '#lib/components/EntityBreadcrumb.svelte';
 	import EntityStatus from '#lib/components/EntityStatus.svelte';
 	import { page } from '$app/state';
@@ -64,7 +65,7 @@
 
 </script>
 
-<EntityBreadcrumb section={{ label: 'Éditeurs', path: 'publishers' }} name={publisher?.name} fallback="Éditeur" />
+<EntityBreadcrumb section={{ label: sectionLabels.publishers, path: 'publishers' }} name={publisher?.name} fallback="Éditeur" />
 
 {#if error || !publisher}
 	<EntityStatus {error} notFound="Éditeur introuvable" />

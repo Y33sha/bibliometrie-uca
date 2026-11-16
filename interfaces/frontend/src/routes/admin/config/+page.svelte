@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { sectionLabels } from "#lib/labels.js";
   import { formatNumber } from "#lib/utils.js";
   import TableScroll from '#lib/components/TableScroll.svelte';
   import IconButton from "#lib/components/IconButton.svelte";
@@ -312,7 +313,7 @@
   });
 </script>
 
-<PageHeader title="Configuration" />
+<PageHeader title={sectionLabels['admin/config']} />
 
 <!-- Éditeur inline partagé par toutes les valeurs de configuration scalaires : focus + sélection à l'ouverture, Entrée valide, Échap annule. -->
 {#snippet inlineEdit(key: string)}
