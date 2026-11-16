@@ -84,6 +84,7 @@ Une étiquette (tag, badge, pastille, chip) est un court texte sur fond clair, a
 - Étiquettes : une seule classe, teintée par la propriété `--tag-color`. Le fond, le texte et le survol en dérivent en OKLCH relatif, à luminosité fixe. Les couleurs des graphiques restent inchangées.
 - Un écart entre copies suit l'usage majoritaire. Tout changement d'apparence est validé sur planches avant et après.
 - Un design volontairement différent garde ses règles locales, par exemple `AccessButton`.
+- Icônes : SVG en ligne, tirées de Lucide (`@lucide/svelte`). Les pictogrammes Creative Commons, absents de Lucide, sont les SVG officiels de Creative Commons, rangés dans un registre local. La police Flaticon est retirée.
 
 ## Phasage
 
@@ -129,8 +130,5 @@ Une étiquette (tag, badge, pastille, chip) est un court texte sur fond clair, a
 - [ ] Dates, nombres, pourcentages et pluriels sur `utils.ts` et `plural.ts`
 - [ ] Énumérations chargées une fois ; signalement d'erreur unique
 - [ ] Libellés sur `labels.ts` ; un nom par section
-- [ ] Un mécanisme d'icônes (question 1)
-
-## Questions ouvertes
-
-1. Icônes : un composant `Icon` en SVG, ou la police Flaticon partout.
+- [ ] Icônes sur Lucide : navigation, `KeyFigures`, `IconButton`, `SectionLabel`, SVG en ligne, glyphes « × »
+- [ ] Pictogrammes Creative Commons de `LicenseBadge` en SVG ; dépendance Flaticon retirée
