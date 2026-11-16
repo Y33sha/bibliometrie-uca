@@ -34,7 +34,7 @@ _TARGETS = f"""
             WHERE sc2.source = '{Source.OPENALEX}' AND sc2.perimeter_evidence && {AFFILIATION_EVIDENCE_SQL}
         )
     ),
-    publishers AS ({openalex_publisher_records("SELECT source_record_id FROM openalex")})
+    publishers AS ({openalex_publisher_records("SELECT id FROM publications")})
     SELECT DISTINCT o.contribution_id
     FROM openalex o
     WHERE o.perimeter_evidence && {AFFILIATION_EVIDENCE_SQL}

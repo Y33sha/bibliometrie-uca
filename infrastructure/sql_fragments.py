@@ -367,16 +367,19 @@ def self_declared_preprint_sql(alias: str = "sr") -> str:
     return f"COALESCE(jsonb_exists({source_extra_json(SourceExtra.RELATION, alias)}, '{CROSSREF_PREPRINT_OF}'), false)"
 
 
-def openalex_publisher_records(source_record_ids: str) -> str:
-    """Renvoie la requête des enregistrements OpenAlex éditeurs parmi les enregistrements sources de la requête `source_record_ids` : un de leurs DOI, de rôle autre que `related`, est celui de leur publication. Colonne `id`."""
+def openalex_publisher_records(publication_ids: str) -> str:
+    """Renvoie la requête des enregistrements OpenAlex éditeurs des publications de la requête `publication_ids` : un de leurs DOI, de rôle autre que `related`, est celui de leur publication. Colonne `id`."""
+    # Le planificateur sous-estime le nombre d'enregistrements éditeurs. Un filtre sur une CTE volumineuse le mène à la reparcourir pour chaque enregistrement trouvé.
     return f"""
-        SELECT DISTINCT sr.id
+        SELECT sr.id
         FROM source_records sr
         JOIN publications p ON p.id = sr.publication_id
-        JOIN source_record_identifiers i
-          ON i.source_record_id = sr.id AND i.id_type = '{SourceIdentifierType.DOI}'
-         AND i.id_value = p.doi AND i.role <> '{SourceIdentifierRole.RELATED}'
-        WHERE sr.source = '{Source.OPENALEX}' AND sr.id IN ({source_record_ids})
+        WHERE sr.source = '{Source.OPENALEX}' AND p.id IN ({publication_ids})
+          AND EXISTS (
+            SELECT 1 FROM source_record_identifiers i
+            WHERE i.source_record_id = sr.id AND i.id_type = '{SourceIdentifierType.DOI}'
+              AND i.id_value = p.doi AND i.role <> '{SourceIdentifierRole.RELATED}'
+        )
     """
 
 
@@ -407,7 +410,7 @@ def propagate_contribution_attributes_sql(contribution_ids: str) -> str:
             WHERE gm.contribution_id IN ({contribution_ids})
         ),
         openalex_publishers AS (
-            {openalex_publisher_records("SELECT source_record_id FROM sources WHERE openalex")}
+            {openalex_publisher_records(f"SELECT DISTINCT publication_id FROM contributions WHERE id IN ({contribution_ids})")}
         ),
         members AS (
             SELECT s.*, op.id IS NOT NULL AS openalex_publisher
