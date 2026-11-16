@@ -64,7 +64,6 @@ EXTRA_LABELS: dict[str, str | tuple[str, str]] = {
     "resolved": "résolu",
     "skipped": "sauté",
     "sudoc_found": ("présent dans le Sudoc", "présents dans le Sudoc"),
-    "unknown_to_doi_org": ("DOI inconnu de doi.org", "DOI inconnus de doi.org"),
     "unmatched": "non retrouvé",
     "unresolved": "non résolu",
     "withheld": (

@@ -3,7 +3,6 @@
 import pytest
 from sqlalchemy import text
 
-from domain.sources.registry import DOI_ORG
 from pipeline.ingestion.common.failed_lookups import (
     forget_failed_doi_lookups,
     pending_failed_lookup_sql,
@@ -37,22 +36,17 @@ class TestRecordFailedLookup:
         )
         assert _pending(sa_sync_conn, "crossref", "doi", "10.1234/x", 30) is False
 
-    def test_doi_org_est_une_source_d_echec(self, sa_sync_conn):
-        record_failed_lookup(sa_sync_conn, DOI_ORG, "doi", "10.1364/ao.xx.xxxxxx")
-        assert _pending(sa_sync_conn, DOI_ORG, "doi", "10.1364/ao.xx.xxxxxx", 30) is True
-
     @pytest.mark.parametrize(
         ("source", "id_type", "id_value"),
         [
             ("hal", "hal_id", "hal-01234567"),
             ("theses", "nnt", "2020UCFA0001"),
-            (DOI_ORG, "doi", "10.1364/ao.xx.xxxxxx"),
         ],
     )
-    def test_un_identifiant_absent_de_son_registre_n_est_plus_cherche(
+    def test_un_identifiant_absent_de_son_registre_reste_ecarte(
         self, sa_sync_conn, source, id_type, id_value
     ):
-        """Un identifiant absent de son registre (hal-id dans HAL, NNT dans theses.fr, DOI dans doi.org) reste écarté, quel que soit l'âge de l'échec."""
+        """Un identifiant absent de son registre (hal-id dans HAL, NNT dans theses.fr) reste écarté, quel que soit l'âge de l'échec."""
         record_failed_lookup(sa_sync_conn, source, id_type, id_value)
         sa_sync_conn.execute(
             text("UPDATE failed_lookups SET not_found_at = now() - interval '365 days'")

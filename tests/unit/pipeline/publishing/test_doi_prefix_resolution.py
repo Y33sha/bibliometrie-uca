@@ -1,4 +1,4 @@
-"""Tests des deux passes de résolution des préfixes DOI : la phase `resolve_ra` (agence d'enregistrement, par doi.org) et les étapes Crossref et DataCite de `resolve_publishers` (éditeur, par les API /prefixes).
+"""Tests des deux passes de résolution des préfixes DOI : la tâche `dois.resolve_prefixes` (agence d'enregistrement, par doi.org) et les étapes Crossref et DataCite de `resolve_publishers` (éditeur, par les API /prefixes).
 
 Faux repositories pour les ports, fonctions locales pour les clients HTTP, sans réseau ni base de données.
 """
@@ -13,7 +13,7 @@ from domain.publishers.names import publisher_name_key
 from domain.sources.registry import DOI_ORG
 from pipeline.http.circuit_breaker import SourceUnavailableError, source_circuit_breaker
 from pipeline.http.lookup import NOT_FOUND, UNAVAILABLE
-from pipeline.transformation.publishing import resolve_ra
+from pipeline.transformation.dois import registration_agencies
 from pipeline.transformation.publishing.doi_prefixes import PendingPublisherPrefix
 from pipeline.transformation.publishing.publishers.resolve_publishers import (
     run_resolve_crossref_publishers,
@@ -38,7 +38,7 @@ class _Row:
 
 @dataclass
 class FakeDoiPrefixRepo:
-    """Faux repository : `candidates` (préfixes des DOI candidats) alimente `resolve_ra` ; `rows` simule la table `doi_prefixes`, indexée par préfixe."""
+    """Faux repository : `candidates` (préfixes des DOI candidats) alimente `dois.resolve_prefixes` ; `rows` simule la table `doi_prefixes`, indexée par préfixe."""
 
     candidates: list[str] = field(default_factory=list)
     rows: dict[str, _Row] = field(default_factory=dict)
@@ -180,7 +180,7 @@ _LOG = logging.getLogger("test")
 
 
 def _run_ra(repo, ras_fn):
-    return resolve_ra.resolve(_LOG, repo, ras_fn)
+    return registration_agencies.resolve(_LOG, repo, ras_fn)
 
 
 def _run_publication(repo, pubrepo, cr=None, dc=None):
@@ -214,7 +214,9 @@ def test_resolve_ra_inserts_ra_only():
 
     assert ras.calls == [["10.1038"]]  # le préfixe seul, sans DOI
     assert repo.rows["10.1038"].ra == "Crossref"
-    assert repo.rows["10.1038"].publisher_id is None  # resolve_ra pose seulement l'agence
+    assert (
+        repo.rows["10.1038"].publisher_id is None
+    )  # la résolution des agences pose seulement l'agence
     assert metrics.new == 1
     assert metrics.extras.get("resolved") == 1
 
@@ -276,10 +278,10 @@ def test_resolve_ra_doi_org_indisponible_garde_les_prefixes_inseres(open_tx, con
         yield prefixes[0], "Crossref"
         raise SourceUnavailableError("doi.org/ra")
 
-    monkeypatch.setattr(resolve_ra, "DoiPrefixStore", lambda conn: repo)  # noqa: ARG005
-    monkeypatch.setattr(resolve_ra, "fetch_registration_agencies", ras)
+    monkeypatch.setattr(registration_agencies, "DoiPrefixStore", lambda conn: repo)  # noqa: ARG005
+    monkeypatch.setattr(registration_agencies, "fetch_registration_agencies", ras)
     with source_circuit_breaker(DOI_ORG) as breaker:
-        metrics = resolve_ra.resolve_prefixes(contexte())
+        metrics = registration_agencies.resolve_prefixes(contexte())
 
     assert set(repo.rows) == {"10.1038"}
     assert open_tx.transactions == 1

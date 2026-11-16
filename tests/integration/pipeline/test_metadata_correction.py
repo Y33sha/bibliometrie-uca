@@ -563,8 +563,8 @@ def test_un_doi_inconnu_de_doi_org_est_nulle_puis_restaure(sa_sync_conn):
     )
     conn.execute(
         text(
-            "INSERT INTO failed_lookups (source, id_type, id_value, not_found_at)"
-            " VALUES ('doi_org', 'doi', '10.1364/ao.xx.xxxxxx', now())"
+            "INSERT INTO dois (doi, registered, resolved_at)"
+            " VALUES ('10.1364/ao.xx.xxxxxx', FALSE, now())"
         )
     )
 
@@ -572,7 +572,7 @@ def test_un_doi_inconnu_de_doi_org_est_nulle_puis_restaure(sa_sync_conn):
     assert _doi_statuses(conn, first) == {"10.1364/ao.xx.xxxxxx": "UNRESOLVED_DOI_TO_NULL"}
 
     # doi.org connaît le DOI au run suivant : les enregistrements sources le retrouvent.
-    conn.execute(text("DELETE FROM failed_lookups"))
+    conn.execute(text("UPDATE dois SET registered = TRUE"))
     assert _apply_cluster(conn) == 2
     for source_record in (first, second):
         assert _doi_statuses(conn, source_record) == {"10.1364/ao.xx.xxxxxx": None}
@@ -666,8 +666,8 @@ def test_une_cible_inconnue_de_doi_org_n_est_pas_une_cible(sa_sync_conn):
     )
     conn.execute(
         text(
-            "INSERT INTO failed_lookups (source, id_type, id_value, not_found_at)"
-            " VALUES ('doi_org', 'doi', '10.1103/inconnu', now())"
+            "INSERT INTO dois (doi, registered, resolved_at)"
+            " VALUES ('10.1103/inconnu', FALSE, now())"
         )
     )
     _apply_cluster(conn)
@@ -686,8 +686,8 @@ def test_un_doi_inconnu_de_doi_org_n_a_pas_de_cible(sa_sync_conn):
     )
     conn.execute(
         text(
-            "INSERT INTO failed_lookups (source, id_type, id_value, not_found_at)"
-            " VALUES ('doi_org', 'doi', '10.5281/zenodo.20', now())"
+            "INSERT INTO dois (doi, registered, resolved_at)"
+            " VALUES ('10.5281/zenodo.20', FALSE, now())"
         )
     )
     _apply_cluster(conn)

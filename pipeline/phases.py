@@ -1,6 +1,6 @@
 """Phases du pipeline, dans l'ordre d'exécution, avec leur libellé et leurs attributs.
 
-Les enrichissements (`extra`) viennent en dernier. Chacun est indépendant des autres. `resolve_ra` et `fetch_missing`, placées avant eux, lisent les relations au run suivant.
+Les enrichissements (`extra`) viennent en dernier. Chacun est indépendant des autres. `fetch_missing` et `dois`, placées avant eux, lisent les relations au run suivant.
 """
 
 from dataclasses import replace
@@ -17,12 +17,13 @@ from pipeline.ingestion.openalex import fetch_truncated
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation import finalize
+from pipeline.transformation.dois import dois
 from pipeline.transformation.persons import persons
-from pipeline.transformation.publications import oa_status, publications, relations
+from pipeline.transformation.publications import publications, relations
 from pipeline.transformation.publications.author_grouping import author_grouping
 from pipeline.transformation.publications.correction import metadata_correction
 from pipeline.transformation.publications.subjects import subjects
-from pipeline.transformation.publishing import publishing, resolve_ra
+from pipeline.transformation.publishing import publishing
 from pipeline.transformation.structures import affiliations
 from pipeline.transformation.structures.perimeter import (
     check_extraction_perimeter,
@@ -80,9 +81,10 @@ PHASES: tuple[Phase, ...] = (
         assemble=affiliations.assemble,
     ),
     Phase(
-        "resolve_ra",
-        "Résolution des agences d'enregistrement des DOI",
-        resolve_ra.TASKS,
+        "dois",
+        "Référentiel des DOI : agence des préfixes, existence et URL chez doi.org, statut open access",
+        dois.TASKS,
+        assemble=dois.assemble,
     ),
     Phase(
         "publishing",
@@ -95,12 +97,6 @@ PHASES: tuple[Phase, ...] = (
         "Correction des métadonnées de publication",
         metadata_correction.TASKS,
         assemble=metadata_correction.assemble,
-    ),
-    Phase(
-        "oa_status",
-        "URL de résolution et statut open access des DOI",
-        oa_status.TASKS,
-        assemble=oa_status.assemble,
     ),
     Phase(
         "publications",

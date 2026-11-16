@@ -1,6 +1,6 @@
 """Recherche par DOI de la phase `fetch_missing` (`pipeline.ingestion.common.doi_search.fetch_missing_doi`).
 
-1. La boucle, avec une recherche simulée : pool de workers, inscription des DOI absents, vérification par doi.org, métriques.
+1. La boucle, avec une recherche simulée : pool de workers, inscription des DOI absents, métriques.
 2. La recherche de chaque source (`fetch_async`), avec la fixture `http_mock` : enregistrement source trouvé, DOI absent, erreurs réseau et HTTP.
 """
 
@@ -17,11 +17,10 @@ from domain.sources.registry import Source
 from pipeline.http.lookup import UNAVAILABLE
 from pipeline.ingestion.adapters import adapter
 from pipeline.ingestion.api_params import API_BASE_URLS
-from pipeline.ingestion.common import doi_search, lookup
+from pipeline.ingestion.common import doi_search
 from pipeline.ingestion.common.doi_search import DoiSearch, fetch_missing_doi
 from pipeline.ingestion.common.lookup import LookupBatch
 from pipeline.ingestion.common.staging import StagingStore, UpsertOutcome
-from pipeline.ingestion.complements.doi_org import doi_existence
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
 
@@ -106,38 +105,6 @@ class TestRunAsyncOrchestrator:
         assert recorded == [("openalex", "10.1/b")]
         assert result.extras == {"not_found": 1}
         assert adapter.inserted_records == [{"doi": "10.1/a"}]
-
-    @pytest.mark.asyncio
-    async def test_l_agence_d_enregistrement_soumet_ses_absents_a_doi_org(self):
-        """Un DOI absent de son agence d'enregistrement est soumis à doi.org, sous la barre de l'agence ; seul un DOI inconnu de doi.org est inscrit sous `doi_org`."""
-        recorded: list = []
-        barres: list[str] = []
-        track_progress = lookup.track_progress
-
-        def _track_progress(total, label, logger, **kwargs):
-            barres.append(label)
-            return track_progress(total, label, logger, **kwargs)
-
-        adapter = _FakeAdapter(absents=frozenset({"10.1/connu", "10.1/inconnu"}))
-        adapter.source = "crossref"
-
-        async def _existence(client, dois, *, user_agent):  # noqa: ARG001
-            return [d for d in dois if d == "10.1/connu"], [d for d in dois if d == "10.1/inconnu"]
-
-        with (
-            patch.object(doi_search, "doi_existence", _existence),
-            patch.object(doi_search, "polite_user_agent", lambda: "test"),
-            patch.object(lookup, "track_progress", _track_progress),
-        ):
-            result = await _run(adapter, ["10.1/connu", "10.1/inconnu"], recorded=recorded)
-
-        assert sorted(recorded) == [
-            ("crossref", "10.1/connu"),
-            ("crossref", "10.1/inconnu"),
-            ("doi_org", "10.1/inconnu"),
-        ]
-        assert result.extras["unknown_to_doi_org"] == 1
-        assert len(barres) == 1
 
     @pytest.mark.asyncio
     async def test_worker_pool_caps_concurrent_fetches(self):
@@ -332,25 +299,6 @@ class TestScanrFetchAsync:
         async with httpx2.AsyncClient() as client:
             result = await self._adapter().fetch(client, ["10.1/a"])
         assert result == UNAVAILABLE
-
-
-class TestDoiOrgExistence:
-    @pytest.mark.asyncio
-    async def test_range_les_doi_selon_doi_org(self, http_mock):
-        """200 : doi.org connaît le DOI ; 404 : il ne le connaît pas ; 503 : pas de conclusion."""
-        base = API_BASE_URLS["doi_org_handles"]
-        http_mock.get(f"{base}/10.1/connu").mock(
-            return_value=httpx2.Response(200, json={"responseCode": 1})
-        )
-        http_mock.get(f"{base}/10.1/inconnu").mock(
-            return_value=httpx2.Response(404, json={"responseCode": 100})
-        )
-        http_mock.get(f"{base}/10.1/muet").mock(return_value=httpx2.Response(503))
-        async with httpx2.AsyncClient() as client:
-            known, unknown = await doi_existence(
-                client, ["10.1/connu", "10.1/inconnu", "10.1/muet"], user_agent="test"
-            )
-        assert (known, unknown) == (["10.1/connu"], ["10.1/inconnu"])
 
 
 class TestDataciteFetchAsync:

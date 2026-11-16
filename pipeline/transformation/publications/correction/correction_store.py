@@ -44,7 +44,7 @@ from domain.source_records.metadata_correction.shared_doi import (
 )
 from domain.source_records.metadata_correction.unary import UnaryCorrection
 from domain.source_records.source_extras import SourceExtra
-from domain.sources.registry import DOI_ORG, Source
+from domain.sources.registry import Source
 from domain.types import JsonValue
 from infrastructure.db.doi_targets import unversioned_doi_sql
 from infrastructure.db.queues import Queue, enqueue, enqueue_ids
@@ -140,7 +140,7 @@ class DoiClusterRow(NamedTuple):
     """Sert à comparer deux chapitres."""
     shared_doi: str
     unresolved: bool = False
-    """Vrai si `shared_doi` est inconnu de doi.org (`failed_lookups`, source `doi_org`)."""
+    """Vrai si `shared_doi` est inconnu de doi.org (`dois.registered`)."""
     has_target: bool = False
     """Vrai si `shared_doi` a une cible dans `doi_targets`."""
     identifiers: tuple[SourceIdentifier, ...] = ()
@@ -287,9 +287,7 @@ def _persist_updates(conn: Connection, updates: Sequence[Mapping[str, object]]) 
     return len(updates)
 
 
-_UNRESOLVED_DOIS_SQL = (
-    f"SELECT id_value AS d FROM failed_lookups WHERE source = '{DOI_ORG}' AND id_type = 'doi'"
-)
+_UNRESOLVED_DOIS_SQL = "SELECT doi AS d FROM dois WHERE NOT registered"
 """DOI inconnus de doi.org."""
 
 _RECORD_DOIS_SQL = f"""

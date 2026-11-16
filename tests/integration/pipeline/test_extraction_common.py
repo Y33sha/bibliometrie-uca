@@ -186,7 +186,7 @@ class TestGetMissingDois:
         assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30) == []
 
     def test_crossref_target_filters_non_crossref_prefixes(self, sa_sync_conn):
-        """Pour Crossref, seuls les DOI de préfixe attribué à Crossref sont retenus. Un DOI de préfixe sans agence connue attend la phase `resolve_ra`."""
+        """Pour Crossref, seuls les DOI de préfixe attribué à Crossref sont retenus. Un DOI de préfixe sans agence connue attend la phase `dois`."""
         insert_doi_prefix(sa_sync_conn, "10.5281", ra="DataCite")
         insert_doi_prefix(sa_sync_conn, "10.1038", ra="Crossref")
         # Trois DOI d'enregistrements sources HAL du périmètre : préfixe DataCite, préfixe Crossref, préfixe inconnu.
@@ -310,13 +310,20 @@ class TestGetMissingDois:
         assert result == ["10.1234/a"]
 
     def test_exclut_les_doi_inconnus_de_doi_org(self, sa_sync_conn):
-        """Un DOI inconnu de doi.org est exclu pour toutes les cibles, quelle que soit la date de l'échec."""
+        """Un DOI inconnu de doi.org (`dois.registered`) est exclu pour toutes les cibles."""
         _add_inperim_source_record(sa_sync_conn, "openalex", "W1", doi="10.1234/a")
         _add_inperim_source_record(sa_sync_conn, "openalex", "W2", doi="10.1234/b")
-        insert_failed_lookup(
-            sa_sync_conn, "doi_org", id_type="doi", id_value="10.1234/a", not_found_days_ago=365
+        _add_inperim_source_record(sa_sync_conn, "openalex", "W3", doi="10.1234/c")
+        sa_sync_conn.execute(
+            text(
+                "INSERT INTO dois (doi, registered, resolved_at)"
+                " VALUES ('10.1234/a', FALSE, now()), ('10.1234/c', TRUE, now())"
+            )
         )
-        assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30) == ["10.1234/b"]
+        assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30) == [
+            "10.1234/b",
+            "10.1234/c",
+        ]
 
     def test_le_delai_configure_s_applique_aux_echecs_deja_inscrits(self, sa_sync_conn):
         """Le délai se lit à la sélection : le raccourcir libère les échecs déjà inscrits."""

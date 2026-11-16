@@ -118,7 +118,7 @@ TASKS = (
             # DOI présents en base.
             "source_record_identifiers",
             # DOI inconnus de doi.org.
-            "failed_lookups",
+            "dois.registered",
         ),
         writes=("doi_targets", "source_record_keys_queue"),
         previous_run=("source_records", "source_record_identifiers.removed_by", "doi_targets"),
@@ -142,7 +142,7 @@ TASKS = (
             "source_record_identifiers",
             "doi_targets",
             # DOI inconnus de doi.org.
-            "failed_lookups",
+            "dois.registered",
             # Noms des auteurs d'un dépôt HAL et de l'enregistrement source Crossref de son DOI.
             "source_contributions.source_record_id",
             "source_contributions.contributor_information_id",

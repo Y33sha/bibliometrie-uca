@@ -1,4 +1,4 @@
-"""Phase `resolve_ra` : résolution préfixe DOI → Registration Agency.
+"""Agence d'enregistrement de chaque préfixe DOI, tâche de la phase `dois`.
 
 Soumet à `doi.org/ra` les préfixes valides (`DoiPrefix`) de tous les DOI connus absents de `doi_prefixes`, et insère `(prefix, ra)`. Un préfixe inconnu de doi.org est inséré avec `ra='unknown'`. Un préfixe sans réponse, faute de requête aboutie, reste à résoudre.
 

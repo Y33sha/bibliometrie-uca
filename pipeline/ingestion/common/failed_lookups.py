@@ -1,6 +1,6 @@
-"""Recherches vaines de la phase `fetch_missing` (table `failed_lookups`) : une ligne par identifiant cherché en vain dans une source, ou inconnu de doi.org (`DOI_ORG`).
+"""Recherches vaines de la phase `fetch_missing` (table `failed_lookups`) : une ligne par identifiant cherché en vain dans une source.
 
-Un identifiant inscrit sort des sélections le temps du délai de nouvelle tentative, et définitivement s'il est absent de son registre. Un document renvoyé par la source efface l'échec. L'appelant commite.
+Un identifiant inscrit sort des sélections le temps du délai de nouvelle tentative, et définitivement s'il est absent de son registre. Un document renvoyé par la source efface l'échec. L'appelant commite. L'existence d'un DOI chez doi.org se lit dans `dois.registered`.
 """
 
 from collections.abc import Sequence
@@ -9,15 +9,15 @@ from typing import Literal
 from sqlalchemy import Connection, text
 
 from domain.documents.identifiers import DOI
-from domain.sources.registry import DOI_ORG, Source
+from domain.sources.registry import Source
 
 LookupIdType = Literal[
     "doi", "hal_id", "nnt", "patent_publication_number", "patent_application_number"
 ]
 """Types d'identifiants cherchés par la phase `fetch_missing` (`LOOKUP_ID_TYPES`)."""
 
-_REGISTRIES: dict[LookupIdType, str] = {"doi": DOI_ORG, "hal_id": Source.HAL, "nnt": Source.THESES}
-"""Registre qui attribue chaque type d'identifiant. Un identifiant absent de son registre n'existe pas : l'échec de sa recherche est définitif. Les offices de brevets sont hors des sources interrogées."""
+_REGISTRIES: dict[LookupIdType, str] = {"hal_id": Source.HAL, "nnt": Source.THESES}
+"""Source qui attribue chaque type d'identifiant. Un identifiant absent de son registre n'existe pas : l'échec de sa recherche est définitif."""
 
 _RECORD_SQL = text(
     """
@@ -48,7 +48,7 @@ _FORGET_SQL = text(
 
 
 def forget_failed_doi_lookups(conn: Connection, source: str, dois: Sequence[str | None]) -> None:
-    """Efface les échecs inscrits dans la source pour ces DOI : DOI d'un document renvoyé par la source, ou DOI connus de doi.org (`DOI_ORG`).
+    """Efface les échecs inscrits dans la source pour les DOI d'un document renvoyé par la source.
 
     Les DOI passent par `DOI.normalize` : un document peut les donner sous toute forme.
     """

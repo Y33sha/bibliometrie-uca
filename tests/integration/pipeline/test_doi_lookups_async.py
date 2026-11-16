@@ -1,4 +1,4 @@
-"""Tâches asynchrones de la phase `oa_status` (`pipeline.transformation.publications.oa_status`), avec les requêtes d'Unpaywall et de doi.org (`pipeline.ingestion.complements`).
+"""Interrogations de doi.org et d'Unpaywall de la phase `dois` (`pipeline.transformation.dois.lookups`), avec les requêtes de `pipeline.ingestion.complements`.
 
 Ce module teste les réponses écrites par DOI, la mise en file de consolidation des publications des DOI dont la réponse change, le DOI absent, le service indisponible, la réponse 429 et le plafond de concurrence. Les règles du statut open access sont testées dans `tests/unit/domain/publications/test_open_access.py`.
 
@@ -24,8 +24,8 @@ from pipeline.phases import PHASES
 from pipeline.runtime.context import PhaseContext, RunOptions
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.task_runner import run_phase
-from pipeline.transformation.publications import oa_status
-from pipeline.transformation.publications.oa_status import (
+from pipeline.transformation.dois import lookups
+from pipeline.transformation.dois.lookups import (
     DOI_ORG,
     UNPAYWALL,
     DoiFetcher,
@@ -91,6 +91,7 @@ class _FakeStore:
         self.answers: list[tuple[str, str | None]] = []
         self.services: set[DoiService] = set()
         self.enqueued: list[str] = []
+        self.found: dict[str, bool] = {}
 
     def fetch_answers(self, service, dois) -> dict[str, str | None]:  # noqa: ARG002
         return {d: s for d, s in self._stored.items() if d in set(dois)}
@@ -103,7 +104,8 @@ class _FakeStore:
 
     def record_answers(self, service, answers) -> None:
         self.services.add(service)
-        self.answers.extend(answers)
+        self.answers.extend((a.doi, a.value) for a in answers)
+        self.found.update({a.doi: a.found for a in answers})
 
     def enqueue_publications(self, dois) -> int:
         self.enqueued.extend(dois)
@@ -112,7 +114,7 @@ class _FakeStore:
 
 @pytest.fixture
 def logger() -> logging.Logger:
-    return logging.getLogger("test_enrich_oa_status")
+    return logging.getLogger("test_doi_lookups")
 
 
 @contextmanager
@@ -178,7 +180,7 @@ def test_les_reponses_changees_mettent_leurs_publications_en_file(logger, http_m
         stale_total=42,
         stored={"10.1/b": "closed", "10.1/c": "bronze"},
     )
-    metrics = oa_status.assemble({"verify_unpaywall": _run(queries, _make_fetcher(), logger)})
+    metrics = lookups.assemble({"verify_unpaywall": _run(queries, _make_fetcher(), logger)})
 
     assert sorted(queries.answers) == [
         ("10.1/a", "gold"),
@@ -196,9 +198,9 @@ def test_les_reponses_changees_mettent_leurs_publications_en_file(logger, http_m
 
 
 def test_les_deux_services_ont_chacun_leur_ligne(logger):
-    resolution, unpaywall = oa_status.TASKS
+    resolution, unpaywall = lookups.TASKS
     phase = dataclasses.replace(
-        next(p for p in PHASES if p.name == "oa_status"),
+        next(p for p in PHASES if p.name == "dois"),
         children=(
             dataclasses.replace(
                 resolution,
@@ -289,9 +291,9 @@ def test_skips_without_unpaywall_configuration(logger):
     """Sans configuration Unpaywall, l'accès à la source signale son absence et la tâche s'arrête avant toute transaction."""
     unconfigured = _FakeStore(["10.1/a"])
     open_tx = MagicMock(side_effect=_open_tx)
-    resolution, unpaywall = oa_status.TASKS
+    resolution, unpaywall = lookups.TASKS
     phase = dataclasses.replace(
-        next(p for p in PHASES if p.name == "oa_status"),
+        next(p for p in PHASES if p.name == "dois"),
         children=(
             dataclasses.replace(
                 resolution, run=_task(_FakeStore([]), _doi_org_fetcher, service=DOI_ORG).run
@@ -317,7 +319,7 @@ def test_skips_without_unpaywall_configuration(logger):
 
 
 def test_adresse_enregistree_lue_chez_doi_org(logger, http_mock):
-    """La valeur `URL` du handle est écrite ; un DOI inconnu et un handle sans URL reçoivent une URL nulle."""
+    """La valeur `URL` du handle est écrite. Un DOI inconnu (404) et un handle sans URL reçoivent une URL nulle ; seul le premier est inconnu de doi.org."""
     _handle_route(
         http_mock,
         "10.1/u",
@@ -341,4 +343,5 @@ def test_adresse_enregistree_lue_chez_doi_org(logger, http_mock):
         ("10.1/u", "https://e.org/a.pdf"),
         ("10.1/x", None),
     ]
-    assert (metrics.new, metrics.extras["not_found"]) == (1, 2)
+    assert queries.found == {"10.1/u": True, "10.1/x": False, "10.1/e": True}
+    assert (metrics.new, metrics.extras["not_found"]) == (2, 1)
