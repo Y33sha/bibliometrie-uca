@@ -80,7 +80,7 @@ _INVISIBLE_CATEGORIES = frozenset({"Cf", "Cc", "Cs", "Co"})
 
 
 def to_plain_text(text: str | None) -> str:
-    """Renvoie le texte brut d'une valeur reçue d'une source : commentaires, balises, entités HTML et caractères invisibles retirés, espacement réduit à un espace simple. Une balise échappée (`&lt;p&gt;`) est retirée aussi. Casse, accents et ponctuation restent."""
+    """Renvoie le texte brut d'une valeur reçue d'une source : commentaires, balises, entités HTML et caractères invisibles retirés, espacement réduit à un espace simple, lettres et diacritiques composés (NFC). Une balise échappée (`&lt;p&gt;`) est retirée aussi. Casse, accents et ponctuation restent."""
     if not text:
         return ""
     plain = _strip_markup(_strip_comments(_unescape_html(text)))
@@ -90,6 +90,8 @@ def to_plain_text(text: str | None) -> str:
             for ch in plain
             if ch.isspace() or unicodedata.category(ch) not in _INVISIBLE_CATEGORIES
         )
+    if not unicodedata.is_normalized("NFC", plain):
+        plain = unicodedata.normalize("NFC", plain)
     return " ".join(plain.split())
 
 
