@@ -9,6 +9,7 @@ import re
 from collections.abc import Mapping
 
 from domain.documents.dates import PublicationDate, parse_date_parts
+from domain.documents.identifiers import DOI
 from domain.serials.issns import IssnSupport, SerialIssn, received_issns
 from domain.source_records.source_extras import SourceExtra
 from domain.types import JsonValue, as_mapping, as_sequence, as_str, as_strs
@@ -94,16 +95,41 @@ def extract_crossref_conference(msg: Mapping[str, JsonValue]) -> dict[str, JsonV
     return conference
 
 
-def extract_crossref_source_extras(msg: Mapping[str, JsonValue]) -> Mapping[str, JsonValue] | None:
-    """Renvoie les champs propres à Crossref gardés dans `source_records.source_extras` : financeurs, relations, congrès, titre de groupe d'un `posted-content`, nombre de références s'il est positif, date d'indexation. Le reste du payload est écarté.
+def crossref_updates(entries: JsonValue) -> list[JsonValue]:
+    """Renvoie les mises à jour déclarées dans `update-to` ou `updated-by` : DOI normalisé, type (`erratum`, `retraction`…) et origine de la déclaration (`publisher`, `retraction-watch`). Les entrées sans DOI ou sans type sont écartées."""
+    updates: list[JsonValue] = []
+    for entry in as_sequence(entries):
+        item = as_mapping(entry)
+        doi = DOI.normalize(as_str(item.get("DOI")))
+        update_type = as_str(item.get("type"))
+        if doi and update_type:
+            updates.append({"doi": doi, "type": update_type, "source": as_str(item.get("source"))})
+    return updates
 
-    Les relations servent à la phase `relations`.
+
+def extract_crossref_updates(msg: Mapping[str, JsonValue]) -> dict[str, JsonValue]:
+    """Renvoie les mises à jour déclarées par l'œuvre (`update-to`) et les mises à jour de l'œuvre (`updated-by`), par clé de `source_extras`."""
+    return {
+        key: updates
+        for key, field in (
+            (SourceExtra.UPDATE_TO, "update-to"),
+            (SourceExtra.UPDATED_BY, "updated-by"),
+        )
+        if (updates := crossref_updates(msg.get(field)))
+    }
+
+
+def extract_crossref_source_extras(msg: Mapping[str, JsonValue]) -> Mapping[str, JsonValue] | None:
+    """Renvoie les champs propres à Crossref gardés dans `source_records.source_extras` : financeurs, relations, mises à jour, congrès, titre de groupe d'un `posted-content`, nombre de références s'il est positif, date d'indexation. Le reste du payload est écarté.
+
+    Les relations et les mises à jour servent à la phase `relations`.
     """
     source_extras: dict[str, JsonValue] = {}
     for key in (SourceExtra.FUNDER, SourceExtra.RELATION):
         val = msg.get(key)
         if val:
             source_extras[key] = val
+    source_extras.update(extract_crossref_updates(msg))
     conference = extract_crossref_conference(msg)
     if conference:
         source_extras[SourceExtra.CONFERENCE] = conference
