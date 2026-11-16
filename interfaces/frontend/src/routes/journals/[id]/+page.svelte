@@ -15,7 +15,7 @@
 	import SubjectsCard from '#lib/components/SubjectsCard.svelte';
 	import TitleRow from '#lib/components/TitleRow.svelte';
 	import SerialDrawer from '#lib/components/serials/SerialDrawer.svelte';
-	import { issnPortalUrl } from '#lib/utils.js';
+	import { formatDate, issnPortalUrl } from '#lib/utils.js';
 	import { useDrawerParam } from '#lib/composables/useDrawerParam.svelte.js';
 	import { isAdmin } from '#lib/session.svelte.js';
 	import type { components } from '#lib/api/schema.js';
@@ -73,11 +73,6 @@
 		await Promise.all([loadSerial(), oaModelLabelsP]);
 		await tick();
 	});
-
-	function formatDate(iso: string | null): string {
-		if (!iso) return '';
-		return new Date(iso).toLocaleDateString('fr-FR');
-	}
 
 	/** Filtre de la liste des revues qui retient les revues d'une liste, ou d'un niveau de classement. */
 	function listQuery(list: { code: string; is_level: boolean }): string {

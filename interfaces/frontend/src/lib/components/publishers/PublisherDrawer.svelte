@@ -1,5 +1,7 @@
 <script lang="ts">
   // Volet d'édition d'un éditeur, réservé à la session admin : nom, type, pays, formes de nom et fusion.
+  import { formatNumber } from "#lib/utils.js";
+  import { formatCount } from "#lib/plural.js";
   import { onMount } from "svelte";
   import { resolve } from "$app/paths";
   import { api, ApiError, errorMessage, publishers as publishersApi } from "#lib/api/index.js";
@@ -167,8 +169,8 @@
     <p class="muted">Chargement…</p>
   {:else}
     <div class="drawer-meta">
-      <span>{publisher.serial_count.toLocaleString("fr-FR")} publications en série</span>
-      <span>{publisher.publication_count.toLocaleString("fr-FR")} publications</span>
+      <span>{formatCount(publisher.serial_count, "publication en série", "publications en série")}</span>
+      <span>{formatCount(publisher.publication_count, "publication")}</span>
     </div>
 
     <dl class="drawer-section drawer-fields">
@@ -244,7 +246,7 @@
         >
           {#snippet item(r)}
             {r.name}
-            <span class="muted">({r.serial_count} publications en série, {r.publication_count} publications)</span>
+            <span class="muted">({formatCount(r.serial_count, "publication en série", "publications en série")}, {formatCount(r.publication_count, "publication")})</span>
           {/snippet}
         </Picker>
       {:else}
@@ -267,7 +269,7 @@
             {#each nameForms as nf (nf.form)}
               <tr>
                 <td>{nf.form}</td>
-                <td class="num" class:zero={nf.source_record_count === 0}>{nf.source_record_count.toLocaleString("fr-FR")}</td>
+                <td class="num" class:zero={nf.source_record_count === 0}>{formatNumber(nf.source_record_count)}</td>
               </tr>
             {/each}
           </tbody>

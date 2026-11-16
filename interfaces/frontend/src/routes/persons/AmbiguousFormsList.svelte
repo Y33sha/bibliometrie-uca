@@ -4,6 +4,7 @@
   import { untrack } from "svelte";
   import { persons as personsApi } from "#lib/api/index.js";
   import { titleCase } from "#lib/utils.js";
+  import { formatCount } from "#lib/plural.js";
   import { usePaginatedFetch } from "#lib/composables/usePaginatedFetch.svelte.js";
   import ListStatus from "#lib/components/ListStatus.svelte";
   import Pagination from "#lib/components/Pagination.svelte";
@@ -63,7 +64,7 @@
       <div class="triage-item">
         <div class="form-head">
           <span class="form-name">{form.name_form}</span>
-          <span class="muted-small">{form.persons.length} personnes</span>
+          <span class="muted-small">{formatCount(form.persons.length, "personne")}</span>
         </div>
         <div class="form-persons">
           {#each form.persons as p (p.person_id)}

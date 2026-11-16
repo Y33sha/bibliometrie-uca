@@ -6,7 +6,7 @@
   import { onMount } from "svelte";
   import { useUrlFilters } from "#lib/composables/useUrlFilters.svelte.js";
   import { api, nameForms, structures as structuresApi, errorMessage } from "#lib/api/index.js";
-  import { deriveStructDetectionStatus } from "#lib/utils.js";
+  import { deriveStructDetectionStatus, formatNumber, formatPercent } from "#lib/utils.js";
   import { structureLabel } from "#lib/structureLabels.js";
   import { groupStructuresByType, structureGroupLabel } from "#lib/structureTypes.js";
   import { columnLabels, structDetectionClasses, structDetectionLabels } from "#lib/labels.js";
@@ -257,14 +257,14 @@
     <KeyFigures
       items={[
         {
-          value: stats.detection_rate !== null ? `${stats.detection_rate.toLocaleString("fr-FR")}\u00a0%` : "\u2014",
+          value: stats.detection_rate !== null ? formatPercent(stats.detection_rate / 100, 1) : "\u2014",
           label: "taux de concordance",
         },
-        { value: stats.total_reviewed.toLocaleString("fr-FR"), label: "adresses examinées" },
-        { value: stats.false_negatives.toLocaleString("fr-FR"), label: "faux négatifs" },
-        { value: stats.false_positives.toLocaleString("fr-FR"), label: "faux positifs" },
-        { value: stats.concordant_valid.toLocaleString("fr-FR"), label: "vrais positifs" },
-        { value: stats.pending.toLocaleString("fr-FR"), label: "en attente" },
+        { value: formatNumber(stats.total_reviewed), label: "adresses examinées" },
+        { value: formatNumber(stats.false_negatives), label: "faux négatifs" },
+        { value: formatNumber(stats.false_positives), label: "faux positifs" },
+        { value: formatNumber(stats.concordant_valid), label: "vrais positifs" },
+        { value: formatNumber(stats.pending), label: "en attente" },
       ]}
     />
   {/if}

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { formatNumber } from '#lib/utils.js';
 	import EntityBreadcrumb from '#lib/components/EntityBreadcrumb.svelte';
 	import EntityStatus from '#lib/components/EntityStatus.svelte';
 	import { page } from '$app/state';
@@ -177,14 +178,14 @@
 								...(ongoingThesesCount > 0
 									? [
 											{
-												value: ongoingThesesCount.toLocaleString('fr-FR'),
+												value: formatNumber(ongoingThesesCount),
 												label: plural(ongoingThesesCount, 'thèse en cours', 'thèses en cours'),
 												icon: 'graduation-cap',
 											},
 										]
 									: []),
 								...(personsCount > 0
-									? [{ value: personsCount.toLocaleString('fr-FR'), label: plural(personsCount, 'personne'), icon: 'user' }]
+									? [{ value: formatNumber(personsCount), label: plural(personsCount, 'personne'), icon: 'user' }]
 									: []),
 							]
 						: []}

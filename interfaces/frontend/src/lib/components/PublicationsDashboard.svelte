@@ -13,7 +13,7 @@
 	import { orderedPivotValues, pivotValueColor, pivotValueDescription, pivotValueLabel } from '#lib/pivotValues.js';
 	import { contextParams, type PublicationListContext } from '#lib/publicationListContext.js';
 	import { plural } from '#lib/plural.js';
-	import { paramsToQuery } from '#lib/utils.js';
+	import { formatNumber, formatPercent, paramsToQuery } from '#lib/utils.js';
 
 	type PivotResponse = components['schemas']['PivotResponse'];
 	type CollaborationsResponse = components['schemas']['CollaborationsResponse'];
@@ -125,7 +125,7 @@
 	});
 
 	const sum = (rows: Row[]) => rows.reduce((total, r) => total + Number(r.value ?? 0), 0);
-	const percent = (part: number, whole: number) => `${Math.round((part / whole) * 100)} %`;
+	const percent = (part: number, whole: number) => formatPercent(part / whole);
 
 	const total = $derived(sum(byYear));
 	const openAccess = $derived(sum(byYear.filter((r) => r.oa_access === 'ouvert')));
@@ -137,7 +137,7 @@
 	const withCitationClass = $derived(sum(citationClasses));
 
 	const keyFigures = $derived<KeyFigure[]>([
-		{ value: total.toLocaleString('fr-FR'), label: plural(total, 'publication'), icon: 'book-open-cover' },
+		{ value: formatNumber(total), label: plural(total, 'publication'), icon: 'book-open-cover' },
 		...(total > 0
 			? [{ value: percent(openAccess, total), label: 'en open access', tone: 'open' as const, icon: 'unlock' }]
 			: []),
@@ -147,7 +147,7 @@
 						value: percent(topCited, withCitationClass),
 						label: 'dans le top 10 % des plus citées',
 						icon: 'star',
-						tooltip: `D'après OpenAlex, sur les ${withCitationClass.toLocaleString('fr-FR')} publications pourvues de l'indicateur (${percent(withCitationClass, total)} du corpus)`,
+						tooltip: `D'après OpenAlex, sur les ${formatNumber(withCitationClass)} publications pourvues de l'indicateur (${percent(withCitationClass, total)} du corpus)`,
 					},
 				]
 			: []),
@@ -161,7 +161,7 @@
 				]
 			: []),
 		...(thesesFigure && theses > 0
-			? [{ value: theses.toLocaleString('fr-FR'), label: plural(theses, 'thèse'), icon: 'graduation-cap' }]
+			? [{ value: formatNumber(theses), label: plural(theses, 'thèse'), icon: 'graduation-cap' }]
 			: []),
 		...figures,
 	]);

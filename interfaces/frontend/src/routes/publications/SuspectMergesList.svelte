@@ -3,6 +3,7 @@
   import { resolve } from "$app/paths";
   import { usePaginatedFetch } from "#lib/composables/usePaginatedFetch.svelte.js";
   import { docTypeLabel } from "#lib/docTypes.svelte.js";
+  import { formatPercent } from "#lib/utils.js";
   import ListStatus from "#lib/components/ListStatus.svelte";
   import Pagination from "#lib/components/Pagination.svelte";
   import PublicationTitle from "#lib/components/PublicationTitle.svelte";
@@ -35,7 +36,6 @@
     untrack(list.load);
   });
 
-  const percent = (part: number, whole: number) => Math.round((100 * part) / whole);
 </script>
 
 <p class="triage-intro">
@@ -61,7 +61,7 @@
         </div>
         <div class="stats">
           <span class="share">
-            {percent(item.matched_source_contributions, item.source_contributions)}&nbsp;% d'auteurs retrouvés
+            {formatPercent(item.matched_source_contributions / item.source_contributions)} d'auteurs retrouvés
           </span>
           <span>{item.matched_source_contributions} / {item.source_contributions} contributions sources</span>
         </div>

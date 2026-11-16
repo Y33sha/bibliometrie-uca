@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { formatNumber } from '#lib/utils.js';
 	import TableScroll from '#lib/components/TableScroll.svelte';
 	import SortChevron from '#lib/components/SortChevron.svelte';
 	import { columnLabels } from '#lib/labels.js';
@@ -137,8 +138,8 @@
 					</div>
 				</td>
 				<!-- Un décompte non nul mène à l'onglet correspondant de la fiche. -->
-				<td class="num">{#if p.serial_count}<a href={resolve(`publishers/${p.id}?tab=serials`)}>{p.serial_count.toLocaleString('fr-FR')}</a>{:else}0{/if}</td>
-				<td class="num">{#if p.publication_count}<a href={resolve(`publishers/${p.id}?tab=publications`)}>{p.publication_count.toLocaleString('fr-FR')}</a>{:else}0{/if}</td>
+				<td class="num">{#if p.serial_count}<a href={resolve(`publishers/${p.id}?tab=serials`)}>{formatNumber(p.serial_count)}</a>{:else}0{/if}</td>
+				<td class="num">{#if p.publication_count}<a href={resolve(`publishers/${p.id}?tab=publications`)}>{formatNumber(p.publication_count)}</a>{:else}0{/if}</td>
 			</tr>
 		{/each}
 		{#if list.listing.items.length === 0}

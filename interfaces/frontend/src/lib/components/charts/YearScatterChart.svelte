@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { formatNumber } from '#lib/utils.js';
 	import { cssColor } from '#lib/components/charts/cssVar.js';
 	import { Chart } from '#lib/components/charts/chart.js';
 
@@ -98,7 +99,7 @@
 							label: (item) => {
 								const point = (item.raw as Datum).point;
 								if (!point) return '';
-								const value = `${valueLabel} : ${point.value.toLocaleString('fr-FR')} (${point.year})`;
+								const value = `${valueLabel} : ${formatNumber(point.value)} (${point.year})`;
 								return point.detail ? [point.detail, value] : value;
 							},
 						},

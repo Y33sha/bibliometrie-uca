@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { formatNumber } from '#lib/utils.js';
 	import TableScroll from '#lib/components/TableScroll.svelte';
 	import SourceLinks from '#lib/components/SourceLinks.svelte';
 	import AccessButton from '#lib/components/AccessButton.svelte';
@@ -410,12 +411,12 @@
 							{@const isPersonNonCorr = isPerson && !isCorresponding(p)}
 							{#if ucaApc.length > 0}
 								<span class="tag" class:tag-success={!isPersonNonCorr}
-									title={ucaApc.map(a => `${a.amount?.toLocaleString('fr-FR')} € (${a.lab_acronym || institution.name})`).join('\n') + (isPersonNonCorr ? '\nAuteur non correspondant' : '')}>
-									{Math.round(ucaApc.reduce((s, a) => s + (a.amount || 0), 0)).toLocaleString('fr-FR')} €
+									title={ucaApc.map(a => `${a.amount == null ? '?' : formatNumber(a.amount)} € (${a.lab_acronym || institution.name})`).join('\n') + (isPersonNonCorr ? '\nAuteur non correspondant' : '')}>
+									{formatNumber(Math.round(ucaApc.reduce((s, a) => s + (a.amount || 0), 0)))} €
 								</span>
 							{:else}
-								<span class="tag" title={p.apc.map(a => `${a.amount?.toLocaleString('fr-FR')} € (${a.institution || '?'})`).join('\n')}>
-									{Math.round(p.apc.reduce((s, a) => s + (a.amount || 0), 0)).toLocaleString('fr-FR')} €
+								<span class="tag" title={p.apc.map(a => `${a.amount == null ? '?' : formatNumber(a.amount)} € (${a.institution || '?'})`).join('\n')}>
+									{formatNumber(Math.round(p.apc.reduce((s, a) => s + (a.amount || 0), 0)))} €
 								</span>
 							{/if}
 						{/if}

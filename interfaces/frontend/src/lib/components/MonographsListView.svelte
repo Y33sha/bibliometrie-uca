@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { formatNumber } from '#lib/utils.js';
 	import TableScroll from '#lib/components/TableScroll.svelte';
 	import SortChevron from '#lib/components/SortChevron.svelte';
 	import { columnLabels } from '#lib/labels.js';
@@ -121,7 +122,7 @@
 						</td>
 					{/if}
 					<!-- Un décompte non nul mène à la fiche, qui liste les publications. -->
-					<td class="num">{#if m.publication_count}<a href={resolve(`monographs/${m.id}`)}>{m.publication_count.toLocaleString('fr-FR')}</a>{:else}0{/if}</td>
+					<td class="num">{#if m.publication_count}<a href={resolve(`monographs/${m.id}`)}>{formatNumber(m.publication_count)}</a>{:else}0{/if}</td>
 				</tr>
 			{/each}
 			{#if list.listing.items.length === 0}

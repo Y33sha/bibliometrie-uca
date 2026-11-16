@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { formatNumber } from "#lib/utils.js";
+  import { formatCount } from "#lib/plural.js";
   import TableScroll from '#lib/components/TableScroll.svelte';
   import EntityBreadcrumb from "#lib/components/EntityBreadcrumb.svelte";
   import EntityStatus from "#lib/components/EntityStatus.svelte";
@@ -80,7 +82,7 @@
     <div class="entity-header">
       <h1 class="entity-title">{data.subject.label}</h1>
       <div class="entity-meta">
-        {data.subject.usage_count.toLocaleString("fr-FR")} publications
+        {formatCount(data.subject.usage_count, "publication")}
       </div>
     </div>
 
@@ -98,7 +100,7 @@
               <span class="current">{data.subject.label}</span>
             </span>
             {#if data.vocabulary_subjects.length > 1}
-              <span class="muted-num">{v.usage_count.toLocaleString("fr-FR")} publications</span>
+              <span class="muted-num">{formatCount(v.usage_count, "publication")}</span>
             {/if}
           </div>
           {#if v.children.length > 0}
@@ -108,7 +110,7 @@
               <ClampedBlock maxHeight="4.5rem" moreLabel={`Voir les ${v.children.length} sous-sujets`}>
                 <div class="detail-tags">
                   {#each v.children as c (c.label_normalized)}
-                    <a href={resolve(`subjects/${c.label_normalized}`)} class="tag">{c.label} <span class="muted-num">{c.usage_count.toLocaleString("fr-FR")}</span></a>
+                    <a href={resolve(`subjects/${c.label_normalized}`)} class="tag">{c.label} <span class="muted-num">{formatNumber(c.usage_count)}</span></a>
                   {/each}
                 </div>
               </ClampedBlock>
@@ -164,14 +166,14 @@
                 {#each sortedNeighbors as n (n.label_normalized)}
                   <tr>
                     <td><a class="entity-link" href={resolve(`subjects/${n.label_normalized}`)}>{n.label}</a></td>
-                    <td class="num">{n.cooccurrence_count.toLocaleString("fr-FR")}</td>
+                    <td class="num">{formatNumber(n.cooccurrence_count)}</td>
                     <td class="num">
                       <span class="spec-cell">
                         <span class="spec-bar" style="width: {(specificity(n) / maxSpecificity) * 60}px"></span>
                         <span><span class="spec-value">{specificityPercent(n)}</span>&nbsp;%</span>
                       </span>
                     </td>
-                    <td class="num muted-num">{n.usage_count.toLocaleString("fr-FR")}</td>
+                    <td class="num muted-num">{formatNumber(n.usage_count)}</td>
                   </tr>
                 {/each}
               </tbody>

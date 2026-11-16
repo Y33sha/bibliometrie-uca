@@ -1,5 +1,6 @@
 <script lang="ts">
 	// Options d'un filtre de présence : chaque élément passe de « tous » à « présents », puis « absents ». Un élément présent partout, ou nulle part, est omis, sauf filtré. Partagé par la liste déroulante d'un filtre et le panneau des filtres.
+	import { formatNumber } from '#lib/utils.js';
 	import { discriminates } from '#lib/filterRegistry.js';
 
 	export type ToggleState = 'all' | 'yes' | 'no';
@@ -114,7 +115,7 @@
 		</span>
 		<span class="item-label">{item.label}</span>
 		{#if c != null}
-			<span class="item-count">{c.toLocaleString('fr-FR')}</span>
+			<span class="item-count">{formatNumber(c)}</span>
 		{/if}
 	</button>
 	{#if item.levels?.length && state !== 'no'}
@@ -129,7 +130,7 @@
 					/>
 					<span class="level-label">{level.label}</span>
 					{#if lc != null}
-						<span class="item-count">{lc.toLocaleString('fr-FR')}</span>
+						<span class="item-count">{formatNumber(lc)}</span>
 					{/if}
 				</label>
 			{/each}

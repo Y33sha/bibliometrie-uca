@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { formatNumber } from '#lib/utils.js';
 	import PageHeader from '#lib/components/PageHeader.svelte';
 	import { institution } from '#lib/institution.svelte.js';
 	import { onMount } from 'svelte';
@@ -104,7 +105,7 @@
 {:else}
 	{#if isAdmin() && orphanCount > 0}
 		<a href={resolve('admin/orphan-contributions')} class="orphan-link">
-			{orphanCount.toLocaleString('fr-FR')} {plural(orphanCount, 'contribution')} {institution.name} {plural(orphanCount, 'orpheline')}
+			{formatNumber(orphanCount)} {plural(orphanCount, 'contribution')} {institution.name} {plural(orphanCount, 'orpheline')}
 			({plural(orphanCount, 'non reliée')} à une personne)
 		</a>
 	{/if}

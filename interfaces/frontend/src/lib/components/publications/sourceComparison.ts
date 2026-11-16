@@ -2,7 +2,7 @@ import type { components } from '#lib/api/schema.js';
 import { docTypeLabel } from '#lib/docTypes.svelte.js';
 import { CONTRIBUTION_ROLE_ORDER } from '#lib/labels.js';
 import { sourceOrder } from '#lib/sources.svelte.js';
-import { formatPublicationDate } from '#lib/utils.js';
+import { formatNumber, formatPublicationDate } from '#lib/utils.js';
 
 export type SourceRecord = components['schemas']['SourceRecordMetadataOut'];
 export type SourceContribution = components['schemas']['SourceContributionOut'];
@@ -174,7 +174,7 @@ function fields(records: SourceRecord[]): Field[] {
 		{
 			key: 'cited_by_count',
 			label: 'Citations',
-			cell: (r) => ({ text: r.cited_by_count?.toLocaleString('fr-FR') ?? null }),
+			cell: (r) => ({ text: r.cited_by_count == null ? null : formatNumber(r.cited_by_count) }),
 			// Chaque source compte les citations dans sa propre base : un écart entre sources est attendu.
 			compared: () => null,
 		},

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { formatNumber } from "#lib/utils.js";
   import PageHeader from "#lib/components/PageHeader.svelte";
   import ListToolbar from "#lib/components/ListToolbar.svelte";
   import SortChevron from "#lib/components/SortChevron.svelte";
@@ -79,7 +80,7 @@
             </td>
             <td class="muted">{s.vocabularies.map((v) => subjectVocabularyLabels[v]).join(", ")}</td>
             <!-- Un décompte non nul mène à l'onglet Publications de la fiche. -->
-            <td class="num">{#if s.usage_count}<a href={resolve(`subjects/${s.label_normalized}?tab=publications`)}>{s.usage_count.toLocaleString("fr-FR")}</a>{:else}0{/if}</td>
+            <td class="num">{#if s.usage_count}<a href={resolve(`subjects/${s.label_normalized}?tab=publications`)}>{formatNumber(s.usage_count)}</a>{:else}0{/if}</td>
           </tr>
         {/each}
       </tbody>

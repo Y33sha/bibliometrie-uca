@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { components } from "#lib/api/schema.js";
+  import { formatPercent } from "#lib/utils.js";
   import PhaseRibbon from "./PhaseRibbon.svelte";
   import { CELL_COLOR, fmtDate, fmtDuration, STATUS_LABEL, type Status } from "./helpers";
   import { PHASE_VIEWS, type PhaseView, type TableColumn } from "./phase-views";
@@ -59,7 +60,7 @@
     return rows.reduce((a, r) => a + (Number(r[key]) || 0), 0);
   }
   function fmtPct(n: number, total: number): string {
-    return total ? `${((n / total) * 100).toFixed(1)} %` : "—";
+    return total ? formatPercent(n / total, 1) : "—";
   }
   function fmtSigned(n: number): string {
     return n > 0 ? `+${n}` : n < 0 ? `${n}` : "—";
@@ -68,7 +69,7 @@
     const n = Number(value) || 0;
     if (col.duration) return fmtDuration(n);
     if (col.sign) return fmtSigned(n);
-    if (col.percent) return `${n} %`;
+    if (col.percent) return formatPercent(n / 100, 1);
     if (col.pct) return `${n} (${fmtPct(n, total)})`;
     return `${n}`;
   }

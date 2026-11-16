@@ -3,7 +3,7 @@
   import RhCheck from "#lib/components/RhCheck.svelte";
   import { resolve } from "$app/paths";
   import { api } from "#lib/api/index.js";
-  import { titleCase } from "#lib/utils.js";
+  import { formatNumber, titleCase } from "#lib/utils.js";
   import { personExclusionLabels, staffCategoryLabels } from "#lib/labels.js";
   import { autofocus } from "#lib/actions/focus.js";
   import Drawer from "#lib/components/Drawer.svelte";
@@ -175,8 +175,8 @@
   {/snippet}
 
     <div class="drawer-meta">
-      <span>{person.contribution_count ?? 0} publications</span>
-      <span>{person.in_perimeter_contribution_count ?? 0} dans le périmètre</span>
+      <span>{formatCount(person.contribution_count ?? 0, "publication")}</span>
+      <span>{formatNumber(person.in_perimeter_contribution_count ?? 0)} dans le périmètre</span>
       {#if person.exclusion}<span class="tag tag-pill tag-danger">{personExclusionLabels[person.exclusion]}</span>{/if}
     </div>
 

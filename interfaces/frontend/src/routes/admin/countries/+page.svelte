@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { formatNumber } from '#lib/utils.js';
 	import TableScroll from '#lib/components/TableScroll.svelte';
 	import { onMount } from 'svelte';
 	import PageHeader from '#lib/components/PageHeader.svelte';
@@ -220,7 +221,7 @@
 	{/if}
 	{#if batchCountry && hasActiveFilter}
 		<button class="btn" onclick={() => batchAddCountry(true)} disabled={batchApplying}>
-			Ajouter à tout le filtre ({list.total.toLocaleString('fr-FR')})
+			Ajouter à tout le filtre ({formatNumber(list.total)})
 		</button>
 	{/if}
 	{#if batchResult}

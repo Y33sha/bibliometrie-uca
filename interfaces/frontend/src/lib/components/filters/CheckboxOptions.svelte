@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { formatNumber } from '#lib/utils.js';
 	import { SvelteSet } from 'svelte/reactivity';
 	import type { FacetOption } from '#lib/components/FacetDropdown.svelte';
 	import { revealTruncated } from '#lib/actions/revealTruncated.js';
@@ -85,13 +86,13 @@
 			{@const empty = opt.count === 0 && !selected.includes(opt.value)}
 			<label class="option-row" class:empty>
 				<input type={single ? 'radio' : 'checkbox'} checked={selected.includes(opt.value)} disabled={empty} onchange={() => toggle(opt.value)} />
-				<span class="facet-option-text" use:revealTruncated>{opt.text}</span>{#if opt.count != null}<span class="facet-count">{opt.count.toLocaleString('fr-FR')}</span>{/if}
+				<span class="facet-option-text" use:revealTruncated>{opt.text}</span>{#if opt.count != null}<span class="facet-count">{formatNumber(opt.count)}</span>{/if}
 			</label>
 		{/each}
 	{/each}
 </div>
 {#if truncated && hiddenCount > 0}
-	<button type="button" class="option-row facet-more" onclick={() => (showAll = true)}>{hiddenCount.toLocaleString('fr-FR')} autres</button>
+	<button type="button" class="option-row facet-more" onclick={() => (showAll = true)}>{formatNumber(hiddenCount)} autres</button>
 {:else if showAll && limit !== undefined && !filterText}
 	<button type="button" class="option-row facet-more" onclick={() => (showAll = false)}>Réduire</button>
 {/if}

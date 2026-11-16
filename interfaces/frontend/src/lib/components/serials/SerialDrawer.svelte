@@ -168,7 +168,7 @@
     <p class="muted">Chargement…</p>
   {:else}
     <div class="drawer-meta">
-      <span>{serial.publication_count.toLocaleString("fr-FR")} publications</span>
+      <span>{formatCount(serial.publication_count, "publication")}</span>
       {#if serial.is_in_doaj}<span class="tag tag-success badge-doaj">DOAJ</span>{/if}
     </div>
 
@@ -245,7 +245,7 @@
           {#snippet item(r)}
             {r.title}
             {#if r.publisher_name}<span class="muted"> — {r.publisher_name}</span>{/if}
-            <span class="muted"> ({r.publication_count} publications)</span>
+            <span class="muted"> ({formatCount(r.publication_count, "publication")})</span>
           {/snippet}
         </Picker>
       {:else}

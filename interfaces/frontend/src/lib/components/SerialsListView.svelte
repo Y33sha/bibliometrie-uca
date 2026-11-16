@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { formatNumber } from '#lib/utils.js';
 	import TableScroll from '#lib/components/TableScroll.svelte';
 	import SortChevron from '#lib/components/SortChevron.svelte';
 	import { columnLabels } from '#lib/labels.js';
@@ -185,7 +186,7 @@
 				{/if}
 				<td class="muted">{serialTypeLabel(j.serial_type)}</td>
 				<!-- Un décompte non nul mène à l'onglet Publications de la fiche. -->
-				<td class="num">{#if j.publication_count}<a href={resolve(`journals/${j.id}?tab=publications`)}>{j.publication_count.toLocaleString('fr-FR')}</a>{:else}0{/if}</td>
+				<td class="num">{#if j.publication_count}<a href={resolve(`journals/${j.id}?tab=publications`)}>{formatNumber(j.publication_count)}</a>{:else}0{/if}</td>
 			</tr>
 		{/each}
 		{#if list.listing.items.length === 0}

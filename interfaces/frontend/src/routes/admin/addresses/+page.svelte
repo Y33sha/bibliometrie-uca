@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { formatNumber } from '#lib/utils.js';
 	import { institution, loadInstitution } from '#lib/institution.svelte.js';
 	import PageHeader from '#lib/components/PageHeader.svelte';
 	import ResultCount from '#lib/components/ResultCount.svelte';
@@ -423,11 +424,11 @@
 			{/each}
 		</select>
 		<div class="stats-bar">
-			<span class="tag tag-pill">{stats.total.toLocaleString('fr-FR')} adresses</span>
-			<span class="tag tag-pill tag-accent">Détectées&nbsp;: {stats.detected.toLocaleString('fr-FR')}</span>
-			<span class="tag tag-pill tag-warning">Non validées&nbsp;: {stats.pending.toLocaleString('fr-FR')}</span>
-			<span class="tag tag-pill tag-success">Reliées&nbsp;: {stats.confirmed.toLocaleString('fr-FR')}</span>
-			<span class="tag tag-pill tag-danger">Rejetées&nbsp;: {stats.rejected.toLocaleString('fr-FR')}</span>
+			<span class="tag tag-pill">{formatCount(stats.total, 'adresse')}</span>
+			<span class="tag tag-pill tag-accent">Détectées&nbsp;: {formatNumber(stats.detected)}</span>
+			<span class="tag tag-pill tag-warning">Non validées&nbsp;: {formatNumber(stats.pending)}</span>
+			<span class="tag tag-pill tag-success">Reliées&nbsp;: {formatNumber(stats.confirmed)}</span>
+			<span class="tag tag-pill tag-danger">Rejetées&nbsp;: {formatNumber(stats.rejected)}</span>
 		</div>
 		{#if currentStructureId}
 			<a href={resolve(`admin/feedback?structure_id=${currentStructureId}`)} class="btn btn-sm feedback-btn">Qualité de la détection</a>

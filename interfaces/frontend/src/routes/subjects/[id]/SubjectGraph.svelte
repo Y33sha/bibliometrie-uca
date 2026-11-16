@@ -1,9 +1,11 @@
 <script lang="ts">
+  import { formatCount } from "#lib/plural.js";
   import { resolve } from "$app/paths";
   import type { components } from "#lib/api/schema.js";
   import { fontSize } from "#lib/components/charts/cssVar.js";
   import { CX, CY, subjectGraphLayout, type GraphNode } from "./subjectGraphLayout";
-  import { specificityPercent } from "./specificity";
+  import { formatPercent } from "#lib/utils.js";
+  import { specificity } from "./specificity";
 
   type SubjectListItem = components["schemas"]["SubjectListItem"];
   type SubjectNeighbor = components["schemas"]["SubjectNeighborOut"];
@@ -106,11 +108,11 @@
           style="left: {((hovered.x - layout.box.x) / layout.box.width) * 100}%; top: {((hovered.y + hovered.r - layout.box.y) / layout.box.height) * 100}%"
         >
           <div class="tip-title">{hovered.neighbor.label}</div>
-          <div>{hovered.neighbor.cooccurrence_count.toLocaleString("fr-FR")} publications en commun</div>
+          <div>{formatCount(hovered.neighbor.cooccurrence_count, "publication")} en commun</div>
           <div>
-            {specificityPercent(hovered.neighbor)}&nbsp;% des publications de ce sujet portent aussi « {subject.label} »
+            {formatPercent(specificity(hovered.neighbor))} des publications de ce sujet portent aussi « {subject.label} »
           </div>
-          <div class="muted">{hovered.neighbor.usage_count.toLocaleString("fr-FR")} publications au total</div>
+          <div class="muted">{formatCount(hovered.neighbor.usage_count, "publication")} au total</div>
         </div>
       {/if}
     </div>

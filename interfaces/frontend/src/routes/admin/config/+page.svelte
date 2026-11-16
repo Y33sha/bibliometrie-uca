@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { formatNumber } from "#lib/utils.js";
   import TableScroll from '#lib/components/TableScroll.svelte';
   import IconButton from "#lib/components/IconButton.svelte";
   import PageHeader from "#lib/components/PageHeader.svelte";
@@ -172,7 +173,7 @@
 
   /** Plafond d'interrogations : zéro retire la borne. */
   function capLabel(value: number): string {
-    return value > 0 ? `${value.toLocaleString("fr-FR")} par run` : "Illimité";
+    return value > 0 ? `${formatNumber(value)} par run` : "Illimité";
   }
 
   function delayLabel(value: number): string {

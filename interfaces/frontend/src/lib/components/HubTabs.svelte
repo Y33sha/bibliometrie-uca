@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { formatNumber } from '#lib/utils.js';
   /** Onglet d'un référentiel d'administration : la liste, ou une file de triage. */
   export interface HubTab {
     key: string;
@@ -22,7 +23,7 @@
   {#each tabs as t (t.key)}
     <button class="tab" class:active={active === t.key} onclick={() => onselect(t.key)}>
       {t.label}
-      {#if t.count}<span class="tab-count">{t.count.toLocaleString("fr-FR")}</span>{/if}
+      {#if t.count}<span class="tab-count">{formatNumber(t.count)}</span>{/if}
     </button>
   {/each}
 </nav>

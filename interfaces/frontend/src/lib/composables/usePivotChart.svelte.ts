@@ -1,3 +1,4 @@
+import { formatNumber, formatPercent } from '#lib/utils.js';
 /**
  * Graphique des statistiques des publications : un indicateur (mesure et ventilation), un axe de comparaison facultatif, et leur tracé.
  *
@@ -102,7 +103,7 @@ export function usePivotChart(config: {
 	// Valeur affichée d'une barre ou d'un total : entier pour un nombre de publications, montant arrondi à l'euro suivi de l'unité pour une somme.
 	function formatValue(value: number): string {
 		const unit = indicatorDef?.unit;
-		const text = Math.round(value).toLocaleString('fr-FR');
+		const text = formatNumber(Math.round(value));
 		return unit ? `${text} ${unit}` : text;
 	}
 
@@ -273,8 +274,8 @@ export function usePivotChart(config: {
 						bodyFont: { size: fontSize('md') },
 						callbacks: {
 							label: (ctx) => {
-								const pct = shareOf(ctx.chart, ctx.datasetIndex, ctx.dataIndex).toFixed(1);
-								return part ? `${ctx.dataset.label} : ${pct}%` : `${ctx.dataset.label} : ${formatValue(ctx.raw as number)} (${pct}%)`;
+								const pct = formatPercent(shareOf(ctx.chart, ctx.datasetIndex, ctx.dataIndex) / 100, 1);
+								return part ? `${ctx.dataset.label} : ${pct}` : `${ctx.dataset.label} : ${formatValue(ctx.raw as number)} (${pct})`;
 							},
 							// Explication de la série empilée ; sans empilement, de la catégorie, que nomme l'axe.
 							afterLabel: (ctx) => (stackDim ? descriptions[ctx.datasetIndex] : pivotValueDescription(xDim, cats[ctx.dataIndex])) ?? '',
@@ -313,7 +314,7 @@ export function usePivotChart(config: {
 								stacked: true,
 								beginAtZero: true,
 								suggestedMax: valueMax,
-								ticks: { precision: 0, callback: (v: string | number) => Number(v).toLocaleString('fr-FR') },
+								ticks: { precision: 0, callback: (v: string | number) => formatNumber(Number(v)) },
 							},
 				},
 			},
