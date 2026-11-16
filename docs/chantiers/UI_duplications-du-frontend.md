@@ -131,6 +131,6 @@ Une étiquette (tag, badge, pastille, chip) est un court texte sur fond clair, a
 - [x] Énumérations chargées une fois (99b60b63a) ; signalement d'erreur unique (675770bb5)
 - [x] Libellés sur `labels.ts` et sur les libellés servis par l'API (c774b1998)
 - [x] Un nom par section dans la navigation, l'en-tête de page et le fil d'Ariane (3e6d404c8)
-- [ ] Icônes sur Lucide : navigation, `KeyFigures`, `IconButton`, `SectionLabel`, SVG en ligne, glyphes « × »
-- [ ] Pictogrammes Creative Commons de `LicenseBadge` en SVG ; dépendance Flaticon retirée
-- [ ] Infobulles sur `Tooltip` : attributs `title` (97 dans 60 fichiers, dont `KeyFigures`), infobulles des graphiques Chart.js
+- [x] Icônes sur Lucide : navigation, `KeyFigures`, `IconButton`, `SectionLabel`, SVG en ligne (49992cb71)
+- [x] Pictogrammes Creative Commons de `LicenseBadge` en SVG ; dépendance Flaticon retirée (ab309395a)
+- [x] Infobulles sur l'action `tooltip` et `TooltipHost` : attributs `title` des éléments, composant `Tooltip`, infobulles des graphiques Chart.js (b7962b529)
