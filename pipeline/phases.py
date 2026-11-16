@@ -19,7 +19,7 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation import finalize
 from pipeline.transformation.dois import dois
 from pipeline.transformation.persons import persons
-from pipeline.transformation.publications import publications, relations
+from pipeline.transformation.publications import publications, relations, retractions
 from pipeline.transformation.publications.author_grouping import author_grouping
 from pipeline.transformation.publications.correction import metadata_correction
 from pipeline.transformation.publications.subjects import subjects
@@ -137,8 +137,8 @@ PHASES: tuple[Phase, ...] = (
     ),
     Phase(
         "relations",
-        "Relations entre publications",
-        relations.TASKS,
+        "Relations entre publications, indicateur « Rétracté »",
+        relations.TASKS + retractions.TASKS,
         Block.ENRICHMENTS,
     ),
     Phase(

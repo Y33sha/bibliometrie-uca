@@ -103,17 +103,22 @@ _CROSSREF_MAP: dict[str, RelationType] = {
 }
 """Clés Crossref du vocabulaire."""
 
+CROSSREF_RETRACTION_UPDATE = "retraction"
+"""Type de mise à jour Crossref d'un avis de rétractation. Vers le DOI de l'enregistrement source lui-même, il signale une rétractation sur place."""
+
+CROSSREF_WITHDRAWAL_UPDATE = "withdrawal"
+"""Type de mise à jour Crossref d'un retrait. Elsevier le déclare sur l'enregistrement source retiré, doublon accidentel d'un article déjà publié, vers cet article."""
+
 _CROSSREF_UPDATE_MAP: dict[str, RelationType] = {
     "correction": RelationType.IS_CORRECTION_OF,
     "erratum": RelationType.IS_CORRECTION_OF,
     "corrigendum": RelationType.IS_CORRECTION_OF,
     "addendum": RelationType.IS_CORRECTION_OF,
     "clarification": RelationType.IS_CORRECTION_OF,
-    "retraction": RelationType.IS_RETRACTION_OF,
-    "withdrawal": RelationType.IS_RETRACTION_OF,
+    CROSSREF_RETRACTION_UPDATE: RelationType.IS_RETRACTION_OF,
     "expression_of_concern": RelationType.IS_CONCERN_ABOUT,
 }
-"""Types de mise à jour Crossref du vocabulaire, vus depuis l'erratum ou l'avis. Les nouvelles versions et éditions, formes d'une même œuvre, restent hors du vocabulaire."""
+"""Types de mise à jour Crossref du vocabulaire, vus depuis l'erratum ou l'avis. Restent hors du vocabulaire les nouvelles versions et éditions, formes d'une même œuvre, et les retraits (`CROSSREF_WITHDRAWAL_UPDATE`)."""
 
 
 _INVERSE_RELATIONS: dict[RelationType, RelationType] = {

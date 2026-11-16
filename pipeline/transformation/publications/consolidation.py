@@ -47,7 +47,6 @@ class _SourceRecordRow(NamedTuple):
     monograph_id: int | None
     container_title: str | None
     language: str | None
-    is_retracted: bool | None
     abstract: str | None
     countries: list[str] | None
     urls: list[str] | None
@@ -81,7 +80,6 @@ def _source_record_from_row(
         monograph_id=row.monograph_id,
         container_title=row.container_title,
         language=row.language,
-        is_retracted=row.is_retracted,
         abstract=row.abstract,
         countries=tuple(row.countries or ()),
         urls=tuple(row.urls or ()),
@@ -107,7 +105,7 @@ def source_records_of(
                    sr.title, sr.publication_year, sr.doc_type::text AS doc_type,
                    {identifiers_json_sql("sr.id")} AS identifiers,
                    sr.serial_id, sr.monograph_id, sr.container_title, sr.language,
-                   sr.is_retracted, sr.abstract,
+                   sr.abstract,
                    sr.countries, sr.urls, sr.keywords,
                    sr.biblio, sr.source_extras, sr.license::text AS license,
                    sr.publisher_id, sr.publication_date,

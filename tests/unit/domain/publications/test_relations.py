@@ -220,9 +220,13 @@ class TestExtractCrossrefUpdateRelations:
             (RelationType.HAS_CONCERN, "10.1/concern"),
         ]
 
-    def test_new_version_out_of_vocabulary(self):
+    def test_new_version_and_withdrawal_out_of_vocabulary(self):
+        """Un retrait Elsevier vise l'article dont l'enregistrement source déclarant est le doublon."""
         source_extras = {
-            "update_to": [{"doi": "10.1/x", "type": "new_version", "source": "publisher"}]
+            "update_to": [
+                {"doi": "10.1/x", "type": "new_version", "source": "publisher"},
+                {"doi": "10.1/y", "type": "withdrawal", "source": "publisher"},
+            ]
         }
         assert extract_crossref_update_relations(source_extras) == []
 
