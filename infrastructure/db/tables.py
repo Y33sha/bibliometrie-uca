@@ -779,6 +779,15 @@ addresses = Table(
             " la pose sur les adresses sans origine."
         ),
     ),
+    Column(
+        "is_concatenated",
+        Boolean,
+        comment=(
+            "Vrai si le texte réunit plusieurs affiliations, chacune suivie des initiales de ses"
+            " auteurs. Une adresse concaténée est sans indice de périmètre. La phase affiliations"
+            " la pose sur les adresses non examinées."
+        ),
+    ),
     schema="structures",
 )
 

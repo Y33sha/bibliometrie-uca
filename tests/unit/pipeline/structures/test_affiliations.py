@@ -32,11 +32,12 @@ def perimetre(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[int]]:
 
 
 def _phase(ror: PhaseMetrics | None = None) -> Phase:
-    """Renvoie la phase `affiliations`, ses deux référentiels et ses tâches des pays remplacés par des tâches sans réseau ni transaction, l'origine des adresses par une transaction vide."""
+    """Renvoie la phase `affiliations`, ses deux référentiels et ses tâches des pays remplacés par des tâches sans réseau ni transaction, l'origine des adresses et la détection des adresses concaténées par des transactions vides."""
     remplacees = {
         "refresh_ror": lambda _ctx: ror or PhaseMetrics(),
         "refresh_hal_structures": lambda _ctx: PhaseMetrics(),
         "classify_addresses": in_transaction(lambda _conn, _logger: PhaseMetrics()),
+        "detect_concatenated_addresses": in_transaction(lambda _conn, _logger: PhaseMetrics()),
         **{task.name: lambda _ctx: PhaseMetrics() for task in countries.STEP.tasks},
     }
     affiliations = next(p for p in PHASES if p.name == "affiliations")
@@ -88,7 +89,7 @@ def test_assemble_les_metriques_de_la_resolution_des_pays_et_du_perimetre(contex
 def test_chaque_sous_etape_dans_sa_transaction(open_tx, contexte):
     _run(contexte)
 
-    assert open_tx.transactions == 5
+    assert open_tx.transactions == 6
 
 
 def test_les_deux_taches_lisent_le_perimetre_des_personnes(contexte):

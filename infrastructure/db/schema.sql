@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict xk5e2q0zRAJ2vqa2lBaS1cCxnwocuAKZmGx8Ev0GT7jRLtc40bhRP0eWBfis9XE
+\restrict SxoBbmNuaCWO7uN0CYT2hFvA4pu7lSsC1MdhsMo3qzcgjBZW9PEZBhw1UL3FuJy
 
--- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
--- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
+-- Dumped from database version 18.7 (Ubuntu 18.7-1.pgdg22.04+2)
+-- Dumped by pg_dump version 18.7 (Ubuntu 18.7-1.pgdg22.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -1470,6 +1470,37 @@ CREATE TABLE structures.address_structures (
 
 
 --
+-- Name: addresses; Type: TABLE; Schema: structures; Owner: -
+--
+
+CREATE TABLE structures.addresses (
+    id integer NOT NULL,
+    raw_text text NOT NULL,
+    normalized_text text NOT NULL,
+    created_at timestamp with time zone DEFAULT now(),
+    publication_count integer DEFAULT 0,
+    countries character(2)[],
+    origin public.address_origin,
+    is_concatenated boolean,
+    CONSTRAINT ck_addresses_normalized_text_not_empty CHECK ((normalized_text <> ''::text))
+);
+
+
+--
+-- Name: COLUMN addresses.origin; Type: COMMENT; Schema: structures; Owner: -
+--
+
+COMMENT ON COLUMN structures.addresses.origin IS 'Origine du texte : adresse brute, libellé HAL ou nom seul. La phase affiliations la pose sur les adresses sans origine.';
+
+
+--
+-- Name: COLUMN addresses.is_concatenated; Type: COMMENT; Schema: structures; Owner: -
+--
+
+COMMENT ON COLUMN structures.addresses.is_concatenated IS 'Vrai si le texte réunit plusieurs affiliations, chacune suivie des initiales de ses auteurs. Une adresse concaténée est sans indice de périmètre. La phase affiliations la pose sur les adresses non examinées.';
+
+
+--
 -- Name: idref_structures; Type: TABLE; Schema: structures; Owner: -
 --
 
@@ -1603,9 +1634,10 @@ CREATE MATERIALIZED VIEW sources.source_contribution_structures AS
  SELECT saa.source_contribution_id,
     ast.structure_id,
     'address'::public.perimeter_evidence AS evidence
-   FROM (sources.source_contribution_addresses saa
+   FROM ((sources.source_contribution_addresses saa
+     JOIN structures.addresses a ON ((a.id = saa.address_id)))
      JOIN structures.address_structures ast ON ((ast.address_id = saa.address_id)))
-  WHERE ((ast.is_confirmed IS DISTINCT FROM false) AND (ast.structure_id IN ( SELECT perimeter.structure_id
+  WHERE ((ast.is_confirmed IS DISTINCT FROM false) AND (a.is_concatenated IS NOT TRUE) AND (ast.structure_id IN ( SELECT perimeter.structure_id
            FROM perimeter)))
 UNION
  SELECT sar.source_contribution_id,
@@ -3497,29 +3529,6 @@ CREATE SEQUENCE structures.address_structures_id_seq
 --
 
 ALTER SEQUENCE structures.address_structures_id_seq OWNED BY structures.address_structures.id;
-
-
---
--- Name: addresses; Type: TABLE; Schema: structures; Owner: -
---
-
-CREATE TABLE structures.addresses (
-    id integer NOT NULL,
-    raw_text text NOT NULL,
-    normalized_text text NOT NULL,
-    created_at timestamp with time zone DEFAULT now(),
-    publication_count integer DEFAULT 0,
-    countries character(2)[],
-    origin public.address_origin,
-    CONSTRAINT ck_addresses_normalized_text_not_empty CHECK ((normalized_text <> ''::text))
-);
-
-
---
--- Name: COLUMN addresses.origin; Type: COMMENT; Schema: structures; Owner: -
---
-
-COMMENT ON COLUMN structures.addresses.origin IS 'Origine du texte : adresse brute, libellé HAL ou nom seul. La phase affiliations la pose sur les adresses sans origine.';
 
 
 --
@@ -6307,5 +6316,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict xk5e2q0zRAJ2vqa2lBaS1cCxnwocuAKZmGx8Ev0GT7jRLtc40bhRP0eWBfis9XE
+\unrestrict SxoBbmNuaCWO7uN0CYT2hFvA4pu7lSsC1MdhsMo3qzcgjBZW9PEZBhw1UL3FuJy
 

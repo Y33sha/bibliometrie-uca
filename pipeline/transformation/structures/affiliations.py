@@ -5,10 +5,11 @@ La phase s'arrête en échec si le périmètre d'extraction ne contient aucune s
 1. **Référentiel ROR** (`affiliations.refresh_ror`) : importe la dernière version du dump ROR, si elle reste à importer.
 2. **Référentiel des structures HAL** (`affiliations.refresh_hal_structures`) : charge les structures HAL citées et absentes du référentiel.
 3. **Origine des adresses** (`affiliations.classify_addresses`) : classe le texte des adresses sans origine en adresse brute, libellé HAL ou nom seul.
-4. **Résolution des adresses** (`affiliations.resolve_addresses`) : rattache les adresses aux structures connues.
-5. **Partenaires de thèse** (`affiliations.resolve_thesis_partners`) : rattache aux structures les PPN des laboratoires partenaires de thèse.
-6. **Pays** (`pipeline.transformation.countries.countries`) : pays des adresses, puis des contributions sources, des enregistrements sources et des publications.
-7. **Contributions sources du périmètre** (`affiliations.populate`) : pose sur chaque contribution source les indices de son entrée dans le périmètre, d'après les structures atteintes et les identifiants des personnes à fiche RH.
+4. **Adresses concaténées** (`affiliations.detect_concatenated_addresses`) : repère parmi les adresses non examinées celles qui réunissent plusieurs affiliations, chacune suivie des initiales de ses auteurs. Une adresse concaténée est sans indice de périmètre.
+5. **Résolution des adresses** (`affiliations.resolve_addresses`) : rattache les adresses aux structures connues.
+6. **Partenaires de thèse** (`affiliations.resolve_thesis_partners`) : rattache aux structures les PPN des laboratoires partenaires de thèse.
+7. **Pays** (`pipeline.transformation.countries.countries`) : pays des adresses, puis des contributions sources, des enregistrements sources et des publications.
+8. **Contributions sources du périmètre** (`affiliations.populate`) : pose sur chaque contribution source les indices de son entrée dans le périmètre, d'après les structures atteintes et les identifiants des personnes à fiche RH.
 """
 
 from __future__ import annotations
@@ -31,6 +32,7 @@ from pipeline.runtime.observability.log_format import LAST_BRANCH, inflect, quan
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import waiting
 from pipeline.transformation.countries import countries
+from pipeline.transformation.structures.address_concatenation import detect_concatenated_addresses
 from pipeline.transformation.structures.address_origin import classify_addresses
 from pipeline.transformation.structures.address_resolution import (
     run_resolution,
@@ -163,6 +165,16 @@ _CLASSIFY_ADDRESSES = Task(
 )
 
 
+_DETECT_CONCATENATED_ADDRESSES = Task(
+    "detect_concatenated_addresses",
+    reads=("addresses.raw_text", "addresses.is_concatenated"),
+    writes=("addresses.is_concatenated",),
+    previous_run=("addresses.is_concatenated",),
+    run=in_transaction(detect_concatenated_addresses),
+    section="Adresses concaténées",
+)
+
+
 _RESOLVE_ADDRESSES = Task(
     "resolve_addresses",
     reads=(
@@ -197,6 +209,7 @@ _POPULATE = Task(
     "populate",
     reads=(
         "address_structures",
+        "addresses.is_concatenated",
         "perimeter_structures",
         "config",
         "source_contribution_addresses",
@@ -254,6 +267,7 @@ STEPS = (
                 (_REFRESH_ROR, _REFRESH_HAL_STRUCTURES),
             ),
             _CLASSIFY_ADDRESSES,
+            _DETECT_CONCATENATED_ADDRESSES,
             _RESOLVE_ADDRESSES,
             _RESOLVE_THESIS_PARTNERS,
         ),
