@@ -170,7 +170,17 @@ Le chantier [alignement des auteurs](archived/2026-10-24_DATA_alignement-auteurs
   - Faux désaccords : l'autre source donne la même structure, par une adresse ou une structure HAL non rattachée (CHU, QuaPA, TSCF).
 - [x] Formes de nom en collision : `gred` (iGReD), `u1095` (GDEC), `umr 547` (PIAF), `umr 6024` (LAPSCO), `umr 1019` (UNH).
 - [ ] Faux désaccords : identifiants HAL à rattacher (QuaPA : 1 450 contributions, TSCF : 194) et formes de nom manquantes (CHU, LASMEA, SEESIB, PFEM, abréviations du WoS).
-- [ ] Détection élargie des adresses concaténées : noms entre parenthèses, initiales espacées, listes d'affiliations d'un essai multicentrique.
+- [ ] Détection élargie des adresses concaténées. Simulation le 2026-11-16 (`concat_v2.py`, `simulate_concat_v2.py`).
+  - Motifs ajoutés : au moins deux groupes de noms entre parenthèses (« (Ms Serole, Mr Prunet) »), au moins deux groupes d'initiales sans points dont un à plusieurs codes (« (MC, FL, PJ, A-LC, EF) »), liste numérotée « 1… 2… 3… », au moins cinq villes. Les initiales espacées n'ajoutent rien. La longueur seule ne discrimine pas.
+  - 120 adresses de plus, dont 84 du périmètre. 276 contributions et 205 personnes hors RH sortent du périmètre, et 4 publications.
+  - Pertes justes : 5 contributions de 3 personnes RH, dans des listes multicentriques qui contiennent leur vrai centre (Centre Jean Perrin, CHU).
+  - OpenAlex découpe une note d'affiliations en une adresse par affiliation, chacune suivie de son groupe d'initiales. La règle, jugée adresse par adresse, laisse passer ces cas.
+  - Piste : garder l'indice de l'auteur dont le nom ou les initiales figurent dans la partie de l'adresse du périmètre. La décision se prend alors par contribution source.
+- [ ] Adresse concaténée comme indice du document : la publication entre dans le périmètre, la contribution se rattache par le nom ou l'identifiant sans créer de personne. Étude le 2026-11-16 (`doc_evidence.py`).
+  - Mise en œuvre : un indice `concatenated_address` parmi les indices liés au document, hors des structures des contributions et de l'union des indices de la contribution, et un troisième état de la décision du rattachement.
+  - 103 publications recevraient l'indice. 93 contributions sans personne se rattacheraient par le nom à une personne existante, souvent une fausse personne du périmètre à une, deux ou trois contributions, ou un homonyme. Garde-fou possible : rattachement limité aux personnes à fiche RH ou à identifiant confirmé.
+- [x] Une contribution aux seuls rôles sans création de personne (jury de thèse, inventeur) laisse supprimer sa personne. 84a6e6e53. Le prochain run supprime au plus 109 personnes hors RH.
+- [ ] Affiliations décalées dans les articles médicaux multicentriques : voie d'entrée principale des fausses personnes à une, deux ou trois contributions (une trentaine sur une cinquantaine examinées). L'affiliation d'un centre clermontois va à un autre auteur, souvent dans plusieurs sources à la fois (OpenAlex, WoS, Crossref), qui reprennent les métadonnées de l'éditeur.
 - [x] Adresse concaténée sans indice de périmètre : colonne `addresses.is_concatenated`, tâche `affiliations.detect_concatenated_addresses`. 0dd031ae5. Simulation le 2026-11-16 (`concat_rule.py`) : 365 contributions de 29 publications sortent du périmètre, et aucune publication.
   - 301 personnes hors RH sortent du périmètre. L'adresse place les initiales de 189 d'entre elles dans une affiliation hors périmètre. Les initiales des 112 autres sont absentes de l'adresse, tronquée par la source à 500 ou 1 000 caractères.
   - Une personne RH perd une contribution : celle d'une homonyme toulousaine.
