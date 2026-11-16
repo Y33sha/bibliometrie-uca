@@ -53,28 +53,33 @@
 
 ## Phases du pipeline
 
-A jour au 2026-10-29
+A jour au 2026-11-16. `uv run python -m interfaces.cli.dev.pipeline_tree` affiche l'arborescence complète (blocs, phases, étapes, tâches).
 
-`harvest` — Moissonnage HAL/OpenAlex/WoS/ScanR/theses/DataCite
+Collecte
+`harvest` — Moissonnage par affiliation (HAL, OpenAlex, WoS, ScanR, theses.fr, DataCite, INSPIRE-HEP, OPS)
 `harvest_by_person` — Moissonnage par identifiant des personnes RH (ORCID, idHAL, IdRef)
-`fetch_missing` — Rattrapage cross-source (hal-id, NNT, DOI)
-`fetch_stale` — Rafraîchissement des docs stale
-`fetch_truncated` — Re-fetch OpenAlex tronqués (100 auteurs)
-`normalize` — Normalisation staging → source_records, source_contributions, addresses
-`affiliations` — Résolution adresses → structures UCA
-`resolve_ra` — Résolution Registration Agency des DOI
-`publishing` — Référentiels de l'édition : éditeurs, publications en série, monographies (DOI, APC, DOAJ)
-`metadata_correction` — Corrections métadonnées
-`publications` — Création/rattachement publications
-`author_grouping` — Alignement des auteurs des enregistrements sources d'une même publication
-`persons` — Création personnes
-`finalize` — Périmètre des publications, vues des structures, purges et compteurs
-`relations` — Relations sémantiques entre publications
-`subjects` — Sujets/mots-clés
-`countries` — Détection pays
-`oa_status` — Statut open access
+`fetch_missing` — Recherche dans chaque source des documents trouvés dans une autre (hal-id, NNT, numéro de brevet, DOI), sources en parallèle
+`fetch_stale` — Recherche des documents non revus par le moissonnage
+`fetch_truncated` — Complétion des listes d'auteurs OpenAlex tronquées
 
-Les quatre dernières sont des enrichissements, hors résolution d'entités : `--no-extras` les omet.
+Enregistrements sources
+`normalize` — Normalisation staging → source_records, source_contributions, addresses
+`affiliations` — Structures, pays et périmètre des contributions sources
+`dois` — Référentiel des DOI : agence des préfixes, existence et URL chez doi.org, verdict d'Unpaywall
+`publishing` — Référentiels de l'édition : préfixes DOI, éditeurs, publications en série, monographies
+`metadata_correction` — Correction des enregistrements sources
+
+Entités
+`publications` — Rattachement des enregistrements sources aux publications, puis consolidation de la file `publications_queue`
+`author_grouping` — Alignement des auteurs d'une publication entre ses sources
+`persons` — Rattachement des contributions aux personnes
+
+Données dérivées
+`finalize` — Périmètre des publications, purges, vues des structures, nettoyage des référentiels de l'édition, compteurs
+
+Enrichissements (`--no-extras` les omet)
+`relations` — Relations entre publications
+`subjects` — Sujets des publications
 
 ## Conventions du projet
 

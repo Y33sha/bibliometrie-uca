@@ -19,7 +19,7 @@ Le pipeline interroge Crossref par DOI, pour les documents découverts par les a
 - Adresse électronique de contact dans le `User-Agent` (`POLITE_POOL_EMAIL`)
 - Limites du polite pool Crossref : 10 req/s et 3 requêtes simultanées. Débit et requêtes simultanées du pipeline : `pipeline/ingestion/api_params.py`
 
-**Prefixes API** (`https://api.crossref.org/prefixes/{prefix}`) — identifie l'éditeur (membre Crossref) d'un préfixe DOI, pour la phase [`publishing`](../pipeline/05-publishing.md) (`resolve_crossref_publishers`), une fois connue l'agence d'enregistrement du préfixe ([`resolve_ra`](../pipeline/05-publishing.md#agences-denregistrement-doi-resolve_ra)).
+**Prefixes API** (`https://api.crossref.org/prefixes/{prefix}`) — identifie l'éditeur (membre Crossref) d'un préfixe DOI, pour la phase [`publishing`](../pipeline/05-publishing.md) (`resolve_crossref_publishers`), une fois connue l'agence d'enregistrement du préfixe (phase [`dois`](../pipeline/05-publishing.md#référentiel-des-doi-dois)).
 
 ## Données récupérées
 

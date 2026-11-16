@@ -1,6 +1,6 @@
 # Moissonnage
 
-*À jour le 2026-11-04.*
+*À jour le 2026-11-16.*
 
 Récupère les données brutes depuis les API et les stocke en JSONB dans le *staging*.
 
@@ -26,7 +26,7 @@ Une publication sans affiliation au périmètre échappe au moissonnage par affi
 
 ## Documents absents d'une source (`fetch_missing`)
 
-Le moissonnage interroge les sources sur le critère de l'affiliation : un document présent dans une source, mais d'affiliation mal renseignée, échappe au moissonnage. On cherche donc dans chaque source les documents trouvés seulement dans les autres.
+Le moissonnage interroge les sources sur le critère de l'affiliation : un document présent dans une source, mais d'affiliation mal renseignée, échappe au moissonnage. On cherche donc dans chaque source les documents trouvés seulement dans les autres. Les sources sont interrogées en parallèle. Chaque source enchaîne ses recherches : HAL par hal-id, puis par NNT, puis par DOI.
 
 **`fetch_missing.hal_by_id` et `fetch_missing.scanr_by_hal_id` : documents manquants, par hal-id.**
 Dans HAL, les documents absents de `staging`, avec un hal-id présent dans OpenAlex ou ScanR. Dans ScanR, les documents absents des enregistrements sources ScanR, avec un hal-id présent dans HAL ou OpenAlex.
@@ -40,9 +40,9 @@ Dans OPS, les familles des brevets du périmètre sans famille OPS, par numéro 
 **`fetch_missing.doi.<source>` : DOI manquants par source.**
 Pour chacune des six sources interrogeables par DOI — HAL, OpenAlex, WoS, ScanR, Crossref, DataCite —, recherche les documents présents dans les autres sources et non trouvés dans celle-ci par le moissonnage initial. Les DOI cherchés sont ceux des publications de la fenêtre d'années du run : l'un des enregistrements sources de la publication a son année dans la fenêtre. Un DOI à suffixe de version (`.v2`, `/v2`) ajoute sa forme sans version, cherchée dans toutes les sources. Crossref, non interrogeable par affiliation, est seulement interrogé ici et par personne.
 
-Crossref et DataCite reçoivent seulement les DOI à préfixe enregistré chez eux, d'après l'agence résolue par la phase [resolve_ra](05-publishing.md#agences-denregistrement-doi-resolve_ra). Un DOI à préfixe sans agence attend le run suivant.
+Crossref et DataCite reçoivent seulement les DOI à préfixe enregistré chez eux, d'après l'agence résolue par la phase [dois](05-publishing.md#référentiel-des-doi-dois). Un DOI à préfixe sans agence attend le run suivant.
 
-**Recherches infructueuses.** Chaque identifiant cherché en vain est inscrit dans `failed_lookups`. L'échec est définitif auprès du registre qui attribue l'identifiant (HAL pour un hal-id, theses.fr pour un NNT, doi.org pour un DOI). Ailleurs, l'identifiant est cherché de nouveau après le délai `fetch_missing_retry_after_days`. La phase `metadata_correction` retire les DOI inconnus de doi.org et les hal-id introuvables dans HAL.
+**Recherches infructueuses.** Chaque identifiant cherché en vain est inscrit dans `failed_lookups`. L'échec est définitif auprès du registre qui attribue l'identifiant (HAL pour un hal-id, theses.fr pour un NNT). Ailleurs, l'identifiant est cherché de nouveau après le délai `fetch_missing_retry_after_days`. Un DOI inconnu de doi.org (`dois.registered`) sort définitivement de la sélection. La phase `metadata_correction` retire les DOI inconnus de doi.org et les hal-id introuvables dans HAL.
 
 ## Documents périmés et disparus (`fetch_stale`)
 
@@ -54,10 +54,10 @@ Chaque ligne périmée est réinterrogée par son identifiant natif :
 - absence confirmée → `disappeared_at` posé. La source répond 404, ou la page du dépôt HAL répond 404, ou la recherche ScanR est vide ;
 - erreur transitoire → laissée, retentée plus tard. Un dépôt HAL absent de la recherche mais en ligne est aussi retenté.
 
-La sélection se borne aux années de la fenêtre courante, lues sur `source_records.publication_year`. Une thèse en cours, qui n'a pas d'année de soutenance, est relue quelle que soit la fenêtre.
+La sélection se borne aux années de la fenêtre courante, lues sur `source_records.publication_year`. Une thèse en cours, sans année de soutenance, est cherchée quelle que soit la fenêtre.
 
 ## Listes d'auteurs tronquées (`fetch_truncated`)
 
 L'[API OpenAlex](../sources/03-openalex.md) plafonne la liste des auteurs à 100 par réponse ; au-delà, les auteurs surnuméraires sont absents du payload moissonné.
 
-Le moissonnage et la recherche par DOI de `fetch_missing` marquent `staging.authors_truncated` sur les documents de 100 auteurs. Cette phase retélécharge un par un les documents marqués, récupère la liste complète des auteurs et retire la marque. Un document absent d'OpenAlex, ou renvoyé sous un autre identifiant (work fusionné), reçoit `disappeared_at`, comme dans `fetch_stale`. Quand OpenAlex est indisponible, la marque reste et le document est repris au run suivant.
+Le moissonnage et la recherche par DOI de `fetch_missing` marquent `staging.authors_truncated` sur les documents de 100 auteurs. Cette phase cherche de nouveau un par un les documents marqués, récupère la liste complète des auteurs et retire la marque. Un document absent d'OpenAlex, ou renvoyé sous un autre identifiant (work fusionné), reçoit `disappeared_at`, comme dans `fetch_stale`. Quand OpenAlex est indisponible, la marque reste et le document est repris au run suivant.

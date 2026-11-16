@@ -21,11 +21,11 @@ Consultée par DOI pour le statut open access des publications. Les DOI DataCite
 
 ### Données récupérées
 
-Une seule donnée consommée : le `oa_status` du payload Unpaywall, mappé sur l'enum du référentiel : `gold`, `hybrid`, `bronze`, `green`, `closed`. La phase [`oa_status`](../pipeline/11-enrichissements.md#statut-open-access-oa_status) l'écrit par DOI dans `sources.dois`, avec la date de l'interrogation. Un DOI absent d'Unpaywall y reçoit un statut nul.
+Une seule donnée consommée : le `oa_status` du payload Unpaywall, mappé sur l'enum du référentiel : `gold`, `hybrid`, `bronze`, `green`, `closed`. La phase [`dois`](../pipeline/05-publishing.md#référentiel-des-doi-dois) l'écrit par DOI dans `sources.dois`, avec la date de l'interrogation. Un DOI absent d'Unpaywall y reçoit un statut nul.
 
 ### Particularités
 
-Le verdict d'Unpaywall relève le statut déduit des copies, sans l'abaisser ([règle](../pipeline/11-enrichissements.md#statut-open-access-oa_status)).
+Le verdict d'Unpaywall relève le statut déduit des copies, sans l'abaisser ([règle](../pipeline/07-publications.md#recalcul-des-métadonnées)).
 
 ## doi.org
 
@@ -35,8 +35,10 @@ Aucun identifiant d'accès n'est requis. Les requêtes s'identifient par leur `U
 
 ### Services utilisés
 
-- `https://doi.org/ra/<préfixe>,<préfixe>` : agence d'enregistrement de chaque préfixe DOI. Phase [`resolve_ra`](../pipeline/05-publishing.md#agences-denregistrement-doi-resolve_ra).
-- `https://doi.org/api/handles/<doi>` : handle du DOI, 404 pour un DOI inconnu. Phase [`fetch_missing`](../pipeline/02-harvest.md#documents-absents-dune-source-fetch_missing), pour un DOI absent de son agence d'enregistrement. Phase [`oa_status`](../pipeline/11-enrichissements.md#statut-open-access-oa_status), pour l'URL de résolution du DOI, valeur de type `URL` du handle.
+- `https://doi.org/ra/<préfixe>,<préfixe>` : agence d'enregistrement de chaque préfixe DOI.
+- `https://doi.org/api/handles/<doi>` : handle du DOI, 404 pour un DOI inconnu. L'URL de résolution est la valeur de type `URL` du handle.
+
+La phase [`dois`](../pipeline/05-publishing.md#référentiel-des-doi-dois) interroge les deux services.
 
 ### Données récupérées
 

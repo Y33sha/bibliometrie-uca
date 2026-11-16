@@ -55,7 +55,7 @@ Seuls les paiements d'un payeur du périmètre sont retenus par les lectures.
 **Pipeline :**
 
 - La phase [`normalize`](../pipeline/03-normalize.md) crée ou reconnaît la monographie, l'éditeur et les plateformes de chaque enregistrement source, et décrit sa série (`biblio.journal`).
-- Les phases [`resolve_ra` et `publishing`](../pipeline/05-publishing.md) résolvent les préfixes DOI, vérifient les ISSN, rattachent les enregistrements sources aux publications en série, cherchent les métadonnées des publications en série dans OpenAlex (identifiant, type, listes), typent les publications en série et calculent les espaces de noms DOI.
+- Les phases [`dois` et `publishing`](../pipeline/05-publishing.md) résolvent les préfixes DOI, vérifient les ISSN, rattachent les enregistrements sources aux publications en série, cherchent les métadonnées des publications en série dans OpenAlex (identifiant, type, listes), typent les publications en série et calculent les espaces de noms DOI.
 - La phase [`finalize`](../pipeline/10-finalize.md) recalcule l'éditeur des publications en série et les nombres de publications, puis supprime les entrées sans usage.
 
 **Administration :**
