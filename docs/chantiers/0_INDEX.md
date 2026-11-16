@@ -9,14 +9,15 @@
 
 ### Non commencé
 
-- [Duplications du frontend](UI_duplications-du-frontend.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
+- [Refactorisation : orchestrateur et moissonnage](CODE_refacto-orchestrateur-et-moissonnage.md)
 - [Résolution probabiliste des personnes](DATA_resolution-personnes-probabiliste.md)
 - [Types de document](DATA_types-document.md)
 - [Vérification des affiliations des sources](DATA_verification-affiliations.md)
 
 ## Chantiers archivés
 
+- 2026-11-16 — [Duplications du frontend](archived/2026-11-16_UI_duplications-du-frontend.md)
 - 2026-11-16 — [Hiérarchie du pipeline](archived/2026-11-16_CODE_hierarchie-du-pipeline.md)
 - 2026-11-10 — [Brevets](archived/2026-11-10_DATA_brevets.md)
 - 2026-11-05 — [Fiabilité de l'alignement des auteurs](archived/2026-11-05_DATA_fiabilite-alignement-auteurs.md)
