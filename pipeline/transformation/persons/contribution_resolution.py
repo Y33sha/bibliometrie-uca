@@ -4,7 +4,7 @@ Les épinglages s'appliquent d'abord : une contribution à contribution source �
 
 Sont décidées :
 
-- les contributions sans personne ayant une contribution source du périmètre, une contribution source épinglée, ou une contribution source à identifiant fiable d'attribution confirmée ou authentifiée, à une personne non marquée hors périmètre ;
+- les contributions sans personne du périmètre, ou ayant une contribution source épinglée, ou une contribution source à identifiant fiable d'attribution confirmée ou authentifiée, à une personne non marquée hors périmètre ;
 - les contributions non manuelles de la file.
 
 Une contribution de la file garde sa personne si sa décision la désigne encore, et la perd sinon. `--rebuild-persons` met en file toutes les contributions rattachées hors épinglage. Les contributions se décident par lots de publications, contre l'index chargé en début de tâche. Les contributions du périmètre au nom inconnu sont traitées ensuite, une à une, contre l'index tenu à jour. Chacune rejoint une personne créée dans le même passage, ou fonde la sienne (`create_persons`).
@@ -21,6 +21,7 @@ from domain.errors import ValidationError
 from domain.normalize import normalize_text
 from domain.persons.contribution_matching import (
     IDENTIFIER_ORDER,
+    AlignedContribution,
     AlignedSourceContribution,
     ContributionDecision,
     ContributionMatchReason,
@@ -129,10 +130,10 @@ _IDENTIFIERS_OBJECT = ", ".join(
 def _members_sql(restriction: str) -> str:
     """Renvoie la requête des contributions sources des contributions retenues par `restriction` (jointures et clause `WHERE` sur `g`)."""
     return f"""
-        SELECT g.id AS contribution_id, g.publication_id, sc.source::text AS source,
+        SELECT g.id AS contribution_id, g.publication_id, g.in_perimeter, sc.source::text AS source,
                sc.raw_author_name, sc.raw_last_name, sc.raw_first_name,
                jsonb_strip_nulls(jsonb_build_object({_IDENTIFIERS_OBJECT})) AS identifiers,
-               sc.in_perimeter, sc.roles,
+               sc.roles,
                (SELECT ca.person_id FROM confirmed_source_contributions ca
                 WHERE ca.source_contribution_id = sc.id) AS pinned_person_id
         FROM {CONTRIBUTIONS_AND_SOURCES}
@@ -236,49 +237,54 @@ def candidate_batches(publication_ids: list[int]) -> Iterator[tuple[int, ...]]:
     return batched(publication_ids, _BATCH_PUBLICATIONS, strict=False)
 
 
-def load_candidate_contributions(
-    conn: Connection, publication_ids: Sequence[int]
-) -> dict[int, dict[int, list[AlignedSourceContribution]]]:
-    """Renvoie les contributions sources des contributions à décider des publications `publication_ids`, par publication puis par contribution. Suit `prepare_candidates`."""
-    return _aligned_members(
+Candidates = dict[int, dict[int, AlignedContribution]]
+"""Contributions à décider, par publication puis par identifiant de contribution."""
+
+
+def load_candidate_contributions(conn: Connection, publication_ids: Sequence[int]) -> Candidates:
+    """Renvoie les contributions à décider des publications `publication_ids`. Suit `prepare_candidates`."""
+    return _aligned_contributions(
         conn.execute(text(_CANDIDATE_MEMBERS_SQL), {"publications": list(publication_ids)})
     )
 
 
-def load_contributions(
-    conn: Connection, contribution_ids: Sequence[int]
-) -> dict[int, dict[int, list[AlignedSourceContribution]]]:
-    """Renvoie les contributions sources des contributions `contribution_ids`, par publication puis par contribution."""
-    return _aligned_members(
+def load_contributions(conn: Connection, contribution_ids: Sequence[int]) -> Candidates:
+    """Renvoie les contributions `contribution_ids`."""
+    return _aligned_contributions(
         conn.execute(text(_CONTRIBUTION_MEMBERS_SQL), {"contributions": list(contribution_ids)})
     )
 
 
-def _aligned_members(
-    rows: Iterable[Row[tuple[object, ...]]],
-) -> dict[int, dict[int, list[AlignedSourceContribution]]]:
-    candidates: dict[int, dict[int, list[AlignedSourceContribution]]] = defaultdict(
+def _aligned_contributions(rows: Iterable[Row[tuple[object, ...]]]) -> Candidates:
+    members: dict[int, dict[int, list[AlignedSourceContribution]]] = defaultdict(
         lambda: defaultdict(list)
     )
+    in_perimeter: dict[int, bool] = {}
     for r in rows:
-        candidates[r.publication_id][r.contribution_id].append(
+        in_perimeter[r.contribution_id] = r.in_perimeter
+        members[r.publication_id][r.contribution_id].append(
             AlignedSourceContribution(
                 source=r.source,
                 name=ContributorName.from_columns(
                     r.raw_author_name, r.raw_last_name, r.raw_first_name
                 ),
                 identifiers=r.identifiers,
-                in_perimeter=r.in_perimeter,
                 roles=r.roles or (),
                 pinned_person_id=r.pinned_person_id,
             )
         )
-    return candidates
+    return {
+        publication_id: {
+            contribution_id: AlignedContribution(
+                tuple(contribution_members), in_perimeter[contribution_id]
+            )
+            for contribution_id, contribution_members in by_contribution.items()
+        }
+        for publication_id, by_contribution in members.items()
+    }
 
 
-def taken_persons(
-    conn: Connection, candidates: dict[int, dict[int, list[AlignedSourceContribution]]]
-) -> dict[int, frozenset[int]]:
+def taken_persons(conn: Connection, candidates: Candidates) -> dict[int, frozenset[int]]:
     """Renvoie, pour chaque publication des contributions à décider, les personnes rattachées à une autre contribution."""
     rows = conn.execute(
         text(_TAKEN_SQL),
@@ -295,7 +301,7 @@ def taken_persons(
 
 
 def decide_contributions(
-    candidates: dict[int, dict[int, list[AlignedSourceContribution]]],
+    candidates: Candidates,
     index: PersonIndex,
     rejected: dict[int, frozenset[int]],
     taken: dict[int, frozenset[int]],
@@ -310,8 +316,11 @@ def decide_contributions(
     for publication_id, by_contribution in candidates.items():
         rejected_here = rejected.get(publication_id, frozenset())
         decided = {
-            contribution_id: (decide_contribution(members, index, rejected_here), len(members))
-            for contribution_id, members in by_contribution.items()
+            contribution_id: (
+                decide_contribution(contribution, index, rejected_here),
+                len(contribution.members),
+            )
+            for contribution_id, contribution in by_contribution.items()
         }
         settled = settle_publication(decided, taken.get(publication_id, frozenset()))
         if progress is not None:
@@ -356,14 +365,14 @@ def write_decisions(conn: Connection, decisions: dict[int, ContributionDecision]
 
 def attribute_identifiers(
     conn: Connection,
-    candidates: dict[int, dict[int, list[AlignedSourceContribution]]],
+    candidates: Candidates,
     decisions: dict[int, ContributionDecision],
 ) -> None:
     """Attribue en attente, à la personne de chaque contribution rattachée par la décision, les identifiants fiables de ses contributions sources (`identifiers_to_attribute`)."""
     members_by_contribution = {
-        contribution_id: members
+        contribution_id: contribution.members
         for by_contribution in candidates.values()
-        for contribution_id, members in by_contribution.items()
+        for contribution_id, contribution in by_contribution.items()
     }
     repo = PgPersonRepository(conn)
     for contribution_id, decision in decisions.items():
@@ -378,7 +387,7 @@ def attribute_identifiers(
 
 def create_persons(
     conn: Connection,
-    candidates: dict[int, dict[int, list[AlignedSourceContribution]]],
+    candidates: Candidates,
     decisions: dict[int, ContributionDecision],
     index: PersonIndex,
     rejected: dict[int, frozenset[int]],
@@ -404,11 +413,12 @@ def create_persons(
         for contribution_id in sorted(by_contribution):
             if decisions[contribution_id].outcome != ContributionOutcome.CREATE:
                 continue
-            members = by_contribution[contribution_id]
+            contribution = by_contribution[contribution_id]
+            members = contribution.members
             if progress is not None:
                 progress.advance()
             decision = decide_contribution(
-                members, index, rejected.get(publication_id, frozenset())
+                contribution, index, rejected.get(publication_id, frozenset())
             )
             if decision.outcome == ContributionOutcome.CREATE:
                 try:
@@ -493,17 +503,17 @@ def _log_identified(
 
 
 def unidentified_orphans(
-    candidates: dict[int, dict[int, list[AlignedSourceContribution]]],
+    candidates: Candidates,
     decisions: dict[int, ContributionDecision],
 ) -> list[ContributionDecision]:
     """Décisions des contributions laissées sans personne parmi les contributions orphelines : contributions du périmètre, sous le rôle `author`."""
     return [
         decisions[contribution_id]
         for by_contribution in candidates.values()
-        for contribution_id, members in by_contribution.items()
+        for contribution_id, contribution in by_contribution.items()
         if decisions[contribution_id].outcome != ContributionOutcome.MATCH
-        and any(m.in_perimeter for m in members)
-        and any(ContributionRole.AUTHOR in m.roles for m in members)
+        and contribution.in_perimeter
+        and any(ContributionRole.AUTHOR in m.roles for m in contribution.members)
     ]
 
 
@@ -540,7 +550,7 @@ def resolve_contributions(
     decisions: dict[int, ContributionDecision] = {}
     unidentified: list[ContributionDecision] = []
     # Publications à décision de création : leurs contributions et les personnes rattachées hors des contributions à décider.
-    to_create: dict[int, dict[int, list[AlignedSourceContribution]]] = {}
+    to_create: Candidates = {}
     taken_to_create: dict[int, frozenset[int]] = {}
     released = written = 0
     with track_progress(total, BRANCH.rstrip(), logger, count_kept=True) as progress:

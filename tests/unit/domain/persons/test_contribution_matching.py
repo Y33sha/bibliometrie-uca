@@ -3,6 +3,7 @@
 from domain.contributions.contribution_roles import ContributionRole
 from domain.normalize import normalize_text
 from domain.persons.contribution_matching import (
+    AlignedContribution,
     AlignedSourceContribution,
     ContributionDecision,
     ContributionMatchReason,
@@ -21,14 +22,20 @@ _ORCID = "0000-0002-1825-0097"
 _IDREF = "123456789"
 
 
-def _member(raw, source="hal", identifiers=None, in_perimeter=True, roles=(), pinned=None):
+def _member(raw, source="hal", identifiers=None, roles=(), pinned=None):
     return AlignedSourceContribution(
         source=source,
         name=ContributorName(raw=raw),
         identifiers=identifiers or {},
-        in_perimeter=in_perimeter,
         roles=roles,
         pinned_person_id=pinned,
+    )
+
+
+def _decide(members, index, rejected_person_ids=frozenset(), *, in_perimeter=True):
+    """Décide la contribution formée de `members`, du périmètre par défaut."""
+    return decide_contribution(
+        AlignedContribution(tuple(members), in_perimeter), index, rejected_person_ids
     )
 
 
@@ -68,7 +75,7 @@ def test_un_epinglage_l_emporte():
         _member("J. Martin", "crossref", {"orcid": _ORCID}),
     ]
 
-    decision = decide_contribution(members, index)
+    decision = _decide(members, index)
 
     assert (decision.outcome, decision.person_id, decision.reason) == (
         ContributionOutcome.MATCH,
@@ -80,14 +87,14 @@ def test_un_epinglage_l_emporte():
 def test_deux_epinglages_differents_laissent_le_groupe_sans_personne():
     members = [_member("Jean Martin", pinned=1), _member("J. Martin", "openalex", pinned=2)]
 
-    assert decide_contribution(members, _index()).reason == ContributionSkipReason.PIN_CONFLICT
+    assert _decide(members, _index()).reason == ContributionSkipReason.PIN_CONFLICT
 
 
 def test_un_identifiant_d_une_contribution_source_rattache_toute_la_contribution():
     index = _index([(1, "Martin", "Jean")], idref={_IDREF: 1})
     members = [_member("Jean Martin", "scanr", {"idref": _IDREF}), _member("J. Martin", "openalex")]
 
-    decision = decide_contribution(members, index)
+    decision = _decide(members, index)
 
     assert (decision.person_id, decision.reason) == (1, ContributionMatchReason.IDREF)
 
@@ -101,7 +108,7 @@ def test_deux_identifiants_de_deux_personnes_laissent_le_groupe_sans_personne():
         _member("J. Martin", "scanr", {"idref": _IDREF}),
     ]
 
-    assert decide_contribution(members, index).reason == ContributionSkipReason.IDENTIFIER_CONFLICT
+    assert _decide(members, index).reason == ContributionSkipReason.IDENTIFIER_CONFLICT
 
 
 def test_deux_identifiants_d_une_contribution_source_sont_deux_candidats():
@@ -116,7 +123,7 @@ def test_deux_identifiants_d_une_contribution_source_sont_deux_candidats():
         _member("Jean Martin", "scanr", {"idref": "987654321"}),
     ]
 
-    decision = decide_contribution(members, index)
+    decision = _decide(members, index)
 
     assert (decision.person_id, decision.reason) == (1, ContributionMatchReason.ORCID)
 
@@ -127,37 +134,43 @@ def test_deux_identifiants_d_une_seule_contribution_source_sans_autre_appui():
     )
     members = [_member("J. Martin", "hal", {"orcid": _ORCID, "idref": _IDREF})]
 
-    assert decide_contribution(members, index).reason == ContributionSkipReason.IDENTIFIER_CONFLICT
+    assert _decide(members, index).reason == ContributionSkipReason.IDENTIFIER_CONFLICT
 
 
 def test_l_orcid_d_une_source_sans_depot_par_l_auteur_est_ignore():
     index = _index([(1, "Martin", "Jean")], orcid={_ORCID: 1})
-    members = [_member("Jean Martin", "wos", {"orcid": _ORCID}, in_perimeter=False)]
+    members = [_member("Jean Martin", "wos", {"orcid": _ORCID})]
 
-    assert decide_contribution(members, index).reason == ContributionSkipReason.OUT_OF_PERIMETER
+    assert (
+        _decide(members, index, in_perimeter=False).reason
+        == ContributionSkipReason.OUT_OF_PERIMETER
+    )
 
 
 def test_un_identifiant_confirme_rattache_hors_perimetre():
     index = _index([(1, "Martin", "Jean")], idref={_IDREF: 1})
-    members = [_member("Jean Martin", "hal", {"idref": _IDREF}, in_perimeter=False)]
+    members = [_member("Jean Martin", "hal", {"idref": _IDREF})]
 
-    decision = decide_contribution(members, index)
+    decision = _decide(members, index, in_perimeter=False)
 
     assert (decision.person_id, decision.reason) == (1, ContributionMatchReason.IDREF)
 
 
 def test_un_identifiant_en_attente_ne_rattache_pas_hors_perimetre():
     index = _index([(1, "Martin", "Jean")], idref={_IDREF: 1}, pending={_IDREF})
-    members = [_member("Jean Martin", "hal", {"idref": _IDREF}, in_perimeter=False)]
+    members = [_member("Jean Martin", "hal", {"idref": _IDREF})]
 
-    assert decide_contribution(members, index).reason == ContributionSkipReason.OUT_OF_PERIMETER
+    assert (
+        _decide(members, index, in_perimeter=False).reason
+        == ContributionSkipReason.OUT_OF_PERIMETER
+    )
 
 
 def test_un_identifiant_en_attente_rattache_dans_le_perimetre():
     index = _index([(1, "Martin", "Jean")], idref={_IDREF: 1}, pending={_IDREF})
     members = [_member("Jean Martin", "hal", {"idref": _IDREF})]
 
-    decision = decide_contribution(members, index)
+    decision = _decide(members, index)
 
     assert (decision.person_id, decision.reason) == (1, ContributionMatchReason.IDREF)
 
@@ -166,7 +179,7 @@ def test_un_identifiant_au_nom_incompatible_est_refuse():
     index = _index([(1, "Durand", "Claire")], orcid={_ORCID: 1})
     members = [_member("Jean Martin", "crossref", {"orcid": _ORCID})]
 
-    decision = decide_contribution(members, index)
+    decision = _decide(members, index)
 
     assert decision.outcome == ContributionOutcome.CREATE
     assert decision.refused == (("orcid", _ORCID),)
@@ -176,32 +189,26 @@ def test_une_personne_rejetee_pour_la_publication_est_ecartee():
     index = _index([(1, "Martin", "Jean")], orcid={_ORCID: 1})
     members = [_member("Jean Martin", "crossref", {"orcid": _ORCID})]
 
-    decision = decide_contribution(members, index, rejected_person_ids=frozenset({1}))
+    decision = _decide(members, index, rejected_person_ids=frozenset({1}))
 
     assert decision.reason == ContributionSkipReason.ALL_CANDIDATES_REJECTED
 
 
 def test_un_nom_seul_ne_rattache_pas_hors_perimetre():
     index = _index([(1, "Martin", "Jean")])
-    members = [_member("Jean Martin", in_perimeter=False)]
+    members = [_member("Jean Martin")]
 
-    assert decide_contribution(members, index).reason == ContributionSkipReason.OUT_OF_PERIMETER
-
-
-def test_un_membre_du_perimetre_suffit_au_rattachement_par_le_nom():
-    index = _index([(1, "Martin", "Jean")])
-    members = [_member("Jean Martin", in_perimeter=False), _member("J. Martin", "openalex")]
-
-    decision = decide_contribution(members, index)
-
-    assert (decision.person_id, decision.reason) == (1, ContributionMatchReason.NAME)
+    assert (
+        _decide(members, index, in_perimeter=False).reason
+        == ContributionSkipReason.OUT_OF_PERIMETER
+    )
 
 
 def test_un_prenom_plein_tranche_l_ambiguite_d_une_initiale():
     index = _index([(1, "Martin", "Jean"), (2, "Martin", "Jacques")])
     members = [_member("J. Martin", "openalex"), _member("Jean Martin")]
 
-    decision = decide_contribution(members, index)
+    decision = _decide(members, index)
 
     assert (decision.outcome, decision.person_id) == (ContributionOutcome.MATCH, 1)
 
@@ -210,7 +217,7 @@ def test_deux_membres_qui_designent_deux_personnes_laissent_le_groupe_sans_perso
     index = _index([(1, "Martin", "Jean"), (2, "Martin", "Jacques")])
     members = [_member("Jean Martin"), _member("Jacques Martin", "openalex")]
 
-    assert decide_contribution(members, index).reason == ContributionSkipReason.NAME_CONFLICT
+    assert _decide(members, index).reason == ContributionSkipReason.NAME_CONFLICT
 
 
 def test_un_nom_univoque_hors_des_candidats_d_un_nom_ambigu_laisse_le_groupe_sans_personne():
@@ -218,36 +225,31 @@ def test_un_nom_univoque_hors_des_candidats_d_un_nom_ambigu_laisse_le_groupe_san
     index = _index([(1, "Boyer", "Christian"), (2, "Boyer", "Bertrand"), (3, "Boyer", "Baptiste")])
     members = [_member("Christian Boyer"), _member("B. Boyer", "openalex")]
 
-    assert decide_contribution(members, index).reason == ContributionSkipReason.NAME_CONFLICT
+    assert _decide(members, index).reason == ContributionSkipReason.NAME_CONFLICT
 
 
 def test_deux_noms_ambigus_d_intersection_multiple():
     index = _index([(1, "Martin", "Jean"), (2, "Martin", "Jacques")])
     members = [_member("J. Martin"), _member("J. Martin", "openalex")]
 
-    assert decide_contribution(members, index).reason == ContributionSkipReason.AMBIGUOUS_NAME_FORM
+    assert _decide(members, index).reason == ContributionSkipReason.AMBIGUOUS_NAME_FORM
 
 
 def test_un_nom_ambigu_ne_cree_pas_de_personne():
     index = _index([(1, "Martin", "Jean"), (2, "Martin", "Jacques")])
     members = [_member("J. Martin")]
 
-    assert decide_contribution(members, index).reason == ContributionSkipReason.AMBIGUOUS_NAME_FORM
+    assert _decide(members, index).reason == ContributionSkipReason.AMBIGUOUS_NAME_FORM
 
 
 def test_un_nom_inconnu_du_perimetre_cree_une_personne():
-    assert (
-        decide_contribution([_member("Jean Martin")], _index()).outcome
-        == ContributionOutcome.CREATE
-    )
+    assert _decide([_member("Jean Martin")], _index()).outcome == ContributionOutcome.CREATE
 
 
 def test_un_jury_de_these_ne_cree_pas_de_personne():
     members = [_member("Jean Martin", "theses", roles=(ContributionRole.RAPPORTEUR,))]
 
-    assert (
-        decide_contribution(members, _index()).reason == ContributionSkipReason.CREATION_NOT_ALLOWED
-    )
+    assert _decide(members, _index()).reason == ContributionSkipReason.CREATION_NOT_ALLOWED
 
 
 def test_une_personne_revient_au_groupe_le_mieux_appuye_de_la_publication():
@@ -286,19 +288,19 @@ class TestDecisionParLeNom:
         """Deux personnes de même nom, dont une rejetée pour la publication : la contribution est rattachée à l'autre."""
         index = _index([(1, "Martin", "Jean"), (2, "Martin", "Jean")])
 
-        decision = decide_contribution([_member("Jean Martin")], index, frozenset({2}))
+        decision = _decide([_member("Jean Martin")], index, frozenset({2}))
 
         assert (decision.person_id, decision.reason) == (1, ContributionMatchReason.NAME)
 
     def test_homonymes_tous_rejetes(self):
         index = _index([(1, "Martin", "Jean"), (2, "Martin", "Jean")])
 
-        decision = decide_contribution([_member("Jean Martin")], index, frozenset({1, 2}))
+        decision = _decide([_member("Jean Martin")], index, frozenset({1, 2}))
 
         assert decision.reason == ContributionSkipReason.ALL_CANDIDATES_REJECTED
 
     def test_forme_inconnue_une_personne_aux_initiales_compatibles(self):
-        decision = decide_contribution([_member("Abdellah Martin")], _index([(1, "Martin", "A.")]))
+        decision = _decide([_member("Abdellah Martin")], _index([(1, "Martin", "A.")]))
 
         assert (decision.person_id, decision.reason) == (
             1,
@@ -306,7 +308,7 @@ class TestDecisionParLeNom:
         )
 
     def test_forme_inconnue_personne_compatible_rejetee(self):
-        decision = decide_contribution(
+        decision = _decide(
             [_member("Abdellah Martin")], _index([(1, "Martin", "A.")]), frozenset({1})
         )
 
@@ -315,7 +317,7 @@ class TestDecisionParLeNom:
     def test_une_forme_connue_l_emporte_sur_les_initiales_compatibles(self):
         index = _index([(7, "Martin", "Jean"), (1, "Martin", "J.")])
 
-        decision = decide_contribution([_member("Jean Martin")], index)
+        decision = _decide([_member("Jean Martin")], index)
 
         assert (decision.person_id, decision.reason) == (7, ContributionMatchReason.NAME)
 
@@ -325,7 +327,6 @@ def _split_member(last, first, source):
         source=source,
         name=ContributorName(last_name=last, first_name=first),
         identifiers={},
-        in_perimeter=True,
     )
 
 
@@ -348,13 +349,12 @@ class TestFoundingName:
         ]
         assert founding_name(members) == ("Martin", "Jean")
 
-    def test_le_role_et_le_perimetre_des_membres_sont_ignores(self):
-        hors = AlignedSourceContribution(
+    def test_le_role_des_membres_est_ignore(self):
+        jury = AlignedSourceContribution(
             source="crossref",
             name=ContributorName(last_name="Martin", first_name="Jean"),
             identifiers={},
-            in_perimeter=False,
             roles=("jury",),
         )
-        members = [_split_member("Martin", "Jeanne", "hal"), hors]
+        members = [_split_member("Martin", "Jeanne", "hal"), jury]
         assert founding_name(members) == ("Martin", "Jean")

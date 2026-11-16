@@ -50,8 +50,8 @@ def mark_ambiguous_nominal(conn: Connection) -> int:
     changed = []
     for publication_id, by_contribution in load_contributions(conn, list(person_of)).items():
         rejected_here = rejected.get(publication_id, frozenset())
-        for contribution_id, members in by_contribution.items():
-            decision = decide_contribution(members, index, rejected_here)
+        for contribution_id, contribution in by_contribution.items():
+            decision = decide_contribution(contribution, index, rejected_here)
             if (decision.outcome, decision.person_id) != (
                 ContributionOutcome.MATCH,
                 person_of[contribution_id],
