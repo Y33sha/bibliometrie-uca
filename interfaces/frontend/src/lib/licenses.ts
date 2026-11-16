@@ -1,6 +1,7 @@
 import { asset } from '$app/paths';
 import { apiOnce } from '#lib/api/index.js';
 import type { components } from '#lib/api/schema.js';
+import type { CreativeCommonsGlyph } from '#lib/creativeCommonsIcons.js';
 
 type EnumOption = components['schemas']['EnumOption'];
 
@@ -11,16 +12,16 @@ export function licenseLabels(): Promise<Record<string, string>> {
 	);
 }
 
-/** Pictogramme d'une licence : suffixes des classes `fi-brands-*` de la police d'icônes (`glyphs`), ou logo local (`image`). Les autres licences s'affichent par leur libellé. */
-export type LicenseIcon = { glyphs: string[] } | { image: string };
+/** Pictogramme d'une licence : suite de pictogrammes Creative Commons (`glyphs`), ou logo local (`image`). Les autres licences s'affichent par leur libellé. */
+export type LicenseIcon = { glyphs: CreativeCommonsGlyph[] } | { image: string };
 
 export const LICENSE_ICONS: Record<string, LicenseIcon> = {
-	'cc-by': { glyphs: ['creative-commons', 'creative-commons-by'] },
-	'cc-by-sa': { glyphs: ['creative-commons', 'creative-commons-by', 'creative-commons-sa'] },
-	'cc-by-nd': { glyphs: ['creative-commons', 'creative-commons-by', 'creative-commons-nd'] },
-	'cc-by-nc': { glyphs: ['creative-commons', 'creative-commons-by', 'creative-commons-nc'] },
-	'cc-by-nc-sa': { glyphs: ['creative-commons', 'creative-commons-by', 'creative-commons-nc', 'creative-commons-sa'] },
-	'cc-by-nc-nd': { glyphs: ['creative-commons', 'creative-commons-by', 'creative-commons-nc', 'creative-commons-nd'] },
-	'public-domain': { glyphs: ['creative-commons-pd'] },
+	'cc-by': { glyphs: ['cc', 'by'] },
+	'cc-by-sa': { glyphs: ['cc', 'by', 'sa'] },
+	'cc-by-nd': { glyphs: ['cc', 'by', 'nd'] },
+	'cc-by-nc': { glyphs: ['cc', 'by', 'nc'] },
+	'cc-by-nc-sa': { glyphs: ['cc', 'by', 'nc', 'sa'] },
+	'cc-by-nc-nd': { glyphs: ['cc', 'by', 'nc', 'nd'] },
+	'public-domain': { glyphs: ['pd'] },
 	'licence-ouverte': { image: asset('icons/licence-ouverte.svg') },
 };
