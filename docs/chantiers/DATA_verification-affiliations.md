@@ -163,7 +163,14 @@ Le chantier [alignement des auteurs](archived/2026-10-24_DATA_alignement-auteurs
 
 ### Phase 4 — Règles
 
-- [ ] Règles de confirmation des indices de périmètre, choisies d'après les phases 1 et 2.
+- [x] Audit des désaccords entre sources, le 2026-11-16 (`audit_population.py`, `audit_sample.py`), après un instantané du périmètre (`perimeter_20261116_1148.json.gz`). 7 511 contributions reposent sur une seule source du périmètre, contredite par une autre source, sans indice RH. 120 cas jugés, 15 par source du périmètre (OpenAlex, HAL, WoS, scanR) et par situation de la personne : 34 justes, 6 douteux, 80 faux. Aucune fonction de décision générale.
+  - La personne a une autre contribution confirmée par plusieurs sources : 30 justes sur 60. La confirmation est elle-même faussée par les grandes collaborations (centaines de contributions « confirmées » de fausses personnes) et par des homonymes fusionnés.
+  - La personne est sans autre contribution confirmée : 52 faux sur 60, soit 3 132 contributions et 2 504 personnes. Les justes sont des personnes peu publiantes (doctorant CIFRE, ancien du LASMEA).
+  - Causes des faux : tutelle multisite atteinte par la hiérarchie HAL (LBBE et TIMC par VetAgro Sup), formes de nom en collision, adresses concaténées hors de la règle, LPC donné par WoS dans les grandes collaborations.
+  - Faux désaccords : l'autre source donne la même structure, par une adresse ou une structure HAL non rattachée (CHU, QuaPA, TSCF).
+- [x] Formes de nom en collision : `gred` (iGReD), `u1095` (GDEC), `umr 547` (PIAF), `umr 6024` (LAPSCO), `umr 1019` (UNH).
+- [ ] Faux désaccords : identifiants HAL à rattacher (QuaPA : 1 450 contributions, TSCF : 194) et formes de nom manquantes (CHU, LASMEA, SEESIB, PFEM, abréviations du WoS).
+- [ ] Détection élargie des adresses concaténées : noms entre parenthèses, initiales espacées, listes d'affiliations d'un essai multicentrique.
 - [x] Adresse concaténée sans indice de périmètre : colonne `addresses.is_concatenated`, tâche `affiliations.detect_concatenated_addresses`. 0dd031ae5. Simulation le 2026-11-16 (`concat_rule.py`) : 365 contributions de 29 publications sortent du périmètre, et aucune publication.
   - 301 personnes hors RH sortent du périmètre. L'adresse place les initiales de 189 d'entre elles dans une affiliation hors périmètre. Les initiales des 112 autres sont absentes de l'adresse, tronquée par la source à 500 ou 1 000 caractères.
   - Une personne RH perd une contribution : celle d'une homonyme toulousaine.
@@ -178,6 +185,7 @@ Le chantier [alignement des auteurs](archived/2026-10-24_DATA_alignement-auteurs
   - La variante qui écarte toujours les enregistrements OpenAlex non éditeurs ferait sortir 2 877 contributions dans 1 107 publications, surtout des prépublications sans enregistrement éditeur.
 - [x] Recomposition des contributions du stock concernées par la règle de l'enregistrement OpenAlex éditeur (`requeue_openalex_preprint_evidence`), le 2026-11-16. Le run applique aussi la règle des adresses concaténées : 687 contributions sources sortent du périmètre, 350 personnes sont supprimées, 71 publications sont purgées, dont les 5 annoncées par la simulation. Les résidus des deux règles sont nuls après le run.
 - [ ] File d'administration des contributions aux affiliations conflictuelles. Elle dépend du chantier [résolution des personnes](archived/2026-10-24_DATA_resolution-personnes.md).
+- [ ] Tutelles et unités multisites : VetAgro Sup, EHIC, LIMOS (site de Saint-Étienne), IHRIM, GEOLAB, EPIA, LMV (site de Saint-Étienne). Une tutelle multisite fait-elle entrer tous ses laboratoires, et une unité multisite tous ses sites ?
 
 ### Phase 5 — Fin de chantier
 
