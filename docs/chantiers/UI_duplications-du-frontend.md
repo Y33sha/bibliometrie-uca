@@ -118,21 +118,19 @@ Une étiquette (tag, badge, pastille, chip) est un court texte sur fond clair, a
 
 ### Phase 6 — Composants
 
-- [ ] Vues de liste sur une base commune (question 1)
-- [ ] Volets sur une base commune (question 2)
+- [x] Vues de liste sur `useFilteredList` et `filterRegistry` (54af447ad)
+- [ ] URL d'export CSV des vues de liste dans `useFilteredList`
+- [ ] Volets : chargement au changement d'identifiant et remise à zéro dans un composable
 - [x] Pages Problèmes HAL et d'administration sur `useUrlFilters` (d932adc14)
 - [x] Pages d'entité : titre d'onglet et fil d'Ariane (d84a7b2e9), onglet actif (d7ed0eacb), carte des sujets (c0fde1cd3), états « introuvable » et « Chargement… » (87d9cfd08)
-- [ ] Balisages recopiés en composants : pastille DOAJ, liens d'éditeur et de revue, nom de personne, en-tête triable
 
 ### Phase 7 — Fonctions, libellés et icônes
 
 - [ ] Dates, nombres, pourcentages et pluriels sur `utils.ts` et `plural.ts`
 - [ ] Énumérations chargées une fois ; signalement d'erreur unique
 - [ ] Libellés sur `labels.ts` ; un nom par section
-- [ ] Un mécanisme d'icônes (question 3)
+- [ ] Un mécanisme d'icônes (question 1)
 
 ## Questions ouvertes
 
-1. Vues de liste : toutes sur `filterRegistry`, ou un composable de liste qui l'englobe.
-2. Volets : un composant de base (en-tête, renommage, fusion), ou des composables partagés.
-3. Icônes : un composant `Icon` en SVG, ou la police Flaticon partout.
+1. Icônes : un composant `Icon` en SVG, ou la police Flaticon partout.
