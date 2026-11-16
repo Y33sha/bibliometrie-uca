@@ -447,6 +447,11 @@ def _repair_encoding(text: str) -> str:
 _ASCII_SEPARATORS_RE = re.compile(r"[^a-z0-9]+")
 
 
+def is_latin_script(text: str) -> bool:
+    """Vrai quand toutes les lettres de `text` sont latines (« Dougé, Aurore »). Faux dès qu'une lettre relève d'une autre écriture (« ドゥージェ，オーロル »)."""
+    return all(unicodedata.name(ch, "").startswith("LATIN") for ch in text if ch.isalpha())
+
+
 def _drops_marks(base: str) -> bool:
     """Vrai quand les diacritiques qui suivent `base` se retirent : derrière une lettre latine ou grecque, ou derrière un caractère qui n'est pas une lettre. Ailleurs, ils distinguent des lettres (й, が)."""
     return not base.isalpha() or unicodedata.name(base, "").startswith(("LATIN", "GREEK"))

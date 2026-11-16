@@ -10,7 +10,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date
 
-from domain.normalize import normalize_text
+from domain.normalize import is_latin_script, normalize_text
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
 
 _COUNTRY_SUFFIX_RE = re.compile(r"\s*\[[A-Z]{2}\]\s*$")
@@ -224,8 +224,12 @@ def applicant_forms(members: list[Member]) -> list[str]:
 
 
 def display_names(parties: list[Party]) -> list[str]:
-    """Renvoie un nom par personne ou organisation : la graphie du format original, à défaut celle du format epodoc sans pays. La graphie « NOM, Prénom » est préférée."""
-    chosen = [p for p in parties if p.original] or parties
+    """Renvoie un nom par personne ou organisation : la graphie du format original, à défaut celle du format epodoc sans pays. La graphie « NOM, Prénom » est préférée.
+
+    Le format original suit l'écriture de l'office de dépôt (chinois, japonais, coréen…). Seules les graphies en écriture latine sont retenues, sauf si la famille en est dépourvue. Une graphie non latine ne partage pas la forme de comparaison de sa graphie latine, donc elle produirait un nom de plus.
+    """
+    latin = [p for p in parties if is_latin_script(p.name)] or parties
+    chosen = [p for p in latin if p.original] or latin
     names: dict[str, str] = {}
     for p in chosen:
         name = _COUNTRY_SUFFIX_RE.sub("", p.name)
