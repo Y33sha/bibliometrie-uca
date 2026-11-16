@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 8euHfavb3NbrPRg7hYamzHe0GUD9pT64nz1DupcUcNm4ghp8TnN3tde8uDrRvmS
+\restrict xk5e2q0zRAJ2vqa2lBaS1cCxnwocuAKZmGx8Ev0GT7jRLtc40bhRP0eWBfis9XE
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -3184,8 +3184,10 @@ CREATE TABLE sources.dois (
     unpaywall_checked_at timestamp with time zone,
     registered_url text,
     resolved_at timestamp with time zone,
+    registered boolean,
     CONSTRAINT dois_doi_lowercase CHECK ((doi = lower(doi))),
-    CONSTRAINT dois_registered_url_dated CHECK (((registered_url IS NULL) OR (resolved_at IS NOT NULL))),
+    CONSTRAINT dois_registered_dated CHECK (((registered IS NULL) = (resolved_at IS NULL))),
+    CONSTRAINT dois_registered_url_registered CHECK (((registered_url IS NULL) OR registered)),
     CONSTRAINT dois_unpaywall_dated CHECK (((unpaywall_oa_status IS NULL) OR (unpaywall_checked_at IS NOT NULL)))
 );
 
@@ -3194,7 +3196,7 @@ CREATE TABLE sources.dois (
 -- Name: TABLE dois; Type: COMMENT; Schema: sources; Owner: -
 --
 
-COMMENT ON TABLE sources.dois IS 'Réponses des services externes sur chaque DOI de publication : verdict d''Unpaywall, URL de résolution chez doi.org.';
+COMMENT ON TABLE sources.dois IS 'Réponses des services externes sur chaque DOI connu : existence et URL de résolution chez doi.org, verdict d''Unpaywall.';
 
 
 --
@@ -3215,14 +3217,21 @@ COMMENT ON COLUMN sources.dois.unpaywall_checked_at IS 'Date du verdict d''Unpay
 -- Name: COLUMN dois.registered_url; Type: COMMENT; Schema: sources; Owner: -
 --
 
-COMMENT ON COLUMN sources.dois.registered_url IS 'URL de résolution du DOI, lue dans l''API des handles de doi.org. NULL avec une date : DOI inconnu de doi.org.';
+COMMENT ON COLUMN sources.dois.registered_url IS 'URL de résolution du DOI, lue dans l''API des handles de doi.org. NULL pour un DOI inconnu, ou connu sans URL.';
 
 
 --
 -- Name: COLUMN dois.resolved_at; Type: COMMENT; Schema: sources; Owner: -
 --
 
-COMMENT ON COLUMN sources.dois.resolved_at IS 'Date de la lecture chez doi.org.';
+COMMENT ON COLUMN sources.dois.resolved_at IS 'Date de la réponse de doi.org.';
+
+
+--
+-- Name: COLUMN dois.registered; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON COLUMN sources.dois.registered IS 'Réponse de doi.org : TRUE pour un DOI connu, FALSE pour un DOI inconnu. NULL sans réponse.';
 
 
 --
@@ -6298,5 +6307,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 8euHfavb3NbrPRg7hYamzHe0GUD9pT64nz1DupcUcNm4ghp8TnN3tde8uDrRvmS
+\unrestrict xk5e2q0zRAJ2vqa2lBaS1cCxnwocuAKZmGx8Ev0GT7jRLtc40bhRP0eWBfis9XE
 
