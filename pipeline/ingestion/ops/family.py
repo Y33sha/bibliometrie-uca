@@ -226,7 +226,7 @@ def applicant_forms(members: list[Member]) -> list[str]:
 def display_names(parties: list[Party]) -> list[str]:
     """Renvoie un nom par personne ou organisation : la graphie du format original, à défaut celle du format epodoc sans pays. La graphie « NOM, Prénom » est préférée.
 
-    Le format original suit l'écriture de l'office de dépôt (chinois, japonais, coréen…). Seules les graphies en écriture latine sont retenues, sauf si la famille en est dépourvue. Une graphie non latine ne partage pas la forme de comparaison de sa graphie latine, donc elle produirait un nom de plus.
+    Le format original suit l'écriture de l'office de dépôt (chinois, japonais, coréen…). Seules les graphies en écriture latine sont retenues, à défaut toutes les graphies.
     """
     latin = [p for p in parties if is_latin_script(p.name)] or parties
     chosen = [p for p in latin if p.original] or latin
