@@ -21,8 +21,6 @@
 	import { useDrawerParam } from '#lib/composables/useDrawerParam.svelte.js';
 	import { isAdmin } from '#lib/session.svelte.js';
 	import { nextSort, sortDirection } from '#lib/sort.js';
-	import { withBase } from '#lib/paths.js';
-	import { paramsToQuery } from '#lib/utils.js';
 	import { facetDefs, type PresenceCounts } from '#lib/filterRegistry.js';
 	import { SERIAL_FILTER_GROUPS, serialFilters } from '#lib/serialFilters.js';
 	import type { components } from '#lib/api/schema.js';
@@ -104,12 +102,6 @@
 			}),
 	});
 
-	function exportCsvUrl(): string {
-		const params = list.filterParams();
-		params.set('sort', list.sort);
-		return withBase(`/api/serials/export.csv?${paramsToQuery(params)}`);
-	}
-
 	function setSort(column: 'title' | 'publisher' | 'publications') {
 		list.setSort(nextSort(list.sort, column, column === 'publications' ? 'desc' : 'asc'));
 	}
@@ -123,7 +115,7 @@
 	onMount(list.restore);
 </script>
 
-<ListToolbar bind:search={list.search} placeholder="Rechercher par titre ou ISSN" onsearch={list.onSearchInput} list={list.listing} one="publication en série" many="publications en série" exportUrl={exportCsvUrl()} countBelow>
+<ListToolbar bind:search={list.search} placeholder="Rechercher par titre ou ISSN" onsearch={list.onSearchInput} list={list.listing} one="publication en série" many="publications en série" exportUrl={list.exportUrl('/api/serials/export.csv')} countBelow>
 	{#snippet leading()}
 		<FilterPanelToggle bind:open={list.panel.open} active={list.activeCount} />
 	{/snippet}

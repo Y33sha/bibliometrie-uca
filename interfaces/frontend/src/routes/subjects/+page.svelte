@@ -12,10 +12,8 @@
   import { useFilteredList } from "#lib/composables/useFilteredList.svelte.js";
   import { facetDefs } from "#lib/filterRegistry.js";
   import { subjectVocabularyLabels } from "#lib/labels.js";
-  import { withBase } from "#lib/paths.js";
   import { nextSort, sortDirection } from "#lib/sort.js";
   import { SUBJECT_FILTER_GROUPS, SUBJECT_FILTERS } from "#lib/subjectFilters.js";
-  import { paramsToQuery } from "#lib/utils.js";
   import ListStatus from "#lib/components/ListStatus.svelte";
   import Pagination from "#lib/components/Pagination.svelte";
   import type { components } from "#lib/api/schema.js";
@@ -41,12 +39,6 @@
       }),
   });
 
-  function exportCsvUrl(): string {
-    const params = list.filterParams();
-    params.set("sort", list.sort);
-    return withBase(`/api/subjects/export.csv?${paramsToQuery(params)}`);
-  }
-
   function setSort(column: "label" | "publications") {
     list.setSort(nextSort(list.sort, column, column === "label" ? "asc" : "desc"));
   }
@@ -56,7 +48,7 @@
 
 <PageHeader title="Sujets" hidden />
 
-<ListToolbar bind:search={list.search} placeholder="Rechercher dans les libellés" onsearch={list.onSearchInput} list={list.listing} one="sujet" many="sujets" exportUrl={exportCsvUrl()} countBelow>
+<ListToolbar bind:search={list.search} placeholder="Rechercher dans les libellés" onsearch={list.onSearchInput} list={list.listing} one="sujet" many="sujets" exportUrl={list.exportUrl("/api/subjects/export.csv")} countBelow>
   {#snippet leading()}
     <FilterPanelToggle bind:open={list.panel.open} active={list.activeCount} />
   {/snippet}

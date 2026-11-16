@@ -7,6 +7,8 @@ import { page as appPage } from '$app/state';
 import { useFilterPanel } from '#lib/composables/useFilterPanel.svelte.js';
 import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
 import { useUrlFilters, type FilterDef as UrlFilterDef } from '#lib/composables/useUrlFilters.svelte.js';
+import { withBase } from '#lib/paths.js';
+import { paramsToQuery } from '#lib/utils.js';
 import {
 	activeCount,
 	appendFilterParams,
@@ -118,6 +120,14 @@ export function useFilteredList<T, F extends Facets>(config: {
 		listing.load();
 	}
 
+	/** URL de l'export CSV de la liste filtrée et triée. `columns` restreint le fichier aux colonnes affichées. */
+	function exportUrl(path: string, columns?: string[]): string {
+		const params = filterParams();
+		params.set('sort', sort);
+		if (columns) params.set('columns', columns.join(','));
+		return withBase(`${path}?${paramsToQuery(params)}`);
+	}
+
 	/** Change de page. */
 	function goToPage(p: number) {
 		listing.goToPage(p);
@@ -168,6 +178,7 @@ export function useFilteredList<T, F extends Facets>(config: {
 		onSearchInput: url.debouncedSearch(onFilterChange),
 		setSort,
 		goToPage,
+		exportUrl,
 		restore,
 	};
 }

@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import ListToolbar from '#lib/components/ListToolbar.svelte';
-	import { withBase } from '#lib/paths.js';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import ThesesTable, { useThesisColumns } from '#lib/components/ThesesTable.svelte';
 	import type { PublicationSort, ThesisRow, ThesisSortColumn } from '#lib/components/ThesesTable.svelte';
@@ -13,7 +12,6 @@
 	import { useFilteredList } from '#lib/composables/useFilteredList.svelte.js';
 	import { PUBLICATION_FACETS_ENDPOINT, usePublicationFacets } from '#lib/composables/usePublicationFacets.svelte.js';
 	import { THESIS_DOC_TYPES, THESIS_FILTER_GROUPS, thesisFilters } from '#lib/thesisFilters.js';
-	import { paramsToQuery } from '#lib/utils.js';
 	import { useDrawerParam } from '#lib/composables/useDrawerParam.svelte.js';
 	import PublicationDrawer from '#lib/components/publications/PublicationDrawer.svelte';
 
@@ -63,18 +61,10 @@
 		list.setSort(nextSort(list.sort, column, dates.includes(column) ? 'desc' : 'asc'));
 	}
 
-	function exportCsvUrl(): string {
-		const params = list.filterParams();
-		params.set('sort', list.sort);
-		// Colonnes visibles → le CSV reflète le tableau affiché.
-		params.set('columns', columns.visibleColumns.join(','));
-		return withBase(`/api/publications/export-theses.csv?${paramsToQuery(params)}`);
-	}
-
 	onMount(list.restore);
 </script>
 
-<ListToolbar bind:search={list.search} placeholder="Rechercher par titre ou sujet" onsearch={list.onSearchInput} list={list.listing} one="thèse" many="thèses" exportUrl={exportCsvUrl()} countBelow>
+<ListToolbar bind:search={list.search} placeholder="Rechercher par titre ou sujet" onsearch={list.onSearchInput} list={list.listing} one="thèse" many="thèses" exportUrl={list.exportUrl('/api/publications/export-theses.csv', columns.visibleColumns)} countBelow>
 	{#snippet leading()}
 		<FilterPanelToggle bind:open={list.panel.open} active={list.activeCount} />
 	{/snippet}

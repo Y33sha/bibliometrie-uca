@@ -23,8 +23,6 @@
 	import IdentifierLink from '#lib/components/IdentifierLink.svelte';
 	import { isAdmin } from '#lib/session.svelte.js';
 	import { nextSort, sortDirection } from '#lib/sort.js';
-	import { withBase } from '#lib/paths.js';
-	import { paramsToQuery } from '#lib/utils.js';
 	import type { components } from '#lib/api/schema.js';
 
 	type Publisher = components['schemas']['PublisherListItem'];
@@ -68,12 +66,6 @@
 		list.setSort(nextSort(list.sort, column, column === 'name' ? 'asc' : 'desc'));
 	}
 
-	function exportCsvUrl(): string {
-		const params = list.filterParams();
-		params.set('sort', list.sort);
-		return withBase(`/api/publishers/export.csv?${paramsToQuery(params)}`);
-	}
-
 	// Un type inconnu est une valeur absente : la cellule reste vide.
 	function publisherTypeLabel(value: string | null): string {
 		if (!value || value === 'unknown') return '';
@@ -84,7 +76,7 @@
 	onMount(list.restore);
 </script>
 
-<ListToolbar bind:search={list.search} placeholder="Rechercher dans les noms" onsearch={list.onSearchInput} list={list.listing} one="éditeur" many="éditeurs" exportUrl={exportCsvUrl()} countBelow>
+<ListToolbar bind:search={list.search} placeholder="Rechercher dans les noms" onsearch={list.onSearchInput} list={list.listing} one="éditeur" many="éditeurs" exportUrl={list.exportUrl('/api/publishers/export.csv')} countBelow>
 	{#snippet leading()}
 		<FilterPanelToggle bind:open={list.panel.open} active={list.activeCount} />
 	{/snippet}

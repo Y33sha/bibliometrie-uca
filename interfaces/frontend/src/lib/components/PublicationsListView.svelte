@@ -10,7 +10,6 @@
 	import { institution } from '#lib/institution.svelte.js';
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
-	import { withBase } from '#lib/paths.js';
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
 	import FilterPanel from '#lib/components/filters/FilterPanel.svelte';
 	import FilterLayout from '#lib/components/filters/FilterLayout.svelte';
@@ -32,7 +31,6 @@
 	import { PUBLICATION_FILTER_GROUPS, publicationFilters } from '#lib/publicationFilters.js';
 	import { useColumnVisibility } from '#lib/composables/useColumnVisibility.svelte.js';
 	import ColumnMenu from '#lib/components/ColumnMenu.svelte';
-	import { paramsToQuery } from '#lib/utils.js';
 	import { nextSort, sortDirection, type SortDirection } from '#lib/sort.js';
 	import IconButton from '#lib/components/IconButton.svelte';
 	import ListStatus from '#lib/components/ListStatus.svelte';
@@ -227,14 +225,6 @@
 		list.setSort(nextSort(currentSort, column, column === 'year' || column === 'apc' ? 'desc' : 'asc'));
 	}
 
-	function exportCsvUrl(): string {
-		const params = list.filterParams();
-		params.set('sort', currentSort);
-		// Colonnes visibles → le CSV reflète le tableau affiché.
-		params.set('columns', cv.visibleColumns.join(','));
-		return withBase(`/api/publications/export.csv?${paramsToQuery(params)}`);
-	}
-
 	async function onExcludeClick(p: Publication) {
 		if (!onExcludeContribution || p.contribution_id == null) return;
 		const result = await onExcludeContribution(p.contribution_id, p.id);
@@ -253,7 +243,7 @@
 </script>
 
 
-<ListToolbar bind:search={list.search} placeholder="Rechercher par titre ou sujet" onsearch={list.onSearchInput} list={listing} one="publication" many="publications" exportUrl={view === 'stats' ? undefined : exportCsvUrl()} countBelow>
+<ListToolbar bind:search={list.search} placeholder="Rechercher par titre ou sujet" onsearch={list.onSearchInput} list={listing} one="publication" many="publications" exportUrl={view === 'stats' ? undefined : list.exportUrl('/api/publications/export.csv', cv.visibleColumns)} countBelow>
 	{#snippet leading()}
 		<FilterPanelToggle bind:open={list.panel.open} active={list.activeCount} />
 	{/snippet}
