@@ -9,12 +9,7 @@ from collections.abc import Mapping
 
 from domain.normalize import normalize_text
 from domain.types import JsonValue
-from pipeline.ingestion.common.harvester import (
-    HarvestWindow,
-    SourceHarvester,
-    stage_document,
-    year_range,
-)
+from pipeline.ingestion.common.harvester import HarvestWindow, SourceHarvester, stage_document
 from pipeline.ingestion.ops.api import (
     SEARCH_MAX,
     SEARCH_PAGE,
@@ -65,8 +60,7 @@ class OpsHarvester(SourceHarvester[None]):
 
     def run(self, window: HarvestWindow) -> PhaseMetrics:
         forms = frozenset(normalize_text(f) for f in self._api_ids())
-        window_years = self._years(window)
-        years = frozenset(window_years)
+        years = frozenset(self._years(window))
         publications: dict[str, str] = {}
         searched = search_forms(forms)
         with track_progress(len(searched), self._label("déposants"), self.logger) as progress:
@@ -78,7 +72,7 @@ class OpsHarvester(SourceHarvester[None]):
         return self._harvest_at_once(
             len(publications),
             lambda progress: self._stage_families(publications, years, progress),
-            scope=year_range(window_years),
+            scope="familles",
         )
 
     def _search(self, form: str) -> list[SearchHit]:
