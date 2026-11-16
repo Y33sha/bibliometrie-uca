@@ -6,7 +6,7 @@ Une donnée se désigne par sa table (`"serials"`) ou par une colonne (`"serials
 
 Une tâche dépend des tâches placées avant elle et écrivant une donnée lue par elle. Une lecture déclarée `previous_run` lit aussi les écritures du run précédent, faites par une tâche placée après elle ou par elle-même. Les tests vérifient que l'ordre d'exécution ne fait lire à aucune tâche une donnée écrite après elle, sauf lecture du run précédent déclarée.
 
-La maintenance d'une tâche (`VACUUM`, `ANALYZE`) suit ses écritures et ne crée aucune dépendance. Des tâches consécutives du même `parallel_group` s'exécutent en parallèle : leurs écritures communes ne dépendent pas de leur ordre, et aucune ne dépend d'une autre tâche du groupe.
+La maintenance d'une tâche (`VACUUM`, `ANALYZE`) suit ses écritures et ne crée aucune dépendance. Des tâches consécutives du même `parallel_group` s'exécutent en parallèle, une file par source (`network`) : les tâches d'une même source s'enchaînent dans l'ordre, les sources s'exécutent en même temps. Une tâche peut dépendre d'une tâche de sa source placée avant elle, jamais d'une tâche d'une autre source du groupe.
 """
 
 from collections.abc import Callable, Iterable, Mapping, Sequence
@@ -42,7 +42,7 @@ class Task:
     maintenance: tuple[str, ...] = ()
     """Maintenance physique des tables, dans l'ordre : `VACUUM staging`, `ANALYZE source_contributions`."""
     parallel_group: str | None = None
-    """Groupe de tâches consécutives exécutées en parallèle, nommé dans sa phase."""
+    """Groupe de tâches consécutives exécutées en parallèle, une file par source, nommé dans sa phase."""
     section: str | None = None
     """Titre de la sous-étape ouverte par une tâche placée hors d'une étape. `None` : la tâche écrit sous le titre courant."""
     label: str | None = None
@@ -93,14 +93,22 @@ def _writes_read(reader: Task, writer: Task) -> list[str]:
     return [r for r in reader.reads if any(_affected_by(r, w) for w in writer.writes)]
 
 
+def concurrent(a: Task, b: Task) -> bool:
+    """Indique si deux tâches s'exécutent en même temps : même groupe parallèle, sources différentes."""
+    return (
+        a.parallel_group is not None
+        and a.parallel_group == b.parallel_group
+        and a.network != b.network
+    )
+
+
 def dependencies(tasks: Sequence[Task]) -> dict[str, set[str]]:
-    """Renvoie, pour chaque tâche, les tâches placées avant elle, hors de son groupe parallèle, et écrivant une donnée lue par elle."""
+    """Renvoie, pour chaque tâche, les tâches placées avant elle, exécutées avant elle (`concurrent`), et écrivant une donnée lue par elle."""
     return {
         reader.name: {
             writer.name
             for writer in tasks[:i]
-            if (reader.parallel_group is None or writer.parallel_group != reader.parallel_group)
-            and _writes_read(reader, writer)
+            if not concurrent(reader, writer) and _writes_read(reader, writer)
         }
         for i, reader in enumerate(tasks)
     }

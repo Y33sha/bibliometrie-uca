@@ -1,6 +1,7 @@
 """Exécuteur des tâches d'une phase (`pipeline.task_runner`)."""
 
 import logging
+import threading
 
 import pytest
 
@@ -65,6 +66,32 @@ def test_l_executeur_ecrit_le_bilan_de_chaque_section_dans_l_ordre_des_taches(co
         "▶ Éditeurs",
         "  └─ Rien à faire",
     ]
+
+
+def test_un_groupe_parallele_ouvre_une_file_par_source(contexte):
+    """Les tâches d'une même source s'enchaînent dans une file, dans l'ordre. Les sources s'exécutent en même temps : la première tâche de chaque source attend l'autre à une barrière."""
+    barriere = threading.Barrier(2, timeout=5)
+    ordre: list[str] = []
+
+    def tache(name: str, network: str, *, attend: bool = False) -> Task:
+        def run(_ctx) -> PhaseMetrics:
+            if attend:
+                barriere.wait()
+            ordre.append(name)
+            return PhaseMetrics()
+
+        return Task(name, run=run, network=network, parallel_group="g")
+
+    execute_tasks(
+        (
+            tache("hal_id", "hal", attend=True),
+            tache("hal_doi", "hal"),
+            tache("crossref_doi", "crossref", attend=True),
+        ),
+        contexte(),
+    )
+
+    assert ordre.index("hal_id") < ordre.index("hal_doi")
 
 
 def test_une_etape_de_premier_niveau_donne_le_titre_de_section_de_ses_taches(contexte, caplog):

@@ -21,25 +21,29 @@ from pipeline.runtime.parallel import run_parallel
 def execute_tasks(children: Sequence[Step | Task], ctx: PhaseContext) -> dict[str, PhaseMetrics]:
     """Exécute les tâches de `children` dans leur ordre et renvoie les métriques des tâches exécutées, par nom de tâche. Une tâche écartée par sa condition est absente du résultat.
 
-    Les tâches consécutives d'un même groupe parallèle s'exécutent ensemble (`run_parallel`). Leurs lignes de bilan suivent, dans l'ordre des tâches.
+    Les tâches consécutives d'un même groupe parallèle s'exécutent ensemble (`run_parallel`). Leurs lignes de bilan suivent, dans l'ordre des tâches. Le titre de section d'un bloc d'une seule section précède son exécution. Un bloc de plusieurs sections ouvre chacune au moment d'écrire ses lignes.
     """
     sections = _sections(children)
     selected = [task for task in leaves(children) if task.when is None or task.when(ctx)]
     next_sections = {task.name: sections[following.name] for task, following in pairwise(selected)}
     results: dict[str, PhaseMetrics] = {}
-    previous_section = None
+    opened = None
     for block in _blocks(selected):
+        block_sections = {sections[task.name] for task in block}
         section = sections[block[0].name]
-        if section is not None and section != previous_section:
+        if len(block_sections) == 1 and section is not None and section != opened:
             step(ctx.logger, section)
+            opened = section
         results.update(_execute_block(block, ctx))
         for task in block:
             ctx.task_durations[task.name] = results[task.name].duration_s or 0.0
             section, next_section = sections[task.name], next_sections.get(task.name)
+            if section is not None and section != opened:
+                step(ctx.logger, section)
+            opened = section
             _write_lines(task, results[task.name], section, next_section, ctx)
             if section is not None and section != next_section:
                 _close_if_silent([t for t in selected if sections[t.name] == section], results, ctx)
-        previous_section = sections[block[-1].name]
     return results
 
 
@@ -66,10 +70,23 @@ def _blocks(tasks: Sequence[Task]) -> list[list[Task]]:
 
 
 def _execute_block(block: list[Task], ctx: PhaseContext) -> dict[str, PhaseMetrics]:
-    """Exécute un bloc de tâches, en parallèle s'il en compte plusieurs, et renvoie leurs métriques par nom de tâche."""
-    if len(block) == 1:
-        return {block[0].name: _execute(block[0], ctx)}
-    return run_parallel({task.name: partial(_execute, task, ctx) for task in block})
+    """Exécute un bloc de tâches et renvoie leurs métriques par nom de tâche. Les tâches d'une même source s'enchaînent dans une file, les files s'exécutent en parallèle."""
+    lanes: dict[str | None, list[Task]] = {}
+    for task in block:
+        lanes.setdefault(task.network, []).append(task)
+    if len(lanes) == 1:
+        return _execute_lane(block, ctx)
+    results: dict[str, PhaseMetrics] = {}
+    for lane_results in run_parallel(
+        {str(source): partial(_execute_lane, lane, ctx) for source, lane in lanes.items()}
+    ).values():
+        results.update(lane_results)
+    return results
+
+
+def _execute_lane(tasks: list[Task], ctx: PhaseContext) -> dict[str, PhaseMetrics]:
+    """Exécute des tâches l'une après l'autre et renvoie leurs métriques par nom de tâche."""
+    return {task.name: _execute(task, ctx) for task in tasks}
 
 
 def _silent(task: Task, metrics: PhaseMetrics) -> bool:
