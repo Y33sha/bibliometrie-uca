@@ -1,7 +1,7 @@
 # STATUS: oneshot (2026-11-16)
 """Ajoute les formes de nom et les rattachements HAL manquants relevés par l'audit des désaccords entre sources.
 
-Une adresse ou une structure HAL sans rattachement au périmètre donne une affiliation contraire à une autre source, alors que les deux désignent la même structure. Le script ajoute les formes de nom par le service des structures, comme l'interface d'administration, et rattache les structures HAL de QuaPA à leur structure interne. Une forme ou un rattachement déjà présents restent en place. Les phases suivantes appliquent les ajouts :
+Une adresse ou une structure HAL sans rattachement au périmètre donne une affiliation contraire à une autre source, alors que les deux désignent la même structure. Le script ajoute les formes de nom par le service des structures, comme l'interface d'administration, et rattache les structures HAL de QuaPA à leur structure interne. Les adresses réduites à « Clermont-Ferrand 1 » ou « Clermont-Ferrand 2 », anciennes universités, reçoivent un lien confirmé à l'UCA par le service des adresses : une forme de nom capterait les adresses postales (« Clermont-Ferrand 1, place… », « 63038 Clermont-Ferrand 1 »). Une forme, un rattachement ou un lien déjà présents restent en place. Les phases suivantes appliquent les ajouts :
     run_pipeline --from affiliations
 
 Usage :
@@ -16,12 +16,22 @@ import os
 from sqlalchemy import Connection, text
 
 from application.ports.repositories.structure_repository import NameFormCreate
+from application.services.addresses import AddressService
 from application.services.structures import StructureService
 from domain.normalize import normalize_text
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.repositories import perimeter_repository, structure_repository
-from pipeline.public import PerimeterStructures
+from infrastructure.repositories import (
+    address_repository,
+    contribution_repository,
+    perimeter_repository,
+    structure_repository,
+)
+from pipeline.public import (
+    CountryRecompute,
+    PerimeterStructures,
+    SourceContributionPerimeterRecompute,
+)
 
 log = setup_logger("add_missing_structure_forms", os.path.dirname(__file__))
 
@@ -41,15 +51,26 @@ FORMS: list[tuple[str, str, bool, tuple[str, ...]]] = [
     ("medis", "ur454", True, ()),
     ("umrh", "umr herbivores", False, ()),
     ("uca", "univ clermont i", True, ()),
+    ("esc_clermont_business_school", "clermont school of business", False, ()),
 ]
 """Formes de nom à ajouter. Le contexte nomme des structures par leur code."""
 
 HAL_LINKS: dict[str, tuple[int, ...]] = {"quapa": (1002065, 37712)}
 """Structures HAL à rattacher, par code de structure interne."""
 
+CONFIRMED_ADDRESSES: dict[str, tuple[str, ...]] = {
+    "uca": ("clermont ferrand 1", "clermont ferrand 2")
+}
+"""Adresses à rattacher par un lien confirmé, par code de structure, désignées par leur texte normalisé entier."""
+
 
 def structure_ids(conn: Connection) -> dict[str, int]:
-    codes = {code for code, *_ in FORMS} | {c for *_, ctx in FORMS for c in ctx} | set(HAL_LINKS)
+    codes = (
+        {code for code, *_ in FORMS}
+        | {c for *_, ctx in FORMS for c in ctx}
+        | set(HAL_LINKS)
+        | set(CONFIRMED_ADDRESSES)
+    )
     rows = conn.execute(
         text("SELECT code, id FROM structures WHERE code = ANY(:codes)"), {"codes": list(codes)}
     )
@@ -103,7 +124,35 @@ def main() -> None:
             linked += conn.execute(
                 statement, {"structure_id": ids[code], "hal_ids": list(hal_ids)}
             ).rowcount
-        log.info("%d formes ajoutées, %d structures HAL rattachées", created, linked)
+        addresses = AddressService(
+            addresses=address_repository(conn),
+            contributions=contribution_repository(conn),
+            country_recompute=CountryRecompute(conn),
+            perimeter_structures=PerimeterStructures(conn),
+            perimeter_recompute=SourceContributionPerimeterRecompute(conn),
+        )
+        confirmed = 0
+        for code, texts in CONFIRMED_ADDRESSES.items():
+            rows = conn.execute(
+                text("""
+                    SELECT a.id FROM addresses a
+                    WHERE a.normalized_text = ANY(:texts)
+                      AND NOT EXISTS (SELECT 1 FROM address_structures ast WHERE ast.address_id = a.id
+                                      AND ast.structure_id = :structure_id AND ast.is_confirmed)
+                """),
+                {"texts": list(texts), "structure_id": ids[code]},
+            ).scalars()
+            for address_id in rows:
+                log.info("lien confirmé à ajouter : adresse %d → %s", address_id, code)
+                confirmed += 1
+                if not args.dry_run:
+                    addresses.review_structure_link(address_id, ids[code], is_confirmed=True)
+        log.info(
+            "%d formes ajoutées, %d structures HAL rattachées, %d liens confirmés",
+            created,
+            linked,
+            confirmed,
+        )
         if args.dry_run:
             conn.rollback()
             return
