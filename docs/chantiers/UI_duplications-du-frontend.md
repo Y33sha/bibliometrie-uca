@@ -127,8 +127,9 @@ Une étiquette (tag, badge, pastille, chip) est un court texte sur fond clair, a
 
 ### Phase 7 — Fonctions, libellés et icônes
 
-- [ ] Dates, nombres, pourcentages et pluriels sur `utils.ts` et `plural.ts`
+- [x] Dates, nombres, pourcentages et pluriels sur `utils.ts` et `plural.ts` (f685fa620)
 - [ ] Énumérations chargées une fois ; signalement d'erreur unique
 - [ ] Libellés sur `labels.ts` ; un nom par section
 - [ ] Icônes sur Lucide : navigation, `KeyFigures`, `IconButton`, `SectionLabel`, SVG en ligne, glyphes « × »
 - [ ] Pictogrammes Creative Commons de `LicenseBadge` en SVG ; dépendance Flaticon retirée
+- [ ] Infobulles sur `Tooltip` : attributs `title` (97 dans 60 fichiers, dont `KeyFigures`), infobulles des graphiques Chart.js
