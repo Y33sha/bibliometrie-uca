@@ -247,6 +247,20 @@ def extract_crossref_update_relations(
     ]
 
 
+def notice_relation(
+    relation: RelationType, subject_doc_type: str | None, object_doc_type: str | None
+) -> RelationType:
+    """Renvoie le type d'une relation déclarée, corrigé par le type de l'avis : une correction dont l'avis est de type `retraction` devient une rétractation.
+
+    Certains éditeurs (Elsevier) déclarent un avis de rétractation comme un erratum. L'avis est le sujet de `is_correction_of`, l'objet de `has_correction`.
+    """
+    if relation is RelationType.IS_CORRECTION_OF and subject_doc_type == DocType.RETRACTION:
+        return RelationType.IS_RETRACTION_OF
+    if relation is RelationType.HAS_CORRECTION and object_doc_type == DocType.RETRACTION:
+        return RelationType.HAS_RETRACTION
+    return relation
+
+
 _WOS_ERRATUM_REFERENCE = re.compile(r"\s*\(vol\.?\s+[^()]*?\b(\d{4})\s*\)\s*$", re.IGNORECASE)
 """Référence de l'article corrigé en fin de titre d'un erratum WoS : `(vol 22, pg 385, 2020)`, `(vol 845, 138110, 2023)`. Le dernier nombre est l'année de l'article."""
 

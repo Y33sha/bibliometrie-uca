@@ -11,6 +11,7 @@ from domain.publications.relations import (
     extract_datacite_relations,
     infer_shared_key_relation,
     inverse_relation,
+    notice_relation,
     wos_corrected_article,
 )
 
@@ -228,6 +229,36 @@ class TestExtractCrossrefUpdateRelations:
     def test_no_update(self):
         assert extract_crossref_update_relations({}) == []
         assert extract_crossref_update_relations(None) == []
+
+
+class TestNoticeRelation:
+    def test_retraction_notice_declared_as_erratum(self):
+        """Cas réel : Elsevier déclare l'avis de rétractation 10.1016/j.joca.2026.08.003 comme un erratum."""
+        assert (
+            notice_relation(RelationType.IS_CORRECTION_OF, "retraction", "poster")
+            is RelationType.IS_RETRACTION_OF
+        )
+        assert (
+            notice_relation(RelationType.HAS_CORRECTION, "poster", "retraction")
+            is RelationType.HAS_RETRACTION
+        )
+
+    def test_erratum_keeps_the_correction(self):
+        assert (
+            notice_relation(RelationType.IS_CORRECTION_OF, "erratum", "article")
+            is RelationType.IS_CORRECTION_OF
+        )
+        assert (
+            notice_relation(RelationType.HAS_CORRECTION, "article", None)
+            is RelationType.HAS_CORRECTION
+        )
+
+    def test_retracted_article_typed_retraction_keeps_the_correction(self):
+        """L'avis est le sujet de `is_correction_of` : le type de l'objet est sans effet."""
+        assert (
+            notice_relation(RelationType.IS_CORRECTION_OF, "erratum", "retraction")
+            is RelationType.IS_CORRECTION_OF
+        )
 
 
 class TestWosCorrectedArticle:

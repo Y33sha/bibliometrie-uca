@@ -26,6 +26,7 @@ from domain.publications.relations import (
     extract_datacite_distinct_works,
     extract_datacite_relations,
     infer_shared_key_relation,
+    notice_relation,
     wos_corrected_article,
 )
 from domain.source_records.identifiers import SourceIdentifierRole, SourceIdentifierType
@@ -55,7 +56,7 @@ class DeclaredRelationSource(NamedTuple):
     doi: str | None = None
     """DOI `primary`. Avec `source_record_doc_type`, décide si une relation de même œuvre relie deux œuvres distinctes."""
     doc_type: str | None = None
-    """Type de la publication, qui donne le type d'une relation entre deux œuvres distinctes."""
+    """Type de la publication. Il donne le type d'une relation entre deux œuvres distinctes, et le type d'une correction déclarée par un avis."""
     source_record_doc_type: str | None = None
 
 
@@ -404,23 +405,43 @@ def count_by_relation_type(conn: Connection) -> list[tuple[str, int]]:
     return [(r.rel_type, r.cnt) for r in rows]
 
 
-def _build_declared_edges(sources: list[DeclaredRelationSource]) -> list[RelationEdge]:
+def _declared_relations(source_record: DeclaredRelationSource) -> list[tuple[RelationType, str]]:
+    """Renvoie les relations déclarées par un enregistrement source : `(type, DOI cible)`."""
+    if source_record.source == Source.DATACITE:
+        return extract_datacite_relations(source_record.source_extras)
+    if source_record.source == Source.CROSSREF:
+        return extract_crossref_relations(
+            source_record.source_extras
+        ) + extract_crossref_update_relations(source_record.source_extras)
+    return []
+
+
+def _declared_targets(sources: list[DeclaredRelationSource]) -> list[str]:
+    """Renvoie les DOI cibles des relations déclarées, et les DOI déclarés comme autre forme de l'œuvre."""
+    return sorted(
+        {
+            *_distinct_work_targets(sources),
+            *(doi for source_record in sources for _, doi in _declared_relations(source_record)),
+        }
+    )
+
+
+def _build_declared_edges(
+    sources: list[DeclaredRelationSource], publications_by_doi: dict[str, DoiPublication]
+) -> list[RelationEdge]:
+    """Construit les arêtes des relations déclarées. Le type d'une correction suit le type de l'avis, déclarant ou cible en base (`notice_relation`)."""
     edges: list[RelationEdge] = []
     for source_record in sources:
-        if source_record.source == Source.DATACITE:
-            relations = extract_datacite_relations(source_record.source_extras)
-        elif source_record.source == Source.CROSSREF:
-            relations = extract_crossref_relations(
-                source_record.source_extras
-            ) + extract_crossref_update_relations(source_record.source_extras)
-        else:
-            continue
-        edges.extend(
-            RelationEdge(
-                source_record.publication_id, rel_type.value, target_doi, source_record.source
+        for rel_type, target_doi in _declared_relations(source_record):
+            target = publications_by_doi.get(target_doi)
+            relation = notice_relation(
+                rel_type, source_record.doc_type, target.doc_type if target else None
             )
-            for rel_type, target_doi in relations
-        )
+            edges.append(
+                RelationEdge(
+                    source_record.publication_id, relation.value, target_doi, source_record.source
+                )
+            )
     return edges
 
 
@@ -551,16 +572,8 @@ def _build_title_match_edges(
 def rebuild(conn: Connection, logger: logging.Logger) -> PhaseMetrics:
     """Reconstruit `publication_relations` depuis les trois signaux, et renvoie les compteurs de la phase (répartition par type de relation dans `details`)."""
     sources = fetch_declared_relation_sources(conn)
-    declared_edges = _build_declared_edges(sources)
-    publications_by_doi = fetch_publications_by_doi(
-        conn,
-        sorted(
-            {
-                *_distinct_work_targets(sources),
-                *(edge.target_doi for edge in declared_edges if edge.target_doi),
-            }
-        ),
-    )
+    publications_by_doi = fetch_publications_by_doi(conn, _declared_targets(sources))
+    declared_edges = _build_declared_edges(sources, publications_by_doi)
     declared_edges += _build_distinct_work_edges(sources, publications_by_doi)
 
     pairs = fetch_shared_key_pairs(conn)

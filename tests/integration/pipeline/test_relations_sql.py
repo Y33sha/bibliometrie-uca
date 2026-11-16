@@ -610,3 +610,39 @@ class TestPhaseRelations:
             ("is_retraction_of", None, "10.1/absent"),
             ("is_retraction_of", article, "10.1/maj-a"),
         ]
+
+    def test_avis_de_retractation_declare_comme_erratum(self, sa_sync_conn):
+        """Cas réel (Elsevier) : l'avis et l'article déclarent un erratum ; le type `retraction` de l'avis donne une rétractation."""
+        article = _publication(
+            sa_sync_conn, doc_type="poster", title_normalized="t-els-a", doi="10.1/els-a"
+        )
+        notice = _publication(
+            sa_sync_conn, doc_type="retraction", title_normalized="t-els-n", doi="10.1/els-n"
+        )
+        for publication, doi, key, target in (
+            (notice, "10.1/els-n", "update_to", "10.1/els-a"),
+            (article, "10.1/els-a", "updated_by", "10.1/els-n"),
+        ):
+            insert_source_record(
+                sa_sync_conn,
+                publication,
+                source="crossref",
+                source_id=doi,
+                title="t",
+                doi=doi,
+                source_extras={key: [{"doi": target, "type": "erratum", "source": "publisher"}]},
+            )
+
+        relations.rebuild(sa_sync_conn, logging.getLogger("test"))
+
+        rows = sa_sync_conn.execute(
+            text(
+                "SELECT from_publication_id, relation_type::text FROM publication_relations "
+                "WHERE from_publication_id IN (:a, :n) ORDER BY relation_type"
+            ),
+            {"a": article, "n": notice},
+        ).all()
+        assert [tuple(r) for r in rows] == [
+            (article, "has_retraction"),
+            (notice, "is_retraction_of"),
+        ]
