@@ -56,7 +56,7 @@ OpenAlex et ScanR ont 1 468 enregistrements sources `memoir` avec une URL DUMAS.
 - Un type `practice_thesis` distingue les thèses d'exercice des mémoires. Il est exclu des publications, comme `memoir`.
 - Un type `journal_issue` désigne le numéro de revue, dirigé ou non. Il est exclu des publications. Un article qui a le DOI de son numéro le perd.
 - `data_paper` rejoint la famille des données et logiciels.
-- Erratum et rétractation quittent les listes de documents. Ils sont rattachés à la publication concernée.
+- Errata et avis de rétractation sont exclus des publications (`OUT_OF_SCOPE_DOC_TYPES`). La publication concernée les relie par leur DOI.
 - Un type `conference_abstract` (« Résumé de conférence »), famille Conférences, désigne le résumé publié d'une communication. Sources : OpenAlex `conference-abstract`, WoS `Meeting Abstract`, recueil de résumés HAL, communication rattachée à une revue, revue au titre en « abstract(s) ».
 - À l'arbitrage, le résumé l'emporte sur la communication. Un poster déclaré par une source (HAL, DataCite, session d'affichage Crossref) l'emporte sur les deux.
 - Les rapports par unité de recherche excluent les résumés.
@@ -86,8 +86,10 @@ Mesures du 2026-11-03, base locale, publications du périmètre : 199 errata sur
 - [x] « Rétracté » calculé par la phase `relations` : relation de rétractation, rétractation sur place déclarée à Crossref, retrait, OpenAlex. Un avis, repéré par ses relations, est exclu. Un retrait Elsevier (`withdrawal`) est déclaré par le doublon retiré, vers l'article déjà publié : il marque le doublon, sans relation. Base locale : 9 publications rétractées. 0a89ad728
 - [ ] Doublons retirés par l'éditeur (Elsevier `withdrawal`) supprimés : 258617, 15131.
 - [ ] DOI tronqué déclaré par Retraction Watch (`10.1016/j.crphar.2022`, avis 9317).
-- [ ] Erratum et rétractation hors des listes de documents, affichés sur la publication concernée. Un article rétracté sur place est typé `retraction` par OpenAlex (2236) : il reste dans les listes.
-- [ ] Erratum et rétractation sans contributions : `author_grouping` les saute, donc ni alignement ni personne. Leurs contributions sources restent en base, comme pour `OUT_OF_SCOPE_DOC_TYPES`. Mesure préalable : publications typées erratum ou rétractation sans titre de correction.
+- [x] Errata et avis typés par enregistrement source : mise à jour Crossref vers une autre œuvre, titres d'errata et d'avis, référence en fin de titre WoS. Un article rétracté sur place typé `retraction` (OpenAlex, 2236) redevient `article`. Mesure du 2026-11-16 : 151 errata et avis sur 346 avaient un enregistrement source d'un autre type ; 391 enregistrements sources retypés. e4f88f785
+- [ ] `erratum` et `retraction` dans `OUT_OF_SCOPE_DOC_TYPES`.
+- [ ] Phase `relations` à partir des enregistrements sources des avis : la relation part de la publication concernée, vers le DOI de l'avis.
+- [ ] « Rétracté » sans exclusion des avis.
 - [ ] Facette « Rétracté ». Mise en forme de la page d'un article rétracté.
 
 ### Phase 3 — Arbitrage
