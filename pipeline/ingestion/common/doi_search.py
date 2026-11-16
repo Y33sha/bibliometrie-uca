@@ -114,14 +114,15 @@ async def fetch_missing_doi(
     retry_after_days: int,
     limit: int | None = None,
     years: list[int] | None = None,
+    scope: str | None = None,
 ) -> PhaseMetrics:
     """Cherche dans la source les DOI absents de son `staging`, et écrit dans `staging` les documents trouvés.
 
-    Un DOI absent de la source est inscrit dans `failed_lookups`. `limit` plafonne le nombre de DOI d'une exécution. Renvoie les compteurs de `look_up`.
+    Un DOI absent de la source est inscrit dans `failed_lookups`. `limit` plafonne le nombre de DOI d'une exécution. `scope` nomme l'identifiant au journal (`LookupChannel.scope`). Renvoie les compteurs de `look_up`.
     """
     dois = get_missing_dois(conn, source, retry_after_days=retry_after_days, years=years)
     if limit and len(dois) > limit:
-        scoped_logger(log, source).info(
+        scoped_logger(log, source, scope).info(
             "plafond de %d DOI par exécution, %d reportés aux suivantes", limit, len(dois) - limit
         )
         dois = dois[:limit]
@@ -137,6 +138,7 @@ async def fetch_missing_doi(
                 source, record, entry_mode=StagingEntryMode.FETCH_MISSING_DOI
             ),
             batch_size=search.batch_size,
+            scope=scope,
         ),
         dois,
     )

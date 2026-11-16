@@ -112,6 +112,7 @@ async def _fetch_ids(
     *,
     fetch: Fetch,
     id_type: LookupIdType,
+    scope: str | None,
 ) -> PhaseMetrics:
     """Cherche chaque identifiant dans HAL et écrit les documents trouvés dans `staging`. Un identifiant introuvable est inscrit dans `failed_lookups`.
 
@@ -132,28 +133,30 @@ async def _fetch_ids(
                 conn, "hal", id_type, identifier
             ),
             stage=lambda staging, doc: staging.stage("hal", doc, entry_mode=entry_mode),
+            scope=scope,
         ),
         ids,
     )
 
 
 async def fetch_missing_hal_by_id(
-    conn: Connection, log: logging.Logger, *, retry_after_days: int
+    conn: Connection, log: logging.Logger, *, retry_after_days: int, scope: str | None = None
 ) -> PhaseMetrics:
-    """Cherche dans HAL les documents repérés par hal-id (OpenAlex, ScanR) et absents du staging. Un hal-id introuvable est écarté définitivement."""
+    """Cherche dans HAL les documents repérés par hal-id (OpenAlex, ScanR) et absents du staging. Un hal-id introuvable est écarté définitivement. `scope` nomme l'identifiant au journal (`LookupChannel.scope`)."""
     return await _fetch_ids(
         conn,
         log,
         get_missing_hal_ids(conn, retry_after_days=retry_after_days),
         fetch=by_native_id("hal", find_deposit),
         id_type="hal_id",
+        scope=scope,
     )
 
 
 async def fetch_missing_hal_by_nnt(
-    conn: Connection, log: logging.Logger, *, retry_after_days: int
+    conn: Connection, log: logging.Logger, *, retry_after_days: int, scope: str | None = None
 ) -> PhaseMetrics:
-    """Cherche dans HAL les thèses soutenues repérées par NNT (theses.fr) et sans enregistrement source HAL. Un NNT introuvable est cherché de nouveau après `retry_after_days` jours."""
+    """Cherche dans HAL les thèses soutenues repérées par NNT (theses.fr) et sans enregistrement source HAL. Un NNT introuvable est cherché de nouveau après `retry_after_days` jours. `scope` nomme l'identifiant au journal (`LookupChannel.scope`)."""
     return await _fetch_ids(
         conn,
         log,
@@ -162,6 +165,7 @@ async def fetch_missing_hal_by_nnt(
             lambda client, nnt: search_one(client, f"nntId_s:{nnt}", label=f"NNT {nnt}")
         ),
         id_type="nnt",
+        scope=scope,
     )
 
 

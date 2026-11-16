@@ -8,7 +8,7 @@ Une étape par source. Les sources sont interrogées en parallèle, et chaque so
 - **OPS** : les familles des numéros de brevet repérés dans une autre source (`pipeline.ingestion.ops.fetch_missing`) ;
 - **OpenAlex, WoS, Crossref, DataCite** : les DOI vus ailleurs et absents de la source.
 
-Une section sans identifiant à chercher se ferme sur « Rien à faire ».
+Au journal, chaque recherche a sa barre, libellée par la source et le type d'identifiant cherché. Une recherche sans identifiant à chercher écrit « rien à faire ».
 
 Un identifiant cherché en vain est inscrit dans `failed_lookups`, et cherché de nouveau après le délai `fetch_missing_retry_after_days`. Auprès du registre qui l'attribue (HAL pour un hal-id, theses.fr pour un NNT), l'échec est définitif. Un DOI inconnu de doi.org (`dois.registered`) sort de la sélection. WoS est opt-in (`--include-wos`).
 """
@@ -19,8 +19,8 @@ import asyncio
 from collections.abc import Callable, Coroutine, Mapping
 
 from domain.config import ConfigKey
-from domain.sources.registry import DOI_SEARCHABLE_SOURCES, PROFILES, Source, source_label
-from pipeline.graph import Step, Task, TaskRun
+from domain.sources.registry import DOI_SEARCHABLE_SOURCES, PROFILES, Source
+from pipeline.graph import Step, Task
 from pipeline.ingestion.adapters import adapter
 from pipeline.ingestion.common.doi_search import fetch_missing_doi
 from pipeline.ingestion.hal.fetch_missing import fetch_missing_hal_by_id, fetch_missing_hal_by_nnt
@@ -53,18 +53,24 @@ def _summary(metrics: PhaseMetrics) -> dict[str, float | None]:
     }
 
 
-def _by_identifier(search: Callable[..., Coroutine[object, object, PhaseMetrics]]) -> TaskRun:
-    """Renvoie l'exécution d'une recherche par hal-id ou par NNT, avec le délai avant de chercher de nouveau un identifiant introuvable."""
+type ChannelRun = Callable[[PhaseContext, str], PhaseMetrics]
+"""Exécution d'un canal : contexte de la phase, type d'identifiant cherché tel qu'affiché au journal."""
 
-    def run(ctx: PhaseContext) -> PhaseMetrics:
+
+def _by_identifier(search: Callable[..., Coroutine[object, object, PhaseMetrics]]) -> ChannelRun:
+    """Renvoie l'exécution d'une recherche par hal-id, NNT ou numéro de brevet, avec le délai avant de chercher de nouveau un identifiant introuvable."""
+
+    def run(ctx: PhaseContext, scope: str) -> PhaseMetrics:
         with ctx.open_tx() as conn:
             retry_after_days = delay(conn, ConfigKey.FETCH_MISSING_RETRY_AFTER_DAYS)
-            return asyncio.run(search(conn, ctx.logger, retry_after_days=retry_after_days))
+            return asyncio.run(
+                search(conn, ctx.logger, retry_after_days=retry_after_days, scope=scope)
+            )
 
     return run
 
 
-def _run_fetch_missing_doi(ctx: PhaseContext, target: str) -> PhaseMetrics:
+def _run_fetch_missing_doi(ctx: PhaseContext, scope: str, target: str) -> PhaseMetrics:
     search = adapter(Source(target)).doi_search
     assert search is not None, f"{target} : source interrogeable par DOI sans recherche"
     options = ctx.options
@@ -81,6 +87,7 @@ def _run_fetch_missing_doi(ctx: PhaseContext, target: str) -> PhaseMetrics:
                 retry_after_days=retry_after_days,
                 limit=limit,
                 years=years,
+                scope=scope,
             )
         )
 
@@ -92,10 +99,10 @@ def _channel(
     previous_run: tuple[str, ...] = (),
     network: str,
     identifier: str,
-    run: TaskRun,
+    run: ChannelRun,
     when: Callable[[PhaseContext], bool] | None = None,
 ) -> Task:
-    """Renvoie la tâche d'un canal de recherche, exécutée quand le run interroge sa source et que `when` est remplie. `identifier` nomme le type d'identifiant cherché, au journal.
+    """Renvoie la tâche d'un canal de recherche, exécutée quand le run interroge sa source et que `when` est remplie. `identifier` nomme le type d'identifiant cherché, au journal ; `run` le reçoit.
 
     Les canaux partagent leurs lectures et leurs écritures : identifiants des publications du périmètre, cherchés dans les autres sources ; échecs retenus dans `failed_lookups`.
     """
@@ -122,7 +129,7 @@ def _channel(
         ),
         network=network,
         parallel_group="sources",
-        run=run,
+        run=lambda ctx: run(ctx, identifier),
         label=f"par {identifier}",
         progress_bar=True,
         when=lambda ctx: network in ctx.options.queried_sources and (when is None or when(ctx)),
@@ -143,7 +150,7 @@ _BY_DOI = {
         previous_run=("doi_prefixes", "publication_relations"),
         network=target,
         identifier="DOI",
-        run=lambda ctx, target=target: _run_fetch_missing_doi(ctx, target),
+        run=lambda ctx, scope, target=target: _run_fetch_missing_doi(ctx, scope, target),
     )
     for target in DOI_SEARCHABLE_SOURCES
 }
@@ -190,7 +197,7 @@ _BY_SOURCE: dict[str, tuple[Task, ...]] = {
         _channel(
             _OPS_BY_NUMBER,
             network="ops",
-            identifier="numéro de brevet",
+            identifier="n° brevet",
             run=_by_identifier(fetch_missing_ops_by_number),
         ),
     ),
@@ -215,10 +222,7 @@ _SUMMARIES: dict[str, str] = {
 }
 """Phrase d'entrées → sorties de l'étape de chaque source."""
 
-STEPS = tuple(
-    Step(str(source), _SUMMARIES[source], tasks, label=source_label(source))
-    for source, tasks in _BY_SOURCE.items()
-)
+STEPS = tuple(Step(str(source), _SUMMARIES[source], tasks) for source, tasks in _BY_SOURCE.items())
 
 _CHANNEL_KEYS = {
     _HAL_BY_ID: "hal-id",
