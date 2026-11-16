@@ -34,22 +34,17 @@ def _run(conn) -> None:
 
 
 class TestMarkRetracted:
-    def test_article_vise_par_une_relation_et_avis_exclu(self, sa_sync_conn):
-        """OpenAlex marque aussi l'avis : l'avis, sujet de `is_retraction_of`, reste non rétracté."""
+    def test_article_avec_un_avis_de_retractation(self, sa_sync_conn):
         article = insert_publication(sa_sync_conn, doc_type="article")
-        notice = insert_publication(sa_sync_conn, doc_type="retraction")
         insert_publication_relation(
             sa_sync_conn,
-            notice,
-            relation_type="is_retraction_of",
+            article,
+            relation_type="has_retraction",
             source="crossref",
-            target_publication_id=article,
-        )
-        insert_source_record(
-            sa_sync_conn, notice, source="openalex", source_id="W-avis", is_retracted=True
+            target_doi="10.1/avis",
         )
         _run(sa_sync_conn)
-        assert _retracted(sa_sync_conn, article, notice) == [True, False]
+        assert _retracted(sa_sync_conn, article) == [True]
 
     def test_retractation_sur_place(self, sa_sync_conn):
         """Cas réel : Elsevier déclare la rétractation vers le DOI de l'article lui-même (10.1016/j.indmarman.2022.05.009)."""

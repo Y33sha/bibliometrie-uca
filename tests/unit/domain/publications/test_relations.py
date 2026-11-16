@@ -279,11 +279,7 @@ class TestInferSharedKeyRelation:
             False,
         )
 
-    def test_erratum_and_dataset(self):
-        assert infer_shared_key_relation("erratum", "article") == (
-            RelationType.IS_CORRECTION_OF,
-            False,
-        )
+    def test_dataset(self):
         assert infer_shared_key_relation("article", "dataset") == (
             RelationType.IS_SUPPLEMENT_TO,
             True,

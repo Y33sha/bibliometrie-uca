@@ -62,6 +62,16 @@ _PAIRS: tuple[tuple[RelationType, RelationType, str], ...] = (
 )
 """Paires de types inverses, avec leur libellé commun : sur la page de B, `A is_preprint_of B` se lit `B has_preprint A`."""
 
+NOTICE_SUBJECT_RELATIONS = frozenset(
+    {RelationType.IS_CORRECTION_OF, RelationType.IS_RETRACTION_OF, RelationType.IS_CONCERN_ABOUT}
+)
+"""Relations d'un erratum ou d'un avis vers l'œuvre concernée."""
+
+NOTICE_RELATION_TYPES = NOTICE_SUBJECT_RELATIONS | frozenset(
+    {RelationType.HAS_CORRECTION, RelationType.HAS_RETRACTION, RelationType.HAS_CONCERN}
+)
+"""Relations d'une publication avec un erratum ou un avis : correction, rétractation, préoccupation. La tâche `notices` de la phase `relations` les écrit, la tâche `rebuild` écrit les autres."""
+
 RELATION_PAIR_LABELS: dict[RelationType, str] = {
     **{relation: label for a, b, label in _PAIRS for relation in (a, b)},
     RelationType.IS_RELATED_TO: "apparentées, type à qualifier",
@@ -164,10 +174,9 @@ def extract_datacite_distinct_works(
 
 DEPENDENT_DOC_TYPE_RELATIONS: dict[str, RelationType] = {
     DocType.PREPRINT: RelationType.IS_PREPRINT_OF,
-    DocType.ERRATUM: RelationType.IS_CORRECTION_OF,
     DocType.DATASET: RelationType.IS_SUPPLEMENT_TO,
 }
-"""Types de document dépendants, sujets d'une relation vers l'œuvre principale : preprint, erratum, jeu de données. Ils typent la relation de deux publications qui partagent une clé (`infer_shared_key_relation`) ou un titre (phase `relations`)."""
+"""Types de document dépendants, sujets d'une relation vers l'œuvre principale : preprint, jeu de données. Ils typent la relation de deux publications qui partagent une clé (`infer_shared_key_relation`) ou un titre (phase `relations`)."""
 
 
 def infer_shared_key_relation(

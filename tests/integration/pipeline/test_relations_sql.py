@@ -1,12 +1,13 @@
-"""Phase `relations` : matching par titre, relations déclarées par les sources, paires de publications à clé partagée, reconstruction de `publication_relations`.
+"""Phase `relations`, tâche `rebuild` : matching par titre, relations déclarées par les sources, paires de publications à clé partagée, reconstruction de `publication_relations`.
 
-Le matching par titre relie un erratum (`fetch_erratum_title_matches`, suffixe de titre) ou un preprint (`fetch_preprint_title_matches`, titre identique) à son parent. Le parent doit être la seule publication substantielle de ce titre, hors autres formes de la même œuvre ; sinon, aucun lien. Le parent est désigné par son `publication_id`, avec ou sans DOI.
+Le matching par titre relie un preprint (`fetch_preprint_title_matches`, titre identique) à sa version publiée. Le parent doit être la seule publication substantielle de ce titre, hors autres formes de la même œuvre ; sinon, aucun lien. Le parent est désigné par son `publication_id`, avec ou sans DOI.
 """
 
 import json
 import logging
 from functools import partial
 
+import pytest
 from sqlalchemy import text
 
 from domain.source_records.identifiers import (
@@ -49,144 +50,6 @@ def _publication(conn, *, doc_type, title_normalized, doi, publication_year=2024
         doi=doi,
         publication_year=publication_year,
     )
-
-
-class TestFetchCorrectedArticleMatches:
-    def _erratum(self, conn, wos_title, *, publication_year=2020) -> int:
-        """Insère un erratum au titre Crossref, avec son enregistrement source WoS de titre `wos_title`."""
-        err = _publication(
-            conn,
-            doc_type="erratum",
-            title_normalized=f"corrigendum to {PARENT_TITLE} journal 12 2012 1 5",
-            doi="10.1/err",
-            publication_year=publication_year,
-        )
-        _source_record(conn, err, source="wos", source_id="WOS:err", title=wos_title)
-        return err
-
-    def test_article_designated_by_the_reference(self, sa_sync_conn):
-        """L'article et l'erratum sont séparés de huit ans : l'année vient de la référence."""
-        parent = _publication(
-            sa_sync_conn,
-            doc_type="article",
-            title_normalized=PARENT_TITLE,
-            doi="10.1/parent",
-            publication_year=2012,
-        )
-        _publication(
-            sa_sync_conn,
-            doc_type="dataset",
-            title_normalized=PARENT_TITLE,
-            doi="10.1/data",
-            publication_year=2012,
-        )
-        err = self._erratum(
-            sa_sync_conn,
-            "Measurement of differential cross sections in proton collisions (vol 72, 2100, 2012)",
-        )
-        matches = relations.fetch_corrected_article_matches(sa_sync_conn)
-        assert [(m.child_id, m.parent_id, m.parent_doi) for m in matches] == [
-            (err, parent, "10.1/parent")
-        ]
-
-    def test_article_outside_the_reference_year(self, sa_sync_conn):
-        _publication(
-            sa_sync_conn,
-            doc_type="article",
-            title_normalized=PARENT_TITLE,
-            doi="10.1/parent",
-            publication_year=2015,
-        )
-        self._erratum(
-            sa_sync_conn,
-            "Measurement of differential cross sections in proton collisions (vol 72, 2100, 2012)",
-        )
-        assert relations.fetch_corrected_article_matches(sa_sync_conn) == []
-
-
-class TestFetchErratumTitleMatches:
-    def test_unique_substantive_parent_matched(self, sa_sync_conn):
-        parent = _publication(
-            sa_sync_conn, doc_type="article", title_normalized=PARENT_TITLE, doi="10.1/parent"
-        )
-        err = _publication(
-            sa_sync_conn,
-            doc_type="erratum",
-            title_normalized=f"erratum to {PARENT_TITLE}",
-            doi="10.1/err",
-        )
-        matches = relations.fetch_erratum_title_matches(sa_sync_conn)
-        assert [(m.child_id, m.parent_id, m.parent_doi) for m in matches] == [
-            (err, parent, "10.1/parent")
-        ]
-
-    def test_doiless_parent_still_matched(self, sa_sync_conn):
-        # Le parent est sans DOI : le lien se fait, avec `parent_doi` à `None`.
-        parent = _publication(
-            sa_sync_conn, doc_type="article", title_normalized=PARENT_TITLE, doi=None
-        )
-        err = _publication(
-            sa_sync_conn,
-            doc_type="erratum",
-            title_normalized=f"erratum to {PARENT_TITLE}",
-            doi="10.1/err",
-        )
-        matches = relations.fetch_erratum_title_matches(sa_sync_conn)
-        assert [(m.child_id, m.parent_id, m.parent_doi) for m in matches] == [(err, parent, None)]
-
-    def test_two_substantive_same_title_blocked(self, sa_sync_conn):
-        # Deux articles distincts au même titre : aucun lien.
-        _publication(sa_sync_conn, doc_type="article", title_normalized=PARENT_TITLE, doi="10.1/p1")
-        _publication(sa_sync_conn, doc_type="article", title_normalized=PARENT_TITLE, doi="10.1/p2")
-        _publication(
-            sa_sync_conn,
-            doc_type="erratum",
-            title_normalized=f"erratum to {PARENT_TITLE}",
-            doi="10.1/err",
-        )
-        assert relations.fetch_erratum_title_matches(sa_sync_conn) == []
-
-    def test_preprint_does_not_block_and_article_chosen(self, sa_sync_conn):
-        # Le preprint a le même titre mais compte comme autre forme de l'œuvre : l'erratum est relié à l'article.
-        article = _publication(
-            sa_sync_conn, doc_type="article", title_normalized=PARENT_TITLE, doi="10.1/article"
-        )
-        _publication(
-            sa_sync_conn, doc_type="preprint", title_normalized=PARENT_TITLE, doi="10.1/preprint"
-        )
-        err = _publication(
-            sa_sync_conn,
-            doc_type="erratum",
-            title_normalized=f"erratum to {PARENT_TITLE}",
-            doi="10.1/err",
-        )
-        matches = relations.fetch_erratum_title_matches(sa_sync_conn)
-        assert [(m.child_id, m.parent_id) for m in matches] == [(err, article)]
-
-    def test_parent_outside_year_window_not_matched(self, sa_sync_conn):
-        _publication(
-            sa_sync_conn,
-            doc_type="article",
-            title_normalized=PARENT_TITLE,
-            doi="10.1/parent",
-            publication_year=2020,
-        )
-        _publication(
-            sa_sync_conn,
-            doc_type="erratum",
-            title_normalized=f"erratum to {PARENT_TITLE}",
-            doi="10.1/err",
-            publication_year=2024,
-        )
-        assert relations.fetch_erratum_title_matches(sa_sync_conn) == []
-
-    def test_short_title_not_matched(self, sa_sync_conn):
-        short = "short title"  # 30 caractères au plus : sous la garde de longueur
-        _publication(sa_sync_conn, doc_type="article", title_normalized=short, doi="10.1/parent")
-        _publication(
-            sa_sync_conn, doc_type="erratum", title_normalized=f"erratum to {short}", doi="10.1/err"
-        )
-        assert relations.fetch_erratum_title_matches(sa_sync_conn) == []
 
 
 class TestFetchPreprintTitleMatches:
@@ -399,13 +262,16 @@ class TestCountByRelationType:
 
 
 class TestRebuildRelations:
-    """Reconstruction complète de la table, et écart avec l'état précédent.
+    """Reconstruction d'une partie de la table, et écart avec l'état précédent.
 
-    La table est vidée puis réécrite à chaque run. `rebuild_relations` compare les relations d'avant et d'après : il compte les relations ajoutées, par type, et les relations disparues.
+    Chaque tâche vide puis réécrit sa partie à chaque run. `rebuild_relations` compare les relations d'avant et d'après : il compte les relations ajoutées, par type, et les relations disparues.
     """
 
     def _edge(self, from_id, relation_type, target_doi):
         return RelationEdge(from_id, relation_type, target_doi, "crossref")
+
+    def _rebuild(self, conn, edges):
+        return relations.rebuild_relations(conn, edges, relations.REBUILT_RELATION_TYPES)
 
     def test_la_cible_d_une_relation_au_doi_d_une_forme_secondaire_est_sa_cible(self, sa_sync_conn):
         """Une relation vers le DOI d'une version Zenodo pointe la publication du concept."""
@@ -417,9 +283,7 @@ class TestRebuildRelations:
         )
         _add_doi_target(sa_sync_conn, "10.5281/zenodo.101", "10.5281/zenodo.100")
 
-        relations.rebuild_relations(
-            sa_sync_conn, [self._edge(article, "has_supplement", "10.5281/zenodo.101")]
-        )
+        self._rebuild(sa_sync_conn, [self._edge(article, "has_supplement", "10.5281/zenodo.101")])
 
         assert sa_sync_conn.execute(
             text("SELECT target_publication_id, target_doi FROM publication_relations")
@@ -431,8 +295,8 @@ class TestRebuildRelations:
         )
         edges = [self._edge(publication, "is_preprint_of", "10.9/x")]
 
-        relations.rebuild_relations(sa_sync_conn, edges)
-        seconde = relations.rebuild_relations(sa_sync_conn, edges)
+        self._rebuild(sa_sync_conn, edges)
+        seconde = self._rebuild(sa_sync_conn, edges)
 
         assert seconde.written == 1
         assert seconde.added_by_type == []
@@ -442,11 +306,9 @@ class TestRebuildRelations:
         publication = _publication(
             sa_sync_conn, doc_type="article", title_normalized=PARENT_TITLE, doi="10.1/b"
         )
-        relations.rebuild_relations(
-            sa_sync_conn, [self._edge(publication, "is_preprint_of", "10.9/x")]
-        )
+        self._rebuild(sa_sync_conn, [self._edge(publication, "is_preprint_of", "10.9/x")])
 
-        rebuild = relations.rebuild_relations(
+        rebuild = self._rebuild(
             sa_sync_conn,
             [
                 self._edge(publication, "is_preprint_of", "10.9/x"),
@@ -462,7 +324,7 @@ class TestRebuildRelations:
         publication = _publication(
             sa_sync_conn, doc_type="article", title_normalized=PARENT_TITLE, doi="10.1/c"
         )
-        relations.rebuild_relations(
+        self._rebuild(
             sa_sync_conn,
             [
                 self._edge(publication, "is_preprint_of", "10.9/x"),
@@ -470,12 +332,43 @@ class TestRebuildRelations:
             ],
         )
 
-        rebuild = relations.rebuild_relations(
-            sa_sync_conn, [self._edge(publication, "is_preprint_of", "10.9/x")]
-        )
+        rebuild = self._rebuild(sa_sync_conn, [self._edge(publication, "is_preprint_of", "10.9/x")])
 
         assert rebuild.added_by_type == []
         assert rebuild.removed == 1
+
+    def test_les_relations_de_l_autre_partie_restent(self, sa_sync_conn):
+        """La reconstruction des relations hors avis laisse les relations avec un avis, et ne les compte pas."""
+        publication = _publication(
+            sa_sync_conn, doc_type="article", title_normalized=PARENT_TITLE, doi="10.1/d"
+        )
+        insert_publication_relation(
+            sa_sync_conn,
+            publication,
+            relation_type="has_correction",
+            source="crossref",
+            target_doi="10.9/erratum",
+        )
+
+        rebuild = self._rebuild(sa_sync_conn, [self._edge(publication, "is_preprint_of", "10.9/x")])
+
+        assert rebuild.removed == 0
+        assert sorted(
+            sa_sync_conn.execute(
+                text(
+                    "SELECT relation_type::text FROM publication_relations "
+                    "WHERE from_publication_id = :p"
+                ),
+                {"p": publication},
+            ).scalars()
+        ) == ["has_correction", "is_preprint_of"]
+
+    def test_une_arete_hors_de_la_partie_est_refusee(self, sa_sync_conn):
+        publication = _publication(
+            sa_sync_conn, doc_type="article", title_normalized=PARENT_TITLE, doi="10.1/e"
+        )
+        with pytest.raises(ValueError, match="has_correction"):
+            self._rebuild(sa_sync_conn, [self._edge(publication, "has_correction", "10.9/x")])
 
 
 class TestFetchSharedKeyPairs:
@@ -572,77 +465,3 @@ class TestPhaseRelations:
             {"a": a, "b": b},
         ).all()
         assert [tuple(r) for r in rows] == [("is_supplement_to", "datacite")]
-
-    def test_mises_a_jour_crossref(self, sa_sync_conn):
-        """Un avis de rétractation relie l'article en base et un article absent de la base. Une rétractation sur place, vers son propre DOI, est écartée."""
-        article = _publication(
-            sa_sync_conn, doc_type="article", title_normalized="t-maj-a", doi="10.1/maj-a"
-        )
-        notice = _publication(
-            sa_sync_conn, doc_type="retraction", title_normalized="t-maj-n", doi="10.1/maj-n"
-        )
-        insert_source_record(
-            sa_sync_conn,
-            notice,
-            source="crossref",
-            source_id="10.1/maj-n",
-            title="t",
-            doi="10.1/maj-n",
-            source_extras={
-                "update_to": [
-                    {"doi": "10.1/maj-a", "type": "retraction", "source": "publisher"},
-                    {"doi": "10.1/absent", "type": "retraction", "source": "retraction-watch"},
-                    {"doi": "10.1/maj-n", "type": "retraction", "source": "publisher"},
-                ]
-            },
-        )
-
-        relations.rebuild(sa_sync_conn, logging.getLogger("test"))
-
-        rows = sa_sync_conn.execute(
-            text(
-                "SELECT relation_type::text, target_publication_id, target_doi "
-                "FROM publication_relations WHERE from_publication_id = :n ORDER BY target_doi"
-            ),
-            {"n": notice},
-        ).all()
-        assert [tuple(r) for r in rows] == [
-            ("is_retraction_of", None, "10.1/absent"),
-            ("is_retraction_of", article, "10.1/maj-a"),
-        ]
-
-    def test_avis_de_retractation_declare_comme_erratum(self, sa_sync_conn):
-        """Cas réel (Elsevier) : l'avis et l'article déclarent un erratum ; le type `retraction` de l'avis donne une rétractation."""
-        article = _publication(
-            sa_sync_conn, doc_type="poster", title_normalized="t-els-a", doi="10.1/els-a"
-        )
-        notice = _publication(
-            sa_sync_conn, doc_type="retraction", title_normalized="t-els-n", doi="10.1/els-n"
-        )
-        for publication, doi, key, target in (
-            (notice, "10.1/els-n", "update_to", "10.1/els-a"),
-            (article, "10.1/els-a", "updated_by", "10.1/els-n"),
-        ):
-            insert_source_record(
-                sa_sync_conn,
-                publication,
-                source="crossref",
-                source_id=doi,
-                title="t",
-                doi=doi,
-                source_extras={key: [{"doi": target, "type": "erratum", "source": "publisher"}]},
-            )
-
-        relations.rebuild(sa_sync_conn, logging.getLogger("test"))
-
-        rows = sa_sync_conn.execute(
-            text(
-                "SELECT from_publication_id, relation_type::text FROM publication_relations "
-                "WHERE from_publication_id IN (:a, :n) ORDER BY relation_type"
-            ),
-            {"a": article, "n": notice},
-        ).all()
-        assert [tuple(r) for r in rows] == [
-            (article, "has_retraction"),
-            (notice, "is_retraction_of"),
-        ]

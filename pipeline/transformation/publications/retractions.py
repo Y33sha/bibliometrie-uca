@@ -2,12 +2,10 @@
 
 Une publication est rétractée sur l'un de ces signaux :
 
-- une relation de rétractation la vise ;
+- elle a un avis de rétractation (`has_retraction`) ;
 - Crossref déclare une rétractation sur place : mise à jour `retraction` ou `withdrawal` vers le DOI de l'enregistrement source lui-même ;
 - Crossref déclare un retrait (`withdrawal`) dans `update_to` : l'enregistrement source déclarant est le doublon retiré ;
 - OpenAlex la marque rétractée.
-
-Un avis de rétractation est exclu : il est sujet d'un `is_retraction_of`, ou objet d'un `has_retraction`. OpenAlex marque aussi les avis.
 """
 
 from __future__ import annotations
@@ -37,12 +35,9 @@ _RETRACTED_SQL = f"""
         ) u
         WHERE sr.source = '{Source.CROSSREF.value}' AND sr.publication_id IS NOT NULL
     ),
-    signal AS (
+    retracted AS (
         SELECT from_publication_id AS id FROM publication_relations
         WHERE relation_type = '{RelationType.HAS_RETRACTION.value}'
-        UNION
-        SELECT target_publication_id FROM publication_relations
-        WHERE relation_type = '{RelationType.IS_RETRACTION_OF.value}' AND target_publication_id IS NOT NULL
         UNION
         SELECT publication_id FROM crossref_update
         WHERE (type IN ('{CROSSREF_RETRACTION_UPDATE}', '{CROSSREF_WITHDRAWAL_UPDATE}') AND doi = source_id)
@@ -50,16 +45,6 @@ _RETRACTED_SQL = f"""
         UNION
         SELECT publication_id FROM source_records
         WHERE source = '{Source.OPENALEX.value}' AND is_retracted AND publication_id IS NOT NULL
-    ),
-    notice AS (
-        SELECT from_publication_id AS id FROM publication_relations
-        WHERE relation_type = '{RelationType.IS_RETRACTION_OF.value}'
-        UNION
-        SELECT target_publication_id FROM publication_relations
-        WHERE relation_type = '{RelationType.HAS_RETRACTION.value}' AND target_publication_id IS NOT NULL
-    ),
-    retracted AS (
-        SELECT id FROM signal EXCEPT SELECT id FROM notice
     )
 """
 """Publications rétractées (`retracted`), d'après les signaux de la docstring du module."""

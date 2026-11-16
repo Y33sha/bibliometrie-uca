@@ -23,6 +23,8 @@ OUT_OF_SCOPE_DOC_TYPES = frozenset(
         DocType.MEMOIR,
         DocType.PHYSICAL_OBJECT,
         DocType.JOURNAL_ISSUE,
+        DocType.ERRATUM,
+        DocType.RETRACTION,
     }
 )
 """Types de document exclus des publications. Une œuvre de l'un de ces types reste sans publication. Ses enregistrements sources et ses contributions sources restent en base, sans contribution ni personne.
@@ -31,6 +33,7 @@ OUT_OF_SCOPE_DOC_TYPES = frozenset(
 - `practice_thesis`, `memoir` : thèse d'exercice et mémoire d'étudiant, surtout de DUMAS ; leurs auteurs sont de passage.
 - `physical_object` : échantillon ou instrument identifié par un DOI DataCite (IGSN).
 - `journal_issue` : numéro de revue, dirigé ou non ; ses articles sont des publications.
+- `erratum`, `retraction` : erratum et avis de rétractation. La publication concernée les relie par leur DOI.
 """
 
 _EXCLUDED_DOI_PREFIXES = frozenset({"10.60692"})
