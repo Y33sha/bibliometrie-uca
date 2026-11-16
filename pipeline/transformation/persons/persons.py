@@ -176,6 +176,8 @@ TASKS = (
             "contributions.person_id",
             "contributions.resolution_mode",
             "contributions.perimeter_evidence",
+            # Une contribution des seuls rôles sans création de personne laisse supprimer sa personne.
+            "contributions.roles",
             "aligned_source_contributions",
             "source_contributions.contributor_information_id",
             "source_contributions.neutralized_identifiers",

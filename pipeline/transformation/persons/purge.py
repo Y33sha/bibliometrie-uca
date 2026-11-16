@@ -1,4 +1,4 @@
-"""Purge de la phase personnes : marquage des contributions rattachées par le nom dont la décision change, suppression des attributions d'identifiant sans appui, puis suppression des personnes sans contribution du périmètre.
+"""Purge de la phase personnes : marquage des contributions rattachées par le nom dont la décision change, suppression des attributions d'identifiant sans appui, puis suppression des personnes sans contribution du périmètre. Une contribution des seuls rôles sans création de personne (jury de thèse, inventeur : `ROLES_WITHOUT_CREATION`) laisse supprimer sa personne.
 
 La purge suit `populate_person_name_forms`, qui régénère les formes dérivées du nom des personnes. Une forme réduite (« j martin ») devient ambiguë quand elle désigne à la fois une personne au prénom réduit et une personne au prénom plein. La purge redécide les contributions rattachées par le nom avec la règle du rattachement (`decide_contribution`). Celles dont la décision change sont marquées pour la redécision de leur personne : au run suivant, le rattachement des contributions les laisse sans personne. La personne réduite, sans autre contribution du périmètre, est alors supprimée avec ses formes de nom, et la forme réduite redevient univoque. La contribution rejoint la personne au prénom plein au run d'après.
 """
@@ -20,6 +20,7 @@ from infrastructure.sql_fragments import (
     CONTRIBUTIONS_AND_SOURCES,
     DETACHED_CONTRIBUTION,
     active_name_form,
+    allows_person_creation,
     identifier_neutralized,
     in_clause,
 )
@@ -86,11 +87,11 @@ def delete_unsupported_identifier_attributions(conn: Connection) -> int:
 
 
 def delete_persons_out_of_perimeter(conn: Connection) -> int:
-    """Supprime les personnes sans contribution du périmètre, sans fiche RH et sans décision humaine (`person_without_decision_sql`). Leurs contributions perdent d'abord leur personne. Leurs formes de nom et leurs identifiants sont supprimés avec elles. Renvoie le nombre de personnes supprimées."""
+    """Supprime les personnes sans contribution du périmètre qui puisse fonder une personne (`allows_person_creation`), sans fiche RH et sans décision humaine (`person_without_decision_sql`). Leurs contributions perdent d'abord leur personne. Leurs formes de nom et leurs identifiants sont supprimés avec elles. Renvoie le nombre de personnes supprimées."""
     deletable = f"""
         NOT EXISTS (
             SELECT 1 FROM contributions g_in
-            WHERE g_in.person_id = p.id AND g_in.in_perimeter
+            WHERE g_in.person_id = p.id AND g_in.in_perimeter AND {allows_person_creation("g_in")}
         )
         AND NOT EXISTS (SELECT 1 FROM hr_records rh WHERE rh.person_id = p.id)
         AND {person_without_decision_sql("p")}

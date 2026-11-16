@@ -10,6 +10,7 @@ from domain.addresses.address_origin import AddressOrigin
 from domain.config import ConfigKey
 from domain.contributions.author_positions import SCANR_TRUNCATED_LENGTHS, AuthorPosition
 from domain.persons.contribution_matching import ContributionMatchReason
+from domain.persons.creation import ROLES_WITHOUT_CREATION
 from domain.persons.identifiers import (
     HUMAN_ATTRIBUTION_STATUSES,
     AttributionStatus,
@@ -112,6 +113,12 @@ def is_raw_address(address: str = "a") -> str:
 def has_author_role(source_contribution: str = "sc") -> str:
     """Renvoie la condition vraie quand la contribution source ou la contribution aliasée `source_contribution` tient un rôle d'auteur (fonction SQL `is_author_role`, `AUTHOR_ROLES`)."""
     return f"is_author_role({source_contribution}.roles)"
+
+
+def allows_person_creation(contribution: str = "g") -> str:
+    """Renvoie la condition vraie quand la contribution ou la contribution source aliasée `contribution` peut fonder une personne : un de ses rôles est hors de `ROLES_WITHOUT_CREATION`, ou elle est sans rôle (`allow_person_creation`)."""
+    roles = "ARRAY[" + ", ".join(f"'{r}'" for r in sorted(ROLES_WITHOUT_CREATION)) + "]::text[]"
+    return f"(coalesce(cardinality({contribution}.roles), 0) = 0 OR NOT {contribution}.roles <@ {roles})"
 
 
 def has_author_position(position: AuthorPosition, contribution: str = "a") -> str:
