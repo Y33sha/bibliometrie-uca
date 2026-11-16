@@ -10,6 +10,7 @@ from pipeline.ingestion.hal.structures import parse_hal_structure
 from pipeline.transformation.structures.hal_structures import HalStructureStore
 from tests.integration.helpers.queues import clear, queued
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
+from tests.integration.helpers.structures import insert_structure
 
 
 def _structure(docid: int, *, parents=(), aliases=()):
@@ -99,3 +100,40 @@ def test_ids_to_fetch_reprend_les_parents_absents(sa_sync_conn):
     store.save([_structure(3, parents=[2])], {})
 
     assert store.ids_to_fetch(refresh_stale=False) == {2}
+
+
+def test_structure_fusionnee_remplacee_par_un_alias(sa_sync_conn):
+    """HAL a fusionné 9 dans 2 : la ligne de 9 devient un alias de 2, et 2 reprend sa structure interne et ses alias."""
+    store = HalStructureStore(sa_sync_conn)
+    store.save([_structure(9, aliases=[8])], {8: 9})
+    internal = insert_structure(sa_sync_conn, "LAB")
+    sa_sync_conn.execute(
+        text("UPDATE hal_structures SET structure_id = :s WHERE hal_structure_id = 9"),
+        {"s": internal},
+    )
+    record = insert_source_record(sa_sync_conn, source="hal", source_id="hal-1")
+    cited = {}
+    for position, hal_structure_id in enumerate((9, 8)):
+        cited[hal_structure_id] = insert_source_contribution(
+            sa_sync_conn, record, source="hal", author_position=position
+        )
+        sa_sync_conn.execute(
+            text(
+                "INSERT INTO source_contribution_hal_structures (source_contribution_id, hal_structure_id)"
+                " VALUES (:s, :h)"
+            ),
+            {"s": cited[hal_structure_id], "h": hal_structure_id},
+        )
+    clear(sa_sync_conn, Queue.SOURCE_CONTRIBUTION_COUNTRIES)
+
+    store.save([_structure(2)], {9: 2}, merged={9})
+
+    assert sa_sync_conn.execute(
+        text("SELECT hal_structure_id, structure_id FROM hal_structures")
+    ).all() == [(2, internal)]
+    aliases = sa_sync_conn.execute(
+        text("SELECT alias_id, hal_structure_id FROM hal_structure_aliases")
+    ).all()
+    assert dict(aliases) == {9: 2, 8: 2}
+    assert store.ids_to_fetch(refresh_stale=False) == set()
+    assert queued(sa_sync_conn, Queue.SOURCE_CONTRIBUTION_COUNTRIES) == {cited[9], cited[8]}

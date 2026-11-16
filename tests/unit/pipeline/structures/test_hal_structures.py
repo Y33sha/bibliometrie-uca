@@ -44,11 +44,13 @@ class _Referential:
     def __init__(self, known=()):
         self.structures: set[int] = set(known)
         self.aliases: dict[int, int] = {}
+        self.merged: set[int] = set()
         self.batches = 0
 
-    def save_batch(self, structures, aliases):
+    def save_batch(self, structures, aliases, merged):
         self.structures |= {s.hal_structure_id for s in structures}
         self.aliases |= aliases
+        self.merged |= merged
         self.batches += 1
 
     def known_ids(self, ids):
@@ -68,7 +70,18 @@ def test_remonte_les_parents_et_resout_les_alias():
 
     assert referential.structures == {1, 2, 3}
     assert referential.aliases == {9: 2}
+    assert referential.merged == {9}
     assert load.not_found == {7}
+
+
+def test_alias_liste_par_une_structure_lue_hors_des_fusions():
+    """9 figure parmi les alias de 2, sans avoir été cherché : seul un identifiant cherché et absent de `ref/structure` est une fusion."""
+    referential = _Referential()
+
+    _fetch({2}, _Source(), referential)
+
+    assert referential.aliases == {9: 2}
+    assert referential.merged == set()
 
 
 def test_enregistre_chaque_lot_des_sa_lecture():
