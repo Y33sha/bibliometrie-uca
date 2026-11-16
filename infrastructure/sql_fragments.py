@@ -367,6 +367,19 @@ def self_declared_preprint_sql(alias: str = "sr") -> str:
     return f"COALESCE(jsonb_exists({source_extra_json(SourceExtra.RELATION, alias)}, '{CROSSREF_PREPRINT_OF}'), false)"
 
 
+def openalex_publisher_records(source_record_ids: str) -> str:
+    """Renvoie la requête des enregistrements OpenAlex éditeurs parmi les enregistrements sources de la requête `source_record_ids` : un de leurs DOI, de rôle autre que `related`, est celui de leur publication. Colonne `id`."""
+    return f"""
+        SELECT DISTINCT sr.id
+        FROM source_records sr
+        JOIN publications p ON p.id = sr.publication_id
+        JOIN source_record_identifiers i
+          ON i.source_record_id = sr.id AND i.id_type = '{SourceIdentifierType.DOI}'
+         AND i.id_value = p.doi AND i.role <> '{SourceIdentifierRole.RELATED}'
+        WHERE sr.source = '{Source.OPENALEX}' AND sr.id IN ({source_record_ids})
+    """
+
+
 def propagate_contribution_attributes_sql(contribution_ids: str) -> str:
     """Renvoie l'instruction recomposant les attributs des contributions de la requête `contribution_ids` depuis leurs contributions sources.
 
@@ -394,13 +407,7 @@ def propagate_contribution_attributes_sql(contribution_ids: str) -> str:
             WHERE gm.contribution_id IN ({contribution_ids})
         ),
         openalex_publishers AS (
-            SELECT DISTINCT sr.id
-            FROM source_records sr
-            JOIN publications p ON p.id = sr.publication_id
-            JOIN source_record_identifiers i
-              ON i.source_record_id = sr.id AND i.id_type = '{SourceIdentifierType.DOI}'
-             AND i.id_value = p.doi AND i.role <> '{SourceIdentifierRole.RELATED}'
-            WHERE sr.id IN (SELECT source_record_id FROM sources WHERE openalex)
+            {openalex_publisher_records("SELECT source_record_id FROM sources WHERE openalex")}
         ),
         members AS (
             SELECT s.*, op.id IS NOT NULL AS openalex_publisher
