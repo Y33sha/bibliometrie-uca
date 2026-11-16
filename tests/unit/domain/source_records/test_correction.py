@@ -854,6 +854,8 @@ class TestTitleErratumPrefixRule:
             "Correction",
             "Department of Error",
             "WITHDRAWN: Corrigendum to ‘Identification of low fluoride areas’",
+            "Publisher Erratum: Open charm production and asymmetry in pNe collisions",
+            "Author Erratum: Search for new phenomena",
         ],
     )
     def test_erratum_titles(self, title):
