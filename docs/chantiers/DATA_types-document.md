@@ -87,9 +87,10 @@ Mesures du 2026-11-03, base locale, publications du périmètre : 199 errata sur
 - [ ] Doublons retirés par l'éditeur (Elsevier `withdrawal`) supprimés : 258617, 15131.
 - [ ] DOI tronqué déclaré par Retraction Watch (`10.1016/j.crphar.2022`, avis 9317).
 - [x] Errata et avis typés par enregistrement source : mise à jour Crossref vers une autre œuvre, titres d'errata et d'avis, référence en fin de titre WoS. Un article rétracté sur place typé `retraction` (OpenAlex, 2236) redevient `article`. Mesure du 2026-11-16 : 151 errata et avis sur 346 avaient un enregistrement source d'un autre type ; 391 enregistrements sources retypés. e4f88f785
-- [ ] `erratum` et `retraction` dans `OUT_OF_SCOPE_DOC_TYPES`.
-- [ ] Phase `relations` à partir des enregistrements sources des avis : la relation part de la publication concernée, vers le DOI de l'avis.
-- [ ] « Rétracté » sans exclusion des avis.
+- [x] `erratum` et `retraction` dans `OUT_OF_SCOPE_DOC_TYPES`. Oneshot `requeue_notice_publications` : 355 publications, 1 434 enregistrements sources à réconcilier. 6959cb793
+- [x] Tâche `notices` de la phase `relations` : la relation part de la publication concernée, vers le DOI de l'avis. Signaux : déclarations Crossref de la publication et de l'avis, référence en fin de titre WoS, titre « Erratum: ». Chaque tâche reconstruit sa partie de `publication_relations`, définie par des types de relation. 6959cb793
+- [x] « Rétracté » lu sur `has_retraction`, sans exclusion des avis. 6959cb793
+- [ ] Mesures après le run : publications d'errata et d'avis, relations de correction et de rétractation, publications rétractées.
 - [ ] Facette « Rétracté ». Mise en forme de la page d'un article rétracté.
 
 ### Phase 3 — Arbitrage
