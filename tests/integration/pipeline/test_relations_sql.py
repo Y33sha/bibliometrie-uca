@@ -51,6 +51,59 @@ def _publication(conn, *, doc_type, title_normalized, doi, publication_year=2024
     )
 
 
+class TestFetchCorrectedArticleMatches:
+    def _erratum(self, conn, wos_title, *, publication_year=2020) -> int:
+        """Insère un erratum au titre Crossref, avec son enregistrement source WoS de titre `wos_title`."""
+        err = _publication(
+            conn,
+            doc_type="erratum",
+            title_normalized=f"corrigendum to {PARENT_TITLE} journal 12 2012 1 5",
+            doi="10.1/err",
+            publication_year=publication_year,
+        )
+        _source_record(conn, err, source="wos", source_id="WOS:err", title=wos_title)
+        return err
+
+    def test_article_designated_by_the_reference(self, sa_sync_conn):
+        """L'article et l'erratum sont séparés de huit ans : l'année vient de la référence."""
+        parent = _publication(
+            sa_sync_conn,
+            doc_type="article",
+            title_normalized=PARENT_TITLE,
+            doi="10.1/parent",
+            publication_year=2012,
+        )
+        _publication(
+            sa_sync_conn,
+            doc_type="dataset",
+            title_normalized=PARENT_TITLE,
+            doi="10.1/data",
+            publication_year=2012,
+        )
+        err = self._erratum(
+            sa_sync_conn,
+            "Measurement of differential cross sections in proton collisions (vol 72, 2100, 2012)",
+        )
+        matches = relations.fetch_corrected_article_matches(sa_sync_conn)
+        assert [(m.child_id, m.parent_id, m.parent_doi) for m in matches] == [
+            (err, parent, "10.1/parent")
+        ]
+
+    def test_article_outside_the_reference_year(self, sa_sync_conn):
+        _publication(
+            sa_sync_conn,
+            doc_type="article",
+            title_normalized=PARENT_TITLE,
+            doi="10.1/parent",
+            publication_year=2015,
+        )
+        self._erratum(
+            sa_sync_conn,
+            "Measurement of differential cross sections in proton collisions (vol 72, 2100, 2012)",
+        )
+        assert relations.fetch_corrected_article_matches(sa_sync_conn) == []
+
+
 class TestFetchErratumTitleMatches:
     def test_unique_substantive_parent_matched(self, sa_sync_conn):
         parent = _publication(

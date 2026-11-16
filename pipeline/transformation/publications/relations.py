@@ -4,7 +4,7 @@ La phase suit `publications` : les enregistrements sources sont rattachés à le
 
 - **Signal #1, relations déclarées** par DataCite (`related_identifiers`) et Crossref (`relation`, mises à jour `update_to` et `updated_by`), traduites par `domain.publications.relations`. Une relation de même œuvre (`IsVersionOf`, `IsVariantFormOf`) entre deux œuvres distinctes selon `declares_same_work` reçoit son type d'après les types de document des deux publications. Exemple : un preprint arXiv et l'article publié.
 - **Signal #2, clés de confirmation partagées** (hal_id, PMID, NNT, DOI arXiv) par deux publications distinctes : leurs types de document donnent la relation (`infer_shared_key_relation`).
-- **Signal #3, titre** : un erratum rejoint l'article corrigé (titre de l'article à la suite de « Erratum: »), un preprint sa version publiée (même titre), à condition qu'un seul candidat ait ce titre.
+- **Signal #3, titre** : un erratum rejoint l'article corrigé (titre de l'article à la suite de « Erratum: », ou suivi de sa référence dans le titre WoS), un preprint sa version publiée (même titre), à condition qu'un seul candidat ait ce titre.
 """
 
 from __future__ import annotations
@@ -16,6 +16,7 @@ from sqlalchemy import Connection, bindparam, text
 
 from domain.documents.doc_types import DocType
 from domain.documents.identifiers import ARXIV_DOI_PREFIX
+from domain.normalize import normalize_text
 from domain.publications.relations import (
     DEPENDENT_DOC_TYPE_RELATIONS,
     RELATION_PAIR_LABELS,
@@ -25,6 +26,7 @@ from domain.publications.relations import (
     extract_datacite_distinct_works,
     extract_datacite_relations,
     infer_shared_key_relation,
+    wos_corrected_article,
 )
 from domain.source_records.identifiers import SourceIdentifierRole, SourceIdentifierType
 from domain.source_records.keys import (
@@ -138,6 +140,18 @@ _SHARED_KEY_PAIRS_SQL = text(f"""
 """)
 """Paires de publications distinctes partageant une clé de confirmation, héritée par la publication de ses enregistrements sources : tout `hal_id` actif, pour NNT et PMID l'identifiant actif de rôle le plus fort, puis de plus petite valeur, et tout DOI arXiv actif. Le DOI arXiv, DOI de dépôt, laisse séparées deux versions publiées d'un même preprint. `k1.pid < k2.pid` produit chaque paire une fois ; le `DISTINCT` fusionne les clés multiples."""
 
+_UNIQUE_SUBSTANTIVE_CANDIDATE = """
+    substantive_count AS (
+        SELECT child_id, count(DISTINCT parent_id) FILTER (WHERE substantive) AS n
+        FROM candidate GROUP BY child_id
+    )
+    SELECT DISTINCT c.child_id, c.parent_id, c.parent_doi
+    FROM candidate c
+    JOIN substantive_count s ON s.child_id = c.child_id
+    WHERE s.n = 1 AND c.substantive
+"""
+"""Garde d'ambiguïté du rattachement par le titre, à la suite d'une CTE `candidate (child_id, parent_id, parent_doi, substantive)` : le candidat retenu est le seul candidat substantiel de l'enfant."""
+
 _ERRATUM_TITLE_MATCHES_SQL = text(f"""
     WITH child AS (
         SELECT id, title_normalized AS t, publication_year AS y
@@ -157,14 +171,7 @@ _ERRATUM_TITLE_MATCHES_SQL = text(f"""
          AND p.publication_year BETWEEN c.y - {_TITLE_MATCH_YEAR_WINDOW} AND c.y
          AND right(c.t, length(p.title_normalized)) = p.title_normalized
     ),
-    substantive_count AS (
-        SELECT child_id, count(*) FILTER (WHERE substantive) AS n
-        FROM candidate GROUP BY child_id
-    )
-    SELECT c.child_id, c.parent_id, c.parent_doi
-    FROM candidate c
-    JOIN substantive_count s ON s.child_id = c.child_id
-    WHERE s.n = 1 AND c.substantive
+    {_UNIQUE_SUBSTANTIVE_CANDIDATE}
 """)
 """Signal #3, erratum → article corrigé : titre de l'article suffixe du titre de l'erratum, article publié dans [année − 2 … année]. Garde d'ambiguïté : un seul candidat substantiel, sinon aucune relation."""
 
@@ -185,16 +192,41 @@ _PREPRINT_TITLE_MATCHES_SQL = text(f"""
          AND length(p.title_normalized) > {DISCRIMINANT_TITLE_MIN_LENGTH}
          AND p.publication_year BETWEEN c.y AND c.y + {_TITLE_MATCH_YEAR_WINDOW}
     ),
-    substantive_count AS (
-        SELECT child_id, count(*) FILTER (WHERE substantive) AS n
-        FROM candidate GROUP BY child_id
-    )
-    SELECT c.child_id, c.parent_id, c.parent_doi
-    FROM candidate c
-    JOIN substantive_count s ON s.child_id = c.child_id
-    WHERE s.n = 1 AND c.substantive
+    {_UNIQUE_SUBSTANTIVE_CANDIDATE}
 """)
 """Preprint → version publiée : titre identique, parent publié dans [année … année + 2]. Garde d'ambiguïté : un seul candidat substantiel (hors `dataset`) au même titre."""
+
+_WOS_ERRATUM_TITLES_SQL = text(f"""
+    SELECT DISTINCT sr.publication_id, sr.title
+    FROM source_records sr
+    JOIN publications p ON p.id = sr.publication_id
+    WHERE sr.source = '{Source.WOS.value}' AND p.doc_type = '{DocType.ERRATUM.value}'
+      AND sr.title ILIKE '%(vol%'
+""")
+"""Titres WoS des errata, candidats à la lecture de la référence de l'article corrigé."""
+
+_REFERENCE_YEAR_WINDOW = 1
+"""Écart d'années toléré entre l'article corrigé et l'année de sa référence dans le titre d'un erratum WoS."""
+
+_CORRECTED_ARTICLE_MATCHES_SQL = text(f"""
+    WITH child AS (
+        SELECT * FROM jsonb_to_recordset(:children) AS c (id int, t text, y int)
+    ),
+    candidate AS (
+        SELECT c.id AS child_id, p.id AS parent_id, p.doi AS parent_doi,
+               (p.doc_type::text NOT IN ('{DocType.PREPRINT.value}', '{DocType.DATASET.value}'))
+                   AS substantive
+        FROM child c
+        JOIN publications p
+          ON p.id <> c.id
+         AND p.doc_type <> '{DocType.ERRATUM.value}'
+         AND length(p.title_normalized) > {DISCRIMINANT_TITLE_MIN_LENGTH}
+         AND p.title_normalized = c.t
+         AND p.publication_year BETWEEN c.y - {_REFERENCE_YEAR_WINDOW} AND c.y + {_REFERENCE_YEAR_WINDOW}
+    ),
+    {_UNIQUE_SUBSTANTIVE_CANDIDATE}
+""").bindparams(bindparam("children", type_=Jsonb))
+"""Erratum WoS → article corrigé : titre identique au titre lu dans la référence, article publié à un an près de l'année de la référence. Garde d'ambiguïté : un seul candidat substantiel."""
 
 
 def fetch_declared_relation_sources(conn: Connection) -> list[DeclaredRelationSource]:
@@ -259,6 +291,19 @@ def fetch_erratum_title_matches(conn: Connection) -> list[TitleMatch]:
     Les candidats d'un erratum sont les publications autres qu'erratum, à titre assez long, publiées dans `[année − 2 … année]`, à `title_normalized` suffixe de celui de l'erratum. La relation exige un seul candidat de ce titre, hors `preprint` et `dataset`, autres formes de la même œuvre.
     """
     rows = conn.execute(_ERRATUM_TITLE_MATCHES_SQL).all()
+    return [TitleMatch(r.child_id, r.parent_id, r.parent_doi) for r in rows]
+
+
+def fetch_corrected_article_matches(conn: Connection) -> list[TitleMatch]:
+    """Renvoie les errata reliés à l'article corrigé par la référence en fin de leur titre WoS (`wos_corrected_article`)."""
+    children = [
+        {"id": r.publication_id, "t": normalize_text(article.title), "y": article.year}
+        for r in conn.execute(_WOS_ERRATUM_TITLES_SQL)
+        if (article := wos_corrected_article(r.title))
+    ]
+    if not children:
+        return []
+    rows = conn.execute(_CORRECTED_ARTICLE_MATCHES_SQL, {"children": children}).all()
     return [TitleMatch(r.child_id, r.parent_id, r.parent_doi) for r in rows]
 
 
@@ -523,7 +568,7 @@ def rebuild(conn: Connection, logger: logging.Logger) -> PhaseMetrics:
         pairs, _declared_pairs(declared_edges, publications_by_doi)
     )
 
-    erratum_matches = fetch_erratum_title_matches(conn)
+    erratum_matches = fetch_erratum_title_matches(conn) + fetch_corrected_article_matches(conn)
     preprint_matches = fetch_preprint_title_matches(conn)
     title_edges = _build_title_match_edges(
         erratum_matches, DEPENDENT_DOC_TYPE_RELATIONS["erratum"]
@@ -584,6 +629,8 @@ TASKS = (
                     "source_extras",
                     "doc_type",
                     "publication_id",
+                    # Titre WoS d'un erratum, suivi de la référence de l'article corrigé.
+                    "title",
                 )
             ),
             "source_record_identifiers",

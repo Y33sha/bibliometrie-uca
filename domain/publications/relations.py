@@ -1,4 +1,4 @@
-"""Relations entre publications distinctes : types, et traduction des vocabulaires de DataCite (`relationType`) et de Crossref (clés de `relation`).
+"""Relations entre publications distinctes : types, traduction des vocabulaires de DataCite (`relationType`) et de Crossref (clés de `relation`, types de mise à jour), référence de l'article corrigé dans le titre d'un erratum WoS.
 
 Restent hors du vocabulaire, et donnent `None` :
 
@@ -8,8 +8,10 @@ Restent hors du vocabulaire, et donnent `None` :
 - les dérivations vagues (`IsDerivedFrom`, `is-related-material`…).
 """
 
+import re
 from collections.abc import Iterator
 from enum import StrEnum
+from typing import NamedTuple
 
 from domain.documents.doc_types import DocType
 from domain.documents.identifiers import DOI
@@ -243,3 +245,22 @@ def extract_crossref_update_relations(
             for relation, doi in _crossref_updates(source_extras, SourceExtra.UPDATED_BY)
         ),
     ]
+
+
+_WOS_ERRATUM_REFERENCE = re.compile(r"\s*\(vol\.?\s+[^()]*?\b(\d{4})\s*\)\s*$", re.IGNORECASE)
+"""Référence de l'article corrigé en fin de titre d'un erratum WoS : `(vol 22, pg 385, 2020)`, `(vol 845, 138110, 2023)`. Le dernier nombre est l'année de l'article."""
+
+
+class CorrectedArticle(NamedTuple):
+    """Article corrigé, désigné par le titre d'un erratum WoS."""
+
+    title: str
+    year: int
+
+
+def wos_corrected_article(erratum_title: str) -> CorrectedArticle | None:
+    """Renvoie le titre et l'année de l'article corrigé, lus dans le titre d'un erratum WoS : titre de l'article suivi de sa référence. `None` sans référence."""
+    match = _WOS_ERRATUM_REFERENCE.search(erratum_title)
+    if match is None or not (title := erratum_title[: match.start()].strip()):
+        return None
+    return CorrectedArticle(title, int(match.group(1)))
