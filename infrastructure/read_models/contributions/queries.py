@@ -15,10 +15,15 @@ from infrastructure.read_models.contributions.models import (
 )
 from infrastructure.read_models.publications.models import PublicationLabItem
 from infrastructure.read_models.sql_fragments import contributor_display_name
-from infrastructure.sql_fragments import case_priority, has_author_role, is_laboratory
+from infrastructure.sql_fragments import (
+    allows_person_creation,
+    case_priority,
+    has_author_role,
+    is_laboratory,
+)
 
-_ORPHAN_BASE = f"g.person_id IS NULL AND g.in_perimeter AND {has_author_role('g')}"
-"""Contribution orpheline, objet de la file de rattachement : contribution du périmètre, sous un rôle d'auteur, sans personne."""
+_ORPHAN_BASE = f"g.person_id IS NULL AND g.in_perimeter AND {has_author_role('g')} AND {allows_person_creation('g')}"
+"""Contribution orpheline, objet de la file de rattachement : contribution du périmètre, sous un rôle d'auteur, sans personne, et capable de fonder une personne. Un inventeur seul est rattaché à une personne existante, ou ignoré."""
 
 _ORPHANS_FROM = """
     FROM contributions g

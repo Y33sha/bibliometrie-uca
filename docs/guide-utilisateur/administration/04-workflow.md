@@ -125,6 +125,6 @@ Le volet de la personne permet de corriger le nom et le prénom venus des source
 La page `admin/orphan-contributions` liste les [contributions](../../glossaire.md#contribution) de l'établissement sans personne. Deux causes :
 
 - la contribution a été détachée à la main ;
-- le pipeline n'a pas pu décider. Le plus souvent, aucun identifiant ne désigne une personne et le nom en désigne plusieurs, fréquent quand le prénom est réduit à l'initiale. Autres causes : identifiants ou épinglages contradictoires, candidats tous rejetés, rôle de jury seul ([rattachement des personnes](../../pipeline/09-persons.md)).
+- le pipeline n'a pas pu décider. Le plus souvent, aucun identifiant ne désigne une personne et le nom en désigne plusieurs, fréquent quand le prénom est réduit à l'initiale. Autres causes : identifiants ou épinglages contradictoires, candidats tous rejetés ([rattachement des personnes](../../pipeline/09-persons.md)).
 
 On rattache ces contributions, une par une ou par lot, à une personne existante ou à une personne créée à la main.
