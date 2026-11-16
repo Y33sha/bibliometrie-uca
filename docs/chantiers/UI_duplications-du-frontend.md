@@ -119,8 +119,8 @@ Une étiquette (tag, badge, pastille, chip) est un court texte sur fond clair, a
 ### Phase 6 — Composants
 
 - [x] Vues de liste sur `useFilteredList` et `filterRegistry` (54af447ad)
-- [ ] URL d'export CSV des vues de liste dans `useFilteredList`
-- [ ] Volets : chargement au changement d'identifiant et remise à zéro dans un composable
+- [x] URL d'export CSV des vues de liste dans `useFilteredList` (23bbf938b)
+- [x] Volets : chargement au changement d'identifiant et remise à zéro dans `useDrawerEntity` (a17c88cb9)
 - [x] Pages Problèmes HAL et d'administration sur `useUrlFilters` (d932adc14)
 - [x] Pages d'entité : titre d'onglet et fil d'Ariane (d84a7b2e9), onglet actif (d7ed0eacb), carte des sujets (c0fde1cd3), états « introuvable » et « Chargement… » (87d9cfd08)
 
