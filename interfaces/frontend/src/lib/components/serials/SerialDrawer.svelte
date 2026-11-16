@@ -1,10 +1,11 @@
 <script lang="ts">
   // Volet d'édition d'une publication en série, réservé à la session admin : titre, type, modèle OA, caractère académique et fusion.
-  import { onMount, untrack } from "svelte";
+  import { onMount } from "svelte";
   import { resolve } from "$app/paths";
   import { api, errorMessage, serials as serialsApi } from "#lib/api/index.js";
   import { autofocus } from "#lib/actions/focus.js";
   import { useDebouncedSearch } from "#lib/composables/useDebouncedSearch.svelte.js";
+  import { useDrawerEntity } from "#lib/composables/useDrawerEntity.svelte.js";
   import { confirmDialog, toast } from "#lib/dialogs.svelte.js";
   import { issnLabel } from "#lib/labels.js";
   import Drawer from "#lib/components/Drawer.svelte";
@@ -31,7 +32,6 @@
     onchange: () => void;
   } = $props();
 
-  let serial = $state<SerialDetail | null>(null);
   let serialTypes: EnumOption[] = $state([]);
   let oaModels: EnumOption[] = $state([]);
 
@@ -50,22 +50,16 @@
     transform: (results) => results.filter((j) => j.id !== id),
   });
 
-  async function load() {
-    const current = id;
-    const detail = await api<SerialDetail>(`/api/serials/${current}`);
-    if (current === id) serial = detail;
-  }
-
   // Chaque publication en série ouverte repart de son état chargé, sans édition ni fusion en cours.
-  $effect(() => {
-    void id;
-    untrack(() => {
-      serial = null;
+  const entity = useDrawerEntity({
+    id: () => id,
+    fetch: (id) => api<SerialDetail>(`/api/serials/${id}`),
+    onreset() {
       editing = false;
       closeMerge();
-      void load();
-    });
+    },
   });
+  const serial = $derived(entity.data);
 
   onMount(async () => {
     [serialTypes, oaModels] = await Promise.all([
@@ -81,7 +75,7 @@
       toast(errorMessage(e), "error");
       return false;
     }
-    await load();
+    await entity.reload();
     onchange();
     return true;
   }
@@ -137,7 +131,7 @@
     if (!(await confirmDialog({ message, danger: true }))) return;
     if (!(await mergeSerial(serial, source.id))) return;
     closeMerge();
-    await load();
+    await entity.reload();
     onchange();
   }
 

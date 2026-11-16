@@ -1,10 +1,11 @@
 <script lang="ts">
   // Volet d'édition d'un éditeur, réservé à la session admin : nom, type, pays, formes de nom et fusion.
-  import { onMount, untrack } from "svelte";
+  import { onMount } from "svelte";
   import { resolve } from "$app/paths";
   import { api, ApiError, errorMessage, publishers as publishersApi } from "#lib/api/index.js";
   import { autofocus } from "#lib/actions/focus.js";
   import { useDebouncedSearch } from "#lib/composables/useDebouncedSearch.svelte.js";
+  import { useDrawerEntity } from "#lib/composables/useDrawerEntity.svelte.js";
   import { confirmDialog, toast } from "#lib/dialogs.svelte.js";
   import Drawer from "#lib/components/Drawer.svelte";
   import IconButton from "#lib/components/IconButton.svelte";
@@ -30,8 +31,6 @@
     onchange: () => void;
   } = $props();
 
-  let publisher = $state<Publisher | null>(null);
-  let nameForms = $state<PublisherNameForm[] | null>(null);
   let publisherTypes: EnumOption[] = $state([]);
   let countries: Country[] = $state([]);
 
@@ -52,29 +51,24 @@
     transform: (results) => results.filter((p) => p.id !== id),
   });
 
-  async function load() {
-    const current = id;
-    const [p, forms] = await Promise.all([
-      api<Publisher>(`/api/publishers/${current}`),
-      api<PublisherNameForm[]>(`/api/publishers/${current}/name-forms`),
-    ]);
-    if (current !== id) return;
-    publisher = p;
-    nameForms = forms;
-  }
-
   // Chaque éditeur ouvert repart de son état chargé, sans édition ni fusion en cours.
-  $effect(() => {
-    void id;
-    untrack(() => {
-      publisher = null;
-      nameForms = null;
+  const entity = useDrawerEntity({
+    id: () => id,
+    fetch: async (id) => {
+      const [publisher, nameForms] = await Promise.all([
+        api<Publisher>(`/api/publishers/${id}`),
+        api<PublisherNameForm[]>(`/api/publishers/${id}/name-forms`),
+      ]);
+      return { publisher, nameForms };
+    },
+    onreset() {
       editing = false;
       blocking = null;
       closeMerge();
-      void load();
-    });
+    },
   });
+  const publisher = $derived(entity.data?.publisher ?? null);
+  const nameForms = $derived(entity.data?.nameForms ?? null);
 
   onMount(async () => {
     [publisherTypes, countries] = await Promise.all([
@@ -90,7 +84,7 @@
       toast(errorMessage(e), "error");
       return false;
     }
-    await load();
+    await entity.reload();
     onchange();
     return true;
   }
@@ -136,7 +130,7 @@
       return;
     }
     closeMerge();
-    await load();
+    await entity.reload();
     onchange();
   }
 

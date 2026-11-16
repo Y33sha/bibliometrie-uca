@@ -3,6 +3,7 @@
   import { api, ApiError } from "#lib/api/index.js";
   import type { components } from "#lib/api/schema.js";
   import Drawer from "#lib/components/Drawer.svelte";
+  import { useDrawerEntity } from "#lib/composables/useDrawerEntity.svelte.js";
   import PublicationTitle from "#lib/components/PublicationTitle.svelte";
   import PublicationMergeSection from "#lib/components/publications/PublicationMergeSection.svelte";
   import SourceTag from "#lib/components/SourceTag.svelte";
@@ -27,34 +28,25 @@
     onchange: (keptId: number) => void;
   } = $props();
 
-  let data = $state<PublicationSources | null>(null);
-  let failure = $state<string | null>(null);
-  // Incrémenté après une fusion qui conserve cette publication, pour relire ses enregistrements sources.
-  let version = $state(0);
+  const sources = useDrawerEntity({
+    id: () => publicationId,
+    fetch: (id) => api<PublicationSources>(`/api/publications/${id}/sources`),
+  });
+  const data = $derived(sources.data);
+  const failure = $derived(
+    sources.failure === null
+      ? null
+      : sources.failure instanceof ApiError && sources.failure.status === 404
+        ? "Publication introuvable."
+        : "Chargement impossible.",
+  );
 
+  // Une fusion qui conserve cette publication change ses enregistrements sources.
   function merged(keptId: number) {
     onchange(keptId);
-    if (keptId === publicationId) version++;
+    if (keptId === publicationId) void sources.reload();
     else onopen(keptId);
   }
-
-  $effect(() => {
-    const id = publicationId;
-    void version;
-    data = null;
-    failure = null;
-    api<PublicationSources>(`/api/publications/${id}/sources`)
-      .then((d) => {
-        if (id === publicationId) data = d;
-      })
-      .catch((e) => {
-        if (id !== publicationId) return;
-        failure =
-          e instanceof ApiError && e.status === 404
-            ? "Publication introuvable."
-            : "Chargement impossible.";
-      });
-  });
 
   // Une colonne par enregistrement source ; une ligne par champ, puis une ligne par contribution d'un même auteur.
   const records = $derived(data ? orderRecords(data.source_records) : []);
