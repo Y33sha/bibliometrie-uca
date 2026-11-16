@@ -20,7 +20,8 @@ Deux valeurs de la publication sont calculées à deux endroits. La consolidatio
 - L'arborescence donne l'ordre d'exécution. Les tests vérifient sa compatibilité avec les dépendances déclarées par les tâches.
 - Les phases d'une seule tâche rejoignent une phase voisine. `finalize` recalcule les données dérivées des entités : périmètre des publications, purges, vues, compteurs.
 - `countries` rejoint `affiliations` : structures, pays, puis indices de périmètre des contributions sources.
-- La consolidation de la publication est seule à calculer les champs de la publication. Les phases `countries` et `oa_status` produisent les faits : pays des adresses, réponses d'Unpaywall. Un changement de pays d'une adresse déclenche la consolidation des publications liées à cette adresse. Un changement de réponse d'Unpaywall déclenche la consolidation des publications du DOI.
+- La consolidation de la publication est seule à calculer les champs de la publication. L'étape des pays et la phase `oa_status` produisent les faits : pays des enregistrements sources, réponses de doi.org et d'Unpaywall. Un fait modifié met en file de consolidation les publications concernées.
+- `dois` est le référentiel des DOI connus. Il contient l'existence et l'URL de résolution chez doi.org de tous les DOI actifs des enregistrements sources rattachés ou du périmètre, et le verdict d'Unpaywall des DOI candidats au DOI d'une publication. `fetch_missing` et la correction lisent l'existence d'un DOI dans `dois`.
 
 ## Phasage
 
@@ -43,12 +44,13 @@ Deux valeurs de la publication sont calculées à deux endroits. La consolidatio
 - [x] Écriture de `publications.countries` retirée de l'étape des pays
 - [x] Écriture de `publications.oa_status` retirée de la phase `oa_status`
 - [x] `oa_status` après la correction, sur les DOI candidats des enregistrements sources (règle des ancres, hors DOI qui ont une cible) : +21 % de DOI interrogés
-- [ ] Source unique pour « DOI inexistant » : `fetch_missing` et la correction lisent `dois` au lieu d'interroger doi.org et de lire `failed_lookups`
+- [ ] Migration : `dois.registered` (DOI connu ou inconnu de doi.org), DOI inconnus repris de `failed_lookups`
+- [ ] Étape DOI avant la correction : agence des préfixes (`resolve_ra`), existence et URL de tous les DOI connus, verdict d'Unpaywall des DOI candidats
+- [ ] `fetch_missing` et la correction lisent `dois.registered`. `fetch_missing` cesse d'interroger doi.org.
 
 ### Phase 3 — Premier niveau
 
 - [ ] Arborescence cible ([annexe](CODE_hierarchie-du-pipeline_arborescence.md)), puis arbitrage de chaque écart avec l'exécution : réviser l'arborescence ou la logique
-- [ ] `resolve_ra` dans l'étape des préfixes DOI de `publishing` ; agence du préfixe posée à un seul endroit
 - [ ] `fetch_truncated` dans la collecte
 - [ ] `finalize` : recalcul des données dérivées
 - [ ] `fetch_missing` : étapes par source, menées en parallèle, chacune avec ses recherches par hal-id, NNT, numéro de brevet ou DOI
