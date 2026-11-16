@@ -101,6 +101,18 @@ _CROSSREF_MAP: dict[str, RelationType] = {
 }
 """Clés Crossref du vocabulaire."""
 
+_CROSSREF_UPDATE_MAP: dict[str, RelationType] = {
+    "correction": RelationType.IS_CORRECTION_OF,
+    "erratum": RelationType.IS_CORRECTION_OF,
+    "corrigendum": RelationType.IS_CORRECTION_OF,
+    "addendum": RelationType.IS_CORRECTION_OF,
+    "clarification": RelationType.IS_CORRECTION_OF,
+    "retraction": RelationType.IS_RETRACTION_OF,
+    "withdrawal": RelationType.IS_RETRACTION_OF,
+    "expression_of_concern": RelationType.IS_CONCERN_ABOUT,
+}
+"""Types de mise à jour Crossref du vocabulaire, vus depuis l'erratum ou l'avis. Les nouvelles versions et éditions, formes d'une même œuvre, restent hors du vocabulaire."""
+
 
 _INVERSE_RELATIONS: dict[RelationType, RelationType] = {
     RelationType.IS_RELATED_TO: RelationType.IS_RELATED_TO,
@@ -199,3 +211,35 @@ def extract_crossref_relations(
             if target:
                 out.append((canonical, target))
     return out
+
+
+def _crossref_updates(
+    source_extras: dict[str, JsonValue] | None, key: SourceExtra
+) -> Iterator[tuple[RelationType, str]]:
+    """Renvoie les mises à jour du vocabulaire rangées sous `key` : `(type vu depuis l'erratum ou l'avis, DOI)`, DOI normalisé à l'ingestion."""
+    updates = (source_extras or {}).get(key)
+    if not isinstance(updates, list):
+        return
+    for item in updates:
+        if (
+            isinstance(item, dict)
+            and (relation := _CROSSREF_UPDATE_MAP.get(as_str(item.get("type")) or ""))
+            and (doi := as_str(item.get("doi")))
+        ):
+            yield relation, doi
+
+
+def extract_crossref_update_relations(
+    source_extras: dict[str, JsonValue] | None,
+) -> list[tuple[RelationType, str]]:
+    """Renvoie les relations tirées des mises à jour déclarées par un enregistrement source Crossref : `(type, DOI cible)`.
+
+    Un erratum ou un avis déclare l'œuvre mise à jour (`update_to`) : `is_correction_of`, `is_retraction_of`, `is_concern_about`. Une œuvre déclare ses mises à jour (`updated_by`) : relation inverse. Une déclaration vers le DOI de l'enregistrement source lui-même, comme une rétractation sur place, donne une auto-relation, écartée à l'insertion.
+    """
+    return [
+        *_crossref_updates(source_extras, SourceExtra.UPDATE_TO),
+        *(
+            (inverse_relation(relation), doi)
+            for relation, doi in _crossref_updates(source_extras, SourceExtra.UPDATED_BY)
+        ),
+    ]

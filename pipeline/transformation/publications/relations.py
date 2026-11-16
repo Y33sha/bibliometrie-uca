@@ -2,7 +2,7 @@
 
 La phase suit `publications` : les enregistrements sources sont rattachés à leur publication, et un DOI cible se résout en publication quand elle est en base. Les relations viennent de trois signaux :
 
-- **Signal #1, relations déclarées** par DataCite (`related_identifiers`) et Crossref (`relation`), traduites par `domain.publications.relations`. Une relation de même œuvre (`IsVersionOf`, `IsVariantFormOf`) entre deux œuvres distinctes selon `declares_same_work` reçoit son type d'après les types de document des deux publications. Exemple : un preprint arXiv et l'article publié.
+- **Signal #1, relations déclarées** par DataCite (`related_identifiers`) et Crossref (`relation`, mises à jour `update_to` et `updated_by`), traduites par `domain.publications.relations`. Une relation de même œuvre (`IsVersionOf`, `IsVariantFormOf`) entre deux œuvres distinctes selon `declares_same_work` reçoit son type d'après les types de document des deux publications. Exemple : un preprint arXiv et l'article publié.
 - **Signal #2, clés de confirmation partagées** (hal_id, PMID, NNT, DOI arXiv) par deux publications distinctes : leurs types de document donnent la relation (`infer_shared_key_relation`).
 - **Signal #3, titre** : un erratum rejoint l'article corrigé (titre de l'article à la suite de « Erratum: »), un preprint sa version publiée (même titre), à condition qu'un seul candidat ait ce titre.
 """
@@ -21,6 +21,7 @@ from domain.publications.relations import (
     RELATION_PAIR_LABELS,
     RelationType,
     extract_crossref_relations,
+    extract_crossref_update_relations,
     extract_datacite_distinct_works,
     extract_datacite_relations,
     infer_shared_key_relation,
@@ -44,7 +45,7 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 
 
 class DeclaredRelationSource(NamedTuple):
-    """Enregistrement source rattaché qui déclare des relations dans son `source_extras` (DataCite `related_identifiers` ou Crossref `relation`)."""
+    """Enregistrement source rattaché qui déclare des relations dans son `source_extras` (DataCite `related_identifiers`, Crossref `relation`, `update_to` ou `updated_by`)."""
 
     publication_id: int
     source: str
@@ -210,7 +211,10 @@ def fetch_declared_relation_sources(conn: Connection) -> list[DeclaredRelationSo
             FROM source_records sr
             JOIN publications p ON p.id = sr.publication_id
             WHERE (sr.source = '{Source.DATACITE.value}' AND {has_source_extra(SourceExtra.RELATED_IDENTIFIERS)})
-               OR (sr.source = '{Source.CROSSREF.value}' AND {has_source_extra(SourceExtra.RELATION)})
+               OR (sr.source = '{Source.CROSSREF.value}'
+                   AND ({has_source_extra(SourceExtra.RELATION)}
+                        OR {has_source_extra(SourceExtra.UPDATE_TO)}
+                        OR {has_source_extra(SourceExtra.UPDATED_BY)}))
         """)
     ).all()
     return [
@@ -361,7 +365,9 @@ def _build_declared_edges(sources: list[DeclaredRelationSource]) -> list[Relatio
         if source_record.source == Source.DATACITE:
             relations = extract_datacite_relations(source_record.source_extras)
         elif source_record.source == Source.CROSSREF:
-            relations = extract_crossref_relations(source_record.source_extras)
+            relations = extract_crossref_relations(
+                source_record.source_extras
+            ) + extract_crossref_update_relations(source_record.source_extras)
         else:
             continue
         edges.extend(

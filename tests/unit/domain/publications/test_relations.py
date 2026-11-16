@@ -5,6 +5,7 @@ from domain.publications.relations import (
     _DATACITE_MAP,
     RelationType,
     extract_crossref_relations,
+    extract_crossref_update_relations,
     extract_datacite_distinct_works,
     extract_datacite_relations,
     infer_shared_key_relation,
@@ -186,6 +187,45 @@ class TestExtractCrossref:
             }
         }
         assert extract_crossref_relations(source_extras) == [(RelationType.DESCRIBES, "10.1/ds")]
+
+
+class TestExtractCrossrefUpdateRelations:
+    def test_notice_declares_the_updated_work(self):
+        """Cas réel : avis de rétractation 10.1016/j.biortech.2024.131679, déclaré par Retraction Watch."""
+        source_extras = {
+            "update_to": [
+                {
+                    "doi": "10.1016/j.biortech.2018.03.127",
+                    "type": "retraction",
+                    "source": "retraction-watch",
+                }
+            ]
+        }
+        assert extract_crossref_update_relations(source_extras) == [
+            (RelationType.IS_RETRACTION_OF, "10.1016/j.biortech.2018.03.127")
+        ]
+
+    def test_work_declares_its_updates(self):
+        source_extras = {
+            "updated_by": [
+                {"doi": "10.1/erratum", "type": "erratum", "source": "publisher"},
+                {"doi": "10.1/concern", "type": "expression_of_concern", "source": "publisher"},
+            ]
+        }
+        assert extract_crossref_update_relations(source_extras) == [
+            (RelationType.HAS_CORRECTION, "10.1/erratum"),
+            (RelationType.HAS_CONCERN, "10.1/concern"),
+        ]
+
+    def test_new_version_out_of_vocabulary(self):
+        source_extras = {
+            "update_to": [{"doi": "10.1/x", "type": "new_version", "source": "publisher"}]
+        }
+        assert extract_crossref_update_relations(source_extras) == []
+
+    def test_no_update(self):
+        assert extract_crossref_update_relations({}) == []
+        assert extract_crossref_update_relations(None) == []
 
 
 class TestInferSharedKeyRelation:

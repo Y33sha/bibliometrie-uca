@@ -519,3 +519,41 @@ class TestPhaseRelations:
             {"a": a, "b": b},
         ).all()
         assert [tuple(r) for r in rows] == [("is_supplement_to", "datacite")]
+
+    def test_mises_a_jour_crossref(self, sa_sync_conn):
+        """Un avis de rétractation relie l'article en base et un article absent de la base. Une rétractation sur place, vers son propre DOI, est écartée."""
+        article = _publication(
+            sa_sync_conn, doc_type="article", title_normalized="t-maj-a", doi="10.1/maj-a"
+        )
+        notice = _publication(
+            sa_sync_conn, doc_type="retraction", title_normalized="t-maj-n", doi="10.1/maj-n"
+        )
+        insert_source_record(
+            sa_sync_conn,
+            notice,
+            source="crossref",
+            source_id="10.1/maj-n",
+            title="t",
+            doi="10.1/maj-n",
+            source_extras={
+                "update_to": [
+                    {"doi": "10.1/maj-a", "type": "retraction", "source": "publisher"},
+                    {"doi": "10.1/absent", "type": "retraction", "source": "retraction-watch"},
+                    {"doi": "10.1/maj-n", "type": "retraction", "source": "publisher"},
+                ]
+            },
+        )
+
+        relations.rebuild(sa_sync_conn, logging.getLogger("test"))
+
+        rows = sa_sync_conn.execute(
+            text(
+                "SELECT relation_type::text, target_publication_id, target_doi "
+                "FROM publication_relations WHERE from_publication_id = :n ORDER BY target_doi"
+            ),
+            {"n": notice},
+        ).all()
+        assert [tuple(r) for r in rows] == [
+            ("is_retraction_of", None, "10.1/absent"),
+            ("is_retraction_of", article, "10.1/maj-a"),
+        ]
