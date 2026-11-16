@@ -13,7 +13,7 @@ import pytest
 from sqlalchemy.exc import OperationalError, PendingRollbackError
 
 from pipeline import run as run_pipeline
-from pipeline.graph import Phase, Task
+from pipeline.graph import Block, Phase, Task
 from pipeline.runtime.context import RunOptions
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
@@ -30,7 +30,7 @@ def _args(**surcharges) -> argparse.Namespace:
 
 def _phase(run, name: str = "persons") -> Phase:
     """Renvoie la phase `name`, dont l'exécution appelle `run(ctx)`."""
-    return Phase(name, "Libellé", (Task("essai", run=run),))
+    return Phase(name, "Libellé", (Task("essai", run=run),), Block.ENTITIES)
 
 
 class _FakeRecorder:

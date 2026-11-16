@@ -4,7 +4,7 @@ import logging
 
 import pytest
 
-from pipeline.graph import Phase, Step, Task
+from pipeline.graph import Block, Phase, Step, Task
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.task_runner import execute_tasks, run_phase
 
@@ -105,11 +105,13 @@ _TACHES = (
 
 
 def test_une_phase_somme_par_defaut_les_metriques_de_ses_taches(contexte):
-    assert run_phase(Phase("essai", "Essai", _TACHES), contexte()).new == 3
+    assert run_phase(Phase("essai", "Essai", _TACHES, Block.ENTITIES), contexte()).new == 3
 
 
 def test_une_phase_assemble_ses_metriques_par_sa_fonction(contexte):
-    phase = Phase("essai", "Essai", _TACHES, assemble=lambda by_task: by_task["deux"])
+    phase = Phase(
+        "essai", "Essai", _TACHES, Block.ENTITIES, assemble=lambda by_task: by_task["deux"]
+    )
 
     assert run_phase(phase, contexte()).new == 2
 
@@ -122,6 +124,6 @@ def test_une_precondition_non_remplie_arrete_la_phase_avant_ses_taches(contexte)
 
     tache = Task("une", run=lambda _ctx: appels.append("une") or PhaseMetrics())
     with pytest.raises(RuntimeError, match="périmètre vide"):
-        run_phase(Phase("essai", "Essai", (tache,), check=check), contexte())
+        run_phase(Phase("essai", "Essai", (tache,), Block.ENTITIES, check=check), contexte())
 
     assert appels == []

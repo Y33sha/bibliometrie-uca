@@ -11,6 +11,7 @@ La maintenance d'une tâche (`VACUUM`, `ANALYZE`) suit ses écritures et ne cré
 
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import KW_ONLY, dataclass
+from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from pipeline.http.circuit_breaker import DEFAULT_THRESHOLD
@@ -151,6 +152,17 @@ def interface(children: Iterable[Step | Task]) -> tuple[frozenset[str], frozense
     return frozenset(reads), frozenset(writes)
 
 
+class Block(StrEnum):
+    """Bloc du premier niveau de l'arborescence du pipeline. Il regroupe les phases à l'affichage, sans effet sur l'exécution."""
+
+    COLLECTION = "Collecte"
+    SOURCE_RECORDS = "Enregistrements sources"
+    ENTITIES = "Entités"
+    DERIVED_DATA = "Données dérivées"
+    ENRICHMENTS = "Enrichissements"
+    """Phases hors résolution d'entités : `--no-extras` les omet."""
+
+
 @dataclass(frozen=True)
 class Phase:
     """Phase du pipeline : étapes et tâches consécutives, avec leur libellé et leurs attributs."""
@@ -159,8 +171,7 @@ class Phase:
     label: str
     """Libellé lisible sans connaître le schéma."""
     children: tuple[Step | Task, ...]
-    extra: bool = False
-    """Enrichissement, hors résolution d'entités : `--no-extras` l'omet."""
+    block: Block
     harvesting: bool = False
     """Moissonnage : le journal de la phase se termine par le total de ses sources."""
     when: Callable[[RunOptions], bool] | None = None
@@ -173,3 +184,8 @@ class Phase:
     @property
     def tasks(self) -> tuple[Task, ...]:
         return leaves(self.children)
+
+    @property
+    def extra(self) -> bool:
+        """Enrichissement : `--no-extras` omet la phase."""
+        return self.block is Block.ENRICHMENTS

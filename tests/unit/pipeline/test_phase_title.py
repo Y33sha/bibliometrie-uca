@@ -7,7 +7,7 @@ import sys
 
 import pytest
 
-from pipeline.graph import Phase
+from pipeline.graph import Block, Phase
 from pipeline.phases import PHASES
 from pipeline.public import PHASE_ORDER
 from pipeline.run import (
@@ -73,7 +73,7 @@ def _texte(lines: list[str]) -> str:
 
 
 def _phase(name: str) -> Phase:
-    return Phase(name, "Libellé", ())
+    return Phase(name, "Libellé", (), Block.ENTITIES)
 
 
 class TestTitreDuRun:

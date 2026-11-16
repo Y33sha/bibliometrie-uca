@@ -1,11 +1,11 @@
 """Phases du pipeline, dans l'ordre d'exécution, avec leur libellé et leurs attributs.
 
-Les enrichissements (`extra`) viennent en dernier. Chacun est indépendant des autres. `fetch_missing` et `dois`, placées avant eux, lisent les relations au run suivant.
+Chaque phase appartient à un bloc (`Block`). Les enrichissements viennent en dernier. Chacun est indépendant des autres. `fetch_missing` et `dois`, placées avant eux, lisent les relations au run suivant.
 """
 
 from dataclasses import replace
 
-from pipeline.graph import Phase, Task
+from pipeline.graph import Block, Phase, Task
 from pipeline.ingestion.common import (
     fetch_missing,
     fetch_stale,
@@ -35,6 +35,7 @@ PHASES: tuple[Phase, ...] = (
         "harvest",
         "Moissonnage par affiliation",
         harvest.TASKS,
+        Block.COLLECTION,
         harvesting=True,
         check=check_extraction_perimeter,
         assemble=harvest.assemble,
@@ -43,13 +44,15 @@ PHASES: tuple[Phase, ...] = (
         "harvest_by_person",
         "Moissonnage par personne",
         harvest_by_person.TASKS,
+        Block.COLLECTION,
         harvesting=True,
         when=lambda options: options.policy.harvest_by_person,
     ),
     Phase(
         "fetch_missing",
-        "Recherche dans chaque source des documents trouvés dans les autres",
+        "Recherche des documents trouvés dans une autre source",
         fetch_missing.STEPS,
+        Block.COLLECTION,
         harvesting=True,
         assemble=fetch_missing.assemble,
     ),
@@ -57,81 +60,92 @@ PHASES: tuple[Phase, ...] = (
         "fetch_stale",
         "Recherche des documents non revus par le moissonnage",
         fetch_stale.TASKS,
+        Block.COLLECTION,
         harvesting=True,
         when=lambda options: options.policy.fetch_stale,
         assemble=fetch_stale.assemble,
     ),
     Phase(
         "fetch_truncated",
-        "Re-téléchargement des documents OpenAlex tronqués à 100 auteurs",
+        "Complétion des listes d'auteurs OpenAlex tronquées",
         fetch_truncated.TASKS,
+        Block.COLLECTION,
         harvesting=True,
     ),
     Phase(
         "normalize",
-        "Normalisation des données brutes",
+        "Normalisation des documents bruts",
         normalize.STEPS,
+        Block.SOURCE_RECORDS,
         assemble=normalize.assemble,
     ),
     Phase(
         "affiliations",
         "Structures, pays et périmètre des contributions sources",
         affiliations.STEPS,
+        Block.SOURCE_RECORDS,
         check=check_extraction_perimeter,
         assemble=affiliations.assemble,
     ),
     Phase(
         "dois",
-        "Référentiel des DOI : agence des préfixes, existence et URL chez doi.org, statut open access",
+        "Référentiel des DOI",
         dois.TASKS,
+        Block.SOURCE_RECORDS,
         assemble=dois.assemble,
     ),
     Phase(
         "publishing",
         "Référentiels de l'édition",
         publishing.STEPS,
+        Block.SOURCE_RECORDS,
         assemble=publishing.assemble,
     ),
     Phase(
         "metadata_correction",
-        "Correction des métadonnées de publication",
+        "Correction des enregistrements sources",
         metadata_correction.TASKS,
+        Block.SOURCE_RECORDS,
         assemble=metadata_correction.assemble,
     ),
     Phase(
         "publications",
-        "Dédoublonnage des publications",
+        "Rattachement des enregistrements sources aux publications",
         publications.TASKS,
+        Block.ENTITIES,
     ),
     Phase(
         "author_grouping",
-        "Alignement des auteurs des enregistrements sources d'une même publication",
+        "Alignement des auteurs d'une publication entre ses sources",
         author_grouping.TASKS,
+        Block.ENTITIES,
         assemble=author_grouping.assemble,
     ),
     Phase(
         "persons",
-        "Résolution des personnes",
+        "Rattachement des contributions aux personnes",
         persons.TASKS,
+        Block.ENTITIES,
         assemble=persons.assemble,
     ),
     Phase(
         "finalize",
-        "Finalisation : périmètre des publications, vues des structures, purges et compteurs",
+        "Données dérivées : périmètre des publications, purges, vues, compteurs",
         finalize.STEPS,
+        Block.DERIVED_DATA,
         assemble=finalize.assemble,
     ),
     Phase(
         "relations",
-        "Relations entre publications apparentées",
+        "Relations entre publications",
         relations.TASKS,
-        extra=True,
+        Block.ENRICHMENTS,
     ),
     Phase(
         "subjects",
         "Sujets des publications",
         subjects.TASKS,
-        extra=True,
+        Block.ENRICHMENTS,
     ),
 )
 

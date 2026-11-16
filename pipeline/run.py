@@ -70,11 +70,13 @@ def _install_sigterm_handler() -> None:
 
 
 def _catalogue_des_phases() -> str:
-    """Renvoie les phases dans l'ordre d'exécution, chacune avec son libellé."""
+    """Renvoie les phases dans l'ordre d'exécution, chacune avec son libellé, sous le titre de son bloc."""
     width = max(len(name) for name in PHASE_NAMES)
     lines = ["Phases, dans l'ordre :"]
     for i, phase in enumerate(PHASES, 1):
-        lines.append(f"  {i:2d}. {phase.name:{width}s}  {phase.label}")
+        if i == 1 or phase.block is not PHASES[i - 2].block:
+            lines.append(f"  {phase.block}")
+        lines.append(f"    {i:2d}. {phase.name:{width}s}  {phase.label}")
     return "\n".join(lines)
 
 
