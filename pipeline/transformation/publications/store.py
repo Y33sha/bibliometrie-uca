@@ -26,6 +26,19 @@ _SAVED = """jsonb_to_recordset(:payload) AS t(
 )"""
 """Colonnes du lot écrit par `save` (`_save_payload`), lues par `jsonb_to_recordset`."""
 
+_MARK_CHANGED_DOIS_SQL = text(
+    enqueue_sql(
+        Queue.CONTRIBUTION_ATTRIBUTES,
+        f"""
+        SELECT c.id FROM {_SAVED}
+        JOIN publications p ON p.id = t.id
+        JOIN contributions c ON c.publication_id = p.id
+        WHERE p.doi IS DISTINCT FROM t.doi
+        """,
+    )
+).bindparams(bindparam("payload", type_=Jsonb))
+"""Marque pour la recomposition de leurs attributs les contributions des publications dont le DOI change : le DOI désigne l'enregistrement OpenAlex éditeur (`propagate_contribution_attributes_sql`)."""
+
 _RELEASE_CHANGED_DOIS_SQL = text(f"""
     UPDATE publications p SET doi = NULL, updated_at = now()
     FROM {_SAVED}
@@ -137,7 +150,7 @@ class PublicationStore:
     def save(self, publications: Sequence[Publication]) -> None:
         """Enregistre les champs modifiables de publications déjà insérées, et recalcule `sources` depuis leurs enregistrements sources.
 
-        Seules les lignes dont une valeur change sont réécrites, avec leur date de mise à jour. Une date de publication absente garde la date en base. Toutes les publications reçues repassent à ingérer par la phase subjects (`subjects_ingested_at` vidé) : leurs enregistrements sources ont pu changer de sujets.
+        Seules les lignes dont une valeur change sont réécrites, avec leur date de mise à jour. Une date de publication absente garde la date en base. Toutes les publications reçues repassent à ingérer par la phase subjects (`subjects_ingested_at` vidé) : leurs enregistrements sources ont pu changer de sujets. Les contributions d'une publication dont le DOI change sont marquées pour la recomposition de leurs attributs.
         """
         if not publications:
             return
@@ -145,6 +158,7 @@ class PublicationStore:
             raise ValueError("save : chaque publication doit avoir un id (create pour insérer)")
         payload = [_save_payload(p) for p in publications]
         params = {"payload": payload}
+        self._conn.execute(_MARK_CHANGED_DOIS_SQL, params)
         # Un index unique couvre le DOI, contrôlé ligne à ligne : un DOI qui passe d'une publication du lot à une autre est d'abord retiré de la première.
         self._conn.execute(_RELEASE_CHANGED_DOIS_SQL, params)
         self._conn.execute(_SAVE_CHANGED_SQL, params)

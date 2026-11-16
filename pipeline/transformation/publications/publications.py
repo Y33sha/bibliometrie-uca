@@ -72,6 +72,8 @@ _CONSOLIDATION_WRITES = (
     "contributions.id",
     "aligned_source_contributions",
     "contribution_resolution_queue",
+    # Contributions d'une publication dont le DOI change : l'enregistrement OpenAlex éditeur peut changer.
+    "contribution_attributes_queue",
     "publication_relations",
     "publication_subjects",
     "publications_detail",

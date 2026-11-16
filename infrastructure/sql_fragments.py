@@ -22,9 +22,15 @@ from domain.persons.source_contribution_matching import (
 )
 from domain.serials.serial import OaModel
 from domain.source_records.corrections import CORRECTED_BY, RAW
+from domain.source_records.identifiers import SourceIdentifierRole, SourceIdentifierType
 from domain.source_records.impact import CitationTop
 from domain.source_records.source_extras import CROSSREF_PREPRINT_OF, SourceExtra
-from domain.structures.perimeter_evidence import DOCUMENT_EVIDENCE, PerimeterEvidence
+from domain.sources.registry import Source
+from domain.structures.perimeter_evidence import (
+    AFFILIATION_EVIDENCE,
+    DOCUMENT_EVIDENCE,
+    PerimeterEvidence,
+)
 from infrastructure.db.queues import Queue, enqueue_sql
 
 
@@ -251,6 +257,11 @@ DOCUMENT_EVIDENCE_SQL = (
 )
 """Indices d'appartenance au périmètre liés au document (`DOCUMENT_EVIDENCE`), en tableau SQL."""
 
+AFFILIATION_EVIDENCE_SQL = (
+    "ARRAY[" + ", ".join(f"'{e}'" for e in sorted(AFFILIATION_EVIDENCE)) + "]::perimeter_evidence[]"
+)
+"""Indices tirés de l'affiliation (`AFFILIATION_EVIDENCE`), en tableau SQL."""
+
 
 def has_document_evidence(publication: str) -> str:
     """Renvoie la condition vraie quand la publication `publication` (expression SQL de son id) a un indice d'appartenance au périmètre lié au document (`DOCUMENT_EVIDENCE`)."""
@@ -359,7 +370,7 @@ def self_declared_preprint_sql(alias: str = "sr") -> str:
 def propagate_contribution_attributes_sql(contribution_ids: str) -> str:
     """Renvoie l'instruction recomposant les attributs des contributions de la requête `contribution_ids` depuis leurs contributions sources.
 
-    Ses rôles et ses indices de périmètre sont l'union de ceux de ses contributions sources. Ses positions d'auteur (`AuthorPosition`) :
+    Ses rôles et ses indices de périmètre sont l'union de ceux de ses contributions sources. Quand une de ses contributions sources est dans l'enregistrement OpenAlex éditeur, au DOI de la publication, les indices d'affiliation des autres enregistrements OpenAlex sont écartés (`AFFILIATION_EVIDENCE`). Ses positions d'auteur (`AuthorPosition`) :
 
     - `corresponding` : une de ses contributions sources est correspondante ;
     - `first` : la contribution reçoit la majorité des votes des listes d'auteurs pour le premier rang ;
@@ -375,18 +386,38 @@ def propagate_contribution_attributes_sql(contribution_ids: str) -> str:
         f" AND resolution_mode <> '{ContributionMatchReason.MANUAL}'",
     )
     return f"""
-        WITH members AS (
-            SELECT gm.contribution_id, sc.is_corresponding, sc.perimeter_evidence, sc.roles
+        WITH sources AS (
+            SELECT gm.contribution_id, gm.source_record_id, sc.is_corresponding,
+                   sc.perimeter_evidence, sc.roles, sc.source = '{Source.OPENALEX}' AS openalex
             FROM aligned_source_contributions gm
             JOIN source_contributions sc ON sc.id = gm.source_contribution_id
             WHERE gm.contribution_id IN ({contribution_ids})
         ),
+        openalex_publishers AS (
+            SELECT DISTINCT sr.id
+            FROM source_records sr
+            JOIN publications p ON p.id = sr.publication_id
+            JOIN source_record_identifiers i
+              ON i.source_record_id = sr.id AND i.id_type = '{SourceIdentifierType.DOI}'
+             AND i.id_value = p.doi AND i.role <> '{SourceIdentifierRole.RELATED}'
+            WHERE sr.id IN (SELECT source_record_id FROM sources WHERE openalex)
+        ),
+        members AS (
+            SELECT s.*, op.id IS NOT NULL AS openalex_publisher
+            FROM sources s LEFT JOIN openalex_publishers op ON op.id = s.source_record_id
+        ),
         scal AS (
-            SELECT contribution_id, bool_or(is_corresponding) AS is_corr FROM members GROUP BY contribution_id
+            SELECT contribution_id, bool_or(is_corresponding) AS is_corr,
+                   bool_or(openalex_publisher) AS has_openalex_publisher
+            FROM members GROUP BY contribution_id
         ),
         ev AS (
             SELECT m.contribution_id, array_agg(DISTINCT e ORDER BY e) AS evidence
-            FROM members m, LATERAL unnest(m.perimeter_evidence) AS e
+            FROM members m
+            JOIN scal s ON s.contribution_id = m.contribution_id,
+            LATERAL unnest(m.perimeter_evidence) AS e
+            WHERE NOT (s.has_openalex_publisher AND m.openalex AND NOT m.openalex_publisher
+                       AND e = ANY({AFFILIATION_EVIDENCE_SQL}))
             GROUP BY m.contribution_id
         ),
         rol AS (

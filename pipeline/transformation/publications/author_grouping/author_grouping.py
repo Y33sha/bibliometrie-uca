@@ -384,6 +384,10 @@ TASKS = (
             # Copie scanR d'un dépôt HAL, écartée du vote des listes d'auteurs.
             "source_records.source",
             "source_records.source_id",
+            # Enregistrement OpenAlex éditeur, au DOI de la publication : seul à donner des indices d'affiliation OpenAlex.
+            "source_contributions.source",
+            "source_record_identifiers",
+            "publications.doi",
             "contributions.id",
             "contributions.publication_id",
             "contributions.author_positions",
@@ -400,11 +404,12 @@ TASKS = (
             # Une contribution rattachée sans épinglage qui quitte le périmètre est marquée pour la redécision de sa personne.
             "contribution_resolution_queue",
         ),
-        # Personnes des contributions, écrites par la phase `persons` ; contributions et alignements supprimés, enregistrements sources détachés par `finalize.purge_publications`.
+        # Personnes des contributions, écrites par la phase `persons` ; contributions et alignements supprimés, enregistrements sources détachés, publications supprimées par `finalize.purge_publications`.
         previous_run=(
             "contributions",
             "aligned_source_contributions",
             "source_records.publication_id",
+            "publications.doi",
         ),
         run=_attributes,
     ),

@@ -26,3 +26,8 @@ DOCUMENT_EVIDENCE: frozenset[PerimeterEvidence] = frozenset(
     {PerimeterEvidence.THESIS_INSTITUTION, PerimeterEvidence.PATENT_APPLICANT}
 )
 """Indices d'appartenance au périmètre liés au document : thèse soutenue ou brevet déposé par une structure du périmètre. Les autres indices sont liés à une contribution. Un indice lié au document va à toutes les contributions sources de l'enregistrement source, quel que soit leur rôle. La publication entre dans le périmètre, même sans contribution rattachée à une personne."""
+
+AFFILIATION_EVIDENCE: frozenset[PerimeterEvidence] = frozenset(
+    {PerimeterEvidence.ADDRESS, PerimeterEvidence.ROR}
+)
+"""Indices tirés de l'affiliation donnée par la source à l'auteur. Dans une contribution qui a une contribution source dans l'enregistrement OpenAlex éditeur, au DOI de la publication, ces indices des autres enregistrements OpenAlex sont écartés : prépublications et dépôts."""
