@@ -3,6 +3,11 @@
 import httpx2
 import pytest
 
+from domain.source_records.identifiers import (
+    SourceIdentifier,
+    SourceIdentifierRole,
+    SourceIdentifierType,
+)
 from pipeline.ingestion.api_params import API_BASE_URLS
 from pipeline.ingestion.scanr.fetch_missing import get_missing_hal_ids, search_by_external_ids
 from tests.integration.helpers.publications import insert_publication
@@ -42,6 +47,28 @@ class TestFindMissingHalIds:
     def test_skips_hal_id_carried_by_a_scanr_record(self, sa_sync_conn):
         _record(sa_sync_conn, "hal", "hal-aaa")
         _record(sa_sync_conn, "scanr", "doi10.1/x", {"hal_id": ["hal-aaa"]})
+        assert _missing(sa_sync_conn) == []
+
+    def test_skips_hal_id_removed_from_a_scanr_record(self, sa_sync_conn):
+        """Un hal-id retiré par la correction reste présent dans ScanR : la recherche renverrait le même document à chaque run."""
+        _record(sa_sync_conn, "hal", "hal-aaa")
+        publication_id = insert_publication(sa_sync_conn)
+        insert_source_record(
+            sa_sync_conn,
+            publication_id,
+            source="scanr",
+            source_id="doi10.1/actes",
+            title="titre test",
+            staging_id=insert_staging(sa_sync_conn, "scanr", source_id="doi10.1/actes"),
+            identifiers=[
+                SourceIdentifier(
+                    SourceIdentifierType.HAL_ID,
+                    "hal-aaa",
+                    SourceIdentifierRole.SECONDARY,
+                    "ACTES_VS_COMMUNICATION",
+                )
+            ],
+        )
         assert _missing(sa_sync_conn) == []
 
     def test_skips_hal_id_already_in_staging_scanr(self, sa_sync_conn):

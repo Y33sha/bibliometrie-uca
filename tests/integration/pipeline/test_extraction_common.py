@@ -177,6 +177,28 @@ class TestGetMissingDois:
 
         assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30) == []
 
+    def test_exclut_un_doi_retire_d_un_enregistrement_de_la_cible(self, sa_sync_conn):
+        """Un DOI retiré par la correction reste présent dans la cible : la recherche renverrait le même document à chaque run."""
+        _add_inperim_source_record(sa_sync_conn, "openalex", "W1", doi="10.1234/livre")
+        publication_id = _publication(sa_sync_conn, "T", in_perimeter=True)
+        _source_record(
+            sa_sync_conn,
+            publication_id,
+            source="hal",
+            source_id="hal-1",
+            doi="10.1234/chapitre",
+            identifiers=[
+                SourceIdentifier(
+                    SourceIdentifierType.DOI,
+                    "10.1234/livre",
+                    SourceIdentifierRole.SECONDARY,
+                    "DOI_D_UNE_AUTRE_PUBLICATION",
+                )
+            ],
+        )
+
+        assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30) == []
+
     def test_excludes_out_of_perimeter_source_records(self, sa_sync_conn):
         """Le DOI d'une publication hors périmètre est exclu des DOI à chercher."""
         publication_id = _publication(sa_sync_conn, "T", in_perimeter=False)

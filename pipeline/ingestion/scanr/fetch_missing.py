@@ -90,7 +90,6 @@ _MISSING_HAL_IDS_SQL = text(
         FROM source_records sr
         JOIN source_record_identifiers h
           ON h.source_record_id = sr.id AND h.id_type = '{SourceIdentifierType.HAL_ID}'
-             AND h.removed_by IS NULL
         WHERE sr.source = 'scanr'
     )
     SELECT c.hal_id
@@ -108,7 +107,7 @@ _MISSING_HAL_IDS_SQL = text(
 def get_missing_hal_ids(conn: Connection, *, retry_after_days: int) -> list[str]:
     """Renvoie les hal-id des documents HAL et OpenAlex des publications du périmètre, absents de ScanR.
 
-    Un hal-id est présent dans ScanR quand un enregistrement source ScanR le contient, ou quand le staging ScanR a le document `hal<hal-id>`. Un hal-id cherché en vain est cherché de nouveau après `retry_after_days` jours.
+    Un hal-id est présent dans ScanR quand un enregistrement source ScanR le contient, même retiré par la correction, ou quand le staging ScanR a le document `hal<hal-id>`. Un hal-id cherché en vain est cherché de nouveau après `retry_after_days` jours.
     """
     return list(
         conn.execute(_MISSING_HAL_IDS_SQL, {"retry_after_days": retry_after_days}).scalars()

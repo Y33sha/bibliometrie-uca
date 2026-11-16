@@ -40,7 +40,7 @@ def get_missing_dois(
 
     Les candidats viennent de la vue `candidate_dois` : DOI des enregistrements sources, cibles des relations entre publications, DOI DataCite déduits des identifiants arXiv. La forme sans version de chaque DOI à suffixe de version s'ajoute aux candidats. Quand elle existe, elle devient la cible des versions (sous-étape `doi_targets`). Le périmètre est celui du run précédent ; les DOI des enregistrements sources créés pendant le run attendent le run suivant.
 
-    Un DOI est absent de la cible s'il manque à son `staging` et à tous les DOI de ses enregistrements sources : une source renvoie un même document pour chacun de ses DOI.
+    Un DOI est absent de la cible s'il manque à son `staging` et à tous les DOI de ses enregistrements sources, DOI retirés par la correction compris : une source renvoie un même document pour chacun de ses DOI.
 
     Un DOI sort de la sélection pendant `retry_after_days` jours après une recherche vaine dans la cible (`failed_lookups`), et définitivement s'il est inconnu de doi.org (`dois.registered`).
 
@@ -76,7 +76,7 @@ def get_missing_dois(
             FROM source_records sr
             JOIN source_record_identifiers d ON d.source_record_id = sr.id
             WHERE sr.source = CAST(:target AS source_type)
-              AND d.id_type = '{SourceIdentifierType.DOI.value}' AND d.removed_by IS NULL
+              AND d.id_type = '{SourceIdentifierType.DOI.value}'
         )
         SELECT DISTINCT c.doi
         FROM (
