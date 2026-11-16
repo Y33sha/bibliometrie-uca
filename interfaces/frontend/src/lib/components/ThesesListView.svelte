@@ -86,9 +86,6 @@
 		publicationId={drawer.id}
 		onclose={() => drawer.open(null)}
 		onopen={drawer.open}
-		onchange={() => {
-			list.listing.load();
-			list.facets.load();
-		}}
+		onchange={list.reload}
 	/>
 {/if}

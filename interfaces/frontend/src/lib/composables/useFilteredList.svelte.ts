@@ -107,9 +107,14 @@ export function useFilteredList<T, F extends Facets>(config: {
 	function onFilterChange() {
 		listing.page = 1;
 		syncUrl();
+		reload();
+		config.onchange?.();
+	}
+
+	/** Après une modification des données : liste et décomptes rechargés, page courante conservée. */
+	function reload() {
 		listing.load();
 		facets.load();
-		config.onchange?.();
 	}
 
 	/** Change le tri : première page, URL et liste rechargée ; les décomptes ne dépendent pas du tri. */
@@ -174,6 +179,7 @@ export function useFilteredList<T, F extends Facets>(config: {
 		filterParams,
 		syncUrl,
 		onFilterChange,
+		reload,
 		/** Recherche saisie : `onFilterChange` après une pause de frappe. */
 		onSearchInput: url.debouncedSearch(onFilterChange),
 		setSort,

@@ -202,8 +202,7 @@
 		id={drawer.id}
 		onclose={() => drawer.open(null)}
 		onchange={() => {
-			list.listing.load();
-			list.facets.load();
+			list.reload();
 			onchange?.();
 		}}
 	/>

@@ -230,9 +230,8 @@
 	async function onExcludeClick(p: Publication) {
 		if (!onExcludeContribution || p.contribution_id == null) return;
 		const result = await onExcludeContribution(p.contribution_id, p.id);
-		// `false` = annulé par le parent (ex. l'utilisatrice a cliqué Annuler) ; `true` ou `undefined` = succès → on retire la ligne du tableau.
-		if (result === false) return;
-		listing.items = listing.items.filter((item) => item.id !== p.id);
+		// `false` : exclusion annulée par le parent. `true` ou `undefined` : exclusion faite.
+		if (result !== false) list.reload();
 	}
 
 	onMount(async () => {
@@ -457,8 +456,7 @@
 		onclose={() => drawer.open(null)}
 		onopen={drawer.open}
 		onchange={() => {
-			listing.load();
-			facets.load();
+			list.reload();
 			onchange?.();
 		}}
 	/>
