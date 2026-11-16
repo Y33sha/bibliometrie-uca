@@ -15,6 +15,8 @@ Le chantier [alignement des auteurs](archived/2026-10-24_DATA_alignement-auteurs
 - L'adresse d'une contribution source INSPIRE est le nom de l'institution rattachée par INSPIRE, avec son ROR quand INSPIRE le donne. L'affiliation brute est écartée : elle reproduit les décalages d'affiliations de l'éditeur. 0,2 % des auteurs ont une affiliation brute sans institution.
 - L'identifiant CDS est un type d'identifiant d'enregistrement source et une clé de confirmation de la réconciliation. La normalisation d'OpenAlex le reprend des URL de localisation.
 - Une adresse concaténée, à au moins deux groupes d'initiales d'auteurs, est sans indice de périmètre.
+- Quand une contribution a une contribution source dans l'enregistrement OpenAlex éditeur, au DOI de la publication, les indices d'adresse et de ROR de ses autres enregistrements OpenAlex sont écartés. La décision porte sur la contribution, à la recomposition de ses attributs. Les indices des contributions sources restent ceux de leur enregistrement.
+- Une affiliation contraire dans un autre enregistrement OpenAlex de la contribution laisse ses indices en place.
 - Un enregistrement source OpenAlex est sans contributions sources quand il partage un DOI, un DOI arXiv, un hal-id ou un identifiant CDS (CERN Document Server) avec un enregistrement source INSPIRE. La condition se décide sur les identifiants des enregistrements sources, connus dès la normalisation, de rôle autre que `related`, quel que soit leur statut.
 
 ## Phasage
@@ -166,6 +168,15 @@ Le chantier [alignement des auteurs](archived/2026-10-24_DATA_alignement-auteurs
   - 301 personnes hors RH sortent du périmètre. L'adresse place les initiales de 189 d'entre elles dans une affiliation hors périmètre. Les initiales des 112 autres sont absentes de l'adresse, tronquée par la source à 500 ou 1 000 caractères.
   - Une personne RH perd une contribution : celle d'une homonyme toulousaine.
   - 5 contributions justes sortent. 3 sont sans personne. Les 2 autres personnes restent du périmètre par d'autres contributions.
+- [x] Règle « OpenAlex écarté quand il se contredit », non retenue. Simulation le 2026-11-16 (`contradiction.sql`) : 645 contributions où une contribution source OpenAlex est du périmètre et une autre donne une affiliation hors périmètre.
+  - 151 contributions sortent, avec 85 personnes hors RH et 10 publications. Un nom seul non rattaché (« Territoires ») compte comme affiliation contraire.
+  - Sans les adresses en nom seul : 116 contributions, 67 personnes hors RH, 4 publications. Environ 5 pertes justes sûres et 8 douteuses sur une soixantaine de cas lus : mobilité et doubles affiliations (LMBP puis Caen, LMV et IPGP).
+- [x] Seul l'enregistrement OpenAlex éditeur donne des indices d'affiliation OpenAlex. a75d604b4, 6d0d1ddb9. Simulation le 2026-11-16 (`publisher.sql`) : 3 234 contributions ont un indice d'un enregistrement OpenAlex non éditeur. 88 sortent du périmètre, avec 50 personnes hors RH, aucune personne RH et 5 publications.
+  - Les sorties relues sont presque toutes fausses : affiliation d'un coauteur dans une prépublication, liste d'affiliations réunies, enregistrement de dépôt LHCb ou ATLAS, membre de jury de thèse. 3 ou 4 cas sont douteux.
+  - Dans 3 des 5 publications sortantes, un coauteur clermontois existe probablement, sans indice dans aucune source : un article d'ATLAS sans affiliations dans l'enregistrement éditeur, un article de l'ICCF déposé dans HAL, un jeu de données Zenodo.
+  - Le rattachement des personnes lit le périmètre de la contribution (`contributions.in_perimeter`), seul calcul de ce périmètre. Une publication dont le DOI change met ses contributions en file de recomposition.
+  - La variante qui écarte toujours les enregistrements OpenAlex non éditeurs ferait sortir 2 877 contributions dans 1 107 publications, surtout des prépublications sans enregistrement éditeur.
+- [ ] Recomposition des contributions du stock concernées par la règle de l'enregistrement OpenAlex éditeur.
 - [ ] File d'administration des contributions aux affiliations conflictuelles. Elle dépend du chantier [résolution des personnes](archived/2026-10-24_DATA_resolution-personnes.md).
 
 ### Phase 5 — Fin de chantier
@@ -179,3 +190,4 @@ Le chantier [alignement des auteurs](archived/2026-10-24_DATA_alignement-auteurs
 - Un acte publié au nom d'une collaboration est-il une publication du périmètre, quand WoS donne toute la liste d'auteurs et INSPIRE seulement l'orateur ?
 - Les enregistrements sources scanR rattachés à un enregistrement source INSPIRE sont-ils aussi sans contributions sources ? Et ceux des autres sources (HAL, WoS, Crossref, DataCite) ? Cela réduit le stockage et la durée de l'alignement des auteurs.
 - Les enregistrements OpenAlex de dépôt, rattachés à la publication par le titre seul, échappent à la condition sur les identifiants.
+- La phase `affiliations` pose les indices des contributions sources. Les décisions entre enregistrements sources portent sur la contribution, à la fin d'`author_grouping`. Faut-il scinder `affiliations` en une phase par niveau ?
