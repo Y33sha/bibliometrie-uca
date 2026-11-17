@@ -121,7 +121,3 @@ Mesures du 2026-11-03, publications du périmètre : 1 895 communications rattac
 ### Phase 6 — Documentation
 
 - [x] Mise à jour de la documentation.
-
-## Questions ouvertes
-
-- Article corrigé ou rétracté absent de la base, cible d'un erratum ou d'un avis du périmètre : moissonnage par DOI (`fetch_missing`) ?
