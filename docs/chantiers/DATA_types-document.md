@@ -97,7 +97,7 @@ Mesures du 2026-11-03, base locale, publications du périmètre : 199 errata sur
 
 ### Phase 3 — Arbitrage
 
-- [ ] `other` d'une source prioritaire face au type précis d'une autre source, compte tenu du type `article` qu'OpenAlex attribue par défaut. Cas : 87 working papers typés `other` par DataCite et `preprint` par HAL, dont 72 à DOI OSF (`10.17605`) (14691, 255632). 58 chapitres à DOI construit sur un ISBN, typés `book_chapter` par HAL ou une autre source (167674).
+- [x] `other` d'une source prioritaire face au type précis d'une autre source : `other` cède au premier type précis d'une source non agrégatrice ; le type d'OpenAlex ou de scanR ne l'emporte pas (pages OSF typées preprint, `article` par défaut). Simulation : 183 publications sur 3 031 `other` changent de type, dont 35 preprints que le `other` de scanR emportait (10.1002/essoar). Restent `other` les 180 où seul un agrégateur donne un type.
 
 - [x] DataCite `Collection` → `dataset` : collections Figshare de fichiers supplémentaires, tables HEPData, PANGAEA, ICOS (775 enregistrements sources). `Model` reste `other` : modèles et produits de modèles mêlés. Script `apply_doc_type_mapping` pour appliquer la table au stock, qui rattrape aussi DataCite `Audiovisual` (127) et `Sound` (1).
 

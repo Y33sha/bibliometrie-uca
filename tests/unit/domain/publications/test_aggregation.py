@@ -142,6 +142,18 @@ def test_la_revue_d_un_enregistrement_preprint_laisse_le_preprint_en_tete():
     assert (publication.doc_type, publication.serial_id) == ("preprint", 7)
 
 
+def test_le_preprint_passe_apres_other_d_un_agregateur_donne_son_type():
+    """Cas réel (10.1002/essoar.10500878.1) : le DOI du preprint compte comme version publiée, et les enregistrements sources preprint passent après le `other` de scanR. Le type d'un agrégateur ne l'emporte pas sur le preprint de Crossref."""
+    crossref = _source_record(
+        id=1, source="crossref", doc_type="preprint", doi="10.1002/essoar.10500878.1"
+    )
+    scanr = _source_record(id=2, source="scanr", doc_type="other", doi="10.1002/essoar.10500878.1")
+
+    publication = _publication()
+    refresh_from_sources(publication, [crossref, scanr], source_priority=("crossref", "scanr"))
+    assert publication.doc_type == "preprint"
+
+
 def test_une_source_sans_doc_type_laisse_la_suivante_le_donner():
     """Le type de document vient de la première source qui en donne un."""
     muette = _source_record(id=1, source="openalex", doc_type=None)
@@ -445,6 +457,27 @@ class TestArbitrageDuSousTypeDArticle:
     def test_le_data_paper_de_hal_ecarte_cede_a_un_autre_sous_type(self):
         assert (
             self._arbitrate(("crossref", "article"), ("hal", "data_paper"), ("openalex", "review"))
+            == "review"
+        )
+
+    def test_other_cede_au_type_precis_d_une_source_non_agregatrice(self):
+        """Cas réels : DataCite `other` pour un rapport INRAE typé par HAL ; Crossref `other` pour un poster F1000 typé par HAL."""
+        assert self._arbitrate(("datacite", "other"), ("hal", "report")) == "report"
+        assert self._arbitrate(("crossref", "other"), ("hal", "poster")) == "poster"
+        assert self._arbitrate(("crossref", "other"), ("wos", "conference_paper")) == (
+            "conference_paper"
+        )
+
+    def test_other_ne_cede_pas_au_type_d_un_agregateur(self):
+        """Cas réel : une page de projet OSF, DataCite `StudyRegistration`, qu'OpenAlex type preprint."""
+        assert self._arbitrate(("datacite", "other"), ("openalex", "preprint")) == "other"
+        assert self._arbitrate(("hal", "other"), ("openalex", "article"), ("scanr", "book")) == (
+            "other"
+        )
+
+    def test_le_type_precis_qui_remplace_other_garde_l_arbitrage_du_sous_type(self):
+        assert (
+            self._arbitrate(("datacite", "other"), ("hal", "article"), ("openalex", "review"))
             == "review"
         )
 
