@@ -10,7 +10,7 @@
 
 **L'onglet Publications** de chaque fiche (`PublicationsListView`) possède le panneau des filtres, leur synchronisation avec l'URL et trois vues : Notices, Tableau, Statistiques. La vue Statistiques trace un indicateur, empilé, le long d'un axe de comparaison (l'année par défaut), sous les filtres actifs.
 
-**Graphiques du dashboard que la vue Statistiques sait reproduire** : publications par année et par niveau d'accès (indicateur `oa_access`), types de documents (`doc_type_grouped`), classes de citation (`citation_class`). Trois lui échappent : le nuage des citations ou du FWCI (fiche de laboratoire), les sujets (fiches de laboratoire et de personne), les pays partenaires (fiches de personne et d'éditeur).
+**Graphiques du dashboard que la vue Statistiques sait reproduire** : publications par année et par niveau d'accès (indicateur `oa_access`), types de documents (`doc_type_grouped`), classes de citation (`citation_class`). Deux lui échappent : le nuage des citations ou du FWCI (fiche de laboratoire) et les sujets (fiches de laboratoire et de personne). Le graphique des pays partenaires n'est affiché par aucune fiche.
 
 ## Décisions
 
@@ -38,7 +38,6 @@
 
 - [ ] Nuage des citations ou du FWCI : visualisation de la vue Statistiques, puis lien.
 - [ ] Sujets : équivalent filtrable, visualisation de la vue Statistiques ou onglet Sujets de la fiche, puis lien.
-- [ ] Pays partenaires : visualisation de la vue Statistiques, puis lien. Les fiches de personne et d'éditeur, seules à montrer ce graphique, n'ont pas d'onglet Collaborations.
 
 ### 4. Mise à jour de la documentation
 
@@ -47,5 +46,5 @@
 ## Pistes hors périmètre
 
 - Onglet Revues dans les fiches de structure.
-- Graphique des types de documents remplacé par une carte mondiale des collaborations : il compte toutes les familles, le reste du dashboard la seule famille « Publications ».
+- Graphique des types de documents remplacé par une carte mondiale des collaborations.
 - Évolution annuelle d'une ventilation dans la vue Statistiques (courbes temporelles) : la comparaison impose de choisir entre l'année et une autre dimension.
