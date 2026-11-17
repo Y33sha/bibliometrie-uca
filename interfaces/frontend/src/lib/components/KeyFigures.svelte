@@ -1,8 +1,16 @@
 <script module lang="ts">
 	import type { LucideIcon } from '@lucide/svelte';
 
-	/** `open` colore le chiffre en vert open access. `tooltip` s'affiche au survol. `icon` est une icône Lucide. */
-	export type KeyFigure = { value: string; label: string; tone?: 'open'; tooltip?: string; icon?: LucideIcon };
+	/** `open` colore le chiffre en vert open access. `tooltip` s'affiche au survol. `icon` est une icône Lucide. Avec `href`, le chiffre est un lien, et son icône prend au survol la couleur `hoverColor`. */
+	export type KeyFigure = {
+		value: string;
+		label: string;
+		tone?: 'open';
+		tooltip?: string;
+		icon?: LucideIcon;
+		href?: string;
+		hoverColor?: string;
+	};
 </script>
 
 <script lang="ts">
@@ -18,16 +26,26 @@
 	} = $props();
 </script>
 
+{#snippet content(item: KeyFigure)}
+	{#if item.icon}<span class="key-figure-icon"><item.icon size="1em" /></span>{/if}
+	<div>
+		<div class="key-figure-value">{item.value}</div>
+		<div class="key-figure-label">{item.label}</div>
+	</div>
+{/snippet}
+
 <div class="key-figures">
 	{#if period}<div class="key-figures-period">{period}</div>{/if}
 	{#each items as item (item.label)}
-		<div class="key-figure" class:open={item.tone === 'open'} use:tooltip={item.tooltip}>
-			{#if item.icon}<span class="key-figure-icon"><item.icon size="1em" /></span>{/if}
-			<div>
-				<div class="key-figure-value">{item.value}</div>
-				<div class="key-figure-label">{item.label}</div>
+		{#if item.href}
+			<a class="key-figure key-figure-link" class:open={item.tone === 'open'} href={item.href} style:--hover-color={item.hoverColor} use:tooltip={item.tooltip}>
+				{@render content(item)}
+			</a>
+		{:else}
+			<div class="key-figure" class:open={item.tone === 'open'} use:tooltip={item.tooltip}>
+				{@render content(item)}
 			</div>
-		</div>
+		{/if}
 	{/each}
 </div>
 
@@ -70,6 +88,17 @@
 	.open .key-figure-icon,
 	.open .key-figure-value {
 		color: var(--open-text);
+	}
+	/* Chiffre cliquable : sans soulignement, l'icône prend sa couleur au survol et au focus. */
+	.key-figure-link {
+		color: inherit;
+		text-decoration: none;
+	}
+	.key-figure-link .key-figure-icon {
+		transition: color 0.15s;
+	}
+	.key-figure-link:is(:hover, :focus-visible) .key-figure-icon {
+		color: var(--hover-color, var(--accent));
 	}
 	.key-figure-label {
 		max-width: 120px;

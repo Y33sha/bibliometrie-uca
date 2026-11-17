@@ -145,9 +145,23 @@
 	const withCitationClass = $derived(sum(citationClasses));
 
 	const keyFigures = $derived<KeyFigure[]>([
-		{ value: formatNumber(total), label: plural(total, 'publication'), icon: BookOpen },
+		{
+			value: formatNumber(total),
+			label: plural(total, 'publication'),
+			icon: BookOpen,
+			href: publicationsHref({}, publicationsDocTypes()),
+		},
 		...(total > 0
-			? [{ value: percent(openAccess, total), label: 'en open access', tone: 'open' as const, icon: LockOpen }]
+			? [
+					{
+						value: percent(openAccess, total),
+						label: 'en open access',
+						tone: 'open' as const,
+						icon: LockOpen,
+						href: statsHref('oa_access', 'year', publicationsDocTypes(), 'part'),
+						hoverColor: 'var(--open-access-logo)',
+					},
+				]
 			: []),
 		...(withCitationClass > 0
 			? [
@@ -155,6 +169,8 @@
 						value: percent(topCited, withCitationClass),
 						label: 'dans le top 10 % des plus citées',
 						icon: Star,
+						href: statsHref('citation_class', 'year', publicationsDocTypes(), 'part'),
+						hoverColor: 'var(--gold)',
 						tooltip: `D'après OpenAlex, sur les ${formatNumber(withCitationClass)} publications pourvues de l'indicateur (${percent(withCitationClass, total)} du corpus)`,
 					},
 				]
@@ -165,6 +181,8 @@
 						value: percent(collab.international_count, collab.total_count),
 						label: 'en collaboration internationale',
 						icon: Globe,
+						href: statsHref('collaboration', 'year', publicationsDocTypes(), 'part'),
+						hoverColor: 'var(--doctype-article)',
 					},
 				]
 			: []),
@@ -201,12 +219,17 @@
 			})),
 	);
 
-	/** Lien vers la vue Statistiques de l'onglet Publications : un indicateur, une comparaison (vide pour « au total »), les types du graphique s'il en restreint, et ses années. */
-	function statsHref(indicator: string, groupBy: string, docTypes: string[] | null): string {
-		const params = new URLSearchParams({ tab: 'publications', view: 'stats', indicator, group_by: groupBy });
+	/** Lien vers l'onglet Publications de la fiche, sur les années du dashboard et les types `docTypes` (tous à défaut) : `settings` choisit la vue et les réglages du graphique. */
+	function publicationsHref(settings: Record<string, string>, docTypes: string[] | null): string {
+		const params = new URLSearchParams({ tab: 'publications', ...settings });
 		if (docTypes) params.set('doc_type', docTypes.join(','));
 		if (years.length) params.set('year', years.join(','));
 		return '?' + paramsToQuery(params);
+	}
+
+	/** Lien vers la vue Statistiques : un indicateur, une comparaison (vide pour « au total »), en valeur absolue ou en pourcentage. */
+	function statsHref(indicator: string, groupBy: string, docTypes: string[] | null, mode: 'absolu' | 'part' = 'absolu'): string {
+		return publicationsHref({ view: 'stats', indicator, group_by: groupBy, mode }, docTypes);
 	}
 
 	const typeValues = $derived(orderedPivotValues('doc_type_grouped', types));

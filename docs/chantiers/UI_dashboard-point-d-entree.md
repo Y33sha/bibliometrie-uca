@@ -29,8 +29,7 @@
 
 ### 2. Évaluation
 
-- [ ] Liens depuis les chiffres clés (open access, top 10 %, collaboration internationale).
-- [ ] Périmètre complet du dashboard affiché à l'écran, types compris.
+- [x] Liens depuis les chiffres clés du dashboard : publications vers la liste, open access, top 10 % et collaboration internationale vers la vue Statistiques, en pourcentage par année. L'icône prend sa couleur au survol.
 
 ### 3. Mise à jour de la documentation
 
@@ -41,4 +40,5 @@
 - Nuage des citations ou du FWCI et sujets parmi les visualisations de la vue Statistiques.
 - Statistiques dans d'autres onglets, par exemple Collaborations, pour les pays partenaires.
 - Onglets Sujets et Revues dans les fiches de structure.
-- Évolution annuelle d'une ventilation dans la vue Statistiques (courbes temporelles) : la comparaison impose aujourd'hui de choisir entre l'année et une autre dimension.
+- Graphique des types de documents remplacé par une carte mondiale des collaborations : il compte toutes les familles, le reste du dashboard la seule famille « Publications ».
+- Évolution annuelle d'une ventilation dans la vue Statistiques (courbes temporelles) : la comparaison impose de choisir entre l'année et une autre dimension.
