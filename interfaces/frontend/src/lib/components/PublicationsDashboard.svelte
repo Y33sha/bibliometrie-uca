@@ -156,7 +156,6 @@
 					{
 						value: percent(openAccess, total),
 						label: 'en open access',
-						tone: 'open' as const,
 						icon: LockOpen,
 						href: statsHref('oa_access', 'year', publicationsDocTypes(), 'part'),
 						hoverColor: 'var(--open-access-logo)',

@@ -1,11 +1,10 @@
 <script module lang="ts">
 	import type { LucideIcon } from '@lucide/svelte';
 
-	/** `open` colore le chiffre en vert open access. `tooltip` s'affiche au survol. `icon` est une icône Lucide. Avec `href`, le chiffre est un lien, et son icône prend au survol la couleur `hoverColor`. */
+	/** `tooltip` s'affiche au survol. `icon` est une icône Lucide. Avec `href`, le chiffre est un lien, et son icône prend au survol la couleur `hoverColor`. */
 	export type KeyFigure = {
 		value: string;
 		label: string;
-		tone?: 'open';
 		tooltip?: string;
 		icon?: LucideIcon;
 		href?: string;
@@ -38,11 +37,11 @@
 	{#if period}<div class="key-figures-period">{period}</div>{/if}
 	{#each items as item (item.label)}
 		{#if item.href}
-			<a class="key-figure key-figure-link" class:open={item.tone === 'open'} href={item.href} style:--hover-color={item.hoverColor} use:tooltip={item.tooltip}>
+			<a class="key-figure key-figure-link" href={item.href} style:--hover-color={item.hoverColor} use:tooltip={item.tooltip}>
 				{@render content(item)}
 			</a>
 		{:else}
-			<div class="key-figure" class:open={item.tone === 'open'} use:tooltip={item.tooltip}>
+			<div class="key-figure" use:tooltip={item.tooltip}>
 				{@render content(item)}
 			</div>
 		{/if}
@@ -84,10 +83,6 @@
 		font-weight: 700;
 		line-height: var(--value-line);
 		letter-spacing: var(--tracking-tight);
-	}
-	.open .key-figure-icon,
-	.open .key-figure-value {
-		color: var(--open-text);
 	}
 	/* Chiffre cliquable : sans soulignement, l'icône prend sa couleur au survol et au focus. */
 	.key-figure-link {

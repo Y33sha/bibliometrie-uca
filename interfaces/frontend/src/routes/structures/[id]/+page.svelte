@@ -189,7 +189,7 @@
 										]
 									: []),
 								...(personsCount > 0
-									? [{ value: formatNumber(personsCount), label: plural(personsCount, 'personne'), icon: User }]
+									? [{ value: formatNumber(personsCount), label: plural(personsCount, 'personne'), icon: User, href: '?tab=persons' }]
 									: []),
 							]
 						: []}
