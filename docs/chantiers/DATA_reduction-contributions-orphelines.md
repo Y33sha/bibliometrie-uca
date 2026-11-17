@@ -51,7 +51,16 @@ Un indice désigne une personne candidate quand elle seule partage cet indice av
   | Sans domaine HAL de niveau 1 | 382 | 464 / 7 |
   | Sans CHU ni domaine HAL de niveau 1 | 364 | 472 / 7 |
 - [ ] Laboratoires, équipes et départements HAL comme indice laboratoire. Mesure du 2026-10-19 (`measure_affiliation.sql`) sur 2 176 contributions au nom ambigu, avec ces structures HAL et le référentiel : une seule personne concorde dans 1 631 cas, plusieurs dans 392. Sur les 1 631 cas, la personne désignée est la personne rattachée dans 1 151, une autre personne dans 7. Échantillon de 97 cas à relire (`build_affiliation_review.py`).
-- [ ] Indice coauteurs : coauteurs habituels de la personne candidate présents dans la publication.
+- [x] Indice coauteurs : personnes rattachées à la publication et présentes dans les autres publications de la personne candidate. Seuil : au moins un coauteur partagé, à défaut au moins deux. Mesure sur le contrôle épuré, laboratoire sans CHU, discipline sans domaine HAL de niveau 1 :
+
+  | Règle | Orphelines départagées | Contrôle épuré : justes / faux |
+  |---|---|---|
+  | Coauteurs | 422 | 613 / 3 |
+  | Coauteurs, puis laboratoire | 429 | 626 / 3 |
+  | Coauteurs, puis laboratoire, puis discipline | 456 | 662 / 5 |
+  | Laboratoire, puis discipline | 364 | 472 / 7 |
+
+  Les coauteurs départagent 4 des 6 erreurs entre homonymes du même laboratoire et du même domaine.
 - [ ] Indices revue et années d'activité.
 - [ ] Confirmations et rejets d'une personne comme indices pour ses autres contributions (idée de ReCiter).
 - [ ] Règle de départage dans la phase `persons`, avec les indices retenus.
