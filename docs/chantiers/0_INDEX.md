@@ -6,11 +6,12 @@
 
 - [Audit de la qualité de la résolution des personnes](DATA_audit-qualite-resolution-personnes.md)
 - [Pertinence des sujets](DATA_pertinence-des-sujets.md)
+- [Refactorisation : orchestrateur et moissonnage](CODE_refacto-orchestrateur-et-moissonnage.md)
 
 ### Non commencé
 
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
-- [Refactorisation : orchestrateur et moissonnage](CODE_refacto-orchestrateur-et-moissonnage.md)
+- [Refactorisation : fin du moissonnage](CODE_refacto-fin-du-moissonnage.md)
 - [Résolution probabiliste des personnes](DATA_resolution-personnes-probabiliste.md)
 - [Types de document](DATA_types-document.md)
 - [Vérification des affiliations des sources](DATA_verification-affiliations.md)
