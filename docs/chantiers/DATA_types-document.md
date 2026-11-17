@@ -124,5 +124,4 @@ Mesures du 2026-11-03, publications du périmètre : 1 895 communications rattac
 
 ## Questions ouvertes
 
-- « Meeting report » publié en revue, typé `article` par toutes les sources (176417, 180148, 16340) : quel signal pour le typer `conference_abstract` ?
 - Article corrigé ou rétracté absent de la base, cible d'un erratum ou d'un avis du périmètre : moissonnage par DOI (`fetch_missing`) ?
