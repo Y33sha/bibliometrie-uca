@@ -37,7 +37,19 @@ Un indice désigne une personne candidate quand elle seule partage cet indice av
 | Laboratoire et discipline désignent deux personnes | 5 | laboratoire juste 4 fois sur 4 |
 | Aucun indice | 147 | 411 |
 
-- [ ] Relecture des faux du jeu de contrôle. Un identifiant attribué à tort fausse la référence.
+- [x] Relecture des 27 faux du jeu de contrôle :
+  - 14 références fausses : 12 IdRef de ScanR, 2 identifiants HAL. La personne désignée par la règle est la bonne.
+  - 1 personne en double : la règle désigne le doublon de la personne de référence.
+  - 10 erreurs de la règle : 6 entre deux homonymes du même laboratoire et du même domaine, 3 par un domaine HAL de niveau 1, 1 par le laboratoire CHU.
+  - 2 cas indécidables.
+- [x] Variantes de la règle. 295 contributions du contrôle ont pour référence le seul IdRef de ScanR. Le contrôle épuré les écarte :
+
+  | Variante | Orphelines départagées | Contrôle épuré : justes / faux |
+  |---|---|---|
+  | Règle mesurée | 386 | 476 / 11 |
+  | Sans CHU | 368 | 484 / 11 |
+  | Sans domaine HAL de niveau 1 | 382 | 464 / 7 |
+  | Sans CHU ni domaine HAL de niveau 1 | 364 | 472 / 7 |
 - [ ] Laboratoires, équipes et départements HAL comme indice laboratoire. Mesure du 2026-10-19 (`measure_affiliation.sql`) sur 2 176 contributions au nom ambigu, avec ces structures HAL et le référentiel : une seule personne concorde dans 1 631 cas, plusieurs dans 392. Sur les 1 631 cas, la personne désignée est la personne rattachée dans 1 151, une autre personne dans 7. Échantillon de 97 cas à relire (`build_affiliation_review.py`).
 - [ ] Indice coauteurs : coauteurs habituels de la personne candidate présents dans la publication.
 - [ ] Indices revue et années d'activité.
