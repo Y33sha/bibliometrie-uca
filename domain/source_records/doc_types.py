@@ -178,7 +178,7 @@ _SOURCE_MAPS: dict[str, dict[str, str]] = {
         "peerreview": "peer_review",
         "audiovisual": "recorded_talk",
         "image": "other",
-        "collection": "other",
+        "collection": "dataset",
         "physicalobject": "physical_object",
         "sound": "media",
         "model": "other",

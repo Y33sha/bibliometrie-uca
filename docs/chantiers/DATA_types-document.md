@@ -99,6 +99,8 @@ Mesures du 2026-11-03, base locale, publications du périmètre : 199 errata sur
 
 - [ ] `other` d'une source prioritaire face au type précis d'une autre source, compte tenu du type `article` qu'OpenAlex attribue par défaut. Cas : 87 working papers typés `other` par DataCite et `preprint` par HAL, dont 72 à DOI OSF (`10.17605`) (14691, 255632). 58 chapitres à DOI construit sur un ISBN, typés `book_chapter` par HAL ou une autre source (167674).
 
+- [x] DataCite `Collection` → `dataset` : collections Figshare de fichiers supplémentaires, tables HEPData, PANGAEA, ICOS (775 enregistrements sources). `Model` reste `other` : modèles et produits de modèles mêlés. Script `apply_doc_type_mapping` pour appliquer la table au stock, qui rattrape aussi DataCite `Audiovisual` (127) et `Sound` (1).
+
 ### Phase 4 — Cas particuliers
 
 - [x] Adresses d'en-tête HTTP `Link` recopiées par OpenAlex comme localisations, écartées : profils ORCID, pages de navigation d'entrepôts. 1 694 enregistrements sources en base locale. a82e4423f
