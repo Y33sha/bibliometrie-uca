@@ -34,7 +34,7 @@ from infrastructure.observability.log import (
     set_log_phase,
 )
 from infrastructure.observability.phase_executions import PhaseExecutionRecorder, start_run
-from pipeline.graph import Phase
+from pipeline.graph import Block, Phase
 from pipeline.ingestion.api_params import request_budget
 from pipeline.ingestion.credentials import source_credentials_missing
 from pipeline.phases import PERIMETER_STRUCTURES, PHASES
@@ -375,7 +375,7 @@ def _run_one_phase(
             )
 
         duration = time.time() - t0_phase
-        if phase.harvesting:
+        if phase.block is Block.COLLECTION:
             log.info("")
             log.info("Total : %s", metrics.as_summary())
         recorder.record(

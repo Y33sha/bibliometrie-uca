@@ -36,7 +36,6 @@ PHASES: tuple[Phase, ...] = (
         "Moissonnage par affiliation",
         harvest.TASKS,
         Block.COLLECTION,
-        harvesting=True,
         check=check_extraction_perimeter,
         assemble=harvest.assemble,
     ),
@@ -45,15 +44,13 @@ PHASES: tuple[Phase, ...] = (
         "Moissonnage par personne",
         harvest_by_person.TASKS,
         Block.COLLECTION,
-        harvesting=True,
-        when=lambda options: options.policy.harvest_by_person,
+        when=lambda ctx: ctx.options.policy.harvest_by_person,
     ),
     Phase(
         "fetch_missing",
         "Recherche des documents trouvés dans une autre source",
         fetch_missing.STEPS,
         Block.COLLECTION,
-        harvesting=True,
         assemble=fetch_missing.assemble,
     ),
     Phase(
@@ -61,8 +58,7 @@ PHASES: tuple[Phase, ...] = (
         "Recherche des documents non revus par le moissonnage",
         fetch_stale.TASKS,
         Block.COLLECTION,
-        harvesting=True,
-        when=lambda options: options.policy.fetch_stale,
+        when=lambda ctx: ctx.options.policy.fetch_stale,
         assemble=fetch_stale.assemble,
     ),
     Phase(
@@ -70,7 +66,6 @@ PHASES: tuple[Phase, ...] = (
         "Complétion des listes d'auteurs OpenAlex tronquées",
         fetch_truncated.TASKS,
         Block.COLLECTION,
-        harvesting=True,
     ),
     Phase(
         "normalize",

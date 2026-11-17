@@ -194,8 +194,8 @@ def _outcome(metrics: PhaseMetrics) -> str:
 
 def run_phase(phase: Phase, ctx: PhaseContext) -> PhaseMetrics:
     """Exécute les tâches d'une phase et renvoie les métriques de la phase."""
-    if phase.when is not None and not phase.when(ctx.options):
-        ctx.logger.info("%sSautée en mode %s", LAST_BRANCH, ctx.options.mode)
+    if phase.when is not None and not phase.when(ctx):
+        ctx.logger.info("%sSautée", LAST_BRANCH)
         return PhaseMetrics()
     if phase.check is not None:
         phase.check(ctx)

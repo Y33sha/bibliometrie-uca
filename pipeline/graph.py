@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
     from sqlalchemy import Connection
 
-    from pipeline.runtime.context import PhaseContext, RunOptions
+    from pipeline.runtime.context import PhaseContext
     from pipeline.runtime.observability.metrics import PhaseMetrics
 
 
@@ -178,10 +178,8 @@ class Phase:
     """Libellé lisible sans connaître le schéma."""
     children: tuple[Step | Task, ...]
     block: Block
-    harvesting: bool = False
-    """Moissonnage : le journal de la phase se termine par le total de ses sources."""
-    when: Callable[[RunOptions], bool] | None = None
-    """Condition d'exécution, d'après les options du run. Une phase écartée le signale au journal et renvoie des métriques vides."""
+    when: Callable[[PhaseContext], bool] | None = None
+    """Condition d'exécution, évaluée avant la précondition. Une phase écartée le signale au journal et renvoie des métriques vides."""
     check: Callable[[PhaseContext], None] | None = None
     """Précondition, vérifiée avant les tâches : lève une exception si elle n'est pas remplie."""
     assemble: Callable[[Mapping[str, PhaseMetrics]], PhaseMetrics] | None = None

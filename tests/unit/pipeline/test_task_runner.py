@@ -195,3 +195,23 @@ def test_une_precondition_non_remplie_arrete_la_phase_avant_ses_taches(contexte)
         run_phase(Phase("essai", "Essai", (tache,), Block.ENTITIES, check=check), contexte())
 
     assert appels == []
+
+
+def test_une_phase_ecartee_par_sa_condition_le_signale_sans_executer_ses_taches(contexte, caplog):
+    """La condition reçoit le contexte de la phase, comme celle d'une tâche."""
+    appels: list[str] = []
+    tache = Task("une", run=lambda _ctx: appels.append("une") or PhaseMetrics(new=1))
+    phase = Phase(
+        "essai",
+        "Essai",
+        (tache,),
+        Block.COLLECTION,
+        when=lambda ctx: ctx.options.policy.fetch_stale,
+    )
+
+    with caplog.at_level(logging.INFO, logger="test"):
+        metrics = run_phase(phase, contexte(mode="daily"))
+
+    assert metrics == PhaseMetrics()
+    assert appels == []
+    assert [record.getMessage() for record in caplog.records] == ["  └─ Sautée"]
